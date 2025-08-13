@@ -1,0 +1,14 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Deploy Apps Script",
+      "type": "shell",
+      "command": "cd",
+      "args": ["src\\server\\apps-script", "&&", "clasp", "push"],
+      "group": "build",
+      "isBackground": false,
+      "problemMatcher": []
+    }
+  ]
+}

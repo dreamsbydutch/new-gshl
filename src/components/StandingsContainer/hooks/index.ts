@@ -1,0 +1,1 @@
+export { useStandingsData } from "./useStandingsData";

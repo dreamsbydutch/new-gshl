@@ -1,0 +1,57 @@
+{
+  "compilerOptions": {
+    /* Base Options: */
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "target": "es2022",
+    "allowJs": true,
+    "resolveJsonModule": true,
+    "moduleDetection": "force",
+    "isolatedModules": true,
+
+    /* Strictness */
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "checkJs": true,
+
+    /* Bundled projects */
+    "lib": ["dom", "dom.iterable", "ES2022"],
+    "noEmit": true,
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "jsx": "preserve",
+    "plugins": [{ "name": "next" }],
+    "incremental": true,
+
+    /* Path Aliases */
+    "baseUrl": ".",
+    "paths": {
+      "@gshl-env": ["./src/env.js"],
+      "@gshl-components/*": ["./src/components/*/main.tsx"],
+      "@gshl-ui": ["./src/components/ui/index.ts"],
+      "@gshl-nav": ["./src/components/ui/nav/index.ts"],
+      "@gshl-skeletons": ["./src/components/skeletons/index.ts"],
+      "@gshl-hooks": ["./src/lib/hooks/index.ts"],
+      "@gshl-sheets": ["./src/lib/sheets/index.ts"],
+      "@gshl-cache": ["./src/lib/cache/index.ts"],
+      "@gshl-types": ["./src/lib/types/index.ts"],
+      "@gshl-utils": ["./src/lib/utils/index.ts"],
+      "@gshl-styles": ["./src/styles/globals.css"],
+      "@gshl-trpc": ["./src/trpc/index.ts"],
+      "@gshl-api": ["./src/server/api/index.ts"],
+      "@gshl-actions": ["./src/actions/index.ts"],
+      "@gshl-api-routers/*": ["./src/api/routers/*"]
+    }
+  },
+  "include": [
+    ".eslintrc.cjs",
+    "next-env.d.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    "**/*.cjs",
+    "**/*.js",
+    ".next/types/**/*.ts",
+    "src/components/MatchupScroller"
+  ],
+  "exclude": ["node_modules"]
+}
