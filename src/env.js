@@ -13,8 +13,8 @@ export const env = createEnv({
       .enum(["development", "test", "production"])
       .default("development"),
     USE_GOOGLE_SHEETS: z.string(),
-    GOOGLE_SERVICE_ACCOUNT_KEY_FILE: z.string(),
-    GOOGLE_SERVICE_ACCOUNT_KEY: z.string().optional(),
+    GOOGLE_SERVICE_ACCOUNT_KEY_FILE: z.string().optional(),
+    GOOGLE_SERVICE_ACCOUNT_KEY: z.string(),
     GOOGLE_APPS_SCRIPT_ID: z.string().optional(),
     GOOGLE_APPS_SCRIPT_ACCESS_TOKEN: z.string().optional(),
   },
