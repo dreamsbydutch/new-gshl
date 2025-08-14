@@ -17,8 +17,11 @@ export function TeamRoster({
   console.log(players);
   const showSalaries = true;
 
-  const { teamLineup, benchPlayers, totalCapHit } =
-    useTeamRosterData(nhlPlayerStats, players, contracts, currentTeam);
+  const { teamLineup, benchPlayers, totalCapHit } = useTeamRosterData(
+    players,
+    contracts,
+    currentTeam,
+  );
 
   return (
     <>
