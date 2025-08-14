@@ -1,8 +1,8 @@
 import { z } from "zod";
 import { createTRPCRouter, publicProcedure } from "../trpc";
 import { optimizedSheetsAdapter } from "@gshl-sheets";
-import { idSchema, baseQuerySchema } from "./_schemas";
-import { PlayerDayStatLine, PlayerTotalStatLine, PlayerWeekStatLine } from "@gshl-types";
+import { baseQuerySchema } from "./_schemas";
+import type { PlayerDayStatLine, PlayerTotalStatLine, PlayerWeekStatLine } from "@gshl-types";
 
 // Player stats schemas
 const playerStatsWhereSchema = z

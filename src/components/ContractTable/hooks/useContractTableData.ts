@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { Contract, GSHLTeam, Player, Season } from "@gshl-types";
+import type { Contract, GSHLTeam, Player, Season } from "@gshl-types";
 import { calculateCapSpace } from "../utils";
 
 export const useContractTableData = (

@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
     if (body.invalidateTables) {
       const validTables = INVALIDATION_CONFIG.INVALIDATABLE_TABLES;
       const invalidTables = body.invalidateTables.filter(
-        (table) => !validTables.includes(table as (typeof validTables)[number]),
+        (table) => !validTables.includes(table),
       );
 
       if (invalidTables.length > 0) {

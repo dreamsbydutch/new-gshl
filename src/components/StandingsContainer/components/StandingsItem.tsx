@@ -1,12 +1,10 @@
-import { GSHLTeam, Season } from "@gshl-types";
 import { LoadingSpinner } from "@gshl-ui";
 import { useState } from "react";
-import { StandingsItemProps } from "../utils/types";
+import type { StandingsItemProps } from "../utils/types";
+import Image from "next/image";
 
 export const StandingsItem = ({
   team,
-  season,
-  standingsType,
 }: StandingsItemProps) => {
   const [showInfo, setShowInfo] = useState(false);
 
@@ -19,7 +17,7 @@ export const StandingsItem = ({
     >
       <div className="mx-auto flex items-center justify-between px-2 py-0.5 text-center font-varela">
         <div className="p-1">
-          <img className="w-12" src={team.logoUrl ?? ""} alt="Team Logo" />
+          <Image className="w-12" src={team.logoUrl ?? ""} alt="Team Logo" />
         </div>
         <div className="text-base font-bold">{team.name}</div>
         <div className="text-base font-bold">

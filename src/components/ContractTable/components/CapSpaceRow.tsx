@@ -1,4 +1,4 @@
-import { Contract, GSHLTeam } from "@gshl-types";
+import type { Contract, GSHLTeam } from "@gshl-types";
 import { formatCurrency } from "@gshl-utils";
 
 interface CapSpaceRowProps {

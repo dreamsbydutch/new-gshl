@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { createTRPCRouter, publicProcedure } from "../trpc";
 import { baseQuerySchema, idSchema } from "./_schemas";
-import { Conference } from "@gshl-types";
+import type { Conference } from "@gshl-types";
 import { optimizedSheetsAdapter } from "@gshl-sheets";
 
 // Conference router

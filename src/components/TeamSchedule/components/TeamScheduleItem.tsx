@@ -1,4 +1,4 @@
-import { TeamScheduleItemProps } from "../utils/types";
+import type { TeamScheduleItemProps } from "../utils/types";
 import { findTeamById, getGameLocation, getGameTypeDisplay } from "../utils";
 import { WeekDisplay } from "./WeekDisplay";
 import { OpponentDisplay } from "./OpponentDisplay";

@@ -1,4 +1,4 @@
-import { Contract } from "@gshl-types";
+import type { Contract } from "@gshl-types";
 import { Skeleton } from "../ui/skeleton";
 
 export function PlayerContractRowSkeleton({

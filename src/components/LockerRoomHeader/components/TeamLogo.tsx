@@ -1,4 +1,4 @@
-import { GSHLTeam } from "@gshl-types";
+import type { GSHLTeam } from "@gshl-types";
 import Image from "next/image";
 import { TEAM_LOGO_SIZE } from "../utils";
 

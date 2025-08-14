@@ -7,11 +7,18 @@
 
 import { getCacheDuration, shouldRefetch, markAsFetched } from "./config";
 
+interface CacheRecord {
+  data: unknown;
+  timestamp: number;
+}
+
 export class SimpleCache {
   private static instance: SimpleCache;
-  private cache = new Map<string, { data: any; timestamp: number }>();
+  private cache = new Map<string, CacheRecord>();
 
-  private constructor() {}
+  private constructor() {
+    // Enforce singleton pattern
+  }
 
   /**
    * Get singleton instance
@@ -52,20 +59,20 @@ export class SimpleCache {
         const data = await fetcher();
         this.cache.set(key, { data, timestamp: Date.now() });
         markAsFetched(dataType);
-        return data;
+        return data; // fresh data is typed as T
       } catch (error) {
         if (cached) {
           console.warn(
             `Fetch failed for ${key}, returning cached data:`,
             error,
           );
-          return cached.data;
+          return cached.data as T; // fallback to cached data
         }
         throw error;
       }
     }
 
-    return cached.data;
+    return cached.data as T; // return cached data
   }
 
   /**
@@ -73,7 +80,7 @@ export class SimpleCache {
    * @param key - Cache key
    * @param data - Data to cache
    */
-  set(key: string, data: any): void {
+  set<T>(key: string, data: T): void {
     this.cache.set(key, { data, timestamp: Date.now() });
   }
 
@@ -109,7 +116,7 @@ export class SimpleCache {
    * Get cache statistics
    * @returns Cache stats object
    */
-  getStats() {
+  getStats(): { size: number; keys: string[]; totalMemory: number } {
     return {
       size: this.cache.size,
       keys: Array.from(this.cache.keys()),
@@ -141,7 +148,7 @@ export function createCachedFetcher<T>(
  */
 export function invalidateCache(pattern: string): void {
   const cache = SimpleCache.getInstance();
-  const keys = Array.from(cache["cache"].keys());
+  const keys = cache.getStats().keys;
 
   keys.forEach((key) => {
     if (key.includes(pattern)) {

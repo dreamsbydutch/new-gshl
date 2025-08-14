@@ -1,6 +1,7 @@
-import { Contract, Player } from "@gshl-types";
+import { ContractStatus, type Contract, type Player } from "@gshl-types";
 import { cn, formatCurrency } from "@gshl-utils";
 import { getRatingColorClass } from "../utils";
+import Image from "next/image";
 
 interface BenchPlayersProps {
   benchPlayers: Player[];
@@ -25,7 +26,7 @@ export const BenchPlayers = ({
               <div className="col-span-3 text-sm">{player?.fullName}</div>
               <div className="text-2xs">{player?.nhlPos.toString()}</div>
               <div>
-                <img
+                <Image
                   src={`https://raw.githubusercontent.com/dreamsbydutch/gshl/main/public/assets/Logos/nhlTeams/${player?.nhlTeam?.slice(-1)}.png`}
                   alt="NHL Team Logo"
                   className="mx-auto h-4 w-4"
@@ -39,7 +40,7 @@ export const BenchPlayers = ({
               <div
                 className={cn(
                   "col-span-3 my-1 rounded-xl text-2xs",
-                  contract?.expiryStatus === "RFA"
+                  contract?.expiryStatus === ContractStatus.RFA
                     ? "text-orange-700"
                     : "text-gray-900",
                   !showSalaries && "hidden",

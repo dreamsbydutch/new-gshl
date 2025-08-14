@@ -1,7 +1,7 @@
 import { cn } from "@gshl-utils";
 import { StandingsItem } from "./StandingsItem";
-import { StandingsGroup } from "../utils/types";
-import { Season } from "@gshl-types";
+import type { StandingsGroup } from "../utils/types";
+import type { Season } from "@gshl-types";
 
 interface StandingsGroupProps {
   group: StandingsGroup;

@@ -1,4 +1,4 @@
-import { Player, RosterPosition } from "@gshl-types";
+import { type Player, RosterPosition } from "@gshl-types";
 
 export const getRatingColorClass = (seasonRk: number | null) => {
   const rank = seasonRk ?? 0;
@@ -15,41 +15,26 @@ export const buildTeamLineup = (
   if (!currentRoster) return [];
 
   const isUtilDefender = !currentRoster
-    ?.filter((obj) => obj.lineupPos === "Util")[0]
+    ?.find((obj) => obj.lineupPos === RosterPosition.Util)
     ?.nhlPos.includes("D" as RosterPosition);
 
   if (isUtilDefender) {
     return [
       [
         [
-          currentRoster?.filter((obj) => obj.lineupPos === "LW")[0] ?? null,
-          currentRoster?.filter((obj) => obj.lineupPos === "C")[0] ?? null,
-          currentRoster?.filter((obj) => obj.lineupPos === "RW")[0] ?? null,
+          currentRoster?.find((obj) => obj.lineupPos === RosterPosition.LW) ?? null,
+          currentRoster?.find((obj) => obj.lineupPos === RosterPosition.C) ?? null,
+          currentRoster?.find((obj) => obj.lineupPos === RosterPosition.RW) ?? null,
         ],
         [
-          currentRoster?.filter((obj) => obj.lineupPos === "LW")[1] ?? null,
-          currentRoster?.filter((obj) => obj.lineupPos === "C")[1] ?? null,
-          currentRoster?.filter((obj) => obj.lineupPos === "RW")[1] ?? null,
-        ],
-        [
-          null,
-          null,
-          currentRoster?.filter((obj) => obj.lineupPos === "Util")[0] ?? null,
-          null,
-          null,
-        ],
-      ],
-      [
-        [
-          null,
-          currentRoster?.filter((obj) => obj.lineupPos === "D")[0] ?? null,
-          currentRoster?.filter((obj) => obj.lineupPos === "D")[1] ?? null,
-          null,
+          currentRoster?.filter((obj) => obj.lineupPos === RosterPosition.LW)[1] ?? null,
+          currentRoster?.filter((obj) => obj.lineupPos === RosterPosition.C)[1] ?? null,
+          currentRoster?.filter((obj) => obj.lineupPos === RosterPosition.RW)[1] ?? null,
         ],
         [
           null,
           null,
-          currentRoster?.filter((obj) => obj.lineupPos === "D")[2] ?? null,
+          currentRoster?.find((obj) => obj.lineupPos === RosterPosition.Util) ?? null,
           null,
           null,
         ],
@@ -57,8 +42,23 @@ export const buildTeamLineup = (
       [
         [
           null,
+          currentRoster?.find((obj) => obj.lineupPos === RosterPosition.D) ?? null,
+          currentRoster?.filter((obj) => obj.lineupPos === RosterPosition.D)[1] ?? null,
           null,
-          currentRoster?.filter((obj) => obj.lineupPos === "G")[0] ?? null,
+        ],
+        [
+          null,
+          null,
+          currentRoster?.filter((obj) => obj.lineupPos === RosterPosition.D)[2] ?? null,
+          null,
+          null,
+        ],
+      ],
+      [
+        [
+          null,
+          null,
+          currentRoster?.find((obj) => obj.lineupPos === RosterPosition.G) ?? null,
           null,
           null,
         ],
@@ -69,35 +69,35 @@ export const buildTeamLineup = (
   return [
     [
       [
-        currentRoster?.filter((obj) => obj.lineupPos === "LW")[0] ?? null,
-        currentRoster?.filter((obj) => obj.lineupPos === "C")[0] ?? null,
-        currentRoster?.filter((obj) => obj.lineupPos === "RW")[0] ?? null,
+        currentRoster?.find((obj) => obj.lineupPos === RosterPosition.LW) ?? null,
+        currentRoster?.find((obj) => obj.lineupPos === RosterPosition.C) ?? null,
+        currentRoster?.find((obj) => obj.lineupPos === RosterPosition.RW) ?? null,
       ],
       [
-        currentRoster?.filter((obj) => obj.lineupPos === "LW")[1] ?? null,
-        currentRoster?.filter((obj) => obj.lineupPos === "C")[1] ?? null,
-        currentRoster?.filter((obj) => obj.lineupPos === "RW")[1] ?? null,
-      ],
-    ],
-    [
-      [
-        null,
-        currentRoster?.filter((obj) => obj.lineupPos === "D")[0] ?? null,
-        currentRoster?.filter((obj) => obj.lineupPos === "D")[1] ?? null,
-        null,
-      ],
-      [
-        null,
-        currentRoster?.filter((obj) => obj.lineupPos === "D")[2] ?? null,
-        currentRoster?.filter((obj) => obj.lineupPos === "Util")[0] ?? null,
-        null,
+        currentRoster?.filter((obj) => obj.lineupPos === RosterPosition.LW)[1] ?? null,
+        currentRoster?.filter((obj) => obj.lineupPos === RosterPosition.C)[1] ?? null,
+        currentRoster?.filter((obj) => obj.lineupPos === RosterPosition.RW)[1] ?? null,
       ],
     ],
     [
       [
         null,
+        currentRoster?.find((obj) => obj.lineupPos === RosterPosition.D) ?? null,
+        currentRoster?.filter((obj) => obj.lineupPos === RosterPosition.D)[1] ?? null,
         null,
-        currentRoster?.filter((obj) => obj.lineupPos === "G")[0] ?? null,
+      ],
+      [
+        null,
+        currentRoster?.filter((obj) => obj.lineupPos === RosterPosition.D)[2] ?? null,
+        currentRoster?.find((obj) => obj.lineupPos === RosterPosition.Util) ?? null,
+        null,
+      ],
+    ],
+    [
+      [
+        null,
+        null,
+        currentRoster?.find((obj) => obj.lineupPos === RosterPosition.G) ?? null,
         null,
         null,
       ],

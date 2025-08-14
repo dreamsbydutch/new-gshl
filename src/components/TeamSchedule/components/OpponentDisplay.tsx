@@ -1,4 +1,4 @@
-import { OpponentDisplayProps } from "../utils/types";
+import type { OpponentDisplayProps } from "../utils/types";
 import { formatOpponentDisplay } from "../utils";
 
 export const OpponentDisplay = ({

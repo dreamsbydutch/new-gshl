@@ -1,4 +1,4 @@
-import { Contract, GSHLTeam, Player, Season } from "@gshl-types";
+import type { Contract, GSHLTeam, Player, Season } from "@gshl-types";
 import { formatCurrency } from "@gshl-utils";
 import { PlayerContractRowSkeleton } from "@gshl-skeletons";
 import Image from "next/image";

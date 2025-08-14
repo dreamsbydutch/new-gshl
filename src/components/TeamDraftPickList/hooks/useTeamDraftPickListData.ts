@@ -1,8 +1,6 @@
 import { useMemo } from "react";
-import { Contract, DraftPick, GSHLTeam, Player } from "@gshl-types";
+import type { Contract, DraftPick, GSHLTeam, Player } from "@gshl-types";
 import {
-  formatDraftPickDescription,
-  getOriginalTeamName,
   isDraftPickAvailable,
   getSelectedPlayer,
 } from "../utils";

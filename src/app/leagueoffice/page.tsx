@@ -1,11 +1,11 @@
 "use client";
 
 import {
-  useAllTeamDays,
   useAllTeams,
   useAllTeamWeeks,
   useAllWeeks,
 } from "@gshl-hooks";
+import Image from "next/image";
 
 export default function LeagueOfficePage() {
   const { data } = useAllTeamWeeks();
@@ -47,7 +47,7 @@ export default function LeagueOfficePage() {
                       <td className="whitespace-nowrap px-6 py-4 text-sm font-medium text-gray-900">
                         <div className="flex items-center">
                           {team?.logoUrl && (
-                            <img
+                            <Image
                               src={team.logoUrl}
                               alt={`${team.name} logo`}
                               className="mr-3 h-8 w-8 rounded-full"

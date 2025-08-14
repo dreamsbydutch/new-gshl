@@ -1,4 +1,4 @@
-import { Contract } from "@gshl-types";
+import type { Contract } from "@gshl-types";
 import { formatCurrency } from "@gshl-utils";
 import { CAP_CEILING } from "../utils/constants";
 

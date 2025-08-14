@@ -1,4 +1,4 @@
-import { GSHLTeam, Season, TeamSeasonStatLine } from "@gshl-types";
+import type { GSHLTeam, Season, TeamSeasonStatLine } from "@gshl-types";
 
 export type StandingsType = "overall" | "conference" | "wildcard";
 

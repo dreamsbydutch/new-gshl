@@ -1,7 +1,7 @@
 import React from "react";
 import { FilterDropdowns, RecordDisplay, MatchupList } from "./components";
 import { useTeamHistoryData } from "./hooks";
-import { TeamHistoryProps } from "./utils";
+import type { TeamHistoryProps } from "./utils";
 
 // Import your actual LoadingSpinner component here
 declare const LoadingSpinner: React.ComponentType;
@@ -52,7 +52,7 @@ export function TeamHistoryContainer({
 
       <MatchupList
         schedule={schedule!}
-        teams={teams!}
+        teams={teams}
         teamInfo={teamInfo}
       />
     </>

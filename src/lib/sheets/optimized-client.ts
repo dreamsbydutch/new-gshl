@@ -27,17 +27,23 @@ interface RateLimitConfig {
 }
 
 interface QueuedRequest {
-  operation: () => Promise<any>;
-  resolve: (value: any) => void;
-  reject: (error: any) => void;
+  operation: () => Promise<unknown>;
+  resolve: (value: unknown) => void;
+  reject: (error: unknown) => void;
   timestamp: number;
 }
 
 export class OptimizedSheetsClient {
   private sheets: sheets_v4.Sheets;
   private auth: GoogleAuth;
-  private connectionPool: Map<string, sheets_v4.Sheets> = new Map();
-  private metadataCache: Map<string, SheetMetadata[]> = new Map();
+  private connectionPool: Map<string, sheets_v4.Sheets> = new Map<
+    string,
+    sheets_v4.Sheets
+  >();
+  private metadataCache: Map<string, SheetMetadata[]> = new Map<
+    string,
+    SheetMetadata[]
+  >();
   private readonly BATCH_SIZE = 1000;
   private readonly CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
@@ -71,16 +77,17 @@ export class OptimizedSheetsClient {
 
   // Rate limiting and retry logic
   private async withRateLimit<T>(operation: () => Promise<T>): Promise<T> {
-    return new Promise((resolve, reject) => {
+    return new Promise<T>((resolve, reject) => {
       this.requestQueue.push({
-        operation,
-        resolve,
-        reject,
+        operation: () => operation(),
+        resolve: (val: unknown) => resolve(val as T),
+        reject: (err: unknown) =>
+          reject(err instanceof Error ? err : new Error(String(err))),
         timestamp: Date.now(),
       });
 
       if (!this.isProcessingQueue) {
-        this.processQueue();
+        void this.processQueue();
       }
     });
   }
@@ -133,11 +140,11 @@ export class OptimizedSheetsClient {
 
   private async executeWithRetry<T>(
     operation: () => Promise<T>,
-    attempt: number = 1,
+    attempt = 1,
   ): Promise<T> {
     try {
       return await operation();
-    } catch (error: any) {
+    } catch (error) {
       if (this.shouldRetry(error, attempt)) {
         const delay = this.calculateBackoffDelay(attempt);
         console.log(
@@ -150,12 +157,27 @@ export class OptimizedSheetsClient {
     }
   }
 
-  private shouldRetry(error: any, attempt: number): boolean {
-    if (attempt >= this.rateLimitConfig.retryAttempts) return false;
+  private getErrorStatusCode(error: unknown): number | undefined {
+    if (typeof error === "object" && error !== null) {
+      const { code, status } = error as { code?: unknown; status?: unknown };
+      const numeric =
+        typeof code === "number"
+          ? code
+          : typeof status === "number"
+            ? status
+            : undefined;
+      if (typeof numeric === "number") return numeric;
+    }
+    return undefined;
+  }
 
-    // Retry on rate limit errors (429) or temporary server errors (5xx)
-    const statusCode = error.code || error.status;
-    return statusCode === 429 || (statusCode >= 500 && statusCode < 600);
+  private shouldRetry(error: unknown, attempt: number): boolean {
+    if (attempt >= this.rateLimitConfig.retryAttempts) return false;
+    const statusCode = this.getErrorStatusCode(error);
+    return (
+      statusCode === 429 ||
+      (typeof statusCode === "number" && statusCode >= 500 && statusCode < 600)
+    );
   }
 
   private calculateBackoffDelay(attempt: number): number {
@@ -217,7 +239,7 @@ export class OptimizedSheetsClient {
         });
 
         const metadata: SheetMetadata[] =
-          response.data.sheets?.map((sheet) => ({
+          response.data.sheets?.map((sheet: sheets_v4.Schema$Sheet) => ({
             sheetId: sheet.properties?.sheetId ?? 0,
             title: sheet.properties?.title ?? "",
             rowCount: sheet.properties?.gridProperties?.rowCount ?? 0,
@@ -408,33 +430,20 @@ export class OptimizedSheetsClient {
   }
 
   private parseRange(range: string) {
-    // Parse A1 notation to grid coordinates
-    const match = range.match(/^([A-Z]+)(\d+):([A-Z]+)(\d+)$/);
+    // Parse A1 notation to grid coordinates using RegExp.exec per lint rule
+    const regex = /^([A-Z]+)(\d+):([A-Z]+)(\d+)$/;
+    const match = regex.exec(range);
     if (!match) throw new Error(`Invalid range format: ${range}`);
-
-    const [, startCol, startRow, endCol, endRow] = match;
-    if (!startCol || !startRow || !endCol || !endRow) {
-      throw new Error(`Invalid range format: ${range}`);
-    }
-
+    const startCol = match[1]!;
+    const startRow = match[2]!;
+    const endCol = match[3]!;
+    const endRow = match[4]!;
     return {
-      startRowIndex: parseInt(startRow) - 1,
-      endRowIndex: parseInt(endRow),
+      startRowIndex: parseInt(startRow, 10) - 1,
+      endRowIndex: parseInt(endRow, 10),
       startColumnIndex: this.columnLetterToIndex(startCol),
       endColumnIndex: this.columnLetterToIndex(endCol) + 1,
     };
-  }
-
-  private getSheetIdFromRange(range: string): number {
-    // This would need to be implemented based on sheet metadata
-    return 0; // Placeholder
-  }
-
-  private formatCellValue(value: CellValue) {
-    if (value === null || value === undefined) return { stringValue: "" };
-    if (typeof value === "boolean") return { boolValue: value };
-    if (typeof value === "number") return { numberValue: value };
-    return { stringValue: String(value) };
   }
 
   private columnLetterToIndex(letter: string): number {
@@ -455,131 +464,18 @@ export class OptimizedSheetsClient {
     return letter;
   }
 
-  // Legacy methods for backward compatibility
-  async testAccess(spreadsheetId: string): Promise<boolean> {
-    return this.withRateLimit(async () => {
-      try {
-        await this.sheets.spreadsheets.get({
-          spreadsheetId,
-          fields: "properties.title",
-        });
-        return true;
-      } catch (error) {
-        console.error("❌ Failed to access spreadsheet:", error);
-        return false;
-      }
-    });
+  private getSheetIdFromRange(_range: string): number {
+    // This would need to be implemented based on sheet metadata
+    return 0; // Placeholder
   }
 
-  async createSheet(
-    spreadsheetId: string,
-    sheetName: string,
-    headers: string[],
-  ): Promise<void> {
-    try {
-      const metadata = await this.getSheetMetadata(spreadsheetId);
-      const existingSheet = metadata.find((sheet) => sheet.title === sheetName);
-
-      if (existingSheet) return;
-
-      await this.sheets.spreadsheets.batchUpdate({
-        spreadsheetId,
-        requestBody: {
-          requests: [
-            {
-              addSheet: {
-                properties: { title: sheetName },
-              },
-            },
-          ],
-        },
-      });
-
-      await this.sheets.spreadsheets.values.update({
-        spreadsheetId,
-        range: `${sheetName}!A1:${this.getColumnLetter(headers.length)}1`,
-        valueInputOption: "RAW",
-        requestBody: { values: [headers] },
-      });
-    } catch (error) {
-      console.error(`❌ Error creating sheet "${sheetName}":`, error);
-      throw error;
-    }
-  }
-
-  async getValues(
-    spreadsheetId: string,
-    range: string,
-  ): Promise<CellValue[][]> {
-    return this.withRateLimit(async () => {
-      try {
-        const response = await this.sheets.spreadsheets.values.get({
-          spreadsheetId,
-          range,
-          valueRenderOption: "UNFORMATTED_VALUE",
-        });
-        return (response.data.values as CellValue[][]) ?? [];
-      } catch (error) {
-        console.error(`❌ Error getting values from range "${range}":`, error);
-        throw error;
-      }
-    });
-  }
-
-  async updateValues(
-    spreadsheetId: string,
-    range: string,
-    values: CellValue[][],
-  ): Promise<void> {
-    return this.withRateLimit(async () => {
-      try {
-        await this.sheets.spreadsheets.values.update({
-          spreadsheetId,
-          range,
-          valueInputOption: "RAW",
-          requestBody: { values },
-        });
-      } catch (error) {
-        console.error(`❌ Error updating values in range "${range}":`, error);
-        throw error;
-      }
-    });
-  }
-
-  async appendValues(
-    spreadsheetId: string,
-    range: string,
-    values: CellValue[][],
-  ): Promise<void> {
-    return this.withRateLimit(async () => {
-      try {
-        await this.sheets.spreadsheets.values.append({
-          spreadsheetId,
-          range,
-          valueInputOption: "RAW",
-          requestBody: { values },
-        });
-      } catch (error) {
-        console.error(`❌ Error appending values to range "${range}":`, error);
-        throw error;
-      }
-    });
-  }
-
-  async clearValues(spreadsheetId: string, range: string): Promise<void> {
-    return this.withRateLimit(async () => {
-      try {
-        await this.sheets.spreadsheets.values.clear({
-          spreadsheetId,
-          range,
-        });
-      } catch (error) {
-        console.error(`❌ Error clearing values in range "${range}":`, error);
-        throw error;
-      }
-    });
+  private formatCellValue(value: CellValue) {
+    if (value === null) return { nullValue: "EMPTY" };
+    if (typeof value === "boolean") return { boolValue: value };
+    if (typeof value === "number") return { numberValue: value };
+    return { stringValue: value };
   }
 }
 
-// Export singleton instance
+// Singleton export (restored)
 export const optimizedSheetsClient = new OptimizedSheetsClient();

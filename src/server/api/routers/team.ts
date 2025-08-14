@@ -2,7 +2,7 @@ import { z } from "zod";
 import { createTRPCRouter, publicProcedure } from "../trpc";
 import { optimizedSheetsAdapter } from "@gshl-sheets";
 import { idSchema, baseQuerySchema, batchDeleteSchema } from "./_schemas";
-import { Player, Team } from "@gshl-types";
+import type { Player, Team } from "@gshl-types";
 
 // Team-specific schemas
 const teamWhereSchema = z

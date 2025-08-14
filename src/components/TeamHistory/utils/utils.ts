@@ -1,5 +1,4 @@
-import { GSHLTeam, Matchup, Season, Week } from "@gshl-types";
-import { GameType } from "./types";
+import { MatchupType, type GSHLTeam, type Matchup, type Season, type Week } from "@gshl-types";
 
 export const removeDuplicates = (arr: string[][]): string[][] => {
   const uniqueItems = new Set<string>();
@@ -78,7 +77,7 @@ export const buildOwnerOptions = (
       return opp
         ? [
             opp.ownerFirstName + " " + opp.ownerLastName || "",
-            String(opp.ownerId || ""),
+            String(opp.ownerId ?? ""),
           ]
         : ["", ""];
     })
@@ -101,17 +100,17 @@ export const getMatchupHeaderText = (
   let header = matchup.season?.name + " - ";
 
   switch (matchup.gameType) {
-    case "QF":
+    case MatchupType.QUATER_FINAL:
       header +=
         matchup.seasonId <= 2017 ? "Quarterfinals" : "Conference Semifinals";
       break;
-    case "SF":
+    case MatchupType.SEMI_FINAL:
       header += matchup.seasonId <= 2017 ? "Semifinals" : "Conference Finals";
       break;
-    case "F":
+    case MatchupType.FINAL:
       header += "GSHL Cup Final";
       break;
-    case "LT":
+    case MatchupType.LOSERS_TOURNAMENT:
       header += "Loser's Tournament";
       break;
     default:

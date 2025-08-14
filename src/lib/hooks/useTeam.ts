@@ -1,10 +1,11 @@
 import { clientApi as api } from "@gshl-trpc";
-import {
+import type {
   GSHLTeam,
   TeamDayStatLine,
   TeamWeekStatLine,
   TeamSeasonStatLine,
 } from "@gshl-types";
+import { SeasonType } from "@gshl-types";
 
 type HookError = { message: string } | null;
 
@@ -43,28 +44,32 @@ export function useAllTeams(): {
           id: t.id,
           seasonId: t.seasonId,
           franchiseId: t.franchiseId,
-          name: franchise?.name || null,
-          abbr: franchise?.abbr || null,
-          logoUrl: franchise?.logoUrl || null,
-          isActive: franchise?.isActive || false,
-          confName: conference?.name || null,
-          confAbbr: conference?.abbr || null,
-          confLogoUrl: conference?.logoUrl || null,
-          ownerId: owner?.id || null,
-          ownerFirstName: owner?.firstName || null,
-          ownerLastName: owner?.lastName || null,
-          ownerNickname: owner?.nickName || null,
-          ownerEmail: owner?.email || null,
-          ownerOwing: owner?.owing || null,
-          ownerIsActive: owner?.isActive || false,
+          name: franchise?.name ?? null,
+          abbr: franchise?.abbr ?? null,
+          logoUrl: franchise?.logoUrl ?? null,
+          isActive: franchise?.isActive ?? false,
+          confName: conference?.name ?? null,
+          confAbbr: conference?.abbr ?? null,
+          confLogoUrl: conference?.logoUrl ?? null,
+          ownerId: owner?.id ?? null,
+          ownerFirstName: owner?.firstName ?? null,
+          ownerLastName: owner?.lastName ?? null,
+          ownerNickname: owner?.nickName ?? null,
+          ownerEmail: owner?.email ?? null,
+          ownerOwing: owner?.owing ?? null,
+          ownerIsActive: owner?.isActive ?? false,
         };
-      }) || [],
-    isLoading:
-      isLoadingTeams ||
-      isLoadingFranchises ||
-      isLoadingConferences ||
+      }) ?? [],
+    isLoading: [
+      isLoadingTeams,
+      isLoadingFranchises,
+      isLoadingConferences,
       isLoadingOwners,
-    error: errorTeams || errorFranchises || errorConferences || errorOwners,
+    ].some(Boolean),
+    error:
+      [errorTeams, errorFranchises, errorConferences, errorOwners].find(
+        (e) => e,
+      ) ?? null,
   };
 }
 
@@ -113,12 +118,15 @@ export function useTeamById(teamId: number): {
       ownerOwing: owner?.owing ?? null,
       ownerIsActive: owner?.isActive ?? false,
     },
-    isLoading:
-      isTeamLoading ||
-      isLoadingFranchise ||
-      isLoadingConference ||
+    isLoading: [
+      isTeamLoading,
+      isLoadingFranchise,
+      isLoadingConference,
       isLoadingOwner,
-    error: errorTeam || errorFranchise || errorConference || errorOwner,
+    ].some(Boolean),
+    error:
+      [errorTeam, errorFranchise, errorConference, errorOwner].find((e) => e) ??
+      null,
   };
 }
 
@@ -175,13 +183,17 @@ export function useTeamsBySeasonId(seasonId: number): {
           ownerOwing: owner?.owing ?? null,
           ownerIsActive: owner?.isActive ?? false,
         };
-      }) || [],
-    isLoading:
-      isTeamsLoading ||
-      isLoadingFranchises ||
-      isLoadingConferences ||
+      }) ?? [],
+    isLoading: [
+      isTeamsLoading,
+      isLoadingFranchises,
+      isLoadingConferences,
       isLoadingOwners,
-    error: errorTeams || errorFranchises || errorConferences || errorOwners,
+    ].some(Boolean),
+    error:
+      [errorTeams, errorFranchises, errorConferences, errorOwners].find(
+        (e) => e,
+      ) ?? null,
   };
 }
 
@@ -235,13 +247,17 @@ export function useTeamsByFranchiseId(franchiseId: number): {
           ownerOwing: owner?.owing ?? null,
           ownerIsActive: owner?.isActive ?? false,
         };
-      }) || [],
-    isLoading:
-      isTeamsLoading ||
-      isFranchiseLoading ||
-      isConferenceLoading ||
+      }) ?? [],
+    isLoading: [
+      isTeamsLoading,
+      isFranchiseLoading,
+      isConferenceLoading,
       isOwnerLoading,
-    error: errorTeams || errorFranchise || errorConference || errorOwner,
+    ].some(Boolean),
+    error:
+      [errorTeams, errorFranchise, errorConference, errorOwner].find(
+        (e) => e,
+      ) ?? null,
   };
 }
 
@@ -275,7 +291,7 @@ export function useTeamsByOwnerId(ownerId: number): {
       teams
         ?.map((t) => {
           const franchise = franchises?.find((f) => f.id === t.franchiseId);
-          if (franchise?.ownerId !== ownerId) return null; // Filter by ownerId
+          if (franchise?.ownerId !== ownerId) return null;
           const conference = conferences?.find((c) => c.id === t.confId);
           return {
             id: t.id,
@@ -297,14 +313,18 @@ export function useTeamsByOwnerId(ownerId: number): {
             ownerIsActive: owner?.isActive ?? false,
           };
         })
-        .filter((team): team is NonNullable<typeof team> => team !== null) ||
+        .filter((team): team is NonNullable<typeof team> => team !== null) ??
       [],
-    isLoading:
-      isTeamsLoading ||
-      isFranchiseLoading ||
-      isConferenceLoading ||
+    isLoading: [
+      isTeamsLoading,
+      isFranchiseLoading,
+      isConferenceLoading,
       isOwnerLoading,
-    error: errorTeams || errorFranchise || errorConference || errorOwner,
+    ].some(Boolean),
+    error:
+      [errorTeams, errorFranchise, errorConference, errorOwner].find(
+        (e) => e,
+      ) ?? null,
   };
 }
 
@@ -324,7 +344,7 @@ export function useAllTeamDays(): {
   } = api.teamStats.daily.getAll.useQuery({});
 
   return {
-    data: teamDays || [],
+    data: teamDays ?? [],
     isLoading,
     error,
   };
@@ -342,7 +362,7 @@ export function useTeamDaysByTeamId(gshlTeamId: number): {
   } = api.teamStats.daily.getByTeam.useQuery({ gshlTeamId });
 
   return {
-    data: teamDays || [],
+    data: teamDays ?? [],
     isLoading,
     error,
   };
@@ -360,7 +380,7 @@ export function useTeamDaysByWeekId(weekId: number): {
   } = api.teamStats.daily.getByWeek.useQuery({ weekId });
 
   return {
-    data: teamDays || [],
+    data: teamDays ?? [],
     isLoading,
     error,
   };
@@ -378,7 +398,7 @@ export function useTeamDaysByDate(date: Date): {
   } = api.teamStats.daily.getByDate.useQuery({ date });
 
   return {
-    data: teamDays || [],
+    data: teamDays ?? [],
     isLoading,
     error,
   };
@@ -399,7 +419,7 @@ export function useTeamDaysByTeamAndSeason(
   } = api.teamStats.daily.getByTeam.useQuery({ gshlTeamId, seasonId });
 
   return {
-    data: teamDays || [],
+    data: teamDays ?? [],
     isLoading,
     error,
   };
@@ -421,7 +441,7 @@ export function useAllTeamWeeks(): {
   } = api.teamStats.weekly.getAll.useQuery({});
 
   return {
-    data: teamWeeks || [],
+    data: teamWeeks ?? [],
     isLoading,
     error,
   };
@@ -439,7 +459,7 @@ export function useTeamWeeksByTeamId(gshlTeamId: number): {
   } = api.teamStats.weekly.getByTeam.useQuery({ gshlTeamId });
 
   return {
-    data: teamWeeks || [],
+    data: teamWeeks ?? [],
     isLoading,
     error,
   };
@@ -457,7 +477,7 @@ export function useTeamWeeksByWeekId(weekId: number): {
   } = api.teamStats.weekly.getByWeek.useQuery({ weekId });
 
   return {
-    data: teamWeeks || [],
+    data: teamWeeks ?? [],
     isLoading,
     error,
   };
@@ -477,7 +497,7 @@ export function useTeamWeeksBySeasonId(seasonId: number): {
   });
 
   return {
-    data: teamWeeks || [],
+    data: teamWeeks ?? [],
     isLoading,
     error,
   };
@@ -498,7 +518,7 @@ export function useTeamWeeksByTeamAndSeason(
   } = api.teamStats.weekly.getByTeam.useQuery({ gshlTeamId, seasonId });
 
   return {
-    data: teamWeeks || [],
+    data: teamWeeks ?? [],
     isLoading,
     error,
   };
@@ -520,7 +540,7 @@ export function useAllTeamSeasons(): {
   } = api.teamStats.season.getAll.useQuery({});
 
   return {
-    data: teamSeasons || [],
+    data: teamSeasons ?? [],
     isLoading,
     error,
   };
@@ -538,7 +558,7 @@ export function useTeamSeasonsByTeamId(gshlTeamId: number): {
   } = api.teamStats.season.getByTeam.useQuery({ gshlTeamId });
 
   return {
-    data: teamSeasons || [],
+    data: teamSeasons ?? [],
     isLoading,
     error,
   };
@@ -559,7 +579,7 @@ export function useTeamSeasonsBySeasonId(seasonId: number): {
   );
 
   return {
-    data: teamSeasons || [],
+    data: teamSeasons ?? [],
     isLoading,
     error,
   };
@@ -580,7 +600,7 @@ export function useTeamSeasonByTeamAndSeason(
   } = api.teamStats.season.getByTeam.useQuery({ gshlTeamId, seasonId });
 
   return {
-    data: teamSeasons || [],
+    data: teamSeasons ?? [],
     isLoading,
     error,
   };
@@ -594,17 +614,25 @@ export function useTeamSeasonsBySeasonType(
   isLoading: boolean;
   error: HookError;
 } {
+  const seasonTypeEnum: SeasonType | undefined = Object.values(
+    SeasonType,
+  ).includes(seasonType as SeasonType)
+    ? (seasonType as SeasonType)
+    : undefined;
   const {
     data: teamSeasons,
     isLoading,
     error,
-  } = api.teamStats.season.getBySeasonType.useQuery({
-    seasonId,
-    seasonType: seasonType as any,
-  });
+  } = api.teamStats.season.getBySeasonType.useQuery(
+    {
+      seasonId,
+      seasonType: seasonTypeEnum!,
+    },
+    { enabled: !!seasonId && seasonId > 0 && !!seasonTypeEnum },
+  );
 
   return {
-    data: teamSeasons || [],
+    data: teamSeasons ?? [],
     isLoading,
     error,
   };

@@ -2,7 +2,7 @@ import { z } from "zod";
 import { createTRPCRouter, publicProcedure } from "../trpc";
 import { optimizedSheetsAdapter } from "@gshl-sheets";
 import { idSchema, baseQuerySchema } from "./_schemas";
-import { Week } from "@gshl-types";
+import type { Week } from "@gshl-types";
 
 // Week-specific schemas
 const weekWhereSchema = z
@@ -61,10 +61,13 @@ export const weekRouter = createTRPCRouter({
   getBySeason: publicProcedure
     .input(z.object({ seasonId: z.number().int() }))
     .query(async ({ input }): Promise<Week[]> => {
-      return optimizedSheetsAdapter.findMany("Week", {
+      const weeksRaw = await optimizedSheetsAdapter.findMany("Week", {
         where: { seasonId: input.seasonId },
-        orderBy: { weekNumber: "asc" } as any,
-      }) as unknown as Promise<Week[]>;
+      });
+      const weeks = (weeksRaw as Week[])
+        .slice()
+        .sort((a, b) => a.weekNum - b.weekNum);
+      return weeks;
     }),
 
   // Get active week

@@ -7,7 +7,7 @@ import {
   TeamsToggle,
   TertiaryPageToolbar,
 } from "@gshl-nav";
-import { ToggleItem } from "@gshl-types";
+import type { ToggleItem } from "@gshl-types";
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const { selectedType, setSelectedType } = useLockerRoomNavigation();

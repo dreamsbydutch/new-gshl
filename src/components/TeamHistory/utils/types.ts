@@ -1,7 +1,7 @@
 // These types should match the actual types from your project
 // I'm making assumptions based on the usage in the component
 
-import { GSHLTeam, Matchup, MatchupType, Season, Week } from "@gshl-types";
+import type { GSHLTeam, Matchup, MatchupType, Season, Week } from "@gshl-types";
 
 export type GameType = MatchupType;
 export type WinLoss = "W" | "L" | "T";

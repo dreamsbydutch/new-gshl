@@ -1,13 +1,7 @@
-import { formatCurrency } from "@gshl-utils";
-import Image from "next/image";
-import type { Contract, GSHLTeam, Player, Season } from "@gshl-types";
-import {
-  PlayerContractRowSkeleton,
-  TeamContractTableSkeleton,
-} from "@gshl-skeletons";
+import { TeamContractTableSkeleton } from "@gshl-skeletons";
 import { CapSpaceRow, PlayerContractRow, TableHeader } from "./components";
 import { useContractTableData } from "./hooks";
-import { ContractTableProps } from "./utils";
+import type { ContractTableProps } from "./utils";
 
 export function TeamContractTable({
   currentSeason,

@@ -19,7 +19,7 @@ export const useTeamScheduleData = () => {
 
   // Find the selected team
   const selectedTeam =
-    teams.find((team) => team.ownerId === selectedOwnerId) || null;
+    teams.find((team) => team.ownerId === selectedOwnerId) ?? null;
 
   // Filter and sort matchups for the selected team
   const teamMatchups = sortMatchupsByWeek(

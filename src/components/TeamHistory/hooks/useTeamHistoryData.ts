@@ -6,7 +6,7 @@ import {
   calculateWinLossRecord,
 } from "../utils";
 import { GAME_TYPE_OPTIONS } from "../utils/constants";
-import { GSHLTeam } from "@gshl-types";
+import type { GSHLTeam } from "@gshl-types";
 import {
   useAllMatchups,
   useAllSeasons,
@@ -51,7 +51,7 @@ export const useTeamHistoryData = (teamInfo: GSHLTeam) => {
   const winLossRecord = useMemo(() => {
     if (!schedule || !teams || teamInfo.ownerId == null)
       return [0, 0, 0] as [number, number, number];
-    return calculateWinLossRecord(schedule, teamInfo.ownerId as number, teams);
+    return calculateWinLossRecord(schedule, teamInfo.ownerId, teams);
   }, [schedule, teams, teamInfo.ownerId]);
 
   const isDataReady = Boolean(schedule && teams && fullSchedule);

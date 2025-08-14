@@ -1,4 +1,4 @@
-import { Contract, Player } from "@gshl-types";
+import type { Contract, Player } from "@gshl-types";
 import { PlayerCard } from "./PlayerCard";
 
 interface RosterLineupProps {

@@ -3,10 +3,9 @@ import {
   useMatchupsBySeasonId,
   useTeamsBySeasonId,
   useTeamSeasonsBySeasonId,
-  useAllTeamSeasons,
 } from "@gshl-hooks";
 import { groupTeamsByStandingsType } from "../utils";
-import { StandingsGroup } from "../utils/types";
+import type { StandingsGroup } from "../utils/types";
 
 /**
  * Custom hook for standings data and navigation

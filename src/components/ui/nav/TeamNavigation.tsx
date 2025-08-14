@@ -12,7 +12,6 @@ import { useNavStore } from "@gshl-cache";
 import { useTeamsBySeasonId } from "@gshl-hooks";
 import { HorizontalToggle } from "./toggle";
 import Image from "next/image";
-import { cn } from "@gshl-utils";
 
 interface TeamsToggleProps {
   className?: string;
@@ -34,7 +33,7 @@ export function TeamsToggle({ className }: TeamsToggleProps) {
     error,
   } = useTeamsBySeasonId(selectedSeasonId);
 
-  const selectedTeam = teams.find((t) => t.ownerId === selectedOwnerId) || null;
+  const selectedTeam = teams.find((t) => t.ownerId === selectedOwnerId) ?? null;
 
   const handleTeamSelect = (team: GSHLTeam) => {
     if (team.ownerId) {
@@ -44,9 +43,9 @@ export function TeamsToggle({ className }: TeamsToggleProps) {
 
   const getTeamKey = (team: GSHLTeam) => team.id.toString();
 
-  const getTeamLabel = (team: GSHLTeam) => team.name || `Team ${team.id}`;
+  const getTeamLabel = (team: GSHLTeam) => team.name ?? `Team ${team.id}`;
 
-  const renderTeamItem = (team: GSHLTeam, isSelected: boolean) => (
+  const renderTeamItem = (team: GSHLTeam) => (
     <Image
       src={team.logoUrl ?? ""}
       alt={`${team.name} logo`}
@@ -67,7 +66,7 @@ export function TeamsToggle({ className }: TeamsToggleProps) {
       getItemLabel={getTeamLabel}
       renderCustomItem={renderTeamItem}
       loading={isLoading}
-      error={error?.message || null}
+      error={error?.message ?? null}
       className={className}
     />
   );

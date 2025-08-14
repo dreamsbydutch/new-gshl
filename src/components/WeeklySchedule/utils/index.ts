@@ -1,4 +1,4 @@
-import { GSHLTeam, Matchup } from "@gshl-types";
+import type { GSHLTeam, Matchup } from "@gshl-types";
 import {
   BACKGROUND_CLASSES,
   DEFAULT_BACKGROUND_CLASS,
@@ -59,7 +59,7 @@ export const shouldDisplayRanking = (rank?: string): boolean => {
  * Determines if matchup has been played (has scores)
  */
 export const isMatchupCompleted = (matchup: Matchup): boolean => {
-  return !!(matchup.homeScore || matchup.awayScore);
+  return !!(matchup.homeScore ?? matchup.awayScore);
 };
 
 /**

@@ -2,7 +2,7 @@ import { z } from "zod";
 import { createTRPCRouter, publicProcedure } from "../trpc";
 import { optimizedSheetsAdapter } from "@gshl-sheets";
 import { idSchema, baseQuerySchema, batchDeleteSchema } from "./_schemas";
-import { Player } from "@gshl-types";
+import type { Player } from "@gshl-types";
 
 // Player-specific schemas
 const playerWhereSchema = z
@@ -98,7 +98,7 @@ export const playerRouter = createTRPCRouter({
       // This is a simple implementation - you might want to implement
       // more sophisticated search in the sheets adapter
       const players = await optimizedSheetsAdapter.findMany("Player", {
-        take: input.take || 25,
+        take: input.take ?? 25,
       });
 
       const searchTerm = input.query.toLowerCase();

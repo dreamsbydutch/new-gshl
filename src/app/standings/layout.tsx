@@ -24,7 +24,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   ];
 
   const selectedStandingsType =
-    standingsTypes.find((type) => type.key === selectedType) || null;
+    standingsTypes.find((type) => type.key === selectedType) ?? null;
 
   return (
     <div className="mb-32 font-varela lg:mb-4">

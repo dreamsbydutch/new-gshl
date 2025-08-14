@@ -7,7 +7,7 @@
  */
 
 import { cn } from "@gshl-utils";
-import type { Week } from "@gshl-types";
+import { SeasonType, type Week } from "@gshl-types";
 import { useNavStore } from "@gshl-cache";
 import { useWeeksBySeasonId } from "@gshl-hooks";
 import { HorizontalToggle } from "./toggle";
@@ -27,7 +27,7 @@ export function WeeksToggle({ className }: WeeksToggleProps) {
   const selectedWeekId = useNavStore((state) => state.selectedWeekId);
   const setWeekId = useNavStore((state) => state.setWeekId);
 
-  const selectedWeek = weeks?.find((w) => w.id === selectedWeekId) || null;
+  const selectedWeek = weeks?.find((w) => w.id === selectedWeekId) ?? null;
 
   const handleWeekSelect = (week: Week) => {
     setWeekId(week.id);
@@ -38,7 +38,7 @@ export function WeeksToggle({ className }: WeeksToggleProps) {
   const getWeekLabel = (week: Week) => `W${week.weekNum}`;
 
   const getWeekDescription = (week: Week) => {
-    if (week.weekType === "PO") {
+    if (week.weekType === SeasonType.PLAYOFFS) {
       return "Playoffs";
     }
     return undefined;
@@ -53,8 +53,8 @@ export function WeeksToggle({ className }: WeeksToggleProps) {
           isSelected
             ? "rounded-sm bg-slate-200 font-bold text-gray-900 shadow-md"
             : "text-gray-700",
-          week.weekType === "PO" && isSelected && "bg-amber-100",
-          week.weekType === "PO" && "font-bold text-amber-900",
+          week.weekType === SeasonType.PLAYOFFS && isSelected && "bg-amber-100",
+          week.weekType === SeasonType.PLAYOFFS && "font-bold text-amber-900",
         )}
       >
         {week.weekNum}

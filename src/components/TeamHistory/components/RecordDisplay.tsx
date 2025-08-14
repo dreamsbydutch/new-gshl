@@ -1,4 +1,4 @@
-import { RecordDisplayProps, calculateWinPercentage } from "../utils";
+import { type RecordDisplayProps, calculateWinPercentage } from "../utils";
 
 export const RecordDisplay = ({ winLossRecord }: RecordDisplayProps) => {
   const winPercentage = calculateWinPercentage(winLossRecord);

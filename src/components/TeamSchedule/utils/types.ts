@@ -1,8 +1,5 @@
-import { GSHLTeam, Matchup, Week } from "@gshl-types";
+import type { GSHLTeam, Matchup, Week } from "@gshl-types";
 
-export interface TeamScheduleProps {
-  // Add props if needed in the future
-}
 
 export interface TeamScheduleItemProps {
   matchup: Matchup;
@@ -11,9 +8,6 @@ export interface TeamScheduleItemProps {
   selectedTeamId: number;
 }
 
-export interface ScheduleHeaderProps {
-  // Add props if needed for customization
-}
 
 export interface OpponentDisplayProps {
   matchup: Matchup;

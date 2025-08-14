@@ -1,6 +1,6 @@
 import { cn } from "@gshl-utils";
 import Image from "next/image";
-import { TeamDisplayProps } from "../utils/types";
+import type { TeamDisplayProps } from "../utils/types";
 import { shouldDisplayRanking } from "../utils";
 import { TEAM_LOGO_DIMENSIONS } from "../utils/constants";
 

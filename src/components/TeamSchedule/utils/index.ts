@@ -1,5 +1,5 @@
-import { GSHLTeam, Matchup, Week } from "@gshl-types";
-import { GameLocation, GameTypeDisplay } from "./types";
+import type { GSHLTeam, Matchup, Week } from "@gshl-types";
+import type { GameLocation, GameTypeDisplay } from "./types";
 import {
   CONFERENCES,
   GAME_TYPE_STYLES,

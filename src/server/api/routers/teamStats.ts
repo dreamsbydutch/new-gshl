@@ -1,11 +1,11 @@
 import { z } from "zod";
 import { createTRPCRouter, publicProcedure } from "../trpc";
 import { optimizedSheetsAdapter } from "@gshl-sheets";
-import { idSchema, baseQuerySchema } from "./_schemas";
+import { baseQuerySchema } from "./_schemas";
 import {
-  TeamDayStatLine,
-  TeamSeasonStatLine,
-  TeamWeekStatLine,
+  type TeamDayStatLine,
+  type TeamSeasonStatLine,
+  type TeamWeekStatLine,
   SeasonType,
 } from "@gshl-types";
 

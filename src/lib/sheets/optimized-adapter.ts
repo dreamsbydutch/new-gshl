@@ -73,9 +73,6 @@ interface IdCache {
   ttl: number;
 }
 
-type ModelName = keyof typeof SHEETS_CONFIG.SHEETS;
-type CellValue = string | number | boolean | null;
-
 export class OptimizedSheetsAdapter {
   private cache = new Map<string, CacheEntry>();
   private rowMappings = new Map<string, RowMapping>();
@@ -84,6 +81,39 @@ export class OptimizedSheetsAdapter {
   private readonly LONG_CACHE_TTL = 300000; // 5 minutes for static data
   private readonly ID_CACHE_TTL = 120000; // 2 minutes for ID cache
   private readonly BATCH_SIZE = 100;
+
+  // Typed wrapper around underlying sheets client to avoid unsafe 'any'
+  private sheetsApi(): {
+    testAccess: (spreadsheetId: string) => Promise<boolean>;
+    createSheet: (
+      spreadsheetId: string,
+      sheetName: string,
+      headers: string[],
+    ) => Promise<void>;
+    getValues: (
+      spreadsheetId: string,
+      range: string,
+    ) => Promise<(string | number | boolean | null)[][]>;
+    appendValues: (
+      spreadsheetId: string,
+      range: string,
+      values: (string | number | boolean | null)[][],
+    ) => Promise<void>;
+    updateValues: (
+      spreadsheetId: string,
+      range: string,
+      values: (string | number | boolean | null)[][],
+    ) => Promise<void>;
+    getQueueStatus: () => {
+      queueLength: number;
+      isProcessing: boolean;
+      requestsInLastMinute: number;
+    };
+  } {
+    return optimizedSheetsClient as unknown as ReturnType<
+      OptimizedSheetsAdapter["sheetsApi"]
+    >;
+  }
 
   private getSpreadsheetId(modelName: string): string {
     const workbookKey = MODEL_TO_WORKBOOK[modelName];
@@ -151,15 +181,16 @@ export class OptimizedSheetsAdapter {
     }
 
     const range = `${sheetName}!A2:A`;
-    const rows = await optimizedSheetsClient.getValues(
+    const rows = await this.sheetsApi().getValues(
       this.getSpreadsheetId(modelName),
       range,
     );
 
     const idToRowIndex = new Map<number, number>();
-    rows.forEach((row: any, index: number) => {
-      if (row && row[0] && typeof row[0] === "number") {
-        idToRowIndex.set(row[0], index + 2); // +2 for header row and 0-based index
+    rows.forEach((row: (string | number | boolean | null)[], index: number) => {
+      const first = row?.[0];
+      if (typeof first === "number") {
+        idToRowIndex.set(first, index + 2); // +2 for header row and 0-based index
       }
     });
 
@@ -178,7 +209,7 @@ export class OptimizedSheetsAdapter {
       async ([workbookKey, workbookId]) => {
         console.log(`🔧 Initializing workbook ${workbookKey} (${workbookId})`);
 
-        const hasAccess = await optimizedSheetsClient.testAccess(workbookId);
+        const hasAccess = await this.sheetsApi().testAccess(workbookId);
         if (!hasAccess) {
           console.warn(`⚠️ Cannot access workbook ${workbookKey}. Skipping...`);
           return;
@@ -195,7 +226,7 @@ export class OptimizedSheetsAdapter {
               ];
             if (columns) {
               try {
-                await optimizedSheetsClient.createSheet(workbookId, sheetName, [
+                await this.sheetsApi().createSheet(workbookId, sheetName, [
                   ...columns,
                 ]);
               } catch (error) {
@@ -233,16 +264,13 @@ export class OptimizedSheetsAdapter {
 
     try {
       const range = `${sheetName}!A2:${this.getColumnLetter(columns.length)}`;
-      const rows = (await this.getCachedOrFetch(
+      const rows = await this.getCachedOrFetch(
         modelName,
         `findMany_${JSON.stringify(options)}`,
         () =>
-          optimizedSheetsClient.getValues(
-            this.getSpreadsheetId(modelName),
-            range,
-          ),
+          this.sheetsApi().getValues(this.getSpreadsheetId(modelName), range),
         this.DEFAULT_CACHE_TTL,
-      )) as (string | number | boolean | null)[][];
+      );
 
       let results = rows
         .filter((row) => row && row.length > 0)
@@ -333,7 +361,7 @@ export class OptimizedSheetsAdapter {
 
         if (rowIndex) {
           const range = `${sheetName}!A${rowIndex}:${this.getColumnLetter(columns.length)}${rowIndex}`;
-          const rows = await optimizedSheetsClient.getValues(
+          const rows = await this.sheetsApi().getValues(
             this.getSpreadsheetId(modelName),
             range,
           );
@@ -409,7 +437,7 @@ export class OptimizedSheetsAdapter {
       const batches = this.chunkArray(rows, this.BATCH_SIZE);
 
       for (const batch of batches) {
-        await optimizedSheetsClient.appendValues(
+        await this.sheetsApi().appendValues(
           this.getSpreadsheetId(modelName),
           `${sheetName}!A:A`,
           batch,
@@ -448,7 +476,7 @@ export class OptimizedSheetsAdapter {
 
       // Get existing data
       const existingRange = `${sheetName}!A${rowIndex}:${this.getColumnLetter(columns.length)}${rowIndex}`;
-      const existingRows = await optimizedSheetsClient.getValues(
+      const existingRows = await this.sheetsApi().getValues(
         this.getSpreadsheetId(modelName),
         existingRange,
       );
@@ -471,7 +499,7 @@ export class OptimizedSheetsAdapter {
       };
 
       const updatedRow = convertModelToRow(updatedData, columns);
-      await optimizedSheetsClient.updateValues(
+      await this.sheetsApi().updateValues(
         this.getSpreadsheetId(modelName),
         existingRange,
         [updatedRow],
@@ -490,7 +518,6 @@ export class OptimizedSheetsAdapter {
     modelName: keyof typeof SHEETS_CONFIG.SHEETS,
     options: UpdateManyOptions<T>,
   ): Promise<{ count: number }> {
-    const sheetName = SHEETS_CONFIG.SHEETS[modelName];
     const columns = SHEETS_CONFIG.COLUMNS[modelName];
 
     if (!columns) {
@@ -505,7 +532,7 @@ export class OptimizedSheetsAdapter {
 
       for (const record of records) {
         await this.update<T>(modelName, {
-          where: { id: (record as any).id },
+          where: { id: (record as Record<string, unknown>).id as number },
           data: options.data,
         });
         count++;
@@ -542,7 +569,7 @@ export class OptimizedSheetsAdapter {
 
       // Get existing data before deletion
       const existingRange = `${sheetName}!A${rowIndex}:${this.getColumnLetter(columns.length)}${rowIndex}`;
-      const existingRows = await optimizedSheetsClient.getValues(
+      const existingRows = await this.sheetsApi().getValues(
         this.getSpreadsheetId(modelName),
         existingRange,
       );
@@ -566,7 +593,7 @@ export class OptimizedSheetsAdapter {
         | boolean
         | null
       )[];
-      await optimizedSheetsClient.updateValues(
+      await this.sheetsApi().updateValues(
         this.getSpreadsheetId(modelName),
         existingRange,
         [emptyRow],
@@ -589,8 +616,10 @@ export class OptimizedSheetsAdapter {
     let count = 0;
 
     for (const record of records) {
+      const recId = (record as Record<string, unknown>).id;
+      if (typeof recId !== "number") continue;
       await this.delete<T>(modelName, {
-        where: { id: (record as any).id },
+        where: { id: recId },
       });
       count++;
     }
@@ -610,7 +639,7 @@ export class OptimizedSheetsAdapter {
 
       if (existing) {
         return await this.update<T>(modelName, {
-          where: { id: (options.where as any).id },
+          where: { id: options.where.id },
           data: options.update,
         });
       } else {
@@ -800,7 +829,7 @@ export class OptimizedSheetsAdapter {
           }),
         ),
       },
-      queueStats: optimizedSheetsClient.getQueueStatus(),
+      queueStats: this.sheetsApi().getQueueStatus(),
     };
   }
 }

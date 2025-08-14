@@ -1,4 +1,4 @@
-import { Season } from "@gshl-types";
+import type { Season } from "@gshl-types";
 import { getSeasonDisplay } from "../utils";
 
 interface TableHeaderProps {

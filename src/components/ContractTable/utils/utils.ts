@@ -1,4 +1,4 @@
-import { Contract } from "@gshl-types";
+import type { Contract } from "@gshl-types";
 
 export const getExpiryStatusClass = (expiryStatus: string) => {
   if (expiryStatus === "RFA") {

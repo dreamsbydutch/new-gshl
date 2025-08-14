@@ -7,7 +7,7 @@ export function useAllMatchups() {
     error,
   } = api.matchup.getAll.useQuery({ orderBy: { seasonId: "asc" } });
   return {
-    data: matchups || [],
+    data: matchups ?? [],
     isLoading,
     error,
   };
@@ -20,7 +20,7 @@ export function useMatchupById(matchupId: number) {
     error,
   } = api.matchup.getById.useQuery({ id: matchupId });
   return {
-    data: matchup || null,
+    data: matchup ?? null,
     isLoading,
     error,
   };
@@ -33,7 +33,7 @@ export function useMatchupsByWeekId(weekId: number) {
     error,
   } = api.matchup.getAll.useQuery({ where: { weekId } });
   return {
-    data: matchups || [],
+    data: matchups ?? [],
     isLoading,
     error,
   };
@@ -45,7 +45,7 @@ export function useMatchupsBySeasonId(seasonId: number) {
     error,
   } = api.matchup.getAll.useQuery({ where: { seasonId } });
   return {
-    data: matchups || [],
+    data: matchups ?? [],
     isLoading,
     error,
   };

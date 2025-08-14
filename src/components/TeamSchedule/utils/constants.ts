@@ -1,4 +1,4 @@
-import { GameTypeDisplay } from "./types";
+import type { GameTypeDisplay } from "./types";
 
 // Game types
 export const GAME_TYPES = {

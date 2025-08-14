@@ -1,6 +1,6 @@
 import { StandingsGroupComponent } from "./components";
 import { useStandingsData } from "./hooks";
-import { StandingsContainerProps } from "./utils/types";
+import type { StandingsContainerProps } from "./utils/types";
 
 export const StandingsContainer = ({
   standingsType,

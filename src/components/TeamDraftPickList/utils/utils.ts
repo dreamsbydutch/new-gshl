@@ -1,4 +1,4 @@
-import { Contract, DraftPick, GSHLTeam, Player } from "@gshl-types";
+import type { Contract, DraftPick, GSHLTeam, Player } from "@gshl-types";
 
 export const formatDraftPickDescription = (draftPick: DraftPick) => {
   const roundText = `${draftPick.round} Round`;

@@ -1,4 +1,4 @@
-import { Contract, GSHLTeam, Player, Season } from "@gshl-types";
+import type { Contract, GSHLTeam, Player, Season } from "@gshl-types";
 
 export interface ContractTableProps {
   currentSeason: Season | undefined;

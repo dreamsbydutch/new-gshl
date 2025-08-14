@@ -1,4 +1,4 @@
-import { TeamInfoProps } from "../utils/types";
+import type { TeamInfoProps } from "../utils/types";
 import {
   OVERALL_SEED_FIELDS,
   CONFERENCE_SEED_FIELDS,
@@ -12,7 +12,6 @@ export const TeamInfo = ({ teamProb, standingsType }: TeamInfoProps) => {
     fieldName: string,
     probability: number,
     label: string,
-    index?: number,
   ) => {
     if (
       probability === 0 &&
@@ -49,7 +48,7 @@ export const TeamInfo = ({ teamProb, standingsType }: TeamInfoProps) => {
           {OVERALL_SEED_FIELDS.map((field, index) => {
             const probability = teamProb[field as keyof typeof teamProb];
             const label = formatSeedPosition(index, "Ovr");
-            return renderProbabilityItem(field, probability, label, index);
+            return renderProbabilityItem(field, probability, label);
           })}
         </div>
       );
@@ -60,7 +59,7 @@ export const TeamInfo = ({ teamProb, standingsType }: TeamInfoProps) => {
           {CONFERENCE_SEED_FIELDS.map((field, index) => {
             const probability = teamProb[field as keyof typeof teamProb];
             const label = formatSeedPosition(index, "Conf");
-            return renderProbabilityItem(field, probability, label, index);
+            return renderProbabilityItem(field, probability, label);
           })}
         </div>
       );

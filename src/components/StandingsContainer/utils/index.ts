@@ -1,5 +1,5 @@
-import { GSHLTeam, TeamSeasonStatLine } from "@gshl-types";
-import { StandingsGroup } from "./types";
+import type { GSHLTeam, TeamSeasonStatLine } from "@gshl-types";
+import type { StandingsGroup } from "./types";
 import {
   CONFERENCE_ABBREVIATIONS,
   CONFERENCE_TITLES,

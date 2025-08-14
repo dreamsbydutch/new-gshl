@@ -34,7 +34,6 @@ interface NavContainerProps {
  * @returns Clickable navigation item with accessibility support
  */
 export function ClickableNavItem({
-  id,
   label,
   icon,
   isActive = false,

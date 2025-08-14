@@ -1,4 +1,4 @@
-import { FilterDropdownsProps } from "../utils";
+import type { FilterDropdownsProps } from "../utils";
 
 export const FilterDropdowns = ({
   seasonValue,

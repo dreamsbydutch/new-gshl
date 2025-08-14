@@ -47,9 +47,17 @@ class SheetsMigrationHelper {
               where: { id: conferences[0]?.id },
             },
           );
-          console.log(
-            `✅ Found unique conference: ${(firstConference as any)?.name}`,
-          );
+          if (
+            firstConference &&
+            typeof firstConference === "object" &&
+            "name" in firstConference
+          ) {
+            const name =
+              (firstConference as { name?: string }).name ?? "Unknown";
+            console.log(`✅ Found unique conference: ${name}`);
+          } else {
+            console.log("✅ Found unique conference record");
+          }
         }
       },
     });
@@ -83,11 +91,6 @@ class SheetsMigrationHelper {
       name: "Batch Operations",
       critical: false,
       test: async () => {
-        // Test batch create with dummy data (won't actually create)
-        const testData = [
-          { name: "Test Conference 1", abbr: "TC1" },
-          { name: "Test Conference 2", abbr: "TC2" },
-        ];
 
         console.log("✅ Batch operation interfaces available");
         // Note: We don't actually create test data to avoid cluttering sheets
@@ -138,9 +141,10 @@ class SheetsMigrationHelper {
         });
         if (players.length > 0) {
           const player = players[0];
-          if (player) {
+          if (player && typeof player === "object") {
+            const p = player as { firstName?: string; lastName?: string };
             console.log(
-              `✅ Data transformation working: ${(player as any).firstName} ${(player as any).lastName}`,
+              `✅ Data transformation working: ${p.firstName ?? ""} ${p.lastName ?? ""}`,
             );
           }
         }
@@ -251,7 +255,8 @@ class SheetsMigrationHelper {
           await op.operation();
           times.push(Date.now() - start);
         } catch (error) {
-          console.log(`❌ ${op.name} failed: ${error}`);
+          const errMsg = error instanceof Error ? error.message : String(error);
+          console.log(`❌ ${op.name} failed: ${errMsg}`);
           break;
         }
       }
@@ -275,7 +280,8 @@ class SheetsMigrationHelper {
         const time = Date.now() - start;
         console.log(`✅ ${model} cache warmed (${time}ms)`);
       } catch (error) {
-        console.log(`❌ Failed to warm ${model}: ${error}`);
+        const errMsg = error instanceof Error ? error.message : String(error);
+        console.log(`❌ Failed to warm ${model}: ${errMsg}`);
       }
     }
 

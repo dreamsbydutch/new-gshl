@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { GSHLTeam, Matchup, MatchupType, Season, Week } from "@gshl-types";
+import { type GSHLTeam, type Matchup, MatchupType, type Season, type Week } from "@gshl-types";
 
 // Helper function to map game type categories to actual MatchupType values
 const getGameTypeFilter = (gameTypeCategory: string): MatchupType[] => {
@@ -114,6 +114,8 @@ export const useScheduleData = (
     params.seasonID,
     params.gameType,
     params.oppOwnerID,
+    weeks,
+    seasons,
   ]);
 
   return {

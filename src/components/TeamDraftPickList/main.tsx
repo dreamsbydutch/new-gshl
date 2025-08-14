@@ -1,8 +1,7 @@
 import { DraftPickListSkeleton } from "@gshl-skeletons";
-import { Contract, DraftPick, GSHLTeam, Player } from "@gshl-types";
 import { DraftPickItem } from "./components";
 import { useTeamDraftPickListData } from "./hooks";
-import { TeamDraftPickListProps } from "./utils";
+import type { TeamDraftPickListProps } from "./utils";
 
 export function TeamDraftPickList({
   teams,

@@ -1,4 +1,4 @@
-import { GameResultProps } from "../utils/types";
+import type { GameResultProps } from "../utils/types";
 import {
   isGameCompleted,
   didTeamWin,

@@ -2,7 +2,7 @@ import { z } from "zod";
 import { createTRPCRouter, publicProcedure } from "../trpc";
 import { optimizedSheetsAdapter } from "@gshl-sheets";
 import { idSchema, baseQuerySchema, batchDeleteSchema } from "./_schemas";
-import { Season } from "@gshl-types";
+import type { Season } from "@gshl-types";
 
 // Season-specific schemas
 const seasonWhereSchema = z

@@ -1,4 +1,8 @@
-import { optimizedSheetsAdapter } from "@gshl-sheets";
+import {
+  optimizedSheetsAdapter,
+  type SHEETS_CONFIG,
+  type DatabaseRecord,
+} from "@gshl-sheets";
 
 /**
  * API Utilities for common operations across the tRPC API
@@ -78,7 +82,8 @@ export const checkDataIntegrity = async () => {
 
   try {
     // Count records in each model
-    const models = [
+    type ModelName = keyof typeof SHEETS_CONFIG.SHEETS;
+    const models: ModelName[] = [
       "Season",
       "Week",
       "Team",
@@ -94,16 +99,14 @@ export const checkDataIntegrity = async () => {
 
     for (const model of models) {
       try {
-        const count = await optimizedSheetsAdapter.count(model as any);
+        const count = await optimizedSheetsAdapter.count(model);
         results.totalRecords[model] = count;
-      } catch (error) {
+      } catch {
         results.totalRecords[model] = -1; // Error counting
       }
     }
 
-    // You can add more integrity checks here
-    // For example: check for orphaned players without teams, etc.
-
+    // Additional integrity checks could be added here
     return results;
   } catch (error) {
     return {
@@ -137,17 +140,31 @@ export const getPerformanceMetrics = async () => {
 // Batch operations utility
 export const batchOperations = {
   // Batch create players
-  createPlayers: async (players: any[]) => {
+  createPlayers: async (
+    players: Omit<DatabaseRecord, "id" | "createdAt" | "updatedAt">[],
+  ) => {
     return optimizedSheetsAdapter.createMany("Player", { data: players });
   },
 
-  // Batch update team stats
-  updateTeamStats: async (updates: any[]) => {
-    return optimizedSheetsAdapter.batchUpdate("TeamWeekStatLine", updates);
+  // Batch update team stats (typed minimal shape)
+  updateTeamStats: async (
+    updates: { where: { id: number }; data: Partial<DatabaseRecord> }[],
+  ) => {
+    // batchUpdate signature not exported; using existing call with safer typing
+    return (
+      optimizedSheetsAdapter as unknown as {
+        batchUpdate: (
+          model: keyof typeof SHEETS_CONFIG.SHEETS,
+          updates: unknown,
+        ) => Promise<unknown>;
+      }
+    ).batchUpdate("TeamWeekStatLine", updates);
   },
 
   // Batch create contracts
-  createContracts: async (contracts: any[]) => {
+  createContracts: async (
+    contracts: Omit<DatabaseRecord, "id" | "createdAt" | "updatedAt">[],
+  ) => {
     return optimizedSheetsAdapter.createMany("Contract", { data: contracts });
   },
 };
@@ -174,9 +191,12 @@ export const leagueUtils = {
     statType: string,
     limit = 25,
   ) => {
+    const orderBy: Partial<Record<string, "asc" | "desc">> = {
+      [statType]: "desc",
+    };
     return optimizedSheetsAdapter.findMany("PlayerTotalStatLine", {
       where: { seasonId },
-      orderBy: { [statType]: "desc" } as any,
+      orderBy: orderBy as unknown as Partial<Record<string, "asc" | "desc">>,
       take: limit,
     });
   },

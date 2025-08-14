@@ -1,4 +1,4 @@
-import { GSHLTeam } from "@gshl-types";
+import type { GSHLTeam } from "@gshl-types";
 
 interface TeamInfoProps {
   currentTeam: GSHLTeam;

@@ -1,8 +1,5 @@
-import { GSHLTeam, Matchup } from "@gshl-types";
+import type { GSHLTeam, Matchup } from "@gshl-types";
 
-export interface WeeklyScheduleProps {
-  // Add props if needed in the future
-}
 
 export interface WeekScheduleItemProps {
   matchup: Matchup;
@@ -19,9 +16,6 @@ export interface ScoreDisplayProps {
   matchup: Matchup;
 }
 
-export interface ScheduleHeaderProps {
-  // Add props if needed for customization
-}
 
 export type GameType = "RS" | "CC" | "NC" | "QF" | "SF" | "F" | "LT";
 

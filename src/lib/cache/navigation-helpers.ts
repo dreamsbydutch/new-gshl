@@ -188,7 +188,7 @@ export function useWeekNavigation() {
   ]);
 
   return {
-    selectedWeek: currentWeek || nextWeek || previousWeek,
+    selectedWeek: currentWeek ?? nextWeek ?? previousWeek,
     selectedWeekId: selectedWeekId,
     setSelectedWeekId: setWeekId,
   };

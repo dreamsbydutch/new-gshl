@@ -1,4 +1,4 @@
-import { ScoreDisplayProps } from "../utils/types";
+import type { ScoreDisplayProps } from "../utils/types";
 import { isMatchupCompleted, getScoreClass } from "../utils";
 
 export const ScoreDisplay = ({ matchup }: ScoreDisplayProps) => {

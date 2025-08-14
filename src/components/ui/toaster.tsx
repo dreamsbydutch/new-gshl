@@ -15,31 +15,37 @@ import {
   ToastTitle,
   ToastViewport,
 } from "./toast";
+import React from "react";
 
 /**
  * Toaster component that renders all active toast notifications
  * @returns Toast provider with rendered toasts
  */
 export function Toaster() {
-  // TODO: Implement useToast hook or import from appropriate location
-  const toasts: any[] = [];
+  // TODO: Replace placeholder with real useToast hook implementation
+  type AppToast = {
+    id: string | number;
+    title?: string;
+    description?: string;
+    action?: React.ReactNode;
+  } & Omit<
+    React.ComponentProps<typeof Toast>,
+    "title" | "description" | "action" | "id"
+  >;
+  const toasts: AppToast[] = [];
 
   return (
     <ToastProvider>
-      {toasts.map(function ({ id, title, description, action, ...props }) {
-        return (
-          <Toast key={id} {...props}>
-            <div className="grid gap-1">
-              {title && <ToastTitle>{title}</ToastTitle>}
-              {description && (
-                <ToastDescription>{description}</ToastDescription>
-              )}
-            </div>
-            {action}
-            <ToastClose />
-          </Toast>
-        );
-      })}
+      {toasts.map(({ id, title, description, action, ...props }) => (
+        <Toast key={id} {...props}>
+          <div className="grid gap-1">
+            {title && <ToastTitle>{title}</ToastTitle>}
+            {description && <ToastDescription>{description}</ToastDescription>}
+          </div>
+          {action}
+          <ToastClose />
+        </Toast>
+      ))}
       <ToastViewport />
     </ToastProvider>
   );

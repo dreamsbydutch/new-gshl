@@ -1,8 +1,6 @@
-import { GSHLTeam } from "@gshl-types";
-import Image from "next/image";
 import { TeamInfo, TeamLogo } from "./components";
 import { useLockerRoomHeaderData } from "./hooks";
-import { LockerRoomHeaderProps } from "./utils";
+import type { LockerRoomHeaderProps } from "./utils";
 
 export function LockerRoomHeader({ currentTeam }: LockerRoomHeaderProps) {
   const { formattedOwnerName } = useLockerRoomHeaderData(currentTeam);

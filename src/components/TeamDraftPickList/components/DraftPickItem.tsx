@@ -1,6 +1,6 @@
-import { GSHLTeam } from "@gshl-types";
+import type { GSHLTeam } from "@gshl-types";
 import {
-  ProcessedDraftPick,
+  type ProcessedDraftPick,
   formatDraftPickDescription,
   getOriginalTeamName,
 } from "../utils";

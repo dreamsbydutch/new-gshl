@@ -13,6 +13,7 @@ import {
   useCurrentSeason,
   useTeamsBySeasonId,
 } from "@gshl-hooks";
+import { ContractStatus } from "@gshl-types";
 
 export default function LockerRoomPage() {
   const selectedLockerRoomType = useNavStore(
@@ -56,7 +57,7 @@ export default function LockerRoomPage() {
                 (a) => a.gshlTeamId === currentTeam.id,
               ),
               contracts: teamContracts?.filter(
-                (a) => a.expiryStatus !== "Buyout",
+                (a) => a.expiryStatus !== ContractStatus.BUYOUT,
               ),
               players,
             }}

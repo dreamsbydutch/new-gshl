@@ -1,4 +1,4 @@
-import { WeekDisplayProps } from "../utils/types";
+import type { WeekDisplayProps } from "../utils/types";
 import { getGameTypeDisplay } from "../utils";
 
 export const WeekDisplay = ({ week, gameType }: WeekDisplayProps) => {

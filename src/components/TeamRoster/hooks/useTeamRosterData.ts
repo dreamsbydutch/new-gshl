@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { Contract, GSHLTeam, Player, PlayerNHLStatLine } from "@gshl-types";
+import { RosterPosition, type Contract, type GSHLTeam, type Player, type PlayerNHLStatLine } from "@gshl-types";
 import { buildTeamLineup } from "../utils";
 
 export const useTeamRosterData = (
@@ -19,7 +19,7 @@ export const useTeamRosterData = (
   }, [currentRoster]);
 
   const benchPlayers = useMemo(() => {
-    return currentRoster?.filter((obj) => obj.lineupPos === "BN") ?? [];
+    return currentRoster?.filter((obj) => obj.lineupPos === RosterPosition.BN) ?? [];
   }, [currentRoster]);
 
   const totalCapHit = useMemo(() => {

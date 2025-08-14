@@ -1,19 +1,11 @@
 import {
-  Contract,
-  GSHLTeam,
-  Player,
-  PlayerNHLStatLine,
-  RosterPosition,
-} from "@gshl-types";
-import { cn, formatCurrency } from "@gshl-utils";
-import {
   BenchPlayers,
   CapSpaceDisplay,
   RatingLegend,
   RosterLineup,
 } from "./components";
 import { useTeamRosterData } from "./hooks";
-import { TeamRosterProps } from "./utils";
+import type { TeamRosterProps } from "./utils";
 
 export function TeamRoster({
   nhlPlayerStats,
@@ -25,7 +17,7 @@ export function TeamRoster({
   console.log(players);
   const showSalaries = true;
 
-  const { currentRoster, teamLineup, benchPlayers, totalCapHit } =
+  const { teamLineup, benchPlayers, totalCapHit } =
     useTeamRosterData(nhlPlayerStats, players, contracts, currentTeam);
 
   return (

@@ -5,7 +5,6 @@
  */
 
 import { useNavStore } from "@gshl-cache";
-import { cn } from "@gshl-utils";
 import { ClickableNavItem } from "./BaseComponents";
 
 /**

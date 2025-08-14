@@ -62,10 +62,13 @@ export const draftPickRouter = createTRPCRouter({
   getBySeason: publicProcedure
     .input(z.object({ seasonId: z.number().int() }))
     .query(async ({ input }): Promise<DraftPick[]> => {
-      return optimizedSheetsAdapter.findMany("DraftPick", {
+      const picksRaw = await optimizedSheetsAdapter.findMany("DraftPick", {
         where: { seasonId: input.seasonId },
-        orderBy: { round: "asc" } as any,
-      }) as unknown as Promise<DraftPick[]>;
+      });
+      const picks = (picksRaw as DraftPick[])
+        .slice()
+        .sort((a, b) => a.round - b.round || a.pick - b.pick);
+      return picks;
     }),
 
   create: publicProcedure

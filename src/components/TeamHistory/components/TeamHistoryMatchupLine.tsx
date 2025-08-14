@@ -1,5 +1,6 @@
+import Image from "next/image";
 import {
-  TeamHistoryMatchupLineProps,
+  type TeamHistoryMatchupLineProps,
   getMatchupHeaderText,
   getMatchupBackgroundColor,
   getScoreColor,
@@ -50,14 +51,14 @@ export const TeamHistoryMatchupLine = ({
               <span className="xs:text-base pr-1 font-oswald text-sm font-bold text-black">
                 {"#" + matchup.awayRank}
               </span>
-              <img
+              <Image
                 className="xs:w-12 w-8"
                 src={awayTeam.logoUrl ?? ""}
                 alt="Away Team Logo"
               />
             </div>
           ) : (
-            <img
+            <Image
               className="xs:w-12 w-8"
               src={awayTeam.logoUrl ?? ""}
               alt="Away Team Logo"
@@ -92,14 +93,14 @@ export const TeamHistoryMatchupLine = ({
               <span className="xs:text-base pr-1 font-oswald text-sm font-bold text-black">
                 {"#" + matchup.homeRank}
               </span>
-              <img
+              <Image
                 className="xs:w-12 w-8"
                 src={homeTeam.logoUrl ?? ""}
                 alt="Home Team Logo"
               />
             </div>
           ) : (
-            <img
+            <Image
               className="xs:w-12 w-8"
               src={homeTeam.logoUrl ?? ""}
               alt="Home Team Logo"
