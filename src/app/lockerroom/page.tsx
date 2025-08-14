@@ -68,7 +68,6 @@ export default function LockerRoomPage() {
         <TeamRoster
           {...{
             players,
-            nhlPlayerStats: undefined,
             contracts: teamContracts,
             currentTeam,
           }}

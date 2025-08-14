@@ -1,7 +1,6 @@
-import type { Contract, GSHLTeam, Player, PlayerNHLStatLine } from "@gshl-types";
+import type { Contract, GSHLTeam, Player } from "@gshl-types";
 
 export interface TeamRosterProps {
-  nhlPlayerStats: PlayerNHLStatLine[] | undefined;
   players: Player[] | undefined;
   contracts: Contract[] | undefined;
   currentTeam: GSHLTeam | undefined;

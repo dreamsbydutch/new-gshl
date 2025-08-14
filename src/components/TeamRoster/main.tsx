@@ -8,13 +8,10 @@ import { useTeamRosterData } from "./hooks";
 import type { TeamRosterProps } from "./utils";
 
 export function TeamRoster({
-  nhlPlayerStats,
   players,
   contracts,
   currentTeam,
 }: TeamRosterProps) {
-  console.log(currentTeam);
-  console.log(players);
   const showSalaries = true;
 
   const { teamLineup, benchPlayers, totalCapHit } = useTeamRosterData(

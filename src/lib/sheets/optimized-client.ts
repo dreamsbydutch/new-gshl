@@ -75,6 +75,100 @@ export class OptimizedSheetsClient {
     }
   }
 
+  // ------------------------------------------------------------------
+  // Compatibility wrapper methods used by optimized-adapter
+  // ------------------------------------------------------------------
+  async testAccess(spreadsheetId: string): Promise<boolean> {
+    try {
+      await this.getSheetMetadata(spreadsheetId);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  async createSheet(
+    spreadsheetId: string,
+    sheetName: string,
+    headers: string[],
+  ): Promise<void> {
+    await this.withRateLimit(async () => {
+      try {
+        // Attempt to add sheet
+        await this.sheets.spreadsheets.batchUpdate({
+          spreadsheetId,
+          requestBody: {
+            requests: [
+              {
+                addSheet: {
+                  properties: { title: sheetName },
+                },
+              },
+            ],
+          },
+        });
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : String(error);
+        if (!msg.includes("already exists")) throw error; // ignore existing
+      }
+
+      // Set header row (A1:...)
+      if (headers.length > 0) {
+        const headerRange = `${sheetName}!A1:${this.getColumnLetter(headers.length)}1`;
+        await this.sheets.spreadsheets.values.update({
+          spreadsheetId,
+          range: headerRange,
+          valueInputOption: "RAW",
+          requestBody: { values: [headers] },
+        });
+      }
+    });
+  }
+
+  async getValues(
+    spreadsheetId: string,
+    range: string,
+  ): Promise<CellValue[][]> {
+    return this.withRateLimit(async () => {
+      const res = await this.sheets.spreadsheets.values.get({
+        spreadsheetId,
+        range,
+        valueRenderOption: "UNFORMATTED_VALUE",
+      });
+      return (res.data.values as CellValue[][]) ?? [];
+    });
+  }
+
+  async appendValues(
+    spreadsheetId: string,
+    range: string,
+    values: CellValue[][],
+  ): Promise<void> {
+    await this.withRateLimit(async () => {
+      await this.sheets.spreadsheets.values.append({
+        spreadsheetId,
+        range,
+        valueInputOption: "RAW",
+        requestBody: { values },
+      });
+    });
+  }
+
+  async updateValues(
+    spreadsheetId: string,
+    range: string,
+    values: CellValue[][],
+  ): Promise<void> {
+    await this.withRateLimit(async () => {
+      await this.sheets.spreadsheets.values.update({
+        spreadsheetId,
+        range,
+        valueInputOption: "RAW",
+        requestBody: { values },
+      });
+    });
+  }
+
   // Rate limiting and retry logic
   private async withRateLimit<T>(operation: () => Promise<T>): Promise<T> {
     return new Promise<T>((resolve, reject) => {
@@ -469,13 +563,13 @@ export class OptimizedSheetsClient {
     return 0; // Placeholder
   }
 
-  private formatCellValue(value: CellValue) {
-    if (value === null) return { nullValue: "EMPTY" };
+  private formatCellValue(value: CellValue): sheets_v4.Schema$ExtendedValue {
+    if (value === null) return { stringValue: "" };
     if (typeof value === "boolean") return { boolValue: value };
     if (typeof value === "number") return { numberValue: value };
     return { stringValue: value };
   }
 }
 
-// Singleton export (restored)
+// Singleton export
 export const optimizedSheetsClient = new OptimizedSheetsClient();
