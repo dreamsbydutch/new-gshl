@@ -39,7 +39,6 @@ export function TeamContractTable({
                 contract={contract}
                 player={players!.find((p) => p.id === contract.playerId)}
                 currentSeason={currentSeason!}
-                currentTeam={currentTeam}
               />
             ))}
             <CapSpaceRow

@@ -55,6 +55,8 @@ export const TeamHistoryMatchupLine = ({
                 className="xs:w-12 w-8"
                 src={awayTeam.logoUrl ?? ""}
                 alt="Away Team Logo"
+                width={48}
+                height={48}
               />
             </div>
           ) : (
@@ -62,6 +64,8 @@ export const TeamHistoryMatchupLine = ({
               className="xs:w-12 w-8"
               src={awayTeam.logoUrl ?? ""}
               alt="Away Team Logo"
+              width={48}
+              height={48}
             />
           )}
           <div className="xs:text-lg font-oswald text-base">
@@ -97,6 +101,8 @@ export const TeamHistoryMatchupLine = ({
                 className="xs:w-12 w-8"
                 src={homeTeam.logoUrl ?? ""}
                 alt="Home Team Logo"
+                width={48}
+                height={48}
               />
             </div>
           ) : (
@@ -104,6 +110,8 @@ export const TeamHistoryMatchupLine = ({
               className="xs:w-12 w-8"
               src={homeTeam.logoUrl ?? ""}
               alt="Home Team Logo"
+              width={48}
+              height={48}
             />
           )}
           <div className="xs:text-lg font-oswald text-base">

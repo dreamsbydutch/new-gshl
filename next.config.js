@@ -13,6 +13,11 @@ const config = {
       { protocol: "https", hostname: "jn9n1jxo7g.ufs.sh" },
       { protocol: "https", hostname: "lh3.googleusercontent.com" },
       { protocol: "https", hostname: "avatars.githubusercontent.com" },
+      {
+        protocol: "https",
+        hostname: "<APP_ID>.ufs.sh",
+        pathname: "/f/*",
+      },
     ], // replace with your image domain(s)
   },
   webpack: (config, { isServer }) => {

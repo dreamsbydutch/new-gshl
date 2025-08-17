@@ -12,6 +12,12 @@ export enum RosterPosition {
   Util = "Util",
 }
 
+export enum ResignableStatus {
+  DRAFT = "DRAFT",
+  RFA = "RFA",
+  UFA = "UFA",
+}
+
 export enum PositionGroup {
   F = "F",
   D = "D",

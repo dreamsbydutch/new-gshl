@@ -27,7 +27,7 @@ export * from "./date";
 /**
  * Data formatting and display helper functions
  * - cn: Combine and merge Tailwind CSS classes safely
- * - formatCurrency: Display numbers as currency ($1,234)
+ * - formatMoney: Display numbers as currency ($1,234)
  * - formatNumber: Display numbers with thousand separators
  * - formatPercentage: Display numbers as percentages (12.3%)
  * - formatPlayerName: Standardize player name display
@@ -87,7 +87,7 @@ export * from "./constants";
  * Common import patterns:
  *
  * // Import specific utilities
- * import { formatCurrency, formatDate } from "@gshl-utils";
+ * import { formatMoney, formatDate } from "@gshl-utils";
  * import { cn } from "@gshl-utils"; // Most common - Tailwind class merging
  *
  * // Import validation functions
@@ -100,7 +100,10 @@ export * from "./constants";
  * import { APP_CONFIG, VALIDATION_RULES } from "@gshl-utils";
  *
  * // Example usage in components
- * const capSpaceDisplay = formatCurrency(calculateCapSpace(contracts));
+ * const capSpaceDisplay = formatMoney(calculateCapSpace(contracts));
  * const playerAgeDisplay = calculatePlayerAge(player.birthDate);
  * const buttonClasses = cn("btn", isActive && "btn-active");
  */
+
+
+export * from "./uploadthing";

@@ -1,31 +1,34 @@
-import type { Contract, GSHLTeam, Player, Season } from "@gshl-types";
-import { formatCurrency } from "@gshl-utils";
+import type { Contract, Player, Season } from "@gshl-types";
+import { formatMoney } from "@gshl-utils";
 import { PlayerContractRowSkeleton } from "@gshl-skeletons";
 import Image from "next/image";
 import { getExpiryStatusClass } from "../utils";
+import { useNHLTeams } from "@gshl-hooks";
 
 interface PlayerContractRowProps {
   contract: Contract;
   player: Player | undefined;
   currentSeason: Season;
-  currentTeam: GSHLTeam | undefined;
 }
 
 export const PlayerContractRow = ({
   contract,
   player,
   currentSeason,
-  currentTeam,
 }: PlayerContractRowProps) => {
-  if (!player) return <PlayerContractRowSkeleton {...{ contract }} />;
+  // Hooks must be invoked unconditionally before any early returns
+  const { data: nhlTeams } = useNHLTeams();
+  if (!player) return <PlayerContractRowSkeleton contract={contract} />;
 
   const expiryStatus = String(contract.expiryStatus);
+  const playerNhlAbbr = player.nhlTeam?.toString();
+  const playerNhlTeam = nhlTeams.find((t) => t.abbreviation === playerNhlAbbr);
 
   const renderCapHitCell = (cutoffDate: Date, expiryYear: number) => {
     if (contract.capHitEndDate > cutoffDate) {
       return (
         <td className="border-b border-t border-gray-300 px-2 py-1 text-center text-xs">
-          {formatCurrency(contract.capHit)}
+          {formatMoney(contract.capHit)}
         </td>
       );
     }
@@ -60,18 +63,22 @@ export const PlayerContractRow = ({
         {player.nhlPos.toString()}
       </td>
       <td className="border-b border-t border-gray-300 px-2 py-1 text-center text-xs">
-        <Image
-          src={currentTeam?.logoUrl ?? ""}
-          alt={currentTeam?.name ?? ""}
-          className="mx-auto h-4 w-4"
-          width={64}
-          height={64}
-        />
+        {playerNhlTeam?.logoUrl ? (
+          <Image
+            src={playerNhlTeam.logoUrl}
+            alt={playerNhlTeam.fullName || playerNhlAbbr || "NHL Team"}
+            className="mx-auto h-4 w-4"
+            width={64}
+            height={64}
+          />
+        ) : (
+          <span className="text-2xs font-semibold">{playerNhlAbbr || "-"}</span>
+        )}
       </td>
       {contract.startDate < currentSeason.signingEndDate &&
         contract.capHitEndDate > new Date() && (
           <td className="border-b border-t border-gray-300 px-2 py-1 text-center text-xs">
-            {formatCurrency(contract.capHit)}
+            {formatMoney(contract.capHit)}
           </td>
         )}
       {renderCapHitCell(new Date(2026, 3, 19), 2026)}

@@ -4,6 +4,7 @@ import type {
   TeamDayStatLine,
   TeamWeekStatLine,
   TeamSeasonStatLine,
+  NHLTeam,
 } from "@gshl-types";
 import { SeasonType } from "@gshl-types";
 
@@ -633,6 +634,24 @@ export function useTeamSeasonsBySeasonType(
 
   return {
     data: teamSeasons ?? [],
+    isLoading,
+    error,
+  };
+}
+
+export function useNHLTeams(): {
+  data: NHLTeam[];
+  isLoading: boolean;
+  error: HookError;
+} {
+  const {
+    data: nhlTeams,
+    isLoading,
+    error,
+  } = api.team.getNHLTeams.useQuery();
+
+  return {
+    data: nhlTeams ?? [],
     isLoading,
     error,
   };

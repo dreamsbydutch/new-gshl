@@ -55,7 +55,7 @@ const PLAYER_NHL_RATING_CONFIG = {
     },
     overall: {
       tailCompression: 0.7,
-      multiplier: 0.9,
+      multiplier: 0.975,
       toiDampener: { min: 30000, max: 80000 },
       topKnee: 0.65,
       topPower: 2.5,

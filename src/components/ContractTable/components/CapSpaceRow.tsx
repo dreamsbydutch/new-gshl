@@ -1,5 +1,5 @@
 import type { Contract, GSHLTeam } from "@gshl-types";
-import { formatCurrency } from "@gshl-utils";
+import { formatMoney } from "@gshl-utils";
 
 interface CapSpaceRowProps {
   contracts: Contract[];
@@ -24,16 +24,16 @@ export const CapSpaceRow = ({
       <td className="border-t border-gray-800 bg-gray-200 px-2 py-1 text-center text-xs"></td>
       <td className="border-t border-gray-800 bg-gray-200 px-2 py-1 text-center text-xs"></td>
       <td className="border-t border-gray-800 bg-gray-200 px-2 py-1 text-center text-xs">
-        {formatCurrency(capSpaceByYear.currentYear)}
+        {formatMoney(capSpaceByYear.currentYear)}
       </td>
       <td className="border-t border-gray-800 bg-gray-200 px-2 py-1 text-center text-xs">
-        {formatCurrency(capSpaceByYear.year2026)}
+        {formatMoney(capSpaceByYear.year2026)}
       </td>
       <td className="border-t border-gray-800 bg-gray-200 px-2 py-1 text-center text-xs">
-        {formatCurrency(capSpaceByYear.year2027)}
+        {formatMoney(capSpaceByYear.year2027)}
       </td>
       <td className="border-t border-gray-800 bg-gray-200 px-2 py-1 text-center text-xs">
-        {formatCurrency(capSpaceByYear.year2028)}
+        {formatMoney(capSpaceByYear.year2028)}
       </td>
     </tr>
   );

@@ -22,6 +22,7 @@ export const DATA_TYPES = {
     "teams",
     "weeks",
     "contracts",
+    "nhlTeams",
     "matchups",
     "draftPicks",
     "awards",

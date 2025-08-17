@@ -1,0 +1,126 @@
+import Image from "next/image";
+import { NHLLogo } from "../../ui/nhlLogo";
+import { formatNumber } from "@gshl-utils";
+import { HorizontalToggle, TertiaryPageToolbar } from "@gshl-nav";
+import type { ToggleItem, DraftPick, NHLTeam, GSHLTeam } from "@gshl-types";
+import type { DraftBoardToolbarProps, DraftBoardPlayer } from "../utils";
+
+export function MockDraftList({
+  seasonDraftPicks,
+  draftPlayers,
+  nhlTeams,
+  gshlTeams,
+  toolbarProps,
+}: {
+  seasonDraftPicks: DraftPick[];
+  draftPlayers: DraftBoardPlayer[];
+  nhlTeams: NHLTeam[];
+  gshlTeams: GSHLTeam[];
+  toolbarProps: DraftBoardToolbarProps;
+}) {
+  return (
+    <div className="mt-8">
+      <h2 className="mb-4 text-2xl font-bold">Mock Draft</h2>
+      <div className="flex flex-col gap-3">
+        {seasonDraftPicks.map((dp: DraftPick, i: number) => {
+          const gshlTeam = gshlTeams.find(
+            (team: GSHLTeam) => team.id === dp.gshlTeamId,
+          );
+          const projectedPlayer: DraftBoardPlayer | undefined = draftPlayers[i];
+          const showRoundHeader =
+            i === 0 || seasonDraftPicks[i - 1]?.round !== dp.round;
+          return (
+            <div key={dp.id} className="flex flex-col items-center gap-1">
+              {showRoundHeader && (
+                <div className="mt-4 flex items-center gap-2">
+                  <div className="h-px flex-1 bg-gray-300" />
+                  <span className="m-2 text-lg font-semibold uppercase tracking-wide text-gray-600">
+                    Round {dp.round}
+                  </span>
+                  <div className="h-px flex-1 bg-gray-300" />
+                </div>
+              )}
+              <div className="w-[350px] rounded-md border border-gray-200 p-1.5 shadow-sm">
+                <div className="ml-4 flex flex-row items-center gap-2 font-varela font-semibold">
+                  <Image
+                    className="shrink-0 rounded-sm"
+                    src={gshlTeam?.logoUrl ?? ""}
+                    alt={gshlTeam?.name ?? ""}
+                    width={28}
+                    height={28}
+                  />
+                  <span className="text-lg leading-snug">{gshlTeam?.name}</span>
+                  <span className="text-xs font-normal text-gray-500">
+                    R{dp.round} P{dp.pick}
+                  </span>
+                </div>
+                <div className="mt-1 rounded bg-gray-50 p-1.5 text-[11px] leading-tight">
+                  {projectedPlayer ? (
+                    <div className="flex max-w-[300px] flex-row items-center">
+                      <NHLLogo
+                        size={24}
+                        team={nhlTeams.find(
+                          (t: NHLTeam) =>
+                            t.abbreviation ===
+                            projectedPlayer.nhlTeam.toString(),
+                        )}
+                      />
+                      <div className="flex min-w-0 flex-col leading-tight">
+                        <span className="truncate text-[13px] font-semibold md:text-sm">
+                          {projectedPlayer.fullName}
+                        </span>
+                        <span className="text-center text-[10px] text-gray-500">
+                          {projectedPlayer.nhlPos.toString()} • Age{" "}
+                          {projectedPlayer.age}
+                        </span>
+                      </div>
+                      <div className="ml-auto flex flex-col items-end gap-0.5 text-[10px]">
+                        <span>
+                          24-25{" "}
+                          {(+formatNumber(
+                            projectedPlayer.seasonRating ?? 0,
+                            2,
+                          )).toFixed(2)}{" "}
+                          (#
+                          {projectedPlayer.seasonRk})
+                        </span>
+                        <span>
+                          Ovr{" "}
+                          {(+formatNumber(
+                            projectedPlayer.overallRating ?? 0,
+                            2,
+                          )).toFixed(2)}{" "}
+                          (#
+                          {projectedPlayer.overallRk})
+                        </span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-[10px] italic text-gray-500">
+                      No projected player for this pick.
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <TertiaryPageToolbar>
+        <HorizontalToggle<ToggleItem<string | null>>
+          items={toolbarProps.toolbarKeys}
+          selectedItem={
+            toolbarProps.toolbarKeys.find(
+              (item) => item.key === toolbarProps.activeKey,
+            ) ?? null
+          }
+          onSelect={(type: ToggleItem<string | null>) => type.setter(type.key)}
+          getItemKey={(type: ToggleItem<string | null>) => type.key}
+          getItemLabel={(type: ToggleItem<string | null>) => type.value}
+          itemClassName="text-sm text-nowrap"
+          className="no-scrollbar flex flex-row overflow-scroll"
+        />
+      </TertiaryPageToolbar>
+    </div>
+  );
+}

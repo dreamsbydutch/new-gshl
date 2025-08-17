@@ -2,7 +2,7 @@ import { z } from "zod";
 import { createTRPCRouter, publicProcedure } from "../trpc";
 import { optimizedSheetsAdapter } from "@gshl-sheets";
 import { idSchema, baseQuerySchema, batchDeleteSchema } from "./_schemas";
-import type { Player, Team } from "@gshl-types";
+import type { NHLTeam, Player, Team } from "@gshl-types";
 
 // Team-specific schemas
 const teamWhereSchema = z
@@ -92,6 +92,13 @@ export const teamRouter = createTRPCRouter({
         where: { teamId: input.id },
       }) as unknown as Promise<Player[]>;
     }),
+
+  getNHLTeams: publicProcedure.query(async (): Promise<NHLTeam[]> => {
+    // Sheet name is case-sensitive; underlying sheet is named 'NHLTeam'
+    return optimizedSheetsAdapter.findMany("NHLTeam") as unknown as Promise<
+      NHLTeam[]
+    >;
+  }),
 
   // Create new team
   create: publicProcedure

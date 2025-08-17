@@ -8,6 +8,7 @@ import type {
   ContractType,
   ContractStatus,
   AwardsList,
+  ResignableStatus,
 } from "./enums";
 
 // Core model types
@@ -102,6 +103,14 @@ export interface Franchise {
   createdAt: Date;
   updatedAt: Date;
 }
+export interface NHLTeam {
+  id: number;
+  fullName: string;
+  abbreviation: string;
+  logoUrl: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
 
 export interface Team {
   id: number;
@@ -141,12 +150,19 @@ export interface Player {
   nhlTeam: string;
   isActive: boolean;
   isSignable: boolean;
+  isResignable: ResignableStatus|null;
   seasonRk?: number | null;
   seasonRating?: number | null;
   overallRk?: number | null;
   overallRating?: number | null;
   salary?: number | null;
   age?: number | null;
+  birthday?: string | null;
+  country?: string | null;
+  handedness?: string | null;
+  jerseyNum?: number | null;
+  weight?: number | null;
+  height?: number | null;
   lineupPos?: RosterPosition | null;
   gshlTeamId?: number | null;
   createdAt: Date;

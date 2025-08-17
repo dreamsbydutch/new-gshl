@@ -1,8 +1,6 @@
 "use client";
 
-import {
-  useLeagueOfficeNavigation,
-} from "@gshl-cache";
+import { useLeagueOfficeNavigation } from "@gshl-cache";
 import {
   HorizontalToggle,
   SecondaryPageToolbar,
@@ -26,8 +24,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         setter: (type: string | null) => setSelectedType(type ?? ""),
       },
       {
-        key: "rankings",
-        value: "GM Rankings",
+        key: "draftboard",
+        value: "Draft Board",
         setter: (type: string | null) => setSelectedType(type ?? ""),
       },
       {
@@ -37,6 +35,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       },
     ],
   };
+
+
+
   return (
     <div className="mb-32 font-varela lg:mb-4">
       {children}

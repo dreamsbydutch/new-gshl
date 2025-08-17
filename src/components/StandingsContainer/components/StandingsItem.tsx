@@ -17,7 +17,7 @@ export const StandingsItem = ({
     >
       <div className="mx-auto flex items-center justify-between px-2 py-0.5 text-center font-varela">
         <div className="p-1">
-          <Image className="w-12" src={team.logoUrl ?? ""} alt="Team Logo" />
+          <Image className="w-12" src={team.logoUrl ?? ""} alt="Team Logo" width={48} height={48} />
         </div>
         <div className="text-base font-bold">{team.name}</div>
         <div className="text-base font-bold">

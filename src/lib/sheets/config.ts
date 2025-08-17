@@ -23,17 +23,11 @@ export const MODEL_TO_WORKBOOK: Record<string, keyof typeof WORKBOOKS> = {
   Contract: "GENERAL",
   Awards: "GENERAL",
   DraftPick: "GENERAL",
+  nhlTeam: "GENERAL", // legacy/lowercase model key
+  NHLTeam: "GENERAL", // alias for actual sheet named 'NHLTeam'
 
   // PLAYERDAYS workbook
   PlayerDayStatLine: "PLAYERDAYS",
-
-  // PLAYERSTATS workbook
-  PlayerWeekStatLine: "PLAYERSTATS",
-  PlayerSplitStatLine: "PLAYERSTATS",
-  PlayerTotalStatLine: "PLAYERSTATS",
-  PlayerNHLStatLine: "PLAYERSTATS",
-
-  // TEAMSTATS workbook
   TeamDayStatLine: "TEAMSTATS",
   TeamWeekStatLine: "TEAMSTATS",
   TeamSeasonStatLine: "TEAMSTATS",
@@ -62,12 +56,22 @@ export const SHEETS_CONFIG = {
     Owner: "Owner",
     Awards: "Awards",
     DraftPick: "DraftPick",
+    nhlTeam: "nhlTeam", // legacy
+    NHLTeam: "NHLTeam", // actual sheet name as provided
     // ArchivedSkaterDayStatLine: "ArchivedSkaterDayStatLine", // Disabled for performance
     // ArchivedGoalieDayStatLine: "ArchivedGoalieDayStatLine", // Disabled for performance
   },
 
   // Column mappings for each model (these match our database schema)
   COLUMNS: {
+    NHLTeam: [
+      "id",
+      "fullName",
+      "abbreviation",
+      "logoUrl",
+      "createdAt",
+      "updatedAt",
+    ],
     PlayerDayStatLine: [
       "id",
       "seasonId",
@@ -175,12 +179,19 @@ export const SHEETS_CONFIG = {
       "nhlTeam",
       "isActive",
       "isSignable",
+      "isResignable",
       "seasonRk",
       "seasonRating",
       "overallRk",
       "overallRating",
       "salary",
       "age",
+      "birthday",
+      "country",
+      "handedness",
+      "jerseyNum",
+      "weight",
+      "height",
       "lineupPos",
       "gshlTeamId",
       "createdAt",
@@ -532,6 +543,14 @@ export const SHEETS_CONFIG = {
       "pick",
       "playerId",
       "isTraded",
+      "createdAt",
+      "updatedAt",
+    ],
+    nhlTeam: [
+      "id",
+      "fullName",
+      "abbreviation",
+      "logoUrl",
       "createdAt",
       "updatedAt",
     ],

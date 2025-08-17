@@ -195,7 +195,7 @@ function ratings_calculateNHLSeasonRating(rec, scales, config, globalCfg) {
     dampeners: dampeners,
     postProcessByPos: { F: cfg.overall, D: cfg.overall, G: cfg.overall },
   });
-  return overall * 75 + 50;
+  return overall * 100 + 25;
 }
 
 /**

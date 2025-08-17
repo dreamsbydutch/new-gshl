@@ -1,7 +1,9 @@
 import { ContractStatus, type Contract, type Player } from "@gshl-types";
-import { cn, formatCurrency } from "@gshl-utils";
+import { cn, formatMoney } from "@gshl-utils";
 import { getRatingColorClass } from "../utils";
 import Image from "next/image";
+import { useNHLTeams } from "@gshl-hooks";
+import { useMemo } from "react";
 
 interface BenchPlayersProps {
   benchPlayers: Player[];
@@ -14,6 +16,18 @@ export const BenchPlayers = ({
   contracts,
   showSalaries,
 }: BenchPlayersProps) => {
+  // Hooks must be called before any early returns
+  const { data: nhlTeams } = useNHLTeams();
+
+  const nhlTeamMap = useMemo(
+    () =>
+      (nhlTeams || []).reduce<Record<string, string>>((acc, t) => {
+        if (t.abbreviation && t.logoUrl) acc[t.abbreviation] = t.logoUrl;
+        return acc;
+      }, {}),
+    [nhlTeams],
+  );
+
   if (benchPlayers.length === 0) return null;
 
   return (
@@ -26,11 +40,23 @@ export const BenchPlayers = ({
               <div className="col-span-3 text-sm">{player?.fullName}</div>
               <div className="text-2xs">{player?.nhlPos.toString()}</div>
               <div>
-                <Image
-                  src={`https://raw.githubusercontent.com/dreamsbydutch/gshl/main/public/assets/Logos/nhlTeams/${player?.nhlTeam?.slice(-1)}.png`}
-                  alt="NHL Team Logo"
-                  className="mx-auto h-4 w-4"
-                />
+                {(() => {
+                  const abbr = player?.nhlTeam?.toString();
+                  const logo = abbr ? nhlTeamMap[abbr] : undefined;
+                  return logo ? (
+                    <Image
+                      src={logo}
+                      alt={abbr || "NHL Team Logo"}
+                      className="mx-auto h-4 w-4"
+                      width={16}
+                      height={16}
+                    />
+                  ) : (
+                    <span className="text-2xs font-semibold">
+                      {abbr || "-"}
+                    </span>
+                  );
+                })()}
               </div>
               <div
                 className={`max-w-fit place-self-center rounded-lg px-2 text-2xs ${getRatingColorClass(player?.seasonRk ?? null)}`}
@@ -48,7 +74,7 @@ export const BenchPlayers = ({
               >
                 {player.isSignable &&
                   (player.salary ?? 0) > 999999 &&
-                  formatCurrency(player.salary ?? 0)}
+                  formatMoney(player.salary ?? 0)}
               </div>
             </div>
           );

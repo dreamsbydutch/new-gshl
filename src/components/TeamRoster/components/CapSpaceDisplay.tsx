@@ -1,5 +1,5 @@
 import type { Contract } from "@gshl-types";
-import { formatCurrency } from "@gshl-utils";
+import { formatMoney } from "@gshl-utils";
 import { CAP_CEILING } from "../utils/constants";
 
 interface CapSpaceDisplayProps {
@@ -17,7 +17,7 @@ export const CapSpaceDisplay = ({
 
   return (
     <div className="font-medum mx-auto pb-4 text-center text-lg">
-      Cap Space - {contracts && formatCurrency(CAP_CEILING - totalCapHit)}
+      Cap Space - {contracts && formatMoney(CAP_CEILING - totalCapHit)}
     </div>
   );
 };

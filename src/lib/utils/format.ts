@@ -6,31 +6,6 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export function formatCurrency(amount: number | string): string {
-  const num = typeof amount === "string" ? parseFloat(amount) : amount;
-  if (isNaN(num)) return "$0";
-
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(num);
-}
-
-export function formatNumber(num: number | string): string {
-  const n = typeof num === "string" ? parseFloat(num) : num;
-  if (isNaN(n)) return "0";
-
-  return new Intl.NumberFormat("en-US").format(n);
-}
-
-export function formatPercentage(num: number | string, decimals = 1): string {
-  const n = typeof num === "string" ? parseFloat(num) : num;
-  if (isNaN(n)) return "0%";
-
-  return `${n.toFixed(decimals)}%`;
-}
 
 export function formatPlayerName(name: string): string {
   return name

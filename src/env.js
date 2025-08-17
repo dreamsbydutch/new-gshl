@@ -17,6 +17,7 @@ export const env = createEnv({
     GOOGLE_SERVICE_ACCOUNT_KEY: z.string(),
     GOOGLE_APPS_SCRIPT_ID: z.string().optional(),
     GOOGLE_APPS_SCRIPT_ACCESS_TOKEN: z.string().optional(),
+    UPLOADTHING_TOKEN: z.string().optional(),
   },
 
   /**
@@ -43,6 +44,7 @@ export const env = createEnv({
     GOOGLE_APPS_SCRIPT_ID: process.env.GOOGLE_APPS_SCRIPT_ID,
     GOOGLE_APPS_SCRIPT_ACCESS_TOKEN:
       process.env.GOOGLE_APPS_SCRIPT_ACCESS_TOKEN,
+    UPLOADTHING_TOKEN: process.env.UPLOADTHING_TOKEN,
     // NEXT_PUBLIC_CLIENTVAR: process.env.NEXT_PUBLIC_CLIENTVAR,
   },
   /**
