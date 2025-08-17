@@ -1,6 +1,7 @@
 "use client";
 
 import { useLockerRoomNavigation } from "@gshl-cache";
+import { useCurrentSeason } from "@gshl-hooks";
 import {
   HorizontalToggle,
   SecondaryPageToolbar,
@@ -11,6 +12,7 @@ import type { ToggleItem } from "@gshl-types";
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const { selectedType, setSelectedType } = useLockerRoomNavigation();
+  const { data: currentSeason } = useCurrentSeason();
 
   const pageToolbarProps: {
     toolbarKeys: ToggleItem<string | null>[];
@@ -46,7 +48,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     <div className="mb-32 font-varela lg:mb-4">
       {children}
       <SecondaryPageToolbar>
-        <TeamsToggle />
+        <TeamsToggle seasonId={currentSeason?.[0]?.id} />
       </SecondaryPageToolbar>
       <TertiaryPageToolbar>
         <HorizontalToggle<ToggleItem<string | null>>

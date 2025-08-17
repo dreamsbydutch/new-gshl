@@ -12,6 +12,7 @@ import {
   useAllPlayers,
   useCurrentSeason,
   useTeamsBySeasonId,
+  useNHLTeams,
 } from "@gshl-hooks";
 import { ContractStatus } from "@gshl-types";
 
@@ -23,8 +24,12 @@ export default function LockerRoomPage() {
 
   const { data: contracts } = useAllContracts();
   const { data: currentSeason } = useCurrentSeason();
-  const { data: teams } = useTeamsBySeasonId(currentSeason?.[0]?.id ?? 11);
+  // Derive season id safely; avoid non-null assertion after optional chain (lint rule).
+  // Passing 0 when undefined yields an empty result set until real season loads.
+  const seasonId = currentSeason?.[0]?.id;
+  const { data: teams } = useTeamsBySeasonId(seasonId ?? 0);
   const { data: draftPicks } = useAllDraftPicks();
+  const { data: nhlTeams } = useNHLTeams();
 
   const currentTeam = teams?.find((t) => t.ownerId === selectedOwnerId);
   const teamContracts = contracts?.filter(
@@ -48,6 +53,7 @@ export default function LockerRoomPage() {
               currentTeam,
               contracts: teamContracts,
               players,
+              nhlTeams,
             }}
           />
           <TeamDraftPickList

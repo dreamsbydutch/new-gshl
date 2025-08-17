@@ -1,18 +1,15 @@
-import type { GSHLTeam } from "@gshl-types";
+import type { TeamInfoProps } from "../utils";
 
-interface TeamInfoProps {
-  currentTeam: GSHLTeam;
-  formattedOwnerName: string;
-}
-
+/**
+ * Displays the team name and formatted owner name.
+ * Stateless: all formatting performed upstream.
+ */
 export const TeamInfo = ({
   currentTeam,
   formattedOwnerName,
-}: TeamInfoProps) => {
-  return (
-    <div className="flex flex-col items-center">
-      <h1 className="text-center text-3xl font-bold">{currentTeam.name}</h1>
-      <span className="text-lg font-semibold">{formattedOwnerName}</span>
-    </div>
-  );
-};
+}: TeamInfoProps) => (
+  <div className="flex flex-col items-center">
+    <h1 className="text-center text-3xl font-bold">{currentTeam.name}</h1>
+    <span className="text-lg font-semibold">{formattedOwnerName}</span>
+  </div>
+);

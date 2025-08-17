@@ -15,6 +15,7 @@ import Image from "next/image";
 
 interface TeamsToggleProps {
   className?: string;
+  seasonId?: number;
 }
 
 /**
@@ -22,8 +23,9 @@ interface TeamsToggleProps {
  * @param props - Component props
  * @returns Team selection interface with horizontal toggle
  */
-export function TeamsToggle({ className }: TeamsToggleProps) {
-  const selectedSeasonId = useNavStore((state) => state.selectedSeasonId);
+export function TeamsToggle({ className, seasonId }: TeamsToggleProps) {
+  const storeSeasonId = useNavStore((state) => state.selectedSeasonId);
+  const selectedSeasonId = seasonId ?? storeSeasonId;
   const selectedOwnerId = useNavStore((state) => state.selectedOwnerId);
   const setOwnerId = useNavStore((state) => state.setOwnerId);
 

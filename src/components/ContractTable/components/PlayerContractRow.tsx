@@ -1,68 +1,80 @@
-import type { Contract, Player, Season } from "@gshl-types";
+/**
+ * PlayerContractRow
+ * @param contract Contract record to display
+ * @param player Player entity (if undefined a skeleton row is shown)
+ * @param currentSeason Season object for conditional rendering of current season column
+ * @param nhlTeams NHL team metadata list for logo lookup
+ * @returns Table row element (<tr>) with contract cells
+ */
 import { formatMoney } from "@gshl-utils";
 import { PlayerContractRowSkeleton } from "@gshl-skeletons";
 import Image from "next/image";
-import { getExpiryStatusClass } from "../utils";
-import { useNHLTeams } from "@gshl-hooks";
-
-interface PlayerContractRowProps {
-  contract: Contract;
-  player: Player | undefined;
-  currentSeason: Season;
-}
+import {
+  getExpiryStatusClass,
+} from "../utils";
+import type { PlayerContractRowProps } from "../utils";
 
 export const PlayerContractRow = ({
   contract,
   player,
   currentSeason,
+  nhlTeams,
 }: PlayerContractRowProps) => {
-  // Hooks must be invoked unconditionally before any early returns
-  const { data: nhlTeams } = useNHLTeams();
   if (!player) return <PlayerContractRowSkeleton contract={contract} />;
 
   const expiryStatus = String(contract.expiryStatus);
   const playerNhlAbbr = player.nhlTeam?.toString();
   const playerNhlTeam = nhlTeams.find((t) => t.abbreviation === playerNhlAbbr);
 
-  const renderCapHitCell = (cutoffDate: Date, expiryYear: number) => {
-    if (contract.capHitEndDate > cutoffDate) {
+  /**
+   * Render a salary (cap hit) or expiry status cell for a given future season year.
+   * Shows cap hit if the contract extends beyond the cutoff for that season; otherwise
+   * if it expires exactly that season (month match), shows the RFA/UFA/other expiry badge.
+   */
+  const renderCapHitCell = (year: number) => {
+    const endYear = contract.capHitEndDate.getFullYear();
+    if (endYear > year) {
+      // Contract still active beyond this season's year => show cap hit
       return (
-        <td className="border-b border-t border-gray-300 px-2 py-1 text-center text-xs">
+        <td
+          key={`yr-${year}`}
+          className="border-b border-t border-gray-300 px-2 py-1 text-center text-xs"
+        >
           {formatMoney(contract.capHit)}
         </td>
       );
     }
-
-    if (
-      contract.capHitEndDate.getFullYear() === expiryYear &&
-      contract.capHitEndDate.getMonth() === 3
-    ) {
+    if (endYear === year) {
+      // Expiry occurs this displayed season => show status badge
       return (
         <td
+          key={`yr-${year}`}
           className={`mx-2 my-1 rounded-xl border-b border-t border-gray-300 text-center text-2xs font-bold ${getExpiryStatusClass(expiryStatus)}`}
         >
           {expiryStatus === "Buyout" ? "" : expiryStatus}
         </td>
       );
     }
-
+    // Contract ended before this season => empty cell
     return (
-      <td className="border-b border-t border-gray-300 px-2 py-1 text-center text-xs"></td>
+      <td
+        key={`yr-${year}`}
+        className="border-b border-t border-gray-300 px-2 py-1 text-center text-xs"
+      />
     );
   };
 
   return (
     <tr
-      key={contract.id}
       className={`${expiryStatus === "Buyout" ? "text-gray-400" : "text-gray-800"}`}
     >
-      <td className="sticky left-0 whitespace-nowrap border-b border-t border-gray-300 bg-gray-50 px-2 py-1 text-center text-xs">
+      <td className="sticky left-0 z-20 w-32 max-w-fit whitespace-nowrap border-b border-t border-gray-300 bg-gray-50 p-1 text-center text-xs">
         {player.fullName}
       </td>
-      <td className="border-b border-t border-gray-300 px-2 py-1 text-center text-xs">
+      <td className="sticky left-[8rem] z-20 w-12 whitespace-nowrap border-b border-t border-gray-300 bg-gray-50 p-1 text-center text-xs">
         {player.nhlPos.toString()}
       </td>
-      <td className="border-b border-t border-gray-300 px-2 py-1 text-center text-xs">
+      <td className="sticky left-[11rem] z-20 w-8 whitespace-nowrap border-b border-t border-gray-300 bg-gray-50 p-1 text-center text-xs">
         {playerNhlTeam?.logoUrl ? (
           <Image
             src={playerNhlTeam.logoUrl}
@@ -75,15 +87,24 @@ export const PlayerContractRow = ({
           <span className="text-2xs font-semibold">{playerNhlAbbr || "-"}</span>
         )}
       </td>
-      {contract.startDate < currentSeason.signingEndDate &&
+      {/* Current season column (only if signing window still open, matching header) */}
+      {currentSeason.signingEndDate > new Date() &&
         contract.capHitEndDate > new Date() && (
-          <td className="border-b border-t border-gray-300 px-2 py-1 text-center text-xs">
+          <td className="border-b border-t border-gray-300 p-1 text-center text-xs">
             {formatMoney(contract.capHit)}
           </td>
         )}
-      {renderCapHitCell(new Date(2026, 3, 19), 2026)}
-      {renderCapHitCell(new Date(2027, 3, 19), 2027)}
-      {renderCapHitCell(new Date(2028, 3, 19), 2028)}
+      {/* Future season columns (dynamic) */}
+      {(() => {
+        // Derive base future year consistent with cap space hook (first season year + 1)
+        const firstYear = parseInt(currentSeason.name.slice(0, 4), 10);
+        const baseYear = firstYear + 1;
+        const futureYears: number[] = [baseYear, baseYear + 1, baseYear + 2];
+        if (currentSeason.signingEndDate < new Date()) {
+          futureYears.push(baseYear + 3);
+        }
+        return futureYears.map((y) => renderCapHitCell(y));
+      })()}
     </tr>
   );
 };

@@ -88,6 +88,7 @@ export * from "./useMatchups";
 export * from "./useContract";
 export * from "./usePlayer";
 export * from "./useDraftPick";
+export * from "./useContractTableData"; // migrated from components/ContractTable
 
 // ============================================================================
 // USAGE EXAMPLES
