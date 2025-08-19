@@ -38,7 +38,7 @@ export function DraftAnnouncement() {
       {/* moving gradient sheen */}
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,0.25),transparent_60%)]" />
       <div className="pointer-events-none absolute -inset-1 animate-pulse bg-[linear-gradient(120deg,rgba(255,255,255,0.12)_0%,rgba(255,255,255,0)_30%,rgba(255,255,255,0.12)_60%)] bg-[length:300%_100%] mix-blend-overlay" />
-      <div className="relative flex flex-col items-center gap-3">
+      <div className="relative flex flex-col items-center gap-2">
         <div className="flex items-center gap-2">
           <span className="inline-flex items-center gap-1 rounded-full bg-black/30 px-3 py-1 text-[11px] font-semibold uppercase tracking-wider text-white backdrop-blur-sm">
             <span className="h-2 w-2 rounded-full bg-amber-400" />
@@ -77,10 +77,6 @@ export function DraftAnnouncement() {
             </div>
           </div>
         )}
-        <p className="max-w-xl text-balance text-sm text-white/80 md:text-base">
-          Sharpen your scouting reports, finalize keeper strategies, and be
-          ready to pounce when the clock starts.
-        </p>
       </div>
     </section>
   );
