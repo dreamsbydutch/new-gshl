@@ -109,7 +109,7 @@ export function MockDraftList({
 }) {
   return (
     <div className="mt-8 text-center">
-      <h2 className="mb-4 text-2xl font-bold">Mock Draft</h2>
+      <h2 className="mb-4 text-2xl font-bold">GSHL Mock Draft</h2>
       <div className="flex flex-col gap-1">
         {seasonDraftPicks.map((dp: DraftPick, i: number) => {
           const gshlTeam = gshlTeams.find(
