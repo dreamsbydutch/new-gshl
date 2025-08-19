@@ -102,8 +102,8 @@ export function MockDraftPreview({ seasonId = 12 }: { seasonId?: number }) {
     useDraftBoardData({ seasonId, selectedType: "mockdraft" });
   if (isLoading) {
     return (
-      <div className="mt-8">
-        <h2 className="mb-4 text-2xl font-bold">Mock Draft</h2>
+      <div className="mt-8 text-center">
+        <h2 className="mb-4 text-2xl font-bold">GSHL Mock Draft</h2>
         <p className="text-gray-500">Loading mock draft...</p>
       </div>
     );

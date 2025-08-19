@@ -4,6 +4,95 @@ import { formatNumber } from "@gshl-utils";
 import { HorizontalToggle, TertiaryPageToolbar } from "@gshl-nav";
 import type { ToggleItem, DraftPick, NHLTeam, GSHLTeam } from "@gshl-types";
 import type { DraftBoardToolbarProps, DraftBoardPlayer } from "../utils";
+import { useTeamColor, lighten, readableText } from "../hooks/useTeamColor";
+
+function MockDraftPickCard({
+  pick,
+  index,
+  draftPlayers,
+  nhlTeams,
+  gshlTeam,
+}: {
+  pick: DraftPick;
+  index: number;
+  draftPlayers: DraftBoardPlayer[];
+  nhlTeams: NHLTeam[];
+  gshlTeam: GSHLTeam | undefined;
+}) {
+  const projectedPlayer: DraftBoardPlayer | undefined = draftPlayers[index];
+  const teamColor = useTeamColor(gshlTeam?.logoUrl);
+  const base = teamColor ? lighten(teamColor, 0.82) : "#f1f5f9"; // lightened background
+  const accent = teamColor ?? "#cbd5e1"; // border uses original or neutral
+  // Determine readable text against the actual background (base), not the original team color
+  const textColor = readableText(base);
+  return (
+    <div
+      className="w-[350px] rounded-md border p-0.5 shadow-sm transition-colors"
+      style={{ backgroundColor: base, borderColor: accent }}
+    >
+      <div
+        className="ml-4 flex flex-row items-center gap-2 font-varela font-semibold"
+        style={{ color: textColor }}
+      >
+        <Image
+          className="shrink-0 rounded-sm ring-1 ring-white/40"
+          src={gshlTeam?.logoUrl ?? ""}
+          alt={gshlTeam?.name ?? ""}
+          width={32}
+          height={32}
+        />
+        <span className="text-lg">{gshlTeam?.name}</span>
+        <span className="text-xs font-normal opacity-70">
+          Rd {pick.round}, Pk {pick.pick}
+        </span>
+      </div>
+      <div
+        className="rounded p-0.5 text-[11px] leading-tight"
+        style={{ color: textColor }}
+      >
+        {projectedPlayer ? (
+          <div className="mx-auto flex max-w-[250px] flex-row items-center">
+            <NHLLogo
+              size={24}
+              team={nhlTeams.find(
+                (t: NHLTeam) =>
+                  t.abbreviation === projectedPlayer.nhlTeam.toString(),
+              )}
+            />
+            <div className="flex min-w-0 flex-col leading-tight">
+              <span className="truncate text-[13px] font-semibold md:text-sm">
+                {projectedPlayer.fullName}
+              </span>
+              <span className="text-center text-[10px] opacity-75">
+                {projectedPlayer.nhlPos.toString()} • Age {projectedPlayer.age}
+              </span>
+            </div>
+            <div className="ml-auto flex flex-col items-end gap-0.5 text-[10px]">
+              <span>
+                24-25{" "}
+                {(+formatNumber(projectedPlayer.seasonRating ?? 0, 2)).toFixed(
+                  2,
+                )}{" "}
+                (#{projectedPlayer.seasonRk})
+              </span>
+              <span>
+                Ovr{" "}
+                {(+formatNumber(projectedPlayer.overallRating ?? 0, 2)).toFixed(
+                  2,
+                )}{" "}
+                (#{projectedPlayer.overallRk})
+              </span>
+            </div>
+          </div>
+        ) : (
+          <div className="text-[10px] italic opacity-70">
+            No projected player for this pick.
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 export function MockDraftList({
   seasonDraftPicks,
@@ -19,14 +108,13 @@ export function MockDraftList({
   toolbarProps?: DraftBoardToolbarProps;
 }) {
   return (
-    <div className="mt-8">
+    <div className="mt-8 text-center">
       <h2 className="mb-4 text-2xl font-bold">Mock Draft</h2>
       <div className="flex flex-col gap-1">
         {seasonDraftPicks.map((dp: DraftPick, i: number) => {
           const gshlTeam = gshlTeams.find(
             (team: GSHLTeam) => team.id === dp.gshlTeamId,
           );
-          const projectedPlayer: DraftBoardPlayer | undefined = draftPlayers[i];
           const showRoundHeader =
             i === 0 || seasonDraftPicks[i - 1]?.round !== dp.round;
           return (
@@ -40,68 +128,13 @@ export function MockDraftList({
                   <div className="h-px flex-1 bg-gray-300" />
                 </div>
               )}
-              <div className="w-[350px] rounded-md border border-gray-200 bg-slate-100 p-0.5 shadow-sm">
-                <div className="ml-4 flex flex-row items-center gap-2 font-varela font-semibold">
-                  <Image
-                    className="shrink-0 rounded-sm"
-                    src={gshlTeam?.logoUrl ?? ""}
-                    alt={gshlTeam?.name ?? ""}
-                    width={32}
-                    height={32}
-                  />
-                  <span className="text-lg">{gshlTeam?.name}</span>
-                  <span className="text-xs font-normal text-gray-500">
-                    Rd {dp.round}, Pk {dp.pick}
-                  </span>
-                </div>
-                <div className="rounded p-0.5 text-[11px] leading-tight">
-                  {projectedPlayer ? (
-                    <div className="mx-auto flex max-w-[250px] flex-row items-center">
-                      <NHLLogo
-                        size={24}
-                        team={nhlTeams.find(
-                          (t: NHLTeam) =>
-                            t.abbreviation ===
-                            projectedPlayer.nhlTeam.toString(),
-                        )}
-                      />
-                      <div className="flex min-w-0 flex-col leading-tight">
-                        <span className="truncate text-[13px] font-semibold md:text-sm">
-                          {projectedPlayer.fullName}
-                        </span>
-                        <span className="text-center text-[10px] text-gray-500">
-                          {projectedPlayer.nhlPos.toString()} • Age{" "}
-                          {projectedPlayer.age}
-                        </span>
-                      </div>
-                      <div className="ml-auto flex flex-col items-end gap-0.5 text-[10px]">
-                        <span>
-                          24-25{" "}
-                          {(+formatNumber(
-                            projectedPlayer.seasonRating ?? 0,
-                            2,
-                          )).toFixed(2)}{" "}
-                          (#
-                          {projectedPlayer.seasonRk})
-                        </span>
-                        <span>
-                          Ovr{" "}
-                          {(+formatNumber(
-                            projectedPlayer.overallRating ?? 0,
-                            2,
-                          )).toFixed(2)}{" "}
-                          (#
-                          {projectedPlayer.overallRk})
-                        </span>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="text-[10px] italic text-gray-500">
-                      No projected player for this pick.
-                    </div>
-                  )}
-                </div>
-              </div>
+              <MockDraftPickCard
+                pick={dp}
+                index={i}
+                draftPlayers={draftPlayers}
+                nhlTeams={nhlTeams}
+                gshlTeam={gshlTeam}
+              />
             </div>
           );
         })}
