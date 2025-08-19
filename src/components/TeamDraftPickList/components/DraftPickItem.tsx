@@ -1,15 +1,11 @@
-import type { GSHLTeam } from "@gshl-types";
-import {
-  type ProcessedDraftPick,
-  formatDraftPickDescription,
-  getOriginalTeamName,
-} from "../utils";
+import { formatDraftPickDescription, getOriginalTeamName } from "../utils";
+import type { DraftPickItemProps } from "../utils";
 
-interface DraftPickItemProps {
-  processedPick: ProcessedDraftPick;
-  teams: GSHLTeam[];
-}
-
+/**
+ * Presentational row-like block for a single draft pick.
+ * Renders either availability (round/overall + optional via) or the selected player details.
+ * All derivation (original team lookup, selection logic) occurs upstream in the hook.
+ */
 export const DraftPickItem = ({ processedPick, teams }: DraftPickItemProps) => {
   const { draftPick, originalTeam, isAvailable, selectedPlayer } =
     processedPick;

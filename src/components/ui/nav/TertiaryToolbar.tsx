@@ -26,9 +26,11 @@ export function TertiaryPageToolbar({
     <NavContainer
       position="tertiary"
       variant="tertiary"
-      className={cn(className)}
+      className={cn("justify-start", className)}
     >
-      {children}
+      <div className="no-scrollbar flex w-full flex-row items-stretch gap-1 overflow-x-auto overflow-y-hidden whitespace-nowrap px-2">
+        {children}
+      </div>
     </NavContainer>
   );
 }

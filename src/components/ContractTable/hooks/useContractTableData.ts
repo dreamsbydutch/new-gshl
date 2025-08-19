@@ -4,7 +4,7 @@
  * Centralizes derived state for the contract table UI.
  * Returns:
  * - sortedContracts: contracts sorted descending by cap hit
- * - capSpaceByYear: remaining cap for current + next 3 seasons
+ * - capSpaceWindow: remaining cap for current season context + next 4 seasons (total 5)
  * - ready: boolean indicating all required datasets are present & non-empty
  */
 import { useMemo } from "react";
@@ -31,7 +31,7 @@ interface Params {
  * @param contracts Contract entities for the team
  * @param players Player entities (presence required for readiness)
  * @param nhlTeams NHL team list (presence required for readiness)
- * @returns { sortedContracts, capSpaceByYear, ready }
+ * @returns { sortedContracts, capSpaceWindow, ready }
  */
 export function useContractTableData({
   currentSeason,
@@ -45,27 +45,31 @@ export function useContractTableData({
     return [...contracts].sort((a, b) => +b.capHit - +a.capHit);
   }, [contracts]);
 
-  const capSpaceByYear = useMemo(() => {
+  const capSpaceWindow = useMemo(() => {
+    // Provide stable structure even while loading
     if (!contracts) {
-      return { currentYear: 0, year2026: 0, year2027: 0, year2028: 0 };
+      return [] as { label: string; year: number; remaining: number }[];
     }
-    // Derive baseYear: first season year + 1 (e.g. "2024-25" -> 2025)
-    const firstYear = currentSeason?.name
+    // Assume season.name format "YYYY-YY"; fallback to current year if missing
+    const seasonStartYear = currentSeason?.name
       ? parseInt(currentSeason.name.slice(0, 4), 10)
       : new Date().getFullYear();
-    const baseYear = firstYear + 1; // matches prior hard-coded 2025 example for 2024-25 season
-    const calc = (year: number) => {
+    // Start window at the season's listed start year (previously +1, per request adjusted earlier)
+    const firstAccountingYear = seasonStartYear;
+    const calcRemaining = (year: number) => {
       const cutoff = new Date(year, CAP_SEASON_END_MONTH, CAP_SEASON_END_DAY);
       const active = contracts.filter((c) => c.capHitEndDate > cutoff);
-      const total = active.reduce((s, c) => s + +c.capHit, 0);
+      const total = active.reduce((sum, c) => sum + +c.capHit, 0);
       return CAP_CEILING - total;
     };
-    return {
-      currentYear: calc(baseYear),
-      year2026: calc(baseYear + 1),
-      year2027: calc(baseYear + 2),
-      year2028: calc(baseYear + 3),
-    };
+    return Array.from({ length: 5 }).map((_, idx) => {
+      const year = firstAccountingYear + idx;
+      return {
+        label: idx === 0 ? `${year}` : `${year}`,
+        year,
+        remaining: calcRemaining(year),
+      };
+    });
   }, [contracts, currentSeason]);
 
   // All required relational data sets must be present & non-empty
@@ -77,5 +81,5 @@ export function useContractTableData({
       nhlTeams?.length,
   );
 
-  return { sortedContracts, capSpaceByYear, ready };
+  return { sortedContracts, capSpaceWindow, ready };
 }

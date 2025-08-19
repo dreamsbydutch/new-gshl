@@ -29,10 +29,5 @@ export interface TableHeaderProps {
 /** Props for the cap space summary row. */
 export interface CapSpaceRowProps {
   currentTeam: GSHLTeam;
-  capSpaceByYear: {
-    currentYear: number;
-    year2026: number;
-    year2027: number;
-    year2028: number;
-  };
+  capSpaceWindow: { label: string; year: number; remaining: number }[]; // length 5 (current + next 4)
 }

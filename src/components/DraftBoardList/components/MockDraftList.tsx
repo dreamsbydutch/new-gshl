@@ -16,12 +16,12 @@ export function MockDraftList({
   draftPlayers: DraftBoardPlayer[];
   nhlTeams: NHLTeam[];
   gshlTeams: GSHLTeam[];
-  toolbarProps: DraftBoardToolbarProps;
+  toolbarProps?: DraftBoardToolbarProps;
 }) {
   return (
     <div className="mt-8">
       <h2 className="mb-4 text-2xl font-bold">Mock Draft</h2>
-      <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-1">
         {seasonDraftPicks.map((dp: DraftPick, i: number) => {
           const gshlTeam = gshlTeams.find(
             (team: GSHLTeam) => team.id === dp.gshlTeamId,
@@ -40,23 +40,23 @@ export function MockDraftList({
                   <div className="h-px flex-1 bg-gray-300" />
                 </div>
               )}
-              <div className="w-[350px] rounded-md border border-gray-200 p-1.5 shadow-sm">
+              <div className="w-[350px] rounded-md border border-gray-200 bg-slate-100 p-0.5 shadow-sm">
                 <div className="ml-4 flex flex-row items-center gap-2 font-varela font-semibold">
                   <Image
                     className="shrink-0 rounded-sm"
                     src={gshlTeam?.logoUrl ?? ""}
                     alt={gshlTeam?.name ?? ""}
-                    width={28}
-                    height={28}
+                    width={32}
+                    height={32}
                   />
-                  <span className="text-lg leading-snug">{gshlTeam?.name}</span>
+                  <span className="text-lg">{gshlTeam?.name}</span>
                   <span className="text-xs font-normal text-gray-500">
-                    R{dp.round} P{dp.pick}
+                    Rd {dp.round}, Pk {dp.pick}
                   </span>
                 </div>
-                <div className="mt-1 rounded bg-gray-50 p-1.5 text-[11px] leading-tight">
+                <div className="rounded p-0.5 text-[11px] leading-tight">
                   {projectedPlayer ? (
-                    <div className="flex max-w-[300px] flex-row items-center">
+                    <div className="mx-auto flex max-w-[250px] flex-row items-center">
                       <NHLLogo
                         size={24}
                         team={nhlTeams.find(
@@ -106,21 +106,25 @@ export function MockDraftList({
           );
         })}
       </div>
-      <TertiaryPageToolbar>
-        <HorizontalToggle<ToggleItem<string | null>>
-          items={toolbarProps.toolbarKeys}
-          selectedItem={
-            toolbarProps.toolbarKeys.find(
-              (item) => item.key === toolbarProps.activeKey,
-            ) ?? null
-          }
-          onSelect={(type: ToggleItem<string | null>) => type.setter(type.key)}
-          getItemKey={(type: ToggleItem<string | null>) => type.key}
-          getItemLabel={(type: ToggleItem<string | null>) => type.value}
-          itemClassName="text-sm text-nowrap"
-          className="no-scrollbar flex flex-row overflow-scroll"
-        />
-      </TertiaryPageToolbar>
+      {toolbarProps && (
+        <TertiaryPageToolbar>
+          <HorizontalToggle<ToggleItem<string | null>>
+            items={toolbarProps.toolbarKeys}
+            selectedItem={
+              toolbarProps.toolbarKeys.find(
+                (item) => item.key === toolbarProps.activeKey,
+              ) ?? null
+            }
+            onSelect={(type: ToggleItem<string | null>) =>
+              type.setter(type.key)
+            }
+            getItemKey={(type: ToggleItem<string | null>) => type.key}
+            getItemLabel={(type: ToggleItem<string | null>) => type.value}
+            itemClassName="text-sm text-nowrap"
+            className="no-scrollbar flex flex-row overflow-scroll"
+          />
+        </TertiaryPageToolbar>
+      )}
     </div>
   );
 }

@@ -1,7 +1,7 @@
 /**
  * CapSpaceRow
  * @param currentTeam Team whose cap space is being displayed
- * @param capSpaceByYear Remaining cap values keyed by season grouping
+ * @param capSpaceWindow Remaining cap values for current + next 4 seasons
  * @returns Table row (<tr>) summarizing cap space
  */
 import { formatMoney } from "@gshl-utils";
@@ -9,7 +9,7 @@ import type { CapSpaceRowProps } from "../utils";
 
 export const CapSpaceRow = ({
   currentTeam,
-  capSpaceByYear,
+  capSpaceWindow,
 }: CapSpaceRowProps) => {
   return (
     <tr key={`${currentTeam.franchiseId}CapSpace`}>
@@ -18,18 +18,14 @@ export const CapSpaceRow = ({
       </td>
       <td className="sticky left-[8rem] z-20 w-12 whitespace-nowrap border-t border-gray-800 bg-gray-200 px-2 py-1 text-center text-xs"></td>
       <td className="sticky left-[11rem] z-20 w-8 whitespace-nowrap border-t border-gray-800 bg-gray-200 px-2 py-1 text-center text-xs"></td>
-      <td className="border-t border-gray-800 bg-gray-200 px-2 py-1 text-center text-xs">
-        {formatMoney(capSpaceByYear.currentYear)}
-      </td>
-      <td className="border-t border-gray-800 bg-gray-200 px-2 py-1 text-center text-xs">
-        {formatMoney(capSpaceByYear.year2026)}
-      </td>
-      <td className="border-t border-gray-800 bg-gray-200 px-2 py-1 text-center text-xs">
-        {formatMoney(capSpaceByYear.year2027)}
-      </td>
-      <td className="border-t border-gray-800 bg-gray-200 px-2 py-1 text-center text-xs">
-        {formatMoney(capSpaceByYear.year2028)}
-      </td>
+      {capSpaceWindow.map((c) => (
+        <td
+          key={c.year}
+          className="border-t border-gray-800 bg-gray-200 px-2 py-1 text-center text-xs"
+        >
+          {formatMoney(c.remaining)}
+        </td>
+      ))}
     </tr>
   );
 };

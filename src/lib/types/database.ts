@@ -207,6 +207,7 @@ export interface DraftPick {
   pick: number;
   playerId?: number | null;
   isTraded: boolean;
+  isSigning: boolean;
   createdAt: Date;
   updatedAt: Date;
 }

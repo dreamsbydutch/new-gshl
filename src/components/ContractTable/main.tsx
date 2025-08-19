@@ -37,7 +37,7 @@ export function TeamContractTable({
   nhlTeams,
 }: ContractTableProps) {
   // Derive display-ready data (sorted contracts, cap space, readiness flag)
-  const { sortedContracts, capSpaceByYear, ready } = useContractTableData({
+  const { sortedContracts, capSpaceWindow, ready } = useContractTableData({
     currentSeason,
     currentTeam,
     contracts,
@@ -78,7 +78,7 @@ export function TeamContractTable({
             {/* Summary row for remaining cap space across seasons */}
             <CapSpaceRow
               currentTeam={currentTeam!}
-              capSpaceByYear={capSpaceByYear}
+              capSpaceWindow={capSpaceWindow}
             />
           </tbody>
         </table>

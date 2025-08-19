@@ -543,6 +543,7 @@ export const SHEETS_CONFIG = {
       "pick",
       "playerId",
       "isTraded",
+      "isSigning",
       "createdAt",
       "updatedAt",
     ],

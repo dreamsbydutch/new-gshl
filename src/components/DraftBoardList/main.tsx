@@ -95,3 +95,25 @@ export function DraftBoardList({ seasonId = 12 }: { seasonId?: number }) {
     />
   );
 }
+
+// Minimal wrapper for homepage: only shows mock draft (no toolbar)
+export function MockDraftPreview({ seasonId = 12 }: { seasonId?: number }) {
+  const { isLoading, draftPlayers, nhlTeams, gshlTeams, seasonDraftPicks } =
+    useDraftBoardData({ seasonId, selectedType: "mockdraft" });
+  if (isLoading) {
+    return (
+      <div className="mt-8">
+        <h2 className="mb-4 text-2xl font-bold">Mock Draft</h2>
+        <p className="text-gray-500">Loading mock draft...</p>
+      </div>
+    );
+  }
+  return (
+    <MockDraftList
+      seasonDraftPicks={seasonDraftPicks}
+      draftPlayers={draftPlayers}
+      nhlTeams={nhlTeams}
+      gshlTeams={gshlTeams}
+    />
+  );
+}

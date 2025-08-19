@@ -9,9 +9,7 @@
 import { formatMoney } from "@gshl-utils";
 import { PlayerContractRowSkeleton } from "@gshl-skeletons";
 import Image from "next/image";
-import {
-  getExpiryStatusClass,
-} from "../utils";
+import { getExpiryStatusClass } from "../utils";
 import type { PlayerContractRowProps } from "../utils";
 
 export const PlayerContractRow = ({
@@ -99,10 +97,13 @@ export const PlayerContractRow = ({
         // Derive base future year consistent with cap space hook (first season year + 1)
         const firstYear = parseInt(currentSeason.name.slice(0, 4), 10);
         const baseYear = firstYear + 1;
-        const futureYears: number[] = [baseYear, baseYear + 1, baseYear + 2];
-        if (currentSeason.signingEndDate < new Date()) {
-          futureYears.push(baseYear + 3);
-        }
+        // Always show next 5 future accounting years now (aligns with header offsets 1..5)
+        const futureYears: number[] = [
+          baseYear,
+          baseYear + 1,
+          baseYear + 2,
+          baseYear + 3,
+        ];
         return futureYears.map((y) => renderCapHitCell(y));
       })()}
     </tr>

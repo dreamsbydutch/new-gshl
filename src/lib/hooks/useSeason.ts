@@ -18,7 +18,7 @@ export function useActiveSeason() {
 }
 export function useCurrentSeason() {
   const now = new Date();
-  const year = now.getMonth() < 9 ? now.getFullYear() : now.getFullYear() + 1;
+  const year = now.getMonth() < 6 ? now.getFullYear() : now.getFullYear() + 1;
 
   const data = api.season.getAll.useQuery({ where: { year } });
   return {

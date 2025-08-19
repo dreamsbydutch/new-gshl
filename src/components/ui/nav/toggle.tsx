@@ -84,7 +84,10 @@ export function HorizontalToggle<T>({
 
   return (
     <div
-      className={cn("no-scrollbar flex flex-row overflow-scroll", className)}
+      className={cn(
+        "no-scrollbar flex flex-row gap-1 overflow-x-auto overflow-y-hidden whitespace-nowrap",
+        className,
+      )}
     >
       {items.map((item) => {
         const key = getItemKey(item);

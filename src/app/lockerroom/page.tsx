@@ -10,17 +10,22 @@ import {
   useAllContracts,
   useAllDraftPicks,
   useAllPlayers,
+  useAllSeasons,
   useCurrentSeason,
   useTeamsBySeasonId,
+  useAllTeams,
   useNHLTeams,
 } from "@gshl-hooks";
 import { ContractStatus } from "@gshl-types";
+import { useSeasonNavigation } from "@gshl-cache";
+import { OwnerContractHistory } from "@gshl-components/ContractHistory";
 
 export default function LockerRoomPage() {
   const selectedLockerRoomType = useNavStore(
     (state) => state.selectedLockerRoomType,
   );
   const selectedOwnerId = useNavStore((state) => state.selectedOwnerId);
+  const { selectedSeasonId: navSelectedSeasonId } = useSeasonNavigation();
 
   const { data: contracts } = useAllContracts();
   const { data: currentSeason } = useCurrentSeason();
@@ -29,7 +34,9 @@ export default function LockerRoomPage() {
   const seasonId = currentSeason?.[0]?.id;
   const { data: teams } = useTeamsBySeasonId(seasonId ?? 0);
   const { data: draftPicks } = useAllDraftPicks();
+  const { data: seasons } = useAllSeasons();
   const { data: nhlTeams } = useNHLTeams();
+  const { data: allTeams } = useAllTeams();
 
   const currentTeam = teams?.find((t) => t.ownerId === selectedOwnerId);
   const teamContracts = contracts?.filter(
@@ -59,13 +66,25 @@ export default function LockerRoomPage() {
           <TeamDraftPickList
             {...{
               teams,
-              draftPicks: draftPicks?.filter(
-                (a) => a.gshlTeamId === currentTeam.id,
-              ),
+              allTeams,
+              draftPicks: draftPicks, // now full list; component scopes by team & season
               contracts: teamContracts?.filter(
                 (a) => a.expiryStatus !== ContractStatus.BUYOUT,
               ),
               players,
+              seasons,
+              gshlTeamId: currentTeam.id,
+              selectedSeasonId: navSelectedSeasonId,
+            }}
+          />
+          <OwnerContractHistory
+            {...{
+              ownerId: selectedOwnerId,
+              teams,
+              allTeams,
+              contracts,
+              players,
+              seasons,
             }}
           />
         </>
