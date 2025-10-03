@@ -1,7 +1,7 @@
 import type { ToggleItem } from "@gshl-types";
 import { useState } from "react";
 import { DraftBoardTable, MockDraftList } from "./components";
-import { useDraftBoardData } from "@gshl-hooks/draft-board-list";
+import { useDraftBoardData } from "@gshl-hooks";
 // utilities exported from utils if needed later
 
 export function DraftBoardList({ seasonId = "12" }: { seasonId?: string }) {

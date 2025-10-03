@@ -4,8 +4,8 @@ import {
   parseNumericValue,
   buildOwnerOptions,
   calculateWinLossRecord,
+  GAME_TYPE_OPTIONS,
 } from "@gshl-utils/team-history";
-import { GAME_TYPE_OPTIONS } from "@gshl-utils/team-history";
 import type { GSHLTeam } from "@gshl-types";
 import {
   useAllMatchups,

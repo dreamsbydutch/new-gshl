@@ -4,7 +4,7 @@ import {
   RatingLegend,
   RosterLineup,
 } from "./components";
-import { useTeamRosterData } from "@gshl-hooks/team-roster";
+import { useTeamRosterData } from "@gshl-hooks";
 import type { TeamRosterProps } from "@gshl-utils/team-roster";
 
 export function TeamRoster({

@@ -11,7 +11,7 @@ import {
   lighten,
   readableText,
   useTeamColor,
-} from "@gshl-hooks/draft-board-list";
+} from "@gshl-hooks";
 
 function MockDraftPickCard({
   pick,

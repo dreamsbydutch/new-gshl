@@ -2,7 +2,7 @@
 
 import { DraftPickListSkeleton } from "@gshl-skeletons";
 import { DraftPickItem } from "./components";
-import { useTeamDraftPickListData } from "@gshl-hooks/team-draft-pick-list";
+import { useTeamDraftPickListData } from "@gshl-hooks";
 import type { TeamDraftPickListProps } from "@gshl-utils/team-draft-pick-list";
 import type { Season } from "@gshl-types";
 import { useEffect, useState } from "react";

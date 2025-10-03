@@ -1,7 +1,7 @@
 "use client";
 
 import { TeamScheduleHeader, TeamScheduleItem } from "./components";
-import { useTeamScheduleData } from "@gshl-hooks/team-schedule";
+import { useTeamScheduleData } from "@gshl-hooks";
 
 export function TeamSchedule() {
   const { selectedTeam, matchups, teams } = useTeamScheduleData();
@@ -18,7 +18,7 @@ export function TeamSchedule() {
     <div className="mx-2 mb-40 mt-4">
       <TeamScheduleHeader />
       <div>
-        {matchups.map(({ matchup, week }) => (
+  {matchups.map(({ matchup, week }) => (
           <TeamScheduleItem
             key={`team-${matchup.id}`}
             matchup={matchup}

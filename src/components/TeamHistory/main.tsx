@@ -1,6 +1,6 @@
 import React from "react";
 import { FilterDropdowns, RecordDisplay, MatchupList } from "./components";
-import { useTeamHistoryData } from "@gshl-hooks/team-history";
+import { useTeamHistoryData } from "@gshl-hooks";
 import type { TeamHistoryProps } from "@gshl-utils/team-history";
 
 // Import your actual LoadingSpinner component here

@@ -1,5 +1,5 @@
 import { StandingsGroupComponent } from "./components";
-import { useStandingsData } from "@gshl-hooks/standings-container";
+import { useStandingsData } from "@gshl-hooks";
 import type { StandingsContainerProps } from "@gshl-utils/standings-container";
 
 export const StandingsContainer = ({
