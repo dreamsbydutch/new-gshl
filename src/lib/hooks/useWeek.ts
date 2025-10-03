@@ -1,7 +1,6 @@
-import { convertInputDate } from "@gshl-utils";
 import { clientApi as api } from "@gshl-trpc";
 
-export function useCurrentWeek(weekId?: number) {
+export function useCurrentWeek(weekId?: string) {
   const now = new Date();
   const { data: season } = api.season.getActive.useQuery();
   const { data: weeks } = weekId
@@ -17,23 +16,20 @@ export function useCurrentWeek(weekId?: number) {
     ? weeks?.[0]
     : weeks?.find(
         (week) =>
-          convertInputDate(+week.startDate) <= now &&
-          convertInputDate(+week.endDate) >= now,
+          week.startDate instanceof Date &&
+          week.endDate instanceof Date &&
+          week.startDate <= now &&
+          week.endDate >= now,
       );
 
   return {
-    data: currentWeek
-      ? {
-          ...currentWeek,
-          startDate: convertInputDate(+currentWeek.startDate),
-          endDate: convertInputDate(+currentWeek.endDate),
-        }
-      : undefined,
+    data: currentWeek,
     isLoading: !currentWeek,
     error: null,
   };
 }
-export function usePreviousWeek(weekId?: number) {
+
+export function usePreviousWeek(weekId?: string) {
   const now = new Date();
   const { data: season } = api.season.getActive.useQuery();
   const { data: weeks } = weekId
@@ -46,23 +42,20 @@ export function usePreviousWeek(weekId?: number) {
     ? weeks?.[weeks?.findIndex((week) => week.id === weekId) - 1]
     : weeks?.find(
         (week) =>
-          convertInputDate(+week.startDate) < now &&
-          convertInputDate(+week.endDate) < now,
+          week.startDate instanceof Date &&
+          week.endDate instanceof Date &&
+          week.startDate < now &&
+          week.endDate < now,
       );
 
   return {
-    data: mostRecentWeek
-      ? {
-          ...mostRecentWeek,
-          startDate: convertInputDate(+mostRecentWeek.startDate),
-          endDate: convertInputDate(+mostRecentWeek.endDate),
-        }
-      : undefined,
+    data: mostRecentWeek ?? undefined,
     isLoading: !mostRecentWeek,
     error: null,
   };
 }
-export function useNextWeek(weekId?: number) {
+
+export function useNextWeek(weekId?: string) {
   const now = new Date();
   const { data: season } = api.season.getActive.useQuery();
   const { data: weeks } = weekId
@@ -75,98 +68,81 @@ export function useNextWeek(weekId?: number) {
     ? weeks?.[weeks?.findIndex((week) => week.id === weekId) + 1]
     : weeks?.find(
         (week) =>
-          convertInputDate(+week.startDate) > now &&
-          convertInputDate(+week.endDate) > now,
+          week.startDate instanceof Date &&
+          week.endDate instanceof Date &&
+          week.startDate > now &&
+          week.endDate > now,
       );
 
   return {
-    data: nextWeek
-      ? {
-          ...nextWeek,
-          startDate: convertInputDate(+nextWeek.startDate),
-          endDate: convertInputDate(+nextWeek.endDate),
-        }
-      : undefined,
+    data: nextWeek ?? undefined,
     isLoading: !nextWeek,
     error: null,
   };
 }
 
-export function useWeekById(weekId: number) {
+export function useWeekById(weekId: string) {
   const {
     data: week,
     isLoading,
     error,
   } = api.week.getById.useQuery({ id: weekId });
-
   return {
-    data: week
-      ? {
-          ...week,
-          startDate: convertInputDate(+week.startDate),
-          endDate: convertInputDate(+week.endDate),
-        }
-      : undefined,
+    data: week ?? undefined,
     isLoading,
     error,
   };
 }
 
-export function useWeeksBySeasonId(seasonId: number) {
+export function useWeeksBySeasonId(seasonId: string) {
   const {
     data: weeks,
     isLoading,
     error,
   } = api.week.getAll.useQuery({
-    where: { seasonId },
+    where: { seasonId: String(seasonId) },
     orderBy: { startDate: "asc" },
   });
   return {
-    data: weeks?.map((week) => ({
-      ...week,
-      startDate: convertInputDate(+week.startDate),
-      endDate: convertInputDate(+week.endDate),
-    })),
+    data: weeks,
     isLoading,
     error,
   };
 }
 
-export function useRegularSeasonWeeks(seasonId?: number) {
+export function useRegularSeasonWeeks(seasonId?: string) {
   const {
     data: weeks,
     isLoading,
     error,
   } = api.week.getAll.useQuery({
-    where: { seasonId, isPlayoffs: false },
+    where: {
+      seasonId: seasonId ? String(seasonId) : undefined,
+      isPlayoffs: false,
+    },
     orderBy: { startDate: "asc" },
   });
   return {
-    data: weeks?.map((week) => ({
-      ...week,
-      startDate: convertInputDate(+week.startDate),
-      endDate: convertInputDate(+week.endDate),
-    })),
+    data: weeks,
     isLoading,
     error,
   };
 }
-export function usePlayoffWeeks(seasonId?: number) {
+
+export function usePlayoffWeeks(seasonId?: string) {
   const {
     data: weeks,
     isLoading,
     error,
   } = api.week.getAll.useQuery({
-    where: { seasonId, isPlayoffs: true },
+    where: {
+      seasonId: seasonId ? String(seasonId) : undefined,
+      isPlayoffs: true,
+    },
     orderBy: { startDate: "asc" },
   });
-
   return {
-    data: weeks?.map((week) => ({
-      ...week,
-      startDate: convertInputDate(+week.startDate),
-      endDate: convertInputDate(+week.endDate),
-    })),
+    data: weeks,
     isLoading,
     error,
   };
@@ -177,14 +153,11 @@ export function useAllWeeks() {
     data: weeks,
     isLoading,
     error,
-  } = api.week.getAll.useQuery({ orderBy: { startDate: "asc" } });
-
+  } = api.week.getAll.useQuery({
+    orderBy: { startDate: "asc" },
+  });
   return {
-    data: weeks?.map((week) => ({
-      ...week,
-      startDate: convertInputDate(+week.startDate),
-      endDate: convertInputDate(+week.endDate),
-    })),
+    data: weeks,
     isLoading,
     error,
   };

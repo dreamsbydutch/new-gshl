@@ -1,4 +1,4 @@
-import type { FilterDropdownsProps } from "../utils";
+import type { FilterDropdownsProps } from "@gshl-utils/team-history";
 
 export const FilterDropdowns = ({
   seasonValue,

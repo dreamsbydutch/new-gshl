@@ -9,8 +9,8 @@
 import { formatMoney } from "@gshl-utils";
 import { PlayerContractRowSkeleton } from "@gshl-skeletons";
 import Image from "next/image";
-import { getExpiryStatusClass } from "../utils";
-import type { PlayerContractRowProps } from "../utils";
+import { getExpiryStatusClass } from "@gshl-utils";
+import type { PlayerContractRowProps } from "@gshl-utils";
 
 export const PlayerContractRow = ({
   contract,
@@ -30,7 +30,10 @@ export const PlayerContractRow = ({
    * if it expires exactly that season (month match), shows the RFA/UFA/other expiry badge.
    */
   const renderCapHitCell = (year: number) => {
-    const endYear = contract.capHitEndDate.getFullYear();
+    const endYear =
+      contract.capHitEndDate instanceof Date
+        ? contract.capHitEndDate.getFullYear()
+        : 0;
     if (endYear > year) {
       // Contract still active beyond this season's year => show cap hit
       return (
@@ -87,6 +90,7 @@ export const PlayerContractRow = ({
       </td>
       {/* Current season column (only if signing window still open, matching header) */}
       {currentSeason.signingEndDate > new Date() &&
+        contract.capHitEndDate instanceof Date &&
         contract.capHitEndDate > new Date() && (
           <td className="border-b border-t border-gray-300 p-1 text-center text-xs">
             {formatMoney(contract.capHit)}

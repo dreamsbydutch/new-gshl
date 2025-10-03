@@ -1,10 +1,10 @@
-import type { GameResultProps } from "../utils/types";
+import type { GameResultProps } from "@gshl-utils/team-schedule";
 import {
   isGameCompleted,
   didTeamWin,
   getResultStyleClass,
   formatTeamScore,
-} from "../utils";
+} from "@gshl-utils/team-schedule";
 
 export const GameResult = ({
   matchup,

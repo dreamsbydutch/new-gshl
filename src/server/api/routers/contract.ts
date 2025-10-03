@@ -7,26 +7,26 @@ import type { Contract } from "@gshl-types";
 // Contract router
 const contractWhereSchema = z
   .object({
-    playerId: z.number().int().optional(),
-    teamId: z.number().int().optional(),
-    seasonId: z.number().int().optional(),
+    playerId: z.string().optional(),
+    teamId: z.string().optional(),
+    seasonId: z.string().optional(),
     isActive: z.boolean().optional(),
   })
   .optional();
 
 const contractCreateSchema = z.object({
-  playerId: z.number().int(),
-  teamId: z.number().int(),
-  seasonId: z.number().int(),
+  playerId: z.string(),
+  teamId: z.string(),
+  seasonId: z.string(),
   salary: z.number().optional(),
   years: z.number().int().optional(),
   isActive: z.boolean().default(true),
 });
 
 const contractUpdateSchema = z.object({
-  playerId: z.number().int().optional(),
-  teamId: z.number().int().optional(),
-  seasonId: z.number().int().optional(),
+  playerId: z.string().optional(),
+  teamId: z.string().optional(),
+  seasonId: z.string().optional(),
   salary: z.number().optional(),
   years: z.number().int().optional(),
   isActive: z.boolean().optional(),
@@ -51,7 +51,7 @@ export const contractRouter = createTRPCRouter({
     }),
 
   getByPlayer: publicProcedure
-    .input(z.object({ playerId: z.number().int() }))
+    .input(z.object({ playerId: z.string() }))
     .query(async ({ input }): Promise<Contract[]> => {
       return optimizedSheetsAdapter.findMany("Contract", {
         where: { playerId: input.playerId },
@@ -59,7 +59,7 @@ export const contractRouter = createTRPCRouter({
     }),
 
   getByTeam: publicProcedure
-    .input(z.object({ teamId: z.number().int() }))
+    .input(z.object({ teamId: z.string() }))
     .query(async ({ input }): Promise<Contract[]> => {
       return optimizedSheetsAdapter.findMany("Contract", {
         where: { teamId: input.teamId },

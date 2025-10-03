@@ -4,7 +4,7 @@ import { formatMoney } from "@gshl-utils";
 import Image from "next/image";
 
 export interface OwnerContractHistoryProps {
-  ownerId: number; // target owner
+  ownerId: string; // target owner
   teams?: GSHLTeam[]; // optional season-constrained teams
   allTeams?: GSHLTeam[]; // full multi-season team list preferred
   contracts?: Contract[];
@@ -33,19 +33,19 @@ export function OwnerContractHistory({
   );
 
   const playerById = useMemo(() => {
-    const map = new Map<number, Player>();
+    const map = new Map<string, Player>();
     players?.forEach((p) => map.set(p.id, p));
     return map;
   }, [players]);
 
   const franchiseById = useMemo(() => {
-    const map = new Map<number, GSHLTeam>();
+    const map = new Map<string, GSHLTeam>();
     teamPool.forEach((t) => map.set(t.franchiseId, t));
     return map;
   }, [teamPool]);
 
   const seasonById = useMemo(() => {
-    const map = new Map<number, Season>();
+    const map = new Map<string, Season>();
     seasons?.forEach((s) => map.set(s.id, s));
     return map;
   }, [seasons]);
@@ -54,7 +54,14 @@ export function OwnerContractHistory({
     if (!contracts) return [];
     return contracts
       .filter((c) => ownerFranchiseIds.includes(c.signingFranchiseId))
-      .sort((a, b) => b.signingDate.getTime() - a.signingDate.getTime())
+      .sort((a, b) => {
+        // Handle null or invalid dates safely
+        const aTime =
+          a.signingDate instanceof Date ? a.signingDate.getTime() : 0;
+        const bTime =
+          b.signingDate instanceof Date ? b.signingDate.getTime() : 0;
+        return bTime - aTime;
+      })
       .map((c) => {
         const player = playerById.get(c.playerId);
         const season = seasonById.get(c.seasonId);
@@ -71,8 +78,22 @@ export function OwnerContractHistory({
           length: c.contractLength,
           salary: c.contractSalary,
           capHit: c.capHit,
-          start: c.startDate.toISOString().slice(0, 10),
-          end: c.capHitEndDate.toISOString().slice(0, 10),
+          start:
+            c.startDate instanceof Date && !isNaN(c.startDate.getTime())
+              ? c.startDate.toLocaleDateString("en-US", {
+                  year: "numeric",
+                  month: "short",
+                  day: "numeric",
+                })
+              : "-",
+          end:
+            c.capHitEndDate instanceof Date && !isNaN(c.capHitEndDate.getTime())
+              ? c.capHitEndDate.toLocaleDateString("en-US", {
+                  year: "numeric",
+                  month: "short",
+                  day: "numeric",
+                })
+              : "-",
           expiryStatus: c.expiryStatus,
         };
       });

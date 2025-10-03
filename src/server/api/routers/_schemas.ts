@@ -2,7 +2,7 @@ import { z } from "zod";
 
 // Common validation schemas
 export const idSchema = z.object({
-  id: z.number().int().positive(),
+  id: z.string(),
 });
 
 export const paginationSchema = z.object({
@@ -29,7 +29,7 @@ export const countResponseSchema = z.object({
 
 // Generic batch operation schemas
 export const batchDeleteSchema = z.object({
-  ids: z.array(z.number().int().positive()),
+  ids: z.array(z.string()),
 });
 
 // Success response

@@ -1,7 +1,7 @@
 "use client";
 
 import { TeamScheduleHeader, TeamScheduleItem } from "./components";
-import { useTeamScheduleData } from "./hooks";
+import { useTeamScheduleData } from "@gshl-hooks/team-schedule";
 
 export function TeamSchedule() {
   const { selectedTeam, matchups, teams } = useTeamScheduleData();

@@ -1,7 +1,11 @@
 import { LoadingSpinner } from "@gshl-ui";
 import { cn } from "@gshl-utils";
-import type { WeekScheduleItemProps } from "../utils/types";
-import { findTeamById, getGameBackgroundClass, isValidMatchup } from "../utils";
+import {
+  findTeamById,
+  getGameBackgroundClass,
+  isValidMatchup,
+  type WeekScheduleItemProps,
+} from "@gshl-utils/weekly-schedule";
 import { TeamDisplay } from "./TeamDisplay";
 import { ScoreDisplay } from "./ScoreDisplay";
 

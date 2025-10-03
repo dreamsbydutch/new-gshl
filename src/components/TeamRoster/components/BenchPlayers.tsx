@@ -1,6 +1,6 @@
 import { ContractStatus, type Contract, type Player } from "@gshl-types";
 import { cn, formatMoney } from "@gshl-utils";
-import { getRatingColorClass } from "../utils";
+import { getRatingColorClass } from "@gshl-utils/team-roster";
 import Image from "next/image";
 import { useNHLTeams } from "@gshl-hooks";
 import { useMemo } from "react";

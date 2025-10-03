@@ -1,4 +1,7 @@
-import { type RecordDisplayProps, calculateWinPercentage } from "../utils";
+import {
+  type RecordDisplayProps,
+  calculateWinPercentage,
+} from "@gshl-utils/team-history";
 
 export const RecordDisplay = ({ winLossRecord }: RecordDisplayProps) => {
   const winPercentage = calculateWinPercentage(winLossRecord);

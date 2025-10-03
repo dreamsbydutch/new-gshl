@@ -7,8 +7,10 @@
  * and intelligent positioning.
  */
 
-import type { Season } from "@gshl-types";
-import { useAllSeasons } from "@gshl-hooks";
+import { useMemo } from "react";
+
+import type { SeasonSummary } from "@gshl-utils";
+import { useSeasonState } from "@gshl-hooks";
 import { DropdownToggle } from "./toggle";
 import { useSeasonNavigation } from "@gshl-cache";
 
@@ -17,46 +19,29 @@ interface SeasonToggleNavProps {
   dropdownPosition?: "above" | "below" | "auto";
 }
 
-/**
- * Season selection dropdown component
- * @param props - Component props
- * @param props.className - Optional CSS classes
- * @param props.dropdownPosition - Dropdown positioning behavior
- * @returns Season selection dropdown
- */
 export function SeasonToggleNav({
   className,
   dropdownPosition,
 }: SeasonToggleNavProps) {
-  const { data: seasons } = useAllSeasons();
-  const { setSelectedSeasonId, selectedSeason } = useSeasonNavigation();
+  const { seasonOptions } = useSeasonState({ autoSelect: false });
+  const { setSelectedSeasonId, selectedSeasonSummary } = useSeasonNavigation();
 
-  /**
-   * Handle season selection
-   * @param season - Selected season object
-   */
-  const handleSeasonSelect = (season: Season) => {
+  const handleSeasonSelect = (season: SeasonSummary) => {
     setSelectedSeasonId(season.id);
   };
 
-  /**
-   * Get unique key for season item
-   * @param season - Season object
-   * @returns Season ID as string
-   */
-  const getSeasonKey = (season: Season) => season.id.toString();
+  const getSeasonKey = (season: SeasonSummary) => season.id;
+  const getSeasonLabel = (season: SeasonSummary) => season.name;
 
-  /**
-   * Get display label for season
-   * @param season - Season object
-   * @returns Season name
-   */
-  const getSeasonLabel = (season: Season) => season.name;
+  const sortedOptions = useMemo(
+    () => [...seasonOptions].sort((a, b) => b.year - a.year),
+    [seasonOptions],
+  );
 
   return (
-    <DropdownToggle<Season>
-      items={seasons?.sort((a, b) => b.year - a.year) ?? []}
-      selectedItem={selectedSeason}
+    <DropdownToggle<SeasonSummary>
+      items={sortedOptions}
+      selectedItem={selectedSeasonSummary ?? null}
       onSelect={handleSeasonSelect}
       getItemKey={getSeasonKey}
       getItemLabel={getSeasonLabel}

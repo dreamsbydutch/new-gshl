@@ -7,30 +7,30 @@ import type { DraftPick } from "@gshl-types";
 // Draft Pick router
 const draftPickWhereSchema = z
   .object({
-    playerId: z.number().int().optional(),
-    teamId: z.number().int().optional(),
-    seasonId: z.number().int().optional(),
-    round: z.number().int().optional(),
-    pick: z.number().int().optional(),
+    playerId: z.string().optional(),
+    teamId: z.string().optional(),
+    seasonId: z.string().optional(),
+    round: z.string().optional(),
+    pick: z.string().optional(),
   })
   .optional();
 
 const draftPickCreateSchema = z.object({
-  playerId: z.number().int().optional(),
-  teamId: z.number().int(),
-  seasonId: z.number().int(),
-  round: z.number().int(),
-  pick: z.number().int(),
-  originalTeamId: z.number().int().optional(),
+  playerId: z.string().optional(),
+  teamId: z.string(),
+  seasonId: z.string(),
+  round: z.string(),
+  pick: z.string(),
+  originalTeamId: z.string().optional(),
 });
 
 const draftPickUpdateSchema = z.object({
-  playerId: z.number().int().optional(),
-  teamId: z.number().int().optional(),
-  seasonId: z.number().int().optional(),
-  round: z.number().int().optional(),
-  pick: z.number().int().optional(),
-  originalTeamId: z.number().int().optional(),
+  playerId: z.string().optional(),
+  teamId: z.string().optional(),
+  seasonId: z.string().optional(),
+  round: z.string().optional(),
+  pick: z.string().optional(),
+  originalTeamId: z.string().optional(),
 });
 
 export const draftPickRouter = createTRPCRouter({
@@ -52,7 +52,7 @@ export const draftPickRouter = createTRPCRouter({
     }),
 
   getByTeam: publicProcedure
-    .input(z.object({ teamId: z.number().int() }))
+    .input(z.object({ teamId: z.string() }))
     .query(async ({ input }): Promise<DraftPick[]> => {
       return optimizedSheetsAdapter.findMany("DraftPick", {
         where: { teamId: input.teamId },
@@ -60,14 +60,14 @@ export const draftPickRouter = createTRPCRouter({
     }),
 
   getBySeason: publicProcedure
-    .input(z.object({ seasonId: z.number().int() }))
+    .input(z.object({ seasonId: z.string() }))
     .query(async ({ input }): Promise<DraftPick[]> => {
       const picksRaw = await optimizedSheetsAdapter.findMany("DraftPick", {
         where: { seasonId: input.seasonId },
       });
       const picks = (picksRaw as DraftPick[])
         .slice()
-        .sort((a, b) => a.round - b.round || a.pick - b.pick);
+        .sort((a, b) => +a.round - +b.round || +a.pick - +b.pick);
       return picks;
     }),
 

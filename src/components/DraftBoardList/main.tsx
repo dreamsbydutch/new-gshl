@@ -1,10 +1,10 @@
 import type { ToggleItem } from "@gshl-types";
 import { useState } from "react";
 import { DraftBoardTable, MockDraftList } from "./components";
-import { useDraftBoardData } from "./hooks";
+import { useDraftBoardData } from "@gshl-hooks/draft-board-list";
 // utilities exported from utils if needed later
 
-export function DraftBoardList({ seasonId = 12 }: { seasonId?: number }) {
+export function DraftBoardList({ seasonId = "12" }: { seasonId?: string }) {
   const [selectedType, setSelectedType] = useState<string>("all");
   const {
     isLoading,
@@ -17,8 +17,8 @@ export function DraftBoardList({ seasonId = 12 }: { seasonId?: number }) {
 
   if (isLoading) {
     return (
-      <div className="mt-8">
-        <h2 className="mb-4 text-2xl font-bold">Draft Board</h2>
+      <div className="mt-6">
+        <h2 className="mb-1 text-xl font-semibold">Draft Board</h2>
         <p className="text-gray-500">Loading players...</p>
       </div>
     );
@@ -72,6 +72,11 @@ export function DraftBoardList({ seasonId = 12 }: { seasonId?: number }) {
         value: "G",
         setter: (type: string | null) => setSelectedType(type ?? ""),
       },
+      {
+        key: "wildcard",
+        value: "WC",
+        setter: (type: string | null) => setSelectedType(type ?? ""),
+      },
     ],
   };
 
@@ -88,6 +93,7 @@ export function DraftBoardList({ seasonId = 12 }: { seasonId?: number }) {
   }
   return (
     <DraftBoardTable
+      // pickedPlayers= {1}
       draftPlayers={filteredPlayers}
       totalCount={draftPlayers.length}
       nhlTeams={nhlTeams}
@@ -97,13 +103,13 @@ export function DraftBoardList({ seasonId = 12 }: { seasonId?: number }) {
 }
 
 // Minimal wrapper for homepage: only shows mock draft (no toolbar)
-export function MockDraftPreview({ seasonId = 12 }: { seasonId?: number }) {
+export function MockDraftPreview({ seasonId = "12" }: { seasonId?: string }) {
   const { isLoading, draftPlayers, nhlTeams, gshlTeams, seasonDraftPicks } =
     useDraftBoardData({ seasonId, selectedType: "mockdraft" });
   if (isLoading) {
     return (
-      <div className="mt-8 text-center">
-        <h2 className="mb-4 text-2xl font-bold">GSHL Mock Draft</h2>
+      <div className="mt-6 text-center">
+        <h2 className="mb-1 text-xl font-semibold">GSHL Mock Draft</h2>
         <p className="text-gray-500">Loading mock draft...</p>
       </div>
     );

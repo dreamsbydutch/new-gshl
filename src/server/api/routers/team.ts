@@ -2,16 +2,24 @@ import { z } from "zod";
 import { createTRPCRouter, publicProcedure } from "../trpc";
 import { optimizedSheetsAdapter } from "@gshl-sheets";
 import { idSchema, baseQuerySchema, batchDeleteSchema } from "./_schemas";
-import type { NHLTeam, Player, Team } from "@gshl-types";
+import type {
+  NHLTeam,
+  Player,
+  Team,
+  GSHLTeam,
+  Franchise,
+  Owner,
+  Conference,
+} from "@gshl-types";
 
 // Team-specific schemas
 const teamWhereSchema = z
   .object({
     name: z.string().optional(),
     abbreviation: z.string().optional(),
-    seasonId: z.number().int().optional(),
-    franchiseId: z.number().int().optional(),
-    conferenceId: z.number().int().optional(),
+    seasonId: z.string().optional(),
+    franchiseId: z.string().optional(),
+    conferenceId: z.string().optional(),
     isActive: z.boolean().optional(),
   })
   .optional();
@@ -19,9 +27,9 @@ const teamWhereSchema = z
 const teamCreateSchema = z.object({
   name: z.string(),
   abbreviation: z.string(),
-  seasonId: z.number().int(),
-  franchiseId: z.number().int(),
-  conferenceId: z.number().int(),
+  seasonId: z.string(),
+  franchiseId: z.string(),
+  conferenceId: z.string(),
   isActive: z.boolean().default(true),
   logoUrl: z.string().optional(),
   primaryColor: z.string().optional(),
@@ -32,9 +40,9 @@ const teamCreateSchema = z.object({
 const teamUpdateSchema = z.object({
   name: z.string().optional(),
   abbreviation: z.string().optional(),
-  seasonId: z.number().int().optional(),
-  franchiseId: z.number().int().optional(),
-  conferenceId: z.number().int().optional(),
+  seasonId: z.string().optional(),
+  franchiseId: z.string().optional(),
+  conferenceId: z.string().optional(),
   isActive: z.boolean().optional(),
   logoUrl: z.string().optional(),
   primaryColor: z.string().optional(),
@@ -50,11 +58,56 @@ export const teamRouter = createTRPCRouter({
         where: teamWhereSchema,
       }),
     )
-    .query(async ({ input }): Promise<Team[]> => {
-      return optimizedSheetsAdapter.findMany(
+    .query(async ({ input }): Promise<GSHLTeam[]> => {
+      // Get basic team data
+      const teams = (await optimizedSheetsAdapter.findMany(
         "Team",
         input,
-      ) as unknown as Promise<Team[]>;
+      )) as unknown as Team[];
+
+      if (!teams || teams.length === 0) {
+        return [];
+      }
+
+      // Get related data for enrichment
+      const [franchises, owners, conferences] = await Promise.all([
+        optimizedSheetsAdapter.findMany(
+          "Franchise",
+          {},
+        ) as unknown as Franchise[],
+        optimizedSheetsAdapter.findMany("Owner", {}) as unknown as Owner[],
+        optimizedSheetsAdapter.findMany(
+          "Conference",
+          {},
+        ) as unknown as Conference[],
+      ]);
+
+      // Enrich team data with franchise, owner, and conference information
+      return teams.map((team): GSHLTeam => {
+        const franchise = franchises.find((f) => f.id === team.franchiseId);
+        const owner = owners.find((o) => o.id === franchise?.ownerId);
+        const conference = conferences.find((c) => c.id === team.confId);
+
+        return {
+          id: team.id,
+          seasonId: team.seasonId,
+          franchiseId: team.franchiseId,
+          name: franchise?.name ?? null,
+          abbr: franchise?.abbr ?? null,
+          logoUrl: franchise?.logoUrl ?? null,
+          isActive: franchise?.isActive ?? false,
+          confName: conference?.name ?? null,
+          confAbbr: conference?.abbr ?? null,
+          confLogoUrl: conference?.logoUrl ?? null,
+          ownerId: owner?.id ?? null,
+          ownerFirstName: owner?.firstName ?? null,
+          ownerLastName: owner?.lastName ?? null,
+          ownerNickname: owner?.nickName ?? null,
+          ownerEmail: owner?.email ?? null,
+          ownerOwing: owner?.owing ?? null,
+          ownerIsActive: owner?.isActive ?? false,
+        };
+      });
     }),
 
   // Get single team by ID
@@ -68,7 +121,7 @@ export const teamRouter = createTRPCRouter({
 
   // Get teams by conference
   getByConference: publicProcedure
-    .input(z.object({ conferenceId: z.number().int() }))
+    .input(z.object({ conferenceId: z.string() }))
     .query(async ({ input }): Promise<Team[]> => {
       return optimizedSheetsAdapter.findMany("Team", {
         where: { conferenceId: input.conferenceId },
@@ -77,7 +130,7 @@ export const teamRouter = createTRPCRouter({
 
   // Get teams by franchise
   getByFranchise: publicProcedure
-    .input(z.object({ franchiseId: z.number().int() }))
+    .input(z.object({ franchiseId: z.string() }))
     .query(async ({ input }): Promise<Team[]> => {
       return optimizedSheetsAdapter.findMany("Team", {
         where: { franchiseId: input.franchiseId },

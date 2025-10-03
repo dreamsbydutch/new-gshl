@@ -1,5 +1,8 @@
 import { useState, useEffect } from "react";
-import { type MatchupListProps, SEASON_SPLIT_INITIAL } from "../utils";
+import {
+  type MatchupListProps,
+  SEASON_SPLIT_INITIAL,
+} from "@gshl-utils/team-history";
 import { TeamHistoryMatchupLine } from "./TeamHistoryMatchupLine";
 
 export const MatchupList = ({

@@ -70,14 +70,14 @@ export const systemRouter = createTRPCRouter({
     playerLeaderboard: publicProcedure
       .input(
         z.object({
-          seasonId: z.number().int(),
+          seasonId: z.string(),
           statType: z.enum(["G", "A", "P", "PIM", "PPG", "SOG", "HIT", "BLK"]),
           limit: z.number().int().positive().max(100).default(25),
         }),
       )
       .query(async ({ input }) => {
         return apiUtils.leagueUtils.getPlayerLeaderboard(
-          input.seasonId,
+          +input.seasonId,
           input.statType,
           input.limit,
         );

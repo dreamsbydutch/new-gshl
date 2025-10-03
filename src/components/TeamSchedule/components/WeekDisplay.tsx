@@ -1,5 +1,5 @@
-import type { WeekDisplayProps } from "../utils/types";
-import { getGameTypeDisplay } from "../utils";
+import type { WeekDisplayProps } from "@gshl-utils/team-schedule";
+import { getGameTypeDisplay } from "@gshl-utils/team-schedule";
 
 export const WeekDisplay = ({ week, gameType }: WeekDisplayProps) => {
   const display = getGameTypeDisplay(

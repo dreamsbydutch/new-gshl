@@ -1,7 +1,7 @@
 "use client";
 
 import { useLockerRoomNavigation } from "@gshl-cache";
-import { useCurrentSeason } from "@gshl-hooks";
+import { useSeasonState } from "@gshl-hooks";
 import {
   HorizontalToggle,
   SecondaryPageToolbar,
@@ -12,7 +12,9 @@ import type { ToggleItem } from "@gshl-types";
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const { selectedType, setSelectedType } = useLockerRoomNavigation();
-  const { data: currentSeason } = useCurrentSeason();
+  const { selectedSeason, currentSeason, defaultSeason } = useSeasonState();
+  const activeSeason = selectedSeason ?? currentSeason ?? defaultSeason;
+  const activeSeasonId = activeSeason?.id?.toString();
 
   const pageToolbarProps: {
     toolbarKeys: ToggleItem<string | null>[];
@@ -42,13 +44,18 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         value: "Trophy Case",
         setter: (type: string | null) => setSelectedType(type ?? ""),
       },
+      {
+        key: "draft",
+        value: "Draft",
+        setter: (type: string | null) => setSelectedType(type ?? ""),
+      },
     ],
   };
   return (
     <div className="mb-32 font-varela lg:mb-4">
       {children}
       <SecondaryPageToolbar>
-        <TeamsToggle seasonId={currentSeason?.[0]?.id} />
+        <TeamsToggle seasonId={activeSeasonId} />
       </SecondaryPageToolbar>
       <TertiaryPageToolbar>
         <HorizontalToggle<ToggleItem<string | null>>

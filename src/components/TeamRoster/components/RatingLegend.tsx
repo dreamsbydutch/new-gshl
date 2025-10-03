@@ -1,4 +1,4 @@
-import { RATING_RANGES } from "../utils/constants";
+import { RATING_RANGES } from "@gshl-utils/team-roster";
 
 export const RatingLegend = () => {
   return (

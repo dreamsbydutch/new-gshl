@@ -1,11 +1,5 @@
-import type { Contract, Player } from "@gshl-types";
 import { PlayerCard } from "./PlayerCard";
-
-interface RosterLineupProps {
-  teamLineup: (Player | null)[][][];
-  contracts: Contract[] | undefined;
-  showSalaries: boolean;
-}
+import type { RosterLineupProps } from "@gshl-utils/team-roster";
 
 export const RosterLineup = ({
   teamLineup,

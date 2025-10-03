@@ -48,9 +48,9 @@ export const STORAGE_KEYS = {
 
 export const DEFAULT_STORE_STATE = {
   selectedScheduleType: "week",
-  selectedSeasonId: 11,
-  selectedWeekId: 0,
-  selectedOwnerId: 1,
+  selectedSeasonId: "11",
+  selectedWeekId: "0",
+  selectedOwnerId: "1",
   selectedLockerRoomType: "roster",
   selectedLeagueOfficeType: "home",
   selectedStandingsType: "overall",

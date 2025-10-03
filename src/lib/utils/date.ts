@@ -76,3 +76,43 @@ export function convertInputDate(excelSerialDate: number): Date {
 
   return new Date(jsMilliseconds);
 }
+
+/**
+ * Safely converts date input from Google Sheets to a Date object
+ * Handles both string and number inputs from Google Sheets
+ * @param input - Date input that could be a string, number, or Date
+ * @returns Date object or null if invalid
+ */
+export function safeParseSheetDate(input: unknown): Date | null {
+  if (!input) return null;
+
+  // If it's already a Date object, return it
+  if (input instanceof Date) {
+    return isNaN(input.getTime()) ? null : input;
+  }
+
+  // If it's a string, try multiple parsing approaches
+  if (typeof input === "string") {
+    // First try as Excel serial number string
+    const asNumber = parseFloat(input);
+    if (!isNaN(asNumber) && asNumber > 1) {
+      // Likely an Excel serial date
+      return convertInputDate(asNumber);
+    }
+
+    // Try as regular date string
+    const asDate = new Date(input);
+    if (!isNaN(asDate.getTime())) {
+      return asDate;
+    }
+
+    return null;
+  }
+
+  // If it's a number, treat as Excel serial date
+  if (typeof input === "number" && !isNaN(input) && input > 1) {
+    return convertInputDate(input);
+  }
+
+  return null;
+}

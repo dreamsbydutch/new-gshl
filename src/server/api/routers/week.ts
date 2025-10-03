@@ -7,8 +7,8 @@ import type { Week } from "@gshl-types";
 // Week-specific schemas
 const weekWhereSchema = z
   .object({
-    id: z.number().int().optional(),
-    seasonId: z.number().int().optional(),
+    id: z.string().optional(),
+    seasonId: z.string().optional(),
     weekNum: z.number().int().optional(),
     isActive: z.boolean().optional(),
     isPlayoffs: z.boolean().optional(),
@@ -16,7 +16,7 @@ const weekWhereSchema = z
   .optional();
 
 const weekCreateSchema = z.object({
-  seasonId: z.number().int(),
+  seasonId: z.string(),
   weekNum: z.number().int(),
   startDate: z.date(),
   endDate: z.date(),
@@ -25,7 +25,7 @@ const weekCreateSchema = z.object({
 });
 
 const weekUpdateSchema = z.object({
-  seasonId: z.number().int().optional(),
+  seasonId: z.string().optional(),
   weekNum: z.number().int().optional(),
   startDate: z.date().optional(),
   endDate: z.date().optional(),
@@ -59,7 +59,7 @@ export const weekRouter = createTRPCRouter({
 
   // Get weeks by season
   getBySeason: publicProcedure
-    .input(z.object({ seasonId: z.number().int() }))
+    .input(z.object({ seasonId: z.string() }))
     .query(async ({ input }): Promise<Week[]> => {
       const weeksRaw = await optimizedSheetsAdapter.findMany("Week", {
         where: { seasonId: input.seasonId },

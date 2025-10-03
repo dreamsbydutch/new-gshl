@@ -1,1 +1,1 @@
-export * from "./useContractTableData";
+export {};

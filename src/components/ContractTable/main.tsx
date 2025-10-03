@@ -14,9 +14,9 @@
  * - Heavy business rule validation (kept minimal here).
  */
 import { TeamContractTableSkeleton } from "@gshl-skeletons";
+import { useContractTableData } from "@gshl-hooks";
+import type { ContractTableProps } from "@gshl-utils";
 import { CapSpaceRow, PlayerContractRow, TableHeader } from "./components";
-import type { ContractTableProps } from "./utils";
-import { useContractTableData } from "./hooks";
 
 /**
  * Renders a salary/cap overview for a single GSHL team across the active season
@@ -68,7 +68,7 @@ export function TeamContractTable({
               <PlayerContractRow
                 // Some datasets may contain duplicate contract ids (e.g. buyout + active artifacts).
                 // Use composite key with capHitEndDate to ensure stable uniqueness across renders.
-                key={`${contract.id}-${contract.capHitEndDate.getTime()}`}
+                key={`${contract.id}-${contract.capHitEndDate instanceof Date ? contract.capHitEndDate.getTime() : "null"}`}
                 contract={contract}
                 player={players!.find((p) => p.id === contract.playerId)}
                 currentSeason={currentSeason!}

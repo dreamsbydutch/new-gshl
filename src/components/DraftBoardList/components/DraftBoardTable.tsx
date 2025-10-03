@@ -1,12 +1,15 @@
 import { Table } from "@gshl-ui";
 import { NHLLogo } from "../../ui/nhlLogo";
-import { HorizontalToggle, TertiaryPageToolbar } from "@gshl-nav";
+import { HorizontalToggle, SecondaryPageToolbar } from "@gshl-nav";
 import type { ToggleItem, NHLTeam } from "@gshl-types";
-import type { DraftBoardPlayer, DraftBoardToolbarProps } from "../utils/index";
+import type {
+  DraftBoardPlayer,
+  DraftBoardToolbarProps,
+} from "@gshl-utils/draft-board-list";
+import { useState } from "react";
 
 export function DraftBoardTable({
   draftPlayers,
-  totalCount,
   nhlTeams,
   toolbarProps,
 }: {
@@ -17,49 +20,52 @@ export function DraftBoardTable({
 }) {
   return (
     <div className="mt-8">
-      <h2 className="mb-2 text-2xl font-bold">Draft Board</h2>
-      <p className="mb-4 text-xs text-muted-foreground">
-        Showing {draftPlayers.length} of {totalCount} players (active signable +
-        active non-signable UFAs).
-      </p>
+      <h2 className="mb-1 text-center text-xl font-semibold">
+        Best Available{" "}
+        {toolbarProps.activeKey === "all"
+          ? "Players"
+          : toolbarProps.activeKey === "forward"
+            ? "Forwards"
+            : toolbarProps.activeKey === "center"
+              ? "Centers"
+              : toolbarProps.activeKey === "leftwing"
+                ? "Left Wings"
+                : toolbarProps.activeKey === "rightwing"
+                  ? "Right Wings"
+                  : toolbarProps.activeKey === "defense"
+                    ? "Defensemen"
+                    : toolbarProps.activeKey === "goalie"
+                      ? "Goalies"
+                      : toolbarProps.activeKey === "wildcard"
+                        ? "Wildcard"
+                        : ""}
+      </h2>
       <Table className="divide-y divide-gray-200 text-center">
         <thead>
           <tr>
-            <th>Pick</th>
+            <th>Ovr Rk</th>
             <th>Tm</th>
             <th>Player</th>
             <th>Pos</th>
+            <th>Hd</th>
             <th>Age</th>
-            <th>2024-25 Rating</th>
+            <th>Ht</th>
+            <th>Wt</th>
+            <th className="min-w-20">2024-25 Rating</th>
             <th>Overall Rating</th>
           </tr>
         </thead>
         <tbody>
           {draftPlayers.map((player: DraftBoardPlayer) => (
-            <tr key={player.id} className="py-2">
-              <td className="whitespace-nowrap">{player.overallRk}</td>
-              <td>
-                <NHLLogo
-                  team={nhlTeams.find(
-                    (t: NHLTeam) =>
-                      t.abbreviation === player.nhlTeam.toString(),
-                  )}
-                />
-              </td>
-              <td className="whitespace-nowrap">{player.fullName}</td>
-              <td className="whitespace-nowrap">{player.nhlPos.toString()}</td>
-              <td className="whitespace-nowrap">{player.age}</td>
-              <td className="whitespace-nowrap">
-                {(+(player.seasonRating ?? 0).toFixed(2)).toFixed(2)}
-              </td>
-              <td className="whitespace-nowrap">
-                {(+(player.overallRating ?? 0).toFixed(2)).toFixed(2)}
-              </td>
-            </tr>
+            <DraftBoardPlayerListing
+              key={player.id}
+              player={player}
+              nhlTeams={nhlTeams}
+            />
           ))}
         </tbody>
       </Table>
-      <TertiaryPageToolbar>
+      <SecondaryPageToolbar>
         <HorizontalToggle<ToggleItem<string | null>>
           items={toolbarProps.toolbarKeys}
           selectedItem={
@@ -74,7 +80,48 @@ export function DraftBoardTable({
           itemClassName="text-sm text-nowrap"
           className="no-scrollbar flex flex-row overflow-scroll"
         />
-      </TertiaryPageToolbar>
+      </SecondaryPageToolbar>
     </div>
+  );
+}
+
+function DraftBoardPlayerListing({
+  player,
+  nhlTeams,
+}: {
+  player: DraftBoardPlayer;
+  nhlTeams: NHLTeam[];
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  return (
+    <tr key={player.id} className="py-2" onClick={() => setIsOpen(!isOpen)}>
+      <td className="whitespace-nowrap px-1">{player.overallRk}</td>
+      <td>
+        <NHLLogo
+          team={nhlTeams.find(
+            (t: NHLTeam) => t.abbreviation === player.nhlTeam.toString(),
+          )}
+        />
+      </td>
+      <td className="whitespace-nowrap px-2">{player.fullName}</td>
+      <td className="whitespace-nowrap px-2">{player.nhlPos.join(", ")}</td>
+      <td className="whitespace-nowrap px-2">{player.handedness}</td>
+      <td className="whitespace-nowrap px-2">
+        {player.birthday
+          ? Math.floor(
+              (Date.now() - new Date(player.birthday).getTime()) /
+                (365.25 * 24 * 60 * 60 * 1000),
+            )
+          : "N/A"}
+      </td>
+      <td className="whitespace-nowrap px-2">{player.height}</td>
+      <td className="whitespace-nowrap px-2">{player.weight}</td>
+      <td className="whitespace-nowrap px-2">
+        {(+(player.seasonRating ?? 0)).toFixed(2)}
+      </td>
+      <td className="whitespace-nowrap px-2">
+        {(+(player.overallRating ?? 0)).toFixed(2)}
+      </td>
+    </tr>
   );
 }

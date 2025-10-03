@@ -4,7 +4,7 @@ import {
   getMatchupHeaderText,
   getMatchupBackgroundColor,
   getScoreColor,
-} from "../utils";
+} from "@gshl-utils/team-history";
 
 export const TeamHistoryMatchupLine = ({
   matchup,
@@ -51,22 +51,32 @@ export const TeamHistoryMatchupLine = ({
               <span className="xs:text-base pr-1 font-oswald text-sm font-bold text-black">
                 {"#" + matchup.awayRank}
               </span>
-              <Image
-                className="xs:w-12 w-8"
-                src={awayTeam.logoUrl ?? ""}
-                alt="Away Team Logo"
-                width={48}
-                height={48}
-              />
+              {awayTeam.logoUrl ? (
+                <Image
+                  className="xs:w-12 w-8"
+                  src={awayTeam.logoUrl}
+                  alt="Away Team Logo"
+                  width={48}
+                  height={48}
+                />
+              ) : (
+                <div className="xs:w-12 xs:h-12 flex h-8 w-8 items-center justify-center rounded bg-gray-200">
+                  <span className="text-xs text-gray-400">?</span>
+                </div>
+              )}
             </div>
-          ) : (
+          ) : awayTeam.logoUrl ? (
             <Image
               className="xs:w-12 w-8"
-              src={awayTeam.logoUrl ?? ""}
+              src={awayTeam.logoUrl}
               alt="Away Team Logo"
               width={48}
               height={48}
             />
+          ) : (
+            <div className="xs:w-12 xs:h-12 flex h-8 w-8 items-center justify-center rounded bg-gray-200">
+              <span className="text-xs text-gray-400">?</span>
+            </div>
           )}
           <div className="xs:text-lg font-oswald text-base">
             {awayTeam.name}
@@ -97,22 +107,32 @@ export const TeamHistoryMatchupLine = ({
               <span className="xs:text-base pr-1 font-oswald text-sm font-bold text-black">
                 {"#" + matchup.homeRank}
               </span>
-              <Image
-                className="xs:w-12 w-8"
-                src={homeTeam.logoUrl ?? ""}
-                alt="Home Team Logo"
-                width={48}
-                height={48}
-              />
+              {homeTeam.logoUrl ? (
+                <Image
+                  className="xs:w-12 w-8"
+                  src={homeTeam.logoUrl}
+                  alt="Home Team Logo"
+                  width={48}
+                  height={48}
+                />
+              ) : (
+                <div className="xs:w-12 xs:h-12 flex h-8 w-8 items-center justify-center rounded bg-gray-200">
+                  <span className="text-xs text-gray-400">?</span>
+                </div>
+              )}
             </div>
-          ) : (
+          ) : homeTeam.logoUrl ? (
             <Image
               className="xs:w-12 w-8"
-              src={homeTeam.logoUrl ?? ""}
+              src={homeTeam.logoUrl}
               alt="Home Team Logo"
               width={48}
               height={48}
             />
+          ) : (
+            <div className="xs:w-12 xs:h-12 flex h-8 w-8 items-center justify-center rounded bg-gray-200">
+              <span className="text-xs text-gray-400">?</span>
+            </div>
           )}
           <div className="xs:text-lg font-oswald text-base">
             {homeTeam.name}

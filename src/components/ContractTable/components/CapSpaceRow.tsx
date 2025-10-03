@@ -5,7 +5,7 @@
  * @returns Table row (<tr>) summarizing cap space
  */
 import { formatMoney } from "@gshl-utils";
-import type { CapSpaceRowProps } from "../utils";
+import type { CapSpaceRowProps } from "@gshl-utils";
 
 export const CapSpaceRow = ({
   currentTeam,

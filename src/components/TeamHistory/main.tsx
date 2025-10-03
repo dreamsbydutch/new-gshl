@@ -1,14 +1,12 @@
 import React from "react";
 import { FilterDropdowns, RecordDisplay, MatchupList } from "./components";
-import { useTeamHistoryData } from "./hooks";
-import type { TeamHistoryProps } from "./utils";
+import { useTeamHistoryData } from "@gshl-hooks/team-history";
+import type { TeamHistoryProps } from "@gshl-utils/team-history";
 
 // Import your actual LoadingSpinner component here
 declare const LoadingSpinner: React.ComponentType;
 
-export function TeamHistoryContainer({
-  teamInfo,
-}: TeamHistoryProps) {
+export function TeamHistoryContainer({ teamInfo }: TeamHistoryProps) {
   const {
     // Filter states
     gameTypeValue,
@@ -50,11 +48,7 @@ export function TeamHistoryContainer({
 
       <RecordDisplay winLossRecord={winLossRecord} />
 
-      <MatchupList
-        schedule={schedule!}
-        teams={teams}
-        teamInfo={teamInfo}
-      />
+      <MatchupList schedule={schedule!} teams={teams} teamInfo={teamInfo} />
     </>
   );
 }

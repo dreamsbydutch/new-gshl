@@ -4,6 +4,8 @@ import {
 } from "@tanstack/react-query";
 import SuperJSON from "superjson";
 
+const DEFAULT_QUERY_GC_TIME = 1000 * 60 * 15;
+
 export const createQueryClient = () =>
   new QueryClient({
     defaultOptions: {
@@ -17,6 +19,7 @@ export const createQueryClient = () =>
         refetchOnReconnect: true,
         // Ensure fresh data when component mounts
         refetchOnMount: true,
+        gcTime: DEFAULT_QUERY_GC_TIME,
       },
       dehydrate: {
         serializeData: SuperJSON.serialize,

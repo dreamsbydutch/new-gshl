@@ -66,7 +66,7 @@ export function FreeAgencyList() {
                 {(+formatNumber(player.seasonRating ?? 0, 2)).toFixed(2)}
               </td>
               <td className="whitespace-nowrap">
-                {formatMoney((player.salary ?? 0) * 1.25, true)}
+                {formatMoney(+(player.salary ?? 0) * 1.25, true)}
               </td>
             </tr>
           ))}

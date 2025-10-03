@@ -1,5 +1,8 @@
-import { formatDraftPickDescription, getOriginalTeamName } from "../utils";
-import type { DraftPickItemProps } from "../utils";
+import {
+  formatDraftPickDescription,
+  getOriginalTeamName,
+  type DraftPickItemProps,
+} from "@gshl-utils/team-draft-pick-list";
 
 /**
  * Presentational row-like block for a single draft pick.

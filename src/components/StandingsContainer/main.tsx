@@ -1,6 +1,6 @@
 import { StandingsGroupComponent } from "./components";
-import { useStandingsData } from "./hooks";
-import type { StandingsContainerProps } from "./utils/types";
+import { useStandingsData } from "@gshl-hooks/standings-container";
+import type { StandingsContainerProps } from "@gshl-utils/standings-container";
 
 export const StandingsContainer = ({
   standingsType,

@@ -1,4 +1,4 @@
-import type { TeamInfoProps } from "../utils";
+import type { TeamInfoProps } from "@gshl-utils/locker-room-header";
 
 /**
  * Displays the team name and formatted owner name.

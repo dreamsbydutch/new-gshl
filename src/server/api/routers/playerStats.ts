@@ -2,67 +2,71 @@ import { z } from "zod";
 import { createTRPCRouter, publicProcedure } from "../trpc";
 import { optimizedSheetsAdapter } from "@gshl-sheets";
 import { baseQuerySchema } from "./_schemas";
-import type { PlayerDayStatLine, PlayerTotalStatLine, PlayerWeekStatLine } from "@gshl-types";
+import type {
+  PlayerDayStatLine,
+  PlayerTotalStatLine,
+  PlayerWeekStatLine,
+} from "@gshl-types";
 
 // Player stats schemas
 const playerStatsWhereSchema = z
   .object({
-    playerId: z.number().int().optional(),
-    seasonId: z.number().int().optional(),
-    weekId: z.number().int().optional(),
-    teamId: z.number().int().optional(),
+    playerId: z.string().optional(),
+    seasonId: z.string().optional(),
+    weekId: z.string().optional(),
+    teamId: z.string().optional(),
     position: z.string().optional(),
   })
   .optional();
 
 const playerDayStatsCreateSchema = z.object({
-  playerId: z.number().int(),
-  seasonId: z.number().int(),
-  weekId: z.number().int(),
-  gshlTeamId: z.number().int(),
+  playerId: z.string(),
+  seasonId: z.string(),
+  weekId: z.string(),
+  gshlTeamId: z.string(),
   date: z.date(),
   nhlPos: z.string(),
   posGroup: z.string(),
   nhlTeam: z.string(),
-  GP: z.number().default(0),
-  G: z.number().default(0),
-  A: z.number().default(0),
-  P: z.number().default(0),
-  PM: z.number().default(0),
-  PIM: z.number().default(0),
-  PPG: z.number().default(0),
-  PPA: z.number().default(0),
-  SHG: z.number().default(0),
-  SHA: z.number().default(0),
-  GWG: z.number().default(0),
-  GTG: z.number().default(0),
-  SOG: z.number().default(0),
-  HIT: z.number().default(0),
-  BLK: z.number().default(0),
+  GP: z.string().default("0"),
+  G: z.string().default("0"),
+  A: z.string().default("0"),
+  P: z.string().default("0"),
+  PM: z.string().default("0"),
+  PIM: z.string().default("0"),
+  PPG: z.string().default("0"),
+  PPA: z.string().default("0"),
+  SHG: z.string().default("0"),
+  SHA: z.string().default("0"),
+  GWG: z.string().default("0"),
+  GTG: z.string().default("0"),
+  SOG: z.string().default("0"),
+  HIT: z.string().default("0"),
+  BLK: z.string().default("0"),
   // Add other stat fields as needed
 });
 
 const playerWeekStatsCreateSchema = z.object({
-  playerId: z.number().int(),
-  seasonId: z.number().int(),
-  weekId: z.number().int(),
-  gshlTeamId: z.number().int(),
+  playerId: z.string(),
+  seasonId: z.string(),
+  weekId: z.string(),
+  gshlTeamId: z.string(),
   position: z.string(),
-  GP: z.number().default(0),
-  G: z.number().default(0),
-  A: z.number().default(0),
-  P: z.number().default(0),
-  PM: z.number().default(0),
-  PIM: z.number().default(0),
-  PPG: z.number().default(0),
-  PPA: z.number().default(0),
-  SHG: z.number().default(0),
-  SHA: z.number().default(0),
-  GWG: z.number().default(0),
-  GTG: z.number().default(0),
-  SOG: z.number().default(0),
-  HIT: z.number().default(0),
-  BLK: z.number().default(0),
+  GP: z.string().default("0"),
+  G: z.string().default("0"),
+  A: z.string().default("0"),
+  P: z.string().default("0"),
+  PM: z.string().default("0"),
+  PIM: z.string().default("0"),
+  PPG: z.string().default("0"),
+  PPA: z.string().default("0"),
+  SHG: z.string().default("0"),
+  SHA: z.string().default("0"),
+  GWG: z.string().default("0"),
+  GTG: z.string().default("0"),
+  SOG: z.string().default("0"),
+  HIT: z.string().default("0"),
+  BLK: z.string().default("0"),
   // Add other stat fields as needed
 });
 
@@ -87,9 +91,9 @@ export const playerStatsRouter = createTRPCRouter({
     getByPlayer: publicProcedure
       .input(
         z.object({
-          playerId: z.number().int(),
-          seasonId: z.number().int().optional(),
-          weekId: z.number().int().optional(),
+          playerId: z.string(),
+          seasonId: z.string().optional(),
+          weekId: z.string().optional(),
         }),
       )
       .query(async ({ input }): Promise<PlayerDayStatLine[]> => {
@@ -106,8 +110,8 @@ export const playerStatsRouter = createTRPCRouter({
     getByWeek: publicProcedure
       .input(
         z.object({
-          weekId: z.number().int(),
-          seasonId: z.number().int().optional(),
+          weekId: z.string(),
+          seasonId: z.string().optional(),
         }),
       )
       .query(async ({ input }): Promise<PlayerDayStatLine[]> => {
@@ -162,8 +166,8 @@ export const playerStatsRouter = createTRPCRouter({
     getByPlayer: publicProcedure
       .input(
         z.object({
-          playerId: z.number().int(),
-          seasonId: z.number().int().optional(),
+          playerId: z.string(),
+          seasonId: z.string().optional(),
         }),
       )
       .query(async ({ input }): Promise<PlayerWeekStatLine[]> => {
@@ -179,8 +183,8 @@ export const playerStatsRouter = createTRPCRouter({
     getByWeek: publicProcedure
       .input(
         z.object({
-          weekId: z.number().int(),
-          seasonId: z.number().int().optional(),
+          weekId: z.string(),
+          seasonId: z.string().optional(),
         }),
       )
       .query(async ({ input }): Promise<PlayerWeekStatLine[]> => {
@@ -196,7 +200,7 @@ export const playerStatsRouter = createTRPCRouter({
     getLeaderboard: publicProcedure
       .input(
         z.object({
-          seasonId: z.number().int(),
+          seasonId: z.string(),
           statType: z.enum(["G", "A", "P", "PIM", "PPG", "SOG", "HIT", "BLK"]),
           take: z.number().int().positive().max(100).default(25),
         }),
@@ -240,8 +244,8 @@ export const playerStatsRouter = createTRPCRouter({
         baseQuerySchema.extend({
           where: z
             .object({
-              playerId: z.number().int().optional(),
-              seasonId: z.number().int().optional(),
+              playerId: z.string().optional(),
+              seasonId: z.string().optional(),
             })
             .optional(),
         }),
@@ -257,8 +261,8 @@ export const playerStatsRouter = createTRPCRouter({
     getByPlayer: publicProcedure
       .input(
         z.object({
-          playerId: z.number().int(),
-          seasonId: z.number().int().optional(),
+          playerId: z.string(),
+          seasonId: z.string().optional(),
         }),
       )
       .query(async ({ input }): Promise<PlayerTotalStatLine[]> => {
@@ -274,7 +278,7 @@ export const playerStatsRouter = createTRPCRouter({
     getLeaderboard: publicProcedure
       .input(
         z.object({
-          seasonId: z.number().int(),
+          seasonId: z.string(),
           statType: z.enum(["G", "A", "P", "PIM", "PPG", "SOG", "HIT", "BLK"]),
           take: z.number().int().positive().max(100).default(25),
         }),

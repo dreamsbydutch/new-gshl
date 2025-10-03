@@ -1,11 +1,9 @@
 import { LoadingSpinner } from "@gshl-ui";
 import { useState } from "react";
-import type { StandingsItemProps } from "../utils/types";
+import type { StandingsItemProps } from "@gshl-utils/standings-container";
 import Image from "next/image";
 
-export const StandingsItem = ({
-  team,
-}: StandingsItemProps) => {
+export const StandingsItem = ({ team }: StandingsItemProps) => {
   const [showInfo, setShowInfo] = useState(false);
 
   if (!team) return <LoadingSpinner />;
@@ -17,7 +15,19 @@ export const StandingsItem = ({
     >
       <div className="mx-auto flex items-center justify-between px-2 py-0.5 text-center font-varela">
         <div className="p-1">
-          <Image className="w-12" src={team.logoUrl ?? ""} alt="Team Logo" width={48} height={48} />
+          {team.logoUrl ? (
+            <Image
+              className="w-12"
+              src={team.logoUrl}
+              alt="Team Logo"
+              width={48}
+              height={48}
+            />
+          ) : (
+            <div className="flex h-12 w-12 items-center justify-center rounded bg-gray-200">
+              <span className="text-xs text-gray-400">?</span>
+            </div>
+          )}
         </div>
         <div className="text-base font-bold">{team.name}</div>
         <div className="text-base font-bold">

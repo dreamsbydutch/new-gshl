@@ -10,6 +10,28 @@ import { SeasonType } from "@gshl-types";
 
 type HookError = { message: string } | null;
 
+// Enhanced franchise type with additional computed properties
+export interface EnrichedFranchise {
+  id: string;
+  name: string;
+  abbr: string;
+  logoUrl: string;
+  isActive: boolean;
+  confId: string;
+  confName: string | null;
+  confAbbr: string | null;
+  confLogoUrl: string | null;
+  ownerId: string;
+  ownerFirstName: string | null;
+  ownerLastName: string | null;
+  ownerNickname: string | null;
+  ownerEmail: string | null;
+  ownerOwing: number | null;
+  ownerIsActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 export function useAllTeams(): {
   data: GSHLTeam[];
   isLoading: boolean;
@@ -39,7 +61,7 @@ export function useAllTeams(): {
     data:
       teams?.map((t) => {
         const franchise = franchises?.find((f) => f.id === t.franchiseId);
-        const conference = conferences?.find((c) => c.id === t.confId);
+        const conference = conferences?.find((c) => c.name === t.confName);
         const owner = owners?.find((o) => o.id === franchise?.ownerId);
         return {
           id: t.id,
@@ -74,7 +96,7 @@ export function useAllTeams(): {
   };
 }
 
-export function useTeamById(teamId: number): {
+export function useTeamById(teamId: string): {
   data: GSHLTeam;
   isLoading: boolean;
   error: HookError;
@@ -88,22 +110,22 @@ export function useTeamById(teamId: number): {
     data: franchise,
     isLoading: isLoadingFranchise,
     error: errorFranchise,
-  } = api.franchise.getById.useQuery({ id: team?.franchiseId ?? 0 });
+  } = api.franchise.getById.useQuery({ id: team?.franchiseId ?? "0" });
   const {
     data: conference,
     isLoading: isLoadingConference,
     error: errorConference,
-  } = api.conference.getById.useQuery({ id: team?.confId ?? 0 });
+  } = api.conference.getById.useQuery({ id: team?.confId ?? "0" });
   const {
     data: owner,
     isLoading: isLoadingOwner,
     error: errorOwner,
-  } = api.owner.getById.useQuery({ id: franchise?.ownerId ?? 0 });
+  } = api.owner.getById.useQuery({ id: franchise?.ownerId ?? "0" });
   return {
     data: {
-      id: team?.id ?? 0,
-      seasonId: team?.seasonId ?? 0,
-      franchiseId: team?.franchiseId ?? 0,
+      id: team?.id ?? "0",
+      seasonId: team?.seasonId ?? "0",
+      franchiseId: team?.franchiseId ?? "0",
       name: franchise?.name ?? null,
       abbr: franchise?.abbr ?? null,
       logoUrl: franchise?.logoUrl ?? null,
@@ -131,18 +153,55 @@ export function useTeamById(teamId: number): {
   };
 }
 
-export function useTeamsBySeasonId(seasonId: number): {
+export function useTeamsBySeasonId(seasonId: string): {
   data: GSHLTeam[];
   isLoading: boolean;
   error: HookError;
 } {
+  // Debug logging
+  console.log("useTeamsBySeasonId called with:", {
+    seasonId,
+    type: typeof seasonId,
+  });
+
   const {
     data: teams,
     isLoading: isTeamsLoading,
     error: errorTeams,
-  } = api.team.getAll.useQuery({
-    where: { seasonId },
+  } = api.team.getAll.useQuery(
+    {
+      where: { seasonId: String(seasonId) },
+      orderBy: { seasonId: "asc" },
+    },
+    {
+      enabled: !!seasonId && seasonId !== "",
+    },
+  );
+
+  // Debug the API response
+  console.log("team.getAll API response:", {
+    teams: teams?.length,
+    isLoading: isTeamsLoading,
+    error: errorTeams,
+    actualTeams: teams?.map((t) => ({
+      id: t.id,
+      seasonId: t.seasonId,
+      name: t.name,
+    })),
+  });
+
+  // Temporary debug: also try without seasonId filter to see if any teams exist
+  const { data: allTeamsDebug } = api.team.getAll.useQuery({
     orderBy: { seasonId: "asc" },
+  });
+
+  console.log("All teams without filter:", {
+    count: allTeamsDebug?.length,
+    teams: allTeamsDebug?.map((t) => ({
+      id: t.id,
+      seasonId: t.seasonId,
+      name: t.name,
+    })),
   });
   const {
     data: franchises,
@@ -163,7 +222,7 @@ export function useTeamsBySeasonId(seasonId: number): {
     data:
       teams?.map((t) => {
         const franchise = franchises?.find((f) => f.id === t.franchiseId);
-        const conference = conferences?.find((c) => c.id === t.confId);
+        const conference = conferences?.find((c) => c.name === t.confName);
         const owner = owners?.find((o) => o.id === franchise?.ownerId);
         return {
           id: t.id,
@@ -198,7 +257,7 @@ export function useTeamsBySeasonId(seasonId: number): {
   };
 }
 
-export function useTeamsByFranchiseId(franchiseId: number): {
+export function useTeamsByFranchiseId(franchiseId: string): {
   data: GSHLTeam[];
   isLoading: boolean;
   error: HookError;
@@ -208,7 +267,7 @@ export function useTeamsByFranchiseId(franchiseId: number): {
     isLoading: isTeamsLoading,
     error: errorTeams,
   } = api.team.getAll.useQuery({
-    where: { franchiseId },
+    where: { franchiseId: String(franchiseId) },
     orderBy: { seasonId: "asc" },
   });
   const {
@@ -220,12 +279,12 @@ export function useTeamsByFranchiseId(franchiseId: number): {
     data: conference,
     isLoading: isConferenceLoading,
     error: errorConference,
-  } = api.conference.getById.useQuery({ id: franchise?.confId ?? 0 });
+  } = api.conference.getById.useQuery({ id: franchise?.confId ?? "0" });
   const {
     data: owner,
     isLoading: isOwnerLoading,
     error: errorOwner,
-  } = api.owner.getById.useQuery({ id: franchise?.ownerId ?? 0 });
+  } = api.owner.getById.useQuery({ id: franchise?.ownerId ?? "0" });
   return {
     data:
       teams?.map((t) => {
@@ -262,7 +321,7 @@ export function useTeamsByFranchiseId(franchiseId: number): {
   };
 }
 
-export function useTeamsByOwnerId(ownerId: number): {
+export function useTeamsByOwnerId(ownerId: string): {
   data: GSHLTeam[];
   isLoading: boolean;
   error: HookError;
@@ -286,14 +345,14 @@ export function useTeamsByOwnerId(ownerId: number): {
     data: owner,
     isLoading: isOwnerLoading,
     error: errorOwner,
-  } = api.owner.getById.useQuery({ id: ownerId ?? 0 });
+  } = api.owner.getById.useQuery({ id: ownerId ?? "0" });
   return {
     data:
       teams
         ?.map((t) => {
           const franchise = franchises?.find((f) => f.id === t.franchiseId);
           if (franchise?.ownerId !== ownerId) return null;
-          const conference = conferences?.find((c) => c.id === t.confId);
+          const conference = conferences?.find((c) => c.name === t.confName);
           return {
             id: t.id,
             seasonId: t.seasonId,
@@ -351,7 +410,7 @@ export function useAllTeamDays(): {
   };
 }
 
-export function useTeamDaysByTeamId(gshlTeamId: number): {
+export function useTeamDaysByTeamId(gshlTeamId: string): {
   data: TeamDayStatLine[];
   isLoading: boolean;
   error: HookError;
@@ -369,7 +428,7 @@ export function useTeamDaysByTeamId(gshlTeamId: number): {
   };
 }
 
-export function useTeamDaysByWeekId(weekId: number): {
+export function useTeamDaysByWeekId(weekId: string): {
   data: TeamDayStatLine[];
   isLoading: boolean;
   error: HookError;
@@ -406,8 +465,8 @@ export function useTeamDaysByDate(date: Date): {
 }
 
 export function useTeamDaysByTeamAndSeason(
-  gshlTeamId: number,
-  seasonId: number,
+  gshlTeamId: string,
+  seasonId: string,
 ): {
   data: TeamDayStatLine[];
   isLoading: boolean;
@@ -448,7 +507,7 @@ export function useAllTeamWeeks(): {
   };
 }
 
-export function useTeamWeeksByTeamId(gshlTeamId: number): {
+export function useTeamWeeksByTeamId(gshlTeamId: string): {
   data: TeamWeekStatLine[];
   isLoading: boolean;
   error: HookError;
@@ -466,7 +525,7 @@ export function useTeamWeeksByTeamId(gshlTeamId: number): {
   };
 }
 
-export function useTeamWeeksByWeekId(weekId: number): {
+export function useTeamWeeksByWeekId(weekId: string): {
   data: TeamWeekStatLine[];
   isLoading: boolean;
   error: HookError;
@@ -475,7 +534,7 @@ export function useTeamWeeksByWeekId(weekId: number): {
     data: teamWeeks,
     isLoading,
     error,
-  } = api.teamStats.weekly.getByWeek.useQuery({ weekId });
+  } = api.teamStats.weekly.getByWeek.useQuery({ weekId: +weekId });
 
   return {
     data: teamWeeks ?? [],
@@ -484,7 +543,7 @@ export function useTeamWeeksByWeekId(weekId: number): {
   };
 }
 
-export function useTeamWeeksBySeasonId(seasonId: number): {
+export function useTeamWeeksBySeasonId(seasonId: string): {
   data: TeamWeekStatLine[];
   isLoading: boolean;
   error: HookError;
@@ -494,7 +553,7 @@ export function useTeamWeeksBySeasonId(seasonId: number): {
     isLoading,
     error,
   } = api.teamStats.weekly.getAll.useQuery({
-    where: { seasonId },
+    where: { seasonId: String(seasonId) },
   });
 
   return {
@@ -505,8 +564,8 @@ export function useTeamWeeksBySeasonId(seasonId: number): {
 }
 
 export function useTeamWeeksByTeamAndSeason(
-  gshlTeamId: number,
-  seasonId: number,
+  gshlTeamId: string,
+  seasonId: string,
 ): {
   data: TeamWeekStatLine[];
   isLoading: boolean;
@@ -547,7 +606,7 @@ export function useAllTeamSeasons(): {
   };
 }
 
-export function useTeamSeasonsByTeamId(gshlTeamId: number): {
+export function useTeamSeasonsByTeamId(gshlTeamId: string): {
   data: TeamSeasonStatLine[];
   isLoading: boolean;
   error: HookError;
@@ -565,7 +624,7 @@ export function useTeamSeasonsByTeamId(gshlTeamId: number): {
   };
 }
 
-export function useTeamSeasonsBySeasonId(seasonId: number): {
+export function useTeamSeasonsBySeasonId(seasonId: string): {
   data: TeamSeasonStatLine[];
   isLoading: boolean;
   error: HookError;
@@ -575,8 +634,8 @@ export function useTeamSeasonsBySeasonId(seasonId: number): {
     isLoading,
     error,
   } = api.teamStats.season.getBySeason.useQuery(
-    { seasonId },
-    { enabled: !!seasonId && seasonId > 0 },
+    { seasonId: +seasonId },
+    { enabled: !!seasonId && +seasonId > 0 },
   );
 
   return {
@@ -587,8 +646,8 @@ export function useTeamSeasonsBySeasonId(seasonId: number): {
 }
 
 export function useTeamSeasonByTeamAndSeason(
-  gshlTeamId: number,
-  seasonId: number,
+  gshlTeamId: string,
+  seasonId: string,
 ): {
   data: TeamSeasonStatLine[];
   isLoading: boolean;
@@ -608,7 +667,7 @@ export function useTeamSeasonByTeamAndSeason(
 }
 
 export function useTeamSeasonsBySeasonType(
-  seasonId: number,
+  seasonId: string,
   seasonType: string,
 ): {
   data: TeamSeasonStatLine[];
@@ -626,10 +685,10 @@ export function useTeamSeasonsBySeasonType(
     error,
   } = api.teamStats.season.getBySeasonType.useQuery(
     {
-      seasonId,
+      seasonId: +seasonId,
       seasonType: seasonTypeEnum!,
     },
-    { enabled: !!seasonId && seasonId > 0 && !!seasonTypeEnum },
+    { enabled: !!seasonId && +seasonId > 0 && !!seasonTypeEnum },
   );
 
   return {
@@ -644,15 +703,309 @@ export function useNHLTeams(): {
   isLoading: boolean;
   error: HookError;
 } {
-  const {
-    data: nhlTeams,
-    isLoading,
-    error,
-  } = api.team.getNHLTeams.useQuery();
+  const { data: nhlTeams, isLoading, error } = api.team.getNHLTeams.useQuery();
 
   return {
     data: nhlTeams ?? [],
     isLoading,
     error,
+  };
+}
+
+// ============================================================================
+// FRANCHISE HOOKS
+// ============================================================================
+
+/**
+ * Fetches all franchises with their associated data
+ */
+export function useAllFranchises(): {
+  data: EnrichedFranchise[];
+  isLoading: boolean;
+  error: HookError;
+} {
+  const {
+    data: franchises,
+    isLoading: isLoadingFranchises,
+    error: errorFranchises,
+  } = api.franchise.getAll.useQuery({ orderBy: { name: "asc" } });
+  const {
+    data: conferences,
+    isLoading: isLoadingConferences,
+    error: errorConferences,
+  } = api.conference.getAll.useQuery({ orderBy: { name: "asc" } });
+  const {
+    data: owners,
+    isLoading: isLoadingOwners,
+    error: errorOwners,
+  } = api.owner.getAll.useQuery({ orderBy: { name: "asc" } });
+
+  return {
+    data:
+      franchises?.map((f) => {
+        const conference = conferences?.find((c) => c.id === f.confId);
+        const owner = owners?.find((o) => o.id === f.ownerId);
+        return {
+          id: f.id,
+          name: f.name,
+          abbr: f.abbr,
+          logoUrl: f.logoUrl,
+          isActive: f.isActive,
+          confId: f.confId,
+          confName: conference?.name ?? null,
+          confAbbr: conference?.abbr ?? null,
+          confLogoUrl: conference?.logoUrl ?? null,
+          ownerId: f.ownerId,
+          ownerFirstName: owner?.firstName ?? null,
+          ownerLastName: owner?.lastName ?? null,
+          ownerNickname: owner?.nickName ?? null,
+          ownerEmail: owner?.email ?? null,
+          ownerOwing: owner?.owing ?? null,
+          ownerIsActive: owner?.isActive ?? false,
+          createdAt: f.createdAt,
+          updatedAt: f.updatedAt,
+        };
+      }) ?? [],
+    isLoading: [
+      isLoadingFranchises,
+      isLoadingConferences,
+      isLoadingOwners,
+    ].some(Boolean),
+    error:
+      [errorFranchises, errorConferences, errorOwners].find((e) => e) ?? null,
+  };
+}
+
+/**
+ * Fetches a single franchise by ID with associated data
+ */
+export function useFranchiseById(franchiseId: string): {
+  data: EnrichedFranchise | null;
+  isLoading: boolean;
+  error: HookError;
+} {
+  const {
+    data: franchise,
+    isLoading: isLoadingFranchise,
+    error: errorFranchise,
+  } = api.franchise.getById.useQuery({ id: franchiseId });
+  const {
+    data: conference,
+    isLoading: isLoadingConference,
+    error: errorConference,
+  } = api.conference.getById.useQuery({ id: franchise?.confId ?? "0" });
+  const {
+    data: owner,
+    isLoading: isLoadingOwner,
+    error: errorOwner,
+  } = api.owner.getById.useQuery({ id: franchise?.ownerId ?? "0" });
+
+  return {
+    data: franchise
+      ? {
+          id: franchise.id,
+          name: franchise.name,
+          abbr: franchise.abbr,
+          logoUrl: franchise.logoUrl,
+          isActive: franchise.isActive,
+          confId: franchise.confId,
+          confName: conference?.name ?? null,
+          confAbbr: conference?.abbr ?? null,
+          confLogoUrl: conference?.logoUrl ?? null,
+          ownerId: franchise.ownerId,
+          ownerFirstName: owner?.firstName ?? null,
+          ownerLastName: owner?.lastName ?? null,
+          ownerNickname: owner?.nickName ?? null,
+          ownerEmail: owner?.email ?? null,
+          ownerOwing: owner?.owing ?? null,
+          ownerIsActive: owner?.isActive ?? false,
+          createdAt: franchise.createdAt,
+          updatedAt: franchise.updatedAt,
+        }
+      : null,
+    isLoading: [isLoadingFranchise, isLoadingConference, isLoadingOwner].some(
+      Boolean,
+    ),
+    error: [errorFranchise, errorConference, errorOwner].find((e) => e) ?? null,
+  };
+}
+
+/**
+ * Fetches franchises by conference ID with associated data
+ */
+export function useFranchisesByConferenceId(conferenceId: string): {
+  data: EnrichedFranchise[];
+  isLoading: boolean;
+  error: HookError;
+} {
+  const {
+    data: franchises,
+    isLoading: isLoadingFranchises,
+    error: errorFranchises,
+  } = api.franchise.getAll.useQuery({ orderBy: { name: "asc" } });
+  const {
+    data: conference,
+    isLoading: isLoadingConference,
+    error: errorConference,
+  } = api.conference.getById.useQuery({ id: conferenceId });
+  const {
+    data: owners,
+    isLoading: isLoadingOwners,
+    error: errorOwners,
+  } = api.owner.getAll.useQuery({ orderBy: { name: "asc" } });
+
+  return {
+    data:
+      franchises
+        ?.filter((f) => f.confId === conferenceId)
+        .map((f) => {
+          const owner = owners?.find((o) => o.id === f.ownerId);
+          return {
+            id: f.id,
+            name: f.name,
+            abbr: f.abbr,
+            logoUrl: f.logoUrl,
+            isActive: f.isActive,
+            confId: f.confId,
+            confName: conference?.name ?? null,
+            confAbbr: conference?.abbr ?? null,
+            confLogoUrl: conference?.logoUrl ?? null,
+            ownerId: f.ownerId,
+            ownerFirstName: owner?.firstName ?? null,
+            ownerLastName: owner?.lastName ?? null,
+            ownerNickname: owner?.nickName ?? null,
+            ownerEmail: owner?.email ?? null,
+            ownerOwing: owner?.owing ?? null,
+            ownerIsActive: owner?.isActive ?? false,
+            createdAt: f.createdAt,
+            updatedAt: f.updatedAt,
+          };
+        }) ?? [],
+    isLoading: [isLoadingFranchises, isLoadingConference, isLoadingOwners].some(
+      Boolean,
+    ),
+    error:
+      [errorFranchises, errorConference, errorOwners].find((e) => e) ?? null,
+  };
+}
+
+/**
+ * Fetches franchises by owner ID with associated data
+ */
+export function useFranchisesByOwnerId(ownerId: string): {
+  data: EnrichedFranchise[];
+  isLoading: boolean;
+  error: HookError;
+} {
+  const {
+    data: franchises,
+    isLoading: isLoadingFranchises,
+    error: errorFranchises,
+  } = api.franchise.getAll.useQuery({ orderBy: { name: "asc" } });
+  const {
+    data: conferences,
+    isLoading: isLoadingConferences,
+    error: errorConferences,
+  } = api.conference.getAll.useQuery({ orderBy: { name: "asc" } });
+  const {
+    data: owner,
+    isLoading: isLoadingOwner,
+    error: errorOwner,
+  } = api.owner.getById.useQuery({ id: ownerId });
+
+  return {
+    data:
+      franchises
+        ?.filter((f) => f.ownerId === ownerId)
+        .map((f) => {
+          const conference = conferences?.find((c) => c.id === f.confId);
+          return {
+            id: f.id,
+            name: f.name,
+            abbr: f.abbr,
+            logoUrl: f.logoUrl,
+            isActive: f.isActive,
+            confId: f.confId,
+            confName: conference?.name ?? null,
+            confAbbr: conference?.abbr ?? null,
+            confLogoUrl: conference?.logoUrl ?? null,
+            ownerId: f.ownerId,
+            ownerFirstName: owner?.firstName ?? null,
+            ownerLastName: owner?.lastName ?? null,
+            ownerNickname: owner?.nickName ?? null,
+            ownerEmail: owner?.email ?? null,
+            ownerOwing: owner?.owing ?? null,
+            ownerIsActive: owner?.isActive ?? false,
+            createdAt: f.createdAt,
+            updatedAt: f.updatedAt,
+          };
+        }) ?? [],
+    isLoading: [isLoadingFranchises, isLoadingConferences, isLoadingOwner].some(
+      Boolean,
+    ),
+    error:
+      [errorFranchises, errorConferences, errorOwner].find((e) => e) ?? null,
+  };
+}
+
+/**
+ * Fetches active franchises only with associated data
+ */
+export function useActiveFranchises(): {
+  data: EnrichedFranchise[];
+  isLoading: boolean;
+  error: HookError;
+} {
+  const {
+    data: franchises,
+    isLoading: isLoadingFranchises,
+    error: errorFranchises,
+  } = api.franchise.getAll.useQuery({ orderBy: { name: "asc" } });
+  const {
+    data: conferences,
+    isLoading: isLoadingConferences,
+    error: errorConferences,
+  } = api.conference.getAll.useQuery({ orderBy: { name: "asc" } });
+  const {
+    data: owners,
+    isLoading: isLoadingOwners,
+    error: errorOwners,
+  } = api.owner.getAll.useQuery({ orderBy: { name: "asc" } });
+
+  return {
+    data:
+      franchises
+        ?.filter((f) => f.isActive)
+        .map((f) => {
+          const conference = conferences?.find((c) => c.id === f.confId);
+          const owner = owners?.find((o) => o.id === f.ownerId);
+          return {
+            id: f.id,
+            name: f.name,
+            abbr: f.abbr,
+            logoUrl: f.logoUrl,
+            isActive: f.isActive,
+            confId: f.confId,
+            confName: conference?.name ?? null,
+            confAbbr: conference?.abbr ?? null,
+            confLogoUrl: conference?.logoUrl ?? null,
+            ownerId: f.ownerId,
+            ownerFirstName: owner?.firstName ?? null,
+            ownerLastName: owner?.lastName ?? null,
+            ownerNickname: owner?.nickName ?? null,
+            ownerEmail: owner?.email ?? null,
+            ownerOwing: owner?.owing ?? null,
+            ownerIsActive: owner?.isActive ?? false,
+            createdAt: f.createdAt,
+            updatedAt: f.updatedAt,
+          };
+        }) ?? [],
+    isLoading: [
+      isLoadingFranchises,
+      isLoadingConferences,
+      isLoadingOwners,
+    ].some(Boolean),
+    error:
+      [errorFranchises, errorConferences, errorOwners].find((e) => e) ?? null,
   };
 }

@@ -7,7 +7,7 @@
 
 import { useNavStore } from "./store";
 import { usePreviousWeek, useCurrentWeek, useNextWeek } from "../hooks/useWeek";
-import { useCurrentSeason, useAllSeasons } from "../hooks/useSeason";
+import { useSeasonState } from "../hooks/useSeason";
 import { useEffect } from "react";
 
 /**
@@ -80,63 +80,33 @@ export function useLeagueOfficeNavigation() {
  * @returns Season data, ID, and setter with intelligent fallback logic
  */
 export function useSeasonNavigation() {
-  const { selectedSeasonId, setSeasonId } = useNavStore();
-
-  const { data: currentSeasonData, isLoading: isCurrentSeasonLoading } =
-    useCurrentSeason();
-  const { data: allSeasons, isLoading: isAllSeasonsLoading } = useAllSeasons();
-
-  useEffect(() => {
-    if (selectedSeasonId || isCurrentSeasonLoading || isAllSeasonsLoading)
-      return;
-
-    if (
-      currentSeasonData &&
-      currentSeasonData.length > 0 &&
-      currentSeasonData[0]?.id
-    ) {
-      setSeasonId(currentSeasonData[0].id);
-      return;
-    }
-
-    if (allSeasons && allSeasons.length > 0) {
-      const today = new Date();
-      const nextSeason = allSeasons.find((season) => {
-        if (!season.startDate) return false;
-        const startDate = new Date(season.startDate);
-        return startDate > today;
-      });
-
-      if (nextSeason) {
-        setSeasonId(nextSeason.id);
-        return;
-      }
-
-      const sortedSeasons = [...allSeasons].sort((a, b) => {
-        const aStart = a.startDate ? new Date(a.startDate).getTime() : 0;
-        const bStart = b.startDate ? new Date(b.startDate).getTime() : 0;
-        return bStart - aStart;
-      });
-
-      if (sortedSeasons[0]?.id) {
-        setSeasonId(sortedSeasons[0].id);
-      }
-    }
-  }, [
+  const {
+    selectedSeason,
+    currentSeason,
+    defaultSeason,
+    selectedSeasonSummary,
+    currentSeasonSummary,
+    defaultSeasonSummary,
+    seasonOptions,
     selectedSeasonId,
-    currentSeasonData,
-    allSeasons,
-    setSeasonId,
-    isCurrentSeasonLoading,
-    isAllSeasonsLoading,
-  ]);
+    setSelectedSeasonId,
+    isSelectedSeasonLoading,
+    isSelectedSeasonFetching,
+    refetchSelectedSeason,
+  } = useSeasonState();
 
   return {
-    selectedSeason: allSeasons?.find(
-      (season) => season.id === selectedSeasonId,
-    ),
-    selectedSeasonId: selectedSeasonId,
-    setSelectedSeasonId: setSeasonId,
+    selectedSeason: selectedSeason ?? currentSeason ?? defaultSeason,
+    selectedSeasonSummary:
+      selectedSeasonSummary ?? currentSeasonSummary ?? defaultSeasonSummary,
+    currentSeasonSummary,
+    defaultSeasonSummary,
+    seasonOptions,
+    selectedSeasonId,
+    setSelectedSeasonId,
+    isSelectedSeasonLoading,
+    isSelectedSeasonFetching,
+    refetchSelectedSeason,
   };
 }
 

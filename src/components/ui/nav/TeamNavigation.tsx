@@ -15,7 +15,7 @@ import Image from "next/image";
 
 interface TeamsToggleProps {
   className?: string;
-  seasonId?: number;
+  seasonId?: string;
 }
 
 /**
@@ -33,7 +33,7 @@ export function TeamsToggle({ className, seasonId }: TeamsToggleProps) {
     data: teams,
     isLoading,
     error,
-  } = useTeamsBySeasonId(selectedSeasonId);
+  } = useTeamsBySeasonId((selectedSeasonId));
 
   const selectedTeam = teams.find((t) => t.ownerId === selectedOwnerId) ?? null;
 
@@ -47,15 +47,20 @@ export function TeamsToggle({ className, seasonId }: TeamsToggleProps) {
 
   const getTeamLabel = (team: GSHLTeam) => team.name ?? `Team ${team.id}`;
 
-  const renderTeamItem = (team: GSHLTeam) => (
-    <Image
-      src={team.logoUrl ?? ""}
-      alt={`${team.name} logo`}
-      height={32}
-      width={32}
-      className="h-8 w-8 rounded-md p-1"
-    />
-  );
+  const renderTeamItem = (team: GSHLTeam) =>
+    team.logoUrl ? (
+      <Image
+        src={team.logoUrl}
+        alt={`${team.name} logo`}
+        height={32}
+        width={32}
+        className="h-8 w-8 rounded-md p-1"
+      />
+    ) : (
+      <div className="flex h-8 w-8 items-center justify-center rounded-md bg-gray-200 p-1">
+        <span className="text-xs text-gray-400">?</span>
+      </div>
+    );
 
   return (
     <HorizontalToggle<GSHLTeam>

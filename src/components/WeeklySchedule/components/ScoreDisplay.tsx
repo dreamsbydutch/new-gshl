@@ -1,5 +1,8 @@
-import type { ScoreDisplayProps } from "../utils/types";
-import { isMatchupCompleted, getScoreClass } from "../utils";
+import {
+  getScoreClass,
+  isMatchupCompleted,
+  type ScoreDisplayProps,
+} from "@gshl-utils/weekly-schedule";
 
 export const ScoreDisplay = ({ matchup }: ScoreDisplayProps) => {
   const hasScores = isMatchupCompleted(matchup);

@@ -1,6 +1,6 @@
 import { TeamInfo, TeamLogo } from "./components";
-import type { LockerRoomHeaderProps } from "./utils";
-import { formatOwnerName } from "./utils";
+import type { LockerRoomHeaderProps } from "@gshl-utils/locker-room-header";
+import { formatOwnerName } from "@gshl-utils/locker-room-header";
 
 /**
  * Renders the locker room header for a team (orchestrator component).

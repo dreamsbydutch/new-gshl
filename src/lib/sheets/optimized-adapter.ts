@@ -7,6 +7,24 @@ import {
   convertModelToRow,
   type DatabaseRecord,
 } from "./config";
+import { SheetCache, type SheetDataset, type SheetRow } from "./sheet-cache";
+import { getModelCacheTTL } from "./model-metadata";
+
+function isStringifiablePrimitive(
+  value: unknown,
+): value is string | number | boolean {
+  return (
+    typeof value === "string" ||
+    typeof value === "number" ||
+    typeof value === "boolean"
+  );
+}
+
+// Type helper for objects with timestamp fields
+type WithTimestamps = {
+  createdAt?: Date;
+  updatedAt?: Date;
+};
 
 // Enhanced types for complete CRUD operations
 export interface FindManyOptions<T> {
@@ -30,7 +48,7 @@ export interface CreateManyOptions<T> {
 }
 
 export interface UpdateOptions<T> {
-  where: { id: number };
+  where: { id: string };
   data: Partial<T>;
 }
 
@@ -40,7 +58,7 @@ export interface UpdateManyOptions<T> {
 }
 
 export interface DeleteOptions {
-  where: { id: number };
+  where: { id: string };
 }
 
 export interface DeleteManyOptions<T> {
@@ -48,22 +66,9 @@ export interface DeleteManyOptions<T> {
 }
 
 export interface UpsertOptions<T> {
-  where: { id: number };
+  where: { id: string };
   update: Partial<T>;
   create: Omit<T, "id" | "createdAt" | "updatedAt">;
-}
-
-// Enhanced cache with better invalidation
-interface CacheEntry {
-  data: unknown[];
-  timestamp: number;
-  ttl: number;
-}
-
-// ID-based row mapping for efficient lookups
-interface RowMapping {
-  idToRowIndex: Map<number, number>;
-  lastUpdate: number;
 }
 
 // Local ID cache to avoid repeated API calls
@@ -73,12 +78,12 @@ interface IdCache {
   ttl: number;
 }
 
+type ModelName = keyof typeof SHEETS_CONFIG.SHEETS;
+
 export class OptimizedSheetsAdapter {
-  private cache = new Map<string, CacheEntry>();
-  private rowMappings = new Map<string, RowMapping>();
+  private readonly sheetCache = new SheetCache();
   private idCache = new Map<string, IdCache>();
-  private readonly DEFAULT_CACHE_TTL = 60000; // 1 minute
-  private readonly LONG_CACHE_TTL = 300000; // 5 minutes for static data
+  private readonly DEFAULT_CACHE_TTL = 60000; // fallback when model metadata missing
   private readonly ID_CACHE_TTL = 120000; // 2 minutes for ID cache
   private readonly BATCH_SIZE = 100;
 
@@ -127,52 +132,28 @@ export class OptimizedSheetsAdapter {
     return `${modelName}_${operation}`;
   }
 
-  private isCacheValid(cacheEntry: CacheEntry): boolean {
-    return Date.now() - cacheEntry.timestamp < cacheEntry.ttl;
-  }
-
-  private async getCachedOrFetch<T>(
-    modelName: string,
-    operation: string,
-    fetcher: () => Promise<T>,
-    ttl: number = this.DEFAULT_CACHE_TTL,
-  ): Promise<T> {
-    const cacheKey = this.getCacheKey(modelName, operation);
-    const cached = this.cache.get(cacheKey);
-
-    if (cached && this.isCacheValid(cached)) {
-      return cached.data as T;
-    }
-
-    const data = await fetcher();
-    this.cache.set(cacheKey, {
-      data: data as unknown[],
-      timestamp: Date.now(),
-      ttl,
-    });
-
-    return data;
-  }
-
   private clearCacheForModel(modelName: string): void {
-    const keysToDelete = Array.from(this.cache.keys()).filter((key) =>
-      key.startsWith(modelName),
-    );
-    keysToDelete.forEach((key) => this.cache.delete(key));
-    this.rowMappings.delete(modelName);
+    this.sheetCache.invalidate(modelName);
     this.idCache.delete(modelName); // Also clear ID cache
   }
 
-  // Build ID-to-row mapping for efficient lookups
-  private async buildRowMapping(
-    modelName: keyof typeof SHEETS_CONFIG.SHEETS,
-  ): Promise<RowMapping> {
-    const cached = this.rowMappings.get(modelName);
-    if (cached && Date.now() - cached.lastUpdate < 30000) {
-      // 30 seconds
-      return cached;
-    }
+  private getModelTTL(modelName: ModelName): number {
+    return getModelCacheTTL(String(modelName)) || this.DEFAULT_CACHE_TTL;
+  }
 
+  private async getDataset<T extends DatabaseRecord>(
+    modelName: ModelName,
+  ): Promise<SheetDataset<T>> {
+    return this.sheetCache.getDataset<T>(
+      String(modelName),
+      () => this.loadModelDataset<T>(modelName),
+      this.getModelTTL(modelName),
+    );
+  }
+
+  private async loadModelDataset<T extends DatabaseRecord>(
+    modelName: ModelName,
+  ): Promise<SheetDataset<T>> {
     const sheetName = SHEETS_CONFIG.SHEETS[modelName];
     const columns = SHEETS_CONFIG.COLUMNS[modelName];
 
@@ -180,27 +161,42 @@ export class OptimizedSheetsAdapter {
       throw new Error(`No column configuration found for model: ${modelName}`);
     }
 
-    const range = `${sheetName}!A2:A`;
-    const rows = await this.sheetsApi().getValues(
-      this.getSpreadsheetId(modelName),
+    const range = `${sheetName}!A2:${this.getColumnLetter(columns.length)}`;
+    const values = await this.sheetsApi().getValues(
+      this.getSpreadsheetId(String(modelName)),
       range,
     );
 
-    const idToRowIndex = new Map<number, number>();
-    rows.forEach((row: (string | number | boolean | null)[], index: number) => {
-      const first = row?.[0];
-      if (typeof first === "number") {
-        idToRowIndex.set(first, index + 2); // +2 for header row and 0-based index
+    const rows: SheetRow<T>[] = [];
+    const idToRowIndex = new Map<string, number>();
+
+    values.forEach((row: (string | number | boolean | null)[], index) => {
+      if (!row || row.length === 0) return;
+      const model = convertRowToModel<T>(row, columns);
+      const rowIndex = index + 2; // account for header row
+      rows.push({ rowIndex, model });
+
+      const idValue =
+        (model as Record<string, unknown>).id ?? row?.[0] ?? undefined;
+      if (
+        idValue !== undefined &&
+        idValue !== null &&
+        idValue !== "" &&
+        isStringifiablePrimitive(idValue)
+      ) {
+        idToRowIndex.set(String(idValue), rowIndex);
       }
     });
 
-    const mapping: RowMapping = {
-      idToRowIndex,
-      lastUpdate: Date.now(),
-    };
+    return { rows, idToRowIndex };
+  }
 
-    this.rowMappings.set(modelName, mapping);
-    return mapping;
+  private async resolveRowIndex(
+    modelName: ModelName,
+    id: string,
+  ): Promise<number | undefined> {
+    const dataset = await this.getDataset<DatabaseRecord>(modelName);
+    return dataset.idToRowIndex.get(id);
   }
 
   // Enhanced initialization with batch operations
@@ -252,68 +248,58 @@ export class OptimizedSheetsAdapter {
 
   // Optimized findMany with better caching and filtering
   async findMany<T extends DatabaseRecord>(
-    modelName: keyof typeof SHEETS_CONFIG.SHEETS,
+    modelName: ModelName,
     options: FindManyOptions<T> = {},
   ): Promise<T[]> {
-    const sheetName = SHEETS_CONFIG.SHEETS[modelName];
-    const columns = SHEETS_CONFIG.COLUMNS[modelName];
-
-    if (!columns) {
-      throw new Error(`No column configuration found for model: ${modelName}`);
-    }
-
     try {
-      const range = `${sheetName}!A2:${this.getColumnLetter(columns.length)}`;
-      const rows = await this.getCachedOrFetch(
-        modelName,
-        `findMany_${JSON.stringify(options)}`,
-        () =>
-          this.sheetsApi().getValues(this.getSpreadsheetId(modelName), range),
-        this.DEFAULT_CACHE_TTL,
-      );
+      const dataset = await this.getDataset<T>(modelName);
+      let results = dataset.rows.map((record: SheetRow<T>) => record.model);
 
-      let results = rows
-        .filter((row) => row && row.length > 0)
-        .map((row) => convertRowToModel<T>(row, columns));
-
-      // Apply filters
       if (options.where) {
-        results = results.filter((item) => {
-          return Object.entries(options.where!).every(([key, value]) => {
+        const predicates = Object.entries(options.where) as Array<
+          [keyof T, T[keyof T]]
+        >;
+        results = results.filter((item: T) =>
+          predicates.every(([key, value]) => {
             if (value === undefined) return true;
-            return (item as Record<string, unknown>)[key] === value;
-          });
-        });
+            const currentValue = (item as Record<string, unknown>)[
+              key as string
+            ];
+            return currentValue === value;
+          }),
+        );
       }
 
-      // Apply ordering
       if (options.orderBy) {
-        const orderEntries = Object.entries(options.orderBy);
-        results.sort((a, b) => {
+        const orderEntries = Object.entries(options.orderBy) as Array<
+          [keyof T, "asc" | "desc"]
+        >;
+        results.sort((a: T, b: T) => {
           for (const [key, direction] of orderEntries) {
-            const aVal = (a as Record<string, unknown>)[key];
-            const bVal = (b as Record<string, unknown>)[key];
+            const aValue = (a as Record<string, unknown>)[key as string];
+            const bValue = (b as Record<string, unknown>)[key as string];
 
             let comparison = 0;
             if (
-              aVal !== null &&
-              aVal !== undefined &&
-              bVal !== null &&
-              bVal !== undefined
+              aValue !== null &&
+              aValue !== undefined &&
+              bValue !== null &&
+              bValue !== undefined
             ) {
-              if (typeof aVal === typeof bVal && aVal < bVal) comparison = -1;
-              else if (typeof aVal === typeof bVal && aVal > bVal)
+              if (typeof aValue === typeof bValue && aValue < bValue)
+                comparison = -1;
+              else if (typeof aValue === typeof bValue && aValue > bValue)
                 comparison = 1;
             } else if (
-              (aVal === null || aVal === undefined) &&
-              bVal !== null &&
-              bVal !== undefined
+              (aValue === null || aValue === undefined) &&
+              bValue !== null &&
+              bValue !== undefined
             ) {
               comparison = 1;
             } else if (
-              aVal !== null &&
-              aVal !== undefined &&
-              (bVal === null || bVal === undefined)
+              aValue !== null &&
+              aValue !== undefined &&
+              (bValue === null || bValue === undefined)
             ) {
               comparison = -1;
             }
@@ -326,11 +312,10 @@ export class OptimizedSheetsAdapter {
         });
       }
 
-      // Apply pagination
-      if (options.skip) {
+      if (typeof options.skip === "number" && options.skip > 0) {
         results = results.slice(options.skip);
       }
-      if (options.take) {
+      if (typeof options.take === "number" && options.take >= 0) {
         results = results.slice(0, options.take);
       }
 
@@ -343,7 +328,7 @@ export class OptimizedSheetsAdapter {
 
   // Optimized findUnique with direct row access
   async findUnique<T extends DatabaseRecord>(
-    modelName: keyof typeof SHEETS_CONFIG.SHEETS,
+    modelName: ModelName,
     options: FindUniqueOptions<T>,
   ): Promise<T | null> {
     const sheetName = SHEETS_CONFIG.SHEETS[modelName];
@@ -354,23 +339,28 @@ export class OptimizedSheetsAdapter {
     }
 
     try {
-      // If searching by ID, use optimized row mapping
-      if (options.where.id && typeof options.where.id === "number") {
-        const mapping = await this.buildRowMapping(modelName);
-        const rowIndex = mapping.idToRowIndex.get(options.where.id);
+      const targetId = options.where.id as unknown;
+      if (isStringifiablePrimitive(targetId)) {
+        const stringId = String(targetId);
+        let rowIndex = await this.resolveRowIndex(modelName, stringId);
+
+        if (!rowIndex) {
+          this.clearCacheForModel(String(modelName));
+          rowIndex = await this.resolveRowIndex(modelName, stringId);
+        }
 
         if (rowIndex) {
           const range = `${sheetName}!A${rowIndex}:${this.getColumnLetter(columns.length)}${rowIndex}`;
           const rows = await this.sheetsApi().getValues(
-            this.getSpreadsheetId(modelName),
+            this.getSpreadsheetId(String(modelName)),
             range,
           );
 
           if (rows.length > 0 && rows[0] && rows[0].length > 0) {
             return convertRowToModel<T>(rows[0], columns);
           }
+          return null;
         }
-        return null;
       }
 
       // Fallback to findMany for non-ID searches
@@ -387,7 +377,7 @@ export class OptimizedSheetsAdapter {
 
   // Optimized create with batch processing
   async create<T extends DatabaseRecord>(
-    modelName: keyof typeof SHEETS_CONFIG.SHEETS,
+    modelName: ModelName,
     options: CreateOptions<T>,
   ): Promise<T> {
     const result = await this.createMany<T>(modelName, {
@@ -409,7 +399,7 @@ export class OptimizedSheetsAdapter {
 
   // Optimized createMany with batch operations
   async createMany<T extends DatabaseRecord>(
-    modelName: keyof typeof SHEETS_CONFIG.SHEETS,
+    modelName: ModelName,
     options: CreateManyOptions<T>,
   ): Promise<{ count: number }> {
     const sheetName = SHEETS_CONFIG.SHEETS[modelName];
@@ -438,13 +428,13 @@ export class OptimizedSheetsAdapter {
 
       for (const batch of batches) {
         await this.sheetsApi().appendValues(
-          this.getSpreadsheetId(modelName),
+          this.getSpreadsheetId(String(modelName)),
           `${sheetName}!A:A`,
           batch,
         );
       }
 
-      this.clearCacheForModel(modelName);
+      this.clearCacheForModel(String(modelName));
       return { count: options.data.length };
     } catch (error) {
       console.error(`Error creating many ${modelName}:`, error);
@@ -454,7 +444,7 @@ export class OptimizedSheetsAdapter {
 
   // Optimized update with direct row access
   async update<T extends DatabaseRecord>(
-    modelName: keyof typeof SHEETS_CONFIG.SHEETS,
+    modelName: ModelName,
     options: UpdateOptions<T>,
   ): Promise<T> {
     const sheetName = SHEETS_CONFIG.SHEETS[modelName];
@@ -465,19 +455,41 @@ export class OptimizedSheetsAdapter {
     }
 
     try {
-      const mapping = await this.buildRowMapping(modelName);
-      const rowIndex = mapping.idToRowIndex.get(options.where.id);
+      const targetId = String(options.where.id);
+      let dataset = await this.getDataset<DatabaseRecord>(modelName);
+      let rowIndex = dataset.idToRowIndex.get(targetId);
+
+      console.log(`Update ${modelName} - Looking for ID ${targetId}`);
+      console.log(
+        "Available IDs:",
+        Array.from(dataset.idToRowIndex.keys()).slice(0, 10),
+      );
+      console.log("Row mapping size:", dataset.idToRowIndex.size);
 
       if (!rowIndex) {
-        throw new Error(
-          `Record with id ${options.where.id} not found in ${modelName}`,
+        console.log("Row not found, clearing cache and retrying...");
+        this.clearCacheForModel(String(modelName));
+        dataset = await this.getDataset<DatabaseRecord>(modelName);
+        rowIndex = dataset.idToRowIndex.get(targetId);
+
+        console.log(
+          "Fresh mapping available IDs:",
+          Array.from(dataset.idToRowIndex.keys()).slice(0, 10),
         );
+
+        if (!rowIndex) {
+          console.error(
+            `Record with id ${targetId} not found in ${modelName} even after cache refresh`,
+          );
+          throw new Error(
+            `Record with id ${targetId} not found in ${modelName}`,
+          );
+        }
       }
 
-      // Get existing data
       const existingRange = `${sheetName}!A${rowIndex}:${this.getColumnLetter(columns.length)}${rowIndex}`;
       const existingRows = await this.sheetsApi().getValues(
-        this.getSpreadsheetId(modelName),
+        this.getSpreadsheetId(String(modelName)),
         existingRange,
       );
 
@@ -486,26 +498,47 @@ export class OptimizedSheetsAdapter {
         !existingRows[0] ||
         existingRows[0].length === 0
       ) {
-        throw new Error(
-          `Record with id ${options.where.id} not found in ${modelName}`,
-        );
+        throw new Error(`Record with id ${targetId} not found in ${modelName}`);
       }
 
       const existingData = convertRowToModel<T>(existingRows[0], columns);
+      console.log(
+        "Existing data createdAt:",
+        (existingData as T & WithTimestamps).createdAt,
+      );
+
       const updatedData = {
         ...existingData,
         ...options.data,
         updatedAt: new Date(),
       };
 
+      if (
+        "createdAt" in existingData &&
+        existingData.createdAt &&
+        !("createdAt" in options.data)
+      ) {
+        (updatedData as T & WithTimestamps).createdAt = (
+          existingData as T & WithTimestamps
+        ).createdAt;
+        console.log(
+          "Preserving createdAt:",
+          (updatedData as T & WithTimestamps).createdAt,
+        );
+      }
+
+      console.log(
+        "Final updatedData createdAt:",
+        (updatedData as T & WithTimestamps).createdAt,
+      );
       const updatedRow = convertModelToRow(updatedData, columns);
       await this.sheetsApi().updateValues(
-        this.getSpreadsheetId(modelName),
+        this.getSpreadsheetId(String(modelName)),
         existingRange,
         [updatedRow],
       );
 
-      this.clearCacheForModel(modelName);
+      this.clearCacheForModel(String(modelName));
       return updatedData;
     } catch (error) {
       console.error(`Error updating ${modelName}:`, error);
@@ -515,7 +548,7 @@ export class OptimizedSheetsAdapter {
 
   // New updateMany operation
   async updateMany<T extends DatabaseRecord>(
-    modelName: keyof typeof SHEETS_CONFIG.SHEETS,
+    modelName: ModelName,
     options: UpdateManyOptions<T>,
   ): Promise<{ count: number }> {
     const columns = SHEETS_CONFIG.COLUMNS[modelName];
@@ -532,7 +565,7 @@ export class OptimizedSheetsAdapter {
 
       for (const record of records) {
         await this.update<T>(modelName, {
-          where: { id: (record as Record<string, unknown>).id as number },
+          where: { id: (record as Record<string, unknown>).id as string },
           data: options.data,
         });
         count++;
@@ -547,7 +580,7 @@ export class OptimizedSheetsAdapter {
 
   // Optimized delete with direct row access
   async delete<T extends DatabaseRecord>(
-    modelName: keyof typeof SHEETS_CONFIG.SHEETS,
+    modelName: ModelName,
     options: DeleteOptions,
   ): Promise<T> {
     const sheetName = SHEETS_CONFIG.SHEETS[modelName];
@@ -558,19 +591,23 @@ export class OptimizedSheetsAdapter {
     }
 
     try {
-      const mapping = await this.buildRowMapping(modelName);
-      const rowIndex = mapping.idToRowIndex.get(options.where.id);
+      const targetId = String(options.where.id);
+      let dataset = await this.getDataset<DatabaseRecord>(modelName);
+      let rowIndex = dataset.idToRowIndex.get(targetId);
 
       if (!rowIndex) {
-        throw new Error(
-          `Record with id ${options.where.id} not found in ${modelName}`,
-        );
+        this.clearCacheForModel(String(modelName));
+        dataset = await this.getDataset<DatabaseRecord>(modelName);
+        rowIndex = dataset.idToRowIndex.get(targetId);
       }
 
-      // Get existing data before deletion
+      if (!rowIndex) {
+        throw new Error(`Record with id ${targetId} not found in ${modelName}`);
+      }
+
       const existingRange = `${sheetName}!A${rowIndex}:${this.getColumnLetter(columns.length)}${rowIndex}`;
       const existingRows = await this.sheetsApi().getValues(
-        this.getSpreadsheetId(modelName),
+        this.getSpreadsheetId(String(modelName)),
         existingRange,
       );
 
@@ -579,9 +616,7 @@ export class OptimizedSheetsAdapter {
         !existingRows[0] ||
         existingRows[0].length === 0
       ) {
-        throw new Error(
-          `Record with id ${options.where.id} not found in ${modelName}`,
-        );
+        throw new Error(`Record with id ${targetId} not found in ${modelName}`);
       }
 
       const existingData = convertRowToModel<T>(existingRows[0], columns);
@@ -594,12 +629,12 @@ export class OptimizedSheetsAdapter {
         | null
       )[];
       await this.sheetsApi().updateValues(
-        this.getSpreadsheetId(modelName),
+        this.getSpreadsheetId(String(modelName)),
         existingRange,
         [emptyRow],
       );
 
-      this.clearCacheForModel(modelName);
+      this.clearCacheForModel(String(modelName));
       return existingData;
     } catch (error) {
       console.error(`Error deleting ${modelName}:`, error);
@@ -609,7 +644,7 @@ export class OptimizedSheetsAdapter {
 
   // New deleteMany operation
   async deleteMany<T extends DatabaseRecord>(
-    modelName: keyof typeof SHEETS_CONFIG.SHEETS,
+    modelName: ModelName,
     options: DeleteManyOptions<T>,
   ): Promise<{ count: number }> {
     const records = await this.findMany<T>(modelName, { where: options.where });
@@ -617,7 +652,7 @@ export class OptimizedSheetsAdapter {
 
     for (const record of records) {
       const recId = (record as Record<string, unknown>).id;
-      if (typeof recId !== "number") continue;
+      if (typeof recId !== "string") continue;
       await this.delete<T>(modelName, {
         where: { id: recId },
       });
@@ -654,10 +689,9 @@ export class OptimizedSheetsAdapter {
   }
 
   // Enhanced utility methods with local ID caching
-  private async getNextId(
-    modelName: keyof typeof SHEETS_CONFIG.SHEETS,
-  ): Promise<number> {
-    const cached = this.idCache.get(modelName);
+  private async getNextId(modelName: ModelName): Promise<number> {
+    const cacheKey = String(modelName);
+    const cached = this.idCache.get(cacheKey);
     const now = Date.now();
 
     // Check if we have a valid cached max ID
@@ -669,12 +703,12 @@ export class OptimizedSheetsAdapter {
 
     // If cache is stale or doesn't exist, fetch from sheet
     try {
-      const mapping = await this.buildRowMapping(modelName);
-      const ids = Array.from(mapping.idToRowIndex.keys());
-      const maxId = ids.length > 0 ? Math.max(...ids) : 0;
+      const dataset = await this.getDataset<DatabaseRecord>(modelName);
+      const ids = Array.from(dataset.idToRowIndex.keys());
+      const maxId = ids.length > 0 ? Math.max(...ids.map(Number)) : 0;
 
       // Cache the max ID for future use
-      this.idCache.set(modelName, {
+      this.idCache.set(cacheKey, {
         maxId,
         lastUpdate: now,
         ttl: this.ID_CACHE_TTL,
@@ -689,10 +723,9 @@ export class OptimizedSheetsAdapter {
   }
 
   // Method to manually refresh ID cache
-  async refreshIdCache(
-    modelName: keyof typeof SHEETS_CONFIG.SHEETS,
-  ): Promise<void> {
-    this.idCache.delete(modelName);
+  async refreshIdCache(modelName: ModelName): Promise<void> {
+    const cacheKey = String(modelName);
+    this.idCache.delete(cacheKey);
     await this.getNextId(modelName);
   }
 
@@ -720,7 +753,7 @@ export class OptimizedSheetsAdapter {
   ): Promise<void> {
     const promises = modelNames.map(async (modelName) => {
       try {
-        await this.findMany(modelName as keyof typeof SHEETS_CONFIG.SHEETS, {});
+        await this.getDataset<DatabaseRecord>(modelName as ModelName);
         console.log(`✅ Warmed up cache for ${modelName}`);
       } catch (error) {
         console.error(`❌ Failed to warm up cache for ${modelName}:`, error);
@@ -731,14 +764,13 @@ export class OptimizedSheetsAdapter {
   }
 
   clearCache(): void {
-    this.cache.clear();
-    this.rowMappings.clear();
+    this.sheetCache.clear();
     this.idCache.clear(); // Also clear ID cache
   }
 
   // Additional utility methods
   async count<T extends DatabaseRecord>(
-    modelName: keyof typeof SHEETS_CONFIG.SHEETS,
+    modelName: ModelName,
     options?: { where?: Partial<T> },
   ): Promise<number> {
     const results = await this.findMany<T>(modelName, {
@@ -748,7 +780,7 @@ export class OptimizedSheetsAdapter {
   }
 
   async findFirst<T extends DatabaseRecord>(
-    modelName: keyof typeof SHEETS_CONFIG.SHEETS,
+    modelName: ModelName,
     options: FindManyOptions<T> = {},
   ): Promise<T | null> {
     const results = await this.findMany<T>(modelName, { ...options, take: 1 });
@@ -757,7 +789,7 @@ export class OptimizedSheetsAdapter {
 
   // Batch operations for better performance
   async batchCreate<T extends DatabaseRecord>(
-    modelName: keyof typeof SHEETS_CONFIG.SHEETS,
+    modelName: ModelName,
     operations: CreateOptions<T>[],
   ): Promise<{ count: number }> {
     const data = operations.map((op) => op.data);
@@ -765,7 +797,7 @@ export class OptimizedSheetsAdapter {
   }
 
   async batchUpdate<T extends DatabaseRecord>(
-    modelName: keyof typeof SHEETS_CONFIG.SHEETS,
+    modelName: ModelName,
     operations: UpdateOptions<T>[],
   ): Promise<{ count: number }> {
     let count = 0;
@@ -777,7 +809,7 @@ export class OptimizedSheetsAdapter {
   }
 
   async batchDelete<T extends DatabaseRecord>(
-    modelName: keyof typeof SHEETS_CONFIG.SHEETS,
+    modelName: ModelName,
     operations: DeleteOptions[],
   ): Promise<{ count: number }> {
     let count = 0;
@@ -790,27 +822,18 @@ export class OptimizedSheetsAdapter {
 
   // Debug methods
   getDebugInfo(): {
-    cacheStats: {
-      totalEntries: number;
-      cacheKeys: string[];
-    };
+    sheetCacheStats: ReturnType<SheetCache["getStats"]>;
     idCacheStats: {
       totalEntries: number;
       entries: Array<{ model: string; maxId: number; age: number }>;
     };
-    rowMappingStats: {
-      totalEntries: number;
-      entries: Array<{ model: string; rowCount: number; age: number }>;
-    };
     queueStats: ReturnType<typeof optimizedSheetsClient.getQueueStatus>;
   } {
     const now = Date.now();
+    const sheetCacheStats = this.sheetCache.getStats();
 
     return {
-      cacheStats: {
-        totalEntries: this.cache.size,
-        cacheKeys: Array.from(this.cache.keys()),
-      },
+      sheetCacheStats,
       idCacheStats: {
         totalEntries: this.idCache.size,
         entries: Array.from(this.idCache.entries()).map(([model, cache]) => ({
@@ -818,16 +841,6 @@ export class OptimizedSheetsAdapter {
           maxId: cache.maxId,
           age: now - cache.lastUpdate,
         })),
-      },
-      rowMappingStats: {
-        totalEntries: this.rowMappings.size,
-        entries: Array.from(this.rowMappings.entries()).map(
-          ([model, mapping]) => ({
-            model,
-            rowCount: mapping.idToRowIndex.size,
-            age: now - mapping.lastUpdate,
-          }),
-        ),
       },
       queueStats: this.sheetsApi().getQueueStatus(),
     };

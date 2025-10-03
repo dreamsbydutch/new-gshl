@@ -1,1 +1,0 @@
-export { useWeeklyScheduleData } from "./useWeeklyScheduleData";

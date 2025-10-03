@@ -1,6 +1,6 @@
 import type { Contract } from "@gshl-types";
 import { formatMoney } from "@gshl-utils";
-import { CAP_CEILING } from "../utils/constants";
+import { CAP_CEILING } from "@gshl-utils/team-roster";
 
 interface CapSpaceDisplayProps {
   contracts: Contract[] | undefined;

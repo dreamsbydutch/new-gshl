@@ -11,17 +11,17 @@ import { DEFAULT_STORE_STATE } from "./config";
 
 interface NavState {
   selectedScheduleType: string;
-  selectedSeasonId: number;
-  selectedWeekId: number;
-  selectedOwnerId: number;
+  selectedSeasonId: string;
+  selectedWeekId: string;
+  selectedOwnerId: string;
   selectedLockerRoomType: string;
   selectedLeagueOfficeType: string;
   selectedStandingsType: string;
 
   setScheduleType: (type: string) => void;
-  setSeasonId: (id: number) => void;
-  setWeekId: (id: number) => void;
-  setOwnerId: (id: number) => void;
+  setSeasonId: (id: string) => void;
+  setWeekId: (id: string) => void;
+  setOwnerId: (id: string) => void;
   setLockerRoomType: (type: string) => void;
   setLeagueOfficeType: (type: string) => void;
   setStandingsType: (type: string) => void;

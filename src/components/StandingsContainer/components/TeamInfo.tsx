@@ -1,11 +1,12 @@
-import type { TeamInfoProps } from "../utils/types";
+import type { TeamInfoProps } from "@gshl-utils/standings-container";
 import {
   OVERALL_SEED_FIELDS,
   CONFERENCE_SEED_FIELDS,
   WILDCARD_FIELDS,
   LOSERS_TOURNEY_FIELDS,
-} from "../utils/constants";
-import { formatSeedPosition, calculatePercentage } from "../utils";
+  formatSeedPosition,
+  calculatePercentage,
+} from "@gshl-utils/standings-container";
 
 export const TeamInfo = ({ teamProb, standingsType }: TeamInfoProps) => {
   const renderProbabilityItem = (

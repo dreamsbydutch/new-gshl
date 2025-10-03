@@ -1,5 +1,5 @@
-import type { OpponentDisplayProps } from "../utils/types";
-import { formatOpponentDisplay } from "../utils";
+import type { OpponentDisplayProps } from "@gshl-utils/team-schedule";
+import { formatOpponentDisplay } from "@gshl-utils/team-schedule";
 
 export const OpponentDisplay = ({
   matchup,

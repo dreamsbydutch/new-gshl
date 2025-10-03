@@ -1,5 +1,9 @@
-import type { TeamScheduleItemProps } from "../utils/types";
-import { findTeamById, getGameLocation, getGameTypeDisplay } from "../utils";
+import type { TeamScheduleItemProps } from "@gshl-utils/team-schedule";
+import {
+  findTeamById,
+  getGameLocation,
+  getGameTypeDisplay,
+} from "@gshl-utils/team-schedule";
 import { WeekDisplay } from "./WeekDisplay";
 import { OpponentDisplay } from "./OpponentDisplay";
 import { GameResult } from "./GameResult";

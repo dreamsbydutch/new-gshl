@@ -1,4 +1,5 @@
 // Configuration for mapping database models to Google Sheets
+import { safeParseSheetDate } from "../utils/date";
 
 // Multi-workbook configuration matching your Apps Script setup
 export const WORKBOOKS = {
@@ -670,6 +671,10 @@ export function convertModelToRow<T extends DatabaseRecord>(
     }
 
     if (value instanceof Date) {
+      // Check if the date is valid before converting to ISO string
+      if (isNaN(value.getTime())) {
+        return "";
+      }
       return value.toISOString();
     }
 
@@ -701,10 +706,43 @@ export function convertRowToModel<T extends DatabaseRecord>(
     }
 
     // Handle special conversions based on column name patterns
-    if (column === "id" || column.endsWith("Id")) {
-      result[column] = parseInt(String(value), 10);
-    } else if (column.endsWith("At")) {
-      result[column] = new Date(String(value));
+    // Keep everything as strings for consistency with Google Sheets
+    if (column.endsWith("At") || column.endsWith("Date")) {
+      const stringValue = String(value).trim();
+      if (
+        stringValue === "" ||
+        stringValue === "null" ||
+        stringValue === "undefined"
+      ) {
+        result[column] = null;
+      } else {
+        // Try to parse the date smartly
+        let dateValue: Date | null = null;
+
+        // If it's a number and looks like an Excel serial date (> 30000, which is roughly 1982)
+        if (typeof value === "number" && value > 30000) {
+          dateValue = safeParseSheetDate(value);
+        }
+        // If it's a string that could be an Excel serial number (large number as string)
+        else if (typeof value === "string") {
+          const asNumber = parseFloat(stringValue);
+          if (!isNaN(asNumber) && asNumber > 30000) {
+            // Likely an Excel serial date
+            dateValue = safeParseSheetDate(asNumber);
+          } else {
+            // Try as regular date string first
+            const asDate = new Date(stringValue);
+            dateValue = !isNaN(asDate.getTime()) ? asDate : null;
+          }
+        }
+        // Fallback to regular date parsing
+        else {
+          const asDate = new Date(stringValue);
+          dateValue = !isNaN(asDate.getTime()) ? asDate : null;
+        }
+
+        result[column] = dateValue;
+      }
     } else if (
       column === "nhlPos" ||
       column === "nhlTeam" ||
@@ -720,17 +758,9 @@ export function convertRowToModel<T extends DatabaseRecord>(
       result[column] = true;
     } else if (typeof value === "string" && value.toLowerCase() === "false") {
       result[column] = false;
-    } else if (
-      typeof value === "string" &&
-      !isNaN(Number(value)) &&
-      value !== ""
-    ) {
-      // Handle numeric values
-      const numValue = Number(value);
-      result[column] =
-        numValue % 1 === 0 ? parseInt(value, 10) : parseFloat(value);
     } else {
-      result[column] = value;
+      // Keep all other values as strings for consistency
+      result[column] = String(value);
     }
   });
 

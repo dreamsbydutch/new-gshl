@@ -3,8 +3,15 @@ import { NHLLogo } from "../../ui/nhlLogo";
 import { formatNumber } from "@gshl-utils";
 import { HorizontalToggle, TertiaryPageToolbar } from "@gshl-nav";
 import type { ToggleItem, DraftPick, NHLTeam, GSHLTeam } from "@gshl-types";
-import type { DraftBoardToolbarProps, DraftBoardPlayer } from "../utils";
-import { useTeamColor, lighten, readableText } from "../hooks/useTeamColor";
+import type {
+  DraftBoardToolbarProps,
+  DraftBoardPlayer,
+} from "@gshl-utils/draft-board-list";
+import {
+  lighten,
+  readableText,
+  useTeamColor,
+} from "@gshl-hooks/draft-board-list";
 
 function MockDraftPickCard({
   pick,
@@ -34,13 +41,19 @@ function MockDraftPickCard({
         className="ml-4 flex flex-row items-center gap-2 font-varela font-semibold"
         style={{ color: textColor }}
       >
-        <Image
-          className="shrink-0 rounded-sm ring-1 ring-white/40"
-          src={gshlTeam?.logoUrl ?? ""}
-          alt={gshlTeam?.name ?? ""}
-          width={32}
-          height={32}
-        />
+        {gshlTeam?.logoUrl ? (
+          <Image
+            className="shrink-0 rounded-sm ring-1 ring-white/40"
+            src={gshlTeam.logoUrl}
+            alt={gshlTeam?.name ?? ""}
+            width={32}
+            height={32}
+          />
+        ) : (
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-sm bg-gray-200 ring-1 ring-white/40">
+            <span className="text-xs text-gray-400">?</span>
+          </div>
+        )}
         <span className="text-lg">{gshlTeam?.name}</span>
         <span className="text-xs font-normal opacity-70">
           Rd {pick.round}, Pk {pick.pick}

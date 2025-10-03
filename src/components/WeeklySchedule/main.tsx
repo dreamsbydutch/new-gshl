@@ -1,7 +1,7 @@
 "use client";
 
 import { ScheduleHeader, WeekScheduleItem } from "./components";
-import { useWeeklyScheduleData } from "./hooks";
+import { useWeeklyScheduleData } from "@gshl-hooks/weekly-schedule";
 
 export function WeeklySchedule() {
   const { matchups, teams } = useWeeklyScheduleData();

@@ -2,8 +2,8 @@
 
 import { DraftPickListSkeleton } from "@gshl-skeletons";
 import { DraftPickItem } from "./components";
-import { useTeamDraftPickListData } from "./hooks";
-import type { TeamDraftPickListProps } from "./utils";
+import { useTeamDraftPickListData } from "@gshl-hooks/team-draft-pick-list";
+import type { TeamDraftPickListProps } from "@gshl-utils/team-draft-pick-list";
 import type { Season } from "@gshl-types";
 import { useEffect, useState } from "react";
 import { DropdownToggle } from "../ui/nav/toggle";
@@ -33,7 +33,7 @@ export function TeamDraftPickList({
   selectedSeasonId,
 }: TeamDraftPickListProps & { seasons?: Season[] }) {
   // Local (component-scoped) season selection so the toggle only affects this list.
-  const [localSeasonId, setLocalSeasonId] = useState<number | undefined>(
+  const [localSeasonId, setLocalSeasonId] = useState<string | undefined>(
     selectedSeasonId,
   );
 
@@ -41,9 +41,11 @@ export function TeamDraftPickList({
   useEffect(() => {
     if (localSeasonId != null) return;
     if (!seasons?.length) return;
-    const mostRecent = [...seasons].sort(
-      (a, b) => b.startDate.getTime() - a.startDate.getTime(),
-    )[0];
+    const mostRecent = [...seasons].sort((a, b) => {
+      const aTime = a.startDate instanceof Date ? a.startDate.getTime() : 0;
+      const bTime = b.startDate instanceof Date ? b.startDate.getTime() : 0;
+      return bTime - aTime;
+    })[0];
     if (mostRecent) setLocalSeasonId(mostRecent.id);
   }, [seasons, localSeasonId]);
 
@@ -57,7 +59,6 @@ export function TeamDraftPickList({
     localSeasonId,
     allTeams,
   );
-
   if (!ready) return <DraftPickListSkeleton />;
 
   return (
@@ -66,14 +67,18 @@ export function TeamDraftPickList({
         <div className="flex items-center gap-2 py-3 text-xl font-bold">
           {seasons && seasons.length > 0 && localSeasonId != null && (
             <DropdownToggle
-              items={[...seasons].sort(
-                (a, b) => b.startDate.getTime() - a.startDate.getTime(),
-              )}
+              items={[...seasons].sort((a, b) => {
+                const aTime =
+                  a.startDate instanceof Date ? a.startDate.getTime() : 0;
+                const bTime =
+                  b.startDate instanceof Date ? b.startDate.getTime() : 0;
+                return bTime - aTime;
+              })}
               selectedItem={seasons.find((s) => s.id === localSeasonId)}
               onSelect={(s: Season) => setLocalSeasonId(s.id)}
               getItemKey={(s: Season) => String(s.id)}
               getItemLabel={(s: Season) => s.name}
-              className="bg-white text-base"
+              className="min-w-28 bg-white text-base"
               dropdownPosition="auto"
             />
           )}

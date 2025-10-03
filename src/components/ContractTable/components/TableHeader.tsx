@@ -3,8 +3,8 @@
  * @param currentSeason Active season; determines whether current season column is rendered
  * @returns Table header (<thead>) element
  */
-import { getSeasonDisplay } from "../utils";
-import type { TableHeaderProps } from "../utils";
+import { getSeasonDisplay } from "@gshl-utils";
+import type { TableHeaderProps } from "@gshl-utils";
 
 export const TableHeader = ({ currentSeason }: TableHeaderProps) => {
   return (

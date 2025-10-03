@@ -13,7 +13,7 @@ import type {
 
 // Core model types
 export interface Season {
-  id: number;
+  id: string;
   year: number;
   name: string;
   categories: string[];
@@ -27,7 +27,7 @@ export interface Season {
 }
 
 export interface Conference {
-  id: number;
+  id: string;
   name: string;
   logoUrl: string;
   abbr: string;
@@ -35,9 +35,18 @@ export interface Conference {
   updatedAt: Date;
 }
 
+export interface Team {
+  id: string;
+  seasonId: string;
+  franchiseId: string;
+  confId: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 export interface Week {
-  id: number;
-  seasonId: number;
+  id: string;
+  seasonId: string;
   weekNum: number;
   weekType: SeasonType;
   gameDays: number;
@@ -50,11 +59,11 @@ export interface Week {
 }
 
 export interface Matchup {
-  id: number;
-  seasonId: number;
-  weekId: number;
-  homeTeamId: number;
-  awayTeamId: number;
+  id: string;
+  seasonId: string;
+  weekId: string;
+  homeTeamId: string;
+  awayTeamId: string;
   gameType: MatchupType;
   homeRank?: number | null;
   awayRank?: number | null;
@@ -70,8 +79,8 @@ export interface Matchup {
 }
 
 export interface Event {
-  id: number;
-  seasonId: number;
+  id: string;
+  seasonId: string;
   name: string;
   description: string;
   date: Date;
@@ -81,7 +90,7 @@ export interface Event {
 }
 
 export interface Owner {
-  id: number;
+  id: string;
   firstName: string;
   lastName: string;
   nickName: string;
@@ -93,18 +102,18 @@ export interface Owner {
 }
 
 export interface Franchise {
-  id: number;
-  ownerId: number;
+  id: string;
+  ownerId: string;
   name: string;
   abbr: string;
   logoUrl: string;
-  confId: number;
+  confId: string;
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
 export interface NHLTeam {
-  id: number;
+  id: string;
   fullName: string;
   abbreviation: string;
   logoUrl: string;
@@ -113,17 +122,17 @@ export interface NHLTeam {
 }
 
 export interface Team {
-  id: number;
-  seasonId: number;
-  franchiseId: number;
-  confId: number;
+  id: string;
+  seasonId: string;
+  franchiseId: string;
+  confId: string;
   createdAt: Date;
   updatedAt: Date;
 }
 export interface GSHLTeam {
-  id: number;
-  seasonId: number;
-  franchiseId: number;
+  id: string;
+  seasonId: string;
+  franchiseId: string;
   name: string | null;
   abbr: string | null;
   logoUrl: string | null;
@@ -131,7 +140,7 @@ export interface GSHLTeam {
   confName: string | null;
   confAbbr: string | null;
   confLogoUrl: string | null;
-  ownerId: number | null;
+  ownerId: string | null;
   ownerFirstName: string | null;
   ownerLastName: string | null;
   ownerNickname: string | null;
@@ -141,7 +150,7 @@ export interface GSHLTeam {
 }
 
 export interface Player {
-  id: number;
+  id: string;
   firstName: string;
   lastName: string;
   fullName: string;
@@ -150,7 +159,7 @@ export interface Player {
   nhlTeam: string;
   isActive: boolean;
   isSignable: boolean;
-  isResignable: ResignableStatus|null;
+  isResignable: ResignableStatus | null;
   seasonRk?: number | null;
   seasonRating?: number | null;
   overallRk?: number | null;
@@ -164,17 +173,17 @@ export interface Player {
   weight?: number | null;
   height?: number | null;
   lineupPos?: RosterPosition | null;
-  gshlTeamId?: number | null;
+  gshlTeamId?: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
 
 export interface Contract {
-  id: number;
-  playerId: number;
-  signingFranchiseId: number;
-  currentFranchiseId: number;
-  seasonId: number;
+  id: string;
+  playerId: string;
+  signingFranchiseId: string;
+  currentFranchiseId: string;
+  seasonId: string;
   contractType: ContractType[];
   contractLength: number;
   contractSalary: number;
@@ -190,22 +199,22 @@ export interface Contract {
 }
 
 export interface Awards {
-  id: number;
-  seasonId: number;
-  winnerId: number;
-  nomineeIds: number[];
+  id: string;
+  seasonId: string;
+  winnerId: string;
+  nomineeIds: string[];
   award: AwardsList;
   createdAt: Date;
   updatedAt: Date;
 }
 export interface DraftPick {
-  id: number;
-  seasonId: number;
-  gshlTeamId: number;
-  originalTeamId?: number | null;
-  round: number;
-  pick: number;
-  playerId?: number | null;
+  id: string;
+  seasonId: string;
+  gshlTeamId: string;
+  originalTeamId?: string | null;
+  round: string;
+  pick: string;
+  playerId?: string | null;
   isTraded: boolean;
   isSigning: boolean;
   createdAt: Date;
@@ -214,11 +223,11 @@ export interface DraftPick {
 
 // Player stat line types
 export interface PlayerDayStatLine {
-  id: number;
-  seasonId: number;
-  gshlTeamId: number;
-  playerId: number;
-  weekId: number;
+  id: string;
+  seasonId: string;
+  gshlTeamId: string;
+  playerId: string;
+  weekId: string;
   date: Date;
   nhlPos: RosterPosition[];
   posGroup: PositionGroup;
@@ -228,195 +237,195 @@ export interface PlayerDayStatLine {
   fullPos: RosterPosition;
   opp: string;
   score: string;
-  GP: number;
-  MG: number;
-  IR: number;
-  IRplus: number;
-  GS: number;
-  G: number;
-  A: number;
-  P: number;
-  PM: number;
-  PIM: number;
-  PPP: number;
-  SOG: number;
-  HIT: number;
-  BLK: number;
-  W: number;
-  GA: number;
-  GAA: number;
-  SV: number;
-  SA: number;
-  SVP: number;
-  SO: number;
-  TOI: number;
-  Rating: number;
-  ADD: number;
-  MS: number;
-  BS: number;
+  GP: string;
+  MG: string;
+  IR: string;
+  IRplus: string;
+  GS: string;
+  G: string;
+  A: string;
+  P: string;
+  PM: string;
+  PIM: string;
+  PPP: string;
+  SOG: string;
+  HIT: string;
+  BLK: string;
+  W: string;
+  GA: string;
+  GAA: string;
+  SV: string;
+  SA: string;
+  SVP: string;
+  SO: string;
+  TOI: string;
+  Rating: string;
+  ADD: string;
+  MS: string;
+  BS: string;
   createdAt: Date;
   updatedAt: Date;
 }
 export interface PlayerWeekStatLine {
-  id: number;
-  seasonId: number;
-  gshlTeamId: number;
-  playerId: number;
-  weekId: number;
+  id: string;
+  seasonId: string;
+  gshlTeamId: string;
+  playerId: string;
+  weekId: string;
   nhlPos: RosterPosition[];
   posGroup: PositionGroup;
   nhlTeam: string;
-  days: number;
-  GP: number;
-  MG: number;
-  IR: number;
-  IRPlus: number; // matches sheets config casing
-  GS: number;
-  G: number;
-  A: number;
-  P: number;
-  PM: number;
-  PIM: number;
-  PPP: number;
-  SOG: number;
-  HIT: number;
-  BLK: number;
-  W: number;
-  GA: number;
-  GAA: number;
-  SV: number;
-  SA: number;
-  SVP: number;
-  SO: number;
-  TOI: number;
-  Rating: number;
-  ADD: number;
-  MS: number;
-  BS: number;
+  days: string;
+  GP: string;
+  MG: string;
+  IR: string;
+  IRPlus: string; // matches sheets config casing
+  GS: string;
+  G: string;
+  A: string;
+  P: string;
+  PM: string;
+  PIM: string;
+  PPP: string;
+  SOG: string;
+  HIT: string;
+  BLK: string;
+  W: string;
+  GA: string;
+  GAA: string;
+  SV: string;
+  SA: string;
+  SVP: string;
+  SO: string;
+  TOI: string;
+  Rating: string;
+  ADD: string;
+  MS: string;
+  BS: string;
   createdAt: Date;
   updatedAt: Date;
 }
 export interface PlayerSplitStatLine {
-  id: number;
-  seasonId: number;
-  gshlTeamId: number;
-  playerId: number;
+  id: string;
+  seasonId: string;
+  gshlTeamId: string;
+  playerId: string;
   nhlPos: RosterPosition[];
   posGroup: PositionGroup;
   nhlTeam: string;
   seasonType: SeasonType;
-  days: number;
-  GP: number;
-  MG: number;
-  IR: number;
-  IRplus: number;
-  GS: number;
-  G: number;
-  A: number;
-  P: number;
-  PM: number;
-  PIM: number;
-  PPP: number;
-  SOG: number;
-  HIT: number;
-  BLK: number;
-  W: number;
-  GA: number;
-  GAA: number;
-  SV: number;
-  SA: number;
-  SVP: number;
-  SO: number;
-  TOI: number;
-  Rating: number;
-  ADD: number;
-  MS: number;
-  BS: number;
+  days: string;
+  GP: string;
+  MG: string;
+  IR: string;
+  IRplus: string;
+  GS: string;
+  G: string;
+  A: string;
+  P: string;
+  PM: string;
+  PIM: string;
+  PPP: string;
+  SOG: string;
+  HIT: string;
+  BLK: string;
+  W: string;
+  GA: string;
+  GAA: string;
+  SV: string;
+  SA: string;
+  SVP: string;
+  SO: string;
+  TOI: string;
+  Rating: string;
+  ADD: string;
+  MS: string;
+  BS: string;
   createdAt: Date;
   updatedAt: Date;
 }
 export interface PlayerTotalStatLine {
-  id: number;
-  seasonId: number;
-  gshlTeamIds: number[]; // Note: plural in sheets config
-  playerId: number;
+  id: string;
+  seasonId: string;
+  gshlTeamIds: string[]; // Note: plural in sheets config
+  playerId: string;
   nhlPos: RosterPosition[];
   posGroup: PositionGroup;
   nhlTeam: string;
   seasonType: SeasonType;
-  days: number;
-  GP: number;
-  MG: number;
-  IR: number;
-  IRplus: number;
-  GS: number;
-  G: number;
-  A: number;
-  P: number;
-  PM: number;
-  PIM: number;
-  PPP: number;
-  SOG: number;
-  HIT: number;
-  BLK: number;
-  W: number;
-  GA: number;
-  GAA: number;
-  SV: number;
-  SA: number;
-  SVP: number;
-  SO: number;
-  TOI: number;
-  Rating: number;
-  ADD: number;
-  MS: number;
-  BS: number;
+  days: string;
+  GP: string;
+  MG: string;
+  IR: string;
+  IRplus: string;
+  GS: string;
+  G: string;
+  A: string;
+  P: string;
+  PM: string;
+  PIM: string;
+  PPP: string;
+  SOG: string;
+  HIT: string;
+  BLK: string;
+  W: string;
+  GA: string;
+  GAA: string;
+  SV: string;
+  SA: string;
+  SVP: string;
+  SO: string;
+  TOI: string;
+  Rating: string;
+  ADD: string;
+  MS: string;
+  BS: string;
   createdAt: Date;
   updatedAt: Date;
 }
 export interface PlayerNHLStatLine {
-  id: number;
-  seasonId: number;
-  playerId: number;
+  id: string;
+  seasonId: string;
+  playerId: string;
   nhlPos: RosterPosition[];
   posGroup: PositionGroup;
   nhlTeam: string;
-  age: number;
-  GP: number;
-  G: number;
-  A: number;
-  P: number;
-  PM: number;
-  PIM: number;
-  PPP: number;
-  SOG: number;
-  HIT: number;
-  BLK: number;
-  W: number;
-  GA: number;
-  GAA: number;
-  SV: number;
-  SA: number;
-  SVP: number;
-  SO: number;
-  QS: number;
-  RBS: number;
-  TOI: number;
-  seasonRating: number; // lowercase from sheets config
-  overallRating: number; // lowercase from sheets config
-  salary: number; // lowercase from sheets config
+  age: string;
+  GP: string;
+  G: string;
+  A: string;
+  P: string;
+  PM: string;
+  PIM: string;
+  PPP: string;
+  SOG: string;
+  HIT: string;
+  BLK: string;
+  W: string;
+  GA: string;
+  GAA: string;
+  SV: string;
+  SA: string;
+  SVP: string;
+  SO: string;
+  QS: string;
+  RBS: string;
+  TOI: string;
+  seasonRating: string; // lowercase from sheets config
+  overallRating: string; // lowercase from sheets config
+  salary: string; // lowercase from sheets config
   createdAt: Date;
   updatedAt: Date;
 }
 
 // Archived stat line types
 export interface ArchivedSkaterDayStatLine {
-  id: number;
-  originalId: number;
-  seasonId: number;
-  gshlTeamId: number;
-  playerId: number;
-  weekId: number;
+  id: string;
+  originalId: string;
+  seasonId: string;
+  gshlTeamId: string;
+  playerId: string;
+  weekId: string;
   date: Date;
   nhlPos: RosterPosition[];
   posGroup: PositionGroup;
@@ -449,12 +458,12 @@ export interface ArchivedSkaterDayStatLine {
 }
 
 export interface ArchivedGoalieDayStatLine {
-  id: number;
-  originalId: number;
-  seasonId: number;
-  gshlTeamId: number;
-  playerId: number;
-  weekId: number;
+  id: string;
+  originalId: string;
+  seasonId: string;
+  gshlTeamId: string;
+  playerId: string;
+  weekId: string;
   date: Date;
   nhlPos: RosterPosition[];
   posGroup: PositionGroup;
@@ -487,10 +496,10 @@ export interface ArchivedGoalieDayStatLine {
 
 // Team stat line types
 export interface TeamDayStatLine {
-  id: number;
-  seasonId: number;
-  gshlTeamId: number;
-  weekId: number;
+  id: string;
+  seasonId: string;
+  gshlTeamId: string;
+  weekId: string;
   date: Date;
   GP: number;
   MG: number;
@@ -523,10 +532,10 @@ export interface TeamDayStatLine {
 }
 
 export interface TeamWeekStatLine {
-  id: number;
-  seasonId: number;
-  gshlTeamId: number;
-  weekId: number;
+  id: string;
+  seasonId: string;
+  gshlTeamId: string;
+  weekId: string;
   days: number;
   GP: number;
   MG: number;
@@ -562,10 +571,10 @@ export interface TeamWeekStatLine {
 }
 
 export interface TeamSeasonStatLine {
-  id: number;
-  seasonId: number;
+  id: string;
+  seasonId: string;
   seasonType: SeasonType;
-  gshlTeamId: number;
+  gshlTeamId: string;
   days: number;
   GP: number;
   MG: number;
@@ -593,7 +602,7 @@ export interface TeamSeasonStatLine {
   ADD: number;
   MS: number;
   BS: number;
-  
+
   streak: string;
   powerRk: number;
   powerRating: number;
