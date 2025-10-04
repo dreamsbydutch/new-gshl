@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
+import { RosterPosition } from "@gshl-types";
 import type { DraftPick, GSHLTeam, NHLTeam, Player } from "@gshl-types";
 import {
   DEFAULT_DRAFT_SEASON_ID,
@@ -80,6 +81,7 @@ export function useDraftAdminList(
 
   const revalidateCoreData = useCallback(async () => {
     await Promise.all([draftPickQuery.invalidate(), playerQuery.invalidate()]);
+    await draftPickQuery.refetch();
   }, [draftPickQuery, playerQuery]);
 
   const draftMutation = api.draftPick.update.useMutation({
@@ -131,14 +133,12 @@ export function useDraftAdminList(
           return;
         }
 
-        await Promise.all(
-          assignments.map((assignment) =>
-            playerUpdateMutation.mutateAsync({
-              id: assignment.playerId,
-              data: { lineupPos: assignment.lineupPos },
-            }),
-          ),
-        );
+        for (const assignment of assignments) {
+          await playerUpdateMutation.mutateAsync({
+            id: assignment.playerId,
+            data: { lineupPos: assignment.lineupPos },
+          });
+        }
 
         await playerQuery.invalidate();
       } catch (error) {
@@ -254,7 +254,10 @@ export function useDraftAdminList(
 
         await playerUpdateMutation.mutateAsync({
           id: player.id,
-          data: { gshlTeamId: teamIdentifier },
+          data: {
+            gshlTeamId: teamIdentifier,
+            lineupPos: RosterPosition.BN,
+          },
         });
 
         void playerQuery.invalidate();

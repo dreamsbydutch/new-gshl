@@ -13,15 +13,16 @@ import { DraftBoardList } from "@gshl-components/DraftBoardList";
 
 import {
   useAllContracts,
+  useAllDraftPicks,
   useAllPlayers,
   useTeamRosterData,
   useTeamsBySeasonId,
 } from "@gshl-hooks";
 import type { Contract, GSHLTeam, Player } from "@gshl-types";
+import { cn } from "@gshl-utils";
 import Image from "next/image";
 import {
   BenchPlayers,
-  RatingLegend,
   RosterLineup,
 } from "src/components/TeamRoster/components";
 
@@ -33,11 +34,53 @@ export default function DraftBoardPage() {
   const { data: contracts } = useAllContracts();
   const { data: players } = useAllPlayers();
   const { data: teams } = useTeamsBySeasonId("12");
+  const { data: draftPicks } = useAllDraftPicks();
+
+  const activeDraftPicks = draftPicks
+    ?.filter((a) => a.seasonId === "12" && a.playerId === null)
+    .sort((a, b) => +a.pick - +b.pick)
+    .slice(0, 8);
   const teamList = teams ?? [];
   const playerList = players ?? [];
   return (
     <div className="mt-20 flex flex-row gap-1">
       <div className="w-[425px]">
+        <div className="mb-6 flex flex-col items-center justify-between">
+          <div className="my-2 space-y-2 text-center text-sm text-muted-foreground">
+            {activeDraftPicks?.map((pick, i) => {
+              const team = teams?.find((t) => t.id === pick.gshlTeamId);
+              return (
+                <div
+                  key={pick.id}
+                  className={cn(
+                    "text-sm",
+                    i === 0
+                      ? "rounded-md border bg-green-100 p-2 text-base font-semibold text-black shadow-lg"
+                      : i === 1
+                        ? "rounded-md border bg-green-50 p-1 text-base text-black shadow-sm"
+                        : i === 2
+                          ? "rounded-md border p-1 text-sm text-black shadow-sm"
+                          : "",
+                  )}
+                >
+                  Round {pick.round}, Pick {pick.pick} -{" "}
+                  {team?.logoUrl ? (
+                    <Image
+                      src={team.logoUrl}
+                      alt={team?.name ?? ""}
+                      width={16}
+                      height={16}
+                      className="mr-1 inline-block h-4 w-4"
+                    />
+                  ) : (
+                    <div className="mr-1 inline-block h-4 w-4 rounded bg-gray-200" />
+                  )}{" "}
+                  {team?.name}
+                </div>
+              );
+            })}
+          </div>
+        </div>
         <DraftBoardList navbarToggle />
       </div>
       <div className="flex flex-col gap-8">

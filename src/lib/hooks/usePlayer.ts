@@ -10,7 +10,7 @@ type AllPlayersQueryResult = Omit<AllPlayersResult, "data"> & {
 const DEFAULT_PLAYER_QUERY_OPTIONS = {
   staleTime: 0,
   refetchOnMount: "always" as const,
-  refetchInterval: 500,
+  refetchInterval: 60_000,
   refetchIntervalInBackground: true,
 } satisfies AllPlayersQueryOptions;
 

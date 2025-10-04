@@ -19,13 +19,10 @@ export const DATA_TYPES = {
     "events",
     "franchises",
     "owners",
-    "players",
     "teams",
     "weeks",
-    "contracts",
     "nhlTeams",
     "matchups",
-    "draftPicks",
     "awards",
   ] as const,
 
