@@ -87,7 +87,7 @@ export default function DraftBoardPage() {
       <div className="flex flex-col gap-8">
         <div className="flex flex-row flex-wrap items-center justify-center gap-2 rounded-lg bg-gray-50 bg-opacity-25 p-1 shadow-md">
           {teamList
-            .filter((t) => inpersonId.includes(t.id!))
+            .filter((t) => inpersonId.includes(t.id))
             .map((team) => (
               <div key={team.id}>
                 <DraftBoardRoster
