@@ -4,7 +4,7 @@ import { DraftBoardTable, MockDraftList } from "./components";
 import { useDraftBoardData } from "@gshl-hooks";
 // utilities exported from utils if needed later
 
-export function DraftBoardList({ seasonId = "12" }: { seasonId?: string }) {
+export function DraftBoardList({ seasonId = "12", navbarToggle = false }: { seasonId?: string, navbarToggle?: boolean }) {
   const [selectedType, setSelectedType] = useState<string>("all");
   const {
     isLoading,
@@ -93,7 +93,7 @@ export function DraftBoardList({ seasonId = "12" }: { seasonId?: string }) {
   }
   return (
     <DraftBoardTable
-      // pickedPlayers= {1}
+      navbar={navbarToggle}
       draftPlayers={filteredPlayers.sort(
         (a, b) => +(a.preDraftRk ?? 9999) - +(b.preDraftRk ?? 9999),
       )}

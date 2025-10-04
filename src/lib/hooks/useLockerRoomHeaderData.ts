@@ -1,3 +1,5 @@
+"use client";
+
 import { useMemo } from "react";
 import type { GSHLTeam } from "@gshl-types";
 import { formatOwnerName } from "@gshl-utils/locker-room-header";

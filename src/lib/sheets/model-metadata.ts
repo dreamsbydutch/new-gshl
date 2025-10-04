@@ -1,11 +1,12 @@
 import { SHEETS_CONFIG } from "./config";
 
-export type ModelDataCategory = "STATIC" | "DYNAMIC" | "MANUAL";
+export type ModelDataCategory = "STATIC" | "DYNAMIC" | "MANUAL" | "REALTIME";
 
 const CACHE_DURATIONS: Record<ModelDataCategory, number> = {
   STATIC: 1000 * 60 * 60 * 24, // 24 hours
   DYNAMIC: 1000 * 60 * 15, // 15 minutes
   MANUAL: 1000 * 60 * 60 * 24 * 7, // 7 days
+  REALTIME: 1000, // 1 second for near-instant refreshes
 };
 
 const MODEL_DATA_TYPES: Record<string, ModelDataCategory> = {
@@ -14,7 +15,7 @@ const MODEL_DATA_TYPES: Record<string, ModelDataCategory> = {
   Franchise: "STATIC",
   Team: "STATIC",
   Owner: "STATIC",
-  Player: "STATIC",
+  Player: "REALTIME",
   NHLTeam: "STATIC",
   nhlTeam: "STATIC",
   Awards: "MANUAL",
@@ -22,8 +23,8 @@ const MODEL_DATA_TYPES: Record<string, ModelDataCategory> = {
   Week: "DYNAMIC",
   Event: "DYNAMIC",
   Matchup: "DYNAMIC",
-  Contract: "DYNAMIC",
-  DraftPick: "DYNAMIC",
+  Contract: "REALTIME",
+  DraftPick: "REALTIME",
 
   PlayerDayStatLine: "DYNAMIC",
   PlayerWeekStatLine: "DYNAMIC",

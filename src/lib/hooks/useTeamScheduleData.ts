@@ -1,3 +1,5 @@
+"use client";
+
 import { useMemo } from "react";
 import { useNavSelections } from "./useNavSelections";
 import { useSeasonMatchupsAndTeams } from "./useSeasonMatchupsAndTeams";
@@ -31,9 +33,8 @@ interface TeamScheduleData {
  */
 export const useTeamScheduleData = (): TeamScheduleData => {
   const { selectedSeasonId, selectedOwnerId } = useNavSelections();
-  const { matchups: allMatchups, teams } = useSeasonMatchupsAndTeams(
-    selectedSeasonId,
-  );
+  const { matchups: allMatchups, teams } =
+    useSeasonMatchupsAndTeams(selectedSeasonId);
   const { data: weeks = [] } = useWeeksBySeasonId(selectedSeasonId ?? "");
 
   // Find the selected team

@@ -1,3 +1,5 @@
+"use client";
+
 import { useCallback, useMemo, useState } from "react";
 import type { DraftPick, GSHLTeam, NHLTeam, Player } from "@gshl-types";
 import {
@@ -125,15 +127,20 @@ export function useDraftAdminList(
 
         const assignments = generateLineupAssignments(teamPlayers);
         if (!assignments.length) {
+          await playerQuery.invalidate();
           return;
         }
 
-        for (const assignment of assignments) {
-          await playerUpdateMutation.mutateAsync({
-            id: assignment.playerId,
-            data: { lineupPos: assignment.lineupPos },
-          });
-        }
+        await Promise.all(
+          assignments.map((assignment) =>
+            playerUpdateMutation.mutateAsync({
+              id: assignment.playerId,
+              data: { lineupPos: assignment.lineupPos },
+            }),
+          ),
+        );
+
+        await playerQuery.invalidate();
       } catch (error) {
         console.error("Failed to rebuild lineup for franchise", {
           teamIdentifier: normalizedIdentifier,
@@ -231,10 +238,14 @@ export function useDraftAdminList(
         }
 
         const draftTeam = resolveTeamFromPick(currentPick, gshlTeams);
+        const franchiseIdentifier = normalizeTeamIdentifier(
+          draftTeam?.franchiseId,
+        );
+        const fallbackIdentifier =
+          normalizeTeamIdentifier(draftTeam?.id) ??
+          normalizeTeamIdentifier(currentPick.gshlTeamId);
         const teamIdentifier =
-          normalizeTeamIdentifier(currentPick.gshlTeamId) ??
-          normalizeTeamIdentifier(draftTeam?.franchiseId) ??
-          normalizeTeamIdentifier(draftTeam?.id);
+          franchiseIdentifier ?? fallbackIdentifier ?? null;
 
         await draftMutation.mutateAsync({
           id: currentPick.id,
@@ -245,6 +256,8 @@ export function useDraftAdminList(
           id: player.id,
           data: { gshlTeamId: teamIdentifier },
         });
+
+        void playerQuery.invalidate();
 
         if (!teamIdentifier) {
           console.error(
@@ -280,6 +293,7 @@ export function useDraftAdminList(
       isDraftPending,
       isPlayerUpdatePending,
       isUndoPending,
+      playerQuery,
       playerUpdateMutation,
       revalidateCoreData,
       updateTeamLineup,
@@ -329,6 +343,8 @@ export function useDraftAdminList(
         data: { gshlTeamId: null, lineupPos: null },
       });
 
+      void playerQuery.invalidate();
+
       if (teamIdentifier) {
         await updateTeamLineup(teamIdentifier);
       }
@@ -361,6 +377,7 @@ export function useDraftAdminList(
     playerUpdateMutation,
     players,
     gshlTeams,
+    playerQuery,
     revalidateCoreData,
     seasonId,
     undoMutation,

@@ -1,9 +1,4 @@
-import {
-  BenchPlayers,
-  CapSpaceDisplay,
-  RatingLegend,
-  RosterLineup,
-} from "./components";
+import { BenchPlayers, RatingLegend, RosterLineup } from "./components";
 import { useTeamRosterData } from "@gshl-hooks";
 import type { TeamRosterProps } from "@gshl-utils/team-roster";
 
@@ -12,9 +7,9 @@ export function TeamRoster({
   contracts,
   currentTeam,
 }: TeamRosterProps) {
-  const showSalaries = true;
+  const showSalaries = false;
 
-  const { teamLineup, benchPlayers, totalCapHit } = useTeamRosterData(
+  const { teamLineup, benchPlayers } = useTeamRosterData(
     players,
     contracts,
     currentTeam,
@@ -39,12 +34,6 @@ export function TeamRoster({
       />
 
       <RatingLegend />
-
-      <CapSpaceDisplay
-        contracts={contracts}
-        showSalaries={showSalaries}
-        totalCapHit={totalCapHit}
-      />
     </>
   );
 }

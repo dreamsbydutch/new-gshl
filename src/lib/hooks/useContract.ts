@@ -1,3 +1,5 @@
+"use client";
+
 import { useCallback, useMemo } from "react";
 import type { Contract, ContractStatus } from "@gshl-types";
 import { api } from "src/trpc/react";

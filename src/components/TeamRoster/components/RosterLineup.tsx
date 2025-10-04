@@ -13,10 +13,10 @@ export const RosterLineup = ({
           <div key={sectionIndex}>
             {lineupSection.map((positionalArray, i) => {
               return (
-                <div key={i} className="grid grid-cols-6 items-center py-2">
+                <div key={i} className="grid grid-cols-6 items-center py-1">
                   {positionalArray.map((player, j) => {
                     if (!player) {
-                      return <div key={j}></div>;
+                      return <div key={j} className="col-span-1"></div>;
                     }
                     const contract = contracts?.find(
                       (b) => b.playerId === player.id,

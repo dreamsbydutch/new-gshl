@@ -1,3 +1,5 @@
+"use client";
+
 /**
  * useWeeklyScheduleData
  * ---------------------
@@ -20,9 +22,8 @@ import {
  */
 export const useWeeklyScheduleData = () => {
   const { selectedSeasonId, selectedWeekId } = useNavSelections();
-  const { matchups: allMatchups, teams } = useSeasonMatchupsAndTeams(
-    selectedSeasonId,
-  );
+  const { matchups: allMatchups, teams } =
+    useSeasonMatchupsAndTeams(selectedSeasonId);
 
   const weeklyMatchups = useMemo(
     () =>

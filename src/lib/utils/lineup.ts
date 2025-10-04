@@ -17,6 +17,14 @@ const FORWARD_CODES = new Set<string>(["LW", "C", "RW"]);
 const DEFENSE_CODES = new Set<string>(["D"]);
 const GOALIE_CODES = new Set<string>(["G"]);
 
+const ROSTER_POSITION_CODES: Partial<Record<RosterPosition, string[]>> = {
+  [RosterPosition.LW]: ["LW"],
+  [RosterPosition.C]: ["C"],
+  [RosterPosition.RW]: ["RW"],
+  [RosterPosition.D]: ["D"],
+  [RosterPosition.G]: ["G"],
+};
+
 function parseRosterPosition(value: unknown): RosterPosition | null {
   if (typeof value !== "string") return null;
   const candidate = value.trim();
@@ -85,6 +93,17 @@ function playsPosition(player: Player, positionCode: string): boolean {
   return getPositionCodes(player).includes(positionCode.toUpperCase());
 }
 
+function canPlayRosterPosition(
+  player: Player,
+  rosterPosition: RosterPosition,
+): boolean {
+  const requiredCodes = ROSTER_POSITION_CODES[rosterPosition];
+  if (!requiredCodes || requiredCodes.length === 0) {
+    return true;
+  }
+  return requiredCodes.some((code) => playsPosition(player, code));
+}
+
 function selectPlayer(
   available: Player[],
   primary: PlayerPredicate,
@@ -139,7 +158,9 @@ export function generateLineupAssignments(
     .slice()
     .sort((a, b) => getLineupScore(b) - getLineupScore(a));
 
-  const goalie = selectPlayer(availablePlayers, isGoalie);
+  const goalie = selectPlayer(availablePlayers, (player) =>
+    canPlayRosterPosition(player, RosterPosition.G),
+  );
   if (goalie) {
     assignmentMap.set(goalie.id, RosterPosition.G);
   }
@@ -159,8 +180,9 @@ export function generateLineupAssignments(
   forwardSlots.forEach(({ position, preferredCode }) => {
     const selected = selectPlayer(
       availablePlayers,
-      (player) => playsPosition(player, preferredCode) && isForward(player),
-      (player) => isForward(player) && !isGoalie(player),
+      (player) =>
+        playsPosition(player, preferredCode) &&
+        canPlayRosterPosition(player, position),
     );
     if (selected) {
       assignmentMap.set(selected.id, position);
@@ -169,10 +191,8 @@ export function generateLineupAssignments(
 
   const defenseSlots = 3;
   for (let index = 0; index < defenseSlots; index += 1) {
-    const selected = selectPlayer(
-      availablePlayers,
-      isDefense,
-      (player) => !isGoalie(player),
+    const selected = selectPlayer(availablePlayers, (player) =>
+      canPlayRosterPosition(player, RosterPosition.D),
     );
     if (selected) {
       assignmentMap.set(selected.id, RosterPosition.D);

@@ -10,10 +10,12 @@ import { useState } from "react";
 import { formatNumber } from "@gshl-utils";
 
 export function DraftBoardTable({
+  navbar,
   draftPlayers,
   nhlTeams,
   toolbarProps,
 }: {
+  navbar?: boolean;
   draftPlayers: DraftBoardPlayer[];
   totalCount: number;
   nhlTeams: NHLTeam[];
@@ -67,22 +69,26 @@ export function DraftBoardTable({
           ))}
         </tbody>
       </Table>
-      <SecondaryPageToolbar>
-        <HorizontalToggle<ToggleItem<string | null>>
-          items={toolbarProps.toolbarKeys}
-          selectedItem={
-            toolbarProps.toolbarKeys.find(
-              (item: ToggleItem<string | null>) =>
-                item.key === toolbarProps.activeKey,
-            ) ?? null
-          }
-          onSelect={(type: ToggleItem<string | null>) => type.setter(type.key)}
-          getItemKey={(type: ToggleItem<string | null>) => type.key}
-          getItemLabel={(type: ToggleItem<string | null>) => type.value}
-          itemClassName="text-sm text-nowrap"
-          className="no-scrollbar flex flex-row overflow-scroll"
-        />
-      </SecondaryPageToolbar>
+      {!navbar && (
+        <SecondaryPageToolbar>
+          <HorizontalToggle<ToggleItem<string | null>>
+            items={toolbarProps.toolbarKeys}
+            selectedItem={
+              toolbarProps.toolbarKeys.find(
+                (item: ToggleItem<string | null>) =>
+                  item.key === toolbarProps.activeKey,
+              ) ?? null
+            }
+            onSelect={(type: ToggleItem<string | null>) =>
+              type.setter(type.key)
+            }
+            getItemKey={(type: ToggleItem<string | null>) => type.key}
+            getItemLabel={(type: ToggleItem<string | null>) => type.value}
+            itemClassName="text-sm text-nowrap"
+            className="no-scrollbar flex flex-row overflow-scroll"
+          />
+        </SecondaryPageToolbar>
+      )}
     </div>
   );
 }

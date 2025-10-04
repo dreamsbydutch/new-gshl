@@ -32,7 +32,7 @@ export const BenchPlayers = ({
 
   return (
     <div className="mx-auto mt-2 flex max-w-md flex-col rounded-xl border bg-brown-50">
-      <div className="mx-2 my-2 grid grid-cols-2 items-center">
+      <div className="mx-2 my-1 grid grid-cols-2 items-center">
         {benchPlayers.map((player, i) => {
           const contract = contracts?.find((b) => b.playerId === player.id);
           return (

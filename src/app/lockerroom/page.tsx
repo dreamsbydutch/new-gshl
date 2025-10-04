@@ -104,7 +104,9 @@ export default function LockerRoomPage() {
       ),
     [teamContracts],
   );
-  const { data: players } = useAllPlayers();
+  const { data: players } = useAllPlayers({
+    refetchInterval: 500,
+  });
 
   if (!currentTeam) {
     return (

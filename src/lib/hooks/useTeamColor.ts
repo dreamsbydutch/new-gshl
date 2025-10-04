@@ -1,3 +1,5 @@
+"use client";
+
 import { useEffect, useState } from "react";
 
 // Legacy single-color cache (primary) & expanded palette cache
