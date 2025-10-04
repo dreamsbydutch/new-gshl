@@ -7,6 +7,7 @@ import type {
   DraftBoardToolbarProps,
 } from "@gshl-utils/draft-board-list";
 import { useState } from "react";
+import { formatNumber } from "@gshl-utils";
 
 export function DraftBoardTable({
   draftPlayers,
@@ -44,6 +45,7 @@ export function DraftBoardTable({
         <thead>
           <tr>
             <th>Ovr Rk</th>
+            <th>ADP</th>
             <th>Tm</th>
             <th>Player</th>
             <th>Pos</th>
@@ -96,6 +98,11 @@ function DraftBoardPlayerListing({
   return (
     <tr key={player.id} className="py-2" onClick={() => setIsOpen(!isOpen)}>
       <td className="whitespace-nowrap px-1">{player.overallRk}</td>
+      <td className="whitespace-nowrap px-1">
+        {isNaN(+formatNumber(player.preDraftRk, 1))
+          ? "—"
+          : (+formatNumber(player.preDraftRk, 1)).toFixed(1)}
+      </td>
       <td>
         <NHLLogo
           team={nhlTeams.find(
@@ -107,12 +114,7 @@ function DraftBoardPlayerListing({
       <td className="whitespace-nowrap px-2">{player.nhlPos.join(", ")}</td>
       <td className="whitespace-nowrap px-2">{player.handedness}</td>
       <td className="whitespace-nowrap px-2">
-        {player.birthday
-          ? Math.floor(
-              (Date.now() - new Date(player.birthday).getTime()) /
-                (365.25 * 24 * 60 * 60 * 1000),
-            )
-          : "N/A"}
+        {(+formatNumber(player.age, 1)).toFixed(1)}
       </td>
       <td className="whitespace-nowrap px-2">{player.height}</td>
       <td className="whitespace-nowrap px-2">{player.weight}</td>

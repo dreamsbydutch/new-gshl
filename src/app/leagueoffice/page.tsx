@@ -15,25 +15,10 @@ export default function LeagueOfficePage() {
   const [isClient, setIsClient] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [isDraftingPlayer, setIsDraftingPlayer] = useState(false);
 
   const utils = api.useUtils();
   const officeToggle = { selectedLeagueOfficeType: "draftboard" };
   // const officeToggle = useNavStore();
-
-  // Mutations
-  const updateDraftPick = api.draftPick.update.useMutation({
-    onSuccess: () => {
-      void utils.draftPick.getAll.invalidate();
-      setLastUpdated(new Date());
-    },
-    onError: (error) => {
-      console.error("Failed to update draft pick:", error);
-    },
-    onSettled: () => {
-      setIsDraftingPlayer(false);
-    },
-  });
 
   // Use refreshKey to force re-fetch of data
   const { data: draftPicks } = useAllDraftPicks();
@@ -81,87 +66,6 @@ export default function LeagueOfficePage() {
     void handleDataRefresh();
   };
 
-  const handleDraftPlayer = async () => {
-    if (!currentDraftPick) {
-      console.error("No current draft pick available");
-      return;
-    }
-
-    console.log("Attempting to draft player for pick:", {
-      id: currentDraftPick.id,
-      pick: currentDraftPick.pick,
-      round: currentDraftPick.round,
-      teamId: currentDraftPick.gshlTeamId,
-    });
-
-    setIsDraftingPlayer(true);
-
-    // For demo purposes, I'm using a placeholder playerId ("999")
-    // In a real implementation, you'd want to:
-    // 1. Open a player selection modal
-    // 2. Let user pick from available players
-    // 3. Use the selected player's ID
-    const placeholderPlayerId = "999";
-
-    try {
-      // First, refresh the draft picks to ensure we have the latest data
-      await utils.draftPick.getAll.invalidate();
-
-      // Re-check if the draft pick still exists after refresh
-      const refreshedPicks = await utils.draftPick.getAll.fetch({});
-      const pickExists = refreshedPicks?.find(
-        (p) => p.id === currentDraftPick.id,
-      );
-
-      if (!pickExists) {
-        console.error(
-          "Draft pick no longer exists after refresh:",
-          currentDraftPick.id,
-        );
-        alert(
-          "This draft pick is no longer available. The data has been refreshed.",
-        );
-        return;
-      }
-
-      if (pickExists.playerId !== null) {
-        console.error(
-          "Draft pick already has a player assigned:",
-          pickExists.playerId,
-        );
-        alert(
-          "This draft pick has already been made. The data has been refreshed.",
-        );
-        return;
-      }
-
-      await updateDraftPick.mutateAsync({
-        id: currentDraftPick.id,
-        data: {
-          playerId: placeholderPlayerId,
-        },
-      });
-
-      console.log("Successfully drafted player for pick:", currentDraftPick.id);
-    } catch (error) {
-      console.error("Draft pick update failed:", error);
-
-      // Show user-friendly error message
-      if (error instanceof Error) {
-        if (error.message.includes("not found")) {
-          alert(
-            "Draft pick not found. The pick may have been removed or modified. Refreshing data...",
-          );
-          await utils.draftPick.getAll.invalidate();
-        } else {
-          alert(`Failed to make draft pick: ${error.message}`);
-        }
-      } else {
-        alert("An unexpected error occurred while making the draft pick.");
-      }
-    }
-  };
-
   const formatLastUpdated = (date: Date) => {
     return date.toLocaleTimeString("en-US", {
       hour: "2-digit",
@@ -175,29 +79,6 @@ export default function LeagueOfficePage() {
     <div className="container mx-auto px-4 py-8">
       <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Button
-            onClick={handleDraftPlayer}
-            disabled={isDraftingPlayer || !currentDraftPick}
-            variant="default"
-            size="sm"
-            className="flex items-center gap-2"
-          >
-            {isDraftingPlayer ? (
-              <>
-                <RefreshCw className="h-4 w-4 animate-spin" />
-                Drafting...
-              </>
-            ) : (
-              <>
-                Draft Player
-                {currentDraftPick && (
-                  <span className="text-xs opacity-75">
-                    (Pick {currentDraftPick.pick})
-                  </span>
-                )}
-              </>
-            )}
-          </Button>
           {!currentDraftPick && (
             <span className="text-sm text-muted-foreground">
               No draft picks available

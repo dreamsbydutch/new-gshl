@@ -1,17 +1,13 @@
 import Image from "next/image";
 import { NHLLogo } from "../../ui/nhlLogo";
 import { formatNumber } from "@gshl-utils";
-import { HorizontalToggle, TertiaryPageToolbar } from "@gshl-nav";
+import { HorizontalToggle, SecondaryPageToolbar } from "@gshl-nav";
 import type { ToggleItem, DraftPick, NHLTeam, GSHLTeam } from "@gshl-types";
 import type {
   DraftBoardToolbarProps,
   DraftBoardPlayer,
 } from "@gshl-utils/draft-board-list";
-import {
-  lighten,
-  readableText,
-  useTeamColor,
-} from "@gshl-hooks";
+import { lighten, readableText, useTeamColor } from "@gshl-hooks";
 
 function MockDraftPickCard({
   pick,
@@ -77,7 +73,8 @@ function MockDraftPickCard({
                 {projectedPlayer.fullName}
               </span>
               <span className="text-center text-[10px] opacity-75">
-                {projectedPlayer.nhlPos.toString()} • Age {projectedPlayer.age}
+                {projectedPlayer.nhlPos.toString()} • Age{" "}
+                {(+formatNumber(projectedPlayer.age, 1)).toFixed(1)}
               </span>
             </div>
             <div className="ml-auto flex flex-col items-end gap-0.5 text-[10px]">
@@ -153,7 +150,7 @@ export function MockDraftList({
         })}
       </div>
       {toolbarProps && (
-        <TertiaryPageToolbar>
+        <SecondaryPageToolbar>
           <HorizontalToggle<ToggleItem<string | null>>
             items={toolbarProps.toolbarKeys}
             selectedItem={
@@ -169,7 +166,7 @@ export function MockDraftList({
             itemClassName="text-sm text-nowrap"
             className="no-scrollbar flex flex-row overflow-scroll"
           />
-        </TertiaryPageToolbar>
+        </SecondaryPageToolbar>
       )}
     </div>
   );

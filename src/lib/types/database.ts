@@ -160,6 +160,7 @@ export interface Player {
   isActive: boolean;
   isSignable: boolean;
   isResignable: ResignableStatus | null;
+  preDraftRk?: number | null;
   seasonRk?: number | null;
   seasonRating?: number | null;
   overallRk?: number | null;

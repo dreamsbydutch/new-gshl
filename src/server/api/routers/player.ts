@@ -4,6 +4,20 @@ import { optimizedSheetsAdapter } from "@gshl-sheets";
 import { idSchema, baseQuerySchema, batchDeleteSchema } from "./_schemas";
 import type { Player } from "@gshl-types";
 
+const normalizeGshlTeamId = (
+  value: string | null | undefined,
+): string | undefined => {
+  if (value === undefined) return undefined;
+  return value ?? "";
+};
+
+const normalizeLineupPos = (
+  value: string | null | undefined,
+): string | undefined => {
+  if (value === undefined) return undefined;
+  return value ?? "";
+};
+
 // Player-specific schemas
 const playerWhereSchema = z
   .object({
@@ -11,8 +25,10 @@ const playerWhereSchema = z
     lastName: z.string().optional(),
     position: z.string().optional(),
     teamId: z.number().int().optional(),
+    gshlTeamId: z.string().optional(),
     isActive: z.boolean().optional(),
     nhlTeam: z.string().optional(),
+    lineupPos: z.string().optional(),
   })
   .optional();
 
@@ -21,6 +37,7 @@ const playerCreateSchema = z.object({
   lastName: z.string(),
   position: z.string(),
   teamId: z.number().int().optional(),
+  gshlTeamId: z.string().nullable().optional(),
   isActive: z.boolean().default(true),
   nhlTeam: z.string().optional(),
   jerseyNumber: z.number().int().optional(),
@@ -28,6 +45,7 @@ const playerCreateSchema = z.object({
   weight: z.number().optional(),
   birthDate: z.date().optional(),
   birthPlace: z.string().optional(),
+  lineupPos: z.string().nullable().optional(),
 });
 
 const playerUpdateSchema = z.object({
@@ -35,6 +53,7 @@ const playerUpdateSchema = z.object({
   lastName: z.string().optional(),
   position: z.string().optional(),
   teamId: z.number().int().optional(),
+  gshlTeamId: z.string().nullable().optional(),
   isActive: z.boolean().optional(),
   nhlTeam: z.string().optional(),
   jerseyNumber: z.number().int().optional(),
@@ -42,6 +61,7 @@ const playerUpdateSchema = z.object({
   weight: z.number().optional(),
   birthDate: z.date().optional(),
   birthPlace: z.string().optional(),
+  lineupPos: z.string().nullable().optional(),
 });
 
 export const playerRouter = createTRPCRouter({
@@ -117,8 +137,19 @@ export const playerRouter = createTRPCRouter({
   create: publicProcedure
     .input(playerCreateSchema)
     .mutation(async ({ input }): Promise<Player> => {
+      const { gshlTeamId, lineupPos, ...rest } = input;
+      const payload = {
+        ...rest,
+        ...(gshlTeamId !== undefined
+          ? { gshlTeamId: normalizeGshlTeamId(gshlTeamId) }
+          : {}),
+        ...(lineupPos !== undefined
+          ? { lineupPos: normalizeLineupPos(lineupPos) }
+          : {}),
+      };
+
       return optimizedSheetsAdapter.create("Player", {
-        data: input,
+        data: payload,
       }) as unknown as Promise<Player>;
     }),
 
@@ -130,9 +161,20 @@ export const playerRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ input }): Promise<Player> => {
+      const { gshlTeamId, lineupPos, ...rest } = input.data;
+      const payload = {
+        ...rest,
+        ...(gshlTeamId !== undefined
+          ? { gshlTeamId: normalizeGshlTeamId(gshlTeamId) }
+          : {}),
+        ...(lineupPos !== undefined
+          ? { lineupPos: normalizeLineupPos(lineupPos) }
+          : {}),
+      };
+
       return optimizedSheetsAdapter.update("Player", {
         where: { id: input.id },
-        data: input.data,
+        data: payload,
       }) as unknown as Promise<Player>;
     }),
 
@@ -171,8 +213,18 @@ export const playerRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ input }): Promise<{ count: number }> => {
+      const rows = input.data.map(({ gshlTeamId, lineupPos, ...rest }) => ({
+        ...rest,
+        ...(gshlTeamId !== undefined
+          ? { gshlTeamId: normalizeGshlTeamId(gshlTeamId) }
+          : {}),
+        ...(lineupPos !== undefined
+          ? { lineupPos: normalizeLineupPos(lineupPos) }
+          : {}),
+      }));
+
       return optimizedSheetsAdapter.createMany("Player", {
-        data: input.data,
+        data: rows,
       }) as unknown as Promise<{ count: number }>;
     }),
 
@@ -185,9 +237,20 @@ export const playerRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ input }): Promise<{ count: number }> => {
+      const { gshlTeamId, lineupPos, ...rest } = input.data;
+      const payload = {
+        ...rest,
+        ...(gshlTeamId !== undefined
+          ? { gshlTeamId: normalizeGshlTeamId(gshlTeamId) }
+          : {}),
+        ...(lineupPos !== undefined
+          ? { lineupPos: normalizeLineupPos(lineupPos) }
+          : {}),
+      };
+
       return optimizedSheetsAdapter.updateMany("Player", {
         where: input.where,
-        data: input.data,
+        data: payload,
       }) as unknown as Promise<{ count: number }>;
     }),
 });

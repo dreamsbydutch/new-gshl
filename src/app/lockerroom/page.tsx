@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useMemo, useRef } from "react";
 import { useNavStore } from "@gshl-cache";
 import { TeamContractTable } from "@gshl-components/ContractTable";
 import { LockerRoomHeader } from "@gshl-components/LockerRoomHeader";
@@ -17,8 +18,10 @@ import {
 } from "@gshl-hooks";
 import { ContractStatus } from "@gshl-types";
 import { OwnerContractHistory } from "@gshl-components/ContractHistory";
+import { DraftAdminList } from "@gshl-components/DraftAdminList";
 
 export default function LockerRoomPage() {
+  const DEFAULT_SEASON_ID = "12";
   const selectedLockerRoomType = useNavStore(
     (state) => state.selectedLockerRoomType,
   );
@@ -29,13 +32,47 @@ export default function LockerRoomPage() {
     currentSeason,
     defaultSeason,
     selectedSeasonId,
+    setSelectedSeasonId,
   } = useSeasonState();
 
-  const activeSeason = selectedSeason ?? currentSeason ?? defaultSeason;
-  const resolvedSeasonId =
-    activeSeason?.id?.toString() ?? selectedSeasonId ?? "";
+  const hasInitializedSeason = useRef(false);
 
-  const { data: contracts } = useAllContracts();
+  const lockerRoomDefaultSeason = useMemo(() => {
+    const explicitSeason = seasons?.find(
+      (season) => String(season.id) === DEFAULT_SEASON_ID,
+    );
+
+    if (explicitSeason) {
+      return explicitSeason;
+    }
+
+    return defaultSeason ?? currentSeason ?? selectedSeason ?? null;
+  }, [
+    seasons,
+    DEFAULT_SEASON_ID,
+    defaultSeason,
+    currentSeason,
+    selectedSeason,
+  ]);
+
+  useEffect(() => {
+    if (hasInitializedSeason.current) return;
+    if (!lockerRoomDefaultSeason?.id) return;
+
+    const desiredSeasonId = String(lockerRoomDefaultSeason.id);
+    if (selectedSeasonId !== desiredSeasonId) {
+      setSelectedSeasonId(desiredSeasonId);
+    }
+
+    hasInitializedSeason.current = true;
+  }, [lockerRoomDefaultSeason?.id, selectedSeasonId, setSelectedSeasonId]);
+
+  const activeSeason =
+    selectedSeason ?? lockerRoomDefaultSeason ?? currentSeason ?? defaultSeason;
+  const resolvedSeasonId =
+    selectedSeasonId ?? activeSeason?.id?.toString() ?? "";
+
+  const { data: contracts, getContracts } = useAllContracts();
   const { data: teams } = useTeamsBySeasonId(resolvedSeasonId);
   const { data: draftPicks } = useAllDraftPicks();
   const { data: nhlTeams } = useNHLTeams();
@@ -50,11 +87,22 @@ export default function LockerRoomPage() {
   const currentTeam = effectiveTeams?.find(
     (t) => t.ownerId === selectedOwnerId,
   );
-  const teamContracts = contracts?.filter(
-    (c) =>
-      c.currentFranchiseId === currentTeam?.franchiseId &&
-      c.capHitEndDate instanceof Date &&
-      c.capHitEndDate > new Date(),
+  const teamContracts = useMemo(() => {
+    if (!currentTeam?.franchiseId) return [];
+    return getContracts({
+      filters: {
+        currentFranchiseIds: currentTeam.franchiseId,
+        activeOnly: true,
+      },
+    });
+  }, [currentTeam?.franchiseId, getContracts]);
+
+  const teamContractsWithoutBuyouts = useMemo(
+    () =>
+      teamContracts.filter(
+        (contract) => contract.expiryStatus !== ContractStatus.BUYOUT,
+      ),
+    [teamContracts],
   );
   const { data: players } = useAllPlayers();
 
@@ -84,9 +132,7 @@ export default function LockerRoomPage() {
               teams: effectiveTeams,
               allTeams,
               draftPicks: draftPicks, // now full list; component scopes by team & season
-              contracts: teamContracts?.filter(
-                (a) => a.expiryStatus !== ContractStatus.BUYOUT,
-              ),
+              contracts: teamContractsWithoutBuyouts,
               players,
               seasons,
               gshlTeamId: currentTeam.id,
@@ -121,25 +167,27 @@ export default function LockerRoomPage() {
           }}
         />
       )}
-      {selectedLockerRoomType === "draft" &&
-        (selectedOwnerId === "1" ? (
-          <></>
-        ) : (
+      {selectedLockerRoomType === "draft" && (
+        <>
           <TeamDraftPickList
             {...{
               teams: effectiveTeams,
               allTeams,
               draftPicks: draftPicks, // now full list; component scopes by team & season
-              contracts: teamContracts?.filter(
-                (a) => a.expiryStatus !== ContractStatus.BUYOUT,
-              ),
+              contracts: teamContractsWithoutBuyouts,
               players,
               seasons,
               gshlTeamId: currentTeam.id,
               selectedSeasonId: resolvedSeasonId,
             }}
           />
-        ))}
+          {selectedOwnerId === "1" && (
+            <>
+              <DraftAdminList />
+            </>
+          )}
+        </>
+      )}
     </>
   );
 }

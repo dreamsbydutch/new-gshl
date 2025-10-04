@@ -101,6 +101,7 @@ export * from "./useTeamScheduleData";
 export * from "./useWeeklyScheduleData";
 export * from "./useNavSelections";
 export * from "./useSeasonMatchupsAndTeams";
+export * from "./useDraftAdminList";
 
 // ============================================================================
 // USAGE EXAMPLES

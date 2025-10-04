@@ -29,7 +29,7 @@ function hasRosterPosition(
 }
 
 export function matchesFilter(
-  player: Pick<DraftBoardPlayer, "posGroup" | "nhlPos" | "overallRk">,
+  player: Pick<DraftBoardPlayer, "posGroup" | "nhlPos" | "overallRating">,
   selectedType: string | null,
 ): boolean {
   if (!selectedType || selectedType === "all") return true;
@@ -47,7 +47,7 @@ export function matchesFilter(
     case "rightwing":
       return hasRosterPosition(player, RosterPosition.RW);
     case "wildcard":
-      return player.overallRk === null;
+      return player.overallRating === null;
     default:
       return false;
   }

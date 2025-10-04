@@ -25,13 +25,11 @@ export function useDraftBoardData({ seasonId, selectedType }: Params) {
     );
 
   const draftPlayers: DraftBoardPlayer[] = (players ?? [])
-    .filter((p: Player) => {
-      const dp = seasonDraftPicks.find((d) => d.playerId === p.id);
-      return !dp;
-    })
+    .filter((p: Player) => p.isActive && !p.gshlTeamId)
     .sort(
       (a: Player, b: Player) => (b.overallRating ?? 0) - (a.overallRating ?? 0),
-    );
+    )
+    .sort((a, b) => +(a.preDraftRk ?? 9999) - +(b.preDraftRk ?? 9999));
 
   const filteredPlayers: DraftBoardPlayer[] = draftPlayers.filter((p) =>
     matchesFilter(p, selectedType),

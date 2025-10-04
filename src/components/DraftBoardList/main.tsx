@@ -94,7 +94,9 @@ export function DraftBoardList({ seasonId = "12" }: { seasonId?: string }) {
   return (
     <DraftBoardTable
       // pickedPlayers= {1}
-      draftPlayers={filteredPlayers}
+      draftPlayers={filteredPlayers.sort(
+        (a, b) => +(a.preDraftRk ?? 9999) - +(b.preDraftRk ?? 9999),
+      )}
       totalCount={draftPlayers.length}
       nhlTeams={nhlTeams}
       toolbarProps={pageToolbarProps}
@@ -118,6 +120,8 @@ export function MockDraftPreview({ seasonId = "12" }: { seasonId?: string }) {
     <MockDraftList
       seasonDraftPicks={seasonDraftPicks}
       draftPlayers={draftPlayers}
+      toolbarProps={undefined}
+      // pickedPlayers= {1}
       nhlTeams={nhlTeams}
       gshlTeams={gshlTeams}
     />

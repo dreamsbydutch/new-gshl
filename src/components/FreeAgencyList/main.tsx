@@ -57,16 +57,19 @@ export function FreeAgencyList() {
                     (t: NHLTeam) =>
                       t.abbreviation === player.nhlTeam.toString(),
                   )}
+                  size={24}
                 />
               </td>
               <td className="whitespace-nowrap">{player.fullName}</td>
               <td className="whitespace-nowrap">{player.nhlPos.toString()}</td>
-              <td className="whitespace-nowrap">{player.age}</td>
+              <td className="whitespace-nowrap">
+                {(+formatNumber(player.age, 1)).toFixed(1)}
+              </td>
               <td className="whitespace-nowrap">
                 {(+formatNumber(player.seasonRating ?? 0, 2)).toFixed(2)}
               </td>
               <td className="whitespace-nowrap">
-                {formatMoney(+(player.salary ?? 0) * 1.25, true)}
+                {formatMoney(+(player.salary ?? 0) * 1.25)}
               </td>
             </tr>
           ))}

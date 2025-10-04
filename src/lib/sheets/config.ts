@@ -181,6 +181,7 @@ export const SHEETS_CONFIG = {
       "isActive",
       "isSignable",
       "isResignable",
+      "preDraftRk",
       "seasonRk",
       "seasonRating",
       "overallRk",
@@ -653,6 +654,43 @@ type DatabaseValue =
 
 export type DatabaseRecord = Record<string, DatabaseValue>;
 
+const BOOLEAN_COLUMNS = new Set([
+  "isActive",
+  "isSignable",
+  "isPlayoffs",
+  "ownerIsActive",
+  "isCompleted",
+  "isTraded",
+  "isSigning",
+]);
+
+const BOOLEAN_TRUE_VALUES = new Set(["true", "1", "yes", "y", "on"]);
+const BOOLEAN_FALSE_VALUES = new Set(["false", "0", "no", "n", "off"]);
+
+function coerceBoolean(value: unknown): boolean | null {
+  if (typeof value === "boolean") {
+    return value;
+  }
+
+  if (typeof value === "number") {
+    if (value === 1) return true;
+    if (value === 0) return false;
+    return null;
+  }
+
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (BOOLEAN_TRUE_VALUES.has(normalized)) {
+      return true;
+    }
+    if (BOOLEAN_FALSE_VALUES.has(normalized)) {
+      return false;
+    }
+  }
+
+  return null;
+}
+
 // Type-safe helper to convert database data to sheet row
 export function convertModelToRow<T extends DatabaseRecord>(
   data: T,
@@ -754,6 +792,23 @@ export function convertRowToModel<T extends DatabaseRecord>(
       } catch {
         result[column] = [String(value)];
       }
+    } else if (BOOLEAN_COLUMNS.has(column)) {
+      const booleanValue = coerceBoolean(value);
+      if (booleanValue !== null) {
+        result[column] = booleanValue;
+      } else {
+        const normalized = String(value).trim();
+        const normalizedLower = normalized.toLowerCase();
+        if (BOOLEAN_TRUE_VALUES.has(normalizedLower)) {
+          result[column] = true;
+        } else if (BOOLEAN_FALSE_VALUES.has(normalizedLower)) {
+          result[column] = false;
+        } else {
+          result[column] = normalized === "" ? null : normalized;
+        }
+      }
+    } else if (typeof value === "boolean") {
+      result[column] = value;
     } else if (typeof value === "string" && value.toLowerCase() === "true") {
       result[column] = true;
     } else if (typeof value === "string" && value.toLowerCase() === "false") {

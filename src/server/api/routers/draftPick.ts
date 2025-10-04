@@ -25,7 +25,7 @@ const draftPickCreateSchema = z.object({
 });
 
 const draftPickUpdateSchema = z.object({
-  playerId: z.string().optional(),
+  playerId: z.string().nullable().optional(),
   teamId: z.string().optional(),
   seasonId: z.string().optional(),
   round: z.string().optional(),
