@@ -42,6 +42,7 @@ export default function DraftBoardPage() {
     .slice(0, 8);
   const teamList = teams ?? [];
   const playerList = players ?? [];
+  const inpersonId = ["174", "175", "176", "177", "184", "171", "172"];
   return (
     <div className="mt-20 flex flex-row gap-1">
       <div className="w-[425px]">
@@ -84,6 +85,25 @@ export default function DraftBoardPage() {
         <DraftBoardList navbarToggle />
       </div>
       <div className="flex flex-col gap-8">
+        <div className="flex flex-row flex-wrap items-center justify-center gap-2 rounded-lg bg-gray-50 bg-opacity-25 p-1 shadow-md">
+          {teamList
+            .filter((t) => inpersonId.includes(t.id!))
+            .map((team) => (
+              <div key={team.id}>
+                <DraftBoardRoster
+                  key={team.id}
+                  players={playerList.filter(
+                    (player) => player.gshlTeamId === team.franchiseId,
+                  )}
+                  contracts={contracts.filter(
+                    (contract) =>
+                      contract.currentFranchiseId === team.franchiseId,
+                  )}
+                  currentTeam={team}
+                />
+              </div>
+            ))}
+        </div>
         <div className="flex flex-row flex-wrap items-center justify-center gap-2 rounded-lg bg-sunview-50 bg-opacity-25 p-1 shadow-md">
           {teamList
             .filter((t) => t.confAbbr === "SV")
