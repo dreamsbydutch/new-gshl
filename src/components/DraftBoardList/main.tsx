@@ -1,10 +1,16 @@
-import type { ToggleItem } from "@gshl-types";
+import { RosterPosition, type ToggleItem } from "@gshl-types";
 import { useState } from "react";
 import { DraftBoardTable, MockDraftList } from "./components";
 import { useDraftBoardData } from "@gshl-hooks";
 // utilities exported from utils if needed later
 
-export function DraftBoardList({ seasonId = "12", navbarToggle = false }: { seasonId?: string, navbarToggle?: boolean }) {
+export function DraftBoardList({
+  seasonId = "12",
+  navbarToggle = false,
+}: {
+  seasonId?: string;
+  navbarToggle?: boolean;
+}) {
   const [selectedType, setSelectedType] = useState<string>("all");
   const {
     isLoading,
@@ -94,9 +100,15 @@ export function DraftBoardList({ seasonId = "12", navbarToggle = false }: { seas
   return (
     <DraftBoardTable
       navbar={navbarToggle}
-      draftPlayers={filteredPlayers.sort(
-        (a, b) => +(a.preDraftRk ?? 9999) - +(b.preDraftRk ?? 9999),
-      )}
+      draftPlayers={
+        navbarToggle
+          ? filteredPlayers
+              .filter((a) => !a.nhlPos.includes(RosterPosition.G))
+              .sort((a, b) => +(a.preDraftRk ?? 9999) - +(b.preDraftRk ?? 9999))
+          : filteredPlayers.sort(
+              (a, b) => +(a.preDraftRk ?? 9999) - +(b.preDraftRk ?? 9999),
+            )
+      }
       totalCount={draftPlayers.length}
       nhlTeams={nhlTeams}
       toolbarProps={pageToolbarProps}
