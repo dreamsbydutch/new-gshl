@@ -9,7 +9,7 @@
 
 import type { GSHLTeam } from "@gshl-types";
 import { useNavStore } from "@gshl-cache";
-import { useTeamsBySeasonId } from "@gshl-hooks";
+import { useTeams } from "@gshl-hooks";
 import { HorizontalToggle } from "./toggle";
 import Image from "next/image";
 
@@ -30,10 +30,11 @@ export function TeamsToggle({ className, seasonId }: TeamsToggleProps) {
   const setOwnerId = useNavStore((state) => state.setOwnerId);
 
   const {
-    data: teams,
+    data: teamsRaw = [],
     isLoading,
     error,
-  } = useTeamsBySeasonId((selectedSeasonId));
+  } = useTeams({ seasonId: selectedSeasonId });
+  const teams = teamsRaw as GSHLTeam[];
 
   const selectedTeam = teams.find((t) => t.ownerId === selectedOwnerId) ?? null;
 

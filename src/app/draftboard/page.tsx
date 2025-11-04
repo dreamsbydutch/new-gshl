@@ -1,6 +1,6 @@
 "use client";
 
-import { DraftBoardList } from "@gshl-components/DraftBoardList";
+import { DraftBoardList } from "@gshl-components/draft/DraftBoardList";
 /**
  * DraftBoardPage
  *
@@ -13,18 +13,15 @@ import { DraftBoardList } from "@gshl-components/DraftBoardList";
 
 import {
   useAllContracts,
-  useAllDraftPicks,
-  useAllPlayers,
+  useDraftPicks,
+  usePlayers,
   useTeamRosterData,
-  useTeamsBySeasonId,
+  useTeams,
 } from "@gshl-hooks";
 import type { Contract, GSHLTeam, Player } from "@gshl-types";
 import { cn } from "@gshl-utils";
 import Image from "next/image";
-import {
-  BenchPlayers,
-  RosterLineup,
-} from "src/components/TeamRoster/components";
+import { BenchPlayers, RosterLineup } from "@gshl-components/team/TeamRoster";
 
 /**
  * DraftBoardPage
@@ -32,9 +29,10 @@ import {
  */
 export default function DraftBoardPage() {
   const { data: contracts } = useAllContracts();
-  const { data: players } = useAllPlayers();
-  const { data: teams } = useTeamsBySeasonId("12");
-  const { data: draftPicks } = useAllDraftPicks();
+  const { data: players } = usePlayers();
+  const { data: teamsRaw = [] } = useTeams({ seasonId: "12" });
+  const teams = teamsRaw as GSHLTeam[];
+  const { data: draftPicks } = useDraftPicks();
 
   const activeDraftPicks = draftPicks
     ?.filter((a) => a.seasonId === "12" && a.playerId === null)
@@ -158,11 +156,11 @@ function DraftBoardRoster({
 }) {
   const showSalaries = false;
 
-  const { teamLineup, benchPlayers } = useTeamRosterData(
+  const { teamLineup, benchPlayers } = useTeamRosterData({
     players,
     contracts,
     currentTeam,
-  );
+  });
 
   return (
     <>

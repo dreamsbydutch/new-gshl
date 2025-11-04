@@ -9,7 +9,7 @@
 import { cn } from "@gshl-utils";
 import { SeasonType, type Week } from "@gshl-types";
 import { useNavStore } from "@gshl-cache";
-import { useWeeksBySeasonId } from "@gshl-hooks";
+import { useWeeks } from "@gshl-hooks";
 import { HorizontalToggle } from "./toggle";
 
 interface WeeksToggleProps {
@@ -23,7 +23,7 @@ interface WeeksToggleProps {
  */
 export function WeeksToggle({ className }: WeeksToggleProps) {
   const seasonId = useNavStore((state) => state.selectedSeasonId);
-  const { data: weeks } = useWeeksBySeasonId(seasonId);
+  const { data: weeks } = useWeeks({ seasonId });
   const selectedWeekId = useNavStore((state) => state.selectedWeekId);
   const setWeekId = useNavStore((state) => state.setWeekId);
 
@@ -49,7 +49,7 @@ export function WeeksToggle({ className }: WeeksToggleProps) {
       <div
         className={cn(
           "py-0.5",
-          week.weekNum < 10 ? "px-1" : "px-0.5",
+          week.weekNum < 10 ? "px-1.5" : "px-0.5",
           isSelected
             ? "rounded-sm bg-slate-200 font-bold text-gray-900 shadow-md"
             : "text-gray-700",

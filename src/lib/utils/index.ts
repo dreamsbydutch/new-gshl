@@ -3,15 +3,30 @@
  *
  * This module provides a centralized export point for all utility functions
  * used throughout the GSHL fantasy hockey league application.
+ *
+ * Utilities are now organized into logical subdirectories:
+ * - core: Generic, reusable utilities (date, format, validation, etc.)
+ * - domain: Business domain utilities (season, team, lineup)
+ * - features: Component-specific utilities for UI features
+ * - stats: Statistics aggregation system
+ * - shared: Shared constants and configurations
+ * - integrations: External service integrations
  */
 
-export * from "./date";
-export * from "./format";
-export * from "./season";
-export * from "./array";
-export * from "./data";
-export * from "./contract-table";
-export * from "./draft-board-list";
-export * from "./weekly-schedule";
-export * from "./draftAdmin";
-export * from "./lineup";
+// Core utilities - Generic helpers used everywhere
+export * from "./core";
+
+// Domain utilities - GSHL business logic
+export * from "./domain";
+
+// Shared utilities and constants (exported before features to establish source of truth)
+export * from "./shared";
+
+// Feature utilities - Component-specific helpers
+export * from "./features";
+
+// Statistics aggregation system
+export * from "./stats";
+
+// External integrations
+export * from "./integrations";

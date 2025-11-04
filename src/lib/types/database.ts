@@ -109,6 +109,7 @@ export interface Franchise {
   logoUrl: string;
   confId: string;
   isActive: boolean;
+  yahooApiId?: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -137,6 +138,7 @@ export interface GSHLTeam {
   abbr: string | null;
   logoUrl: string | null;
   isActive: boolean;
+  yahooApiId: string | null;
   confName: string | null;
   confAbbr: string | null;
   confLogoUrl: string | null;
@@ -613,10 +615,15 @@ export interface TeamSeasonStatLine {
   teamHW: number;
   teamHL: number;
   teamL: number;
+  teamTie: number;
+  teamCCW: number;
+  teamCCHW: number;
+  teamCCHL: number;
+  teamCCL: number;
+  teamCCTie: number;
   overallRk: number;
   conferenceRk: number;
   wildcardRk?: number | null;
-  losersTournRk?: number | null;
   playersUsed: number;
   norrisRating?: number | null;
   norrisRk?: number | null;

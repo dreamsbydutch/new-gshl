@@ -13,6 +13,8 @@ import { eventRouter } from "./routers/event";
 import { contractRouter } from "./routers/contract";
 import { draftPickRouter } from "./routers/draftPick";
 import { systemRouter } from "./routers/system";
+import { yahooScraperRouter } from "./routers/yahoo-scraper";
+import { statAggregationRouter } from "./routers/statAggregation";
 // import { archivedStatsRouter } from "./routers/archivedStats"; // Disabled for performance
 
 /**
@@ -39,9 +41,11 @@ export const appRouter = createTRPCRouter({
   // Statistics
   playerStats: playerStatsRouter,
   teamStats: teamStatsRouter,
+  statAggregation: statAggregationRouter,
 
   // System utilities
   system: systemRouter,
+  yahooScraper: yahooScraperRouter,
 
   // Archived stats (disabled for performance)
   // archivedStats: archivedStatsRouter,

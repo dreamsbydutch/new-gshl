@@ -7,6 +7,11 @@
 // Button Components
 export { Button, buttonVariants, type ButtonProps } from "./button";
 
+// Form Controls
+export { Input, type InputProps } from "./input";
+export { Label, type LabelProps } from "./label";
+export { Select, type SelectProps } from "./select";
+
 // Dropdown Menu Components
 export {
   DropdownMenu,
@@ -66,3 +71,6 @@ export {
 } from "./toast";
 
 export { Toaster } from "./toaster";
+
+// NHL Logo Component
+export { NHLLogo } from "./nhlLogo";

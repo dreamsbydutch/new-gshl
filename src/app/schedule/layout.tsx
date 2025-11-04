@@ -29,7 +29,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   return (
     <div className="mb-32 font-varela lg:mb-4">
       {children}
-      <SecondaryPageToolbar>
+      <SecondaryPageToolbar className="mx-auto text-center">
         <SeasonToggleNav />
         {scheduleType === "team" && (
           <>

@@ -3,10 +3,18 @@
  *
  * This module provides a centralized export point for all Google Sheets related functionality
  * used throughout the GSHL application for data storage and retrieval.
+ *
+ * Organized into logical subdirectories:
+ * - config: Configuration, workbook mappings, and model metadata
+ * - cache: Caching layer with TTL management
+ * - client: Low-level Google Sheets API client
+ * - adapters: High-level Prisma-like database adapters
+ * - playerday: PlayerDay-specific partitioning and validation
+ * - migration: Schema migration and data transformation tools
  */
 
 // ============================================================================
-// CONFIGURATION & SETUP
+// CONFIGURATION & METADATA
 // ============================================================================
 
 /**
@@ -14,28 +22,20 @@
  * - WORKBOOKS: Maps workbook names to their Google Sheets IDs
  * - MODEL_TO_WORKBOOK: Routes database models to appropriate workbooks
  * - SHEETS_CONFIG: Defines sheet names and column mappings for each model
- * - convertModelToRow/convertRowToModel: Transform data between database and sheets formats
+ * - Model metadata: Cache TTLs and data categorization
  */
-export {
-  WORKBOOKS,
-  MODEL_TO_WORKBOOK,
-  SHEETS_CONFIG,
-  type DatabaseRecord,
-  convertModelToRow,
-  convertRowToModel,
-} from "./config";
+export * from "./config";
 
 // ============================================================================
-// DATABASE MIGRATION & SCHEMA MANAGEMENT
+// CACHING LAYER
 // ============================================================================
 
 /**
- * Migration helper for managing Google Sheets schema changes
- * - Handles data migration between different sheet structures
- * - Manages schema updates and data transformations
- * - Provides rollback capabilities for failed migrations
+ * Sheet caching with TTL management
+ * - Reduces API calls to Google Sheets
+ * - Automatic cache invalidation based on data type
  */
-export { migrationHelper } from "./migration-helper";
+export * from "./cache";
 
 // ============================================================================
 // LOW-LEVEL GOOGLE SHEETS CLIENT
@@ -46,41 +46,43 @@ export { migrationHelper } from "./migration-helper";
  * - Raw Google Sheets API access with caching layer
  * - Batch operations for improved performance
  * - Connection pooling and retry logic
- * - Rate limiting and error handling
  */
-export {
-  OptimizedSheetsClient,
-  optimizedSheetsClient,
-} from "./optimized-client";
+export * from "./client";
 
 // ============================================================================
-// HIGH-LEVEL DATABASE ADAPTER
+// HIGH-LEVEL DATABASE ADAPTERS
 // ============================================================================
 
 /**
- * Prisma-like database adapter for Google Sheets
+ * Prisma-like database adapters for Google Sheets
+ * - OptimizedSheetsAdapter: General-purpose adapter for all models
+ * - PlayerDayAdapter: Specialized adapter for partitioned PlayerDay data
  * - Provides familiar database operations (findMany, create, update, delete)
- * - Handles complex queries with where clauses and ordering
- * - Manages relationships between different models
- * - Includes caching, validation, and error handling
- * - Supports transactions and batch operations
  */
-export {
-  // Main adapter class and singleton instance
-  OptimizedSheetsAdapter,
-  optimizedSheetsAdapter,
+export * from "./adapters";
 
-  // TypeScript interfaces for type safety
-  type FindManyOptions,
-  type FindUniqueOptions,
-  type CreateOptions,
-  type CreateManyOptions,
-  type UpdateOptions,
-  type UpdateManyOptions,
-  type DeleteOptions,
-  type DeleteManyOptions,
-  type UpsertOptions,
-} from "./optimized-adapter";
+// ============================================================================
+// PLAYERDAY UTILITIES
+// ============================================================================
+
+/**
+ * PlayerDay partitioning and validation
+ * - Workbook partitioning by season ranges
+ * - Update timeframe validation (2-day window)
+ * - Batch operation categorization
+ */
+export * from "./playerday";
+
+// ============================================================================
+// MIGRATION TOOLS
+// ============================================================================
+
+/**
+ * Schema migration and data transformation
+ * - Handles data migration between different sheet structures
+ * - Manages schema updates and data transformations
+ */
+export * from "./migration";
 
 // ============================================================================
 // USAGE EXAMPLES

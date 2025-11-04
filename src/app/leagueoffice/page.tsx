@@ -1,15 +1,16 @@
 "use client";
 
 // import { useNavStore } from "@gshl-cache";
-import { DraftBoardList } from "@gshl-components/DraftBoardList";
-import { FreeAgencyList } from "@gshl-components/FreeAgencyList";
-import { useAllDraftPicks, useTeamsBySeasonId } from "@gshl-hooks";
+import { DraftBoardList } from "@gshl-components/draft/DraftBoardList";
+import { FreeAgencyList } from "@gshl-components/contracts/FreeAgencyList";
+import { useDraftPicks, useTeams } from "@gshl-hooks";
+import type { GSHLTeam } from "@gshl-types";
 import { Button } from "@gshl-ui";
 import { cn } from "@gshl-utils";
 import { RefreshCw } from "lucide-react";
 import Image from "next/image";
 import { useState, useEffect, useCallback } from "react";
-import { api } from "src/trpc/react";
+import { clientApi as api } from "@gshl-trpc";
 
 export default function LeagueOfficePage() {
   const [isClient, setIsClient] = useState(false);
@@ -21,8 +22,9 @@ export default function LeagueOfficePage() {
   // const officeToggle = useNavStore();
 
   // Use refreshKey to force re-fetch of data
-  const { data: draftPicks } = useAllDraftPicks();
-  const { data: gshlTeams } = useTeamsBySeasonId("12");
+  const { data: draftPicks } = useDraftPicks();
+  const { data: gshlTeamsRaw = [] } = useTeams({ seasonId: "12" });
+  const gshlTeams = gshlTeamsRaw as GSHLTeam[];
 
   const activeDraftPicks = draftPicks
     ?.filter((a) => a.seasonId === "12" && a.playerId === null)

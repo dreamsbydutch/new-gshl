@@ -4,7 +4,8 @@ import {
 } from "@tanstack/react-query";
 import SuperJSON from "superjson";
 
-const DEFAULT_QUERY_GC_TIME = 1000 * 60 * 15;
+const THIRTY_SECONDS_IN_MS = 1000 * 30;
+const FIFTEEN_MINUTES_IN_MS = 1000 * 60 * 15;
 
 export const createQueryClient = () =>
   new QueryClient({
@@ -12,14 +13,15 @@ export const createQueryClient = () =>
       queries: {
         // With SSR, we usually want to set some default staleTime
         // above 0 to avoid refetching immediately on the client
-        staleTime: 30 * 1000,
+        // Using 30s as per architecture guidelines for initial stale window
+        staleTime: THIRTY_SECONDS_IN_MS,
         // Add retry and refetch on window focus for better data consistency
         retry: 3,
         refetchOnWindowFocus: true,
         refetchOnReconnect: true,
-        // Ensure fresh data when component mounts
-        refetchOnMount: true,
-        gcTime: DEFAULT_QUERY_GC_TIME,
+        // Don't refetch on mount if data is fresh from server
+        refetchOnMount: false,
+        gcTime: FIFTEEN_MINUTES_IN_MS,
       },
       dehydrate: {
         serializeData: SuperJSON.serialize,

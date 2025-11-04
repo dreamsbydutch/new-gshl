@@ -9,7 +9,6 @@ export const CACHE_DURATIONS = {
   STATIC: 1000 * 60 * 60 * 24,
   DYNAMIC: 1000 * 60 * 15,
   MANUAL: 1000 * 60 * 60 * 24 * 7,
-  REALTIME: 1000,
 } as const;
 
 export const DATA_TYPES = {
@@ -19,11 +18,13 @@ export const DATA_TYPES = {
     "events",
     "franchises",
     "owners",
+    "players",
     "teams",
     "weeks",
+    "contracts",
     "nhlTeams",
     "matchups",
-    "awards",
+    "draftPicks",
   ] as const,
 
   DYNAMIC: [
@@ -33,8 +34,6 @@ export const DATA_TYPES = {
     "playerDayStats",
     "teamDayStats",
   ] as const,
-
-  REALTIME: ["players", "contracts", "draftPicks"] as const,
 
   MANUAL: ["archivedStats"] as const,
 } as const;
@@ -67,9 +66,6 @@ export function getCacheDuration(dataType: string): number {
   }
   if ((DATA_TYPES.DYNAMIC as readonly string[]).includes(dataType)) {
     return CACHE_DURATIONS.DYNAMIC;
-  }
-  if ((DATA_TYPES.REALTIME as readonly string[]).includes(dataType)) {
-    return CACHE_DURATIONS.REALTIME;
   }
   if ((DATA_TYPES.MANUAL as readonly string[]).includes(dataType)) {
     return CACHE_DURATIONS.MANUAL;

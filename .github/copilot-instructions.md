@@ -4,8 +4,15 @@
 
 - Next.js 15 App Router + React 18 powers the UI; server data flows through tRPC 11 defined in `src/server/api/routers/*`.
 - Google Sheets is the source of truth via the `optimizedSheetsAdapter` in `src/lib/sheets`; every router wraps that adapter.
-- Client hooks under `src/lib/hooks` use `clientApi` from `src/trpc/react` and compose multiple queries into view models (see `useTeam.ts`).
+- **Hooks orchestrate, utils calculate**: Client hooks in `src/lib/hooks` fetch data via `clientApi` and delegate heavy transformations to pure functions in `src/lib/utils`.
 - Query caching is handled by `createQueryClient` (`src/trpc/query-client.ts`) with a 30s stale window and SuperJSON hydration.
+
+## Hook architecture
+
+- **Main hooks** (`src/lib/hooks/main/*`): Wrap tRPC queries for type-safe backend access. Minimal logic—just fetch and optionally filter.
+- **Feature hooks** (`src/lib/hooks/features/*`): Orchestrate multiple data sources and apply utility functions to produce view models for UI features.
+- **Separation of concerns**: Heavy data manipulation, filtering, sorting, and calculations live in `src/lib/utils`. Hooks focus on fetching, combining sources, and applying those utilities.
+- Example: `useFreeAgencyData` fetches players/teams, then calls `getFreeAgents()` from `lib/utils/domain/player.ts` for filtering/sorting logic.
 
 ## UI conventions
 
@@ -20,7 +27,7 @@
 - Use the persisted Zustand store in `src/lib/cache/store.ts` (`useNavStore`) for cross-page filters like season/owner, then pass that state into hooks.
 - Season-aware views should call `useSeasonState` to obtain `selectedSeason`, fallbacks, and setter logic instead of re-deriving IDs.
 - When adding mutations, expose them through tRPC procedures and invalidate caches with `api.useUtils()` as seen in `src/app/leagueoffice/page.tsx`.
-- Date fields often arrive as strings from Sheets; normalize in hooks or utils before passing to components (see filtering in `lockerroom/page.tsx`).
+- **Data transformations belong in utils**: Don't inline complex filtering, sorting, or calculations in hooks. Extract to `src/lib/utils` as pure functions and import them.
 
 ## Workflows & automation
 
@@ -31,8 +38,9 @@
 
 ## Adding or modifying features
 
-- To surface new data, add or extend a router in `src/server/api/routers`, then export a hook in `src/lib/hooks` that composes the query result.
-- Keep transformations pure and immutable; reuse helpers from `src/lib/utils` (e.g. season resolution, formatting) instead of ad-hoc logic.
+- To surface new data, add or extend a router in `src/server/api/routers`, then export a hook in `src/lib/hooks/main` that wraps the tRPC query.
+- For complex features, create an orchestration hook in `src/lib/hooks/features` that composes multiple main hooks and applies utility functions.
+- **Extract logic to utils**: Keep transformations pure and immutable in `src/lib/utils` (domain logic in `domain/`, feature-specific in `features/`). Hooks should orchestrate, not calculate.
 - Demo pages under `src/app/*` are client components—wrap new widgets with `"use client"` and feed them pre-fetched props from hooks.
 - Use `@gshl-ui` primitives and Tailwind utility classes for styling; respect existing `cn` helper merges for conditional classes.
 - Before finishing a PR, run lint + typecheck locally and confirm the relevant TRPC queries still hydrate on the client (watch for schema drift from Sheets).

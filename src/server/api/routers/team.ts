@@ -21,6 +21,8 @@ const teamWhereSchema = z
     franchiseId: z.string().optional(),
     conferenceId: z.string().optional(),
     isActive: z.boolean().optional(),
+    yahooApiId: z.string().optional(),
+    confId: z.string().optional(),
   })
   .optional();
 
@@ -31,6 +33,7 @@ const teamCreateSchema = z.object({
   franchiseId: z.string(),
   conferenceId: z.string(),
   isActive: z.boolean().default(true),
+  yahooApiId: z.string().optional(),
   logoUrl: z.string().optional(),
   primaryColor: z.string().optional(),
   secondaryColor: z.string().optional(),
@@ -44,6 +47,7 @@ const teamUpdateSchema = z.object({
   franchiseId: z.string().optional(),
   conferenceId: z.string().optional(),
   isActive: z.boolean().optional(),
+  yahooApiId: z.string().optional(),
   logoUrl: z.string().optional(),
   primaryColor: z.string().optional(),
   secondaryColor: z.string().optional(),
@@ -96,6 +100,7 @@ export const teamRouter = createTRPCRouter({
           abbr: franchise?.abbr ?? null,
           logoUrl: franchise?.logoUrl ?? null,
           isActive: franchise?.isActive ?? false,
+          yahooApiId: franchise?.yahooApiId ?? null,
           confName: conference?.name ?? null,
           confAbbr: conference?.abbr ?? null,
           confLogoUrl: conference?.logoUrl ?? null,

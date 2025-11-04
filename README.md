@@ -179,4 +179,30 @@ Destination candidates:
 
 ---
 
+## Documentation
+
+Comprehensive documentation is available in the `docs/` folder:
+
+- **[docs/DATA_SYSTEMS.md](./docs/DATA_SYSTEMS.md)** - Complete guide to data systems:
+
+  - PlayerDay system with upsert, partitioning, and validation
+  - Stat aggregation pipeline (Days → Weeks → Splits → Totals)
+  - Season type splitting (Regular Season, Playoffs, Losers Tournament)
+  - Google Sheets partitioning across multiple workbooks
+
+- **[docs/RANKING.md](./docs/RANKING.md)** - Player performance ranking system:
+
+  - Position-specific ranking algorithm (0-100 scale)
+  - Training and testing the ranking model
+  - API reference and integration examples
+  - Performance considerations and troubleshooting
+
+- **[docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md)** - Vercel deployment guide:
+  - Quick start deployment steps
+  - Cron job configuration for automated scraping
+  - Security, monitoring, and troubleshooting
+  - Local development setup
+
+---
+
 Questions or improvements? Open a PR updating this README so the guide stays living and authoritative.

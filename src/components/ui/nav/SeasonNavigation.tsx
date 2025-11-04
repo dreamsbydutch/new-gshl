@@ -7,7 +7,7 @@
  * and intelligent positioning.
  */
 
-import { useMemo } from "react";
+import { useMemo, useState, useEffect } from "react";
 
 import type { SeasonSummary } from "@gshl-utils";
 import { useSeasonState } from "@gshl-hooks";
@@ -23,8 +23,14 @@ export function SeasonToggleNav({
   className,
   dropdownPosition,
 }: SeasonToggleNavProps) {
+  const [mounted, setMounted] = useState(false);
   const { seasonOptions } = useSeasonState({ autoSelect: false });
   const { setSelectedSeasonId, selectedSeasonSummary } = useSeasonNavigation();
+
+  // Prevent hydration mismatch by only rendering with store data on client
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const handleSeasonSelect = (season: SeasonSummary) => {
     setSelectedSeasonId(season.id);
@@ -37,6 +43,15 @@ export function SeasonToggleNav({
     () => [...seasonOptions].sort((a, b) => b.year - a.year),
     [seasonOptions],
   );
+
+  // Show loading state during SSR and initial client hydration
+  if (!mounted) {
+    return (
+      <div className="mx-2 animate-pulse">
+        <div className="h-8 w-32 rounded bg-muted" />
+      </div>
+    );
+  }
 
   return (
     <DropdownToggle<SeasonSummary>

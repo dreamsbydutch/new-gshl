@@ -85,7 +85,7 @@ export function HorizontalToggle<T>({
   return (
     <div
       className={cn(
-        "no-scrollbar flex flex-row gap-1 overflow-x-auto overflow-y-hidden whitespace-nowrap",
+        "no-scrollbar mx-auto flex flex-row gap-1 overflow-x-auto overflow-y-hidden whitespace-nowrap",
         className,
       )}
     >

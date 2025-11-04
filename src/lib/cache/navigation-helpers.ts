@@ -6,8 +6,8 @@
  */
 
 import { useNavStore } from "./store";
-import { usePreviousWeek, useCurrentWeek, useNextWeek } from "../hooks/useWeek";
-import { useSeasonState } from "../hooks/useSeason";
+import { useWeeks } from "../hooks/main/useWeek";
+import { useSeasonState } from "../hooks/main/useSeason";
 import { useEffect } from "react";
 
 /**
@@ -118,11 +118,22 @@ export function useSeasonNavigation() {
 export function useWeekNavigation() {
   const { selectedWeekId, setWeekId, selectedSeasonId } = useNavStore();
 
-  const { data: currentWeek, isLoading: isCurrentWeekLoading } =
-    useCurrentWeek();
-  const { data: nextWeek, isLoading: isNextWeekLoading } = useNextWeek();
-  const { data: previousWeek, isLoading: isPreviousWeekLoading } =
-    usePreviousWeek();
+  const { data: currentWeekData, isLoading: isCurrentWeekLoading } = useWeeks({
+    seasonId: selectedSeasonId,
+    timeMode: "current",
+  });
+  const { data: nextWeekData, isLoading: isNextWeekLoading } = useWeeks({
+    seasonId: selectedSeasonId,
+    timeMode: "next",
+  });
+  const { data: previousWeekData, isLoading: isPreviousWeekLoading } = useWeeks(
+    { seasonId: selectedSeasonId, timeMode: "previous" },
+  );
+
+  // Extract first week from array results
+  const currentWeek = currentWeekData?.[0];
+  const nextWeek = nextWeekData?.[0];
+  const previousWeek = previousWeekData?.[0];
 
   useEffect(() => {
     if (selectedWeekId || !selectedSeasonId) return;

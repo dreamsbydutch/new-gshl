@@ -47,6 +47,39 @@ export * from "./app";
 export * from "./enums";
 
 // ============================================================================
+// STAT AGGREGATION TYPES
+// ============================================================================
+
+/**
+ * Type definitions for the stat aggregation system
+ * - StatFieldConfig: Stat field aggregation behavior configuration
+ * - AggregationConfig: Generic aggregation configuration interface
+ * - AggregationSummary: Metrics for aggregation reporting
+ * - StatLineInput types: Input types for all aggregation levels
+ * - StatOrchestrationResult: Orchestration summary and breakdown
+ * - StatOrchestrationDeps: Dependency injection for orchestration
+ */
+export * from "./aggregation";
+
+// ============================================================================
+// UI COMPONENT TYPES
+// ============================================================================
+
+/**
+ * Type definitions for UI components and their props
+ * - ContractTable: Contract management table props
+ * - DraftBoardList: Draft board filtering and display props
+ * - LockerRoomHeader: Team header display props
+ * - Standings: Standings display and grouping props
+ * - TeamDraftPickList: Draft pick list props
+ * - TeamHistory: Team matchup history props
+ * - TeamRoster: Team roster display props
+ * - TeamSchedule: Schedule display props
+ * - WeeklySchedule: Week-based schedule props
+ */
+export * from "./ui-components";
+
+// ============================================================================
 // GOOGLE SHEETS INTEGRATION
 // ============================================================================
 
@@ -84,6 +117,18 @@ export * from "./transforms";
  * - Positioning, styling, and interaction types
  */
 export * from "./nav";
+
+// ============================================================================
+// EXTERNAL API TYPES
+// ============================================================================
+
+/**
+ * Yahoo Fantasy Sports data contracts for NHL integrations.
+ * - Mirrors Yahoo's REST v2 resources (games, leagues, teams, players, etc.)
+ * - Includes helper response wrappers and flag unions for raw API payloads
+ * - Enables strongly typed parsing of fantasy hockey data fetched from Yahoo
+ */
+export * from "./yahooSports";
 
 // ============================================================================
 // USAGE EXAMPLES
