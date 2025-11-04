@@ -403,7 +403,8 @@ export const playerStatsRouter = createTRPCRouter({
               // Categorize each record
               for (const record of records) {
                 const existingId = existingByDate.get(record.dateKey);
-                const { dateKey: _dateKey, ...recordData } = record;
+                const { dateKey: _omitDateKey, ...recordData } = record;
+                void _omitDateKey;
 
                 if (existingId) {
                   // Record exists - check if update is allowed

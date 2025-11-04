@@ -32,6 +32,7 @@
  */
 
 import dotenv from "dotenv";
+import type { sheets_v4 } from "googleapis";
 
 dotenv.config({ path: ".env.local" });
 
@@ -201,9 +202,13 @@ async function fetchAllPlayerDays() {
       console.log(
         `   ✓ ${name}: ${playerDayRows.length.toLocaleString()} player days`,
       );
-    } catch (error) {
+  } catch (error) {
       const errorMsg =
-        error instanceof Error ? error.message : String(error ?? "Unknown");
+        error instanceof Error
+          ? error.message
+          : typeof error === "string"
+            ? error
+            : JSON.stringify(error);
       console.log(`   ⚠️  ${name}: Error fetching - ${errorMsg}`);
     }
   }
@@ -679,9 +684,7 @@ async function optimizeAllLineups(teamWeekLineups: TeamWeekLineup[]) {
 // Google Sheets Updates
 // ============================================================================
 
-type GoogleSheetsClient = ReturnType<
-  (typeof import("googleapis"))["google"]["sheets"]
->;
+type GoogleSheetsClient = sheets_v4.Sheets;
 
 /**
  * Updates lineup positions and derived metrics in Google Sheets.
@@ -889,7 +892,11 @@ async function updateLineupPositionsInSheets(
       }
     } catch (error) {
       const errorMsg =
-        error instanceof Error ? error.message : String(error ?? "Unknown");
+        error instanceof Error
+          ? error.message
+          : typeof error === "string"
+            ? error
+            : JSON.stringify(error);
       console.log(`   ❌ ${name}: Error updating - ${errorMsg}`);
     }
   }

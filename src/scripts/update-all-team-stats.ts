@@ -26,6 +26,7 @@
  */
 
 import dotenv from "dotenv";
+import type { AppRouter } from "@gshl-api";
 
 dotenv.config({ path: ".env.local" });
 
@@ -50,9 +51,7 @@ const DELAY_BETWEEN_SEASONS_MS = 500;
 // Type Definitions
 // ============================================================================
 
-type TRPCCaller = ReturnType<
-  (typeof import("@gshl-api"))["appRouter"]["createCaller"]
->;
+type TRPCCaller = ReturnType<AppRouter["createCaller"]>;
 
 interface ScriptOptions {
   seasonId?: string;

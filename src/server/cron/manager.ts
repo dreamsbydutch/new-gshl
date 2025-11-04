@@ -134,7 +134,7 @@ class CronManager {
 
     // Start the task if enabled
     if (!enabled) {
-      cronTask.stop();
+      void cronTask.stop();
     }
 
     this.jobs.set(name, { config, task: cronTask, status, isRunning: false });

@@ -1098,8 +1098,8 @@ export const teamStatsRouter = createTRPCRouter({
                   }
 
                   const { homeScore, awayScore } = calculateMatchupScores(
-                    homeTeamStats as TeamWeekStatLine,
-                    awayTeamStats as TeamWeekStatLine,
+                    homeTeamStats,
+                    awayTeamStats,
                   );
 
                   const homeWin = homeScore >= awayScore;

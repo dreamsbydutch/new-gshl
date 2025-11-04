@@ -58,41 +58,6 @@ const DEFAULT_TIMEOUT = 30_000;
 const DEFAULT_USER_AGENT =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36";
 
-/** Valid NHL team codes (32 teams) */
-const NHL_TEAMS = new Set([
-  "ANA",
-  "BOS",
-  "BUF",
-  "CGY",
-  "CAR",
-  "CHI",
-  "COL",
-  "CBJ",
-  "DAL",
-  "DET",
-  "EDM",
-  "FLA",
-  "LA",
-  "MIN",
-  "MTL",
-  "NSH",
-  "NJ",
-  "NYI",
-  "NYR",
-  "OTT",
-  "PHI",
-  "PIT",
-  "SJ",
-  "SEA",
-  "STL",
-  "TB",
-  "TOR",
-  "VAN",
-  "VGK",
-  "WPG",
-  "WSH",
-  "ARI",
-]);
 
 // ============================================================================
 // Type Definitions

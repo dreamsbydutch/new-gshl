@@ -98,7 +98,7 @@ export function stopYahooScraperCron() {
   console.log("🛑 [Cron] Stopping Yahoo Scraper cron jobs...");
 
   for (const { name, task } of activeTasks) {
-    task.stop();
+    void task.stop();
     console.log(`   - Stopped: ${name}`);
   }
 

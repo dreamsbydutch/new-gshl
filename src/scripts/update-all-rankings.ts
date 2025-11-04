@@ -24,6 +24,7 @@
 
 import dotenv from "dotenv";
 import * as fs from "fs";
+import type { sheets_v4 } from "googleapis";
 
 dotenv.config({ path: ".env.local" });
 
@@ -136,7 +137,7 @@ function loadRankingModel(): RankingModel {
  * Fetches all PlayerDay data from partitioned Google Sheets workbooks.
  */
 async function fetchAllPlayerDays(): Promise<{
-  sheets: ReturnType<typeof import("googleapis").google.sheets>;
+  sheets: sheets_v4.Sheets;
   workbookData: Map<string, WorkbookData>;
 }> {
   console.log("📥 Fetching PlayerDay data from Google Sheets...\n");
@@ -184,7 +185,11 @@ async function fetchAllPlayerDays(): Promise<{
       );
     } catch (error) {
       const errorMsg =
-        error instanceof Error ? error.message : String(error ?? "Unknown");
+        error instanceof Error
+          ? error.message
+          : typeof error === "string"
+            ? error
+            : JSON.stringify(error);
       console.log(`   ⚠️  ${name}: Error fetching - ${errorMsg}`);
     }
   }
@@ -333,7 +338,7 @@ function buildStatLine(data: Record<string, unknown>): PlayerStatLine {
  * Updates the Rating column in all Google Sheets workbooks.
  */
 async function updateRankingsInSheets(
-  sheets: ReturnType<typeof import("googleapis").google.sheets>,
+  sheets: sheets_v4.Sheets,
   workbookData: Map<string, WorkbookData>,
 ): Promise<void> {
   console.log("💾 Updating rankings in Google Sheets...\n");
@@ -345,7 +350,11 @@ async function updateRankingsInSheets(
       await updateWorkbookRankings(sheets, name, data);
     } catch (error) {
       const errorMsg =
-        error instanceof Error ? error.message : String(error ?? "Unknown");
+        error instanceof Error
+          ? error.message
+          : typeof error === "string"
+            ? error
+            : JSON.stringify(error);
       console.log(`   ❌ ${name}: Error updating - ${errorMsg}`);
     }
   }
@@ -357,7 +366,7 @@ async function updateRankingsInSheets(
  * Updates rankings for a single workbook.
  */
 async function updateWorkbookRankings(
-  sheets: ReturnType<typeof import("googleapis").google.sheets>,
+  sheets: sheets_v4.Sheets,
   name: string,
   { spreadsheetId, rows, headers }: WorkbookData,
 ): Promise<void> {

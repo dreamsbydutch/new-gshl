@@ -170,7 +170,7 @@ export function stopStatAggregationCron() {
   console.log("🛑 [Cron] Stopping Stat Aggregation cron jobs...");
 
   for (const { name, task } of activeTasks) {
-    task.stop();
+    void task.stop();
     console.log(`   ✓ Stopped: ${name}`);
   }
 
