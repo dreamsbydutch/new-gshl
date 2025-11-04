@@ -4,7 +4,7 @@ import {
   CONFERENCE_ABBR,
   RANKING_DISPLAY_THRESHOLD,
   TEAM_LOGO_DIMENSIONS,
-} from "../shared/schedule-constants";
+} from "../domain/schedule";
 import { findTeamById } from "../domain/team";
 import type {
   WeekScheduleItemProps,

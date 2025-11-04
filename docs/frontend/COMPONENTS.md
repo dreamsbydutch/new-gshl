@@ -1,5 +1,10 @@
 # Component Architecture
 
+> Note: This guide assumes the core standards in `docs/core-systems/CODING_STANDARDS.md`.
+> - Components are pure UI files (render-only)
+> - Hooks orchestrate data and transformations
+> - Heavy logic belongs in utils; shared types live in `@gshl-types`
+
 ## Overview
 
 GSHL components follow a **strict single-file, single-export architecture** that separates data logic from presentation. This ensures components are predictable, testable, and maintainable.

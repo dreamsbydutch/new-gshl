@@ -125,16 +125,16 @@ export function TeamDraftPickList({
     if (mostRecent) setLocalSeasonId(mostRecent.id);
   }, [seasons, localSeasonId]);
 
-  const { processedDraftPicks, ready } = useTeamDraftPickListData(
+  const { processedDraftPicks, ready } = useTeamDraftPickListData({
     teams,
     draftPicks,
     contracts,
     players,
     seasons,
     gshlTeamId,
-    localSeasonId,
+    selectedSeasonId: localSeasonId,
     allTeams,
-  );
+  });
   if (!ready) return <DraftPickListSkeleton />;
 
   return (

@@ -4,7 +4,7 @@ import {
   GAME_LOCATIONS,
   CONFERENCES,
   RANKING_DISPLAY_THRESHOLD,
-} from "../shared/schedule-constants";
+} from "../domain/schedule";
 import { findTeamById } from "../domain/team";
 import type {
   TeamScheduleItemProps,

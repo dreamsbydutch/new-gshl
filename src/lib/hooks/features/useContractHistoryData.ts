@@ -1,28 +1,80 @@
 /**
  * useContractHistoryData Hook
- *
+ * ---------------------------
  * Provides contract history data for a specific owner across multiple seasons.
  * Handles franchise tracking, data filtering, and sorting logic.
  *
- * @param ownerId - Target owner ID to display contracts for
- * @param teams - Optional season-constrained teams
- * @param allTeams - Full multi-season team list (preferred over teams)
- * @param contracts - List of contracts to filter and display
- * @param players - Player data for displaying names
- * @param seasons - Season data for displaying season names
- * @returns Processed contract history rows ready for display
+ * Heavy lifting: lib/utils/domain (contract filtering and sorting)
  */
+
+"use client";
 
 import { useMemo } from "react";
 import type { Contract, GSHLTeam, Player, Season } from "@gshl-types";
 
-export interface UseContractHistoryDataProps {
+/**
+ * Options for configuring contract history data.
+ */
+export interface UseContractHistoryDataOptions {
+  /**
+   * Target owner ID to display contracts for
+   */
   ownerId: string;
+
+  /**
+   * Optional season-constrained teams
+   */
   teams?: GSHLTeam[];
+
+  /**
+   * Full multi-season team list (preferred over teams)
+   */
   allTeams?: GSHLTeam[];
+
+  /**
+   * List of contracts to filter and display
+   */
   contracts?: Contract[];
+
+  /**
+   * Player data for displaying names
+   */
   players?: Player[];
+
+  /**
+   * Season data for displaying season names
+   */
   seasons?: Season[];
+}
+
+/**
+ * Result returned by useContractHistoryData.
+ */
+export interface UseContractHistoryDataResult {
+  /**
+   * Processed contract history rows ready for display
+   */
+  rows: ContractHistoryRow[];
+
+  /**
+   * Map of franchise ID to team for quick lookups
+   */
+  franchiseById: Map<string, GSHLTeam>;
+
+  /**
+   * Whether there is any contract data
+   */
+  hasData: boolean;
+
+  /**
+   * Loading state (always false for this hook as it doesn't fetch)
+   */
+  isLoading: boolean;
+
+  /**
+   * Error state (always null for this hook as it doesn't fetch)
+   */
+  error: Error | null;
 }
 
 export interface ContractHistoryRow {
@@ -53,14 +105,38 @@ const formatDate = (date: Date | string | null | undefined): string => {
   return "-";
 };
 
-export function useContractHistoryData({
-  ownerId,
-  teams,
-  allTeams,
-  contracts,
-  players,
-  seasons,
-}: UseContractHistoryDataProps) {
+/**
+ * Processes contract history data for a specific owner.
+ *
+ * @param options - Configuration options
+ * @returns Processed contract history rows with lookup maps
+ *
+ * @example
+ * ```tsx
+ * const {
+ *   rows,
+ *   franchiseById,
+ *   hasData
+ * } = useContractHistoryData({
+ *   ownerId: 'owner-123',
+ *   contracts: allContracts,
+ *   players: allPlayers,
+ *   seasons: allSeasons,
+ *   allTeams: allTeams
+ * });
+ * ```
+ */
+export function useContractHistoryData(
+  options: UseContractHistoryDataOptions,
+): UseContractHistoryDataResult {
+  const {
+    ownerId,
+    teams,
+    allTeams,
+    contracts,
+    players,
+    seasons,
+  } = options;
   // Stable pooled team list across renders
   const teamPool = useMemo(() => allTeams ?? teams ?? [], [allTeams, teams]);
 
@@ -141,5 +217,7 @@ export function useContractHistoryData({
     rows: sortedRows,
     franchiseById,
     hasData: rows.length > 0,
+    isLoading: false,
+    error: null,
   };
 }

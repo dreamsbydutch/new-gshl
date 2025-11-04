@@ -631,6 +631,12 @@ To dive deeper:
 - **[Component Architecture](./COMPONENTS.md)** - Build UI features
 - **[Development Setup](./DEVELOPMENT.md)** - Configure local environment
 
+### Standards & Conventions
+
+- **[Coding Standards](./CODING_STANDARDS.md)** - Summary of architecture conventions
+- **[Utilities Guide](./UTILS.md)** - How we build and organize utility functions
+- **[Types Policy](./TYPES.md)** - Where shared types and interfaces live
+
 ---
 
 _For questions or clarifications, see [Troubleshooting](./TROUBLESHOOTING.md)_

@@ -59,18 +59,16 @@ export function useTeamHistoryData(options: UseTeamHistoryDataOptions) {
     [gameTypeValue],
   );
 
-  const schedule = useScheduleData(
-    {
-      ownerID: teamInfo.ownerId ?? undefined,
-      seasonID: parseNumericValue(seasonValue),
-      gameType,
-      oppOwnerID: parseNumericValue(ownerValue),
-    },
-    fullSchedule,
+  const { data: schedule } = useScheduleData({
+    ownerID: teamInfo.ownerId ?? undefined,
+    seasonID: parseNumericValue(seasonValue),
+    gameType,
+    oppOwnerID: parseNumericValue(ownerValue),
+    allMatchups: fullSchedule,
     teams,
     weeks,
     seasons,
-  ).data;
+  });
 
   const ownerOptions = useMemo(() => {
     if (!fullSchedule || !teams) return [["All", ""]];

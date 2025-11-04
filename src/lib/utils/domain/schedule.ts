@@ -1,8 +1,8 @@
 /**
- * Shared schedule constants
+ * Schedule Domain Utilities
  * -------------------------
- * Centralizes game types, conferences, and other schedule-related constants
- * used across team-schedule and weekly-schedule features to eliminate duplication.
+ * Domain-specific constants and utilities for game schedules, conferences, and matchups.
+ * Used across team-schedule and weekly-schedule features.
  */
 
 /**
@@ -63,3 +63,4 @@ export const TEAM_LOGO_DIMENSIONS = {
   width: 64,
   height: 64,
 } as const;
+

@@ -5,7 +5,7 @@
  */
 
 import type { Player } from "@gshl-types";
-import { isTruthy } from "../shared/boolean-helpers";
+import { isTruthy } from "../core/validation";
 
 /**
  * Checks if a player is active

@@ -53,6 +53,14 @@ export interface DraftAdminListViewModel {
   undoDisabled: boolean;
   handleDraftPlayer: (player: Player) => Promise<void>;
   handleUndoLastPick: () => Promise<void>;
+  /**
+   * Loading state (aggregated from all queries)
+   */
+  isLoading: boolean;
+  /**
+   * Error state (from any failed queries)
+   */
+  error: Error | null;
 }
 
 export function useDraftAdminList(
@@ -393,6 +401,12 @@ export function useDraftAdminList(
 
   const playersReady = Boolean(players);
 
+  // Aggregate loading state from all queries
+  const isLoading = playersLoading;
+
+  // Aggregate error state (check for any query errors)
+  const error: Error | null = null; // No direct query errors exposed, mutations handle errors internally
+
   return {
     searchTerm,
     setSearchTerm,
@@ -411,5 +425,7 @@ export function useDraftAdminList(
     undoDisabled,
     handleDraftPlayer,
     handleUndoLastPick,
+    isLoading,
+    error,
   };
 }

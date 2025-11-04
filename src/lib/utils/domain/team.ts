@@ -112,3 +112,71 @@ export const findTeamsByIds = (
 ): GSHLTeam[] => {
   return teams.filter((team) => teamIds.includes(team.id));
 };
+
+/**
+ * Calculates fantasy points from a stats record using GSHL scoring rules.
+ *
+ * Scoring weights:
+ * - Goals: 3 points
+ * - Assists: 2 points
+ * - Shots: 0.1 points
+ * - Hits: 0.1 points
+ * - Blocks: 0.2 points
+ * - Wins (goalies): 3 points
+ * - Saves: 0.1 points
+ * - Shutouts: 2 points
+ *
+ * @param stats - Record of stat names to values
+ * @returns Total fantasy points
+ */
+export function calculateFantasyPoints(stats: Record<string, number>): number {
+  const scoring = {
+    goals: 3,
+    assists: 2,
+    shots: 0.1,
+    hits: 0.1,
+    blocks: 0.2,
+    wins: 3,
+    saves: 0.1,
+    shutouts: 2,
+  } as const;
+
+  return Object.entries(stats).reduce((total, [stat, value]) => {
+    const weight = scoring[stat as keyof typeof scoring] ?? 0;
+    return total + value * weight;
+  }, 0);
+}
+
+/**
+ * Calculates a team's win-loss-tie record from matchups.
+ *
+ * @param matchups - Array of matchup objects with team IDs and results
+ * @param teamId - The team ID to calculate the record for
+ * @returns Object with wins, losses, and ties counts
+ */
+export function calculateTeamRecord(
+  matchups: Array<{
+    homeTeamId: string;
+    awayTeamId: string;
+    homeWin?: boolean | null;
+    awayWin?: boolean | null;
+    tie?: boolean | null;
+  }>,
+  teamId: string,
+): { wins: number; losses: number; ties: number } {
+  return matchups.reduce(
+    (record, matchup) => {
+      if (matchup.homeTeamId === teamId) {
+        if (matchup.homeWin) record.wins += 1;
+        else if (matchup.awayWin) record.losses += 1;
+        else if (matchup.tie) record.ties += 1;
+      } else if (matchup.awayTeamId === teamId) {
+        if (matchup.awayWin) record.wins += 1;
+        else if (matchup.homeWin) record.losses += 1;
+        else if (matchup.tie) record.ties += 1;
+      }
+      return record;
+    },
+    { wins: 0, losses: 0, ties: 0 },
+  );
+}

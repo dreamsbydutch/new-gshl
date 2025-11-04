@@ -11,28 +11,125 @@ import type {
 import type { ProcessedDraftPick } from "@gshl-utils";
 
 /**
- * Derivation hook for TeamDraftPickList.
- * Responsibilities:
- * - Produce a stable, sorted list of processed draft pick view models.
- * - Annotate each pick with availability, originalTeam (if traded), and selectedPlayer when taken.
- * - Remain pure: no mutations of input arrays; no side-effects or network calls.
- *
- * @param teams Loaded GSHL teams (undefined while loading)
- * @param draftPicks Raw draft picks for a team
- * @param contracts Contracts used to infer selected players (mapping pick index)
- * @param players Player entities for lookup when a pick is no longer available
- * @returns { processedDraftPicks, ready }
+ * Options for configuring team draft pick list data.
  */
-export const useTeamDraftPickListData = (
-  teams: GSHLTeam[] | undefined,
-  draftPicks: DraftPick[] | undefined,
-  contracts: Contract[] | undefined, // retained for future advanced mapping if needed
-  players: Player[] | undefined,
-  seasons?: Season[],
-  gshlTeamId?: string,
-  selectedSeasonId?: string,
-  allTeams?: GSHLTeam[],
-) => {
+export interface UseTeamDraftPickListDataOptions {
+  /**
+   * Loaded GSHL teams (undefined while loading)
+   */
+  teams?: GSHLTeam[];
+
+  /**
+   * Raw draft picks for a team
+   */
+  draftPicks?: DraftPick[];
+
+  /**
+   * Contracts used to infer selected players (mapping pick index)
+   * Retained for future advanced mapping if needed
+   */
+  contracts?: Contract[];
+
+  /**
+   * Player entities for lookup when a pick is no longer available
+   */
+  players?: Player[];
+
+  /**
+   * Season data for season filtering
+   */
+  seasons?: Season[];
+
+  /**
+   * GSHL team ID to filter picks for
+   */
+  gshlTeamId?: string;
+
+  /**
+   * Selected season ID for filtering
+   */
+  selectedSeasonId?: string;
+
+  /**
+   * All teams across seasons (for owner-wide scoping)
+   */
+  allTeams?: GSHLTeam[];
+}
+
+/**
+ * Result returned by useTeamDraftPickListData.
+ */
+export interface UseTeamDraftPickListDataResult {
+  /**
+   * Processed draft picks with availability and player info
+   */
+  processedDraftPicks: ProcessedDraftPick[];
+
+  /**
+   * Whether data is ready
+   */
+  ready: boolean;
+
+  /**
+   * Active season resolved from seasons data
+   */
+  activeSeason?: Season;
+
+  /**
+   * Resolved team ID (season-specific team ID if available)
+   */
+  resolvedTeamId?: string;
+
+  /**
+   * Loading state (always false for this hook as it doesn't fetch)
+   */
+  isLoading: boolean;
+
+  /**
+   * Error state (always null for this hook as it doesn't fetch)
+   */
+  error: Error | null;
+}
+
+/**
+ * Hook for processing team draft pick list data.
+ * Produces a stable, sorted list of processed draft pick view models.
+ * Annotates each pick with availability, originalTeam (if traded), and selectedPlayer when taken.
+ *
+ * Heavy lifting: lib/utils/features (draft pick processing logic)
+ *
+ * @param options - Configuration options
+ * @returns Processed draft picks with readiness state
+ *
+ * @example
+ * ```tsx
+ * const {
+ *   processedDraftPicks,
+ *   ready,
+ *   activeSeason
+ * } = useTeamDraftPickListData({
+ *   teams: allTeams,
+ *   draftPicks: allDraftPicks,
+ *   players: allPlayers,
+ *   seasons: allSeasons,
+ *   gshlTeamId: 'team-123',
+ *   selectedSeasonId: 'S15'
+ * });
+ * ```
+ */
+export function useTeamDraftPickListData(
+  options: UseTeamDraftPickListDataOptions = {},
+): UseTeamDraftPickListDataResult {
+  const {
+    teams,
+    draftPicks,
+    contracts,
+    players,
+    seasons,
+    gshlTeamId,
+    selectedSeasonId,
+    allTeams,
+  } = options;
   /** Normalize date-like fields in seasons defensively (in case they arrive as strings) */
   const normalizedSeasons = useMemo<Season[] | undefined>(() => {
     if (!seasons) return seasons;
@@ -174,8 +271,15 @@ export const useTeamDraftPickListData = (
     allTeams,
   ]);
 
-  /** Ready once we have draft picks array computed (even if empty array) and a target team id */
+  // Ready once we have draft picks array computed (even if empty array) and a target team id
   const ready = Boolean(draftPicks && (resolvedTeamId ?? gshlTeamId));
 
-  return { processedDraftPicks, ready, activeSeason, resolvedTeamId };
-};
+  return {
+    processedDraftPicks,
+    ready,
+    activeSeason,
+    resolvedTeamId,
+    isLoading: false,
+    error: null,
+  };
+}

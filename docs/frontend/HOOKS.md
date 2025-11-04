@@ -1,5 +1,10 @@
 # Custom Hooks Architecture
 
+> Note: Hooks are our data orchestration layer per `docs/core-systems/CODING_STANDARDS.md`.
+> - Accept a single options object
+> - Return `{ ..., isLoading, error }` (and `ready` when helpful)
+> - Compose utils for heavy work; keep components render-only
+
 Complete guide to custom React hooks and state management in the GSHL application.
 
 ---

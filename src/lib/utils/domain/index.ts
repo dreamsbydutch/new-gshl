@@ -10,3 +10,5 @@ export * from "./team";
 export * from "./player";
 export * from "./lineup";
 export * from "./lineup-optimizer";
+export * from "./contracts";
+export * from "./schedule";

@@ -43,31 +43,100 @@ const getContractDedupeKey = (contract: Contract) =>
     String(contract.expiryStatus ?? "no-expiry"),
   ].join("|");
 
-/** Optional input params – component may render a skeleton until all are present. */
-interface Params {
+/**
+ * Options for configuring contract table data.
+ */
+export interface UseContractTableDataOptions {
+  /**
+   * Active season metadata (used for deriving base year)
+   */
   currentSeason?: Season;
+
+  /**
+   * Target team for which contracts are displayed
+   */
   currentTeam?: GSHLTeam;
+
+  /**
+   * Contract entities for the team
+   */
   contracts?: Contract[];
+
+  /**
+   * Player entities (presence required for readiness)
+   */
   players?: Player[];
+
+  /**
+   * NHL team list (presence required for readiness)
+   */
   nhlTeams?: NHLTeam[];
 }
 
 /**
- * Compute ready state + derived contract metrics for display.
- * @param currentSeason Active season metadata (used for deriving base year)
- * @param currentTeam Target team for which contracts are displayed
- * @param contracts Contract entities for the team
- * @param players Player entities (presence required for readiness)
- * @param nhlTeams NHL team list (presence required for readiness)
- * @returns { sortedContracts, capSpaceWindow, ready }
+ * Result returned by useContractTableData.
  */
-export function useContractTableData({
-  currentSeason,
-  currentTeam,
-  contracts,
-  players,
-  nhlTeams,
-}: Params) {
+export interface UseContractTableDataResult {
+  /**
+   * Contracts sorted descending by cap hit with duplicates removed
+   */
+  sortedContracts: Contract[];
+
+  /**
+   * Remaining cap space window for current season + next 4 seasons (total 5)
+   */
+  capSpaceWindow: Array<{ label: string; year: number; remaining: number }>;
+
+  /**
+   * Whether all required datasets are present & non-empty
+   */
+  ready: boolean;
+
+  /**
+   * Loading state (always false for this hook as it doesn't fetch)
+   */
+  isLoading: boolean;
+
+  /**
+   * Error state (always null for this hook as it doesn't fetch)
+   */
+  error: Error | null;
+}
+
+/**
+ * Hook for computing contract table view model.
+ * Centralizes derived state for the contract table UI.
+ *
+ * Heavy lifting: lib/utils/domain (cap space calculations)
+ *
+ * @param options - Configuration options
+ * @returns Sorted contracts and cap space window with readiness state
+ *
+ * @example
+ * ```tsx
+ * const {
+ *   sortedContracts,
+ *   capSpaceWindow,
+ *   ready
+ * } = useContractTableData({
+ *   currentSeason: selectedSeason,
+ *   currentTeam: selectedTeam,
+ *   contracts: teamContracts,
+ *   players: allPlayers,
+ *   nhlTeams: allNHLTeams
+ * });
+ * ```
+ */
+export function useContractTableData(
+  options: UseContractTableDataOptions = {},
+): UseContractTableDataResult {
+  const {
+    currentSeason,
+    currentTeam,
+    contracts,
+    players,
+    nhlTeams,
+  } = options;
   const sortedContracts = useMemo(() => {
     if (!contracts) return [];
 
@@ -123,5 +192,11 @@ export function useContractTableData({
       nhlTeams?.length,
   );
 
-  return { sortedContracts, capSpaceWindow, ready };
+  return {
+    sortedContracts,
+    capSpaceWindow,
+    ready,
+    isLoading: false,
+    error: null,
+  };
 }
