@@ -403,7 +403,7 @@ export const playerStatsRouter = createTRPCRouter({
               // Categorize each record
               for (const record of records) {
                 const existingId = existingByDate.get(record.dateKey);
-                const { dateKey, ...recordData } = record;
+                const { dateKey: _dateKey, ...recordData } = record;
 
                 if (existingId) {
                   // Record exists - check if update is allowed
@@ -740,7 +740,7 @@ export const playerStatsRouter = createTRPCRouter({
             const createResult = await optimizedSheetsAdapter.createMany(
               "PlayerWeekStatLine",
               {
-                data: recordsToCreate as any,
+                data: recordsToCreate as Partial<PlayerWeekStatLine>[],
               },
             );
             createCount = createResult.count;
@@ -750,7 +750,10 @@ export const playerStatsRouter = createTRPCRouter({
           if (recordsToUpdate.length > 0) {
             const updateResult = await optimizedSheetsAdapter.bulkUpdateByIds(
               "PlayerWeekStatLine",
-              recordsToUpdate as any,
+              recordsToUpdate as Array<{
+                id: string;
+                data: Partial<PlayerWeekStatLine>;
+              }>,
             );
             updateCount = updateResult.count;
           }
@@ -935,7 +938,7 @@ export const playerStatsRouter = createTRPCRouter({
             const createResult = await optimizedSheetsAdapter.createMany(
               "PlayerSplitStatLine",
               {
-                data: recordsToCreate as any,
+                data: recordsToCreate as Partial<PlayerSplitStatLine>[],
               },
             );
             createCount = createResult.count;
@@ -945,7 +948,10 @@ export const playerStatsRouter = createTRPCRouter({
           if (recordsToUpdate.length > 0) {
             const updateResult = await optimizedSheetsAdapter.bulkUpdateByIds(
               "PlayerSplitStatLine",
-              recordsToUpdate as any,
+              recordsToUpdate as Array<{
+                id: string;
+                data: Partial<PlayerSplitStatLine>;
+              }>,
             );
             updateCount = updateResult.count;
           }
@@ -1129,7 +1135,7 @@ export const playerStatsRouter = createTRPCRouter({
             const createResult = await optimizedSheetsAdapter.createMany(
               "PlayerTotalStatLine",
               {
-                data: recordsToCreate as any,
+                data: recordsToCreate as Partial<PlayerTotalStatLine>[],
               },
             );
             createCount = createResult.count;
@@ -1139,7 +1145,10 @@ export const playerStatsRouter = createTRPCRouter({
           if (recordsToUpdate.length > 0) {
             const updateResult = await optimizedSheetsAdapter.bulkUpdateByIds(
               "PlayerTotalStatLine",
-              recordsToUpdate as any,
+              recordsToUpdate as Array<{
+                id: string;
+                data: Partial<PlayerTotalStatLine>;
+              }>,
             );
             updateCount = updateResult.count;
           }

@@ -283,7 +283,7 @@ async function fetchYahooRoster(params: {
   }
 
   const text = await response.text();
-  const json = JSON.parse(text);
+  const json: unknown = JSON.parse(text);
 
   const normalized = parseYahooRoster(json);
   if (!normalized) {
@@ -494,8 +494,9 @@ function parseYahooPlayers(raw: unknown): {
       continue;
     }
 
-    const attributeSegment = segments[0];
-    const attributes = flattenAttributeSegment(attributeSegment);
+    const attributeSegment: unknown = segments[0];
+    const attributes: Record<string, unknown> =
+      flattenAttributeSegment(attributeSegment);
 
     const playerKey = pickString(attributes.player_key);
     const playerId = pickString(attributes.player_id);
@@ -505,9 +506,7 @@ function parseYahooPlayers(raw: unknown): {
       continue;
     }
 
-    const eligiblePositions = extractPositions(
-      attributes.eligible_positions,
-    );
+    const eligiblePositions = extractPositions(attributes.eligible_positions);
     const eligiblePositionsToAdd = extractPositions(
       attributes.eligible_positions_to_add,
     );
@@ -515,10 +514,7 @@ function parseYahooPlayers(raw: unknown): {
     const selectedPosition = parseSelectedPositionSegment(
       segments.find(
         (segment): segment is Record<string, unknown> =>
-          isObjectRecord(segment) &&
-          Array.isArray(
-            (segment).selected_position,
-          ),
+          isObjectRecord(segment) && Array.isArray(segment.selected_position),
       ),
     );
 
@@ -938,7 +934,7 @@ async function refreshYahooAccessToken(): Promise<{
 
   if (!response.ok || !payload.access_token) {
     const detail =
-      payload.error_description || payload.error || response.statusText;
+      payload.error_description ?? payload.error ?? response.statusText;
     throw new Error(`Yahoo token request failed: ${detail}`);
   }
 

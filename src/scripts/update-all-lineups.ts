@@ -55,11 +55,10 @@ const PLAYERDAY_WORKBOOKS = {
   PLAYERDAYS_11_15: "18IqgstBaBIAfM08w7ddzjF2JTrAqZUjAvsbyZxgHiag",
 };
 
-/** Number of rows to process per batch update chunk */
-const CHUNK_SIZE = 10000;
-
-/** Delay between chunks to avoid API rate limits (ms) */
-const CHUNK_DELAY_MS = 2000;
+// Commented out - not currently used but kept for reference
+// const CHUNK_SIZE = 10000;
+// const CHUNK_DELAY_MS = 2000;
+// const PROGRESS_UPDATE_FREQUENCY = 50;
 
 /** Initial retry delay for quota errors (ms) */
 const INITIAL_RETRY_DELAY_MS = 10000;
@@ -67,16 +66,13 @@ const INITIAL_RETRY_DELAY_MS = 10000;
 /** Maximum number of retries for failed operations */
 const MAX_RETRIES = 5;
 
-/** Progress update frequency (every N team-days) */
-const PROGRESS_UPDATE_FREQUENCY = 50;
-
 // ============================================================================
 // Type Definitions
 // ============================================================================
 
 interface PlayerDayRow {
   row: number; // Row number in sheet (1-indexed, accounting for header)
-  data: any;
+  data: Record<string, unknown>;
   fullPos?: RosterPosition;
   bestPos?: RosterPosition;
   MS?: number; // Missed Start (0 or 1)
@@ -154,7 +150,10 @@ async function fetchAllPlayerDays() {
   const { env } = await import("../env.js");
 
   // Parse service account credentials
-  const credentials = JSON.parse(env.GOOGLE_SERVICE_ACCOUNT_KEY);
+  const credentials = JSON.parse(env.GOOGLE_SERVICE_ACCOUNT_KEY) as Record<
+    string,
+    unknown
+  >;
   const auth = new google.auth.GoogleAuth({
     credentials,
     scopes: ["https://www.googleapis.com/auth/spreadsheets"],
@@ -172,7 +171,7 @@ async function fetchAllPlayerDays() {
         range: "PlayerDayStatLine!A:AZ",
       });
 
-      const rows = response.data.values;
+      const rows = response.data.values as unknown[][] | undefined;
       if (!rows || rows.length < 2) {
         console.log(`   ⚠️  ${name}: No data found`);
         continue;
@@ -183,7 +182,7 @@ async function fetchAllPlayerDays() {
 
       // Store rows with their row numbers (2-indexed because of header)
       const playerDayRows: PlayerDayRow[] = dataRows.map((row, index) => {
-        const obj: any = {};
+        const obj: Record<string, unknown> = {};
         headers.forEach((header, colIndex) => {
           obj[header] = row[colIndex] ?? "";
         });
@@ -203,7 +202,9 @@ async function fetchAllPlayerDays() {
         `   ✓ ${name}: ${playerDayRows.length.toLocaleString()} player days`,
       );
     } catch (error) {
-      console.log(`   ⚠️  ${name}: Error fetching - ${error}`);
+      const errorMsg =
+        error instanceof Error ? error.message : String(error ?? "Unknown");
+      console.log(`   ⚠️  ${name}: Error fetching - ${errorMsg}`);
     }
   }
 
@@ -228,7 +229,7 @@ function getAllSeasonIds(workbookData: Map<string, WorkbookData>): string[] {
 
   for (const { rows } of workbookData.values()) {
     for (const playerDay of rows) {
-      const { seasonId } = playerDay.data;
+      const seasonId = playerDay.data.seasonId as string | undefined;
       if (seasonId) seasonIds.add(seasonId);
     }
   }
@@ -251,7 +252,9 @@ function groupByTeamWeek(
 
   for (const { rows } of workbookData.values()) {
     for (const playerDay of rows) {
-      const { gshlTeamId, date, seasonId } = playerDay.data;
+      const gshlTeamId = playerDay.data.gshlTeamId as string | undefined;
+      const date = playerDay.data.date as string | undefined;
+      const seasonId = playerDay.data.seasonId as string | undefined;
 
       // Filter: Only process target season
       if (seasonId !== targetSeasonId) continue;
@@ -338,11 +341,12 @@ function calculateADD(
     totalRows += rows.length;
     for (const playerDay of rows) {
       // Filter by season early
-      if (playerDay.data.seasonId !== targetSeasonId) continue;
+      const seasonId = playerDay.data.seasonId as string | undefined;
+      if (seasonId !== targetSeasonId) continue;
 
-      const date = playerDay.data.date;
-      const playerId = playerDay.data.playerId;
-      const gshlTeamId = playerDay.data.gshlTeamId;
+      const date = playerDay.data.date as string | undefined;
+      const playerId = playerDay.data.playerId as string | undefined;
+      const gshlTeamId = playerDay.data.gshlTeamId as string | undefined;
 
       if (!date || !playerId || !gshlTeamId) continue;
 
@@ -375,11 +379,12 @@ function calculateADD(
   for (const { rows } of workbookData.values()) {
     for (const playerDay of rows) {
       // Filter by season early
-      if (playerDay.data.seasonId !== targetSeasonId) continue;
+      const seasonId = playerDay.data.seasonId as string | undefined;
+      if (seasonId !== targetSeasonId) continue;
 
-      const date = playerDay.data.date;
-      const playerId = playerDay.data.playerId;
-      const gshlTeamId = playerDay.data.gshlTeamId;
+      const date = playerDay.data.date as string | undefined;
+      const playerId = playerDay.data.playerId as string | undefined;
+      const gshlTeamId = playerDay.data.gshlTeamId as string | undefined;
 
       processedCount++;
 
@@ -397,8 +402,7 @@ function calculateADD(
 
       try {
         const currentDate = new Date(date);
-        const currentDateStr = currentDate.toISOString().split("T")[0]!;
-
+        // currentDateStr not used, removed
         // Get previous day's date
         const previousDate = new Date(currentDate);
         previousDate.setDate(previousDate.getDate() - 1);
@@ -483,7 +487,9 @@ async function retryWithBackoff<T>(
     }
   }
 
-  throw lastError;
+  throw new Error(
+    lastError instanceof Error ? lastError.message : String(lastError),
+  );
 }
 
 /**
@@ -521,7 +527,7 @@ function parseNhlPos(nhlPosStr: string): RosterPosition[] {
     let result: RosterPosition[];
     // Handle both JSON array format and comma-separated
     if (nhlPosStr.startsWith("[")) {
-      result = JSON.parse(nhlPosStr);
+      result = JSON.parse(nhlPosStr) as RosterPosition[];
     } else {
       result = nhlPosStr.split(",").map((p) => p.trim() as RosterPosition);
     }
@@ -558,7 +564,7 @@ async function optimizeAllLineups(teamWeekLineups: TeamWeekLineup[]) {
       let hasInvalidPlayer = false;
 
       for (const pd of teamWeek.players) {
-        const playerId = pd.data.playerId || pd.data.id || "";
+        const playerId = (pd.data.playerId ?? pd.data.id ?? "") as string;
         if (!playerId) {
           hasInvalidPlayer = true;
           break;
@@ -566,14 +572,14 @@ async function optimizeAllLineups(teamWeekLineups: TeamWeekLineup[]) {
 
         roster.push({
           playerId,
-          nhlPos: parseNhlPos(pd.data.nhlPos),
+          nhlPos: parseNhlPos(pd.data.nhlPos as string),
           posGroup: pd.data.posGroup as PositionGroup,
           dailyPos: pd.data.dailyPos as RosterPosition,
-          GP: parseFloat(pd.data.GP || "0"),
-          GS: parseFloat(pd.data.GS || "0"),
-          IR: parseFloat(pd.data.IR || "0"),
-          IRplus: parseFloat(pd.data.IRplus || "0"),
-          Rating: parseFloat(pd.data.Rating || "0"),
+          GP: parseFloat((pd.data.GP ?? "0") as string),
+          GS: parseFloat((pd.data.GS ?? "0") as string),
+          IR: parseFloat((pd.data.IR ?? "0") as string),
+          IRplus: parseFloat((pd.data.IRplus ?? "0") as string),
+          Rating: parseFloat((pd.data.Rating ?? "0") as string),
         });
       }
 
@@ -587,7 +593,7 @@ async function optimizeAllLineups(teamWeekLineups: TeamWeekLineup[]) {
       let optimized;
       try {
         optimized = optimizeLineup(roster);
-      } catch (optError) {
+      } catch {
         console.log(
           `\n   ⚠️  Optimization timeout for ${teamWeek.gshlTeamId} date ${teamWeek.weekId} (${roster.length} players)`,
         );
@@ -607,8 +613,8 @@ async function optimizeAllLineups(teamWeekLineups: TeamWeekLineup[]) {
 
         // Calculate MS (Missed Start)
         // MS = 1 when: GS is not "1" (didn't start) AND GP = "1" (did play) AND fullPos is in active lineup
-        const gs = player.data.GS; // String "1" or undefined/empty
-        const gp = player.data.GP; // String "1" or undefined/empty
+        const gs = player.data.GS as string | undefined; // String "1" or undefined/empty
+        const gp = player.data.GP as string | undefined; // String "1" or undefined/empty
         const fullPos = optimizedPlayer.fullPos;
         const isInFullLineup =
           fullPos !== Pos.BN && fullPos !== Pos.IR && fullPos !== Pos.IRPlus;
@@ -624,8 +630,14 @@ async function optimizeAllLineups(teamWeekLineups: TeamWeekLineup[]) {
       successCount++;
       totalPlayers += roster.length;
     } catch (error) {
+      const errorMsg =
+        error instanceof Error
+          ? error.message
+          : typeof error === "string"
+            ? error
+            : "Unknown error";
       console.log(
-        `\n   ⚠️  Error optimizing ${teamWeek.gshlTeamId} date ${teamWeek.weekId}: ${error}`,
+        `\n   ⚠️  Error optimizing ${teamWeek.gshlTeamId} date ${teamWeek.weekId}: ${errorMsg}`,
       );
       errorCount++;
     }
@@ -667,12 +679,16 @@ async function optimizeAllLineups(teamWeekLineups: TeamWeekLineup[]) {
 // Google Sheets Updates
 // ============================================================================
 
+type GoogleSheetsClient = ReturnType<
+  (typeof import("googleapis"))["google"]["sheets"]
+>;
+
 /**
  * Updates lineup positions and derived metrics in Google Sheets.
  * Processes data in chunks to avoid API rate limits and timeouts.
  */
 async function updateLineupPositionsInSheets(
-  sheets: any,
+  sheets: GoogleSheetsClient,
   workbookData: Map<string, WorkbookData>,
 ) {
   console.log(
@@ -757,9 +773,7 @@ async function updateLineupPositionsInSheets(
       }
 
       const startRow = 2; // First data row (after header)
-      const endRow = startRow + rows.length - 1;
-
-      const updateRequests: any[] = [];
+      // endRow and updateRequests are not used - removed
 
       // Split into chunks to avoid timeout on large datasets
       // Process 10,000 rows at a time (5 columns × 10k rows = 50k cells per batch)
@@ -776,7 +790,10 @@ async function updateLineupPositionsInSheets(
           const chunkStartRow = startRow + chunkStart;
           const chunkEndRow = startRow + chunkEnd - 1;
 
-          const chunkUpdateRequests: any[] = [];
+          const chunkUpdateRequests: Array<{
+            range: string;
+            values: (string | number)[][];
+          }> = [];
 
           // Update fullPos column for this chunk
           const fullPosData = chunkRows.map((pd) =>
@@ -846,10 +863,12 @@ async function updateLineupPositionsInSheets(
           if (chunkIndex < totalChunks - 1) {
             await sleep(2000); // 2 seconds between chunks
           }
-        } catch (chunkError) {
+        } catch {
           failedChunks.push(chunkIndex + 1);
+          const chunkEndCalc =
+            startRow + Math.min((chunkIndex + 1) * CHUNK_SIZE, rows.length) - 1;
           console.log(
-            `   ❌ Chunk ${chunkIndex + 1}/${totalChunks} failed (rows ${startRow + chunkIndex * CHUNK_SIZE}-${startRow + Math.min((chunkIndex + 1) * CHUNK_SIZE, rows.length) - 1})`,
+            `   ❌ Chunk ${chunkIndex + 1}/${totalChunks} failed (rows ${startRow + chunkIndex * CHUNK_SIZE}-${chunkEndCalc})`,
           );
           console.log(`   ⚠️  Continuing with next chunk...`);
           // Continue to next chunk even if this one fails
@@ -869,7 +888,9 @@ async function updateLineupPositionsInSheets(
         );
       }
     } catch (error) {
-      console.log(`   ❌ ${name}: Error updating - ${error}`);
+      const errorMsg =
+        error instanceof Error ? error.message : String(error ?? "Unknown");
+      console.log(`   ❌ ${name}: Error updating - ${errorMsg}`);
     }
   }
 

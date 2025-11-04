@@ -134,7 +134,7 @@ export const statAggregationRouter = createTRPCRouter({
           if (toCreate.length > 0) {
             const result = await optimizedSheetsAdapter.createMany(
               "PlayerWeekStatLine",
-              { data: toCreate as any },
+              { data: toCreate as Partial<PlayerWeekStatLine>[] },
             );
             created = result.count;
           }
@@ -142,7 +142,10 @@ export const statAggregationRouter = createTRPCRouter({
           if (toUpdate.length > 0) {
             const result = await optimizedSheetsAdapter.bulkUpdateByIds(
               "PlayerWeekStatLine",
-              toUpdate as any,
+              toUpdate as Array<{
+                id: string;
+                data: Partial<PlayerWeekStatLine>;
+              }>,
             );
             updated = result.count;
           }
@@ -187,7 +190,7 @@ export const statAggregationRouter = createTRPCRouter({
           if (toCreate.length > 0) {
             const result = await optimizedSheetsAdapter.createMany(
               "PlayerSplitStatLine",
-              { data: toCreate as any },
+              { data: toCreate as Partial<PlayerSplitStatLine>[] },
             );
             created = result.count;
           }
@@ -195,7 +198,10 @@ export const statAggregationRouter = createTRPCRouter({
           if (toUpdate.length > 0) {
             const result = await optimizedSheetsAdapter.bulkUpdateByIds(
               "PlayerSplitStatLine",
-              toUpdate as any,
+              toUpdate as Array<{
+                id: string;
+                data: Partial<PlayerSplitStatLine>;
+              }>,
             );
             updated = result.count;
           }
@@ -240,7 +246,7 @@ export const statAggregationRouter = createTRPCRouter({
           if (toCreate.length > 0) {
             const result = await optimizedSheetsAdapter.createMany(
               "PlayerTotalStatLine",
-              { data: toCreate as any },
+              { data: toCreate as Partial<PlayerTotalStatLine>[] },
             );
             created = result.count;
           }
@@ -248,7 +254,10 @@ export const statAggregationRouter = createTRPCRouter({
           if (toUpdate.length > 0) {
             const result = await optimizedSheetsAdapter.bulkUpdateByIds(
               "PlayerTotalStatLine",
-              toUpdate as any,
+              toUpdate as Array<{
+                id: string;
+                data: Partial<PlayerTotalStatLine>;
+              }>,
             );
             updated = result.count;
           }
@@ -301,7 +310,7 @@ export const statAggregationRouter = createTRPCRouter({
           if (toCreate.length > 0) {
             const result = await optimizedSheetsAdapter.createMany(
               "TeamDayStatLine",
-              { data: toCreate as any },
+              { data: toCreate as Partial<TeamDayStatLine>[] },
             );
             created = result.count;
           }
@@ -309,7 +318,7 @@ export const statAggregationRouter = createTRPCRouter({
           if (toUpdate.length > 0) {
             const result = await optimizedSheetsAdapter.bulkUpdateByIds(
               "TeamDayStatLine",
-              toUpdate as any,
+              toUpdate as Array<{ id: string; data: Partial<TeamDayStatLine> }>,
             );
             updated = result.count;
           }
@@ -354,7 +363,7 @@ export const statAggregationRouter = createTRPCRouter({
           if (toCreate.length > 0) {
             const result = await optimizedSheetsAdapter.createMany(
               "TeamWeekStatLine",
-              { data: toCreate as any },
+              { data: toCreate as Partial<TeamWeekStatLine>[] },
             );
             created = result.count;
           }
@@ -362,7 +371,10 @@ export const statAggregationRouter = createTRPCRouter({
           if (toUpdate.length > 0) {
             const result = await optimizedSheetsAdapter.bulkUpdateByIds(
               "TeamWeekStatLine",
-              toUpdate as any,
+              toUpdate as Array<{
+                id: string;
+                data: Partial<TeamWeekStatLine>;
+              }>,
             );
             updated = result.count;
           }
@@ -407,7 +419,7 @@ export const statAggregationRouter = createTRPCRouter({
           if (toCreate.length > 0) {
             const result = await optimizedSheetsAdapter.createMany(
               "TeamSeasonStatLine",
-              { data: toCreate as any },
+              { data: toCreate as Partial<TeamSeasonStatLine>[] },
             );
             created = result.count;
           }
@@ -415,7 +427,10 @@ export const statAggregationRouter = createTRPCRouter({
           if (toUpdate.length > 0) {
             const result = await optimizedSheetsAdapter.bulkUpdateByIds(
               "TeamSeasonStatLine",
-              toUpdate as any,
+              toUpdate as Array<{
+                id: string;
+                data: Partial<TeamSeasonStatLine>;
+              }>,
             );
             updated = result.count;
           }
@@ -444,8 +459,8 @@ export const statAggregationRouter = createTRPCRouter({
       const { rebuildStatsForDateRange } = await import("@gshl-utils");
 
       // Reuse the same deps builder as single date
-      const { rebuildStatsForDate: singleDateMutation } =
-        statAggregationRouter._def.procedures;
+      // const { rebuildStatsForDate: singleDateMutation } =
+      //   statAggregationRouter._def.procedures;
 
       // Build deps once (same as above)
       const deps: StatOrchestrationDeps = {
@@ -530,7 +545,7 @@ export const statAggregationRouter = createTRPCRouter({
           if (toCreate.length > 0) {
             const result = await optimizedSheetsAdapter.createMany(
               "PlayerWeekStatLine",
-              { data: toCreate as any },
+              { data: toCreate as Partial<PlayerWeekStatLine>[] },
             );
             created = result.count;
           }
@@ -538,7 +553,10 @@ export const statAggregationRouter = createTRPCRouter({
           if (toUpdate.length > 0) {
             const result = await optimizedSheetsAdapter.bulkUpdateByIds(
               "PlayerWeekStatLine",
-              toUpdate as any,
+              toUpdate as Array<{
+                id: string;
+                data: Partial<PlayerWeekStatLine>;
+              }>,
             );
             updated = result.count;
           }

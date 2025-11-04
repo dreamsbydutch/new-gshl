@@ -146,7 +146,7 @@ class CronManager {
     // Run immediately on startup if configured
     if (runOnInit && enabled) {
       console.log(`🚀 [CronManager] Running "${name}" on initialization...`);
-      setTimeout(() => wrappedTask(), 1000);
+      setTimeout(() => void wrappedTask(), 1000);
     }
   }
 
@@ -160,7 +160,7 @@ class CronManager {
       return false;
     }
 
-    job.task.start();
+    void job.task.start();
     job.status.enabled = true;
     job.status.running = true;
     console.log(`▶️  [CronManager] Started job: ${name}`);
@@ -177,7 +177,7 @@ class CronManager {
       return false;
     }
 
-    job.task.stop();
+    void job.task.stop();
     job.status.enabled = false;
     job.status.running = false;
     console.log(`⏸️  [CronManager] Stopped job: ${name}`);

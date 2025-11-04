@@ -167,7 +167,7 @@ function calculateTeamSeasonStats(
       const opponentConf = teamConfMap.get(opponentId);
       const isConference =
         teamConf && opponentConf && teamConf === opponentConf;
-      const isPostseason = seasonType === SeasonType.PLAYOFFS;
+      // const isPostseason = seasonType === SeasonType.PLAYOFFS;
 
       const homeScore = matchup.homeScore ?? 0;
       const awayScore = matchup.awayScore ?? 0;
@@ -793,7 +793,7 @@ export const teamStatsRouter = createTRPCRouter({
             const createResult = await optimizedSheetsAdapter.createMany(
               "TeamDayStatLine",
               {
-                data: recordsToCreate as any,
+                data: recordsToCreate as Partial<TeamDayStatLine>[],
               },
             );
             createCount = createResult.count;
@@ -803,7 +803,10 @@ export const teamStatsRouter = createTRPCRouter({
           if (recordsToUpdate.length > 0) {
             const updateResult = await optimizedSheetsAdapter.bulkUpdateByIds(
               "TeamDayStatLine",
-              recordsToUpdate as any,
+              recordsToUpdate as Array<{
+                id: string;
+                data: Partial<TeamDayStatLine>;
+              }>,
             );
             updateCount = updateResult.count;
           }
@@ -1031,7 +1034,7 @@ export const teamStatsRouter = createTRPCRouter({
             const createResult = await optimizedSheetsAdapter.createMany(
               "TeamWeekStatLine",
               {
-                data: recordsToCreate as any,
+                data: recordsToCreate as Partial<TeamWeekStatLine>[],
               },
             );
             createCount = createResult.count;
@@ -1041,7 +1044,10 @@ export const teamStatsRouter = createTRPCRouter({
           if (recordsToUpdate.length > 0) {
             const updateResult = await optimizedSheetsAdapter.bulkUpdateByIds(
               "TeamWeekStatLine",
-              recordsToUpdate as any,
+              recordsToUpdate as Array<{
+                id: string;
+                data: Partial<TeamWeekStatLine>;
+              }>,
             );
             updateCount = updateResult.count;
           }
@@ -1073,7 +1079,10 @@ export const teamStatsRouter = createTRPCRouter({
               }
 
               // Prepare batch updates for all matchups
-              const matchupUpdates: Array<{ id: string; data: any }> = [];
+              const matchupUpdates: Array<{
+                id: string;
+                data: Partial<Matchup>;
+              }> = [];
 
               for (const matchup of matchups) {
                 try {
@@ -1089,8 +1098,8 @@ export const teamStatsRouter = createTRPCRouter({
                   }
 
                   const { homeScore, awayScore } = calculateMatchupScores(
-                    homeTeamStats as any,
-                    awayTeamStats as any,
+                    homeTeamStats as TeamWeekStatLine,
+                    awayTeamStats as TeamWeekStatLine,
                   );
 
                   const homeWin = homeScore >= awayScore;
@@ -1389,7 +1398,7 @@ export const teamStatsRouter = createTRPCRouter({
             const createResult = await optimizedSheetsAdapter.createMany(
               "TeamSeasonStatLine",
               {
-                data: recordsToCreate as any,
+                data: recordsToCreate as Partial<TeamSeasonStatLine>[],
               },
             );
             createCount = createResult.count;
@@ -1399,7 +1408,10 @@ export const teamStatsRouter = createTRPCRouter({
           if (recordsToUpdate.length > 0) {
             const updateResult = await optimizedSheetsAdapter.bulkUpdateByIds(
               "TeamSeasonStatLine",
-              recordsToUpdate as any,
+              recordsToUpdate as Array<{
+                id: string;
+                data: Partial<TeamSeasonStatLine>;
+              }>,
             );
             updateCount = updateResult.count;
           }

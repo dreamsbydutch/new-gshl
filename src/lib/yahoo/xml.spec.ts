@@ -3,7 +3,7 @@ import test from "node:test";
 
 import { parseYahooFantasyXml } from "./xml";
 
-test("parseYahooFantasyXml parses metadata attributes and payload structure", () => {
+void test("parseYahooFantasyXml parses metadata attributes and payload structure", () => {
   const sampleXml = `<?xml version="1.0" encoding="UTF-8"?>
 <fantasy_content time="42.1ms" xml:lang="en-US" yahoo:uri="http://fantasysports.yahooapis.com/sample">
   <league>

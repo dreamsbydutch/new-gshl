@@ -12,7 +12,17 @@ import {
 } from "../../../scripts/yahoo-roster-scraper";
 import { optimizedSheetsAdapter } from "@gshl-sheets";
 import { findCurrentSeason } from "@gshl-utils";
-import type { Player, Team, Franchise, Season } from "@gshl-types";
+import type {
+  Player,
+  Team,
+  Franchise,
+  Season,
+  Owner,
+  Week,
+  RosterPosition,
+  PositionGroup,
+  PlayerDayStatLine,
+} from "@gshl-types";
 
 // ============================================================================
 // SCHEMAS
@@ -146,10 +156,7 @@ export const yahooScraperRouter = createTRPCRouter({
           "Franchise",
           {},
         ) as unknown as Franchise[],
-        optimizedSheetsAdapter.findMany(
-          "Owner",
-          {},
-        ) as unknown as import("@gshl-types").Owner[],
+        optimizedSheetsAdapter.findMany("Owner", {}) as unknown as Owner[],
         optimizedSheetsAdapter.findMany("Season", {}) as unknown as Season[],
       ]);
 
@@ -440,10 +447,7 @@ export const yahooScraperRouter = createTRPCRouter({
           {},
         ) as unknown as Franchise[],
         optimizedSheetsAdapter.findMany("Season", {}) as unknown as Season[],
-        optimizedSheetsAdapter.findMany(
-          "Week",
-          {},
-        ) as unknown as import("@gshl-types").Week[],
+        optimizedSheetsAdapter.findMany("Week", {}) as unknown as Week[],
         optimizedSheetsAdapter.findMany("Player", {}) as unknown as Player[],
       ]);
 
@@ -490,8 +494,17 @@ export const yahooScraperRouter = createTRPCRouter({
           );
         }
 
+        const startDateStr =
+          week.startDate instanceof Date
+            ? week.startDate.toISOString().split("T")[0]
+            : String(week.startDate).split("T")[0];
+        const endDateStr =
+          week.endDate instanceof Date
+            ? week.endDate.toISOString().split("T")[0]
+            : String(week.endDate).split("T")[0];
+
         console.log(
-          `📅 Matched date ${targetDate.toISOString().split("T")[0]} to week ${week.weekNum} (${week.id}): ${week.startDate} to ${week.endDate}`,
+          `📅 Matched date ${targetDate.toISOString().split("T")[0]} to week ${week.weekNum} (${week.id}): ${startDateStr} to ${endDateStr}`,
         );
         weekId = week.id;
       }
@@ -833,9 +846,9 @@ export const yahooScraperRouter = createTRPCRouter({
           // Convert PlayerDay records to LineupPlayer format
           const lineupPlayers = teamPlayers.map((p) => ({
             playerId: String(p.playerId),
-            nhlPos: p.nhlPos as import("@gshl-types").RosterPosition[],
-            posGroup: p.posGroup as import("@gshl-types").PositionGroup,
-            dailyPos: p.dailyPos as import("@gshl-types").RosterPosition,
+            nhlPos: p.nhlPos as RosterPosition[],
+            posGroup: p.posGroup as PositionGroup,
+            dailyPos: p.dailyPos as RosterPosition,
             GP: Number(p.GP) || 0,
             GS: Number(p.GS) || 0,
             IR: Number(p.IR) || 0,
@@ -919,7 +932,7 @@ export const yahooScraperRouter = createTRPCRouter({
           });
 
           upsertResult = await caller.daily.upsertMany({
-            data: playerDayRecords as any, // Type assertion to handle complex nested types
+            data: playerDayRecords as unknown as PlayerDayStatLine[], // Type assertion to handle complex nested types
             dryRun: false,
           });
 
@@ -1101,8 +1114,7 @@ export const yahooScraperRouter = createTRPCRouter({
         ADD: string | undefined;
       }> = [];
 
-      for (let i = 0; i < uniqueDates.length; i++) {
-        const currentDateStr = uniqueDates[i]!;
+      for (const currentDateStr of uniqueDates) {
         const currentRecords = recordsByDate.get(currentDateStr)!;
 
         // Calculate previous date (the day before)
@@ -1168,7 +1180,7 @@ export const yahooScraperRouter = createTRPCRouter({
             "PlayerDayStatLine",
             updatesToApply.map((update) => ({
               id: update.id,
-              data: { ADD: update.ADD } as any,
+              data: { ADD: update.ADD } as Partial<PlayerDayStatLine>,
             })),
           );
 

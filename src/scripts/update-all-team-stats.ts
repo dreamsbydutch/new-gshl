@@ -30,9 +30,8 @@ import dotenv from "dotenv";
 dotenv.config({ path: ".env.local" });
 
 // Dynamic imports to ensure env vars are loaded first
-const [{ optimizedSheetsAdapter }, types] = await Promise.all([
+const [{ optimizedSheetsAdapter }] = await Promise.all([
   import("@gshl-sheets"),
-  import("@gshl-types"),
 ]);
 
 import type { Week } from "@gshl-types";
@@ -50,6 +49,10 @@ const DELAY_BETWEEN_SEASONS_MS = 500;
 // ============================================================================
 // Type Definitions
 // ============================================================================
+
+type TRPCCaller = ReturnType<
+  (typeof import("@gshl-api"))["appRouter"]["createCaller"]
+>;
 
 interface ScriptOptions {
   seasonId?: string;
@@ -160,7 +163,7 @@ function displayConfiguration(options: ScriptOptions): void {
 async function fetchWeeks(options: ScriptOptions): Promise<Week[]> {
   console.log("📅 Fetching weeks...");
 
-  const whereClause: Record<string, any> = {};
+  const whereClause: Record<string, string> = {};
 
   if (options.seasonId) {
     whereClause.seasonId = options.seasonId;
@@ -184,7 +187,7 @@ async function fetchWeeks(options: ScriptOptions): Promise<Week[]> {
 /**
  * Initializes the tRPC caller for API operations.
  */
-async function initializeTRPCCaller(): Promise<any> {
+async function initializeTRPCCaller(): Promise<TRPCCaller> {
   console.log("⚙️  Initializing tRPC caller...");
 
   const { appRouter } = await import("@gshl-api");
@@ -192,7 +195,7 @@ async function initializeTRPCCaller(): Promise<any> {
 
   const ctx = await createTRPCContext({
     headers: new Headers(),
-  } as any);
+  } as { headers: Headers });
 
   const caller = appRouter.createCaller(ctx);
 
@@ -210,7 +213,7 @@ async function initializeTRPCCaller(): Promise<any> {
  */
 async function processAllWeeks(
   weeks: Week[],
-  caller: any,
+  caller: TRPCCaller,
   options: ScriptOptions,
 ): Promise<ProcessingStats> {
   const stats: ProcessingStats = {
@@ -269,7 +272,7 @@ async function processAllWeeks(
  */
 async function processWeek(
   week: Week,
-  caller: any,
+  caller: TRPCCaller,
   options: ScriptOptions,
 ): Promise<WeekProcessingResult> {
   const weekStartTime = Date.now();
@@ -313,11 +316,16 @@ async function processWeek(
       console.log(
         `      ⚠️  Matchup errors: ${teamWeeksResult.matchups.errors.length}`,
       );
-      teamWeeksResult.matchups.errors.forEach(
-        (err: { id: string; error: string }) => {
-          console.log(`         - ${err.id}: ${err.error}`);
-        },
-      );
+      for (const err of teamWeeksResult.matchups.errors) {
+        if (
+          typeof err === "object" &&
+          err !== null &&
+          "id" in err &&
+          "error" in err
+        ) {
+          console.log(`         - ${String(err.id)}: ${String(err.error)}`);
+        }
+      }
     }
   }
 
@@ -397,7 +405,7 @@ async function processSeason(
 
   const ctx = await createTRPCContext({
     headers: new Headers(),
-  } as any);
+  } as { headers: Headers });
 
   const caller = appRouter.createCaller(ctx);
 

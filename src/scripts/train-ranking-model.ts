@@ -25,17 +25,13 @@ import { writeFile } from "fs/promises";
 dotenv.config({ path: ".env.local" });
 
 // Dynamic imports to ensure env vars are loaded first
-const [
-  { optimizedSheetsAdapter },
-  { trainRankingModel, serializeModel },
-  { PositionGroup },
-] = await Promise.all([
-  import("../lib/sheets/index.js"),
-  import("../lib/ranking/index.js"),
-  import("../lib/types/enums.js"),
-]);
+const [{ trainRankingModel, serializeModel }, { PositionGroup }] =
+  await Promise.all([
+    import("../lib/ranking/index.js"),
+    import("../lib/types/enums.js"),
+  ]);
 
-import type { PlayerStatLine } from "../lib/ranking/index.js";
+import type { PlayerStatLine, RankingModel } from "../lib/ranking/index.js";
 
 // ============================================================================
 // Configuration
@@ -121,7 +117,7 @@ async function main() {
 /**
  * Fetches all PlayerDay stat lines from all partitioned workbooks.
  */
-async function fetchAllPlayerDays(): Promise<any[]> {
+async function fetchAllPlayerDays(): Promise<PlayerStatLine[]> {
   console.log("📥 Fetching PlayerDay data from Google Sheets...");
   console.log("   Querying all PlayerDay workbooks (seasons 1-15)");
   console.log("   This may take several minutes.\n");
@@ -131,12 +127,15 @@ async function fetchAllPlayerDays(): Promise<any[]> {
   const { env } = await import("../env.js");
 
   const auth = new google.auth.GoogleAuth({
-    credentials: JSON.parse(env.GOOGLE_SERVICE_ACCOUNT_KEY),
+    credentials: JSON.parse(env.GOOGLE_SERVICE_ACCOUNT_KEY) as Record<
+      string,
+      unknown
+    >,
     scopes: ["https://www.googleapis.com/auth/spreadsheets.readonly"],
   });
 
   const sheets = google.sheets({ version: "v4", auth });
-  const allStatLines: any[] = [];
+  const allStatLines: PlayerStatLine[] = [];
 
   for (const [name, spreadsheetId] of Object.entries(PLAYERDAY_WORKBOOKS)) {
     console.log(`   Fetching ${name}...`);
@@ -147,7 +146,7 @@ async function fetchAllPlayerDays(): Promise<any[]> {
         range: "PlayerDayStatLine!A:AZ",
       });
 
-      const rows = response.data.values;
+      const rows = response.data.values as unknown[][] | undefined;
       if (!rows || rows.length < 2) {
         console.log(`   ⚠️  ${name}: No data found`);
         continue;
@@ -182,16 +181,16 @@ async function fetchAllPlayerDays(): Promise<any[]> {
 /**
  * Parses workbook rows into stat line objects.
  */
-function parseWorkbookRows(rows: any[][]): any[] {
+function parseWorkbookRows(rows: unknown[][]): PlayerStatLine[] {
   const headers = rows[0] as string[];
   const dataRows = rows.slice(1);
 
   return dataRows.map((row) => {
-    const obj: any = {};
+    const obj: Record<string, unknown> = {};
     headers.forEach((header, index) => {
       obj[header] = row[index] ?? "";
     });
-    return obj;
+    return obj as unknown as PlayerStatLine;
   });
 }
 
@@ -202,7 +201,7 @@ function parseWorkbookRows(rows: any[][]): any[] {
 /**
  * Validates that the dataset contains all required fields.
  */
-function validateDataStructure(statLines: any[]): void {
+function validateDataStructure(statLines: PlayerStatLine[]): void {
   console.log("🔍 Validating data structure...");
 
   const sample = statLines[0];
@@ -222,7 +221,7 @@ function validateDataStructure(statLines: any[]): void {
 /**
  * Displays dataset analysis statistics.
  */
-function displayDatasetAnalysis(statLines: any[]): void {
+function displayDatasetAnalysis(statLines: PlayerStatLine[]): void {
   console.log("📊 Dataset Analysis:");
 
   const seasons = new Set(statLines.map((s) => s.seasonId));
@@ -250,15 +249,12 @@ function displayDatasetAnalysis(statLines: any[]): void {
 /**
  * Trains the ranking model on the provided stat lines.
  */
-function trainModel(statLines: any[]) {
+function trainModel(statLines: PlayerStatLine[]): RankingModel {
   console.log("🎓 Training Ranking Model...");
   console.log("   Analyzing distributions and calculating optimal weights.\n");
 
   const startTime = Date.now();
-  const model = trainRankingModel(
-    statLines as PlayerStatLine[],
-    TRAINING_CONFIG,
-  );
+  const model = trainRankingModel(statLines, TRAINING_CONFIG);
   const elapsedTime = ((Date.now() - startTime) / 1000).toFixed(1);
 
   console.log(`✓ Training completed in ${elapsedTime}s\n`);
@@ -273,7 +269,7 @@ function trainModel(statLines: any[]) {
 /**
  * Displays a summary of the trained model.
  */
-function displayModelSummary(model: any): void {
+function displayModelSummary(model: RankingModel): void {
   console.log("📦 Model Summary:");
   console.log(`   Version: ${model.version}`);
   console.log(`   Total samples: ${model.totalSamples.toLocaleString()}`);
@@ -288,7 +284,7 @@ function displayModelSummary(model: any): void {
 /**
  * Displays position-specific weights from the trained model.
  */
-function displayPositionWeights(model: any): void {
+function displayPositionWeights(model: RankingModel): void {
   console.log("⚖️  Position Weights:");
 
   for (const pos of [PositionGroup.F, PositionGroup.D, PositionGroup.G]) {
@@ -314,7 +310,7 @@ function displayPositionWeights(model: any): void {
 /**
  * Saves the trained model to a JSON file.
  */
-async function saveModelToFile(model: any): Promise<void> {
+async function saveModelToFile(model: RankingModel): Promise<void> {
   console.log("💾 Saving model to file...");
 
   const modelJson = serializeModel(model);
@@ -327,7 +323,10 @@ async function saveModelToFile(model: any): Promise<void> {
 /**
  * Displays validation metrics showing model coverage.
  */
-function displayValidationMetrics(model: any, statLines: any[]): void {
+function displayValidationMetrics(
+  model: RankingModel,
+  statLines: PlayerStatLine[],
+): void {
   console.log("✅ Validation:");
 
   const seasons = new Set(statLines.map((s) => s.seasonId));

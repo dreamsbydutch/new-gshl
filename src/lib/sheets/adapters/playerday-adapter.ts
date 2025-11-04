@@ -86,7 +86,8 @@ export class PlayerDayAdapter {
       );
     }
 
-    const _spreadsheetId = getPlayerDaySpreadsheetId(seasonId);
+    // Determine target workbook (used when this method is implemented)
+    getPlayerDaySpreadsheetId(seasonId);
 
     // Use the underlying adapter with the correct spreadsheet ID
     // This requires extending the adapter to support custom spreadsheet IDs
@@ -103,7 +104,8 @@ export class PlayerDayAdapter {
   async createMany<T>(options: {
     data: Array<Record<string, unknown>>;
   }): Promise<T[]> {
-    const _groupedRecords = groupPlayerDaysByWorkbook(options.data);
+    // Group records by workbook (used when this method is implemented)
+    groupPlayerDaysByWorkbook(options.data);
 
     // TODO: Batch write to each workbook
     throw new Error(
@@ -147,7 +149,8 @@ export class PlayerDayAdapter {
       );
     }
 
-    const _spreadsheetId = getPlayerDaySpreadsheetId(seasonId);
+    // Determine target workbook (used when this method is implemented)
+    getPlayerDaySpreadsheetId(seasonId);
 
     // Use the underlying adapter with the correct spreadsheet ID
     throw new Error(
@@ -200,8 +203,9 @@ export class PlayerDayAdapter {
     // Query each season's workbook to get existing records
     for (const [seasonId, seasonRecords] of groupedBySeason) {
       try {
-        const _playerIds = [...new Set(seasonRecords.map((r) => r.playerId))];
-        const _dates = [...new Set(seasonRecords.map((r) => r.date))];
+        // Extract unique player IDs and dates (used when query is implemented)
+        // const playerIds = [...new Set(seasonRecords.map((r) => r.playerId))];
+        // const dates = [...new Set(seasonRecords.map((r) => r.date))];
 
         // Query existing records for these players and dates
         // This is a placeholder - actual implementation depends on adapter capabilities
@@ -281,7 +285,8 @@ export class PlayerDayAdapter {
       );
     }
 
-    const _spreadsheetId = getPlayerDaySpreadsheetId(seasonId);
+    // Determine target workbook (used when this method is implemented)
+    getPlayerDaySpreadsheetId(seasonId);
 
     // Use the underlying adapter with the correct spreadsheet ID
     throw new Error(

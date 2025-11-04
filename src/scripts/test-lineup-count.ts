@@ -58,7 +58,10 @@ async function analyzeTeamWeeks(): Promise<{
   const { env } = await import("../env.js");
 
   const auth = new google.auth.GoogleAuth({
-    credentials: JSON.parse(env.GOOGLE_SERVICE_ACCOUNT_KEY),
+    credentials: JSON.parse(env.GOOGLE_SERVICE_ACCOUNT_KEY) as Record<
+      string,
+      unknown
+    >,
     scopes: ["https://www.googleapis.com/auth/spreadsheets.readonly"],
   });
 
@@ -76,7 +79,7 @@ async function analyzeTeamWeeks(): Promise<{
       range: FETCH_RANGE,
     });
 
-    const rows = response.data.values;
+    const rows = response.data.values as string[][] | undefined;
     if (!rows || rows.length < 2) {
       console.log(`   ⚠️  ${name}: No data found`);
       continue;
@@ -126,7 +129,7 @@ function processWorkbookRows(rows: string[][]): {
 
     if (teamId && weekId) {
       const key = `${teamId}|${weekId}`;
-      teamWeekMap.set(key, (teamWeekMap.get(key) || 0) + 1);
+      teamWeekMap.set(key, (teamWeekMap.get(key) ?? 0) + 1);
     }
   }
 

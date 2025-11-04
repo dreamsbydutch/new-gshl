@@ -696,9 +696,7 @@ export class OptimizedSheetsAdapter {
       // Build updated rows array
       const updatedRows: Array<(string | number | boolean)[]> = [];
 
-      for (let i = 0; i < existingRows.length; i++) {
-        const existingRow = existingRows[i];
-
+      for (const existingRow of existingRows) {
         if (!existingRow || existingRow.length === 0) {
           // Keep empty row as is
           updatedRows.push([]);

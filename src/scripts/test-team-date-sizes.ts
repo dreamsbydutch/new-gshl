@@ -82,7 +82,9 @@ async function main() {
  */
 async function initializeSheetsClient() {
   const auth = new google.auth.GoogleAuth({
-    credentials: JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_KEY ?? "{}"),
+    credentials: JSON.parse(
+      process.env.GOOGLE_SERVICE_ACCOUNT_KEY ?? "{}",
+    ) as Record<string, unknown>,
     scopes: ["https://www.googleapis.com/auth/spreadsheets.readonly"],
   });
 
@@ -146,7 +148,7 @@ async function analyzeTeamDates(
  * Processes workbook data to extract team-date roster information.
  */
 function processWorkbookData(
-  rows: any[][],
+  rows: unknown[][],
   teamDateSizes: Map<string, number>,
   sampleDetails: Map<string, RosterStats>,
 ): void {
@@ -172,10 +174,10 @@ function processWorkbookData(
 /**
  * Parses a row into a PlayerDayData object.
  */
-function parsePlayerDayRow(headers: string[], row: any[]): PlayerDayData {
+function parsePlayerDayRow(headers: string[], row: unknown[]): PlayerDayData {
   const data: PlayerDayData = {};
   headers.forEach((header, idx) => {
-    data[header as keyof PlayerDayData] = row[idx];
+    data[header as keyof PlayerDayData] = row[idx] as string | undefined;
   });
   return data;
 }

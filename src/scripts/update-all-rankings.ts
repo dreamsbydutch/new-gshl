@@ -28,12 +28,11 @@ import * as fs from "fs";
 dotenv.config({ path: ".env.local" });
 
 // Dynamic imports to ensure env vars are loaded first
-const [{ rankPerformance }, { PositionGroup }] = await Promise.all([
+const [{ rankPerformance }] = await Promise.all([
   import("../lib/ranking/index.js"),
-  import("../lib/types/enums.js"),
 ]);
 
-import type { RankingModel } from "../lib/ranking/types";
+import type { RankingModel, PlayerStatLine } from "../lib/ranking/types";
 
 // ============================================================================
 // Configuration
@@ -61,7 +60,7 @@ const PROGRESS_INTERVAL = 10000;
 
 interface PlayerDayRow {
   row: number;
-  data: any;
+  data: Record<string, unknown>;
   ranking?: number;
 }
 
@@ -116,7 +115,9 @@ function loadRankingModel(): RankingModel {
     );
   }
 
-  const modelData = JSON.parse(fs.readFileSync(MODEL_PATH, "utf-8"));
+  const modelData = JSON.parse(
+    fs.readFileSync(MODEL_PATH, "utf-8"),
+  ) as RankingModel & { trainedAt: string };
   const model: RankingModel = {
     ...modelData,
     trainedAt: new Date(modelData.trainedAt),
@@ -135,7 +136,7 @@ function loadRankingModel(): RankingModel {
  * Fetches all PlayerDay data from partitioned Google Sheets workbooks.
  */
 async function fetchAllPlayerDays(): Promise<{
-  sheets: any;
+  sheets: ReturnType<typeof import("googleapis").google.sheets>;
   workbookData: Map<string, WorkbookData>;
 }> {
   console.log("📥 Fetching PlayerDay data from Google Sheets...\n");
@@ -144,7 +145,10 @@ async function fetchAllPlayerDays(): Promise<{
   const { env } = await import("../env.js");
 
   const auth = new google.auth.GoogleAuth({
-    credentials: JSON.parse(env.GOOGLE_SERVICE_ACCOUNT_KEY),
+    credentials: JSON.parse(env.GOOGLE_SERVICE_ACCOUNT_KEY) as Record<
+      string,
+      unknown
+    >,
     scopes: ["https://www.googleapis.com/auth/spreadsheets"],
   });
 
@@ -160,7 +164,7 @@ async function fetchAllPlayerDays(): Promise<{
         range: FETCH_RANGE,
       });
 
-      const rows = response.data.values;
+      const rows = response.data.values as unknown[][] | undefined;
       if (!rows || rows.length < 2) {
         console.log(`   ⚠️  ${name}: No data found`);
         continue;
@@ -179,7 +183,9 @@ async function fetchAllPlayerDays(): Promise<{
         `   ✓ ${name}: ${playerDayRows.length.toLocaleString()} player days`,
       );
     } catch (error) {
-      console.log(`   ⚠️  ${name}: Error fetching - ${error}`);
+      const errorMsg =
+        error instanceof Error ? error.message : String(error ?? "Unknown");
+      console.log(`   ⚠️  ${name}: Error fetching - ${errorMsg}`);
     }
   }
 
@@ -197,11 +203,11 @@ async function fetchAllPlayerDays(): Promise<{
  * Parses raw sheet rows into PlayerDayRow objects with row numbers.
  */
 function parsePlayerDayRows(
-  dataRows: any[][],
+  dataRows: unknown[][],
   headers: string[],
 ): PlayerDayRow[] {
   return dataRows.map((row, index) => {
-    const obj: any = {};
+    const obj: Record<string, unknown> = {};
     headers.forEach((header, colIndex) => {
       obj[header] = row[colIndex] ?? "";
     });
@@ -262,9 +268,9 @@ function processWorkbookRankings(
   for (const playerDay of rows) {
     try {
       // Only calculate rating if the player actually played (GP=1)
-      const gp = playerDay.data.GP || playerDay.data.gp || "0";
+      const gp = (playerDay.data.GP ?? playerDay.data.gp ?? "0") as string;
 
-      if (gp !== "1" && gp !== 1) {
+      if (gp !== "1") {
         // Player didn't play, leave rating undefined
         playerDay.ranking = undefined;
         processed++;
@@ -280,7 +286,7 @@ function processWorkbookRankings(
         : Math.round(result.score * 1000) / 1000;
 
       success++;
-    } catch (error) {
+    } catch {
       // Skip invalid rows
       playerDay.ranking = undefined;
       errors++;
@@ -301,21 +307,21 @@ function processWorkbookRankings(
 /**
  * Builds a stat line object from raw player day data.
  */
-function buildStatLine(data: any): any {
+function buildStatLine(data: Record<string, unknown>): PlayerStatLine {
   return {
-    posGroup: data.posGroup,
-    seasonId: data.seasonId,
-    G: data.G || "0",
-    A: data.A || "0",
-    P: data.P || "0",
-    PM: data.PM || "0",
-    PPP: data.PPP || "0",
-    SOG: data.SOG || "0",
-    HIT: data.HIT || "0",
-    BLK: data.BLK || "0",
-    W: data.W || "0",
-    GAA: data.GAA || "0",
-    SVP: data.SVP || "0",
+    posGroup: data.posGroup as PlayerStatLine["posGroup"],
+    seasonId: data.seasonId as string,
+    G: (data.G ?? "0") as string,
+    A: (data.A ?? "0") as string,
+    P: (data.P ?? "0") as string,
+    PM: (data.PM ?? "0") as string,
+    PPP: (data.PPP ?? "0") as string,
+    SOG: (data.SOG ?? "0") as string,
+    HIT: (data.HIT ?? "0") as string,
+    BLK: (data.BLK ?? "0") as string,
+    W: (data.W ?? "0") as string,
+    GAA: (data.GAA ?? "0") as string,
+    SVP: (data.SVP ?? "0") as string,
   };
 }
 
@@ -327,7 +333,7 @@ function buildStatLine(data: any): any {
  * Updates the Rating column in all Google Sheets workbooks.
  */
 async function updateRankingsInSheets(
-  sheets: any,
+  sheets: ReturnType<typeof import("googleapis").google.sheets>,
   workbookData: Map<string, WorkbookData>,
 ): Promise<void> {
   console.log("💾 Updating rankings in Google Sheets...\n");
@@ -338,7 +344,9 @@ async function updateRankingsInSheets(
     try {
       await updateWorkbookRankings(sheets, name, data);
     } catch (error) {
-      console.log(`   ❌ ${name}: Error updating - ${error}`);
+      const errorMsg =
+        error instanceof Error ? error.message : String(error ?? "Unknown");
+      console.log(`   ❌ ${name}: Error updating - ${errorMsg}`);
     }
   }
 
@@ -349,7 +357,7 @@ async function updateRankingsInSheets(
  * Updates rankings for a single workbook.
  */
 async function updateWorkbookRankings(
-  sheets: any,
+  sheets: ReturnType<typeof import("googleapis").google.sheets>,
   name: string,
   { spreadsheetId, rows, headers }: WorkbookData,
 ): Promise<void> {
@@ -370,9 +378,7 @@ async function updateWorkbookRankings(
   );
 
   // Build update data
-  const updateData = rows.map((playerDay) => [
-    playerDay.ranking !== undefined ? playerDay.ranking : "",
-  ]);
+  const updateData = rows.map((playerDay) => [playerDay.ranking ?? ""]);
 
   // Update the sheet
   const startRow = 2;
