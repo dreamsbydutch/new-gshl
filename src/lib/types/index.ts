@@ -19,16 +19,6 @@
  */
 export * from "./database";
 
-// ============================================================================
-// APPLICATION-SPECIFIC TYPES
-// ============================================================================
-
-/**
- * Enhanced types that extend database models with computed properties
- * - FranchisePlus: Franchise with conference relationship and team ID
- * - Additional composite types for UI and business logic
- */
-export * from "./app";
 
 // ============================================================================
 // ENUMS & CONSTANTS
@@ -45,21 +35,6 @@ export * from "./app";
  * - AwardsList: Available awards and recognitions
  */
 export * from "./enums";
-
-// ============================================================================
-// STAT AGGREGATION TYPES
-// ============================================================================
-
-/**
- * Type definitions for the stat aggregation system
- * - StatFieldConfig: Stat field aggregation behavior configuration
- * - AggregationConfig: Generic aggregation configuration interface
- * - AggregationSummary: Metrics for aggregation reporting
- * - StatLineInput types: Input types for all aggregation levels
- * - StatOrchestrationResult: Orchestration summary and breakdown
- * - StatOrchestrationDeps: Dependency injection for orchestration
- */
-export * from "./aggregation";
 
 // ============================================================================
 // UI COMPONENT TYPES
@@ -117,18 +92,6 @@ export * from "./transforms";
  * - Positioning, styling, and interaction types
  */
 export * from "./nav";
-
-// ============================================================================
-// EXTERNAL API TYPES
-// ============================================================================
-
-/**
- * Yahoo Fantasy Sports data contracts for NHL integrations.
- * - Mirrors Yahoo's REST v2 resources (games, leagues, teams, players, etc.)
- * - Includes helper response wrappers and flag unions for raw API payloads
- * - Enables strongly typed parsing of fantasy hockey data fetched from Yahoo
- */
-export * from "./yahooSports";
 
 // ============================================================================
 // USAGE EXAMPLES

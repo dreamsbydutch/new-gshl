@@ -6,6 +6,16 @@ export function formatDate(date: Date | string | null): string {
   return d.toISOString().split("T")[0] ?? ""; // YYYY-MM-DD
 }
 
+export function showDate(date: Date | string | null): string {
+  if (!date) return "N/A";
+  const d = typeof date === "string" ? new Date(date) : date;
+  return d.toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+}
+
 export function parseSheetDate(dateStr: string | null): Date | null {
   if (!dateStr) return null;
   const date = new Date(dateStr);
@@ -23,7 +33,7 @@ export function getCurrentSeason(): number {
   const month = now.getMonth();
 
   // Hockey season typically starts in October
-  return month >= 9 ? year : year - 1;
+  return month >= 9 ? year+1 : year;
 }
 
 export function getSeasonString(year: number): string {

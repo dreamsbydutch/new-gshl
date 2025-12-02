@@ -1,158 +1,66 @@
-/**
- * Statistical Utilities
- * ======================
- * Core statistical functions for ranking calculations.
- */
+import type { StatDistribution } from "./types";
 
-/**
- * Calculate mean (average) of an array of numbers
- */
 export function mean(values: number[]): number {
-  if (values.length === 0) return 0;
-  return values.reduce((sum, val) => sum + val, 0) / values.length;
+  if (!values.length) return 0;
+  return values.reduce((sum, value) => sum + value, 0) / values.length;
 }
 
-/**
- * Calculate standard deviation of an array of numbers
- */
-export function standardDeviation(values: number[]): number {
-  if (values.length === 0) return 0;
+export function variance(values: number[]): number {
+  if (values.length <= 1) return 0;
   const avg = mean(values);
-  const squareDiffs = values.map((value) => Math.pow(value - avg, 2));
-  return Math.sqrt(mean(squareDiffs));
-}
-
-/**
- * Calculate percentile of a value within a dataset
- * @param value - The value to rank
- * @param sortedValues - Array of values sorted in ascending order
- * @returns Percentile (0-100)
- */
-export function percentileRank(value: number, sortedValues: number[]): number {
-  if (sortedValues.length === 0) return 0;
-
-  // Find position where value would fit
-  let rank = 0;
-  for (const val of sortedValues) {
-    if (val <= value) rank++;
-    else break;
-  }
-
-  return (rank / sortedValues.length) * 100;
-}
-
-/**
- * Get specific percentile value from a sorted dataset
- * @param percentile - Target percentile (0-100)
- * @param sortedValues - Array of values sorted in ascending order
- */
-export function getPercentileValue(
-  percentile: number,
-  sortedValues: number[],
-): number {
-  if (sortedValues.length === 0) return 0;
-  if (percentile <= 0) return sortedValues[0]!;
-  if (percentile >= 100) return sortedValues[sortedValues.length - 1]!;
-
-  const index = Math.ceil((percentile / 100) * sortedValues.length) - 1;
-  return sortedValues[index]!;
-}
-
-/**
- * Calculate z-score (standardized score)
- * @param value - The value to standardize
- * @param mean - Mean of the distribution
- * @param stdDev - Standard deviation of the distribution
- */
-export function zScore(value: number, mean: number, stdDev: number): number {
-  if (stdDev === 0) return 0;
-  return (value - mean) / stdDev;
-}
-
-/**
- * Detect outliers using z-score method
- * @param value - The value to check
- * @param mean - Mean of the distribution
- * @param stdDev - Standard deviation of the distribution
- * @param threshold - Z-score threshold (typically 3)
- */
-export function isOutlier(
-  value: number,
-  mean: number,
-  stdDev: number,
-  threshold = 3,
-): boolean {
-  return Math.abs(zScore(value, mean, stdDev)) > threshold;
-}
-
-/**
- * Normalize a value to 0-100 scale using min-max normalization
- */
-export function normalizeToScale(
-  value: number,
-  min: number,
-  max: number,
-): number {
-  if (max === min) return 50; // Middle value if no variance
-  return Math.max(0, Math.min(100, ((value - min) / (max - min)) * 100));
-}
-
-/**
- * Clip a value to a specified range
- */
-export function clip(value: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, value));
-}
-
-/**
- * Calculate weighted average
- */
-export function weightedAverage(values: number[], weights: number[]): number {
-  if (values.length !== weights.length || values.length === 0) return 0;
-
-  const weightSum = weights.reduce((sum, w) => sum + w, 0);
-  if (weightSum === 0) return 0;
-
-  const weightedSum = values.reduce(
-    (sum, val, i) => sum + val * weights[i]!,
-    0,
+  return (
+    values.reduce((sum, value) => sum + Math.pow(value - avg, 2), 0) /
+    (values.length - 1)
   );
-  return weightedSum / weightSum;
 }
 
-/**
- * Sort array and return sorted copy
- */
-export function sortAscending(values: number[]): number[] {
-  return [...values].sort((a, b) => a - b);
+export function standardDeviation(values: number[]): number {
+  return Math.sqrt(variance(values));
 }
 
-/**
- * Calculate Pearson correlation coefficient between two arrays
- */
 export function correlation(x: number[], y: number[]): number {
-  if (x.length !== y.length || x.length === 0) return 0;
-
+  if (!x.length || x.length !== y.length) return 0;
   const meanX = mean(x);
   const meanY = mean(y);
-  const stdX = standardDeviation(x);
-  const stdY = standardDeviation(y);
-
-  if (stdX === 0 || stdY === 0) return 0;
-
-  let sum = 0;
-  for (let i = 0; i < x.length; i++) {
-    sum += ((x[i]! - meanX) / stdX) * ((y[i]! - meanY) / stdY);
-  }
-
-  return sum / x.length;
+  const numerator = x.reduce(
+    (sum, value, index) => sum + (value - meanX) * (y[index]! - meanY),
+    0,
+  );
+  const denominator = Math.sqrt(
+    x.reduce((sum, value) => sum + Math.pow(value - meanX, 2), 0) *
+      y.reduce((sum, value) => sum + Math.pow(value - meanY, 2), 0),
+  );
+  return denominator === 0 ? 0 : numerator / denominator;
 }
 
-/**
- * Calculate distribution statistics for a dataset
- */
-export function calculateDistribution(values: number[]) {
-  if (values.length === 0) {
+export function calculatePercentiles(
+  sortedValues: number[],
+): StatDistribution["percentiles"] {
+  const pct = (p: number) => percentile(sortedValues, p);
+  return {
+    p10: pct(0.1),
+    p25: pct(0.25),
+    p50: pct(0.5),
+    p75: pct(0.75),
+    p90: pct(0.9),
+    p95: pct(0.95),
+    p99: pct(0.99),
+  };
+}
+
+export function percentile(values: number[], percentileRank: number): number {
+  if (!values.length) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  const index = (sorted.length - 1) * percentileRank;
+  const lower = Math.floor(index);
+  const upper = Math.ceil(index);
+  if (lower === upper) return sorted[lower]!;
+  const weight = index - lower;
+  return sorted[lower]! * (1 - weight) + sorted[upper]! * weight;
+}
+
+export function calculateDistribution(values: number[]): StatDistribution {
+  if (!values.length) {
     return {
       mean: 0,
       stdDev: 0,
@@ -170,35 +78,39 @@ export function calculateDistribution(values: number[]) {
     };
   }
 
-  const sorted = sortAscending(values);
+  const sorted = [...values].sort((a, b) => a - b);
+  const percentiles = calculatePercentiles(sorted);
 
   return {
     mean: mean(values),
     stdDev: standardDeviation(values),
     min: sorted[0]!,
     max: sorted[sorted.length - 1]!,
-    percentiles: {
-      p10: getPercentileValue(10, sorted),
-      p25: getPercentileValue(25, sorted),
-      p50: getPercentileValue(50, sorted),
-      p75: getPercentileValue(75, sorted),
-      p90: getPercentileValue(90, sorted),
-      p95: getPercentileValue(95, sorted),
-      p99: getPercentileValue(99, sorted),
-    },
+    percentiles,
   };
 }
 
-/**
- * Smooth values using exponential moving average
- */
-export function exponentialSmoothing(values: number[], alpha = 0.3): number[] {
-  if (values.length === 0) return [];
+export function isOutlier(
+  value: number,
+  avg: number,
+  stdDev: number,
+  threshold: number,
+): boolean {
+  if (stdDev === 0) return false;
+  return Math.abs((value - avg) / stdDev) > threshold;
+}
 
-  const smoothed: number[] = [values[0]!];
-  for (let i = 1; i < values.length; i++) {
-    smoothed.push(alpha * values[i]! + (1 - alpha) * smoothed[i - 1]!);
+export function clip(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value));
+}
+
+export function safeNumber(value: unknown): number {
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : 0;
   }
-
-  return smoothed;
+  if (typeof value === "string" && value.trim() !== "") {
+    const parsed = Number.parseFloat(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+  return 0;
 }

@@ -29,9 +29,9 @@
  */
 
 import Image from "next/image";
-import { useContractHistoryData } from "@gshl-hooks";
-import { formatMoney } from "@gshl-utils";
-import type { Contract, GSHLTeam, Player, Season } from "@gshl-types";
+import { formatMoney, showDate } from "@gshl-utils";
+import type { GSHLTeam } from "@gshl-types";
+import type { ContractHistoryRowType } from "@gshl-hooks/main/useContract";
 
 // ============================================================================
 // INTERNAL COMPONENTS
@@ -58,7 +58,9 @@ const ContractHistoryRow = ({
     capHit: number;
     start: string;
     end: string;
+    signingStatus: string;
     expiryStatus: string;
+    buyoutEnd?: string;
   };
   franchiseById: Map<string, GSHLTeam>;
   rowBg: string;
@@ -85,9 +87,29 @@ const ContractHistoryRow = ({
       </td>
       <td className="px-2 py-1 text-right">{row.length} years</td>
       <td className="px-2 py-1 text-right">{formatMoney(row.salary)}</td>
-      <td className="whitespace-nowrap px-2 py-1">{row.start}</td>
-      <td className="whitespace-nowrap px-2 py-1">{row.end}</td>
+      <td className="whitespace-nowrap px-2 py-1">{showDate(row.start)}</td>
+      <td className="whitespace-nowrap px-2 py-1">{showDate(row.end)}</td>
+      <td className="whitespace-nowrap px-2 py-1">{row.signingStatus}</td>
       <td className="whitespace-nowrap px-2 py-1">{row.expiryStatus}</td>
+      <td className="whitespace-nowrap px-2 py-1">
+        {row.buyoutEnd
+          ? formatMoney(row.salary * 0.5, true) +
+            ", " +
+            Math.round(
+              (new Date(row.buyoutEnd).getTime() -
+                new Date(row.end).getTime()) /
+                31536000000,
+            ) +
+            " yr" +
+            (Math.round(
+              (new Date(row.buyoutEnd).getTime() -
+                new Date(row.end).getTime()) /
+                31536000000,
+            ) > 1
+              ? "s"
+              : "")
+          : "-"}
+      </td>
     </tr>
   );
 };
@@ -108,37 +130,16 @@ const EmptyState = () => (
 // ============================================================================
 
 export interface OwnerContractHistoryProps {
-  /** Target owner ID to display contracts for */
-  ownerId: string;
-  /** Optional season-constrained teams */
-  teams?: GSHLTeam[];
-  /** Full multi-season team list (preferred over teams) */
-  allTeams?: GSHLTeam[];
-  /** List of contracts to filter and display */
-  contracts?: Contract[];
-  /** Player data for displaying names */
-  players?: Player[];
-  /** Season data for displaying season names */
-  seasons?: Season[];
+  rows: ContractHistoryRowType[];
+  franchiseById: Map<string, GSHLTeam>;
+  hasData: boolean;
 }
 
 export function OwnerContractHistory({
-  ownerId,
-  teams,
-  allTeams,
-  contracts,
-  players,
-  seasons,
+  rows,
+  franchiseById,
+  hasData,
 }: OwnerContractHistoryProps) {
-  const { rows, franchiseById, hasData } = useContractHistoryData({
-    ownerId,
-    teams,
-    allTeams,
-    contracts,
-    players,
-    seasons,
-  });
-
   return (
     <div className="py-6">
       <h2 className="mb-2 text-center text-lg font-bold">
@@ -160,21 +161,26 @@ export function OwnerContractHistory({
                 <th className="px-2 py-1 text-center font-normal">Salary</th>
                 <th className="px-2 py-1 text-center font-normal">Start</th>
                 <th className="px-2 py-1 text-center font-normal">End</th>
+                <th className="px-2 py-1 text-center font-normal">Signing</th>
                 <th className="px-2 py-1 text-center font-normal">Expiry</th>
+                <th className="px-2 py-1 text-center font-normal">Buyout</th>
               </tr>
             </thead>
             <tbody>
-              {rows.map((r, idx) => {
-                const rowBg = idx % 2 === 0 ? "bg-white" : "bg-gray-100";
-                return (
-                  <ContractHistoryRow
-                    key={r.id}
-                    row={r}
-                    franchiseById={franchiseById}
-                    rowBg={rowBg}
-                  />
-                );
-              })}
+              {rows
+                .sort((a, b) => b.salary - a.salary)
+                .sort((a, b) => a.start.localeCompare(b.start))
+                .map((r, idx) => {
+                  const rowBg = idx % 2 === 0 ? "bg-white" : "bg-gray-100";
+                  return (
+                    <ContractHistoryRow
+                      key={r.id}
+                      row={r}
+                      franchiseById={franchiseById}
+                      rowBg={rowBg}
+                    />
+                  );
+                })}
             </tbody>
           </table>
         </div>

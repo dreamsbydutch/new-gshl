@@ -21,7 +21,6 @@ export {
   CONFERENCE_SEED_FIELDS,
   WILDCARD_FIELDS,
   LOSERS_TOURNEY_FIELDS,
-  WILDCARD_TEAM_LIMITS,
   groupTeamsByStandingsType,
   filterTeamsByConference,
   getOrdinalSuffix,

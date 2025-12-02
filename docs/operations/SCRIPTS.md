@@ -24,7 +24,6 @@ GSHL includes several utility scripts in `src/scripts/` for data maintenance and
 | Script                    | Purpose                                       | Frequency          |
 | ------------------------- | --------------------------------------------- | ------------------ |
 | **train-ranking-model**   | Train player ranking model                    | On-demand / Season |
-| **update-all-rankings**   | Calculate ratings for all PlayerDay records   | On-demand / Weekly |
 | **visualize-rankings**    | Show ranking distribution visualizations      | On-demand          |
 | **update-all-lineups**    | Optimize lineups for all team-days            | On-demand          |
 | **update-all-team-stats** | Aggregate PlayerDays → TeamDays/Weeks/Seasons | On-demand          |
@@ -365,7 +364,6 @@ npm run ranking:train
 📋 Next Steps:
   1. Review the model file: ranking-model.json
   2. Run visualizations: npm run ranking:visualize
-  3. Update all rankings: npm run ranking:update-all
 ```
 
 **Runtime**: ~15-30 minutes (depends on data volume)
@@ -378,7 +376,7 @@ npm run ranking:train
 **Output File**: `ranking-model.json`
 
 - Contains season-specific distributions and weights
-- Used by `update-all-rankings` and Yahoo scraper
+- Consumed by the Apps Script ranking engine and Yahoo scraper tooling
 
 ---
 
@@ -436,72 +434,9 @@ npm run ranking:visualize
 
 ---
 
-### update-all-rankings.ts
+### Apps Script Ranking Updates
 
-**Purpose**: Calculate ratings for all PlayerDay records and update Google Sheets.
-
-**Command**:
-
-```bash
-npm run ranking:update-all
-```
-
-**Process**:
-
-1. Load trained model from `ranking-model.json`
-2. Fetch all PlayerDay records from Google Sheets
-3. Calculate rating for each player-day using trained model
-4. Batch update `Rating` column in Google Sheets
-5. Handle rate limiting and retries
-
-**Output**:
-
-```
-🏒 Update All Player Day Rankings
-================================================================================
-
-📥 Fetching all PlayerDay data from Google Sheets...
-
-   Fetching from PLAYERDAYS_6_10...
-   ✓ PLAYERDAYS_6_10: 89,432 records loaded
-
-   Fetching from PLAYERDAYS_11_15...
-   ✓ PLAYERDAYS_11_15: 112,876 records loaded
-
-🎯 Calculating rankings for 202,308 player-days...
-
-   ⏳ Processed 10,000/202,308...
-   ⏳ Processed 20,000/202,308...
-   ...
-   ✓ Processed: 202,308 player-days in 18.3s
-   ✓ Ranked: 124,567 performances (zero-stat performances skipped)
-
-💾 Updating Rating in Google Sheets...
-
-   Processing PLAYERDAYS_6_10...
-   ⏳ Updated 1000/89432 cells...
-   ⏳ Updated 2000/89432 cells...
-   ...
-   ✓ PLAYERDAYS_6_10: Updated 89,432 rows
-
-   Processing PLAYERDAYS_11_15...
-   ✓ PLAYERDAYS_11_15: Updated 112,876 rows
-
-✓ All rankings updated!
-```
-
-**Runtime**: ~10-20 minutes for ~200,000 records
-
-**Rate Limiting**:
-
-- 500ms delay between batches
-- Exponential backoff on quota errors (10s, 20s, 40s, 80s, 160s)
-- Up to 5 retry attempts
-
-**Requirements**:
-
-- `ranking-model.json` must exist
-- `GOOGLE_SERVICE_ACCOUNT_KEY` in `.env.local`
+Player-day and team-day ratings are now updated exclusively inside the Apps Script project (`apps-script/`). Once a new `ranking-model.json` is trained and exported via `npm run ranking:export-to-apps-script`, the Sheets automations call `rankPerformance` directly while ingesting Yahoo data. No Node.js script is required for production updates.
 
 ---
 

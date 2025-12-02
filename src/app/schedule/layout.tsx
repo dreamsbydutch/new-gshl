@@ -27,7 +27,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const selectedScheduleType =
     scheduleTypes.find((type) => type.key === scheduleType) ?? null;
   return (
-    <div className="mb-32 font-varela lg:mb-4">
+    <div className="mb-32 font-varela lg:mb-4 lg:mt-20">
       {children}
       <SecondaryPageToolbar className="mx-auto text-center">
         <SeasonToggleNav />

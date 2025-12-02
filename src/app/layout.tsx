@@ -47,8 +47,8 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-capable" content="yes"></meta>
         <link rel="apple-touch-icon" href="/favicon.ico"></link>
         <link rel="apple-touch-startup-image" href="/favicon.ico"></link>
-        <meta name="mobile-web-app-title" content="PGC Clubhouse"></meta>
-        <meta name="apple-mobile-web-app-title" content="PGC Clubhouse"></meta>
+        <meta name="mobile-web-app-title" content="GSHL App"></meta>
+        <meta name="apple-mobile-web-app-title" content="GSHL App"></meta>
       </head>
       <body
         className={cn(

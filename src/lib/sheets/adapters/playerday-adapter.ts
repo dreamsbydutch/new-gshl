@@ -7,10 +7,18 @@
  */
 
 import { optimizedSheetsAdapter } from "./optimized-adapter";
-import type { DatabaseRecord } from "../config/config";
 import {
+  SHEETS_CONFIG,
+  convertModelToRow,
+  convertRowToModel,
+  type DatabaseRecord,
+} from "../config/config";
+import { optimizedSheetsClient } from "../client/optimized-client";
+import {
+  PLAYERDAY_WORKBOOKS,
   getPlayerDaySpreadsheetId,
   groupPlayerDaysByWorkbook,
+  type PlayerDayWorkbookKey,
 } from "../playerday/playerday-partition";
 import {
   canUpdatePlayerDay,
@@ -19,6 +27,38 @@ import {
   formatValidationError,
 } from "../playerday/playerday-validation";
 import type { FindManyOptions } from "./optimized-adapter";
+
+const PLAYER_DAY_MODEL = "PlayerDayStatLine";
+const PLAYER_DAY_SHEET_NAME = SHEETS_CONFIG.SHEETS[PLAYER_DAY_MODEL];
+const PLAYER_DAY_COLUMNS = SHEETS_CONFIG.COLUMNS[PLAYER_DAY_MODEL];
+
+if (!PLAYER_DAY_SHEET_NAME) {
+  throw new Error("PlayerDay sheet name is not configured in SHEETS_CONFIG.");
+}
+
+if (!PLAYER_DAY_COLUMNS) {
+  throw new Error("PlayerDay columns are not configured in SHEETS_CONFIG.");
+}
+
+const getColumnLetter = (index: number): string => {
+  let letter = "";
+  let current = index;
+  while (current > 0) {
+    current--;
+    letter = String.fromCharCode((current % 26) + 65) + letter;
+    current = Math.floor(current / 26);
+  }
+  return letter;
+};
+
+const PLAYER_DAY_MAX_COLUMN = getColumnLetter(PLAYER_DAY_COLUMNS.length);
+const PLAYER_DAY_RANGE = `${PLAYER_DAY_SHEET_NAME}!A2:${PLAYER_DAY_MAX_COLUMN}`;
+
+type WorkbookIndex = {
+  rowById: Map<string, number>;
+  rowByKey: Map<string, number>;
+  rowsByIndex: Map<number, DatabaseRecord>;
+};
 
 export class PlayerDayAdapter {
   /**
@@ -42,11 +82,26 @@ export class PlayerDayAdapter {
     console.warn(
       "PlayerDay query without seasonId will search all partitions. Consider adding a seasonId filter.",
     );
+    const workbookEntries = Object.entries(PLAYERDAY_WORKBOOKS) as Array<
+      [PlayerDayWorkbookKey, string]
+    >;
 
-    // TODO: Implement multi-workbook search if needed
-    throw new Error(
-      "PlayerDay queries without seasonId are not yet supported. Please specify a seasonId in your where clause.",
+    const results = await Promise.all(
+      workbookEntries.map(async ([workbookKey, spreadsheetId]) => {
+        try {
+          return await this.queryWorkbook<T>(spreadsheetId, options);
+        } catch (error) {
+          const message =
+            error instanceof Error ? error.message : String(error);
+          console.error(
+            `Failed to query ${workbookKey} PlayerDay workbook: ${message}`,
+          );
+          return [] as T[];
+        }
+      }),
     );
+
+    return results.flat();
   }
 
   /**
@@ -104,13 +159,32 @@ export class PlayerDayAdapter {
   async createMany<T>(options: {
     data: Array<Record<string, unknown>>;
   }): Promise<T[]> {
-    // Group records by workbook (used when this method is implemented)
-    groupPlayerDaysByWorkbook(options.data);
+    const { data } = options;
+    if (!data || data.length === 0) {
+      return [];
+    }
 
-    // TODO: Batch write to each workbook
-    throw new Error(
-      "PlayerDay createMany not yet implemented. Need to extend optimizedSheetsAdapter to support batch writes to multiple workbooks.",
-    );
+    const grouped = groupPlayerDaysByWorkbook(data);
+    if (grouped.size === 0) {
+      console.warn(
+        "No PlayerDay records were created because none included a valid seasonId.",
+      );
+      return [];
+    }
+
+    for (const [workbookKey, records] of grouped) {
+      const spreadsheetId = PLAYERDAY_WORKBOOKS[workbookKey];
+      try {
+        await this.appendRecordsToWorkbook(spreadsheetId, records);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        throw new Error(
+          `Failed to create PlayerDay records in ${workbookKey}: ${message}`,
+        );
+      }
+    }
+
+    return data as T[];
   }
 
   /**
@@ -252,14 +326,33 @@ export class PlayerDayAdapter {
 
     // Step 4: Execute operations (if not dry run)
     if (!dryRun) {
-      // TODO: Implement actual create/update operations
-      // This requires extending optimizedSheetsAdapter to support:
-      // 1. Custom spreadsheet routing
-      // 2. Batch operations within each workbook
+      const createGroups = groupPlayerDaysByWorkbook(toCreate);
+      for (const [workbookKey, records] of createGroups) {
+        const spreadsheetId = PLAYERDAY_WORKBOOKS[workbookKey];
+        try {
+          await this.appendRecordsToWorkbook(spreadsheetId, records);
+        } catch (error) {
+          const message =
+            error instanceof Error ? error.message : String(error);
+          const errorMsg = `Failed to create ${records.length} PlayerDay records in ${workbookKey}: ${message}`;
+          errors.push(errorMsg);
+          console.error(errorMsg);
+        }
+      }
 
-      console.log(
-        `Would create ${toCreate.length} and update ${toUpdate.length} PlayerDay records`,
-      );
+      const updateGroups = groupPlayerDaysByWorkbook(toUpdate);
+      for (const [workbookKey, records] of updateGroups) {
+        const spreadsheetId = PLAYERDAY_WORKBOOKS[workbookKey];
+        try {
+          await this.updateRecordsInWorkbook(spreadsheetId, records);
+        } catch (error) {
+          const message =
+            error instanceof Error ? error.message : String(error);
+          const errorMsg = `Failed to update ${records.length} PlayerDay records in ${workbookKey}: ${message}`;
+          errors.push(errorMsg);
+          console.error(errorMsg);
+        }
+      }
     }
 
     return {
@@ -307,6 +400,153 @@ export class PlayerDayAdapter {
       options,
       spreadsheetId,
     );
+  }
+
+  private getStringField(
+    record: Record<string, unknown>,
+    field: string,
+  ): string | undefined {
+    const value = record[field];
+    if (typeof value === "string" && value.trim().length > 0) {
+      return value.trim();
+    }
+    if (typeof value === "number" && Number.isFinite(value)) {
+      return String(value);
+    }
+    return undefined;
+  }
+
+  private buildFallbackId(record: Record<string, unknown>): string | undefined {
+    const playerId = this.getStringField(record, "playerId");
+    const seasonId = this.getStringField(record, "seasonId");
+    const date = this.getStringField(record, "date");
+
+    if (playerId && seasonId && date) {
+      return buildPlayerDayKey(playerId, seasonId, date);
+    }
+    return undefined;
+  }
+
+  private async appendRecordsToWorkbook(
+    spreadsheetId: string,
+    records: Array<Record<string, unknown>>,
+  ): Promise<void> {
+    if (records.length === 0) return;
+
+    const now = new Date();
+    const values = records.map((record) => {
+      const prepared: Record<string, unknown> = { ...record };
+      if (!prepared.id) {
+        const generatedId = this.buildFallbackId(prepared);
+        if (generatedId) {
+          prepared.id = generatedId;
+        }
+      }
+      if (!prepared.createdAt) {
+        prepared.createdAt = now;
+      }
+      prepared.updatedAt = now;
+      return convertModelToRow(prepared as DatabaseRecord, PLAYER_DAY_COLUMNS);
+    });
+
+    await optimizedSheetsClient.appendValues(
+      spreadsheetId,
+      `${PLAYER_DAY_SHEET_NAME}!A:A`,
+      values,
+    );
+  }
+
+  private async updateRecordsInWorkbook(
+    spreadsheetId: string,
+    records: Array<Record<string, unknown>>,
+  ): Promise<void> {
+    if (records.length === 0) return;
+
+    const indexData = await this.buildWorkbookIndex(spreadsheetId);
+    const now = new Date();
+
+    for (const record of records) {
+      const rowIndex = this.resolveRowIndex(record, indexData);
+      if (!rowIndex) {
+        const id = this.getStringField(record, "id") ?? "unknown";
+        const key = this.buildFallbackId(record) ?? "unknown";
+        console.warn(
+          `PlayerDay update skipped: unable to locate row for id ${id} (key ${key}).`,
+        );
+        continue;
+      }
+
+      const existing = indexData.rowsByIndex.get(rowIndex) ?? {};
+      const merged: Record<string, unknown> = {
+        ...existing,
+        ...record,
+        updatedAt: now,
+      };
+
+      if (existing.createdAt && record.createdAt === undefined) {
+        merged.createdAt = existing.createdAt;
+      }
+
+      const range = `${PLAYER_DAY_SHEET_NAME}!A${rowIndex}:${PLAYER_DAY_MAX_COLUMN}${rowIndex}`;
+      const rowValues = convertModelToRow(
+        merged as DatabaseRecord,
+        PLAYER_DAY_COLUMNS,
+      );
+
+      await optimizedSheetsClient.updateValues(spreadsheetId, range, [
+        rowValues,
+      ]);
+    }
+  }
+
+  private async buildWorkbookIndex(
+    spreadsheetId: string,
+  ): Promise<WorkbookIndex> {
+    const values = await optimizedSheetsClient.getValues(
+      spreadsheetId,
+      PLAYER_DAY_RANGE,
+    );
+
+    const rowById = new Map<string, number>();
+    const rowByKey = new Map<string, number>();
+    const rowsByIndex = new Map<number, DatabaseRecord>();
+
+    values.forEach((row, index) => {
+      if (!row || row.length === 0) return;
+      const model = convertRowToModel<DatabaseRecord>(row, PLAYER_DAY_COLUMNS);
+      const rowIndex = index + 2; // account for header row
+      rowsByIndex.set(rowIndex, model);
+
+      const idValue = this.getStringField(model, "id");
+      if (idValue) {
+        rowById.set(idValue, rowIndex);
+      }
+
+      const composite = this.buildFallbackId(model);
+      if (composite) {
+        rowByKey.set(composite, rowIndex);
+      }
+    });
+
+    return { rowById, rowByKey, rowsByIndex };
+  }
+
+  private resolveRowIndex(
+    record: Record<string, unknown>,
+    indexData: WorkbookIndex,
+  ): number | undefined {
+    const id = this.getStringField(record, "id");
+    if (id) {
+      const byId = indexData.rowById.get(id);
+      if (byId) return byId;
+    }
+
+    const fallback = this.buildFallbackId(record);
+    if (fallback) {
+      return indexData.rowByKey.get(fallback);
+    }
+
+    return undefined;
   }
 }
 

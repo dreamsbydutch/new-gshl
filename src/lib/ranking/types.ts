@@ -1,85 +1,40 @@
-/**
- * Ranking Algorithm Types
- * =======================
- * Type definitions for the player performance ranking system.
- */
+import type { PositionGroup, SeasonType } from "../types/enums";
 
-import type { PositionGroup } from "../types/enums";
+export type AggregationLevel =
+  | "playerDay"
+  | "playerWeek"
+  | "playerSplit"
+  | "playerTotal"
+  | "playerNhl"
+  | "teamDay"
+  | "teamWeek"
+  | "teamSeason";
 
-/**
- * Statistical categories used in ranking calculations
- */
+export type EntityType = "player" | "team";
+
 export type StatCategory =
   | "G"
   | "A"
   | "P"
-  | "PM" // Plus/Minus (used in seasons 1-6)
+  | "PM"
   | "PPP"
   | "SOG"
   | "HIT"
   | "BLK"
   | "W"
+  | "GA"
   | "GAA"
-  | "SVP";
+  | "SA"
+  | "SV"
+  | "SVP"
+  | "SO"
+  | "TOI";
 
-/**
- * Raw stat line from a player's daily performance
- */
-export interface PlayerStatLine {
-  posGroup: PositionGroup;
-  seasonId: string;
-  G: string;
-  A: string;
-  P: string;
-  PM?: string; // Plus/Minus (optional - only in seasons 1-6)
-  PPP: string;
-  SOG: string;
-  HIT: string;
-  BLK: string;
-  W: string;
-  GAA: string;
-  SVP: string;
-}
+export type ParsedStats = Record<StatCategory, number>;
 
-/**
- * Parsed stat values as numbers for calculation
- */
-export interface ParsedStats {
-  G: number;
-  A: number;
-  P: number;
-  PM: number; // Plus/Minus (used in seasons 1-6)
-  PPP: number;
-  SOG: number;
-  HIT: number;
-  BLK: number;
-  W: number;
-  GAA: number;
-  SVP: number;
-}
+export type PositionWeights = Record<StatCategory, number>;
 
-/**
- * Position-specific weights for each stat category
- * Values range from 0 to 1, representing relative importance
- */
-export interface PositionWeights {
-  G: number;
-  A: number;
-  P: number;
-  PM: number; // Plus/Minus (used in seasons 1-6)
-  PPP: number;
-  SOG: number;
-  HIT: number;
-  BLK: number;
-  W: number;
-  GAA: number;
-  SVP: number;
-}
-
-/**
- * Statistical distribution parameters for a season
- */
-export interface SeasonDistribution {
+export interface StatDistribution {
   mean: number;
   stdDev: number;
   min: number;
@@ -95,21 +50,30 @@ export interface SeasonDistribution {
   };
 }
 
-/**
- * Trained model parameters for a specific position in a season
- */
+export type CompositeDistribution = StatDistribution;
+
 export interface PositionSeasonModel {
   seasonId: string;
   posGroup: PositionGroup;
+  aggregationLevel: AggregationLevel;
+  seasonPhase: SeasonType;
+  entityType: EntityType;
   sampleSize: number;
   weights: PositionWeights;
-  distributions: Record<StatCategory, SeasonDistribution>;
-  compositeDistribution: SeasonDistribution;
+  distributions: Record<StatCategory, StatDistribution>;
+  compositeDistribution: CompositeDistribution;
 }
 
-/**
- * Complete trained ranking model
- */
+export interface TrainingConfig {
+  minSampleSize: number;
+  outlierThreshold: number;
+  smoothingFactor: number;
+  useAdaptiveWeights: boolean;
+  scarcityWeights?: Record<string, number>;
+  categoryImpactWeights?: Record<string, number>;
+  weekTypeLookup?: Record<string, SeasonType>;
+}
+
 export interface RankingModel {
   version: string;
   trainedAt: Date;
@@ -118,46 +82,57 @@ export interface RankingModel {
     earliest: string;
     latest: string;
   };
-  models: Record<string, PositionSeasonModel>; // Key: `${seasonId}:${posGroup}`
+  models: Record<string, PositionSeasonModel>;
   globalWeights: Record<PositionGroup, PositionWeights>;
+  aggregationBlendWeights?: Record<string, Record<string, unknown>>;
 }
 
-/**
- * Result of ranking a single stat line
- */
+export interface RankingBreakdownEntry {
+  category: StatCategory;
+  value: number;
+  percentile: number;
+  weight: number;
+}
+
 export interface RankingResult {
-  score: number; // 0-100
-  percentile: number; // 0-100
-  breakdown: {
-    category: StatCategory;
-    value: number;
-    percentile: number;
-    weight: number;
-    contribution: number;
-  }[];
+  score: number;
+  percentile: number;
+  modelKey: string;
   seasonId: string;
+  aggregationLevel: AggregationLevel;
   posGroup: PositionGroup;
-  isOutlier: boolean;
+  seasonPhase: SeasonType;
+  breakdown: RankingBreakdownEntry[];
 }
 
-/**
- * Training configuration options
- */
-export interface TrainingConfig {
-  minSampleSize: number;
-  outlierThreshold: number; // z-score threshold
-  smoothingFactor: number; // For cross-season normalization
-  useAdaptiveWeights: boolean;
-}
+export type PlayerStatLine = Record<string, unknown> & {
+  seasonId: string | number;
+  posGroup?: string | null;
+  seasonPhase?: string | null;
+  seasonType?: string | null;
+  playerId?: string | null;
+  gshlTeamId?: string | null;
+  weekId?: string | null;
+  date?: string | Date | null;
+  entityType?: EntityType;
+};
 
-/**
- * Performance metrics for model validation
- */
-export interface ModelMetrics {
+export type TeamStatLine = Record<string, unknown> & {
+  seasonId: string | number;
+  gshlTeamId?: string | null;
+  weekId?: string | null;
+  date?: string | Date | null;
+  seasonPhase?: string | null;
+  seasonType?: string | null;
+  entityType?: EntityType;
+};
+
+export type StatLine = PlayerStatLine | TeamStatLine;
+
+export interface ModelClassification {
   seasonId: string;
+  seasonPhase: SeasonType;
+  aggregationLevel: AggregationLevel;
   posGroup: PositionGroup;
-  sampleSize: number;
-  coverage: number; // Percentage of data used
-  correlations: Record<StatCategory, number>;
-  weightStability: number;
+  entityType: EntityType;
 }

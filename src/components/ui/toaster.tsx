@@ -16,28 +16,27 @@ import {
   ToastViewport,
 } from "./toast";
 import React from "react";
+import { useToast } from "./use-toast";
 
 /**
  * Toaster component that renders all active toast notifications
  * @returns Toast provider with rendered toasts
  */
 export function Toaster() {
-  // TODO: Replace placeholder with real useToast hook implementation
-  type AppToast = {
-    id: string | number;
-    title?: string;
-    description?: string;
-    action?: React.ReactNode;
-  } & Omit<
-    React.ComponentProps<typeof Toast>,
-    "title" | "description" | "action" | "id"
-  >;
-  const toasts: AppToast[] = [];
+  const { toasts, dismiss } = useToast();
 
   return (
     <ToastProvider>
       {toasts.map(({ id, title, description, action, ...props }) => (
-        <Toast key={id} {...props}>
+        <Toast
+          key={id}
+          {...props}
+          onOpenChange={(open) => {
+            if (!open) {
+              dismiss(id);
+            }
+          }}
+        >
           <div className="grid gap-1">
             {title && <ToastTitle>{title}</ToastTitle>}
             {description && <ToastDescription>{description}</ToastDescription>}

@@ -12,8 +12,8 @@ import type { ToggleItem } from "@gshl-types";
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const { selectedType, setSelectedType } = useLockerRoomNavigation();
-  const { selectedSeason, currentSeason, defaultSeason } = useSeasonState();
-  const activeSeason = selectedSeason ?? currentSeason ?? defaultSeason;
+  const { currentSeason, defaultSeason } = useSeasonState();
+  const activeSeason = currentSeason ?? defaultSeason;
   const activeSeasonId = activeSeason?.id?.toString();
 
   const pageToolbarProps: {

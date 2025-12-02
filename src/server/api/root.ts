@@ -5,16 +5,14 @@ import { teamRouter } from "./routers/team";
 import { ownerRouter } from "./routers/owner";
 import { matchupRouter } from "./routers/matchup";
 import { playerRouter } from "./routers/player";
-import { playerStatsRouter } from "./routers/playerStats";
-import { teamStatsRouter } from "./routers/teamStats";
 import { conferenceRouter } from "./routers/conference";
 import { franchiseRouter } from "./routers/franchise";
 import { eventRouter } from "./routers/event";
 import { contractRouter } from "./routers/contract";
 import { draftPickRouter } from "./routers/draftPick";
 import { systemRouter } from "./routers/system";
-import { yahooScraperRouter } from "./routers/yahoo-scraper";
-import { statAggregationRouter } from "./routers/statAggregation";
+import { playerStatsRouter } from "./routers/playerStats";
+import { teamStatsRouter } from "./routers/teamStats";
 // import { archivedStatsRouter } from "./routers/archivedStats"; // Disabled for performance
 
 /**
@@ -38,14 +36,12 @@ export const appRouter = createTRPCRouter({
   contract: contractRouter,
   draftPick: draftPickRouter,
 
-  // Statistics
   playerStats: playerStatsRouter,
   teamStats: teamStatsRouter,
-  statAggregation: statAggregationRouter,
+
 
   // System utilities
   system: systemRouter,
-  yahooScraper: yahooScraperRouter,
 
   // Archived stats (disabled for performance)
   // archivedStats: archivedStatsRouter,

@@ -3,7 +3,7 @@
 export enum RosterPosition {
   BN = "BN",
   IR = "IR",
-  IRPlus = "IRPlus",
+  IRplus = "IRplus",
   LW = "LW",
   C = "C",
   RW = "RW",
@@ -22,6 +22,7 @@ export enum PositionGroup {
   F = "F",
   D = "D",
   G = "G",
+  TEAM = "TEAM", // Team-level stats (not individual player)
 }
 
 export enum SeasonType {

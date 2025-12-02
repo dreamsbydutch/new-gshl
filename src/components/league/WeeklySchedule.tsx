@@ -144,9 +144,15 @@ const TeamDisplay = ({ team, rank, isAway = false }: TeamDisplayProps) => {
  * Displays a single matchup with both teams, their logos, rankings,
  * and score. Background color varies by game type and conference matchup.
  */
-const WeekScheduleItem = ({ matchup, teams }: WeekScheduleItemProps) => {
+const WeekScheduleItem = ({
+  matchup,
+  teams,
+  teamWeekStatsByTeam,
+}: WeekScheduleItemProps) => {
   const homeTeam = findTeamById(teams, matchup.homeTeamId);
   const awayTeam = findTeamById(teams, matchup.awayTeamId);
+  const homeTeamStats = teamWeekStatsByTeam[matchup.homeTeamId];
+  const awayTeamStats = teamWeekStatsByTeam[matchup.awayTeamId];
 
   // Show loading if required data is missing or invalid
   if (!isValidMatchup(matchup, homeTeam, awayTeam)) {
@@ -162,23 +168,246 @@ const WeekScheduleItem = ({ matchup, teams }: WeekScheduleItemProps) => {
   return (
     <div
       className={cn(
-        "mx-1 mb-3 grid grid-cols-10 items-center rounded-xl bg-red-400 py-1 shadow-md",
+        "mx-1 mb-3 flex flex-col items-center rounded-xl py-1 shadow-md",
         bgClass,
       )}
     >
-      <TeamDisplay
-        team={awayTeam!}
-        rank={matchup.awayRank?.toString()}
-        isAway={true}
-      />
+      <div className="grid w-full grid-cols-10 items-center">
+        <TeamDisplay
+          team={awayTeam!}
+          rank={matchup.awayRank?.toString()}
+          isAway={true}
+        />
 
-      <ScoreDisplay matchup={matchup} />
+        <ScoreDisplay matchup={matchup} />
 
-      <TeamDisplay
-        team={homeTeam!}
-        rank={matchup.homeRank?.toString()}
-        isAway={false}
-      />
+        <TeamDisplay
+          team={homeTeam!}
+          rank={matchup.homeRank?.toString()}
+          isAway={false}
+        />
+      </div>
+      {awayTeamStats && homeTeamStats ? (
+        <table className="my-2 w-11/12 justify-evenly text-center text-xs">
+          <thead>
+            <tr className="border-b font-bold">
+              <td></td>
+              <td>G</td>
+              <td>A</td>
+              <td>P</td>
+              <td>PPP</td>
+              <td>SOG</td>
+              <td>HIT</td>
+              <td>BLK</td>
+              <td>W</td>
+              <td>GAA</td>
+              <td>SVP</td>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>
+                <Image
+                  src={awayTeam!.logoUrl ?? ""}
+                  alt={`${awayTeam!.name} Logo`}
+                  className="mr-1 inline-block h-4 w-4"
+                />
+              </td>
+              <td
+                className={
+                  Number(awayTeamStats.G) > Number(homeTeamStats.G)
+                    ? "font-semibold"
+                    : ""
+                }
+              >
+                {awayTeamStats.G}
+              </td>
+              <td
+                className={
+                  Number(awayTeamStats.A) > Number(homeTeamStats.A)
+                    ? "font-semibold"
+                    : ""
+                }
+              >
+                {awayTeamStats.A}
+              </td>
+              <td
+                className={
+                  Number(awayTeamStats.P) > Number(homeTeamStats.P)
+                    ? "font-semibold"
+                    : ""
+                }
+              >
+                {awayTeamStats.P}
+              </td>
+              <td
+                className={
+                  Number(awayTeamStats.PPP) > Number(homeTeamStats.PPP)
+                    ? "font-semibold"
+                    : ""
+                }
+              >
+                {awayTeamStats.PPP}
+              </td>
+              <td
+                className={
+                  Number(awayTeamStats.SOG) > Number(homeTeamStats.SOG)
+                    ? "font-semibold"
+                    : ""
+                }
+              >
+                {awayTeamStats.SOG}
+              </td>
+              <td
+                className={
+                  Number(awayTeamStats.HIT) > Number(homeTeamStats.HIT)
+                    ? "font-semibold"
+                    : ""
+                }
+              >
+                {awayTeamStats.HIT}
+              </td>
+              <td
+                className={
+                  Number(awayTeamStats.BLK) > Number(homeTeamStats.BLK)
+                    ? "font-semibold"
+                    : ""
+                }
+              >
+                {awayTeamStats.BLK}
+              </td>
+              <td
+                className={
+                  Number(awayTeamStats.W) > Number(homeTeamStats.W)
+                    ? "font-semibold"
+                    : ""
+                }
+              >
+                {awayTeamStats.W}
+              </td>
+              <td
+                className={
+                  Number(awayTeamStats.GAA) < Number(homeTeamStats.GAA)
+                    ? "font-semibold"
+                    : ""
+                }
+              >
+                {(+awayTeamStats.GAA).toFixed(2)}
+              </td>
+              <td
+                className={
+                  Number(awayTeamStats.SVP) > Number(homeTeamStats.SVP)
+                    ? "font-semibold"
+                    : ""
+                }
+              >
+                {(+awayTeamStats.SVP).toFixed(3).toString().slice(1)}
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <Image
+                  src={homeTeam!.logoUrl ?? ""}
+                  alt={`${homeTeam!.name} Logo`}
+                  className="mr-1 inline-block h-4 w-4"
+                />
+              </td>
+              <td
+                className={
+                  Number(homeTeamStats.G) > Number(awayTeamStats.G)
+                    ? "font-semibold"
+                    : ""
+                }
+              >
+                {homeTeamStats.G}
+              </td>
+              <td
+                className={
+                  Number(homeTeamStats.A) > Number(awayTeamStats.A)
+                    ? "font-semibold"
+                    : ""
+                }
+              >
+                {homeTeamStats.A}
+              </td>
+              <td
+                className={
+                  Number(homeTeamStats.P) > Number(awayTeamStats.P)
+                    ? "font-semibold"
+                    : ""
+                }
+              >
+                {homeTeamStats.P}
+              </td>
+              <td
+                className={
+                  Number(homeTeamStats.PPP) > Number(awayTeamStats.PPP)
+                    ? "font-semibold"
+                    : ""
+                }
+              >
+                {homeTeamStats.PPP}
+              </td>
+              <td
+                className={
+                  Number(homeTeamStats.SOG) > Number(awayTeamStats.SOG)
+                    ? "font-semibold"
+                    : ""
+                }
+              >
+                {homeTeamStats.SOG}
+              </td>
+              <td
+                className={
+                  Number(homeTeamStats.HIT) > Number(awayTeamStats.HIT)
+                    ? "font-semibold"
+                    : ""
+                }
+              >
+                {homeTeamStats.HIT}
+              </td>
+              <td
+                className={
+                  Number(homeTeamStats.BLK) > Number(awayTeamStats.BLK)
+                    ? "font-semibold"
+                    : ""
+                }
+              >
+                {homeTeamStats.BLK}
+              </td>
+              <td
+                className={
+                  Number(homeTeamStats.W) > Number(awayTeamStats.W)
+                    ? "font-semibold"
+                    : ""
+                }
+              >
+                {homeTeamStats.W}
+              </td>
+              <td
+                className={
+                  Number(homeTeamStats.GAA) < Number(awayTeamStats.GAA)
+                    ? "font-semibold"
+                    : ""
+                }
+              >
+                {(+homeTeamStats.GAA).toFixed(2)}
+              </td>
+              <td
+                className={
+                  Number(homeTeamStats.SVP) > Number(awayTeamStats.SVP)
+                    ? "font-semibold"
+                    : ""
+                }
+              >
+                {(+homeTeamStats.SVP).toFixed(3).toString().slice(1)}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      ) : (
+        "Team stats unavailable"
+      )}
     </div>
   );
 };
@@ -197,7 +426,7 @@ const WeekScheduleItem = ({ matchup, teams }: WeekScheduleItemProps) => {
  * and team information.
  */
 export function WeeklySchedule() {
-  const { matchups, teams } = useWeeklyScheduleData();
+  const { matchups, teams, teamWeekStatsByTeam } = useWeeklyScheduleData();
 
   return (
     <div className="mx-2 mb-40 mt-4">
@@ -208,6 +437,7 @@ export function WeeklySchedule() {
             key={`week-${matchup.id}`}
             matchup={matchup}
             teams={teams}
+            teamWeekStatsByTeam={teamWeekStatsByTeam}
           />
         ))}
       </div>

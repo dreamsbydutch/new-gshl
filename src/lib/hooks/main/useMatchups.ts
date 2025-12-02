@@ -81,12 +81,20 @@ export function useMatchups(options: UseMatchupsOptions = {}) {
 
   const getAllQuery = api.matchup.getAll.useQuery(
     Object.keys(where).length > 0 ? { where, orderBy } : { orderBy },
-    { enabled: enabled && !isSingleMatchup },
+    {
+      enabled: enabled && !isSingleMatchup,
+      staleTime: 60 * 1000,
+      gcTime: 5 * 60 * 1000,
+    },
   );
 
   const getByIdQuery = api.matchup.getById.useQuery(
     { id: normalizedMatchupId ?? "" },
-    { enabled: enabled && isSingleMatchup },
+    {
+      enabled: enabled && isSingleMatchup,
+      staleTime: 60 * 1000,
+      gcTime: 5 * 60 * 1000,
+    },
   );
 
   // Use appropriate query based on filter type

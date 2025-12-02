@@ -25,12 +25,12 @@ import {
   TeamContractTableSkeleton,
   PlayerContractRowSkeleton,
 } from "@gshl-skeletons";
-import { useContractTableData } from "@gshl-hooks";
 import {
   formatMoney,
   getExpiryStatusClass,
   getSeasonDisplay,
-  getContractRowKey,
+  CAP_SEASON_END_MONTH,
+  CAP_SEASON_END_DAY,
 } from "@gshl-utils";
 import type {
   ContractTableProps,
@@ -95,11 +95,20 @@ const PlayerContractRow = ({
   currentSeason,
   nhlTeams,
 }: PlayerContractRowProps) => {
+  console.log("Rendering contract row for contract:", contract);
   if (!player) return <PlayerContractRowSkeleton contract={contract} />;
 
   const expiryStatus = String(contract.expiryStatus);
   const playerNhlAbbr = player.nhlTeam?.toString();
   const playerNhlTeam = nhlTeams.find((t) => t.abbreviation === playerNhlAbbr);
+  const year = currentSeason.year;
+  const cutoffDates = [
+    new Date(year, CAP_SEASON_END_MONTH, CAP_SEASON_END_DAY),
+    new Date(year + 1, CAP_SEASON_END_MONTH, CAP_SEASON_END_DAY),
+    new Date(year + 2, CAP_SEASON_END_MONTH, CAP_SEASON_END_DAY),
+    new Date(year + 3, CAP_SEASON_END_MONTH, CAP_SEASON_END_DAY),
+    new Date(year + 4, CAP_SEASON_END_MONTH, CAP_SEASON_END_DAY),
+  ];
 
   /**
    * Render a salary (cap hit) or expiry status cell for a given future season year.
@@ -107,11 +116,18 @@ const PlayerContractRow = ({
    * if it expires exactly that season (month match), shows the RFA/UFA/other expiry badge.
    */
   const renderCapHitCell = (year: number) => {
-    const endYear =
-      contract.capHitEndDate instanceof Date
-        ? contract.capHitEndDate.getFullYear()
-        : 0;
+    const endYear = +contract.capHitEndDate.slice(-4) + 1;
+    const startYear = +contract.startDate.slice(-4);
     if (endYear > year) {
+      if (year <= startYear) {
+        // Contract not yet started for this season => empty cell
+        return (
+          <td
+            key={`yr-${year}`}
+            className="border-b border-t border-gray-300 px-2 py-1 text-center text-xs"
+          />
+        );
+      }
       // Contract still active beyond this season's year => show cap hit
       return (
         <td
@@ -165,28 +181,9 @@ const PlayerContractRow = ({
           <span className="text-2xs font-semibold">{playerNhlAbbr || "-"}</span>
         )}
       </td>
-      {/* Current season column (only if signing window still open, matching header) */}
-      {currentSeason.signingEndDate > new Date() &&
-        contract.capHitEndDate instanceof Date &&
-        contract.capHitEndDate > new Date() && (
-          <td className="border-b border-t border-gray-300 p-1 text-center text-xs">
-            {formatMoney(contract.capHit)}
-          </td>
-        )}
-      {/* Future season columns (dynamic) */}
-      {(() => {
-        // Derive base future year consistent with cap space hook (first season year + 1)
-        const firstYear = parseInt(currentSeason.name.slice(0, 4), 10);
-        const baseYear = firstYear + 1;
-        // Always show next 5 future accounting years now (aligns with header offsets 1..5)
-        const futureYears: number[] = [
-          baseYear,
-          baseYear + 1,
-          baseYear + 2,
-          baseYear + 3,
-        ];
-        return futureYears.map((y) => renderCapHitCell(y));
-      })()}
+      {cutoffDates.map((date, index) =>
+        renderCapHitCell(+currentSeason.year + index),
+      )}
     </tr>
   );
 };
@@ -237,19 +234,12 @@ const CapSpaceRow = ({ currentTeam, capSpaceWindow }: CapSpaceRowProps) => {
 export function TeamContractTable({
   currentSeason,
   currentTeam,
-  contracts,
   players,
   nhlTeams,
+  sortedContracts,
+  capSpaceWindow,
+  ready,
 }: ContractTableProps) {
-  // Derive display-ready data (sorted contracts, cap space, readiness flag)
-  const { sortedContracts, capSpaceWindow, ready } = useContractTableData({
-    currentSeason,
-    currentTeam,
-    contracts,
-    players,
-    nhlTeams,
-  });
-
   const playerById = useMemo(() => {
     const map = new Map<string, Player>();
     players?.forEach((player) => {
@@ -281,16 +271,16 @@ export function TeamContractTable({
             {/* Render each contract row (sorted by cap hit desc) */}
             {sortedContracts.map((contract, index) => (
               <PlayerContractRow
-                key={getContractRowKey(contract, index)}
+                key={contract.id || `contract-row-${index}`}
                 contract={contract}
                 player={playerById.get(contract.playerId)}
                 currentSeason={currentSeason!}
-                nhlTeams={nhlTeams!}
+                nhlTeams={nhlTeams}
               />
             ))}
             {/* Summary row for remaining cap space across seasons */}
             <CapSpaceRow
-              currentTeam={currentTeam!}
+              currentTeam={currentTeam}
               capSpaceWindow={capSpaceWindow}
             />
           </tbody>

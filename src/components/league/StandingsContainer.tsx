@@ -28,7 +28,6 @@ import Image from "next/image";
 import { LoadingSpinner } from "@gshl-ui";
 import { cn } from "@gshl-utils";
 import type {
-  StandingsContainerProps,
   StandingsItemProps,
   StandingsTeamInfoProps,
   StandingsGroup,
@@ -42,7 +41,6 @@ import {
   calculatePercentage,
 } from "@gshl-utils";
 import type { Season } from "@gshl-types";
-import { useStandingsData } from "@gshl-hooks";
 
 // ============================================================================
 // INTERNAL COMPONENTS
@@ -203,7 +201,7 @@ const StandingsItem = ({ team }: StandingsItemProps) => {
           {team.logoUrl ? (
             <Image
               className="w-12"
-              src={team.logoUrl}
+              src={team.logoUrl ?? ""}
               alt="Team Logo"
               width={48}
               height={48}
@@ -223,8 +221,24 @@ const StandingsItem = ({ team }: StandingsItemProps) => {
         <>
           <div className="col-span-12 mb-0.5 flex flex-row flex-wrap justify-center">
             <div className="pr-2 text-2xs font-bold">Tiebreak Pts:</div>
-            <div className="text-2xs">-- pts</div>
+            <div className="text-2xs">
+              {(team.seasonStats?.teamW ?? 0) * 3 +
+                (team.seasonStats?.teamHW ?? 0) * 2 +
+                (team.seasonStats?.teamHL ?? 0) * 2}{" "}
+              pts
+            </div>
           </div>
+          <div>{team.seasonStats?.G}</div>
+          <div>{team.seasonStats?.A}</div>
+          <div>{team.seasonStats?.P}</div>
+          <div>{team.seasonStats?.PPP}</div>
+          <div>{team.seasonStats?.SOG}</div>
+          <div>{team.seasonStats?.HIT}</div>
+          <div>{team.seasonStats?.BLK}</div>
+          <div>{team.seasonStats?.W}</div>
+          <div>{team.seasonStats?.GAA}</div>
+          <div>{team.seasonStats?.SVP}</div>
+
           {/* <TeamInfo {...{ teamProb, standingsType }} /> */}
         </>
       ) : null}
@@ -239,17 +253,15 @@ const StandingsItem = ({ team }: StandingsItemProps) => {
  * and list of standings items. Groups teams by division or conference
  * depending on the standings type.
  */
-interface StandingsGroupProps {
-  group: StandingsGroup;
-  selectedSeason: Season | null;
-  standingsType: string;
-}
-
-const StandingsGroupComponent = ({
+export const StandingsComponent = ({
   group,
   selectedSeason,
   standingsType,
-}: StandingsGroupProps) => {
+}: {
+  group: StandingsGroup;
+  selectedSeason: Season | null;
+  standingsType: string;
+}) => {
   return (
     <div key={group.title}>
       <div className="mt-8 text-center font-varela text-sm font-bold">
@@ -273,43 +285,5 @@ const StandingsGroupComponent = ({
           })}
       </div>
     </div>
-  );
-};
-
-// ============================================================================
-// MAIN EXPORT
-// ============================================================================
-
-/**
- * StandingsContainer Component
- *
- * Main standings orchestrator that fetches standings data and renders
- * groups of teams organized by division/conference. Uses the useStandingsData
- * hook to get team data and group them appropriately.
- *
- * Supports multiple standings views:
- * - Overall: League-wide standings
- * - Conference: Conference-based standings
- * - Wildcard: Wildcard race standings
- * - LosersTourney: Losers tournament draft position standings
- *
- * @param standingsType - Type of standings to display
- */
-export const StandingsContainer = ({
-  standingsType,
-}: StandingsContainerProps) => {
-  const { selectedSeason, groups } = useStandingsData({ standingsType });
-
-  return (
-    <>
-      {groups.map((group) => (
-        <StandingsGroupComponent
-          key={group.title}
-          group={group}
-          selectedSeason={selectedSeason ?? null}
-          standingsType={standingsType}
-        />
-      ))}
-    </>
   );
 };

@@ -1,113 +1,53 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
-import { useNavStore } from "@gshl-cache";
-import { TeamContractTable } from "@gshl-components/contracts/ContractTable";
+import { useMemo } from "react";
 import { LockerRoomHeader } from "@gshl-components/team/LockerRoomHeader";
 import { TeamDraftPickList } from "@gshl-components/team/TeamDraftPickList";
-import { TeamHistoryContainer } from "@gshl-components/team/TeamHistory";
-import { TeamRoster } from "@gshl-components/team/TeamRoster";
 import {
-  useAllContracts,
   useDraftPicks,
   usePlayers,
   useSeasonState,
   useTeams,
   useNHLTeams,
+  useNav,
+  useContractData,
 } from "@gshl-hooks";
 import type { GSHLTeam, NHLTeam } from "@gshl-types";
 import { ContractStatus } from "@gshl-types";
+import { TeamHistoryContainer } from "@gshl-components/team/TeamHistory";
+import { TeamRoster } from "@gshl-components/team/TeamRoster";
+import { TeamContractTable } from "@gshl-components/contracts/ContractTable";
 import { OwnerContractHistory } from "@gshl-components/contracts/ContractHistory";
-import { DraftAdminList } from "@gshl-components/draft/DraftAdminList";
 
 export default function LockerRoomPage() {
-  const DEFAULT_SEASON_ID = "12";
-  const selectedLockerRoomType = useNavStore(
-    (state) => state.selectedLockerRoomType,
-  );
-  const selectedOwnerId = useNavStore((state) => state.selectedOwnerId);
-  const {
-    seasons,
-    selectedSeason,
-    currentSeason,
-    defaultSeason,
-    selectedSeasonId,
-    setSelectedSeasonId,
-  } = useSeasonState();
-
-  const hasInitializedSeason = useRef(false);
-
-  const lockerRoomDefaultSeason = useMemo(() => {
-    const explicitSeason = seasons?.find(
-      (season) => String(season.id) === DEFAULT_SEASON_ID,
-    );
-
-    if (explicitSeason) {
-      return explicitSeason;
-    }
-
-    return defaultSeason ?? currentSeason ?? selectedSeason ?? null;
-  }, [
-    seasons,
-    DEFAULT_SEASON_ID,
-    defaultSeason,
-    currentSeason,
-    selectedSeason,
-  ]);
-
-  useEffect(() => {
-    if (hasInitializedSeason.current) return;
-    if (!lockerRoomDefaultSeason?.id) return;
-
-    const desiredSeasonId = String(lockerRoomDefaultSeason.id);
-    if (selectedSeasonId !== desiredSeasonId) {
-      setSelectedSeasonId(desiredSeasonId);
-    }
-
-    hasInitializedSeason.current = true;
-  }, [lockerRoomDefaultSeason?.id, selectedSeasonId, setSelectedSeasonId]);
-
-  const activeSeason =
-    selectedSeason ?? lockerRoomDefaultSeason ?? currentSeason ?? defaultSeason;
-  const resolvedSeasonId =
-    selectedSeasonId ?? activeSeason?.id?.toString() ?? "";
-
-  const { data: contracts, getContracts } = useAllContracts();
-  const { data: teamsRaw = [] } = useTeams({ seasonId: resolvedSeasonId });
-  const teams = teamsRaw as GSHLTeam[];
+  const { currentSeason, seasons } = useSeasonState();
+  const { selectedLockerRoomType, selectedOwnerId } = useNav();
   const { data: draftPicks } = useDraftPicks();
+  const { data: players = [] } = usePlayers();
+  const { data: teamsRaw = [] } = useTeams();
+  const allTeams = teamsRaw as GSHLTeam[];
+  const teams = useMemo(
+    () => allTeams.filter((team) => team.seasonId == currentSeason?.id),
+    [allTeams, currentSeason?.id],
+  );
   const { data: nhlTeamsRaw = [] } = useNHLTeams();
   const nhlTeams = nhlTeamsRaw as NHLTeam[];
-  const { data: allTeamsRaw = [] } = useTeams();
-  const allTeams = allTeamsRaw as GSHLTeam[];
 
-  // Temporary fallback: if no teams from season filter, try filtering allTeams
-  const effectiveTeams =
-    teams && teams.length > 0
-      ? teams
-      : allTeams.filter((t) => t.seasonId === resolvedSeasonId);
+  const currentTeam = teams?.find((t) => t.ownerId === selectedOwnerId);
 
-  const currentTeam = effectiveTeams?.find(
-    (t) => t.ownerId === selectedOwnerId,
-  );
-  const teamContracts = useMemo(() => {
-    if (!currentTeam?.franchiseId) return [];
-    return getContracts({
-      filters: {
-        currentFranchiseIds: currentTeam.franchiseId,
-        activeOnly: true,
-      },
-    });
-  }, [currentTeam?.franchiseId, getContracts]);
-
-  const teamContractsWithoutBuyouts = useMemo(
-    () =>
-      teamContracts.filter(
-        (contract) => contract.expiryStatus !== ContractStatus.BUYOUT,
-      ),
-    [teamContracts],
-  );
-  const { data: players = [] } = usePlayers();
+  const {
+    table: teamContractTableData,
+    history: teamContractHistory,
+    teamContracts,
+  } = useContractData({
+    currentSeason,
+    currentTeam,
+    players,
+    nhlTeams,
+    teams,
+    allTeams,
+    ownerId: selectedOwnerId,
+  });
 
   if (!currentTeam) {
     return (
@@ -123,35 +63,29 @@ export default function LockerRoomPage() {
         <>
           <TeamContractTable
             {...{
-              currentSeason: activeSeason,
-              currentTeam,
-              contracts: teamContracts,
+              currentSeason,
               players,
               nhlTeams,
+              contracts: teamContracts,
+              currentTeam,
+              ...teamContractTableData,
             }}
           />
           <TeamDraftPickList
             {...{
-              teams: effectiveTeams,
+              teams,
               allTeams,
-              draftPicks: draftPicks, // now full list; component scopes by team & season
-              contracts: teamContractsWithoutBuyouts,
+              draftPicks, // now full list; component scopes by team & season
+              contracts: teamContracts?.filter(
+                (c) => c.expiryStatus !== ContractStatus.BUYOUT,
+              ),
               players,
               seasons,
               gshlTeamId: currentTeam.id,
-              selectedSeasonId: resolvedSeasonId,
+              selectedSeasonId: currentSeason?.id ?? "",
             }}
           />
-          <OwnerContractHistory
-            {...{
-              ownerId: selectedOwnerId,
-              teams: effectiveTeams,
-              allTeams,
-              contracts,
-              players,
-              seasons,
-            }}
-          />
+          <OwnerContractHistory {...teamContractHistory} />
         </>
       )}
       {selectedLockerRoomType === "roster" && (
@@ -174,21 +108,18 @@ export default function LockerRoomPage() {
         <>
           <TeamDraftPickList
             {...{
-              teams: effectiveTeams,
+              teams,
               allTeams,
-              draftPicks: draftPicks, // now full list; component scopes by team & season
-              contracts: teamContractsWithoutBuyouts,
+              draftPicks: draftPicks,
+              contracts: teamContracts?.filter(
+                (c) => c.expiryStatus !== ContractStatus.BUYOUT,
+              ),
               players,
               seasons,
               gshlTeamId: currentTeam.id,
-              selectedSeasonId: resolvedSeasonId,
+              selectedSeasonId: currentSeason?.id ?? "",
             }}
           />
-          {selectedOwnerId === "1" && (
-            <>
-              <DraftAdminList />
-            </>
-          )}
         </>
       )}
     </>

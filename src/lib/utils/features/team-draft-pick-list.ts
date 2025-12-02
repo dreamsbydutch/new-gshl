@@ -30,7 +30,6 @@ export const formatDraftPickDescription = (draftPick: DraftPick): string => {
  * @returns Suffix string or empty when no difference.
  */
 export const getOriginalTeamName = (
-  draftPick: DraftPick,
   teams: GSHLTeam[],
   originalTeam: GSHLTeam | undefined,
 ): string => {

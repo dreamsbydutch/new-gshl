@@ -17,6 +17,8 @@ import type {
   NHLTeam,
   TeamSeasonStatLine,
   Week,
+  TeamWeekStatLine,
+  Franchise,
 } from "./database";
 import type { MatchupType, RosterPosition } from "./enums";
 import type { ToggleItem } from "./nav";
@@ -30,11 +32,14 @@ import type { ToggleItem } from "./nav";
  * All props optional at first render; component shows skeleton until hook marks ready.
  */
 export interface ContractTableProps {
-  currentSeason?: Season;
-  currentTeam?: GSHLTeam;
-  contracts?: Contract[];
-  players?: Player[];
-  nhlTeams?: NHLTeam[];
+  currentSeason: Season | undefined;
+  players: Player[];
+  nhlTeams: NHLTeam[];
+  contracts: Contract[];
+  currentTeam: GSHLTeam;
+  sortedContracts: Contract[];
+  capSpaceWindow: { label: string; year: number; remaining: number }[];
+  ready: boolean;
 }
 
 /** Props for an individual player contract line item. */
@@ -113,7 +118,10 @@ export type StandingsOption =
 
 export interface StandingsGroup {
   title: string;
-  teams: (GSHLTeam & { seasonStats?: TeamSeasonStatLine })[];
+  teams: (GSHLTeam & {
+    franchise?: Franchise;
+    seasonStats?: TeamSeasonStatLine;
+  })[];
 }
 
 export interface StandingsContainerProps {
@@ -121,7 +129,7 @@ export interface StandingsContainerProps {
 }
 
 export interface StandingsItemProps {
-  team: GSHLTeam & { seasonStats?: TeamSeasonStatLine };
+  team: GSHLTeam & { franchise?: Franchise; seasonStats?: TeamSeasonStatLine };
   season: Season;
   standingsType: string;
 }
@@ -177,7 +185,7 @@ export interface TeamDraftPickListProps {
   draftPicks: DraftPick[] | undefined;
   contracts: Contract[];
   players: Player[] | undefined;
-  seasons: Season[];
+  seasons?: Season[];
   gshlTeamId: string;
   selectedSeasonId: string;
 }
@@ -333,6 +341,7 @@ export interface ConferenceConfig {
 export interface WeekScheduleItemProps {
   matchup: Matchup;
   teams: GSHLTeam[];
+  teamWeekStatsByTeam: Record<string, TeamWeekStatLine>;
 }
 
 export interface TeamDisplayProps {

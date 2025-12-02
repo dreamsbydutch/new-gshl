@@ -165,31 +165,51 @@ Auto-format all files with Prettier.
 
 ### npm run ranking:train
 
-Train the player ranking model using historical PlayerDay data from Google Sheets.
+Train the ranking model using every player/team dataset (PlayerDay/Week/Split/Total/NHL + TeamDay/Week/Season) from Google Sheets.
 
 **Usage**: `npm run ranking:train`
 
-**Input**: PlayerDay records from Google Sheets (all seasons)
+**Input**: Player + team stat lines across all supported sheets (daily, weekly, season splits/totals, NHL reference data)
 
 **Output**:
 
-- `ranking-model.json` (trained model with season-specific weights)
-- Console output with model accuracy metrics
+- `ranking-model.json` (trained models for every aggregation/phase/position)
+- Console output with scarcity + scoreboard multipliers and coverage metrics
 
 **Runtime**: ~15-30 minutes (depends on data volume)
 
 **Process**:
 
-1. Fetch all PlayerDay records from Google Sheets
-2. Calculate stat distributions per season & position
-3. Train position-specific weights (F, D, G)
-4. Generate season-specific models
-5. Save to `ranking-model.json`
+1. Fetch all PlayerDay/Week/Split/Total/NHL data plus TeamDay/Week/Season sheets
+2. Load week metadata to label season phases (RS/PO/LT)
+3. Calculate scarcity + scoreboard multipliers from team stats
+4. Train aggregation-level, position, and phase-specific models with decay-weighted seasons
+5. Save to `ranking-model.json` and print validation summary
 
 **Requirements**:
 
 - `GOOGLE_SERVICE_ACCOUNT_KEY` in `.env.local`
-- Access to PlayerDay Google Sheets
+- Access to Player + Team Google Sheets
+
+---
+
+### npm run ranking:export-to-apps-script
+
+Convert `ranking-model.json` into the Apps Script bundle (`src/server/apps-script/RankingModels.js`).
+
+**Usage**: `npm run ranking:export-to-apps-script`
+
+**Input**: Latest `ranking-model.json` (run `ranking:train` first)
+
+**Output**:
+
+- Updated `RankingModels.js` containing all trained models, helper lookup utilities, and global weights
+- Console summary of model count/size
+
+**When to run**:
+
+1. After each model training session
+2. Before deploying Apps Script (`npm run Deploy Apps Script` task)
 
 **See**: [Ranking Engine Documentation](../backend/RANKING_ENGINE.md)
 
@@ -500,7 +520,6 @@ All scripts are defined in `package.json`:
     "ranking:train": "tsx src/scripts/train-ranking-model.ts",
     "ranking:test": "tsx src/scripts/test-ranking-model.ts",
     "ranking:visualize": "tsx src/scripts/visualize-rankings.ts",
-    "ranking:update-all": "tsx src/scripts/update-all-rankings.ts",
 
     "lineup:update-all": "node --expose-gc --max-old-space-size=4096 ./node_modules/tsx/dist/cli.mjs src/scripts/update-all-lineups.ts"
   }

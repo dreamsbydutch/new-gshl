@@ -1,63 +1,33 @@
 "use client";
 
 import { useCallback, useMemo } from "react";
-import type { Contract, ContractStatus } from "@gshl-types";
+import { type Contract, type GSHLTeam, type Player, type Season, type NHLTeam, ContractStatus } from "@gshl-types";
 import { api } from "src/trpc/react";
+import {
+  applyContractFilters,
+  sortContracts,
+  mergeContractFilters,
+  computeContractSummary,
+  identity,
+  getContractDedupeKey,
+  CAP_CEILING,
+  CAP_SEASON_END_DAY,
+  CAP_SEASON_END_MONTH,
+  formatDate,
+} from "@gshl-utils";
+import type {
+  ContractFilters,
+  ContractSortOption,
+} from "@gshl-utils";
+
+export type {
+  ContractFilters,
+  ContractSortOption,
+  ContractSummary,
+} from "@gshl-utils";
 
 const EMPTY_CONTRACTS: Contract[] = Object.freeze([]) as unknown as Contract[];
 const DEFAULT_SELECT_DEPS: readonly unknown[] = Object.freeze([]);
-
-type MaybeArray<T> = T | T[] | undefined | null;
-
-const identity = <Value>(value: Value) => value;
-
-function toArray<T>(value: MaybeArray<T>): T[] | undefined {
-  if (value == null) return undefined;
-  return Array.isArray(value) ? value.filter((item) => item != null) : [value];
-}
-
-function toSet<T>(value: MaybeArray<T>): Set<T> | undefined {
-  const arr = toArray(value);
-  return arr ? new Set(arr) : undefined;
-}
-
-export interface ContractFilters {
-  ids?: MaybeArray<string>;
-  excludeIds?: MaybeArray<string>;
-  playerIds?: MaybeArray<string>;
-  signingFranchiseIds?: MaybeArray<string>;
-  currentFranchiseIds?: MaybeArray<string>;
-  seasonIds?: MaybeArray<string>;
-  activeOnly?: boolean;
-  activeOn?: Date;
-  includeExpiryStatuses?: MaybeArray<ContractStatus>;
-  excludeExpiryStatuses?: MaybeArray<ContractStatus>;
-  includeSigningStatuses?: MaybeArray<ContractStatus>;
-  excludeSigningStatuses?: MaybeArray<ContractStatus>;
-  predicate?: (contract: Contract) => boolean;
-}
-
-type ContractSortKey =
-  | "capHit"
-  | "contractSalary"
-  | "signingDate"
-  | "startDate"
-  | "capHitEndDate"
-  | "createdAt"
-  | "updatedAt";
-
-export interface ContractSortOption {
-  by?: ContractSortKey;
-  direction?: "asc" | "desc";
-  comparator?: (a: Contract, b: Contract) => number;
-}
-
-export interface ContractSummary {
-  count: number;
-  totalCapHit: number;
-  totalSalary: number;
-  averageCapHit: number;
-}
 
 type ScopedOptions<U> = {
   filters?: ContractFilters;
@@ -82,144 +52,6 @@ export interface UseContractsOptions<T = Contract, S = undefined> {
   selectDeps?: ReadonlyArray<unknown>;
   withSummary?: boolean;
   enabled?: boolean;
-}
-
-function applyFilters(
-  contracts: Contract[],
-  filters?: ContractFilters,
-): Contract[] {
-  if (!filters) return contracts;
-
-  const ids = toSet(filters.ids);
-  const excludeIds = toSet(filters.excludeIds);
-  const playerIds = toSet(filters.playerIds);
-  const signingFranchiseIds = toSet(filters.signingFranchiseIds);
-  const currentFranchiseIds = toSet(filters.currentFranchiseIds);
-  const seasonIds = toSet(filters.seasonIds);
-  const includeExpiryStatuses = toSet(filters.includeExpiryStatuses);
-  const excludeExpiryStatuses = toSet(filters.excludeExpiryStatuses);
-  const includeSigningStatuses = toSet(filters.includeSigningStatuses);
-  const excludeSigningStatuses = toSet(filters.excludeSigningStatuses);
-  const cutoff = filters.activeOnly
-    ? (filters.activeOn ?? new Date())
-    : filters.activeOn;
-
-  return contracts.filter((contract) => {
-    if (ids?.has(contract.id) === false) return false;
-    if (excludeIds?.has(contract.id)) return false;
-    if (playerIds?.has(contract.playerId) === false) return false;
-    if (signingFranchiseIds?.has(contract.signingFranchiseId) === false)
-      return false;
-    if (currentFranchiseIds?.has(contract.currentFranchiseId) === false)
-      return false;
-    if (seasonIds?.has(contract.seasonId) === false) return false;
-
-    if (cutoff) {
-      if (!(contract.capHitEndDate instanceof Date)) return false;
-      if (contract.capHitEndDate <= cutoff) return false;
-    }
-
-    if (includeExpiryStatuses?.has(contract.expiryStatus) === false) {
-      return false;
-    }
-
-    if (excludeExpiryStatuses?.has(contract.expiryStatus)) {
-      return false;
-    }
-
-    if (includeSigningStatuses?.has(contract.signingStatus) === false) {
-      return false;
-    }
-
-    if (excludeSigningStatuses?.has(contract.signingStatus)) {
-      return false;
-    }
-
-    if (filters.predicate?.(contract) === false) return false;
-
-    return true;
-  });
-}
-
-function getComparableValue(value: unknown): number | string | undefined {
-  if (value instanceof Date) return value.getTime();
-  if (typeof value === "number" || typeof value === "string") return value;
-  return undefined;
-}
-
-function applySort(
-  contracts: Contract[],
-  sort?: ContractSortOption,
-): Contract[] {
-  if (!sort) return contracts;
-
-  if (typeof sort.comparator === "function") {
-    const copy = [...contracts];
-    copy.sort(sort.comparator);
-    return copy;
-  }
-
-  if (!sort.by) return contracts;
-
-  const direction = sort.direction === "desc" ? -1 : 1;
-  const key = sort.by;
-  const copy = [...contracts];
-
-  copy.sort((a, b) => {
-    const aVal = getComparableValue(a[key]);
-    const bVal = getComparableValue(b[key]);
-
-    if (aVal == null && bVal == null) return 0;
-    if (aVal == null) return -1 * direction;
-    if (bVal == null) return 1 * direction;
-
-    if (aVal < bVal) return -1 * direction;
-    if (aVal > bVal) return 1 * direction;
-    return 0;
-  });
-
-  return copy;
-}
-
-function mergeFilters(
-  base?: ContractFilters,
-  overrides?: ContractFilters,
-): ContractFilters | undefined {
-  if (!base) return overrides ? { ...overrides } : undefined;
-  if (!overrides) return base;
-
-  const merged: ContractFilters = { ...base, ...overrides };
-
-  if (base.predicate || overrides.predicate) {
-    merged.predicate = (contract) => {
-      const baseResult = base.predicate ? base.predicate(contract) : true;
-      const overrideResult = overrides.predicate
-        ? overrides.predicate(contract)
-        : true;
-      return baseResult && overrideResult;
-    };
-  }
-
-  return merged;
-}
-
-function computeSummary(contracts: Contract[]): ContractSummary {
-  const count = contracts.length;
-  const totalCapHit = contracts.reduce(
-    (sum, contract) => sum + (contract.capHit ?? 0),
-    0,
-  );
-  const totalSalary = contracts.reduce(
-    (sum, contract) => sum + (contract.contractSalary ?? 0),
-    0,
-  );
-
-  return {
-    count,
-    totalCapHit,
-    totalSalary,
-    averageCapHit: count > 0 ? totalCapHit / count : 0,
-  };
 }
 
 /**
@@ -302,12 +134,12 @@ export function useContracts<T = Contract, S = undefined>(
   const rawContracts = queryData ?? EMPTY_CONTRACTS;
 
   const filteredContracts = useMemo(
-    () => applyFilters(rawContracts, filters),
+    () => applyContractFilters(rawContracts, filters),
     [rawContracts, filters],
   );
 
   const sortedContracts = useMemo(
-    () => applySort(filteredContracts, sort),
+    () => sortContracts(filteredContracts, sort),
     [filteredContracts, sort],
   );
 
@@ -325,7 +157,7 @@ export function useContracts<T = Contract, S = undefined>(
 
   const summary = useMemo(() => {
     if (!withSummary) return undefined;
-    return computeSummary(limitedContracts);
+    return computeContractSummary(limitedContracts);
   }, [limitedContracts, withSummary]);
 
   const getContracts = useCallback(
@@ -335,9 +167,9 @@ export function useContracts<T = Contract, S = undefined>(
       take: scopedTake,
       map: scopedMap,
     }: ScopedOptions<U> = {}): U[] => {
-      const mergedFilters = mergeFilters(filters, scopedFilters);
-      const base = applyFilters(rawContracts, mergedFilters);
-      const ordered = applySort(base, scopedSort ?? sort);
+      const mergedFilters = mergeContractFilters(filters, scopedFilters);
+      const base = applyContractFilters(rawContracts, mergedFilters);
+      const ordered = sortContracts(base, scopedSort ?? sort);
       const sliced =
         typeof scopedTake === "number"
           ? ordered.slice(0, scopedTake)
@@ -391,4 +223,237 @@ export function useAllContracts<T = Contract, S = undefined>(
   options?: UseContractsOptions<T, S>,
 ) {
   return useContracts(options);
+}
+
+export interface UseContractDataOptions {
+  currentSeason?: Season;
+  currentTeam?: GSHLTeam;
+  ownerId?: string;
+  teams?: GSHLTeam[];
+  allTeams?: GSHLTeam[];
+  players?: Player[];
+  nhlTeams?: NHLTeam[];
+  seasons?: Season[];
+}
+
+export interface CapSpaceEntry {
+  label: string;
+  year: number;
+  remaining: number;
+}
+
+export interface ContractHistoryRowType {
+  id: string;
+  signingFranchiseId: string;
+  playerName: string;
+  season: string;
+  type: string;
+  length: number;
+  salary: number;
+  capHit: number;
+  start: string;
+  end: string;
+  signingStatus: string;
+  expiryStatus: string;
+  buyoutEnd?: string;
+}
+
+export interface UseContractDataResult {
+  table: {
+    sortedContracts: Contract[];
+    capSpaceWindow: CapSpaceEntry[];
+    ready: boolean;
+  };
+  history: {
+    rows: ContractHistoryRowType[];
+    franchiseById: Map<string, GSHLTeam>;
+    hasData: boolean;
+  };
+  teamContracts: Contract[];
+  isLoading: boolean;
+  error: Error | null;
+}
+
+export function useContractData(
+  options: UseContractDataOptions = {},
+): UseContractDataResult {
+  const {
+    currentSeason,
+    currentTeam,
+    ownerId,
+    teams,
+    allTeams,
+    players,
+    nhlTeams,
+    seasons,
+  } = options;
+
+  const { data: contracts } = useAllContracts();
+
+  const teamContracts = useMemo(() => {
+    if (!currentTeam?.franchiseId || !contracts) return [];
+    return contracts.filter(
+      (contract) =>
+        contract.currentFranchiseId === currentTeam.franchiseId &&
+        new Date(contract.capHitEndDate) > new Date(),
+    );
+  }, [currentTeam?.franchiseId, contracts]);
+
+  const sortedContracts = useMemo(() => {
+    if (!teamContracts?.length) return [];
+
+    return [...teamContracts].sort((a, b) => +b.capHit - +a.capHit);
+  }, [teamContracts]);
+
+  const capSpaceWindow = useMemo(() => {
+    const seasonStartYear = currentSeason?.name
+      ? +currentSeason.year
+      : new Date().getFullYear();
+
+    const dataset = sortedContracts.length ? sortedContracts : teamContracts;
+
+    const calcRemaining = (year: number) => {
+      const cutoffDate = new Date(
+        year,
+        CAP_SEASON_END_MONTH,
+        CAP_SEASON_END_DAY,
+      );
+      const active = dataset.filter(
+        (c) =>
+          new Date(c.capHitEndDate) >= cutoffDate &&
+          !(new Date(c.startDate) > cutoffDate),
+      );
+      const total = active.reduce((sum, c) => sum + +c.capHit, 0);
+      return CAP_CEILING - total;
+    };
+
+    return Array.from({ length: 5 }).map((_, idx) => {
+      const year = seasonStartYear + idx;
+      return {
+        label: `${year}`,
+        year,
+        remaining: calcRemaining(year),
+      };
+    });
+  }, [sortedContracts, teamContracts, currentSeason]);
+
+  const teamPool = useMemo(() => allTeams ?? teams ?? [], [allTeams, teams]);
+
+  const ownerFranchiseIds = useMemo(() => {
+    if (!ownerId) return [] as string[];
+    return teamPool
+      .filter((t) => t.ownerId === ownerId)
+      .map((t) => t.franchiseId)
+      .filter((value, index, arr) => arr.indexOf(value) === index);
+  }, [teamPool, ownerId]);
+
+  const playerById = useMemo(() => {
+    const map = new Map<string, Player>();
+    players?.forEach((player) => {
+      if (player?.id) {
+        map.set(player.id, player);
+      }
+    });
+    return map;
+  }, [players]);
+
+  const franchiseById = useMemo(() => {
+    const map = new Map<string, GSHLTeam>();
+    teamPool.forEach((team) => {
+      map.set(team.franchiseId, team);
+    });
+    return map;
+  }, [teamPool]);
+
+  const seasonById = useMemo(() => {
+    const map = new Map<string, Season>();
+    seasons?.forEach((season) => {
+      map.set(season.id, season);
+    });
+    return map;
+  }, [seasons]);
+
+  const historyRows = useMemo(() => {
+    if (!contracts || !ownerId) return [] as ContractHistoryRowType[];
+
+    const seenIds = new Set<string>();
+    const seenFallbackKeys = new Set<string>();
+
+    return (contracts ?? [])
+      .filter((contract) =>
+        ownerFranchiseIds.includes(contract.signingFranchiseId),
+      )
+      .filter((contract) => {
+        if (contract.id) {
+          if (seenIds.has(contract.id)) {
+            return false;
+          }
+          seenIds.add(contract.id);
+          return true;
+        }
+
+        const key = getContractDedupeKey(contract);
+        if (seenFallbackKeys.has(key)) {
+          return false;
+        }
+        seenFallbackKeys.add(key);
+        return true;
+      })
+      .sort((a, b) => b.signingDate.localeCompare(a.signingDate))
+      .map((contract) => {
+        const player = playerById.get(contract.playerId);
+        const season = seasonById.get(contract.seasonId);
+
+        return {
+          id: contract.id,
+          signingFranchiseId: contract.signingFranchiseId,
+          playerName: player?.fullName ?? "Unknown",
+          season: season?.name ?? String(contract.seasonId),
+          type: Array.isArray(contract.contractType)
+            ? contract.contractType.join(", ")
+            : contract.contractType
+              ? String(contract.contractType)
+              : "-",
+          length: contract.contractLength,
+          salary: contract.contractSalary,
+          capHit: contract.capHit,
+          start: formatDate(contract.startDate),
+          end: formatDate(contract.expiryDate),
+          signingStatus: contract.signingStatus,
+          expiryStatus: contract.expiryStatus,
+          buyoutEnd:
+            contract.expiryStatus === ContractStatus.BUYOUT
+              ? formatDate(contract.capHitEndDate)
+              : undefined,
+        };
+      });
+  }, [contracts, ownerId, ownerFranchiseIds, playerById, seasonById]);
+
+  const sortedHistoryRows = useMemo(
+    () => historyRows.slice().sort((a, b) => b.salary - a.salary),
+    [historyRows],
+  );
+
+  const tableReady = Boolean(
+    currentSeason &&
+      currentTeam &&
+      teamContracts &&
+      players?.length &&
+      nhlTeams?.length,
+  );
+  return {
+    table: {
+      sortedContracts,
+      capSpaceWindow,
+      ready: tableReady,
+    },
+    history: {
+      rows: sortedHistoryRows,
+      franchiseById,
+      hasData: historyRows.length > 0,
+    },
+    teamContracts,
+    isLoading: false,
+    error: null,
+  };
 }

@@ -25,8 +25,5 @@ export * from "./shared";
 // Feature utilities - Component-specific helpers
 export * from "./features";
 
-// Statistics aggregation system
-export * from "./stats";
-
 // External integrations
 export * from "./integrations";

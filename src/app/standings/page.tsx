@@ -1,9 +1,20 @@
 "use client";
-import { useStandingsNavigation } from "@gshl-cache";
-import { StandingsContainer } from "@gshl-components/league/StandingsContainer";
+import { StandingsComponent } from "@gshl-components/league";
+import { useStandingsData } from "@gshl-hooks";
 
 export default function Standings() {
-  const { selectedType } = useStandingsNavigation();
+  const { selectedSeason, groups, standingsType } = useStandingsData({});
 
-  return <StandingsContainer standingsType={selectedType ?? "overall"} />;
+  return (
+    <>
+      {groups.map((group) => (
+        <StandingsComponent
+          key={group.title}
+          group={group}
+          selectedSeason={selectedSeason ?? null}
+          standingsType={standingsType ?? "overall"}
+        />
+      ))}
+    </>
+  );
 }

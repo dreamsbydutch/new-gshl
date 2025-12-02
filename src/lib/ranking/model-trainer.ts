@@ -1,291 +1,236 @@
-/**
- * Ranking Model Trainer
- * ======================
- * Trains the ranking algorithm on historical PlayerDay data to create
- * season-specific and position-specific ranking models.
- */
-
 import { PositionGroup } from "../types/enums";
 import type {
   PlayerStatLine,
+  TeamStatLine,
   ParsedStats,
   RankingModel,
   PositionSeasonModel,
-  PositionWeights,
   TrainingConfig,
+  PositionWeights,
   StatCategory,
+  StatLine,
 } from "./types";
-import { calculateDistribution, mean, isOutlier } from "./stats-utils";
 import {
+  calculateDistribution,
+  mean,
+  isOutlier,
+  safeNumber,
+  standardDeviation,
+} from "./stats-utils";
+import {
+  ALL_STATS,
   calculatePositionWeights,
   calculateGlobalWeights,
   applyPositionAdjustments,
 } from "./weight-calculator";
+import { buildModelKey, classifyStatLine } from "./classification";
 
-/**
- * Default training configuration
- */
 const DEFAULT_CONFIG: TrainingConfig = {
-  minSampleSize: 50, // Minimum games per position per season
-  outlierThreshold: 4, // Z-score threshold for outlier removal
-  smoothingFactor: 0.3, // For cross-season normalization
-  useAdaptiveWeights: false, // Set true if outcome data available
+  minSampleSize: 50,
+  outlierThreshold: 4,
+  smoothingFactor: 0.3,
+  useAdaptiveWeights: false,
 };
 
-/**
- * Parse string stat values to numbers
- */
-export function parseStats(statLine: PlayerStatLine): ParsedStats {
-  const parseFloat = (val: string): number => {
-    const parsed = Number.parseFloat(val);
-    return isNaN(parsed) ? 0 : parsed;
+type ClassifiedGroup = {
+  stats: ParsedStats[];
+  meta: NonNullable<ReturnType<typeof classifyStatLine>>;
+};
+
+function extractStats(line: StatLine): ParsedStats {
+  const stats: ParsedStats = {
+    G: safeNumber(line.G),
+    A: safeNumber(line.A),
+    P: safeNumber(line.P),
+    PM: safeNumber(line.PM),
+    PPP: safeNumber(line.PPP),
+    SOG: safeNumber(line.SOG),
+    HIT: safeNumber(line.HIT),
+    BLK: safeNumber(line.BLK),
+    W: safeNumber(line.W),
+    GA: safeNumber(line.GA),
+    GAA: safeNumber(line.GAA),
+    SA: safeNumber(line.SA),
+    SV: safeNumber(line.SV),
+    SVP: safeNumber(line.SVP),
+    SO: safeNumber(line.SO),
+    TOI: safeNumber(line.TOI),
   };
 
-  return {
-    G: parseFloat(statLine.G),
-    A: parseFloat(statLine.A),
-    P: parseFloat(statLine.P),
-    PM: parseFloat(statLine.PM ?? "0"), // Plus/Minus (seasons 1-6 only)
-    PPP: parseFloat(statLine.PPP),
-    SOG: parseFloat(statLine.SOG),
-    HIT: parseFloat(statLine.HIT),
-    BLK: parseFloat(statLine.BLK),
-    W: parseFloat(statLine.W),
-    GAA: parseFloat(statLine.GAA),
-    SVP: parseFloat(statLine.SVP),
-  };
+  // Derived fallbacks to keep historical data compatible
+  if (!stats.P && (stats.G || stats.A)) {
+    stats.P = stats.G + stats.A;
+  }
+
+  return stats;
 }
 
-/**
- * Calculate composite score for a stat line using weights
- */
 function calculateCompositeScore(
   stats: ParsedStats,
   weights: PositionWeights,
   posGroup: PositionGroup,
 ): number {
-  let score = 0;
-
-  // For goalies, invert GAA (lower is better)
-  const gaaValue = posGroup === PositionGroup.G ? -stats.GAA : 0;
-
-  score += stats.G * weights.G;
-  score += stats.A * weights.A;
-  score += stats.P * weights.P;
-  score += stats.PM * weights.PM; // Plus/Minus (seasons 1-6)
-  score += stats.PPP * weights.PPP;
-  score += stats.SOG * weights.SOG;
-  score += stats.HIT * weights.HIT;
-  score += stats.BLK * weights.BLK;
-  score += stats.W * weights.W;
-  score += gaaValue * weights.GAA;
-  score += stats.SVP * weights.SVP;
-
-  return score;
-}
-
-/**
- * Train a model for a specific position and season
- */
-function trainPositionSeasonModel(
-  statLines: PlayerStatLine[],
-  seasonId: string,
-  posGroup: PositionGroup,
-  config: TrainingConfig,
-): PositionSeasonModel | null {
-  // Filter to this position group
-  const positionStats = statLines.filter((s) => s.posGroup === posGroup);
-
-  if (positionStats.length < config.minSampleSize) {
-    console.warn(
-      `Insufficient data for ${posGroup} in ${seasonId}: ${positionStats.length} samples (min: ${config.minSampleSize})`,
-    );
-    return null;
+  let total = 0;
+  for (const stat of ALL_STATS) {
+    const weight = weights[stat] ?? 0;
+    if (!weight) continue;
+    const value = stats[stat] ?? 0;
+    const signedValue = stat === "GA" || stat === "GAA" ? -value : value;
+    total += signedValue * weight;
   }
 
-  // Parse all stat lines
-  const parsed = positionStats.map(parseStats);
+  // Goalies benefit from workload; ensure TOI contributes positively
+  if (posGroup === PositionGroup.G && weights.TOI) {
+    total += (stats.TOI ?? 0) * weights.TOI;
+  }
 
-  // Calculate weights for this position
-  let weights = calculatePositionWeights(parsed, posGroup);
-  weights = applyPositionAdjustments(weights, posGroup);
+  return total;
+}
 
-  // Calculate distributions for each stat category
-  const stats: StatCategory[] = [
-    "G",
-    "A",
-    "P",
-    "PM", // Plus/Minus (seasons 1-6)
-    "PPP",
-    "SOG",
-    "HIT",
-    "BLK",
-    "W",
-    "GAA",
-    "SVP",
-  ];
-
-  type SeasonDistribution = {
-    mean: number;
-    stdDev: number;
-    min: number;
-    max: number;
-    percentiles: {
-      p10: number;
-      p25: number;
-      p50: number;
-      p75: number;
-      p90: number;
-      p95: number;
-      p99: number;
-    };
-  };
-
-  const distributions: Record<StatCategory, SeasonDistribution> = {} as Record<
+function buildDistributions(
+  samples: ParsedStats[],
+  relevantStats: StatCategory[],
+): Record<StatCategory, ReturnType<typeof calculateDistribution>> {
+  const distributions: Record<
     StatCategory,
-    SeasonDistribution
-  >;
+    ReturnType<typeof calculateDistribution>
+  > = {} as Record<StatCategory, ReturnType<typeof calculateDistribution>>;
 
-  for (const stat of stats) {
-    const values = parsed.map((p) => p[stat]);
+  for (const stat of relevantStats) {
+    const values = samples.map((sample) => sample[stat] ?? 0);
     distributions[stat] = calculateDistribution(values);
   }
 
-  // Calculate composite scores
-  const compositeScores = parsed.map((p) =>
-    calculateCompositeScore(p, weights, posGroup),
-  );
+  return distributions;
+}
 
-  // Remove outliers from composite distribution
-  const compositeMean = mean(compositeScores);
-  const compositeFiltered = compositeScores.filter(
-    (score) =>
-      !isOutlier(
-        score,
-        compositeMean,
-        Math.sqrt(
-          compositeScores.reduce(
-            (sum, s) => sum + Math.pow(s - compositeMean, 2),
-            0,
-          ) / compositeScores.length,
-        ),
-        config.outlierThreshold,
-      ),
-  );
-
-  const compositeDistribution = calculateDistribution(compositeFiltered);
-
+function summarizeSeasonRange(modelKeys: string[]): {
+  earliest: string;
+  latest: string;
+} {
+  if (!modelKeys.length) return { earliest: "", latest: "" };
+  const seasons = modelKeys
+    .map((key) => key.split(":")[1])
+    .filter(Boolean)
+    .sort((a, b) => Number(a) - Number(b));
   return {
-    seasonId,
-    posGroup,
-    sampleSize: positionStats.length,
-    weights,
-    distributions,
-    compositeDistribution,
+    earliest: seasons[0] ?? "",
+    latest: seasons[seasons.length - 1] ?? "",
   };
 }
 
-/**
- * Train the complete ranking model on all historical data
- */
+export function parseStats(
+  statLine: PlayerStatLine | TeamStatLine,
+): ParsedStats {
+  return extractStats(statLine);
+}
+
 export function trainRankingModel(
-  allStatLines: PlayerStatLine[],
+  statLines: Array<PlayerStatLine | TeamStatLine>,
   config: Partial<TrainingConfig> = {},
 ): RankingModel {
-  const finalConfig = { ...DEFAULT_CONFIG, ...config };
+  const finalConfig: TrainingConfig = { ...DEFAULT_CONFIG, ...config };
+  const groupMap = new Map<string, ClassifiedGroup>();
 
-  console.log("🎓 Training ranking model...");
-  console.log(`📊 Total stat lines: ${allStatLines.length}`);
+  for (const line of statLines) {
+    const classification = classifyStatLine(line, finalConfig.weekTypeLookup);
+    if (!classification) continue;
 
-  // Group by season
-  const seasonGroups = new Map<string, PlayerStatLine[]>();
-  for (const line of allStatLines) {
-    if (!seasonGroups.has(line.seasonId)) {
-      seasonGroups.set(line.seasonId, []);
+    const key = buildModelKey(classification);
+    if (!groupMap.has(key)) {
+      groupMap.set(key, { stats: [], meta: classification });
     }
-    seasonGroups.get(line.seasonId)!.push(line);
+    groupMap.get(key)!.stats.push(extractStats(line));
   }
 
-  console.log(`📅 Seasons found: ${seasonGroups.size}`);
-
   const models: Record<string, PositionSeasonModel> = {};
-  const globalWeightsByPosition: Record<PositionGroup, PositionWeights[]> = {
+  const weightsByPosition: Record<PositionGroup, PositionWeights[]> = {
     [PositionGroup.F]: [],
     [PositionGroup.D]: [],
     [PositionGroup.G]: [],
+    [PositionGroup.TEAM]: [],
   };
 
-  // Train models for each season and position combination
-  for (const [seasonId, seasonLines] of seasonGroups.entries()) {
-    console.log(
-      `\n📈 Training season ${seasonId} (${seasonLines.length} games)`,
+  let processedSamples = 0;
+
+  for (const [key, payload] of groupMap.entries()) {
+    const { stats, meta } = payload;
+    if (stats.length < finalConfig.minSampleSize) continue;
+
+    const weights = calculatePositionWeights(stats, meta.posGroup, {
+      scarcityWeights: finalConfig.scarcityWeights,
+      categoryImpactWeights: finalConfig.categoryImpactWeights,
+    });
+
+    const distributions = buildDistributions(stats, ALL_STATS);
+
+    const compositeScores = stats.map((sample) =>
+      calculateCompositeScore(sample, weights, meta.posGroup),
     );
 
-    for (const posGroup of [
-      PositionGroup.F,
-      PositionGroup.D,
-      PositionGroup.G,
-    ]) {
-      const model = trainPositionSeasonModel(
-        seasonLines,
-        seasonId,
-        posGroup,
-        finalConfig,
-      );
+    const compositeMean = mean(compositeScores);
+    const compositeStdDev = standardDeviation(compositeScores);
+    const filteredScores = compositeScores.filter(
+      (score) =>
+        !isOutlier(
+          score,
+          compositeMean,
+          compositeStdDev,
+          finalConfig.outlierThreshold,
+        ),
+    );
 
-      if (model) {
-        const key = `${seasonId}:${posGroup}`;
-        models[key] = model;
-        globalWeightsByPosition[posGroup].push(model.weights);
-        console.log(
-          `  ✓ ${posGroup}: ${model.sampleSize} samples, composite range [${model.compositeDistribution.min.toFixed(2)}, ${model.compositeDistribution.max.toFixed(2)}]`,
-        );
-      }
-    }
+    const compositeDistribution = calculateDistribution(
+      filteredScores.length ? filteredScores : compositeScores,
+    );
+
+    models[key] = {
+      seasonId: meta.seasonId,
+      posGroup: meta.posGroup,
+      aggregationLevel: meta.aggregationLevel,
+      seasonPhase: meta.seasonPhase,
+      entityType: meta.entityType,
+      sampleSize: stats.length,
+      weights: applyPositionAdjustments(weights, meta.posGroup),
+      distributions,
+      compositeDistribution,
+    };
+
+    weightsByPosition[meta.posGroup].push(weights);
+    processedSamples += stats.length;
   }
 
-  // Calculate global weights for each position
   const globalWeights: Record<PositionGroup, PositionWeights> = {
     [PositionGroup.F]: calculateGlobalWeights(
-      globalWeightsByPosition[PositionGroup.F],
+      weightsByPosition[PositionGroup.F],
     ),
     [PositionGroup.D]: calculateGlobalWeights(
-      globalWeightsByPosition[PositionGroup.D],
+      weightsByPosition[PositionGroup.D],
     ),
     [PositionGroup.G]: calculateGlobalWeights(
-      globalWeightsByPosition[PositionGroup.G],
+      weightsByPosition[PositionGroup.G],
+    ),
+    [PositionGroup.TEAM]: calculateGlobalWeights(
+      weightsByPosition[PositionGroup.TEAM],
     ),
   };
 
-  // Find season range
-  const seasonIds = Array.from(seasonGroups.keys()).sort();
-  const earliest = seasonIds[0] ?? "unknown";
-  const latest = seasonIds[seasonIds.length - 1] ?? "unknown";
-
-  console.log("\n✅ Training complete!");
-  console.log(`📦 Total models trained: ${Object.keys(models).length}`);
+  const seasonRange = summarizeSeasonRange(Object.keys(models));
 
   return {
-    version: "1.0.0",
+    version: "2.0.0",
     trainedAt: new Date(),
-    totalSamples: allStatLines.length,
-    seasonRange: {
-      earliest,
-      latest,
-    },
+    totalSamples: processedSamples,
+    seasonRange,
     models,
     globalWeights,
   };
 }
 
-/**
- * Save model to JSON for persistence
- */
 export function serializeModel(model: RankingModel): string {
   return JSON.stringify(
     model,
     (key, value) => {
-      // Convert dates to ISO strings
       if (value instanceof Date) {
         return value.toISOString();
       }
@@ -295,29 +240,10 @@ export function serializeModel(model: RankingModel): string {
   );
 }
 
-/**
- * Load model from JSON
- */
 export function deserializeModel(json: string): RankingModel {
-  const parsed = JSON.parse(json) as {
-    trainedAt?: string;
-    version?: string;
-    totalSamples?: number;
-    seasonRange?: { earliest: string; latest: string };
-    models?: Record<string, PositionSeasonModel>;
-    globalWeights?: Record<PositionGroup, PositionWeights>;
-  };
-
-  // Convert ISO strings back to dates
-  const trainedAt = parsed.trainedAt ? new Date(parsed.trainedAt) : new Date();
-
+  const data = JSON.parse(json) as RankingModel & { trainedAt?: string };
   return {
-    version: parsed.version ?? "1.0",
-    trainedAt,
-    totalSamples: parsed.totalSamples ?? 0,
-    seasonRange: parsed.seasonRange ?? { earliest: "", latest: "" },
-    models: parsed.models ?? {},
-    globalWeights:
-      parsed.globalWeights ?? ({} as Record<PositionGroup, PositionWeights>),
+    ...data,
+    trainedAt: data.trainedAt ? new Date(data.trainedAt) : new Date(),
   };
 }

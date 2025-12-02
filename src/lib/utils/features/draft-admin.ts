@@ -9,6 +9,7 @@
  */
 
 import type { DraftPick, GSHLTeam, Player } from "@gshl-types";
+import { RosterPosition } from "@gshl-types";
 
 /**
  * Default season ID for draft operations
@@ -139,4 +140,103 @@ export function filterFreeAgentsBySearch(
 
     return nameMatch || positionMatch || nhlTeamMatch;
   });
+}
+
+export interface LineupAssignment {
+  playerId: string;
+  lineupPos: RosterPosition;
+}
+
+const DEFAULT_LINEUP_SLOTS: Array<{
+  position: RosterPosition;
+  eligible: RosterPosition[];
+}> = [
+  { position: RosterPosition.LW, eligible: [RosterPosition.LW] },
+  { position: RosterPosition.LW, eligible: [RosterPosition.LW] },
+  { position: RosterPosition.C, eligible: [RosterPosition.C] },
+  { position: RosterPosition.C, eligible: [RosterPosition.C] },
+  { position: RosterPosition.RW, eligible: [RosterPosition.RW] },
+  { position: RosterPosition.RW, eligible: [RosterPosition.RW] },
+  { position: RosterPosition.D, eligible: [RosterPosition.D] },
+  { position: RosterPosition.D, eligible: [RosterPosition.D] },
+  { position: RosterPosition.D, eligible: [RosterPosition.D] },
+  {
+    position: RosterPosition.Util,
+    eligible: [
+      RosterPosition.LW,
+      RosterPosition.C,
+      RosterPosition.RW,
+      RosterPosition.D,
+    ],
+  },
+  { position: RosterPosition.G, eligible: [RosterPosition.G] },
+];
+
+const PROTECTED_LINEUP_POSITIONS = new Set<RosterPosition>([
+  RosterPosition.IR,
+  RosterPosition.IRplus,
+]);
+
+const getPlayerRating = (player: Player): number => player.overallRating ?? 0;
+
+const isEligibleForSlot = (
+  player: Player,
+  eligiblePositions: RosterPosition[],
+): boolean => {
+  const positions = player.nhlPos ?? [];
+  return positions.some((position) => eligiblePositions.includes(position));
+};
+
+/**
+ * Generates lineup assignments for a team by filling default lineup slots with the
+ * highest-rated eligible players and pushing the remainder to the bench.
+ */
+export function generateLineupAssignments(
+  players: Player[] | null | undefined,
+): LineupAssignment[] {
+  if (!players?.length) {
+    return [];
+  }
+
+  const assignments: LineupAssignment[] = [];
+  const usedPlayerIds = new Set<string>();
+  const sortedPlayers = [...players].sort(
+    (a, b) => getPlayerRating(b) - getPlayerRating(a),
+  );
+
+  // Preserve IR slots so they are never reassigned automatically.
+  for (const player of sortedPlayers) {
+    if (player.lineupPos && PROTECTED_LINEUP_POSITIONS.has(player.lineupPos)) {
+      assignments.push({ playerId: player.id, lineupPos: player.lineupPos });
+      usedPlayerIds.add(player.id);
+    }
+  }
+
+  for (const slot of DEFAULT_LINEUP_SLOTS) {
+    const candidate = sortedPlayers.find((player) => {
+      if (usedPlayerIds.has(player.id)) {
+        return false;
+      }
+
+      return isEligibleForSlot(player, slot.eligible);
+    });
+
+    if (!candidate) {
+      continue;
+    }
+
+    assignments.push({ playerId: candidate.id, lineupPos: slot.position });
+    usedPlayerIds.add(candidate.id);
+  }
+
+  for (const player of sortedPlayers) {
+    if (usedPlayerIds.has(player.id)) {
+      continue;
+    }
+
+    assignments.push({ playerId: player.id, lineupPos: RosterPosition.BN });
+    usedPlayerIds.add(player.id);
+  }
+
+  return assignments;
 }

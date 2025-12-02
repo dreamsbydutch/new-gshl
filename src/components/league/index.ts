@@ -5,5 +5,8 @@
  * schedules, and league-level statistics.
  */
 
-export { StandingsContainer } from "./StandingsContainer";
+export { StandingsComponent } from "./StandingsContainer";
+
 export { WeeklySchedule } from "./WeeklySchedule";
+
+export { DraftClasses } from "./DraftClasses";

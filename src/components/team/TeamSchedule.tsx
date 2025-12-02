@@ -482,15 +482,17 @@ export function TeamSchedule() {
     <div className="mx-2 mb-40 mt-4">
       <TeamScheduleHeader />
       <div>
-        {matchups.map(({ matchup, week }) => (
-          <TeamScheduleItem
-            key={`team-${matchup.id}`}
-            matchup={matchup}
-            week={week}
-            teams={teams}
-            selectedTeamId={selectedTeam.id}
-          />
-        ))}
+        {matchups
+          .sort((a, b) => (a.week?.weekNum ?? 0) - (b.week?.weekNum ?? 0))
+          .map(({ matchup, week }) => (
+            <TeamScheduleItem
+              key={`team-${matchup.id}`}
+              matchup={matchup}
+              week={week}
+              teams={teams}
+              selectedTeamId={selectedTeam.id}
+            />
+          ))}
       </div>
     </div>
   );

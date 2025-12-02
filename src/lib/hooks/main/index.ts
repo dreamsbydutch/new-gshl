@@ -16,11 +16,16 @@
 export {
   useContracts,
   useAllContracts,
+  useContractData,
   type ContractFilters,
   type ContractSortOption,
   type ContractSummary,
   type UseContractsOptions,
   type ContractSelectionContext,
+  type UseContractDataOptions,
+  type UseContractDataResult,
+  type CapSpaceEntry,
+  type ContractHistoryRowType,
 } from "./useContract";
 
 // Draft pick hooks
@@ -30,7 +35,16 @@ export { useDraftPicks, type UseDraftPicksOptions } from "./useDraftPick";
 export { useMatchups, type UseMatchupsOptions } from "./useMatchups";
 
 // Player hooks
-export { usePlayers, type UsePlayersOptions } from "./usePlayer";
+export {
+  usePlayers,
+  useActivePlayers,
+  useRankedPlayers,
+  useRosterPlayers,
+  type UsePlayersOptions,
+  type UseRankedPlayersOptions,
+  type UseRosterPlayersOptions,
+  type PlayerRankField,
+} from "./usePlayer";
 
 // Season management hooks
 export {
@@ -53,3 +67,6 @@ export {
 
 // Week and scheduling hooks
 export { useWeeks, type UseWeeksOptions, type WeekTimeMode } from "./useWeek";
+
+// Navigation selection hooks
+export { useNav } from "./useNav";

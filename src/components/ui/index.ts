@@ -71,6 +71,7 @@ export {
 } from "./toast";
 
 export { Toaster } from "./toaster";
+export { useToast, toast } from "./use-toast";
 
 // NHL Logo Component
 export { NHLLogo } from "./nhlLogo";

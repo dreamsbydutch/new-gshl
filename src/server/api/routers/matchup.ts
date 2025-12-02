@@ -76,7 +76,6 @@ export function calculateMatchupScores(
         } else if (awayValue < homeValue) {
           awayScore++;
         }
-        // Tie: no points awarded
       }
     } else {
       // For all other stats (higher is better)
@@ -85,7 +84,6 @@ export function calculateMatchupScores(
       } else if (awayValue > homeValue) {
         awayScore++;
       }
-      // Tie: no points awarded
     }
   }
 

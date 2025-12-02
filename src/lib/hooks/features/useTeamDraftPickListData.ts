@@ -123,7 +123,6 @@ export function useTeamDraftPickListData(
   const {
     teams,
     draftPicks,
-    contracts,
     players,
     seasons,
     gshlTeamId,
@@ -133,13 +132,10 @@ export function useTeamDraftPickListData(
   /** Normalize date-like fields in seasons defensively (in case they arrive as strings) */
   const normalizedSeasons = useMemo<Season[] | undefined>(() => {
     if (!seasons) return seasons;
-    const coerce = (d: Date | string | number): Date =>
-      d instanceof Date ? d : new Date(d);
     return seasons.map((s) => ({
       ...s,
-      // Cast to acceptable input types; Season may declare these as unknown/string
-      startDate: coerce(s.startDate as Date | string | number),
-      endDate: coerce(s.endDate as Date | string | number),
+      startDate: s.startDate,
+      endDate: s.endDate,
     }));
   }, [seasons]);
 
@@ -153,18 +149,16 @@ export function useTeamDraftPickListData(
     }
     const now = Date.now();
     const upcoming = normalizedSeasons
-      .filter(
-        (s) => s.startDate instanceof Date && s.startDate.getTime() >= now,
-      )
+      .filter((s) => new Date(s.startDate).getTime() >= now)
       .sort((a, b) => {
-        const aTime = a.startDate instanceof Date ? a.startDate.getTime() : 0;
-        const bTime = b.startDate instanceof Date ? b.startDate.getTime() : 0;
+        const aTime = new Date(a.startDate).getTime();
+        const bTime = new Date(b.startDate).getTime();
         return aTime - bTime;
       });
     if (upcoming.length) return upcoming[0];
     return [...normalizedSeasons].sort((a, b) => {
-      const aTime = a.startDate instanceof Date ? a.startDate.getTime() : 0;
-      const bTime = b.startDate instanceof Date ? b.startDate.getTime() : 0;
+      const aTime = new Date(a.startDate).getTime();
+      const bTime = new Date(b.startDate).getTime();
       return bTime - aTime;
     })[0];
   }, [normalizedSeasons, selectedSeasonId]);

@@ -9,10 +9,10 @@
  * Heavy lifting: lib/utils/features (filterMatchupsByWeek, sortMatchupsByRating)
  */
 import { useMemo } from "react";
-import { useNavSelections } from "./useNavSelections";
 import { useSeasonMatchupsAndTeams } from "./useSeasonMatchupsAndTeams";
+import { useNav, useTeams } from "../main";
 import { filterMatchupsByWeek, sortMatchupsByRating } from "@gshl-utils";
-import type { Matchup, GSHLTeam } from "@gshl-types";
+import type { Matchup, GSHLTeam, TeamWeekStatLine } from "@gshl-types";
 
 /**
  * Options for configuring weekly schedule data.
@@ -37,6 +37,8 @@ export interface UseWeeklyScheduleDataResult {
   selectedWeekId: string | null;
   matchups: Matchup[];
   teams: GSHLTeam[];
+  teamWeekStats: TeamWeekStatLine[];
+  teamWeekStatsByTeam: Record<string, TeamWeekStatLine>;
   allMatchups: Matchup[];
   isLoading: boolean;
   error: Error | null;
@@ -68,7 +70,7 @@ export function useWeeklyScheduleData(
   const { seasonId: optionSeasonId, weekId: optionWeekId } = options;
 
   const { selectedSeasonId: navSeasonId, selectedWeekId: navWeekId } =
-    useNavSelections();
+    useNav();
 
   // Use provided IDs or fall back to navigation context
   const selectedSeasonId = optionSeasonId ?? navSeasonId;
@@ -80,20 +82,59 @@ export function useWeeklyScheduleData(
     status,
   } = useSeasonMatchupsAndTeams(selectedSeasonId);
 
+  const teamWeekStatsQuery = useTeams({
+    seasonId: selectedSeasonId ?? null,
+    weekId: selectedWeekId ?? null,
+    statsLevel: "weekly",
+    enabled: Boolean(selectedSeasonId && selectedWeekId),
+    staleTime: 60 * 1000,
+    gcTime: 5 * 60 * 1000,
+    // Weekly stats change frequently; lean on hook defaults for caching
+  }) as {
+    data: TeamWeekStatLine[] | undefined;
+    isLoading: boolean;
+    error: Error | null;
+  };
+
+  const teamWeekStats = useMemo(
+    () => teamWeekStatsQuery.data ?? [],
+    [teamWeekStatsQuery.data],
+  );
+
+  const teamWeekStatsByTeam = useMemo(() => {
+    return teamWeekStats.reduce<Record<string, TeamWeekStatLine>>(
+      (acc, stat) => {
+        if (stat?.gshlTeamId) {
+          acc[stat.gshlTeamId] = stat;
+        }
+        return acc;
+      },
+      {},
+    );
+  }, [teamWeekStats]);
+
   const weeklyMatchups = useMemo(
     () =>
       sortMatchupsByRating(filterMatchupsByWeek(allMatchups, selectedWeekId)),
     [allMatchups, selectedWeekId],
   );
 
+  const isLoading = status.isLoading || teamWeekStatsQuery.isLoading;
+  const statusError = (status.error as Error) ?? null;
+  const combinedError = teamWeekStatsQuery.error ?? statusError;
+  const ready =
+    !status.isLoading && !status.isFetching && !teamWeekStatsQuery.isLoading;
+
   return {
     selectedSeasonId,
     selectedWeekId,
     matchups: weeklyMatchups,
     teams,
+    teamWeekStats,
+    teamWeekStatsByTeam,
     allMatchups,
-    isLoading: status.isLoading,
-    error: (status.error as Error) ?? null,
-    ready: !status.isLoading && !status.isFetching,
+    isLoading,
+    error: combinedError,
+    ready,
   };
 }

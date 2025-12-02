@@ -1,13 +1,22 @@
 // Configuration for mapping database models to Google Sheets
 import { safeParseSheetDate } from "../../utils/core/date";
 
+const NHL_TEAM_COLUMNS = [
+  "id",
+  "fullName",
+  "abbreviation",
+  "logoUrl",
+  "createdAt",
+  "updatedAt",
+] as const;
+
 // Multi-workbook configuration matching your Apps Script setup
 export const WORKBOOKS = {
   GENERAL: "1I6kmnnL6rSAWLOG12Ixr89g4W-ZQ0weGbfETKDTrvH8",
   // PlayerDay workbooks partitioned by season ranges
-  PLAYERDAYS_1_5: "18IqgstBaBIAfM08w7ddzjF2JTrAqZUjAvsbyZxgHiag",
-  PLAYERDAYS_6_10: "PLACEHOLDER_ID_SEASONS_6_10", // TODO: Replace with actual spreadsheet ID
-  PLAYERDAYS_11_15: "PLACEHOLDER_ID_SEASONS_11_15", // TODO: Replace with actual spreadsheet ID
+  PLAYERDAYS_1_5: "1ny8gEOotQCbG3uvr29JgX5iRjCS_2Pt44eF4f4l3f1g",
+  PLAYERDAYS_6_10: "14XZoxMbcmWh0-XmYOu16Ur0HNOFP9UttHbiMMut_PJ0",
+  PLAYERDAYS_11_15: "18IqgstBaBIAfM08w7ddzjF2JTrAqZUjAvsbyZxgHiag",
   // Legacy reference (points to seasons 1-5 for backward compatibility)
   PLAYERDAYS: "18IqgstBaBIAfM08w7ddzjF2JTrAqZUjAvsbyZxgHiag",
   PLAYERSTATS: "1qkyxmx8gC-xs8niDrmlB9Jv6qXhRmAWjFCq8ECEr-Cg",
@@ -78,14 +87,8 @@ export const SHEETS_CONFIG = {
 
   // Column mappings for each model (these match our database schema)
   COLUMNS: {
-    NHLTeam: [
-      "id",
-      "fullName",
-      "abbreviation",
-      "logoUrl",
-      "createdAt",
-      "updatedAt",
-    ],
+    nhlTeam: NHL_TEAM_COLUMNS,
+    NHLTeam: NHL_TEAM_COLUMNS,
     PlayerDayStatLine: [
       "id",
       "seasonId",
@@ -143,7 +146,7 @@ export const SHEETS_CONFIG = {
       "GP",
       "MG",
       "IR",
-      "IRPlus",
+      "IRplus",
       "GS",
       "G",
       "A",
@@ -182,9 +185,18 @@ export const SHEETS_CONFIG = {
       "createdAt",
       "updatedAt",
     ],
-    Team: ["id", "seasonId", "franchiseId", "confId", "createdAt", "updatedAt"],
+    Team: [
+      "id",
+      "seasonId",
+      "franchiseId",
+      "yahooId",
+      "confId",
+      "createdAt",
+      "updatedAt",
+    ],
     Player: [
       "id",
+      "yahooId",
       "firstName",
       "lastName",
       "fullName",
@@ -264,7 +276,6 @@ export const SHEETS_CONFIG = {
       "logoUrl",
       "confId",
       "isActive",
-      "yahooApiId",
       "createdAt",
       "updatedAt",
     ],
@@ -494,12 +505,10 @@ export const SHEETS_CONFIG = {
       "teamHW",
       "teamHL",
       "teamL",
-      "teamTie",
       "teamCCW",
       "teamCCHW",
       "teamCCHL",
       "teamCCL",
-      "teamCCTie",
       "overallRk",
       "conferenceRk",
       "wildcardRk",
@@ -568,95 +577,6 @@ export const SHEETS_CONFIG = {
       "createdAt",
       "updatedAt",
     ],
-    nhlTeam: [
-      "id",
-      "fullName",
-      "abbreviation",
-      "logoUrl",
-      "createdAt",
-      "updatedAt",
-    ],
-    // ArchivedSkaterDayStatLine: [  // Disabled for performance
-    //   "id",
-    //   "originalId",
-    //   "seasonId",
-    //   "gshlTeamId",
-    //   "playerId",
-    //   "weekId",
-    //   "date",
-    //   "nhlPos",
-    //   "posGroup",
-    //   "nhlTeam",
-    //   "fullPos",
-    //   "bestPos",
-    //   "dailyPos",
-    //   "opp",
-    //   "score",
-    //   "IR",
-    //   "IRplus",
-    //   "GP",
-    //   "MG",
-    //   "GS",
-    //   "G",
-    //   "A",
-    //   "P",
-    //   "PM",
-    //   "PIM",
-    //   "PPP",
-    //   "SOG",
-    //   "HIT",
-    //   "BLK",
-    //   "TOI",
-    //   "ADD",
-    //   "Rating",
-    //   "MS",
-    //   "BS",
-    //   "archivedDate",
-    //   "archiveReason",
-    //   "originalCreatedAt",
-    //   "originalUpdatedAt",
-    //   "createdAt",    //   "updatedAt",
-    // ],
-    // ArchivedGoalieDayStatLine: [  // Disabled for performance
-    //   "id",
-    //   "originalId",
-    //   "seasonId",
-    //   "gshlTeamId",
-    //   "playerId",
-    //   "weekId",
-    //   "date",
-    //   "nhlPos",
-    //   "posGroup",
-    //   "nhlTeam",
-    //   "fullPos",
-    //   "bestPos",
-    //   "dailyPos",
-    //   "opp",
-    //   "score",
-    //   "IR",
-    //   "IRplus",
-    //   "GP",
-    //   "MG",
-    //   "GS",
-    //   "W",
-    //   "GA",
-    //   "GAA",
-    //   "SV",
-    //   "SA",
-    //   "SVP",
-    //   "SO",
-    //   "TOI",
-    //   "ADD",
-    //   "Rating",
-    //   "MS",
-    //   "BS",
-    //   "archivedDate",
-    //   "archiveReason",
-    //   "originalCreatedAt",
-    //   "originalUpdatedAt",
-    //   "createdAt",
-    //   "updatedAt",
-    // ],
   } as const,
 };
 
@@ -765,7 +685,7 @@ export function convertRowToModel<T extends DatabaseRecord>(
 
     // Handle special conversions based on column name patterns
     // Keep everything as strings for consistency with Google Sheets
-    if (column.endsWith("At") || column.endsWith("Date")) {
+    if (column.endsWith("At")) {
       const stringValue = String(value).trim();
       if (
         stringValue === "" ||

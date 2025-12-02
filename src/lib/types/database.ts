@@ -18,10 +18,10 @@ export interface Season {
   name: string;
   categories: string[];
   rosterSpots: string[];
-  startDate: Date;
-  endDate: Date;
+  startDate: string;
+  endDate: string;
   isActive: boolean;
-  signingEndDate: Date;
+  signingEndDate: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -35,23 +35,14 @@ export interface Conference {
   updatedAt: Date;
 }
 
-export interface Team {
-  id: string;
-  seasonId: string;
-  franchiseId: string;
-  confId: string;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
 export interface Week {
   id: string;
   seasonId: string;
   weekNum: number;
   weekType: SeasonType;
   gameDays: number;
-  startDate: Date;
-  endDate: Date;
+  startDate: string;
+  endDate: string;
   isActive: boolean;
   isPlayoffs: boolean;
   createdAt: Date;
@@ -83,7 +74,7 @@ export interface Event {
   seasonId: string;
   name: string;
   description: string;
-  date: Date;
+  date: string;
   type: EventType;
   createdAt: Date;
   updatedAt: Date;
@@ -109,7 +100,6 @@ export interface Franchise {
   logoUrl: string;
   confId: string;
   isActive: boolean;
-  yahooApiId?: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -126,6 +116,7 @@ export interface Team {
   id: string;
   seasonId: string;
   franchiseId: string;
+  yahooId: string;
   confId: string;
   createdAt: Date;
   updatedAt: Date;
@@ -138,7 +129,8 @@ export interface GSHLTeam {
   abbr: string | null;
   logoUrl: string | null;
   isActive: boolean;
-  yahooApiId: string | null;
+  yahooId: string | null;
+  confId: string | null;
   confName: string | null;
   confAbbr: string | null;
   confLogoUrl: string | null;
@@ -153,6 +145,7 @@ export interface GSHLTeam {
 
 export interface Player {
   id: string;
+  yahooId?: string | null;
   firstName: string;
   lastName: string;
   fullName: string;
@@ -190,13 +183,13 @@ export interface Contract {
   contractType: ContractType[];
   contractLength: number;
   contractSalary: number;
-  signingDate: Date;
-  startDate: Date;
+  signingDate: string;
+  startDate: string;
   signingStatus: ContractStatus;
   expiryStatus: ContractStatus;
-  expiryDate: Date;
+  expiryDate: string;
   capHit: number;
-  capHitEndDate: Date;
+  capHitEndDate: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -231,7 +224,7 @@ export interface PlayerDayStatLine {
   gshlTeamId: string;
   playerId: string;
   weekId: string;
-  date: Date;
+  date: string;
   nhlPos: RosterPosition[];
   posGroup: PositionGroup;
   nhlTeam: string;
@@ -282,7 +275,7 @@ export interface PlayerWeekStatLine {
   GP: string;
   MG: string;
   IR: string;
-  IRPlus: string; // matches sheets config casing
+  IRplus: string; // matches sheets config casing
   GS: string;
   G: string;
   A: string;
@@ -429,7 +422,7 @@ export interface ArchivedSkaterDayStatLine {
   gshlTeamId: string;
   playerId: string;
   weekId: string;
-  date: Date;
+  date: string;
   nhlPos: RosterPosition[];
   posGroup: PositionGroup;
   nhlTeam: string;
@@ -467,7 +460,7 @@ export interface ArchivedGoalieDayStatLine {
   gshlTeamId: string;
   playerId: string;
   weekId: string;
-  date: Date;
+  date: string;
   nhlPos: RosterPosition[];
   posGroup: PositionGroup;
   nhlTeam: string;
@@ -503,7 +496,7 @@ export interface TeamDayStatLine {
   seasonId: string;
   gshlTeamId: string;
   weekId: string;
-  date: Date;
+  date: string;
   GP: number;
   MG: number;
   IR: number;
@@ -615,12 +608,10 @@ export interface TeamSeasonStatLine {
   teamHW: number;
   teamHL: number;
   teamL: number;
-  teamTie: number;
   teamCCW: number;
   teamCCHW: number;
   teamCCHL: number;
   teamCCL: number;
-  teamCCTie: number;
   overallRk: number;
   conferenceRk: number;
   wildcardRk?: number | null;

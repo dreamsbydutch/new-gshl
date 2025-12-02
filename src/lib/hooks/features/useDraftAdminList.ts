@@ -7,6 +7,7 @@ import {
   filterFreeAgentsBySearch,
   pickHasAssignedPlayer,
   resolveTeamFromPick,
+  type LineupAssignment,
 } from "@gshl-utils/features/draft-admin";
 import { getFreeAgents } from "@gshl-utils/domain/player";
 import { generateLineupAssignments } from "@gshl-utils";
@@ -129,7 +130,8 @@ export function useDraftAdminList(
           return;
         }
 
-        const assignments = generateLineupAssignments(teamPlayers);
+        const assignments: LineupAssignment[] =
+          generateLineupAssignments(teamPlayers);
         if (!assignments.length) {
           await playerQuery.invalidate();
           return;

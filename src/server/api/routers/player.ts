@@ -33,6 +33,7 @@ const playerWhereSchema = z
   .optional();
 
 const playerCreateSchema = z.object({
+  yahooId: z.string().optional(),
   firstName: z.string(),
   lastName: z.string(),
   position: z.string(),
@@ -49,6 +50,7 @@ const playerCreateSchema = z.object({
 });
 
 const playerUpdateSchema = z.object({
+  yahooId: z.string().optional(),
   firstName: z.string().optional(),
   lastName: z.string().optional(),
   position: z.string().optional(),

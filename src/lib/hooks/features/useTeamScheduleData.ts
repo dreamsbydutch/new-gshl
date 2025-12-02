@@ -1,9 +1,8 @@
 "use client";
 
 import { useMemo } from "react";
-import { useNavSelections } from "./useNavSelections";
 import { useSeasonMatchupsAndTeams } from "./useSeasonMatchupsAndTeams";
-import { useWeeks } from "../main";
+import { useNav, useWeeks } from "../main";
 import type { GSHLTeam, Matchup, Week } from "@gshl-types";
 import {
   filterTeamMatchups,
@@ -73,7 +72,7 @@ export function useTeamScheduleData(
   const { seasonId: optionSeasonId, ownerId: optionOwnerId } = options;
 
   const { selectedSeasonId: navSeasonId, selectedOwnerId: navOwnerId } =
-    useNavSelections();
+    useNav();
 
   // Use provided IDs or fall back to navigation context
   const selectedSeasonId = optionSeasonId ?? navSeasonId;

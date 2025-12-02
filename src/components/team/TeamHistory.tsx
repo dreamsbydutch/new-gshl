@@ -27,9 +27,7 @@ import {
   SEASON_SPLIT_INITIAL,
 } from "@gshl-utils";
 import { useTeamHistoryData } from "@gshl-hooks";
-
-// Import your actual LoadingSpinner component here
-declare const LoadingSpinner: React.ComponentType;
+import { LoadingSpinner } from "@gshl-components/ui";
 
 // ============================================================================
 // INTERNAL COMPONENTS
@@ -165,7 +163,7 @@ const TeamHistoryMatchupLine = ({
     <>
       <div className="px-8 text-left text-sm font-bold">{header}</div>
       <div
-        className={`mb-3 grid grid-cols-7 items-center rounded-xl px-1 py-1 shadow-md ${backgroundColor}`}
+        className={`mb-3 grid grid-cols-8 items-center rounded-xl px-1 py-1 shadow-md ${backgroundColor}`}
       >
         {/* Away Team */}
         <div className="col-span-3 flex flex-col items-center justify-center gap-2 whitespace-nowrap p-2 text-center">
@@ -207,7 +205,7 @@ const TeamHistoryMatchupLine = ({
         </div>
 
         {/* Score */}
-        <div className="xs:text-xl text-center font-oswald text-2xl">
+        <div className="xs:text-xl col-span-2 text-center font-oswald text-2xl">
           {matchup.homeScore || matchup.awayScore ? (
             <>
               <span className={getScoreColor(awayWinLoss)}>
@@ -387,7 +385,7 @@ export function TeamHistoryContainer({ teamInfo }: TeamHistoryProps) {
 
       <RecordDisplay winLossRecord={winLossRecord} />
 
-      <MatchupList schedule={schedule!} teams={teams} teamInfo={teamInfo} />
+      <MatchupList schedule={schedule} teams={teams} teamInfo={teamInfo} />
     </>
   );
 }

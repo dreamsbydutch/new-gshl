@@ -1,0 +1,35 @@
+{
+  "name": "gshl-apps-script-data-pipeline",
+  "version": "1.0.0",
+  "description": "GSHL Data Pipeline - The primary data manipulation layer. Fetches from Yahoo, calculates ratings/lineups/aggregations, writes to Google Sheets. Next.js is read-only.",
+  "private": true,
+  "scripts": {
+    "push": "clasp push",
+    "open": "clasp open",
+    "logs": "clasp logs",
+    "login": "clasp login",
+    "create": "clasp create --type standalone --title \"GSHL Cron Jobs\"",
+    "deploy": "clasp push && echo Successfully deployed to Google Apps Script!"
+  },
+  "keywords": [
+    "google-apps-script",
+    "cron",
+    "gshl",
+    "clasp"
+  ],
+  "author": "GSHL Team",
+  "license": "UNLICENSED",
+  "devDependencies": {
+    "@google/clasp": "^2.4.2",
+    "@types/google-apps-script": "^1.0.97"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dreamsbydutch/new-gshl",
+    "directory": "src/server/apps-script"
+  },
+  "readme": "README.md"
+}

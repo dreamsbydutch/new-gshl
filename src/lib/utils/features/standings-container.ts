@@ -80,11 +80,6 @@ export const LOSERS_TOURNEY_FIELDS = [
   "8thPickPer",
 ] as const;
 
-export const WILDCARD_TEAM_LIMITS = {
-  CONFERENCE_TEAMS: 3,
-  WILDCARD_START_INDEX: 6,
-} as const;
-
 /**
  * Groups teams based on standings type
  */
@@ -93,18 +88,25 @@ export const groupTeamsByStandingsType = (
   stats: TeamSeasonStatLine[],
   standingsType: string,
 ): StandingsGroup[] => {
+  console.log(teams, stats, standingsType);
   switch (standingsType) {
     case STANDINGS_TYPES.OVERALL:
       return [
         {
           title: "Overall",
-          teams: teams.map((team) => {
-            const stat = stats.find((s) => s.gshlTeamId === team.id);
-            return {
-              ...team,
-              seasonStats: stat ? { ...stat } : undefined,
-            };
-          }),
+          teams: teams
+            .map((team) => {
+              const stat = stats.find((s) => s.gshlTeamId === team.id);
+              return {
+                ...team,
+                seasonStats: stat ? { ...stat } : undefined,
+              };
+            })
+            .sort(
+              (a, b) =>
+                +(a.seasonStats?.overallRk ?? 0) -
+                +(b.seasonStats?.overallRk ?? 0),
+            ),
         },
       ];
 
@@ -116,6 +118,10 @@ export const groupTeamsByStandingsType = (
             teams,
             stats,
             CONFERENCE_ABBREVIATIONS.SUNVIEW,
+          ).sort(
+            (a, b) =>
+              +(a.seasonStats?.conferenceRk ?? 0) -
+              +(b.seasonStats?.conferenceRk ?? 0),
           ),
         },
         {
@@ -124,6 +130,10 @@ export const groupTeamsByStandingsType = (
             teams,
             stats,
             CONFERENCE_ABBREVIATIONS.HICKORY_HOTEL,
+          ).sort(
+            (a, b) =>
+              +(a.seasonStats?.conferenceRk ?? 0) -
+              +(b.seasonStats?.conferenceRk ?? 0),
           ),
         },
       ];
@@ -136,7 +146,13 @@ export const groupTeamsByStandingsType = (
             teams,
             stats,
             CONFERENCE_ABBREVIATIONS.SUNVIEW,
-          ).slice(0, WILDCARD_TEAM_LIMITS.CONFERENCE_TEAMS),
+          )
+            .sort(
+              (a, b) =>
+                +(a.seasonStats?.conferenceRk ?? 0) -
+                +(b.seasonStats?.conferenceRk ?? 0),
+            )
+            .slice(0, 3),
         },
         {
           title: CONFERENCE_TITLES.HICKORY_HOTEL,
@@ -144,19 +160,34 @@ export const groupTeamsByStandingsType = (
             teams,
             stats,
             CONFERENCE_ABBREVIATIONS.HICKORY_HOTEL,
-          ).slice(0, WILDCARD_TEAM_LIMITS.CONFERENCE_TEAMS),
+          )
+            .sort(
+              (a, b) =>
+                +(a.seasonStats?.conferenceRk ?? 0) -
+                +(b.seasonStats?.conferenceRk ?? 0),
+            )
+            .slice(0, 3),
         },
         {
           title: "Wildcard",
           teams: teams
-            .slice(WILDCARD_TEAM_LIMITS.WILDCARD_START_INDEX)
             .map((team) => {
               const stat = stats.find((s) => s.gshlTeamId === team.id);
               return {
                 ...team,
                 seasonStats: stat ? { ...stat } : undefined,
               };
-            }),
+            })
+            .filter(
+              (a) =>
+                a.seasonStats?.wildcardRk !== null &&
+                a.seasonStats?.wildcardRk !== undefined,
+            )
+            .sort(
+              (a, b) =>
+                +(a.seasonStats?.wildcardRk ?? 0) -
+                +(b.seasonStats?.wildcardRk ?? 0),
+            ),
         },
       ];
 
