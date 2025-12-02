@@ -162,34 +162,26 @@ export function useWeeks(options: UseWeeksOptions = {}) {
       if (timeMode === "current") {
         const currentWeek = weeks.find(
           (week) =>
-            week.startDate instanceof Date &&
-            week.endDate instanceof Date &&
-            week.startDate <= now &&
-            week.endDate >= now,
+            new Date(week.startDate) <= now &&
+            new Date(week.endDate) >= now,
         );
         filteredWeeks = currentWeek ? [currentWeek] : [];
       } else if (timeMode === "previous") {
         // Find most recent completed week
         const previousWeek = weeks
-          .filter((week) => week.endDate instanceof Date && week.endDate < now)
+          .filter((week) => new Date(week.endDate) < now)
           .sort((a, b) => {
-            const aEnd = a.endDate instanceof Date ? a.endDate.getTime() : 0;
-            const bEnd = b.endDate instanceof Date ? b.endDate.getTime() : 0;
-            return bEnd - aEnd;
+            return new Date(b.endDate).getTime() - new Date(a.endDate).getTime();
           })[0];
         filteredWeeks = previousWeek ? [previousWeek] : [];
       } else if (timeMode === "next") {
         // Find next upcoming week
         const nextWeek = weeks
           .filter(
-            (week) => week.startDate instanceof Date && week.startDate > now,
+            (week) => new Date(week.startDate) > now,
           )
           .sort((a, b) => {
-            const aStart =
-              a.startDate instanceof Date ? a.startDate.getTime() : 0;
-            const bStart =
-              b.startDate instanceof Date ? b.startDate.getTime() : 0;
-            return aStart - bStart;
+            return new Date(a.startDate).getTime() - new Date(b.startDate).getTime();
           })[0];
         filteredWeeks = nextWeek ? [nextWeek] : [];
       }

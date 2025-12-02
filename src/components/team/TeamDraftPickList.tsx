@@ -118,9 +118,7 @@ export function TeamDraftPickList({
     if (localSeasonId != null) return;
     if (!seasons?.length) return;
     const mostRecent = [...seasons].sort((a, b) => {
-      const aTime = a.startDate instanceof Date ? a.startDate.getTime() : 0;
-      const bTime = b.startDate instanceof Date ? b.startDate.getTime() : 0;
-      return bTime - aTime;
+      return new Date(a.startDate).getTime() - new Date(b.startDate).getTime();
     })[0];
     if (mostRecent) setLocalSeasonId(mostRecent.id);
   }, [seasons, localSeasonId]);
@@ -144,11 +142,10 @@ export function TeamDraftPickList({
           {seasons && seasons.length > 0 && localSeasonId != null && (
             <DropdownToggle
               items={[...seasons].sort((a, b) => {
-                const aTime =
-                  a.startDate instanceof Date ? a.startDate.getTime() : 0;
-                const bTime =
-                  b.startDate instanceof Date ? b.startDate.getTime() : 0;
-                return bTime - aTime;
+                return (
+                  new Date(b.startDate).getTime() -
+                  new Date(a.startDate).getTime()
+                );
               })}
               selectedItem={seasons.find((s) => s.id === localSeasonId)}
               onSelect={(s: Season) => setLocalSeasonId(s.id)}
