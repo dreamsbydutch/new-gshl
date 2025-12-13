@@ -302,7 +302,7 @@ const WeekScheduleItem = ({
           isAway={false}
         />
       </div>
-      {awayTeamStats && homeTeamStats ? (
+      {/* {awayTeamStats && homeTeamStats ? (
         <>
           <table className="my-2 w-11/12 justify-evenly text-center text-xs">
             <thead>
@@ -521,7 +521,7 @@ const WeekScheduleItem = ({
         <div className="text-xs font-semibold text-slate-500">
           Team stats unavailable
         </div>
-      )}
+      )} */}
     </div>
   );
 };
