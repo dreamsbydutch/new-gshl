@@ -16,7 +16,7 @@ import type {
   TeamInfoProps,
   TeamLogoProps,
 } from "@gshl-utils";
-import { formatOwnerName, TEAM_LOGO_SIZE } from "@gshl-utils";
+import { formatMoney, formatOwnerName, TEAM_LOGO_SIZE } from "@gshl-utils";
 
 // ============================================================================
 // INTERNAL COMPONENTS
@@ -55,7 +55,14 @@ const TeamLogo = ({ currentTeam }: TeamLogoProps) =>
 const TeamInfo = ({ currentTeam, formattedOwnerName }: TeamInfoProps) => (
   <div className="flex flex-col items-center">
     <h1 className="text-center text-3xl font-bold">{currentTeam.name}</h1>
-    <span className="text-lg font-semibold">{formattedOwnerName}</span>
+    <span className="text-center text-lg font-semibold">
+      {formattedOwnerName}
+    </span>
+    {+(currentTeam.ownerOwing ?? 0) > 0 && (
+      <span className="mt-1 text-center text-sm font-medium text-red-600">
+        {formatMoney(currentTeam.ownerOwing, true)}
+      </span>
+    )}
   </div>
 );
 

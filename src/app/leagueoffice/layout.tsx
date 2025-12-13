@@ -23,6 +23,11 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         value: "Draft Classes",
         setter: (type: string | null) => setSelectedType(type ?? ""),
       },
+      {
+        key: "rules",
+        value: "Rulebook",
+        setter: (type: string | null) => setSelectedType(type ?? ""),
+      },
     ],
   };
 

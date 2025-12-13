@@ -11,3 +11,5 @@ export { PlayoffBracket } from "./PlayoffBracket";
 export { WeeklySchedule } from "./WeeklySchedule";
 
 export { DraftClasses } from "./DraftClasses";
+
+export { default as Rulebook } from "./Rulebook";
