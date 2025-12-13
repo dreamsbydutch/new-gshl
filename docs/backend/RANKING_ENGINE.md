@@ -6,6 +6,12 @@ A sophisticated, machine-learning-inspired ranking system that scores player dai
 
 This ranking engine now analyzes every player and team stat line we track (daily, weekly, seasonal splits/totals, and NHL baselines) across hundreds of thousands of records. Each sample is classified by aggregation level, season phase (Regular Season, Playoffs, Losers), and entity type before training, producing position-specific, phase-aware models with reliable fallbacks.
 
+**Implementation split:**
+
+- `src/lib/ranking/*` – TypeScript source used by the Next.js app, data scripts, and the training/export pipeline.
+- `apps-script/features/ranking/RankingEngine.js` – Apps Script runtime that consumes the exported model blob (see `RankingConfig.js` + generated `RankingModels.js`).
+- `npm run ranking:export-to-apps-script` – Copies `ranking-model.json` into the Apps Script folder so `rankPerformance` stays consistent between environments.
+
 ## Key Features
 
 ### 🎯 Position-Specific & Scoreboard-Aware Weighting
@@ -57,7 +63,7 @@ Already included in your project's dependencies.
 If you need to script it manually:
 
 ```typescript
-import { trainRankingModel, serializeModel } from "@gshl/lib/ranking";
+import { trainRankingModel, serializeModel } from "@gshl-ranking";
 
 async function trainModel(allStatLines: Array<Record<string, unknown>>) {
   const model = trainRankingModel(allStatLines, {
@@ -77,8 +83,8 @@ async function trainModel(allStatLines: Array<Record<string, unknown>>) {
 ### 3. Rank Performances
 
 ```typescript
-import { rankPerformance, getPerformanceGrade } from "@gshl/lib/ranking";
-import type { PlayerDayStatLine } from "@gshl/lib/types";
+import { rankPerformance, getPerformanceGrade } from "@gshl-ranking";
+import type { PlayerDayStatLine } from "@gshl-types";
 
 async function scorePlayerDay(playerDay: PlayerDayStatLine) {
   const model = await loadModel();
@@ -115,7 +121,7 @@ Under the hood, each stat line is classified using fields like `date`, `weekId`,
 ### 4. Batch Ranking & Analysis
 
 ```typescript
-import { rankPerformances } from "@gshl/lib/ranking";
+import { rankPerformances } from "@gshl-ranking";
 
 async function analyzeWeek(weekId: string, seasonId: string) {
   const weekStats = await optimizedSheetsAdapter.findMany("PlayerDayStatLine", {
@@ -159,6 +165,15 @@ src/lib/ranking/
 ├── model-trainer.ts          # Model training logic
 └── ranking-engine.ts         # Performance ranking engine
 ```
+
+```
+apps-script/features/ranking/
+├── RankingConfig.js          # Minimal runtime config + helpers for Apps Script
+├── RankingEngine.js          # Google Apps Script runtime wrapper
+└── RankingModels.js          # Generated JSON blob from ranking-model.json
+```
+
+The Apps Script files are transpiled JS mirrors of the TypeScript implementation. Run `npm run ranking:export-to-apps-script` after training to refresh `RankingModels.js` so the deployed script and the Next.js app score performances with the same data.
 
 ### Data Flow
 
@@ -248,7 +263,7 @@ final_score = clip(percentile, 0, 100);
 ### Comparing Performances
 
 ```typescript
-import { comparePerformances } from "@gshl/lib/ranking";
+import { comparePerformances } from "@gshl-ranking";
 
 const result1 = rankPerformance(player1Day, model);
 const result2 = rankPerformance(player2Day, model);
@@ -262,7 +277,7 @@ console.log(`Better performance: Player ${comparison.betterPerformance}`);
 ### Custom Weight Training
 
 ```typescript
-import { calculatePositionWeights } from "@gshl/lib/ranking";
+import { calculatePositionWeights } from "@gshl-ranking";
 
 // Train custom weights for specific season
 const seasonStats = allStats.filter((s) => s.seasonId === "season_12");
@@ -297,7 +312,7 @@ console.log("Composite distribution:", s12fModel.compositeDistribution);
 
 ```typescript
 // src/server/api/routers/player-stats.ts
-import { rankPerformance } from "@gshl/lib/ranking";
+import { rankPerformance } from "@gshl-ranking";
 
 export const playerStatsRouter = createTRPCRouter({
   getRankedPlayerDay: publicProcedure
@@ -326,8 +341,8 @@ export const playerStatsRouter = createTRPCRouter({
 
 ```typescript
 // src/components/PlayerDayCard/main.tsx
-import { getPerformanceGrade } from "@gshl/lib/ranking";
-import type { RankingResult } from "@gshl/lib/ranking";
+import { getPerformanceGrade } from "@gshl-ranking";
+import type { RankingResult } from "@gshl-ranking";
 
 export function PlayerDayCard({
   statLine,

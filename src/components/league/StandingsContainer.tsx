@@ -23,7 +23,7 @@
  * ```
  */
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Image from "next/image";
 import { LoadingSpinner } from "@gshl-ui";
 import { cn } from "@gshl-utils";
@@ -41,6 +41,66 @@ import {
   calculatePercentage,
 } from "@gshl-utils";
 import type { Season } from "@gshl-types";
+import type { TeamSeasonStatLine } from "@gshl-types";
+import type { Matchup, Week } from "@gshl-types";
+import { useMatchups } from "@gshl-hooks";
+
+const formatOrdinal = (n: number) => {
+  const mod100 = n % 100;
+  if (mod100 >= 11 && mod100 <= 13) return `${n}th`;
+  switch (n % 10) {
+    case 1:
+      return `${n}st`;
+    case 2:
+      return `${n}nd`;
+    case 3:
+      return `${n}rd`;
+    default:
+      return `${n}th`;
+  }
+};
+
+const formatRank = (rank: unknown) => {
+  const num = Number(rank);
+  return Number.isFinite(num) && num > 0 ? `(${formatOrdinal(num)})` : "";
+};
+
+const compareNumeric = (
+  a: number | null | undefined,
+  b: number | null | undefined,
+) => {
+  const av = a ?? -Infinity;
+  const bv = b ?? -Infinity;
+  return bv - av;
+};
+
+const compareNumericAsc = (
+  a: number | null | undefined,
+  b: number | null | undefined,
+) => {
+  const av = a ?? Infinity;
+  const bv = b ?? Infinity;
+  return av - bv;
+};
+
+const formatStat = (value: unknown, fallback = "-") => {
+  if (value === null || value === undefined || value === "") return fallback;
+  if (typeof value === "number")
+    return Number.isFinite(value) ? value : fallback;
+  if (typeof value === "string") return value;
+  if (typeof value === "boolean") return value ? "Yes" : "No";
+  return fallback;
+};
+
+const formatGaa = (value: unknown) => {
+  const num = Number(value);
+  return Number.isFinite(num) ? num.toFixed(2) : "-";
+};
+
+const formatSvp = (value: unknown) => {
+  const num = Number(value);
+  return Number.isFinite(num) ? num.toFixed(3).toString().slice(1) : "-";
+};
 
 // ============================================================================
 // INTERNAL COMPONENTS
@@ -185,62 +245,339 @@ const TeamInfo = ({ teamProb, standingsType }: StandingsTeamInfoProps) => {
  * Expandable to show additional tiebreak points and seed probability information.
  * Click anywhere on the row to toggle expanded state.
  */
-const StandingsItem = ({ team }: StandingsItemProps) => {
+const StandingsItem = ({
+  team,
+  matchups = [],
+  weeks = [],
+}: StandingsItemProps) => {
   const [showInfo, setShowInfo] = useState(false);
+
+  const tiebreakPoints =
+    (+(team?.seasonStats?.teamW ?? 0) - +(team?.seasonStats?.teamHW ?? 0)) * 3 +
+    +(team?.seasonStats?.teamHW ?? 0) * 2 +
+    +(team?.seasonStats?.teamHL ?? 0);
+
+  const standingsContext = useMemo(() => {
+    const seasonStats = team?.seasonStats;
+    if (!team || !seasonStats) return null;
+
+    const allTeamsStats = (
+      team as unknown as { __allTeamSeasonStats?: TeamSeasonStatLine[] }
+    ).__allTeamSeasonStats;
+
+    if (!Array.isArray(allTeamsStats) || allTeamsStats.length === 0)
+      return null;
+
+    const teamSeasonStatByTeamId = new Map(
+      allTeamsStats.map((s) => [s.gshlTeamId, s]),
+    );
+
+    return {
+      seasonStats,
+      allTeamsStats,
+      teamSeasonStatByTeamId,
+    };
+  }, [team]);
+
+  const categories = useMemo(() => {
+    if (!team) return [];
+
+    const statDefs: Array<{
+      label: string;
+      value: number | null | undefined;
+      rank: number | null;
+    }> = [];
+
+    const add = (
+      label: string,
+      value: number | null | undefined,
+      rank: number | null,
+    ) => {
+      statDefs.push({ label, value, rank });
+    };
+
+    // Use computed ranks if we can derive them from all-team stats.
+    if (standingsContext) {
+      const { allTeamsStats } = standingsContext;
+
+      const rankMapDesc = (key: keyof TeamSeasonStatLine) => {
+        const sorted = [...allTeamsStats].sort((a, b) =>
+          compareNumeric(
+            a[key] as unknown as number,
+            b[key] as unknown as number,
+          ),
+        );
+        const map = new Map<string, number>();
+        sorted.forEach((s, idx) => map.set(s.gshlTeamId, idx + 1));
+        return map;
+      };
+
+      const rankMapAsc = (key: keyof TeamSeasonStatLine) => {
+        const sorted = [...allTeamsStats].sort((a, b) =>
+          compareNumericAsc(
+            a[key] as unknown as number,
+            b[key] as unknown as number,
+          ),
+        );
+        const map = new Map<string, number>();
+        sorted.forEach((s, idx) => map.set(s.gshlTeamId, idx + 1));
+        return map;
+      };
+
+      const rankG = rankMapDesc("G");
+      const rankA = rankMapDesc("A");
+      const rankP = rankMapDesc("P");
+      const rankPPP = rankMapDesc("PPP");
+      const rankSOG = rankMapDesc("SOG");
+      const rankHIT = rankMapDesc("HIT");
+      const rankBLK = rankMapDesc("BLK");
+      const rankW = rankMapDesc("W");
+      const rankGAA = rankMapAsc("GAA");
+      const rankSVP = rankMapDesc("SVP");
+
+      add("G", standingsContext.seasonStats.G, rankG.get(team.id) ?? null);
+      add("A", standingsContext.seasonStats.A, rankA.get(team.id) ?? null);
+      add("P", standingsContext.seasonStats.P, rankP.get(team.id) ?? null);
+      add(
+        "PPP",
+        standingsContext.seasonStats.PPP,
+        rankPPP.get(team.id) ?? null,
+      );
+      add(
+        "SOG",
+        standingsContext.seasonStats.SOG,
+        rankSOG.get(team.id) ?? null,
+      );
+      add(
+        "HIT",
+        standingsContext.seasonStats.HIT,
+        rankHIT.get(team.id) ?? null,
+      );
+      add(
+        "BLK",
+        standingsContext.seasonStats.BLK,
+        rankBLK.get(team.id) ?? null,
+      );
+      add("W", standingsContext.seasonStats.W, rankW.get(team.id) ?? null);
+      add(
+        "GAA",
+        standingsContext.seasonStats.GAA,
+        rankGAA.get(team.id) ?? null,
+      );
+      add(
+        "SV%",
+        standingsContext.seasonStats.SVP,
+        rankSVP.get(team.id) ?? null,
+      );
+    } else {
+      add("G", team.seasonStats?.G ?? null, null);
+      add("A", team.seasonStats?.A ?? null, null);
+      add("P", team.seasonStats?.P ?? null, null);
+      add("PPP", team.seasonStats?.PPP ?? null, null);
+      add("SOG", team.seasonStats?.SOG ?? null, null);
+      add("HIT", team.seasonStats?.HIT ?? null, null);
+      add("BLK", team.seasonStats?.BLK ?? null, null);
+      add("W", team.seasonStats?.W ?? null, null);
+      add("GAA", team.seasonStats?.GAA ?? null, null);
+      add("SV%", team.seasonStats?.SVP ?? null, null);
+    }
+
+    return statDefs;
+  }, [team, standingsContext]);
+
+  const matchupSummary = useMemo(() => {
+    if (!team) return [];
+
+    const weekNumById = new Map<string, number>();
+    weeks.forEach((w) => weekNumById.set(w.id, w.weekNum));
+
+    const teamMatchups = matchups
+      .filter((m) => m.homeTeamId === team.id || m.awayTeamId === team.id)
+      .map((m) => ({
+        matchup: m,
+        weekNum: weekNumById.get(m.weekId) ?? null,
+      }))
+      .filter((x) => x.weekNum !== null)
+      .sort((a, b) => (a.weekNum ?? 0) - (b.weekNum ?? 0));
+
+    // Use the earliest non-completed matchup from the season as the pivot.
+    const firstUpcomingIndex = teamMatchups.findIndex(
+      (x) => !x.matchup.isComplete,
+    );
+    const pivotIndex =
+      firstUpcomingIndex === -1 ? teamMatchups.length : firstUpcomingIndex;
+
+    const prev = teamMatchups.slice(Math.max(0, pivotIndex - 3), pivotIndex);
+
+    return prev;
+  }, [matchups, team, weeks]);
+
+  const opponentNameById = useMemo(() => {
+    const byId = new Map<string, string>();
+    const allTeams = (
+      team as unknown as { __allTeams?: Array<{ id: string; name: string }> }
+    ).__allTeams;
+    if (Array.isArray(allTeams)) {
+      allTeams.forEach((t) => byId.set(t.id, t.name));
+    }
+    return byId;
+  }, [team]);
 
   if (!team) return <LoadingSpinner />;
 
   return (
     <div
       key={team.id}
-      className="border-b border-dotted border-gray-400"
-      onClick={() => setShowInfo(!showInfo)}
+      className={cn(
+        "border-b border-dotted border-gray-400",
+        "transition-colors hover:bg-muted/50",
+      )}
     >
-      <div className="mx-auto flex items-center justify-between px-2 py-0.5 text-center font-varela">
-        <div className="p-1">
-          {team.logoUrl ? (
-            <Image
-              className="w-12"
-              src={team.logoUrl ?? ""}
-              alt="Team Logo"
-              width={48}
-              height={48}
-            />
-          ) : (
-            <div className="flex h-12 w-12 items-center justify-center rounded bg-gray-200">
-              <span className="text-xs text-gray-400">?</span>
-            </div>
-          )}
+      <button
+        type="button"
+        onClick={() => setShowInfo((prev) => !prev)}
+        className={cn(
+          "mx-auto flex w-full items-center justify-between gap-2 px-2 py-1 text-center font-varela",
+          "rounded-md",
+        )}
+        aria-expanded={showInfo}
+      >
+        <div className="flex items-center gap-2">
+          <div className="p-1">
+            {team.logoUrl ? (
+              <Image
+                className="w-12"
+                src={team.logoUrl ?? ""}
+                alt="Team Logo"
+                width={48}
+                height={48}
+              />
+            ) : (
+              <div className="flex h-12 w-12 items-center justify-center rounded bg-gray-200">
+                <span className="text-xs text-gray-400">?</span>
+              </div>
+            )}
+          </div>
         </div>
-        <div className="text-base font-bold">{team.name}</div>
-        <div className="text-base font-bold">
-          {team.seasonStats?.teamW} - {team.seasonStats?.teamL}
+        <div className="min-w-0 flex-1 text-left">
+          <div className="truncate text-sm font-bold">{team.name}</div>
         </div>
-      </div>
-      {showInfo ? (
-        <>
-          <div className="col-span-12 mb-0.5 flex flex-row flex-wrap justify-center">
-            <div className="pr-2 text-2xs font-bold">Tiebreak Pts:</div>
-            <div className="text-2xs">
-              {(team.seasonStats?.teamW ?? 0) * 3 +
-                (team.seasonStats?.teamHW ?? 0) * 2 +
-                (team.seasonStats?.teamHL ?? 0) * 2}{" "}
-              pts
+        <div className="flex items-center gap-3">
+          <div className="w-[65px] text-center">
+            <div className="text-sm font-bold">
+              {formatStat(team.seasonStats?.teamW, "0")} -{" "}
+              {formatStat(team.seasonStats?.teamL, "0")}
             </div>
           </div>
-          <div>{team.seasonStats?.G}</div>
-          <div>{team.seasonStats?.A}</div>
-          <div>{team.seasonStats?.P}</div>
-          <div>{team.seasonStats?.PPP}</div>
-          <div>{team.seasonStats?.SOG}</div>
-          <div>{team.seasonStats?.HIT}</div>
-          <div>{team.seasonStats?.BLK}</div>
-          <div>{team.seasonStats?.W}</div>
-          <div>{team.seasonStats?.GAA}</div>
-          <div>{team.seasonStats?.SVP}</div>
+          <div className="w-[25px] text-center">
+            <div className="text-xs font-bold">
+              {formatStat(tiebreakPoints)}
+            </div>
+          </div>
+          <div className="w-4">
+            <svg
+              className={cn(
+                "h-4 w-4 text-muted-foreground transition-transform",
+                showInfo ? "rotate-180" : "rotate-0",
+              )}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M19 9l-7 7-7-7"
+              />
+            </svg>
+          </div>
+        </div>
+      </button>
+
+      {showInfo ? (
+        <div className="px-3 pb-2">
+          <div className="overflow-x-auto rounded-lg border bg-slate-50 text-xs">
+            <table className="min-w-full border-separate border-spacing-0">
+              <thead>
+                <tr className="bg-white text-slate-600">
+                  {categories.map((cell) => (
+                    <th
+                      key={cell.label}
+                      scope="col"
+                      className="whitespace-nowrap border-b px-2 py-1 text-center text-2xs font-semibold"
+                    >
+                      {cell.label}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                <tr className="text-slate-900">
+                  {categories.map((cell) => (
+                    <td
+                      key={cell.label}
+                      className="whitespace-nowrap border-b px-2 py-1 text-center font-mono tabular-nums"
+                      title={
+                        typeof cell.rank === "number"
+                          ? formatRank(cell.rank)
+                          : undefined
+                      }
+                    >
+                      <div className="font-varela">
+                        <div>
+                          {cell.label === "GAA"
+                            ? formatGaa(cell.value)
+                            : cell.label === "SV%"
+                              ? formatSvp(cell.value)
+                              : formatStat(cell.value)}
+                        </div>
+                        <div className="text-2xs text-muted-foreground">
+                          {formatRank(cell.rank)}
+                        </div>
+                      </div>
+                    </td>
+                  ))}
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div className="mt-2 grid gap-2 text-xs">
+            <div className="rounded-lg border bg-white p-2">
+              <div className="grid gap-1">
+                {matchupSummary.length ? (
+                  matchupSummary.map(({ matchup, weekNum }) => {
+                    const isHome = matchup.homeTeamId === team.id;
+                    const opponentId = isHome
+                      ? matchup.awayTeamId
+                      : matchup.homeTeamId;
+                    const opponent =
+                      opponentNameById.get(opponentId) ?? opponentId;
+                    return (
+                      <div
+                        key={matchup.id}
+                        className="flex items-center justify-between gap-2"
+                      >
+                        <div className="text-muted-foreground">
+                          Wk {weekNum}
+                        </div>
+                        <div className="flex-1 truncate text-right">
+                          {isHome ? "vs" : "@"} {opponent}
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="text-muted-foreground">No matchups found</div>
+                )}
+              </div>
+            </div>
+          </div>
 
           {/* <TeamInfo {...{ teamProb, standingsType }} /> */}
-        </>
+        </div>
       ) : null}
     </div>
   );
@@ -257,19 +594,35 @@ export const StandingsComponent = ({
   group,
   selectedSeason,
   standingsType,
+  matchups,
+  weeks,
 }: {
   group: StandingsGroup;
   selectedSeason: Season | null;
   standingsType: string;
+  matchups: Matchup[];
+  weeks: Week[];
 }) => {
+  console.log(useMatchups().data.filter((m) => m.isComplete !== null));
   return (
     <div key={group.title}>
-      <div className="mt-8 text-center font-varela text-sm font-bold">
+      <div className="mt-8 text-center font-varela text-xl font-bold">
         {group.title}
+      </div>
+      <div className="mt-2 flex w-full px-2 text-center font-varela text-2xs text-muted-foreground">
+        <div className="flex-1 text-center">Team</div>
+        <div className="w-[85px] text-center">W/L</div>
+        <div className="w-[25px] text-center">Pts</div>
+        <div className="w-8"></div>
       </div>
       <div
         className={cn(
-          "mb-4 rounded-xl p-2 shadow-md [&>*:last-child]:border-none",
+          "rounded-xl bg-opacity-30 p-1 shadow-md [&>*:last-child]:border-none",
+          group.title === "Sunview" ? "bg-sunview-50" : "",
+          group.title === "Hickory Hotel" ? "bg-hotel-50" : "",
+          group.title === "Wildcard" || group.title === "Overall"
+            ? "bg-gray-100"
+            : "",
         )}
       >
         {selectedSeason &&
@@ -280,6 +633,8 @@ export const StandingsComponent = ({
                 team={team}
                 season={selectedSeason}
                 standingsType={standingsType}
+                matchups={matchups}
+                weeks={weeks}
               />
             );
           })}

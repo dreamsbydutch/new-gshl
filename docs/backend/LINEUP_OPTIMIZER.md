@@ -27,6 +27,8 @@ The **Lineup Optimizer** determines the best possible lineup for each team on ea
 - **BS** (Bad Starts): Count of players who started but shouldn't have
 - **ADD**: Flag indicating player was newly added to roster
 
+**Implementation**: `apps-script/features/lineup/LineupBuilder.js` loads into the Apps Script runtime (via clasp) and exposes `optimizeLineup`, `findBestLineup*`, and `getLineupStats` globally. The Yahoo scraper (`features/scrapers/YahooScraper.js`) and maintenance jobs call these helpers directly whenever PlayerDay rows are scraped, replayed, or repaired.
+
 ### Why Optimize?
 
 Fantasy hockey requires choosing which players to start each day. The optimizer:
@@ -314,34 +316,32 @@ function findBestLineupExhaustive(
 
 ### In Application Code
 
+Within Apps Script, `LineupBuilder.js` registers `optimizeLineup` on the global scope. Call it directly after assembling the roster for a given team-day:
+
+```javascript
+function demoOptimizeLineup(roster) {
+  var optimized = optimizeLineup(roster);
+
+  optimized.forEach(function (player) {
+    Logger.log(
+      player.playerId +
+        ": fullPos=" +
+        player.fullPos +
+        ", bestPos=" +
+        player.bestPos,
+    );
+  });
+
+  return optimized;
+}
+```
+
+Need to run the optimizer from a local Node script (for diagnostics or alternative tooling)? Import the Apps Script module directly:
+
 ```typescript
-import { optimizeLineup } from "@gshl-utils/domain/lineup-optimizer";
+import "../../apps-script/features/lineup/LineupBuilder.js";
 
-// Prepare player data
-const players: LineupPlayer[] = [
-  {
-    playerId: "8477934",
-    nhlPos: ["C", "LW"],
-    posGroup: "F",
-    dailyPos: "C",
-    GP: 1,
-    GS: 1,
-    IR: 0,
-    IRplus: 0,
-    Rating: 85.5,
-  },
-  // ... more players
-];
-
-// Optimize
-const result = optimizeLineup(players);
-
-// Result includes fullPos and bestPos for each player
-result.forEach((player) => {
-  console.log(
-    `${player.playerId}: fullPos=${player.fullPos}, bestPos=${player.bestPos}`,
-  );
-});
+const optimized = globalThis.optimizeLineup(players);
 ```
 
 ### Input Requirements
@@ -373,54 +373,30 @@ interface OptimizedLineupPlayer extends LineupPlayer {
 
 ## Bulk Updates
 
-### Update All Lineups Script
+### Daily Pipeline (Yahoo Scraper)
 
-**Script**: `src/scripts/update-all-lineups.ts`
-
-**Command**: `npm run lineup:update-all`
-
-Updates fullPos, bestPos, MS, BS, and ADD for **all PlayerDay records** in bulk.
-
-### Process
+`apps-script/features/scrapers/YahooScraper.js` calls `optimizeLineup` every time `updatePlayerDays` runs. The workflow:
 
 ```
-1. Fetch all PlayerDay records from 3 partitioned workbooks
-2. Group by team-date (gshlTeamId|date)
-3. For each team-day:
-   a. Filter to specific season (currently season 7)
-   b. Prepare LineupPlayer objects
-   c. Run optimizeLineup for fullPos
-   d. Run optimizeLineup for bestPos
-   e. Calculate MS and BS
-   f. Batch update Google Sheets
-4. Every 50 lineups, trigger garbage collection
-5. Report progress and statistics
+1. Read Season, Week, Franchise, and Team tables to derive the active context.
+2. Scrape Yahoo rosters for each GSHL team and normalize into PlayerDay payloads.
+3. Rank each player and team day (via RankingEngine).
+4. Call optimizeLineup once per team roster to stamp fullPos/bestPos/MS/BS/ADD.
+5. Upsert PlayerDay and TeamDay sheets through upsertSheetByKeys (with delete-on-missing per date).
 ```
 
-### Configuration
+This means fresh lineups are always calculated as part of the ingestion job—no extra scripts necessary for day-to-day operations.
 
-```typescript
-// Filter to specific season(s)
-if (seasonId !== "7") continue;
+### Historical Repairs & Backfills
 
-// Performance settings (in package.json)
-"lineup:update-all": "node --expose-gc --max-old-space-size=4096 ./node_modules/tsx/dist/cli.mjs src/scripts/update-all-lineups.ts"
-```
+When historical PlayerDay rows need to be re-optimized (model change, Sheets surgery, etc.), use the maintenance helpers:
 
-**Settings**:
+- **File**: `apps-script/maintenance/RatingRecalculator.js`
+- **Function**: `updateLineups()` (filter by `seasonId`, `date`, or `gshlTeamId` before running)
 
-- `--expose-gc`: Allows manual garbage collection
-- `--max-old-space-size=4096`: Increase heap to 4GB
+`updateLineups` fetches the relevant PlayerDay partitions, splits `nhlPos` back into arrays, groups by team-date, and re-runs `optimizeLineup` for each roster before writing `bestPos`, `fullPos`, `MS`, and `BS` via `groupAndApplyColumnUpdates`. Enable `DRY_RUN_MODE=true` in Script Properties to log intended updates without touching Sheets.
 
-### Runtime
-
-**Season 6** (~2,544 team-days): ~25 seconds (hybrid)  
-**Season 7** (~1,654 team-days): ~16 seconds (hybrid)
-
-**Average**: ~10ms per team-day lineup optimization
-
-- **Fast path (95%)**: 1-5ms
-- **Slow path (5%)**: 50-500ms
+For targeted debugging, you can also run `testLineupBuilder()` (defined in `LineupBuilder.js`) or craft a small Apps Script function that filters a single team-day, calls `optimizeLineup`, and logs the resulting assignments.
 
 ---
 
@@ -631,4 +607,4 @@ To dive deeper:
 
 ---
 
-_For questions about lineup optimization, check the source code in `src/lib/utils/domain/lineup-optimizer.ts`_
+_For questions about lineup optimization, read `apps-script/features/lineup/LineupBuilder.js`_

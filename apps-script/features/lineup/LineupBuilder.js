@@ -41,7 +41,6 @@ const RosterPosition = {
   Util: "Util",
 };
 
-
 /**
  * Standard fantasy hockey lineup structure
  */
@@ -207,14 +206,18 @@ function findBestLineupExhaustive(availablePlayers, playersMap) {
   let bestAssignments = {};
   let bestRating = -Infinity;
 
+  const sortedSlots = LINEUP_STRUCTURE.slice().sort((a, b) => {
+    return a.eligiblePositions.length - b.eligiblePositions.length;
+  });
+
   function backtrack(
     slotIndex,
     currentAssignments,
     usedPlayers,
     currentRating,
   ) {
-    // Base case: all slots filled
-    if (slotIndex >= LINEUP_STRUCTURE.length) {
+    // Base case: processed all slots (filled or skipped)
+    if (slotIndex >= sortedSlots.length) {
       if (currentRating > bestRating) {
         bestRating = currentRating;
         bestAssignments = Object.assign({}, currentAssignments);
@@ -222,47 +225,62 @@ function findBestLineupExhaustive(availablePlayers, playersMap) {
       return;
     }
 
-    const slot = LINEUP_STRUCTURE[slotIndex];
+    const slot = sortedSlots[slotIndex];
+    let foundEligible = false;
 
     // Try each available player for this slot
     for (const player of availablePlayers) {
       if (usedPlayers.has(player.playerId)) continue;
       if (!isEligibleForPosition(player, slot.eligiblePositions)) continue;
+      foundEligible = true;
 
       const playerRating = player.Rating || 0;
-
-      // Branch-and-bound: prune if we can't beat current best
-      // Find max rating among unused players
-      let maxRemainingRating = 0;
-      for (const p of availablePlayers) {
-        if (!usedPlayers.has(p.playerId)) {
-          maxRemainingRating = Math.max(maxRemainingRating, p.Rating || 0);
-        }
-      }
-      const remainingSlots = LINEUP_STRUCTURE.length - slotIndex - 1;
-      const maxPossibleRating =
-        currentRating + playerRating + remainingSlots * maxRemainingRating;
-      if (maxPossibleRating <= bestRating) continue;
 
       // Try this player
       currentAssignments[player.playerId] = slot.position;
       usedPlayers.add(player.playerId);
 
-      backtrack(
-        slotIndex + 1,
-        currentAssignments,
-        usedPlayers,
-        currentRating + playerRating,
-      );
+      const remainingSlots = sortedSlots.length - slotIndex - 1;
+      const upperBound =
+        currentRating +
+        playerRating +
+        estimateMaxRemaining(usedPlayers, remainingSlots);
+      if (upperBound > bestRating) {
+        backtrack(
+          slotIndex + 1,
+          currentAssignments,
+          usedPlayers,
+          currentRating + playerRating,
+        );
+      }
 
       // Backtrack
       delete currentAssignments[player.playerId];
       usedPlayers.delete(player.playerId);
     }
+
+    if (!foundEligible) {
+      // No player can fill this slot (e.g., missing position). Skip it.
+      backtrack(slotIndex + 1, currentAssignments, usedPlayers, currentRating);
+    }
   }
 
   backtrack(0, {}, new Set(), 0);
   return bestAssignments;
+
+  function estimateMaxRemaining(usedPlayers, remainingSlots) {
+    if (remainingSlots <= 0) return 0;
+    const remainingRatings = [];
+    for (const player of availablePlayers) {
+      if (usedPlayers.has(player.playerId)) continue;
+      remainingRatings.push(player.Rating || 0);
+    }
+    if (remainingRatings.length === 0) return 0;
+    remainingRatings.sort((a, b) => b - a);
+    return remainingRatings
+      .slice(0, remainingSlots)
+      .reduce((sum, rating) => sum + rating, 0);
+  }
 }
 
 /**
@@ -358,34 +376,37 @@ function optimizeLineup(players) {
   }
 
   // ===== STEP 1: Calculate fullPos =====
-  // fullPos = ALL players with GS=1 MUST be in the lineup (highest priority)
-  // Then fill remaining spots with players who played (GP=1), then non-players
-  // Strategy: Use tiered priority boosting with LARGE gaps to prevent tier jumping
-  //   Tier 1: GS=1 (games started) -> +1000000 (NEVER benched)
-  //   Tier 2: GP=1 (played, including from bench/IR/IR+) -> +100000
-  //   Tier 3: Active lineup players who didn't play -> +10000
-  //   Tier 4: Bench/IR players who didn't play -> no boost
+  // fullPos priority hierarchy:
+  //   1. Active lineup starters (GS=1) – absolute lock
+  //   2. Active lineup players who played (GP=1 & in lineup)
+  //   3. Active bench players who played (GP=1 but not in lineup)
+  //   4. Inactive lineup players (didn't play but were in lineup)
+  //   5. Inactive bench players (didn't play and were not in lineup)
+  // Large tier gaps ensure ordering is respected before actual Rating tiebreakers
+
+  const PRIORITY_GAP = 100000000;
 
   const playersWithFullPosPriority = players.map((p) => {
     const wasInActiveLineup = wasInDailyLineup(p);
-    const gamesStarted = p.GS === 1;
-    const played = p.GP === 1;
+    const gamesStarted = p.GS == 1;
+    const played = p.GP == 1;
 
     let priorityBoost = 0;
+    let priorityTier = 1;
 
     if (gamesStarted) {
-      // GS=1 players MUST be in lineup - highest priority
-      priorityBoost = 1000000000 + (p.Rating || 0);
-    } else if (played) {
-      // All players who played (GP=1), regardless of dailyPos
-      priorityBoost = 100000 + (p.Rating || 0);
-    } else if (wasInActiveLineup) {
-      // Active lineup players who didn't play
-      priorityBoost = 10000000 + (p.Rating || 0);
+      priorityTier = 5;
+    } else if (played && wasInActiveLineup) {
+      priorityTier = 4;
+    } else if (played && !wasInActiveLineup) {
+      priorityTier = 3;
+    } else if (!played && wasInActiveLineup) {
+      priorityTier = 2;
     } else {
-      // Bench/IR players who didn't play
-      priorityBoost = p.Rating || 0;
+      priorityTier = 1;
     }
+
+    priorityBoost = priorityTier * PRIORITY_GAP + (p.Rating || 0);
 
     // Explicitly construct new object to ensure all properties are copied
     return {
@@ -417,12 +438,12 @@ function optimizeLineup(players) {
     .sort((a, b) => (b.Rating || 0) - (a.Rating || 0));
 
   const didNotPlayBest = results
-    .filter((p) => p.GP == 0) // Use == to handle string "0" or number 0
+    .filter((p) => !(p.GP == 1))
     .sort((a, b) => (b.Rating || 0) - (a.Rating || 0));
 
   const bestPosPriority = [...playedPlayers, ...didNotPlayBest];
 
-  const bestPosAssignments = findBestLineup(bestPosPriority, false);
+  const bestPosAssignments = findBestLineup(bestPosCandidates, false);
 
   // Apply bestPos assignments
   for (const result of results) {

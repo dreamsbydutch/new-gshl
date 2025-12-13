@@ -11,6 +11,84 @@
 // @ts-nocheck
 
 // ============================================================================
+// ENVIRONMENT FLAG HELPERS
+// ============================================================================
+
+var _scriptPropertyCache = null;
+
+function getScriptPropertiesSnapshot() {
+  if (_scriptPropertyCache !== null) return _scriptPropertyCache;
+  if (typeof PropertiesService === "undefined" || !PropertiesService) {
+    _scriptPropertyCache = null;
+    return _scriptPropertyCache;
+  }
+  try {
+    _scriptPropertyCache =
+      PropertiesService.getScriptProperties().getProperties() || {};
+  } catch (err) {
+    if (typeof console !== "undefined" && console && console.log) {
+      console.log("Unable to read script properties: " + err);
+    }
+    _scriptPropertyCache = {};
+  }
+  return _scriptPropertyCache;
+}
+
+function coerceBooleanFlag(value, fallback) {
+  if (value === undefined || value === null || value === "") {
+    return !!fallback;
+  }
+  if (typeof value === "boolean") return value;
+  var normalized = String(value).trim().toLowerCase();
+  if (
+    normalized === "true" ||
+    normalized === "1" ||
+    normalized === "yes" ||
+    normalized === "on"
+  ) {
+    return true;
+  }
+  if (
+    normalized === "false" ||
+    normalized === "0" ||
+    normalized === "no" ||
+    normalized === "off"
+  ) {
+    return false;
+  }
+  return !!fallback;
+}
+
+function getEnvironmentFlag(flagName, fallback) {
+  var props = getScriptPropertiesSnapshot();
+  if (props && Object.prototype.hasOwnProperty.call(props, flagName)) {
+    return coerceBooleanFlag(props[flagName], fallback);
+  }
+  return coerceBooleanFlag(undefined, fallback);
+}
+
+function isVerboseLoggingEnabled() {
+  var fallback =
+    typeof ENABLE_VERBOSE_LOGGING === "undefined"
+      ? false
+      : !!ENABLE_VERBOSE_LOGGING;
+  return getEnvironmentFlag("VERBOSE_LOGGING", fallback);
+}
+
+function isDryRunModeEnabled() {
+  var fallback =
+    typeof ENABLE_DRY_RUN_MODE === "undefined" ? false : !!ENABLE_DRY_RUN_MODE;
+  return getEnvironmentFlag("DRY_RUN_MODE", fallback);
+}
+
+function logVerbose() {
+  if (!isVerboseLoggingEnabled()) return;
+  if (typeof console !== "undefined" && console && console.log) {
+    console.log.apply(console, arguments);
+  }
+}
+
+// ============================================================================
 // HTML PARSING UTILITIES
 // ============================================================================
 
@@ -358,45 +436,242 @@ var SHEET_NUMERIC_FIELDS = new Set([
   "weekSortOrder",
 ]);
 
-var SHEET_TYPE_OVERRIDES = {
-  Season: {
-    startDate: "date",
-    endDate: "date",
-  },
-  Week: {
-    startDate: "date",
-    endDate: "date",
-  },
-  Matchup: {
-    homeScore: "number",
-    awayScore: "number",
-    homeWin: "boolean",
-    awayWin: "boolean",
-    isComplete: "boolean",
-  },
-};
+var SHEET_SCHEMAS = typeof SHEET_SCHEMAS !== "undefined" ? SHEET_SCHEMAS : {};
 
-var STAT_SHEETS = [
-  "PlayerDayStatLine",
-  "PlayerWeekStatLine",
-  "PlayerSplitStatLine",
-  "PlayerTotalStatLine",
-  "TeamDayStatLine",
-  "TeamWeekStatLine",
-  "TeamSeasonStatLine",
-  "TeamWeekStatLineHistory",
+function createSheetSchema(config) {
+  return {
+    description: config.description || "",
+    category: config.category || "core",
+    keyColumns: (config.keyColumns || []).slice(),
+    fields: config.fields || {},
+    numericColumns: (config.numericColumns || []).slice(),
+    booleanColumns: (config.booleanColumns || []).slice(),
+    dateColumns: (config.dateColumns || []).slice(),
+    datetimeColumns: (config.datetimeColumns || []).slice(),
+    timestampColumns: (config.timestampColumns || []).slice(),
+  };
+}
+
+SHEET_SCHEMAS.Season =
+  SHEET_SCHEMAS.Season ||
+  createSheetSchema({
+    description: "Season master metadata",
+    keyColumns: ["id"],
+    dateColumns: ["startDate", "endDate"],
+    numericColumns: ["seasonNumber"],
+  });
+
+SHEET_SCHEMAS.Week =
+  SHEET_SCHEMAS.Week ||
+  createSheetSchema({
+    description: "Week definitions per season",
+    keyColumns: ["id"],
+    dateColumns: ["startDate", "endDate"],
+    numericColumns: ["weekNumber", "weekIndex", "weekSortOrder"],
+  });
+
+SHEET_SCHEMAS.Matchup =
+  SHEET_SCHEMAS.Matchup ||
+  createSheetSchema({
+    description: "Weekly team matchups",
+    keyColumns: ["id"],
+    numericColumns: ["homeScore", "awayScore"],
+    booleanColumns: ["homeWin", "awayWin", "isComplete"],
+    timestampColumns: ["updatedAt"],
+  });
+
+var PLAYER_DAY_NUMERIC_FIELDS = [
+  "GP",
+  "MG",
+  "IR",
+  "IRplus",
+  "GS",
+  "G",
+  "A",
+  "P",
+  "PM",
+  "PIM",
+  "PPP",
+  "SOG",
+  "HIT",
+  "BLK",
+  "W",
+  "GA",
+  "GAA",
+  "SV",
+  "SA",
+  "SVP",
+  "SO",
+  "TOI",
+  "Rating",
+  "ADD",
+  "MS",
+  "BS",
 ];
 
-STAT_SHEETS.forEach(function (sheetName) {
-  var schema = SHEET_TYPE_OVERRIDES[sheetName] || {};
-  SHEET_NUMERIC_FIELDS.forEach(function (field) {
-    schema[field] = schema[field] || "number";
+var PLAYER_WEEK_NUMERIC_FIELDS = PLAYER_DAY_NUMERIC_FIELDS.concat(["days"]);
+
+SHEET_SCHEMAS.PlayerDayStatLine =
+  SHEET_SCHEMAS.PlayerDayStatLine ||
+  createSheetSchema({
+    description: "Daily player stat lines",
+    category: "stat",
+    keyColumns: ["playerId", "gshlTeamId", "date"],
+    dateColumns: ["date"],
+    datetimeColumns: ["createdAt", "updatedAt"],
+    numericColumns: PLAYER_DAY_NUMERIC_FIELDS,
   });
-  schema.date = schema.date || "date";
-  schema.createdAt = schema.createdAt || "datetime";
-  schema.updatedAt = schema.updatedAt || "datetime";
-  SHEET_TYPE_OVERRIDES[sheetName] = schema;
-});
+
+SHEET_SCHEMAS.PlayerWeekStatLine =
+  SHEET_SCHEMAS.PlayerWeekStatLine ||
+  createSheetSchema({
+    description: "Weekly player aggregates",
+    category: "stat",
+    keyColumns: ["playerId", "gshlTeamId", "weekId"],
+    datetimeColumns: ["createdAt", "updatedAt"],
+    numericColumns: PLAYER_WEEK_NUMERIC_FIELDS,
+  });
+
+SHEET_SCHEMAS.PlayerSplitStatLine =
+  SHEET_SCHEMAS.PlayerSplitStatLine ||
+  createSheetSchema({
+    description: "Season splits per team",
+    category: "stat",
+    keyColumns: ["playerId", "gshlTeamId", "seasonId", "seasonType"],
+    datetimeColumns: ["createdAt", "updatedAt"],
+    numericColumns: PLAYER_WEEK_NUMERIC_FIELDS,
+  });
+
+SHEET_SCHEMAS.PlayerTotalStatLine =
+  SHEET_SCHEMAS.PlayerTotalStatLine ||
+  createSheetSchema({
+    description: "Season totals per player",
+    category: "stat",
+    keyColumns: ["playerId", "seasonId", "seasonType"],
+    datetimeColumns: ["createdAt", "updatedAt"],
+    numericColumns: PLAYER_WEEK_NUMERIC_FIELDS,
+  });
+
+var TEAM_DAY_NUMERIC_FIELDS = PLAYER_DAY_NUMERIC_FIELDS.slice();
+
+SHEET_SCHEMAS.TeamDayStatLine =
+  SHEET_SCHEMAS.TeamDayStatLine ||
+  createSheetSchema({
+    description: "Daily team aggregates",
+    category: "stat",
+    keyColumns: ["gshlTeamId", "date"],
+    dateColumns: ["date"],
+    datetimeColumns: ["createdAt", "updatedAt"],
+    numericColumns: TEAM_DAY_NUMERIC_FIELDS,
+  });
+
+var TEAM_WEEK_NUMERIC_FIELDS = TEAM_DAY_NUMERIC_FIELDS.concat([
+  "days",
+  "yearToDateRating",
+  "powerRating",
+  "powerRk",
+]);
+
+SHEET_SCHEMAS.TeamWeekStatLine =
+  SHEET_SCHEMAS.TeamWeekStatLine ||
+  createSheetSchema({
+    description: "Weekly team aggregates",
+    category: "stat",
+    keyColumns: ["gshlTeamId", "weekId"],
+    datetimeColumns: ["createdAt", "updatedAt"],
+    numericColumns: TEAM_WEEK_NUMERIC_FIELDS,
+  });
+
+var TEAM_SEASON_NUMERIC_FIELDS = TEAM_DAY_NUMERIC_FIELDS.concat([
+  "days",
+  "powerRating",
+  "powerRk",
+  "prevPowerRating",
+  "prevPowerRk",
+  "teamW",
+  "teamHW",
+  "teamHL",
+  "teamL",
+  "teamCCW",
+  "teamCCHW",
+  "teamCCHL",
+  "teamCCL",
+  "overallRk",
+  "conferenceRk",
+  "wildcardRk",
+  "playersUsed",
+]);
+
+SHEET_SCHEMAS.TeamSeasonStatLine =
+  SHEET_SCHEMAS.TeamSeasonStatLine ||
+  createSheetSchema({
+    description: "Season-level team aggregates",
+    category: "stat",
+    keyColumns: ["gshlTeamId", "seasonId", "seasonType"],
+    datetimeColumns: ["createdAt", "updatedAt"],
+    numericColumns: TEAM_SEASON_NUMERIC_FIELDS,
+  });
+
+SHEET_SCHEMAS.TeamWeekStatLineHistory =
+  SHEET_SCHEMAS.TeamWeekStatLineHistory ||
+  createSheetSchema({
+    description: "Historical weekly aggregates",
+    category: "stat",
+    keyColumns: ["gshlTeamId", "weekId"],
+    datetimeColumns: ["createdAt", "updatedAt"],
+    numericColumns: TEAM_WEEK_NUMERIC_FIELDS.concat([
+      "weekIndex",
+      "weekSortOrder",
+    ]),
+  });
+
+var SHEET_TYPE_OVERRIDES = buildSheetTypeOverrides(SHEET_SCHEMAS);
+
+function buildSheetTypeOverrides(schemaMap) {
+  var overrides = {};
+  Object.keys(schemaMap).forEach(function (sheetName) {
+    overrides[sheetName] = buildFieldTypeMap(schemaMap[sheetName]);
+  });
+  return overrides;
+}
+
+function buildFieldTypeMap(schema) {
+  var typeMap = {};
+  if (!schema) return typeMap;
+  addTypeGroup(typeMap, schema.numericColumns, "number");
+  addTypeGroup(typeMap, schema.booleanColumns, "boolean");
+  addTypeGroup(typeMap, schema.dateColumns, "date");
+  addTypeGroup(typeMap, schema.datetimeColumns, "datetime");
+  addTypeGroup(typeMap, schema.timestampColumns, "datetime");
+  if (schema.fields) {
+    Object.keys(schema.fields).forEach(function (fieldName) {
+      var def = schema.fields[fieldName];
+      if (!def || !def.type) return;
+      if (!typeMap[fieldName]) {
+        typeMap[fieldName] = def.type;
+      }
+    });
+  }
+  return typeMap;
+}
+
+function addTypeGroup(map, columns, type) {
+  if (!columns || !columns.length) return;
+  columns.forEach(function (column) {
+    if (!column || map[column]) return;
+    map[column] = type;
+  });
+}
+
+function getSheetSchema(sheetName) {
+  return SHEET_SCHEMAS[sheetName] || null;
+}
+
+function getSheetKeyColumns(sheetName) {
+  var schema = getSheetSchema(sheetName);
+  if (!schema || !schema.keyColumns) return [];
+  return schema.keyColumns.slice();
+}
 
 function resolveFieldType(sheetName, fieldName, overrideMap) {
   if (!fieldName) return "string";
@@ -834,6 +1109,8 @@ function upsertSheetByKeys(
   var fieldTypes = options.fieldTypes || options.schema || null;
   var stringifyValues =
     options.stringifyValues === undefined ? true : !!options.stringifyValues;
+  var dryRunMode =
+    typeof isDryRunModeEnabled === "function" && isDryRunModeEnabled();
 
   var sheet = getSheetByName(spreadsheetId, sheetName, true);
   var data = sheet.getDataRange().getValues();
@@ -952,16 +1229,32 @@ function upsertSheetByKeys(
 
   // Apply updates in grouped contiguous writes
   if (updates.length > 0) {
-    groupAndApplyUpdates(sheet, updates);
+    if (dryRunMode) {
+      logVerbose(
+        "[dry-run] upsertSheetByKeys(%s) would update %s row(s).",
+        sheetName,
+        updates.length,
+      );
+    } else {
+      groupAndApplyUpdates(sheet, updates);
+    }
   }
 
   // Append inserts in a single block
   if (inserts.length > 0) {
-    var lastRow = sheet.getLastRow();
-    var startRow = lastRow + 1;
-    sheet
-      .getRange(startRow, 1, inserts.length, headers.length)
-      .setValues(inserts);
+    if (dryRunMode) {
+      logVerbose(
+        "[dry-run] upsertSheetByKeys(%s) would insert %s row(s).",
+        sheetName,
+        inserts.length,
+      );
+    } else {
+      var lastRow = sheet.getLastRow();
+      var startRow = lastRow + 1;
+      sheet
+        .getRange(startRow, 1, inserts.length, headers.length)
+        .setValues(inserts);
+    }
   }
 
   // clearMissing handling
@@ -1038,7 +1331,15 @@ function upsertSheetByKeys(
     }
 
     if (clearUpdates.length > 0) {
-      groupAndApplyUpdates(sheet, clearUpdates);
+      if (dryRunMode) {
+        logVerbose(
+          "[dry-run] upsertSheetByKeys(%s) would clear %s row(s).",
+          sheetName,
+          clearUpdates.length,
+        );
+      } else {
+        groupAndApplyUpdates(sheet, clearUpdates);
+      }
     }
   }
 
@@ -1077,14 +1378,33 @@ function upsertSheetByKeys(
 
     // Delete rows in reverse order to maintain correct indices
     if (rowsToDelete.length > 0) {
-      rowsToDelete.sort(function (a, b) {
-        return b - a;
-      });
-      for (var di = 0; di < rowsToDelete.length; di++) {
-        sheet.deleteRow(rowsToDelete[di]);
-        deleted++;
+      deleted = rowsToDelete.length;
+      if (dryRunMode) {
+        logVerbose(
+          "[dry-run] upsertSheetByKeys(%s) would delete %s row(s).",
+          sheetName,
+          rowsToDelete.length,
+        );
+      } else {
+        rowsToDelete.sort(function (a, b) {
+          return b - a;
+        });
+        for (var di = 0; di < rowsToDelete.length; di++) {
+          sheet.deleteRow(rowsToDelete[di]);
+        }
       }
     }
+  }
+
+  if (dryRunMode) {
+    logVerbose(
+      "[dry-run] upsertSheetByKeys(%s) summary -> updates:%s inserts:%s cleared:%s deleted:%s",
+      sheetName,
+      updated,
+      inserted,
+      cleared,
+      deleted,
+    );
   }
 
   return {

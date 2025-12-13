@@ -33,6 +33,7 @@ export const STANDINGS_TYPES = {
   OVERALL: "overall",
   CONFERENCE: "conference",
   WILDCARD: "wildcard",
+  PLAYOFF: "playoff",
 } as const;
 
 export const OVERALL_SEED_FIELDS = [

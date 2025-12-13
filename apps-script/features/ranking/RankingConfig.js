@@ -33,6 +33,11 @@ const StatCategory = {
   W: "W", // Wins
   GAA: "GAA", // Goals Against Average (lower is better)
   SVP: "SVP", // Save Percentage
+  GA: "GA", // Goals Against (lower is better)
+  SA: "SA", // Shots Against
+  SV: "SV", // Saves
+  SO: "SO", // Shutouts
+  TOI: "TOI", // Time on Ice / Minutes played
 };
 
 // ===== SCALING PARAMETERS =====
@@ -47,7 +52,7 @@ const ScalingConfig = {
   curveStrength: {
     F: 0.5, // Forwards: Parabolic curve (sqrt)
     D: 0.5, // Defense: Parabolic curve (sqrt)
-    G: 0.95, // Goalies: Nearly linear for maximum spread
+    G: 0.825, // Goalies: Nearly linear for maximum spread
     TEAM: 0.5, // Teams: Same as players
   },
 
@@ -61,9 +66,10 @@ const ScalingConfig = {
 
   // Position multipliers: Final adjustment
   multiplier: {
-    F: 1.0, // Forwards: No adjustment
+    F: 1.05, // Forwards: No adjustment
     D: 1.0, // Defense: No adjustment
-    G: 1.25, // Goalies: Boost to reach ~100-105 for shutouts
+    G: 1.01, // Goalies: Boost to reach ~100-105 for shutouts
+    GDay: 0.9, // Goalies: Boost to reach ~100-105 for shutouts
     TEAM: 1.0, // Teams: No adjustment
   },
 
@@ -117,6 +123,16 @@ const FallbackAggregationBlendWeights = {
   },
 };
 
+// ===== CATEGORY WEIGHT MULTIPLIERS =====
+
+const CategoryAggregationWeightMultipliers = {
+  playerDay: {
+    [PositionGroup.G]: {
+      [StatCategory.W]: 0.25,
+    },
+  },
+};
+
 // ===== PERCENTILE THRESHOLDS =====
 
 /**
@@ -124,6 +140,65 @@ const FallbackAggregationBlendWeights = {
  * These define the lookup table for estimating percentiles
  */
 const PercentilePoints = [0, 10, 25, 50, 75, 90, 95, 99, 100];
+
+// ===== AGGREGATION BEHAVIOR PROFILES =====
+
+const AggregationBehaviorProfiles = {
+  default: {
+    spikeWeight: 0.1,
+    spikeCap: 10,
+    consistencyWeight: 0.12,
+    consistencyMaxPenalty: 12,
+  },
+  playerDay: {
+    spikeWeight: 0.45,
+    spikeCap: 18,
+    consistencyWeight: 0.05,
+    consistencyMaxPenalty: 6,
+  },
+  teamDay: {
+    spikeWeight: 0.35,
+    spikeCap: 15,
+    consistencyWeight: 0.08,
+    consistencyMaxPenalty: 8,
+  },
+  playerWeek: {
+    spikeWeight: 0.25,
+    spikeCap: 13,
+    consistencyWeight: 0.18,
+    consistencyMaxPenalty: 12,
+  },
+  teamWeek: {
+    spikeWeight: 0.15,
+    spikeCap: 10,
+    consistencyWeight: 0.22,
+    consistencyMaxPenalty: 14,
+  },
+  playerSplit: {
+    spikeWeight: 0.12,
+    spikeCap: 9,
+    consistencyWeight: 0.3,
+    consistencyMaxPenalty: 16,
+  },
+  playerTotal: {
+    spikeWeight: 0.1,
+    spikeCap: 8,
+    consistencyWeight: 0.32,
+    consistencyMaxPenalty: 18,
+  },
+  playerNhl: {
+    spikeWeight: 0.08,
+    spikeCap: 8,
+    consistencyWeight: 0.35,
+    consistencyMaxPenalty: 18,
+  },
+  teamSeason: {
+    spikeWeight: 0.08,
+    spikeCap: 10,
+    consistencyWeight: 0.3,
+    consistencyMaxPenalty: 18,
+  },
+};
 
 // ===== OUTLIER DETECTION =====
 
@@ -170,18 +245,63 @@ function getRelevantStats(posGroup, seasonId) {
   switch (posGroup) {
     case PositionGroup.F:
     case PositionGroup.D:
-      return usesPM
-        ? ["G", "A", "P", "PM", "PPP", "SOG", "HIT", "BLK"]
-        : ["G", "A", "P", "PPP", "SOG", "HIT", "BLK"];
+      const skaterStats = [
+        StatCategory.G,
+        StatCategory.A,
+        StatCategory.P,
+        StatCategory.PPP,
+        StatCategory.SOG,
+        StatCategory.HIT,
+        StatCategory.BLK,
+        StatCategory.TOI,
+      ];
+      if (usesPM) {
+        skaterStats.splice(3, 0, StatCategory.PM);
+      }
+      return skaterStats;
     case PositionGroup.G:
-      return ["W", "GAA", "SVP"];
+      return [
+        StatCategory.W,
+        StatCategory.GAA,
+        StatCategory.SVP,
+        StatCategory.GA,
+        StatCategory.SA,
+        StatCategory.SV,
+        StatCategory.SO,
+        StatCategory.TOI,
+      ];
     case PositionGroup.TEAM:
-      return usesPM
-        ? ["G", "A", "P", "PM", "PPP", "SOG", "HIT", "BLK", "W", "GAA", "SVP"]
-        : ["G", "A", "P", "PPP", "SOG", "HIT", "BLK", "W", "GAA", "SVP"];
+      const teamStats = [
+        StatCategory.G,
+        StatCategory.A,
+        StatCategory.P,
+        StatCategory.PPP,
+        StatCategory.SOG,
+        StatCategory.HIT,
+        StatCategory.BLK,
+        StatCategory.W,
+        StatCategory.GAA,
+        StatCategory.SVP,
+        StatCategory.GA,
+        StatCategory.SA,
+        StatCategory.SV,
+        StatCategory.SO,
+        StatCategory.TOI,
+      ];
+      if (usesPM) {
+        teamStats.splice(3, 0, StatCategory.PM);
+      }
+      return teamStats;
     default:
       return [];
   }
+}
+
+function getAggregationBehaviorProfile(aggregationLevel) {
+  return (
+    AggregationBehaviorProfiles[aggregationLevel] ||
+    AggregationBehaviorProfiles.default
+  );
 }
 
 /**
@@ -243,6 +363,25 @@ function getAggregationBlendWeights(aggregationLevel, posGroup) {
     fallbackConfig.DEFAULT ||
     FallbackAggregationBlendWeights.default.DEFAULT
   );
+}
+
+const LowerBetterStats = new Set([StatCategory.GAA, StatCategory.GA]);
+
+function isLowerBetterStat(category) {
+  return LowerBetterStats.has(category);
+}
+
+function getCategoryWeightMultiplier(aggregationLevel, posGroup, category) {
+  const aggConfig =
+    CategoryAggregationWeightMultipliers[aggregationLevel] ||
+    CategoryAggregationWeightMultipliers.default;
+  if (!aggConfig) return 1;
+
+  const posConfig = aggConfig[posGroup] || aggConfig.DEFAULT;
+  if (!posConfig) return 1;
+
+  const multiplier = posConfig[category];
+  return typeof multiplier === "number" ? multiplier : 1;
 }
 
 /**

@@ -550,7 +550,7 @@ export const SHEETS_CONFIG = {
       "homeWin",
       "awayWin",
       "tie",
-      "isCompleted",
+      "isComplete",
       "rating",
       "createdAt",
       "updatedAt",
@@ -598,13 +598,18 @@ const BOOLEAN_COLUMNS = new Set([
   "isSignable",
   "isPlayoffs",
   "ownerIsActive",
-  "isCompleted",
+  "isComplete",
   "isTraded",
   "isSigning",
 ]);
 
 const BOOLEAN_TRUE_VALUES = new Set(["true", "1", "yes", "y", "on"]);
 const BOOLEAN_FALSE_VALUES = new Set(["false", "0", "no", "n", "off"]);
+
+// Google Sheets checkbox cells can come through as literal "TRUE"/"FALSE".
+// We normalize via `.toLowerCase()`, but include these explicitly for clarity and safety.
+BOOLEAN_TRUE_VALUES.add("true");
+BOOLEAN_FALSE_VALUES.add("false");
 
 function coerceBoolean(value: unknown): boolean | null {
   if (typeof value === "boolean") {
@@ -624,6 +629,18 @@ function coerceBoolean(value: unknown): boolean | null {
     }
     if (BOOLEAN_FALSE_VALUES.has(normalized)) {
       return false;
+    }
+
+    // Some sheets emit checkbox values as "TRUE"/"FALSE" (already handled above),
+    // but occasionally come through as quoted JSON strings like "\"TRUE\"".
+    // Try a very small unquote step.
+    if (
+      (normalized.startsWith('"') && normalized.endsWith('"')) ||
+      (normalized.startsWith("'") && normalized.endsWith("'"))
+    ) {
+      const unquoted = normalized.slice(1, -1).trim();
+      if (BOOLEAN_TRUE_VALUES.has(unquoted)) return true;
+      if (BOOLEAN_FALSE_VALUES.has(unquoted)) return false;
     }
   }
 

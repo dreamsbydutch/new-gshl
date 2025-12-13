@@ -5,6 +5,7 @@ import { useSeasonNavigation, useStandingsNavigation } from "@gshl-cache";
 import { useMatchups, useTeams } from "@gshl-hooks";
 import { groupTeamsByStandingsType, type StandingsGroup } from "@gshl-utils";
 import type { GSHLTeam, TeamSeasonStatLine } from "@gshl-types";
+import { useWeeks } from "@gshl-hooks";
 
 /**
  * Options for configuring the standings data.
@@ -63,6 +64,11 @@ export function useStandingsData(options: UseStandingsDataOptions) {
     enabled: Boolean(selectedSeasonId),
   });
 
+  const { data: weeks, isLoading: weeksLoading } = useWeeks({
+    seasonId: selectedSeasonId,
+    enabled: Boolean(selectedSeasonId),
+  });
+
   const {
     data: teamsResponse,
     isLoading: baseTeamsLoading,
@@ -70,6 +76,9 @@ export function useStandingsData(options: UseStandingsDataOptions) {
   } = useTeams({
     seasonId: selectedSeasonId,
     enabled: Boolean(selectedSeasonId),
+    // Teams rarely change, but ensure persisted cache doesn't pin data forever.
+    refetchOnWindowFocus: true,
+    refetchOnMount: true,
   });
 
   const {
@@ -80,6 +89,9 @@ export function useStandingsData(options: UseStandingsDataOptions) {
     seasonId: selectedSeasonId,
     statsLevel: "season",
     enabled: Boolean(selectedSeasonId),
+    // Standings must reflect DB updates; allow focus/mount refetch while keeping hour-level staleTime.
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
   });
 
   const teams = useMemo(
@@ -92,14 +104,42 @@ export function useStandingsData(options: UseStandingsDataOptions) {
     [statsResponse],
   );
 
-  console.log(statsResponse);
+  // Intentionally no logging in production render path
+
+  const teamById = useMemo(() => {
+    return new Map(teams.map((t) => [t.id, t]));
+  }, [teams]);
 
   const groups: StandingsGroup[] = useMemo(() => {
-    return groupTeamsByStandingsType(teams, teamStats, standingsType);
-  }, [teams, teamStats, standingsType]);
+    const baseGroups = groupTeamsByStandingsType(
+      teams,
+      teamStats,
+      standingsType,
+    );
+    // Attach all-team stats to each team object so the UI can compute per-category ranks.
+    // This avoids changing shared types while keeping the standings view self-contained.
+    return baseGroups.map((group) => {
+      return {
+        ...group,
+        teams: group.teams.map((groupTeam) => {
+          const baseTeam = teamById.get(groupTeam.id) ?? groupTeam;
+          return {
+            ...baseTeam,
+            ...groupTeam,
+            __allTeamSeasonStats: teamStats,
+            __allTeams: teams,
+          } as typeof groupTeam & {
+            __allTeamSeasonStats: TeamSeasonStatLine[];
+            __allTeams: GSHLTeam[];
+          };
+        }),
+      };
+    });
+  }, [teamById, teamStats, teams, standingsType]);
 
   const isLoading =
     (matchupsLoading ?? false) ||
+    (weeksLoading ?? false) ||
     (baseTeamsLoading ?? false) ||
     (statsLoading ?? false);
   const error = matchupsError ?? baseTeamsError ?? statsError;
@@ -108,6 +148,7 @@ export function useStandingsData(options: UseStandingsDataOptions) {
     selectedSeason,
     selectedSeasonId,
     matchups: matchups ?? [],
+    weeks: weeks ?? [],
     teams,
     groups,
     stats: teamStats,

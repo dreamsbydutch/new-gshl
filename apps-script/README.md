@@ -21,12 +21,27 @@ Yahoo Fantasy → Apps Script (scrape & write) → Google Sheets → Next.js (re
 2. **Data Writing**: Writes PlayerDay records to Google Sheets
 3. **Schema Understanding**: Reads from the Google Sheets schema (Team, Season, Week, Player tables)
 
-## Files
+## File Layout
 
-- **Config.js** - Configuration (Spreadsheet ID, Yahoo League ID)
-- **YahooScraper.js** - Complete scraper with schema reading and console logging
-- **PlayerAgeUpdater.js** - Updates player ages based on birth dates
-- **PROJECT_GOALS.md** - Architecture vision and principles
+```
+apps-script/
+   config/Config.js                 # Spreadsheet + league/config constants
+   core/utils.js                    # Shared sheet/date/helpers
+   features/
+      scrapers/YahooScraper.js       # Yahoo roster ingestion + PlayerDay writes
+      lineup/LineupBuilder.js        # Hybrid optimizer powering best/full lineups
+      ranking/                       # Ranking engine + config + generated models
+         RankingConfig.js
+         RankingEngine.js
+         RankingModels.js
+      aggregation/StatsAggregator.js # Player/team/week aggregation + matchup math
+      validation/IntegrityChecks.js  # Automated integrity checks + ValidationLog writes
+   maintenance/
+      PlayerAgeUpdater.js            # Player master data refresh
+      RatingRecalculator.js          # Batch rating recompute helpers
+   PROJECT_GOALS.md                 # Architecture vision and principles
+   README.md
+```
 
 ## Google Sheets Schema
 
@@ -69,7 +84,7 @@ The scraper reads from and writes to these tables:
 
 2. This will create a `.clasp.json` file with your script ID.
 
-3. Update the `Config.ts` file with your configuration.
+3. Update the `config/Config.js` file with your configuration.
 
 4. Deploy the code (clasp automatically transpiles TypeScript to JavaScript):
 
@@ -100,10 +115,43 @@ The Apps Script editor will show the transpiled JavaScript, which is normal.
 
 ## Configuration
 
-Edit `Config.ts` to configure:
+Edit `config/Config.js` to configure:
 
 - **API_BASE_URL** - Your production API endpoint (e.g., `https://your-app.vercel.app`)
 - **CRON_AUTH_KEY** - Secret key for authenticating cron requests (set in your .env as `CRON_SECRET_KEY`)
+
+### Environment Flags
+
+You can toggle diagnostic behavior without redeploying by setting **Script Properties** inside the Apps Script editor (Project Settings → Script properties). Two flags are available:
+
+| Property          | Description                                                                        | Default |
+| ----------------- | ---------------------------------------------------------------------------------- | ------- |
+| `VERBOSE_LOGGING` | Enables verbose per-row log statements (`true` / `false`).                         | `true`  |
+| `DRY_RUN_MODE`    | Skips sheet mutations while still computing changes and logging what would happen. | `false` |
+
+If a property is unset, the default defined in `config/Config.js` (`ENABLE_VERBOSE_LOGGING`, `ENABLE_DRY_RUN_MODE`) is used.
+
+### Validation Checks
+
+Run automated integrity checks directly within Apps Script (or via clasp) to verify PlayerDay, TeamWeek, and Matchup health:
+
+```javascript
+runIntegrityChecks(); // defaults to today + active week
+runIntegrityChecks({ targetDate: "2025-11-17" });
+runIntegrityChecks({ seasonId: "12" });
+```
+
+Results are logged to the console and appended to the `ValidationLog` sheet (unless `DRY_RUN_MODE` is enabled). Each row captures the timestamp, target date, check key, outcome, and sample issues to aid debugging.
+
+### Sheet Schemas
+
+Lightweight schema metadata now lives alongside the shared utilities (`core/utils.js`). Each sheet exposes:
+
+- `description` and `category` (core vs stat tables)
+- `keyColumns` used for upserts
+- Field-type groupings (numeric/date/datetime/boolean)
+
+Use `getSheetSchema("PlayerDayStatLine")` or `getSheetKeyColumns("TeamWeekStatLine")` inside Apps Script to introspect the definitions, and the reader/serializer helpers automatically lean on these schemas when coercing sheet values.
 
 ### Initial Setup
 
@@ -119,7 +167,7 @@ Edit `Config.ts` to configure:
    clasp create --title "GSHL Yahoo Scraper" --type standalone
    ```
 
-3. Update `Config.ts` with your IDs:
+3. Update `config/Config.js` with your IDs:
 
    - `SPREADSHEET_ID` - Your Google Sheets spreadsheet ID
    - `YAHOO_LEAGUE_ID` - Your Yahoo Fantasy Hockey league ID
@@ -191,9 +239,13 @@ Or view in the Apps Script editor under **Executions**.
 - `.clasp.json` - Clasp configuration (created after `clasp create`)
 - `.claspignore` - Exclude files from deployment
 - `appsscript.json` - Apps Script manifest (runtime settings)
-- `Config.ts` - Configuration (Spreadsheet ID, League ID)
-- `CronJobs.ts` - Cron trigger function
-- `YahooScraper.ts` - Main scraper logic
+- `config/Config.js` - Configuration (Spreadsheet ID, League ID)
+- `features/scrapers/YahooScraper.js` - Main scraper logic
+- `features/lineup/LineupBuilder.js` - Lineup optimizer
+- `features/ranking/` - Ranking engine, config, and generated models
+- `features/aggregation/StatsAggregator.js` - Aggregation + matchup logic
+- `maintenance/PlayerAgeUpdater.js` - Player metadata upkeep
+- `maintenance/RatingRecalculator.js` - Rating maintenance scripts
 - `PROJECT_GOALS.md` - Architecture documentation
 - `package.json` - NPM scripts for convenience
 
@@ -210,7 +262,7 @@ Yes, clasp supports TypeScript! The `.ts` files are automatically transpiled to 
 
 **Scraper not finding data:**
 
-- Verify `SPREADSHEET_ID` in Config.ts is correct
+- Verify `SPREADSHEET_ID` in `config/Config.js` is correct
 - Check that the Team sheet has Yahoo team IDs populated
 - View execution logs with `clasp logs`
 

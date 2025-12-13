@@ -45,6 +45,11 @@ export {
   type UseRosterPlayersOptions,
   type PlayerRankField,
 } from "./usePlayer";
+export {
+  usePlayerStats,
+  type UsePlayerStatsOptions,
+  type UsePlayerStatsResult,
+} from "./usePlayerStats";
 
 // Season management hooks
 export {

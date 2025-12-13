@@ -6,6 +6,7 @@ import { Barlow_Condensed, Oswald, Varela, Yellowtail } from "next/font/google";
 import { cn } from "@gshl-utils";
 import { TRPCReactProvider } from "@gshl-trpc";
 import { Navbar } from "@gshl-nav";
+import NavDefaults from "@gshl-components/nav/NavDefaults";
 
 const varela = Varela({
   weight: ["400"],
@@ -60,6 +61,7 @@ export default function RootLayout({
         )}
       >
         <TRPCReactProvider>
+          <NavDefaults />
           <div className="mb-36">{children}</div>
           <Navbar />
         </TRPCReactProvider>

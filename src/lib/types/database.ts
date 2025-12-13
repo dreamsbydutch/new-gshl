@@ -63,7 +63,7 @@ export interface Matchup {
   homeWin?: boolean | null;
   awayWin?: boolean | null;
   tie?: boolean | null;
-  isCompleted: boolean;
+  isComplete: boolean;
   rating?: number | null;
   createdAt: Date;
   updatedAt: Date;

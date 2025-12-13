@@ -19,6 +19,7 @@ import type {
   Week,
   TeamWeekStatLine,
   Franchise,
+  PlayerWeekStatLine,
 } from "./database";
 import type { MatchupType, RosterPosition } from "./enums";
 import type { ToggleItem } from "./nav";
@@ -132,6 +133,8 @@ export interface StandingsItemProps {
   team: GSHLTeam & { franchise?: Franchise; seasonStats?: TeamSeasonStatLine };
   season: Season;
   standingsType: string;
+  matchups?: Matchup[];
+  weeks?: Week[];
 }
 
 export interface StandingsTeamInfoProps {
@@ -342,6 +345,8 @@ export interface WeekScheduleItemProps {
   matchup: Matchup;
   teams: GSHLTeam[];
   teamWeekStatsByTeam: Record<string, TeamWeekStatLine>;
+  playerWeekStatsByTeam: Record<string, (PlayerWeekStatLine & Player)[]>;
+  showPlusMinus?: boolean;
 }
 
 export interface TeamDisplayProps {

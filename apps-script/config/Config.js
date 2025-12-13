@@ -57,8 +57,10 @@ const TEAMSTATS_SPREADSHEET_ID = "1X2pvw18aYEekdNApyJMqijOZL1Bl0e3Azlkg-eb2X54";
 const YAHOO_LEAGUE_ID = "6989";
 
 /**
- * Enable/disable verbose logging
- * Set to true to see detailed logs of all scraped data
+ * Environment feature flags
+ * These default values can be overridden at runtime via Script Properties:
+ *   VERBOSE_LOGGING = true | false
+ *   DRY_RUN_MODE    = true | false
  */
 const ENABLE_VERBOSE_LOGGING = true;
-
+const ENABLE_DRY_RUN_MODE = false;

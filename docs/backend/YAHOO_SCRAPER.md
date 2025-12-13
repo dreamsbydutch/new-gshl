@@ -4,6 +4,12 @@ Utilities in this folder wrap the Yahoo Fantasy Sports v2 XML API with first-cla
 contracts. They power the league data sync scripts and are available to any server-side code via
 the `@gshl-yahoo` path alias.
 
+**Apps Script integration:** `apps-script/features/scrapers/YahooScraper.js` is the production job
+that calls Yahoo, enriches rosters, and writes PlayerDay + TeamDay rows. It leans on helpers from
+`apps-script/core/utils.js` (legacy `yahooTableScraper`) and shares the same OAuth credentials and
+schema contracts described below. Whenever you add a new endpoint helper or change the response
+shape, update both the TypeScript utilities _and_ the Apps Script scraper to keep parity.
+
 ## Prerequisites
 
 Configure Yahoo OAuth credentials in your environment so token refreshes can occur seamlessly:
@@ -29,6 +35,19 @@ async function loadLeague() {
   return payload.league; // Typed as YahooLeague
 }
 ```
+
+In Apps Script, `updatePlayerDays` coordinates the nightly roster sync:
+
+```
+1. Read Season/Week/Team metadata from Google Sheets.
+2. For each active franchise, call yahooTableScraper(targetDate, yahooTeamId, seasonId).
+3. Normalize the roster payload, merge Player sheet metadata, and compute ratings + lineups.
+4. Upsert PlayerDayStatLine / TeamDayStatLine tables via upsertSheetByKeys.
+```
+
+`yahooTableScraper` mirrors the behavior of `yahooEndpoints.teamRoster` by hitting the same Yahoo
+resources, parsing the HTML table response, and returning unified player objects the optimizer can
+consume.
 
 All endpoint helpers perform three things for you:
 

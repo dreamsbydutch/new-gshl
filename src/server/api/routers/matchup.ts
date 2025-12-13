@@ -23,7 +23,7 @@ const matchupCreateSchema = z.object({
   awayTeamId: idStringSchema,
   homeScore: z.number().optional(),
   awayScore: z.number().optional(),
-  isComplete: z.boolean().default(false),
+  isComplete: z.boolean(),
 });
 
 const matchupUpdateSchema = z.object({
@@ -33,7 +33,7 @@ const matchupUpdateSchema = z.object({
   awayTeamId: idStringSchema.optional(),
   homeScore: z.number().optional(),
   awayScore: z.number().optional(),
-  isComplete: z.boolean().optional(),
+  isComplete: z.boolean(),
 });
 
 /**

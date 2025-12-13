@@ -6,6 +6,7 @@
  */
 
 export { StandingsComponent } from "./StandingsContainer";
+export { PlayoffBracket } from "./PlayoffBracket";
 
 export { WeeklySchedule } from "./WeeklySchedule";
 

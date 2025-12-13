@@ -23,6 +23,11 @@ export interface UseSeasonMatchupsAndTeamsOptions {
    * Season ID to filter matchups and teams by
    */
   seasonId: string | null;
+
+  /**
+   * Optional week ID to scope matchups to a single week
+   */
+  weekId?: string | null;
 }
 
 /**
@@ -53,6 +58,11 @@ export interface UseSeasonMatchupsAndTeamsResult {
    * Raw teams query result
    */
   teamsQuery: ReturnType<typeof useTeams>;
+
+  /**
+   * Whether the hook is scoped to a single week
+   */
+  isWeekScoped: boolean;
 }
 
 /**
@@ -78,14 +88,23 @@ export function useSeasonMatchupsAndTeams(
     typeof options === "string" || options === null
       ? options
       : options.seasonId;
+  const weekId =
+    typeof options === "string" || options === null
+      ? null
+      : (options.weekId ?? null);
+
   const seasonKey = seasonId ?? "";
+  const weekKey = weekId ?? "";
+
   const matchupsQuery = useMatchups({
     seasonId,
-    enabled: Boolean(seasonId),
+    weekId,
+    enabled: Boolean(seasonId ?? weekId),
   });
   const teamsQuery = useTeams({
     seasonId: seasonKey,
-    enabled: Boolean(seasonKey),
+    weekId: weekKey,
+    enabled: Boolean(seasonKey ?? weekKey),
   });
 
   const status = useMemo(
@@ -99,5 +118,6 @@ export function useSeasonMatchupsAndTeams(
     status,
     matchupsQuery,
     teamsQuery,
+    isWeekScoped: Boolean(weekId),
   };
 }

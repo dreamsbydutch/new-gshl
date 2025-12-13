@@ -1,9 +1,21 @@
 "use client";
-import { StandingsComponent } from "@gshl-components/league";
+import { PlayoffBracket, StandingsComponent } from "@gshl-components/league";
 import { useStandingsData } from "@gshl-hooks";
 
 export default function Standings() {
-  const { selectedSeason, groups, standingsType } = useStandingsData({});
+  const {
+    selectedSeason,
+    groups,
+    standingsType,
+    teams,
+    stats,
+    matchups,
+    weeks,
+  } = useStandingsData({});
+
+  if ((standingsType ?? "overall") === "playoff") {
+    return <PlayoffBracket teams={teams} stats={stats} />;
+  }
 
   return (
     <>
@@ -13,6 +25,8 @@ export default function Standings() {
           group={group}
           selectedSeason={selectedSeason ?? null}
           standingsType={standingsType ?? "overall"}
+          matchups={matchups}
+          weeks={weeks}
         />
       ))}
     </>

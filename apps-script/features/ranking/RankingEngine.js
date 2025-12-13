@@ -328,6 +328,16 @@ function normalizeStats(stats) {
   return stats;
 }
 
+function computeCategoryPercentile(category, value, distribution) {
+  if (!distribution) return 0;
+  const rawPercentile = estimatePercentileFromDistribution(value, distribution);
+  const safePercentile = isNaN(rawPercentile) ? 0 : rawPercentile;
+  if (isLowerBetterStat && isLowerBetterStat(category)) {
+    return 100 - safePercentile;
+  }
+  return safePercentile;
+}
+
 /**
  * Parse stats from stat line (daily/weekly/season)
  * @param {Object} statLine - Stat line with raw stat values
@@ -369,22 +379,35 @@ function parseStats(statLine) {
   };
 }
 
-function calculateWeightedScore(stats, weights, posGroup) {
+function calculateWeightedScore(stats, weights, posGroup, aggregationLevel) {
   if (!weights) return 0;
   let score = 0;
   const gaaValue = posGroup === PositionGroup.G ? -stats.GAA : 0;
 
-  score += stats.G * (weights.G || 0);
-  score += stats.A * (weights.A || 0);
-  score += stats.P * (weights.P || 0);
-  score += stats.PM * (weights.PM || 0);
-  score += stats.PPP * (weights.PPP || 0);
-  score += stats.SOG * (weights.SOG || 0);
-  score += stats.HIT * (weights.HIT || 0);
-  score += stats.BLK * (weights.BLK || 0);
-  score += stats.W * (weights.W || 0);
-  score += gaaValue * (weights.GAA || 0);
-  score += stats.SVP * (weights.SVP || 0);
+  function adjustedWeight(category) {
+    const baseWeight = weights[category] || 0;
+    const aggregation = aggregationLevel || "playerDay";
+    return (
+      baseWeight *
+      getCategoryWeightMultiplier(
+        aggregation,
+        posGroup,
+        StatCategory[category] || category,
+      )
+    );
+  }
+
+  score += stats.G * adjustedWeight("G");
+  score += stats.A * adjustedWeight("A");
+  score += stats.P * adjustedWeight("P");
+  score += stats.PM * adjustedWeight("PM");
+  score += stats.PPP * adjustedWeight("PPP");
+  score += stats.SOG * adjustedWeight("SOG");
+  score += stats.HIT * adjustedWeight("HIT");
+  score += stats.BLK * adjustedWeight("BLK");
+  score += stats.W * adjustedWeight("W");
+  score += gaaValue * adjustedWeight("GAA");
+  score += stats.SVP * adjustedWeight("SVP");
 
   return score;
 }
@@ -486,11 +509,18 @@ function rankPerformance(statLine) {
       score: Number.NaN,
       percentile: 0,
       breakdown: statsToRank.map(function (stat) {
+        const baseWeight = seasonModel.weights[stat] || 1;
+        const weightMultiplier = getCategoryWeightMultiplier(
+          classification.aggregationLevel,
+          classification.posGroup,
+          stat,
+        );
+        const adjustedWeight = baseWeight * weightMultiplier;
         return {
           category: stat,
           value: stats[stat],
           percentile: 0,
-          weight: seasonModel.weights[stat] || 1,
+          weight: adjustedWeight,
           contribution: 0,
         };
       }),
@@ -512,24 +542,25 @@ function rankPerformance(statLine) {
   const statStrengths = [];
 
   for (const stat of statsToRank) {
-    // For GAA and GA, invert value (lower is better)
-    const value =
-      stat === "GAA" && classification.posGroup === PositionGroup.G
-        ? -stats[stat]
-        : stats[stat];
-
+    const value = stats[stat];
     const distribution = seasonModel.distributions[stat];
     if (!distribution) continue;
 
     // Get percentile rank (0-100) for this stat
-    const percentile = estimatePercentileFromDistribution(value, distribution);
+    const percentile = computeCategoryPercentile(stat, value, distribution);
 
     // Apply exponential transformation to spread out the top end
     // This creates significant separation between 95th, 99th, and 99.9th percentiles
     const transformedPercentile =
       Math.pow(percentile / 100, ScalingConfig.percentileTransform) * 100;
 
-    const weight = seasonModel.weights[stat] || 1;
+    const baseWeight = seasonModel.weights[stat] || 1;
+    const weightMultiplier = getCategoryWeightMultiplier(
+      classification.aggregationLevel,
+      classification.posGroup,
+      stat,
+    );
+    const weight = baseWeight * weightMultiplier;
     weightedSum += transformedPercentile * weight;
     totalWeight += weight;
     statStrengths.push({
@@ -553,11 +584,20 @@ function rankPerformance(statLine) {
     blendWeights,
   );
 
+  const behaviorProfile = getAggregationBehaviorProfile(
+    classification.aggregationLevel,
+  );
+  const behaviorAdjustedComposite = applyAggregationBehaviorAdjustments(
+    blendedCompositeScore,
+    statStrengths,
+    behaviorProfile,
+  );
+
   // Normalize to 0-1 range
-  const normalized = blendedCompositeScore / 100;
+  const normalized = behaviorAdjustedComposite / 100;
 
   // Get position-specific scaling configuration
-  const config = getScalingConfig(classification.posGroup);
+  const config = getScalingConfig(classification.posGroup==="G" && classification.aggregationLevel==="playerDay"?"GDay":classification.posGroup);
 
   // Apply position-specific curve
   const midCompressed = applyMidpointCompression(
@@ -573,40 +613,45 @@ function rankPerformance(statLine) {
   score = Math.max(0, score);
 
   // Percentile for reference (the composite score is our percentile)
-  const percentile = Math.min(100, blendedCompositeScore);
+  const percentile = Math.min(100, behaviorAdjustedComposite);
 
   // Check if outlier
-  const isOutlier = isOutlierPerformance(blendedCompositeScore);
+  const isOutlier = isOutlierPerformance(behaviorAdjustedComposite);
 
   // Calculate per-stat breakdown
   const breakdown = statsToRank.map((category) => {
     const value = stats[category];
     const distribution = seasonModel.distributions[category];
-
-    // For GAA, invert the percentile calculation (lower is better)
-    let statPercentile;
-    if (category === "GAA" && classification.posGroup === PositionGroup.G) {
-      statPercentile = normalizeToScale(
-        -value,
-        -distribution.max,
-        -distribution.min,
-      );
-    } else {
-      statPercentile = normalizeToScale(
-        value,
-        distribution.min,
-        distribution.max,
-      );
+    const baseWeight = seasonModel.weights[category] || 0;
+    const weightMultiplier = getCategoryWeightMultiplier(
+      classification.aggregationLevel,
+      classification.posGroup,
+      category,
+    );
+    const adjustedWeight = baseWeight * weightMultiplier;
+    if (!distribution) {
+      return {
+        category: category,
+        value: value,
+        percentile: 0,
+        weight: adjustedWeight,
+        contribution: 0,
+      };
     }
 
-    const weight = seasonModel.weights[category];
-    const contribution = (statPercentile * weight) / statsToRank.length;
+    const statPercentile = computeCategoryPercentile(
+      category,
+      value,
+      distribution,
+    );
+
+    const contribution = (statPercentile * adjustedWeight) / statsToRank.length;
 
     return {
       category: category,
       value: value,
       percentile: statPercentile,
-      weight: weight,
+      weight: adjustedWeight,
       contribution: contribution,
     };
   });
@@ -686,6 +731,7 @@ function rankWithGlobalWeights(statLine, classification) {
     stats,
     globalWeights,
     classification.posGroup,
+    classification.aggregationLevel,
   );
 
   let percentile = 50;
@@ -899,6 +945,56 @@ function blendCompositeScore(baseScore, subsetScores, weights) {
     return sum + entry.value * entry.weight;
   }, 0);
   return weightedSum / totalWeight;
+}
+
+function applyAggregationBehaviorAdjustments(baseScore, entries, behavior) {
+  if (!behavior || !entries || entries.length === 0) {
+    return baseScore;
+  }
+  const percentiles = entries.map(function (entry) {
+    return clip(Number(entry.percentile) || 0, 0, 100);
+  });
+  const spikeBoost = behavior.spikeWeight
+    ? computeSpikeBoost(baseScore, percentiles, behavior)
+    : 0;
+  const consistencyPenalty = behavior.consistencyWeight
+    ? computeConsistencyPenalty(percentiles, behavior)
+    : 0;
+  const adjusted = baseScore + spikeBoost - consistencyPenalty;
+  return clip(adjusted, 0, 100);
+}
+
+function computeSpikeBoost(baseScore, percentiles, behavior) {
+  if (!percentiles || percentiles.length === 0) {
+    return 0;
+  }
+  const maxPercentile = percentiles.reduce(function (max, value) {
+    return value > max ? value : max;
+  }, 0);
+  const delta = Math.max(0, maxPercentile - baseScore);
+  const rawBoost = delta * behavior.spikeWeight;
+  const cap = behavior.spikeCap || 0;
+  return cap > 0 ? Math.min(rawBoost, cap) : rawBoost;
+}
+
+function computeConsistencyPenalty(percentiles, behavior) {
+  if (!percentiles || percentiles.length <= 1) {
+    return 0;
+  }
+  const mean =
+    percentiles.reduce(function (sum, value) {
+      return sum + value;
+    }, 0) / percentiles.length;
+  const variance =
+    percentiles.reduce(function (sum, value) {
+      const diff = value - mean;
+      return sum + diff * diff;
+    }, 0) / percentiles.length;
+  const stdDev = Math.sqrt(variance);
+  const normalizedStd = stdDev / 100;
+  const rawPenalty = normalizedStd * behavior.consistencyWeight * 100;
+  const cap = behavior.consistencyMaxPenalty || 0;
+  return cap > 0 ? Math.min(rawPenalty, cap) : rawPenalty;
 }
 
 /**

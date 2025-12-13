@@ -152,7 +152,7 @@ Summary:
 - **homeWin**: Boolean (true if home team won)
 - **awayWin**: Boolean (true if away team won)
 - **tie**: Boolean (true if tied)
-- **isCompleted**: Set to true after scoring
+- **isComplete**: Set to true after scoring
 
 ---
 
