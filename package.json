@@ -48,7 +48,7 @@
     "google-auth-library": "^9.15.1",
     "googleapis": "^149.0.0",
     "lucide-react": "^0.479.0",
-    "next": "^15.0.1",
+    "next": "15.0.7",
     "node-cron": "^4.2.1",
     "p-limit": "^7.1.1",
     "react": "^18.3.1",
