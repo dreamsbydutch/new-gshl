@@ -26,7 +26,7 @@
 import { useMemo, useState } from "react";
 import Image from "next/image";
 import { LoadingSpinner } from "@gshl-ui";
-import { cn } from "@gshl-utils";
+import { cn, getCurrentSeason } from "@gshl-utils";
 import type {
   StandingsItemProps,
   StandingsTeamInfoProps,
@@ -43,7 +43,7 @@ import {
 import type { Season } from "@gshl-types";
 import type { TeamSeasonStatLine } from "@gshl-types";
 import type { Matchup, Week } from "@gshl-types";
-import { useMatchups } from "@gshl-hooks";
+import { useMatchups, useTeamColor } from "@gshl-hooks";
 
 const formatOrdinal = (n: number) => {
   const mod100 = n % 100;
@@ -402,28 +402,43 @@ const StandingsItem = ({
 
     // Use the earliest non-completed matchup from the season as the pivot.
     const firstUpcomingIndex = teamMatchups.findIndex(
-      (x) => !x.matchup.isComplete,
+      (x) =>
+        x.matchup.weekId ===
+        weeks.find(
+          (w) =>
+            w.startDate <= (new Date().toISOString().split("T")[0] ?? "") &&
+            w.endDate >= (new Date().toISOString().split("T")[0] ?? ""),
+        )?.id,
     );
     const pivotIndex =
       firstUpcomingIndex === -1 ? teamMatchups.length : firstUpcomingIndex;
 
-    const prev = teamMatchups.slice(Math.max(0, pivotIndex - 3), pivotIndex);
+    const prev = teamMatchups.slice(
+      Math.max(0, pivotIndex - 4),
+      pivotIndex + 2,
+    );
 
     return prev;
   }, [matchups, team, weeks]);
 
   const opponentNameById = useMemo(() => {
-    const byId = new Map<string, string>();
+    const byId = new Map<string, { name: string; logoUrl: string }>();
     const allTeams = (
-      team as unknown as { __allTeams?: Array<{ id: string; name: string }> }
+      team as unknown as {
+        __allTeams?: Array<{ id: string; name: string; logoUrl: string }>;
+      }
     ).__allTeams;
     if (Array.isArray(allTeams)) {
-      allTeams.forEach((t) => byId.set(t.id, t.name));
+      allTeams.forEach((t) =>
+        byId.set(t.id, { name: t.name, logoUrl: t.logoUrl }),
+      );
     }
     return byId;
   }, [team]);
 
   if (!team) return <LoadingSpinner />;
+
+  const teamColor = useTeamColor(team.logoUrl);
 
   return (
     <div
@@ -497,8 +512,14 @@ const StandingsItem = ({
       </button>
 
       {showInfo ? (
-        <div className="px-3 pb-2">
-          <div className="overflow-x-auto rounded-lg border bg-slate-50 text-xs">
+        <div
+          className="mx-3 mb-2"
+          style={{
+            borderColor: teamColor ?? "",
+            boxShadow: `0 0 4px ${teamColor ?? ""}`,
+          }}
+        >
+          <div className={cn("border-1 overflow-x-auto rounded-lg text-xs")}>
             <table className="min-w-full border-separate border-spacing-0">
               <thead>
                 <tr className="bg-white text-slate-600">
@@ -526,7 +547,21 @@ const StandingsItem = ({
                       }
                     >
                       <div className="font-varela">
-                        <div>
+                        <div
+                          className={cn(
+                            "rounded-md p-1",
+                            cell.rank === 1 ? "font-bold" : "",
+                            +(cell.rank ?? 0) <= 3
+                              ? "bg-green-200"
+                              : (cell.rank ?? 20) <= 6
+                                ? "bg-green-100"
+                                : (cell.rank ?? 20) <= 9
+                                  ? "bg-yellow-100"
+                                  : (cell.rank ?? 20) <= 12
+                                    ? "bg-orange-100"
+                                    : "bg-red-100",
+                          )}
+                        >
                           {cell.label === "GAA"
                             ? formatGaa(cell.value)
                             : cell.label === "SV%"
@@ -543,39 +578,63 @@ const StandingsItem = ({
               </tbody>
             </table>
           </div>
-
-          <div className="mt-2 grid gap-2 text-xs">
-            <div className="rounded-lg border bg-white p-2">
-              <div className="grid gap-1">
-                {matchupSummary.length ? (
-                  matchupSummary.map(({ matchup, weekNum }) => {
-                    const isHome = matchup.homeTeamId === team.id;
-                    const opponentId = isHome
-                      ? matchup.awayTeamId
-                      : matchup.homeTeamId;
-                    const opponent =
-                      opponentNameById.get(opponentId) ?? opponentId;
-                    return (
-                      <div
-                        key={matchup.id}
-                        className="flex items-center justify-between gap-2"
-                      >
-                        <div className="text-muted-foreground">
-                          Wk {weekNum}
+          <div className={cn("border-1 mt-2 rounded-lg p-2 text-xs")}>
+            <div className="flex w-full justify-evenly gap-2">
+              {matchupSummary.length ? (
+                matchupSummary.map(({ matchup, weekNum }, i) => {
+                  const isHome = matchup.homeTeamId === team.id;
+                  const win = isHome ? matchup.homeWin : matchup.awayWin;
+                  const opponentId = isHome
+                    ? matchup.awayTeamId
+                    : matchup.homeTeamId;
+                  const opponent = opponentNameById.get(opponentId);
+                  return (
+                    <div
+                      key={matchup.id}
+                      className="flex flex-col items-center justify-between gap-2"
+                    >
+                      <div className={cn("flex flex-col gap-1")}>
+                        <div
+                          className={cn(
+                            "flex flex-row items-center gap-0.5",
+                            win ? "font-bold text-green-800" : "text-red-800",
+                          )}
+                        >
+                          {i >= 4 ? "" : win ? "W" : "L"}{" "}
+                          {i >= 4
+                            ? ""
+                            : isHome
+                              ? matchup.homeScore
+                              : matchup.awayScore}{" "}
+                          -{" "}
+                          {i >= 4
+                            ? ""
+                            : isHome
+                              ? matchup.awayScore
+                              : matchup.homeScore}
                         </div>
-                        <div className="flex-1 truncate text-right">
-                          {isHome ? "vs" : "@"} {opponent}
+                        <div className="flex flex-row items-center justify-center font-bold">
+                          {isHome ? "" : "@"}
+                          <Image
+                            className="h-6 w-6"
+                            src={opponent?.logoUrl ?? ""}
+                            alt={opponent?.name ?? ""}
+                            width={48}
+                            height={48}
+                          />
                         </div>
                       </div>
-                    );
-                  })
-                ) : (
-                  <div className="text-muted-foreground">No matchups found</div>
-                )}
-              </div>
+                      <div className="text-2xs text-muted-foreground">
+                        Wk {weekNum}
+                      </div>
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="text-muted-foreground">No matchups found</div>
+              )}
             </div>
           </div>
-
           {/* <TeamInfo {...{ teamProb, standingsType }} /> */}
         </div>
       ) : null}
@@ -603,7 +662,6 @@ export const StandingsComponent = ({
   matchups: Matchup[];
   weeks: Week[];
 }) => {
-  console.log(useMatchups().data.filter((m) => m.isComplete !== null));
   return (
     <div key={group.title}>
       <div className="mt-8 text-center font-varela text-xl font-bold">
@@ -617,11 +675,15 @@ export const StandingsComponent = ({
       </div>
       <div
         className={cn(
-          "rounded-xl bg-opacity-30 p-1 shadow-md [&>*:last-child]:border-none",
-          group.title === "Sunview" ? "bg-sunview-50" : "",
-          group.title === "Hickory Hotel" ? "bg-hotel-50" : "",
+          "rounded-xl p-1 shadow-md [&>*:last-child]:border-none",
+          group.title === "Sunview"
+            ? "border-2 border-sunview-500 shadow-sunview-500"
+            : "",
+          group.title === "Hickory Hotel"
+            ? "border-2 border-hotel-500 shadow-hotel-500"
+            : "",
           group.title === "Wildcard" || group.title === "Overall"
-            ? "bg-gray-100"
+            ? "border-2 border-slate-500 shadow-slate-500"
             : "",
         )}
       >
