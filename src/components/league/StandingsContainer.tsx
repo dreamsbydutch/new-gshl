@@ -26,7 +26,7 @@
 import { useMemo, useState } from "react";
 import Image from "next/image";
 import { LoadingSpinner } from "@gshl-ui";
-import { cn, getCurrentSeason } from "@gshl-utils";
+import { cn } from "@gshl-utils";
 import type {
   StandingsItemProps,
   StandingsTeamInfoProps,
@@ -43,7 +43,7 @@ import {
 import type { Season } from "@gshl-types";
 import type { TeamSeasonStatLine } from "@gshl-types";
 import type { Matchup, Week } from "@gshl-types";
-import { useMatchups, useTeamColor } from "@gshl-hooks";
+import { useTeamColor } from "@gshl-hooks";
 
 const formatOrdinal = (n: number) => {
   const mod100 = n % 100;
@@ -435,10 +435,9 @@ const StandingsItem = ({
     }
     return byId;
   }, [team]);
+  const teamColor = useTeamColor(team.logoUrl);
 
   if (!team) return <LoadingSpinner />;
-
-  const teamColor = useTeamColor(team.logoUrl);
 
   return (
     <div
