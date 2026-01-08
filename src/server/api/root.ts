@@ -13,6 +13,7 @@ import { draftPickRouter } from "./routers/draftPick";
 import { systemRouter } from "./routers/system";
 import { playerStatsRouter } from "./routers/playerStats";
 import { teamStatsRouter } from "./routers/teamStats";
+import { snapshotRouter } from "./routers/snapshot";
 // import { archivedStatsRouter } from "./routers/archivedStats"; // Disabled for performance
 
 /**
@@ -39,6 +40,8 @@ export const appRouter = createTRPCRouter({
   playerStats: playerStatsRouter,
   teamStats: teamStatsRouter,
 
+  // High-throughput snapshot endpoint (client-side caching)
+  snapshot: snapshotRouter,
 
   // System utilities
   system: systemRouter,

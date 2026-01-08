@@ -10,6 +10,16 @@
 
 // @ts-nocheck
 
+/**
+ * Table of contents
+ * - Environment flags + logging
+ * - Date + name + numeric helpers
+ * - Sheet typing + schema metadata
+ * - Sheet read helpers
+ * - Sheet write/upsert helpers
+ * - Yahoo scraper utilities (HTML parsing + fetch)
+ */
+
 // ============================================================================
 // ENVIRONMENT FLAG HELPERS
 // ============================================================================
@@ -89,59 +99,7 @@ function logVerbose() {
 }
 
 // ============================================================================
-// HTML PARSING UTILITIES
-// ============================================================================
-
-/**
- * Strip HTML tags and clean text content
- * @param {string} html - HTML string
- * @returns {string} Clean text
- */
-function cleanText(html) {
-  if (!html) return "";
-  return html
-    .replace(/<[^>]*>/g, "")
-    .replace(/&#x[0-9a-fA-F]+;/gi, "")
-    .trim();
-}
-
-/**
- * Extract game status from nested span structure
- * @param {string} html - HTML containing game status span
- * @returns {string} Clean game status text
- */
-function extractGameStatus(html) {
-  const gameStatusStart = html.indexOf('<span class="ysf-game-status');
-  if (gameStatusStart === -1) return "";
-
-  // Find matching closing span by counting depth
-  let depth = 0;
-  let pos = html.indexOf(">", gameStatusStart) + 1;
-  const len = html.length;
-
-  for (let i = pos; i < len; i++) {
-    if (html[i] === "<") {
-      if (html.substr(i, 6) === "<span ") {
-        depth++;
-      } else if (html.substr(i, 7) === "</span>") {
-        if (depth === 0) {
-          return html
-            .substring(pos, i)
-            .replace(/<span[^>]*>&#x[0-9a-fA-F]+;<\/span>/gi, "")
-            .replace(/<[^>]*>/g, "")
-            .replace(/&#x[0-9a-fA-F]+;/gi, "")
-            .replace(/\s+(vs|@)\s+[A-Z]{2,3}$/i, "")
-            .trim();
-        }
-        depth--;
-      }
-    }
-  }
-  return "";
-}
-
-// ============================================================================
-// DATE UTILITIES
+// DATE + NAME + NUMERIC UTILITIES
 // ============================================================================
 
 /**
@@ -182,6 +140,48 @@ function getPreviousDate(date) {
   var targetDate = new Date(etDateStr + "T00:00:00.000");
   targetDate.setDate(targetDate.getDate() - 1);
   return formatDate(targetDate);
+}
+/**
+ * Get next date
+ */
+function getNextDate(date) {
+  var now = new Date(date + "T00:00:00.000");
+  var etDateStr = now.toLocaleDateString("en-CA", {
+    timeZone: "America/New_York",
+  });
+  var targetDate = new Date(etDateStr + "T00:00:00.000");
+  targetDate.setDate(targetDate.getDate() + 1);
+  return formatDate(targetDate);
+}
+/**
+ * Return all dates between start and end (inclusive) in YYYY-MM-DD format.
+ *
+ * Inputs may be Date objects, YYYY-MM-DD strings, or values coercible to Date.
+ * Output is always an array of YYYY-MM-DD strings.
+ *
+ * @param {Date|string|number} start
+ * @param {Date|string|number} end
+ * @returns {string[]}
+ */
+function getDatesInRangeInclusive(start, end) {
+  var startStr = formatDateOnly(start);
+  var endStr = formatDateOnly(end);
+  if (!startStr || !endStr) return [];
+
+  // If the caller swaps the order, keep behavior simple and safe.
+  if (startStr > endStr) return [];
+
+  // Work in UTC to avoid timezone/DST off-by-one issues.
+  var current = new Date(startStr + "T00:00:00.000Z");
+  var endDate = new Date(endStr + "T00:00:00.000Z");
+  if (isNaN(current.getTime()) || isNaN(endDate.getTime())) return [];
+
+  var out = [];
+  while (current.getTime() <= endDate.getTime()) {
+    out.push(formatDateOnly(current));
+    current.setUTCDate(current.getUTCDate() + 1);
+  }
+  return out;
 }
 
 function isDateInRange(target, start, end) {
@@ -1420,6 +1420,58 @@ function upsertSheetByKeys(
 // YAHOO SCRAPER UTILITIES
 // ============================================================================
 
+// ---------------------------------------------------------------------------
+// HTML parsing helpers (used by Yahoo scraper)
+// ---------------------------------------------------------------------------
+
+/**
+ * Strip HTML tags and clean text content
+ * @param {string} html - HTML string
+ * @returns {string} Clean text
+ */
+function cleanText(html) {
+  if (!html) return "";
+  return html
+    .replace(/<[^>]*>/g, "")
+    .replace(/&#x[0-9a-fA-F]+;/gi, "")
+    .trim();
+}
+
+/**
+ * Extract game status from nested span structure
+ * @param {string} html - HTML containing game status span
+ * @returns {string} Clean game status text
+ */
+function extractGameStatus(html) {
+  const gameStatusStart = html.indexOf('<span class="ysf-game-status');
+  if (gameStatusStart === -1) return "";
+
+  // Find matching closing span by counting depth
+  let depth = 0;
+  let pos = html.indexOf(">", gameStatusStart) + 1;
+  const len = html.length;
+
+  for (let i = pos; i < len; i++) {
+    if (html[i] === "<") {
+      if (html.substr(i, 6) === "<span ") {
+        depth++;
+      } else if (html.substr(i, 7) === "</span>") {
+        if (depth === 0) {
+          return html
+            .substring(pos, i)
+            .replace(/<span[^>]*>&#x[0-9a-fA-F]+;<\/span>/gi, "")
+            .replace(/<[^>]*>/g, "")
+            .replace(/&#x[0-9a-fA-F]+;/gi, "")
+            .replace(/\s+(vs|@)\s+[A-Z]{2,3}$/i, "")
+            .trim();
+        }
+        depth--;
+      }
+    }
+  }
+  return "";
+}
+
 /**
  * Parse table HTML to extract player data
  * @param {string} tableHtml - Complete table HTML
@@ -1765,4 +1817,82 @@ function yahooTableScraper(targetDate, yahooTeamId, seasonId) {
     Logger.log(error.toString());
     throw error;
   }
+}
+
+function getTodayDateString() {
+  return formatDateOnly(new Date());
+}
+
+function isWeekCompleteRecord(week, todayDateString) {
+  if (!week) return false;
+  var endDateStr = formatDateOnly(week.endDate);
+  if (!endDateStr) return false;
+  if (!todayDateString) return false;
+  return todayDateString > endDateStr;
+}
+
+function getPlayerDayWorkbookId(seasonId) {
+  const seasonNumber = Number(seasonId);
+  if (isNaN(seasonNumber)) return CURRENT_PLAYERDAY_SPREADSHEET_ID;
+  if (seasonNumber <= 5) return PLAYERDAY_WORKBOOKS.PLAYERDAYS_1_5;
+  if (seasonNumber <= 10) return PLAYERDAY_WORKBOOKS.PLAYERDAYS_6_10;
+  return PLAYERDAY_WORKBOOKS.PLAYERDAYS_11_15;
+}
+
+function normalizeNhlPosValue(value) {
+  if (!value) return "";
+  if (Array.isArray(value)) return value.join(",");
+  return value.toString();
+}
+
+function resolvePosGroupFromNhlPos(nhlPos) {
+  const normalized = normalizeNhlPosValue(nhlPos).toUpperCase();
+  if (normalized.includes("G")) return "G";
+  if (normalized.includes("D")) return "D";
+  return "F";
+}
+
+function buildMissingPlayerDayRow(
+  scrapedPlayer,
+  playerRecord,
+  teamId,
+  seasonId,
+  weekId,
+  dateStr,
+) {
+  if (!scrapedPlayer || !playerRecord || !playerRecord.id) return null;
+  if (!teamId || !seasonId || !dateStr) return null;
+
+  const playerIdStr = playerRecord.id.toString();
+  const normalizedNhlPos = normalizeNhlPosValue(scrapedPlayer.nhlPos);
+  const row = {
+    ...scrapedPlayer,
+    playerId: playerIdStr,
+    gshlTeamId: teamId,
+    seasonId,
+    weekId: weekId || "",
+    date: dateStr,
+    posGroup: resolvePosGroupFromNhlPos(normalizedNhlPos),
+    bestPos: "",
+    fullPos: "",
+    IR: "",
+    IRplus: "",
+    ADD: "",
+    MS: "",
+    BS: "",
+    nhlPos: normalizedNhlPos,
+    yahooId:
+      scrapedPlayer.yahooId ||
+      (playerRecord.yahooId && playerRecord.yahooId.toString()) ||
+      "",
+    playerName:
+      scrapedPlayer.playerName ||
+      playerRecord.playerName ||
+      playerRecord.fullName ||
+      playerRecord.name ||
+      "",
+  };
+
+  row.Rating = "";
+  return row;
 }

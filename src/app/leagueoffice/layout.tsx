@@ -28,6 +28,11 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         value: "Rulebook",
         setter: (type: string | null) => setSelectedType(type ?? ""),
       },
+      {
+        key: "confBattle",
+        value: "Conf v Conf",
+        setter: (type: string | null) => setSelectedType(type ?? ""),
+      },
     ],
   };
 

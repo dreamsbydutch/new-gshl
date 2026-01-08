@@ -13,8 +13,6 @@ Yahoo Fantasy → Apps Script (scrape & write) → Google Sheets → Next.js (re
 
 **Key Principle:** Apps Script is the data manipulation layer. Next.js is the display layer.
 
-📖 See [PROJECT_GOALS.md](PROJECT_GOALS.md) for the complete architecture vision.
-
 ## What This Does
 
 1. **Yahoo Roster Scraping**: Fetches daily roster data from Yahoo Fantasy Hockey
@@ -26,7 +24,10 @@ Yahoo Fantasy → Apps Script (scrape & write) → Google Sheets → Next.js (re
 ```
 apps-script/
    config/Config.js                 # Spreadsheet + league/config constants
-   core/utils.js                    # Shared sheet/date/helpers
+   core/constants.js                # Shared constants
+   core/environment.js              # Script Properties flags (verbose/dry-run)
+   core/sheetSchemas.js             # Schema + coercion metadata
+   core/utils.js                    # Shared helpers + sheet read/write
    features/
       scrapers/YahooScraper.js       # Yahoo roster ingestion + PlayerDay writes
       lineup/LineupBuilder.js        # Hybrid optimizer powering best/full lineups
@@ -38,8 +39,6 @@ apps-script/
       validation/IntegrityChecks.js  # Automated integrity checks + ValidationLog writes
    maintenance/
       PlayerAgeUpdater.js            # Player master data refresh
-      RatingRecalculator.js          # Batch rating recompute helpers
-   PROJECT_GOALS.md                 # Architecture vision and principles
    README.md
 ```
 
@@ -78,7 +77,7 @@ The scraper reads from and writes to these tables:
 1. Create a new Apps Script project:
 
    ```bash
-   cd src/server/apps-script
+   cd apps-script
    clasp create --type standalone --title "GSHL Cron Jobs"
    ```
 
@@ -86,7 +85,7 @@ The scraper reads from and writes to these tables:
 
 3. Update the `config/Config.js` file with your configuration.
 
-4. Deploy the code (clasp automatically transpiles TypeScript to JavaScript):
+4. Deploy the code:
 
    ```bash
    clasp push
@@ -100,25 +99,22 @@ The scraper reads from and writes to these tables:
 
 6. In the Apps Script editor, set up time-based triggers for each function.
 
-### TypeScript Support
+### Language & Runtime
 
-✅ **Yes, we use TypeScript!**
+This project is **JavaScript-first** and targets the Google Apps Script runtime.
 
-Clasp automatically transpiles `.ts` files to JavaScript when you run `clasp push`. This gives us:
-
-- Type safety during development
-- Better IDE support
-- Cleaner code with modern syntax
-- Automatic conversion to Apps Script-compatible JavaScript
-
-The Apps Script editor will show the transpiled JavaScript, which is normal.
+- Avoid Node-only APIs (`fs`, `process.env`, etc.)
+- Use `@types/google-apps-script` for editor IntelliSense
 
 ## Configuration
 
 Edit `config/Config.js` to configure:
 
-- **API_BASE_URL** - Your production API endpoint (e.g., `https://your-app.vercel.app`)
-- **CRON_AUTH_KEY** - Secret key for authenticating cron requests (set in your .env as `CRON_SECRET_KEY`)
+- `SPREADSHEET_ID` (general workbook)
+- `PLAYERDAY_WORKBOOKS` + `CURRENT_PLAYERDAY_SPREADSHEET_ID`
+- `PLAYERSTATS_SPREADSHEET_ID` + `TEAMSTATS_SPREADSHEET_ID`
+- `YAHOO_LEAGUE_ID`
+- Defaults for `ENABLE_VERBOSE_LOGGING` + `ENABLE_DRY_RUN_MODE`
 
 ### Environment Flags
 
@@ -158,7 +154,7 @@ Use `getSheetSchema("PlayerDayStatLine")` or `getSheetKeyColumns("TeamWeekStatLi
 1. Navigate to the apps-script directory:
 
    ```bash
-   cd src/server/apps-script
+   cd apps-script
    ```
 
 2. Create a new Apps Script project:
@@ -189,25 +185,14 @@ In the Apps Script editor:
 
 1. Click **Triggers** (clock icon on left sidebar)
 2. Click **+ Add Trigger**
-3. Set up trigger for `scrapeYahooRosters`:
-   - Function: `scrapeYahooRosters`
+3. Set up trigger for `updatePlayerDays`:
+   - Function: `updatePlayerDays`
    - Deployment: `Head`
    - Event source: `Time-driven`
    - Type: Choose based on your needs:
      - **Every 15 minutes** (during game times)
      - **Hourly** (pre-game)
      - **Day timer** (morning updates)
-
-### Testing
-
-Run the test function from the Apps Script editor:
-
-1. Open the script in the editor (`clasp open`)
-2. Select `testYahooScraper` from the function dropdown
-3. Click **Run**
-4. Check the logs for results
-
-## Usage
 
 ## Usage
 
@@ -216,7 +201,7 @@ Run the test function from the Apps Script editor:
 From the Apps Script editor:
 
 1. Open the script: `clasp open`
-2. Select `scrapeYahooRosters` from the function dropdown
+2. Select `updatePlayerDays` from the function dropdown
 3. Click **Run**
 4. View **Execution log** to see:
    - Teams and season/week info read from Sheets
@@ -224,7 +209,8 @@ From the Apps Script editor:
    - All PlayerDay records that would be written
    - Summary of scraped data
 
-The scraper currently **logs data only** - it does not write to Sheets yet. This lets you review the data structure before implementing the write logic.
+The scraper upserts into Sheets using `upsertSheetByKeys`.
+To run safely without mutations, enable `DRY_RUN_MODE` in Script Properties.
 
 ### Viewing Logs
 
@@ -240,18 +226,15 @@ Or view in the Apps Script editor under **Executions**.
 - `.claspignore` - Exclude files from deployment
 - `appsscript.json` - Apps Script manifest (runtime settings)
 - `config/Config.js` - Configuration (Spreadsheet ID, League ID)
+- `core/environment.js` - Script Properties flags (verbose/dry-run)
+- `core/sheetSchemas.js` - Schema definitions used for coercion/upserts
+- `core/utils.js` - Shared sheet/date/helpers + upsert utilities
 - `features/scrapers/YahooScraper.js` - Main scraper logic
 - `features/lineup/LineupBuilder.js` - Lineup optimizer
 - `features/ranking/` - Ranking engine, config, and generated models
 - `features/aggregation/StatsAggregator.js` - Aggregation + matchup logic
 - `maintenance/PlayerAgeUpdater.js` - Player metadata upkeep
-- `maintenance/RatingRecalculator.js` - Rating maintenance scripts
-- `PROJECT_GOALS.md` - Architecture documentation
 - `package.json` - NPM scripts for convenience
-
-## TypeScript Support
-
-Yes, clasp supports TypeScript! The `.ts` files are automatically transpiled to JavaScript when you run `clasp push`.
 
 ## Troubleshooting
 

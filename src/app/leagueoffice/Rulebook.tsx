@@ -20,7 +20,7 @@ function normalizeQuery(value: string) {
   return value.trim().toLowerCase();
 }
 
-export default function Rulebook() {
+export function Rulebook() {
   const [query, setQuery] = useState("");
   const normalized = useMemo(() => normalizeQuery(query), [query]);
 

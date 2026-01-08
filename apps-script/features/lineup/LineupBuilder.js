@@ -443,7 +443,7 @@ function optimizeLineup(players) {
 
   const bestPosPriority = [...playedPlayers, ...didNotPlayBest];
 
-  const bestPosAssignments = findBestLineup(bestPosCandidates, false);
+  const bestPosAssignments = findBestLineup(bestPosPriority, false);
 
   // Apply bestPos assignments
   for (const result of results) {

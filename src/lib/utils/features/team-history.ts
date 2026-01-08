@@ -157,7 +157,7 @@ export const getMatchupHeaderText = (
   let header = matchup.season?.name + " - ";
 
   switch (matchup.gameType) {
-    case MatchupType.QUATER_FINAL:
+    case MatchupType.QUARTER_FINAL:
       header +=
         Number(matchup.seasonId) <= 2017
           ? "Quarterfinals"

@@ -17,6 +17,7 @@ export * from "./useDraftBoardData";
 export * from "./useDraftAdminList";
 export * from "./useDraftCountdown";
 export * from "./useFreeAgencyData";
+export * from "./useConferenceContestData";
 export * from "./useScheduleData";
 export * from "./useSeasonMatchupsAndTeams";
 export * from "./useStandingsData";

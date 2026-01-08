@@ -1,13 +1,13 @@
-import { optimizedSheetsAdapter } from "@gshl-sheets";
+import { optimizedSheetsClient } from "@gshl-sheets";
 import { NextResponse } from "next/server";
 
 export async function GET() {
   try {
-    const debugInfo = optimizedSheetsAdapter.getDebugInfo();
-
     return NextResponse.json({
       success: true,
-      data: debugInfo,
+      data: {
+        queueStatus: optimizedSheetsClient.getQueueStatus(),
+      },
       timestamp: new Date().toISOString(),
     });
   } catch (error) {

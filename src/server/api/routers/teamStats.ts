@@ -1,6 +1,5 @@
 import { z } from "zod";
 import { createTRPCRouter, publicProcedure } from "../trpc";
-import { optimizedSheetsAdapter } from "@gshl-sheets";
 import { baseQuerySchema } from "./_schemas";
 import {
   type TeamDayStatLine,
@@ -8,6 +7,7 @@ import {
   type TeamWeekStatLine,
   SeasonType,
 } from "@gshl-types";
+import { getMany } from "../sheets-store";
 
 // Team Stats router
 const teamStatsWhereSchema = z
@@ -19,17 +19,13 @@ const teamStatsWhereSchema = z
   })
   .optional();
 
-
 export const teamStatsRouter = createTRPCRouter({
   // Daily team stats
   daily: createTRPCRouter({
     getAll: publicProcedure
       .input(baseQuerySchema.extend({ where: teamStatsWhereSchema }))
       .query(async ({ input }): Promise<TeamDayStatLine[]> => {
-        return optimizedSheetsAdapter.findMany(
-          "TeamDayStatLine",
-          input,
-        ) as unknown as Promise<TeamDayStatLine[]>;
+        return getMany<TeamDayStatLine>("TeamDayStatLine", input);
       }),
 
     getByTeam: publicProcedure
@@ -40,12 +36,12 @@ export const teamStatsRouter = createTRPCRouter({
         }),
       )
       .query(async ({ input }): Promise<TeamDayStatLine[]> => {
-        return optimizedSheetsAdapter.findMany("TeamDayStatLine", {
+        return getMany<TeamDayStatLine>("TeamDayStatLine", {
           where: {
             gshlTeamId: input.gshlTeamId,
             ...(input.seasonId && { seasonId: input.seasonId }),
           },
-        }) as unknown as Promise<TeamDayStatLine[]>;
+        });
       }),
 
     getByWeek: publicProcedure
@@ -56,12 +52,12 @@ export const teamStatsRouter = createTRPCRouter({
         }),
       )
       .query(async ({ input }): Promise<TeamDayStatLine[]> => {
-        return optimizedSheetsAdapter.findMany("TeamDayStatLine", {
+        return getMany<TeamDayStatLine>("TeamDayStatLine", {
           where: {
             weekId: input.weekId,
             ...(input.seasonId && { seasonId: input.seasonId }),
           },
-        }) as unknown as Promise<TeamDayStatLine[]>;
+        });
       }),
 
     getByDate: publicProcedure
@@ -72,14 +68,13 @@ export const teamStatsRouter = createTRPCRouter({
         }),
       )
       .query(async ({ input }): Promise<TeamDayStatLine[]> => {
-        return optimizedSheetsAdapter.findMany("TeamDayStatLine", {
+        return getMany<TeamDayStatLine>("TeamDayStatLine", {
           where: {
             date: input.date,
             ...(input.seasonId && { seasonId: input.seasonId }),
           },
-        }) as unknown as Promise<TeamDayStatLine[]>;
+        });
       }),
-
   }),
 
   // Weekly team stats
@@ -87,10 +82,7 @@ export const teamStatsRouter = createTRPCRouter({
     getAll: publicProcedure
       .input(baseQuerySchema.extend({ where: teamStatsWhereSchema }))
       .query(async ({ input }): Promise<TeamWeekStatLine[]> => {
-        return optimizedSheetsAdapter.findMany(
-          "TeamWeekStatLine",
-          input,
-        ) as unknown as Promise<TeamWeekStatLine[]>;
+        return getMany<TeamWeekStatLine>("TeamWeekStatLine", input);
       }),
 
     getByTeam: publicProcedure
@@ -101,12 +93,12 @@ export const teamStatsRouter = createTRPCRouter({
         }),
       )
       .query(async ({ input }): Promise<TeamWeekStatLine[]> => {
-        return optimizedSheetsAdapter.findMany("TeamWeekStatLine", {
+        return getMany<TeamWeekStatLine>("TeamWeekStatLine", {
           where: {
             gshlTeamId: input.gshlTeamId,
             ...(input.seasonId && { seasonId: input.seasonId }),
           },
-        }) as unknown as Promise<TeamWeekStatLine[]>;
+        });
       }),
 
     getByWeek: publicProcedure
@@ -117,12 +109,12 @@ export const teamStatsRouter = createTRPCRouter({
         }),
       )
       .query(async ({ input }): Promise<TeamWeekStatLine[]> => {
-        return optimizedSheetsAdapter.findMany("TeamWeekStatLine", {
+        return getMany<TeamWeekStatLine>("TeamWeekStatLine", {
           where: {
             weekId: String(input.weekId),
             ...(input.seasonId && { seasonId: String(input.seasonId) }),
           },
-        }) as unknown as Promise<TeamWeekStatLine[]>;
+        });
       }),
   }),
 
@@ -131,10 +123,7 @@ export const teamStatsRouter = createTRPCRouter({
     getAll: publicProcedure
       .input(baseQuerySchema.extend({ where: teamStatsWhereSchema }))
       .query(async ({ input }): Promise<TeamSeasonStatLine[]> => {
-        return optimizedSheetsAdapter.findMany(
-          "TeamSeasonStatLine",
-          input,
-        ) as unknown as Promise<TeamSeasonStatLine[]>;
+        return getMany<TeamSeasonStatLine>("TeamSeasonStatLine", input);
       }),
 
     getByTeam: publicProcedure
@@ -145,20 +134,20 @@ export const teamStatsRouter = createTRPCRouter({
         }),
       )
       .query(async ({ input }): Promise<TeamSeasonStatLine[]> => {
-        return optimizedSheetsAdapter.findMany("TeamSeasonStatLine", {
+        return getMany<TeamSeasonStatLine>("TeamSeasonStatLine", {
           where: {
             gshlTeamId: input.gshlTeamId,
             ...(input.seasonId && { seasonId: input.seasonId }),
           },
-        }) as unknown as Promise<TeamSeasonStatLine[]>;
+        });
       }),
 
     getBySeason: publicProcedure
       .input(z.object({ seasonId: z.number().int() }))
       .query(async ({ input }): Promise<TeamSeasonStatLine[]> => {
-        return optimizedSheetsAdapter.findMany("TeamSeasonStatLine", {
+        return getMany<TeamSeasonStatLine>("TeamSeasonStatLine", {
           where: { seasonId: input.seasonId },
-        }) as unknown as Promise<TeamSeasonStatLine[]>;
+        });
       }),
 
     getBySeasonType: publicProcedure
@@ -169,13 +158,12 @@ export const teamStatsRouter = createTRPCRouter({
         }),
       )
       .query(async ({ input }): Promise<TeamSeasonStatLine[]> => {
-        return optimizedSheetsAdapter.findMany("TeamSeasonStatLine", {
+        return getMany<TeamSeasonStatLine>("TeamSeasonStatLine", {
           where: {
             seasonId: input.seasonId,
             seasonType: input.seasonType,
           },
-        }) as unknown as Promise<TeamSeasonStatLine[]>;
+        });
       }),
-
   }),
 });

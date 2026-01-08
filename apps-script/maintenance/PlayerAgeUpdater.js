@@ -82,25 +82,29 @@ function updateAllPlayerAges() {
 
     // Step 3: Find column indices
     var headers = data[0];
-    var birthdayCol = headers.indexOf("birthday");
-    var ageCol = headers.indexOf("age");
     var idCol = headers.indexOf("id");
     var nhlPosCol = headers.indexOf("nhlPos");
     var nhlTeamCol = headers.indexOf("nhlTeam");
+    var gshlTeamIdCol = headers.indexOf("gshlTeamId");
+    if (gshlTeamIdCol === -1) gshlTeamIdCol = headers.indexOf("gshlTeamID");
 
-    if (birthdayCol === -1) {
-      Logger.log("❌ ERROR: 'birthday' column not found in Player sheet");
+    var lineupPosCol = headers.indexOf("lineupPos");
+    if (lineupPosCol === -1) lineupPosCol = headers.indexOf("lineupPOS");
+    if (lineupPosCol === -1) lineupPosCol = headers.indexOf("dailyPos");
+
+    var overallRatingCol = headers.indexOf("overallRating");
+    if (overallRatingCol === -1)
+      overallRatingCol = headers.indexOf("overallRating");
+
+    var birthdayCol = headers.indexOf("birthday");
+    var ageCol = headers.indexOf("age");
+    var shouldUpdateAges = birthdayCol !== -1 && ageCol !== -1;
+
+    if (idCol === -1) {
+      Logger.log("❌ ERROR: 'id' column not found in Player sheet");
       return {
         success: false,
-        error: "birthday column not found",
-      };
-    }
-
-    if (ageCol === -1) {
-      Logger.log("❌ ERROR: 'age' column not found in Player sheet");
-      return {
-        success: false,
-        error: "age column not found",
+        error: "id column not found",
       };
     }
 
@@ -120,101 +124,334 @@ function updateAllPlayerAges() {
       };
     }
 
-    Logger.log("✅ Found birthday column at index: " + birthdayCol);
-    Logger.log("✅ Found age column at index: " + ageCol);
+    if (gshlTeamIdCol === -1) {
+      Logger.log("❌ ERROR: 'gshlTeamId' column not found in Player sheet");
+      return {
+        success: false,
+        error: "gshlTeamId column not found",
+      };
+    }
+
+    if (lineupPosCol === -1) {
+      Logger.log(
+        "❌ ERROR: 'lineupPos' column not found in Player sheet (also tried dailyPos)",
+      );
+      return {
+        success: false,
+        error: "lineupPos column not found",
+      };
+    }
+
+    if (overallRatingCol === -1) {
+      Logger.log(
+        "❌ ERROR: 'overallRating' column not found in Player sheet (also tried overallRating)",
+      );
+      return {
+        success: false,
+        error: "overallRating column not found",
+      };
+    }
+
+    if (!shouldUpdateAges) {
+      Logger.log(
+        "⚠️  birthday/age columns missing; skipping age updates this run",
+      );
+    } else {
+      Logger.log("✅ Found birthday column at index: " + birthdayCol);
+      Logger.log("✅ Found age column at index: " + ageCol);
+    }
+
+    Logger.log("✅ Found id column at index: " + idCol);
     Logger.log("✅ Found nhlPos column at index: " + nhlPosCol);
     Logger.log("✅ Found nhlTeam column at index: " + nhlTeamCol);
+    Logger.log("✅ Found gshlTeamId column at index: " + gshlTeamIdCol);
+    Logger.log("✅ Found lineupPos column at index: " + lineupPosCol);
+    Logger.log("✅ Found overallRating column at index: " + overallRatingCol);
 
     // Step 3b: Get PlayerDayStatLine data
     Logger.log("\n📊 Step 3b: Reading PlayerDayStatLine data...");
-    var playerDayData = getMostRecentPlayerDayStats();
+    var playerDayResult = getMostRecentPlayerDayStats();
+    var playerDayData = playerDayResult.playerMap;
+    var mostRecentDayKey = playerDayResult.mostRecentDayKey;
+    if (mostRecentDayKey) {
+      Logger.log(
+        "   ✅ Most recent PlayerDayStatLine day: " + mostRecentDayKey,
+      );
+    }
 
-    // Step 4: Calculate and update ages, positions, and teams
+    // Step 4: Calculate and update ages, positions, teams, and GSHL team
     Logger.log("\n🔄 Step 4: Calculating ages and updating player info...");
     var currentDate = new Date();
+
+    // We store franchiseId (not teamId) in the Player.gshlTeamId column.
+    // PlayerDayStatLine.gshlTeamId refers to the season's Team.id, so we map Team.id -> Team.franchiseId.
+    var season = null;
+    var seasonTeams = [];
+    var teamIdToFranchiseId = {};
+    var inRange =
+      typeof isDateInRange === "function"
+        ? isDateInRange
+        : function (date, startDate, endDate) {
+            try {
+              var d = date instanceof Date ? date : new Date(date);
+              var s =
+                startDate instanceof Date ? startDate : new Date(startDate);
+              var e = endDate instanceof Date ? endDate : new Date(endDate);
+              if (!d || !s || !e) return false;
+              if (
+                isNaN(d.getTime()) ||
+                isNaN(s.getTime()) ||
+                isNaN(e.getTime())
+              )
+                return false;
+              return d >= s && d <= e;
+            } catch (err) {
+              return false;
+            }
+          };
+
+    try {
+      var seasons = fetchSheetAsObjects(SPREADSHEET_ID, "Season");
+      season = seasons.find((s) =>
+        inRange(currentDate, s.startDate, s.endDate),
+      );
+      if (!season && seasons.length > 0) {
+        seasons.sort((a, b) => new Date(b.startDate) - new Date(a.startDate));
+        season = seasons[0];
+      }
+
+      if (season) {
+        seasonTeams = fetchSheetAsObjects(SPREADSHEET_ID, "Team").filter(
+          (t) => String(t.seasonId) === String(season.id),
+        );
+        seasonTeams.forEach((t) => {
+          if (t && t.id !== undefined && t.franchiseId !== undefined) {
+            teamIdToFranchiseId[String(t.id)] = String(t.franchiseId);
+          }
+        });
+      }
+    } catch (eSeason) {
+      Logger.log(
+        "⚠️  Unable to load Season/Team sheets for franchise mapping: " +
+          eSeason.message,
+      );
+      season = null;
+      seasonTeams = [];
+      teamIdToFranchiseId = {};
+    }
     var updatedCount = 0;
-    var skippedCount = 0;
+    var skippedBirthdayCount = 0;
+    var invalidBirthdayCount = 0;
     var ageUpdates = [];
     var nhlPosUpdates = [];
     var nhlTeamUpdates = [];
+    var gshlTeamIdUpdates = [];
+    var lineupPosClearUpdates = [];
+    var lineupPosUpdates = [];
+    var gshlTeamIdSetCount = 0;
+    var gshlTeamIdClearedCount = 0;
+
+    var playerRowIndexById = {};
+    var rosterByFranchiseId = {};
 
     for (var i = 1; i < data.length; i++) {
       var row = data[i];
-      var birthday = row[birthdayCol];
-      var playerId = idCol !== -1 ? row[idCol] : "Row " + (i + 1);
+      var playerId = row[idCol];
+      var playerKey = String(playerId);
 
-      // Skip if no birthday
-      if (!birthday) {
-        skippedCount++;
-        continue;
+      playerRowIndexById[playerKey] = i + 1;
+
+      // Clear lineupPos for everyone (we'll rebuild for active rosters later)
+      lineupPosClearUpdates.push({
+        rowIndex: i + 1,
+        value: "",
+        playerId: playerKey,
+      });
+
+      // Age update is optional; don't block other updates.
+      if (shouldUpdateAges) {
+        var birthday = row[birthdayCol];
+        if (birthday) {
+          var age = calculateAgeWithDecimal(birthday, currentDate);
+          if (age !== null) {
+            ageUpdates.push({
+              rowIndex: i + 1, // 1-based including header row
+              value: age,
+              playerId: playerKey,
+            });
+          } else {
+            Logger.log("⚠️  Invalid birthday for player: " + playerKey);
+            invalidBirthdayCount++;
+          }
+        } else {
+          skippedBirthdayCount++;
+        }
       }
 
-      // Calculate age to one decimal place
-      var age = calculateAgeWithDecimal(birthday, currentDate);
+      // Get most recent player day data for this player
+      var playerDayInfo = playerDayData[playerKey];
 
-      if (age !== null) {
-        // Store the age update
-        ageUpdates.push({
-          rowIndex: i + 1, // 1-based including header row
-          value: age,
-          playerId: playerId,
+      if (playerDayInfo) {
+        // Always sync nhlPos/nhlTeam from the most recent stat line (even if blank)
+        nhlPosUpdates.push({
+          rowIndex: i + 1,
+          value: playerDayInfo.nhlPos || "",
+          playerId: playerKey,
         });
 
-        // Get most recent player day data for this player
-        var playerDayInfo = playerDayData[playerId];
-        if (playerDayInfo) {
-          // Store nhlPos update if available
-          if (playerDayInfo.nhlPos) {
-            nhlPosUpdates.push({
-              rowIndex: i + 1,
-              value: playerDayInfo.nhlPos,
-              playerId: playerId,
-            });
-          }
+        nhlTeamUpdates.push({
+          rowIndex: i + 1,
+          value: playerDayInfo.nhlTeam || "",
+          playerId: playerKey,
+        });
 
-          // Store nhlTeam update if available
-          if (playerDayInfo.nhlTeam) {
-            nhlTeamUpdates.push({
-              rowIndex: i + 1,
-              value: playerDayInfo.nhlTeam,
-              playerId: playerId,
-            });
+        // gshlTeamId: only keep if player's latest stat line is from the most recent day
+        var shouldKeepTeam =
+          mostRecentDayKey && playerDayInfo.dateKey === mostRecentDayKey;
+        var nextGshlTeamId = "";
+        if (shouldKeepTeam) {
+          var statTeamId = playerDayInfo.gshlTeamId || "";
+          if (statTeamId) {
+            nextGshlTeamId = teamIdToFranchiseId[String(statTeamId)] || "";
           }
         }
 
-        updatedCount++;
+        gshlTeamIdUpdates.push({
+          rowIndex: i + 1,
+          value: nextGshlTeamId,
+          playerId: playerKey,
+        });
+
+        if (nextGshlTeamId) gshlTeamIdSetCount++;
+        else gshlTeamIdClearedCount++;
+
+        // Build roster groups for lineup rebuild (based on Player sheet overallRating)
+        if (nextGshlTeamId) {
+          var rawPos = playerDayInfo.nhlPos || "";
+          var nhlPosList = Array.isArray(rawPos)
+            ? rawPos
+            : String(rawPos)
+                .split(",")
+                .map((p) => String(p).trim())
+                .filter((p) => p);
+
+          var overallRating = row[overallRatingCol];
+          var ratingNumber = 0;
+          if (
+            overallRating !== null &&
+            overallRating !== undefined &&
+            overallRating !== ""
+          ) {
+            ratingNumber = Number(overallRating);
+            if (isNaN(ratingNumber)) ratingNumber = 0;
+          }
+
+          if (!rosterByFranchiseId[nextGshlTeamId])
+            rosterByFranchiseId[nextGshlTeamId] = [];
+          rosterByFranchiseId[nextGshlTeamId].push({
+            playerId: playerKey,
+            nhlPos: nhlPosList,
+            Rating: ratingNumber,
+          });
+        }
       } else {
-        Logger.log("⚠️  Invalid birthday for player: " + playerId);
-        skippedCount++;
+        // No stat line found: wipe gshlTeamId (player not currently active on a roster)
+        gshlTeamIdUpdates.push({
+          rowIndex: i + 1,
+          value: "",
+          playerId: playerKey,
+        });
+        gshlTeamIdClearedCount++;
       }
+
+      updatedCount++;
     }
 
     // Step 5: Write updates back to sheet
-    if (ageUpdates.length > 0) {
-      Logger.log(
-        "\n💾 Step 5: Writing " + ageUpdates.length + " updates to sheet...",
-      );
+    Logger.log("\n💾 Step 5: Writing updates to Player sheet...");
 
-      // Batch write ages
+    if (ageUpdates.length > 0 && shouldUpdateAges) {
       groupAndApplyColumnUpdates(sheet, ageCol + 1, ageUpdates);
-      Logger.log("✅ Successfully updated " + updatedCount + " player ages");
+      Logger.log("✅ Updated ages for " + ageUpdates.length + " players");
+    }
 
-      // Batch write nhlPos
-      if (nhlPosUpdates.length > 0) {
-        groupAndApplyColumnUpdates(sheet, nhlPosCol + 1, nhlPosUpdates);
-        Logger.log(
-          "✅ Successfully updated " +
-            nhlPosUpdates.length +
-            " player positions",
-        );
-      }
+    if (nhlPosUpdates.length > 0) {
+      groupAndApplyColumnUpdates(sheet, nhlPosCol + 1, nhlPosUpdates);
+      Logger.log("✅ Updated nhlPos for " + nhlPosUpdates.length + " players");
+    }
 
-      // Batch write nhlTeam
-      if (nhlTeamUpdates.length > 0) {
-        groupAndApplyColumnUpdates(sheet, nhlTeamCol + 1, nhlTeamUpdates);
+    if (nhlTeamUpdates.length > 0) {
+      groupAndApplyColumnUpdates(sheet, nhlTeamCol + 1, nhlTeamUpdates);
+      Logger.log(
+        "✅ Updated nhlTeam for " + nhlTeamUpdates.length + " players",
+      );
+    }
+
+    if (gshlTeamIdUpdates.length > 0) {
+      groupAndApplyColumnUpdates(sheet, gshlTeamIdCol + 1, gshlTeamIdUpdates);
+      Logger.log(
+        "✅ Updated gshlTeamId for " +
+          gshlTeamIdUpdates.length +
+          " players (set: " +
+          gshlTeamIdSetCount +
+          ", cleared: " +
+          gshlTeamIdClearedCount +
+          ")",
+      );
+    }
+
+    if (lineupPosClearUpdates.length > 0) {
+      groupAndApplyColumnUpdates(
+        sheet,
+        lineupPosCol + 1,
+        lineupPosClearUpdates,
+      );
+      Logger.log(
+        "✅ Cleared lineupPos for " + lineupPosClearUpdates.length + " players",
+      );
+    }
+
+    // Step 5b: Rebuild lineupPos for each team in the current season
+    Logger.log("\n🏒 Step 5b: Building lineupPos for active rosters...");
+    var lineupTeamsProcessed = 0;
+    var lineupPlayersProcessed = 0;
+
+    if (!season) {
+      Logger.log("⚠️  No season found; skipping lineupPos rebuild");
+    } else {
+      seasonTeams.forEach((team) => {
+        var franchiseId =
+          team && team.franchiseId ? String(team.franchiseId) : "";
+        if (!franchiseId) return;
+
+        var roster = rosterByFranchiseId[franchiseId] || [];
+        if (roster.length === 0) return;
+
+        // Assign lineup slots purely by season rating + eligibility
+        var assignments = findBestLineup(roster, false);
+        roster.forEach((p) => {
+          lineupPosUpdates.push({
+            rowIndex: playerRowIndexById[p.playerId],
+            value: assignments[p.playerId] || "BN",
+            playerId: p.playerId,
+          });
+        });
+
+        lineupTeamsProcessed++;
+        lineupPlayersProcessed += roster.length;
+      });
+
+      if (lineupPosUpdates.length > 0) {
+        groupAndApplyColumnUpdates(sheet, lineupPosCol + 1, lineupPosUpdates);
         Logger.log(
-          "✅ Successfully updated " + nhlTeamUpdates.length + " player teams",
+          "✅ Built lineupPos for " +
+            lineupTeamsProcessed +
+            " team(s) (" +
+            lineupPlayersProcessed +
+            " rostered players)",
         );
+      } else {
+        Logger.log("⚠️  No rostered players found; lineupPos not updated");
       }
     }
 
@@ -226,14 +463,24 @@ function updateAllPlayerAges() {
     Logger.log("   - Ages: " + ageUpdates.length);
     Logger.log("   - Positions: " + nhlPosUpdates.length);
     Logger.log("   - Teams: " + nhlTeamUpdates.length);
-    Logger.log("⏭️  Skipped: " + skippedCount + " (no birthday)");
+    Logger.log("   - GSHL Teams: " + gshlTeamIdUpdates.length);
+    Logger.log("   - LineupPos cleared: " + lineupPosClearUpdates.length);
+    Logger.log("   - LineupPos rebuilt: " + lineupPosUpdates.length);
+    Logger.log(
+      "⏭️  Skipped birthdays: " + skippedBirthdayCount + " (no birthday)",
+    );
+    Logger.log("⚠️  Invalid birthdays: " + invalidBirthdayCount);
     Logger.log("📅 Update date: " + formatDate(currentDate));
     Logger.log("═".repeat(60));
 
     return {
       success: true,
       updated: updatedCount,
-      skipped: skippedCount,
+      skippedBirthdays: skippedBirthdayCount,
+      invalidBirthdays: invalidBirthdayCount,
+      gshlTeamIdSet: gshlTeamIdSetCount,
+      gshlTeamIdCleared: gshlTeamIdClearedCount,
+      mostRecentPlayerDayKey: mostRecentDayKey || null,
       timestamp: currentDate,
     };
   } catch (error) {
@@ -347,14 +594,14 @@ function getMostRecentPlayerDayStats() {
       Logger.log(
         "   ⚠️  PlayerDayStatLine sheet not found, position/team updates skipped",
       );
-      return {};
+      return { playerMap: {}, mostRecentDayKey: null };
     }
 
     var data = sheet.getDataRange().getValues();
 
     if (!data || data.length <= 1) {
       Logger.log("   ⚠️  No PlayerDayStatLine data found");
-      return {};
+      return { playerMap: {}, mostRecentDayKey: null };
     }
 
     var headers = data[0];
@@ -362,6 +609,7 @@ function getMostRecentPlayerDayStats() {
     var dateCol = headers.indexOf("date");
     var nhlPosCol = headers.indexOf("nhlPos");
     var nhlTeamCol = headers.indexOf("nhlTeam");
+    var gshlTeamIdCol = headers.indexOf("gshlTeamId");
 
     if (
       playerIdCol === -1 ||
@@ -370,12 +618,27 @@ function getMostRecentPlayerDayStats() {
       nhlTeamCol === -1
     ) {
       Logger.log("   ⚠️  Required columns not found in PlayerDayStatLine");
-      return {};
+      return { playerMap: {}, mostRecentDayKey: null };
+    }
+
+    function getDayKey(dateValue) {
+      try {
+        var d = dateValue instanceof Date ? dateValue : new Date(dateValue);
+        if (!d || isNaN(d.getTime())) return null;
+        return Utilities.formatDate(
+          d,
+          Session.getScriptTimeZone(),
+          "yyyy-MM-dd",
+        );
+      } catch (e) {
+        return null;
+      }
     }
 
     // Build a map of playerId -> most recent record
     var playerMap = {};
     var debugCount = 0;
+    var mostRecentDate = null;
 
     for (var i = 1; i < data.length; i++) {
       var row = data[i];
@@ -383,18 +646,28 @@ function getMostRecentPlayerDayStats() {
       var date = row[dateCol];
       var nhlPos = row[nhlPosCol];
       var nhlTeam = row[nhlTeamCol];
+      var gshlTeamId = gshlTeamIdCol !== -1 ? row[gshlTeamIdCol] : "";
 
       if (!playerId || !date) {
         continue;
       }
 
       // Convert date to comparable format
-      var recordDate = new Date(date);
+      var recordDate = date instanceof Date ? date : new Date(date);
+      if (!recordDate || isNaN(recordDate.getTime())) continue;
+
+      if (!mostRecentDate || recordDate > mostRecentDate) {
+        mostRecentDate = recordDate;
+      }
 
       // If we haven't seen this player yet, or this record is more recent
-      if (!playerMap[playerId] || recordDate > playerMap[playerId].date) {
-        playerMap[playerId] = {
+      var playerKey = String(playerId);
+
+      if (!playerMap[playerKey] || recordDate > playerMap[playerKey].date) {
+        playerMap[playerKey] = {
           date: recordDate,
+          dateKey: getDayKey(recordDate),
+          gshlTeamId: gshlTeamId ? String(gshlTeamId) : "",
           nhlPos: nhlPos ? nhlPos : "",
           nhlTeam: nhlTeam ? nhlTeam : "",
         };
@@ -403,8 +676,10 @@ function getMostRecentPlayerDayStats() {
         if (debugCount < 5) {
           Logger.log(
             "   🔍 Player " +
-              playerId +
-              ": nhlTeam=" +
+              playerKey +
+              ": gshlTeamId=" +
+              gshlTeamId +
+              ", nhlTeam=" +
               nhlTeam +
               ", nhlPos=" +
               nhlPos +
@@ -416,15 +691,17 @@ function getMostRecentPlayerDayStats() {
       }
     }
 
+    var mostRecentDayKey = mostRecentDate ? getDayKey(mostRecentDate) : null;
+
     Logger.log(
       "   ✅ Found most recent data for " +
         Object.keys(playerMap).length +
         " players",
     );
-    return playerMap;
+    return { playerMap: playerMap, mostRecentDayKey: mostRecentDayKey };
   } catch (error) {
     Logger.log("   ❌ Error fetching PlayerDayStatLine data: " + error.message);
-    return {};
+    return { playerMap: {}, mostRecentDayKey: null };
   }
 }
 

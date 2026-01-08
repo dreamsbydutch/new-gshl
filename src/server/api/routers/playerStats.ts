@@ -1,6 +1,5 @@
 import { z } from "zod";
 import { createTRPCRouter, publicProcedure } from "../trpc";
-import { optimizedSheetsAdapter } from "@gshl-sheets";
 import { baseQuerySchema } from "./_schemas";
 import {
   type PlayerDayStatLine,
@@ -8,6 +7,7 @@ import {
   type PlayerTotalStatLine,
   type PlayerWeekStatLine,
 } from "@gshl-types";
+import { getMany } from "../sheets-store";
 
 // Player stats schemas
 const playerStatsWhereSchema = z
@@ -20,7 +20,6 @@ const playerStatsWhereSchema = z
   })
   .optional();
 
-
 export const playerStatsRouter = createTRPCRouter({
   // Daily stats operations
   daily: createTRPCRouter({
@@ -32,10 +31,7 @@ export const playerStatsRouter = createTRPCRouter({
         }),
       )
       .query(async ({ input }): Promise<PlayerDayStatLine[]> => {
-        return optimizedSheetsAdapter.findMany(
-          "PlayerDayStatLine",
-          input,
-        ) as unknown as Promise<PlayerDayStatLine[]>;
+        return getMany<PlayerDayStatLine>("PlayerDayStatLine", input);
       }),
 
     // Get daily stats by player
@@ -48,13 +44,13 @@ export const playerStatsRouter = createTRPCRouter({
         }),
       )
       .query(async ({ input }): Promise<PlayerDayStatLine[]> => {
-        return optimizedSheetsAdapter.findMany("PlayerDayStatLine", {
+        return getMany<PlayerDayStatLine>("PlayerDayStatLine", {
           where: {
             playerId: input.playerId,
             ...(input.seasonId && { seasonId: input.seasonId }),
             ...(input.weekId && { weekId: input.weekId }),
           },
-        }) as unknown as Promise<PlayerDayStatLine[]>;
+        });
       }),
 
     // Get daily stats by week
@@ -66,13 +62,13 @@ export const playerStatsRouter = createTRPCRouter({
         }),
       )
       .query(async ({ input }): Promise<PlayerDayStatLine[]> => {
-        return optimizedSheetsAdapter.findMany("PlayerDayStatLine", {
+        return getMany<PlayerDayStatLine>("PlayerDayStatLine", {
           where: {
             weekId: input.weekId,
             ...(input.seasonId && { seasonId: input.seasonId }),
           },
-        }) as unknown as Promise<PlayerDayStatLine[]>;
-      })
+        });
+      }),
   }),
 
   // Weekly stats operations
@@ -85,10 +81,7 @@ export const playerStatsRouter = createTRPCRouter({
         }),
       )
       .query(async ({ input }): Promise<PlayerWeekStatLine[]> => {
-        return optimizedSheetsAdapter.findMany(
-          "PlayerWeekStatLine",
-          input,
-        ) as unknown as Promise<PlayerWeekStatLine[]>;
+        return getMany<PlayerWeekStatLine>("PlayerWeekStatLine", input);
       }),
 
     // Get weekly stats by player
@@ -100,12 +93,12 @@ export const playerStatsRouter = createTRPCRouter({
         }),
       )
       .query(async ({ input }): Promise<PlayerWeekStatLine[]> => {
-        return optimizedSheetsAdapter.findMany("PlayerWeekStatLine", {
+        return getMany<PlayerWeekStatLine>("PlayerWeekStatLine", {
           where: {
             playerId: input.playerId,
             ...(input.seasonId && { seasonId: input.seasonId }),
           },
-        }) as unknown as Promise<PlayerWeekStatLine[]>;
+        });
       }),
 
     // Get weekly stats by week
@@ -117,12 +110,12 @@ export const playerStatsRouter = createTRPCRouter({
         }),
       )
       .query(async ({ input }): Promise<PlayerWeekStatLine[]> => {
-        return optimizedSheetsAdapter.findMany("PlayerWeekStatLine", {
+        return getMany<PlayerWeekStatLine>("PlayerWeekStatLine", {
           where: {
             weekId: input.weekId,
             ...(input.seasonId && { seasonId: input.seasonId }),
           },
-        }) as unknown as Promise<PlayerWeekStatLine[]>;
+        });
       }),
 
     // Get leaderboard
@@ -135,13 +128,12 @@ export const playerStatsRouter = createTRPCRouter({
         }),
       )
       .query(async ({ input }): Promise<PlayerWeekStatLine[]> => {
-        return optimizedSheetsAdapter.findMany("PlayerWeekStatLine", {
+        return getMany<PlayerWeekStatLine>("PlayerWeekStatLine", {
           where: { seasonId: input.seasonId },
           orderBy: { [input.statType]: "desc" },
           take: input.take,
-        }) as unknown as Promise<PlayerWeekStatLine[]>;
+        });
       }),
-
   }),
 
   // Season splits operations (player stats per team)
@@ -160,10 +152,7 @@ export const playerStatsRouter = createTRPCRouter({
         }),
       )
       .query(async ({ input }): Promise<PlayerSplitStatLine[]> => {
-        return optimizedSheetsAdapter.findMany(
-          "PlayerSplitStatLine",
-          input,
-        ) as unknown as Promise<PlayerSplitStatLine[]>;
+        return getMany<PlayerSplitStatLine>("PlayerSplitStatLine", input);
       }),
 
     // Get splits by player
@@ -175,14 +164,13 @@ export const playerStatsRouter = createTRPCRouter({
         }),
       )
       .query(async ({ input }): Promise<PlayerSplitStatLine[]> => {
-        return optimizedSheetsAdapter.findMany("PlayerSplitStatLine", {
+        return getMany<PlayerSplitStatLine>("PlayerSplitStatLine", {
           where: {
             playerId: input.playerId,
             ...(input.seasonId && { seasonId: input.seasonId }),
           },
-        }) as unknown as Promise<PlayerSplitStatLine[]>;
+        });
       }),
-
   }),
 
   // Season totals operations
@@ -200,10 +188,7 @@ export const playerStatsRouter = createTRPCRouter({
         }),
       )
       .query(async ({ input }): Promise<PlayerTotalStatLine[]> => {
-        return optimizedSheetsAdapter.findMany(
-          "PlayerTotalStatLine",
-          input,
-        ) as unknown as Promise<PlayerTotalStatLine[]>;
+        return getMany<PlayerTotalStatLine>("PlayerTotalStatLine", input);
       }),
 
     // Get season totals by player
@@ -215,12 +200,12 @@ export const playerStatsRouter = createTRPCRouter({
         }),
       )
       .query(async ({ input }): Promise<PlayerTotalStatLine[]> => {
-        return optimizedSheetsAdapter.findMany("PlayerTotalStatLine", {
+        return getMany<PlayerTotalStatLine>("PlayerTotalStatLine", {
           where: {
             playerId: input.playerId,
             ...(input.seasonId && { seasonId: input.seasonId }),
           },
-        }) as unknown as Promise<PlayerTotalStatLine[]>;
+        });
       }),
 
     // Get season leaderboard
@@ -233,11 +218,11 @@ export const playerStatsRouter = createTRPCRouter({
         }),
       )
       .query(async ({ input }): Promise<PlayerTotalStatLine[]> => {
-        return optimizedSheetsAdapter.findMany("PlayerTotalStatLine", {
+        return getMany<PlayerTotalStatLine>("PlayerTotalStatLine", {
           where: { seasonId: input.seasonId },
           orderBy: { [input.statType]: "desc" },
           take: input.take,
-        }) as unknown as Promise<PlayerTotalStatLine[]>;
+        });
       }),
   }),
 });

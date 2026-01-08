@@ -2,6 +2,7 @@ import { google } from "googleapis";
 import { GoogleAuth } from "google-auth-library";
 import { env } from "@gshl-env";
 import type { sheets_v4 } from "googleapis";
+import pLimit from "p-limit";
 
 // Enhanced types for better performance
 type CellValue = string | number | boolean | null;
@@ -26,13 +27,6 @@ interface RateLimitConfig {
   baseDelay: number;
 }
 
-interface QueuedRequest {
-  operation: () => Promise<unknown>;
-  resolve: (value: unknown) => void;
-  reject: (error: unknown) => void;
-  timestamp: number;
-}
-
 export class OptimizedSheetsClient {
   private sheets: sheets_v4.Sheets;
   private auth: GoogleAuth;
@@ -48,8 +42,6 @@ export class OptimizedSheetsClient {
   private readonly CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
   // Rate limiting properties
-  private requestQueue: QueuedRequest[] = [];
-  private isProcessingQueue = false;
   private requestTimestamps: number[] = [];
   private readonly rateLimitConfig: RateLimitConfig = {
     requestsPerMinute: 300, // Conservative limit (Google's limit is 300/min)
@@ -57,6 +49,8 @@ export class OptimizedSheetsClient {
     retryAttempts: 5,
     baseDelay: 1000, // 1 second base delay
   };
+
+  private readonly limiter = pLimit(this.rateLimitConfig.burstLimit);
 
   constructor() {
     try {
@@ -171,39 +165,10 @@ export class OptimizedSheetsClient {
 
   // Rate limiting and retry logic
   private async withRateLimit<T>(operation: () => Promise<T>): Promise<T> {
-    return new Promise<T>((resolve, reject) => {
-      this.requestQueue.push({
-        operation: () => operation(),
-        resolve: (val: unknown) => resolve(val as T),
-        reject: (err: unknown) =>
-          reject(err instanceof Error ? err : new Error(String(err))),
-        timestamp: Date.now(),
-      });
-
-      if (!this.isProcessingQueue) {
-        void this.processQueue();
-      }
+    return this.limiter(async () => {
+      await this.waitForRateLimit();
+      return this.executeWithRetry(operation);
     });
-  }
-
-  private async processQueue(): Promise<void> {
-    if (this.isProcessingQueue) return;
-    this.isProcessingQueue = true;
-
-    while (this.requestQueue.length > 0) {
-      const request = this.requestQueue.shift();
-      if (!request) break;
-
-      try {
-        await this.waitForRateLimit();
-        const result = await this.executeWithRetry(request.operation);
-        request.resolve(result);
-      } catch (error) {
-        request.reject(error);
-      }
-    }
-
-    this.isProcessingQueue = false;
   }
 
   private async waitForRateLimit(): Promise<void> {
@@ -299,8 +264,8 @@ export class OptimizedSheetsClient {
     );
 
     return {
-      queueLength: this.requestQueue.length,
-      isProcessing: this.isProcessingQueue,
+      queueLength: this.limiter.pendingCount,
+      isProcessing: this.limiter.activeCount > 0,
       requestsInLastMinute: recentRequests.length,
     };
   }

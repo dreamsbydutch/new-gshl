@@ -6,6 +6,7 @@
  */
 
 export * from "./contract-table";
+export * from "./conference-contest";
 export * from "./draft-board-list";
 export * from "./draft-admin";
 

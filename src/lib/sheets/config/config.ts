@@ -647,6 +647,59 @@ function coerceBoolean(value: unknown): boolean | null {
   return null;
 }
 
+function isIdColumn(column: string): boolean {
+  return column === "id" || column.endsWith("Id") || column.endsWith("Ids");
+}
+
+function isJsonArrayColumn(column: string): boolean {
+  return (
+    column === "categories" ||
+    column === "rosterSpots" ||
+    column.endsWith("Ids") ||
+    column === "nhlPos" ||
+    column === "nhlTeam"
+  );
+}
+
+function toIsoDateOnly(value: Date): string {
+  return value.toISOString().split("T")[0]!;
+}
+
+function coerceDateOnlyString(value: unknown): string | null {
+  if (value === null || value === undefined || value === "") return null;
+
+  if (value instanceof Date) {
+    if (isNaN(value.getTime())) return null;
+    return toIsoDateOnly(value);
+  }
+
+  if (typeof value === "number") {
+    // Excel serial date
+    if (value > 30000) {
+      const dateValue = safeParseSheetDate(value);
+      return dateValue ? toIsoDateOnly(dateValue) : null;
+    }
+    return String(value);
+  }
+
+  const raw = String(value).trim();
+  if (!raw || raw === "null" || raw === "undefined") return null;
+
+  // If it's ISO-like with time, strip time.
+  if (raw.includes("T")) {
+    return raw.split("T")[0]!;
+  }
+
+  // If it's a numeric string that looks like Excel serial date
+  const asNumber = parseFloat(raw);
+  if (!isNaN(asNumber) && asNumber > 30000) {
+    const dateValue = safeParseSheetDate(asNumber);
+    return dateValue ? toIsoDateOnly(dateValue) : null;
+  }
+
+  return raw;
+}
+
 // Type-safe helper to convert database data to sheet row
 export function convertModelToRow<T extends DatabaseRecord>(
   data: T,
@@ -701,7 +754,6 @@ export function convertRowToModel<T extends DatabaseRecord>(
     }
 
     // Handle special conversions based on column name patterns
-    // Keep everything as strings for consistency with Google Sheets
     if (column.endsWith("At")) {
       const stringValue = String(value).trim();
       if (
@@ -749,15 +801,28 @@ export function convertRowToModel<T extends DatabaseRecord>(
         result[column] = dateValue;
       }
     } else if (
-      column === "nhlPos" ||
-      column === "nhlTeam" ||
-      column === "categories" ||
-      column === "rosterSpots"
+      column === "date" ||
+      column.endsWith("Date") ||
+      column === "birthday"
     ) {
+      // Date-only fields are stored as YYYY-MM-DD strings in our domain models.
+      // Normalize serial dates / ISO strings with times to date-only.
+      result[column] = coerceDateOnlyString(value);
+    } else if (isJsonArrayColumn(column)) {
+      const stringValue = String(value).trim();
       try {
-        result[column] = JSON.parse(String(value)) as unknown[];
+        const parsed = JSON.parse(stringValue) as unknown;
+        result[column] = parsed as unknown[];
       } catch {
-        result[column] = [String(value)];
+        // Common legacy format: comma-separated string
+        if (stringValue.includes(",")) {
+          result[column] = stringValue
+            .split(",")
+            .map((part) => part.trim())
+            .filter(Boolean);
+        } else {
+          result[column] = [stringValue];
+        }
       }
     } else if (BOOLEAN_COLUMNS.has(column)) {
       const booleanValue = coerceBoolean(value);
@@ -774,14 +839,15 @@ export function convertRowToModel<T extends DatabaseRecord>(
           result[column] = normalized === "" ? null : normalized;
         }
       }
+    } else if (isIdColumn(column)) {
+      // Domain model IDs are strings, even if Sheets returns numbers.
+      result[column] = String(value);
+    } else if (typeof value === "number") {
+      // Preserve numeric values (Sheets API returns numbers for numeric cells)
+      result[column] = value;
     } else if (typeof value === "boolean") {
       result[column] = value;
-    } else if (typeof value === "string" && value.toLowerCase() === "true") {
-      result[column] = true;
-    } else if (typeof value === "string" && value.toLowerCase() === "false") {
-      result[column] = false;
     } else {
-      // Keep all other values as strings for consistency
       result[column] = String(value);
     }
   });

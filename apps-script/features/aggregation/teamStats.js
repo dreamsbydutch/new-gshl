@@ -69,8 +69,14 @@ function updateTeamStatsForSeason(seasonId) {
       awayTeamId: m.awayTeamId?.toString(),
       homeScore: parseScore(m.homeScore),
       awayScore: parseScore(m.awayScore),
-      homeWin: toBool(m.homeWin),
-      awayWin: toBool(m.awayWin),
+      homeWin:
+        m.homeWin === undefined || m.homeWin === null || m.homeWin === ""
+          ? null
+          : toBool(m.homeWin),
+      awayWin:
+        m.awayWin === undefined || m.awayWin === null || m.awayWin === ""
+          ? null
+          : toBool(m.awayWin),
     }));
 
   const teamDayMap = new Map();
@@ -345,6 +351,36 @@ function calculateTeamSeasonStats(
   playerUsageMap,
   allWeeks,
 ) {
+  const weekIdsBySeasonType = new Map();
+  weekIdsBySeasonType.set(
+    SeasonType.REGULAR_SEASON,
+    new Set(
+      allWeeks
+        .filter(
+          (w) =>
+            (w.weekType || SeasonType.REGULAR_SEASON) ===
+            SeasonType.REGULAR_SEASON,
+        )
+        .map((w) => w.id.toString()),
+    ),
+  );
+  weekIdsBySeasonType.set(
+    SeasonType.PLAYOFFS,
+    new Set(
+      allWeeks
+        .filter((w) => w.weekType === SeasonType.PLAYOFFS)
+        .map((w) => w.id.toString()),
+    ),
+  );
+  weekIdsBySeasonType.set(
+    SeasonType.LOSERS_TOURNAMENT,
+    new Set(
+      allWeeks
+        .filter((w) => w.weekType === SeasonType.LOSERS_TOURNAMENT)
+        .map((w) => w.id.toString()),
+    ),
+  );
+
   const weekTypeMap = new Map(
     allWeeks.map((w) => [
       w.id.toString(),
@@ -406,17 +442,10 @@ function calculateTeamSeasonStats(
     const SVP = aggregated.SA > 0 ? aggregated.SV / aggregated.SA : 0;
 
     const seasonType = group.seasonType;
-    const weekIdsInSeasonType = new Set(
-      allWeeks
-        .filter((w) => {
-          if (seasonType === SeasonType.PLAYOFFS)
-            return w.weekType === SeasonType.PLAYOFFS;
-          if (seasonType === SeasonType.LOSERS_TOURNAMENT)
-            return w.weekType === SeasonType.LOSERS_TOURNAMENT;
-          return w.weekType === SeasonType.REGULAR_SEASON;
-        })
-        .map((w) => w.id.toString()),
-    );
+    const weekIdsInSeasonType =
+      weekIdsBySeasonType.get(seasonType) ||
+      weekIdsBySeasonType.get(SeasonType.REGULAR_SEASON) ||
+      new Set();
 
     const teamMatchups = matchups.filter((m) => {
       if (!weekIdsInSeasonType.has(m.weekId)) return false;
@@ -565,10 +594,20 @@ function calculateTeamSeasonStats(
     });
   });
 
-  return calculateRankings(teamSeasonStats, teamConfMap);
+  return calculateRankings(
+    teamSeasonStats,
+    teamConfMap,
+    matchups,
+    weekIdsBySeasonType,
+  );
 }
 
-function calculateRankings(teamSeasons, teamConfMap) {
+function calculateRankings(
+  teamSeasons,
+  teamConfMap,
+  matchups,
+  weekIdsBySeasonType,
+) {
   const seasonTypeGroups = new Map();
   teamSeasons.forEach((ts) => {
     if (!seasonTypeGroups.has(ts.seasonType)) {
@@ -577,19 +616,159 @@ function calculateRankings(teamSeasons, teamConfMap) {
     seasonTypeGroups.get(ts.seasonType).push(ts);
   });
 
-  const compareEntries = (a, b) => {
-    if (b.points !== a.points) return b.points - a.points;
-    if (b.team.teamW !== a.team.teamW) return b.team.teamW - a.team.teamW;
-    return a.team.gshlTeamId.localeCompare(b.team.gshlTeamId);
+  const resolvedMatchups = Array.isArray(matchups) ? matchups : [];
+  const matchupHasOutcome = (matchup) => {
+    if (!matchup) return false;
+    return matchup.homeWin === true || matchup.awayWin === true;
+  };
+
+  const computeStandingsPoints = (team) => {
+    if (!team) return 0;
+    const wins = toNumber(team.teamW);
+    const homeTieWins = toNumber(team.teamHW);
+    const homeTieLosses = toNumber(team.teamHL);
+    return 3 * (wins - homeTieWins) + 2 * homeTieWins + homeTieLosses;
+  };
+
+  const computeConferencePoints = (team) => {
+    if (!team) return 0;
+    const wins = toNumber(team.teamCCW);
+    const homeTieWins = toNumber(team.teamCCHW);
+    const homeTieLosses = toNumber(team.teamCCHL);
+    return 3 * (wins - homeTieWins) + 2 * homeTieWins + homeTieLosses;
+  };
+
+  const computeMiniStandingsForTeams = (teamIds, seasonType) => {
+    const ids = Array.isArray(teamIds) ? teamIds.filter(Boolean) : [];
+    const idSet = new Set(ids);
+    const weekIdsInSeasonType =
+      (weekIdsBySeasonType && weekIdsBySeasonType.get(seasonType)) ||
+      (weekIdsBySeasonType &&
+        weekIdsBySeasonType.get(SeasonType.REGULAR_SEASON)) ||
+      null;
+
+    const mini = new Map();
+    ids.forEach((id) => {
+      mini.set(id, { W: 0, HW: 0, HL: 0 });
+    });
+
+    resolvedMatchups.forEach((matchup) => {
+      if (!matchup || !matchup.weekId) return;
+      if (weekIdsInSeasonType && !weekIdsInSeasonType.has(matchup.weekId))
+        return;
+      if (!matchupHasOutcome(matchup)) return;
+      const homeId = matchup.homeTeamId;
+      const awayId = matchup.awayTeamId;
+      if (!idSet.has(homeId) || !idSet.has(awayId)) return;
+      const homeStats = mini.get(homeId);
+      const awayStats = mini.get(awayId);
+      if (!homeStats || !awayStats) return;
+
+      const scoresWereEqual =
+        matchup.homeScore !== null &&
+        matchup.awayScore !== null &&
+        matchup.homeScore === matchup.awayScore;
+
+      if (matchup.homeWin) {
+        homeStats.W += 1;
+        if (scoresWereEqual) {
+          homeStats.HW += 1;
+          awayStats.HL += 1;
+        }
+      } else if (matchup.awayWin) {
+        awayStats.W += 1;
+      }
+    });
+
+    const pointsByTeamId = new Map();
+    ids.forEach((id) => {
+      const stats = mini.get(id) || { W: 0, HW: 0, HL: 0 };
+      pointsByTeamId.set(
+        id,
+        3 * (stats.W - stats.HW) + 2 * stats.HW + stats.HL,
+      );
+    });
+
+    return { miniByTeamId: mini, pointsByTeamId };
+  };
+
+  const orderEntriesWithTiebreakers = (entries, seasonType) => {
+    const baseSorted = [...entries].sort((a, b) => {
+      if (b.team.teamW !== a.team.teamW) return b.team.teamW - a.team.teamW;
+      if (b.points !== a.points) return b.points - a.points;
+      return a.team.gshlTeamId.localeCompare(b.team.gshlTeamId);
+    });
+
+    const output = [];
+    let i = 0;
+    while (i < baseSorted.length) {
+      const start = i;
+      const wins = baseSorted[i].team.teamW;
+      const points = baseSorted[i].points;
+      i++;
+      while (
+        i < baseSorted.length &&
+        baseSorted[i].team.teamW === wins &&
+        baseSorted[i].points === points
+      ) {
+        i++;
+      }
+      const group = baseSorted.slice(start, i);
+      if (group.length <= 1) {
+        output.push(group[0]);
+        continue;
+      }
+
+      const teamIds = group.map((entry) => entry.team.gshlTeamId);
+      const headToHead = computeMiniStandingsForTeams(teamIds, seasonType);
+      group.sort((a, b) => {
+        const aId = a.team.gshlTeamId;
+        const bId = b.team.gshlTeamId;
+        const aMini = headToHead.miniByTeamId.get(aId) || {
+          W: 0,
+          HW: 0,
+          HL: 0,
+        };
+        const bMini = headToHead.miniByTeamId.get(bId) || {
+          W: 0,
+          HW: 0,
+          HL: 0,
+        };
+        const aMiniPoints = headToHead.pointsByTeamId.get(aId) || 0;
+        const bMiniPoints = headToHead.pointsByTeamId.get(bId) || 0;
+
+        if (bMini.W !== aMini.W) return bMini.W - aMini.W;
+        if (bMiniPoints !== aMiniPoints) return bMiniPoints - aMiniPoints;
+
+        const aConfWins = toNumber(a.team.teamCCW);
+        const bConfWins = toNumber(b.team.teamCCW);
+        if (bConfWins !== aConfWins) return bConfWins - aConfWins;
+
+        const aConfPoints = computeConferencePoints(a.team);
+        const bConfPoints = computeConferencePoints(b.team);
+        if (bConfPoints !== aConfPoints) return bConfPoints - aConfPoints;
+
+        // TODO: final tiebreaker should use power ranking once implemented.
+        return aId.localeCompare(bId);
+      });
+
+      output.push(...group);
+    }
+
+    return output;
   };
 
   seasonTypeGroups.forEach((teams) => {
     const teamsWithPoints = teams.map((t) => ({
       team: t,
-      points: 3 * (t.teamW - t.teamHW) + 2 * t.teamHW + t.teamHL,
+      points: computeStandingsPoints(t),
     }));
 
-    const overallOrdered = [...teamsWithPoints].sort(compareEntries);
+    const seasonType = teamsWithPoints[0]?.team?.seasonType;
+    const overallOrdered = orderEntriesWithTiebreakers(
+      teamsWithPoints,
+      seasonType,
+    );
     overallOrdered.forEach((entry, index) => {
       entry.team.overallRk = index + 1;
       entry.team.conferenceRk = null;
@@ -607,7 +786,9 @@ function calculateRankings(teamSeasons, teamConfMap) {
     });
 
     conferenceBuckets.forEach((bucket) => {
-      bucket.sort(compareEntries);
+      const ordered = orderEntriesWithTiebreakers(bucket, seasonType);
+      bucket.length = 0;
+      bucket.push(...ordered);
       bucket.forEach((entry, index) => {
         entry.team.conferenceRk = index + 1;
       });
@@ -620,7 +801,11 @@ function calculateRankings(teamSeasons, teamConfMap) {
       return typeof rank === "number" && rank > 3;
     });
 
-    wildcardEntries.forEach((entry, index) => {
+    const wildcardOrdered = orderEntriesWithTiebreakers(
+      wildcardEntries,
+      seasonType,
+    );
+    wildcardOrdered.forEach((entry, index) => {
       entry.team.wildcardRk = index + 1;
     });
   });

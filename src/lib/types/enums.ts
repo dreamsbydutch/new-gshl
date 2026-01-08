@@ -34,7 +34,7 @@ export enum SeasonType {
 export enum MatchupType {
   CONFERENCE = "CC",
   NON_CONFERENCE = "NC",
-  QUATER_FINAL = "QF",
+  QUARTER_FINAL = "QF",
   SEMI_FINAL = "SF",
   FINAL = "F",
   LOSERS_TOURNAMENT = "LT",

@@ -6,11 +6,9 @@
  *
  * Organized into logical subdirectories:
  * - config: Configuration, workbook mappings, and model metadata
- * - cache: Caching layer with TTL management
  * - client: Low-level Google Sheets API client
- * - adapters: High-level Prisma-like database adapters
- * - playerday: PlayerDay-specific partitioning and validation
- * - migration: Schema migration and data transformation tools
+ * - reader: Minimal read-optimized snapshot reader
+ * - writer: Minimal targeted write helpers (used sparingly)
  */
 
 // ============================================================================
@@ -27,17 +25,6 @@
 export * from "./config";
 
 // ============================================================================
-// CACHING LAYER
-// ============================================================================
-
-/**
- * Sheet caching with TTL management
- * - Reduces API calls to Google Sheets
- * - Automatic cache invalidation based on data type
- */
-export * from "./cache";
-
-// ============================================================================
 // LOW-LEVEL GOOGLE SHEETS CLIENT
 // ============================================================================
 
@@ -50,39 +37,26 @@ export * from "./cache";
 export * from "./client";
 
 // ============================================================================
-// HIGH-LEVEL DATABASE ADAPTERS
+// (Adapter/migration utilities intentionally not exported; keep this integration lean.)
+
+// ============================================================================
+// FAST READ-ONLY READER
 // ============================================================================
 
 /**
- * Prisma-like database adapters for Google Sheets
- * - OptimizedSheetsAdapter: General-purpose adapter for all models
- * - PlayerDayAdapter: Specialized adapter for partitioned PlayerDay data
- * - Provides familiar database operations (findMany, create, update, delete)
+ * Minimal, read-only batch reader designed for quick snapshots.
+ * Prefer this for client-side caching (BrowserDB/localStorage) patterns.
  */
-export * from "./adapters";
+export * from "./reader/fast-reader";
 
 // ============================================================================
-// PLAYERDAY UTILITIES
+// MINIMAL WRITER
 // ============================================================================
 
 /**
- * PlayerDay partitioning and validation
- * - Workbook partitioning by season ranges
- * - Update timeframe validation (2-day window)
- * - Batch operation categorization
+ * Targeted write helper (used for the few remaining update flows).
  */
-export * from "./playerday";
-
-// ============================================================================
-// MIGRATION TOOLS
-// ============================================================================
-
-/**
- * Schema migration and data transformation
- * - Handles data migration between different sheet structures
- * - Manages schema updates and data transformations
- */
-export * from "./migration";
+export * from "./writer/minimal-writer";
 
 // ============================================================================
 // USAGE EXAMPLES
@@ -91,27 +65,13 @@ export * from "./migration";
 /**
  * Common usage patterns:
  *
- * // Basic queries
- * import { optimizedSheetsAdapter } from "~/lib/sheets";
- * const seasons = await optimizedSheetsAdapter.findMany("Season");
- * const team = await optimizedSheetsAdapter.findUnique("Team", { where: { id: 1 } });
- *
- * // Creating data
- * const newPlayer = await optimizedSheetsAdapter.create("Player", {
- *   data: { name: "Connor McDavid", position: "C" }
- * });
- *
- * // Batch operations
- * await optimizedSheetsAdapter.createMany("Player", {
- *   data: [player1, player2, player3]
- * });
+ * // Snapshot reads (preferred)
+ * import { fastSheetsReader } from "~/lib/sheets";
+ * const snapshot = await fastSheetsReader.fetchSnapshot(["Season", "Team", "Player"]);
  *
  * // Configuration access
  * import { WORKBOOKS, MODEL_TO_WORKBOOK } from "~/lib/sheets";
  * const generalWorkbookId = WORKBOOKS.GENERAL;
  * const teamWorkbook = MODEL_TO_WORKBOOK.Team;
  *
- * // Migration operations
- * import { migrationHelper } from "~/lib/sheets";
- * await migrationHelper.migrateSheet("Player", newSchema);
  */

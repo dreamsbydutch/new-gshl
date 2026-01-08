@@ -1,8 +1,9 @@
 import { z } from "zod";
 import { createTRPCRouter, publicProcedure } from "../trpc";
-import { optimizedSheetsAdapter } from "@gshl-sheets";
 import { idSchema, baseQuerySchema } from "./_schemas";
 import type { DraftPick } from "@gshl-types";
+import { minimalSheetsWriter } from "@gshl-sheets";
+import { getById, getCount, getMany } from "../sheets-store";
 
 // Draft Pick router
 const draftPickWhereSchema = z
@@ -14,15 +15,6 @@ const draftPickWhereSchema = z
     pick: z.string().optional(),
   })
   .optional();
-
-const draftPickCreateSchema = z.object({
-  playerId: z.string().optional(),
-  teamId: z.string(),
-  seasonId: z.string(),
-  round: z.string(),
-  pick: z.string(),
-  originalTeamId: z.string().optional(),
-});
 
 const draftPickUpdateSchema = z.object({
   playerId: z.string().nullable().optional(),
@@ -37,69 +29,46 @@ export const draftPickRouter = createTRPCRouter({
   getAll: publicProcedure
     .input(baseQuerySchema.extend({ where: draftPickWhereSchema }))
     .query(async ({ input }): Promise<DraftPick[]> => {
-      return optimizedSheetsAdapter.findMany(
-        "DraftPick",
-        input,
-      ) as unknown as Promise<DraftPick[]>;
+      return getMany<DraftPick>("DraftPick", input);
     }),
 
   getById: publicProcedure
     .input(idSchema)
     .query(async ({ input }): Promise<DraftPick | null> => {
-      return optimizedSheetsAdapter.findUnique("DraftPick", {
-        where: { id: input.id },
-      }) as unknown as Promise<DraftPick | null>;
+      return getById<DraftPick>("DraftPick", input.id);
     }),
 
   getByTeam: publicProcedure
     .input(z.object({ teamId: z.string() }))
     .query(async ({ input }): Promise<DraftPick[]> => {
-      return optimizedSheetsAdapter.findMany("DraftPick", {
+      return getMany<DraftPick>("DraftPick", {
         where: { teamId: input.teamId },
-      }) as unknown as Promise<DraftPick[]>;
+      });
     }),
 
   getBySeason: publicProcedure
     .input(z.object({ seasonId: z.string() }))
     .query(async ({ input }): Promise<DraftPick[]> => {
-      const picksRaw = await optimizedSheetsAdapter.findMany("DraftPick", {
+      return getMany<DraftPick>("DraftPick", {
         where: { seasonId: input.seasonId },
+        orderBy: { round: "asc", pick: "asc" },
       });
-      const picks = (picksRaw as DraftPick[])
-        .slice()
-        .sort((a, b) => +a.round - +b.round || +a.pick - +b.pick);
-      return picks;
-    }),
-
-  create: publicProcedure
-    .input(draftPickCreateSchema)
-    .mutation(async ({ input }): Promise<DraftPick> => {
-      return optimizedSheetsAdapter.create("DraftPick", {
-        data: input,
-      }) as unknown as Promise<DraftPick>;
     }),
 
   update: publicProcedure
     .input(idSchema.extend({ data: draftPickUpdateSchema }))
     .mutation(async ({ input }): Promise<DraftPick> => {
-      return optimizedSheetsAdapter.update("DraftPick", {
-        where: { id: input.id },
-        data: input.data,
-      }) as unknown as Promise<DraftPick>;
-    }),
-
-  delete: publicProcedure
-    .input(idSchema)
-    .mutation(async ({ input }): Promise<DraftPick> => {
-      return optimizedSheetsAdapter.delete("DraftPick", {
-        where: { id: input.id },
-      }) as unknown as Promise<DraftPick>;
+      await minimalSheetsWriter.updateById("DraftPick", input.id, input.data);
+      const updated = await getById<DraftPick>("DraftPick", input.id);
+      if (!updated) {
+        throw new Error(`DraftPick with id ${input.id} not found after update`);
+      }
+      return updated;
     }),
 
   count: publicProcedure
     .input(z.object({ where: draftPickWhereSchema }))
     .query(async ({ input }): Promise<{ count: number }> => {
-      const count = await optimizedSheetsAdapter.count("DraftPick", input);
-      return { count };
+      return { count: await getCount("DraftPick", input) };
     }),
 });

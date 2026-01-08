@@ -40,7 +40,6 @@ function updateMatchupsFromTeamWeeks(seasonId) {
     TEAMSTATS_SPREADSHEET_ID,
     "TeamWeekStatLine",
   ).filter((tw) => tw.seasonId?.toString() === seasonKey);
-
   if (!teamWeeks.length) {
     console.log(`No team week stats found for season ${seasonKey}`);
     return;

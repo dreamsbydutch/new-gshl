@@ -2,9 +2,11 @@
 
 /**
  * Aggregation constants shared across player, team, and matchup modules.
- * Use defensive re-declaration to avoid duplicate definitions when clasp
- * concatenates files in an arbitrary order.
+ *
+ * Note: Apps Script loads files into a shared global scope.
+ * Keeping these in core avoids duplicate definitions across feature folders.
  */
+
 var SeasonType =
   typeof SeasonType !== "undefined"
     ? SeasonType

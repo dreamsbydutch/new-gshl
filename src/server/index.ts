@@ -11,6 +11,3 @@
 
 // API exports (already has its own barrel)
 export * from "./api";
-
-// Re-export commonly used server utilities
-export { optimizedSheetsAdapter } from "@gshl-sheets";

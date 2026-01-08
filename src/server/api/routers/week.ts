@@ -1,8 +1,8 @@
 import { z } from "zod";
 import { createTRPCRouter, publicProcedure } from "../trpc";
-import { optimizedSheetsAdapter } from "@gshl-sheets";
 import { idSchema, baseQuerySchema } from "./_schemas";
 import type { Week } from "@gshl-types";
+import { getById, getCount, getFirst, getMany } from "../sheets-store";
 
 // Week-specific schemas
 const weekWhereSchema = z
@@ -15,24 +15,6 @@ const weekWhereSchema = z
   })
   .optional();
 
-const weekCreateSchema = z.object({
-  seasonId: z.string(),
-  weekNum: z.number().int(),
-  startDate: z.date(),
-  endDate: z.date(),
-  isActive: z.boolean().default(false),
-  isPlayoffs: z.boolean().default(false),
-});
-
-const weekUpdateSchema = z.object({
-  seasonId: z.string().optional(),
-  weekNum: z.number().int().optional(),
-  startDate: z.date().optional(),
-  endDate: z.date().optional(),
-  isActive: z.boolean().optional(),
-  isPlayoffs: z.boolean().optional(),
-});
-
 export const weekRouter = createTRPCRouter({
   // Get all weeks with filtering
   getAll: publicProcedure
@@ -42,78 +24,35 @@ export const weekRouter = createTRPCRouter({
       }),
     )
     .query(async ({ input }): Promise<Week[]> => {
-      return optimizedSheetsAdapter.findMany(
-        "Week",
-        input,
-      ) as unknown as Promise<Week[]>;
+      return getMany<Week>("Week", input);
     }),
 
   // Get single week by ID
   getById: publicProcedure
     .input(idSchema)
     .query(async ({ input }): Promise<Week | null> => {
-      return optimizedSheetsAdapter.findUnique("Week", {
-        where: { id: input.id },
-      }) as unknown as Promise<Week | null>;
+      return getById<Week>("Week", input.id);
     }),
 
   // Get weeks by season
   getBySeason: publicProcedure
     .input(z.object({ seasonId: z.string() }))
     .query(async ({ input }): Promise<Week[]> => {
-      const weeksRaw = await optimizedSheetsAdapter.findMany("Week", {
+      return getMany<Week>("Week", {
         where: { seasonId: input.seasonId },
+        orderBy: { weekNum: "asc" },
       });
-      const weeks = (weeksRaw as Week[])
-        .slice()
-        .sort((a, b) => a.weekNum - b.weekNum);
-      return weeks;
     }),
 
   // Get active week
   getActive: publicProcedure.query(async (): Promise<Week | null> => {
-    return optimizedSheetsAdapter.findFirst("Week", {
-      where: { isActive: true },
-    }) as unknown as Promise<Week | null>;
+    return getFirst<Week>("Week", { where: { isActive: true } });
   }),
-
-  // Create new week
-  create: publicProcedure
-    .input(weekCreateSchema)
-    .mutation(async ({ input }): Promise<Week> => {
-      return optimizedSheetsAdapter.create("Week", {
-        data: input,
-      }) as unknown as Promise<Week>;
-    }),
-
-  // Update week
-  update: publicProcedure
-    .input(
-      idSchema.extend({
-        data: weekUpdateSchema,
-      }),
-    )
-    .mutation(async ({ input }): Promise<Week> => {
-      return optimizedSheetsAdapter.update("Week", {
-        where: { id: input.id },
-        data: input.data,
-      }) as unknown as Promise<Week>;
-    }),
-
-  // Delete week
-  delete: publicProcedure
-    .input(idSchema)
-    .mutation(async ({ input }): Promise<Week> => {
-      return optimizedSheetsAdapter.delete("Week", {
-        where: { id: input.id },
-      }) as unknown as Promise<Week>;
-    }),
 
   // Count weeks
   count: publicProcedure
     .input(z.object({ where: weekWhereSchema }))
     .query(async ({ input }): Promise<{ count: number }> => {
-      const count = await optimizedSheetsAdapter.count("Week", input);
-      return { count };
+      return { count: await getCount("Week", input) };
     }),
 });

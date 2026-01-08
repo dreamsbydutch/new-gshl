@@ -20,7 +20,7 @@ const getGameTypeFilter = (gameTypeCategory: string): MatchupType[] => {
       return [MatchupType.NON_CONFERENCE];
     case "PO": // Playoffs
       return [
-        MatchupType.QUATER_FINAL,
+        MatchupType.QUARTER_FINAL,
         MatchupType.SEMI_FINAL,
         MatchupType.FINAL,
       ];
