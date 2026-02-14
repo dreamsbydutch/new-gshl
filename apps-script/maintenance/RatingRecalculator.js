@@ -36,7 +36,7 @@ function recalcPlayerRatings() {
       statLine[headers[c]] = row[c];
     }
 
-    var ratingResult = rankPerformance(statLine);
+    var ratingResult = RankingEngine.rankPerformance(statLine);
     var score =
       ratingResult && !isNaN(ratingResult.score)
         ? Number(ratingResult.score.toFixed(2))
@@ -83,7 +83,7 @@ function recalcPlayerRatings() {
       statLine[headers[c]] = row[c];
     }
 
-    var ratingResult = rankPerformance(statLine);
+    var ratingResult = RankingEngine.rankPerformance(statLine);
     var score =
       ratingResult && !isNaN(ratingResult.score)
         ? Number(ratingResult.score.toFixed(2))
@@ -129,7 +129,7 @@ function recalcPlayerRatings() {
       statLine[headers[c]] = row[c];
     }
 
-    var ratingResult = rankPerformance(statLine);
+    var ratingResult = RankingEngine.rankPerformance(statLine);
     var score =
       ratingResult && !isNaN(ratingResult.score)
         ? Number(ratingResult.score.toFixed(2))
@@ -175,7 +175,7 @@ function recalcPlayerRatings() {
       statLine[headers[c]] = row[c];
     }
 
-    var ratingResult = rankPerformance(statLine);
+    var ratingResult = RankingEngine.rankPerformance(statLine);
     var score =
       ratingResult && !isNaN(ratingResult.score)
         ? Number(ratingResult.score.toFixed(2))
@@ -221,7 +221,7 @@ function recalcPlayerRatings() {
       statLine[headers[c]] = row[c];
     }
 
-    var ratingResult = rankPerformance(statLine);
+    var ratingResult = RankingEngine.rankPerformance(statLine);
     var score =
       ratingResult && !isNaN(ratingResult.score)
         ? Number(ratingResult.score.toFixed(2))
@@ -267,7 +267,7 @@ function recalcPlayerRatings() {
       statLine[headers[c]] = row[c];
     }
 
-    var ratingResult = rankPerformance(statLine);
+    var ratingResult = RankingEngine.rankPerformance(statLine);
     var score =
       ratingResult && !isNaN(ratingResult.score)
         ? Number(ratingResult.score.toFixed(2))

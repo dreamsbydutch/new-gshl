@@ -123,7 +123,7 @@ function updatePastPlayerDays(targetDate) {
           );
           return;
         }
-        const ratingResult = rankPerformance(newRow);
+        const ratingResult = RankingEngine.rankPerformance(newRow);
         newRow.Rating =
           ratingResult && ratingResult.score !== undefined
             ? ratingResult.score
@@ -146,7 +146,7 @@ function updatePastPlayerDays(targetDate) {
         }
       });
 
-      const ratingResult = rankPerformance(mergedRow);
+      const ratingResult = RankingEngine.rankPerformance(mergedRow);
       const ratingScore =
         ratingResult && ratingResult.score !== undefined
           ? ratingResult.score
@@ -205,7 +205,7 @@ function updatePlayerStatsForSeason(seasonId) {
   const playerTotals = [];
 
   weeks.forEach((week) => {
-    const weekSeasonType = week.weekType || SeasonType.REGULAR_SEASON;
+    const weekSeasonType = week.weekType || SEASON_TYPE.REGULAR_SEASON;
     const weekPlayerDays = playerDays.filter((pd) => pd.weekId === week.id);
     const playerDayMap = new Map();
     weekPlayerDays.forEach((pd) => {
@@ -313,7 +313,8 @@ function updatePlayerStatsForSeason(seasonId) {
               .toFixed(6)
               .toString()
           : "";
-      playerWeekStatLine.Rating = rankPerformance(playerWeekStatLine).score;
+      playerWeekStatLine.Rating =
+        RankingEngine.rankPerformance(playerWeekStatLine).score;
       playerWeeks.push(playerWeekStatLine);
     });
   });
@@ -432,7 +433,8 @@ function updatePlayerStatsForSeason(seasonId) {
             .toFixed(6)
             .toString()
         : "";
-    playerSplitStatLine.Rating = rankPerformance(playerSplitStatLine).score;
+    playerSplitStatLine.Rating =
+      RankingEngine.rankPerformance(playerSplitStatLine).score;
     playerSplits.push(playerSplitStatLine);
   });
 
@@ -536,7 +538,8 @@ function updatePlayerStatsForSeason(seasonId) {
             .toFixed(6)
             .toString()
         : "";
-    playerTotalStatLine.Rating = rankPerformance(playerTotalStatLine).score;
+    playerTotalStatLine.Rating =
+      RankingEngine.rankPerformance(playerTotalStatLine).score;
     playerTotals.push(playerTotalStatLine);
   });
 

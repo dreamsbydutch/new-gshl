@@ -15,7 +15,7 @@ function ensurePlayerRatings(statLines) {
     ) {
       return;
     }
-    var ratingResult = rankPerformance(line);
+    var ratingResult = RankingEngine.rankPerformance(line);
     if (ratingResult && ratingResult.score !== undefined) {
       line.Rating = ratingResult.score;
     }
@@ -234,7 +234,7 @@ function buildRosterEntries(
           : "F";
       playerRow.bestPos = "";
       playerRow.fullPos = "";
-      const rating = rankPerformance(playerRow);
+      const rating = RankingEngine.rankPerformance(playerRow);
       playerRow.Rating =
         rating && rating.score !== undefined ? rating.score : "";
       playerRow.ADD = !yest ? 1 : "";
@@ -311,7 +311,7 @@ function buildTeamDayStatLine(
     BS: String(sumStat(lineup, "BS")),
   };
 
-  const teamRating = rankPerformance(teamDayStatLine);
+  const teamRating = RankingEngine.rankPerformance(teamDayStatLine);
   teamDayStatLine.Rating =
     teamRating && teamRating.score !== undefined ? teamRating.score : "";
 

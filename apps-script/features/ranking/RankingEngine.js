@@ -1,203 +1,121 @@
 // @ts-nocheck
 
 /**
- * Ranking Engine
- * ==============
- * Core ranking algorithm that scores stat line performances from 0-120+ using
- * percentile-based normalization with exponential scaling at the top end.
+ * Ranking Engine (Apps Script)
+ * ----------------------------
+ * Scores a single stat line (player/team; day/week/season) by:
+ * - Classifying the line (entity type, aggregation level, season phase)
+ * - Converting stat categories into percentiles via trained distributions
+ * - Applying an exponential transform to separate elite performances
+ * - Weighting by position/category importance
+ * - Blending/adjusting based on aggregation behavior profiles
  *
- * SUPPORTS ALL AGGREGATION LEVELS:
+ * Output:
+ * - `score`: unbounded (typically ~0–120+), floored at 0
+ * - `percentile`: 0–100 reference percentile for the composite
+ * - `breakdown`: per-category contribution details
  *
- * Player Stats:
- * - Daily: Individual game performances (date field present)
- * - Weekly: Week aggregations (weekId field, no seasonType)
- * - Season: Full season totals (seasonType field or just seasonId)
+ * Dependencies (globals injected elsewhere in Apps Script):
+ * - RANKING_MODELS, PositionGroup, ScalingConfig, StatCategory
+ * - SEASON_PHASE_* constants
+ * - getRelevantStats, getScalingConfig, applyMidpointCompression
+ * - isLowerBetterStat, getCategoryWeightMultiplier
+ * - getAggregationBlendWeights, getAggregationBehaviorProfile
+ * - isOutlierPerformance, clip, percentileRank
  *
- * Team Stats (sum of all players on team):
- * - Daily: Team performance for a specific date
- * - Weekly: Team performance for a week
- * - Season: Team performance for entire season
- *
- * HOW IT WORKS:
- *
- * 1. Auto-detects aggregation type from fields (date/weekId/seasonType)
- * 2. Uses raw cumulative stats for weekly/season aggregates (daily already per-game)
- * 3. Converts stats to percentiles using historical distributions
- * 4. Applies exponential transformation (power 1.8) to spread top performers
- * 5. Weights stats by position-specific importance
- * 6. Applies position-specific curve and scaling
- * 7. Returns rating from ~0-120 with no artificial ceiling
- *
- * IMPORTANT: All aggregation levels use the SAME baseline distributions
- * (trained on daily performances). Weekly/season stats are normalized to
- * per-game averages first, so they can be compared on the same scale.
- *
- * USAGE EXAMPLES:
- *
- * // Player daily - model auto-selected based on seasonId and posGroup
- * rankPerformance({
- *   playerId: "123",
- *   seasonId: "10",
- *   posGroup: "F",
- *   date: new Date(),
- *   GS: 1,
- *   G: 2, A: 1, P: 3, SOG: 5, ...
- * });
- *
- * // Player weekly - model auto-selected
- * rankPerformance({
- *   playerId: "123",
- *   seasonId: "10",
- *   posGroup: "F",
- *   weekId: "10-01",
- *   GS: 3,  // Started 3 games this week
- *   G: 4, A: 3, P: 7, SOG: 15, ...  // Totals for week
- * });
- *
- * // Team weekly - model auto-selected
- * rankPerformance({
- *   gshlTeamId: "team1",
- *   seasonId: "10",
- *   posGroup: "F",
- *   weekId: "10-01",
- *   GS: 45,  // Total GS across all forwards
- *   G: 25, A: 30, P: 55, ...  // Team totals
- * });
- */ // ===== UTILITY FUNCTIONS =====
+ * Usage:
+ * - `RankingEngine.rankPerformance(statLine)` for a single item
+ * - `RankingEngine.rankPerformances(statLines)` for batches
+ */
 
 /**
- * Clip a value between min and max
- * @param {number} value - Value to clip
- * @param {number} min - Minimum value
- * @param {number} max - Maximum value
- * @returns {number} Clipped value
+ * Module wrapper
+ * --------------
+ * Apps Script does not have real ES module boundaries across files. Wrapping
+ * the implementation in an IIFE keeps helper functions out of the global
+ * namespace while still allowing other files to call the public API.
  */
-function clip(value, min, max) {
-  return Math.max(min, Math.min(max, value));
-}
+var RankingEngine = (function () {
+
+// =============================================================================
+// Classification & keys
+// =============================================================================
 
 /**
- * Calculate percentile rank of a value in a sorted array
- * @param {number} value - Value to rank
- * @param {number[]} sortedValues - Array sorted in ascending order
- * @returns {number} Percentile (0-100)
+ * Classify a stat line into the metadata needed to pick a ranking model.
+ *
+ * This keeps model selection consistent across player/team and day/week/season
+ * inputs (and handles older/partial inputs with safe fallbacks).
+ *
+ * @param {Object} line
+ * @returns {{seasonId:string,posGroup:string,aggregationLevel:string,entityType:string,seasonPhase:string}|null}
  */
-function percentileRank(value, sortedValues) {
-  if (sortedValues.length === 0) return 0;
-
-  let rank = 0;
-  for (const val of sortedValues) {
-    if (val <= value) rank++;
-    else break;
-  }
-
-  return (rank / sortedValues.length) * 100;
-}
-
-/**
- * Normalize value to 0-100 scale based on min/max
- * @param {number} value - Value to normalize
- * @param {number} min - Minimum value
- * @param {number} max - Maximum value
- * @returns {number} Normalized value (0-100)
- */
-function normalizeToScale(value, min, max) {
-  if (max === min) return 50; // If no range, return middle
-  return ((value - min) / (max - min)) * 100;
-}
-
-/**
- * Sort array in ascending order
- * @param {number[]} arr - Array to sort
- * @returns {number[]} Sorted array
- */
-function sortAscending(arr) {
-  return arr.slice().sort((a, b) => a - b);
-}
-
-// ===== CLASSIFICATION HELPERS =====
-
-const SEASON_PHASE_REGULAR =
-  typeof SeasonType !== "undefined" && SeasonType.REGULAR_SEASON
-    ? SeasonType.REGULAR_SEASON
-    : "RS";
-const SEASON_PHASE_PLAYOFF =
-  typeof SeasonType !== "undefined" && SeasonType.PLAYOFFS
-    ? SeasonType.PLAYOFFS
-    : "PO";
-const SEASON_PHASE_LOSERS =
-  typeof SeasonType !== "undefined" && SeasonType.LOSERS_TOURNAMENT
-    ? SeasonType.LOSERS_TOURNAMENT
-    : "LT";
-
-function normalizeSeasonPhase(value, fallbackPhase) {
-  if (!value || typeof value !== "string") return fallbackPhase;
-  const upper = value.toUpperCase();
-  if (upper === "PO" || upper === "PLAYOFFS") return SEASON_PHASE_PLAYOFF;
-  if (upper === "LT" || upper === "LOSERS_TOURNAMENT")
-    return SEASON_PHASE_LOSERS;
-  return SEASON_PHASE_REGULAR;
-}
-
-function detectEntityType(line) {
-  if (line.entityType === "team") return "team";
-  if (line.entityType === "player") return "player";
-  if (line.playerId) return "player";
-  if (line.gshlTeamId || line.teamId) return "team";
-  return "player";
-}
-
-function normalizePosGroup(raw, entityType) {
-  if (entityType === "team") return PositionGroup.TEAM;
-  if (!raw) return null;
-  const str = String(raw).toUpperCase();
-  if (str === PositionGroup.F) return PositionGroup.F;
-  if (str === PositionGroup.D) return PositionGroup.D;
-  if (str === PositionGroup.G) return PositionGroup.G;
-  return null;
-}
-
-function detectAggregationLevel(line, entityType) {
-  const hasDate = Boolean(line.date);
-  const hasWeekId = Boolean(line.weekId);
-  const hasDaysField = line.days !== undefined && line.days !== null;
-  const hasSeasonType =
-    typeof line.seasonType === "string" && line.seasonType !== "";
-  const hasTeamList =
-    line.gshlTeamIds !== undefined && line.gshlTeamIds !== null;
-  const hasNhlSeasonFields =
-    line.seasonRating !== undefined ||
-    line.overallRating !== undefined ||
-    line.salary !== undefined ||
-    line.QS !== undefined ||
-    line.RBS !== undefined;
-
-  if (entityType === "player") {
-    if (hasNhlSeasonFields) return "playerNhl";
-    if (hasDate) return "playerDay";
-    if (hasWeekId && hasDaysField) return "playerWeek";
-    if (hasSeasonType && line.gshlTeamId) return "playerSplit";
-    if (hasTeamList) return "playerTotal";
-    if (hasSeasonType) return "playerTotal";
-    return hasWeekId ? "playerWeek" : "playerDay";
-  }
-
-  if (hasDate) return "teamDay";
-  if (hasWeekId) return "teamWeek";
-  return "teamSeason";
-}
-
-function resolveSeasonPhase(line, fallbackPhase) {
-  if (line.seasonPhase) {
-    return normalizeSeasonPhase(line.seasonPhase, fallbackPhase);
-  }
-  if (line.seasonType) {
-    return normalizeSeasonPhase(line.seasonType, fallbackPhase);
-  }
-  return fallbackPhase;
-}
-
 function classifyStatLine(line) {
+  function detectEntityType(input) {
+    if (input.entityType === "team") return "team";
+    if (input.entityType === "player") return "player";
+    if (input.playerId) return "player";
+    if (input.gshlTeamId || input.teamId) return "team";
+    return "player";
+  }
+
+  function normalizePosGroup(raw, entityType) {
+    if (entityType === "team") return PositionGroup.TEAM;
+    if (!raw) return null;
+    const str = String(raw).toUpperCase();
+    if (str === PositionGroup.F) return PositionGroup.F;
+    if (str === PositionGroup.D) return PositionGroup.D;
+    if (str === PositionGroup.G) return PositionGroup.G;
+    return null;
+  }
+
+  function detectAggregationLevel(input, entityType) {
+    const hasDate = Boolean(input.date);
+    const hasWeekId = Boolean(input.weekId);
+    const hasDaysField = input.days !== undefined && input.days !== null;
+    const hasSeasonType =
+      typeof input.seasonType === "string" && input.seasonType !== "";
+    const hasTeamList =
+      input.gshlTeamIds !== undefined && input.gshlTeamIds !== null;
+    const hasNhlSeasonFields =
+      input.seasonRating !== undefined ||
+      input.overallRating !== undefined ||
+      input.salary !== undefined ||
+      input.QS !== undefined ||
+      input.RBS !== undefined;
+
+    if (entityType === "player") {
+      if (hasNhlSeasonFields) return "playerNhl";
+      if (hasDate) return "playerDay";
+      if (hasWeekId && hasDaysField) return "playerWeek";
+      if (hasSeasonType && input.gshlTeamId) return "playerSplit";
+      if (hasTeamList) return "playerTotal";
+      if (hasSeasonType) return "playerTotal";
+      return hasWeekId ? "playerWeek" : "playerDay";
+    }
+
+    if (hasDate) return "teamDay";
+    if (hasWeekId) return "teamWeek";
+    return "teamSeason";
+  }
+  function normalizeSeasonPhase(value, fallbackPhase) {
+    if (!value || typeof value !== "string") return fallbackPhase;
+    const upper = value.toUpperCase();
+    if (upper === "PO" || upper === "PLAYOFFS") return SEASON_PHASE_PLAYOFF;
+    if (upper === "LT" || upper === "LOSERS_TOURNAMENT")
+      return SEASON_PHASE_LOSERS;
+    return SEASON_PHASE_REGULAR;
+  }
+
+  function resolveSeasonPhase(input, fallbackPhase) {
+    if (input.seasonPhase) {
+      return normalizeSeasonPhase(input.seasonPhase, fallbackPhase);
+    }
+    if (input.seasonType) {
+      return normalizeSeasonPhase(input.seasonType, fallbackPhase);
+    }
+    return fallbackPhase;
+  }
   const seasonId = line.seasonId ? String(line.seasonId) : "";
   if (!seasonId) return null;
 
@@ -222,6 +140,15 @@ function classifyStatLine(line) {
   };
 }
 
+/**
+ * Build the primary lookup key for a model.
+ *
+ * Keys are intentionally stable and explicit so that the training/export
+ * pipeline can generate deterministic names.
+ *
+ * @param {{seasonPhase?:string,seasonId:string,aggregationLevel?:string,posGroup:string}} meta
+ * @returns {string}
+ */
 function buildModelKey(meta) {
   return [
     meta.seasonPhase || SEASON_PHASE_REGULAR,
@@ -231,6 +158,15 @@ function buildModelKey(meta) {
   ].join(":");
 }
 
+/**
+ * Fallback classification for partial inputs.
+ *
+ * This should be rare in normal operation. It exists so callers can pass
+ * minimally-shaped stat lines without crashing the ranking engine.
+ *
+ * @param {Object} statLine
+ * @returns {{seasonId:string,posGroup:string,aggregationLevel:string,entityType:string,seasonPhase:string}}
+ */
 function buildFallbackClassification(statLine) {
   const seasonId = statLine.seasonId ? String(statLine.seasonId) : "unknown";
   const entityType = statLine.playerId ? "player" : "team";
@@ -257,24 +193,27 @@ function buildFallbackClassification(statLine) {
   };
 }
 
-// ===== CORE RANKING FUNCTIONS =====
+// =============================================================================
+// Percentiles, parsing, and base utilities
+// =============================================================================
 
 /**
- * Estimate percentile from distribution using interpolation
- * @param {number} value - Stat value
- * @param {Object} distribution - Distribution object with min, max, and percentiles
- * @returns {number} Estimated percentile (0-100)
+ * Estimate percentile from a distribution (min/max + key percentile markers).
+ *
+ * Uses piecewise linear interpolation between anchors.
+ *
+ * @param {number} value
+ * @param {{min:number,max:number,percentiles:{p10:number,p25:number,p50:number,p75:number,p90:number,p95:number,p99:number}}} distribution
+ * @returns {number} percentile in [0, 100]
  */
 function estimatePercentileFromDistribution(value, distribution) {
   const min = distribution.min;
   const max = distribution.max;
   const percentiles = distribution.percentiles;
 
-  // Handle edge cases
   if (value <= min) return 0;
   if (value >= max) return 100;
 
-  // Build lookup table from percentile values
   const lookup = [
     [0, min],
     [10, percentiles.p10],
@@ -287,7 +226,6 @@ function estimatePercentileFromDistribution(value, distribution) {
     [100, max],
   ];
 
-  // Find which two percentiles the value falls between
   for (let i = 0; i < lookup.length - 1; i++) {
     const pct1 = lookup[i][0];
     const val1 = lookup[i][1];
@@ -295,14 +233,13 @@ function estimatePercentileFromDistribution(value, distribution) {
     const val2 = lookup[i + 1][1];
 
     if (value >= val1 && value <= val2) {
-      // Linear interpolation
-      if (val2 === val1) return pct1; // Avoid division by zero
+      if (val2 === val1) return pct1;
       const ratio = (value - val1) / (val2 - val1);
       return pct1 + ratio * (pct2 - pct1);
     }
   }
 
-  return 50; // Fallback to median
+  return 50;
 }
 
 /**
@@ -311,23 +248,26 @@ function estimatePercentileFromDistribution(value, distribution) {
  * @returns {string} One of: 'daily', 'weekly', 'season'
  */
 function detectAggregationType(statLine) {
-  // Has 'date' field = daily
+  // date => daily
   if (statLine.date) return "daily";
-  // Has 'weekId' but not 'seasonType' = weekly
+  // weekId without seasonType => weekly
   if (statLine.weekId && !statLine.seasonType) return "weekly";
-  // Has 'seasonType' or just 'seasonId' = season
+  // seasonType (or just seasonId) => season
   return "season";
 }
 
 /**
- * Preserve cumulative stats (no per-game normalization)
- * @param {Object} stats - Raw stat values
- * @returns {Object} Stats for ranking
+ * Convert a raw category value into a safe percentile (0..100) using the
+ * model's distribution for that category.
+ *
+ * Lower-is-better categories (e.g., GAA) are flipped if `isLowerBetterStat`
+ * exists in the global environment.
+ *
+ * @param {string} category
+ * @param {number} value
+ * @param {Object|null|undefined} distribution
+ * @returns {number}
  */
-function normalizeStats(stats) {
-  return stats;
-}
-
 function computeCategoryPercentile(category, value, distribution) {
   if (!distribution) return 0;
   const rawPercentile = estimatePercentileFromDistribution(value, distribution);
@@ -339,14 +279,18 @@ function computeCategoryPercentile(category, value, distribution) {
 }
 
 /**
- * Parse stats from stat line (daily/weekly/season)
- * @param {Object} statLine - Stat line with raw stat values
- * @returns {Object} Object with parsed stats, aggregation type, and games played
+ * Normalize raw stat line values into a consistent numeric shape.
+ *
+ * Note: weekly/season values are expected to be totals; daily is per-game.
+ * Model training/distributions handle any needed per-game normalization.
+ *
+ * @param {Object} statLine
+ * @returns {{stats:Object,aggType:string,gamesPlayed:number}}
  */
 function parseStats(statLine) {
   const aggType = detectAggregationType(statLine);
 
-  // Extract raw stats (handle both number and string types)
+  // Raw numeric stats (defensive parsing: treat missing/blank as 0)
   const raw = {
     G: Number(statLine.G) || 0,
     A: Number(statLine.A) || 0,
@@ -366,58 +310,25 @@ function parseStats(statLine) {
     TOI: Number(statLine.TOI) || 0,
   };
 
-  // Determine games played (GS for both skaters and goalies)
+  // Games started/played (GS is used for skaters and goalies in this system)
   const gamesPlayed = Number(statLine.GS) || 0;
 
-  // Normalize stats based on aggregation type
-  const normalized = normalizeStats(raw, aggType, gamesPlayed);
-
   return {
-    stats: normalized,
+    stats: raw,
     aggType: aggType,
     gamesPlayed: gamesPlayed,
   };
 }
 
-function calculateWeightedScore(stats, weights, posGroup, aggregationLevel) {
-  if (!weights) return 0;
-  let score = 0;
-  const gaaValue = posGroup === PositionGroup.G ? -stats.GAA : 0;
-
-  function adjustedWeight(category) {
-    const baseWeight = weights[category] || 0;
-    const aggregation = aggregationLevel || "playerDay";
-    return (
-      baseWeight *
-      getCategoryWeightMultiplier(
-        aggregation,
-        posGroup,
-        StatCategory[category] || category,
-      )
-    );
-  }
-
-  score += stats.G * adjustedWeight("G");
-  score += stats.A * adjustedWeight("A");
-  score += stats.P * adjustedWeight("P");
-  score += stats.PM * adjustedWeight("PM");
-  score += stats.PPP * adjustedWeight("PPP");
-  score += stats.SOG * adjustedWeight("SOG");
-  score += stats.HIT * adjustedWeight("HIT");
-  score += stats.BLK * adjustedWeight("BLK");
-  score += stats.W * adjustedWeight("W");
-  score += gaaValue * adjustedWeight("GAA");
-  score += stats.SVP * adjustedWeight("SVP");
-
-  return score;
-}
-
 /**
- * Check if a performance has zero stats (didn't play)
- * @param {Object} stats - Parsed/normalized stats
- * @param {string} posGroup - Position group
- * @param {number} gamesPlayed - Number of games played
- * @returns {boolean} True if zero performance
+ * Determine whether a stat line represents a "did not play" performance.
+ *
+ * This is used to short-circuit scoring so we don't inflate zeros via
+ * percentile transforms.
+ *
+ * @param {Object} stats
+ * @param {{posGroup:string}} classification
+ * @returns {boolean}
  */
 function isZeroPerformance(stats, classification) {
   if (classification.posGroup === PositionGroup.G) {
@@ -446,14 +357,17 @@ function isZeroPerformance(stats, classification) {
   );
 }
 
+// =============================================================================
+// Public ranking API
+// =============================================================================
+
 /**
- * Rank a single stat line performance (player or team, daily/weekly/season)
- * Automatically finds the correct model based on seasonId and posGroup
- * Auto-detects posGroup as "TEAM" if teamId/gshlTeamId is present instead of playerId
- * @param {Object} statLine - Stat line with stats and metadata
- *   Required fields: seasonId, posGroup (or auto-detected as TEAM), and stat values (G, A, P, etc.)
- *   Optional fields: playerId (for player), gshlTeamId/teamId (for team), date/weekId/seasonType
- * @returns {Object} Ranking result with score, percentile, breakdown, and metadata
+ * Rank a single stat line.
+ *
+ * This is the primary entry point used by other Apps Script modules.
+ *
+ * @param {Object} statLine
+ * @returns {Object} ranking result (score/percentile/breakdown + metadata)
  */
 function rankPerformance(statLine) {
   const classification =
@@ -536,7 +450,7 @@ function rankPerformance(statLine) {
     };
   }
 
-  // Calculate percentile-based composite score
+  // Composite percentile (0..100) from weighted category percentiles
   let weightedSum = 0;
   let totalWeight = 0;
   const statStrengths = [];
@@ -546,11 +460,10 @@ function rankPerformance(statLine) {
     const distribution = seasonModel.distributions[stat];
     if (!distribution) continue;
 
-    // Get percentile rank (0-100) for this stat
+    // Percentile rank (0..100) for this stat
     const percentile = computeCategoryPercentile(stat, value, distribution);
 
-    // Apply exponential transformation to spread out the top end
-    // This creates significant separation between 95th, 99th, and 99.9th percentiles
+    // Exponential transform to create separation in the top tail
     const transformedPercentile =
       Math.pow(percentile / 100, ScalingConfig.percentileTransform) * 100;
 
@@ -570,7 +483,7 @@ function rankPerformance(statLine) {
     });
   }
 
-  // Composite score: weighted average of transformed percentiles (0-100 scale)
+  // Weighted average (still 0..100 scale)
   const compositeScore = totalWeight > 0 ? weightedSum / totalWeight : 0;
 
   const subsetScores = computeSubsetScores(statStrengths);
@@ -593,32 +506,37 @@ function rankPerformance(statLine) {
     behaviorProfile,
   );
 
-  // Normalize to 0-1 range
+  // Normalize to 0..1 for curve/scaling steps
   const normalized = behaviorAdjustedComposite / 100;
 
-  // Get position-specific scaling configuration
-  const config = getScalingConfig(classification.posGroup==="G" && classification.aggregationLevel==="playerDay"?"GDay":classification.posGroup);
+  // Position-specific scaling
+  const config = getScalingConfig(
+    classification.posGroup === "G" &&
+      classification.aggregationLevel === "playerDay"
+      ? "GDay"
+      : classification.posGroup,
+  );
 
-  // Apply position-specific curve
+  // Shape the curve (compress mid, then apply power curve)
   const midCompressed = applyMidpointCompression(
     normalized,
     config.midpointCompression,
   );
   const curved = Math.pow(midCompressed, config.curveStrength);
 
-  // Calculate final score with position-specific scaling
+  // Final score (floored at 0; intentionally no ceiling)
   let score = curved * config.scaleFactor * config.multiplier;
 
   // Only floor at 0, no ceiling - extreme outliers can exceed typical max
   score = Math.max(0, score);
 
-  // Percentile for reference (the composite score is our percentile)
+  // Reference percentile (composite is on a 0..100 scale)
   const percentile = Math.min(100, behaviorAdjustedComposite);
 
   // Check if outlier
   const isOutlier = isOutlierPerformance(behaviorAdjustedComposite);
 
-  // Calculate per-stat breakdown
+  // Per-category breakdown (raw percentiles; weights applied)
   const breakdown = statsToRank.map((category) => {
     const value = stats[category];
     const distribution = seasonModel.distributions[category];
@@ -673,9 +591,10 @@ function rankPerformance(statLine) {
 }
 
 /**
- * Rank multiple stat line performances in batch
- * @param {Array} statLines - Array of stat lines (player or team, any aggregation level)
- * @returns {Array} Array of ranking results
+ * Rank many stat lines.
+ *
+ * @param {Array<Object>} statLines
+ * @returns {Array<Object>}
  */
 function rankPerformances(statLines) {
   return statLines.map(function (statLine) {
@@ -683,7 +602,53 @@ function rankPerformances(statLines) {
   });
 }
 
+// =============================================================================
+// Fallback scoring (global weights)
+// =============================================================================
+
+/**
+ * Fallback path when a season-specific model cannot be resolved.
+ *
+ * Uses `RANKING_MODELS.globalWeights[posGroup]` and a coarse percentile
+ * estimate when possible.
+ *
+ * @param {Object} statLine
+ * @param {Object} classification
+ * @returns {Object}
+ */
 function rankWithGlobalWeights(statLine, classification) {
+  function calculateWeightedScore(stats, weights, posGroup, aggregationLevel) {
+    if (!weights) return 0;
+    let score = 0;
+    const gaaValue = posGroup === PositionGroup.G ? -stats.GAA : 0;
+
+    function adjustedWeight(category) {
+      const baseWeight = weights[category] || 0;
+      const aggregation = aggregationLevel || "playerDay";
+      return (
+        baseWeight *
+        getCategoryWeightMultiplier(
+          aggregation,
+          posGroup,
+          StatCategory[category] || category,
+        )
+      );
+    }
+
+    score += stats.G * adjustedWeight("G");
+    score += stats.A * adjustedWeight("A");
+    score += stats.P * adjustedWeight("P");
+    score += stats.PM * adjustedWeight("PM");
+    score += stats.PPP * adjustedWeight("PPP");
+    score += stats.SOG * adjustedWeight("SOG");
+    score += stats.HIT * adjustedWeight("HIT");
+    score += stats.BLK * adjustedWeight("BLK");
+    score += stats.W * adjustedWeight("W");
+    score += gaaValue * adjustedWeight("GAA");
+    score += stats.SVP * adjustedWeight("SVP");
+
+    return score;
+  }
   if (typeof RANKING_MODELS === "undefined") {
     return {
       score: null,
@@ -762,7 +727,7 @@ function rankWithGlobalWeights(statLine, classification) {
     if (distributionScores.length > 0) {
       percentile = percentileRank(
         compositeScore,
-        sortAscending(distributionScores),
+        distributionScores.sort((a, b) => a - b),
       );
     }
   }
@@ -797,7 +762,46 @@ function rankWithGlobalWeights(statLine, classification) {
   };
 }
 
+// =============================================================================
+// Model resolution
+// =============================================================================
+
+/**
+ * Find the best season model for a classification.
+ *
+ * Resolution order:
+ * 1) Exact key match (phase + seasonId + aggregation + posGroup)
+ * 2) Legacy key match (seasonId + posGroup)
+ * 3) Same aggregation/posGroup, closest seasonId, same phase
+ * 4) Same aggregation/posGroup, closest seasonId, alternate phase
+ *
+ * @param {Object} classification
+ * @returns {Object|null}
+ */
 function resolveSeasonModel(classification) {
+  function getPhaseFallbackOrder(phase) {
+    if (phase === SEASON_PHASE_PLAYOFF) {
+      return [SEASON_PHASE_PLAYOFF, SEASON_PHASE_REGULAR];
+    }
+    if (phase === SEASON_PHASE_LOSERS) {
+      return [SEASON_PHASE_LOSERS, SEASON_PHASE_REGULAR];
+    }
+    return [SEASON_PHASE_REGULAR, SEASON_PHASE_PLAYOFF];
+  }
+  function compareSeasonDistance(seasonA, seasonB, target) {
+    const aNum = parseInt(seasonA, 10);
+    const bNum = parseInt(seasonB, 10);
+    if (isNaN(target)) {
+      return (aNum || 0) - (bNum || 0);
+    }
+    const aDistance = isNaN(aNum)
+      ? Number.MAX_SAFE_INTEGER
+      : Math.abs(aNum - target);
+    const bDistance = isNaN(bNum)
+      ? Number.MAX_SAFE_INTEGER
+      : Math.abs(bNum - target);
+    return aDistance - bDistance;
+  }
   if (typeof RANKING_MODELS === "undefined") return null;
   const models = RANKING_MODELS.models || {};
 
@@ -874,42 +878,17 @@ function resolveSeasonModel(classification) {
   return null;
 }
 
-function getPhaseFallbackOrder(phase) {
-  if (phase === SEASON_PHASE_PLAYOFF) {
-    return [SEASON_PHASE_PLAYOFF, SEASON_PHASE_REGULAR];
-  }
-  if (phase === SEASON_PHASE_LOSERS) {
-    return [SEASON_PHASE_LOSERS, SEASON_PHASE_REGULAR];
-  }
-  return [SEASON_PHASE_REGULAR, SEASON_PHASE_PLAYOFF];
-}
+// =============================================================================
+// Composite blending & behavior adjustments
+// =============================================================================
 
-function compareSeasonDistance(seasonA, seasonB, target) {
-  const aNum = parseInt(seasonA, 10);
-  const bNum = parseInt(seasonB, 10);
-  if (isNaN(target)) {
-    return (aNum || 0) - (bNum || 0);
-  }
-  const aDistance = isNaN(aNum)
-    ? Number.MAX_SAFE_INTEGER
-    : Math.abs(aNum - target);
-  const bDistance = isNaN(bNum)
-    ? Number.MAX_SAFE_INTEGER
-    : Math.abs(bNum - target);
-  return aDistance - bDistance;
-}
-
-function computeSubsetScores(entries) {
-  if (!entries || entries.length === 0) {
-    return { top2: 0, top3: 0, top5: 0 };
-  }
-  return {
-    top2: computeTopSubsetAverage(entries, 2),
-    top3: computeTopSubsetAverage(entries, 3),
-    top5: computeTopSubsetAverage(entries, 5),
-  };
-}
-
+/**
+ * Compute the weighted average percentile of the top-N category strengths.
+ *
+ * @param {Array<{percentile:number,weight:number}>} entries
+ * @param {number} size
+ * @returns {number}
+ */
 function computeTopSubsetAverage(entries, size) {
   if (!entries || entries.length === 0) return 0;
   const effectiveSize = Math.min(size, entries.length);
@@ -929,6 +908,31 @@ function computeTopSubsetAverage(entries, size) {
   return weightSum > 0 ? total / weightSum : 0;
 }
 
+/**
+ * Compute subset scores used by the blend function.
+ *
+ * @param {Array<{percentile:number,weight:number}>} entries
+ * @returns {{top2:number,top3:number,top5:number}}
+ */
+function computeSubsetScores(entries) {
+  if (!entries || entries.length === 0) {
+    return { top2: 0, top3: 0, top5: 0 };
+  }
+  return {
+    top2: computeTopSubsetAverage(entries, 2),
+    top3: computeTopSubsetAverage(entries, 3),
+    top5: computeTopSubsetAverage(entries, 5),
+  };
+}
+
+/**
+ * Blend composite score with subset scores (top-2/3/5) using configured weights.
+ *
+ * @param {number} baseScore
+ * @param {{top2:number,top3:number,top5:number}} subsetScores
+ * @param {{all?:number,top2?:number,top3?:number,top5?:number}|null|undefined} weights
+ * @returns {number}
+ */
 function blendCompositeScore(baseScore, subsetScores, weights) {
   if (!weights) return baseScore;
   const contributions = [
@@ -947,7 +951,50 @@ function blendCompositeScore(baseScore, subsetScores, weights) {
   return weightedSum / totalWeight;
 }
 
+/**
+ * Apply behavior adjustments to composite score.
+ *
+ * These adjustments are designed to make weekly/season aggregates behave
+ * more intuitively (reward spikes, penalize inconsistency, etc) without
+ * changing the underlying distributions.
+ *
+ * @param {number} baseScore
+ * @param {Array<{percentile:number}>} entries
+ * @param {{spikeWeight?:number,spikeCap?:number,consistencyWeight?:number,consistencyMaxPenalty?:number}|null|undefined} behavior
+ * @returns {number}
+ */
 function applyAggregationBehaviorAdjustments(baseScore, entries, behavior) {
+  function computeSpikeBoost(baseScore, percentiles, behavior) {
+    if (!percentiles || percentiles.length === 0) {
+      return 0;
+    }
+    const maxPercentile = percentiles.reduce(function (max, value) {
+      return value > max ? value : max;
+    }, 0);
+    const delta = Math.max(0, maxPercentile - baseScore);
+    const rawBoost = delta * behavior.spikeWeight;
+    const cap = behavior.spikeCap || 0;
+    return cap > 0 ? Math.min(rawBoost, cap) : rawBoost;
+  }
+  function computeConsistencyPenalty(percentiles, behavior) {
+    if (!percentiles || percentiles.length <= 1) {
+      return 0;
+    }
+    const mean =
+      percentiles.reduce(function (sum, value) {
+        return sum + value;
+      }, 0) / percentiles.length;
+    const variance =
+      percentiles.reduce(function (sum, value) {
+        const diff = value - mean;
+        return sum + diff * diff;
+      }, 0) / percentiles.length;
+    const stdDev = Math.sqrt(variance);
+    const normalizedStd = stdDev / 100;
+    const rawPenalty = normalizedStd * behavior.consistencyWeight * 100;
+    const cap = behavior.consistencyMaxPenalty || 0;
+    return cap > 0 ? Math.min(rawPenalty, cap) : rawPenalty;
+  }
   if (!behavior || !entries || entries.length === 0) {
     return baseScore;
   }
@@ -964,164 +1011,9 @@ function applyAggregationBehaviorAdjustments(baseScore, entries, behavior) {
   return clip(adjusted, 0, 100);
 }
 
-function computeSpikeBoost(baseScore, percentiles, behavior) {
-  if (!percentiles || percentiles.length === 0) {
-    return 0;
-  }
-  const maxPercentile = percentiles.reduce(function (max, value) {
-    return value > max ? value : max;
-  }, 0);
-  const delta = Math.max(0, maxPercentile - baseScore);
-  const rawBoost = delta * behavior.spikeWeight;
-  const cap = behavior.spikeCap || 0;
-  return cap > 0 ? Math.min(rawBoost, cap) : rawBoost;
-}
-
-function computeConsistencyPenalty(percentiles, behavior) {
-  if (!percentiles || percentiles.length <= 1) {
-    return 0;
-  }
-  const mean =
-    percentiles.reduce(function (sum, value) {
-      return sum + value;
-    }, 0) / percentiles.length;
-  const variance =
-    percentiles.reduce(function (sum, value) {
-      const diff = value - mean;
-      return sum + diff * diff;
-    }, 0) / percentiles.length;
-  const stdDev = Math.sqrt(variance);
-  const normalizedStd = stdDev / 100;
-  const rawPenalty = normalizedStd * behavior.consistencyWeight * 100;
-  const cap = behavior.consistencyMaxPenalty || 0;
-  return cap > 0 ? Math.min(rawPenalty, cap) : rawPenalty;
-}
-
-/**
- * Example usage function for testing
- * Shows how to use the ranking engine with sample data
- * NOTE: This assumes RankingConfig.js and RankingModels.js are loaded
- */
-function testRankingEngine() {
-  // Use the actual trained models from RankingModels.js
-  if (typeof RANKING_MODELS === "undefined") {
-    Logger.log("❌ ERROR: RANKING_MODELS not found.");
-    Logger.log("   Make sure RankingModels.js is deployed to Apps Script.");
-    return;
-  }
-
-  Logger.log("=== Testing Ranking Engine ===");
-  Logger.log("Available seasons: " + getAvailableSeasons().join(", "));
-  Logger.log("");
-
-  // Example 1: Daily player performances
-  const dailyPlayers = [
-    {
-      playerId: "player1",
-      playerName: "Elite Player",
-      seasonId: "10",
-      posGroup: "F",
-      date: new Date("2024-01-15"),
-      GS: 1,
-      G: 2,
-      A: 2,
-      P: 4,
-      PPP: 1,
-      SOG: 6,
-      HIT: 3,
-      BLK: 2,
-    },
-    {
-      playerId: "player2",
-      playerName: "Average Player",
-      seasonId: "10",
-      posGroup: "F",
-      date: new Date("2024-01-15"),
-      GS: 1,
-      G: 0,
-      A: 1,
-      P: 1,
-      PPP: 0,
-      SOG: 2,
-      HIT: 1,
-      BLK: 1,
-    },
-  ];
-
-  // Example 2: Weekly player aggregation
-  const weeklyPlayers = [
-    {
-      playerId: "player1",
-      playerName: "Elite Player",
-      seasonId: "10",
-      posGroup: "F",
-      weekId: "10-01",
-      GS: 3, // 3 games started
-      G: 4, // Total goals in week
-      A: 5,
-      P: 9,
-      PPP: 2,
-      SOG: 15,
-      HIT: 8,
-      BLK: 6,
-    },
-  ];
-
-  // Example 3: Team weekly aggregation
-  const teamWeeks = [
-    {
-      gshlTeamId: "team1",
-      seasonId: "10",
-      posGroup: "F", // Team's forward performance
-      weekId: "10-01",
-      GS: 45, // Total GS across all forwards
-      G: 25,
-      A: 35,
-      P: 60,
-      PPP: 15,
-      SOG: 180,
-      HIT: 95,
-      BLK: 70,
-    },
-  ];
-
-  Logger.log("=== Daily Player Rankings ===");
-  const dailyResults = rankPerformances(dailyPlayers);
-  dailyResults.forEach(function (result, index) {
-    Logger.log("");
-    Logger.log("Player: " + dailyPlayers[index].playerName);
-    Logger.log(
-      "Type: " + result.entityType + " (aggType: " + result.aggType + ")",
-    );
-    Logger.log("Score: " + (result.score ? result.score.toFixed(2) : "DNP"));
-    Logger.log("Percentile: " + result.percentile.toFixed(2));
-  });
-
-  Logger.log("");
-  Logger.log("=== Weekly Player Rankings ===");
-  const weeklyResults = rankPerformances(weeklyPlayers);
-  weeklyResults.forEach(function (result, index) {
-    Logger.log("");
-    Logger.log("Player: " + weeklyPlayers[index].playerName);
-    Logger.log(
-      "Games: " + result.gamesPlayed + " (aggType: " + result.aggType + ")",
-    );
-    Logger.log("Score: " + (result.score ? result.score.toFixed(2) : "DNP"));
-    Logger.log("Percentile: " + result.percentile.toFixed(2));
-  });
-
-  Logger.log("");
-  Logger.log("=== Team Weekly Rankings ===");
-  const teamResults = rankPerformances(teamWeeks);
-  teamResults.forEach(function (result, index) {
-    Logger.log("");
-    Logger.log("Team: " + teamWeeks[index].gshlTeamId);
-    Logger.log(
-      "Type: " + result.entityType + " (aggType: " + result.aggType + ")",
-    );
-    Logger.log("Total GS: " + result.gamesPlayed);
-    Logger.log(
-      "Score: " + (result.score ? result.score.toFixed(2) : "No games"),
-    );
-  });
-}
+  // Public API (intentionally small)
+  return {
+    rankPerformance: rankPerformance,
+    rankPerformances: rankPerformances,
+  };
+})();
