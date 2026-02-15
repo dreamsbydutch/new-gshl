@@ -73,26 +73,41 @@ var LineupBuilder = (function () {
    * @returns {boolean}
    */
   function isEligibleForPosition(player, eligiblePositions) {
-    if (!player || !player.nhlPos) return false;
+    if (!player || player.nhlPos === undefined || player.nhlPos === null)
+      return false;
+
+    var nhlPosArr = Array.isArray(player.nhlPos)
+      ? player.nhlPos
+      : String(player.nhlPos)
+          .split(",")
+          .map(function (p) {
+            return String(p).trim();
+          })
+          .filter(Boolean);
+
+    if (!nhlPosArr.length) return false;
 
     // Goalie check
     if (eligiblePositions.includes(RosterPosition.G)) {
-      return player.nhlPos.includes(RosterPosition.G);
+      return nhlPosArr.includes(RosterPosition.G);
     }
 
     // Util can be any forward or defense, but not goalie
     if (eligiblePositions.includes(RosterPosition.Util)) {
-      return player.nhlPos.some(
-        (pos) =>
+      return nhlPosArr.some(function (pos) {
+        return (
           pos === RosterPosition.LW ||
           pos === RosterPosition.C ||
           pos === RosterPosition.RW ||
-          pos === RosterPosition.D,
-      );
+          pos === RosterPosition.D
+        );
+      });
     }
 
     // Regular position check
-    return player.nhlPos.some((pos) => eligiblePositions.includes(pos));
+    return nhlPosArr.some(function (pos) {
+      return eligiblePositions.includes(pos);
+    });
   }
 
   /**
