@@ -51,6 +51,47 @@ var RankingEngine = RankingEngine || {};
 (function (ns) {
   "use strict";
 
+  function clip(value, min, max) {
+    var v = Number(value);
+    if (!isFinite(v)) return min;
+    if (v < min) return min;
+    if (v > max) return max;
+    return v;
+  }
+
+  /**
+   * Percentile rank (0..100) against a sorted ascending array.
+   * Uses linear interpolation within the nearest bracket.
+   */
+  function percentileRank(value, sortedValues) {
+    if (!sortedValues || sortedValues.length === 0) return 50;
+    var v = Number(value);
+    if (!isFinite(v)) return 50;
+
+    var arr = sortedValues;
+    var n = arr.length;
+    if (n === 1) return v >= Number(arr[0]) ? 100 : 0;
+
+    var min = Number(arr[0]);
+    var max = Number(arr[n - 1]);
+    if (!isFinite(min) || !isFinite(max)) return 50;
+    if (v <= min) return 0;
+    if (v >= max) return 100;
+
+    // Find the upper bound index.
+    var hi = 1;
+    while (hi < n && Number(arr[hi]) < v) hi++;
+    if (hi >= n) return 100;
+    var lo = hi - 1;
+    var a = Number(arr[lo]);
+    var b = Number(arr[hi]);
+    if (!isFinite(a) || !isFinite(b) || b === a) {
+      return clip((lo / (n - 1)) * 100, 0, 100);
+    }
+    var t = (v - a) / (b - a);
+    return clip(((lo + t) / (n - 1)) * 100, 0, 100);
+  }
+
   // Lazy-loaded references to config helpers/consts attached by RankingConfig.js.
   // We load on first call to keep initialization order flexible.
   var PositionGroup;
