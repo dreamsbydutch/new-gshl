@@ -392,92 +392,192 @@ var LineupBuilder = (function () {
    *
    * This is a Sheets-writing utility (not a pure optimizer).
    */
-  function updateLineups(seasonId) {
-    const seasonKey =
+  function resolvePlayerDayWorkbookIdForSeason(seasonId) {
+    var seasonKey =
+      seasonId === undefined || seasonId === null ? "" : String(seasonId);
+    if (!seasonKey) return "";
+    try {
+      var getId =
+        GshlUtils &&
+        GshlUtils.domain &&
+        GshlUtils.domain.workbooks &&
+        GshlUtils.domain.workbooks.getPlayerDayWorkbookId;
+      if (typeof getId === "function") {
+        var id = getId(seasonKey);
+        if (id) return id;
+      }
+    } catch (_e) {
+      // ignore
+    }
+    if (typeof CURRENT_PLAYERDAY_SPREADSHEET_ID !== "undefined") {
+      return CURRENT_PLAYERDAY_SPREADSHEET_ID;
+    }
+    if (
+      typeof PLAYERDAY_WORKBOOKS !== "undefined" &&
+      PLAYERDAY_WORKBOOKS &&
+      PLAYERDAY_WORKBOOKS.PLAYERDAYS_6_10
+    ) {
+      return PLAYERDAY_WORKBOOKS.PLAYERDAYS_6_10;
+    }
+    return "";
+  }
+
+  function computeBenchAndMissingStartsFlags(player) {
+    // Match YahooScraper.finalizeLineupAssignments behavior.
+    var GS = player && player.GS !== undefined && player.GS !== null
+      ? String(player.GS)
+      : "";
+    var GP = player && player.GP !== undefined && player.GP !== null
+      ? String(player.GP)
+      : "";
+    var BS = GS === "1" && player.bestPos === RosterPosition.BN ? 1 : "";
+    var MS =
+      GP === "1" && GS !== "1" && player.fullPos !== RosterPosition.BN
+        ? 1
+        : "";
+    return { BS: BS, MS: MS };
+  }
+
+  /**
+   * Recompute lineup helper columns for all PlayerDay rows in a season.
+   *
+   * @param {string|number} seasonId
+   * @param {Object=} options
+   * @param {string=} options.playerDayWorkbookId Override workbook id
+   * @param {boolean=} options.dryRun When true, computes but does not write
+   * @param {boolean=} options.logToConsole When true, prints progress
+   */
+  function updateLineups(seasonId, options) {
+    var seasonKey =
       seasonId === undefined || seasonId === null ? "" : String(seasonId);
     if (!seasonKey) {
       throw new Error("updateLineups requires a seasonId argument");
     }
 
-    const teamDays = GshlUtils.sheets.read
-      .fetchSheetAsObjects(TEAMSTATS_SPREADSHEET_ID, "TeamDayStatLine", true)
-      .filter((a) => String(a.seasonId) === seasonKey);
+    var opts = options || {};
+    var dryRun = !!opts.dryRun;
+    var logToConsole = opts.logToConsole === undefined ? true : !!opts.logToConsole;
 
-    const playerDays = GshlUtils.sheets.read
-      .fetchSheetAsObjects(
-        PLAYERDAY_WORKBOOKS.PLAYERDAYS_6_10,
-        "PlayerDayStatLine",
-        true,
-      )
-      .filter((a) => String(a.seasonId) === seasonKey)
-      .map((a) => {
-        if (a && a.nhlPos && typeof a.nhlPos === "string") {
-          a.nhlPos = a.nhlPos.split(",").map((p) => p.trim());
-        }
-        return a;
-      });
-
-    const output = [];
-    console.log("[LineupBuilder] Fetched teamDays:", teamDays.length);
-    console.log("[LineupBuilder] Fetched playerDays:", playerDays.length);
-
-    teamDays.forEach((td) => {
-      const players = playerDays.filter(
-        (pd) => pd.date === td.date && pd.gshlTeamId === td.gshlTeamId,
+    var playerDayWorkbookId =
+      (opts.playerDayWorkbookId && String(opts.playerDayWorkbookId)) ||
+      resolvePlayerDayWorkbookIdForSeason(seasonKey);
+    if (!playerDayWorkbookId) {
+      throw new Error(
+        "updateLineups could not resolve PlayerDay workbook id for seasonId=" +
+          seasonKey,
       );
+    }
 
-      output.push(
-        ...optimizeLineup(players).map((a) => {
-          return {
-            id: a.id,
-            dailyPos: a.dailyPos,
-            fullPos: a.fullPos,
-            bestPos: a.bestPos,
-            MS: a.MS,
-            BS: a.BS,
-          };
-        }),
-      );
+    var fetchSheetAsObjects = GshlUtils.sheets.read.fetchSheetAsObjects;
+    var openSheet = GshlUtils.sheets.open.getSheetByName;
+    var getHeaders = GshlUtils.sheets.read.getHeadersFromSheet;
+    var getColIndex = GshlUtils.sheets.read.getColIndex;
+    var groupAndApply = GshlUtils.sheets.write.groupAndApplyColumnUpdates;
+
+    var playerDays = fetchSheetAsObjects(playerDayWorkbookId, "PlayerDayStatLine", {
+      coerceTypes: true,
+    }).filter(function (pd) {
+      return String(pd && pd.seasonId) === seasonKey;
     });
 
-    output.sort((a, b) => +a.id - +b.id);
+    if (logToConsole) {
+      console.log(
+        "[LineupBuilder] updateLineups season=" +
+          seasonKey +
+          " workbook=" +
+          playerDayWorkbookId +
+          " rows=" +
+          playerDays.length,
+      );
+    }
 
-    const ss = GshlUtils.sheets.open.getSheetByName(
-      PLAYERDAY_WORKBOOKS.PLAYERDAYS_6_10,
-      "PlayerDayStatLine",
-      true,
-    );
+    if (!playerDays.length) {
+      return { updatedRows: 0, dryRun: dryRun };
+    }
 
-    // Column indices here match the existing sheet layout.
-    // (bestPos=11, fullPos=12, MS=39, BS=40)
-    GshlUtils.sheets.write.groupAndApplyColumnUpdates(
-      ss,
-      11,
-      output.map((a) => ({ rowIndex: +a.id + 1, value: a.bestPos })),
+    // Group by date + team.
+    var groups = new Map();
+    playerDays.forEach(function (pd) {
+      if (!pd) return;
+      var dateKey = pd.date;
+      var teamKey = pd.gshlTeamId;
+      if (!dateKey || !teamKey) return;
+      var key = String(dateKey) + "|" + String(teamKey);
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(pd);
+    });
+
+    var updates = [];
+    groups.forEach(function (players) {
+      var optimized = optimizeLineup(players);
+      optimized.forEach(function (p) {
+        if (!p || p.id === undefined || p.id === null || p.id === "") return;
+
+        var flags = computeBenchAndMissingStartsFlags(p);
+
+        updates.push({
+          id: p.id,
+          bestPos: p.bestPos,
+          fullPos: p.fullPos,
+          MS: flags.MS,
+          BS: flags.BS,
+        });
+      });
+    });
+
+    updates.sort(function (a, b) {
+      return Number(a.id) - Number(b.id);
+    });
+
+    if (dryRun) {
+      return { updatedRows: updates.length, dryRun: true };
+    }
+
+    var sheet = openSheet(playerDayWorkbookId, "PlayerDayStatLine", true);
+    var headers = getHeaders(sheet);
+    var bestPosCol = getColIndex(headers, "bestPos", true) + 1;
+    var fullPosCol = getColIndex(headers, "fullPos", true) + 1;
+    var msCol = getColIndex(headers, "MS", true) + 1;
+    var bsCol = getColIndex(headers, "BS", true) + 1;
+
+    groupAndApply(
+      sheet,
+      bestPosCol,
+      updates.map(function (u) {
+        return { rowIndex: Number(u.id) + 1, value: u.bestPos };
+      }),
     );
-    GshlUtils.sheets.write.groupAndApplyColumnUpdates(
-      ss,
-      12,
-      output.map((a) => ({ rowIndex: +a.id + 1, value: a.fullPos })),
+    groupAndApply(
+      sheet,
+      fullPosCol,
+      updates.map(function (u) {
+        return { rowIndex: Number(u.id) + 1, value: u.fullPos };
+      }),
     );
-    GshlUtils.sheets.write.groupAndApplyColumnUpdates(
-      ss,
-      39,
-      output.map((a) => ({ rowIndex: +a.id + 1, value: a.MS })),
+    groupAndApply(
+      sheet,
+      msCol,
+      updates.map(function (u) {
+        return { rowIndex: Number(u.id) + 1, value: u.MS };
+      }),
     );
-    GshlUtils.sheets.write.groupAndApplyColumnUpdates(
-      ss,
-      40,
-      output.map((a) => ({ rowIndex: +a.id + 1, value: a.BS })),
+    groupAndApply(
+      sheet,
+      bsCol,
+      updates.map(function (u) {
+        return { rowIndex: Number(u.id) + 1, value: u.BS };
+      }),
     );
 
     Logger.log(
       "Updated lineup helper columns for " +
-        output.length +
-        " PlayerDays rows.",
+        updates.length +
+        " PlayerDayStatLine row(s) in seasonId=" +
+        seasonKey +
+        ".",
     );
 
-    return { updatedRows: output.length };
+    return { updatedRows: updates.length, dryRun: false };
   }
 
   // ===== TESTS =====
