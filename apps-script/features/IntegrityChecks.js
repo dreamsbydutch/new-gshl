@@ -677,8 +677,8 @@ var IntegrityChecks = (function () {
     var goalieRows = teamMatchupTables[2] || [];
     goalieRows.forEach(function (row) {
       if (!row || !row.length) return;
-      var goalieName = row[1] ? String(row[1]) : "";
-      if (!goalieName) return;
+      var goalieName = row[1] ? String(row[1]).trim() : "";
+      if (!goalieName || goalieName === "(Empty)") return;
       out.goalies.push({
         playerName: goalieName,
         stats: {
@@ -1228,8 +1228,11 @@ var IntegrityChecks = (function () {
 
           var allPlayerRows = parsedTeam.skaters.concat(parsedTeam.goalies);
           allPlayerRows.forEach(function (row) {
+            if (!row || !row.playerName) return;
+            var playerName = String(row.playerName).trim();
+            if (!playerName || playerName === "(Empty)") return;
             var player = resolvePlayerFromMatchupRowName(
-              row.playerName,
+              playerName,
               playersByNormalizedName,
               players,
             );
@@ -1243,7 +1246,7 @@ var IntegrityChecks = (function () {
                   weekId: weekId,
                   gshlTeamId: String(team.id),
                   yahooTeamId: side.yahooTeamId,
-                  playerName: row.playerName,
+                  playerName: playerName,
                   url: url,
                 },
               });
