@@ -55,6 +55,7 @@ var RankingEngine = RankingEngine || {};
   // We load on first call to keep initialization order flexible.
   var PositionGroup;
   var StatCategory;
+  var ScalingConfig;
   var getRelevantStats;
   var getScalingConfig;
   var applyMidpointCompression;
@@ -69,6 +70,7 @@ var RankingEngine = RankingEngine || {};
 
     PositionGroup = ns.PositionGroup;
     StatCategory = ns.StatCategory;
+    ScalingConfig = ns.ScalingConfig;
     getRelevantStats = ns.getRelevantStats;
     getScalingConfig = ns.getScalingConfig;
     applyMidpointCompression = ns.applyMidpointCompression;
@@ -77,6 +79,11 @@ var RankingEngine = RankingEngine || {};
     getAggregationBlendWeights = ns.getAggregationBlendWeights;
     getAggregationBehaviorProfile = ns.getAggregationBehaviorProfile;
     isOutlierPerformance = ns.isOutlierPerformance;
+
+    if (!ScalingConfig) {
+      // Fallback so rankPerformance never crashes if config order is wrong.
+      ScalingConfig = { percentileTransform: 1.8 };
+    }
 
     if (!PositionGroup || !StatCategory) {
       throw new Error(
