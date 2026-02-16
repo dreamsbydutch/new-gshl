@@ -424,17 +424,17 @@ var LineupBuilder = (function () {
 
   function computeBenchAndMissingStartsFlags(player) {
     // Match YahooScraper.finalizeLineupAssignments behavior.
-    var GS = player && player.GS !== undefined && player.GS !== null
-      ? String(player.GS)
-      : "";
-    var GP = player && player.GP !== undefined && player.GP !== null
-      ? String(player.GP)
-      : "";
+    var GS =
+      player && player.GS !== undefined && player.GS !== null
+        ? String(player.GS)
+        : "";
+    var GP =
+      player && player.GP !== undefined && player.GP !== null
+        ? String(player.GP)
+        : "";
     var BS = GS === "1" && player.bestPos === RosterPosition.BN ? 1 : "";
     var MS =
-      GP === "1" && GS !== "1" && player.fullPos !== RosterPosition.BN
-        ? 1
-        : "";
+      GP === "1" && GS !== "1" && player.fullPos !== RosterPosition.BN ? 1 : "";
     return { BS: BS, MS: MS };
   }
 
@@ -456,7 +456,8 @@ var LineupBuilder = (function () {
 
     var opts = options || {};
     var dryRun = !!opts.dryRun;
-    var logToConsole = opts.logToConsole === undefined ? true : !!opts.logToConsole;
+    var logToConsole =
+      opts.logToConsole === undefined ? true : !!opts.logToConsole;
 
     var playerDayWorkbookId =
       (opts.playerDayWorkbookId && String(opts.playerDayWorkbookId)) ||
@@ -474,9 +475,13 @@ var LineupBuilder = (function () {
     var getColIndex = GshlUtils.sheets.read.getColIndex;
     var groupAndApply = GshlUtils.sheets.write.groupAndApplyColumnUpdates;
 
-    var playerDays = fetchSheetAsObjects(playerDayWorkbookId, "PlayerDayStatLine", {
-      coerceTypes: true,
-    }).filter(function (pd) {
+    var playerDays = fetchSheetAsObjects(
+      playerDayWorkbookId,
+      "PlayerDayStatLine",
+      {
+        coerceTypes: true,
+      },
+    ).filter(function (pd) {
       return String(pd && pd.seasonId) === seasonKey;
     });
 
@@ -540,34 +545,100 @@ var LineupBuilder = (function () {
     var msCol = getColIndex(headers, "MS", true) + 1;
     var bsCol = getColIndex(headers, "BS", true) + 1;
 
-    groupAndApply(
+    function groupAndApplyTwoColumnUpdates(
       sheet,
-      bestPosCol,
-      updates.map(function (u) {
-        return { rowIndex: Number(u.id) + 1, value: u.bestPos };
-      }),
-    );
-    groupAndApply(
-      sheet,
-      fullPosCol,
-      updates.map(function (u) {
-        return { rowIndex: Number(u.id) + 1, value: u.fullPos };
-      }),
-    );
-    groupAndApply(
-      sheet,
-      msCol,
-      updates.map(function (u) {
-        return { rowIndex: Number(u.id) + 1, value: u.MS };
-      }),
-    );
-    groupAndApply(
-      sheet,
-      bsCol,
-      updates.map(function (u) {
-        return { rowIndex: Number(u.id) + 1, value: u.BS };
-      }),
-    );
+      startColIndex1Based,
+      updates2,
+    ) {
+      if (!updates2 || updates2.length === 0) return;
+      updates2.sort(function (a, b) {
+        return a.rowIndex - b.rowIndex;
+      });
+
+      var start = updates2[0].rowIndex;
+      var buffer = [updates2[0].values];
+      for (var i = 1; i < updates2.length; i++) {
+        var prev = updates2[i - 1].rowIndex;
+        var curr = updates2[i];
+        if (curr.rowIndex === prev + 1) {
+          buffer.push(curr.values);
+        } else {
+          sheet
+            .getRange(start, startColIndex1Based, buffer.length, 2)
+            .setValues(buffer);
+          start = curr.rowIndex;
+          buffer = [curr.values];
+        }
+      }
+      sheet
+        .getRange(start, startColIndex1Based, buffer.length, 2)
+        .setValues(buffer);
+    }
+
+    var bestFullAdjacent = Math.abs(bestPosCol - fullPosCol) === 1;
+    var msBsAdjacent = Math.abs(msCol - bsCol) === 1;
+
+    if (bestFullAdjacent) {
+      var startCol = Math.min(bestPosCol, fullPosCol);
+      var bestFirst = startCol === bestPosCol;
+      groupAndApplyTwoColumnUpdates(
+        sheet,
+        startCol,
+        updates.map(function (u) {
+          var rowIndex = Number(u.id) + 1;
+          return {
+            rowIndex: rowIndex,
+            values: bestFirst ? [u.bestPos, u.fullPos] : [u.fullPos, u.bestPos],
+          };
+        }),
+      );
+    } else {
+      groupAndApply(
+        sheet,
+        bestPosCol,
+        updates.map(function (u) {
+          return { rowIndex: Number(u.id) + 1, value: u.bestPos };
+        }),
+      );
+      groupAndApply(
+        sheet,
+        fullPosCol,
+        updates.map(function (u) {
+          return { rowIndex: Number(u.id) + 1, value: u.fullPos };
+        }),
+      );
+    }
+
+    if (msBsAdjacent) {
+      var startCol2 = Math.min(msCol, bsCol);
+      var msFirst = startCol2 === msCol;
+      groupAndApplyTwoColumnUpdates(
+        sheet,
+        startCol2,
+        updates.map(function (u) {
+          var rowIndex = Number(u.id) + 1;
+          return {
+            rowIndex: rowIndex,
+            values: msFirst ? [u.MS, u.BS] : [u.BS, u.MS],
+          };
+        }),
+      );
+    } else {
+      groupAndApply(
+        sheet,
+        msCol,
+        updates.map(function (u) {
+          return { rowIndex: Number(u.id) + 1, value: u.MS };
+        }),
+      );
+      groupAndApply(
+        sheet,
+        bsCol,
+        updates.map(function (u) {
+          return { rowIndex: Number(u.id) + 1, value: u.BS };
+        }),
+      );
+    }
 
     Logger.log(
       "Updated lineup helper columns for " +
