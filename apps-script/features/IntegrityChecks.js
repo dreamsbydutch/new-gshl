@@ -1091,17 +1091,6 @@ var IntegrityChecks = (function () {
 
         var url = buildWeeklyMatchupUrl(weekNum, teamAId, teamBId);
 
-        if (logToConsole && progress) {
-          console.log(
-            "[IntegrityChecks][MatchupTables] Scraping matchup week=" +
-              weekNum +
-              " mid1=" +
-              teamAId +
-              " mid2=" +
-              teamBId,
-          );
-        }
-
         var parsed = null;
         try {
           parsed = parseTwoTeamWeekPage(url);
