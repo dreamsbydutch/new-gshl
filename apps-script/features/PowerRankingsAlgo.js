@@ -74,8 +74,8 @@ var PowerRankingsAlgo = (function buildPowerRankingsAlgo() {
     // Playoff rounds should matter more each week/round.
     // Applied only to playoff matchups, as an additive step:
     // multiplier = basePlayoffMultiplier + (roundIndex-1) * eloPlayoffRoundStep
-    // Example (base=2, step=0.5): 2.0, 2.5, 3.0, ...
-    eloPlayoffRoundStep: 0.5,
+    // Example (base=2, step=1): 2.0, 3.0, 4.0, ...
+    eloPlayoffRoundStep: 1,
 
     // Stat strength EWMA
     ewmaAlpha: 0.35, // higher = more weight on most recent week
@@ -451,7 +451,8 @@ var PowerRankingsAlgo = (function buildPowerRankingsAlgo() {
     var mult = 1;
     if (opts && opts.eloWeekTypeKMultipliers) {
       var raw = opts.eloWeekTypeKMultipliers[String(weekType)];
-      if (raw === undefined || raw === null) raw = opts.eloWeekTypeKMultipliers[weekType];
+      if (raw === undefined || raw === null)
+        raw = opts.eloWeekTypeKMultipliers[weekType];
       var n = toNumber(raw);
       if (isFinite(n) && n > 0) mult = n;
     }
@@ -731,7 +732,8 @@ var PowerRankingsAlgo = (function buildPowerRankingsAlgo() {
           if (!(isFinite(typeMult) && typeMult > 0)) typeMult = baseTypeMult;
         }
 
-        var K = computeKFactor(opts.baseK, opts.marginKMultiplier, m) * typeMult;
+        var K =
+          computeKFactor(opts.baseK, opts.marginKMultiplier, m) * typeMult;
 
         // Record the expected score + K for the team/week if not already set.
         if (!matchupParamsByTeam.has(homeId)) {
