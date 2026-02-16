@@ -31,14 +31,3 @@ function updatePowerRankings(seasonId = "12") {
 function checkSeasonWeeks() {
   IntegrityChecks.scrapeAndCheckMatchupTables(12, { floatTolerance: 0.01 });
 }
-
-function test() {
-  GoalieRateUpdater.updateGoalieRatesForSeason(12);
-  RatingUpdater.updatePlayerDayRatingsForSeason(12);
-  // LineupBuilder.updateLineups(12,{weekNums:[1,2,3,4,5]})
-  // LineupBuilder.updateLineups(12,{weekNums:[6,7,8,9,10]})
-  // LineupBuilder.updateLineups(12,{weekNums:[11,12,13,14,15]})
-  // LineupBuilder.updateLineups(12,{weekNums:[16,17,18,19,20]})
-  // LineupBuilder.updateLineups(12,{weekNums:[21,22,23,24,25]})
-  // LineupBuilder.updateLineups(12,{weekNums:[26,27,28,29,30]})
-}

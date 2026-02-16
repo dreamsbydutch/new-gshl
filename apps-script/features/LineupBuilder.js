@@ -30,6 +30,7 @@ var LineupBuilder = (function () {
   const RosterPosition = {
     BN: "BN",
     IR: "IR",
+    // Yahoo uses "IR+" (aka IL+) in matchup tables.
     IRplus: "IR+",
     LW: "LW",
     C: "C",
@@ -38,6 +39,13 @@ var LineupBuilder = (function () {
     G: "G",
     Util: "Util",
   };
+
+  function normalizeDailyPos(pos) {
+    var p = pos === undefined || pos === null ? "" : String(pos).trim();
+    if (p === "IRplus") return "IR+";
+    if (p === "ILplus") return "IL+";
+    return p;
+  }
 
   /**
    * Standard fantasy hockey lineup structure
@@ -115,21 +123,13 @@ var LineupBuilder = (function () {
    * @param {Object} player
    * @returns {boolean}
    */
-  function normalizeDailyPos(pos) {
-    if (pos === undefined || pos === null) return "";
-    var s = String(pos).trim();
-    if (!s) return "";
-    // Back-compat with older internal tokens.
-    if (s === "IRplus") return RosterPosition.IRplus;
-    return s;
-  }
-
   function wasInDailyLineup(player) {
     var dailyPos = normalizeDailyPos(player && player.dailyPos);
     return (
       dailyPos !== RosterPosition.BN &&
       dailyPos !== RosterPosition.IR &&
-      dailyPos !== RosterPosition.IRplus
+      dailyPos !== RosterPosition.IRplus &&
+      dailyPos !== "IL+"
     );
   }
 
@@ -138,11 +138,14 @@ var LineupBuilder = (function () {
    * @param {Array} availablePlayers
    * @returns {Object} assignments map playerId -> slot position
    */
-  function findBestLineupGreedy(availablePlayers) {
+  function findBestLineupGreedy(availablePlayers, slots) {
     const assignments = {};
     const usedPlayers = new Set();
 
-    const sortedSlots = LINEUP_STRUCTURE.slice().sort((a, b) => {
+    const slotList =
+      Array.isArray(slots) && slots.length ? slots : LINEUP_STRUCTURE;
+
+    const sortedSlots = slotList.slice().sort((a, b) => {
       return a.eligiblePositions.length - b.eligiblePositions.length;
     });
 
@@ -181,9 +184,10 @@ var LineupBuilder = (function () {
     return total;
   }
 
-  function getTheoreticalMaxRating(players) {
+  function getTheoreticalMaxRating(players, slots) {
+    const take = Array.isArray(slots) && slots.length ? slots.length : 11;
     const sorted = players.map((p) => p.Rating || 0).sort((a, b) => b - a);
-    return sorted.slice(0, 11).reduce((sum, rating) => sum + rating, 0);
+    return sorted.slice(0, take).reduce((sum, rating) => sum + rating, 0);
   }
 
   /**
@@ -192,11 +196,14 @@ var LineupBuilder = (function () {
    * @param {Object} playersMap
    * @returns {Object}
    */
-  function findBestLineupExhaustive(availablePlayers, playersMap) {
+  function findBestLineupExhaustive(availablePlayers, playersMap, slots) {
     let bestAssignments = {};
     let bestRating = -Infinity;
 
-    const sortedSlots = LINEUP_STRUCTURE.slice().sort((a, b) => {
+    const slotList =
+      Array.isArray(slots) && slots.length ? slots : LINEUP_STRUCTURE;
+
+    const sortedSlots = slotList.slice().sort((a, b) => {
       return a.eligiblePositions.length - b.eligiblePositions.length;
     });
 
@@ -279,23 +286,23 @@ var LineupBuilder = (function () {
    * @param {boolean} skipValidation
    * @returns {Object}
    */
-  function findBestLineup(availablePlayers, skipValidation) {
+  function findBestLineup(availablePlayers, skipValidation, slots) {
     const playersMap = {};
     for (const p of availablePlayers) {
       playersMap[p.playerId] = p;
     }
 
-    const greedyAssignments = findBestLineupGreedy(availablePlayers);
+    const greedyAssignments = findBestLineupGreedy(availablePlayers, slots);
     if (skipValidation) return greedyAssignments;
 
     const greedyRating = calculateLineupRating(greedyAssignments, playersMap);
-    const theoreticalMax = getTheoreticalMaxRating(availablePlayers);
+    const theoreticalMax = getTheoreticalMaxRating(availablePlayers, slots);
 
     if (Math.abs(greedyRating - theoreticalMax) < 0.01) {
       return greedyAssignments;
     }
 
-    return findBestLineupExhaustive(availablePlayers, playersMap);
+    return findBestLineupExhaustive(availablePlayers, playersMap, slots);
   }
 
   // ===== PUBLIC API =====
@@ -315,42 +322,62 @@ var LineupBuilder = (function () {
 
     if (safePlayers.length === 0) return results;
 
-    // FULL lineup:
-    // - Never start players who did not play (GP != 1)
-    // - Strongly prefer players who played AND were in the active daily lineup
-    // - Allow repositioning: any eligible starting slot is fine
+    // Build fullPos as:
+    // - Only players who played (GP == 1) can occupy a starting slot.
+    // - Players who were in the *active* daily lineup and played must stay in the
+    //   starting lineup, but may be repositioned (e.g., LW -> Util).
+    // We achieve this by optimizing over played players only, and giving played
+    // active-lineup players a large priority boost so they cannot be bumped out.
+
     const PRIORITY_GAP = 100000000;
-    const playedOnly = safePlayers.filter((p) => p && p.GP == 1);
 
-    const playersWithFullPosPriority = playedOnly.map((p) => {
-      const wasInActiveLineup = wasInDailyLineup(p);
-      const priorityTier = wasInActiveLineup ? 2 : 1;
-      const priorityBoost = priorityTier * PRIORITY_GAP + (p.Rating || 0);
-      return {
-        playerId: p.playerId,
-        nhlPos: p.nhlPos,
-        posGroup: p.posGroup,
-        dailyPos: normalizeDailyPos(p.dailyPos),
-        GP: p.GP,
-        GS: p.GS,
-        IR: p.IR,
-        IRplus: p.IRplus,
-        Rating: priorityBoost,
-      };
-    });
+    const playedCandidatesForFull = results
+      .filter((p) => p && p.playerId && p.GP == 1)
+      .map((p) => {
+        const wasInActiveLineup = wasInDailyLineup(p);
+        // GS is used as a "bench start" indicator in this codebase:
+        // the player played (has stats) but was not started (BN/IR/IR+).
+        // Only treat it as such when they were NOT in the active daily lineup.
+        const benchStarted = p.GS == 1 && !wasInActiveLineup;
 
-    const fullPosAssignments = findBestLineup(playersWithFullPosPriority, true);
+        // Tiering (higher = harder to bump):
+        // 3: started game but was benched ("bench start")
+        // 2: played and was in active lineup
+        // 1: played but was not in active lineup
+        const tier = benchStarted ? 3 : wasInActiveLineup ? 2 : 1;
+
+        return {
+          playerId: p.playerId,
+          nhlPos: p.nhlPos,
+          posGroup: p.posGroup,
+          dailyPos: p.dailyPos,
+          GP: p.GP,
+          GS: p.GS,
+          IR: p.IR,
+          IRplus: p.IRplus,
+          Rating: tier * PRIORITY_GAP + (p.Rating || 0),
+        };
+      });
+
+    const fullPosAssignments = findBestLineup(
+      playedCandidatesForFull,
+      false,
+      LINEUP_STRUCTURE,
+    );
     for (const result of results) {
       result.fullPos = fullPosAssignments[result.playerId] || RosterPosition.BN;
     }
 
-    // BEST lineup: only players who played.
-    const bestPosAssignments = findBestLineup(
-      results
-        .filter((p) => p && p.GP == 1)
-        .sort((a, b) => (b.Rating || 0) - (a.Rating || 0)),
-      false,
-    );
+    const playedPlayers = results
+      .filter((p) => p.GP == 1)
+      .sort((a, b) => (b.Rating || 0) - (a.Rating || 0));
+
+    const didNotPlayBest = results
+      .filter((p) => !(p.GP == 1))
+      .sort((a, b) => (b.Rating || 0) - (a.Rating || 0));
+
+    const bestPosPriority = [...playedPlayers, ...didNotPlayBest];
+    const bestPosAssignments = findBestLineup(bestPosPriority, false);
     for (const result of results) {
       result.bestPos = bestPosAssignments[result.playerId] || RosterPosition.BN;
     }
@@ -455,42 +482,6 @@ var LineupBuilder = (function () {
     var dryRun = !!opts.dryRun;
     var logToConsole =
       opts.logToConsole === undefined ? true : !!opts.logToConsole;
-
-    var debugFocus = opts.debugFocus || null;
-    var debugFocusDate =
-      debugFocus && debugFocus.date ? String(debugFocus.date) : "";
-    var debugFocusPlayerIds =
-      debugFocus && Array.isArray(debugFocus.playerIds)
-        ? debugFocus.playerIds
-        : [];
-    var debugFocusWriteback = !!(debugFocus && debugFocus.writeback);
-    var debugFocusSet = new Set(
-      debugFocusPlayerIds
-        .filter(function (x) {
-          return x !== undefined && x !== null && x !== "";
-        })
-        .map(function (x) {
-          return String(x);
-        }),
-    );
-
-    function debugLog() {
-      var msg = Array.prototype.slice.call(arguments).join(" ");
-      try {
-        if (typeof Logger !== "undefined" && Logger && Logger.log) {
-          Logger.log(msg);
-        }
-      } catch (_e1) {
-        // ignore
-      }
-      try {
-        if (typeof console !== "undefined" && console && console.log) {
-          console.log(msg);
-        }
-      } catch (_e2) {
-        // ignore
-      }
-    }
 
     var playerDayWorkbookId =
       (opts.playerDayWorkbookId && String(opts.playerDayWorkbookId)) ||
@@ -608,13 +599,11 @@ var LineupBuilder = (function () {
 
     function dateOnly(d) {
       if (!d) return "";
-
-      // IMPORTANT: Avoid timezone shifting for date-only strings.
+      // Avoid timezone shifts: treat YYYY-MM-DD strings as already-normalized.
       if (typeof d === "string") {
         var s = String(d).trim();
         if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
       }
-
       if (typeof formatDateOnly === "function") {
         return formatDateOnly(d);
       }
@@ -632,20 +621,10 @@ var LineupBuilder = (function () {
       if (typeof getPreviousDate === "function") {
         return String(getPreviousDate(dateKey));
       }
-      var dt;
-      if (typeof dateKey === "string" && /^\d{4}-\d{2}-\d{2}$/.test(dateKey)) {
-        var parts = dateKey.split("-").map(function (x) {
-          return Number(x);
-        });
-        dt = new Date(parts[0], parts[1] - 1, parts[2]);
-      } else {
-        dt = dateKey instanceof Date ? dateKey : new Date(dateKey);
-      }
+      var dt = dateKey instanceof Date ? dateKey : new Date(dateKey);
       if (isNaN(dt.getTime())) return "";
       return dateOnly(new Date(dt.getTime() - 24 * 60 * 60 * 1000));
     }
-
-    var debugFocusDateKey = debugFocusDate ? dateOnly(debugFocusDate) : "";
 
     // Presence map across the season: (playerId, teamId, date) => true
     var presence = new Set();
@@ -706,96 +685,24 @@ var LineupBuilder = (function () {
     }
 
     var updates = [];
-    var debugFocusRowIds = [];
-    var debugFocusIntendedByRowId = {};
-
     groups.forEach(function (players, groupKey) {
-      var parts = String(groupKey || "").split("|");
-      var groupDateKey = parts.length ? String(parts[0]) : "";
-      var groupTeamKey = parts.length > 1 ? String(parts[1]) : "";
-      var shouldDebugThisGroup =
-        !!debugFocusDateKey &&
-        groupDateKey === debugFocusDateKey &&
-        debugFocusSet &&
-        debugFocusSet.size;
-
-      if (shouldDebugThisGroup) {
-        debugLog(
-          "[LineupBuilder.debug] focus group date=" +
-            groupDateKey +
-            " team=" +
-            groupTeamKey +
-            " players=" +
-            String(players.length),
-        );
-        players
-          .filter(function (p) {
-            return p && debugFocusSet.has(String(p.playerId));
-          })
-          .forEach(function (p) {
-            debugLog(
-              "[LineupBuilder.debug] BEFORE playerId=" +
-                String(p.playerId) +
-                " id=" +
-                String(p.id) +
-                " dailyPos=" +
-                String(p.dailyPos) +
-                " GP=" +
-                String(p.GP) +
-                " GS=" +
-                String(p.GS) +
-                " Rating=" +
-                String(p.Rating),
-            );
-          });
-      }
-
       var optimized = optimizeLineup(players);
+
       optimized.forEach(function (p) {
         if (!p || p.id === undefined || p.id === null || p.id === "") return;
 
         var flags = computeBenchAndMissingStartsFlags(p);
 
-        updates.push({
+        var updateObj = {
           id: p.id,
           bestPos: p.bestPos,
           fullPos: p.fullPos,
           ADD: computeAddValue(p),
           MS: flags.MS,
           BS: flags.BS,
-        });
-
-        if (
-          shouldDebugThisGroup &&
-          p.playerId !== undefined &&
-          p.playerId !== null &&
-          debugFocusSet.has(String(p.playerId))
-        ) {
-          debugFocusRowIds.push(String(p.id));
-          debugFocusIntendedByRowId[String(p.id)] = {
-            playerId: String(p.playerId),
-            bestPos: String(p.bestPos),
-            fullPos: String(p.fullPos),
-          };
-        }
+        };
+        updates.push(updateObj);
       });
-
-      if (shouldDebugThisGroup) {
-        optimized
-          .filter(function (p) {
-            return p && debugFocusSet.has(String(p.playerId));
-          })
-          .forEach(function (p) {
-            debugLog(
-              "[LineupBuilder.debug] AFTER playerId=" +
-                String(p.playerId) +
-                " bestPos=" +
-                String(p.bestPos) +
-                " fullPos=" +
-                String(p.fullPos),
-            );
-          });
-      }
     });
 
     updates.sort(function (a, b) {
@@ -818,17 +725,36 @@ var LineupBuilder = (function () {
     // IMPORTANT: Sheet `id` values are not row indices. Build a rowIndex map.
     var lastRow = sheet.getLastRow();
     var idToRowIndex = {};
+    var duplicateIds = [];
     if (lastRow >= 2) {
       var idValues = sheet.getRange(2, idCol, lastRow - 1, 1).getValues();
       for (var r = 0; r < idValues.length; r++) {
         var rawId = idValues[r][0];
         if (rawId === undefined || rawId === null || rawId === "") continue;
         var key = String(rawId);
+        var rowIndex = r + 2;
         // First occurrence wins; ids should be unique.
         if (idToRowIndex[key] === undefined) {
-          idToRowIndex[key] = r + 2;
+          idToRowIndex[key] = rowIndex;
+        } else {
+          // Duplicate id in sheet - this breaks id->rowIndex mapping and can
+          // corrupt writes. Fail fast so the sheet can be fixed.
+          if (duplicateIds.length < 20) {
+            duplicateIds.push({
+              id: key,
+              firstRowIndex: idToRowIndex[key],
+              dupRowIndex: rowIndex,
+            });
+          }
         }
       }
+    }
+
+    if (duplicateIds.length) {
+      throw new Error(
+        "PlayerDayStatLine sheet has duplicate 'id' values; fix the sheet and rerun. Example duplicates: " +
+          JSON.stringify(duplicateIds),
+      );
     }
 
     function toRowIndexFromId(id) {
@@ -838,13 +764,9 @@ var LineupBuilder = (function () {
       return idx ? Number(idx) : 0;
     }
 
-    function readBestFullAtRow(rowIndex) {
-      var bestVal = sheet.getRange(rowIndex, bestPosCol, 1, 1).getValue();
-      var fullVal = sheet.getRange(rowIndex, fullPosCol, 1, 1).getValue();
-      return { bestPos: bestVal, fullPos: fullVal };
-    }
-
-    var resolvedUpdates = [];
+    // Resolve updates to rowIndex and dedupe by rowIndex (prevents batched-write
+    // spillover if duplicates ever reappear).
+    var resolvedByRowIndex = {};
     var skippedMissingRow = 0;
     updates.forEach(function (u) {
       var rowIndex = toRowIndexFromId(u && u.id);
@@ -852,15 +774,30 @@ var LineupBuilder = (function () {
         skippedMissingRow++;
         return;
       }
-      resolvedUpdates.push({
+      var nextResolved = {
         rowIndex: rowIndex,
+        id: u.id,
         bestPos: u.bestPos,
         fullPos: u.fullPos,
         ADD: u.ADD,
         MS: u.MS,
         BS: u.BS,
-      });
+      };
+
+      // Last write wins.
+      resolvedByRowIndex[rowIndex] = nextResolved;
     });
+
+    var resolvedUpdates = Object.keys(resolvedByRowIndex)
+      .map(function (k) {
+        return Number(k);
+      })
+      .sort(function (a, b) {
+        return a - b;
+      })
+      .map(function (rowIndex) {
+        return resolvedByRowIndex[rowIndex];
+      });
 
     if (!resolvedUpdates.length) {
       if (logToConsole) {
@@ -907,49 +844,6 @@ var LineupBuilder = (function () {
     var addMsBsAdjacent = msCol === addCol + 1 && bsCol === addCol + 2;
     var msBsAdjacent = Math.abs(msCol - bsCol) === 1;
 
-    if (debugFocusWriteback && debugFocusRowIds.length) {
-      // De-dupe
-      var seenIds = {};
-      debugFocusRowIds = debugFocusRowIds.filter(function (id) {
-        var k = String(id);
-        if (seenIds[k]) return false;
-        seenIds[k] = true;
-        return true;
-      });
-
-      debugLog(
-        "[LineupBuilder.debug] WRITEBACK cols bestPosCol=" +
-          String(bestPosCol) +
-          " fullPosCol=" +
-          String(fullPosCol) +
-          " adjacent=" +
-          String(bestFullAdjacent),
-      );
-
-      debugFocusRowIds.forEach(function (rowId) {
-        var rowIndex = toRowIndexFromId(rowId);
-        if (!rowIndex) return;
-        var before = readBestFullAtRow(rowIndex);
-        var intended = debugFocusIntendedByRowId[String(rowId)] || {};
-        debugLog(
-          "[LineupBuilder.debug] WRITEBACK BEFORE rowId=" +
-            String(rowId) +
-            " rowIndex=" +
-            String(rowIndex) +
-            " playerId=" +
-            String(intended.playerId || "?") +
-            " bestPos=" +
-            String(before.bestPos) +
-            " fullPos=" +
-            String(before.fullPos) +
-            " intendedBest=" +
-            String(intended.bestPos || "") +
-            " intendedFull=" +
-            String(intended.fullPos || ""),
-        );
-      });
-    }
-
     if (bestFullAdjacent) {
       var startCol = Math.min(bestPosCol, fullPosCol);
       var bestFirst = startCol === bestPosCol;
@@ -978,43 +872,6 @@ var LineupBuilder = (function () {
           return { rowIndex: u.rowIndex, value: u.fullPos };
         }),
       );
-    }
-
-    if (debugFocusWriteback && debugFocusRowIds.length) {
-      try {
-        if (
-          typeof SpreadsheetApp !== "undefined" &&
-          SpreadsheetApp &&
-          typeof SpreadsheetApp.flush === "function"
-        ) {
-          SpreadsheetApp.flush();
-        }
-      } catch (_e) {
-        // ignore
-      }
-
-      debugFocusRowIds.forEach(function (rowId) {
-        var rowIndex = toRowIndexFromId(rowId);
-        if (!rowIndex) return;
-        var after = readBestFullAtRow(rowIndex);
-        var intended = debugFocusIntendedByRowId[String(rowId)] || {};
-        debugLog(
-          "[LineupBuilder.debug] WRITEBACK AFTER rowId=" +
-            String(rowId) +
-            " rowIndex=" +
-            String(rowIndex) +
-            " playerId=" +
-            String(intended.playerId || "?") +
-            " bestPos=" +
-            String(after.bestPos) +
-            " fullPos=" +
-            String(after.fullPos) +
-            " intendedBest=" +
-            String(intended.bestPos || "") +
-            " intendedFull=" +
-            String(intended.fullPos || ""),
-        );
-      });
     }
 
     if (addMsBsAdjacent) {
@@ -1219,6 +1076,125 @@ var LineupBuilder = (function () {
     return { ok: true, stats: stats };
   }
 
+  function regression_irPlusNonPlayerCannotBumpPlayedActive() {
+    const roster = [
+      // Active LW who played.
+      {
+        playerId: "playedLW",
+        nhlPos: ["LW"],
+        posGroup: "F",
+        dailyPos: "LW",
+        GP: "1",
+        GS: null,
+        Rating: 10,
+      },
+      // IR+ player who did NOT play (should never appear in fullPos).
+      {
+        playerId: "irPlusNoGame",
+        nhlPos: ["LW"],
+        posGroup: "F",
+        dailyPos: "IR+",
+        GP: null,
+        GS: null,
+        Rating: 999,
+      },
+      // Fill out enough other played skaters/goalie to satisfy slots.
+      {
+        playerId: "lw2",
+        nhlPos: ["LW"],
+        posGroup: "F",
+        dailyPos: "BN",
+        GP: "1",
+        Rating: 9,
+      },
+      {
+        playerId: "c1",
+        nhlPos: ["C"],
+        posGroup: "F",
+        dailyPos: "C",
+        GP: "1",
+        Rating: 9,
+      },
+      {
+        playerId: "c2",
+        nhlPos: ["C"],
+        posGroup: "F",
+        dailyPos: "C",
+        GP: "1",
+        Rating: 9,
+      },
+      {
+        playerId: "rw1",
+        nhlPos: ["RW"],
+        posGroup: "F",
+        dailyPos: "RW",
+        GP: "1",
+        Rating: 9,
+      },
+      {
+        playerId: "rw2",
+        nhlPos: ["RW"],
+        posGroup: "F",
+        dailyPos: "RW",
+        GP: "1",
+        Rating: 9,
+      },
+      {
+        playerId: "d1",
+        nhlPos: ["D"],
+        posGroup: "D",
+        dailyPos: "D",
+        GP: "1",
+        Rating: 9,
+      },
+      {
+        playerId: "d2",
+        nhlPos: ["D"],
+        posGroup: "D",
+        dailyPos: "D",
+        GP: "1",
+        Rating: 9,
+      },
+      {
+        playerId: "d3",
+        nhlPos: ["D"],
+        posGroup: "D",
+        dailyPos: "D",
+        GP: "1",
+        Rating: 9,
+      },
+      {
+        playerId: "util",
+        nhlPos: ["C"],
+        posGroup: "F",
+        dailyPos: "Util",
+        GP: "1",
+        Rating: 9,
+      },
+      {
+        playerId: "g",
+        nhlPos: ["G"],
+        posGroup: "G",
+        dailyPos: "G",
+        GP: "1",
+        Rating: 9,
+      },
+    ];
+
+    const optimized = optimizeLineup(roster);
+    const playedLW = optimized.find((p) => p.playerId === "playedLW");
+    const irPlus = optimized.find((p) => p.playerId === "irPlusNoGame");
+    assert(
+      playedLW.fullPos !== "BN",
+      "Expected played active LW to remain in starting lineup (non-BN) in fullPos",
+    );
+    assert(
+      irPlus.fullPos === "BN",
+      "Expected non-playing IR+ to remain BN in fullPos",
+    );
+    return { ok: true };
+  }
+
   return {
     RosterPosition: RosterPosition,
     LINEUP_STRUCTURE: LINEUP_STRUCTURE,
@@ -1239,6 +1215,8 @@ var LineupBuilder = (function () {
       exampleRoster: exampleRoster,
       runExample: runExample,
       smoke: smoke,
+      regression_irPlusNonPlayerCannotBumpPlayedActive:
+        regression_irPlusNonPlayerCannotBumpPlayedActive,
     },
   };
 })();

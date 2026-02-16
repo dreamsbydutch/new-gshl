@@ -143,7 +143,7 @@ SHEET_SCHEMAS.Matchup =
   createSheetSchema({
     description: "Weekly team matchups",
     keyColumns: ["id"],
-    numericColumns: ["homeScore", "awayScore"],
+    numericColumns: ["homeRank", "awayRank", "homeScore", "awayScore"],
     booleanColumns: ["homeWin", "awayWin", "isComplete"],
     timestampColumns: ["updatedAt"],
   });

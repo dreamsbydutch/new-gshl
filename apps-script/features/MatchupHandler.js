@@ -830,6 +830,106 @@ var MatchupHandler = (function buildMatchupHandler() {
     );
   }
 
+  /**
+   * Update Matchup.homeRank / Matchup.awayRank from TeamWeekStatLine.powerRk.
+   *
+   * Writes only when a rank is available for the matchup's week/team.
+   *
+   * @param {string|number} seasonId
+   * @param {Object=} options
+   * @param {boolean=} options.logToConsole
+   */
+  function updateMatchupRanksFromPowerRankings(seasonId, options) {
+    var seasonKey = normalizeSeasonId(
+      seasonId,
+      "MatchupHandler.updateMatchupRanksFromPowerRankings",
+    );
+
+    var opts = options || {};
+    var logToConsole =
+      opts.logToConsole === undefined ? true : !!opts.logToConsole;
+
+    var matchups = fetchSheetAsObjects(SPREADSHEET_ID, "Matchup").filter(
+      function (m) {
+        return m && String(m.seasonId) === seasonKey;
+      },
+    );
+
+    if (!matchups.length) {
+      if (logToConsole)
+        console.log("[MatchupHandler] No matchups found for season", seasonKey);
+      return { updated: 0, inserted: 0, cleared: 0, total: 0 };
+    }
+
+    var teamWeeks = fetchSheetAsObjects(
+      TEAMSTATS_SPREADSHEET_ID,
+      "TeamWeekStatLine",
+    ).filter(function (tw) {
+      return tw && String(tw.seasonId) === seasonKey;
+    });
+
+    var rankByTeamWeek = new Map();
+    teamWeeks.forEach(function (tw) {
+      var tid = tw && tw.gshlTeamId !== undefined ? String(tw.gshlTeamId) : "";
+      var wid = tw && tw.weekId !== undefined ? String(tw.weekId) : "";
+      if (!tid || !wid) return;
+      var rk = toNumber(tw.powerRk);
+      if (!isFinite(rk) || rk <= 0) return;
+      rankByTeamWeek.set(tid + "|" + wid, Math.round(rk));
+    });
+
+    var updates = [];
+    matchups.forEach(function (m) {
+      var id = m && m.id !== undefined && m.id !== null ? String(m.id) : "";
+      var weekId =
+        m && m.weekId !== undefined && m.weekId !== null
+          ? String(m.weekId)
+          : "";
+      var homeTeamId =
+        m && m.homeTeamId !== undefined && m.homeTeamId !== null
+          ? String(m.homeTeamId)
+          : "";
+      var awayTeamId =
+        m && m.awayTeamId !== undefined && m.awayTeamId !== null
+          ? String(m.awayTeamId)
+          : "";
+      if (!id || !weekId || !homeTeamId || !awayTeamId) return;
+
+      var homeRk = rankByTeamWeek.get(homeTeamId + "|" + weekId);
+      var awayRk = rankByTeamWeek.get(awayTeamId + "|" + weekId);
+      if (homeRk === undefined && awayRk === undefined) return;
+
+      var u = { id: id };
+      if (homeRk !== undefined) u.homeRank = homeRk;
+      if (awayRk !== undefined) u.awayRank = awayRk;
+      updates.push(u);
+    });
+
+    if (!updates.length) {
+      if (logToConsole)
+        console.log(
+          "[MatchupHandler] No matchup rank updates available for season",
+          seasonKey,
+        );
+      return { updated: 0, inserted: 0, cleared: 0, total: 0 };
+    }
+
+    if (logToConsole) {
+      console.log(
+        "[MatchupHandler] Updating",
+        updates.length,
+        "matchup rank row(s) for season",
+        seasonKey,
+      );
+    }
+
+    return upsertSheetByKeys(SPREADSHEET_ID, "Matchup", ["id"], updates, {
+      idColumn: "id",
+      createdAtColumn: "createdAt",
+      updatedAtColumn: "updatedAt",
+    });
+  }
+
   function updateMatchupsAndStandings(seasonId) {
     var seasonKey = normalizeSeasonId(
       seasonId,
@@ -845,6 +945,7 @@ var MatchupHandler = (function buildMatchupHandler() {
 
   return {
     updateMatchupsFromTeamWeeks: updateMatchupsFromTeamWeeks,
+    updateMatchupRanksFromPowerRankings: updateMatchupRanksFromPowerRankings,
     updateTeamSeasonStandings: updateTeamSeasonStandings,
     updateMatchupsAndStandings: updateMatchupsAndStandings,
   };

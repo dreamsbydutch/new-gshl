@@ -47,8 +47,10 @@ var PowerRankingsAlgo = (function buildPowerRankingsAlgo() {
     // Elo
     baseElo: 1500,
     eloScale: 400,
-    baseK: 20,
-    marginKMultiplier: 0.5,
+    // Higher K => more week-to-week movement.
+    baseK: 32,
+    // Larger margin sensitivity => blowouts move Elo more.
+    marginKMultiplier: 0.9,
     // Elo actual-score blend per matchup:
     // - marginScore uses (teamScore-opponentScore) from Matchup scores
     // - pointsScore uses the win/loss points rule (3/2/1/0)
@@ -81,7 +83,8 @@ var PowerRankingsAlgo = (function buildPowerRankingsAlgo() {
     eloPlayoffRoundStep: 1,
 
     // Stat strength EWMA
-    ewmaAlpha: 0.35, // higher = more weight on most recent week
+    // Higher alpha => faster reaction to what happened this week.
+    ewmaAlpha: 0.6,
 
     // Weekly performance score weights (all in z-space):
     // - categoryZ: based on TeamWeekStatLine category fields (MATCHUP_CATEGORY_RULES)
@@ -92,12 +95,30 @@ var PowerRankingsAlgo = (function buildPowerRankingsAlgo() {
     perfCategoryWeight: 0.4,
     perfRatingWeight: 0.3,
     perfTalentWeight: 0.1,
+    // Last-season finish influence: strong early, then decays quickly.
+    // Finish signal is pulled from last season's TeamSeasonStatLine snapshot.
+    perfFinishWeight: 0.15,
     perfMatchupPointsWeight: 0.1,
     perfMatchupMarginWeight: 0.1,
 
+    // Steep priors decay: half-life in weeks (week1 full strength).
+    perfTalentHalfLifeWeeks: 2,
+    perfFinishHalfLifeWeeks: 3,
+
+    // Season-start seeding (priors) for Elo + stat EWMA.
+    // - Seeds Elo from last season + talent + finish (so early season is not noisy)
+    // - Then weekly performance takes over as data accumulates
+    seedEloFromLastSeasonWeight: 0.75, // 0..1 blend into last season powerElo
+    seedEloTalentPointsPerZ: 120, // Elo points per talent z (week1)
+    seedEloFinishPointsPerZ: 80, // Elo points per finish z (last season)
+    seedStatFromLastSeasonWeight: 0.5, // 0..1 blend into last season powerStatEwma
+    seedStatTalentZWeight: 0.6, // stat-z points per talent z (week1)
+    seedStatFinishZWeight: 0.3, // stat-z points per finish z (last season)
+
     // Composite weights
-    wElo: 0.7,
-    wStat: 0.3,
+    // Slightly more weight on the more-volatile stat signal.
+    wElo: 0.6,
+    wStat: 0.4,
 
     // Scope
     // By default, include ALL weeks for a season (RS + playoffs + LT). To restrict, pass:
@@ -152,14 +173,107 @@ var PowerRankingsAlgo = (function buildPowerRankingsAlgo() {
     return { sheetName: null, rows: [] };
   }
 
-  function getPlayerSeasonTalentRating(nhlRow) {
+  function safeLower(s) {
+    return s === undefined || s === null ? "" : String(s).trim().toLowerCase();
+  }
+
+  function detectPlayerNhlSheetName() {
+    // Fast-path: common names.
+    var known = [
+      "PlayerNHLStatLine",
+      "PlayerNHL",
+      "PlayerNhlStatLine",
+      "PlayerNhl",
+    ];
+    for (var i = 0; i < known.length; i++) {
+      var rows = tryFetchSheetAsObjects(PLAYERSTATS_SPREADSHEET_ID, known[i]);
+      if (rows) return known[i];
+    }
+
+    // Fallback: scan the workbook for a sheet with playerId + seasonId + (seasonRating|overallRating).
+    // This avoids silent breakage if the sheet is renamed.
+    if (typeof SpreadsheetApp === "undefined") return null;
+    try {
+      var ss = SpreadsheetApp.openById(PLAYERSTATS_SPREADSHEET_ID);
+      var sheets = ss.getSheets() || [];
+      for (var s = 0; s < sheets.length; s++) {
+        var sh = sheets[s];
+        var lastCol = sh.getLastColumn();
+        if (!lastCol) continue;
+        var header = sh.getRange(1, 1, 1, lastCol).getValues();
+        var cols = (header && header[0] ? header[0] : []).map(safeLower);
+        if (!cols.length) continue;
+
+        var hasSeason =
+          cols.indexOf("seasonid") !== -1 ||
+          cols.indexOf("gshlseasonid") !== -1 ||
+          cols.indexOf("nhlseasonid") !== -1 ||
+          cols.indexOf("season") !== -1 ||
+          cols.indexOf("nhlseason") !== -1;
+        var hasPlayer =
+          cols.indexOf("playerid") !== -1 ||
+          cols.indexOf("gshlplayerid") !== -1 ||
+          cols.indexOf("player_id") !== -1 ||
+          cols.indexOf("yahooplayerid") !== -1 ||
+          cols.indexOf("yahooid") !== -1 ||
+          cols.indexOf("id") !== -1;
+        var hasRating =
+          cols.indexOf("seasonrating") !== -1 ||
+          cols.indexOf("season_rating") !== -1 ||
+          cols.indexOf("overallrating") !== -1 ||
+          cols.indexOf("overall_rating") !== -1 ||
+          cols.indexOf("rating") !== -1;
+        if (hasSeason && hasPlayer && hasRating) {
+          return sh.getName();
+        }
+      }
+    } catch (e) {
+      return null;
+    }
+    return null;
+  }
+
+  function pickFirstExistingField(sampleRow, candidates) {
+    if (!sampleRow) return null;
+    for (var i = 0; i < (candidates || []).length; i++) {
+      var f = candidates[i];
+      if (sampleRow[f] !== undefined) return f;
+    }
+
+    // Case-insensitive fallback (helps if headers are e.g. SeasonId vs seasonId).
+    var actualByLower = {};
+    for (var k in sampleRow) {
+      if (!Object.prototype.hasOwnProperty.call(sampleRow, k)) continue;
+      actualByLower[safeLower(k)] = k;
+    }
+    for (var j = 0; j < (candidates || []).length; j++) {
+      var c = candidates[j];
+      var actual = actualByLower[safeLower(c)];
+      if (actual && sampleRow[actual] !== undefined) return actual;
+    }
+    return null;
+  }
+
+  function getPlayerSeasonTalentRating(nhlRow, ratingField) {
     if (!nhlRow) return null;
+
+    if (ratingField && nhlRow[ratingField] !== undefined) {
+      var rf = toNumber(nhlRow[ratingField]);
+      if (isFinite(rf)) return rf;
+    }
+
     // Prefer seasonRating; fall back to overallRating then Rating.
     var r = toNumber(nhlRow.seasonRating);
     if (isFinite(r)) return r;
+    r = toNumber(nhlRow.season_rating);
+    if (isFinite(r)) return r;
     r = toNumber(nhlRow.overallRating);
     if (isFinite(r)) return r;
+    r = toNumber(nhlRow.overall_rating);
+    if (isFinite(r)) return r;
     r = toNumber(nhlRow.Rating);
+    if (isFinite(r)) return r;
+    r = toNumber(nhlRow.rating);
     return isFinite(r) ? r : null;
   }
 
@@ -310,10 +424,159 @@ var PowerRankingsAlgo = (function buildPowerRankingsAlgo() {
     return { mean: mean, std: std };
   }
 
+  function halfLifeDecay(weekNumber, halfLifeWeeks) {
+    var hl = toNumber(halfLifeWeeks);
+    if (!isFinite(hl) || hl <= 0) return 1;
+    var w = toNumber(weekNumber);
+    if (!isFinite(w) || w <= 1) return 1;
+    return Math.pow(0.5, (w - 1) / hl);
+  }
+
+  function findPreviousSeasonId(seasonKey) {
+    // Best-effort: use Season sheet ordering when present, else numeric decrement.
+    var seasons = [];
+    try {
+      seasons = fetchSheetAsObjects(SPREADSHEET_ID, "Season", {
+        coerceTypes: true,
+      });
+    } catch (e) {
+      seasons = [];
+    }
+
+    if (seasons && seasons.length) {
+      var sorted = seasons.slice().sort(function (a, b) {
+        var ay = toNumber(a && (a.seasonYear || a.year || a.season));
+        var by = toNumber(b && (b.seasonYear || b.year || b.season));
+        if (isFinite(ay) && isFinite(by) && ay !== by) return ay - by;
+
+        var ad = formatDateOnly(a && a.startDate);
+        var bd = formatDateOnly(b && b.startDate);
+        if (ad && bd && ad !== bd) return ad < bd ? -1 : 1;
+
+        return String(a && a.id) < String(b && b.id) ? -1 : 1;
+      });
+
+      var idx = -1;
+      for (var i = 0; i < sorted.length; i++) {
+        if (String(sorted[i] && sorted[i].id) === String(seasonKey)) {
+          idx = i;
+          break;
+        }
+      }
+      if (idx > 0) {
+        return String(sorted[idx - 1].id);
+      }
+    }
+
+    var n = toNumber(seasonKey);
+    if (isFinite(n)) return String(n - 1);
+    return null;
+  }
+
+  function getCurrentSeasonId() {
+    // Best-effort: use Season sheet ordering when present.
+    var seasons = [];
+    try {
+      seasons = fetchSheetAsObjects(SPREADSHEET_ID, "Season", {
+        coerceTypes: true,
+      });
+    } catch (e) {
+      seasons = [];
+    }
+
+    if (!seasons || !seasons.length) return null;
+
+    var sorted = seasons.slice().sort(function (a, b) {
+      var ay = toNumber(a && (a.seasonYear || a.year || a.season));
+      var by = toNumber(b && (b.seasonYear || b.year || b.season));
+      if (isFinite(ay) && isFinite(by) && ay !== by) return ay - by;
+
+      var ad = formatDateOnly(a && a.startDate);
+      var bd = formatDateOnly(b && b.startDate);
+      if (ad && bd && ad !== bd) return ad < bd ? -1 : 1;
+
+      return String(a && a.id) < String(b && b.id) ? -1 : 1;
+    });
+
+    var last = sorted[sorted.length - 1];
+    return last && last.id !== undefined && last.id !== null
+      ? String(last.id)
+      : null;
+  }
+
+  function pickBestFinishRowsForSeason(teamSeasonRows, seasonId) {
+    // Prefer playoff snapshot as "finish"; fall back to regular season.
+    var rows = (teamSeasonRows || []).filter(function (r) {
+      return r && String(r.seasonId) === String(seasonId);
+    });
+    if (!rows.length) return [];
+
+    var byTeam = new Map();
+    rows.forEach(function (r) {
+      var tid =
+        r.gshlTeamId !== undefined && r.gshlTeamId !== null
+          ? String(r.gshlTeamId)
+          : "";
+      if (!tid) return;
+      if (!byTeam.has(tid)) byTeam.set(tid, []);
+      byTeam.get(tid).push(r);
+    });
+
+    var out = [];
+    byTeam.forEach(function (list) {
+      var best = null;
+      // PO first.
+      for (var i = 0; i < list.length; i++) {
+        if (
+          String(list[i].seasonType) === String(SeasonType.PLAYOFFS) ||
+          String(list[i].seasonType) === "PO"
+        ) {
+          best = list[i];
+          break;
+        }
+      }
+      // RS fallback.
+      if (!best) {
+        for (var j = 0; j < list.length; j++) {
+          if (
+            String(list[j].seasonType) === String(SeasonType.REGULAR_SEASON) ||
+            String(list[j].seasonType) === "RS"
+          ) {
+            best = list[j];
+            break;
+          }
+        }
+      }
+      if (!best) best = list[0];
+      out.push(best);
+    });
+    return out;
+  }
+
   function clamp01(x) {
     if (x <= 0) return 0;
     if (x >= 1) return 1;
     return x;
+  }
+
+  function clamp(x, min, max) {
+    if (x <= min) return min;
+    if (x >= max) return max;
+    return x;
+  }
+
+  // powerRating is a display-friendly projection of powerComposite.
+  // Current model: fixed static scale (roughly z-space) in [-2.25, 1.75].
+  // Legacy model (older seasons): 0..100 weekly min/max normalization.
+  function powerRatingToCompositeSignal(powerRating) {
+    var n = toNumber(powerRating);
+    if (!isFinite(n)) return null;
+
+    // Legacy 0..100 -> approximate z-space around 0.
+    if (n >= 0 && n <= 100) return (n - 50) / 25;
+
+    // New-scale ratings already live in composite units.
+    return n;
   }
 
   function computeMatchupPointsFromRow(m) {
@@ -566,82 +829,244 @@ var PowerRankingsAlgo = (function buildPowerRankingsAlgo() {
     var teamIds = buildLeagueTeamIds(seasonKey);
     var teamIdSet = new Set(teamIds);
 
-    // Pull PlayerWeekStatLine rows for this season and weeks, to derive team talent.
-    var playerWeekRows = fetchSheetAsObjects(
-      PLAYERSTATS_SPREADSHEET_ID,
-      "PlayerWeekStatLine",
-      { coerceTypes: true },
-    ).filter(function (pw) {
-      if (!pw) return false;
-      if (String(pw && pw.seasonId) !== String(seasonKey)) return false;
-      var wk =
-        pw.weekId !== undefined && pw.weekId !== null ? String(pw.weekId) : "";
-      if (!wk || !weekIdSet.has(wk)) return false;
-      var tid =
-        pw.gshlTeamId !== undefined && pw.gshlTeamId !== null
-          ? String(pw.gshlTeamId)
-          : "";
-      return tid ? teamIdSet.has(tid) : false;
-    });
-
-    // Pull player NHL season ratings for this season.
-    var nhlSheet = fetchFirstAvailableSheet(
-      PLAYERSTATS_SPREADSHEET_ID,
-      ["PlayerNHLStatLine", "PlayerNHL", "PlayerNhlStatLine", "PlayerNhl"],
-      { coerceTypes: true },
-    );
-    var nhlRows = (nhlSheet.rows || []).filter(function (r) {
-      return String(r && r.seasonId) === String(seasonKey);
-    });
-
-    var nhlRatingByPlayerId = new Map();
-    nhlRows.forEach(function (r) {
-      var pid = r && r.playerId !== undefined && r.playerId !== null ? String(r.playerId) : "";
-      if (!pid) return;
-      var rating = getPlayerSeasonTalentRating(r);
-      if (!isFinite(toNumber(rating))) return;
-      nhlRatingByPlayerId.set(pid, toNumber(rating));
-    });
-
-    if (opts.logToConsole) {
-      console.log(
-        "[PowerRankingsAlgo] talent inputs: PlayerWeekStatLine rows=",
-        playerWeekRows.length,
-        "PlayerNHL sheet=",
-        nhlSheet.sheetName || "(not found)",
-        "PlayerNHL rows=",
-        nhlRows.length,
-      );
-    }
-
-    // Precompute weighted team talent per (weekId, teamId): weighted average of player season ratings by days on team.
-    var talentAggByWeekTeamKey = new Map();
-    playerWeekRows.forEach(function (pw) {
-      var wk = String(pw.weekId);
-      var tid = String(pw.gshlTeamId);
-      var pid = pw.playerId !== undefined && pw.playerId !== null ? String(pw.playerId) : "";
-      if (!pid) return;
-
-      var days = toNumber(pw.days);
-      if (!isFinite(days) || days <= 0) return;
-
-      var pr = nhlRatingByPlayerId.get(pid);
-      if (!isFinite(pr)) return;
-
-      var key = wk + "_" + tid;
-      if (!talentAggByWeekTeamKey.has(key)) {
-        talentAggByWeekTeamKey.set(key, { sum: 0, denom: 0 });
-      }
-      var agg = talentAggByWeekTeamKey.get(key);
-      agg.sum += pr * days;
-      agg.denom += days;
-    });
-
+    // Team talent (powerTalent)
+    // - Current season: use the master Player roster table (Player.gshlTeamId + rating) for roster membership and talent.
+    // - Previous seasons: use PlayerWeekStatLine days-weighted membership + PlayerNHL season ratings.
     var teamTalentByWeekTeamKey = new Map();
-    talentAggByWeekTeamKey.forEach(function (agg, key) {
-      var avg = agg && agg.denom ? agg.sum / agg.denom : 0;
-      teamTalentByWeekTeamKey.set(key, isFinite(avg) ? avg : 0);
-    });
+    var currentSeasonId = getCurrentSeasonId();
+    var isCurrentSeason =
+      currentSeasonId && String(currentSeasonId) === String(seasonKey);
+
+    if (isCurrentSeason) {
+      var teamsForSeason = fetchSheetAsObjects(SPREADSHEET_ID, "Team", {
+        coerceTypes: true,
+      }).filter(function (t) {
+        return String(t && t.seasonId) === String(seasonKey);
+      });
+
+      var franchiseIdToTeamId = new Map();
+      teamsForSeason.forEach(function (t) {
+        var tid = t && t.id !== undefined && t.id !== null ? String(t.id) : "";
+        var fid =
+          t && t.franchiseId !== undefined && t.franchiseId !== null
+            ? String(t.franchiseId)
+            : "";
+        if (tid && fid) franchiseIdToTeamId.set(fid, tid);
+      });
+
+      var playerRows = fetchSheetAsObjects(SPREADSHEET_ID, "Player", {
+        coerceTypes: true,
+      });
+      var pTeamField =
+        playerRows && playerRows.length
+          ? pickFirstExistingField(playerRows[0], [
+              "gshlTeamId",
+              "teamId",
+              "franchiseId",
+            ])
+          : null;
+      var pRatingField =
+        playerRows && playerRows.length
+          ? pickFirstExistingField(playerRows[0], [
+              "overallRating",
+              "overall_rating",
+              "Rating",
+              "rating",
+            ])
+          : null;
+
+      var sumByTeamId = new Map();
+      var countByTeamId = new Map();
+      (playerRows || []).forEach(function (p) {
+        if (!p) return;
+        var rawRosterKey = pTeamField ? p[pTeamField] : p && p.gshlTeamId;
+        var rosterKey =
+          rawRosterKey !== undefined && rawRosterKey !== null
+            ? String(rawRosterKey)
+            : "";
+        if (!rosterKey) return;
+
+        // Player.gshlTeamId is typically franchiseId (not Team.id). Map it back.
+        var tid = franchiseIdToTeamId.get(rosterKey);
+        if (!tid && teamIdSet.has(rosterKey)) tid = rosterKey;
+        if (!tid) return;
+
+        var rawRating = pRatingField ? p[pRatingField] : p && p.overallRating;
+        var rating = toNumber(rawRating);
+        if (!isFinite(rating)) return;
+
+        sumByTeamId.set(tid, (sumByTeamId.get(tid) || 0) + rating);
+        countByTeamId.set(tid, (countByTeamId.get(tid) || 0) + 1);
+      });
+
+      // Fill (weekId, teamId) with a constant roster average for the current season.
+      weekIdSet.forEach(function (wkId) {
+        teamIds.forEach(function (tid) {
+          var sum = sumByTeamId.get(String(tid)) || 0;
+          var cnt = countByTeamId.get(String(tid)) || 0;
+          var avg = cnt ? sum / cnt : 0;
+          teamTalentByWeekTeamKey.set(
+            String(wkId) + "_" + String(tid),
+            isFinite(avg) ? avg : 0,
+          );
+        });
+      });
+
+      if (opts.logToConsole) {
+        console.log(
+          "[PowerRankingsAlgo] talent inputs (current season roster): players=",
+          (playerRows || []).length,
+          "teamField=",
+          pTeamField || "(none)",
+          "ratingField=",
+          pRatingField || "(none)",
+          "rosterTeamsWithPlayers=",
+          countByTeamId.size,
+        );
+      }
+    } else {
+      // Previous seasons: PlayerWeekStatLine + PlayerNHL join.
+      var playerWeekRows = fetchSheetAsObjects(
+        PLAYERSTATS_SPREADSHEET_ID,
+        "PlayerWeekStatLine",
+        { coerceTypes: true },
+      ).filter(function (pw) {
+        if (!pw) return false;
+        if (String(pw && pw.seasonId) !== String(seasonKey)) return false;
+        var wk =
+          pw.weekId !== undefined && pw.weekId !== null
+            ? String(pw.weekId)
+            : "";
+        if (!wk || !weekIdSet.has(wk)) return false;
+        var tid =
+          pw.gshlTeamId !== undefined && pw.gshlTeamId !== null
+            ? String(pw.gshlTeamId)
+            : "";
+        return tid ? teamIdSet.has(tid) : false;
+      });
+
+      var nhlSheetName = detectPlayerNhlSheetName();
+      var nhlAllRows = nhlSheetName
+        ? fetchSheetAsObjects(PLAYERSTATS_SPREADSHEET_ID, nhlSheetName, {
+            coerceTypes: true,
+          })
+        : [];
+
+      var seasonField = null;
+      var playerField = null;
+      var ratingField = null;
+      if (nhlAllRows && nhlAllRows.length) {
+        seasonField = pickFirstExistingField(nhlAllRows[0], [
+          "seasonId",
+          "gshlSeasonId",
+          "nhlSeasonId",
+          "season",
+          "nhlSeason",
+        ]);
+        playerField = pickFirstExistingField(nhlAllRows[0], [
+          "playerId",
+          "gshlPlayerId",
+          "player_id",
+          "yahooPlayerId",
+          "yahooId",
+          "id",
+        ]);
+
+        ratingField = pickFirstExistingField(nhlAllRows[0], [
+          "seasonRating",
+          "season_rating",
+          "overallRating",
+          "overall_rating",
+          "rating",
+          "Rating",
+        ]);
+      }
+
+      var nhlRows = (nhlAllRows || []).filter(function (r) {
+        if (!r) return false;
+        if (!seasonField) return true;
+        return String(r[seasonField]) === String(seasonKey);
+      });
+
+      if (!nhlRows.length && nhlAllRows && nhlAllRows.length) {
+        nhlRows = nhlAllRows;
+      }
+
+      var nhlRatingByPlayerId = new Map();
+      nhlRows.forEach(function (r) {
+        var pidRaw = playerField ? r[playerField] : r && r.playerId;
+        var pid = pidRaw !== undefined && pidRaw !== null ? String(pidRaw) : "";
+        if (!pid) return;
+        var rating = getPlayerSeasonTalentRating(r, ratingField);
+        if (!isFinite(toNumber(rating))) return;
+        nhlRatingByPlayerId.set(pid, toNumber(rating));
+      });
+
+      if (opts.logToConsole) {
+        console.log(
+          "[PowerRankingsAlgo] talent inputs (prior seasons): PlayerWeekStatLine rows=",
+          playerWeekRows.length,
+          "PlayerNHL sheet=",
+          nhlSheetName || "(not found)",
+          "PlayerNHL rows=",
+          nhlRows.length,
+          "PlayerNHL indexed=",
+          nhlRatingByPlayerId.size,
+          "PlayerNHL ratingField=",
+          ratingField || "(none)",
+        );
+      }
+
+      var talentAggByWeekTeamKey = new Map();
+      var talentRowsWithDays = 0;
+      var talentRowsWithRating = 0;
+      playerWeekRows.forEach(function (pw) {
+        var wk = String(pw.weekId);
+        var tid = String(pw.gshlTeamId);
+        var pid =
+          pw.playerId !== undefined && pw.playerId !== null
+            ? String(pw.playerId)
+            : "";
+        if (!pid) return;
+
+        var days = toNumber(pw.days);
+        if (!isFinite(days) || days <= 0) return;
+        talentRowsWithDays++;
+
+        var pr = nhlRatingByPlayerId.get(pid);
+        if (!isFinite(pr)) return;
+        talentRowsWithRating++;
+
+        var key = wk + "_" + tid;
+        if (!talentAggByWeekTeamKey.has(key)) {
+          talentAggByWeekTeamKey.set(key, { sum: 0, denom: 0 });
+        }
+        var agg = talentAggByWeekTeamKey.get(key);
+        agg.sum += pr * days;
+        agg.denom += days;
+      });
+
+      if (opts.logToConsole) {
+        console.log(
+          "[PowerRankingsAlgo] talent join stats (prior seasons): pwWithDays=",
+          talentRowsWithDays,
+          "pwWithRating=",
+          talentRowsWithRating,
+          "weekTeamTalentBuckets=",
+          talentAggByWeekTeamKey.size,
+        );
+        if (!nhlSheetName || nhlRatingByPlayerId.size === 0) {
+          console.log(
+            "[PowerRankingsAlgo] WARNING: No PlayerNHL ratings indexed; powerTalent will be 0.",
+          );
+        }
+      }
+
+      talentAggByWeekTeamKey.forEach(function (agg, key) {
+        var avg = agg && agg.denom ? agg.sum / agg.denom : 0;
+        teamTalentByWeekTeamKey.set(key, isFinite(avg) ? avg : 0);
+      });
+    }
 
     // Pull TeamWeekStatLine for this season and these weeks.
     var teamWeekRows = fetchSheetAsObjects(
@@ -697,12 +1122,237 @@ var PowerRankingsAlgo = (function buildPowerRankingsAlgo() {
       matchupsByWeekId.get(wk).push(m);
     });
 
+    // Last-season finish priors (used for season start seeding + early-week weighting).
+    var prevSeasonId = findPreviousSeasonId(seasonKey);
+    var finishZFromLastSeason = new Map();
+    var prevEloByTeam = new Map();
+    var prevStatByTeam = new Map();
+    if (prevSeasonId) {
+      var allTeamSeasonRows = [];
+      try {
+        allTeamSeasonRows = fetchSheetAsObjects(
+          TEAMSTATS_SPREADSHEET_ID,
+          "TeamSeasonStatLine",
+          { coerceTypes: true },
+        );
+      } catch (e) {
+        allTeamSeasonRows = [];
+      }
+
+      // Build cross-season mapping: current teamId -> previous season teamId.
+      // Primary join: franchiseId.
+      // Fallback for new franchises: match by Franchise.ownerId.
+      var allTeams = [];
+      var allFranchises = [];
+      try {
+        allTeams = fetchSheetAsObjects(SPREADSHEET_ID, "Team", {
+          coerceTypes: true,
+        });
+      } catch (e) {
+        allTeams = [];
+      }
+      try {
+        allFranchises = fetchSheetAsObjects(SPREADSHEET_ID, "Franchise", {
+          coerceTypes: true,
+        });
+      } catch (e) {
+        allFranchises = [];
+      }
+
+      var ownerIdByFranchiseId = new Map();
+      (allFranchises || []).forEach(function (f) {
+        if (!f) return;
+        var fid = f.id !== undefined && f.id !== null ? String(f.id) : "";
+        if (!fid) return;
+        var oid =
+          f.ownerId !== undefined && f.ownerId !== null
+            ? String(f.ownerId)
+            : "";
+        if (oid) ownerIdByFranchiseId.set(fid, oid);
+      });
+
+      var prevTeamIdByFranchiseId = new Map();
+      var prevTeamIdByOwnerId = new Map();
+      (allTeams || []).forEach(function (t) {
+        if (!t) return;
+        if (String(t.seasonId) !== String(prevSeasonId)) return;
+        var tid = t.id !== undefined && t.id !== null ? String(t.id) : "";
+        if (!tid) return;
+        var fid =
+          t.franchiseId !== undefined && t.franchiseId !== null
+            ? String(t.franchiseId)
+            : "";
+        if (fid) {
+          if (!prevTeamIdByFranchiseId.has(fid))
+            prevTeamIdByFranchiseId.set(fid, tid);
+          var oid = ownerIdByFranchiseId.get(fid) || "";
+          if (oid && !prevTeamIdByOwnerId.has(oid))
+            prevTeamIdByOwnerId.set(oid, tid);
+        }
+      });
+
+      var currFranchiseIdByTeamId = new Map();
+      (allTeams || []).forEach(function (t) {
+        if (!t) return;
+        if (String(t.seasonId) !== String(seasonKey)) return;
+        var tid = t.id !== undefined && t.id !== null ? String(t.id) : "";
+        if (!tid) return;
+        var fid =
+          t.franchiseId !== undefined && t.franchiseId !== null
+            ? String(t.franchiseId)
+            : "";
+        if (fid) currFranchiseIdByTeamId.set(tid, fid);
+      });
+
+      var finishRows = pickBestFinishRowsForSeason(
+        allTeamSeasonRows,
+        prevSeasonId,
+      );
+      var finishRowByPrevTeamId = new Map();
+      finishRows.forEach(function (r) {
+        var tidPrev =
+          r && r.gshlTeamId !== undefined && r.gshlTeamId !== null
+            ? String(r.gshlTeamId)
+            : "";
+        if (!tidPrev) return;
+        finishRowByPrevTeamId.set(tidPrev, r);
+      });
+
+      var finishSignalByCurrentTeamId = new Map();
+      var matchedByFranchise = 0;
+      var matchedByOwner = 0;
+      var unmatched = 0;
+
+      teamIds.forEach(function (currTeamId) {
+        var currTid = String(currTeamId);
+        var currFid = currFranchiseIdByTeamId.get(currTid) || "";
+
+        var prevTeamId = "";
+        if (currFid) {
+          var direct = prevTeamIdByFranchiseId.get(currFid);
+          if (direct) {
+            prevTeamId = String(direct);
+            matchedByFranchise++;
+          } else {
+            var ownerId = ownerIdByFranchiseId.get(currFid) || "";
+            var byOwner = ownerId ? prevTeamIdByOwnerId.get(ownerId) : "";
+            if (byOwner) {
+              prevTeamId = String(byOwner);
+              matchedByOwner++;
+            }
+          }
+        }
+
+        if (!prevTeamId) {
+          unmatched++;
+          finishSignalByCurrentTeamId.set(currTid, 0);
+          return;
+        }
+
+        var prevRow = finishRowByPrevTeamId.get(prevTeamId);
+        if (!prevRow) {
+          finishSignalByCurrentTeamId.set(currTid, 0);
+          return;
+        }
+
+        var sig = null;
+        if (isFinite(toNumber(prevRow.powerComposite))) {
+          sig = toNumber(prevRow.powerComposite);
+        } else if (isFinite(toNumber(prevRow.powerRating))) {
+          var fromRating = powerRatingToCompositeSignal(prevRow.powerRating);
+          sig = fromRating === null ? 0 : toNumber(fromRating);
+        } else {
+          sig = 0;
+        }
+        finishSignalByCurrentTeamId.set(currTid, sig);
+
+        if (isFinite(toNumber(prevRow.powerElo)))
+          prevEloByTeam.set(currTid, toNumber(prevRow.powerElo));
+        if (isFinite(toNumber(prevRow.powerStatEwma)))
+          prevStatByTeam.set(currTid, toNumber(prevRow.powerStatEwma));
+      });
+
+      var finishVals = teamIds.map(function (tid) {
+        var v = finishSignalByCurrentTeamId.get(String(tid));
+        return v === undefined ? 0 : toNumber(v);
+      });
+      var finishMeta = computeZFromArray(finishVals);
+      teamIds.forEach(function (tid) {
+        var v = finishSignalByCurrentTeamId.get(String(tid));
+        var vn = v === undefined ? 0 : toNumber(v);
+        finishZFromLastSeason.set(
+          String(tid),
+          (vn - finishMeta.mean) / finishMeta.std,
+        );
+      });
+
+      if (opts.logToConsole) {
+        console.log(
+          "[PowerRankingsAlgo] priors: prevSeasonId=",
+          prevSeasonId,
+          "finishRows=",
+          finishRows.length,
+          "prevEloTeams=",
+          prevEloByTeam.size,
+          "prevStatTeams=",
+          prevStatByTeam.size,
+          "matchedByFranchise=",
+          matchedByFranchise,
+          "matchedByOwner=",
+          matchedByOwner,
+          "unmatched=",
+          unmatched,
+        );
+      }
+    }
+
+    // Compute week-1 talent z-score for seeding.
+    var firstWeekIdForSeed = weeks && weeks.length ? String(weeks[0].id) : null;
+    var seedTalentZ = new Map();
+    if (firstWeekIdForSeed) {
+      var seedTalVals = teamIds.map(function (tid) {
+        var key = String(firstWeekIdForSeed) + "_" + String(tid);
+        var t = teamTalentByWeekTeamKey.get(key);
+        return t === undefined ? 0 : toNumber(t);
+      });
+      var seedTalMeta = computeZFromArray(seedTalVals);
+      teamIds.forEach(function (tid) {
+        var key = String(firstWeekIdForSeed) + "_" + String(tid);
+        var t = teamTalentByWeekTeamKey.get(key);
+        var tn = t === undefined ? 0 : toNumber(t);
+        seedTalentZ.set(String(tid), (tn - seedTalMeta.mean) / seedTalMeta.std);
+      });
+    }
+
     // Initialize Elo / EWMA state.
     var eloByTeam = new Map();
     var statEwmaByTeam = new Map();
     teamIds.forEach(function (tid) {
-      eloByTeam.set(String(tid), toNumber(opts.baseElo));
-      statEwmaByTeam.set(String(tid), 0);
+      var id = String(tid);
+
+      // Elo seeding: blend base -> last-season powerElo, then add z-based offsets.
+      var elo0 = toNumber(opts.baseElo);
+      var prevElo = prevEloByTeam.get(id);
+      if (isFinite(prevElo)) {
+        var wPrevElo = clamp01(toNumber(opts.seedEloFromLastSeasonWeight));
+        elo0 = (1 - wPrevElo) * elo0 + wPrevElo * toNumber(prevElo);
+      }
+      var talZ0 = toNumber(seedTalentZ.get(id) || 0);
+      var finZ0 = toNumber(finishZFromLastSeason.get(id) || 0);
+      elo0 += toNumber(opts.seedEloTalentPointsPerZ) * talZ0;
+      elo0 += toNumber(opts.seedEloFinishPointsPerZ) * finZ0;
+      eloByTeam.set(id, isFinite(elo0) ? elo0 : toNumber(opts.baseElo));
+
+      // Stat EWMA seeding (z-space): blend from last season, then add priors.
+      var stat0 = 0;
+      var prevStat = prevStatByTeam.get(id);
+      if (isFinite(prevStat)) {
+        var wPrevStat = clamp01(toNumber(opts.seedStatFromLastSeasonWeight));
+        stat0 = (1 - wPrevStat) * stat0 + wPrevStat * toNumber(prevStat);
+      }
+      stat0 += toNumber(opts.seedStatTalentZWeight) * talZ0;
+      stat0 += toNumber(opts.seedStatFinishZWeight) * finZ0;
+      statEwmaByTeam.set(id, isFinite(stat0) ? stat0 : 0);
     });
 
     var weekUpdates = [];
@@ -721,8 +1371,9 @@ var PowerRankingsAlgo = (function buildPowerRankingsAlgo() {
     });
 
     // Iterate weeks in order.
-    weeks.forEach(function (week) {
+    weeks.forEach(function (week, weekIdx) {
       var weekId = String(week.id);
+      var weekNumber = toNumber(weekIdx) + 1;
       var weekType = (week && week.weekType) || SeasonType.REGULAR_SEASON;
       lastWeekIdByType.set(String(weekType), String(weekId));
       var weekTeamMap = teamWeeksByWeekId.get(weekId) || new Map();
@@ -793,13 +1444,21 @@ var PowerRankingsAlgo = (function buildPowerRankingsAlgo() {
       var wCat = toNumber(opts.perfCategoryWeight);
       var wRat = toNumber(opts.perfRatingWeight);
       var wTal = toNumber(opts.perfTalentWeight);
+      var wFin = toNumber(opts.perfFinishWeight);
       var wPts = toNumber(opts.perfMatchupPointsWeight);
       var wMar = toNumber(opts.perfMatchupMarginWeight);
       if (!isFinite(wCat)) wCat = 0.45;
       if (!isFinite(wRat)) wRat = 0.35;
       if (!isFinite(wTal)) wTal = 0.1;
+      if (!isFinite(wFin)) wFin = 0;
       if (!isFinite(wPts)) wPts = 0.1;
       if (!isFinite(wMar)) wMar = 0.1;
+
+      // Steep early-season prior weighting.
+      var wTalEff =
+        wTal * halfLifeDecay(weekNumber, opts.perfTalentHalfLifeWeeks);
+      var wFinEff =
+        wFin * halfLifeDecay(weekNumber, opts.perfFinishHalfLifeWeeks);
 
       // Team talent z-score (weighted avg of player season ratings).
       var talentVals = teamIds.map(function (tid) {
@@ -821,7 +1480,8 @@ var PowerRankingsAlgo = (function buildPowerRankingsAlgo() {
         var s =
           wCat * toNumber(categoryZ.get(key)) +
           wRat * toNumber(ratingZ.get(key)) +
-          wTal * toNumber(talentZ.get(key)) +
+          wTalEff * toNumber(talentZ.get(key)) +
+          wFinEff * toNumber(finishZFromLastSeason.get(key) || 0) +
           wPts * toNumber(ptsZ.get(key)) +
           wMar * toNumber(marginZ.get(key));
         weeklyPerfScore.set(key, s);
@@ -939,18 +1599,16 @@ var PowerRankingsAlgo = (function buildPowerRankingsAlgo() {
         s.powerComposite = opts.wElo * eloZ + opts.wStat * statZ;
       });
 
-      // Normalize powerRating to 0..100 each week.
-      var compVals = teamSnapshots.map(function (s) {
-        return toNumber(s.powerComposite);
-      });
-      var cMin = Math.min.apply(null, compVals);
-      var cMax = Math.max.apply(null, compVals);
+      // Normalize powerRating to a static scale for cross-week comparability.
+      // powerComposite is already in (approx) z-space, so we clamp to a fixed range.
+      var POWER_RATING_MIN = -2.25;
+      var POWER_RATING_MAX = 1.75;
       teamSnapshots.forEach(function (s) {
-        if (!isFinite(cMin) || !isFinite(cMax) || cMax === cMin) {
-          s.powerRating = 50;
+        var pc = toNumber(s.powerComposite);
+        if (!isFinite(pc)) {
+          s.powerRating = 0;
         } else {
-          s.powerRating =
-            ((toNumber(s.powerComposite) - cMin) / (cMax - cMin)) * 100;
+          s.powerRating = clamp(pc, POWER_RATING_MIN, POWER_RATING_MAX);
         }
       });
 
