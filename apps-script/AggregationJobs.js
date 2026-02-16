@@ -19,5 +19,15 @@ function aggregateSeason(seasonId = "12") {
 }
 
 function checkSeasonWeeks() {
-  IntegrityChecks.scrapeAndCheckMatchupTables(12);
+  IntegrityChecks.scrapeAndCheckMatchupTables(12, { floatTolerance: 0.01 });
+}
+
+function test() {
+  RatingUpdater.updatePlayerDayRatingsForSeason(11);
+  // LineupBuilder.updateLineups(11,{weekNums:[1,2,3,4,5]})
+  // LineupBuilder.updateLineups(11,{weekNums:[6,7,8,9,10]})
+  // LineupBuilder.updateLineups(11,{weekNums:[11,12,13,14,15]})
+  // LineupBuilder.updateLineups(11,{weekNums:[16,17,18,19,20]})
+  // LineupBuilder.updateLineups(11,{weekNums:[21,22,23,24,25]})
+  // LineupBuilder.updateLineups(11,{weekNums:[26,27,28,29,30]})
 }
