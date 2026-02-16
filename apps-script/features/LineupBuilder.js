@@ -444,8 +444,8 @@ var LineupBuilder = (function () {
    * @param {string|number} seasonId
    * @param {Object=} options
    * @param {string=} options.playerDayWorkbookId Override workbook id
-    * @param {Array<string|number>=} options.weekIds Only update PlayerDays with these weekIds
-    * @param {Array<string|number>=} options.weekNums Only update PlayerDays in these week numbers (resolved via Week sheet)
+   * @param {Array<string|number>=} options.weekIds Only update PlayerDays with these weekIds
+   * @param {Array<string|number>=} options.weekNums Only update PlayerDays in these week numbers (resolved via Week sheet)
    * @param {boolean=} options.dryRun When true, computes but does not write
    * @param {boolean=} options.logToConsole When true, prints progress
    */
@@ -503,7 +503,10 @@ var LineupBuilder = (function () {
         });
 
         weeks.forEach(function (w) {
-          var wn = w && w.weekNum !== undefined && w.weekNum !== null ? String(w.weekNum) : "";
+          var wn =
+            w && w.weekNum !== undefined && w.weekNum !== null
+              ? String(w.weekNum)
+              : "";
           if (!wn) return;
           if (!weekNumSet.has(wn)) return;
           if (w && w.id !== undefined && w.id !== null && w.id !== "") {
@@ -519,18 +522,29 @@ var LineupBuilder = (function () {
 
     var weekIdAllowList = buildWeekIdAllowList();
 
-    var playerDays = fetchSheetAsObjects(
+    // Load the whole season to build a presence map for ADD.
+    // ADD depends on whether a player/team existed on the previous calendar day,
+    // which might be outside a week-scoped update window.
+    var seasonPlayerDays = fetchSheetAsObjects(
       playerDayWorkbookId,
       "PlayerDayStatLine",
       {
         coerceTypes: true,
       },
     ).filter(function (pd) {
-      if (String(pd && pd.seasonId) !== seasonKey) return false;
-      if (!weekIdAllowList) return true;
-      var wk = pd && pd.weekId !== undefined && pd.weekId !== null ? String(pd.weekId) : "";
-      return wk ? weekIdAllowList.has(wk) : false;
+      return String(pd && pd.seasonId) === seasonKey;
     });
+
+    var playerDays = seasonPlayerDays;
+    if (weekIdAllowList) {
+      playerDays = seasonPlayerDays.filter(function (pd) {
+        var wk =
+          pd && pd.weekId !== undefined && pd.weekId !== null
+            ? String(pd.weekId)
+            : "";
+        return wk ? weekIdAllowList.has(wk) : false;
+      });
+    }
 
     if (logToConsole) {
       console.log(
@@ -538,7 +552,9 @@ var LineupBuilder = (function () {
           seasonKey +
           " workbook=" +
           playerDayWorkbookId +
-          (weekIdAllowList ? " weeks=" + Array.from(weekIdAllowList).join(",") : "") +
+          (weekIdAllowList
+            ? " weeks=" + Array.from(weekIdAllowList).join(",")
+            : "") +
           " rows=" +
           playerDays.length,
       );
@@ -546,6 +562,67 @@ var LineupBuilder = (function () {
 
     if (!playerDays.length) {
       return { updatedRows: 0, dryRun: dryRun };
+    }
+
+    var formatDateOnly =
+      GshlUtils &&
+      GshlUtils.core &&
+      GshlUtils.core.date &&
+      GshlUtils.core.date.formatDateOnly;
+    var getPreviousDate =
+      GshlUtils &&
+      GshlUtils.core &&
+      GshlUtils.core.date &&
+      GshlUtils.core.date.getPreviousDate;
+
+    function dateOnly(d) {
+      if (!d) return "";
+      if (typeof formatDateOnly === "function") {
+        return formatDateOnly(d);
+      }
+      var dt = d instanceof Date ? d : new Date(d);
+      if (isNaN(dt.getTime())) return "";
+      // Fallback: YYYY-MM-DD in local time.
+      var yyyy = String(dt.getFullYear());
+      var mm = String(dt.getMonth() + 1).padStart(2, "0");
+      var dd = String(dt.getDate()).padStart(2, "0");
+      return yyyy + "-" + mm + "-" + dd;
+    }
+
+    function previousDateKey(dateKey) {
+      if (!dateKey) return "";
+      if (typeof getPreviousDate === "function") {
+        return String(getPreviousDate(dateKey));
+      }
+      var dt = dateKey instanceof Date ? dateKey : new Date(dateKey);
+      if (isNaN(dt.getTime())) return "";
+      return dateOnly(new Date(dt.getTime() - 24 * 60 * 60 * 1000));
+    }
+
+    // Presence map across the season: (playerId, teamId, date) => true
+    var presence = new Set();
+    seasonPlayerDays.forEach(function (pd) {
+      if (!pd) return;
+      var pid = pd.playerId;
+      var tid = pd.gshlTeamId;
+      var dk = dateOnly(pd.date);
+      if (!pid || !tid || !dk) return;
+      presence.add(String(pid) + "|" + String(tid) + "|" + String(dk));
+    });
+
+    function computeAddValue(playerDay) {
+      if (!playerDay) return "";
+      var pid = playerDay.playerId;
+      var tid = playerDay.gshlTeamId;
+      var dk = dateOnly(playerDay.date);
+      if (!pid || !tid || !dk) return "";
+      var prev = previousDateKey(dk || playerDay.date);
+      if (!prev) {
+        // If we can't compute the previous day, leave as-is.
+        return playerDay.ADD !== undefined ? playerDay.ADD : "";
+      }
+      var keyPrev = String(pid) + "|" + String(tid) + "|" + String(prev);
+      return presence.has(keyPrev) ? "" : 1;
     }
 
     // Group by date + team.
@@ -572,6 +649,7 @@ var LineupBuilder = (function () {
           id: p.id,
           bestPos: p.bestPos,
           fullPos: p.fullPos,
+          ADD: computeAddValue(p),
           MS: flags.MS,
           BS: flags.BS,
         });
@@ -588,10 +666,64 @@ var LineupBuilder = (function () {
 
     var sheet = openSheet(playerDayWorkbookId, "PlayerDayStatLine", true);
     var headers = getHeaders(sheet);
+    var idCol = getColIndex(headers, "id", true) + 1;
     var bestPosCol = getColIndex(headers, "bestPos", true) + 1;
     var fullPosCol = getColIndex(headers, "fullPos", true) + 1;
+    var addCol = getColIndex(headers, "ADD", true) + 1;
     var msCol = getColIndex(headers, "MS", true) + 1;
     var bsCol = getColIndex(headers, "BS", true) + 1;
+
+    // IMPORTANT: Sheet `id` values are not row indices. Build a rowIndex map.
+    var lastRow = sheet.getLastRow();
+    var idToRowIndex = {};
+    if (lastRow >= 2) {
+      var idValues = sheet.getRange(2, idCol, lastRow - 1, 1).getValues();
+      for (var r = 0; r < idValues.length; r++) {
+        var rawId = idValues[r][0];
+        if (rawId === undefined || rawId === null || rawId === "") continue;
+        var key = String(rawId);
+        // First occurrence wins; ids should be unique.
+        if (idToRowIndex[key] === undefined) {
+          idToRowIndex[key] = r + 2;
+        }
+      }
+    }
+
+    function toRowIndexFromId(id) {
+      if (id === undefined || id === null || id === "") return 0;
+      var key = String(id);
+      var idx = idToRowIndex[key];
+      return idx ? Number(idx) : 0;
+    }
+
+    var resolvedUpdates = [];
+    var skippedMissingRow = 0;
+    updates.forEach(function (u) {
+      var rowIndex = toRowIndexFromId(u && u.id);
+      if (!rowIndex) {
+        skippedMissingRow++;
+        return;
+      }
+      resolvedUpdates.push({
+        rowIndex: rowIndex,
+        bestPos: u.bestPos,
+        fullPos: u.fullPos,
+        ADD: u.ADD,
+        MS: u.MS,
+        BS: u.BS,
+      });
+    });
+
+    if (!resolvedUpdates.length) {
+      if (logToConsole) {
+        console.log(
+          "[LineupBuilder] updateLineups: no matching sheet rows found for updates (skipped=" +
+            skippedMissingRow +
+            ")",
+        );
+      }
+      return { updatedRows: 0, dryRun: false };
+    }
 
     function groupAndApplyTwoColumnUpdates(
       sheet,
@@ -624,6 +756,7 @@ var LineupBuilder = (function () {
     }
 
     var bestFullAdjacent = Math.abs(bestPosCol - fullPosCol) === 1;
+    var addMsBsAdjacent = msCol === addCol + 1 && bsCol === addCol + 2;
     var msBsAdjacent = Math.abs(msCol - bsCol) === 1;
 
     if (bestFullAdjacent) {
@@ -632,10 +765,9 @@ var LineupBuilder = (function () {
       groupAndApplyTwoColumnUpdates(
         sheet,
         startCol,
-        updates.map(function (u) {
-          var rowIndex = Number(u.id) + 1;
+        resolvedUpdates.map(function (u) {
           return {
-            rowIndex: rowIndex,
+            rowIndex: u.rowIndex,
             values: bestFirst ? [u.bestPos, u.fullPos] : [u.fullPos, u.bestPos],
           };
         }),
@@ -644,59 +776,94 @@ var LineupBuilder = (function () {
       groupAndApply(
         sheet,
         bestPosCol,
-        updates.map(function (u) {
-          return { rowIndex: Number(u.id) + 1, value: u.bestPos };
+        resolvedUpdates.map(function (u) {
+          return { rowIndex: u.rowIndex, value: u.bestPos };
         }),
       );
       groupAndApply(
         sheet,
         fullPosCol,
-        updates.map(function (u) {
-          return { rowIndex: Number(u.id) + 1, value: u.fullPos };
+        resolvedUpdates.map(function (u) {
+          return { rowIndex: u.rowIndex, value: u.fullPos };
         }),
       );
     }
 
-    if (msBsAdjacent) {
-      var startCol2 = Math.min(msCol, bsCol);
-      var msFirst = startCol2 === msCol;
-      groupAndApplyTwoColumnUpdates(
-        sheet,
-        startCol2,
-        updates.map(function (u) {
-          var rowIndex = Number(u.id) + 1;
-          return {
-            rowIndex: rowIndex,
-            values: msFirst ? [u.MS, u.BS] : [u.BS, u.MS],
-          };
-        }),
-      );
+    if (addMsBsAdjacent) {
+      // Columns are in order ADD/MS/BS, so write all three in one pass.
+      resolvedUpdates.sort(function (a, b) {
+        return a.rowIndex - b.rowIndex;
+      });
+      var start3 = resolvedUpdates[0].rowIndex;
+      var buffer3 = [
+        [resolvedUpdates[0].ADD, resolvedUpdates[0].MS, resolvedUpdates[0].BS],
+      ];
+      for (var j = 1; j < resolvedUpdates.length; j++) {
+        var prevIdx = resolvedUpdates[j - 1].rowIndex;
+        var currU = resolvedUpdates[j];
+        if (currU.rowIndex === prevIdx + 1) {
+          buffer3.push([currU.ADD, currU.MS, currU.BS]);
+        } else {
+          sheet.getRange(start3, addCol, buffer3.length, 3).setValues(buffer3);
+          start3 = currU.rowIndex;
+          buffer3 = [[currU.ADD, currU.MS, currU.BS]];
+        }
+      }
+      sheet.getRange(start3, addCol, buffer3.length, 3).setValues(buffer3);
     } else {
+      // Fallback: keep existing 2-col batching and apply ADD separately.
+      if (msBsAdjacent) {
+        var startCol2 = Math.min(msCol, bsCol);
+        var msFirst = startCol2 === msCol;
+        groupAndApplyTwoColumnUpdates(
+          sheet,
+          startCol2,
+          resolvedUpdates.map(function (u) {
+            return {
+              rowIndex: u.rowIndex,
+              values: msFirst ? [u.MS, u.BS] : [u.BS, u.MS],
+            };
+          }),
+        );
+      } else {
+        groupAndApply(
+          sheet,
+          msCol,
+          resolvedUpdates.map(function (u) {
+            return { rowIndex: u.rowIndex, value: u.MS };
+          }),
+        );
+        groupAndApply(
+          sheet,
+          bsCol,
+          resolvedUpdates.map(function (u) {
+            return { rowIndex: u.rowIndex, value: u.BS };
+          }),
+        );
+      }
+
       groupAndApply(
         sheet,
-        msCol,
-        updates.map(function (u) {
-          return { rowIndex: Number(u.id) + 1, value: u.MS };
-        }),
-      );
-      groupAndApply(
-        sheet,
-        bsCol,
-        updates.map(function (u) {
-          return { rowIndex: Number(u.id) + 1, value: u.BS };
+        addCol,
+        resolvedUpdates.map(function (u) {
+          return { rowIndex: u.rowIndex, value: u.ADD };
         }),
       );
     }
 
     Logger.log(
       "Updated lineup helper columns for " +
-        updates.length +
+        resolvedUpdates.length +
         " PlayerDayStatLine row(s) in seasonId=" +
         seasonKey +
         ".",
     );
 
-    return { updatedRows: updates.length, dryRun: false };
+    return {
+      updatedRows: resolvedUpdates.length,
+      skippedRows: skippedMissingRow,
+      dryRun: false,
+    };
   }
 
   // ===== TESTS =====
