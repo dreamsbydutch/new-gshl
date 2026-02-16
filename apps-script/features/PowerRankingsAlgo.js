@@ -29,6 +29,9 @@ var PowerRankingsAlgo = (function buildPowerRankingsAlgo() {
   if (typeof TEAMSTATS_SPREADSHEET_ID === "undefined") {
     throw new Error("TEAMSTATS_SPREADSHEET_ID is not defined");
   }
+  if (typeof PLAYERSTATS_SPREADSHEET_ID === "undefined") {
+    throw new Error("PLAYERSTATS_SPREADSHEET_ID is not defined");
+  }
 
   var fetchSheetAsObjects = GshlUtils.sheets.read.fetchSheetAsObjects;
   var upsertSheetByKeys = GshlUtils.sheets.write.upsertSheetByKeys;
@@ -83,10 +86,12 @@ var PowerRankingsAlgo = (function buildPowerRankingsAlgo() {
     // Weekly performance score weights (all in z-space):
     // - categoryZ: based on TeamWeekStatLine category fields (MATCHUP_CATEGORY_RULES)
     // - ratingZ: based on TeamWeekStatLine.Rating
+    // - talentZ: based on weighted team talent from PlayerWeekStatLine + PlayerNHL (seasonRating)
     // - matchupPointsZ: based on points from Matchup table (3/2/1/0)
     // - matchupMarginZ: based on (teamScore-opponentScore) from Matchup table
-    perfCategoryWeight: 0.45,
-    perfRatingWeight: 0.35,
+    perfCategoryWeight: 0.4,
+    perfRatingWeight: 0.3,
+    perfTalentWeight: 0.1,
     perfMatchupPointsWeight: 0.1,
     perfMatchupMarginWeight: 0.1,
 
@@ -115,6 +120,7 @@ var PowerRankingsAlgo = (function buildPowerRankingsAlgo() {
     "powerEloK",
     "powerStatScore",
     "powerStatEwma",
+    "powerTalent",
     "powerComposite",
     "powerRating",
     "powerRk",
@@ -123,10 +129,39 @@ var PowerRankingsAlgo = (function buildPowerRankingsAlgo() {
   var REQUIRED_TEAM_SEASON_COLUMNS = [
     "powerElo",
     "powerStatEwma",
+    "powerTalent",
     "powerComposite",
     "powerRating",
     "powerRk",
   ];
+
+  function tryFetchSheetAsObjects(spreadsheetId, sheetName, options) {
+    try {
+      return fetchSheetAsObjects(spreadsheetId, sheetName, options);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function fetchFirstAvailableSheet(spreadsheetId, candidates, options) {
+    for (var i = 0; i < (candidates || []).length; i++) {
+      var name = candidates[i];
+      var rows = tryFetchSheetAsObjects(spreadsheetId, name, options);
+      if (rows) return { sheetName: name, rows: rows };
+    }
+    return { sheetName: null, rows: [] };
+  }
+
+  function getPlayerSeasonTalentRating(nhlRow) {
+    if (!nhlRow) return null;
+    // Prefer seasonRating; fall back to overallRating then Rating.
+    var r = toNumber(nhlRow.seasonRating);
+    if (isFinite(r)) return r;
+    r = toNumber(nhlRow.overallRating);
+    if (isFinite(r)) return r;
+    r = toNumber(nhlRow.Rating);
+    return isFinite(r) ? r : null;
+  }
 
   function applyDefaults(options) {
     var opts = options || {};
@@ -531,6 +566,83 @@ var PowerRankingsAlgo = (function buildPowerRankingsAlgo() {
     var teamIds = buildLeagueTeamIds(seasonKey);
     var teamIdSet = new Set(teamIds);
 
+    // Pull PlayerWeekStatLine rows for this season and weeks, to derive team talent.
+    var playerWeekRows = fetchSheetAsObjects(
+      PLAYERSTATS_SPREADSHEET_ID,
+      "PlayerWeekStatLine",
+      { coerceTypes: true },
+    ).filter(function (pw) {
+      if (!pw) return false;
+      if (String(pw && pw.seasonId) !== String(seasonKey)) return false;
+      var wk =
+        pw.weekId !== undefined && pw.weekId !== null ? String(pw.weekId) : "";
+      if (!wk || !weekIdSet.has(wk)) return false;
+      var tid =
+        pw.gshlTeamId !== undefined && pw.gshlTeamId !== null
+          ? String(pw.gshlTeamId)
+          : "";
+      return tid ? teamIdSet.has(tid) : false;
+    });
+
+    // Pull player NHL season ratings for this season.
+    var nhlSheet = fetchFirstAvailableSheet(
+      PLAYERSTATS_SPREADSHEET_ID,
+      ["PlayerNHLStatLine", "PlayerNHL", "PlayerNhlStatLine", "PlayerNhl"],
+      { coerceTypes: true },
+    );
+    var nhlRows = (nhlSheet.rows || []).filter(function (r) {
+      return String(r && r.seasonId) === String(seasonKey);
+    });
+
+    var nhlRatingByPlayerId = new Map();
+    nhlRows.forEach(function (r) {
+      var pid = r && r.playerId !== undefined && r.playerId !== null ? String(r.playerId) : "";
+      if (!pid) return;
+      var rating = getPlayerSeasonTalentRating(r);
+      if (!isFinite(toNumber(rating))) return;
+      nhlRatingByPlayerId.set(pid, toNumber(rating));
+    });
+
+    if (opts.logToConsole) {
+      console.log(
+        "[PowerRankingsAlgo] talent inputs: PlayerWeekStatLine rows=",
+        playerWeekRows.length,
+        "PlayerNHL sheet=",
+        nhlSheet.sheetName || "(not found)",
+        "PlayerNHL rows=",
+        nhlRows.length,
+      );
+    }
+
+    // Precompute weighted team talent per (weekId, teamId): weighted average of player season ratings by days on team.
+    var talentAggByWeekTeamKey = new Map();
+    playerWeekRows.forEach(function (pw) {
+      var wk = String(pw.weekId);
+      var tid = String(pw.gshlTeamId);
+      var pid = pw.playerId !== undefined && pw.playerId !== null ? String(pw.playerId) : "";
+      if (!pid) return;
+
+      var days = toNumber(pw.days);
+      if (!isFinite(days) || days <= 0) return;
+
+      var pr = nhlRatingByPlayerId.get(pid);
+      if (!isFinite(pr)) return;
+
+      var key = wk + "_" + tid;
+      if (!talentAggByWeekTeamKey.has(key)) {
+        talentAggByWeekTeamKey.set(key, { sum: 0, denom: 0 });
+      }
+      var agg = talentAggByWeekTeamKey.get(key);
+      agg.sum += pr * days;
+      agg.denom += days;
+    });
+
+    var teamTalentByWeekTeamKey = new Map();
+    talentAggByWeekTeamKey.forEach(function (agg, key) {
+      var avg = agg && agg.denom ? agg.sum / agg.denom : 0;
+      teamTalentByWeekTeamKey.set(key, isFinite(avg) ? avg : 0);
+    });
+
     // Pull TeamWeekStatLine for this season and these weeks.
     var teamWeekRows = fetchSheetAsObjects(
       TEAMSTATS_SPREADSHEET_ID,
@@ -680,18 +792,36 @@ var PowerRankingsAlgo = (function buildPowerRankingsAlgo() {
       var weeklyPerfScore = new Map();
       var wCat = toNumber(opts.perfCategoryWeight);
       var wRat = toNumber(opts.perfRatingWeight);
+      var wTal = toNumber(opts.perfTalentWeight);
       var wPts = toNumber(opts.perfMatchupPointsWeight);
       var wMar = toNumber(opts.perfMatchupMarginWeight);
       if (!isFinite(wCat)) wCat = 0.45;
       if (!isFinite(wRat)) wRat = 0.35;
+      if (!isFinite(wTal)) wTal = 0.1;
       if (!isFinite(wPts)) wPts = 0.1;
       if (!isFinite(wMar)) wMar = 0.1;
+
+      // Team talent z-score (weighted avg of player season ratings).
+      var talentVals = teamIds.map(function (tid) {
+        var key = String(weekId) + "_" + String(tid);
+        var t = teamTalentByWeekTeamKey.get(key);
+        return t === undefined ? 0 : toNumber(t);
+      });
+      var talentMeta = computeZFromArray(talentVals);
+      var talentZ = new Map();
+      teamIds.forEach(function (tid) {
+        var key = String(weekId) + "_" + String(tid);
+        var t = teamTalentByWeekTeamKey.get(key);
+        var tn = t === undefined ? 0 : toNumber(t);
+        talentZ.set(String(tid), (tn - talentMeta.mean) / talentMeta.std);
+      });
 
       teamIds.forEach(function (tid) {
         var key = String(tid);
         var s =
           wCat * toNumber(categoryZ.get(key)) +
           wRat * toNumber(ratingZ.get(key)) +
+          wTal * toNumber(talentZ.get(key)) +
           wPts * toNumber(ptsZ.get(key)) +
           wMar * toNumber(marginZ.get(key));
         weeklyPerfScore.set(key, s);
@@ -764,6 +894,7 @@ var PowerRankingsAlgo = (function buildPowerRankingsAlgo() {
         var pre = eloPreByTeam.get(tidKey);
         var post = eloByTeam.get(tidKey);
         var meta = matchupParamsByTeam.get(tidKey);
+        var talentKey = String(weekId) + "_" + tidKey;
         return {
           gshlTeamId: tidKey,
           weekId: weekId,
@@ -782,6 +913,7 @@ var PowerRankingsAlgo = (function buildPowerRankingsAlgo() {
             meta && meta.K !== undefined && meta.K !== null ? meta.K : "",
           powerStatScore: weeklyPerfScore.get(tidKey) || 0,
           powerStatEwma: statEwmaByTeam.get(tidKey) || 0,
+          powerTalent: teamTalentByWeekTeamKey.get(talentKey) || 0,
         };
       });
 
@@ -868,6 +1000,7 @@ var PowerRankingsAlgo = (function buildPowerRankingsAlgo() {
           seasonType: String(wt),
           powerElo: u.powerElo,
           powerStatEwma: u.powerStatEwma,
+          powerTalent: u.powerTalent,
           powerComposite: u.powerComposite,
           powerRating: u.powerRating,
           powerRk: u.powerRk,

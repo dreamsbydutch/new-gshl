@@ -68,6 +68,7 @@ var SHEET_NUMERIC_FIELDS = new Set([
   "powerEloK",
   "powerStatScore",
   "powerStatEwma",
+  "powerTalent",
   "powerComposite",
   "powerRk",
   "ADD",
@@ -244,6 +245,7 @@ var TEAM_WEEK_NUMERIC_FIELDS = TEAM_DAY_NUMERIC_FIELDS.concat([
   "powerEloK",
   "powerStatScore",
   "powerStatEwma",
+  "powerTalent",
   "powerComposite",
   "powerRk",
 ]);
@@ -269,6 +271,7 @@ var TEAM_SEASON_NUMERIC_FIELDS = TEAM_DAY_NUMERIC_FIELDS.concat([
   "powerEloK",
   "powerStatScore",
   "powerStatEwma",
+  "powerTalent",
   "powerComposite",
   "powerRk",
   "prevPowerRating",
