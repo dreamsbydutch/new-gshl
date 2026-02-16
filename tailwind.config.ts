@@ -72,8 +72,8 @@ export default {
       },
       colors: {
         hotel: {
-          "50": "#ffdfd8",
-          "100": "#ffc2bc",
+          "50": "#ffefe8",
+          "100": "#ffddc1",
           "200": "#ffa7a1",
           "300": "#eb8c87",
           "400": "#cd716d",
@@ -84,7 +84,7 @@ export default {
           "900": "#410000",
         },
         sunview: {
-          "50": "#c7e8ff",
+          "50": "#effdff",
           "100": "#abccff",
           "200": "#8eb1f1",
           "300": "#7396d4",

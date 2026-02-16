@@ -625,17 +625,32 @@ var LineupBuilder = (function () {
       return presence.has(keyPrev) ? "" : 1;
     }
 
-    // Group by date + team.
+    // Group by calendar date + team.
+    // IMPORTANT: Use date-only normalization (YYYY-MM-DD) so a single day with
+    // mixed Date objects / strings / timestamps doesn't get split into multiple
+    // partial-roster groups (which would yield bad lineups for that day).
     var groups = new Map();
+    var skippedMissingGroupKey = 0;
     playerDays.forEach(function (pd) {
       if (!pd) return;
-      var dateKey = pd.date;
+      var dateKey = dateOnly(pd.date);
       var teamKey = pd.gshlTeamId;
-      if (!dateKey || !teamKey) return;
+      if (!dateKey || teamKey === undefined || teamKey === null || teamKey === "") {
+        skippedMissingGroupKey++;
+        return;
+      }
       var key = String(dateKey) + "|" + String(teamKey);
       if (!groups.has(key)) groups.set(key, []);
       groups.get(key).push(pd);
     });
+
+    if (logToConsole && skippedMissingGroupKey) {
+      console.log(
+        "[LineupBuilder] updateLineups: skipped " +
+          skippedMissingGroupKey +
+          " row(s) missing date/team for grouping",
+      );
+    }
 
     var updates = [];
     groups.forEach(function (players) {

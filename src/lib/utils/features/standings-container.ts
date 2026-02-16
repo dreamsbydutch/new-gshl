@@ -188,7 +188,30 @@ export const groupTeamsByStandingsType = (
               (a, b) =>
                 +(a.seasonStats?.wildcardRk ?? 0) -
                 +(b.seasonStats?.wildcardRk ?? 0),
-            ),
+            )
+            .slice(0, 2),
+        },
+        {
+          title: "Out of the Playoffs",
+          teams: teams
+            .map((team) => {
+              const stat = stats.find((s) => s.gshlTeamId === team.id);
+              return {
+                ...team,
+                seasonStats: stat ? { ...stat } : undefined,
+              };
+            })
+            .filter(
+              (a) =>
+                a.seasonStats?.wildcardRk !== null &&
+                a.seasonStats?.wildcardRk !== undefined,
+            )
+            .sort(
+              (a, b) =>
+                +(a.seasonStats?.wildcardRk ?? 0) -
+                +(b.seasonStats?.wildcardRk ?? 0),
+            )
+            .slice(2),
         },
       ];
 

@@ -1512,6 +1512,62 @@ var GshlUtils = (function buildGshlUtilsNamespace() {
     };
   }
 
+  /**
+   * Ensures the given sheet has header columns for each name in `requiredColumns`.
+   * Missing columns are appended to the end of the header row.
+   *
+   * @param {string} spreadsheetId
+   * @param {string} sheetName
+   * @param {string[]} requiredColumns
+   * @returns {{added: string[], existing: string[]}}
+   */
+  function ensureSheetColumns(spreadsheetId, sheetName, requiredColumns) {
+    var sheet = getSheetByName(spreadsheetId, sheetName, true);
+    var lastCol = sheet.getLastColumn();
+    if (!lastCol || lastCol < 1) {
+      throw new Error(
+        "ensureSheetColumns: sheet has no header row: " + sheetName,
+      );
+    }
+
+    var headerValues = sheet.getRange(1, 1, 1, lastCol).getValues();
+    var headers = headerValues && headerValues[0] ? headerValues[0] : [];
+
+    var existingSet = new Set();
+    headers.forEach(function (h) {
+      if (h === undefined || h === null || h === "") return;
+      existingSet.add(String(h));
+    });
+
+    var toAdd = [];
+    (requiredColumns || []).forEach(function (c) {
+      if (!c) return;
+      var key = String(c);
+      if (existingSet.has(key)) return;
+      toAdd.push(key);
+      existingSet.add(key);
+    });
+
+    if (!toAdd.length) {
+      return { added: [], existing: headers.map(String) };
+    }
+
+    // Ensure the grid has enough columns.
+    var needed = headers.length + toAdd.length;
+    var maxCols = sheet.getMaxColumns();
+    if (maxCols < needed) {
+      sheet.insertColumnsAfter(maxCols, needed - maxCols);
+    }
+
+    var newHeaders = headers.slice();
+    toAdd.forEach(function (c) {
+      newHeaders.push(c);
+    });
+
+    sheet.getRange(1, 1, 1, newHeaders.length).setValues([newHeaders]);
+    return { added: toAdd, existing: newHeaders.map(String) };
+  }
+
   // ============================================================================
   // YAHOO SCRAPER UTILITIES
   // ============================================================================
@@ -2079,6 +2135,7 @@ var GshlUtils = (function buildGshlUtilsNamespace() {
         objectToRow: objectToRow,
         groupAndApplyUpdates: groupAndApplyUpdates,
         groupAndApplyColumnUpdates: groupAndApplyColumnUpdates,
+        ensureSheetColumns: ensureSheetColumns,
         upsertSheetByKeys: upsertSheetByKeys,
       },
     },

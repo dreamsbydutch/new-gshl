@@ -249,7 +249,8 @@ const StandingsItem = ({
   team,
   matchups = [],
   weeks = [],
-}: StandingsItemProps) => {
+  showCutoffLine = false,
+}: StandingsItemProps & { showCutoffLine?: boolean }) => {
   const [showInfo, setShowInfo] = useState(false);
 
   const tiebreakPoints =
@@ -443,7 +444,9 @@ const StandingsItem = ({
     <div
       key={team.id}
       className={cn(
-        "border-b border-dotted border-gray-400",
+        showCutoffLine
+          ? "border-b-4 border-solid border-gray-500"
+          : "border-b border-dotted border-gray-400",
         "transition-colors hover:bg-muted/50",
       )}
     >
@@ -675,19 +678,15 @@ export const StandingsComponent = ({
       <div
         className={cn(
           "rounded-xl p-1 shadow-md [&>*:last-child]:border-none",
-          group.title === "Sunview"
-            ? "border-2 border-sunview-500 shadow-sunview-500"
-            : "",
-          group.title === "Hickory Hotel"
-            ? "border-2 border-hotel-500 shadow-hotel-500"
-            : "",
+          group.title === "Sunview" ? "bg-sunview-50 shadow-sunview-500" : "",
+          group.title === "Hickory Hotel" ? "bg-hotel-50 shadow-hotel-500" : "",
           group.title === "Wildcard" || group.title === "Overall"
-            ? "border-2 border-slate-500 shadow-slate-500"
+            ? "bg-slate-50 shadow-slate-500"
             : "",
         )}
       >
         {selectedSeason &&
-          group.teams.map((team) => {
+          group.teams.map((team, idx) => {
             return (
               <StandingsItem
                 key={team.id}
@@ -696,6 +695,7 @@ export const StandingsComponent = ({
                 standingsType={standingsType}
                 matchups={matchups}
                 weeks={weeks}
+                showCutoffLine={standingsType === "Wildcard" && idx === 1}
               />
             );
           })}
