@@ -1302,6 +1302,533 @@ var IntegrityChecks = (function () {
     };
   }
 
+  /**
+   * Compare PlayerWeekStatLine rows against a recomputed rollup of PlayerDayStatLine
+   * using the same aggregation rules as StatsAggregator.updatePlayerStatsForSeason.
+   *
+   * This is a read-only integrity check: it does not write any stat updates.
+   *
+   * @param {string|number} seasonId
+   * @param {Object=} options
+   * @param {Array<string|number>=} options.weekNums Week numbers to check (defaults to all weeks in season)
+   * @param {string=} options.playerDayWorkbookId Override the PlayerDay workbook id
+   * @param {number=} options.floatTolerance Tolerance for float comparisons (GAA/SVP)
+   * @param {boolean=} options.logToConsole When true, prints a short summary
+   * @param {boolean=} options.verbose When true, prints every mismatch line-by-line (default true)
+   * @param {boolean=} options.progress When true, prints week progress (default true)
+   */
+  function scrapeAndCheckPlayerWeeksAgainstPlayerDays(seasonId, options) {
+    var safeOptions = options || {};
+
+    var seasonKey =
+      seasonId === undefined || seasonId === null
+        ? ""
+        : typeof seasonId === "string"
+          ? seasonId.trim()
+          : String(seasonId);
+    if (!seasonKey) {
+      throw new Error(
+        "IntegrityChecks.scrapeAndCheckPlayerWeeksAgainstPlayerDays requires a seasonId",
+      );
+    }
+
+    var fetchSheetAsObjects = GshlUtils.sheets.read.fetchSheetAsObjects;
+    var isStarter = GshlUtils.domain.players.isStarter;
+    var getPlayerDayWorkbookId =
+      GshlUtils.domain.workbooks.getPlayerDayWorkbookId;
+
+    var floatTolerance =
+      typeof safeOptions.floatTolerance === "number"
+        ? safeOptions.floatTolerance
+        : 1e-4;
+    var logToConsole =
+      safeOptions.logToConsole === undefined ||
+      safeOptions.logToConsole === null
+        ? true
+        : !!safeOptions.logToConsole;
+    var verbose =
+      safeOptions.verbose === undefined || safeOptions.verbose === null
+        ? true
+        : !!safeOptions.verbose;
+    var progress =
+      safeOptions.progress === undefined || safeOptions.progress === null
+        ? true
+        : !!safeOptions.progress;
+
+    function computeGAA(totalGA, totalTOI) {
+      var ga = Number(totalGA) || 0;
+      var toi = Number(totalTOI) || 0;
+      if (toi <= 0) return null;
+      return Number(((ga / toi) * 60).toFixed(5));
+    }
+
+    function computeSVP(totalSV, totalSA) {
+      var sv = Number(totalSV) || 0;
+      var sa = Number(totalSA) || 0;
+      if (sa <= 0) return null;
+      return Number((sv / sa).toFixed(6));
+    }
+
+    var weeks = fetchSheetAsObjects(SPREADSHEET_ID, "Week").filter(
+      function (w) {
+        return (
+          w && w.seasonId !== undefined && String(w.seasonId) === seasonKey
+        );
+      },
+    );
+    if (!weeks.length) {
+      return {
+        seasonId: seasonKey,
+        weeksChecked: 0,
+        issues: [],
+        summary: {
+          mismatches: 0,
+          missingPlayerWeeks: 0,
+          missingPlayerDays: 0,
+        },
+        note: "No Week rows found for season",
+      };
+    }
+
+    var requestedWeekNums = Array.isArray(safeOptions.weekNums)
+      ? safeOptions.weekNums
+          .map(function (w) {
+            return String(w);
+          })
+          .filter(Boolean)
+      : [];
+
+    var weeksToCheck = requestedWeekNums.length
+      ? weeks.filter(function (w) {
+          var weekNum = w && w.weekNum !== undefined ? String(w.weekNum) : "";
+          return weekNum && requestedWeekNums.indexOf(weekNum) >= 0;
+        })
+      : weeks.slice();
+
+    var weekIdSet = new Set(
+      weeksToCheck
+        .map(function (w) {
+          return w && w.id !== undefined && w.id !== null ? String(w.id) : "";
+        })
+        .filter(Boolean),
+    );
+
+    var players = fetchSheetAsObjects(SPREADSHEET_ID, "Player");
+    var playerById = new Map(
+      (players || [])
+        .filter(function (p) {
+          return p && p.id !== undefined && p.id !== null && p.id !== "";
+        })
+        .map(function (p) {
+          return [String(p.id), p];
+        }),
+    );
+
+    var teams = fetchSheetAsObjects(SPREADSHEET_ID, "Team").filter(
+      function (t) {
+        return (
+          t && t.seasonId !== undefined && String(t.seasonId) === seasonKey
+        );
+      },
+    );
+    var teamById = new Map(
+      (teams || [])
+        .filter(function (t) {
+          return t && t.id !== undefined && t.id !== null && t.id !== "";
+        })
+        .map(function (t) {
+          return [String(t.id), t];
+        }),
+    );
+
+    var playerDayWorkbookId = safeOptions.playerDayWorkbookId
+      ? String(safeOptions.playerDayWorkbookId)
+      : getPlayerDayWorkbookId(seasonKey);
+
+    var playerDays = fetchSheetAsObjects(
+      playerDayWorkbookId,
+      "PlayerDayStatLine",
+    )
+      .filter(function (pd) {
+        return (
+          pd && pd.seasonId !== undefined && String(pd.seasonId) === seasonKey
+        );
+      })
+      .filter(function (pd) {
+        var weekId =
+          pd.weekId !== undefined && pd.weekId !== null
+            ? String(pd.weekId)
+            : "";
+        return weekId && weekIdSet.has(weekId);
+      });
+
+    var playerWeeks = fetchSheetAsObjects(
+      PLAYERSTATS_SPREADSHEET_ID,
+      "PlayerWeekStatLine",
+    )
+      .filter(function (pw) {
+        return (
+          pw && pw.seasonId !== undefined && String(pw.seasonId) === seasonKey
+        );
+      })
+      .filter(function (pw) {
+        var weekId =
+          pw.weekId !== undefined && pw.weekId !== null
+            ? String(pw.weekId)
+            : "";
+        return weekId && weekIdSet.has(weekId);
+      });
+
+    var weekById = new Map(
+      weeksToCheck
+        .filter(function (w) {
+          return w && w.id !== undefined && w.id !== null;
+        })
+        .map(function (w) {
+          return [String(w.id), w];
+        }),
+    );
+
+    var playerWeekIndex = new Map();
+    playerWeeks.forEach(function (pw) {
+      var weekId =
+        pw.weekId !== undefined && pw.weekId !== null ? String(pw.weekId) : "";
+      var teamId =
+        pw.gshlTeamId !== undefined && pw.gshlTeamId !== null
+          ? String(pw.gshlTeamId)
+          : "";
+      var playerId =
+        pw.playerId !== undefined && pw.playerId !== null
+          ? String(pw.playerId)
+          : "";
+      if (!weekId || !teamId || !playerId) return;
+      playerWeekIndex.set(weekId + "|" + teamId + "|" + playerId, pw);
+    });
+
+    var playerDaysByKey = new Map();
+    playerDays.forEach(function (pd) {
+      var weekId =
+        pd.weekId !== undefined && pd.weekId !== null ? String(pd.weekId) : "";
+      var teamId =
+        pd.gshlTeamId !== undefined && pd.gshlTeamId !== null
+          ? String(pd.gshlTeamId)
+          : "";
+      var playerId =
+        pd.playerId !== undefined && pd.playerId !== null
+          ? String(pd.playerId)
+          : "";
+      if (!weekId || !teamId || !playerId) return;
+      var key = weekId + "|" + teamId + "|" + playerId;
+      if (!playerDaysByKey.has(key)) playerDaysByKey.set(key, []);
+      playerDaysByKey.get(key).push(pd);
+    });
+
+    var ALWAYS_SUM_FIELDS = [
+      "GP",
+      "MG",
+      "IR",
+      "IRplus",
+      "GS",
+      "ADD",
+      "MS",
+      "BS",
+    ];
+    var SKATER_STARTER_FIELDS = [
+      "G",
+      "A",
+      "P",
+      "PM",
+      "PIM",
+      "PPP",
+      "SOG",
+      "HIT",
+      "BLK",
+    ];
+    var GOALIE_STARTER_FIELDS = ["W", "GA", "SV", "SA", "SO", "TOI"];
+    var RATE_FIELDS = ["GAA", "SVP"];
+    var SPECIAL_FIELDS = ["days"].concat(RATE_FIELDS);
+
+    var issues = [];
+    var counts = {
+      mismatches: 0,
+      missingPlayerWeeks: 0,
+      missingPlayerDays: 0,
+    };
+
+    function formatMeta(meta) {
+      if (!meta) return "";
+      var parts = [];
+      if (meta.weekNum) parts.push("week=" + meta.weekNum);
+      if (meta.weekId) parts.push("weekId=" + meta.weekId);
+      if (meta.gshlTeamId) parts.push("teamId=" + meta.gshlTeamId);
+      if (meta.teamLabel) parts.push('team="' + meta.teamLabel + '"');
+      if (meta.playerId) parts.push("playerId=" + meta.playerId);
+      if (meta.playerName) parts.push('player="' + meta.playerName + '"');
+      if (meta.posGroup) parts.push("posGroup=" + meta.posGroup);
+      return parts.length ? " (" + parts.join(" ") + ")" : "";
+    }
+
+    function logIssueLine(issue) {
+      if (!logToConsole || !verbose) return;
+      var prefix = "[IntegrityChecks][PlayerWeeksVsDays]";
+      var metaStr = formatMeta(issue && issue.meta ? issue.meta : null);
+      if (
+        issue.type === "PLAYER_WEEK_STAT_MISMATCH" ||
+        issue.type === "PLAYER_WEEK_STAT_MISSING" ||
+        issue.type === "PLAYER_WEEK_STAT_UNEXPECTED"
+      ) {
+        console.log(
+          prefix +
+            " " +
+            issue.type +
+            metaStr +
+            " field=" +
+            issue.field +
+            " expected=" +
+            issue.expectedValue +
+            " actual=" +
+            issue.actualValue,
+        );
+        return;
+      }
+      console.log(prefix + " " + (issue.type || "ISSUE") + metaStr);
+    }
+
+    function pushIssue(issue) {
+      issues.push(issue);
+      if (
+        issue.type === "PLAYER_WEEK_STAT_MISMATCH" ||
+        issue.type === "PLAYER_WEEK_STAT_MISSING" ||
+        issue.type === "PLAYER_WEEK_STAT_UNEXPECTED"
+      ) {
+        counts.mismatches++;
+      }
+      if (issue.type === "PLAYER_WEEK_MISSING") counts.missingPlayerWeeks++;
+      if (issue.type === "PLAYER_DAYS_MISSING") counts.missingPlayerDays++;
+      logIssueLine(issue);
+    }
+
+    function sumField(rows, field) {
+      var sum = 0;
+      for (var i = 0; i < rows.length; i++) {
+        var val = toNumberOrNull(rows[i] && rows[i][field]);
+        sum += val === null ? 0 : val;
+      }
+      return sum;
+    }
+
+    function resolveMetaFromKey(key) {
+      var parts = String(key).split("|");
+      var weekId = parts[0] || "";
+      var gshlTeamId = parts[1] || "";
+      var playerId = parts[2] || "";
+
+      var week = weekById.has(weekId) ? weekById.get(weekId) : null;
+      var team = teamById.has(gshlTeamId) ? teamById.get(gshlTeamId) : null;
+      var player = playerById.has(playerId) ? playerById.get(playerId) : null;
+
+      return {
+        weekId: weekId,
+        weekNum: week && week.weekNum !== undefined ? String(week.weekNum) : "",
+        gshlTeamId: gshlTeamId,
+        teamLabel:
+          team && (team.teamName || team.name)
+            ? String(team.teamName || team.name)
+            : "",
+        playerId: playerId,
+        playerName:
+          player && (player.fullName || player.playerName || player.name)
+            ? String(player.fullName || player.playerName || player.name)
+            : "",
+        posGroup: "",
+      };
+    }
+
+    function compareExpectedToActual(expected, actualRow, fields, meta) {
+      fields.forEach(function (field) {
+        var expectedVal =
+          expected && Object.prototype.hasOwnProperty.call(expected, field)
+            ? expected[field]
+            : null;
+
+        var actualRaw = actualRow ? actualRow[field] : null;
+        var actualVal = toNumberOrNull(actualRaw);
+
+        var expectedIsBlank = isNullish(expectedVal);
+        var actualIsBlank = isNullish(actualRaw) || actualVal === null;
+
+        if (expectedIsBlank && actualIsBlank) return;
+
+        if (!expectedIsBlank && actualIsBlank) {
+          pushIssue({
+            type: "PLAYER_WEEK_STAT_MISSING",
+            field: field,
+            expectedValue: expectedVal,
+            actualValue: actualRaw,
+            meta: meta,
+          });
+          return;
+        }
+
+        if (expectedIsBlank && !actualIsBlank) {
+          pushIssue({
+            type: "PLAYER_WEEK_STAT_UNEXPECTED",
+            field: field,
+            expectedValue: expectedVal,
+            actualValue: actualRaw,
+            meta: meta,
+          });
+          return;
+        }
+
+        var tol = field === "GAA" || field === "SVP" ? floatTolerance : 0;
+        if (numbersDiffer(Number(expectedVal), actualVal, tol)) {
+          pushIssue({
+            type: "PLAYER_WEEK_STAT_MISMATCH",
+            field: field,
+            expectedValue: expectedVal,
+            actualValue: actualRaw,
+            meta: meta,
+          });
+        }
+      });
+    }
+
+    function buildExpectedWeekFromDays(daysArr, posGroup) {
+      var days = Array.isArray(daysArr) ? daysArr : [];
+      var starts = days.filter(function (d) {
+        return isStarter(d);
+      });
+      var isGoalie = String(posGroup || "").toUpperCase() === "G";
+
+      var expected = {
+        days: days.length,
+      };
+
+      ALWAYS_SUM_FIELDS.forEach(function (f) {
+        expected[f] = sumField(days, f);
+      });
+
+      if (isGoalie) {
+        GOALIE_STARTER_FIELDS.forEach(function (f) {
+          expected[f] = sumField(starts, f);
+        });
+        SKATER_STARTER_FIELDS.forEach(function (f) {
+          expected[f] = null;
+        });
+
+        expected.GAA = computeGAA(expected.GA, expected.TOI);
+        expected.SVP = computeSVP(expected.SV, expected.SA);
+      } else {
+        SKATER_STARTER_FIELDS.forEach(function (f) {
+          expected[f] = sumField(starts, f);
+        });
+        GOALIE_STARTER_FIELDS.forEach(function (f) {
+          expected[f] = null;
+        });
+        expected.GAA = null;
+        expected.SVP = null;
+      }
+
+      return expected;
+    }
+
+    var checkedKeys = new Set();
+
+    weeksToCheck.forEach(function (week) {
+      var weekNum =
+        week && week.weekNum !== undefined ? String(week.weekNum) : "";
+      var weekId = week && week.id !== undefined ? String(week.id) : "";
+      if (!weekId) return;
+
+      if (logToConsole && progress) {
+        console.log(
+          "[IntegrityChecks][PlayerWeeksVsDays] Checking week " +
+            weekNum +
+            " (weekId=" +
+            weekId +
+            ")",
+        );
+      }
+
+      playerWeeks
+        .filter(function (pw) {
+          return pw && pw.weekId !== undefined && String(pw.weekId) === weekId;
+        })
+        .forEach(function (pw) {
+          var teamId =
+            pw.gshlTeamId !== undefined && pw.gshlTeamId !== null
+              ? String(pw.gshlTeamId)
+              : "";
+          var playerId =
+            pw.playerId !== undefined && pw.playerId !== null
+              ? String(pw.playerId)
+              : "";
+          if (!teamId || !playerId) return;
+
+          var key = weekId + "|" + teamId + "|" + playerId;
+          checkedKeys.add(key);
+
+          var daysArr = playerDaysByKey.has(key)
+            ? playerDaysByKey.get(key)
+            : [];
+          var posGroup = pw.posGroup
+            ? String(pw.posGroup)
+            : daysArr[0] && daysArr[0].posGroup
+              ? String(daysArr[0].posGroup)
+              : "";
+
+          var meta = resolveMetaFromKey(key);
+          meta.posGroup = posGroup;
+
+          if (!daysArr || !daysArr.length) {
+            pushIssue({ type: "PLAYER_DAYS_MISSING", meta: meta });
+            return;
+          }
+
+          var expected = buildExpectedWeekFromDays(daysArr, posGroup);
+
+          var fieldsToCompare = ALWAYS_SUM_FIELDS.concat(["days"])
+            .concat(SKATER_STARTER_FIELDS)
+            .concat(GOALIE_STARTER_FIELDS)
+            .concat(RATE_FIELDS);
+
+          compareExpectedToActual(expected, pw, fieldsToCompare, meta);
+        });
+    });
+
+    // Find PlayerDay aggregates that are missing corresponding PlayerWeek rows.
+    playerDaysByKey.forEach(function (_daysArr, key) {
+      if (checkedKeys.has(key)) return;
+      if (playerWeekIndex.has(key)) return;
+      var meta = resolveMetaFromKey(key);
+      var daysArr = playerDaysByKey.get(key) || [];
+      var posGroup =
+        daysArr[0] && daysArr[0].posGroup ? String(daysArr[0].posGroup) : "";
+      meta.posGroup = posGroup;
+      pushIssue({ type: "PLAYER_WEEK_MISSING", meta: meta });
+    });
+
+    if (logToConsole) {
+      console.log(
+        "[IntegrityChecks] PlayerWeek vs PlayerDay integrity for season " +
+          seasonKey +
+          " checked weeks=" +
+          weeksToCheck.length +
+          " issues=" +
+          issues.length,
+      );
+    }
+
+    return {
+      seasonId: seasonKey,
+      playerDayWorkbookId: playerDayWorkbookId,
+      weeksChecked: weeksToCheck.length,
+      issues: issues,
+      summary: counts,
+    };
+  }
+
   function smokeTest(options) {
     var envIssues = validateEnvironment();
     assert(
@@ -1337,6 +1864,8 @@ var IntegrityChecks = (function () {
     runChecks: runChecks,
     buildContext: buildContext,
     scrapeAndCheckMatchupTables: scrapeAndCheckMatchupTables,
+    scrapeAndCheckPlayerWeeksAgainstPlayerDays:
+      scrapeAndCheckPlayerWeeksAgainstPlayerDays,
     checks: {
       playerDayDuplicateKeys: checkPlayerDayDuplicateKeys,
       teamWeekCoverage: checkTeamWeekCoverage,
