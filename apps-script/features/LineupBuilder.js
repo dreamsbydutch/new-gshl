@@ -444,6 +444,8 @@ var LineupBuilder = (function () {
    * @param {string|number} seasonId
    * @param {Object=} options
    * @param {string=} options.playerDayWorkbookId Override workbook id
+    * @param {Array<string|number>=} options.weekIds Only update PlayerDays with these weekIds
+    * @param {Array<string|number>=} options.weekNums Only update PlayerDays in these week numbers (resolved via Week sheet)
    * @param {boolean=} options.dryRun When true, computes but does not write
    * @param {boolean=} options.logToConsole When true, prints progress
    */
@@ -475,6 +477,48 @@ var LineupBuilder = (function () {
     var getColIndex = GshlUtils.sheets.read.getColIndex;
     var groupAndApply = GshlUtils.sheets.write.groupAndApplyColumnUpdates;
 
+    function buildWeekIdAllowList() {
+      var allow = new Set();
+
+      if (opts.weekIds && Array.isArray(opts.weekIds)) {
+        opts.weekIds.forEach(function (w) {
+          if (w === undefined || w === null || w === "") return;
+          allow.add(String(w));
+        });
+        return allow.size ? allow : null;
+      }
+
+      if (opts.weekNums && Array.isArray(opts.weekNums)) {
+        var weekNumSet = new Set();
+        opts.weekNums.forEach(function (n) {
+          if (n === undefined || n === null || n === "") return;
+          weekNumSet.add(String(n));
+        });
+        if (!weekNumSet.size) return null;
+
+        var weeks = fetchSheetAsObjects(SPREADSHEET_ID, "Week", {
+          coerceTypes: true,
+        }).filter(function (w) {
+          return String(w && w.seasonId) === seasonKey;
+        });
+
+        weeks.forEach(function (w) {
+          var wn = w && w.weekNum !== undefined && w.weekNum !== null ? String(w.weekNum) : "";
+          if (!wn) return;
+          if (!weekNumSet.has(wn)) return;
+          if (w && w.id !== undefined && w.id !== null && w.id !== "") {
+            allow.add(String(w.id));
+          }
+        });
+
+        return allow.size ? allow : null;
+      }
+
+      return null;
+    }
+
+    var weekIdAllowList = buildWeekIdAllowList();
+
     var playerDays = fetchSheetAsObjects(
       playerDayWorkbookId,
       "PlayerDayStatLine",
@@ -482,7 +526,10 @@ var LineupBuilder = (function () {
         coerceTypes: true,
       },
     ).filter(function (pd) {
-      return String(pd && pd.seasonId) === seasonKey;
+      if (String(pd && pd.seasonId) !== seasonKey) return false;
+      if (!weekIdAllowList) return true;
+      var wk = pd && pd.weekId !== undefined && pd.weekId !== null ? String(pd.weekId) : "";
+      return wk ? weekIdAllowList.has(wk) : false;
     });
 
     if (logToConsole) {
@@ -491,6 +538,7 @@ var LineupBuilder = (function () {
           seasonKey +
           " workbook=" +
           playerDayWorkbookId +
+          (weekIdAllowList ? " weeks=" + Array.from(weekIdAllowList).join(",") : "") +
           " rows=" +
           playerDays.length,
       );
