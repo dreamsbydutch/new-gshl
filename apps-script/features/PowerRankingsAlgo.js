@@ -7,7 +7,7 @@
  *
  * Outputs (stored on TEAMSTATS_SPREADSHEET_ID):
  * - TeamWeekStatLine: powerElo*, powerStat*, powerComposite, powerRating, powerRk
- * - TeamSeasonStatLine: end-of-run values for the chosen seasonType
+ * - TeamSeasonStatLine: end-of-run values per seasonType encountered (RS/PO/LT)
  *
  * Design notes:
  * - Deterministic computations from existing sheets (Week/Matchup/TeamWeekStatLine)
@@ -52,6 +52,31 @@ var PowerRankingsAlgo = (function buildPowerRankingsAlgo() {
     // 1.0 => pure marginScore, 0.0 => pure pointsScore
     eloMarginWeight: 0.75,
 
+    // Week-type weighting for Elo. Values multiply K (so higher => Elo moves more).
+    // Override by passing `eloWeekTypeKMultipliers` in options.
+    eloWeekTypeKMultipliers: (function () {
+      var out = {};
+      // Always support common short codes.
+      out["RS"] = 1;
+      out["LT"] = 0.5;
+      out["PO"] = 2;
+
+      // Also support whatever constants your codebase uses.
+      if (SeasonType && SeasonType.REGULAR_SEASON !== undefined)
+        out[String(SeasonType.REGULAR_SEASON)] = 1;
+      if (SeasonType && SeasonType.LOSERS_TOURNAMENT !== undefined)
+        out[String(SeasonType.LOSERS_TOURNAMENT)] = 0.5;
+      if (SeasonType && SeasonType.PLAYOFFS !== undefined)
+        out[String(SeasonType.PLAYOFFS)] = 2;
+      return out;
+    })(),
+
+    // Playoff rounds should matter more each week/round.
+    // Applied only to playoff matchups, as an additive step:
+    // multiplier = basePlayoffMultiplier + (roundIndex-1) * eloPlayoffRoundStep
+    // Example (base=2, step=0.5): 2.0, 2.5, 3.0, ...
+    eloPlayoffRoundStep: 0.5,
+
     // Stat strength EWMA
     ewmaAlpha: 0.35, // higher = more weight on most recent week
 
@@ -70,7 +95,11 @@ var PowerRankingsAlgo = (function buildPowerRankingsAlgo() {
     wStat: 0.3,
 
     // Scope
-    seasonType: SeasonType.REGULAR_SEASON,
+    // By default, include ALL weeks for a season (RS + playoffs + LT). To restrict, pass:
+    // - weekTypes: [SeasonType.REGULAR_SEASON] (preferred)
+    // - seasonType: SeasonType.REGULAR_SEASON (legacy)
+    weekTypes: null,
+    seasonType: null,
 
     // Writes/logging
     dryRun: false,
@@ -398,6 +427,37 @@ var PowerRankingsAlgo = (function buildPowerRankingsAlgo() {
     return baseK * (1 + marginKMultiplier * margin);
   }
 
+  function getWeekType(week) {
+    return (week && week.weekType) || SeasonType.REGULAR_SEASON;
+  }
+
+  function getMatchupWeekType(week, matchup) {
+    // Losers tournament matchups can occur during playoff weeks.
+    // Convention used in this codebase: `week.weekType` marks the period, while
+    // `matchup.isPlayoff` marks whether a specific matchup is part of playoffs.
+    var wt = getWeekType(week);
+    if (matchup && matchup.isPlayoff === true) return SeasonType.PLAYOFFS;
+
+    // If it's a playoff week but the matchup is explicitly not playoff, treat it as LT.
+    if (String(wt) === String(SeasonType.PLAYOFFS) && matchup) {
+      if (matchup.isPlayoff === false || matchup.isPlayoff === "FALSE") {
+        return SeasonType.LOSERS_TOURNAMENT;
+      }
+    }
+    return wt;
+  }
+
+  function getBaseKMultiplierForType(opts, weekType) {
+    var mult = 1;
+    if (opts && opts.eloWeekTypeKMultipliers) {
+      var raw = opts.eloWeekTypeKMultipliers[String(weekType)];
+      if (raw === undefined || raw === null) raw = opts.eloWeekTypeKMultipliers[weekType];
+      var n = toNumber(raw);
+      if (isFinite(n) && n > 0) mult = n;
+    }
+    return mult;
+  }
+
   /**
    * Primary entry point.
    *
@@ -412,8 +472,8 @@ var PowerRankingsAlgo = (function buildPowerRankingsAlgo() {
       console.log(
         "[PowerRankingsAlgo] start season=",
         seasonKey,
-        "type=",
-        opts.seasonType,
+        "weekTypes=",
+        opts.weekTypes || (opts.seasonType ? [opts.seasonType] : "ALL"),
         "dryRun=",
         opts.dryRun,
       );
@@ -427,11 +487,25 @@ var PowerRankingsAlgo = (function buildPowerRankingsAlgo() {
       },
     );
 
-    // Filter to requested seasonType (RS/PO/LT) based on week.weekType.
-    weeks = weeks.filter(function (w) {
-      var wt = (w && w.weekType) || SeasonType.REGULAR_SEASON;
-      return String(wt) === String(opts.seasonType);
-    });
+    // Optional filtering by weekType.
+    var weekTypesSet = null;
+    if (opts.weekTypes && opts.weekTypes.length) {
+      weekTypesSet = new Set(
+        opts.weekTypes.map(function (x) {
+          return String(x);
+        }),
+      );
+    } else if (opts.seasonType) {
+      // Legacy option; keep for backwards compatibility.
+      weekTypesSet = new Set([String(opts.seasonType)]);
+    }
+
+    if (weekTypesSet) {
+      weeks = weeks.filter(function (w) {
+        var wt = (w && w.weekType) || SeasonType.REGULAR_SEASON;
+        return weekTypesSet.has(String(wt));
+      });
+    }
 
     weeks = sortWeeks(weeks);
     if (!weeks.length) {
@@ -520,9 +594,24 @@ var PowerRankingsAlgo = (function buildPowerRankingsAlgo() {
 
     var weekUpdates = [];
 
+    // For season snapshots: track the last weekId per weekType encountered.
+    var lastWeekIdByType = new Map();
+
+    // For stepped playoff weighting: map weekId -> playoff round index (1..N).
+    var playoffRoundIndexByWeekId = new Map();
+    var playoffWeeks = weeks.filter(function (w) {
+      return String(getWeekType(w)) === String(SeasonType.PLAYOFFS);
+    });
+    playoffWeeks = sortWeeks(playoffWeeks);
+    playoffWeeks.forEach(function (w, idx) {
+      playoffRoundIndexByWeekId.set(String(w.id), idx + 1);
+    });
+
     // Iterate weeks in order.
     weeks.forEach(function (week) {
       var weekId = String(week.id);
+      var weekType = (week && week.weekType) || SeasonType.REGULAR_SEASON;
+      lastWeekIdByType.set(String(weekType), String(weekId));
       var weekTeamMap = teamWeeksByWeekId.get(weekId) || new Map();
 
       // Snapshot Elo at the start of the week (pre-matchup).
@@ -629,7 +718,20 @@ var PowerRankingsAlgo = (function buildPowerRankingsAlgo() {
 
         var expHome = expectedScore(homeElo, awayElo, opts.eloScale);
         var expAway = 1 - expHome;
-        var K = computeKFactor(opts.baseK, opts.marginKMultiplier, m);
+
+        var matchupType = getMatchupWeekType(week, m);
+        var baseTypeMult = getBaseKMultiplierForType(opts, matchupType);
+        var typeMult = baseTypeMult;
+
+        if (String(matchupType) === String(SeasonType.PLAYOFFS)) {
+          var roundIdx = playoffRoundIndexByWeekId.get(String(weekId)) || 1;
+          var step = toNumber(opts.eloPlayoffRoundStep);
+          if (!isFinite(step)) step = 0;
+          typeMult = baseTypeMult + Math.max(0, roundIdx - 1) * step;
+          if (!(isFinite(typeMult) && typeMult > 0)) typeMult = baseTypeMult;
+        }
+
+        var K = computeKFactor(opts.baseK, opts.marginKMultiplier, m) * typeMult;
 
         // Record the expected score + K for the team/week if not already set.
         if (!matchupParamsByTeam.has(homeId)) {
@@ -701,8 +803,21 @@ var PowerRankingsAlgo = (function buildPowerRankingsAlgo() {
         var eloZ = (toNumber(s.powerElo) - eloMean) / eloStd;
         var statZ = toNumber(s.powerStatEwma);
         s.powerComposite = opts.wElo * eloZ + opts.wStat * statZ;
-        // Keep `powerRating` aligned with composite for now.
-        s.powerRating = s.powerComposite;
+      });
+
+      // Normalize powerRating to 0..100 each week.
+      var compVals = teamSnapshots.map(function (s) {
+        return toNumber(s.powerComposite);
+      });
+      var cMin = Math.min.apply(null, compVals);
+      var cMax = Math.max.apply(null, compVals);
+      teamSnapshots.forEach(function (s) {
+        if (!isFinite(cMin) || !isFinite(cMax) || cMax === cMin) {
+          s.powerRating = 50;
+        } else {
+          s.powerRating =
+            ((toNumber(s.powerComposite) - cMin) / (cMax - cMin)) * 100;
+        }
       });
 
       teamSnapshots.sort(function (a, b) {
@@ -738,23 +853,24 @@ var PowerRankingsAlgo = (function buildPowerRankingsAlgo() {
       },
     );
 
-    // Update TeamSeasonStatLine (RS only for now): take last week snapshot.
-    var lastWeekId = String(weeks[weeks.length - 1].id);
-    var lastWeekRows = weekUpdates.filter(function (u) {
-      return String(u.weekId) === lastWeekId;
-    });
-
-    var seasonUpdates = lastWeekRows.map(function (u) {
-      return {
-        gshlTeamId: u.gshlTeamId,
-        seasonId: String(seasonKey),
-        seasonType: String(opts.seasonType),
-        powerElo: u.powerElo,
-        powerStatEwma: u.powerStatEwma,
-        powerComposite: u.powerComposite,
-        powerRating: u.powerRating,
-        powerRk: u.powerRk,
-      };
+    // Update TeamSeasonStatLine: write a snapshot for each weekType encountered.
+    var seasonUpdates = [];
+    lastWeekIdByType.forEach(function (wkId, wt) {
+      var rowsForType = weekUpdates.filter(function (u) {
+        return String(u.weekId) === String(wkId);
+      });
+      rowsForType.forEach(function (u) {
+        seasonUpdates.push({
+          gshlTeamId: u.gshlTeamId,
+          seasonId: String(seasonKey),
+          seasonType: String(wt),
+          powerElo: u.powerElo,
+          powerStatEwma: u.powerStatEwma,
+          powerComposite: u.powerComposite,
+          powerRating: u.powerRating,
+          powerRk: u.powerRk,
+        });
+      });
     });
 
     upsertSheetByKeys(
