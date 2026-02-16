@@ -30,7 +30,7 @@ var LineupBuilder = (function () {
   const RosterPosition = {
     BN: "BN",
     IR: "IR",
-    IRplus: "IRplus",
+    IRplus: "IR+",
     LW: "LW",
     C: "C",
     RW: "RW",
@@ -115,11 +115,21 @@ var LineupBuilder = (function () {
    * @param {Object} player
    * @returns {boolean}
    */
+  function normalizeDailyPos(pos) {
+    if (pos === undefined || pos === null) return "";
+    var s = String(pos).trim();
+    if (!s) return "";
+    // Back-compat with older internal tokens.
+    if (s === "IRplus") return RosterPosition.IRplus;
+    return s;
+  }
+
   function wasInDailyLineup(player) {
+    var dailyPos = normalizeDailyPos(player && player.dailyPos);
     return (
-      player.dailyPos !== RosterPosition.BN &&
-      player.dailyPos !== RosterPosition.IR &&
-      player.dailyPos !== RosterPosition.IRplus
+      dailyPos !== RosterPosition.BN &&
+      dailyPos !== RosterPosition.IR &&
+      dailyPos !== RosterPosition.IRplus
     );
   }
 
@@ -305,34 +315,22 @@ var LineupBuilder = (function () {
 
     if (safePlayers.length === 0) return results;
 
+    // FULL lineup:
+    // - Never start players who did not play (GP != 1)
+    // - Strongly prefer players who played AND were in the active daily lineup
+    // - Allow repositioning: any eligible starting slot is fine
     const PRIORITY_GAP = 100000000;
+    const playedOnly = safePlayers.filter((p) => p && p.GP == 1);
 
-    const playersWithFullPosPriority = safePlayers.map((p) => {
+    const playersWithFullPosPriority = playedOnly.map((p) => {
       const wasInActiveLineup = wasInDailyLineup(p);
-      const gamesStarted = p.GS == 1;
-      const played = p.GP == 1;
-
-      let priorityTier = 1;
-
-      if (gamesStarted) {
-        priorityTier = 5;
-      } else if (played && wasInActiveLineup) {
-        priorityTier = 4;
-      } else if (played && !wasInActiveLineup) {
-        priorityTier = 3;
-      } else if (!played && wasInActiveLineup) {
-        priorityTier = 2;
-      } else {
-        priorityTier = 1;
-      }
-
+      const priorityTier = wasInActiveLineup ? 2 : 1;
       const priorityBoost = priorityTier * PRIORITY_GAP + (p.Rating || 0);
-
       return {
         playerId: p.playerId,
         nhlPos: p.nhlPos,
         posGroup: p.posGroup,
-        dailyPos: p.dailyPos,
+        dailyPos: normalizeDailyPos(p.dailyPos),
         GP: p.GP,
         GS: p.GS,
         IR: p.IR,
@@ -346,16 +344,13 @@ var LineupBuilder = (function () {
       result.fullPos = fullPosAssignments[result.playerId] || RosterPosition.BN;
     }
 
-    const playedPlayers = results
-      .filter((p) => p.GP == 1)
-      .sort((a, b) => (b.Rating || 0) - (a.Rating || 0));
-
-    const didNotPlayBest = results
-      .filter((p) => !(p.GP == 1))
-      .sort((a, b) => (b.Rating || 0) - (a.Rating || 0));
-
-    const bestPosPriority = [...playedPlayers, ...didNotPlayBest];
-    const bestPosAssignments = findBestLineup(bestPosPriority, false);
+    // BEST lineup: only players who played.
+    const bestPosAssignments = findBestLineup(
+      results
+        .filter((p) => p && p.GP == 1)
+        .sort((a, b) => (b.Rating || 0) - (a.Rating || 0)),
+      false,
+    );
     for (const result of results) {
       result.bestPos = bestPosAssignments[result.playerId] || RosterPosition.BN;
     }
@@ -460,6 +455,42 @@ var LineupBuilder = (function () {
     var dryRun = !!opts.dryRun;
     var logToConsole =
       opts.logToConsole === undefined ? true : !!opts.logToConsole;
+
+    var debugFocus = opts.debugFocus || null;
+    var debugFocusDate =
+      debugFocus && debugFocus.date ? String(debugFocus.date) : "";
+    var debugFocusPlayerIds =
+      debugFocus && Array.isArray(debugFocus.playerIds)
+        ? debugFocus.playerIds
+        : [];
+    var debugFocusWriteback = !!(debugFocus && debugFocus.writeback);
+    var debugFocusSet = new Set(
+      debugFocusPlayerIds
+        .filter(function (x) {
+          return x !== undefined && x !== null && x !== "";
+        })
+        .map(function (x) {
+          return String(x);
+        }),
+    );
+
+    function debugLog() {
+      var msg = Array.prototype.slice.call(arguments).join(" ");
+      try {
+        if (typeof Logger !== "undefined" && Logger && Logger.log) {
+          Logger.log(msg);
+        }
+      } catch (_e1) {
+        // ignore
+      }
+      try {
+        if (typeof console !== "undefined" && console && console.log) {
+          console.log(msg);
+        }
+      } catch (_e2) {
+        // ignore
+      }
+    }
 
     var playerDayWorkbookId =
       (opts.playerDayWorkbookId && String(opts.playerDayWorkbookId)) ||
@@ -577,6 +608,13 @@ var LineupBuilder = (function () {
 
     function dateOnly(d) {
       if (!d) return "";
+
+      // IMPORTANT: Avoid timezone shifting for date-only strings.
+      if (typeof d === "string") {
+        var s = String(d).trim();
+        if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+      }
+
       if (typeof formatDateOnly === "function") {
         return formatDateOnly(d);
       }
@@ -594,10 +632,20 @@ var LineupBuilder = (function () {
       if (typeof getPreviousDate === "function") {
         return String(getPreviousDate(dateKey));
       }
-      var dt = dateKey instanceof Date ? dateKey : new Date(dateKey);
+      var dt;
+      if (typeof dateKey === "string" && /^\d{4}-\d{2}-\d{2}$/.test(dateKey)) {
+        var parts = dateKey.split("-").map(function (x) {
+          return Number(x);
+        });
+        dt = new Date(parts[0], parts[1] - 1, parts[2]);
+      } else {
+        dt = dateKey instanceof Date ? dateKey : new Date(dateKey);
+      }
       if (isNaN(dt.getTime())) return "";
       return dateOnly(new Date(dt.getTime() - 24 * 60 * 60 * 1000));
     }
+
+    var debugFocusDateKey = debugFocusDate ? dateOnly(debugFocusDate) : "";
 
     // Presence map across the season: (playerId, teamId, date) => true
     var presence = new Set();
@@ -635,7 +683,12 @@ var LineupBuilder = (function () {
       if (!pd) return;
       var dateKey = dateOnly(pd.date);
       var teamKey = pd.gshlTeamId;
-      if (!dateKey || teamKey === undefined || teamKey === null || teamKey === "") {
+      if (
+        !dateKey ||
+        teamKey === undefined ||
+        teamKey === null ||
+        teamKey === ""
+      ) {
         skippedMissingGroupKey++;
         return;
       }
@@ -653,7 +706,50 @@ var LineupBuilder = (function () {
     }
 
     var updates = [];
-    groups.forEach(function (players) {
+    var debugFocusRowIds = [];
+    var debugFocusIntendedByRowId = {};
+
+    groups.forEach(function (players, groupKey) {
+      var parts = String(groupKey || "").split("|");
+      var groupDateKey = parts.length ? String(parts[0]) : "";
+      var groupTeamKey = parts.length > 1 ? String(parts[1]) : "";
+      var shouldDebugThisGroup =
+        !!debugFocusDateKey &&
+        groupDateKey === debugFocusDateKey &&
+        debugFocusSet &&
+        debugFocusSet.size;
+
+      if (shouldDebugThisGroup) {
+        debugLog(
+          "[LineupBuilder.debug] focus group date=" +
+            groupDateKey +
+            " team=" +
+            groupTeamKey +
+            " players=" +
+            String(players.length),
+        );
+        players
+          .filter(function (p) {
+            return p && debugFocusSet.has(String(p.playerId));
+          })
+          .forEach(function (p) {
+            debugLog(
+              "[LineupBuilder.debug] BEFORE playerId=" +
+                String(p.playerId) +
+                " id=" +
+                String(p.id) +
+                " dailyPos=" +
+                String(p.dailyPos) +
+                " GP=" +
+                String(p.GP) +
+                " GS=" +
+                String(p.GS) +
+                " Rating=" +
+                String(p.Rating),
+            );
+          });
+      }
+
       var optimized = optimizeLineup(players);
       optimized.forEach(function (p) {
         if (!p || p.id === undefined || p.id === null || p.id === "") return;
@@ -668,7 +764,38 @@ var LineupBuilder = (function () {
           MS: flags.MS,
           BS: flags.BS,
         });
+
+        if (
+          shouldDebugThisGroup &&
+          p.playerId !== undefined &&
+          p.playerId !== null &&
+          debugFocusSet.has(String(p.playerId))
+        ) {
+          debugFocusRowIds.push(String(p.id));
+          debugFocusIntendedByRowId[String(p.id)] = {
+            playerId: String(p.playerId),
+            bestPos: String(p.bestPos),
+            fullPos: String(p.fullPos),
+          };
+        }
       });
+
+      if (shouldDebugThisGroup) {
+        optimized
+          .filter(function (p) {
+            return p && debugFocusSet.has(String(p.playerId));
+          })
+          .forEach(function (p) {
+            debugLog(
+              "[LineupBuilder.debug] AFTER playerId=" +
+                String(p.playerId) +
+                " bestPos=" +
+                String(p.bestPos) +
+                " fullPos=" +
+                String(p.fullPos),
+            );
+          });
+      }
     });
 
     updates.sort(function (a, b) {
@@ -709,6 +836,12 @@ var LineupBuilder = (function () {
       var key = String(id);
       var idx = idToRowIndex[key];
       return idx ? Number(idx) : 0;
+    }
+
+    function readBestFullAtRow(rowIndex) {
+      var bestVal = sheet.getRange(rowIndex, bestPosCol, 1, 1).getValue();
+      var fullVal = sheet.getRange(rowIndex, fullPosCol, 1, 1).getValue();
+      return { bestPos: bestVal, fullPos: fullVal };
     }
 
     var resolvedUpdates = [];
@@ -774,6 +907,49 @@ var LineupBuilder = (function () {
     var addMsBsAdjacent = msCol === addCol + 1 && bsCol === addCol + 2;
     var msBsAdjacent = Math.abs(msCol - bsCol) === 1;
 
+    if (debugFocusWriteback && debugFocusRowIds.length) {
+      // De-dupe
+      var seenIds = {};
+      debugFocusRowIds = debugFocusRowIds.filter(function (id) {
+        var k = String(id);
+        if (seenIds[k]) return false;
+        seenIds[k] = true;
+        return true;
+      });
+
+      debugLog(
+        "[LineupBuilder.debug] WRITEBACK cols bestPosCol=" +
+          String(bestPosCol) +
+          " fullPosCol=" +
+          String(fullPosCol) +
+          " adjacent=" +
+          String(bestFullAdjacent),
+      );
+
+      debugFocusRowIds.forEach(function (rowId) {
+        var rowIndex = toRowIndexFromId(rowId);
+        if (!rowIndex) return;
+        var before = readBestFullAtRow(rowIndex);
+        var intended = debugFocusIntendedByRowId[String(rowId)] || {};
+        debugLog(
+          "[LineupBuilder.debug] WRITEBACK BEFORE rowId=" +
+            String(rowId) +
+            " rowIndex=" +
+            String(rowIndex) +
+            " playerId=" +
+            String(intended.playerId || "?") +
+            " bestPos=" +
+            String(before.bestPos) +
+            " fullPos=" +
+            String(before.fullPos) +
+            " intendedBest=" +
+            String(intended.bestPos || "") +
+            " intendedFull=" +
+            String(intended.fullPos || ""),
+        );
+      });
+    }
+
     if (bestFullAdjacent) {
       var startCol = Math.min(bestPosCol, fullPosCol);
       var bestFirst = startCol === bestPosCol;
@@ -802,6 +978,43 @@ var LineupBuilder = (function () {
           return { rowIndex: u.rowIndex, value: u.fullPos };
         }),
       );
+    }
+
+    if (debugFocusWriteback && debugFocusRowIds.length) {
+      try {
+        if (
+          typeof SpreadsheetApp !== "undefined" &&
+          SpreadsheetApp &&
+          typeof SpreadsheetApp.flush === "function"
+        ) {
+          SpreadsheetApp.flush();
+        }
+      } catch (_e) {
+        // ignore
+      }
+
+      debugFocusRowIds.forEach(function (rowId) {
+        var rowIndex = toRowIndexFromId(rowId);
+        if (!rowIndex) return;
+        var after = readBestFullAtRow(rowIndex);
+        var intended = debugFocusIntendedByRowId[String(rowId)] || {};
+        debugLog(
+          "[LineupBuilder.debug] WRITEBACK AFTER rowId=" +
+            String(rowId) +
+            " rowIndex=" +
+            String(rowIndex) +
+            " playerId=" +
+            String(intended.playerId || "?") +
+            " bestPos=" +
+            String(after.bestPos) +
+            " fullPos=" +
+            String(after.fullPos) +
+            " intendedBest=" +
+            String(intended.bestPos || "") +
+            " intendedFull=" +
+            String(intended.fullPos || ""),
+        );
+      });
     }
 
     if (addMsBsAdjacent) {
