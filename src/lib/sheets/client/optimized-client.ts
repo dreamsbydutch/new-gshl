@@ -52,13 +52,35 @@ export class OptimizedSheetsClient {
 
   private readonly limiter = pLimit(this.rateLimitConfig.burstLimit);
 
+  private parseServiceAccountCredentials(raw?: string): object | undefined {
+    if (!raw) return undefined;
+
+    const trimmed = raw.trim();
+    const maybeUnquoted =
+      (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+      (trimmed.startsWith("'") && trimmed.endsWith("'"))
+        ? trimmed.slice(1, -1).trim()
+        : trimmed;
+
+    // Ignore non-JSON values (for example, accidental file paths in this env var).
+    if (!maybeUnquoted.startsWith("{") && !maybeUnquoted.startsWith("[")) {
+      return undefined;
+    }
+
+    try {
+      return JSON.parse(maybeUnquoted) as object;
+    } catch {
+      return undefined;
+    }
+  }
+
   constructor() {
     try {
       this.auth = new GoogleAuth({
         keyFile: env.GOOGLE_SERVICE_ACCOUNT_KEY_FILE ?? "./gsconfig.json",
-        credentials: env.GOOGLE_SERVICE_ACCOUNT_KEY
-          ? (JSON.parse(env.GOOGLE_SERVICE_ACCOUNT_KEY) as object)
-          : undefined,
+        credentials: this.parseServiceAccountCredentials(
+          env.GOOGLE_SERVICE_ACCOUNT_KEY,
+        ),
         scopes: ["https://www.googleapis.com/auth/spreadsheets"],
       });
 

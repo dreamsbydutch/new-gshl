@@ -89,7 +89,6 @@ export const groupTeamsByStandingsType = (
   stats: TeamSeasonStatLine[],
   standingsType: string,
 ): StandingsGroup[] => {
-  console.log(teams, stats, standingsType);
   switch (standingsType) {
     case STANDINGS_TYPES.OVERALL:
       return [

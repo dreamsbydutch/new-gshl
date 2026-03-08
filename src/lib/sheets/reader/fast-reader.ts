@@ -13,15 +13,38 @@ type SnapshotResult<M extends readonly ModelName[]> = {
   [K in M[number]]: DatabaseRecord[];
 };
 
-function getColumnLetter(index: number): string {
-  let letter = "";
-  let current = index;
-  while (current > 0) {
-    current--;
-    letter = String.fromCharCode((current % 26) + 65) + letter;
-    current = Math.floor(current / 26);
+function alignRowsToConfiguredColumns(
+  rawRows: (string | number | boolean | null)[][],
+  columns: readonly string[],
+): (string | number | boolean | null)[][] {
+  const header = rawRows[0] ?? [];
+  const dataRows = rawRows.slice(1);
+
+  if (!header.length) {
+    // Fallback for unexpected sheets without header rows.
+    return dataRows.map((row) =>
+      columns.map((_, index) => (row[index] ?? null) as string | number | boolean | null),
+    );
   }
-  return letter;
+
+  const headerIndex = new Map<string, number>();
+  header.forEach((cell, index) => {
+    const key = String(cell).trim();
+    if (key) {
+      headerIndex.set(key, index);
+    }
+  });
+
+  return dataRows.map((row) =>
+    columns.map((column) => {
+      const index = headerIndex.get(column);
+      return (index === undefined ? null : (row[index] ?? null)) as
+        | string
+        | number
+        | boolean
+        | null;
+    }),
+  );
 }
 
 function getSpreadsheetIdForModel(modelName: string): string {
@@ -49,11 +72,12 @@ export class FastSheetsReader {
       throw new Error(`No column configuration found for model: ${modelName}`);
     }
 
-    const maxColumn = getColumnLetter(columns.length);
-    const range = `${sheetName}!A2:${maxColumn}`;
+    const range = `${sheetName}!A1:ZZ`;
     const spreadsheetId = getSpreadsheetIdForModel(String(modelName));
 
-    const rows = await optimizedSheetsClient.getValues(spreadsheetId, range);
+    const rawRows = await optimizedSheetsClient.getValues(spreadsheetId, range);
+    const rows = alignRowsToConfiguredColumns(rawRows, columns);
+
     return rows
       .filter((row) => row && row.length > 0)
       .map((row) => convertRowToModel<T>(row, columns));
@@ -94,8 +118,7 @@ export class FastSheetsReader {
             );
           }
 
-          const maxColumn = getColumnLetter(columns.length);
-          const range = `${sheetName}!A2:${maxColumn}`;
+          const range = `${sheetName}!A1:ZZ`;
           ranges.push(range);
           rangeToModel.set(range, modelName);
         }
@@ -112,7 +135,9 @@ export class FastSheetsReader {
           const columns = SHEETS_CONFIG.COLUMNS[modelName];
           if (!columns) continue;
 
-          output[String(modelName)] = values
+          const alignedRows = alignRowsToConfiguredColumns(values, columns);
+
+          output[String(modelName)] = alignedRows
             .filter((row) => row && row.length > 0)
             .map((row) => convertRowToModel(row, columns));
         }
