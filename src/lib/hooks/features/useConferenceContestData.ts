@@ -2,7 +2,6 @@
 
 import { useMemo } from "react";
 import { useMatchups, useSeasons, useTeams } from "@gshl-hooks";
-import type { GSHLTeam } from "@gshl-types";
 import {
   buildConferenceContestOverallViewModel,
   buildConferenceContestSeasonViewModel,
@@ -11,11 +10,7 @@ import {
   type ConferenceContestSeasonViewModel,
 } from "@gshl-utils";
 
-export interface UseConferenceContestDataOptions {}
-
-export function useConferenceContestData(
-  _options: UseConferenceContestDataOptions = {},
-) {
+export function useConferenceContestData() {
   const {
     data: seasons = [],
     isLoading: seasonsLoading,
@@ -32,10 +27,7 @@ export function useConferenceContestData(
     error: teamsError,
   } = useTeams();
 
-  const teams = useMemo(
-    () => teamsRaw.filter(isGshlTeam) as GSHLTeam[],
-    [teamsRaw],
-  );
+  const teams = useMemo(() => teamsRaw.filter(isGshlTeam), [teamsRaw]);
 
   const seasonViewModels: ConferenceContestSeasonViewModel[] = useMemo(() => {
     if (!seasons.length || !matchups.length || !teams.length) return [];
@@ -61,7 +53,11 @@ export function useConferenceContestData(
     });
   }, [seasons, matchups, teams]);
 
-  const isLoading = Boolean(seasonsLoading || matchupsLoading || teamsLoading);
+  const isLoading = Boolean(
+    (seasonsLoading ?? false) ||
+      (matchupsLoading ?? false) ||
+      (teamsLoading ?? false),
+  );
   const error = seasonsError ?? matchupsError ?? teamsError ?? null;
   const ready = !isLoading;
 

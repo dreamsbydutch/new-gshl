@@ -48,6 +48,7 @@ export const isGshlTeam = (team: unknown): team is GSHLTeam => {
 
 const normalizeId = (value: unknown): string | null => {
   if (value == null) return null;
+  if (typeof value !== "string" && typeof value !== "number") return null;
   const str = String(value).trim();
   return str.length ? str : null;
 };

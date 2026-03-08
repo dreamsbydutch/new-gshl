@@ -9,9 +9,10 @@ import {
 
 type ModelName = keyof typeof SHEETS_CONFIG.SHEETS;
 
-type SnapshotResult<M extends readonly ModelName[]> = {
-  [K in M[number]]: DatabaseRecord[];
-};
+type SnapshotResult<M extends readonly ModelName[]> = Record<
+  M[number],
+  DatabaseRecord[]
+>;
 
 function alignRowsToConfiguredColumns(
   rawRows: (string | number | boolean | null)[][],
@@ -23,7 +24,7 @@ function alignRowsToConfiguredColumns(
   if (!header.length) {
     // Fallback for unexpected sheets without header rows.
     return dataRows.map((row) =>
-      columns.map((_, index) => (row[index] ?? null) as string | number | boolean | null),
+      columns.map((_, index) => row[index] ?? null),
     );
   }
 
@@ -38,11 +39,7 @@ function alignRowsToConfiguredColumns(
   return dataRows.map((row) =>
     columns.map((column) => {
       const index = headerIndex.get(column);
-      return (index === undefined ? null : (row[index] ?? null)) as
-        | string
-        | number
-        | boolean
-        | null;
+      return index === undefined ? null : row[index] ?? null;
     }),
   );
 }
@@ -92,7 +89,7 @@ export class FastSheetsReader {
   async fetchSnapshot<M extends readonly ModelName[]>(
     models: M,
   ): Promise<SnapshotResult<M>> {
-    const uniqueModels = Array.from(new Set(models)) as ModelName[];
+    const uniqueModels = Array.from(new Set(models));
 
     const bySpreadsheet = new Map<string, ModelName[]>();
     for (const modelName of uniqueModels) {

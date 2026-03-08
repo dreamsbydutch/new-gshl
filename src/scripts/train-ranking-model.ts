@@ -118,6 +118,37 @@ const SEASON_TYPE_ALIASES: Record<string, SeasonTypeEnum> = {
   LT: SeasonType.LOSERS_TOURNAMENT,
 };
 
+async function createGoogleAuth() {
+  const { google } = await import("googleapis");
+  const { env } = await import("../env.js");
+
+  let credentials: Record<string, unknown> | undefined;
+  if (env.GOOGLE_SERVICE_ACCOUNT_KEY) {
+    try {
+      credentials = JSON.parse(env.GOOGLE_SERVICE_ACCOUNT_KEY) as Record<
+        string,
+        unknown
+      >;
+    } catch {
+      throw new Error(
+        "GOOGLE_SERVICE_ACCOUNT_KEY is set but is not valid JSON.",
+      );
+    }
+  }
+
+  if (!credentials && !env.GOOGLE_SERVICE_ACCOUNT_KEY_FILE) {
+    throw new Error(
+      "Missing Google auth config. Set GOOGLE_SERVICE_ACCOUNT_KEY_FILE or GOOGLE_SERVICE_ACCOUNT_KEY.",
+    );
+  }
+
+  return new google.auth.GoogleAuth({
+    keyFile: env.GOOGLE_SERVICE_ACCOUNT_KEY_FILE,
+    credentials,
+    scopes: ["https://www.googleapis.com/auth/spreadsheets.readonly"],
+  });
+}
+
 // ============================================================================
 // Main Execution
 // ============================================================================
@@ -197,15 +228,7 @@ async function fetchAllPlayerDays(): Promise<PlayerStatLine[]> {
 
   const startTime = Date.now();
   const { google } = await import("googleapis");
-  const { env } = await import("../env.js");
-
-  const auth = new google.auth.GoogleAuth({
-    credentials: JSON.parse(env.GOOGLE_SERVICE_ACCOUNT_KEY) as Record<
-      string,
-      unknown
-    >,
-    scopes: ["https://www.googleapis.com/auth/spreadsheets.readonly"],
-  });
+  const auth = await createGoogleAuth();
 
   const sheets = google.sheets({ version: "v4", auth });
   const allStatLines: PlayerStatLine[] = [];
@@ -417,15 +440,7 @@ async function fetchAllTeamDays(): Promise<TeamStatLine[]> {
 
   const startTime = Date.now();
   const { google } = await import("googleapis");
-  const { env } = await import("../env.js");
-
-  const auth = new google.auth.GoogleAuth({
-    credentials: JSON.parse(env.GOOGLE_SERVICE_ACCOUNT_KEY) as Record<
-      string,
-      unknown
-    >,
-    scopes: ["https://www.googleapis.com/auth/spreadsheets.readonly"],
-  });
+  const auth = await createGoogleAuth();
 
   const sheets = google.sheets({ version: "v4", auth });
   const allTeamStatLines: TeamStatLine[] = [];
@@ -579,15 +594,7 @@ async function fetchTeamWeekStats(): Promise<Record<string, unknown>[]> {
   console.log("📊 Fetching TeamWeek data for scarcity analysis...");
 
   const { google } = await import("googleapis");
-  const { env } = await import("../env.js");
-
-  const auth = new google.auth.GoogleAuth({
-    credentials: JSON.parse(env.GOOGLE_SERVICE_ACCOUNT_KEY) as Record<
-      string,
-      unknown
-    >,
-    scopes: ["https://www.googleapis.com/auth/spreadsheets.readonly"],
-  });
+  const auth = await createGoogleAuth();
 
   const sheets = google.sheets({ version: "v4", auth });
 
@@ -625,15 +632,7 @@ async function fetchWeekTypeMap(): Promise<Record<string, SeasonTypeEnum>> {
   console.log("📅 Fetching week metadata (season phases)...");
 
   const { google } = await import("googleapis");
-  const { env } = await import("../env.js");
-
-  const auth = new google.auth.GoogleAuth({
-    credentials: JSON.parse(env.GOOGLE_SERVICE_ACCOUNT_KEY) as Record<
-      string,
-      unknown
-    >,
-    scopes: ["https://www.googleapis.com/auth/spreadsheets.readonly"],
-  });
+  const auth = await createGoogleAuth();
 
   const sheets = google.sheets({ version: "v4", auth });
 

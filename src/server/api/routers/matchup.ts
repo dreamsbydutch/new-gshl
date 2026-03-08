@@ -2,7 +2,7 @@ import { z } from "zod";
 import { createTRPCRouter, publicProcedure } from "../trpc";
 import { idSchema, baseQuerySchema } from "./_schemas";
 import type { Matchup, TeamWeekStatLine } from "@gshl-types";
-import { getById, getCount, getFirst, getMany } from "../sheets-store";
+import { getById, getCount, getMany } from "../sheets-store";
 
 // Matchup router
 const idStringSchema = z.coerce.string();

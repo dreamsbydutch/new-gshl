@@ -47,7 +47,7 @@ async function findRowNumberById(
     throw new Error(`No workbook mapping for model: ${String(modelName)}`);
   }
 
-  const spreadsheetId = WORKBOOKS[workbookKey as keyof typeof WORKBOOKS];
+  const spreadsheetId = WORKBOOKS[workbookKey];
   const columns = SHEETS_CONFIG.COLUMNS[modelName];
 
   if (!sheetName || !spreadsheetId || !columns) {

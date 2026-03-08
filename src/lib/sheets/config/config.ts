@@ -682,7 +682,11 @@ function coerceDateOnlyString(value: unknown): string | null {
     return String(value);
   }
 
-  const raw = String(value).trim();
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const raw = value.trim();
   if (!raw || raw === "null" || raw === "undefined") return null;
 
   // If it's ISO-like with time, strip time.
