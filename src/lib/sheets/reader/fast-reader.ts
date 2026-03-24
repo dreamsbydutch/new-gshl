@@ -14,6 +14,11 @@ type SnapshotResult<M extends readonly ModelName[]> = Record<
   DatabaseRecord[]
 >;
 
+interface CacheEntry {
+  rows: DatabaseRecord[];
+  timestamp: number;
+}
+
 function alignRowsToConfiguredColumns(
   rawRows: (string | number | boolean | null)[][],
   columns: readonly string[],
@@ -60,24 +65,83 @@ function getSpreadsheetIdForModel(modelName: string): string {
  * where the server should return data quickly with minimal logic.
  */
 export class FastSheetsReader {
+  private readonly MODEL_CACHE_TTL = 60 * 1000;
+  private modelCache = new Map<ModelName, CacheEntry>();
+  private inFlightModelFetches = new Map<ModelName, Promise<DatabaseRecord[]>>();
+
+  private getCachedModel<T extends DatabaseRecord>(modelName: ModelName): T[] | null {
+    const cached = this.modelCache.get(modelName);
+    if (!cached) return null;
+
+    if (Date.now() - cached.timestamp > this.MODEL_CACHE_TTL) {
+      this.modelCache.delete(modelName);
+      return null;
+    }
+
+    return cached.rows as T[];
+  }
+
+  private setCachedModel(
+    modelName: ModelName,
+    rows: DatabaseRecord[],
+    timestamp = Date.now(),
+  ): void {
+    this.modelCache.set(modelName, {
+      rows,
+      timestamp,
+    });
+  }
+
+  clearCache(modelName?: ModelName): void {
+    if (modelName) {
+      this.modelCache.delete(modelName);
+      this.inFlightModelFetches.delete(modelName);
+      return;
+    }
+
+    this.modelCache.clear();
+    this.inFlightModelFetches.clear();
+  }
+
   async fetchModel<T extends DatabaseRecord>(
     modelName: ModelName,
   ): Promise<T[]> {
+    const cached = this.getCachedModel<T>(modelName);
+    if (cached) {
+      return cached;
+    }
+
+    const existingRequest = this.inFlightModelFetches.get(modelName);
+    if (existingRequest) {
+      return existingRequest as Promise<T[]>;
+    }
+
     const sheetName = SHEETS_CONFIG.SHEETS[modelName];
     const columns = SHEETS_CONFIG.COLUMNS[modelName];
     if (!columns) {
       throw new Error(`No column configuration found for model: ${modelName}`);
     }
 
-    const range = `${sheetName}!A1:ZZ`;
-    const spreadsheetId = getSpreadsheetIdForModel(String(modelName));
+    const request = (async () => {
+      const range = `${sheetName}!A1:ZZ`;
+      const spreadsheetId = getSpreadsheetIdForModel(String(modelName));
 
-    const rawRows = await optimizedSheetsClient.getValues(spreadsheetId, range);
-    const rows = alignRowsToConfiguredColumns(rawRows, columns);
+      const rawRows = await optimizedSheetsClient.getValues(spreadsheetId, range);
+      const rows = alignRowsToConfiguredColumns(rawRows, columns)
+        .filter((row) => row && row.length > 0)
+        .map((row) => convertRowToModel<T>(row, columns));
 
-    return rows
-      .filter((row) => row && row.length > 0)
-      .map((row) => convertRowToModel<T>(row, columns));
+      this.setCachedModel(modelName, rows as DatabaseRecord[]);
+      return rows;
+    })();
+
+    this.inFlightModelFetches.set(modelName, request as Promise<DatabaseRecord[]>);
+
+    try {
+      return await request;
+    } finally {
+      this.inFlightModelFetches.delete(modelName);
+    }
   }
 
   /**
@@ -90,16 +154,32 @@ export class FastSheetsReader {
     models: M,
   ): Promise<SnapshotResult<M>> {
     const uniqueModels = Array.from(new Set(models));
+    const output: Record<string, DatabaseRecord[]> = {};
+    const pendingModels: ModelName[] = [];
+
+    for (const modelName of uniqueModels) {
+      const cached = this.getCachedModel(modelName);
+      if (cached) {
+        output[String(modelName)] = cached;
+        continue;
+      }
+
+      pendingModels.push(modelName);
+    }
+
+    if (!pendingModels.length) {
+      return output as SnapshotResult<M>;
+    }
 
     const bySpreadsheet = new Map<string, ModelName[]>();
-    for (const modelName of uniqueModels) {
+    for (const modelName of pendingModels) {
       const spreadsheetId = getSpreadsheetIdForModel(String(modelName));
       const list = bySpreadsheet.get(spreadsheetId) ?? [];
       list.push(modelName);
       bySpreadsheet.set(spreadsheetId, list);
     }
 
-    const output: Record<string, DatabaseRecord[]> = {};
+    const timestamp = Date.now();
 
     await Promise.all(
       Array.from(bySpreadsheet.entries()).map(async ([spreadsheetId, list]) => {
@@ -134,9 +214,12 @@ export class FastSheetsReader {
 
           const alignedRows = alignRowsToConfiguredColumns(values, columns);
 
-          output[String(modelName)] = alignedRows
+          const rows = alignedRows
             .filter((row) => row && row.length > 0)
             .map((row) => convertRowToModel(row, columns));
+
+          output[String(modelName)] = rows;
+          this.setCachedModel(modelName, rows, timestamp);
         }
       }),
     );

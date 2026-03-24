@@ -1,5 +1,6 @@
 import { optimizedSheetsClient } from "../client/optimized-client";
 import { MODEL_TO_WORKBOOK, SHEETS_CONFIG, WORKBOOKS } from "../config/config";
+import { fastSheetsReader } from "../reader/fast-reader";
 
 type PrimitiveCellValue = string | number | boolean | null;
 
@@ -104,6 +105,8 @@ export class MinimalSheetsWriter {
         [normalizeWriteValue(value)],
       ]);
     }
+
+    fastSheetsReader.clearCache(modelName);
   }
 }
 
