@@ -29,8 +29,8 @@ import {
   formatMoney,
   getExpiryStatusClass,
   getSeasonDisplay,
-  CAP_SEASON_END_MONTH,
-  CAP_SEASON_END_DAY,
+  showDate,
+  toNumber,
 } from "@gshl-utils";
 import type {
   ContractTableProps,
@@ -38,7 +38,8 @@ import type {
   PlayerContractRowProps,
   TableHeaderProps,
 } from "@gshl-utils";
-import type { Player } from "@gshl-types";
+import type { GSHLTeam, NHLTeam, Player } from "@gshl-types";
+import type { BuyoutContractType } from "@gshl-hooks/main/useContract";
 
 // ============================================================================
 // INTERNAL COMPONENTS
@@ -95,20 +96,13 @@ const PlayerContractRow = ({
   currentSeason,
   nhlTeams,
 }: PlayerContractRowProps) => {
-  console.log("Rendering contract row for contract:", contract);
   if (!player) return <PlayerContractRowSkeleton contract={contract} />;
 
   const expiryStatus = String(contract.expiryStatus);
-  const playerNhlAbbr = player.nhlTeam?.toString();
+  const playerNhlAbbr = getPlayerNhlAbbreviation(player);
   const playerNhlTeam = nhlTeams.find((t) => t.abbreviation === playerNhlAbbr);
-  const year = currentSeason.year;
-  const cutoffDates = [
-    new Date(year, CAP_SEASON_END_MONTH, CAP_SEASON_END_DAY),
-    new Date(year + 1, CAP_SEASON_END_MONTH, CAP_SEASON_END_DAY),
-    new Date(year + 2, CAP_SEASON_END_MONTH, CAP_SEASON_END_DAY),
-    new Date(year + 3, CAP_SEASON_END_MONTH, CAP_SEASON_END_DAY),
-    new Date(year + 4, CAP_SEASON_END_MONTH, CAP_SEASON_END_DAY),
-  ];
+  const year = getDisplaySeasonYear(currentSeason);
+  const displayYears = Array.from({ length: 5 }, (_, index) => year + index);
 
   /**
    * Render a salary (cap hit) or expiry status cell for a given future season year.
@@ -116,8 +110,8 @@ const PlayerContractRow = ({
    * if it expires exactly that season (month match), shows the RFA/UFA/other expiry badge.
    */
   const renderCapHitCell = (year: number) => {
-    const endYear = +contract.capHitEndDate.slice(-4) + 1;
-    const startYear = +contract.startDate.slice(-4);
+    const endYear = (getDateYear(contract.capHitEndDate) ?? year) + 1;
+    const startYear = getDateYear(contract.startDate) ?? year;
     if (endYear > year) {
       if (year <= startYear) {
         // Contract not yet started for this season => empty cell
@@ -172,18 +166,16 @@ const PlayerContractRow = ({
         {playerNhlTeam?.logoUrl ? (
           <Image
             src={playerNhlTeam.logoUrl}
-            alt={playerNhlTeam.fullName || playerNhlAbbr || "NHL Team"}
+            alt={playerNhlTeam.fullName ?? playerNhlAbbr ?? "NHL Team"}
             className="mx-auto h-4 w-4"
             width={64}
             height={64}
           />
         ) : (
-          <span className="text-2xs font-semibold">{playerNhlAbbr || "-"}</span>
+          <span className="text-2xs font-semibold">{playerNhlAbbr ?? "-"}</span>
         )}
       </td>
-      {cutoffDates.map((date, index) =>
-        renderCapHitCell(+currentSeason.year + index),
-      )}
+      {displayYears.map((displayYear) => renderCapHitCell(displayYear))}
     </tr>
   );
 };
@@ -262,7 +254,7 @@ export function TeamContractTable({
   return (
     <div className="mx-auto w-full">
       <div className="mt-4 w-full text-center text-xl font-bold">
-        Current Contracts & Buyouts
+        Current Contracts
       </div>
       <div className="no-scrollbar mb-8 w-full overflow-x-auto overflow-y-hidden">
         <table className="mx-auto mt-2 min-w-max whitespace-nowrap">
@@ -288,4 +280,162 @@ export function TeamContractTable({
       </div>
     </div>
   );
+}
+
+interface TeamBuyoutTableProps {
+  buyoutContracts: BuyoutContractType[];
+  currentTeam: GSHLTeam;
+  players: Player[];
+  nhlTeams: NHLTeam[];
+  ready: boolean;
+}
+
+export function TeamBuyoutTable({
+  buyoutContracts,
+  currentTeam,
+  players,
+  nhlTeams,
+  ready,
+}: TeamBuyoutTableProps) {
+  const playerById = useMemo(() => {
+    const map = new Map<string, Player>();
+    players.forEach((player) => {
+      if (player?.id) {
+        map.set(player.id, player);
+      }
+    });
+    return map;
+  }, [players]);
+
+  if (!ready) return null;
+
+  return (
+    <div className="mx-auto mb-8 w-full max-w-4xl">
+      <div className="mt-4 w-full text-center text-lg font-bold">Buyouts</div>
+      {buyoutContracts.length === 0 ? (
+        <div className="mt-2 text-center text-sm text-muted-foreground">
+          No buyouts for {currentTeam.name}.
+        </div>
+      ) : (
+        <div className="no-scrollbar mt-2 overflow-x-auto">
+          <table className="mx-auto min-w-max whitespace-nowrap text-xs">
+            <thead>
+              <tr className="bg-gray-800 text-gray-200">
+                <th className="sticky left-0 bg-gray-800 px-2 py-1 text-center font-normal">
+                  Player
+                </th>
+                <th className="px-2 py-1 text-center font-normal">Pos</th>
+                <th className="px-2 py-1 text-center font-normal">Team</th>
+                <th className="px-2 py-1 text-center font-normal">Cap Hit</th>
+                <th className="px-2 py-1 text-center font-normal">Expiry</th>
+                <th className="px-2 py-1 text-center font-normal">Buyout End</th>
+                <th className="px-2 py-1 text-center font-normal">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {buyoutContracts.map((contract, index) => {
+                const player = playerById.get(contract.playerId);
+                const playerNhlAbbr = player
+                  ? getPlayerNhlAbbreviation(player)
+                  : null;
+                const playerNhlTeam = nhlTeams.find(
+                  (team) => team.abbreviation === playerNhlAbbr,
+                );
+
+                return (
+                  <tr
+                    key={contract.id || `buyout-row-${index}`}
+                    className={contract.isActiveBuyout ? "text-gray-900" : "text-gray-400"}
+                  >
+                    <td className="sticky left-0 bg-white px-2 py-1 text-center">
+                      {player?.fullName ?? "Unknown"}
+                    </td>
+                    <td className="px-2 py-1 text-center">
+                      {player?.nhlPos?.toString() ?? "-"}
+                    </td>
+                    <td className="px-2 py-1 text-center">
+                      {playerNhlTeam?.logoUrl ? (
+                        <Image
+                          src={playerNhlTeam.logoUrl}
+                          alt={playerNhlTeam.fullName ?? playerNhlAbbr ?? "NHL Team"}
+                          className="mx-auto h-4 w-4"
+                          width={16}
+                          height={16}
+                        />
+                      ) : (
+                        <span className="text-2xs font-semibold">
+                          {playerNhlAbbr ?? "-"}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-2 py-1 text-center">
+                      {formatMoney(contract.capHit)}
+                    </td>
+                    <td className="px-2 py-1 text-center">
+                      {showDate(contract.expiryDate)}
+                    </td>
+                    <td className="px-2 py-1 text-center">
+                      {showDate(contract.capHitEndDate)}
+                    </td>
+                    <td className="px-2 py-1 text-center">
+                      <span
+                        className={
+                          contract.isActiveBuyout
+                            ? "rounded-full bg-orange-100 px-2 py-0.5 text-orange-700"
+                            : "rounded-full bg-gray-100 px-2 py-0.5 text-gray-500"
+                        }
+                      >
+                        {contract.isActiveBuyout ? "Active" : "Expired"}
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function getPlayerNhlAbbreviation(player: Player): string | null {
+  const rawTeam: unknown = player.nhlTeam;
+
+  if (Array.isArray(rawTeam)) {
+    const firstTeam = rawTeam.find(
+      (team): team is string =>
+        typeof team === "string" && team.trim().length > 0,
+    );
+    return firstTeam ?? null;
+  }
+
+  if (typeof rawTeam !== "string") {
+    return null;
+  }
+
+  const value = rawTeam.trim();
+  return value.length > 0 ? value : null;
+}
+
+function getDisplaySeasonYear(currentSeason: ContractTableProps["currentSeason"]) {
+  const explicitYear = toNumber(currentSeason?.year, Number.NaN);
+  if (Number.isFinite(explicitYear)) {
+    return explicitYear;
+  }
+
+  const match = currentSeason?.name?.match(/^(\d{4})/);
+  return match ? Number(match[1]) + 1 : new Date().getFullYear();
+}
+
+function getDateYear(value: Date | string | null | undefined): number | null {
+  if (!value) return null;
+  const parsed = value instanceof Date ? value : new Date(String(value));
+  if (!Number.isNaN(parsed.getTime())) {
+    return parsed.getFullYear();
+  }
+
+  const matches = String(value).match(/\d{4}/g);
+  if (!matches?.length) return null;
+  return Number(matches[matches.length - 1]);
 }

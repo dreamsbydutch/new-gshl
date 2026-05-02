@@ -1,7 +1,15 @@
 "use client";
 
 import { useCallback, useMemo } from "react";
-import { type Contract, type GSHLTeam, type Player, type Season, type NHLTeam, ContractStatus } from "@gshl-types";
+import {
+  type Contract,
+  type DraftPick,
+  type GSHLTeam,
+  type NHLTeam,
+  type Player,
+  type Season,
+  ContractStatus,
+} from "@gshl-types";
 import { api } from "src/trpc/react";
 import {
   applyContractFilters,
@@ -14,11 +22,9 @@ import {
   CAP_SEASON_END_DAY,
   CAP_SEASON_END_MONTH,
   formatDate,
+  toNumber,
 } from "@gshl-utils";
-import type {
-  ContractFilters,
-  ContractSortOption,
-} from "@gshl-utils";
+import type { ContractFilters, ContractSortOption } from "@gshl-utils";
 
 export type {
   ContractFilters,
@@ -234,6 +240,9 @@ export interface UseContractDataOptions {
   players?: Player[];
   nhlTeams?: NHLTeam[];
   seasons?: Season[];
+  draftPicks?: DraftPick[];
+  /** When false, skips fetching contracts from the server. Defaults to true. */
+  enabled?: boolean;
 }
 
 export interface CapSpaceEntry {
@@ -242,9 +251,10 @@ export interface CapSpaceEntry {
   remaining: number;
 }
 
-export interface ContractHistoryRowType {
+export interface FranchiseContractHistoryRowType {
   id: string;
   signingFranchiseId: string;
+  currentFranchiseId: string;
   playerName: string;
   season: string;
   type: string;
@@ -256,6 +266,25 @@ export interface ContractHistoryRowType {
   signingStatus: string;
   expiryStatus: string;
   buyoutEnd?: string;
+  signedHere: boolean;
+  heldHere: boolean;
+}
+
+export type BuyoutContractType = Contract & {
+  isActiveBuyout: boolean;
+};
+
+export interface FranchiseDraftPickRowType {
+  draftPick: DraftPick;
+  selectedPlayer?: Player;
+  originalTeam?: GSHLTeam;
+  seasonTeam?: GSHLTeam;
+}
+
+export interface FranchiseDraftPickGroupType {
+  seasonId: string;
+  seasonName: string;
+  picks: FranchiseDraftPickRowType[];
 }
 
 export interface UseContractDataResult {
@@ -265,11 +294,18 @@ export interface UseContractDataResult {
     ready: boolean;
   };
   history: {
-    rows: ContractHistoryRowType[];
+    rows: FranchiseContractHistoryRowType[];
     franchiseById: Map<string, GSHLTeam>;
     hasData: boolean;
   };
-  teamContracts: Contract[];
+  draft: {
+    groups: FranchiseDraftPickGroupType[];
+    hasData: boolean;
+  };
+  currentContracts: Contract[];
+  buyoutContracts: BuyoutContractType[];
+  expiredRows: FranchiseContractHistoryRowType[];
+  draftPickGroups: FranchiseDraftPickGroupType[];
   isLoading: boolean;
   error: Error | null;
 }
@@ -280,72 +316,24 @@ export function useContractData(
   const {
     currentSeason,
     currentTeam,
-    ownerId,
     teams,
     allTeams,
     players,
     nhlTeams,
     seasons,
+    draftPicks,
+    enabled = true,
   } = options;
 
-  const { data: contracts } = useAllContracts();
-
-  const teamContracts = useMemo(() => {
-    if (!currentTeam?.franchiseId || !contracts) return [];
-    return contracts.filter(
-      (contract) =>
-        contract.currentFranchiseId === currentTeam.franchiseId &&
-        new Date(contract.capHitEndDate) > new Date(),
-    );
-  }, [currentTeam?.franchiseId, contracts]);
-
-  const sortedContracts = useMemo(() => {
-    if (!teamContracts?.length) return [];
-
-    return [...teamContracts].sort((a, b) => +b.capHit - +a.capHit);
-  }, [teamContracts]);
-
-  const capSpaceWindow = useMemo(() => {
-    const seasonStartYear = currentSeason?.name
-      ? +currentSeason.year
-      : new Date().getFullYear();
-
-    const dataset = sortedContracts.length ? sortedContracts : teamContracts;
-
-    const calcRemaining = (year: number) => {
-      const cutoffDate = new Date(
-        year,
-        CAP_SEASON_END_MONTH,
-        CAP_SEASON_END_DAY,
-      );
-      const active = dataset.filter(
-        (c) =>
-          new Date(c.capHitEndDate) >= cutoffDate &&
-          !(new Date(c.startDate) > cutoffDate),
-      );
-      const total = active.reduce((sum, c) => sum + +c.capHit, 0);
-      return CAP_CEILING - total;
-    };
-
-    return Array.from({ length: 5 }).map((_, idx) => {
-      const year = seasonStartYear + idx;
-      return {
-        label: `${year}`,
-        year,
-        remaining: calcRemaining(year),
-      };
-    });
-  }, [sortedContracts, teamContracts, currentSeason]);
-
+  const { data: contracts } = useAllContracts({ enabled });
+  const currentFranchiseId = currentTeam?.franchiseId
+    ? String(currentTeam.franchiseId)
+    : null;
+  const activeSeasonEndYear = useMemo(
+    () => getSeasonEndYear(currentSeason),
+    [currentSeason],
+  );
   const teamPool = useMemo(() => allTeams ?? teams ?? [], [allTeams, teams]);
-
-  const ownerFranchiseIds = useMemo(() => {
-    if (!ownerId) return [] as string[];
-    return teamPool
-      .filter((t) => t.ownerId === ownerId)
-      .map((t) => t.franchiseId)
-      .filter((value, index, arr) => arr.indexOf(value) === index);
-  }, [teamPool, ownerId]);
 
   const playerById = useMemo(() => {
     const map = new Map<string, Player>();
@@ -360,7 +348,19 @@ export function useContractData(
   const franchiseById = useMemo(() => {
     const map = new Map<string, GSHLTeam>();
     teamPool.forEach((team) => {
-      map.set(team.franchiseId, team);
+      if (team.franchiseId) {
+        map.set(String(team.franchiseId), team);
+      }
+    });
+    return map;
+  }, [teamPool]);
+
+  const teamById = useMemo(() => {
+    const map = new Map<string, GSHLTeam>();
+    teamPool.forEach((team) => {
+      if (team.id) {
+        map.set(String(team.id), team);
+      }
     });
     return map;
   }, [teamPool]);
@@ -368,78 +368,195 @@ export function useContractData(
   const seasonById = useMemo(() => {
     const map = new Map<string, Season>();
     seasons?.forEach((season) => {
-      map.set(season.id, season);
+      map.set(String(season.id), season);
     });
     return map;
   }, [seasons]);
 
-  const historyRows = useMemo(() => {
-    if (!contracts || !ownerId) return [] as ContractHistoryRowType[];
+  const heldContracts = useMemo(() => {
+    if (!currentFranchiseId) return [] as Contract[];
+    return dedupeContracts(
+      (contracts ?? []).filter(
+        (contract) =>
+          String(contract.currentFranchiseId) === currentFranchiseId,
+      ),
+    );
+  }, [contracts, currentFranchiseId]);
 
-    const seenIds = new Set<string>();
-    const seenFallbackKeys = new Set<string>();
+  const signedHereContracts = useMemo(() => {
+    if (!currentFranchiseId) return [] as Contract[];
+    return dedupeContracts(
+      (contracts ?? []).filter(
+        (contract) =>
+          String(contract.signingFranchiseId) === currentFranchiseId,
+      ),
+    );
+  }, [contracts, currentFranchiseId]);
 
-    return (contracts ?? [])
-      .filter((contract) =>
-        ownerFranchiseIds.includes(contract.signingFranchiseId),
-      )
-      .filter((contract) => {
-        if (contract.id) {
-          if (seenIds.has(contract.id)) {
-            return false;
-          }
-          seenIds.add(contract.id);
-          return true;
-        }
-
-        const key = getContractDedupeKey(contract);
-        if (seenFallbackKeys.has(key)) {
-          return false;
-        }
-        seenFallbackKeys.add(key);
-        return true;
-      })
-      .sort((a, b) => b.signingDate.localeCompare(a.signingDate))
-      .map((contract) => {
-        const player = playerById.get(contract.playerId);
-        const season = seasonById.get(contract.seasonId);
-
-        return {
-          id: contract.id,
-          signingFranchiseId: contract.signingFranchiseId,
-          playerName: player?.fullName ?? "Unknown",
-          season: season?.name ?? String(contract.seasonId),
-          type: Array.isArray(contract.contractType)
-            ? contract.contractType.join(", ")
-            : contract.contractType
-              ? String(contract.contractType)
-              : "-",
-          length: contract.contractLength,
-          salary: contract.contractSalary,
-          capHit: contract.capHit,
-          start: formatDate(contract.startDate),
-          end: formatDate(contract.expiryDate),
-          signingStatus: contract.signingStatus,
-          expiryStatus: contract.expiryStatus,
-          buyoutEnd:
-            contract.expiryStatus === ContractStatus.BUYOUT
-              ? formatDate(contract.capHitEndDate)
-              : undefined,
-        };
-      });
-  }, [contracts, ownerId, ownerFranchiseIds, playerById, seasonById]);
-
-  const sortedHistoryRows = useMemo(
-    () => historyRows.slice().sort((a, b) => b.salary - a.salary),
-    [historyRows],
+  const franchiseRelevantContracts = useMemo(
+    () => dedupeContracts([...heldContracts, ...signedHereContracts]),
+    [heldContracts, signedHereContracts],
   );
 
+  const currentContracts = useMemo(() => {
+    return heldContracts
+      .filter(
+        (contract) =>
+          contract.expiryStatus !== ContractStatus.BUYOUT &&
+          hasCurrentOrFutureCapImpact(contract, activeSeasonEndYear),
+      )
+      .sort((a, b) => toNumber(b.capHit, 0) - toNumber(a.capHit, 0));
+  }, [heldContracts, activeSeasonEndYear]);
+
+  const buyoutContracts = useMemo(() => {
+    return heldContracts
+      .filter((contract) => contract.expiryStatus === ContractStatus.BUYOUT)
+      .map((contract) => ({
+        ...contract,
+        isActiveBuyout: hasCurrentOrFutureCapImpact(
+          contract,
+          activeSeasonEndYear,
+        ),
+      }))
+      .sort((a, b) => {
+        if (a.isActiveBuyout !== b.isActiveBuyout) {
+          return a.isActiveBuyout ? -1 : 1;
+        }
+        return toNumber(b.capHit, 0) - toNumber(a.capHit, 0);
+      });
+  }, [heldContracts, activeSeasonEndYear]);
+
+  const sortedContracts = useMemo(() => {
+    return [...currentContracts];
+  }, [currentContracts]);
+
+  const capSpaceWindow = useMemo(() => {
+    const seasonStartYear = activeSeasonEndYear ?? new Date().getFullYear();
+    const dataset = sortedContracts;
+
+    const calcRemaining = (year: number) => {
+      const cutoffDate = new Date(
+        year,
+        CAP_SEASON_END_MONTH,
+        CAP_SEASON_END_DAY,
+      );
+      const active = dataset.filter(
+        (c) =>
+          new Date(c.capHitEndDate) >= cutoffDate &&
+          !(new Date(c.startDate) > cutoffDate),
+      );
+      const total = active.reduce((sum, c) => sum + toNumber(c.capHit, 0), 0);
+      return CAP_CEILING - total;
+    };
+
+    return Array.from({ length: 5 }).map((_, idx) => {
+      const year = seasonStartYear + idx;
+      return {
+        label: `${year}`,
+        year,
+        remaining: calcRemaining(year),
+      };
+    });
+  }, [sortedContracts, activeSeasonEndYear]);
+
+  const currentContractKeys = useMemo(
+    () => new Set(currentContracts.map(getContractUniqueKey)),
+    [currentContracts],
+  );
+  const buyoutContractKeys = useMemo(
+    () => new Set(buyoutContracts.map(getContractUniqueKey)),
+    [buyoutContracts],
+  );
+
+  const expiredRows = useMemo(() => {
+    if (!currentFranchiseId) return [] as FranchiseContractHistoryRowType[];
+
+    return franchiseRelevantContracts
+      .filter((contract) => {
+        const key = getContractUniqueKey(contract);
+        return !currentContractKeys.has(key) && !buyoutContractKeys.has(key);
+      })
+      .sort((a, b) => {
+        const signingDateDelta =
+          new Date(b.signingDate).getTime() - new Date(a.signingDate).getTime();
+        if (!Number.isNaN(signingDateDelta) && signingDateDelta !== 0) {
+          return signingDateDelta;
+        }
+        return toNumber(b.contractSalary, 0) - toNumber(a.contractSalary, 0);
+      })
+      .map((contract) =>
+        createHistoryRow(contract, currentFranchiseId, playerById, seasonById),
+      );
+  }, [
+    buyoutContractKeys,
+    currentContractKeys,
+    currentFranchiseId,
+    franchiseRelevantContracts,
+    playerById,
+    seasonById,
+  ]);
+
+  const draftPickGroups = useMemo(() => {
+    if (!currentFranchiseId || !currentSeason) {
+      return [] as FranchiseDraftPickGroupType[];
+    }
+
+    const seasonWindow = getDraftSeasonWindow(seasons, currentSeason);
+    return seasonWindow.map((season) => {
+      const seasonTeam = teamPool.find(
+        (team) =>
+          String(team.franchiseId) === currentFranchiseId &&
+          String(team.seasonId) === String(season.id),
+      );
+      const teamIdentifiers = new Set(
+        [seasonTeam?.id, seasonTeam?.franchiseId]
+          .filter(Boolean)
+          .map((value) => String(value)),
+      );
+      const picks = (draftPicks ?? [])
+        .filter(
+          (draftPick) =>
+            String(draftPick.seasonId) === String(season.id) &&
+            teamIdentifiers.has(String(draftPick.gshlTeamId)),
+        )
+        .sort((a, b) => {
+          if (toNumber(a.round, 0) !== toNumber(b.round, 0)) {
+            return toNumber(a.round, 0) - toNumber(b.round, 0);
+          }
+          return toNumber(a.pick, 0) - toNumber(b.pick, 0);
+        })
+        .map((draftPick) => ({
+          draftPick,
+          selectedPlayer: draftPick.playerId
+            ? playerById.get(String(draftPick.playerId))
+            : undefined,
+          originalTeam: resolveTeamReference(
+            draftPick.originalTeamId,
+            teamById,
+            franchiseById,
+          ),
+          seasonTeam,
+        }));
+
+      return {
+        seasonId: String(season.id),
+        seasonName: season.name,
+        picks,
+      };
+    });
+  }, [
+    currentFranchiseId,
+    currentSeason,
+    draftPicks,
+    franchiseById,
+    playerById,
+    seasons,
+    teamById,
+    teamPool,
+  ]);
+
   const tableReady = Boolean(
-    currentSeason &&
-      currentTeam &&
-      teamContracts &&
-      players?.length &&
-      nhlTeams?.length,
+    currentSeason && currentTeam && players?.length && nhlTeams?.length,
   );
   return {
     table: {
@@ -448,12 +565,142 @@ export function useContractData(
       ready: tableReady,
     },
     history: {
-      rows: sortedHistoryRows,
+      rows: expiredRows,
       franchiseById,
-      hasData: historyRows.length > 0,
+      hasData: expiredRows.length > 0,
     },
-    teamContracts,
+    draft: {
+      groups: draftPickGroups,
+      hasData: draftPickGroups.some((group) => group.picks.length > 0),
+    },
+    currentContracts,
+    buyoutContracts,
+    expiredRows,
+    draftPickGroups,
     isLoading: false,
     error: null,
   };
+}
+
+function getContractUniqueKey(contract: Contract): string {
+  return contract.id || getContractDedupeKey(contract);
+}
+
+function dedupeContracts(contracts: Contract[]): Contract[] {
+  const seenKeys = new Set<string>();
+  return contracts.filter((contract) => {
+    const key = getContractUniqueKey(contract);
+    if (seenKeys.has(key)) return false;
+    seenKeys.add(key);
+    return true;
+  });
+}
+
+function getSeasonEndYear(season?: Season): number | null {
+  if (!season) return null;
+
+  const explicitYear = toNumber(season.year, Number.NaN);
+  if (Number.isFinite(explicitYear)) {
+    return Math.trunc(explicitYear);
+  }
+
+  const match = /^(\d{4})/.exec(season.name ?? "");
+  if (!match) return null;
+  return Number(match[1]) + 1;
+}
+
+function getContractCapHitEndYear(contract: Contract): number | null {
+  return getDateYear(contract.capHitEndDate);
+}
+
+function hasCurrentOrFutureCapImpact(
+  contract: Contract,
+  activeSeasonEndYear: number | null,
+): boolean {
+  if (activeSeasonEndYear === null) return true;
+  const endYear = getContractCapHitEndYear(contract);
+  if (endYear === null) return true;
+  return endYear >= activeSeasonEndYear;
+}
+
+function getDateYear(value: Date | string | null | undefined): number | null {
+  if (!value) return null;
+
+  const parsed = value instanceof Date ? value : new Date(String(value));
+  if (!Number.isNaN(parsed.getTime())) {
+    return parsed.getFullYear();
+  }
+
+  const matches = String(value).match(/\d{4}/g);
+  if (!matches?.length) return null;
+  return Number(matches[matches.length - 1]);
+}
+
+function createHistoryRow(
+  contract: Contract,
+  currentFranchiseId: string,
+  playerById: Map<string, Player>,
+  seasonById: Map<string, Season>,
+): FranchiseContractHistoryRowType {
+  const player = playerById.get(String(contract.playerId));
+  const season = seasonById.get(String(contract.seasonId));
+  const signingFranchiseId = String(contract.signingFranchiseId ?? "");
+  const heldFranchiseId = String(contract.currentFranchiseId ?? "");
+
+  return {
+    id: contract.id,
+    signingFranchiseId,
+    currentFranchiseId: heldFranchiseId,
+    playerName: player?.fullName ?? "Unknown",
+    season: season?.name ?? String(contract.seasonId),
+    type: Array.isArray(contract.contractType)
+      ? contract.contractType.join(", ")
+      : contract.contractType
+        ? String(contract.contractType)
+        : "-",
+    length: toNumber(contract.contractLength, 0),
+    salary: toNumber(contract.contractSalary, 0),
+    capHit: toNumber(contract.capHit, 0),
+    start: formatDate(contract.startDate),
+    end: formatDate(contract.expiryDate),
+    signingStatus: String(contract.signingStatus ?? "-"),
+    expiryStatus: String(contract.expiryStatus ?? "-"),
+    buyoutEnd:
+      contract.expiryStatus === ContractStatus.BUYOUT
+        ? formatDate(contract.capHitEndDate)
+        : undefined,
+    signedHere: signingFranchiseId === currentFranchiseId,
+    heldHere: heldFranchiseId === currentFranchiseId,
+  };
+}
+
+function getDraftSeasonWindow(
+  seasons: Season[] | undefined,
+  currentSeason: Season,
+): Season[] {
+  const ordered = [...(seasons ?? [])].sort((a, b) => {
+    const aYear = getSeasonEndYear(a) ?? 0;
+    const bYear = getSeasonEndYear(b) ?? 0;
+    if (aYear !== bYear) return aYear - bYear;
+    return String(a.id).localeCompare(String(b.id));
+  });
+  const currentIndex = ordered.findIndex(
+    (season) => String(season.id) === String(currentSeason.id),
+  );
+  const previousSeason =
+    currentIndex > 0 ? ordered[currentIndex - 1] : undefined;
+
+  return [currentSeason, previousSeason].filter((season): season is Season =>
+    Boolean(season),
+  );
+}
+
+function resolveTeamReference(
+  referenceId: string | null | undefined,
+  teamById: Map<string, GSHLTeam>,
+  franchiseById: Map<string, GSHLTeam>,
+): GSHLTeam | undefined {
+  if (!referenceId) return undefined;
+  const key = String(referenceId);
+  return teamById.get(key) ?? franchiseById.get(key);
 }

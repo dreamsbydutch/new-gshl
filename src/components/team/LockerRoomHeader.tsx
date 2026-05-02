@@ -11,6 +11,7 @@
  */
 
 import Image from "next/image";
+import { useState } from "react";
 import type {
   LockerRoomHeaderProps,
   TeamInfoProps,
@@ -28,14 +29,17 @@ import { formatMoney, formatOwnerName, TEAM_LOGO_SIZE } from "@gshl-utils";
  * Renders the team's logo at a fixed dimension.
  * Uses conditional rendering to prevent empty src attributes.
  */
-const TeamLogo = ({ currentTeam }: TeamLogoProps) =>
-  currentTeam.logoUrl ? (
+const TeamLogo = ({ currentTeam }: TeamLogoProps) => {
+  const [errored, setErrored] = useState(false);
+
+  return currentTeam.logoUrl && !errored ? (
     <Image
       className="rounded-lg bg-gray-100 shadow-emboss"
       src={currentTeam.logoUrl}
       alt={`${currentTeam.name} logo`}
       width={TEAM_LOGO_SIZE.width}
       height={TEAM_LOGO_SIZE.height}
+      onError={() => setErrored(true)}
     />
   ) : (
     <div
@@ -45,6 +49,7 @@ const TeamLogo = ({ currentTeam }: TeamLogoProps) =>
       <span className="text-xs font-medium text-gray-400">No Logo</span>
     </div>
   );
+};
 
 /**
  * TeamInfo Component

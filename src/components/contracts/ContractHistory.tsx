@@ -1,149 +1,101 @@
 "use client";
 
-/**
- * OwnerContractHistory Component
- *
- * Displays a comprehensive contract history table for a specific owner across
- * multiple seasons and franchises. Shows player contracts signed by teams owned
- * by the target owner, sorted by signing date with details including salary,
- * contract length, start/end dates, and expiry status.
- *
- * Features:
- * - Multi-season franchise tracking (follows owner across team changes)
- * - Sortable by salary (highest to lowest)
- * - Team logo display
- * - Date formatting for contract periods
- * - Sticky player name column for horizontal scrolling
- * - Alternating row backgrounds for readability
- *
- * @example
- * ```tsx
- * <OwnerContractHistory
- *   ownerId="owner123"
- *   allTeams={teams}
- *   contracts={contracts}
- *   players={players}
- *   seasons={seasons}
- * />
- * ```
- */
-
-import Image from "next/image";
-import { formatMoney, showDate } from "@gshl-utils";
+import { cn, formatMoney, showDate } from "@gshl-utils";
 import type { GSHLTeam } from "@gshl-types";
-import type { ContractHistoryRowType } from "@gshl-hooks/main/useContract";
+import type { FranchiseContractHistoryRowType } from "@gshl-hooks/main/useContract";
 
-// ============================================================================
-// INTERNAL COMPONENTS
-// ============================================================================
+const EmptyState = () => (
+  <div className="text-center text-xs text-muted-foreground">
+    No expired contracts found for this franchise.
+  </div>
+);
 
-/**
- * ContractHistoryRow Component
- *
- * Renders a single contract history entry with all details
- */
+const ScopeBadges = ({
+  row,
+  franchiseById,
+}: {
+  row: FranchiseContractHistoryRowType;
+  franchiseById: Map<string, GSHLTeam>;
+}) => {
+  const signedTeamName =
+    franchiseById.get(row.signingFranchiseId)?.name ?? "Signing franchise";
+  const heldTeamName =
+    franchiseById.get(row.currentFranchiseId)?.name ?? "Current holder";
+
+  return (
+    <div className="flex justify-center gap-1">
+      {row.signedHere ? (
+        <span
+          className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] text-emerald-800"
+          title={signedTeamName ?? undefined}
+        >
+          Signed Here
+        </span>
+      ) : null}
+      {row.heldHere ? (
+        <span
+          className="rounded-full bg-sky-100 px-2 py-0.5 text-[11px] text-sky-800"
+          title={heldTeamName ?? undefined}
+        >
+          Held Here
+        </span>
+      ) : null}
+      {!row.signedHere && !row.heldHere ? (
+        <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] text-gray-500">
+          Legacy
+        </span>
+      ) : null}
+    </div>
+  );
+};
+
 const ContractHistoryRow = ({
   row,
   franchiseById,
   rowBg,
 }: {
-  row: {
-    id: string;
-    signingFranchiseId: string;
-    playerName: string;
-    season: string;
-    type: string;
-    length: number;
-    salary: number;
-    capHit: number;
-    start: string;
-    end: string;
-    signingStatus: string;
-    expiryStatus: string;
-    buyoutEnd?: string;
-  };
+  row: FranchiseContractHistoryRowType;
   franchiseById: Map<string, GSHLTeam>;
   rowBg: string;
 }) => {
-  const team = franchiseById.get(row.signingFranchiseId);
-
   return (
-    <tr className={`text-center ${rowBg}`}>
-      <td className={`sticky left-0 whitespace-nowrap px-2 py-1 ${rowBg}`}>
+    <tr className={cn("text-center", rowBg)}>
+      <td className={cn("sticky left-0 whitespace-nowrap px-2 py-1", rowBg)}>
         {row.playerName}
       </td>
-      <td className="px-2 py-1 text-center">
-        {team?.logoUrl ? (
-          <Image
-            src={team.logoUrl}
-            alt={team.name + " logo"}
-            width={24}
-            height={24}
-            className="mx-auto h-6 w-6 object-contain"
-          />
-        ) : (
-          <span>-</span>
-        )}
+      <td className="px-2 py-1">
+        <ScopeBadges row={row} franchiseById={franchiseById} />
       </td>
+      <td className="px-2 py-1 whitespace-nowrap">{row.season}</td>
       <td className="px-2 py-1 text-right">{row.length} years</td>
       <td className="px-2 py-1 text-right">{formatMoney(row.salary)}</td>
+      <td className="px-2 py-1 text-right">{formatMoney(row.capHit)}</td>
       <td className="whitespace-nowrap px-2 py-1">{showDate(row.start)}</td>
       <td className="whitespace-nowrap px-2 py-1">{showDate(row.end)}</td>
       <td className="whitespace-nowrap px-2 py-1">{row.signingStatus}</td>
       <td className="whitespace-nowrap px-2 py-1">{row.expiryStatus}</td>
       <td className="whitespace-nowrap px-2 py-1">
-        {row.buyoutEnd
-          ? formatMoney(row.salary * 0.5, true) +
-            ", " +
-            Math.round(
-              (new Date(row.buyoutEnd).getTime() -
-                new Date(row.end).getTime()) /
-                31536000000,
-            ) +
-            " yr" +
-            (Math.round(
-              (new Date(row.buyoutEnd).getTime() -
-                new Date(row.end).getTime()) /
-                31536000000,
-            ) > 1
-              ? "s"
-              : "")
-          : "-"}
+        {row.buyoutEnd ? showDate(row.buyoutEnd) : "-"}
       </td>
     </tr>
   );
 };
 
-/**
- * EmptyState Component
- *
- * Displays message when no contracts are found
- */
-const EmptyState = () => (
-  <div className="text-center text-xs text-muted-foreground">
-    No contracts found for owner.
-  </div>
-);
-
-// ============================================================================
-// MAIN EXPORT
-// ============================================================================
-
-export interface OwnerContractHistoryProps {
-  rows: ContractHistoryRowType[];
+export interface FranchiseContractHistoryProps {
+  rows: FranchiseContractHistoryRowType[];
   franchiseById: Map<string, GSHLTeam>;
   hasData: boolean;
 }
 
-export function OwnerContractHistory({
+export function FranchiseContractHistory({
   rows,
   franchiseById,
   hasData,
-}: OwnerContractHistoryProps) {
+}: FranchiseContractHistoryProps) {
   return (
     <div className="py-6">
       <h2 className="mb-2 text-center text-lg font-bold">
-        Owner Contract History
+        Franchise Contract History
       </h2>
 
       {!hasData && <EmptyState />}
@@ -156,31 +108,30 @@ export function OwnerContractHistory({
                 <th className="sticky left-0 bg-gray-800 px-2 py-1 text-center font-normal">
                   Player
                 </th>
-                <th className="px-2 py-1 text-center font-normal">Team</th>
+                <th className="px-2 py-1 text-center font-normal">Scope</th>
+                <th className="px-2 py-1 text-center font-normal">Season</th>
                 <th className="px-2 py-1 text-center font-normal">Len</th>
                 <th className="px-2 py-1 text-center font-normal">Salary</th>
+                <th className="px-2 py-1 text-center font-normal">Cap Hit</th>
                 <th className="px-2 py-1 text-center font-normal">Start</th>
                 <th className="px-2 py-1 text-center font-normal">End</th>
                 <th className="px-2 py-1 text-center font-normal">Signing</th>
                 <th className="px-2 py-1 text-center font-normal">Expiry</th>
-                <th className="px-2 py-1 text-center font-normal">Buyout</th>
+                <th className="px-2 py-1 text-center font-normal">Buyout End</th>
               </tr>
             </thead>
             <tbody>
-              {rows
-                .sort((a, b) => b.salary - a.salary)
-                .sort((a, b) => a.start.localeCompare(b.start))
-                .map((r, idx) => {
-                  const rowBg = idx % 2 === 0 ? "bg-white" : "bg-gray-100";
-                  return (
-                    <ContractHistoryRow
-                      key={r.id}
-                      row={r}
-                      franchiseById={franchiseById}
-                      rowBg={rowBg}
-                    />
-                  );
-                })}
+              {rows.map((row, index) => {
+                const rowBg = index % 2 === 0 ? "bg-white" : "bg-gray-100";
+                return (
+                  <ContractHistoryRow
+                    key={row.id || `${row.playerName}-${row.start}-${index}`}
+                    row={row}
+                    franchiseById={franchiseById}
+                    rowBg={rowBg}
+                  />
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -188,3 +139,5 @@ export function OwnerContractHistory({
     </div>
   );
 }
+
+export const OwnerContractHistory = FranchiseContractHistory;

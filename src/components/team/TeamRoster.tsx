@@ -23,12 +23,14 @@ import {
 } from "@gshl-types";
 import {
   cn,
+  formatNumber,
   formatMoney,
   getRatingColorClass,
   CAP_CEILING,
   RATING_RANGES,
+  toNumber,
 } from "@gshl-utils";
-import type { TeamRosterProps, RosterLineupProps } from "@gshl-utils";
+import type { TeamRosterProps } from "@gshl-utils";
 import { useTeamRosterData, useNHLTeams } from "@gshl-hooks";
 
 // ============================================================================
@@ -45,14 +47,26 @@ interface PlayerCardProps {
   player: Player;
   contract?: Contract;
   showSalaries: boolean;
+  nhlTeamByAbbr: Map<string, NHLTeam>;
 }
 
-const PlayerCard = ({ player, contract, showSalaries }: PlayerCardProps) => {
-  // Resolve NHL team logo from NHLTeam table by player.nhlTeam abbreviation
-  const { data: nhlTeamsData } = useNHLTeams();
-  const nhlTeams = (nhlTeamsData ?? []) as NHLTeam[];
-  const playerNhlAbbr = player.nhlTeam?.toString();
-  const playerNhlTeam = nhlTeams.find((t) => t.abbreviation === playerNhlAbbr);
+const PlayerCard = ({
+  player,
+  contract,
+  showSalaries,
+  nhlTeamByAbbr,
+}: PlayerCardProps) => {
+  const playerNhlAbbr = getPlayerNhlAbbreviation(player);
+  const playerNhlTeam = playerNhlAbbr
+    ? nhlTeamByAbbr.get(playerNhlAbbr)
+    : undefined;
+  const playerSalary = toNumber(player.salary, 0);
+  const ratingValue =
+    typeof player.seasonRating === "number" &&
+    Number.isFinite(player.seasonRating)
+      ? formatNumber(player.seasonRating, 2)
+      : "--";
+
   return (
     <div className="col-span-2 grid grid-cols-2 px-2 text-center">
       <div className="col-span-3 text-sm">{player.fullName}</div>
@@ -61,19 +75,22 @@ const PlayerCard = ({ player, contract, showSalaries }: PlayerCardProps) => {
         {playerNhlTeam?.logoUrl ? (
           <Image
             src={playerNhlTeam.logoUrl}
-            alt={playerNhlTeam.fullName || playerNhlAbbr || "NHL Team Logo"}
+            alt={playerNhlTeam.fullName ?? playerNhlAbbr ?? "NHL Team Logo"}
             className="mx-auto h-4 w-4"
             width={16}
             height={16}
           />
         ) : (
-          <span className="text-2xs font-semibold">{playerNhlAbbr || "-"}</span>
+          <span className="text-2xs font-semibold">{playerNhlAbbr ?? "-"}</span>
         )}
       </div>
       <div
-        className={`max-w-fit place-self-center rounded-lg px-2 text-2xs ${getRatingColorClass(player?.seasonRk ?? null)}`}
+        className={cn(
+          "max-w-fit place-self-center rounded-lg px-2 text-2xs",
+          getRosterRatingClass(player.seasonRk),
+        )}
       >
-        {Math.round((player?.seasonRating ?? 0) * 100) / 100}
+        {ratingValue}
       </div>
       <div
         className={cn(
@@ -85,8 +102,8 @@ const PlayerCard = ({ player, contract, showSalaries }: PlayerCardProps) => {
         )}
       >
         {player.isSignable &&
-          (player.salary ?? 0) > 999999 &&
-          formatMoney(player.salary ?? 0)}
+          playerSalary > 0 &&
+          formatMoney(playerSalary)}
       </div>
     </div>
   );
@@ -98,10 +115,18 @@ const PlayerCard = ({ player, contract, showSalaries }: PlayerCardProps) => {
  * Displays the main roster lineup organized by position groups
  * with dividers between sections.
  */
+interface RosterLineupProps {
+  teamLineup: (Player | null)[][][];
+  contracts: Contract[] | undefined;
+  showSalaries: boolean;
+  nhlTeamByAbbr: Map<string, NHLTeam>;
+}
+
 export const RosterLineup = ({
   teamLineup,
   contracts,
   showSalaries,
+  nhlTeamByAbbr,
 }: RosterLineupProps) => {
   return (
     <div className="mx-auto flex max-w-md flex-col rounded-xl border bg-gray-50">
@@ -124,6 +149,7 @@ export const RosterLineup = ({
                         player={player}
                         contract={contract}
                         showSalaries={showSalaries}
+                        nhlTeamByAbbr={nhlTeamByAbbr}
                       />
                     );
                   })}
@@ -150,29 +176,15 @@ interface BenchPlayersProps {
   benchPlayers: Player[];
   contracts: Contract[] | undefined;
   showSalaries: boolean;
+  nhlTeamByAbbr: Map<string, NHLTeam>;
 }
 
 export const BenchPlayers = ({
   benchPlayers,
   contracts,
   showSalaries,
+  nhlTeamByAbbr,
 }: BenchPlayersProps) => {
-  // Hooks must be called before any early returns
-  const { data: nhlTeamsData } = useNHLTeams();
-  const nhlTeams = useMemo(
-    () => (nhlTeamsData ?? []) as NHLTeam[],
-    [nhlTeamsData],
-  );
-
-  const nhlTeamMap = useMemo(
-    () =>
-      nhlTeams.reduce<Record<string, string>>((acc, t) => {
-        if (t.abbreviation && t.logoUrl) acc[t.abbreviation] = t.logoUrl;
-        return acc;
-      }, {}),
-    [nhlTeams],
-  );
-
   if (benchPlayers.length === 0) return null;
 
   return (
@@ -180,33 +192,43 @@ export const BenchPlayers = ({
       <div className="mx-2 my-1 grid grid-cols-2 items-center">
         {benchPlayers.map((player, i) => {
           const contract = contracts?.find((b) => b.playerId === player.id);
+          const playerNhlAbbr = getPlayerNhlAbbreviation(player);
+          const playerNhlTeam = playerNhlAbbr
+            ? nhlTeamByAbbr.get(playerNhlAbbr)
+            : undefined;
+          const playerSalary = toNumber(player.salary, 0);
+          const ratingValue =
+            typeof player.seasonRating === "number" &&
+            Number.isFinite(player.seasonRating)
+              ? formatNumber(player.seasonRating, 2)
+              : "--";
+
           return (
             <div key={i} className="my-2 grid grid-cols-2 px-2 text-center">
               <div className="col-span-3 text-sm">{player?.fullName}</div>
               <div className="text-2xs">{player?.nhlPos.toString()}</div>
               <div>
-                {(() => {
-                  const abbr = player?.nhlTeam?.toString();
-                  const logo = abbr ? nhlTeamMap[abbr] : undefined;
-                  return logo ? (
-                    <Image
-                      src={logo}
-                      alt={abbr || "NHL Team Logo"}
-                      className="mx-auto h-4 w-4"
-                      width={16}
-                      height={16}
-                    />
-                  ) : (
-                    <span className="text-2xs font-semibold">
-                      {abbr || "-"}
-                    </span>
-                  );
-                })()}
+                {playerNhlTeam?.logoUrl ? (
+                  <Image
+                    src={playerNhlTeam.logoUrl}
+                    alt={playerNhlAbbr ?? "NHL Team Logo"}
+                    className="mx-auto h-4 w-4"
+                    width={16}
+                    height={16}
+                  />
+                ) : (
+                  <span className="text-2xs font-semibold">
+                    {playerNhlAbbr ?? "-"}
+                  </span>
+                )}
               </div>
               <div
-                className={`max-w-fit place-self-center rounded-lg px-2 text-2xs ${getRatingColorClass(player?.seasonRk ?? null)}`}
+                className={cn(
+                  "max-w-fit place-self-center rounded-lg px-2 text-2xs",
+                  getRosterRatingClass(player.seasonRk),
+                )}
               >
-                {Math.round((player?.seasonRating ?? 0) * 100) / 100}
+                {ratingValue}
               </div>
               <div
                 className={cn(
@@ -218,8 +240,8 @@ export const BenchPlayers = ({
                 )}
               >
                 {player.isSignable &&
-                  (player.salary ?? 0) > 999999 &&
-                  formatMoney(player.salary ?? 0)}
+                  playerSalary > 0 &&
+                  formatMoney(playerSalary)}
               </div>
             </div>
           );
@@ -314,14 +336,25 @@ export function TeamRoster({
   players,
   contracts,
   currentTeam,
+  showSalaries = false,
 }: TeamRosterProps) {
-  const showSalaries = false;
-
   const { teamLineup, benchPlayers } = useTeamRosterData({
     players,
     contracts,
     currentTeam,
   });
+  const { data: nhlTeamsData } = useNHLTeams();
+  const nhlTeamByAbbr = useMemo(() => {
+    return ((nhlTeamsData ?? []) as NHLTeam[]).reduce(
+      (map, team) => {
+        if (team.abbreviation) {
+          map.set(team.abbreviation, team);
+        }
+        return map;
+      },
+      new Map<string, NHLTeam>(),
+    );
+  }, [nhlTeamsData]);
 
   return (
     <>
@@ -333,15 +366,42 @@ export function TeamRoster({
         teamLineup={teamLineup}
         contracts={contracts}
         showSalaries={showSalaries}
+        nhlTeamByAbbr={nhlTeamByAbbr}
       />
 
       <BenchPlayers
         benchPlayers={benchPlayers}
         contracts={contracts}
         showSalaries={showSalaries}
+        nhlTeamByAbbr={nhlTeamByAbbr}
       />
 
       <RatingLegend />
     </>
   );
+}
+
+function getPlayerNhlAbbreviation(player: Player): string | null {
+  const rawTeam: unknown = player.nhlTeam;
+
+  if (Array.isArray(rawTeam)) {
+    const firstTeam = rawTeam.find(
+      (team): team is string =>
+        typeof team === "string" && team.trim().length > 0,
+    );
+    return firstTeam ?? null;
+  }
+
+  if (typeof rawTeam !== "string") {
+    return null;
+  }
+
+  const value = rawTeam.trim();
+  return value.length > 0 ? value : null;
+}
+
+function getRosterRatingClass(seasonRk: Player["seasonRk"]) {
+  return typeof seasonRk === "number" && Number.isFinite(seasonRk)
+    ? getRatingColorClass(seasonRk)
+    : "bg-gray-200 text-gray-700";
 }
