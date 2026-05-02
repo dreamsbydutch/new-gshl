@@ -287,10 +287,8 @@ npm run format:write # Auto-format with Prettier
 npm run yahoo:sync-team-day     # Sync one team-day from Yahoo
 
 # Player rankings
-npm run ranking:train           # Train ranking model
-npm run ranking:test            # Test ranking accuracy
-npm run ranking:visualize       # Generate ranking visualizations
-npm run ranking:update-all      # Update rankings for all players
+# Player ratings are calculated in Apps Script during aggregation.
+# Use RatingUpdater.updateAllPlayerStatRatingsForSeason(...) in Apps Script for backfills.
 
 # Lineup optimizer
 npm run lineup:update-all       # Optimize all lineups (fullPos/bestPos)

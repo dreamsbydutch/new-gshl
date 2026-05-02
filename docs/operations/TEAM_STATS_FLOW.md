@@ -246,15 +246,14 @@ When you scrape new roster data from Yahoo:
 
 ```bash
 # 1. Scrape Yahoo data (creates PlayerDay records)
-# 2. Calculate player ratings
-npm run ranking:update-all
-
-# 3. Optimize lineups
+# 2. Optimize lineups
 npm run lineup:update-all
 
-# 4. Aggregate team stats
+# 3. Aggregate team stats
 npm run team:update-all
 ```
+
+Player ratings are refreshed by Apps Script aggregation.
 
 ### After Manual Data Changes
 
@@ -271,7 +270,6 @@ For ongoing season maintenance:
 
 ```bash
 # Complete weekly update
-npm run ranking:update-all  # Update all player ratings
 npm run lineup:update-all   # Optimize all lineups
 npm run team:update-all     # Aggregate all team stats
 ```

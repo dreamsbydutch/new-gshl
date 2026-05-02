@@ -161,112 +161,24 @@ Auto-format all files with Prettier.
 
 ---
 
-## Ranking Commands
+## Rating Commands
 
-### npm run ranking:train
+Player ratings are calculated in Apps Script, not through npm scripts. The main
+aggregation functions refresh aggregate player ratings automatically:
 
-Train the ranking model using every player/team dataset (PlayerDay/Week/Split/Total/NHL + TeamDay/Week/Season) from Google Sheets.
+```javascript
+aggregateCurrentSeason();
+aggregatePastSeason("10", "weeks");
+```
 
-**Usage**: `npm run ranking:train`
+For manual backfills, run Apps Script directly:
 
-**Input**: Player + team stat lines across all supported sheets (daily, weekly, season splits/totals, NHL reference data)
+```javascript
+RatingUpdater.updateAllPlayerStatRatingsForSeason("12", { dryRun: true });
+RatingUpdater.updateAllPlayerStatRatingsForSeason("12", { dryRun: false });
+```
 
-**Output**:
-
-- `ranking-model.json` (trained models for every aggregation/phase/position)
-- Console output with scarcity + scoreboard multipliers and coverage metrics
-
-**Runtime**: ~15-30 minutes (depends on data volume)
-
-**Process**:
-
-1. Fetch all PlayerDay/Week/Split/Total/NHL data plus TeamDay/Week/Season sheets
-2. Load week metadata to label season phases (RS/PO/LT)
-3. Calculate scarcity + scoreboard multipliers from team stats
-4. Train aggregation-level, position, and phase-specific models with decay-weighted seasons
-5. Save to `ranking-model.json` and print validation summary
-
-**Requirements**:
-
-- `GOOGLE_SERVICE_ACCOUNT_KEY` in `.env.local`
-- Access to Player + Team Google Sheets
-
----
-
-### npm run ranking:export-to-apps-script
-
-Convert `ranking-model.json` into the Apps Script bundle (`src/server/apps-script/RankingModels.js`).
-
-**Usage**: `npm run ranking:export-to-apps-script`
-
-**Input**: Latest `ranking-model.json` (run `ranking:train` first)
-
-**Output**:
-
-- Updated `RankingModels.js` containing all trained models, helper lookup utilities, and global weights
-- Console summary of model count/size
-
-**When to run**:
-
-1. After each model training session
-2. Before deploying Apps Script (`npm run Deploy Apps Script` task)
-
-**See**: [Ranking Engine Documentation](../backend/RANKING_ENGINE.md)
-
----
-
-### npm run ranking:visualize
-
-Generate ranking distribution visualizations.
-
-**Usage**: `npm run ranking:visualize`
-
-**Input**: `ranking-model.json` (must run `ranking:train` first)
-
-**Output**: Console visualization showing:
-
-- Rating distribution by position (F, D, G)
-- Sample player rankings
-- Model statistics
-
-**Runtime**: ~5 seconds
-
----
-
-### npm run ranking:update-all
-
-Recalculate ratings for all PlayerDay records and update Google Sheets.
-
-**Usage**: `npm run ranking:update-all`
-
-**Input**:
-
-- `ranking-model.json` (trained model)
-- PlayerDay records from Google Sheets
-
-**Output**: Updates `Rating` column in PlayerDayStatLine sheets
-
-**Runtime**: ~10-20 minutes for ~200,000+ records
-
-**Process**:
-
-1. Load trained ranking model
-2. Fetch all PlayerDay records across all workbooks
-3. Calculate rating for each player-day performance
-4. Batch update Google Sheets with new ratings
-
-**Rate Limiting**:
-
-- 500ms delay between batches
-- Exponential backoff on quota errors
-- Automatic retry (up to 5 attempts)
-
-**Requirements**:
-
-- Must run `ranking:train` first to generate model
-- `GOOGLE_SERVICE_ACCOUNT_KEY` in `.env.local`
-
-**See**: [Scripts Documentation](SCRIPTS.md)
+**See**: [Rating Engine Documentation](../backend/RANKING_ENGINE.md)
 
 ---
 
@@ -274,7 +186,7 @@ Recalculate ratings for all PlayerDay records and update Google Sheets.
 
 ### npm run lineup:update-all
 
-Optimize lineups for all team-days, calculating fullPos, bestPos, MS, BS, and ADD.
+Optimize lineups for all team-days, calculating fullPos, bestPos, GS, MS, BS, and ADD.
 
 **Usage**: `npm run lineup:update-all`
 
@@ -290,12 +202,13 @@ Optimize lineups for all team-days, calculating fullPos, bestPos, MS, BS, and AD
 1. Fetch all PlayerDay records from Google Sheets
 2. Group by team-week combinations
 3. For each team-day:
-   - **fullPos**: Optimal lineup from players who actually played
-   - **bestPos**: Theoretical best lineup (including bench)
-   - **MS**: Missed Starts (bench players who should have started)
-   - **BS**: Bad Starts (starters who should have been benched)
-   - **ADD**: Track new roster additions
-4. Batch update Google Sheets (fullPos, bestPos, MS, BS, ADD columns)
+   - **fullPos**: Played daily-lineup players guaranteed, then filled by played bench players and remaining roster players
+   - **bestPos**: Theoretical best lineup by PlayerDay Rating across the team-day roster
+   - **GS**: GP=1 and dailyPos is a starting lineup position
+   - **MS**: dailyPos is not starting, fullPos is starting
+   - **BS**: dailyPos is starting, bestPos is BN
+   - **ADD**: Track new roster additions versus the previous day, unless the previous day has no PlayerDay rows
+4. Batch update Google Sheets (fullPos, bestPos, GS, MS, BS, ADD columns)
 
 **Algorithm**: Hybrid approach
 
@@ -514,13 +427,6 @@ All scripts are defined in `package.json`:
     "preview": "next build && next start",
     "start": "next start",
     "typecheck": "tsc --noEmit",
-
-    "yahoo:sync-team-day": "tsx src/scripts/sync-yahoo-team-day.ts",
-
-    "ranking:train": "tsx src/scripts/train-ranking-model.ts",
-    "ranking:test": "tsx src/scripts/test-ranking-model.ts",
-    "ranking:visualize": "tsx src/scripts/visualize-rankings.ts",
-
     "lineup:update-all": "node --expose-gc --max-old-space-size=4096 ./node_modules/tsx/dist/cli.mjs src/scripts/update-all-lineups.ts"
   }
 }
@@ -564,15 +470,14 @@ npm run build
 ### Data Maintenance
 
 ```bash
-# Weekly: Update rankings
-npm run ranking:update-all
-
 # As needed: Optimize lineups
 npm run lineup:update-all
 
 # Weekly: Aggregate stats
 npm run stats:aggregate-all
 ```
+
+Player ratings are refreshed in Apps Script during aggregation.
 
 ---
 

@@ -23,10 +23,11 @@ That's it! This will:
 
 ```bash
 # Complete post-scrape workflow
-npm run ranking:update-all  # 1. Update player ratings
-npm run lineup:update-all   # 2. Optimize lineups
-npm run team:update-all     # 3. Aggregate team stats
+npm run lineup:update-all   # 1. Optimize lineups
+npm run team:update-all     # 2. Aggregate team stats
 ```
+
+Player ratings are refreshed by Apps Script aggregation.
 
 ### Update Specific Season
 
@@ -195,11 +196,6 @@ Summary:
 ## Related Commands
 
 ```bash
-# Player stats
-npm run ranking:train         # Train ranking model
-npm run ranking:update-all    # Update all player ratings
-npm run ranking:visualize     # View rating distributions
-
 # Lineup optimization
 npm run lineup:update-all     # Optimize all lineups
 
