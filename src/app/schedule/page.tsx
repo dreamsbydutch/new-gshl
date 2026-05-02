@@ -1,33 +1,56 @@
-"use client";
+import { HydrateClient, serverApi } from "@gshl-trpc/server-exports";
+import { ScheduleContent } from "./ScheduleContent";
 
-import { Suspense } from "react";
-import { useNavStore } from "@gshl-cache";
-import { WeeklySchedule } from "@gshl-components/league/WeeklySchedule";
-import { TeamSchedule } from "@gshl-components/team/TeamSchedule";
-import { ScheduleSkeleton } from "@gshl-skeletons";
+export default async function SchedulePage() {
+  const activeSeason = await serverApi.season.getActive();
+  const seasonId = activeSeason?.id ? String(activeSeason.id) : undefined;
 
-/**
- * Client-side schedule page component.
- *
- * @description
- * Simple page that renders either WeeklySchedule or TeamSchedule based on
- * user selection from the navigation store. Data is prefetched on the server
- * and hydrated automatically via tRPC.
- *
- * @features
- * - Dynamic view switching (week/team)
- * - Server-prefetched data
- * - Suspense boundaries for loading states
- */
-export default function SchedulePage() {
-  const scheduleType = useNavStore((state) => state.selectedScheduleType);
+  // Find the current week to prefetch week-scoped stats
+  const weeks = seasonId
+    ? await serverApi.week.getAll({
+        where: { seasonId },
+        orderBy: { startDate: "asc" },
+      })
+    : [];
+  const now = new Date();
+  const currentWeek = weeks.find(
+    (w) => new Date(w.startDate) <= now && new Date(w.endDate) >= now,
+  );
+  const weekId = currentWeek?.id ? String(currentWeek.id) : undefined;
+
+  await Promise.all([
+    serverApi.season.getAll.prefetch({ orderBy: { year: "asc" } }),
+    seasonId
+      ? serverApi.team.getAll.prefetch({ where: { seasonId } })
+      : Promise.resolve(),
+    seasonId
+      ? serverApi.matchup.getAll.prefetch({
+          where: { seasonId },
+          orderBy: { seasonId: "asc" },
+        })
+      : Promise.resolve(),
+    serverApi.player.getAll.prefetch({ where: { isActive: true } }),
+    seasonId
+      ? serverApi.week.getAll.prefetch({
+          where: { seasonId },
+          orderBy: { startDate: "asc" },
+        })
+      : Promise.resolve(),
+    seasonId && weekId
+      ? serverApi.teamStats.weekly.getAll.prefetch({
+          where: { seasonId, weekId },
+        })
+      : Promise.resolve(),
+    seasonId && weekId
+      ? serverApi.playerStats.weekly.getAll.prefetch({
+          where: { seasonId, weekId },
+        })
+      : Promise.resolve(),
+  ]);
 
   return (
-    <div className="mx-auto max-w-2xl">
-      <Suspense fallback={<ScheduleSkeleton />}>
-        {scheduleType === "week" && <WeeklySchedule />}
-        {(scheduleType === "team" || !scheduleType) && <TeamSchedule />}
-      </Suspense>
-    </div>
+    <HydrateClient>
+      <ScheduleContent />
+    </HydrateClient>
   );
 }
