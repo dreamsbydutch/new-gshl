@@ -69,7 +69,8 @@ type BrowserFetchResult = {
   url: string;
 };
 
-type OptimizedSheetsClient = typeof import("../lib/sheets/client/optimized-client").optimizedSheetsClient;
+// eslint-disable-next-line @typescript-eslint/consistent-type-imports
+type OptimizedSheetsClient = Awaited<typeof import("../lib/sheets/client/optimized-client")>["optimizedSheetsClient"];
 
 type SheetRecord = Record<string, PrimitiveCellValue>;
 
@@ -228,8 +229,8 @@ function sleep(ms: number): Promise<void> {
 let optimizedSheetsClientPromise: Promise<OptimizedSheetsClient> | null = null;
 
 async function getOptimizedSheetsClient(): Promise<OptimizedSheetsClient> {
-  process.env.USE_GOOGLE_SHEETS ||= "true";
-  process.env.GOOGLE_SERVICE_ACCOUNT_KEY_FILE ||= path.resolve("credentials.json");
+  process.env.USE_GOOGLE_SHEETS ??= "true";
+  process.env.GOOGLE_SERVICE_ACCOUNT_KEY_FILE ??= path.resolve("credentials.json");
 
   if (!optimizedSheetsClientPromise) {
     optimizedSheetsClientPromise = import("../lib/sheets/client/optimized-client").then(
@@ -331,6 +332,7 @@ function toPositiveInteger(
 
 function toTrimmedString(value: unknown): string {
   if (value === undefined || value === null) return "";
+  if (typeof value === "object") return "";
   return String(value).trim();
 }
 
@@ -379,7 +381,7 @@ function formatDateOnlyValue(value: unknown): string {
 }
 
 function removeAccentsSafe(value: unknown): string {
-  const raw = String(value ?? "");
+  const raw = value === null || value === undefined ? "" : String(value);
   if (!raw) return "";
   return raw.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 }
@@ -469,7 +471,7 @@ function getNormalizedFirstNameKeys(value: unknown): string[] {
 
 function normalizeApiPosition(value: unknown): string {
   const raw = toTrimmedString(value).toLowerCase();
-  return API_POSITION_MAP[raw] || "";
+  return API_POSITION_MAP[raw] ?? "";
 }
 
 function normalizePositionGroupToken(value: unknown): string {
@@ -506,7 +508,7 @@ function normalizeSheetPositionToken(value: unknown): string {
 function splitSheetPositionTokens(value: unknown): string[] {
   const parts = Array.isArray(value)
     ? value
-    : String(value ?? "").split(/[,\//|]/);
+    : toTrimmedString(value).split(/[,\//|]/);
   const seen = new Set<string>();
   const output: string[] = [];
 
@@ -523,7 +525,7 @@ function splitSheetPositionTokens(value: unknown): string[] {
 function splitPositionGroupTokens(value: unknown): string[] {
   const parts = Array.isArray(value)
     ? value
-    : String(value ?? "").split(/[,\//|]/);
+    : toTrimmedString(value).split(/[,\//|]/);
   const seen = new Set<string>();
   const output: string[] = [];
 
@@ -540,7 +542,7 @@ function splitPositionGroupTokens(value: unknown): string[] {
 function splitNhlPosTokens(value: unknown): string[] {
   const parts = Array.isArray(value)
     ? value
-    : String(value ?? "").split(/[,/|;]/);
+    : toTrimmedString(value).split(/[,/|;]/);
   const seen = new Set<string>();
   const output: string[] = [];
 
@@ -643,7 +645,7 @@ function isValidDateOnlyString(value: unknown): value is string {
 
 function toFiniteNumber(value: unknown): number | null {
   if (value === undefined || value === null || value === "") return null;
-  const normalized = String(value).replace(/,/g, "").trim();
+  const normalized = toTrimmedString(value).replace(/,/g, "");
   if (!normalized) return null;
   const numeric = Number(normalized);
   return Number.isFinite(numeric) ? numeric : null;
@@ -1900,7 +1902,7 @@ async function buildPlayerNhlContext(
         ? getRecordPosGroup(currentSeasonRow)
         : historyRows[0]
           ? getRecordPosGroup(historyRows[0])
-          : getRecordPosGroup(null, playerRow.data.posGroup || playerRow.data.nhlPos);
+          : getRecordPosGroup(null, playerRow.data.posGroup ?? playerRow.data.nhlPos);
       const overallRating = computeOverallRatingForHistory(
         historyRows,
         seasonLeagueAnchors[posGroup] ?? 62.5,

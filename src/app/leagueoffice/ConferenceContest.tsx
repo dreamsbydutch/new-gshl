@@ -2,6 +2,7 @@ import { Button } from "@gshl-components/ui";
 import { useSeasonNavigation } from "@gshl-cache";
 import { useConferenceContestData } from "@gshl-hooks";
 import type { GSHLTeam } from "@gshl-types";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 
 export function ConferenceContest() {
@@ -20,7 +21,7 @@ export function ConferenceContest() {
     }
 
     return (
-      <img src={team.logoUrl} alt={formatTeamLabel(team)} className="h-6 w-6" />
+      <Image src={team.logoUrl} alt={formatTeamLabel(team)} width={24} height={24} className="h-6 w-6" />
     );
   };
 
