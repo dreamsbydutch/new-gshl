@@ -5,6 +5,7 @@ import readline from "node:readline/promises";
 import { stdin as input, stdout as output } from "node:process";
 import puppeteer from "puppeteer-core";
 import type { Browser, Page } from "puppeteer-core";
+import type { OptimizedSheetsClient } from "../lib/sheets/client/optimized-client";
 import {
   getPlayerDayWorkbookId,
   PLAYERDAY_WORKBOOK_KEYS,
@@ -69,10 +70,6 @@ type BrowserFetchResult = {
   url: string;
 };
 
-
-type OptimizedSheetsClient = Awaited<
-  typeof import("../lib/sheets/client/optimized-client")
->["optimizedSheetsClient"];
 
 type SheetRecord = Record<string, PrimitiveCellValue>;
 
@@ -238,11 +235,9 @@ async function getOptimizedSheetsClient(): Promise<OptimizedSheetsClient> {
   process.env.GOOGLE_SERVICE_ACCOUNT_KEY_FILE ??=
     path.resolve("credentials.json");
 
-  if (!optimizedSheetsClientPromise) {
-    optimizedSheetsClientPromise = import(
-      "../lib/sheets/client/optimized-client"
-    ).then((module) => module.optimizedSheetsClient);
-  }
+  optimizedSheetsClientPromise ??= import(
+    "../lib/sheets/client/optimized-client"
+  ).then((module) => module.optimizedSheetsClient);
 
   return optimizedSheetsClientPromise;
 }
