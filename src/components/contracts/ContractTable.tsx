@@ -330,7 +330,9 @@ export function TeamBuyoutTable({
                 <th className="px-2 py-1 text-center font-normal">Team</th>
                 <th className="px-2 py-1 text-center font-normal">Cap Hit</th>
                 <th className="px-2 py-1 text-center font-normal">Expiry</th>
-                <th className="px-2 py-1 text-center font-normal">Buyout End</th>
+                <th className="px-2 py-1 text-center font-normal">
+                  Buyout End
+                </th>
                 <th className="px-2 py-1 text-center font-normal">Status</th>
               </tr>
             </thead>
@@ -347,7 +349,11 @@ export function TeamBuyoutTable({
                 return (
                   <tr
                     key={contract.id || `buyout-row-${index}`}
-                    className={contract.isActiveBuyout ? "text-gray-900" : "text-gray-400"}
+                    className={
+                      contract.isActiveBuyout
+                        ? "text-gray-900"
+                        : "text-gray-400"
+                    }
                   >
                     <td className="sticky left-0 bg-white px-2 py-1 text-center">
                       {player?.fullName ?? "Unknown"}
@@ -359,7 +365,11 @@ export function TeamBuyoutTable({
                       {playerNhlTeam?.logoUrl ? (
                         <Image
                           src={playerNhlTeam.logoUrl}
-                          alt={playerNhlTeam.fullName ?? playerNhlAbbr ?? "NHL Team"}
+                          alt={
+                            playerNhlTeam.fullName ??
+                            playerNhlAbbr ??
+                            "NHL Team"
+                          }
                           className="mx-auto h-4 w-4"
                           width={16}
                           height={16}
@@ -420,7 +430,9 @@ function getPlayerNhlAbbreviation(player: Player): string | null {
   return value.length > 0 ? value : null;
 }
 
-function getDisplaySeasonYear(currentSeason: ContractTableProps["currentSeason"]) {
+function getDisplaySeasonYear(
+  currentSeason: ContractTableProps["currentSeason"],
+) {
   const explicitYear = toNumber(currentSeason?.year, Number.NaN);
   if (Number.isFinite(explicitYear)) {
     return explicitYear;

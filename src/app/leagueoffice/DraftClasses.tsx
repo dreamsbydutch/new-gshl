@@ -137,7 +137,9 @@ export function DraftClasses() {
                   key={player.id}
                   className={cn(
                     "border-b border-gray-400 py-0.5 text-sm",
-                    contract?.expiryStatus === ContractStatus.UFA ? "font-semibold" : "",
+                    contract?.expiryStatus === ContractStatus.UFA
+                      ? "font-semibold"
+                      : "",
                   )}
                 >
                   <td className="text-center">{player.overallRk}</td>

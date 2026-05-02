@@ -1,6 +1,10 @@
 import { Skeleton } from "../ui/skeleton";
 
-const DraftPickEntrySkeleton = ({ highlight = false }: { highlight?: boolean }) => (
+const DraftPickEntrySkeleton = ({
+  highlight = false,
+}: {
+  highlight?: boolean;
+}) => (
   <div
     className={`mx-auto w-5/6 border-t border-gray-200 px-2 py-1 ${highlight ? "rounded-md border bg-gray-100 p-2 shadow-sm" : ""}`}
   >
@@ -13,7 +17,10 @@ const TeamRosterCardSkeleton = () => (
     <Skeleton className="mx-auto mb-2 h-12 w-12 rounded" />
     <Skeleton className="mx-auto mb-2 h-5 w-24" />
     {Array.from({ length: 8 }).map((_, i) => (
-      <div key={i} className="mx-auto w-5/6 border-t border-gray-100 px-2 py-0.5">
+      <div
+        key={i}
+        className="mx-auto w-5/6 border-t border-gray-100 px-2 py-0.5"
+      >
         <Skeleton className="mx-auto h-3 w-32" />
       </div>
     ))}

@@ -101,9 +101,7 @@ const PlayerCard = ({
           !showSalaries && "hidden",
         )}
       >
-        {player.isSignable &&
-          playerSalary > 0 &&
-          formatMoney(playerSalary)}
+        {player.isSignable && playerSalary > 0 && formatMoney(playerSalary)}
       </div>
     </div>
   );
@@ -345,15 +343,12 @@ export function TeamRoster({
   });
   const { data: nhlTeamsData } = useNHLTeams();
   const nhlTeamByAbbr = useMemo(() => {
-    return ((nhlTeamsData ?? []) as NHLTeam[]).reduce(
-      (map, team) => {
-        if (team.abbreviation) {
-          map.set(team.abbreviation, team);
-        }
-        return map;
-      },
-      new Map<string, NHLTeam>(),
-    );
+    return ((nhlTeamsData ?? []) as NHLTeam[]).reduce((map, team) => {
+      if (team.abbreviation) {
+        map.set(team.abbreviation, team);
+      }
+      return map;
+    }, new Map<string, NHLTeam>());
   }, [nhlTeamsData]);
 
   return (

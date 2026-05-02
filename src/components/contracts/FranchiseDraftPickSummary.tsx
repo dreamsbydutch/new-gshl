@@ -35,28 +35,30 @@ export function FranchiseDraftPickSummary({
                 </div>
               ) : (
                 <div className="divide-y">
-                  {group.picks.map(({ draftPick, selectedPlayer, originalTeam }) => {
-                    const originalTeamSuffix =
-                      originalTeam?.name &&
-                      String(originalTeam.id) !== String(draftPick.gshlTeamId)
-                        ? ` (via ${originalTeam.name})`
-                        : "";
+                  {group.picks.map(
+                    ({ draftPick, selectedPlayer, originalTeam }) => {
+                      const originalTeamSuffix =
+                        originalTeam?.name &&
+                        String(originalTeam.id) !== String(draftPick.gshlTeamId)
+                          ? ` (via ${originalTeam.name})`
+                          : "";
 
-                    return (
-                      <div
-                        key={draftPick.id}
-                        className={
-                          selectedPlayer
-                            ? "px-4 py-2 text-center text-xs text-gray-400"
-                            : "px-4 py-2 text-center text-xs text-gray-800"
-                        }
-                      >
-                        {selectedPlayer
-                          ? `${selectedPlayer.fullName}, ${selectedPlayer.nhlPos?.toString() ?? ""} (${formatDraftPickDescription(draftPick)}${originalTeamSuffix})`
-                          : `${formatDraftPickDescription(draftPick)}${originalTeamSuffix}`}
-                      </div>
-                    );
-                  })}
+                      return (
+                        <div
+                          key={draftPick.id}
+                          className={
+                            selectedPlayer
+                              ? "px-4 py-2 text-center text-xs text-gray-400"
+                              : "px-4 py-2 text-center text-xs text-gray-800"
+                          }
+                        >
+                          {selectedPlayer
+                            ? `${selectedPlayer.fullName}, ${selectedPlayer.nhlPos?.toString() ?? ""} (${formatDraftPickDescription(draftPick)}${originalTeamSuffix})`
+                            : `${formatDraftPickDescription(draftPick)}${originalTeamSuffix}`}
+                        </div>
+                      );
+                    },
+                  )}
                 </div>
               )}
             </div>

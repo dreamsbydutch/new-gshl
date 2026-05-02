@@ -31,10 +31,7 @@ export function LockerRoomSkeleton() {
             </div>
             {/* Player rows */}
             {Array.from({ length: 10 }).map((_, i) => (
-              <div
-                key={i}
-                className="flex gap-1 border-b border-gray-100 py-1"
-              >
+              <div key={i} className="flex gap-1 border-b border-gray-100 py-1">
                 <Skeleton className="h-4 w-32" />
                 <Skeleton className="h-4 w-12" />
                 <Skeleton className="h-4 w-8" />
