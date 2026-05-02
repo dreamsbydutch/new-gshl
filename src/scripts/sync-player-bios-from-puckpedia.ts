@@ -332,8 +332,8 @@ function toPositiveInteger(
 
 function toTrimmedString(value: unknown): string {
   if (value === undefined || value === null) return "";
-  if (typeof value === "object") return "";
-  return String(value).trim();
+  if (typeof value === "object" || typeof value === "symbol") return "";
+  return (value as string | number | boolean | bigint).toString().trim();
 }
 
 function toBoolean(value: unknown): boolean {
@@ -381,7 +381,8 @@ function formatDateOnlyValue(value: unknown): string {
 }
 
 function removeAccentsSafe(value: unknown): string {
-  const raw = value === null || value === undefined ? "" : String(value);
+  if (value === null || value === undefined || typeof value === "object" || typeof value === "symbol") return "";
+  const raw = (value as string | number | boolean | bigint).toString();
   if (!raw) return "";
   return raw.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 }
