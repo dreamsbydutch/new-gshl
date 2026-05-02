@@ -26,6 +26,8 @@ export {
   cache,
 } from "./simple-cache";
 
+export { referenceStore, type ReferenceSnapshot } from "./reference-store";
+
 // Navigation state store
 export { useNavStore } from "./store";
 

@@ -1,9 +1,42 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import type { GSHLTeam, Franchise } from "@gshl-types";
 import { clientApi as api } from "@gshl-trpc";
+import { referenceStore } from "@gshl-cache";
+import { useReferenceSnapshotRefresh } from "./useReferenceSnapshotRefresh";
 
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
+
+function orderRecords<T extends object>(
+  records: T[],
+  orderBy?: Record<string, "asc" | "desc">,
+) {
+  if (!orderBy) {
+    return records;
+  }
+
+  const [field, direction] = Object.entries(orderBy)[0] ?? [];
+  if (!field || !direction) {
+    return records;
+  }
+
+  return [...records].sort((left, right) => {
+    const leftValue = (left as Record<string, unknown>)[field];
+    const rightValue = (right as Record<string, unknown>)[field];
+    if (leftValue === rightValue) return 0;
+
+    if (
+      (typeof leftValue !== "string" && typeof leftValue !== "number") ||
+      (typeof rightValue !== "string" && typeof rightValue !== "number")
+    ) {
+      return 0;
+    }
+
+    const result = leftValue > rightValue ? 1 : -1;
+    return direction === "desc" ? -result : result;
+  });
+}
 
 // ============================================================================
 // TYPES & INTERFACES
@@ -199,6 +232,61 @@ export function useTeams(options: UseTeamsOptions = {}) {
   const defaultStaleTime =
     staleTime ?? (isStatsData ? 60 * 60 * 1000 : DAY_IN_MS);
   const defaultGcTime = gcTime ?? (isStatsData ? 60 * 60 * 1000 : DAY_IN_MS);
+  const normalizedFranchiseId = franchiseId ? String(franchiseId) : null;
+  const normalizedOwnerId = ownerId ? String(ownerId) : null;
+  const normalizedTeamId = teamId ? String(teamId) : null;
+  const normalizedSeasonId = seasonId ? String(seasonId) : null;
+  const normalizedConferenceId = conferenceId ? String(conferenceId) : null;
+  const normalizedWeekId = weekId ? String(weekId) : null;
+  const shouldUseReferenceStore = enabled && statsLevel === "none";
+  useReferenceSnapshotRefresh(
+    shouldUseReferenceStore &&
+      referenceStore.isSupported() &&
+      (teamType === "gshl" || teamType === "franchise"),
+  );
+  const [cachedTeams, setCachedTeams] = useState<GSHLTeam[] | null>(null);
+  const [cachedFranchises, setCachedFranchises] = useState<Franchise[] | null>(null);
+  const [cacheReady, setCacheReady] = useState(typeof window === "undefined");
+
+  useEffect(() => {
+    if (!shouldUseReferenceStore || !referenceStore.isSupported()) {
+      setCacheReady(true);
+      return;
+    }
+
+    let isMounted = true;
+
+    const loadReferenceData = async () => {
+      try {
+        if (teamType === "franchise") {
+          const franchises = await referenceStore.getFranchises();
+          if (isMounted) {
+            setCachedFranchises(franchises);
+          }
+        } else if (teamType === "gshl") {
+          const teams = normalizedSeasonId
+            ? await referenceStore.getTeamsBySeason(normalizedSeasonId)
+            : await referenceStore.getTeams();
+          if (isMounted) {
+            setCachedTeams(teams);
+          }
+        }
+      } finally {
+        if (isMounted) {
+          setCacheReady(true);
+        }
+      }
+    };
+
+    void loadReferenceData();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [shouldUseReferenceStore, teamType, normalizedSeasonId]);
+
+  const hasCachedTeams = Boolean(cachedTeams && cachedTeams.length > 0);
+  const hasCachedFranchises = Boolean(cachedFranchises && cachedFranchises.length > 0);
 
   // ========== NHL TEAMS ==========
   const nhlQuery = api.team.getNHLTeams.useQuery(undefined, {
@@ -212,9 +300,6 @@ export function useTeams(options: UseTeamsOptions = {}) {
   });
 
   // ========== FRANCHISES ==========
-  const normalizedFranchiseId = franchiseId ? String(franchiseId) : null;
-  const normalizedOwnerId = ownerId ? String(ownerId) : null;
-
   const franchiseWhere: Record<string, unknown> = {};
   if (normalizedOwnerId) franchiseWhere.ownerId = normalizedOwnerId;
   if (isActive !== undefined) franchiseWhere.isActive = isActive;
@@ -224,7 +309,12 @@ export function useTeams(options: UseTeamsOptions = {}) {
   const franchisesGetAllQuery = api.franchise.getAll.useQuery(
     Object.keys(franchiseWhere).length > 0 ? { where: franchiseWhere } : {},
     {
-      enabled: enabled && teamType === "franchise" && !isSingleFranchise,
+      enabled:
+        enabled &&
+        cacheReady &&
+        teamType === "franchise" &&
+        !isSingleFranchise &&
+        !hasCachedFranchises,
       staleTime: defaultStaleTime,
       gcTime: defaultGcTime,
       refetchOnMount,
@@ -237,7 +327,12 @@ export function useTeams(options: UseTeamsOptions = {}) {
   const franchiseGetByIdQuery = api.franchise.getById.useQuery(
     { id: normalizedFranchiseId ?? "" },
     {
-      enabled: enabled && teamType === "franchise" && isSingleFranchise,
+      enabled:
+        enabled &&
+        cacheReady &&
+        teamType === "franchise" &&
+        isSingleFranchise &&
+        !hasCachedFranchises,
       staleTime: defaultStaleTime,
       gcTime: defaultGcTime,
       refetchOnMount,
@@ -248,11 +343,6 @@ export function useTeams(options: UseTeamsOptions = {}) {
   );
 
   // ========== GSHL TEAMS ==========
-  const normalizedTeamId = teamId ? String(teamId) : null;
-  const normalizedSeasonId = seasonId ? String(seasonId) : null;
-  const normalizedConferenceId = conferenceId ? String(conferenceId) : null;
-  const normalizedWeekId = weekId ? String(weekId) : null;
-
   // Build where clause for GSHL teams
   const gshlWhere: Record<string, unknown> = {};
   if (normalizedSeasonId) gshlWhere.seasonId = normalizedSeasonId;
@@ -271,9 +361,11 @@ export function useTeams(options: UseTeamsOptions = {}) {
     {
       enabled:
         enabled &&
+        cacheReady &&
         teamType === "gshl" &&
         statsLevel === "none" &&
-        !isSingleTeam,
+        !isSingleTeam &&
+        !hasCachedTeams,
       staleTime: defaultStaleTime,
       gcTime: defaultGcTime,
       refetchOnMount,
@@ -287,7 +379,12 @@ export function useTeams(options: UseTeamsOptions = {}) {
     { id: normalizedTeamId ?? "" },
     {
       enabled:
-        enabled && teamType === "gshl" && statsLevel === "none" && isSingleTeam,
+        enabled &&
+        cacheReady &&
+        teamType === "gshl" &&
+        statsLevel === "none" &&
+        isSingleTeam &&
+        !hasCachedTeams,
       staleTime: defaultStaleTime,
       gcTime: defaultGcTime,
       refetchOnMount,
@@ -354,6 +451,30 @@ export function useTeams(options: UseTeamsOptions = {}) {
     },
   );
 
+  useEffect(() => {
+    if (franchisesGetAllQuery.data?.length) {
+      void referenceStore.putFranchises(franchisesGetAllQuery.data);
+    }
+  }, [franchisesGetAllQuery.data]);
+
+  useEffect(() => {
+    if (franchiseGetByIdQuery.data) {
+      void referenceStore.putFranchises([franchiseGetByIdQuery.data]);
+    }
+  }, [franchiseGetByIdQuery.data]);
+
+  useEffect(() => {
+    if (gshlGetAllQuery.data?.length) {
+      void referenceStore.putTeams(gshlGetAllQuery.data);
+    }
+  }, [gshlGetAllQuery.data]);
+
+  useEffect(() => {
+    if (gshlGetByIdQuery.data) {
+      void referenceStore.putTeams([gshlGetByIdQuery.data]);
+    }
+  }, [gshlGetByIdQuery.data]);
+
   // ========== RETURN APPROPRIATE DATA ==========
   if (teamType === "nhl") {
     return {
@@ -367,15 +488,31 @@ export function useTeams(options: UseTeamsOptions = {}) {
     const query = isSingleFranchise
       ? franchiseGetByIdQuery
       : franchisesGetAllQuery;
-    const franchises = isSingleFranchise
-      ? franchiseGetByIdQuery.data
-        ? [franchiseGetByIdQuery.data]
-        : []
-      : (franchisesGetAllQuery.data ?? []);
+    const franchises = hasCachedFranchises && cachedFranchises
+      ? orderRecords(
+          cachedFranchises.filter((franchise) => {
+            if (normalizedFranchiseId && String(franchise.id) !== normalizedFranchiseId) {
+              return false;
+            }
+            if (normalizedOwnerId && String(franchise.ownerId) !== normalizedOwnerId) {
+              return false;
+            }
+            if (isActive !== undefined && franchise.isActive !== isActive) {
+              return false;
+            }
+            return true;
+          }),
+          orderBy,
+        )
+      : isSingleFranchise
+        ? franchiseGetByIdQuery.data
+          ? [franchiseGetByIdQuery.data]
+          : []
+        : (franchisesGetAllQuery.data ?? []);
 
     return {
       data: franchises,
-      isLoading: query.isLoading,
+      isLoading: !hasCachedFranchises && !cacheReady ? true : query.isLoading,
       error: query.error ?? null,
     };
   }
@@ -407,15 +544,37 @@ export function useTeams(options: UseTeamsOptions = {}) {
 
   // Base GSHL teams (no stats)
   const query = isSingleTeam ? gshlGetByIdQuery : gshlGetAllQuery;
-  const teams = isSingleTeam
-    ? gshlGetByIdQuery.data
-      ? ([gshlGetByIdQuery.data])
-      : []
-    : (gshlGetAllQuery.data ?? []);
+  const teams = hasCachedTeams && cachedTeams
+    ? orderRecords(
+        cachedTeams.filter((team) => {
+          if (normalizedTeamId && String(team.id) !== normalizedTeamId) {
+            return false;
+          }
+          if (normalizedSeasonId && String(team.seasonId) !== normalizedSeasonId) {
+            return false;
+          }
+          if (normalizedFranchiseId && String(team.franchiseId) !== normalizedFranchiseId) {
+            return false;
+          }
+          if (normalizedConferenceId && String(team.confId) !== normalizedConferenceId) {
+            return false;
+          }
+          if (isActive !== undefined && team.isActive !== isActive) {
+            return false;
+          }
+          return true;
+        }),
+        orderBy,
+      )
+    : isSingleTeam
+      ? gshlGetByIdQuery.data
+        ? [gshlGetByIdQuery.data]
+        : []
+      : (gshlGetAllQuery.data ?? []);
 
   return {
     data: teams,
-    isLoading: query.isLoading,
+    isLoading: !hasCachedTeams && !cacheReady ? true : query.isLoading,
     error: query.error ?? null,
   };
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import type { Season } from "@gshl-types";
 import {
@@ -12,7 +12,22 @@ import {
 } from "@gshl-utils";
 import { clientApi as api } from "@gshl-trpc";
 
-import { useNavStore } from "@gshl-cache";
+import { referenceStore, useNavStore } from "@gshl-cache";
+import { useReferenceSnapshotRefresh } from "./useReferenceSnapshotRefresh";
+
+function orderSeasons(
+  seasons: Season[],
+  orderBy: Record<string, "asc" | "desc">,
+) {
+  const [field, direction] = Object.entries(orderBy)[0] ?? ["year", "asc"];
+  return [...seasons].sort((left, right) => {
+    const leftValue = left[field as keyof Season];
+    const rightValue = right[field as keyof Season];
+    if (leftValue === rightValue) return 0;
+    const result = leftValue > rightValue ? 1 : -1;
+    return direction === "desc" ? -result : result;
+  });
+}
 
 /**
  * Options for configuring the seasons query.
@@ -127,6 +142,40 @@ export function useSeasons(options: UseSeasonsOptions = {}) {
       ? selectedSeasonId
       : null;
 
+  useReferenceSnapshotRefresh(enabled && referenceStore.isSupported());
+
+  const [cachedSeasons, setCachedSeasons] = useState<Season[] | null>(null);
+  const [cacheReady, setCacheReady] = useState(typeof window === "undefined");
+
+  useEffect(() => {
+    if (!enabled || !referenceStore.isSupported()) {
+      setCacheReady(true);
+      return;
+    }
+
+    let isMounted = true;
+
+    void referenceStore
+      .getSeasons()
+      .then((seasons) => {
+        if (isMounted) {
+          setCachedSeasons(seasons);
+          setCacheReady(true);
+        }
+      })
+      .catch(() => {
+        if (isMounted) {
+          setCacheReady(true);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [enabled]);
+
+  const hasCachedSeasons = Boolean(cachedSeasons && cachedSeasons.length > 0);
+
   // Build where clause
   const where: Record<string, unknown> = {};
   if (year !== undefined) where.year = year;
@@ -136,21 +185,53 @@ export function useSeasons(options: UseSeasonsOptions = {}) {
 
   const getAllQuery = api.season.getAll.useQuery(
     Object.keys(where).length > 0 ? { where, orderBy } : { orderBy },
-    { enabled: enabled && !isSingleSeason },
+    { enabled: enabled && cacheReady && !isSingleSeason && !hasCachedSeasons },
   );
 
   const getByIdQuery = api.season.getById.useQuery(
     { id: normalizedSeasonId ?? "" },
-    { enabled: enabled && isSingleSeason },
+    { enabled: enabled && cacheReady && isSingleSeason && !hasCachedSeasons },
   );
+
+  useEffect(() => {
+    if (getAllQuery.data?.length) {
+      void referenceStore.putSeasons(getAllQuery.data);
+    }
+  }, [getAllQuery.data]);
+
+  useEffect(() => {
+    if (getByIdQuery.data) {
+      void referenceStore.putSeasons([getByIdQuery.data]);
+    }
+  }, [getByIdQuery.data]);
 
   // Use appropriate query
   const query = isSingleSeason ? getByIdQuery : getAllQuery;
-  const seasons = isSingleSeason
-    ? getByIdQuery.data
-      ? [getByIdQuery.data]
-      : []
-    : (getAllQuery.data ?? []);
+  const seasons = useMemo(() => {
+    if (hasCachedSeasons && cachedSeasons) {
+      const filtered = normalizedSeasonId
+        ? cachedSeasons.filter((season) => String(season.id) === normalizedSeasonId)
+        : year !== undefined
+          ? cachedSeasons.filter((season) => season.year === year)
+          : cachedSeasons;
+      return orderSeasons(filtered, orderBy);
+    }
+
+    return isSingleSeason
+      ? getByIdQuery.data
+        ? [getByIdQuery.data]
+        : []
+      : (getAllQuery.data ?? []);
+  }, [
+    cachedSeasons,
+    getAllQuery.data,
+    getByIdQuery.data,
+    hasCachedSeasons,
+    isSingleSeason,
+    normalizedSeasonId,
+    orderBy,
+    year,
+  ]);
 
   // Apply current season filtering if requested
   let filteredSeasons: Season[] = seasons;
@@ -161,7 +242,7 @@ export function useSeasons(options: UseSeasonsOptions = {}) {
 
   return {
     data: filteredSeasons,
-    isLoading: query.isLoading,
+    isLoading: !hasCachedSeasons && !cacheReady ? true : query.isLoading,
     error: query.error ?? null,
   };
 }
@@ -200,8 +281,12 @@ export function useSeasonState(options: UseSeasonStateOptions = {}) {
   const { autoSelect = true, referenceDate = new Date() } = options;
 
   // Fetch all seasons
-  const query = api.season.getAll.useQuery({ orderBy: { year: "asc" } });
-  const seasons = useMemo(() => query.data ?? [], [query.data]);
+  const {
+    data: seasonsData = [],
+    isLoading,
+    error,
+  } = useSeasons({ orderBy: { year: "asc" } });
+  const seasons = useMemo(() => seasonsData ?? [], [seasonsData]);
   const seasonOptions = useMemo(() => buildSeasonSummaries(seasons), [seasons]);
 
   // Nav store integration
@@ -256,7 +341,7 @@ export function useSeasonState(options: UseSeasonStateOptions = {}) {
   // Auto-select default season if none is selected
   useEffect(() => {
     if (!autoSelect) return;
-    if (query.isLoading || query.isFetching) return;
+    if (isLoading) return;
     if (selectedSeasonId) return;
     if (!seasons.length) return;
     if (!defaultSeason?.id) return;
@@ -264,8 +349,7 @@ export function useSeasonState(options: UseSeasonStateOptions = {}) {
     setSelectedSeasonId(String(defaultSeason.id));
   }, [
     autoSelect,
-    query.isLoading,
-    query.isFetching,
+    isLoading,
     selectedSeasonId,
     seasons,
     defaultSeason,
@@ -273,7 +357,10 @@ export function useSeasonState(options: UseSeasonStateOptions = {}) {
   ]);
 
   return {
-    ...query,
+    data: seasons,
+    isLoading,
+    isFetching: false,
+    error,
     seasons,
     currentSeason,
     currentSeasonSummary,

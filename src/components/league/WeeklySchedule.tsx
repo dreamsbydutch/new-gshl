@@ -123,7 +123,11 @@ const TeamDisplay = ({ team, rank, isAway = false }: TeamDisplayProps) => {
   );
 };
 
-const WeekScheduleItem = ({ matchup, teams }: WeekScheduleItemProps) => {
+
+const WeekScheduleItem = ({
+  matchup,
+  teams,
+}: WeekScheduleItemProps) => {
   const homeTeam = findTeamById(teams, matchup.homeTeamId);
   const awayTeam = findTeamById(teams, matchup.awayTeamId);
 
