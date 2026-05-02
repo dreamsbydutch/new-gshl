@@ -168,13 +168,13 @@ export class FastSheetsReader {
       );
       const rows = workbookRows.flat();
 
-      this.setCachedModel(modelName, rows as DatabaseRecord[]);
+      this.setCachedModel(modelName, rows);
       return rows;
     })();
 
     this.inFlightModelFetches.set(
       modelName,
-      request as Promise<DatabaseRecord[]>,
+      request,
     );
 
     try {
@@ -225,13 +225,13 @@ export class FastSheetsReader {
           );
         });
 
-      this.setCachedPlayerDaySeason(seasonKey, rows as DatabaseRecord[]);
+      this.setCachedPlayerDaySeason(seasonKey, rows);
       return rows;
     })();
 
     this.inFlightPlayerDaySeasonFetches.set(
       seasonKey,
-      request as Promise<DatabaseRecord[]>,
+      request,
     );
 
     try {

@@ -153,7 +153,7 @@ export function useScheduleData(
         ...m,
         week: weeks?.find((w) => w.id === m.weekId),
         season: seasons?.find((s) => s.id === m.seasonId),
-      } as EnhancedMatchup;
+      };
     });
 
     // Filter by owner ID

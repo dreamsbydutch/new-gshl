@@ -21,7 +21,13 @@ export function ConferenceContest() {
     }
 
     return (
-      <Image src={team.logoUrl} alt={formatTeamLabel(team)} width={24} height={24} className="h-6 w-6" />
+      <Image
+        src={team.logoUrl}
+        alt={formatTeamLabel(team)}
+        width={24}
+        height={24}
+        className="h-6 w-6"
+      />
     );
   };
 

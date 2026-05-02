@@ -69,8 +69,10 @@ type BrowserFetchResult = {
   url: string;
 };
 
-// eslint-disable-next-line @typescript-eslint/consistent-type-imports
-type OptimizedSheetsClient = Awaited<typeof import("../lib/sheets/client/optimized-client")>["optimizedSheetsClient"];
+
+type OptimizedSheetsClient = Awaited<
+  typeof import("../lib/sheets/client/optimized-client")
+>["optimizedSheetsClient"];
 
 type SheetRecord = Record<string, PrimitiveCellValue>;
 
@@ -214,7 +216,10 @@ Options:
 
 const DEBUG_PLAYER_ID = toTrimmedString(process.env.PLAYER_BIO_DEBUG_PLAYER_ID);
 
-function parseBooleanFlag(value: string | undefined, fallback: boolean): boolean {
+function parseBooleanFlag(
+  value: string | undefined,
+  fallback: boolean,
+): boolean {
   if (value === undefined) return fallback;
   const normalized = value.trim().toLowerCase();
   if (["1", "true", "yes", "on"].includes(normalized)) return true;
@@ -230,12 +235,13 @@ let optimizedSheetsClientPromise: Promise<OptimizedSheetsClient> | null = null;
 
 async function getOptimizedSheetsClient(): Promise<OptimizedSheetsClient> {
   process.env.USE_GOOGLE_SHEETS ??= "true";
-  process.env.GOOGLE_SERVICE_ACCOUNT_KEY_FILE ??= path.resolve("credentials.json");
+  process.env.GOOGLE_SERVICE_ACCOUNT_KEY_FILE ??=
+    path.resolve("credentials.json");
 
   if (!optimizedSheetsClientPromise) {
-    optimizedSheetsClientPromise = import("../lib/sheets/client/optimized-client").then(
-      (module) => module.optimizedSheetsClient,
-    );
+    optimizedSheetsClientPromise = import(
+      "../lib/sheets/client/optimized-client"
+    ).then((module) => module.optimizedSheetsClient);
   }
 
   return optimizedSheetsClientPromise;
@@ -326,7 +332,8 @@ function toPositiveInteger(
   maxValue?: number,
 ): number {
   const numeric = Number(value);
-  const safe = Number.isFinite(numeric) && numeric > 0 ? Math.floor(numeric) : fallback;
+  const safe =
+    Number.isFinite(numeric) && numeric > 0 ? Math.floor(numeric) : fallback;
   return maxValue !== undefined ? Math.min(safe, maxValue) : safe;
 }
 
@@ -381,7 +388,13 @@ function formatDateOnlyValue(value: unknown): string {
 }
 
 function removeAccentsSafe(value: unknown): string {
-  if (value === null || value === undefined || typeof value === "object" || typeof value === "symbol") return "";
+  if (
+    value === null ||
+    value === undefined ||
+    typeof value === "object" ||
+    typeof value === "symbol"
+  )
+    return "";
   const raw = (value as string | number | boolean | bigint).toString();
   if (!raw) return "";
   return raw.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
@@ -393,7 +406,11 @@ function buildFirstNameAliasMap(
   const aliasMap: Record<string, string[]> = {};
 
   for (const family of families) {
-    const normalizedFamily = [...new Set(family.map((value) => normalizeNameKeyPart(value)).filter(Boolean))];
+    const normalizedFamily = [
+      ...new Set(
+        family.map((value) => normalizeNameKeyPart(value)).filter(Boolean),
+      ),
+    ];
     for (const familyMember of normalizedFamily) {
       const existingAliases = aliasMap[familyMember] ?? [];
       aliasMap[familyMember] = [
@@ -419,7 +436,9 @@ function normalizeNameKeyPart(value: unknown): string {
 const FIRST_NAME_ALIAS_MAP = buildFirstNameAliasMap(FIRST_NAME_ALIAS_FAMILIES);
 
 function sanitizeDisplayNamePart(value: unknown): string {
-  return removeAccentsSafe(value).replace(/[^A-Za-z]/g, "").trim();
+  return removeAccentsSafe(value)
+    .replace(/[^A-Za-z]/g, "")
+    .trim();
 }
 
 function extractInitialsNameKeyPart(value: unknown): string {
@@ -476,7 +495,9 @@ function normalizeApiPosition(value: unknown): string {
 }
 
 function normalizePositionGroupToken(value: unknown): string {
-  const raw = toTrimmedString(value).toUpperCase().replace(/[^A-Z]/g, "");
+  const raw = toTrimmedString(value)
+    .toUpperCase()
+    .replace(/[^A-Z]/g, "");
   if (!raw) return "";
   if (raw === "F" || raw === "FWD" || raw === "FORWARD") return "F";
   if (raw === "D" || raw === "DEFENSE" || raw === "DEFENCE") return "D";
@@ -488,7 +509,9 @@ function normalizePositionGroupToken(value: unknown): string {
 }
 
 function normalizeSheetPositionToken(value: unknown): string {
-  const raw = toTrimmedString(value).toUpperCase().replace(/[^A-Z]/g, "");
+  const raw = toTrimmedString(value)
+    .toUpperCase()
+    .replace(/[^A-Z]/g, "");
   if (!raw) return "";
   if (raw === "L" || raw === "LW" || raw === "LEFTWING") return "LW";
   if (raw === "R" || raw === "RW" || raw === "RIGHTWING") return "RW";
@@ -557,7 +580,10 @@ function splitNhlPosTokens(value: unknown): string[] {
   return output;
 }
 
-function choosePreferredPlayerDayRow(existing: SheetRecord | null, candidate: SheetRecord): SheetRecord {
+function choosePreferredPlayerDayRow(
+  existing: SheetRecord | null,
+  candidate: SheetRecord,
+): SheetRecord {
   if (!existing) return candidate;
 
   const existingTeam = toTrimmedString(existing.gshlTeamId);
@@ -579,11 +605,16 @@ function buildMatchKeyFromParts(
   normalizedLastName: string,
   normalizedPosGroup: string,
 ): string {
-  if (!normalizedFirstName || !normalizedLastName || !normalizedPosGroup) return "";
+  if (!normalizedFirstName || !normalizedLastName || !normalizedPosGroup)
+    return "";
   return `${normalizedFirstName}|${normalizedLastName}|${normalizedPosGroup}`;
 }
 
-function buildExactMatchKey(firstName: unknown, lastName: unknown, pos: unknown): string {
+function buildExactMatchKey(
+  firstName: unknown,
+  lastName: unknown,
+  pos: unknown,
+): string {
   return buildMatchKeyFromParts(
     normalizeNameKeyPart(firstName),
     normalizeNameKeyPart(lastName),
@@ -641,7 +672,10 @@ function isValidDateOnlyString(value: unknown): value is string {
   const text = toTrimmedString(value);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) return false;
   const parsed = new Date(`${text}T00:00:00Z`);
-  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === text;
+  return (
+    !Number.isNaN(parsed.getTime()) &&
+    parsed.toISOString().slice(0, 10) === text
+  );
 }
 
 function toFiniteNumber(value: unknown): number | null {
@@ -767,7 +801,10 @@ function isHtmlLikeResponse(text: string): boolean {
 }
 
 function getResponseExcerpt(text: string): string {
-  return String(text || "").replace(/\s+/g, " ").trim().slice(0, 300);
+  return String(text || "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 300);
 }
 
 function createDefaultQuery(pageNumber: number, options: PlayerBioSyncOptions) {
@@ -783,11 +820,16 @@ function createDefaultQuery(pageNumber: number, options: PlayerBioSyncOptions) {
   };
 }
 
-function buildPuckPediaUrl(pageNumber: number, options: PlayerBioSyncOptions): string {
+function buildPuckPediaUrl(
+  pageNumber: number,
+  options: PlayerBioSyncOptions,
+): string {
   return `https://puckpedia.com/players/api?q=${encodeURIComponent(JSON.stringify(createDefaultQuery(pageNumber, options)))}`;
 }
 
-function getRowsFromCandidate(candidate: unknown): Record<string, unknown>[] | null {
+function getRowsFromCandidate(
+  candidate: unknown,
+): Record<string, unknown>[] | null {
   if (!candidate) return null;
   if (Array.isArray(candidate)) {
     return candidate.filter(
@@ -833,11 +875,20 @@ function getRowsFromCandidate(candidate: unknown): Record<string, unknown>[] | n
   return null;
 }
 
-function extractRowsFromResponse(parsed: unknown, pageNumber: number): Record<string, unknown>[] {
+function extractRowsFromResponse(
+  parsed: unknown,
+  pageNumber: number,
+): Record<string, unknown>[] {
   const candidates = [
-    typeof parsed === "object" && parsed ? (parsed as Record<string, unknown>).data : undefined,
-    typeof parsed === "object" && parsed ? (parsed as Record<string, unknown>).results : undefined,
-    typeof parsed === "object" && parsed ? (parsed as Record<string, unknown>).rows : undefined,
+    typeof parsed === "object" && parsed
+      ? (parsed as Record<string, unknown>).data
+      : undefined,
+    typeof parsed === "object" && parsed
+      ? (parsed as Record<string, unknown>).results
+      : undefined,
+    typeof parsed === "object" && parsed
+      ? (parsed as Record<string, unknown>).rows
+      : undefined,
     parsed,
   ];
 
@@ -851,7 +902,9 @@ function extractRowsFromResponse(parsed: unknown, pageNumber: number): Record<st
   );
 }
 
-function normalizeWriteValue(value: PrimitiveCellValue | undefined): PrimitiveCellValue {
+function normalizeWriteValue(
+  value: PrimitiveCellValue | undefined,
+): PrimitiveCellValue {
   if (value === undefined || value === null) return "";
   return value;
 }
@@ -880,7 +933,9 @@ function buildExistingPlayerIndex(rows: PlayerSheetRow[]) {
           normalizePositionGroupToken(token),
         );
 
-    const uniqueMatchGroups = [...new Set(effectiveMatchGroups.filter(Boolean))];
+    const uniqueMatchGroups = [
+      ...new Set(effectiveMatchGroups.filter(Boolean)),
+    ];
     const firstNameKeys = getNormalizedFirstNameKeys(row.data.firstName);
     const normalizedLastName = normalizeNameKeyPart(row.data.lastName);
     if (!firstNameKeys.length || !normalizedLastName) continue;
@@ -906,7 +961,9 @@ function buildExistingPlayerIndex(rows: PlayerSheetRow[]) {
   const ambiguousKeys = new Map<string, PlayerSheetRow[]>();
 
   for (const [key, entries] of playersByKey.entries()) {
-    const uniqueEntries = [...new Map(entries.map((entry) => [entry.rowNumber, entry])).values()];
+    const uniqueEntries = [
+      ...new Map(entries.map((entry) => [entry.rowNumber, entry])).values(),
+    ];
     if (uniqueEntries.length === 1) {
       const [onlyEntry] = uniqueEntries;
       if (onlyEntry) uniquePlayersByKey.set(key, onlyEntry);
@@ -933,7 +990,8 @@ function resolveExistingPlayerMatches(
       matchedRows.set(uniquePlayer.rowNumber, uniquePlayer);
     }
 
-    const ambiguousPlayers = existingIndex.ambiguousKeys.get(candidateKey) ?? [];
+    const ambiguousPlayers =
+      existingIndex.ambiguousKeys.get(candidateKey) ?? [];
     for (const ambiguousPlayer of ambiguousPlayers) {
       matchedRows.set(ambiguousPlayer.rowNumber, ambiguousPlayer);
     }
@@ -968,7 +1026,10 @@ async function waitForSearchPageReady(
   options: PlayerBioSyncOptions,
 ): Promise<void> {
   const targetUrl = "https://puckpedia.com/players/search";
-  await page.goto(targetUrl, { waitUntil: "domcontentloaded", timeout: 120000 });
+  await page.goto(targetUrl, {
+    waitUntil: "domcontentloaded",
+    timeout: 120000,
+  });
 
   const deadline = Date.now() + options.waitForManualClearanceMs;
   let promptedForManualClearance = false;
@@ -992,7 +1053,10 @@ async function waitForSearchPageReady(
       const rl = readline.createInterface({ input, output });
       await rl.question("");
       rl.close();
-      await page.goto(targetUrl, { waitUntil: "domcontentloaded", timeout: 120000 });
+      await page.goto(targetUrl, {
+        waitUntil: "domcontentloaded",
+        timeout: 120000,
+      });
       continue;
     }
 
@@ -1114,7 +1178,10 @@ function resolveSeasonRatingValue(row: SheetRecord | null): number | null {
   return null;
 }
 
-function getRecordPosGroup(row: SheetRecord | null, fallback?: unknown): string {
+function getRecordPosGroup(
+  row: SheetRecord | null,
+  fallback?: unknown,
+): string {
   const directPosGroup = normalizePositionGroupToken(row?.posGroup);
   if (directPosGroup) return directPosGroup;
 
@@ -1146,18 +1213,20 @@ function getUsageValue(row: SheetRecord | null): number {
 }
 
 function buildSeasonOrder(rows: SheetRecord[]): string[] {
-  return [...new Set(rows.map((row) => toTrimmedString(row.seasonId)).filter(Boolean))].sort(
-    compareSeasonIdAsc,
-  );
+  return [
+    ...new Set(
+      rows.map((row) => toTrimmedString(row.seasonId)).filter(Boolean),
+    ),
+  ].sort(compareSeasonIdAsc);
 }
 
 function buildSeasonIndexMap(
   rows: SheetRecord[],
   extraSeasonIds: string[] = [],
 ): Map<string, number> {
-  const seasonOrder = [...new Set(buildSeasonOrder(rows).concat(extraSeasonIds.filter(Boolean)))].sort(
-    compareSeasonIdAsc,
-  );
+  const seasonOrder = [
+    ...new Set(buildSeasonOrder(rows).concat(extraSeasonIds.filter(Boolean))),
+  ].sort(compareSeasonIdAsc);
   const seasonIndexMap = new Map<string, number>();
   seasonOrder.forEach((seasonId, index) => {
     seasonIndexMap.set(seasonId, index);
@@ -1188,16 +1257,23 @@ function buildRowsByPlayerId(rows: SheetRecord[]): Map<string, SheetRecord[]> {
   return rowsByPlayerId;
 }
 
-function getLeagueAnchor(rowsForSeason: SheetRecord[], posGroup: string): number {
+function getLeagueAnchor(
+  rowsForSeason: SheetRecord[],
+  posGroup: string,
+): number {
   const scores = rowsForSeason
     .filter((row) => getRecordPosGroup(row) === posGroup)
     .map((row) => resolveSeasonRatingValue(row))
-    .filter((value): value is number => value !== null && Number.isFinite(value));
+    .filter(
+      (value): value is number => value !== null && Number.isFinite(value),
+    );
   if (!scores.length) return 62.5;
   return scores.reduce((sum, score) => sum + score, 0) / scores.length;
 }
 
-function buildSeasonLeagueAnchors(rowsForSeason: SheetRecord[]): Record<string, number> {
+function buildSeasonLeagueAnchors(
+  rowsForSeason: SheetRecord[],
+): Record<string, number> {
   return {
     F: getLeagueAnchor(rowsForSeason, "F"),
     D: getLeagueAnchor(rowsForSeason, "D"),
@@ -1220,14 +1296,30 @@ function getCareerStabilityFactor(
   totalUsage: number,
 ): number {
   const usageTarget =
-    posGroup === "G" ? GOALIE_TALENT_STABILITY_TARGET : SKATER_TALENT_STABILITY_TARGET;
-  const usageTrust = clip(Math.sqrt(clip(totalUsage / usageTarget, 0, 1)), 0, 1);
+    posGroup === "G"
+      ? GOALIE_TALENT_STABILITY_TARGET
+      : SKATER_TALENT_STABILITY_TARGET;
+  const usageTrust = clip(
+    Math.sqrt(clip(totalUsage / usageTarget, 0, 1)),
+    0,
+    1,
+  );
   const seasonTrust =
-    seasonCount >= 4 ? 1 : seasonCount === 3 ? 0.92 : seasonCount === 2 ? 0.84 : 0.76;
+    seasonCount >= 4
+      ? 1
+      : seasonCount === 3
+        ? 0.92
+        : seasonCount === 2
+          ? 0.84
+          : 0.76;
   return seasonTrust * (0.8 + 0.2 * usageTrust);
 }
 
-function dampDeviation(score: number, mean: number, reliability: number): number {
+function dampDeviation(
+  score: number,
+  mean: number,
+  reliability: number,
+): number {
   const deviation = score - mean;
   const absDeviation = Math.abs(deviation);
   let factor = 1;
@@ -1270,22 +1362,32 @@ function computeOverallRatingForHistory(
     value: entry.score,
     weight: entry.recencyWeight * entry.reliability,
   }));
-  const prelimWeight = prelimEntries.reduce((sum, entry) => sum + entry.weight, 0);
+  const prelimWeight = prelimEntries.reduce(
+    (sum, entry) => sum + entry.weight,
+    0,
+  );
   const prelimMean =
     prelimWeight > 0
-      ? prelimEntries.reduce((sum, entry) => sum + entry.value * entry.weight, 0) /
-        prelimWeight
+      ? prelimEntries.reduce(
+          (sum, entry) => sum + entry.value * entry.weight,
+          0,
+        ) / prelimWeight
       : 0;
 
   const dampedEntries = scoredHistory.map((entry) => ({
     value: dampDeviation(entry.score, prelimMean, entry.reliability),
     weight: entry.recencyWeight * entry.reliability,
   }));
-  const dampedWeight = dampedEntries.reduce((sum, entry) => sum + entry.weight, 0);
+  const dampedWeight = dampedEntries.reduce(
+    (sum, entry) => sum + entry.weight,
+    0,
+  );
   const dampedMean =
     dampedWeight > 0
-      ? dampedEntries.reduce((sum, entry) => sum + entry.value * entry.weight, 0) /
-        dampedWeight
+      ? dampedEntries.reduce(
+          (sum, entry) => sum + entry.value * entry.weight,
+          0,
+        ) / dampedWeight
       : 0;
 
   const posGroup = getRecordPosGroup(scoredHistory[0]?.row ?? null);
@@ -1434,18 +1536,27 @@ function compareSeasonIdAsc(left: string, right: string): number {
   return left.localeCompare(right);
 }
 
-function getDatesInRangeInclusiveCount(startDate: unknown, endDate: unknown): number {
+function getDatesInRangeInclusiveCount(
+  startDate: unknown,
+  endDate: unknown,
+): number {
   const startKey = formatDateOnlyValue(startDate);
   const endKey = formatDateOnlyValue(endDate);
   if (!startKey || !endKey) return 0;
 
   const start = new Date(`${startKey}T00:00:00Z`);
   const end = new Date(`${endKey}T00:00:00Z`);
-  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end < start) {
+  if (
+    Number.isNaN(start.getTime()) ||
+    Number.isNaN(end.getTime()) ||
+    end < start
+  ) {
     return 0;
   }
 
-  return Math.floor((end.getTime() - start.getTime()) / (24 * 60 * 60 * 1000)) + 1;
+  return (
+    Math.floor((end.getTime() - start.getTime()) / (24 * 60 * 60 * 1000)) + 1
+  );
 }
 
 function normalizeExpiryStatus(value: unknown): string {
@@ -1504,7 +1615,10 @@ async function resolveCurrentGshlSeasonId(
     return toTrimmedString(explicitSeasonId);
   }
 
-  const seasonRows = await readSheetRecords(WORKBOOKS.GENERAL, SHEETS_CONFIG.SHEETS.Season);
+  const seasonRows = await readSheetRecords(
+    WORKBOOKS.GENERAL,
+    SHEETS_CONFIG.SHEETS.Season,
+  );
   const activeRows = seasonRows.filter((row) => toBoolean(row.isActive));
   const candidates = activeRows.length ? activeRows : seasonRows;
   const sortedCandidates = candidates.slice().sort((left, right) => {
@@ -1518,7 +1632,9 @@ async function resolveCurrentGshlSeasonId(
 
   const currentSeasonId = toTrimmedString(sortedCandidates[0]?.id);
   if (!currentSeasonId) {
-    throw new Error("[player-bio-sync] Could not determine the current GSHL season id.");
+    throw new Error(
+      "[player-bio-sync] Could not determine the current GSHL season id.",
+    );
   }
 
   return currentSeasonId;
@@ -1527,7 +1643,10 @@ async function resolveCurrentGshlSeasonId(
 async function buildTeamIdToFranchiseIdMapForSeason(
   gshlSeasonId: string,
 ): Promise<Map<string, string>> {
-  const teamRows = await readSheetRecords(WORKBOOKS.GENERAL, SHEETS_CONFIG.SHEETS.Team);
+  const teamRows = await readSheetRecords(
+    WORKBOOKS.GENERAL,
+    SHEETS_CONFIG.SHEETS.Team,
+  );
   const teamIdToFranchiseId = new Map<string, string>();
 
   for (const row of teamRows) {
@@ -1541,7 +1660,9 @@ async function buildTeamIdToFranchiseIdMapForSeason(
   return teamIdToFranchiseId;
 }
 
-async function buildLatestPlayerDaySnapshots(): Promise<Map<string, LatestPlayerDaySnapshot>> {
+async function buildLatestPlayerDaySnapshots(): Promise<
+  Map<string, LatestPlayerDaySnapshot>
+> {
   const snapshots = new Map<string, LatestPlayerDaySnapshot>();
 
   for (const workbookKey of PLAYERDAY_WORKBOOK_KEYS) {
@@ -1590,16 +1711,17 @@ async function buildRosterSnapshotContext(
     seasonRows.find((row) => toTrimmedString(row.id) === gshlSeasonId) ?? null;
   const seasonStartKey = formatDateOnlyValue(seasonRow?.startDate);
   const seasonEndKey = formatDateOnlyValue(seasonRow?.endDate);
-  const regularSeasonEndKey = weekRows
-    .filter(
-      (row) =>
-        toTrimmedString(row.seasonId) === gshlSeasonId &&
-        toTrimmedString(row.weekType) === REGULAR_SEASON,
-    )
-    .map((row) => formatDateOnlyValue(row.endDate))
-    .filter(Boolean)
-    .sort()
-    .at(-1) ?? "";
+  const regularSeasonEndKey =
+    weekRows
+      .filter(
+        (row) =>
+          toTrimmedString(row.seasonId) === gshlSeasonId &&
+          toTrimmedString(row.weekType) === REGULAR_SEASON,
+      )
+      .map((row) => formatDateOnlyValue(row.endDate))
+      .filter(Boolean)
+      .sort()
+      .at(-1) ?? "";
   const referenceDateKey = formatDateOnlyValue(referenceDate);
   const activeByDate =
     !!seasonStartKey &&
@@ -1611,7 +1733,8 @@ async function buildRosterSnapshotContext(
     activeByDate ||
     ((!seasonStartKey || !seasonEndKey) && toBoolean(seasonRow?.isActive));
   const targetDateKey =
-    (isSeasonActive ? referenceDateKey : regularSeasonEndKey || seasonEndKey) || "";
+    (isSeasonActive ? referenceDateKey : regularSeasonEndKey || seasonEndKey) ||
+    "";
 
   if (!targetDateKey) {
     return {
@@ -1674,7 +1797,10 @@ async function buildPlayerSeasonStatusContext(
     readSheetRecords(WORKBOOKS.GENERAL, SHEETS_CONFIG.SHEETS.Season),
     readSheetRecords(WORKBOOKS.GENERAL, SHEETS_CONFIG.SHEETS.Week),
     readSheetRecords(WORKBOOKS.GENERAL, SHEETS_CONFIG.SHEETS.Contract),
-    readSheetRecords(WORKBOOKS.PLAYERSTATS, SHEETS_CONFIG.SHEETS.PlayerTotalStatLine),
+    readSheetRecords(
+      WORKBOOKS.PLAYERSTATS,
+      SHEETS_CONFIG.SHEETS.PlayerTotalStatLine,
+    ),
   ]);
 
   const regularSeasonDayCount = weekRows
@@ -1701,7 +1827,8 @@ async function buildPlayerSeasonStatusContext(
   const todayKey = formatDateOnlyValue(referenceDate);
   const seasonEndKey =
     formatDateOnlyValue(
-      seasonRows.find((row) => toTrimmedString(row.id) === gshlSeasonId)?.endDate,
+      seasonRows.find((row) => toTrimmedString(row.id) === gshlSeasonId)
+        ?.endDate,
     ) || "";
 
   const pushContract = (
@@ -1874,7 +2001,9 @@ async function buildPlayerNhlContext(
     .filter((row): row is NonNullable<typeof row> => Boolean(row));
 
   const previousSeasonRows = previousSeasonId
-    ? allRows.filter((row) => toTrimmedString(row.seasonId) === previousSeasonId)
+    ? allRows.filter(
+        (row) => toTrimmedString(row.seasonId) === previousSeasonId,
+      )
     : [];
   const previousSeasonOverallRows = previousSeasonRows
     .map((row) => {
@@ -1891,7 +2020,8 @@ async function buildPlayerNhlContext(
       const playerId = toTrimmedString(playerRow.data.id);
       if (!playerId || targetSeasonIndex === undefined) return null;
 
-      const currentSeasonRow = currentSeasonRowsByPlayerId.get(playerId) ?? null;
+      const currentSeasonRow =
+        currentSeasonRowsByPlayerId.get(playerId) ?? null;
       const historyRows = getHistoryRowsForSeason(
         playerId,
         rowsByPlayerId,
@@ -1903,7 +2033,10 @@ async function buildPlayerNhlContext(
         ? getRecordPosGroup(currentSeasonRow)
         : historyRows[0]
           ? getRecordPosGroup(historyRows[0])
-          : getRecordPosGroup(null, playerRow.data.posGroup ?? playerRow.data.nhlPos);
+          : getRecordPosGroup(
+              null,
+              playerRow.data.posGroup ?? playerRow.data.nhlPos,
+            );
       const overallRating = computeOverallRatingForHistory(
         historyRows,
         seasonLeagueAnchors[posGroup] ?? 62.5,
@@ -1911,7 +2044,9 @@ async function buildPlayerNhlContext(
       return {
         playerId,
         overallRating: overallRating ?? 0,
-        seasonRating: currentSeasonRow ? resolveSeasonRatingValue(currentSeasonRow) : null,
+        seasonRating: currentSeasonRow
+          ? resolveSeasonRatingValue(currentSeasonRow)
+          : null,
       };
     })
     .filter((row): row is NonNullable<typeof row> => Boolean(row));
@@ -2066,7 +2201,8 @@ function buildPlayerStatusPatch(
     return fields;
   }
 
-  const preDraftRank = nhlContext.preDraftRanksByPlayerId.get(normalizedPlayerId);
+  const preDraftRank =
+    nhlContext.preDraftRanksByPlayerId.get(normalizedPlayerId);
   fields.preDraftRk = preDraftRank ?? "";
 
   const futureContracts =
@@ -2074,7 +2210,8 @@ function buildPlayerStatusPatch(
   const currentContracts =
     statusContext.currentContractsByPlayerId.get(normalizedPlayerId) ?? [];
   const offseasonExpiredContracts =
-    statusContext.offseasonExpiredContractsByPlayerId.get(normalizedPlayerId) ?? [];
+    statusContext.offseasonExpiredContractsByPlayerId.get(normalizedPlayerId) ??
+    [];
   const offseasonUfaExpiries =
     statusContext.offseasonUfaExpiryByPlayerId.get(normalizedPlayerId) ?? [];
   const regularSeasonDays =
@@ -2100,7 +2237,10 @@ function buildPlayerStatusPatch(
   }
 
   const latestRelevantContract =
-    currentContracts[0] ?? offseasonExpiredContracts[0] ?? futureContracts[0] ?? null;
+    currentContracts[0] ??
+    offseasonExpiredContracts[0] ??
+    futureContracts[0] ??
+    null;
   const normalizedExpiryStatus = normalizeExpiryStatus(
     latestRelevantContract?.expiryStatus,
   );
@@ -2121,13 +2261,15 @@ function buildPlayerStatusPatch(
             capHitEndDate: contract.capHitEndDate,
             effectiveEndKey: getContractEffectiveEndKey(contract),
           })),
-          offseasonExpiredContracts: offseasonExpiredContracts.map((contract) => ({
-            id: contract.id,
-            expiryStatus: contract.expiryStatus,
-            expiryDate: contract.expiryDate,
-            capHitEndDate: contract.capHitEndDate,
-            effectiveEndKey: getContractEffectiveEndKey(contract),
-          })),
+          offseasonExpiredContracts: offseasonExpiredContracts.map(
+            (contract) => ({
+              id: contract.id,
+              expiryStatus: contract.expiryStatus,
+              expiryDate: contract.expiryDate,
+              capHitEndDate: contract.capHitEndDate,
+              effectiveEndKey: getContractEffectiveEndKey(contract),
+            }),
+          ),
           offseasonUfaExpiries: offseasonUfaExpiries.map((contract) => ({
             id: contract.id,
             expiryStatus: contract.expiryStatus,
@@ -2200,7 +2342,7 @@ function buildRosterSnapshotPatch(
 
   const rosterTeamId = toTrimmedString(snapshotRow.gshlTeamId);
   fields.gshlTeamId = rosterTeamId
-    ? teamIdToFranchiseId.get(rosterTeamId) ?? ""
+    ? (teamIdToFranchiseId.get(rosterTeamId) ?? "")
     : "";
 
   return fields;
@@ -2219,7 +2361,10 @@ function buildPlayerContextPatch(
   const normalizedPlayerId = toTrimmedString(playerId);
 
   if (normalizedPlayerId) {
-    Object.assign(fields, buildSeasonContextPatch(normalizedPlayerId, nhlContext));
+    Object.assign(
+      fields,
+      buildSeasonContextPatch(normalizedPlayerId, nhlContext),
+    );
     Object.assign(
       fields,
       buildLatestPlayerDayPatch(normalizedPlayerId, latestPlayerDaySnapshots),
@@ -2258,7 +2403,13 @@ function buildInsertPayload(
 ): Record<string, PrimitiveCellValue> | null {
   const firstName = sanitizeDisplayNamePart(apiRow.p_fn);
   const lastName = sanitizeDisplayNamePart(apiRow.p_ln);
-  if (!Number.isFinite(id) || id <= 0 || !firstName || !lastName || !normalizedPos) {
+  if (
+    !Number.isFinite(id) ||
+    id <= 0 ||
+    !firstName ||
+    !lastName ||
+    !normalizedPos
+  ) {
     return null;
   }
 
@@ -2311,22 +2462,28 @@ function parseOptions(argv: string[]): PlayerBioSyncOptions {
     logToConsole: parseBooleanFlag(getArgValue(argv, "--log"), true),
     gshlSeasonId: toTrimmedString(getArgValue(argv, "--gshl-season-id")),
     focusSeason:
-      toTrimmedString(getArgValue(argv, "--focus-season")) || DEFAULT_FOCUS_SEASON,
+      toTrimmedString(getArgValue(argv, "--focus-season")) ||
+      DEFAULT_FOCUS_SEASON,
     statSeason:
-      toTrimmedString(getArgValue(argv, "--stat-season")) || DEFAULT_STAT_SEASON,
+      toTrimmedString(getArgValue(argv, "--stat-season")) ||
+      DEFAULT_STAT_SEASON,
     pageSize: toPositiveInteger(
       getArgValue(argv, "--page-size"),
       DEFAULT_PAGE_SIZE,
       MAX_PAGE_SIZE,
     ),
-    maxPages: toPositiveInteger(getArgValue(argv, "--max-pages"), DEFAULT_MAX_PAGES),
+    maxPages: toPositiveInteger(
+      getArgValue(argv, "--max-pages"),
+      DEFAULT_MAX_PAGES,
+    ),
     currentDate,
     headless,
     browserExecutablePath: resolveBrowserExecutablePath(
       getArgValue(argv, "--browser-path"),
     ),
     userDataDir:
-      toTrimmedString(getArgValue(argv, "--user-data-dir")) || DEFAULT_USER_DATA_DIR,
+      toTrimmedString(getArgValue(argv, "--user-data-dir")) ||
+      DEFAULT_USER_DATA_DIR,
     waitForManualClearanceMs: toPositiveInteger(
       getArgValue(argv, "--wait-ms"),
       DEFAULT_WAIT_FOR_MANUAL_CLEARANCE_MS,
@@ -2365,14 +2522,13 @@ async function run(): Promise<void> {
     rosterSnapshotContext,
     teamIdToFranchiseId,
     statusContext,
-  ] =
-    await Promise.all([
-      buildPlayerNhlContext(gshlSeasonId, rows),
-      buildLatestPlayerDaySnapshots(),
-      buildRosterSnapshotContext(gshlSeasonId, options.currentDate),
-      buildTeamIdToFranchiseIdMapForSeason(gshlSeasonId),
-      buildPlayerSeasonStatusContext(gshlSeasonId, options.currentDate),
-    ]);
+  ] = await Promise.all([
+    buildPlayerNhlContext(gshlSeasonId, rows),
+    buildLatestPlayerDaySnapshots(),
+    buildRosterSnapshotContext(gshlSeasonId, options.currentDate),
+    buildTeamIdToFranchiseIdMapForSeason(gshlSeasonId),
+    buildPlayerSeasonStatusContext(gshlSeasonId, options.currentDate),
+  ]);
   summary.ambiguousSheetKeys = existingIndex.ambiguousKeys.size;
 
   console.log(
@@ -2426,7 +2582,11 @@ async function run(): Promise<void> {
         }
         seenApiKeys.add(exactMatchKey);
 
-        const managedFields = buildManagedFieldPatch(apiRow, options.currentDate, summary);
+        const managedFields = buildManagedFieldPatch(
+          apiRow,
+          options.currentDate,
+          summary,
+        );
         const existingMatches = resolveExistingPlayerMatches(
           existingIndex,
           apiRow.p_fn,
@@ -2603,7 +2763,9 @@ async function run(): Promise<void> {
       }
     }
 
-    const rosterSizes = [...rosterByFranchiseId.values()].map((roster) => roster.length);
+    const rosterSizes = [...rosterByFranchiseId.values()].map(
+      (roster) => roster.length,
+    );
     const totalRosterPlayers = rosterSizes.reduce((sum, size) => sum + size, 0);
     const maxRosterSize = rosterSizes.length ? Math.max(...rosterSizes) : 0;
     console.log(
@@ -2617,7 +2779,7 @@ async function run(): Promise<void> {
       };
       const franchiseId = toTrimmedString(effectiveRecord.gshlTeamId);
       pendingUpdate.source.lineupPos = franchiseId
-        ? lineupAssignments.get(pendingUpdate.playerId) ?? "BN"
+        ? (lineupAssignments.get(pendingUpdate.playerId) ?? "BN")
         : "";
       rowUpdates.set(
         pendingUpdate.row.rowNumber - 1,
@@ -2628,7 +2790,7 @@ async function run(): Promise<void> {
     for (const pendingInsert of pendingInserts) {
       const franchiseId = toTrimmedString(pendingInsert.payload.gshlTeamId);
       pendingInsert.payload.lineupPos = franchiseId
-        ? lineupAssignments.get(pendingInsert.playerId) ?? "BN"
+        ? (lineupAssignments.get(pendingInsert.playerId) ?? "BN")
         : "";
       appendRows.push(buildRowArray(headers, pendingInsert.payload));
     }

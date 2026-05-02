@@ -3,9 +3,10 @@
  * for Docker builds.
  */
 import "./src/env.js";
+import type { NextConfig } from "next";
 
 /** @type {import("next").NextConfig} */
-const config = {
+const config: NextConfig = {
   images: {
     remotePatterns: [
       { protocol: "https", hostname: "qzcw4d2n1l.ufs.sh" },
@@ -13,19 +14,22 @@ const config = {
       { protocol: "https", hostname: "avatars.githubusercontent.com" },
     ], // replace with your image domain(s)
   },
-  webpack: (config, { isServer }) => {
+  webpack: (webpackConfig: { resolve?: { fallback?: Record<string, boolean> } }, { isServer }: { isServer: boolean }) => {
     if (!isServer) {
       // Exclude Node.js-only modules from client-side bundle
-      config.resolve.fallback = {
-        ...config.resolve.fallback,
-        tls: false,
-        net: false,
-        dns: false,
-        child_process: false,
-        fs: false,
+      webpackConfig.resolve = {
+        ...webpackConfig.resolve,
+        fallback: {
+          ...(webpackConfig.resolve?.fallback ?? {}),
+          tls: false,
+          net: false,
+          dns: false,
+          child_process: false,
+          fs: false,
+        },
       };
     }
-    return config;
+    return webpackConfig;
   },
 };
 

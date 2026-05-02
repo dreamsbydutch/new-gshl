@@ -123,9 +123,6 @@ export function useStandingsData(options: UseStandingsDataOptions) {
             ...groupTeam,
             __allTeamSeasonStats: teamStats,
             __allTeams: teams,
-          } as typeof groupTeam & {
-            __allTeamSeasonStats: TeamSeasonStatLine[];
-            __allTeams: GSHLTeam[];
           };
         }),
       };

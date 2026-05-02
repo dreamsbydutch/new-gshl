@@ -18,6 +18,6 @@ export const snapshotRouter = createTRPCRouter({
     .query(async ({ input }): Promise<Record<string, unknown[]>> => {
       const models = input.models as SheetsModelName[];
       const snapshot = await fastSheetsReader.fetchSnapshot(models);
-      return snapshot as unknown as Record<string, unknown[]>;
+      return snapshot;
     }),
 });

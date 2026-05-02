@@ -409,7 +409,7 @@ export function useTeams(options: UseTeamsOptions = {}) {
   const query = isSingleTeam ? gshlGetByIdQuery : gshlGetAllQuery;
   const teams = isSingleTeam
     ? gshlGetByIdQuery.data
-      ? ([gshlGetByIdQuery.data] as unknown as GSHLTeam[])
+      ? ([gshlGetByIdQuery.data])
       : []
     : (gshlGetAllQuery.data ?? []);
 

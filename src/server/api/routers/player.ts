@@ -101,13 +101,13 @@ export const playerRouter = createTRPCRouter({
       const searchTerm = input.query.toLowerCase();
       return players.filter(
         (player) =>
-          (player as unknown as Player).firstName
+          player.firstName
             ?.toLowerCase()
             .includes(searchTerm) ||
-          (player as unknown as Player).lastName
+          player.lastName
             ?.toLowerCase()
             .includes(searchTerm),
-      ) as unknown as Player[];
+      );
     }),
 
   // Update player

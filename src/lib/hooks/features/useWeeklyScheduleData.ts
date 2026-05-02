@@ -220,9 +220,7 @@ export function useWeeklyScheduleData(
     >((acc, stat) => {
       const player = stat.playerId ? playerLookup.get(stat.playerId) : null;
       if (stat?.gshlTeamId) {
-        if (!acc[stat.gshlTeamId]) {
-          acc[stat.gshlTeamId] = [];
-        }
+        acc[stat.gshlTeamId] ??= [];
         acc[stat.gshlTeamId]!.push({
           ...stat,
           ...player,

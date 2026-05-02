@@ -10,11 +10,17 @@ const compat = new FlatCompat({ baseDirectory: __dirname });
 
 export default tseslint.config(
   {
-    ignores: [".next/**", "node_modules/**", "apps-script/**"],
+    ignores: [".next/**", "node_modules/**", "apps-script/**", "next-env.d.ts"],
   },
   ...compat.extends("next/core-web-vitals"),
   ...tseslint.configs.recommendedTypeChecked,
   ...tseslint.configs.stylisticTypeChecked,
+  {
+    files: ["postcss.config.js", "prettier.config.js"],
+    rules: {
+      "import/no-anonymous-default-export": "off",
+    },
+  },
   {
     languageOptions: {
       parserOptions: {
