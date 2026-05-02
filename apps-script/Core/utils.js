@@ -266,6 +266,91 @@ var GshlUtils = (function buildGshlUtilsNamespace() {
     return targetDate >= startDate && targetDate <= endDate;
   }
 
+  function compareSeasonRowsByStartDate(a, b) {
+    var aStart = formatDateOnly(a && a.startDate);
+    var bStart = formatDateOnly(b && b.startDate);
+    if (aStart && bStart && aStart !== bStart) return aStart < bStart ? -1 : 1;
+
+    var aEnd = formatDateOnly(a && a.endDate);
+    var bEnd = formatDateOnly(b && b.endDate);
+    if (aEnd && bEnd && aEnd !== bEnd) return aEnd < bEnd ? -1 : 1;
+
+    var aId = a && a.id !== undefined && a.id !== null ? String(a.id) : "";
+    var bId = b && b.id !== undefined && b.id !== null ? String(b.id) : "";
+    if (aId === bId) return 0;
+    return aId < bId ? -1 : 1;
+  }
+
+  function resolveActiveSeasonRow(targetDate, callerName) {
+    var caller = callerName || "resolveActiveSeasonRow";
+    if (typeof SPREADSHEET_ID === "undefined" || !SPREADSHEET_ID) {
+      throw new Error(caller + " requires SPREADSHEET_ID");
+    }
+
+    var resolvedTargetDate = formatDateOnly(
+      targetDate || getTargetDateForScraping(),
+    );
+    if (!resolvedTargetDate) {
+      throw new Error(caller + " could not resolve a targetDate");
+    }
+
+    var seasons = fetchSheetAsObjects(SPREADSHEET_ID, "Season", {
+      coerceTypes: true,
+    });
+    if (!seasons || !seasons.length) {
+      throw new Error(caller + " could not find any Season rows");
+    }
+
+    var dateMatches = seasons.filter(function (season) {
+      return isDateInRange(
+        resolvedTargetDate,
+        season && season.startDate,
+        season && season.endDate,
+      );
+    });
+
+    if (dateMatches.length === 1) {
+      return dateMatches[0];
+    }
+    if (dateMatches.length > 1) {
+      throw new Error(
+        caller +
+          " found multiple Season rows matching targetDate=" +
+          resolvedTargetDate +
+          ": " +
+          dateMatches
+            .slice()
+            .sort(compareSeasonRowsByStartDate)
+            .map(function (season) {
+              return String(season && season.id);
+            })
+            .join(","),
+      );
+    }
+
+    var activeMatches = seasons.filter(function (season) {
+      return toBool(season && season.isActive);
+    });
+    if (activeMatches.length === 1) {
+      return activeMatches[0];
+    }
+
+    throw new Error(
+      caller +
+        " could not resolve an active season for targetDate=" +
+        resolvedTargetDate +
+        ". Date matches=" +
+        dateMatches.length +
+        ", isActive matches=" +
+        activeMatches.length,
+    );
+  }
+
+  function resolveActiveSeasonId(targetDate, callerName) {
+    var season = resolveActiveSeasonRow(targetDate, callerName || "resolveActiveSeasonId");
+    return normalizeSeasonId(season && season.id, callerName || "resolveActiveSeasonId");
+  }
+
   /**
    * Remove accents/diacritics using Unicode normalization.
    * @param {string} str
@@ -787,13 +872,33 @@ var GshlUtils = (function buildGshlUtilsNamespace() {
     var headerIndex = {};
     for (var i = 0; i < headers.length; i++) headerIndex[headers[i]] = i;
 
+    function normalizeUpsertKeyPart(value) {
+      if (value === undefined || value === null) return "";
+      if (value instanceof Date) return formatDate(value);
+
+      if (typeof value === "number") {
+        return isFinite(value) ? String(value) : "";
+      }
+
+      var text = String(value).trim();
+      if (!text) return "";
+
+      // Canonicalize integer-like and decimal-like id values so 12, "12",
+      // and "12.0" all produce the same composite key.
+      if (/^-?\d+(\.\d+)?$/.test(text)) {
+        var numeric = Number(text);
+        if (isFinite(numeric)) return String(numeric);
+      }
+
+      return text;
+    }
+
     function makeKeyFromArray(arr) {
       return keyColumns
         .map(function (k) {
           var idx = headerIndex[k];
           var val = idx === undefined ? "" : arr[idx];
-          if (val instanceof Date) return formatDate(val);
-          return String(val === undefined || val === null ? "" : val);
+          return normalizeUpsertKeyPart(val);
         })
         .join("|");
     }
@@ -802,8 +907,7 @@ var GshlUtils = (function buildGshlUtilsNamespace() {
       return keyColumns
         .map(function (k) {
           var v = obj[k];
-          if (v instanceof Date) return formatDate(v);
-          return String(v === undefined || v === null ? "" : v);
+          return normalizeUpsertKeyPart(v);
         })
         .join("|");
     }
@@ -967,7 +1071,7 @@ var GshlUtils = (function buildGshlUtilsNamespace() {
             var idx = headerIndex[fcol];
             var want = cfg.filter[fcol];
             var have = idx !== undefined ? erow[idx] : undefined;
-            if (String(have) !== String(want)) {
+            if (normalizeUpsertKeyPart(have) !== normalizeUpsertKeyPart(want)) {
               skip = true;
               break;
             }
@@ -1027,7 +1131,9 @@ var GshlUtils = (function buildGshlUtilsNamespace() {
             var didx = headerIndex[dfcol];
             var dwant = deleteFilter[dfcol];
             var dhave = didx !== undefined ? drow[didx] : undefined;
-            if (String(dhave) !== String(dwant)) {
+            if (
+              normalizeUpsertKeyPart(dhave) !== normalizeUpsertKeyPart(dwant)
+            ) {
               dskip = true;
               break;
             }
@@ -1154,6 +1260,79 @@ var GshlUtils = (function buildGshlUtilsNamespace() {
       .replace(/<[^>]*>/g, "")
       .replace(/&#x[0-9a-fA-F]+;/gi, "")
       .trim();
+  }
+
+  function decodeHtmlText(value) {
+    return String(value || "")
+      .replace(/&nbsp;/gi, " ")
+      .replace(/&#160;/gi, " ")
+      .replace(/&#43;/gi, "+")
+      .replace(/&#x2b;/gi, "+")
+      .replace(/&plus;/gi, "+")
+      .replace(/&amp;/gi, "&")
+      .trim();
+  }
+
+  function normalizeYahooLineupSlot(value) {
+    var text = decodeHtmlText(value)
+      .replace(/\s+/g, " ")
+      .replace(/[^A-Za-z0-9+]/g, "")
+      .trim();
+    if (!text) return "";
+
+    var upper = text.toUpperCase();
+    if (upper === "C") return "C";
+    if (upper === "LW") return "LW";
+    if (upper === "RW") return "RW";
+    if (upper === "UTIL" || upper === "U") return "Util";
+    if (upper === "G") return "G";
+    if (upper === "D") return "D";
+    if (upper === "IR" || upper === "IL") return "IR";
+    if (upper === "IR+" || upper === "IRPLUS" || upper === "IL+") return "IR+";
+    if (upper === "ILPLUS") return "IR+";
+    if (upper === "BN" || upper === "BENCH") return "BN";
+    return "";
+  }
+
+  function extractYahooLineupSlotFromCell(cellHtml) {
+    var html = String(cellHtml || "");
+    if (!html) return "";
+
+    var selectedOptionMatch = html.match(
+      /<option\b[^>]*\bselected(?:=["'][^"']*["'])?[^>]*>([\s\S]*?)<\/option>/i,
+    );
+    if (selectedOptionMatch) {
+      var selectedText = normalizeYahooLineupSlot(cleanText(selectedOptionMatch[1]));
+      if (selectedText) return selectedText;
+
+      var selectedValueMatch = selectedOptionMatch[0].match(
+        /\bvalue=["']([^"']+)["']/i,
+      );
+      selectedText = selectedValueMatch
+        ? normalizeYahooLineupSlot(selectedValueMatch[1])
+        : "";
+      if (selectedText) return selectedText;
+    }
+
+    var attrMatch;
+    var attrPattern =
+      /\b(?:title|aria-label|data-pos|data-position|data-ys-pos)=["']([^"']+)["']/gi;
+    while ((attrMatch = attrPattern.exec(html)) !== null) {
+      var attrPos = normalizeYahooLineupSlot(attrMatch[1]);
+      if (attrPos) return attrPos;
+    }
+
+    var htmlWithoutControls = html
+      .replace(/<script[\s\S]*?<\/script>/gi, "")
+      .replace(/<style[\s\S]*?<\/style>/gi, "")
+      .replace(/<select[\s\S]*?<\/select>/gi, "")
+      .replace(/<!--[\s\S]*?-->/g, "");
+    var visibleText = decodeHtmlText(cleanText(htmlWithoutControls));
+    var directPos = normalizeYahooLineupSlot(visibleText);
+    if (directPos) return directPos;
+
+    var allowedTokenMatch = visibleText.match(/\b(IR\+|IL\+|Util|BN|IR|IL|LW|RW|C|D|G)\b/i);
+    return allowedTokenMatch ? normalizeYahooLineupSlot(allowedTokenMatch[1]) : "";
   }
 
   /**
@@ -1297,7 +1476,9 @@ var GshlUtils = (function buildGshlUtilsNamespace() {
 
         // Extract position (index 0 or from columnMap)
         const posIdx = columnMap.pos !== undefined ? columnMap.pos : 0;
-        const dailyPos = cols[posIdx] ? cleanText(cols[posIdx]) : "";
+        const dailyPos = cols[posIdx]
+          ? extractYahooLineupSlotFromCell(cols[posIdx])
+          : "";
 
         // Extract player column data (index 1 or from columnMap)
         const playerIdx = columnMap.player !== undefined ? columnMap.player : 1;
@@ -1497,7 +1678,8 @@ var GshlUtils = (function buildGshlUtilsNamespace() {
    * @param {string} yahooTeamId - Yahoo team ID
    * @returns {Array} Array of player objects (skaters and goaltenders combined)
    */
-  function yahooTableScraper(targetDate, yahooTeamId, seasonId) {
+  function yahooTableScraper(targetDate, yahooTeamId, seasonId, options) {
+    const opts = options || {};
     const urlMap = {
       1: "https://hockey.fantasysports.yahoo.com/2014/hockey/32199/",
       2: "https://hockey.fantasysports.yahoo.com/2015/hockey/15588/",
@@ -1515,10 +1697,94 @@ var GshlUtils = (function buildGshlUtilsNamespace() {
         YAHOO_LEAGUE_ID +
         "/",
     };
-    const url = urlMap[seasonId] + yahooTeamId + "/team?&date=" + targetDate;
+
+    function extractLeagueIdFromLegacyUrl(url) {
+      if (!url) return "";
+      var match = String(url).match(/\/hockey\/([^/]+)\/?$/);
+      return match && match[1] ? match[1] : "";
+    }
+
+    function resolveSeasonYear() {
+      if (opts.seasonYear !== undefined && opts.seasonYear !== null) {
+        return String(opts.seasonYear).trim();
+      }
+      if (opts.year !== undefined && opts.year !== null) {
+        return String(opts.year).trim();
+      }
+      var seasonNumber = Number(seasonId);
+      if (isFinite(seasonNumber)) return String(2013 + seasonNumber);
+      if (
+        opts.season &&
+        opts.season.year !== undefined &&
+        opts.season.year !== null
+      ) {
+        return String(opts.season.year).trim();
+      }
+      return "";
+    }
+
+    const legacyBaseUrl = urlMap[seasonId] || "";
+    const seasonYear = resolveSeasonYear();
+    const leagueId =
+      (opts.leagueId !== undefined && opts.leagueId !== null
+        ? String(opts.leagueId).trim()
+        : "") ||
+      (opts.seasonCode !== undefined && opts.seasonCode !== null
+        ? String(opts.seasonCode).trim()
+        : "") ||
+      extractLeagueIdFromLegacyUrl(legacyBaseUrl) ||
+      (typeof YAHOO_LEAGUE_ID !== "undefined" && YAHOO_LEAGUE_ID
+        ? String(YAHOO_LEAGUE_ID)
+        : "");
+
+    if (!seasonYear || !leagueId) {
+      throw new Error(
+        "yahooTableScraper could not resolve Yahoo season year/league id for seasonId=" +
+          seasonId,
+      );
+    }
+
+    const url =
+      "https://hockey.fantasysports.yahoo.com/" +
+      seasonYear +
+      "/hockey/" +
+      leagueId +
+      "/" +
+      yahooTeamId +
+      "/team?&date=" +
+      targetDate;
     try {
-      const response = UrlFetchApp.fetch(url);
+      const headers = opts.headers ? Object.assign({}, opts.headers) : {};
+      if (opts.cookie && !headers.Cookie) {
+        headers.Cookie = String(opts.cookie);
+      }
+      if (!headers.Cookie) {
+        const props = getScriptPropertiesSnapshot() || {};
+        if (props.YAHOO_COOKIE) headers.Cookie = String(props.YAHOO_COOKIE);
+      }
+      if (!headers["User-Agent"]) {
+        headers["User-Agent"] =
+          "Mozilla/5.0 (compatible; GSHL-AppsScript/1.0; +https://hockey.fantasysports.yahoo.com/)";
+      }
+
+      const response = UrlFetchApp.fetch(url, {
+        method: "get",
+        followRedirects: true,
+        muteHttpExceptions: true,
+        headers: headers,
+      });
+      const responseCode = response.getResponseCode();
       const html = response.getContentText();
+      if (responseCode < 200 || responseCode >= 300) {
+        throw new Error(
+          "Yahoo roster page request failed with HTTP " +
+            responseCode +
+            " for " +
+            url +
+            ". If this is HTTP 999, set/refresh Script Property YAHOO_COOKIE. Response excerpt: " +
+            String(html || "").slice(0, 500),
+        );
+      }
 
       // Extract skater table
       const skaterTableMatch = html.match(
@@ -1555,12 +1821,58 @@ var GshlUtils = (function buildGshlUtilsNamespace() {
     return todayDateString > endDateStr;
   }
 
-  function getPlayerDayWorkbookId(seasonId) {
+  function getPlayerDayWorkbookKey(seasonId) {
     const seasonNumber = Number(seasonId);
-    if (isNaN(seasonNumber)) return CURRENT_PLAYERDAY_SPREADSHEET_ID;
-    if (seasonNumber <= 5) return PLAYERDAY_WORKBOOKS.PLAYERDAYS_1_5;
-    if (seasonNumber <= 10) return PLAYERDAY_WORKBOOKS.PLAYERDAYS_6_10;
-    return PLAYERDAY_WORKBOOKS.PLAYERDAYS_11_15;
+    if (!isFinite(seasonNumber) || seasonNumber < 1) return "";
+    return "PLAYERDAYS_" + (seasonNumber < 10 ? "0" : "") + seasonNumber;
+  }
+
+  function getPlayerDayWorkbookId(seasonId) {
+    const workbookKey = getPlayerDayWorkbookKey(seasonId);
+    if (!workbookKey) {
+      throw new Error(
+        "PlayerDay workbook lookup requires a valid seasonId; received " +
+          seasonId,
+      );
+    }
+
+    const workbookId =
+      PLAYERDAY_WORKBOOKS && PLAYERDAY_WORKBOOKS[workbookKey]
+        ? String(PLAYERDAY_WORKBOOKS[workbookKey]).trim()
+        : "";
+    if (!workbookId) {
+      throw new Error(
+        "Missing PlayerDay workbook id for " +
+          workbookKey +
+          ". Configure PLAYERDAY_WORKBOOKS." +
+          workbookKey +
+          " for PlayerDays-" +
+          workbookKey.replace("PLAYERDAYS_", "") +
+          ".",
+      );
+    }
+
+    return workbookId;
+  }
+
+  function getAllPlayerDayWorkbookIds() {
+    const ids = [];
+    const seen = {};
+    if (!PLAYERDAY_WORKBOOKS) return ids;
+    Object.keys(PLAYERDAY_WORKBOOKS)
+      .filter(function (key) {
+        return /^PLAYERDAYS_\d{2}$/.test(key);
+      })
+      .sort()
+      .forEach(function (key) {
+        const id = PLAYERDAY_WORKBOOKS[key]
+          ? String(PLAYERDAY_WORKBOOKS[key]).trim()
+          : "";
+        if (!id || seen[id]) return;
+        seen[id] = true;
+        ids.push(id);
+      });
+    return ids;
   }
 
   function normalizeNhlPosValue(value) {
@@ -1712,6 +2024,7 @@ var GshlUtils = (function buildGshlUtilsNamespace() {
         cleanText: cleanText,
         extractGameStatus: extractGameStatus,
         parseTable: parseTable,
+        extractYahooLineupSlotFromCell: extractYahooLineupSlotFromCell,
       },
       roster: {
         yahooTableScraper: yahooTableScraper,
@@ -1731,6 +2044,11 @@ var GshlUtils = (function buildGshlUtilsNamespace() {
       },
       workbooks: {
         getPlayerDayWorkbookId: getPlayerDayWorkbookId,
+        getAllPlayerDayWorkbookIds: getAllPlayerDayWorkbookIds,
+      },
+      seasons: {
+        resolveActiveSeasonRow: resolveActiveSeasonRow,
+        resolveActiveSeasonId: resolveActiveSeasonId,
       },
       weeks: {
         isWeekCompleteRecord: isWeekCompleteRecord,

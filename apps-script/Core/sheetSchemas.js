@@ -184,7 +184,7 @@ SHEET_SCHEMAS.PlayerDayStatLine =
   createSheetSchema({
     description: "Daily player stat lines",
     category: "stat",
-    keyColumns: ["playerId", "gshlTeamId", "date"],
+    keyColumns: ["gshlTeamId", "playerId", "date", "weekId", "seasonId"],
     dateColumns: ["date"],
     datetimeColumns: ["createdAt", "updatedAt"],
     numericColumns: PLAYER_DAY_NUMERIC_FIELDS,
@@ -195,7 +195,7 @@ SHEET_SCHEMAS.PlayerWeekStatLine =
   createSheetSchema({
     description: "Weekly player aggregates",
     category: "stat",
-    keyColumns: ["playerId", "gshlTeamId", "weekId"],
+    keyColumns: ["gshlTeamId", "playerId", "weekId", "seasonId"],
     datetimeColumns: ["createdAt", "updatedAt"],
     numericColumns: PLAYER_WEEK_NUMERIC_FIELDS,
   });
@@ -205,7 +205,7 @@ SHEET_SCHEMAS.PlayerSplitStatLine =
   createSheetSchema({
     description: "Season splits per team",
     category: "stat",
-    keyColumns: ["playerId", "gshlTeamId", "seasonId", "seasonType"],
+    keyColumns: ["gshlTeamId", "playerId", "seasonId", "seasonType"],
     datetimeColumns: ["createdAt", "updatedAt"],
     numericColumns: PLAYER_WEEK_NUMERIC_FIELDS,
   });
@@ -220,6 +220,53 @@ SHEET_SCHEMAS.PlayerTotalStatLine =
     numericColumns: PLAYER_WEEK_NUMERIC_FIELDS,
   });
 
+var PLAYER_NHL_NUMERIC_FIELDS = [
+  "age",
+  "GP",
+  "G",
+  "A",
+  "P",
+  "PM",
+  "PIM",
+  "PPP",
+  "SOG",
+  "HIT",
+  "BLK",
+  "W",
+  "GA",
+  "GAA",
+  "SV",
+  "SA",
+  "SVP",
+  "SO",
+  "QS",
+  "RBS",
+  "TOI",
+  "seasonRating",
+  "overallRating",
+  "salary",
+];
+
+SHEET_SCHEMAS.PlayerNHL =
+  SHEET_SCHEMAS.PlayerNHL ||
+  createSheetSchema({
+    description: "NHL season stat lines",
+    category: "stat",
+    keyColumns: ["playerId", "seasonId"],
+    datetimeColumns: ["createdAt", "updatedAt"],
+    numericColumns: PLAYER_NHL_NUMERIC_FIELDS,
+  });
+
+SHEET_SCHEMAS.PlayerNHLStatLine =
+  SHEET_SCHEMAS.PlayerNHLStatLine ||
+  createSheetSchema({
+    description: "NHL season stat lines",
+    category: "stat",
+    keyColumns: ["playerId", "seasonId"],
+    datetimeColumns: ["createdAt", "updatedAt"],
+    numericColumns: PLAYER_NHL_NUMERIC_FIELDS,
+  });
+
 var TEAM_DAY_NUMERIC_FIELDS = PLAYER_DAY_NUMERIC_FIELDS.slice();
 
 SHEET_SCHEMAS.TeamDayStatLine =
@@ -227,7 +274,7 @@ SHEET_SCHEMAS.TeamDayStatLine =
   createSheetSchema({
     description: "Daily team aggregates",
     category: "stat",
-    keyColumns: ["gshlTeamId", "date"],
+    keyColumns: ["gshlTeamId", "date", "weekId", "seasonId"],
     dateColumns: ["date"],
     datetimeColumns: ["createdAt", "updatedAt"],
     numericColumns: TEAM_DAY_NUMERIC_FIELDS,
@@ -255,7 +302,7 @@ SHEET_SCHEMAS.TeamWeekStatLine =
   createSheetSchema({
     description: "Weekly team aggregates",
     category: "stat",
-    keyColumns: ["gshlTeamId", "weekId"],
+    keyColumns: ["gshlTeamId", "weekId", "seasonId"],
     datetimeColumns: ["createdAt", "updatedAt"],
     numericColumns: TEAM_WEEK_NUMERIC_FIELDS,
   });
@@ -381,6 +428,30 @@ function resolveFieldType(sheetName, fieldName, overrideMap) {
   return "string";
 }
 
+function formatSheetDateOnly(value) {
+  if (
+    typeof GshlUtils !== "undefined" &&
+    GshlUtils &&
+    GshlUtils.core &&
+    GshlUtils.core.date &&
+    typeof GshlUtils.core.date.formatDateOnly === "function"
+  ) {
+    return GshlUtils.core.date.formatDateOnly(value);
+  }
+
+  if (typeof formatDateOnly === "function") {
+    return formatDateOnly(value);
+  }
+
+  if (value === undefined || value === null || value === "") return "";
+  var parsed = value instanceof Date ? value : new Date(value);
+  if (isNaN(parsed.getTime())) return "";
+  var year = parsed.getFullYear();
+  var month = String(parsed.getMonth() + 1).padStart(2, "0");
+  var day = String(parsed.getDate()).padStart(2, "0");
+  return year + "-" + month + "-" + day;
+}
+
 function coerceSheetValue(sheetName, fieldName, value, overrideMap) {
   if (value === undefined || value === null || value === "") {
     return resolveFieldType(sheetName, fieldName, overrideMap) === "string"
@@ -403,7 +474,7 @@ function coerceSheetValue(sheetName, fieldName, value, overrideMap) {
       );
     }
     case "date": {
-      return formatDateOnly(value);
+      return formatSheetDateOnly(value);
     }
     case "datetime": {
       if (value instanceof Date) return value;
@@ -445,7 +516,7 @@ function stringifySheetValue(sheetName, fieldName, value, overrideMap) {
       return "";
     }
     case "date": {
-      return formatDateOnly(value);
+      return formatSheetDateOnly(value);
     }
     case "datetime": {
       var date = value instanceof Date ? value : new Date(value);

@@ -14,26 +14,38 @@
 const SPREADSHEET_ID = "1I6kmnnL6rSAWLOG12Ixr89g4W-ZQ0weGbfETKDTrvH8";
 
 /**
- * PlayerDay workbooks - Partitioned by season ranges
+ * PlayerDay workbooks - Partitioned by season
  *
  * Use the appropriate workbook based on which season you're writing to:
- * - Seasons 1-5:   PLAYERDAYS_1_5
- * - Seasons 6-10:  PLAYERDAYS_6_10
- * - Seasons 11-15: PLAYERDAYS_11_15
+ * - Season 1:  PLAYERDAYS_01 / PlayerDays-01
+ * - Season 2:  PLAYERDAYS_02 / PlayerDays-02
+ * - etc.
  *
- * Current season (Season 12) uses PLAYERDAYS_11_15
+ * Current season (Season 12) uses PLAYERDAYS_12
  */
 const PLAYERDAY_WORKBOOKS = {
-  PLAYERDAYS_1_5: "18IqgstBaBIAfM08w7ddzjF2JTrAqZUjAvsbyZxgHiag",
-  PLAYERDAYS_6_10: "14XZoxMbcmWh0-XmYOu16Ur0HNOFP9UttHbiMMut_PJ0",
-  PLAYERDAYS_11_15: "18IqgstBaBIAfM08w7ddzjF2JTrAqZUjAvsbyZxgHiag",
+  PLAYERDAYS_01: "1L0lqm3DDXv92hml67aGgJ2AYT49hitMl0GX16VZOCrg",
+  PLAYERDAYS_02: "1M-YNvrUtfLKqv0b5MJ6HWErMvL9pTm6_TRrb6-1Dz0Y",
+  PLAYERDAYS_03: "1-qtE0DSueGi47h-l5pBSJik4Y8knDq8r64zH94FYdXU",
+  PLAYERDAYS_04: "1G7wBlYgSliyzh1N2U6sqOeDfiDeNcT7cDY9OUkWxDn4",
+  PLAYERDAYS_05: "1ny8gEOotQCbG3uvr29JgX5iRjCS_2Pt44eF4f4l3f1g",
+  PLAYERDAYS_06: "1nOp4mi_0kskY5etY70ErpSGYcKevouEwhe3Nh3VwZ_8",
+  PLAYERDAYS_07: "1spmkDwfKOiMZBQt4-roOeIuL88m457X0F9inHa_zw4c",
+  PLAYERDAYS_08: "1i7rqNNJrHUZT7SIisesJzHNVJfVz2lZExUB6XHsc2vw",
+  PLAYERDAYS_09: "1Ffb0gqr-tm3HECUIA2vPNUFfs04XLTg51JX7tQ3xETM",
+  PLAYERDAYS_10: "1x7KS6XsSCtbgZ5rxGqH6NNCS91ZHNH-lWJc84ZPmkO0",
+  PLAYERDAYS_11: "1eai9BxtIXcaWBKzNI0BCn-kcjf06Hszx4aFXAkAGqVw",
+  PLAYERDAYS_12: "1M1CLZ9FXqq7dWtgpNZa4OFoUU3h71N1bLxZTmprqVKk",
+  PLAYERDAYS_13: "1980OlOIIK7OegX-yd3WICSiReeHpUROi8x0i4x6TtYI",
+  PLAYERDAYS_14: "",
+  PLAYERDAYS_15: "",
 };
 
 /**
  * Current season's PlayerDay workbook
- * Update this when moving to a new season range
+ * Update this when moving to a new season
  */
-const CURRENT_PLAYERDAY_SPREADSHEET_ID = PLAYERDAY_WORKBOOKS.PLAYERDAYS_11_15;
+const CURRENT_PLAYERDAY_SPREADSHEET_ID = PLAYERDAY_WORKBOOKS.PLAYERDAYS_12;
 
 /**
  * Player Stats workbook - Contains aggregated player statistics:
