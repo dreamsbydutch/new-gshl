@@ -88,6 +88,36 @@ export function findMostRecentSeason(
   return previous[0];
 }
 
+/**
+ * When between seasons, returns whichever adjacent season is closest in time
+ * to the reference date — the just-ended season or the upcoming one.
+ */
+function findClosestAdjacentSeason(
+  seasons: Season[],
+  referenceDate: Date,
+): Season | undefined {
+  const refTime = referenceDate.getTime();
+
+  const mostRecent = findMostRecentSeason(seasons, referenceDate);
+  const upcoming = findUpcomingSeason(seasons, referenceDate);
+
+  if (!mostRecent && !upcoming) return undefined;
+  if (!mostRecent) return upcoming;
+  if (!upcoming) return mostRecent;
+
+  const recentEnd = coerceDate(mostRecent.endDate);
+  const upcomingStart = coerceDate(upcoming.startDate);
+
+  const distanceToRecent = recentEnd
+    ? Math.abs(refTime - recentEnd.getTime())
+    : Number.POSITIVE_INFINITY;
+  const distanceToUpcoming = upcomingStart
+    ? Math.abs(upcomingStart.getTime() - refTime)
+    : Number.POSITIVE_INFINITY;
+
+  return distanceToUpcoming < distanceToRecent ? upcoming : mostRecent;
+}
+
 export function resolveDefaultSeason(
   seasons: Season[] | undefined,
   referenceDate: Date = new Date(),
@@ -96,8 +126,7 @@ export function resolveDefaultSeason(
 
   return (
     findCurrentSeason(seasons, referenceDate) ??
-    findUpcomingSeason(seasons, referenceDate) ??
-    findMostRecentSeason(seasons, referenceDate) ??
+    findClosestAdjacentSeason(seasons, referenceDate) ??
     seasons[0]
   );
 }
