@@ -1,7 +1,12 @@
 import { z } from "zod";
 import { createTRPCRouter, publicProcedure } from "../trpc";
 import { idSchema, baseQuerySchema } from "./_schemas";
-import type { Matchup, TeamWeekStatLine } from "@gshl-types";
+import type {
+  Matchup,
+  MatchupLiveState,
+  MatchupMetadata,
+  TeamWeekStatLine,
+} from "@gshl-types";
 import { getById, getCount, getMany } from "../sheets-store";
 
 // Matchup router
@@ -9,12 +14,41 @@ const idStringSchema = z.coerce.string();
 
 const matchupWhereSchema = z
   .object({
+    id: idStringSchema.optional(),
     seasonId: idStringSchema.optional(),
     weekId: idStringSchema.optional(),
     homeTeamId: idStringSchema.optional(),
     awayTeamId: idStringSchema.optional(),
   })
   .optional();
+
+function toMatchupMetadata(matchup: Matchup): MatchupMetadata {
+  return {
+    id: matchup.id,
+    seasonId: matchup.seasonId,
+    weekId: matchup.weekId,
+    homeTeamId: matchup.homeTeamId,
+    awayTeamId: matchup.awayTeamId,
+    gameType: matchup.gameType,
+    homeRank: matchup.homeRank ?? null,
+    awayRank: matchup.awayRank ?? null,
+    rating: matchup.rating ?? null,
+    createdAt: matchup.createdAt,
+  };
+}
+
+function toMatchupLiveState(matchup: Matchup): MatchupLiveState {
+  return {
+    id: matchup.id,
+    homeScore: matchup.homeScore ?? null,
+    awayScore: matchup.awayScore ?? null,
+    homeWin: matchup.homeWin ?? null,
+    awayWin: matchup.awayWin ?? null,
+    tie: matchup.tie ?? null,
+    isComplete: matchup.isComplete,
+    updatedAt: matchup.updatedAt,
+  };
+}
 
 /**
  * Stat categories used for head-to-head matchup scoring
@@ -71,6 +105,20 @@ export function calculateMatchupScores(
 }
 
 export const matchupRouter = createTRPCRouter({
+  getMetadata: publicProcedure
+    .input(baseQuerySchema.extend({ where: matchupWhereSchema }))
+    .query(async ({ input }): Promise<MatchupMetadata[]> => {
+      const matchups = await getMany<Matchup>("Matchup", input);
+      return matchups.map(toMatchupMetadata);
+    }),
+
+  getLiveStates: publicProcedure
+    .input(baseQuerySchema.extend({ where: matchupWhereSchema }))
+    .query(async ({ input }): Promise<MatchupLiveState[]> => {
+      const matchups = await getMany<Matchup>("Matchup", input);
+      return matchups.map(toMatchupLiveState);
+    }),
+
   getAll: publicProcedure
     .input(baseQuerySchema.extend({ where: matchupWhereSchema }))
     .query(async ({ input }): Promise<Matchup[]> => {

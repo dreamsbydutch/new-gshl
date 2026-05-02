@@ -6,23 +6,13 @@ export default async function StandingsPage() {
   const seasonId = activeSeason?.id ? String(activeSeason.id) : undefined;
 
   await Promise.all([
-    serverApi.season.getAll.prefetch({ orderBy: { year: "asc" } }),
-    seasonId
-      ? serverApi.team.getAll.prefetch({ where: { seasonId } })
-      : Promise.resolve(),
     seasonId
       ? serverApi.teamStats.season.getAll.prefetch({ where: { seasonId } })
       : Promise.resolve(),
     seasonId
-      ? serverApi.matchup.getAll.prefetch({
+      ? serverApi.matchup.getLiveStates.prefetch({
           where: { seasonId },
           orderBy: { seasonId: "asc" },
-        })
-      : Promise.resolve(),
-    seasonId
-      ? serverApi.week.getAll.prefetch({
-          where: { seasonId },
-          orderBy: { startDate: "asc" },
         })
       : Promise.resolve(),
   ]);

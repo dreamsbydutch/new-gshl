@@ -1,6 +1,31 @@
-import type { Matchup } from "@gshl-types";
+import { useMemo } from "react";
+import type { Matchup, MatchupLiveState, MatchupMetadata } from "@gshl-types";
 import { clientApi as api } from "@gshl-trpc";
-import { useQueryAdapter } from "@gshl-utils/shared";
+
+const DAY_IN_MS = 24 * 60 * 60 * 1000;
+const FIFTEEN_MINUTES_IN_MS = 15 * 60 * 1000;
+
+function mergeMatchups(
+  metadata: MatchupMetadata[],
+  liveStates: MatchupLiveState[],
+): Matchup[] {
+  const liveStateById = new Map(liveStates.map((state) => [state.id, state]));
+
+  return metadata.map((matchup) => {
+    const liveState = liveStateById.get(matchup.id);
+
+    return {
+      ...matchup,
+      homeScore: liveState?.homeScore ?? null,
+      awayScore: liveState?.awayScore ?? null,
+      homeWin: liveState?.homeWin ?? null,
+      awayWin: liveState?.awayWin ?? null,
+      tie: liveState?.tie ?? null,
+      isComplete: liveState?.isComplete ?? false,
+      updatedAt: liveState?.updatedAt ?? matchup.createdAt,
+    };
+  });
+}
 
 /**
  * Options for configuring the matchups query.
@@ -75,50 +100,33 @@ export function useMatchups(options: UseMatchupsOptions = {}) {
   if (normalizedWeekId) where.weekId = normalizedWeekId;
   if (normalizedSeasonId) where.seasonId = normalizedSeasonId;
 
-  // For single matchup by ID, use getById endpoint
-  const isSingleMatchup =
-    !!normalizedMatchupId && !normalizedWeekId && !normalizedSeasonId;
+  const queryInput =
+    Object.keys(where).length > 0 ? { where, orderBy } : { orderBy };
 
-  const getAllQuery = api.matchup.getAll.useQuery(
-    Object.keys(where).length > 0 ? { where, orderBy } : { orderBy },
-    {
-      enabled: enabled && !isSingleMatchup,
-      staleTime: 60 * 1000,
-      gcTime: 5 * 60 * 1000,
-      refetchOnMount: true,
-      refetchOnWindowFocus: true,
-    },
-  );
+  const metadataQuery = api.matchup.getMetadata.useQuery(queryInput, {
+    enabled,
+    staleTime: DAY_IN_MS,
+    gcTime: DAY_IN_MS,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+  });
 
-  const getByIdQuery = api.matchup.getById.useQuery(
-    { id: normalizedMatchupId ?? "" },
-    {
-      enabled: enabled && isSingleMatchup,
-      staleTime: 60 * 1000,
-      gcTime: 5 * 60 * 1000,
-      refetchOnMount: true,
-      refetchOnWindowFocus: true,
-    },
-  );
+  const liveStatesQuery = api.matchup.getLiveStates.useQuery(queryInput, {
+    enabled,
+    staleTime: FIFTEEN_MINUTES_IN_MS,
+    gcTime: FIFTEEN_MINUTES_IN_MS,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
+  });
 
-  // Use appropriate query based on filter type
-  const query = isSingleMatchup ? getByIdQuery : getAllQuery;
+  const data = useMemo(() => {
+    return mergeMatchups(metadataQuery.data ?? [], liveStatesQuery.data ?? []);
+  }, [metadataQuery.data, liveStatesQuery.data]);
 
-  // For single matchup queries, wrap in array for consistent return type
-  const adaptedData = isSingleMatchup
-    ? getByIdQuery.data
-      ? [getByIdQuery.data]
-      : null
-    : getAllQuery.data;
-
-  return useQueryAdapter<Matchup[] | Matchup | null, Matchup[]>(
-    { ...query, data: adaptedData },
-    {
-      fallback: [],
-      map: (data) => {
-        if (!data) return [];
-        return Array.isArray(data) ? data : [data];
-      },
-    },
-  );
+  return {
+    data,
+    isLoading: metadataQuery.isLoading || liveStatesQuery.isLoading,
+    isFetching: metadataQuery.isFetching || liveStatesQuery.isFetching,
+    error: metadataQuery.error ?? liveStatesQuery.error ?? null,
+  };
 }

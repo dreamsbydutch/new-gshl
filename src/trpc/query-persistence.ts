@@ -1,5 +1,6 @@
 import {
   defaultShouldDehydrateQuery,
+  hydrate,
   type QueryClient,
 } from "@tanstack/react-query";
 import {
@@ -13,12 +14,45 @@ import { CACHE_DURATIONS, CACHE_VERSION } from "@gshl-cache";
 const STORAGE_KEY = `gshl-query-cache::${CACHE_VERSION}`;
 const PERSIST_MAX_AGE = CACHE_DURATIONS.STATIC;
 
-function createLocalStoragePersister(): Persister | undefined {
+function getStorage(): Storage | undefined {
   if (typeof window === "undefined") {
     return undefined;
   }
 
-  const storage = window.localStorage;
+  return window.localStorage;
+}
+
+function readPersistedClient(storage: Storage): PersistedClient | undefined {
+  try {
+    const serialized = storage.getItem(STORAGE_KEY);
+    if (!serialized) {
+      return undefined;
+    }
+
+    return SuperJSON.parse<PersistedClient>(serialized);
+  } catch (error) {
+    storage.removeItem(STORAGE_KEY);
+    if (process.env.NODE_ENV !== "production") {
+      console.warn("Discarding corrupted query cache", error);
+    }
+    return undefined;
+  }
+}
+
+function isPersistedClientFresh(persistedClient: PersistedClient): boolean {
+  if (persistedClient.buster !== CACHE_VERSION) {
+    return false;
+  }
+
+  return Date.now() - persistedClient.timestamp <= PERSIST_MAX_AGE;
+}
+
+function createLocalStoragePersister(): Persister | undefined {
+  const storage = getStorage();
+
+  if (!storage) {
+    return undefined;
+  }
 
   return {
     persistClient: async (persistedClient) => {
@@ -32,20 +66,17 @@ function createLocalStoragePersister(): Persister | undefined {
       }
     },
     restoreClient: async () => {
-      try {
-        const serialized = storage.getItem(STORAGE_KEY);
-        if (!serialized) {
-          return undefined;
-        }
-
-        return SuperJSON.parse<PersistedClient>(serialized);
-      } catch (error) {
-        storage.removeItem(STORAGE_KEY);
-        if (process.env.NODE_ENV !== "production") {
-          console.warn("Discarding corrupted query cache", error);
-        }
+      const persistedClient = readPersistedClient(storage);
+      if (!persistedClient) {
         return undefined;
       }
+
+      if (!isPersistedClientFresh(persistedClient)) {
+        storage.removeItem(STORAGE_KEY);
+        return undefined;
+      }
+
+      return persistedClient;
     },
     removeClient: async () => {
       storage.removeItem(STORAGE_KEY);
@@ -56,6 +87,34 @@ function createLocalStoragePersister(): Persister | undefined {
 export interface QueryPersistenceHandle {
   unsubscribe: () => void;
   restorePromise: Promise<void>;
+}
+
+export function restorePersistedQueryClientSync(
+  queryClient: QueryClient,
+): boolean {
+  const storage = getStorage();
+
+  if (!storage) {
+    return false;
+  }
+
+  const persistedClient = readPersistedClient(storage);
+  if (!persistedClient) {
+    return false;
+  }
+
+  if (!isPersistedClientFresh(persistedClient)) {
+    storage.removeItem(STORAGE_KEY);
+    return false;
+  }
+
+  hydrate(queryClient, persistedClient.clientState, {
+    defaultOptions: {
+      deserializeData: SuperJSON.deserialize,
+    },
+  });
+
+  return true;
 }
 
 export function initQueryClientPersistence(

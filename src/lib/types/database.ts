@@ -69,6 +69,30 @@ export interface Matchup {
   updatedAt: Date;
 }
 
+export interface MatchupMetadata {
+  id: string;
+  seasonId: string;
+  weekId: string;
+  homeTeamId: string;
+  awayTeamId: string;
+  gameType: MatchupType;
+  homeRank?: number | null;
+  awayRank?: number | null;
+  rating?: number | null;
+  createdAt: Date;
+}
+
+export interface MatchupLiveState {
+  id: string;
+  homeScore?: number | null;
+  awayScore?: number | null;
+  homeWin?: boolean | null;
+  awayWin?: boolean | null;
+  tie?: boolean | null;
+  isComplete: boolean;
+  updatedAt: Date;
+}
+
 export interface Event {
   id: string;
   seasonId: string;
