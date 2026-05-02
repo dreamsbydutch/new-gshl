@@ -25,7 +25,8 @@ import { FranchiseDraftPickSummary } from "@gshl-components/contracts/FranchiseD
 const SHOW_LOCKER_ROOM_ROSTER_SALARIES = false;
 
 export function LockerRoomContent() {
-  const { currentSeason, seasons } = useSeasonState();
+  const { currentSeason, defaultSeason, seasons } = useSeasonState();
+  const activeSeason = currentSeason ?? defaultSeason;
   const { selectedLockerRoomType, selectedOwnerId } = useNav();
 
   // Only fetch contract data when on a tab that needs it
@@ -39,8 +40,8 @@ export function LockerRoomContent() {
   const { data: teamsRaw = [] } = useTeams();
   const allTeams = teamsRaw as GSHLTeam[];
   const teams = useMemo(
-    () => allTeams.filter((team) => team.seasonId == currentSeason?.id),
-    [allTeams, currentSeason?.id],
+    () => allTeams.filter((team) => team.seasonId == activeSeason?.id),
+    [allTeams, activeSeason?.id],
   );
   const { data: nhlTeamsRaw = [] } = useNHLTeams();
   const nhlTeams = nhlTeamsRaw as NHLTeam[];
@@ -54,7 +55,7 @@ export function LockerRoomContent() {
     currentContracts,
     buyoutContracts,
   } = useContractData({
-    currentSeason,
+    currentSeason: activeSeason,
     currentTeam,
     players,
     nhlTeams,
@@ -128,7 +129,7 @@ export function LockerRoomContent() {
               players,
               seasons,
               gshlTeamId: currentTeam.id,
-              selectedSeasonId: currentSeason?.id ?? "",
+              selectedSeasonId: activeSeason?.id ?? "",
             }}
           />
         </>
