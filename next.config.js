@@ -8,16 +8,9 @@ import "./src/env.js";
 const config = {
   images: {
     remotePatterns: [
-      { protocol: "https", hostname: "i.postimg.cc" },
-      { protocol: "https", hostname: "raw.githubusercontent.com" },
-      { protocol: "https", hostname: "jn9n1jxo7g.ufs.sh" },
+      { protocol: "https", hostname: "qzcw4d2n1l.ufs.sh" },
       { protocol: "https", hostname: "lh3.googleusercontent.com" },
       { protocol: "https", hostname: "avatars.githubusercontent.com" },
-      {
-        protocol: "https",
-        hostname: "<APP_ID>.ufs.sh",
-        pathname: "/f/*",
-      },
     ], // replace with your image domain(s)
   },
   webpack: (config, { isServer }) => {

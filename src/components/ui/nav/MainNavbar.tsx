@@ -28,31 +28,31 @@ export function Navbar({ className }: NavbarProps) {
       id: "home",
       label: "Home",
       href: "/",
-      icon: "https://jn9n1jxo7g.ufs.sh/f/94GU8p0EVxqPUlYN16LenlwB8jrUW0c12o5NM39iGduZPVHy",
+      icon: "https://qzcw4d2n1l.ufs.sh/f/wTZjIHOpQwiMaxJjw04E3mwF7uVBU48DCS2OnLW9fcI0QiA5",
     },
     {
       id: "schedule",
       label: "Schedule",
       href: "/schedule",
-      icon: "https://jn9n1jxo7g.ufs.sh/f/94GU8p0EVxqPs04OIzdLR9ueY0X1NhCqQOSWadyrJxT3A2Fj",
+      icon: "https://qzcw4d2n1l.ufs.sh/f/wTZjIHOpQwiMI7MWvQRNdPSmXIBgAbtWUyKaxRZHCfQYzp3l",
     },
     {
       id: "standings",
       label: "Standings",
       href: "/standings",
-      icon: "https://jn9n1jxo7g.ufs.sh/f/94GU8p0EVxqPiectEHnCYyHDkF5T4S9ctKIqur7Lomb6zPjZ",
+      icon: "https://qzcw4d2n1l.ufs.sh/f/wTZjIHOpQwiMuqdgVVUEFxzGnpeN7IBhDvwsJM8P6fLmXqCb",
     },
     {
       id: "lockerroom",
       label: "Locker Room",
       href: "/lockerroom",
-      icon: "https://jn9n1jxo7g.ufs.sh/f/94GU8p0EVxqPLyrpNZeCT8iDGR3lYbs7e6nujtdHEZJpXg1B",
+      icon: "https://qzcw4d2n1l.ufs.sh/f/wTZjIHOpQwiMKD0Cm0ynvo3h1cd80KYVjsC6fXrutBw95TND",
     },
     {
       id: "leagueoffice",
       label: "League Office",
       href: "/leagueoffice",
-      icon: "https://jn9n1jxo7g.ufs.sh/f/94GU8p0EVxqPqRHfkoWc94CkgwWOzBQ5iATa0py2DdXlMIUH",
+      icon: "https://qzcw4d2n1l.ufs.sh/f/wTZjIHOpQwiMxA70fumSV4vn8XiNop25ErOBzWbPQtAfHj31",
     },
   ];
 

@@ -47,8 +47,6 @@
       "@gshl-yahoo/*": ["./src/lib/yahoo/*"],
       "@gshl-nhl": ["./src/lib/nhl/index.ts"],
       "@gshl-nhl/*": ["./src/lib/nhl/*"],
-      "@gshl-ranking": ["./src/lib/ranking/index.ts"],
-      "@gshl-ranking/*": ["./src/lib/ranking/*"],
       "@gshl-styles": ["./src/styles/globals.css"],
       "@gshl-trpc": ["./src/trpc/index.ts"],
       "@gshl-trpc/*": ["./src/trpc/*"],
