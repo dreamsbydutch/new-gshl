@@ -11,6 +11,32 @@ var YahooScraper = YahooScraper || {};
 (function (ns) {
   "use strict";
 
+  const TEAM_DAY_TOTAL_FIELDS = [
+    "GP",
+    "MG",
+    "IR",
+    "IRplus",
+    "GS",
+    "G",
+    "A",
+    "P",
+    "PM",
+    "PIM",
+    "PPP",
+    "SOG",
+    "HIT",
+    "BLK",
+    "W",
+    "GA",
+    "SV",
+    "SA",
+    "SO",
+    "TOI",
+    "ADD",
+    "MS",
+    "BS",
+  ];
+
   function ensurePlayerRatings(statLines) {
     if (!Array.isArray(statLines)) return;
     statLines.forEach(function (line) {
@@ -25,8 +51,63 @@ var YahooScraper = YahooScraper || {};
       var ratingResult = RankingEngine.rankPerformance(line);
       if (ratingResult && ratingResult.score !== undefined) {
         line.Rating = ratingResult.score;
+        line.rating = line.Rating;
       }
     });
+  }
+
+  function rankRowsIfAvailable(rows, sheetName, outputField) {
+    if (
+      !rows ||
+      !rows.length ||
+      typeof RankingEngine === "undefined" ||
+      !RankingEngine ||
+      typeof RankingEngine.rankRows !== "function"
+    ) {
+      return rows || [];
+    }
+
+    var rankedRows = RankingEngine.rankRows(rows, {
+      sheetName: sheetName,
+      outputField: outputField || "Rating",
+      mutate: true,
+    });
+
+    (rankedRows || []).forEach(function (row) {
+      if (!row) return;
+      if (row.Rating !== undefined) row.rating = row.Rating;
+      else if (row.rating !== undefined) row.Rating = row.rating;
+    });
+
+    return rankedRows;
+  }
+
+  function buildPlayerWeekRatingKey(row) {
+    return [
+      normalizeSheetKey(row && row.gshlTeamId),
+      normalizeSheetKey(row && row.playerId),
+      normalizeSheetKey(row && row.weekId),
+      normalizeSheetKey(row && row.seasonId),
+    ].join("|");
+  }
+
+  function mergePlayerWeeksForRating(rawRows, updatedRows, selectedWeekIdSet) {
+    var byKey = new Map();
+    (rawRows || []).forEach(function (row) {
+      if (!row) return;
+      if (
+        selectedWeekIdSet &&
+        !selectedWeekIdSet.has(String(row.weekId))
+      ) {
+        return;
+      }
+      byKey.set(buildPlayerWeekRatingKey(row), row);
+    });
+    (updatedRows || []).forEach(function (row) {
+      if (!row) return;
+      byKey.set(buildPlayerWeekRatingKey(row), row);
+    });
+    return Array.from(byKey.values());
   }
 
   function updatePlayerDays() {
@@ -40,8 +121,7 @@ var YahooScraper = YahooScraper || {};
       const lookups = createScraperLookups(context, targetDate, prevDate);
       const seasonIdStr = context.season.id.toString();
       const weekIdStr = context.week.id.toString();
-      const playerDayWorkbookId =
-        context.playerDayWorkbookId || CURRENT_PLAYERDAY_SPREADSHEET_ID;
+      const playerDayWorkbookId = context.playerDayWorkbookId;
       const playerDays = [];
       const teamDays = [];
 
@@ -68,7 +148,7 @@ var YahooScraper = YahooScraper || {};
       GshlUtils.sheets.write.upsertSheetByKeys(
         playerDayWorkbookId,
         "PlayerDayStatLine",
-        ["playerId", "gshlTeamId", "date"],
+        ["gshlTeamId", "playerId", "date", "weekId", "seasonId"],
         playerDays,
         {
           idColumn: "id",
@@ -81,7 +161,7 @@ var YahooScraper = YahooScraper || {};
       GshlUtils.sheets.write.upsertSheetByKeys(
         TEAMSTATS_SPREADSHEET_ID,
         "TeamDayStatLine",
-        ["gshlTeamId", "date"],
+        ["gshlTeamId", "date", "weekId", "seasonId"],
         teamDays,
         {
           idColumn: "id",
@@ -139,14 +219,11 @@ var YahooScraper = YahooScraper || {};
     const teams = GshlUtils.sheets.read
       .fetchSheetAsObjects(SPREADSHEET_ID, "Team")
       .filter((t) => t.seasonId === season.id);
+    const matchups = GshlUtils.sheets.read
+      .fetchSheetAsObjects(SPREADSHEET_ID, "Matchup")
+      .filter((m) => m && String(m.seasonId) === String(season.id));
 
-    const playerDayWorkbookId =
-      (GshlUtils.domain &&
-        GshlUtils.domain.workbooks &&
-        typeof GshlUtils.domain.workbooks.getPlayerDayWorkbookId ===
-          "function" &&
-        GshlUtils.domain.workbooks.getPlayerDayWorkbookId(season.id)) ||
-      CURRENT_PLAYERDAY_SPREADSHEET_ID;
+    const playerDayWorkbookId = getPlayerDayWorkbookIdForSeason(season.id);
 
     const existingPlayerDays = GshlUtils.sheets.read.fetchSheetAsObjects(
       playerDayWorkbookId,
@@ -159,6 +236,7 @@ var YahooScraper = YahooScraper || {};
       players,
       franchises,
       teams,
+      matchups,
       existingPlayerDays,
       playerDayWorkbookId,
     };
@@ -177,37 +255,184 @@ var YahooScraper = YahooScraper || {};
       teamsByFranchiseId.set(team.franchiseId, team);
     });
 
-    const { yesterdayMap, existingMap } = buildExistingPlayerDayMaps(
+    const playerDayState = buildPlayerDayLookupState(
       context.existingPlayerDays,
       targetDate,
       prevDate,
+    );
+    const matchupGameTypesByTeamWeek = buildMatchupGameTypeMap(
+      context.matchups,
     );
 
     return {
       playersByYahooId,
       teamsByFranchiseId,
-      yesterdayMap,
-      existingMap,
+      yesterdayMap: playerDayState.yesterdayMap,
+      existingMap: playerDayState.existingMap,
+      rowPresence: playerDayState.rowPresence,
+      datePresence: playerDayState.datePresence,
+      matchupGameTypesByTeamWeek,
     };
   }
 
-  function buildExistingPlayerDayMaps(
+  function computeAddForPlayerDay(playerDay, lookups) {
+    if (
+      typeof LineupBuilder !== "undefined" &&
+      LineupBuilder &&
+      LineupBuilder.internals &&
+      typeof LineupBuilder.internals.computeAddValue === "function"
+    ) {
+      return LineupBuilder.internals.computeAddValue(
+        playerDay,
+        lookups && lookups.rowPresence,
+        lookups && lookups.datePresence,
+      );
+    }
+
+    if (!playerDay || !lookups) return "";
+    const dateKey = GshlUtils.core.date.formatDateOnly(playerDay.date);
+    const previousDate = GshlUtils.core.date.getPreviousDate(dateKey);
+    if (
+      !lookups.datePresence ||
+      !lookups.datePresence.has(String(previousDate))
+    ) {
+      return "";
+    }
+    const key = `${playerDay.playerId}|${playerDay.gshlTeamId}|${previousDate}`;
+    return lookups.rowPresence && lookups.rowPresence.has(key) ? "" : 1;
+  }
+
+  function buildMatchupGameTypeMap(matchups) {
+    const matchupGameTypesByTeamWeek = new Map();
+    (matchups || []).forEach(function (matchup) {
+      if (!matchup) return;
+      const weekKey = normalizeSheetKey(matchup.weekId);
+      if (!weekKey) return;
+      const gameType =
+        matchup.gameType === undefined || matchup.gameType === null
+          ? ""
+          : String(matchup.gameType);
+      const homeTeamKey = normalizeSheetKey(matchup.homeTeamId);
+      const awayTeamKey = normalizeSheetKey(matchup.awayTeamId);
+      if (homeTeamKey) {
+        matchupGameTypesByTeamWeek.set(
+          buildTeamWeekLookupKey(homeTeamKey, weekKey),
+          gameType,
+        );
+      }
+      if (awayTeamKey) {
+        matchupGameTypesByTeamWeek.set(
+          buildTeamWeekLookupKey(awayTeamKey, weekKey),
+          gameType,
+        );
+      }
+    });
+    return matchupGameTypesByTeamWeek;
+  }
+
+  function buildTeamWeekLookupKey(teamId, weekId) {
+    return normalizeSheetKey(teamId) + "|" + normalizeSheetKey(weekId);
+  }
+
+  function getMatchupGameTypeFromLookups(lookups, matchups, teamId, weekId) {
+    if (
+      lookups &&
+      lookups.matchupGameTypesByTeamWeek &&
+      typeof lookups.matchupGameTypesByTeamWeek.get === "function"
+    ) {
+      const key = buildTeamWeekLookupKey(teamId, weekId);
+      if (lookups.matchupGameTypesByTeamWeek.has(key)) {
+        return lookups.matchupGameTypesByTeamWeek.get(key);
+      }
+    }
+    return getMatchupGameTypeForTeamWeek(matchups, teamId, weekId);
+  }
+
+  function computeLineupFlagsForPlayer(player) {
+    if (
+      typeof LineupBuilder !== "undefined" &&
+      LineupBuilder &&
+      LineupBuilder.internals &&
+      typeof LineupBuilder.internals.computeLineupFlags === "function"
+    ) {
+      return LineupBuilder.internals.computeLineupFlags(player);
+    }
+
+    var dailyPos =
+      player && player.dailyPos !== undefined && player.dailyPos !== null
+        ? String(player.dailyPos).trim()
+        : "";
+    var fullPos =
+      player && player.fullPos !== undefined && player.fullPos !== null
+        ? String(player.fullPos).trim()
+        : "";
+    var bestPos =
+      player && player.bestPos !== undefined && player.bestPos !== null
+        ? String(player.bestPos).trim()
+        : "";
+    function isStart(pos) {
+      return (
+        pos === "LW" ||
+        pos === "C" ||
+        pos === "RW" ||
+        pos === "D" ||
+        pos === "G" ||
+        pos === "Util"
+      );
+    }
+    var dailyPosIsStart = isStart(dailyPos);
+    var played = String(player && player.GP) === "1";
+    var isGoalie = String((player && player.posGroup) || "") === "G";
+    return {
+      GS: dailyPosIsStart && played ? 1 : "",
+      MS: played && !isGoalie && !dailyPosIsStart && isStart(fullPos) ? 1 : "",
+      BS: played && dailyPosIsStart && bestPos === "BN" ? 1 : "",
+    };
+  }
+
+  function buildPlayerDayLookupState(
     existingPlayerDays,
     targetDate,
     prevDate,
   ) {
     const yesterdayMap = new Map();
     const existingMap = new Map();
-    existingPlayerDays.forEach((playerDay) => {
+    const rowPresence = new Set();
+    const datePresence = new Set();
+    const targetKey = GshlUtils.core.date.formatDateOnly(targetDate);
+    const prevKey = GshlUtils.core.date.formatDateOnly(prevDate);
+    (existingPlayerDays || []).forEach((playerDay) => {
+      if (!playerDay) return;
       const key = `${playerDay.playerId}_${playerDay.gshlTeamId}`;
       const normalizedDate = GshlUtils.core.date.formatDateOnly(playerDay.date);
-      if (normalizedDate === prevDate) {
+      if (!normalizedDate) return;
+      if (
+        (targetKey || prevKey) &&
+        normalizedDate !== targetKey &&
+        normalizedDate !== prevKey
+      ) {
+        return;
+      }
+
+      datePresence.add(String(normalizedDate));
+      if (playerDay.playerId && playerDay.gshlTeamId) {
+        rowPresence.add(
+          `${playerDay.playerId}|${playerDay.gshlTeamId}|${normalizedDate}`,
+        );
+      }
+
+      if (normalizedDate === prevKey) {
         yesterdayMap.set(key, playerDay);
-      } else if (normalizedDate === targetDate) {
+      } else if (normalizedDate === targetKey) {
         existingMap.set(key, playerDay);
       }
     });
-    return { yesterdayMap, existingMap };
+    return {
+      yesterdayMap,
+      existingMap,
+      rowPresence,
+      datePresence,
+    };
   }
 
   function processFranchiseRoster(
@@ -230,7 +455,14 @@ var YahooScraper = YahooScraper || {};
       lookups,
     );
 
-    const lineup = finalizeLineupAssignments(rosterEntries);
+    const lineup = finalizeLineupAssignments(rosterEntries, {
+      gameType: getMatchupGameTypeFromLookups(
+        lookups,
+        context.matchups,
+        gshlTeam && gshlTeam.id,
+        weekIdStr,
+      ),
+    });
     ensurePlayerRatings(lineup);
     const teamDayStatLine = buildTeamDayStatLine(
       lineup,
@@ -281,7 +513,6 @@ var YahooScraper = YahooScraper || {};
 
         const playerId = playerRecord.id.toString();
         const lookupKey = `${playerId}_${gshlTeam.id.toString()}`;
-        const yest = lookups.yesterdayMap.get(lookupKey);
         const existing = lookups.existingMap.get(lookupKey);
 
         playerRow.id = existing ? existing.id : undefined;
@@ -310,7 +541,7 @@ var YahooScraper = YahooScraper || {};
         const rating = RankingEngine.rankPerformance(playerRow);
         playerRow.Rating =
           rating && rating.score !== undefined ? rating.score : "";
-        playerRow.ADD = !yest ? 1 : "";
+        playerRow.ADD = computeAddForPlayerDay(playerRow, lookups);
         playerRow.BS = "";
         playerRow.MS = "";
         return playerRow;
@@ -318,13 +549,67 @@ var YahooScraper = YahooScraper || {};
       .filter(Boolean);
   }
 
-  function finalizeLineupAssignments(rosterEntries) {
-    return LineupBuilder.optimizeLineup(rosterEntries).map((player) => {
-      player.BS = player.GS === "1" && player.bestPos === "BN" ? 1 : "";
-      player.MS =
-        player.GP === "1" && player.GS !== "1" && player.fullPos !== "BN"
-          ? 1
+  function getMatchupGameTypeForTeamWeek(matchups, teamId, weekId) {
+    var teamKey =
+      teamId === undefined || teamId === null ? "" : String(teamId).trim();
+    var weekKey =
+      weekId === undefined || weekId === null ? "" : String(weekId).trim();
+    if (!teamKey || !weekKey || !Array.isArray(matchups)) return "";
+
+    var matchup = matchups.find(function (m) {
+      if (!m) return false;
+      var matchupWeekId =
+        m.weekId === undefined || m.weekId === null ? "" : String(m.weekId);
+      if (matchupWeekId !== weekKey) return false;
+      return (
+        String(m.homeTeamId) === teamKey || String(m.awayTeamId) === teamKey
+      );
+    });
+
+    return matchup &&
+      matchup.gameType !== undefined &&
+      matchup.gameType !== null
+      ? String(matchup.gameType)
+      : "";
+  }
+
+  function isLosersTournamentGame(gameType) {
+    return String(gameType || "") === "LT";
+  }
+
+  function applyAutomaticLtLineup(optimizedRoster, gameType) {
+    if (!Array.isArray(optimizedRoster) || !isLosersTournamentGame(gameType)) {
+      return optimizedRoster;
+    }
+
+    optimizedRoster.forEach(function (player) {
+      if (!player) return;
+      var assignedBestPos =
+        player.bestPos !== undefined && player.bestPos !== null
+          ? String(player.bestPos)
           : "";
+      player.dailyPos = assignedBestPos;
+      player.bestPos = assignedBestPos;
+      player.fullPos = assignedBestPos;
+      var flags = computeLineupFlagsForPlayer(player);
+      player.GS = flags.GS;
+      player.MS = flags.MS;
+      player.BS = flags.BS;
+    });
+
+    return optimizedRoster;
+  }
+
+  function finalizeLineupAssignments(rosterEntries, options) {
+    var opts = options || {};
+    return applyAutomaticLtLineup(
+      LineupBuilder.optimizeLineup(rosterEntries),
+      opts.gameType,
+    ).map((player) => {
+      var flags = computeLineupFlagsForPlayer(player);
+      player.GS = flags.GS;
+      player.BS = flags.BS;
+      player.MS = flags.MS;
       player.nhlPos = player.nhlPos.toString();
       return player;
     });
@@ -344,44 +629,43 @@ var YahooScraper = YahooScraper || {};
     const goalieStart = lineup.some(
       (player) => player.posGroup === "G" && player.GP === "1",
     );
+    const totals = buildLineupStatTotals(lineup);
 
     const teamDayStatLine = {
       date: targetDate,
       gshlTeamId: gshlTeam.id,
       seasonId: seasonIdStr,
       weekId: weekIdStr,
-      GP: String(sumStat(lineup, "GP")),
-      MG: String(sumStat(lineup, "MG")),
-      IR: String(sumStat(lineup, "IR")),
-      IRplus: String(sumStat(lineup, "IRplus")),
-      GS: String(sumStat(lineup, "GS")),
-      G: skaterStart ? String(sumStat(lineup, "G")) : "",
-      A: skaterStart ? String(sumStat(lineup, "A")) : "",
-      P: skaterStart ? String(sumStat(lineup, "P")) : "",
-      PM: +season.id <= 6 && skaterStart ? String(sumStat(lineup, "PM")) : "",
-      PIM: +season.id <= 4 && skaterStart ? String(sumStat(lineup, "PIM")) : "",
-      PPP: skaterStart ? String(sumStat(lineup, "PPP")) : "",
-      SOG: skaterStart ? String(sumStat(lineup, "SOG")) : "",
-      HIT: skaterStart ? String(sumStat(lineup, "HIT")) : "",
-      BLK: skaterStart ? String(sumStat(lineup, "BLK")) : "",
-      W: goalieStart ? String(sumStat(lineup, "W")) : "",
-      GA: goalieStart ? String(sumStat(lineup, "GA")) : "",
+      GP: String(totals.GP),
+      MG: String(totals.MG),
+      IR: String(totals.IR),
+      IRplus: String(totals.IRplus),
+      GS: String(totals.GS),
+      G: skaterStart ? String(totals.G) : "",
+      A: skaterStart ? String(totals.A) : "",
+      P: skaterStart ? String(totals.P) : "",
+      PM: +season.id <= 6 && skaterStart ? String(totals.PM) : "",
+      PIM: +season.id <= 4 && skaterStart ? String(totals.PIM) : "",
+      PPP: skaterStart ? String(totals.PPP) : "",
+      SOG: skaterStart ? String(totals.SOG) : "",
+      HIT: skaterStart ? String(totals.HIT) : "",
+      BLK: skaterStart ? String(totals.BLK) : "",
+      W: goalieStart ? String(totals.W) : "",
+      GA: goalieStart ? String(totals.GA) : "",
       GAA: goalieStart
-        ? ((sumStat(lineup, "GA") / sumStat(lineup, "TOI")) * 60)
-            .toFixed(5)
-            .toString()
+        ? ((totals.GA / totals.TOI) * 60).toFixed(5).toString()
         : "",
-      SV: goalieStart ? String(sumStat(lineup, "SV")) : "",
-      SA: goalieStart ? String(sumStat(lineup, "SA")) : "",
+      SV: goalieStart ? String(totals.SV) : "",
+      SA: goalieStart ? String(totals.SA) : "",
       SVP: goalieStart
-        ? (sumStat(lineup, "SV") / sumStat(lineup, "SA")).toFixed(6).toString()
+        ? (totals.SV / totals.SA).toFixed(6).toString()
         : "",
-      SO: +season.id <= 4 && goalieStart ? String(sumStat(lineup, "SO")) : "",
-      TOI: goalieStart ? String(sumStat(lineup, "TOI")) : "",
+      SO: +season.id <= 4 && goalieStart ? String(totals.SO) : "",
+      TOI: goalieStart ? String(totals.TOI) : "",
       Rating: "",
-      ADD: String(sumStat(lineup, "ADD")),
-      MS: String(sumStat(lineup, "MS")),
-      BS: String(sumStat(lineup, "BS")),
+      ADD: String(totals.ADD),
+      MS: String(totals.MS),
+      BS: String(totals.BS),
     };
 
     const teamRating = RankingEngine.rankPerformance(teamDayStatLine);
@@ -391,32 +675,616 @@ var YahooScraper = YahooScraper || {};
     return teamDayStatLine;
   }
 
-  function sumStat(lineup, field) {
-    return lineup.reduce(function (total, player) {
-      return total + +player[field];
-    }, 0);
+  function buildLineupStatTotals(lineup) {
+    const totals = {};
+    TEAM_DAY_TOTAL_FIELDS.forEach(function (field) {
+      totals[field] = 0;
+    });
+    (lineup || []).forEach(function (player) {
+      TEAM_DAY_TOTAL_FIELDS.forEach(function (field) {
+        totals[field] += +(player && player[field]);
+      });
+    });
+    return totals;
   }
 
   ns.updatePlayerDays = updatePlayerDays;
-  ns.ensurePlayerRatings = ensurePlayerRatings;
-  ns.scrapers = ns.scrapers || {};
-  ns.scrapers.scrapeDailyTeamTablesToPlayerDays = updatePlayerDays;
   ns.internals = ns.internals || {};
   ns.internals.shouldSkipYahooScrapeWindow = shouldSkipYahooScrapeWindow;
   ns.internals.loadYahooScrapeContext = loadYahooScrapeContext;
   ns.internals.createScraperLookups = createScraperLookups;
   ns.internals.buildRosterEntries = buildRosterEntries;
+  ns.internals.getMatchupGameTypeForTeamWeek = getMatchupGameTypeForTeamWeek;
+  ns.internals.isLosersTournamentGame = isLosersTournamentGame;
+  ns.internals.applyAutomaticLtLineup = applyAutomaticLtLineup;
   ns.internals.finalizeLineupAssignments = finalizeLineupAssignments;
   ns.internals.buildTeamDayStatLine = buildTeamDayStatLine;
+  ns.internals.buildLineupStatTotals = buildLineupStatTotals;
+
+  function normalizeYahooLineupPosition(pos) {
+    var normalized =
+      pos === undefined || pos === null ? "" : String(pos).trim();
+    if (!normalized) return "";
+
+    normalized = normalized
+      .replace(/&nbsp;/gi, " ")
+      .replace(/&#160;/gi, " ")
+      .replace(/&#43;/gi, "+")
+      .replace(/&#x2b;/gi, "+")
+      .replace(/&plus;/gi, "+")
+      .replace(/\s+/g, " ")
+      .replace(/[^A-Za-z0-9+]/g, "")
+      .trim();
+    var upper = normalized.toUpperCase();
+
+    if (upper === "C") return "C";
+    if (upper === "LW") return "LW";
+    if (upper === "RW") return "RW";
+    if (upper === "UTIL" || upper === "U") return "Util";
+    if (upper === "G") return "G";
+    if (upper === "D") return "D";
+    if (upper === "IR" || upper === "IL") return "IR";
+    if (upper === "IR+" || upper === "IRPLUS" || upper === "IL+") return "IR+";
+    if (upper === "ILPLUS") return "IR+";
+    if (upper === "BN" || upper === "BENCH") return "BN";
+
+    return "";
+  }
+
+  function buildPlayerDayLineupRepairKey(teamId, date, playerId, weekId) {
+    return [
+      normalizeSheetKey(teamId),
+      GshlUtils.core.date.formatDateOnly(date),
+      normalizeSheetKey(playerId),
+      normalizeSheetKey(weekId),
+    ].join("|");
+  }
+
+  function resolveYahooRosterSeasonYear(season, seasonId, options) {
+    var opts = options || {};
+    if (opts.seasonYear !== undefined && opts.seasonYear !== null) {
+      return String(opts.seasonYear).trim();
+    }
+    if (opts.year !== undefined && opts.year !== null) {
+      return String(opts.year).trim();
+    }
+    var seasonNumber = Number(seasonId);
+    if (isFinite(seasonNumber)) return String(2013 + seasonNumber);
+    if (season && season.year !== undefined && season.year !== null) {
+      return String(season.year).trim();
+    }
+    return "";
+  }
+
+  function computeRepairedGs(playerDay, newDailyPos) {
+    var next = Object.assign({}, playerDay, { dailyPos: newDailyPos });
+    if (
+      typeof LineupBuilder !== "undefined" &&
+      LineupBuilder &&
+      LineupBuilder.internals &&
+      typeof LineupBuilder.internals.computeLineupFlags === "function"
+    ) {
+      return LineupBuilder.internals.computeLineupFlags(next).GS;
+    }
+    return computeLineupFlagsForPlayer(next).GS;
+  }
+
+  function repairStoredLineupsFromYahooInternal(seasonId, weekNums, options) {
+    var opts = options || {};
+    var seasonKey =
+      GshlUtils.core &&
+      GshlUtils.core.parse &&
+      typeof GshlUtils.core.parse.normalizeSeasonId === "function"
+        ? GshlUtils.core.parse.normalizeSeasonId(
+            seasonId,
+            "repairStoredLineupsFromYahooInternal",
+          )
+        : normalizeSheetKey(seasonId);
+    if (!seasonKey) {
+      throw new Error("repairStoredLineupsFromYahooInternal requires a seasonId");
+    }
+
+    var weekNumList = normalizeMatchupScrapeValueList(
+      weekNums || opts.weekNums,
+    );
+    if (!weekNumList.length) {
+      throw new Error("repairStoredLineupsFromYahooInternal requires weekNums");
+    }
+
+    var fetchSheetAsObjects = GshlUtils.sheets.read.fetchSheetAsObjects;
+    var season = fetchSheetAsObjects(SPREADSHEET_ID, "Season", {
+      coerceTypes: true,
+    }).find(function (row) {
+      return String(row && row.id) === seasonKey;
+    });
+    if (!season) {
+      throw new Error(
+        "repairStoredLineupsFromYahooInternal could not find Season.id=" + seasonKey,
+      );
+    }
+
+    var weekNumSet = new Set(weekNumList);
+    var weeks = fetchSheetAsObjects(SPREADSHEET_ID, "Week", {
+      coerceTypes: true,
+    }).filter(function (week) {
+      return (
+        String(week && week.seasonId) === seasonKey &&
+        weekNumSet.has(String(week && week.weekNum))
+      );
+    });
+    var weeksByWeekNum = new Map();
+    weeks.forEach(function (week) {
+      weeksByWeekNum.set(String(week.weekNum), week);
+    });
+    var missingWeekNums = weekNumList.filter(function (weekNum) {
+      return !weeksByWeekNum.has(String(weekNum));
+    });
+    if (missingWeekNums.length) {
+      throw new Error(
+        "repairStoredLineupsFromYahooInternal could not find Week.weekNum values for seasonId=" +
+          seasonKey +
+          ": " +
+          missingWeekNums.join(","),
+      );
+    }
+    weeks = weekNumList.map(function (weekNum) {
+      return weeksByWeekNum.get(String(weekNum));
+    });
+    if (!weeks.length) {
+      throw new Error(
+        "repairStoredLineupsFromYahooInternal found no Week rows for seasonId=" +
+          seasonKey +
+          " weekNums=" +
+          weekNumList.join(","),
+      );
+    }
+
+    var weekIdSet = new Set(
+      weeks.map(function (week) {
+        return String(week.id);
+      }),
+    );
+    var teams = fetchSheetAsObjects(SPREADSHEET_ID, "Team", {
+      coerceTypes: true,
+    }).filter(function (team) {
+      return String(team && team.seasonId) === seasonKey;
+    });
+    var playersByYahooId = new Map();
+    fetchSheetAsObjects(SPREADSHEET_ID, "Player", {
+      coerceTypes: true,
+    }).forEach(function (player) {
+      var yahooId = normalizeSheetKey(player && player.yahooId);
+      if (!yahooId) return;
+      playersByYahooId.set(yahooId, player);
+    });
+
+    var playerDayWorkbookId =
+      (opts.playerDayWorkbookId && String(opts.playerDayWorkbookId)) ||
+      getPlayerDayWorkbookIdForSeason(seasonKey);
+    var playerDays = fetchSheetAsObjects(
+      playerDayWorkbookId,
+      "PlayerDayStatLine",
+      { coerceTypes: true },
+    ).filter(function (playerDay) {
+      return (
+        String(playerDay && playerDay.seasonId) === seasonKey &&
+        weekIdSet.has(String(playerDay && playerDay.weekId))
+      );
+    });
+
+    var playerDaysByKey = new Map();
+    playerDays.forEach(function (playerDay) {
+      var key = buildPlayerDayLineupRepairKey(
+        playerDay && playerDay.gshlTeamId,
+        playerDay && playerDay.date,
+        playerDay && playerDay.playerId,
+        playerDay && playerDay.weekId,
+      );
+      if (key) playerDaysByKey.set(key, playerDay);
+    });
+
+    var summary = {
+      seasonId: seasonKey,
+      weekNums: weekNumList,
+      weekIds: weeks.map(function (week) {
+        return String(week.id);
+      }),
+      dryRun: !!opts.dryRun,
+      scanned: {
+        weeks: weeks.length,
+        teams: teams.length,
+        teamDates: 0,
+        yahooRows: 0,
+      },
+      updatedRows: 0,
+      missingPlayers: [],
+      missingPlayerDayRows: [],
+      skippedTeams: [],
+      failedFetches: [],
+      aborted: false,
+      abortReason: "",
+      cursorIndex:
+        opts.cursorIndex === undefined || opts.cursorIndex === null
+          ? 0
+          : Number(opts.cursorIndex),
+      nextCursorIndex: null,
+      processedTeamDates: 0,
+      complete: false,
+      changes: [],
+    };
+    summary.cursorIndex =
+      isFinite(summary.cursorIndex) && summary.cursorIndex > 0
+        ? Math.floor(summary.cursorIndex)
+        : 0;
+    var missingPlayerKeys = new Set();
+    var missingPlayerDayKeys = new Set();
+    var skippedTeamKeys = new Set();
+
+    function addMissingPlayer(scrapedPlayer, team, week, date) {
+      var key =
+        normalizeSheetKey(scrapedPlayer && scrapedPlayer.yahooId) +
+        "|" +
+        normalizeSheetKey(team && team.yahooId) +
+        "|" +
+        date;
+      if (missingPlayerKeys.has(key)) return;
+      missingPlayerKeys.add(key);
+      summary.missingPlayers.push({
+        yahooId: normalizeSheetKey(scrapedPlayer && scrapedPlayer.yahooId),
+        playerName: scrapedPlayer && scrapedPlayer.playerName,
+        yahooTeamId: normalizeSheetKey(team && team.yahooId),
+        gshlTeamId: normalizeSheetKey(team && team.id),
+        weekId: normalizeSheetKey(week && week.id),
+        date: date,
+      });
+    }
+
+    function addMissingPlayerDay(scrapedPlayer, player, team, week, date) {
+      var key =
+        normalizeSheetKey(player && player.id) +
+        "|" +
+        normalizeSheetKey(team && team.id) +
+        "|" +
+        normalizeSheetKey(week && week.id) +
+        "|" +
+        date;
+      if (missingPlayerDayKeys.has(key)) return;
+      missingPlayerDayKeys.add(key);
+      summary.missingPlayerDayRows.push({
+        playerId: normalizeSheetKey(player && player.id),
+        playerName:
+          (player && (player.fullName || player.playerName || player.name)) ||
+          (scrapedPlayer && scrapedPlayer.playerName) ||
+          "",
+        yahooId: normalizeSheetKey(scrapedPlayer && scrapedPlayer.yahooId),
+        gshlTeamId: normalizeSheetKey(team && team.id),
+        yahooTeamId: normalizeSheetKey(team && team.yahooId),
+        weekId: normalizeSheetKey(week && week.id),
+        date: date,
+      });
+    }
+
+    var seasonYear = resolveYahooRosterSeasonYear(season, seasonKey, opts);
+    var requestDelayMs =
+      opts.requestDelayMs === undefined || opts.requestDelayMs === null
+        ? 0
+        : Number(opts.requestDelayMs);
+    requestDelayMs =
+      isFinite(requestDelayMs) && requestDelayMs > 0 ? requestDelayMs : 0;
+    var retryCount =
+      opts.retryCount === undefined || opts.retryCount === null
+        ? 0
+        : Number(opts.retryCount);
+    retryCount = isFinite(retryCount) && retryCount > 0 ? retryCount : 0;
+    var retryDelayMs =
+      opts.retryDelayMs === undefined || opts.retryDelayMs === null
+        ? 0
+        : Number(opts.retryDelayMs);
+    retryDelayMs =
+      isFinite(retryDelayMs) && retryDelayMs > 0 ? retryDelayMs : 0;
+    var continueOnFetchError = !!opts.continueOnFetchError;
+    var maxTeamDates =
+      opts.maxTeamDates === undefined || opts.maxTeamDates === null
+        ? 30
+        : Number(opts.maxTeamDates);
+    maxTeamDates =
+      isFinite(maxTeamDates) && maxTeamDates > 0 ? Math.floor(maxTeamDates) : 0;
+    var maxRuntimeMs =
+      opts.maxRuntimeMs === undefined || opts.maxRuntimeMs === null
+        ? 300000
+        : Number(opts.maxRuntimeMs);
+    maxRuntimeMs =
+      isFinite(maxRuntimeMs) && maxRuntimeMs > 0 ? Math.floor(maxRuntimeMs) : 0;
+    summary.maxTeamDates = maxTeamDates;
+    summary.maxRuntimeMs = maxRuntimeMs;
+
+    var runStartedAt = Date.now();
+    var taskIndex = 0;
+
+    function shouldPauseBeforeNextTask() {
+      if (summary.processedTeamDates <= 0) return false;
+      if (maxTeamDates && summary.processedTeamDates >= maxTeamDates) {
+        return true;
+      }
+      return maxRuntimeMs && Date.now() - runStartedAt >= maxRuntimeMs;
+    }
+
+    function sleepIfAvailable(ms) {
+      if (
+        ms &&
+        typeof Utilities !== "undefined" &&
+        Utilities &&
+        typeof Utilities.sleep === "function"
+      ) {
+        Utilities.sleep(ms);
+      }
+    }
+
+    function fetchRosterRowsForRepair(date, yahooTeamId, team, week) {
+      var attempts = retryCount + 1;
+      var lastError = null;
+      for (var attempt = 1; attempt <= attempts; attempt++) {
+        try {
+          if (attempt > 1) sleepIfAvailable(retryDelayMs);
+          return GshlUtils.yahoo.roster.yahooTableScraper(
+            date,
+            yahooTeamId,
+            seasonKey,
+            Object.assign({}, opts, {
+              seasonYear: seasonYear,
+              seasonCode: opts.seasonCode,
+              leagueId: opts.leagueId,
+            }),
+          );
+        } catch (err) {
+          lastError = err;
+          console.log(
+            "[YahooScraper] Roster fetch failed attempt " +
+              attempt +
+              "/" +
+              attempts +
+              " teamId=" +
+              normalizeSheetKey(team && team.id) +
+              " yahooTeamId=" +
+              yahooTeamId +
+              " weekId=" +
+              normalizeSheetKey(week && week.id) +
+              " date=" +
+              date +
+              ": " +
+              (err && err.message ? err.message : String(err)),
+          );
+        }
+      }
+
+      summary.failedFetches.push({
+        gshlTeamId: normalizeSheetKey(team && team.id),
+        yahooTeamId: yahooTeamId,
+        weekId: normalizeSheetKey(week && week.id),
+        date: date,
+        error: lastError && lastError.message ? lastError.message : String(lastError),
+      });
+      if (!continueOnFetchError) {
+        summary.aborted = true;
+        summary.abortReason = "fetchError";
+      }
+      return null;
+    }
+
+    weeks.forEach(function (week) {
+      if (summary.aborted) return;
+      var dates = GshlUtils.core.date.getDatesInRangeInclusive(
+        week.startDate,
+        week.endDate,
+      );
+      teams.forEach(function (team) {
+        if (summary.aborted) return;
+        var yahooTeamId = normalizeSheetKey(team && team.yahooId);
+        if (!yahooTeamId) {
+          var skippedKey = normalizeSheetKey(team && team.id);
+          if (!skippedTeamKeys.has(skippedKey)) {
+            skippedTeamKeys.add(skippedKey);
+            summary.skippedTeams.push({
+              gshlTeamId: skippedKey,
+              reason: "missing yahooId",
+            });
+          }
+          return;
+        }
+
+        dates.forEach(function (date) {
+          if (summary.aborted) return;
+          var currentTaskIndex = taskIndex++;
+          if (currentTaskIndex < summary.cursorIndex) return;
+          if (shouldPauseBeforeNextTask()) {
+            summary.aborted = true;
+            summary.abortReason = "chunkLimit";
+            summary.nextCursorIndex = currentTaskIndex;
+            return;
+          }
+          summary.scanned.teamDates++;
+          summary.processedTeamDates++;
+          sleepIfAvailable(requestDelayMs);
+          var rosterRows = fetchRosterRowsForRepair(
+            date,
+            yahooTeamId,
+            team,
+            week,
+          );
+          if (!rosterRows) return;
+          summary.scanned.yahooRows += Array.isArray(rosterRows)
+            ? rosterRows.length
+            : 0;
+
+          (rosterRows || []).forEach(function (scrapedPlayer) {
+            var yahooId = normalizeSheetKey(
+              scrapedPlayer && scrapedPlayer.yahooId,
+            );
+            if (!yahooId) return;
+
+            var player = playersByYahooId.get(yahooId);
+            if (!player) {
+              addMissingPlayer(scrapedPlayer, team, week, date);
+              return;
+            }
+
+            var playerDayKey = buildPlayerDayLineupRepairKey(
+              team && team.id,
+              date,
+              player && player.id,
+              week && week.id,
+            );
+            var playerDay = playerDaysByKey.get(playerDayKey);
+            if (!playerDay) {
+              addMissingPlayerDay(scrapedPlayer, player, team, week, date);
+              return;
+            }
+
+            var oldDailyPos = normalizeYahooLineupPosition(playerDay.dailyPos);
+            var newDailyPos = normalizeYahooLineupPosition(
+              scrapedPlayer.dailyPos,
+            );
+            if (!newDailyPos || oldDailyPos === newDailyPos) return;
+
+            var oldGs =
+              playerDay.GS === undefined || playerDay.GS === null
+                ? ""
+                : playerDay.GS;
+            var newGs = computeRepairedGs(playerDay, newDailyPos);
+            summary.changes.push({
+              playerDayId: normalizeSheetKey(playerDay.id),
+              playerId: normalizeSheetKey(player && player.id),
+              playerName:
+                (player &&
+                  (player.fullName || player.playerName || player.name)) ||
+                scrapedPlayer.playerName ||
+                "",
+              gshlTeamId: normalizeSheetKey(team && team.id),
+              yahooTeamId: yahooTeamId,
+              date: date,
+              weekId: normalizeSheetKey(week && week.id),
+              oldDailyPos: oldDailyPos,
+              newDailyPos: newDailyPos,
+              oldGS: oldGs,
+              newGS: newGs,
+            });
+          });
+        });
+      });
+    });
+
+    if (!summary.aborted) {
+      summary.complete = true;
+    }
+    summary.updatedRows = summary.changes.length;
+    if (opts.dryRun || !summary.changes.length) {
+      return summary;
+    }
+
+    writeOldLineupRepairChanges(playerDayWorkbookId, summary.changes);
+    return summary;
+  }
+
+  function writeOldLineupRepairChanges(playerDayWorkbookId, changes) {
+    var openSheet = GshlUtils.sheets.open.getSheetByName;
+    var getHeaders = GshlUtils.sheets.read.getHeadersFromSheet;
+    var getColIndex = GshlUtils.sheets.read.getColIndex;
+    var groupAndApply = GshlUtils.sheets.write.groupAndApplyColumnUpdates;
+    var sheet = openSheet(playerDayWorkbookId, "PlayerDayStatLine", true);
+    var headers = getHeaders(sheet);
+    var idCol = getColIndex(headers, "id", true) + 1;
+    var dailyPosCol = getColIndex(headers, "dailyPos", true) + 1;
+    var gsCol = getColIndex(headers, "GS", true) + 1;
+    var updatedAtCol = getColIndex(headers, "updatedAt", true) + 1;
+
+    var lastRow = sheet.getLastRow();
+    var idToRowIndex = {};
+    var duplicateIds = [];
+    if (lastRow >= 2) {
+      var idValues = sheet.getRange(2, idCol, lastRow - 1, 1).getValues();
+      for (var r = 0; r < idValues.length; r++) {
+        var rawId = idValues[r][0];
+        if (rawId === undefined || rawId === null || rawId === "") continue;
+        var key = String(rawId);
+        var rowIndex = r + 2;
+        if (idToRowIndex[key] === undefined) {
+          idToRowIndex[key] = rowIndex;
+        } else if (duplicateIds.length < 20) {
+          duplicateIds.push({
+            id: key,
+            firstRowIndex: idToRowIndex[key],
+            dupRowIndex: rowIndex,
+          });
+        }
+      }
+    }
+
+    if (duplicateIds.length) {
+      throw new Error(
+        "PlayerDayStatLine sheet has duplicate 'id' values; fix the sheet and rerun. Example duplicates: " +
+          JSON.stringify(duplicateIds),
+      );
+    }
+
+    var now = new Date();
+    var resolved = [];
+    var missingIds = [];
+    changes.forEach(function (change) {
+      var id = normalizeSheetKey(change && change.playerDayId);
+      var rowIndex = id ? idToRowIndex[id] : 0;
+      if (!rowIndex) {
+        missingIds.push(id || "(blank)");
+        return;
+      }
+      resolved.push({
+        rowIndex: rowIndex,
+        dailyPos: change.newDailyPos,
+        GS: change.newGS,
+        updatedAt: now,
+      });
+    });
+
+    if (missingIds.length) {
+      throw new Error(
+        "Could not map PlayerDayStatLine id(s) to sheet rows: " +
+          missingIds.slice(0, 20).join(","),
+      );
+    }
+
+    groupAndApply(
+      sheet,
+      dailyPosCol,
+      resolved.map(function (update) {
+        return { rowIndex: update.rowIndex, value: update.dailyPos };
+      }),
+    );
+    groupAndApply(
+      sheet,
+      gsCol,
+      resolved.map(function (update) {
+        return { rowIndex: update.rowIndex, value: update.GS };
+      }),
+    );
+    groupAndApply(
+      sheet,
+      updatedAtCol,
+      resolved.map(function (update) {
+        return { rowIndex: update.rowIndex, value: update.updatedAt };
+      }),
+    );
+  }
 
   function normalizeYahooMatchupPlayerName(rawName) {
     if (!rawName) return "";
     var s = String(rawName);
+    s = s.replace(/Player Note/gi, " ");
+    s = s.replace(/No new player Notes?/gi, " ");
     // Remove common Yahoo status markers.
     s = s.replace(/\bPPD\b/g, " ");
     s = s.replace(/\b(IL\+|IR\+|IR)\b/g, " ");
     // Remove trailing records like "W," / "L," that can appear inline.
     s = s.replace(/\b(W|L),\b/g, " ");
+    s = s.replace(/\b[A-Z]{2,3}\s*-\s*[A-Z+]+\b/g, " ");
     // Remove parentheses metadata e.g. "(WSH - RW)".
     s = s.replace(/\([^)]*\)/g, " ");
     s = s.replace(/\s+/g, " ").trim();
@@ -430,7 +1298,92 @@ var YahooScraper = YahooScraper || {};
     } catch (_e) {
       // ignore
     }
-    return s.toLowerCase();
+
+    return s
+      .toLowerCase()
+      .replace(/^matt(?=\s|$)/, "matthew")
+      .replace(/^josh(?=\s|$)/, "joshua")
+      .replace(/[^a-z]/g, "")
+      .trim();
+  }
+
+  function getYahooMatchupNameKeys(rawName) {
+    if (!rawName) return [];
+    var raw = String(rawName).trim();
+    if (!raw) return [];
+
+    var keys = [];
+    function addKey(value) {
+      var key = normalizeYahooMatchupPlayerName(value);
+      if (key && keys.indexOf(key) === -1) keys.push(key);
+    }
+
+    addKey(raw);
+
+    var firstSpace = raw.indexOf(" ");
+    if (firstSpace > 0) {
+      var firstName = raw.slice(0, firstSpace);
+      var lastName = raw.slice(firstSpace + 1).trim();
+      var aliasMap = {
+        josh: ["joshua"],
+        joshua: ["josh"],
+        matt: ["matthew"],
+        matthew: ["matt"],
+      };
+      var firstNameKey = firstName.toLowerCase();
+      var aliases = aliasMap[firstNameKey] || [];
+      aliases.forEach(function (alias) {
+        addKey(alias + " " + lastName);
+      });
+    }
+
+    return keys;
+  }
+
+  function logUnmatchedYahooMatchupPlayer(
+    playerDay,
+    player,
+    team,
+    date,
+    matchupRows,
+  ) {
+    var candidateNames = [
+      player && player.fullName,
+      player && player.playerName,
+      player && player.name,
+    ].filter(Boolean);
+    var candidateKeys = [];
+    candidateNames.forEach(function (name) {
+      getYahooMatchupNameKeys(name).forEach(function (key) {
+        if (candidateKeys.indexOf(key) === -1) candidateKeys.push(key);
+      });
+    });
+
+    var availableRows = (matchupRows || [])
+      .map(function (row) {
+        return row && row[2] ? String(row[2]).trim() : "";
+      })
+      .filter(Boolean);
+
+    console.log(
+      "[YahooScraper] Stale PlayerDay row missing from Yahoo daily matchup table; row will be removed on write" +
+        " teamId=" +
+        normalizeSheetKey(team && team.id) +
+        " weekId=" +
+        normalizeSheetKey(playerDay && playerDay.weekId) +
+        " date=" +
+        (date || "") +
+        " playerId=" +
+        normalizeSheetKey(playerDay && playerDay.playerId) +
+        " posGroup=" +
+        String((playerDay && playerDay.posGroup) || "") +
+        " names=" +
+        candidateNames.join(" | ") +
+        " keys=" +
+        candidateKeys.join(",") +
+        " yahooRows=" +
+        availableRows.join(" | "),
+    );
   }
 
   function buildPlayersByNormalizedName(players) {
@@ -439,31 +1392,111 @@ var YahooScraper = YahooScraper || {};
       if (!p) return;
       var candidates = [p.fullName, p.playerName, p.name];
       candidates.forEach(function (c) {
-        var key = normalizeYahooMatchupPlayerName(c);
-        if (!key) return;
-        if (!map.has(key)) map.set(key, p);
+        getYahooMatchupNameKeys(c).forEach(function (key) {
+          if (!map.has(key)) map.set(key, p);
+        });
       });
     });
     return map;
   }
 
   function resolvePlayerFromMatchupRowName(rowName, playersByName, players) {
-    var key = normalizeYahooMatchupPlayerName(rowName);
-    if (!key) return null;
-    if (playersByName && playersByName.has(key)) return playersByName.get(key);
+    var keys = getYahooMatchupNameKeys(rowName);
+    if (!keys.length) return null;
+    if (playersByName) {
+      for (var idx = 0; idx < keys.length; idx++) {
+        if (playersByName.has(keys[idx])) return playersByName.get(keys[idx]);
+      }
+    }
 
     // Fallback: contains match (handles middle initials / suffixes).
     var best = null;
     (players || []).some(function (p) {
-      var full = normalizeYahooMatchupPlayerName(p && p.fullName);
-      if (!full) return false;
-      if (full === key || full.includes(key) || key.includes(full)) {
+      var candidateKeys = [];
+      [p && p.fullName, p && p.playerName, p && p.name].forEach(
+        function (name) {
+          getYahooMatchupNameKeys(name).forEach(function (key) {
+            if (candidateKeys.indexOf(key) === -1) candidateKeys.push(key);
+          });
+        },
+      );
+      var matched = candidateKeys.some(function (candidateKey) {
+        return keys.some(function (rowKey) {
+          return (
+            candidateKey === rowKey ||
+            candidateKey.includes(rowKey) ||
+            rowKey.includes(candidateKey)
+          );
+        });
+      });
+      if (matched) {
         best = p;
         return true;
       }
       return false;
     });
     return best;
+  }
+
+  function matchesYahooMatchupRowName(rowName, player) {
+    if (!player) return false;
+    var rowKeys = getYahooMatchupNameKeys(rowName);
+    if (!rowKeys.length) return false;
+
+    var candidates = [player.fullName, player.playerName, player.name]
+      .reduce(function (keys, value) {
+        getYahooMatchupNameKeys(value).forEach(function (key) {
+          if (keys.indexOf(key) === -1) keys.push(key);
+        });
+        return keys;
+      }, [])
+      .filter(Boolean);
+
+    return candidates.some(function (candidate) {
+      return rowKeys.some(function (rowKey) {
+        return (
+          candidate === rowKey ||
+          candidate.includes(rowKey) ||
+          rowKey.includes(candidate)
+        );
+      });
+    });
+  }
+
+  function wasInExistingDailyLineup(player) {
+    try {
+      if (
+        typeof LineupBuilder !== "undefined" &&
+        LineupBuilder &&
+        LineupBuilder.internals &&
+        typeof LineupBuilder.internals.wasInDailyLineup === "function"
+      ) {
+        return LineupBuilder.internals.wasInDailyLineup(player);
+      }
+    } catch (_e) {
+      // ignore and use local fallback
+    }
+
+    var dailyPos =
+      player && player.dailyPos !== undefined && player.dailyPos !== null
+        ? String(player.dailyPos).trim().toUpperCase()
+        : "";
+    return (
+      !!dailyPos &&
+      dailyPos !== "BN" &&
+      dailyPos !== "IR" &&
+      dailyPos !== "IR+" &&
+      dailyPos !== "IL+"
+    );
+  }
+
+  function applyDailyParticipationFlags(player, playedGame) {
+    var gp = playedGame ? "1" : null;
+    player.GP = gp;
+    var flags = computeLineupFlagsForPlayer(player);
+    player.GS = flags.GS;
+    player.BS = flags.BS;
+    player.MS = flags.MS;
   }
 
   /**
@@ -489,14 +1522,22 @@ var YahooScraper = YahooScraper || {};
    * - Behavior is controlled by the local toggles (`skipDays`, `seasonStats`) inside.
    * - This function is intended to be run manually from the Apps Script editor.
    */
-  function scrapeYahooMatchupTables() {
-    const fetchSheetAsObjects = GshlUtils.sheets.read.fetchSheetAsObjects;
-    const upsertSheetByKeys = GshlUtils.sheets.write.upsertSheetByKeys;
+  function normalizeMatchupScrapeValueList(values) {
+    if (values === undefined || values === null) return [];
+    if (!Array.isArray(values)) values = [values];
+    return values
+      .map((value) =>
+        value === undefined || value === null ? "" : String(value).trim(),
+      )
+      .filter(Boolean);
+  }
 
-    const seasonId = "10";
-    const seasonIdNum = Number(seasonId);
-    const hasPM = seasonIdNum <= 6;
-    const createMissingWeeks = true;
+  function normalizeSheetKey(value) {
+    if (value === undefined || value === null) return "";
+    return String(value).trim();
+  }
+
+  function getYahooSeasonCodeById(seasonId, override) {
     const seasonCodeById = {
       1: "32199",
       2: "15588",
@@ -512,152 +1553,477 @@ var YahooScraper = YahooScraper || {};
       12: "",
       13: "",
     };
-    const seasonCode = seasonCodeById[seasonId] ?? "";
-    const skipDays = false;
-    const seasonStats = false;
-    const weekNumsArray = ["1", "2"];
-    // const weekNumsArray = ["3","4"]
-    // const weekNumsArray = ["5","6"]
-    // const weekNumsArray = ["7","8"]
-    // const weekNumsArray = ["9","10"]
-    // const weekNumsArray = ["11","12"]
-    // const weekNumsArray = ["13","14"]
-    // const weekNumsArray = ["15","16"]
-    // const weekNumsArray = ["17","18"]
-    // const weekNumsArray = ["19","20"]
-    // const weekNumsArray = ["21","22"]
-    // const weekNumsArray = ["23","24"]
-    // const weekNumsArray = ["25","26"]
-    // const weekNumsArray = ["1","2","3","4","5","6","7","8","9","10","11","12","13"]
-    // const weekNumsArray = ["14","15","16","17","18","19","20","21","22","23","24","25","26"]
-    const weeks = fetchSheetAsObjects(SPREADSHEET_ID, "Week").filter(
-      (s) => +s.seasonId === +seasonId,
+
+    const overrideValue =
+      override === undefined || override === null
+        ? ""
+        : String(override).trim();
+    if (overrideValue) return overrideValue;
+
+    const seasonIdNum = Number(seasonId);
+    const mapped = seasonCodeById[seasonIdNum] || "";
+    if (mapped) return mapped;
+
+    if (typeof YAHOO_LEAGUE_ID !== "undefined" && YAHOO_LEAGUE_ID) {
+      return String(YAHOO_LEAGUE_ID);
+    }
+
+    return "";
+  }
+
+  function buildYahooMatchupUrl(params) {
+    const seasonId =
+      params && params.seasonId !== undefined ? params.seasonId : "";
+    const seasonCodeRaw =
+      params && params.seasonCode !== undefined && params.seasonCode !== null
+        ? String(params.seasonCode)
+        : "";
+    const seasonCode = seasonCodeRaw.replace(/^\/+|\/+$/g, "").trim();
+    const weekId =
+      params && params.weekId !== undefined ? String(params.weekId) : "";
+    const teamAId =
+      params && params.teamAId !== undefined ? String(params.teamAId) : "";
+    const teamBId =
+      params && params.teamBId !== undefined ? String(params.teamBId) : "";
+    const date = params && params.date ? String(params.date) : "";
+
+    if (!seasonCode) {
+      throw new Error(
+        "[YahooScraper] Missing Yahoo league code for seasonId=" +
+          String(seasonId) +
+          ". Provide options.seasonCode or set YAHOO_LEAGUE_ID.",
+      );
+    }
+
+    let url =
+      "https://hockey.fantasysports.yahoo.com/" +
+      (2013 + +seasonId) +
+      "/hockey/" +
+      seasonCode +
+      "/matchup?week=" +
+      weekId +
+      "&mid1=" +
+      teamAId +
+      "&mid2=" +
+      teamBId;
+
+    if (date) {
+      url += "&date=" + date;
+    }
+
+    return url;
+  }
+
+  function getPlayerDayWorkbookIdForSeason(seasonId) {
+    if (
+      GshlUtils.domain &&
+      GshlUtils.domain.workbooks &&
+      typeof GshlUtils.domain.workbooks.getPlayerDayWorkbookId === "function"
+    ) {
+      return GshlUtils.domain.workbooks.getPlayerDayWorkbookId(seasonId);
+    }
+    throw new Error(
+      "[YahooScraper] PlayerDay workbook resolver is unavailable for seasonId=" +
+        seasonId,
     );
+  }
+
+  function getWeeksToProcessForMatchupScrape(fetchSheetAsObjects, options) {
+    const allWeeks = fetchSheetAsObjects(SPREADSHEET_ID, "Week");
+    const requestedWeekIds = normalizeMatchupScrapeValueList(options.weekIds);
+    const requestedWeekNums = normalizeMatchupScrapeValueList(options.weekNums);
+    let seasonKey =
+      options.seasonId === undefined || options.seasonId === null
+        ? ""
+        : String(options.seasonId).trim();
+    let weeks = [];
+
+    if (requestedWeekIds.length) {
+      const weekIdSet = new Set(requestedWeekIds);
+      weeks = allWeeks.filter((week) => weekIdSet.has(String(week.id)));
+      if (!weeks.length) {
+        throw new Error(
+          "[YahooScraper] No Week rows found for weekIds=" +
+            requestedWeekIds.join(","),
+        );
+      }
+
+      const seasonIds = Array.from(
+        new Set(
+          weeks
+            .map((week) =>
+              week && week.seasonId !== undefined && week.seasonId !== null
+                ? String(week.seasonId)
+                : "",
+            )
+            .filter(Boolean),
+        ),
+      );
+
+      if (seasonIds.length !== 1) {
+        throw new Error(
+          "[YahooScraper] Week ids must belong to exactly one season",
+        );
+      }
+
+      if (seasonKey && seasonKey !== seasonIds[0]) {
+        throw new Error(
+          "[YahooScraper] seasonId does not match the provided weekIds",
+        );
+      }
+
+      seasonKey = seasonIds[0];
+      weeks = requestedWeekIds
+        .map((weekId) => weeks.find((week) => String(week.id) === weekId))
+        .filter(Boolean);
+      return { seasonKey, weeks };
+    }
+
+    if (!seasonKey) {
+      throw new Error(
+        "[YahooScraper] seasonId is required when weekIds are not provided",
+      );
+    }
+
+    weeks = allWeeks.filter((week) => String(week.seasonId) === seasonKey);
+    if (requestedWeekNums.length) {
+      const weekNumSet = new Set(requestedWeekNums);
+      weeks = weeks.filter((week) => weekNumSet.has(String(week.weekNum)));
+      weeks = requestedWeekNums
+        .map((weekNum) =>
+          weeks.find((week) => String(week.weekNum) === weekNum),
+        )
+        .filter(Boolean);
+    }
+
+    if (!weeks.length) {
+      throw new Error(
+        "[YahooScraper] No Week rows found for seasonId=" + seasonKey,
+      );
+    }
+
+    return { seasonKey, weeks };
+  }
+
+  function runMatchupTableScrape(options) {
+    const fetchSheetAsObjects = GshlUtils.sheets.read.fetchSheetAsObjects;
+    const upsertSheetByKeys = GshlUtils.sheets.write.upsertSheetByKeys;
+    const opts = options || {};
+    const skipDays = opts.skipDays === undefined ? true : !!opts.skipDays;
+    const writePlayerDays =
+      opts.writePlayerDays === undefined ? !skipDays : !!opts.writePlayerDays;
+    const seasonStats = !!opts.seasonStats;
+    const createMissingWeeks =
+      opts.createMissingWeeks === undefined ? true : !!opts.createMissingWeeks;
+    const updateDailyPos =
+      opts.updateDailyPos === undefined ? false : !!opts.updateDailyPos;
+    const resolvedWeekContext = getWeeksToProcessForMatchupScrape(
+      fetchSheetAsObjects,
+      opts,
+    );
+    const seasonKey = resolvedWeekContext.seasonKey;
+    const weeks = resolvedWeekContext.weeks;
+    const seasonIdNum = Number(seasonKey);
+    const hasPM = seasonIdNum <= 6;
+    const seasonCode = getYahooSeasonCodeById(seasonKey, opts.seasonCode);
+    if (!seasonCode) {
+      throw new Error(
+        "[YahooScraper] Could not resolve Yahoo league code for seasonId=" +
+          seasonKey +
+          ". Provide options.seasonCode or set YAHOO_LEAGUE_ID.",
+      );
+    }
     const players = seasonStats
       ? []
       : fetchSheetAsObjects(SPREADSHEET_ID, "Player");
     const playersByNormalizedName = buildPlayersByNormalizedName(players);
     const teams = fetchSheetAsObjects(SPREADSHEET_ID, "Team").filter(
-      (s) => +s.seasonId === +seasonId,
+      (team) => String(team.seasonId) === seasonKey,
     );
-    const playerDayWorkbookId =
-      seasonIdNum <= 5
-        ? PLAYERDAY_WORKBOOKS.PLAYERDAYS_1_5
-        : PLAYERDAY_WORKBOOKS.PLAYERDAYS_6_10;
+    const playerDayWorkbookId = getPlayerDayWorkbookIdForSeason(seasonKey);
+    const selectedWeekIdSet = new Set(weeks.map((week) => String(week.id)));
+    const selectedDateSet = new Set();
+    weeks.forEach((week) => {
+      GshlUtils.core.date
+        .getDatesInRangeInclusive(week.startDate, week.endDate)
+        .forEach((date) => selectedDateSet.add(String(date)));
+    });
     const rawPlayerDays =
       skipDays && !seasonStats
         ? []
         : fetchSheetAsObjects(playerDayWorkbookId, "PlayerDayStatLine").filter(
-            (s) => +s.seasonId === +seasonId,
+            (row) =>
+              (String(row.seasonId) === seasonKey &&
+                selectedWeekIdSet.has(String(row.weekId))) ||
+              selectedDateSet.has(GshlUtils.core.date.formatDateOnly(row.date)),
           );
     const rawPlayerWeeks = fetchSheetAsObjects(
       PLAYERSTATS_SPREADSHEET_ID,
       "PlayerWeekStatLine",
-    ).filter((s) => +s.seasonId === +seasonId);
+    ).filter(
+      (row) =>
+        String(row.seasonId) === seasonKey &&
+        selectedWeekIdSet.has(String(row.weekId)),
+    );
     const rawTeamWeeks = fetchSheetAsObjects(
       TEAMSTATS_SPREADSHEET_ID,
       "TeamWeekStatLine",
-    ).filter((s) => +s.seasonId === +seasonId);
+    ).filter(
+      (row) =>
+        String(row.seasonId) === seasonKey &&
+        selectedWeekIdSet.has(String(row.weekId)),
+    );
 
-    // Pre-index for faster lookups inside loops.
-    const playerById = new Map(players.map((p) => [String(p.id), p]));
-    const teamByYahooId = new Map(teams.map((t) => [String(t.yahooId), t]));
+    const playerById = new Map(
+      players.map((player) => [String(player.id), player]),
+    );
+    const teamByYahooId = new Map(
+      teams.map((team) => [String(team.yahooId), team]),
+    );
     const playerDaysByWeekId = new Map();
-    rawPlayerDays.forEach((pd) => {
-      const weekKey = String(pd.weekId);
+    rawPlayerDays.forEach((playerDay) => {
+      const weekKey = String(playerDay.weekId);
       const list = playerDaysByWeekId.get(weekKey) ?? [];
-      list.push(pd);
+      list.push(playerDay);
       playerDaysByWeekId.set(weekKey, list);
     });
     const playerWeeksByWeekId = new Map();
-    rawPlayerWeeks.forEach((pw) => {
-      const weekKey = String(pw.weekId);
+    rawPlayerWeeks.forEach((playerWeek) => {
+      const weekKey = String(playerWeek.weekId);
       const list = playerWeeksByWeekId.get(weekKey) ?? [];
-      list.push(pw);
+      list.push(playerWeek);
       playerWeeksByWeekId.set(weekKey, list);
     });
     const teamWeeksByWeekId = new Map();
-    rawTeamWeeks.forEach((tw) => {
-      const weekKey = String(tw.weekId);
+    rawTeamWeeks.forEach((teamWeek) => {
+      const weekKey = String(teamWeek.weekId);
       const list = teamWeeksByWeekId.get(weekKey) ?? [];
-      list.push(tw);
+      list.push(teamWeek);
       teamWeeksByWeekId.set(weekKey, list);
     });
 
     const teamWeeksOutput = [];
     const playerWeeksOutput = [];
     const playerDaysOutput = [];
+    const manualAddWarnings = [];
+    const manualAddWarningKeySet = new Set();
+    let playerDaysWriteResult = null;
 
     if (seasonStats) {
       updateTeamStatsFromWeeks(
-        seasonId,
+        seasonKey,
         weeks,
         teams,
         rawPlayerDays,
         rawPlayerWeeks,
         rawTeamWeeks,
       );
-      updatePlayerStatsForSeasonCustom(seasonId, rawPlayerWeeks);
+      updatePlayerStatsForSeasonCustom(seasonKey, rawPlayerWeeks);
     } else {
-      weekNumsArray.forEach((w) => {
-        console.log("Week " + w);
-        const week = weeks.find((wk) => +wk.weekNum === +w);
-        if (!week) return;
+      weeks.forEach((week) => {
+        console.log(
+          "[YahooScraper] Matchup scrape - WeekId",
+          String(week.id),
+          "WeekNum",
+          String(week.weekNum),
+        );
+
         const weekKey = String(week.id);
-        const pdys = playerDaysByWeekId.get(weekKey) ?? [];
-        const pwks = playerWeeksByWeekId.get(weekKey) ?? [];
-        const twks = teamWeeksByWeekId.get(weekKey) ?? [];
+        const weekDateSet = new Set(
+          GshlUtils.core.date.getDatesInRangeInclusive(
+            week.startDate,
+            week.endDate,
+          ),
+        );
+        const playerDaysForWeekMap = new Map();
+        function addPlayerDayForWeek(playerDay) {
+          if (!playerDay) return;
+          const key =
+            normalizeSheetKey(playerDay.id) ||
+            buildPlayerDayExistenceKey(
+              playerDay.gshlTeamId,
+              playerDay.playerId,
+              playerDay.date,
+            );
+          if (key) playerDaysForWeekMap.set(key, playerDay);
+        }
+        (playerDaysByWeekId.get(weekKey) ?? []).forEach(addPlayerDayForWeek);
+        rawPlayerDays.forEach((playerDay) => {
+          if (
+            weekDateSet.has(
+              GshlUtils.core.date.formatDateOnly(playerDay && playerDay.date),
+            )
+          ) {
+            addPlayerDayForWeek(playerDay);
+          }
+        });
+        const playerDaysForWeek = Array.from(playerDaysForWeekMap.values());
+        const playerWeeksForWeek = playerWeeksByWeekId.get(weekKey) ?? [];
+        const teamWeeksForWeek = teamWeeksByWeekId.get(weekKey) ?? [];
+
         scrapeYahooMatchupTablesforWeek(
-          w,
-          seasonId,
+          String(week.weekNum),
+          seasonKey,
           seasonCode,
           week,
           playerById,
           players,
           playersByNormalizedName,
           teamByYahooId,
-          pdys,
-          pwks,
-          twks,
+          playerDaysForWeek,
+          playerWeeksForWeek,
+          teamWeeksForWeek,
           playerDaysOutput,
           playerWeeksOutput,
           teamWeeksOutput,
           skipDays,
           hasPM,
           createMissingWeeks,
+          updateDailyPos,
+          manualAddWarnings,
+          manualAddWarningKeySet,
         );
       });
 
-      upsertSheetByKeys(
-        playerDayWorkbookId,
-        "PlayerDayStatLine",
-        ["id"],
-        playerDaysOutput,
-        { idColumn: "id", updatedAtColumn: "updatedAt" },
-      );
-      upsertSheetByKeys(
-        PLAYERSTATS_SPREADSHEET_ID,
-        "PlayerWeekStatLine",
-        ["weekId", "gshlTeamId", "playerId"],
-        playerWeeksOutput,
-        { idColumn: "id", updatedAtColumn: "updatedAt" },
-      );
-      upsertSheetByKeys(
-        TEAMSTATS_SPREADSHEET_ID,
-        "TeamWeekStatLine",
-        ["weekId", "gshlTeamId"],
-        teamWeeksOutput,
-        { idColumn: "id", updatedAtColumn: "updatedAt" },
-      );
+      if (!skipDays && writePlayerDays) {
+        rankRowsIfAvailable(playerDaysOutput, "PlayerDayStatLine", "Rating");
+        const weekWriteResults = [];
+        weeks.forEach((week) => {
+          const weekId = String(week.id);
+          const weekRows = playerDaysOutput.filter(
+            (row) => String(row && row.weekId) === weekId,
+          );
+          if (!weekRows.length) {
+            console.log(
+              "[YahooScraper] Skipping PlayerDay deleteMissing write for weekId=" +
+                weekId +
+                " because no daily matchup rows were scraped",
+            );
+            weekWriteResults.push({
+              weekId: weekId,
+              weekNum: String(week.weekNum),
+              writeResult: null,
+            });
+            return;
+          }
+
+          weekWriteResults.push({
+            weekId: weekId,
+            weekNum: String(week.weekNum),
+            writeResult: upsertSheetByKeys(
+              playerDayWorkbookId,
+              "PlayerDayStatLine",
+              ["gshlTeamId", "playerId", "date", "weekId", "seasonId"],
+              weekRows,
+              {
+                idColumn: "id",
+                createdAtColumn: "createdAt",
+                updatedAtColumn: "updatedAt",
+                deleteMissing: { seasonId: seasonKey, weekId: weekId },
+              },
+            ),
+          });
+        });
+        playerDaysWriteResult =
+          weekWriteResults.length === 1
+            ? weekWriteResults[0].writeResult
+            : weekWriteResults;
+      }
+
+      if (skipDays) {
+        const playerWeeksToWrite = mergePlayerWeeksForRating(
+          rawPlayerWeeks,
+          playerWeeksOutput,
+          selectedWeekIdSet,
+        );
+        rankRowsIfAvailable(
+          playerWeeksToWrite,
+          "PlayerWeekStatLine",
+          "Rating",
+        );
+
+        upsertSheetByKeys(
+          PLAYERSTATS_SPREADSHEET_ID,
+          "PlayerWeekStatLine",
+          ["gshlTeamId", "playerId", "weekId", "seasonId"],
+          playerWeeksToWrite,
+          { idColumn: "id", updatedAtColumn: "updatedAt" },
+        );
+        upsertSheetByKeys(
+          TEAMSTATS_SPREADSHEET_ID,
+          "TeamWeekStatLine",
+          ["gshlTeamId", "weekId", "seasonId"],
+          teamWeeksOutput,
+          { idColumn: "id", updatedAtColumn: "updatedAt" },
+        );
+      }
     }
+
+    return {
+      seasonId: seasonKey,
+      weekIds: weeks.map((week) => String(week.id)),
+      weekNums: weeks.map((week) => String(week.weekNum)),
+      mode: skipDays ? "weekly" : "daily",
+      playerDays: playerDaysOutput,
+      playerDaysWrite: playerDaysWriteResult,
+      manualAddWarnings: manualAddWarnings,
+      playerWeeks: playerWeeksOutput,
+      teamWeeks: teamWeeksOutput,
+    };
+  }
+
+  function updateWeekStatsFromWeekIds(weekIds, options) {
+    const opts = options || {};
+    return runMatchupTableScrape({
+      weekIds: weekIds,
+      seasonId: opts.seasonId,
+      seasonCode: opts.seasonCode,
+      createMissingWeeks:
+        opts.createMissingWeeks === undefined ? true : opts.createMissingWeeks,
+      skipDays: true,
+      seasonStats: false,
+    });
+  }
+
+  function updatePlayerDaysFromWeekIds(weekIds, options) {
+    const opts = options || {};
+    return runMatchupTableScrape({
+      weekIds: weekIds,
+      seasonId: opts.seasonId,
+      seasonCode: opts.seasonCode,
+      skipDays: false,
+      seasonStats: false,
+      writePlayerDays:
+        opts.writePlayerDays === undefined ? true : !!opts.writePlayerDays,
+      updateDailyPos:
+        opts.updateDailyPos === undefined ? true : !!opts.updateDailyPos,
+    });
+  }
+
+  function updateWeekStatsFromWeekId(weekId, options) {
+    return updateWeekStatsFromWeekIds([weekId], options);
+  }
+
+  function updatePlayerDaysFromWeekId(weekId, options) {
+    return updatePlayerDaysFromWeekIds([weekId], options);
+  }
+
+  function scrapeYahooMatchupTables() {
+    return runMatchupTableScrape({
+      seasonId: "10",
+      weekNums: ["1", "2"],
+      skipDays: false,
+      seasonStats: false,
+      createMissingWeeks: true,
+      updateDailyPos: true,
+    });
   }
 
   /**
    * Scrapes Yahoo matchup pages in weekly mode (no daily pages) for the provided
    * season + week numbers, and upserts PlayerWeekStatLine + TeamWeekStatLine.
    *
-   * This is intended to support “week-first” stat pipelines for older seasons
-   * where PlayerDay is unreliable.
+   * Internal matchup-table scrape path retained for non-production support work.
    *
    * @param {string|number} seasonId GSHL season id.
    * @param {Array<string|number>} weekNumsArray Week numbers to scrape (e.g. ["1","2"]).
@@ -666,155 +2032,17 @@ var YahooScraper = YahooScraper || {};
    * @param {boolean=} options.createMissingWeeks Whether to create missing week rows.
    */
   function scrapeYahooWeeklyMatchupTables(seasonId, weekNumsArray, options) {
-    const fetchSheetAsObjects = GshlUtils.sheets.read.fetchSheetAsObjects;
-    const upsertSheetByKeys = GshlUtils.sheets.write.upsertSheetByKeys;
-
-    const seasonKey =
-      seasonId === undefined || seasonId === null
-        ? ""
-        : typeof seasonId === "string"
-          ? seasonId.trim()
-          : String(seasonId);
-    if (!seasonKey) {
-      throw new Error(
-        "YahooScraper.matchups.scrapeYahooWeeklyMatchupTables requires a seasonId",
-      );
-    }
-
-    const seasonIdNum = Number(seasonKey);
-    const hasPM = seasonIdNum <= 6;
-    const createMissingWeeks =
-      options && typeof options.createMissingWeeks === "boolean"
-        ? options.createMissingWeeks
-        : true;
-
-    const seasonCodeById = {
-      1: "32199",
-      2: "15588",
-      3: "14315",
-      4: "2537",
-      5: "22201",
-      6: "75888",
-      7: "8673",
-      8: "31325",
-      9: "52650",
-      10: "45850",
-      11: "47379",
-      12: "",
-      13: "",
-    };
-
-    const seasonCodeOverride =
-      options && options.seasonCode ? String(options.seasonCode) : "";
-    const seasonCode = seasonCodeOverride || seasonCodeById[seasonIdNum] || "";
-
-    const weeks = fetchSheetAsObjects(SPREADSHEET_ID, "Week").filter(
-      (w) => +w.seasonId === +seasonKey,
-    );
-    if (!weeks.length) {
-      console.log("[YahooScraper] No Week rows found for season", seasonKey);
-      return { playerWeeks: [], teamWeeks: [] };
-    }
-
-    const requestedWeekNums = Array.isArray(weekNumsArray)
-      ? weekNumsArray.map((w) => String(w)).filter(Boolean)
-      : [];
-    const weekNumsToScrape = requestedWeekNums.length
-      ? requestedWeekNums
-      : Array.from(
-          new Set(
-            weeks
-              .map((w) =>
-                w && w.weekNum !== undefined ? String(w.weekNum) : "",
-              )
-              .filter(Boolean),
-          ),
-        );
-
-    const players = fetchSheetAsObjects(SPREADSHEET_ID, "Player");
-    const teams = fetchSheetAsObjects(SPREADSHEET_ID, "Team").filter(
-      (t) => +t.seasonId === +seasonKey,
-    );
-
-    const playersByNormalizedName = buildPlayersByNormalizedName(players);
-    const rawPlayerWeeks = fetchSheetAsObjects(
-      PLAYERSTATS_SPREADSHEET_ID,
-      "PlayerWeekStatLine",
-    ).filter((s) => +s.seasonId === +seasonKey);
-    const rawTeamWeeks = fetchSheetAsObjects(
-      TEAMSTATS_SPREADSHEET_ID,
-      "TeamWeekStatLine",
-    ).filter((s) => +s.seasonId === +seasonKey);
-
-    const playerById = new Map(players.map((p) => [String(p.id), p]));
-    const teamByYahooId = new Map(teams.map((t) => [String(t.yahooId), t]));
-
-    const playerWeeksByWeekId = new Map();
-    rawPlayerWeeks.forEach((pw) => {
-      const weekKey = String(pw.weekId);
-      const list = playerWeeksByWeekId.get(weekKey) ?? [];
-      list.push(pw);
-      playerWeeksByWeekId.set(weekKey, list);
+    return runMatchupTableScrape({
+      seasonId: seasonId,
+      weekNums: weekNumsArray,
+      seasonCode: options && options.seasonCode,
+      createMissingWeeks:
+        options && typeof options.createMissingWeeks === "boolean"
+          ? options.createMissingWeeks
+          : true,
+      skipDays: true,
+      seasonStats: false,
     });
-
-    const teamWeeksByWeekId = new Map();
-    rawTeamWeeks.forEach((tw) => {
-      const weekKey = String(tw.weekId);
-      const list = teamWeeksByWeekId.get(weekKey) ?? [];
-      list.push(tw);
-      teamWeeksByWeekId.set(weekKey, list);
-    });
-
-    const playerWeeksOutput = [];
-    const teamWeeksOutput = [];
-
-    weekNumsToScrape.forEach((w) => {
-      console.log("[YahooScraper] Weekly scrape - Week", w);
-      const week = weeks.find((wk) => String(wk.weekNum) === String(w));
-      if (!week) return;
-
-      const weekKey = String(week.id);
-      const pwks = playerWeeksByWeekId.get(weekKey) ?? [];
-      const twks = teamWeeksByWeekId.get(weekKey) ?? [];
-
-      scrapeYahooMatchupTablesforWeek(
-        w,
-        seasonKey,
-        seasonCode,
-        week,
-        playerById,
-        players,
-        playersByNormalizedName,
-        teamByYahooId,
-        [],
-        pwks,
-        twks,
-        [],
-        playerWeeksOutput,
-        teamWeeksOutput,
-        true,
-        hasPM,
-        createMissingWeeks,
-      );
-    });
-
-    upsertSheetByKeys(
-      PLAYERSTATS_SPREADSHEET_ID,
-      "PlayerWeekStatLine",
-      ["weekId", "gshlTeamId", "playerId"],
-      playerWeeksOutput,
-      { idColumn: "id", updatedAtColumn: "updatedAt" },
-    );
-
-    upsertSheetByKeys(
-      TEAMSTATS_SPREADSHEET_ID,
-      "TeamWeekStatLine",
-      ["weekId", "gshlTeamId"],
-      teamWeeksOutput,
-      { idColumn: "id", updatedAtColumn: "updatedAt" },
-    );
-
-    return { playerWeeks: playerWeeksOutput, teamWeeks: teamWeeksOutput };
   }
 
   function updateWeeksFromMatchupTables(seasonId, weekNumsArray, options) {
@@ -847,6 +2075,9 @@ var YahooScraper = YahooScraper || {};
     skipDays,
     hasPM,
     createMissingWeeks,
+    updateDailyPos,
+    manualAddWarnings,
+    manualAddWarningKeySet,
   ) {
     const getDatesInRangeInclusive =
       GshlUtils.core.date.getDatesInRangeInclusive;
@@ -854,7 +2085,8 @@ var YahooScraper = YahooScraper || {};
     const dates = getDatesInRangeInclusive(week.startDate, week.endDate);
     const playerDaysByDate = new Map();
     rawPlayerDays.forEach((pd) => {
-      const dateKey = String(pd.date);
+      const dateKey = GshlUtils.core.date.formatDateOnly(pd.date);
+      if (!dateKey) return;
       const list = playerDaysByDate.get(dateKey) ?? [];
       list.push(pd);
       playerDaysByDate.set(dateKey, list);
@@ -900,12 +2132,18 @@ var YahooScraper = YahooScraper || {};
             pair[1],
             seasonId,
             weekNum,
+            String(week.id),
             d,
             playerById,
+            players,
+            playersByNormalizedName,
             playerDays,
             teamByYahooId,
             playerDaysOutput,
             hasPM,
+            updateDailyPos,
+            manualAddWarnings,
+            manualAddWarningKeySet,
           );
         });
       }
@@ -948,17 +2186,13 @@ var YahooScraper = YahooScraper || {};
     hasPM,
     createMissingWeeks,
   ) {
-    let url =
-      "https://hockey.fantasysports.yahoo.com/" +
-      (2013 + +seasonId) +
-      "/hockey/" +
-      seasonCode +
-      "/matchup?week=" +
-      yahooWeekNum +
-      "&mid1=" +
-      teamAId +
-      "&mid2=" +
-      teamBId;
+    let url = buildYahooMatchupUrl({
+      seasonId: seasonId,
+      seasonCode: seasonCode,
+      weekId: yahooWeekNum,
+      teamAId: teamAId,
+      teamBId: teamBId,
+    });
     let matchupTables = fetchYahooMatchupTables(url).tables;
     matchupTables = [
       matchupTables[1],
@@ -1018,9 +2252,12 @@ var YahooScraper = YahooScraper || {};
    * @param {string} teamAId Yahoo matchup team id (mid1).
    * @param {string} teamBId Yahoo matchup team id (mid2).
    * @param {string} seasonId GSHL season id (string).
-   * @param {string|number} weekId Yahoo matchup week id (week query param).
+   * @param {string|number} yahooWeekNum Yahoo matchup week id (week query param).
+   * @param {string|number} gshlWeekId GSHL Week.id for PlayerDay rows.
    * @param {string} d Date string (YYYY-MM-DD) used in Yahoo `date` query param.
    * @param {Map<string, Object>} playerById Player lookup map by player id.
+   * @param {Object[]} players Player rows from the Player sheet.
+   * @param {Map<string, Object>} playersByNormalizedName Player lookup by normalized name.
    * @param {Object[]} playerDays Existing player-day stat lines for the date.
    * @param {Map<string, Object>} teamByYahooId Team lookup map by Yahoo team id.
    * @param {Object[]} playerDaysOutput Output array to append updated player-day stat lines.
@@ -1030,32 +2267,64 @@ var YahooScraper = YahooScraper || {};
     teamAId,
     teamBId,
     seasonId,
-    weekId,
+    yahooWeekNum,
+    gshlWeekId,
     d,
     playerById,
+    players,
+    playersByNormalizedName,
     playerDays,
     teamByYahooId,
     playerDaysOutput,
     hasPM,
+    updateDailyPos,
+    manualAddWarnings,
+    manualAddWarningKeySet,
   ) {
-    let url =
-      "https://hockey.fantasysports.yahoo.com/" +
-      (2013 + +seasonId) +
-      "/hockey/" +
-      seasonCode +
-      "/matchup?week=" +
-      weekId +
-      "&date=" +
-      d +
-      "&mid1=" +
-      teamAId +
-      "&mid2=" +
-      teamBId;
-    let matchupTables = fetchYahooMatchupTables(url).tables;
-    matchupTables = matchupTables.slice(
-      matchupTables.length - 3,
-      matchupTables.length - 1,
+    let url = buildYahooMatchupUrl({
+      seasonId: seasonId,
+      seasonCode: seasonCode,
+      weekId: yahooWeekNum,
+      date: d,
+      teamAId: teamAId,
+      teamBId: teamBId,
+    });
+    let matchupResult = fetchYahooMatchupTables(url);
+    let matchupTables =
+      matchupResult && Array.isArray(matchupResult.tables)
+        ? matchupResult.tables
+        : [];
+    let candidateTables = matchupTables.filter(
+      (table) => table && Array.isArray(table.rows) && table.rows.length,
     );
+
+    let slicedTables = candidateTables.slice(
+      candidateTables.length - 3,
+      candidateTables.length - 1,
+    );
+    if (slicedTables.length < 2) {
+      slicedTables = candidateTables.slice(-2);
+    }
+
+    if (
+      slicedTables.length < 2 ||
+      !slicedTables[0] ||
+      !Array.isArray(slicedTables[0].rows) ||
+      !slicedTables[1] ||
+      !Array.isArray(slicedTables[1].rows)
+    ) {
+      console.log(
+        "[YahooScraper] Skipping daily matchup page with unexpected table layout: " +
+          url +
+          " tableCount=" +
+          matchupTables.length +
+          " candidateCount=" +
+          candidateTables.length,
+      );
+      return;
+    }
+
+    matchupTables = slicedTables;
     let teamAMatchupTables = [
       matchupTables[0].rows.map((x) => [x[10], ...x.slice(0, 10)]),
       matchupTables[1].rows.map((x) => [x[6], ...x.slice(0, 6)]),
@@ -1066,21 +2335,35 @@ var YahooScraper = YahooScraper || {};
     ];
     processTeamMatchupDate(
       playerById,
+      players,
+      playersByNormalizedName,
       playerDays,
       teamAMatchupTables,
       d,
       teamByYahooId.get(String(teamAId)),
+      seasonId,
+      gshlWeekId,
       playerDaysOutput,
       hasPM,
+      updateDailyPos,
+      manualAddWarnings,
+      manualAddWarningKeySet,
     );
     processTeamMatchupDate(
       playerById,
+      players,
+      playersByNormalizedName,
       playerDays,
       teamBMatchupTables,
       d,
       teamByYahooId.get(String(teamBId)),
+      seasonId,
+      gshlWeekId,
       playerDaysOutput,
       hasPM,
+      updateDailyPos,
+      manualAddWarnings,
+      manualAddWarningKeySet,
     );
   }
 
@@ -1115,15 +2398,26 @@ var YahooScraper = YahooScraper || {};
   ) {
     if (!team) return;
 
-    let teamPlayerWeeks = playerWeeks.filter((pd) => pd.gshlTeamId === team.id);
-    let teamWeek = teamWeeks.find((pd) => pd.gshlTeamId === team.id);
+    const teamId = normalizeSheetKey(team.id);
+    const weekKey = normalizeSheetKey(weekId);
+
+    let teamPlayerWeeks = playerWeeks.filter(
+      (pd) =>
+        normalizeSheetKey(pd && pd.gshlTeamId) === teamId &&
+        normalizeSheetKey(pd && pd.weekId) === weekKey,
+    );
+    let teamWeek = teamWeeks.find(
+      (pd) =>
+        normalizeSheetKey(pd && pd.gshlTeamId) === teamId &&
+        normalizeSheetKey(pd && pd.weekId) === weekKey,
+    );
 
     if (!teamWeek) {
       if (!createMissingWeeks) return;
       teamWeek = {
         seasonId: team.seasonId,
-        gshlTeamId: team.id,
-        weekId,
+        gshlTeamId: teamId,
+        weekId: weekKey,
       };
     }
 
@@ -1414,8 +2708,8 @@ var YahooScraper = YahooScraper || {};
 
           const out = {
             playerId: plyr.id,
-            gshlTeamId: team.id,
-            weekId,
+            gshlTeamId: teamId,
+            weekId: weekKey,
             seasonId: team.seasonId,
             seasonType: resolvedWeekSeasonType,
             yahooId:
@@ -1458,8 +2752,8 @@ var YahooScraper = YahooScraper || {};
 
           const out = {
             playerId: plyr.id,
-            gshlTeamId: team.id,
-            weekId,
+            gshlTeamId: teamId,
+            weekId: weekKey,
             seasonId: team.seasonId,
             seasonType: resolvedWeekSeasonType,
             yahooId:
@@ -1778,17 +3072,200 @@ var YahooScraper = YahooScraper || {};
    *
    * Mutates the existing stat line objects and appends them to the provided output array.
    */
+  function getMatchupRowPlayerName(row) {
+    return row && row[2] !== undefined && row[2] !== null
+      ? String(row[2]).trim()
+      : "";
+  }
+
+  function normalizeMatchupStatValue(value) {
+    if (value === undefined || value === null) return "";
+    var text = String(value).trim();
+    return !text || text === "-" ? "" : text;
+  }
+
+  function getMatchupRowDailyPos(row) {
+    return normalizeYahooLineupPosition(row && row[0]);
+  }
+
+  function buildPlayerDayExistenceKey(teamId, playerId, date) {
+    return [
+      normalizeSheetKey(teamId),
+      normalizeSheetKey(playerId),
+      GshlUtils.core.date.formatDateOnly(date) || normalizeSheetKey(date),
+    ].join("|");
+  }
+
+  function getPlayerDisplayName(player) {
+    return (
+      (player && (player.fullName || player.playerName || player.name)) || ""
+    );
+  }
+
+  function getPlayerYahooId(player) {
+    return player && player.yahooId !== undefined && player.yahooId !== null
+      ? String(player.yahooId)
+      : "";
+  }
+
+  function buildManualPlayerDayWarningKey(
+    teamId,
+    date,
+    playerId,
+    rowName,
+    rowType,
+  ) {
+    return [
+      normalizeSheetKey(teamId),
+      GshlUtils.core.date.formatDateOnly(date) || normalizeSheetKey(date),
+      normalizeSheetKey(playerId),
+      normalizeYahooMatchupPlayerName(rowName),
+      normalizeSheetKey(rowType),
+    ].join("|");
+  }
+
+  function collectManualPlayerDayWarningsFromMatchupRows(
+    rows,
+    rowType,
+    players,
+    playersByNormalizedName,
+    team,
+    weekId,
+    date,
+    existingKeySet,
+    outputKeySet,
+    manualAddWarnings,
+    manualAddWarningKeySet,
+  ) {
+    (rows || []).forEach(function (row) {
+      var rowName = getMatchupRowPlayerName(row);
+      if (!rowName || rowName === "(Empty)") return;
+
+      var player = resolvePlayerFromMatchupRowName(
+        rowName,
+        playersByNormalizedName,
+        players,
+      );
+      if (!player || !player.id) {
+        var unresolvedWarningKey = buildManualPlayerDayWarningKey(
+          team && team.id,
+          date,
+          "",
+          rowName,
+          rowType,
+        );
+        if (manualAddWarningKeySet.has(unresolvedWarningKey)) return;
+        manualAddWarningKeySet.add(unresolvedWarningKey);
+        var unresolvedWarning = {
+          type: "MANUAL_PLAYER_DAY_ADD_REQUIRED",
+          seasonId: normalizeSheetKey(team && team.seasonId),
+          weekId: normalizeSheetKey(weekId),
+          gshlTeamId: normalizeSheetKey(team && team.id),
+          date: GshlUtils.core.date.formatDateOnly(date) || normalizeSheetKey(date),
+          playerId: "",
+          playerName: rowName,
+          rowType: rowType,
+          dailyPos: getMatchupRowDailyPos(row),
+          reason: "yahoo-player-not-resolved-to-player-sheet",
+        };
+        manualAddWarnings.push(unresolvedWarning);
+        console.log(
+          "[YahooScraper] Manual PlayerDay add required; could not resolve Yahoo daily player" +
+            " teamId=" +
+            normalizeSheetKey(team && team.id) +
+            " weekId=" +
+            normalizeSheetKey(weekId) +
+            " date=" +
+            unresolvedWarning.date +
+            " rowType=" +
+            rowType +
+            " playerName=" +
+            rowName,
+        );
+        return;
+      }
+
+      var key = buildPlayerDayExistenceKey(team && team.id, player.id, date);
+      if (existingKeySet.has(key) || outputKeySet.has(key)) return;
+      var warningKey = buildManualPlayerDayWarningKey(
+        team && team.id,
+        date,
+        player.id,
+        rowName,
+        rowType,
+      );
+      if (manualAddWarningKeySet.has(warningKey)) return;
+      manualAddWarningKeySet.add(warningKey);
+
+      var warning = {
+        type: "MANUAL_PLAYER_DAY_ADD_REQUIRED",
+        seasonId: normalizeSheetKey(team && team.seasonId),
+        weekId: normalizeSheetKey(weekId),
+        gshlTeamId: normalizeSheetKey(team && team.id),
+        date: GshlUtils.core.date.formatDateOnly(date) || normalizeSheetKey(date),
+        playerId: normalizeSheetKey(player.id),
+        playerName: getPlayerDisplayName(player) || rowName,
+        rowType: rowType,
+        dailyPos: getMatchupRowDailyPos(row),
+        reason: "player-in-yahoo-daily-table-but-missing-playerday-row",
+      };
+      manualAddWarnings.push(warning);
+      console.log(
+        "[YahooScraper] Manual PlayerDay add required" +
+          " teamId=" +
+          warning.gshlTeamId +
+          " weekId=" +
+          warning.weekId +
+          " date=" +
+          warning.date +
+          " playerId=" +
+          warning.playerId +
+          " rowType=" +
+          warning.rowType +
+          " dailyPos=" +
+          warning.dailyPos +
+          " playerName=" +
+          warning.playerName,
+      );
+    });
+  }
+
   function processTeamMatchupDate(
     playerById,
+    players,
+    playersByNormalizedName,
     playerDays,
     matchupTables,
     date,
     team,
+    seasonId,
+    weekId,
     playerDaysOutput,
     hasPM,
+    updateDailyPos,
+    manualAddWarnings,
+    manualAddWarningKeySet,
   ) {
     if (!team) return;
-    let teamPlayerDays = playerDays.filter((pd) => pd.gshlTeamId === team.id);
+    const teamId = normalizeSheetKey(team.id);
+    let teamPlayerDays = playerDays.filter(
+      (pd) => normalizeSheetKey(pd && pd.gshlTeamId) === teamId,
+    );
+    const existingKeySet = new Set();
+    teamPlayerDays.forEach((pd) => {
+      if (!pd || !pd.playerId) return;
+      existingKeySet.add(
+        buildPlayerDayExistenceKey(teamId, pd.playerId, pd.date || date),
+      );
+    });
+    const outputKeySet = new Set();
+    (playerDaysOutput || []).forEach((pd) => {
+      if (!pd || !pd.playerId || !pd.gshlTeamId || !pd.date) return;
+      outputKeySet.add(
+        buildPlayerDayExistenceKey(pd.gshlTeamId, pd.playerId, pd.date),
+      );
+    });
+
     teamPlayerDays = teamPlayerDays.map((pd) => {
       const plyr = playerById.get(String(pd.playerId));
       if (!plyr) {
@@ -1796,27 +3273,14 @@ var YahooScraper = YahooScraper || {};
         return pd;
       }
       if (pd.posGroup === "G") {
-        const stats = matchupTables[1].find(
-          (b) =>
-            b[2].split("W,")[0].split("L,")[0].split("PPD")[0].trim() ===
-            plyr.fullName,
+        const stats = matchupTables[1].find((b) =>
+          matchesYahooMatchupRowName(b && b[2], plyr),
         );
         if (stats) {
-          if (stats[3] && stats[3] !== "" && stats[3] !== "-") {
-            pd.GP = "1";
-          } else {
-            pd.GP = null;
-          }
-          if (
-            stats[3] &&
-            stats[3] !== "" &&
-            stats[3] !== "-" &&
-            ["BN", "IR+", "IR"].includes(stats[0])
-          ) {
-            pd.GS = "1";
-          } else {
-            pd.GS = null;
-          }
+          applyDailyParticipationFlags(
+            pd,
+            !!(stats[3] && stats[3] !== "" && stats[3] !== "-"),
+          );
           if (
             +pd.W !== +stats[3] &&
             stats[3] &&
@@ -1856,6 +3320,16 @@ var YahooScraper = YahooScraper || {};
             );
             pd.SVP = +stats[5];
           }
+          if (updateDailyPos) {
+            var goalieDailyPos = getMatchupRowDailyPos(stats);
+            if (goalieDailyPos) {
+              pd.dailyPos = goalieDailyPos;
+              var updatedGoalieFlags = computeLineupFlagsForPlayer(pd);
+              pd.GS = updatedGoalieFlags.GS;
+              pd.MS = updatedGoalieFlags.MS;
+              pd.BS = updatedGoalieFlags.BS;
+            }
+          }
           playerDaysOutput.push(pd);
         } else {
           +pd.GP > 0
@@ -1871,34 +3345,24 @@ var YahooScraper = YahooScraper || {};
                   pd.weekId,
               )
             : null;
-          pd.W = null;
-          pd.GAA = null;
-          pd.SVP = null;
-          return pd;
+          logUnmatchedYahooMatchupPlayer(
+            pd,
+            plyr,
+            team,
+            date,
+            matchupTables[1],
+          );
         }
         return pd;
       }
-      const stats = matchupTables[0].find(
-        (b) =>
-          b[2].split("W,")[0].split("L,")[0].split("PPD")[0].trim() ===
-          plyr.fullName,
+      const stats = matchupTables[0].find((b) =>
+        matchesYahooMatchupRowName(b && b[2], plyr),
       );
       if (stats) {
-        if (stats[3] && stats[3] !== "" && stats[3] !== "-") {
-          pd.GP = "1";
-        } else {
-          pd.GP = null;
-        }
-        if (
-          stats[3] &&
-          stats[3] !== "" &&
-          stats[3] !== "-" &&
-          ["BN", "IR+", "IR"].includes(stats[0])
-        ) {
-          pd.GS = "1";
-        } else {
-          pd.GS = null;
-        }
+        applyDailyParticipationFlags(
+          pd,
+          !!(stats[3] && stats[3] !== "" && stats[3] !== "-"),
+        );
         if (
           +pd.G !== +stats[3] &&
           stats[3] &&
@@ -1994,6 +3458,16 @@ var YahooScraper = YahooScraper || {};
           );
           pd.BLK = +stats[hasPM ? 10 : 9];
         }
+        if (updateDailyPos) {
+          var skaterDailyPos = getMatchupRowDailyPos(stats);
+          if (skaterDailyPos) {
+            pd.dailyPos = skaterDailyPos;
+            var updatedFlags = computeLineupFlagsForPlayer(pd);
+            pd.GS = updatedFlags.GS;
+            pd.MS = updatedFlags.MS;
+            pd.BS = updatedFlags.BS;
+          }
+        }
         playerDaysOutput.push(pd);
       } else {
         +pd.GP > 0
@@ -2009,19 +3483,37 @@ var YahooScraper = YahooScraper || {};
                 pd.weekId,
             )
           : null;
-        pd.G = null;
-        pd.A = null;
-        pd.P = null;
-        if (hasPM) pd.PM = null;
-        pd.PPP = null;
-        pd.SOG = null;
-        pd.HIT = null;
-        pd.BLK = null;
-        return pd;
+        logUnmatchedYahooMatchupPlayer(pd, plyr, team, date, matchupTables[0]);
       }
-      pd.dailyPos = stats[0];
       return pd;
     });
+
+    collectManualPlayerDayWarningsFromMatchupRows(
+      matchupTables[0],
+      "skater",
+      players,
+      playersByNormalizedName,
+      team,
+      weekId,
+      date,
+      existingKeySet,
+      outputKeySet,
+      manualAddWarnings,
+      manualAddWarningKeySet,
+    );
+    collectManualPlayerDayWarningsFromMatchupRows(
+      matchupTables[1],
+      "goalie",
+      players,
+      playersByNormalizedName,
+      team,
+      weekId,
+      date,
+      existingKeySet,
+      outputKeySet,
+      manualAddWarnings,
+      manualAddWarningKeySet,
+    );
   }
 
   /**
@@ -2043,6 +3535,28 @@ var YahooScraper = YahooScraper || {};
     const isStarter = GshlUtils.domain.players.isStarter;
     const { parseScore, toBool, toNumber, formatNumber } = GshlUtils.core.parse;
     const { SeasonType, TEAM_STAT_FIELDS } = GshlUtils.core.constants;
+    const TEAM_ALWAYS_SUM_FIELDS = [
+      "GP",
+      "MG",
+      "IR",
+      "IRplus",
+      "GS",
+      "ADD",
+      "MS",
+      "BS",
+    ];
+    const TEAM_SKATER_STARTER_FIELDS = [
+      "G",
+      "A",
+      "P",
+      "PM",
+      "PIM",
+      "PPP",
+      "SOG",
+      "HIT",
+      "BLK",
+    ];
+    const TEAM_GOALIE_STARTER_FIELDS = ["W", "GA", "SV", "SA", "SO", "TOI"];
 
     const weekTypeMap = new Map();
     weeks.forEach((week) => {
@@ -2183,7 +3697,6 @@ var YahooScraper = YahooScraper || {};
 
     const teamDayMap = new Map();
     playerDays.forEach((pd) => {
-      if (!isStarter(pd)) return;
       const teamId = pd.gshlTeamId?.toString();
       const weekId = pd.weekId?.toString();
       if (!teamId || !weekId) return;
@@ -2201,7 +3714,21 @@ var YahooScraper = YahooScraper || {};
         );
       }
       const bucket = teamDayMap.get(mapKey);
-      TEAM_STAT_FIELDS.forEach((field) => {
+
+      TEAM_ALWAYS_SUM_FIELDS.forEach((field) => {
+        bucket[field] += toNumber(pd[field]);
+      });
+
+      if (!isStarter(pd)) return;
+
+      if (String(pd.posGroup || "") === "G") {
+        TEAM_GOALIE_STARTER_FIELDS.forEach((field) => {
+          bucket[field] += toNumber(pd[field]);
+        });
+        return;
+      }
+
+      TEAM_SKATER_STARTER_FIELDS.forEach((field) => {
         bucket[field] += toNumber(pd[field]);
       });
     });
@@ -2273,7 +3800,7 @@ var YahooScraper = YahooScraper || {};
     upsertSheetByKeys(
       TEAMSTATS_SPREADSHEET_ID,
       "TeamDayStatLine",
-      ["gshlTeamId", "date"],
+      ["gshlTeamId", "date", "weekId", "seasonId"],
       teamDayRows,
       {
         idColumn: "id",
@@ -2285,7 +3812,7 @@ var YahooScraper = YahooScraper || {};
     upsertSheetByKeys(
       TEAMSTATS_SPREADSHEET_ID,
       "TeamWeekStatLine",
-      ["gshlTeamId", "weekId"],
+      ["gshlTeamId", "weekId", "seasonId"],
       teamWeekRows,
       {
         idColumn: "id",
@@ -2728,8 +4255,6 @@ var YahooScraper = YahooScraper || {};
               .toFixed(6)
               .toString()
           : "";
-      playerSplitStatLine.Rating =
-        RankingEngine.rankPerformance(playerSplitStatLine).score;
       playerSplits.push(playerSplitStatLine);
     });
 
@@ -2833,15 +4358,16 @@ var YahooScraper = YahooScraper || {};
               .toFixed(6)
               .toString()
           : "";
-      playerTotalStatLine.Rating =
-        RankingEngine.rankPerformance(playerTotalStatLine).score;
       playerTotals.push(playerTotalStatLine);
     });
+
+    rankRowsIfAvailable(playerSplits, "PlayerSplitStatLine", "Rating");
+    rankRowsIfAvailable(playerTotals, "PlayerTotalStatLine", "Rating");
 
     upsertSheetByKeys(
       PLAYERSTATS_SPREADSHEET_ID,
       "PlayerSplitStatLine",
-      ["playerId", "gshlTeamId", "seasonId", "seasonType"],
+      ["gshlTeamId", "playerId", "seasonId", "seasonType"],
       playerSplits,
       {
         idColumn: "id",
@@ -3083,16 +4609,4 @@ var YahooScraper = YahooScraper || {};
     return s;
   }
 
-  ns.matchups = ns.matchups || {};
-  ns.matchups.scrapeYahooWeeklyMatchupTables = scrapeYahooWeeklyMatchupTables;
-  ns.matchups.updateWeeksFromMatchupTables = updateWeeksFromMatchupTables;
-  ns.matchups.fetchYahooMatchupTables = fetchYahooMatchupTables;
-  ns.matchups.fetchYahooHtml = fetchYahooHtml;
-  ns.matchups.extractHtmlTables = extractHtmlTables;
-  ns.matchups.parseHtmlTable = parseHtmlTable;
-  ns.matchups.htmlToText = htmlToText;
-  ns.matchups.decodeHtmlEntities = decodeHtmlEntities;
-
-  ns.scrapers.scrapeMatchupTableToWeeks = updateWeeksFromMatchupTables;
-  ns.updateWeeksFromMatchupTables = updateWeeksFromMatchupTables;
 })(YahooScraper);

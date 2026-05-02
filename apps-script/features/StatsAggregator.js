@@ -30,6 +30,59 @@ var StatsAggregator = (function StatsAggregatorModule() {
     return seasonKey;
   }
 
+  function requireWeekIds(weekIds, caller) {
+    if (!Array.isArray(weekIds) || !weekIds.length) {
+      throw new Error((caller || "StatsAggregator") + " requires weekIds");
+    }
+
+    return weekIds
+      .map(function (weekId) {
+        return weekId === undefined || weekId === null
+          ? ""
+          : String(weekId).trim();
+      })
+      .filter(Boolean);
+  }
+
+  function buildWeekMapById(weeks) {
+    var map = new Map();
+    (weeks || []).forEach(function (week) {
+      var weekId =
+        week && week.id !== undefined && week.id !== null ? String(week.id) : "";
+      if (!weekId) return;
+      map.set(weekId, week);
+    });
+    return map;
+  }
+
+  function buildWeekTypeMap(weeks, seasonTypeFallback) {
+    var SeasonType = GshlUtils.core.constants.SeasonType;
+    var fallback = seasonTypeFallback || SeasonType.REGULAR_SEASON;
+    var map = new Map();
+    (weeks || []).forEach(function (week) {
+      var weekId =
+        week && week.id !== undefined && week.id !== null ? String(week.id) : "";
+      if (!weekId) return;
+      map.set(weekId, week.weekType || fallback);
+    });
+    return map;
+  }
+
+  function mergeRowsByKey(existingRows, updatedRows, keyBuilder) {
+    var map = new Map();
+    (existingRows || []).forEach(function (row) {
+      var key = keyBuilder(row);
+      if (!key) return;
+      map.set(key, row);
+    });
+    (updatedRows || []).forEach(function (row) {
+      var key = keyBuilder(row);
+      if (!key) return;
+      map.set(key, row);
+    });
+    return Array.from(map.values());
+  }
+
   function safeSplitCsv(value) {
     if (!value) return [];
     return String(value)
@@ -75,16 +128,304 @@ var StatsAggregator = (function StatsAggregatorModule() {
     return sum;
   }
 
-  function sumFieldsInto(target, rows, fields, toNumber) {
-    fields.forEach(function (field) {
-      target[field] = (target[field] || 0) + sumField(rows, field, toNumber);
-    });
-  }
-
   function blankFields(target, fields) {
     fields.forEach(function (f) {
       target[f] = "";
     });
+  }
+
+  function rankPlayerRows(rows, sheetName, seasonId) {
+    if (
+      !rows ||
+      !rows.length ||
+      typeof RankingEngine === "undefined" ||
+      !RankingEngine ||
+      typeof RankingEngine.rankRows !== "function"
+    ) {
+      return;
+    }
+
+    RankingEngine.rankRows(rows, {
+      sheetName: sheetName,
+      seasonId: seasonId,
+      outputField: "Rating",
+      mutate: true,
+    });
+
+    rows.forEach(function (row) {
+      if (!row) return;
+      if (row.Rating !== undefined) row.rating = row.Rating;
+      else if (row.rating !== undefined) row.Rating = row.rating;
+    });
+  }
+
+  var TEAM_ALWAYS_SUM_FIELDS = [
+    "GP",
+    "MG",
+    "IR",
+    "IRplus",
+    "GS",
+    "ADD",
+    "MS",
+    "BS",
+  ];
+
+  var TEAM_SKATER_STARTER_FIELDS = [
+    "G",
+    "A",
+    "P",
+    "PM",
+    "PIM",
+    "PPP",
+    "SOG",
+    "HIT",
+    "BLK",
+  ];
+
+  var TEAM_GOALIE_STARTER_FIELDS = ["W", "GA", "SV", "SA", "SO", "TOI"];
+  var SKATER_STARTER_FIELD_SET = new Set(TEAM_SKATER_STARTER_FIELDS);
+  var GOALIE_STARTER_FIELD_SET = new Set(TEAM_GOALIE_STARTER_FIELDS);
+
+  function addFieldsToBucket(bucket, source, fields, toNumber) {
+    for (var i = 0; i < fields.length; i++) {
+      var field = fields[i];
+      bucket[field] = (bucket[field] || 0) + toNumber(source && source[field]);
+    }
+  }
+
+  function createPlayerWeekBucket(
+    seasonId,
+    weekId,
+    teamId,
+    playerId,
+    seasonType,
+    posGroup,
+    statFields,
+  ) {
+    var bucket = {
+      playerId: playerId,
+      gshlTeamId: teamId,
+      seasonId: seasonId,
+      weekId: weekId,
+      seasonType: seasonType,
+      posGroup: posGroup || "",
+      nhlPosValues: [],
+      nhlTeamValues: [],
+      days: 0,
+    };
+
+    statFields.forEach(function (field) {
+      bucket[field] = 0;
+    });
+
+    return bucket;
+  }
+
+  function addPlayerDayToWeekBucket(bucket, playerDay, isStarter, toNumber) {
+    bucket.days += 1;
+    if (!bucket.posGroup && playerDay && playerDay.posGroup) {
+      bucket.posGroup = String(playerDay.posGroup);
+    }
+    if (playerDay && playerDay.nhlPos)
+      bucket.nhlPosValues.push(playerDay.nhlPos);
+    if (playerDay && playerDay.nhlTeam) {
+      bucket.nhlTeamValues.push(playerDay.nhlTeam);
+    }
+
+    addFieldsToBucket(bucket, playerDay, TEAM_ALWAYS_SUM_FIELDS, toNumber);
+
+    if (!isStarter) return;
+
+    if (String(bucket.posGroup || playerDay.posGroup || "") === "G") {
+      addFieldsToBucket(
+        bucket,
+        playerDay,
+        TEAM_GOALIE_STARTER_FIELDS,
+        toNumber,
+      );
+      return;
+    }
+
+    addFieldsToBucket(bucket, playerDay, TEAM_SKATER_STARTER_FIELDS, toNumber);
+  }
+
+  function buildPlayerWeekRowFromBucket(bucket, statFields, formatNumber) {
+    var isGoalie = String(bucket.posGroup || "") === "G";
+    var row = {
+      playerId: bucket.playerId,
+      gshlTeamId: bucket.gshlTeamId,
+      seasonId: bucket.seasonId,
+      weekId: bucket.weekId,
+      seasonType: bucket.seasonType,
+      nhlPos: uniqCsv(bucket.nhlPosValues),
+      posGroup: bucket.posGroup,
+      nhlTeam: uniqCsv(bucket.nhlTeamValues),
+      days: formatNumber(bucket.days),
+      Rating: "",
+    };
+
+    TEAM_ALWAYS_SUM_FIELDS.forEach(function (field) {
+      row[field] = formatNumber(bucket[field]);
+    });
+
+    if (isGoalie) {
+      TEAM_GOALIE_STARTER_FIELDS.forEach(function (field) {
+        row[field] = formatNumber(bucket[field]);
+      });
+      blankFields(row, TEAM_SKATER_STARTER_FIELDS);
+      row.GAA = computeGAA(row.GA, row.TOI);
+      row.SVP = computeSVP(row.SV, row.SA);
+    } else {
+      TEAM_SKATER_STARTER_FIELDS.forEach(function (field) {
+        row[field] = formatNumber(bucket[field]);
+      });
+      blankFields(row, TEAM_GOALIE_STARTER_FIELDS.concat(["GAA", "SVP"]));
+    }
+
+    statFields.forEach(function (field) {
+      if (row[field] === undefined) row[field] = "";
+    });
+
+    return row;
+  }
+
+  function buildPlayerAggregateFromWeeks(base, weeksArr, opts, context) {
+    var isGoalie = base.posGroup === "G";
+    var statFields = context.statFields;
+    var toNumber = context.toNumber;
+    var formatNumber = context.formatNumber;
+
+    var agg = {
+      playerId: opts.playerId,
+      seasonId: context.seasonId,
+      seasonType: opts.seasonType,
+      posGroup: base.posGroup,
+      nhlPos: uniqCsv(
+        weeksArr.map(function (w) {
+          return w && w.nhlPos;
+        }),
+      ),
+      nhlTeam: uniqCsv(
+        weeksArr.map(function (w) {
+          return w && w.nhlTeam;
+        }),
+      ),
+      days: formatNumber(
+        weeksArr.reduce(function (p, c) {
+          return p + toNumber(c && c.days);
+        }, 0),
+      ),
+      Rating: "",
+    };
+
+    if (opts.gshlTeamId) {
+      agg.gshlTeamId = opts.gshlTeamId;
+    }
+    if (opts.gshlTeamIds) {
+      agg.gshlTeamIds = uniqCsv(opts.gshlTeamIds);
+    }
+
+    statFields.forEach(function (field) {
+      var sum = sumField(weeksArr, field, toNumber);
+
+      if (isGoalie && SKATER_STARTER_FIELD_SET.has(field)) {
+        agg[field] = "";
+      } else if (!isGoalie && GOALIE_STARTER_FIELD_SET.has(field)) {
+        agg[field] = "";
+      } else {
+        agg[field] = formatNumber(sum);
+      }
+    });
+
+    if (isGoalie) {
+      agg.GAA = computeGAA(agg.GA, agg.TOI);
+      agg.SVP = computeSVP(agg.SV, agg.SA);
+    } else {
+      agg.GAA = "";
+      agg.SVP = "";
+    }
+
+    return agg;
+  }
+
+  function buildPlayerSplitsAndTotalsFromWeeks(playerWeeks, context) {
+    var SeasonType = GshlUtils.core.constants.SeasonType;
+    var playerSplitsMap = new Map();
+    var playerTotalsMap = new Map();
+
+    function resolveSeasonTypeForWeekRow(pw) {
+      var raw = pw && pw.seasonType ? String(pw.seasonType) : "";
+      if (raw) return raw;
+      var fromWeek =
+        context.weekTypeMap && context.weekTypeMap.get(String(pw && pw.weekId));
+      return fromWeek || context.defaultSeasonType || SeasonType.REGULAR_SEASON;
+    }
+
+    playerWeeks.forEach(function (pw) {
+      if (!pw) return;
+      var playerId =
+        pw.playerId === undefined || pw.playerId === null
+          ? ""
+          : String(pw.playerId);
+      var teamId =
+        pw.gshlTeamId === undefined || pw.gshlTeamId === null
+          ? ""
+          : String(pw.gshlTeamId);
+      if (!playerId || !teamId) return;
+
+      var seasonType = resolveSeasonTypeForWeekRow(pw);
+      var totalKey = playerId + "|" + String(seasonType);
+      if (!playerTotalsMap.has(totalKey)) playerTotalsMap.set(totalKey, []);
+      playerTotalsMap.get(totalKey).push(pw);
+
+      var splitKey = playerId + "|" + teamId + "|" + String(seasonType);
+      if (!playerSplitsMap.has(splitKey)) playerSplitsMap.set(splitKey, []);
+      playerSplitsMap.get(splitKey).push(pw);
+    });
+
+    var playerSplits = [];
+    var playerTotals = [];
+
+    playerSplitsMap.forEach(function (weeksArr, splitKey) {
+      if (!weeksArr || !weeksArr.length) return;
+      var parts = splitKey.split("|");
+      playerSplits.push(
+        buildPlayerAggregateFromWeeks(
+          weeksArr[0],
+          weeksArr,
+          {
+            playerId: parts[0],
+            gshlTeamId: parts[1],
+            seasonType: parts[2],
+          },
+          context,
+        ),
+      );
+    });
+
+    playerTotalsMap.forEach(function (weeksArr, totalKey) {
+      if (!weeksArr || !weeksArr.length) return;
+      var parts = totalKey.split("|");
+      playerTotals.push(
+        buildPlayerAggregateFromWeeks(
+          weeksArr[0],
+          weeksArr,
+          {
+            playerId: parts[0],
+            seasonType: parts[1],
+            gshlTeamIds: weeksArr.map(function (w) {
+              return w && w.gshlTeamId;
+            }),
+          },
+          context,
+        ),
+      );
+    });
+
+    return {
+      splits: playerSplits,
+      totals: playerTotals,
+    };
   }
 
   // ============================================================================
@@ -94,7 +435,7 @@ var StatsAggregator = (function StatsAggregatorModule() {
   /**
    * Builds PlayerSplitStatLine + PlayerTotalStatLine from PlayerWeekStatLine.
    *
-   * Use this for “week-first” seasons where PlayerWeek is the lowest reliable layer.
+   * Internal alternate aggregation path from existing PlayerWeek rows.
    */
   ns.updatePlayerSplitsAndTotalsFromExistingPlayerWeeks =
     function updatePlayerSplitsAndTotalsFromExistingPlayerWeeks(seasonId) {
@@ -151,156 +492,24 @@ var StatsAggregator = (function StatsAggregatorModule() {
         return;
       }
 
-      function resolveSeasonTypeForWeekRow(pw) {
-        var raw = pw && pw.seasonType ? String(pw.seasonType) : "";
-        if (raw) return raw;
-        var fromWeek = weekTypeMap.get(String(pw && pw.weekId));
-        return fromWeek || SeasonType.REGULAR_SEASON;
-      }
-
-      function buildPlayerAggregateFromWeeks(base, weeksArr, opts) {
-        var isGoalie = base.posGroup === "G";
-
-        var agg = {
-          playerId: opts.playerId,
-          seasonId: season.id,
-          seasonType: opts.seasonType,
-          posGroup: base.posGroup,
-          nhlPos: uniqCsv(
-            weeksArr.map(function (w) {
-              return w && w.nhlPos;
-            }),
-          ),
-          nhlTeam: uniqCsv(
-            weeksArr.map(function (w) {
-              return w && w.nhlTeam;
-            }),
-          ),
-          days: formatNumber(
-            weeksArr.reduce(function (p, c) {
-              return p + toNumber(c && c.days);
-            }, 0),
-          ),
-          Rating: "",
-        };
-
-        if (opts.gshlTeamId) {
-          agg.gshlTeamId = opts.gshlTeamId;
-        }
-        if (opts.gshlTeamIds) {
-          agg.gshlTeamIds = uniqCsv(opts.gshlTeamIds);
-        }
-
-        TEAM_STAT_FIELDS.forEach(function (field) {
-          var sum = weeksArr.reduce(function (p, c) {
-            return p + toNumber(c && c[field]);
-          }, 0);
-
-          if (isGoalie) {
-            if (
-              field === "G" ||
-              field === "A" ||
-              field === "P" ||
-              field === "PM" ||
-              field === "PIM" ||
-              field === "PPP" ||
-              field === "SOG" ||
-              field === "HIT" ||
-              field === "BLK"
-            ) {
-              agg[field] = "";
-            } else {
-              agg[field] = formatNumber(sum);
-            }
-          } else {
-            if (
-              field === "W" ||
-              field === "GA" ||
-              field === "SV" ||
-              field === "SA" ||
-              field === "SO" ||
-              field === "TOI"
-            ) {
-              agg[field] = "";
-            } else {
-              agg[field] = formatNumber(sum);
-            }
-          }
-        });
-
-        if (isGoalie) {
-          agg.GAA = computeGAA(agg.GA, agg.TOI);
-          agg.SVP = computeSVP(agg.SV, agg.SA);
-        } else {
-          agg.GAA = "";
-          agg.SVP = "";
-        }
-
-        return agg;
-      }
-
-      var playerSplitsMap = new Map();
-      var playerTotalsMap = new Map();
-
-      playerWeeks.forEach(function (pw) {
-        if (!pw) return;
-        var seasonType = resolveSeasonTypeForWeekRow(pw);
-        var totalKey = String(pw.playerId) + "|" + String(seasonType);
-        if (!playerTotalsMap.has(totalKey)) playerTotalsMap.set(totalKey, []);
-        playerTotalsMap.get(totalKey).push(pw);
-
-        var splitKey =
-          String(pw.playerId) +
-          "|" +
-          String(pw.gshlTeamId) +
-          "|" +
-          String(seasonType);
-        if (!playerSplitsMap.has(splitKey)) playerSplitsMap.set(splitKey, []);
-        playerSplitsMap.get(splitKey).push(pw);
+      var playerAggregates = buildPlayerSplitsAndTotalsFromWeeks(playerWeeks, {
+        seasonId: season.id,
+        weekTypeMap: weekTypeMap,
+        defaultSeasonType: SeasonType.REGULAR_SEASON,
+        statFields: TEAM_STAT_FIELDS,
+        toNumber: toNumber,
+        formatNumber: formatNumber,
       });
+      var playerSplits = playerAggregates.splits;
+      var playerTotals = playerAggregates.totals;
 
-      var playerSplits = [];
-      var playerTotals = [];
-
-      playerSplitsMap.forEach(function (weeksArr, splitKey) {
-        if (!weeksArr || !weeksArr.length) return;
-        var firstWeek = weeksArr[0];
-        var parts = splitKey.split("|");
-        var playerId = parts[0];
-        var gshlTeamId = parts[1];
-        var seasonType = parts[2];
-
-        var row = buildPlayerAggregateFromWeeks(firstWeek, weeksArr, {
-          playerId: playerId,
-          gshlTeamId: gshlTeamId,
-          seasonType: seasonType,
-        });
-        playerSplits.push(row);
-      });
-
-      playerTotalsMap.forEach(function (weeksArr, totalKey) {
-        if (!weeksArr || !weeksArr.length) return;
-        var firstWeek = weeksArr[0];
-        var parts = totalKey.split("|");
-        var playerId = parts[0];
-        var seasonType = parts[1];
-
-        var gshlTeamIds = weeksArr.map(function (w) {
-          return w && w.gshlTeamId;
-        });
-
-        var row = buildPlayerAggregateFromWeeks(firstWeek, weeksArr, {
-          playerId: playerId,
-          gshlTeamIds: gshlTeamIds,
-          seasonType: seasonType,
-        });
-        playerTotals.push(row);
-      });
+      rankPlayerRows(playerSplits, "PlayerSplitStatLine", seasonKey);
+      rankPlayerRows(playerTotals, "PlayerTotalStatLine", seasonKey);
 
       upsertSheetByKeys(
         PLAYERSTATS_SPREADSHEET_ID,
         "PlayerSplitStatLine",
-        ["playerId", "gshlTeamId", "seasonId", "seasonType"],
+        ["gshlTeamId", "playerId", "seasonId", "seasonType"],
         playerSplits,
         {
           idColumn: "id",
@@ -331,6 +540,9 @@ var StatsAggregator = (function StatsAggregatorModule() {
         ")",
       );
     };
+
+  ns.updatePlayerStatsForSeasonFromExistingPlayerWeeks =
+    ns.updatePlayerSplitsAndTotalsFromExistingPlayerWeeks;
 
   /**
    * Rolls up player days -> weeks -> splits + totals for a season.
@@ -377,265 +589,84 @@ var StatsAggregator = (function StatsAggregatorModule() {
       return String(pd.seasonId) === String(season.id);
     });
 
-    var playerWeeks = [];
-    var playerSplits = [];
-    var playerTotals = [];
-
-    // Days -> Weeks
+    var weekTypeMap = new Map();
     weeks.forEach(function (week) {
-      var weekSeasonType = week.weekType || SeasonType.REGULAR_SEASON;
-      var weekPlayerDays = playerDays.filter(function (pd) {
-        return String(pd.weekId) === String(week.id);
-      });
+      weekTypeMap.set(
+        String(week.id),
+        week.weekType || SeasonType.REGULAR_SEASON,
+      );
+    });
 
-      var playerDayMap = new Map();
-      weekPlayerDays.forEach(function (pd) {
-        var key = String(pd.playerId) + "_" + String(pd.gshlTeamId);
-        if (!playerDayMap.has(key)) {
-          playerDayMap.set(key, []);
-        }
-        playerDayMap.get(key).push(pd);
-      });
+    var playerWeekMap = new Map();
+    playerDays.forEach(function (pd) {
+      if (!pd) return;
+      var weekId =
+        pd.weekId === undefined || pd.weekId === null ? "" : String(pd.weekId);
+      var weekSeasonType = weekTypeMap.get(weekId);
+      if (!weekId || !weekSeasonType) return;
 
-      playerDayMap.forEach(function (days, playerKey) {
-        if (!days || !days.length) return;
+      var playerId =
+        pd.playerId === undefined || pd.playerId === null
+          ? ""
+          : String(pd.playerId);
+      var gshlTeamId =
+        pd.gshlTeamId === undefined || pd.gshlTeamId === null
+          ? ""
+          : String(pd.gshlTeamId);
+      if (!playerId || !gshlTeamId) return;
 
-        var starts = days.filter(function (a) {
-          return isStarter(a);
-        });
-
-        var playerId = playerKey.split("_")[0];
-        var gshlTeamId = playerKey.split("_")[1];
-
-        var posGroup =
-          days[0] && days[0].posGroup ? String(days[0].posGroup) : "";
-        var isGoalie = posGroup === "G";
-
-        var row = {
-          playerId: playerId,
-          gshlTeamId: gshlTeamId,
-          seasonId: season.id,
-          weekId: week.id,
-          seasonType: weekSeasonType,
-          nhlPos: uniqCsv(
-            days.map(function (a) {
-              return a && a.nhlPos;
-            }),
+      var key = weekId + "|" + gshlTeamId + "|" + playerId;
+      if (!playerWeekMap.has(key)) {
+        playerWeekMap.set(
+          key,
+          createPlayerWeekBucket(
+            String(season.id),
+            weekId,
+            gshlTeamId,
+            playerId,
+            weekSeasonType,
+            pd.posGroup ? String(pd.posGroup) : "",
+            TEAM_STAT_FIELDS,
           ),
-          posGroup: posGroup,
-          nhlTeam: uniqCsv(
-            days.map(function (a) {
-              return a && a.nhlTeam;
-            }),
-          ),
-          days: formatNumber(days.length),
-          Rating: "",
-        };
-
-        // Always-summed fields (include non-starters too)
-        row.GP = formatNumber(sumField(days, "GP", toNumber));
-        row.MG = formatNumber(sumField(days, "MG", toNumber));
-        row.IR = formatNumber(sumField(days, "IR", toNumber));
-        row.IRplus = formatNumber(sumField(days, "IRplus", toNumber));
-        row.GS = formatNumber(sumField(days, "GS", toNumber));
-        row.ADD = formatNumber(sumField(days, "ADD", toNumber));
-        row.MS = formatNumber(sumField(days, "MS", toNumber));
-        row.BS = formatNumber(sumField(days, "BS", toNumber));
-
-        if (isGoalie) {
-          // Goalie-only stats come from starters.
-          row.W = formatNumber(sumField(starts, "W", toNumber));
-          row.GA = formatNumber(sumField(starts, "GA", toNumber));
-          row.SV = formatNumber(sumField(starts, "SV", toNumber));
-          row.SA = formatNumber(sumField(starts, "SA", toNumber));
-          row.SO = formatNumber(sumField(starts, "SO", toNumber));
-          row.TOI = formatNumber(sumField(starts, "TOI", toNumber));
-
-          // Blank skater stats.
-          blankFields(row, [
-            "G",
-            "A",
-            "P",
-            "PM",
-            "PIM",
-            "PPP",
-            "SOG",
-            "HIT",
-            "BLK",
-          ]);
-
-          row.GAA = computeGAA(row.GA, row.TOI);
-          row.SVP = computeSVP(row.SV, row.SA);
-        } else {
-          // Skater-only stats come from starters.
-          row.G = formatNumber(sumField(starts, "G", toNumber));
-          row.A = formatNumber(sumField(starts, "A", toNumber));
-          row.P = formatNumber(sumField(starts, "P", toNumber));
-          row.PM = formatNumber(sumField(starts, "PM", toNumber));
-          row.PIM = formatNumber(sumField(starts, "PIM", toNumber));
-          row.PPP = formatNumber(sumField(starts, "PPP", toNumber));
-          row.SOG = formatNumber(sumField(starts, "SOG", toNumber));
-          row.HIT = formatNumber(sumField(starts, "HIT", toNumber));
-          row.BLK = formatNumber(sumField(starts, "BLK", toNumber));
-
-          // Blank goalie stats.
-          blankFields(row, ["W", "GA", "SV", "SA", "SO", "TOI", "GAA", "SVP"]);
-        }
-
-        // Ensure all TEAM_STAT_FIELDS exist at least as blanks/strings.
-        TEAM_STAT_FIELDS.forEach(function (field) {
-          if (row[field] === undefined) row[field] = "";
-        });
-
-        playerWeeks.push(row);
-      });
-    });
-
-    // Weeks -> Splits + Totals
-    var playerSplitsMap = new Map();
-    var playerTotalsMap = new Map();
-
-    playerWeeks.forEach(function (pw) {
-      var totalKey = String(pw.playerId) + "|" + String(pw.seasonType);
-      if (!playerTotalsMap.has(totalKey)) playerTotalsMap.set(totalKey, []);
-      playerTotalsMap.get(totalKey).push(pw);
-
-      var splitKey =
-        String(pw.playerId) +
-        "|" +
-        String(pw.gshlTeamId) +
-        "|" +
-        String(pw.seasonType);
-      if (!playerSplitsMap.has(splitKey)) playerSplitsMap.set(splitKey, []);
-      playerSplitsMap.get(splitKey).push(pw);
-    });
-
-    function buildPlayerAggregateFromWeeks(base, weeksArr, opts) {
-      var isGoalie = base.posGroup === "G";
-
-      var agg = {
-        playerId: opts.playerId,
-        seasonId: season.id,
-        seasonType: opts.seasonType,
-        posGroup: base.posGroup,
-        nhlPos: uniqCsv(
-          weeksArr.map(function (w) {
-            return w && w.nhlPos;
-          }),
-        ),
-        nhlTeam: uniqCsv(
-          weeksArr.map(function (w) {
-            return w && w.nhlTeam;
-          }),
-        ),
-        days: formatNumber(
-          weeksArr.reduce(function (p, c) {
-            return p + toNumber(c && c.days);
-          }, 0),
-        ),
-        Rating: "",
-      };
-
-      if (opts.gshlTeamId) {
-        agg.gshlTeamId = opts.gshlTeamId;
-      }
-      if (opts.gshlTeamIds) {
-        agg.gshlTeamIds = uniqCsv(opts.gshlTeamIds);
+        );
       }
 
-      // Sum numeric stat fields from week rows.
-      TEAM_STAT_FIELDS.forEach(function (field) {
-        var sum = weeksArr.reduce(function (p, c) {
-          return p + toNumber(c && c[field]);
-        }, 0);
-
-        // Keep skater/goalie blanking behavior.
-        if (isGoalie) {
-          if (
-            field === "G" ||
-            field === "A" ||
-            field === "P" ||
-            field === "PM" ||
-            field === "PIM" ||
-            field === "PPP" ||
-            field === "SOG" ||
-            field === "HIT" ||
-            field === "BLK"
-          ) {
-            agg[field] = "";
-          } else {
-            agg[field] = formatNumber(sum);
-          }
-        } else {
-          if (
-            field === "W" ||
-            field === "GA" ||
-            field === "SV" ||
-            field === "SA" ||
-            field === "SO" ||
-            field === "TOI"
-          ) {
-            agg[field] = "";
-          } else {
-            agg[field] = formatNumber(sum);
-          }
-        }
-      });
-
-      // Derived goalie rates (only when goalie)
-      if (isGoalie) {
-        agg.GAA = computeGAA(agg.GA, agg.TOI);
-        agg.SVP = computeSVP(agg.SV, agg.SA);
-      } else {
-        agg.GAA = "";
-        agg.SVP = "";
-      }
-
-      return agg;
-    }
-
-    playerSplitsMap.forEach(function (weeksArr, splitKey) {
-      if (!weeksArr || !weeksArr.length) return;
-      var firstWeek = weeksArr[0];
-      var parts = splitKey.split("|");
-      var playerId = parts[0];
-      var gshlTeamId = parts[1];
-      var seasonType = parts[2];
-
-      var row = buildPlayerAggregateFromWeeks(firstWeek, weeksArr, {
-        playerId: playerId,
-        gshlTeamId: gshlTeamId,
-        seasonType: seasonType,
-      });
-
-      playerSplits.push(row);
+      addPlayerDayToWeekBucket(
+        playerWeekMap.get(key),
+        pd,
+        isStarter(pd),
+        toNumber,
+      );
     });
 
-    playerTotalsMap.forEach(function (weeksArr, totalKey) {
-      if (!weeksArr || !weeksArr.length) return;
-      var firstWeek = weeksArr[0];
-      var parts = totalKey.split("|");
-      var playerId = parts[0];
-      var seasonType = parts[1];
-
-      var gshlTeamIds = weeksArr.map(function (w) {
-        return w && w.gshlTeamId;
-      });
-
-      var row = buildPlayerAggregateFromWeeks(firstWeek, weeksArr, {
-        playerId: playerId,
-        gshlTeamIds: gshlTeamIds,
-        seasonType: seasonType,
-      });
-
-      playerTotals.push(row);
+    var playerWeeks = Array.from(playerWeekMap.values()).map(function (bucket) {
+      return buildPlayerWeekRowFromBucket(
+        bucket,
+        TEAM_STAT_FIELDS,
+        formatNumber,
+      );
     });
+
+    var playerAggregates = buildPlayerSplitsAndTotalsFromWeeks(playerWeeks, {
+      seasonId: season.id,
+      weekTypeMap: weekTypeMap,
+      defaultSeasonType: SeasonType.REGULAR_SEASON,
+      statFields: TEAM_STAT_FIELDS,
+      toNumber: toNumber,
+      formatNumber: formatNumber,
+    });
+    var playerSplits = playerAggregates.splits;
+    var playerTotals = playerAggregates.totals;
+
+    rankPlayerRows(playerWeeks, "PlayerWeekStatLine", seasonKey);
+    rankPlayerRows(playerSplits, "PlayerSplitStatLine", seasonKey);
+    rankPlayerRows(playerTotals, "PlayerTotalStatLine", seasonKey);
 
     // Persist
     upsertSheetByKeys(
       PLAYERSTATS_SPREADSHEET_ID,
       "PlayerWeekStatLine",
-      ["playerId", "gshlTeamId", "weekId"],
+      ["gshlTeamId", "playerId", "weekId", "seasonId"],
       playerWeeks,
       {
         idColumn: "id",
@@ -647,7 +678,7 @@ var StatsAggregator = (function StatsAggregatorModule() {
     upsertSheetByKeys(
       PLAYERSTATS_SPREADSHEET_ID,
       "PlayerSplitStatLine",
-      ["playerId", "gshlTeamId", "seasonId", "seasonType"],
+      ["gshlTeamId", "playerId", "seasonId", "seasonType"],
       playerSplits,
       {
         idColumn: "id",
@@ -679,6 +710,246 @@ var StatsAggregator = (function StatsAggregatorModule() {
       playerTotals.length,
       ")",
     );
+  };
+
+  ns.updatePlayerStatsForWeekIds = function updatePlayerStatsForWeekIds(
+    seasonId,
+    weekIds,
+  ) {
+    var seasonKey = requireSeason(seasonId, "updatePlayerStatsForWeekIds");
+    var selectedWeekIds = requireWeekIds(weekIds, "updatePlayerStatsForWeekIds");
+
+    var SeasonType = GshlUtils.core.constants.SeasonType;
+    var TEAM_STAT_FIELDS = GshlUtils.core.constants.TEAM_STAT_FIELDS;
+
+    var fetchSheetAsObjects = GshlUtils.sheets.read.fetchSheetAsObjects;
+    var upsertSheetByKeys = GshlUtils.sheets.write.upsertSheetByKeys;
+    var getPlayerDayWorkbookId =
+      GshlUtils.domain.workbooks.getPlayerDayWorkbookId;
+    var isStarter = GshlUtils.domain.players.isStarter;
+
+    var toNumber = GshlUtils.core.parse.toNumber;
+    var formatNumber = GshlUtils.core.parse.formatNumber;
+
+    var season = fetchSheetAsObjects(SPREADSHEET_ID, "Season").find(
+      function (s) {
+        return String(s && s.id) === seasonKey;
+      },
+    );
+    if (!season) {
+      throw new Error("[StatsAggregator] Season not found for id " + seasonKey);
+    }
+
+    var seasonIdStr = String(season.id);
+    var weeks = fetchSheetAsObjects(SPREADSHEET_ID, "Week").filter(function (w) {
+      return String(w && w.seasonId) === seasonIdStr;
+    });
+    var weekById = buildWeekMapById(weeks);
+    var weekIdSet = new Set(
+      selectedWeekIds.filter(function (weekId) {
+        return weekById.has(String(weekId));
+      }),
+    );
+    if (weekIdSet.size !== selectedWeekIds.length) {
+      throw new Error(
+        "[StatsAggregator] updatePlayerStatsForWeekIds could not resolve every requested weekId",
+      );
+    }
+
+    var weekTypeMap = buildWeekTypeMap(weeks, SeasonType.REGULAR_SEASON);
+    var playerDayWorkbookId = getPlayerDayWorkbookId(season.id);
+    var playerDays = fetchSheetAsObjects(
+      playerDayWorkbookId,
+      "PlayerDayStatLine",
+    ).filter(function (pd) {
+      return (
+        String(pd && pd.seasonId) === seasonIdStr &&
+        weekIdSet.has(String(pd && pd.weekId))
+      );
+    });
+
+    if (!playerDays.length) {
+      console.log(
+        "[StatsAggregator] No player days found for selected weeks in season",
+        seasonKey,
+      );
+      return {
+        seasonId: seasonKey,
+        weekIds: selectedWeekIds,
+        playerWeeks: [],
+        playerSplits: [],
+        playerTotals: [],
+        touchedPlayerIds: [],
+      };
+    }
+
+    var playerWeekMap = new Map();
+    playerDays.forEach(function (pd) {
+      if (!pd) return;
+      var weekId =
+        pd.weekId === undefined || pd.weekId === null ? "" : String(pd.weekId);
+      var weekSeasonType = weekTypeMap.get(weekId);
+      if (!weekId || !weekSeasonType) return;
+
+      var playerId =
+        pd.playerId === undefined || pd.playerId === null
+          ? ""
+          : String(pd.playerId);
+      var gshlTeamId =
+        pd.gshlTeamId === undefined || pd.gshlTeamId === null
+          ? ""
+          : String(pd.gshlTeamId);
+      if (!playerId || !gshlTeamId) return;
+
+      var key = weekId + "|" + gshlTeamId + "|" + playerId;
+      if (!playerWeekMap.has(key)) {
+        playerWeekMap.set(
+          key,
+          createPlayerWeekBucket(
+            seasonIdStr,
+            weekId,
+            gshlTeamId,
+            playerId,
+            weekSeasonType,
+            pd.posGroup ? String(pd.posGroup) : "",
+            TEAM_STAT_FIELDS,
+          ),
+        );
+      }
+
+      addPlayerDayToWeekBucket(
+        playerWeekMap.get(key),
+        pd,
+        isStarter(pd),
+        toNumber,
+      );
+    });
+
+    var playerWeeks = Array.from(playerWeekMap.values()).map(function (bucket) {
+      return buildPlayerWeekRowFromBucket(
+        bucket,
+        TEAM_STAT_FIELDS,
+        formatNumber,
+      );
+    });
+    rankPlayerRows(playerWeeks, "PlayerWeekStatLine", seasonKey);
+
+    upsertSheetByKeys(
+      PLAYERSTATS_SPREADSHEET_ID,
+      "PlayerWeekStatLine",
+      ["gshlTeamId", "playerId", "weekId", "seasonId"],
+      playerWeeks,
+      {
+        idColumn: "id",
+        createdAtColumn: "createdAt",
+        updatedAtColumn: "updatedAt",
+      },
+    );
+
+    var existingSeasonPlayerWeeks = fetchSheetAsObjects(
+      PLAYERSTATS_SPREADSHEET_ID,
+      "PlayerWeekStatLine",
+    ).filter(function (pw) {
+      return String(pw && pw.seasonId) === seasonIdStr;
+    });
+    var touchedPlayerIds = new Set();
+    existingSeasonPlayerWeeks.forEach(function (pw) {
+      if (!pw || !weekIdSet.has(String(pw.weekId))) return;
+      if (pw.playerId !== undefined && pw.playerId !== null) {
+        touchedPlayerIds.add(String(pw.playerId));
+      }
+    });
+    playerWeeks.forEach(function (pw) {
+      if (pw && pw.playerId !== undefined && pw.playerId !== null) {
+        touchedPlayerIds.add(String(pw.playerId));
+      }
+    });
+
+    var mergedSeasonPlayerWeeks = mergeRowsByKey(
+      existingSeasonPlayerWeeks,
+      playerWeeks,
+      function (row) {
+        if (!row) return "";
+        return [
+          row.gshlTeamId === undefined || row.gshlTeamId === null
+            ? ""
+            : String(row.gshlTeamId),
+          row.playerId === undefined || row.playerId === null
+            ? ""
+            : String(row.playerId),
+          row.weekId === undefined || row.weekId === null ? "" : String(row.weekId),
+          row.seasonId === undefined || row.seasonId === null
+            ? ""
+            : String(row.seasonId),
+        ].join("|");
+      },
+    ).filter(function (pw) {
+      return pw && touchedPlayerIds.has(String(pw.playerId));
+    });
+
+    var playerAggregates = buildPlayerSplitsAndTotalsFromWeeks(
+      mergedSeasonPlayerWeeks,
+      {
+        seasonId: season.id,
+        weekTypeMap: weekTypeMap,
+        defaultSeasonType: SeasonType.REGULAR_SEASON,
+        statFields: TEAM_STAT_FIELDS,
+        toNumber: toNumber,
+        formatNumber: formatNumber,
+      },
+    );
+    var playerSplits = playerAggregates.splits;
+    var playerTotals = playerAggregates.totals;
+
+    rankPlayerRows(playerSplits, "PlayerSplitStatLine", seasonKey);
+    rankPlayerRows(playerTotals, "PlayerTotalStatLine", seasonKey);
+
+    upsertSheetByKeys(
+      PLAYERSTATS_SPREADSHEET_ID,
+      "PlayerSplitStatLine",
+      ["gshlTeamId", "playerId", "seasonId", "seasonType"],
+      playerSplits,
+      {
+        idColumn: "id",
+        createdAtColumn: "createdAt",
+        updatedAtColumn: "updatedAt",
+      },
+    );
+
+    upsertSheetByKeys(
+      PLAYERSTATS_SPREADSHEET_ID,
+      "PlayerTotalStatLine",
+      ["playerId", "seasonId", "seasonType"],
+      playerTotals,
+      {
+        idColumn: "id",
+        createdAtColumn: "createdAt",
+        updatedAtColumn: "updatedAt",
+      },
+    );
+
+    console.log(
+      "[StatsAggregator] Updated player aggregates for selected weeks in season",
+      seasonKey,
+      "(weekIds:",
+      selectedWeekIds.join(","),
+      "weeks:",
+      playerWeeks.length,
+      "splits:",
+      playerSplits.length,
+      "totals:",
+      playerTotals.length,
+      ")",
+    );
+
+    return {
+      seasonId: seasonKey,
+      weekIds: selectedWeekIds,
+      playerWeeks: playerWeeks,
+      playerSplits: playerSplits,
+      playerTotals: playerTotals,
+      touchedPlayerIds: Array.from(touchedPlayerIds),
+    };
   };
 
   // ============================================================================
@@ -783,47 +1054,18 @@ var StatsAggregator = (function StatsAggregatorModule() {
       var teamWeekAggregates = Array.from(teamWeekMap.values());
       var teamWeekRows = teamWeekAggregates.map(buildTeamWeekRow);
 
-      // TeamWeek -> TeamSeason (by seasonType)
-      var teamSeasonMap = new Map();
-
-      teamWeekAggregates.forEach(function (weekAgg) {
-        var seasonType =
-          weekTypeMap.get(String(weekAgg.weekId)) || SeasonType.REGULAR_SEASON;
-        var key = String(weekAgg.gshlTeamId) + ":" + String(seasonType);
-        if (!teamSeasonMap.has(key)) {
-          var init = {
-            seasonId: seasonIdStr,
-            seasonType: seasonType,
-            gshlTeamId: String(weekAgg.gshlTeamId),
-            days: 0,
-          };
-          TEAM_STAT_FIELDS.forEach(function (f) {
-            init[f] = 0;
-          });
-          teamSeasonMap.set(key, init);
-        }
-
-        var bucket = teamSeasonMap.get(key);
-        bucket.days += Number(weekAgg.days) || 0;
-        TEAM_STAT_FIELDS.forEach(function (f) {
-          bucket[f] += Number(weekAgg[f]) || 0;
-        });
-      });
-
-      var teamSeasonAggregates = Array.from(teamSeasonMap.values()).map(
-        function (agg) {
-          agg.GAA = agg.TOI > 0 ? (agg.GA / agg.TOI) * 60 : 0;
-          agg.SVP = agg.SA > 0 ? agg.SV / agg.SA : 0;
-          return agg;
-        },
+      var teamSeasonRows = buildTeamSeasonRowsFromWeekAggregates(
+        teamWeekAggregates,
+        weekTypeMap,
+        seasonIdStr,
+        SeasonType.REGULAR_SEASON,
+        TEAM_STAT_FIELDS,
       );
-
-      var teamSeasonRows = teamSeasonAggregates.map(buildTeamSeasonRow);
 
       upsertSheetByKeys(
         TEAMSTATS_SPREADSHEET_ID,
         "TeamWeekStatLine",
-        ["gshlTeamId", "weekId"],
+        ["gshlTeamId", "weekId", "seasonId"],
         teamWeekRows,
         {
           idColumn: "id",
@@ -845,7 +1087,7 @@ var StatsAggregator = (function StatsAggregatorModule() {
       );
 
       console.log(
-        "[StatsAggregator] Updated week-first team aggregates for season",
+        "[StatsAggregator] Updated alternate team aggregates from PlayerWeek rows for season",
         seasonKey,
         "(weeks:",
         teamWeekRows.length,
@@ -854,6 +1096,53 @@ var StatsAggregator = (function StatsAggregatorModule() {
         ")",
       );
     };
+
+  function buildTeamSeasonRowsFromWeekAggregates(
+    teamWeekAggregates,
+    weekTypeMap,
+    seasonId,
+    defaultSeasonType,
+    statFields,
+  ) {
+    var teamSeasonMap = new Map();
+
+    teamWeekAggregates.forEach(function (weekAgg) {
+      if (!weekAgg) return;
+      var teamId =
+        weekAgg.gshlTeamId === undefined || weekAgg.gshlTeamId === null
+          ? ""
+          : String(weekAgg.gshlTeamId);
+      var weekId =
+        weekAgg.weekId === undefined || weekAgg.weekId === null
+          ? ""
+          : String(weekAgg.weekId);
+      if (!teamId || !weekId) return;
+
+      var seasonType =
+        (weekTypeMap && weekTypeMap.get(weekId)) || defaultSeasonType;
+      var key = teamId + ":" + String(seasonType);
+      if (!teamSeasonMap.has(key)) {
+        var init = {
+          seasonId: seasonId,
+          seasonType: seasonType,
+          gshlTeamId: teamId,
+          days: 0,
+        };
+        statFields.forEach(function (field) {
+          init[field] = 0;
+        });
+        teamSeasonMap.set(key, init);
+      }
+
+      var bucket = teamSeasonMap.get(key);
+      bucket.days += Number(weekAgg.days) || 0;
+      statFields.forEach(function (field) {
+        bucket[field] += Number(weekAgg[field]) || 0;
+      });
+    });
+
+    return Array.from(teamSeasonMap.values()).map(buildTeamSeasonRow);
+  }
 
   function createTeamDayBucket(seasonId, teamId, weekId, date) {
     var TEAM_STAT_FIELDS = GshlUtils.core.constants.TEAM_STAT_FIELDS;
@@ -964,8 +1253,6 @@ var StatsAggregator = (function StatsAggregatorModule() {
       TOI: formatNumber(week.TOI),
       Rating: "",
       yearToDateRating: "",
-      powerRating: "",
-      powerRk: "",
       ADD: formatNumber(week.ADD),
       MS: formatNumber(week.MS),
       BS: formatNumber(week.BS),
@@ -975,8 +1262,8 @@ var StatsAggregator = (function StatsAggregatorModule() {
   function buildTeamSeasonRow(seasonStat) {
     var formatNumber = GshlUtils.core.parse.formatNumber;
 
-    var GAA = seasonStat.GAA ? seasonStat.GAA.toFixed(5).toString() : "";
-    var SVP = seasonStat.SVP ? seasonStat.SVP.toFixed(6).toString() : "";
+    var GAA = computeGAA(seasonStat.GA, seasonStat.TOI);
+    var SVP = computeSVP(seasonStat.SV, seasonStat.SA);
 
     // Keep schema-compatible fields, but this module does not compute standings.
     return {
@@ -1011,10 +1298,6 @@ var StatsAggregator = (function StatsAggregatorModule() {
       MS: formatNumber(seasonStat.MS),
       BS: formatNumber(seasonStat.BS),
       streak: "",
-      powerRk: "",
-      powerRating: "",
-      prevPowerRk: "",
-      prevPowerRating: "",
       teamW: "",
       teamHW: "",
       teamHL: "",
@@ -1087,15 +1370,12 @@ var StatsAggregator = (function StatsAggregatorModule() {
     var playerWB = getPlayerDayWorkbookId(seasonIdStr);
     var playerDays = fetchSheetAsObjects(playerWB, "PlayerDayStatLine").filter(
       function (pd) {
-        return String(pd.seasonId) === seasonIdStr && isStarter(pd);
+        return String(pd.seasonId) === seasonIdStr;
       },
     );
 
     if (!playerDays.length) {
-      console.log(
-        "[StatsAggregator] No starter player days for season",
-        seasonKey,
-      );
+      console.log("[StatsAggregator] No player days for season", seasonKey);
       return;
     }
 
@@ -1103,14 +1383,13 @@ var StatsAggregator = (function StatsAggregatorModule() {
     var teamDayMap = new Map();
 
     playerDays.forEach(function (pd) {
-      if (!isStarter(pd)) return;
       var teamId = pd.gshlTeamId && String(pd.gshlTeamId);
       var weekId = pd.weekId && String(pd.weekId);
       if (!teamId || !weekId) return;
       var dateKey = formatDateOnly(pd.date);
       if (!dateKey) return;
 
-      var mapKey = teamId + "_" + dateKey;
+      var mapKey = weekId + "|" + teamId + "|" + dateKey;
       if (!teamDayMap.has(mapKey)) {
         teamDayMap.set(
           mapKey,
@@ -1118,7 +1397,21 @@ var StatsAggregator = (function StatsAggregatorModule() {
         );
       }
       var bucket = teamDayMap.get(mapKey);
-      TEAM_STAT_FIELDS.forEach(function (field) {
+
+      TEAM_ALWAYS_SUM_FIELDS.forEach(function (field) {
+        bucket[field] += toNumber(pd[field]);
+      });
+
+      if (!isStarter(pd)) return;
+
+      if (String(pd.posGroup || "") === "G") {
+        TEAM_GOALIE_STARTER_FIELDS.forEach(function (field) {
+          bucket[field] += toNumber(pd[field]);
+        });
+        return;
+      }
+
+      TEAM_SKATER_STARTER_FIELDS.forEach(function (field) {
         bucket[field] += toNumber(pd[field]);
       });
     });
@@ -1146,47 +1439,18 @@ var StatsAggregator = (function StatsAggregatorModule() {
     var teamWeekAggregates = Array.from(teamWeekMap.values());
     var teamWeekRows = teamWeekAggregates.map(buildTeamWeekRow);
 
-    // TeamWeek -> TeamSeason (by seasonType)
-    var teamSeasonMap = new Map();
-
-    teamWeekAggregates.forEach(function (weekAgg) {
-      var seasonType =
-        weekTypeMap.get(String(weekAgg.weekId)) || SeasonType.REGULAR_SEASON;
-      var key = String(weekAgg.gshlTeamId) + ":" + String(seasonType);
-      if (!teamSeasonMap.has(key)) {
-        var init = {
-          seasonId: seasonIdStr,
-          seasonType: seasonType,
-          gshlTeamId: String(weekAgg.gshlTeamId),
-          days: 0,
-        };
-        TEAM_STAT_FIELDS.forEach(function (f) {
-          init[f] = 0;
-        });
-        teamSeasonMap.set(key, init);
-      }
-
-      var bucket = teamSeasonMap.get(key);
-      bucket.days += Number(weekAgg.days) || 0;
-      TEAM_STAT_FIELDS.forEach(function (f) {
-        bucket[f] += Number(weekAgg[f]) || 0;
-      });
-    });
-
-    var teamSeasonAggregates = Array.from(teamSeasonMap.values()).map(
-      function (agg) {
-        agg.GAA = agg.TOI > 0 ? (agg.GA / agg.TOI) * 60 : 0;
-        agg.SVP = agg.SA > 0 ? agg.SV / agg.SA : 0;
-        return agg;
-      },
+    var teamSeasonRows = buildTeamSeasonRowsFromWeekAggregates(
+      teamWeekAggregates,
+      weekTypeMap,
+      seasonIdStr,
+      SeasonType.REGULAR_SEASON,
+      TEAM_STAT_FIELDS,
     );
-
-    var teamSeasonRows = teamSeasonAggregates.map(buildTeamSeasonRow);
 
     upsertSheetByKeys(
       TEAMSTATS_SPREADSHEET_ID,
       "TeamDayStatLine",
-      ["gshlTeamId", "date"],
+      ["gshlTeamId", "date", "weekId", "seasonId"],
       teamDayRows,
       {
         idColumn: "id",
@@ -1198,7 +1462,7 @@ var StatsAggregator = (function StatsAggregatorModule() {
     upsertSheetByKeys(
       TEAMSTATS_SPREADSHEET_ID,
       "TeamWeekStatLine",
-      ["gshlTeamId", "weekId"],
+      ["gshlTeamId", "weekId", "seasonId"],
       teamWeekRows,
       {
         idColumn: "id",
@@ -1232,6 +1496,234 @@ var StatsAggregator = (function StatsAggregatorModule() {
     );
   };
 
+  ns.updateTeamStatsForWeekIds = function updateTeamStatsForWeekIds(
+    seasonId,
+    weekIds,
+  ) {
+    var seasonKey = requireSeason(seasonId, "updateTeamStatsForWeekIds");
+    var selectedWeekIds = requireWeekIds(weekIds, "updateTeamStatsForWeekIds");
+
+    var SeasonType = GshlUtils.core.constants.SeasonType;
+    var TEAM_STAT_FIELDS = GshlUtils.core.constants.TEAM_STAT_FIELDS;
+
+    var fetchSheetAsObjects = GshlUtils.sheets.read.fetchSheetAsObjects;
+    var upsertSheetByKeys = GshlUtils.sheets.write.upsertSheetByKeys;
+    var getPlayerDayWorkbookId =
+      GshlUtils.domain.workbooks.getPlayerDayWorkbookId;
+    var isStarter = GshlUtils.domain.players.isStarter;
+    var formatDateOnly = GshlUtils.core.date.formatDateOnly;
+    var toNumber = GshlUtils.core.parse.toNumber;
+
+    var season = fetchSheetAsObjects(SPREADSHEET_ID, "Season").find(
+      function (s) {
+        return String(s && s.id) === seasonKey;
+      },
+    );
+    if (!season) {
+      throw new Error("[StatsAggregator] Season not found for id " + seasonKey);
+    }
+
+    var seasonIdStr = String(season.id);
+    var weeks = fetchSheetAsObjects(SPREADSHEET_ID, "Week").filter(function (w) {
+      return String(w && w.seasonId) === seasonIdStr;
+    });
+    var weekById = buildWeekMapById(weeks);
+    var weekIdSet = new Set(
+      selectedWeekIds.filter(function (weekId) {
+        return weekById.has(String(weekId));
+      }),
+    );
+    if (weekIdSet.size !== selectedWeekIds.length) {
+      throw new Error(
+        "[StatsAggregator] updateTeamStatsForWeekIds could not resolve every requested weekId",
+      );
+    }
+
+    var weekTypeMap = buildWeekTypeMap(weeks, SeasonType.REGULAR_SEASON);
+    var playerWB = getPlayerDayWorkbookId(seasonIdStr);
+    var playerDays = fetchSheetAsObjects(playerWB, "PlayerDayStatLine").filter(
+      function (pd) {
+        return (
+          String(pd && pd.seasonId) === seasonIdStr &&
+          weekIdSet.has(String(pd && pd.weekId))
+        );
+      },
+    );
+
+    if (!playerDays.length) {
+      console.log(
+        "[StatsAggregator] No player days found for selected team-week rebuild in season",
+        seasonKey,
+      );
+      return {
+        seasonId: seasonKey,
+        weekIds: selectedWeekIds,
+        teamDays: [],
+        teamWeeks: [],
+        teamSeasons: [],
+        touchedTeamIds: [],
+      };
+    }
+
+    var teamDayMap = new Map();
+    playerDays.forEach(function (pd) {
+      var teamId = pd.gshlTeamId && String(pd.gshlTeamId);
+      var weekId = pd.weekId && String(pd.weekId);
+      if (!teamId || !weekId) return;
+      var dateKey = formatDateOnly(pd.date);
+      if (!dateKey) return;
+
+      var mapKey = weekId + "|" + teamId + "|" + dateKey;
+      if (!teamDayMap.has(mapKey)) {
+        teamDayMap.set(
+          mapKey,
+          createTeamDayBucket(seasonIdStr, teamId, weekId, dateKey),
+        );
+      }
+      var bucket = teamDayMap.get(mapKey);
+
+      TEAM_ALWAYS_SUM_FIELDS.forEach(function (field) {
+        bucket[field] += toNumber(pd[field]);
+      });
+
+      if (!isStarter(pd)) return;
+
+      if (String(pd.posGroup || "") === "G") {
+        TEAM_GOALIE_STARTER_FIELDS.forEach(function (field) {
+          bucket[field] += toNumber(pd[field]);
+        });
+        return;
+      }
+
+      TEAM_SKATER_STARTER_FIELDS.forEach(function (field) {
+        bucket[field] += toNumber(pd[field]);
+      });
+    });
+
+    var teamDayAggregates = Array.from(teamDayMap.values());
+    var teamDayRows = teamDayAggregates.map(buildTeamDayRow);
+
+    var teamWeekMap = new Map();
+    teamDayAggregates.forEach(function (day) {
+      var key = String(day.weekId) + "_" + String(day.gshlTeamId);
+      if (!teamWeekMap.has(key)) {
+        teamWeekMap.set(key, createTeamWeekBucket(day));
+      }
+      var weekBucket = teamWeekMap.get(key);
+      weekBucket.days += 1;
+      TEAM_STAT_FIELDS.forEach(function (field) {
+        weekBucket[field] += day[field];
+      });
+    });
+
+    var teamWeekRows = Array.from(teamWeekMap.values()).map(buildTeamWeekRow);
+
+    upsertSheetByKeys(
+      TEAMSTATS_SPREADSHEET_ID,
+      "TeamDayStatLine",
+      ["gshlTeamId", "date", "weekId", "seasonId"],
+      teamDayRows,
+      {
+        idColumn: "id",
+        createdAtColumn: "createdAt",
+        updatedAtColumn: "updatedAt",
+      },
+    );
+
+    upsertSheetByKeys(
+      TEAMSTATS_SPREADSHEET_ID,
+      "TeamWeekStatLine",
+      ["gshlTeamId", "weekId", "seasonId"],
+      teamWeekRows,
+      {
+        idColumn: "id",
+        createdAtColumn: "createdAt",
+        updatedAtColumn: "updatedAt",
+      },
+    );
+
+    var existingSeasonTeamWeeks = fetchSheetAsObjects(
+      TEAMSTATS_SPREADSHEET_ID,
+      "TeamWeekStatLine",
+    ).filter(function (tw) {
+      return String(tw && tw.seasonId) === seasonIdStr;
+    });
+    var touchedTeamIds = new Set();
+    existingSeasonTeamWeeks.forEach(function (tw) {
+      if (!tw || !weekIdSet.has(String(tw.weekId))) return;
+      if (tw.gshlTeamId !== undefined && tw.gshlTeamId !== null) {
+        touchedTeamIds.add(String(tw.gshlTeamId));
+      }
+    });
+    teamWeekRows.forEach(function (tw) {
+      if (tw && tw.gshlTeamId !== undefined && tw.gshlTeamId !== null) {
+        touchedTeamIds.add(String(tw.gshlTeamId));
+      }
+    });
+
+    var mergedSeasonTeamWeeks = mergeRowsByKey(
+      existingSeasonTeamWeeks,
+      teamWeekRows,
+      function (row) {
+        if (!row) return "";
+        return [
+          row.gshlTeamId === undefined || row.gshlTeamId === null
+            ? ""
+            : String(row.gshlTeamId),
+          row.weekId === undefined || row.weekId === null ? "" : String(row.weekId),
+          row.seasonId === undefined || row.seasonId === null
+            ? ""
+            : String(row.seasonId),
+        ].join("|");
+      },
+    ).filter(function (tw) {
+      return tw && touchedTeamIds.has(String(tw.gshlTeamId));
+    });
+
+    var teamSeasonRows = buildTeamSeasonRowsFromWeekAggregates(
+      mergedSeasonTeamWeeks,
+      weekTypeMap,
+      seasonIdStr,
+      SeasonType.REGULAR_SEASON,
+      TEAM_STAT_FIELDS,
+    );
+
+    upsertSheetByKeys(
+      TEAMSTATS_SPREADSHEET_ID,
+      "TeamSeasonStatLine",
+      ["gshlTeamId", "seasonId", "seasonType"],
+      teamSeasonRows,
+      {
+        idColumn: "id",
+        createdAtColumn: "createdAt",
+        updatedAtColumn: "updatedAt",
+      },
+    );
+
+    console.log(
+      "[StatsAggregator] Updated team aggregates for selected weeks in season",
+      seasonKey,
+      "(weekIds:",
+      selectedWeekIds.join(","),
+      "days:",
+      teamDayRows.length,
+      "weeks:",
+      teamWeekRows.length,
+      "seasons:",
+      teamSeasonRows.length,
+      ")",
+    );
+
+    return {
+      seasonId: seasonKey,
+      weekIds: selectedWeekIds,
+      teamDays: teamDayRows,
+      teamWeeks: teamWeekRows,
+      teamSeasons: teamSeasonRows,
+      touchedTeamIds: Array.from(touchedTeamIds),
+    };
+  };
+
   // Expose internals needed by other modules (e.g. YahooScraper)
   ns.internals = {
     createTeamDayBucket: createTeamDayBucket,
@@ -1240,6 +1732,12 @@ var StatsAggregator = (function StatsAggregatorModule() {
     buildTeamWeekRow: buildTeamWeekRow,
     buildTeamSeasonRow: buildTeamSeasonRow,
   };
+
+  delete ns.updatePlayerSplitsAndTotalsFromExistingPlayerWeeks;
+  delete ns.updatePlayerStatsForSeasonFromExistingPlayerWeeks;
+  delete ns.updatePlayerStatsForWeekIds;
+  delete ns.updateTeamStatsForSeasonFromExistingPlayerWeeks;
+  delete ns.updateTeamStatsForWeekIds;
 
   return ns;
 })();

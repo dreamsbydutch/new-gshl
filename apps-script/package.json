@@ -1,7 +1,7 @@
 {
   "name": "gshl-apps-script-data-pipeline",
   "version": "1.0.0",
-  "description": "GSHL Data Pipeline - The primary data manipulation layer. Fetches from Yahoo, calculates ratings/lineups/aggregations, writes to Google Sheets. Next.js is read-only.",
+  "description": "GSHL active-season Apps Script pipeline for daily Yahoo ingest, current-season aggregation, ratings, standings, and power rankings.",
   "private": true,
   "scripts": {
     "push": "clasp push",

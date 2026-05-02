@@ -37,6 +37,17 @@ var MatchupHandler = (function buildMatchupHandler() {
   var GOALIE_CATEGORY_SET = GshlUtils.core.constants.GOALIE_CATEGORY_SET;
   var GOALIE_START_MINIMUM = GshlUtils.core.constants.GOALIE_START_MINIMUM;
 
+  function normalizeWeekIds(weekIds) {
+    if (!Array.isArray(weekIds)) return [];
+    return weekIds
+      .map(function (weekId) {
+        return weekId === undefined || weekId === null
+          ? ""
+          : String(weekId).trim();
+      })
+      .filter(Boolean);
+  }
+
   function buildWeekStatusMap(weeks) {
     var today = getTodayDateString();
     var map = new Map();
@@ -359,22 +370,34 @@ var MatchupHandler = (function buildMatchupHandler() {
     };
   }
 
-  function updateMatchupsFromTeamWeeks(seasonId) {
+  function updateMatchupsFromTeamWeeks(seasonId, options) {
     var seasonKey = normalizeSeasonId(
       seasonId,
       "MatchupHandler.updateMatchupsFromTeamWeeks",
     );
+    var opts = options || {};
+    var requestedWeekIds = normalizeWeekIds(opts.weekIds);
+    var weekIdSet = requestedWeekIds.length ? new Set(requestedWeekIds) : null;
 
     var weeks = fetchSheetAsObjects(SPREADSHEET_ID, "Week").filter(
       function (w) {
         return w && String(w.seasonId) === seasonKey;
       },
     );
+    if (weekIdSet) {
+      weeks = weeks.filter(function (w) {
+        return w && weekIdSet.has(String(w.id));
+      });
+    }
     var weekStatusMap = buildWeekStatusMap(weeks);
 
     var matchups = fetchSheetAsObjects(SPREADSHEET_ID, "Matchup").filter(
       function (m) {
-        return m && String(m.seasonId) === seasonKey;
+        return (
+          m &&
+          String(m.seasonId) === seasonKey &&
+          (!weekIdSet || weekIdSet.has(String(m.weekId)))
+        );
       },
     );
 
@@ -393,14 +416,22 @@ var MatchupHandler = (function buildMatchupHandler() {
       TEAMSTATS_SPREADSHEET_ID,
       "TeamWeekStatLine",
     ).filter(function (tw) {
-      return tw && String(tw.seasonId) === seasonKey;
+      return (
+        tw &&
+        String(tw.seasonId) === seasonKey &&
+        (!weekIdSet || weekIdSet.has(String(tw.weekId)))
+      );
     });
 
     var playerWeeks = fetchSheetAsObjects(
       PLAYERSTATS_SPREADSHEET_ID,
       "PlayerWeekStatLine",
     ).filter(function (pw) {
-      return pw && String(pw.seasonId) === seasonKey;
+      return (
+        pw &&
+        String(pw.seasonId) === seasonKey &&
+        (!weekIdSet || weekIdSet.has(String(pw.weekId)))
+      );
     });
 
     var goalieStartsMap = buildGoalieStartsByTeamWeek(playerWeeks);
