@@ -52,7 +52,7 @@ export function FranchiseDraftPickSummary({
                         }
                       >
                         {selectedPlayer
-                          ? `${selectedPlayer.fullName}, ${selectedPlayer.nhlPos.toString()} (${formatDraftPickDescription(draftPick)}${originalTeamSuffix})`
+                          ? `${selectedPlayer.fullName}, ${selectedPlayer.nhlPos?.toString() ?? ""} (${formatDraftPickDescription(draftPick)}${originalTeamSuffix})`
                           : `${formatDraftPickDescription(draftPick)}${originalTeamSuffix}`}
                       </div>
                     );

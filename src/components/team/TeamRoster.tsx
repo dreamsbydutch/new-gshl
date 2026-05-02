@@ -70,7 +70,7 @@ const PlayerCard = ({
   return (
     <div className="col-span-2 grid grid-cols-2 px-2 text-center">
       <div className="col-span-3 text-sm">{player.fullName}</div>
-      <div className="text-2xs">{player.nhlPos.toString()}</div>
+      <div className="text-2xs">{player.nhlPos?.toString() ?? ""}</div>
       <div>
         {playerNhlTeam?.logoUrl ? (
           <Image
@@ -206,7 +206,7 @@ export const BenchPlayers = ({
           return (
             <div key={i} className="my-2 grid grid-cols-2 px-2 text-center">
               <div className="col-span-3 text-sm">{player?.fullName}</div>
-              <div className="text-2xs">{player?.nhlPos.toString()}</div>
+              <div className="text-2xs">{player?.nhlPos?.toString() ?? ""}</div>
               <div>
                 {playerNhlTeam?.logoUrl ? (
                   <Image

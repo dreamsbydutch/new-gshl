@@ -52,6 +52,8 @@ import type { BuyoutContractType } from "@gshl-hooks/main/useContract";
  * Shows current season and next 4 future seasons.
  */
 const TableHeader = ({ currentSeason }: TableHeaderProps) => {
+  if (!currentSeason) return null;
+  const seasonName = currentSeason.name ?? "";
   return (
     <thead>
       <tr>
@@ -65,19 +67,19 @@ const TableHeader = ({ currentSeason }: TableHeaderProps) => {
           Team
         </th>
         <th className="bg-gray-800 p-1 text-center text-2xs font-normal text-gray-200">
-          {currentSeason.name}
+          {seasonName}
         </th>
         <th className="bg-gray-800 p-1 text-center text-2xs font-normal text-gray-200">
-          {getSeasonDisplay(currentSeason.name, 1)}
+          {seasonName ? getSeasonDisplay(seasonName, 1) : ""}
         </th>
         <th className="bg-gray-800 p-1 text-center text-2xs font-normal text-gray-200">
-          {getSeasonDisplay(currentSeason.name, 2)}
+          {seasonName ? getSeasonDisplay(seasonName, 2) : ""}
         </th>
         <th className="bg-gray-800 p-1 text-center text-2xs font-normal text-gray-200">
-          {getSeasonDisplay(currentSeason.name, 3)}
+          {seasonName ? getSeasonDisplay(seasonName, 3) : ""}
         </th>
         <th className="bg-gray-800 p-1 text-center text-2xs font-normal text-gray-200">
-          {getSeasonDisplay(currentSeason.name, 4)}
+          {seasonName ? getSeasonDisplay(seasonName, 4) : ""}
         </th>
       </tr>
     </thead>
@@ -160,7 +162,7 @@ const PlayerContractRow = ({
         {player.fullName}
       </td>
       <td className="sticky left-[8rem] z-20 w-12 whitespace-nowrap border-b border-t border-gray-300 bg-gray-50 p-1 text-center text-xs">
-        {player.nhlPos.toString()}
+        {player.nhlPos?.toString() ?? ""}
       </td>
       <td className="sticky left-[11rem] z-20 w-8 whitespace-nowrap border-b border-t border-gray-300 bg-gray-50 p-1 text-center text-xs">
         {playerNhlTeam?.logoUrl ? (
@@ -258,7 +260,7 @@ export function TeamContractTable({
       </div>
       <div className="no-scrollbar mb-8 w-full overflow-x-auto overflow-y-hidden">
         <table className="mx-auto mt-2 min-w-max whitespace-nowrap">
-          <TableHeader currentSeason={currentSeason!} />
+          <TableHeader currentSeason={currentSeason} />
           <tbody>
             {/* Render each contract row (sorted by cap hit desc) */}
             {sortedContracts.map((contract, index) => (

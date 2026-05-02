@@ -53,7 +53,7 @@ export interface PlayerContractRowProps {
 
 /** Props for the dynamic header row. */
 export interface TableHeaderProps {
-  currentSeason: Season;
+  currentSeason: Season | undefined;
 }
 
 /** Props for the cap space summary row. */
