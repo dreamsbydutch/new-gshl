@@ -101,12 +101,8 @@ export const playerRouter = createTRPCRouter({
       const searchTerm = input.query.toLowerCase();
       return players.filter(
         (player) =>
-          player.firstName
-            ?.toLowerCase()
-            .includes(searchTerm) ||
-          player.lastName
-            ?.toLowerCase()
-            .includes(searchTerm),
+          player.firstName?.toLowerCase().includes(searchTerm) ||
+          player.lastName?.toLowerCase().includes(searchTerm),
       );
     }),
 

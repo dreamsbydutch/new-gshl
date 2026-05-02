@@ -13,7 +13,10 @@ const config: NextConfig = {
       { protocol: "https", hostname: "avatars.githubusercontent.com" },
     ], // replace with your image domain(s)
   },
-  webpack: (webpackConfig: { resolve?: { fallback?: Record<string, boolean> } }, { isServer }: { isServer: boolean }) => {
+  webpack: (
+    webpackConfig: { resolve?: { fallback?: Record<string, boolean> } },
+    { isServer }: { isServer: boolean },
+  ) => {
     if (!isServer) {
       // Exclude Node.js-only modules from client-side bundle
       webpackConfig.resolve = {
