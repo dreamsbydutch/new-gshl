@@ -9,6 +9,9 @@ const __dirname = dirname(__filename);
 const compat = new FlatCompat({ baseDirectory: __dirname });
 
 export default tseslint.config(
+  {
+    ignores: [".next/**", "node_modules/**", "apps-script/**"],
+  },
   ...compat.extends("next/core-web-vitals"),
   ...tseslint.configs.recommendedTypeChecked,
   ...tseslint.configs.stylisticTypeChecked,
