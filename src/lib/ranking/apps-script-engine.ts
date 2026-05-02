@@ -16,7 +16,10 @@ export type RankingEngineSheetName =
 export type RankingEngineRow = DatabaseRecord;
 
 type RankingEngineApi = {
-  rankRows: (rows: RankingEngineRow[], options?: Record<string, unknown>) => RankingEngineRow[];
+  rankRows: (
+    rows: RankingEngineRow[],
+    options?: Record<string, unknown>,
+  ) => RankingEngineRow[];
   rankPerformance: (
     row: RankingEngineRow,
     options?: Record<string, unknown>,
@@ -33,7 +36,10 @@ const APPS_SCRIPT_ENGINE_FILES = [
   path.resolve("apps-script/features/RankingEngine/index.js"),
 ] as const;
 
-const RANKING_ENGINE_SHEET_NAME_ALIASES: Record<string, RankingEngineSheetName> = {
+const RANKING_ENGINE_SHEET_NAME_ALIASES: Record<
+  string,
+  RankingEngineSheetName
+> = {
   PlayerDay: "PlayerDayStatLine",
   PlayerDayStatLine: "PlayerDayStatLine",
   PlayerWeek: "PlayerWeekStatLine",
@@ -88,7 +94,9 @@ async function readRankingEngineSources(): Promise<readonly string[]> {
 }
 
 async function loadSeasonRows(): Promise<RankingEngineRow[]> {
-  const { fastSheetsReader } = await import("@gshl-lib/sheets/reader/fast-reader");
+  const { fastSheetsReader } = await import(
+    "@gshl-lib/sheets/reader/fast-reader"
+  );
   return fastSheetsReader.fetchModel<RankingEngineRow>("Season");
 }
 
@@ -137,7 +145,9 @@ async function loadRankingEngine(): Promise<RankingEngineApi> {
 
   const engine = context.RankingEngine;
   if (!engine || typeof engine.rankRows !== "function") {
-    throw new Error("[rating-engine] Failed to load Apps Script ranking engine.");
+    throw new Error(
+      "[rating-engine] Failed to load Apps Script ranking engine.",
+    );
   }
 
   return engine;
@@ -159,7 +169,8 @@ export async function rankRowsWithAppsScriptEngine(
 ): Promise<RankingEngineRow[]> {
   const engine = await getRankingEngine();
   const sheetName = normalizeRankingEngineSheetName(options.sheetName);
-  const outputField = options.outputField ?? getDefaultRatingOutputField(sheetName);
+  const outputField =
+    options.outputField ?? getDefaultRatingOutputField(sheetName);
 
   return engine.rankRows(rows, {
     sheetName,

@@ -38,15 +38,18 @@ function isBrowserWithIndexedDb() {
 function requestToPromise<T>(request: IDBRequest): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     request.onsuccess = () => resolve(request.result as T);
-    request.onerror = () => reject(request.error ?? new Error("IndexedDB request failed"));
+    request.onerror = () =>
+      reject(request.error ?? new Error("IndexedDB request failed"));
   });
 }
 
 function transactionDone(transaction: IDBTransaction): Promise<void> {
   return new Promise<void>((resolve, reject) => {
     transaction.oncomplete = () => resolve();
-    transaction.onerror = () => reject(transaction.error ?? new Error("IndexedDB transaction failed"));
-    transaction.onabort = () => reject(transaction.error ?? new Error("IndexedDB transaction aborted"));
+    transaction.onerror = () =>
+      reject(transaction.error ?? new Error("IndexedDB transaction failed"));
+    transaction.onabort = () =>
+      reject(transaction.error ?? new Error("IndexedDB transaction aborted"));
   });
 }
 
@@ -113,17 +116,32 @@ class IndexedDbReferenceStore {
       "readwrite",
     );
 
-    this.replaceStoreContents(transaction.objectStore(SEASONS_STORE), snapshot.seasons);
-    this.replaceStoreContents(transaction.objectStore(WEEKS_STORE), snapshot.weeks);
-    this.replaceStoreContents(transaction.objectStore(TEAMS_STORE), snapshot.teams);
+    this.replaceStoreContents(
+      transaction.objectStore(SEASONS_STORE),
+      snapshot.seasons,
+    );
+    this.replaceStoreContents(
+      transaction.objectStore(WEEKS_STORE),
+      snapshot.weeks,
+    );
+    this.replaceStoreContents(
+      transaction.objectStore(TEAMS_STORE),
+      snapshot.teams,
+    );
     this.replaceStoreContents(
       transaction.objectStore(FRANCHISES_STORE),
       snapshot.franchises,
     );
 
     const metaStore = transaction.objectStore(META_STORE);
-    metaStore.put({ key: LAST_UPDATED_KEY, value: Date.now() } satisfies MetaRecord);
-    metaStore.put({ key: CACHE_VERSION_KEY, value: CACHE_VERSION } satisfies MetaRecord);
+    metaStore.put({
+      key: LAST_UPDATED_KEY,
+      value: Date.now(),
+    } satisfies MetaRecord);
+    metaStore.put({
+      key: CACHE_VERSION_KEY,
+      value: CACHE_VERSION,
+    } satisfies MetaRecord);
 
     await transactionDone(transaction);
   }
@@ -188,7 +206,9 @@ class IndexedDbReferenceStore {
     return this.getAllFromStore<Franchise>(FRANCHISES_STORE);
   }
 
-  private async getAllFromStore<T>(storeName: ReferenceStoreName): Promise<T[]> {
+  private async getAllFromStore<T>(
+    storeName: ReferenceStoreName,
+  ): Promise<T[]> {
     const db = await this.getDb();
     if (!db) return [];
 
@@ -215,13 +235,22 @@ class IndexedDbReferenceStore {
     }
 
     const metaStore = transaction.objectStore(META_STORE);
-    metaStore.put({ key: LAST_UPDATED_KEY, value: Date.now() } satisfies MetaRecord);
-    metaStore.put({ key: CACHE_VERSION_KEY, value: CACHE_VERSION } satisfies MetaRecord);
+    metaStore.put({
+      key: LAST_UPDATED_KEY,
+      value: Date.now(),
+    } satisfies MetaRecord);
+    metaStore.put({
+      key: CACHE_VERSION_KEY,
+      value: CACHE_VERSION,
+    } satisfies MetaRecord);
 
     await transactionDone(transaction);
   }
 
-  private replaceStoreContents(store: IDBObjectStore, records: Array<{ id: string }>) {
+  private replaceStoreContents(
+    store: IDBObjectStore,
+    records: Array<{ id: string }>,
+  ) {
     store.clear();
     for (const record of records) {
       store.put(record);
@@ -234,36 +263,37 @@ class IndexedDbReferenceStore {
     }
 
     this.dbPromise ??= new Promise<IDBDatabase>((resolve, reject) => {
-        const request = indexedDB.open(DATABASE_NAME, DATABASE_VERSION);
+      const request = indexedDB.open(DATABASE_NAME, DATABASE_VERSION);
 
-        request.onupgradeneeded = () => {
-          const db = request.result;
+      request.onupgradeneeded = () => {
+        const db = request.result;
 
-          if (!db.objectStoreNames.contains(META_STORE)) {
-            db.createObjectStore(META_STORE, { keyPath: "key" });
-          }
-          if (!db.objectStoreNames.contains(SEASONS_STORE)) {
-            db.createObjectStore(SEASONS_STORE, { keyPath: "id" });
-          }
-          if (!db.objectStoreNames.contains(WEEKS_STORE)) {
-            db.createObjectStore(WEEKS_STORE, { keyPath: "id" });
-          }
-          if (!db.objectStoreNames.contains(TEAMS_STORE)) {
-            db.createObjectStore(TEAMS_STORE, { keyPath: "id" });
-          }
-          if (!db.objectStoreNames.contains(FRANCHISES_STORE)) {
-            db.createObjectStore(FRANCHISES_STORE, { keyPath: "id" });
-          }
-        };
-
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = () => reject(request.error ?? new Error("Failed to open IndexedDB"));
-      }).catch((error) => {
-        if (process.env.NODE_ENV !== "production") {
-          console.error("Failed to initialize reference store", error);
+        if (!db.objectStoreNames.contains(META_STORE)) {
+          db.createObjectStore(META_STORE, { keyPath: "key" });
         }
-        return null;
-      });
+        if (!db.objectStoreNames.contains(SEASONS_STORE)) {
+          db.createObjectStore(SEASONS_STORE, { keyPath: "id" });
+        }
+        if (!db.objectStoreNames.contains(WEEKS_STORE)) {
+          db.createObjectStore(WEEKS_STORE, { keyPath: "id" });
+        }
+        if (!db.objectStoreNames.contains(TEAMS_STORE)) {
+          db.createObjectStore(TEAMS_STORE, { keyPath: "id" });
+        }
+        if (!db.objectStoreNames.contains(FRANCHISES_STORE)) {
+          db.createObjectStore(FRANCHISES_STORE, { keyPath: "id" });
+        }
+      };
+
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () =>
+        reject(request.error ?? new Error("Failed to open IndexedDB"));
+    }).catch((error) => {
+      if (process.env.NODE_ENV !== "production") {
+        console.error("Failed to initialize reference store", error);
+      }
+      return null;
+    });
 
     return this.dbPromise;
   }

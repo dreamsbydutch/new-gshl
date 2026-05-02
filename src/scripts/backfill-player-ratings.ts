@@ -118,7 +118,9 @@ async function executeModel(
     for (const row of prepared.targetRows) {
       const nextValue = row.record[prepared.outputField];
       row.sheetValues[outputColumnIndex] =
-        nextValue === undefined || nextValue === null ? "" : (nextValue as PrimitiveCellValue);
+        nextValue === undefined || nextValue === null
+          ? ""
+          : (nextValue as PrimitiveCellValue);
       updates.set(row.rowNumber, row.sheetValues);
     }
     await clientModule.optimizedSheetsClient.updateRowsByIds(
@@ -143,7 +145,8 @@ async function main(): Promise<void> {
   const options = parseOptions(process.argv.slice(2));
 
   process.env.USE_GOOGLE_SHEETS ??= "true";
-  process.env.GOOGLE_SERVICE_ACCOUNT_KEY_FILE ??= path.resolve("credentials.json");
+  process.env.GOOGLE_SERVICE_ACCOUNT_KEY_FILE ??=
+    path.resolve("credentials.json");
 
   log(
     options,
@@ -160,8 +163,14 @@ async function main(): Promise<void> {
     );
   }
 
-  const matchedRows = summaries.reduce((sum, summary) => sum + summary.matchedRows, 0);
-  const updatedRows = summaries.reduce((sum, summary) => sum + summary.updatedRows, 0);
+  const matchedRows = summaries.reduce(
+    (sum, summary) => sum + summary.matchedRows,
+    0,
+  );
+  const updatedRows = summaries.reduce(
+    (sum, summary) => sum + summary.updatedRows,
+    0,
+  );
   console.log(
     JSON.stringify(
       {
@@ -181,7 +190,8 @@ async function main(): Promise<void> {
 }
 
 void main().catch((error: unknown) => {
-  const message = error instanceof Error ? error.stack ?? error.message : String(error);
+  const message =
+    error instanceof Error ? (error.stack ?? error.message) : String(error);
   console.error(message);
   process.exitCode = 1;
 });

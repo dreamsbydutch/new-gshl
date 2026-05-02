@@ -210,7 +210,9 @@ export function useSeasons(options: UseSeasonsOptions = {}) {
   const seasons = useMemo(() => {
     if (hasCachedSeasons && cachedSeasons) {
       const filtered = normalizedSeasonId
-        ? cachedSeasons.filter((season) => String(season.id) === normalizedSeasonId)
+        ? cachedSeasons.filter(
+            (season) => String(season.id) === normalizedSeasonId,
+          )
         : year !== undefined
           ? cachedSeasons.filter((season) => season.year === year)
           : cachedSeasons;

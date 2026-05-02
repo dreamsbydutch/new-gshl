@@ -17,7 +17,9 @@ var RatingParityHarness = (function RatingParityHarnessModule() {
           ? seasonId.trim()
           : String(seasonId);
     if (!seasonKey) {
-      throw new Error((caller || "RatingParityHarness") + " requires a seasonId");
+      throw new Error(
+        (caller || "RatingParityHarness") + " requires a seasonId",
+      );
     }
     return seasonKey;
   }
@@ -86,13 +88,20 @@ var RatingParityHarness = (function RatingParityHarnessModule() {
   function getOutputField(sheetName, options) {
     var opts = options || {};
     if (opts.outputField) return String(opts.outputField);
-    return normalizeSheetName(sheetName) === "PlayerNHL" ? "seasonRating" : "Rating";
+    return normalizeSheetName(sheetName) === "PlayerNHL"
+      ? "seasonRating"
+      : "Rating";
   }
 
   function resolveExistingOutputField(sheetName, rows, requestedField) {
     var normalizedSheetName = normalizeSheetName(sheetName);
     var desired = requestedField || getOutputField(normalizedSheetName, {});
-    var sampleRow = rows && rows.length ? rows.find(function (row) { return !!row; }) : null;
+    var sampleRow =
+      rows && rows.length
+        ? rows.find(function (row) {
+            return !!row;
+          })
+        : null;
     if (!sampleRow) return desired;
 
     if (Object.prototype.hasOwnProperty.call(sampleRow, desired)) {
@@ -144,7 +153,9 @@ var RatingParityHarness = (function RatingParityHarnessModule() {
 
       weeks.forEach(function (w) {
         var wn =
-          w && w.weekNum !== undefined && w.weekNum !== null ? String(w.weekNum) : "";
+          w && w.weekNum !== undefined && w.weekNum !== null
+            ? String(w.weekNum)
+            : "";
         if (!wn || !weekNumSet.has(wn)) return;
         if (w && w.id !== undefined && w.id !== null && w.id !== "") {
           allow2.add(String(w.id));
@@ -158,9 +169,16 @@ var RatingParityHarness = (function RatingParityHarnessModule() {
   }
 
   ns.runSample = function runSample(request) {
-    var seasonKey = requireSeasonId(request && request.seasonId, "runRatingParitySample");
+    var seasonKey = requireSeasonId(
+      request && request.seasonId,
+      "runRatingParitySample",
+    );
     var normalizedSheetName = normalizeSheetName(request && request.sheetName);
-    var workbookId = resolveWorkbookIdForSheet(normalizedSheetName, seasonKey, request || {});
+    var workbookId = resolveWorkbookIdForSheet(
+      normalizedSheetName,
+      seasonKey,
+      request || {},
+    );
 
     if (!workbookId) {
       throw new Error(
@@ -184,12 +202,18 @@ var RatingParityHarness = (function RatingParityHarnessModule() {
     }).filter(function (row) {
       if (!row) return false;
       if (String(row.seasonId || "") !== seasonKey) return false;
-      if (request && request.seasonType && String(row.seasonType || "") !== String(request.seasonType)) {
+      if (
+        request &&
+        request.seasonType &&
+        String(row.seasonType || "") !== String(request.seasonType)
+      ) {
         return false;
       }
       if (weekIdAllowList) {
         var wk =
-          row && row.weekId !== undefined && row.weekId !== null ? String(row.weekId) : "";
+          row && row.weekId !== undefined && row.weekId !== null
+            ? String(row.weekId)
+            : "";
         if (!wk || !weekIdAllowList.has(wk)) return false;
       }
       return true;

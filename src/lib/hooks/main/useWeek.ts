@@ -4,10 +4,7 @@ import { clientApi as api } from "@gshl-trpc";
 import { referenceStore } from "@gshl-cache";
 import { useReferenceSnapshotRefresh } from "./useReferenceSnapshotRefresh";
 
-function orderWeeks(
-  weeks: Week[],
-  orderBy: Record<string, "asc" | "desc">,
-) {
+function orderWeeks(weeks: Week[], orderBy: Record<string, "asc" | "desc">) {
   const [field, direction] = Object.entries(orderBy)[0] ?? ["startDate", "asc"];
   return [...weeks].sort((left, right) => {
     const leftValue = left[field as keyof Week];
@@ -201,7 +198,10 @@ export function useWeeks(options: UseWeeksOptions = {}) {
         if (normalizedWeekId && !timeMode) {
           return week.id === normalizedWeekId;
         }
-        if (effectiveSeasonId && String(week.seasonId) !== String(effectiveSeasonId)) {
+        if (
+          effectiveSeasonId &&
+          String(week.seasonId) !== String(effectiveSeasonId)
+        ) {
           return false;
         }
         if (isPlayoffs !== undefined && week.isPlayoffs !== isPlayoffs) {
@@ -255,8 +255,7 @@ export function useWeeks(options: UseWeeksOptions = {}) {
       if (timeMode === "current") {
         const currentWeek = weeks.find(
           (week) =>
-            new Date(week.startDate) <= now &&
-            new Date(week.endDate) >= now,
+            new Date(week.startDate) <= now && new Date(week.endDate) >= now,
         );
         filteredWeeks = currentWeek ? [currentWeek] : [];
       } else if (timeMode === "previous") {
@@ -264,17 +263,19 @@ export function useWeeks(options: UseWeeksOptions = {}) {
         const previousWeek = weeks
           .filter((week) => new Date(week.endDate) < now)
           .sort((a, b) => {
-            return new Date(b.endDate).getTime() - new Date(a.endDate).getTime();
+            return (
+              new Date(b.endDate).getTime() - new Date(a.endDate).getTime()
+            );
           })[0];
         filteredWeeks = previousWeek ? [previousWeek] : [];
       } else if (timeMode === "next") {
         // Find next upcoming week
         const nextWeek = weeks
-          .filter(
-            (week) => new Date(week.startDate) > now,
-          )
+          .filter((week) => new Date(week.startDate) > now)
           .sort((a, b) => {
-            return new Date(a.startDate).getTime() - new Date(b.startDate).getTime();
+            return (
+              new Date(a.startDate).getTime() - new Date(b.startDate).getTime()
+            );
           })[0];
         filteredWeeks = nextWeek ? [nextWeek] : [];
       }

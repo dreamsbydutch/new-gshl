@@ -35,7 +35,9 @@ export async function runAppsScriptFunction<T>(
   };
 
   if (!response.ok || body.error) {
-    const detailMessage = body.error?.details?.find((detail) => detail.errorMessage)?.errorMessage;
+    const detailMessage = body.error?.details?.find(
+      (detail) => detail.errorMessage,
+    )?.errorMessage;
     throw new Error(
       detailMessage ??
         body.error?.message ??
@@ -44,7 +46,9 @@ export async function runAppsScriptFunction<T>(
   }
 
   if (!body.response) {
-    throw new Error("[apps-script-execution] Apps Script returned no response payload.");
+    throw new Error(
+      "[apps-script-execution] Apps Script returned no response payload.",
+    );
   }
 
   return body.response.result as T;

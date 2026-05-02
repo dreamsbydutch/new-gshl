@@ -103,19 +103,20 @@ function hashString(value: string): number {
   return hash >>> 0;
 }
 
-function stableSortRows(rows: LoadedPlayerRatingRow[], seed: string): LoadedPlayerRatingRow[] {
-  return rows
-    .slice()
-    .sort((left, right) => {
-      const leftKey = `${seed}|${toTrimmedString(left.record.id)}`;
-      const rightKey = `${seed}|${toTrimmedString(right.record.id)}`;
-      const leftHash = hashString(leftKey);
-      const rightHash = hashString(rightKey);
-      if (leftHash !== rightHash) {
-        return leftHash - rightHash;
-      }
-      return leftKey.localeCompare(rightKey);
-    });
+function stableSortRows(
+  rows: LoadedPlayerRatingRow[],
+  seed: string,
+): LoadedPlayerRatingRow[] {
+  return rows.slice().sort((left, right) => {
+    const leftKey = `${seed}|${toTrimmedString(left.record.id)}`;
+    const rightKey = `${seed}|${toTrimmedString(right.record.id)}`;
+    const leftHash = hashString(leftKey);
+    const rightHash = hashString(rightKey);
+    if (leftHash !== rightHash) {
+      return leftHash - rightHash;
+    }
+    return leftKey.localeCompare(rightKey);
+  });
 }
 
 function sampleRows(
@@ -141,8 +142,14 @@ function sampleRows(
   let remainingGroups = groupKeys.length;
 
   for (const groupKey of groupKeys) {
-    const groupRows = stableSortRows(groups.get(groupKey) ?? [], `${seed}|${groupKey}`);
-    const targetCount = Math.min(groupRows.length, Math.ceil(remaining / remainingGroups));
+    const groupRows = stableSortRows(
+      groups.get(groupKey) ?? [],
+      `${seed}|${groupKey}`,
+    );
+    const targetCount = Math.min(
+      groupRows.length,
+      Math.ceil(remaining / remainingGroups),
+    );
     for (const row of groupRows.slice(0, targetCount)) {
       const rowId = toTrimmedString(row.record.id);
       if (!rowId) continue;
@@ -236,8 +243,14 @@ async function runModelParity(
     modelName,
   );
 
-  const sample = sampleRows(prepared.targetRows, options.sampleSize, `${options.seed}|${modelName}`);
-  const sampleIds = sample.map((row) => toTrimmedString(row.record.id)).filter(Boolean);
+  const sample = sampleRows(
+    prepared.targetRows,
+    options.sampleSize,
+    `${options.seed}|${modelName}`,
+  );
+  const sampleIds = sample
+    .map((row) => toTrimmedString(row.record.id))
+    .filter(Boolean);
   const localRows = prepared.targetRows.map((row) => ({ ...row.record }));
 
   await rankRowsWithAppsScriptEngine(localRows, {
@@ -253,24 +266,29 @@ async function runModelParity(
     localById.set(rowId, row);
   }
 
-  const appsScriptResult = await runAppsScriptFunction<AppsScriptParityResponse>(
-    "runRatingParitySample",
-    {
-      seasonId: options.seasonId,
-      sheetName: prepared.rankingSheetName,
-      sampleIds,
-      seasonType: options.seasonType,
-      weekIds: options.weekIds,
-      weekNums: options.weekNums,
-    },
-  );
+  const appsScriptResult =
+    await runAppsScriptFunction<AppsScriptParityResponse>(
+      "runRatingParitySample",
+      {
+        seasonId: options.seasonId,
+        sheetName: prepared.rankingSheetName,
+        sampleIds,
+        seasonType: options.seasonType,
+        weekIds: options.weekIds,
+        weekNums: options.weekNums,
+      },
+    );
 
   const mismatches: ParityRowResult[] = [];
   let matchedRows = 0;
   for (const remoteRow of appsScriptResult.sampleResults) {
     const localRow = localById.get(remoteRow.id);
     const localScore = localRow?.[prepared.outputField] ?? "";
-    const comparison = compareScores(localScore, remoteRow.score, options.maxDelta);
+    const comparison = compareScores(
+      localScore,
+      remoteRow.score,
+      options.maxDelta,
+    );
     if (comparison.matches) {
       matchedRows += 1;
       continue;
@@ -305,7 +323,8 @@ async function main(): Promise<void> {
   const options = parseOptions(process.argv.slice(2));
 
   process.env.USE_GOOGLE_SHEETS ??= "true";
-  process.env.GOOGLE_SERVICE_ACCOUNT_KEY_FILE ??= path.resolve("credentials.json");
+  process.env.GOOGLE_SERVICE_ACCOUNT_KEY_FILE ??=
+    path.resolve("credentials.json");
 
   log(
     options,
@@ -351,7 +370,8 @@ async function main(): Promise<void> {
 }
 
 void main().catch((error: unknown) => {
-  const message = error instanceof Error ? error.stack ?? error.message : String(error);
+  const message =
+    error instanceof Error ? (error.stack ?? error.message) : String(error);
   console.error(message);
   process.exitCode = 1;
 });

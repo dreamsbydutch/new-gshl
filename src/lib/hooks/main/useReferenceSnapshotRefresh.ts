@@ -119,7 +119,10 @@ export function useReferenceSnapshotRefresh(enabled: boolean) {
     let isMounted = true;
 
     void referenceStore.getSnapshot().then((snapshot) => {
-      if (!isMounted || hasFreshReferenceSnapshot(snapshot?.updatedAt ?? null)) {
+      if (
+        !isMounted ||
+        hasFreshReferenceSnapshot(snapshot?.updatedAt ?? null)
+      ) {
         return;
       }
 

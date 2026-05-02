@@ -43,15 +43,19 @@ export type PreparedPlayerRatingModel = {
   targetRows: LoadedPlayerRatingRow[];
 };
 
-export const ALL_SUPPORTED_PLAYER_RATING_MODELS: SupportedPlayerRatingModelName[] = [
-  "PlayerDayStatLine",
-  "PlayerWeekStatLine",
-  "PlayerSplitStatLine",
-  "PlayerTotalStatLine",
-  "PlayerNHLStatLine",
-];
+export const ALL_SUPPORTED_PLAYER_RATING_MODELS: SupportedPlayerRatingModelName[] =
+  [
+    "PlayerDayStatLine",
+    "PlayerWeekStatLine",
+    "PlayerSplitStatLine",
+    "PlayerTotalStatLine",
+    "PlayerNHLStatLine",
+  ];
 
-const MODEL_NAME_ALIASES: Record<string, SupportedPlayerRatingModelName | "all"> = {
+const MODEL_NAME_ALIASES: Record<
+  string,
+  SupportedPlayerRatingModelName | "all"
+> = {
   all: "all",
   playerday: "PlayerDayStatLine",
   playerdaystatline: "PlayerDayStatLine",
@@ -65,7 +69,10 @@ const MODEL_NAME_ALIASES: Record<string, SupportedPlayerRatingModelName | "all">
   playernhlstatline: "PlayerNHLStatLine",
 };
 
-export function getArgValue(args: string[], flagName: string): string | undefined {
+export function getArgValue(
+  args: string[],
+  flagName: string,
+): string | undefined {
   const exactIndex = args.findIndex((arg) => arg === flagName);
   if (exactIndex >= 0) {
     return args[exactIndex + 1];
@@ -141,13 +148,18 @@ export function parseSupportedPlayerRatingModels(
 
   const resolved = requested.flatMap((modelName) => {
     const normalized = normalizeModelName(modelName);
-    return normalized === "all" ? ALL_SUPPORTED_PLAYER_RATING_MODELS : [normalized];
+    return normalized === "all"
+      ? ALL_SUPPORTED_PLAYER_RATING_MODELS
+      : [normalized];
   });
 
   return Array.from(new Set(resolved));
 }
 
-function padRow(values: PrimitiveCellValue[], length: number): PrimitiveCellValue[] {
+function padRow(
+  values: PrimitiveCellValue[],
+  length: number,
+): PrimitiveCellValue[] {
   const next = values.slice(0, length);
   while (next.length < length) {
     next.push("");
@@ -209,7 +221,9 @@ function matchesWeekIdFilter(
 }
 
 function isWeekScopedModel(modelName: SupportedPlayerRatingModelName): boolean {
-  return modelName === "PlayerDayStatLine" || modelName === "PlayerWeekStatLine";
+  return (
+    modelName === "PlayerDayStatLine" || modelName === "PlayerWeekStatLine"
+  );
 }
 
 async function buildWeekIdAllowList(
@@ -223,14 +237,17 @@ async function buildWeekIdAllowList(
     return null;
   }
 
-  const { fastSheetsReader } = await import("@gshl-lib/sheets/reader/fast-reader");
+  const { fastSheetsReader } = await import(
+    "@gshl-lib/sheets/reader/fast-reader"
+  );
   const weeks = await fastSheetsReader.fetchModel<DatabaseRecord>("Week");
   const allowList = new Set<string>();
   for (const week of weeks) {
     if (toTrimmedString(week.seasonId) !== options.seasonId) continue;
     const weekNum = toTrimmedString(week.weekNum);
     const weekId = toTrimmedString(week.id);
-    if (!weekNum || !weekId || !(options.weekNums ?? []).includes(weekNum)) continue;
+    if (!weekNum || !weekId || !(options.weekNums ?? []).includes(weekNum))
+      continue;
     allowList.add(weekId);
   }
 
@@ -275,7 +292,9 @@ async function loadWritableRows(
         `${sheetName}!A1:ZZ`,
       );
 
-      const headers = (rawRows[0] ?? []).map((value) => String(value ?? "").trim());
+      const headers = (rawRows[0] ?? []).map((value) =>
+        String(value ?? "").trim(),
+      );
       if (!headers.length) {
         return { sheetName, headers: [], rows: [] };
       }
@@ -296,7 +315,9 @@ async function loadWritableRows(
         );
         const alignedValues = columns.map((column) => {
           const headerPosition = headerIndex.get(column);
-          return headerPosition === undefined ? null : paddedSheetValues[headerPosition] ?? null;
+          return headerPosition === undefined
+            ? null
+            : (paddedSheetValues[headerPosition] ?? null);
         });
 
         const record = configModule.convertRowToModel<DatabaseRecord>(
@@ -327,7 +348,10 @@ export async function preparePlayerRatingModelRows(
   modelName: SupportedPlayerRatingModelName,
 ): Promise<PreparedPlayerRatingModel> {
   const configModule = await import("@gshl-lib/sheets/config/config");
-  const spreadsheetId = await resolveSpreadsheetId(modelName, selection.seasonId);
+  const spreadsheetId = await resolveSpreadsheetId(
+    modelName,
+    selection.seasonId,
+  );
   const loaded = await loadWritableRows(
     spreadsheetId,
     getSheetCandidates(configModule.SHEETS_CONFIG, modelName),
@@ -342,8 +366,12 @@ export async function preparePlayerRatingModelRows(
 
   const targetRows = loaded.rows.filter(({ record }) => {
     if (toTrimmedString(record.seasonId) !== selection.seasonId) return false;
-    if (!matchesSeasonTypeFilter(record, selection.seasonType ?? "")) return false;
-    if (isWeekScopedModel(modelName) && !matchesWeekIdFilter(record, weekIdAllowList)) {
+    if (!matchesSeasonTypeFilter(record, selection.seasonType ?? ""))
+      return false;
+    if (
+      isWeekScopedModel(modelName) &&
+      !matchesWeekIdFilter(record, weekIdAllowList)
+    ) {
       return false;
     }
     return true;
