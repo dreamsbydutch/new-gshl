@@ -1,5 +1,5 @@
 import { optimizedSheetsClient } from "../client/optimized-client";
-import { MODEL_TO_WORKBOOK, SHEETS_CONFIG, WORKBOOKS } from "../config/config";
+import { getSpreadsheetIdsForModel, SHEETS_CONFIG } from "../config/config";
 import { fastSheetsReader } from "../reader/fast-reader";
 
 type PrimitiveCellValue = string | number | boolean | null;
@@ -43,15 +43,9 @@ async function findRowNumberById(
   rowNumber: number;
 } | null> {
   const sheetName = SHEETS_CONFIG.SHEETS[modelName];
-  const workbookKey = MODEL_TO_WORKBOOK[modelName];
-  if (!workbookKey) {
-    throw new Error(`No workbook mapping for model: ${String(modelName)}`);
-  }
-
-  const spreadsheetId = WORKBOOKS[workbookKey];
   const columns = SHEETS_CONFIG.COLUMNS[modelName];
 
-  if (!sheetName || !spreadsheetId || !columns) {
+  if (!sheetName || !columns) {
     throw new Error(`Unknown or unconfigured model: ${String(modelName)}`);
   }
 
@@ -62,16 +56,19 @@ async function findRowNumberById(
 
   const idColLetter = columnToLetter(idColumnIndex + 1);
   const idColumnRange = `${sheetName}!${idColLetter}2:${idColLetter}`;
-  const idValues = await optimizedSheetsClient.getValues(
-    spreadsheetId,
-    idColumnRange,
-  );
 
-  for (let i = 0; i < idValues.length; i++) {
-    const cell = idValues[i]?.[0];
-    if (cell === undefined || cell === null) continue;
-    if (String(cell).trim() === String(id).trim()) {
-      return { spreadsheetId, sheetName, rowNumber: i + 2 };
+  for (const spreadsheetId of getSpreadsheetIdsForModel(String(modelName))) {
+    const idValues = await optimizedSheetsClient.getValues(
+      spreadsheetId,
+      idColumnRange,
+    );
+
+    for (let i = 0; i < idValues.length; i++) {
+      const cell = idValues[i]?.[0];
+      if (cell === undefined || cell === null) continue;
+      if (String(cell).trim() === String(id).trim()) {
+        return { spreadsheetId, sheetName, rowNumber: i + 2 };
+      }
     }
   }
 

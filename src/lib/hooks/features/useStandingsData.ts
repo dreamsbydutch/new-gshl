@@ -76,9 +76,6 @@ export function useStandingsData(options: UseStandingsDataOptions) {
   } = useTeams({
     seasonId: selectedSeasonId,
     enabled: Boolean(selectedSeasonId),
-    // Teams rarely change, but ensure persisted cache doesn't pin data forever.
-    refetchOnWindowFocus: true,
-    refetchOnMount: true,
   });
 
   const {
@@ -89,8 +86,6 @@ export function useStandingsData(options: UseStandingsDataOptions) {
     seasonId: selectedSeasonId,
     statsLevel: "season",
     enabled: Boolean(selectedSeasonId),
-    // Standings must reflect DB updates; allow focus/mount refetch while keeping hour-level staleTime.
-    refetchOnMount: true,
     refetchOnWindowFocus: true,
   });
 

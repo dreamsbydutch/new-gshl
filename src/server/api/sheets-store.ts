@@ -93,11 +93,28 @@ function applyPagination<T>(rows: T[], skip?: number, take?: number): T[] {
   return rows.slice(start, start + take);
 }
 
+async function fetchRowsForQuery<T>(
+  model: SheetsModelName,
+  input: BaseQueryInput,
+): Promise<T[]> {
+  const seasonId = input.where?.seasonId;
+  if (
+    model === "PlayerDayStatLine" &&
+    (typeof seasonId === "string" || typeof seasonId === "number")
+  ) {
+    return (await fastSheetsReader.fetchPlayerDaySeason(
+      seasonId,
+    )) as unknown as T[];
+  }
+
+  return (await fastSheetsReader.fetchModel(model)) as unknown as T[];
+}
+
 export async function getMany<T>(
   model: SheetsModelName,
   input: BaseQueryInput = {},
 ): Promise<T[]> {
-  const all = (await fastSheetsReader.fetchModel(model)) as unknown as T[];
+  const all = await fetchRowsForQuery<T>(model, input);
   const filtered = applyWhere(all, input.where);
   const ordered = applyOrderBy(filtered, input.orderBy);
   return applyPagination(ordered, input.skip, input.take);
@@ -122,9 +139,6 @@ export async function getCount(
   model: SheetsModelName,
   input: Pick<BaseQueryInput, "where"> = {},
 ): Promise<number> {
-  const all = (await fastSheetsReader.fetchModel(model)) as unknown as Record<
-    string,
-    unknown
-  >[];
+  const all = await fetchRowsForQuery<Record<string, unknown>>(model, input);
   return applyWhere(all, input.where).length;
 }

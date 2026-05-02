@@ -38,7 +38,7 @@ export const DATA_TYPES = {
   MANUAL: ["archivedStats"] as const,
 } as const;
 
-export const CACHE_VERSION = "1.0.0";
+export const CACHE_VERSION = "1.1.0";
 
 export const STORAGE_KEYS = {
   CACHE_VERSION: "gshl_cache_version",

@@ -271,6 +271,7 @@ export interface TeamRosterProps {
   players: Player[] | undefined;
   contracts: Contract[];
   currentTeam: GSHLTeam;
+  showSalaries?: boolean;
 }
 
 export interface PlayerCardProps {

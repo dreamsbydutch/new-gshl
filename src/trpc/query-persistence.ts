@@ -11,7 +11,7 @@ import SuperJSON from "superjson";
 import { CACHE_DURATIONS, CACHE_VERSION } from "@gshl-cache";
 
 const STORAGE_KEY = `gshl-query-cache::${CACHE_VERSION}`;
-const PERSIST_MAX_AGE = CACHE_DURATIONS.DYNAMIC;
+const PERSIST_MAX_AGE = CACHE_DURATIONS.STATIC;
 
 function createLocalStoragePersister(): Persister | undefined {
   if (typeof window === "undefined") {

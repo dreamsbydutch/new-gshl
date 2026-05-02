@@ -468,19 +468,24 @@ export class OptimizedSheetsClient {
     sheetName: string,
     updates: Map<number, CellValue[]>,
   ): Promise<void> {
-    const operations: BatchOperation[] = [];
+    const data = Array.from(updates.entries()).map(([id, values]) => ({
+      range: `${sheetName}!A${id + 1}:${this.getColumnLetter(values.length)}${id + 1}`,
+      values: [values],
+    }));
 
-    updates.forEach((values, id) => {
-      const range = `${sheetName}!A${id + 1}:${this.getColumnLetter(values.length)}${id + 1}`;
-      operations.push({
-        type: "update",
-        range,
-        values: [values],
-        spreadsheetId,
+    const batches = this.chunkArray(data, this.BATCH_SIZE);
+
+    for (const batch of batches) {
+      await this.withRateLimit(async () => {
+        await this.sheets.spreadsheets.values.batchUpdate({
+          spreadsheetId,
+          requestBody: {
+            valueInputOption: "RAW",
+            data: batch,
+          },
+        });
       });
-    });
-
-    await this.batchUpdate(operations);
+    }
   }
 
   // Efficient append with batch processing

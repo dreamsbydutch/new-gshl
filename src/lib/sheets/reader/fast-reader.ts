@@ -1,8 +1,8 @@
 import { optimizedSheetsClient } from "../client/optimized-client";
 import {
   SHEETS_CONFIG,
-  WORKBOOKS,
-  MODEL_TO_WORKBOOK,
+  getPlayerDayWorkbookId,
+  getSpreadsheetIdsForModel,
   convertRowToModel,
   type DatabaseRecord,
 } from "../config/config";
@@ -49,14 +49,6 @@ function alignRowsToConfiguredColumns(
   );
 }
 
-function getSpreadsheetIdForModel(modelName: string): string {
-  const workbookKey = MODEL_TO_WORKBOOK[modelName];
-  if (!workbookKey) {
-    throw new Error(`No workbook mapping found for model: ${modelName}`);
-  }
-  return WORKBOOKS[workbookKey];
-}
-
 /**
  * FastSheetsReader
  *
@@ -67,9 +59,16 @@ function getSpreadsheetIdForModel(modelName: string): string {
 export class FastSheetsReader {
   private readonly MODEL_CACHE_TTL = 60 * 1000;
   private modelCache = new Map<ModelName, CacheEntry>();
+  private playerDaySeasonCache = new Map<string, CacheEntry>();
   private inFlightModelFetches = new Map<ModelName, Promise<DatabaseRecord[]>>();
+  private inFlightPlayerDaySeasonFetches = new Map<
+    string,
+    Promise<DatabaseRecord[]>
+  >();
 
-  private getCachedModel<T extends DatabaseRecord>(modelName: ModelName): T[] | null {
+  private getCachedModel<T extends DatabaseRecord>(
+    modelName: ModelName,
+  ): T[] | null {
     const cached = this.modelCache.get(modelName);
     if (!cached) return null;
 
@@ -92,15 +91,46 @@ export class FastSheetsReader {
     });
   }
 
+  private getCachedPlayerDaySeason<T extends DatabaseRecord>(
+    seasonId: string | number,
+  ): T[] | null {
+    const cached = this.playerDaySeasonCache.get(String(seasonId));
+    if (!cached) return null;
+
+    if (Date.now() - cached.timestamp > this.MODEL_CACHE_TTL) {
+      this.playerDaySeasonCache.delete(String(seasonId));
+      return null;
+    }
+
+    return cached.rows as T[];
+  }
+
+  private setCachedPlayerDaySeason(
+    seasonId: string | number,
+    rows: DatabaseRecord[],
+    timestamp = Date.now(),
+  ): void {
+    this.playerDaySeasonCache.set(String(seasonId), {
+      rows,
+      timestamp,
+    });
+  }
+
   clearCache(modelName?: ModelName): void {
     if (modelName) {
       this.modelCache.delete(modelName);
       this.inFlightModelFetches.delete(modelName);
+      if (modelName === "PlayerDayStatLine") {
+        this.playerDaySeasonCache.clear();
+        this.inFlightPlayerDaySeasonFetches.clear();
+      }
       return;
     }
 
     this.modelCache.clear();
+    this.playerDaySeasonCache.clear();
     this.inFlightModelFetches.clear();
+    this.inFlightPlayerDaySeasonFetches.clear();
   }
 
   async fetchModel<T extends DatabaseRecord>(
@@ -124,23 +154,90 @@ export class FastSheetsReader {
 
     const request = (async () => {
       const range = `${sheetName}!A1:ZZ`;
-      const spreadsheetId = getSpreadsheetIdForModel(String(modelName));
-
-      const rawRows = await optimizedSheetsClient.getValues(spreadsheetId, range);
-      const rows = alignRowsToConfiguredColumns(rawRows, columns)
-        .filter((row) => row && row.length > 0)
-        .map((row) => convertRowToModel<T>(row, columns));
+      const spreadsheetIds = getSpreadsheetIdsForModel(String(modelName));
+      const workbookRows = await Promise.all(
+        spreadsheetIds.map(async (spreadsheetId) => {
+          const rawRows = await optimizedSheetsClient.getValues(
+            spreadsheetId,
+            range,
+          );
+          return alignRowsToConfiguredColumns(rawRows, columns)
+            .filter((row) => row && row.length > 0)
+            .map((row) => convertRowToModel<T>(row, columns));
+        }),
+      );
+      const rows = workbookRows.flat();
 
       this.setCachedModel(modelName, rows as DatabaseRecord[]);
       return rows;
     })();
 
-    this.inFlightModelFetches.set(modelName, request as Promise<DatabaseRecord[]>);
+    this.inFlightModelFetches.set(
+      modelName,
+      request as Promise<DatabaseRecord[]>,
+    );
 
     try {
       return await request;
     } finally {
       this.inFlightModelFetches.delete(modelName);
+    }
+  }
+
+  async fetchPlayerDaySeason<T extends DatabaseRecord>(
+    seasonId: string | number,
+  ): Promise<T[]> {
+    const seasonKey = String(seasonId);
+    const cached = this.getCachedPlayerDaySeason<T>(seasonKey);
+    if (cached) {
+      return cached;
+    }
+
+    const existingRequest =
+      this.inFlightPlayerDaySeasonFetches.get(seasonKey);
+    if (existingRequest) {
+      return existingRequest as Promise<T[]>;
+    }
+
+    const modelName = "PlayerDayStatLine";
+    const sheetName = SHEETS_CONFIG.SHEETS[modelName];
+    const columns = SHEETS_CONFIG.COLUMNS[modelName];
+    if (!columns) {
+      throw new Error(`No column configuration found for model: ${modelName}`);
+    }
+
+    const request = (async () => {
+      const range = `${sheetName}!A1:ZZ`;
+      const spreadsheetId = getPlayerDayWorkbookId(seasonKey);
+      const rawRows = await optimizedSheetsClient.getValues(
+        spreadsheetId,
+        range,
+      );
+      const rows = alignRowsToConfiguredColumns(rawRows, columns)
+        .filter((row) => row && row.length > 0)
+        .map((row) => convertRowToModel<T>(row, columns))
+        .filter((row) => {
+          const seasonValue = row.seasonId;
+          return (
+            (typeof seasonValue === "string" ||
+              typeof seasonValue === "number") &&
+            String(seasonValue) === seasonKey
+          );
+        });
+
+      this.setCachedPlayerDaySeason(seasonKey, rows as DatabaseRecord[]);
+      return rows;
+    })();
+
+    this.inFlightPlayerDaySeasonFetches.set(
+      seasonKey,
+      request as Promise<DatabaseRecord[]>,
+    );
+
+    try {
+      return await request;
+    } finally {
+      this.inFlightPlayerDaySeasonFetches.delete(seasonKey);
     }
   }
 
@@ -173,10 +270,11 @@ export class FastSheetsReader {
 
     const bySpreadsheet = new Map<string, ModelName[]>();
     for (const modelName of pendingModels) {
-      const spreadsheetId = getSpreadsheetIdForModel(String(modelName));
-      const list = bySpreadsheet.get(spreadsheetId) ?? [];
-      list.push(modelName);
-      bySpreadsheet.set(spreadsheetId, list);
+      for (const spreadsheetId of getSpreadsheetIdsForModel(String(modelName))) {
+        const list = bySpreadsheet.get(spreadsheetId) ?? [];
+        list.push(modelName);
+        bySpreadsheet.set(spreadsheetId, list);
+      }
     }
 
     const timestamp = Date.now();
@@ -218,11 +316,21 @@ export class FastSheetsReader {
             .filter((row) => row && row.length > 0)
             .map((row) => convertRowToModel(row, columns));
 
-          output[String(modelName)] = rows;
-          this.setCachedModel(modelName, rows, timestamp);
+          output[String(modelName)] = [
+            ...(output[String(modelName)] ?? []),
+            ...rows,
+          ];
         }
       }),
     );
+
+    for (const modelName of pendingModels) {
+      this.setCachedModel(
+        modelName,
+        output[String(modelName)] ?? [],
+        timestamp,
+      );
+    }
 
     return output as SnapshotResult<M>;
   }

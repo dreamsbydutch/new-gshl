@@ -10,18 +10,48 @@ const NHL_TEAM_COLUMNS = [
   "updatedAt",
 ] as const;
 
-// Multi-workbook configuration matching your Apps Script setup
+// Multi-workbook configuration matching your Apps Script setup.
 export const WORKBOOKS = {
   GENERAL: "1I6kmnnL6rSAWLOG12Ixr89g4W-ZQ0weGbfETKDTrvH8",
-  // PlayerDay workbooks partitioned by season ranges
-  PLAYERDAYS_1_5: "1ny8gEOotQCbG3uvr29JgX5iRjCS_2Pt44eF4f4l3f1g",
-  PLAYERDAYS_6_10: "14XZoxMbcmWh0-XmYOu16Ur0HNOFP9UttHbiMMut_PJ0",
-  PLAYERDAYS_11_15: "18IqgstBaBIAfM08w7ddzjF2JTrAqZUjAvsbyZxgHiag",
-  // Legacy reference (points to seasons 1-5 for backward compatibility)
-  PLAYERDAYS: "18IqgstBaBIAfM08w7ddzjF2JTrAqZUjAvsbyZxgHiag",
+  // PlayerDay workbooks partitioned by season: PlayerDays-01, PlayerDays-02, etc.
+  PLAYERDAYS_01: "1L0lqm3DDXv92hml67aGgJ2AYT49hitMl0GX16VZOCrg",
+  PLAYERDAYS_02: "1M-YNvrUtfLKqv0b5MJ6HWErMvL9pTm6_TRrb6-1Dz0Y",
+  PLAYERDAYS_03: "1-qtE0DSueGi47h-l5pBSJik4Y8knDq8r64zH94FYdXU",
+  PLAYERDAYS_04: "1G7wBlYgSliyzh1N2U6sqOeDfiDeNcT7cDY9OUkWxDn4",
+  PLAYERDAYS_05: "1ny8gEOotQCbG3uvr29JgX5iRjCS_2Pt44eF4f4l3f1g",
+  PLAYERDAYS_06: "1nOp4mi_0kskY5etY70ErpSGYcKevouEwhe3Nh3VwZ_8",
+  PLAYERDAYS_07: "1spmkDwfKOiMZBQt4-roOeIuL88m457X0F9inHa_zw4c",
+  PLAYERDAYS_08: "1i7rqNNJrHUZT7SIisesJzHNVJfVz2lZExUB6XHsc2vw",
+  PLAYERDAYS_09: "1Ffb0gqr-tm3HECUIA2vPNUFfs04XLTg51JX7tQ3xETM",
+  PLAYERDAYS_10: "1x7KS6XsSCtbgZ5rxGqH6NNCS91ZHNH-lWJc84ZPmkO0",
+  PLAYERDAYS_11: "1eai9BxtIXcaWBKzNI0BCn-kcjf06Hszx4aFXAkAGqVw",
+  PLAYERDAYS_12: "1M1CLZ9FXqq7dWtgpNZa4OFoUU3h71N1bLxZTmprqVKk",
+  PLAYERDAYS_13: "1980OlOIIK7OegX-yd3WICSiReeHpUROi8x0i4x6TtYI",
+  PLAYERDAYS_14: "",
+  PLAYERDAYS_15: "",
   PLAYERSTATS: "1qkyxmx8gC-xs8niDrmlB9Jv6qXhRmAWjFCq8ECEr-Cg",
   TEAMSTATS: "1X2pvw18aYEekdNApyJMqijOZL1Bl0e3Azlkg-eb2X54",
 };
+
+export const PLAYERDAY_WORKBOOK_KEYS = [
+  "PLAYERDAYS_01",
+  "PLAYERDAYS_02",
+  "PLAYERDAYS_03",
+  "PLAYERDAYS_04",
+  "PLAYERDAYS_05",
+  "PLAYERDAYS_06",
+  "PLAYERDAYS_07",
+  "PLAYERDAYS_08",
+  "PLAYERDAYS_09",
+  "PLAYERDAYS_10",
+  "PLAYERDAYS_11",
+  "PLAYERDAYS_12",
+  "PLAYERDAYS_13",
+  "PLAYERDAYS_14",
+  "PLAYERDAYS_15",
+] as const satisfies readonly (keyof typeof WORKBOOKS)[];
+
+export type PlayerDayWorkbookKey = (typeof PLAYERDAY_WORKBOOK_KEYS)[number];
 
 // Model to workbook mapping
 export const MODEL_TO_WORKBOOK: Record<string, keyof typeof WORKBOOKS> = {
@@ -42,7 +72,7 @@ export const MODEL_TO_WORKBOOK: Record<string, keyof typeof WORKBOOKS> = {
   NHLTeam: "GENERAL", // alias for actual sheet named 'NHLTeam'
 
   // PLAYERDAYS workbook
-  PlayerDayStatLine: "PLAYERDAYS",
+  PlayerDayStatLine: "PLAYERDAYS_12",
 
   // PLAYERSTATS workbook
   PlayerWeekStatLine: "PLAYERSTATS",
@@ -55,6 +85,66 @@ export const MODEL_TO_WORKBOOK: Record<string, keyof typeof WORKBOOKS> = {
   TeamWeekStatLine: "TEAMSTATS",
   TeamSeasonStatLine: "TEAMSTATS",
 };
+
+function uniqueWorkbookIds(keys: readonly (keyof typeof WORKBOOKS)[]): string[] {
+  return Array.from(new Set(keys.map((key) => WORKBOOKS[key]).filter(Boolean)));
+}
+
+export function getPlayerDayWorkbookKey(
+  seasonId: string | number | null | undefined,
+): PlayerDayWorkbookKey | null {
+  const seasonNumber = Number(seasonId);
+  if (!Number.isInteger(seasonNumber) || seasonNumber < 1) {
+    return null;
+  }
+
+  const key = `PLAYERDAYS_${String(seasonNumber).padStart(2, "0")}`;
+  return PLAYERDAY_WORKBOOK_KEYS.includes(key as PlayerDayWorkbookKey)
+    ? (key as PlayerDayWorkbookKey)
+    : null;
+}
+
+export function getPlayerDayWorkbookId(
+  seasonId: string | number | null | undefined,
+): string {
+  const key = getPlayerDayWorkbookKey(seasonId);
+  if (!key) {
+    throw new Error(
+      `PlayerDay workbook lookup requires a valid seasonId; received ${String(seasonId)}`,
+    );
+  }
+
+  const spreadsheetId = WORKBOOKS[key]?.trim();
+  if (!spreadsheetId) {
+    throw new Error(
+      `Missing PlayerDay workbook id for ${key}. Configure WORKBOOKS.${key} for PlayerDays-${key.replace("PLAYERDAYS_", "")}.`,
+    );
+  }
+
+  return spreadsheetId;
+}
+
+export function getSpreadsheetIdsForModel(modelName: string): string[] {
+  if (modelName === "PlayerDayStatLine") {
+    return uniqueWorkbookIds(PLAYERDAY_WORKBOOK_KEYS);
+  }
+
+  const workbookKey = MODEL_TO_WORKBOOK[modelName];
+  if (!workbookKey) {
+    throw new Error(`No workbook mapping found for model: ${modelName}`);
+  }
+
+  return [WORKBOOKS[workbookKey]];
+}
+
+export function getSpreadsheetIdForModel(modelName: string): string {
+  const spreadsheetId = getSpreadsheetIdsForModel(modelName)[0];
+  if (!spreadsheetId) {
+    throw new Error(`No spreadsheet configured for model: ${modelName}`);
+  }
+
+  return spreadsheetId;
+}
 
 export const SHEETS_CONFIG = {
   // Sheet names for each model
