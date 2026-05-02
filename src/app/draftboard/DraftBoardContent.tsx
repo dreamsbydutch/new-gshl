@@ -14,8 +14,9 @@ import Image from "next/image";
 import { TeamRoster } from "@gshl-components/team/TeamRoster";
 
 export function DraftBoardContent() {
-  const { currentSeason } = useSeasonState();
-  const seasonId = currentSeason?.id;
+  const { currentSeason, defaultSeason } = useSeasonState();
+  const activeSeason = currentSeason ?? defaultSeason;
+  const seasonId = activeSeason?.id;
   const { data: contracts } = useAllContracts();
   const { data: players } = usePlayers();
   const { data: teamsRaw = [] } = useTeams({

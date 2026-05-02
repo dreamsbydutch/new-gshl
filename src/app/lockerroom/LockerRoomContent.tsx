@@ -80,7 +80,7 @@ export function LockerRoomContent() {
         <>
           <TeamContractTable
             {...{
-              currentSeason,
+              currentSeason: activeSeason,
               players,
               nhlTeams,
               contracts: currentContracts,
