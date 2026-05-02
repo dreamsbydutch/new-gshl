@@ -13,6 +13,8 @@
     "lint:fix": "eslint . --fix",
     "preview": "next build && next start",
     "player-bios:sync": "tsx src/scripts/sync-player-bios-from-puckpedia.ts",
+    "ratings:backfill": "tsx src/scripts/backfill-player-ratings.ts",
+    "ratings:parity": "tsx src/scripts/ratings-parity.ts",
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "lineup:update-all": "node --expose-gc --max-old-space-size=4096 ./node_modules/tsx/dist/cli.mjs src/scripts/update-all-lineups.ts",
