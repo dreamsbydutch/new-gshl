@@ -5,12 +5,18 @@ import { useActivePlayers, useContracts } from "@gshl-hooks";
 import { ContractStatus, type ToggleItem } from "@gshl-types";
 import { cn, getCurrentSeason } from "@gshl-utils";
 import { useState } from "react";
+import { DraftClassesSkeleton } from "@gshl-skeletons";
 
 export function DraftClasses() {
   const [selectedType, setSelectedType] = useState<string>("nyufa");
   const year = +getCurrentSeason();
-  const { data: players } = useActivePlayers();
-  const { data: contracts } = useContracts();
+  const { data: players, isLoading: playersLoading } = useActivePlayers();
+  const { data: contracts, isLoading: contractsLoading } = useContracts();
+
+  if (playersLoading || contractsLoading) {
+    return <DraftClassesSkeleton />;
+  }
+
   const cyDraftClass = players.filter(
     (player) =>
       !contracts.find(

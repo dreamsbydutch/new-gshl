@@ -2,6 +2,7 @@
 
 import { PlayoffBracket, StandingsComponent } from "@gshl-components/league";
 import { useStandingsData } from "@gshl-hooks";
+import { StandingsSkeleton } from "@gshl-skeletons";
 
 export function StandingsContent() {
   const {
@@ -12,7 +13,12 @@ export function StandingsContent() {
     stats,
     matchups,
     weeks,
+    isLoading,
   } = useStandingsData({});
+
+  if (isLoading) {
+    return <StandingsSkeleton />;
+  }
 
   if ((standingsType ?? "overall") === "playoff") {
     return <PlayoffBracket teams={teams} stats={stats} />;

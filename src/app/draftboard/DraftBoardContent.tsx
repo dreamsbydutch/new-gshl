@@ -12,19 +12,28 @@ import type { Contract, GSHLTeam, Player } from "@gshl-types";
 import { cn } from "@gshl-utils";
 import Image from "next/image";
 import { TeamRoster } from "@gshl-components/team/TeamRoster";
+import { DraftBoardSkeleton } from "@gshl-skeletons";
 
 export function DraftBoardContent() {
   const { currentSeason, defaultSeason } = useSeasonState();
   const activeSeason = currentSeason ?? defaultSeason;
   const seasonId = activeSeason?.id;
-  const { data: contracts } = useAllContracts();
-  const { data: players } = usePlayers();
-  const { data: teamsRaw = [] } = useTeams({
+  const { data: contracts = [], isLoading: contractsLoading } =
+    useAllContracts();
+  const { data: players, isLoading: playersLoading } = usePlayers();
+  const { data: teamsRaw = [], isLoading: teamsLoading } = useTeams({
     seasonId,
     enabled: Boolean(seasonId),
   });
   const teams = teamsRaw as GSHLTeam[];
-  const { data: draftPicks } = useDraftPicks();
+  const { data: draftPicks, isLoading: draftPicksLoading } = useDraftPicks();
+
+  const isLoading =
+    contractsLoading || playersLoading || teamsLoading || draftPicksLoading;
+
+  if (isLoading) {
+    return <DraftBoardSkeleton />;
+  }
 
   const activeDraftPicks = draftPicks
     ?.filter((a) => a.seasonId === seasonId && a.playerId === null)

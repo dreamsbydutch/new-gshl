@@ -4,11 +4,16 @@ import { useConferenceContestData } from "@gshl-hooks";
 import type { GSHLTeam } from "@gshl-types";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
+import { ConferenceContestSkeleton } from "@gshl-skeletons";
 
 export function ConferenceContest() {
-  const { overall, seasons } = useConferenceContestData();
+  const { overall, seasons, isLoading } = useConferenceContestData();
   const router = useRouter();
   const { setSelectedSeasonId } = useSeasonNavigation();
+
+  if (isLoading) {
+    return <ConferenceContestSkeleton />;
+  }
 
   const formatTeamLabel = (team?: GSHLTeam) => {
     if (!team) return "—";

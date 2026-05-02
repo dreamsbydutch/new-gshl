@@ -21,6 +21,7 @@ import {
 } from "@gshl-components/contracts/ContractTable";
 import { FranchiseContractHistory } from "@gshl-components/contracts/ContractHistory";
 import { FranchiseDraftPickSummary } from "@gshl-components/contracts/FranchiseDraftPickSummary";
+import { LockerRoomSkeleton, TeamRosterSkeleton } from "@gshl-skeletons";
 
 const SHOW_LOCKER_ROOM_ROSTER_SALARIES = false;
 
@@ -36,14 +37,14 @@ export function LockerRoomContent() {
     selectedLockerRoomType === "roster";
 
   const { data: draftPicks } = useDraftPicks();
-  const { data: players = [] } = usePlayers();
-  const { data: teamsRaw = [] } = useTeams();
+  const { data: players = [], isLoading: playersLoading } = usePlayers();
+  const { data: teamsRaw = [], isLoading: teamsLoading } = useTeams();
   const allTeams = teamsRaw as GSHLTeam[];
   const teams = useMemo(
     () => allTeams.filter((team) => team.seasonId == activeSeason?.id),
     [allTeams, activeSeason?.id],
   );
-  const { data: nhlTeamsRaw = [] } = useNHLTeams();
+  const { data: nhlTeamsRaw = [], isLoading: nhlTeamsLoading } = useNHLTeams();
   const nhlTeams = nhlTeamsRaw as NHLTeam[];
 
   const currentTeam = teams?.find((t) => t.ownerId === selectedOwnerId);
@@ -65,6 +66,15 @@ export function LockerRoomContent() {
     draftPicks,
     enabled: needsContractData,
   });
+
+  const isLoading = teamsLoading || playersLoading || nhlTeamsLoading;
+
+  if (isLoading) {
+    if (selectedLockerRoomType === "roster") {
+      return <TeamRosterSkeleton />;
+    }
+    return <LockerRoomSkeleton />;
+  }
 
   if (!currentTeam) {
     return (
