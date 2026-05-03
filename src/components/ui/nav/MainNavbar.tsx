@@ -62,8 +62,8 @@ export function Navbar({ className }: NavbarProps) {
         className={cn(
           className,
           "fixed bottom-0 z-20 flex w-full items-center justify-evenly bg-gray-200 shadow-inv",
-          "lg:top-0 lg:justify-center lg:gap-8 lg:px-4 lg:py-2 xl:gap-14",
-          "h-[55px] text-center",
+          "lg:bottom-auto lg:top-0 lg:justify-center lg:gap-8 lg:px-4 lg:py-2 xl:gap-14",
+          "h-14 text-center",
         )}
       >
         {navItems.map((item) => (

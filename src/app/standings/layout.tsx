@@ -27,7 +27,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     standingsTypes.find((type) => type.key === selectedType) ?? null;
 
   return (
-    <div className="mb-32 font-varela lg:mb-4">
+    <div className="pb-24 font-varela lg:pb-8 lg:pt-12">
       {children}
       <SecondaryPageToolbar>
         <SeasonToggleNav />

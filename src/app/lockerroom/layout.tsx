@@ -52,7 +52,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     ],
   };
   return (
-    <div className="mb-32 font-varela lg:mb-4">
+    <div className="pb-24 font-varela lg:pb-8 lg:pt-20">
       {children}
       <SecondaryPageToolbar>
         <TeamsToggle seasonId={activeSeasonId} />

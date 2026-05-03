@@ -76,6 +76,11 @@ export interface UseWeeklyScheduleDataResult {
 export function useWeeklyScheduleData(
   options: UseWeeklyScheduleDataOptions = {},
 ): UseWeeklyScheduleDataResult {
+  const normalizePlayerId = (playerId: string | null | undefined) => {
+    const normalized = playerId?.trim();
+    return normalized ?? null;
+  };
+
   const { seasonId: optionSeasonId, weekId: optionWeekId } = options;
 
   const { selectedSeasonId: navSeasonId, selectedWeekId: navWeekId } = useNav();
@@ -124,8 +129,9 @@ export function useWeeklyScheduleData(
     if (!playerWeekStats.length) return [] as string[];
     const missing = new Set<string>();
     for (const stat of playerWeekStats) {
-      if (stat.playerId && !activePlayerIdSet.has(stat.playerId)) {
-        missing.add(stat.playerId);
+      const playerId = normalizePlayerId(stat.playerId);
+      if (playerId && !activePlayerIdSet.has(playerId)) {
+        missing.add(playerId);
       }
     }
     return Array.from(missing);
@@ -141,7 +147,9 @@ export function useWeeklyScheduleData(
     setInactivePlayerMap({});
   }, [selectedSeasonId, selectedWeekId]);
   const pendingInactiveIds = useMemo(() => {
-    return inactivePlayerIds.filter((id) => id && !(id in inactivePlayerMap));
+    return inactivePlayerIds.filter(
+      (id) => normalizePlayerId(id) && !(id in inactivePlayerMap),
+    );
   }, [inactivePlayerIds, inactivePlayerMap]);
 
   useEffect(() => {
@@ -218,7 +226,8 @@ export function useWeeklyScheduleData(
     return playerWeekStats.reduce<
       Record<string, (PlayerWeekStatLine & Player)[]>
     >((acc, stat) => {
-      const player = stat.playerId ? playerLookup.get(stat.playerId) : null;
+      const playerId = normalizePlayerId(stat.playerId);
+      const player = playerId ? playerLookup.get(playerId) : null;
       if (stat?.gshlTeamId) {
         acc[stat.gshlTeamId] ??= [];
         acc[stat.gshlTeamId]!.push({

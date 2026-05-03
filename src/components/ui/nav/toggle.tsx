@@ -102,7 +102,7 @@ export function HorizontalToggle<T>({
               onClick={() => onSelect(item)}
               className={cn(
                 "flex-shrink-0 cursor-pointer rounded-md transition-colors",
-                isSelected ? "bg-primary" : "bg-white",
+                isSelected ? "bg-primary" : "bg-transparent hover:bg-gray-200",
               )}
             >
               {renderCustomItem(item, isSelected)}

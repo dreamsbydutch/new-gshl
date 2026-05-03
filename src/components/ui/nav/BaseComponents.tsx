@@ -136,15 +136,15 @@ export function NavContainer({
 
   const positionClasses = {
     top: "top-0 left-0 right-0",
-    bottom: "bottom-0 left-0 right-0",
-    secondary: "bottom-14 left-0 right-0",
-    tertiary: "bottom-24 left-0 right-0",
+    bottom: "bottom-0 left-0 right-0 lg:bottom-auto lg:top-0",
+    secondary: "bottom-14 left-0 right-0 lg:bottom-auto lg:top-14",
+    tertiary: "bottom-24 left-0 right-0 lg:bottom-auto lg:top-24",
   };
 
   const variantClasses = {
-    primary: "bg-white border-t h-14 z-50",
-    secondary: "bg-gray-100 border-t h-10 z-20",
-    tertiary: "bg-gray-100 border-t h-7 text-sm z-10",
+    primary: "bg-gray-100 border-t h-14 z-50 lg:border-b lg:border-t-0",
+    secondary: "bg-gray-100 border-t h-10 z-50 lg:border-b lg:border-t-0",
+    tertiary: "bg-gray-100 border-t h-7 text-sm z-50 lg:border-b lg:border-t-0",
   };
 
   return (

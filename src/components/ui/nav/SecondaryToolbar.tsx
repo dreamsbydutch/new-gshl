@@ -26,7 +26,7 @@ export function SecondaryPageToolbar({
     <NavContainer
       position="secondary"
       variant="secondary"
-      className={cn(className)}
+      className={cn( className)}
     >
       {children}
     </NavContainer>

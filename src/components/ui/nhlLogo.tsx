@@ -1,4 +1,5 @@
 import Image from "next/image";
+import { cn } from "@gshl-utils";
 
 export function NHLLogo({
   team,
@@ -9,11 +10,17 @@ export function NHLLogo({
   size?: number;
   className?: string;
 }) {
-  if (!team) return <span className="text-[10px] text-gray-400">-</span>;
+  if (!team?.logoUrl) {
+    return (
+      <span className={cn("text-[10px] text-gray-400", className)}>-</span>
+    );
+  }
+
   return (
     <Image
       src={team.logoUrl}
-      className={`mx-auto h-[${size}px] w-[${size}px] ${className ?? ""}`}
+      className={cn("mx-auto object-contain", className)}
+      style={{ width: size, height: size }}
       alt={team.fullName}
       width={size}
       height={size}

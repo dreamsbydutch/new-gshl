@@ -104,7 +104,7 @@ export function LockerRoomHeader({ currentTeam }: LockerRoomHeaderProps) {
   const formattedOwnerName = formatOwnerName(currentTeam);
 
   return (
-    <header className="flex max-w-3xl items-center justify-evenly p-4">
+    <header className="mx-auto flex max-w-3xl items-center justify-evenly p-4">
       <TeamLogo currentTeam={currentTeam} />
       <TeamInfo
         currentTeam={currentTeam}
