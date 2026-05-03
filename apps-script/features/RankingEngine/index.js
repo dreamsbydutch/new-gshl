@@ -19,7 +19,15 @@ var RankingEngine = RankingEngine || {};
 
   var SKATER_DAY_CATEGORIES = ["G", "A", "P", "PPP", "SOG", "HIT", "BLK"];
   var SKATER_DAY_FALLBACK_MEANS = {
-    F: { G: 0.26, A: 0.43, P: 0.7, PPP: 0.21, SOG: 2.144, HIT: 0.91, BLK: 0.75 },
+    F: {
+      G: 0.26,
+      A: 0.43,
+      P: 0.7,
+      PPP: 0.21,
+      SOG: 2.144,
+      HIT: 0.91,
+      BLK: 0.75,
+    },
     D: { G: 0.14, A: 0.36, P: 0.5, PPP: 0.16, SOG: 1.7, HIT: 1.05, BLK: 1.35 },
   };
   var SKATER_DAY_IMPACT_WEIGHTS = [1, 0.85, 0.7, 0.45, 0.3, 0.2, 0.15];
@@ -46,50 +54,73 @@ var RankingEngine = RankingEngine || {};
       smallSampleCaps: [],
     },
     PlayerWeekStatLine: {
-      categoryBlend: { raw: 0.65, rate: 0.35 },
-      weights: { efficiency: 0.22, support: 0.2, breadth: 0.16, volume: 0.28, star: 0.14 },
-      volumeMix: { usage: 0.75, event: 0.25 },
+      categoryBlend: { raw: 0.58, rate: 0.42 },
+      weights: {
+        efficiency: 0.25,
+        support: 0.19,
+        breadth: 0.14,
+        volume: 0.2,
+        star: 0.22,
+      },
+      volumeMix: { usage: 0.62, event: 0.38 },
       balancedBonus: 3,
       specialistCap: { maxSupport: 0.3, cap: 94 },
-      smallSampleCaps: [{ maxUsage: 1, cap: 86 }],
+      smallSampleCaps: [{ maxUsage: 1, cap: 88 }],
     },
     PlayerSplitStatLine: {
-      categoryBlend: { raw: 0.75, rate: 0.25 },
-      weights: { efficiency: 0.18, support: 0.18, breadth: 0.16, volume: 0.3, star: 0.18 },
-      volumeMix: { usage: 0.85, event: 0.15 },
+      categoryBlend: { raw: 0.6, rate: 0.4 },
+      weights: {
+        efficiency: 0.24,
+        support: 0.17,
+        breadth: 0.13,
+        volume: 0.18,
+        star: 0.28,
+      },
+      volumeMix: { usage: 0.7, event: 0.3 },
       balancedBonus: 4,
       specialistCap: { maxSupport: 0.32, cap: 90 },
-      smallSampleCaps: [{ maxUsageExclusive: 5, cap: 84 }],
+      smallSampleCaps: [{ maxUsageExclusive: 3, cap: 87 }],
     },
     PlayerTotalStatLine: {
-      categoryBlend: { raw: 0.85, rate: 0.15 },
-      weights: { efficiency: 0.12, support: 0.16, breadth: 0.12, volume: 0.34, star: 0.26 },
-      volumeMix: { usage: 0.9, event: 0.1 },
+      categoryBlend: { raw: 0.58, rate: 0.42 },
+      weights: {
+        efficiency: 0.24,
+        support: 0.14,
+        breadth: 0.1,
+        volume: 0.14,
+        star: 0.38,
+      },
+      volumeMix: { usage: 0.68, event: 0.32 },
       balancedBonus: 5,
       specialistCap: { maxSupport: 0.3, cap: 88 },
-      smallSampleCaps: [{ maxUsageExclusive: 12, cap: 82 }],
+      smallSampleCaps: [{ maxUsageExclusive: 6, cap: 86 }],
     },
     PlayerNHL: {
-      categoryBlend: { raw: 0.85, rate: 0.15 },
+      categoryBlend: { raw: 0.58, rate: 0.42 },
       weights: {
-        efficiency: 0.01,
-        support: 0.03,
+        efficiency: 0.03,
+        support: 0.04,
         breadth: 0.01,
-        volume: 0.02,
-        star: 0.11,
-        core: 0.82,
+        volume: 0.005,
+        star: 0.18,
+        core: 0.735,
       },
-      volumeMix: { usage: 0.9, event: 0.1 },
+      volumeMix: { usage: 0.6, event: 0.4 },
       balancedBonus: 5,
       specialistCap: { maxSupport: 0.3, cap: 88 },
-      smallSampleCaps: [{ maxUsageExclusive: 12, cap: 82 }],
+      smallSampleCaps: [{ maxUsageExclusive: 6, cap: 86 }],
     },
   };
 
   var GOALIE_LEVEL_PROFILES = {
     PlayerDayStatLine: {
       winBlend: { raw: 1, rate: 0 },
-      weights: { efficiency: 0.42, support: 0.18, breadth: 0.12, workload: 0.28 },
+      weights: {
+        efficiency: 0.42,
+        support: 0.18,
+        breadth: 0.12,
+        workload: 0.28,
+      },
       workloadMix: { GS: 0, SA: 0.45, SV: 0.35, TOI: 0.2 },
       balancedBonus: 0,
       specialistCap: null,
@@ -105,7 +136,12 @@ var RankingEngine = RankingEngine || {};
     },
     PlayerSplitStatLine: {
       winBlend: { raw: 0.75, rate: 0.25 },
-      weights: { efficiency: 0.25, support: 0.17, breadth: 0.16, workload: 0.42 },
+      weights: {
+        efficiency: 0.25,
+        support: 0.17,
+        breadth: 0.16,
+        workload: 0.42,
+      },
       workloadMix: { GS: 0.65, SA: 0.15, SV: 0.1, TOI: 0.1 },
       balancedBonus: 4,
       specialistCap: { type: "support", maxSupport: 0.4, cap: 88 },
@@ -113,7 +149,12 @@ var RankingEngine = RankingEngine || {};
     },
     PlayerTotalStatLine: {
       winBlend: { raw: 0.85, rate: 0.15 },
-      weights: { efficiency: 0.2, support: 0.16, breadth: 0.16, workload: 0.48 },
+      weights: {
+        efficiency: 0.2,
+        support: 0.16,
+        breadth: 0.16,
+        workload: 0.48,
+      },
       workloadMix: { GS: 0.75, SA: 0.1, SV: 0.1, TOI: 0.05 },
       balancedBonus: 5,
       specialistCap: { type: "support", maxSupport: 0.45, cap: 84 },
@@ -121,7 +162,12 @@ var RankingEngine = RankingEngine || {};
     },
     PlayerNHL: {
       winBlend: { raw: 0.85, rate: 0.15 },
-      weights: { efficiency: 0.2, support: 0.16, breadth: 0.16, workload: 0.48 },
+      weights: {
+        efficiency: 0.2,
+        support: 0.16,
+        breadth: 0.16,
+        workload: 0.48,
+      },
       workloadMix: { GS: 0.75, SA: 0.1, SV: 0.1, TOI: 0.05 },
       balancedBonus: 5,
       specialistCap: { type: "support", maxSupport: 0.45, cap: 84 },
@@ -157,17 +203,21 @@ var RankingEngine = RankingEngine || {};
   }
 
   function normalizePosGroup(value, row) {
-    var raw = String(value || (row && (row.posGroup || row.POS_GROUP)) || "").toUpperCase();
+    var raw = String(
+      value || (row && (row.posGroup || row.POS_GROUP)) || "",
+    ).toUpperCase();
     if (raw === "G") return PositionGroup.G;
     if (raw === "D") return PositionGroup.D;
     if (raw === "F") return PositionGroup.F;
     if (raw === "TEAM") return PositionGroup.TEAM;
-    if (row && (row.gshlTeamId || row.teamId) && !row.playerId) return PositionGroup.TEAM;
+    if (row && (row.gshlTeamId || row.teamId) && !row.playerId)
+      return PositionGroup.TEAM;
     return PositionGroup.F;
   }
 
   function detectSheetName(row, options) {
-    if (options && options.sheetName) return normalizeSheetName(options.sheetName);
+    if (options && options.sheetName)
+      return normalizeSheetName(options.sheetName);
     if (!row) return "";
     if (row.date) return row.playerId ? "PlayerDayStatLine" : "TeamDayStatLine";
     if (
@@ -179,16 +229,21 @@ var RankingEngine = RankingEngine || {};
     ) {
       return "PlayerNHL";
     }
-    if (row.weekId) return row.playerId ? "PlayerWeekStatLine" : "TeamWeekStatLine";
+    if (row.weekId)
+      return row.playerId ? "PlayerWeekStatLine" : "TeamWeekStatLine";
     if (row.gshlTeamIds !== undefined) return "PlayerTotalStatLine";
-    if (row.seasonType && row.playerId && row.gshlTeamId) return "PlayerSplitStatLine";
+    if (row.seasonType && row.playerId && row.gshlTeamId)
+      return "PlayerSplitStatLine";
     if (row.seasonType && row.playerId) return "PlayerTotalStatLine";
-    if (!row.playerId && (row.gshlTeamId || row.teamId)) return "TeamSeasonStatLine";
+    if (!row.playerId && (row.gshlTeamId || row.teamId))
+      return "TeamSeasonStatLine";
     return "PlayerDayStatLine";
   }
 
   function normalizeCategory(category) {
-    var value = String(category || "").trim().toUpperCase();
+    var value = String(category || "")
+      .trim()
+      .toUpperCase();
     if (
       value === "G" ||
       value === "A" ||
@@ -218,7 +273,8 @@ var RankingEngine = RankingEngine || {};
   }
 
   function readSeasonCategories(seasonId) {
-    var seasonKey = seasonId === undefined || seasonId === null ? "" : String(seasonId);
+    var seasonKey =
+      seasonId === undefined || seasonId === null ? "" : String(seasonId);
     if (!seasonKey) return SKATER_DEFAULT_CATEGORIES.slice();
     if (Object.prototype.hasOwnProperty.call(seasonCategoryCache, seasonKey)) {
       return seasonCategoryCache[seasonKey].slice();
@@ -283,7 +339,9 @@ var RankingEngine = RankingEngine || {};
 
   function getOutputField(sheetName, options) {
     if (options && options.outputField) return options.outputField;
-    return normalizeSheetName(sheetName) === "PlayerNHL" ? "seasonRating" : "Rating";
+    return normalizeSheetName(sheetName) === "PlayerNHL"
+      ? "seasonRating"
+      : "Rating";
   }
 
   function getSkaterProductionVolumeProxy(row) {
@@ -482,7 +540,10 @@ var RankingEngine = RankingEngine || {};
   }
 
   function getDailyPlayedFlag(row) {
-    var gp = row && row.GP !== undefined && row.GP !== null ? String(row.GP).trim() : "";
+    var gp =
+      row && row.GP !== undefined && row.GP !== null
+        ? String(row.GP).trim()
+        : "";
     if (gp === "1") return true;
     return toNumber(row && row.GS) > 0;
   }
@@ -510,7 +571,11 @@ var RankingEngine = RankingEngine || {};
   }
 
   function getSkaterEventLoadValue(row) {
-    return 0.4 * toNumber(row && row.SOG) + 0.35 * toNumber(row && row.HIT) + 0.25 * toNumber(row && row.BLK);
+    return (
+      0.4 * toNumber(row && row.SOG) +
+      0.35 * toNumber(row && row.HIT) +
+      0.25 * toNumber(row && row.BLK)
+    );
   }
 
   function shareAbove(values, threshold) {
@@ -524,7 +589,10 @@ var RankingEngine = RankingEngine || {};
 
   function computeBreadthScore(values, targetDepth) {
     if (!values || !values.length) return 0;
-    var depth = Math.max(1, Math.min(Number(targetDepth) || values.length, values.length));
+    var depth = Math.max(
+      1,
+      Math.min(Number(targetDepth) || values.length, values.length),
+    );
     var above60 = Math.min(
       values.filter(function (value) {
         return value >= 0.6;
@@ -543,7 +611,11 @@ var RankingEngine = RankingEngine || {};
       }).length,
       depth,
     );
-    return 0.5 * (above60 / depth) + 0.3 * (above75 / depth) + 0.2 * (above90 / depth);
+    return (
+      0.5 * (above60 / depth) +
+      0.3 * (above75 / depth) +
+      0.2 * (above90 / depth)
+    );
   }
 
   function computeSupportScore(values, count) {
@@ -569,14 +641,17 @@ var RankingEngine = RankingEngine || {};
 
   function computeWeightedTopAverage(entries, skipCount, takeCount) {
     if (!entries || !entries.length) return 0;
-    var sorted = entries
-      .slice()
-      .sort(function (a, b) {
-        return (Number(b && b.score) || 0) * (Number(b && b.weight) || 0) -
-          (Number(a && a.score) || 0) * (Number(a && a.weight) || 0);
-      });
+    var sorted = entries.slice().sort(function (a, b) {
+      return (
+        (Number(b && b.score) || 0) * (Number(b && b.weight) || 0) -
+        (Number(a && a.score) || 0) * (Number(a && a.weight) || 0)
+      );
+    });
     return computeWeightedScoreAverage(
-      sorted.slice(skipCount || 0, (skipCount || 0) + (takeCount || sorted.length)),
+      sorted.slice(
+        skipCount || 0,
+        (skipCount || 0) + (takeCount || sorted.length),
+      ),
     );
   }
 
@@ -598,7 +673,9 @@ var RankingEngine = RankingEngine || {};
   }
 
   function getEntrySeasonValueScore(entryMap, category) {
-    return entryMap[category] ? Number(entryMap[category].seasonValueScore) || 0 : 0;
+    return entryMap[category]
+      ? Number(entryMap[category].seasonValueScore) || 0
+      : 0;
   }
 
   function percentileValue(sortedValues, percentile) {
@@ -615,7 +692,12 @@ var RankingEngine = RankingEngine || {};
     return lowerValue + (upperValue - lowerValue) * ratio;
   }
 
-  function computePlayerNhlSeasonValueScore(value, sortedValues, category, posGroup) {
+  function computePlayerNhlSeasonValueScore(
+    value,
+    sortedValues,
+    category,
+    posGroup,
+  ) {
     var numeric = Number(value);
     if (!isFinite(numeric)) numeric = 0;
     if (!sortedValues || !sortedValues.length) return 0.5;
@@ -639,7 +721,10 @@ var RankingEngine = RankingEngine || {};
       p7 = percentileValue(sortedValues, 0.72);
       p88 = percentileValue(sortedValues, 0.9);
       p97 = percentileValue(sortedValues, 0.98);
-    } else if (posGroup === PositionGroup.D && (category === "HIT" || category === "BLK")) {
+    } else if (
+      posGroup === PositionGroup.D &&
+      (category === "HIT" || category === "BLK")
+    ) {
       p20 = percentileValue(sortedValues, 0.2);
       p45 = percentileValue(sortedValues, 0.5);
       p7 = percentileValue(sortedValues, 0.76);
@@ -670,22 +755,28 @@ var RankingEngine = RankingEngine || {};
       tailMax = 1.34;
     } else if (posGroup === PositionGroup.D && category === "P") {
       tailMax = 1.24;
-    } else if (posGroup === PositionGroup.D && (category === "HIT" || category === "BLK")) {
+    } else if (
+      posGroup === PositionGroup.D &&
+      (category === "HIT" || category === "BLK")
+    ) {
       tailMax = 1.22;
     }
 
-    return Math.max(baseScore, 1.12 + (tailMax - 1.12) * Math.pow(tailRatio, 0.72));
+    return Math.max(
+      baseScore,
+      1.12 + (tailMax - 1.12) * Math.pow(tailRatio, 0.72),
+    );
   }
 
   function computePlayerNhlCoreScore(entryMap, posGroup) {
     if (posGroup === PositionGroup.D) {
       return (
-        0.2 * getEntryScore(entryMap, "P") +
-        0.1 * getEntrySeasonValueScore(entryMap, "P") +
+        0.24 * getEntryScore(entryMap, "P") +
+        0.06 * getEntrySeasonValueScore(entryMap, "P") +
         0.1 * getEntryScore(entryMap, "HIT") +
-        0.08 * getEntrySeasonValueScore(entryMap, "HIT") +
+        0.05 * getEntrySeasonValueScore(entryMap, "HIT") +
         0.1 * getEntryScore(entryMap, "BLK") +
-        0.08 * getEntrySeasonValueScore(entryMap, "BLK") +
+        0.05 * getEntrySeasonValueScore(entryMap, "BLK") +
         0.08 * getEntryScore(entryMap, "G") +
         0.08 * getEntryScore(entryMap, "PPP") +
         0.1 * getEntryScore(entryMap, "A") +
@@ -694,8 +785,8 @@ var RankingEngine = RankingEngine || {};
     }
 
     var forwardPointScore =
-      0.42 * getEntryScore(entryMap, "P") +
-      0.58 * getEntrySeasonValueScore(entryMap, "P");
+      0.68 * getEntryScore(entryMap, "P") +
+      0.32 * getEntrySeasonValueScore(entryMap, "P");
 
     return (
       0.6 * forwardPointScore +
@@ -708,7 +799,12 @@ var RankingEngine = RankingEngine || {};
     );
   }
 
-  function applySkaterTalentCategoryEmphasis(sheetName, posGroup, category, score) {
+  function applySkaterTalentCategoryEmphasis(
+    sheetName,
+    posGroup,
+    category,
+    score,
+  ) {
     var normalizedSheetName = normalizeSheetName(sheetName);
     var adjusted = Number(score);
     if (!isFinite(adjusted)) return 0;
@@ -729,7 +825,10 @@ var RankingEngine = RankingEngine || {};
         if (adjusted > 0.76) adjusted += (adjusted - 0.76) * 0.28;
         if (adjusted > 0.9) adjusted += (adjusted - 0.9) * 0.34;
       }
-    } else if (normalizedSheetName === "PlayerNHL" && posGroup === PositionGroup.D) {
+    } else if (
+      normalizedSheetName === "PlayerNHL" &&
+      posGroup === PositionGroup.D
+    ) {
       maxScore = 1.14;
       if (category === "P") {
         if (adjusted > 0.72) adjusted += (adjusted - 0.72) * 0.5;
@@ -737,7 +836,12 @@ var RankingEngine = RankingEngine || {};
       } else if (category === "HIT" || category === "BLK") {
         maxScore = 1.08;
         if (adjusted > 0.74) adjusted += (adjusted - 0.74) * 0.22;
-      } else if (category === "G" || category === "PPP" || category === "A" || category === "SOG") {
+      } else if (
+        category === "G" ||
+        category === "PPP" ||
+        category === "A" ||
+        category === "SOG"
+      ) {
         maxScore = 1.1;
         if (adjusted > 0.76) adjusted += (adjusted - 0.76) * 0.24;
         if (adjusted > 0.9) adjusted += (adjusted - 0.9) * 0.28;
@@ -762,7 +866,10 @@ var RankingEngine = RankingEngine || {};
       weights.SOG = 1.05;
       weights.HIT = 0.7;
       weights.BLK = 0.55;
-    } else if (normalizedSheetName === "PlayerNHL" && posGroup === PositionGroup.D) {
+    } else if (
+      normalizedSheetName === "PlayerNHL" &&
+      posGroup === PositionGroup.D
+    ) {
       weights.G = 1.02;
       weights.A = 1.08;
       weights.P = 1.42;
@@ -779,30 +886,54 @@ var RankingEngine = RankingEngine || {};
     return (categoryEntries || [])
       .slice()
       .sort(function (a, b) {
-        return (Number(b && b.score) || 0) * (Number(b && b.weight) || 0) -
-          (Number(a && a.score) || 0) * (Number(a && a.weight) || 0);
+        return (
+          (Number(b && b.score) || 0) * (Number(b && b.weight) || 0) -
+          (Number(a && a.score) || 0) * (Number(a && a.weight) || 0)
+        );
       })
       .slice(0, Math.min(5, (categoryEntries || []).length));
   }
 
   function getSkaterProfile(sheetName) {
-    return SKATER_LEVEL_PROFILES[normalizeSheetName(sheetName)] || SKATER_LEVEL_PROFILES.PlayerTotalStatLine;
+    return (
+      SKATER_LEVEL_PROFILES[normalizeSheetName(sheetName)] ||
+      SKATER_LEVEL_PROFILES.PlayerTotalStatLine
+    );
   }
 
   function getGoalieProfile(sheetName) {
-    return GOALIE_LEVEL_PROFILES[normalizeSheetName(sheetName)] || GOALIE_LEVEL_PROFILES.PlayerTotalStatLine;
+    return (
+      GOALIE_LEVEL_PROFILES[normalizeSheetName(sheetName)] ||
+      GOALIE_LEVEL_PROFILES.PlayerTotalStatLine
+    );
   }
 
   function buildPrimaryGroupKey(row, sheetName, posGroup) {
-    var seasonId = row && row.seasonId !== undefined && row.seasonId !== null ? String(row.seasonId) : "";
+    var seasonId =
+      row && row.seasonId !== undefined && row.seasonId !== null
+        ? String(row.seasonId)
+        : "";
     if (sheetName === "PlayerDayStatLine") {
-      return [seasonId, row && row.date ? String(row.date) : "", posGroup].join("|");
+      return [seasonId, row && row.date ? String(row.date) : "", posGroup].join(
+        "|",
+      );
     }
     if (sheetName === "PlayerWeekStatLine") {
-      return [seasonId, row && row.weekId ? String(row.weekId) : "", posGroup].join("|");
+      return [
+        seasonId,
+        row && row.weekId ? String(row.weekId) : "",
+        posGroup,
+      ].join("|");
     }
-    if (sheetName === "PlayerSplitStatLine" || sheetName === "PlayerTotalStatLine") {
-      return [seasonId, row && row.seasonType ? String(row.seasonType) : "", posGroup].join("|");
+    if (
+      sheetName === "PlayerSplitStatLine" ||
+      sheetName === "PlayerTotalStatLine"
+    ) {
+      return [
+        seasonId,
+        row && row.seasonType ? String(row.seasonType) : "",
+        posGroup,
+      ].join("|");
     }
     if (sheetName === "PlayerNHL") {
       return [seasonId, posGroup].join("|");
@@ -811,8 +942,14 @@ var RankingEngine = RankingEngine || {};
   }
 
   function buildFallbackGroupKey(row, sheetName, posGroup) {
-    var seasonId = row && row.seasonId !== undefined && row.seasonId !== null ? String(row.seasonId) : "";
-    if (sheetName === "PlayerDayStatLine" || sheetName === "PlayerWeekStatLine") {
+    var seasonId =
+      row && row.seasonId !== undefined && row.seasonId !== null
+        ? String(row.seasonId)
+        : "";
+    if (
+      sheetName === "PlayerDayStatLine" ||
+      sheetName === "PlayerWeekStatLine"
+    ) {
       return [seasonId, sheetName, posGroup].join("|");
     }
     return buildPrimaryGroupKey(row, sheetName, posGroup);
@@ -832,25 +969,38 @@ var RankingEngine = RankingEngine || {};
   function buildAggregateGroupContext(rows, sheetName) {
     return {
       primaryGroups: groupRowsByKey(rows, function (row) {
-        return buildPrimaryGroupKey(row, sheetName, normalizePosGroup(row && row.posGroup, row));
+        return buildPrimaryGroupKey(
+          row,
+          sheetName,
+          normalizePosGroup(row && row.posGroup, row),
+        );
       }),
       fallbackGroups: groupRowsByKey(rows, function (row) {
-        return buildFallbackGroupKey(row, sheetName, normalizePosGroup(row && row.posGroup, row));
+        return buildFallbackGroupKey(
+          row,
+          sheetName,
+          normalizePosGroup(row && row.posGroup, row),
+        );
       }),
     };
   }
 
   function getPoolRowsForGroup(groupRows, sheetName, context, posGroup) {
-    var threshold = posGroup === PositionGroup.G ? SMALL_COHORT_THRESHOLDS.goalie : SMALL_COHORT_THRESHOLDS.skater;
+    var threshold =
+      posGroup === PositionGroup.G
+        ? SMALL_COHORT_THRESHOLDS.goalie
+        : SMALL_COHORT_THRESHOLDS.skater;
     var validPrimaryRows = (groupRows || []).filter(function (row) {
       return hasMeaningfulPlayerVolume(row, posGroup, sheetName);
     });
     if (validPrimaryRows.length >= threshold) return validPrimaryRows;
 
     var fallbackKey = buildFallbackGroupKey(groupRows[0], sheetName, posGroup);
-    var fallbackRows = (context.fallbackGroups[fallbackKey] || []).filter(function (row) {
-      return hasMeaningfulPlayerVolume(row, posGroup, sheetName);
-    });
+    var fallbackRows = (context.fallbackGroups[fallbackKey] || []).filter(
+      function (row) {
+        return hasMeaningfulPlayerVolume(row, posGroup, sheetName);
+      },
+    );
     return fallbackRows.length ? fallbackRows : validPrimaryRows;
   }
 
@@ -890,7 +1040,13 @@ var RankingEngine = RankingEngine || {};
     };
   }
 
-  function computeSkaterCategoryParts(row, category, profile, distributions, sheetName) {
+  function computeSkaterCategoryParts(
+    row,
+    category,
+    profile,
+    distributions,
+    sheetName,
+  ) {
     var rawScore = percentileRank(
       toNumber(row && row[category]),
       distributions.raw[category],
@@ -903,7 +1059,9 @@ var RankingEngine = RankingEngine || {};
           isLowerBetterStat(category),
         )
       : rawScore;
-    var blendedScore = profile.categoryBlend.raw * rawScore + profile.categoryBlend.rate * rateScore;
+    var blendedScore =
+      profile.categoryBlend.raw * rawScore +
+      profile.categoryBlend.rate * rateScore;
     return {
       rawScore: rawScore,
       rateScore: rateScore,
@@ -911,8 +1069,20 @@ var RankingEngine = RankingEngine || {};
     };
   }
 
-  function computeSkaterCategoryScore(row, category, profile, distributions, sheetName) {
-    return computeSkaterCategoryParts(row, category, profile, distributions, sheetName).blendedScore;
+  function computeSkaterCategoryScore(
+    row,
+    category,
+    profile,
+    distributions,
+    sheetName,
+  ) {
+    return computeSkaterCategoryParts(
+      row,
+      category,
+      profile,
+      distributions,
+      sheetName,
+    ).blendedScore;
   }
 
   function computeSkaterVolumeScore(row, profile, distributions, sheetName) {
@@ -921,11 +1091,23 @@ var RankingEngine = RankingEngine || {};
       distributions.usage,
       false,
     );
-    var eventScore = percentileRank(getSkaterEventLoadValue(row), distributions.event, false);
-    return profile.volumeMix.usage * usageScore + profile.volumeMix.event * eventScore;
+    var eventScore = percentileRank(
+      getSkaterEventLoadValue(row),
+      distributions.event,
+      false,
+    );
+    return (
+      profile.volumeMix.usage * usageScore +
+      profile.volumeMix.event * eventScore
+    );
   }
 
-  function applySkaterSpecialistCap(score, profile, supportScore, breadthScore) {
+  function applySkaterSpecialistCap(
+    score,
+    profile,
+    supportScore,
+    breadthScore,
+  ) {
     var cap = profile.specialistCap;
     if (!cap) return score;
     if (
@@ -949,16 +1131,29 @@ var RankingEngine = RankingEngine || {};
       if (rule.maxUsage !== undefined && usage <= rule.maxUsage) {
         score = Math.min(score, rule.cap);
       }
-      if (rule.maxUsageExclusive !== undefined && usage < rule.maxUsageExclusive) {
+      if (
+        rule.maxUsageExclusive !== undefined &&
+        usage < rule.maxUsageExclusive
+      ) {
         score = Math.min(score, rule.cap);
       }
     }
     return score;
   }
 
-  function maybeApplyBalancedBonus(score, profile, supportScore, breadthScore, volumeOrWorkload) {
+  function maybeApplyBalancedBonus(
+    score,
+    profile,
+    supportScore,
+    breadthScore,
+    volumeOrWorkload,
+  ) {
     if (!profile.balancedBonus) return score;
-    if (supportScore >= 0.75 && breadthScore >= 0.6 && volumeOrWorkload >= 0.55) {
+    if (
+      supportScore >= 0.75 &&
+      breadthScore >= 0.6 &&
+      volumeOrWorkload >= 0.55
+    ) {
       return score + profile.balancedBonus;
     }
     return score;
@@ -969,11 +1164,20 @@ var RankingEngine = RankingEngine || {};
     var categories = getRatingSkaterCategories(seasonId, sheetName);
     var profile = getSkaterProfile(sheetName);
     var posGroup = normalizePosGroup(rows[0] && rows[0].posGroup, rows[0]);
-    var categoryWeights = getSkaterCategoryWeights(sheetName, posGroup, categories);
+    var categoryWeights = getSkaterCategoryWeights(
+      sheetName,
+      posGroup,
+      categories,
+    );
     var validPoolRows = (poolRows || []).filter(function (row) {
       return hasMeaningfulPlayerVolume(row, PositionGroup.F, sheetName);
     });
-    var distributions = buildSkaterDistributions(validPoolRows, categories, sheetName, posGroup);
+    var distributions = buildSkaterDistributions(
+      validPoolRows,
+      categories,
+      sheetName,
+      posGroup,
+    );
 
     rows.forEach(function (row) {
       if (!hasMeaningfulPlayerVolume(row, PositionGroup.F, sheetName)) {
@@ -1014,7 +1218,12 @@ var RankingEngine = RankingEngine || {};
                 )
               : 0,
           value: categoryValue,
-          perGameValue: getUsageRateValue(row, category, PositionGroup.F, sheetName),
+          perGameValue: getUsageRateValue(
+            row,
+            category,
+            PositionGroup.F,
+            sheetName,
+          ),
         };
       });
       var categoryScores = categoryEntries.map(function (entry) {
@@ -1033,7 +1242,12 @@ var RankingEngine = RankingEngine || {};
         }),
         breadthEntries.length,
       );
-      var volumeScore = computeSkaterVolumeScore(row, profile, distributions, sheetName);
+      var volumeScore = computeSkaterVolumeScore(
+        row,
+        profile,
+        distributions,
+        sheetName,
+      );
       var starScore = computeWeightedTopAverage(
         categoryEntries,
         0,
@@ -1054,10 +1268,25 @@ var RankingEngine = RankingEngine || {};
           (weights.star || 0) * starScore +
           (weights.core || 0) * coreScore);
 
-      score = maybeApplyBalancedBonus(score, profile, supportScore, breadthScore, volumeScore);
-      score = applySkaterSpecialistCap(score, profile, supportScore, breadthScore);
+      score = maybeApplyBalancedBonus(
+        score,
+        profile,
+        supportScore,
+        breadthScore,
+        volumeScore,
+      );
+      score = applySkaterSpecialistCap(
+        score,
+        profile,
+        supportScore,
+        breadthScore,
+      );
       score = applySkaterSmallSampleCaps(score, row, profile, sheetName);
-      score = applyAggregateSheetCalibration(score, sheetName, normalizePosGroup(row && row.posGroup, row));
+      score = applyAggregateSheetCalibration(
+        score,
+        sheetName,
+        normalizePosGroup(row && row.posGroup, row),
+      );
 
       row[outputField] = finalizeAggregateScore(score, sheetName);
 
@@ -1076,7 +1305,9 @@ var RankingEngine = RankingEngine || {};
               emphasizedScore: roundScore(entry.score),
               seasonValueScore: roundScore(entry.seasonValueScore || 0),
               weight: entry.weight,
-              weightedScore: roundScore((Number(entry.score) || 0) * (Number(entry.weight) || 0)),
+              weightedScore: roundScore(
+                (Number(entry.score) || 0) * (Number(entry.weight) || 0),
+              ),
             };
           }),
           components: {
@@ -1095,7 +1326,9 @@ var RankingEngine = RankingEngine || {};
             star: weights.star || 0,
             core: weights.core || 0,
           },
-          usageValue: roundScore(getUsageValue(row, PositionGroup.F, sheetName)),
+          usageValue: roundScore(
+            getUsageValue(row, PositionGroup.F, sheetName),
+          ),
           eventLoadValue: roundScore(getSkaterEventLoadValue(row)),
           finalScore: row[outputField],
         };
@@ -1104,12 +1337,23 @@ var RankingEngine = RankingEngine || {};
   }
 
   function buildGoalieDistributions(rows, sheetName) {
-    var distributionLimit = getPlayerNhlDistributionLimit(sheetName, PositionGroup.G);
+    var distributionLimit = getPlayerNhlDistributionLimit(
+      sheetName,
+      PositionGroup.G,
+    );
     return {
       raw: {
         W: limitDistribution(sortedValues(rows, "W"), distributionLimit, false),
-        GAA: limitDistribution(sortedValues(rows, "GAA"), distributionLimit, true),
-        SVP: limitDistribution(sortedValues(rows, "SVP"), distributionLimit, false),
+        GAA: limitDistribution(
+          sortedValues(rows, "GAA"),
+          distributionLimit,
+          true,
+        ),
+        SVP: limitDistribution(
+          sortedValues(rows, "SVP"),
+          distributionLimit,
+          false,
+        ),
       },
       rate: {
         W: limitDistribution(
@@ -1129,12 +1373,20 @@ var RankingEngine = RankingEngine || {};
       ),
       SA: limitDistribution(sortedValues(rows, "SA"), distributionLimit, false),
       SV: limitDistribution(sortedValues(rows, "SV"), distributionLimit, false),
-      TOI: limitDistribution(sortedValues(rows, "TOI"), distributionLimit, false),
+      TOI: limitDistribution(
+        sortedValues(rows, "TOI"),
+        distributionLimit,
+        false,
+      ),
     };
   }
 
   function computeGoalieWinScore(row, profile, distributions, sheetName) {
-    var rawScore = percentileRank(toNumber(row && row.W), distributions.raw.W, false);
+    var rawScore = percentileRank(
+      toNumber(row && row.W),
+      distributions.raw.W,
+      false,
+    );
     if (!profile.winBlend.rate) return rawScore;
     var rateScore = percentileRank(
       getUsageRateValue(row, "W", PositionGroup.G, sheetName),
@@ -1150,21 +1402,36 @@ var RankingEngine = RankingEngine || {};
     if (mix.GS) {
       score +=
         mix.GS *
-        percentileRank(getUsageValue(row, PositionGroup.G, sheetName), distributions.GS, false);
+        percentileRank(
+          getUsageValue(row, PositionGroup.G, sheetName),
+          distributions.GS,
+          false,
+        );
     }
     if (mix.SA) {
-      score += mix.SA * percentileRank(toNumber(row && row.SA), distributions.SA, false);
+      score +=
+        mix.SA *
+        percentileRank(toNumber(row && row.SA), distributions.SA, false);
     }
     if (mix.SV) {
-      score += mix.SV * percentileRank(toNumber(row && row.SV), distributions.SV, false);
+      score +=
+        mix.SV *
+        percentileRank(toNumber(row && row.SV), distributions.SV, false);
     }
     if (mix.TOI) {
-      score += mix.TOI * percentileRank(toNumber(row && row.TOI), distributions.TOI, false);
+      score +=
+        mix.TOI *
+        percentileRank(toNumber(row && row.TOI), distributions.TOI, false);
     }
     return score;
   }
 
-  function applyGoalieSpecialistCap(score, profile, categoryScores, supportScore) {
+  function applyGoalieSpecialistCap(
+    score,
+    profile,
+    categoryScores,
+    supportScore,
+  ) {
     var cap = profile.specialistCap;
     if (!cap) return score;
     if (cap.type === "singleElite") {
@@ -1180,7 +1447,13 @@ var RankingEngine = RankingEngine || {};
     return score;
   }
 
-  function applyGoalieSmallSampleCap(score, row, profile, workloadScore, sheetName) {
+  function applyGoalieSmallSampleCap(
+    score,
+    row,
+    profile,
+    workloadScore,
+    sheetName,
+  ) {
     var rule = profile.smallSampleCap;
     if (!rule) return score;
     var usage = getUsageValue(row, PositionGroup.G, sheetName);
@@ -1189,7 +1462,10 @@ var RankingEngine = RankingEngine || {};
         return Math.min(score, rule.cap);
       }
     }
-    if (rule.maxUsageExclusive !== undefined && usage < rule.maxUsageExclusive) {
+    if (
+      rule.maxUsageExclusive !== undefined &&
+      usage < rule.maxUsageExclusive
+    ) {
       return Math.min(score, rule.cap);
     }
     return score;
@@ -1210,14 +1486,34 @@ var RankingEngine = RankingEngine || {};
 
       var coreScores = {
         W: computeGoalieWinScore(row, profile, distributions, sheetName),
-        GAA: percentileRank(toNumber(row && row.GAA), distributions.raw.GAA, true),
-        SVP: percentileRank(toNumber(row && row.SVP), distributions.raw.SVP, false),
+        GAA: percentileRank(
+          toNumber(row && row.GAA),
+          distributions.raw.GAA,
+          true,
+        ),
+        SVP: percentileRank(
+          toNumber(row && row.SVP),
+          distributions.raw.SVP,
+          false,
+        ),
       };
       var categoryValues = [coreScores.W, coreScores.GAA, coreScores.SVP];
-      var efficiencyScore = weightedAverage(coreScores, { W: 0.3, GAA: 0.35, SVP: 0.35 });
+      var efficiencyScore = weightedAverage(coreScores, {
+        W: 0.3,
+        GAA: 0.35,
+        SVP: 0.35,
+      });
       var supportScore = computeSupportScore(categoryValues, 2);
-      var breadthScore = computeBreadthScore(categoryValues, categoryValues.length);
-      var workloadScore = computeGoalieWorkloadScore(row, profile, distributions, sheetName);
+      var breadthScore = computeBreadthScore(
+        categoryValues,
+        categoryValues.length,
+      );
+      var workloadScore = computeGoalieWorkloadScore(
+        row,
+        profile,
+        distributions,
+        sheetName,
+      );
       var weights = profile.weights;
       var scoreScale = getScoreScale(sheetName);
       var score =
@@ -1227,10 +1523,31 @@ var RankingEngine = RankingEngine || {};
           weights.breadth * breadthScore +
           weights.workload * workloadScore);
 
-      score = maybeApplyBalancedBonus(score, profile, supportScore, breadthScore, workloadScore);
-      score = applyGoalieSpecialistCap(score, profile, categoryValues, supportScore);
-      score = applyGoalieSmallSampleCap(score, row, profile, workloadScore, sheetName);
-      score = applyAggregateSheetCalibration(score, sheetName, normalizePosGroup(row && row.posGroup, row));
+      score = maybeApplyBalancedBonus(
+        score,
+        profile,
+        supportScore,
+        breadthScore,
+        workloadScore,
+      );
+      score = applyGoalieSpecialistCap(
+        score,
+        profile,
+        categoryValues,
+        supportScore,
+      );
+      score = applyGoalieSmallSampleCap(
+        score,
+        row,
+        profile,
+        workloadScore,
+        sheetName,
+      );
+      score = applyAggregateSheetCalibration(
+        score,
+        sheetName,
+        normalizePosGroup(row && row.posGroup, row),
+      );
 
       row[outputField] = finalizeAggregateScore(score, sheetName);
     });
@@ -1244,7 +1561,11 @@ var RankingEngine = RankingEngine || {};
     });
     rows.forEach(function (row) {
       var scores = categories.map(function (category) {
-        return percentileRank(toNumber(row[category]), distributions[category], isLowerBetterStat(category));
+        return percentileRank(
+          toNumber(row[category]),
+          distributions[category],
+          isLowerBetterStat(category),
+        );
       });
       row[outputField] = roundScore(clip(125 * average(scores), 0, 125));
     });
@@ -1252,16 +1573,20 @@ var RankingEngine = RankingEngine || {};
 
   function rankRows(rows, options) {
     var opts = options || {};
-    var sheetName = normalizeSheetName(opts.sheetName || (rows && rows[0] ? detectSheetName(rows[0], opts) : ""));
+    var sheetName = normalizeSheetName(
+      opts.sheetName || (rows && rows[0] ? detectSheetName(rows[0], opts) : ""),
+    );
     var outputField = getOutputField(sheetName, opts);
-    var targetRows = opts.mutate === false ? (rows || []).map(cloneObject) : rows || [];
+    var targetRows =
+      opts.mutate === false ? (rows || []).map(cloneObject) : rows || [];
 
     if (!targetRows.length) return targetRows;
 
     if (sheetName === "TeamDayStatLine") {
       targetRows.forEach(function (row) {
         var result = rankPerformance(row, { sheetName: sheetName });
-        row[outputField] = result && result.score !== undefined ? result.score : "";
+        row[outputField] =
+          result && result.score !== undefined ? result.score : "";
       });
       return targetRows;
     }
@@ -1290,9 +1615,11 @@ var RankingEngine = RankingEngine || {};
 
   function rankSkaterPlayerDay(row) {
     var posGroup = normalizePosGroup(row && row.posGroup, row);
-    if (!getDailyPlayedFlag(row)) return blankResult(row, "PlayerDayStatLine", posGroup);
+    if (!getDailyPlayedFlag(row))
+      return blankResult(row, "PlayerDayStatLine", posGroup);
 
-    var fallback = SKATER_DAY_FALLBACK_MEANS[posGroup] || SKATER_DAY_FALLBACK_MEANS.F;
+    var fallback =
+      SKATER_DAY_FALLBACK_MEANS[posGroup] || SKATER_DAY_FALLBACK_MEANS.F;
     var breakdown = SKATER_DAY_CATEGORIES.map(function (category) {
       var value = toNumber(row[category]);
       var mean = fallback[category] || 1;
@@ -1319,14 +1646,26 @@ var RankingEngine = RankingEngine || {};
       .reduce(function (sum, contribution, index) {
         return sum + contribution * (SKATER_DAY_IMPACT_WEIGHTS[index] || 0);
       }, 0);
-    var rawComposite = clip(weightedImpact / SKATER_DAY_IMPACT_DENOMINATOR, 0, 1.4);
-    var score = 125 * (1 - Math.exp(-SKATER_DAY_SCORE_CURVE * Math.max(rawComposite, 0)));
-    return buildResult(row, "PlayerDayStatLine", posGroup, roundScore(score), breakdown, {
-      categoryQuality: rawComposite,
-      spike: rawComposite,
-      breadth: 0,
-      volume: 1,
-    });
+    var rawComposite = clip(
+      weightedImpact / SKATER_DAY_IMPACT_DENOMINATOR,
+      0,
+      1.4,
+    );
+    var score =
+      125 * (1 - Math.exp(-SKATER_DAY_SCORE_CURVE * Math.max(rawComposite, 0)));
+    return buildResult(
+      row,
+      "PlayerDayStatLine",
+      posGroup,
+      roundScore(score),
+      breakdown,
+      {
+        categoryQuality: rawComposite,
+        spike: rawComposite,
+        breadth: 0,
+        volume: 1,
+      },
+    );
   }
 
   function interpolatePiecewise(value, points, lowerBetter) {
@@ -1341,7 +1680,9 @@ var RankingEngine = RankingEngine || {};
         if (numeric <= sorted[i + 1].value) {
           var span = Math.max(sorted[i + 1].value - sorted[i].value, 0.0001);
           var ratio = (numeric - sorted[i].value) / span;
-          return sorted[i].score + ratio * (sorted[i + 1].score - sorted[i].score);
+          return (
+            sorted[i].score + ratio * (sorted[i + 1].score - sorted[i].score)
+          );
         }
       }
       var tail = sorted[sorted.length - 1];
@@ -1352,16 +1693,22 @@ var RankingEngine = RankingEngine || {};
       if (numeric <= sorted[j + 1].value) {
         var width = Math.max(sorted[j + 1].value - sorted[j].value, 0.0001);
         var progress = (numeric - sorted[j].value) / width;
-        return sorted[j].score + progress * (sorted[j + 1].score - sorted[j].score);
+        return (
+          sorted[j].score + progress * (sorted[j + 1].score - sorted[j].score)
+        );
       }
     }
     var top = sorted[sorted.length - 1];
-    return Math.min(1.02, top.score + (1 - Math.exp(-(numeric - top.value) * 2)) * 0.02);
+    return Math.min(
+      1.02,
+      top.score + (1 - Math.exp(-(numeric - top.value) * 2)) * 0.02,
+    );
   }
 
   function rankGoaliePlayerDay(row) {
     var posGroup = PositionGroup.G;
-    if (!getDailyPlayedFlag(row)) return blankResult(row, "PlayerDayStatLine", posGroup);
+    if (!getDailyPlayedFlag(row))
+      return blankResult(row, "PlayerDayStatLine", posGroup);
 
     var wins = toNumber(row.W);
     var gaa = toNumber(row.GAA);
@@ -1458,16 +1805,26 @@ var RankingEngine = RankingEngine || {};
       0.16 * gaContribution;
     var shapedComposite = Math.pow(Math.max(rawComposite, 0), 1.35);
     var score = 125 * (1 - Math.exp(-1.81 * shapedComposite));
-    if (shutouts > 0 || (wins >= 1 && gaa === 0 && svp >= 1 && shotsAgainst > 0)) {
+    if (
+      shutouts > 0 ||
+      (wins >= 1 && gaa === 0 && svp >= 1 && shotsAgainst > 0)
+    ) {
       score += 10;
     }
 
-    return buildResult(row, "PlayerDayStatLine", posGroup, roundScore(score), [], {
-      categoryQuality: rawComposite,
-      spike: Math.max(gaaContribution, svpContribution, winContribution),
-      breadth: 0,
-      volume: 1,
-    });
+    return buildResult(
+      row,
+      "PlayerDayStatLine",
+      posGroup,
+      roundScore(score),
+      [],
+      {
+        categoryQuality: rawComposite,
+        spike: Math.max(gaaContribution, svpContribution, winContribution),
+        breadth: 0,
+        volume: 1,
+      },
+    );
   }
 
   function rankTeamSingle(row, sheetName) {
@@ -1482,12 +1839,19 @@ var RankingEngine = RankingEngine || {};
       }
       return clip(value / 10, 0, 1);
     });
-    return buildResult(row, sheetName, PositionGroup.TEAM, roundScore(125 * average(scores)), [], {
-      categoryQuality: average(scores),
-      spike: topAverage(scores, 2),
-      breadth: 0,
-      volume: 1,
-    });
+    return buildResult(
+      row,
+      sheetName,
+      PositionGroup.TEAM,
+      roundScore(125 * average(scores)),
+      [],
+      {
+        categoryQuality: average(scores),
+        spike: topAverage(scores, 2),
+        breadth: 0,
+        volume: 1,
+      },
+    );
   }
 
   function rankAggregateSingle(row, sheetName, posGroup) {
@@ -1497,9 +1861,20 @@ var RankingEngine = RankingEngine || {};
       var dayResult = rankPerformance(row, { sheetName: sheetName });
       return buildResult(row, sheetName, posGroup, dayResult.score, [], {});
     }
-    rankRows([clone], { sheetName: sheetName, outputField: outputField, mutate: true });
+    rankRows([clone], {
+      sheetName: sheetName,
+      outputField: outputField,
+      mutate: true,
+    });
     var score = clone[outputField];
-    return buildResult(row, sheetName, posGroup, score === undefined ? "" : score, [], {});
+    return buildResult(
+      row,
+      sheetName,
+      posGroup,
+      score === undefined ? "" : score,
+      [],
+      {},
+    );
   }
 
   function blankResult(row, sheetName, posGroup) {
@@ -1523,7 +1898,10 @@ var RankingEngine = RankingEngine || {};
       modelKey: "",
       breakdown: breakdown || [],
       components: components || {},
-      efficiencyScore: components && components.categoryQuality ? components.categoryQuality : 0,
+      efficiencyScore:
+        components && components.categoryQuality
+          ? components.categoryQuality
+          : 0,
       gamesScore: components && components.volume ? components.volume : 0,
       densityScore: components && components.breadth ? components.breadth : 0,
       rawComposite: score === "" ? 0 : Number(score) / 125,
@@ -1536,7 +1914,9 @@ var RankingEngine = RankingEngine || {};
     var posGroup = normalizePosGroup(row && row.posGroup, row);
 
     if (sheetName === "PlayerDayStatLine") {
-      return posGroup === PositionGroup.G ? rankGoaliePlayerDay(row) : rankSkaterPlayerDay(row);
+      return posGroup === PositionGroup.G
+        ? rankGoaliePlayerDay(row)
+        : rankSkaterPlayerDay(row);
     }
     if (posGroup === PositionGroup.TEAM || sheetName.indexOf("Team") === 0) {
       return rankTeamSingle(row, sheetName);
@@ -1545,7 +1925,8 @@ var RankingEngine = RankingEngine || {};
   }
 
   function getPerformanceGrade(score) {
-    if (score === "" || score === null || score === undefined) return "No Impact";
+    if (score === "" || score === null || score === undefined)
+      return "No Impact";
     var numeric = Number(score);
     if (numeric >= 120) return "Insanity";
     if (numeric >= 110) return "Super Elite";

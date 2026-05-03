@@ -39,7 +39,9 @@ var PlayerOverallRatingUpdater = (function PlayerOverallRatingUpdaterModule() {
           ? seasonId.trim()
           : String(seasonId);
     if (!seasonKey) {
-      throw new Error((caller || "PlayerOverallRatingUpdater") + " requires a seasonId");
+      throw new Error(
+        (caller || "PlayerOverallRatingUpdater") + " requires a seasonId",
+      );
     }
     return seasonKey;
   }
@@ -76,12 +78,21 @@ var PlayerOverallRatingUpdater = (function PlayerOverallRatingUpdaterModule() {
   }
 
   function detectNhlSheetName() {
-    var candidates = ["PlayerNHLStatLine", "PlayerNHL", "PlayerNhlStatLine", "PlayerNhl"];
+    var candidates = [
+      "PlayerNHLStatLine",
+      "PlayerNHL",
+      "PlayerNhlStatLine",
+      "PlayerNhl",
+    ];
     for (var i = 0; i < candidates.length; i++) {
       try {
-        GshlUtils.sheets.read.fetchSheetAsObjects(PLAYERSTATS_SPREADSHEET_ID, candidates[i], {
-          coerceTypes: true,
-        });
+        GshlUtils.sheets.read.fetchSheetAsObjects(
+          PLAYERSTATS_SPREADSHEET_ID,
+          candidates[i],
+          {
+            coerceTypes: true,
+          },
+        );
         return candidates[i];
       } catch (_e) {
         // try next
@@ -91,16 +102,29 @@ var PlayerOverallRatingUpdater = (function PlayerOverallRatingUpdaterModule() {
   }
 
   function resolveOutputField(rows) {
-    var sample = rows && rows.length ? rows.find(function (row) { return !!row; }) : null;
+    var sample =
+      rows && rows.length
+        ? rows.find(function (row) {
+            return !!row;
+          })
+        : null;
     if (!sample) return "overallRating";
-    if (Object.prototype.hasOwnProperty.call(sample, "overallRating")) return "overallRating";
-    if (Object.prototype.hasOwnProperty.call(sample, "overallrating")) return "overallrating";
-    if (Object.prototype.hasOwnProperty.call(sample, "overall_rating")) return "overall_rating";
+    if (Object.prototype.hasOwnProperty.call(sample, "overallRating"))
+      return "overallRating";
+    if (Object.prototype.hasOwnProperty.call(sample, "overallrating"))
+      return "overallrating";
+    if (Object.prototype.hasOwnProperty.call(sample, "overall_rating"))
+      return "overall_rating";
     return "overallRating";
   }
 
   function resolveSalaryField(rows) {
-    var sample = rows && rows.length ? rows.find(function (row) { return !!row; }) : null;
+    var sample =
+      rows && rows.length
+        ? rows.find(function (row) {
+            return !!row;
+          })
+        : null;
     if (!sample) return "salary";
     if (Object.prototype.hasOwnProperty.call(sample, "salary")) return "salary";
     if (Object.prototype.hasOwnProperty.call(sample, "Salary")) return "Salary";
@@ -145,7 +169,13 @@ var PlayerOverallRatingUpdater = (function PlayerOverallRatingUpdaterModule() {
 
   function getSeasonRatingValue(row) {
     if (!row) return null;
-    var candidates = ["seasonRating", "seasonrating", "season_rating", "Rating", "rating"];
+    var candidates = [
+      "seasonRating",
+      "seasonrating",
+      "season_rating",
+      "Rating",
+      "rating",
+    ];
     for (var i = 0; i < candidates.length; i++) {
       if (!Object.prototype.hasOwnProperty.call(row, candidates[i])) continue;
       var numeric = Number(row[candidates[i]]);
@@ -164,7 +194,10 @@ var PlayerOverallRatingUpdater = (function PlayerOverallRatingUpdaterModule() {
   function buildSeasonOrder(rows) {
     var seen = {};
     (rows || []).forEach(function (row) {
-      var seasonId = row && row.seasonId !== undefined && row.seasonId !== null ? String(row.seasonId) : "";
+      var seasonId =
+        row && row.seasonId !== undefined && row.seasonId !== null
+          ? String(row.seasonId)
+          : "";
       if (!seasonId) return;
       seen[seasonId] = true;
     });
@@ -178,7 +211,8 @@ var PlayerOverallRatingUpdater = (function PlayerOverallRatingUpdaterModule() {
       seen[String(seasonId)] = true;
     });
     (extraSeasonIds || []).forEach(function (seasonId) {
-      if (seasonId === undefined || seasonId === null || seasonId === "") return;
+      if (seasonId === undefined || seasonId === null || seasonId === "")
+        return;
       seen[String(seasonId)] = true;
     });
 
@@ -194,7 +228,13 @@ var PlayerOverallRatingUpdater = (function PlayerOverallRatingUpdaterModule() {
     var rowsByPlayerId = {};
 
     (rows || []).forEach(function (row) {
-      if (!row || row.playerId === undefined || row.playerId === null || row.playerId === "") return;
+      if (
+        !row ||
+        row.playerId === undefined ||
+        row.playerId === null ||
+        row.playerId === ""
+      )
+        return;
       var playerId = String(row.playerId);
       if (!rowsByPlayerId[playerId]) rowsByPlayerId[playerId] = [];
       rowsByPlayerId[playerId].push(row);
@@ -202,7 +242,10 @@ var PlayerOverallRatingUpdater = (function PlayerOverallRatingUpdaterModule() {
 
     Object.keys(rowsByPlayerId).forEach(function (playerId) {
       rowsByPlayerId[playerId].sort(function (a, b) {
-        return compareSeasonIdAsc(String(b && b.seasonId || ""), String(a && a.seasonId || ""));
+        return compareSeasonIdAsc(
+          String((b && b.seasonId) || ""),
+          String((a && a.seasonId) || ""),
+        );
       });
     });
 
@@ -234,17 +277,32 @@ var PlayerOverallRatingUpdater = (function PlayerOverallRatingUpdaterModule() {
     var posGroup = getPosGroup(row);
     var usage = getUsageValue(row);
     if (usage <= 0) return 0;
-    var target = posGroup === "G" ? GOALIE_SAMPLE_TARGET : SKATER_SAMPLE_TARGET;
+    var target = posGroup === "G" ? GOALIE_SAMPLE_TARGET : 68;
     var ratio = clip(usage / target, 0, 1);
-    return 0.35 + 0.65 * Math.sqrt(ratio);
+    if (posGroup === "G") {
+      return 0.35 + 0.65 * Math.sqrt(ratio);
+    }
+    return 0.5 + 0.5 * Math.sqrt(ratio);
   }
 
   function getCareerStabilityFactor(posGroup, seasonCount, totalUsage) {
     var usageTarget =
-      posGroup === "G" ? GOALIE_TALENT_STABILITY_TARGET : SKATER_TALENT_STABILITY_TARGET;
-    var usageTrust = clip(Math.sqrt(clip(totalUsage / usageTarget, 0, 1)), 0, 1);
+      posGroup === "G"
+        ? GOALIE_TALENT_STABILITY_TARGET
+        : SKATER_TALENT_STABILITY_TARGET;
+    var usageTrust = clip(
+      Math.sqrt(clip(totalUsage / usageTarget, 0, 1)),
+      0,
+      1,
+    );
     var seasonTrust =
-      seasonCount >= 4 ? 1 : seasonCount === 3 ? 0.92 : seasonCount === 2 ? 0.84 : 0.76;
+      seasonCount >= 4
+        ? 1
+        : seasonCount === 3
+          ? 0.92
+          : seasonCount === 2
+            ? 0.84
+            : 0.76;
     return seasonTrust * (0.8 + 0.2 * usageTrust);
   }
 
@@ -255,9 +313,9 @@ var PlayerOverallRatingUpdater = (function PlayerOverallRatingUpdaterModule() {
     if (absDeviation <= 8) {
       factor = 1;
     } else if (absDeviation <= 18) {
-      factor = 0.78 + 0.12 * reliability;
+      factor = 0.86 + 0.1 * reliability;
     } else {
-      factor = 0.55 + 0.2 * reliability;
+      factor = 0.68 + 0.18 * reliability;
     }
     return mean + deviation * factor;
   }
@@ -274,7 +332,9 @@ var PlayerOverallRatingUpdater = (function PlayerOverallRatingUpdaterModule() {
           score: score,
           usage: getUsageValue(row),
           reliability: getSampleReliability(row),
-          recencyWeight: RECENCY_WEIGHTS[index] || RECENCY_WEIGHTS[RECENCY_WEIGHTS.length - 1],
+          recencyWeight:
+            RECENCY_WEIGHTS[index] ||
+            RECENCY_WEIGHTS[RECENCY_WEIGHTS.length - 1],
         };
       })
       .filter(Boolean);
@@ -301,12 +361,17 @@ var PlayerOverallRatingUpdater = (function PlayerOverallRatingUpdaterModule() {
     var totalUsage = scoredHistory.reduce(function (sum, entry) {
       return sum + entry.usage;
     }, 0);
-    var stability = getCareerStabilityFactor(posGroup, scoredHistory.length, totalUsage);
+    var stability = getCareerStabilityFactor(
+      posGroup,
+      scoredHistory.length,
+      totalUsage,
+    );
     var anchored = leagueAnchor + (dampedMean - leagueAnchor) * stability;
 
     // Keep recent seasons slightly more influential for talent perception.
     var recentScore = scoredHistory[0].score;
-    var recentInfluence = RECENT_SEASON_INFLUENCE_BASE * scoredHistory[0].reliability;
+    var recentInfluence =
+      RECENT_SEASON_INFLUENCE_BASE * scoredHistory[0].reliability;
     var overall = anchored + (recentScore - anchored) * recentInfluence;
 
     if (posGroup === "G") {
@@ -325,7 +390,8 @@ var PlayerOverallRatingUpdater = (function PlayerOverallRatingUpdaterModule() {
     targetSeasonIndex,
     maxLookbackSeasons,
   ) {
-    var playerHistory = rowsByPlayerId && playerId ? rowsByPlayerId[String(playerId)] || [] : [];
+    var playerHistory =
+      rowsByPlayerId && playerId ? rowsByPlayerId[String(playerId)] || [] : [];
     if (!playerHistory.length) return [];
 
     return playerHistory
@@ -333,7 +399,8 @@ var PlayerOverallRatingUpdater = (function PlayerOverallRatingUpdaterModule() {
         if (!historyRow) return false;
         var historySeasonId = String(historyRow.seasonId || "");
         var historyIndex = seasonIndexMap[historySeasonId];
-        if (historyIndex === undefined || targetSeasonIndex === undefined) return false;
+        if (historyIndex === undefined || targetSeasonIndex === undefined)
+          return false;
         return historyIndex <= targetSeasonIndex;
       })
       .slice(0, maxLookbackSeasons || MAX_LOOKBACK_SEASONS);
@@ -343,7 +410,8 @@ var PlayerOverallRatingUpdater = (function PlayerOverallRatingUpdaterModule() {
     var numericRank = Number(rank);
     if (!isFinite(numericRank) || numericRank <= 0) return MAX_SALARY;
     if (numericRank <= SALARY_RANK_POINTS[0].rank) return MAX_SALARY;
-    if (numericRank >= SALARY_RANK_POINTS[SALARY_RANK_POINTS.length - 1].rank) return MIN_SALARY;
+    if (numericRank >= SALARY_RANK_POINTS[SALARY_RANK_POINTS.length - 1].rank)
+      return MIN_SALARY;
 
     for (var i = 0; i < SALARY_RANK_POINTS.length - 1; i++) {
       var left = SALARY_RANK_POINTS[i];
@@ -371,7 +439,9 @@ var PlayerOverallRatingUpdater = (function PlayerOverallRatingUpdaterModule() {
     });
 
     rated.sort(function (a, b) {
-      var ratingDiff = (Number(b.overallRatingValue) || 0) - (Number(a.overallRatingValue) || 0);
+      var ratingDiff =
+        (Number(b.overallRatingValue) || 0) -
+        (Number(a.overallRatingValue) || 0);
       if (ratingDiff !== 0) return ratingDiff;
 
       var seasonRatingDiff =
@@ -387,7 +457,10 @@ var PlayerOverallRatingUpdater = (function PlayerOverallRatingUpdaterModule() {
     while (index < rated.length) {
       var end = index + 1;
       var score = Number(rated[index].overallRatingValue) || 0;
-      while (end < rated.length && Number(rated[end].overallRatingValue) === score) {
+      while (
+        end < rated.length &&
+        Number(rated[end].overallRatingValue) === score
+      ) {
         end++;
       }
 
@@ -413,7 +486,10 @@ var PlayerOverallRatingUpdater = (function PlayerOverallRatingUpdaterModule() {
     });
   }
 
-  ns.updateOverallRatingsForSeason = function updateOverallRatingsForSeason(seasonId, options) {
+  ns.updateOverallRatingsForSeason = function updateOverallRatingsForSeason(
+    seasonId,
+    options,
+  ) {
     var seasonKey = requireSeasonId(seasonId, "updateOverallRatingsForSeason");
     var opts = Object.assign(
       {
@@ -441,7 +517,7 @@ var PlayerOverallRatingUpdater = (function PlayerOverallRatingUpdaterModule() {
     var seasonLeagueAnchors = buildSeasonLeagueAnchors(seasonRows);
 
     seasonRows.forEach(function (row) {
-      var playerId = String(row && row.playerId || "");
+      var playerId = String((row && row.playerId) || "");
       var playerHistory = getHistoryRowsForSeason(
         playerId,
         rowsByPlayerId,
