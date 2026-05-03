@@ -8,13 +8,13 @@ import { useMemo, useState } from "react";
 import { DraftClassesSkeleton } from "@gshl-skeletons";
 
 export function DraftClasses() {
-  const [selectedType, setSelectedType] = useState<string>("nyufa");
+  const [selectedType, setSelectedType] = useState<string>("cyufa");
   const { currentSeason, defaultSeason, seasons } = useSeasonState();
   const draftClassSeason = useMemo(
     () => currentSeason ?? findMostRecentSeason(seasons) ?? defaultSeason,
     [currentSeason, defaultSeason, seasons],
   );
-  const year = Number(draftClassSeason?.year ?? new Date().getFullYear());
+  const draftYear = Number(draftClassSeason?.year ?? new Date().getFullYear()) + 1;
   const { data: players, isLoading: playersLoading } = useActivePlayers();
   const { data: contracts, isLoading: contractsLoading } = useContracts();
 
@@ -22,13 +22,16 @@ export function DraftClasses() {
     return <DraftClassesSkeleton />;
   }
 
+  const getDraftClassCutoff = (offset: number) =>
+    new Date(draftYear + offset, 3, 19);
+
   const cyDraftClass = players.filter(
     (player) =>
       !contracts.find(
         (a) =>
           a.playerId === player.id &&
-          new Date(a.expiryDate) >= new Date(year + 1, 3, 19) &&
-          new Date(a.startDate) < new Date(year + 1, 3, 19),
+          new Date(a.expiryDate) >= getDraftClassCutoff(0) &&
+          new Date(a.startDate) < getDraftClassCutoff(0),
       ),
   );
 
@@ -37,8 +40,8 @@ export function DraftClasses() {
       !contracts.find(
         (a) =>
           a.playerId === player.id &&
-          new Date(a.expiryDate) >= new Date(year + 2, 3, 19) &&
-          new Date(a.startDate) < new Date(year + 2, 3, 19),
+          new Date(a.expiryDate) >= getDraftClassCutoff(1) &&
+          new Date(a.startDate) < getDraftClassCutoff(1),
       ),
   );
 
@@ -47,8 +50,8 @@ export function DraftClasses() {
       !contracts.find(
         (a) =>
           a.playerId === player.id &&
-          new Date(a.expiryDate) >= new Date(year + 3, 3, 19) &&
-          new Date(a.startDate) < new Date(year + 3, 3, 19),
+          new Date(a.expiryDate) >= getDraftClassCutoff(2) &&
+          new Date(a.startDate) < getDraftClassCutoff(2),
       ),
   );
 
@@ -57,8 +60,8 @@ export function DraftClasses() {
       !contracts.find(
         (a) =>
           a.playerId === player.id &&
-          new Date(a.expiryDate) >= new Date(year + 4, 3, 19) &&
-          new Date(a.startDate) < new Date(year + 4, 3, 19),
+          new Date(a.expiryDate) >= getDraftClassCutoff(3) &&
+          new Date(a.startDate) < getDraftClassCutoff(3),
       ),
   );
 
@@ -72,22 +75,22 @@ export function DraftClasses() {
     toolbarKeys: [
       {
         key: "cyufa",
-        value: year.toString(),
+        value: draftYear.toString(),
         setter: (type: string | null) => setSelectedType(type ?? ""),
       },
       {
         key: "nyufa",
-        value: (+year + 1).toString(),
+        value: (draftYear + 1).toString(),
         setter: (type: string | null) => setSelectedType(type ?? ""),
       },
       {
         key: "fyufa",
-        value: (+year + 2).toString(),
+        value: (draftYear + 2).toString(),
         setter: (type: string | null) => setSelectedType(type ?? ""),
       },
       {
         key: "lyufa",
-        value: (+year + 3).toString(),
+        value: (draftYear + 3).toString(),
         setter: (type: string | null) => setSelectedType(type ?? ""),
       },
     ],
@@ -123,19 +126,15 @@ export function DraftClasses() {
               const contract = contracts.find(
                 (c) =>
                   c.playerId === player.id &&
-                  new Date(c.expiryDate) >=
-                    new Date(
-                      year +
-                        (selectedType === "cyufa"
-                          ? 0
-                          : selectedType === "nyufa"
-                            ? 1
-                            : selectedType === "fyufa"
-                              ? 2
-                              : 3),
-                      3,
-                      19,
-                    ),
+                  new Date(c.expiryDate) >= getDraftClassCutoff(
+                    selectedType === "cyufa"
+                      ? 0
+                      : selectedType === "nyufa"
+                        ? 1
+                        : selectedType === "fyufa"
+                          ? 2
+                          : 3,
+                  ),
               );
               return (
                 <tr
