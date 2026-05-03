@@ -33,7 +33,7 @@ export function getCurrentSeason(): number {
   const month = now.getMonth();
 
   // Hockey season typically starts in October
-  return month >= 9 ? year+1 : year;
+  return month >= 9 ? year + 1 : year;
 }
 
 export function getSeasonString(year: number): string {
@@ -68,21 +68,14 @@ export function formatTimestamp(date: Date | string | null): string {
 }
 
 export function convertInputDate(excelSerialDate: number): Date {
-  // Excel's epoch is January 1, 1900. JavaScript's epoch is January 1, 1970.
-  // The difference in days between these two dates is 25569.
-  // We also need to account for the leap year bug in Excel's 1900 calculation,
-  // where it incorrectly treats 1900 as a leap year, adding an extra day.
-  // This adjustment is typically handled by subtracting 1 if the date is after Feb 28, 1900.
-  // However, for simplicity and common use cases (dates after 1900),
-  // directly using the 25569 offset is often sufficient.
-
-  const daysSince1900 = excelSerialDate - 1; // Subtract 1 because Excel's day 1 is Jan 1, 1900
+  // Google Sheets and Excel serial dates are day counts relative to 1899-12-30.
+  // Using the standard 25569 offset preserves the expected date-only value.
   const millisecondsPerDay = 24 * 60 * 60 * 1000;
   const excelEpochToJSEpochOffsetMs = 25569 * millisecondsPerDay;
 
   // Calculate milliseconds since JS epoch
   const jsMilliseconds =
-    daysSince1900 * millisecondsPerDay - excelEpochToJSEpochOffsetMs;
+    excelSerialDate * millisecondsPerDay - excelEpochToJSEpochOffsetMs;
 
   return new Date(jsMilliseconds);
 }

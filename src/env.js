@@ -12,7 +12,7 @@ export const env = createEnv({
     NODE_ENV: z
       .enum(["development", "test", "production"])
       .default("development"),
-    USE_GOOGLE_SHEETS: z.string(),
+    USE_GOOGLE_SHEETS: z.enum(["true", "false"]).default("true"),
     GOOGLE_SERVICE_ACCOUNT_KEY_FILE: z.string().optional(),
     GOOGLE_SERVICE_ACCOUNT_KEY: z.string().optional(),
     GOOGLE_APPS_SCRIPT_ID: z.string().optional(),
@@ -38,7 +38,7 @@ export const env = createEnv({
     // DATABASE_URL: process.env.DATABASE_URL,
     // DIRECT_URL: process.env.DIRECT_URL,
     NODE_ENV: process.env.NODE_ENV,
-    USE_GOOGLE_SHEETS: process.env.USE_GOOGLE_SHEETS,
+    USE_GOOGLE_SHEETS: process.env.USE_GOOGLE_SHEETS ?? "true",
     GOOGLE_SERVICE_ACCOUNT_KEY_FILE:
       process.env.GOOGLE_SERVICE_ACCOUNT_KEY_FILE,
     GOOGLE_SERVICE_ACCOUNT_KEY: process.env.GOOGLE_SERVICE_ACCOUNT_KEY,

@@ -1,3 +1,4 @@
+import { existsSync, readFileSync } from "node:fs";
 import { google } from "googleapis";
 import { GoogleAuth } from "google-auth-library";
 import { env } from "@gshl-env";
@@ -30,6 +31,7 @@ interface RateLimitConfig {
 export class OptimizedSheetsClient {
   private sheets: sheets_v4.Sheets;
   private auth: GoogleAuth;
+  private serviceAccountEmail?: string;
   private connectionPool: Map<string, sheets_v4.Sheets> = new Map<
     string,
     sheets_v4.Sheets
@@ -52,8 +54,23 @@ export class OptimizedSheetsClient {
 
   private readonly limiter = pLimit(this.rateLimitConfig.burstLimit);
 
-  private parseServiceAccountCredentials(raw?: string): object | undefined {
-    if (!raw) return undefined;
+  private parseServiceAccountCredentials(raw?: string): {
+    credentials?: object;
+  } {
+    if (!raw) return {};
+
+    const recordClientEmail = (value: unknown): void => {
+      if (
+        typeof value === "object" &&
+        value !== null &&
+        "client_email" in value &&
+        typeof (value as { client_email?: unknown }).client_email === "string"
+      ) {
+        this.serviceAccountEmail = (
+          value as { client_email: string }
+        ).client_email;
+      }
+    };
 
     const trimmed = raw.trim();
     const maybeUnquoted =
@@ -64,23 +81,54 @@ export class OptimizedSheetsClient {
 
     // Ignore non-JSON values (for example, accidental file paths in this env var).
     if (!maybeUnquoted.startsWith("{") && !maybeUnquoted.startsWith("[")) {
-      return undefined;
+      return {};
     }
 
     try {
-      return JSON.parse(maybeUnquoted) as object;
+      const parsed = JSON.parse(maybeUnquoted) as object;
+      recordClientEmail(parsed);
+      return { credentials: parsed };
+    } catch {
+      return {};
+    }
+  }
+
+  private readServiceAccountEmailFromKeyFile(
+    keyFilePath?: string,
+  ): string | undefined {
+    if (!keyFilePath) return undefined;
+
+    try {
+      const parsed = JSON.parse(readFileSync(keyFilePath, "utf8")) as {
+        client_email?: unknown;
+      };
+      if (typeof parsed.client_email === "string") {
+        this.serviceAccountEmail = parsed.client_email;
+        return parsed.client_email;
+      }
     } catch {
       return undefined;
     }
+
+    return undefined;
   }
 
   constructor() {
     try {
+      const keyFile =
+        env.GOOGLE_SERVICE_ACCOUNT_KEY_FILE ??
+        (existsSync("./credentials.json")
+          ? "./credentials.json"
+          : existsSync("./gsconfig.json")
+            ? "./gsconfig.json"
+            : "./credentials.json");
+      const parsedCredentials = this.parseServiceAccountCredentials(
+        env.GOOGLE_SERVICE_ACCOUNT_KEY,
+      );
+      this.readServiceAccountEmailFromKeyFile(keyFile);
       this.auth = new GoogleAuth({
-        keyFile: env.GOOGLE_SERVICE_ACCOUNT_KEY_FILE ?? "./gsconfig.json",
-        credentials: this.parseServiceAccountCredentials(
-          env.GOOGLE_SERVICE_ACCOUNT_KEY,
-        ),
+        keyFile,
+        credentials: parsedCredentials.credentials,
         scopes: ["https://www.googleapis.com/auth/spreadsheets"],
       });
 
@@ -504,6 +552,10 @@ export class OptimizedSheetsClient {
         requestBody: { values: batch },
       });
     }
+  }
+
+  getConfiguredServiceAccountEmail(): string | undefined {
+    return this.serviceAccountEmail;
   }
 
   // Utility methods
