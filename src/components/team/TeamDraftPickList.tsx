@@ -13,13 +13,39 @@
  * @module components/team/TeamDraftPickList
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { DraftPickListSkeleton } from "@gshl-skeletons";
 import { DropdownToggle } from "@gshl-nav";
 import type { TeamDraftPickListProps, DraftPickItemProps } from "@gshl-utils";
-import { formatDraftPickDescription, getOriginalTeamName } from "@gshl-utils";
+import {
+  formatDraftPickDescription,
+  getOriginalTeamName,
+  getSeasonString,
+} from "@gshl-utils";
 import type { Season } from "@gshl-types";
 import { useTeamDraftPickListData } from "@gshl-hooks";
+
+function shiftSeasonDate(dateValue: string, yearOffset: number): string {
+  const parsed = new Date(dateValue);
+  if (Number.isNaN(parsed.getTime())) return dateValue;
+
+  parsed.setFullYear(parsed.getFullYear() + yearOffset);
+  return parsed.toISOString().split("T")[0] ?? dateValue;
+}
+
+function buildSyntheticSeason(previousSeason: Season, id: string): Season {
+  const nextEndYear = Number(previousSeason.year) + 1;
+  return {
+    ...previousSeason,
+    id,
+    year: nextEndYear,
+    name: getSeasonString(nextEndYear - 1),
+    startDate: shiftSeasonDate(previousSeason.startDate, 1),
+    endDate: shiftSeasonDate(previousSeason.endDate, 1),
+    signingEndDate: shiftSeasonDate(previousSeason.signingEndDate, 1),
+    isActive: false,
+  };
+}
 
 // ============================================================================
 // INTERNAL COMPONENTS
@@ -108,6 +134,37 @@ export function TeamDraftPickList({
   gshlTeamId,
   selectedSeasonId,
 }: TeamDraftPickListProps & { seasons?: Season[] }) {
+  const seasonOptions = useMemo<Season[]>(() => {
+    const knownSeasons = [...(seasons ?? [])].sort(
+      (a, b) => Number(a.id) - Number(b.id),
+    );
+    const seasonIdsFromPicks = Array.from(
+      new Set((draftPicks ?? []).map((pick) => String(pick.seasonId ?? ""))),
+    )
+      .filter(Boolean)
+      .sort((a, b) => Number(a) - Number(b));
+
+    if (!knownSeasons.length) return knownSeasons;
+
+    const seasonsById = new Map(
+      knownSeasons.map((season) => [season.id, season]),
+    );
+    const orderedSeasons = [...knownSeasons];
+
+    for (const seasonId of seasonIdsFromPicks) {
+      if (seasonsById.has(seasonId)) continue;
+
+      const previousSeason = orderedSeasons[orderedSeasons.length - 1];
+      if (!previousSeason) continue;
+
+      const syntheticSeason = buildSyntheticSeason(previousSeason, seasonId);
+      orderedSeasons.push(syntheticSeason);
+      seasonsById.set(seasonId, syntheticSeason);
+    }
+
+    return orderedSeasons;
+  }, [draftPicks, seasons]);
+
   // Local (component-scoped) season selection so the toggle only affects this list.
   const [localSeasonId, setLocalSeasonId] = useState<string | undefined>(
     selectedSeasonId,
@@ -115,20 +172,27 @@ export function TeamDraftPickList({
 
   // If no explicit season provided, default to most recent season (by startDate)
   useEffect(() => {
-    if (localSeasonId != null) return;
-    if (!seasons?.length) return;
-    const mostRecent = [...seasons].sort((a, b) => {
-      return new Date(a.startDate).getTime() - new Date(b.startDate).getTime();
+    if (!seasonOptions.length) return;
+
+    if (
+      localSeasonId != null &&
+      seasonOptions.some((season) => season.id === localSeasonId)
+    ) {
+      return;
+    }
+
+    const mostRecent = [...seasonOptions].sort((a, b) => {
+      return new Date(b.startDate).getTime() - new Date(a.startDate).getTime();
     })[0];
     if (mostRecent) setLocalSeasonId(mostRecent.id);
-  }, [seasons, localSeasonId]);
+  }, [seasonOptions, localSeasonId]);
 
   const { processedDraftPicks, ready } = useTeamDraftPickListData({
     teams,
     draftPicks,
     contracts,
     players,
-    seasons,
+    seasons: seasonOptions,
     gshlTeamId,
     selectedSeasonId: localSeasonId,
     allTeams,
@@ -139,15 +203,15 @@ export function TeamDraftPickList({
     <>
       <div className="mx-auto mt-4 flex flex-col items-center gap-2">
         <div className="flex items-center gap-2 py-3 text-xl font-bold">
-          {seasons && seasons.length > 0 && localSeasonId != null && (
+          {seasonOptions.length > 0 && localSeasonId != null && (
             <DropdownToggle
-              items={[...seasons].sort((a, b) => {
+              items={[...seasonOptions].sort((a, b) => {
                 return (
                   new Date(b.startDate).getTime() -
                   new Date(a.startDate).getTime()
                 );
               })}
-              selectedItem={seasons.find((s) => s.id === localSeasonId)}
+              selectedItem={seasonOptions.find((s) => s.id === localSeasonId)}
               onSelect={(s: Season) => setLocalSeasonId(s.id)}
               getItemKey={(s: Season) => String(s.id)}
               getItemLabel={(s: Season) => s.name}

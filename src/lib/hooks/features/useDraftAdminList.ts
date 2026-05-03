@@ -12,7 +12,7 @@ import {
 import { getFreeAgents } from "@gshl-utils/domain/player";
 import { generateLineupAssignments } from "@gshl-utils";
 import { useDraftPicks, usePlayers, useNHLTeams, useTeams } from "@gshl-hooks";
-import { api } from "src/trpc/react";
+import { api } from "@gshl-trpc/react";
 
 const normalizeTeamIdentifier = (value: unknown): string | null => {
   if (value === null || value === undefined) {

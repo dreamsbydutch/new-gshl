@@ -3,6 +3,7 @@ import { createTRPCRouter, publicProcedure } from "../trpc";
 import { baseQuerySchema } from "./_schemas";
 import {
   type PlayerDayStatLine,
+  type PlayerNHLStatLine,
   type PlayerSplitStatLine,
   type PlayerTotalStatLine,
   type PlayerWeekStatLine,
@@ -222,6 +223,39 @@ export const playerStatsRouter = createTRPCRouter({
           where: { seasonId: input.seasonId },
           orderBy: { [input.statType]: "desc" },
           take: input.take,
+        });
+      }),
+  }),
+
+  nhl: createTRPCRouter({
+    getAll: publicProcedure
+      .input(
+        baseQuerySchema.extend({
+          where: z
+            .object({
+              playerId: z.string().optional(),
+              seasonId: z.string().optional(),
+            })
+            .optional(),
+        }),
+      )
+      .query(async ({ input }): Promise<PlayerNHLStatLine[]> => {
+        return getMany<PlayerNHLStatLine>("PlayerNHLStatLine", input);
+      }),
+
+    getByPlayer: publicProcedure
+      .input(
+        z.object({
+          playerId: z.string(),
+          seasonId: z.string().optional(),
+        }),
+      )
+      .query(async ({ input }): Promise<PlayerNHLStatLine[]> => {
+        return getMany<PlayerNHLStatLine>("PlayerNHLStatLine", {
+          where: {
+            playerId: input.playerId,
+            ...(input.seasonId && { seasonId: input.seasonId }),
+          },
         });
       }),
   }),

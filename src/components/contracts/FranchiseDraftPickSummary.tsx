@@ -12,6 +12,7 @@ export function FranchiseDraftPickSummary({
   groups,
   hasData,
 }: FranchiseDraftPickSummaryProps) {
+  console.log(groups);
   return (
     <div className="mx-auto mb-8 w-full max-w-3xl">
       <div className="mt-4 w-full text-center text-lg font-bold">

@@ -5,8 +5,8 @@
  * Type definitions have been moved to @gshl-types/ui-components
  */
 
-import { RosterPosition, PositionGroup } from "@gshl-types";
-import type { DraftBoardPlayer, DraftPick } from "@gshl-types";
+import { ContractStatus, RosterPosition, PositionGroup } from "@gshl-types";
+import type { Contract, DraftBoardPlayer, DraftPick } from "@gshl-types";
 
 // Re-export types for backward compatibility
 export type { DraftBoardToolbarProps, DraftBoardPlayer } from "@gshl-types";
@@ -69,12 +69,69 @@ export function sortByOverallRating(
 }
 
 /**
- * Filters players to only active undrafted players
+ * Sorts draft players by their overall rank (ascending).
+ */
+export function sortByOverallRank(
+  a: Pick<DraftBoardPlayer, "overallRk">,
+  b: Pick<DraftBoardPlayer, "overallRk">,
+): number {
+  return (a.overallRk ?? 9999) - (b.overallRk ?? 9999);
+}
+
+function parseDate(value: string | Date | null | undefined): Date | null {
+  if (!value) return null;
+
+  const parsed = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function hasUpcomingSeasonContract(
+  playerId: string,
+  contracts: Contract[],
+  activeOn: Date | null,
+): boolean {
+  return contracts.some((contract) => {
+    if (String(contract.playerId) !== String(playerId)) {
+      return false;
+    }
+
+    if (
+      contract.expiryStatus === ContractStatus.BUYOUT ||
+      contract.signingStatus === ContractStatus.BUYOUT
+    ) {
+      return false;
+    }
+
+    if (!activeOn) {
+      return true;
+    }
+
+    const startDate = parseDate(contract.startDate);
+    const expiryDate = parseDate(contract.expiryDate);
+    if (!startDate || !expiryDate) {
+      return false;
+    }
+
+    return (
+      startDate.getTime() < activeOn.getTime() &&
+      expiryDate.getTime() >= activeOn.getTime()
+    );
+  });
+}
+
+/**
+ * Filters players to only active draft-eligible players for a target season.
  */
 export function filterAvailableDraftPlayers<
-  T extends Pick<DraftBoardPlayer, "isActive" | "gshlTeamId">,
->(players: T[]): T[] {
-  return players.filter((p) => p.isActive && !p.gshlTeamId);
+  T extends Pick<DraftBoardPlayer, "id" | "isActive">,
+>(players: T[], contracts: Contract[], activeOn?: string | Date | null): T[] {
+  const activeDate = parseDate(activeOn ?? null);
+
+  return players.filter(
+    (player) =>
+      player.isActive &&
+      !hasUpcomingSeasonContract(String(player.id), contracts, activeDate),
+  );
 }
 
 /**
@@ -82,10 +139,13 @@ export function filterAvailableDraftPlayers<
  */
 export function prepareDraftBoardPlayers<T extends DraftBoardPlayer>(
   players: T[],
+  contracts: Contract[],
+  activeOn?: string | Date | null,
 ): T[] {
-  return filterAvailableDraftPlayers(players)
+  return filterAvailableDraftPlayers(players, contracts, activeOn)
     .sort(sortByOverallRating)
-    .sort(sortByPreDraftRank);
+    .sort(sortByPreDraftRank)
+    .sort(sortByOverallRank);
 }
 
 /**
@@ -126,5 +186,5 @@ export function getSeasonDraftPicks<
 }
 
 export const draftBoardFilters = { matchesFilter };
-export const draftBoardSorters = { sortByPreDraftRank };
+export const draftBoardSorters = { sortByPreDraftRank, sortByOverallRank };
 export const draftBoardHelpers = { excludeGoalies };

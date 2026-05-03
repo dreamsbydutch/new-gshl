@@ -1,12 +1,24 @@
 "use client";
 
 import { useMemo } from "react";
-import { useDraftPicks, usePlayers, useNHLTeams, useTeams } from "@gshl-hooks";
 import {
+  useContracts,
+  useDraftPicks,
+  usePlayers,
+  useNHLTeams,
+  useSeasons,
+  useTeams,
+} from "@gshl-hooks";
+import {
+  buildMockDraftProjection,
+  findOffseasonWindow,
+  findSeasonById,
   matchesFilter,
   prepareDraftBoardPlayers,
   getSeasonDraftPicks,
+  resolveContractDefaultSeason,
   type DraftBoardPlayer,
+  type ProjectedDraftPick,
 } from "@gshl-utils";
 import type { DraftPick, GSHLTeam, NHLTeam } from "@gshl-types";
 
@@ -53,15 +65,25 @@ export function useDraftBoardData(options: UseDraftBoardDataOptions) {
   const { seasonId, selectedType = null } = options;
 
   const { data: players, isLoading: playersLoading } = usePlayers();
+  const { data: contracts = [], isLoading: contractsLoading } = useContracts();
   const { data: nhlTeamsRaw, isLoading: nhlTeamsLoading } = useNHLTeams();
+  const { data: seasons = [], isLoading: seasonsLoading } = useSeasons({
+    orderBy: { year: "asc" },
+  });
   const { data: gshlTeamsData, isLoading: gshlTeamsLoading } = useTeams({
     seasonId,
     enabled: Boolean(seasonId),
   });
   const { data: draftPicks, isLoading: draftPicksLoading } = useDraftPicks();
 
-  const nhlTeams = (nhlTeamsRaw as NHLTeam[]) ?? [];
-  const gshlTeams = (gshlTeamsData as GSHLTeam[]) ?? [];
+  const nhlTeams = useMemo(
+    () => (nhlTeamsRaw as NHLTeam[]) ?? [],
+    [nhlTeamsRaw],
+  );
+  const gshlTeams = useMemo(
+    () => (gshlTeamsData as GSHLTeam[]) ?? [],
+    [gshlTeamsData],
+  );
 
   // Apply utility to filter and sort draft picks for the season
   const seasonDraftPicks: DraftPick[] = useMemo(
@@ -69,10 +91,35 @@ export function useDraftBoardData(options: UseDraftBoardDataOptions) {
     [draftPicks, seasonId],
   );
 
+  const activeSeason = useMemo(() => {
+    const matchedSeason = findSeasonById(seasons, seasonId);
+    if (matchedSeason) {
+      return matchedSeason;
+    }
+
+    const offseasonUpcomingSeason =
+      findOffseasonWindow(seasons)?.upcomingSeason;
+    if (String(offseasonUpcomingSeason?.id ?? "") === String(seasonId)) {
+      return offseasonUpcomingSeason;
+    }
+
+    const contractDefaultSeason = resolveContractDefaultSeason(seasons);
+    if (String(contractDefaultSeason?.id ?? "") === String(seasonId)) {
+      return contractDefaultSeason;
+    }
+
+    return undefined;
+  }, [seasons, seasonId]);
+
   // Apply utility to filter and sort available players
   const draftPlayers: DraftBoardPlayer[] = useMemo(
-    () => prepareDraftBoardPlayers((players ?? []) as DraftBoardPlayer[]),
-    [players],
+    () =>
+      prepareDraftBoardPlayers(
+        (players ?? []) as DraftBoardPlayer[],
+        contracts,
+        activeSeason?.startDate,
+      ),
+    [players, contracts, activeSeason],
   );
 
   // Apply position filter
@@ -81,13 +128,36 @@ export function useDraftBoardData(options: UseDraftBoardDataOptions) {
     [draftPlayers, selectedType],
   );
 
+  const projectedDraftPicks: ProjectedDraftPick[] = useMemo(
+    () =>
+      buildMockDraftProjection({
+        seasonDraftPicks,
+        draftPlayers,
+        teams: gshlTeams,
+      }),
+    [seasonDraftPicks, draftPlayers, gshlTeams],
+  );
+
+  const hasHydratedData =
+    players !== undefined &&
+    nhlTeamsRaw !== undefined &&
+    gshlTeamsData !== undefined &&
+    draftPicks !== undefined;
+
   const isLoading =
-    playersLoading || nhlTeamsLoading || gshlTeamsLoading || draftPicksLoading;
+    !hasHydratedData &&
+    (playersLoading ||
+      contractsLoading ||
+      nhlTeamsLoading ||
+      seasonsLoading ||
+      gshlTeamsLoading ||
+      draftPicksLoading);
 
   return {
     draftPlayers,
     filteredPlayers,
     seasonDraftPicks,
+    projectedDraftPicks,
     nhlTeams,
     gshlTeams,
     isLoading,

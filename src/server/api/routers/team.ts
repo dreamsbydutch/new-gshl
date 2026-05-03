@@ -38,6 +38,28 @@ const hasEntityId = <T extends { id?: string | number | null }>(
   return typeof entity.id === "string" || typeof entity.id === "number";
 };
 
+type RawNHLTeam = Partial<NHLTeam> & {
+  abbr?: string | null;
+  name?: string | null;
+};
+
+function normalizeNHLTeam(team: RawNHLTeam): NHLTeam {
+  return {
+    id: String(team.id ?? ""),
+    fullName: String(team.fullName ?? team.name ?? ""),
+    abbreviation: String(team.abbreviation ?? team.abbr ?? ""),
+    logoUrl: String(team.logoUrl ?? ""),
+    createdAt:
+      team.createdAt instanceof Date
+        ? team.createdAt
+        : new Date(team.createdAt ?? 0),
+    updatedAt:
+      team.updatedAt instanceof Date
+        ? team.updatedAt
+        : new Date(team.updatedAt ?? 0),
+  };
+}
+
 const normalizeIdString = (
   value: string | number | null | undefined,
 ): string | undefined => {
@@ -192,7 +214,8 @@ export const teamRouter = createTRPCRouter({
 
   getNHLTeams: publicProcedure.query(async (): Promise<NHLTeam[]> => {
     // Sheet name is case-sensitive; underlying sheet is named 'NHLTeam'
-    return getMany<NHLTeam>("NHLTeam");
+    const teams = await getMany<RawNHLTeam>("NHLTeam");
+    return teams.map(normalizeNHLTeam);
   }),
 
   // Count teams

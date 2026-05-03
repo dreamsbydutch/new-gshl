@@ -20,6 +20,33 @@ import { formatMoney, formatNumber } from "@gshl-utils";
 import type { NHLTeam, Player } from "@gshl-types";
 import { useDraftAdminList } from "@gshl-hooks";
 
+function getPlayerNhlAbbreviation(value: unknown): string | null {
+  if (Array.isArray(value)) {
+    const firstTeam = value.find(
+      (team): team is string =>
+        typeof team === "string" && team.trim().length > 0,
+    );
+    return firstTeam ?? null;
+  }
+
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const team = value.trim();
+  return team.length > 0 ? team : null;
+}
+
+function findNhlTeamByAbbreviation(
+  nhlTeams: NHLTeam[],
+  abbreviation: unknown,
+): NHLTeam | undefined {
+  const normalizedAbbreviation = getPlayerNhlAbbreviation(abbreviation);
+  return normalizedAbbreviation
+    ? nhlTeams.find((team) => team.abbreviation === normalizedAbbreviation)
+    : undefined;
+}
+
 export function DraftAdminList(): JSX.Element {
   const {
     searchTerm,
@@ -135,8 +162,9 @@ export function DraftAdminList(): JSX.Element {
             </tr>
           ) : (
             filteredFreeAgents.map((player: Player) => {
-              const nhlTeam: NHLTeam | undefined = nhlTeams.find(
-                (team) => team.abbreviation === player.nhlTeam?.toString(),
+              const nhlTeam = findNhlTeamByAbbreviation(
+                nhlTeams,
+                player.nhlTeam,
               );
               const isDraftingThisPlayer = draftingPlayerId === player.id;
               const isDisabled =

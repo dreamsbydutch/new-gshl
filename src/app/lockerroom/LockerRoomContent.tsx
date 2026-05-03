@@ -12,13 +12,11 @@ import {
   useNav,
   useContractData,
 } from "@gshl-hooks";
+import { resolveContractDefaultSeason } from "@gshl-utils";
 import type { GSHLTeam, NHLTeam } from "@gshl-types";
 import { TeamHistoryContainer } from "@gshl-components/team/TeamHistory";
 import { TeamRoster } from "@gshl-components/team/TeamRoster";
-import {
-  TeamBuyoutTable,
-  TeamContractTable,
-} from "@gshl-components/contracts/ContractTable";
+import { TeamContractTable } from "@gshl-components/contracts/ContractTable";
 import { FranchiseContractHistory } from "@gshl-components/contracts/ContractHistory";
 import { FranchiseDraftPickSummary } from "@gshl-components/contracts/FranchiseDraftPickSummary";
 import { LockerRoomSkeleton, TeamRosterSkeleton } from "@gshl-skeletons";
@@ -29,20 +27,25 @@ export function LockerRoomContent() {
   const { currentSeason, defaultSeason, seasons } = useSeasonState();
   const activeSeason = currentSeason ?? defaultSeason;
   const { selectedLockerRoomType, selectedOwnerId } = useNav();
+  const contractSeason = useMemo(
+    () => resolveContractDefaultSeason(seasons) ?? defaultSeason,
+    [defaultSeason, seasons],
+  );
 
   // Only fetch contract data when on a tab that needs it
   const needsContractData =
     selectedLockerRoomType === "salary" ||
     selectedLockerRoomType === "draft" ||
     selectedLockerRoomType === "roster";
+  const lockerRoomSeason = needsContractData ? contractSeason : activeSeason;
 
   const { data: draftPicks } = useDraftPicks();
   const { data: players = [], isLoading: playersLoading } = usePlayers();
   const { data: teamsRaw = [], isLoading: teamsLoading } = useTeams();
   const allTeams = teamsRaw as GSHLTeam[];
   const teams = useMemo(
-    () => allTeams.filter((team) => team.seasonId == activeSeason?.id),
-    [allTeams, activeSeason?.id],
+    () => allTeams.filter((team) => team.seasonId == lockerRoomSeason?.id),
+    [allTeams, lockerRoomSeason?.id],
   );
   const { data: nhlTeamsRaw = [], isLoading: nhlTeamsLoading } = useNHLTeams();
   const nhlTeams = nhlTeamsRaw as NHLTeam[];
@@ -54,9 +57,8 @@ export function LockerRoomContent() {
     history: teamContractHistory,
     draft: franchiseDraftSummary,
     currentContracts,
-    buyoutContracts,
   } = useContractData({
-    currentSeason: activeSeason,
+    currentSeason: contractSeason,
     currentTeam,
     players,
     nhlTeams,
@@ -90,21 +92,12 @@ export function LockerRoomContent() {
         <>
           <TeamContractTable
             {...{
-              currentSeason: activeSeason,
+              currentSeason: contractSeason,
               players,
               nhlTeams,
               contracts: currentContracts,
               currentTeam,
               ...teamContractTableData,
-            }}
-          />
-          <TeamBuyoutTable
-            {...{
-              buyoutContracts,
-              currentTeam,
-              players,
-              nhlTeams,
-              ready: teamContractTableData.ready,
             }}
           />
           <FranchiseDraftPickSummary {...franchiseDraftSummary} />
@@ -139,7 +132,7 @@ export function LockerRoomContent() {
               players,
               seasons,
               gshlTeamId: currentTeam.id,
-              selectedSeasonId: activeSeason?.id ?? "",
+              selectedSeasonId: lockerRoomSeason?.id ?? "",
             }}
           />
         </>

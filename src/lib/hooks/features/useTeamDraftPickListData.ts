@@ -143,8 +143,9 @@ export function useTeamDraftPickListData(
   const activeSeason = useMemo(() => {
     if (!normalizedSeasons?.length) return undefined;
     if (selectedSeasonId != null) {
-      const coerced = Number(selectedSeasonId);
-      const found = normalizedSeasons.find((s) => Number(s.id) === coerced);
+      const found = normalizedSeasons.find(
+        (s) => String(s.id) === String(selectedSeasonId),
+      );
       if (found) return found;
     }
     const now = Date.now();
@@ -163,22 +164,31 @@ export function useTeamDraftPickListData(
     })[0];
   }, [normalizedSeasons, selectedSeasonId]);
 
+  const activeSeasonId = activeSeason?.id
+    ? String(activeSeason.id)
+    : selectedSeasonId
+      ? String(selectedSeasonId)
+      : undefined;
+
   /**
    * Resolve season-specific team id (franchise continuity) but NEVER return undefined if a base id is supplied.
    * If teams aren't loaded yet we still proceed with the provided gshlTeamId to avoid empty UI flashes.
    */
   const resolvedTeamId = useMemo(() => {
     if (!gshlTeamId) return undefined; // no baseline supplied
-    if (!teams || !activeSeason) return gshlTeamId; // can't map yet – use raw id
-    const baseTeam = teams.find((t) => t.id === gshlTeamId);
+    const lookupTeams = allTeams ?? teams;
+    if (!lookupTeams?.length || !activeSeasonId) return gshlTeamId;
+    const baseTeam = lookupTeams.find(
+      (t) => String(t.id) === String(gshlTeamId),
+    );
     if (!baseTeam) return gshlTeamId;
-    const seasonTeam = teams.find(
+    const seasonTeam = lookupTeams.find(
       (t) =>
-        t.seasonId === activeSeason.id &&
-        t.franchiseId === baseTeam.franchiseId,
+        String(t.seasonId) === activeSeasonId &&
+        String(t.franchiseId) === String(baseTeam.franchiseId),
     );
     return seasonTeam ? seasonTeam.id : gshlTeamId;
-  }, [teams, gshlTeamId, activeSeason]);
+  }, [teams, allTeams, gshlTeamId, activeSeasonId]);
 
   /** Fast lookup maps */
   const playerById = useMemo(() => {
@@ -187,40 +197,49 @@ export function useTeamDraftPickListData(
   }, [players]);
 
   const teamById = useMemo(() => {
-    if (!teams) return new Map<string, GSHLTeam>();
-    return new Map(teams.map((t) => [t.id, t] as const));
-  }, [teams]);
+    const lookupTeams = allTeams ?? teams;
+    if (!lookupTeams) return new Map<string, GSHLTeam>();
+    return new Map(lookupTeams.map((t) => [t.id, t] as const));
+  }, [teams, allTeams]);
 
   /** Derive picks */
   const processedDraftPicks = useMemo<ProcessedDraftPick[]>(() => {
     if (!draftPicks || !gshlTeamId) return [];
 
-    // Owner-wide scoping (span multiple franchises if the same owner retained control across seasons)
     const lookupTeams = allTeams ?? teams;
     const baseTeam = lookupTeams?.find((t) => t.id === gshlTeamId);
-    const ownerTeamIds =
-      baseTeam?.ownerId != null
-        ? lookupTeams
-            ?.filter((t) => t.ownerId === baseTeam.ownerId)
-            .map((t) => t.id)
-        : undefined;
+    const relatedTeamIds = baseTeam
+      ? lookupTeams
+          ?.filter((team) => {
+            if (baseTeam.franchiseId) {
+              return String(team.franchiseId) === String(baseTeam.franchiseId);
+            }
+            if (baseTeam.ownerId != null) {
+              return String(team.ownerId) === String(baseTeam.ownerId);
+            }
+            return false;
+          })
+          .map((team) => String(team.id))
+      : undefined;
 
-    // Start from all picks owned by any owner-associated team id; fallback to resolvedTeamId
     const targetTeamId = resolvedTeamId ?? gshlTeamId;
-    let picks = ownerTeamIds
-      ? draftPicks.filter((p) => ownerTeamIds.includes(p.gshlTeamId))
-      : draftPicks.filter((p) => p.gshlTeamId === targetTeamId);
+    let picks = relatedTeamIds?.length
+      ? draftPicks.filter((pick) =>
+          relatedTeamIds.includes(String(pick.gshlTeamId)),
+        )
+      : draftPicks.filter(
+          (pick) => String(pick.gshlTeamId) === String(targetTeamId),
+        );
 
-    // Season filter (explicit user selection vs auto)
     const explicitSelection = selectedSeasonId !== undefined;
-    if (activeSeason) {
-      const seasonId = activeSeason.id;
+    if (activeSeasonId) {
+      const seasonId = String(activeSeasonId);
       if (explicitSelection) {
-        // Always enforce explicit filter, even if it yields zero (lets UI show empty state instead of stale data)
-        picks = picks.filter((p) => p.seasonId === seasonId);
+        picks = picks.filter((pick) => String(pick.seasonId) === seasonId);
       } else {
-        // Auto mode (computed) keeps fallback behavior if no season-specific picks yet
-        const seasonScoped = picks.filter((p) => p.seasonId === seasonId);
+        const seasonScoped = picks.filter(
+          (pick) => String(pick.seasonId) === seasonId,
+        );
         if (seasonScoped.length) {
           picks = seasonScoped;
         }
@@ -257,7 +276,7 @@ export function useTeamDraftPickListData(
     draftPicks,
     gshlTeamId,
     resolvedTeamId,
-    activeSeason,
+    activeSeasonId,
     teamById,
     playerById,
     teams,

@@ -201,8 +201,7 @@ export interface Player {
 export interface Contract {
   id: string;
   playerId: string;
-  signingFranchiseId: string;
-  currentFranchiseId: string;
+  ownerId: string;
   seasonId: string;
   contractType: ContractType[];
   contractLength: number;

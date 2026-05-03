@@ -9,6 +9,7 @@ export * from "./contract-table";
 export * from "./conference-contest";
 export * from "./draft-board-list";
 export * from "./draft-admin";
+export * from "./mock-draft";
 
 // locker-room-header exports (including TeamInfoProps)
 export * from "./locker-room-header";

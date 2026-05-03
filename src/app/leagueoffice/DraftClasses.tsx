@@ -1,15 +1,20 @@
 "use client";
 
 import { HorizontalToggle, TertiaryPageToolbar } from "@gshl-components/ui/nav";
-import { useActivePlayers, useContracts } from "@gshl-hooks";
+import { useActivePlayers, useContracts, useSeasonState } from "@gshl-hooks";
 import { ContractStatus, type ToggleItem } from "@gshl-types";
-import { cn, getCurrentSeason } from "@gshl-utils";
-import { useState } from "react";
+import { cn, findMostRecentSeason } from "@gshl-utils";
+import { useMemo, useState } from "react";
 import { DraftClassesSkeleton } from "@gshl-skeletons";
 
 export function DraftClasses() {
   const [selectedType, setSelectedType] = useState<string>("nyufa");
-  const year = +getCurrentSeason();
+  const { currentSeason, defaultSeason, seasons } = useSeasonState();
+  const draftClassSeason = useMemo(
+    () => currentSeason ?? findMostRecentSeason(seasons) ?? defaultSeason,
+    [currentSeason, defaultSeason, seasons],
+  );
+  const year = Number(draftClassSeason?.year ?? new Date().getFullYear());
   const { data: players, isLoading: playersLoading } = useActivePlayers();
   const { data: contracts, isLoading: contractsLoading } = useContracts();
 
@@ -88,7 +93,7 @@ export function DraftClasses() {
     ],
   };
   return (
-    <>
+    <div className="pb-20 lg:pb-8 lg:pt-8">
       <div className="mb-2 flex flex-col gap-4 text-center">
         <span className="text-2xs font-semibold">
           *Bold - UFAs guaranteed to be in draft class
@@ -169,6 +174,6 @@ export function DraftClasses() {
           className="no-scrollbar flex flex-row overflow-scroll"
         />
       </TertiaryPageToolbar>
-    </>
+    </div>
   );
 }

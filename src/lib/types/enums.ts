@@ -61,6 +61,7 @@ export enum ContractStatus {
   DRAFTED = "Drafted",
   RFA = "RFA",
   UFA = "UFA",
+  TRADE = "Trade",
   BUYOUT = "Buyout",
   RETIRED = "Retired",
   INJURED = "Injured",

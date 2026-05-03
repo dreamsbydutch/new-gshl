@@ -207,6 +207,9 @@ export function useSeasons(options: UseSeasonsOptions = {}) {
 
   // Use appropriate query
   const query = isSingleSeason ? getByIdQuery : getAllQuery;
+  const hasHydratedQueryData = isSingleSeason
+    ? getByIdQuery.data !== undefined
+    : getAllQuery.data !== undefined;
   const seasons = useMemo(() => {
     if (hasCachedSeasons && cachedSeasons) {
       const filtered = normalizedSeasonId
@@ -244,7 +247,10 @@ export function useSeasons(options: UseSeasonsOptions = {}) {
 
   return {
     data: filteredSeasons,
-    isLoading: !hasCachedSeasons && !cacheReady ? true : query.isLoading,
+    isLoading:
+      !hasCachedSeasons && !hasHydratedQueryData && !cacheReady
+        ? true
+        : query.isLoading,
     error: query.error ?? null,
   };
 }

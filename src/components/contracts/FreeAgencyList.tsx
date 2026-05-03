@@ -26,6 +26,33 @@ import { Table, NHLLogo } from "@gshl-ui";
 import { formatMoney, formatNumber } from "@gshl-utils";
 import type { Player, NHLTeam } from "@gshl-types";
 
+function getPlayerNhlAbbreviation(value: unknown): string | null {
+  if (Array.isArray(value)) {
+    const firstTeam = value.find(
+      (team): team is string =>
+        typeof team === "string" && team.trim().length > 0,
+    );
+    return firstTeam ?? null;
+  }
+
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const team = value.trim();
+  return team.length > 0 ? team : null;
+}
+
+function findNhlTeamByAbbreviation(
+  nhlTeams: NHLTeam[],
+  abbreviation: unknown,
+): NHLTeam | undefined {
+  const normalizedAbbreviation = getPlayerNhlAbbreviation(abbreviation);
+  return normalizedAbbreviation
+    ? nhlTeams.find((team) => team.abbreviation === normalizedAbbreviation)
+    : undefined;
+}
+
 // ============================================================================
 // INTERNAL COMPONENTS
 // ============================================================================
@@ -42,9 +69,7 @@ const FreeAgentRow = ({
   player: Player;
   nhlTeams: NHLTeam[];
 }) => {
-  const nhlTeam = nhlTeams.find(
-    (t: NHLTeam) => t.abbreviation === player.nhlTeam.toString(),
-  );
+  const nhlTeam = findNhlTeamByAbbreviation(nhlTeams, player.nhlTeam);
 
   return (
     <tr className="py-2">

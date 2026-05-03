@@ -27,19 +27,15 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import {
-  type ToggleItem,
-  type DraftPick,
-  type NHLTeam,
-  type GSHLTeam,
-} from "@gshl-types";
+import { type ToggleItem, type NHLTeam } from "@gshl-types";
 import { Table, NHLLogo } from "@gshl-ui";
 import { HorizontalToggle, SecondaryPageToolbar } from "@gshl-nav";
 import {
   type DraftBoardPlayer,
   type DraftBoardToolbarProps,
+  type ProjectedDraftPick,
   formatNumber,
-  sortByPreDraftRank,
+  sortByOverallRank,
   excludeGoalies,
 } from "@gshl-utils";
 import {
@@ -48,6 +44,54 @@ import {
   lighten,
   readableText,
 } from "@gshl-hooks";
+
+function groupProjectedDraftPicksByRound(
+  projectedDraftPicks: ProjectedDraftPick[],
+): Array<{
+  round: string;
+  picks: ProjectedDraftPick[];
+}> {
+  const rounds = new Map<string, ProjectedDraftPick[]>();
+
+  for (const projectedPick of projectedDraftPicks) {
+    const round = String(projectedPick.pick.round);
+    const picks = rounds.get(round) ?? [];
+    picks.push(projectedPick);
+    rounds.set(round, picks);
+  }
+
+  return Array.from(rounds.entries()).map(([round, picks]) => ({
+    round,
+    picks,
+  }));
+}
+
+function getPlayerNhlAbbreviation(value: unknown): string | null {
+  if (Array.isArray(value)) {
+    const firstTeam = value.find(
+      (team): team is string =>
+        typeof team === "string" && team.trim().length > 0,
+    );
+    return firstTeam ?? null;
+  }
+
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const team = value.trim();
+  return team.length > 0 ? team : null;
+}
+
+function findNhlTeamByAbbreviation(
+  nhlTeams: NHLTeam[],
+  abbreviation: unknown,
+): NHLTeam | undefined {
+  const normalizedAbbreviation = getPlayerNhlAbbreviation(abbreviation);
+  return normalizedAbbreviation
+    ? nhlTeams.find((team) => team.abbreviation === normalizedAbbreviation)
+    : undefined;
+}
 
 // ============================================================================
 // INTERNAL COMPONENTS
@@ -66,6 +110,8 @@ function DraftBoardPlayerListing({
   nhlTeams: NHLTeam[];
 }) {
   const [isOpen, setIsOpen] = useState(false);
+  const nhlTeam = findNhlTeamByAbbreviation(nhlTeams, player.nhlTeam);
+
   return (
     <tr key={player.id} className="py-2" onClick={() => setIsOpen(!isOpen)}>
       <td className="whitespace-nowrap px-1">{player.overallRk}</td>
@@ -75,11 +121,7 @@ function DraftBoardPlayerListing({
           : (+formatNumber(player.preDraftRk, 1)).toFixed(1)}
       </td>
       <td>
-        <NHLLogo
-          team={nhlTeams.find(
-            (t: NHLTeam) => t.abbreviation === player.nhlTeam.toString(),
-          )}
-        />
+        <NHLLogo team={nhlTeam} />
       </td>
       <td className="whitespace-nowrap px-2">{player.fullName}</td>
       <td className="whitespace-nowrap px-2">{player.nhlPos.join(", ")}</td>
@@ -196,27 +238,25 @@ function DraftBoardTable({
  * and stats. Uses team colors for background with readable text contrast.
  */
 function MockDraftPickCard({
-  pick,
-  index,
-  draftPlayers,
+  projectedPick,
   nhlTeams,
-  gshlTeam,
 }: {
-  pick: DraftPick;
-  index: number;
-  draftPlayers: DraftBoardPlayer[];
+  projectedPick: ProjectedDraftPick;
   nhlTeams: NHLTeam[];
-  gshlTeam: GSHLTeam | undefined;
 }) {
-  const projectedPlayer: DraftBoardPlayer | undefined = draftPlayers[index];
+  const { pick, projectedPlayer, gshlTeam } = projectedPick;
   const teamColor = useTeamColor(gshlTeam?.logoUrl);
   const base = teamColor ? lighten(teamColor, 0.82) : "#f1f5f9"; // lightened background
   const accent = teamColor ?? "#cbd5e1"; // border uses original or neutral
   // Determine readable text against the actual background (base), not the original team color
   const textColor = readableText(base);
+  const projectedPlayerNhlTeam = projectedPlayer
+    ? findNhlTeamByAbbreviation(nhlTeams, projectedPlayer.nhlTeam)
+    : undefined;
+
   return (
     <div
-      className="w-[350px] rounded-md border p-0.5 shadow-sm transition-colors"
+      className="mx-auto w-full min-w-[18rem] max-w-[24rem] rounded-md border p-0.5 shadow-sm transition-colors xl:min-w-[22rem]"
       style={{ backgroundColor: base, borderColor: accent }}
     >
       <div
@@ -236,8 +276,8 @@ function MockDraftPickCard({
             <span className="text-xs text-gray-400">?</span>
           </div>
         )}
-        <span className="text-lg">{gshlTeam?.name}</span>
-        <span className="text-xs font-normal opacity-70">
+        <span className="whitespace-nowrap text-lg">{gshlTeam?.name}</span>
+        <span className="whitespace-nowrap text-xs font-normal opacity-70">
           Rd {pick.round}, Pk {pick.pick}
         </span>
       </div>
@@ -246,32 +286,26 @@ function MockDraftPickCard({
         style={{ color: textColor }}
       >
         {projectedPlayer ? (
-          <div className="mx-auto flex max-w-[250px] flex-row items-center">
-            <NHLLogo
-              size={24}
-              team={nhlTeams.find(
-                (t: NHLTeam) =>
-                  t.abbreviation === projectedPlayer.nhlTeam.toString(),
-              )}
-            />
+          <div className="mx-auto flex w-full min-w-0 flex-row items-center gap-2 px-3 py-1">
+            <NHLLogo size={24} team={projectedPlayerNhlTeam} />
             <div className="flex min-w-0 flex-col leading-tight">
-              <span className="truncate text-[13px] font-semibold md:text-sm">
+              <span className="whitespace-nowrap text-[13px] font-semibold md:text-sm">
                 {projectedPlayer.fullName}
               </span>
-              <span className="text-center text-[10px] opacity-75">
+              <span className="whitespace-nowrap text-[10px] opacity-75">
                 {projectedPlayer.nhlPos.toString()} • Age{" "}
                 {(+formatNumber(projectedPlayer.age, 1)).toFixed(1)}
               </span>
             </div>
-            <div className="ml-auto flex flex-col items-end gap-0.5 text-[10px]">
-              <span>
+            <div className="ml-auto flex shrink-0 flex-col items-end gap-0.5 text-[10px]">
+              <span className="whitespace-nowrap">
                 24-25{" "}
                 {(+formatNumber(projectedPlayer.seasonRating ?? 0, 2)).toFixed(
                   2,
                 )}{" "}
                 (#{projectedPlayer.seasonRk})
               </span>
-              <span>
+              <span className="whitespace-nowrap">
                 Ovr{" "}
                 {(+formatNumber(projectedPlayer.overallRating ?? 0, 2)).toFixed(
                   2,
@@ -297,49 +331,45 @@ function MockDraftPickCard({
  * showing projected players for each pick with team branding.
  */
 function MockDraftList({
-  seasonDraftPicks,
-  draftPlayers,
+  projectedDraftPicks,
   nhlTeams,
-  gshlTeams,
   toolbarProps,
+  title = "GSHL Mock Draft",
 }: {
-  seasonDraftPicks: DraftPick[];
-  draftPlayers: DraftBoardPlayer[];
+  projectedDraftPicks: ProjectedDraftPick[];
   nhlTeams: NHLTeam[];
-  gshlTeams: GSHLTeam[];
   toolbarProps?: DraftBoardToolbarProps;
+  title?: string;
 }) {
+  const rounds = groupProjectedDraftPicksByRound(projectedDraftPicks);
+
   return (
-    <div className="mt-8 text-center">
-      <h2 className="mb-4 text-2xl font-bold">GSHL Mock Draft</h2>
-      <div className="flex flex-col gap-1">
-        {seasonDraftPicks.map((dp: DraftPick, i: number) => {
-          const gshlTeam = gshlTeams.find(
-            (team: GSHLTeam) => team.id === dp.gshlTeamId,
-          );
-          const showRoundHeader =
-            i === 0 || seasonDraftPicks[i - 1]?.round !== dp.round;
-          return (
-            <div key={dp.id} className="flex flex-col items-center gap-1">
-              {showRoundHeader && (
-                <div className="mt-4 flex items-center gap-2">
-                  <div className="h-px flex-1 bg-gray-300" />
-                  <span className="m-2 text-lg font-semibold uppercase tracking-wide text-gray-600">
-                    Round {dp.round}
-                  </span>
-                  <div className="h-px flex-1 bg-gray-300" />
-                </div>
-              )}
-              <MockDraftPickCard
-                pick={dp}
-                index={i}
-                draftPlayers={draftPlayers}
-                nhlTeams={nhlTeams}
-                gshlTeam={gshlTeam}
-              />
+    <div className="mt-8">
+      <h2 className="text-center text-2xl font-bold">{title}</h2>
+      <div className="mt-6 flex flex-col gap-6">
+        {rounds.map(({ round, picks }) => (
+          <section
+            key={round}
+            className="flex h-full flex-col rounded-2xl border border-slate-200 bg-white/70 p-4 text-left shadow-sm"
+          >
+            <div className="flex items-center gap-3">
+              <div className="h-px flex-1 bg-slate-300" />
+              <span className="text-sm font-semibold uppercase tracking-[0.24em] text-slate-600">
+                Round {round}
+              </span>
+              <div className="h-px flex-1 bg-slate-300" />
             </div>
-          );
-        })}
+            <div className="mt-4 grid grid-cols-[repeat(auto-fit,minmax(18rem,1fr))] gap-3 xl:grid-cols-[repeat(auto-fit,minmax(22rem,1fr))]">
+              {picks.map((projectedPick) => (
+                <MockDraftPickCard
+                  key={projectedPick.pick.id}
+                  projectedPick={projectedPick}
+                  nhlTeams={nhlTeams}
+                />
+              ))}
+            </div>
+          </section>
+        ))}
       </div>
       {toolbarProps && (
         <SecondaryPageToolbar>
@@ -390,8 +420,7 @@ export function DraftBoardList({
     draftPlayers,
     filteredPlayers,
     nhlTeams,
-    gshlTeams,
-    seasonDraftPicks,
+    projectedDraftPicks,
   } = useDraftBoardData({ seasonId, selectedType });
 
   if (isLoading) {
@@ -462,10 +491,8 @@ export function DraftBoardList({
   if (selectedType === "mockdraft") {
     return (
       <MockDraftList
-        seasonDraftPicks={seasonDraftPicks}
-        draftPlayers={draftPlayers}
+        projectedDraftPicks={projectedDraftPicks}
         nhlTeams={nhlTeams}
-        gshlTeams={gshlTeams}
         toolbarProps={pageToolbarProps}
       />
     );
@@ -473,8 +500,8 @@ export function DraftBoardList({
 
   // Apply position filter and sorting for table view
   const displayPlayers = navbarToggle
-    ? filteredPlayers.filter(excludeGoalies).sort(sortByPreDraftRank)
-    : filteredPlayers.sort(sortByPreDraftRank);
+    ? filteredPlayers.filter(excludeGoalies).sort(sortByOverallRank)
+    : filteredPlayers.sort(sortByOverallRank);
 
   return (
     <DraftBoardTable
@@ -494,9 +521,19 @@ export function DraftBoardList({
  *
  * @param seasonId - The season ID to display mock draft for
  */
-export function MockDraftPreview({ seasonId = "12" }: { seasonId?: string }) {
-  const { isLoading, draftPlayers, nhlTeams, gshlTeams, seasonDraftPicks } =
-    useDraftBoardData({ seasonId, selectedType: "mockdraft" });
+export function MockDraftPreview({
+  seasonId,
+  limit,
+  title,
+}: {
+  seasonId: string;
+  limit?: number;
+  title?: string;
+}) {
+  const { isLoading, nhlTeams, projectedDraftPicks } = useDraftBoardData({
+    seasonId,
+    selectedType: "mockdraft",
+  });
   if (isLoading) {
     return (
       <div className="mt-6 text-center">
@@ -507,11 +544,14 @@ export function MockDraftPreview({ seasonId = "12" }: { seasonId?: string }) {
   }
   return (
     <MockDraftList
-      seasonDraftPicks={seasonDraftPicks}
-      draftPlayers={draftPlayers}
+      projectedDraftPicks={
+        typeof limit === "number"
+          ? projectedDraftPicks.slice(0, limit)
+          : projectedDraftPicks
+      }
       toolbarProps={undefined}
       nhlTeams={nhlTeams}
-      gshlTeams={gshlTeams}
+      title={title}
     />
   );
 }

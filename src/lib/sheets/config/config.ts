@@ -3,8 +3,8 @@ import { safeParseSheetDate } from "../../utils/core/date";
 
 const NHL_TEAM_COLUMNS = [
   "id",
-  "fullName",
-  "abbreviation",
+  "name",
+  "abbr",
   "logoUrl",
   "createdAt",
   "updatedAt",
@@ -86,7 +86,9 @@ export const MODEL_TO_WORKBOOK: Record<string, keyof typeof WORKBOOKS> = {
   TeamSeasonStatLine: "TEAMSTATS",
 };
 
-function uniqueWorkbookIds(keys: readonly (keyof typeof WORKBOOKS)[]): string[] {
+function uniqueWorkbookIds(
+  keys: readonly (keyof typeof WORKBOOKS)[],
+): string[] {
   return Array.from(new Set(keys.map((key) => WORKBOOKS[key]).filter(Boolean)));
 }
 
@@ -342,8 +344,7 @@ export const SHEETS_CONFIG = {
     Contract: [
       "id",
       "playerId",
-      "signingFranchiseId",
-      "currentFranchiseId",
+      "ownerId",
       "seasonId",
       "contractType",
       "contractLength",

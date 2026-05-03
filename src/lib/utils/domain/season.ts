@@ -1,5 +1,6 @@
 import type { Season } from "@gshl-types";
 import type { Week } from "@gshl-types";
+import { getSeasonString } from "../core/date";
 
 export type SeasonSummary = {
   id: string;
@@ -88,6 +89,58 @@ export function findMostRecentSeason(
   return previous[0];
 }
 
+export interface OffseasonWindow {
+  endedSeason: Season;
+  upcomingSeason: Season;
+}
+
+export function findOffseasonWindow(
+  seasons: Season[] | undefined,
+  referenceDate: Date = new Date(),
+): OffseasonWindow | undefined {
+  if (!seasons?.length) return undefined;
+
+  const endedSeason = seasons
+    .filter((season) => {
+      const end = coerceDate(season.endDate);
+      if (!end) return false;
+      return end.getTime() < referenceDate.getTime();
+    })
+    .sort(compareByStartDateDesc)[0];
+
+  const upcomingSeason =
+    findUpcomingSeason(seasons, referenceDate) ??
+    deriveProjectedNextSeason(endedSeason);
+
+  if (!endedSeason || !upcomingSeason) {
+    return undefined;
+  }
+
+  return {
+    endedSeason,
+    upcomingSeason,
+  };
+}
+
+export function isBetweenSeasons(
+  seasons: Season[] | undefined,
+  referenceDate: Date = new Date(),
+): boolean {
+  const offseasonWindow = findOffseasonWindow(seasons, referenceDate);
+  if (!offseasonWindow) {
+    return false;
+  }
+
+  const endedAt = coerceDate(offseasonWindow.endedSeason.endDate);
+  const startsAt = coerceDate(offseasonWindow.upcomingSeason.startDate);
+  if (!endedAt || !startsAt) {
+    return false;
+  }
+
+  const currentTime = referenceDate.getTime();
+  return endedAt.getTime() < currentTime && currentTime < startsAt.getTime();
+}
+
 /**
  * When between seasons, returns whichever adjacent season is closest in time
  * to the reference date — the just-ended season or the upcoming one.
@@ -128,6 +181,54 @@ export function resolveDefaultSeason(
     findCurrentSeason(seasons, referenceDate) ??
     findClosestAdjacentSeason(seasons, referenceDate) ??
     seasons[0]
+  );
+}
+
+function deriveProjectedNextSeason(
+  season: Season | undefined,
+): Season | undefined {
+  if (!season) return undefined;
+
+  const nextSeasonEndYear = Number(season.year) + 1;
+  const nextSeasonId = Number.isFinite(Number(season.id))
+    ? String(Number(season.id) + 1)
+    : season.id;
+  const shiftYear = (value: string) => {
+    const parsed = coerceDate(value);
+    if (!parsed) return value;
+
+    const shifted = new Date(parsed);
+    shifted.setFullYear(shifted.getFullYear() + 1);
+    return shifted.toISOString().split("T")[0] ?? value;
+  };
+
+  return {
+    ...season,
+    id: nextSeasonId,
+    year: nextSeasonEndYear,
+    name: getSeasonString(Number(season.year)),
+    startDate: shiftYear(season.startDate),
+    endDate: shiftYear(season.endDate),
+    signingEndDate: shiftYear(season.signingEndDate),
+    isActive: false,
+  };
+}
+
+/**
+ * Contract views should anchor to the active season while a season is in progress,
+ * then flip immediately to the next upcoming season once the current season ends.
+ */
+export function resolveContractDefaultSeason(
+  seasons: Season[] | undefined,
+  referenceDate: Date = new Date(),
+): Season | undefined {
+  if (!seasons?.length) return undefined;
+
+  return (
+    findCurrentSeason(seasons, referenceDate) ??
+    findUpcomingSeason(seasons, referenceDate) ??
+    deriveProjectedNextSeason(findMostRecentSeason(seasons, referenceDate)) ??
+    resolveDefaultSeason(seasons, referenceDate)
   );
 }
 

@@ -9,17 +9,17 @@ import {
   useSeasonState,
 } from "@gshl-hooks";
 import type { Contract, GSHLTeam, Player } from "@gshl-types";
-import { cn } from "@gshl-utils";
+import { cn, resolveContractDefaultSeason } from "@gshl-utils";
 import Image from "next/image";
 import { TeamRoster } from "@gshl-components/team/TeamRoster";
 import { DraftBoardSkeleton } from "@gshl-skeletons";
 
 export function DraftBoardContent() {
-  const { currentSeason, defaultSeason } = useSeasonState();
-  const activeSeason = currentSeason ?? defaultSeason;
-  const seasonId = activeSeason?.id;
-  const { data: contracts = [], isLoading: contractsLoading } =
-    useAllContracts();
+  const { defaultSeason, seasons } = useSeasonState();
+  const contractSeason = resolveContractDefaultSeason(seasons) ?? defaultSeason;
+  const seasonId = contractSeason?.id;
+  const { data: contractsData, isLoading: contractsLoading } = useAllContracts();
+  const contracts: Contract[] = contractsData ?? [];
   const { data: players, isLoading: playersLoading } = usePlayers();
   const { data: teamsRaw = [], isLoading: teamsLoading } = useTeams({
     seasonId,
@@ -95,8 +95,7 @@ export function DraftBoardContent() {
                     (player) => player.gshlTeamId === team.franchiseId,
                   )}
                   contracts={contracts.filter(
-                    (contract) =>
-                      contract.currentFranchiseId === team.franchiseId,
+                    (contract) => contract.ownerId === team.ownerId,
                   )}
                   currentTeam={team}
                 />
@@ -114,8 +113,7 @@ export function DraftBoardContent() {
                     (player) => player.gshlTeamId === team.franchiseId,
                   )}
                   contracts={contracts.filter(
-                    (contract) =>
-                      contract.currentFranchiseId === team.franchiseId,
+                    (contract) => contract.ownerId === team.ownerId,
                   )}
                   currentTeam={team}
                 />
@@ -133,8 +131,7 @@ export function DraftBoardContent() {
                     (player) => player.gshlTeamId === team.franchiseId,
                   )}
                   contracts={contracts.filter(
-                    (contract) =>
-                      contract.currentFranchiseId === team.franchiseId,
+                    (contract) => contract.ownerId === team.ownerId,
                   )}
                   currentTeam={team}
                 />

@@ -26,8 +26,7 @@ export interface ContractFilters {
   ids?: MaybeArray<string>;
   excludeIds?: MaybeArray<string>;
   playerIds?: MaybeArray<string>;
-  signingFranchiseIds?: MaybeArray<string>;
-  currentFranchiseIds?: MaybeArray<string>;
+  ownerIds?: MaybeArray<string>;
   seasonIds?: MaybeArray<string>;
   activeOnly?: boolean;
   activeOn?: string;
@@ -75,8 +74,7 @@ export function applyContractFilters(
   const ids = toSet(filters.ids);
   const excludeIds = toSet(filters.excludeIds);
   const playerIds = toSet(filters.playerIds);
-  const signingFranchiseIds = toSet(filters.signingFranchiseIds);
-  const currentFranchiseIds = toSet(filters.currentFranchiseIds);
+  const ownerIds = toSet(filters.ownerIds);
   const seasonIds = toSet(filters.seasonIds);
   const includeExpiryStatuses = toSet(filters.includeExpiryStatuses);
   const excludeExpiryStatuses = toSet(filters.excludeExpiryStatuses);
@@ -90,10 +88,7 @@ export function applyContractFilters(
     if (ids?.has(contract.id) === false) return false;
     if (excludeIds?.has(contract.id)) return false;
     if (playerIds?.has(contract.playerId) === false) return false;
-    if (signingFranchiseIds?.has(contract.signingFranchiseId) === false)
-      return false;
-    if (currentFranchiseIds?.has(contract.currentFranchiseId) === false)
-      return false;
+    if (ownerIds?.has(contract.ownerId) === false) return false;
     if (seasonIds?.has(contract.seasonId) === false) return false;
 
     if (cutoff && contract.capHitEndDate <= cutoff) {

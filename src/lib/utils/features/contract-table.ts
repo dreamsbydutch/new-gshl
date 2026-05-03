@@ -19,7 +19,7 @@ export type {
 
 /**
  * Maps a contract expiry status to Tailwind utility classes for badge styling.
- * @param expiryStatus - Contract expiry status (e.g. "RFA", "UFA", "Buyout")
+ * @param expiryStatus - Contract expiry status (e.g. "RFA", "UFA", "Trade", "Buyout")
  * @returns Tailwind class string (empty string if no special styling)
  */
 export const getExpiryStatusClass = (expiryStatus: string) => {
@@ -28,6 +28,9 @@ export const getExpiryStatusClass = (expiryStatus: string) => {
   }
   if (expiryStatus === "UFA") {
     return "bg-rose-100 text-rose-800";
+  }
+  if (expiryStatus === "Trade") {
+    return "bg-sky-100 text-sky-800";
   }
   return "";
 };
