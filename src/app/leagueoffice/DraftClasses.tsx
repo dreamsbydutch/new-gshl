@@ -7,6 +7,13 @@ import { cn, findMostRecentSeason } from "@gshl-utils";
 import { useMemo, useState } from "react";
 import { DraftClassesSkeleton } from "@gshl-skeletons";
 
+function parseDate(value: string | Date | null | undefined): Date | null {
+  if (!value) return null;
+
+  const parsed = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
 export function DraftClasses() {
   const [selectedType, setSelectedType] = useState<string>("cyufa");
   const { currentSeason, defaultSeason, seasons } = useSeasonState();
@@ -14,7 +21,7 @@ export function DraftClasses() {
     () => currentSeason ?? findMostRecentSeason(seasons) ?? defaultSeason,
     [currentSeason, defaultSeason, seasons],
   );
-  const draftYear = Number(draftClassSeason?.year ?? new Date().getFullYear()) + 1;
+  const draftYear = Number(draftClassSeason?.year ?? new Date().getFullYear());
   const { data: players, isLoading: playersLoading } = useActivePlayers();
   const { data: contracts, isLoading: contractsLoading } = useContracts();
 
@@ -24,6 +31,15 @@ export function DraftClasses() {
 
   const getDraftClassCutoff = (offset: number) =>
     new Date(draftYear + offset, 3, 19);
+
+  const getDraftClassOffset = () =>
+    selectedType === "cyufa"
+      ? 0
+      : selectedType === "nyufa"
+        ? 1
+        : selectedType === "fyufa"
+          ? 2
+          : 3;
 
   const cyDraftClass = players.filter(
     (player) =>
@@ -123,25 +139,35 @@ export function DraftClasses() {
             .sort((a, b) => (b.overallRating ?? 0) - (a.overallRating ?? 0))
             .slice(0, 300)
             .map((player) => {
-              const contract = contracts.find(
-                (c) =>
-                  c.playerId === player.id &&
-                  new Date(c.expiryDate) >= getDraftClassCutoff(
-                    selectedType === "cyufa"
-                      ? 0
-                      : selectedType === "nyufa"
-                        ? 1
-                        : selectedType === "fyufa"
-                          ? 2
-                          : 3,
-                  ),
-              );
+              const draftClassOffset = getDraftClassOffset();
+              const previousCutoff = getDraftClassCutoff(draftClassOffset - 1);
+              const cutoff = getDraftClassCutoff(getDraftClassOffset());
+              const expiringContract = contracts
+                .filter((contract) => String(contract.playerId) === String(player.id))
+                .filter((contract) => {
+                  const expiryDate = parseDate(contract.expiryDate);
+
+                  if (!expiryDate) {
+                    return false;
+                  }
+
+                  return (
+                    previousCutoff.getTime() <= expiryDate.getTime() &&
+                    expiryDate.getTime() < cutoff.getTime()
+                  );
+                })
+                .sort((left, right) => {
+                  const leftExpiry = parseDate(left.expiryDate)?.getTime() ?? 0;
+                  const rightExpiry = parseDate(right.expiryDate)?.getTime() ?? 0;
+                  return rightExpiry - leftExpiry;
+                })[0];
+
               return (
                 <tr
                   key={player.id}
                   className={cn(
                     "border-b border-gray-400 py-0.5 text-sm",
-                    contract?.expiryStatus === ContractStatus.UFA
+                    expiringContract?.expiryStatus === ContractStatus.UFA
                       ? "font-semibold"
                       : "",
                   )}
