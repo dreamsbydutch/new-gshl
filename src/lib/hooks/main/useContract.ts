@@ -443,9 +443,14 @@ export function useContractData(
         return;
       }
 
+      const seasonSalary = toNumber(row.salary, Number.NaN);
+      if (!Number.isFinite(seasonSalary)) {
+        return;
+      }
+
       map.set(
         getPlayerSeasonValueKey(playerId, seasonEndYear),
-        toNumber(row.salary, 0),
+        seasonSalary,
       );
     });
 
