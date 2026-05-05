@@ -17,6 +17,7 @@
     "ratings:rebuild-all": "tsx src/scripts/backfill-all-player-ratings.ts",
     "ratings:parity": "tsx src/scripts/ratings-parity.ts",
     "stats:aggregate-season": "tsx src/scripts/aggregate-season-stats.ts",
+    "stats:backfill-hockey-reference": "tsx src/scripts/backfill-hockey-reference-season.ts",
     "stats:backfill-yahoo-rosters": "tsx src/scripts/backfill-yahoo-roster-player-days.ts",
     "start": "next start",
     "typecheck": "tsc --noEmit",
