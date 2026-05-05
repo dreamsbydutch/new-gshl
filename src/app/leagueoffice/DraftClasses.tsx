@@ -2,7 +2,12 @@
 
 import { HorizontalToggle, TertiaryPageToolbar } from "@gshl-components/ui/nav";
 import { useActivePlayers, useContracts, useSeasonState } from "@gshl-hooks";
-import { ContractStatus, type ToggleItem } from "@gshl-types";
+import {
+  ContractStatus,
+  type Contract,
+  type Player,
+  type ToggleItem,
+} from "@gshl-types";
 import { cn, findMostRecentSeason } from "@gshl-utils";
 import { useMemo, useState } from "react";
 import { DraftClassesSkeleton } from "@gshl-skeletons";
@@ -12,6 +17,32 @@ function parseDate(value: string | Date | null | undefined): Date | null {
 
   const parsed = value instanceof Date ? value : new Date(value);
   return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function filterAvailableDraftPlayers(
+  players: Player[],
+  contracts: Contract[],
+  cutoff: Date,
+): Player[] {
+  return players.filter(
+    (player) =>
+      !contracts.find((contract) => {
+        if (String(contract.playerId) !== String(player.id)) {
+          return false;
+        }
+
+        const expiryDate = parseDate(contract.expiryDate);
+        const startDate = parseDate(contract.startDate);
+        if (!expiryDate || !startDate) {
+          return false;
+        }
+
+        return (
+          expiryDate.getTime() >= cutoff.getTime() &&
+          startDate.getTime() < cutoff.getTime()
+        );
+      }),
+  );
 }
 
 export function DraftClasses() {
@@ -24,10 +55,7 @@ export function DraftClasses() {
   const draftYear = Number(draftClassSeason?.year ?? new Date().getFullYear());
   const { data: players, isLoading: playersLoading } = useActivePlayers();
   const { data: contracts, isLoading: contractsLoading } = useContracts();
-
-  if (playersLoading || contractsLoading) {
-    return <DraftClassesSkeleton />;
-  }
+  const activeContracts = contracts ?? [];
 
   const getDraftClassCutoff = (offset: number) =>
     new Date(draftYear + offset, 3, 19);
@@ -41,45 +69,38 @@ export function DraftClasses() {
           ? 2
           : 3;
 
-  const cyDraftClass = players.filter(
-    (player) =>
-      !contracts.find(
-        (a) =>
-          a.playerId === player.id &&
-          new Date(a.expiryDate) >= getDraftClassCutoff(0) &&
-          new Date(a.startDate) < getDraftClassCutoff(0),
-      ),
-  );
+  const { cyDraftClass, nyDraftClass, fyDraftClass, lyDraftClass } =
+    useMemo(() => {
+      const availablePlayers = players ?? [];
+      const availableContracts = contracts ?? [];
 
-  const nyDraftClass = players.filter(
-    (player) =>
-      !contracts.find(
-        (a) =>
-          a.playerId === player.id &&
-          new Date(a.expiryDate) >= getDraftClassCutoff(1) &&
-          new Date(a.startDate) < getDraftClassCutoff(1),
-      ),
-  );
+      return {
+        cyDraftClass: filterAvailableDraftPlayers(
+          availablePlayers,
+          availableContracts,
+          new Date(draftYear, 3, 19),
+        ),
+        nyDraftClass: filterAvailableDraftPlayers(
+          availablePlayers,
+          availableContracts,
+          new Date(draftYear + 1, 3, 19),
+        ),
+        fyDraftClass: filterAvailableDraftPlayers(
+          availablePlayers,
+          availableContracts,
+          new Date(draftYear + 2, 3, 19),
+        ),
+        lyDraftClass: filterAvailableDraftPlayers(
+          availablePlayers,
+          availableContracts,
+          new Date(draftYear + 3, 3, 19),
+        ),
+      };
+    }, [contracts, draftYear, players]);
 
-  const fyDraftClass = players.filter(
-    (player) =>
-      !contracts.find(
-        (a) =>
-          a.playerId === player.id &&
-          new Date(a.expiryDate) >= getDraftClassCutoff(2) &&
-          new Date(a.startDate) < getDraftClassCutoff(2),
-      ),
-  );
-
-  const lyDraftClass = players.filter(
-    (player) =>
-      !contracts.find(
-        (a) =>
-          a.playerId === player.id &&
-          new Date(a.expiryDate) >= getDraftClassCutoff(3) &&
-          new Date(a.startDate) < getDraftClassCutoff(3),
-      ),
-  );
+  if (playersLoading || contractsLoading) {
+    return <DraftClassesSkeleton />;
+  }
 
   const pageToolbarProps: {
     toolbarKeys: ToggleItem<string | null>[];
@@ -142,8 +163,10 @@ export function DraftClasses() {
               const draftClassOffset = getDraftClassOffset();
               const previousCutoff = getDraftClassCutoff(draftClassOffset - 1);
               const cutoff = getDraftClassCutoff(getDraftClassOffset());
-              const expiringContract = contracts
-                .filter((contract) => String(contract.playerId) === String(player.id))
+              const expiringContract = activeContracts
+                .filter(
+                  (contract) => String(contract.playerId) === String(player.id),
+                )
                 .filter((contract) => {
                   const expiryDate = parseDate(contract.expiryDate);
 
@@ -158,7 +181,8 @@ export function DraftClasses() {
                 })
                 .sort((left, right) => {
                   const leftExpiry = parseDate(left.expiryDate)?.getTime() ?? 0;
-                  const rightExpiry = parseDate(right.expiryDate)?.getTime() ?? 0;
+                  const rightExpiry =
+                    parseDate(right.expiryDate)?.getTime() ?? 0;
                   return rightExpiry - leftExpiry;
                 })[0];
 

@@ -21,7 +21,7 @@ import { FranchiseContractHistory } from "@gshl-components/contracts/ContractHis
 import { FranchiseDraftPickSummary } from "@gshl-components/contracts/FranchiseDraftPickSummary";
 import { LockerRoomSkeleton, TeamRosterSkeleton } from "@gshl-skeletons";
 
-const SHOW_LOCKER_ROOM_ROSTER_SALARIES = false;
+const SHOW_LOCKER_ROOM_ROSTER_SALARIES = true;
 
 export function LockerRoomContent() {
   const { currentSeason, defaultSeason, seasons } = useSeasonState();
