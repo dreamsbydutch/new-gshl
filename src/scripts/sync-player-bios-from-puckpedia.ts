@@ -70,7 +70,6 @@ type BrowserFetchResult = {
   url: string;
 };
 
-
 type SheetRecord = Record<string, PrimitiveCellValue>;
 
 type LatestPlayerDaySnapshot = {
@@ -118,11 +117,11 @@ const MIN_SALARY = 1_000_000;
 const MAX_SALARY = 10_000_000;
 const SALARY_RANK_POINTS = [
   { rank: 3.5, salary: 10_000_000 },
-  { rank: 18, salary: 9_000_000 },
+  { rank: 21, salary: 9_000_000 },
   { rank: 35, salary: 8_000_000 },
-  { rank: 140, salary: 5_000_000 },
-  { rank: 225, salary: 2_000_000 },
-  { rank: 270, salary: 1_000_000 },
+  { rank: 154, salary: 5_000_000 },
+  { rank: 240, salary: 2_000_000 },
+  { rank: 285, salary: 1_000_000 },
 ] as const;
 const RESIGNABLE_STATUS = {
   DRAFT: "DRAFT",
@@ -133,6 +132,8 @@ const REGULAR_SEASON = "RS";
 const MAX_LOOKBACK_SEASONS = 4;
 const RECENCY_WEIGHTS = [1.0, 0.78, 0.59, 0.43] as const;
 const RECENT_SEASON_INFLUENCE_BASE = 0.11;
+const RECENT_SEASON_INFLUENCE_MIN = 0.05;
+const RECENT_SEASON_INFLUENCE_MAX = 0.24;
 const SKATER_SAMPLE_TARGET = 82;
 const GOALIE_SAMPLE_TARGET = 50;
 const SKATER_TALENT_STABILITY_TARGET = 180;
@@ -1328,6 +1329,47 @@ function dampDeviation(
   return mean + deviation * factor;
 }
 
+function getRecentSeasonInfluence(
+  anchoredScore: number,
+  recentScore: number,
+  reliability: number,
+  seasonCount: number,
+): number {
+  const tierScore = Math.max(anchoredScore, recentScore);
+  const volatility = Math.abs(recentScore - anchoredScore);
+
+  let tierMultiplier = 1;
+  if (tierScore >= 88) {
+    tierMultiplier = 0.58;
+  } else if (tierScore >= 80) {
+    tierMultiplier = 0.78;
+  } else if (tierScore >= 68) {
+    tierMultiplier = 1.2;
+  } else if (tierScore >= 56) {
+    tierMultiplier = 1.4;
+  } else {
+    tierMultiplier = 1.3;
+  }
+
+  const volatilityMultiplier =
+    tierScore >= 80
+      ? 1 - 0.35 * clip(volatility / 18, 0, 1)
+      : 1 + 0.35 * clip(volatility / 16, 0, 1);
+
+  const historyMultiplier =
+    seasonCount >= 3 ? 1 : seasonCount === 2 ? 1.08 : 1.16;
+
+  return clip(
+    RECENT_SEASON_INFLUENCE_BASE *
+      reliability *
+      tierMultiplier *
+      volatilityMultiplier *
+      historyMultiplier,
+    RECENT_SEASON_INFLUENCE_MIN,
+    RECENT_SEASON_INFLUENCE_MAX,
+  );
+}
+
 function computeOverallRatingForHistory(
   historyRows: SheetRecord[],
   leagueAnchor: number,
@@ -1394,8 +1436,12 @@ function computeOverallRatingForHistory(
   );
   const anchored = leagueAnchor + (dampedMean - leagueAnchor) * stability;
   const recentScore = scoredHistory[0]?.score ?? anchored;
-  const recentInfluence =
-    RECENT_SEASON_INFLUENCE_BASE * (scoredHistory[0]?.reliability ?? 0);
+  const recentInfluence = getRecentSeasonInfluence(
+    anchored,
+    recentScore,
+    scoredHistory[0]?.reliability ?? 0,
+    scoredHistory.length,
+  );
   let overall = anchored + (recentScore - anchored) * recentInfluence;
 
   if (posGroup === "G") {
@@ -1430,17 +1476,30 @@ function buildSalaryByPlayerId(
     playerId: string;
     overallRating: number;
     seasonRating: number | null;
+    age: number | null;
   }>,
 ): Map<string, number> {
   const rated = overallEntries
     .filter((entry) => Number.isFinite(entry.overallRating))
     .slice()
     .sort((left, right) => {
-      const overallDiff = right.overallRating - left.overallRating;
+      const leftMarketScore =
+        left.overallRating +
+        0.08 * (left.seasonRating ?? left.overallRating) +
+        getAgeMarketAdjustment(left.age);
+      const rightMarketScore =
+        right.overallRating +
+        0.08 * (right.seasonRating ?? right.overallRating) +
+        getAgeMarketAdjustment(right.age);
+      const overallDiff = rightMarketScore - leftMarketScore;
       if (overallDiff !== 0) return overallDiff;
 
       const seasonDiff = (right.seasonRating ?? 0) - (left.seasonRating ?? 0);
       if (seasonDiff !== 0) return seasonDiff;
+
+      const ageDiff =
+        getAgeMarketAdjustment(right.age) - getAgeMarketAdjustment(left.age);
+      if (ageDiff !== 0) return ageDiff;
 
       return left.playerId.localeCompare(right.playerId);
     });
@@ -1470,6 +1529,23 @@ function buildSalaryByPlayerId(
   }
 
   return salaryByPlayerId;
+}
+
+function getAgeValue(value: unknown): number | null {
+  const numeric = toFiniteNumber(value);
+  return numeric === null ? null : clip(numeric, 18, 45);
+}
+
+function getAgeMarketAdjustment(age: number | null): number {
+  if (age === null) return 0;
+  if (age <= 22) return 1.1;
+  if (age <= 24) return 0.8;
+  if (age <= 26) return 0.45;
+  if (age <= 28) return 0.15;
+  if (age <= 30) return 0;
+  if (age <= 32) return -0.3;
+  if (age <= 34) return -0.75;
+  return -1.1;
 }
 
 function resolveOverallRatingValue(row: SheetRecord | null): number | null {
@@ -2042,6 +2118,7 @@ async function buildPlayerNhlContext(
         seasonRating: currentSeasonRow
           ? resolveSeasonRatingValue(currentSeasonRow)
           : null,
+        age: currentSeasonRow ? getAgeValue(currentSeasonRow.age) : null,
       };
     })
     .filter((row): row is NonNullable<typeof row> => Boolean(row));

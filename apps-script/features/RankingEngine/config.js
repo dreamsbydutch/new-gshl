@@ -80,10 +80,7 @@ var RankingEngine = RankingEngine || {};
       return rawValue.map(normalizeCategory).filter(Boolean);
     }
     if (typeof rawValue === "string") {
-      return rawValue
-        .split(",")
-        .map(normalizeCategory)
-        .filter(Boolean);
+      return rawValue.split(",").map(normalizeCategory).filter(Boolean);
     }
     return [];
   }
@@ -150,13 +147,13 @@ var RankingEngine = RankingEngine || {};
   }
 
   function getPerformanceGrade(score) {
-    if (score >= 120) return "Insanity";
-    if (score >= 110) return "Super Elite";
-    if (score >= 100) return "Elite";
-    if (score >= 90) return "Above Average Starter";
-    if (score >= 70) return "Borderline Starter";
-    if (score >= 50) return "Rosterable";
-    if (score >= 30) return "Waiver Wire";
+    if (score >= 105) return "Insanity";
+    if (score >= 100) return "Super Elite";
+    if (score >= 85) return "Elite";
+    if (score >= 75) return "Above Average Starter";
+    if (score >= 50) return "Borderline Starter";
+    if (score >= 30) return "Rosterable";
+    if (score >= 10) return "Waiver Wire";
     return "No Impact";
   }
 

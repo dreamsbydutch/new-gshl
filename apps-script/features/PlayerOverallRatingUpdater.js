@@ -24,11 +24,11 @@ var PlayerOverallRatingUpdater = (function PlayerOverallRatingUpdaterModule() {
   var MAX_SALARY = 10000000;
   var SALARY_RANK_POINTS = [
     { rank: 3.5, salary: 10000000 },
-    { rank: 18, salary: 9000000 },
+    { rank: 21, salary: 9000000 },
     { rank: 35, salary: 8000000 },
-    { rank: 140, salary: 5000000 },
-    { rank: 225, salary: 2000000 },
-    { rank: 270, salary: 1000000 },
+    { rank: 154, salary: 5000000 },
+    { rank: 240, salary: 2000000 },
+    { rank: 285, salary: 1000000 },
   ];
 
   function requireSeasonId(seasonId, caller) {

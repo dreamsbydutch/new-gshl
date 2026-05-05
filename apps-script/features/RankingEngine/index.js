@@ -39,9 +39,9 @@ var RankingEngine = RankingEngine || {};
     goalie: 8,
   };
   var PLAYER_NHL_DISTRIBUTION_LIMITS = {
-    F: 240,
-    D: 100,
-    G: 45,
+    F: 256,
+    D: 128,
+    G: 56,
   };
 
   var SKATER_LEVEL_PROFILES = {
@@ -96,16 +96,16 @@ var RankingEngine = RankingEngine || {};
       smallSampleCaps: [{ maxUsageExclusive: 6, cap: 86 }],
     },
     PlayerNHL: {
-      categoryBlend: { raw: 0.58, rate: 0.42 },
+      categoryBlend: { raw: 0.55, rate: 0.45 },
       weights: {
-        efficiency: 0.03,
+        efficiency: 0.045,
         support: 0.04,
         breadth: 0.01,
         volume: 0.005,
         star: 0.18,
-        core: 0.735,
+        core: 0.675,
       },
-      volumeMix: { usage: 0.6, event: 0.4 },
+      volumeMix: { usage: 0.5, event: 0.5 },
       balancedBonus: 5,
       specialistCap: { maxSupport: 0.3, cap: 88 },
       smallSampleCaps: [{ maxUsageExclusive: 6, cap: 86 }],
@@ -161,7 +161,7 @@ var RankingEngine = RankingEngine || {};
       smallSampleCap: { maxUsageExclusive: 8, cap: 82 },
     },
     PlayerNHL: {
-      winBlend: { raw: 0.85, rate: 0.15 },
+      winBlend: { raw: 0.8, rate: 0.2 },
       weights: {
         efficiency: 0.2,
         support: 0.16,
@@ -517,14 +517,11 @@ var RankingEngine = RankingEngine || {};
     if (!isFinite(adjusted)) return 0;
 
     if (normalizedSheetName === "PlayerNHL") {
-      adjusted = compressScoreAbove(adjusted, 100, 0.7);
-      if (posGroup === PositionGroup.D) {
-        adjusted += 2.25;
-        adjusted *= 1.125;
+      adjusted = compressScoreAbove(adjusted, 100, 0.78);
+      if (posGroup === PositionGroup.F) {
+        adjusted *= 1.015;
       } else if (posGroup === PositionGroup.G) {
-        adjusted += 3.5;
-        adjusted *= 1.125;
-        adjusted *= 0.995;
+        adjusted *= 1.0425;
       }
     }
 
@@ -768,35 +765,12 @@ var RankingEngine = RankingEngine || {};
     );
   }
 
-  function computePlayerNhlCoreScore(entryMap, posGroup) {
-    if (posGroup === PositionGroup.D) {
-      return (
-        0.24 * getEntryScore(entryMap, "P") +
-        0.06 * getEntrySeasonValueScore(entryMap, "P") +
-        0.1 * getEntryScore(entryMap, "HIT") +
-        0.05 * getEntrySeasonValueScore(entryMap, "HIT") +
-        0.1 * getEntryScore(entryMap, "BLK") +
-        0.05 * getEntrySeasonValueScore(entryMap, "BLK") +
-        0.08 * getEntryScore(entryMap, "G") +
-        0.08 * getEntryScore(entryMap, "PPP") +
-        0.1 * getEntryScore(entryMap, "A") +
-        0.1 * getEntryScore(entryMap, "SOG")
-      );
-    }
-
-    var forwardPointScore =
-      0.68 * getEntryScore(entryMap, "P") +
-      0.32 * getEntrySeasonValueScore(entryMap, "P");
-
-    return (
-      0.6 * forwardPointScore +
-      0.12 * getEntryScore(entryMap, "G") +
-      0.12 * getEntryScore(entryMap, "PPP") +
-      0.08 * getEntryScore(entryMap, "A") +
-      0.06 * getEntryScore(entryMap, "SOG") +
-      0.01 * getEntryScore(entryMap, "HIT") +
-      0.01 * getEntryScore(entryMap, "BLK")
+  function computePlayerNhlCoreScore(categoryEntries) {
+    var topFiveAverage = computeWeightedScoreAverage(
+      getNhlBreadthEntries(categoryEntries),
     );
+    var topThreeAverage = computeWeightedTopAverage(categoryEntries, 0, 3);
+    return 0.72 * topFiveAverage + 0.28 * topThreeAverage;
   }
 
   function applySkaterTalentCategoryEmphasis(
@@ -810,41 +784,15 @@ var RankingEngine = RankingEngine || {};
     if (!isFinite(adjusted)) return 0;
     var maxScore = 1;
 
-    if (normalizedSheetName === "PlayerNHL" && posGroup === PositionGroup.F) {
-      maxScore = 1.18;
-      if (category === "P") {
-        if (adjusted > 0.68) adjusted += (adjusted - 0.68) * 1.05;
-        if (adjusted > 0.82) adjusted += (adjusted - 0.82) * 1.55;
-        if (adjusted > 0.92) adjusted += (adjusted - 0.92) * 1.9;
-      } else if (category === "G" || category === "PPP") {
-        maxScore = 1.12;
-        if (adjusted > 0.72) adjusted += (adjusted - 0.72) * 0.52;
-        if (adjusted > 0.88) adjusted += (adjusted - 0.88) * 0.62;
-      } else if (category === "A" || category === "SOG") {
-        maxScore = 1.08;
-        if (adjusted > 0.76) adjusted += (adjusted - 0.76) * 0.28;
-        if (adjusted > 0.9) adjusted += (adjusted - 0.9) * 0.34;
-      }
-    } else if (
+    if (
       normalizedSheetName === "PlayerNHL" &&
-      posGroup === PositionGroup.D
+      (posGroup === PositionGroup.F || posGroup === PositionGroup.D)
     ) {
-      maxScore = 1.14;
+      maxScore = 1.08;
       if (category === "P") {
-        if (adjusted > 0.72) adjusted += (adjusted - 0.72) * 0.5;
-        if (adjusted > 0.88) adjusted += (adjusted - 0.88) * 0.6;
-      } else if (category === "HIT" || category === "BLK") {
-        maxScore = 1.08;
-        if (adjusted > 0.74) adjusted += (adjusted - 0.74) * 0.22;
-      } else if (
-        category === "G" ||
-        category === "PPP" ||
-        category === "A" ||
-        category === "SOG"
-      ) {
-        maxScore = 1.1;
-        if (adjusted > 0.76) adjusted += (adjusted - 0.76) * 0.24;
-        if (adjusted > 0.9) adjusted += (adjusted - 0.9) * 0.28;
+        maxScore = 1.14;
+        if (adjusted > 0.72) adjusted += (adjusted - 0.72) * 0.22;
+        if (adjusted > 0.88) adjusted += (adjusted - 0.88) * 0.28;
       }
     }
 
@@ -858,25 +806,11 @@ var RankingEngine = RankingEngine || {};
       weights[category] = 1;
     });
 
-    if (normalizedSheetName === "PlayerNHL" && posGroup === PositionGroup.F) {
-      weights.G = 1.35;
-      weights.A = 1.05;
-      weights.P = 2.1;
-      weights.PPP = 1.35;
-      weights.SOG = 1.05;
-      weights.HIT = 0.7;
-      weights.BLK = 0.55;
-    } else if (
+    if (
       normalizedSheetName === "PlayerNHL" &&
-      posGroup === PositionGroup.D
+      (posGroup === PositionGroup.F || posGroup === PositionGroup.D)
     ) {
-      weights.G = 1.02;
-      weights.A = 1.08;
-      weights.P = 1.42;
-      weights.PPP = 1.04;
-      weights.SOG = 1.06;
-      weights.HIT = 1.1;
-      weights.BLK = 1.1;
+      weights.P = 1.18;
     }
 
     return weights;
@@ -1180,7 +1114,10 @@ var RankingEngine = RankingEngine || {};
     );
 
     rows.forEach(function (row) {
-      if (!hasMeaningfulPlayerVolume(row, PositionGroup.F, sheetName)) {
+      if (
+        !hasMeaningfulPlayerVolume(row, PositionGroup.F, sheetName) &&
+        normalizeSheetName(sheetName) !== "PlayerNHL"
+      ) {
         row[outputField] = "";
         row.Rating = outputField === "Rating" ? "" : row.Rating;
         return;
@@ -1229,8 +1166,10 @@ var RankingEngine = RankingEngine || {};
       var categoryScores = categoryEntries.map(function (entry) {
         return entry.score;
       });
-      var categoryEntryMap = buildCategoryEntryMap(categoryEntries);
-      var efficiencyScore = computeWeightedScoreAverage(categoryEntries);
+      var efficiencyScore =
+        normalizeSheetName(sheetName) === "PlayerNHL"
+          ? computeWeightedScoreAverage(getNhlBreadthEntries(categoryEntries))
+          : computeWeightedScoreAverage(categoryEntries);
       var supportScore = computeWeightedTopAverage(categoryEntries, 1, 4);
       var breadthEntries =
         normalizeSheetName(sheetName) === "PlayerNHL"
@@ -1255,7 +1194,7 @@ var RankingEngine = RankingEngine || {};
       );
       var coreScore =
         normalizeSheetName(sheetName) === "PlayerNHL"
-          ? computePlayerNhlCoreScore(categoryEntryMap, posGroup)
+          ? computePlayerNhlCoreScore(categoryEntries)
           : 0;
       var weights = profile.weights;
       var scoreScale = getScoreScale(sheetName);
@@ -1479,7 +1418,10 @@ var RankingEngine = RankingEngine || {};
     var distributions = buildGoalieDistributions(validPoolRows, sheetName);
 
     rows.forEach(function (row) {
-      if (!hasMeaningfulPlayerVolume(row, PositionGroup.G, sheetName)) {
+      if (
+        !hasMeaningfulPlayerVolume(row, PositionGroup.G, sheetName) &&
+        normalizeSheetName(sheetName) !== "PlayerNHL"
+      ) {
         row[outputField] = "";
         return;
       }
@@ -1928,13 +1870,13 @@ var RankingEngine = RankingEngine || {};
     if (score === "" || score === null || score === undefined)
       return "No Impact";
     var numeric = Number(score);
-    if (numeric >= 120) return "Insanity";
-    if (numeric >= 110) return "Super Elite";
-    if (numeric >= 100) return "Elite";
-    if (numeric >= 90) return "Above Average Starter";
-    if (numeric >= 70) return "Borderline Starter";
-    if (numeric >= 50) return "Rosterable";
-    if (numeric >= 30) return "Waiver Wire";
+    if (numeric >= 105) return "Insanity";
+    if (numeric >= 100) return "Super Elite";
+    if (numeric >= 85) return "Elite";
+    if (numeric >= 75) return "Above Average Starter";
+    if (numeric >= 50) return "Borderline Starter";
+    if (numeric >= 30) return "Rosterable";
+    if (numeric >= 10) return "Waiver Wire";
     return "No Impact";
   }
 
