@@ -326,7 +326,8 @@ function readOptionalTextFile(pathValue: string | undefined): string {
 
 function resolveYahooCookie(): string {
   const directCookie = toTrimmedString(process.env.YAHOO_COOKIE);
-  const cookie = directCookie || readOptionalTextFile(process.env.YAHOO_COOKIE_FILE);
+  const cookie =
+    directCookie || readOptionalTextFile(process.env.YAHOO_COOKIE_FILE);
   if (!cookie) return "";
 
   for (let index = 0; index < cookie.length; index += 1) {
@@ -566,9 +567,7 @@ function parseRosterTable(
     const playerHref = playerAnchor.attr("href") ?? "";
     const playerHrefMatch = /\/players\/(\d+)/.exec(playerHref);
     const yahooId = cleanCellText(
-      playerAnchor.attr("data-ys-playerid") ??
-        playerHrefMatch?.[1] ??
-        "",
+      playerAnchor.attr("data-ys-playerid") ?? playerHrefMatch?.[1] ?? "",
     );
     const playerName = cleanCellText(
       playerCell.find(".ysf-player-name a").first().text() ||
@@ -1146,12 +1145,12 @@ export function parseYahooRosterBackfillOptions(
 export async function runYahooRosterPlayerDayBackfill(
   options: YahooRosterBackfillOptions,
 ): Promise<YahooRosterBackfillSeasonSummary[]> {
-  const [seasons, weeks, teams, players] = await Promise.all([
+  const [seasons, weeks, teams, players] = (await Promise.all([
     fastSheetsReader.fetchModel<DatabaseRecord>("Season"),
     fastSheetsReader.fetchModel<DatabaseRecord>("Week"),
     fastSheetsReader.fetchModel<DatabaseRecord>("Team"),
     fastSheetsReader.fetchModel<DatabaseRecord>("Player"),
-  ]) as unknown as [Season[], Week[], Team[], Player[]];
+  ])) as unknown as [Season[], Week[], Team[], Player[]];
 
   const playersByYahooId = new Map<string, Player>();
   for (const player of players) {

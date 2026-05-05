@@ -448,10 +448,7 @@ export function useContractData(
         return;
       }
 
-      map.set(
-        getPlayerSeasonValueKey(playerId, seasonEndYear),
-        seasonSalary,
-      );
+      map.set(getPlayerSeasonValueKey(playerId, seasonEndYear), seasonSalary);
     });
 
     return map;
