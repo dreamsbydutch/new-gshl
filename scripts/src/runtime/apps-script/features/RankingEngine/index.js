@@ -33,9 +33,9 @@ var RankingEngine = RankingEngine || {};
     },
   };
   var PLAYER_DAY_RETAINED_SHARE = {
-    F: 0.9,
+    F: 0.85,
     D: 0.75,
-    G: 0.6,
+    G: 0.55,
   };
   var PLAYER_WEEK_RETAINED_SHARE = {
     F: 0.5,
@@ -47,6 +47,11 @@ var RankingEngine = RankingEngine || {};
   var GOALIE_MINIMUM_TOI_FOR_RATING = 0;
   var GOALIE_NEGLIGIBLE_TOI_THRESHOLD = 30;
   var GOALIE_NEGLIGIBLE_TOI_MAX_SCORE = 15;
+  var PLAYER_DAY_POSITION_MULTIPLIER = {
+    F: 1.725,
+    D: 1.575,
+    G: 1.325,
+  };
   var PLAYER_WEEK_POSITION_MULTIPLIER = {
     F: 1.75,
     D: 1.5,
@@ -142,7 +147,7 @@ var RankingEngine = RankingEngine || {};
         breadth: 0.07,
         workload: 0.18,
       },
-      workloadMix: { GS: 0, SA: 0.18, SV: 0.42, TOI: 0.24 },
+      workloadMix: { GS: 0, SA: 0.18, SV: 0.34, TOI: 0.4 },
       balancedBonus: 0,
       specialistCap: null,
       smallSampleCap: null,
@@ -726,6 +731,10 @@ var RankingEngine = RankingEngine || {};
     var normalizedSheetName = normalizeSheetName(sheetName);
     var adjusted = Number(score);
     if (!isFinite(adjusted)) return 0;
+
+    if (normalizedSheetName === "PlayerDayStatLine") {
+      adjusted *= PLAYER_DAY_POSITION_MULTIPLIER[posGroup] || 1;
+    }
 
     if (normalizedSheetName === "PlayerWeekStatLine") {
       adjusted *= PLAYER_WEEK_POSITION_MULTIPLIER[posGroup] || 1;
