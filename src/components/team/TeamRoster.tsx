@@ -64,6 +64,8 @@ const PlayerCard = ({
     ? nhlTeamByAbbr.get(playerNhlAbbr)
     : undefined;
   const playerSalary = toNumber(player.salary, 0);
+  const shouldShowSalaryBadge =
+    showSalaries && player.isSignable && playerSalary > 0;
   const ratingValue =
     typeof player.seasonRating === "number" &&
     Number.isFinite(player.seasonRating)
@@ -95,19 +97,18 @@ const PlayerCard = ({
       >
         {ratingValue}
       </div>
-      <div
-        className={cn(
-          "col-span-3 my-1 rounded-xl px-2 py-1 text-2xs font-semibold tracking-wide shadow-sm",
-          contract?.expiryStatus === ContractStatus.RFA
-            ? "bg-orange-100 text-orange-900 ring-1 ring-orange-300"
-            : "bg-slate-100 text-slate-900 ring-1 ring-slate-200",
-          !showSalaries && "hidden",
-        )}
-      >
-        {player.isSignable &&
-          playerSalary > 0 &&
-          formatMoney(getDisplayedRosterSalary(playerSalary, contract))}
-      </div>
+      {shouldShowSalaryBadge && (
+        <div
+          className={cn(
+            "col-span-3 my-1 rounded-xl px-2 py-1 text-2xs font-semibold tracking-wide shadow-sm",
+            contract?.expiryStatus === ContractStatus.RFA
+              ? "bg-orange-100 text-orange-900 ring-1 ring-orange-300"
+              : "bg-slate-100 text-slate-900 ring-1 ring-slate-200",
+          )}
+        >
+          {formatMoney(getDisplayedRosterSalary(playerSalary, contract))}
+        </div>
+      )}
     </div>
   );
 };
@@ -200,6 +201,8 @@ export const BenchPlayers = ({
             ? nhlTeamByAbbr.get(playerNhlAbbr)
             : undefined;
           const playerSalary = toNumber(player.salary, 0);
+          const shouldShowSalaryBadge =
+            showSalaries && player.isSignable && playerSalary > 0;
           const ratingValue =
             typeof player.seasonRating === "number" &&
             Number.isFinite(player.seasonRating)
@@ -233,19 +236,20 @@ export const BenchPlayers = ({
               >
                 {ratingValue}
               </div>
-              <div
-                className={cn(
-                  "col-span-3 my-1 rounded-xl px-2 py-1 text-2xs font-semibold tracking-wide shadow-sm",
-                  contract?.expiryStatus === ContractStatus.RFA
-                    ? "bg-orange-100 text-orange-900 ring-1 ring-orange-300"
-                    : "bg-slate-100 text-slate-900 ring-1 ring-slate-200",
-                  !showSalaries && "hidden",
-                )}
-              >
-                {player.isSignable &&
-                  playerSalary > 0 &&
-                  formatMoney(getDisplayedRosterSalary(playerSalary, contract))}
-              </div>
+              {shouldShowSalaryBadge && (
+                <div
+                  className={cn(
+                    "col-span-3 my-1 rounded-xl px-2 py-1 text-2xs font-semibold tracking-wide shadow-sm",
+                    contract?.expiryStatus === ContractStatus.RFA
+                      ? "bg-orange-100 text-orange-900 ring-1 ring-orange-300"
+                      : "bg-slate-100 text-slate-900 ring-1 ring-slate-200",
+                  )}
+                >
+                  {formatMoney(
+                    getDisplayedRosterSalary(playerSalary, contract),
+                  )}
+                </div>
+              )}
             </div>
           );
         })}
