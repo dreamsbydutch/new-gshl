@@ -15,7 +15,7 @@ export function HomeContent() {
   const showOffseasonContent = isBetweenSeasons(seasons);
 
   return (
-    <main className="container mx-auto py-4">
+    <main className="container mx-auto px-2 py-4 sm:px-4">
       {showOffseasonContent && offseasonWindow ? (
         <MockDraftPreview
           seasonId={String(offseasonWindow.upcomingSeason.id)}

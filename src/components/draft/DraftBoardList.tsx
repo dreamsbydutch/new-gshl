@@ -256,11 +256,11 @@ function MockDraftPickCard({
 
   return (
     <div
-      className="mx-auto w-full min-w-[18rem] max-w-[24rem] rounded-md border p-0.5 shadow-sm transition-colors xl:min-w-[22rem]"
+      className="mx-auto w-full min-w-0 overflow-hidden rounded-md border p-0.5 shadow-sm transition-colors sm:min-w-[18rem] sm:max-w-[24rem]"
       style={{ backgroundColor: base, borderColor: accent }}
     >
       <div
-        className="ml-4 flex flex-row items-center gap-2 font-varela font-semibold"
+        className="ml-2 flex flex-row items-center gap-2 font-varela font-semibold sm:ml-4"
         style={{ color: textColor }}
       >
         {gshlTeam?.logoUrl ? (
@@ -268,16 +268,18 @@ function MockDraftPickCard({
             className="shrink-0 rounded-sm ring-1 ring-white/40"
             src={gshlTeam.logoUrl}
             alt={gshlTeam?.name ?? ""}
-            width={32}
-            height={32}
+            width={28}
+            height={28}
           />
         ) : (
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-sm bg-gray-200 ring-1 ring-white/40">
+          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-sm bg-gray-200 ring-1 ring-white/40 sm:h-8 sm:w-8">
             <span className="text-xs text-gray-400">?</span>
           </div>
         )}
-        <span className="whitespace-nowrap text-lg">{gshlTeam?.name}</span>
-        <span className="whitespace-nowrap text-xs font-normal opacity-70">
+        <span className="truncate text-sm font-semibold sm:text-lg">
+          {gshlTeam?.name}
+        </span>
+        <span className="ml-auto shrink-0 whitespace-nowrap pr-1 text-xs font-normal opacity-70">
           Rd {pick.round}, Pk {pick.pick}
         </span>
       </div>
@@ -289,7 +291,7 @@ function MockDraftPickCard({
           <div className="mx-auto flex w-full min-w-0 flex-row items-center gap-2 px-3 py-1">
             <NHLLogo size={24} team={projectedPlayerNhlTeam} />
             <div className="flex min-w-0 flex-col leading-tight">
-              <span className="whitespace-nowrap text-[13px] font-semibold md:text-sm">
+              <span className="truncate text-[13px] font-semibold md:text-sm">
                 {projectedPlayer.fullName}
               </span>
               <span className="whitespace-nowrap text-[10px] opacity-75">
@@ -359,7 +361,7 @@ function MockDraftList({
               </span>
               <div className="h-px flex-1 bg-slate-300" />
             </div>
-            <div className="mt-4 grid grid-cols-[repeat(auto-fit,minmax(18rem,1fr))] gap-3 xl:grid-cols-[repeat(auto-fit,minmax(22rem,1fr))]">
+            <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-[repeat(auto-fit,minmax(18rem,1fr))] xl:grid-cols-[repeat(auto-fit,minmax(22rem,1fr))]">
               {picks.map((projectedPick) => (
                 <MockDraftPickCard
                   key={projectedPick.pick.id}

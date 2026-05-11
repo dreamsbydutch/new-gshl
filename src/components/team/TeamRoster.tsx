@@ -50,6 +50,9 @@ interface PlayerCardProps {
   nhlTeamByAbbr: Map<string, NHLTeam>;
 }
 
+const RFA_SALARY_MULTIPLIER = 1.15;
+const SALARY_ROUNDING_INCREMENT = 50_000;
+
 const PlayerCard = ({
   player,
   contract,
@@ -94,14 +97,16 @@ const PlayerCard = ({
       </div>
       <div
         className={cn(
-          "col-span-3 my-1 rounded-xl text-2xs",
+          "col-span-3 my-1 rounded-xl px-2 py-1 text-2xs font-semibold tracking-wide shadow-sm",
           contract?.expiryStatus === ContractStatus.RFA
-            ? "text-orange-700"
-            : "text-gray-900",
+            ? "bg-orange-100 text-orange-900 ring-1 ring-orange-300"
+            : "bg-slate-100 text-slate-900 ring-1 ring-slate-200",
           !showSalaries && "hidden",
         )}
       >
-        {player.isSignable && playerSalary > 0 && formatMoney(playerSalary)}
+        {player.isSignable &&
+          playerSalary > 0 &&
+          formatMoney(getDisplayedRosterSalary(playerSalary, contract))}
       </div>
     </div>
   );
@@ -230,16 +235,16 @@ export const BenchPlayers = ({
               </div>
               <div
                 className={cn(
-                  "col-span-3 my-1 rounded-xl text-2xs",
+                  "col-span-3 my-1 rounded-xl px-2 py-1 text-2xs font-semibold tracking-wide shadow-sm",
                   contract?.expiryStatus === ContractStatus.RFA
-                    ? "text-orange-700"
-                    : "text-gray-900",
+                    ? "bg-orange-100 text-orange-900 ring-1 ring-orange-300"
+                    : "bg-slate-100 text-slate-900 ring-1 ring-slate-200",
                   !showSalaries && "hidden",
                 )}
               >
                 {player.isSignable &&
                   playerSalary > 0 &&
-                  formatMoney(playerSalary)}
+                  formatMoney(getDisplayedRosterSalary(playerSalary, contract))}
               </div>
             </div>
           );
@@ -399,4 +404,15 @@ function getRosterRatingClass(seasonRk: Player["seasonRk"]) {
   return typeof seasonRk === "number" && Number.isFinite(seasonRk)
     ? getRatingColorClass(seasonRk)
     : "bg-gray-200 text-gray-700";
+}
+
+function getDisplayedRosterSalary(salary: number, contract?: Contract) {
+  if (contract?.expiryStatus !== ContractStatus.RFA) {
+    return salary;
+  }
+
+  return (
+    Math.round((salary * RFA_SALARY_MULTIPLIER) / SALARY_ROUNDING_INCREMENT) *
+    SALARY_ROUNDING_INCREMENT
+  );
 }
