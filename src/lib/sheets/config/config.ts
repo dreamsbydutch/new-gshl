@@ -854,7 +854,16 @@ function normalizeMultiValueTokens(value: unknown): string[] {
       .filter(Boolean);
   }
 
-  return [String(value).trim()].filter(Boolean);
+  if (
+    typeof value === "string" ||
+    typeof value === "number" ||
+    typeof value === "boolean" ||
+    typeof value === "bigint"
+  ) {
+    return [value.toString().trim()].filter(Boolean);
+  }
+
+  return [];
 }
 
 export function serializeCsvMultiValue(value: unknown): string {

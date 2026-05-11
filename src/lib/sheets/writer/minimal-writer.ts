@@ -30,7 +30,16 @@ function stringifyPrimitive(value: string | number | boolean): string {
 }
 
 function normalizeColumnKey(value: unknown): string {
-  return String(value ?? "").trim().toLowerCase();
+  if (
+    typeof value === "string" ||
+    typeof value === "number" ||
+    typeof value === "boolean" ||
+    typeof value === "bigint"
+  ) {
+    return value.toString().trim().toLowerCase();
+  }
+
+  return "";
 }
 
 function isDateOnlyColumn(column: string): boolean {
