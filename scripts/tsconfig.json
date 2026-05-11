@@ -1,0 +1,34 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2022", "DOM"],
+    "strict": true,
+    "esModuleInterop": true,
+    "allowJs": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "paths": {
+      "@gshl-env": ["./src/env.ts"],
+      "@gshl-lib/ranking/*": ["./src/domains/ranking/*"],
+      "@gshl-lib/lineup/*": ["./src/domains/lineup/*"],
+      "@gshl-lib/yahoo/*": ["./src/domains/yahoo/*"],
+      "@gshl-lib/stats/season-stat-aggregation": [
+        "./src/domains/aggregation/season-stat-aggregation.ts"
+      ],
+      "@gshl-lib/stats/player-day-flags": [
+        "./src/domains/aggregation/player-day-flags.ts"
+      ],
+      "@gshl-lib/sheets": ["./src/integrations/sheets/index.ts"],
+      "@gshl-lib/sheets/*": ["./src/integrations/sheets/*"],
+      "@gshl-lib/types/*": ["./src/types/*"],
+      "@gshl-lib/utils/core/*": ["./src/utils/*"],
+      "@gshl-types": ["./src/types/index.ts"]
+    }
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules"]
+}

@@ -1,0 +1,19 @@
+{
+  "name": "@gshl/scripts",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "player-bios:sync": "tsx src/commands/player-bios/sync-player-bios-from-puckpedia.ts",
+    "ratings:backfill": "tsx src/commands/ratings/backfill-player-ratings.ts",
+    "ratings:rebuild-all": "tsx src/commands/ratings/backfill-all-player-ratings.ts",
+    "ratings:parity": "tsx src/commands/ratings/ratings-parity.ts",
+    "standings:backfill": "tsx src/commands/standings/backfill-season-standings.ts",
+    "stats:aggregate-season": "tsx src/commands/stats/aggregate-season-stats.ts",
+    "stats:backfill-hockey-reference": "tsx src/commands/stats/backfill-hockey-reference-season.ts",
+    "stats:backfill-yahoo-rosters": "tsx src/commands/stats/backfill-yahoo-roster-player-days.ts",
+    "lineup:update-all": "node --expose-gc --max-old-space-size=4096 ../node_modules/tsx/dist/cli.mjs src/commands/lineup/update-all-lineups.ts",
+    "yahoo:check-weekly-matchups": "tsx src/commands/yahoo/check-yahoo-weekly-matchup-stats.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  }
+}

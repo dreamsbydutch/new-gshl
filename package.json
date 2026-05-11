@@ -12,19 +12,8 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "preview": "next build && next start",
-    "player-bios:sync": "tsx src/scripts/sync-player-bios-from-puckpedia.ts",
-    "ratings:backfill": "tsx src/scripts/backfill-player-ratings.ts",
-    "ratings:rebuild-all": "tsx src/scripts/backfill-all-player-ratings.ts",
-    "ratings:parity": "tsx src/scripts/ratings-parity.ts",
-    "stats:aggregate-season": "tsx src/scripts/aggregate-season-stats.ts",
-    "stats:backfill-hockey-reference": "tsx src/scripts/backfill-hockey-reference-season.ts",
-    "stats:backfill-yahoo-rosters": "tsx src/scripts/backfill-yahoo-roster-player-days.ts",
     "start": "next start",
-    "typecheck": "tsc --noEmit",
-    "lineup:update-all": "node --expose-gc --max-old-space-size=4096 ./node_modules/tsx/dist/cli.mjs src/scripts/update-all-lineups.ts",
-    "team:update-all": "tsx src/scripts/update-all-team-stats.ts",
-    "test:lineup-count": "tsx src/scripts/test-lineup-count.ts",
-    "test:team-sizes": "tsx src/scripts/test-team-date-sizes.ts"
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@radix-ui/react-dropdown-menu": "^2.1.15",

@@ -2,7 +2,7 @@
 import {
   normalizeDateOnlyValue,
   safeParseSheetDate,
-} from "../../utils/core/date";
+} from "../../../utils/date";
 
 const NHL_TEAM_COLUMNS = [
   "id",

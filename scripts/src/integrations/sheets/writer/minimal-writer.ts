@@ -5,7 +5,7 @@ import {
   SHEETS_CONFIG,
 } from "../config/config";
 import { fastSheetsReader } from "../reader/fast-reader";
-import { normalizeDateOnlyValue } from "../../utils/core/date";
+import { normalizeDateOnlyValue } from "../../../utils/date";
 
 type PrimitiveCellValue = string | number | boolean | null;
 type ModelName = keyof typeof SHEETS_CONFIG.SHEETS;
@@ -30,7 +30,9 @@ function stringifyPrimitive(value: string | number | boolean): string {
 }
 
 function normalizeColumnKey(value: unknown): string {
-  return String(value ?? "").trim().toLowerCase();
+  return String(value ?? "")
+    .trim()
+    .toLowerCase();
 }
 
 function isDateOnlyColumn(column: string): boolean {
@@ -283,11 +285,13 @@ export class MinimalSheetsWriter {
       string,
       { rowNumber: number; row: PrimitiveCellValue[] }
     >();
+    const duplicateRowNumbers = new Set<number>();
     let maxNumericId = 0;
     const idIndex = idColumn ? headerIndex.get(idColumn) : undefined;
 
     dataRows.forEach((row, rowOffset) => {
       const paddedRow = headerColumns.map((_column, index) => row[index] ?? "");
+      const rowNumber = rowOffset + 2;
       const key = makeCompositeKey(
         rowToRecord(headerColumns, paddedRow),
         keyColumns,
@@ -295,7 +299,11 @@ export class MinimalSheetsWriter {
       if (!key) {
         return;
       }
-      existingByKey.set(key, { rowNumber: rowOffset + 2, row: paddedRow });
+      const existing = existingByKey.get(key);
+      if (existing) {
+        duplicateRowNumbers.add(existing.rowNumber);
+      }
+      existingByKey.set(key, { rowNumber: rowNumber, row: paddedRow });
       if (idIndex !== undefined) {
         const idValue = paddedRow[idIndex];
         const numericId = Number(String(idValue ?? "").trim());
@@ -378,6 +386,14 @@ export class MinimalSheetsWriter {
         spreadsheetId,
         sheetName,
         inserts,
+      );
+    }
+
+    if (duplicateRowNumbers.size > 0) {
+      await optimizedSheetsClient.deleteRows(
+        spreadsheetId,
+        sheetName,
+        Array.from(duplicateRowNumbers),
       );
     }
 
