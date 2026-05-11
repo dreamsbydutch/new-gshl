@@ -1877,8 +1877,40 @@ var GshlUtils = (function buildGshlUtilsNamespace() {
 
   function normalizeNhlPosValue(value) {
     if (!value) return "";
-    if (Array.isArray(value)) return value.join(",");
-    return value.toString();
+    if (Array.isArray(value)) {
+      return value
+        .map(function (entry) {
+          return String(entry == null ? "" : entry).trim();
+        })
+        .filter(Boolean)
+        .join(",");
+    }
+
+    var text = String(value).trim();
+    if (!text) return "";
+    if (text.indexOf("[") === 0 && text.lastIndexOf("]") === text.length - 1) {
+      try {
+        var parsed = JSON.parse(text);
+        if (Array.isArray(parsed)) {
+          return parsed
+            .map(function (entry) {
+              return String(entry == null ? "" : entry).trim();
+            })
+            .filter(Boolean)
+            .join(",");
+        }
+      } catch (error) {
+        text = text.slice(1, -1);
+      }
+    }
+
+    return text
+      .split(/[,\//|;]+/)
+      .map(function (entry) {
+        return String(entry).replace(/^['"]+|['"]+$/g, "").trim();
+      })
+      .filter(Boolean)
+      .join(",");
   }
 
   function resolvePosGroupFromNhlPos(nhlPos) {

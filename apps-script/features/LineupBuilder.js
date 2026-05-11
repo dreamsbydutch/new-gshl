@@ -95,10 +95,29 @@ var LineupBuilder = (function () {
 
   function normalizeNhlPosToken(pos) {
     if (pos === undefined || pos === null) return "";
-    var normalized = String(pos).trim().toUpperCase();
+    var normalized = String(pos)
+      .replace(/^[\[\s'"]+|[\]\s'"]+$/g, "")
+      .trim()
+      .toUpperCase();
     if (normalized === "UTIL") return RosterPosition.Util;
     if (normalized === "IRPLUS") return RosterPosition.IRplus;
     return normalized;
+  }
+
+  function coerceNhlPosValues(raw) {
+    if (Array.isArray(raw)) return raw;
+    if (raw === undefined || raw === null || raw === "") return [];
+    var text = String(raw).trim();
+    if (!text) return [];
+    if (text.indexOf("[") === 0 && text.lastIndexOf("]") === text.length - 1) {
+      try {
+        var parsed = JSON.parse(text);
+        if (Array.isArray(parsed)) return parsed;
+      } catch (error) {
+        // Fall through to delimiter-based parsing for malformed legacy values.
+      }
+    }
+    return [text];
   }
 
   function addUniquePosition(positions, seen, pos) {
@@ -111,8 +130,7 @@ var LineupBuilder = (function () {
   function getEligibleNhlPositions(player) {
     var positions = [];
     var seen = {};
-    var raw = player && player.nhlPos;
-    var values = Array.isArray(raw) ? raw : [raw];
+    var values = coerceNhlPosValues(player && player.nhlPos);
 
     values.forEach(function (value) {
       if (value === undefined || value === null || value === "") return;

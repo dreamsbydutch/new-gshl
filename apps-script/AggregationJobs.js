@@ -45,6 +45,17 @@ function aggregateCurrentSeason() {
   };
 }
 
+function aggregateCurrentSeasonStatsOnly() {
+  var seasonKey = AggregationJobHelpers.resolveActiveSeasonId(
+    "aggregateCurrentSeasonStatsOnly",
+  );
+
+  return AggregationJobHelpers.runCurrentSeasonStatsAggregation(
+    seasonKey,
+    "[Aggregate Current Season Stats]",
+  );
+}
+
 function aggregateCurrentSeasonRefreshOnly() {
   var seasonKey = AggregationJobHelpers.resolveActiveSeasonId(
     "aggregateCurrentSeasonRefreshOnly",
@@ -93,10 +104,14 @@ var AggregationJobHelpers = (function buildAggregationJobHelpers() {
 
   function runSeasonAggregationRefreshPhase(seasonKey, logPrefix) {
     console.log(logPrefix + " Starting with player days as base.");
-    StatsAggregator.updatePlayerStatsForSeason(seasonKey);
-    StatsAggregator.updateTeamStatsForSeason(seasonKey);
+    var statsResult = runCurrentSeasonStatsAggregation(
+      seasonKey,
+      logPrefix + " [Stats]",
+    );
 
-    console.log(logPrefix + " Refreshing PlayerNHL stats from Hockey Reference.");
+    console.log(
+      logPrefix + " Refreshing PlayerNHL stats from Hockey Reference.",
+    );
     PlayerNhlStatsUpdater.updateSeasonStats(seasonKey, {
       dryRun: false,
       logToConsole: true,
@@ -120,6 +135,19 @@ var AggregationJobHelpers = (function buildAggregationJobHelpers() {
     return {
       seasonId: seasonKey,
       phase: "refresh",
+      statsResult: statsResult,
+    };
+  }
+
+  function runCurrentSeasonStatsAggregation(seasonKey, logPrefix) {
+    var safePrefix = logPrefix || "[Aggregate Current Season Stats]";
+    console.log(safePrefix + " Aggregating player and team season stats.");
+
+    return {
+      seasonId: seasonKey,
+      phase: "stats",
+      playerStats: StatsAggregator.updatePlayerStatsForSeason(seasonKey),
+      teamStats: StatsAggregator.updateTeamStatsForSeason(seasonKey),
     };
   }
 
@@ -187,6 +215,7 @@ var AggregationJobHelpers = (function buildAggregationJobHelpers() {
 
   return {
     resolveActiveSeasonId: resolveActiveSeasonId,
+    runCurrentSeasonStatsAggregation: runCurrentSeasonStatsAggregation,
     runSeasonAggregationRefreshPhase: runSeasonAggregationRefreshPhase,
     runSeasonAggregationFinalizePhase: runSeasonAggregationFinalizePhase,
     scheduleOneTimeFunction: scheduleOneTimeFunction,

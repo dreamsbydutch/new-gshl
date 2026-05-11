@@ -531,5 +531,13 @@ function stringifySheetValue(sheetName, fieldName, value, overrideMap) {
 function matchupHasOutcome(matchup) {
   if (!matchup) return false;
   if (matchup.homeWin || matchup.awayWin || matchup.tie) return true;
-  return matchup.homeScore !== null && matchup.awayScore !== null;
+
+  function hasScore(value) {
+    if (value === null || value === undefined || value === "") return false;
+    if (value instanceof Date) return false;
+    var numeric = Number(value);
+    return isFinite(numeric);
+  }
+
+  return hasScore(matchup.homeScore) && hasScore(matchup.awayScore);
 }

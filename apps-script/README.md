@@ -39,6 +39,7 @@ Only these globals are intended to be run from Apps Script triggers or manual ex
 
 - `scrapeYahoo()`
 - `aggregateCurrentSeason()`
+- `aggregateCurrentSeasonStatsOnly()`
 - `aggregateCurrentSeasonRefreshOnly()`
 - `finalizeCurrentSeasonAggregation()`
 - `runScheduledCurrentSeasonFinalize()`
@@ -57,6 +58,13 @@ Only these globals are intended to be run from Apps Script triggers or manual ex
 - writes `PlayerDayStatLine` and `TeamDayStatLine`
 
 ### 2. Current-season refresh
+
+`aggregateCurrentSeasonStatsOnly()`:
+
+- resolves the active season
+- rolls `PlayerDayStatLine` into `PlayerWeekStatLine`
+- rolls player aggregates into `PlayerSplitStatLine` and `PlayerTotalStatLine`
+- rolls team aggregates into `TeamDayStatLine`, `TeamWeekStatLine`, and `TeamSeasonStatLine`
 
 `aggregateCurrentSeasonRefreshOnly()`:
 

@@ -14,58 +14,79 @@ var RankingEngine = RankingEngine || {};
 
   var SKATER_DEFAULT_CATEGORIES = ["G", "A", "P", "PPP", "SOG", "HIT", "BLK"];
   var GOALIE_CORE_CATEGORIES = ["W", "GAA", "SVP"];
-  var LOWER_BETTER = { GAA: true };
+  var LOWER_BETTER = { GAA: true, GA: true };
   var seasonCategoryCache = {};
 
-  var SKATER_DAY_CATEGORIES = ["G", "A", "P", "PPP", "SOG", "HIT", "BLK"];
-  var SKATER_DAY_FALLBACK_MEANS = {
-    F: {
-      G: 0.26,
-      A: 0.43,
-      P: 0.7,
-      PPP: 0.21,
-      SOG: 2.144,
-      HIT: 0.91,
-      BLK: 0.75,
-    },
-    D: { G: 0.14, A: 0.36, P: 0.5, PPP: 0.16, SOG: 1.7, HIT: 1.05, BLK: 1.35 },
-  };
-  var SKATER_DAY_IMPACT_WEIGHTS = [1, 0.85, 0.7, 0.45, 0.3, 0.2, 0.15];
-  var SKATER_DAY_IMPACT_DENOMINATOR = 2.8;
-  var SKATER_DAY_SCORE_CURVE = 1.8;
-
   var SMALL_COHORT_THRESHOLDS = {
-    skater: 15,
-    goalie: 8,
+    skater: 17,
+    goalie: 5,
   };
-  var PLAYER_NHL_DISTRIBUTION_LIMITS = {
-    F: 256,
-    D: 128,
-    G: 56,
+  var PLAYER_AGGREGATE_DISTRIBUTION_LIMITS = {
+    PlayerNHL: { F: 256, D: 128, G: 56 },
+    PlayerTotalStatLine: {
+      RS: { F: 350, D: 140, G: 112 },
+      PO: { F: 140, D: 49, G: 28 },
+    },
+    PlayerSplitStatLine: {
+      RS: { F: 350, D: 140, G: 112 },
+      PO: { F: 140, D: 49, G: 28 },
+    },
+  };
+  var PLAYER_DAY_RETAINED_SHARE = {
+    F: 0.9,
+    D: 0.75,
+    G: 0.4,
+  };
+  var PLAYER_WEEK_RETAINED_SHARE = {
+    F: 0.9,
+    D: 0.75,
+    G: 0.4,
+  };
+  var RETAINED_RANGE_NEGATIVE_CARRY = 0.3;
+  var RETAINED_RANGE_NEGATIVE_FLOOR = -0.3;
+  var GOALIE_MINIMUM_TOI_FOR_RATING = 0;
+  var GOALIE_NEGLIGIBLE_TOI_THRESHOLD = 30;
+  var GOALIE_NEGLIGIBLE_TOI_MAX_SCORE = 15;
+  var PLAYER_WEEK_POSITION_MULTIPLIER = {
+    F: 1.6,
+    D: 1.35,
+    G: 1.125,
+  };
+  var WEEK_NORMALIZATION_CONFIG = {
+    skater: { targetUsage: 3.5, fullUsage: 3 },
+    goalie: { targetUsage: 2, fullUsage: 2 },
   };
 
   var SKATER_LEVEL_PROFILES = {
     PlayerDayStatLine: {
       categoryBlend: { raw: 1, rate: 0 },
-      weights: { efficiency: 0.38, support: 0.27, breadth: 0.2, volume: 0.15 },
-      volumeMix: { usage: 0, event: 1 },
+      weights: {
+        efficiency: 0.33,
+        support: 0.14,
+        breadth: 0.08,
+        volume: 0.1,
+        star: 0.35,
+      },
+      volumeMix: { usage: 0.1, event: 0.9 },
+      volumeScoreBlend: { normalized: 0.675, raw: 0.325 },
       balancedBonus: 0,
-      specialistCap: { maxSupport: 0.3, maxBreadth: 0.25, cap: 94 },
+      specialistCap: { maxSupport: 0.18, maxBreadth: 0.15, cap: 102 },
       smallSampleCaps: [],
     },
     PlayerWeekStatLine: {
-      categoryBlend: { raw: 0.58, rate: 0.42 },
+      categoryBlend: { raw: 0.62, rate: 0.38 },
       weights: {
-        efficiency: 0.25,
-        support: 0.19,
-        breadth: 0.14,
-        volume: 0.2,
-        star: 0.22,
+        efficiency: 0.24,
+        support: 0.14,
+        breadth: 0.09,
+        volume: 0.17,
+        star: 0.36,
       },
-      volumeMix: { usage: 0.62, event: 0.38 },
-      balancedBonus: 3,
-      specialistCap: { maxSupport: 0.3, cap: 94 },
-      smallSampleCaps: [{ maxUsage: 1, cap: 88 }],
+      volumeMix: { usage: 0.58, event: 0.42 },
+      volumeScoreBlend: { normalized: 0.675, raw: 0.325 },
+      balancedBonus: 2,
+      specialistCap: { maxSupport: 0.24, cap: 96 },
+      smallSampleCaps: [{ maxUsage: 1, cap: 92 }],
     },
     PlayerSplitStatLine: {
       categoryBlend: { raw: 0.6, rate: 0.4 },
@@ -116,33 +137,38 @@ var RankingEngine = RankingEngine || {};
     PlayerDayStatLine: {
       winBlend: { raw: 1, rate: 0 },
       weights: {
-        efficiency: 0.42,
-        support: 0.18,
-        breadth: 0.12,
+        efficiency: 0.53,
+        support: 0.12,
+        breadth: 0.07,
         workload: 0.28,
       },
-      workloadMix: { GS: 0, SA: 0.45, SV: 0.35, TOI: 0.2 },
+      workloadMix: { GS: 0, SA: 0.18, SV: 0.42, TOI: 0.24 },
       balancedBonus: 0,
       specialistCap: null,
       smallSampleCap: null,
     },
     PlayerWeekStatLine: {
       winBlend: { raw: 0.65, rate: 0.35 },
-      weights: { efficiency: 0.3, support: 0.17, breadth: 0.13, workload: 0.4 },
-      workloadMix: { GS: 0.55, SA: 0.2, SV: 0.15, TOI: 0.1 },
-      balancedBonus: 3,
-      specialistCap: { type: "singleElite", threshold: 0.75, cap: 92 },
-      smallSampleCap: { maxUsage: 1, minWorkload: 0.55, cap: 88 },
+      weights: {
+        efficiency: 0.58,
+        support: 0.2,
+        breadth: 0.14,
+        workload: 0.08,
+      },
+      workloadMix: { GS: 0.15, SA: 0.03, SV: 0.06, TOI: 0.06 },
+      balancedBonus: 2,
+      specialistCap: { type: "singleElite", threshold: 0.78, cap: 94 },
+      smallSampleCap: { maxUsage: 1, minWorkload: 0.5, cap: 90 },
     },
     PlayerSplitStatLine: {
       winBlend: { raw: 0.75, rate: 0.25 },
       weights: {
-        efficiency: 0.25,
-        support: 0.17,
-        breadth: 0.16,
-        workload: 0.42,
+        efficiency: 0.29,
+        support: 0.18,
+        breadth: 0.17,
+        workload: 0.36,
       },
-      workloadMix: { GS: 0.65, SA: 0.15, SV: 0.1, TOI: 0.1 },
+      workloadMix: { GS: 0.7, SA: 0.12, SV: 0.08, TOI: 0.1 },
       balancedBonus: 4,
       specialistCap: { type: "support", maxSupport: 0.4, cap: 88 },
       smallSampleCap: { maxUsageExclusive: 3, cap: 84 },
@@ -150,12 +176,12 @@ var RankingEngine = RankingEngine || {};
     PlayerTotalStatLine: {
       winBlend: { raw: 0.85, rate: 0.15 },
       weights: {
-        efficiency: 0.2,
-        support: 0.16,
-        breadth: 0.16,
-        workload: 0.48,
+        efficiency: 0.24,
+        support: 0.17,
+        breadth: 0.17,
+        workload: 0.42,
       },
-      workloadMix: { GS: 0.75, SA: 0.1, SV: 0.1, TOI: 0.05 },
+      workloadMix: { GS: 0.8, SA: 0.08, SV: 0.07, TOI: 0.05 },
       balancedBonus: 5,
       specialistCap: { type: "support", maxSupport: 0.45, cap: 84 },
       smallSampleCap: { maxUsageExclusive: 8, cap: 82 },
@@ -163,12 +189,12 @@ var RankingEngine = RankingEngine || {};
     PlayerNHL: {
       winBlend: { raw: 0.8, rate: 0.2 },
       weights: {
-        efficiency: 0.2,
-        support: 0.16,
-        breadth: 0.16,
-        workload: 0.48,
+        efficiency: 0.24,
+        support: 0.17,
+        breadth: 0.17,
+        workload: 0.42,
       },
-      workloadMix: { GS: 0.75, SA: 0.1, SV: 0.1, TOI: 0.05 },
+      workloadMix: { GS: 0.8, SA: 0.08, SV: 0.07, TOI: 0.05 },
       balancedBonus: 5,
       specialistCap: { type: "support", maxSupport: 0.45, cap: 84 },
       smallSampleCap: { maxUsageExclusive: 8, cap: 82 },
@@ -329,6 +355,45 @@ var RankingEngine = RankingEngine || {};
     return getSkaterCategories(seasonId);
   }
 
+  function isPlayerAggregateSheet(sheetName) {
+    var normalizedSheetName = normalizeSheetName(sheetName);
+    return (
+      normalizedSheetName === "PlayerDayStatLine" ||
+      normalizedSheetName === "PlayerWeekStatLine" ||
+      normalizedSheetName === "PlayerSplitStatLine" ||
+      normalizedSheetName === "PlayerTotalStatLine" ||
+      normalizedSheetName === "PlayerNHL"
+    );
+  }
+
+  function isFullSeasonPlayerSheet(sheetName) {
+    var normalizedSheetName = normalizeSheetName(sheetName);
+    return (
+      normalizedSheetName === "PlayerSplitStatLine" ||
+      normalizedSheetName === "PlayerTotalStatLine" ||
+      normalizedSheetName === "PlayerNHL"
+    );
+  }
+
+  function isSeasonTypeScopedPlayerAggregateSheet(sheetName) {
+    var normalizedSheetName = normalizeSheetName(sheetName);
+    return (
+      normalizedSheetName === "PlayerSplitStatLine" ||
+      normalizedSheetName === "PlayerTotalStatLine"
+    );
+  }
+
+  function getAggregateCategoryScoreMode(sheetName) {
+    var normalizedSheetName = normalizeSheetName(sheetName);
+    if (
+      normalizedSheetName === "PlayerDayStatLine" ||
+      normalizedSheetName === "PlayerWeekStatLine"
+    ) {
+      return "retainedRange";
+    }
+    return "distribution";
+  }
+
   function getMatchupCategoriesForSeason(seasonId) {
     return getSkaterCategories(seasonId).concat(GOALIE_CORE_CATEGORIES);
   }
@@ -431,6 +496,139 @@ var RankingEngine = RankingEngine || {};
       });
   }
 
+  function maxSortedValue(values) {
+    if (!values || !values.length) return 0;
+    var value = Number(values[values.length - 1]);
+    return isFinite(value) ? value : 0;
+  }
+
+  function minSortedValue(values) {
+    if (!values || !values.length) return 0;
+    var value = Number(values[0]);
+    return isFinite(value) ? value : 0;
+  }
+
+  function computeZeroBaselineScore(value, maxValue, lowerBetter) {
+    var numeric = Number(value);
+    if (!isFinite(numeric)) numeric = 0;
+    var ceiling = Number(maxValue);
+    if (!isFinite(ceiling) || ceiling <= 0) {
+      if (lowerBetter) return numeric <= 0 ? 1 : 0;
+      return numeric > 0 ? 1 : 0;
+    }
+    if (lowerBetter) {
+      return clip(1 - numeric / ceiling, 0, 1);
+    }
+    return clip(numeric / ceiling, 0, 1);
+  }
+
+  function getRetainedRangeShare(sheetName, posGroup) {
+    var normalizedSheetName = normalizeSheetName(sheetName);
+    if (normalizedSheetName === "PlayerDayStatLine") {
+      return PLAYER_DAY_RETAINED_SHARE[posGroup] || 0;
+    }
+    if (normalizedSheetName === "PlayerWeekStatLine") {
+      return PLAYER_WEEK_RETAINED_SHARE[posGroup] || 0;
+    }
+    return 0;
+  }
+
+  function getDayWeekBaselineRows(rows, sheetName, posGroup) {
+    var normalizedSheetName = normalizeSheetName(sheetName);
+    if (
+      normalizedSheetName !== "PlayerDayStatLine" &&
+      normalizedSheetName !== "PlayerWeekStatLine"
+    ) {
+      return rows || [];
+    }
+
+    var playedRows = (rows || []).filter(function (row) {
+      if (!hasMeaningfulPlayerVolume(row, posGroup, sheetName)) return false;
+      if (normalizedSheetName === "PlayerDayStatLine") {
+        return getDailyPlayedFlag(row);
+      }
+      return getUsageValue(row, posGroup, sheetName) > 0;
+    });
+
+    return playedRows.length ? playedRows : rows || [];
+  }
+
+  function getRetainedRangeFloorValue(
+    sortedValues,
+    lowerBetter,
+    retainedShare,
+  ) {
+    if (!sortedValues || !sortedValues.length) return 0;
+    var share = clip(Number(retainedShare) || 0, 0, 1);
+    if (share <= 0) {
+      return lowerBetter
+        ? minSortedValue(sortedValues)
+        : maxSortedValue(sortedValues);
+    }
+    return percentileValue(sortedValues, lowerBetter ? share : 1 - share);
+  }
+
+  function computeRetainedRangeScore(
+    value,
+    baselineValue,
+    bestValue,
+    lowerBetter,
+  ) {
+    var numeric = Number(value);
+    if (!isFinite(numeric)) numeric = 0;
+    var baseline = Number(baselineValue);
+    var best = Number(bestValue);
+    if (!isFinite(baseline)) baseline = 0;
+    if (!isFinite(best)) best = 0;
+
+    if (lowerBetter) {
+      var lowerSpan = baseline - best;
+      if (lowerSpan <= 0.0001) {
+        return numeric <= best ? 1 : 0;
+      }
+      var lowerScore = (baseline - numeric) / lowerSpan;
+      if (lowerScore >= 0) return clip(lowerScore, 0, 1);
+      return Math.max(
+        RETAINED_RANGE_NEGATIVE_FLOOR,
+        lowerScore * RETAINED_RANGE_NEGATIVE_CARRY,
+      );
+    }
+
+    var upperSpan = best - baseline;
+    if (upperSpan <= 0.0001) {
+      return numeric >= best ? 1 : 0;
+    }
+    var upperScore = (numeric - baseline) / upperSpan;
+    if (upperScore >= 0) return clip(upperScore, 0, 1);
+    return Math.max(
+      RETAINED_RANGE_NEGATIVE_FLOOR,
+      upperScore * RETAINED_RANGE_NEGATIVE_CARRY,
+    );
+  }
+
+  function computeAggregateCategoryScore(
+    value,
+    sortedValues,
+    maxValue,
+    lowerBetter,
+    scoreMode,
+    floorValue,
+    bestValue,
+  ) {
+    if (scoreMode === "retainedRange") {
+      return computeRetainedRangeScore(
+        value,
+        floorValue,
+        bestValue,
+        lowerBetter,
+      );
+    }
+    if (scoreMode === "zeroToMax") {
+      return computeZeroBaselineScore(value, maxValue, lowerBetter);
+    }
+    return percentileRank(value, sortedValues, lowerBetter);
+  }
+
   function limitDistribution(values, limit, lowerBetter) {
     var numericLimit = Number(limit) || 0;
     var source = (values || []).slice();
@@ -450,9 +648,25 @@ var RankingEngine = RankingEngine || {};
       });
   }
 
-  function getPlayerNhlDistributionLimit(sheetName, posGroup) {
-    if (normalizeSheetName(sheetName) !== "PlayerNHL") return 0;
-    return PLAYER_NHL_DISTRIBUTION_LIMITS[posGroup] || 0;
+  function getAggregateSeasonTypeKey(row) {
+    var seasonType =
+      row && row.seasonType !== undefined && row.seasonType !== null
+        ? String(row.seasonType).trim().toUpperCase()
+        : "";
+    return seasonType === "PO" ? "PO" : "RS";
+  }
+
+  function getAggregateDistributionLimit(sheetName, posGroup, seasonType) {
+    var normalizedSheetName = normalizeSheetName(sheetName);
+    var sheetLimits = PLAYER_AGGREGATE_DISTRIBUTION_LIMITS[normalizedSheetName];
+    if (!sheetLimits) return 0;
+    if (
+      isSeasonTypeScopedPlayerAggregateSheet(normalizedSheetName) &&
+      sheetLimits[seasonType || "RS"]
+    ) {
+      return sheetLimits[seasonType || "RS"][posGroup] || 0;
+    }
+    return sheetLimits[posGroup] || 0;
   }
 
   function average(values) {
@@ -499,16 +713,13 @@ var RankingEngine = RankingEngine || {};
   }
 
   function getScoreScale(sheetName) {
-    return normalizeSheetName(sheetName) === "PlayerNHL" ? 100 : 125;
+    return 100;
   }
 
   function finalizeAggregateScore(score, sheetName) {
     var numeric = Number(score);
     if (!isFinite(numeric)) return 0;
-    if (normalizeSheetName(sheetName) === "PlayerNHL") {
-      return roundScore(Math.max(numeric, 0));
-    }
-    return roundScore(clip(numeric, 0, 125));
+    return roundScore(Math.max(numeric, 0));
   }
 
   function applyAggregateSheetCalibration(score, sheetName, posGroup) {
@@ -516,13 +727,12 @@ var RankingEngine = RankingEngine || {};
     var adjusted = Number(score);
     if (!isFinite(adjusted)) return 0;
 
+    if (normalizedSheetName === "PlayerWeekStatLine") {
+      adjusted *= PLAYER_WEEK_POSITION_MULTIPLIER[posGroup] || 1;
+    }
+
     if (normalizedSheetName === "PlayerNHL") {
       adjusted = compressScoreAbove(adjusted, 100, 0.78);
-      if (posGroup === PositionGroup.F) {
-        adjusted *= 1.015;
-      } else if (posGroup === PositionGroup.G) {
-        adjusted *= 1.0425;
-      }
     }
 
     return adjusted;
@@ -561,10 +771,96 @@ var RankingEngine = RankingEngine || {};
     return 0;
   }
 
+  function getGoalieToiValue(row) {
+    return toNumber(row && row.TOI);
+  }
+
   function getUsageRateValue(row, field, posGroup, sheetName) {
     var usage = getUsageValue(row, posGroup, sheetName);
     if (usage <= 0) return 0;
     return toNumber(row && row[field]) / usage;
+  }
+
+  function isWeeklyAggregateSheet(sheetName) {
+    return normalizeSheetName(sheetName) === "PlayerWeekStatLine";
+  }
+
+  function shouldClampNonNegativeCategoryScore(sheetName) {
+    var normalizedSheetName = normalizeSheetName(sheetName);
+    return (
+      normalizedSheetName === "PlayerDayStatLine" ||
+      normalizedSheetName === "PlayerWeekStatLine"
+    );
+  }
+
+  function clampCategoryScore(score, sheetName) {
+    var numericScore = Number(score);
+    if (!isFinite(numericScore)) return 0;
+    return shouldClampNonNegativeCategoryScore(sheetName)
+      ? Math.max(numericScore, 0)
+      : numericScore;
+  }
+
+  function getWeekNormalizationConfig(posGroup) {
+    return posGroup === PositionGroup.G
+      ? WEEK_NORMALIZATION_CONFIG.goalie
+      : WEEK_NORMALIZATION_CONFIG.skater;
+  }
+
+  // Normalize weekly counting stats toward a comparable "full week" workload.
+  function getComparableWeekUsageValue(usage, posGroup, sheetName) {
+    var numericUsage = Number(usage);
+    if (!isFinite(numericUsage) || numericUsage <= 0) return 0;
+    if (!isWeeklyAggregateSheet(sheetName)) return numericUsage;
+
+    if (posGroup !== PositionGroup.G) {
+      if (numericUsage >= 3) return 3.5;
+      if (numericUsage >= 2) {
+        return 2.75 + (numericUsage - 2) * 0.75;
+      }
+      if (numericUsage >= 1) {
+        return 2 + (numericUsage - 1) * 0.75;
+      }
+      return numericUsage;
+    }
+
+    var config = getWeekNormalizationConfig(posGroup);
+    var targetUsage = Number(config && config.targetUsage) || numericUsage;
+    var fullUsage = Number(config && config.fullUsage) || targetUsage;
+
+    if (numericUsage >= targetUsage) return targetUsage;
+
+    var completion = clip(numericUsage / Math.max(fullUsage, 0.0001), 0, 1);
+    return numericUsage + (targetUsage - numericUsage) * completion;
+  }
+
+  function getComparableUsageValue(row, posGroup, sheetName) {
+    return getComparableWeekUsageValue(
+      getUsageValue(row, posGroup, sheetName),
+      posGroup,
+      sheetName,
+    );
+  }
+
+  function scaleWeeklyCountingValue(value, row, posGroup, sheetName) {
+    var numericValue = Number(value);
+    if (!isFinite(numericValue) || numericValue <= 0)
+      return Math.max(numericValue, 0);
+
+    var usage = getUsageValue(row, posGroup, sheetName);
+    if (usage <= 0) return numericValue;
+
+    var comparableUsage = getComparableUsageValue(row, posGroup, sheetName);
+    if (comparableUsage <= 0) return numericValue;
+
+    return numericValue * (comparableUsage / usage);
+  }
+
+  function getComparableCategoryValue(row, category, posGroup, sheetName) {
+    var value = toNumber(row && row[category]);
+    if (!isWeeklyAggregateSheet(sheetName)) return value;
+    if (category === "GAA" || category === "SVP") return value;
+    return scaleWeeklyCountingValue(value, row, posGroup, sheetName);
   }
 
   function getSkaterEventLoadValue(row) {
@@ -573,6 +869,12 @@ var RankingEngine = RankingEngine || {};
       0.35 * toNumber(row && row.HIT) +
       0.25 * toNumber(row && row.BLK)
     );
+  }
+
+  function getComparableSkaterEventLoadValue(row, sheetName) {
+    var eventLoad = getSkaterEventLoadValue(row);
+    if (!isWeeklyAggregateSheet(sheetName)) return eventLoad;
+    return scaleWeeklyCountingValue(eventLoad, row, PositionGroup.F, sheetName);
   }
 
   function shareAbove(values, threshold) {
@@ -785,14 +1087,18 @@ var RankingEngine = RankingEngine || {};
     var maxScore = 1;
 
     if (
-      normalizedSheetName === "PlayerNHL" &&
+      isFullSeasonPlayerSheet(normalizedSheetName) &&
       (posGroup === PositionGroup.F || posGroup === PositionGroup.D)
     ) {
       maxScore = 1.08;
       if (category === "P") {
-        maxScore = 1.14;
+        maxScore = normalizedSheetName === "PlayerNHL" ? 1.14 : 1.1;
         if (adjusted > 0.72) adjusted += (adjusted - 0.72) * 0.22;
-        if (adjusted > 0.88) adjusted += (adjusted - 0.88) * 0.28;
+        if (adjusted > 0.88) {
+          adjusted +=
+            (adjusted - 0.88) *
+            (normalizedSheetName === "PlayerNHL" ? 0.28 : 0.18);
+        }
       }
     }
 
@@ -806,11 +1112,20 @@ var RankingEngine = RankingEngine || {};
       weights[category] = 1;
     });
 
-    if (
-      normalizedSheetName === "PlayerNHL" &&
-      (posGroup === PositionGroup.F || posGroup === PositionGroup.D)
-    ) {
-      weights.P = 1.18;
+    if (posGroup === PositionGroup.F || posGroup === PositionGroup.D) {
+      if (normalizedSheetName === "PlayerNHL") {
+        weights.P = 1.18;
+      } else if (
+        normalizedSheetName === "PlayerSplitStatLine" ||
+        normalizedSheetName === "PlayerTotalStatLine"
+      ) {
+        weights.P = 1.14;
+      } else if (
+        normalizedSheetName === "PlayerDayStatLine" ||
+        normalizedSheetName === "PlayerWeekStatLine"
+      ) {
+        weights.P = 1.08;
+      }
     }
 
     return weights;
@@ -847,30 +1162,12 @@ var RankingEngine = RankingEngine || {};
       row && row.seasonId !== undefined && row.seasonId !== null
         ? String(row.seasonId)
         : "";
-    if (sheetName === "PlayerDayStatLine") {
-      return [seasonId, row && row.date ? String(row.date) : "", posGroup].join(
-        "|",
-      );
-    }
-    if (sheetName === "PlayerWeekStatLine") {
-      return [
-        seasonId,
-        row && row.weekId ? String(row.weekId) : "",
-        posGroup,
-      ].join("|");
-    }
-    if (
-      sheetName === "PlayerSplitStatLine" ||
-      sheetName === "PlayerTotalStatLine"
-    ) {
-      return [
-        seasonId,
-        row && row.seasonType ? String(row.seasonType) : "",
-        posGroup,
-      ].join("|");
-    }
-    if (sheetName === "PlayerNHL") {
-      return [seasonId, posGroup].join("|");
+    var seasonType = getAggregateSeasonTypeKey(row);
+    if (isPlayerAggregateSheet(sheetName)) {
+      if (isSeasonTypeScopedPlayerAggregateSheet(sheetName)) {
+        return [seasonId, sheetName, seasonType, posGroup].join("|");
+      }
+      return [seasonId, sheetName, posGroup].join("|");
     }
     return [seasonId, posGroup].join("|");
   }
@@ -880,10 +1177,11 @@ var RankingEngine = RankingEngine || {};
       row && row.seasonId !== undefined && row.seasonId !== null
         ? String(row.seasonId)
         : "";
-    if (
-      sheetName === "PlayerDayStatLine" ||
-      sheetName === "PlayerWeekStatLine"
-    ) {
+    var seasonType = getAggregateSeasonTypeKey(row);
+    if (isPlayerAggregateSheet(sheetName)) {
+      if (isSeasonTypeScopedPlayerAggregateSheet(sheetName)) {
+        return [seasonId, sheetName, seasonType, posGroup].join("|");
+      }
       return [seasonId, sheetName, posGroup].join("|");
     }
     return buildPrimaryGroupKey(row, sheetName, posGroup);
@@ -939,38 +1237,113 @@ var RankingEngine = RankingEngine || {};
   }
 
   function buildSkaterDistributions(rows, categories, sheetName, posGroup) {
-    var distributionLimit = getPlayerNhlDistributionLimit(sheetName, posGroup);
+    var distributionLimit = getAggregateDistributionLimit(
+      sheetName,
+      posGroup,
+      getAggregateSeasonTypeKey(rows && rows[0]),
+    );
+    var scoreMode = getAggregateCategoryScoreMode(sheetName);
+    var retainedShare = getRetainedRangeShare(sheetName, posGroup);
+    var baselineRows =
+      scoreMode === "retainedRange"
+        ? getDayWeekBaselineRows(rows, sheetName, posGroup)
+        : rows;
     var raw = {};
     var rate = {};
+    var rawMax = {};
+    var rawBest = {};
+    var rawFloor = {};
+    var rateMax = {};
+    var rateBest = {};
+    var rateFloor = {};
     categories.forEach(function (category) {
       raw[category] = limitDistribution(
-        sortedValues(rows, category),
+        sortedValuesByGetter(baselineRows, function (row) {
+          return getComparableCategoryValue(row, category, posGroup, sheetName);
+        }),
         distributionLimit,
         isLowerBetterStat(category),
+      );
+      rawMax[category] = maxSortedValue(raw[category]);
+      rawBest[category] = isLowerBetterStat(category)
+        ? minSortedValue(raw[category])
+        : rawMax[category];
+      rawFloor[category] = getRetainedRangeFloorValue(
+        raw[category],
+        isLowerBetterStat(category),
+        retainedShare,
       );
       rate[category] = limitDistribution(
-        sortedValuesByGetter(rows, function (row) {
-          return getUsageRateValue(row, category, PositionGroup.F, sheetName);
+        sortedValuesByGetter(baselineRows, function (row) {
+          return getUsageRateValue(row, category, posGroup, sheetName);
         }),
         distributionLimit,
         isLowerBetterStat(category),
       );
+      rateMax[category] = maxSortedValue(rate[category]);
+      rateBest[category] = isLowerBetterStat(category)
+        ? minSortedValue(rate[category])
+        : rateMax[category];
+      rateFloor[category] = getRetainedRangeFloorValue(
+        rate[category],
+        isLowerBetterStat(category),
+        retainedShare,
+      );
     });
+    var usage = limitDistribution(
+      sortedValuesByGetter(baselineRows, function (row) {
+        return getComparableUsageValue(row, posGroup, sheetName);
+      }),
+      distributionLimit,
+      false,
+    );
+    var rawUsage = limitDistribution(
+      sortedValuesByGetter(baselineRows, function (row) {
+        return getUsageValue(row, posGroup, sheetName);
+      }),
+      distributionLimit,
+      false,
+    );
+    var event = limitDistribution(
+      sortedValuesByGetter(baselineRows, function (row) {
+        return getComparableSkaterEventLoadValue(row, sheetName);
+      }),
+      distributionLimit,
+      false,
+    );
+    var rawEvent = limitDistribution(
+      sortedValuesByGetter(baselineRows, function (row) {
+        return getSkaterEventLoadValue(row);
+      }),
+      distributionLimit,
+      false,
+    );
     return {
+      scoreMode: scoreMode,
       raw: raw,
       rate: rate,
-      usage: limitDistribution(
-        sortedValuesByGetter(rows, function (row) {
-          return getUsageValue(row, PositionGroup.F, sheetName);
-        }),
-        distributionLimit,
-        false,
-      ),
-      event: limitDistribution(
-        sortedValuesByGetter(rows, getSkaterEventLoadValue),
-        distributionLimit,
-        false,
-      ),
+      rawMax: rawMax,
+      rawBest: rawBest,
+      rawFloor: rawFloor,
+      rateMax: rateMax,
+      rateBest: rateBest,
+      rateFloor: rateFloor,
+      usage: usage,
+      usageMax: maxSortedValue(usage),
+      usageBest: maxSortedValue(usage),
+      usageFloor: getRetainedRangeFloorValue(usage, false, retainedShare),
+      rawUsage: rawUsage,
+      rawUsageMax: maxSortedValue(rawUsage),
+      rawUsageBest: maxSortedValue(rawUsage),
+      rawUsageFloor: getRetainedRangeFloorValue(rawUsage, false, retainedShare),
+      event: event,
+      eventMax: maxSortedValue(event),
+      eventBest: maxSortedValue(event),
+      eventFloor: getRetainedRangeFloorValue(event, false, retainedShare),
+      rawEvent: rawEvent,
+      rawEventMax: maxSortedValue(rawEvent),
+      rawEventBest: maxSortedValue(rawEvent),
+      rawEventFloor: getRetainedRangeFloorValue(rawEvent, false, retainedShare),
     };
   }
 
@@ -981,21 +1354,33 @@ var RankingEngine = RankingEngine || {};
     distributions,
     sheetName,
   ) {
-    var rawScore = percentileRank(
-      toNumber(row && row[category]),
+    var scoreMode = distributions.scoreMode || "distribution";
+    var rawScore = computeAggregateCategoryScore(
+      getComparableCategoryValue(row, category, PositionGroup.F, sheetName),
       distributions.raw[category],
+      distributions.rawMax[category],
       isLowerBetterStat(category),
+      scoreMode,
+      distributions.rawFloor[category],
+      distributions.rawBest[category],
     );
     var rateScore = profile.categoryBlend.rate
-      ? percentileRank(
+      ? computeAggregateCategoryScore(
           getUsageRateValue(row, category, PositionGroup.F, sheetName),
           distributions.rate[category],
+          distributions.rateMax[category],
           isLowerBetterStat(category),
+          scoreMode,
+          distributions.rateFloor[category],
+          distributions.rateBest[category],
         )
       : rawScore;
+    rawScore = clampCategoryScore(rawScore, sheetName);
+    rateScore = clampCategoryScore(rateScore, sheetName);
     var blendedScore =
       profile.categoryBlend.raw * rawScore +
       profile.categoryBlend.rate * rateScore;
+    blendedScore = clampCategoryScore(blendedScore, sheetName);
     return {
       rawScore: rawScore,
       rateScore: rateScore,
@@ -1020,20 +1405,54 @@ var RankingEngine = RankingEngine || {};
   }
 
   function computeSkaterVolumeScore(row, profile, distributions, sheetName) {
-    var usageScore = percentileRank(
-      getUsageValue(row, PositionGroup.F, sheetName),
+    var blend = profile.volumeScoreBlend || { normalized: 1, raw: 0 };
+    var scoreMode = distributions.scoreMode || "distribution";
+    var normalizedUsageScore = computeAggregateCategoryScore(
+      getComparableUsageValue(row, PositionGroup.F, sheetName),
       distributions.usage,
+      distributions.usageMax,
       false,
+      scoreMode,
+      distributions.usageFloor,
+      distributions.usageBest,
     );
-    var eventScore = percentileRank(
-      getSkaterEventLoadValue(row),
+    var normalizedEventScore = computeAggregateCategoryScore(
+      getComparableSkaterEventLoadValue(row, sheetName),
       distributions.event,
+      distributions.eventMax,
       false,
+      scoreMode,
+      distributions.eventFloor,
+      distributions.eventBest,
     );
-    return (
-      profile.volumeMix.usage * usageScore +
-      profile.volumeMix.event * eventScore
+    var normalizedScore =
+      profile.volumeMix.usage * normalizedUsageScore +
+      profile.volumeMix.event * normalizedEventScore;
+
+    if (!blend.raw) return normalizedScore;
+
+    var rawUsageScore = computeAggregateCategoryScore(
+      getUsageValue(row, PositionGroup.F, sheetName),
+      distributions.rawUsage,
+      distributions.rawUsageMax,
+      false,
+      scoreMode,
+      distributions.rawUsageFloor,
+      distributions.rawUsageBest,
     );
+    var rawEventScore = computeAggregateCategoryScore(
+      getSkaterEventLoadValue(row),
+      distributions.rawEvent,
+      distributions.rawEventMax,
+      false,
+      scoreMode,
+      distributions.rawEventFloor,
+      distributions.rawEventBest,
+    );
+    var rawScore =
+      profile.volumeMix.usage * rawUsageScore +
+      profile.volumeMix.event * rawEventScore;
+    return blend.normalized * normalizedScore + blend.raw * rawScore;
   }
 
   function applySkaterSpecialistCap(
@@ -1091,6 +1510,107 @@ var RankingEngine = RankingEngine || {};
       return score + profile.balancedBonus;
     }
     return score;
+  }
+
+  function getSkaterDropScenarioWeights(sheetName) {
+    var normalizedSheetName = normalizeSheetName(sheetName);
+    if (normalizedSheetName === "PlayerDayStatLine") {
+      return [
+        { dropCount: 3, weight: 0.5 },
+        { dropCount: 2, weight: 0.35 },
+        { dropCount: 1, weight: 0.1 },
+        { dropCount: 0, weight: 0.05 },
+      ];
+    }
+    if (normalizedSheetName === "PlayerWeekStatLine") {
+      return [
+        { dropCount: 3, weight: 0.25 },
+        { dropCount: 2, weight: 0.45 },
+        { dropCount: 1, weight: 0.2 },
+        { dropCount: 0, weight: 0.1 },
+      ];
+    }
+    return [{ dropCount: 0, weight: 1 }];
+  }
+
+  function splitSkaterCategoryEntriesByDropCount(entries, dropCount) {
+    var list = (entries || []).slice();
+    if (!dropCount || list.length <= 1) {
+      return { kept: list, dropped: [] };
+    }
+
+    var maxDrop = Math.max(0, Math.min(dropCount, list.length - 1));
+    if (!maxDrop) {
+      return { kept: list, dropped: [] };
+    }
+
+    var byWeakest = list.slice().sort(function (a, b) {
+      var left = (Number(a && a.score) || 0) * (Number(a && a.weight) || 0);
+      var right = (Number(b && b.score) || 0) * (Number(b && b.weight) || 0);
+      if (left !== right) return left - right;
+      return (Number(a && a.score) || 0) - (Number(b && b.score) || 0);
+    });
+    var droppedKeys = {};
+    byWeakest.slice(0, maxDrop).forEach(function (entry) {
+      if (!entry || !entry.category) return;
+      droppedKeys[entry.category] = true;
+    });
+
+    return {
+      kept: list.filter(function (entry) {
+        return !droppedKeys[entry.category];
+      }),
+      dropped: list.filter(function (entry) {
+        return !!droppedKeys[entry.category];
+      }),
+    };
+  }
+
+  function buildSkaterScenarioMetrics(entries, sheetName, dropCount) {
+    var retainedCategoryGroups = splitSkaterCategoryEntriesByDropCount(
+      entries,
+      dropCount,
+    );
+    var retainedCategoryEntries = retainedCategoryGroups.kept;
+    var efficiencyScore =
+      normalizeSheetName(sheetName) === "PlayerNHL"
+        ? computeWeightedScoreAverage(
+            getNhlBreadthEntries(retainedCategoryEntries),
+          )
+        : computeWeightedScoreAverage(retainedCategoryEntries);
+    var supportScore = computeWeightedTopAverage(retainedCategoryEntries, 1, 4);
+    var breadthEntries =
+      normalizeSheetName(sheetName) === "PlayerNHL"
+        ? getNhlBreadthEntries(retainedCategoryEntries)
+        : retainedCategoryEntries.slice(
+            0,
+            Math.min(5, retainedCategoryEntries.length || 0),
+          );
+    var breadthScore = computeBreadthScore(
+      breadthEntries.map(function (entry) {
+        return entry.score;
+      }),
+      breadthEntries.length,
+    );
+    var starScore = computeWeightedTopAverage(
+      retainedCategoryEntries,
+      0,
+      Math.min(3, retainedCategoryEntries.length || 0),
+    );
+    var coreScore =
+      normalizeSheetName(sheetName) === "PlayerNHL"
+        ? computePlayerNhlCoreScore(retainedCategoryEntries)
+        : 0;
+
+    return {
+      retainedCategoryEntries: retainedCategoryEntries,
+      droppedCategoryEntries: retainedCategoryGroups.dropped,
+      efficiencyScore: efficiencyScore,
+      supportScore: supportScore,
+      breadthScore: breadthScore,
+      starScore: starScore,
+      coreScore: coreScore,
+    };
   }
 
   function rankSkaterGroup(rows, poolRows, sheetName, outputField, options) {
@@ -1163,64 +1683,102 @@ var RankingEngine = RankingEngine || {};
           ),
         };
       });
-      var categoryScores = categoryEntries.map(function (entry) {
-        return entry.score;
-      });
-      var efficiencyScore =
-        normalizeSheetName(sheetName) === "PlayerNHL"
-          ? computeWeightedScoreAverage(getNhlBreadthEntries(categoryEntries))
-          : computeWeightedScoreAverage(categoryEntries);
-      var supportScore = computeWeightedTopAverage(categoryEntries, 1, 4);
-      var breadthEntries =
-        normalizeSheetName(sheetName) === "PlayerNHL"
-          ? getNhlBreadthEntries(categoryEntries)
-          : categoryEntries.slice(0, Math.min(5, categoryEntries.length || 0));
-      var breadthScore = computeBreadthScore(
-        breadthEntries.map(function (entry) {
-          return entry.score;
-        }),
-        breadthEntries.length,
-      );
       var volumeScore = computeSkaterVolumeScore(
         row,
         profile,
         distributions,
         sheetName,
       );
-      var starScore = computeWeightedTopAverage(
-        categoryEntries,
-        0,
-        Math.min(3, categoryEntries.length || 0),
-      );
-      var coreScore =
-        normalizeSheetName(sheetName) === "PlayerNHL"
-          ? computePlayerNhlCoreScore(categoryEntries)
-          : 0;
       var weights = profile.weights;
       var scoreScale = getScoreScale(sheetName);
-      var score =
-        scoreScale *
-        (weights.efficiency * efficiencyScore +
-          weights.support * supportScore +
-          weights.breadth * breadthScore +
-          weights.volume * volumeScore +
-          (weights.star || 0) * starScore +
-          (weights.core || 0) * coreScore);
+      var scenarioWeights = getSkaterDropScenarioWeights(sheetName);
+      var droppedCategoryMap = {};
+      var scenarioDebug = [];
+      var blendedComponents = {
+        efficiency: 0,
+        support: 0,
+        breadth: 0,
+        star: 0,
+        core: 0,
+      };
+      var score = scenarioWeights.reduce(function (sum, scenario) {
+        var metrics = buildSkaterScenarioMetrics(
+          categoryEntries,
+          sheetName,
+          scenario.dropCount,
+        );
+        metrics.droppedCategoryEntries.forEach(function (entry) {
+          if (!entry || !entry.category) return;
+          if (!droppedCategoryMap[entry.category]) {
+            droppedCategoryMap[entry.category] = [];
+          }
+          droppedCategoryMap[entry.category].push(scenario.dropCount);
+        });
 
-      score = maybeApplyBalancedBonus(
-        score,
-        profile,
-        supportScore,
-        breadthScore,
-        volumeScore,
-      );
-      score = applySkaterSpecialistCap(
-        score,
-        profile,
-        supportScore,
-        breadthScore,
-      );
-      score = applySkaterSmallSampleCaps(score, row, profile, sheetName);
+        blendedComponents.efficiency +=
+          scenario.weight * metrics.efficiencyScore;
+        blendedComponents.support += scenario.weight * metrics.supportScore;
+        blendedComponents.breadth += scenario.weight * metrics.breadthScore;
+        blendedComponents.star += scenario.weight * metrics.starScore;
+        blendedComponents.core += scenario.weight * metrics.coreScore;
+
+        var scenarioScore =
+          scoreScale *
+          (weights.efficiency * metrics.efficiencyScore +
+            weights.support * metrics.supportScore +
+            weights.breadth * metrics.breadthScore +
+            weights.volume * volumeScore +
+            (weights.star || 0) * metrics.starScore +
+            (weights.core || 0) * metrics.coreScore);
+
+        scenarioScore = maybeApplyBalancedBonus(
+          scenarioScore,
+          profile,
+          metrics.supportScore,
+          metrics.breadthScore,
+          volumeScore,
+        );
+        scenarioScore = applySkaterSpecialistCap(
+          scenarioScore,
+          profile,
+          metrics.supportScore,
+          metrics.breadthScore,
+        );
+        scenarioScore = applySkaterSmallSampleCaps(
+          scenarioScore,
+          row,
+          profile,
+          sheetName,
+        );
+
+        if (options && options.includeBreakdown) {
+          scenarioDebug.push({
+            dropCount: scenario.dropCount,
+            weight: scenario.weight,
+            keptCategories: metrics.retainedCategoryEntries.map(
+              function (entry) {
+                return entry.category;
+              },
+            ),
+            droppedCategories: metrics.droppedCategoryEntries.map(
+              function (entry) {
+                return entry.category;
+              },
+            ),
+            components: {
+              efficiency: roundScore(metrics.efficiencyScore),
+              support: roundScore(metrics.supportScore),
+              breadth: roundScore(metrics.breadthScore),
+              volume: roundScore(volumeScore),
+              star: roundScore(metrics.starScore),
+              core: roundScore(metrics.coreScore),
+            },
+            score: roundScore(scenarioScore),
+          });
+        }
+
+        return sum + scenario.weight * scenarioScore;
+      }, 0);
       score = applyAggregateSheetCalibration(
         score,
         sheetName,
@@ -1236,7 +1794,16 @@ var RankingEngine = RankingEngine || {};
           categories: categoryEntries.map(function (entry) {
             return {
               category: entry.category,
+              droppedScenarios: droppedCategoryMap[entry.category] || [],
               value: entry.value,
+              comparableValue: roundScore(
+                getComparableCategoryValue(
+                  row,
+                  entry.category,
+                  PositionGroup.F,
+                  sheetName,
+                ),
+              ),
               perGameValue: roundScore(entry.perGameValue),
               rawScore: roundScore(entry.rawScore),
               rateScore: roundScore(entry.rateScore),
@@ -1250,12 +1817,12 @@ var RankingEngine = RankingEngine || {};
             };
           }),
           components: {
-            efficiency: roundScore(efficiencyScore),
-            support: roundScore(supportScore),
-            breadth: roundScore(breadthScore),
+            efficiency: roundScore(blendedComponents.efficiency),
+            support: roundScore(blendedComponents.support),
+            breadth: roundScore(blendedComponents.breadth),
             volume: roundScore(volumeScore),
-            star: roundScore(starScore),
-            core: roundScore(coreScore),
+            star: roundScore(blendedComponents.star),
+            core: roundScore(blendedComponents.core),
           },
           weights: {
             efficiency: weights.efficiency || 0,
@@ -1265,10 +1832,17 @@ var RankingEngine = RankingEngine || {};
             star: weights.star || 0,
             core: weights.core || 0,
           },
+          scenarioBlend: scenarioDebug,
           usageValue: roundScore(
             getUsageValue(row, PositionGroup.F, sheetName),
           ),
+          comparableUsageValue: roundScore(
+            getComparableUsageValue(row, PositionGroup.F, sheetName),
+          ),
           eventLoadValue: roundScore(getSkaterEventLoadValue(row)),
+          comparableEventLoadValue: roundScore(
+            getComparableSkaterEventLoadValue(row, sheetName),
+          ),
           finalScore: row[outputField],
         };
       }
@@ -1276,91 +1850,250 @@ var RankingEngine = RankingEngine || {};
   }
 
   function buildGoalieDistributions(rows, sheetName) {
-    var distributionLimit = getPlayerNhlDistributionLimit(
+    var distributionLimit = getAggregateDistributionLimit(
       sheetName,
       PositionGroup.G,
+      getAggregateSeasonTypeKey(rows && rows[0]),
+    );
+    var scoreMode = getAggregateCategoryScoreMode(sheetName);
+    var retainedShare = getRetainedRangeShare(sheetName, PositionGroup.G);
+    var baselineRows =
+      scoreMode === "retainedRange"
+        ? getDayWeekBaselineRows(rows, sheetName, PositionGroup.G)
+        : rows;
+    var rawW = limitDistribution(
+      sortedValuesByGetter(baselineRows, function (row) {
+        return getComparableCategoryValue(row, "W", PositionGroup.G, sheetName);
+      }),
+      distributionLimit,
+      false,
+    );
+    var rawGaa = limitDistribution(
+      sortedValues(baselineRows, "GAA"),
+      distributionLimit,
+      true,
+    );
+    var rawSvp = limitDistribution(
+      sortedValues(baselineRows, "SVP"),
+      distributionLimit,
+      false,
+    );
+    var rateW = limitDistribution(
+      sortedValuesByGetter(baselineRows, function (row) {
+        return getUsageRateValue(row, "W", PositionGroup.G, sheetName);
+      }),
+      distributionLimit,
+      false,
+    );
+    var gs = limitDistribution(
+      sortedValuesByGetter(baselineRows, function (row) {
+        return getComparableUsageValue(row, PositionGroup.G, sheetName);
+      }),
+      distributionLimit,
+      false,
+    );
+    var sa = limitDistribution(
+      sortedValuesByGetter(baselineRows, function (row) {
+        return getComparableCategoryValue(
+          row,
+          "SA",
+          PositionGroup.G,
+          sheetName,
+        );
+      }),
+      distributionLimit,
+      false,
+    );
+    var ga = limitDistribution(
+      sortedValuesByGetter(baselineRows, function (row) {
+        return getComparableCategoryValue(
+          row,
+          "GA",
+          PositionGroup.G,
+          sheetName,
+        );
+      }),
+      distributionLimit,
+      true,
+    );
+    var sv = limitDistribution(
+      sortedValuesByGetter(baselineRows, function (row) {
+        return getComparableCategoryValue(
+          row,
+          "SV",
+          PositionGroup.G,
+          sheetName,
+        );
+      }),
+      distributionLimit,
+      false,
+    );
+    var toi = limitDistribution(
+      sortedValuesByGetter(baselineRows, function (row) {
+        return getComparableCategoryValue(
+          row,
+          "TOI",
+          PositionGroup.G,
+          sheetName,
+        );
+      }),
+      distributionLimit,
+      false,
     );
     return {
+      scoreMode: scoreMode,
       raw: {
-        W: limitDistribution(sortedValues(rows, "W"), distributionLimit, false),
-        GAA: limitDistribution(
-          sortedValues(rows, "GAA"),
-          distributionLimit,
-          true,
-        ),
-        SVP: limitDistribution(
-          sortedValues(rows, "SVP"),
-          distributionLimit,
-          false,
-        ),
+        W: rawW,
+        GAA: rawGaa,
+        SVP: rawSvp,
+      },
+      rawMax: {
+        W: maxSortedValue(rawW),
+        GAA: maxSortedValue(rawGaa),
+        SVP: maxSortedValue(rawSvp),
+      },
+      rawBest: {
+        W: maxSortedValue(rawW),
+        GAA: minSortedValue(rawGaa),
+        SVP: maxSortedValue(rawSvp),
+      },
+      rawFloor: {
+        W: getRetainedRangeFloorValue(rawW, false, retainedShare),
+        GAA: getRetainedRangeFloorValue(rawGaa, true, retainedShare),
+        SVP: getRetainedRangeFloorValue(rawSvp, false, retainedShare),
       },
       rate: {
-        W: limitDistribution(
-          sortedValuesByGetter(rows, function (row) {
-            return getUsageRateValue(row, "W", PositionGroup.G, sheetName);
-          }),
-          distributionLimit,
-          false,
-        ),
+        W: rateW,
       },
-      GS: limitDistribution(
-        sortedValuesByGetter(rows, function (row) {
-          return getUsageValue(row, PositionGroup.G, sheetName);
-        }),
-        distributionLimit,
-        false,
-      ),
-      SA: limitDistribution(sortedValues(rows, "SA"), distributionLimit, false),
-      SV: limitDistribution(sortedValues(rows, "SV"), distributionLimit, false),
-      TOI: limitDistribution(
-        sortedValues(rows, "TOI"),
-        distributionLimit,
-        false,
-      ),
+      rateMax: {
+        W: maxSortedValue(rateW),
+      },
+      rateBest: {
+        W: maxSortedValue(rateW),
+      },
+      rateFloor: {
+        W: getRetainedRangeFloorValue(rateW, false, retainedShare),
+      },
+      GS: gs,
+      GSMax: maxSortedValue(gs),
+      GSBest: maxSortedValue(gs),
+      GSFloor: getRetainedRangeFloorValue(gs, false, retainedShare),
+      SA: sa,
+      SAMax: maxSortedValue(sa),
+      SABest: maxSortedValue(sa),
+      SAFloor: getRetainedRangeFloorValue(sa, false, retainedShare),
+      GA: ga,
+      GAMax: maxSortedValue(ga),
+      GABest: minSortedValue(ga),
+      GAFloor: getRetainedRangeFloorValue(ga, true, retainedShare),
+      SV: sv,
+      SVMax: maxSortedValue(sv),
+      SVBest: maxSortedValue(sv),
+      SVFloor: getRetainedRangeFloorValue(sv, false, retainedShare),
+      TOI: toi,
+      TOIMax: maxSortedValue(toi),
+      TOIBest: maxSortedValue(toi),
+      TOIFloor: getRetainedRangeFloorValue(toi, false, retainedShare),
     };
   }
 
   function computeGoalieWinScore(row, profile, distributions, sheetName) {
-    var rawScore = percentileRank(
-      toNumber(row && row.W),
+    var scoreMode = distributions.scoreMode || "distribution";
+    var rawScore = computeAggregateCategoryScore(
+      getComparableCategoryValue(row, "W", PositionGroup.G, sheetName),
       distributions.raw.W,
+      distributions.rawMax.W,
       false,
+      scoreMode,
+      distributions.rawFloor.W,
+      distributions.rawBest.W,
     );
+    rawScore = clampCategoryScore(rawScore, sheetName);
     if (!profile.winBlend.rate) return rawScore;
-    var rateScore = percentileRank(
+    var rateScore = computeAggregateCategoryScore(
       getUsageRateValue(row, "W", PositionGroup.G, sheetName),
       distributions.rate.W,
+      distributions.rateMax.W,
       false,
+      scoreMode,
+      distributions.rateFloor.W,
+      distributions.rateBest.W,
     );
-    return profile.winBlend.raw * rawScore + profile.winBlend.rate * rateScore;
+    rateScore = clampCategoryScore(rateScore, sheetName);
+    return clampCategoryScore(
+      profile.winBlend.raw * rawScore + profile.winBlend.rate * rateScore,
+      sheetName,
+    );
   }
 
   function computeGoalieWorkloadScore(row, profile, distributions, sheetName) {
     var mix = profile.workloadMix;
+    var scoreMode = distributions.scoreMode || "distribution";
     var score = 0;
     if (mix.GS) {
       score +=
         mix.GS *
-        percentileRank(
-          getUsageValue(row, PositionGroup.G, sheetName),
+        computeAggregateCategoryScore(
+          getComparableUsageValue(row, PositionGroup.G, sheetName),
           distributions.GS,
+          distributions.GSMax,
           false,
+          scoreMode,
+          distributions.GSFloor,
+          distributions.GSBest,
         );
     }
     if (mix.SA) {
       score +=
         mix.SA *
-        percentileRank(toNumber(row && row.SA), distributions.SA, false);
+        computeAggregateCategoryScore(
+          getComparableCategoryValue(row, "SA", PositionGroup.G, sheetName),
+          distributions.SA,
+          distributions.SAMax,
+          false,
+          scoreMode,
+          distributions.SAFloor,
+          distributions.SABest,
+        );
+    }
+    if (mix.GA) {
+      score +=
+        mix.GA *
+        computeAggregateCategoryScore(
+          getComparableCategoryValue(row, "GA", PositionGroup.G, sheetName),
+          distributions.GA,
+          distributions.GAMax,
+          true,
+          scoreMode,
+          distributions.GAFloor,
+          distributions.GABest,
+        );
     }
     if (mix.SV) {
       score +=
         mix.SV *
-        percentileRank(toNumber(row && row.SV), distributions.SV, false);
+        computeAggregateCategoryScore(
+          getComparableCategoryValue(row, "SV", PositionGroup.G, sheetName),
+          distributions.SV,
+          distributions.SVMax,
+          false,
+          scoreMode,
+          distributions.SVFloor,
+          distributions.SVBest,
+        );
     }
     if (mix.TOI) {
       score +=
         mix.TOI *
-        percentileRank(toNumber(row && row.TOI), distributions.TOI, false);
+        computeAggregateCategoryScore(
+          getComparableCategoryValue(row, "TOI", PositionGroup.G, sheetName),
+          distributions.TOI,
+          distributions.TOIMax,
+          false,
+          scoreMode,
+          distributions.TOIFloor,
+          distributions.TOIBest,
+        );
     }
     return score;
   }
@@ -1410,6 +2143,17 @@ var RankingEngine = RankingEngine || {};
     return score;
   }
 
+  function applyGoalieToiCap(score, row) {
+    var toi = getGoalieToiValue(row);
+    if (toi <= GOALIE_MINIMUM_TOI_FOR_RATING) return 0;
+    if (toi >= GOALIE_NEGLIGIBLE_TOI_THRESHOLD) return score;
+
+    var toiCap =
+      GOALIE_NEGLIGIBLE_TOI_MAX_SCORE *
+      clip(toi / GOALIE_NEGLIGIBLE_TOI_THRESHOLD, 0, 1);
+    return Math.min(score, toiCap);
+  }
+
   function rankGoalieGroup(rows, poolRows, sheetName, outputField) {
     var profile = getGoalieProfile(sheetName);
     var validPoolRows = (poolRows || []).filter(function (row) {
@@ -1426,17 +2170,37 @@ var RankingEngine = RankingEngine || {};
         return;
       }
 
+      if (getGoalieToiValue(row) <= GOALIE_MINIMUM_TOI_FOR_RATING) {
+        row[outputField] = 0;
+        return;
+      }
+
+      var scoreMode = distributions.scoreMode || "distribution";
       var coreScores = {
         W: computeGoalieWinScore(row, profile, distributions, sheetName),
-        GAA: percentileRank(
-          toNumber(row && row.GAA),
-          distributions.raw.GAA,
-          true,
+        GAA: clampCategoryScore(
+          computeAggregateCategoryScore(
+            toNumber(row && row.GAA),
+            distributions.raw.GAA,
+            distributions.rawMax.GAA,
+            true,
+            scoreMode,
+            distributions.rawFloor.GAA,
+            distributions.rawBest.GAA,
+          ),
+          sheetName,
         ),
-        SVP: percentileRank(
-          toNumber(row && row.SVP),
-          distributions.raw.SVP,
-          false,
+        SVP: clampCategoryScore(
+          computeAggregateCategoryScore(
+            toNumber(row && row.SVP),
+            distributions.raw.SVP,
+            distributions.rawMax.SVP,
+            false,
+            scoreMode,
+            distributions.rawFloor.SVP,
+            distributions.rawBest.SVP,
+          ),
+          sheetName,
         ),
       };
       var categoryValues = [coreScores.W, coreScores.GAA, coreScores.SVP];
@@ -1490,6 +2254,7 @@ var RankingEngine = RankingEngine || {};
         sheetName,
         normalizePosGroup(row && row.posGroup, row),
       );
+      score = applyGoalieToiCap(score, row);
 
       row[outputField] = finalizeAggregateScore(score, sheetName);
     });
@@ -1555,61 +2320,6 @@ var RankingEngine = RankingEngine || {};
     return targetRows;
   }
 
-  function rankSkaterPlayerDay(row) {
-    var posGroup = normalizePosGroup(row && row.posGroup, row);
-    if (!getDailyPlayedFlag(row))
-      return blankResult(row, "PlayerDayStatLine", posGroup);
-
-    var fallback =
-      SKATER_DAY_FALLBACK_MEANS[posGroup] || SKATER_DAY_FALLBACK_MEANS.F;
-    var breakdown = SKATER_DAY_CATEGORIES.map(function (category) {
-      var value = toNumber(row[category]);
-      var mean = fallback[category] || 1;
-      var peak = Math.max(mean * 3.5, 1);
-      return {
-        category: category,
-        value: value,
-        perGameValue: value,
-        baseline: mean,
-        winThreshold: mean,
-        softCap: peak,
-        direction: "higher",
-        delta: value - mean,
-        contribution: value / Math.max(peak, 0.01),
-      };
-    });
-    var weightedImpact = breakdown
-      .map(function (item) {
-        return clip(item.contribution, 0, 1.35);
-      })
-      .sort(function (a, b) {
-        return b - a;
-      })
-      .reduce(function (sum, contribution, index) {
-        return sum + contribution * (SKATER_DAY_IMPACT_WEIGHTS[index] || 0);
-      }, 0);
-    var rawComposite = clip(
-      weightedImpact / SKATER_DAY_IMPACT_DENOMINATOR,
-      0,
-      1.4,
-    );
-    var score =
-      125 * (1 - Math.exp(-SKATER_DAY_SCORE_CURVE * Math.max(rawComposite, 0)));
-    return buildResult(
-      row,
-      "PlayerDayStatLine",
-      posGroup,
-      roundScore(score),
-      breakdown,
-      {
-        categoryQuality: rawComposite,
-        spike: rawComposite,
-        breadth: 0,
-        volume: 1,
-      },
-    );
-  }
-
   function interpolatePiecewise(value, points, lowerBetter) {
     var numeric = Number(value);
     if (!isFinite(numeric)) numeric = 0;
@@ -1647,128 +2357,6 @@ var RankingEngine = RankingEngine || {};
     );
   }
 
-  function rankGoaliePlayerDay(row) {
-    var posGroup = PositionGroup.G;
-    if (!getDailyPlayedFlag(row))
-      return blankResult(row, "PlayerDayStatLine", posGroup);
-
-    var wins = toNumber(row.W);
-    var gaa = toNumber(row.GAA);
-    var svp = toNumber(row.SVP);
-    var saves = toNumber(row.SV);
-    var shotsAgainst = toNumber(row.SA);
-    var goalsAgainst = toNumber(row.GA);
-    var toi = toNumber(row.TOI);
-    var shutouts = toNumber(row.SO);
-
-    var winContribution = wins >= 1 ? 1 : 0;
-    var gaaContribution = interpolatePiecewise(
-      gaa,
-      [
-        { value: 0, score: 1 },
-        { value: 2, score: 0.82 },
-        { value: 3, score: 0.62 },
-        { value: 4, score: 0.3 },
-        { value: 5, score: 0.1 },
-        { value: 6, score: 0.03 },
-      ],
-      true,
-    );
-    var svpContribution = interpolatePiecewise(
-      svp,
-      [
-        { value: 0.85, score: 0.1 },
-        { value: 0.875, score: 0.28 },
-        { value: 0.9, score: 0.52 },
-        { value: 0.92, score: 0.68 },
-        { value: 0.95, score: 0.9 },
-        { value: 1, score: 1 },
-      ],
-      false,
-    );
-    var svContribution = interpolatePiecewise(
-      saves,
-      [
-        { value: 0, score: 0 },
-        { value: 15, score: 0.28 },
-        { value: 25, score: 0.55 },
-        { value: 32, score: 0.75 },
-        { value: 40, score: 0.92 },
-        { value: 50, score: 1 },
-      ],
-      false,
-    );
-    var saContribution = interpolatePiecewise(
-      shotsAgainst,
-      [
-        { value: 0, score: 0 },
-        { value: 18, score: 0.25 },
-        { value: 26, score: 0.5 },
-        { value: 32, score: 0.72 },
-        { value: 40, score: 0.9 },
-        { value: 50, score: 1 },
-      ],
-      false,
-    );
-    var toiContribution = interpolatePiecewise(
-      toi,
-      [
-        { value: 0, score: 0 },
-        { value: 20, score: 0.18 },
-        { value: 35, score: 0.45 },
-        { value: 50, score: 0.78 },
-        { value: 60, score: 1 },
-        { value: 70, score: 1.02 },
-      ],
-      false,
-    );
-    var gaContribution = interpolatePiecewise(
-      goalsAgainst,
-      [
-        { value: 0, score: 1 },
-        { value: 1, score: 0.86 },
-        { value: 2, score: 0.66 },
-        { value: 3, score: 0.42 },
-        { value: 4, score: 0.2 },
-        { value: 5, score: 0.08 },
-        { value: 6, score: 0.02 },
-      ],
-      true,
-    );
-    var rateQuality = 0.52 * svpContribution + 0.48 * gaaContribution;
-    var workloadContribution =
-      (0.42 * svContribution + 0.23 * saContribution + 0.35 * toiContribution) *
-      (0.35 + 0.65 * rateQuality);
-    var rawComposite =
-      0.12 * winContribution +
-      0.24 * gaaContribution +
-      0.28 * svpContribution +
-      0.2 * workloadContribution +
-      0.16 * gaContribution;
-    var shapedComposite = Math.pow(Math.max(rawComposite, 0), 1.35);
-    var score = 125 * (1 - Math.exp(-1.81 * shapedComposite));
-    if (
-      shutouts > 0 ||
-      (wins >= 1 && gaa === 0 && svp >= 1 && shotsAgainst > 0)
-    ) {
-      score += 10;
-    }
-
-    return buildResult(
-      row,
-      "PlayerDayStatLine",
-      posGroup,
-      roundScore(score),
-      [],
-      {
-        categoryQuality: rawComposite,
-        spike: Math.max(gaaContribution, svpContribution, winContribution),
-        breadth: 0,
-        volume: 1,
-      },
-    );
-  }
-
   function rankTeamSingle(row, sheetName) {
     var categories = getMatchupCategoriesForSeason(row && row.seasonId);
     var scores = categories.map(function (category) {
@@ -1799,10 +2387,6 @@ var RankingEngine = RankingEngine || {};
   function rankAggregateSingle(row, sheetName, posGroup) {
     var outputField = getOutputField(sheetName, {});
     var clone = cloneObject(row);
-    if (sheetName === "PlayerDayStatLine") {
-      var dayResult = rankPerformance(row, { sheetName: sheetName });
-      return buildResult(row, sheetName, posGroup, dayResult.score, [], {});
-    }
     rankRows([clone], {
       sheetName: sheetName,
       outputField: outputField,
@@ -1855,10 +2439,12 @@ var RankingEngine = RankingEngine || {};
     var sheetName = normalizeSheetName(detectSheetName(row, opts));
     var posGroup = normalizePosGroup(row && row.posGroup, row);
 
-    if (sheetName === "PlayerDayStatLine") {
-      return posGroup === PositionGroup.G
-        ? rankGoaliePlayerDay(row)
-        : rankSkaterPlayerDay(row);
+    if (
+      row &&
+      row.playerId &&
+      (sheetName === "PlayerDayStatLine" || sheetName === "PlayerWeekStatLine")
+    ) {
+      return blankResult(row, sheetName, posGroup);
     }
     if (posGroup === PositionGroup.TEAM || sheetName.indexOf("Team") === 0) {
       return rankTeamSingle(row, sheetName);

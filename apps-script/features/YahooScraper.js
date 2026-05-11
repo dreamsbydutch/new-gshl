@@ -40,19 +40,9 @@ var YahooScraper = YahooScraper || {};
   function ensurePlayerRatings(statLines) {
     if (!Array.isArray(statLines)) return;
     statLines.forEach(function (line) {
-      if (
-        !line ||
-        (line.Rating !== undefined &&
-          line.Rating !== null &&
-          line.Rating !== "")
-      ) {
-        return;
-      }
-      var ratingResult = RankingEngine.rankPerformance(line);
-      if (ratingResult && ratingResult.score !== undefined) {
-        line.Rating = ratingResult.score;
-        line.rating = line.Rating;
-      }
+      if (!line) return;
+      line.Rating = "";
+      line.rating = "";
     });
   }
 
@@ -538,9 +528,7 @@ var YahooScraper = YahooScraper || {};
                 : "F";
         playerRow.bestPos = "";
         playerRow.fullPos = "";
-        const rating = RankingEngine.rankPerformance(playerRow);
-        playerRow.Rating =
-          rating && rating.score !== undefined ? rating.score : "";
+        playerRow.Rating = "";
         playerRow.ADD = computeAddForPlayerDay(playerRow, lookups);
         playerRow.BS = "";
         playerRow.MS = "";
@@ -3800,7 +3788,7 @@ var YahooScraper = YahooScraper || {};
     upsertSheetByKeys(
       TEAMSTATS_SPREADSHEET_ID,
       "TeamDayStatLine",
-      ["gshlTeamId", "date", "weekId", "seasonId"],
+      ["date", "gshlTeamId"],
       teamDayRows,
       {
         idColumn: "id",
@@ -3812,7 +3800,7 @@ var YahooScraper = YahooScraper || {};
     upsertSheetByKeys(
       TEAMSTATS_SPREADSHEET_ID,
       "TeamWeekStatLine",
-      ["gshlTeamId", "weekId", "seasonId"],
+      ["weekId", "gshlTeamId"],
       teamWeekRows,
       {
         idColumn: "id",
@@ -3824,7 +3812,7 @@ var YahooScraper = YahooScraper || {};
     upsertSheetByKeys(
       TEAMSTATS_SPREADSHEET_ID,
       "TeamSeasonStatLine",
-      ["gshlTeamId", "seasonId", "seasonType"],
+      ["seasonId", "gshlTeamId", "seasonType"],
       teamSeasonRows,
       {
         idColumn: "id",
@@ -4367,7 +4355,7 @@ var YahooScraper = YahooScraper || {};
     upsertSheetByKeys(
       PLAYERSTATS_SPREADSHEET_ID,
       "PlayerSplitStatLine",
-      ["gshlTeamId", "playerId", "seasonId", "seasonType"],
+      ["playerId", "seasonId", "gshlTeamId", "seasonType"],
       playerSplits,
       {
         idColumn: "id",

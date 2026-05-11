@@ -37,6 +37,15 @@ var MatchupHandler = (function buildMatchupHandler() {
   var GOALIE_CATEGORY_SET = GshlUtils.core.constants.GOALIE_CATEGORY_SET;
   var GOALIE_START_MINIMUM = GshlUtils.core.constants.GOALIE_START_MINIMUM;
 
+  function normalizeStandingsSeasonType(value) {
+    var seasonType = value === undefined || value === null ? "" : String(value);
+    if (!seasonType) return SeasonType.REGULAR_SEASON;
+    if (seasonType === SeasonType.LOSERS_TOURNAMENT) {
+      return SeasonType.PLAYOFFS;
+    }
+    return seasonType;
+  }
+
   function normalizeWeekIds(weekIds) {
     if (!Array.isArray(weekIds)) return [];
     return weekIds
@@ -142,6 +151,56 @@ var MatchupHandler = (function buildMatchupHandler() {
     return (W - HW) * 3 + HW * 2 + HL;
   }
 
+  function resolveMatchupOutcome(matchup) {
+    var homeScore = parseScore(matchup && matchup.homeScore);
+    var awayScore = parseScore(matchup && matchup.awayScore);
+    var hasScores = homeScore !== null && awayScore !== null;
+    var scoresWereEqual = hasScores && homeScore === awayScore;
+
+    if (toBool(matchup && matchup.homeWin)) {
+      return {
+        hasOutcome: true,
+        homeWin: true,
+        awayWin: false,
+        scoresWereEqual: scoresWereEqual,
+      };
+    }
+
+    if (toBool(matchup && matchup.awayWin)) {
+      return {
+        hasOutcome: true,
+        homeWin: false,
+        awayWin: true,
+        scoresWereEqual: scoresWereEqual,
+      };
+    }
+
+    if (hasScores) {
+      if (scoresWereEqual) {
+        return {
+          hasOutcome: true,
+          homeWin: true,
+          awayWin: false,
+          scoresWereEqual: true,
+        };
+      }
+
+      return {
+        hasOutcome: true,
+        homeWin: homeScore > awayScore,
+        awayWin: awayScore > homeScore,
+        scoresWereEqual: false,
+      };
+    }
+
+    return {
+      hasOutcome: false,
+      homeWin: false,
+      awayWin: false,
+      scoresWereEqual: false,
+    };
+  }
+
   function buildCategoriesForMap(matchups, weekIdsInType) {
     var map = new Map();
     (matchups || []).forEach(function (m) {
@@ -201,23 +260,18 @@ var MatchupHandler = (function buildMatchupHandler() {
       var awayStat = stats.get(awayId);
       if (!homeStat || !awayStat) return;
 
-      var homeScore = m.homeScore;
-      var awayScore = m.awayScore;
-      var hasScores = homeScore !== null && awayScore !== null;
-      var scoresWereEqual = hasScores && homeScore === awayScore;
+      var outcome = resolveMatchupOutcome(m);
 
       homeStat.h2hCatsFor += toNumber(m.homeScore);
       awayStat.h2hCatsFor += toNumber(m.awayScore);
 
-      if (m.tie === true) return;
-
-      if (m.homeWin === true) {
+      if (outcome.homeWin) {
         homeStat.h2hW += 1;
-        if (scoresWereEqual) {
+        if (outcome.scoresWereEqual) {
           homeStat.h2hHW += 1;
           awayStat.h2hHL += 1;
         }
-      } else if (m.awayWin === true) {
+      } else if (outcome.awayWin) {
         awayStat.h2hW += 1;
       }
     });
@@ -541,7 +595,7 @@ var MatchupHandler = (function buildMatchupHandler() {
 
     var weekTypeMap = new Map();
     weeks.forEach(function (w) {
-      weekTypeMap.set(String(w.id), w.weekType || SeasonType.REGULAR_SEASON);
+      weekTypeMap.set(String(w.id), normalizeStandingsSeasonType(w.weekType));
     });
 
     var weekIdsBySeasonType = new Map();
@@ -565,19 +619,9 @@ var MatchupHandler = (function buildMatchupHandler() {
       new Set(
         weeks
           .filter(function (w) {
-            return w.weekType === SeasonType.PLAYOFFS;
-          })
-          .map(function (w) {
-            return String(w.id);
-          }),
-      ),
-    );
-    weekIdsBySeasonType.set(
-      SeasonType.LOSERS_TOURNAMENT,
-      new Set(
-        weeks
-          .filter(function (w) {
-            return w.weekType === SeasonType.LOSERS_TOURNAMENT;
+            return (
+              normalizeStandingsSeasonType(w.weekType) === SeasonType.PLAYOFFS
+            );
           })
           .map(function (w) {
             return String(w.id);
@@ -631,7 +675,7 @@ var MatchupHandler = (function buildMatchupHandler() {
           : "";
       if (!teamId) return;
 
-      var seasonType = ts.seasonType || SeasonType.REGULAR_SEASON;
+      var seasonType = normalizeStandingsSeasonType(ts.seasonType);
       var weekIdsInType =
         weekIdsBySeasonType.get(seasonType) ||
         weekIdsBySeasonType.get(SeasonType.REGULAR_SEASON) ||
@@ -672,13 +716,11 @@ var MatchupHandler = (function buildMatchupHandler() {
         var isConference =
           teamConf && opponentConf && teamConf === opponentConf;
 
-        var homeScore = matchup.homeScore;
-        var awayScore = matchup.awayScore;
-        var hasScores = homeScore !== null && awayScore !== null;
-        var scoresWereEqual = hasScores && homeScore === awayScore;
+        var outcome = resolveMatchupOutcome(matchup);
+        var scoresWereEqual = outcome.scoresWereEqual;
 
-        var isHomeWin = !!matchup.homeWin;
-        var isAwayWin = !!matchup.awayWin;
+        var isHomeWin = outcome.homeWin;
+        var isAwayWin = outcome.awayWin;
 
         var result = null;
 
@@ -730,7 +772,7 @@ var MatchupHandler = (function buildMatchupHandler() {
       var update = {
         gshlTeamId: ts.gshlTeamId,
         seasonId: ts.seasonId,
-        seasonType: ts.seasonType || SeasonType.REGULAR_SEASON,
+        seasonType: seasonType,
         teamW: teamW,
         teamHW: teamHW,
         teamHL: teamHL,

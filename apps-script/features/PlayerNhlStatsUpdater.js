@@ -212,7 +212,21 @@ var PlayerNhlStatsUpdater = (function PlayerNhlStatsUpdaterModule() {
         .map(normalizePosToken)
         .filter(Boolean);
     }
-    return String(value || "")
+    var text = String(value || "").trim();
+    if (!text) return [];
+    if (text.indexOf("[") === 0 && text.lastIndexOf("]") === text.length - 1) {
+      try {
+        var parsed = JSON.parse(text);
+        if (Array.isArray(parsed)) {
+          return parsed
+            .map(normalizePosToken)
+            .filter(Boolean);
+        }
+      } catch (error) {
+        // Fall through to delimiter parsing for malformed legacy strings.
+      }
+    }
+    return text
       .split(/[,\//|]/)
       .map(normalizePosToken)
       .filter(Boolean);
