@@ -110,7 +110,8 @@ var RatingUpdater = (function RatingUpdaterModule() {
       return schema.keyColumns.slice();
     }
     throw new Error(
-      "[RatingUpdater] No keyColumns found for sheet " + normalizeSheetName(sheetName),
+      "[RatingUpdater] No keyColumns found for sheet " +
+        normalizeSheetName(sheetName),
     );
   }
 
@@ -130,7 +131,12 @@ var RatingUpdater = (function RatingUpdaterModule() {
   function resolveExistingOutputField(sheetName, rows, requestedField) {
     var normalizedSheetName = normalizeSheetName(sheetName);
     var desired = requestedField || getOutputField(normalizedSheetName, {});
-    var sampleRow = rows && rows.length ? rows.find(function (row) { return !!row; }) : null;
+    var sampleRow =
+      rows && rows.length
+        ? rows.find(function (row) {
+            return !!row;
+          })
+        : null;
     if (!sampleRow) return desired;
 
     if (Object.prototype.hasOwnProperty.call(sampleRow, desired)) {
@@ -247,7 +253,11 @@ var RatingUpdater = (function RatingUpdaterModule() {
       );
     }
 
-    var workbookId = resolveWorkbookIdForSheet(normalizedSheetName, seasonKey, opts);
+    var workbookId = resolveWorkbookIdForSheet(
+      normalizedSheetName,
+      seasonKey,
+      opts,
+    );
     if (!workbookId) {
       throw new Error(
         "[RatingUpdater] Could not resolve workbook for sheet=" +
@@ -334,7 +344,8 @@ var RatingUpdater = (function RatingUpdaterModule() {
       } else {
         rows.forEach(function (row) {
           var rating = RankingEngine.rankPerformance(row);
-          row[outputField] = rating && rating.score !== undefined ? rating.score : "";
+          row[outputField] =
+            rating && rating.score !== undefined ? rating.score : "";
         });
       }
     } catch (e) {
@@ -399,29 +410,66 @@ var RatingUpdater = (function RatingUpdaterModule() {
     seasonId,
     options,
   ) {
-    return ns.updateRatingsForSheet(seasonId, "PlayerDayStatLine", options || {});
+    return ns.updateRatingsForSheet(
+      seasonId,
+      "PlayerDayStatLine",
+      options || {},
+    );
   };
 
-  ns.updatePlayerWeekRatingsForSeason = function updatePlayerWeekRatingsForSeason(
+  ns.updateTeamDayRatingsForSeason = function updateTeamDayRatingsForSeason(
     seasonId,
     options,
   ) {
-    return ns.updateRatingsForSheet(seasonId, "PlayerWeekStatLine", options || {});
+    return ns.updateRatingsForSheet(seasonId, "TeamDayStatLine", options || {});
   };
 
-  ns.updatePlayerSplitRatingsForSeason = function updatePlayerSplitRatingsForSeason(
+  ns.updateTeamWeekRatingsForSeason = function updateTeamWeekRatingsForSeason(
     seasonId,
     options,
   ) {
-    return ns.updateRatingsForSheet(seasonId, "PlayerSplitStatLine", options || {});
+    return ns.updateRatingsForSheet(
+      seasonId,
+      "TeamWeekStatLine",
+      options || {},
+    );
   };
 
-  ns.updatePlayerTotalRatingsForSeason = function updatePlayerTotalRatingsForSeason(
-    seasonId,
-    options,
-  ) {
-    return ns.updateRatingsForSheet(seasonId, "PlayerTotalStatLine", options || {});
-  };
+  ns.updateTeamSeasonRatingsForSeason =
+    function updateTeamSeasonRatingsForSeason(seasonId, options) {
+      return ns.updateRatingsForSheet(
+        seasonId,
+        "TeamSeasonStatLine",
+        options || {},
+      );
+    };
+
+  ns.updatePlayerWeekRatingsForSeason =
+    function updatePlayerWeekRatingsForSeason(seasonId, options) {
+      return ns.updateRatingsForSheet(
+        seasonId,
+        "PlayerWeekStatLine",
+        options || {},
+      );
+    };
+
+  ns.updatePlayerSplitRatingsForSeason =
+    function updatePlayerSplitRatingsForSeason(seasonId, options) {
+      return ns.updateRatingsForSheet(
+        seasonId,
+        "PlayerSplitStatLine",
+        options || {},
+      );
+    };
+
+  ns.updatePlayerTotalRatingsForSeason =
+    function updatePlayerTotalRatingsForSeason(seasonId, options) {
+      return ns.updateRatingsForSheet(
+        seasonId,
+        "PlayerTotalStatLine",
+        options || {},
+      );
+    };
 
   ns.updatePlayerNhlRatingsForSeason = function updatePlayerNhlRatingsForSeason(
     seasonId,
@@ -434,42 +482,85 @@ var RatingUpdater = (function RatingUpdaterModule() {
     );
   };
 
-  ns.updateAllPlayerStatRatingsForSeason = function updateAllPlayerStatRatingsForSeason(
-    seasonId,
-    options,
-  ) {
-    var opts = Object.assign(
-      {
-        includePlayerDays: false,
-        includePlayerWeeks: true,
-        includePlayerSplits: true,
-        includePlayerTotals: true,
-        includePlayerNhl: true,
-        dryRun: false,
-        logToConsole: true,
-      },
-      options || {},
-    );
-    var results = {};
+  ns.updateAllPlayerStatRatingsForSeason =
+    function updateAllPlayerStatRatingsForSeason(seasonId, options) {
+      var opts = Object.assign(
+        {
+          includePlayerDays: false,
+          includePlayerWeeks: true,
+          includePlayerSplits: true,
+          includePlayerTotals: true,
+          includePlayerNhl: true,
+          dryRun: false,
+          logToConsole: true,
+        },
+        options || {},
+      );
+      var results = {};
 
-    if (opts.includePlayerDays) {
-      results.playerDays = ns.updatePlayerDayRatingsForSeason(seasonId, opts);
-    }
-    if (opts.includePlayerWeeks) {
-      results.playerWeeks = ns.updatePlayerWeekRatingsForSeason(seasonId, opts);
-    }
-    if (opts.includePlayerSplits) {
-      results.playerSplits = ns.updatePlayerSplitRatingsForSeason(seasonId, opts);
-    }
-    if (opts.includePlayerTotals) {
-      results.playerTotals = ns.updatePlayerTotalRatingsForSeason(seasonId, opts);
-    }
-    if (opts.includePlayerNhl) {
-      results.playerNhl = ns.updatePlayerNhlRatingsForSeason(seasonId, opts);
-    }
+      if (opts.includePlayerDays) {
+        results.playerDays = ns.updatePlayerDayRatingsForSeason(seasonId, opts);
+      }
+      if (opts.includePlayerWeeks) {
+        results.playerWeeks = ns.updatePlayerWeekRatingsForSeason(
+          seasonId,
+          opts,
+        );
 
-    return results;
-  };
+        ns.updateAllTeamStatRatingsForSeason =
+          function updateAllTeamStatRatingsForSeason(seasonId, options) {
+            var opts = Object.assign(
+              {
+                includeTeamDays: true,
+                includeTeamWeeks: true,
+                includeTeamSeasons: true,
+                dryRun: false,
+                logToConsole: true,
+              },
+              options || {},
+            );
+            var results = {};
+
+            if (opts.includeTeamDays) {
+              results.teamDays = ns.updateTeamDayRatingsForSeason(
+                seasonId,
+                opts,
+              );
+            }
+            if (opts.includeTeamWeeks) {
+              results.teamWeeks = ns.updateTeamWeekRatingsForSeason(
+                seasonId,
+                opts,
+              );
+            }
+            if (opts.includeTeamSeasons) {
+              results.teamSeasons = ns.updateTeamSeasonRatingsForSeason(
+                seasonId,
+                opts,
+              );
+            }
+
+            return results;
+          };
+      }
+      if (opts.includePlayerSplits) {
+        results.playerSplits = ns.updatePlayerSplitRatingsForSeason(
+          seasonId,
+          opts,
+        );
+      }
+      if (opts.includePlayerTotals) {
+        results.playerTotals = ns.updatePlayerTotalRatingsForSeason(
+          seasonId,
+          opts,
+        );
+      }
+      if (opts.includePlayerNhl) {
+        results.playerNhl = ns.updatePlayerNhlRatingsForSeason(seasonId, opts);
+      }
+
+      return results;
+    };
 
   return ns;
 })();

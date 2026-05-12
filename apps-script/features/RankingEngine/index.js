@@ -16,6 +16,9 @@ var RankingEngine = RankingEngine || {};
   var GOALIE_CORE_CATEGORIES = ["W", "GAA", "SVP"];
   var LOWER_BETTER = { GAA: true, GA: true };
   var seasonCategoryCache = {};
+  var teamDaySeasonRowsCache = {};
+  var TEAM_DAY_NO_GOALIE_CATEGORY_SCORE = 0.45;
+  var TEAM_DAY_FINAL_SCORE_MULTIPLIER = 1.25;
 
   var SMALL_COHORT_THRESHOLDS = {
     skater: 17,
@@ -33,24 +36,29 @@ var RankingEngine = RankingEngine || {};
     },
   };
   var PLAYER_DAY_RETAINED_SHARE = {
-    F: 0.9,
+    F: 0.85,
     D: 0.75,
-    G: 0.4,
+    G: 0.55,
   };
   var PLAYER_WEEK_RETAINED_SHARE = {
-    F: 0.9,
+    F: 0.5,
     D: 0.75,
-    G: 0.4,
+    G: 0.5,
   };
   var RETAINED_RANGE_NEGATIVE_CARRY = 0.3;
   var RETAINED_RANGE_NEGATIVE_FLOOR = -0.3;
   var GOALIE_MINIMUM_TOI_FOR_RATING = 0;
   var GOALIE_NEGLIGIBLE_TOI_THRESHOLD = 30;
   var GOALIE_NEGLIGIBLE_TOI_MAX_SCORE = 15;
+  var PLAYER_DAY_POSITION_MULTIPLIER = {
+    F: 1.725,
+    D: 1.575,
+    G: 1.325,
+  };
   var PLAYER_WEEK_POSITION_MULTIPLIER = {
-    F: 1.6,
-    D: 1.35,
-    G: 1.125,
+    F: 1.75,
+    D: 1.5,
+    G: 1.05,
   };
   var WEEK_NORMALIZATION_CONFIG = {
     skater: { targetUsage: 3.5, fullUsage: 3 },
@@ -140,25 +148,25 @@ var RankingEngine = RankingEngine || {};
         efficiency: 0.53,
         support: 0.12,
         breadth: 0.07,
-        workload: 0.28,
+        workload: 0.18,
       },
-      workloadMix: { GS: 0, SA: 0.18, SV: 0.42, TOI: 0.24 },
+      workloadMix: { GS: 0, SA: 0.18, SV: 0.34, TOI: 0.4 },
       balancedBonus: 0,
       specialistCap: null,
       smallSampleCap: null,
     },
     PlayerWeekStatLine: {
-      winBlend: { raw: 0.65, rate: 0.35 },
+      winBlend: { raw: 1, rate: 0 },
       weights: {
-        efficiency: 0.58,
+        efficiency: 0.5,
         support: 0.2,
-        breadth: 0.14,
-        workload: 0.08,
+        breadth: 0.15,
+        workload: 0.225,
       },
-      workloadMix: { GS: 0.15, SA: 0.03, SV: 0.06, TOI: 0.06 },
+      workloadMix: { GS: 0.25, SA: 0.2, SV: 0.3, TOI: 0.45 },
       balancedBonus: 2,
-      specialistCap: { type: "singleElite", threshold: 0.78, cap: 94 },
-      smallSampleCap: { maxUsage: 1, minWorkload: 0.5, cap: 90 },
+      specialistCap: null,
+      smallSampleCap: null,
     },
     PlayerSplitStatLine: {
       winBlend: { raw: 0.75, rate: 0.25 },
@@ -726,6 +734,10 @@ var RankingEngine = RankingEngine || {};
     var normalizedSheetName = normalizeSheetName(sheetName);
     var adjusted = Number(score);
     if (!isFinite(adjusted)) return 0;
+
+    if (normalizedSheetName === "PlayerDayStatLine") {
+      adjusted *= PLAYER_DAY_POSITION_MULTIPLIER[posGroup] || 1;
+    }
 
     if (normalizedSheetName === "PlayerWeekStatLine") {
       adjusted *= PLAYER_WEEK_POSITION_MULTIPLIER[posGroup] || 1;
@@ -2027,7 +2039,7 @@ var RankingEngine = RankingEngine || {};
   }
 
   function computeGoalieWorkloadScore(row, profile, distributions, sheetName) {
-    var mix = profile.workloadMix;
+    var mix = (profile && profile.workloadMix) || {};
     var scoreMode = distributions.scoreMode || "distribution";
     var score = 0;
     if (mix.GS) {
@@ -2278,6 +2290,133 @@ var RankingEngine = RankingEngine || {};
     });
   }
 
+  function hasNonBlankCellValue(value) {
+    return !(value === undefined || value === null || String(value).trim() === "");
+  }
+
+  function getTeamDayCategoryValue(row, category) {
+    if (!row || !hasNonBlankCellValue(row[category])) return null;
+    var numeric = Number(row[category]);
+    return isFinite(numeric) ? numeric : null;
+  }
+
+  function hasMeaningfulTeamDayActivity(row, categories) {
+    if (!row) return false;
+    if (toNumber(row.GP) <= 0) return false;
+    if (toNumber(row.GS) > 0) return true;
+    return (categories || []).some(function (category) {
+      var value = getTeamDayCategoryValue(row, category);
+      return value !== null && value > 0;
+    });
+  }
+
+  function hasTeamDayGoalieActivity(row) {
+    if (!row) return false;
+    return (
+      toNumber(row.W) > 0 ||
+      toNumber(row.GA) > 0 ||
+      toNumber(row.SV) > 0 ||
+      toNumber(row.SA) > 0 ||
+      toNumber(row.SO) > 0 ||
+      toNumber(row.TOI) > 0 ||
+      getTeamDayCategoryValue(row, "GAA") !== null ||
+      getTeamDayCategoryValue(row, "SVP") !== null
+    );
+  }
+
+  function buildTeamDayDistributions(rows, categories) {
+    var distributions = {};
+    (categories || []).forEach(function (category) {
+      distributions[category] = sortedValuesByGetter(rows, function (row) {
+        return getTeamDayCategoryValue(row, category);
+      });
+    });
+    return distributions;
+  }
+
+  function scoreTeamDayCategory(row, category, distributions) {
+    var value = getTeamDayCategoryValue(row, category);
+    if (value === null) {
+      if (
+        GOALIE_CORE_CATEGORIES.indexOf(category) !== -1 &&
+        !hasTeamDayGoalieActivity(row)
+      ) {
+        return TEAM_DAY_NO_GOALIE_CATEGORY_SCORE;
+      }
+      return 0;
+    }
+    return percentileRank(
+      value,
+      distributions[category],
+      isLowerBetterStat(category),
+    );
+  }
+
+  function rankTeamDayRows(rows, outputField) {
+    if (!rows || !rows.length) return;
+
+    var categories = getMatchupCategoriesForSeason(rows[0] && rows[0].seasonId);
+    var scoreScale = getScoreScale("TeamDayStatLine");
+    var distributions = buildTeamDayDistributions(rows, categories);
+    rows.forEach(function (row) {
+      if (!hasMeaningfulTeamDayActivity(row, categories)) {
+        row[outputField] = 0;
+        return;
+      }
+
+      var scores = categories.map(function (category) {
+        return scoreTeamDayCategory(row, category, distributions);
+      });
+      row[outputField] = roundScore(
+        scoreScale * average(scores) * TEAM_DAY_FINAL_SCORE_MULTIPLIER,
+      );
+    });
+  }
+
+  function getTeamDayRowKey(row) {
+    return [
+      row && row.gshlTeamId !== undefined ? String(row.gshlTeamId) : "",
+      row && row.date !== undefined ? String(row.date) : "",
+      row && row.weekId !== undefined ? String(row.weekId) : "",
+      row && row.seasonId !== undefined ? String(row.seasonId) : "",
+    ].join("|");
+  }
+
+  function fetchSeasonTeamDayRows(seasonId) {
+    var seasonKey = String(seasonId || "");
+    if (Object.prototype.hasOwnProperty.call(teamDaySeasonRowsCache, seasonKey)) {
+      return teamDaySeasonRowsCache[seasonKey].map(cloneObject);
+    }
+
+    try {
+      var fetchSheetAsObjects =
+        typeof GshlUtils !== "undefined" &&
+        GshlUtils.sheets &&
+        GshlUtils.sheets.read &&
+        GshlUtils.sheets.read.fetchSheetAsObjects
+          ? GshlUtils.sheets.read.fetchSheetAsObjects
+          : null;
+      if (!fetchSheetAsObjects || typeof TEAMSTATS_SPREADSHEET_ID === "undefined") {
+        teamDaySeasonRowsCache[seasonKey] = [];
+        return [];
+      }
+
+      teamDaySeasonRowsCache[seasonKey] = (fetchSheetAsObjects(
+        TEAMSTATS_SPREADSHEET_ID,
+        "TeamDayStatLine",
+        {
+          coerceTypes: true,
+        },
+      ) || []).filter(function (row) {
+        return String(row && row.seasonId) === seasonKey;
+      });
+      return teamDaySeasonRowsCache[seasonKey].map(cloneObject);
+    } catch (_error) {
+      teamDaySeasonRowsCache[seasonKey] = [];
+      return [];
+    }
+  }
+
   function rankRows(rows, options) {
     var opts = options || {};
     var sheetName = normalizeSheetName(
@@ -2290,10 +2429,16 @@ var RankingEngine = RankingEngine || {};
     if (!targetRows.length) return targetRows;
 
     if (sheetName === "TeamDayStatLine") {
+      var seasonGroups = {};
       targetRows.forEach(function (row) {
-        var result = rankPerformance(row, { sheetName: sheetName });
-        row[outputField] =
-          result && result.score !== undefined ? result.score : "";
+        var seasonKey = row && row.seasonId !== undefined ? String(row.seasonId) : "";
+        if (!seasonGroups[seasonKey]) {
+          seasonGroups[seasonKey] = [];
+        }
+        seasonGroups[seasonKey].push(row);
+      });
+      Object.keys(seasonGroups).forEach(function (seasonKey) {
+        rankTeamDayRows(seasonGroups[seasonKey], outputField);
       });
       return targetRows;
     }
@@ -2358,6 +2503,58 @@ var RankingEngine = RankingEngine || {};
   }
 
   function rankTeamSingle(row, sheetName) {
+    if (normalizeSheetName(sheetName) === "TeamDayStatLine") {
+      var categories = getMatchupCategoriesForSeason(row && row.seasonId);
+      if (!hasMeaningfulTeamDayActivity(row, categories)) {
+        return buildResult(row, sheetName, PositionGroup.TEAM, 0, [], {
+          categoryQuality: 0,
+          spike: 0,
+          breadth: 0,
+          volume: 0,
+        });
+      }
+
+      var poolRows = fetchSeasonTeamDayRows(row && row.seasonId);
+      var targetRow = cloneObject(row);
+      var targetKey = getTeamDayRowKey(targetRow);
+      var hasExistingRow = poolRows.some(function (poolRow) {
+        return getTeamDayRowKey(poolRow) === targetKey;
+      });
+      if (!hasExistingRow) {
+        poolRows.push(targetRow);
+      }
+
+      rankRows(poolRows, {
+        sheetName: "TeamDayStatLine",
+        outputField: getOutputField("TeamDayStatLine", {}),
+        mutate: true,
+      });
+
+      var resolvedRow = hasExistingRow
+        ? poolRows.find(function (poolRow) {
+            return getTeamDayRowKey(poolRow) === targetKey;
+          })
+        : targetRow;
+      var score =
+        resolvedRow && resolvedRow.Rating !== undefined ? resolvedRow.Rating : 0;
+      var normalizedScore = Number(score);
+      if (!isFinite(normalizedScore)) normalizedScore = 0;
+
+      return buildResult(
+        row,
+        sheetName,
+        PositionGroup.TEAM,
+        normalizedScore,
+        [],
+        {
+          categoryQuality: normalizedScore / getScoreScale(sheetName),
+          spike: normalizedScore / getScoreScale(sheetName),
+          breadth: normalizedScore > 0 ? 1 : 0,
+          volume: normalizedScore > 0 ? 1 : 0,
+        },
+      );
+    }
+
     var categories = getMatchupCategoriesForSeason(row && row.seasonId);
     var scores = categories.map(function (category) {
       var value = toNumber(row && row[category]);
