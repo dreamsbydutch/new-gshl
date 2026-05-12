@@ -18,8 +18,6 @@ import {
   identity,
   getContractDedupeKey,
   CAP_CEILING,
-  CAP_SEASON_END_DAY,
-  CAP_SEASON_END_MONTH,
   formatDate,
   toNumber,
 } from "@gshl-utils";
@@ -500,33 +498,29 @@ export function useContractData(
   }, [currentContracts]);
 
   const capSpaceWindow = useMemo(() => {
-    const seasonStartYear = activeSeasonEndYear ?? new Date().getFullYear();
+    const displaySeasonYear =
+      getContractTableDisplaySeasonYear(currentSeason) ??
+      activeSeasonEndYear ??
+      new Date().getFullYear();
     const dataset = sortedContracts;
 
     const calcRemaining = (year: number) => {
-      const cutoffDate = new Date(
-        year,
-        CAP_SEASON_END_MONTH,
-        CAP_SEASON_END_DAY,
-      );
       const active = dataset.filter(
-        (c) =>
-          new Date(c.capHitEndDate) >= cutoffDate &&
-          !(new Date(c.startDate) > cutoffDate),
+        (contract) => isContractActiveForDisplayYear(contract, year),
       );
       const total = active.reduce((sum, c) => sum + toNumber(c.capHit, 0), 0);
       return CAP_CEILING - total;
     };
 
     return Array.from({ length: 5 }).map((_, idx) => {
-      const year = seasonStartYear + idx;
+      const year = displaySeasonYear + idx;
       return {
         label: `${year}`,
         year,
         remaining: calcRemaining(year),
       };
     });
-  }, [sortedContracts, activeSeasonEndYear]);
+  }, [sortedContracts, currentSeason, activeSeasonEndYear]);
 
   const activeCurrentContractKeys = useMemo(
     () => new Set(activeCurrentContracts.map(getContractUniqueKey)),
@@ -692,6 +686,34 @@ function getSeasonEndYear(season?: Season): number | null {
   const match = /^(\d{4})/.exec(season.name ?? "");
   if (!match) return null;
   return Number(match[1]) + 1;
+}
+
+function getContractTableDisplaySeasonYear(season?: Season): number | null {
+  if (!season) return null;
+
+  const explicitYear = toNumber(season.year, Number.NaN);
+  if (Number.isFinite(explicitYear)) {
+    return Math.trunc(explicitYear);
+  }
+
+  const match = /^(\d{4})/.exec(season.name ?? "");
+  if (!match) return null;
+  return Number(match[1]) + 1;
+}
+
+function isContractActiveForDisplayYear(contract: Contract, year: number) {
+  const startYear = getDateYear(contract.startDate);
+  const endYear = getDateYear(contract.capHitEndDate);
+
+  if (startYear !== null && year <= startYear) {
+    return false;
+  }
+
+  if (endYear === null) {
+    return true;
+  }
+
+  return endYear + 1 > year;
 }
 
 function getContractCapHitEndYear(contract: Contract): number | null {
