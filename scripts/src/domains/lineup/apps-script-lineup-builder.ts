@@ -6,6 +6,14 @@ import type { DatabaseRecord } from "@gshl-lib/sheets/config/config";
 
 type LineupBuilderApi = {
   optimizeLineup: (players: DatabaseRecord[]) => DatabaseRecord[];
+  findBestLineup: (
+    players: DatabaseRecord[],
+    skipValidation?: boolean,
+    slots?: ReadonlyArray<{
+      position: string;
+      eligiblePositions: readonly string[];
+    }>,
+  ) => Record<string, string>;
   internals?: {
     isEligibleForPosition?: (
       player: DatabaseRecord,
@@ -48,7 +56,9 @@ async function loadLineupBuilder(): Promise<LineupBuilderApi> {
 
   const lineupBuilder = context.LineupBuilder;
   if (!lineupBuilder || typeof lineupBuilder.optimizeLineup !== "function") {
-    throw new Error("[lineup-builder] Failed to load Apps Script LineupBuilder.");
+    throw new Error(
+      "[lineup-builder] Failed to load Apps Script LineupBuilder.",
+    );
   }
 
   return lineupBuilder;

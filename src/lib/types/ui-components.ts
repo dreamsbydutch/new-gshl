@@ -8,11 +8,13 @@
  */
 
 import type {
+  Awards,
   Contract,
   DraftPick,
   GSHLTeam,
   Matchup,
   Player,
+  PlayerTotalStatLine,
   Season,
   NHLTeam,
   TeamSeasonStatLine,
@@ -21,7 +23,7 @@ import type {
   Franchise,
   PlayerWeekStatLine,
 } from "./database";
-import type { MatchupType, RosterPosition } from "./enums";
+import type { AwardsList, MatchupType, RosterPosition } from "./enums";
 import type { ToggleItem } from "./nav";
 
 /* ============================================================================
@@ -103,6 +105,43 @@ export interface TeamLogoProps {
 export interface TeamInfoProps {
   currentTeam: GSHLTeam;
   formattedOwnerName: string;
+}
+
+export type AwardGroupKey = "TEAM TROPHIES" | "TIER 1 AWARDS" | "TIER 2 AWARDS";
+
+export interface AwardCatalogEntry {
+  key: AwardsList;
+  group: AwardGroupKey;
+  fullName: string;
+  imageUrl: string;
+  summaryLabel: string;
+  sortOrder: number;
+}
+
+export interface TrophyCaseCard {
+  id: string;
+  award: Awards;
+  catalog: AwardCatalogEntry;
+  seasonYear: number | string;
+  franchiseLogoUrl: string | null;
+}
+
+export interface TrophyCaseSummaryLine {
+  awardKey: AwardsList;
+  group: AwardGroupKey;
+  sortOrder: number;
+  text: string;
+}
+
+export interface TrophyCaseProps {
+  awards: Awards[];
+  allAwards: Awards[];
+  allTeams: GSHLTeam[];
+  currentTeam: GSHLTeam;
+  nhlTeams: NHLTeam[];
+  playerTotals: PlayerTotalStatLine[];
+  players: Player[];
+  seasons: Season[];
 }
 
 /* ============================================================================

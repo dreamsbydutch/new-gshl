@@ -12,3 +12,4 @@ export { TeamDraftPickList } from "./TeamDraftPickList";
 export { TeamHistoryContainer } from "./TeamHistory";
 export { TeamRoster, RosterLineup, BenchPlayers } from "./TeamRoster";
 export { TeamSchedule } from "./TeamSchedule";
+export { TrophyCase } from "./TrophyCase";

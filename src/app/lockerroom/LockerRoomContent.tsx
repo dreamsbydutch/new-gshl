@@ -3,9 +3,12 @@
 import { useMemo } from "react";
 import { LockerRoomHeader } from "@gshl-components/team/LockerRoomHeader";
 import { TeamDraftPickList } from "@gshl-components/team/TeamDraftPickList";
+import { TrophyCase } from "@gshl-components/team/TrophyCase";
 import {
+  useAwards,
   useDraftPicks,
   usePlayers,
+  usePlayerStats,
   useSeasonState,
   useTeams,
   useNHLTeams,
@@ -51,6 +54,25 @@ export function LockerRoomContent() {
   const nhlTeams = nhlTeamsRaw as NHLTeam[];
 
   const currentTeam = teams?.find((t) => t.ownerId === selectedOwnerId);
+  const isTrophyTab = selectedLockerRoomType === "trophy";
+
+  const { data: awards = [], isLoading: awardsLoading } = useAwards({
+    winnerId: selectedOwnerId ?? undefined,
+    enabled: isTrophyTab && Boolean(selectedOwnerId),
+    orderBy: { seasonId: "desc" },
+  });
+  const { data: allAwards = [], isLoading: allAwardsLoading } = useAwards({
+    enabled: isTrophyTab,
+    orderBy: { seasonId: "desc" },
+  });
+  const playerTotalsQuery = usePlayerStats({
+    enabled: isTrophyTab,
+    includeDaily: false,
+    includeWeekly: false,
+    includeSplits: false,
+    includeTotals: true,
+  });
+  const playerTotals = playerTotalsQuery.totals;
 
   const {
     table: teamContractTableData,
@@ -69,7 +91,14 @@ export function LockerRoomContent() {
     enabled: needsContractData,
   });
 
-  const isLoading = teamsLoading || playersLoading || nhlTeamsLoading;
+  const isLoading =
+    teamsLoading ||
+    playersLoading ||
+    nhlTeamsLoading ||
+    (isTrophyTab &&
+      (awardsLoading ||
+        allAwardsLoading ||
+        playerTotalsQuery.status.isLoading));
 
   if (isLoading) {
     if (selectedLockerRoomType === "roster") {
@@ -136,6 +165,18 @@ export function LockerRoomContent() {
             }}
           />
         </>
+      )}
+      {selectedLockerRoomType === "trophy" && (
+        <TrophyCase
+          awards={awards}
+          allAwards={allAwards}
+          allTeams={allTeams}
+          currentTeam={currentTeam}
+          nhlTeams={nhlTeams}
+          playerTotals={playerTotals}
+          players={players}
+          seasons={seasons}
+        />
       )}
     </>
   );

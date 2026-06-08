@@ -17,6 +17,7 @@ type CompositeKeyUpsertOptions = {
   idColumn?: string;
   generateId?: () => string;
   spreadsheetId?: string;
+  deleteMissing?: boolean | { filter?: Record<string, unknown> };
 };
 
 type CompositeKeyUpsertResult = {
@@ -108,6 +109,22 @@ function normalizeCompositeKeyPart(column: string, value: unknown): string {
   }
 
   return "";
+}
+
+function matchesFilter(
+  rowRecord: Record<string, unknown>,
+  filter: Record<string, unknown> | null,
+): boolean {
+  if (!filter) {
+    return true;
+  }
+
+  return Object.entries(filter).every(([column, expected]) => {
+    return (
+      normalizeCompositeKeyPart(column, rowRecord[column]) ===
+      normalizeCompositeKeyPart(column, expected)
+    );
+  });
 }
 
 function makeCompositeKey(
@@ -233,10 +250,6 @@ export class MinimalSheetsWriter {
     rows: T[],
     options: CompositeKeyUpsertOptions = {},
   ): Promise<CompositeKeyUpsertResult> {
-    if (!rows.length) {
-      return { updated: 0, inserted: 0, total: 0 };
-    }
-
     const sheetName = SHEETS_CONFIG.SHEETS[modelName];
     const columns = SHEETS_CONFIG.COLUMNS[modelName];
     if (!sheetName || !columns) {
@@ -256,6 +269,7 @@ export class MinimalSheetsWriter {
     const updatedAtColumn = options.updatedAtColumn;
     const createdAtColumn = options.createdAtColumn;
     const idColumn = options.idColumn;
+    const deleteMissing = options.deleteMissing ?? null;
     const nowIso = new Date().toISOString();
     const spreadsheetId = spreadsheetIds[0];
     const rawRows = await optimizedSheetsClient.getValues(
@@ -373,6 +387,28 @@ export class MinimalSheetsWriter {
       inserted += 1;
     }
 
+    const deleteMissingFilter =
+      deleteMissing && typeof deleteMissing === "object"
+        ? deleteMissing.filter ?? null
+        : null;
+    const rowNumbersToDelete: number[] = [];
+    if (deleteMissing) {
+      dataRows.forEach((row, rowOffset) => {
+        const paddedRow = headerColumns.map((_, index) => row[index] ?? "");
+        const rowRecord = rowToRecord(headerColumns, paddedRow);
+        const key = makeCompositeKey(rowRecord, keyColumns);
+
+        if (!matchesFilter(rowRecord, deleteMissingFilter)) {
+          return;
+        }
+        if (incomingSeen.has(key)) {
+          return;
+        }
+
+        rowNumbersToDelete.push(rowOffset + 2);
+      });
+    }
+
     if (updates.size > 0) {
       await optimizedSheetsClient.updateRowsByIds(
         spreadsheetId,
@@ -386,6 +422,14 @@ export class MinimalSheetsWriter {
         spreadsheetId,
         sheetName,
         inserts,
+      );
+    }
+
+    if (rowNumbersToDelete.length > 0) {
+      await optimizedSheetsClient.deleteRows(
+        spreadsheetId,
+        sheetName,
+        rowNumbersToDelete,
       );
     }
 
