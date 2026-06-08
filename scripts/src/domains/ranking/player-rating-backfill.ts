@@ -10,6 +10,7 @@ import { applyPlayerDayDerivedColumns } from "@gshl-lib/stats/player-day-flags";
 import {
   getArgValue,
   hasFlag,
+  isSkippableMissingSheetError,
   parseSupportedPlayerRatingModels,
   preparePlayerRatingModelRows,
   toBoolean,
@@ -734,15 +735,43 @@ export async function executePlayerRatingModelBackfill(
   modelName: SupportedPlayerRatingModelName,
 ): Promise<PlayerRatingModelExecutionSummary> {
   const clientModule = await import("@gshl-lib/sheets/client/optimized-client");
-  const prepared = await preparePlayerRatingModelRows(
-    {
-      seasonId: options.seasonId,
-      seasonType: options.seasonType,
-      weekIds: options.weekIds,
-      weekNums: options.weekNums,
-    },
-    modelName,
-  );
+  let prepared: Awaited<ReturnType<typeof preparePlayerRatingModelRows>>;
+  try {
+    prepared = await preparePlayerRatingModelRows(
+      {
+        seasonId: options.seasonId,
+        seasonType: options.seasonType,
+        weekIds: options.weekIds,
+        weekNums: options.weekNums,
+      },
+      modelName,
+    );
+  } catch (error) {
+    if (!isSkippableMissingSheetError(error, modelName)) {
+      throw error;
+    }
+
+    const configModule = await import("@gshl-lib/sheets/config/config");
+    const sheetName = configModule.SHEETS_CONFIG.SHEETS[modelName] ?? modelName;
+    const outputField = modelName === "PlayerNHLStatLine" ? "seasonRating" : "Rating";
+    const reason =
+      error instanceof Error ? error.message : formatUnknownMessage(error);
+
+    logPlayerRatingBackfill(
+      options,
+      `${modelName}: skipped for season ${options.seasonId} because no active sheet/workbook is configured yet (${reason}).`,
+    );
+
+    return {
+      modelName,
+      spreadsheetId: "",
+      sheetName,
+      outputField,
+      matchedRows: 0,
+      updatedRows: 0,
+      dryRun: !options.apply,
+    };
+  }
 
   const targetRecords = prepared.targetRows.map((entry) => entry.record);
   if (modelName === "PlayerDayStatLine") {

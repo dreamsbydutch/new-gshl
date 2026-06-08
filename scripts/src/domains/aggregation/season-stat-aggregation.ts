@@ -217,11 +217,35 @@ export function getArgValue(
 
   const prefix = `${flagName}=`;
   const match = args.find((arg) => arg.startsWith(prefix));
-  return match ? match.slice(prefix.length) : undefined;
+  if (match) {
+    return match.slice(prefix.length);
+  }
+
+  const envKey = getNpmConfigEnvKey(flagName);
+  const envValue = envKey ? process.env[envKey] : undefined;
+  return toTrimmedString(envValue) || undefined;
 }
 
 export function hasFlag(args: string[], flagName: string): boolean {
-  return args.includes(flagName);
+  if (args.includes(flagName)) {
+    return true;
+  }
+
+  if (flagName === "--apply" && looksLikeMisparsedNpmApplyFlag()) {
+    return true;
+  }
+
+  const envKey = getNpmConfigEnvKey(flagName);
+  if (!envKey) {
+    return false;
+  }
+
+  const envValue = process.env[envKey];
+  if (envValue === undefined) {
+    return false;
+  }
+
+  return toBoolean(envValue, true);
 }
 
 function toTrimmedString(value: unknown): string {
@@ -243,6 +267,33 @@ function toBoolean(value: unknown, fallback: boolean): boolean {
   if (["1", "true", "yes", "on"].includes(normalized)) return true;
   if (["0", "false", "no", "off"].includes(normalized)) return false;
   return fallback;
+}
+
+function getNpmConfigEnvKey(flagName: string): string | null {
+  const normalized = toTrimmedString(flagName);
+  if (!normalized.startsWith("--")) return null;
+  const configName = normalized
+    .slice(2)
+    .replace(/-/g, "_")
+    .trim();
+  return configName ? `npm_config_${configName}` : null;
+}
+
+function looksLikeMisparsedNpmApplyFlag(): boolean {
+  if (process.env.npm_command !== "run") {
+    return false;
+  }
+
+  if (process.env.npm_config_apply !== undefined) {
+    return false;
+  }
+
+  return (
+    toBoolean(process.env.npm_config_all, false) &&
+    toBoolean(process.env.npm_config_parseable, false) &&
+    toBoolean(process.env.npm_config_long, false) &&
+    toBoolean(process.env.npm_config_yes, false)
+  );
 }
 
 export function parseSeasonAggregationOptions(
@@ -282,6 +333,56 @@ function formatNumber(value: unknown): string {
   return numeric.toString();
 }
 
+const INTEGER_AGGREGATE_FIELDS = new Set<string>([
+  ...TEAM_STAT_FIELDS,
+  "days",
+  "playersUsed",
+]);
+
+function formatRoundedInteger(value: unknown): string {
+  if (value === null || value === undefined || value === "") return "";
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return "";
+  return String(Math.round(numeric));
+}
+
+function formatRoundedFixed(value: unknown, decimals: number): string {
+  if (value === null || value === undefined || value === "") return "";
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return "";
+  const factor = 10 ** decimals;
+  return (Math.round(numeric * factor) / factor).toFixed(decimals);
+}
+
+function normalizeAggregateFieldValue(field: string, value: unknown): unknown {
+  if (value === null || value === undefined || value === "") {
+    return value === "" ? "" : value ?? "";
+  }
+  if (field === "GAA" || field === "SVP") {
+    return formatRoundedFixed(value, 5);
+  }
+  if (field === "TOI") {
+    return formatRoundedFixed(value, 2);
+  }
+  if (/rating$/i.test(field)) {
+    return formatRoundedFixed(value, 4);
+  }
+  if (INTEGER_AGGREGATE_FIELDS.has(field)) {
+    return formatRoundedInteger(value);
+  }
+  return value;
+}
+
+function normalizeAggregateRowPrecision(row: DatabaseRecord): DatabaseRecord {
+  for (const field of Object.keys(row)) {
+    row[field] = normalizeAggregateFieldValue(
+      field,
+      row[field],
+    ) as DatabaseRecord[string];
+  }
+  return row;
+}
+
 function computeGAA(totalGA: unknown, totalTOI: unknown): string {
   const ga = toNumber(totalGA, 0);
   const toi = toNumber(totalTOI, 0);
@@ -293,7 +394,7 @@ function computeSVP(totalSV: unknown, totalSA: unknown): string {
   const sv = toNumber(totalSV, 0);
   const sa = toNumber(totalSA, 0);
   if (sa <= 0) return "";
-  return (sv / sa).toFixed(6);
+  return (sv / sa).toFixed(5);
 }
 
 function formatUnknownMessage(value: unknown): string {
@@ -359,6 +460,120 @@ function normalizeSeasonType(value: unknown): string | null {
     return SeasonType.PLAYOFFS;
   }
   return TARGET_SEASON_TYPES.has(seasonType) ? seasonType : null;
+}
+
+function normalizeDateKey(value: unknown): string {
+  if (value instanceof Date) {
+    return value.toISOString().slice(0, 10);
+  }
+
+  const text = toTrimmedString(value);
+  if (!text) return "";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return text;
+
+  const parsed = new Date(text);
+  if (Number.isNaN(parsed.getTime())) return "";
+  return parsed.toISOString().slice(0, 10);
+}
+
+function getDatesInRangeInclusive(
+  startDate: unknown,
+  endDate: unknown,
+): string[] {
+  const startKey = normalizeDateKey(startDate);
+  const endKey = normalizeDateKey(endDate);
+  if (!startKey || !endKey || startKey > endKey) {
+    return [];
+  }
+
+  const dates: string[] = [];
+  let cursor = new Date(`${startKey}T00:00:00.000Z`);
+  const end = new Date(`${endKey}T00:00:00.000Z`);
+  while (cursor.getTime() <= end.getTime()) {
+    dates.push(cursor.toISOString().slice(0, 10));
+    cursor = new Date(cursor.getTime() + 24 * 60 * 60 * 1000);
+  }
+  return dates;
+}
+
+function preferNonEmpty(current: unknown, candidate: unknown): string {
+  const currentValue = toTrimmedString(current);
+  if (currentValue) return currentValue;
+  return toTrimmedString(candidate);
+}
+
+function canonicalizePlayerDayRows(
+  playerDays: DatabaseRecord[],
+): DatabaseRecord[] {
+  const playerDayMap = new Map<string, DatabaseRecord>();
+
+  for (const playerDay of playerDays) {
+    const playerId = toTrimmedString(playerDay.playerId);
+    const date = normalizeDateKey(playerDay.date);
+    if (!playerId || !date) {
+      continue;
+    }
+
+    const key = `${playerId}|${date}`;
+    const existing = playerDayMap.get(key);
+    if (!existing) {
+      const canonical: DatabaseRecord = {
+        ...playerDay,
+        playerId,
+        date,
+        seasonId: toTrimmedString(playerDay.seasonId),
+        gshlTeamId: toTrimmedString(playerDay.gshlTeamId),
+        weekId: toTrimmedString(playerDay.weekId),
+        nhlPos: uniqCsv([playerDay.nhlPos]),
+        posGroup: toTrimmedString(playerDay.posGroup),
+        nhlTeam: uniqCsv([playerDay.nhlTeam]),
+        dailyPos: toTrimmedString(playerDay.dailyPos),
+        bestPos: toTrimmedString(playerDay.bestPos),
+        fullPos: toTrimmedString(playerDay.fullPos),
+        opp: toTrimmedString(playerDay.opp),
+        score: toTrimmedString(playerDay.score),
+        Rating: "",
+      };
+
+      for (const field of TEAM_STAT_FIELDS) {
+        canonical[field] = formatNumber(toNumber(playerDay[field], 0));
+      }
+      playerDayMap.set(key, canonical);
+      continue;
+    }
+
+    existing.seasonId = preferNonEmpty(existing.seasonId, playerDay.seasonId);
+    existing.gshlTeamId = preferNonEmpty(
+      existing.gshlTeamId,
+      playerDay.gshlTeamId,
+    );
+    existing.weekId = preferNonEmpty(existing.weekId, playerDay.weekId);
+    existing.posGroup = preferNonEmpty(existing.posGroup, playerDay.posGroup);
+    existing.dailyPos = preferNonEmpty(existing.dailyPos, playerDay.dailyPos);
+    existing.bestPos = preferNonEmpty(existing.bestPos, playerDay.bestPos);
+    existing.fullPos = preferNonEmpty(existing.fullPos, playerDay.fullPos);
+    existing.opp = preferNonEmpty(existing.opp, playerDay.opp);
+    existing.score = preferNonEmpty(existing.score, playerDay.score);
+    existing.nhlPos = uniqCsv([existing.nhlPos, playerDay.nhlPos]);
+    existing.nhlTeam = uniqCsv([existing.nhlTeam, playerDay.nhlTeam]);
+
+    for (const field of TEAM_STAT_FIELDS) {
+      existing[field] = formatNumber(
+        toNumber(existing[field], 0) + toNumber(playerDay[field], 0),
+      );
+    }
+  }
+
+  const canonicalRows = Array.from(playerDayMap.values());
+  for (const row of canonicalRows) {
+    const isGoalie = toTrimmedString(row.posGroup) === "G";
+    row.GAA = isGoalie ? computeGAA(row.GA, row.TOI) : "";
+    row.SVP = isGoalie ? computeSVP(row.SV, row.SA) : "";
+    row.Rating = "";
+    normalizeAggregateRowPrecision(row);
+  }
+
+  return sortRows("PlayerDayStatLine", canonicalRows);
 }
 
 function buildWeekTypeMap(
@@ -494,7 +709,7 @@ function buildPlayerWeekRow(bucket: PlayerWeekBucket): DatabaseRecord {
     blankFields(row, [...TEAM_GOALIE_STARTER_FIELDS, "GAA", "SVP"]);
   }
 
-  return row;
+  return normalizeAggregateRowPrecision(row);
 }
 
 function sumField(rows: DatabaseRecord[], field: string): number {
@@ -553,7 +768,7 @@ function buildPlayerAggregate(
     aggregate.SVP = "";
   }
 
-  return aggregate;
+  return normalizeAggregateRowPrecision(aggregate);
 }
 
 function buildPlayerSplitsAndTotals(
@@ -640,7 +855,7 @@ function hasGoalieStats(
 }
 
 function buildTeamDayRow(day: TeamDayBucket): DatabaseRecord {
-  return {
+  return normalizeAggregateRowPrecision({
     seasonId: day.seasonId,
     gshlTeamId: day.gshlTeamId,
     weekId: day.weekId,
@@ -671,12 +886,12 @@ function buildTeamDayRow(day: TeamDayBucket): DatabaseRecord {
     ADD: formatNumber(day.ADD),
     MS: formatNumber(day.MS),
     BS: formatNumber(day.BS),
-  };
+  });
 }
 
 function buildTeamWeekRow(week: TeamWeekBucket): DatabaseRecord {
   const hasQualifiedGoalieStats = week.goalieStatDays >= 2;
-  return {
+  return normalizeAggregateRowPrecision({
     seasonId: week.seasonId,
     gshlTeamId: week.gshlTeamId,
     weekId: week.weekId,
@@ -704,17 +919,14 @@ function buildTeamWeekRow(week: TeamWeekBucket): DatabaseRecord {
     SO: hasQualifiedGoalieStats ? formatNumber(week.SO) : "",
     TOI: hasQualifiedGoalieStats ? formatNumber(week.TOI) : "",
     Rating: "",
-    yearToDateRating: "",
-    powerRating: "",
-    powerRk: "",
     ADD: formatNumber(week.ADD),
     MS: formatNumber(week.MS),
     BS: formatNumber(week.BS),
-  };
+  });
 }
 
 function buildTeamSeasonRow(seasonBucket: TeamSeasonBucket): DatabaseRecord {
-  return {
+  return normalizeAggregateRowPrecision({
     seasonId: seasonBucket.seasonId,
     seasonType: seasonBucket.seasonType,
     gshlTeamId: seasonBucket.gshlTeamId,
@@ -745,23 +957,9 @@ function buildTeamSeasonRow(seasonBucket: TeamSeasonBucket): DatabaseRecord {
     ADD: formatNumber(seasonBucket.ADD),
     MS: formatNumber(seasonBucket.MS),
     BS: formatNumber(seasonBucket.BS),
-    streak: "",
-    powerRk: "",
-    powerRating: "",
-    prevPowerRk: "",
-    prevPowerRating: "",
-    teamW: "",
-    teamHW: "",
-    teamHL: "",
-    teamL: "",
-    teamCCW: "",
-    teamCCHW: "",
-    teamCCHL: "",
-    teamCCL: "",
-    overallRk: "",
-    conferenceRk: "",
-    wildcardRk: "",
     playersUsed: formatNumber(seasonBucket.playersUsed),
+    hartRating: "",
+    hartRk: "",
     norrisRating: "",
     norrisRk: "",
     vezinaRating: "",
@@ -772,7 +970,7 @@ function buildTeamSeasonRow(seasonBucket: TeamSeasonBucket): DatabaseRecord {
     jackAdamsRk: "",
     GMOYRating: "",
     GMOYRk: "",
-  };
+  });
 }
 
 function buildPlayerSplitCountByTeam(
@@ -844,6 +1042,8 @@ function buildTeamSeasonRowsFromWeeks(
 function aggregateTeamStats(
   playerDays: DatabaseRecord[],
   playerSplits: DatabaseRecord[],
+  teamRows: DatabaseRecord[],
+  weekRows: DatabaseRecord[],
   weekTypeMap: Map<string, string>,
   seasonId: string,
 ): {
@@ -852,11 +1052,37 @@ function aggregateTeamStats(
   teamSeasons: DatabaseRecord[];
 } {
   const teamDayMap = new Map<string, TeamDayBucket>();
+  const activeTeamIds = Array.from(
+    new Set(
+      teamRows
+        .filter((team) => toTrimmedString(team.seasonId) === seasonId)
+        .map((team) => toTrimmedString(team.id))
+        .filter(Boolean),
+    ),
+  );
+
+  for (const week of weekRows) {
+    const weekId = toTrimmedString(week.id);
+    if (!weekId || !weekTypeMap.has(weekId)) continue;
+
+    const dates = getDatesInRangeInclusive(week.startDate, week.endDate);
+    for (const gshlTeamId of activeTeamIds) {
+      for (const date of dates) {
+        const key = `${weekId}|${gshlTeamId}|${date}`;
+        if (!teamDayMap.has(key)) {
+          teamDayMap.set(
+            key,
+            createTeamDayBucket(seasonId, gshlTeamId, weekId, date),
+          );
+        }
+      }
+    }
+  }
 
   for (const playerDay of playerDays) {
     const gshlTeamId = toTrimmedString(playerDay.gshlTeamId);
     const weekId = toTrimmedString(playerDay.weekId);
-    const date = toTrimmedString(playerDay.date);
+    const date = normalizeDateKey(playerDay.date);
     if (!gshlTeamId || !weekId || !date) continue;
     if (!weekTypeMap.has(weekId)) continue;
 
@@ -1077,6 +1303,7 @@ async function rankBaseStatRows(
     if (outputField !== "Rating") {
       row.Rating = row[outputField];
     }
+    normalizeAggregateRowPrecision(row);
   }
 }
 
@@ -1114,6 +1341,9 @@ async function replaceModelRowsForSeason(
       createdAtColumn: "createdAt",
       updatedAtColumn: "updatedAt",
       spreadsheetId,
+      deleteMissing: {
+        filter: { seasonId },
+      },
     },
   );
 
@@ -1135,9 +1365,10 @@ async function replaceModelRowsForSeason(
 export async function aggregateSeasonStats(
   seasonId: string,
 ): Promise<SeasonStatsAggregationResult> {
-  const [seasonRows, weekRows, playerDays] = await Promise.all([
+  const [seasonRows, weekRows, teamRows, loadedPlayerDays] = await Promise.all([
     fastSheetsReader.fetchModel<DatabaseRecord>("Season"),
     fastSheetsReader.fetchModel<DatabaseRecord>("Week"),
+    fastSheetsReader.fetchModel<DatabaseRecord>("Team"),
     fastSheetsReader.fetchPlayerDaySeason<DatabaseRecord>(seasonId),
   ]);
 
@@ -1157,6 +1388,7 @@ export async function aggregateSeasonStats(
     );
   }
 
+  const playerDays = canonicalizePlayerDayRows(loadedPlayerDays);
   applyPlayerDayDerivedColumns(playerDays, playerDays);
 
   const playerWeekMap = new Map<string, PlayerWeekBucket>();
@@ -1194,6 +1426,8 @@ export async function aggregateSeasonStats(
   const { teamDays, teamWeeks, teamSeasons } = aggregateTeamStats(
     playerDays,
     splits,
+    teamRows,
+    weekRows.filter((week) => toTrimmedString(week.seasonId) === seasonId),
     weekTypeMap,
     seasonId,
   );

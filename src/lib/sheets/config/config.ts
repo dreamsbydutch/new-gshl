@@ -168,7 +168,7 @@ export function getCompositeKeyColumnsForModel(
     case "PlayerDayStatLine":
       return ["playerId", "date"];
     case "PlayerWeekStatLine":
-      return ["playerId", "weekId"];
+      return ["playerId", "weekId", "gshlTeamId"];
     case "PlayerSplitStatLine":
       return ["playerId", "seasonId", "gshlTeamId", "seasonType"];
     case "PlayerTotalStatLine":
@@ -218,7 +218,7 @@ export const SHEETS_CONFIG = {
     Event: "Event",
     Matchup: "Matchup",
     Owner: "Owner",
-    Awards: "Awards",
+    Awards: "Award",
     DraftPick: "DraftPick",
     nhlTeam: "nhlTeam", // legacy
     NHLTeam: "NHLTeam", // actual sheet name as provided
@@ -605,6 +605,7 @@ export const SHEETS_CONFIG = {
       "powerStatScore",
       "powerStatEwma",
       "powerTalent",
+      "powerHistoryPrior",
       "powerComposite",
       "powerRk",
       "ADD",
@@ -647,19 +648,6 @@ export const SHEETS_CONFIG = {
       "BS",
       "streak",
       "powerRk",
-      "powerElo",
-      "powerEloPre",
-      "powerEloPost",
-      "powerEloDelta",
-      "powerEloExpected",
-      "powerEloK",
-      "powerStatScore",
-      "powerStatEwma",
-      "powerTalent",
-      "powerComposite",
-      "powerRating",
-      "prevPowerRk",
-      "prevPowerRating",
       "teamW",
       "teamHW",
       "teamHL",
@@ -672,6 +660,8 @@ export const SHEETS_CONFIG = {
       "conferenceRk",
       "wildcardRk",
       "playersUsed",
+      "hartRating",
+      "hartRk",
       "norrisRating",
       "norrisRk",
       "vezinaRating",
@@ -711,6 +701,11 @@ export const SHEETS_CONFIG = {
       "tie",
       "isComplete",
       "rating",
+      "ratingPre",
+      "ratingRealized",
+      "ratingCompetitive",
+      "ratingImportance",
+      "ratingRosterStrength",
       "createdAt",
       "updatedAt",
     ],

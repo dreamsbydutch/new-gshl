@@ -40,6 +40,14 @@ const APPS_SCRIPT_ENGINE_FILES = [
   ),
   path.resolve(
     CURRENT_FILE_DIR,
+    "../../runtime/apps-script/features/RankingEngine/player-pure.js",
+  ),
+  path.resolve(
+    CURRENT_FILE_DIR,
+    "../../runtime/apps-script/features/RankingEngine/team-pure.js",
+  ),
+  path.resolve(
+    CURRENT_FILE_DIR,
     "../../runtime/apps-script/features/RankingEngine/index.js",
   ),
 ] as const;
@@ -69,6 +77,9 @@ const RANKING_ENGINE_SHEET_NAME_ALIASES: Record<
 };
 
 const SYNTHETIC_SEASON_SPREADSHEET_ID = "__LOCAL_RANKING_ENGINE_SEASON__";
+const SYNTHETIC_TEAMSTATS_SPREADSHEET_ID = "__LOCAL_RANKING_ENGINE_TEAMSTATS__";
+const SYNTHETIC_PLAYERSTATS_SPREADSHEET_ID =
+  "__LOCAL_RANKING_ENGINE_PLAYERSTATS__";
 
 let rankingEnginePromise: Promise<RankingEngineApi> | null = null;
 let rankingEngineSourcePromise: Promise<readonly string[]> | null = null;
@@ -101,20 +112,58 @@ async function readRankingEngineSources(): Promise<readonly string[]> {
   return rankingEngineSourcePromise;
 }
 
-async function loadSeasonRows(): Promise<RankingEngineRow[]> {
+async function loadRankingEngineRows(): Promise<{
+  seasonRows: RankingEngineRow[];
+  teamSeasonRows: RankingEngineRow[];
+  playerSplitRows: RankingEngineRow[];
+  playerTotalRows: RankingEngineRow[];
+  playerNhlRows: RankingEngineRow[];
+  draftPickRows: RankingEngineRow[];
+}> {
   const { fastSheetsReader } = await import(
     "@gshl-lib/sheets/reader/fast-reader"
   );
-  return fastSheetsReader.fetchModel<RankingEngineRow>("Season");
+  const [
+    seasonRows,
+    teamSeasonRows,
+    playerSplitRows,
+    playerTotalRows,
+    playerNhlRows,
+    draftPickRows,
+  ] = await Promise.all([
+    fastSheetsReader.fetchModel<RankingEngineRow>("Season"),
+    fastSheetsReader.fetchModel<RankingEngineRow>("TeamSeasonStatLine"),
+    fastSheetsReader.fetchModel<RankingEngineRow>("PlayerSplitStatLine"),
+    fastSheetsReader.fetchModel<RankingEngineRow>("PlayerTotalStatLine"),
+    fastSheetsReader.fetchModel<RankingEngineRow>("PlayerNHLStatLine"),
+    fastSheetsReader.fetchModel<RankingEngineRow>("DraftPick"),
+  ]);
+  return {
+    seasonRows,
+    teamSeasonRows,
+    playerSplitRows,
+    playerTotalRows,
+    playerNhlRows,
+    draftPickRows,
+  };
 }
 
 function createRankingEngineContext(
-  seasonRows: RankingEngineRow[],
+  rankingRows: {
+    seasonRows: RankingEngineRow[];
+    teamSeasonRows: RankingEngineRow[];
+    playerSplitRows: RankingEngineRow[];
+    playerTotalRows: RankingEngineRow[];
+    playerNhlRows: RankingEngineRow[];
+    draftPickRows: RankingEngineRow[];
+  },
 ): RankingEngineContext {
   const context = vm.createContext({
     console,
     RankingEngine: {},
     SPREADSHEET_ID: SYNTHETIC_SEASON_SPREADSHEET_ID,
+    TEAMSTATS_SPREADSHEET_ID: SYNTHETIC_TEAMSTATS_SPREADSHEET_ID,
+    PLAYERSTATS_SPREADSHEET_ID: SYNTHETIC_PLAYERSTATS_SPREADSHEET_ID,
     GshlUtils: {
       sheets: {
         read: {
@@ -126,7 +175,42 @@ function createRankingEngineContext(
               spreadsheetId === SYNTHETIC_SEASON_SPREADSHEET_ID &&
               String(sheetName).trim() === "Season"
             ) {
-              return seasonRows;
+              return rankingRows.seasonRows;
+            }
+            if (
+              spreadsheetId === SYNTHETIC_TEAMSTATS_SPREADSHEET_ID &&
+              String(sheetName).trim() === "TeamSeasonStatLine"
+            ) {
+              return rankingRows.teamSeasonRows;
+            }
+            if (
+              spreadsheetId === SYNTHETIC_PLAYERSTATS_SPREADSHEET_ID &&
+              String(sheetName).trim() === "PlayerSplitStatLine"
+            ) {
+              return rankingRows.playerSplitRows;
+            }
+            if (
+              spreadsheetId === SYNTHETIC_PLAYERSTATS_SPREADSHEET_ID &&
+              String(sheetName).trim() === "PlayerTotalStatLine"
+            ) {
+              return rankingRows.playerTotalRows;
+            }
+            if (
+              spreadsheetId === SYNTHETIC_PLAYERSTATS_SPREADSHEET_ID &&
+              [
+                "PlayerNHLStatLine",
+                "PlayerNHL",
+                "PlayerNhlStatLine",
+                "PlayerNhl",
+              ].includes(String(sheetName).trim())
+            ) {
+              return rankingRows.playerNhlRows;
+            }
+            if (
+              spreadsheetId === SYNTHETIC_SEASON_SPREADSHEET_ID &&
+              String(sheetName).trim() === "DraftPick"
+            ) {
+              return rankingRows.draftPickRows;
             }
             return [];
           },
@@ -139,12 +223,12 @@ function createRankingEngineContext(
 }
 
 async function loadRankingEngine(): Promise<RankingEngineApi> {
-  const [seasonRows, sources] = await Promise.all([
-    loadSeasonRows(),
+  const [rankingRows, sources] = await Promise.all([
+    loadRankingEngineRows(),
     readRankingEngineSources(),
   ]);
 
-  const context = createRankingEngineContext(seasonRows);
+  const context = createRankingEngineContext(rankingRows);
   for (let index = 0; index < sources.length; index += 1) {
     vm.runInContext(sources[index] ?? "", context, {
       filename: APPS_SCRIPT_ENGINE_FILES[index],

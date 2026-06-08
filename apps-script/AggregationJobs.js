@@ -126,11 +126,21 @@ var AggregationJobHelpers = (function buildAggregationJobHelpers() {
       includePlayerNhl: true,
     });
 
+    console.log(logPrefix + " Refreshing team week ratings.");
+    RatingUpdater.updateTeamWeekRatingsForSeason(seasonKey, {
+      dryRun: false,
+      logToConsole: true,
+    });
+
     console.log(logPrefix + " Refreshing PlayerNHL overall talent ratings.");
     PlayerOverallRatingUpdater.updateOverallRatingsForSeason(seasonKey, {
       dryRun: false,
       logToConsole: true,
     });
+
+    console.log(logPrefix + " Refreshing power ratings and matchup ranks.");
+    PowerRankingsAlgo.updatePowerRankingsForSeason(seasonKey, {});
+    MatchupHandler.updateMatchupsAndStandings(seasonKey);
 
     return {
       seasonId: seasonKey,

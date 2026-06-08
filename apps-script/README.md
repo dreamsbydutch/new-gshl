@@ -65,12 +65,14 @@ Only these globals are intended to be run from Apps Script triggers or manual ex
 - rolls `PlayerDayStatLine` into `PlayerWeekStatLine`
 - rolls player aggregates into `PlayerSplitStatLine` and `PlayerTotalStatLine`
 - rolls team aggregates into `TeamDayStatLine`, `TeamWeekStatLine`, and `TeamSeasonStatLine`
+- assigns regular-season team-season award ratings/ranks
 
 `aggregateCurrentSeasonRefreshOnly()`:
 
 - rolls `PlayerDayStatLine` into `PlayerWeekStatLine`
 - rolls player aggregates into `PlayerSplitStatLine` and `PlayerTotalStatLine`
 - rolls team aggregates into `TeamWeekStatLine` and `TeamSeasonStatLine`
+- assigns regular-season team-season award ratings/ranks
 - refreshes `PlayerNHL` season stats
 - refreshes current-season ratings
 - refreshes current-season overall talent ratings
@@ -105,6 +107,42 @@ apps-script/
     YahooScraper.js
     RankingEngine/
 ```
+
+## Ranking Engine Sync
+
+Current ranking outputs also include team-season award-style ratings:
+
+- `hartRating` / `hartRk` for pure team-season value
+- `norrisRating` / `norrisRk` for defense-driven team performance
+- `vezinaRating` / `vezinaRk` for goalie-driven team performance
+- `calderRating` / `calderRk` for draft value
+- `jackAdamsRating` / `jackAdamsRk` for coaching value
+- `GMOYRating` / `GMOYRk` for roster-management value
+
+These are calculated by the shared ranking engine from regular-season team,
+player, draft, and standings data and written onto `TeamSeasonStatLine`.
+
+The ranking engine is hand-edited in `scripts/src/runtime/apps-script/features/RankingEngine/`.
+
+`apps-script/features/RankingEngine/` is the deployed copy and should be treated
+as generated/synced output.
+
+From the repo root:
+
+```bash
+npm run ranking-engine:check
+npm run ranking-engine:sync
+```
+
+What these commands do:
+
+- `ranking-engine:check` fails if the `scripts` source copy and the `apps-script`
+  deployed copy differ
+- `ranking-engine:sync` copies `config.js`, `player-pure.js`,
+  `team-pure.js`, and `index.js` from `scripts` into `apps-script`, then
+  verifies the hashes match
+
+CI also runs the sync check automatically for ranking-engine changes.
 
 ## Setup
 

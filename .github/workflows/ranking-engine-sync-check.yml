@@ -1,0 +1,38 @@
+name: Ranking Engine Sync Check
+
+on:
+  pull_request:
+    paths:
+      - "apps-script/features/RankingEngine/**"
+      - "scripts/src/runtime/apps-script/features/RankingEngine/**"
+      - "tools/ranking-engine-sync.mjs"
+      - "package.json"
+      - "scripts/package.json"
+      - ".github/workflows/ranking-engine-sync-check.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "apps-script/features/RankingEngine/**"
+      - "scripts/src/runtime/apps-script/features/RankingEngine/**"
+      - "tools/ranking-engine-sync.mjs"
+      - "package.json"
+      - "scripts/package.json"
+      - ".github/workflows/ranking-engine-sync-check.yml"
+  workflow_dispatch:
+
+jobs:
+  check-sync:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Verify ranking engine copies are in sync
+        run: npm run ranking-engine:check

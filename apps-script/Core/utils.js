@@ -838,8 +838,8 @@ var GshlUtils = (function buildGshlUtilsNamespace() {
    * @param {string} sheetName
    * @param {string[]} keyColumns
    * @param {Array<Object>} items
-   * @param {{idColumn?:string,createdAtColumn?:string,updatedAtColumn?:string,merge?:boolean,clearMissing?:boolean|{filter?:Object,columnsToClear?:string[]}}} [options]
-   * @returns {{updated:number, inserted:number, cleared:number, total:number}}
+   * @param {{idColumn?:string,createdAtColumn?:string,updatedAtColumn?:string,merge?:boolean,clearMissing?:boolean|{filter?:Object,columnsToClear?:string[]},deleteMissing?:boolean|Object|{filter?:Object}}} [options]
+   * @returns {{updated:number, inserted:number, cleared:number, deleted:number, total:number}}
    */
   function upsertSheetByKeys(
     spreadsheetId,
@@ -914,13 +914,18 @@ var GshlUtils = (function buildGshlUtilsNamespace() {
 
     // Build map of existing rows by key
     var existingMap = {};
+    var duplicateRowNumbers = {};
     var maxId = 0;
     var idIdx = idColName ? headerIndex[idColName] : undefined;
 
     for (var r = 0; r < existingRows.length; r++) {
       var row = existingRows[r];
       var key = makeKeyFromArray(row);
-      existingMap[key] = { row: row, rowIndex1Based: r + 2 };
+      var rowIndex1Based = r + 2;
+      if (existingMap[key]) {
+        duplicateRowNumbers[existingMap[key].rowIndex1Based] = true;
+      }
+      existingMap[key] = { row: row, rowIndex1Based: rowIndex1Based };
 
       if (idIdx !== undefined) {
         var rowId = row[idIdx];
@@ -1112,9 +1117,19 @@ var GshlUtils = (function buildGshlUtilsNamespace() {
 
     // deleteMissing handling - actually delete rows that are missing from incoming data
     var deleted = 0;
+    var rowsToDelete = [];
+    for (var duplicateRowNumber in duplicateRowNumbers) {
+      if (!duplicateRowNumbers[duplicateRowNumber]) continue;
+      rowsToDelete.push(Number(duplicateRowNumber));
+    }
     if (deleteMissing) {
-      var deleteFilter = deleteMissing === true ? null : deleteMissing;
-      var rowsToDelete = [];
+      var deleteFilter = null;
+      if (deleteMissing !== true) {
+        deleteFilter =
+          deleteMissing && deleteMissing.filter !== undefined
+            ? deleteMissing.filter || null
+            : deleteMissing;
+      }
 
       // Find existing rows that match filter (if provided) and are NOT in incomingKeys
       for (var dr = 0; dr < existingRows.length; dr++) {
@@ -1145,22 +1160,31 @@ var GshlUtils = (function buildGshlUtilsNamespace() {
         rowsToDelete.push(dr + 2);
       }
 
-      // Delete rows in reverse order to maintain correct indices
-      if (rowsToDelete.length > 0) {
-        deleted = rowsToDelete.length;
-        if (dryRunMode) {
-          logVerbose(
-            "[dry-run] upsertSheetByKeys(%s) would delete %s row(s).",
-            sheetName,
-            rowsToDelete.length,
-          );
-        } else {
-          rowsToDelete.sort(function (a, b) {
-            return b - a;
-          });
-          for (var di = 0; di < rowsToDelete.length; di++) {
-            sheet.deleteRow(rowsToDelete[di]);
-          }
+    }
+
+    // Delete rows in reverse order to maintain correct indices
+    if (rowsToDelete.length > 0) {
+      var uniqueRowsToDelete = [];
+      var seenDeleteRows = {};
+      for (var ri = 0; ri < rowsToDelete.length; ri++) {
+        var rowNumber = Number(rowsToDelete[ri]);
+        if (!rowNumber || seenDeleteRows[rowNumber]) continue;
+        seenDeleteRows[rowNumber] = true;
+        uniqueRowsToDelete.push(rowNumber);
+      }
+      deleted = uniqueRowsToDelete.length;
+      if (dryRunMode) {
+        logVerbose(
+          "[dry-run] upsertSheetByKeys(%s) would delete %s row(s).",
+          sheetName,
+          uniqueRowsToDelete.length,
+        );
+      } else {
+        uniqueRowsToDelete.sort(function (a, b) {
+          return b - a;
+        });
+        for (var di = 0; di < uniqueRowsToDelete.length; di++) {
+          sheet.deleteRow(uniqueRowsToDelete[di]);
         }
       }
     }

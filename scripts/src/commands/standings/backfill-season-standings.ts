@@ -105,7 +105,7 @@ type TeamSeasonRecord = DatabaseRecord & {
   seasonId?: string | number | null;
   seasonType?: string | null;
   gshlTeamId?: string | number | null;
-  powerRating?: string | number | null;
+  powerRk?: string | number | null;
   conferenceRk?: string | number | null;
 };
 
@@ -151,7 +151,7 @@ type RankingEntry = {
   update: TeamSeasonStandingUpdate;
   wins: number;
   teamPoints: number;
-  powerRating: number;
+  powerRk: number;
 };
 
 const MATCHUP_CATEGORY_RULES = [
@@ -605,8 +605,8 @@ function sortEntriesWithTiebreakers(
           return rightCatsFor - leftCatsFor;
         }
 
-        if (left.powerRating !== right.powerRating) {
-          return right.powerRating - left.powerRating;
+        if (left.powerRk !== right.powerRk) {
+          return left.powerRk - right.powerRk;
         }
 
         return left.teamId.localeCompare(right.teamId);
@@ -1032,7 +1032,7 @@ export async function rebuildSeasonStandingsForSeasonId(
         update,
         wins: teamW,
         teamPoints: computeTeamPointsFromRecord(teamW, teamHW, teamHL),
-        powerRating: toNumber(teamSeason.powerRating),
+        powerRk: toNumber(teamSeason.powerRk),
       });
     }
   }

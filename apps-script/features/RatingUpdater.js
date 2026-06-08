@@ -128,6 +128,27 @@ var RatingUpdater = (function RatingUpdaterModule() {
       : "Rating";
   }
 
+  function getSupplementalOutputFields(sheetName) {
+    var normalizedSheetName = normalizeSheetName(sheetName);
+    if (normalizedSheetName === "TeamSeasonStatLine") {
+      return [
+        "hartRating",
+        "hartRk",
+        "norrisRating",
+        "norrisRk",
+        "vezinaRating",
+        "vezinaRk",
+        "calderRating",
+        "calderRk",
+        "jackAdamsRating",
+        "jackAdamsRk",
+        "GMOYRating",
+        "GMOYRk",
+      ];
+    }
+    return [];
+  }
+
   function resolveExistingOutputField(sheetName, rows, requestedField) {
     var normalizedSheetName = normalizeSheetName(sheetName);
     var desired = requestedField || getOutputField(normalizedSheetName, {});
@@ -363,6 +384,9 @@ var RatingUpdater = (function RatingUpdaterModule() {
     }
 
     var updates = [];
+    var supplementalOutputFields = getSupplementalOutputFields(
+      normalizedSheetName,
+    );
     for (var i = 0; i < rows.length; i++) {
       var row = rows[i];
       if (!row) continue;
@@ -373,6 +397,10 @@ var RatingUpdater = (function RatingUpdaterModule() {
         update[keyColumn] = row[keyColumn];
       }
       update[outputField] = toFiniteNumberOrBlank(row[outputField]);
+      for (var s = 0; s < supplementalOutputFields.length; s++) {
+        var fieldName = supplementalOutputFields[s];
+        update[fieldName] = toFiniteNumberOrBlank(row[fieldName]);
+      }
       updates.push(update);
     }
 

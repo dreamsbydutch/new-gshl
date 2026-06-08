@@ -80,11 +80,35 @@ export function getArgValue(
 
   const prefix = `${flagName}=`;
   const match = args.find((arg) => arg.startsWith(prefix));
-  return match ? match.slice(prefix.length) : undefined;
+  if (match) {
+    return match.slice(prefix.length);
+  }
+
+  const envKey = getNpmConfigEnvKey(flagName);
+  const envValue = envKey ? process.env[envKey] : undefined;
+  return toTrimmedString(envValue) || undefined;
 }
 
 export function hasFlag(args: string[], flagName: string): boolean {
-  return args.includes(flagName);
+  if (args.includes(flagName)) {
+    return true;
+  }
+
+  if (flagName === "--apply" && looksLikeMisparsedNpmApplyFlag()) {
+    return true;
+  }
+
+  const envKey = getNpmConfigEnvKey(flagName);
+  if (!envKey) {
+    return false;
+  }
+
+  const envValue = process.env[envKey];
+  if (envValue === undefined) {
+    return false;
+  }
+
+  return toBoolean(envValue, true);
 }
 
 export function toTrimmedString(value: unknown): string {
@@ -107,6 +131,33 @@ export function toBoolean(value: unknown, fallback: boolean): boolean {
   if (["1", "true", "yes", "on"].includes(normalized)) return true;
   if (["0", "false", "no", "off"].includes(normalized)) return false;
   return fallback;
+}
+
+function getNpmConfigEnvKey(flagName: string): string | null {
+  const normalized = toTrimmedString(flagName);
+  if (!normalized.startsWith("--")) return null;
+  const configName = normalized
+    .slice(2)
+    .replace(/-/g, "_")
+    .trim();
+  return configName ? `npm_config_${configName}` : null;
+}
+
+function looksLikeMisparsedNpmApplyFlag(): boolean {
+  if (process.env.npm_command !== "run") {
+    return false;
+  }
+
+  if (process.env.npm_config_apply !== undefined) {
+    return false;
+  }
+
+  return (
+    toBoolean(process.env.npm_config_all, false) &&
+    toBoolean(process.env.npm_config_parseable, false) &&
+    toBoolean(process.env.npm_config_long, false) &&
+    toBoolean(process.env.npm_config_yes, false)
+  );
 }
 
 export function parseCsvList(value: string | undefined): string[] {
@@ -260,6 +311,26 @@ async function resolveSpreadsheetId(
 ): Promise<string> {
   const configModule = await import("@gshl-lib/sheets/config/config");
   return configModule.getWriteSpreadsheetIdForModel(modelName, { seasonId });
+}
+
+export function isSkippableMissingSheetError(
+  error: unknown,
+  modelName: SupportedPlayerRatingModelName,
+): boolean {
+  const message =
+    error instanceof Error ? error.message : toTrimmedString(error);
+  if (!message) return false;
+
+  if (
+    modelName === "PlayerDayStatLine" &&
+    /Missing PlayerDay workbook id|PlayerDay workbook lookup requires a valid seasonId/i.test(
+      message,
+    )
+  ) {
+    return true;
+  }
+
+  return /Unable to parse range|Requested entity was not found/i.test(message);
 }
 
 async function loadWritableRows(

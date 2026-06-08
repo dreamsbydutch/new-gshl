@@ -65,6 +65,11 @@ export interface Matchup {
   tie?: boolean | null;
   isComplete: boolean;
   rating?: number | null;
+  ratingPre?: number | null;
+  ratingRealized?: number | null;
+  ratingCompetitive?: number | null;
+  ratingImportance?: number | null;
+  ratingRosterStrength?: number | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -79,6 +84,11 @@ export interface MatchupMetadata {
   homeRank?: number | null;
   awayRank?: number | null;
   rating?: number | null;
+  ratingPre?: number | null;
+  ratingRealized?: number | null;
+  ratingCompetitive?: number | null;
+  ratingImportance?: number | null;
+  ratingRosterStrength?: number | null;
   createdAt: Date;
 }
 
@@ -580,6 +590,17 @@ export interface TeamWeekStatLine {
   TOI: number;
   Rating: number;
   yearToDateRating: number;
+  powerElo: number;
+  powerEloPre: number;
+  powerEloPost: number;
+  powerEloDelta: number;
+  powerEloExpected: number;
+  powerEloK: number;
+  powerStatScore: number;
+  powerStatEwma: number;
+  powerTalent: number;
+  powerHistoryPrior: number;
+  powerComposite: number;
   powerRating: number;
   powerRk: number;
   ADD: number;
@@ -624,9 +645,6 @@ export interface TeamSeasonStatLine {
 
   streak: string;
   powerRk: number;
-  powerRating: number;
-  prevPowerRk: number;
-  prevPowerRating: number;
   teamW: number;
   teamHW: number;
   teamHL: number;
@@ -639,6 +657,8 @@ export interface TeamSeasonStatLine {
   conferenceRk: number;
   wildcardRk?: number | null;
   playersUsed: number;
+  hartRating?: number | null;
+  hartRk?: number | null;
   norrisRating?: number | null;
   norrisRk?: number | null;
   vezinaRating?: number | null;

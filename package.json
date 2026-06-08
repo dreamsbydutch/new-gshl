@@ -12,6 +12,8 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "preview": "next build && next start",
+    "ranking-engine:check": "node tools/ranking-engine-sync.mjs check",
+    "ranking-engine:sync": "node tools/ranking-engine-sync.mjs sync",
     "start": "next start",
     "typecheck": "tsc --noEmit"
   },

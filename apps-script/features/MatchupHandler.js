@@ -349,8 +349,7 @@ var MatchupHandler = (function buildMatchupHandler() {
           var bCatsFor = categoriesForMap.get(b.teamId) || 0;
           if (aCatsFor !== bCatsFor) return bCatsFor - aCatsFor;
 
-          if (a.powerRating !== b.powerRating)
-            return b.powerRating - a.powerRating;
+          if (a.powerRk !== b.powerRk) return a.powerRk - b.powerRk;
 
           return String(a.teamId).localeCompare(String(b.teamId));
         });
@@ -809,7 +808,7 @@ var MatchupHandler = (function buildMatchupHandler() {
           update: update,
           wins: toNumber(teamW),
           teamPoints: computeTeamPointsFromRecord(teamW, teamHW, teamHL),
-          powerRating: toNumber(ts.powerRating),
+          powerRk: toNumber(ts.powerRk),
         });
       }
     });
@@ -1010,9 +1009,13 @@ var MatchupHandler = (function buildMatchupHandler() {
     );
     var matchupResult = updateMatchupsFromTeamWeeks(seasonKey);
     var standingsResult = updateTeamSeasonStandings(seasonKey);
+    var rankResult = updateMatchupRanksFromPowerRankings(seasonKey, {
+      logToConsole: false,
+    });
     return {
       matchups: matchupResult,
       standings: standingsResult,
+      ranks: rankResult,
     };
   }
 

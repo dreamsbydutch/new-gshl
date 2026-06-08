@@ -98,6 +98,130 @@ var StatsAggregator = (function StatsAggregatorModule() {
     return Array.from(map.values());
   }
 
+  function normalizeDateKey(value) {
+    if (value === undefined || value === null || value === "") return "";
+    if (Object.prototype.toString.call(value) === "[object Date]") {
+      if (isNaN(value.getTime())) return "";
+      return value.toISOString().slice(0, 10);
+    }
+
+    var text = String(value).trim();
+    if (!text) return "";
+    if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return text;
+
+    var parsed = new Date(text);
+    if (isNaN(parsed.getTime())) return "";
+    return parsed.toISOString().slice(0, 10);
+  }
+
+  function getDatesInRangeInclusive(startDate, endDate) {
+    var startKey = normalizeDateKey(startDate);
+    var endKey = normalizeDateKey(endDate);
+    if (!startKey || !endKey || startKey > endKey) {
+      return [];
+    }
+
+    var dates = [];
+    var cursor = new Date(startKey + "T00:00:00.000Z");
+    var end = new Date(endKey + "T00:00:00.000Z");
+    while (cursor.getTime() <= end.getTime()) {
+      dates.push(cursor.toISOString().slice(0, 10));
+      cursor = new Date(cursor.getTime() + 24 * 60 * 60 * 1000);
+    }
+
+    return dates;
+  }
+
+  function preferNonEmpty(current, candidate) {
+    if (current !== undefined && current !== null) {
+      var currentText = String(current).trim();
+      if (currentText) return currentText;
+    }
+
+    if (candidate !== undefined && candidate !== null) {
+      return String(candidate).trim();
+    }
+
+    return "";
+  }
+
+  function canonicalizePlayerDayRows(playerDays) {
+    var TEAM_STAT_FIELDS = GshlUtils.core.constants.TEAM_STAT_FIELDS;
+    var formatNumber = GshlUtils.core.parse.formatNumber;
+    var toNumber = GshlUtils.core.parse.toNumber;
+    var playerDayMap = new Map();
+
+    (playerDays || []).forEach(function (playerDay) {
+      if (!playerDay) return;
+      var playerId =
+        playerDay.playerId === undefined || playerDay.playerId === null
+          ? ""
+          : String(playerDay.playerId).trim();
+      var date = normalizeDateKey(playerDay.date);
+      if (!playerId || !date) return;
+
+      var key = playerId + "|" + date;
+      var existing = playerDayMap.get(key);
+      if (!existing) {
+        var canonical = {
+          id: playerDay.id,
+          createdAt: playerDay.createdAt,
+          updatedAt: playerDay.updatedAt,
+          playerId: playerId,
+          date: date,
+          seasonId: preferNonEmpty("", playerDay.seasonId),
+          gshlTeamId: preferNonEmpty("", playerDay.gshlTeamId),
+          weekId: preferNonEmpty("", playerDay.weekId),
+          nhlPos: uniqCsv([playerDay.nhlPos]),
+          posGroup: preferNonEmpty("", playerDay.posGroup),
+          nhlTeam: uniqCsv([playerDay.nhlTeam]),
+          dailyPos: preferNonEmpty("", playerDay.dailyPos),
+          bestPos: preferNonEmpty("", playerDay.bestPos),
+          fullPos: preferNonEmpty("", playerDay.fullPos),
+          opp: preferNonEmpty("", playerDay.opp),
+          score: preferNonEmpty("", playerDay.score),
+          Rating: "",
+        };
+
+        TEAM_STAT_FIELDS.forEach(function (field) {
+          canonical[field] = formatNumber(toNumber(playerDay[field]));
+        });
+
+        playerDayMap.set(key, canonical);
+        return;
+      }
+
+      existing.seasonId = preferNonEmpty(existing.seasonId, playerDay.seasonId);
+      existing.gshlTeamId = preferNonEmpty(
+        existing.gshlTeamId,
+        playerDay.gshlTeamId,
+      );
+      existing.weekId = preferNonEmpty(existing.weekId, playerDay.weekId);
+      existing.posGroup = preferNonEmpty(existing.posGroup, playerDay.posGroup);
+      existing.dailyPos = preferNonEmpty(existing.dailyPos, playerDay.dailyPos);
+      existing.bestPos = preferNonEmpty(existing.bestPos, playerDay.bestPos);
+      existing.fullPos = preferNonEmpty(existing.fullPos, playerDay.fullPos);
+      existing.opp = preferNonEmpty(existing.opp, playerDay.opp);
+      existing.score = preferNonEmpty(existing.score, playerDay.score);
+      existing.nhlPos = uniqCsv([existing.nhlPos, playerDay.nhlPos]);
+      existing.nhlTeam = uniqCsv([existing.nhlTeam, playerDay.nhlTeam]);
+
+      TEAM_STAT_FIELDS.forEach(function (field) {
+        existing[field] = formatNumber(
+          toNumber(existing[field]) + toNumber(playerDay[field]),
+        );
+      });
+    });
+
+    return Array.from(playerDayMap.values()).map(function (row) {
+      var isGoalie = String(row.posGroup || "") === "G";
+      row.GAA = isGoalie ? computeGAA(row.GA, row.TOI) : "";
+      row.SVP = isGoalie ? computeSVP(row.SV, row.SA) : "";
+      row.Rating = "";
+      return normalizeAggregateRowPrecision(row);
+    });
+  }
+
   function safeSplitCsv(value) {
     if (!value) return [];
     var text = String(value).trim();
@@ -148,7 +272,56 @@ var StatsAggregator = (function StatsAggregatorModule() {
     var sv = Number(totalSV) || 0;
     var sa = Number(totalSA) || 0;
     if (sa <= 0) return "";
-    return (sv / sa).toFixed(6);
+    return (sv / sa).toFixed(5);
+  }
+
+  var INTEGER_AGGREGATE_FIELDS = new Set(
+    GshlUtils.core.constants.TEAM_STAT_FIELDS.concat([
+      "days",
+      "playersUsed",
+    ]),
+  );
+
+  function formatRoundedInteger(value) {
+    if (value === null || value === undefined || value === "") return "";
+    var num = Number(value);
+    if (!isFinite(num)) return "";
+    return String(Math.round(num));
+  }
+
+  function formatRoundedFixed(value, decimals) {
+    if (value === null || value === undefined || value === "") return "";
+    var num = Number(value);
+    if (!isFinite(num)) return "";
+    var factor = Math.pow(10, decimals);
+    return (Math.round(num * factor) / factor).toFixed(decimals);
+  }
+
+  function normalizeAggregateFieldValue(field, value) {
+    if (value === null || value === undefined || value === "") {
+      return value === "" ? "" : value == null ? "" : value;
+    }
+    if (field === "GAA" || field === "SVP") {
+      return formatRoundedFixed(value, 5);
+    }
+    if (field === "TOI") {
+      return formatRoundedFixed(value, 2);
+    }
+    if (/rating$/i.test(field)) {
+      return formatRoundedFixed(value, 4);
+    }
+    if (INTEGER_AGGREGATE_FIELDS.has(field)) {
+      return formatRoundedInteger(value);
+    }
+    return value;
+  }
+
+  function normalizeAggregateRowPrecision(row) {
+    if (!row) return row;
+    Object.keys(row).forEach(function (field) {
+      row[field] = normalizeAggregateFieldValue(field, row[field]);
+    });
+    return row;
   }
 
   function hasGoalieStats(source) {
@@ -214,6 +387,7 @@ var StatsAggregator = (function StatsAggregatorModule() {
       if (!row) return;
       if (row.Rating !== undefined) row.rating = row.Rating;
       else if (row.rating !== undefined) row.Rating = row.rating;
+      normalizeAggregateRowPrecision(row);
     });
   }
 
@@ -344,7 +518,7 @@ var StatsAggregator = (function StatsAggregatorModule() {
       if (row[field] === undefined) row[field] = "";
     });
 
-    return row;
+    return normalizeAggregateRowPrecision(row);
   }
 
   function buildPlayerAggregateFromWeeks(base, weeksArr, opts, context) {
@@ -403,7 +577,7 @@ var StatsAggregator = (function StatsAggregatorModule() {
       agg.SVP = "";
     }
 
-    return agg;
+    return normalizeAggregateRowPrecision(agg);
   }
 
   function buildPlayerSplitsAndTotalsFromWeeks(playerWeeks, context) {
@@ -542,14 +716,6 @@ var StatsAggregator = (function StatsAggregatorModule() {
         return String(pw && pw.seasonId) === String(season.id);
       });
 
-      if (!playerWeeks.length) {
-        console.log(
-          "[StatsAggregator] No PlayerWeekStatLine rows found for season",
-          seasonKey,
-        );
-        return;
-      }
-
       var playerAggregates = buildPlayerSplitsAndTotalsFromWeeks(playerWeeks, {
         seasonId: season.id,
         weekTypeMap: weekTypeMap,
@@ -573,6 +739,11 @@ var StatsAggregator = (function StatsAggregatorModule() {
           idColumn: "id",
           createdAtColumn: "createdAt",
           updatedAtColumn: "updatedAt",
+          deleteMissing: {
+            filter: {
+              seasonId: String(season.id),
+            },
+          },
         },
       );
 
@@ -585,6 +756,11 @@ var StatsAggregator = (function StatsAggregatorModule() {
           idColumn: "id",
           createdAtColumn: "createdAt",
           updatedAtColumn: "updatedAt",
+          deleteMissing: {
+            filter: {
+              seasonId: String(season.id),
+            },
+          },
         },
       );
 
@@ -640,12 +816,13 @@ var StatsAggregator = (function StatsAggregatorModule() {
     );
 
     var playerDayWorkbookId = getPlayerDayWorkbookId(season.id);
-    var playerDays = fetchSheetAsObjects(
+    var rawPlayerDays = fetchSheetAsObjects(
       playerDayWorkbookId,
       "PlayerDayStatLine",
     ).filter(function (pd) {
       return String(pd.seasonId) === String(season.id);
     });
+    var playerDays = canonicalizePlayerDayRows(rawPlayerDays);
 
     var weekTypeMap = new Map();
     weeks.forEach(function (week) {
@@ -654,6 +831,24 @@ var StatsAggregator = (function StatsAggregatorModule() {
         normalizeSeasonType(week.weekType, SeasonType.REGULAR_SEASON),
       );
     });
+
+    rankPlayerRows(playerDays, "PlayerDayStatLine", seasonKey);
+    upsertSheetByKeys(
+      playerDayWorkbookId,
+      "PlayerDayStatLine",
+      ["playerId", "date"],
+      playerDays,
+      {
+        idColumn: "id",
+        createdAtColumn: "createdAt",
+        updatedAtColumn: "updatedAt",
+        deleteMissing: {
+          filter: {
+            seasonId: String(season.id),
+          },
+        },
+      },
+    );
 
     var playerWeekMap = new Map();
     playerDays.forEach(function (pd) {
@@ -725,37 +920,52 @@ var StatsAggregator = (function StatsAggregatorModule() {
       PLAYERSTATS_SPREADSHEET_ID,
       "PlayerWeekStatLine",
       ["playerId", "gshlTeamId", "weekId"],
-      playerWeeks,
-      {
-        idColumn: "id",
-        createdAtColumn: "createdAt",
-        updatedAtColumn: "updatedAt",
-      },
-    );
+        playerWeeks,
+        {
+          idColumn: "id",
+          createdAtColumn: "createdAt",
+          updatedAtColumn: "updatedAt",
+          deleteMissing: {
+            filter: {
+              seasonId: String(season.id),
+            },
+          },
+        },
+      );
 
     upsertSheetByKeys(
       PLAYERSTATS_SPREADSHEET_ID,
       "PlayerSplitStatLine",
       ["playerId", "seasonId", "gshlTeamId", "seasonType"],
-      playerSplits,
-      {
-        idColumn: "id",
-        createdAtColumn: "createdAt",
-        updatedAtColumn: "updatedAt",
-      },
-    );
+        playerSplits,
+        {
+          idColumn: "id",
+          createdAtColumn: "createdAt",
+          updatedAtColumn: "updatedAt",
+          deleteMissing: {
+            filter: {
+              seasonId: String(season.id),
+            },
+          },
+        },
+      );
 
     upsertSheetByKeys(
       PLAYERSTATS_SPREADSHEET_ID,
       "PlayerTotalStatLine",
       ["playerId", "seasonId", "seasonType"],
-      playerTotals,
-      {
-        idColumn: "id",
-        createdAtColumn: "createdAt",
-        updatedAtColumn: "updatedAt",
-      },
-    );
+        playerTotals,
+        {
+          idColumn: "id",
+          createdAtColumn: "createdAt",
+          updatedAtColumn: "updatedAt",
+          deleteMissing: {
+            filter: {
+              seasonId: String(season.id),
+            },
+          },
+        },
+      );
 
     console.log(
       "[StatsAggregator] Updated player aggregates for season",
@@ -1272,9 +1482,9 @@ var StatsAggregator = (function StatsAggregatorModule() {
     var formatNumber = GshlUtils.core.parse.formatNumber;
 
     var GAA = day.TOI > 0 ? ((day.GA / day.TOI) * 60).toFixed(5) : "";
-    var SVP = day.SA > 0 ? (day.SV / day.SA).toFixed(6) : "";
+    var SVP = day.SA > 0 ? (day.SV / day.SA).toFixed(5) : "";
 
-    return {
+    return normalizeAggregateRowPrecision({
       seasonId: day.seasonId,
       gshlTeamId: day.gshlTeamId,
       weekId: day.weekId,
@@ -1305,7 +1515,7 @@ var StatsAggregator = (function StatsAggregatorModule() {
       ADD: formatNumber(day.ADD),
       MS: formatNumber(day.MS),
       BS: formatNumber(day.BS),
-    };
+    });
   }
 
   function buildTeamWeekRow(week) {
@@ -1318,10 +1528,10 @@ var StatsAggregator = (function StatsAggregatorModule() {
         : "";
     var SVP =
       hasQualifiedGoalieStats && week.SA > 0
-        ? (week.SV / week.SA).toFixed(6)
+        ? (week.SV / week.SA).toFixed(5)
         : "";
 
-    return {
+    return normalizeAggregateRowPrecision({
       seasonId: week.seasonId,
       gshlTeamId: week.gshlTeamId,
       weekId: week.weekId,
@@ -1349,11 +1559,10 @@ var StatsAggregator = (function StatsAggregatorModule() {
       SO: hasQualifiedGoalieStats ? formatNumber(week.SO) : "",
       TOI: hasQualifiedGoalieStats ? formatNumber(week.TOI) : "",
       Rating: "",
-      yearToDateRating: "",
       ADD: formatNumber(week.ADD),
       MS: formatNumber(week.MS),
       BS: formatNumber(week.BS),
-    };
+    });
   }
 
   function buildTeamSeasonRow(seasonStat) {
@@ -1363,7 +1572,7 @@ var StatsAggregator = (function StatsAggregatorModule() {
     var SVP = computeSVP(seasonStat.SV, seasonStat.SA);
 
     // Keep schema-compatible fields, but this module does not compute standings.
-    return {
+    return normalizeAggregateRowPrecision({
       seasonId: seasonStat.seasonId,
       seasonType: seasonStat.seasonType,
       gshlTeamId: seasonStat.gshlTeamId,
@@ -1394,7 +1603,7 @@ var StatsAggregator = (function StatsAggregatorModule() {
       MS: formatNumber(seasonStat.MS),
       BS: formatNumber(seasonStat.BS),
       playersUsed: formatNumber(seasonStat.playersUsed),
-    };
+    });
   }
 
   /**
@@ -1412,7 +1621,6 @@ var StatsAggregator = (function StatsAggregatorModule() {
     var getPlayerDayWorkbookId =
       GshlUtils.domain.workbooks.getPlayerDayWorkbookId;
     var isStarter = GshlUtils.domain.players.isStarter;
-    var formatDateOnly = GshlUtils.core.date.formatDateOnly;
     var toNumber = GshlUtils.core.parse.toNumber;
 
     var season = fetchSheetAsObjects(SPREADSHEET_ID, "Season").find(
@@ -1430,6 +1638,16 @@ var StatsAggregator = (function StatsAggregatorModule() {
         return String(w && w.seasonId) === String(season.id);
       },
     );
+    var activeTeamIds = fetchSheetAsObjects(SPREADSHEET_ID, "Team")
+      .filter(function (team) {
+        return String(team && team.seasonId) === String(season.id);
+      })
+      .map(function (team) {
+        return team && team.id !== undefined && team.id !== null
+          ? String(team.id)
+          : "";
+      })
+      .filter(Boolean);
     if (!weeks.length) return;
 
     var weekTypeMap = new Map();
@@ -1449,25 +1667,38 @@ var StatsAggregator = (function StatsAggregatorModule() {
     });
     var playerSplitCountByTeam = buildPlayerSplitCountByTeam(playerSplits);
     var playerWB = getPlayerDayWorkbookId(seasonIdStr);
-    var playerDays = fetchSheetAsObjects(playerWB, "PlayerDayStatLine").filter(
-      function (pd) {
+    var playerDays = canonicalizePlayerDayRows(
+      fetchSheetAsObjects(playerWB, "PlayerDayStatLine").filter(function (pd) {
         return String(pd.seasonId) === seasonIdStr;
-      },
+      }),
     );
-
-    if (!playerDays.length) {
-      console.log("[StatsAggregator] No player days for season", seasonKey);
-      return;
-    }
 
     // PlayerDay -> TeamDay
     var teamDayMap = new Map();
+
+    weeks.forEach(function (week) {
+      var weekId =
+        week && week.id !== undefined && week.id !== null ? String(week.id) : "";
+      if (!weekId || !weekTypeMap.has(weekId)) return;
+      var dates = getDatesInRangeInclusive(week.startDate, week.endDate);
+      activeTeamIds.forEach(function (teamId) {
+        dates.forEach(function (dateKey) {
+          var key = weekId + "|" + teamId + "|" + dateKey;
+          if (!teamDayMap.has(key)) {
+            teamDayMap.set(
+              key,
+              createTeamDayBucket(seasonIdStr, teamId, weekId, dateKey),
+            );
+          }
+        });
+      });
+    });
 
     playerDays.forEach(function (pd) {
       var teamId = pd.gshlTeamId && String(pd.gshlTeamId);
       var weekId = pd.weekId && String(pd.weekId);
       if (!teamId || !weekId) return;
-      var dateKey = formatDateOnly(pd.date);
+      var dateKey = normalizeDateKey(pd.date);
       if (!dateKey) return;
 
       var mapKey = weekId + "|" + teamId + "|" + dateKey;
@@ -1496,8 +1727,6 @@ var StatsAggregator = (function StatsAggregatorModule() {
         bucket[field] += toNumber(pd[field]);
       });
     });
-
-    if (!teamDayMap.size) return;
 
     var teamDayAggregates = Array.from(teamDayMap.values());
     var teamDayRows = teamDayAggregates.map(buildTeamDayRow);
@@ -1536,37 +1765,52 @@ var StatsAggregator = (function StatsAggregatorModule() {
       TEAMSTATS_SPREADSHEET_ID,
       "TeamDayStatLine",
       ["date", "gshlTeamId"],
-      teamDayRows,
-      {
-        idColumn: "id",
-        createdAtColumn: "createdAt",
-        updatedAtColumn: "updatedAt",
-      },
-    );
+        teamDayRows,
+        {
+          idColumn: "id",
+          createdAtColumn: "createdAt",
+          updatedAtColumn: "updatedAt",
+          deleteMissing: {
+            filter: {
+              seasonId: seasonIdStr,
+            },
+          },
+        },
+      );
 
     upsertSheetByKeys(
       TEAMSTATS_SPREADSHEET_ID,
       "TeamWeekStatLine",
       ["weekId", "gshlTeamId"],
-      teamWeekRows,
-      {
-        idColumn: "id",
-        createdAtColumn: "createdAt",
-        updatedAtColumn: "updatedAt",
-      },
-    );
+        teamWeekRows,
+        {
+          idColumn: "id",
+          createdAtColumn: "createdAt",
+          updatedAtColumn: "updatedAt",
+          deleteMissing: {
+            filter: {
+              seasonId: seasonIdStr,
+            },
+          },
+        },
+      );
 
     upsertSheetByKeys(
       TEAMSTATS_SPREADSHEET_ID,
       "TeamSeasonStatLine",
       ["seasonId", "gshlTeamId", "seasonType"],
-      teamSeasonRows,
-      {
-        idColumn: "id",
-        createdAtColumn: "createdAt",
-        updatedAtColumn: "updatedAt",
-      },
-    );
+        teamSeasonRows,
+        {
+          idColumn: "id",
+          createdAtColumn: "createdAt",
+          updatedAtColumn: "updatedAt",
+          deleteMissing: {
+            filter: {
+              seasonId: seasonIdStr,
+            },
+          },
+        },
+      );
 
     console.log(
       "[StatsAggregator] Updated team aggregates for season",

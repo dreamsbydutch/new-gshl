@@ -2,18 +2,19 @@
  * Usage:
  *   npm run ratings:rebuild-team
  *   npm run ratings:rebuild-team -- --season-ids 11,12 --apply
- *   npm run ratings:rebuild-team -- --season-ids 11,12 --include-team-weeks --include-team-seasons
+ *   npm run ratings:rebuild-team -- --season-ids 11,12 --include-team-seasons
  *
  * What it does:
  *   Calls the Apps Script team-rating updater across one or more seasons and
- *   prints a combined summary. Runs as a dry-run unless --apply is passed.
+ *   prints a combined summary. Team-week rebuilds also refresh power/team-week
+ *   rankings and matchup ranks/ratings. Runs as a dry-run unless --apply is passed.
  *
  * Options:
  *   --season-ids <list>     Optional comma-separated season ids. Default: all Season rows.
  *   --apply                 Write updated team ratings back to Google Sheets. Omit for dry-run.
  *   --log <true|false>      Enable or disable console logging. Default: true.
- *   --include-team-weeks    Also recompute TeamWeekStatLine ratings.
- *   --include-team-seasons  Also recompute TeamSeasonStatLine ratings.
+ *   --include-team-weeks    Accepted for compatibility; TeamWeekStatLine ratings are included by default.
+ *   --include-team-seasons  Accepted for compatibility; TeamSeasonStatLine ratings are included by default.
  *   --stop-on-error         Abort immediately on the first failed season.
  *   --help                  Show this message and exit.
  */
@@ -32,6 +33,7 @@ import {
   type RankingEngineSheetName,
 } from "@gshl-lib/ranking/apps-script-engine";
 import { getAllSeasonIds } from "@gshl-lib/ranking/player-rating-backfill";
+import { runLocalPowerRankingsSeason } from "../../domains/power/apps-script-power-engine";
 import {
   getArgValue,
   hasFlag,
@@ -66,6 +68,12 @@ type TeamRatingSheetSummary = {
 type TeamRatingSeasonSummary = {
   seasonId: string;
   models: TeamRatingSheetSummary[];
+  powerRefresh: {
+    weekRows: number;
+    seasonRows: number;
+    matchupRows: number;
+    dryRun: boolean;
+  } | null;
   matchedRows: number;
   updatedRows: number;
 };
@@ -90,19 +98,20 @@ const HELP_TEXT = `
 Usage:
   npm run ratings:rebuild-team
   npm run ratings:rebuild-team -- --season-ids 11,12 --apply
-  npm run ratings:rebuild-team -- --season-ids 11,12 --include-team-weeks --include-team-seasons
+  npm run ratings:rebuild-team -- --season-ids 11,12 --include-team-seasons
 
 Options:
   --season-ids <list>     Optional comma-separated season ids. Default: all Season rows.
   --apply                 Write updated team ratings back to Google Sheets. Omit for dry-run.
   --log <true|false>      Enable or disable console logging. Default: true.
-  --include-team-weeks    Also recompute TeamWeekStatLine ratings.
-  --include-team-seasons  Also recompute TeamSeasonStatLine ratings.
+  --include-team-weeks    Accepted for compatibility; TeamWeekStatLine ratings are included by default.
+  --include-team-seasons  Accepted for compatibility; TeamSeasonStatLine ratings are included by default.
   --stop-on-error         Abort immediately on the first failed season.
   --help                  Show this message and exit.
 
 Requirements:
   Google Sheets credentials must be configured for local sheet reads/writes.
+  Team-week rebuilds automatically trigger a power refresh for the same season.
 `.trim();
 
 function parseSeasonIds(value: string | undefined): string[] {
@@ -144,8 +153,8 @@ async function parseOptions(args: string[]): Promise<TeamRatingRebuildOptions> {
     apply: hasFlag(args, "--apply"),
     logToConsole: toBoolean(getArgValue(args, "--log"), true),
     includeTeamDays: true,
-    includeTeamWeeks: hasFlag(args, "--include-team-weeks"),
-    includeTeamSeasons: hasFlag(args, "--include-team-seasons"),
+    includeTeamWeeks: true,
+    includeTeamSeasons: true,
     stopOnError: hasFlag(args, "--stop-on-error"),
   };
 }
@@ -229,8 +238,86 @@ async function executeSeason(
     );
   }
 
+  let powerRefresh: TeamRatingSeasonSummary["powerRefresh"] = null;
+  if (options.includeTeamWeeks) {
+    const powerResult = await runLocalPowerRankingsSeason(seasonId, {
+      dryRun: !options.apply,
+      returnRows: true,
+      logToConsole: options.logToConsole,
+    });
+
+    if (options.apply) {
+      const weekUpdates = powerResult.weekUpdates ?? [];
+      const seasonUpdates = powerResult.seasonUpdates ?? [];
+      const matchupUpdates = powerResult.matchupUpdates ?? [];
+
+      if (weekUpdates.length > 0) {
+        await minimalSheetsWriter.upsertByCompositeKey(
+          "TeamWeekStatLine",
+          getCompositeKeyColumnsForModel("TeamWeekStatLine"),
+          weekUpdates,
+          {
+            merge: true,
+            idColumn: "id",
+            createdAtColumn: "createdAt",
+            updatedAtColumn: "updatedAt",
+            spreadsheetId: getWriteSpreadsheetIdForModel("TeamWeekStatLine", {
+              seasonId,
+            }),
+          },
+        );
+      }
+
+      if (seasonUpdates.length > 0) {
+        await minimalSheetsWriter.upsertByCompositeKey(
+          "TeamSeasonStatLine",
+          getCompositeKeyColumnsForModel("TeamSeasonStatLine"),
+          seasonUpdates,
+          {
+            merge: true,
+            idColumn: "id",
+            createdAtColumn: "createdAt",
+            updatedAtColumn: "updatedAt",
+            spreadsheetId: getWriteSpreadsheetIdForModel("TeamSeasonStatLine", {
+              seasonId,
+            }),
+          },
+        );
+      }
+
+      if (matchupUpdates.length > 0) {
+        await minimalSheetsWriter.upsertByCompositeKey(
+          "Matchup",
+          ["id"],
+          matchupUpdates,
+          {
+            merge: true,
+            idColumn: "id",
+            createdAtColumn: "createdAt",
+            updatedAtColumn: "updatedAt",
+            spreadsheetId: getWriteSpreadsheetIdForModel("Matchup", {
+              seasonId,
+            }),
+          },
+        );
+      }
+    }
+
+    powerRefresh = {
+      weekRows: powerResult.updatedWeekRows,
+      seasonRows: powerResult.updatedSeasonRows,
+      matchupRows: powerResult.updatedMatchupRows,
+      dryRun: !options.apply,
+    };
+    log(
+      options,
+      `Season ${seasonId} power refresh: teamWeeks=${powerResult.updatedWeekRows} teamSeasons=${powerResult.updatedSeasonRows} matchups=${powerResult.updatedMatchupRows}.`,
+    );
+  }
+
   return {
     seasonId,
+    powerRefresh,
     matchedRows: summaries.reduce(
       (sum, summary) => sum + summary.matchedRows,
       0,
