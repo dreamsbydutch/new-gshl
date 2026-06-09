@@ -17,7 +17,7 @@ export const AWARD_CATALOG: AwardCatalogEntry[] = [
     sortOrder: 1,
   },
   {
-    key: AwardsList.PRESIDENTS_TROPHY,
+    key: AwardsList.PRESIDENT,
     group: "TEAM TROPHIES",
     fullName: "President's Trophy",
     imageUrl: "https://qzcw4d2n1l.ufs.sh/f/wTZjIHOpQwiMWCj22tAz9iuA7F6XIgrwRMlZ2cKBCvPfOpJx",

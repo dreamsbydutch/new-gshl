@@ -142,7 +142,15 @@ function normalizeIdList(value: unknown): string[] {
     return value.flatMap((entry) => normalizeIdList(entry));
   }
 
-  const raw = String(value ?? "").trim();
+  if (
+    typeof value !== "string" &&
+    typeof value !== "number" &&
+    typeof value !== "boolean"
+  ) {
+    return [];
+  }
+
+  const raw = String(value).trim();
   if (!raw) return [];
 
   try {
@@ -160,14 +168,14 @@ function normalizeIdList(value: unknown): string[] {
     .filter(Boolean);
 }
 
-function getAllStarSeasonType(awardKey: string): SeasonType | null {
-  if (awardKey === AwardsList.FIRST_AS || awardKey === AwardsList.SECOND_AS) {
-    return SeasonType.REGULAR_SEASON;
+function getAllStarSeasonType(awardKey: AllStarAwardKey): SeasonType {
+  switch (awardKey) {
+    case AwardsList.FIRST_AS:
+    case AwardsList.SECOND_AS:
+      return SeasonType.REGULAR_SEASON;
+    case AwardsList.PLAYOFF_AS:
+      return SeasonType.PLAYOFFS;
   }
-  if (awardKey === AwardsList.PLAYOFF_AS) {
-    return SeasonType.PLAYOFFS;
-  }
-  return null;
 }
 
 function getAllStarLabel(awardKey: AllStarAwardKey): string {
