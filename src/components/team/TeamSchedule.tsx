@@ -21,7 +21,11 @@ import type {
   OpponentDisplayProps,
   WeekDisplayProps,
 } from "@gshl-utils";
-import type { GSHLTeam, TeamWeekStatLine } from "@gshl-types";
+import type {
+  GSHLTeam,
+  MatchupCategoryConfig,
+  TeamWeekStatLine,
+} from "@gshl-types";
 import {
   getGameLocation,
   getGameTypeDisplay,
@@ -33,13 +37,6 @@ import {
 } from "@gshl-utils";
 import { findTeamById } from "@gshl-utils/domain/team";
 import { useSeasons, useTeamScheduleData, useTeams } from "@gshl-hooks";
-
-type MatchupCategoryConfig = {
-  field: keyof TeamWeekStatLine;
-  label: string;
-  isInverse?: boolean;
-  precision?: number;
-};
 
 const MATCHUP_CATEGORY_MAP: Record<string, MatchupCategoryConfig> = {
   G: { field: "G", label: "G" },
@@ -61,16 +58,16 @@ const MATCHUP_CATEGORY_MAP: Record<string, MatchupCategoryConfig> = {
 };
 
 const FALLBACK_MATCHUP_CATEGORIES: MatchupCategoryConfig[] = [
-  MATCHUP_CATEGORY_MAP.G,
-  MATCHUP_CATEGORY_MAP.A,
-  MATCHUP_CATEGORY_MAP.P,
-  MATCHUP_CATEGORY_MAP.PPP,
-  MATCHUP_CATEGORY_MAP.SOG,
-  MATCHUP_CATEGORY_MAP.HIT,
-  MATCHUP_CATEGORY_MAP.BLK,
-  MATCHUP_CATEGORY_MAP.W,
-  MATCHUP_CATEGORY_MAP.GAA,
-  MATCHUP_CATEGORY_MAP.SVP,
+  MATCHUP_CATEGORY_MAP.G!,
+  MATCHUP_CATEGORY_MAP.A!,
+  MATCHUP_CATEGORY_MAP.P!,
+  MATCHUP_CATEGORY_MAP.PPP!,
+  MATCHUP_CATEGORY_MAP.SOG!,
+  MATCHUP_CATEGORY_MAP.HIT!,
+  MATCHUP_CATEGORY_MAP.BLK!,
+  MATCHUP_CATEGORY_MAP.W!,
+  MATCHUP_CATEGORY_MAP.GAA!,
+  MATCHUP_CATEGORY_MAP.SVP!,
 ];
 
 function normalizeSeasonCategory(category: unknown): string | null {

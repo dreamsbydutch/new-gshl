@@ -343,7 +343,15 @@ export interface TeamScheduleItemProps {
   week: Week | undefined;
   teams: GSHLTeam[];
   selectedTeamId: string;
+  categories: MatchupCategoryConfig[]
 }
+
+export type MatchupCategoryConfig = {
+  field: keyof TeamWeekStatLine;
+  label: string;
+  isInverse?: boolean;
+  precision?: number;
+};
 
 export interface OpponentDisplayProps {
   matchup: Matchup;
