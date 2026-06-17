@@ -74,13 +74,17 @@ const FALLBACK_MATCHUP_CATEGORIES: MatchupCategoryConfig[] = [
 ];
 
 function normalizeSeasonCategory(category: unknown): string | null {
-  const value = String(category ?? "").trim().toUpperCase();
+  const value = String(category ?? "")
+    .trim()
+    .toUpperCase();
   if (!value) return null;
   if (value === "SV%") return "SVP";
   return value;
 }
 
-function resolveMatchupCategories(categories: unknown): MatchupCategoryConfig[] {
+function resolveMatchupCategories(
+  categories: unknown,
+): MatchupCategoryConfig[] {
   const normalized = Array.isArray(categories)
     ? categories.map((category) => normalizeSeasonCategory(category))
     : String(categories ?? "")
@@ -90,9 +94,7 @@ function resolveMatchupCategories(categories: unknown): MatchupCategoryConfig[] 
   const resolved = normalized
     .filter((category): category is string => Boolean(category))
     .map((category) => MATCHUP_CATEGORY_MAP[category])
-    .filter(
-      (category): category is MatchupCategoryConfig => Boolean(category),
-    );
+    .filter((category): category is MatchupCategoryConfig => Boolean(category));
 
   return resolved.length > 0 ? resolved : FALLBACK_MATCHUP_CATEGORIES;
 }
@@ -148,7 +150,8 @@ function formatCategoryValue(
 ): string {
   const value = toCategoryNumber(stats, category);
   if (!Number.isFinite(value)) return "0";
-  if (category.precision !== undefined) return value.toFixed(category.precision);
+  if (category.precision !== undefined)
+    return value.toFixed(category.precision);
   return String(value);
 }
 
@@ -255,8 +258,16 @@ function TeamLogoCell({ team }: { team?: GSHLTeam | null }) {
 /**
  * Stat category headers row
  */
-function StatHeadersRow({ categories }: { categories: MatchupCategoryConfig[] }) {
-  const headers = ["", "Score", ...categories.map((category) => category.label)];
+function StatHeadersRow({
+  categories,
+}: {
+  categories: MatchupCategoryConfig[];
+}) {
+  const headers = [
+    "",
+    "Score",
+    ...categories.map((category) => category.label),
+  ];
 
   return (
     <tr className="rounded-lg bg-gray-100 text-gray-600">
@@ -310,7 +321,10 @@ function TeamStatsRow({
       <TeamLogoCell team={team} />
       <td className={getScoreCellClass(scoreWon)}>{teamScore}</td>
       {categoryStates.map((categoryState) => (
-        <td key={categoryState.key} className={getStatCellClass(categoryState.won)}>
+        <td
+          key={categoryState.key}
+          className={getStatCellClass(categoryState.won)}
+        >
           {categoryState.display}
         </td>
       ))}
