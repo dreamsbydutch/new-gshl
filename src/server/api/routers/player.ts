@@ -35,6 +35,7 @@ const playerWhereSchema = z
 
 const playerUpdateSchema = z.object({
   yahooId: z.string().optional(),
+  nhlApiId: z.string().nullable().optional(),
   firstName: z.string().optional(),
   lastName: z.string().optional(),
   position: z.string().optional(),

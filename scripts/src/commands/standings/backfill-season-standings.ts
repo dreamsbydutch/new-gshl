@@ -58,6 +58,7 @@ export type StandingsBackfillSeasonSummary = {
 
 type SeasonRecord = DatabaseRecord & {
   id?: string | number | null;
+  categories?: unknown;
   startDate?: string | Date | null;
   endDate?: string | Date | null;
   isActive?: boolean | string | number | null;
@@ -158,6 +159,7 @@ const MATCHUP_CATEGORY_RULES = [
   { field: "G", higherBetter: true },
   { field: "A", higherBetter: true },
   { field: "P", higherBetter: true },
+  { field: "PM", higherBetter: true },
   { field: "PPP", higherBetter: true },
   { field: "SOG", higherBetter: true },
   { field: "HIT", higherBetter: true },
@@ -167,8 +169,17 @@ const MATCHUP_CATEGORY_RULES = [
   { field: "SVP", higherBetter: true },
 ] as const;
 
+type MatchupCategoryRule = (typeof MATCHUP_CATEGORY_RULES)[number];
+
 const GOALIE_CATEGORY_SET = new Set<string>(["W", "GAA", "SVP"]);
 const GOALIE_START_MINIMUM = 2;
+const SINGLE_GOALIE_START_SEASON_IDS = new Set<string>(["1"]);
+const MATCHUP_RULE_BY_FIELD = new Map<string, MatchupCategoryRule>(
+  MATCHUP_CATEGORY_RULES.map((rule) => [rule.field, rule] as const),
+);
+const FALLBACK_MATCHUP_CATEGORY_FIELDS = MATCHUP_CATEGORY_RULES.map(
+  (rule) => rule.field,
+);
 
 const HELP_TEXT = `
 Usage:
@@ -217,6 +228,57 @@ function toTrimmedString(value: unknown): string {
     return String(value).trim();
   }
   return "";
+}
+
+function normalizeSeasonCategory(category: unknown): string | null {
+  const normalized = toTrimmedString(category).toUpperCase();
+  return MATCHUP_RULE_BY_FIELD.has(normalized) ? normalized : null;
+}
+
+function parseSeasonCategories(rawValue: unknown): string[] {
+  if (Array.isArray(rawValue)) {
+    return rawValue
+      .map((category) => normalizeSeasonCategory(category))
+      .filter((category): category is string => !!category);
+  }
+
+  if (typeof rawValue === "string") {
+    const trimmed = rawValue.trim();
+    if (!trimmed) return [];
+
+    if (trimmed.startsWith("[")) {
+      try {
+        const parsed = JSON.parse(trimmed) as unknown;
+        if (Array.isArray(parsed)) {
+          return parsed
+            .map((category) => normalizeSeasonCategory(category))
+            .filter((category): category is string => !!category);
+        }
+      } catch {
+        // Fall through to CSV parsing for plain sheet values.
+      }
+    }
+
+    return trimmed
+      .split(",")
+      .map((category) => normalizeSeasonCategory(category))
+      .filter((category): category is string => !!category);
+  }
+
+  return [];
+}
+
+function getMatchupCategoryRulesForSeason(
+  season: SeasonRecord | undefined,
+): MatchupCategoryRule[] {
+  const configuredFields = parseSeasonCategories(season?.categories);
+  const resolvedFields = configuredFields.length
+    ? configuredFields
+    : FALLBACK_MATCHUP_CATEGORY_FIELDS;
+
+  return resolvedFields
+    .map((field) => MATCHUP_RULE_BY_FIELD.get(field))
+    .filter((rule): rule is MatchupCategoryRule => !!rule);
 }
 
 function toBoolean(value: unknown, fallback: boolean): boolean {
@@ -440,6 +502,12 @@ function buildGoalieStartsByTeamWeek(playerWeeks: PlayerWeekRecord[]) {
   return map;
 }
 
+function getGoalieStartMinimumForSeasonId(seasonId: string): number {
+  return SINGLE_GOALIE_START_SEASON_IDS.has(seasonId)
+    ? 1
+    : GOALIE_START_MINIMUM;
+}
+
 function computeTeamPointsFromRecord(
   teamW: unknown,
   teamHW: unknown,
@@ -624,17 +692,20 @@ function sortEntriesWithTiebreakers(
 }
 
 function computeMatchupScore(
+  seasonId: string,
   homeWeek: TeamWeekRecord,
   awayWeek: TeamWeekRecord,
   homeGoalieStarts: number,
   awayGoalieStarts: number,
+  matchupCategoryRules: readonly MatchupCategoryRule[],
 ) {
   let homeScore = 0;
   let awayScore = 0;
-  const homeHasGoalies = homeGoalieStarts >= GOALIE_START_MINIMUM;
-  const awayHasGoalies = awayGoalieStarts >= GOALIE_START_MINIMUM;
+  const goalieStartMinimum = getGoalieStartMinimumForSeasonId(seasonId);
+  const homeHasGoalies = homeGoalieStarts >= goalieStartMinimum;
+  const awayHasGoalies = awayGoalieStarts >= goalieStartMinimum;
 
-  for (const rule of MATCHUP_CATEGORY_RULES) {
+  for (const rule of matchupCategoryRules) {
     const isGoalieCategory = GOALIE_CATEGORY_SET.has(rule.field);
     if (isGoalieCategory) {
       if (!homeHasGoalies && !awayHasGoalies) continue;
@@ -750,6 +821,7 @@ export async function rebuildSeasonStandingsForSeasonId(
     path.resolve("credentials.json");
 
   const [
+    seasons,
     weeks,
     teams,
     franchises,
@@ -758,6 +830,7 @@ export async function rebuildSeasonStandingsForSeasonId(
     matchups,
     teamSeasons,
   ] = await Promise.all([
+    fastSheetsReader.fetchModel<SeasonRecord>("Season"),
     fastSheetsReader.fetchModel<WeekRecord>("Week"),
     fastSheetsReader.fetchModel<TeamRecord>("Team"),
     fastSheetsReader.fetchModel<FranchiseRecord>("Franchise"),
@@ -766,6 +839,11 @@ export async function rebuildSeasonStandingsForSeasonId(
     fastSheetsReader.fetchModel<DatabaseRecord>("Matchup"),
     fastSheetsReader.fetchModel<TeamSeasonRecord>("TeamSeasonStatLine"),
   ]);
+
+  const season = seasons.find(
+    (candidate) => normalizeRecordId(candidate.id) === seasonId,
+  );
+  const matchupCategoryRules = getMatchupCategoryRulesForSeason(season);
 
   const seasonWeeks = weeks.filter(
     (week) => normalizeRecordId(week.seasonId) === seasonId,
@@ -815,10 +893,12 @@ export async function rebuildSeasonStandingsForSeasonId(
     if (!homeWeek || !awayWeek) continue;
 
     const scores = computeMatchupScore(
+      seasonId,
       homeWeek,
       awayWeek,
       goalieStartsMap.get(`${homeTeamId}|${weekId}`) ?? 0,
       goalieStartsMap.get(`${awayTeamId}|${weekId}`) ?? 0,
+      matchupCategoryRules,
     );
 
     matchupUpdates.push({

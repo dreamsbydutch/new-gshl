@@ -1,1 +1,1 @@
-import "../../domains/yahoo/check-weekly-matchup-stats";
+import "./check-yahoo-weekly-player-days";

@@ -364,6 +364,7 @@ export const SHEETS_CONFIG = {
       "gshlTeamId",
       "createdAt",
       "updatedAt",
+      "nhlApiId",
     ],
     Week: [
       "id",

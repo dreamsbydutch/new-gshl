@@ -61,6 +61,18 @@ const LINEUP_SLOT_ELIGIBILITY: Record<string, string[]> = {
   G: ["G"],
 };
 
+type LineupSlot = {
+  position: string;
+  eligiblePositions: readonly string[];
+};
+
+type LineupSlotConfig = {
+  slots: readonly LineupSlot[];
+  startingPositions: Set<string>;
+  slotLimits: Record<string, number>;
+  slotEligibility: Record<string, string[]>;
+};
+
 function toTrimmedString(value: unknown): string {
   return String(value ?? "").trim();
 }
@@ -95,6 +107,78 @@ function computeGsValue(row: DatabaseRecord): string {
 function ratingValue(row: DatabaseRecord): number {
   const numeric = Number(row.Rating);
   return Number.isFinite(numeric) ? numeric : 0;
+}
+
+function buildDefaultLineupSlots(): LineupSlot[] {
+  return [
+    { position: "LW", eligiblePositions: ["LW"] },
+    { position: "LW", eligiblePositions: ["LW"] },
+    { position: "C", eligiblePositions: ["C"] },
+    { position: "C", eligiblePositions: ["C"] },
+    { position: "RW", eligiblePositions: ["RW"] },
+    { position: "RW", eligiblePositions: ["RW"] },
+    { position: "D", eligiblePositions: ["D"] },
+    { position: "D", eligiblePositions: ["D"] },
+    { position: "D", eligiblePositions: ["D"] },
+    { position: "Util", eligiblePositions: ["LW", "C", "RW", "D"] },
+    { position: "G", eligiblePositions: ["G"] },
+  ];
+}
+
+function buildLineupSlotsForSeason(
+  rosterSpots: unknown,
+  lineupBuilder?: {
+    buildLineupStructureFromRosterSpots?: (
+      spots: unknown[],
+    ) => readonly LineupSlot[];
+    internals?: {
+      buildLineupStructureFromRosterSpots?: (
+        spots: unknown[],
+      ) => readonly LineupSlot[];
+    };
+  },
+): readonly LineupSlot[] {
+  const safeRosterSpots = Array.isArray(rosterSpots) ? rosterSpots : [];
+  const buildFromBuilder =
+    lineupBuilder?.buildLineupStructureFromRosterSpots ??
+    lineupBuilder?.internals?.buildLineupStructureFromRosterSpots;
+  if (buildFromBuilder) {
+    const slots = buildFromBuilder(safeRosterSpots);
+    if (Array.isArray(slots) && slots.length > 0) {
+      return slots;
+    }
+  }
+  return buildDefaultLineupSlots();
+}
+
+function buildLineupSlotConfig(
+  slots: readonly LineupSlot[],
+): LineupSlotConfig {
+  const safeSlots = Array.isArray(slots) && slots.length > 0
+    ? slots
+    : buildDefaultLineupSlots();
+  const startingPositions = new Set<string>();
+  const slotLimits: Record<string, number> = {};
+  const slotEligibility: Record<string, string[]> = {};
+
+  for (const slot of safeSlots) {
+    const position = toUpperToken(slot?.position);
+    if (!position) continue;
+    startingPositions.add(position);
+    slotLimits[position] = (slotLimits[position] ?? 0) + 1;
+    if (!slotEligibility[position]) {
+      slotEligibility[position] = (slot?.eligiblePositions ?? []).map((entry: string) =>
+        toUpperToken(entry),
+      );
+    }
+  }
+
+  return {
+    slots: safeSlots,
+    startingPositions,
+    slotLimits,
+    slotEligibility,
+  };
 }
 
 function getGroupKey(row: DatabaseRecord): string {
@@ -178,6 +262,7 @@ function clonePlayerDayRow(row: DatabaseRecord): DatabaseRecord {
 
 function sanitizeImpossibleDailyLineup(
   players: DatabaseRecord[],
+  lineupSlotConfig: LineupSlotConfig,
   isEligibleForPosition?: (
     player: DatabaseRecord,
     eligiblePositions: string[],
@@ -189,11 +274,11 @@ function sanitizeImpossibleDailyLineup(
   for (const row of sanitized) {
     const dailyPos = toUpperToken(row.dailyPos);
     const played = toTrimmedString(row.GP) === "1";
-    if (!played || !STARTING_DAILY_POSITIONS.has(dailyPos)) {
+    if (!played || !lineupSlotConfig.startingPositions.has(dailyPos)) {
       continue;
     }
 
-    const eligiblePositions = LINEUP_SLOT_ELIGIBILITY[dailyPos];
+    const eligiblePositions = lineupSlotConfig.slotEligibility[dailyPos];
     if (
       !eligiblePositions ||
       (isEligibleForPosition && !isEligibleForPosition(row, eligiblePositions))
@@ -208,7 +293,7 @@ function sanitizeImpossibleDailyLineup(
   }
 
   for (const [slot, bucket] of protectedBySlot) {
-    const limit = LINEUP_SLOT_LIMITS[slot] ?? 0;
+    const limit = lineupSlotConfig.slotLimits[slot] ?? 0;
     if (bucket.length <= limit) continue;
     bucket.sort((left, right) => ratingValue(right) - ratingValue(left));
     for (const overflow of bucket.slice(limit)) {
@@ -302,12 +387,21 @@ export function parsePlayerDayLineupBackfillOptions(
 export async function runPlayerDayLineupBackfill(
   options: PlayerDayLineupBackfillOptions,
 ): Promise<PlayerDayLineupBackfillSummary> {
-  const [weeks, matchups, seasonRows, lineupBuilder] = await Promise.all([
+  const [weeks, matchups, seasons, seasonRows, lineupBuilder] = await Promise.all([
     fastSheetsReader.fetchModel<WeekRecord>("Week"),
     fastSheetsReader.fetchModel<MatchupRecord>("Matchup"),
+    fastSheetsReader.fetchModel<DatabaseRecord>("Season"),
     fastSheetsReader.fetchPlayerDaySeason<DatabaseRecord>(options.seasonId),
     getAppsScriptLineupBuilder(),
   ]);
+  const seasonRow = seasons.find(
+    (row) => toTrimmedString(row.id) === options.seasonId,
+  );
+  const lineupSlots = buildLineupSlotsForSeason(
+    seasonRow?.rosterSpots,
+    lineupBuilder,
+  );
+  const lineupSlotConfig = buildLineupSlotConfig(lineupSlots);
 
   const weekIdAllowList = buildWeekIdAllowList(
     options.seasonId,
@@ -362,7 +456,7 @@ export async function runPlayerDayLineupBackfill(
     );
     let optimized: DatabaseRecord[];
     try {
-      optimized = lineupBuilder.optimizeLineup(players);
+      optimized = lineupBuilder.optimizeLineup(players, lineupSlots);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       if (!message.includes("Unable to reserve played daily-lineup slot(s)")) {
@@ -371,9 +465,10 @@ export async function runPlayerDayLineupBackfill(
       repairedGroups += 1;
       const sanitizedPlayers = sanitizeImpossibleDailyLineup(
         players,
+        lineupSlotConfig,
         lineupBuilder.internals?.isEligibleForPosition,
       );
-      optimized = lineupBuilder.optimizeLineup(sanitizedPlayers);
+      optimized = lineupBuilder.optimizeLineup(sanitizedPlayers, lineupSlots);
       const optimizedById = new Map(
         optimized.map((row) => [toTrimmedString(row.id), row] as const),
       );

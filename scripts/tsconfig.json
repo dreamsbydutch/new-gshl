@@ -15,6 +15,7 @@
       "@gshl-env": ["./src/env.ts"],
       "@gshl-lib/ranking/*": ["./src/domains/ranking/*"],
       "@gshl-lib/lineup/*": ["./src/domains/lineup/*"],
+      "@gshl-lib/nhl/*": ["./src/domains/nhl/*"],
       "@gshl-lib/yahoo/*": ["./src/domains/yahoo/*"],
       "@gshl-lib/stats/season-stat-aggregation": [
         "./src/domains/aggregation/season-stat-aggregation.ts"

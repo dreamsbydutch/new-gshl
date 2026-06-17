@@ -69,6 +69,54 @@ var LineupBuilder = (function () {
     { position: RosterPosition.G, eligiblePositions: [RosterPosition.G] },
   ];
 
+  function buildLineupStructureFromRosterSpots(rosterSpots) {
+    var safeRosterSpots = Array.isArray(rosterSpots) ? rosterSpots : [];
+    var slots = [];
+
+    safeRosterSpots.forEach(function (spot) {
+      var normalized = normalizeDailyPos(spot);
+      if (!normalized) return;
+      if (
+        normalized === RosterPosition.BN ||
+        normalized === RosterPosition.IR ||
+        normalized === RosterPosition.IRplus ||
+        normalized === "IL+" ||
+        normalized === "IRplus"
+      ) {
+        return;
+      }
+      if (
+        normalized === RosterPosition.LW ||
+        normalized === RosterPosition.C ||
+        normalized === RosterPosition.RW ||
+        normalized === RosterPosition.D ||
+        normalized === RosterPosition.G
+      ) {
+        slots.push({
+          position: normalized,
+          eligiblePositions: [normalized],
+        });
+        return;
+      }
+      if (
+        normalized === RosterPosition.Util ||
+        String(normalized).toUpperCase() === "UTIL"
+      ) {
+        slots.push({
+          position: RosterPosition.Util,
+          eligiblePositions: [
+            RosterPosition.LW,
+            RosterPosition.C,
+            RosterPosition.RW,
+            RosterPosition.D,
+          ],
+        });
+      }
+    });
+
+    return slots.length ? slots : LINEUP_STRUCTURE.slice();
+  }
+
   // ===== HELPERS =====
 
   function ratingValue(player) {
@@ -295,9 +343,6 @@ var LineupBuilder = (function () {
       }
     });
 
-    if (safePlayers.length > MAX_TEAM_DAY_PLAYERS) {
-      errors.push("rowCount=" + safePlayers.length);
-    }
     if (duplicatePlayerIds.length) {
       errors.push("duplicatePlayerIds=" + duplicatePlayerIds.join(","));
     }
@@ -904,8 +949,9 @@ var LineupBuilder = (function () {
    * @param {Array} players
    * @returns {Array}
    */
-  function optimizeLineup(players) {
+  function optimizeLineup(players, slots) {
     const safePlayers = Array.isArray(players) ? players : [];
+    const slotList = normalizeSlotList(slots);
     validateTeamDayRoster(safePlayers, "optimizeLineup");
     const results = safePlayers.map((p) => ({
       ...p,
@@ -923,7 +969,7 @@ var LineupBuilder = (function () {
 
     const protectedFullPlayerIds = {};
     const lockedFullAssignments = {};
-    const remainingFullSlots = LINEUP_STRUCTURE.slice();
+    const remainingFullSlots = slotList.slice();
     const failedFullSlotReservations = [];
 
     results.forEach(function (p) {
@@ -999,7 +1045,7 @@ var LineupBuilder = (function () {
     const bestPosPriority = results
       .slice()
       .sort((a, b) => ratingValue(b) - ratingValue(a));
-    const bestPosAssignments = findBestLineup(bestPosPriority, false);
+    const bestPosAssignments = findBestLineup(bestPosPriority, false, slotList);
     for (const result of results) {
       result.bestPos = bestPosAssignments[result.playerId] || RosterPosition.BN;
       const flags = computeLineupFlags(result);
@@ -1138,6 +1184,14 @@ var LineupBuilder = (function () {
     var getHeaders = GshlUtils.sheets.read.getHeadersFromSheet;
     var getColIndex = GshlUtils.sheets.read.getColIndex;
     var groupAndApply = GshlUtils.sheets.write.groupAndApplyColumnUpdates;
+    var seasonRow = fetchSheetAsObjects(SPREADSHEET_ID, "Season", {
+      coerceTypes: true,
+    }).find(function (season) {
+      return String(season && season.id) === seasonKey;
+    });
+    var lineupSlots = buildLineupStructureFromRosterSpots(
+      seasonRow && seasonRow.rosterSpots,
+    );
     var seasonWeeks = fetchSheetAsObjects(SPREADSHEET_ID, "Week", {
       coerceTypes: true,
     }).filter(function (w) {
@@ -1346,7 +1400,7 @@ var LineupBuilder = (function () {
       var shouldApplyLtAutoLineup =
         !!opts.applyLtAutoLineups && isLosersTournamentGame(gameType);
 
-      var optimized = optimizeLineup(players);
+      var optimized = optimizeLineup(players, lineupSlots);
       if (shouldApplyLtAutoLineup) {
         optimized.forEach(function (p) {
           if (!p) return;
@@ -2516,13 +2570,7 @@ var LineupBuilder = (function () {
     for (var i = 0; i < MAX_TEAM_DAY_PLAYERS + 1; i++) {
       tooMany.push({ playerId: "p" + i });
     }
-    var threwTooMany = false;
-    try {
-      validateTeamDayRoster(tooMany, "too-many");
-    } catch (_e) {
-      threwTooMany = true;
-    }
-    assert(threwTooMany, "Expected >17 roster to throw");
+    validateTeamDayRoster(tooMany, "too-many");
 
     var threwDuplicate = false;
     try {
@@ -2698,6 +2746,7 @@ var LineupBuilder = (function () {
   return {
     RosterPosition: RosterPosition,
     LINEUP_STRUCTURE: LINEUP_STRUCTURE,
+    buildLineupStructureFromRosterSpots: buildLineupStructureFromRosterSpots,
     optimizeLineup: optimizeLineup,
     findBestLineup: findBestLineup,
     getLineupStats: getLineupStats,
@@ -2713,6 +2762,7 @@ var LineupBuilder = (function () {
       buildPresenceSets: buildPresenceSets,
       computeAddValue: computeAddValue,
       validateTeamDayRoster: validateTeamDayRoster,
+      buildLineupStructureFromRosterSpots: buildLineupStructureFromRosterSpots,
       findBestLineupGreedy: findBestLineupGreedy,
       findQuickFillLineup: findQuickFillLineup,
       findBestLineupExhaustive: findBestLineupExhaustive,

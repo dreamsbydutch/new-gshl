@@ -180,6 +180,7 @@ export interface GSHLTeam {
 export interface Player {
   id: string;
   yahooId?: string | null;
+  nhlApiId?: string | null;
   firstName: string;
   lastName: string;
   fullName: string;

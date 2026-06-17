@@ -1,0 +1,30 @@
+{
+  "seasonIds": [
+    "1"
+  ],
+  "weekIds": [],
+  "weekNums": [],
+  "startDate": "2014-10-18",
+  "endDate": "2014-12-31",
+  "teamIds": [],
+  "matchupIds": [],
+  "concurrency": 1,
+  "requestDelayMs": 3500,
+  "apply": true,
+  "summaries": [
+    {
+      "seasonId": "1",
+      "apply": true,
+      "datesScanned": 75,
+      "matchupsScanned": 139,
+      "pagesScanned": 450,
+      "teamSlicesScanned": 900,
+      "matchedYahooRows": 21392,
+      "updatedRows": 1755,
+      "createdRows": 0,
+      "deletedRows": 0,
+      "unchangedRows": 19637,
+      "flags": []
+    }
+  ]
+}

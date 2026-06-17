@@ -1,0 +1,36 @@
+{
+  "seasonIds": [
+    "1"
+  ],
+  "weekIds": [],
+  "weekNums": [
+    "1"
+  ],
+  "startDate": null,
+  "endDate": null,
+  "teamIds": [
+    "153"
+  ],
+  "matchupIds": [
+    "6"
+  ],
+  "concurrency": 1,
+  "requestDelayMs": 3500,
+  "apply": false,
+  "summaries": [
+    {
+      "seasonId": "1",
+      "apply": false,
+      "datesScanned": 12,
+      "matchupsScanned": 1,
+      "pagesScanned": 0,
+      "teamSlicesScanned": 0,
+      "matchedYahooRows": 0,
+      "updatedRows": 0,
+      "createdRows": 0,
+      "deletedRows": 0,
+      "unchangedRows": 0,
+      "flags": []
+    }
+  ]
+}

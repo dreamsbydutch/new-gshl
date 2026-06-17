@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "player-bios:sync": "tsx src/commands/player-bios/sync-player-bios-from-puckpedia.ts",
+    "player-bios:backfill-nhl-ids": "tsx src/commands/player-bios/backfill-nhl-api-ids.ts",
+    "player-bios:backfill-yahoo-ids": "tsx src/commands/player-bios/backfill-yahoo-ids.ts",
     "awards:backfill": "tsx src/commands/awards/backfill-season-awards.ts",
     "ranking-engine:check": "node ../tools/ranking-engine-sync.mjs check",
     "ranking-engine:sync": "node ../tools/ranking-engine-sync.mjs sync",
@@ -17,8 +19,12 @@
     "standings:backfill": "tsx src/commands/standings/backfill-season-standings.ts",
     "stats:aggregate-season": "tsx src/commands/stats/aggregate-season-stats.ts",
     "stats:backfill-hockey-reference": "tsx src/commands/stats/backfill-hockey-reference-season.ts",
+    "stats:backfill-yahoo-matchup-days": "tsx src/commands/stats/backfill-yahoo-matchup-player-days.ts",
+    "stats:debug-yahoo-matchup-table": "tsx src/commands/stats/debug-yahoo-matchup-table.ts",
     "stats:backfill-yahoo-rosters": "tsx src/commands/stats/backfill-yahoo-roster-player-days.ts",
+    "stats:sync-nhl-daily": "tsx src/commands/stats/sync-nhl-daily-stats.ts",
     "lineup:update-all": "node --expose-gc --max-old-space-size=4096 ../node_modules/tsx/dist/cli.mjs src/commands/lineup/update-all-lineups.ts",
+    "yahoo:check-weekly-player-days": "tsx src/commands/yahoo/check-yahoo-weekly-player-days.ts",
     "yahoo:check-weekly-matchups": "tsx src/commands/yahoo/check-yahoo-weekly-matchup-stats.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   }

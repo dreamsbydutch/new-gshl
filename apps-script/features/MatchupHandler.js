@@ -36,6 +36,114 @@ var MatchupHandler = (function buildMatchupHandler() {
   var MATCHUP_CATEGORY_RULES = GshlUtils.core.constants.MATCHUP_CATEGORY_RULES;
   var GOALIE_CATEGORY_SET = GshlUtils.core.constants.GOALIE_CATEGORY_SET;
   var GOALIE_START_MINIMUM = GshlUtils.core.constants.GOALIE_START_MINIMUM;
+  var SINGLE_GOALIE_START_SEASON_IDS = new Set(["1"]);
+  var matchupCategoryRulesByField = new Map();
+  var seasonMatchupCategoryRuleCache = {};
+
+  (MATCHUP_CATEGORY_RULES || []).forEach(function (rule) {
+    if (!rule || !rule.field) return;
+    matchupCategoryRulesByField.set(String(rule.field).toUpperCase(), {
+      field: String(rule.field).toUpperCase(),
+      higherBetter: rule.higherBetter === false ? false : true,
+    });
+  });
+
+  if (!matchupCategoryRulesByField.has("PM")) {
+    matchupCategoryRulesByField.set("PM", {
+      field: "PM",
+      higherBetter: true,
+    });
+  }
+
+  var defaultMatchupCategoryFields = Array.from(
+    matchupCategoryRulesByField.keys(),
+  );
+
+  function getGoalieStartMinimumForSeasonId(seasonId) {
+    var normalized = seasonId === undefined || seasonId === null ? "" : String(seasonId).trim();
+    return SINGLE_GOALIE_START_SEASON_IDS.has(normalized)
+      ? 1
+      : GOALIE_START_MINIMUM;
+  }
+
+  function normalizeSeasonCategory(category) {
+    var normalized =
+      category === undefined || category === null
+        ? ""
+        : String(category).trim().toUpperCase();
+    return matchupCategoryRulesByField.has(normalized) ? normalized : null;
+  }
+
+  function parseSeasonCategories(rawValue) {
+    if (Array.isArray(rawValue)) {
+      return rawValue.map(normalizeSeasonCategory).filter(Boolean);
+    }
+
+    if (typeof rawValue === "string") {
+      var trimmed = rawValue.trim();
+      if (!trimmed) return [];
+
+      if (trimmed.charAt(0) === "[") {
+        try {
+          var parsed = JSON.parse(trimmed);
+          if (Array.isArray(parsed)) {
+            return parsed.map(normalizeSeasonCategory).filter(Boolean);
+          }
+        } catch (error) {
+          // Fall through to CSV parsing for plain sheet values.
+        }
+      }
+
+      return trimmed.split(",").map(normalizeSeasonCategory).filter(Boolean);
+    }
+
+    return [];
+  }
+
+  function getMatchupCategoryRulesForSeason(seasonId) {
+    var seasonKey =
+      seasonId === undefined || seasonId === null ? "" : String(seasonId).trim();
+    var fallbackRules = defaultMatchupCategoryFields
+      .map(function (field) {
+        return matchupCategoryRulesByField.get(field);
+      })
+      .filter(Boolean);
+
+    if (!seasonKey) {
+      return fallbackRules;
+    }
+
+    if (seasonMatchupCategoryRuleCache.hasOwnProperty(seasonKey)) {
+      return seasonMatchupCategoryRuleCache[seasonKey];
+    }
+
+    try {
+      var seasons = fetchSheetAsObjects(SPREADSHEET_ID, "Season");
+      var season = (seasons || []).find(function (entry) {
+        return String(entry && entry.id) === seasonKey;
+      });
+      var configuredCategories = parseSeasonCategories(
+        season && season.categories,
+      );
+      var resolvedFields = configuredCategories.length
+        ? configuredCategories
+        : defaultMatchupCategoryFields;
+
+      seasonMatchupCategoryRuleCache[seasonKey] = resolvedFields
+        .map(function (field) {
+          return matchupCategoryRulesByField.get(field);
+        })
+        .filter(Boolean);
+    } catch (error) {
+      seasonMatchupCategoryRuleCache[seasonKey] = fallbackRules;
+    }
+
+    if (!seasonMatchupCategoryRuleCache[seasonKey].length) {
+      seasonMatchupCategoryRuleCache[seasonKey] = fallbackRules;
+    }
+
+    return seasonMatchupCategoryRuleCache[seasonKey];
+  }
 
   function normalizeStandingsSeasonType(value) {
     var seasonType = value === undefined || value === null ? "" : String(value);
@@ -366,6 +474,7 @@ var MatchupHandler = (function buildMatchupHandler() {
   }
 
   function computeMatchupScore(
+    seasonId,
     homeWeek,
     awayWeek,
     homeGoalieStarts,
@@ -373,11 +482,17 @@ var MatchupHandler = (function buildMatchupHandler() {
   ) {
     var homeScore = 0;
     var awayScore = 0;
+    var goalieStartMinimum = getGoalieStartMinimumForSeasonId(
+      seasonId || (homeWeek && homeWeek.seasonId) || (awayWeek && awayWeek.seasonId),
+    );
+    var matchupCategoryRules = getMatchupCategoryRulesForSeason(
+      seasonId || (homeWeek && homeWeek.seasonId) || (awayWeek && awayWeek.seasonId),
+    );
 
-    var homeHasGoalies = (homeGoalieStarts || 0) >= GOALIE_START_MINIMUM;
-    var awayHasGoalies = (awayGoalieStarts || 0) >= GOALIE_START_MINIMUM;
+    var homeHasGoalies = (homeGoalieStarts || 0) >= goalieStartMinimum;
+    var awayHasGoalies = (awayGoalieStarts || 0) >= goalieStartMinimum;
 
-    (MATCHUP_CATEGORY_RULES || []).forEach(function (rule) {
+    (matchupCategoryRules || []).forEach(function (rule) {
       if (!rule || !rule.field) return;
       var field = rule.field;
 
@@ -531,6 +646,7 @@ var MatchupHandler = (function buildMatchupHandler() {
         goalieStartsMap.get(awayTeamId + "|" + weekId) || 0;
 
       var scores = computeMatchupScore(
+        m.seasonId,
         homeWeek,
         awayWeek,
         homeGoalieStarts,

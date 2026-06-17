@@ -5,7 +5,19 @@ import vm from "node:vm";
 import type { DatabaseRecord } from "@gshl-lib/sheets/config/config";
 
 type LineupBuilderApi = {
-  optimizeLineup: (players: DatabaseRecord[]) => DatabaseRecord[];
+  optimizeLineup: (
+    players: DatabaseRecord[],
+    slots?: ReadonlyArray<{
+      position: string;
+      eligiblePositions: readonly string[];
+    }>,
+  ) => DatabaseRecord[];
+  buildLineupStructureFromRosterSpots?: (
+    rosterSpots: unknown[],
+  ) => ReadonlyArray<{
+    position: string;
+    eligiblePositions: readonly string[];
+  }>;
   findBestLineup: (
     players: DatabaseRecord[],
     skipValidation?: boolean,
@@ -15,6 +27,12 @@ type LineupBuilderApi = {
     }>,
   ) => Record<string, string>;
   internals?: {
+    buildLineupStructureFromRosterSpots?: (
+      rosterSpots: unknown[],
+    ) => ReadonlyArray<{
+      position: string;
+      eligiblePositions: readonly string[];
+    }>;
     isEligibleForPosition?: (
       player: DatabaseRecord,
       eligiblePositions: string[],

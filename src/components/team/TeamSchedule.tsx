@@ -13,7 +13,7 @@
  * @module components/team/TeamSchedule
  */
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Image from "next/image";
 import type {
   TeamScheduleItemProps,
@@ -32,7 +32,70 @@ import {
   formatOpponentDisplay,
 } from "@gshl-utils";
 import { findTeamById } from "@gshl-utils/domain/team";
-import { useTeamScheduleData, useTeams } from "@gshl-hooks";
+import { useSeasons, useTeamScheduleData, useTeams } from "@gshl-hooks";
+
+type MatchupCategoryConfig = {
+  field: keyof TeamWeekStatLine;
+  label: string;
+  isInverse?: boolean;
+  precision?: number;
+};
+
+const MATCHUP_CATEGORY_MAP: Record<string, MatchupCategoryConfig> = {
+  G: { field: "G", label: "G" },
+  A: { field: "A", label: "A" },
+  P: { field: "P", label: "P" },
+  PM: { field: "PM", label: "+/-" },
+  PIM: { field: "PIM", label: "PIM" },
+  PPP: { field: "PPP", label: "PPP" },
+  SOG: { field: "SOG", label: "SOG" },
+  HIT: { field: "HIT", label: "HIT" },
+  BLK: { field: "BLK", label: "BLK" },
+  W: { field: "W", label: "W" },
+  GA: { field: "GA", label: "GA" },
+  GAA: { field: "GAA", label: "GAA", isInverse: true, precision: 2 },
+  SV: { field: "SV", label: "SV" },
+  SA: { field: "SA", label: "SA" },
+  SVP: { field: "SVP", label: "SV%", precision: 3 },
+  SO: { field: "SO", label: "SO" },
+};
+
+const FALLBACK_MATCHUP_CATEGORIES: MatchupCategoryConfig[] = [
+  MATCHUP_CATEGORY_MAP.G,
+  MATCHUP_CATEGORY_MAP.A,
+  MATCHUP_CATEGORY_MAP.P,
+  MATCHUP_CATEGORY_MAP.PPP,
+  MATCHUP_CATEGORY_MAP.SOG,
+  MATCHUP_CATEGORY_MAP.HIT,
+  MATCHUP_CATEGORY_MAP.BLK,
+  MATCHUP_CATEGORY_MAP.W,
+  MATCHUP_CATEGORY_MAP.GAA,
+  MATCHUP_CATEGORY_MAP.SVP,
+];
+
+function normalizeSeasonCategory(category: unknown): string | null {
+  const value = String(category ?? "").trim().toUpperCase();
+  if (!value) return null;
+  if (value === "SV%") return "SVP";
+  return value;
+}
+
+function resolveMatchupCategories(categories: unknown): MatchupCategoryConfig[] {
+  const normalized = Array.isArray(categories)
+    ? categories.map((category) => normalizeSeasonCategory(category))
+    : String(categories ?? "")
+        .split(",")
+        .map((category) => normalizeSeasonCategory(category));
+
+  const resolved = normalized
+    .filter((category): category is string => Boolean(category))
+    .map((category) => MATCHUP_CATEGORY_MAP[category])
+    .filter(
+      (category): category is MatchupCategoryConfig => Boolean(category),
+    );
+
+  return resolved.length > 0 ? resolved : FALLBACK_MATCHUP_CATEGORIES;
+}
 
 // ============================================================================
 // HELPER FUNCTIONS
@@ -69,6 +132,24 @@ function getStatCellClass(won: boolean): string {
  */
 function getScoreCellClass(won: boolean): string {
   return `justify-center py-1 text-center text-lg ${won ? "font-semibold" : "font-light text-gray-400"}`;
+}
+
+function toCategoryNumber(
+  stats: TeamWeekStatLine,
+  category: MatchupCategoryConfig,
+): number {
+  const rawValue = stats[category.field];
+  return Number(rawValue ?? 0);
+}
+
+function formatCategoryValue(
+  stats: TeamWeekStatLine,
+  category: MatchupCategoryConfig,
+): string {
+  const value = toCategoryNumber(stats, category);
+  if (!Number.isFinite(value)) return "0";
+  if (category.precision !== undefined) return value.toFixed(category.precision);
+  return String(value);
 }
 
 // ============================================================================
@@ -174,21 +255,8 @@ function TeamLogoCell({ team }: { team?: GSHLTeam | null }) {
 /**
  * Stat category headers row
  */
-function StatHeadersRow() {
-  const headers = [
-    "",
-    "Score",
-    "G",
-    "A",
-    "P",
-    "PPP",
-    "SOG",
-    "HIT",
-    "BLK",
-    "W",
-    "GAA",
-    "SV%",
-  ];
+function StatHeadersRow({ categories }: { categories: MatchupCategoryConfig[] }) {
+  const headers = ["", "Score", ...categories.map((category) => category.label)];
 
   return (
     <tr className="rounded-lg bg-gray-100 text-gray-600">
@@ -214,6 +282,7 @@ interface TeamStatsRowProps {
   opponentStats: TeamWeekStatLine;
   teamScore: number | null;
   opponentScore: number | null;
+  categories: MatchupCategoryConfig[];
 }
 
 function TeamStatsRow({
@@ -222,56 +291,29 @@ function TeamStatsRow({
   opponentStats,
   teamScore,
   opponentScore,
+  categories,
 }: TeamStatsRowProps) {
   const scoreWon = Number(teamScore) > Number(opponentScore);
-  const gWon = didWinCategory(Number(teamStats.G), Number(opponentStats.G));
-  const aWon = didWinCategory(Number(teamStats.A), Number(opponentStats.A));
-  const pWon = didWinCategory(Number(teamStats.P), Number(opponentStats.P));
-  const pppWon = didWinCategory(
-    Number(teamStats.PPP),
-    Number(opponentStats.PPP),
-  );
-  const sogWon = didWinCategory(
-    Number(teamStats.SOG),
-    Number(opponentStats.SOG),
-  );
-  const hitWon = didWinCategory(
-    Number(teamStats.HIT),
-    Number(opponentStats.HIT),
-  );
-  const blkWon = didWinCategory(
-    Number(teamStats.BLK),
-    Number(opponentStats.BLK),
-  );
-  const wWon = didWinCategory(Number(teamStats.W), Number(opponentStats.W));
-  const gaaWon = didWinCategory(
-    Number(teamStats.GAA),
-    Number(opponentStats.GAA),
-    true,
-  );
-  const svpWon = didWinCategory(
-    Number(teamStats.SVP),
-    Number(opponentStats.SVP),
-  );
+  const categoryStates = categories.map((category) => {
+    const teamValue = toCategoryNumber(teamStats, category);
+    const opponentValue = toCategoryNumber(opponentStats, category);
+    const won = didWinCategory(teamValue, opponentValue, category.isInverse);
+    return {
+      key: String(category.field),
+      won,
+      display: formatCategoryValue(teamStats, category),
+    };
+  });
 
   return (
     <tr>
       <TeamLogoCell team={team} />
       <td className={getScoreCellClass(scoreWon)}>{teamScore}</td>
-      <td className={getStatCellClass(gWon)}>{teamStats.G}</td>
-      <td className={getStatCellClass(aWon)}>{teamStats.A}</td>
-      <td className={getStatCellClass(pWon)}>{teamStats.P}</td>
-      <td className={getStatCellClass(pppWon)}>{teamStats.PPP}</td>
-      <td className={getStatCellClass(sogWon)}>{teamStats.SOG}</td>
-      <td className={getStatCellClass(hitWon)}>{teamStats.HIT}</td>
-      <td className={getStatCellClass(blkWon)}>{teamStats.BLK}</td>
-      <td className={getStatCellClass(wWon)}>{teamStats.W}</td>
-      <td className={getStatCellClass(gaaWon)}>
-        {Number(teamStats.GAA).toFixed(2)}
-      </td>
-      <td className={getStatCellClass(svpWon)}>
-        {Number(teamStats.SVP).toFixed(3)}
-      </td>
+      {categoryStates.map((categoryState) => (
+        <td key={categoryState.key} className={getStatCellClass(categoryState.won)}>
+          {categoryState.display}
+        </td>
+      ))}
     </tr>
   );
 }
@@ -287,6 +329,7 @@ interface MatchupStatsTableProps {
   opponentTeam: GSHLTeam | null;
   opponentStats: TeamWeekStatLine;
   opponentScore: number | null;
+  categories: MatchupCategoryConfig[];
 }
 
 function MatchupStatsTable({
@@ -296,6 +339,7 @@ function MatchupStatsTable({
   opponentTeam,
   opponentStats,
   opponentScore,
+  categories,
 }: MatchupStatsTableProps) {
   return (
     <div className="mx-auto w-5/6 py-1.5">
@@ -308,10 +352,11 @@ function MatchupStatsTable({
             opponentStats={opponentStats}
             teamScore={selectedTeamScore}
             opponentScore={opponentScore}
+            categories={categories}
           />
 
           {/* Header Row */}
-          <StatHeadersRow />
+          <StatHeadersRow categories={categories} />
 
           {/* Opponent Team Row (always on bottom) */}
           <TeamStatsRow
@@ -320,6 +365,7 @@ function MatchupStatsTable({
             opponentStats={selectedTeamStats}
             teamScore={opponentScore}
             opponentScore={selectedTeamScore}
+            categories={categories}
           />
         </tbody>
       </table>
@@ -337,6 +383,7 @@ function TeamScheduleItem({
   week,
   teams,
   selectedTeamId,
+  categories,
 }: TeamScheduleItemProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const homeTeam = findTeamById(teams, matchup.homeTeamId);
@@ -430,6 +477,7 @@ function TeamScheduleItem({
               opponentTeam={opponentTeam ?? null}
               opponentStats={opponentStats}
               opponentScore={opponentScore ?? null}
+              categories={categories}
             />
           )}
         </>
@@ -468,7 +516,17 @@ function TeamScheduleItem({
  * ```
  */
 export function TeamSchedule() {
-  const { selectedTeam, matchups, teams } = useTeamScheduleData();
+  const { selectedTeam, selectedSeasonId, matchups, teams } =
+    useTeamScheduleData();
+  const { data: selectedSeasonData = [] } = useSeasons({
+    seasonId: selectedSeasonId,
+    enabled: Boolean(selectedSeasonId),
+  });
+  const selectedSeason = selectedSeasonData[0] ?? null;
+  const matchupCategories = useMemo(
+    () => resolveMatchupCategories(selectedSeason?.categories),
+    [selectedSeason?.categories],
+  );
 
   if (!selectedTeam) {
     return (
@@ -491,6 +549,7 @@ export function TeamSchedule() {
               week={week}
               teams={teams}
               selectedTeamId={selectedTeam.id}
+              categories={matchupCategories}
             />
           ))}
       </div>
