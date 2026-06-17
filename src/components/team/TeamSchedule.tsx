@@ -71,9 +71,11 @@ const FALLBACK_MATCHUP_CATEGORIES: MatchupCategoryConfig[] = [
 ];
 
 function normalizeSeasonCategory(category: unknown): string | null {
-  const value = String(category ?? "")
-    .trim()
-    .toUpperCase();
+  if (typeof category !== "string" && typeof category !== "number") {
+    return null;
+  }
+
+  const value = `${category}`.trim().toUpperCase();
   if (!value) return null;
   if (value === "SV%") return "SVP";
   return value;
@@ -84,9 +86,11 @@ function resolveMatchupCategories(
 ): MatchupCategoryConfig[] {
   const normalized = Array.isArray(categories)
     ? categories.map((category) => normalizeSeasonCategory(category))
-    : String(categories ?? "")
-        .split(",")
-        .map((category) => normalizeSeasonCategory(category));
+    : typeof categories === "string" || typeof categories === "number"
+      ? `${categories}`
+          .split(",")
+          .map((category) => normalizeSeasonCategory(category))
+      : [];
 
   const resolved = normalized
     .filter((category): category is string => Boolean(category))
