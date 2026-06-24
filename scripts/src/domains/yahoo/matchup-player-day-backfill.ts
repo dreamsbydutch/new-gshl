@@ -136,26 +136,35 @@ export type YahooMatchupBackfillSeasonSummary = {
 const PLAYER_DAY_MODEL = "PlayerDayStatLine";
 const PLAYER_DAY_SHEET = SHEETS_CONFIG.SHEETS.PlayerDayStatLine;
 const PLAYER_DAY_COLUMNS = SHEETS_CONFIG.COLUMNS.PlayerDayStatLine;
-const SUPPORTED_SKATER_FIELDS = ["G", "A", "P", "PPP", "SOG", "HIT", "BLK"] as const;
+const SUPPORTED_SKATER_FIELDS = [
+  "G",
+  "A",
+  "P",
+  "PPP",
+  "SOG",
+  "HIT",
+  "BLK",
+] as const;
 const SUPPORTED_GOALIE_FIELDS = ["W", "GAA", "SVP"] as const;
-const YAHOO_HEADER_TO_TEAM_WEEK_FIELD: Record<string, keyof TeamWeekStatLine> = {
-  G: "G",
-  A: "A",
-  P: "P",
-  "+/-": "PM",
-  PIM: "PIM",
-  PPP: "PPP",
-  SOG: "SOG",
-  HIT: "HIT",
-  BLK: "BLK",
-  W: "W",
-  "GA*": "GA",
-  GAA: "GAA",
-  SV: "SV",
-  "SA*": "SA",
-  "SV%": "SVP",
-  SHO: "SO",
-};
+const YAHOO_HEADER_TO_TEAM_WEEK_FIELD: Record<string, keyof TeamWeekStatLine> =
+  {
+    G: "G",
+    A: "A",
+    P: "P",
+    "+/-": "PM",
+    PIM: "PIM",
+    PPP: "PPP",
+    SOG: "SOG",
+    HIT: "HIT",
+    BLK: "BLK",
+    W: "W",
+    "GA*": "GA",
+    GAA: "GAA",
+    SV: "SV",
+    "SA*": "SA",
+    "SV%": "SVP",
+    SHO: "SO",
+  };
 
 function formatProgressPrefix(scope: string): string {
   return `[yahoo-matchup-backfill] ${scope}`;
@@ -308,7 +317,10 @@ function resolveSideAssignmentFromYahooTeamTable(params: {
     return null;
   }
 
-  if (leftYahooTeamId === homeYahooTeamId && rightYahooTeamId === awayYahooTeamId) {
+  if (
+    leftYahooTeamId === homeYahooTeamId &&
+    rightYahooTeamId === awayYahooTeamId
+  ) {
     return {
       leftTeam: homeTeam,
       rightTeam: awayTeam,
@@ -319,7 +331,10 @@ function resolveSideAssignmentFromYahooTeamTable(params: {
     };
   }
 
-  if (leftYahooTeamId === awayYahooTeamId && rightYahooTeamId === homeYahooTeamId) {
+  if (
+    leftYahooTeamId === awayYahooTeamId &&
+    rightYahooTeamId === homeYahooTeamId
+  ) {
     return {
       leftTeam: awayTeam,
       rightTeam: homeTeam,
@@ -386,7 +401,12 @@ function resolveWeekForDate(weeks: Week[], date: string): Week | undefined {
   return weeks.find((week) => {
     const startDate = normalizeDateKey(week.startDate);
     const endDate = normalizeDateKey(week.endDate);
-    return !!startDate && !!endDate && startDate <= targetDate && targetDate <= endDate;
+    return (
+      !!startDate &&
+      !!endDate &&
+      startDate <= targetDate &&
+      targetDate <= endDate
+    );
   });
 }
 
@@ -417,10 +437,14 @@ function buildTargetDatesForWeek(
 
 function getIdentityKeysForPlayer(player: Player): string[] {
   return [
-    ...new Set([
-      normalizeYahooMatchupPlayerName(player.fullName),
-      normalizeYahooMatchupPlayerName(`${player.firstName} ${player.lastName}`),
-    ].filter(Boolean)),
+    ...new Set(
+      [
+        normalizeYahooMatchupPlayerName(player.fullName),
+        normalizeYahooMatchupPlayerName(
+          `${player.firstName} ${player.lastName}`,
+        ),
+      ].filter(Boolean),
+    ),
   ];
 }
 
@@ -441,7 +465,9 @@ function sameExistingPlayer(
       ),
     ].filter(Boolean),
   );
-  return getIdentityKeysForPlayer(existingPlayer).some((key) => rowKeys.has(key));
+  return getIdentityKeysForPlayer(existingPlayer).some((key) =>
+    rowKeys.has(key),
+  );
 }
 
 function buildFallbackPlayerId(playerName: unknown): string {
@@ -495,10 +521,7 @@ function sameExistingRow(
   yahooRow: YahooDailyMatchupPlayerRow,
   resolvedPlayerId: string,
 ): boolean {
-  if (
-    existingPlayer &&
-    sameExistingPlayer(existingPlayer, yahooRow)
-  ) {
+  if (existingPlayer && sameExistingPlayer(existingPlayer, yahooRow)) {
     return true;
   }
 
@@ -508,7 +531,11 @@ function sameExistingRow(
   }
 
   const fallbackPlayerId = buildFallbackPlayerId(yahooRow.playerName);
-  if (existingPlayerId && fallbackPlayerId && existingPlayerId === fallbackPlayerId) {
+  if (
+    existingPlayerId &&
+    fallbackPlayerId &&
+    existingPlayerId === fallbackPlayerId
+  ) {
     return true;
   }
 
@@ -523,9 +550,7 @@ function buildDailyUpdatePayload(
   existing?: PlayerDayStatLine,
 ): Partial<PlayerDayStatLine> {
   const resolvedDailyPos =
-    source.dailyPos ||
-    toTrimmedString(existing?.dailyPos) ||
-    "BN";
+    source.dailyPos || toTrimmedString(existing?.dailyPos) || "BN";
   const next: Partial<PlayerDayStatLine> = {
     dailyPos: resolvedDailyPos as PlayerDayStatLine["dailyPos"],
   };
@@ -539,7 +564,8 @@ function hasSupportedDiff(
 ): boolean {
   const fields = Object.keys(next) as Array<keyof PlayerDayStatLine>;
   return fields.some(
-    (field) => toTrimmedString(existing[field]) !== toTrimmedString(next[field]),
+    (field) =>
+      toTrimmedString(existing[field]) !== toTrimmedString(next[field]),
   );
 }
 
@@ -554,8 +580,17 @@ function buildCreatedPlayerDayRow(params: {
   now: Date;
   existing?: PlayerDayStatLine;
 }): PlayerDayStatLine {
-  const { seasonId, weekId, date, teamId, player, playerId, yahoo, now, existing } =
-    params;
+  const {
+    seasonId,
+    weekId,
+    date,
+    teamId,
+    player,
+    playerId,
+    yahoo,
+    now,
+    existing,
+  } = params;
   const basePayload = buildDailyUpdatePayload(yahoo, existing);
 
   return {
@@ -565,9 +600,15 @@ function buildCreatedPlayerDayRow(params: {
     playerId,
     weekId,
     date: normalizeDateKey(date),
-    nhlPos: player ? (Array.isArray(player.nhlPos) ? player.nhlPos : []) : inferFallbackNhlPos(yahoo, existing),
+    nhlPos: player
+      ? Array.isArray(player.nhlPos)
+        ? player.nhlPos
+        : []
+      : inferFallbackNhlPos(yahoo, existing),
     posGroup: player?.posGroup ?? inferFallbackPosGroup(yahoo, existing),
-    nhlTeam: player ? toTrimmedString(player.nhlTeam) : toTrimmedString(existing?.nhlTeam),
+    nhlTeam: player
+      ? toTrimmedString(player.nhlTeam)
+      : toTrimmedString(existing?.nhlTeam),
     dailyPos: (basePayload.dailyPos ?? "BN") as PlayerDayStatLine["dailyPos"],
     bestPos: (existing?.bestPos ?? "") as PlayerDayStatLine["bestPos"],
     fullPos: (existing?.fullPos ?? "") as PlayerDayStatLine["fullPos"],
@@ -607,9 +648,7 @@ function buildCreatedPlayerDayRow(params: {
 function sortExistingRowsForDeterministicMatching(
   rows: LoadedPlayerDayRow[],
 ): LoadedPlayerDayRow[] {
-  return rows
-    .slice()
-    .sort((left, right) => left.rowNumber - right.rowNumber);
+  return rows.slice().sort((left, right) => left.rowNumber - right.rowNumber);
 }
 
 function reconcileTeamDate(params: {
@@ -649,7 +688,8 @@ function reconcileTeamDate(params: {
   const flags: InvestigationFlag[] = [];
   const now = new Date();
   const claimedRowNumbers = new Set<number>();
-  const sortedExistingRows = sortExistingRowsForDeterministicMatching(existingRows);
+  const sortedExistingRows =
+    sortExistingRowsForDeterministicMatching(existingRows);
   const exactByPlayerId = new Map<string, LoadedPlayerDayRow>();
   const createdByPlayerId = new Map<string, PlayerDayStatLine>();
 
@@ -784,7 +824,10 @@ function reconcileTeamDate(params: {
       continue;
     }
 
-    const nextPayload = buildDailyUpdatePayload(yahooRow, matchedExisting.record);
+    const nextPayload = buildDailyUpdatePayload(
+      yahooRow,
+      matchedExisting.record,
+    );
     if (hasSupportedDiff(matchedExisting.record, nextPayload)) {
       updates.push({
         rowNumber: matchedExisting.rowNumber,
@@ -962,7 +1005,10 @@ async function reconcileMatchupDate(params: {
     logProgress?.(
       `${formatProgressPrefix(taskLabel)} matched matchup sides from Yahoo team table; assigning left rows to team ${toTrimmedString(sideAssignment.leftTeam.id)} and right rows to team ${toTrimmedString(sideAssignment.rightTeam.id)}`,
     );
-  } else if (sideAssignment.source === "team-week-stats" && sideAssignment.swapped) {
+  } else if (
+    sideAssignment.source === "team-week-stats" &&
+    sideAssignment.swapped
+  ) {
     logProgress?.(
       `${formatProgressPrefix(taskLabel)} detected swapped matchup sides from Yahoo totals; assigning left rows to team ${toTrimmedString(sideAssignment.leftTeam.id)} and right rows to team ${toTrimmedString(sideAssignment.rightTeam.id)} (defaultScore=${sideAssignment.scoreDefault.toFixed(3)} swappedScore=${sideAssignment.scoreSwapped.toFixed(3)})`,
     );
@@ -985,7 +1031,10 @@ async function reconcileMatchupDate(params: {
     playersByNormalizedName,
     existingRows:
       existingByTeamDate.get(
-        buildTeamDateKey(toTrimmedString(sideAssignment.leftTeam.id), normalizedDate),
+        buildTeamDateKey(
+          toTrimmedString(sideAssignment.leftTeam.id),
+          normalizedDate,
+        ),
       ) ?? [],
     logProgress,
   });
@@ -1002,7 +1051,10 @@ async function reconcileMatchupDate(params: {
     playersByNormalizedName,
     existingRows:
       existingByTeamDate.get(
-        buildTeamDateKey(toTrimmedString(sideAssignment.rightTeam.id), normalizedDate),
+        buildTeamDateKey(
+          toTrimmedString(sideAssignment.rightTeam.id),
+          normalizedDate,
+        ),
       ) ?? [],
     logProgress,
   });
@@ -1046,9 +1098,7 @@ async function applySeasonWrites(params: {
   if (rowsToWrite.length > 0) {
     await minimalSheetsWriter.upsertByCompositeKey(
       PLAYER_DAY_MODEL,
-      getCompositeKeyColumnsForModel(
-        PLAYER_DAY_MODEL as CompositeKeyModelName,
-      ),
+      getCompositeKeyColumnsForModel(PLAYER_DAY_MODEL as CompositeKeyModelName),
       rowsToWrite,
       {
         merge: true,
@@ -1144,14 +1194,22 @@ export async function runYahooMatchupPlayerDayBackfill(
   const logProgress: ProgressLogger | undefined = options.logToConsole
     ? (message) => console.log(message)
     : undefined;
-  const [seasons, weeks, teams, matchups, players, teamWeekRows] = (await Promise.all([
-    fastSheetsReader.fetchModel<DatabaseRecord>("Season"),
-    fastSheetsReader.fetchModel<DatabaseRecord>("Week"),
-    fastSheetsReader.fetchModel<DatabaseRecord>("Team"),
-    fastSheetsReader.fetchModel<DatabaseRecord>("Matchup"),
-    fastSheetsReader.fetchModel<DatabaseRecord>("Player"),
-    fastSheetsReader.fetchModel<DatabaseRecord>("TeamWeekStatLine"),
-  ])) as unknown as [Season[], Week[], Team[], Matchup[], Player[], TeamWeekStatLine[]];
+  const [seasons, weeks, teams, matchups, players, teamWeekRows] =
+    (await Promise.all([
+      fastSheetsReader.fetchModel<DatabaseRecord>("Season"),
+      fastSheetsReader.fetchModel<DatabaseRecord>("Week"),
+      fastSheetsReader.fetchModel<DatabaseRecord>("Team"),
+      fastSheetsReader.fetchModel<DatabaseRecord>("Matchup"),
+      fastSheetsReader.fetchModel<DatabaseRecord>("Player"),
+      fastSheetsReader.fetchModel<DatabaseRecord>("TeamWeekStatLine"),
+    ])) as unknown as [
+      Season[],
+      Week[],
+      Team[],
+      Matchup[],
+      Player[],
+      TeamWeekStatLine[],
+    ];
 
   const playersById = new Map(
     players.map((player) => [toTrimmedString(player.id), player] as const),
@@ -1165,19 +1223,25 @@ export async function runYahooMatchupPlayerDayBackfill(
   }
   const playersByNormalizedName = buildPlayersByNormalizedName(players);
   const teamWeekByKey = new Map(
-    teamWeekRows.map((row) => [
-      buildTeamWeekKey(
-        toTrimmedString(row.gshlTeamId),
-        toTrimmedString(row.weekId),
-      ),
-      row,
-    ] as const),
+    teamWeekRows.map(
+      (row) =>
+        [
+          buildTeamWeekKey(
+            toTrimmedString(row.gshlTeamId),
+            toTrimmedString(row.weekId),
+          ),
+          row,
+        ] as const,
+    ),
   );
 
   const selectedWeeks = options.weekIds.length
     ? weeks.filter((week) => options.weekIds.includes(toTrimmedString(week.id)))
     : [];
-  if (options.weekIds.length > 0 && selectedWeeks.length !== options.weekIds.length) {
+  if (
+    options.weekIds.length > 0 &&
+    selectedWeeks.length !== options.weekIds.length
+  ) {
     const selectedWeekIdSet = new Set(
       selectedWeeks.map((week) => toTrimmedString(week.id)),
     );
@@ -1214,7 +1278,9 @@ export async function runYahooMatchupPlayerDayBackfill(
     );
     const season = seasons.find((row) => toTrimmedString(row.id) === seasonId);
     if (!season) {
-      throw new Error(`[yahoo-matchup-backfill] Season ${seasonId} was not found.`);
+      throw new Error(
+        `[yahoo-matchup-backfill] Season ${seasonId} was not found.`,
+      );
     }
 
     const seasonWeeks = weeks.filter(
@@ -1234,7 +1300,9 @@ export async function runYahooMatchupPlayerDayBackfill(
         `[yahoo-matchup-backfill] No Week rows matched --weekNum/--weekNums for season ${seasonId}: ${options.weekNums.join(", ")}.`,
       );
     }
-    const targetWeekIdSet = new Set(targetWeeks.map((week) => toTrimmedString(week.id)));
+    const targetWeekIdSet = new Set(
+      targetWeeks.map((week) => toTrimmedString(week.id)),
+    );
     const seasonTeams = teams.filter(
       (team) => toTrimmedString(team.seasonId) === seasonId,
     );
@@ -1289,12 +1357,15 @@ export async function runYahooMatchupPlayerDayBackfill(
 
     const loadedRows = await loadPlayerDayRowsWithNumbers(seasonId);
     const existingByTeamDate = buildExistingByTeamDate(
-      loadedRows.filter((row) => targetWeekIdSet.has(toTrimmedString(row.record.weekId))),
+      loadedRows.filter((row) =>
+        targetWeekIdSet.has(toTrimmedString(row.record.weekId)),
+      ),
     );
     const limiter = pLimit(options.concurrency);
     const matchupDateTasks = seasonMatchups.flatMap((matchup) => {
       const week = targetWeeks.find(
-        (entry) => toTrimmedString(entry.id) === toTrimmedString(matchup.weekId),
+        (entry) =>
+          toTrimmedString(entry.id) === toTrimmedString(matchup.weekId),
       );
       if (!week) return [];
       const homeTeam = teamById.get(toTrimmedString(matchup.homeTeamId));
@@ -1318,30 +1389,30 @@ export async function runYahooMatchupPlayerDayBackfill(
     const tasks = matchupDateTasks.map((task, index) => {
       const taskLabel = `season ${seasonId} ${index + 1}/${matchupDateTasks.length} ${normalizeDateKey(task.date)} matchup ${toTrimmedString(task.matchup.id)}`;
       return limiter(() =>
-          reconcileMatchupDate({
-            season,
-            week: resolveWeekForDate(targetWeeks, task.date),
-            matchup: task.matchup,
-            homeTeam: task.homeTeam,
-            awayTeam: task.awayTeam,
-            teamWeekByKey,
-            date: task.date,
-            requestDelayMs: options.requestDelayMs,
-            players,
-            playersById,
-            playersByYahooId,
-            playersByNormalizedName,
-            existingByTeamDate,
-            taskLabel,
-            logProgress,
-          }).then((result) => {
-            completedTaskCount += 1;
-            logProgress?.(
-              `${formatProgressPrefix(taskLabel)} complete (${completedTaskCount}/${matchupDateTasks.length} done)`,
-            );
-            return result;
-          }),
-        );
+        reconcileMatchupDate({
+          season,
+          week: resolveWeekForDate(targetWeeks, task.date),
+          matchup: task.matchup,
+          homeTeam: task.homeTeam,
+          awayTeam: task.awayTeam,
+          teamWeekByKey,
+          date: task.date,
+          requestDelayMs: options.requestDelayMs,
+          players,
+          playersById,
+          playersByYahooId,
+          playersByNormalizedName,
+          existingByTeamDate,
+          taskLabel,
+          logProgress,
+        }).then((result) => {
+          completedTaskCount += 1;
+          logProgress?.(
+            `${formatProgressPrefix(taskLabel)} complete (${completedTaskCount}/${matchupDateTasks.length} done)`,
+          );
+          return result;
+        }),
+      );
     });
 
     const results = await Promise.all(tasks);
@@ -1353,7 +1424,9 @@ export async function runYahooMatchupPlayerDayBackfill(
       (sum, result) => sum + result.matchedYahooRows,
       0,
     );
-    const pageScannedCount = results.filter((result) => result.pageScanned).length;
+    const pageScannedCount = results.filter(
+      (result) => result.pageScanned,
+    ).length;
     const deletedRows = deletes.length;
     const updatedRows = updates.length;
     const createdRows = creates.length;
@@ -1378,7 +1451,8 @@ export async function runYahooMatchupPlayerDayBackfill(
       datesScanned: new Set(
         seasonMatchups.flatMap((matchup) => {
           const week = targetWeeks.find(
-            (entry) => toTrimmedString(entry.id) === toTrimmedString(matchup.weekId),
+            (entry) =>
+              toTrimmedString(entry.id) === toTrimmedString(matchup.weekId),
           );
           return week ? buildTargetDatesForWeek(week, options) : [];
         }),
