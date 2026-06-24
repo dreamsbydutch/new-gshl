@@ -61,6 +61,7 @@ type YahooMatchupBackfillOptions = {
   endDate?: string;
   teamIds: string[];
   matchupIds: string[];
+  includeLt: boolean;
   concurrency: number;
   requestDelayMs: number;
   logToConsole: boolean;
@@ -650,6 +651,7 @@ function reconcileTeamDate(params: {
   const claimedRowNumbers = new Set<number>();
   const sortedExistingRows = sortExistingRowsForDeterministicMatching(existingRows);
   const exactByPlayerId = new Map<string, LoadedPlayerDayRow>();
+  const createdByPlayerId = new Map<string, PlayerDayStatLine>();
 
   for (const existing of sortedExistingRows) {
     const playerId = toTrimmedString(existing.record.playerId);
@@ -732,6 +734,21 @@ function reconcileTeamDate(params: {
     }
 
     if (!matchedExisting) {
+      const alreadyCreated = createdByPlayerId.get(resolvedPlayerId);
+      if (!alreadyCreated) {
+        const createdRow = buildCreatedPlayerDayRow({
+          seasonId,
+          weekId,
+          date: normalizedDate,
+          teamId,
+          player,
+          playerId: resolvedPlayerId,
+          yahoo: yahooRow,
+          now,
+        });
+        creates.push(createdRow);
+        createdByPlayerId.set(resolvedPlayerId, createdRow);
+      }
       flags.push({
         kind: "created-player-day-row",
         seasonId,
@@ -743,7 +760,7 @@ function reconcileTeamDate(params: {
         playerId: resolvedPlayerId,
         yahooId: toTrimmedString(yahooRow.yahooId),
         playerName: yahooRow.playerName,
-        details: `No PlayerDayStatLine row existed for team ${teamId}, player ${resolvedPlayerId}, date ${normalizedDate}; flagged only because Yahoo matchup backfill is position-only.`,
+        details: `Created PlayerDayStatLine row for team ${teamId}, player ${resolvedPlayerId}, date ${normalizedDate} from Yahoo matchup backfill.`,
       });
       continue;
     }
@@ -1007,16 +1024,18 @@ async function reconcileMatchupDate(params: {
 async function applySeasonWrites(params: {
   seasonId: string;
   updates: LoadedPlayerDayRow[];
+  creates: PlayerDayStatLine[];
   logProgress?: ProgressLogger;
 }): Promise<void> {
-  const { seasonId, updates, logProgress } = params;
+  const { seasonId, updates, creates, logProgress } = params;
   const spreadsheetId = getPlayerDayWorkbookId(seasonId);
-  const rowsToWrite = updates.map(
-    (update) => update.record as unknown as DatabaseRecord,
-  );
+  const rowsToWrite = [
+    ...updates.map((update) => update.record as unknown as DatabaseRecord),
+    ...creates.map((create) => create as unknown as DatabaseRecord),
+  ];
 
   logProgress?.(
-    `${formatProgressPrefix(`season ${seasonId}`)} preparing writes: updates=${updates.length}`,
+    `${formatProgressPrefix(`season ${seasonId}`)} preparing writes: updates=${updates.length}, creates=${creates.length}`,
   );
   if (rowsToWrite.length > 0) {
     logProgress?.(
@@ -1103,6 +1122,7 @@ export function parseYahooMatchupBackfillOptions(
     endDate,
     teamIds: parseCsvList(getArgValue(args, "--teamIds")),
     matchupIds: parseCsvList(getArgValue(args, "--matchupIds")),
+    includeLt: hasFlag(args, "--include-lt") || hasFlag(args, "--includeLt"),
     concurrency: parsePositiveInteger(getArgValue(args, "--concurrency"), 1),
     requestDelayMs: parsePositiveInteger(
       getArgValue(args, "--requestDelayMs"),
@@ -1221,7 +1241,7 @@ export async function runYahooMatchupPlayerDayBackfill(
     const teamById = new Map(
       seasonTeams.map((team) => [toTrimmedString(team.id), team] as const),
     );
-    const seasonMatchups = matchups.filter((matchup) => {
+    const requestedSeasonMatchups = matchups.filter((matchup) => {
       if (toTrimmedString(matchup.seasonId) !== seasonId) return false;
       if (!targetWeekIdSet.has(toTrimmedString(matchup.weekId))) return false;
       if (
@@ -1230,13 +1250,42 @@ export async function runYahooMatchupPlayerDayBackfill(
       ) {
         return false;
       }
-      if (toTrimmedString(matchup.gameType) === LT_MATCHUP_TYPE) return false;
       if (!options.teamIds.length) return true;
       return (
         options.teamIds.includes(toTrimmedString(matchup.homeTeamId)) ||
         options.teamIds.includes(toTrimmedString(matchup.awayTeamId))
       );
     });
+    if (options.matchupIds.length > 0) {
+      const matchedRequestedIds = new Set(
+        requestedSeasonMatchups.map((matchup) => toTrimmedString(matchup.id)),
+      );
+      const missingMatchupIds = options.matchupIds.filter(
+        (matchupId) => !matchedRequestedIds.has(matchupId),
+      );
+      if (missingMatchupIds.length > 0) {
+        throw new Error(
+          `[yahoo-matchup-backfill] Requested matchup ids were not found in season ${seasonId} for the selected week scope: ${missingMatchupIds.join(", ")}.`,
+        );
+      }
+    }
+    const ltFilteredMatchupIds = !options.includeLt
+      ? requestedSeasonMatchups
+          .filter(
+            (matchup) => toTrimmedString(matchup.gameType) === LT_MATCHUP_TYPE,
+          )
+          .map((matchup) => toTrimmedString(matchup.id))
+      : [];
+    if (ltFilteredMatchupIds.length > 0) {
+      throw new Error(
+        `[yahoo-matchup-backfill] Requested matchup ids are LT matchups and are excluded by default: ${ltFilteredMatchupIds.join(", ")}. Re-run with --include-lt to backfill them intentionally.`,
+      );
+    }
+    const seasonMatchups = requestedSeasonMatchups.filter(
+      (matchup) =>
+        options.includeLt ||
+        toTrimmedString(matchup.gameType) !== LT_MATCHUP_TYPE,
+    );
 
     const loadedRows = await loadPlayerDayRowsWithNumbers(seasonId);
     const existingByTeamDate = buildExistingByTeamDate(
@@ -1314,6 +1363,7 @@ export async function runYahooMatchupPlayerDayBackfill(
       await applySeasonWrites({
         seasonId,
         updates,
+        creates,
         logProgress,
       });
     }

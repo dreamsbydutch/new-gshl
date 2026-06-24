@@ -149,10 +149,12 @@ var GshlUtils = (function buildGshlUtilsNamespace() {
     { field: "BLK", higherBetter: true },
     { field: "W", higherBetter: true },
     { field: "GAA", higherBetter: false },
+    { field: "SV", higherBetter: true },
     { field: "SVP", higherBetter: true },
+    { field: "SO", higherBetter: true },
   ];
 
-  var GOALIE_CATEGORY_SET = new Set(["W", "GAA", "SVP"]);
+  var GOALIE_CATEGORY_SET = new Set(["W", "GAA", "SV", "SVP", "SO"]);
   var GOALIE_START_MINIMUM = 2;
 
   var PLAYER_DAY_STAT_FIELDS = [
@@ -347,8 +349,14 @@ var GshlUtils = (function buildGshlUtilsNamespace() {
   }
 
   function resolveActiveSeasonId(targetDate, callerName) {
-    var season = resolveActiveSeasonRow(targetDate, callerName || "resolveActiveSeasonId");
-    return normalizeSeasonId(season && season.id, callerName || "resolveActiveSeasonId");
+    var season = resolveActiveSeasonRow(
+      targetDate,
+      callerName || "resolveActiveSeasonId",
+    );
+    return normalizeSeasonId(
+      season && season.id,
+      callerName || "resolveActiveSeasonId",
+    );
   }
 
   /**
@@ -1159,7 +1167,6 @@ var GshlUtils = (function buildGshlUtilsNamespace() {
         // Mark row for deletion (store 1-based row index)
         rowsToDelete.push(dr + 2);
       }
-
     }
 
     // Delete rows in reverse order to maintain correct indices
@@ -1326,7 +1333,9 @@ var GshlUtils = (function buildGshlUtilsNamespace() {
       /<option\b[^>]*\bselected(?:=["'][^"']*["'])?[^>]*>([\s\S]*?)<\/option>/i,
     );
     if (selectedOptionMatch) {
-      var selectedText = normalizeYahooLineupSlot(cleanText(selectedOptionMatch[1]));
+      var selectedText = normalizeYahooLineupSlot(
+        cleanText(selectedOptionMatch[1]),
+      );
       if (selectedText) return selectedText;
 
       var selectedValueMatch = selectedOptionMatch[0].match(
@@ -1355,8 +1364,12 @@ var GshlUtils = (function buildGshlUtilsNamespace() {
     var directPos = normalizeYahooLineupSlot(visibleText);
     if (directPos) return directPos;
 
-    var allowedTokenMatch = visibleText.match(/\b(IR\+|IL\+|Util|BN|IR|IL|LW|RW|C|D|G)\b/i);
-    return allowedTokenMatch ? normalizeYahooLineupSlot(allowedTokenMatch[1]) : "";
+    var allowedTokenMatch = visibleText.match(
+      /\b(IR\+|IL\+|Util|BN|IR|IL|LW|RW|C|D|G)\b/i,
+    );
+    return allowedTokenMatch
+      ? normalizeYahooLineupSlot(allowedTokenMatch[1])
+      : "";
   }
 
   /**
@@ -1931,7 +1944,9 @@ var GshlUtils = (function buildGshlUtilsNamespace() {
     return text
       .split(/[,\//|;]+/)
       .map(function (entry) {
-        return String(entry).replace(/^['"]+|['"]+$/g, "").trim();
+        return String(entry)
+          .replace(/^['"]+|['"]+$/g, "")
+          .trim();
       })
       .filter(Boolean)
       .join(",");

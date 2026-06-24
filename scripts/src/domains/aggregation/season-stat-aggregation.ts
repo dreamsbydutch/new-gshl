@@ -300,10 +300,7 @@ function toBoolean(value: unknown, fallback: boolean): boolean {
 function getNpmConfigEnvKey(flagName: string): string | null {
   const normalized = toTrimmedString(flagName);
   if (!normalized.startsWith("--")) return null;
-  const configName = normalized
-    .slice(2)
-    .replace(/-/g, "_")
-    .trim();
+  const configName = normalized.slice(2).replace(/-/g, "_").trim();
   return configName ? `npm_config_${configName}` : null;
 }
 
@@ -478,7 +475,7 @@ function formatRoundedFixed(value: unknown, decimals: number): string {
 
 function normalizeAggregateFieldValue(field: string, value: unknown): unknown {
   if (value === null || value === undefined || value === "") {
-    return value === "" ? "" : value ?? "";
+    return value === "" ? "" : (value ?? "");
   }
   if (field === "GAA" || field === "SVP") {
     return formatRoundedFixed(value, 5);
@@ -625,7 +622,11 @@ function preferNonEmpty(current: unknown, candidate: unknown): string {
 }
 
 function hasNumericPlayerDayValue(value: unknown): boolean {
-  return !(value === null || value === undefined || toTrimmedString(value) === "");
+  return !(
+    value === null ||
+    value === undefined ||
+    toTrimmedString(value) === ""
+  );
 }
 
 function formatPlayerDayFieldValue(value: unknown): string {
@@ -981,22 +982,30 @@ function buildPlayerSplitsAndTotals(
 
   const splits = Array.from(splitMap.entries()).map(([key, rows]) => {
     const [playerId, gshlTeamId, seasonType] = key.split("|");
-    return buildPlayerAggregate(rows, {
-      playerId: playerId ?? "",
-      gshlTeamId: gshlTeamId ?? "",
-      seasonId,
-      seasonType: seasonType ?? SeasonType.REGULAR_SEASON,
-    }, fieldConfig);
+    return buildPlayerAggregate(
+      rows,
+      {
+        playerId: playerId ?? "",
+        gshlTeamId: gshlTeamId ?? "",
+        seasonId,
+        seasonType: seasonType ?? SeasonType.REGULAR_SEASON,
+      },
+      fieldConfig,
+    );
   });
 
   const totals = Array.from(totalMap.entries()).map(([key, rows]) => {
     const [playerId, seasonType] = key.split("|");
-    return buildPlayerAggregate(rows, {
-      playerId: playerId ?? "",
-      seasonId,
-      seasonType: seasonType ?? SeasonType.REGULAR_SEASON,
-      gshlTeamIds: rows.map((row) => toTrimmedString(row.gshlTeamId)),
-    }, fieldConfig);
+    return buildPlayerAggregate(
+      rows,
+      {
+        playerId: playerId ?? "",
+        seasonId,
+        seasonType: seasonType ?? SeasonType.REGULAR_SEASON,
+        gshlTeamIds: rows.map((row) => toTrimmedString(row.gshlTeamId)),
+      },
+      fieldConfig,
+    );
   });
 
   return { splits, totals };
@@ -1065,7 +1074,7 @@ function hasQualifiedWeekGoalieStats(
   ) {
     return Number(source.goalieStatDays) >= goalieStartMinimum;
   }
-  return hasGoalieStats(source);
+  return false;
 }
 
 function buildTeamDayRow(
@@ -1143,9 +1152,7 @@ function buildTeamWeekRow(
     G: fieldConfig.activeStarterFields.has("G") ? formatNumber(week.G) : "",
     A: fieldConfig.activeStarterFields.has("A") ? formatNumber(week.A) : "",
     P: fieldConfig.activeStarterFields.has("P") ? formatNumber(week.P) : "",
-    PM: fieldConfig.activeStarterFields.has("PM")
-      ? formatNumber(week.PM)
-      : "",
+    PM: fieldConfig.activeStarterFields.has("PM") ? formatNumber(week.PM) : "",
     PIM: fieldConfig.activeStarterFields.has("PIM")
       ? formatNumber(week.PIM)
       : "",
@@ -1342,13 +1349,16 @@ function buildTeamSeasonRowsFromWeeks(
   }
 
   return Array.from(teamSeasonMap.values()).map((seasonBucket) =>
-    buildTeamSeasonRow({
-      ...seasonBucket,
-      playersUsed:
-        playerSplitCountByTeam.get(
-          `${seasonBucket.seasonId}|${seasonBucket.gshlTeamId}|${seasonBucket.seasonType}`,
-        ) ?? 0,
-    }, fieldConfig),
+    buildTeamSeasonRow(
+      {
+        ...seasonBucket,
+        playersUsed:
+          playerSplitCountByTeam.get(
+            `${seasonBucket.seasonId}|${seasonBucket.gshlTeamId}|${seasonBucket.seasonType}`,
+          ) ?? 0,
+      },
+      fieldConfig,
+    ),
   );
 }
 
@@ -1721,7 +1731,9 @@ export async function aggregateSeasonStats(
     );
   }
 
-  const seasonRow = seasonRows.find((row) => toTrimmedString(row.id) === seasonId);
+  const seasonRow = seasonRows.find(
+    (row) => toTrimmedString(row.id) === seasonId,
+  );
   const fieldConfig = buildSeasonAggregationFieldConfig(seasonRow);
 
   const playerDays = canonicalizePlayerDayRows(loadedPlayerDays);
@@ -1751,8 +1763,8 @@ export async function aggregateSeasonStats(
     addPlayerDayToWeekBucket(bucket, playerDay, fieldConfig);
   }
 
-  const playerWeeks = Array.from(playerWeekMap.values()).map(
-    (bucket) => buildPlayerWeekRow(bucket, fieldConfig),
+  const playerWeeks = Array.from(playerWeekMap.values()).map((bucket) =>
+    buildPlayerWeekRow(bucket, fieldConfig),
   );
   const { splits, totals } = buildPlayerSplitsAndTotals(
     playerWeeks,
@@ -1901,10 +1913,7 @@ export async function runSeasonStatsAggregation(
         throw error;
       }
     }
-    standings = await rebuildSeasonStandingsForSeasonId(
-      options.seasonId,
-      true,
-    );
+    standings = await rebuildSeasonStandingsForSeasonId(options.seasonId, true);
     log(
       options,
       `Standings: matchups=${standings.matchupWrite.total} matchupRanks=${standings.matchupRankWrite.total} standings=${standings.standingsWrite.total}`,

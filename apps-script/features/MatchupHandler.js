@@ -60,7 +60,10 @@ var MatchupHandler = (function buildMatchupHandler() {
   );
 
   function getGoalieStartMinimumForSeasonId(seasonId) {
-    var normalized = seasonId === undefined || seasonId === null ? "" : String(seasonId).trim();
+    var normalized =
+      seasonId === undefined || seasonId === null
+        ? ""
+        : String(seasonId).trim();
     return SINGLE_GOALIE_START_SEASON_IDS.has(normalized)
       ? 1
       : GOALIE_START_MINIMUM;
@@ -102,7 +105,9 @@ var MatchupHandler = (function buildMatchupHandler() {
 
   function getMatchupCategoryRulesForSeason(seasonId) {
     var seasonKey =
-      seasonId === undefined || seasonId === null ? "" : String(seasonId).trim();
+      seasonId === undefined || seasonId === null
+        ? ""
+        : String(seasonId).trim();
     var fallbackRules = defaultMatchupCategoryFields
       .map(function (field) {
         return matchupCategoryRulesByField.get(field);
@@ -483,10 +488,14 @@ var MatchupHandler = (function buildMatchupHandler() {
     var homeScore = 0;
     var awayScore = 0;
     var goalieStartMinimum = getGoalieStartMinimumForSeasonId(
-      seasonId || (homeWeek && homeWeek.seasonId) || (awayWeek && awayWeek.seasonId),
+      seasonId ||
+        (homeWeek && homeWeek.seasonId) ||
+        (awayWeek && awayWeek.seasonId),
     );
     var matchupCategoryRules = getMatchupCategoryRulesForSeason(
-      seasonId || (homeWeek && homeWeek.seasonId) || (awayWeek && awayWeek.seasonId),
+      seasonId ||
+        (homeWeek && homeWeek.seasonId) ||
+        (awayWeek && awayWeek.seasonId),
     );
 
     var homeHasGoalies = (homeGoalieStarts || 0) >= goalieStartMinimum;

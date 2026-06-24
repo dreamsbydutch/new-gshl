@@ -58,13 +58,15 @@ var MATCHUP_CATEGORY_RULES =
         { field: "BLK", higherBetter: true },
         { field: "W", higherBetter: true },
         { field: "GAA", higherBetter: false },
+        { field: "SV", higherBetter: true },
         { field: "SVP", higherBetter: true },
+        { field: "SO", higherBetter: true },
       ];
 
 var GOALIE_CATEGORY_SET =
   typeof GOALIE_CATEGORY_SET !== "undefined"
     ? GOALIE_CATEGORY_SET
-    : new Set(["W", "GAA", "SVP"]);
+    : new Set(["W", "GAA", "SV", "SVP", "SO"]);
 
 var GOALIE_START_MINIMUM =
   typeof GOALIE_START_MINIMUM !== "undefined" ? GOALIE_START_MINIMUM : 2;

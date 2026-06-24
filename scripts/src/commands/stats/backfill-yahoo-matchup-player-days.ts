@@ -40,6 +40,7 @@ Options:
   --endDate <date>                  Optional YYYY-MM-DD upper date bound.
   --teamIds <list>                  Optional comma-separated GSHL team ids.
   --matchupIds <list>               Optional comma-separated matchup ids.
+  --include-lt                      Include LT matchups. By default LT matchups are skipped.
   --concurrency <n>                 Concurrent matchup/date fetches. Default: 1.
   --requestDelayMs <ms>             Minimum delay between Yahoo requests.
   --log <true|false>                Enable live progress logging. Default: true.
@@ -120,6 +121,7 @@ async function main(): Promise<void> {
             endDate: options.endDate ?? null,
             teamIds: options.teamIds,
             matchupIds: options.matchupIds,
+            includeLt: options.includeLt,
             concurrency: options.concurrency,
             requestDelayMs: options.requestDelayMs,
             apply: options.apply,
@@ -141,6 +143,7 @@ async function main(): Promise<void> {
       endDate: options.endDate ?? null,
       teamIds: options.teamIds,
       matchupIds: options.matchupIds,
+      includeLt: options.includeLt,
       concurrency: options.concurrency,
       requestDelayMs: options.requestDelayMs,
       apply: options.apply,
@@ -159,6 +162,7 @@ async function main(): Promise<void> {
           endDate: options.endDate ?? null,
           teamIds: options.teamIds,
           matchupIds: options.matchupIds,
+          includeLt: options.includeLt,
           concurrency: options.concurrency,
           requestDelayMs: options.requestDelayMs,
           apply: options.apply,

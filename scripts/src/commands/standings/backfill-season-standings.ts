@@ -160,20 +160,41 @@ const MATCHUP_CATEGORY_RULES = [
   { field: "A", higherBetter: true },
   { field: "P", higherBetter: true },
   { field: "PM", higherBetter: true },
+  { field: "PIM", higherBetter: true },
   { field: "PPP", higherBetter: true },
   { field: "SOG", higherBetter: true },
   { field: "HIT", higherBetter: true },
   { field: "BLK", higherBetter: true },
   { field: "W", higherBetter: true },
+  { field: "GA", higherBetter: false },
   { field: "GAA", higherBetter: false },
+  { field: "SV", higherBetter: true },
   { field: "SVP", higherBetter: true },
+  { field: "SO", higherBetter: true },
 ] as const;
 
 type MatchupCategoryRule = (typeof MATCHUP_CATEGORY_RULES)[number];
 
-const GOALIE_CATEGORY_SET = new Set<string>(["W", "GAA", "SVP"]);
+const GOALIE_CATEGORY_SET = new Set<string>(["W", "GAA", "SV", "SVP", "SO"]);
 const GOALIE_START_MINIMUM = 2;
 const SINGLE_GOALIE_START_SEASON_IDS = new Set<string>(["1"]);
+const MATCHUP_CATEGORY_ALIASES = new Map<string, string>([
+  ["+/-", "PM"],
+  ["PLUSMINUS", "PM"],
+  ["PLUS_MINUS", "PM"],
+  ["PLUS-MINUS", "PM"],
+  ["PIM", "PIM"],
+  ["GAA", "GAA"],
+  ["GOALSAGAINST", "GA"],
+  ["GOALS_AGAINST", "GA"],
+  ["GOALS-AGAINST", "GA"],
+  ["SV%", "SVP"],
+  ["SAVEPERCENTAGE", "SVP"],
+  ["SAVE_PERCENTAGE", "SVP"],
+  ["SAVE-PERCENTAGE", "SVP"],
+  ["SAVES", "SV"],
+  ["SHUTOUTS", "SO"],
+]);
 const MATCHUP_RULE_BY_FIELD = new Map<string, MatchupCategoryRule>(
   MATCHUP_CATEGORY_RULES.map((rule) => [rule.field, rule] as const),
 );
@@ -232,7 +253,9 @@ function toTrimmedString(value: unknown): string {
 
 function normalizeSeasonCategory(category: unknown): string | null {
   const normalized = toTrimmedString(category).toUpperCase();
-  return MATCHUP_RULE_BY_FIELD.has(normalized) ? normalized : null;
+  if (!normalized) return null;
+  const alias = MATCHUP_CATEGORY_ALIASES.get(normalized) ?? normalized;
+  return MATCHUP_RULE_BY_FIELD.has(alias) ? alias : null;
 }
 
 function parseSeasonCategories(rawValue: unknown): string[] {
@@ -480,7 +503,9 @@ function buildTeamConferenceMap(
     const teamConfId = normalizeRecordId(team.confId);
     const franchiseId = normalizeRecordId(team.franchiseId);
     const resolvedConfId =
-      teamConfId !== "" ? teamConfId : (franchiseConfMap.get(franchiseId) ?? "");
+      teamConfId !== ""
+        ? teamConfId
+        : (franchiseConfMap.get(franchiseId) ?? "");
     if (resolvedConfId) {
       teamConfMap.set(teamId, resolvedConfId);
     }
@@ -752,7 +777,9 @@ function resolveCurrentSeasonId(seasons: SeasonRecord[]): string {
   const currentSeason = seasons.find((season) => {
     const startDate = formatDateOnly(season.startDate);
     const endDate = formatDateOnly(season.endDate);
-    return Boolean(startDate && endDate && startDate <= today && today <= endDate);
+    return Boolean(
+      startDate && endDate && startDate <= today && today <= endDate,
+    );
   });
 
   if (currentSeason) {

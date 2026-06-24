@@ -2005,8 +2005,15 @@ var RankingEngine = RankingEngine || {};
     var msValues = (regularRows || []).map(function (row) {
       return toNumber(row && row.MS);
     });
-    var bsValues = (regularRows || []).map(function (row) {
-      return toNumber(row && row.BS);
+    var lineupDecisionPctValues = (regularRows || []).map(function (row) {
+      var gamesPlayed = toNumber(row && row.GP);
+      var goodStarts = toNumber(row && row.GS);
+      var missedStarts = toNumber(row && row.MS);
+      var badStarts = toNumber(row && row.BS);
+      var lineupDecisions = gamesPlayed - goodStarts - missedStarts;
+
+      if (lineupDecisions <= 0) return 1;
+      return badStarts / lineupDecisions;
     });
     var addValues = (regularRows || []).map(function (row) {
       return toNumber(row && row.ADD);
@@ -2035,9 +2042,19 @@ var RankingEngine = RankingEngine || {};
         { value: winsScore, weight: 0.6 },
         { value: pointsScore, weight: 0.4 },
       ]);
+      var gamesPlayed = toNumber(row && row.GP);
+      var goodStarts = toNumber(row && row.GS);
+      var missedStarts = toNumber(row && row.MS);
+      var badStarts = toNumber(row && row.BS);
+      var lineupDecisions = gamesPlayed - goodStarts - missedStarts;
+      var lineupDecisionPct =
+        lineupDecisions > 0 ? badStarts / lineupDecisions : 1;
       var lineupScore = weightedScore([
-        { value: percentileScore(toNumber(row && row.MS), msValues, true), weight: 0.7 },
-        { value: percentileScore(toNumber(row && row.BS), bsValues, true), weight: 0.3 },
+        { value: percentileScore(missedStarts, msValues, true), weight: 0.6 },
+        {
+          value: percentileScore(lineupDecisionPct, lineupDecisionPctValues, true),
+          weight: 0.4,
+        },
       ]);
       var rosterTalentScore = percentileScore(
         teamTalentValues[teamKey],
@@ -2373,10 +2390,10 @@ var RankingEngine = RankingEngine || {};
       row.calderRating = roundScore(calder.score || 0);
       row.jackAdamsRating = roundScore(
         weightedScore([
-          { value: components.lineupScore || 0, weight: 0.4 },
-          { value: components.overPerformanceScore || 0, weight: 0.3 },
-          { value: components.standingsScore || 0, weight: 0.15 },
-          { value: components.categoryScore || 0, weight: 0.15 },
+          { value: components.lineupScore || 0, weight: 0.7 },
+          { value: components.overPerformanceScore || 0, weight: 0.15 },
+          { value: components.standingsScore || 0, weight: 0.075 },
+          { value: components.categoryScore || 0, weight: 0.075 },
         ]),
       );
       row.GMOYRating = roundScore(
