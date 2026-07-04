@@ -206,7 +206,10 @@ const TeamHistoryMatchupLine = ({
 
         {/* Score */}
         <div className="xs:text-xl col-span-2 text-center font-oswald text-2xl">
-          {matchup.homeScore || matchup.awayScore ? (
+          {matchup.homeScore !== null &&
+          matchup.homeScore !== undefined &&
+          matchup.awayScore !== null &&
+          matchup.awayScore !== undefined ? (
             <>
               <span className={getScoreColor(awayWinLoss)}>
                 {matchup.awayScore}

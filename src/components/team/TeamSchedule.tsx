@@ -30,7 +30,7 @@ import {
   getGameLocation,
   getGameTypeDisplay,
   isGameCompleted,
-  didTeamWin,
+  getTeamMatchupResult,
   getResultStyleClass,
   formatTeamScore,
   formatOpponentDisplay,
@@ -223,7 +223,7 @@ function GameResult({ matchup, selectedTeamId, week }: GameResultProps) {
     return null;
   }
 
-  const teamWon = didTeamWin(matchup, selectedTeamId);
+  const result = getTeamMatchupResult(matchup, selectedTeamId);
   const styleClass = getResultStyleClass(matchup, selectedTeamId);
   const scoreText = formatTeamScore(matchup, selectedTeamId);
 
@@ -231,7 +231,7 @@ function GameResult({ matchup, selectedTeamId, week }: GameResultProps) {
     <div
       className={`col-span-2 my-auto text-center font-varela text-sm ${styleClass}`}
     >
-      <span className="pr-2">{teamWon ? "W" : "L"}</span>
+      <span className="pr-2">{result ?? ""}</span>
       <span>{scoreText}</span>
     </div>
   );

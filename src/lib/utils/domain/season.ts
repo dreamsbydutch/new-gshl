@@ -1,6 +1,7 @@
-import type { Season } from "@gshl-types";
+import type { Season, TeamSeasonStatLine } from "@gshl-types";
 import type { Week } from "@gshl-types";
 import { getSeasonString } from "../core/date";
+import { formatRecord } from "../core/format";
 
 export type SeasonSummary = {
   id: string;
@@ -239,6 +240,45 @@ export function findSeasonById(
   if (!seasons?.length || seasonId == null) return undefined;
   const target = String(seasonId);
   return seasons.find((season) => String(season.id) === target);
+}
+
+export function usesLegacyTieRules(
+  season: Pick<Season, "usesLegacyTies"> | null | undefined,
+): boolean {
+  return season?.usesLegacyTies === true;
+}
+
+export function calculateStandingsPoints(
+  stats:
+    | Pick<TeamSeasonStatLine, "teamW" | "teamHW" | "teamHL" | "teamT">
+    | null
+    | undefined,
+  season: Pick<Season, "usesLegacyTies"> | null | undefined,
+): number {
+  const wins = Number(stats?.teamW ?? 0);
+  const homeWins = Number(stats?.teamHW ?? 0);
+  const homeLosses = Number(stats?.teamHL ?? 0);
+  const ties = Number(stats?.teamT ?? 0);
+
+  if (usesLegacyTieRules(season)) {
+    return wins * 2 + ties;
+  }
+
+  return (wins - homeWins) * 3 + homeWins * 2 + homeLosses;
+}
+
+export function formatStandingsRecord(
+  stats:
+    | Pick<TeamSeasonStatLine, "teamW" | "teamL" | "teamT">
+    | null
+    | undefined,
+  season: Pick<Season, "usesLegacyTies"> | null | undefined,
+): string {
+  return formatRecord(
+    Number(stats?.teamW ?? 0),
+    Number(stats?.teamL ?? 0),
+    usesLegacyTieRules(season) ? Number(stats?.teamT ?? 0) : 0,
+  );
 }
 
 export function toSeasonSummary(

@@ -21,7 +21,13 @@ export function StandingsContent() {
   }
 
   if ((standingsType ?? "overall") === "playoff") {
-    return <PlayoffBracket teams={teams} stats={stats} />;
+    return (
+      <PlayoffBracket
+        teams={teams}
+        stats={stats}
+        season={selectedSeason ?? null}
+      />
+    );
   }
 
   return (

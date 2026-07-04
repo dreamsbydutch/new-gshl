@@ -39,6 +39,10 @@ import {
   LOSERS_TOURNEY_FIELDS,
   formatSeedPosition,
   calculatePercentage,
+  calculateStandingsPoints,
+  formatStandingsRecord,
+  getTeamMatchupResult,
+  usesLegacyTieRules,
 } from "@gshl-utils";
 import type { Season } from "@gshl-types";
 import type { TeamSeasonStatLine } from "@gshl-types";
@@ -247,16 +251,15 @@ const TeamInfo = ({ teamProb, standingsType }: StandingsTeamInfoProps) => {
  */
 const StandingsItem = ({
   team,
+  season,
   matchups = [],
   weeks = [],
   showCutoffLine = false,
 }: StandingsItemProps & { showCutoffLine?: boolean }) => {
   const [showInfo, setShowInfo] = useState(false);
 
-  const tiebreakPoints =
-    (+(team?.seasonStats?.teamW ?? 0) - +(team?.seasonStats?.teamHW ?? 0)) * 3 +
-    +(team?.seasonStats?.teamHW ?? 0) * 2 +
-    +(team?.seasonStats?.teamHL ?? 0);
+  const standingsPoints = calculateStandingsPoints(team?.seasonStats, season);
+  const recordText = formatStandingsRecord(team?.seasonStats, season);
 
   const standingsContext = useMemo(() => {
     const seasonStats = team?.seasonStats;
@@ -481,15 +484,10 @@ const StandingsItem = ({
         </div>
         <div className="flex items-center gap-3">
           <div className="w-[65px] text-center">
-            <div className="text-sm font-bold">
-              {formatStat(team.seasonStats?.teamW, "0")} -{" "}
-              {formatStat(team.seasonStats?.teamL, "0")}
-            </div>
+            <div className="text-sm font-bold">{recordText}</div>
           </div>
           <div className="w-[25px] text-center">
-            <div className="text-xs font-bold">
-              {formatStat(tiebreakPoints)}
-            </div>
+            <div className="text-xs font-bold">{formatStat(standingsPoints)}</div>
           </div>
           <div className="w-4">
             <svg
@@ -585,7 +583,7 @@ const StandingsItem = ({
               {matchupSummary.length ? (
                 matchupSummary.map(({ matchup, weekNum }, i) => {
                   const isHome = matchup.homeTeamId === team.id;
-                  const win = isHome ? matchup.homeWin : matchup.awayWin;
+                  const result = getTeamMatchupResult(matchup, team.id);
                   const opponentId = isHome
                     ? matchup.awayTeamId
                     : matchup.homeTeamId;
@@ -599,10 +597,14 @@ const StandingsItem = ({
                         <div
                           className={cn(
                             "flex flex-row items-center gap-0.5",
-                            win ? "font-bold text-green-800" : "text-red-800",
+                            result === "W"
+                              ? "font-bold text-green-800"
+                              : result === "L"
+                                ? "text-red-800"
+                                : "text-slate-700",
                           )}
                         >
-                          {i >= 4 ? "" : win ? "W" : "L"}{" "}
+                          {i >= 4 ? "" : (result ?? "")}{" "}
                           {i >= 4
                             ? ""
                             : isHome
@@ -664,6 +666,8 @@ export const StandingsComponent = ({
   matchups: Matchup[];
   weeks: Week[];
 }) => {
+  const recordHeader = usesLegacyTieRules(selectedSeason) ? "W-L-T" : "W/L";
+
   return (
     <div key={group.title}>
       <div className="mt-8 text-center font-varela text-xl font-bold">
@@ -671,7 +675,7 @@ export const StandingsComponent = ({
       </div>
       <div className="mt-2 flex w-full px-2 text-center font-varela text-2xs text-muted-foreground">
         <div className="flex-1 text-center">Team</div>
-        <div className="w-[85px] text-center">W/L</div>
+        <div className="w-[85px] text-center">{recordHeader}</div>
         <div className="w-[25px] text-center">Pts</div>
         <div className="w-8"></div>
       </div>

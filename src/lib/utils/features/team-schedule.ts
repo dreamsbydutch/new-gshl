@@ -6,6 +6,7 @@ import {
   RANKING_DISPLAY_THRESHOLD,
 } from "../domain/schedule";
 import { findTeamById } from "../domain/team";
+import { getTeamMatchupResult } from "../domain/team";
 import type {
   TeamScheduleItemProps,
   OpponentDisplayProps,
@@ -21,7 +22,7 @@ import type {
 export { GAME_TYPES, GAME_LOCATIONS, CONFERENCES, RANKING_DISPLAY_THRESHOLD };
 
 // Re-export domain utilities
-export { findTeamById };
+export { findTeamById, getTeamMatchupResult };
 
 // Re-export types for backward compatibility
 export type {
@@ -195,9 +196,7 @@ export const didTeamWin = (
   matchup: Matchup,
   selectedTeamId: string,
 ): boolean => {
-  return matchup.homeTeamId === selectedTeamId
-    ? !!matchup.homeWin
-    : !!matchup.awayWin;
+  return getTeamMatchupResult(matchup, selectedTeamId) === "W";
 };
 
 /**
@@ -207,12 +206,10 @@ export const getResultStyleClass = (
   matchup: Matchup,
   selectedTeamId: string,
 ): string => {
-  const teamWon = didTeamWin(matchup, selectedTeamId);
-  const teamLost =
-    matchup.homeTeamId === selectedTeamId ? !matchup.homeWin : !matchup.awayWin;
+  const result = getTeamMatchupResult(matchup, selectedTeamId);
 
-  if (teamWon) return RESULT_STYLES.WIN;
-  if (teamLost) return RESULT_STYLES.LOSS;
+  if (result === "W") return RESULT_STYLES.WIN;
+  if (result === "L") return RESULT_STYLES.LOSS;
   return RESULT_STYLES.DEFAULT;
 };
 

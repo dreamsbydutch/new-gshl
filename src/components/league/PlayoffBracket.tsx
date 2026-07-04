@@ -1,8 +1,8 @@
 "use client";
 
 import Image from "next/image";
-import { cn } from "@gshl-utils";
-import type { GSHLTeam, TeamSeasonStatLine } from "@gshl-types";
+import { cn, formatStandingsRecord } from "@gshl-utils";
+import type { GSHLTeam, Season, TeamSeasonStatLine } from "@gshl-types";
 
 type SeededTeam = GSHLTeam & { seasonStats?: TeamSeasonStatLine };
 
@@ -48,7 +48,15 @@ function sortByWildcardRank(teams: SeededTeam[]) {
   );
 }
 
-function TeamChip({ label, team }: { label: string; team: SeededTeam | null }) {
+function TeamChip({
+  label,
+  team,
+  season,
+}: {
+  label: string;
+  team: SeededTeam | null;
+  season: Season | null;
+}) {
   return (
     <div
       className={cn(
@@ -70,10 +78,7 @@ function TeamChip({ label, team }: { label: string; team: SeededTeam | null }) {
         </div>
       </div>
       <div className="text-right text-xs text-muted-foreground">
-        {team?.seasonStats?.teamW !== undefined &&
-        team?.seasonStats?.teamL !== undefined
-          ? `${team.seasonStats.teamW}-${team.seasonStats.teamL}`
-          : ""}
+        {team?.seasonStats ? formatStandingsRecord(team.seasonStats, season) : ""}
       </div>
     </div>
   );
@@ -83,7 +88,6 @@ export function buildPlayoffBracket(
   teams: SeededTeam[],
   stats: TeamSeasonStatLine[],
 ): ConferenceBracket[] {
-  console.log(stats);
   const playoffTeams = teams.map((t) => {
     const stat = stats.find((s) => s.gshlTeamId === t.id);
     return {
@@ -181,9 +185,11 @@ export function buildPlayoffBracket(
 export function PlayoffBracket({
   teams,
   stats,
+  season,
 }: {
   teams: SeededTeam[];
   stats: TeamSeasonStatLine[];
+  season: Season | null;
 }) {
   const brackets = buildPlayoffBracket(teams, stats);
 
@@ -209,8 +215,16 @@ export function PlayoffBracket({
               {conf.matchups.map((m) => (
                 <div key={m.title} className="rounded-lg border bg-white p-2">
                   <div className="flex flex-col gap-2">
-                    <TeamChip label={m.homeLabel} team={m.homeTeam} />
-                    <TeamChip label={m.awayLabel} team={m.awayTeam} />
+                    <TeamChip
+                      label={m.homeLabel}
+                      team={m.homeTeam}
+                      season={season}
+                    />
+                    <TeamChip
+                      label={m.awayLabel}
+                      team={m.awayTeam}
+                      season={season}
+                    />
                   </div>
                 </div>
               ))}

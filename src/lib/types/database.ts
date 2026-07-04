@@ -21,6 +21,7 @@ export interface Season {
   startDate: string;
   endDate: string;
   isActive: boolean;
+  usesLegacyTies: boolean;
   signingEndDate: string;
   createdAt: Date;
   updatedAt: Date;
@@ -205,6 +206,14 @@ export interface Player {
   height?: number | null;
   lineupPos?: RosterPosition | null;
   gshlTeamId?: string | null;
+  nhlContractStatus?: string | null;
+  nhlContractLength?: number | null;
+  nhlCapHit?: number | null;
+  nhlClauses?: string | null;
+  nhlStartYear?: number | null;
+  nhlSigningStatus?: string | null;
+  nhlExpiryYear?: number | null;
+  nhlExpiryStatus?: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -650,10 +659,12 @@ export interface TeamSeasonStatLine {
   teamHW: number;
   teamHL: number;
   teamL: number;
+  teamT: number;
   teamCCW: number;
   teamCCHW: number;
   teamCCHL: number;
   teamCCL: number;
+  teamCCT: number;
   overallRk: number;
   conferenceRk: number;
   wildcardRk?: number | null;

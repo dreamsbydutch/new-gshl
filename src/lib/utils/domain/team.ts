@@ -1,4 +1,11 @@
-import type { Conference, Franchise, GSHLTeam, Owner, Team } from "@gshl-types";
+import type {
+  Conference,
+  Franchise,
+  GSHLTeam,
+  Matchup,
+  Owner,
+  Team,
+} from "@gshl-types";
 
 export type TeamRelations = {
   franchises?: Franchise[];
@@ -181,4 +188,30 @@ export function calculateTeamRecord(
     },
     { wins: 0, losses: 0, ties: 0 },
   );
+}
+
+export function getTeamMatchupResult(
+  matchup: Pick<
+    Matchup,
+    "homeTeamId" | "awayTeamId" | "homeWin" | "awayWin" | "tie"
+  >,
+  teamId: string,
+): "W" | "L" | "T" | null {
+  if (matchup.tie === true) {
+    return "T";
+  }
+
+  if (matchup.homeTeamId === teamId) {
+    if (matchup.homeWin === true) return "W";
+    if (matchup.awayWin === true) return "L";
+    return null;
+  }
+
+  if (matchup.awayTeamId === teamId) {
+    if (matchup.awayWin === true) return "W";
+    if (matchup.homeWin === true) return "L";
+    return null;
+  }
+
+  return null;
 }

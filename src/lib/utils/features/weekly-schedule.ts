@@ -127,7 +127,12 @@ export const shouldDisplayRanking = (rank?: string | number): boolean => {
  * Determines if matchup has been played (i.e., has scores).
  */
 export const isMatchupCompleted = (matchup: Matchup): boolean => {
-  return !!(matchup.homeScore ?? matchup.awayScore);
+  return (
+    matchup.homeScore !== null &&
+    matchup.homeScore !== undefined &&
+    matchup.awayScore !== null &&
+    matchup.awayScore !== undefined
+  );
 };
 
 /**
