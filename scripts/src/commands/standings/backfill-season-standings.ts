@@ -62,6 +62,7 @@ type SeasonRecord = DatabaseRecord & {
   startDate?: string | Date | null;
   endDate?: string | Date | null;
   isActive?: boolean | string | number | null;
+  usesLegacyTies?: boolean | string | number | null;
 };
 
 type WeekRecord = DatabaseRecord & {
@@ -136,10 +137,12 @@ type TeamSeasonStandingUpdate = {
   teamHW: number;
   teamHL: number;
   teamL: number;
+  teamT: number;
   teamCCW: number;
   teamCCHW: number;
   teamCCHL: number;
   teamCCL: number;
+  teamCCT: number;
   streak: string;
   overallRk?: number | null;
   conferenceRk?: number | null;
@@ -153,6 +156,7 @@ type RankingEntry = {
   wins: number;
   teamPoints: number;
   powerRk: number;
+  usesLegacyTies: boolean;
 };
 
 const MATCHUP_CATEGORY_RULES = [
@@ -184,6 +188,19 @@ const MATCHUP_CATEGORY_ALIASES = new Map<string, string>([
   ["PLUS_MINUS", "PM"],
   ["PLUS-MINUS", "PM"],
   ["PIM", "PIM"],
+  ["PENALTYMINUTES", "PIM"],
+  ["PENALTY_MINUTES", "PIM"],
+  ["PENALTY-MINUTES", "PIM"],
+  ["POWERPLAYPOINTS", "PPP"],
+  ["POWER_PLAY_POINTS", "PPP"],
+  ["POWER-PLAY-POINTS", "PPP"],
+  ["SHOTS", "SOG"],
+  ["SHOTSONGOAL", "SOG"],
+  ["SHOTS_ON_GOAL", "SOG"],
+  ["SHOTS-ON-GOAL", "SOG"],
+  ["HITS", "HIT"],
+  ["BLOCKS", "BLK"],
+  ["WINS", "W"],
   ["GAA", "GAA"],
   ["GOALSAGAINST", "GA"],
   ["GOALS_AGAINST", "GA"],
@@ -198,9 +215,19 @@ const MATCHUP_CATEGORY_ALIASES = new Map<string, string>([
 const MATCHUP_RULE_BY_FIELD = new Map<string, MatchupCategoryRule>(
   MATCHUP_CATEGORY_RULES.map((rule) => [rule.field, rule] as const),
 );
-const FALLBACK_MATCHUP_CATEGORY_FIELDS = MATCHUP_CATEGORY_RULES.map(
-  (rule) => rule.field,
-);
+const FALLBACK_MATCHUP_CATEGORY_FIELDS = [
+  "G",
+  "A",
+  "P",
+  "PM",
+  "PPP",
+  "SOG",
+  "HIT",
+  "BLK",
+  "W",
+  "GAA",
+  "SVP",
+] as const;
 
 const HELP_TEXT = `
 Usage:
@@ -345,6 +372,10 @@ function toNullableNumber(value: unknown): number | null {
   return Number.isFinite(numeric) ? numeric : null;
 }
 
+function hasNonBlankValue(value: unknown): boolean {
+  return value !== null && value !== undefined && toTrimmedString(value) !== "";
+}
+
 function toBooleanFlag(value: unknown): boolean {
   return (
     value === true ||
@@ -405,6 +436,10 @@ function normalizeStandingsSeasonType(value: unknown): string {
   return seasonType;
 }
 
+function seasonUsesLegacyTies(season: SeasonRecord | undefined): boolean {
+  return toBooleanFlag(season?.usesLegacyTies);
+}
+
 function matchupHasOutcome(matchup: DatabaseRecord): boolean {
   if (toBooleanFlag(matchup.homeWin)) return true;
   if (toBooleanFlag(matchup.awayWin)) return true;
@@ -421,12 +456,34 @@ function resolveMatchupOutcome(matchup: DatabaseRecord) {
   const scoresWereEqual =
     homeScore !== null && awayScore !== null && homeScore === awayScore;
 
+  if (toBooleanFlag(matchup.tie)) {
+    return {
+      hasOutcome: true,
+      homeWin: false,
+      awayWin: false,
+      tie: true,
+      scoresWereEqual,
+    };
+  }
+
   if (toBooleanFlag(matchup.homeWin)) {
-    return { hasOutcome: true, homeWin: true, awayWin: false, scoresWereEqual };
+    return {
+      hasOutcome: true,
+      homeWin: true,
+      awayWin: false,
+      tie: false,
+      scoresWereEqual,
+    };
   }
 
   if (toBooleanFlag(matchup.awayWin)) {
-    return { hasOutcome: true, homeWin: false, awayWin: true, scoresWereEqual };
+    return {
+      hasOutcome: true,
+      homeWin: false,
+      awayWin: true,
+      tie: false,
+      scoresWereEqual,
+    };
   }
 
   if (homeScore !== null && awayScore !== null) {
@@ -435,6 +492,7 @@ function resolveMatchupOutcome(matchup: DatabaseRecord) {
         hasOutcome: true,
         homeWin: true,
         awayWin: false,
+        tie: false,
         scoresWereEqual: true,
       };
     }
@@ -443,6 +501,7 @@ function resolveMatchupOutcome(matchup: DatabaseRecord) {
       hasOutcome: true,
       homeWin: homeScore > awayScore,
       awayWin: awayScore > homeScore,
+      tie: false,
       scoresWereEqual: false,
     };
   }
@@ -451,6 +510,7 @@ function resolveMatchupOutcome(matchup: DatabaseRecord) {
     hasOutcome: false,
     homeWin: false,
     awayWin: false,
+    tie: false,
     scoresWereEqual: false,
   };
 }
@@ -533,14 +593,33 @@ function getGoalieStartMinimumForSeasonId(seasonId: string): number {
     : GOALIE_START_MINIMUM;
 }
 
+function hasQualifiedGoalieStats(teamWeek: TeamWeekRecord): boolean {
+  return (
+    hasNonBlankValue(teamWeek.W) ||
+    hasNonBlankValue(teamWeek.GA) ||
+    hasNonBlankValue(teamWeek.GAA) ||
+    hasNonBlankValue(teamWeek.SV) ||
+    hasNonBlankValue(teamWeek.SA) ||
+    hasNonBlankValue(teamWeek.SVP) ||
+    hasNonBlankValue(teamWeek.SO) ||
+    hasNonBlankValue(teamWeek.TOI)
+  );
+}
+
 function computeTeamPointsFromRecord(
   teamW: unknown,
   teamHW: unknown,
   teamHL: unknown,
+  teamT: unknown,
+  usesLegacyTies: boolean,
 ): number {
   const wins = toNumber(teamW);
   const homeWins = toNumber(teamHW);
   const homeLosses = toNumber(teamHL);
+  const ties = toNumber(teamT);
+  if (usesLegacyTies) {
+    return wins * 2 + ties;
+  }
   return (wins - homeWins) * 3 + homeWins * 2 + homeLosses;
 }
 
@@ -567,6 +646,7 @@ function computeHeadToHeadStatsForGroup(
   teamIdSet: Set<string>,
   matchups: DatabaseRecord[],
   weekIdsInType: Set<string>,
+  usesLegacyTies: boolean,
 ) {
   const stats = new Map<
     string,
@@ -574,6 +654,7 @@ function computeHeadToHeadStatsForGroup(
       h2hW: number;
       h2hHW: number;
       h2hHL: number;
+      h2hT: number;
       h2hTeamPoints: number;
       h2hCatsFor: number;
     }
@@ -584,6 +665,7 @@ function computeHeadToHeadStatsForGroup(
       h2hW: 0,
       h2hHW: 0,
       h2hHL: 0,
+      h2hT: 0,
       h2hTeamPoints: 0,
       h2hCatsFor: 0,
     });
@@ -614,7 +696,10 @@ function computeHeadToHeadStatsForGroup(
     homeStats.h2hCatsFor += toNumber(matchup.homeScore);
     awayStats.h2hCatsFor += toNumber(matchup.awayScore);
 
-    if (outcome.homeWin) {
+    if (outcome.tie) {
+      homeStats.h2hT += 1;
+      awayStats.h2hT += 1;
+    } else if (outcome.homeWin) {
       homeStats.h2hW += 1;
       if (outcome.scoresWereEqual) {
         homeStats.h2hHW += 1;
@@ -630,6 +715,8 @@ function computeHeadToHeadStatsForGroup(
       statsEntry.h2hW,
       statsEntry.h2hHW,
       statsEntry.h2hHL,
+      statsEntry.h2hT,
+      usesLegacyTies,
     );
   }
 
@@ -641,11 +728,19 @@ function sortEntriesWithTiebreakers(
   matchups: DatabaseRecord[],
   weekIdsInType: Set<string>,
   categoriesForMap: Map<string, number>,
+  usesLegacyTies: boolean,
 ): RankingEntry[] {
   const sorted = entries.slice().sort((left, right) => {
-    if (left.wins !== right.wins) return right.wins - left.wins;
-    if (left.teamPoints !== right.teamPoints) {
-      return right.teamPoints - left.teamPoints;
+    if (usesLegacyTies) {
+      if (left.teamPoints !== right.teamPoints) {
+        return right.teamPoints - left.teamPoints;
+      }
+      if (left.wins !== right.wins) return right.wins - left.wins;
+    } else {
+      if (left.wins !== right.wins) return right.wins - left.wins;
+      if (left.teamPoints !== right.teamPoints) {
+        return right.teamPoints - left.teamPoints;
+      }
     }
     return left.teamId.localeCompare(right.teamId);
   });
@@ -655,8 +750,13 @@ function sortEntriesWithTiebreakers(
     let end = index + 1;
     while (
       end < sorted.length &&
-      sorted[end]!.wins === sorted[index]!.wins &&
-      sorted[end]!.teamPoints === sorted[index]!.teamPoints
+      sorted[index] &&
+      sorted[end] &&
+      (usesLegacyTies
+        ? sorted[end].teamPoints === sorted[index].teamPoints &&
+          sorted[end].wins === sorted[index].wins
+        : sorted[end].wins === sorted[index].wins &&
+          sorted[end].teamPoints === sorted[index].teamPoints)
     ) {
       end += 1;
     }
@@ -668,25 +768,37 @@ function sortEntriesWithTiebreakers(
         teamIdSet,
         matchups,
         weekIdsInType,
+        usesLegacyTies,
       );
 
       group.sort((left, right) => {
         const leftH2H = h2hStats.get(left.teamId) ?? {
           h2hW: 0,
+          h2hT: 0,
           h2hTeamPoints: 0,
           h2hCatsFor: 0,
         };
         const rightH2H = h2hStats.get(right.teamId) ?? {
           h2hW: 0,
+          h2hT: 0,
           h2hTeamPoints: 0,
           h2hCatsFor: 0,
         };
 
-        if (leftH2H.h2hW !== rightH2H.h2hW) {
-          return rightH2H.h2hW - leftH2H.h2hW;
-        }
-        if (leftH2H.h2hTeamPoints !== rightH2H.h2hTeamPoints) {
-          return rightH2H.h2hTeamPoints - leftH2H.h2hTeamPoints;
+        if (usesLegacyTies) {
+          if (leftH2H.h2hTeamPoints !== rightH2H.h2hTeamPoints) {
+            return rightH2H.h2hTeamPoints - leftH2H.h2hTeamPoints;
+          }
+          if (leftH2H.h2hW !== rightH2H.h2hW) {
+            return rightH2H.h2hW - leftH2H.h2hW;
+          }
+        } else {
+          if (leftH2H.h2hW !== rightH2H.h2hW) {
+            return rightH2H.h2hW - leftH2H.h2hW;
+          }
+          if (leftH2H.h2hTeamPoints !== rightH2H.h2hTeamPoints) {
+            return rightH2H.h2hTeamPoints - leftH2H.h2hTeamPoints;
+          }
         }
         if (leftH2H.h2hCatsFor !== rightH2H.h2hCatsFor) {
           return rightH2H.h2hCatsFor - leftH2H.h2hCatsFor;
@@ -720,15 +832,21 @@ function computeMatchupScore(
   seasonId: string,
   homeWeek: TeamWeekRecord,
   awayWeek: TeamWeekRecord,
-  homeGoalieStarts: number,
-  awayGoalieStarts: number,
+  homeGoalieStarts: number | null,
+  awayGoalieStarts: number | null,
   matchupCategoryRules: readonly MatchupCategoryRule[],
 ) {
   let homeScore = 0;
   let awayScore = 0;
   const goalieStartMinimum = getGoalieStartMinimumForSeasonId(seasonId);
-  const homeHasGoalies = homeGoalieStarts >= goalieStartMinimum;
-  const awayHasGoalies = awayGoalieStarts >= goalieStartMinimum;
+  const homeHasGoalies =
+    (homeGoalieStarts !== null
+      ? homeGoalieStarts >= goalieStartMinimum
+      : hasQualifiedGoalieStats(homeWeek));
+  const awayHasGoalies =
+    (awayGoalieStarts !== null
+      ? awayGoalieStarts >= goalieStartMinimum
+      : hasQualifiedGoalieStats(awayWeek));
 
   for (const rule of matchupCategoryRules) {
     const isGoalieCategory = GOALIE_CATEGORY_SET.has(rule.field);
@@ -870,6 +988,7 @@ export async function rebuildSeasonStandingsForSeasonId(
   const season = seasons.find(
     (candidate) => normalizeRecordId(candidate.id) === seasonId,
   );
+  const usesLegacyTies = seasonUsesLegacyTies(season);
   const matchupCategoryRules = getMatchupCategoryRulesForSeason(season);
 
   const seasonWeeks = weeks.filter(
@@ -923,8 +1042,12 @@ export async function rebuildSeasonStandingsForSeasonId(
       seasonId,
       homeWeek,
       awayWeek,
-      goalieStartsMap.get(`${homeTeamId}|${weekId}`) ?? 0,
-      goalieStartsMap.get(`${awayTeamId}|${weekId}`) ?? 0,
+      goalieStartsMap.has(`${homeTeamId}|${weekId}`)
+        ? (goalieStartsMap.get(`${homeTeamId}|${weekId}`) ?? 0)
+        : null,
+      goalieStartsMap.has(`${awayTeamId}|${weekId}`)
+        ? (goalieStartsMap.get(`${awayTeamId}|${weekId}`) ?? 0)
+        : null,
       matchupCategoryRules,
     );
 
@@ -938,11 +1061,18 @@ export async function rebuildSeasonStandingsForSeasonId(
       awayScore: scores.awayScore,
       isComplete: status.isComplete,
       ...(status.isComplete
-        ? {
-            tie: false,
-            homeWin: scores.homeScore >= scores.awayScore,
-            awayWin: scores.homeScore < scores.awayScore,
-          }
+        ? (() => {
+            const isLegacyTie =
+              usesLegacyTies &&
+              status.weekType === String(SeasonType.REGULAR_SEASON) &&
+              scores.homeScore === scores.awayScore;
+
+            return {
+              tie: isLegacyTie,
+              homeWin: isLegacyTie ? false : scores.homeScore >= scores.awayScore,
+              awayWin: isLegacyTie ? false : scores.homeScore < scores.awayScore,
+            };
+          })()
         : {}),
     });
   }
@@ -1044,10 +1174,12 @@ export async function rebuildSeasonStandingsForSeasonId(
     let teamHW = 0;
     let teamHL = 0;
     let teamL = 0;
+    let teamT = 0;
     let teamCCW = 0;
     let teamCCHW = 0;
     let teamCCHL = 0;
     let teamCCL = 0;
+    let teamCCT = 0;
     const recentResults: string[] = [];
 
     for (const matchup of teamMatchups) {
@@ -1061,31 +1193,32 @@ export async function rebuildSeasonStandingsForSeasonId(
         Boolean(teamConference) && teamConference === opponentConference;
 
       const outcome = resolveMatchupOutcome(matchup);
-      const scoresWereEqual = outcome.scoresWereEqual;
-      const isHomeWin = outcome.homeWin;
-      const isAwayWin = outcome.awayWin;
 
       let result = "";
-      if (isHome && isHomeWin) {
+      if (outcome.tie) {
+        teamT += 1;
+        if (isConference) teamCCT += 1;
+        result = "T";
+      } else if (isHome && outcome.homeWin) {
         teamW += 1;
         if (isConference) teamCCW += 1;
-        if (scoresWereEqual) {
+        if (outcome.scoresWereEqual) {
           teamHW += 1;
           if (isConference) teamCCHW += 1;
         }
         result = "W";
-      } else if (!isHome && isAwayWin) {
+      } else if (!isHome && outcome.awayWin) {
         teamW += 1;
         if (isConference) teamCCW += 1;
         result = "W";
-      } else if (isHome && isAwayWin) {
+      } else if (isHome && outcome.awayWin) {
         teamL += 1;
         if (isConference) teamCCL += 1;
         result = "L";
-      } else if (!isHome && isHomeWin) {
+      } else if (!isHome && outcome.homeWin) {
         teamL += 1;
         if (isConference) teamCCL += 1;
-        if (scoresWereEqual) {
+        if (outcome.scoresWereEqual) {
           teamHL += 1;
           if (isConference) teamCCHL += 1;
         }
@@ -1099,7 +1232,7 @@ export async function rebuildSeasonStandingsForSeasonId(
 
     let streak = "";
     if (recentResults.length > 0) {
-      const lastResult = recentResults[recentResults.length - 1]!;
+      const lastResult = recentResults[recentResults.length - 1] ?? "";
       let streakCount = 1;
       for (let index = recentResults.length - 2; index >= 0; index -= 1) {
         if (recentResults[index] === lastResult) streakCount += 1;
@@ -1117,10 +1250,12 @@ export async function rebuildSeasonStandingsForSeasonId(
       teamHW,
       teamHL,
       teamL,
+      teamT,
       teamCCW,
       teamCCHW,
       teamCCHL,
       teamCCL,
+      teamCCT,
       streak,
     };
 
@@ -1138,8 +1273,15 @@ export async function rebuildSeasonStandingsForSeasonId(
         confId: teamConfMap.get(teamId) ?? "",
         update,
         wins: teamW,
-        teamPoints: computeTeamPointsFromRecord(teamW, teamHW, teamHL),
+        teamPoints: computeTeamPointsFromRecord(
+          teamW,
+          teamHW,
+          teamHL,
+          teamT,
+          usesLegacyTies,
+        ),
         powerRk: toNumber(teamSeason.powerRk),
+        usesLegacyTies,
       });
     }
   }
@@ -1150,6 +1292,7 @@ export async function rebuildSeasonStandingsForSeasonId(
       recalculatedMatchups,
       regularSeasonWeekIds,
       categoriesForMap,
+      usesLegacyTies,
     );
     overallSorted.forEach((entry, index) => {
       entry.update.overallRk = index + 1;
@@ -1169,6 +1312,7 @@ export async function rebuildSeasonStandingsForSeasonId(
         recalculatedMatchups,
         regularSeasonWeekIds,
         categoriesForMap,
+        usesLegacyTies,
       );
       conferenceSorted.forEach((entry, index) => {
         entry.update.conferenceRk = index + 1;
@@ -1184,6 +1328,7 @@ export async function rebuildSeasonStandingsForSeasonId(
         recalculatedMatchups,
         regularSeasonWeekIds,
         categoriesForMap,
+        usesLegacyTies,
       );
       wildcardSorted.forEach((entry, index) => {
         entry.update.wildcardRk = index + 1;

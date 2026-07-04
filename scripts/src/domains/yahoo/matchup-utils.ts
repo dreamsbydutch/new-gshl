@@ -126,7 +126,7 @@ export const DEFAULT_REQUEST_DELAY_MS = 3500;
 const DEFAULT_RETRY_COUNT = 3;
 const DEFAULT_RETRY_BASE_DELAY_MS = 2000;
 const DEFAULT_REQUEST_JITTER_MS = 1500;
-const DEFAULT_REQUEST_DENIED_COOLDOWN_MS = 5 * 60 * 1000;
+const DEFAULT_REQUEST_DENIED_COOLDOWN_MS = 8 * 60 * 1000;
 const DEFAULT_BROWSER_WAIT_MS = 180000;
 const STARTING_POSITIONS = new Set(["C", "LW", "RW", "D", "G", "Util"]);
 const USER_AGENT =
@@ -204,6 +204,7 @@ export type YahooFetchProgressEvent =
       attempt: number;
       retryCount: number;
       waitMs: number;
+      status?: number;
     }
   | {
       phase: "status-retry";
@@ -933,6 +934,10 @@ function shouldRetryYahooStatus(status: number): boolean {
   return status === 999 || status === 429 || status === 503;
 }
 
+function shouldUseYahooCooldownForStatus(status: number): boolean {
+  return status === 429 || status === 999;
+}
+
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -1063,11 +1068,14 @@ export async function fetchYahooMatchupPage(
       );
     }
 
-    const backoffMs = retryBaseDelayMs * 2 ** (attempt - 1);
-    const jitterMs = Math.floor(Math.random() * 500);
+    const useCooldown = shouldUseYahooCooldownForStatus(response.status);
+    const backoffMs = useCooldown
+      ? requestDeniedCooldownMs
+      : retryBaseDelayMs * 2 ** (attempt - 1);
+    const jitterMs = Math.floor(Math.random() * (useCooldown ? 15000 : 500));
     const waitMs = backoffMs + jitterMs;
     onProgress?.({
-      phase: "status-retry",
+      phase: useCooldown ? "request-denied-cooldown" : "status-retry",
       url,
       attempt,
       retryCount,

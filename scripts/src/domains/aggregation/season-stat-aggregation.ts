@@ -99,6 +99,35 @@ type SeasonAggregationFieldConfig = {
   goalieStartMinimum: number;
 };
 
+const SEASON_CATEGORY_ALIASES = new Map<string, string>([
+  ["+/-", "PM"],
+  ["PLUSMINUS", "PM"],
+  ["PLUS_MINUS", "PM"],
+  ["PLUS-MINUS", "PM"],
+  ["PENALTYMINUTES", "PIM"],
+  ["PENALTY_MINUTES", "PIM"],
+  ["PENALTY-MINUTES", "PIM"],
+  ["POWERPLAYPOINTS", "PPP"],
+  ["POWER_PLAY_POINTS", "PPP"],
+  ["POWER-PLAY-POINTS", "PPP"],
+  ["SHOTS", "SOG"],
+  ["SHOTSONGOAL", "SOG"],
+  ["SHOTS_ON_GOAL", "SOG"],
+  ["SHOTS-ON-GOAL", "SOG"],
+  ["HITS", "HIT"],
+  ["BLOCKS", "BLK"],
+  ["WINS", "W"],
+  ["GOALSAGAINST", "GA"],
+  ["GOALS_AGAINST", "GA"],
+  ["GOALS-AGAINST", "GA"],
+  ["SV%", "SVP"],
+  ["SAVEPERCENTAGE", "SVP"],
+  ["SAVE_PERCENTAGE", "SVP"],
+  ["SAVE-PERCENTAGE", "SVP"],
+  ["SAVES", "SV"],
+  ["SHUTOUTS", "SO"],
+]);
+
 const DEFAULT_GOALIE_START_MINIMUM = 2;
 const SINGLE_GOALIE_START_SEASON_IDS = new Set(["1"]);
 
@@ -371,6 +400,7 @@ function computePlayerDayGsValue(playerDay: DatabaseRecord): string {
 function normalizeSeasonCategory(category: unknown): string | null {
   const normalized = toTrimmedString(category).toUpperCase();
   if (!normalized) return null;
+  const alias = SEASON_CATEGORY_ALIASES.get(normalized) ?? normalized;
 
   const supportedCategories = new Set<string>([
     ...TEAM_SKATER_STARTER_FIELDS,
@@ -379,7 +409,7 @@ function normalizeSeasonCategory(category: unknown): string | null {
     "SVP",
   ]);
 
-  return supportedCategories.has(normalized) ? normalized : null;
+  return supportedCategories.has(alias) ? alias : null;
 }
 
 function parseSeasonCategories(rawValue: unknown): string[] {
@@ -390,7 +420,23 @@ function parseSeasonCategories(rawValue: unknown): string[] {
   }
 
   if (typeof rawValue === "string") {
-    return rawValue
+    const trimmed = rawValue.trim();
+    if (!trimmed) return [];
+
+    if (trimmed.startsWith("[")) {
+      try {
+        const parsed = JSON.parse(trimmed) as unknown;
+        if (Array.isArray(parsed)) {
+          return parsed
+            .map((category) => normalizeSeasonCategory(category))
+            .filter((category): category is string => !!category);
+        }
+      } catch {
+        // Fall through to CSV parsing for plain sheet values.
+      }
+    }
+
+    return trimmed
       .split(",")
       .map((category) => normalizeSeasonCategory(category))
       .filter((category): category is string => !!category);

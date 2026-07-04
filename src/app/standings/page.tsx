@@ -15,6 +15,12 @@ export default async function StandingsPage() {
           orderBy: { seasonId: "asc" },
         })
       : Promise.resolve(),
+    seasonId
+      ? serverApi.award.getAll.prefetch({
+          where: { seasonId },
+          orderBy: { award: "asc" },
+        })
+      : Promise.resolve(),
   ]);
 
   return (

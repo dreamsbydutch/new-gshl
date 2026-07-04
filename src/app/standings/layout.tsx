@@ -21,6 +21,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     { key: "conference", label: "Conference" },
     { key: "wildcard", label: "Wildcard" },
     { key: "playoff", label: "Playoff" },
+    { key: "awards", label: "Awards" },
   ];
 
   const selectedStandingsType =

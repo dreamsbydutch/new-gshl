@@ -252,6 +252,11 @@ type KnownPlayerDayTeam = {
 };
 
 const EXTERNAL_FETCH_DATE_BATCH_SIZE = 7;
+const NHL_SEASON_TOKEN_OVERRIDES_BY_GSHL_SEASON_ID: Record<string, string> = {
+  // Season 7 was the pandemic-shortened 2020-21 NHL season even though both
+  // GSHL boundary dates fall inside calendar year 2021.
+  "7": "20202021",
+};
 
 type InvestigationFlag = {
   kind:
@@ -346,6 +351,13 @@ function normalizeDateKey(value: unknown): string {
 }
 
 function resolveNhlSeasonTokenFromSeason(season: Season): string {
+  const seasonId = toTrimmedString(season.id);
+  const overriddenToken =
+    NHL_SEASON_TOKEN_OVERRIDES_BY_GSHL_SEASON_ID[seasonId];
+  if (overriddenToken) {
+    return overriddenToken;
+  }
+
   const startDate = normalizeDateKey(season.startDate);
   const endDate = normalizeDateKey(season.endDate);
   const startYear = Number(startDate.slice(0, 4));
@@ -365,7 +377,7 @@ function resolveNhlSeasonTokenFromSeason(season: Season): string {
   }
 
   throw new Error(
-    `[stats:sync-nhl-daily] Could not resolve NHL season token for season ${toTrimmedString(season.id)}.`,
+    `[stats:sync-nhl-daily] Could not resolve NHL season token for season ${seasonId}.`,
   );
 }
 

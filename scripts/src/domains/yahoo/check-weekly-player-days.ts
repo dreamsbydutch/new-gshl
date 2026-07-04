@@ -22,6 +22,7 @@ import {
   toTrimmedString,
 } from "@gshl-lib/ranking/player-rating-support";
 import type {
+  Franchise,
   Matchup,
   Player,
   PlayerDayStatLine,
@@ -44,6 +45,7 @@ import {
   parseYahooMatchupTotals,
   parseYahooWeeklyMatchupPlayers,
   resolvePlayerFromYahooReference,
+  type YahooFetchProgressEvent,
   type ParsedYahooMatchupTotals,
   type ParsedYahooWeeklyPlayers,
   type YahooWeeklyMatchupPlayerRow,
@@ -63,6 +65,7 @@ type YahooWeeklyPlayerDayCheckOptions = {
   teamIds: string[];
   matchupIds: string[];
   requestDelayMs: number;
+  requestStaggerMinMs: number;
   requestStaggerMs: number;
   logToConsole: boolean;
   apply: boolean;
@@ -156,16 +159,20 @@ type CountBreakdownRow = {
 
 type ResolvedYahooWeeklySide = {
   sourceSide: "home" | "away";
+  gshlTeamId: string;
   yahooTeamId: string;
   totals: ParsedYahooMatchupTotals["home"];
   rows: YahooWeeklyMatchupPlayerRow[];
 };
 
+type FranchiseNameTeamIndex = ReadonlyMap<string, Team>;
+
 const PLAYER_DAY_MODEL = "PlayerDayStatLine";
 const PLAYER_DAY_SHEET = SHEETS_CONFIG.SHEETS.PlayerDayStatLine;
 const PLAYER_DAY_COLUMNS = SHEETS_CONFIG.COLUMNS.PlayerDayStatLine;
 const STARTING_DAILY_POSITIONS = new Set(["C", "LW", "RW", "D", "G", "UTIL"]);
-const DEFAULT_WEEKLY_CHECK_REQUEST_STAGGER_MS = 2500;
+const DEFAULT_WEEKLY_CHECK_REQUEST_STAGGER_MIN_MS = 2500;
+const DEFAULT_WEEKLY_CHECK_REQUEST_STAGGER_MS = 5000;
 const TEAM_WEEK_MODEL = "TeamWeekStatLine";
 const TEAM_WEEK_ALLOWED_FIELDS = new Set([
   "G",
@@ -188,6 +195,7 @@ const TEAM_WEEK_ALLOWED_FIELDS = new Set([
   "PIM",
 ]);
 const GOALIE_TEAM_FIELDS = new Set(["W", "GA", "GAA", "SV", "SA", "SVP", "SO"]);
+const CONSOLE_IGNORED_CHANGE_FIELDS = new Set(["PM", "PPP"]);
 const WEEKLY_SKATER_FIELDS = ["G", "A", "P", "PPP", "SOG", "HIT", "BLK"] as const;
 const WEEKLY_GOALIE_FIELDS = ["W"] as const;
 type MutablePlayerDayStatField =
@@ -239,8 +247,9 @@ Options:
   --week-nums <list>          Optional comma-separated week numbers.
   --team-ids <list>           Optional comma-separated team ids.
   --matchup-ids <list>        Optional comma-separated matchup ids.
-  --request-delay-ms <ms>     Minimum delay between Yahoo requests. Default: 3500.
-  --request-stagger-ms <ms>   Extra random pre-fetch stagger for this command. Default: 2500.
+  --request-delay-ms <ms>     Minimum global gap between Yahoo requests. Default: 3500.
+  --request-stagger-min-ms <ms> Minimum pre-fetch wait for this command. Default: 2500.
+  --request-stagger-ms <ms>   Additional random pre-fetch jitter. Default: 5000.
   --browser-fallback <true|false> Enable browser render fallback when Yahoo serves a JS/login shell. Default: true.
   --browser-headless <true|false> Use headless browser fallback. Default: false.
   --browser-path <path>       Optional Chrome/Edge executable path for browser fallback.
@@ -275,13 +284,46 @@ function sleep(ms: number): Promise<void> {
 
 async function applyRandomRequestStagger(
   url: string,
-  options: Pick<YahooWeeklyPlayerDayCheckOptions, "requestStaggerMs" | "logToConsole">,
+  options: Pick<
+    YahooWeeklyPlayerDayCheckOptions,
+    "requestStaggerMinMs" | "requestStaggerMs" | "logToConsole"
+  >,
 ): Promise<void> {
-  if (options.requestStaggerMs <= 0) return;
-  const waitMs = Math.floor(Math.random() * (options.requestStaggerMs + 1));
+  if (options.requestStaggerMinMs <= 0 && options.requestStaggerMs <= 0) {
+    return;
+  }
+  const randomMs =
+    options.requestStaggerMs > 0
+      ? Math.floor(Math.random() * (options.requestStaggerMs + 1))
+      : 0;
+  const waitMs = options.requestStaggerMinMs + randomMs;
   if (waitMs <= 0) return;
-  log(options, `Random Yahoo stagger ${waitMs}ms before fetching ${url}.`);
+  log(
+    options,
+    `Yahoo throttle wait ${waitMs}ms before fetching ${url} (minimum=${options.requestStaggerMinMs}ms random=${randomMs}ms).`,
+  );
   await sleep(waitMs);
+}
+
+function formatYahooFetchProgress(event: YahooFetchProgressEvent): string {
+  switch (event.phase) {
+    case "wait":
+      return `Yahoo global throttle wait ${event.waitMs}ms before ${event.url}`;
+    case "attempt":
+      return `Yahoo fetch attempt ${event.attempt}/${event.retryCount} for ${event.url}`;
+    case "browser-fallback":
+      return `Yahoo browser fallback for ${event.url}`;
+    case "browser-fallback-failed":
+      return `Yahoo browser fallback failed for ${event.url}: ${event.error}`;
+    case "request-denied-cooldown":
+      return event.status
+        ? `Yahoo HTTP ${event.status}; cooling down ${event.waitMs}ms before retrying ${event.url}`
+        : `Yahoo request denied; cooling down ${event.waitMs}ms before retrying ${event.url}`;
+    case "status-retry":
+      return `Yahoo HTTP ${event.status}; retrying ${event.url} after ${event.waitMs}ms`;
+    default:
+      return "Yahoo fetch progress";
+  }
 }
 
 function printSection(title: string): void {
@@ -373,8 +415,19 @@ function printRequiredChanges(
   goalieDifferences: GoalieDifferenceRecord[],
 ): void {
   const lines = [
-    ...discrepancies.map(formatDiscrepancyChangeLine),
-    ...goalieDifferences.map(formatGoalieChangeLine),
+    ...discrepancies
+      .filter(
+        (discrepancy) =>
+          !discrepancy.field ||
+          !CONSOLE_IGNORED_CHANGE_FIELDS.has(discrepancy.field),
+      )
+      .map(formatDiscrepancyChangeLine),
+    ...goalieDifferences
+      .filter(
+        (difference) =>
+          !difference.field || !CONSOLE_IGNORED_CHANGE_FIELDS.has(difference.field),
+      )
+      .map(formatGoalieChangeLine),
   ];
   if (lines.length === 0) return;
 
@@ -455,6 +508,13 @@ function parseOptions(args: string[]): YahooWeeklyPlayerDayCheckOptions {
         DEFAULT_REQUEST_DELAY_MS,
       ),
     ),
+    requestStaggerMinMs: parseNonNegativeInteger(
+      getArgValue(args, "--request-stagger-min-ms"),
+      parseNonNegativeInteger(
+        process.env.YAHOO_WEEKLY_CHECK_REQUEST_STAGGER_MIN_MS,
+        DEFAULT_WEEKLY_CHECK_REQUEST_STAGGER_MIN_MS,
+      ),
+    ),
     requestStaggerMs: parseNonNegativeInteger(
       getArgValue(args, "--request-stagger-ms"),
       parseNonNegativeInteger(
@@ -491,6 +551,39 @@ function buildPlayerWeekKey(
   playerId: string,
 ): string {
   return `${weekId}|${gshlTeamId}|${playerId}`;
+}
+
+function normalizeTeamNameLookupKey(value: unknown): string {
+  return toTrimmedString(value)
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/&/g, "and")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim()
+    .replace(/\s+/g, " ");
+}
+
+function buildFranchiseNameTeamIndex(params: {
+  franchises: Franchise[];
+  seasonTeams: Team[];
+}): Map<string, Team> {
+  const { franchises, seasonTeams } = params;
+  const franchiseById = new Map(
+    franchises.map(
+      (franchise) => [toTrimmedString(franchise.id), franchise] as const,
+    ),
+  );
+  const index = new Map<string, Team>();
+
+  for (const team of seasonTeams) {
+    const franchise = franchiseById.get(toTrimmedString(team.franchiseId));
+    const key = normalizeTeamNameLookupKey(franchise?.name);
+    if (!key || index.has(key)) continue;
+    index.set(key, team);
+  }
+
+  return index;
 }
 
 function resolveTargetWeeks(
@@ -582,24 +675,57 @@ function compareStatValues(
 }
 
 function resolveYahooWeeklySides(params: {
+  expectedHomeTeamId: string;
+  expectedAwayTeamId: string;
   expectedHomeYahooTeamId: string;
   expectedAwayYahooTeamId: string;
   teamTotals: ParsedYahooMatchupTotals;
   weeklyPlayers: ParsedYahooWeeklyPlayers;
+  franchiseNameTeamIndex: FranchiseNameTeamIndex;
 }): {
   home: ResolvedYahooWeeklySide;
   away: ResolvedYahooWeeklySide;
-  mode: "direct" | "swapped" | "fallback";
+  mode: "franchise-name" | "direct" | "swapped" | "fallback";
 } {
   const {
+    expectedHomeTeamId,
+    expectedAwayTeamId,
     expectedHomeYahooTeamId,
     expectedAwayYahooTeamId,
     teamTotals,
     weeklyPlayers,
+    franchiseNameTeamIndex,
   } = params;
 
   const pageHomeId = toTrimmedString(teamTotals.home.yahooTeamId);
   const pageAwayId = toTrimmedString(teamTotals.away.yahooTeamId);
+  const pageHomeTeam = franchiseNameTeamIndex.get(
+    normalizeTeamNameLookupKey(teamTotals.home.teamName),
+  );
+  const pageAwayTeam = franchiseNameTeamIndex.get(
+    normalizeTeamNameLookupKey(teamTotals.away.teamName),
+  );
+
+  if (pageHomeTeam && pageAwayTeam) {
+    return {
+      mode: "franchise-name",
+      home: {
+        sourceSide: "home",
+        gshlTeamId: toTrimmedString(pageHomeTeam.id),
+        yahooTeamId: pageHomeId,
+        totals: teamTotals.home,
+        rows: [...weeklyPlayers.home.skaters, ...weeklyPlayers.home.goalies],
+      },
+      away: {
+        sourceSide: "away",
+        gshlTeamId: toTrimmedString(pageAwayTeam.id),
+        yahooTeamId: pageAwayId,
+        totals: teamTotals.away,
+        rows: [...weeklyPlayers.away.skaters, ...weeklyPlayers.away.goalies],
+      },
+    };
+  }
+
   const directEvidence =
     (pageHomeId && pageHomeId === expectedHomeYahooTeamId) ||
     (pageAwayId && pageAwayId === expectedAwayYahooTeamId);
@@ -625,12 +751,14 @@ function resolveYahooWeeklySides(params: {
       mode,
       home: {
         sourceSide: "away",
+        gshlTeamId: expectedHomeTeamId,
         yahooTeamId: pageAwayId,
         totals: teamTotals.away,
         rows: [...weeklyPlayers.away.skaters, ...weeklyPlayers.away.goalies],
       },
       away: {
         sourceSide: "home",
+        gshlTeamId: expectedAwayTeamId,
         yahooTeamId: pageHomeId,
         totals: teamTotals.home,
         rows: [...weeklyPlayers.home.skaters, ...weeklyPlayers.home.goalies],
@@ -642,12 +770,14 @@ function resolveYahooWeeklySides(params: {
     mode,
     home: {
       sourceSide: "home",
+      gshlTeamId: expectedHomeTeamId,
       yahooTeamId: pageHomeId,
       totals: teamTotals.home,
       rows: [...weeklyPlayers.home.skaters, ...weeklyPlayers.home.goalies],
     },
     away: {
       sourceSide: "away",
+      gshlTeamId: expectedAwayTeamId,
       yahooTeamId: pageAwayId,
       totals: teamTotals.away,
       rows: [...weeklyPlayers.away.skaters, ...weeklyPlayers.away.goalies],
@@ -982,18 +1112,20 @@ async function main(): Promise<void> {
 
     applyYahooBrowserArgOverrides(args);
     const optionsInput = parseOptions(args);
-    const [seasons, weeks, teams, matchups, teamWeekRows, players] =
+    const [seasons, weeks, teams, franchises, matchups, teamWeekRows, players] =
       (await Promise.all([
         fastSheetsReader.fetchModel("Season"),
         fastSheetsReader.fetchModel("Week"),
         fastSheetsReader.fetchModel("Team"),
+        fastSheetsReader.fetchModel("Franchise"),
         fastSheetsReader.fetchModel("Matchup"),
         fastSheetsReader.fetchModel("TeamWeekStatLine"),
         fastSheetsReader.fetchModel("Player"),
       ])) as unknown as [
-        Season[],
+      Season[],
       Week[],
       Team[],
+      Franchise[],
       Matchup[],
       TeamWeekStatLine[],
       Player[],
@@ -1050,11 +1182,16 @@ async function main(): Promise<void> {
   const weekById = new Map(
     targetWeeks.map((week) => [toTrimmedString(week.id), week] as const),
   );
-  const teamById = new Map(
-    teams
-      .filter((team) => toTrimmedString(team.seasonId) === options.seasonId)
-      .map((team) => [toTrimmedString(team.id), team] as const),
+  const seasonTeams = teams.filter(
+    (team) => toTrimmedString(team.seasonId) === options.seasonId,
   );
+  const teamById = new Map(
+    seasonTeams.map((team) => [toTrimmedString(team.id), team] as const),
+  );
+  const franchiseNameTeamIndex = buildFranchiseNameTeamIndex({
+    franchises,
+    seasonTeams,
+  });
   const teamWeekByKey = new Map(
     teamWeekRows
       .filter((row) => toTrimmedString(row.seasonId) === options.seasonId)
@@ -1172,7 +1309,9 @@ async function main(): Promise<void> {
     let html: string;
     try {
       await applyRandomRequestStagger(url, options);
-      html = await fetchYahooMatchupPage(url, options.requestDelayMs);
+      html = await fetchYahooMatchupPage(url, options.requestDelayMs, (event) => {
+        log(options, formatYahooFetchProgress(event));
+      });
     } catch (error) {
       fetchFailures += 1;
       recordDiscrepancy({
@@ -1207,12 +1346,20 @@ async function main(): Promise<void> {
     }
 
     const resolvedSides = resolveYahooWeeklySides({
+      expectedHomeTeamId: homeTeamId,
+      expectedAwayTeamId: awayTeamId,
       expectedHomeYahooTeamId: homeYahooTeamId,
       expectedAwayYahooTeamId: awayYahooTeamId,
       teamTotals,
       weeklyPlayers,
+      franchiseNameTeamIndex,
     });
-    if (resolvedSides.mode === "swapped") {
+    if (resolvedSides.mode === "franchise-name") {
+      log(
+        options,
+        `Resolved Yahoo matchup ${matchupId} by Yahoo team names. Page home "${teamTotals.home.teamName}" -> team ${resolvedSides.home.gshlTeamId}; page away "${teamTotals.away.teamName}" -> team ${resolvedSides.away.gshlTeamId}.`,
+      );
+    } else if (resolvedSides.mode === "swapped") {
       log(
         options,
         `Resolved Yahoo matchup ${matchupId} with swapped page sides. Expected home=${homeYahooTeamId} away=${awayYahooTeamId}; page home=${toTrimmedString(teamTotals.home.yahooTeamId) || "(missing)"} away=${toTrimmedString(teamTotals.away.yahooTeamId) || "(missing)"}.`,
@@ -1227,13 +1374,13 @@ async function main(): Promise<void> {
     for (const [side, teamId, yahooTeamId, yahooStats] of [
       [
         "home",
-        homeTeamId,
+        resolvedSides.home.gshlTeamId,
         resolvedSides.home.yahooTeamId || homeYahooTeamId,
         resolvedSides.home.totals,
       ] as const,
       [
         "away",
-        awayTeamId,
+        resolvedSides.away.gshlTeamId,
         resolvedSides.away.yahooTeamId || awayYahooTeamId,
         resolvedSides.away.totals,
       ] as const,
@@ -1360,13 +1507,13 @@ async function main(): Promise<void> {
     for (const [side, teamId, yahooTeamId, yahooRows] of [
       [
         "home",
-        homeTeamId,
+        resolvedSides.home.gshlTeamId,
         resolvedSides.home.yahooTeamId || homeYahooTeamId,
         resolvedSides.home.rows,
       ] as const,
       [
         "away",
-        awayTeamId,
+        resolvedSides.away.gshlTeamId,
         resolvedSides.away.yahooTeamId || awayYahooTeamId,
         resolvedSides.away.rows,
       ] as const,
