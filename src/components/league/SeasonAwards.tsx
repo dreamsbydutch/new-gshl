@@ -7,7 +7,6 @@ import { AwardsList } from "@gshl-types";
 import type {
   Awards,
   AwardCatalogEntry,
-  AwardGroupKey,
   GSHLTeam,
   Player,
   PlayerTotalStatLine,
@@ -191,7 +190,9 @@ function normalizeIdList(value: unknown): string[] {
     .filter(Boolean);
 }
 
-function getPlayerPositions(nhlPos: PlayerTotalStatLine["nhlPos"]): string {
+function getPlayerPositions(
+  nhlPos: PlayerTotalStatLine["nhlPos"] | undefined,
+): string {
   return Array.isArray(nhlPos) ? nhlPos.join("/") : String(nhlPos ?? "-");
 }
 
@@ -220,11 +221,11 @@ function buildSeasonAwardCards(
         award,
         catalog,
         winnerName:
-          winningTeam?.name?.trim() || ownerDisplayName || "Winner not found",
+          winningTeam?.name?.trim() ?? ownerDisplayName ?? "Winner not found",
         winnerDetail:
           winningTeam?.name?.trim() && ownerDisplayName
             ? ownerDisplayName
-            : winningTeam?.confName?.trim() || null,
+            : (winningTeam?.confName?.trim() ?? null),
         logoUrl: winningTeam?.logoUrl ?? null,
       } satisfies SeasonAwardWinnerCard;
     })
@@ -267,7 +268,11 @@ function buildAllStarTeamCards(
           playerId,
           playerName: playerById.get(playerId) ?? `Player ${playerId}`,
           positions: getPlayerPositions(playerTotal?.nhlPos),
-          teamName: gshlTeams.map((team) => team.name).filter(Boolean).join(", ") || null,
+          teamName:
+            gshlTeams
+              .map((team) => team.name)
+              .filter((teamName): teamName is string => Boolean(teamName))
+              .join(", ") || null,
           teamLogoUrl: primaryTeam?.logoUrl ?? null,
         } satisfies AllStarWinner;
       })
