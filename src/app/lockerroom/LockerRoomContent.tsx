@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import { LockerRoomHeader } from "@gshl-components/team/LockerRoomHeader";
+import { TeamRecordBook } from "@gshl-components/team/TeamRecordBook";
 import { TeamDraftPickList } from "@gshl-components/team/TeamDraftPickList";
 import { TrophyCase } from "@gshl-components/team/TrophyCase";
 import {
@@ -17,6 +18,7 @@ import {
 } from "@gshl-hooks";
 import { resolveContractDefaultSeason } from "@gshl-utils";
 import type { GSHLTeam, NHLTeam } from "@gshl-types";
+import { clientApi as api } from "@gshl-trpc";
 import { TeamHistoryContainer } from "@gshl-components/team/TeamHistory";
 import { TeamRoster } from "@gshl-components/team/TeamRoster";
 import { TeamContractTable } from "@gshl-components/contracts/ContractTable";
@@ -55,6 +57,8 @@ export function LockerRoomContent() {
 
   const currentTeam = teams?.find((t) => t.ownerId === selectedOwnerId);
   const isTrophyTab = selectedLockerRoomType === "trophy";
+  const isRecordBookTab = selectedLockerRoomType === "recordbook";
+  const needsAwardsData = isTrophyTab || isRecordBookTab;
 
   const { data: awards = [], isLoading: awardsLoading } = useAwards({
     winnerId: selectedOwnerId ?? undefined,
@@ -62,17 +66,28 @@ export function LockerRoomContent() {
     orderBy: { seasonId: "desc" },
   });
   const { data: allAwards = [], isLoading: allAwardsLoading } = useAwards({
-    enabled: isTrophyTab,
+    enabled: needsAwardsData,
     orderBy: { seasonId: "desc" },
   });
   const playerTotalsQuery = usePlayerStats({
-    enabled: isTrophyTab,
+    enabled: needsAwardsData,
     includeDaily: false,
     includeWeekly: false,
     includeSplits: false,
     includeTotals: true,
   });
   const playerTotals = playerTotalsQuery.totals;
+  const careerSplitsQuery = api.playerStats.careerSplits.getAll.useQuery(
+    {},
+    {
+      enabled: isRecordBookTab,
+      staleTime: 5 * 60 * 1000,
+      gcTime: 15 * 60 * 1000,
+      refetchOnWindowFocus: true,
+      refetchOnMount: true,
+    },
+  );
+  const careerSplits = careerSplitsQuery.data ?? [];
 
   const {
     table: teamContractTableData,
@@ -95,10 +110,11 @@ export function LockerRoomContent() {
     teamsLoading ||
     playersLoading ||
     nhlTeamsLoading ||
-    (isTrophyTab &&
+    (needsAwardsData &&
       (awardsLoading ||
         allAwardsLoading ||
-        playerTotalsQuery.status.isLoading));
+        playerTotalsQuery.status.isLoading)) ||
+    (isRecordBookTab && careerSplitsQuery.isLoading);
 
   if (isLoading) {
     if (selectedLockerRoomType === "roster") {
@@ -171,6 +187,18 @@ export function LockerRoomContent() {
           awards={awards}
           allAwards={allAwards}
           allTeams={allTeams}
+          currentTeam={currentTeam}
+          nhlTeams={nhlTeams}
+          playerTotals={playerTotals}
+          players={players}
+          seasons={seasons}
+        />
+      )}
+      {selectedLockerRoomType === "recordbook" && (
+        <TeamRecordBook
+          allAwards={allAwards}
+          allTeams={allTeams}
+          careerSplits={careerSplits}
           currentTeam={currentTeam}
           nhlTeams={nhlTeams}
           playerTotals={playerTotals}

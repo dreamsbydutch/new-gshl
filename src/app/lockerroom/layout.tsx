@@ -45,6 +45,11 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         setter: (type: string | null) => setSelectedType(type ?? ""),
       },
       {
+        key: "recordbook",
+        value: "Record Book",
+        setter: (type: string | null) => setSelectedType(type ?? ""),
+      },
+      {
         key: "draft",
         value: "Draft",
         setter: (type: string | null) => setSelectedType(type ?? ""),
