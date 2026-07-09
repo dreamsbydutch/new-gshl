@@ -77,8 +77,9 @@ type AwardSummaryRow = {
   nhlTeam: NHLTeam | undefined;
   positions: string;
   totalAwards: number;
-  majorAwards: number;
-  allStarAwards: number;
+  firstTeamAllStars: number;
+  secondTeamAllStars: number;
+  playoffAllStars: number;
   latestYear: number | string;
   breakdown: string;
 };
@@ -106,14 +107,6 @@ interface TeamRecordBookProps {
 }
 
 const PLAYER_AWARD_KEYS = new Set<AwardsList>([
-  AwardsList.HART,
-  AwardsList.ROCKET,
-  AwardsList.ART_ROSS,
-  AwardsList.SELKE,
-  AwardsList.VEZINA,
-  AwardsList.NORRIS,
-  AwardsList.CALDER,
-  AwardsList.LADY_BYNG,
   AwardsList.FIRST_AS,
   AwardsList.SECOND_AS,
   AwardsList.PLAYOFF_AS,
@@ -503,8 +496,9 @@ function buildAwardSummaryRows({
       playerId: string;
       counts: Map<AwardsList, number>;
       totalAwards: number;
-      majorAwards: number;
-      allStarAwards: number;
+      firstTeamAllStars: number;
+      secondTeamAllStars: number;
+      playoffAllStars: number;
       latestYear: number | string;
     }
   >();
@@ -544,8 +538,9 @@ function buildAwardSummaryRows({
       playerId,
       counts: new Map<AwardsList, number>(),
       totalAwards: 0,
-      majorAwards: 0,
-      allStarAwards: 0,
+      firstTeamAllStars: 0,
+      secondTeamAllStars: 0,
+      playoffAllStars: 0,
       latestYear: seasonYear,
     };
 
@@ -554,10 +549,12 @@ function buildAwardSummaryRows({
     }
 
     existing.totalAwards += 1;
-    if (ALL_STAR_AWARD_KEYS.has(awardKey)) {
-      existing.allStarAwards += 1;
-    } else {
-      existing.majorAwards += 1;
+    if (awardKey === AwardsList.FIRST_AS) {
+      existing.firstTeamAllStars += 1;
+    } else if (awardKey === AwardsList.SECOND_AS) {
+      existing.secondTeamAllStars += 1;
+    } else if (awardKey === AwardsList.PLAYOFF_AS) {
+      existing.playoffAllStars += 1;
     }
     existing.counts.set(awardKey, (existing.counts.get(awardKey) ?? 0) + 1);
 
@@ -591,8 +588,9 @@ function buildAwardSummaryRows({
         ),
         positions: getPlayerPositions(player, []),
         totalAwards: summary.totalAwards,
-        majorAwards: summary.majorAwards,
-        allStarAwards: summary.allStarAwards,
+        firstTeamAllStars: summary.firstTeamAllStars,
+        secondTeamAllStars: summary.secondTeamAllStars,
+        playoffAllStars: summary.playoffAllStars,
         latestYear: summary.latestYear,
         breakdown,
       };
@@ -601,11 +599,14 @@ function buildAwardSummaryRows({
       if (right.totalAwards !== left.totalAwards) {
         return right.totalAwards - left.totalAwards;
       }
-      if (right.majorAwards !== left.majorAwards) {
-        return right.majorAwards - left.majorAwards;
+      if (right.firstTeamAllStars !== left.firstTeamAllStars) {
+        return right.firstTeamAllStars - left.firstTeamAllStars;
       }
-      if (right.allStarAwards !== left.allStarAwards) {
-        return right.allStarAwards - left.allStarAwards;
+      if (right.secondTeamAllStars !== left.secondTeamAllStars) {
+        return right.secondTeamAllStars - left.secondTeamAllStars;
+      }
+      if (right.playoffAllStars !== left.playoffAllStars) {
+        return right.playoffAllStars - left.playoffAllStars;
       }
       return left.playerName.localeCompare(right.playerName);
     });
@@ -726,7 +727,7 @@ function AwardsTable({
     <div className="rounded-[1.75rem] border border-gray-200 bg-white/95 p-4 shadow-[0_18px_40px_rgba(15,23,42,0.08)]">
       <div className="mb-3 px-1">
         <h3 className="font-oswald text-2xl leading-none text-black">
-          Franchise Award Leaders
+          Franchise All-Star Leaders
         </h3>
       </div>
       <Table>
@@ -735,8 +736,9 @@ function AwardsTable({
             <TableHead>Player</TableHead>
             <TableHead>Pos</TableHead>
             <TableHead className="text-right">Total</TableHead>
-            <TableHead className="text-right">Major</TableHead>
-            <TableHead className="text-right">All-Star</TableHead>
+            <TableHead className="text-right">1st</TableHead>
+            <TableHead className="text-right">2nd</TableHead>
+            <TableHead className="text-right">Playoff</TableHead>
             <TableHead>Breakdown</TableHead>
           </TableRow>
         </TableHeader>
@@ -755,10 +757,13 @@ function AwardsTable({
                   {formatNumber(row.totalAwards, 0)}
                 </TableCell>
                 <TableCell className="text-right">
-                  {formatNumber(row.majorAwards, 0)}
+                  {formatNumber(row.firstTeamAllStars, 0)}
                 </TableCell>
                 <TableCell className="text-right">
-                  {formatNumber(row.allStarAwards, 0)}
+                  {formatNumber(row.secondTeamAllStars, 0)}
+                </TableCell>
+                <TableCell className="text-right">
+                  {formatNumber(row.playoffAllStars, 0)}
                 </TableCell>
                 <TableCell className="text-xs text-muted-foreground">
                   {row.breakdown}
@@ -769,9 +774,9 @@ function AwardsTable({
             <TableRow>
               <TableCell
                 className="py-6 text-center text-sm text-muted-foreground"
-                colSpan={6}
+                colSpan={7}
               >
-                No player awards on file for this franchise yet.
+                No all-star selections on file for this franchise yet.
               </TableCell>
             </TableRow>
           )}
@@ -975,7 +980,7 @@ export function TeamRecordBook(props: TeamRecordBookProps) {
           <RecordLeaderCard
             leader={{
               key: "most-awards",
-              label: "Most Player Awards",
+              label: "Most All-Star Honors",
               playerId: awardsLeader.playerId,
               playerName: awardsLeader.playerName,
               nhlTeam: awardsLeader.nhlTeam,
@@ -1011,7 +1016,7 @@ export function TeamRecordBook(props: TeamRecordBookProps) {
         />
       </div>
 
-      <RecordBookDivider label="PLAYER AWARDS" />
+      <RecordBookDivider label="ALL-STAR TEAMS" />
       <div className="mx-auto max-w-6xl px-4">
         <AwardsTable rows={awardSummaryRows} />
       </div>
