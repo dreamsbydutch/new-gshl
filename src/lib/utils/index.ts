@@ -25,5 +25,3 @@ export * from "./shared";
 // Feature utilities - Component-specific helpers
 export * from "./features";
 
-// External integrations
-export * from "./integrations";

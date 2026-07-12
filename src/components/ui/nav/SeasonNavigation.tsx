@@ -9,15 +9,9 @@
 
 import { useMemo, useState, useEffect } from "react";
 
-import type { SeasonSummary } from "@gshl-utils";
-import { useSeasonState } from "@gshl-hooks";
+import type { SeasonSummary, SeasonToggleNavProps } from "@gshl-types";
+import { useSeasonNavigation, useSeasonState } from "@gshl-hooks";
 import { DropdownToggle } from "./toggle";
-import { useSeasonNavigation } from "@gshl-cache";
-
-interface SeasonToggleNavProps {
-  className?: string;
-  dropdownPosition?: "above" | "below" | "auto";
-}
 
 export function SeasonToggleNav({
   className,

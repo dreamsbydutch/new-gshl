@@ -5,6 +5,9 @@
  * Type definitions have been moved to @gshl-types/ui-components
  */
 
+import type { ContractTableProps } from "@gshl-types";
+import { toNumber } from "../core";
+
 export const CAP_CEILING = 25000000;
 export const CAP_SEASON_END_MONTH = 3; // April (0-indexed)
 export const CAP_SEASON_END_DAY = 19;
@@ -54,3 +57,30 @@ export const getSeasonDisplay = (seasonName: string, yearOffset: number) => {
  */
 export const isValidDate = (value: unknown): value is Date =>
   value instanceof Date && !Number.isNaN(value.getTime());
+
+export function getDisplaySeasonYear(
+  currentSeason: ContractTableProps["currentSeason"],
+): number {
+  const explicitYear = toNumber(currentSeason?.year, Number.NaN);
+  if (Number.isFinite(explicitYear)) {
+    return explicitYear;
+  }
+
+  const match = currentSeason?.name?.match(/^(\d{4})/);
+  return match ? Number(match[1]) + 1 : new Date().getFullYear();
+}
+
+export function getDateYear(
+  value: Date | string | null | undefined,
+): number | null {
+  if (!value) return null;
+
+  const parsed = value instanceof Date ? value : new Date(String(value));
+  if (!Number.isNaN(parsed.getTime())) {
+    return parsed.getFullYear();
+  }
+
+  const matches = String(value).match(/\d{4}/g);
+  if (!matches?.length) return null;
+  return Number(matches[matches.length - 1]);
+}

@@ -16,36 +16,17 @@
 import { useEffect, useMemo, useState } from "react";
 import { DraftPickListSkeleton } from "@gshl-skeletons";
 import { DropdownToggle } from "@gshl-nav";
-import type { TeamDraftPickListProps, DraftPickItemProps } from "@gshl-utils";
+import type {
+  DraftPickItemProps,
+  Season,
+  TeamDraftPickListProps,
+} from "@gshl-types";
 import {
+  buildSyntheticSeason,
   formatDraftPickDescription,
   getOriginalTeamName,
-  getSeasonString,
 } from "@gshl-utils";
-import type { Season } from "@gshl-types";
 import { useTeamDraftPickListData } from "@gshl-hooks";
-
-function shiftSeasonDate(dateValue: string, yearOffset: number): string {
-  const parsed = new Date(dateValue);
-  if (Number.isNaN(parsed.getTime())) return dateValue;
-
-  parsed.setFullYear(parsed.getFullYear() + yearOffset);
-  return parsed.toISOString().split("T")[0] ?? dateValue;
-}
-
-function buildSyntheticSeason(previousSeason: Season, id: string): Season {
-  const nextEndYear = Number(previousSeason.year) + 1;
-  return {
-    ...previousSeason,
-    id,
-    year: nextEndYear,
-    name: getSeasonString(nextEndYear - 1),
-    startDate: shiftSeasonDate(previousSeason.startDate, 1),
-    endDate: shiftSeasonDate(previousSeason.endDate, 1),
-    signingEndDate: shiftSeasonDate(previousSeason.signingEndDate, 1),
-    isActive: false,
-  };
-}
 
 // ============================================================================
 // INTERNAL COMPONENTS

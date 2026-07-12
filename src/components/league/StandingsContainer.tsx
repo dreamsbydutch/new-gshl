@@ -37,74 +37,24 @@ import {
   CONFERENCE_SEED_FIELDS,
   WILDCARD_FIELDS,
   LOSERS_TOURNEY_FIELDS,
+  buildStandingsCategories,
+  buildStandingsOpponentLookup,
   formatSeedPosition,
   calculatePercentage,
   calculateStandingsPoints,
+  formatStandingsRank,
   formatStandingsRecord,
+  formatStandingsDetailStat,
+  formatStandingsGaa,
+  formatStandingsSvp,
   getTeamMatchupResult,
+  getStandingsMatchupWindow,
   usesLegacyTieRules,
 } from "@gshl-utils";
 import type { Season } from "@gshl-types";
 import type { TeamSeasonStatLine } from "@gshl-types";
 import type { Matchup, Week } from "@gshl-types";
 import { useTeamColor } from "@gshl-hooks";
-
-const formatOrdinal = (n: number) => {
-  const mod100 = n % 100;
-  if (mod100 >= 11 && mod100 <= 13) return `${n}th`;
-  switch (n % 10) {
-    case 1:
-      return `${n}st`;
-    case 2:
-      return `${n}nd`;
-    case 3:
-      return `${n}rd`;
-    default:
-      return `${n}th`;
-  }
-};
-
-const formatRank = (rank: unknown) => {
-  const num = Number(rank);
-  return Number.isFinite(num) && num > 0 ? `(${formatOrdinal(num)})` : "";
-};
-
-const compareNumeric = (
-  a: number | null | undefined,
-  b: number | null | undefined,
-) => {
-  const av = a ?? -Infinity;
-  const bv = b ?? -Infinity;
-  return bv - av;
-};
-
-const compareNumericAsc = (
-  a: number | null | undefined,
-  b: number | null | undefined,
-) => {
-  const av = a ?? Infinity;
-  const bv = b ?? Infinity;
-  return av - bv;
-};
-
-const formatStat = (value: unknown, fallback = "-") => {
-  if (value === null || value === undefined || value === "") return fallback;
-  if (typeof value === "number")
-    return Number.isFinite(value) ? value : fallback;
-  if (typeof value === "string") return value;
-  if (typeof value === "boolean") return value ? "Yes" : "No";
-  return fallback;
-};
-
-const formatGaa = (value: unknown) => {
-  const num = Number(value);
-  return Number.isFinite(num) ? num.toFixed(2) : "-";
-};
-
-const formatSvp = (value: unknown) => {
-  const num = Number(value);
-  return Number.isFinite(num) ? num.toFixed(3).toString().slice(1) : "-";
-};
 
 // ============================================================================
 // INTERNAL COMPONENTS
@@ -285,159 +235,25 @@ const StandingsItem = ({
 
   const categories = useMemo(() => {
     if (!team) return [];
-
-    const statDefs: Array<{
-      label: string;
-      value: number | null | undefined;
-      rank: number | null;
-    }> = [];
-
-    const add = (
-      label: string,
-      value: number | null | undefined,
-      rank: number | null,
-    ) => {
-      statDefs.push({ label, value, rank });
-    };
-
-    // Use computed ranks if we can derive them from all-team stats.
-    if (standingsContext) {
-      const { allTeamsStats } = standingsContext;
-
-      const rankMapDesc = (key: keyof TeamSeasonStatLine) => {
-        const sorted = [...allTeamsStats].sort((a, b) =>
-          compareNumeric(
-            a[key] as unknown as number,
-            b[key] as unknown as number,
-          ),
-        );
-        const map = new Map<string, number>();
-        sorted.forEach((s, idx) => map.set(s.gshlTeamId, idx + 1));
-        return map;
-      };
-
-      const rankMapAsc = (key: keyof TeamSeasonStatLine) => {
-        const sorted = [...allTeamsStats].sort((a, b) =>
-          compareNumericAsc(
-            a[key] as unknown as number,
-            b[key] as unknown as number,
-          ),
-        );
-        const map = new Map<string, number>();
-        sorted.forEach((s, idx) => map.set(s.gshlTeamId, idx + 1));
-        return map;
-      };
-
-      const rankG = rankMapDesc("G");
-      const rankA = rankMapDesc("A");
-      const rankP = rankMapDesc("P");
-      const rankPPP = rankMapDesc("PPP");
-      const rankSOG = rankMapDesc("SOG");
-      const rankHIT = rankMapDesc("HIT");
-      const rankBLK = rankMapDesc("BLK");
-      const rankW = rankMapDesc("W");
-      const rankGAA = rankMapAsc("GAA");
-      const rankSVP = rankMapDesc("SVP");
-
-      add("G", standingsContext.seasonStats.G, rankG.get(team.id) ?? null);
-      add("A", standingsContext.seasonStats.A, rankA.get(team.id) ?? null);
-      add("P", standingsContext.seasonStats.P, rankP.get(team.id) ?? null);
-      add(
-        "PPP",
-        standingsContext.seasonStats.PPP,
-        rankPPP.get(team.id) ?? null,
-      );
-      add(
-        "SOG",
-        standingsContext.seasonStats.SOG,
-        rankSOG.get(team.id) ?? null,
-      );
-      add(
-        "HIT",
-        standingsContext.seasonStats.HIT,
-        rankHIT.get(team.id) ?? null,
-      );
-      add(
-        "BLK",
-        standingsContext.seasonStats.BLK,
-        rankBLK.get(team.id) ?? null,
-      );
-      add("W", standingsContext.seasonStats.W, rankW.get(team.id) ?? null);
-      add(
-        "GAA",
-        standingsContext.seasonStats.GAA,
-        rankGAA.get(team.id) ?? null,
-      );
-      add(
-        "SV%",
-        standingsContext.seasonStats.SVP,
-        rankSVP.get(team.id) ?? null,
-      );
-    } else {
-      add("G", team.seasonStats?.G ?? null, null);
-      add("A", team.seasonStats?.A ?? null, null);
-      add("P", team.seasonStats?.P ?? null, null);
-      add("PPP", team.seasonStats?.PPP ?? null, null);
-      add("SOG", team.seasonStats?.SOG ?? null, null);
-      add("HIT", team.seasonStats?.HIT ?? null, null);
-      add("BLK", team.seasonStats?.BLK ?? null, null);
-      add("W", team.seasonStats?.W ?? null, null);
-      add("GAA", team.seasonStats?.GAA ?? null, null);
-      add("SV%", team.seasonStats?.SVP ?? null, null);
-    }
-
-    return statDefs;
+    return buildStandingsCategories(
+      team.id,
+      standingsContext?.seasonStats ?? team.seasonStats,
+      standingsContext?.allTeamsStats,
+    );
   }, [team, standingsContext]);
 
   const matchupSummary = useMemo(() => {
     if (!team) return [];
-
-    const weekNumById = new Map<string, number>();
-    weeks.forEach((w) => weekNumById.set(w.id, w.weekNum));
-
-    const teamMatchups = matchups
-      .filter((m) => m.homeTeamId === team.id || m.awayTeamId === team.id)
-      .map((m) => ({
-        matchup: m,
-        weekNum: weekNumById.get(m.weekId) ?? null,
-      }))
-      .filter((x) => x.weekNum !== null)
-      .sort((a, b) => (a.weekNum ?? 0) - (b.weekNum ?? 0));
-
-    // Use the earliest non-completed matchup from the season as the pivot.
-    const firstUpcomingIndex = teamMatchups.findIndex(
-      (x) =>
-        x.matchup.weekId ===
-        weeks.find(
-          (w) =>
-            w.startDate <= (new Date().toISOString().split("T")[0] ?? "") &&
-            w.endDate >= (new Date().toISOString().split("T")[0] ?? ""),
-        )?.id,
-    );
-    const pivotIndex =
-      firstUpcomingIndex === -1 ? teamMatchups.length : firstUpcomingIndex;
-
-    const prev = teamMatchups.slice(
-      Math.max(0, pivotIndex - 4),
-      pivotIndex + 2,
-    );
-
-    return prev;
+    return getStandingsMatchupWindow(team.id, matchups, weeks);
   }, [matchups, team, weeks]);
 
   const opponentNameById = useMemo(() => {
-    const byId = new Map<string, { name: string; logoUrl: string }>();
     const allTeams = (
       team as unknown as {
         __allTeams?: Array<{ id: string; name: string; logoUrl: string }>;
       }
     ).__allTeams;
-    if (Array.isArray(allTeams)) {
-      allTeams.forEach((t) =>
-        byId.set(t.id, { name: t.name, logoUrl: t.logoUrl }),
-      );
-    }
-    return byId;
+    return buildStandingsOpponentLookup(allTeams);
   }, [team]);
   const teamColor = useTeamColor(team.logoUrl);
 
@@ -487,7 +303,9 @@ const StandingsItem = ({
             <div className="text-sm font-bold">{recordText}</div>
           </div>
           <div className="w-[25px] text-center">
-            <div className="text-xs font-bold">{formatStat(standingsPoints)}</div>
+            <div className="text-xs font-bold">
+              {formatStandingsDetailStat(standingsPoints)}
+            </div>
           </div>
           <div className="w-4">
             <svg
@@ -540,9 +358,9 @@ const StandingsItem = ({
                     <td
                       key={cell.label}
                       className="whitespace-nowrap border-b px-2 py-1 text-center font-mono tabular-nums"
-                      title={
-                        typeof cell.rank === "number"
-                          ? formatRank(cell.rank)
+                        title={
+                          typeof cell.rank === "number"
+                          ? formatStandingsRank(cell.rank)
                           : undefined
                       }
                     >
@@ -563,13 +381,13 @@ const StandingsItem = ({
                           )}
                         >
                           {cell.label === "GAA"
-                            ? formatGaa(cell.value)
+                            ? formatStandingsGaa(cell.value)
                             : cell.label === "SV%"
-                              ? formatSvp(cell.value)
-                              : formatStat(cell.value)}
+                              ? formatStandingsSvp(cell.value)
+                              : formatStandingsDetailStat(cell.value)}
                         </div>
                         <div className="text-2xs text-muted-foreground">
-                          {formatRank(cell.rank)}
+                          {formatStandingsRank(cell.rank)}
                         </div>
                       </div>
                     </td>

@@ -7,9 +7,13 @@
 
 export * from "./contract-table";
 export * from "./conference-contest";
+export * from "./draft-classes";
 export * from "./draft-board-list";
 export * from "./draft-admin";
+export * from "./matchup-details";
 export * from "./mock-draft";
+export * from "./playoff-bracket";
+export * from "./season-awards";
 
 // locker-room-header exports (including TeamInfoProps)
 export * from "./locker-room-header";
@@ -23,6 +27,16 @@ export {
   CONFERENCE_SEED_FIELDS,
   WILDCARD_FIELDS,
   LOSERS_TOURNEY_FIELDS,
+  buildStandingsCategories,
+  buildStandingsOpponentLookup,
+  compareNumeric,
+  compareNumericAsc,
+  formatOrdinal,
+  formatStandingsRank,
+  formatStandingsDetailStat,
+  formatStandingsGaa,
+  formatStandingsSvp,
+  getStandingsMatchupWindow,
   groupTeamsByStandingsType,
   filterTeamsByConference,
   getOrdinalSuffix,
@@ -40,6 +54,7 @@ export type {
 } from "./standings-container";
 
 export * from "./team-draft-pick-list";
+export * from "./team-record-book";
 
 // team-history exports (has GameType - aliased from TeamHistoryGameType)
 export {
@@ -69,6 +84,7 @@ export type {
 } from "./team-history";
 
 export * from "./team-roster";
+export * from "./trophy-case";
 
 // team-schedule exports (has GameType conflict)
 export {

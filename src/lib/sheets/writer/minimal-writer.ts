@@ -17,12 +17,35 @@ type CompositeKeyUpsertOptions = {
   idColumn?: string;
   generateId?: () => string;
   spreadsheetId?: string;
+  diagnostics?:
+    | boolean
+    | {
+        maxSamples?: number;
+        maxFieldsPerSample?: number;
+      };
+};
+
+type CompositeKeyDiffSample = {
+  key: string;
+  rowNumber: number;
+  changedFields: Array<{
+    column: string;
+    previousValue: string;
+    nextValue: string;
+  }>;
 };
 
 type CompositeKeyUpsertResult = {
   updated: number;
   inserted: number;
+  deleted: number;
+  duplicateDeletes: number;
+  unchanged: number;
   total: number;
+  diagnostics?: {
+    changedColumns: Array<{ column: string; count: number }>;
+    sampleUpdates: CompositeKeyDiffSample[];
+  };
 };
 
 function stringifyPrimitive(value: string | number | boolean): string {
@@ -137,6 +160,53 @@ function rowToRecord(
   return record;
 }
 
+function normalizeComparableCellValue(value: PrimitiveCellValue): string {
+  if (value === null || value === undefined || value === "") {
+    return "";
+  }
+  return String(value).trim();
+}
+
+function rowsMatch(
+  left: readonly PrimitiveCellValue[],
+  right: readonly PrimitiveCellValue[],
+): boolean {
+  const maxLength = Math.max(left.length, right.length);
+  for (let index = 0; index < maxLength; index += 1) {
+    if (
+      normalizeComparableCellValue(left[index] ?? "") !==
+      normalizeComparableCellValue(right[index] ?? "")
+    ) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function getChangedFields(
+  header: readonly string[],
+  left: readonly PrimitiveCellValue[],
+  right: readonly PrimitiveCellValue[],
+): CompositeKeyDiffSample["changedFields"] {
+  const maxLength = Math.max(header.length, left.length, right.length);
+  const changedFields: CompositeKeyDiffSample["changedFields"] = [];
+
+  for (let index = 0; index < maxLength; index += 1) {
+    const previousValue = normalizeComparableCellValue(left[index] ?? "");
+    const nextValue = normalizeComparableCellValue(right[index] ?? "");
+    if (previousValue === nextValue) {
+      continue;
+    }
+    changedFields.push({
+      column: header[index] ?? String(index),
+      previousValue,
+      nextValue,
+    });
+  }
+
+  return changedFields;
+}
+
 function buildRowFromObject(
   header: readonly string[],
   item: Record<string, unknown>,
@@ -241,7 +311,14 @@ export class MinimalSheetsWriter {
     options: CompositeKeyUpsertOptions = {},
   ): Promise<CompositeKeyUpsertResult> {
     if (!rows.length) {
-      return { updated: 0, inserted: 0, total: 0 };
+      return {
+        updated: 0,
+        inserted: 0,
+        deleted: 0,
+        duplicateDeletes: 0,
+        unchanged: 0,
+        total: 0,
+      };
     }
 
     const sheetName = SHEETS_CONFIG.SHEETS[modelName];
@@ -263,6 +340,14 @@ export class MinimalSheetsWriter {
     const updatedAtColumn = options.updatedAtColumn;
     const createdAtColumn = options.createdAtColumn;
     const idColumn = options.idColumn;
+    const diagnosticsOptions =
+      options.diagnostics && typeof options.diagnostics === "object"
+        ? options.diagnostics
+        : null;
+    const captureDiagnostics =
+      options.diagnostics !== undefined && options.diagnostics !== false;
+    const maxDiffSamples = diagnosticsOptions?.maxSamples ?? 5;
+    const maxFieldsPerSample = diagnosticsOptions?.maxFieldsPerSample ?? 8;
     const nowIso = new Date().toISOString();
     const spreadsheetId = spreadsheetIds[0];
     const rawRows = await optimizedSheetsClient.getValues(
@@ -317,8 +402,11 @@ export class MinimalSheetsWriter {
     const updates = new Map<number, PrimitiveCellValue[]>();
     const inserts: PrimitiveCellValue[][] = [];
     const incomingSeen = new Set<string>();
+    const changedColumnCounts = new Map<string, number>();
+    const sampleUpdates: CompositeKeyDiffSample[] = [];
     let updated = 0;
     let inserted = 0;
+    let unchanged = 0;
     let nextNumericId = maxNumericId + 1;
 
     for (const row of rows) {
@@ -335,17 +423,47 @@ export class MinimalSheetsWriter {
       incomingSeen.add(key);
 
       const existing = existingByKey.get(key);
-      if (updatedAtColumn) {
-        mutableRow[updatedAtColumn] = nowIso;
-      }
-
       if (existing) {
-        const nextRow = buildRowFromObject(
+        const candidateRow = buildRowFromObject(
           headerColumns,
           mutableRow,
           existing.row,
           merge,
         );
+        if (rowsMatch(existing.row, candidateRow)) {
+          unchanged += 1;
+          continue;
+        }
+        if (captureDiagnostics) {
+          const changedFields = getChangedFields(
+            headerColumns,
+            existing.row,
+            candidateRow,
+          );
+          for (const changedField of changedFields) {
+            changedColumnCounts.set(
+              changedField.column,
+              (changedColumnCounts.get(changedField.column) ?? 0) + 1,
+            );
+          }
+          if (sampleUpdates.length < maxDiffSamples) {
+            sampleUpdates.push({
+              key,
+              rowNumber: existing.rowNumber,
+              changedFields: changedFields.slice(0, maxFieldsPerSample),
+            });
+          }
+        }
+        const nextRow = [...candidateRow];
+        if (updatedAtColumn) {
+          const updatedAtIndex = headerIndex.get(updatedAtColumn);
+          if (updatedAtIndex !== undefined) {
+            nextRow[updatedAtIndex] = normalizeWriteValue(
+              updatedAtColumn,
+              nowIso,
+            );
+          }
+        }
         if (createdAtColumn) {
           const createdAtIndex = headerIndex.get(createdAtColumn);
           if (
@@ -395,7 +513,18 @@ export class MinimalSheetsWriter {
     return {
       updated,
       inserted,
+      deleted: 0,
+      duplicateDeletes: 0,
+      unchanged,
       total: updated + inserted,
+      diagnostics: captureDiagnostics
+        ? {
+            changedColumns: Array.from(changedColumnCounts.entries())
+              .map(([column, count]) => ({ column, count }))
+              .sort((left, right) => right.count - left.count),
+            sampleUpdates,
+          }
+        : undefined,
     };
   }
 }

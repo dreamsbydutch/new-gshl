@@ -1,23 +1,13 @@
-import { type DraftPick, type GSHLTeam } from "@gshl-types";
-import type { DraftBoardPlayer } from "@gshl-types";
+import type {
+  BuildMockDraftProjectionOptions,
+  DraftBoardPlayer,
+  ProjectedDraftPick,
+} from "@gshl-types";
 
-export interface ProjectedDraftPick<
-  TPlayer extends DraftBoardPlayer = DraftBoardPlayer,
-> {
-  pick: DraftPick;
-  gshlTeam?: GSHLTeam;
-  projectedPlayer?: TPlayer;
-  score: number | null;
-}
-
-export interface BuildMockDraftProjectionOptions<
-  TPlayer extends DraftBoardPlayer = DraftBoardPlayer,
-> {
-  seasonDraftPicks: DraftPick[];
-  draftPlayers: TPlayer[];
-  teams: GSHLTeam[];
-  take?: number;
-}
+export type {
+  BuildMockDraftProjectionOptions,
+  ProjectedDraftPick,
+} from "@gshl-types";
 
 function comparePlayers(
   left: Pick<

@@ -15,146 +15,37 @@
 
 import { useMemo, useState } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import type {
+  MatchupStatsTableProps,
   TeamScheduleItemProps,
+  TeamStatsRowProps,
   GameResultProps,
   OpponentDisplayProps,
   WeekDisplayProps,
-} from "@gshl-utils";
+} from "@gshl-types";
 import type {
   GSHLTeam,
   MatchupCategoryConfig,
   TeamWeekStatLine,
 } from "@gshl-types";
 import {
+  didWinCategory,
+  formatCategoryValue,
   getGameLocation,
   getGameTypeDisplay,
+  getScoreCellClass,
+  getStatCellClass,
   isGameCompleted,
   getTeamMatchupResult,
   getResultStyleClass,
   formatTeamScore,
   formatOpponentDisplay,
+  resolveMatchupCategories,
+  toCategoryNumber,
 } from "@gshl-utils";
 import { findTeamById } from "@gshl-utils/domain/team";
 import { useSeasons, useTeamScheduleData, useTeams } from "@gshl-hooks";
-
-const MATCHUP_CATEGORY_MAP: Record<string, MatchupCategoryConfig> = {
-  G: { field: "G", label: "G" },
-  A: { field: "A", label: "A" },
-  P: { field: "P", label: "P" },
-  PM: { field: "PM", label: "+/-" },
-  PIM: { field: "PIM", label: "PIM" },
-  PPP: { field: "PPP", label: "PPP" },
-  SOG: { field: "SOG", label: "SOG" },
-  HIT: { field: "HIT", label: "HIT" },
-  BLK: { field: "BLK", label: "BLK" },
-  W: { field: "W", label: "W" },
-  GA: { field: "GA", label: "GA" },
-  GAA: { field: "GAA", label: "GAA", isInverse: true, precision: 2 },
-  SV: { field: "SV", label: "SV" },
-  SA: { field: "SA", label: "SA" },
-  SVP: { field: "SVP", label: "SV%", precision: 3 },
-  SO: { field: "SO", label: "SO" },
-};
-
-const FALLBACK_MATCHUP_CATEGORIES: MatchupCategoryConfig[] = [
-  MATCHUP_CATEGORY_MAP.G!,
-  MATCHUP_CATEGORY_MAP.A!,
-  MATCHUP_CATEGORY_MAP.P!,
-  MATCHUP_CATEGORY_MAP.PPP!,
-  MATCHUP_CATEGORY_MAP.SOG!,
-  MATCHUP_CATEGORY_MAP.HIT!,
-  MATCHUP_CATEGORY_MAP.BLK!,
-  MATCHUP_CATEGORY_MAP.W!,
-  MATCHUP_CATEGORY_MAP.GAA!,
-  MATCHUP_CATEGORY_MAP.SVP!,
-];
-
-function normalizeSeasonCategory(category: unknown): string | null {
-  if (typeof category !== "string" && typeof category !== "number") {
-    return null;
-  }
-
-  const value = `${category}`.trim().toUpperCase();
-  if (!value) return null;
-  if (value === "SV%") return "SVP";
-  return value;
-}
-
-function resolveMatchupCategories(
-  categories: unknown,
-): MatchupCategoryConfig[] {
-  const normalized = Array.isArray(categories)
-    ? categories.map((category) => normalizeSeasonCategory(category))
-    : typeof categories === "string" || typeof categories === "number"
-      ? `${categories}`
-          .split(",")
-          .map((category) => normalizeSeasonCategory(category))
-      : [];
-
-  const resolved = normalized
-    .filter((category): category is string => Boolean(category))
-    .map((category) => MATCHUP_CATEGORY_MAP[category])
-    .filter((category): category is MatchupCategoryConfig => Boolean(category));
-
-  return resolved.length > 0 ? resolved : FALLBACK_MATCHUP_CATEGORIES;
-}
-
-// ============================================================================
-// HELPER FUNCTIONS
-// ============================================================================
-
-/**
- * Determine if team won a specific stat category
- * @param teamValue - The team's stat value
- * @param opponentValue - The opponent's stat value
- * @param isInverse - Whether lower is better (like GAA)
- * @returns True if team won this category
- */
-function didWinCategory(
-  teamValue: number,
-  opponentValue: number,
-  isInverse = false,
-): boolean {
-  if (isInverse) {
-    // For GAA, lower is better, but both must be > 0
-    return teamValue > 0 && opponentValue > 0 && teamValue < opponentValue;
-  }
-  return teamValue > opponentValue;
-}
-
-/**
- * Get CSS classes for stat category based on win/loss
- */
-function getStatCellClass(won: boolean): string {
-  return `py-1 text-center ${won ? "font-semibold" : "font-light text-gray-400"}`;
-}
-
-/**
- * Get CSS classes for score cell based on win/loss
- */
-function getScoreCellClass(won: boolean): string {
-  return `justify-center py-1 text-center text-lg ${won ? "font-semibold" : "font-light text-gray-400"}`;
-}
-
-function toCategoryNumber(
-  stats: TeamWeekStatLine,
-  category: MatchupCategoryConfig,
-): number {
-  const rawValue = stats[category.field];
-  return Number(rawValue ?? 0);
-}
-
-function formatCategoryValue(
-  stats: TeamWeekStatLine,
-  category: MatchupCategoryConfig,
-): string {
-  const value = toCategoryNumber(stats, category);
-  if (!Number.isFinite(value)) return "0";
-  if (category.precision !== undefined)
-    return value.toFixed(category.precision);
-  return String(value);
-}
 
 // ============================================================================
 // INTERNAL COMPONENTS
@@ -288,15 +179,6 @@ function StatHeadersRow({
  * Team stats row component
  * Displays all stats for a team with conditional styling based on category wins
  */
-interface TeamStatsRowProps {
-  team?: GSHLTeam | null;
-  teamStats: TeamWeekStatLine;
-  opponentStats: TeamWeekStatLine;
-  teamScore: number | null;
-  opponentScore: number | null;
-  categories: MatchupCategoryConfig[];
-}
-
 function TeamStatsRow({
   team,
   teamStats,
@@ -337,16 +219,6 @@ function TeamStatsRow({
  * Matchup stats table component
  * Displays detailed stats breakdown with selected team always on top
  */
-interface MatchupStatsTableProps {
-  selectedTeam: GSHLTeam | null;
-  selectedTeamStats: TeamWeekStatLine;
-  selectedTeamScore: number | null;
-  opponentTeam: GSHLTeam | null;
-  opponentStats: TeamWeekStatLine;
-  opponentScore: number | null;
-  categories: MatchupCategoryConfig[];
-}
-
 function MatchupStatsTable({
   selectedTeam,
   selectedTeamStats,
@@ -485,15 +357,25 @@ function TeamScheduleItem({
               Loading stats...
             </div>
           ) : (
-            <MatchupStatsTable
-              selectedTeam={selectedTeam ?? null}
-              selectedTeamStats={selectedTeamStats}
-              selectedTeamScore={selectedTeamScore ?? null}
-              opponentTeam={opponentTeam ?? null}
-              opponentStats={opponentStats}
-              opponentScore={opponentScore ?? null}
-              categories={categories}
-            />
+            <div className="pb-2">
+              <div className="mx-auto flex w-5/6 justify-end pt-2">
+                <Link
+                  href={`/matchup/${matchup.id}`}
+                  className="rounded-full border border-slate-300 px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-slate-600 transition hover:border-slate-800 hover:text-slate-900"
+                >
+                  Open matchup page
+                </Link>
+              </div>
+              <MatchupStatsTable
+                selectedTeam={selectedTeam ?? null}
+                selectedTeamStats={selectedTeamStats}
+                selectedTeamScore={selectedTeamScore ?? null}
+                opponentTeam={opponentTeam ?? null}
+                opponentStats={opponentStats}
+                opponentScore={opponentScore ?? null}
+                categories={categories}
+              />
+            </div>
           )}
         </>
       )}

@@ -27,19 +27,21 @@ import {
 } from "@gshl-skeletons";
 import {
   formatMoney,
+  getDateYear,
+  getDisplaySeasonYear,
   getExpiryStatusClass,
+  getPlayerNhlAbbreviation,
   getSeasonDisplay,
   showDate,
-  toNumber,
 } from "@gshl-utils";
 import type {
+  TeamBuyoutTableProps,
   ContractTableProps,
   CapSpaceRowProps,
   PlayerContractRowProps,
   TableHeaderProps,
-} from "@gshl-utils";
-import type { GSHLTeam, NHLTeam, Player } from "@gshl-types";
-import type { BuyoutContractType } from "@gshl-hooks/main/useContract";
+} from "@gshl-types";
+import type { Player } from "@gshl-types";
 
 // ============================================================================
 // INTERNAL COMPONENTS
@@ -284,14 +286,6 @@ export function TeamContractTable({
   );
 }
 
-interface TeamBuyoutTableProps {
-  buyoutContracts: BuyoutContractType[];
-  currentTeam: GSHLTeam;
-  players: Player[];
-  nhlTeams: NHLTeam[];
-  ready: boolean;
-}
-
 export function TeamBuyoutTable({
   buyoutContracts,
   currentTeam,
@@ -409,47 +403,4 @@ export function TeamBuyoutTable({
       )}
     </div>
   );
-}
-
-function getPlayerNhlAbbreviation(player: Player): string | null {
-  const rawTeam: unknown = player.nhlTeam;
-
-  if (Array.isArray(rawTeam)) {
-    const firstTeam = rawTeam.find(
-      (team): team is string =>
-        typeof team === "string" && team.trim().length > 0,
-    );
-    return firstTeam ?? null;
-  }
-
-  if (typeof rawTeam !== "string") {
-    return null;
-  }
-
-  const value = rawTeam.trim();
-  return value.length > 0 ? value : null;
-}
-
-function getDisplaySeasonYear(
-  currentSeason: ContractTableProps["currentSeason"],
-) {
-  const explicitYear = toNumber(currentSeason?.year, Number.NaN);
-  if (Number.isFinite(explicitYear)) {
-    return explicitYear;
-  }
-
-  const match = currentSeason?.name?.match(/^(\d{4})/);
-  return match ? Number(match[1]) + 1 : new Date().getFullYear();
-}
-
-function getDateYear(value: Date | string | null | undefined): number | null {
-  if (!value) return null;
-  const parsed = value instanceof Date ? value : new Date(String(value));
-  if (!Number.isNaN(parsed.getTime())) {
-    return parsed.getFullYear();
-  }
-
-  const matches = String(value).match(/\d{4}/g);
-  if (!matches?.length) return null;
-  return Number(matches[matches.length - 1]);
 }

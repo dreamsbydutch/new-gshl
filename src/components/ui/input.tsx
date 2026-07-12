@@ -6,10 +6,7 @@
 
 import * as React from "react";
 import { cn } from "@gshl-utils";
-
-// eslint-disable-next-line @typescript-eslint/no-empty-object-type
-export interface InputProps
-  extends React.InputHTMLAttributes<HTMLInputElement> {}
+import type { InputProps } from "@gshl-types";
 
 /**
  * Text input element with Tailwind styling.

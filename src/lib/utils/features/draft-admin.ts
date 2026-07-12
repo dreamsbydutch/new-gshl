@@ -8,8 +8,10 @@
  * - Player search and filtering for draft context
  */
 
-import type { DraftPick, GSHLTeam, Player } from "@gshl-types";
+import type { DraftPick, GSHLTeam, LineupAssignment, Player } from "@gshl-types";
 import { RosterPosition } from "@gshl-types";
+
+export type { LineupAssignment } from "@gshl-types";
 
 /**
  * Default season ID for draft operations
@@ -140,11 +142,6 @@ export function filterFreeAgentsBySearch(
 
     return nameMatch || positionMatch || nhlTeamMatch;
   });
-}
-
-export interface LineupAssignment {
-  playerId: string;
-  lineupPos: RosterPosition;
 }
 
 const DEFAULT_LINEUP_SLOTS: Array<{

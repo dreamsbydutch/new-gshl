@@ -1,5 +1,5 @@
 import { HydrateClient, serverApi } from "@gshl-trpc/server-exports";
-import { StandingsContent } from "./StandingsContent";
+import { StandingsContent } from "@gshl-components/standings/StandingsContent";
 
 export default async function StandingsPage() {
   const activeSeason = await serverApi.season.getActive();

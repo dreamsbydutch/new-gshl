@@ -4,7 +4,7 @@
  * Pure functions for player data filtering, sorting, and transformations.
  */
 
-import type { Player } from "@gshl-types";
+import type { NHLTeam, Player } from "@gshl-types";
 import { isTruthy } from "../core/validation";
 
 /**
@@ -92,4 +92,47 @@ export function getFreeAgents(
   }
 
   return sortPlayersByRating(result, sortDirection);
+}
+
+export function getPlayerNhlAbbreviation(value: unknown): string | null {
+  if (Array.isArray(value)) {
+    const firstTeam = value.find(
+      (team): team is string =>
+        typeof team === "string" && team.trim().length > 0,
+    );
+    return firstTeam ?? null;
+  }
+
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const team = value.trim();
+  return team.length > 0 ? team : null;
+}
+
+export function findNhlTeamByAbbreviation(
+  nhlTeams: NHLTeam[],
+  abbreviation: unknown,
+): NHLTeam | undefined {
+  const normalizedAbbreviation = getPlayerNhlAbbreviation(abbreviation);
+  return normalizedAbbreviation
+    ? nhlTeams.find((team) => team.abbreviation === normalizedAbbreviation)
+    : undefined;
+}
+
+export function formatPlayerPositionList(
+  positions: unknown,
+  fallback = "-",
+): string {
+  if (Array.isArray(positions)) {
+    return positions.length > 0 ? positions.join("/") : fallback;
+  }
+
+  if (typeof positions === "string") {
+    const value = positions.trim();
+    return value || fallback;
+  }
+
+  return fallback;
 }

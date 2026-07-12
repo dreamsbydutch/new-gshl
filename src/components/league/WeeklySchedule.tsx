@@ -20,15 +20,15 @@
  * ```
  */
 
-import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { LoadingSpinner } from "@gshl-ui";
 import { cn } from "@gshl-utils";
 import type {
   ScoreDisplayProps,
   TeamDisplayProps,
   WeekScheduleItemProps,
-} from "@gshl-utils";
+} from "@gshl-types";
 import {
   getGameBackgroundClass,
   getScoreClass,
@@ -38,8 +38,7 @@ import {
   TEAM_LOGO_DIMENSIONS,
 } from "@gshl-utils";
 import { findTeamById } from "@gshl-utils/domain/team";
-import { useWeeklyScheduleData, useWeeks } from "@gshl-hooks";
-import { clientApi as trpc } from "@gshl-trpc";
+import { useWeeklyScheduleData } from "@gshl-hooks";
 
 // ============================================================================
 // INTERNAL COMPONENTS
@@ -138,9 +137,10 @@ const WeekScheduleItem = ({ matchup, teams }: WeekScheduleItemProps) => {
   );
 
   return (
-    <div
+    <Link
+      href={`/matchup/${matchup.id}`}
       className={cn(
-        "mx-1 mb-3 flex flex-col items-center rounded-xl py-1 shadow-md",
+        "mx-1 mb-3 flex flex-col items-center rounded-xl py-1 shadow-md transition hover:-translate-y-0.5 hover:shadow-lg",
         bgClass,
       )}
     >
@@ -159,7 +159,7 @@ const WeekScheduleItem = ({ matchup, teams }: WeekScheduleItemProps) => {
           isAway={false}
         />
       </div>
-    </div>
+    </Link>
   );
 };
 
@@ -174,89 +174,14 @@ export function WeeklySchedule() {
     teams,
     teamWeekStatsByTeam,
     playerWeekStatsByTeam,
+    isPrefetching,
     selectedSeasonId,
-    selectedWeekId,
-    ready,
   } = data;
 
   const seasonNumericId = Number(selectedSeasonId ?? "");
   const showPlusMinus = Number.isFinite(seasonNumericId)
     ? seasonNumericId <= 6
     : true;
-  const utils = trpc.useUtils();
-  const weekList = useWeeks({
-    seasonId: selectedSeasonId,
-    orderBy: { startDate: "asc" },
-    enabled: Boolean(selectedSeasonId),
-  });
-
-  const nextWeekIds = useMemo(() => {
-    const weeks = weekList.data ?? [];
-    const currentIndex = weeks.findIndex((week) => week.id === selectedWeekId);
-    if (currentIndex < 0) return [];
-    return weeks
-      .slice(currentIndex + 1, currentIndex + 3)
-      .map((week) => week.id)
-      .filter(Boolean);
-  }, [selectedWeekId, weekList.data]);
-
-  const prefetchedWeekIds = useRef(new Set<string>());
-  const [isPrefetching, setIsPrefetching] = useState(false);
-
-  useEffect(() => {
-    prefetchedWeekIds.current.clear();
-  }, [selectedSeasonId]);
-
-  useEffect(() => {
-    if (!ready || !selectedSeasonId || !selectedWeekId || !nextWeekIds.length) {
-      return;
-    }
-
-    if (typeof navigator !== "undefined" && !navigator.onLine) {
-      return;
-    }
-
-    let cancelled = false;
-
-    async function prefetchWeeks() {
-      setIsPrefetching(true);
-      try {
-        await Promise.all(
-          nextWeekIds.map(async (weekId) => {
-            if (prefetchedWeekIds.current.has(weekId)) {
-              return;
-            }
-            prefetchedWeekIds.current.add(weekId);
-            await Promise.all([
-              utils.matchup.getLiveStates.prefetch({
-                where: { seasonId: selectedSeasonId ?? undefined, weekId },
-              }),
-              utils.teamStats.weekly.getByWeek.prefetch({
-                weekId,
-                seasonId: selectedSeasonId ?? undefined,
-              }),
-              utils.playerStats.weekly.getByWeek.prefetch({
-                weekId,
-                seasonId: selectedSeasonId ?? undefined,
-              }),
-            ]);
-          }),
-        );
-      } finally {
-        if (!cancelled) {
-          setIsPrefetching(false);
-        }
-      }
-    }
-
-    void prefetchWeeks();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [ready, selectedSeasonId, selectedWeekId, nextWeekIds, utils]);
-
-  console.log(matchups);
 
   return (
     <div className="mx-2 mb-40 mt-4">

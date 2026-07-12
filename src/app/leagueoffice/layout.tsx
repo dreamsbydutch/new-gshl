@@ -1,6 +1,6 @@
 "use client";
 
-import { useLeagueOfficeNavigation } from "@gshl-cache";
+import { useLeagueOfficeNavigation } from "@gshl-hooks";
 import {
   HorizontalToggle,
   SecondaryPageToolbar,

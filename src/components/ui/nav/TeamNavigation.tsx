@@ -7,16 +7,10 @@
  * and manages selection state through the navigation store.
  */
 
-import type { GSHLTeam } from "@gshl-types";
-import { useNavStore } from "@gshl-cache";
-import { useTeams } from "@gshl-hooks";
+import type { GSHLTeam, TeamsToggleProps } from "@gshl-types";
+import { useNav, useTeamNavigation, useTeams } from "@gshl-hooks";
 import { HorizontalToggle } from "./toggle";
 import Image from "next/image";
-
-interface TeamsToggleProps {
-  className?: string;
-  seasonId?: string;
-}
 
 /**
  * Team selection toggle component with franchise logos
@@ -24,10 +18,10 @@ interface TeamsToggleProps {
  * @returns Team selection interface with horizontal toggle
  */
 export function TeamsToggle({ className, seasonId }: TeamsToggleProps) {
-  const storeSeasonId = useNavStore((state) => state.selectedSeasonId);
+  const { selectedSeasonId: storeSeasonId } = useNav();
   const selectedSeasonId = seasonId ?? storeSeasonId;
-  const selectedOwnerId = useNavStore((state) => state.selectedOwnerId);
-  const setOwnerId = useNavStore((state) => state.setOwnerId);
+  const { selectedOwnerId, setSelectedOwnerId: setOwnerId } =
+    useTeamNavigation();
 
   const {
     data: teamsRaw = [],

@@ -1,17 +1,4 @@
-import type {
-  Conference,
-  Franchise,
-  GSHLTeam,
-  Matchup,
-  Owner,
-  Team,
-} from "@gshl-types";
-
-export type TeamRelations = {
-  franchises?: Franchise[];
-  conferences?: Conference[];
-  owners?: Owner[];
-};
+import type { GSHLTeam, Matchup, Team, TeamRelations } from "@gshl-types";
 
 const defaultTeam: GSHLTeam = {
   id: "0",

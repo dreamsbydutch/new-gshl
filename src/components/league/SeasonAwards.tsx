@@ -2,59 +2,18 @@
 /* eslint-disable @next/next/no-img-element */
 
 import { useMemo, useState } from "react";
-import {
-  AWARD_CATALOG_BY_KEY,
-  AWARD_GROUP_ORDER,
-} from "@gshl-lib/config/awards";
-import { AwardsList } from "@gshl-types";
+import { AWARD_GROUP_ORDER } from "@gshl-lib/config/awards";
 import type {
-  Awards,
-  AwardCatalogEntry,
-  GSHLTeam,
-  Player,
-  PlayerTotalStatLine,
-  Season,
+  AllStarTeamCard,
+  SeasonAwardsProps,
+  SeasonAwardWinnerCard,
 } from "@gshl-types";
-import { cn } from "@gshl-utils";
-
-const ALL_STAR_AWARD_ORDER = [
-  AwardsList.FIRST_AS,
-  AwardsList.SECOND_AS,
-  AwardsList.PLAYOFF_AS,
-] as const;
-
-type AllStarAwardKey = (typeof ALL_STAR_AWARD_ORDER)[number];
-
-type SeasonAwardWinnerCard = {
-  id: string;
-  award: Awards;
-  catalog: AwardCatalogEntry;
-  winnerName: string;
-  winnerDetail: string | null;
-  logoUrl: string | null;
-};
-
-type AllStarWinner = {
-  playerId: string;
-  playerName: string;
-  positions: string;
-  teamName: string | null;
-  teamLogoUrl: string | null;
-};
-
-type AllStarTeamCard = {
-  awardKey: AllStarAwardKey;
-  title: string;
-  winners: AllStarWinner[];
-};
-
-export interface SeasonAwardsProps {
-  awards: Awards[];
-  players: Player[];
-  playerTotals: PlayerTotalStatLine[];
-  season: Season | null;
-  teams: GSHLTeam[];
-}
+import {
+  buildAllStarTeamCards,
+  buildSeasonAwardCards,
+  cn,
+  getAllStarCardClass,
+} from "@gshl-utils";
 
 function TrophySectionDivider({ label }: { label: string }) {
   return (
@@ -126,168 +85,6 @@ function TrophyImage({
   );
 }
 
-function getOwnerDisplayName(team: GSHLTeam | undefined): string | null {
-  if (!team) return null;
-
-  const nickname = String(team.ownerNickname ?? "").trim();
-  if (nickname) return nickname;
-
-  const fullName = [team.ownerFirstName, team.ownerLastName]
-    .map((part) => String(part ?? "").trim())
-    .filter(Boolean)
-    .join(" ");
-
-  return fullName || null;
-}
-
-function getAllStarTitle(awardKey: AllStarAwardKey): string {
-  switch (awardKey) {
-    case AwardsList.FIRST_AS:
-      return "First Team All-Stars";
-    case AwardsList.SECOND_AS:
-      return "Second Team All-Stars";
-    case AwardsList.PLAYOFF_AS:
-      return "Playoff All-Stars";
-  }
-}
-
-function getAllStarCardClass(awardKey: AllStarAwardKey): string {
-  switch (awardKey) {
-    case AwardsList.FIRST_AS:
-      return "border-amber-200 bg-gradient-to-b from-amber-50 to-white";
-    case AwardsList.SECOND_AS:
-      return "border-slate-200 bg-gradient-to-b from-slate-100 to-white";
-    case AwardsList.PLAYOFF_AS:
-      return "border-orange-200 bg-gradient-to-b from-orange-50 to-white";
-  }
-}
-
-function normalizeIdList(value: unknown): string[] {
-  if (Array.isArray(value)) {
-    return value.flatMap((entry) => normalizeIdList(entry));
-  }
-
-  if (
-    typeof value !== "string" &&
-    typeof value !== "number" &&
-    typeof value !== "boolean"
-  ) {
-    return [];
-  }
-
-  const raw = String(value).trim();
-  if (!raw) return [];
-
-  try {
-    const parsed = JSON.parse(raw) as unknown;
-    if (Array.isArray(parsed)) {
-      return normalizeIdList(parsed);
-    }
-  } catch {
-    // Fall back to CSV parsing.
-  }
-
-  return raw
-    .split(",")
-    .map((token) => token.trim())
-    .filter(Boolean);
-}
-
-function getPlayerPositions(
-  nhlPos: PlayerTotalStatLine["nhlPos"] | undefined,
-): string {
-  return Array.isArray(nhlPos) ? nhlPos.join("/") : String(nhlPos ?? "-");
-}
-
-function buildSeasonAwardCards(
-  awards: Awards[],
-  teams: GSHLTeam[],
-): SeasonAwardWinnerCard[] {
-  const allStarAwardKeys = new Set<string>(ALL_STAR_AWARD_ORDER);
-  const teamByOwnerId = new Map(
-    teams
-      .filter((team) => team.ownerId)
-      .map((team) => [String(team.ownerId), team]),
-  );
-
-  return awards
-    .filter((award) => !allStarAwardKeys.has(String(award.award)))
-    .map((award) => {
-      const catalog = AWARD_CATALOG_BY_KEY.get(award.award);
-      if (!catalog) return null;
-
-      const winningTeam = teamByOwnerId.get(String(award.winnerId));
-      const ownerDisplayName = getOwnerDisplayName(winningTeam);
-
-      return {
-        id: String(award.id),
-        award,
-        catalog,
-        winnerName:
-          winningTeam?.name?.trim() ?? ownerDisplayName ?? "Winner not found",
-        winnerDetail:
-          winningTeam?.name?.trim() && ownerDisplayName
-            ? ownerDisplayName
-            : (winningTeam?.confName?.trim() ?? null),
-        logoUrl: winningTeam?.logoUrl ?? null,
-      } satisfies SeasonAwardWinnerCard;
-    })
-    .filter((card): card is SeasonAwardWinnerCard => card !== null)
-    .sort((left, right) => {
-      const groupDelta =
-        AWARD_GROUP_ORDER.indexOf(left.catalog.group) -
-        AWARD_GROUP_ORDER.indexOf(right.catalog.group);
-      if (groupDelta !== 0) return groupDelta;
-      return left.catalog.sortOrder - right.catalog.sortOrder;
-    });
-}
-
-function buildAllStarTeamCards(
-  awards: Awards[],
-  players: Player[],
-  playerTotals: PlayerTotalStatLine[],
-  teams: GSHLTeam[],
-): AllStarTeamCard[] {
-  const playerById = new Map(
-    players.map((player) => [String(player.id), player.fullName]),
-  );
-  const teamById = new Map(teams.map((team) => [String(team.id), team]));
-
-  return ALL_STAR_AWARD_ORDER.map((awardKey) => {
-    const winners = awards
-      .filter((award) => award.award === awardKey)
-      .map((award) => {
-        const playerId = String(award.winnerId);
-        const playerTotal = playerTotals.find((row) => {
-          return String(row.playerId) === playerId;
-        });
-        const gshlTeamIds = normalizeIdList(playerTotal?.gshlTeamIds);
-        const gshlTeams = gshlTeamIds
-          .map((teamId) => teamById.get(teamId))
-          .filter((team): team is GSHLTeam => Boolean(team));
-        const primaryTeam = gshlTeams[0] ?? null;
-        const joinedTeamNames = gshlTeams
-          .map((team) => team.name)
-          .filter((teamName): teamName is string => Boolean(teamName))
-          .join(", ");
-
-        return {
-          playerId,
-          playerName: playerById.get(playerId) ?? `Player ${playerId}`,
-          positions: getPlayerPositions(playerTotal?.nhlPos),
-          teamName: joinedTeamNames || null,
-          teamLogoUrl: primaryTeam?.logoUrl ?? null,
-        } satisfies AllStarWinner;
-      })
-      .sort((left, right) => left.playerName.localeCompare(right.playerName));
-
-    return {
-      awardKey,
-      title: getAllStarTitle(awardKey),
-      winners,
-    };
-  });
-}
 
 function AwardWinnerCard({ card }: { card: SeasonAwardWinnerCard }) {
   return (

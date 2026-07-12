@@ -1,6 +1,6 @@
 import { HydrateClient, serverApi } from "@gshl-trpc/server-exports";
 import { resolveContractDefaultSeason } from "@gshl-utils";
-import { LockerRoomContent } from "./LockerRoomContent";
+import { LockerRoomContent } from "@gshl-components/locker-room/LockerRoomContent";
 
 export default async function LockerRoomPage() {
   const seasons = await serverApi.season.getAll({ orderBy: { year: "asc" } });

@@ -1,6 +1,6 @@
 "use client";
 
-import { useNavStore } from "@gshl-cache";
+import { useScheduleNavigation } from "@gshl-hooks";
 import {
   HorizontalToggle,
   SeasonToggleNav,
@@ -9,17 +9,13 @@ import {
   WeeksToggle,
   TertiaryPageToolbar,
 } from "@gshl-nav";
-
-type ScheduleType = {
-  key: string;
-  label: string;
-};
+import type { LabeledToggleOption } from "@gshl-types";
 export default function Layout({ children }: { children: React.ReactNode }) {
-  const scheduleType = useNavStore((state) => state.selectedScheduleType);
-  const setScheduleType = useNavStore((state) => state.setScheduleType);
+  const { selectedType: scheduleType, setSelectedType: setScheduleType } =
+    useScheduleNavigation();
 
   // Schedule type navigation items
-  const scheduleTypes: ScheduleType[] = [
+  const scheduleTypes: LabeledToggleOption[] = [
     { key: "team", label: "Team" },
     { key: "week", label: "Week" },
   ];
@@ -41,12 +37,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           scheduleType === "playoff") && <WeeksToggle />}
       </SecondaryPageToolbar>
       <TertiaryPageToolbar>
-        <HorizontalToggle<ScheduleType>
+        <HorizontalToggle<LabeledToggleOption>
           items={scheduleTypes}
           selectedItem={selectedScheduleType}
-          onSelect={(type: ScheduleType) => setScheduleType(type.key)}
-          getItemKey={(type: ScheduleType) => type.key}
-          getItemLabel={(type: ScheduleType) => type.label}
+          onSelect={(type: LabeledToggleOption) => setScheduleType(type.key)}
+          getItemKey={(type: LabeledToggleOption) => type.key}
+          getItemLabel={(type: LabeledToggleOption) => type.label}
           itemClassName="py-0.5 text-sm"
         />
       </TertiaryPageToolbar>

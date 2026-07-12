@@ -4,14 +4,9 @@
  * Wrapper component for tertiary navigation elements and toolbar controls.
  */
 
-import { type ReactNode } from "react";
 import { cn } from "@gshl-utils";
+import type { ToolbarProps } from "@gshl-types";
 import { NavContainer } from "./BaseComponents";
-
-interface TertiaryPageToolbarProps {
-  children: ReactNode;
-  className?: string;
-}
 
 /**
  * Tertiary page toolbar component with consistent styling and positioning
@@ -21,7 +16,7 @@ interface TertiaryPageToolbarProps {
 export function TertiaryPageToolbar({
   children,
   className,
-}: TertiaryPageToolbarProps) {
+}: ToolbarProps) {
   return (
     <NavContainer
       position="tertiary"

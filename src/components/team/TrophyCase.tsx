@@ -2,10 +2,7 @@
 /* eslint-disable @next/next/no-img-element */
 
 import { useMemo, useState } from "react";
-import {
-  AWARD_CATALOG_BY_KEY,
-  AWARD_GROUP_ORDER,
-} from "@gshl-lib/config/awards";
+import { AWARD_GROUP_ORDER } from "@gshl-lib/config/awards";
 import {
   NHLLogo,
   Table,
@@ -15,440 +12,21 @@ import {
   TableHeader,
   TableRow,
 } from "@gshl-ui";
-import { AwardsList, SeasonType } from "@gshl-types";
-import { cn, formatNumber } from "@gshl-utils";
+import {
+  buildTrophyCaseData,
+  cn,
+  formatNumber,
+  formatPlayerPositionList,
+  getAllStarRowClass,
+  getSummaryLineClass,
+} from "@gshl-utils";
 import type {
-  AwardCatalogEntry,
-  AwardGroupKey,
-  NHLTeam,
-  PlayerTotalStatLine,
+  AllStarCountLine,
+  AllStarRowData,
   TrophyCaseCard,
   TrophyCaseProps,
   TrophyCaseSummaryLine,
 } from "@gshl-types";
-
-type AllStarAwardKey =
-  | AwardsList.FIRST_AS
-  | AwardsList.SECOND_AS
-  | AwardsList.PLAYOFF_AS;
-
-interface AllStarCountLine {
-  awardKey: AllStarAwardKey;
-  label: string;
-  count: number;
-}
-
-interface AllStarRowData {
-  awardKey: AllStarAwardKey;
-  seasonId: string;
-  seasonYear: number | string;
-  playerId: string;
-  playerName: string;
-  playerTotal: PlayerTotalStatLine;
-  nhlTeam: NHLTeam | undefined;
-}
-
-const ALL_STAR_AWARD_ORDER = [
-  AwardsList.FIRST_AS,
-  AwardsList.SECOND_AS,
-  AwardsList.PLAYOFF_AS,
-] as const;
-
-const groupOrderMap = new Map(
-  AWARD_GROUP_ORDER.map((group, index) => [group, index]),
-);
-const allStarOrderMap = new Map(
-  ALL_STAR_AWARD_ORDER.map((award, index) => [award, index]),
-);
-
-function getSeasonYearMap(cards: TrophyCaseProps["seasons"]) {
-  return new Map(cards.map((season) => [String(season.id), season.year]));
-}
-
-function resolveSummaryText(
-  count: number,
-  latestYear: number | string,
-  summaryLabel: string,
-  years: Array<number | string>,
-) {
-  const trimmedLabel = summaryLabel.trim();
-  const hasSuffix = /(winner|champ|champion)$/i.test(trimmedLabel);
-
-  if (count > 1) {
-    const baseText = hasSuffix
-      ? `${count}-time ${trimmedLabel}`
-      : `${count}-time ${trimmedLabel} Winner`;
-    const formattedYears = formatYearRanges(years);
-
-    return formattedYears ? `${baseText} (${formattedYears})` : baseText;
-  }
-
-  return hasSuffix
-    ? `${latestYear} ${trimmedLabel}`
-    : `${latestYear} ${trimmedLabel} Winner`;
-}
-
-function formatYearRanges(years: Array<number | string>): string {
-  const normalizedYears = Array.from(
-    new Set(
-      years
-        .map((year) => Number(year))
-        .filter((year) => Number.isFinite(year))
-        .sort((left, right) => left - right),
-    ),
-  );
-
-  if (normalizedYears.length === 0) {
-    return years.map(String).join(", ");
-  }
-
-  const ranges: string[] = [];
-  let rangeStart = normalizedYears[0]!;
-  let rangeEnd = normalizedYears[0]!;
-
-  for (let index = 1; index < normalizedYears.length; index += 1) {
-    const currentYear = normalizedYears[index]!;
-
-    if (currentYear === rangeEnd + 1) {
-      rangeEnd = currentYear;
-      continue;
-    }
-
-    ranges.push(formatYearRange(rangeStart, rangeEnd));
-    rangeStart = currentYear;
-    rangeEnd = currentYear;
-  }
-
-  ranges.push(formatYearRange(rangeStart, rangeEnd));
-  return ranges.join(", ");
-}
-
-function formatYearRange(startYear: number, endYear: number): string {
-  if (startYear === endYear) {
-    return String(startYear);
-  }
-
-  const startCentury = Math.floor(startYear / 100);
-  const endCentury = Math.floor(endYear / 100);
-  if (startCentury === endCentury) {
-    return `${startYear}-${String(endYear).slice(-2)}`;
-  }
-
-  return `${startYear}-${endYear}`;
-}
-
-function normalizeIdList(value: unknown): string[] {
-  if (Array.isArray(value)) {
-    return value.flatMap((entry) => normalizeIdList(entry));
-  }
-
-  if (
-    typeof value !== "string" &&
-    typeof value !== "number" &&
-    typeof value !== "boolean"
-  ) {
-    return [];
-  }
-
-  const raw = String(value).trim();
-  if (!raw) return [];
-
-  try {
-    const parsed = JSON.parse(raw) as unknown;
-    if (Array.isArray(parsed)) {
-      return normalizeIdList(parsed);
-    }
-  } catch {
-    // Fall through to CSV parsing.
-  }
-
-  return raw
-    .split(",")
-    .map((token) => token.trim())
-    .filter(Boolean);
-}
-
-function getAllStarSeasonType(awardKey: AllStarAwardKey): SeasonType {
-  switch (awardKey) {
-    case AwardsList.FIRST_AS:
-    case AwardsList.SECOND_AS:
-      return SeasonType.REGULAR_SEASON;
-    case AwardsList.PLAYOFF_AS:
-      return SeasonType.PLAYOFFS;
-  }
-}
-
-function getAllStarLabel(awardKey: AllStarAwardKey): string {
-  switch (awardKey) {
-    case AwardsList.FIRST_AS:
-      return "First Team All-Stars";
-    case AwardsList.SECOND_AS:
-      return "Second Team All-Stars";
-    case AwardsList.PLAYOFF_AS:
-      return "Playoff All-Stars";
-  }
-}
-
-function getAllStarRowClass(awardKey: AllStarAwardKey): string {
-  switch (awardKey) {
-    case AwardsList.FIRST_AS:
-      return "bg-amber-50/70 hover:!bg-amber-100/50";
-    case AwardsList.SECOND_AS:
-      return "bg-slate-100/70 hover:!bg-slate-200/50";
-    case AwardsList.PLAYOFF_AS:
-      return "bg-orange-50/70 hover:!bg-orange-100/50";
-  }
-}
-
-function getPlayerPositions(nhlPos: PlayerTotalStatLine["nhlPos"]): string {
-  return Array.isArray(nhlPos) ? nhlPos.join("/") : String(nhlPos ?? "-");
-}
-
-function getPlayerNhlAbbreviation(value: unknown): string | null {
-  if (Array.isArray(value)) {
-    const firstTeam = value.find(
-      (team): team is string =>
-        typeof team === "string" && team.trim().length > 0,
-    );
-    return firstTeam ?? null;
-  }
-
-  if (typeof value !== "string") {
-    return null;
-  }
-
-  const team = value.trim();
-  return team.length > 0 ? team : null;
-}
-
-function buildAllStarData(props: TrophyCaseProps): {
-  counts: AllStarCountLine[];
-  rows: AllStarRowData[];
-} {
-  const ownerId = String(props.currentTeam.ownerId ?? "");
-  const seasonYearMap = getSeasonYearMap(props.seasons);
-
-  const counts = ALL_STAR_AWARD_ORDER.map((awardKey) => ({
-    awardKey,
-    label: getAllStarLabel(awardKey),
-    count: 0,
-  }));
-
-  if (!ownerId) {
-    return { counts, rows: [] };
-  }
-
-  const countByAwardKey = new Map<AllStarAwardKey, number>(
-    counts.map((item) => [item.awardKey, item.count]),
-  );
-  const ownerTeamIdBySeason = new Map(
-    props.allTeams
-      .filter((team) => String(team.ownerId ?? "") === ownerId)
-      .map((team) => [String(team.seasonId), String(team.id)]),
-  );
-  const playerNameById = new Map(
-    props.players.map((player) => [String(player.id), player.fullName]),
-  );
-  const nhlTeamByAbbr = new Map(
-    props.nhlTeams.map((team) => [team.abbreviation, team]),
-  );
-  const rows: AllStarRowData[] = [];
-
-  for (const award of props.allAwards) {
-    const awardKey = String(award.award) as AllStarAwardKey;
-    const seasonType = getAllStarSeasonType(awardKey);
-    if (!seasonType) continue;
-
-    const seasonId = String(award.seasonId);
-    const ownerTeamId = ownerTeamIdBySeason.get(seasonId);
-    if (!ownerTeamId) continue;
-
-    const playerTotal = props.playerTotals.find((row) => {
-      return (
-        String(row.playerId) === String(award.winnerId) &&
-        String(row.seasonId) === seasonId &&
-        String(row.seasonType) === String(seasonType) &&
-        normalizeIdList(row.gshlTeamIds).includes(ownerTeamId)
-      );
-    });
-
-    if (!playerTotal) continue;
-
-    const playerId = String(award.winnerId);
-    rows.push({
-      awardKey,
-      seasonId,
-      seasonYear: seasonYearMap.get(seasonId) ?? award.seasonId,
-      playerId,
-      playerName: playerNameById.get(playerId) ?? `Player ${playerId}`,
-      playerTotal,
-      nhlTeam: nhlTeamByAbbr.get(getPlayerNhlAbbreviation(playerTotal.nhlTeam) ?? ""),
-    });
-    countByAwardKey.set(awardKey, (countByAwardKey.get(awardKey) ?? 0) + 1);
-  }
-
-  return {
-    counts: counts.map((item) => ({
-      ...item,
-      count: countByAwardKey.get(item.awardKey) ?? 0,
-    })),
-    rows: rows.sort((left, right) => {
-      const awardDelta =
-        (allStarOrderMap.get(left.awardKey) ?? 0) -
-        (allStarOrderMap.get(right.awardKey) ?? 0);
-      if (awardDelta !== 0) return awardDelta;
-
-      const yearDelta = Number(right.seasonYear) - Number(left.seasonYear);
-      if (yearDelta !== 0) return yearDelta;
-
-      return left.playerName.localeCompare(right.playerName);
-    }),
-  };
-}
-
-function buildTrophyCaseData({
-  awards,
-  allAwards,
-  allTeams,
-  currentTeam,
-  nhlTeams,
-  playerTotals,
-  players,
-  seasons,
-}: TrophyCaseProps): {
-  cards: TrophyCaseCard[];
-  summaryLines: TrophyCaseSummaryLine[];
-  allStarCounts: AllStarCountLine[];
-  allStarRows: AllStarRowData[];
-} {
-  const seasonYearMap = getSeasonYearMap(seasons);
-
-  const cards = awards
-    .map((award) => {
-      const awardKey = String(award.award);
-      const catalog = AWARD_CATALOG_BY_KEY.get(
-        awardKey as AwardCatalogEntry["key"],
-      );
-      if (!catalog) {
-        return null;
-      }
-
-      const historicalTeam =
-        allTeams.find(
-          (team) =>
-            String(team.seasonId) === String(award.seasonId) &&
-            String(team.ownerId ?? "") === String(award.winnerId),
-        ) ?? null;
-
-      return {
-        id: String(award.id),
-        award,
-        catalog,
-        seasonYear: seasonYearMap.get(String(award.seasonId)) ?? award.seasonId,
-        franchiseLogoUrl:
-          historicalTeam?.logoUrl ?? currentTeam.logoUrl ?? null,
-      } satisfies TrophyCaseCard;
-    })
-    .filter((card): card is TrophyCaseCard => card !== null)
-    .sort((left, right) => {
-      const groupDelta =
-        (groupOrderMap.get(left.catalog.group) ?? 0) -
-        (groupOrderMap.get(right.catalog.group) ?? 0);
-      if (groupDelta !== 0) return groupDelta;
-
-      const awardDelta = left.catalog.sortOrder - right.catalog.sortOrder;
-      if (awardDelta !== 0) return awardDelta;
-
-      return Number(right.seasonYear) - Number(left.seasonYear);
-    });
-
-  const summaryLines = Array.from(
-    cards.reduce(
-      (map, card) => {
-        const existing = map.get(card.catalog.key);
-        const numericYear = Number(card.seasonYear);
-
-        if (!existing) {
-          map.set(card.catalog.key, {
-            awardKey: card.catalog.key,
-            group: card.catalog.group,
-            sortOrder: card.catalog.sortOrder,
-            count: 1,
-            latestYear: Number.isFinite(numericYear)
-              ? numericYear
-              : card.seasonYear,
-            years: [Number.isFinite(numericYear) ? numericYear : card.seasonYear],
-            summaryLabel: card.catalog.summaryLabel,
-          });
-          return map;
-        }
-
-        existing.count += 1;
-        existing.years.push(
-          Number.isFinite(numericYear) ? numericYear : card.seasonYear,
-        );
-        if (
-          typeof existing.latestYear === "number" &&
-          Number.isFinite(numericYear) &&
-          numericYear > existing.latestYear
-        ) {
-          existing.latestYear = numericYear;
-        }
-
-        return map;
-      },
-      new Map<
-        string,
-        {
-          awardKey: AwardCatalogEntry["key"];
-          group: AwardGroupKey;
-          sortOrder: number;
-          count: number;
-          latestYear: number | string;
-          years: Array<number | string>;
-          summaryLabel: string;
-        }
-      >(),
-    ),
-  )
-    .map(([, item]) => ({
-      awardKey: item.awardKey,
-      group: item.group,
-      sortOrder: item.sortOrder,
-      text: resolveSummaryText(
-        item.count,
-        item.latestYear,
-        item.summaryLabel,
-        item.years
-          .slice()
-          .sort((left, right) => Number(left) - Number(right)),
-      ),
-    }))
-    .sort((left, right) => {
-      const groupDelta =
-        (groupOrderMap.get(left.group) ?? 0) - (groupOrderMap.get(right.group) ?? 0);
-      if (groupDelta !== 0) return groupDelta;
-      return left.sortOrder - right.sortOrder;
-    });
-
-  const { counts: allStarCounts, rows: allStarRows } = buildAllStarData({
-    awards,
-    allAwards,
-    allTeams,
-    currentTeam,
-    nhlTeams,
-    playerTotals,
-    players,
-    seasons,
-  });
-
-  return {
-    cards,
-    summaryLines,
-    allStarCounts,
-    allStarRows,
-  };
-}
 
 function TrophySectionDivider({ label }: { label: string }) {
   return (
@@ -460,19 +38,6 @@ function TrophySectionDivider({ label }: { label: string }) {
       <div className="h-0 w-full border-t-4 border-dotted border-gray-300" />
     </div>
   );
-}
-
-function getSummaryLineClass(group: AwardGroupKey) {
-  switch (group) {
-    case "TEAM TROPHIES":
-      return "text-xl sm:text-2xl";
-    case "TIER 1 AWARDS":
-      return "text-lg sm:text-xl";
-    case "TIER 2 AWARDS":
-      return "text-base sm:text-lg";
-    default:
-      return "text-lg sm:text-xl";
-  }
 }
 
 function TrophySummary({
@@ -644,13 +209,13 @@ function AllStarTable({ rows }: { rows: AllStarRowData[] }) {
                         size={18}
                         className="mx-0 shrink-0"
                       />
-                      <span className="truncate">
+                    <span className="truncate">
                         {row.playerName}
                       </span>
                     </div>
                   </TableCell>
                   <TableCell className="whitespace-nowrap">
-                    {getPlayerPositions(row.playerTotal.nhlPos)}
+                    {formatPlayerPositionList(row.playerTotal.nhlPos)}
                   </TableCell>
                   <TableCell className="text-right">
                     {formatNumber(row.playerTotal.GP, 0)}

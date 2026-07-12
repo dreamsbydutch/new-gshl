@@ -6,8 +6,7 @@
  */
 
 import { useNavStore } from "./store";
-import { useWeeks } from "../hooks/main/useWeek";
-import { useSeasonState } from "../hooks/main/useSeason";
+import { useWeeks, useSeasonState } from "@gshl-hooks";
 import { useEffect } from "react";
 
 /**

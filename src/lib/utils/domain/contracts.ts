@@ -4,11 +4,15 @@
  * Business domain-specific functions for contract calculations and operations.
  */
 
-import type { Contract, ContractStatus } from "@gshl-types";
+import type {
+  Contract,
+  ContractFilters,
+  ContractSortOption,
+  ContractSummary,
+  MaybeArray,
+} from "@gshl-types";
 import { SALARY_CAP } from "@gshl-types";
 import { formatDate } from "../core/date";
-
-export type MaybeArray<T> = T | T[] | null | undefined;
 
 export const identity = <Value>(value: Value) => value;
 
@@ -20,43 +24,6 @@ export function toArray<T>(value: MaybeArray<T>): T[] | undefined {
 export function toSet<T>(value: MaybeArray<T>): Set<T> | undefined {
   const arr = toArray(value);
   return arr ? new Set(arr) : undefined;
-}
-
-export interface ContractFilters {
-  ids?: MaybeArray<string>;
-  excludeIds?: MaybeArray<string>;
-  playerIds?: MaybeArray<string>;
-  ownerIds?: MaybeArray<string>;
-  seasonIds?: MaybeArray<string>;
-  activeOnly?: boolean;
-  activeOn?: string;
-  includeExpiryStatuses?: MaybeArray<ContractStatus>;
-  excludeExpiryStatuses?: MaybeArray<ContractStatus>;
-  includeSigningStatuses?: MaybeArray<ContractStatus>;
-  excludeSigningStatuses?: MaybeArray<ContractStatus>;
-  predicate?: (contract: Contract) => boolean;
-}
-
-export type ContractSortKey =
-  | "capHit"
-  | "contractSalary"
-  | "signingDate"
-  | "startDate"
-  | "capHitEndDate"
-  | "createdAt"
-  | "updatedAt";
-
-export interface ContractSortOption {
-  by?: ContractSortKey;
-  direction?: "asc" | "desc";
-  comparator?: (a: Contract, b: Contract) => number;
-}
-
-export interface ContractSummary {
-  count: number;
-  totalCapHit: number;
-  totalSalary: number;
-  averageCapHit: number;
 }
 
 function getComparableValue(value: unknown): number | string | undefined {

@@ -1,9 +1,16 @@
-import type { Contract, DraftPick, GSHLTeam, Player } from "@gshl-types";
+import type {
+  Contract,
+  DraftPick,
+  GSHLTeam,
+  Player,
+  Season,
+} from "@gshl-types";
 import type {
   TeamDraftPickListProps,
   ProcessedDraftPick,
   DraftPickItemProps,
 } from "@gshl-types";
+import { getSeasonString, toIsoDateOnly } from "../core";
 
 // Re-export types for backward compatibility
 export type { TeamDraftPickListProps, ProcessedDraftPick, DraftPickItemProps };
@@ -70,3 +77,29 @@ export const getSelectedPlayer = (
   if (!contract) return undefined;
   return players.find((player) => player.id === contract.playerId);
 };
+
+export function shiftSeasonDate(dateValue: string, yearOffset: number): string {
+  const parsed = new Date(dateValue);
+  if (Number.isNaN(parsed.getTime())) return dateValue;
+
+  parsed.setFullYear(parsed.getFullYear() + yearOffset);
+  return toIsoDateOnly(parsed);
+}
+
+export function buildSyntheticSeason(
+  previousSeason: Season,
+  id: string,
+): Season {
+  const nextEndYear = Number(previousSeason.year) + 1;
+
+  return {
+    ...previousSeason,
+    id,
+    year: nextEndYear,
+    name: getSeasonString(nextEndYear - 1),
+    startDate: shiftSeasonDate(previousSeason.startDate, 1),
+    endDate: shiftSeasonDate(previousSeason.endDate, 1),
+    signingEndDate: shiftSeasonDate(previousSeason.signingEndDate, 1),
+    isActive: false,
+  };
+}

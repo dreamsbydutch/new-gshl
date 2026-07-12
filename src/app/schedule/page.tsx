@@ -1,5 +1,5 @@
 import { HydrateClient, serverApi } from "@gshl-trpc/server-exports";
-import { ScheduleContent } from "./ScheduleContent";
+import { ScheduleContent } from "@gshl-components/schedule/ScheduleContent";
 
 export default async function SchedulePage() {
   const activeSeason = await serverApi.season.getActive();

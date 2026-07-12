@@ -1,13 +1,12 @@
-import type { Season, TeamSeasonStatLine } from "@gshl-types";
-import type { Week } from "@gshl-types";
+import type {
+  OffseasonWindow,
+  Season,
+  SeasonSummary,
+  TeamSeasonStatLine,
+  Week,
+} from "@gshl-types";
 import { getSeasonString } from "../core/date";
 import { formatRecord } from "../core/format";
-
-export type SeasonSummary = {
-  id: string;
-  name: string;
-  year: number;
-};
 
 function coerceDate(value: unknown): Date | null {
   if (!value) return null;
@@ -88,11 +87,6 @@ export function findMostRecentSeason(
     .sort(compareByStartDateDesc);
 
   return previous[0];
-}
-
-export interface OffseasonWindow {
-  endedSeason: Season;
-  upcomingSeason: Season;
 }
 
 export function findOffseasonWindow(

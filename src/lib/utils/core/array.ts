@@ -1,11 +1,5 @@
+import type { RangeFilter } from "@gshl-types";
 import { isDefined } from "./data";
-
-type RangeFilter = {
-  min?: number;
-  max?: number;
-  start?: Date;
-  end?: Date;
-};
 
 function isRangeFilter(value: unknown): value is RangeFilter {
   return (

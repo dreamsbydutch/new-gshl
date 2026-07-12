@@ -1,4 +1,9 @@
-import { type Player, RosterPosition } from "@gshl-types";
+import {
+  type Contract,
+  ContractStatus,
+  type Player,
+  RosterPosition,
+} from "@gshl-types";
 import { CAP_CEILING } from "./contract-table";
 import type {
   TeamRosterProps,
@@ -34,6 +39,29 @@ export const getRatingColorClass = (seasonRk: number | null) => {
   if (rank < 216) return "bg-orange-200";
   return "bg-rose-200";
 };
+
+export function getRosterRatingClass(seasonRk: Player["seasonRk"]) {
+  return typeof seasonRk === "number" && Number.isFinite(seasonRk)
+    ? getRatingColorClass(seasonRk)
+    : "bg-gray-200 text-gray-700";
+}
+
+const RFA_SALARY_MULTIPLIER = 1.15;
+const SALARY_ROUNDING_INCREMENT = 50_000;
+
+export function getDisplayedRosterSalary(
+  salary: number,
+  contract?: Contract,
+): number {
+  if (contract?.expiryStatus !== ContractStatus.RFA) {
+    return salary;
+  }
+
+  return (
+    Math.round((salary * RFA_SALARY_MULTIPLIER) / SALARY_ROUNDING_INCREMENT) *
+    SALARY_ROUNDING_INCREMENT
+  );
+}
 
 export const buildTeamLineup = (
   currentRoster: Player[] | undefined,

@@ -6,7 +6,12 @@
  */
 
 import { ContractStatus, RosterPosition, PositionGroup } from "@gshl-types";
-import type { Contract, DraftBoardPlayer, DraftPick } from "@gshl-types";
+import type {
+  Contract,
+  DraftBoardPlayer,
+  DraftPick,
+  ProjectedDraftPick,
+} from "@gshl-types";
 
 // Re-export types for backward compatibility
 export type { DraftBoardToolbarProps, DraftBoardPlayer } from "@gshl-types";
@@ -183,6 +188,27 @@ export function getSeasonDraftPicks<
   T extends Pick<DraftPick, "seasonId" | "round" | "pick">,
 >(allPicks: T[], seasonId: string): T[] {
   return sortDraftPicks(filterDraftPicksBySeason(allPicks, seasonId));
+}
+
+export function groupProjectedDraftPicksByRound(
+  projectedDraftPicks: ProjectedDraftPick[],
+): Array<{
+  round: string;
+  picks: ProjectedDraftPick[];
+}> {
+  const rounds = new Map<string, ProjectedDraftPick[]>();
+
+  for (const projectedPick of projectedDraftPicks) {
+    const round = String(projectedPick.pick.round);
+    const picks = rounds.get(round) ?? [];
+    picks.push(projectedPick);
+    rounds.set(round, picks);
+  }
+
+  return Array.from(rounds.entries()).map(([round, picks]) => ({
+    round,
+    picks,
+  }));
 }
 
 export const draftBoardFilters = { matchesFilter };

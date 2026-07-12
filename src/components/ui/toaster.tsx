@@ -16,7 +16,7 @@ import {
   ToastViewport,
 } from "./toast";
 import React from "react";
-import { useToast } from "./use-toast";
+import { useToast } from "@gshl-hooks";
 
 /**
  * Toaster component that renders all active toast notifications

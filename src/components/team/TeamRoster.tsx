@@ -16,21 +16,25 @@
 import { useMemo } from "react";
 import Image from "next/image";
 import {
+  type BenchPlayersProps,
+  type CapSpaceDisplayProps,
   ContractStatus,
-  type Contract,
-  type Player,
   type NHLTeam,
+  type PlayerCardProps,
+  type RosterLineupProps,
+  type TeamRosterProps,
 } from "@gshl-types";
 import {
   cn,
   formatNumber,
   formatMoney,
-  getRatingColorClass,
   CAP_CEILING,
+  getDisplayedRosterSalary,
+  getPlayerNhlAbbreviation,
+  getRosterRatingClass,
   RATING_RANGES,
   toNumber,
 } from "@gshl-utils";
-import type { TeamRosterProps } from "@gshl-utils";
 import { useTeamRosterData, useNHLTeams } from "@gshl-hooks";
 
 // ============================================================================
@@ -43,16 +47,6 @@ import { useTeamRosterData, useNHLTeams } from "@gshl-hooks";
  * Displays individual player information including name, position,
  * NHL team logo, rating, and optional salary.
  */
-interface PlayerCardProps {
-  player: Player;
-  contract?: Contract;
-  showSalaries: boolean;
-  nhlTeamByAbbr: Map<string, NHLTeam>;
-}
-
-const RFA_SALARY_MULTIPLIER = 1.15;
-const SALARY_ROUNDING_INCREMENT = 50_000;
-
 const PlayerCard = ({
   player,
   contract,
@@ -119,13 +113,6 @@ const PlayerCard = ({
  * Displays the main roster lineup organized by position groups
  * with dividers between sections.
  */
-interface RosterLineupProps {
-  teamLineup: (Player | null)[][][];
-  contracts: Contract[] | undefined;
-  showSalaries: boolean;
-  nhlTeamByAbbr: Map<string, NHLTeam>;
-}
-
 export const RosterLineup = ({
   teamLineup,
   contracts,
@@ -176,13 +163,6 @@ export const RosterLineup = ({
  * Displays players who are not in the main lineup positions,
  * organized in a 2-column grid layout.
  */
-interface BenchPlayersProps {
-  benchPlayers: Player[];
-  contracts: Contract[] | undefined;
-  showSalaries: boolean;
-  nhlTeamByAbbr: Map<string, NHLTeam>;
-}
-
 export const BenchPlayers = ({
   benchPlayers,
   contracts,
@@ -283,12 +263,6 @@ const RatingLegend = () => {
  *
  * Displays the team's remaining salary cap space.
  */
-interface CapSpaceDisplayProps {
-  contracts: Contract[] | undefined;
-  showSalaries: boolean;
-  totalCapHit: number;
-}
-
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const CapSpaceDisplay = ({
   contracts,
@@ -382,41 +356,5 @@ export function TeamRoster({
 
       <RatingLegend />
     </>
-  );
-}
-
-function getPlayerNhlAbbreviation(player: Player): string | null {
-  const rawTeam: unknown = player.nhlTeam;
-
-  if (Array.isArray(rawTeam)) {
-    const firstTeam = rawTeam.find(
-      (team): team is string =>
-        typeof team === "string" && team.trim().length > 0,
-    );
-    return firstTeam ?? null;
-  }
-
-  if (typeof rawTeam !== "string") {
-    return null;
-  }
-
-  const value = rawTeam.trim();
-  return value.length > 0 ? value : null;
-}
-
-function getRosterRatingClass(seasonRk: Player["seasonRk"]) {
-  return typeof seasonRk === "number" && Number.isFinite(seasonRk)
-    ? getRatingColorClass(seasonRk)
-    : "bg-gray-200 text-gray-700";
-}
-
-function getDisplayedRosterSalary(salary: number, contract?: Contract) {
-  if (contract?.expiryStatus !== ContractStatus.RFA) {
-    return salary;
-  }
-
-  return (
-    Math.round((salary * RFA_SALARY_MULTIPLIER) / SALARY_ROUNDING_INCREMENT) *
-    SALARY_ROUNDING_INCREMENT
   );
 }

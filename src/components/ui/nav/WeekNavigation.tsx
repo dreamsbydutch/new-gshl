@@ -8,13 +8,9 @@
 
 import { cn } from "@gshl-utils";
 import { SeasonType, type Week } from "@gshl-types";
-import { useNavStore } from "@gshl-cache";
-import { useWeeks } from "@gshl-hooks";
+import type { WeeksToggleProps } from "@gshl-types";
+import { useNav, useWeekNavigation, useWeeks } from "@gshl-hooks";
 import { HorizontalToggle } from "./toggle";
-
-interface WeeksToggleProps {
-  className?: string;
-}
 
 /**
  * Week selection toggle component with playoff styling
@@ -22,10 +18,9 @@ interface WeeksToggleProps {
  * @returns Horizontal scrollable week selection interface
  */
 export function WeeksToggle({ className }: WeeksToggleProps) {
-  const seasonId = useNavStore((state) => state.selectedSeasonId);
+  const { selectedSeasonId: seasonId } = useNav();
   const { data: weeks } = useWeeks({ seasonId });
-  const selectedWeekId = useNavStore((state) => state.selectedWeekId);
-  const setWeekId = useNavStore((state) => state.setWeekId);
+  const { selectedWeekId, setSelectedWeekId: setWeekId } = useWeekNavigation();
 
   const selectedWeek = weeks?.find((w) => w.id === selectedWeekId) ?? null;
 

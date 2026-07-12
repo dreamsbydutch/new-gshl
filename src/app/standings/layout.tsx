@@ -1,22 +1,18 @@
 "use client";
 
-import { useStandingsNavigation } from "@gshl-cache";
+import { useStandingsNavigation } from "@gshl-hooks";
 import {
   SeasonToggleNav,
   SecondaryPageToolbar,
   HorizontalToggle,
 } from "@gshl-nav";
-
-type StandingsType = {
-  key: string;
-  label: string;
-};
+import type { LabeledToggleOption } from "@gshl-types";
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const { selectedType, setSelectedType } = useStandingsNavigation();
 
   // Standings type navigation items
-  const standingsTypes: StandingsType[] = [
+  const standingsTypes: LabeledToggleOption[] = [
     { key: "overall", label: "Overall" },
     { key: "conference", label: "Conference" },
     { key: "wildcard", label: "Wildcard" },
@@ -32,12 +28,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       {children}
       <SecondaryPageToolbar>
         <SeasonToggleNav />
-        <HorizontalToggle<StandingsType>
+        <HorizontalToggle<LabeledToggleOption>
           items={standingsTypes}
           selectedItem={selectedStandingsType}
-          onSelect={(type: StandingsType) => setSelectedType(type.key)}
-          getItemKey={(type: StandingsType) => type.key}
-          getItemLabel={(type: StandingsType) => type.label}
+          onSelect={(type: LabeledToggleOption) => setSelectedType(type.key)}
+          getItemKey={(type: LabeledToggleOption) => type.key}
+          getItemLabel={(type: LabeledToggleOption) => type.label}
         />
       </SecondaryPageToolbar>
     </div>

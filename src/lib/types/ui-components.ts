@@ -25,6 +25,7 @@ import type {
 } from "./database";
 import type { AwardsList, MatchupType, RosterPosition } from "./enums";
 import type { ToggleItem } from "./nav";
+import type { MatchupCategoryConfig } from "./team-schedule-ui";
 
 /* ============================================================================
  * CONTRACT TABLE TYPES
@@ -303,38 +304,6 @@ export interface TeamHistoryMatchupLineProps {
 }
 
 /* ============================================================================
- * TEAM ROSTER TYPES
- * ========================================================================= */
-
-export interface TeamRosterProps {
-  players: Player[] | undefined;
-  contracts: Contract[];
-  currentTeam: GSHLTeam;
-  showSalaries?: boolean;
-}
-
-export interface PlayerCardProps {
-  player: Player;
-  nhlTeam?: NHLTeam;
-}
-
-export interface BenchPlayersProps {
-  players: Player[];
-  nhlTeams: NHLTeam[];
-}
-
-export interface RosterLineupProps {
-  teamLineup: (Player | null)[][][];
-  contracts: Contract[];
-  showSalaries: boolean;
-}
-
-export interface RosterCapSpaceDisplayProps {
-  capSpace: number;
-  capCeiling: number;
-}
-
-/* ============================================================================
  * TEAM SCHEDULE TYPES
  * ========================================================================= */
 
@@ -343,15 +312,8 @@ export interface TeamScheduleItemProps {
   week: Week | undefined;
   teams: GSHLTeam[];
   selectedTeamId: string;
-  categories: MatchupCategoryConfig[]
+  categories: MatchupCategoryConfig[];
 }
-
-export type MatchupCategoryConfig = {
-  field: keyof TeamWeekStatLine;
-  label: string;
-  isInverse?: boolean;
-  precision?: number;
-};
 
 export interface OpponentDisplayProps {
   matchup: Matchup;

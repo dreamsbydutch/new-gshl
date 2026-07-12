@@ -1,45 +1,21 @@
-import type { GSHLTeam, Matchup, Season } from "@gshl-types";
+import type {
+  ConferenceContestConferenceInfo,
+  ConferenceContestOverallViewModel,
+  ConferenceContestRecord,
+  ConferenceContestSeasonViewModel,
+  ConferenceContestWinner,
+  GSHLTeam,
+  Matchup,
+  Season,
+} from "@gshl-types";
 import { MatchupType } from "@gshl-types";
 
-export interface ConferenceContestConferenceInfo {
-  id: string;
-  name: string;
-  abbr: string | null;
-  logoUrl: string | null;
-}
-
-export interface ConferenceContestRecord {
-  wins: number;
-  losses: number;
-}
-
-export interface ConferenceContestSeasonViewModel {
-  seasonId: string;
-  seasonName: string;
-  leftConference: ConferenceContestConferenceInfo;
-  rightConference: ConferenceContestConferenceInfo;
-
-  championTeamsByConferenceId: Record<string, GSHLTeam[]>;
-  finalsTeamsByConferenceId: Record<string, GSHLTeam[]>;
-  playoffTeamsByConferenceId: Record<string, GSHLTeam[]>;
-
-  seasonRecordByConferenceId: Record<string, ConferenceContestRecord>;
-  playoffRecordByConferenceId: Record<string, ConferenceContestRecord>;
-  headToHeadRecordByConferenceId: Record<string, ConferenceContestRecord>;
-}
-
-export interface ConferenceContestOverallViewModel {
-  leftConference: ConferenceContestConferenceInfo;
-  rightConference: ConferenceContestConferenceInfo;
-
-  championTeamsByConferenceId: Record<string, GSHLTeam[]>;
-  finalsTeamsByConferenceId: Record<string, GSHLTeam[]>;
-  playoffTeamsByConferenceId: Record<string, GSHLTeam[]>;
-
-  seasonRecordByConferenceId: Record<string, ConferenceContestRecord>;
-  playoffRecordByConferenceId: Record<string, ConferenceContestRecord>;
-  headToHeadRecordByConferenceId: Record<string, ConferenceContestRecord>;
-}
+export type {
+  ConferenceContestConferenceInfo,
+  ConferenceContestOverallViewModel,
+  ConferenceContestRecord,
+  ConferenceContestSeasonViewModel,
+} from "@gshl-types";
 
 export const isGshlTeam = (team: unknown): team is GSHLTeam => {
   if (!team || typeof team !== "object") return false;
@@ -109,8 +85,6 @@ export const getAllConferences = (
   );
 };
 
-type Winner = "home" | "away" | "tie" | "unknown";
-
 const normalizeScore = (score: unknown): number | null => {
   if (score == null) return null;
   if (typeof score === "number" && Number.isFinite(score)) return score;
@@ -149,7 +123,7 @@ const getMatchupWinner = (
     Matchup,
     "homeWin" | "awayWin" | "tie" | "homeScore" | "awayScore"
   >,
-): Winner => {
+): ConferenceContestWinner => {
   const tie = normalizeBoolean(matchup.tie);
   const homeWin = normalizeBoolean(matchup.homeWin);
   const awayWin = normalizeBoolean(matchup.awayWin);

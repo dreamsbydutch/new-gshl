@@ -1,6 +1,6 @@
 import { HydrateClient, serverApi } from "@gshl-trpc/server-exports";
 import { isBetweenSeasons, findOffseasonWindow } from "@gshl-utils";
-import { HomeContent } from "./HomeContent";
+import { HomeContent } from "@gshl-components/home/HomeContent";
 
 export default async function Home() {
   const seasons = await serverApi.season.getAll({ orderBy: { year: "asc" } });

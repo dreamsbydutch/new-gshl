@@ -1,7 +1,6 @@
 "use client";
 
-import { useLockerRoomNavigation } from "@gshl-cache";
-import { useSeasonState } from "@gshl-hooks";
+import { useLockerRoomNavigation, useSeasonState } from "@gshl-hooks";
 import {
   HorizontalToggle,
   SecondaryPageToolbar,
