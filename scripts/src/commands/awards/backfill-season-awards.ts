@@ -68,6 +68,7 @@ type TeamSeasonRecord = DatabaseRecord & {
   seasonType?: string | null;
   gshlTeamId?: string | number | null;
   G?: string | number | null;
+  A?: string | number | null;
   P?: string | number | null;
   HIT?: string | number | null;
   BLK?: string | number | null;
@@ -304,6 +305,35 @@ function toFiniteNumber(value: unknown): number | null {
 
 function toNumber(value: unknown): number {
   return toFiniteNumber(value) ?? 0;
+}
+
+function shouldDeriveArtRossPointsFromGoalsAndAssists(
+  seasonId: string,
+): boolean {
+  const seasonNumber = Number.parseInt(seasonId, 10);
+  return (
+    Number.isFinite(seasonNumber) && seasonNumber >= 1 && seasonNumber <= 2
+  );
+}
+
+function getArtRossPointsValue(
+  row: TeamSeasonRecord,
+  seasonId: string,
+): number | null {
+  const explicitPoints = toFiniteNumber(row.P);
+  const goals = toFiniteNumber(row.G);
+  const assists = toFiniteNumber(row.A);
+
+  if (shouldDeriveArtRossPointsFromGoalsAndAssists(seasonId)) {
+    return goals === null && assists === null
+      ? explicitPoints
+      : (goals ?? 0) + (assists ?? 0);
+  }
+
+  if (explicitPoints !== null) return explicitPoints;
+  return goals === null && assists === null
+    ? null
+    : (goals ?? 0) + (assists ?? 0);
 }
 
 function toBooleanFlag(value: unknown): boolean {
@@ -897,7 +927,9 @@ async function computeAwardsForSeason(
 
   const awardPodiums: Record<AwardKey, AwardPodium | null> = {
     rocket: selectNumericAward(regularRows, (row) => toFiniteNumber(row.G)),
-    artRoss: selectNumericAward(regularRows, (row) => toFiniteNumber(row.P)),
+    artRoss: selectNumericAward(regularRows, (row) =>
+      getArtRossPointsValue(row, seasonId),
+    ),
     selke: selectNumericAward(regularRows, (row) => {
       const hits = toFiniteNumber(row.HIT);
       const blocks = toFiniteNumber(row.BLK);

@@ -173,6 +173,8 @@ const PLAYER_DAY_COLUMNS = SHEETS_CONFIG.COLUMNS.PlayerDayStatLine;
 const STARTING_DAILY_POSITIONS = new Set(["C", "LW", "RW", "D", "G", "UTIL"]);
 const DEFAULT_WEEKLY_CHECK_REQUEST_STAGGER_MIN_MS = 2500;
 const DEFAULT_WEEKLY_CHECK_REQUEST_STAGGER_MS = 5000;
+const DEFAULT_GOALIE_START_MINIMUM = 2;
+const SINGLE_GOALIE_START_SEASON_IDS = new Set(["1"]);
 const TEAM_WEEK_MODEL = "TeamWeekStatLine";
 const TEAM_WEEK_ALLOWED_FIELDS = new Set([
   "G",
@@ -551,6 +553,42 @@ function buildPlayerWeekKey(
   playerId: string,
 ): string {
   return `${weekId}|${gshlTeamId}|${playerId}`;
+}
+
+function getGoalieStartMinimumForSeasonId(seasonId: string): number {
+  return SINGLE_GOALIE_START_SEASON_IDS.has(seasonId)
+    ? 1
+    : DEFAULT_GOALIE_START_MINIMUM;
+}
+
+function buildGoalieStartsByTeamWeek(params: {
+  playerDayRows: LoadedPlayerDayRow[];
+  playersById: ReadonlyMap<string, Player>;
+  targetWeekIds: ReadonlySet<string>;
+}): Map<string, number> {
+  const { playerDayRows, playersById, targetWeekIds } = params;
+  const goalieStartsByTeamWeek = new Map<string, number>();
+
+  for (const row of playerDayRows) {
+    const weekId = toTrimmedString(row.record.weekId);
+    if (!targetWeekIds.has(weekId)) continue;
+
+    const player = playersById.get(toTrimmedString(row.record.playerId));
+    if (!isGoaliePlayer(player) || !shouldCountPlayerDayRow(row.record)) {
+      continue;
+    }
+
+    const key = buildTeamWeekKey(
+      weekId,
+      toTrimmedString(row.record.gshlTeamId),
+    );
+    goalieStartsByTeamWeek.set(
+      key,
+      (goalieStartsByTeamWeek.get(key) ?? 0) + (Number(row.record.GS) || 0),
+    );
+  }
+
+  return goalieStartsByTeamWeek;
 }
 
 function normalizeTeamNameLookupKey(value: unknown): string {
@@ -1230,6 +1268,12 @@ async function main(): Promise<void> {
     list.push(row);
     playerDaysByWeekTeamPlayer.set(key, list);
   }
+  const goalieStartsByTeamWeek = buildGoalieStartsByTeamWeek({
+    playerDayRows,
+    playersById,
+    targetWeekIds,
+  });
+  const goalieStartMinimum = getGoalieStartMinimumForSeasonId(options.seasonId);
 
   const discrepancies: DiscrepancyRecord[] = [];
   const goalieDifferences: GoalieDifferenceRecord[] = [];
@@ -1406,6 +1450,9 @@ async function main(): Promise<void> {
 
       teamRowsChecked += 1;
       let mutableTeamWeek = teamWeek;
+      const teamWeekGoalieStarts = goalieStartsByTeamWeek.get(teamWeekKey) ?? 0;
+      const shouldSkipGoalieValidation =
+        teamWeekGoalieStarts > 0 && teamWeekGoalieStarts < goalieStartMinimum;
       for (const [yahooHeader, yahooValue] of Object.entries(yahooStats.stats)) {
         const sheetField = YAHOO_HEADER_TO_TEAM_WEEK_FIELD[yahooHeader];
         if (!sheetField || !TEAM_WEEK_ALLOWED_FIELDS.has(sheetField)) {
@@ -1445,6 +1492,9 @@ async function main(): Promise<void> {
               details: `Mapped field ${sheetField} does not exist on TeamWeekStatLine and was skipped.`,
             });
           }
+          continue;
+        }
+        if (isGoalieTeamField(sheetField) && shouldSkipGoalieValidation) {
           continue;
         }
 

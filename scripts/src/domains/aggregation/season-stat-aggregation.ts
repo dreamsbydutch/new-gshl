@@ -141,6 +141,8 @@ type WritableSeasonStatModelName =
   | "PlayerWeekStatLine"
   | "PlayerSplitStatLine"
   | "PlayerTotalStatLine"
+  | "PlayerCareerSplitStatLine"
+  | "PlayerCareerTotalStatLine"
   | "TeamDayStatLine"
   | "TeamWeekStatLine"
   | "TeamSeasonStatLine";
@@ -158,6 +160,8 @@ type SeasonAggregationSummary = {
   playerWeeks: number;
   playerSplits: number;
   playerTotals: number;
+  playerCareerSplits: number;
+  playerCareerTotals: number;
   teamDays: number;
   teamWeeks: number;
   teamSeasons: number;
@@ -168,6 +172,23 @@ type SeasonAggregationSummary = {
     sheetName: string;
     seasonRows: number;
     totalRows: number;
+    updatedRows: number;
+    insertedRows: number;
+    unchangedRows: number;
+    deletedRows: number;
+    duplicateDeletes: number;
+    diagnostics?: {
+      changedColumns: Array<{ column: string; count: number }>;
+      sampleUpdates: Array<{
+        key: string;
+        rowNumber: number;
+        changedFields: Array<{
+          column: string;
+          previousValue: string;
+          nextValue: string;
+        }>;
+      }>;
+    };
     applied: boolean;
   }>;
 };
@@ -177,6 +198,8 @@ export type SeasonStatsAggregationResult = {
   playerWeeks: DatabaseRecord[];
   playerSplits: DatabaseRecord[];
   playerTotals: DatabaseRecord[];
+  playerCareerSplits: DatabaseRecord[];
+  playerCareerTotals: DatabaseRecord[];
   teamDays: DatabaseRecord[];
   teamWeeks: DatabaseRecord[];
   teamSeasons: DatabaseRecord[];
@@ -579,6 +602,40 @@ function formatUnknownMessage(value: unknown): string {
   } catch {
     return Object.prototype.toString.call(value);
   }
+}
+
+function truncateDiagnosticValue(value: string, maxLength = 32): string {
+  if (value.length <= maxLength) {
+    return value;
+  }
+  return `${value.slice(0, Math.max(0, maxLength - 3))}...`;
+}
+
+function formatWriteDiagnostics(
+  write: NonNullable<SeasonAggregationSummary["writes"][number]["diagnostics"]>,
+): string[] {
+  const diagnostics: string[] = [];
+  if (write.changedColumns.length > 0) {
+    diagnostics.push(
+      `topChangedColumns=${write.changedColumns
+        .slice(0, 8)
+        .map((entry) => `${entry.column}:${entry.count}`)
+        .join(", ")}`,
+    );
+  }
+
+  for (const sample of write.sampleUpdates) {
+    diagnostics.push(
+      `sample key=${sample.key} row=${sample.rowNumber} changes=${sample.changedFields
+        .map(
+          (field) =>
+            `${field.column}(${truncateDiagnosticValue(field.previousValue)}=>${truncateDiagnosticValue(field.nextValue)})`,
+        )
+        .join(", ")}`,
+    );
+  }
+
+  return diagnostics;
 }
 
 function normalizeMultiValueTokens(value: unknown): string[] {
@@ -1055,6 +1112,66 @@ function buildPlayerSplitsAndTotals(
   });
 
   return { splits, totals };
+}
+
+function buildPlayerCareerSplitsAndTotals(
+  playerWeeks: DatabaseRecord[],
+  fieldConfig: SeasonAggregationFieldConfig,
+): { careerSplits: DatabaseRecord[]; careerTotals: DatabaseRecord[] } {
+  const careerSplitMap = new Map<string, DatabaseRecord[]>();
+  const careerTotalMap = new Map<string, DatabaseRecord[]>();
+
+  for (const playerWeek of playerWeeks) {
+    const playerId = toTrimmedString(playerWeek.playerId);
+    const gshlTeamId = toTrimmedString(playerWeek.gshlTeamId);
+    const seasonType = normalizeSeasonType(playerWeek.seasonType);
+    if (!playerId || !gshlTeamId || !seasonType) continue;
+
+    const splitKey = [playerId, gshlTeamId, seasonType].join("|");
+    const totalKey = [playerId, seasonType].join("|");
+
+    const splitRows = careerSplitMap.get(splitKey) ?? [];
+    splitRows.push(playerWeek);
+    careerSplitMap.set(splitKey, splitRows);
+
+    const totalRows = careerTotalMap.get(totalKey) ?? [];
+    totalRows.push(playerWeek);
+    careerTotalMap.set(totalKey, totalRows);
+  }
+
+  const careerSplits = Array.from(careerSplitMap.entries()).map(
+    ([key, rows]) => {
+      const [playerId, gshlTeamId, seasonType] = key.split("|");
+      return buildPlayerAggregate(
+        rows,
+        {
+          playerId: playerId ?? "",
+          seasonId: "",
+          seasonType: seasonType ?? SeasonType.REGULAR_SEASON,
+          gshlTeamId: gshlTeamId ?? "",
+        },
+        fieldConfig,
+      );
+    },
+  );
+
+  const careerTotals = Array.from(careerTotalMap.entries()).map(
+    ([key, rows]) => {
+      const [playerId, seasonType] = key.split("|");
+      return buildPlayerAggregate(
+        rows,
+        {
+          playerId: playerId ?? "",
+          seasonId: "",
+          seasonType: seasonType ?? SeasonType.REGULAR_SEASON,
+          gshlTeamIds: rows.map((row) => toTrimmedString(row.gshlTeamId)),
+        },
+        fieldConfig,
+      );
+    },
+  );
+
+  return { careerSplits, careerTotals };
 }
 
 function createTeamDayBucket(
@@ -1584,6 +1701,32 @@ function sortRows(
             toTrimmedString(right.playerId),
           )
         );
+      case "PlayerCareerSplitStatLine":
+        return (
+          compareValues(
+            toTrimmedString(left.seasonType),
+            toTrimmedString(right.seasonType),
+          ) ||
+          compareValues(
+            toTrimmedString(left.gshlTeamId),
+            toTrimmedString(right.gshlTeamId),
+          ) ||
+          compareValues(
+            toTrimmedString(left.playerId),
+            toTrimmedString(right.playerId),
+          )
+        );
+      case "PlayerCareerTotalStatLine":
+        return (
+          compareValues(
+            toTrimmedString(left.seasonType),
+            toTrimmedString(right.seasonType),
+          ) ||
+          compareValues(
+            toTrimmedString(left.playerId),
+            toTrimmedString(right.playerId),
+          )
+        );
       case "PlayerDayStatLine":
         return (
           compareValues(
@@ -1703,6 +1846,15 @@ function getSpreadsheetIdForSeasonWrite(
   return getWriteSpreadsheetIdForModel(modelName, { seasonId });
 }
 
+function isCareerPlayerStatModel(
+  modelName: WritableSeasonStatModelName,
+): boolean {
+  return (
+    modelName === "PlayerCareerSplitStatLine" ||
+    modelName === "PlayerCareerTotalStatLine"
+  );
+}
+
 async function replaceModelRowsForSeason(
   modelName: WritableSeasonStatModelName,
   seasonId: string,
@@ -1713,6 +1865,23 @@ async function replaceModelRowsForSeason(
   sheetName: string;
   seasonRows: number;
   totalRows: number;
+  updatedRows: number;
+  insertedRows: number;
+  unchangedRows: number;
+  deletedRows: number;
+  duplicateDeletes: number;
+  diagnostics?: {
+    changedColumns: Array<{ column: string; count: number }>;
+    sampleUpdates: Array<{
+      key: string;
+      rowNumber: number;
+      changedFields: Array<{
+        column: string;
+        previousValue: string;
+        nextValue: string;
+      }>;
+    }>;
+  };
 }> {
   const spreadsheetId = getSpreadsheetIdForSeasonWrite(modelName, seasonId);
   const sheetName = SHEETS_CONFIG.SHEETS[modelName];
@@ -1730,9 +1899,18 @@ async function replaceModelRowsForSeason(
       createdAtColumn: "createdAt",
       updatedAtColumn: "updatedAt",
       spreadsheetId,
-      deleteMissing: {
-        filter: { seasonId },
-      },
+      deleteMissing: isCareerPlayerStatModel(modelName)
+        ? true
+        : {
+            filter: { seasonId },
+          },
+      diagnostics:
+        modelName === "PlayerDayStatLine"
+          ? {
+              maxSamples: 5,
+              maxFieldsPerSample: 8,
+            }
+          : false,
     },
   );
 
@@ -1742,6 +1920,12 @@ async function replaceModelRowsForSeason(
     sheetName,
     seasonRows: preparedRows.length,
     totalRows: writeResult.total,
+    updatedRows: writeResult.updated,
+    insertedRows: writeResult.inserted,
+    unchangedRows: writeResult.unchanged,
+    deletedRows: writeResult.deleted,
+    duplicateDeletes: writeResult.duplicateDeletes,
+    diagnostics: writeResult.diagnostics,
   };
 }
 
@@ -1754,12 +1938,14 @@ async function replaceModelRowsForSeason(
 export async function aggregateSeasonStats(
   seasonId: string,
 ): Promise<SeasonStatsAggregationResult> {
-  const [seasonRows, weekRows, teamRows, loadedPlayerDays] = await Promise.all([
-    fastSheetsReader.fetchModel<DatabaseRecord>("Season"),
-    fastSheetsReader.fetchModel<DatabaseRecord>("Week"),
-    fastSheetsReader.fetchModel<DatabaseRecord>("Team"),
-    fastSheetsReader.fetchPlayerDaySeason<DatabaseRecord>(seasonId),
-  ]);
+  const [seasonRows, weekRows, teamRows, loadedPlayerDays, loadedPlayerWeeks] =
+    await Promise.all([
+      fastSheetsReader.fetchModel<DatabaseRecord>("Season"),
+      fastSheetsReader.fetchModel<DatabaseRecord>("Week"),
+      fastSheetsReader.fetchModel<DatabaseRecord>("Team"),
+      fastSheetsReader.fetchPlayerDaySeason<DatabaseRecord>(seasonId),
+      fastSheetsReader.fetchModel<DatabaseRecord>("PlayerWeekStatLine"),
+    ]);
 
   const hasSeason = seasonRows.some(
     (row) => toTrimmedString(row.id) === seasonId,
@@ -1818,6 +2004,19 @@ export async function aggregateSeasonStats(
     seasonId,
     fieldConfig,
   );
+  const mergedCareerPlayerWeeks = dedupeRowsByCompositeKey(
+    "PlayerWeekStatLine",
+    [
+      ...loadedPlayerWeeks.filter(
+        (row) => toTrimmedString(row.seasonId) !== seasonId,
+      ),
+      ...playerWeeks,
+    ],
+  );
+  const { careerSplits, careerTotals } = buildPlayerCareerSplitsAndTotals(
+    mergedCareerPlayerWeeks,
+    fieldConfig,
+  );
   const { teamDays, teamWeeks, teamSeasons } = aggregateTeamStats(
     playerDays,
     splits,
@@ -1832,6 +2031,8 @@ export async function aggregateSeasonStats(
   await rankBaseStatRows(playerWeeks, "PlayerWeekStatLine");
   await rankBaseStatRows(splits, "PlayerSplitStatLine");
   await rankBaseStatRows(totals, "PlayerTotalStatLine");
+  await rankBaseStatRows(careerSplits, "PlayerCareerSplitStatLine");
+  await rankBaseStatRows(careerTotals, "PlayerCareerTotalStatLine");
   await rankBaseStatRows(teamDays, "TeamDayStatLine");
   await rankBaseStatRows(teamWeeks, "TeamWeekStatLine");
   await rankBaseStatRows(teamSeasons, "TeamSeasonStatLine");
@@ -1841,6 +2042,8 @@ export async function aggregateSeasonStats(
     playerWeeks,
     playerSplits: splits,
     playerTotals: totals,
+    playerCareerSplits: careerSplits,
+    playerCareerTotals: careerTotals,
     teamDays,
     teamWeeks,
     teamSeasons,
@@ -1928,6 +2131,14 @@ export async function runSeasonStatsAggregation(
     { modelName: "PlayerWeekStatLine", rows: generated.playerWeeks },
     { modelName: "PlayerSplitStatLine", rows: generated.playerSplits },
     { modelName: "PlayerTotalStatLine", rows: generated.playerTotals },
+    {
+      modelName: "PlayerCareerSplitStatLine",
+      rows: generated.playerCareerSplits,
+    },
+    {
+      modelName: "PlayerCareerTotalStatLine",
+      rows: generated.playerCareerTotals,
+    },
     { modelName: "TeamDayStatLine", rows: generated.teamDays },
     { modelName: "TeamWeekStatLine", rows: generated.teamWeeks },
     { modelName: "TeamSeasonStatLine", rows: generated.teamSeasons },
@@ -1946,8 +2157,15 @@ export async function runSeasonStatsAggregation(
         writes.push({ ...result, applied: true });
         log(
           options,
-          `${input.modelName}: wrote seasonRows=${result.seasonRows} totalRows=${result.totalRows} sheet=${result.sheetName}`,
+          `${input.modelName}: wrote seasonRows=${result.seasonRows} updated=${result.updatedRows} inserted=${result.insertedRows} unchanged=${result.unchangedRows} deleted=${result.deletedRows} duplicateDeletes=${result.duplicateDeletes} totalRows=${result.totalRows} sheet=${result.sheetName}`,
         );
+        if (result.diagnostics) {
+          for (const diagnosticLine of formatWriteDiagnostics(
+            result.diagnostics,
+          )) {
+            log(options, `${input.modelName}: ${diagnosticLine}`);
+          }
+        }
       } catch (error) {
         if (isWritePermissionError(error)) {
           throw wrapWritePermissionError(
@@ -1975,6 +2193,11 @@ export async function runSeasonStatsAggregation(
         sheetName: SHEETS_CONFIG.SHEETS[input.modelName],
         seasonRows: input.rows.length,
         totalRows: -1,
+        updatedRows: -1,
+        insertedRows: -1,
+        unchangedRows: -1,
+        deletedRows: -1,
+        duplicateDeletes: -1,
         applied: false,
       });
       log(
@@ -1999,6 +2222,8 @@ export async function runSeasonStatsAggregation(
     playerWeeks: generated.playerWeeks.length,
     playerSplits: generated.playerSplits.length,
     playerTotals: generated.playerTotals.length,
+    playerCareerSplits: generated.playerCareerSplits.length,
+    playerCareerTotals: generated.playerCareerTotals.length,
     teamDays: generated.teamDays.length,
     teamWeeks: generated.teamWeeks.length,
     teamSeasons: generated.teamSeasons.length,

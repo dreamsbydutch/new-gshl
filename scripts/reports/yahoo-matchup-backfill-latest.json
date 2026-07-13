@@ -1,13 +1,11 @@
 {
   "seasonIds": [
-    "5"
+    "9"
   ],
-  "weekIds": [],
-  "weekNums": [
-    "17",
-    "18",
-    "19"
+  "weekIds": [
+    "125"
   ],
+  "weekNums": [],
   "startDate": null,
   "endDate": null,
   "teamIds": [],
@@ -18,17 +16,17 @@
   "apply": true,
   "summaries": [
     {
-      "seasonId": "5",
+      "seasonId": "9",
       "apply": true,
-      "datesScanned": 21,
-      "matchupsScanned": 24,
-      "pagesScanned": 168,
-      "teamSlicesScanned": 336,
-      "matchedYahooRows": 5275,
+      "datesScanned": 7,
+      "matchupsScanned": 8,
+      "pagesScanned": 56,
+      "teamSlicesScanned": 112,
+      "matchedYahooRows": 1780,
       "updatedRows": 0,
       "createdRows": 0,
       "deletedRows": 0,
-      "unchangedRows": 5275,
+      "unchangedRows": 1780,
       "flags": []
     }
   ]

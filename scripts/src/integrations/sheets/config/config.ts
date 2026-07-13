@@ -81,6 +81,8 @@ export const MODEL_TO_WORKBOOK: Record<string, keyof typeof WORKBOOKS> = {
   PlayerWeekStatLine: "PLAYERSTATS",
   PlayerSplitStatLine: "PLAYERSTATS",
   PlayerTotalStatLine: "PLAYERSTATS",
+  PlayerCareerSplitStatLine: "PLAYERSTATS",
+  PlayerCareerTotalStatLine: "PLAYERSTATS",
   PlayerNHLStatLine: "PLAYERSTATS",
 
   // TEAMSTATS workbook
@@ -156,6 +158,8 @@ export type CompositeKeyModelName =
   | "PlayerWeekStatLine"
   | "PlayerSplitStatLine"
   | "PlayerTotalStatLine"
+  | "PlayerCareerSplitStatLine"
+  | "PlayerCareerTotalStatLine"
   | "PlayerNHLStatLine"
   | "TeamDayStatLine"
   | "TeamWeekStatLine"
@@ -173,6 +177,10 @@ export function getCompositeKeyColumnsForModel(
       return ["playerId", "seasonId", "gshlTeamId", "seasonType"];
     case "PlayerTotalStatLine":
       return ["playerId", "seasonId", "seasonType"];
+    case "PlayerCareerSplitStatLine":
+      return ["playerId", "gshlTeamId", "seasonType"];
+    case "PlayerCareerTotalStatLine":
+      return ["playerId", "seasonType"];
     case "PlayerNHLStatLine":
       return ["playerId", "seasonId"];
     case "TeamDayStatLine":
@@ -211,6 +219,8 @@ export const SHEETS_CONFIG = {
     PlayerWeekStatLine: "PlayerWeekStatLine",
     PlayerSplitStatLine: "PlayerSplitStatLine",
     PlayerTotalStatLine: "PlayerTotalStatLine",
+    PlayerCareerSplitStatLine: "PlayerCareerSplitStatLine",
+    PlayerCareerTotalStatLine: "PlayerCareerTotalStatLine",
     PlayerNHLStatLine: "PlayerNHLStatLine",
     TeamDayStatLine: "TeamDayStatLine",
     TeamWeekStatLine: "TeamWeekStatLine",
@@ -471,6 +481,82 @@ export const SHEETS_CONFIG = {
     PlayerTotalStatLine: [
       "id",
       "seasonId",
+      "gshlTeamIds",
+      "playerId",
+      "nhlPos",
+      "posGroup",
+      "nhlTeam",
+      "seasonType",
+      "days",
+      "GP",
+      "MG",
+      "IR",
+      "IRplus",
+      "GS",
+      "G",
+      "A",
+      "P",
+      "PM",
+      "PIM",
+      "PPP",
+      "SOG",
+      "HIT",
+      "BLK",
+      "W",
+      "GA",
+      "GAA",
+      "SV",
+      "SA",
+      "SVP",
+      "SO",
+      "TOI",
+      "Rating",
+      "ADD",
+      "MS",
+      "BS",
+      "createdAt",
+      "updatedAt",
+    ],
+    PlayerCareerSplitStatLine: [
+      "id",
+      "gshlTeamId",
+      "playerId",
+      "nhlPos",
+      "posGroup",
+      "nhlTeam",
+      "seasonType",
+      "days",
+      "GP",
+      "MG",
+      "IR",
+      "IRplus",
+      "GS",
+      "G",
+      "A",
+      "P",
+      "PM",
+      "PIM",
+      "PPP",
+      "SOG",
+      "HIT",
+      "BLK",
+      "W",
+      "GA",
+      "GAA",
+      "SV",
+      "SA",
+      "SVP",
+      "SO",
+      "TOI",
+      "Rating",
+      "ADD",
+      "MS",
+      "BS",
+      "createdAt",
+      "updatedAt",
+    ],
+    PlayerCareerTotalStatLine: [
+      "id",
       "gshlTeamIds",
       "playerId",
       "nhlPos",

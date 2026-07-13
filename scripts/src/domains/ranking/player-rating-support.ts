@@ -12,6 +12,8 @@ export type SupportedPlayerRatingModelName =
   | "PlayerWeekStatLine"
   | "PlayerSplitStatLine"
   | "PlayerTotalStatLine"
+  | "PlayerCareerSplitStatLine"
+  | "PlayerCareerTotalStatLine"
   | "PlayerNHLStatLine";
 
 export type PlayerRatingSelectionOptions = {
@@ -49,6 +51,8 @@ export const ALL_SUPPORTED_PLAYER_RATING_MODELS: SupportedPlayerRatingModelName[
     "PlayerWeekStatLine",
     "PlayerSplitStatLine",
     "PlayerTotalStatLine",
+    "PlayerCareerSplitStatLine",
+    "PlayerCareerTotalStatLine",
     "PlayerNHLStatLine",
   ];
 
@@ -65,6 +69,10 @@ const MODEL_NAME_ALIASES: Record<
   playersplitstatline: "PlayerSplitStatLine",
   playertotal: "PlayerTotalStatLine",
   playertotalstatline: "PlayerTotalStatLine",
+  playercareersplit: "PlayerCareerSplitStatLine",
+  playercareersplitstatline: "PlayerCareerSplitStatLine",
+  playercareertotal: "PlayerCareerTotalStatLine",
+  playercareertotalstatline: "PlayerCareerTotalStatLine",
   playernhl: "PlayerNHLStatLine",
   playernhlstatline: "PlayerNHLStatLine",
 };
@@ -277,6 +285,26 @@ function isWeekScopedModel(modelName: SupportedPlayerRatingModelName): boolean {
   );
 }
 
+function isCareerAggregateModel(
+  modelName: SupportedPlayerRatingModelName,
+): boolean {
+  return (
+    modelName === "PlayerCareerSplitStatLine" ||
+    modelName === "PlayerCareerTotalStatLine"
+  );
+}
+
+function isSeasonTypeScopedModel(
+  modelName: SupportedPlayerRatingModelName,
+): boolean {
+  return (
+    modelName === "PlayerSplitStatLine" ||
+    modelName === "PlayerTotalStatLine" ||
+    modelName === "PlayerCareerSplitStatLine" ||
+    modelName === "PlayerCareerTotalStatLine"
+  );
+}
+
 async function buildWeekIdAllowList(
   options: PlayerRatingSelectionOptions,
 ): Promise<ReadonlySet<string> | null> {
@@ -433,9 +461,18 @@ export async function preparePlayerRatingModelRows(
     : null;
 
   const targetRows = loaded.rows.filter(({ record }) => {
-    if (toTrimmedString(record.seasonId) !== selection.seasonId) return false;
-    if (!matchesSeasonTypeFilter(record, selection.seasonType ?? ""))
+    if (
+      !isCareerAggregateModel(modelName) &&
+      toTrimmedString(record.seasonId) !== selection.seasonId
+    ) {
       return false;
+    }
+    if (
+      isSeasonTypeScopedModel(modelName) &&
+      !matchesSeasonTypeFilter(record, selection.seasonType ?? "")
+    ) {
+      return false;
+    }
     if (
       isWeekScopedModel(modelName) &&
       !matchesWeekIdFilter(record, weekIdAllowList)
