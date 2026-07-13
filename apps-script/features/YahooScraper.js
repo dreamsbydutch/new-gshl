@@ -4374,6 +4374,15 @@ var YahooScraper = YahooScraper || {};
         updatedAtColumn: "updatedAt",
       },
     );
+
+    if (
+      typeof StatsAggregator !== "undefined" &&
+      StatsAggregator &&
+      typeof StatsAggregator.updatePlayerCareerStatsFromExistingPlayerWeeks ===
+        "function"
+    ) {
+      StatsAggregator.updatePlayerCareerStatsFromExistingPlayerWeeks(seasonId);
+    }
   }
 
   /**

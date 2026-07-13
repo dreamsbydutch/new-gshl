@@ -244,6 +244,26 @@ SHEET_SCHEMAS.PlayerTotalStatLine =
     numericColumns: PLAYER_WEEK_NUMERIC_FIELDS,
   });
 
+SHEET_SCHEMAS.PlayerCareerSplitStatLine =
+  SHEET_SCHEMAS.PlayerCareerSplitStatLine ||
+  createSheetSchema({
+    description: "Career splits per team",
+    category: "stat",
+    keyColumns: ["gshlTeamId", "playerId", "seasonType"],
+    datetimeColumns: ["createdAt", "updatedAt"],
+    numericColumns: PLAYER_WEEK_NUMERIC_FIELDS,
+  });
+
+SHEET_SCHEMAS.PlayerCareerTotalStatLine =
+  SHEET_SCHEMAS.PlayerCareerTotalStatLine ||
+  createSheetSchema({
+    description: "Career totals per player",
+    category: "stat",
+    keyColumns: ["playerId", "seasonType"],
+    datetimeColumns: ["createdAt", "updatedAt"],
+    numericColumns: PLAYER_WEEK_NUMERIC_FIELDS,
+  });
+
 var PLAYER_NHL_NUMERIC_FIELDS = [
   "age",
   "GP",

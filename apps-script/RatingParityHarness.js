@@ -35,6 +35,8 @@ var RatingParityHarness = (function RatingParityHarnessModule() {
       PlayerWeek: "PlayerWeekStatLine",
       PlayerSplit: "PlayerSplitStatLine",
       PlayerTotal: "PlayerTotalStatLine",
+      PlayerCareerSplit: "PlayerCareerSplitStatLine",
+      PlayerCareerTotal: "PlayerCareerTotalStatLine",
       PlayerNHL: "PlayerNHL",
       PlayerNhl: "PlayerNHL",
       PlayerNHLStatLine: "PlayerNHL",
@@ -70,6 +72,8 @@ var RatingParityHarness = (function RatingParityHarnessModule() {
       normalizedSheetName === "PlayerWeekStatLine" ||
       normalizedSheetName === "PlayerSplitStatLine" ||
       normalizedSheetName === "PlayerTotalStatLine" ||
+      normalizedSheetName === "PlayerCareerSplitStatLine" ||
+      normalizedSheetName === "PlayerCareerTotalStatLine" ||
       normalizedSheetName === "PlayerNHL"
     ) {
       return PLAYERSTATS_SPREADSHEET_ID;
@@ -201,7 +205,13 @@ var RatingParityHarness = (function RatingParityHarnessModule() {
       coerceTypes: true,
     }).filter(function (row) {
       if (!row) return false;
-      if (String(row.seasonId || "") !== seasonKey) return false;
+      if (
+        normalizedSheetName !== "PlayerCareerSplitStatLine" &&
+        normalizedSheetName !== "PlayerCareerTotalStatLine" &&
+        String(row.seasonId || "") !== seasonKey
+      ) {
+        return false;
+      }
       if (
         request &&
         request.seasonType &&

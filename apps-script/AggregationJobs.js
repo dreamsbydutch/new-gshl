@@ -123,6 +123,8 @@ var AggregationJobHelpers = (function buildAggregationJobHelpers() {
       includePlayerWeeks: true,
       includePlayerSplits: true,
       includePlayerTotals: true,
+      includePlayerCareerSplits: true,
+      includePlayerCareerTotals: true,
       includePlayerNhl: true,
     });
 

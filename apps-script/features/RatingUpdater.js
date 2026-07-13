@@ -34,6 +34,8 @@ var RatingUpdater = (function RatingUpdaterModule() {
       PlayerWeek: "PlayerWeekStatLine",
       PlayerSplit: "PlayerSplitStatLine",
       PlayerTotal: "PlayerTotalStatLine",
+      PlayerCareerSplit: "PlayerCareerSplitStatLine",
+      PlayerCareerTotal: "PlayerCareerTotalStatLine",
       TeamDay: "TeamDayStatLine",
       TeamWeek: "TeamWeekStatLine",
       TeamSeason: "TeamSeasonStatLine",
@@ -72,6 +74,8 @@ var RatingUpdater = (function RatingUpdaterModule() {
       normalizedSheetName === "PlayerWeekStatLine" ||
       normalizedSheetName === "PlayerSplitStatLine" ||
       normalizedSheetName === "PlayerTotalStatLine" ||
+      normalizedSheetName === "PlayerCareerSplitStatLine" ||
+      normalizedSheetName === "PlayerCareerTotalStatLine" ||
       normalizedSheetName === "PlayerNHL"
     ) {
       return PLAYERSTATS_SPREADSHEET_ID;
@@ -102,6 +106,14 @@ var RatingUpdater = (function RatingUpdaterModule() {
       return SHEET_SCHEMAS[normalizedSheetName];
     }
     return null;
+  }
+
+  function isCareerPlayerSheet(sheetName) {
+    var normalizedSheetName = normalizeSheetName(sheetName);
+    return (
+      normalizedSheetName === "PlayerCareerSplitStatLine" ||
+      normalizedSheetName === "PlayerCareerTotalStatLine"
+    );
   }
 
   function getUpsertKeyColumns(sheetName) {
@@ -304,7 +316,18 @@ var RatingUpdater = (function RatingUpdaterModule() {
       coerceTypes: true,
     }).filter(function (row) {
       if (!row) return false;
-      if (String(row.seasonId || "") !== seasonKey) return false;
+      if (
+        !isCareerPlayerSheet(normalizedSheetName) &&
+        String(row.seasonId || "") !== seasonKey
+      ) {
+        return false;
+      }
+      if (
+        opts.seasonType &&
+        String(row.seasonType || "") !== String(opts.seasonType)
+      ) {
+        return false;
+      }
       if (weekIdAllowList) {
         var wk =
           row && row.weekId !== undefined && row.weekId !== null
@@ -499,6 +522,24 @@ var RatingUpdater = (function RatingUpdaterModule() {
       );
     };
 
+  ns.updatePlayerCareerSplitRatingsForSeason =
+    function updatePlayerCareerSplitRatingsForSeason(seasonId, options) {
+      return ns.updateRatingsForSheet(
+        seasonId,
+        "PlayerCareerSplitStatLine",
+        options || {},
+      );
+    };
+
+  ns.updatePlayerCareerTotalRatingsForSeason =
+    function updatePlayerCareerTotalRatingsForSeason(seasonId, options) {
+      return ns.updateRatingsForSheet(
+        seasonId,
+        "PlayerCareerTotalStatLine",
+        options || {},
+      );
+    };
+
   ns.updatePlayerNhlRatingsForSeason = function updatePlayerNhlRatingsForSeason(
     seasonId,
     options,
@@ -518,6 +559,8 @@ var RatingUpdater = (function RatingUpdaterModule() {
           includePlayerWeeks: true,
           includePlayerSplits: true,
           includePlayerTotals: true,
+          includePlayerCareerSplits: true,
+          includePlayerCareerTotals: true,
           includePlayerNhl: true,
           dryRun: false,
           logToConsole: true,
@@ -579,6 +622,18 @@ var RatingUpdater = (function RatingUpdaterModule() {
       }
       if (opts.includePlayerTotals) {
         results.playerTotals = ns.updatePlayerTotalRatingsForSeason(
+          seasonId,
+          opts,
+        );
+      }
+      if (opts.includePlayerCareerSplits) {
+        results.playerCareerSplits = ns.updatePlayerCareerSplitRatingsForSeason(
+          seasonId,
+          opts,
+        );
+      }
+      if (opts.includePlayerCareerTotals) {
+        results.playerCareerTotals = ns.updatePlayerCareerTotalRatingsForSeason(
           seasonId,
           opts,
         );
