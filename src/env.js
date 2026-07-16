@@ -12,7 +12,7 @@ export const env = createEnv({
     NODE_ENV: z
       .enum(["development", "test", "production"])
       .default("development"),
-    GSHL_DATA_BACKEND: z.enum(["sheets", "convex"]).default("sheets"),
+    GSHL_DATA_BACKEND: z.enum(["sheets", "convex"]).default("convex"),
     USE_GOOGLE_SHEETS: z.enum(["true", "false"]).default("true"),
     GOOGLE_SERVICE_ACCOUNT_KEY_FILE: z.string().optional(),
     GOOGLE_SERVICE_ACCOUNT_KEY: z.string().optional(),
@@ -41,7 +41,7 @@ export const env = createEnv({
     // DATABASE_URL: process.env.DATABASE_URL,
     // DIRECT_URL: process.env.DIRECT_URL,
     NODE_ENV: process.env.NODE_ENV,
-    GSHL_DATA_BACKEND: process.env.GSHL_DATA_BACKEND ?? "sheets",
+    GSHL_DATA_BACKEND: process.env.GSHL_DATA_BACKEND ?? "convex",
     USE_GOOGLE_SHEETS: process.env.USE_GOOGLE_SHEETS ?? "true",
     GOOGLE_SERVICE_ACCOUNT_KEY_FILE:
       process.env.GOOGLE_SERVICE_ACCOUNT_KEY_FILE,

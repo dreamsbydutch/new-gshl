@@ -9,6 +9,7 @@
 import { initTRPC } from "@trpc/server";
 import superjson from "superjson";
 import { ZodError } from "zod";
+import { env } from "@gshl-env";
 
 /**
  * 1. CONTEXT
@@ -76,15 +77,50 @@ export const createTRPCRouter = t.router;
  * You can remove this if you don't like it, but it can help catch unwanted waterfalls by simulating
  * network latency that would occur in production but not in local development.
  */
+function describeError(error: unknown): Record<string, unknown> {
+  if (!(error instanceof Error)) {
+    return { error };
+  }
+
+  const cause = error.cause;
+  return {
+    name: error.name,
+    message: error.message,
+    cause:
+      cause instanceof Error
+        ? {
+            name: cause.name,
+            message: cause.message,
+          }
+        : cause,
+  };
+}
+
 const timingMiddleware = t.middleware(async ({ next, path }) => {
   const start = Date.now();
 
-  const result = await next();
+  try {
+    const result = await next();
 
-  const end = Date.now();
-  console.log(`[TRPC] ${path} took ${end - start}ms to execute`);
+    const end = Date.now();
+    if (!result.ok) {
+      console.error(`[TRPC] ${path} failed after ${end - start}ms`, {
+        backend: env.GSHL_DATA_BACKEND,
+        error: describeError(result.error),
+      });
+    } else {
+      console.log(`[TRPC] ${path} took ${end - start}ms to execute`);
+    }
 
-  return result;
+    return result;
+  } catch (error) {
+    const end = Date.now();
+    console.error(`[TRPC] ${path} threw after ${end - start}ms`, {
+      backend: env.GSHL_DATA_BACKEND,
+      error: describeError(error),
+    });
+    throw error;
+  }
 });
 
 /**
