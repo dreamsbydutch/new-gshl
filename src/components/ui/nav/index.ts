@@ -4,7 +4,7 @@
  */
 
 // Main Navigation
-export { Navbar } from "./MainNavbar";
+export { MainNavbar as Navbar } from "./MainNavbar";
 export { SeasonToggleNav } from "./SeasonNavigation";
 export { WeeksToggle } from "./WeekNavigation";
 export { TeamsToggle } from "./TeamNavigation";

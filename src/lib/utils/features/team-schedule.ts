@@ -1,11 +1,15 @@
 import type { GSHLTeam, Matchup, Week } from "@gshl-types";
 import {
-  GAME_TYPES,
-  GAME_LOCATIONS,
+  filterMatchups,
+  formatMatchupScore,
+  getMatchupOutcomeClass,
+  isScheduleItemComplete,
   CONFERENCES,
   RANKING_DISPLAY_THRESHOLD,
+  shouldDisplayRank,
+  sortMatchups,
 } from "../domain/schedule";
-import { findTeamById } from "../domain/team";
+import { getTeamMatchupResult } from "../domain/team";
 import type {
   TeamScheduleItemProps,
   OpponentDisplayProps,
@@ -17,13 +21,6 @@ import type {
   ConferenceConfig,
 } from "@gshl-types";
 
-// Re-export shared constants for backward compatibility
-export { GAME_TYPES, GAME_LOCATIONS, CONFERENCES, RANKING_DISPLAY_THRESHOLD };
-
-// Re-export domain utilities
-export { findTeamById };
-
-// Re-export types for backward compatibility
 export type {
   TeamScheduleItemProps,
   OpponentDisplayProps,
@@ -35,8 +32,7 @@ export type {
   ConferenceConfig,
 };
 
-// Team schedule specific styling constants
-export const GAME_TYPE_STYLES: Record<string, GameTypeDisplay> = {
+const GAME_TYPE_STYLES: Record<string, GameTypeDisplay> = {
   QF: {
     label: "QF",
     className: "text-orange-800 bg-orange-100",
@@ -55,44 +51,46 @@ export const GAME_TYPE_STYLES: Record<string, GameTypeDisplay> = {
   },
 } as const;
 
-export const RESULT_STYLES = {
+const RESULT_STYLES = {
   WIN: "font-semibold text-emerald-700",
   LOSS: "text-rose-800",
   DEFAULT: "text-gray-500",
 } as const;
 
 /**
- * Filters matchups for a specific team ID.
+ * Filters team matchups.
+ *
+ * @param matchups - The matchups to use.
+ * @param selectedTeamId - The selected team id to use.
+ * @returns The filtered team matchups.
  */
 export const filterTeamMatchups = (
   matchups: Matchup[],
   selectedTeamId: string | null | undefined,
 ): Matchup[] => {
-  if (!matchups || !selectedTeamId) return [];
-
-  return matchups.filter(
-    (matchup) =>
-      matchup.homeTeamId === selectedTeamId ||
-      matchup.awayTeamId === selectedTeamId,
-  );
+  return filterMatchups(matchups, { teamId: selectedTeamId });
 };
 
 /**
- * Sorts matchups by their week sequence.
+ * Sorts matchups by week.
+ *
+ * @param matchups - The matchups to use.
+ * @param weeks - The weeks to use.
+ * @returns The sorted matchups by week.
  */
 export const sortMatchupsByWeek = (
   matchups: Matchup[],
   weeks: Week[],
 ): Matchup[] => {
-  return matchups.sort((a, b) => {
-    const weekA = weeks?.find((w) => w.id === a.weekId);
-    const weekB = weeks?.find((w) => w.id === b.weekId);
-    return (weekA?.weekNum ?? 0) - (weekB?.weekNum ?? 0);
-  });
+  return sortMatchups(matchups, { by: "week", weeks });
 };
 
 /**
- * Finds a week by its ID.
+ * Finds week by id.
+ *
+ * @param weeks - The weeks to use.
+ * @param weekId - The week id to use.
+ * @returns The matching week by id, if one exists.
  */
 export const findWeekById = (
   weeks: Week[],
@@ -102,7 +100,11 @@ export const findWeekById = (
 };
 
 /**
- * Determines if a matchup is at home for the selected team.
+ * Returns game location.
+ *
+ * @param matchup - The matchup to use.
+ * @param selectedTeamId - The selected team id to use.
+ * @returns The requested game location.
  */
 export const getGameLocation = (
   matchup: Matchup,
@@ -112,7 +114,14 @@ export const getGameLocation = (
 };
 
 /**
- * Resolves the display metadata for a matchup's game type.
+ * Returns game type display.
+ *
+ * @param gameType - The game type to use.
+ * @param week - The week to use.
+ * @param gameLocation - The game location to use.
+ * @param awayTeam - The away team to use.
+ * @param homeTeam - The home team to use.
+ * @returns The requested game type display.
  */
 export const getGameTypeDisplay = (
   gameType: string,
@@ -136,13 +145,18 @@ export const getGameTypeDisplay = (
 };
 
 /**
- * Resolves the text color class based on opponent conference.
+ * Returns conference color.
+ *
+ * @param gameLocation - The game location to use.
+ * @param awayTeam - The away team to use.
+ * @param homeTeam - The home team to use.
+ * @returns The requested conference color.
  */
-export const getConferenceColor = (
+function getConferenceColor(
   gameLocation: GameLocation,
   awayTeam: GSHLTeam | undefined,
   homeTeam: GSHLTeam | undefined,
-): string => {
+): string {
   const opponentConf =
     gameLocation === "HOME" ? awayTeam?.confAbbr : homeTeam?.confAbbr;
 
@@ -152,7 +166,13 @@ export const getConferenceColor = (
 };
 
 /**
- * Formats opponent display text including rank and venue.
+ * Formats opponent display for display.
+ *
+ * @param gameLocation - The game location to use.
+ * @param matchup - The matchup to use.
+ * @param homeTeam - The home team to use.
+ * @param awayTeam - The away team to use.
+ * @returns The formatted opponent display.
  */
 export const formatOpponentDisplay = (
   gameLocation: GameLocation,
@@ -174,56 +194,59 @@ export const formatOpponentDisplay = (
 };
 
 /**
- * Determines if a ranking badge should be shown.
+ * Determines whether to show rank.
+ *
+ * @param rank - The rank to use.
+ * @returns True when show rank; otherwise false.
  */
 export const shouldShowRank = (rank: number | null | undefined): boolean => {
-  return !!(rank && rank <= RANKING_DISPLAY_THRESHOLD);
+  return shouldDisplayRank(rank, {
+    threshold: RANKING_DISPLAY_THRESHOLD,
+  });
 };
 
 /**
- * Indicates whether a matchup has concluded.
+ * Checks whether game completed.
+ *
+ * @param week - The week to use.
+ * @returns True when game completed; otherwise false.
  */
 export const isGameCompleted = (week: Week | undefined): boolean => {
-  if (!week?.endDate) return false;
-  return new Date(week.endDate) < new Date();
+  return isScheduleItemComplete({ mode: "weekEnd", week });
 };
 
 /**
- * Calculates whether the selected team won a matchup.
- */
-export const didTeamWin = (
-  matchup: Matchup,
-  selectedTeamId: string,
-): boolean => {
-  return matchup.homeTeamId === selectedTeamId
-    ? !!matchup.homeWin
-    : !!matchup.awayWin;
-};
-
-/**
- * Derives the styling class for the matchup result.
+ * Returns result style class.
+ *
+ * @param matchup - The matchup to use.
+ * @param selectedTeamId - The selected team id to use.
+ * @returns The requested result style class.
  */
 export const getResultStyleClass = (
   matchup: Matchup,
   selectedTeamId: string,
 ): string => {
-  const teamWon = didTeamWin(matchup, selectedTeamId);
-  const teamLost =
-    matchup.homeTeamId === selectedTeamId ? !matchup.homeWin : !matchup.awayWin;
-
-  if (teamWon) return RESULT_STYLES.WIN;
-  if (teamLost) return RESULT_STYLES.LOSS;
-  return RESULT_STYLES.DEFAULT;
+  return getMatchupOutcomeClass({
+    defaultClass: RESULT_STYLES.DEFAULT,
+    lossClass: RESULT_STYLES.LOSS,
+    result: getTeamMatchupResult(matchup, selectedTeamId),
+    winClass: RESULT_STYLES.WIN,
+  });
 };
 
 /**
- * Formats the score from the selected team's viewpoint.
+ * Formats team score for display.
+ *
+ * @param matchup - The matchup to use.
+ * @param selectedTeamId - The selected team id to use.
+ * @returns The formatted team score.
  */
 export const formatTeamScore = (
   matchup: Matchup,
   selectedTeamId: string,
 ): string => {
-  return matchup.homeTeamId === selectedTeamId
-    ? `${matchup.homeScore} - ${matchup.awayScore}`
-    : `${matchup.awayScore} - ${matchup.homeScore}`;
+  return formatMatchupScore({
+    matchup,
+    perspectiveTeamId: selectedTeamId,
+  });
 };

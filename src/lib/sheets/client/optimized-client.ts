@@ -28,6 +28,16 @@ interface RateLimitConfig {
   baseDelay: number;
 }
 
+type RequestKind = "read" | "write";
+
+function assertSheetsWritesEnabled(operation: string): void {
+  if (env.GSHL_DATA_BACKEND === "convex") {
+    throw new Error(
+      `${operation} attempted a direct Google Sheets write while GSHL_DATA_BACKEND=convex. Route this flow through the data adapter instead.`,
+    );
+  }
+}
+
 export class OptimizedSheetsClient {
   private sheets: sheets_v4.Sheets;
   private auth: GoogleAuth;
@@ -41,18 +51,30 @@ export class OptimizedSheetsClient {
     SheetMetadata[]
   >();
   private readonly BATCH_SIZE = 1000;
+  private readonly MAX_ROWS_PER_WRITE_RANGE = 250;
+  private readonly MAX_CELLS_PER_WRITE_RANGE = 10000;
+  private readonly MAX_RANGES_PER_WRITE_REQUEST = 25;
+  private readonly MAX_CELLS_PER_WRITE_REQUEST = 30000;
   private readonly CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
-  // Rate limiting properties
-  private requestTimestamps: number[] = [];
-  private readonly rateLimitConfig: RateLimitConfig = {
-    requestsPerMinute: 300, // Conservative limit (Google's limit is 300/min)
-    burstLimit: 10, // Max requests in burst
-    retryAttempts: 5,
-    baseDelay: 1000, // 1 second base delay
+  // Google Sheets enforces separate per-user read/write quotas.
+  private readRequestTimestamps: number[] = [];
+  private writeRequestTimestamps: number[] = [];
+  private readonly rateLimitConfig: Record<RequestKind, RateLimitConfig> = {
+    read: {
+      requestsPerMinute: 55,
+      burstLimit: 5,
+      retryAttempts: 5,
+      baseDelay: 1000,
+    },
+    write: {
+      requestsPerMinute: 55,
+      burstLimit: 3,
+      retryAttempts: 5,
+      baseDelay: 1000,
+    },
   };
-
-  private readonly limiter = pLimit(this.rateLimitConfig.burstLimit);
+  private readonly limiters: Record<RequestKind, ReturnType<typeof pLimit>>;
 
   private parseServiceAccountCredentials(raw?: string): {
     credentials?: object;
@@ -133,6 +155,10 @@ export class OptimizedSheetsClient {
       });
 
       this.sheets = google.sheets({ version: "v4", auth: this.auth });
+      this.limiters = {
+        read: pLimit(this.rateLimitConfig.read.burstLimit),
+        write: pLimit(this.rateLimitConfig.write.burstLimit),
+      };
     } catch (error) {
       console.error("❌ Failed to initialize Google Sheets client:", error);
       throw error;
@@ -156,7 +182,9 @@ export class OptimizedSheetsClient {
     sheetName: string,
     headers: string[],
   ): Promise<void> {
-    await this.withRateLimit(async () => {
+    assertSheetsWritesEnabled("createSheet");
+
+    await this.withRateLimit("write", async () => {
       try {
         // Attempt to add sheet
         await this.sheets.spreadsheets.batchUpdate({
@@ -179,11 +207,13 @@ export class OptimizedSheetsClient {
       // Set header row (A1:...)
       if (headers.length > 0) {
         const headerRange = `${sheetName}!A1:${this.getColumnLetter(headers.length)}1`;
-        await this.sheets.spreadsheets.values.update({
-          spreadsheetId,
-          range: headerRange,
-          valueInputOption: "RAW",
-          requestBody: { values: [headers] },
+        await this.withRateLimit("write", async () => {
+          await this.sheets.spreadsheets.values.update({
+            spreadsheetId,
+            range: headerRange,
+            valueInputOption: "RAW",
+            requestBody: { values: [headers] },
+          });
         });
       }
     });
@@ -193,7 +223,7 @@ export class OptimizedSheetsClient {
     spreadsheetId: string,
     range: string,
   ): Promise<CellValue[][]> {
-    return this.withRateLimit(async () => {
+    return this.withRateLimit("read", async () => {
       const res = await this.sheets.spreadsheets.values.get({
         spreadsheetId,
         range,
@@ -208,7 +238,9 @@ export class OptimizedSheetsClient {
     range: string,
     values: CellValue[][],
   ): Promise<void> {
-    await this.withRateLimit(async () => {
+    assertSheetsWritesEnabled("appendValues");
+
+    await this.withRateLimit("write", async () => {
       await this.sheets.spreadsheets.values.append({
         spreadsheetId,
         range,
@@ -223,7 +255,9 @@ export class OptimizedSheetsClient {
     range: string,
     values: CellValue[][],
   ): Promise<void> {
-    await this.withRateLimit(async () => {
+    assertSheetsWritesEnabled("updateValues");
+
+    await this.withRateLimit("write", async () => {
       await this.sheets.spreadsheets.values.update({
         spreadsheetId,
         range,
@@ -238,6 +272,8 @@ export class OptimizedSheetsClient {
     sheetName: string,
     rowNumbers: number[],
   ): Promise<void> {
+    assertSheetsWritesEnabled("deleteRows");
+
     const uniqueDescendingRowNumbers = Array.from(
       new Set(
         rowNumbers.filter(
@@ -268,7 +304,7 @@ export class OptimizedSheetsClient {
 
     const batches = this.chunkArray(requests, this.BATCH_SIZE);
     for (const batch of batches) {
-      await this.withRateLimit(async () => {
+      await this.withRateLimit("write", async () => {
         await this.sheets.spreadsheets.batchUpdate({
           spreadsheetId,
           requestBody: {
@@ -280,53 +316,72 @@ export class OptimizedSheetsClient {
   }
 
   // Rate limiting and retry logic
-  private async withRateLimit<T>(operation: () => Promise<T>): Promise<T> {
-    return this.limiter(async () => {
-      await this.waitForRateLimit();
-      return this.executeWithRetry(operation);
+  private async withRateLimit<T>(
+    kind: RequestKind,
+    operation: () => Promise<T>,
+  ): Promise<T> {
+    return this.limiters[kind](async () => {
+      await this.waitForRateLimit(kind);
+      return this.executeWithRetry(operation, kind);
     });
   }
 
-  private async waitForRateLimit(): Promise<void> {
+  private getRequestTimestamps(kind: RequestKind): number[] {
+    return kind === "write"
+      ? this.writeRequestTimestamps
+      : this.readRequestTimestamps;
+  }
+
+  private setRequestTimestamps(kind: RequestKind, timestamps: number[]): void {
+    if (kind === "write") {
+      this.writeRequestTimestamps = timestamps;
+      return;
+    }
+    this.readRequestTimestamps = timestamps;
+  }
+
+  private async waitForRateLimit(kind: RequestKind): Promise<void> {
     const now = Date.now();
     const oneMinuteAgo = now - 60 * 1000;
-
-    // Clean old timestamps
-    this.requestTimestamps = this.requestTimestamps.filter(
+    const config = this.rateLimitConfig[kind];
+    const recentRequestTimestamps = this.getRequestTimestamps(kind).filter(
       (timestamp) => timestamp > oneMinuteAgo,
     );
+    this.setRequestTimestamps(kind, recentRequestTimestamps);
 
-    // Check if we've exceeded the rate limit
-    if (
-      this.requestTimestamps.length >= this.rateLimitConfig.requestsPerMinute
-    ) {
-      const oldestRequest = this.requestTimestamps[0];
+    if (recentRequestTimestamps.length >= config.requestsPerMinute) {
+      const oldestRequest = recentRequestTimestamps[0];
       const waitTime = oldestRequest ? oldestRequest + 60 * 1000 - now : 1000;
 
       if (waitTime > 0) {
-        console.log(`⏳ Rate limit reached. Waiting ${waitTime}ms...`);
+        console.log(
+          `[sheets:${kind}] Rate limit reached. Waiting ${waitTime}ms...`,
+        );
         await this.sleep(waitTime);
       }
     }
 
-    // Add current timestamp
-    this.requestTimestamps.push(now);
+    this.setRequestTimestamps(kind, [
+      ...this.getRequestTimestamps(kind),
+      Date.now(),
+    ]);
   }
 
   private async executeWithRetry<T>(
     operation: () => Promise<T>,
+    kind: RequestKind,
     attempt = 1,
   ): Promise<T> {
     try {
       return await operation();
     } catch (error) {
-      if (this.shouldRetry(error, attempt)) {
-        const delay = this.calculateBackoffDelay(attempt);
+      if (this.shouldRetry(error, kind, attempt)) {
+        const delay = this.calculateBackoffDelay(kind, attempt);
         console.log(
-          `🔄 Retrying request (attempt ${attempt}/${this.rateLimitConfig.retryAttempts}) after ${delay}ms...`,
+          `Retrying ${kind} request (attempt ${attempt}/${this.rateLimitConfig[kind].retryAttempts}) after ${delay}ms...`,
         );
         await this.sleep(delay);
-        return this.executeWithRetry(operation, attempt + 1);
+        return this.executeWithRetry(operation, kind, attempt + 1);
       }
       throw error;
     }
@@ -334,11 +389,7 @@ export class OptimizedSheetsClient {
 
   private getErrorStatusCode(error: unknown): number | undefined {
     if (typeof error === "object" && error !== null) {
-      const {
-        code,
-        status,
-        response,
-      } = error as {
+      const { code, status, response } = error as {
         code?: unknown;
         status?: unknown;
         response?: { status?: unknown };
@@ -350,7 +401,7 @@ export class OptimizedSheetsClient {
             ? status
             : typeof response?.status === "number"
               ? response.status
-            : undefined;
+              : undefined;
       if (typeof numeric === "number") return numeric;
     }
     return undefined;
@@ -363,8 +414,12 @@ export class OptimizedSheetsClient {
     return String(error);
   }
 
-  private shouldRetry(error: unknown, attempt: number): boolean {
-    if (attempt >= this.rateLimitConfig.retryAttempts) return false;
+  private shouldRetry(
+    error: unknown,
+    kind: RequestKind,
+    attempt: number,
+  ): boolean {
+    if (attempt >= this.rateLimitConfig[kind].retryAttempts) return false;
     const statusCode = this.getErrorStatusCode(error);
     const errorMessage = this.getErrorMessage(error).toLowerCase();
     const isQuotaError =
@@ -380,9 +435,9 @@ export class OptimizedSheetsClient {
     );
   }
 
-  private calculateBackoffDelay(attempt: number): number {
+  private calculateBackoffDelay(kind: RequestKind, attempt: number): number {
     // Exponential backoff with jitter
-    const baseDelay = this.rateLimitConfig.baseDelay;
+    const baseDelay = this.rateLimitConfig[kind].baseDelay;
     const exponentialDelay = baseDelay * Math.pow(2, attempt - 1);
     const jitter = Math.random() * 1000; // Add up to 1 second of jitter
     return Math.min(exponentialDelay + jitter, 30000); // Cap at 30 seconds
@@ -394,20 +449,29 @@ export class OptimizedSheetsClient {
 
   // Debug method to check queue status
   getQueueStatus(): {
-    queueLength: number;
+    readQueueLength: number;
+    writeQueueLength: number;
     isProcessing: boolean;
-    requestsInLastMinute: number;
+    readRequestsInLastMinute: number;
+    writeRequestsInLastMinute: number;
   } {
     const now = Date.now();
     const oneMinuteAgo = now - 60 * 1000;
-    const recentRequests = this.requestTimestamps.filter(
+    const recentReadRequests = this.readRequestTimestamps.filter(
+      (timestamp) => timestamp > oneMinuteAgo,
+    );
+    const recentWriteRequests = this.writeRequestTimestamps.filter(
       (timestamp) => timestamp > oneMinuteAgo,
     );
 
     return {
-      queueLength: this.limiter.pendingCount,
-      isProcessing: this.limiter.activeCount > 0,
-      requestsInLastMinute: recentRequests.length,
+      readQueueLength: this.limiters.read.pendingCount,
+      writeQueueLength: this.limiters.write.pendingCount,
+      isProcessing:
+        this.limiters.read.activeCount > 0 ||
+        this.limiters.write.activeCount > 0,
+      readRequestsInLastMinute: recentReadRequests.length,
+      writeRequestsInLastMinute: recentWriteRequests.length,
     };
   }
 
@@ -430,7 +494,7 @@ export class OptimizedSheetsClient {
       return cached;
     }
 
-    return this.withRateLimit(async () => {
+    return this.withRateLimit("read", async () => {
       try {
         const response = await this.sheets.spreadsheets.get({
           spreadsheetId,
@@ -510,9 +574,11 @@ export class OptimizedSheetsClient {
           );
 
         if (batchRequests.length > 0) {
-          await this.sheets.spreadsheets.batchUpdate({
-            spreadsheetId,
-            requestBody: { requests: batchRequests },
+          await this.withRateLimit("write", async () => {
+            await this.sheets.spreadsheets.batchUpdate({
+              spreadsheetId,
+              requestBody: { requests: batchRequests },
+            });
           });
         }
       },
@@ -526,7 +592,7 @@ export class OptimizedSheetsClient {
     spreadsheetId: string,
     ranges: string[],
   ): Promise<Map<string, CellValue[][]>> {
-    return this.withRateLimit(async () => {
+    return this.withRateLimit("read", async () => {
       try {
         const response = await this.sheets.spreadsheets.values.batchGet({
           spreadsheetId,
@@ -592,21 +658,23 @@ export class OptimizedSheetsClient {
     );
     const data: Array<{ range: string; values: CellValue[][] }> = [];
 
-    let currentGroup:
-      | {
-          startRowId: number;
-          endRowId: number;
-          columnCount: number;
-          values: CellValue[][];
-        }
-      | null = null;
+    let currentGroup: {
+      startRowId: number;
+      endRowId: number;
+      columnCount: number;
+      values: CellValue[][];
+    } | null = null;
 
     for (const [rowId, values] of sortedUpdates) {
       const columnCount = values.length;
+      const nextRowCellCount = values.length;
       const canExtendGroup =
         currentGroup !== null &&
         currentGroup.columnCount === columnCount &&
-        rowId === currentGroup.endRowId + 1;
+        rowId === currentGroup.endRowId + 1 &&
+        currentGroup.values.length < this.MAX_ROWS_PER_WRITE_RANGE &&
+        this.countCells(currentGroup.values) + nextRowCellCount <=
+          this.MAX_CELLS_PER_WRITE_RANGE;
 
       if (!canExtendGroup) {
         if (currentGroup) {
@@ -639,10 +707,10 @@ export class OptimizedSheetsClient {
       });
     }
 
-    const batches = this.chunkArray(data, this.BATCH_SIZE);
+    const batches = this.chunkValueUpdateRequests(data);
 
     for (const batch of batches) {
-      await this.withRateLimit(async () => {
+      await this.withRateLimit("write", async () => {
         await this.sheets.spreadsheets.values.batchUpdate({
           spreadsheetId,
           requestBody: {
@@ -660,14 +728,18 @@ export class OptimizedSheetsClient {
     sheetName: string,
     values: CellValue[][],
   ): Promise<void> {
-    const batches = this.chunkArray(values, this.BATCH_SIZE);
+    assertSheetsWritesEnabled("appendValuesBatch");
+
+    const batches = this.chunkRowsForWrite(values);
 
     for (const batch of batches) {
-      await this.sheets.spreadsheets.values.append({
-        spreadsheetId,
-        range: `${sheetName}!A:A`,
-        valueInputOption: "RAW",
-        requestBody: { values: batch },
+      await this.withRateLimit("write", async () => {
+        await this.sheets.spreadsheets.values.append({
+          spreadsheetId,
+          range: `${sheetName}!A:A`,
+          valueInputOption: "RAW",
+          requestBody: { values: batch },
+        });
       });
     }
   }
@@ -682,6 +754,76 @@ export class OptimizedSheetsClient {
     for (let i = 0; i < array.length; i += size) {
       chunks.push(array.slice(i, i + size));
     }
+    return chunks;
+  }
+
+  private countCells(rows: CellValue[][]): number {
+    return rows.reduce((total, row) => total + row.length, 0);
+  }
+
+  private chunkRowsForWrite(rows: CellValue[][]): CellValue[][][] {
+    const chunks: CellValue[][][] = [];
+    let currentChunk: CellValue[][] = [];
+    let currentCellCount = 0;
+
+    for (const row of rows) {
+      const rowCellCount = row.length;
+      const wouldExceedRowLimit =
+        currentChunk.length >= this.MAX_ROWS_PER_WRITE_RANGE;
+      const wouldExceedCellLimit =
+        currentCellCount + rowCellCount > this.MAX_CELLS_PER_WRITE_RANGE;
+
+      if (
+        currentChunk.length > 0 &&
+        (wouldExceedRowLimit || wouldExceedCellLimit)
+      ) {
+        chunks.push(currentChunk);
+        currentChunk = [];
+        currentCellCount = 0;
+      }
+
+      currentChunk.push(row);
+      currentCellCount += rowCellCount;
+    }
+
+    if (currentChunk.length > 0) {
+      chunks.push(currentChunk);
+    }
+
+    return chunks;
+  }
+
+  private chunkValueUpdateRequests<T extends { values: CellValue[][] }>(
+    entries: T[],
+  ): T[][] {
+    const chunks: T[][] = [];
+    let currentChunk: T[] = [];
+    let currentCellCount = 0;
+
+    for (const entry of entries) {
+      const entryCellCount = this.countCells(entry.values);
+      const wouldExceedRangeLimit =
+        currentChunk.length >= this.MAX_RANGES_PER_WRITE_REQUEST;
+      const wouldExceedCellLimit =
+        currentCellCount + entryCellCount > this.MAX_CELLS_PER_WRITE_REQUEST;
+
+      if (
+        currentChunk.length > 0 &&
+        (wouldExceedRangeLimit || wouldExceedCellLimit)
+      ) {
+        chunks.push(currentChunk);
+        currentChunk = [];
+        currentCellCount = 0;
+      }
+
+      currentChunk.push(entry);
+      currentCellCount += entryCellCount;
+    }
+
+    if (currentChunk.length > 0) {
+      chunks.push(currentChunk);
+    }
+
     return chunks;
   }
 

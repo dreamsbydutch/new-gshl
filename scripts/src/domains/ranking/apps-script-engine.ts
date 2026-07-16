@@ -9,6 +9,8 @@ export type RankingEngineSheetName =
   | "PlayerWeekStatLine"
   | "PlayerSplitStatLine"
   | "PlayerTotalStatLine"
+  | "PlayerCareerSplitStatLine"
+  | "PlayerCareerTotalStatLine"
   | "PlayerNHL"
   | "TeamDayStatLine"
   | "TeamWeekStatLine"
@@ -64,6 +66,10 @@ const RANKING_ENGINE_SHEET_NAME_ALIASES: Record<
   PlayerSplitStatLine: "PlayerSplitStatLine",
   PlayerTotal: "PlayerTotalStatLine",
   PlayerTotalStatLine: "PlayerTotalStatLine",
+  PlayerCareerSplit: "PlayerCareerSplitStatLine",
+  PlayerCareerSplitStatLine: "PlayerCareerSplitStatLine",
+  PlayerCareerTotal: "PlayerCareerTotalStatLine",
+  PlayerCareerTotalStatLine: "PlayerCareerTotalStatLine",
   PlayerNHL: "PlayerNHL",
   PlayerNhl: "PlayerNHL",
   PlayerNHLStatLine: "PlayerNHL",
@@ -117,17 +123,30 @@ async function loadRankingEngineRows(): Promise<{
   teamSeasonRows: RankingEngineRow[];
   playerSplitRows: RankingEngineRow[];
   playerTotalRows: RankingEngineRow[];
+  playerCareerSplitRows: RankingEngineRow[];
+  playerCareerTotalRows: RankingEngineRow[];
   playerNhlRows: RankingEngineRow[];
   draftPickRows: RankingEngineRow[];
 }> {
   const { fastSheetsReader } = await import(
     "@gshl-lib/sheets/reader/fast-reader"
   );
+  const fetchOptionalModel = async (
+    modelName: "PlayerCareerSplitStatLine" | "PlayerCareerTotalStatLine",
+  ): Promise<RankingEngineRow[]> => {
+    try {
+      return await fastSheetsReader.fetchModel<RankingEngineRow>(modelName);
+    } catch {
+      return [];
+    }
+  };
   const [
     seasonRows,
     teamSeasonRows,
     playerSplitRows,
     playerTotalRows,
+    playerCareerSplitRows,
+    playerCareerTotalRows,
     playerNhlRows,
     draftPickRows,
   ] = await Promise.all([
@@ -135,6 +154,8 @@ async function loadRankingEngineRows(): Promise<{
     fastSheetsReader.fetchModel<RankingEngineRow>("TeamSeasonStatLine"),
     fastSheetsReader.fetchModel<RankingEngineRow>("PlayerSplitStatLine"),
     fastSheetsReader.fetchModel<RankingEngineRow>("PlayerTotalStatLine"),
+    fetchOptionalModel("PlayerCareerSplitStatLine"),
+    fetchOptionalModel("PlayerCareerTotalStatLine"),
     fastSheetsReader.fetchModel<RankingEngineRow>("PlayerNHLStatLine"),
     fastSheetsReader.fetchModel<RankingEngineRow>("DraftPick"),
   ]);
@@ -143,6 +164,8 @@ async function loadRankingEngineRows(): Promise<{
     teamSeasonRows,
     playerSplitRows,
     playerTotalRows,
+    playerCareerSplitRows,
+    playerCareerTotalRows,
     playerNhlRows,
     draftPickRows,
   };
@@ -154,6 +177,8 @@ function createRankingEngineContext(
     teamSeasonRows: RankingEngineRow[];
     playerSplitRows: RankingEngineRow[];
     playerTotalRows: RankingEngineRow[];
+    playerCareerSplitRows: RankingEngineRow[];
+    playerCareerTotalRows: RankingEngineRow[];
     playerNhlRows: RankingEngineRow[];
     draftPickRows: RankingEngineRow[];
   },
@@ -194,6 +219,18 @@ function createRankingEngineContext(
               String(sheetName).trim() === "PlayerTotalStatLine"
             ) {
               return rankingRows.playerTotalRows;
+            }
+            if (
+              spreadsheetId === SYNTHETIC_PLAYERSTATS_SPREADSHEET_ID &&
+              String(sheetName).trim() === "PlayerCareerSplitStatLine"
+            ) {
+              return rankingRows.playerCareerSplitRows;
+            }
+            if (
+              spreadsheetId === SYNTHETIC_PLAYERSTATS_SPREADSHEET_ID &&
+              String(sheetName).trim() === "PlayerCareerTotalStatLine"
+            ) {
+              return rankingRows.playerCareerTotalRows;
             }
             if (
               spreadsheetId === SYNTHETIC_PLAYERSTATS_SPREADSHEET_ID &&

@@ -1,42 +1,92 @@
-import type { Season } from "@gshl-types";
-import type { Week } from "@gshl-types";
-import { getSeasonString } from "../core/date";
+import type {
+  OffseasonWindow,
+  Season,
+  SeasonSummary,
+  TeamSeasonStatLine,
+  Week,
+} from "@gshl-types";
+import { getSeasonString, safeParseSheetDate } from "../core/date";
+import { formatRecord } from "../core/format";
 
-export type SeasonSummary = {
-  id: string;
-  name: string;
-  year: number;
+type SeasonDateInput = Date | string | number | null | undefined;
+
+/**
+ * Coerces date.
+ *
+ * @param value - The source value to process.
+ * @returns The coerced date.
+ */
+function coerceDate(value: SeasonDateInput): Date | null {
+  return safeParseSheetDate(value);
+}
+
+type SeasonDateField = "endDate" | "startDate";
+type SeasonSearchMode = "after" | "before" | "current";
+
+type FindSeasonByTimingOptions = {
+  dateField?: SeasonDateField;
+  inclusive?: boolean;
+  mode: SeasonSearchMode;
+  referenceDate?: Date;
+  sort?: "asc" | "desc";
 };
 
-function coerceDate(value: unknown): Date | null {
-  if (!value) return null;
+type ResolveSeasonOptions = {
+  referenceDate?: Date;
+  strategy?: "contractDefault" | "default";
+};
 
-  if (value instanceof Date) {
-    return Number.isNaN(value.getTime()) ? null : value;
-  }
-
-  if (typeof value === "string" || typeof value === "number") {
-    const parsed = new Date(value);
-    return Number.isNaN(parsed.getTime()) ? null : parsed;
-  }
-
-  return null;
+/**
+ * Returns season date value.
+ *
+ * @param season - The season to use.
+ * @param dateField - The date field to use.
+ * @returns The requested season date value.
+ */
+function getSeasonDateValue(
+  season: Season,
+  dateField: SeasonDateField,
+): number | null {
+  return coerceDate(season[dateField])?.getTime() ?? null;
 }
 
-function compareByStartDateAsc(a: Season, b: Season): number {
-  const aTime = coerceDate(a.startDate)?.getTime() ?? Number.POSITIVE_INFINITY;
-  const bTime = coerceDate(b.startDate)?.getTime() ?? Number.POSITIVE_INFINITY;
-
-  return aTime - bTime;
+/**
+ * Returns missing date sort value.
+ *
+ * @param direction - The direction to apply.
+ * @returns The requested missing date sort value.
+ */
+function getMissingDateSortValue(direction: "asc" | "desc"): number {
+  return direction === "asc"
+    ? Number.POSITIVE_INFINITY
+    : Number.NEGATIVE_INFINITY;
 }
 
-function compareByStartDateDesc(a: Season, b: Season): number {
-  const aTime = coerceDate(a.startDate)?.getTime() ?? Number.NEGATIVE_INFINITY;
-  const bTime = coerceDate(b.startDate)?.getTime() ?? Number.NEGATIVE_INFINITY;
-
-  return bTime - aTime;
+/**
+ * Compare season dates.
+ *
+ * @param dateField - The date field to use.
+ * @param direction - The direction to apply.
+ */
+function compareSeasonDates(
+  dateField: SeasonDateField,
+  direction: "asc" | "desc",
+) {
+  const missingValue = getMissingDateSortValue(direction);
+  return (left: Season, right: Season) => {
+    const leftTime = getSeasonDateValue(left, dateField) ?? missingValue;
+    const rightTime = getSeasonDateValue(right, dateField) ?? missingValue;
+    return direction === "asc" ? leftTime - rightTime : rightTime - leftTime;
+  };
 }
 
+/**
+ * Checks whether within season.
+ *
+ * @param season - The season to use.
+ * @param reference - The reference to use.
+ * @returns True when within season; otherwise false.
+ */
 function isWithinSeason(season: Season, reference: Date): boolean {
   const start = coerceDate(season.startDate);
   const end = coerceDate(season.endDate);
@@ -46,68 +96,166 @@ function isWithinSeason(season: Season, reference: Date): boolean {
   return start.getTime() <= refTime && refTime <= end.getTime();
 }
 
+/**
+ * Finds season by timing.
+ *
+ * @param seasons - The seasons to use.
+ * @param options - Configuration options for the operation.
+ * @returns The matching season by timing, if one exists.
+ */
+function findSeasonByTiming(
+  seasons: Season[] | undefined,
+  options: FindSeasonByTimingOptions,
+): Season | undefined {
+  if (!seasons?.length) return undefined;
+
+  const {
+    dateField = "startDate",
+    inclusive = true,
+    mode,
+    referenceDate = new Date(),
+    sort = mode === "after" ? "asc" : "desc",
+  } = options;
+
+  if (mode === "current") {
+    return seasons.find((season) => isWithinSeason(season, referenceDate));
+  }
+
+  const referenceTime = referenceDate.getTime();
+  return seasons
+    .filter((season) => {
+      const time = getSeasonDateValue(season, dateField);
+      if (time === null) return false;
+
+      if (mode === "after") {
+        return inclusive ? time >= referenceTime : time > referenceTime;
+      }
+
+      return inclusive ? time <= referenceTime : time < referenceTime;
+    })
+    .sort(compareSeasonDates(dateField, sort))[0];
+}
+
+/**
+ * Resolves season.
+ *
+ * @param seasons - The seasons to use.
+ * @param options - Configuration options for the operation.
+ * @returns The resolved season.
+ */
+function resolveSeason(
+  seasons: Season[] | undefined,
+  options: ResolveSeasonOptions = {},
+): Season | undefined {
+  if (!seasons?.length) return undefined;
+
+  const { referenceDate = new Date(), strategy = "default" } = options;
+  const currentSeason = findSeasonByTiming(seasons, {
+    mode: "current",
+    referenceDate,
+  });
+  const upcomingSeason = findSeasonByTiming(seasons, {
+    dateField: "startDate",
+    inclusive: false,
+    mode: "after",
+    referenceDate,
+  });
+  const mostRecentSeason = findSeasonByTiming(seasons, {
+    dateField: "startDate",
+    mode: "before",
+    referenceDate,
+  });
+
+  if (strategy === "contractDefault") {
+    return (
+      currentSeason ??
+      upcomingSeason ??
+      deriveProjectedNextSeason(mostRecentSeason) ??
+      findClosestAdjacentSeason(seasons, referenceDate) ??
+      seasons[0]
+    );
+  }
+
+  return (
+    currentSeason ??
+    findClosestAdjacentSeason(seasons, referenceDate) ??
+    seasons[0]
+  );
+}
+
+/**
+ * Finds current season.
+ *
+ * @param seasons - The seasons to use.
+ * @param referenceDate - The reference date to use.
+ * @returns The matching current season, if one exists.
+ */
 export function findCurrentSeason(
   seasons: Season[] | undefined,
   referenceDate: Date = new Date(),
 ): Season | undefined {
-  if (!seasons?.length) return undefined;
-
-  return seasons.find((season) => isWithinSeason(season, referenceDate));
+  return findSeasonByTiming(seasons, {
+    mode: "current",
+    referenceDate,
+  });
 }
 
+/**
+ * Finds upcoming season.
+ *
+ * @param seasons - The seasons to use.
+ * @param referenceDate - The reference date to use.
+ * @returns The matching upcoming season, if one exists.
+ */
 export function findUpcomingSeason(
   seasons: Season[] | undefined,
   referenceDate: Date = new Date(),
 ): Season | undefined {
-  if (!seasons?.length) return undefined;
-
-  const upcoming = seasons
-    .filter((season) => {
-      const start = coerceDate(season.startDate);
-      if (!start) return false;
-      return start.getTime() > referenceDate.getTime();
-    })
-    .sort(compareByStartDateAsc);
-
-  return upcoming[0];
+  return findSeasonByTiming(seasons, {
+    dateField: "startDate",
+    inclusive: false,
+    mode: "after",
+    referenceDate,
+  });
 }
 
+/**
+ * Finds most recent season.
+ *
+ * @param seasons - The seasons to use.
+ * @param referenceDate - The reference date to use.
+ * @returns The matching most recent season, if one exists.
+ */
 export function findMostRecentSeason(
   seasons: Season[] | undefined,
   referenceDate: Date = new Date(),
 ): Season | undefined {
-  if (!seasons?.length) return undefined;
-
-  const previous = seasons
-    .filter((season) => {
-      const start = coerceDate(season.startDate);
-      if (!start) return false;
-      return start.getTime() <= referenceDate.getTime();
-    })
-    .sort(compareByStartDateDesc);
-
-  return previous[0];
+  return findSeasonByTiming(seasons, {
+    dateField: "startDate",
+    mode: "before",
+    referenceDate,
+  });
 }
 
-export interface OffseasonWindow {
-  endedSeason: Season;
-  upcomingSeason: Season;
-}
-
+/**
+ * Finds offseason window.
+ *
+ * @param seasons - The seasons to use.
+ * @param referenceDate - The reference date to use.
+ * @returns The matching offseason window, if one exists.
+ */
 export function findOffseasonWindow(
   seasons: Season[] | undefined,
   referenceDate: Date = new Date(),
 ): OffseasonWindow | undefined {
   if (!seasons?.length) return undefined;
 
-  const endedSeason = seasons
-    .filter((season) => {
-      const end = coerceDate(season.endDate);
-      if (!end) return false;
-      return end.getTime() < referenceDate.getTime();
-    })
-    .sort(compareByStartDateDesc)[0];
-
+  const endedSeason = findSeasonByTiming(seasons, {
+    dateField: "endDate",
+    inclusive: false,
+    mode: "before",
+    referenceDate,
+  });
   const upcomingSeason =
     findUpcomingSeason(seasons, referenceDate) ??
     deriveProjectedNextSeason(endedSeason);
@@ -122,6 +270,13 @@ export function findOffseasonWindow(
   };
 }
 
+/**
+ * Checks whether between seasons.
+ *
+ * @param seasons - The seasons to use.
+ * @param referenceDate - The reference date to use.
+ * @returns True when between seasons; otherwise false.
+ */
 export function isBetweenSeasons(
   seasons: Season[] | undefined,
   referenceDate: Date = new Date(),
@@ -142,8 +297,11 @@ export function isBetweenSeasons(
 }
 
 /**
- * When between seasons, returns whichever adjacent season is closest in time
- * to the reference date — the just-ended season or the upcoming one.
+ * Finds closest adjacent season.
+ *
+ * @param seasons - The seasons to use.
+ * @param referenceDate - The reference date to use.
+ * @returns The matching closest adjacent season, if one exists.
  */
 function findClosestAdjacentSeason(
   seasons: Season[],
@@ -171,19 +329,26 @@ function findClosestAdjacentSeason(
   return distanceToUpcoming < distanceToRecent ? upcoming : mostRecent;
 }
 
+/**
+ * Resolves default season.
+ *
+ * @param seasons - The seasons to use.
+ * @param referenceDate - The reference date to use.
+ * @returns The resolved default season.
+ */
 export function resolveDefaultSeason(
   seasons: Season[] | undefined,
   referenceDate: Date = new Date(),
 ): Season | undefined {
-  if (!seasons?.length) return undefined;
-
-  return (
-    findCurrentSeason(seasons, referenceDate) ??
-    findClosestAdjacentSeason(seasons, referenceDate) ??
-    seasons[0]
-  );
+  return resolveSeason(seasons, { referenceDate, strategy: "default" });
 }
 
+/**
+ * Derives projected next season.
+ *
+ * @param season - The season to use.
+ * @returns The derived projected next season.
+ */
 function deriveProjectedNextSeason(
   season: Season | undefined,
 ): Season | undefined {
@@ -193,6 +358,11 @@ function deriveProjectedNextSeason(
   const nextSeasonId = Number.isFinite(Number(season.id))
     ? String(Number(season.id) + 1)
     : season.id;
+      /**
+   * Shifts year.
+   *
+   * @param value - The source value to process.
+   */
   const shiftYear = (value: string) => {
     const parsed = coerceDate(value);
     if (!parsed) return value;
@@ -215,23 +385,29 @@ function deriveProjectedNextSeason(
 }
 
 /**
- * Contract views should anchor to the active season while a season is in progress,
- * then flip immediately to the next upcoming season once the current season ends.
+ * Resolves contract default season.
+ *
+ * @param seasons - The seasons to use.
+ * @param referenceDate - The reference date to use.
+ * @returns The resolved contract default season.
  */
 export function resolveContractDefaultSeason(
   seasons: Season[] | undefined,
   referenceDate: Date = new Date(),
 ): Season | undefined {
-  if (!seasons?.length) return undefined;
-
-  return (
-    findCurrentSeason(seasons, referenceDate) ??
-    findUpcomingSeason(seasons, referenceDate) ??
-    deriveProjectedNextSeason(findMostRecentSeason(seasons, referenceDate)) ??
-    resolveDefaultSeason(seasons, referenceDate)
-  );
+  return resolveSeason(seasons, {
+    referenceDate,
+    strategy: "contractDefault",
+  });
 }
 
+/**
+ * Finds season by id.
+ *
+ * @param seasons - The seasons to use.
+ * @param seasonId - The season id to use.
+ * @returns The matching season by id, if one exists.
+ */
 export function findSeasonById(
   seasons: Season[] | undefined,
   seasonId: string | number | null | undefined,
@@ -241,6 +417,71 @@ export function findSeasonById(
   return seasons.find((season) => String(season.id) === target);
 }
 
+/**
+ * Checks whether legacy tie rules applies.
+ *
+ * @param season - The season to use.
+ * @returns True when legacy tie rules; otherwise false.
+ */
+export function usesLegacyTieRules(
+  season: Pick<Season, "usesLegacyTies"> | null | undefined,
+): boolean {
+  return season?.usesLegacyTies === true;
+}
+
+/**
+ * Calculates standings points.
+ *
+ * @param stats - The stats to use.
+ * @param season - The season to use.
+ * @returns The calculated standings points.
+ */
+export function calculateStandingsPoints(
+  stats:
+    | Pick<TeamSeasonStatLine, "teamW" | "teamHW" | "teamHL" | "teamT">
+    | null
+    | undefined,
+  season: Pick<Season, "usesLegacyTies"> | null | undefined,
+): number {
+  const wins = Number(stats?.teamW ?? 0);
+  const homeWins = Number(stats?.teamHW ?? 0);
+  const homeLosses = Number(stats?.teamHL ?? 0);
+  const ties = Number(stats?.teamT ?? 0);
+
+  if (usesLegacyTieRules(season)) {
+    return wins * 2 + ties;
+  }
+
+  return (wins - homeWins) * 3 + homeWins * 2 + homeLosses;
+}
+
+/**
+ * Formats standings record for display.
+ *
+ * @param stats - The stats to use.
+ * @param season - The season to use.
+ * @returns The formatted standings record.
+ */
+export function formatStandingsRecord(
+  stats:
+    | Pick<TeamSeasonStatLine, "teamW" | "teamL" | "teamT">
+    | null
+    | undefined,
+  season: Pick<Season, "usesLegacyTies"> | null | undefined,
+): string {
+  return formatRecord(
+    Number(stats?.teamW ?? 0),
+    Number(stats?.teamL ?? 0),
+    usesLegacyTieRules(season) ? Number(stats?.teamT ?? 0) : 0,
+  );
+}
+
+/**
+ * Converts input into season summary.
+ *
+ * @param season - The season to use.
+ * @returns The converted season summary.
+ */
 export function toSeasonSummary(
   season: Season | undefined | null,
 ): SeasonSummary | undefined {
@@ -253,6 +494,12 @@ export function toSeasonSummary(
   };
 }
 
+/**
+ * Builds season summaries.
+ *
+ * @param seasons - The seasons to use.
+ * @returns The assembled season summaries.
+ */
 export function buildSeasonSummaries(
   seasons: Season[] | undefined,
 ): SeasonSummary[] {

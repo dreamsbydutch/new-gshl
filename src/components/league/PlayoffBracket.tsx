@@ -1,54 +1,18 @@
 "use client";
 
 import Image from "next/image";
-import { cn } from "@gshl-utils";
-import type { GSHLTeam, TeamSeasonStatLine } from "@gshl-types";
+import { buildPlayoffBracket, cn, formatStandingsRecord } from "@gshl-utils";
+import type { PlayoffBracketProps, SeededTeam, Season } from "@gshl-types";
 
-type SeededTeam = GSHLTeam & { seasonStats?: TeamSeasonStatLine };
-
-type BracketMatchup = {
-  title: string;
-  homeLabel: string;
-  awayLabel: string;
-  homeTeam: SeededTeam | null;
-  awayTeam: SeededTeam | null;
-};
-
-type ConferenceBracket = {
-  conferenceTitle: string;
-  matchups: BracketMatchup[];
-};
-
-function safeRank(value: unknown) {
-  const num = Number(value);
-  return Number.isFinite(num) ? num : null;
-}
-
-function sortByConferenceRank(teams: SeededTeam[]) {
-  return [...teams].sort(
-    (a, b) =>
-      (safeRank(a.seasonStats?.conferenceRk) ?? 999) -
-      (safeRank(b.seasonStats?.conferenceRk) ?? 999),
-  );
-}
-
-function sortByOverallRank(teams: SeededTeam[]) {
-  return [...teams].sort(
-    (a, b) =>
-      (safeRank(a.seasonStats?.overallRk) ?? 999) -
-      (safeRank(b.seasonStats?.overallRk) ?? 999),
-  );
-}
-
-function sortByWildcardRank(teams: SeededTeam[]) {
-  return [...teams].sort(
-    (a, b) =>
-      (safeRank(a.seasonStats?.wildcardRk) ?? 999) -
-      (safeRank(b.seasonStats?.wildcardRk) ?? 999),
-  );
-}
-
-function TeamChip({ label, team }: { label: string; team: SeededTeam | null }) {
+function TeamChip({
+  label,
+  team,
+  season,
+}: {
+  label: string;
+  team: SeededTeam | null;
+  season: Season | null;
+}) {
   return (
     <div
       className={cn(
@@ -70,121 +34,17 @@ function TeamChip({ label, team }: { label: string; team: SeededTeam | null }) {
         </div>
       </div>
       <div className="text-right text-xs text-muted-foreground">
-        {team?.seasonStats?.teamW !== undefined &&
-        team?.seasonStats?.teamL !== undefined
-          ? `${team.seasonStats.teamW}-${team.seasonStats.teamL}`
-          : ""}
+        {team?.seasonStats ? formatStandingsRecord(team.seasonStats, season) : ""}
       </div>
     </div>
   );
 }
 
-export function buildPlayoffBracket(
-  teams: SeededTeam[],
-  stats: TeamSeasonStatLine[],
-): ConferenceBracket[] {
-  console.log(stats);
-  const playoffTeams = teams.map((t) => {
-    const stat = stats.find((s) => s.gshlTeamId === t.id);
-    return {
-      ...t,
-      seasonStats: stat ? { ...stat } : undefined,
-    };
-  });
-  // Determine league-wide #1 seed
-  const leagueSorted = sortByOverallRank(playoffTeams);
-  const leagueOneSeed = leagueSorted[0] ?? null;
-
-  // Determine wildcard ordering league-wide
-  const wildcardPool = playoffTeams.filter(
-    (t) =>
-      t.seasonStats?.wildcardRk !== null &&
-      t.seasonStats?.wildcardRk !== undefined,
-  );
-  const wildcardsSorted = sortByWildcardRank(wildcardPool);
-  const topWildcard = wildcardsSorted[0] ?? null;
-  const secondWildcard = wildcardsSorted[1] ?? null;
-
-  // Conference champs (rank 1 within conference)
-  const svTeams = playoffTeams.filter((t) => t.confAbbr === "SV");
-  const hhTeams = playoffTeams.filter((t) => t.confAbbr === "HH");
-
-  const svOneSeed = sortByConferenceRank(svTeams)[0] ?? null;
-  const hhOneSeed = sortByConferenceRank(hhTeams)[0] ?? null;
-
-  // The rule from you:
-  // - top wildcard plays the lower-ranked #1 seed (i.e. worse overallRk among the two conf #1s)
-  // - second wildcard plays the #1 overall league-wide seed
-  const confOnes: SeededTeam[] = [svOneSeed, hhOneSeed].filter(
-    Boolean,
-  ) as SeededTeam[];
-  const confOnesByOverall = sortByOverallRank(confOnes);
-  const worstConfOne = confOnesByOverall[1] ?? null;
-
-  const wildcardVsWorstOne: BracketMatchup = {
-    title: "1 vs WC",
-    homeLabel: "#1",
-    awayLabel: "#4",
-    homeTeam: worstConfOne,
-    awayTeam: topWildcard,
-  };
-
-  const wildcardVsLeagueOne: BracketMatchup = {
-    title: "1Ovr vs WC",
-    homeLabel: "#1",
-    awayLabel: "#4",
-    homeTeam: leagueOneSeed,
-    awayTeam: secondWildcard,
-  };
-
-  // Within each conference: 2 vs 3
-  const buildTwoVsThree = (
-    confTitle: string,
-    confTeams: SeededTeam[],
-  ): BracketMatchup => {
-    const sorted = sortByConferenceRank(confTeams);
-    return {
-      title: "2 vs 3",
-      homeLabel: "#2",
-      awayLabel: "#3",
-      homeTeam: sorted[1] ?? null,
-      awayTeam: sorted[2] ?? null,
-    };
-  };
-
-  // Map the “1 vs WC” matchup to a conference (the conference of the #1 seed involved)
-  const matchConfKey = (oneSeed: SeededTeam | null) => oneSeed?.confAbbr ?? "";
-  const oneWcConf = matchConfKey(wildcardVsWorstOne.homeTeam);
-
-  const svMatchups: BracketMatchup[] = [];
-  const hhMatchups: BracketMatchup[] = [];
-
-  // Always include 2v3 in each conference.
-  svMatchups.push(buildTwoVsThree("Sunview", svTeams));
-  hhMatchups.push(buildTwoVsThree("Hickory Hotel", hhTeams));
-
-  // Place the wildcard series under the appropriate conference.
-  if (oneWcConf === "SV") svMatchups.unshift(wildcardVsWorstOne);
-  if (oneWcConf === "HH") hhMatchups.unshift(wildcardVsWorstOne);
-
-  // The #1 overall vs WC2 could be in either conference; put it under its team's conference.
-  const leagueOneConf = matchConfKey(leagueOneSeed);
-  if (leagueOneConf === "SV") svMatchups.unshift(wildcardVsLeagueOne);
-  if (leagueOneConf === "HH") hhMatchups.unshift(wildcardVsLeagueOne);
-
-  return [
-    { conferenceTitle: "Sunview", matchups: svMatchups },
-    { conferenceTitle: "Hickory Hotel", matchups: hhMatchups },
-  ];
-}
-
 export function PlayoffBracket({
   teams,
   stats,
-}: {
-  teams: SeededTeam[];
-  stats: TeamSeasonStatLine[];
-}) {
+  season,
+}: PlayoffBracketProps) {
   const brackets = buildPlayoffBracket(teams, stats);
 
   return (
@@ -206,11 +66,22 @@ export function PlayoffBracket({
               {conf.conferenceTitle}
             </div>
             <div className="flex flex-col gap-2">
-              {conf.matchups.map((m) => (
-                <div key={m.title} className="rounded-lg border bg-white p-2">
+              {conf.matchups.map((matchup) => (
+                <div
+                  key={matchup.title}
+                  className="rounded-lg border bg-white p-2"
+                >
                   <div className="flex flex-col gap-2">
-                    <TeamChip label={m.homeLabel} team={m.homeTeam} />
-                    <TeamChip label={m.awayLabel} team={m.awayTeam} />
+                    <TeamChip
+                      label={matchup.homeLabel}
+                      team={matchup.homeTeam}
+                      season={season}
+                    />
+                    <TeamChip
+                      label={matchup.awayLabel}
+                      team={matchup.awayTeam}
+                      season={season}
+                    />
                   </div>
                 </div>
               ))}

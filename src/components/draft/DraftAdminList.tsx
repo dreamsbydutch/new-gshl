@@ -16,36 +16,13 @@ import Image from "next/image";
 import { RefreshCw, Undo2 } from "lucide-react";
 
 import { Button, Table, NHLLogo } from "@gshl-ui";
-import { formatMoney, formatNumber } from "@gshl-utils";
-import type { NHLTeam, Player } from "@gshl-types";
+import {
+  findNhlTeamByAbbreviation,
+  formatMoney,
+  formatNumber,
+} from "@gshl-utils";
+import type { Player } from "@gshl-types";
 import { useDraftAdminList } from "@gshl-hooks";
-
-function getPlayerNhlAbbreviation(value: unknown): string | null {
-  if (Array.isArray(value)) {
-    const firstTeam = value.find(
-      (team): team is string =>
-        typeof team === "string" && team.trim().length > 0,
-    );
-    return firstTeam ?? null;
-  }
-
-  if (typeof value !== "string") {
-    return null;
-  }
-
-  const team = value.trim();
-  return team.length > 0 ? team : null;
-}
-
-function findNhlTeamByAbbreviation(
-  nhlTeams: NHLTeam[],
-  abbreviation: unknown,
-): NHLTeam | undefined {
-  const normalizedAbbreviation = getPlayerNhlAbbreviation(abbreviation);
-  return normalizedAbbreviation
-    ? nhlTeams.find((team) => team.abbreviation === normalizedAbbreviation)
-    : undefined;
-}
 
 export function DraftAdminList(): JSX.Element {
   const {

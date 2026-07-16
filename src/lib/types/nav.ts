@@ -153,3 +153,74 @@ export type NavVariant = "primary" | "secondary" | "sidebar" | "floating";
  * Navigation size variants
  */
 export type NavSize = "sm" | "md" | "lg";
+
+export interface NavContainerProps {
+  children: ReactNode;
+  className?: string;
+  position?: "top" | "bottom" | "secondary" | "tertiary";
+  variant?: "primary" | "secondary" | "tertiary";
+}
+
+export interface ClickableNavItemProps {
+  id: string;
+  label: string;
+  icon?: ReactNode | string;
+  isActive?: boolean;
+  isDisabled?: boolean;
+  onClick: () => void;
+  className?: string;
+}
+
+export interface NavbarProps {
+  className?: string;
+}
+
+export interface ToolbarProps {
+  children: ReactNode;
+  className?: string;
+}
+
+export interface SeasonToggleNavProps {
+  className?: string;
+  dropdownPosition?: "above" | "below" | "auto";
+}
+
+export interface TeamsToggleProps {
+  className?: string;
+  seasonId?: string;
+}
+
+export interface WeeksToggleProps {
+  className?: string;
+}
+
+export interface LabeledToggleOption {
+  key: string;
+  label: string;
+}
+
+export interface BaseToggleProps<T> {
+  items: T[];
+  selectedItem?: T | null;
+  onSelect: (item: T) => void;
+  getItemKey?: (item: T) => string;
+  getItemLabel?: (item: T) => string;
+  getItemDescription?: (item: T) => string | undefined;
+  renderCustomItem?: (item: T, isSelected: boolean) => ReactNode;
+  loading?: boolean;
+  error?: string | null;
+  className?: string;
+}
+
+export interface HorizontalToggleProps<T> extends BaseToggleProps<T> {
+  itemClassName?: string;
+}
+
+export interface DropdownToggleProps<T> extends BaseToggleProps<T> {
+  renderSelectedItem?: (item: T) => ReactNode;
+  buttonClassName?: string;
+  dropdownClassName?: string;
+  placeholder?: string;
+  maxHeight?: string;
+  dropdownPosition?: "above" | "below" | "auto";
+}

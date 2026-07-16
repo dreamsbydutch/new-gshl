@@ -6,22 +6,18 @@
  * Primary application navigation with route-based active states and responsive design.
  */
 
-import { usePathname } from "next/navigation";
+import { useAppPathname } from "@gshl-hooks";
 import { cn } from "@gshl-utils";
 import { NavContainer, LinkNavItem } from "./BaseComponents";
-import type { LinkNavItem as LinkNavItemType } from "@gshl-types";
-
-interface NavbarProps {
-  className?: string;
-}
+import type { LinkNavItem as LinkNavItemType, NavbarProps } from "@gshl-types";
 
 /**
  * Main navigation bar component with responsive design and active state detection
  * @param props - Component props
  * @returns Primary navigation bar with route-based active states
  */
-export function Navbar({ className }: NavbarProps) {
-  const pathname = usePathname();
+export function MainNavbar({ className }: NavbarProps) {
+  const pathname = useAppPathname();
 
   const navItems: LinkNavItemType[] = [
     {

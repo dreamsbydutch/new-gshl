@@ -8,7 +8,7 @@ const whereSchema = z
   .object({
     id: z.string().optional(),
     seasonId: z.string().optional(),
-    gshlTeamId: z.string().optional(),
+    teamId: z.string().optional(),
     award: z.string().optional(),
   })
   .optional();

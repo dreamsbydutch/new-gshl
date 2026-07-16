@@ -1,6 +1,6 @@
 import { HydrateClient, serverApi } from "@gshl-trpc/server-exports";
 import { resolveContractDefaultSeason } from "@gshl-utils";
-import { DraftBoardContent } from "./DraftBoardContent";
+import { DraftBoardContent } from "@gshl-components/draft/DraftBoardContent";
 
 export default async function DraftBoardPage() {
   const seasons = await serverApi.season.getAll({ orderBy: { year: "asc" } });

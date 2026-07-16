@@ -31,6 +31,8 @@ const MODEL_DATA_TYPES: Record<string, ModelDataCategory> = {
   PlayerWeekStatLine: "DYNAMIC",
   PlayerSplitStatLine: "DYNAMIC",
   PlayerTotalStatLine: "DYNAMIC",
+  PlayerCareerSplitStatLine: "DYNAMIC",
+  PlayerCareerTotalStatLine: "DYNAMIC",
   PlayerNHLStatLine: "DYNAMIC",
   TeamDayStatLine: "DYNAMIC",
   TeamWeekStatLine: "DYNAMIC",

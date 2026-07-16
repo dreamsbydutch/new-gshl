@@ -5,12 +5,14 @@
  */
 
 // Button Components
-export { Button, buttonVariants, type ButtonProps } from "./button";
+export { Button, buttonVariants } from "./button";
+export type { ButtonProps } from "@gshl-types";
 
 // Form Controls
-export { Input, type InputProps } from "./input";
-export { Label, type LabelProps } from "./label";
-export { Select, type SelectProps } from "./select";
+export { Input } from "./input";
+export { Label } from "./label";
+export { Select } from "./select";
+export type { InputProps, LabelProps, SelectProps } from "@gshl-types";
 
 // Dropdown Menu Components
 export {
@@ -71,7 +73,7 @@ export {
 } from "./toast";
 
 export { Toaster } from "./toaster";
-export { useToast, toast } from "./use-toast";
+export { UploadButton, UploadDropzone } from "./uploadthing";
 
 // NHL Logo Component
 export { NHLLogo } from "./nhlLogo";

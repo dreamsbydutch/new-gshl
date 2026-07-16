@@ -6,23 +6,43 @@
  */
 
 import { useNavStore } from "./store";
-import { useWeeks } from "../hooks/main/useWeek";
-import { useSeasonState } from "../hooks/main/useSeason";
+import { useWeeks, useSeasonState } from "@gshl-hooks";
 import { useEffect } from "react";
+
+type NavStoreState = ReturnType<typeof useNavStore.getState>;
+
+type NavigationSelectionOptions = {
+  fallback?: string;
+  selector: (state: NavStoreState) => string;
+  setter: (state: NavStoreState) => (value: string) => void;
+};
+
+function useNavigationSelection(options: NavigationSelectionOptions) {
+  const selectedValue = useNavStore(options.selector);
+  const setSelectedValue = useNavStore(options.setter);
+  const resolvedValue =
+    selectedValue === "" ? (options.fallback ?? selectedValue) : selectedValue;
+
+  return {
+    selectedValue: resolvedValue,
+    setSelectedValue,
+  };
+}
 
 /**
  * Schedule type navigation hook
  * @returns Schedule type state and setter with default fallback to "week"
  */
 export function useScheduleNavigation() {
-  const selectedScheduleType = useNavStore(
-    (state) => state.selectedScheduleType,
-  );
-  const setScheduleType = useNavStore((state) => state.setScheduleType);
+  const { selectedValue, setSelectedValue } = useNavigationSelection({
+    selector: (state) => state.selectedScheduleType,
+    setter: (state) => state.setScheduleType,
+    fallback: "week",
+  });
 
   return {
-    selectedType: selectedScheduleType || "week",
-    setSelectedType: setScheduleType,
+    selectedType: selectedValue,
+    setSelectedType: setSelectedValue,
   };
 }
 
@@ -31,14 +51,15 @@ export function useScheduleNavigation() {
  * @returns Standings type state and setter with default fallback to "overall"
  */
 export function useStandingsNavigation() {
-  const selectedStandingsType = useNavStore(
-    (state) => state.selectedStandingsType,
-  );
-  const setStandingsType = useNavStore((state) => state.setStandingsType);
+  const { selectedValue, setSelectedValue } = useNavigationSelection({
+    selector: (state) => state.selectedStandingsType,
+    setter: (state) => state.setStandingsType,
+    fallback: "overall",
+  });
 
   return {
-    selectedType: selectedStandingsType || "overall",
-    setSelectedType: setStandingsType,
+    selectedType: selectedValue,
+    setSelectedType: setSelectedValue,
   };
 }
 
@@ -47,14 +68,15 @@ export function useStandingsNavigation() {
  * @returns Locker room type state and setter with default fallback to "roster"
  */
 export function useLockerRoomNavigation() {
-  const selectedLockerRoomType = useNavStore(
-    (state) => state.selectedLockerRoomType,
-  );
-  const setLockerRoomType = useNavStore((state) => state.setLockerRoomType);
+  const { selectedValue, setSelectedValue } = useNavigationSelection({
+    selector: (state) => state.selectedLockerRoomType,
+    setter: (state) => state.setLockerRoomType,
+    fallback: "roster",
+  });
 
   return {
-    selectedType: selectedLockerRoomType || "roster",
-    setSelectedType: setLockerRoomType,
+    selectedType: selectedValue,
+    setSelectedType: setSelectedValue,
   };
 }
 
@@ -63,14 +85,15 @@ export function useLockerRoomNavigation() {
  * @returns League office type state and setter with default fallback to "home"
  */
 export function useLeagueOfficeNavigation() {
-  const selectedLeagueOfficeType = useNavStore(
-    (state) => state.selectedLeagueOfficeType,
-  );
-  const setLeagueOfficeType = useNavStore((state) => state.setLeagueOfficeType);
+  const { selectedValue, setSelectedValue } = useNavigationSelection({
+    selector: (state) => state.selectedLeagueOfficeType,
+    setter: (state) => state.setLeagueOfficeType,
+    fallback: "home",
+  });
 
   return {
-    selectedType: selectedLeagueOfficeType || "home",
-    setSelectedType: setLeagueOfficeType,
+    selectedType: selectedValue,
+    setSelectedType: setSelectedValue,
   };
 }
 
@@ -180,12 +203,14 @@ export function useWeekNavigation() {
  * @returns Owner ID and setter for team selection
  */
 export function useTeamNavigation() {
-  const selectedOwnerId = useNavStore((state) => state.selectedOwnerId);
-  const setOwnerId = useNavStore((state) => state.setOwnerId);
+  const { selectedValue, setSelectedValue } = useNavigationSelection({
+    selector: (state) => state.selectedOwnerId,
+    setter: (state) => state.setOwnerId,
+  });
 
   return {
-    selectedOwnerId: selectedOwnerId,
-    setSelectedOwnerId: setOwnerId,
+    selectedOwnerId: selectedValue,
+    setSelectedOwnerId: setSelectedValue,
   };
 }
 

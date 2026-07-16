@@ -1,9 +1,9 @@
 "use client";
 
-import { useLeagueOfficeNavigation } from "@gshl-cache";
-import { ConferenceContest } from "./ConferenceContest";
-import { Rulebook } from "./Rulebook";
-import { DraftClasses } from "./DraftClasses";
+import { useLeagueOfficeNavigation } from "@gshl-hooks";
+import { ConferenceContest } from "@gshl-components/league-office/ConferenceContest";
+import { Rulebook } from "@gshl-components/league-office/Rulebook";
+import { DraftClasses } from "@gshl-components/league-office/DraftClasses";
 
 export default function LeagueOfficePage() {
   const { selectedType } = useLeagueOfficeNavigation();

@@ -5,28 +5,10 @@
  * behavior, and accessibility features across the application.
  */
 
-import { type ReactNode } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { cn } from "@gshl-utils";
-import type { LinkNavItem } from "@gshl-types";
-
-interface ClickableNavItemProps {
-  id: string;
-  label: string;
-  icon?: ReactNode | string;
-  isActive?: boolean;
-  isDisabled?: boolean;
-  onClick: () => void;
-  className?: string;
-}
-
-interface NavContainerProps {
-  children: ReactNode;
-  className?: string;
-  position?: "top" | "bottom" | "secondary" | "tertiary";
-  variant?: "primary" | "secondary" | "tertiary";
-}
+import type { ClickableNavItemProps, LinkNavItem, NavContainerProps } from "@gshl-types";
 
 /**
  * Clickable navigation item component

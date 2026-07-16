@@ -21,6 +21,7 @@ export interface Season {
   startDate: string;
   endDate: string;
   isActive: boolean;
+  usesLegacyTies: boolean;
   signingEndDate: string;
   createdAt: Date;
   updatedAt: Date;
@@ -205,6 +206,14 @@ export interface Player {
   height?: number | null;
   lineupPos?: RosterPosition | null;
   gshlTeamId?: string | null;
+  nhlContractStatus?: string | null;
+  nhlContractLength?: number | null;
+  nhlCapHit?: number | null;
+  nhlClauses?: string | null;
+  nhlStartYear?: number | null;
+  nhlSigningStatus?: string | null;
+  nhlExpiryYear?: number | null;
+  nhlExpiryStatus?: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -238,27 +247,21 @@ export interface Awards {
   updatedAt: Date;
 }
 
-/** A player recognition, tied to the team the player represented that season. */
 export interface PlayerAward {
   id: string;
   seasonId: string;
-  playerId?: string;
-  winnerId?: string;
-  gshlTeamId?: string;
-  teamId?: string;
+  playerId: string;
+  nomineeIds: string[];
   award: AwardsList;
-  nomineeIds?: string[];
   createdAt: Date;
   updatedAt: Date;
 }
 
-/** A franchise/team recognition for a specific season. */
 export interface TeamAward {
   id: string;
   seasonId: string;
-  gshlTeamId?: string;
-  teamId?: string;
-  winnerId?: string;
+  teamId: string;
+  nomineeIds: string[];
   award: AwardsList;
   createdAt: Date;
   updatedAt: Date;
@@ -404,6 +407,82 @@ export interface PlayerTotalStatLine {
   id: string;
   seasonId: string;
   gshlTeamIds: string[]; // Note: plural in sheets config
+  playerId: string;
+  nhlPos: RosterPosition[];
+  posGroup: PositionGroup;
+  nhlTeam: string;
+  seasonType: SeasonType;
+  days: string;
+  GP: string;
+  MG: string;
+  IR: string;
+  IRplus: string;
+  GS: string;
+  G: string;
+  A: string;
+  P: string;
+  PM: string;
+  PIM: string;
+  PPP: string;
+  SOG: string;
+  HIT: string;
+  BLK: string;
+  W: string;
+  GA: string;
+  GAA: string;
+  SV: string;
+  SA: string;
+  SVP: string;
+  SO: string;
+  TOI: string;
+  Rating: string;
+  ADD: string;
+  MS: string;
+  BS: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+export interface PlayerCareerSplitStatLine {
+  id: string;
+  gshlTeamId: string;
+  playerId: string;
+  nhlPos: RosterPosition[];
+  posGroup: PositionGroup;
+  nhlTeam: string;
+  seasonType: SeasonType;
+  days: string;
+  GP: string;
+  MG: string;
+  IR: string;
+  IRplus: string;
+  GS: string;
+  G: string;
+  A: string;
+  P: string;
+  PM: string;
+  PIM: string;
+  PPP: string;
+  SOG: string;
+  HIT: string;
+  BLK: string;
+  W: string;
+  GA: string;
+  GAA: string;
+  SV: string;
+  SA: string;
+  SVP: string;
+  SO: string;
+  TOI: string;
+  Rating: string;
+  ADD: string;
+  MS: string;
+  BS: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+export interface PlayerCareerTotalStatLine {
+  id: string;
+  gshlTeamIds: string[];
   playerId: string;
   nhlPos: RosterPosition[];
   posGroup: PositionGroup;
@@ -676,10 +755,12 @@ export interface TeamSeasonStatLine {
   teamHW: number;
   teamHL: number;
   teamL: number;
+  teamT: number;
   teamCCW: number;
   teamCCHW: number;
   teamCCHL: number;
   teamCCL: number;
+  teamCCT: number;
   overallRk: number;
   conferenceRk: number;
   wildcardRk?: number | null;

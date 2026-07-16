@@ -22,6 +22,7 @@
     "jsx": "preserve",
     "plugins": [{ "name": "next" }],
     "incremental": true,
+    "baseUrl": ".",
 
     /* Path Aliases */
     "paths": {
@@ -35,8 +36,8 @@
       "@gshl-ui": ["./src/components/ui/index.ts"],
       "@gshl-nav": ["./src/components/ui/nav/index.ts"],
       "@gshl-skeletons": ["./src/components/skeletons/index.ts"],
-      "@gshl-hooks": ["./src/lib/hooks/index.ts"],
-      "@gshl-hooks/*": ["./src/lib/hooks/*"],
+      "@gshl-hooks": ["./src/hooks/index.ts"],
+      "@gshl-hooks/*": ["./src/hooks/*"],
       "@gshl-sheets": ["./src/lib/sheets/index.ts"],
       "@gshl-cache": ["./src/lib/cache/index.ts"],
       "@gshl-types": ["./src/lib/types/index.ts"],

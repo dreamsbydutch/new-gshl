@@ -1,4 +1,6 @@
 import { fastSheetsReader, type SheetsModelName } from "@gshl-sheets";
+import { env } from "@gshl-env";
+import * as convexStore from "@gshl-lib/data/convex-store";
 
 type AnyRow = Record<string, unknown>;
 
@@ -114,6 +116,10 @@ export async function getMany<T>(
   model: SheetsModelName,
   input: BaseQueryInput = {},
 ): Promise<T[]> {
+  if (env.GSHL_DATA_BACKEND === "convex") {
+    return convexStore.getMany<T>(model, input);
+  }
+
   const all = await fetchRowsForQuery<T>(model, input);
   const filtered = applyWhere(all, input.where);
   const ordered = applyOrderBy(filtered, input.orderBy);
@@ -124,6 +130,10 @@ export async function getFirst<T>(
   model: SheetsModelName,
   input: BaseQueryInput = {},
 ): Promise<T | null> {
+  if (env.GSHL_DATA_BACKEND === "convex") {
+    return convexStore.getFirst<T>(model, input);
+  }
+
   const rows = await getMany<T>(model, { ...input, take: 1 });
   return rows[0] ?? null;
 }
@@ -132,6 +142,10 @@ export async function getById<T>(
   model: SheetsModelName,
   id: string,
 ): Promise<T | null> {
+  if (env.GSHL_DATA_BACKEND === "convex") {
+    return convexStore.getById<T>(model, id);
+  }
+
   return getFirst<T>(model, { where: { id } });
 }
 
@@ -139,6 +153,20 @@ export async function getCount(
   model: SheetsModelName,
   input: Pick<BaseQueryInput, "where"> = {},
 ): Promise<number> {
+  if (env.GSHL_DATA_BACKEND === "convex") {
+    return convexStore.getCount(model, input);
+  }
+
   const all = await fetchRowsForQuery<Record<string, unknown>>(model, input);
   return applyWhere(all, input.where).length;
+}
+
+export async function fetchSnapshot<M extends readonly SheetsModelName[]>(
+  models: M,
+): Promise<Record<M[number], Record<string, unknown>[]>> {
+  if (env.GSHL_DATA_BACKEND === "convex") {
+    return convexStore.fetchSnapshot(models);
+  }
+
+  return fastSheetsReader.fetchSnapshot(models);
 }

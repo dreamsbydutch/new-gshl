@@ -1,24 +1,21 @@
-import { type DraftPick, type GSHLTeam } from "@gshl-types";
-import type { DraftBoardPlayer } from "@gshl-types";
+import type {
+  BuildMockDraftProjectionOptions,
+  DraftBoardPlayer,
+  ProjectedDraftPick,
+} from "@gshl-types";
 
-export interface ProjectedDraftPick<
-  TPlayer extends DraftBoardPlayer = DraftBoardPlayer,
-> {
-  pick: DraftPick;
-  gshlTeam?: GSHLTeam;
-  projectedPlayer?: TPlayer;
-  score: number | null;
-}
+export type {
+  BuildMockDraftProjectionOptions,
+  ProjectedDraftPick,
+} from "@gshl-types";
 
-export interface BuildMockDraftProjectionOptions<
-  TPlayer extends DraftBoardPlayer = DraftBoardPlayer,
-> {
-  seasonDraftPicks: DraftPick[];
-  draftPlayers: TPlayer[];
-  teams: GSHLTeam[];
-  take?: number;
-}
-
+/**
+ * Creates a comparison result for players.
+ *
+ * @param left - The left to use.
+ * @param right - The right to use.
+ * @returns The comparison callback result.
+ */
 function comparePlayers(
   left: Pick<
     DraftBoardPlayer,
@@ -41,6 +38,13 @@ function comparePlayers(
   return String(left.id).localeCompare(String(right.id));
 }
 
+/**
+ * Sorts projected picks.
+ *
+ * @param left - The left to use.
+ * @param right - The right to use.
+ * @returns The sorted projected picks.
+ */
 function sortProjectedPicks(
   left: ProjectedDraftPick,
   right: ProjectedDraftPick,
@@ -51,6 +55,12 @@ function sortProjectedPicks(
   );
 }
 
+/**
+ * Builds mock draft projection.
+ *
+ * @param options - Configuration options for the operation.
+ * @returns The assembled mock draft projection.
+ */
 export function buildMockDraftProjection<
   TPlayer extends DraftBoardPlayer = DraftBoardPlayer,
 >(

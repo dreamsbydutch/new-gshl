@@ -74,6 +74,14 @@ var RankingEngine = RankingEngine || {};
           RS: { F: 350, D: 140, G: 112 },
           PO: { F: 140, D: 49, G: 28 },
         },
+        PlayerCareerSplitStatLine: {
+          RS: { F: 350, D: 140, G: 112 },
+          PO: { F: 140, D: 49, G: 28 },
+        },
+        PlayerCareerTotalStatLine: {
+          RS: { F: 350, D: 140, G: 112 },
+          PO: { F: 140, D: 49, G: 28 },
+        },
       },
     },
     retention: {
@@ -171,6 +179,34 @@ var RankingEngine = RankingEngine || {};
           specialistCap: { maxSupport: 0.3, cap: 88 },
           smallSampleCaps: [{ maxUsageExclusive: 6, cap: 86 }],
         },
+        PlayerCareerSplitStatLine: {
+          categoryBlend: { raw: 0.6, rate: 0.4 },
+          weights: {
+            efficiency: 0.24,
+            support: 0.17,
+            breadth: 0.13,
+            volume: 0.18,
+            star: 0.28,
+          },
+          volumeMix: { usage: 0.7, event: 0.3 },
+          balancedBonus: 4,
+          specialistCap: { maxSupport: 0.32, cap: 90 },
+          smallSampleCaps: [{ maxUsageExclusive: 3, cap: 87 }],
+        },
+        PlayerCareerTotalStatLine: {
+          categoryBlend: { raw: 0.58, rate: 0.42 },
+          weights: {
+            efficiency: 0.24,
+            support: 0.14,
+            breadth: 0.1,
+            volume: 0.14,
+            star: 0.38,
+          },
+          volumeMix: { usage: 0.68, event: 0.32 },
+          balancedBonus: 5,
+          specialistCap: { maxSupport: 0.3, cap: 88 },
+          smallSampleCaps: [{ maxUsageExclusive: 6, cap: 86 }],
+        },
         PlayerNHL: {
           categoryBlend: { raw: 0.55, rate: 0.45 },
           weights: {
@@ -228,6 +264,32 @@ var RankingEngine = RankingEngine || {};
           smallSampleCap: { maxUsageExclusive: 3, cap: 84 },
         },
         PlayerTotalStatLine: {
+          winBlend: { raw: 0.85, rate: 0.15 },
+          weights: {
+            efficiency: 0.24,
+            support: 0.17,
+            breadth: 0.17,
+            workload: 0.42,
+          },
+          workloadMix: { GS: 0.8, SA: 0.08, SV: 0.07, TOI: 0.05 },
+          balancedBonus: 5,
+          specialistCap: { type: "support", maxSupport: 0.45, cap: 84 },
+          smallSampleCap: { maxUsageExclusive: 8, cap: 82 },
+        },
+        PlayerCareerSplitStatLine: {
+          winBlend: { raw: 0.75, rate: 0.25 },
+          weights: {
+            efficiency: 0.29,
+            support: 0.18,
+            breadth: 0.17,
+            workload: 0.36,
+          },
+          workloadMix: { GS: 0.7, SA: 0.12, SV: 0.08, TOI: 0.1 },
+          balancedBonus: 4,
+          specialistCap: { type: "support", maxSupport: 0.4, cap: 88 },
+          smallSampleCap: { maxUsageExclusive: 3, cap: 84 },
+        },
+        PlayerCareerTotalStatLine: {
           winBlend: { raw: 0.85, rate: 0.15 },
           weights: {
             efficiency: 0.24,

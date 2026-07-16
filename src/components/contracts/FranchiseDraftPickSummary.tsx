@@ -1,12 +1,7 @@
 "use client";
 
 import { formatDraftPickDescription } from "@gshl-utils";
-import type { FranchiseDraftPickGroupType } from "@gshl-hooks/main/useContract";
-
-export interface FranchiseDraftPickSummaryProps {
-  groups: FranchiseDraftPickGroupType[];
-  hasData: boolean;
-}
+import type { FranchiseDraftPickSummaryProps } from "@gshl-types";
 
 export function FranchiseDraftPickSummary({
   groups,

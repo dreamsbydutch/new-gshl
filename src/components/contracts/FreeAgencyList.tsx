@@ -23,35 +23,12 @@
 
 import { useFreeAgencyData } from "@gshl-hooks";
 import { Table, NHLLogo } from "@gshl-ui";
-import { formatMoney, formatNumber } from "@gshl-utils";
+import {
+  findNhlTeamByAbbreviation,
+  formatMoney,
+  formatNumber,
+} from "@gshl-utils";
 import type { Player, NHLTeam } from "@gshl-types";
-
-function getPlayerNhlAbbreviation(value: unknown): string | null {
-  if (Array.isArray(value)) {
-    const firstTeam = value.find(
-      (team): team is string =>
-        typeof team === "string" && team.trim().length > 0,
-    );
-    return firstTeam ?? null;
-  }
-
-  if (typeof value !== "string") {
-    return null;
-  }
-
-  const team = value.trim();
-  return team.length > 0 ? team : null;
-}
-
-function findNhlTeamByAbbreviation(
-  nhlTeams: NHLTeam[],
-  abbreviation: unknown,
-): NHLTeam | undefined {
-  const normalizedAbbreviation = getPlayerNhlAbbreviation(abbreviation);
-  return normalizedAbbreviation
-    ? nhlTeams.find((team) => team.abbreviation === normalizedAbbreviation)
-    : undefined;
-}
 
 // ============================================================================
 // INTERNAL COMPONENTS

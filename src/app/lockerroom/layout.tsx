@@ -1,7 +1,6 @@
 "use client";
 
-import { useLockerRoomNavigation } from "@gshl-cache";
-import { useSeasonState } from "@gshl-hooks";
+import { useLockerRoomNavigation, useSeasonState } from "@gshl-hooks";
 import {
   HorizontalToggle,
   SecondaryPageToolbar,
@@ -45,7 +44,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         setter: (type: string | null) => setSelectedType(type ?? ""),
       },
       {
-        key: "records",
+        key: "recordbook",
         value: "Record Book",
         setter: (type: string | null) => setSelectedType(type ?? ""),
       },

@@ -30,6 +30,12 @@ export type TransformedPlayerSplitStatLine = DB.PlayerSplitStatLine;
 
 export type TransformedPlayerTotalStatLine = DB.PlayerTotalStatLine;
 
+export type TransformedPlayerCareerSplitStatLine =
+  DB.PlayerCareerSplitStatLine;
+
+export type TransformedPlayerCareerTotalStatLine =
+  DB.PlayerCareerTotalStatLine;
+
 export type TransformedPlayerNHLStatLine = DB.PlayerNHLStatLine;
 
 export type TransformedTeamDayStatLine = DB.TeamDayStatLine;
@@ -54,6 +60,8 @@ export interface TransformedModelMap {
   PlayerWeekStatLine: TransformedPlayerWeekStatLine;
   PlayerSplitStatLine: TransformedPlayerSplitStatLine;
   PlayerTotalStatLine: TransformedPlayerTotalStatLine;
+  PlayerCareerSplitStatLine: TransformedPlayerCareerSplitStatLine;
+  PlayerCareerTotalStatLine: TransformedPlayerCareerTotalStatLine;
   PlayerNHLStatLine: TransformedPlayerNHLStatLine;
   TeamDayStatLine: TransformedTeamDayStatLine;
   TeamWeekStatLine: TransformedTeamWeekStatLine;

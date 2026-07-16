@@ -3,10 +3,21 @@ import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { toNumber } from "./data";
 
+/**
+ * Cn.
+ *
+ * @param inputs - The inputs to use.
+ */
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+/**
+ * Formats player name for display.
+ *
+ * @param name - The name to use.
+ * @returns The formatted player name.
+ */
 export function formatPlayerName(name: string): string {
   return name
     .split(" ")
@@ -14,6 +25,13 @@ export function formatPlayerName(name: string): string {
     .join(" ");
 }
 
+/**
+ * Formats team name for display.
+ *
+ * @param name - The name to use.
+ * @param location - The location to use.
+ * @returns The formatted team name.
+ */
 export function formatTeamName(name: string, location?: string): string {
   if (location) {
     return `${location} ${name}`;
@@ -21,16 +39,38 @@ export function formatTeamName(name: string, location?: string): string {
   return name;
 }
 
+/**
+ * Truncate text.
+ *
+ * @param text - The text to use.
+ * @param maxLength - The max length to use.
+ * @returns The resulting truncate text.
+ */
 export function truncateText(text: string, maxLength: number): string {
   if (text.length <= maxLength) return text;
   return text.slice(0, maxLength - 3) + "...";
 }
 
+/**
+ * Formats stat for display.
+ *
+ * @param stat - The stat to use.
+ * @param decimals - The decimals to use.
+ * @returns The formatted stat.
+ */
 export function formatStat(stat: number | string, decimals = 0): string {
   const value = toNumber(stat, 0);
   return value.toFixed(decimals);
 }
 
+/**
+ * Formats record for display.
+ *
+ * @param wins - The wins to use.
+ * @param losses - The losses to use.
+ * @param ties - The ties to use.
+ * @returns The formatted record.
+ */
 export function formatRecord(wins: number, losses: number, ties = 0): string {
   if (ties > 0) {
     return `${wins}-${losses}-${ties}`;
@@ -38,6 +78,13 @@ export function formatRecord(wins: number, losses: number, ties = 0): string {
   return `${wins}-${losses}`;
 }
 
+/**
+ * Formats number for display.
+ *
+ * @param value - The source value to process.
+ * @param maxFractionDigits - The max fraction digits to use.
+ * @returns The formatted number.
+ */
 export function formatNumber(
   value: number | string | null | undefined,
   maxFractionDigits = 1,
@@ -54,6 +101,12 @@ export function formatNumber(
   }
 }
 
+/**
+ * Formats compact number for display.
+ *
+ * @param value - The source value to process.
+ * @returns The formatted compact number.
+ */
 export function formatCompactNumber(
   value: number | string | null | undefined,
 ): string {
@@ -69,6 +122,13 @@ export function formatCompactNumber(
   }
 }
 
+/**
+ * Formats money for display.
+ *
+ * @param value - The source value to process.
+ * @param short - The short to use.
+ * @returns The formatted money.
+ */
 export function formatMoney(
   value: number | string | null | undefined,
   short = false,
@@ -93,6 +153,13 @@ export function formatMoney(
   }
 }
 
+/**
+ * Formats percentage for display.
+ *
+ * @param value - The source value to process.
+ * @param asDecimal - The as decimal to use.
+ * @returns The formatted percentage.
+ */
 export function formatPercentage(
   value: number | string | null | undefined,
   asDecimal = false,
@@ -112,6 +179,12 @@ export function formatPercentage(
   }
 }
 
+/**
+ * Formats rank for display.
+ *
+ * @param value - The source value to process.
+ * @returns The formatted rank.
+ */
 export function formatRank(value: number | string | null | undefined): string {
   const num = Math.trunc(toNumber(value, 0));
   if (num <= 0) return "0th";
@@ -121,6 +194,12 @@ export function formatRank(value: number | string | null | undefined): string {
   return `${num}${["th", "st", "nd", "rd"][lastDigit] ?? "th"}`;
 }
 
+/**
+ * Formats time for display.
+ *
+ * @param value - The source value to process.
+ * @returns The formatted time.
+ */
 export function formatTime(value: Date | string | null | undefined): string {
   if (!value) return "N/A";
 

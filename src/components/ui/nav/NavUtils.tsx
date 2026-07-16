@@ -4,7 +4,7 @@
  * Helper components that provide common navigation functionality across the app.
  */
 
-import { useNavStore } from "@gshl-cache";
+import { useNavigationReset } from "@gshl-hooks";
 import { ClickableNavItem } from "./BaseComponents";
 
 /**
@@ -12,7 +12,7 @@ import { ClickableNavItem } from "./BaseComponents";
  * @returns Clickable button that resets all navigation state to defaults
  */
 export function NavResetButton() {
-  const resetNavigation = useNavStore((state) => state.resetNavigation);
+  const resetNavigation = useNavigationReset();
 
   return (
     <ClickableNavItem

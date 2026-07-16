@@ -24,6 +24,8 @@ export const MODEL_TO_CONVEX_TABLE = {
   PlayerWeekStatLine: "playerWeekStatLines",
   PlayerSplitStatLine: "playerSplitStatLines",
   PlayerTotalStatLine: "playerTotalStatLines",
+  PlayerCareerSplitStatLine: "playerCareerSplitStatLines",
+  PlayerCareerTotalStatLine: "playerCareerTotalStatLines",
   PlayerNHLStatLine: "playerNhlStatLines",
   TeamDayStatLine: "teamDayStatLines",
   TeamWeekStatLine: "teamWeekStatLines",

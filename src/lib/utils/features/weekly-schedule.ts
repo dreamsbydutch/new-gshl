@@ -1,11 +1,20 @@
-import type { GSHLTeam, Matchup } from "@gshl-types";
+import type {
+  GSHLTeam,
+  Matchup,
+  Player,
+  PlayerWeekStatLine,
+  TeamWeekStatLine,
+  Week,
+} from "@gshl-types";
 import {
-  GAME_TYPES,
-  CONFERENCE_ABBR,
+  filterMatchups,
+  getMatchupOutcomeClass,
+  isScheduleItemComplete,
   RANKING_DISPLAY_THRESHOLD,
-  TEAM_LOGO_DIMENSIONS,
+  shouldDisplayRank,
+  sortMatchups,
 } from "../domain/schedule";
-import { findTeamById } from "../domain/team";
+import { keyBy } from "../core";
 import type {
   WeekScheduleItemProps,
   TeamDisplayProps,
@@ -14,14 +23,8 @@ import type {
   ConferenceAbbr,
   GameTypeConfig,
 } from "@gshl-types";
+import { ResignableStatus as ResignableStatusEnum } from "@gshl-types";
 
-// Re-export shared constants for backward compatibility
-export { GAME_TYPES, RANKING_DISPLAY_THRESHOLD, TEAM_LOGO_DIMENSIONS };
-
-// Re-export domain utilities
-export { findTeamById };
-
-// Re-export types for backward compatibility
 export type {
   WeekScheduleItemProps,
   TeamDisplayProps,
@@ -31,14 +34,7 @@ export type {
   GameTypeConfig,
 };
 
-// Weekly schedule specific conference abbreviations (simplified structure)
-export const WEEKLY_CONFERENCES = {
-  SUNVIEW: CONFERENCE_ABBR.SUNVIEW,
-  HICKORY_HOTEL: CONFERENCE_ABBR.HICKORY_HOTEL,
-} as const;
-
-// Background class mappings for different game/conference combinations
-export const BACKGROUND_CLASSES = {
+const BACKGROUND_CLASSES = {
   // Sunview intra-conference games
   RSSVSV: "bg-sunview-50/50",
   CCSVSV: "bg-sunview-50/50",
@@ -78,29 +74,134 @@ export const BACKGROUND_CLASSES = {
   LTSVHH: "bg-brown-200/40",
 } as const;
 
-// Default background class when no specific mapping exists
-export const DEFAULT_BACKGROUND_CLASS = "bg-gray-100";
+const DEFAULT_BACKGROUND_CLASS = "bg-gray-100";
 
 /**
- * Filters matchups for a specific week identifier.
+ * Filters matchups by week.
+ *
+ * @param matchups - The matchups to use.
+ * @param selectedWeekId - The selected week id to use.
+ * @returns The filtered matchups by week.
  */
 export const filterMatchupsByWeek = (
   matchups: Matchup[],
   selectedWeekId: string | number | null,
 ): Matchup[] => {
-  if (!matchups || !selectedWeekId) return [];
-  return matchups.filter((matchup) => matchup.weekId === selectedWeekId);
+  return filterMatchups(matchups, { weekId: selectedWeekId });
 };
 
 /**
- * Sorts matchups by rating in descending order.
+ * Sorts matchups by rating.
+ *
+ * @param matchups - The matchups to use.
+ * @returns The sorted matchups by rating.
  */
 export const sortMatchupsByRating = (matchups: Matchup[]): Matchup[] => {
-  return matchups.sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0));
+  return sortMatchups(matchups, { by: "rating", direction: "desc" });
 };
 
 /**
- * Generates background class based on game type and conference combination.
+ * Collects player ids that appear in weekly stats but are not present in the
+ * active-player collection.
+ */
+export const collectInactivePlayerIds = (
+  activePlayers: Player[],
+  playerWeekStats: PlayerWeekStatLine[],
+): string[] => {
+  if (!playerWeekStats.length) {
+    return [];
+  }
+
+  const activePlayerIdSet = new Set(
+    activePlayers.map((player) => player.id).filter(Boolean),
+  );
+  const missingIds = new Set<string>();
+
+  for (const stat of playerWeekStats) {
+    const playerId = stat.playerId?.trim();
+    if (playerId && !activePlayerIdSet.has(playerId)) {
+      missingIds.add(playerId);
+    }
+  }
+
+  return Array.from(missingIds);
+};
+
+/**
+ * Builds a player lookup map keyed by player id.
+ */
+export const buildPlayerLookup = (players: Player[]): Map<string, Player> => {
+  return keyBy(players, (player) => player.id);
+};
+
+/**
+ * Groups weekly player stat rows by GSHL team and merges in player metadata.
+ */
+export const buildPlayerWeekStatsByTeam = (
+  playerWeekStats: PlayerWeekStatLine[],
+  playerLookup: Map<string, Player>,
+): Record<string, (PlayerWeekStatLine & Player)[]> => {
+  return playerWeekStats.reduce<Record<string, (PlayerWeekStatLine & Player)[]>>(
+    (acc, stat) => {
+      const playerId = stat.playerId?.trim();
+      const player = playerId ? playerLookup.get(playerId) : null;
+      if (!stat.gshlTeamId) {
+        return acc;
+      }
+
+      const teamRows = (acc[stat.gshlTeamId] ??= []);
+      teamRows.push({
+        ...stat,
+        ...player,
+        gshlTeamId: stat.gshlTeamId,
+        firstName: player?.firstName ?? "",
+        lastName: player?.lastName ?? "",
+        fullName: player?.fullName ?? "",
+        isActive: player?.isActive ?? false,
+        isSignable: player?.isSignable ?? false,
+        isResignable: player?.isResignable ?? ResignableStatusEnum.DRAFT,
+      });
+      return acc;
+    },
+    {},
+  );
+};
+
+/**
+ * Groups weekly team stat rows by team id.
+ */
+export const buildTeamWeekStatsByTeam = (
+  teamWeekStats: TeamWeekStatLine[],
+): Record<string, TeamWeekStatLine> => {
+  return Object.fromEntries(keyBy(teamWeekStats, (stat) => stat.gshlTeamId));
+};
+
+/**
+ * Returns the next week ids immediately following the selected week.
+ */
+export const getUpcomingWeekIds = (
+  weeks: Week[],
+  selectedWeekId: string | null,
+  count = 2,
+): string[] => {
+  const currentIndex = weeks.findIndex((week) => week.id === selectedWeekId);
+  if (currentIndex < 0) {
+    return [];
+  }
+
+  return weeks
+    .slice(currentIndex + 1, currentIndex + 1 + count)
+    .map((week) => week.id)
+    .filter(Boolean);
+};
+
+/**
+ * Returns game background class.
+ *
+ * @param gameType - The game type to use.
+ * @param awayTeamConf - The away team conf to use.
+ * @param homeTeamConf - The home team conf to use.
+ * @returns The requested game background class.
  */
 export const getGameBackgroundClass = (
   gameType: string,
@@ -115,32 +216,50 @@ export const getGameBackgroundClass = (
 };
 
 /**
- * Checks if a team should display a ranking badge.
+ * Determines whether to display ranking.
+ *
+ * @param rank - The rank to use.
+ * @returns True when display ranking; otherwise false.
  */
 export const shouldDisplayRanking = (rank?: string | number): boolean => {
-  if (rank === undefined) return false;
-  const rankNum = typeof rank === "number" ? rank : +rank;
-  return !isNaN(rankNum) && rankNum <= RANKING_DISPLAY_THRESHOLD;
+  return shouldDisplayRank(rank, {
+    threshold: RANKING_DISPLAY_THRESHOLD,
+  });
 };
 
 /**
- * Determines if matchup has been played (i.e., has scores).
+ * Checks whether matchup completed.
+ *
+ * @param matchup - The matchup to use.
+ * @returns True when matchup completed; otherwise false.
  */
 export const isMatchupCompleted = (matchup: Matchup): boolean => {
-  return !!(matchup.homeScore ?? matchup.awayScore);
+  return isScheduleItemComplete({ matchup, mode: "scores" });
 };
 
 /**
- * Gets score display class based on win/loss status.
+ * Returns score class.
+ *
+ * @param isWinner - The is winner to use.
+ * @param isLoser - The is loser to use.
+ * @returns The requested score class.
  */
 export const getScoreClass = (isWinner: boolean, isLoser: boolean): string => {
-  if (isWinner) return "font-bold text-emerald-700";
-  if (isLoser) return "text-rose-800";
-  return "";
+  return getMatchupOutcomeClass({
+    isLoser,
+    isWinner,
+    lossClass: "text-rose-800",
+    winClass: "font-bold text-emerald-700",
+  });
 };
 
 /**
- * Validates if matchup data is complete and the teams are different.
+ * Checks whether valid matchup.
+ *
+ * @param matchup - The matchup to use.
+ * @param homeTeam - The home team to use.
+ * @param awayTeam - The away team to use.
+ * @returns True when valid matchup; otherwise false.
  */
 export const isValidMatchup = (
   matchup: Matchup,

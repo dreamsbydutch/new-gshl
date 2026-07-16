@@ -83,6 +83,8 @@ export const MODEL_TO_WORKBOOK: Record<string, keyof typeof WORKBOOKS> = {
   PlayerWeekStatLine: "PLAYERSTATS",
   PlayerSplitStatLine: "PLAYERSTATS",
   PlayerTotalStatLine: "PLAYERSTATS",
+  PlayerCareerSplitStatLine: "PLAYERSTATS",
+  PlayerCareerTotalStatLine: "PLAYERSTATS",
   PlayerNHLStatLine: "PLAYERSTATS",
 
   // TEAMSTATS workbook
@@ -158,6 +160,8 @@ export type CompositeKeyModelName =
   | "PlayerWeekStatLine"
   | "PlayerSplitStatLine"
   | "PlayerTotalStatLine"
+  | "PlayerCareerSplitStatLine"
+  | "PlayerCareerTotalStatLine"
   | "PlayerNHLStatLine"
   | "TeamDayStatLine"
   | "TeamWeekStatLine"
@@ -175,6 +179,10 @@ export function getCompositeKeyColumnsForModel(
       return ["playerId", "seasonId", "gshlTeamId", "seasonType"];
     case "PlayerTotalStatLine":
       return ["playerId", "seasonId", "seasonType"];
+    case "PlayerCareerSplitStatLine":
+      return ["playerId", "gshlTeamId", "seasonType"];
+    case "PlayerCareerTotalStatLine":
+      return ["playerId", "seasonType"];
     case "PlayerNHLStatLine":
       return ["playerId", "seasonId"];
     case "TeamDayStatLine":
@@ -213,6 +221,8 @@ export const SHEETS_CONFIG = {
     PlayerWeekStatLine: "PlayerWeekStatLine",
     PlayerSplitStatLine: "PlayerSplitStatLine",
     PlayerTotalStatLine: "PlayerTotalStatLine",
+    PlayerCareerSplitStatLine: "PlayerCareerSplitStatLine",
+    PlayerCareerTotalStatLine: "PlayerCareerTotalStatLine",
     PlayerNHLStatLine: "PlayerNHLStatLine",
     TeamDayStatLine: "TeamDayStatLine",
     TeamWeekStatLine: "TeamWeekStatLine",
@@ -326,6 +336,7 @@ export const SHEETS_CONFIG = {
       "startDate",
       "endDate",
       "isActive",
+      "usesLegacyTies",
       "signingEndDate",
       "createdAt",
       "updatedAt",
@@ -366,6 +377,14 @@ export const SHEETS_CONFIG = {
       "height",
       "lineupPos",
       "gshlTeamId",
+      "nhlContractStatus",
+      "nhlContractLength",
+      "nhlCapHit",
+      "nhlClauses",
+      "nhlStartYear",
+      "nhlSigningStatus",
+      "nhlExpiryYear",
+      "nhlExpiryStatus",
       "createdAt",
       "updatedAt",
       "nhlApiId",
@@ -466,6 +485,82 @@ export const SHEETS_CONFIG = {
     PlayerTotalStatLine: [
       "id",
       "seasonId",
+      "gshlTeamIds",
+      "playerId",
+      "nhlPos",
+      "posGroup",
+      "nhlTeam",
+      "seasonType",
+      "days",
+      "GP",
+      "MG",
+      "IR",
+      "IRplus",
+      "GS",
+      "G",
+      "A",
+      "P",
+      "PM",
+      "PIM",
+      "PPP",
+      "SOG",
+      "HIT",
+      "BLK",
+      "W",
+      "GA",
+      "GAA",
+      "SV",
+      "SA",
+      "SVP",
+      "SO",
+      "TOI",
+      "Rating",
+      "ADD",
+      "MS",
+      "BS",
+      "createdAt",
+      "updatedAt",
+    ],
+    PlayerCareerSplitStatLine: [
+      "id",
+      "gshlTeamId",
+      "playerId",
+      "nhlPos",
+      "posGroup",
+      "nhlTeam",
+      "seasonType",
+      "days",
+      "GP",
+      "MG",
+      "IR",
+      "IRplus",
+      "GS",
+      "G",
+      "A",
+      "P",
+      "PM",
+      "PIM",
+      "PPP",
+      "SOG",
+      "HIT",
+      "BLK",
+      "W",
+      "GA",
+      "GAA",
+      "SV",
+      "SA",
+      "SVP",
+      "SO",
+      "TOI",
+      "Rating",
+      "ADD",
+      "MS",
+      "BS",
+      "createdAt",
+      "updatedAt",
+    ],
+    PlayerCareerTotalStatLine: [
+      "id",
       "gshlTeamIds",
       "playerId",
       "nhlPos",
@@ -657,10 +752,12 @@ export const SHEETS_CONFIG = {
       "teamHW",
       "teamHL",
       "teamL",
+      "teamT",
       "teamCCW",
       "teamCCHW",
       "teamCCHL",
       "teamCCL",
+      "teamCCT",
       "overallRk",
       "conferenceRk",
       "wildcardRk",
@@ -727,20 +824,16 @@ export const SHEETS_CONFIG = {
       "id",
       "seasonId",
       "playerId",
-      "winnerId",
-      "gshlTeamId",
-      "teamId",
-      "award",
       "nomineeIds",
+      "award",
       "createdAt",
       "updatedAt",
     ],
     TeamAwards: [
       "id",
       "seasonId",
-      "gshlTeamId",
       "teamId",
-      "winnerId",
+      "nomineeIds",
       "award",
       "createdAt",
       "updatedAt",
@@ -776,10 +869,14 @@ export type DatabaseRecord = Record<string, DatabaseValue>;
 
 const BOOLEAN_COLUMNS = new Set([
   "isActive",
+  "usesLegacyTies",
   "isSignable",
   "isPlayoffs",
   "ownerIsActive",
   "isComplete",
+  "homeWin",
+  "awayWin",
+  "tie",
   "isTraded",
   "isSigning",
 ]);
@@ -851,7 +948,19 @@ function isDateOnlyColumn(column: string): boolean {
 }
 
 function coerceDateOnlyString(value: unknown): string | null {
-  return normalizeDateOnlyValue(value);
+  if (
+    value === null ||
+    value === undefined ||
+    typeof value === "string" ||
+    typeof value === "number" ||
+    typeof value === "boolean" ||
+    value instanceof Date ||
+    typeof value === "object"
+  ) {
+    return normalizeDateOnlyValue(value);
+  }
+
+  return null;
 }
 
 function normalizeMultiValueTokens(value: unknown): string[] {

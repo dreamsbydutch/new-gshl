@@ -26,6 +26,7 @@ var SHEET_BOOLEAN_FIELDS = new Set([
   "tie",
   "isComplete",
   "isActive",
+  "usesLegacyTies",
   "enabled",
   "isArchived",
   "isPlayoff",
@@ -136,6 +137,7 @@ SHEET_SCHEMAS.Season =
   createSheetSchema({
     description: "Season master metadata",
     keyColumns: ["id"],
+    booleanColumns: ["usesLegacyTies"],
     dateColumns: ["startDate", "endDate"],
     numericColumns: ["seasonNumber"],
   });
@@ -166,7 +168,7 @@ SHEET_SCHEMAS.Matchup =
       "homeScore",
       "awayScore",
     ],
-    booleanColumns: ["homeWin", "awayWin", "isComplete"],
+    booleanColumns: ["homeWin", "awayWin", "tie", "isComplete"],
     timestampColumns: ["updatedAt"],
   });
 
@@ -238,6 +240,26 @@ SHEET_SCHEMAS.PlayerTotalStatLine =
     description: "Season totals per player",
     category: "stat",
     keyColumns: ["playerId", "seasonId", "seasonType"],
+    datetimeColumns: ["createdAt", "updatedAt"],
+    numericColumns: PLAYER_WEEK_NUMERIC_FIELDS,
+  });
+
+SHEET_SCHEMAS.PlayerCareerSplitStatLine =
+  SHEET_SCHEMAS.PlayerCareerSplitStatLine ||
+  createSheetSchema({
+    description: "Career splits per team",
+    category: "stat",
+    keyColumns: ["gshlTeamId", "playerId", "seasonType"],
+    datetimeColumns: ["createdAt", "updatedAt"],
+    numericColumns: PLAYER_WEEK_NUMERIC_FIELDS,
+  });
+
+SHEET_SCHEMAS.PlayerCareerTotalStatLine =
+  SHEET_SCHEMAS.PlayerCareerTotalStatLine ||
+  createSheetSchema({
+    description: "Career totals per player",
+    category: "stat",
+    keyColumns: ["playerId", "seasonType"],
     datetimeColumns: ["createdAt", "updatedAt"],
     numericColumns: PLAYER_WEEK_NUMERIC_FIELDS,
   });
@@ -337,10 +359,12 @@ var TEAM_SEASON_NUMERIC_FIELDS = TEAM_DAY_NUMERIC_FIELDS.concat([
   "teamHW",
   "teamHL",
   "teamL",
+  "teamT",
   "teamCCW",
   "teamCCHW",
   "teamCCHL",
   "teamCCL",
+  "teamCCT",
   "overallRk",
   "conferenceRk",
   "wildcardRk",

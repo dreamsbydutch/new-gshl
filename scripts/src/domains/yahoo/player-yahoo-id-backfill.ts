@@ -642,7 +642,9 @@ function describeYahooFetchProgress(event: YahooFetchProgressEvent): string {
     case "browser-fallback-failed":
       return `Browser fallback failed for ${event.url}: ${event.error}`;
     case "request-denied-cooldown":
-      return `Yahoo request denied cooldown ${event.waitMs}ms for ${event.url}.`;
+      return event.status
+        ? `Yahoo returned HTTP ${event.status}; cooldown ${event.waitMs}ms for ${event.url}.`
+        : `Yahoo request denied cooldown ${event.waitMs}ms for ${event.url}.`;
     case "status-retry":
       return `Yahoo returned HTTP ${event.status}; retrying ${event.url} in ${event.waitMs}ms.`;
   }

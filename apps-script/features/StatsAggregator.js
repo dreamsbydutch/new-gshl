@@ -831,6 +831,175 @@ var StatsAggregator = (function StatsAggregatorModule() {
     };
   }
 
+  function buildPlayerCareerSplitsAndTotalsFromWeeks(playerWeeks, context) {
+    var SeasonType = GshlUtils.core.constants.SeasonType;
+    var playerCareerSplitsMap = new Map();
+    var playerCareerTotalsMap = new Map();
+
+    function resolveSeasonTypeForWeekRow(pw) {
+      var raw = pw && pw.seasonType ? String(pw.seasonType) : "";
+      if (raw) return normalizeSeasonType(raw, SeasonType.REGULAR_SEASON);
+      var fromWeek =
+        context.weekTypeMap && context.weekTypeMap.get(String(pw && pw.weekId));
+      return fromWeek || context.defaultSeasonType || SeasonType.REGULAR_SEASON;
+    }
+
+    playerWeeks.forEach(function (pw) {
+      if (!pw) return;
+      var playerId =
+        pw.playerId === undefined || pw.playerId === null
+          ? ""
+          : String(pw.playerId);
+      var teamId =
+        pw.gshlTeamId === undefined || pw.gshlTeamId === null
+          ? ""
+          : String(pw.gshlTeamId);
+      var seasonType = resolveSeasonTypeForWeekRow(pw);
+      if (!playerId || !teamId || !seasonType) return;
+
+      var totalKey = playerId + "|" + String(seasonType);
+      if (!playerCareerTotalsMap.has(totalKey)) {
+        playerCareerTotalsMap.set(totalKey, []);
+      }
+      playerCareerTotalsMap.get(totalKey).push(pw);
+
+      var splitKey = playerId + "|" + teamId + "|" + String(seasonType);
+      if (!playerCareerSplitsMap.has(splitKey)) {
+        playerCareerSplitsMap.set(splitKey, []);
+      }
+      playerCareerSplitsMap.get(splitKey).push(pw);
+    });
+
+    var playerCareerSplits = [];
+    var playerCareerTotals = [];
+
+    playerCareerSplitsMap.forEach(function (weeksArr, splitKey) {
+      if (!weeksArr || !weeksArr.length) return;
+      var parts = splitKey.split("|");
+      playerCareerSplits.push(
+        buildPlayerAggregateFromWeeks(
+          weeksArr[0],
+          weeksArr,
+          {
+            playerId: parts[0],
+            gshlTeamId: parts[1],
+            seasonType: parts[2],
+          },
+          context,
+        ),
+      );
+    });
+
+    playerCareerTotalsMap.forEach(function (weeksArr, totalKey) {
+      if (!weeksArr || !weeksArr.length) return;
+      var parts = totalKey.split("|");
+      playerCareerTotals.push(
+        buildPlayerAggregateFromWeeks(
+          weeksArr[0],
+          weeksArr,
+          {
+            playerId: parts[0],
+            seasonType: parts[1],
+            gshlTeamIds: weeksArr.map(function (w) {
+              return w && w.gshlTeamId;
+            }),
+          },
+          context,
+        ),
+      );
+    });
+
+    return {
+      careerSplits: playerCareerSplits,
+      careerTotals: playerCareerTotals,
+    };
+  }
+
+  function updatePlayerCareerStatsFromExistingPlayerWeeksInternal(
+    seasonId,
+    fieldConfigOverride,
+  ) {
+    var seasonKey = requireSeason(
+      seasonId,
+      "updatePlayerCareerStatsFromExistingPlayerWeeks",
+    );
+    var SeasonType = GshlUtils.core.constants.SeasonType;
+    var TEAM_STAT_FIELDS = GshlUtils.core.constants.TEAM_STAT_FIELDS;
+    var fetchSheetAsObjects = GshlUtils.sheets.read.fetchSheetAsObjects;
+    var upsertSheetByKeys = GshlUtils.sheets.write.upsertSheetByKeys;
+    var toNumber = GshlUtils.core.parse.toNumber;
+    var formatNumber = GshlUtils.core.parse.formatNumber;
+
+    var season = fetchSheetAsObjects(SPREADSHEET_ID, "Season").find(
+      function (s) {
+        return String(s && s.id) === seasonKey;
+      },
+    );
+    if (!season) {
+      throw new Error("[StatsAggregator] Season not found for id " + seasonKey);
+    }
+
+    var fieldConfig =
+      fieldConfigOverride || buildSeasonAggregationFieldConfig(season);
+    var playerWeeks = fetchSheetAsObjects(
+      PLAYERSTATS_SPREADSHEET_ID,
+      "PlayerWeekStatLine",
+    );
+    var careerAggregates = buildPlayerCareerSplitsAndTotalsFromWeeks(
+      playerWeeks,
+      {
+        seasonId: "",
+        weekTypeMap: new Map(),
+        defaultSeasonType: SeasonType.REGULAR_SEASON,
+        statFields: TEAM_STAT_FIELDS,
+        fieldConfig: fieldConfig,
+        toNumber: toNumber,
+        formatNumber: formatNumber,
+      },
+    );
+    var playerCareerSplits = careerAggregates.careerSplits;
+    var playerCareerTotals = careerAggregates.careerTotals;
+
+    rankPlayerRows(playerCareerSplits, "PlayerCareerSplitStatLine", seasonKey);
+    rankPlayerRows(playerCareerTotals, "PlayerCareerTotalStatLine", seasonKey);
+
+    upsertSheetByKeys(
+      PLAYERSTATS_SPREADSHEET_ID,
+      "PlayerCareerSplitStatLine",
+      ["playerId", "gshlTeamId", "seasonType"],
+      playerCareerSplits,
+      {
+        idColumn: "id",
+        createdAtColumn: "createdAt",
+        updatedAtColumn: "updatedAt",
+        deleteMissing: true,
+      },
+    );
+
+    upsertSheetByKeys(
+      PLAYERSTATS_SPREADSHEET_ID,
+      "PlayerCareerTotalStatLine",
+      ["playerId", "seasonType"],
+      playerCareerTotals,
+      {
+        idColumn: "id",
+        createdAtColumn: "createdAt",
+        updatedAtColumn: "updatedAt",
+        deleteMissing: true,
+      },
+    );
+
+    return {
+      playerCareerSplits: playerCareerSplits.length,
+      playerCareerTotals: playerCareerTotals.length,
+    };
+  }
+
+  ns.updatePlayerCareerStatsFromExistingPlayerWeeks =
+    function updatePlayerCareerStatsFromExistingPlayerWeeks(seasonId) {
+      return updatePlayerCareerStatsFromExistingPlayerWeeksInternal(seasonId);
+    };
+
   // ============================================================================
   // PLAYER AGGREGATION
   // ============================================================================
@@ -937,6 +1106,11 @@ var StatsAggregator = (function StatsAggregatorModule() {
         },
       );
 
+      var careerStats = updatePlayerCareerStatsFromExistingPlayerWeeksInternal(
+        seasonKey,
+        fieldConfig,
+      );
+
       console.log(
         "[StatsAggregator] Updated player splits/totals from existing weeks for season",
         seasonKey,
@@ -944,8 +1118,20 @@ var StatsAggregator = (function StatsAggregatorModule() {
         playerSplits.length,
         "totals:",
         playerTotals.length,
+        "careerSplits:",
+        careerStats.playerCareerSplits,
+        "careerTotals:",
+        careerStats.playerCareerTotals,
         ")",
       );
+
+      return {
+        seasonId: seasonKey,
+        playerSplits: playerSplits.length,
+        playerTotals: playerTotals.length,
+        playerCareerSplits: careerStats.playerCareerSplits,
+        playerCareerTotals: careerStats.playerCareerTotals,
+      };
     };
 
   ns.updatePlayerStatsForSeasonFromExistingPlayerWeeks =
@@ -1143,6 +1329,11 @@ var StatsAggregator = (function StatsAggregatorModule() {
       },
     );
 
+    var careerStats = updatePlayerCareerStatsFromExistingPlayerWeeksInternal(
+      seasonKey,
+      fieldConfig,
+    );
+
     console.log(
       "[StatsAggregator] Updated player aggregates for season",
       seasonKey,
@@ -1152,6 +1343,10 @@ var StatsAggregator = (function StatsAggregatorModule() {
       playerSplits.length,
       "totals:",
       playerTotals.length,
+      "careerSplits:",
+      careerStats.playerCareerSplits,
+      "careerTotals:",
+      careerStats.playerCareerTotals,
       ")",
     );
 
@@ -1160,6 +1355,8 @@ var StatsAggregator = (function StatsAggregatorModule() {
       playerWeeks: playerWeeks.length,
       playerSplits: playerSplits.length,
       playerTotals: playerTotals.length,
+      playerCareerSplits: careerStats.playerCareerSplits,
+      playerCareerTotals: careerStats.playerCareerTotals,
     };
   };
 
@@ -1386,6 +1583,11 @@ var StatsAggregator = (function StatsAggregatorModule() {
       },
     );
 
+    var careerStats = updatePlayerCareerStatsFromExistingPlayerWeeksInternal(
+      seasonKey,
+      fieldConfig,
+    );
+
     console.log(
       "[StatsAggregator] Updated player aggregates for selected weeks in season",
       seasonKey,
@@ -1397,6 +1599,10 @@ var StatsAggregator = (function StatsAggregatorModule() {
       playerSplits.length,
       "totals:",
       playerTotals.length,
+      "careerSplits:",
+      careerStats.playerCareerSplits,
+      "careerTotals:",
+      careerStats.playerCareerTotals,
       ")",
     );
 
@@ -1406,6 +1612,8 @@ var StatsAggregator = (function StatsAggregatorModule() {
       playerWeeks: playerWeeks,
       playerSplits: playerSplits,
       playerTotals: playerTotals,
+      playerCareerSplits: careerStats.playerCareerSplits,
+      playerCareerTotals: careerStats.playerCareerTotals,
       touchedPlayerIds: Array.from(touchedPlayerIds),
     };
   };

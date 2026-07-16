@@ -1,24 +1,56 @@
+type TruthyInput = string | number | boolean | Date | object | null | undefined;
+
 // Validation utility functions
 
+/**
+ * Checks whether valid email.
+ *
+ * @param email - The email to use.
+ * @returns True when valid email; otherwise false.
+ */
 export function isValidEmail(email: string): boolean {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   return emailRegex.test(email);
 }
 
+/**
+ * Checks whether valid year.
+ *
+ * @param year - The year to use.
+ * @returns True when valid year; otherwise false.
+ */
 export function isValidYear(year: number): boolean {
   const currentYear = new Date().getFullYear();
   return year >= 2000 && year <= currentYear + 10;
 }
 
+/**
+ * Checks whether valid salary.
+ *
+ * @param salary - The salary to use.
+ * @returns True when valid salary; otherwise false.
+ */
 export function isValidSalary(salary: string | number): boolean {
   const num = typeof salary === "string" ? parseFloat(salary) : salary;
   return !isNaN(num) && num >= 0 && num <= 20_000_000;
 }
 
+/**
+ * Checks whether valid jersey number.
+ *
+ * @param num - The num to use.
+ * @returns True when valid jersey number; otherwise false.
+ */
 export function isValidJerseyNumber(num: number): boolean {
   return Number.isInteger(num) && num >= 1 && num <= 99;
 }
 
+/**
+ * Checks whether valid position.
+ *
+ * @param pos - The pos to use.
+ * @returns True when valid position; otherwise false.
+ */
 export function isValidPosition(pos: string): boolean {
   const validPositions = [
     "C",
@@ -34,10 +66,22 @@ export function isValidPosition(pos: string): boolean {
   return validPositions.includes(pos.toUpperCase());
 }
 
+/**
+ * Sanitize input.
+ *
+ * @param input - The input value to process.
+ * @returns The resulting sanitize input.
+ */
 export function sanitizeInput(input: string): string {
   return input.trim().replace(/[<>]/g, "");
 }
 
+/**
+ * Checks whether valid id.
+ *
+ * @param id - The id to use.
+ * @returns True when valid id; otherwise false.
+ */
 export function isValidId(id: string | number): boolean {
   if (typeof id === "number") {
     return Number.isInteger(id) && id > 0;
@@ -45,10 +89,22 @@ export function isValidId(id: string | number): boolean {
   return id.length > 0 && id.trim() !== "";
 }
 
+/**
+ * Checks whether valid name.
+ *
+ * @param name - The name to use.
+ * @returns True when valid name; otherwise false.
+ */
 export function isValidName(name: string): boolean {
   return name.trim().length >= 1 && name.trim().length <= 100;
 }
 
+/**
+ * Checks whether valid team name.
+ *
+ * @param name - The name to use.
+ * @returns True when valid team name; otherwise false.
+ */
 export function isValidTeamName(name: string): boolean {
   return name.trim().length >= 1 && name.trim().length <= 50;
 }
@@ -79,7 +135,7 @@ export function isValidTeamName(name: string): boolean {
  * isTruthy(null); // false
  * ```
  */
-export function isTruthy(value: unknown): boolean {
+export function isTruthy(value: TruthyInput): boolean {
   if (typeof value === "boolean") return value;
   if (typeof value === "number") return value === 1;
   if (typeof value === "string") {

@@ -7,34 +7,12 @@
  * support, loading states, and accessibility features.
  */
 
-import { type ReactNode, useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect } from "react";
 import { cn } from "@gshl-utils";
-
-interface BaseToggleProps<T> {
-  items: T[];
-  selectedItem?: T | null;
-  onSelect: (item: T) => void;
-  getItemKey?: (item: T) => string;
-  getItemLabel?: (item: T) => string;
-  getItemDescription?: (item: T) => string | undefined;
-  renderCustomItem?: (item: T, isSelected: boolean) => ReactNode;
-  loading?: boolean;
-  error?: string | null;
-  className?: string;
-}
-
-interface HorizontalToggleProps<T> extends BaseToggleProps<T> {
-  itemClassName?: string;
-}
-
-interface DropdownToggleProps<T> extends BaseToggleProps<T> {
-  renderSelectedItem?: (item: T) => ReactNode;
-  buttonClassName?: string;
-  dropdownClassName?: string;
-  placeholder?: string;
-  maxHeight?: string;
-  dropdownPosition?: "above" | "below" | "auto";
-}
+import type {
+  DropdownToggleProps,
+  HorizontalToggleProps,
+} from "@gshl-types";
 
 /**
  * Horizontal toggle component with scrollable item selector

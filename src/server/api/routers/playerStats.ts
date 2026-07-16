@@ -2,6 +2,8 @@ import { z } from "zod";
 import { createTRPCRouter, publicProcedure } from "../trpc";
 import { baseQuerySchema } from "./_schemas";
 import {
+  type PlayerCareerSplitStatLine,
+  type PlayerCareerTotalStatLine,
   type PlayerDayStatLine,
   type PlayerNHLStatLine,
   type PlayerSplitStatLine,
@@ -223,6 +225,79 @@ export const playerStatsRouter = createTRPCRouter({
           where: { seasonId: input.seasonId },
           orderBy: { [input.statType]: "desc" },
           take: input.take,
+        });
+      }),
+  }),
+
+  careerSplits: createTRPCRouter({
+    getAll: publicProcedure
+      .input(
+        baseQuerySchema.extend({
+          where: z
+            .object({
+              playerId: z.string().optional(),
+              gshlTeamId: z.string().optional(),
+              seasonType: z.string().optional(),
+            })
+            .optional(),
+        }),
+      )
+      .query(async ({ input }): Promise<PlayerCareerSplitStatLine[]> => {
+        return getMany<PlayerCareerSplitStatLine>(
+          "PlayerCareerSplitStatLine",
+          input,
+        );
+      }),
+
+    getByPlayer: publicProcedure
+      .input(
+        z.object({
+          playerId: z.string(),
+          seasonType: z.string().optional(),
+        }),
+      )
+      .query(async ({ input }): Promise<PlayerCareerSplitStatLine[]> => {
+        return getMany<PlayerCareerSplitStatLine>("PlayerCareerSplitStatLine", {
+          where: {
+            playerId: input.playerId,
+            ...(input.seasonType && { seasonType: input.seasonType }),
+          },
+        });
+      }),
+  }),
+
+  careerTotals: createTRPCRouter({
+    getAll: publicProcedure
+      .input(
+        baseQuerySchema.extend({
+          where: z
+            .object({
+              playerId: z.string().optional(),
+              seasonType: z.string().optional(),
+            })
+            .optional(),
+        }),
+      )
+      .query(async ({ input }): Promise<PlayerCareerTotalStatLine[]> => {
+        return getMany<PlayerCareerTotalStatLine>(
+          "PlayerCareerTotalStatLine",
+          input,
+        );
+      }),
+
+    getByPlayer: publicProcedure
+      .input(
+        z.object({
+          playerId: z.string(),
+          seasonType: z.string().optional(),
+        }),
+      )
+      .query(async ({ input }): Promise<PlayerCareerTotalStatLine[]> => {
+        return getMany<PlayerCareerTotalStatLine>("PlayerCareerTotalStatLine", {
+          where: {
+            playerId: input.playerId,
+            ...(input.seasonType && { seasonType: input.seasonType }),
+          },
         });
       }),
   }),

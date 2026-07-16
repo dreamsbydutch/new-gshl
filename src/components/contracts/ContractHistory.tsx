@@ -1,7 +1,10 @@
 "use client";
 
 import { cn, formatMoney, showDate } from "@gshl-utils";
-import type { FranchiseContractHistoryRowType } from "@gshl-hooks/main/useContract";
+import type {
+  FranchiseContractHistoryProps,
+  FranchiseContractHistoryRowType,
+} from "@gshl-types";
 
 const EmptyState = () => (
   <div className="text-center text-xs text-muted-foreground">
@@ -47,11 +50,6 @@ const ContractHistoryRow = ({
     </tr>
   );
 };
-
-export interface FranchiseContractHistoryProps {
-  rows: FranchiseContractHistoryRowType[];
-  hasData: boolean;
-}
 
 export function FranchiseContractHistory({
   rows,

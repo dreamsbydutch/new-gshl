@@ -196,7 +196,16 @@ var RankingEngine = RankingEngine || {};
     }
     if (row.weekId)
       return row.playerId ? "PlayerWeekStatLine" : "TeamWeekStatLine";
-    if (row.gshlTeamIds !== undefined) return "PlayerTotalStatLine";
+    if (row.gshlTeamIds !== undefined) {
+      return row.seasonId
+        ? "PlayerTotalStatLine"
+        : "PlayerCareerTotalStatLine";
+    }
+    if (row.playerId && row.gshlTeamId) {
+      return row.seasonId
+        ? "PlayerSplitStatLine"
+        : "PlayerCareerSplitStatLine";
+    }
     if (row.seasonType && row.playerId && row.gshlTeamId)
       return "PlayerSplitStatLine";
     if (row.seasonType && row.playerId) return "PlayerTotalStatLine";
@@ -301,6 +310,8 @@ var RankingEngine = RankingEngine || {};
       normalizedSheetName === "PlayerWeekStatLine" ||
       normalizedSheetName === "PlayerSplitStatLine" ||
       normalizedSheetName === "PlayerTotalStatLine" ||
+      normalizedSheetName === "PlayerCareerSplitStatLine" ||
+      normalizedSheetName === "PlayerCareerTotalStatLine" ||
       normalizedSheetName === "PlayerNHL"
     );
   }
@@ -310,6 +321,8 @@ var RankingEngine = RankingEngine || {};
     return (
       normalizedSheetName === "PlayerSplitStatLine" ||
       normalizedSheetName === "PlayerTotalStatLine" ||
+      normalizedSheetName === "PlayerCareerSplitStatLine" ||
+      normalizedSheetName === "PlayerCareerTotalStatLine" ||
       normalizedSheetName === "PlayerNHL"
     );
   }
@@ -318,7 +331,9 @@ var RankingEngine = RankingEngine || {};
     var normalizedSheetName = normalizeSheetName(sheetName);
     return (
       normalizedSheetName === "PlayerSplitStatLine" ||
-      normalizedSheetName === "PlayerTotalStatLine"
+      normalizedSheetName === "PlayerTotalStatLine" ||
+      normalizedSheetName === "PlayerCareerSplitStatLine" ||
+      normalizedSheetName === "PlayerCareerTotalStatLine"
     );
   }
 
@@ -1069,7 +1084,9 @@ var RankingEngine = RankingEngine || {};
         weights.P = 1.18;
       } else if (
         normalizedSheetName === "PlayerSplitStatLine" ||
-        normalizedSheetName === "PlayerTotalStatLine"
+        normalizedSheetName === "PlayerTotalStatLine" ||
+        normalizedSheetName === "PlayerCareerSplitStatLine" ||
+        normalizedSheetName === "PlayerCareerTotalStatLine"
       ) {
         weights.P = 1.14;
       } else if (

@@ -169,9 +169,9 @@ export function getAwardLabel(award: AwardsList | string): string {
 }
 
 export function getAwardTeamId(award: PlayerAward | TeamAward): string {
-  return String(award.gshlTeamId ?? award.teamId ?? award.winnerId ?? "");
+  return "teamId" in award ? String(award.teamId) : "";
 }
 
 export function getPlayerAwardPlayerId(award: PlayerAward): string {
-  return String(award.playerId ?? award.winnerId ?? "");
+  return String(award.playerId);
 }

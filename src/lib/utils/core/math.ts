@@ -1,8 +1,8 @@
 /**
- * Core Math Utilities
- * -------------------
- * Generic mathematical calculation functions that are not domain-specific.
- * These are pure functions for common calculations.
+ * Calculates player age.
+ *
+ * @param birthDate - The birth date to use.
+ * @returns The calculated player age.
  */
 
 /**
@@ -35,11 +35,11 @@ export function calculatePlayerAge(
 }
 
 /**
- * Calculates save percentage (saves / shots * 100).
+ * Calculates save percentage.
  *
- * @param saves - Number of saves
- * @param shots - Number of shots against
- * @returns Save percentage as a number (0-100)
+ * @param saves - The saves to use.
+ * @param shots - The shots to use.
+ * @returns The calculated save percentage.
  */
 export function calculateSavePercentage(saves: number, shots: number): number {
   if (shots === 0) return 0;
@@ -47,11 +47,11 @@ export function calculateSavePercentage(saves: number, shots: number): number {
 }
 
 /**
- * Calculates goals against average (GAA).
+ * Calculates goals against average.
  *
- * @param goalsAgainst - Number of goals allowed
- * @param gamesPlayed - Number of games played
- * @returns Goals against average
+ * @param goalsAgainst - The goals against to use.
+ * @param gamesPlayed - The games played to use.
+ * @returns The calculated goals against average.
  */
 export function calculateGoalsAgainstAverage(
   goalsAgainst: number,
@@ -62,11 +62,11 @@ export function calculateGoalsAgainstAverage(
 }
 
 /**
- * Calculates points percentage (points / possible points * 100).
+ * Calculates points percentage.
  *
- * @param points - Points earned
- * @param possiblePoints - Total possible points
- * @returns Points percentage as a number (0-100)
+ * @param points - The points to use.
+ * @param possiblePoints - The possible points to use.
+ * @returns The calculated points percentage.
  */
 export function calculatePointsPercentage(
   points: number,

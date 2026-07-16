@@ -1,15 +1,5 @@
 "use client";
 
-/**
- * @fileoverview Locker Room Header Component
- *
- * Displays the team logo and information (team name and owner name)
- * at the top of the locker room page. Pure presentational component
- * with no data fetching or complex logic.
- *
- * @module components/team/LockerRoomHeader
- */
-
 import Image from "next/image";
 import { useState } from "react";
 import type {
@@ -19,16 +9,6 @@ import type {
 } from "@gshl-utils";
 import { formatMoney, formatOwnerName, TEAM_LOGO_SIZE } from "@gshl-utils";
 
-// ============================================================================
-// INTERNAL COMPONENTS
-// ============================================================================
-
-/**
- * TeamLogo Component
- *
- * Renders the team's logo at a fixed dimension.
- * Uses conditional rendering to prevent empty src attributes.
- */
 const TeamLogo = ({ currentTeam }: TeamLogoProps) => {
   const [errored, setErrored] = useState(false);
 
@@ -51,64 +31,27 @@ const TeamLogo = ({ currentTeam }: TeamLogoProps) => {
   );
 };
 
-/**
- * TeamInfo Component
- *
- * Displays the team name and formatted owner name.
- * Stateless: all formatting performed upstream.
- */
 const TeamInfo = ({ currentTeam, formattedOwnerName }: TeamInfoProps) => (
   <div className="flex flex-col items-center">
     <h1 className="text-center text-3xl font-bold">{currentTeam.name}</h1>
     <span className="text-center text-lg font-semibold">
       {formattedOwnerName}
     </span>
-    {+(currentTeam.ownerOwing ?? 0) > 0 && (
+    {+(currentTeam.ownerOwing ?? 0) > 0 ? (
       <span className="mt-1 text-center text-sm font-medium text-red-600">
         {formatMoney(currentTeam.ownerOwing, true)}
       </span>
-    )}
+    ) : null}
   </div>
 );
 
-// ============================================================================
-// MAIN EXPORT
-// ============================================================================
-
-/**
- * LockerRoomHeader Component
- *
- * Displays team branding and owner information at the top of the locker room page.
- * Pure presentational component - all data received via props.
- *
- * **Component Responsibilities:**
- * - Render team logo with fallback placeholder
- * - Display team name and formatted owner name
- * - Compose internal presentational components
- *
- * **Data Flow:**
- * - Receives fully-populated `currentTeam` entity
- * - Performs simple string formatting (no hook needed for trivial logic)
- * - No data fetching, subscriptions, or global state
- *
- * @param currentTeam - The team whose header information to display
- * @returns Team header with logo and owner information
- *
- * @example
- * ```tsx
- * <LockerRoomHeader currentTeam={team} />
- * ```
- */
 export function LockerRoomHeader({ currentTeam }: LockerRoomHeaderProps) {
-  // Simple derived string - no hook needed per architecture guidelines
-  const formattedOwnerName = formatOwnerName(currentTeam);
-
   return (
     <header className="mx-auto flex max-w-3xl items-center justify-evenly p-4">
       <TeamLogo currentTeam={currentTeam} />
       <TeamInfo
         currentTeam={currentTeam}
-        formattedOwnerName={formattedOwnerName}
+        formattedOwnerName={formatOwnerName(currentTeam)}
       />
     </header>
   );

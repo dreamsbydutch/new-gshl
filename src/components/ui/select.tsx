@@ -6,11 +6,7 @@
 
 import * as React from "react";
 import { cn } from "@gshl-utils";
-
-export interface SelectProps
-  extends React.SelectHTMLAttributes<HTMLSelectElement> {
-  onValueChange?: (value: string) => void;
-}
+import type { SelectProps } from "@gshl-types";
 
 /**
  * Drop-down select element styled for app forms.

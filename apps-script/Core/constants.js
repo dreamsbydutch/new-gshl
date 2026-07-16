@@ -52,6 +52,8 @@ var MATCHUP_CATEGORY_RULES =
         { field: "G", higherBetter: true },
         { field: "A", higherBetter: true },
         { field: "P", higherBetter: true },
+        { field: "PM", higherBetter: true },
+        { field: "PIM", higherBetter: true },
         { field: "PPP", higherBetter: true },
         { field: "SOG", higherBetter: true },
         { field: "HIT", higherBetter: true },

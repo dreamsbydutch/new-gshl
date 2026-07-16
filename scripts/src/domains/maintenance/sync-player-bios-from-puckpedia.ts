@@ -11,7 +11,7 @@
  *   --apply is passed.
  *
  * Options:
- *   --apply                 Persist Player sheet updates to Convex.
+ *   --apply                 Persist Player sheet updates to Google Sheets.
  *   --headless              Run the browser headless.
  *   --gshl-season-id <id>   Override the target GSHL season id.
  *   --focus-season <value>  Override the PuckPedia focus_season token. Default: 162.
@@ -188,6 +188,42 @@ const API_POSITION_MAP: Record<string, string> = {
   d: "D",
   g: "G",
 };
+
+const NHL_CONTRACT_FIELD_ALIASES = {
+  nhlContractStatus: [
+    "status",
+    "contract_status",
+    "contractStatus",
+    "current_contract_status",
+  ],
+  nhlContractLength: ["length", "contract_length", "contractLength", "term"],
+  nhlCapHit: ["cap_hit", "capHit", "caphit", "contract_cap_hit"],
+  nhlClauses: ["clauses", "contract_clauses", "contractClauses"],
+  nhlStartYear: [
+    "start_year",
+    "startYear",
+    "contract_start_year",
+    "contractStartYear",
+  ],
+  nhlSigningStatus: [
+    "signing_status",
+    "signingStatus",
+    "contract_signing_status",
+    "contractSigningStatus",
+  ],
+  nhlExpiryYear: [
+    "expiry_year",
+    "expiryYear",
+    "contract_expiry_year",
+    "contractExpiryYear",
+  ],
+  nhlExpiryStatus: [
+    "expiry_status",
+    "expiryStatus",
+    "contract_expiry_status",
+    "contractExpiryStatus",
+  ],
+} as const;
 
 const FIRST_NAME_ALIAS_FAMILIES = [
   ["alexei", "alexey"],
@@ -709,6 +745,63 @@ function toFiniteNumber(value: unknown): number | null {
   return Number.isFinite(numeric) ? numeric : null;
 }
 
+function toFlexibleNumber(value: unknown): number | null {
+  const direct = toFiniteNumber(value);
+  if (direct !== null) return direct;
+
+  const raw = toTrimmedString(value);
+  if (!raw) return null;
+
+  const normalized = raw
+    .replace(/\$/g, "")
+    .replace(/,/g, "")
+    .replace(/\s+/g, "")
+    .toUpperCase();
+  if (!normalized) return null;
+
+  const scaledMatch = normalized.match(/^(-?\d+(?:\.\d+)?)([KMB])$/);
+  if (scaledMatch) {
+    const base = Number(scaledMatch[1]);
+    const suffix = scaledMatch[2];
+    if (!Number.isFinite(base)) return null;
+    if (suffix === "K") return base * 1_000;
+    if (suffix === "M") return base * 1_000_000;
+    if (suffix === "B") return base * 1_000_000_000;
+  }
+
+  const numericMatch = normalized.match(/-?\d+(?:\.\d+)?/);
+  if (!numericMatch) return null;
+
+  const numeric = Number(numericMatch[0]);
+  return Number.isFinite(numeric) ? numeric : null;
+}
+
+function assignResolvedStringField(
+  fields: Record<string, PrimitiveCellValue>,
+  apiRow: Record<string, unknown>,
+  targetField: string,
+  fieldNames: readonly string[],
+): void {
+  const value = resolveFirstPresentValue(apiRow, [...fieldNames]);
+  const text = toTrimmedString(value);
+  if (text) {
+    fields[targetField] = text;
+  }
+}
+
+function assignResolvedNumericField(
+  fields: Record<string, PrimitiveCellValue>,
+  apiRow: Record<string, unknown>,
+  targetField: string,
+  fieldNames: readonly string[],
+  options?: { integer?: boolean },
+): void {
+  const value = resolveFirstPresentValue(apiRow, [...fieldNames]);
+  const numeric = toFlexibleNumber(value);
+  if (numeric === null) return;
+  fields[targetField] = options?.integer ? Math.round(numeric) : numeric;
+}
+
 function clip(value: number, min: number, max: number): number {
   if (!Number.isFinite(value)) return min;
   if (value < min) return min;
@@ -751,18 +844,6 @@ function buildManagedFieldPatch(
   summary: PlayerBioSyncSummary,
 ): Record<string, PrimitiveCellValue> {
   const fields: Record<string, PrimitiveCellValue> = {};
-  const setNhlContractField = (
-    sourceFieldNames: string[],
-    targetFieldNames: string[],
-  ) => {
-    const rawValue = resolveFirstPresentValue(apiRow, sourceFieldNames);
-    const normalizedValue = toTrimmedString(rawValue);
-    if (!normalizedValue) return;
-
-    for (const targetFieldName of targetFieldNames) {
-      fields[targetFieldName] = normalizedValue;
-    }
-  };
 
   const birthdayValue = resolveFirstPresentValue(apiRow, [
     "birthday",
@@ -816,89 +897,56 @@ function buildManagedFieldPatch(
     }
   }
 
-  // Preserve GSHL salary behavior and map NHL contract values into dedicated columns.
-  setNhlContractField(
-    [
-      "contract_status",
-      "contractStatus",
-      "status",
-      "Status",
-      "nhl_status",
-      "nhlStatus",
-    ],
-    ["nhlContractStatus", "Status"],
+  assignResolvedStringField(
+    fields,
+    apiRow,
+    "nhlContractStatus",
+    NHL_CONTRACT_FIELD_ALIASES.nhlContractStatus,
   );
-  setNhlContractField(
-    ["contract_length", "contractLength", "length", "Length", "term"],
-    ["nhlContractLength", "Length"],
+  assignResolvedNumericField(
+    fields,
+    apiRow,
+    "nhlContractLength",
+    NHL_CONTRACT_FIELD_ALIASES.nhlContractLength,
+    { integer: true },
   );
-  setNhlContractField(
-    [
-      "cap_hit",
-      "caphit",
-      "capHit",
-      "cap hit",
-      "Cap Hit",
-      "aav",
-      "AAV",
-    ],
-    ["nhlCapHit", "Cap Hit"],
+  assignResolvedNumericField(
+    fields,
+    apiRow,
+    "nhlCapHit",
+    NHL_CONTRACT_FIELD_ALIASES.nhlCapHit,
   );
-  setNhlContractField(
-    [
-      "clauses",
-      "clause",
-      "Clauses",
-      "contract_clauses",
-      "contractClauses",
-      "no_move_clause",
-      "no_trade_clause",
-    ],
-    ["nhlClauses", "Clauses"],
+  assignResolvedStringField(
+    fields,
+    apiRow,
+    "nhlClauses",
+    NHL_CONTRACT_FIELD_ALIASES.nhlClauses,
   );
-  setNhlContractField(
-    [
-      "start_year",
-      "startYear",
-      "Start Year",
-      "contract_start_year",
-      "contractStartYear",
-    ],
-    ["nhlStartYear", "Start Year"],
+  assignResolvedNumericField(
+    fields,
+    apiRow,
+    "nhlStartYear",
+    NHL_CONTRACT_FIELD_ALIASES.nhlStartYear,
+    { integer: true },
   );
-  setNhlContractField(
-    [
-      "signing_status",
-      "signingStatus",
-      "Signing Status",
-      "sign_status",
-      "signStatus",
-    ],
-    ["nhlSigningStatus", "Signing Status"],
+  assignResolvedStringField(
+    fields,
+    apiRow,
+    "nhlSigningStatus",
+    NHL_CONTRACT_FIELD_ALIASES.nhlSigningStatus,
   );
-  setNhlContractField(
-    [
-      "expiry_year",
-      "expiryYear",
-      "Expiry Year",
-      "expiration_year",
-      "expirationYear",
-      "exp_year",
-      "expYear",
-    ],
-    ["nhlExpiryYear", "Expiry Year"],
+  assignResolvedNumericField(
+    fields,
+    apiRow,
+    "nhlExpiryYear",
+    NHL_CONTRACT_FIELD_ALIASES.nhlExpiryYear,
+    { integer: true },
   );
-  setNhlContractField(
-    [
-      "expiry_status",
-      "expiryStatus",
-      "Expiry Status",
-      "expiration_status",
-      "expirationStatus",
-      "exp_status",
-      "expStatus",
-    ],
-    ["nhlExpiryStatus", "Expiry Status"],
+  assignResolvedStringField(
+    fields,
+    apiRow,
+    "nhlExpiryStatus",
+    NHL_CONTRACT_FIELD_ALIASES.nhlExpiryStatus,
   );
 
   return fields;

@@ -9,7 +9,6 @@ const whereSchema = z
     id: z.string().optional(),
     seasonId: z.string().optional(),
     playerId: z.string().optional(),
-    gshlTeamId: z.string().optional(),
     award: z.string().optional(),
   })
   .optional();

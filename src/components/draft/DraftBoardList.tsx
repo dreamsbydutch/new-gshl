@@ -34,7 +34,9 @@ import {
   type DraftBoardPlayer,
   type DraftBoardToolbarProps,
   type ProjectedDraftPick,
+  findNhlTeamByAbbreviation,
   formatNumber,
+  groupProjectedDraftPicksByRound,
   sortByOverallRank,
   excludeGoalies,
 } from "@gshl-utils";
@@ -44,54 +46,6 @@ import {
   lighten,
   readableText,
 } from "@gshl-hooks";
-
-function groupProjectedDraftPicksByRound(
-  projectedDraftPicks: ProjectedDraftPick[],
-): Array<{
-  round: string;
-  picks: ProjectedDraftPick[];
-}> {
-  const rounds = new Map<string, ProjectedDraftPick[]>();
-
-  for (const projectedPick of projectedDraftPicks) {
-    const round = String(projectedPick.pick.round);
-    const picks = rounds.get(round) ?? [];
-    picks.push(projectedPick);
-    rounds.set(round, picks);
-  }
-
-  return Array.from(rounds.entries()).map(([round, picks]) => ({
-    round,
-    picks,
-  }));
-}
-
-function getPlayerNhlAbbreviation(value: unknown): string | null {
-  if (Array.isArray(value)) {
-    const firstTeam = value.find(
-      (team): team is string =>
-        typeof team === "string" && team.trim().length > 0,
-    );
-    return firstTeam ?? null;
-  }
-
-  if (typeof value !== "string") {
-    return null;
-  }
-
-  const team = value.trim();
-  return team.length > 0 ? team : null;
-}
-
-function findNhlTeamByAbbreviation(
-  nhlTeams: NHLTeam[],
-  abbreviation: unknown,
-): NHLTeam | undefined {
-  const normalizedAbbreviation = getPlayerNhlAbbreviation(abbreviation);
-  return normalizedAbbreviation
-    ? nhlTeams.find((team) => team.abbreviation === normalizedAbbreviation)
-    : undefined;
-}
 
 // ============================================================================
 // INTERNAL COMPONENTS

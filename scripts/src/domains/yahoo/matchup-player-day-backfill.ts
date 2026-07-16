@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import pLimit from "p-limit";
 import { addDays, format, isAfter, parseISO } from "date-fns";
 import type {
+  Franchise,
   Matchup,
   Player,
   PlayerDayStatLine,
@@ -16,6 +17,7 @@ import {
   getCompositeKeyColumnsForModel,
   getPlayerDayWorkbookId,
   SHEETS_CONFIG,
+  convertModelToRow,
   type CompositeKeyModelName,
   type DatabaseRecord,
 } from "@gshl-lib/sheets/config/config";
@@ -74,6 +76,7 @@ type InvestigationFlag = {
   kind:
     | "unknown-yahoo-player"
     | "created-player-day-row"
+    | "moved-player-day-row"
     | "rekeyed-player-day-row"
     | "deleted-stale-player-day-row"
     | "date-missing-week"
@@ -115,8 +118,14 @@ type SideAssignment = {
   scoreDefault: number;
   scoreSwapped: number;
   swapped: boolean;
-  source: "yahoo-team-table" | "team-week-stats" | "default-order";
+  source:
+    | "franchise-name"
+    | "yahoo-team-table"
+    | "team-week-stats"
+    | "default-order";
 };
+
+type FranchiseNameTeamIndex = ReadonlyMap<string, Team>;
 
 export type YahooMatchupBackfillSeasonSummary = {
   seasonId: string;
@@ -181,7 +190,9 @@ function formatYahooFetchProgress(event: YahooFetchProgressEvent): string {
     case "browser-fallback-failed":
       return `browser fallback failed: ${event.error}`;
     case "request-denied-cooldown":
-      return `Yahoo served request denied; cooling down for ${event.waitMs}ms`;
+      return event.status
+        ? `HTTP ${event.status}; cooling down for ${event.waitMs}ms`
+        : `Yahoo served request denied; cooling down for ${event.waitMs}ms`;
     case "status-retry":
       return `HTTP ${event.status}; retrying after ${event.waitMs}ms`;
     default:
@@ -250,24 +261,99 @@ function buildTeamDateKey(teamId: string, date: string): string {
   return [toTrimmedString(teamId), normalizeDateKey(date)].join("|");
 }
 
+function buildPlayerDayBaseKey(
+  seasonId: string,
+  teamId: string,
+  playerId: string,
+  date: string,
+): string {
+  return [seasonId, teamId, playerId, normalizeDateKey(date)]
+    .map((value) => toTrimmedString(value))
+    .join("|");
+}
+
+function buildPlayerDayPlayerDateKey(
+  seasonId: string,
+  playerId: string,
+  date: string,
+): string {
+  return [seasonId, playerId, normalizeDateKey(date)]
+    .map((value) => toTrimmedString(value))
+    .join("|");
+}
+
 function buildTeamWeekKey(teamId: string, weekId: string): string {
   return [toTrimmedString(teamId), toTrimmedString(weekId)].join("|");
 }
 
-function buildExistingByTeamDate(
-  rows: LoadedPlayerDayRow[],
-): Map<string, LoadedPlayerDayRow[]> {
+function normalizeTeamNameLookupKey(value: unknown): string {
+  return toTrimmedString(value)
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/&/g, "and")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim()
+    .replace(/\s+/g, " ");
+}
+
+function buildFranchiseNameTeamIndex(params: {
+  franchises: Franchise[];
+  seasonTeams: Team[];
+}): Map<string, Team> {
+  const { franchises, seasonTeams } = params;
+  const franchiseById = new Map(
+    franchises.map(
+      (franchise) => [toTrimmedString(franchise.id), franchise] as const,
+    ),
+  );
+  const index = new Map<string, Team>();
+
+  for (const team of seasonTeams) {
+    const franchise = franchiseById.get(toTrimmedString(team.franchiseId));
+    const key = normalizeTeamNameLookupKey(franchise?.name);
+    if (!key || index.has(key)) continue;
+    index.set(key, team);
+  }
+
+  return index;
+}
+
+function buildExistingIndexes(rows: LoadedPlayerDayRow[]): {
+  byBaseKey: Map<string, LoadedPlayerDayRow>;
+  byPlayerDateKey: Map<string, LoadedPlayerDayRow>;
+  byTeamDate: Map<string, LoadedPlayerDayRow[]>;
+} {
+  const byBaseKey = new Map<string, LoadedPlayerDayRow>();
+  const byPlayerDateKey = new Map<string, LoadedPlayerDayRow>();
   const byTeamDate = new Map<string, LoadedPlayerDayRow[]>();
   for (const row of rows) {
+    const seasonId = toTrimmedString(row.record.seasonId);
+    const teamId = toTrimmedString(row.record.gshlTeamId);
+    const playerId = toTrimmedString(row.record.playerId);
+    const date = toTrimmedString(row.record.date);
+    const baseKey = buildPlayerDayBaseKey(seasonId, teamId, playerId, date);
+    if (!byBaseKey.has(baseKey)) {
+      byBaseKey.set(baseKey, row);
+    }
+    const playerDateKey = buildPlayerDayPlayerDateKey(
+      seasonId,
+      playerId,
+      date,
+    );
+    if (!byPlayerDateKey.has(playerDateKey)) {
+      byPlayerDateKey.set(playerDateKey, row);
+    }
+
     const key = buildTeamDateKey(
-      toTrimmedString(row.record.gshlTeamId),
-      toTrimmedString(row.record.date),
+      teamId,
+      date,
     );
     const list = byTeamDate.get(key) ?? [];
     list.push(row);
     byTeamDate.set(key, list);
   }
-  return byTeamDate;
+  return { byBaseKey, byPlayerDateKey, byTeamDate };
 }
 
 function toComparableNumeric(value: unknown): number | null {
@@ -348,14 +434,62 @@ function resolveSideAssignmentFromYahooTeamTable(params: {
   return null;
 }
 
+function resolveSideAssignmentFromFranchiseNames(params: {
+  homeTeam: Team;
+  awayTeam: Team;
+  yahooTotals: ReturnType<typeof parseYahooMatchupTotals>;
+  franchiseNameTeamIndex: FranchiseNameTeamIndex;
+}): SideAssignment | null {
+  const { homeTeam, awayTeam, yahooTotals, franchiseNameTeamIndex } = params;
+  const leftTeam = franchiseNameTeamIndex.get(
+    normalizeTeamNameLookupKey(yahooTotals.home.teamName),
+  );
+  const rightTeam = franchiseNameTeamIndex.get(
+    normalizeTeamNameLookupKey(yahooTotals.away.teamName),
+  );
+
+  if (!leftTeam || !rightTeam) {
+    return null;
+  }
+
+  return {
+    leftTeam,
+    rightTeam,
+    scoreDefault: 0,
+    scoreSwapped: 0,
+    swapped:
+      toTrimmedString(leftTeam.id) !== toTrimmedString(homeTeam.id) ||
+      toTrimmedString(rightTeam.id) !== toTrimmedString(awayTeam.id),
+    source: "franchise-name",
+  };
+}
+
 function resolveSideAssignment(params: {
   homeTeam: Team;
   awayTeam: Team;
   weekId: string;
   teamWeekByKey: ReadonlyMap<string, TeamWeekStatLine>;
   yahooTotals: ReturnType<typeof parseYahooMatchupTotals>;
+  franchiseNameTeamIndex: FranchiseNameTeamIndex;
 }): SideAssignment {
-  const { homeTeam, awayTeam, weekId, teamWeekByKey, yahooTotals } = params;
+  const {
+    homeTeam,
+    awayTeam,
+    weekId,
+    teamWeekByKey,
+    yahooTotals,
+    franchiseNameTeamIndex,
+  } = params;
+  const franchiseNameAssignment = resolveSideAssignmentFromFranchiseNames({
+    homeTeam,
+    awayTeam,
+    yahooTotals,
+    franchiseNameTeamIndex,
+  });
+  if (franchiseNameAssignment) {
+    return franchiseNameAssignment;
+  }
+
   const directAssignment = resolveSideAssignmentFromYahooTeamTable({
     homeTeam,
     awayTeam,
@@ -662,6 +796,8 @@ function reconcileTeamDate(params: {
   playersById: ReadonlyMap<string, Player>;
   playersByYahooId: ReadonlyMap<string, Player>;
   playersByNormalizedName: ReadonlyMap<string, Player>;
+  existingByBaseKey: ReadonlyMap<string, LoadedPlayerDayRow>;
+  existingByPlayerDateKey: ReadonlyMap<string, LoadedPlayerDayRow>;
   existingRows: LoadedPlayerDayRow[];
   logProgress?: ProgressLogger;
 }): TeamDateReconciliation {
@@ -676,6 +812,8 @@ function reconcileTeamDate(params: {
     playersById,
     playersByYahooId,
     playersByNormalizedName,
+    existingByBaseKey,
+    existingByPlayerDateKey,
     existingRows,
     logProgress,
   } = params;
@@ -687,18 +825,10 @@ function reconcileTeamDate(params: {
   const deletes: LoadedPlayerDayRow[] = [];
   const flags: InvestigationFlag[] = [];
   const now = new Date();
-  const claimedRowNumbers = new Set<number>();
   const sortedExistingRows =
     sortExistingRowsForDeterministicMatching(existingRows);
-  const exactByPlayerId = new Map<string, LoadedPlayerDayRow>();
   const createdByPlayerId = new Map<string, PlayerDayStatLine>();
-
-  for (const existing of sortedExistingRows) {
-    const playerId = toTrimmedString(existing.record.playerId);
-    if (playerId && !exactByPlayerId.has(playerId)) {
-      exactByPlayerId.set(playerId, existing);
-    }
-  }
+  const matchedRowNumbers = new Set<number>();
 
   let matchedYahooRows = 0;
 
@@ -753,25 +883,20 @@ function reconcileTeamDate(params: {
         details: `Could not resolve Yahoo daily matchup player ${yahooRow.playerName} (${toTrimmedString(yahooRow.yahooId) || "missing yahoo id"}) to Player. Using fallback playerId="${resolvedPlayerId}".`,
       });
     }
-    let matchedExisting = exactByPlayerId.get(resolvedPlayerId);
-    if (matchedExisting && claimedRowNumbers.has(matchedExisting.rowNumber)) {
-      matchedExisting = undefined;
-    }
-
-    if (!matchedExisting) {
-      matchedExisting = sortedExistingRows.find((candidate) => {
-        if (claimedRowNumbers.has(candidate.rowNumber)) return false;
-        const existingPlayer = playersById.get(
-          toTrimmedString(candidate.record.playerId),
-        );
-        return sameExistingRow(
-          candidate.record,
-          existingPlayer,
-          yahooRow,
-          resolvedPlayerId,
-        );
-      });
-    }
+    const baseKey = buildPlayerDayBaseKey(
+      seasonId,
+      teamId,
+      resolvedPlayerId,
+      normalizedDate,
+    );
+    const playerDateKey = buildPlayerDayPlayerDateKey(
+      seasonId,
+      resolvedPlayerId,
+      normalizedDate,
+    );
+    const matchedExisting =
+      existingByBaseKey.get(baseKey) ??
+      existingByPlayerDateKey.get(playerDateKey);
 
     if (!matchedExisting) {
       const alreadyCreated = createdByPlayerId.get(resolvedPlayerId);
@@ -805,7 +930,8 @@ function reconcileTeamDate(params: {
       continue;
     }
 
-    claimedRowNumbers.add(matchedExisting.rowNumber);
+    matchedRowNumbers.add(matchedExisting.rowNumber);
+    const existingTeamId = toTrimmedString(matchedExisting.record.gshlTeamId);
     if (toTrimmedString(matchedExisting.record.playerId) !== resolvedPlayerId) {
       flags.push({
         kind: "rekeyed-player-day-row",
@@ -828,6 +954,23 @@ function reconcileTeamDate(params: {
       yahooRow,
       matchedExisting.record,
     );
+    if (existingTeamId !== teamId) {
+      nextPayload.gshlTeamId = teamId;
+      flags.push({
+        kind: "moved-player-day-row",
+        seasonId,
+        weekId,
+        matchupId,
+        date: normalizedDate,
+        gshlTeamId: teamId,
+        yahooTeamId,
+        playerId: resolvedPlayerId,
+        yahooId: toTrimmedString(yahooRow.yahooId),
+        playerName: yahooRow.playerName,
+        rowId: toTrimmedString(matchedExisting.record.id),
+        details: `Updated PlayerDayStatLine row ${matchedExisting.record.id} for player ${resolvedPlayerId} on ${normalizedDate} from team ${existingTeamId || "(missing)"} to team ${teamId} instead of creating a duplicate row.`,
+      });
+    }
     if (hasSupportedDiff(matchedExisting.record, nextPayload)) {
       updates.push({
         rowNumber: matchedExisting.rowNumber,
@@ -841,7 +984,7 @@ function reconcileTeamDate(params: {
   }
 
   for (const existing of sortedExistingRows) {
-    if (claimedRowNumbers.has(existing.rowNumber)) continue;
+    if (matchedRowNumbers.has(existing.rowNumber)) continue;
     flags.push({
       kind: "deleted-stale-player-day-row",
       seasonId,
@@ -872,12 +1015,15 @@ async function reconcileMatchupDate(params: {
   homeTeam: Team;
   awayTeam: Team;
   teamWeekByKey: ReadonlyMap<string, TeamWeekStatLine>;
+  franchiseNameTeamIndex: FranchiseNameTeamIndex;
   date: string;
   requestDelayMs: number;
   players: Player[];
   playersById: ReadonlyMap<string, Player>;
   playersByYahooId: ReadonlyMap<string, Player>;
   playersByNormalizedName: ReadonlyMap<string, Player>;
+  existingByBaseKey: ReadonlyMap<string, LoadedPlayerDayRow>;
+  existingByPlayerDateKey: ReadonlyMap<string, LoadedPlayerDayRow>;
   existingByTeamDate: ReadonlyMap<string, LoadedPlayerDayRow[]>;
   taskLabel: string;
   logProgress?: ProgressLogger;
@@ -889,12 +1035,15 @@ async function reconcileMatchupDate(params: {
     homeTeam,
     awayTeam,
     teamWeekByKey,
+    franchiseNameTeamIndex,
     date,
     requestDelayMs,
     players,
     playersById,
     playersByYahooId,
     playersByNormalizedName,
+    existingByBaseKey,
+    existingByPlayerDateKey,
     existingByTeamDate,
     taskLabel,
     logProgress,
@@ -1000,8 +1149,19 @@ async function reconcileMatchupDate(params: {
     weekId,
     teamWeekByKey,
     yahooTotals,
+    franchiseNameTeamIndex,
   });
-  if (sideAssignment.source === "yahoo-team-table" && sideAssignment.swapped) {
+  if (
+    sideAssignment.source === "franchise-name" &&
+    sideAssignment.swapped
+  ) {
+    logProgress?.(
+      `${formatProgressPrefix(taskLabel)} matched matchup sides from Yahoo team names; assigning left "${yahooTotals.home.teamName}" to team ${toTrimmedString(sideAssignment.leftTeam.id)} and right "${yahooTotals.away.teamName}" to team ${toTrimmedString(sideAssignment.rightTeam.id)}`,
+    );
+  } else if (
+    sideAssignment.source === "yahoo-team-table" &&
+    sideAssignment.swapped
+  ) {
     logProgress?.(
       `${formatProgressPrefix(taskLabel)} matched matchup sides from Yahoo team table; assigning left rows to team ${toTrimmedString(sideAssignment.leftTeam.id)} and right rows to team ${toTrimmedString(sideAssignment.rightTeam.id)}`,
     );
@@ -1012,7 +1172,10 @@ async function reconcileMatchupDate(params: {
     logProgress?.(
       `${formatProgressPrefix(taskLabel)} detected swapped matchup sides from Yahoo totals; assigning left rows to team ${toTrimmedString(sideAssignment.leftTeam.id)} and right rows to team ${toTrimmedString(sideAssignment.rightTeam.id)} (defaultScore=${sideAssignment.scoreDefault.toFixed(3)} swappedScore=${sideAssignment.scoreSwapped.toFixed(3)})`,
     );
-  } else if (sideAssignment.source !== "yahoo-team-table") {
+  } else if (
+    sideAssignment.source !== "franchise-name" &&
+    sideAssignment.source !== "yahoo-team-table"
+  ) {
     logProgress?.(
       `${formatProgressPrefix(taskLabel)} could not map both sides from Yahoo team table; using ${sideAssignment.source === "team-week-stats" ? "team-week stat comparison" : "default matchup order"} instead`,
     );
@@ -1029,6 +1192,8 @@ async function reconcileMatchupDate(params: {
     playersById,
     playersByYahooId,
     playersByNormalizedName,
+    existingByBaseKey,
+    existingByPlayerDateKey,
     existingRows:
       existingByTeamDate.get(
         buildTeamDateKey(
@@ -1049,6 +1214,8 @@ async function reconcileMatchupDate(params: {
     playersById,
     playersByYahooId,
     playersByNormalizedName,
+    existingByBaseKey,
+    existingByPlayerDateKey,
     existingRows:
       existingByTeamDate.get(
         buildTeamDateKey(
@@ -1081,25 +1248,47 @@ async function applySeasonWrites(params: {
 }): Promise<void> {
   const { seasonId, updates, creates, logProgress } = params;
   const spreadsheetId = getPlayerDayWorkbookId(seasonId);
-  const rowsToWrite = [
-    ...updates.map((update) => update.record as unknown as DatabaseRecord),
-    ...creates.map((create) => create as unknown as DatabaseRecord),
-  ];
+  const updateRowsByRowId = new Map<number, PrimitiveCellValue[]>();
+  for (const update of updates) {
+    updateRowsByRowId.set(
+      update.rowNumber - 1,
+      convertModelToRow(
+        update.record as unknown as DatabaseRecord,
+        PLAYER_DAY_COLUMNS,
+      ),
+    );
+  }
+  const rowsToInsert = creates.map(
+    (create) => create as unknown as DatabaseRecord,
+  );
 
   logProgress?.(
     `${formatProgressPrefix(`season ${seasonId}`)} preparing writes: updates=${updates.length}, creates=${creates.length}`,
   );
-  if (rowsToWrite.length > 0) {
+  if (updateRowsByRowId.size > 0) {
     logProgress?.(
-      `${formatProgressPrefix(`season ${seasonId}`)} upserting ${rowsToWrite.length} position-only rows to ${PLAYER_DAY_SHEET}`,
+      `${formatProgressPrefix(`season ${seasonId}`)} updating ${updateRowsByRowId.size} existing position-only rows in ${PLAYER_DAY_SHEET}`,
+    );
+  }
+  if (rowsToInsert.length > 0) {
+    logProgress?.(
+      `${formatProgressPrefix(`season ${seasonId}`)} inserting ${rowsToInsert.length} new position-only rows to ${PLAYER_DAY_SHEET}`,
     );
   }
 
-  if (rowsToWrite.length > 0) {
+  if (updateRowsByRowId.size > 0) {
+    await optimizedSheetsClient.updateRowsByIds(
+      spreadsheetId,
+      PLAYER_DAY_SHEET,
+      updateRowsByRowId,
+    );
+  }
+
+  if (rowsToInsert.length > 0) {
     await minimalSheetsWriter.upsertByCompositeKey(
       PLAYER_DAY_MODEL,
       getCompositeKeyColumnsForModel(PLAYER_DAY_MODEL as CompositeKeyModelName),
-      rowsToWrite,
+      rowsToInsert,
       {
         merge: true,
         idColumn: "id",
@@ -1110,7 +1299,7 @@ async function applySeasonWrites(params: {
     );
   }
 
-  if (rowsToWrite.length > 0) {
+  if (updateRowsByRowId.size > 0 || rowsToInsert.length > 0) {
     fastSheetsReader.clearCache(PLAYER_DAY_MODEL);
   }
 
@@ -1194,11 +1383,12 @@ export async function runYahooMatchupPlayerDayBackfill(
   const logProgress: ProgressLogger | undefined = options.logToConsole
     ? (message) => console.log(message)
     : undefined;
-  const [seasons, weeks, teams, matchups, players, teamWeekRows] =
+  const [seasons, weeks, teams, franchises, matchups, players, teamWeekRows] =
     (await Promise.all([
       fastSheetsReader.fetchModel<DatabaseRecord>("Season"),
       fastSheetsReader.fetchModel<DatabaseRecord>("Week"),
       fastSheetsReader.fetchModel<DatabaseRecord>("Team"),
+      fastSheetsReader.fetchModel<DatabaseRecord>("Franchise"),
       fastSheetsReader.fetchModel<DatabaseRecord>("Matchup"),
       fastSheetsReader.fetchModel<DatabaseRecord>("Player"),
       fastSheetsReader.fetchModel<DatabaseRecord>("TeamWeekStatLine"),
@@ -1206,6 +1396,7 @@ export async function runYahooMatchupPlayerDayBackfill(
       Season[],
       Week[],
       Team[],
+      Franchise[],
       Matchup[],
       Player[],
       TeamWeekStatLine[],
@@ -1309,6 +1500,10 @@ export async function runYahooMatchupPlayerDayBackfill(
     const teamById = new Map(
       seasonTeams.map((team) => [toTrimmedString(team.id), team] as const),
     );
+    const franchiseNameTeamIndex = buildFranchiseNameTeamIndex({
+      franchises,
+      seasonTeams,
+    });
     const requestedSeasonMatchups = matchups.filter((matchup) => {
       if (toTrimmedString(matchup.seasonId) !== seasonId) return false;
       if (!targetWeekIdSet.has(toTrimmedString(matchup.weekId))) return false;
@@ -1356,7 +1551,11 @@ export async function runYahooMatchupPlayerDayBackfill(
     );
 
     const loadedRows = await loadPlayerDayRowsWithNumbers(seasonId);
-    const existingByTeamDate = buildExistingByTeamDate(
+    const {
+      byBaseKey: existingByBaseKey,
+      byPlayerDateKey: existingByPlayerDateKey,
+      byTeamDate: existingByTeamDate,
+    } = buildExistingIndexes(
       loadedRows.filter((row) =>
         targetWeekIdSet.has(toTrimmedString(row.record.weekId)),
       ),
@@ -1396,12 +1595,15 @@ export async function runYahooMatchupPlayerDayBackfill(
           homeTeam: task.homeTeam,
           awayTeam: task.awayTeam,
           teamWeekByKey,
+          franchiseNameTeamIndex,
           date: task.date,
           requestDelayMs: options.requestDelayMs,
           players,
           playersById,
           playersByYahooId,
           playersByNormalizedName,
+          existingByBaseKey,
+          existingByPlayerDateKey,
           existingByTeamDate,
           taskLabel,
           logProgress,

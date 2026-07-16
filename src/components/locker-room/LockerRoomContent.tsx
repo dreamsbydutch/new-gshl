@@ -1,0 +1,199 @@
+"use client";
+
+import { useMemo } from "react";
+import { LockerRoomHeader } from "@gshl-components/team/LockerRoomHeader";
+import { TeamRecordBook } from "@gshl-components/team/TeamRecordBook";
+import { TeamDraftPickList } from "@gshl-components/team/TeamDraftPickList";
+import { TrophyCase } from "@gshl-components/team/TrophyCase";
+import {
+  useCareerSplits,
+  useDraftPicks,
+  usePlayers,
+  usePlayerStats,
+  usePlayerAwards,
+  useSeasonState,
+  useTeams,
+  useNHLTeams,
+  useNav,
+  useContractData,
+  useTeamAwards,
+} from "@gshl-hooks";
+import { resolveContractDefaultSeason } from "@gshl-utils";
+import type { GSHLTeam, NHLTeam } from "@gshl-types";
+import { TeamHistoryContainer } from "@gshl-components/team/TeamHistory";
+import { TeamRoster } from "@gshl-components/team/TeamRoster";
+import { TeamContractTable } from "@gshl-components/contracts/ContractTable";
+import { FranchiseContractHistory } from "@gshl-components/contracts/ContractHistory";
+import { FranchiseDraftPickSummary } from "@gshl-components/contracts/FranchiseDraftPickSummary";
+import { LockerRoomSkeleton, TeamRosterSkeleton } from "@gshl-skeletons";
+
+const SHOW_LOCKER_ROOM_ROSTER_SALARIES = true;
+
+export function LockerRoomContent() {
+  const { currentSeason, defaultSeason, seasons } = useSeasonState();
+  const activeSeason = currentSeason ?? defaultSeason;
+  const { selectedLockerRoomType, selectedOwnerId } = useNav();
+  const contractSeason = useMemo(
+    () => resolveContractDefaultSeason(seasons) ?? defaultSeason,
+    [defaultSeason, seasons],
+  );
+
+  // Only fetch contract data when on a tab that needs it
+  const needsContractData =
+    selectedLockerRoomType === "salary" ||
+    selectedLockerRoomType === "draft" ||
+    selectedLockerRoomType === "roster";
+  const lockerRoomSeason = needsContractData ? contractSeason : activeSeason;
+
+  const { data: draftPicks } = useDraftPicks();
+  const { data: players = [], isLoading: playersLoading } = usePlayers();
+  const { data: teamsRaw = [], isLoading: teamsLoading } = useTeams();
+  const allTeams = teamsRaw as GSHLTeam[];
+  const teams = useMemo(
+    () => allTeams.filter((team) => team.seasonId == lockerRoomSeason?.id),
+    [allTeams, lockerRoomSeason?.id],
+  );
+  const { data: nhlTeamsRaw = [], isLoading: nhlTeamsLoading } = useNHLTeams();
+  const nhlTeams = nhlTeamsRaw as NHLTeam[];
+
+  const currentTeam = teams?.find((t) => t.ownerId === selectedOwnerId);
+  const isTrophyTab = selectedLockerRoomType === "trophy";
+  const isRecordBookTab = selectedLockerRoomType === "recordbook";
+  const { data: teamAwards = [], isLoading: teamAwardsLoading } = useTeamAwards(
+    {
+      enabled: isTrophyTab,
+      orderBy: { seasonId: "desc" },
+    },
+  );
+  const { data: playerAwards = [], isLoading: playerAwardsLoading } =
+    usePlayerAwards({
+      enabled: isRecordBookTab,
+      orderBy: { seasonId: "desc" },
+    });
+  const playerTotalsQuery = usePlayerStats({
+    enabled: isRecordBookTab,
+    includeDaily: false,
+    includeWeekly: false,
+    includeSplits: false,
+    includeTotals: true,
+  });
+  const playerTotals = playerTotalsQuery.totals;
+  const careerSplitsQuery = useCareerSplits(isRecordBookTab);
+  const careerSplits = careerSplitsQuery.data ?? [];
+
+  const {
+    table: teamContractTableData,
+    history: teamContractHistory,
+    draft: franchiseDraftSummary,
+    currentContracts,
+  } = useContractData({
+    currentSeason: contractSeason,
+    currentTeam,
+    players,
+    nhlTeams,
+    teams,
+    allTeams,
+    seasons,
+    draftPicks,
+    enabled: needsContractData,
+  });
+
+  const isLoading =
+    teamsLoading ||
+    playersLoading ||
+    nhlTeamsLoading ||
+    (isTrophyTab && teamAwardsLoading) ||
+    (isRecordBookTab &&
+      (playerAwardsLoading ||
+        playerTotalsQuery.status.isLoading ||
+        careerSplitsQuery.isLoading));
+
+  if (isLoading) {
+    if (selectedLockerRoomType === "roster") {
+      return <TeamRosterSkeleton />;
+    }
+    return <LockerRoomSkeleton />;
+  }
+
+  if (!currentTeam) {
+    return (
+      <div className="p-4 text-sm text-muted-foreground">
+        No roster data found for the selected owner in this season.
+      </div>
+    );
+  }
+  return (
+    <>
+      <LockerRoomHeader currentTeam={currentTeam} />
+      {selectedLockerRoomType === "salary" && (
+        <>
+          <TeamContractTable
+            {...{
+              currentSeason: contractSeason,
+              players,
+              nhlTeams,
+              contracts: currentContracts,
+              currentTeam,
+              ...teamContractTableData,
+            }}
+          />
+          <FranchiseDraftPickSummary {...franchiseDraftSummary} />
+          <FranchiseContractHistory {...teamContractHistory} />
+        </>
+      )}
+      {selectedLockerRoomType === "roster" && (
+        <TeamRoster
+          {...{
+            players,
+            contracts: currentContracts,
+            currentTeam,
+            showSalaries: SHOW_LOCKER_ROOM_ROSTER_SALARIES,
+          }}
+        />
+      )}
+      {selectedLockerRoomType === "history" && (
+        <TeamHistoryContainer
+          {...{
+            teamInfo: currentTeam,
+          }}
+        />
+      )}
+      {selectedLockerRoomType === "draft" && (
+        <>
+          <TeamDraftPickList
+            {...{
+              teams,
+              allTeams,
+              draftPicks: draftPicks,
+              contracts: currentContracts,
+              players,
+              seasons,
+              gshlTeamId: currentTeam.id,
+              selectedSeasonId: lockerRoomSeason?.id ?? "",
+            }}
+          />
+        </>
+      )}
+      {selectedLockerRoomType === "trophy" && (
+        <TrophyCase
+          teamAwards={teamAwards}
+          allTeams={allTeams}
+          currentTeam={currentTeam}
+          seasons={seasons}
+        />
+      )}
+      {selectedLockerRoomType === "recordbook" && (
+        <TeamRecordBook
+          playerAwards={playerAwards}
+          allTeams={allTeams}
+          careerSplits={careerSplits}
+          currentTeam={currentTeam}
+          nhlTeams={nhlTeams}
+          playerTotals={playerTotals}
+          players={players}
+          seasons={seasons}
+        />
+      )}
+    </>
+  );
+}

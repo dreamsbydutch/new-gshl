@@ -26,6 +26,7 @@
       "@gshl-lib/data/*": ["./src/integrations/data/*"],
       "@gshl-lib/sheets": ["./src/integrations/sheets/index.ts"],
       "@gshl-lib/sheets/*": ["./src/integrations/sheets/*"],
+      "@gshl-lib/data/*": ["./src/integrations/data/*"],
       "@gshl-lib/types/*": ["./src/types/*"],
       "@gshl-lib/utils/core/*": ["./src/utils/*"],
       "@gshl-types": ["./src/types/index.ts"]
