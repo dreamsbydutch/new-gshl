@@ -3,6 +3,7 @@ import { mutationGeneric, queryGeneric } from "convex/server";
 import { v } from "convex/values";
 
 type Row = Record<string, unknown>;
+type ConvexRow = Row & { _id: string; _creationTime: number };
 
 const queryArgs = {
   table: v.string(),
@@ -65,6 +66,131 @@ function compareRows(
   return 0;
 }
 
+const defaultIndexes = ["legacyId"] as const;
+const TABLE_INDEX_FIELDS: Record<string, Set<string>> = {
+  seasons: new Set(defaultIndexes),
+  conferences: new Set(defaultIndexes),
+  franchises: new Set(["legacyId", "ownerId", "confId"]),
+  teams: new Set(["legacyId", "seasonId", "franchiseId", "confId"]),
+  owners: new Set(defaultIndexes),
+  players: new Set(["legacyId", "gshlTeamId"]),
+  contracts: new Set(["legacyId", "playerId", "ownerId", "seasonId"]),
+  weeks: new Set(["legacyId", "seasonId"]),
+  matchups: new Set([
+    "legacyId",
+    "seasonId",
+    "weekId",
+    "homeTeamId",
+    "awayTeamId",
+  ]),
+  events: new Set(["legacyId", "seasonId", "date"]),
+  awards: new Set(["legacyId", "seasonId", "winnerId"]),
+  draftPicks: new Set(["legacyId", "seasonId", "gshlTeamId", "playerId"]),
+  nhlTeams: new Set(defaultIndexes),
+  playerDayStatLines: new Set([
+    "legacyId",
+    "seasonId",
+    "gshlTeamId",
+    "playerId",
+    "weekId",
+    "date",
+  ]),
+  playerWeekStatLines: new Set([
+    "legacyId",
+    "seasonId",
+    "gshlTeamId",
+    "playerId",
+    "weekId",
+  ]),
+  playerSplitStatLines: new Set([
+    "legacyId",
+    "seasonId",
+    "gshlTeamId",
+    "playerId",
+    "seasonType",
+  ]),
+  playerTotalStatLines: new Set([
+    "legacyId",
+    "seasonId",
+    "playerId",
+    "seasonType",
+  ]),
+  playerCareerSplitStatLines: new Set([
+    "legacyId",
+    "gshlTeamId",
+    "playerId",
+    "seasonType",
+  ]),
+  playerCareerTotalStatLines: new Set(["legacyId", "playerId", "seasonType"]),
+  playerNhlStatLines: new Set(["legacyId", "seasonId", "playerId"]),
+  teamDayStatLines: new Set([
+    "legacyId",
+    "seasonId",
+    "gshlTeamId",
+    "weekId",
+    "date",
+  ]),
+  teamWeekStatLines: new Set(["legacyId", "seasonId", "gshlTeamId", "weekId"]),
+  teamSeasonStatLines: new Set([
+    "legacyId",
+    "seasonId",
+    "seasonType",
+    "gshlTeamId",
+  ]),
+};
+
+function indexesForTable(table: string) {
+  return TABLE_INDEX_FIELDS[table] ?? new Set(defaultIndexes);
+}
+
+function firstIndexedWhere(
+  table: string,
+  where?: Record<string, unknown>,
+): [string, unknown] | null {
+  if (!where) return null;
+  const indexedFields = indexesForTable(table);
+  return (
+    Object.entries(where).find(
+      ([field, value]) => value !== undefined && indexedFields.has(field),
+    ) ?? null
+  );
+}
+
+async function readCandidateRows(
+  ctx: { db: any },
+  table: string,
+  args: {
+    where?: Record<string, unknown>;
+    orderBy?: Record<string, "asc" | "desc">;
+    take?: number;
+    skip?: number;
+  },
+): Promise<ConvexRow[]> {
+  const indexedWhere = firstIndexedWhere(table, args.where);
+  const needsInMemoryFiltering =
+    Boolean(
+      args.where && Object.keys(args.where).length > (indexedWhere ? 1 : 0),
+    ) || Boolean(args.orderBy);
+
+  if (indexedWhere) {
+    const [field, expected] = indexedWhere;
+    return (await ctx.db
+      .query(table as never)
+      .withIndex(`by_${field}` as never, (q: any) =>
+        q.eq(field as never, expected),
+      )
+      .collect()) as ConvexRow[];
+  }
+
+  if (!needsInMemoryFiltering && args.take !== undefined) {
+    return (await ctx.db
+      .query(table as never)
+      .take((args.skip ?? 0) + args.take)) as ConvexRow[];
+  }
+
+  return (await ctx.db.query(table as never).collect()) as ConvexRow[];
+}
+
 function normalizeDoc(input: Row): Row {
   const { id, ...rest } = input;
   delete rest._id;
@@ -100,7 +226,7 @@ function compositeKey(row: Row, columns: readonly string[]): string {
 export const list = queryGeneric({
   args: queryArgs,
   handler: async (ctx, args) => {
-    const rows = await ctx.db.query(args.table as never).collect();
+    const rows = await readCandidateRows(ctx, args.table, args);
     const filtered = rows
       .map((row) => publicRow(row as never))
       .filter((row) => matchesWhere(row, args.where))
@@ -137,7 +263,9 @@ export const count = queryGeneric({
     where: v.optional(v.record(v.string(), v.any())),
   },
   handler: async (ctx, args) => {
-    const rows = await ctx.db.query(args.table as never).collect();
+    const rows = await readCandidateRows(ctx, args.table, {
+      where: args.where,
+    });
     return rows.filter((row) => matchesWhere(row as never, args.where)).length;
   },
 });
@@ -233,9 +361,22 @@ export const upsertByCompositeKey = mutationGeneric({
     ),
   },
   handler: async (ctx, args) => {
-    const existingRows = (await ctx.db
-      .query(args.table as never)
-      .collect()) as Array<Row & { _id: string; _creationTime: number }>;
+    const deleteMissingFilter =
+      args.deleteMissing && typeof args.deleteMissing === "object"
+        ? args.deleteMissing.filter
+        : undefined;
+    const rowIndexedFilter = Object.fromEntries(
+      Object.entries(args.rows[0] ?? {}).filter(([field, value]) => {
+        return value !== undefined && indexesForTable(args.table).has(field);
+      }),
+    );
+    const existingRows = (await readCandidateRows(ctx, args.table, {
+      where:
+        deleteMissingFilter ??
+        (Object.keys(rowIndexedFilter).length > 0
+          ? rowIndexedFilter
+          : undefined),
+    })) as Array<Row & { _id: string; _creationTime: number }>;
     const existingByKey = new Map<
       string,
       Row & { _id: string; _creationTime: number }
@@ -293,10 +434,7 @@ export const upsertByCompositeKey = mutationGeneric({
 
     let deleted = 0;
     if (args.deleteMissing) {
-      const filter =
-        typeof args.deleteMissing === "object"
-          ? args.deleteMissing.filter
-          : undefined;
+      const filter = deleteMissingFilter;
       for (const row of existingRows) {
         if (filter && !matchesWhere(row, filter)) continue;
         if (incomingKeys.has(compositeKey(row, args.keyColumns))) continue;

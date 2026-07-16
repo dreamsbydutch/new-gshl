@@ -315,6 +315,21 @@ const statColumns = [
 ] as const;
 
 function table(fields: readonly string[]) {
+  const indexedFields = [
+    "seasonId",
+    "weekId",
+    "playerId",
+    "gshlTeamId",
+    "franchiseId",
+    "ownerId",
+    "confId",
+    "homeTeamId",
+    "awayTeamId",
+    "winnerId",
+    "date",
+    "seasonType",
+  ];
+  const fieldSet = new Set(fields);
   const shape = Object.fromEntries(
     Array.from(new Set(["legacyId", ...fields])).map((field) => [
       field,
@@ -322,7 +337,13 @@ function table(fields: readonly string[]) {
     ]),
   );
 
-  return defineTable(shape).index("by_legacyId", ["legacyId"]);
+  let definition = defineTable(shape).index("by_legacyId", ["legacyId"]);
+  for (const field of indexedFields) {
+    if (fieldSet.has(field)) {
+      definition = definition.index(`by_${field}`, [field]);
+    }
+  }
+  return definition;
 }
 
 export default defineSchema({
