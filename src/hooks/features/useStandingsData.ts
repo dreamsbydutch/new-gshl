@@ -12,6 +12,7 @@ import type {
   UseStandingsDataOptions,
   UseStandingsDataResult,
 } from "@gshl-types";
+import { SeasonType } from "@gshl-types";
 import { useSeasonDataBundle } from "./useSeasonDataBundle";
 
 /**
@@ -78,6 +79,7 @@ export function useStandingsData(
     teamStatsLevel: "season",
     useNavigation: false,
     teamQueryOptions: {
+      seasonType: SeasonType.REGULAR_SEASON,
       refetchOnWindowFocus: true,
     },
   });

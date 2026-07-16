@@ -1,5 +1,6 @@
 import { HydrateClient, serverApi } from "@gshl-trpc/server-exports";
 import { StandingsContent } from "@gshl-components/standings/StandingsContent";
+import { SeasonType } from "@gshl-types";
 
 export default async function StandingsPage() {
   const activeSeason = await serverApi.season.getActive();
@@ -7,7 +8,9 @@ export default async function StandingsPage() {
 
   await Promise.all([
     seasonId
-      ? serverApi.teamStats.season.getAll.prefetch({ where: { seasonId } })
+      ? serverApi.teamStats.season.getAll.prefetch({
+          where: { seasonId, seasonType: SeasonType.REGULAR_SEASON },
+        })
       : Promise.resolve(),
     seasonId
       ? serverApi.matchup.getLiveStates.prefetch({

@@ -98,6 +98,7 @@ export function useTeams(options: UseTeamsOptions = {}) {
     conferenceId,
     weekId,
     date,
+    seasonType,
     ownerId,
     isActive,
     statsLevel = "none",
@@ -121,6 +122,7 @@ export function useTeams(options: UseTeamsOptions = {}) {
   const normalizedSeasonId = seasonId ? String(seasonId) : null;
   const normalizedConferenceId = conferenceId ? String(conferenceId) : null;
   const normalizedWeekId = weekId ? String(weekId) : null;
+  const normalizedSeasonType = seasonType ? String(seasonType) : null;
   const shouldUseReferenceStore = enabled && statsLevel === "none";
   useReferenceSnapshotRefresh(
     shouldUseReferenceStore &&
@@ -286,6 +288,7 @@ export function useTeams(options: UseTeamsOptions = {}) {
   const statsWhere: Record<string, string> = {};
   if (normalizedTeamId) statsWhere.gshlTeamId = normalizedTeamId;
   if (normalizedSeasonId) statsWhere.seasonId = normalizedSeasonId;
+  if (normalizedSeasonType) statsWhere.seasonType = normalizedSeasonType;
 
   // Daily stats
   if (date && statsLevel === "daily") {

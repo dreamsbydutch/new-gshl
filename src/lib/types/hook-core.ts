@@ -8,6 +8,7 @@ import type {
   PlayerWeekStatLine,
 } from "./database";
 import type { ContractFilters, ContractSortOption } from "./contracts";
+import type { SeasonType } from "./enums";
 import type { QueryLike, QueryState } from "./hook-query";
 
 export interface UseAwardsOptions {
@@ -132,6 +133,7 @@ export interface UseTeamsOptions {
   conferenceId?: string | null;
   weekId?: string | null;
   date?: Date | string | null;
+  seasonType?: SeasonType | string | null;
   ownerId?: string | null;
   isActive?: boolean;
   statsLevel?: TeamStatsLevel;

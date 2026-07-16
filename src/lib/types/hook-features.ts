@@ -109,7 +109,11 @@ export interface UseSeasonDataBundleOptions {
   teamQueryOptions?: Partial<
     Pick<
       UseTeamsOptions,
-      "staleTime" | "gcTime" | "refetchOnMount" | "refetchOnWindowFocus"
+      | "seasonType"
+      | "staleTime"
+      | "gcTime"
+      | "refetchOnMount"
+      | "refetchOnWindowFocus"
     >
   >;
 }
