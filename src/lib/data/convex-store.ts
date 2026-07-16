@@ -70,11 +70,56 @@ const refs = {
 
 let client: ConvexHttpClient | null = null;
 
+function convexUrl(): string {
+  return env.CONVEX_URL ?? env.NEXT_PUBLIC_CONVEX_URL ?? "";
+}
+
+function convexHost(): string {
+  const url = convexUrl();
+  if (!url) return "unset";
+  try {
+    return new URL(url).host;
+  } catch {
+    return "invalid";
+  }
+}
+
+function describeUnknownError(error: unknown): string {
+  if (error instanceof Error) {
+    const message = error.message || String(error);
+    const cause =
+      error.cause === undefined ? "" : ` cause=${describeUnknownError(error.cause)}`;
+    return `${error.name}: ${message}${cause}`;
+  }
+
+  try {
+    return JSON.stringify(error);
+  } catch {
+    return String(error);
+  }
+}
+
+async function runConvex<T>(
+  operation: string,
+  model: ModelName,
+  args: Record<string, unknown>,
+  run: () => Promise<T>,
+): Promise<T> {
+  try {
+    return await run();
+  } catch (error) {
+    throw new Error(
+      `Convex ${operation} failed for ${model} (${getConvexTableName(model)}) at ${convexHost()} with args ${JSON.stringify(args)}: ${describeUnknownError(error)}`,
+      { cause: error },
+    );
+  }
+}
+
 function getClient(): ConvexHttpClient {
-  const url = env.NEXT_PUBLIC_CONVEX_URL;
+  const url = convexUrl();
   if (!url) {
     throw new Error(
-      "GSHL_DATA_BACKEND=convex requires NEXT_PUBLIC_CONVEX_URL to be set.",
+      "GSHL_DATA_BACKEND=convex requires CONVEX_URL or NEXT_PUBLIC_CONVEX_URL to be set.",
     );
   }
 
@@ -101,10 +146,10 @@ export async function getMany<T>(
   model: ModelName,
   input: BaseQueryInput = {},
 ): Promise<T[]> {
-  const rows = await getClient().query(refs.list, {
-    table: getConvexTableName(model),
-    ...input,
-  });
+  const args = { table: getConvexTableName(model), ...input };
+  const rows = await runConvex("query data:list", model, args, () =>
+    getClient().query(refs.list, args),
+  );
   return rows.map(hydrateRow<T>);
 }
 
@@ -120,10 +165,10 @@ export async function getById<T>(
   model: ModelName,
   id: string,
 ): Promise<T | null> {
-  const row = await getClient().query(refs.byId, {
-    table: getConvexTableName(model),
-    id,
-  });
+  const args = { table: getConvexTableName(model), id };
+  const row = await runConvex("query data:byId", model, args, () =>
+    getClient().query(refs.byId, args),
+  );
   return row ? hydrateRow<T>(row) : null;
 }
 
@@ -131,17 +176,30 @@ export async function getCount(
   model: ModelName,
   input: Pick<BaseQueryInput, "where"> = {},
 ): Promise<number> {
-  return getClient().query(refs.count, {
+  const args = {
     table: getConvexTableName(model),
     where: input.where,
-  });
+  };
+  return runConvex("query data:count", model, args, () =>
+    getClient().query(refs.count, args),
+  );
 }
 
 export async function fetchSnapshot<M extends readonly ModelName[]>(
   models: M,
 ): Promise<Record<M[number], AnyRow[]>> {
+  if (models.length === 0) {
+    return {} as Record<M[number], AnyRow[]>;
+  }
+
   const tables = models.map(getConvexTableName);
-  const snapshot = await getClient().query(refs.snapshot, { tables });
+  const args = { tables };
+  const snapshot = await runConvex(
+    "query data:snapshot",
+    models[0]!,
+    args,
+    () => getClient().query(refs.snapshot, args),
+  );
   const output: Partial<Record<ModelName, AnyRow[]>> = {};
 
   for (const [table, rows] of Object.entries(snapshot)) {
@@ -158,11 +216,14 @@ export async function updateById<T extends Record<string, unknown>>(
   id: string,
   data: Partial<T>,
 ): Promise<void> {
-  await getClient().mutation(refs.updateById, {
+  const args = {
     table: getConvexTableName(model),
     id,
     data,
-  });
+  };
+  await runConvex("mutation data:updateById", model, args, () =>
+    getClient().mutation(refs.updateById, args),
+  );
 }
 
 export async function upsertByCompositeKey<T extends Record<string, unknown>>(
@@ -171,13 +232,16 @@ export async function upsertByCompositeKey<T extends Record<string, unknown>>(
   rows: T[],
   options: UpsertOptions = {},
 ): Promise<UpsertResult> {
-  return getClient().mutation(refs.upsertByCompositeKey, {
+  const args = {
     table: getConvexTableName(model),
     keyColumns: [...keyColumns],
     rows,
     merge: options.merge,
     deleteMissing: options.deleteMissing,
-  });
+  };
+  return runConvex("mutation data:upsertByCompositeKey", model, args, () =>
+    getClient().mutation(refs.upsertByCompositeKey, args),
+  );
 }
 
 export const convexDataStore = {

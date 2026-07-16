@@ -18,6 +18,7 @@ export const env = createEnv({
     GOOGLE_SERVICE_ACCOUNT_KEY: z.string().optional(),
     GOOGLE_APPS_SCRIPT_ID: z.string().optional(),
     GOOGLE_APPS_SCRIPT_ACCESS_TOKEN: z.string().optional(),
+    CONVEX_URL: z.string().url().optional(),
     CONVEX_DEPLOYMENT: z.string().optional(),
     CONVEX_DEPLOY_KEY: z.string().optional(),
     UPLOADTHING_TOKEN: z.string().optional(),
@@ -49,6 +50,7 @@ export const env = createEnv({
     GOOGLE_APPS_SCRIPT_ID: process.env.GOOGLE_APPS_SCRIPT_ID,
     GOOGLE_APPS_SCRIPT_ACCESS_TOKEN:
       process.env.GOOGLE_APPS_SCRIPT_ACCESS_TOKEN,
+    CONVEX_URL: process.env.CONVEX_URL,
     CONVEX_DEPLOYMENT: process.env.CONVEX_DEPLOYMENT,
     CONVEX_DEPLOY_KEY: process.env.CONVEX_DEPLOY_KEY,
     UPLOADTHING_TOKEN: process.env.UPLOADTHING_TOKEN,
