@@ -1,4 +1,9 @@
-import type { AwardCatalogEntry, AwardGroupKey } from "@gshl-types";
+import type {
+  AwardCatalogEntry,
+  AwardGroupKey,
+  PlayerAward,
+  TeamAward,
+} from "@gshl-types";
 import { AwardsList } from "@gshl-types";
 
 export const AWARD_GROUP_ORDER: AwardGroupKey[] = [
@@ -12,7 +17,8 @@ export const AWARD_CATALOG: AwardCatalogEntry[] = [
     key: AwardsList.GSHL_CUP,
     group: "TEAM TROPHIES",
     fullName: "GSHL Cup",
-    imageUrl: "https://qzcw4d2n1l.ufs.sh/f/wTZjIHOpQwiMqmHsLqnu8zTgQJHtWPjswfb4x51ZVaUmCycA",
+    imageUrl:
+      "https://qzcw4d2n1l.ufs.sh/f/wTZjIHOpQwiMqmHsLqnu8zTgQJHtWPjswfb4x51ZVaUmCycA",
     summaryLabel: "GSHL Cup",
     sortOrder: 1,
   },
@@ -20,7 +26,8 @@ export const AWARD_CATALOG: AwardCatalogEntry[] = [
     key: AwardsList.PRESIDENT,
     group: "TEAM TROPHIES",
     fullName: "President's Trophy",
-    imageUrl: "https://qzcw4d2n1l.ufs.sh/f/wTZjIHOpQwiMWCj22tAz9iuA7F6XIgrwRMlZ2cKBCvPfOpJx",
+    imageUrl:
+      "https://qzcw4d2n1l.ufs.sh/f/wTZjIHOpQwiMWCj22tAz9iuA7F6XIgrwRMlZ2cKBCvPfOpJx",
     summaryLabel: "President's Trophy",
     sortOrder: 2,
   },
@@ -28,7 +35,8 @@ export const AWARD_CATALOG: AwardCatalogEntry[] = [
     key: AwardsList.HICKORY,
     group: "TEAM TROPHIES",
     fullName: "Hickory Trophy",
-    imageUrl: "https://qzcw4d2n1l.ufs.sh/f/wTZjIHOpQwiMfJPQWwEnyhHQ48UTs16OM7km2lFdqZNwJbAp",
+    imageUrl:
+      "https://qzcw4d2n1l.ufs.sh/f/wTZjIHOpQwiMfJPQWwEnyhHQ48UTs16OM7km2lFdqZNwJbAp",
     summaryLabel: "Hickory Hotel Regular Season Champ",
     sortOrder: 3,
   },
@@ -36,7 +44,8 @@ export const AWARD_CATALOG: AwardCatalogEntry[] = [
     key: AwardsList.SUNVIEW,
     group: "TEAM TROPHIES",
     fullName: "Sunview Trophy",
-    imageUrl: "https://qzcw4d2n1l.ufs.sh/f/wTZjIHOpQwiMWBCl8LAz9iuA7F6XIgrwRMlZ2cKBCvPfOpJx",
+    imageUrl:
+      "https://qzcw4d2n1l.ufs.sh/f/wTZjIHOpQwiMWBCl8LAz9iuA7F6XIgrwRMlZ2cKBCvPfOpJx",
     summaryLabel: "Sunview Regular Season Champ",
     sortOrder: 4,
   },
@@ -44,7 +53,8 @@ export const AWARD_CATALOG: AwardCatalogEntry[] = [
     key: AwardsList.BROPHY,
     group: "TEAM TROPHIES",
     fullName: "Brophy Trophy",
-    imageUrl: "https://qzcw4d2n1l.ufs.sh/f/wTZjIHOpQwiMg9Df4Vcpj089yn4QkDZ1XfqBUOEVMYizxdGF",
+    imageUrl:
+      "https://qzcw4d2n1l.ufs.sh/f/wTZjIHOpQwiMg9Df4Vcpj089yn4QkDZ1XfqBUOEVMYizxdGF",
     summaryLabel: "Brophy Trophy",
     sortOrder: 5,
   },
@@ -52,7 +62,8 @@ export const AWARD_CATALOG: AwardCatalogEntry[] = [
     key: AwardsList.HART,
     group: "TIER 1 AWARDS",
     fullName: "Hart Trophy",
-    imageUrl: "https://qzcw4d2n1l.ufs.sh/f/wTZjIHOpQwiM9O8bqT53sYjkIOmdlLVgBTXw2nAP8azqeZyb",
+    imageUrl:
+      "https://qzcw4d2n1l.ufs.sh/f/wTZjIHOpQwiM9O8bqT53sYjkIOmdlLVgBTXw2nAP8azqeZyb",
     summaryLabel: "Hart",
     sortOrder: 1,
   },
@@ -60,7 +71,8 @@ export const AWARD_CATALOG: AwardCatalogEntry[] = [
     key: AwardsList.NORRIS,
     group: "TIER 1 AWARDS",
     fullName: "Norris Trophy",
-    imageUrl: "https://qzcw4d2n1l.ufs.sh/f/wTZjIHOpQwiMUwcmA8rpJv4dqGs8bj7iKZmCeMNSOFT2ck9V",
+    imageUrl:
+      "https://qzcw4d2n1l.ufs.sh/f/wTZjIHOpQwiMUwcmA8rpJv4dqGs8bj7iKZmCeMNSOFT2ck9V",
     summaryLabel: "Norris",
     sortOrder: 2,
   },
@@ -68,7 +80,8 @@ export const AWARD_CATALOG: AwardCatalogEntry[] = [
     key: AwardsList.VEZINA,
     group: "TIER 1 AWARDS",
     fullName: "Vezina Trophy",
-    imageUrl: "https://qzcw4d2n1l.ufs.sh/f/wTZjIHOpQwiMy376tZI09z2CeSKuZMtgV46qIXxB7l5A1poD",
+    imageUrl:
+      "https://qzcw4d2n1l.ufs.sh/f/wTZjIHOpQwiMy376tZI09z2CeSKuZMtgV46qIXxB7l5A1poD",
     summaryLabel: "Vezina",
     sortOrder: 3,
   },
@@ -76,7 +89,8 @@ export const AWARD_CATALOG: AwardCatalogEntry[] = [
     key: AwardsList.CALDER,
     group: "TIER 1 AWARDS",
     fullName: "Calder Trophy",
-    imageUrl: "https://qzcw4d2n1l.ufs.sh/f/wTZjIHOpQwiM1SEaTMbkQ75UzTFynNthwaG9omDCgPVIcMSJ",
+    imageUrl:
+      "https://qzcw4d2n1l.ufs.sh/f/wTZjIHOpQwiM1SEaTMbkQ75UzTFynNthwaG9omDCgPVIcMSJ",
     summaryLabel: "Calder",
     sortOrder: 4,
   },
@@ -84,7 +98,8 @@ export const AWARD_CATALOG: AwardCatalogEntry[] = [
     key: AwardsList.GM_OF_THE_YEAR,
     group: "TIER 1 AWARDS",
     fullName: "General Manager of the Year",
-    imageUrl: "https://qzcw4d2n1l.ufs.sh/f/wTZjIHOpQwiMKGU1z3ynvo3h1cd80KYVjsC6fXrutBw95TND",
+    imageUrl:
+      "https://qzcw4d2n1l.ufs.sh/f/wTZjIHOpQwiMKGU1z3ynvo3h1cd80KYVjsC6fXrutBw95TND",
     summaryLabel: "GM of the Year",
     sortOrder: 5,
   },
@@ -92,7 +107,8 @@ export const AWARD_CATALOG: AwardCatalogEntry[] = [
     key: AwardsList.JACK_ADAMS,
     group: "TIER 1 AWARDS",
     fullName: "Jack Adams Award",
-    imageUrl: "https://qzcw4d2n1l.ufs.sh/f/wTZjIHOpQwiMdF1znCGjvrNGugImeAEicjQUD0qyz2nb1B5Z",
+    imageUrl:
+      "https://qzcw4d2n1l.ufs.sh/f/wTZjIHOpQwiMdF1znCGjvrNGugImeAEicjQUD0qyz2nb1B5Z",
     summaryLabel: "Jack Adams",
     sortOrder: 6,
   },
@@ -100,7 +116,8 @@ export const AWARD_CATALOG: AwardCatalogEntry[] = [
     key: AwardsList.ROCKET,
     group: "TIER 2 AWARDS",
     fullName: "Rocket Richard Trophy",
-    imageUrl: "https://qzcw4d2n1l.ufs.sh/f/wTZjIHOpQwiM7qCeydDBWlUhdc6B3jnr5wuiRE7aNTgpL89F",
+    imageUrl:
+      "https://qzcw4d2n1l.ufs.sh/f/wTZjIHOpQwiM7qCeydDBWlUhdc6B3jnr5wuiRE7aNTgpL89F",
     summaryLabel: "Rocket Richard",
     sortOrder: 1,
   },
@@ -108,7 +125,8 @@ export const AWARD_CATALOG: AwardCatalogEntry[] = [
     key: AwardsList.ART_ROSS,
     group: "TIER 2 AWARDS",
     fullName: "Art Ross Trophy",
-    imageUrl: "https://qzcw4d2n1l.ufs.sh/f/wTZjIHOpQwiMXNBbuH9eUFO1XWmtTViK8j9IM3506pqAgZNJ",
+    imageUrl:
+      "https://qzcw4d2n1l.ufs.sh/f/wTZjIHOpQwiMXNBbuH9eUFO1XWmtTViK8j9IM3506pqAgZNJ",
     summaryLabel: "Art Ross",
     sortOrder: 2,
   },
@@ -116,7 +134,8 @@ export const AWARD_CATALOG: AwardCatalogEntry[] = [
     key: AwardsList.SELKE,
     group: "TIER 2 AWARDS",
     fullName: "Selke Trophy",
-    imageUrl: "https://qzcw4d2n1l.ufs.sh/f/wTZjIHOpQwiMXwOIFg9eUFO1XWmtTViK8j9IM3506pqAgZNJ",
+    imageUrl:
+      "https://qzcw4d2n1l.ufs.sh/f/wTZjIHOpQwiMXwOIFg9eUFO1XWmtTViK8j9IM3506pqAgZNJ",
     summaryLabel: "Selke",
     sortOrder: 3,
   },
@@ -124,7 +143,8 @@ export const AWARD_CATALOG: AwardCatalogEntry[] = [
     key: AwardsList.LADY_BYNG,
     group: "TIER 2 AWARDS",
     fullName: "Lady Byng Trophy",
-    imageUrl: "https://qzcw4d2n1l.ufs.sh/f/wTZjIHOpQwiMOAIBvFfEVpikMSWFd7T5JXG9tmvgbL4nl0xs",
+    imageUrl:
+      "https://qzcw4d2n1l.ufs.sh/f/wTZjIHOpQwiMOAIBvFfEVpikMSWFd7T5JXG9tmvgbL4nl0xs",
     summaryLabel: "Lady Byng",
     sortOrder: 4,
   },
@@ -133,3 +153,25 @@ export const AWARD_CATALOG: AwardCatalogEntry[] = [
 export const AWARD_CATALOG_BY_KEY = new Map(
   AWARD_CATALOG.map((entry) => [entry.key, entry]),
 );
+
+export const ALL_STAR_AWARD_LABELS = new Map<AwardsList, string>([
+  [AwardsList.FIRST_AS, "First Team All-Star"],
+  [AwardsList.SECOND_AS, "Second Team All-Star"],
+  [AwardsList.PLAYOFF_AS, "Playoff All-Star"],
+]);
+
+export function getAwardLabel(award: AwardsList | string): string {
+  return (
+    AWARD_CATALOG_BY_KEY.get(award as AwardsList)?.fullName ??
+    ALL_STAR_AWARD_LABELS.get(award as AwardsList) ??
+    String(award)
+  );
+}
+
+export function getAwardTeamId(award: PlayerAward | TeamAward): string {
+  return String(award.gshlTeamId ?? award.teamId ?? award.winnerId ?? "");
+}
+
+export function getPlayerAwardPlayerId(award: PlayerAward): string {
+  return String(award.playerId ?? award.winnerId ?? "");
+}

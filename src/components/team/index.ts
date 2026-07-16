@@ -13,3 +13,4 @@ export { TeamHistoryContainer } from "./TeamHistory";
 export { TeamRoster, RosterLineup, BenchPlayers } from "./TeamRoster";
 export { TeamSchedule } from "./TeamSchedule";
 export { TrophyCase } from "./TrophyCase";
+export { TeamRecordBook } from "./TeamRecordBook";

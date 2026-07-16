@@ -7,5 +7,6 @@
 
 export { StandingsComponent } from "./StandingsContainer";
 export { PlayoffBracket } from "./PlayoffBracket";
+export { AwardsShowcase } from "./AwardsShowcase";
 
 export { WeeklySchedule } from "./WeeklySchedule";
