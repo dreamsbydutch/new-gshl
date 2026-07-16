@@ -43,7 +43,7 @@ Options:
   --nhl-end-season <YYYYYYYY>   Inclusive end season. Default: inferred from today.
   --python-bin <path>           Python executable to run. Default: python
   --ssl-verify <bool>           Pass through to nhl-api-py. Default: false
-  --apply                       Write Player.nhlApiId values to Google Sheets.
+  --apply                       Write Player.nhlApiId values to Convex.
   --log <true|false>            Enable or disable console logging. Default: true.
   --help                        Show this message and exit.
 `.trim();

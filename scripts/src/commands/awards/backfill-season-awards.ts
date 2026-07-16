@@ -11,16 +11,15 @@
  * Options:
  *   --season-id <id>       Backfill one season.
  *   --season-ids <list>    Backfill a comma-separated list of seasons. Default: all Season rows.
- *   --apply                Persist award rows to Google Sheets.
+ *   --apply                Persist award rows to Convex.
  *   --log <true|false>     Enable or disable console logging. Default: true.
  *   --stop-on-error        Stop immediately after the first failed season.
  *   --help                 Print the built-in help text and exit.
  */
-import path from "node:path";
 import type { DatabaseRecord } from "@gshl-lib/sheets/config/config";
 import { getAppsScriptLineupBuilder } from "@gshl-lib/lineup/apps-script-lineup-builder";
+import * as convexStore from "@gshl-lib/data/convex-store";
 import { fastSheetsReader } from "@gshl-lib/sheets/reader/fast-reader";
-import { minimalSheetsWriter } from "@gshl-lib/sheets/writer/minimal-writer";
 import { MatchupType, SeasonType } from "@gshl-lib/types/enums";
 import {
   getArgValue,
@@ -56,12 +55,21 @@ type AwardsBackfillOptions = {
   stopOnError: boolean;
 };
 
-type AwardRecord = DatabaseRecord & {
+type PlayerAwardRecord = DatabaseRecord & {
   seasonId: string;
-  winnerId: string;
+  playerId: string;
   nomineeIds: string[];
   award: AwardKey;
 };
+
+type TeamAwardRecord = DatabaseRecord & {
+  seasonId: string;
+  teamId: string;
+  nomineeIds: string[];
+  award: AwardKey;
+};
+
+type AwardRecord = PlayerAwardRecord | TeamAwardRecord;
 
 type TeamSeasonRecord = DatabaseRecord & {
   seasonId?: string | number | null;
@@ -190,6 +198,8 @@ type AwardsBackfillSummary = {
     updated: number;
     inserted: number;
     total: number;
+    playerAwards: number;
+    teamAwards: number;
     applied: boolean;
   };
   failures: Array<{ seasonId: string; message: string }>;
@@ -236,13 +246,13 @@ Usage:
 Options:
   --season-id <id>       Backfill one season.
   --season-ids <list>    Backfill comma-separated season ids. Default: all Season rows.
-  --apply                Write Awards rows back to Google Sheets. Omit for dry-run.
+  --apply                Write Awards rows back to Convex. Omit for dry-run.
   --log <true|false>     Enable or disable console logging. Default: true.
   --stop-on-error        Abort immediately on the first season failure.
   --help                 Show this message and exit.
 
 Requirements:
-  Google Sheets credentials must be configured locally.
+  CONVEX_PROD_URL, a prod: CONVEX_DEPLOYMENT, or a production CONVEX_DEPLOY_KEY is required.
 `.trim();
 
 function compareSeasonIds(left: string, right: string): number {
@@ -273,13 +283,11 @@ function formatDateOnly(value: unknown): string {
       return trimmed;
     }
   }
-  if (
-    !(
-      value instanceof Date ||
-      typeof value === "string" ||
-      typeof value === "number"
-    )
-  ) {
+  if (!(
+    value instanceof Date ||
+    typeof value === "string" ||
+    typeof value === "number"
+  )) {
     return "";
   }
   const date = value instanceof Date ? value : new Date(value);
@@ -369,32 +377,6 @@ function buildTeamConferenceMap(
   }
 
   return teamConfMap;
-}
-
-function buildTeamOwnerMap(
-  teams: TeamRecord[],
-  franchises: FranchiseRecord[],
-): Map<string, string> {
-  const franchiseOwnerMap = new Map<string, string>();
-  for (const franchise of franchises) {
-    const franchiseId = normalizeRecordId(franchise.id);
-    const ownerId = normalizeRecordId(franchise.ownerId);
-    if (franchiseId && ownerId) {
-      franchiseOwnerMap.set(franchiseId, ownerId);
-    }
-  }
-
-  const teamOwnerMap = new Map<string, string>();
-  for (const team of teams) {
-    const teamId = normalizeRecordId(team.id);
-    const franchiseId = normalizeRecordId(team.franchiseId);
-    const ownerId = franchiseOwnerMap.get(franchiseId) ?? "";
-    if (teamId && ownerId) {
-      teamOwnerMap.set(teamId, ownerId);
-    }
-  }
-
-  return teamOwnerMap;
 }
 
 function getConferenceAliases(
@@ -566,25 +548,17 @@ function selectRankAward(
   return podiumFromSortedCandidates(candidates);
 }
 
-function makeAwardRecord(
+function makeTeamAwardRecord(
   seasonId: string,
   award: AwardKey,
   podium: AwardPodium | null,
-  teamOwnerMap: Map<string, string>,
-): AwardRecord | null {
+): TeamAwardRecord | null {
   if (!podium) return null;
-
-  const winnerOwnerId = teamOwnerMap.get(podium.winnerId) ?? "";
-  if (!winnerOwnerId) return null;
-
-  const nomineeOwnerIds = podium.nomineeIds
-    .map((teamId) => teamOwnerMap.get(teamId) ?? "")
-    .filter(Boolean);
 
   return {
     seasonId,
-    winnerId: winnerOwnerId,
-    nomineeIds: nomineeOwnerIds,
+    teamId: podium.winnerId,
+    nomineeIds: podium.nomineeIds,
     award,
   };
 }
@@ -593,10 +567,10 @@ function makePlayerAwardRecords(
   seasonId: string,
   award: AwardKey,
   playerIds: string[],
-): AwardRecord[] {
+): PlayerAwardRecord[] {
   return playerIds.map((playerId) => ({
     seasonId,
-    winnerId: playerId,
+    playerId,
     nomineeIds: [],
     award,
   }));
@@ -802,7 +776,7 @@ async function selectAllStarTeam(
 async function buildAllStarAwardRows(
   seasonId: string,
   playerTotals: PlayerTotalRecord[],
-): Promise<Record<"firstAS" | "secondAS" | "playoffAS", AwardRecord[]>> {
+): Promise<Record<"firstAS" | "secondAS" | "playoffAS", PlayerAwardRecord[]>> {
   const regularSeasonPool = buildAllStarPlayers(
     playerTotals.filter(
       (row) =>
@@ -853,7 +827,6 @@ async function computeAwardsForSeason(
     seasonTeams,
     snapshot.franchises,
   );
-  const teamOwnerMap = buildTeamOwnerMap(seasonTeams, snapshot.franchises);
   const conferenceById = new Map<string, ConferenceRecord>();
   for (const conference of snapshot.conferences) {
     const conferenceId = normalizeRecordId(conference.id);
@@ -953,10 +926,8 @@ async function computeAwardsForSeason(
       (award) =>
         award !== "firstAS" && award !== "secondAS" && award !== "playoffAS",
     )
-      .map((award) =>
-        makeAwardRecord(seasonId, award, awardPodiums[award], teamOwnerMap),
-      )
-      .filter((award): award is AwardRecord => award !== null),
+      .map((award) => makeTeamAwardRecord(seasonId, award, awardPodiums[award]))
+      .filter((award): award is TeamAwardRecord => award !== null),
     ...allStarAwards.firstAS,
     ...allStarAwards.secondAS,
     ...allStarAwards.playoffAS,
@@ -972,10 +943,6 @@ async function computeAwardsForSeason(
 }
 
 async function loadSnapshot(): Promise<AwardsDataSnapshot> {
-  process.env.USE_GOOGLE_SHEETS ??= "true";
-  process.env.GOOGLE_SERVICE_ACCOUNT_KEY_FILE ??=
-    path.resolve("credentials.json");
-
   const [
     teamSeasons,
     playerTotals,
@@ -1008,12 +975,15 @@ async function loadSnapshot(): Promise<AwardsDataSnapshot> {
 function summarizeWrite(
   total: number,
   applied: boolean,
+  counts: { playerAwards: number; teamAwards: number },
   result?: { updated: number; inserted: number; total: number },
 ): AwardsBackfillSummary["write"] {
   return {
     updated: result?.updated ?? (applied ? total : 0),
     inserted: result?.inserted ?? 0,
     total: result?.total ?? total,
+    playerAwards: counts.playerAwards,
+    teamAwards: counts.teamAwards,
     applied,
   };
 }
@@ -1028,10 +998,6 @@ function log(
 }
 
 async function getCompletedSeasonIds(): Promise<string[]> {
-  process.env.USE_GOOGLE_SHEETS ??= "true";
-  process.env.GOOGLE_SERVICE_ACCOUNT_KEY_FILE ??=
-    path.resolve("credentials.json");
-
   const today = getTodayDateString();
   const seasons = await fastSheetsReader.fetchModel<SeasonRecord>("Season");
 
@@ -1107,24 +1073,32 @@ async function runAwardsBackfill(
   }
 
   const awardRows = seasons.flatMap((season) => season.awards);
+  const playerAwardRows = awardRows.filter(
+    (award): award is PlayerAwardRecord => "playerId" in award,
+  );
+  const teamAwardRows = awardRows.filter(
+    (award): award is TeamAwardRecord => "teamId" in award,
+  );
   let writeResult:
-    | { updated: number; inserted: number; total: number }
-    | undefined;
+    { updated: number; inserted: number; total: number } | undefined;
   if (options.apply) {
     let updated = 0;
     let inserted = 0;
     let total = 0;
 
     for (const season of seasons) {
-      const result = await minimalSheetsWriter.upsertByCompositeKey(
-        "Awards",
-        ["seasonId", "award", "winnerId"],
-        season.awards,
+      const seasonPlayerAwards = season.awards.filter(
+        (award): award is PlayerAwardRecord => "playerId" in award,
+      );
+      const seasonTeamAwards = season.awards.filter(
+        (award): award is TeamAwardRecord => "teamId" in award,
+      );
+      const playerResult = await convexStore.upsertByCompositeKey(
+        "PlayerAward",
+        ["seasonId", "award", "playerId"],
+        seasonPlayerAwards,
         {
           merge: true,
-          idColumn: "id",
-          createdAtColumn: "createdAt",
-          updatedAtColumn: "updatedAt",
           deleteMissing: {
             filter: {
               seasonId: season.seasonId,
@@ -1132,9 +1106,22 @@ async function runAwardsBackfill(
           },
         },
       );
-      updated += result.updated;
-      inserted += result.inserted;
-      total += result.total;
+      const teamResult = await convexStore.upsertByCompositeKey(
+        "TeamAward",
+        ["seasonId", "award", "teamId"],
+        seasonTeamAwards,
+        {
+          merge: true,
+          deleteMissing: {
+            filter: {
+              seasonId: season.seasonId,
+            },
+          },
+        },
+      );
+      updated += playerResult.updated + teamResult.updated;
+      inserted += playerResult.inserted + teamResult.inserted;
+      total += playerResult.total + teamResult.total;
     }
 
     writeResult = { updated, inserted, total };
@@ -1145,7 +1132,15 @@ async function runAwardsBackfill(
     seasonIds: options.seasonIds,
     processedSeasons: seasons.length,
     computedAwards: awardRows.length,
-    write: summarizeWrite(awardRows.length, options.apply, writeResult),
+    write: summarizeWrite(
+      awardRows.length,
+      options.apply,
+      {
+        playerAwards: playerAwardRows.length,
+        teamAwards: teamAwardRows.length,
+      },
+      writeResult,
+    ),
     failures,
     seasons,
   };

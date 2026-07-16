@@ -21,11 +21,19 @@
     "stats:backfill-hockey-reference": "tsx src/commands/stats/backfill-hockey-reference-season.ts",
     "stats:backfill-yahoo-matchup-days": "tsx src/commands/stats/backfill-yahoo-matchup-player-days.ts",
     "stats:debug-yahoo-matchup-table": "tsx src/commands/stats/debug-yahoo-matchup-table.ts",
-    "stats:backfill-yahoo-rosters": "tsx src/commands/stats/backfill-yahoo-roster-player-days.ts",
+    "stats:backfill-yahoo-rosters": "tsx src/commands/stats/backfill-yahoo-matchup-player-days.ts",
     "stats:sync-nhl-daily": "tsx src/commands/stats/sync-nhl-daily-stats.ts",
-    "lineup:update-all": "node --expose-gc --max-old-space-size=4096 ../node_modules/tsx/dist/cli.mjs src/commands/lineup/update-all-lineups.ts",
+    "lineup:update-all": "node --expose-gc --max-old-space-size=4096 ./node_modules/tsx/dist/cli.mjs src/commands/lineup/update-all-lineups.ts",
     "yahoo:check-weekly-player-days": "tsx src/commands/yahoo/check-yahoo-weekly-player-days.ts",
     "yahoo:check-weekly-matchups": "tsx src/commands/yahoo/check-yahoo-weekly-matchup-stats.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.4",
+    "typescript": "^5.5.3"
+  },
+  "dependencies": {
+    "convex": "^1.42.0",
+    "dotenv": "^16.5.0"
   }
 }

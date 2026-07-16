@@ -229,7 +229,7 @@ Usage:
 
 Options:
   --season-id <id>    Required season id to aggregate.
-  --apply             Write the generated season rows back to Google Sheets.
+  --apply             Write the generated season rows back to Convex.
   --log <true|false>  Enable or disable console logging. Default: true.
   --help              Show this message and exit.
 `.trim();
@@ -1852,12 +1852,12 @@ function wrapWritePermissionError(
     optimizedSheetsClient.getConfiguredServiceAccountEmail();
   const accountLabel = serviceAccountEmail
     ? `Service account ${serviceAccountEmail}`
-    : "Configured Google Sheets credentials";
+    : "Configured Convex credentials";
   const spreadsheetId = getSpreadsheetIdForSeasonWrite(modelName, seasonId);
   const sheetName = SHEETS_CONFIG.SHEETS[modelName];
 
   return new Error(
-    `[stats:aggregate-season] ${accountLabel} cannot update ${modelName} for season ${seasonId} in workbook ${spreadsheetId} sheet ${sheetName}. Google Sheets returned: ${baseMessage}. Share that spreadsheet with Editor access for the service account or rerun without --apply.`,
+    `[stats:aggregate-season] ${accountLabel} cannot update ${modelName} for season ${seasonId} in workbook ${spreadsheetId} sheet ${sheetName}. Convex returned: ${baseMessage}. Share that spreadsheet with Editor access for the service account or rerun without --apply.`,
   );
 }
 

@@ -9,7 +9,7 @@
  *
  * Options:
  *   --season-id <id>    Required season id to aggregate.
- *   --apply             Persist generated rows and standings back to Google Sheets.
+ *   --apply             Persist generated rows and standings back to Convex.
  *   --log <true|false>  Enable or disable console logging. Default: true.
  *   --help              Print the built-in help text and exit.
  */

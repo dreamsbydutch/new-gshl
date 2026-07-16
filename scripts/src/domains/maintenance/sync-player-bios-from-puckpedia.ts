@@ -11,7 +11,7 @@
  *   --apply is passed.
  *
  * Options:
- *   --apply                 Persist Player sheet updates to Google Sheets.
+ *   --apply                 Persist Player sheet updates to Convex.
  *   --headless              Run the browser headless.
  *   --gshl-season-id <id>   Override the target GSHL season id.
  *   --focus-season <value>  Override the PuckPedia focus_season token. Default: 162.
@@ -751,6 +751,18 @@ function buildManagedFieldPatch(
   summary: PlayerBioSyncSummary,
 ): Record<string, PrimitiveCellValue> {
   const fields: Record<string, PrimitiveCellValue> = {};
+  const setNhlContractField = (
+    sourceFieldNames: string[],
+    targetFieldNames: string[],
+  ) => {
+    const rawValue = resolveFirstPresentValue(apiRow, sourceFieldNames);
+    const normalizedValue = toTrimmedString(rawValue);
+    if (!normalizedValue) return;
+
+    for (const targetFieldName of targetFieldNames) {
+      fields[targetFieldName] = normalizedValue;
+    }
+  };
 
   const birthdayValue = resolveFirstPresentValue(apiRow, [
     "birthday",
@@ -803,6 +815,91 @@ function buildManagedFieldPatch(
       summary.invalidHeights++;
     }
   }
+
+  // Preserve GSHL salary behavior and map NHL contract values into dedicated columns.
+  setNhlContractField(
+    [
+      "contract_status",
+      "contractStatus",
+      "status",
+      "Status",
+      "nhl_status",
+      "nhlStatus",
+    ],
+    ["nhlContractStatus", "Status"],
+  );
+  setNhlContractField(
+    ["contract_length", "contractLength", "length", "Length", "term"],
+    ["nhlContractLength", "Length"],
+  );
+  setNhlContractField(
+    [
+      "cap_hit",
+      "caphit",
+      "capHit",
+      "cap hit",
+      "Cap Hit",
+      "aav",
+      "AAV",
+    ],
+    ["nhlCapHit", "Cap Hit"],
+  );
+  setNhlContractField(
+    [
+      "clauses",
+      "clause",
+      "Clauses",
+      "contract_clauses",
+      "contractClauses",
+      "no_move_clause",
+      "no_trade_clause",
+    ],
+    ["nhlClauses", "Clauses"],
+  );
+  setNhlContractField(
+    [
+      "start_year",
+      "startYear",
+      "Start Year",
+      "contract_start_year",
+      "contractStartYear",
+    ],
+    ["nhlStartYear", "Start Year"],
+  );
+  setNhlContractField(
+    [
+      "signing_status",
+      "signingStatus",
+      "Signing Status",
+      "sign_status",
+      "signStatus",
+    ],
+    ["nhlSigningStatus", "Signing Status"],
+  );
+  setNhlContractField(
+    [
+      "expiry_year",
+      "expiryYear",
+      "Expiry Year",
+      "expiration_year",
+      "expirationYear",
+      "exp_year",
+      "expYear",
+    ],
+    ["nhlExpiryYear", "Expiry Year"],
+  );
+  setNhlContractField(
+    [
+      "expiry_status",
+      "expiryStatus",
+      "Expiry Status",
+      "expiration_status",
+      "expirationStatus",
+      "exp_status",
+      "expStatus",
+    ],
+    ["nhlExpiryStatus", "Expiry Status"],
+  );
 
   return fields;
 }

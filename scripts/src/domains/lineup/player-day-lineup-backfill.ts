@@ -342,7 +342,7 @@ export function parsePlayerDayLineupBackfillOptions(
         "  --start-date <date>       Optional YYYY-MM-DD date filter.",
         "  --end-date <date>         Optional YYYY-MM-DD date filter.",
         "  --apply-lt-auto-lineups   Optional LT mode to persist dailyPos=bestPos.",
-        "  --apply                   Write updates to Sheets. Omit for dry-run.",
+        "  --apply                   Write updates to Convex. Omit for dry-run.",
         "  --log <true|false>        Enable or disable console logging. Default: true.",
       ].join("\n"),
     );

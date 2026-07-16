@@ -11,7 +11,7 @@
  *
  * Options:
  *   --season-ids <list>     Optional comma-separated season ids. Default: all Season rows.
- *   --apply                 Write updated team ratings back to Google Sheets. Omit for dry-run.
+ *   --apply                 Write updated team ratings back to Convex. Omit for dry-run.
  *   --log <true|false>      Enable or disable console logging. Default: true.
  *   --include-team-weeks    Accepted for compatibility; TeamWeekStatLine ratings are included by default.
  *   --include-team-seasons  Accepted for compatibility; TeamSeasonStatLine ratings are included by default.
@@ -102,7 +102,7 @@ Usage:
 
 Options:
   --season-ids <list>     Optional comma-separated season ids. Default: all Season rows.
-  --apply                 Write updated team ratings back to Google Sheets. Omit for dry-run.
+  --apply                 Write updated team ratings back to Convex. Omit for dry-run.
   --log <true|false>      Enable or disable console logging. Default: true.
   --include-team-weeks    Accepted for compatibility; TeamWeekStatLine ratings are included by default.
   --include-team-seasons  Accepted for compatibility; TeamSeasonStatLine ratings are included by default.
@@ -110,7 +110,7 @@ Options:
   --help                  Show this message and exit.
 
 Requirements:
-  Google Sheets credentials must be configured for local sheet reads/writes.
+  NEXT_PUBLIC_CONVEX_URL (or CONVEX_URL) must be configured for data reads/writes.
   Team-week rebuilds automatically trigger a power refresh for the same season.
 `.trim();
 
@@ -339,7 +339,7 @@ async function main(): Promise<void> {
   const selectedModels = getSelectedModels(options);
   if (!options.apply) {
     warn(
-      "Dry-run mode: ratings are recomputed in memory only. Pass --apply to write changes to Google Sheets.",
+      "Dry-run mode: ratings are recomputed in memory only. Pass --apply to write changes to Convex.",
     );
   }
   log(

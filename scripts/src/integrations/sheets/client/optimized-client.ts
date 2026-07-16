@@ -4,6 +4,13 @@ import { GoogleAuth } from "google-auth-library";
 import { env } from "@gshl-env";
 import type { sheets_v4 } from "googleapis";
 import pLimit from "p-limit";
+import {
+  PLAYERDAY_WORKBOOK_KEYS,
+  SHEETS_CONFIG,
+  WORKBOOKS,
+} from "../config/config";
+import * as convexStore from "../../data/convex-store";
+import type { SheetModelName } from "../../data/model-map";
 
 // Enhanced types for better performance
 type CellValue = string | number | boolean | null;
@@ -26,6 +33,50 @@ interface RateLimitConfig {
   burstLimit: number;
   retryAttempts: number;
   baseDelay: number;
+}
+
+function modelForSheetName(sheetName: string): SheetModelName | null {
+  const match = (
+    Object.entries(SHEETS_CONFIG.SHEETS) as Array<[SheetModelName, string]>
+  ).find(([, configuredSheetName]) => configuredSheetName === sheetName);
+  return match?.[0] ?? null;
+}
+
+function sheetNameFromRange(range: string): string {
+  return (range.split("!", 1)[0] ?? range).replace(/^'|'$/g, "");
+}
+
+function playerDaySeasonForWorkbook(spreadsheetId: string): string | null {
+  const key = PLAYERDAY_WORKBOOK_KEYS.find(
+    (candidate) => WORKBOOKS[candidate] === spreadsheetId,
+  );
+  return key ? String(Number(key.replace("PLAYERDAYS_", ""))) : null;
+}
+
+function toCellValue(value: unknown): CellValue {
+  if (value === null || value === undefined) return "";
+  if (
+    typeof value === "string" ||
+    typeof value === "number" ||
+    typeof value === "boolean"
+  ) {
+    return value;
+  }
+  if (value instanceof Date) return value.toISOString();
+  if (Array.isArray(value)) return value.join(",");
+  return JSON.stringify(value);
+}
+
+function recordFromCells(
+  columns: readonly string[],
+  values: readonly CellValue[],
+): Record<string, unknown> {
+  return Object.fromEntries(
+    columns.flatMap((column, index) => {
+      const value = values[index];
+      return value === undefined ? [] : [[column, value]];
+    }),
+  );
 }
 
 export class OptimizedSheetsClient {
@@ -156,6 +207,11 @@ export class OptimizedSheetsClient {
     sheetName: string,
     headers: string[],
   ): Promise<void> {
+    if (env.GSHL_DATA_BACKEND === "convex") {
+      throw new Error(
+        `Cannot create the reporting-only sheet ${sheetName} while scripts use Convex. Use a report file instead.`,
+      );
+    }
     await this.withRateLimit(async () => {
       try {
         // Attempt to add sheet
@@ -193,6 +249,30 @@ export class OptimizedSheetsClient {
     spreadsheetId: string,
     range: string,
   ): Promise<CellValue[][]> {
+    if (env.GSHL_DATA_BACKEND === "convex") {
+      const sheetName = sheetNameFromRange(range);
+      const model = modelForSheetName(sheetName);
+      if (!model) {
+        throw new Error(
+          `The range ${range} is not a configured data model and cannot be read from Convex.`,
+        );
+      }
+      const columns = SHEETS_CONFIG.COLUMNS[model] as readonly string[];
+      const playerDaySeason =
+        model === "PlayerDayStatLine"
+          ? playerDaySeasonForWorkbook(spreadsheetId)
+          : null;
+      const rows = playerDaySeason
+        ? await convexStore.fetchPlayerDaySeason<Record<string, unknown>>(
+            playerDaySeason,
+          )
+        : await convexStore.fetchModel<Record<string, unknown>>(model);
+      return [
+        [...columns],
+        ...rows.map((row) => columns.map((column) => toCellValue(row[column]))),
+      ];
+    }
+
     return this.withRateLimit(async () => {
       const res = await this.sheets.spreadsheets.values.get({
         spreadsheetId,
@@ -208,6 +288,14 @@ export class OptimizedSheetsClient {
     range: string,
     values: CellValue[][],
   ): Promise<void> {
+    if (env.GSHL_DATA_BACKEND === "convex") {
+      await this.appendValuesBatch(
+        spreadsheetId,
+        sheetNameFromRange(range),
+        values,
+      );
+      return;
+    }
     await this.withRateLimit(async () => {
       await this.sheets.spreadsheets.values.append({
         spreadsheetId,
@@ -223,6 +311,13 @@ export class OptimizedSheetsClient {
     range: string,
     values: CellValue[][],
   ): Promise<void> {
+    if (env.GSHL_DATA_BACKEND === "convex") {
+      // Header writes only describe a Sheets layout. Convex fields are schema-driven.
+      if (/!A1:/i.test(range)) return;
+      throw new Error(
+        `Direct cell update ${range} cannot be translated safely to Convex; update the model by id instead.`,
+      );
+    }
     await this.withRateLimit(async () => {
       await this.sheets.spreadsheets.values.update({
         spreadsheetId,
@@ -238,6 +333,11 @@ export class OptimizedSheetsClient {
     sheetName: string,
     rowNumbers: number[],
   ): Promise<void> {
+    if (env.GSHL_DATA_BACKEND === "convex") {
+      throw new Error(
+        `Deleting ${sheetName} by spreadsheet row number is not supported in Convex. Delete by model identity instead.`,
+      );
+    }
     const uniqueDescendingRowNumbers = Array.from(
       new Set(
         rowNumbers.filter(
@@ -334,11 +434,7 @@ export class OptimizedSheetsClient {
 
   private getErrorStatusCode(error: unknown): number | undefined {
     if (typeof error === "object" && error !== null) {
-      const {
-        code,
-        status,
-        response,
-      } = error as {
+      const { code, status, response } = error as {
         code?: unknown;
         status?: unknown;
         response?: { status?: unknown };
@@ -350,7 +446,7 @@ export class OptimizedSheetsClient {
             ? status
             : typeof response?.status === "number"
               ? response.status
-            : undefined;
+              : undefined;
       if (typeof numeric === "number") return numeric;
     }
     return undefined;
@@ -526,6 +622,15 @@ export class OptimizedSheetsClient {
     spreadsheetId: string,
     ranges: string[],
   ): Promise<Map<string, CellValue[][]>> {
+    if (env.GSHL_DATA_BACKEND === "convex") {
+      const entries = await Promise.all(
+        ranges.map(
+          async (range) =>
+            [range, await this.getValues(spreadsheetId, range)] as const,
+        ),
+      );
+      return new Map(entries);
+    }
     return this.withRateLimit(async () => {
       try {
         const response = await this.sheets.spreadsheets.values.batchGet({
@@ -587,19 +692,43 @@ export class OptimizedSheetsClient {
     sheetName: string,
     updates: Map<number, CellValue[]>,
   ): Promise<void> {
+    if (env.GSHL_DATA_BACKEND === "convex") {
+      const model = modelForSheetName(sheetName);
+      if (!model) throw new Error(`Unknown model sheet ${sheetName}.`);
+      const columns = SHEETS_CONFIG.COLUMNS[model] as readonly string[];
+      const playerDaySeason =
+        model === "PlayerDayStatLine"
+          ? playerDaySeasonForWorkbook(spreadsheetId)
+          : null;
+      const currentRows = playerDaySeason
+        ? await convexStore.fetchPlayerDaySeason<Record<string, unknown>>(
+            playerDaySeason,
+          )
+        : await convexStore.fetchModel<Record<string, unknown>>(model);
+      for (const [rowId, values] of updates) {
+        const record = recordFromCells(columns, values);
+        const id = String(record.id ?? currentRows[rowId - 1]?.id ?? "").trim();
+        if (!id) {
+          throw new Error(
+            `Cannot update ${sheetName} row ${rowId}: no id was found.`,
+          );
+        }
+        await convexStore.updateById(model, id, record);
+      }
+      return;
+    }
+
     const sortedUpdates = Array.from(updates.entries()).sort(
       (left, right) => left[0] - right[0],
     );
     const data: Array<{ range: string; values: CellValue[][] }> = [];
 
-    let currentGroup:
-      | {
-          startRowId: number;
-          endRowId: number;
-          columnCount: number;
-          values: CellValue[][];
-        }
-      | null = null;
+    let currentGroup: {
+      startRowId: number;
+      endRowId: number;
+      columnCount: number;
+      values: CellValue[][];
+    } | null = null;
 
     for (const [rowId, values] of sortedUpdates) {
       const columnCount = values.length;
@@ -660,6 +789,17 @@ export class OptimizedSheetsClient {
     sheetName: string,
     values: CellValue[][],
   ): Promise<void> {
+    if (env.GSHL_DATA_BACKEND === "convex") {
+      const model = modelForSheetName(sheetName);
+      if (!model) throw new Error(`Unknown model sheet ${sheetName}.`);
+      const columns = SHEETS_CONFIG.COLUMNS[model] as readonly string[];
+      const records = values.map((row) => recordFromCells(columns, row));
+      await convexStore.upsertByCompositeKey(model, ["id"], records, {
+        merge: true,
+      });
+      return;
+    }
+
     const batches = this.chunkArray(values, this.BATCH_SIZE);
 
     for (const batch of batches) {

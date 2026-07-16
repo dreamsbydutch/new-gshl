@@ -48,7 +48,7 @@ Usage:
 Options:
   --season-id <id>        Required season id to rate.
   --models <list>         Comma-separated models. Default: all supported player models.
-  --apply                 Write updated ratings back to Google Sheets. Omit for dry-run.
+  --apply                 Write updated ratings back to Convex. Omit for dry-run.
   --season-type <value>   Optional seasonType filter for split and total models.
   --week-ids <list>       Optional comma-separated week ids for day/week models.
   --week-nums <list>      Optional comma-separated week numbers for day/week models.
@@ -723,10 +723,10 @@ function wrapWritePermissionError(
       : formatUnknownMessage(error) || "Unknown error";
   const accountLabel = serviceAccountEmail
     ? `Service account ${serviceAccountEmail}`
-    : "Configured Google Sheets credentials";
+    : "Configured Convex credentials";
 
   return new Error(
-    `[ratings:backfill] ${accountLabel} cannot update ${modelName} for season ${options.seasonId} in workbook ${prepared.spreadsheetId} sheet ${prepared.sheetName}. Google Sheets returned: ${baseMessage}. Share that spreadsheet with Editor access for the service account or rerun with --models excluding ${modelName}.`,
+    `[ratings:backfill] ${accountLabel} cannot update ${modelName} for season ${options.seasonId} in workbook ${prepared.spreadsheetId} sheet ${prepared.sheetName}. Convex returned: ${baseMessage}. Share that spreadsheet with Editor access for the service account or rerun with --models excluding ${modelName}.`,
   );
 }
 

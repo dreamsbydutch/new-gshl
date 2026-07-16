@@ -11,7 +11,7 @@
  * Options:
  *   --season-id <id>       Backfill one season.
  *   --season-ids <list>    Backfill a comma-separated list of seasons.
- *   --apply                Persist matchup and standings updates to Google Sheets.
+ *   --apply                Persist matchup and standings updates to Convex.
  *   --include-active       Include the active season when auto-selecting seasons.
  *   --log <true|false>     Enable or disable console logging. Default: true.
  *   --stop-on-error        Stop immediately after the first failed season.
@@ -213,14 +213,14 @@ Usage:
 Options:
   --season-id <id>       Optional single season id to finalize.
   --season-ids <list>    Optional comma-separated season ids. Default: all prior seasons.
-  --apply                Write matchup and standings updates back to Google Sheets.
+  --apply                Write matchup and standings updates back to Convex.
   --include-active       Include the current active season when auto-selecting seasons.
   --log <true|false>     Enable or disable console logging. Default: true.
   --stop-on-error        Abort immediately on the first season failure.
   --help                 Show this message and exit.
 
 Requirements:
-  Google Sheets credentials must be configured locally.
+  NEXT_PUBLIC_CONVEX_URL (or CONVEX_URL) must be configured locally.
 `.trim();
 
 function getArgValue(args: string[], flagName: string): string | undefined {

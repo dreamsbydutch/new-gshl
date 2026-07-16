@@ -1,7 +1,7 @@
 # GSHL Scripts
 
 Standalone Node/TypeScript tooling for historical backfills, repair jobs,
-Yahoo validation, ratings rebuilds, and Google Sheets maintenance.
+Yahoo validation, ratings rebuilds, and Convex database maintenance.
 
 This package is intentionally separate from both the Next.js app and
 `apps-script/`:
@@ -30,16 +30,26 @@ Most commands also support:
 
 ## Prerequisites
 
-### Google Sheets access
+### Convex access
 
-Most commands read from or write to the league spreadsheets.
+Commands read from and write to the league's production Convex deployment by
+default. Set the production deployment in `scripts/.env.local` or the root
+`.env.local`:
 
-Supported credential sources:
+```bash
+CONVEX_PROD_URL=https://your-production-deployment.convex.cloud
+```
 
-- `scripts/credentials.json`
-- `scripts/gsconfig.json`
-- `GOOGLE_SERVICE_ACCOUNT_KEY_FILE`
-- `GOOGLE_SERVICE_ACCOUNT_KEY`
+A `CONVEX_DEPLOYMENT=prod:<deployment-name>` or production
+`CONVEX_DEPLOY_KEY` can also identify the production deployment. The scripts
+refuse to fall back to `NEXT_PUBLIC_CONVEX_URL`, because that value commonly
+points at a developer deployment.
+
+To intentionally target a non-production deployment, set
+`GSHL_CONVEX_TARGET=development` and configure `NEXT_PUBLIC_CONVEX_URL` or
+`CONVEX_URL`. To use the old Sheets backend temporarily, set
+`GSHL_DATA_BACKEND=sheets` and provide the existing Google service-account
+configuration.
 
 ### Yahoo-authenticated workflows
 
@@ -52,14 +62,14 @@ Supported inputs:
 - `YAHOO_HEADERS_JSON`
 - `YAHOO_HEADERS_FILE`
 
-Many Yahoo commands also support browser fallback flags such as:
+Browser-assisted Yahoo commands may also support:
 
-- `--browser-fallback`
-- `--browser-headless`
-- `--browser-path`
-- `--browser-user-data-dir`
-- `--browser-wait-ms`
-- `--browser-import-cookie`
+- `--browser-fallback <true|false>`
+- `--browser-headless <true|false>`
+- `--browser-path <path>`
+- `--browser-user-data-dir <path>`
+- `--browser-wait-ms <ms>`
+- `--browser-import-cookie <true|false>`
 
 ### Python helper for NHL scripts
 
@@ -82,7 +92,7 @@ All commands below are available through `npm run <name>`.
 #### `player-bios:sync`
 
 Scrapes PuckPedia player bios and roster context, matches the results to the
-`Player` sheet, and prepares player updates or inserts.
+`Player` table, and prepares player updates or inserts.
 
 Notable flags:
 
@@ -93,6 +103,10 @@ Notable flags:
 - `--stat-season <value>`
 - `--page-size <value>`
 - `--max-pages <value>`
+- `--current-date <value>`
+- `--browser-path <path>`
+- `--user-data-dir <path>`
+- `--wait-ms <value>`
 
 Example:
 
@@ -154,8 +168,10 @@ npm run player-bios:backfill-yahoo-ids -- --season-id 1 --apply
 
 #### `awards:backfill`
 
-Rebuilds `Awards` rows from season standings, rating outputs, and playoff final
-results.
+Rebuilds split award data from season standings, rating outputs, and playoff
+final results. All-star selections are upserted into `playerAwards` using
+`playerId`; league, playoff, and management awards are upserted into
+`teamAwards` using the season-specific `teamId`.
 
 Notable flags:
 
@@ -231,9 +247,9 @@ Notable flags:
 
 #### `ratings:rebuild-team`
 
-Rebuilds team-day, team-week, and team-season ratings across one or more
-seasons. Team-week rebuilds also refresh power and matchup ranks/ratings for
-the same season.
+Rebuilds `TeamDayStatLine`, `TeamWeekStatLine`, and `TeamSeasonStatLine`
+ratings across one or more seasons. Team-week rebuilds also refresh power and
+matchup ranks/ratings for the same season.
 
 Notable flags:
 
@@ -331,8 +347,16 @@ Notable flags:
 - `--endDate <date>`
 - `--teamIds <list>`
 - `--matchupIds <list>`
+- `--include-lt`
 - `--concurrency <n>`
 - `--requestDelayMs <ms>`
+- `--quiet`
+- `--browser-fallback <true|false>`
+- `--browser-headless <true|false>`
+- `--browser-path <path>`
+- `--browser-user-data-dir <path>`
+- `--browser-wait-ms <ms>`
+- `--browser-import-cookie <true|false>`
 - `--report-file <path>`
 - `--apply`
 
@@ -350,6 +374,8 @@ npm run stats:backfill-yahoo-matchup-days -- --seasonId 12 --apply
 
 Legacy alias for `stats:backfill-yahoo-matchup-days`.
 
+It does not run the older roster-table backfill implementation anymore.
+
 #### `stats:debug-yahoo-matchup-table`
 
 Fetches a Yahoo matchup page, saves the raw HTML plus a parsed debug report,
@@ -364,6 +390,12 @@ Notable flags:
 - `--homeYahooTeamId <id>`
 - `--awayYahooTeamId <id>`
 - `--requestDelayMs <ms>`
+- `--browser-fallback <true|false>`
+- `--browser-headless <true|false>`
+- `--browser-path <path>`
+- `--browser-user-data-dir <path>`
+- `--browser-wait-ms <ms>`
+- `--browser-import-cookie <true|false>`
 - `--reportBase <path>`
 
 Default output base:
@@ -374,7 +406,7 @@ Default output base:
 
 Uses the Python `nhl-api-py` client to fetch real NHL boxscore data for one or
 more dates, matches those rows to existing `PlayerDayStatLine` records, and can
-write refreshed day-level stats back to Sheets.
+write refreshed day-level stats back to Convex.
 
 Notable flags:
 
@@ -412,6 +444,13 @@ Notable flags:
 - `--team-ids <list>`
 - `--matchup-ids <list>`
 - `--request-delay-ms <ms>`
+- `--request-stagger-ms <ms>`
+- `--browser-fallback <true|false>`
+- `--browser-headless <true|false>`
+- `--browser-path <path>`
+- `--browser-user-data-dir <path>`
+- `--browser-wait-ms <ms>`
+- `--browser-import-cookie <true|false>`
 - `--apply`
 
 Example:
@@ -468,9 +507,9 @@ npm run ranking-engine:sync
 
 ## Notes
 
-- Commands that write to Sheets usually print JSON summaries so runs are easy to
+- Commands that write to Convex usually print JSON summaries so runs are easy to
   diff and log.
-- Historical Yahoo workflows may pause for interactive browser login/challenge
-  clearance when Yahoo rejects direct requests.
+- Historical Yahoo workflows may pause for interactive browser login or
+  challenge clearance when Yahoo rejects direct requests.
 - The NHL helper scripts assume the target `PlayerDayStatLine` rows already
   exist before daily stat refreshes are applied.

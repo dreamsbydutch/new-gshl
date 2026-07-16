@@ -23,6 +23,7 @@
       "@gshl-lib/stats/player-day-flags": [
         "./src/domains/aggregation/player-day-flags.ts"
       ],
+      "@gshl-lib/data/*": ["./src/integrations/data/*"],
       "@gshl-lib/sheets": ["./src/integrations/sheets/index.ts"],
       "@gshl-lib/sheets/*": ["./src/integrations/sheets/*"],
       "@gshl-lib/types/*": ["./src/types/*"],

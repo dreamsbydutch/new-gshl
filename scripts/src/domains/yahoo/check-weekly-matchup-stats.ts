@@ -8,7 +8,7 @@
  *   Fetches Yahoo fantasy hockey matchup totals pages, compares the displayed
  *   weekly team stats to TeamWeekStatLine for the same week/team pairs, and
  *   logs any discrepancies. This script is read-only and does not write to
- *   Google Sheets.
+ *   Convex.
  *
  * Options:
  *   --season-id <id>            Optional season id. Defaults to the active season.

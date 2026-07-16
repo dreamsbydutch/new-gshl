@@ -6,7 +6,7 @@
  * What it does:
  *   Uses the Python nhl-api-py client to fetch actual NHL boxscore data for one
  *   or more dates, matches those rows to existing PlayerDayStatLine records,
- *   and optionally writes the refreshed daily stats back to Google Sheets.
+ *   and optionally writes the refreshed daily stats back to Convex.
  */
 import path from "node:path";
 import { config as loadEnv } from "dotenv";

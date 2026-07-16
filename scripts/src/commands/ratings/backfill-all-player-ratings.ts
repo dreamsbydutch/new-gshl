@@ -11,7 +11,7 @@
  * Options:
  *   --season-ids <list>     Optional comma-separated season ids. Default: all seasons.
  *   --models <list>         Comma-separated rating models. Default: all supported models.
- *   --apply                 Persist updated ratings back to Google Sheets.
+ *   --apply                 Persist updated ratings back to Convex.
  *   --include-breakdown     Keep in-memory rating debug payloads during execution.
  *   --log <true|false>      Enable or disable console logging. Default: true.
  *   --stop-on-error         Stop immediately after the first failed season.
@@ -55,7 +55,7 @@ Usage:
 Options:
   --season-ids <list>     Optional comma-separated season ids. Default: all Season rows.
   --models <list>         Comma-separated models. Default: all supported player models.
-  --apply                 Write updated ratings back to Google Sheets. Omit for dry-run.
+  --apply                 Write updated ratings back to Convex. Omit for dry-run.
   --include-breakdown     Preserve __ratingDebug payload on in-memory rows during execution.
   --log <true|false>      Enable or disable console logging. Default: true.
   --stop-on-error         Abort immediately on the first season failure.

@@ -10,7 +10,7 @@
  * Options:
  *   --season-id <id>        Required season id to rate.
  *   --models <list>         Comma-separated rating models. Default: all supported models.
- *   --apply                 Persist updated ratings back to Google Sheets.
+ *   --apply                 Persist updated ratings back to Convex.
  *   --season-type <value>   Optional seasonType filter for split/total models.
  *   --week-ids <list>       Optional comma-separated week ids for day/week models.
  *   --week-nums <list>      Optional comma-separated week numbers for day/week models.

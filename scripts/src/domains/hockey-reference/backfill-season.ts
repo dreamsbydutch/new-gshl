@@ -6,26 +6,26 @@
  * What it does:
  *   Scrapes Hockey Reference skater and goalie totals for one or more seasons,
  *   matches them to GSHL players, and prepares PlayerNHLStatLine upserts. It
- *   also writes unmatched or ambiguous rows to PlayerNHLBackfillMismatches.
+ *   also writes unmatched or ambiguous rows to a local JSON report.
  *   Runs as a dry-run unless --apply is passed.
  *
  * Options:
  *   --season-id <id>       Backfill one season.
  *   --season-ids <list>    Backfill a comma-separated list of seasons.
  *   --year <value>         Override the Hockey Reference season year lookup.
- *   --apply                Persist PlayerNHLStatLine changes to Google Sheets.
+ *   --apply                Persist PlayerNHLStatLine changes to Convex.
  *   --log <true|false>     Enable or disable console logging. Default: true.
  *   --stop-on-error        Stop immediately after the first failed season.
  *   --help                 Print the built-in help text and exit.
  */
 import { load } from "cheerio";
+import { mkdir, writeFile } from "node:fs/promises";
+import path from "node:path";
 import {
   getArgValue,
   hasFlag,
   toBoolean,
 } from "@gshl-lib/ranking/player-rating-support";
-import { optimizedSheetsClient } from "@gshl-lib/sheets/client/optimized-client";
-import { getSpreadsheetIdForModel } from "@gshl-lib/sheets/config/config";
 import { fastSheetsReader } from "@gshl-lib/sheets/reader/fast-reader";
 import { minimalSheetsWriter } from "@gshl-lib/sheets/writer/minimal-writer";
 import { getCompositeKeyColumnsForModel } from "@gshl-lib/sheets/config/config";
@@ -129,34 +129,10 @@ Options:
 
 const FETCH_RETRY_DELAYS_MS = [1500, 4000, 9000] as const;
 const FETCH_DELAY_BETWEEN_SOURCE_PAGES_MS = 1200;
-const MISMATCH_SHEET_NAME = "PlayerNHLBackfillMismatches";
-const MISMATCH_SHEET_HEADERS = [
-  "seasonId",
-  "seasonYear",
-  "fullName",
-  "posGroup",
-  "sourceType",
-  "reason",
-  "nhlTeam",
-  "rawPos",
-  "nhlPos",
-  "age",
-  "GP",
-  "sourceIndex",
-] as const;
-
-function columnToLetter(columnIndex1: number): string {
-  let columnIndex = columnIndex1;
-  let letter = "";
-
-  while (columnIndex > 0) {
-    const remainder = (columnIndex - 1) % 26;
-    letter = String.fromCharCode(65 + remainder) + letter;
-    columnIndex = Math.floor((columnIndex - 1) / 26);
-  }
-
-  return letter;
-}
+const MISMATCH_REPORT_PATH = path.resolve(
+  process.cwd(),
+  "reports/hockey-reference-mismatches-latest.json",
+);
 
 const NHL_TEAM_ALIASES: Record<string, string> = {
   ANH: "ANA",
@@ -1061,50 +1037,12 @@ function buildInvestigationRow(
   };
 }
 
-async function writeMismatchSheet(rows: InvestigationRow[]): Promise<void> {
-  const spreadsheetId = getSpreadsheetIdForModel("PlayerNHLStatLine");
-  const lastColumnLetter = columnToLetter(MISMATCH_SHEET_HEADERS.length);
-  await optimizedSheetsClient.createSheet(spreadsheetId, MISMATCH_SHEET_NAME, [
-    ...MISMATCH_SHEET_HEADERS,
-  ]);
-
-  const existingRows = await optimizedSheetsClient.getValues(
-    spreadsheetId,
-    `${MISMATCH_SHEET_NAME}!A1:${lastColumnLetter}`,
-  );
-  const existingDataRowCount = Math.max(existingRows.length - 1, 0);
-  const writeRowCount = Math.max(rows.length, existingDataRowCount, 1);
-  const values = rows.map((row) => [
-    row.seasonId,
-    row.seasonYear,
-    row.fullName,
-    row.posGroup,
-    row.sourceType,
-    row.reason,
-    row.nhlTeam,
-    row.rawPos,
-    row.nhlPos,
-    row.age,
-    row.gp,
-    String(row.sourceIndex),
-  ]);
-
-  while (values.length < writeRowCount) {
-    values.push(
-      Array.from({ length: MISMATCH_SHEET_HEADERS.length }, () => ""),
-    );
-  }
-
-  await optimizedSheetsClient.updateValues(
-    spreadsheetId,
-    `${MISMATCH_SHEET_NAME}!A1:${lastColumnLetter}1`,
-    [[...MISMATCH_SHEET_HEADERS]],
-  );
-
-  await optimizedSheetsClient.updateValues(
-    spreadsheetId,
-    `${MISMATCH_SHEET_NAME}!A2:${lastColumnLetter}${writeRowCount + 1}`,
-    values,
+async function writeMismatchReport(rows: InvestigationRow[]): Promise<void> {
+  await mkdir(path.dirname(MISMATCH_REPORT_PATH), { recursive: true });
+  await writeFile(
+    MISMATCH_REPORT_PATH,
+    `${JSON.stringify(rows, null, 2)}\n`,
+    "utf8",
   );
 }
 
@@ -1313,10 +1251,10 @@ async function main(): Promise<void> {
     }
   }
 
-  await writeMismatchSheet(investigationRows);
+  await writeMismatchReport(investigationRows);
   log(
     options,
-    `Wrote ${investigationRows.length} mismatch row(s) to ${MISMATCH_SHEET_NAME}.`,
+    `Wrote ${investigationRows.length} mismatch row(s) to ${MISMATCH_REPORT_PATH}.`,
   );
 
   console.log(

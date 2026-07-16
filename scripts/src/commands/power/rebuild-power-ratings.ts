@@ -22,7 +22,7 @@ Usage:
 
 Options:
   --season-id <id>      Required season id.
-  --apply               Write power and matchup updates back to Google Sheets.
+  --apply               Write power and matchup updates back to Convex.
   --week-types <list>   Optional comma-separated week types.
   --season-type <type>  Optional legacy seasonType filter.
   --log <true|false>    Enable or disable console logging. Default: true.

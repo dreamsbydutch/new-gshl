@@ -16,7 +16,7 @@
  *   --start-date <date>       Optional YYYY-MM-DD lower date bound.
  *   --end-date <date>         Optional YYYY-MM-DD upper date bound.
  *   --apply-lt-auto-lineups   For LT matchups, persist dailyPos=bestPos.
- *   --apply                   Persist lineup updates to Google Sheets.
+ *   --apply                   Persist lineup updates to Convex.
  *   --log <true|false>        Enable or disable console logging. Default: true.
  *   --help                    Print the built-in help text and exit.
  */

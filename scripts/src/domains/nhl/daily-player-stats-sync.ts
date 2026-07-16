@@ -54,7 +54,7 @@ Options:
   --python-bin <path>     Python executable to run. Default: python
   --ssl-verify <bool>     Pass through to nhl-api-py. Default: false
   --aggregate             Rebuild season aggregates after applying PlayerDay updates.
-  --apply                 Write PlayerDayStatLine changes to Google Sheets.
+  --apply                 Write PlayerDayStatLine changes to Convex.
   --log <true|false>      Enable or disable console logging. Default: true.
   --help                  Show this message and exit.
 `.trim();

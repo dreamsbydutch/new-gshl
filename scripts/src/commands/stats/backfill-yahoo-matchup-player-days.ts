@@ -52,7 +52,7 @@ Options:
   --browser-wait-ms <ms>            Browser fallback wait timeout. Default: 180000.
   --browser-import-cookie <true|false> Best-effort import of YAHOO_COOKIE into the browser profile. Default: false.
   --report-file <path>              Optional file path for the full JSON report.
-  --apply                           Persist reconciled changes to Google Sheets.
+  --apply                           Persist reconciled changes to Convex.
   --help                            Show this message and exit.
 `.trim();
 
