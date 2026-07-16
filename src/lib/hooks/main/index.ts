@@ -34,6 +34,8 @@ export {
 // Draft pick hooks
 export { useDraftPicks, type UseDraftPicksOptions } from "./useDraftPick";
 export { useAwards, type UseAwardsOptions } from "./useAward";
+export { usePlayerAwards, type UsePlayerAwardsOptions } from "./usePlayerAward";
+export { useTeamAwards, type UseTeamAwardsOptions } from "./useTeamAward";
 
 // Matchup and game hooks
 export { useMatchups, type UseMatchupsOptions } from "./useMatchups";

@@ -237,6 +237,32 @@ export interface Awards {
   createdAt: Date;
   updatedAt: Date;
 }
+
+/** A player recognition, tied to the team the player represented that season. */
+export interface PlayerAward {
+  id: string;
+  seasonId: string;
+  playerId?: string;
+  winnerId?: string;
+  gshlTeamId?: string;
+  teamId?: string;
+  award: AwardsList;
+  nomineeIds?: string[];
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/** A franchise/team recognition for a specific season. */
+export interface TeamAward {
+  id: string;
+  seasonId: string;
+  gshlTeamId?: string;
+  teamId?: string;
+  winnerId?: string;
+  award: AwardsList;
+  createdAt: Date;
+  updatedAt: Date;
+}
 export interface DraftPick {
   id: string;
   seasonId: string;

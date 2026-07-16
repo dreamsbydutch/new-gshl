@@ -9,6 +9,8 @@ import { conferenceRouter } from "./routers/conference";
 import { franchiseRouter } from "./routers/franchise";
 import { eventRouter } from "./routers/event";
 import { awardRouter } from "./routers/award";
+import { playerAwardRouter } from "./routers/playerAward";
+import { teamAwardRouter } from "./routers/teamAward";
 import { contractRouter } from "./routers/contract";
 import { draftPickRouter } from "./routers/draftPick";
 import { systemRouter } from "./routers/system";
@@ -36,6 +38,8 @@ export const appRouter = createTRPCRouter({
   matchup: matchupRouter,
   event: eventRouter,
   award: awardRouter,
+  playerAward: playerAwardRouter,
+  teamAward: teamAwardRouter,
   contract: contractRouter,
   draftPick: draftPickRouter,
 

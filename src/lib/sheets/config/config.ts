@@ -70,6 +70,8 @@ export const MODEL_TO_WORKBOOK: Record<string, keyof typeof WORKBOOKS> = {
   Player: "GENERAL",
   Contract: "GENERAL",
   Awards: "GENERAL",
+  PlayerAwards: "GENERAL",
+  TeamAwards: "GENERAL",
   DraftPick: "GENERAL",
   nhlTeam: "GENERAL", // legacy/lowercase model key
   NHLTeam: "GENERAL", // alias for actual sheet named 'NHLTeam'
@@ -219,6 +221,8 @@ export const SHEETS_CONFIG = {
     Matchup: "Matchup",
     Owner: "Owner",
     Awards: "Award",
+    PlayerAwards: "PlayerAwards",
+    TeamAwards: "TeamAwards",
     DraftPick: "DraftPick",
     nhlTeam: "nhlTeam", // legacy
     NHLTeam: "NHLTeam", // actual sheet name as provided
@@ -715,6 +719,28 @@ export const SHEETS_CONFIG = {
       "seasonId",
       "winnerId",
       "nomineeIds",
+      "award",
+      "createdAt",
+      "updatedAt",
+    ],
+    PlayerAwards: [
+      "id",
+      "seasonId",
+      "playerId",
+      "winnerId",
+      "gshlTeamId",
+      "teamId",
+      "award",
+      "nomineeIds",
+      "createdAt",
+      "updatedAt",
+    ],
+    TeamAwards: [
+      "id",
+      "seasonId",
+      "gshlTeamId",
+      "teamId",
+      "winnerId",
       "award",
       "createdAt",
       "updatedAt",
