@@ -8,7 +8,12 @@ import type {
   TrophyCaseProps,
   TrophyCaseSummaryLine,
 } from "@gshl-types";
-import { buildTrophyCaseData, cn, getSummaryLineClass } from "@gshl-utils";
+import {
+  buildTrophyCaseData,
+  cn,
+  formatOwnerName,
+  getSummaryLineClass,
+} from "@gshl-utils";
 
 function TrophySectionDivider({ label }: { label: string }) {
   return (
@@ -23,17 +28,17 @@ function TrophySectionDivider({ label }: { label: string }) {
 }
 
 function TrophySummary({
-  teamName,
+  ownerName,
   summaryLines,
 }: {
-  teamName: string | null;
+  ownerName: string;
   summaryLines: TrophyCaseSummaryLine[];
 }) {
   if (summaryLines.length === 0) {
     return (
       <div className="mx-auto max-w-3xl px-6 text-center">
         <p className="text-sm text-muted-foreground">
-          {teamName ?? "This franchise"} has no team awards to display yet.
+          {ownerName} has no team awards to display yet.
         </p>
       </div>
     );
@@ -108,13 +113,7 @@ function FranchiseLogo({
   );
 }
 
-function TrophyCard({
-  card,
-  teamName,
-}: {
-  card: TrophyCaseCard;
-  teamName: string | null;
-}) {
+function TrophyCard({ card }: { card: TrophyCaseCard }) {
   return (
     <article className="mx-auto flex w-full max-w-[10.5rem] flex-col items-center text-center">
       <div className="relative flex w-full items-end justify-center pb-4">
@@ -124,7 +123,10 @@ function TrophyCard({
           fallbackLabel={`${card.catalog.fullName} image`}
         />
         <div className="absolute bottom-0 left-1/2 -translate-x-1/2">
-          <FranchiseLogo logoUrl={card.franchiseLogoUrl} teamName={teamName} />
+          <FranchiseLogo
+            logoUrl={card.franchiseLogoUrl}
+            teamName={card.franchiseName}
+          />
         </div>
       </div>
       <div className="mt-2 font-oswald text-3xl font-bold leading-none text-black">
@@ -133,6 +135,11 @@ function TrophyCard({
       <div className="mt-1 font-oswald text-xl leading-tight text-black">
         {card.catalog.fullName}
       </div>
+      {card.franchiseName ? (
+        <div className="mt-1 text-xs leading-tight text-muted-foreground">
+          {card.franchiseName}
+        </div>
+      ) : null}
     </article>
   );
 }
@@ -149,7 +156,7 @@ export function TrophyCase(props: TrophyCaseProps) {
   return (
     <section className="pb-12">
       <TrophySummary
-        teamName={props.currentTeam.name}
+        ownerName={formatOwnerName(props.currentTeam)}
         summaryLines={summaryLines}
       />
       {visibleGroups.map((group) => {
@@ -164,11 +171,7 @@ export function TrophyCase(props: TrophyCaseProps) {
               )}
             >
               {groupCards.map((card) => (
-                <TrophyCard
-                  key={card.id}
-                  card={card}
-                  teamName={props.currentTeam.name}
-                />
+                <TrophyCard key={card.id} card={card} />
               ))}
             </div>
           </div>

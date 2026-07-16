@@ -41,6 +41,7 @@ export interface TrophyCaseCard {
   catalog: AwardCatalogEntry;
   seasonYear: number | string;
   franchiseLogoUrl: string | null;
+  franchiseName: string | null;
 }
 
 export interface TrophyCaseSummaryLine {

@@ -86,17 +86,20 @@ export function buildTrophyCaseData({
   seasons,
 }: BuildTrophyCaseDataInput): BuildTrophyCaseDataResult {
   const seasonYearMap = getSeasonYearMap(seasons);
-  const franchiseTeamIds = new Set(
+  const ownerId = String(currentTeam.ownerId ?? "");
+  const ownerTeamIds = new Set(
     allTeams
-      .filter(
-        (team) => String(team.franchiseId) === String(currentTeam.franchiseId),
+      .filter((team) =>
+        ownerId
+          ? String(team.ownerId ?? "") === ownerId
+          : String(team.franchiseId) === String(currentTeam.franchiseId),
       )
       .map((team) => String(team.id)),
   );
   const teamById = new Map(allTeams.map((team) => [String(team.id), team]));
 
   const cards = teamAwards
-    .filter((award) => franchiseTeamIds.has(String(award.teamId)))
+    .filter((award) => ownerTeamIds.has(String(award.teamId)))
     .map((award) => {
       const catalog = AWARD_CATALOG_BY_KEY.get(award.award);
       if (!catalog) return null;
@@ -108,6 +111,7 @@ export function buildTrophyCaseData({
         seasonYear: seasonYearMap.get(String(award.seasonId)) ?? award.seasonId,
         franchiseLogoUrl:
           historicalTeam?.logoUrl ?? currentTeam.logoUrl ?? null,
+        franchiseName: historicalTeam?.name ?? null,
       } satisfies TrophyCaseCard;
     })
     .filter((card): card is TrophyCaseCard => card !== null)
