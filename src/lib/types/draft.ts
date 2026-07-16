@@ -1,5 +1,11 @@
 import type { DraftPick, GSHLTeam } from "./database";
-import type { DraftBoardPlayer } from "./ui-components";
+import type { RosterPosition } from "./enums";
+import type { DraftBoardPlayer } from "./draft-ui";
+
+export interface LineupAssignment {
+  playerId: string;
+  lineupPos: RosterPosition;
+}
 
 export interface ProjectedDraftPick<
   TPlayer extends DraftBoardPlayer = DraftBoardPlayer,

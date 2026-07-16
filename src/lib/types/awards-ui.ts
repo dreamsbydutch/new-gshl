@@ -12,7 +12,7 @@ import type {
   TrophyCaseCard,
   TrophyCaseProps,
   TrophyCaseSummaryLine,
-} from "./ui-components";
+} from "./team-ui";
 
 export type AllStarAwardKey =
   | AwardsList.FIRST_AS
