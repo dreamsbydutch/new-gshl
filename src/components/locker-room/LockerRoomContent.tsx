@@ -6,16 +6,17 @@ import { TeamRecordBook } from "@gshl-components/team/TeamRecordBook";
 import { TeamDraftPickList } from "@gshl-components/team/TeamDraftPickList";
 import { TrophyCase } from "@gshl-components/team/TrophyCase";
 import {
-  useAwards,
   useCareerSplits,
   useDraftPicks,
   usePlayers,
   usePlayerStats,
+  usePlayerAwards,
   useSeasonState,
   useTeams,
   useNHLTeams,
   useNav,
   useContractData,
+  useTeamAwards,
 } from "@gshl-hooks";
 import { resolveContractDefaultSeason } from "@gshl-utils";
 import type { GSHLTeam, NHLTeam } from "@gshl-types";
@@ -58,19 +59,19 @@ export function LockerRoomContent() {
   const currentTeam = teams?.find((t) => t.ownerId === selectedOwnerId);
   const isTrophyTab = selectedLockerRoomType === "trophy";
   const isRecordBookTab = selectedLockerRoomType === "recordbook";
-  const needsAwardsData = isTrophyTab || isRecordBookTab;
-
-  const { data: awards = [], isLoading: awardsLoading } = useAwards({
-    winnerId: selectedOwnerId ?? undefined,
-    enabled: isTrophyTab && Boolean(selectedOwnerId),
-    orderBy: { seasonId: "desc" },
-  });
-  const { data: allAwards = [], isLoading: allAwardsLoading } = useAwards({
-    enabled: needsAwardsData,
-    orderBy: { seasonId: "desc" },
-  });
+  const { data: teamAwards = [], isLoading: teamAwardsLoading } = useTeamAwards(
+    {
+      enabled: isTrophyTab,
+      orderBy: { seasonId: "desc" },
+    },
+  );
+  const { data: playerAwards = [], isLoading: playerAwardsLoading } =
+    usePlayerAwards({
+      enabled: isRecordBookTab,
+      orderBy: { seasonId: "desc" },
+    });
   const playerTotalsQuery = usePlayerStats({
-    enabled: needsAwardsData,
+    enabled: isRecordBookTab,
     includeDaily: false,
     includeWeekly: false,
     includeSplits: false,
@@ -101,11 +102,11 @@ export function LockerRoomContent() {
     teamsLoading ||
     playersLoading ||
     nhlTeamsLoading ||
-    (needsAwardsData &&
-      (awardsLoading ||
-        allAwardsLoading ||
-        playerTotalsQuery.status.isLoading)) ||
-    (isRecordBookTab && careerSplitsQuery.isLoading);
+    (isTrophyTab && teamAwardsLoading) ||
+    (isRecordBookTab &&
+      (playerAwardsLoading ||
+        playerTotalsQuery.status.isLoading ||
+        careerSplitsQuery.isLoading));
 
   if (isLoading) {
     if (selectedLockerRoomType === "roster") {
@@ -175,19 +176,15 @@ export function LockerRoomContent() {
       )}
       {selectedLockerRoomType === "trophy" && (
         <TrophyCase
-          awards={awards}
-          allAwards={allAwards}
+          teamAwards={teamAwards}
           allTeams={allTeams}
           currentTeam={currentTeam}
-          nhlTeams={nhlTeams}
-          playerTotals={playerTotals}
-          players={players}
           seasons={seasons}
         />
       )}
       {selectedLockerRoomType === "recordbook" && (
         <TeamRecordBook
-          allAwards={allAwards}
+          playerAwards={playerAwards}
           allTeams={allTeams}
           careerSplits={careerSplits}
           currentTeam={currentTeam}

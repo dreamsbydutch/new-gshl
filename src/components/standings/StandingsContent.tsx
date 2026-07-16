@@ -5,7 +5,13 @@ import {
   SeasonAwards,
   StandingsComponent,
 } from "@gshl-components/league";
-import { useAwards, usePlayers, usePlayerStats, useStandingsData } from "@gshl-hooks";
+import {
+  usePlayerAwards,
+  usePlayers,
+  usePlayerStats,
+  useStandingsData,
+  useTeamAwards,
+} from "@gshl-hooks";
 import { StandingsSkeleton } from "@gshl-skeletons";
 
 export function StandingsContent() {
@@ -22,11 +28,19 @@ export function StandingsContent() {
   } = useStandingsData({});
   const isAwardsView = (standingsType ?? "overall") === "awards";
 
-  const { data: seasonAwards = [], isLoading: awardsLoading } = useAwards({
-    seasonId: selectedSeasonId ?? undefined,
-    enabled: isAwardsView && Boolean(selectedSeasonId),
-    orderBy: { award: "asc" },
-  });
+  const { data: playerAwards = [], isLoading: playerAwardsLoading } =
+    usePlayerAwards({
+      seasonId: selectedSeasonId ?? undefined,
+      enabled: isAwardsView && Boolean(selectedSeasonId),
+      orderBy: { award: "asc" },
+    });
+  const { data: teamAwards = [], isLoading: teamAwardsLoading } = useTeamAwards(
+    {
+      seasonId: selectedSeasonId ?? undefined,
+      enabled: isAwardsView && Boolean(selectedSeasonId),
+      orderBy: { award: "asc" },
+    },
+  );
   const { data: players = [], isLoading: playersLoading } = usePlayers({
     enabled: isAwardsView,
   });
@@ -42,7 +56,10 @@ export function StandingsContent() {
   if (
     isLoading ||
     (isAwardsView &&
-      (awardsLoading || playersLoading || playerTotalsQuery.status.isLoading))
+      (playerAwardsLoading ||
+        teamAwardsLoading ||
+        playersLoading ||
+        playerTotalsQuery.status.isLoading))
   ) {
     return <StandingsSkeleton />;
   }
@@ -50,7 +67,8 @@ export function StandingsContent() {
   if (isAwardsView) {
     return (
       <SeasonAwards
-        awards={seasonAwards}
+        playerAwards={playerAwards}
+        teamAwards={teamAwards}
         players={players}
         playerTotals={playerTotalsQuery.totals}
         season={selectedSeason ?? null}

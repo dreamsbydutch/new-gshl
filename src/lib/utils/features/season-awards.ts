@@ -7,11 +7,12 @@ import type {
   AllStarAwardKey,
   AllStarTeamCard,
   AllStarWinner,
-  Awards,
   GSHLTeam,
   Player,
+  PlayerAward,
   PlayerTotalStatLine,
   SeasonAwardWinnerCard,
+  TeamAward,
 } from "@gshl-types";
 import { normalizeIdList } from "../core/ids";
 import { formatPlayerPositionList } from "../domain/player";
@@ -102,25 +103,17 @@ export function getAllStarCardClass(awardKey: AllStarAwardKey): string {
  * @returns The assembled season award cards.
  */
 export function buildSeasonAwardCards(
-  awards: Awards[],
+  awards: TeamAward[],
   teams: GSHLTeam[],
 ): SeasonAwardWinnerCard[] {
-  const allStarAwardKeys = new Set<string>(ALL_STAR_AWARD_ORDER);
-  const teamByOwnerId = new Map(
-    teams
-      .filter((team) => team.ownerId)
-      .map((team) => [String(team.ownerId), team]),
-  );
   const teamById = new Map(teams.map((team) => [String(team.id), team]));
 
   return awards
-    .filter((award) => !allStarAwardKeys.has(String(award.award)))
     .map((award) => {
       const catalog = AWARD_CATALOG_BY_KEY.get(award.award);
       if (!catalog) return null;
 
-      const winnerId = String(award.winnerId);
-      const winningTeam = teamById.get(winnerId) ?? teamByOwnerId.get(winnerId);
+      const winningTeam = teamById.get(String(award.teamId));
       const ownerDisplayName = getOwnerDisplayName(winningTeam);
 
       return {
@@ -156,7 +149,7 @@ export function buildSeasonAwardCards(
  * @returns The assembled all star team cards.
  */
 export function buildAllStarTeamCards(
-  awards: Awards[],
+  awards: PlayerAward[],
   players: Player[],
   playerTotals: PlayerTotalStatLine[],
   teams: GSHLTeam[],
@@ -170,7 +163,7 @@ export function buildAllStarTeamCards(
     const winners = awards
       .filter((award) => award.award === awardKey)
       .map((award) => {
-        const playerId = String(award.winnerId);
+        const playerId = String(award.playerId);
         const playerTotal = playerTotals.find((row) => {
           return String(row.playerId) === playerId;
         });

@@ -84,7 +84,6 @@ const GOALIE_RECORD_DEFS: Array<{ key: RecordStatKey; label: string }> = [
   { key: "SVP", label: "Save Percentage" },
 ];
 
-
 function RecordBookDivider({ label }: { label: string }) {
   return (
     <div className="mb-6 mt-12 flex items-center gap-4 px-4">
@@ -191,11 +190,7 @@ function RecordLeadersTable({
   );
 }
 
-function AwardsTable({
-  rows,
-}: {
-  rows: AwardSummaryRow[];
-}) {
+function AwardsTable({ rows }: { rows: AwardSummaryRow[] }) {
   return (
     <div className="rounded-[1.75rem] border border-gray-200 bg-white/95 p-4 shadow-[0_18px_40px_rgba(15,23,42,0.08)]">
       <div className="mb-3 px-1">
@@ -261,7 +256,7 @@ function AwardsTable({
 
 export function TeamRecordBook(props: TeamRecordBookProps) {
   const {
-    allAwards,
+    playerAwards,
     allTeams,
     careerSplits,
     currentTeam,
@@ -406,7 +401,7 @@ export function TeamRecordBook(props: TeamRecordBookProps) {
   const awardSummaryRows = useMemo(
     () =>
       buildAwardSummaryRows({
-        allAwards,
+        playerAwards,
         allTeams,
         currentTeam,
         nhlTeamsByAbbr,
@@ -415,7 +410,7 @@ export function TeamRecordBook(props: TeamRecordBookProps) {
         seasonsById,
       }),
     [
-      allAwards,
+      playerAwards,
       allTeams,
       currentTeam,
       nhlTeamsByAbbr,
@@ -479,14 +474,8 @@ export function TeamRecordBook(props: TeamRecordBookProps) {
 
       <RecordBookDivider label="PLAYOFFS" />
       <div className="mx-auto grid max-w-6xl gap-4 px-4 lg:grid-cols-2">
-        <RecordLeadersTable
-          title="Skater Records"
-          rows={playoffSkaterRows}
-        />
-        <RecordLeadersTable
-          title="Goalie Records"
-          rows={playoffGoalieRows}
-        />
+        <RecordLeadersTable title="Skater Records" rows={playoffSkaterRows} />
+        <RecordLeadersTable title="Goalie Records" rows={playoffGoalieRows} />
       </div>
 
       <RecordBookDivider label="ALL-STAR TEAMS" />

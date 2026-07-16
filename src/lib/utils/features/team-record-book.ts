@@ -2,7 +2,7 @@ import { AWARD_CATALOG_BY_KEY } from "@gshl-lib/config/awards";
 import { AwardsList, PositionGroup, SeasonType } from "@gshl-types";
 import type {
   AwardSummaryRow,
-  Awards,
+  PlayerAward,
   FranchiseCareerRow,
   GSHLTeam,
   NHLTeam,
@@ -42,7 +42,13 @@ const GOALIE_RATE_MINIMUMS: Record<SeasonType, number> = {
 const CAREER_TOTAL_FIELDS: Array<
   keyof Omit<
     FranchiseCareerRow,
-    "playerId" | "seasonType" | "posGroup" | "nhlPos" | "nhlTeam" | "GAA" | "SVP"
+    | "playerId"
+    | "seasonType"
+    | "posGroup"
+    | "nhlPos"
+    | "nhlTeam"
+    | "GAA"
+    | "SVP"
   >
 > = [
   "days",
@@ -266,7 +272,10 @@ export function findLeader(
       return false;
     }
 
-    if ((definition.stat === "GAA" || definition.stat === "SVP") && row.GS <= 0) {
+    if (
+      (definition.stat === "GAA" || definition.stat === "SVP") &&
+      row.GS <= 0
+    ) {
       return false;
     }
 
@@ -287,8 +296,10 @@ export function findLeader(
 
     if (definition.stat === "GAA") {
       if (leftValue !== rightValue) {
-        return (leftValue ?? Number.POSITIVE_INFINITY) -
-          (rightValue ?? Number.POSITIVE_INFINITY);
+        return (
+          (leftValue ?? Number.POSITIVE_INFINITY) -
+          (rightValue ?? Number.POSITIVE_INFINITY)
+        );
       }
     } else if ((rightValue ?? -Infinity) !== (leftValue ?? -Infinity)) {
       return (rightValue ?? -Infinity) - (leftValue ?? -Infinity);
@@ -299,7 +310,8 @@ export function findLeader(
     }
 
     const leftName = playersById.get(left.playerId)?.fullName ?? left.playerId;
-    const rightName = playersById.get(right.playerId)?.fullName ?? right.playerId;
+    const rightName =
+      playersById.get(right.playerId)?.fullName ?? right.playerId;
     return leftName.localeCompare(rightName);
   });
 
@@ -309,11 +321,7 @@ export function findLeader(
   }
 
   const player = playersById.get(leader.playerId);
-  const nhlTeam = getNhlTeamForPlayer(
-    nhlTeamsByAbbr,
-    player,
-    leader.nhlTeam,
-  );
+  const nhlTeam = getNhlTeamForPlayer(nhlTeamsByAbbr, player, leader.nhlTeam);
 
   return {
     key: definition.key,
@@ -339,7 +347,7 @@ export function findLeader(
  * @returns The assembled award summary rows.
  */
 export function buildAwardSummaryRows({
-  allAwards,
+  playerAwards,
   allTeams,
   currentTeam,
   nhlTeamsByAbbr,
@@ -347,7 +355,7 @@ export function buildAwardSummaryRows({
   playersById,
   seasonsById,
 }: {
-  allAwards: Awards[];
+  playerAwards: PlayerAward[];
   allTeams: GSHLTeam[];
   currentTeam: GSHLTeam;
   nhlTeamsByAbbr: Map<string, NHLTeam>;
@@ -363,7 +371,7 @@ export function buildAwardSummaryRows({
   );
   const summaryMap = new Map<string, PlayerAwardBreakdown>();
 
-  for (const award of allAwards) {
+  for (const award of playerAwards) {
     const awardKey = String(award.award) as AwardsList;
     if (!PLAYER_AWARD_KEYS.has(awardKey)) {
       continue;
@@ -375,7 +383,7 @@ export function buildAwardSummaryRows({
       continue;
     }
 
-    const playerId = String(award.winnerId);
+    const playerId = String(award.playerId);
     const seasonType =
       (ALL_STAR_AWARD_KEYS.has(awardKey)
         ? getAllStarSeasonType(awardKey)
@@ -436,7 +444,9 @@ export function buildAwardSummaryRows({
             getPlayerAwardLabel(right[0]),
           );
         })
-        .map(([awardKey, count]) => `${count}x ${getPlayerAwardLabel(awardKey)}`)
+        .map(
+          ([awardKey, count]) => `${count}x ${getPlayerAwardLabel(awardKey)}`,
+        )
         .join(", ");
 
       return {

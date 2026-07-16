@@ -1,6 +1,6 @@
 import type { AwardsList, SeasonType } from "./enums";
 import type {
-  Awards,
+  PlayerAward,
   Conference,
   Contract,
   Franchise,
@@ -174,7 +174,7 @@ export interface RecordLeader {
 }
 
 export interface TeamRecordBookProps {
-  allAwards: Awards[];
+  playerAwards: PlayerAward[];
   allTeams: GSHLTeam[];
   careerSplits: PlayerCareerSplitStatLine[];
   currentTeam: GSHLTeam;

@@ -1,11 +1,11 @@
 import type { AwardsList } from "./enums";
 import type {
-  Awards,
   GSHLTeam,
-  NHLTeam,
   Player,
+  PlayerAward,
   PlayerTotalStatLine,
   Season,
+  TeamAward,
 } from "./database";
 import type {
   AwardCatalogEntry,
@@ -21,7 +21,7 @@ export type AllStarAwardKey =
 
 export interface SeasonAwardWinnerCard {
   id: string;
-  award: Awards;
+  award: TeamAward;
   catalog: AwardCatalogEntry;
   winnerName: string;
   winnerDetail: string | null;
@@ -43,27 +43,12 @@ export interface AllStarTeamCard {
 }
 
 export interface SeasonAwardsProps {
-  awards: Awards[];
+  playerAwards: PlayerAward[];
+  teamAwards: TeamAward[];
   players: Player[];
   playerTotals: PlayerTotalStatLine[];
   season: Season | null;
   teams: GSHLTeam[];
-}
-
-export interface AllStarCountLine {
-  awardKey: AllStarAwardKey;
-  label: string;
-  count: number;
-}
-
-export interface AllStarRowData {
-  awardKey: AllStarAwardKey;
-  seasonId: string;
-  seasonYear: number | string;
-  playerId: string;
-  playerName: string;
-  playerTotal: PlayerTotalStatLine;
-  nhlTeam: NHLTeam | undefined;
 }
 
 export type BuildTrophyCaseDataInput = TrophyCaseProps;
@@ -71,6 +56,4 @@ export type BuildTrophyCaseDataInput = TrophyCaseProps;
 export interface BuildTrophyCaseDataResult {
   cards: TrophyCaseCard[];
   summaryLines: TrophyCaseSummaryLine[];
-  allStarCounts: AllStarCountLine[];
-  allStarRows: AllStarRowData[];
 }

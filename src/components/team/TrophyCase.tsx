@@ -3,30 +3,12 @@
 
 import { useMemo, useState } from "react";
 import { AWARD_GROUP_ORDER } from "@gshl-lib/config/awards";
-import {
-  NHLLogo,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@gshl-ui";
-import {
-  buildTrophyCaseData,
-  cn,
-  formatNumber,
-  formatPlayerPositionList,
-  getAllStarRowClass,
-  getSummaryLineClass,
-} from "@gshl-utils";
 import type {
-  AllStarCountLine,
-  AllStarRowData,
   TrophyCaseCard,
   TrophyCaseProps,
   TrophyCaseSummaryLine,
 } from "@gshl-types";
+import { buildTrophyCaseData, cn, getSummaryLineClass } from "@gshl-utils";
 
 function TrophySectionDivider({ label }: { label: string }) {
   return (
@@ -43,19 +25,15 @@ function TrophySectionDivider({ label }: { label: string }) {
 function TrophySummary({
   teamName,
   summaryLines,
-  allStarCounts,
 }: {
   teamName: string | null;
   summaryLines: TrophyCaseSummaryLine[];
-  allStarCounts: AllStarCountLine[];
 }) {
-  const hasAnyAllStars = allStarCounts.some((item) => item.count > 0);
-
-  if (summaryLines.length === 0 && !hasAnyAllStars) {
+  if (summaryLines.length === 0) {
     return (
       <div className="mx-auto max-w-3xl px-6 text-center">
         <p className="text-sm text-muted-foreground">
-          {teamName ?? "This franchise"} has no awards to display yet.
+          {teamName ?? "This franchise"} has no team awards to display yet.
         </p>
       </div>
     );
@@ -67,11 +45,6 @@ function TrophySummary({
         {summaryLines.map((line) => (
           <p key={line.awardKey} className={getSummaryLineClass(line.group)}>
             {line.text}
-          </p>
-        ))}
-        {allStarCounts.map((line) => (
-          <p key={line.awardKey} className="text-base sm:text-lg">
-            {line.count} {line.label}
           </p>
         ))}
       </div>
@@ -89,7 +62,6 @@ function TrophyImage({
   fallbackLabel: string;
 }) {
   const [errored, setErrored] = useState(false);
-
   if (!imageUrl || errored) {
     return (
       <div className="flex h-28 w-full items-center justify-center rounded-[2rem] border border-gray-200 bg-gradient-to-b from-gray-50 to-white px-4 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_12px_28px_rgba(15,23,42,0.08)]">
@@ -99,7 +71,6 @@ function TrophyImage({
       </div>
     );
   }
-
   return (
     <img
       className="h-28 w-full object-contain"
@@ -118,7 +89,6 @@ function FranchiseLogo({
   teamName: string | null;
 }) {
   const [errored, setErrored] = useState(false);
-
   if (!logoUrl || errored) {
     return (
       <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/80 bg-white/90 shadow-lg">
@@ -128,7 +98,6 @@ function FranchiseLogo({
       </div>
     );
   }
-
   return (
     <img
       className="h-10 w-10 rounded-xl bg-white/90 object-cover p-1 shadow-lg"
@@ -168,105 +137,8 @@ function TrophyCard({
   );
 }
 
-function AllStarTable({ rows }: { rows: AllStarRowData[] }) {
-  return (
-    <div>
-      <TrophySectionDivider label="ALL-STAR TEAMS" />
-      <div className="mx-auto max-w-6xl px-3 sm:px-6">
-        {rows.length > 0 ? (
-          <Table className="min-w-[720px] table-fixed border-separate border-spacing-0 text-[11px] sm:min-w-[860px] sm:text-xs [&_td]:px-0.5 [&_td]:py-1 [&_th]:h-7 [&_th]:px-0.5 [&_th]:py-1">
-            <TableHeader>
-              <TableRow className="bg-muted/30 hover:bg-muted/30">
-                <TableHead className="w-[3rem] whitespace-nowrap">Season</TableHead>
-                <TableHead className="w-[8.5rem] whitespace-nowrap">Player</TableHead>
-                <TableHead className="w-[2rem] whitespace-nowrap">Pos</TableHead>
-                <TableHead className="w-[2rem] text-right">GP</TableHead>
-                <TableHead className="w-[2rem] text-right">G</TableHead>
-                <TableHead className="w-[2rem] text-right">A</TableHead>
-                <TableHead className="w-[2rem] text-right">P</TableHead>
-                <TableHead className="w-[2.25rem] text-right">HIT</TableHead>
-                <TableHead className="w-[2.25rem] text-right">BLK</TableHead>
-                <TableHead className="w-[2rem] text-right">W</TableHead>
-                <TableHead className="w-[2.5rem] text-right">GAA</TableHead>
-                <TableHead className="w-[2.5rem] text-right">SVP</TableHead>
-                <TableHead className="w-[2rem] text-right">SO</TableHead>
-                <TableHead className="w-[2.75rem] text-right">Rating</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {rows.map((row) => (
-                <TableRow
-                  key={`${row.awardKey}-${row.seasonId}-${row.playerId}`}
-                  className={getAllStarRowClass(row.awardKey)}
-                >
-                  <TableCell className="whitespace-nowrap font-medium">
-                    {row.seasonYear}
-                  </TableCell>
-                  <TableCell className="whitespace-nowrap font-medium">
-                    <div className="flex items-center justify-start gap-1.5 text-left">
-                      <NHLLogo
-                        team={row.nhlTeam}
-                        size={18}
-                        className="mx-0 shrink-0"
-                      />
-                    <span className="truncate">
-                        {row.playerName}
-                      </span>
-                    </div>
-                  </TableCell>
-                  <TableCell className="whitespace-nowrap">
-                    {formatPlayerPositionList(row.playerTotal.nhlPos)}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    {formatNumber(row.playerTotal.GP, 0)}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    {formatNumber(row.playerTotal.G, 0)}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    {formatNumber(row.playerTotal.A, 0)}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    {formatNumber(row.playerTotal.P, 0)}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    {formatNumber(row.playerTotal.HIT, 0)}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    {formatNumber(row.playerTotal.BLK, 0)}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    {formatNumber(row.playerTotal.W, 0)}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    {formatNumber(row.playerTotal.GAA, 2)}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    {formatNumber(row.playerTotal.SVP, 3)}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    {formatNumber(row.playerTotal.SO, 0)}
-                  </TableCell>
-                  <TableCell className="text-right font-medium">
-                    {formatNumber(row.playerTotal.Rating, 2)}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        ) : (
-          <p className="text-center text-sm text-muted-foreground">
-            No all-stars on record yet.
-          </p>
-        )}
-      </div>
-    </div>
-  );
-}
-
 export function TrophyCase(props: TrophyCaseProps) {
-  const { currentTeam } = props;
-  const { cards, summaryLines, allStarCounts, allStarRows } = useMemo(
+  const { cards, summaryLines } = useMemo(
     () => buildTrophyCaseData(props),
     [props],
   );
@@ -277,13 +149,11 @@ export function TrophyCase(props: TrophyCaseProps) {
   return (
     <section className="pb-12">
       <TrophySummary
-        teamName={currentTeam.name}
+        teamName={props.currentTeam.name}
         summaryLines={summaryLines}
-        allStarCounts={allStarCounts}
       />
       {visibleGroups.map((group) => {
         const groupCards = cards.filter((card) => card.catalog.group === group);
-
         return (
           <div key={group}>
             <TrophySectionDivider label={group} />
@@ -297,14 +167,13 @@ export function TrophyCase(props: TrophyCaseProps) {
                 <TrophyCard
                   key={card.id}
                   card={card}
-                  teamName={currentTeam.name}
+                  teamName={props.currentTeam.name}
                 />
               ))}
             </div>
           </div>
         );
       })}
-      <AllStarTable rows={allStarRows} />
     </section>
   );
 }

@@ -56,13 +56,7 @@ function WinnerLogo({
   );
 }
 
-function TrophyImage({
-  imageUrl,
-  alt,
-}: {
-  imageUrl: string;
-  alt: string;
-}) {
+function TrophyImage({ imageUrl, alt }: { imageUrl: string; alt: string }) {
   const [errored, setErrored] = useState(false);
 
   if (!imageUrl || errored) {
@@ -84,7 +78,6 @@ function TrophyImage({
     />
   );
 }
-
 
 function AwardWinnerCard({ card }: { card: SeasonAwardWinnerCard }) {
   return (
@@ -164,19 +157,20 @@ function AllStarTeamSection({ card }: { card: AllStarTeamCard }) {
 }
 
 export function SeasonAwards({
-  awards,
+  playerAwards,
+  teamAwards,
   players,
   playerTotals,
   season,
   teams,
 }: SeasonAwardsProps) {
   const awardCards = useMemo(
-    () => buildSeasonAwardCards(awards, teams),
-    [awards, teams],
+    () => buildSeasonAwardCards(teamAwards, teams),
+    [teamAwards, teams],
   );
   const allStarCards = useMemo(
-    () => buildAllStarTeamCards(awards, players, playerTotals, teams),
-    [awards, players, playerTotals, teams],
+    () => buildAllStarTeamCards(playerAwards, players, playerTotals, teams),
+    [playerAwards, players, playerTotals, teams],
   );
   const visibleGroups = useMemo(
     () =>
@@ -186,7 +180,7 @@ export function SeasonAwards({
     [awardCards],
   );
 
-  if (awards.length === 0) {
+  if (teamAwards.length === 0 && playerAwards.length === 0) {
     return (
       <div className="px-4 py-12 text-center text-sm text-muted-foreground">
         No awards are on record for this season yet.

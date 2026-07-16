@@ -1,12 +1,10 @@
 import type {
-  Awards,
   GSHLTeam,
   Matchup,
-  NHLTeam,
   Player,
-  PlayerTotalStatLine,
   PlayerWeekStatLine,
   Season,
+  TeamAward,
   TeamWeekStatLine,
   Week,
 } from "./database";
@@ -39,7 +37,7 @@ export interface AwardCatalogEntry {
 
 export interface TrophyCaseCard {
   id: string;
-  award: Awards;
+  award: TeamAward;
   catalog: AwardCatalogEntry;
   seasonYear: number | string;
   franchiseLogoUrl: string | null;
@@ -53,13 +51,9 @@ export interface TrophyCaseSummaryLine {
 }
 
 export interface TrophyCaseProps {
-  awards: Awards[];
-  allAwards: Awards[];
+  teamAwards: TeamAward[];
   allTeams: GSHLTeam[];
   currentTeam: GSHLTeam;
-  nhlTeams: NHLTeam[];
-  playerTotals: PlayerTotalStatLine[];
-  players: Player[];
   seasons: Season[];
 }
 
