@@ -69,11 +69,7 @@ const RELATIONS: Partial<
     homeTeamId: "Team",
     awayTeamId: "Team",
   },
-  Awards: {
-    seasonId: "Season",
-    winnerId: "Player",
-    nomineeIds: { model: "Player", many: true },
-  },
+  Awards: { seasonId: "Season" },
   DraftPick: {
     seasonId: "Season",
     gshlTeamId: "Team",

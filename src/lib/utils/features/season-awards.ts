@@ -111,6 +111,7 @@ export function buildSeasonAwardCards(
       .filter((team) => team.ownerId)
       .map((team) => [String(team.ownerId), team]),
   );
+  const teamById = new Map(teams.map((team) => [String(team.id), team]));
 
   return awards
     .filter((award) => !allStarAwardKeys.has(String(award.award)))
@@ -118,7 +119,8 @@ export function buildSeasonAwardCards(
       const catalog = AWARD_CATALOG_BY_KEY.get(award.award);
       if (!catalog) return null;
 
-      const winningTeam = teamByOwnerId.get(String(award.winnerId));
+      const winnerId = String(award.winnerId);
+      const winningTeam = teamById.get(winnerId) ?? teamByOwnerId.get(winnerId);
       const ownerDisplayName = getOwnerDisplayName(winningTeam);
 
       return {

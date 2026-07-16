@@ -291,7 +291,8 @@ export function buildTrophyCaseData({
         allTeams.find(
           (team) =>
             String(team.seasonId) === String(award.seasonId) &&
-            String(team.ownerId ?? "") === String(award.winnerId),
+            (String(team.id) === String(award.winnerId) ||
+              String(team.ownerId ?? "") === String(award.winnerId)),
         ) ?? null;
 
       return {
@@ -331,7 +332,9 @@ export function buildTrophyCaseData({
             latestYear: Number.isFinite(numericYear)
               ? numericYear
               : card.seasonYear,
-            years: [Number.isFinite(numericYear) ? numericYear : card.seasonYear],
+            years: [
+              Number.isFinite(numericYear) ? numericYear : card.seasonYear,
+            ],
             summaryLabel: card.catalog.summaryLabel,
           });
           return map;
@@ -373,14 +376,13 @@ export function buildTrophyCaseData({
         item.count,
         item.latestYear,
         item.summaryLabel,
-        item.years
-          .slice()
-          .sort((left, right) => Number(left) - Number(right)),
+        item.years.slice().sort((left, right) => Number(left) - Number(right)),
       ),
     }))
     .sort((left, right) => {
       const groupDelta =
-        (groupOrderMap.get(left.group) ?? 0) - (groupOrderMap.get(right.group) ?? 0);
+        (groupOrderMap.get(left.group) ?? 0) -
+        (groupOrderMap.get(right.group) ?? 0);
       if (groupDelta !== 0) return groupDelta;
       return left.sortOrder - right.sortOrder;
     });

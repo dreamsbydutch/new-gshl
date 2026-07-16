@@ -285,6 +285,30 @@ export default defineSchema({
     ["seasonId", "winnerId"],
   ),
 
+  playerAwards: table(
+    {
+      seasonId: id("seasons"),
+      playerId: id("players"),
+      nomineeIds: optionalNullable(v.array(id("players"))),
+      award: stringValue,
+      createdAt: timestampValue,
+      updatedAt: timestampValue,
+    },
+    ["seasonId", "playerId"],
+  ),
+
+  teamAwards: table(
+    {
+      seasonId: id("seasons"),
+      teamId: id("teams"),
+      nomineeIds: optionalNullable(v.array(id("teams"))),
+      award: stringValue,
+      createdAt: timestampValue,
+      updatedAt: timestampValue,
+    },
+    ["seasonId", "teamId"],
+  ),
+
   draftPicks: table(
     {
       seasonId: id("seasons"),
