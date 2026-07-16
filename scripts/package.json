@@ -24,6 +24,7 @@
     "stats:backfill-yahoo-rosters": "tsx src/commands/stats/backfill-yahoo-roster-player-days.ts",
     "stats:sync-nhl-daily": "tsx src/commands/stats/sync-nhl-daily-stats.ts",
     "lineup:update-all": "node --expose-gc --max-old-space-size=4096 ../node_modules/tsx/dist/cli.mjs src/commands/lineup/update-all-lineups.ts",
+    "convex:migrate": "tsx src/commands/convex/migrate-sheets-to-convex.ts",
     "yahoo:check-weekly-player-days": "tsx src/commands/yahoo/check-yahoo-weekly-player-days.ts",
     "yahoo:check-weekly-matchups": "tsx src/commands/yahoo/check-yahoo-weekly-matchup-stats.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json"
