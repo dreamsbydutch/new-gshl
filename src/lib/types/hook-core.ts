@@ -20,6 +20,22 @@ export interface UseAwardsOptions {
   orderBy?: Record<string, "asc" | "desc">;
 }
 
+export interface UsePlayerAwardsOptions {
+  playerId?: string;
+  seasonId?: string;
+  award?: string;
+  enabled?: boolean;
+  orderBy?: Record<string, "asc" | "desc">;
+}
+
+export interface UseTeamAwardsOptions {
+  teamId?: string;
+  seasonId?: string;
+  award?: string;
+  enabled?: boolean;
+  orderBy?: Record<string, "asc" | "desc">;
+}
+
 export interface UseDraftPicksOptions {
   pickId?: string;
   seasonId?: string;

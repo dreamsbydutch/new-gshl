@@ -36,7 +36,14 @@ export type {
 // Draft pick hooks
 export { useDraftPicks } from "./useDraftPick";
 export { useAwards } from "./useAward";
-export type { UseAwardsOptions, UseDraftPicksOptions } from "@gshl-types";
+export { usePlayerAwards } from "./usePlayerAward";
+export { useTeamAwards } from "./useTeamAward";
+export type {
+  UseAwardsOptions,
+  UseDraftPicksOptions,
+  UsePlayerAwardsOptions,
+  UseTeamAwardsOptions,
+} from "@gshl-types";
 
 // Matchup and game hooks
 export { useMatchups } from "./useMatchups";

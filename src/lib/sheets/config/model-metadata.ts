@@ -18,6 +18,8 @@ const MODEL_DATA_TYPES: Record<string, ModelDataCategory> = {
   NHLTeam: "STATIC",
   nhlTeam: "STATIC",
   Awards: "MANUAL",
+  PlayerAwards: "MANUAL",
+  TeamAwards: "MANUAL",
 
   Week: "DYNAMIC",
   Event: "DYNAMIC",

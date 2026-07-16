@@ -14,6 +14,8 @@ export const MODEL_TO_CONVEX_TABLE = {
   Matchup: "matchups",
   Event: "events",
   Awards: "awards",
+  PlayerAwards: "playerAwards",
+  TeamAwards: "teamAwards",
   DraftPick: "draftPicks",
   nhlTeam: "nhlTeams",
   NHLTeam: "nhlTeams",

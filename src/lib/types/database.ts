@@ -246,6 +246,26 @@ export interface Awards {
   createdAt: Date;
   updatedAt: Date;
 }
+
+export interface PlayerAward {
+  id: string;
+  seasonId: string;
+  playerId: string;
+  nomineeIds: string[];
+  award: AwardsList;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface TeamAward {
+  id: string;
+  seasonId: string;
+  teamId: string;
+  nomineeIds: string[];
+  award: AwardsList;
+  createdAt: Date;
+  updatedAt: Date;
+}
 export interface DraftPick {
   id: string;
   seasonId: string;
