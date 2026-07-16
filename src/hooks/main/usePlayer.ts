@@ -62,7 +62,7 @@ export function usePlayers(options: UsePlayersOptions = {}) {
   const normalizedNhlTeam = nhlTeam ? String(nhlTeam) : null;
 
   // Build where clause
-  const where: Record<string, unknown> = {};
+  const where: Record<string, string | boolean> = {};
   if (normalizedPlayerId) where.id = normalizedPlayerId;
   if (normalizedTeamId) where.teamId = normalizedTeamId;
   if (normalizedPosition) where.position = normalizedPosition;
@@ -101,7 +101,8 @@ export function useActivePlayers(
 }
 
 /**
- * Fetch players constrained by roster and rank metadata.
+ * Fetches roster-scoped players, optionally keeping inactive players and
+ * applying rank-based sorting and limits for lineup-oriented UIs.
  */
 export function useRosterPlayers(options: UseRosterPlayersOptions = {}) {
   const {
@@ -158,7 +159,8 @@ export function useRosterPlayers(options: UseRosterPlayersOptions = {}) {
 }
 
 /**
- * Fetch top/bottom players based on ranking fields.
+ * Fetches players and narrows them to a rank window for draft boards and
+ * similar ranking-driven views.
  */
 export function useRankedPlayers(options: UseRankedPlayersOptions = {}) {
   const {
@@ -206,6 +208,9 @@ export function useRankedPlayers(options: UseRankedPlayersOptions = {}) {
   } as const;
 }
 
+/**
+ * Reads a rank value from a player using the requested ranking field.
+ */
 function getPlayerRankValue(player: Player, field: PlayerRankField) {
   switch (field) {
     case "preDraftRk":

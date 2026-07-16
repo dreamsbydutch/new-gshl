@@ -9,15 +9,11 @@
  *
  * Heavy lifting: lib/utils/shared (combineQueryStates)
  */
-
-import { useMemo } from "react";
 import type {
-  GSHLTeam,
   UseSeasonMatchupsAndTeamsOptions,
   UseSeasonMatchupsAndTeamsResult,
 } from "@gshl-types";
-import { combineQueryStates } from "@gshl-utils/shared";
-import { useMatchups, useTeams } from "../main";
+import { useSeasonDataBundle } from "./useSeasonDataBundle";
 
 /**
  * Fetches and combines matchups and teams for a specific season.
@@ -47,31 +43,18 @@ export function useSeasonMatchupsAndTeams(
       ? null
       : (options.weekId ?? null);
 
-  const seasonKey = seasonId ?? "";
-  const weekKey = weekId ?? "";
-
-  const matchupsQuery = useMatchups({
+  const bundle = useSeasonDataBundle({
     seasonId,
     weekId,
-    enabled: Boolean(seasonId ?? weekId),
+    useNavigation: false,
   });
-  const teamsQuery = useTeams({
-    seasonId: seasonKey,
-    weekId: weekKey,
-    enabled: Boolean(seasonKey ?? weekKey),
-  });
-
-  const status = useMemo(
-    () => combineQueryStates(matchupsQuery, teamsQuery),
-    [matchupsQuery, teamsQuery],
-  );
 
   return {
-    matchups: matchupsQuery.data ?? [],
-    teams: (teamsQuery.data as GSHLTeam[]) ?? [],
-    status,
-    matchupsQuery,
-    teamsQuery: teamsQuery as UseSeasonMatchupsAndTeamsResult["teamsQuery"],
+    matchups: bundle.matchups,
+    teams: bundle.teams,
+    status: bundle.status,
+    matchupsQuery: bundle.matchupsQuery,
+    teamsQuery: bundle.teamsQuery,
     isWeekScoped: Boolean(weekId),
   };
 }

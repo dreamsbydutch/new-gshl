@@ -25,7 +25,7 @@ const getGameTypeFilter = (gameTypeCategory: string): MatchupType[] => {
     case "LT": // Losers Tournament
       return [MatchupType.LOSERS_TOURNAMENT];
     default:
-      return []; // For "All" or any other values, return empty array (no filtering)
+      return []; // For "All" or unsupported values, return empty array (no filtering)
   }
 };
 

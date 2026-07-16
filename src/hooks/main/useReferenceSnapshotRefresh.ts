@@ -24,6 +24,9 @@ const REFERENCE_SNAPSHOT_MODELS = [
 
 let lastAppliedSnapshotAt = 0;
 
+/**
+ * Normalizes id-like values coming from snapshot rows.
+ */
 function normalizeIdString(
   value: string | number | null | undefined,
 ): string | undefined {
@@ -39,6 +42,9 @@ function normalizeIdString(
   return undefined;
 }
 
+/**
+ * Rebuilds enriched GSHL team rows from the raw snapshot collections.
+ */
 function enrichTeamsWithRelations(
   teams: Team[],
   franchises: Franchise[],
@@ -90,6 +96,10 @@ function enrichTeamsWithRelations(
   });
 }
 
+/**
+ * Returns whether the cached reference snapshot is still within the static
+ * freshness window.
+ */
 function hasFreshReferenceSnapshot(updatedAt: number | null) {
   if (!updatedAt) {
     return false;
@@ -98,6 +108,10 @@ function hasFreshReferenceSnapshot(updatedAt: number | null) {
   return Date.now() - updatedAt < CACHE_DURATIONS.STATIC;
 }
 
+/**
+ * Keeps the browser reference snapshot store synchronized with the backend
+ * snapshot endpoint used by the lightweight read hooks.
+ */
 export function useReferenceSnapshotRefresh(enabled: boolean) {
   const snapshotQuery = api.snapshot.get.useQuery(
     { models: [...REFERENCE_SNAPSHOT_MODELS] },

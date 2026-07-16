@@ -4,12 +4,16 @@ import { useMemo } from "react";
 import { useMatchups, useSeasons, useTeams } from "@gshl-hooks";
 import {
   buildConferenceContestOverallViewModel,
-  buildConferenceContestSeasonViewModel,
+  buildConferenceContestSeasonViewModels,
   isGshlTeam,
   type ConferenceContestOverallViewModel,
   type ConferenceContestSeasonViewModel,
 } from "@gshl-utils";
 
+/**
+ * Builds conference-contest season and overall view models from shared season,
+ * matchup, and team collections.
+ */
 export function useConferenceContestData() {
   const {
     data: seasons = [],
@@ -31,17 +35,11 @@ export function useConferenceContestData() {
 
   const seasonViewModels: ConferenceContestSeasonViewModel[] = useMemo(() => {
     if (!seasons.length || !matchups.length || !teams.length) return [];
-
-    return seasons
-      .sort((a, b) => b.year - a.year)
-      .map((season) =>
-        buildConferenceContestSeasonViewModel({
-          season,
-          matchups,
-          gshlTeams: teams,
-        }),
-      )
-      .filter((vm): vm is ConferenceContestSeasonViewModel => Boolean(vm));
+    return buildConferenceContestSeasonViewModels({
+      seasons,
+      matchups,
+      gshlTeams: teams,
+    });
   }, [seasons, matchups, teams]);
 
   const overall: ConferenceContestOverallViewModel | null = useMemo(() => {

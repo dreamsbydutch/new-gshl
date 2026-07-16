@@ -2,15 +2,17 @@
 
 import { useMemo } from "react";
 import { useSeasonNavigation, useStandingsNavigation } from "@gshl-cache";
-import { useMatchups, useTeams } from "@gshl-hooks";
-import { groupTeamsByStandingsType, type StandingsGroup } from "@gshl-utils";
+import { useSeasons } from "../main";
+import {
+  groupTeamsByStandingsType,
+  type StandingsGroup,
+} from "@gshl-utils";
 import type {
-  GSHLTeam,
   TeamSeasonStatLine,
   UseStandingsDataOptions,
   UseStandingsDataResult,
 } from "@gshl-types";
-import { useWeeks } from "@gshl-hooks";
+import { useSeasonDataBundle } from "./useSeasonDataBundle";
 
 /**
  * useStandingsData Hook
@@ -34,7 +36,7 @@ import { useWeeks } from "@gshl-hooks";
  * ```
  */
 export function useStandingsData(
-  options: UseStandingsDataOptions,
+  options: UseStandingsDataOptions = {},
 ): UseStandingsDataResult {
   const { standingsType: optionStandingsType, seasonId: optionSeasonId } =
     options;
@@ -42,94 +44,66 @@ export function useStandingsData(
   const { selectedType: navStandingsType } = useStandingsNavigation();
   const { selectedSeason, selectedSeasonId: navSeasonId } =
     useSeasonNavigation();
+  const shouldResolveOverrideSeason = Boolean(
+    optionSeasonId && optionSeasonId !== navSeasonId,
+  );
 
   // Use provided seasonId or fall back to navigation context
   const standingsType = optionStandingsType ?? navStandingsType ?? "overall";
   const selectedSeasonId = optionSeasonId ?? navSeasonId;
 
   const {
-    data: matchups,
-    isLoading: matchupsLoading,
-    error: matchupsError,
-  } = useMatchups({
-    seasonId: selectedSeasonId,
-    enabled: Boolean(selectedSeasonId),
+    data: overrideSeasonData,
+    isLoading: overrideSeasonLoading,
+    error: overrideSeasonError,
+  } = useSeasons({
+    seasonId: shouldResolveOverrideSeason ? selectedSeasonId : null,
+    enabled: shouldResolveOverrideSeason,
   });
-
-  const { data: weeks, isLoading: weeksLoading } = useWeeks({
-    seasonId: selectedSeasonId,
-    enabled: Boolean(selectedSeasonId),
-  });
+  const resolvedSelectedSeason = shouldResolveOverrideSeason
+    ? (overrideSeasonData?.[0] ?? null)
+    : (selectedSeason ?? null);
 
   const {
-    data: teamsResponse,
-    isLoading: baseTeamsLoading,
-    error: baseTeamsError,
-  } = useTeams({
+    matchups,
+    teams: teamsResponse,
+    weeks,
+    teamStats: statsResponse,
+    status,
+    ready: seasonDataReady,
+    error: seasonDataError,
+  } = useSeasonDataBundle<TeamSeasonStatLine>({
     seasonId: selectedSeasonId,
-    enabled: Boolean(selectedSeasonId),
+    includeWeeks: true,
+    teamStatsLevel: "season",
+    useNavigation: false,
+    teamQueryOptions: {
+      refetchOnWindowFocus: true,
+    },
   });
 
-  const {
-    data: statsResponse,
-    isLoading: statsLoading,
-    error: statsError,
-  } = useTeams({
-    seasonId: selectedSeasonId,
-    statsLevel: "season",
-    enabled: Boolean(selectedSeasonId),
-    refetchOnWindowFocus: true,
-  });
-
-  const teams = useMemo(
-    () => ((teamsResponse as GSHLTeam[]) ?? []).filter(Boolean),
-    [teamsResponse],
-  );
+  const teams = useMemo(() => (teamsResponse ?? []).filter(Boolean), [teamsResponse]);
 
   const teamStats = useMemo(
-    () => ((statsResponse as TeamSeasonStatLine[]) ?? []).filter(Boolean),
+    () => (statsResponse ?? []).filter(Boolean),
     [statsResponse],
   );
 
   // Intentionally no logging in production render path
 
-  const teamById = useMemo(() => {
-    return new Map(teams.map((t) => [t.id, t]));
-  }, [teams]);
-
   const groups: StandingsGroup[] = useMemo(() => {
-    const baseGroups = groupTeamsByStandingsType(
-      teams,
-      teamStats,
-      standingsType,
-    );
-    // Attach all-team stats to each team object so the UI can compute per-category ranks.
-    // This avoids changing shared types while keeping the standings view self-contained.
-    return baseGroups.map((group) => {
-      return {
-        ...group,
-        teams: group.teams.map((groupTeam) => {
-          const baseTeam = teamById.get(groupTeam.id) ?? groupTeam;
-          return {
-            ...baseTeam,
-            ...groupTeam,
-            __allTeamSeasonStats: teamStats,
-            __allTeams: teams,
-          };
-        }),
-      };
+    return groupTeamsByStandingsType(teams, teamStats, standingsType, {
+      includeContext: true,
+      allTeams: teams,
+      allTeamStats: teamStats,
     });
-  }, [teamById, teamStats, teams, standingsType]);
+  }, [teamStats, teams, standingsType]);
 
-  const isLoading =
-    (matchupsLoading ?? false) ||
-    (weeksLoading ?? false) ||
-    (baseTeamsLoading ?? false) ||
-    (statsLoading ?? false);
-  const error = matchupsError ?? baseTeamsError ?? statsError;
+  const isLoading = status.isLoading || overrideSeasonLoading;
+  const error = seasonDataError ?? overrideSeasonError ?? null;
 
   return {
-    selectedSeason,
+    selectedSeason: resolvedSelectedSeason,
     selectedSeasonId,
     matchups: matchups ?? [],
     weeks: weeks ?? [],
@@ -139,6 +113,6 @@ export function useStandingsData(
     standingsType,
     isLoading,
     error: (error as Error | null | undefined) ?? null,
-    ready: !isLoading && !error,
+    ready: seasonDataReady && !overrideSeasonLoading && !error,
   };
 }

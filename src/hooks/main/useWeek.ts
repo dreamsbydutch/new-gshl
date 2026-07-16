@@ -4,6 +4,9 @@ import { clientApi as api } from "@gshl-trpc";
 import { referenceStore } from "@gshl-cache";
 import { useReferenceSnapshotRefresh } from "./useReferenceSnapshotRefresh";
 
+/**
+ * Sorts week records using the first requested order field.
+ */
 function orderWeeks(weeks: Week[], orderBy: Record<string, "asc" | "desc">) {
   const [field, direction] = Object.entries(orderBy)[0] ?? ["startDate", "asc"];
   return [...weeks].sort((left, right) => {
@@ -107,7 +110,7 @@ export function useWeeks(options: UseWeeksOptions = {}) {
   const effectiveSeasonId = normalizedSeasonId ?? activeSeason?.id;
 
   // Build where clause
-  const where: Record<string, unknown> = {};
+  const where: Record<string, string | boolean> = {};
   if (normalizedWeekId && !timeMode) {
     where.id = normalizedWeekId;
   } else if (effectiveSeasonId) {

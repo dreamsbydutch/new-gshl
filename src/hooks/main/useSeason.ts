@@ -15,6 +15,9 @@ import { clientApi as api } from "@gshl-trpc";
 import { referenceStore, useNavStore } from "@gshl-cache";
 import { useReferenceSnapshotRefresh } from "./useReferenceSnapshotRefresh";
 
+/**
+ * Sorts seasons by the first requested order field, defaulting to year.
+ */
 function orderSeasons(
   seasons: Season[],
   orderBy: Record<string, "asc" | "desc">,
@@ -117,7 +120,7 @@ export function useSeasons(options: UseSeasonsOptions = {}) {
   const hasCachedSeasons = Boolean(cachedSeasons && cachedSeasons.length > 0);
 
   // Build where clause
-  const where: Record<string, unknown> = {};
+  const where: Record<string, number> = {};
   if (year !== undefined) where.year = year;
 
   // For single season by ID, use getById endpoint

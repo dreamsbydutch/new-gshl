@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo } from "react";
+import { useMemo } from "react";
 import {
   type Contract,
   type ContractFilters,
@@ -20,7 +20,6 @@ import {
   sortContracts,
   mergeContractFilters,
   computeContractSummary,
-  identity,
   getContractDedupeKey,
   CAP_CEILING,
   formatDate,
@@ -34,8 +33,8 @@ export type {
   ContractSummary,
 } from "@gshl-types";
 
-const EMPTY_CONTRACTS: Contract[] = Object.freeze([]) as unknown as Contract[];
-const DEFAULT_SELECT_DEPS: readonly unknown[] = Object.freeze([]);
+const EMPTY_CONTRACTS: Contract[] = [];
+const DEFAULT_SELECT_DEPS = [] as const;
 
 /**
  * Hook for fetching and filtering contracts with advanced options.
@@ -135,7 +134,7 @@ export function useContracts<T = Contract, S = undefined>(
 
   const finalData = useMemo(() => {
     if (map) return limitedContracts.map(map);
-    return limitedContracts as unknown as T[];
+    return limitedContracts as T[];
   }, [limitedContracts, map]);
 
   const summary = useMemo(() => {
@@ -143,18 +142,31 @@ export function useContracts<T = Contract, S = undefined>(
     return computeContractSummary(limitedContracts);
   }, [limitedContracts, withSummary]);
 
-  const getContracts = useCallback(
-    <U = T>({
-      filters: scopedFilters,
-      sort: scopedSort,
-      take: scopedTake,
-      map: scopedMap,
-    }: {
+  const getContracts = useMemo(() => {
+    function getScopedContracts(options?: {
+      filters?: ContractFilters;
+      sort?: ContractSortOption;
+      take?: number;
+    }): T[];
+    function getScopedContracts<U>(options: {
+      filters?: ContractFilters;
+      sort?: ContractSortOption;
+      take?: number;
+      map: (contract: Contract) => U;
+    }): U[];
+    function getScopedContracts<U>(options: {
       filters?: ContractFilters;
       sort?: ContractSortOption;
       take?: number;
       map?: (contract: Contract) => U;
-    } = {}): U[] => {
+    } = {}) {
+      const {
+        filters: scopedFilters,
+        sort: scopedSort,
+        take: scopedTake,
+        map: scopedMap,
+      } = options;
+
       const mergedFilters = mergeContractFilters(filters, scopedFilters);
       const base = applyContractFilters(rawContracts, mergedFilters);
       const ordered = sortContracts(base, scopedSort ?? sort);
@@ -164,14 +176,20 @@ export function useContracts<T = Contract, S = undefined>(
           : typeof take === "number"
             ? ordered.slice(0, take)
             : ordered;
-      const mapper =
-        scopedMap ??
-        (map as unknown as ((contract: Contract) => U) | undefined) ??
-        (identity as unknown as (contract: Contract) => U);
-      return sliced.map(mapper);
-    },
-    [filters, rawContracts, sort, take, map],
-  );
+
+      if (scopedMap) {
+        return sliced.map(scopedMap);
+      }
+
+      if (map) {
+        return sliced.map(map);
+      }
+
+      return sliced;
+    }
+
+    return getScopedContracts;
+  }, [filters, rawContracts, sort, take, map]);
 
   const selection = useMemo(() => {
     if (!select) return undefined;
@@ -213,6 +231,10 @@ export function useAllContracts<T = Contract, S = undefined>(
   return useContracts(options);
 }
 
+/**
+ * Builds contract table, history, and draft-pick view models for a single
+ * franchise context while preserving the full contract hook behavior.
+ */
 export function useContractData(
   options: UseContractDataOptions = {},
 ): UseContractDataResult {
@@ -569,10 +591,16 @@ export function useContractData(
   };
 }
 
+/**
+ * Returns a stable key for contract deduplication and lookup operations.
+ */
 function getContractUniqueKey(contract: Contract): string {
   return contract.id || getContractDedupeKey(contract);
 }
 
+/**
+ * Removes duplicate contracts while preserving original order.
+ */
 function dedupeContracts(contracts: Contract[]): Contract[] {
   const seenKeys = new Set<string>();
   return contracts.filter((contract) => {
@@ -583,6 +611,9 @@ function dedupeContracts(contracts: Contract[]): Contract[] {
   });
 }
 
+/**
+ * Resolves the ending calendar year for a season.
+ */
 function getSeasonEndYear(season?: Season): number | null {
   if (!season) return null;
 
@@ -596,6 +627,9 @@ function getSeasonEndYear(season?: Season): number | null {
   return Number(match[1]) + 1;
 }
 
+/**
+ * Resolves the display year used for contract cap-window tables.
+ */
 function getContractTableDisplaySeasonYear(season?: Season): number | null {
   if (!season) return null;
 
@@ -609,6 +643,10 @@ function getContractTableDisplaySeasonYear(season?: Season): number | null {
   return Number(match[1]) + 1;
 }
 
+/**
+ * Checks whether a contract should contribute to the displayed cap number for
+ * a specific season-ending year.
+ */
 function isContractActiveForDisplayYear(contract: Contract, year: number) {
   const startYear = getDateYear(contract.startDate);
   const endYear = getDateYear(contract.capHitEndDate);
@@ -624,10 +662,16 @@ function isContractActiveForDisplayYear(contract: Contract, year: number) {
   return endYear + 1 > year;
 }
 
+/**
+ * Reads the final cap-hit year from a contract.
+ */
 function getContractCapHitEndYear(contract: Contract): number | null {
   return getDateYear(contract.capHitEndDate);
 }
 
+/**
+ * Determines whether a contract still affects the active or future cap window.
+ */
 function hasCurrentOrFutureCapImpact(
   contract: Contract,
   activeSeasonEndYear: number | null,
@@ -638,6 +682,9 @@ function hasCurrentOrFutureCapImpact(
   return endYear >= activeSeasonEndYear;
 }
 
+/**
+ * Determines whether a contract belongs in the current-contracts table.
+ */
 function shouldDisplayInCurrentContracts(
   contract: Contract,
   currentSeason: Season | undefined,
@@ -656,6 +703,9 @@ function shouldDisplayInCurrentContracts(
   );
 }
 
+/**
+ * Keeps very recent expiries visible until the current season signing deadline.
+ */
 function shouldShowRecentExpiryStatus(
   contract: Contract,
   currentSeason: Season | undefined,
@@ -675,6 +725,9 @@ function shouldShowRecentExpiryStatus(
   return expiryYear === activeSeasonEndYear - 1;
 }
 
+/**
+ * Extracts a year from a date-like value.
+ */
 function getDateYear(value: Date | string | null | undefined): number | null {
   if (!value) return null;
 
@@ -688,6 +741,9 @@ function getDateYear(value: Date | string | null | undefined): number | null {
   return Number(matches[matches.length - 1]);
 }
 
+/**
+ * Safely converts a date-like value into a valid Date instance.
+ */
 function parseDateValue(value: Date | string | null | undefined): Date | null {
   if (!value) return null;
 
@@ -699,6 +755,9 @@ function parseDateValue(value: Date | string | null | undefined): Date | null {
   return parsed;
 }
 
+/**
+ * Normalizes a contract into the row shape used by franchise history tables.
+ */
 function createHistoryRow(
   contract: Contract,
   playerById: Map<string, Player>,
@@ -739,6 +798,10 @@ function createHistoryRow(
   };
 }
 
+/**
+ * Calculates surplus value by comparing contract salary to NHL salary by
+ * season across the contract window.
+ */
 function calculateContractValue(
   contract: Contract,
   seasonById: Map<string, Season>,
@@ -773,6 +836,9 @@ function calculateContractValue(
   return (salaryDiffs as number[]).reduce((sum, value) => sum + value, 0);
 }
 
+/**
+ * Expands a contract into the list of active season-ending years it spans.
+ */
 function getContractActiveSeasonEndYears(
   contract: Contract,
   seasonById: Map<string, Season>,
@@ -796,6 +862,9 @@ function getContractActiveSeasonEndYears(
   return [];
 }
 
+/**
+ * Builds a composite key for player salary lookup by season-ending year.
+ */
 function getPlayerSeasonValueKey(
   playerId: string,
   seasonEndYear: number,
@@ -803,6 +872,9 @@ function getPlayerSeasonValueKey(
   return `${playerId}:${seasonEndYear}`;
 }
 
+/**
+ * Returns the current and next draft seasons for franchise pick summaries.
+ */
 function getDraftSeasonWindow(
   seasons: Season[] | undefined,
   currentSeason: Season,
@@ -823,6 +895,9 @@ function getDraftSeasonWindow(
   );
 }
 
+/**
+ * Resolves a team reference that may point to either a team id or franchise id.
+ */
 function resolveTeamReference(
   referenceId: string | null | undefined,
   teamById: Map<string, GSHLTeam>,

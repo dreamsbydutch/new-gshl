@@ -20,7 +20,12 @@ import { generateLineupAssignments } from "@gshl-utils";
 import { useDraftPicks, usePlayers, useNHLTeams, useTeams } from "@gshl-hooks";
 import { api } from "@gshl-trpc/react";
 
-const normalizeTeamIdentifier = (value: unknown): string | null => {
+/**
+ * Normalizes team and franchise identifiers into trimmed string ids.
+ */
+const normalizeTeamIdentifier = (
+  value: string | number | null | undefined,
+): string | null => {
   if (value === null || value === undefined) {
     return null;
   }
@@ -38,6 +43,10 @@ const normalizeTeamIdentifier = (value: unknown): string | null => {
   return null;
 };
 
+/**
+ * Coordinates draft pick mutations, player assignment updates, and derived
+ * free-agent/search state for the draft admin workflow.
+ */
 export function useDraftAdminList(
   options: UseDraftAdminListOptions = {},
 ): DraftAdminListViewModel {
@@ -380,7 +389,7 @@ export function useDraftAdminList(
   // Aggregate loading state from all queries
   const isLoading = playersLoading;
 
-  // Aggregate error state (check for any query errors)
+  // Aggregate error state (mutations handle surfaced failures internally)
   const error: Error | null = null; // No direct query errors exposed, mutations handle errors internally
 
   return {

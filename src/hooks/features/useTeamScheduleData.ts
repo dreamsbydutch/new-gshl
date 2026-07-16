@@ -1,8 +1,8 @@
 "use client";
 
 import { useMemo } from "react";
-import { useSeasonMatchupsAndTeams } from "./useSeasonMatchupsAndTeams";
-import { useNav, useWeeks } from "../main";
+import { useSeasonDataBundle } from "./useSeasonDataBundle";
+import { useNav } from "../main";
 import type {
   UseTeamScheduleDataOptions,
   UseTeamScheduleEnhancedMatchup,
@@ -42,22 +42,27 @@ export function useTeamScheduleData(
 ): UseTeamScheduleDataResult {
   const { seasonId: optionSeasonId, ownerId: optionOwnerId } = options;
 
-  const { selectedSeasonId: navSeasonId, selectedOwnerId: navOwnerId } =
-    useNav();
+  const { selectedOwnerId: navOwnerId } = useNav();
 
-  // Use provided IDs or fall back to navigation context
-  const selectedSeasonId = optionSeasonId ?? navSeasonId;
-  const selectedOwnerId = optionOwnerId ?? navOwnerId;
+  const hasOwnerOverride = Object.prototype.hasOwnProperty.call(
+    options,
+    "ownerId",
+  );
+  const selectedOwnerId = hasOwnerOverride
+    ? (optionOwnerId ?? null)
+    : navOwnerId;
 
   const {
+    seasonId: selectedSeasonId,
     matchups: allMatchups,
     teams,
+    weeks,
     status,
-  } = useSeasonMatchupsAndTeams(selectedSeasonId);
-
-  const { data: weeks, isLoading: weeksLoading } = useWeeks({
-    seasonId: selectedSeasonId ?? "",
-    enabled: Boolean(selectedSeasonId),
+    ready: seasonDataReady,
+    error: seasonDataError,
+  } = useSeasonDataBundle({
+    seasonId: optionSeasonId,
+    includeWeeks: true,
   });
 
   // Find the selected team
@@ -86,8 +91,8 @@ export function useTeamScheduleData(
     [teamMatchups, weeks],
   );
 
-  const isLoading = status.isLoading || weeksLoading;
-  const ready = !status.isLoading && !status.isFetching && !weeksLoading;
+  const isLoading = status.isLoading;
+  const ready = seasonDataReady;
 
   return {
     selectedSeasonId,
@@ -98,7 +103,7 @@ export function useTeamScheduleData(
     weeks: weeks ?? [],
     allMatchups,
     isLoading,
-    error: (status.error as Error) ?? null,
+    error: seasonDataError,
     ready,
   };
 }

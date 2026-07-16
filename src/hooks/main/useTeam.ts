@@ -8,6 +8,10 @@ import { useReferenceSnapshotRefresh } from "./useReferenceSnapshotRefresh";
 
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
 
+/**
+ * Sorts collection records by the first requested order field when that field
+ * contains string or numeric values.
+ */
 function orderRecords<T extends object>(
   records: T[],
   orderBy?: Record<string, "asc" | "desc">,
@@ -22,14 +26,11 @@ function orderRecords<T extends object>(
   }
 
   return [...records].sort((left, right) => {
-    const leftValue = (left as Record<string, unknown>)[field];
-    const rightValue = (right as Record<string, unknown>)[field];
+    const leftValue = (left as Record<string, string | number | null | undefined>)[field];
+    const rightValue = (right as Record<string, string | number | null | undefined>)[field];
     if (leftValue === rightValue) return 0;
 
-    if (
-      (typeof leftValue !== "string" && typeof leftValue !== "number") ||
-      (typeof rightValue !== "string" && typeof rightValue !== "number")
-    ) {
+    if (leftValue == null || rightValue == null) {
       return 0;
     }
 
@@ -186,7 +187,7 @@ export function useTeams(options: UseTeamsOptions = {}) {
   });
 
   // ========== FRANCHISES ==========
-  const franchiseWhere: Record<string, unknown> = {};
+  const franchiseWhere: Record<string, string | boolean> = {};
   if (normalizedOwnerId) franchiseWhere.ownerId = normalizedOwnerId;
   if (isActive !== undefined) franchiseWhere.isActive = isActive;
 
@@ -230,7 +231,7 @@ export function useTeams(options: UseTeamsOptions = {}) {
 
   // ========== GSHL TEAMS ==========
   // Build where clause for GSHL teams
-  const gshlWhere: Record<string, unknown> = {};
+  const gshlWhere: Record<string, string | boolean> = {};
   if (normalizedSeasonId) gshlWhere.seasonId = normalizedSeasonId;
   if (normalizedFranchiseId && teamType === "gshl")
     gshlWhere.franchiseId = normalizedFranchiseId;
@@ -282,15 +283,17 @@ export function useTeams(options: UseTeamsOptions = {}) {
 
   // ========== TEAM STATS ==========
   // Build where clause for stats
-  const statsWhere: Record<string, unknown> = {};
+  const statsWhere: Record<string, string> = {};
   if (normalizedTeamId) statsWhere.gshlTeamId = normalizedTeamId;
   if (normalizedSeasonId) statsWhere.seasonId = normalizedSeasonId;
 
   // Daily stats
   if (date && statsLevel === "daily") {
     const dateStr =
-      typeof date === "string" ? date : date.toISOString().split("T")[0];
-    statsWhere.date = dateStr;
+      typeof date === "string" ? date : (date.toISOString().split("T")[0] ?? "");
+    if (dateStr) {
+      statsWhere.date = dateStr;
+    }
   }
 
   // Weekly stats

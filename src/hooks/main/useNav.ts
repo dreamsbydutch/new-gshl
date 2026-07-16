@@ -1,42 +1,29 @@
 /**
- * useNav
- * ----------------
- * Centralizes access to persisted navigation selections (season, owner, week).
- * This avoids duplicated `useNavStore` subscriptions across derived hooks that
- * simply need the current selection context.
+ * Returns the current persisted navigation selections and reset action in a
+ * single shallow-subscribed object for components that need navigation context.
  */
+import { useShallow } from "zustand/react/shallow";
 import { useNavStore } from "@gshl-cache";
 
-export const useNav = () => {
-  const selectedSeasonId = useNavStore((state) => state.selectedSeasonId);
-  const selectedOwnerId = useNavStore((state) => state.selectedOwnerId);
-  const selectedWeekId = useNavStore((state) => state.selectedWeekId);
-  const selectedLeagueOfficeType = useNavStore(
-    (state) => state.selectedLeagueOfficeType,
+export function useNav() {
+  return useNavStore(
+    useShallow((state) => ({
+      selectedSeasonId: state.selectedSeasonId,
+      selectedOwnerId: state.selectedOwnerId,
+      selectedWeekId: state.selectedWeekId,
+      selectedLeagueOfficeType: state.selectedLeagueOfficeType,
+      selectedLockerRoomType: state.selectedLockerRoomType,
+      selectedScheduleType: state.selectedScheduleType,
+      selectedStandingsType: state.selectedStandingsType,
+      resetNavigation: state.resetNavigation,
+    })),
   );
-  const selectedLockerRoomType = useNavStore(
-    (state) => state.selectedLockerRoomType,
-  );
-  const selectedScheduleType = useNavStore(
-    (state) => state.selectedScheduleType,
-  );
-  const selectedStandingsType = useNavStore(
-    (state) => state.selectedStandingsType,
-  );
-  const resetNavigation = useNavStore((state) => state.resetNavigation);
+}
 
-  return {
-    selectedSeasonId,
-    selectedOwnerId,
-    selectedWeekId,
-    selectedLeagueOfficeType,
-    selectedLockerRoomType,
-    selectedScheduleType,
-    selectedStandingsType,
-    resetNavigation,
-  };
-};
-
-export const useNavigationReset = () => {
+/**
+ * Returns only the navigation reset action for callers that do not need the
+ * rest of the navigation store state.
+ */
+export function useNavigationReset() {
   return useNavStore((state) => state.resetNavigation);
-};
+}

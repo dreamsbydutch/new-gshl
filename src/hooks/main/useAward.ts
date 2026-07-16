@@ -3,6 +3,10 @@ import { clientApi as api } from "@gshl-trpc";
 
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
 
+/**
+ * Fetches awards with optional filters and stable long-lived caching because
+ * award data changes infrequently.
+ */
 export function useAwards(options: UseAwardsOptions = {}) {
   const {
     awardId,
@@ -13,7 +17,7 @@ export function useAwards(options: UseAwardsOptions = {}) {
     orderBy,
   } = options;
 
-  const where: Record<string, unknown> = {};
+  const where: Record<string, string> = {};
   if (awardId) where.id = awardId;
   if (winnerId) where.winnerId = winnerId;
   if (seasonId) where.seasonId = seasonId;

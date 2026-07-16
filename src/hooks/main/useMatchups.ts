@@ -6,6 +6,10 @@ import { clientApi as api } from "@gshl-trpc";
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
 const FIFTEEN_MINUTES_IN_MS = 15 * 60 * 1000;
 
+/**
+ * Merges static matchup metadata with live scoring state into a single
+ * component-friendly matchup collection.
+ */
 function mergeMatchups(
   metadata: MatchupMetadata[],
   liveStates: MatchupLiveState[],

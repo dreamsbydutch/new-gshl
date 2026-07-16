@@ -27,7 +27,7 @@ const DAY_IN_MS = 24 * 60 * 60 * 1000;
 export function useDraftPicks(options: UseDraftPicksOptions = {}) {
   const { pickId, seasonId, teamId, round, enabled = true } = options;
 
-  const where: Record<string, unknown> = {};
+  const where: Record<string, string | number> = {};
   if (pickId) where.id = pickId;
   if (seasonId) where.seasonId = seasonId;
   if (teamId) where.teamId = teamId;

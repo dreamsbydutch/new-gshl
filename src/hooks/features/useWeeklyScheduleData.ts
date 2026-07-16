@@ -10,14 +10,20 @@
  */
 import { useEffect, useMemo, useState } from "react";
 import { clientApi as trpc } from "@gshl-trpc";
-import { useSeasonMatchupsAndTeams } from "./useSeasonMatchupsAndTeams";
-import { useNav, usePlayers, usePlayerStats, useTeams, useWeeks } from "../main";
-import { filterMatchupsByWeek, sortMatchupsByRating } from "@gshl-utils";
+import { useSeasonDataBundle } from "./useSeasonDataBundle";
+import { usePlayers, usePlayerStats } from "../main";
+import {
+  buildPlayerLookup,
+  buildPlayerWeekStatsByTeam,
+  buildTeamWeekStatsByTeam,
+  collectInactivePlayerIds,
+  filterMatchupsByWeek,
+  getUpcomingWeekIds,
+  sortMatchupsByRating,
+} from "@gshl-utils";
 import {
   type TeamWeekStatLine,
-  type PlayerWeekStatLine,
   type Player,
-  ResignableStatus,
   type UseWeeklyScheduleDataOptions,
   type UseWeeklyScheduleDataResult,
 } from "@gshl-types";
@@ -44,28 +50,33 @@ import {
 export function useWeeklyScheduleData(
   options: UseWeeklyScheduleDataOptions = {},
 ): UseWeeklyScheduleDataResult {
-  const normalizePlayerId = (playerId: string | null | undefined) => {
-    const normalized = playerId?.trim();
-    return normalized ?? null;
-  };
-
   const { seasonId: optionSeasonId, weekId: optionWeekId } = options;
-
-  const { selectedSeasonId: navSeasonId, selectedWeekId: navWeekId } = useNav();
   const trpcUtils = trpc.useUtils();
 
-  // Use provided IDs or fall back to navigation context
-  const selectedSeasonId = optionSeasonId ?? navSeasonId;
-  const selectedWeekId = optionWeekId ?? navWeekId;
-
   const {
-    matchups: allMatchups,
-    teams,
-    status,
-  } = useSeasonMatchupsAndTeams({
     seasonId: selectedSeasonId,
     weekId: selectedWeekId,
+    matchups: allMatchups,
+    teams,
+    weeks,
+    teamStats,
+    status: scheduleStatus,
+    ready: scheduleReady,
+    error: scheduleError,
+  } = useSeasonDataBundle<TeamWeekStatLine>({
+    seasonId: optionSeasonId,
+    weekId: optionWeekId,
+    includeWeeks: true,
+    teamStatsLevel: "weekly",
+    weeksOrderBy: { startDate: "asc" },
+    teamQueryOptions: {
+      staleTime: 60 * 1000,
+      gcTime: 5 * 60 * 1000,
+      refetchOnMount: true,
+      refetchOnWindowFocus: true,
+    },
   });
+
   const activePlayersQuery = usePlayers({
     isActive: true,
     enabled: Boolean(selectedSeasonId),
@@ -90,20 +101,10 @@ export function useWeeklyScheduleData(
     () => playerWeekStatsQuery.weekly ?? [],
     [playerWeekStatsQuery.weekly],
   );
-  const activePlayerIdSet = useMemo(() => {
-    return new Set(activePlayers.map((player) => player.id).filter(Boolean));
-  }, [activePlayers]);
-  const inactivePlayerIds = useMemo(() => {
-    if (!playerWeekStats.length) return [] as string[];
-    const missing = new Set<string>();
-    for (const stat of playerWeekStats) {
-      const playerId = normalizePlayerId(stat.playerId);
-      if (playerId && !activePlayerIdSet.has(playerId)) {
-        missing.add(playerId);
-      }
-    }
-    return Array.from(missing);
-  }, [playerWeekStats, activePlayerIdSet]);
+  const inactivePlayerIds = useMemo(
+    () => collectInactivePlayerIds(activePlayers, playerWeekStats),
+    [activePlayers, playerWeekStats],
+  );
   const [inactivePlayerMap, setInactivePlayerMap] = useState<
     Record<string, Player | null>
   >({});
@@ -116,7 +117,7 @@ export function useWeeklyScheduleData(
   }, [selectedSeasonId, selectedWeekId]);
   const pendingInactiveIds = useMemo(() => {
     return inactivePlayerIds.filter(
-      (id) => normalizePlayerId(id) && !(id in inactivePlayerMap),
+      (id) => id.trim().length > 0 && !(id in inactivePlayerMap),
     );
   }, [inactivePlayerIds, inactivePlayerMap]);
 
@@ -181,113 +182,44 @@ export function useWeeklyScheduleData(
     () => [...activePlayers, ...inactivePlayers],
     [activePlayers, inactivePlayers],
   );
-  const playerLookup = useMemo(() => {
-    const map = new Map<string, Player>();
-    players.forEach((player) => {
-      if (player?.id) {
-        map.set(player.id, player);
-      }
-    });
-    return map;
-  }, [players]);
-  const playerWeekStatsByTeam = useMemo(() => {
-    return playerWeekStats.reduce<
-      Record<string, (PlayerWeekStatLine & Player)[]>
-    >((acc, stat) => {
-      const playerId = normalizePlayerId(stat.playerId);
-      const player = playerId ? playerLookup.get(playerId) : null;
-      if (stat?.gshlTeamId) {
-        acc[stat.gshlTeamId] ??= [];
-        acc[stat.gshlTeamId]!.push({
-          ...stat,
-          ...player,
-          gshlTeamId: stat.gshlTeamId,
-          firstName: player?.firstName ?? "",
-          lastName: player?.lastName ?? "",
-          fullName: player?.fullName ?? "",
-          isActive: player?.isActive ?? false,
-          isSignable: player?.isSignable ?? false,
-          isResignable: player?.isResignable ?? ResignableStatus.DRAFT,
-        });
-      }
-      return acc;
-    }, {});
-  }, [playerWeekStats, playerLookup]);
-
-  const teamWeekStatsQuery = useTeams({
-    seasonId: selectedSeasonId ?? null,
-    weekId: selectedWeekId ?? null,
-    statsLevel: "weekly",
-    enabled: Boolean(selectedSeasonId && selectedWeekId),
-    staleTime: 60 * 1000,
-    gcTime: 5 * 60 * 1000,
-    refetchOnMount: true,
-    refetchOnWindowFocus: true,
-    // Weekly stats change frequently; lean on hook defaults for caching
-  }) as {
-    data: TeamWeekStatLine[] | undefined;
-    isLoading: boolean;
-    error: Error | null;
-  };
-
-  const teamWeekStats = useMemo(
-    () => teamWeekStatsQuery.data ?? [],
-    [teamWeekStatsQuery.data],
+  const playerLookup = useMemo(() => buildPlayerLookup(players), [players]);
+  const playerWeekStatsByTeam = useMemo(
+    () => buildPlayerWeekStatsByTeam(playerWeekStats, playerLookup),
+    [playerLookup, playerWeekStats],
   );
+  const teamWeekStats = useMemo(() => teamStats ?? [], [teamStats]);
 
-  const teamWeekStatsByTeam = useMemo(() => {
-    return teamWeekStats.reduce<Record<string, TeamWeekStatLine>>(
-      (acc, stat) => {
-        if (stat?.gshlTeamId) {
-          acc[stat.gshlTeamId] = stat;
-        }
-        return acc;
-      },
-      {},
-    );
-  }, [teamWeekStats]);
+  const teamWeekStatsByTeam = useMemo(
+    () => buildTeamWeekStatsByTeam(teamWeekStats),
+    [teamWeekStats],
+  );
 
   const weeklyMatchups = useMemo(
     () =>
       sortMatchupsByRating(filterMatchupsByWeek(allMatchups, selectedWeekId)),
     [allMatchups, selectedWeekId],
   );
-  const weekList = useWeeks({
-    seasonId: selectedSeasonId,
-    orderBy: { startDate: "asc" },
-    enabled: Boolean(selectedSeasonId),
-  });
-  const nextWeekIds = useMemo(() => {
-    const weeks = weekList.data ?? [];
-    const currentIndex = weeks.findIndex((week) => week.id === selectedWeekId);
-    if (currentIndex < 0) return [];
-    return weeks
-      .slice(currentIndex + 1, currentIndex + 3)
-      .map((week) => week.id)
-      .filter(Boolean);
-  }, [selectedWeekId, weekList.data]);
+  const nextWeekIds = useMemo(
+    () => getUpcomingWeekIds(weeks, selectedWeekId),
+    [selectedWeekId, weeks],
+  );
   const [prefetchedWeekIds] = useState(() => new Set<string>());
   const [isPrefetching, setIsPrefetching] = useState(false);
   const inactivePlayersLoading = inactiveFetchState.isLoading;
   const inactivePlayerError = inactiveFetchState.error;
   const isLoading =
-    status.isLoading ||
-    teamWeekStatsQuery.isLoading ||
+    scheduleStatus.isLoading ||
     playerWeekStatsQuery.status.isLoading ||
     activePlayersQuery.isLoading ||
     inactivePlayersLoading;
-  const statusError = (status.error as Error) ?? null;
   const combinedError =
-    teamWeekStatsQuery.error ??
-    statusError ??
+    scheduleError ??
     (playerWeekStatsQuery.status.error as Error | null) ??
     (activePlayersQuery.error as Error | null) ??
     inactivePlayerError ??
     null;
   const ready =
-    !status.isLoading &&
-    !status.isFetching &&
-    !teamWeekStatsQuery.isLoading &&
+    scheduleReady &&
     playerWeekStatsQuery.ready &&
     !activePlayersQuery.isLoading &&
     !inactivePlayersLoading;

@@ -7,6 +7,10 @@ import { clientApi as api } from "@gshl-trpc";
 const DEFAULT_STALE_TIME = 5 * 60 * 1000;
 const DEFAULT_GC_TIME = 15 * 60 * 1000;
 
+/**
+ * Fetches player stat collections behind one options object and only activates
+ * the individual stat queries required by the current view.
+ */
 export function usePlayerStats(
   options: UsePlayerStatsOptions = {},
 ): UsePlayerStatsResult {
@@ -204,6 +208,9 @@ export function usePlayerStats(
   };
 }
 
+/**
+ * Fetches full-career split aggregates for record-book style views.
+ */
 export function useCareerSplits(enabled = true) {
   const query = api.playerStats.careerSplits.getAll.useQuery(
     {},
