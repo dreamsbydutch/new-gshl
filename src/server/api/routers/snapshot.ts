@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { createTRPCRouter, publicProcedure } from "../trpc";
-import { fastSheetsReader, type SheetsModelName } from "@gshl-sheets";
+import type { SheetsModelName } from "@gshl-sheets";
+import { fetchSnapshot } from "../sheets-store";
 
 const snapshotSchema = z.object({
   models: z.array(z.string()).min(1),
@@ -17,7 +18,7 @@ export const snapshotRouter = createTRPCRouter({
     .input(snapshotSchema)
     .query(async ({ input }): Promise<Record<string, unknown[]>> => {
       const models = input.models as SheetsModelName[];
-      const snapshot = await fastSheetsReader.fetchSnapshot(models);
+      const snapshot = await fetchSnapshot(models);
       return snapshot;
     }),
 });

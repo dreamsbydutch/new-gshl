@@ -30,6 +30,14 @@ interface RateLimitConfig {
 
 type RequestKind = "read" | "write";
 
+function assertSheetsWritesEnabled(operation: string): void {
+  if (env.GSHL_DATA_BACKEND === "convex") {
+    throw new Error(
+      `${operation} attempted a direct Google Sheets write while GSHL_DATA_BACKEND=convex. Route this job through the data adapter instead.`,
+    );
+  }
+}
+
 export class OptimizedSheetsClient {
   private sheets: sheets_v4.Sheets;
   private auth: GoogleAuth;
@@ -174,6 +182,8 @@ export class OptimizedSheetsClient {
     sheetName: string,
     headers: string[],
   ): Promise<void> {
+    assertSheetsWritesEnabled("createSheet");
+
     await this.withRateLimit("write", async () => {
       try {
         // Attempt to add sheet
@@ -228,6 +238,8 @@ export class OptimizedSheetsClient {
     range: string,
     values: CellValue[][],
   ): Promise<void> {
+    assertSheetsWritesEnabled("appendValues");
+
     await this.withRateLimit("write", async () => {
       await this.sheets.spreadsheets.values.append({
         spreadsheetId,
@@ -243,6 +255,8 @@ export class OptimizedSheetsClient {
     range: string,
     values: CellValue[][],
   ): Promise<void> {
+    assertSheetsWritesEnabled("updateValues");
+
     await this.withRateLimit("write", async () => {
       await this.sheets.spreadsheets.values.update({
         spreadsheetId,
@@ -258,6 +272,8 @@ export class OptimizedSheetsClient {
     sheetName: string,
     rowNumbers: number[],
   ): Promise<void> {
+    assertSheetsWritesEnabled("deleteRows");
+
     const uniqueDescendingRowNumbers = Array.from(
       new Set(
         rowNumbers.filter(
@@ -712,6 +728,8 @@ export class OptimizedSheetsClient {
     sheetName: string,
     values: CellValue[][],
   ): Promise<void> {
+    assertSheetsWritesEnabled("appendValuesBatch");
+
     const batches = this.chunkRowsForWrite(values);
 
     for (const batch of batches) {

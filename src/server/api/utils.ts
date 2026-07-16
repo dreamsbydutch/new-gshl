@@ -1,5 +1,5 @@
-import { fastSheetsReader, type SheetsModelName } from "@gshl-sheets";
-import { getCount, getFirst, getMany } from "./sheets-store";
+import type { SheetsModelName } from "@gshl-sheets";
+import { fetchSnapshot, getCount, getFirst, getMany } from "./sheets-store";
 
 /**
  * API Utilities for common operations across the tRPC API
@@ -10,7 +10,7 @@ export const warmupCache = async () => {
   console.log("🔥 Warming up sheets snapshot...");
 
   try {
-    await fastSheetsReader.fetchSnapshot([
+    await fetchSnapshot([
       "Season",
       "Week",
       "Team",

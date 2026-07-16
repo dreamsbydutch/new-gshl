@@ -6,6 +6,8 @@ import {
 } from "../config/config";
 import { fastSheetsReader } from "../reader/fast-reader";
 import { normalizeDateOnlyValue } from "../../../utils/date";
+import { env } from "@gshl-env";
+import * as convexStore from "@gshl-lib/data/convex-store";
 
 type PrimitiveCellValue = string | number | boolean | null;
 type ModelName = keyof typeof SHEETS_CONFIG.SHEETS;
@@ -289,6 +291,11 @@ export class MinimalSheetsWriter {
     id: string,
     data: Partial<T>,
   ): Promise<void> {
+    if (env.GSHL_DATA_BACKEND === "convex") {
+      await convexStore.updateById(modelName, id, data);
+      return;
+    }
+
     const location = await findRowNumberById(modelName, id);
     if (!location) {
       throw new Error(`${String(modelName)} with id ${id} not found`);
@@ -320,6 +327,15 @@ export class MinimalSheetsWriter {
     rows: T[],
     options: CompositeKeyUpsertOptions = {},
   ): Promise<CompositeKeyUpsertResult> {
+    if (env.GSHL_DATA_BACKEND === "convex") {
+      return convexStore.upsertByCompositeKey(
+        modelName,
+        keyColumns,
+        rows,
+        options,
+      ) as Promise<CompositeKeyUpsertResult>;
+    }
+
     const sheetName = SHEETS_CONFIG.SHEETS[modelName];
     const columns = SHEETS_CONFIG.COLUMNS[modelName];
     if (!sheetName || !columns) {

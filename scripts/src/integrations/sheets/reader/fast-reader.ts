@@ -6,6 +6,8 @@ import {
   convertRowToModel,
   type DatabaseRecord,
 } from "../config/config";
+import { env } from "@gshl-env";
+import * as convexStore from "@gshl-lib/data/convex-store";
 
 type ModelName = keyof typeof SHEETS_CONFIG.SHEETS;
 
@@ -20,7 +22,9 @@ interface CacheEntry {
 }
 
 function normalizeHeaderKey(value: unknown): string {
-  return String(value ?? "").trim().toLowerCase();
+  return String(value ?? "")
+    .trim()
+    .toLowerCase();
 }
 
 function alignRowsToConfiguredColumns(
@@ -32,9 +36,7 @@ function alignRowsToConfiguredColumns(
 
   if (!header.length) {
     // Fallback for unexpected sheets without header rows.
-    return dataRows.map((row) =>
-      columns.map((_, index) => row[index] ?? null),
-    );
+    return dataRows.map((row) => columns.map((_, index) => row[index] ?? null));
   }
 
   const headerIndex = new Map<string, number>();
@@ -53,7 +55,7 @@ function alignRowsToConfiguredColumns(
     columns.map((column) => {
       const index =
         headerIndex.get(column) ?? headerIndex.get(normalizeHeaderKey(column));
-      return index === undefined ? null : row[index] ?? null;
+      return index === undefined ? null : (row[index] ?? null);
     }),
   );
 }
@@ -69,7 +71,10 @@ export class FastSheetsReader {
   private readonly MODEL_CACHE_TTL = 60 * 1000;
   private modelCache = new Map<ModelName, CacheEntry>();
   private playerDaySeasonCache = new Map<string, CacheEntry>();
-  private inFlightModelFetches = new Map<ModelName, Promise<DatabaseRecord[]>>();
+  private inFlightModelFetches = new Map<
+    ModelName,
+    Promise<DatabaseRecord[]>
+  >();
   private inFlightPlayerDaySeasonFetches = new Map<
     string,
     Promise<DatabaseRecord[]>
@@ -145,6 +150,10 @@ export class FastSheetsReader {
   async fetchModel<T extends DatabaseRecord>(
     modelName: ModelName,
   ): Promise<T[]> {
+    if (env.GSHL_DATA_BACKEND === "convex") {
+      return convexStore.fetchModel<T>(modelName);
+    }
+
     const cached = this.getCachedModel<T>(modelName);
     if (cached) {
       return cached;
@@ -181,10 +190,7 @@ export class FastSheetsReader {
       return rows;
     })();
 
-    this.inFlightModelFetches.set(
-      modelName,
-      request,
-    );
+    this.inFlightModelFetches.set(modelName, request);
 
     try {
       return await request;
@@ -196,14 +202,17 @@ export class FastSheetsReader {
   async fetchPlayerDaySeason<T extends DatabaseRecord>(
     seasonId: string | number,
   ): Promise<T[]> {
+    if (env.GSHL_DATA_BACKEND === "convex") {
+      return convexStore.fetchPlayerDaySeason<T>(seasonId);
+    }
+
     const seasonKey = String(seasonId);
     const cached = this.getCachedPlayerDaySeason<T>(seasonKey);
     if (cached) {
       return cached;
     }
 
-    const existingRequest =
-      this.inFlightPlayerDaySeasonFetches.get(seasonKey);
+    const existingRequest = this.inFlightPlayerDaySeasonFetches.get(seasonKey);
     if (existingRequest) {
       return existingRequest as Promise<T[]>;
     }
@@ -238,10 +247,7 @@ export class FastSheetsReader {
       return rows;
     })();
 
-    this.inFlightPlayerDaySeasonFetches.set(
-      seasonKey,
-      request,
-    );
+    this.inFlightPlayerDaySeasonFetches.set(seasonKey, request);
 
     try {
       return await request;
@@ -259,6 +265,10 @@ export class FastSheetsReader {
   async fetchSnapshot<M extends readonly ModelName[]>(
     models: M,
   ): Promise<SnapshotResult<M>> {
+    if (env.GSHL_DATA_BACKEND === "convex") {
+      return convexStore.fetchSnapshot(models) as Promise<SnapshotResult<M>>;
+    }
+
     const uniqueModels = Array.from(new Set(models));
     const output: Record<string, DatabaseRecord[]> = {};
     const pendingModels: ModelName[] = [];
@@ -279,7 +289,9 @@ export class FastSheetsReader {
 
     const bySpreadsheet = new Map<string, ModelName[]>();
     for (const modelName of pendingModels) {
-      for (const spreadsheetId of getSpreadsheetIdsForModel(String(modelName))) {
+      for (const spreadsheetId of getSpreadsheetIdsForModel(
+        String(modelName),
+      )) {
         const list = bySpreadsheet.get(spreadsheetId) ?? [];
         list.push(modelName);
         bySpreadsheet.set(spreadsheetId, list);
