@@ -2,7 +2,7 @@
  * Locker Room Header Utility Functions
  *
  * Contains constants and helper functions for the LockerRoomHeader component.
- * Type definitions have been moved to @gshl-types/ui-components
+ * Type definitions are sourced from @gshl-types
  */
 
 import type { GSHLTeam } from "@gshl-types";
@@ -24,10 +24,9 @@ export const TEAM_LOGO_SIZE = {
 } as const;
 
 /**
- * Formats an owner's display name, inserting nickname in single quotes when present.
- * Example: John 'Hammer' Doe OR Jane Doe
- * @param team Team containing owner name fields.
- * @returns Human-readable owner name string.
+ * Formats owner name for display.
+ *
+ * @param team - The team to use.
  */
 export const formatOwnerName = (team: GSHLTeam) => {
   const { ownerFirstName, ownerNickname, ownerLastName } = team;

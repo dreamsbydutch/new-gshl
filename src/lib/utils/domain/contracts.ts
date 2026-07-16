@@ -14,24 +14,58 @@ import type {
 import { SALARY_CAP } from "@gshl-types";
 import { formatDate } from "../core/date";
 
+type ContractComparableValue = Date | number | string | null | undefined;
+
+/**
+ * Identity.
+ *
+ * @param value - The source value to process.
+ */
 export const identity = <Value>(value: Value) => value;
 
+/**
+ * Converts input into array.
+ *
+ * @param value - The source value to process.
+ * @returns The converted array.
+ */
 export function toArray<T>(value: MaybeArray<T>): T[] | undefined {
   if (value == null) return undefined;
   return Array.isArray(value) ? value.filter((item) => item != null) : [value];
 }
 
+/**
+ * Converts input into set.
+ *
+ * @param value - The source value to process.
+ * @returns The converted set.
+ */
 export function toSet<T>(value: MaybeArray<T>): Set<T> | undefined {
   const arr = toArray(value);
   return arr ? new Set(arr) : undefined;
 }
 
-function getComparableValue(value: unknown): number | string | undefined {
+/**
+ * Returns comparable value.
+ *
+ * @param value - The source value to process.
+ * @returns The requested comparable value.
+ */
+function getComparableValue(
+  value: ContractComparableValue,
+): number | string | undefined {
   if (value instanceof Date) return value.getTime();
   if (typeof value === "number" || typeof value === "string") return value;
   return undefined;
 }
 
+/**
+ * Applies contract filters.
+ *
+ * @param contracts - The contracts to use.
+ * @param filters - The filter definitions to apply.
+ * @returns The updated contract filters.
+ */
 export function applyContractFilters(
   contracts: Contract[],
   filters?: ContractFilters,
@@ -84,6 +118,13 @@ export function applyContractFilters(
   });
 }
 
+/**
+ * Sorts contracts.
+ *
+ * @param contracts - The contracts to use.
+ * @param sort - The sort to use.
+ * @returns The sorted contracts.
+ */
 export function sortContracts(
   contracts: Contract[],
   sort?: ContractSortOption,
@@ -118,6 +159,13 @@ export function sortContracts(
   return copy;
 }
 
+/**
+ * Merges contract filters.
+ *
+ * @param base - The base to use.
+ * @param overrides - The overrides to use.
+ * @returns The merged contract filters.
+ */
 export function mergeContractFilters(
   base?: ContractFilters,
   overrides?: ContractFilters,
@@ -140,6 +188,12 @@ export function mergeContractFilters(
   return merged;
 }
 
+/**
+ * Computes contract summary.
+ *
+ * @param contracts - The contracts to use.
+ * @returns The calculated contract summary.
+ */
 export function computeContractSummary(contracts: Contract[]): ContractSummary {
   const count = contracts.length;
   const totalCapHit = contracts.reduce(
@@ -159,10 +213,23 @@ export function computeContractSummary(contracts: Contract[]): ContractSummary {
   };
 }
 
-export const isValidContractDate = (value: unknown): value is Date =>
+/**
+ * Checks whether valid contract date.
+ *
+ * @param value - The source value to process.
+ * @returns The resulting valid contract date.
+ */
+export const isValidContractDate = (
+  value: ContractComparableValue,
+): value is Date =>
   value instanceof Date && !Number.isNaN(value.getTime());
 
-export const getTimestampToken = (value: unknown) => {
+/**
+ * Returns timestamp token.
+ *
+ * @param value - The source value to process.
+ */
+export const getTimestampToken = (value: ContractComparableValue) => {
   if (isValidContractDate(value)) {
     return String(value.getTime());
   }
@@ -174,6 +241,11 @@ export const getTimestampToken = (value: unknown) => {
   return "na";
 };
 
+/**
+ * Returns contract dedupe key.
+ *
+ * @param contract - The contract to use.
+ */
 export const getContractDedupeKey = (contract: Contract) =>
   [
     contract.id ?? "no-id",
@@ -184,10 +256,10 @@ export const getContractDedupeKey = (contract: Contract) =>
   ].join("|");
 
 /**
- * Calculates the remaining cap space for a team based on their contracts.
+ * Calculates cap space.
  *
- * @param contracts - Array of contracts with CapHit property
- * @returns The remaining cap space (salary cap - total cap hit)
+ * @param contracts - The contracts to use.
+ * @returns The calculated cap space.
  */
 export function calculateCapSpace(
   contracts: Array<{ CapHit?: string | null }>,
@@ -201,10 +273,10 @@ export function calculateCapSpace(
 }
 
 /**
- * Calculates the percentage of salary cap used by a team's contracts.
+ * Calculates cap percentage.
  *
- * @param contracts - Array of contracts with CapHit property
- * @returns The percentage of salary cap used (0-100)
+ * @param contracts - The contracts to use.
+ * @returns The calculated cap percentage.
  */
 export function calculateCapPercentage(
   contracts: Array<{ CapHit?: string | null }>,

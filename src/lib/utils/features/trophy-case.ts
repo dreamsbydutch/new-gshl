@@ -2,7 +2,7 @@ import {
   AWARD_CATALOG_BY_KEY,
   AWARD_GROUP_ORDER,
 } from "@gshl-lib/config/awards";
-import { AwardsList, SeasonType } from "@gshl-types";
+import { AwardsList } from "@gshl-types";
 import type {
   AllStarAwardKey,
   AllStarCountLine,
@@ -19,7 +19,11 @@ import {
   findNhlTeamByAbbreviation,
   getPlayerNhlAbbreviation,
 } from "../domain/player";
-import { ALL_STAR_AWARD_ORDER, getAllStarTitle } from "./season-awards";
+import {
+  ALL_STAR_AWARD_ORDER,
+  getAllStarSeasonType,
+  getAllStarTitle,
+} from "./season-awards";
 
 const groupOrderMap = new Map(
   AWARD_GROUP_ORDER.map((group, index) => [group, index]),
@@ -28,10 +32,22 @@ const allStarOrderMap = new Map(
   ALL_STAR_AWARD_ORDER.map((award, index) => [award, index]),
 );
 
+/**
+ * Returns season year map.
+ *
+ * @param cards - The cards to use.
+ */
 export function getSeasonYearMap(cards: TrophyCaseProps["seasons"]) {
   return new Map(cards.map((season) => [String(season.id), season.year]));
 }
 
+/**
+ * Formats year range for display.
+ *
+ * @param startYear - The start year to use.
+ * @param endYear - The end year to use.
+ * @returns The formatted year range.
+ */
 export function formatYearRange(startYear: number, endYear: number): string {
   if (startYear === endYear) {
     return String(startYear);
@@ -46,6 +62,12 @@ export function formatYearRange(startYear: number, endYear: number): string {
   return `${startYear}-${endYear}`;
 }
 
+/**
+ * Formats year ranges for display.
+ *
+ * @param years - The years to use.
+ * @returns The formatted year ranges.
+ */
 export function formatYearRanges(years: Array<number | string>): string {
   const normalizedYears = Array.from(
     new Set(
@@ -81,6 +103,14 @@ export function formatYearRanges(years: Array<number | string>): string {
   return ranges.join(", ");
 }
 
+/**
+ * Resolves summary text.
+ *
+ * @param count - The count to use.
+ * @param latestYear - The latest year to use.
+ * @param summaryLabel - The summary label to use.
+ * @param years - The years to use.
+ */
 export function resolveSummaryText(
   count: number,
   latestYear: number | string,
@@ -104,16 +134,12 @@ export function resolveSummaryText(
     : `${latestYear} ${trimmedLabel} Winner`;
 }
 
-export function getAllStarSeasonType(awardKey: AllStarAwardKey): SeasonType {
-  switch (awardKey) {
-    case AwardsList.FIRST_AS:
-    case AwardsList.SECOND_AS:
-      return SeasonType.REGULAR_SEASON;
-    case AwardsList.PLAYOFF_AS:
-      return SeasonType.PLAYOFFS;
-  }
-}
-
+/**
+ * Returns all star row class.
+ *
+ * @param awardKey - The award key to use.
+ * @returns The requested all star row class.
+ */
 export function getAllStarRowClass(awardKey: AllStarAwardKey): string {
   switch (awardKey) {
     case AwardsList.FIRST_AS:
@@ -125,6 +151,11 @@ export function getAllStarRowClass(awardKey: AllStarAwardKey): string {
   }
 }
 
+/**
+ * Returns summary line class.
+ *
+ * @param group - The group to use.
+ */
 export function getSummaryLineClass(group: AwardGroupKey) {
   switch (group) {
     case "TEAM TROPHIES":
@@ -138,6 +169,12 @@ export function getSummaryLineClass(group: AwardGroupKey) {
   }
 }
 
+/**
+ * Builds all star data.
+ *
+ * @param props - The props to use.
+ * @returns The assembled all star data.
+ */
 export function buildAllStarData(props: TrophyCaseProps): {
   counts: AllStarCountLine[];
   rows: AllStarRowData[];
@@ -223,6 +260,11 @@ export function buildAllStarData(props: TrophyCaseProps): {
   };
 }
 
+/**
+ * Builds trophy case data.
+ *
+ * @returns The assembled trophy case data.
+ */
 export function buildTrophyCaseData({
   awards,
   allAwards,

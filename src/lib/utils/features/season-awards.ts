@@ -2,7 +2,7 @@ import {
   AWARD_CATALOG_BY_KEY,
   AWARD_GROUP_ORDER,
 } from "@gshl-lib/config/awards";
-import { AwardsList } from "@gshl-types";
+import { AwardsList, SeasonType } from "@gshl-types";
 import type {
   AllStarAwardKey,
   AllStarTeamCard,
@@ -22,6 +22,30 @@ export const ALL_STAR_AWARD_ORDER = [
   AwardsList.PLAYOFF_AS,
 ] as const;
 
+/**
+ * Returns all star season type.
+ *
+ * @param awardKey - The award key to use.
+ * @returns The requested all star season type.
+ */
+export function getAllStarSeasonType(
+  awardKey: AwardsList,
+): SeasonType | undefined {
+  switch (awardKey) {
+    case AwardsList.FIRST_AS:
+    case AwardsList.SECOND_AS:
+      return SeasonType.REGULAR_SEASON;
+    case AwardsList.PLAYOFF_AS:
+      return SeasonType.PLAYOFFS;
+  }
+}
+
+/**
+ * Returns owner display name.
+ *
+ * @param team - The team to use.
+ * @returns The requested owner display name.
+ */
 export function getOwnerDisplayName(team: GSHLTeam | undefined): string | null {
   if (!team) return null;
 
@@ -36,6 +60,12 @@ export function getOwnerDisplayName(team: GSHLTeam | undefined): string | null {
   return fullName || null;
 }
 
+/**
+ * Returns all star title.
+ *
+ * @param awardKey - The award key to use.
+ * @returns The requested all star title.
+ */
 export function getAllStarTitle(awardKey: AllStarAwardKey): string {
   switch (awardKey) {
     case AwardsList.FIRST_AS:
@@ -47,6 +77,12 @@ export function getAllStarTitle(awardKey: AllStarAwardKey): string {
   }
 }
 
+/**
+ * Returns all star card class.
+ *
+ * @param awardKey - The award key to use.
+ * @returns The requested all star card class.
+ */
 export function getAllStarCardClass(awardKey: AllStarAwardKey): string {
   switch (awardKey) {
     case AwardsList.FIRST_AS:
@@ -58,6 +94,13 @@ export function getAllStarCardClass(awardKey: AllStarAwardKey): string {
   }
 }
 
+/**
+ * Builds season award cards.
+ *
+ * @param awards - The awards to use.
+ * @param teams - The teams to use.
+ * @returns The assembled season award cards.
+ */
 export function buildSeasonAwardCards(
   awards: Awards[],
   teams: GSHLTeam[],
@@ -101,6 +144,15 @@ export function buildSeasonAwardCards(
     });
 }
 
+/**
+ * Builds all star team cards.
+ *
+ * @param awards - The awards to use.
+ * @param players - The players to use.
+ * @param playerTotals - The player totals to use.
+ * @param teams - The teams to use.
+ * @returns The assembled all star team cards.
+ */
 export function buildAllStarTeamCards(
   awards: Awards[],
   players: Player[],

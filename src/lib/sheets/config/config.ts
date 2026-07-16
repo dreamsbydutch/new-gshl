@@ -926,7 +926,19 @@ function isDateOnlyColumn(column: string): boolean {
 }
 
 function coerceDateOnlyString(value: unknown): string | null {
-  return normalizeDateOnlyValue(value);
+  if (
+    value === null ||
+    value === undefined ||
+    typeof value === "string" ||
+    typeof value === "number" ||
+    typeof value === "boolean" ||
+    value instanceof Date ||
+    typeof value === "object"
+  ) {
+    return normalizeDateOnlyValue(value);
+  }
+
+  return null;
 }
 
 function normalizeMultiValueTokens(value: unknown): string[] {

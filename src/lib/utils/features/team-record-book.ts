@@ -19,6 +19,7 @@ import {
   formatPlayerPositionList,
 } from "../domain/player";
 import { formatNumber, toNumber } from "../core";
+import { getAllStarSeasonType } from "./season-awards";
 
 const PLAYER_AWARD_KEYS = new Set<AwardsList>([
   AwardsList.FIRST_AS,
@@ -64,12 +65,12 @@ const CAREER_TOTAL_FIELDS: Array<
   "TOI",
 ];
 
-function getAllStarSeasonType(awardKey: AwardsList): SeasonType {
-  return awardKey === AwardsList.PLAYOFF_AS
-    ? SeasonType.PLAYOFFS
-    : SeasonType.REGULAR_SEASON;
-}
-
+/**
+ * Returns player award label.
+ *
+ * @param awardKey - The award key to use.
+ * @returns The requested player award label.
+ */
 export function getPlayerAwardLabel(awardKey: AwardsList): string {
   if (awardKey === AwardsList.FIRST_AS) {
     return "First Team All-Star";
@@ -84,6 +85,13 @@ export function getPlayerAwardLabel(awardKey: AwardsList): string {
   return AWARD_CATALOG_BY_KEY.get(awardKey)?.fullName ?? awardKey;
 }
 
+/**
+ * Returns player positions.
+ *
+ * @param player - The player to use.
+ * @param fallbackPositions - The fallback positions to use.
+ * @returns The requested player positions.
+ */
 export function getPlayerPositions(
   player: Player | undefined,
   fallbackPositions: string[],
@@ -94,6 +102,14 @@ export function getPlayerPositions(
   );
 }
 
+/**
+ * Returns nhl team for player.
+ *
+ * @param nhlTeamsByAbbr - The nhl teams by abbr to use.
+ * @param player - The player to use.
+ * @param fallbackAbbr - The fallback abbr to use.
+ * @returns The requested nhl team for player.
+ */
 export function getNhlTeamForPlayer(
   nhlTeamsByAbbr: Map<string, NHLTeam>,
   player: Player | undefined,
@@ -104,6 +120,13 @@ export function getNhlTeamForPlayer(
   return nhlTeamsByAbbr.get(teamAbbr);
 }
 
+/**
+ * Formats record value for display.
+ *
+ * @param stat - The stat to use.
+ * @param value - The source value to process.
+ * @returns The formatted record value.
+ */
 export function formatRecordValue(stat: RecordStatKey, value: number): string {
   if (stat === "SVP") {
     return formatNumber(value, 3);
@@ -114,6 +137,13 @@ export function formatRecordValue(stat: RecordStatKey, value: number): string {
   return formatNumber(value, 0);
 }
 
+/**
+ * Builds franchise career rows.
+ *
+ * @param careerSplits - The career splits to use.
+ * @param franchiseTeamIds - The franchise team ids to use.
+ * @returns The assembled franchise career rows.
+ */
 export function buildFranchiseCareerRows(
   careerSplits: PlayerCareerSplitStatLine[],
   franchiseTeamIds: Set<string>,
@@ -194,6 +224,16 @@ export function buildFranchiseCareerRows(
   }));
 }
 
+/**
+ * Finds leader.
+ *
+ * @param rows - The rows to use.
+ * @param playersById - The players by id to use.
+ * @param nhlTeamsByAbbr - The nhl teams by abbr to use.
+ * @param definition - The definition to use.
+ * @param options - Configuration options for the operation.
+ * @returns The matching leader, if one exists.
+ */
 export function findLeader(
   rows: FranchiseCareerRow[],
   playersById: Map<string, Player>,
@@ -293,6 +333,11 @@ export function findLeader(
   };
 }
 
+/**
+ * Builds award summary rows.
+ *
+ * @returns The assembled award summary rows.
+ */
 export function buildAwardSummaryRows({
   allAwards,
   allTeams,
@@ -331,9 +376,10 @@ export function buildAwardSummaryRows({
     }
 
     const playerId = String(award.winnerId);
-    const seasonType = ALL_STAR_AWARD_KEYS.has(awardKey)
-      ? getAllStarSeasonType(awardKey)
-      : SeasonType.REGULAR_SEASON;
+    const seasonType =
+      (ALL_STAR_AWARD_KEYS.has(awardKey)
+        ? getAllStarSeasonType(awardKey)
+        : SeasonType.REGULAR_SEASON) ?? SeasonType.REGULAR_SEASON;
 
     const belongsToFranchise = playerTotals.some((row) => {
       return (

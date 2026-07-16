@@ -1,10 +1,19 @@
-import type { QueryLike, QueryState } from "@gshl-types";
+import type { QueryState } from "@gshl-types";
+
+type QueryStatusLike = {
+  error?: QueryState["error"];
+  isFetching?: boolean;
+  isLoading?: boolean;
+};
 
 /**
- * Collapses multiple query states into a single status descriptor.
+ * Combines query states.
+ *
+ * @param queries - The queries to use.
+ * @returns The combined query states.
  */
 export function combineQueryStates(
-  ...queries: QueryLike<unknown>[]
+  ...queries: QueryStatusLike[]
 ): QueryState {
   return {
     isLoading: queries.some((query) => Boolean(query?.isLoading)),

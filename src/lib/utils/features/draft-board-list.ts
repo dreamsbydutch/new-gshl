@@ -2,7 +2,7 @@
  * Draft Board List Utility Functions
  *
  * Contains filtering, sorting, and transformation logic for draft board features.
- * Type definitions have been moved to @gshl-types/ui-components
+ * Type definitions are sourced from @gshl-types
  */
 
 import { ContractStatus, RosterPosition, PositionGroup } from "@gshl-types";
@@ -17,7 +17,11 @@ import type {
 export type { DraftBoardToolbarProps, DraftBoardPlayer } from "@gshl-types";
 
 /**
- * Type guard / helper to determine if a player has a given roster position.
+ * Checks whether roster position exists.
+ *
+ * @param player - The player to use.
+ * @param pos - The pos to use.
+ * @returns True when roster position; otherwise false.
  */
 function hasRosterPosition(
   player: Pick<DraftBoardPlayer, "nhlPos">,
@@ -28,6 +32,13 @@ function hasRosterPosition(
     : player.nhlPos === pos;
 }
 
+/**
+ * Matches filter.
+ *
+ * @param player - The player to use.
+ * @param selectedType - The selected type to use.
+ * @returns True when matches filter; otherwise false.
+ */
 export function matchesFilter(
   player: Pick<DraftBoardPlayer, "posGroup" | "nhlPos" | "overallRating">,
   selectedType: string | null,
@@ -54,7 +65,11 @@ export function matchesFilter(
 }
 
 /**
- * Sorts draft players by their pre-draft ranking (ADP)
+ * Sorts by pre draft rank.
+ *
+ * @param a - The a to use.
+ * @param b - The b to use.
+ * @returns The sorted by pre draft rank.
  */
 export function sortByPreDraftRank(
   a: Pick<DraftBoardPlayer, "preDraftRk">,
@@ -64,7 +79,11 @@ export function sortByPreDraftRank(
 }
 
 /**
- * Sorts draft players by overall rating (descending)
+ * Sorts by overall rating.
+ *
+ * @param a - The a to use.
+ * @param b - The b to use.
+ * @returns The sorted by overall rating.
  */
 export function sortByOverallRating(
   a: Pick<DraftBoardPlayer, "overallRating">,
@@ -74,7 +93,11 @@ export function sortByOverallRating(
 }
 
 /**
- * Sorts draft players by their overall rank (ascending).
+ * Sorts by overall rank.
+ *
+ * @param a - The a to use.
+ * @param b - The b to use.
+ * @returns The sorted by overall rank.
  */
 export function sortByOverallRank(
   a: Pick<DraftBoardPlayer, "overallRk">,
@@ -83,6 +106,12 @@ export function sortByOverallRank(
   return (a.overallRk ?? 9999) - (b.overallRk ?? 9999);
 }
 
+/**
+ * Parses date.
+ *
+ * @param value - The source value to process.
+ * @returns The parsed date.
+ */
 function parseDate(value: string | Date | null | undefined): Date | null {
   if (!value) return null;
 
@@ -90,6 +119,14 @@ function parseDate(value: string | Date | null | undefined): Date | null {
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
+/**
+ * Checks whether upcoming season contract exists.
+ *
+ * @param playerId - The player id to use.
+ * @param contracts - The contracts to use.
+ * @param activeOn - The active on to use.
+ * @returns True when upcoming season contract; otherwise false.
+ */
 function hasUpcomingSeasonContract(
   playerId: string,
   contracts: Contract[],
@@ -125,7 +162,12 @@ function hasUpcomingSeasonContract(
 }
 
 /**
- * Filters players to only active draft-eligible players for a target season.
+ * Filters available draft players.
+ *
+ * @param players - The players to use.
+ * @param contracts - The contracts to use.
+ * @param activeOn - The active on to use.
+ * @returns The filtered available draft players.
  */
 export function filterAvailableDraftPlayers<
   T extends Pick<DraftBoardPlayer, "id" | "isActive">,
@@ -140,7 +182,12 @@ export function filterAvailableDraftPlayers<
 }
 
 /**
- * Sorts and prepares players for the draft board
+ * Prepare draft board players.
+ *
+ * @param players - The players to use.
+ * @param contracts - The contracts to use.
+ * @param activeOn - The active on to use.
+ * @returns The resulting prepare draft board players.
  */
 export function prepareDraftBoardPlayers<T extends DraftBoardPlayer>(
   players: T[],
@@ -154,7 +201,10 @@ export function prepareDraftBoardPlayers<T extends DraftBoardPlayer>(
 }
 
 /**
- * Filters out goalies from the player list
+ * Exclude goalies.
+ *
+ * @param player - The player to use.
+ * @returns True when exclude goalies; otherwise false.
  */
 export function excludeGoalies(
   player: Pick<DraftBoardPlayer, "nhlPos">,
@@ -163,7 +213,11 @@ export function excludeGoalies(
 }
 
 /**
- * Filters draft picks by season ID
+ * Filters draft picks by season.
+ *
+ * @param draftPicks - The draft picks to use.
+ * @param seasonId - The season id to use.
+ * @returns The filtered draft picks by season.
  */
 export function filterDraftPicksBySeason<T extends Pick<DraftPick, "seasonId">>(
   draftPicks: T[],
@@ -173,7 +227,10 @@ export function filterDraftPicksBySeason<T extends Pick<DraftPick, "seasonId">>(
 }
 
 /**
- * Sorts draft picks by round and pick number
+ * Sorts draft picks.
+ *
+ * @param picks - The picks to use.
+ * @returns The sorted draft picks.
  */
 export function sortDraftPicks<T extends Pick<DraftPick, "round" | "pick">>(
   picks: T[],
@@ -182,7 +239,11 @@ export function sortDraftPicks<T extends Pick<DraftPick, "round" | "pick">>(
 }
 
 /**
- * Gets season draft picks sorted by round and pick
+ * Returns season draft picks.
+ *
+ * @param allPicks - The all picks to use.
+ * @param seasonId - The season id to use.
+ * @returns The requested season draft picks.
  */
 export function getSeasonDraftPicks<
   T extends Pick<DraftPick, "seasonId" | "round" | "pick">,
@@ -190,6 +251,12 @@ export function getSeasonDraftPicks<
   return sortDraftPicks(filterDraftPicksBySeason(allPicks, seasonId));
 }
 
+/**
+ * Groups projected draft picks by round.
+ *
+ * @param projectedDraftPicks - The projected draft picks to use.
+ * @returns The grouped projected draft picks by round.
+ */
 export function groupProjectedDraftPicksByRound(
   projectedDraftPicks: ProjectedDraftPick[],
 ): Array<{

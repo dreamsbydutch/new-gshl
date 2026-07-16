@@ -16,10 +16,10 @@ import { getSeasonString, toIsoDateOnly } from "../core";
 export type { TeamDraftPickListProps, ProcessedDraftPick, DraftPickItemProps };
 
 /**
- * Format a draft pick into human-readable round / overall string.
- * Example: Round 1, 3 Overall
- * @param draftPick Draft pick entity.
- * @returns String description (no trailing punctuation).
+ * Formats draft pick description for display.
+ *
+ * @param draftPick - The draft pick to use.
+ * @returns The formatted draft pick description.
  */
 export const formatDraftPickDescription = (draftPick: DraftPick): string => {
   const roundText = `${draftPick.round} Round`;
@@ -48,9 +48,12 @@ export const getOriginalTeamName = (
 };
 
 /**
- * Determine if a draft pick slot is still available (no contract/player selected yet).
- * Logic: Remaining picks after current index exceed number of contracts (selected players).
- * @remarks Assumes contracts are ordered from earliest selection to latest mapping end.
+ * Checks whether draft pick available.
+ *
+ * @param draftPicks - The draft picks to use.
+ * @param contracts - The contracts to use.
+ * @param index - The index to use.
+ * @returns True when draft pick available; otherwise false.
  */
 export const isDraftPickAvailable = (
   draftPicks: DraftPick[],
@@ -78,6 +81,13 @@ export const getSelectedPlayer = (
   return players.find((player) => player.id === contract.playerId);
 };
 
+/**
+ * Shifts season date.
+ *
+ * @param dateValue - The date value to use.
+ * @param yearOffset - The year offset to use.
+ * @returns The shifted season date.
+ */
 export function shiftSeasonDate(dateValue: string, yearOffset: number): string {
   const parsed = new Date(dateValue);
   if (Number.isNaN(parsed.getTime())) return dateValue;
@@ -86,6 +96,13 @@ export function shiftSeasonDate(dateValue: string, yearOffset: number): string {
   return toIsoDateOnly(parsed);
 }
 
+/**
+ * Builds synthetic season.
+ *
+ * @param previousSeason - The previous season to use.
+ * @param id - The id to use.
+ * @returns The assembled synthetic season.
+ */
 export function buildSyntheticSeason(
   previousSeason: Season,
   id: string,

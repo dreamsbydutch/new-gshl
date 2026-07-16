@@ -17,23 +17,52 @@ export type {
   ConferenceContestSeasonViewModel,
 } from "@gshl-types";
 
-export const isGshlTeam = (team: unknown): team is GSHLTeam => {
+type TeamLike = GSHLTeam | Partial<GSHLTeam> | null | undefined;
+type IdLike = string | number | null | undefined;
+type ScoreLike = string | number | null | undefined;
+type BooleanLike = string | number | boolean | null | undefined;
+
+/**
+ * Checks whether gshl team.
+ *
+ * @param team - The team to use.
+ * @returns The resulting gshl team.
+ */
+export const isGshlTeam = (team: TeamLike): team is GSHLTeam => {
   if (!team || typeof team !== "object") return false;
   return "id" in team && "seasonId" in team && "confId" in team;
 };
 
-const normalizeId = (value: unknown): string | null => {
+/**
+ * Normalizes id.
+ *
+ * @param value - The source value to process.
+ * @returns The normalized id.
+ */
+const normalizeId = (value: IdLike): string | null => {
   if (value == null) return null;
   if (typeof value !== "string" && typeof value !== "number") return null;
   const str = String(value).trim();
   return str.length ? str : null;
 };
 
+/**
+ * Checks whether playoff game type.
+ *
+ * @param gameType - The game type to use.
+ */
 const isPlayoffGameType = (gameType: MatchupType) =>
   gameType === MatchupType.QUARTER_FINAL ||
   gameType === MatchupType.SEMI_FINAL ||
   gameType === MatchupType.FINAL;
 
+/**
+ * Returns season conferences.
+ *
+ * @param seasonId - The season id to use.
+ * @param gshlTeams - The gshl teams to use.
+ * @returns The requested season conferences.
+ */
 export const getSeasonConferences = (
   seasonId: string,
   gshlTeams: GSHLTeam[],
@@ -62,6 +91,12 @@ export const getSeasonConferences = (
   );
 };
 
+/**
+ * Returns all conferences.
+ *
+ * @param gshlTeams - The gshl teams to use.
+ * @returns The requested all conferences.
+ */
 export const getAllConferences = (
   gshlTeams: GSHLTeam[],
 ): ConferenceContestConferenceInfo[] => {
@@ -85,7 +120,13 @@ export const getAllConferences = (
   );
 };
 
-const normalizeScore = (score: unknown): number | null => {
+/**
+ * Normalizes score.
+ *
+ * @param score - The score to use.
+ * @returns The normalized score.
+ */
+const normalizeScore = (score: ScoreLike): number | null => {
   if (score == null) return null;
   if (typeof score === "number" && Number.isFinite(score)) return score;
   if (typeof score === "string") {
@@ -95,7 +136,13 @@ const normalizeScore = (score: unknown): number | null => {
   return null;
 };
 
-const normalizeBoolean = (value: unknown): boolean | null => {
+/**
+ * Normalizes boolean.
+ *
+ * @param value - The source value to process.
+ * @returns True when boolean; otherwise false.
+ */
+const normalizeBoolean = (value: BooleanLike): boolean | null => {
   if (value == null) return null;
   if (typeof value === "boolean") return value;
   if (typeof value === "number") {
@@ -112,12 +159,23 @@ const normalizeBoolean = (value: unknown): boolean | null => {
   return null;
 };
 
+/**
+ * Checks whether matchup complete by score.
+ *
+ * @param matchup - The matchup to use.
+ */
 const isMatchupCompleteByScore = (
   matchup: Pick<Matchup, "homeScore" | "awayScore">,
 ) =>
   normalizeScore(matchup.homeScore) != null &&
   normalizeScore(matchup.awayScore) != null;
 
+/**
+ * Returns matchup winner.
+ *
+ * @param matchup - The matchup to use.
+ * @returns The requested matchup winner.
+ */
 const getMatchupWinner = (
   matchup: Pick<
     Matchup,
@@ -144,6 +202,14 @@ const getMatchupWinner = (
   return "unknown";
 };
 
+/**
+ * Applies result to record.
+ *
+ * @param matchup - The matchup to use.
+ * @param homeConfId - The home conf id to use.
+ * @param awayConfId - The away conf id to use.
+ * @param recordByConfId - The record by conf id to use.
+ */
 const applyResultToRecord = (
   matchup: Pick<
     Matchup,
@@ -169,6 +235,12 @@ const applyResultToRecord = (
   recordByConfId[homeConfId].losses += 1;
 };
 
+/**
+ * Builds conference contest season view model.
+ *
+ * @param params - The params to use.
+ * @returns The assembled conference contest season view model.
+ */
 export const buildConferenceContestSeasonViewModel = (params: {
   season: Season;
   matchups: Matchup[];
@@ -201,7 +273,12 @@ export const buildConferenceContestSeasonViewModel = (params: {
       })
       .filter((entry): entry is readonly [string, GSHLTeam] => Boolean(entry)),
   );
-  const getTeamById = (teamId: unknown) => {
+      /**
+   * Returns team by id.
+   *
+   * @param teamId - The team id to use.
+   */
+  const getTeamById = (teamId: IdLike) => {
     const id = normalizeId(teamId);
     return id ? teamsById.get(id) : undefined;
   };
@@ -355,6 +432,37 @@ export const buildConferenceContestSeasonViewModel = (params: {
   };
 };
 
+/**
+ * Builds all season-scoped conference contest view models in reverse
+ * chronological order.
+ */
+export const buildConferenceContestSeasonViewModels = (params: {
+  seasons: Season[];
+  matchups: Matchup[];
+  gshlTeams: GSHLTeam[];
+}): ConferenceContestSeasonViewModel[] => {
+  const { seasons, matchups, gshlTeams } = params;
+
+  return [...seasons]
+    .sort((a, b) => b.year - a.year)
+    .map((season) =>
+      buildConferenceContestSeasonViewModel({
+        season,
+        matchups,
+        gshlTeams,
+      }),
+    )
+    .filter((viewModel): viewModel is ConferenceContestSeasonViewModel =>
+      Boolean(viewModel),
+    );
+};
+
+/**
+ * Builds conference contest overall view model.
+ *
+ * @param params - The params to use.
+ * @returns The assembled conference contest overall view model.
+ */
 export const buildConferenceContestOverallViewModel = (params: {
   seasons: Season[];
   matchups: Matchup[];
@@ -377,7 +485,12 @@ export const buildConferenceContestOverallViewModel = (params: {
       })
       .filter((entry): entry is readonly [string, GSHLTeam] => Boolean(entry)),
   );
-  const getTeamById = (teamId: unknown) => {
+      /**
+   * Returns team by id.
+   *
+   * @param teamId - The team id to use.
+   */
+  const getTeamById = (teamId: IdLike) => {
     const id = normalizeId(teamId);
     return id ? teamsById.get(id) : undefined;
   };

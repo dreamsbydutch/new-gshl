@@ -9,6 +9,13 @@ export type {
   ProjectedDraftPick,
 } from "@gshl-types";
 
+/**
+ * Creates a comparison result for players.
+ *
+ * @param left - The left to use.
+ * @param right - The right to use.
+ * @returns The comparison callback result.
+ */
 function comparePlayers(
   left: Pick<
     DraftBoardPlayer,
@@ -31,6 +38,13 @@ function comparePlayers(
   return String(left.id).localeCompare(String(right.id));
 }
 
+/**
+ * Sorts projected picks.
+ *
+ * @param left - The left to use.
+ * @param right - The right to use.
+ * @returns The sorted projected picks.
+ */
 function sortProjectedPicks(
   left: ProjectedDraftPick,
   right: ProjectedDraftPick,
@@ -41,6 +55,12 @@ function sortProjectedPicks(
   );
 }
 
+/**
+ * Builds mock draft projection.
+ *
+ * @param options - Configuration options for the operation.
+ * @returns The assembled mock draft projection.
+ */
 export function buildMockDraftProjection<
   TPlayer extends DraftBoardPlayer = DraftBoardPlayer,
 >(

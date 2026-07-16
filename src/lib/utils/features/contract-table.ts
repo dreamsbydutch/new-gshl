@@ -2,11 +2,13 @@
  * Contract Table Utility Functions
  *
  * Contains constants and helper functions for the ContractTable component.
- * Type definitions have been moved to @gshl-types/ui-components
+ * Type definitions are sourced from @gshl-types
  */
 
 import type { ContractTableProps } from "@gshl-types";
 import { toNumber } from "../core";
+
+type DateCandidate = Date | string | number | null | undefined;
 
 export const CAP_CEILING = 25000000;
 export const CAP_SEASON_END_MONTH = 3; // April (0-indexed)
@@ -21,9 +23,9 @@ export type {
 } from "@gshl-types";
 
 /**
- * Maps a contract expiry status to Tailwind utility classes for badge styling.
- * @param expiryStatus - Contract expiry status (e.g. "RFA", "UFA", "Trade", "Buyout")
- * @returns Tailwind class string (empty string if no special styling)
+ * Returns expiry status class.
+ *
+ * @param expiryStatus - The expiry status to use.
  */
 export const getExpiryStatusClass = (expiryStatus: string) => {
   if (expiryStatus === "RFA") {
@@ -51,13 +53,20 @@ export const getSeasonDisplay = (seasonName: string, yearOffset: number) => {
 };
 
 /**
- * Validates if a value is a valid Date object
- * @param value - Value to check
- * @returns True if value is a valid Date object
+ * Checks whether valid date.
+ *
+ * @param value - The source value to process.
+ * @returns The resulting valid date.
  */
-export const isValidDate = (value: unknown): value is Date =>
+export const isValidDate = (value: DateCandidate): value is Date =>
   value instanceof Date && !Number.isNaN(value.getTime());
 
+/**
+ * Returns display season year.
+ *
+ * @param currentSeason - The current season to use.
+ * @returns The requested display season year.
+ */
 export function getDisplaySeasonYear(
   currentSeason: ContractTableProps["currentSeason"],
 ): number {
@@ -70,6 +79,12 @@ export function getDisplaySeasonYear(
   return match ? Number(match[1]) + 1 : new Date().getFullYear();
 }
 
+/**
+ * Returns date year.
+ *
+ * @param value - The source value to process.
+ * @returns The requested date year.
+ */
 export function getDateYear(
   value: Date | string | null | undefined,
 ): number | null {

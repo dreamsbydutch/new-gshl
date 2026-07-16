@@ -1,10 +1,3 @@
-/**
- * Feature Utilities
- * -----------------
- * Component-specific utility functions for individual features.
- * Each file corresponds to a specific UI component or feature area.
- */
-
 export * from "./contract-table";
 export * from "./conference-contest";
 export * from "./draft-classes";
@@ -15,23 +8,15 @@ export * from "./mock-draft";
 export * from "./playoff-bracket";
 export * from "./season-awards";
 
-// locker-room-header exports (including TeamInfoProps)
 export * from "./locker-room-header";
 
-// standings-container exports (has TeamInfoProps conflict - aliased as StandingsTeamInfoProps)
 export {
-  CONFERENCE_ABBREVIATIONS,
-  CONFERENCE_TITLES,
-  STANDINGS_TYPES,
   OVERALL_SEED_FIELDS,
   CONFERENCE_SEED_FIELDS,
   WILDCARD_FIELDS,
   LOSERS_TOURNEY_FIELDS,
   buildStandingsCategories,
   buildStandingsOpponentLookup,
-  compareNumeric,
-  compareNumericAsc,
-  formatOrdinal,
   formatStandingsRank,
   formatStandingsDetailStat,
   formatStandingsGaa,
@@ -39,7 +24,6 @@ export {
   getStandingsMatchupWindow,
   groupTeamsByStandingsType,
   filterTeamsByConference,
-  getOrdinalSuffix,
   calculatePercentage,
   formatSeedPosition,
 } from "./standings-container";
@@ -56,13 +40,11 @@ export type {
 export * from "./team-draft-pick-list";
 export * from "./team-record-book";
 
-// team-history exports (has GameType - aliased from TeamHistoryGameType)
 export {
   GAME_TYPE_OPTIONS,
   SEASON_OPTIONS,
   SEASON_SPLIT_INITIAL,
   PLAYOFF_TRANSITION_YEAR,
-  removeDuplicates,
   calculateWinLossRecord,
   calculateWinPercentage,
   parseGameTypeValue,
@@ -86,20 +68,15 @@ export type {
 export * from "./team-roster";
 export * from "./trophy-case";
 
-// team-schedule exports (has GameType conflict)
 export {
-  GAME_TYPE_STYLES,
-  RESULT_STYLES,
   filterTeamMatchups,
   sortMatchupsByWeek,
   findWeekById,
   getGameLocation,
   getGameTypeDisplay,
-  getConferenceColor,
   formatOpponentDisplay,
   shouldShowRank,
   isGameCompleted,
-  didTeamWin,
   getResultStyleClass,
   formatTeamScore,
 } from "./team-schedule";
@@ -114,13 +91,14 @@ export type {
   ConferenceConfig,
 } from "./team-schedule";
 
-// weekly-schedule exports (has GameType conflict)
 export {
-  WEEKLY_CONFERENCES,
-  BACKGROUND_CLASSES,
-  DEFAULT_BACKGROUND_CLASS,
   filterMatchupsByWeek,
   sortMatchupsByRating,
+  collectInactivePlayerIds,
+  buildPlayerLookup,
+  buildPlayerWeekStatsByTeam,
+  buildTeamWeekStatsByTeam,
+  getUpcomingWeekIds,
   getGameBackgroundClass,
   shouldDisplayRanking,
   isMatchupCompleted,

@@ -174,8 +174,21 @@ const PROTECTED_LINEUP_POSITIONS = new Set<RosterPosition>([
   RosterPosition.IRplus,
 ]);
 
+/**
+ * Returns player rating.
+ *
+ * @param player - The player to use.
+ * @returns The requested player rating.
+ */
 const getPlayerRating = (player: Player): number => player.overallRating ?? 0;
 
+/**
+ * Checks whether eligible for slot.
+ *
+ * @param player - The player to use.
+ * @param eligiblePositions - The eligible positions to use.
+ * @returns True when eligible for slot; otherwise false.
+ */
 const isEligibleForSlot = (
   player: Player,
   eligiblePositions: RosterPosition[],
@@ -185,8 +198,10 @@ const isEligibleForSlot = (
 };
 
 /**
- * Generates lineup assignments for a team by filling default lineup slots with the
- * highest-rated eligible players and pushing the remainder to the bench.
+ * Generate lineup assignments.
+ *
+ * @param players - The players to use.
+ * @returns The resulting generate lineup assignments.
  */
 export function generateLineupAssignments(
   players: Player[] | null | undefined,

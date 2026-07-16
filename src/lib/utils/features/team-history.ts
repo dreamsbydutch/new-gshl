@@ -5,6 +5,7 @@ import {
   type Season,
   type Week,
 } from "@gshl-types";
+import { getMatchupOutcomeClass } from "../domain/schedule";
 import type {
   TeamHistoryGameType,
   WinLoss,
@@ -57,7 +58,13 @@ export const SEASON_SPLIT_INITIAL = "2015";
 
 export const PLAYOFF_TRANSITION_YEAR = 2017;
 
-export const removeDuplicates = (arr: string[][]): string[][] => {
+/**
+ * Remove duplicates.
+ *
+ * @param arr - The arr to use.
+ * @returns The resulting remove duplicates.
+ */
+const removeDuplicates = (arr: string[][]): string[][] => {
   const uniqueItems = new Set<string>();
 
   return arr.filter((item) => {
@@ -66,6 +73,24 @@ export const removeDuplicates = (arr: string[][]): string[][] => {
   });
 };
 
+/**
+ * Parses delimited value.
+ *
+ * @param value - The source value to process.
+ * @returns The parsed delimited value.
+ */
+function parseDelimitedValue(value: string): string {
+  return value.split(",")[1] ?? "";
+}
+
+/**
+ * Calculates win loss record.
+ *
+ * @param schedule - The schedule to use.
+ * @param teamOwnerId - The team owner id to use.
+ * @param teams - The teams to use.
+ * @returns The calculated win loss record.
+ */
 export const calculateWinLossRecord = (
   schedule: Matchup[],
   teamOwnerId: string,
@@ -95,6 +120,12 @@ export const calculateWinLossRecord = (
   return winLossRecord;
 };
 
+/**
+ * Calculates win percentage.
+ *
+ * @param winLossRecord - The win loss record to use.
+ * @returns The calculated win percentage.
+ */
 export const calculateWinPercentage = (
   winLossRecord: [number, number, number],
 ): number => {
@@ -107,18 +138,38 @@ export const calculateWinPercentage = (
   return Math.round((points / possiblePoints) * 1000) / 10;
 };
 
+/**
+ * Parses game type value.
+ *
+ * @param gameTypeValue - The game type value to use.
+ * @returns The parsed game type value.
+ */
 export const parseGameTypeValue = (
   gameTypeValue: string,
 ): string | undefined => {
-  const splitValue = gameTypeValue.split(",")[1];
-  return splitValue === "" ? undefined : splitValue;
+  const parsedValue = parseDelimitedValue(gameTypeValue);
+  return parsedValue === "" ? undefined : parsedValue;
 };
 
+/**
+ * Parses numeric value.
+ *
+ * @param value - The source value to process.
+ * @returns The parsed numeric value.
+ */
 export const parseNumericValue = (value: string): number => {
-  const splitValue = value.split(",")[1];
-  return splitValue ? +splitValue : 0;
+  const parsedValue = parseDelimitedValue(value);
+  return parsedValue ? +parsedValue : 0;
 };
 
+/**
+ * Builds owner options.
+ *
+ * @param fullSchedule - The full schedule to use.
+ * @param teams - The teams to use.
+ * @param teamInfo - The team info to use.
+ * @returns The assembled owner options.
+ */
 export const buildOwnerOptions = (
   fullSchedule: Matchup[],
   teams: GSHLTeam[],
@@ -151,6 +202,12 @@ export const buildOwnerOptions = (
   ];
 };
 
+/**
+ * Returns matchup header text.
+ *
+ * @param matchup - The matchup to use.
+ * @returns The requested matchup header text.
+ */
 export const getMatchupHeaderText = (
   matchup: Matchup & { week: Week | undefined; season: Season | undefined },
 ): string => {
@@ -181,24 +238,31 @@ export const getMatchupHeaderText = (
   return header;
 };
 
+/**
+ * Returns matchup background color.
+ *
+ * @param winLoss - The win loss to use.
+ * @returns The requested matchup background color.
+ */
 export const getMatchupBackgroundColor = (winLoss: string): string => {
-  switch (winLoss) {
-    case "W":
-      return "bg-green-100";
-    case "L":
-      return "bg-red-100";
-    default:
-      return "bg-slate-100";
-  }
+  return getMatchupOutcomeClass({
+    defaultClass: "bg-slate-100",
+    lossClass: "bg-red-100",
+    result: winLoss,
+    winClass: "bg-green-100",
+  });
 };
 
+/**
+ * Returns score color.
+ *
+ * @param result - The result to use.
+ * @returns The requested score color.
+ */
 export const getScoreColor = (result: string): string => {
-  switch (result) {
-    case "W":
-      return "text-emerald-700 font-bold";
-    case "L":
-      return "text-rose-800";
-    default:
-      return "";
-  }
+  return getMatchupOutcomeClass({
+    lossClass: "text-rose-800",
+    result,
+    winClass: "text-emerald-700 font-bold",
+  });
 };

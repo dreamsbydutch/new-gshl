@@ -1,9 +1,23 @@
 // Date utility functions
 
+/**
+ * Pad date part.
+ *
+ * @param value - The source value to process.
+ * @returns The resulting pad date part.
+ */
 function padDatePart(value: number | string): string {
   return String(value).padStart(2, "0");
 }
 
+/**
+ * Builds utc date.
+ *
+ * @param year - The year to use.
+ * @param month - The month to use.
+ * @param day - The day to use.
+ * @returns The assembled utc date.
+ */
 function buildUtcDate(year: number, month: number, day: number): Date | null {
   const parsed = new Date(Date.UTC(year, month - 1, day));
   if (isNaN(parsed.getTime())) return null;
@@ -17,10 +31,22 @@ function buildUtcDate(year: number, month: number, day: number): Date | null {
   return parsed;
 }
 
+/**
+ * Converts input into iso date only.
+ *
+ * @param date - The date value to process.
+ * @returns The converted iso date only.
+ */
 export function toIsoDateOnly(date: Date): string {
   return date.toISOString().slice(0, 10);
 }
 
+/**
+ * Converts input into local iso date only.
+ *
+ * @param date - The date value to process.
+ * @returns The converted local iso date only.
+ */
 export function toLocalIsoDateOnly(date: Date = new Date()): string {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -28,33 +54,40 @@ export function toLocalIsoDateOnly(date: Date = new Date()): string {
   return `${year}-${month}-${day}`;
 }
 
-export function isIsoDateInRange(
-  target: string,
-  start: string,
-  end: string,
-): boolean {
-  return start <= target && target <= end;
+type DateValueOutput = "date" | "iso";
+type DateFormatMode = "iso" | "display" | "timestamp";
+type DateInput = Date | string | number | boolean | object | null | undefined;
+
+type ResolveDateValueOptions = {
+  output?: DateValueOutput;
+};
+
+type FormatDateValueOptions = {
+  fallback?: string;
+  mode?: DateFormatMode;
+};
+
+/**
+ * Formats resolved date output for display.
+ *
+ * @param date - The date value to process.
+ * @param output - The output to use.
+ * @returns The formatted resolved date output.
+ */
+function formatResolvedDateOutput(
+  date: Date,
+  output: DateValueOutput,
+): Date | string {
+  return output === "iso" ? toIsoDateOnly(date) : date;
 }
 
-export function normalizeDateOnlyValue(input: unknown): string | null {
-  if (input === null || input === undefined || input === "") return null;
-
-  if (input instanceof Date) {
-    return isNaN(input.getTime()) ? null : toIsoDateOnly(input);
-  }
-
-  if (typeof input === "number") {
-    if (!Number.isFinite(input) || input <= 1) return null;
-    return toIsoDateOnly(convertInputDate(input));
-  }
-
-  if (typeof input !== "string") {
-    return null;
-  }
-
-  const raw = input.trim();
-  if (!raw || raw === "null" || raw === "undefined") return null;
-
+/**
+ * Normalizes structured date string.
+ *
+ * @param raw - The raw to use.
+ * @returns The normalized structured date string.
+ */
+function normalizeStructuredDateString(raw: string): string | null {
   const isoMatch = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(raw);
   if (isoMatch) {
     const [, year, month, day] = isoMatch;
@@ -79,83 +112,123 @@ export function normalizeDateOnlyValue(input: unknown): string | null {
     return `${year}-${padDatePart(month ?? "")}-${padDatePart(day ?? "")}`;
   }
 
+  return null;
+}
+
+/**
+ * Converts input into date from normalized iso.
+ *
+ * @param value - The source value to process.
+ * @returns The converted date from normalized iso.
+ */
+function toDateFromNormalizedIso(value: string): Date | null {
+  const [year = 0, month = 0, day = 0] = value.split("-").map(Number);
+  return buildUtcDate(year, month, day);
+}
+
+/**
+ * Resolves date value.
+ *
+ * @param input - The input value to process.
+ * @param options - Configuration options for the operation.
+ * @returns The resolved date value.
+ */
+function resolveDateValue(
+  input: DateInput,
+  options: ResolveDateValueOptions = {},
+): Date | string | null {
+  const output = options.output ?? "date";
+
+  if (input === null || input === undefined || input === "") return null;
+
+  if (input instanceof Date) {
+    return isNaN(input.getTime()) ? null : formatResolvedDateOutput(input, output);
+  }
+
+  if (typeof input === "number") {
+    if (!Number.isFinite(input) || input <= 1) return null;
+    return formatResolvedDateOutput(convertInputDate(input), output);
+  }
+
+  if (typeof input !== "string") {
+    return null;
+  }
+
+  const raw = input.trim();
+  if (!raw || raw === "null" || raw === "undefined") return null;
+
+  const normalized = normalizeStructuredDateString(raw);
+  if (normalized) {
+    return output === "iso"
+      ? normalized
+      : toDateFromNormalizedIso(normalized);
+  }
+
   if (/^-?\d+(\.\d+)?$/.test(raw)) {
     const asNumber = Number(raw);
     if (Number.isFinite(asNumber) && asNumber > 1) {
-      return toIsoDateOnly(convertInputDate(asNumber));
+      return formatResolvedDateOutput(convertInputDate(asNumber), output);
     }
     return null;
   }
 
-  const parsed = safeParseSheetDate(raw);
-  return parsed ? toIsoDateOnly(parsed) : null;
-}
-
-export function formatDate(date: Date | string | null): string {
-  return normalizeDateOnlyValue(date) ?? "";
-}
-
-function formatLocalDateOnlyForDisplay(date: Date | string): string {
-  const normalized = normalizeDateOnlyValue(date);
-  if (normalized) {
-    const [year = 0, month = 1, day = 1] = normalized.split("-").map(Number);
-    const localMidday = new Date(year, month - 1, day, 12);
-    return localMidday.toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
+  const parsed = new Date(raw);
+  if (isNaN(parsed.getTime())) {
+    return null;
   }
 
-  const parsed = safeParseSheetDate(date);
-  if (!parsed) return "";
-  return parsed.toLocaleDateString("en-US", {
+  return formatResolvedDateOutput(parsed, output);
+}
+
+/**
+ * Formats local date only for display for display.
+ *
+ * @param value - The source value to process.
+ * @returns The formatted local date only for display.
+ */
+function formatLocalDateOnlyForDisplay(value: DateInput): string {
+  const normalized = resolveDateValue(value, { output: "iso" });
+  if (typeof normalized !== "string") {
+    return "";
+  }
+
+  const [year = 0, month = 1, day = 1] = normalized.split("-").map(Number);
+  const localMidday = new Date(year, month - 1, day, 12);
+  return localMidday.toLocaleDateString("en-US", {
     year: "numeric",
     month: "short",
     day: "numeric",
   });
 }
 
-export function showDate(date: Date | string | null): string {
-  if (!date) return "N/A";
-  return formatLocalDateOnlyForDisplay(date) || "N/A";
-}
+/**
+ * Formats date value for display.
+ *
+ * @param value - The source value to process.
+ * @param options - Configuration options for the operation.
+ * @returns The formatted date value.
+ */
+function formatDateValue(
+  value: DateInput,
+  options: FormatDateValueOptions = {},
+): string {
+  const { fallback = "", mode = "display" } = options;
 
-export function parseSheetDate(dateStr: string | null): Date | null {
-  return safeParseSheetDate(dateStr);
-}
+  if (mode === "iso") {
+    const normalized = resolveDateValue(value, { output: "iso" });
+    return typeof normalized === "string" ? normalized : fallback;
+  }
 
-export function formatSheetDate(date: Date | null): string {
-  return date ? toIsoDateOnly(date) : "";
-}
+  if (mode === "display") {
+    return formatLocalDateOnlyForDisplay(value) || fallback;
+  }
 
-export function getCurrentSeason(): number {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth();
+  const parsed = resolveDateValue(value, { output: "date" });
+  if (!(parsed instanceof Date)) {
+    return fallback;
+  }
 
-  // Hockey season typically starts in October
-  return month >= 9 ? year + 1 : year;
-}
-
-export function getSeasonString(year: number): string {
-  return `${year}-${(year + 1).toString().slice(-2)}`;
-}
-
-export function isDateInRange(date: Date, start: Date, end: Date): boolean {
-  return date >= start && date <= end;
-}
-
-export function formatDisplayDate(date: Date | string | null): string {
-  if (!date) return "";
-  return formatLocalDateOnlyForDisplay(date);
-}
-
-export function formatTimestamp(date: Date | string | null): string {
-  if (!date) return "";
-  const d = safeParseSheetDate(date);
-  if (!d) return "";
-  return d.toLocaleString("en-US", {
+  return parsed.toLocaleString("en-US", {
     year: "numeric",
     month: "short",
     day: "numeric",
@@ -165,6 +238,135 @@ export function formatTimestamp(date: Date | string | null): string {
   });
 }
 
+/**
+ * Checks whether iso date in range.
+ *
+ * @param target - The target to use.
+ * @param start - The start to use.
+ * @param end - The end to use.
+ * @returns True when iso date in range; otherwise false.
+ */
+export function isIsoDateInRange(
+  target: string,
+  start: string,
+  end: string,
+): boolean {
+  return start <= target && target <= end;
+}
+
+/**
+ * Normalizes date only value.
+ *
+ * @param input - The input value to process.
+ * @returns The normalized date only value.
+ */
+export function normalizeDateOnlyValue(input: DateInput): string | null {
+  const normalized = resolveDateValue(input, { output: "iso" });
+  return typeof normalized === "string" ? normalized : null;
+}
+
+/**
+ * Formats date for display.
+ *
+ * @param date - The date value to process.
+ * @returns The formatted date.
+ */
+export function formatDate(date: Date | string | null): string {
+  return formatDateValue(date, { mode: "iso" });
+}
+
+/**
+ * Show date.
+ *
+ * @param date - The date value to process.
+ * @returns The resulting show date.
+ */
+export function showDate(date: Date | string | null): string {
+  return formatDateValue(date, { mode: "display", fallback: "N/A" });
+}
+
+/**
+ * Parses sheet date.
+ *
+ * @param dateStr - The date str to use.
+ * @returns The parsed sheet date.
+ */
+export function parseSheetDate(dateStr: string | null): Date | null {
+  return safeParseSheetDate(dateStr);
+}
+
+/**
+ * Formats sheet date for display.
+ *
+ * @param date - The date value to process.
+ * @returns The formatted sheet date.
+ */
+export function formatSheetDate(date: Date | null): string {
+  return date ? toIsoDateOnly(date) : "";
+}
+
+/**
+ * Returns current season.
+ *
+ * @returns The requested current season.
+ */
+export function getCurrentSeason(): number {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth();
+
+  // Hockey season typically starts in October
+  return month >= 9 ? year + 1 : year;
+}
+
+/**
+ * Returns season string.
+ *
+ * @param year - The year to use.
+ * @returns The requested season string.
+ */
+export function getSeasonString(year: number): string {
+  return `${year}-${(year + 1).toString().slice(-2)}`;
+}
+
+/**
+ * Checks whether date in range.
+ *
+ * @param date - The date value to process.
+ * @param start - The start to use.
+ * @param end - The end to use.
+ * @returns True when date in range; otherwise false.
+ */
+export function isDateInRange(date: Date, start: Date, end: Date): boolean {
+  return date >= start && date <= end;
+}
+
+/**
+ * Formats display date for display.
+ *
+ * @param date - The date value to process.
+ * @returns The formatted display date.
+ */
+export function formatDisplayDate(date: Date | string | null): string {
+  return formatDateValue(date, { mode: "display" });
+}
+
+/**
+ * Formats timestamp for display.
+ *
+ * @param date - The date value to process.
+ * @returns The formatted timestamp.
+ */
+export function formatTimestamp(date: Date | string | null): string {
+  return formatDateValue(date, { mode: "timestamp" });
+}
+
+/**
+ * Convert input date.
+ *
+ * @param excelSerialDate - The excel serial date to use.
+ * @returns The resulting convert input date.
+ */
 export function convertInputDate(excelSerialDate: number): Date {
   // Google Sheets and Excel serial dates are day counts relative to 1899-12-30.
   // Using the standard 25569 offset preserves the expected date-only value.
@@ -179,69 +381,12 @@ export function convertInputDate(excelSerialDate: number): Date {
 }
 
 /**
- * Safely converts date input from Google Sheets to a Date object
- * Handles both string and number inputs from Google Sheets
- * @param input - Date input that could be a string, number, or Date
- * @returns Date object or null if invalid
+ * Safe parse sheet date.
+ *
+ * @param input - The input value to process.
+ * @returns The resulting safe parse sheet date.
  */
-export function safeParseSheetDate(input: unknown): Date | null {
-  if (!input) return null;
-
-  // If it's already a Date object, return it
-  if (input instanceof Date) {
-    return isNaN(input.getTime()) ? null : input;
-  }
-
-  // If it's a string, try multiple parsing approaches
-  if (typeof input === "string") {
-    const raw = input.trim();
-    if (!raw) return null;
-
-    // First try as Excel serial number string
-    if (/^-?\d+(\.\d+)?$/.test(raw)) {
-      const asNumber = Number(raw);
-      if (!isNaN(asNumber) && asNumber > 1) {
-        return convertInputDate(asNumber);
-      }
-    }
-
-    const isoMatch = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(raw);
-    if (isoMatch) {
-      const [, year, month, day] = isoMatch;
-      return buildUtcDate(Number(year), Number(month), Number(day));
-    }
-
-    const slashIsoMatch = /^(\d{4})\/(\d{1,2})\/(\d{1,2})$/.exec(raw);
-    if (slashIsoMatch) {
-      const [, year, month, day] = slashIsoMatch;
-      return buildUtcDate(Number(year), Number(month), Number(day));
-    }
-
-    const mdyMatch = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(raw);
-    if (mdyMatch) {
-      const [, month, day, year] = mdyMatch;
-      return buildUtcDate(Number(year), Number(month), Number(day));
-    }
-
-    const isoDateTimeMatch = /^(\d{4})-(\d{1,2})-(\d{1,2})T/.exec(raw);
-    if (isoDateTimeMatch) {
-      const [, year, month, day] = isoDateTimeMatch;
-      return buildUtcDate(Number(year), Number(month), Number(day));
-    }
-
-    // Try as regular date string
-    const asDate = new Date(raw);
-    if (!isNaN(asDate.getTime())) {
-      return asDate;
-    }
-
-    return null;
-  }
-
-  // If it's a number, treat as Excel serial date
-  if (typeof input === "number" && !isNaN(input) && input > 1) {
-    return convertInputDate(input);
-  }
-
-  return null;
+export function safeParseSheetDate(input: DateInput): Date | null {
+  const parsed = resolveDateValue(input, { output: "date" });
+  return parsed instanceof Date ? parsed : null;
 }

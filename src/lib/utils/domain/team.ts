@@ -22,9 +22,22 @@ const defaultTeam: GSHLTeam = {
   ownerIsActive: false,
 };
 
+/**
+ * Checks whether gshl team.
+ *
+ * @param team - The team to use.
+ * @returns The resulting gshl team.
+ */
 const isGshlTeam = (team: Team | GSHLTeam): team is GSHLTeam =>
   "ownerFirstName" in team;
 
+/**
+ * Enrich team.
+ *
+ * @param team - The team to use.
+ * @param relations - The relations to use.
+ * @returns The resulting enrich team.
+ */
 export function enrichTeam(
   team: Team | GSHLTeam | null | undefined,
   relations: TeamRelations,
@@ -60,6 +73,13 @@ export function enrichTeam(
   };
 }
 
+/**
+ * Enrich teams.
+ *
+ * @param teams - The teams to use.
+ * @param relations - The relations to use.
+ * @returns The resulting enrich teams.
+ */
 export function enrichTeams(
   teams: Array<Team | GSHLTeam> | null | undefined,
   relations: TeamRelations,
@@ -144,11 +164,11 @@ export function calculateFantasyPoints(stats: Record<string, number>): number {
 }
 
 /**
- * Calculates a team's win-loss-tie record from matchups.
+ * Calculates team record.
  *
- * @param matchups - Array of matchup objects with team IDs and results
- * @param teamId - The team ID to calculate the record for
- * @returns Object with wins, losses, and ties counts
+ * @param matchups - The matchups to use.
+ * @param teamId - The team id to use.
+ * @returns The calculated team record.
  */
 export function calculateTeamRecord(
   matchups: Array<{
@@ -177,6 +197,13 @@ export function calculateTeamRecord(
   );
 }
 
+/**
+ * Returns team matchup result.
+ *
+ * @param matchup - The matchup to use.
+ * @param teamId - The team id to use.
+ * @returns The requested team matchup result.
+ */
 export function getTeamMatchupResult(
   matchup: Pick<
     Matchup,

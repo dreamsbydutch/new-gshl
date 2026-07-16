@@ -5,11 +5,23 @@ import type {
   TeamSeasonStatLine,
 } from "@gshl-types";
 
-function safeRank(value: unknown): number | null {
+/**
+ * Safe rank.
+ *
+ * @param value - The source value to process.
+ * @returns The resulting safe rank.
+ */
+function safeRank(value: string | number | null | undefined): number | null {
   const num = Number(value);
   return Number.isFinite(num) ? num : null;
 }
 
+/**
+ * Sorts by conference rank.
+ *
+ * @param teams - The teams to use.
+ * @returns The sorted by conference rank.
+ */
 function sortByConferenceRank(teams: SeededTeam[]): SeededTeam[] {
   return [...teams].sort(
     (a, b) =>
@@ -18,6 +30,12 @@ function sortByConferenceRank(teams: SeededTeam[]): SeededTeam[] {
   );
 }
 
+/**
+ * Sorts by overall rank.
+ *
+ * @param teams - The teams to use.
+ * @returns The sorted by overall rank.
+ */
 function sortByOverallRank(teams: SeededTeam[]): SeededTeam[] {
   return [...teams].sort(
     (a, b) =>
@@ -26,6 +44,12 @@ function sortByOverallRank(teams: SeededTeam[]): SeededTeam[] {
   );
 }
 
+/**
+ * Sorts by wildcard rank.
+ *
+ * @param teams - The teams to use.
+ * @returns The sorted by wildcard rank.
+ */
 function sortByWildcardRank(teams: SeededTeam[]): SeededTeam[] {
   return [...teams].sort(
     (a, b) =>
@@ -34,6 +58,13 @@ function sortByWildcardRank(teams: SeededTeam[]): SeededTeam[] {
   );
 }
 
+/**
+ * Builds playoff bracket.
+ *
+ * @param teams - The teams to use.
+ * @param stats - The stats to use.
+ * @returns The assembled playoff bracket.
+ */
 export function buildPlayoffBracket(
   teams: SeededTeam[],
   stats: TeamSeasonStatLine[],
@@ -85,6 +116,12 @@ export function buildPlayoffBracket(
     awayTeam: secondWildcard,
   };
 
+        /**
+   * Builds two vs three.
+   *
+   * @param confTeams - The conf teams to use.
+   * @returns The assembled two vs three.
+   */
   const buildTwoVsThree = (confTeams: SeededTeam[]): BracketMatchup => {
     const sorted = sortByConferenceRank(confTeams);
     return {
@@ -96,6 +133,11 @@ export function buildPlayoffBracket(
     };
   };
 
+      /**
+   * Match conf key.
+   *
+   * @param oneSeed - The one seed to use.
+   */
   const matchConfKey = (oneSeed: SeededTeam | null) => oneSeed?.confAbbr ?? "";
   const oneWcConf = matchConfKey(wildcardVsWorstOne.homeTeam);
 
