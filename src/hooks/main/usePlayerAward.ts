@@ -17,7 +17,7 @@ export function usePlayerAwards(options: UsePlayerAwardsOptions = {}) {
       enabled,
       staleTime: DAY_IN_MS,
       gcTime: DAY_IN_MS,
-      refetchOnMount: false,
+      refetchOnMount: "always",
       refetchOnWindowFocus: false,
     },
   );

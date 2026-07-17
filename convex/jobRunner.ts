@@ -12,7 +12,10 @@ import {
   canonicalJobName,
   isExternalJob,
 } from "./jobCatalog";
-import { calculateTeamAwards } from "./awardCalculations";
+import {
+  calculatePlayerAllStarAwards,
+  calculateTeamAwards,
+} from "./awardCalculations";
 
 const mutationRef = (name: string) =>
   makeFunctionReference<"mutation">(name) as unknown as FunctionReference<
@@ -288,40 +291,59 @@ export const processAwardsBackfill = internalMutationGeneric({
 
     for (const season of seasons) {
       const seasonId = String(season._id);
-      const [teamSeasonRows, teams, matchups, weeks, existingAwards] =
-        await Promise.all([
-          ctx.db
-            .query("teamSeasonStatLines" as never)
-            .withIndex("by_seasonId" as never, (q) =>
-              q.eq("seasonId" as never, seasonId),
-            )
-            .collect(),
-          ctx.db
-            .query("teams" as never)
-            .withIndex("by_seasonId" as never, (q) =>
-              q.eq("seasonId" as never, seasonId),
-            )
-            .collect(),
-          ctx.db
-            .query("matchups" as never)
-            .withIndex("by_seasonId" as never, (q) =>
-              q.eq("seasonId" as never, seasonId),
-            )
-            .collect(),
-          ctx.db
-            .query("weeks" as never)
-            .withIndex("by_seasonId" as never, (q) =>
-              q.eq("seasonId" as never, seasonId),
-            )
-            .collect(),
-          ctx.db
-            .query("teamAwards" as never)
-            .withIndex("by_seasonId" as never, (q) =>
-              q.eq("seasonId" as never, seasonId),
-            )
-            .collect(),
-        ]);
-      const calculated = calculateTeamAwards({
+      const [
+        teamSeasonRows,
+        playerTotalRows,
+        teams,
+        matchups,
+        weeks,
+        existingTeamAwards,
+        existingPlayerAwards,
+      ] = await Promise.all([
+        ctx.db
+          .query("teamSeasonStatLines" as never)
+          .withIndex("by_seasonId" as never, (q) =>
+            q.eq("seasonId" as never, seasonId),
+          )
+          .collect(),
+        ctx.db
+          .query("playerTotalStatLines" as never)
+          .withIndex("by_seasonId" as never, (q) =>
+            q.eq("seasonId" as never, seasonId),
+          )
+          .collect(),
+        ctx.db
+          .query("teams" as never)
+          .withIndex("by_seasonId" as never, (q) =>
+            q.eq("seasonId" as never, seasonId),
+          )
+          .collect(),
+        ctx.db
+          .query("matchups" as never)
+          .withIndex("by_seasonId" as never, (q) =>
+            q.eq("seasonId" as never, seasonId),
+          )
+          .collect(),
+        ctx.db
+          .query("weeks" as never)
+          .withIndex("by_seasonId" as never, (q) =>
+            q.eq("seasonId" as never, seasonId),
+          )
+          .collect(),
+        ctx.db
+          .query("teamAwards" as never)
+          .withIndex("by_seasonId" as never, (q) =>
+            q.eq("seasonId" as never, seasonId),
+          )
+          .collect(),
+        ctx.db
+          .query("playerAwards" as never)
+          .withIndex("by_seasonId" as never, (q) =>
+            q.eq("seasonId" as never, seasonId),
+          )
+          .collect(),
+      ]);
+      const calculatedTeamAwards = calculateTeamAwards({
         seasonId,
         seasonLegacyId:
           typeof season.legacyId === "string" ? season.legacyId : undefined,
@@ -332,20 +354,24 @@ export const processAwardsBackfill = internalMutationGeneric({
         matchups,
         weeks,
       });
-      const existingByKey = new Map(
-        existingAwards.map((award) => [
+      const calculatedPlayerAwards = calculatePlayerAllStarAwards({
+        seasonId,
+        playerTotalRows,
+      });
+      const existingTeamByKey = new Map(
+        existingTeamAwards.map((award) => [
           `${String(award.award)}|${String(award.ownerId ?? "")}`,
           award,
         ]),
       );
-      const incomingKeys = new Set<string>();
+      const incomingTeamKeys = new Set<string>();
       let inserted = 0;
       let updated = 0;
       let unchanged = 0;
-      for (const award of calculated) {
+      for (const award of calculatedTeamAwards) {
         const key = `${award.award}|${award.ownerId}`;
-        incomingKeys.add(key);
-        const existing = existingByKey.get(key);
+        incomingTeamKeys.add(key);
+        const existing = existingTeamByKey.get(key);
         if (!existing) {
           inserted += 1;
           if (run.apply) {
@@ -380,29 +406,88 @@ export const processAwardsBackfill = internalMutationGeneric({
           );
         }
       }
-      const deletedRows = existingAwards.filter(
+      const deletedTeamRows = existingTeamAwards.filter(
         (award) =>
-          !incomingKeys.has(
+          !incomingTeamKeys.has(
             `${String(award.award)}|${String(award.ownerId ?? "")}`,
           ),
       );
       if (run.apply) {
-        for (const award of deletedRows) {
+        for (const award of deletedTeamRows) {
           await ctx.db.delete(award._id as never);
         }
       }
-      totals.processed += teamSeasonRows.length;
+
+      const allStarAwards = new Set(["firstAS", "secondAS", "playoffAS"]);
+      const existingAllStars = existingPlayerAwards.filter((award) =>
+        allStarAwards.has(String(award.award)),
+      );
+      const existingPlayerByKey = new Map(
+        existingAllStars.map((award) => [
+          `${String(award.award)}|${String(award.playerId)}`,
+          award,
+        ]),
+      );
+      const incomingPlayerKeys = new Set<string>();
+      for (const award of calculatedPlayerAwards) {
+        const key = `${award.award}|${award.playerId}`;
+        incomingPlayerKeys.add(key);
+        const existing = existingPlayerByKey.get(key);
+        if (!existing) {
+          inserted += 1;
+          if (run.apply) {
+            await ctx.db.insert(
+              "playerAwards" as never,
+              {
+                ...award,
+                createdAt: now,
+                updatedAt: now,
+              } as never,
+            );
+          }
+          continue;
+        }
+        const changed =
+          JSON.stringify(existing.nomineeIds ?? []) !==
+          JSON.stringify(award.nomineeIds);
+        if (!changed) {
+          unchanged += 1;
+          continue;
+        }
+        updated += 1;
+        if (run.apply) {
+          await ctx.db.patch(
+            existing._id as never,
+            { nomineeIds: award.nomineeIds, updatedAt: now } as never,
+          );
+        }
+      }
+      const deletedPlayerRows = existingAllStars.filter(
+        (award) =>
+          !incomingPlayerKeys.has(
+            `${String(award.award)}|${String(award.playerId)}`,
+          ),
+      );
+      if (run.apply) {
+        for (const award of deletedPlayerRows) {
+          await ctx.db.delete(award._id as never);
+        }
+      }
+
+      const deleted = deletedTeamRows.length + deletedPlayerRows.length;
+      totals.processed += teamSeasonRows.length + playerTotalRows.length;
       totals.inserted += inserted;
       totals.updated += updated;
-      totals.deleted += deletedRows.length;
+      totals.deleted += deleted;
       totals.unchanged += unchanged;
       summaries.push({
         seasonId,
         legacyId: season.legacyId,
-        computed: calculated.length,
+        teamAwardsComputed: calculatedTeamAwards.length,
+        playerAwardsComputed: calculatedPlayerAwards.length,
         inserted,
         updated,
-        deleted: deletedRows.length,
+        deleted,
         unchanged,
       });
     }

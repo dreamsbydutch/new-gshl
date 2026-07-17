@@ -7,6 +7,13 @@ export type TeamAwardOutput = {
   award: string;
 };
 
+export type PlayerAwardOutput = {
+  seasonId: string;
+  playerId: string;
+  nomineeIds: string[];
+  award: "firstAS" | "secondAS" | "playoffAS";
+};
+
 type Candidate = {
   teamId: string;
   value: number;
@@ -38,6 +45,7 @@ const truthy = (value: unknown) =>
   value === "TRUE";
 const regularSeason = (row: Row) =>
   ["", "rs", "regularseason"].includes(token(row.seasonType));
+const playoffSeason = (row: Row) => token(row.seasonType) === "po";
 
 function compareRank(
   left: number | null | undefined,
@@ -279,4 +287,116 @@ export function calculateTeamAwards(input: {
       },
     ];
   });
+}
+
+type AllStarPlayer = {
+  playerId: string;
+  positions: Set<string>;
+  rating: number;
+};
+
+function positionList(value: unknown): string[] {
+  if (Array.isArray(value)) return value.flatMap(positionList);
+  const raw = text(value);
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (Array.isArray(parsed)) return positionList(parsed);
+  } catch {
+    // CSV and single-position values are handled below.
+  }
+  return raw
+    .split(",")
+    .map((value) => value.trim().toUpperCase())
+    .filter(Boolean);
+}
+
+function allStarPool(rows: Row[]): AllStarPlayer[] {
+  return rows
+    .flatMap((row): AllStarPlayer[] => {
+      const playerId = text(row.playerId);
+      const rating = number(row.Rating);
+      const positions = new Set(positionList(row.nhlPos));
+      const posGroup = token(row.posGroup);
+      return playerId &&
+        rating !== null &&
+        rating > 0 &&
+        posGroup &&
+        positions.size > 0
+        ? [{ playerId, rating, positions }]
+        : [];
+    })
+    .sort((a, b) => a.playerId.localeCompare(b.playerId));
+}
+
+const ALL_STAR_SLOTS = ["C", "LW", "RW", "D", "D", "G"] as const;
+
+function betterLineup(
+  candidate: { score: number; picks: string[] },
+  existing: { score: number; picks: string[] } | undefined,
+) {
+  if (!existing || candidate.score > existing.score + 1e-9) return true;
+  if (candidate.score < existing.score - 1e-9) return false;
+  return candidate.picks.join("|").localeCompare(existing.picks.join("|")) < 0;
+}
+
+function selectAllStarLineup(players: AllStarPlayer[]): string[] {
+  const states: Array<{ score: number; picks: string[] } | undefined> = [];
+  states[0] = {
+    score: 0,
+    picks: Array.from({ length: ALL_STAR_SLOTS.length }, () => ""),
+  };
+  for (const player of players) {
+    const previous = states.slice();
+    for (let mask = 0; mask < previous.length; mask += 1) {
+      const state = previous[mask];
+      if (!state) continue;
+      for (let slot = 0; slot < ALL_STAR_SLOTS.length; slot += 1) {
+        if ((mask & (1 << slot)) !== 0) continue;
+        if (!player.positions.has(ALL_STAR_SLOTS[slot]!)) continue;
+        const nextMask = mask | (1 << slot);
+        const picks = [...state.picks];
+        picks[slot] = player.playerId;
+        const candidate = { score: state.score + player.rating, picks };
+        if (betterLineup(candidate, states[nextMask]))
+          states[nextMask] = candidate;
+      }
+    }
+  }
+  return states[(1 << ALL_STAR_SLOTS.length) - 1]?.picks ?? [];
+}
+
+export function calculatePlayerAllStarAwards(input: {
+  seasonId: string;
+  playerTotalRows: Row[];
+}): PlayerAwardOutput[] {
+  const regularPool = allStarPool(input.playerTotalRows.filter(regularSeason));
+  const first = selectAllStarLineup(regularPool);
+  const firstSet = new Set(first);
+  const second = selectAllStarLineup(
+    regularPool.filter((player) => !firstSet.has(player.playerId)),
+  );
+  const playoffs = selectAllStarLineup(
+    allStarPool(input.playerTotalRows.filter(playoffSeason)),
+  );
+  return [
+    ...first.map((playerId) => ({
+      seasonId: input.seasonId,
+      playerId,
+      nomineeIds: [],
+      award: "firstAS" as const,
+    })),
+    ...second.map((playerId) => ({
+      seasonId: input.seasonId,
+      playerId,
+      nomineeIds: [],
+      award: "secondAS" as const,
+    })),
+    ...playoffs.map((playerId) => ({
+      seasonId: input.seasonId,
+      playerId,
+      nomineeIds: [],
+      award: "playoffAS" as const,
+    })),
+  ];
 }

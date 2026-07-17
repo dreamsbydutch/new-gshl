@@ -17,7 +17,7 @@ export function useTeamAwards(options: UseTeamAwardsOptions = {}) {
       enabled,
       staleTime: DAY_IN_MS,
       gcTime: DAY_IN_MS,
-      refetchOnMount: false,
+      refetchOnMount: "always",
       refetchOnWindowFocus: false,
     },
   );

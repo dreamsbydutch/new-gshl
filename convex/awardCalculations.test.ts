@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { calculateTeamAwards } from "./awardCalculations";
+import {
+  calculatePlayerAllStarAwards,
+  calculateTeamAwards,
+} from "./awardCalculations";
 
 const statRow = (teamId: string, rank: number, goals: number) => ({
   gshlTeamId: teamId,
@@ -65,4 +68,71 @@ void test("calculates Convex team awards with owner winners and nominees", () =>
     "owner-b",
   );
   assert.ok(awards.every((award) => !Object.hasOwn(award, "teamId")));
+});
+
+void test("calculates first, second, and playoff player All-Star teams", () => {
+  const row = (
+    playerId: string,
+    nhlPos: string[],
+    rating: number,
+    seasonType = "RS",
+  ) => ({ playerId, nhlPos, posGroup: "S", Rating: rating, seasonType });
+  const goalie = (playerId: string, rating: number, seasonType = "RS") => ({
+    playerId,
+    nhlPos: ["G"],
+    posGroup: "G",
+    Rating: rating,
+    seasonType,
+  });
+  const awards = calculatePlayerAllStarAwards({
+    seasonId: "season",
+    playerTotalRows: [
+      row("c-1", ["C"], 100),
+      row("lw-1", ["LW"], 99),
+      row("rw-1", ["RW"], 98),
+      row("d-1", ["D"], 97),
+      row("d-2", ["D"], 96),
+      goalie("g-1", 95),
+      row("c-2", ["C"], 90),
+      row("lw-2", ["LW"], 89),
+      row("rw-2", ["RW"], 88),
+      row("d-3", ["D"], 87),
+      row("d-4", ["D"], 86),
+      goalie("g-2", 85),
+      row("c-po", ["C"], 80, "PO"),
+      row("lw-po", ["LW"], 79, "PO"),
+      row("rw-po", ["RW"], 78, "PO"),
+      row("d-po-1", ["D"], 77, "PO"),
+      row("d-po-2", ["D"], 76, "PO"),
+      goalie("g-po", 75, "PO"),
+    ],
+  });
+
+  const playersFor = (award: string) =>
+    awards.filter((row) => row.award === award).map((row) => row.playerId);
+  assert.deepEqual(playersFor("firstAS"), [
+    "c-1",
+    "lw-1",
+    "rw-1",
+    "d-1",
+    "d-2",
+    "g-1",
+  ]);
+  assert.deepEqual(playersFor("secondAS"), [
+    "c-2",
+    "lw-2",
+    "rw-2",
+    "d-3",
+    "d-4",
+    "g-2",
+  ]);
+  assert.deepEqual(playersFor("playoffAS"), [
+    "c-po",
+    "lw-po",
+    "rw-po",
+    "d-po-1",
+    "d-po-2",
+    "g-po",
+  ]);
+  assert.ok(awards.every((award) => award.nomineeIds.length === 0));
 });
