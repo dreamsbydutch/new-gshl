@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { createTRPCRouter, publicProcedure } from "../trpc";
+import { commissionerProcedure, createTRPCRouter, publicProcedure } from "../trpc";
 import { idSchema, baseQuerySchema } from "./_schemas";
 import type { DraftPick } from "@gshl-types";
 import { minimalSheetsWriter } from "@gshl-sheets";
@@ -55,7 +55,7 @@ export const draftPickRouter = createTRPCRouter({
       });
     }),
 
-  update: publicProcedure
+  update: commissionerProcedure
     .input(idSchema.extend({ data: draftPickUpdateSchema }))
     .mutation(async ({ input }): Promise<DraftPick> => {
       await minimalSheetsWriter.updateById("DraftPick", input.id, input.data);

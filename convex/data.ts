@@ -6,6 +6,7 @@ type Row = Record<string, unknown>;
 type ConvexRow = Row & { _id: string; _creationTime: number };
 
 const queryArgs = {
+  serverSecret: v.string(),
   table: v.string(),
   where: v.optional(v.record(v.string(), v.any())),
   orderBy: v.optional(
@@ -14,6 +15,13 @@ const queryArgs = {
   take: v.optional(v.number()),
   skip: v.optional(v.number()),
 };
+
+function requireServerSecret(serverSecret: string) {
+  const expected = process.env.CONVEX_SERVER_SECRET;
+  if (!expected || serverSecret !== expected) {
+    throw new Error("Unauthorized server request");
+  }
+}
 
 function publicRow(row: Row & { _id: string; _creationTime: number }) {
   return {
@@ -911,6 +919,7 @@ async function applyAwardsUpsertByCompositeKey(
 export const list = queryGeneric({
   args: queryArgs,
   handler: async (ctx, args) => {
+    requireServerSecret(args.serverSecret);
     if (isAwardsTable(args.table)) {
       const rows = await readAwardRows(ctx, args);
       const start = args.skip ?? 0;
@@ -932,10 +941,12 @@ export const list = queryGeneric({
 
 export const byId = queryGeneric({
   args: {
+    serverSecret: v.string(),
     table: v.string(),
     id: v.string(),
   },
   handler: async (ctx, args) => {
+    requireServerSecret(args.serverSecret);
     if (isAwardsTable(args.table)) {
       const direct = await safeGet(ctx, args.id);
       if (direct && "playerId" in direct) {
@@ -974,10 +985,12 @@ export const byId = queryGeneric({
 
 export const count = queryGeneric({
   args: {
+    serverSecret: v.string(),
     table: v.string(),
     where: v.optional(v.record(v.string(), v.any())),
   },
   handler: async (ctx, args) => {
+    requireServerSecret(args.serverSecret);
     if (isAwardsTable(args.table)) {
       const rows = await readAwardRows(ctx, { where: args.where });
       return rows.length;
@@ -992,9 +1005,11 @@ export const count = queryGeneric({
 
 export const snapshot = queryGeneric({
   args: {
+    serverSecret: v.string(),
     tables: v.array(v.string()),
   },
   handler: async (ctx, args) => {
+    requireServerSecret(args.serverSecret);
     const output: Record<string, Row[]> = {};
     for (const table of args.tables) {
       if (isAwardsTable(table)) {
@@ -1010,9 +1025,11 @@ export const snapshot = queryGeneric({
 
 export const clearTables = mutationGeneric({
   args: {
+    serverSecret: v.string(),
     tables: v.array(v.string()),
   },
   handler: async (ctx, args) => {
+    requireServerSecret(args.serverSecret);
     const deleted: Record<string, number> = {};
     for (const table of args.tables) {
       if (isAwardsTable(table)) {
@@ -1030,10 +1047,12 @@ export const clearTables = mutationGeneric({
 
 export const insertMany = mutationGeneric({
   args: {
+    serverSecret: v.string(),
     table: v.string(),
     rows: v.array(v.record(v.string(), v.any())),
   },
   handler: async (ctx, args) => {
+    requireServerSecret(args.serverSecret);
     const inserted: Array<{ legacyId: string | null; id: string }> = [];
     for (const row of args.rows) {
       if (isAwardsTable(args.table)) {
@@ -1072,11 +1091,13 @@ export const insertMany = mutationGeneric({
 
 export const updateById = mutationGeneric({
   args: {
+    serverSecret: v.string(),
     table: v.string(),
     id: v.string(),
     data: v.record(v.string(), v.any()),
   },
   handler: async (ctx, args) => {
+    requireServerSecret(args.serverSecret);
     if (isAwardsTable(args.table)) {
       const mapped = await toAwardStorageDoc(ctx, args.data);
       if ("missing" in mapped) {
@@ -1126,6 +1147,7 @@ export const updateById = mutationGeneric({
 
 export const upsertByCompositeKey = mutationGeneric({
   args: {
+    serverSecret: v.string(),
     table: v.string(),
     keyColumns: v.array(v.string()),
     rows: v.array(v.record(v.string(), v.any())),
@@ -1140,6 +1162,7 @@ export const upsertByCompositeKey = mutationGeneric({
     ),
   },
   handler: async (ctx, args) => {
+    requireServerSecret(args.serverSecret);
     if (isAwardsTable(args.table)) {
       return applyAwardsUpsertByCompositeKey(ctx, args);
     }
@@ -1149,8 +1172,9 @@ export const upsertByCompositeKey = mutationGeneric({
 });
 
 export const splitLegacyAwards = mutationGeneric({
-  args: {},
-  handler: async (ctx) => {
+  args: { serverSecret: v.string() },
+  handler: async (ctx, args) => {
+    requireServerSecret(args.serverSecret);
     await deleteAllRows(ctx, PLAYER_AWARDS_TABLE);
     await deleteAllRows(ctx, TEAM_AWARDS_TABLE);
 

@@ -18,14 +18,18 @@ const ownerWhereSchema = z
 export const ownerRouter = createTRPCRouter({
   getAll: publicProcedure
     .input(baseQuerySchema.extend({ where: ownerWhereSchema }))
-    .query(async ({ input }): Promise<Owner[]> => {
-      return getMany<Owner>("Owner", input);
+    .query(async ({ ctx, input }): Promise<Owner[]> => {
+      const owners = await getMany<Owner>("Owner", input);
+      if (ctx.session?.user) return owners;
+      return owners.map((owner) => ({ ...owner, email: null, owing: 0 }));
     }),
 
   getById: publicProcedure
     .input(idSchema)
-    .query(async ({ input }): Promise<Owner | null> => {
-      return getById<Owner>("Owner", input.id);
+    .query(async ({ ctx, input }): Promise<Owner | null> => {
+      const owner = await getById<Owner>("Owner", input.id);
+      if (!owner || ctx.session?.user) return owner;
+      return { ...owner, email: null, owing: 0 };
     }),
 
   count: publicProcedure

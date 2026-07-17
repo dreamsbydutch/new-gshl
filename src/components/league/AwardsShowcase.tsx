@@ -7,14 +7,7 @@ import {
   getAwardTeamId,
   getPlayerAwardPlayerId,
 } from "@gshl-lib/config/awards";
-import type { GSHLTeam, Player, PlayerAward, TeamAward } from "@gshl-types";
-
-interface AwardsShowcaseProps {
-  playerAwards: PlayerAward[];
-  teamAwards: TeamAward[];
-  players: Player[];
-  teams: GSHLTeam[];
-}
+import type { AwardsShowcaseProps, PlayerAward } from "@gshl-types";
 
 function AwardImage({
   award,

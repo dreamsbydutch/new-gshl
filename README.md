@@ -1,5 +1,20 @@
 # new-gshl Frontend Architecture & Component Structure Guide
 
+## Authentication setup
+
+The protected locker room, draft board, and league office use Auth.js with
+Google OAuth. Copy `.env.example` to `.env.local`, generate `AUTH_SECRET` with
+`npx auth secret`, and create Google OAuth credentials with these callback URLs:
+
+- Development: `http://localhost:3000/api/auth/callback/google`
+- Production: `https://<your-domain>/api/auth/callback/google`
+
+Set `CONVEX_SERVER_SECRET` to the same random 32+ character value in both the
+Next.js environment and the Convex deployment (`npx convex env set
+CONVEX_SERVER_SECRET <value>`). After deploying the Convex schema, sign in once
+and change the new `authUsers` record's role to `commissioner` in the Convex
+dashboard. Commissioners can manage subsequent roles from League Office.
+
 This document defines the conventions we are following for React / Next.js feature components in this repo. Treat it as the single source of truth when adding or refactoring UI code.
 
 ## Core Principles

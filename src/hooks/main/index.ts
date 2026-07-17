@@ -13,6 +13,7 @@
  */
 
 // Contract hooks - sophisticated filtering and aggregation
+export { useAuthUserAdmin, useUpdateAuthUserAccess } from "./useAuthUsers";
 export {
   useContracts,
   useAllContracts,
@@ -55,6 +56,7 @@ export {
   useActivePlayers,
   useRankedPlayers,
   useRosterPlayers,
+  useUpdatePlayerLineup,
 } from "./usePlayer";
 export type {
   PlayerRankField,

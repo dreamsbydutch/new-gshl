@@ -27,6 +27,7 @@
     /* Path Aliases */
     "paths": {
       "@gshl-env": ["./src/env.js"],
+      "@gshl-auth": ["./auth.ts"],
       "@gshl-components/team/*": ["./src/components/team/*"],
       "@gshl-components/draft/*": ["./src/components/draft/*"],
       "@gshl-components/contracts/*": ["./src/components/contracts/*"],

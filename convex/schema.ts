@@ -95,6 +95,26 @@ function table(fields: TableShape, indexes: readonly string[] = []) {
 }
 
 export default defineSchema({
+  authUsers: defineTable({
+    googleSubject: v.string(),
+    email: v.string(),
+    name: v.optional(v.string()),
+    image: v.optional(v.string()),
+    role: v.union(
+      v.literal("viewer"),
+      v.literal("owner"),
+      v.literal("commissioner"),
+    ),
+    ownerId: v.optional(id("owners")),
+    status: v.union(v.literal("active"), v.literal("disabled")),
+    createdAt: v.string(),
+    updatedAt: v.string(),
+    lastLoginAt: v.string(),
+  })
+    .index("by_googleSubject", ["googleSubject"])
+    .index("by_email", ["email"])
+    .index("by_ownerId", ["ownerId"]),
+
   seasons: table({
     year: stringValue,
     name: stringValue,

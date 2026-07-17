@@ -8,11 +8,13 @@ export function RosterLineup({
   contractByPlayerId,
   showSalaries,
   nhlTeamByAbbr,
+  canEditLineup,
 }: {
   teamLineup: Array<Array<Array<Player | null>>>;
   contractByPlayerId: Map<string, Contract>;
   showSalaries: boolean;
   nhlTeamByAbbr: Map<string, NHLTeam>;
+  canEditLineup: boolean;
 }) {
   return (
     <div className="mx-auto flex max-w-md flex-col rounded-xl border bg-gray-50">
@@ -29,6 +31,7 @@ export function RosterLineup({
                     showSalaries={showSalaries}
                     nhlTeamByAbbr={nhlTeamByAbbr}
                     className="col-span-2"
+                    canEditLineup={canEditLineup}
                   />
                 ) : (
                   <div

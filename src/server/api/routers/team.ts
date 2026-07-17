@@ -89,7 +89,10 @@ function normalizeConferenceFields<T extends ConferenceFieldPayload>(
   return normalized;
 }
 
-async function enrichTeamsWithRelations(teams: Team[]): Promise<GSHLTeam[]> {
+async function enrichTeamsWithRelations(
+  teams: Team[],
+  includePrivateOwnerFields: boolean,
+): Promise<GSHLTeam[]> {
   if (!teams.length) return [];
 
   const [franchises, owners, conferences] = await Promise.all([
@@ -146,8 +149,8 @@ async function enrichTeamsWithRelations(teams: Team[]): Promise<GSHLTeam[]> {
       ownerFirstName: owner?.firstName ?? null,
       ownerLastName: owner?.lastName ?? null,
       ownerNickname: owner?.nickName ?? null,
-      ownerEmail: owner?.email ?? null,
-      ownerOwing: owner?.owing ?? null,
+      ownerEmail: includePrivateOwnerFields ? (owner?.email ?? null) : null,
+      ownerOwing: includePrivateOwnerFields ? (owner?.owing ?? null) : null,
       ownerIsActive: owner?.isActive ?? false,
     };
   });
@@ -161,7 +164,7 @@ export const teamRouter = createTRPCRouter({
         where: teamWhereSchema,
       }),
     )
-    .query(async ({ input }): Promise<GSHLTeam[]> => {
+    .query(async ({ ctx, input }): Promise<GSHLTeam[]> => {
       const { where, ...rest } = input;
       const teams = await getMany<Team>("Team", {
         ...rest,
@@ -172,20 +175,23 @@ export const teamRouter = createTRPCRouter({
         return [];
       }
 
-      return enrichTeamsWithRelations(teams);
+      return enrichTeamsWithRelations(teams, Boolean(ctx.session?.user));
     }),
 
   // Get single team by ID
   getById: publicProcedure
     .input(idSchema)
-    .query(async ({ input }): Promise<GSHLTeam | null> => {
+    .query(async ({ ctx, input }): Promise<GSHLTeam | null> => {
       const team = await getById<Team>("Team", input.id);
 
       if (!team) {
         return null;
       }
 
-      const [enriched] = await enrichTeamsWithRelations([team]);
+      const [enriched] = await enrichTeamsWithRelations(
+        [team],
+        Boolean(ctx.session?.user),
+      );
       return enriched ?? null;
     }),
 

@@ -1,7 +1,18 @@
 import { NextResponse } from "next/server";
 import { env } from "../../../../env";
+import { auth } from "@gshl-auth";
 
 export async function GET() {
+  if (env.NODE_ENV === "production") {
+    return new NextResponse(null, { status: 404 });
+  }
+  const session = await auth();
+  if (!session?.user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  if (session.user.role !== "commissioner") {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
   try {
     if (!env.GOOGLE_SERVICE_ACCOUNT_KEY) {
       return NextResponse.json(

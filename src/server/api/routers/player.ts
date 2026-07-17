@@ -1,8 +1,13 @@
 import { z } from "zod";
-import { createTRPCRouter, publicProcedure } from "../trpc";
+import { TRPCError } from "@trpc/server";
+import {
+  createTRPCRouter,
+  ownerOrCommissionerProcedure,
+  publicProcedure,
+} from "../trpc";
 import { minimalSheetsWriter } from "@gshl-sheets";
 import { idSchema, baseQuerySchema } from "./_schemas";
-import type { Player } from "@gshl-types";
+import { RosterPosition, type Player } from "@gshl-types";
 import { getById, getCount, getMany } from "../sheets-store";
 
 const normalizeGshlTeamId = (
@@ -108,13 +113,41 @@ export const playerRouter = createTRPCRouter({
     }),
 
   // Update player
-  update: publicProcedure
+  update: ownerOrCommissionerProcedure
     .input(
       idSchema.extend({
         data: playerUpdateSchema,
       }),
     )
-    .mutation(async ({ input }): Promise<Player> => {
+    .mutation(async ({ ctx, input }): Promise<Player> => {
+      const user = ctx.session?.user;
+      if (!user) throw new TRPCError({ code: "UNAUTHORIZED" });
+      if (user.role === "owner") {
+        const changedFields = Object.entries(input.data)
+          .filter(([, value]) => value !== undefined)
+          .map(([key]) => key);
+        if (
+          changedFields.length !== 1 ||
+          changedFields[0] !== "lineupPos" ||
+          !Object.values(RosterPosition).includes(
+            input.data.lineupPos as RosterPosition,
+          ) ||
+          !user.ownerId
+        ) {
+          throw new TRPCError({ code: "FORBIDDEN" });
+        }
+
+        const [player, franchises] = await Promise.all([
+          getById<Player>("Player", input.id),
+          getMany<{ id: string }>("Franchise", {
+            where: { ownerId: user.ownerId, isActive: true },
+          }),
+        ]);
+        const franchiseIds = new Set(franchises.map((franchise) => franchise.id));
+        if (!player?.gshlTeamId || !franchiseIds.has(String(player.gshlTeamId))) {
+          throw new TRPCError({ code: "FORBIDDEN" });
+        }
+      }
       const { gshlTeamId, lineupPos, ...rest } = input.data;
       const payload = {
         ...rest,

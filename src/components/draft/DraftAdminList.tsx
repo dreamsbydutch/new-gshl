@@ -23,8 +23,11 @@ import {
 } from "@gshl-utils";
 import type { Player } from "@gshl-types";
 import { useDraftAdminList } from "@gshl-hooks";
+import { useSession } from "next-auth/react";
 
 export function DraftAdminList(): JSX.Element {
+  const { data: session } = useSession();
+  const canManageDraft = session?.user.role === "commissioner";
   const {
     searchTerm,
     setSearchTerm,
@@ -63,7 +66,7 @@ export function DraftAdminList(): JSX.Element {
             {freeAgentsCount} signable players available
           </p>
         </div>
-        <Button
+        {canManageDraft ? <Button
           size="sm"
           variant="outline"
           disabled={undoDisabled}
@@ -86,7 +89,7 @@ export function DraftAdminList(): JSX.Element {
               </span>
             </>
           )}
-        </Button>
+        </Button> : null}
       </div>
 
       <div className="mb-2 text-sm">
@@ -170,7 +173,7 @@ export function DraftAdminList(): JSX.Element {
                     {formatMoney((Number(player.salary) || 0) * 1.25, true)}
                   </td>
                   <td className="whitespace-nowrap">
-                    <Button
+                    {canManageDraft ? <Button
                       size="sm"
                       variant="secondary"
                       disabled={isDisabled}
@@ -182,7 +185,7 @@ export function DraftAdminList(): JSX.Element {
                       ) : (
                         "Draft"
                       )}
-                    </Button>
+                    </Button> : <span className="text-xs text-muted-foreground">Read only</span>}
                   </td>
                 </tr>
               );

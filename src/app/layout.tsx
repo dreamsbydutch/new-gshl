@@ -7,6 +7,7 @@ import { cn } from "@gshl-utils";
 import { TRPCReactProvider } from "@gshl-trpc";
 import { Navbar } from "@gshl-nav";
 import NavDefaults from "@gshl-components/nav/NavDefaults";
+import { AuthProvider } from "@gshl-components/auth";
 
 const varela = Varela({
   weight: ["400"],
@@ -60,11 +61,13 @@ export default function RootLayout({
           "font-sans",
         )}
       >
-        <TRPCReactProvider>
-          <NavDefaults />
-          <div className="pb-20 lg:pb-8 lg:pt-16">{children}</div>
-          <Navbar />
-        </TRPCReactProvider>
+        <AuthProvider>
+          <TRPCReactProvider>
+            <NavDefaults />
+            <div className="pb-20 lg:pb-8 lg:pt-16">{children}</div>
+            <Navbar />
+          </TRPCReactProvider>
+        </AuthProvider>
       </body>
     </html>
   );

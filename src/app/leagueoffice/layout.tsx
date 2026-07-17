@@ -6,9 +6,11 @@ import {
   SecondaryPageToolbar,
 } from "@gshl-components/ui/nav";
 import type { ToggleItem } from "@gshl-types";
+import { useSession } from "next-auth/react";
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const { selectedType, setSelectedType } = useLeagueOfficeNavigation();
+  const { data: session } = useSession();
 
   const pageToolbarProps: {
     toolbarKeys: ToggleItem<string | null>[];
@@ -33,6 +35,15 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         value: "Conf v Conf",
         setter: (type: string | null) => setSelectedType(type ?? ""),
       },
+      ...(session?.user.role === "commissioner"
+        ? [
+            {
+              key: "users",
+              value: "User Access",
+              setter: (type: string | null) => setSelectedType(type ?? ""),
+            },
+          ]
+        : []),
     ],
   };
 

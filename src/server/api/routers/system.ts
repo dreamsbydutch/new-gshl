@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { createTRPCRouter, publicProcedure } from "../trpc";
+import { commissionerProcedure, createTRPCRouter, publicProcedure } from "../trpc";
 import { apiUtils } from "../utils";
 
 /**
@@ -14,19 +14,19 @@ export const systemRouter = createTRPCRouter({
   // Cache management
   cache: createTRPCRouter({
     // Warm up cache
-    warmup: publicProcedure.mutation(async () => {
+    warmup: commissionerProcedure.mutation(async () => {
       await apiUtils.warmupCache();
       return { success: true, message: "Cache warmed up successfully" };
     }),
 
     // Clear cache
-    clear: publicProcedure.mutation(async () => {
+    clear: commissionerProcedure.mutation(async () => {
       // This would need to be implemented in the adapter
       return { success: true, message: "Cache cleared successfully" };
     }),
 
     // Get cache status
-    status: publicProcedure.query(async () => {
+    status: commissionerProcedure.query(async () => {
       return apiUtils.getPerformanceMetrics();
     }),
   }),
@@ -34,12 +34,12 @@ export const systemRouter = createTRPCRouter({
   // Data integrity checks
   integrity: createTRPCRouter({
     // Check data integrity
-    check: publicProcedure.query(async () => {
+    check: commissionerProcedure.query(async () => {
       return apiUtils.checkDataIntegrity();
     }),
 
     // Get record counts
-    counts: publicProcedure.query(async () => {
+    counts: commissionerProcedure.query(async () => {
       const integrity = await apiUtils.checkDataIntegrity();
       return {
         totalRecords: integrity.totalRecords,
@@ -49,7 +49,7 @@ export const systemRouter = createTRPCRouter({
   }),
 
   // Initialize sheets
-  initialize: publicProcedure.mutation(async () => {
+  initialize: commissionerProcedure.mutation(async () => {
     await apiUtils.initializeSheets();
     return { success: true, message: "Sheets initialized successfully" };
   }),

@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect } from "react";
-import { useNav, useWeekNavigation, useWeeks } from "@gshl-hooks";
+import { useNav, useTeamNavigation, useWeekNavigation, useWeeks } from "@gshl-hooks";
 import { isIsoDateInRange, toLocalIsoDateOnly } from "@gshl-utils";
+import { useSession } from "next-auth/react";
 
 /**
  * NavDefaults
@@ -12,6 +13,8 @@ import { isIsoDateInRange, toLocalIsoDateOnly } from "@gshl-utils";
  */
 export default function NavDefaults(): null {
   const { selectedSeasonId } = useNav();
+  const { selectedOwnerId, setSelectedOwnerId } = useTeamNavigation();
+  const { data: session } = useSession();
   const { selectedWeekId, setSelectedWeekId: setWeekId } = useWeekNavigation();
 
   const { data: weeks, isLoading } = useWeeks({
@@ -19,6 +22,16 @@ export default function NavDefaults(): null {
     orderBy: { startDate: "asc" },
     enabled: Boolean(selectedSeasonId),
   });
+
+  useEffect(() => {
+    if (
+      session?.user.role === "owner" &&
+      session.user.ownerId &&
+      selectedOwnerId === "1"
+    ) {
+      setSelectedOwnerId(session.user.ownerId);
+    }
+  }, [selectedOwnerId, session, setSelectedOwnerId]);
 
   useEffect(() => {
     if (isLoading) return;

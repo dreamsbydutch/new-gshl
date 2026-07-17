@@ -2,7 +2,8 @@
 
 import Image from "next/image";
 import type { Contract, NHLTeam, Player } from "@gshl-types";
-import { ContractStatus } from "@gshl-types";
+import { ContractStatus, RosterPosition } from "@gshl-types";
+import { useUpdatePlayerLineup } from "@gshl-hooks";
 import {
   cn,
   formatMoney,
@@ -19,13 +20,16 @@ export function RosterPlayerCard({
   showSalaries,
   nhlTeamByAbbr,
   className,
+  canEditLineup = false,
 }: {
   player: Player;
   contract?: Contract;
   showSalaries: boolean;
   nhlTeamByAbbr: Map<string, NHLTeam>;
   className?: string;
+  canEditLineup?: boolean;
 }) {
+  const lineupUpdate = useUpdatePlayerLineup();
   const playerNhlAbbr = getPlayerNhlAbbreviation(player);
   const playerNhlTeam = playerNhlAbbr
     ? nhlTeamByAbbr.get(playerNhlAbbr)
@@ -74,6 +78,34 @@ export function RosterPlayerCard({
           )}
         >
           {formatMoney(getDisplayedRosterSalary(playerSalary, contract))}
+        </div>
+      ) : null}
+      {canEditLineup ? (
+        <div className="col-span-3 mt-1">
+          <label className="sr-only" htmlFor={`lineup-${player.id}`}>
+            Lineup position for {player.fullName}
+          </label>
+          <select
+            id={`lineup-${player.id}`}
+            value={player.lineupPos ?? RosterPosition.BN}
+            disabled={lineupUpdate.isPending}
+            onChange={(event) =>
+              lineupUpdate.mutate({
+                id: player.id,
+                data: { lineupPos: event.target.value },
+              })
+            }
+            className="w-full rounded border bg-white px-1 py-0.5 text-2xs"
+          >
+            {Object.values(RosterPosition).map((position) => (
+              <option key={position} value={position}>
+                {position}
+              </option>
+            ))}
+          </select>
+          {lineupUpdate.error ? (
+            <p className="mt-1 text-2xs text-red-600">Update failed</p>
+          ) : null}
         </div>
       ) : null}
     </div>

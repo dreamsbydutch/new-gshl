@@ -16,9 +16,16 @@ const snapshotSchema = z.object({
 export const snapshotRouter = createTRPCRouter({
   get: publicProcedure
     .input(snapshotSchema)
-    .query(async ({ input }): Promise<Record<string, unknown[]>> => {
+    .query(async ({ ctx, input }): Promise<Record<string, unknown[]>> => {
       const models = input.models as SheetsModelName[];
       const snapshot = await fetchSnapshot(models);
+      if (!ctx.session?.user && Array.isArray(snapshot.Owner)) {
+        snapshot.Owner = snapshot.Owner.map((row) => ({
+          ...row,
+          email: null,
+          owing: 0,
+        }));
+      }
       return snapshot;
     }),
 });

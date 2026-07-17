@@ -16,12 +16,12 @@ type IdMap = Map<string, string>;
 
 const clearTables = makeFunctionReference<
   "mutation",
-  { tables: string[] },
+  { serverSecret: string; tables: string[] },
   { deleted: Record<string, number> }
 >("data:clearTables");
 const insertMany = makeFunctionReference<
   "mutation",
-  { table: string; rows: Row[] },
+  { serverSecret: string; table: string; rows: Row[] },
   { inserted: Array<{ legacyId: string | null; id: string }> }
 >("data:insertMany");
 
@@ -227,6 +227,10 @@ async function main() {
     "@gshl-lib/sheets/reader/fast-reader"
   );
   const client = new ConvexHttpClient(requireConvexUrl());
+  const serverSecret = process.env.CONVEX_SERVER_SECRET;
+  if (!serverSecret) {
+    throw new Error("CONVEX_SERVER_SECRET is required for Convex migrations.");
+  }
   const modelMaps = new Map<ModelName, IdMap>();
   const report = {
     startedAt: new Date().toISOString(),
@@ -252,7 +256,7 @@ async function main() {
     new Set(IMPORT_ORDER.map((model) => MODEL_TO_CONVEX_TABLE[model])),
   ).reverse();
   report.cleared = (
-    await client.mutation(clearTables, { tables: tablesToClear })
+    await client.mutation(clearTables, { serverSecret, tables: tablesToClear })
   ).deleted;
 
   for (const model of IMPORT_ORDER) {
@@ -279,7 +283,11 @@ async function main() {
 
     for (let index = 0; index < rows.length; index += BATCH_SIZE) {
       const batch = rows.slice(index, index + BATCH_SIZE);
-      const result = await client.mutation(insertMany, { table, rows: batch });
+      const result = await client.mutation(insertMany, {
+        serverSecret,
+        table,
+        rows: batch,
+      });
       insertedRows += result.inserted.length;
       for (const inserted of result.inserted) {
         if (inserted.legacyId) idMap.set(inserted.legacyId, inserted.id);

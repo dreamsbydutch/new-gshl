@@ -74,6 +74,7 @@ function describeUnknownError(error: unknown): string {
 
 function summarizeArgs(args: Record<string, unknown>): string {
   const summary = { ...args };
+  if ("serverSecret" in summary) summary.serverSecret = "[REDACTED]";
   if (Array.isArray(summary.rows)) {
     summary.rows = `[${summary.rows.length} rows]`;
   }
@@ -111,7 +112,7 @@ function getConvexUrl(): string {
   return url;
 }
 
-async function callConvex<T>(
+export async function callConvex<T>(
   kind: "query" | "mutation",
   path: string,
   args: Record<string, unknown>,
@@ -126,7 +127,12 @@ async function callConvex<T>(
     body: JSON.stringify({
       path,
       format: "convex_encoded_json",
-      args: [convexToJson(args as never)],
+      args: [
+        convexToJson({
+          ...args,
+          serverSecret: env.CONVEX_SERVER_SECRET ?? "",
+        }),
+      ],
     }),
   });
 

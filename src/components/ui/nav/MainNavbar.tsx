@@ -10,6 +10,7 @@ import { useAppPathname } from "@gshl-hooks";
 import { cn } from "@gshl-utils";
 import { NavContainer, LinkNavItem } from "./BaseComponents";
 import type { LinkNavItem as LinkNavItemType, NavbarProps } from "@gshl-types";
+import { AuthNavControl } from "@gshl-components/auth";
 
 /**
  * Main navigation bar component with responsive design and active state detection
@@ -69,6 +70,9 @@ export function MainNavbar({ className }: NavbarProps) {
             isActive={pathname === item.href}
           />
         ))}
+        <div className="ml-1 lg:absolute lg:right-4">
+          <AuthNavControl />
+        </div>
       </div>
     </NavContainer>
   );

@@ -90,6 +90,13 @@ function getClient(): ConvexHttpClient {
   return client;
 }
 
+function serverArgs(args: Record<string, unknown>): Record<string, unknown> {
+  if (!env.CONVEX_SERVER_SECRET) {
+    throw new Error("CONVEX_SERVER_SECRET is required for Convex scripts.");
+  }
+  return { ...args, serverSecret: env.CONVEX_SERVER_SECRET };
+}
+
 function hydrateRow<T>(row: AnyRow): T {
   const hydrated: AnyRow = { ...row };
   for (const [key, value] of Object.entries(hydrated)) {
@@ -123,28 +130,28 @@ function compactRecord(
 export async function fetchModel<T extends AnyRow>(
   model: ModelName,
 ): Promise<T[]> {
-  const rows = await getClient().query(refs.list, {
+  const rows = await getClient().query(refs.list, serverArgs({
     table: getConvexTableName(model),
-  });
+  }));
   return rows.map(hydrateRow<T>);
 }
 
 export async function fetchPlayerDaySeason<T extends AnyRow>(
   seasonId: string | number,
 ): Promise<T[]> {
-  const rows = await getClient().query(refs.list, {
+  const rows = await getClient().query(refs.list, serverArgs({
     table: getConvexTableName("PlayerDayStatLine"),
     where: { seasonId: String(seasonId) },
-  });
+  }));
   return rows.map(hydrateRow<T>);
 }
 
 export async function fetchSnapshot<M extends readonly ModelName[]>(
   models: M,
 ): Promise<Record<M[number], AnyRow[]>> {
-  const snapshot = await getClient().query(refs.snapshot, {
+  const snapshot = await getClient().query(refs.snapshot, serverArgs({
     tables: models.map(getConvexTableName),
-  });
+  }));
   const output: Partial<Record<ModelName, AnyRow[]>> = {};
   for (const [table, rows] of Object.entries(snapshot)) {
     const model = CONVEX_TABLE_TO_MODEL[table];
@@ -158,11 +165,11 @@ export async function updateById<T extends AnyRow>(
   id: string,
   data: Partial<T>,
 ): Promise<void> {
-  await getClient().mutation(refs.updateById, {
+  await getClient().mutation(refs.updateById, serverArgs({
     table: getConvexTableName(model),
     id,
     data: compactRecord(data),
-  });
+  }));
 }
 
 export async function upsertByCompositeKey<T extends AnyRow>(
@@ -180,5 +187,5 @@ export async function upsertByCompositeKey<T extends AnyRow>(
   if (options.deleteMissing !== undefined) {
     args.deleteMissing = toConvexValue(options.deleteMissing);
   }
-  return getClient().mutation(refs.upsertByCompositeKey, args);
+  return getClient().mutation(refs.upsertByCompositeKey, serverArgs(args));
 }

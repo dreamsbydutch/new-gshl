@@ -2,6 +2,7 @@ import { env } from "@gshl-env";
 import { getMany } from "@gshl-api/sheets-store";
 import type { Season } from "@gshl-types";
 import { NextResponse } from "next/server";
+import { auth } from "@gshl-auth";
 
 function safeHost(value: string | undefined): string | null {
   if (!value) return null;
@@ -13,6 +14,16 @@ function safeHost(value: string | undefined): string | null {
 }
 
 export async function GET() {
+  if (env.NODE_ENV === "production") {
+    return new NextResponse(null, { status: 404 });
+  }
+  const session = await auth();
+  if (!session?.user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  if (session.user.role !== "commissioner") {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
   try {
     const convexUrl = env.CONVEX_URL ?? env.NEXT_PUBLIC_CONVEX_URL;
     const data: Record<string, unknown> = {

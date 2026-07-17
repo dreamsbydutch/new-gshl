@@ -6,10 +6,11 @@
  * TL;DR - This is where all the tRPC server stuff is created and plugged in. The pieces you will
  * need to use are documented accordingly near the end.
  */
-import { initTRPC } from "@trpc/server";
+import { initTRPC, TRPCError } from "@trpc/server";
 import superjson from "superjson";
 import { ZodError } from "zod";
 import { env } from "@gshl-env";
+import { auth } from "@gshl-auth";
 
 /**
  * 1. CONTEXT
@@ -24,8 +25,10 @@ import { env } from "@gshl-env";
  * @see https://trpc.io/docs/server/context
  */
 export const createTRPCContext = async (opts: { headers: Headers }) => {
+  const session = await auth();
   return {
     ...opts,
+    session,
   };
 };
 
@@ -131,3 +134,34 @@ const timingMiddleware = t.middleware(async ({ next, path }) => {
  * are logged in.
  */
 export const publicProcedure = t.procedure.use(timingMiddleware);
+
+const requireUser = t.middleware(({ ctx, next }) => {
+  const session = ctx.session;
+  if (session?.user?.status !== "active") {
+    throw new TRPCError({ code: "UNAUTHORIZED" });
+  }
+  return next({ ctx: { ...ctx, session } });
+});
+
+const requireOwnerOrCommissioner = t.middleware(({ ctx, next }) => {
+  const session = ctx.session;
+  const role = session?.user?.role;
+  if (role !== "owner" && role !== "commissioner") {
+    throw new TRPCError({ code: "FORBIDDEN" });
+  }
+  return next({ ctx: { ...ctx, session } });
+});
+
+const requireCommissioner = t.middleware(({ ctx, next }) => {
+  const session = ctx.session;
+  if (session?.user?.role !== "commissioner") {
+    throw new TRPCError({ code: "FORBIDDEN" });
+  }
+  return next({ ctx: { ...ctx, session } });
+});
+
+export const protectedProcedure = publicProcedure.use(requireUser);
+export const ownerOrCommissionerProcedure = publicProcedure.use(
+  requireOwnerOrCommissioner,
+);
+export const commissionerProcedure = publicProcedure.use(requireCommissioner);

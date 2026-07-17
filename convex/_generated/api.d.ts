@@ -8,6 +8,7 @@
  * @module
  */
 
+import type * as authUsers from "../authUsers.js";
 import type * as data from "../data.js";
 
 import type {
@@ -17,6 +18,7 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  authUsers: typeof authUsers;
   data: typeof data;
 }>;
 

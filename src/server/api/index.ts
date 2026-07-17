@@ -9,6 +9,9 @@ export {
   createCallerFactory,
   createTRPCRouter,
   publicProcedure,
+  protectedProcedure,
+  ownerOrCommissionerProcedure,
+  commissionerProcedure,
 } from "./trpc";
 
 // API utilities and helper functions

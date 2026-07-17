@@ -1,11 +1,7 @@
 import { createUploadthing, type FileRouter } from "uploadthing/next";
+import { auth } from "@gshl-auth";
 
 const f = createUploadthing();
-
-// Fake auth function (async to mirror real-world usage and satisfy await pattern)
-const auth = async (_req: Request): Promise<{ id: string }> => ({
-  id: "fakeId",
-});
 
 // FileRouter for your app, can contain multiple FileRoutes
 export const ourFileRouter = {
@@ -21,15 +17,16 @@ export const ourFileRouter = {
     },
   })
     // Set permissions and file types for this FileRoute
-    .middleware(async ({ req }) => {
+    .middleware(async () => {
       // This code runs on your server before upload
-      const user = await auth(req);
+      const session = await auth();
 
-      // If you throw, the user will not be able to upload
-      if (!user) throw new Error("Unauthorized");
+      if (session?.user.role !== "commissioner") {
+        throw new Error("Forbidden");
+      }
 
       // Whatever is returned here is accessible in onUploadComplete as `metadata`
-      return { userId: user.id };
+      return { userId: session.user.id };
     })
     .onUploadComplete(async ({ metadata, file }) => {
       // This code RUNS ON YOUR SERVER after upload

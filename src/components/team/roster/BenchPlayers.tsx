@@ -8,11 +8,13 @@ export function BenchPlayers({
   contractByPlayerId,
   showSalaries,
   nhlTeamByAbbr,
+  canEditLineup,
 }: {
   benchPlayers: Player[];
   contractByPlayerId: Map<string, Contract>;
   showSalaries: boolean;
   nhlTeamByAbbr: Map<string, NHLTeam>;
+  canEditLineup: boolean;
 }) {
   if (benchPlayers.length === 0) {
     return null;
@@ -29,6 +31,7 @@ export function BenchPlayers({
             showSalaries={showSalaries}
             nhlTeamByAbbr={nhlTeamByAbbr}
             className="my-2"
+            canEditLineup={canEditLineup}
           />
         ))}
       </div>

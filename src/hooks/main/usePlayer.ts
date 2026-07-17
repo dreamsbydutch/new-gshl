@@ -11,6 +11,13 @@ import { clientApi as api } from "@gshl-trpc";
 
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
 
+export function useUpdatePlayerLineup() {
+  const utils = api.useUtils();
+  return api.player.update.useMutation({
+    onSuccess: async () => utils.player.getAll.invalidate(),
+  });
+}
+
 /**
  * Hook for fetching players with optional filtering.
  *
