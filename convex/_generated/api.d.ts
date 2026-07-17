@@ -9,7 +9,12 @@
  */
 
 import type * as authUsers from "../authUsers.js";
+import type * as crons from "../crons.js";
 import type * as data from "../data.js";
+import type * as externalWorker from "../externalWorker.js";
+import type * as jobCatalog from "../jobCatalog.js";
+import type * as jobRunner from "../jobRunner.js";
+import type * as jobs from "../jobs.js";
 
 import type {
   ApiFromModules,
@@ -19,7 +24,12 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   authUsers: typeof authUsers;
+  crons: typeof crons;
   data: typeof data;
+  externalWorker: typeof externalWorker;
+  jobCatalog: typeof jobCatalog;
+  jobRunner: typeof jobRunner;
+  jobs: typeof jobs;
 }>;
 
 /**
