@@ -18,7 +18,7 @@ export function AuthNavControl() {
         className="flex items-center gap-1 rounded-md border bg-white px-2 py-1 text-xs font-semibold shadow-sm hover:bg-gray-50"
       >
         <LogIn className="h-4 w-4" />
-        <span className="hidden xl:inline">Sign in</span>
+        <span>Sign in</span>
       </Link>
     );
   }

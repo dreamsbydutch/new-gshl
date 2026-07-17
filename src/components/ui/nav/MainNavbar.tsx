@@ -70,7 +70,7 @@ export function MainNavbar({ className }: NavbarProps) {
             isActive={pathname === item.href}
           />
         ))}
-        <div className="ml-1 lg:absolute lg:right-4">
+        <div className="fixed right-2 top-2 z-[60] lg:absolute lg:right-4">
           <AuthNavControl />
         </div>
       </div>

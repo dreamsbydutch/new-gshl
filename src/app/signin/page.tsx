@@ -1,16 +1,21 @@
 import { redirect } from "next/navigation";
 import { auth, signIn } from "@gshl-auth";
 import type { SignInPageProps } from "@gshl-lib/auth/types";
+import { env } from "@gshl-env";
 
 export default async function SignInPage({ searchParams }: SignInPageProps) {
-  const [{ callbackUrl, error }, session] = await Promise.all([
-    searchParams,
-    auth(),
-  ]);
+  const { callbackUrl, error } = await searchParams;
   const destination =
     callbackUrl?.startsWith("/") && !callbackUrl.startsWith("//")
       ? callbackUrl
       : "/lockerroom";
+  const isOAuthConfigured = Boolean(
+    env.AUTH_SECRET &&
+      env.AUTH_GOOGLE_ID &&
+      env.AUTH_GOOGLE_SECRET &&
+      env.CONVEX_SERVER_SECRET,
+  );
+  const session = env.AUTH_SECRET ? await auth() : null;
 
   if (session?.user.status === "active") redirect(destination);
 
@@ -31,20 +36,28 @@ export default async function SignInPage({ searchParams }: SignInPageProps) {
             or ask a commissioner for help.
           </p>
         ) : null}
-        <form
-          className="mt-6"
-          action={async () => {
-            "use server";
-            await signIn("google", { redirectTo: destination });
-          }}
-        >
-          <button
-            type="submit"
-            className="w-full rounded-lg border bg-white px-4 py-3 font-semibold shadow-sm transition hover:bg-gray-50"
+        {isOAuthConfigured ? (
+          <form
+            className="mt-6"
+            action={async () => {
+              "use server";
+              await signIn("google", { redirectTo: destination });
+            }}
           >
-            Continue with Google
-          </button>
-        </form>
+            <button
+              type="submit"
+              className="w-full rounded-lg border bg-white px-4 py-3 font-semibold shadow-sm transition hover:bg-gray-50"
+            >
+              Continue with Google
+            </button>
+          </form>
+        ) : (
+          <p className="mt-6 rounded-md bg-amber-50 p-3 text-sm text-amber-800">
+            Google sign-in is not configured for this deployment. Add the Auth.js,
+            Google OAuth, and Convex server secrets to the hosting environment,
+            then redeploy.
+          </p>
+        )}
         <p className="mt-5 text-xs text-muted-foreground">
           New accounts receive viewer access until a commissioner approves a
           different role.
