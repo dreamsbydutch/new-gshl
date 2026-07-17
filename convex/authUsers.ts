@@ -121,8 +121,14 @@ export const updateAccess = mutation({
     const user = await ctx.db.get(args.id);
     if (!user) throw new Error("User not found");
 
-    if (args.role === "owner") {
-      if (!args.ownerId) throw new Error("Owners must be linked to an owner record");
+    const canHaveOwnerLink =
+      args.role === "owner" || args.role === "commissioner";
+
+    if (args.role === "owner" && !args.ownerId) {
+      throw new Error("Owners must be linked to an owner record");
+    }
+
+    if (canHaveOwnerLink && args.ownerId) {
       const owner = (await ctx.db.get(args.ownerId)) as { isActive?: boolean } | null;
       if (!owner?.isActive) throw new Error("Owner link must reference an active owner");
       const linked = await ctx.db
@@ -137,7 +143,7 @@ export const updateAccess = mutation({
     await ctx.db.patch(args.id, {
       role: args.role,
       status: args.status,
-      ownerId: args.role === "owner" ? args.ownerId : undefined,
+      ownerId: canHaveOwnerLink ? args.ownerId : undefined,
       updatedAt: new Date().toISOString(),
     });
     return publicUser((await ctx.db.get(args.id))!);

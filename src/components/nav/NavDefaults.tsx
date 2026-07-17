@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useNav, useTeamNavigation, useWeekNavigation, useWeeks } from "@gshl-hooks";
 import { isIsoDateInRange, toLocalIsoDateOnly } from "@gshl-utils";
+import { canManageOwnTeam } from "@gshl-lib/auth/types";
 import { useSession } from "next-auth/react";
 
 /**
@@ -25,8 +26,8 @@ export default function NavDefaults(): null {
 
   useEffect(() => {
     if (
-      session?.user.role === "owner" &&
-      session.user.ownerId &&
+      canManageOwnTeam(session?.user.role) &&
+      session?.user.ownerId &&
       selectedOwnerId === "1"
     ) {
       setSelectedOwnerId(session.user.ownerId);

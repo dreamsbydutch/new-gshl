@@ -21,6 +21,7 @@ function UserAccessRow({
   const [status, setStatus] = useState<UserStatus>(user.status);
   const [ownerId, setOwnerId] = useState(user.ownerId ?? "");
   const update = useUpdateAuthUserAccess();
+  const canHaveOwnerLink = role === "owner" || role === "commissioner";
 
   return (
     <tr className="border-b align-top">
@@ -42,7 +43,7 @@ function UserAccessRow({
       <td className="px-2 py-3">
         <select
           value={ownerId}
-          disabled={role !== "owner"}
+          disabled={!canHaveOwnerLink}
           onChange={(event) => setOwnerId(event.target.value)}
           className="max-w-52 rounded border bg-white px-2 py-1 disabled:opacity-50"
         >
@@ -74,7 +75,7 @@ function UserAccessRow({
               id: user.id,
               role,
               status,
-              ownerId: role === "owner" ? ownerId : undefined,
+              ownerId: canHaveOwnerLink && ownerId ? ownerId : undefined,
             })
           }
         >
@@ -110,7 +111,7 @@ export function UserManagement() {
         <h1 className="text-2xl font-bold">User Access</h1>
         <p className="text-sm text-muted-foreground">
           New Google accounts begin as viewers. Owners require one linked league
-          owner record.
+          owner record; commissioners can optionally link their owner record too.
         </p>
       </div>
       <table className="w-full min-w-[780px] text-sm">
