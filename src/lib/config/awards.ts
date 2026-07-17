@@ -1,6 +1,7 @@
 import type {
   AwardCatalogEntry,
   AwardGroupKey,
+  GSHLTeam,
   PlayerAward,
   TeamAward,
 } from "@gshl-types";
@@ -168,8 +169,46 @@ export function getAwardLabel(award: AwardsList | string): string {
   );
 }
 
-export function getAwardTeamId(award: PlayerAward | TeamAward): string {
-  return "teamId" in award ? String(award.teamId) : "";
+export function getTeamAwardOwnerId(award: TeamAward): string {
+  return String(award.ownerId ?? "");
+}
+
+export function getTeamAwardTeam(
+  award: TeamAward,
+  teams: readonly GSHLTeam[],
+): GSHLTeam | undefined {
+  const ownerId = getTeamAwardOwnerId(award);
+  const ownerTeam = ownerId
+    ? teams.find(
+        (team) =>
+          String(team.seasonId) === String(award.seasonId) &&
+          String(team.ownerId ?? "") === ownerId,
+      )
+    : undefined;
+  if (ownerTeam) return ownerTeam;
+  return award.teamId
+    ? teams.find((team) => String(team.id) === String(award.teamId))
+    : undefined;
+}
+
+export function getTeamAwardNomineeTeams(
+  award: TeamAward,
+  teams: readonly GSHLTeam[],
+): GSHLTeam[] {
+  const nomineeOwnerIds = new Set(award.nomineeIds.map(String));
+  return teams.filter(
+    (team) =>
+      String(team.seasonId) === String(award.seasonId) &&
+      nomineeOwnerIds.has(String(team.ownerId ?? "")),
+  );
+}
+
+export function getAwardTeamId(
+  award: PlayerAward | TeamAward,
+  teams: readonly GSHLTeam[] = [],
+): string {
+  if (!("ownerId" in award)) return "";
+  return String(getTeamAwardTeam(award, teams)?.id ?? "");
 }
 
 export function getPlayerAwardPlayerId(award: PlayerAward): string {

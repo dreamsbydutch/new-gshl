@@ -832,7 +832,7 @@ export const SHEETS_CONFIG = {
     TeamAwards: [
       "id",
       "seasonId",
-      "teamId",
+      "ownerId",
       "nomineeIds",
       "award",
       "createdAt",

@@ -1,6 +1,7 @@
 import {
   AWARD_CATALOG_BY_KEY,
   AWARD_GROUP_ORDER,
+  getTeamAwardTeam,
 } from "@gshl-lib/config/awards";
 import type {
   AwardCatalogEntry,
@@ -96,14 +97,16 @@ export function buildTrophyCaseData({
       )
       .map((team) => String(team.id)),
   );
-  const teamById = new Map(allTeams.map((team) => [String(team.id), team]));
-
   const cards = teamAwards
-    .filter((award) => ownerTeamIds.has(String(award.teamId)))
+    .filter(
+      (award) =>
+        String(award.ownerId) === ownerId ||
+        ownerTeamIds.has(String(award.teamId ?? "")),
+    )
     .map((award) => {
       const catalog = AWARD_CATALOG_BY_KEY.get(award.award);
       if (!catalog) return null;
-      const historicalTeam = teamById.get(String(award.teamId));
+      const historicalTeam = getTeamAwardTeam(award, allTeams);
       return {
         id: String(award.id),
         award,

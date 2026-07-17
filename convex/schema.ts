@@ -335,13 +335,16 @@ export default defineSchema({
   teamAwards: table(
     {
       seasonId: id("seasons"),
-      teamId: id("teams"),
-      nomineeIds: optionalNullable(v.array(id("teams"))),
+      // ownerId is canonical. teamId remains temporarily optional so existing
+      // rows can be migrated without blocking the schema deployment.
+      ownerId: optional(id("owners")),
+      teamId: optional(id("teams")),
+      nomineeIds: optionalNullable(v.array(v.union(id("owners"), id("teams")))),
       award: stringValue,
       createdAt: timestampValue,
       updatedAt: timestampValue,
     },
-    ["seasonId", "teamId"],
+    ["seasonId", "ownerId", "teamId", ["seasonId", "ownerId"]],
   ),
 
   draftPicks: table(

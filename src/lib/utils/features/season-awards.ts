@@ -1,6 +1,7 @@
 import {
   AWARD_CATALOG_BY_KEY,
   AWARD_GROUP_ORDER,
+  getTeamAwardTeam,
 } from "@gshl-lib/config/awards";
 import { AwardsList, SeasonType } from "@gshl-types";
 import type {
@@ -106,14 +107,12 @@ export function buildSeasonAwardCards(
   awards: TeamAward[],
   teams: GSHLTeam[],
 ): SeasonAwardWinnerCard[] {
-  const teamById = new Map(teams.map((team) => [String(team.id), team]));
-
   return awards
     .map((award) => {
       const catalog = AWARD_CATALOG_BY_KEY.get(award.award);
       if (!catalog) return null;
 
-      const winningTeam = teamById.get(String(award.teamId));
+      const winningTeam = getTeamAwardTeam(award, teams);
       const ownerDisplayName = getOwnerDisplayName(winningTeam);
 
       return {

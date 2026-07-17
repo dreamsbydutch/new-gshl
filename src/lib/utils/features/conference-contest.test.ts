@@ -88,12 +88,12 @@ const matchup = (
 const award = (
   id: string,
   seasonId: string,
-  teamId: string,
+  ownerId: string,
   awardKey: AwardsList,
 ): TeamAward => ({
   id,
   seasonId,
-  teamId,
+  ownerId,
   nomineeIds: [],
   award: awardKey,
   createdAt: now,
@@ -101,7 +101,10 @@ const award = (
 });
 
 void test("builds a complementary neutral rating when evidence is missing", () => {
-  const teams = [team("left", "s1", "A", "Alpha"), team("right", "s1", "B", "Beta")];
+  const teams = [
+    team("left", "s1", "A", "Alpha"),
+    team("right", "s1", "B", "Beta"),
+  ];
   const result = buildConferenceContestSeasonViewModel({
     season: season("s1", 2026, true),
     matchups: [],
@@ -114,13 +117,21 @@ void test("builds a complementary neutral rating when evidence is missing", () =
 });
 
 void test("counts ties as half a win and weights leadership awards triple", () => {
-  const teams = [team("left", "s1", "A", "Alpha"), team("right", "s1", "B", "Beta")];
+  const teams = [
+    team("left", "s1", "A", "Alpha"),
+    team("right", "s1", "B", "Beta"),
+  ];
   const result = buildConferenceContestSeasonViewModel({
     season: season("s1", 2025),
     gshlTeams: teams,
-    matchups: [matchup("tie", "s1", "left", "right", MatchupType.NON_CONFERENCE, 5, 5)],
+    matchups: [
+      matchup("tie", "s1", "left", "right", MatchupType.NON_CONFERENCE, 5, 5),
+    ],
     teamAwards: [
-      award("coach", "s1", "right", AwardsList.JACK_ADAMS),
+      {
+        ...award("coach", "s1", "right", AwardsList.JACK_ADAMS),
+        teamId: "left",
+      },
       award("gm", "s1", "right", AwardsList.GM_OF_THE_YEAR),
       award("conference", "s1", "left", AwardsList.HICKORY),
     ],
@@ -134,11 +145,16 @@ void test("counts ties as half a win and weights leadership awards triple", () =
 });
 
 void test("uses a recorded Cup winner without double-counting the completed final", () => {
-  const teams = [team("left", "s1", "A", "Alpha"), team("right", "s1", "B", "Beta")];
+  const teams = [
+    team("left", "s1", "A", "Alpha"),
+    team("right", "s1", "B", "Beta"),
+  ];
   const result = buildConferenceContestSeasonViewModel({
     season: season("s1", 2025),
     gshlTeams: teams,
-    matchups: [matchup("final", "s1", "left", "right", MatchupType.FINAL, 8, 4)],
+    matchups: [
+      matchup("final", "s1", "left", "right", MatchupType.FINAL, 8, 4),
+    ],
     teamAwards: [award("cup", "s1", "right", AwardsList.GSHL_CUP)],
   });
   assert.ok(result);
@@ -156,8 +172,18 @@ void test("applies exact 85% current-form retention and equal all-time weighting
       rightConference: { id: "B", name: "Beta", abbr: "B", logoUrl: null },
       ratingByConferenceId: { A: leftRating, B: 100 - leftRating },
       componentsByConferenceId: {
-        A: { headToHead: leftRating, playoffs: leftRating, cups: leftRating, awards: leftRating },
-        B: { headToHead: 100 - leftRating, playoffs: 100 - leftRating, cups: 100 - leftRating, awards: 100 - leftRating },
+        A: {
+          headToHead: leftRating,
+          playoffs: leftRating,
+          cups: leftRating,
+          awards: leftRating,
+        },
+        B: {
+          headToHead: 100 - leftRating,
+          playoffs: 100 - leftRating,
+          cups: 100 - leftRating,
+          awards: 100 - leftRating,
+        },
       },
     }) as unknown as ConferenceContestSeasonViewModel;
   const result = aggregateConferenceRatings([
@@ -165,7 +191,9 @@ void test("applies exact 85% current-form retention and equal all-time weighting
     makeRatingSeason(2025, 20),
   ]);
   assert.ok(result);
-  const expectedCurrent = (80 + 20 * CONFERENCE_RECENCY_RETENTION) / (1 + CONFERENCE_RECENCY_RETENTION);
+  const expectedCurrent =
+    (80 + 20 * CONFERENCE_RECENCY_RETENTION) /
+    (1 + CONFERENCE_RECENCY_RETENTION);
   assert.equal(result.currentRating.ratingByConferenceId.A, expectedCurrent);
   assert.equal(result.allTimeRating.ratingByConferenceId.A, 50);
   assert.equal(

@@ -60,7 +60,7 @@ export function AwardsShowcase({
       <AwardGroup title="Team Awards">
         {orderedTeamAwards.map((award) => {
           const label = getAwardLabel(award.award);
-          const teamId = getAwardTeamId(award);
+          const teamId = getAwardTeamId(award, teams);
           const team = teamById.get(teamId);
           return (
             <AwardCard

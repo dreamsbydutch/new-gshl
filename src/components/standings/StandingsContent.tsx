@@ -3,7 +3,7 @@
 import {
   PlayoffBracket,
   SeasonAwards,
-  StandingsComponent,
+  StandingsTable,
 } from "@gshl-components/league";
 import {
   usePlayerAwards,
@@ -22,8 +22,6 @@ export function StandingsContent() {
     standingsType,
     teams,
     stats,
-    matchups,
-    weeks,
     isLoading,
   } = useStandingsData({});
   const isAwardsView = (standingsType ?? "overall") === "awards";
@@ -88,17 +86,10 @@ export function StandingsContent() {
   }
 
   return (
-    <>
-      {groups.map((group) => (
-        <StandingsComponent
-          key={group.title}
-          group={group}
-          selectedSeason={selectedSeason ?? null}
-          standingsType={standingsType ?? "overall"}
-          matchups={matchups}
-          weeks={weeks}
-        />
-      ))}
-    </>
+    <StandingsTable
+      groups={groups}
+      selectedSeason={selectedSeason ?? null}
+      standingsType={standingsType ?? "overall"}
+    />
   );
 }

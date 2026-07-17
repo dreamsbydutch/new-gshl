@@ -13,6 +13,7 @@ import type {
   TeamAward,
 } from "@gshl-types";
 import { AwardsList, MatchupType } from "@gshl-types";
+import { getTeamAwardTeam } from "@gshl-lib/config/awards";
 
 export type {
   ConferenceContestConferenceInfo,
@@ -72,7 +73,8 @@ const normalizeScore = (score: ScoreLike): number | null => {
 const normalizeBoolean = (value: BooleanLike): boolean | null => {
   if (value == null) return null;
   if (typeof value === "boolean") return value;
-  if (typeof value === "number") return value === 1 ? true : value === 0 ? false : null;
+  if (typeof value === "number")
+    return value === 1 ? true : value === 0 ? false : null;
   const normalized = value.trim().toLowerCase();
   if (["true", "t", "yes", "y", "1"].includes(normalized)) return true;
   if (["false", "f", "no", "n", "0"].includes(normalized)) return false;
@@ -182,7 +184,14 @@ const recordEvidence = (record?: ConferenceContestRecord) =>
   (record?.wins ?? 0) + (record?.ties ?? 0) * 0.5;
 
 const awardWeight = (award: AwardsList) =>
-  award === AwardsList.JACK_ADAMS || award === AwardsList.GM_OF_THE_YEAR ? 3 : 1;
+  award === AwardsList.JACK_ADAMS || award === AwardsList.GM_OF_THE_YEAR
+    ? 3
+    : 1;
+
+const teamForAward = (
+  award: TeamAward,
+  teamsById: ReadonlyMap<string, GSHLTeam>,
+) => getTeamAwardTeam(award, [...teamsById.values()]);
 
 const buildAwardSummary = (
   conferenceIds: string[],
@@ -204,7 +213,7 @@ const buildAwardSummary = (
 
   for (const award of seasonAwards) {
     if (EXCLUDED_AWARDS.has(award.award)) continue;
-    const conferenceId = normalizeId(teamsById.get(String(award.teamId))?.confId);
+    const conferenceId = normalizeId(teamForAward(award, teamsById)?.confId);
     if (!conferenceId || !awardsByConferenceId[conferenceId]) continue;
     awardsByConferenceId[conferenceId].push(award);
     awardPointsByConferenceId[conferenceId] =
@@ -309,16 +318,18 @@ export const buildConferenceContestSeasonViewModel = (params: {
   );
   const teamsById = new Map(seasonTeams.map((team) => [String(team.id), team]));
   const completeMatchups = matchups.filter(
-    (matchup) => normalizeId(matchup.seasonId) === seasonId && isComplete(matchup),
+    (matchup) =>
+      normalizeId(matchup.seasonId) === seasonId && isComplete(matchup),
   );
   const getTeam = (id: IdLike) => {
     const normalized = normalizeId(id);
     return normalized ? teamsById.get(normalized) : undefined;
   };
-  const getConferencePair = (matchup: Matchup) => [
-    normalizeId(getTeam(matchup.homeTeamId)?.confId),
-    normalizeId(getTeam(matchup.awayTeamId)?.confId),
-  ] as const;
+  const getConferencePair = (matchup: Matchup) =>
+    [
+      normalizeId(getTeam(matchup.homeTeamId)?.confId),
+      normalizeId(getTeam(matchup.awayTeamId)?.confId),
+    ] as const;
 
   const seasonRecordByConferenceId = emptyRecordMap(conferenceIds);
   const playoffRecordByConferenceId = emptyRecordMap(conferenceIds);
@@ -386,11 +397,15 @@ export const buildConferenceContestSeasonViewModel = (params: {
   if (finalMatchup) {
     const homeTeam = getTeam(finalMatchup.homeTeamId);
     const awayTeam = getTeam(finalMatchup.awayTeamId);
-    if (homeTeam?.confId) finalsTeamsByConferenceId[String(homeTeam.confId)]?.push(homeTeam);
-    if (awayTeam?.confId) finalsTeamsByConferenceId[String(awayTeam.confId)]?.push(awayTeam);
+    if (homeTeam?.confId)
+      finalsTeamsByConferenceId[String(homeTeam.confId)]?.push(homeTeam);
+    if (awayTeam?.confId)
+      finalsTeamsByConferenceId[String(awayTeam.confId)]?.push(awayTeam);
     const winner = getMatchupWinner(finalMatchup);
-    const champion = winner === "home" ? homeTeam : winner === "away" ? awayTeam : undefined;
-    if (champion?.confId) championTeamsByConferenceId[String(champion.confId)]?.push(champion);
+    const champion =
+      winner === "home" ? homeTeam : winner === "away" ? awayTeam : undefined;
+    if (champion?.confId)
+      championTeamsByConferenceId[String(champion.confId)]?.push(champion);
   }
 
   const seasonAwards = teamAwards.filter(
@@ -402,12 +417,17 @@ export const buildConferenceContestSeasonViewModel = (params: {
   if (cupAwards.length > 0) {
     for (const id of conferenceIds) championTeamsByConferenceId[id] = [];
     for (const award of cupAwards) {
-      const team = teamsById.get(String(award.teamId));
-      if (team?.confId) championTeamsByConferenceId[String(team.confId)]?.push(team);
+      const team = teamForAward(award, teamsById);
+      if (team?.confId)
+        championTeamsByConferenceId[String(team.confId)]?.push(team);
     }
   }
 
-  const awardSummary = buildAwardSummary(conferenceIds, seasonAwards, teamsById);
+  const awardSummary = buildAwardSummary(
+    conferenceIds,
+    seasonAwards,
+    teamsById,
+  );
   const rating = buildSeasonRating(
     leftConference.id,
     rightConference.id,
@@ -445,8 +465,12 @@ export const buildConferenceContestSeasonViewModels = (params: {
 }): ConferenceContestSeasonViewModel[] =>
   [...params.seasons]
     .sort((a, b) => b.year - a.year)
-    .map((season) => buildConferenceContestSeasonViewModel({ ...params, season }))
-    .filter((season): season is ConferenceContestSeasonViewModel => Boolean(season));
+    .map((season) =>
+      buildConferenceContestSeasonViewModel({ ...params, season }),
+    )
+    .filter((season): season is ConferenceContestSeasonViewModel =>
+      Boolean(season),
+    );
 
 const combineRecords = (
   conferenceIds: string[],
@@ -473,7 +497,10 @@ const combineRecords = (
 export const aggregateConferenceRatings = (
   seasons: ConferenceContestSeasonViewModel[],
   retention = CONFERENCE_RECENCY_RETENTION,
-): { currentRating: ConferenceContestRating; allTimeRating: ConferenceContestRating } | null => {
+): {
+  currentRating: ConferenceContestRating;
+  allTimeRating: ConferenceContestRating;
+} | null => {
   const newest = seasons[0];
   if (!newest) return null;
   const leftId = newest.leftConference.id;
@@ -485,14 +512,18 @@ export const aggregateConferenceRatings = (
     "awards",
   ];
   const aggregate = (weighted: boolean): ConferenceContestRating => {
-    const weights = seasons.map((_, index) => (weighted ? retention ** index : 1));
+    const weights = seasons.map((_, index) =>
+      weighted ? retention ** index : 1,
+    );
     const weightTotal = weights.reduce((sum, weight) => sum + weight, 0);
     const leftComponents = Object.fromEntries(
       componentKeys.map((key) => [
         key,
         seasons.reduce(
           (sum, season, index) =>
-            sum + (season.componentsByConferenceId[leftId]?.[key] ?? 50) * (weights[index] ?? 0),
+            sum +
+            (season.componentsByConferenceId[leftId]?.[key] ?? 50) *
+              (weights[index] ?? 0),
           0,
         ) / weightTotal,
       ]),
@@ -500,14 +531,22 @@ export const aggregateConferenceRatings = (
     const rightComponents = Object.fromEntries(
       componentKeys.map((key) => [key, 100 - leftComponents[key]]),
     ) as unknown as ConferenceContestRatingComponents;
-    const leftRating = seasons.reduce(
-      (sum, season, index) =>
-        sum + (season.ratingByConferenceId[leftId] ?? 50) * (weights[index] ?? 0),
-      0,
-    ) / weightTotal;
+    const leftRating =
+      seasons.reduce(
+        (sum, season, index) =>
+          sum +
+          (season.ratingByConferenceId[leftId] ?? 50) * (weights[index] ?? 0),
+        0,
+      ) / weightTotal;
     return {
-      ratingByConferenceId: { [leftId]: leftRating, [rightId]: 100 - leftRating },
-      componentsByConferenceId: { [leftId]: leftComponents, [rightId]: rightComponents },
+      ratingByConferenceId: {
+        [leftId]: leftRating,
+        [rightId]: 100 - leftRating,
+      },
+      componentsByConferenceId: {
+        [leftId]: leftComponents,
+        [rightId]: rightComponents,
+      },
     };
   };
   return { currentRating: aggregate(true), allTimeRating: aggregate(false) };
@@ -537,7 +576,10 @@ export const buildConferenceContestOverallViewModel = (params: {
   const awardPointsByConferenceId = Object.fromEntries(
     conferenceIds.map((id) => [
       id,
-      seasonModels.reduce((sum, season) => sum + (season.awardPointsByConferenceId[id] ?? 0), 0),
+      seasonModels.reduce(
+        (sum, season) => sum + (season.awardPointsByConferenceId[id] ?? 0),
+        0,
+      ),
     ]),
   ) as Record<string, number>;
   return {
@@ -550,15 +592,35 @@ export const buildConferenceContestOverallViewModel = (params: {
       seasonYear: season.seasonYear,
       ratingByConferenceId: season.ratingByConferenceId,
     })),
-    championTeamsByConferenceId: mergeArrays<GSHLTeam>("championTeamsByConferenceId"),
-    finalsTeamsByConferenceId: mergeArrays<GSHLTeam>("finalsTeamsByConferenceId"),
-    playoffTeamsByConferenceId: mergeArrays<GSHLTeam>("playoffTeamsByConferenceId"),
+    championTeamsByConferenceId: mergeArrays<GSHLTeam>(
+      "championTeamsByConferenceId",
+    ),
+    finalsTeamsByConferenceId: mergeArrays<GSHLTeam>(
+      "finalsTeamsByConferenceId",
+    ),
+    playoffTeamsByConferenceId: mergeArrays<GSHLTeam>(
+      "playoffTeamsByConferenceId",
+    ),
     awardsByConferenceId: mergeArrays<TeamAward>("awardsByConferenceId"),
-    coachAwardsByConferenceId: mergeArrays<TeamAward>("coachAwardsByConferenceId"),
+    coachAwardsByConferenceId: mergeArrays<TeamAward>(
+      "coachAwardsByConferenceId",
+    ),
     gmAwardsByConferenceId: mergeArrays<TeamAward>("gmAwardsByConferenceId"),
     awardPointsByConferenceId,
-    seasonRecordByConferenceId: combineRecords(conferenceIds, seasonModels, "seasonRecordByConferenceId"),
-    playoffRecordByConferenceId: combineRecords(conferenceIds, seasonModels, "playoffRecordByConferenceId"),
-    headToHeadRecordByConferenceId: combineRecords(conferenceIds, seasonModels, "headToHeadRecordByConferenceId"),
+    seasonRecordByConferenceId: combineRecords(
+      conferenceIds,
+      seasonModels,
+      "seasonRecordByConferenceId",
+    ),
+    playoffRecordByConferenceId: combineRecords(
+      conferenceIds,
+      seasonModels,
+      "playoffRecordByConferenceId",
+    ),
+    headToHeadRecordByConferenceId: combineRecords(
+      conferenceIds,
+      seasonModels,
+      "headToHeadRecordByConferenceId",
+    ),
   };
 };

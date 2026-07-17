@@ -27,6 +27,7 @@ import {
   toBoolean,
   toTrimmedString,
 } from "@gshl-lib/ranking/player-rating-support";
+import { mapTeamAwardPodiumToOwners } from "../../domains/awards/team-award-ownership";
 
 type AwardKey =
   | "rocket"
@@ -64,7 +65,7 @@ type PlayerAwardRecord = DatabaseRecord & {
 
 type TeamAwardRecord = DatabaseRecord & {
   seasonId: string;
-  teamId: string;
+  ownerId: string;
   nomineeIds: string[];
   award: AwardKey;
 };
@@ -284,11 +285,13 @@ function formatDateOnly(value: unknown): string {
       return trimmed;
     }
   }
-  if (!(
-    value instanceof Date ||
-    typeof value === "string" ||
-    typeof value === "number"
-  )) {
+  if (
+    !(
+      value instanceof Date ||
+      typeof value === "string" ||
+      typeof value === "number"
+    )
+  ) {
     return "";
   }
   const date = value instanceof Date ? value : new Date(value);
@@ -582,13 +585,15 @@ function makeTeamAwardRecord(
   seasonId: string,
   award: AwardKey,
   podium: AwardPodium | null,
+  ownerIdByTeamId: ReadonlyMap<string, string>,
 ): TeamAwardRecord | null {
   if (!podium) return null;
+  const ownerPodium = mapTeamAwardPodiumToOwners(podium, ownerIdByTeamId);
+  if (!ownerPodium) return null;
 
   return {
     seasonId,
-    teamId: podium.winnerId,
-    nomineeIds: podium.nomineeIds,
+    ...ownerPodium,
     award,
   };
 }
@@ -857,6 +862,28 @@ async function computeAwardsForSeason(
     seasonTeams,
     snapshot.franchises,
   );
+  const ownerIdByFranchiseId = new Map(
+    snapshot.franchises
+      .map(
+        (franchise) =>
+          [
+            normalizeRecordId(franchise.id),
+            normalizeRecordId(franchise.ownerId),
+          ] as const,
+      )
+      .filter(([franchiseId, ownerId]) => Boolean(franchiseId && ownerId)),
+  );
+  const ownerIdByTeamId = new Map(
+    seasonTeams
+      .map(
+        (team) =>
+          [
+            normalizeRecordId(team.id),
+            ownerIdByFranchiseId.get(normalizeRecordId(team.franchiseId)) ?? "",
+          ] as const,
+      )
+      .filter(([teamId, ownerId]) => Boolean(teamId && ownerId)),
+  );
   const conferenceById = new Map<string, ConferenceRecord>();
   for (const conference of snapshot.conferences) {
     const conferenceId = normalizeRecordId(conference.id);
@@ -958,7 +985,14 @@ async function computeAwardsForSeason(
       (award) =>
         award !== "firstAS" && award !== "secondAS" && award !== "playoffAS",
     )
-      .map((award) => makeTeamAwardRecord(seasonId, award, awardPodiums[award]))
+      .map((award) =>
+        makeTeamAwardRecord(
+          seasonId,
+          award,
+          awardPodiums[award],
+          ownerIdByTeamId,
+        ),
+      )
       .filter((award): award is TeamAwardRecord => award !== null),
     ...allStarAwards.firstAS,
     ...allStarAwards.secondAS,
@@ -1109,10 +1143,11 @@ async function runAwardsBackfill(
     (award): award is PlayerAwardRecord => "playerId" in award,
   );
   const teamAwardRows = awardRows.filter(
-    (award): award is TeamAwardRecord => "teamId" in award,
+    (award): award is TeamAwardRecord => "ownerId" in award,
   );
   let writeResult:
-    { updated: number; inserted: number; total: number } | undefined;
+    | { updated: number; inserted: number; total: number }
+    | undefined;
   if (options.apply) {
     let updated = 0;
     let inserted = 0;
@@ -1123,7 +1158,7 @@ async function runAwardsBackfill(
         (award): award is PlayerAwardRecord => "playerId" in award,
       );
       const seasonTeamAwards = season.awards.filter(
-        (award): award is TeamAwardRecord => "teamId" in award,
+        (award): award is TeamAwardRecord => "ownerId" in award,
       );
       const playerResult = await convexStore.upsertByCompositeKey(
         "PlayerAward",
@@ -1140,7 +1175,7 @@ async function runAwardsBackfill(
       );
       const teamResult = await convexStore.upsertByCompositeKey(
         "TeamAward",
-        ["seasonId", "award", "teamId"],
+        ["seasonId", "award", "ownerId"],
         seasonTeamAwards,
         {
           merge: true,

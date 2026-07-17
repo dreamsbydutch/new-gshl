@@ -73,7 +73,8 @@ const numericScore = (value: unknown): number | null => {
 };
 
 const isCompleteMatchup = (matchup: Matchup) =>
-  numericScore(matchup.homeScore) != null && numericScore(matchup.awayScore) != null;
+  numericScore(matchup.homeScore) != null &&
+  numericScore(matchup.awayScore) != null;
 
 const ownerName = (owner: Owner) =>
   owner.nickName?.trim() ||
@@ -96,7 +97,9 @@ const toRecord = (record: MutableRecord): OwnerRankingRecord => ({
 
 const bayesianPercentage = (record: MutableRecord, priorGames: number) => {
   const games = gamesPlayed(record);
-  return (record.wins + record.ties * 0.5 + priorGames * 0.5) / (games + priorGames);
+  return (
+    (record.wins + record.ties * 0.5 + priorGames * 0.5) / (games + priorGames)
+  );
 };
 
 const performanceAdjustment = (state: OwnerLadderState) =>
@@ -108,7 +111,9 @@ const clampRating = (rating: number) =>
   Math.min(OWNER_LADDER_MAX_RATING, Math.max(OWNER_LADDER_MIN_RATING, rating));
 
 const ladderRating = (state: OwnerLadderState) =>
-  clampRating(state.elo + state.achievementBonus + performanceAdjustment(state));
+  clampRating(
+    state.elo + state.achievementBonus + performanceAdjustment(state),
+  );
 
 const expectedScore = (ratingA: number, ratingB: number) =>
   1 / (1 + 10 ** ((ratingB - ratingA) / 400));
@@ -148,7 +153,9 @@ const makeState = (
   seedRating: number,
   teams: GSHLTeam[],
 ): OwnerLadderState => {
-  const ownerTeams = teams.filter((team) => normalizeId(team.ownerId) === owner.id);
+  const ownerTeams = teams.filter(
+    (team) => normalizeId(team.ownerId) === owner.id,
+  );
   const primaryTeam =
     ownerTeams.find((team) => team.isActive) ?? ownerTeams.at(-1) ?? null;
   return {
@@ -207,15 +214,20 @@ export function buildOwnerRankings(params: {
   teamAwards: TeamAward[];
 }): OwnerRankingsViewModel {
   const { teams, matchups, seasons, weeks, teamAwards } = params;
-  const ownerById = new Map(params.owners.map((owner) => [String(owner.id), owner]));
+  const ownerById = new Map(
+    params.owners.map((owner) => [String(owner.id), owner]),
+  );
   for (const team of teams) {
     const fallback = fallbackOwnerFromTeam(team);
-    if (fallback && !ownerById.has(fallback.id)) ownerById.set(fallback.id, fallback);
+    if (fallback && !ownerById.has(fallback.id))
+      ownerById.set(fallback.id, fallback);
   }
 
   const seasonsAscending = [...seasons].sort((a, b) => a.year - b.year);
   const latestSeason = seasonsAscending.at(-1) ?? null;
-  const seasonById = new Map(seasons.map((season) => [String(season.id), season]));
+  const seasonById = new Map(
+    seasons.map((season) => [String(season.id), season]),
+  );
   const weekById = new Map(weeks.map((week) => [String(week.id), week]));
   const teamById = new Map(teams.map((team) => [String(team.id), team]));
   const firstSeasonYearByOwner = new Map<string, number>();
@@ -224,7 +236,8 @@ export function buildOwnerRankings(params: {
     const season = seasonById.get(String(team.seasonId));
     if (!ownerId || !season) continue;
     const current = firstSeasonYearByOwner.get(ownerId);
-    if (current == null || season.year < current) firstSeasonYearByOwner.set(ownerId, season.year);
+    if (current == null || season.year < current)
+      firstSeasonYearByOwner.set(ownerId, season.year);
   }
 
   const states = new Map<string, OwnerLadderState>();
@@ -252,7 +265,8 @@ export function buildOwnerRankings(params: {
     }
 
     if (season.id === latestSeason?.id) {
-      for (const { state, rank } of rankStates(states)) previousRanks.set(state.owner.id, rank);
+      for (const { state, rank } of rankStates(states))
+        previousRanks.set(state.owner.id, rank);
     }
 
     const seasonMatchups = matchups
@@ -270,19 +284,28 @@ export function buildOwnerRankings(params: {
       });
 
     for (const matchup of seasonMatchups) {
-      const homeOwnerId = normalizeId(teamById.get(String(matchup.homeTeamId))?.ownerId);
-      const awayOwnerId = normalizeId(teamById.get(String(matchup.awayTeamId))?.ownerId);
+      const homeOwnerId = normalizeId(
+        teamById.get(String(matchup.homeTeamId))?.ownerId,
+      );
+      const awayOwnerId = normalizeId(
+        teamById.get(String(matchup.awayTeamId))?.ownerId,
+      );
       if (!homeOwnerId || !awayOwnerId || homeOwnerId === awayOwnerId) continue;
       const homeState = ensureOwner(homeOwnerId);
       const awayState = ensureOwner(awayOwnerId);
       const homeScore = numericScore(matchup.homeScore);
       const awayScore = numericScore(matchup.awayScore);
-      if (!homeState || !awayState || homeScore == null || awayScore == null) continue;
+      if (!homeState || !awayState || homeScore == null || awayScore == null)
+        continue;
 
       const actualHome = matchupActual(homeScore, awayScore);
       const expectedHome = expectedScore(homeState.elo, awayState.elo);
-      const marginMultiplier = 1 + Math.min(Math.abs(homeScore - awayScore), 4) * 0.08;
-      const rawDelta = matchupK(matchup.gameType) * marginMultiplier * (actualHome - expectedHome);
+      const marginMultiplier =
+        1 + Math.min(Math.abs(homeScore - awayScore), 4) * 0.08;
+      const rawDelta =
+        matchupK(matchup.gameType) *
+        marginMultiplier *
+        (actualHome - expectedHome);
       const nextHomeElo = clampRating(homeState.elo + rawDelta);
       const nextAwayElo = clampRating(awayState.elo - rawDelta);
       const homeDelta = nextHomeElo - homeState.elo;
@@ -299,7 +322,11 @@ export function buildOwnerRankings(params: {
         applyRecordResult(homeState.overall, awayState.overall, actualHome);
       }
       if (matchup.gameType === MatchupType.CONFERENCE) {
-        applyRecordResult(homeState.conference, awayState.conference, actualHome);
+        applyRecordResult(
+          homeState.conference,
+          awayState.conference,
+          actualHome,
+        );
       }
       if (PLAYOFF_TYPES.has(matchup.gameType)) {
         applyRecordResult(homeState.playoffs, awayState.playoffs, actualHome);
@@ -319,7 +346,11 @@ export function buildOwnerRankings(params: {
         homeDelta,
         awayDelta,
         winnerOwnerId:
-          actualHome === 1 ? homeOwnerId : actualHome === 0 ? awayOwnerId : null,
+          actualHome === 1
+            ? homeOwnerId
+            : actualHome === 0
+              ? awayOwnerId
+              : null,
       });
     }
 
@@ -328,9 +359,15 @@ export function buildOwnerRankings(params: {
     const seasonFinal = seasonMatchups.find(
       (matchup) => matchup.gameType === MatchupType.FINAL,
     );
-    for (const matchup of seasonMatchups.filter((item) => PLAYOFF_TYPES.has(item.gameType))) {
-      const homeOwnerId = normalizeId(teamById.get(String(matchup.homeTeamId))?.ownerId);
-      const awayOwnerId = normalizeId(teamById.get(String(matchup.awayTeamId))?.ownerId);
+    for (const matchup of seasonMatchups.filter((item) =>
+      PLAYOFF_TYPES.has(item.gameType),
+    )) {
+      const homeOwnerId = normalizeId(
+        teamById.get(String(matchup.homeTeamId))?.ownerId,
+      );
+      const awayOwnerId = normalizeId(
+        teamById.get(String(matchup.awayTeamId))?.ownerId,
+      );
       if (homeOwnerId) playoffOwnerIds.add(homeOwnerId);
       if (awayOwnerId) playoffOwnerIds.add(awayOwnerId);
       if (matchup.gameType === MatchupType.FINAL) {
@@ -354,18 +391,27 @@ export function buildOwnerRankings(params: {
     const seasonAwards = teamAwards.filter(
       (award) => normalizeId(award.seasonId) === String(season.id),
     );
-    const cupAwards = seasonAwards.filter((award) => award.award === AwardsList.GSHL_CUP);
+    const cupAwards = seasonAwards.filter(
+      (award) => award.award === AwardsList.GSHL_CUP,
+    );
     const cupOwnerIds = new Set<string>();
     for (const award of cupAwards) {
-      const ownerId = normalizeId(teamById.get(String(award.teamId))?.ownerId);
+      const ownerId =
+        normalizeId(award.ownerId) ??
+        normalizeId(teamById.get(String(award.teamId ?? ""))?.ownerId);
       if (ownerId) cupOwnerIds.add(ownerId);
     }
     if (!cupOwnerIds.size && seasonFinal) {
       const homeScore = numericScore(seasonFinal.homeScore);
       const awayScore = numericScore(seasonFinal.awayScore);
       if (homeScore != null && awayScore != null && homeScore !== awayScore) {
-        const winningTeamId = homeScore > awayScore ? seasonFinal.homeTeamId : seasonFinal.awayTeamId;
-        const ownerId = normalizeId(teamById.get(String(winningTeamId))?.ownerId);
+        const winningTeamId =
+          homeScore > awayScore
+            ? seasonFinal.homeTeamId
+            : seasonFinal.awayTeamId;
+        const ownerId = normalizeId(
+          teamById.get(String(winningTeamId))?.ownerId,
+        );
         if (ownerId) cupOwnerIds.add(ownerId);
       }
     }
@@ -377,7 +423,9 @@ export function buildOwnerRankings(params: {
     }
 
     for (const award of seasonAwards) {
-      const ownerId = normalizeId(teamById.get(String(award.teamId))?.ownerId);
+      const ownerId =
+        normalizeId(award.ownerId) ??
+        normalizeId(teamById.get(String(award.teamId ?? ""))?.ownerId);
       const state = ownerId ? ensureOwner(ownerId) : null;
       if (!state) continue;
       state.totalAwards += 1;

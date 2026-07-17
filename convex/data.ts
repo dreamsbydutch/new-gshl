@@ -94,7 +94,7 @@ const TABLE_INDEX_FIELDS: Record<string, Set<string>> = {
   events: new Set(["legacyId", "seasonId", "date"]),
   awards: new Set(["legacyId", "seasonId", "winnerId"]),
   playerAwards: new Set(["legacyId", "seasonId", "playerId"]),
-  teamAwards: new Set(["legacyId", "seasonId", "teamId"]),
+  teamAwards: new Set(["legacyId", "seasonId", "ownerId", "teamId"]),
   draftPicks: new Set(["legacyId", "seasonId", "gshlTeamId", "playerId"]),
   nhlTeams: new Set(defaultIndexes),
   playerDayStatLines: new Set([
@@ -249,6 +249,10 @@ type UpsertArgs = {
 
 function isAwardsTable(table: string): boolean {
   return table === AWARDS_TABLE;
+}
+
+function isTeamAwardsTable(table: string): boolean {
+  return table === TEAM_AWARDS_TABLE;
 }
 
 function isAllStarAward(award: unknown): boolean {
@@ -468,7 +472,11 @@ async function resolveTeamIdFromPlayerContract(
   );
   if (!matchingContract) return null;
 
-  return resolveTeamIdFromOwner(ctx, normalizedSeasonId, matchingContract.ownerId);
+  return resolveTeamIdFromOwner(
+    ctx,
+    normalizedSeasonId,
+    matchingContract.ownerId,
+  );
 }
 
 async function resolveTeamIdFromPlayerCurrentTeam(
@@ -496,7 +504,7 @@ async function resolveTeamIdFromPlayerCurrentTeam(
   return matchingTeam?._id ?? null;
 }
 
-async function resolveTeamAwardTeamId(
+async function resolveTeamAwardOwnerId(
   ctx: { db: any },
   seasonId: unknown,
   value: unknown,
@@ -506,8 +514,11 @@ async function resolveTeamAwardTeamId(
   if (!normalizedSeasonId || !normalizedValue) return null;
 
   const direct = await safeGet(ctx, normalizedValue);
+  if (isOwnerRow(direct)) return normalizedValue;
+
   if (isTeamRow(direct) && equals(direct?.seasonId, normalizedSeasonId)) {
-    return normalizedValue;
+    const franchise = await safeGet(ctx, direct?.franchiseId);
+    return resolveOwnerId(ctx, franchise?.ownerId);
   }
 
   if (isPlayerRow(direct)) {
@@ -516,21 +527,36 @@ async function resolveTeamAwardTeamId(
       normalizedSeasonId,
       normalizedValue,
     );
-    if (playerTeamId) return playerTeamId;
+    if (playerTeamId) {
+      const team = await safeGet(ctx, playerTeamId);
+      const franchise = await safeGet(ctx, team?.franchiseId);
+      const ownerId = await resolveOwnerId(ctx, franchise?.ownerId);
+      if (ownerId) return ownerId;
+    }
 
     const contractTeamId = await resolveTeamIdFromPlayerContract(
       ctx,
       normalizedSeasonId,
       normalizedValue,
     );
-    if (contractTeamId) return contractTeamId;
+    if (contractTeamId) {
+      const team = await safeGet(ctx, contractTeamId);
+      const franchise = await safeGet(ctx, team?.franchiseId);
+      const ownerId = await resolveOwnerId(ctx, franchise?.ownerId);
+      if (ownerId) return ownerId;
+    }
 
     const currentFranchiseTeamId = await resolveTeamIdFromPlayerCurrentTeam(
       ctx,
       normalizedSeasonId,
       direct,
     );
-    if (currentFranchiseTeamId) return currentFranchiseTeamId;
+    if (currentFranchiseTeamId) {
+      const team = await safeGet(ctx, currentFranchiseTeamId);
+      const franchise = await safeGet(ctx, team?.franchiseId);
+      const ownerId = await resolveOwnerId(ctx, franchise?.ownerId);
+      if (ownerId) return ownerId;
+    }
   }
 
   const teamByLegacyId = await firstByIndex(
@@ -540,7 +566,8 @@ async function resolveTeamAwardTeamId(
     normalizedValue,
   );
   if (teamByLegacyId && equals(teamByLegacyId.seasonId, normalizedSeasonId)) {
-    return teamByLegacyId._id;
+    const franchise = await safeGet(ctx, teamByLegacyId.franchiseId);
+    return resolveOwnerId(ctx, franchise?.ownerId);
   }
 
   const playerByLegacyId = await firstByIndex(
@@ -555,38 +582,42 @@ async function resolveTeamAwardTeamId(
       normalizedSeasonId,
       playerByLegacyId._id,
     );
-    if (playerTeamId) return playerTeamId;
+    if (playerTeamId) {
+      const team = await safeGet(ctx, playerTeamId);
+      const franchise = await safeGet(ctx, team?.franchiseId);
+      const ownerId = await resolveOwnerId(ctx, franchise?.ownerId);
+      if (ownerId) return ownerId;
+    }
 
     const contractTeamId = await resolveTeamIdFromPlayerContract(
       ctx,
       normalizedSeasonId,
       playerByLegacyId._id,
     );
-    if (contractTeamId) return contractTeamId;
+    if (contractTeamId) {
+      const team = await safeGet(ctx, contractTeamId);
+      const franchise = await safeGet(ctx, team?.franchiseId);
+      const ownerId = await resolveOwnerId(ctx, franchise?.ownerId);
+      if (ownerId) return ownerId;
+    }
 
     const currentFranchiseTeamId = await resolveTeamIdFromPlayerCurrentTeam(
       ctx,
       normalizedSeasonId,
       playerByLegacyId,
     );
-    if (currentFranchiseTeamId) return currentFranchiseTeamId;
+    if (currentFranchiseTeamId) {
+      const team = await safeGet(ctx, currentFranchiseTeamId);
+      const franchise = await safeGet(ctx, team?.franchiseId);
+      const ownerId = await resolveOwnerId(ctx, franchise?.ownerId);
+      if (ownerId) return ownerId;
+    }
   }
 
-  const franchiseId =
-    (isTeamRow(direct) ? normalizeId(direct?.franchiseId) : null) ??
-    (await resolveFranchiseId(ctx, normalizedValue));
+  const franchiseId = await resolveFranchiseId(ctx, normalizedValue);
   if (!franchiseId) return null;
-
-  const seasonTeams = (await ctx.db
-    .query("teams" as never)
-    .withIndex("by_seasonId" as never, (q: any) =>
-      q.eq("seasonId" as never, normalizedSeasonId),
-    )
-    .collect()) as ConvexRow[];
-  const matchingTeam = seasonTeams.find((team) =>
-    equals(team.franchiseId, franchiseId),
-  );
-  return matchingTeam?._id ?? null;
+  const franchise = await safeGet(ctx, franchiseId);
+  return resolveOwnerId(ctx, franchise?.ownerId);
 }
 
 async function resolveAwardNomineeIds(
@@ -603,7 +634,7 @@ async function resolveAwardNomineeIds(
     const id =
       kind === "player"
         ? await resolvePlayerId(ctx, entry)
-        : await resolveTeamAwardTeamId(ctx, seasonId, entry);
+        : await resolveTeamAwardOwnerId(ctx, seasonId, entry);
     if (!id) return null;
     resolved.push(id);
   }
@@ -654,12 +685,12 @@ async function toAwardStorageDoc(
     };
   }
 
-  const teamId = await resolveTeamAwardTeamId(
+  const ownerId = await resolveTeamAwardOwnerId(
     ctx,
     seasonId,
-    row.teamId ?? row.winnerId ?? row.ownerId,
+    row.ownerId ?? row.winnerId ?? row.teamId,
   );
-  if (!teamId) return { missing: "teamId" };
+  if (!ownerId) return { missing: "ownerId" };
 
   const nomineeIds = await resolveAwardNomineeIds(
     ctx,
@@ -673,7 +704,7 @@ async function toAwardStorageDoc(
     kind: "team",
     doc: {
       ...common,
-      teamId,
+      ownerId,
       nomineeIds,
     },
   };
@@ -686,7 +717,31 @@ function publicAwardRow(
   const publicValue = publicRow(row) as Row;
   return {
     ...publicValue,
-    winnerId: kind === "player" ? publicValue.playerId : publicValue.teamId,
+    winnerId: kind === "player" ? publicValue.playerId : publicValue.ownerId,
+  };
+}
+
+async function publicTeamAwardRow(
+  ctx: { db: any },
+  row: Row & { _id: string; _creationTime: number },
+) {
+  const ownerId = await resolveTeamAwardOwnerId(
+    ctx,
+    row.seasonId,
+    row.ownerId ?? row.teamId,
+  );
+  const nomineeIds = await resolveAwardNomineeIds(
+    ctx,
+    "team",
+    row.seasonId,
+    row.nomineeIds,
+  );
+  const publicValue = publicRow(row) as Row;
+  return {
+    ...publicValue,
+    ownerId,
+    nomineeIds,
+    winnerId: ownerId,
   };
 }
 
@@ -698,7 +753,7 @@ function translateAwardWhere(
   const { winnerId, ...rest } = where;
   return {
     ...rest,
-    [kind === "player" ? "playerId" : "teamId"]: winnerId,
+    [kind === "player" ? "playerId" : "ownerId"]: winnerId,
   };
 }
 
@@ -708,7 +763,7 @@ function translateAwardKeyColumns(
 ): string[] {
   return columns.map((column) => {
     if (column !== "winnerId") return column;
-    return kind === "player" ? "playerId" : "teamId";
+    return kind === "player" ? "playerId" : "ownerId";
   });
 }
 
@@ -739,12 +794,14 @@ async function readAwardRows(
       where: translateAwardWhere(args.where, "player"),
     })
   ).map((row) => publicAwardRow(row, "player"));
-  const teamRows = (
-    await readCandidateRows(ctx, TEAM_AWARDS_TABLE, {
-      ...args,
-      where: translateAwardWhere(args.where, "team"),
-    })
-  ).map((row) => publicAwardRow(row, "team"));
+  const teamRows = await Promise.all(
+    (
+      await readCandidateRows(ctx, TEAM_AWARDS_TABLE, {
+        ...args,
+        where: translateAwardWhere(args.where, "team"),
+      })
+    ).map((row) => publicTeamAwardRow(ctx, row)),
+  );
   const splitRows = [...playerRows, ...teamRows];
 
   const rows =
@@ -927,6 +984,19 @@ export const list = queryGeneric({
       return rows.slice(start, end);
     }
 
+    if (isTeamAwardsTable(args.table)) {
+      const rows = await readCandidateRows(ctx, args.table, args);
+      const normalized = await Promise.all(
+        rows.map((row) => publicTeamAwardRow(ctx, row)),
+      );
+      const filtered = normalized
+        .filter((row) => matchesWhere(row, args.where))
+        .sort((left, right) => compareRows(left, right, args.orderBy));
+      const start = args.skip ?? 0;
+      const end = args.take === undefined ? undefined : start + args.take;
+      return filtered.slice(start, end);
+    }
+
     const rows = await readCandidateRows(ctx, args.table, args);
     const filtered = rows
       .map((row) => publicRow(row as never))
@@ -952,8 +1022,8 @@ export const byId = queryGeneric({
       if (direct && "playerId" in direct) {
         return publicAwardRow(direct as ConvexRow, "player");
       }
-      if (direct && "teamId" in direct) {
-        return publicAwardRow(direct as ConvexRow, "team");
+      if (direct && ("ownerId" in direct || "teamId" in direct)) {
+        return publicTeamAwardRow(ctx, direct as ConvexRow);
       }
 
       for (const [table, kind] of [
@@ -966,8 +1036,23 @@ export const byId = queryGeneric({
             q.eq("legacyId" as never, args.id),
           )
           .first();
-        if (row) return publicAwardRow(row as never, kind);
+        if (row)
+          return kind === "team"
+            ? publicTeamAwardRow(ctx, row as never)
+            : publicAwardRow(row as never, kind);
       }
+    }
+
+    if (isTeamAwardsTable(args.table)) {
+      const direct = await safeGet(ctx, args.id);
+      if (direct) return publicTeamAwardRow(ctx, direct as ConvexRow);
+      const legacy = await ctx.db
+        .query(TEAM_AWARDS_TABLE as never)
+        .withIndex("by_legacyId" as never, (q) =>
+          q.eq("legacyId" as never, args.id),
+        )
+        .first();
+      return legacy ? publicTeamAwardRow(ctx, legacy as never) : null;
     }
 
     const byId = await ctx.db.get(args.id as never);
@@ -996,6 +1081,14 @@ export const count = queryGeneric({
       return rows.length;
     }
 
+    if (isTeamAwardsTable(args.table)) {
+      const rows = await readCandidateRows(ctx, args.table, {});
+      const normalized = await Promise.all(
+        rows.map((row) => publicTeamAwardRow(ctx, row)),
+      );
+      return normalized.filter((row) => matchesWhere(row, args.where)).length;
+    }
+
     const rows = await readCandidateRows(ctx, args.table, {
       where: args.where,
     });
@@ -1014,6 +1107,13 @@ export const snapshot = queryGeneric({
     for (const table of args.tables) {
       if (isAwardsTable(table)) {
         output[table] = await readAwardRows(ctx, {});
+        continue;
+      }
+      if (isTeamAwardsTable(table)) {
+        const rows = await ctx.db.query(table as never).collect();
+        output[table] = await Promise.all(
+          rows.map((row) => publicTeamAwardRow(ctx, row as never)),
+        );
         continue;
       }
       const rows = await ctx.db.query(table as never).collect();
@@ -1055,13 +1155,18 @@ export const insertMany = mutationGeneric({
     requireServerSecret(args.serverSecret);
     const inserted: Array<{ legacyId: string | null; id: string }> = [];
     for (const row of args.rows) {
-      if (isAwardsTable(args.table)) {
+      if (isAwardsTable(args.table) || isTeamAwardsTable(args.table)) {
         const mapped = await toAwardStorageDoc(ctx, row);
         if ("missing" in mapped) {
           throw new Error(
             `Unable to resolve award ${keyPart(row.award)} ${keyPart(
               row.legacyId ?? row.id,
             )}: missing ${mapped.missing}`,
+          );
+        }
+        if (isTeamAwardsTable(args.table) && mapped.kind !== "team") {
+          throw new Error(
+            "All-star player awards cannot be stored as team awards",
           );
         }
         const id = await ctx.db.insert(
@@ -1098,17 +1203,23 @@ export const updateById = mutationGeneric({
   },
   handler: async (ctx, args) => {
     requireServerSecret(args.serverSecret);
-    if (isAwardsTable(args.table)) {
+    if (isAwardsTable(args.table) || isTeamAwardsTable(args.table)) {
       const mapped = await toAwardStorageDoc(ctx, args.data);
       if ("missing" in mapped) {
         throw new Error(
           `Unable to resolve award update ${args.id}: missing ${mapped.missing}`,
         );
       }
+      if (isTeamAwardsTable(args.table) && mapped.kind !== "team") {
+        throw new Error(
+          "All-star player awards cannot be stored as team awards",
+        );
+      }
 
       const direct = await safeGet(ctx, args.id);
       const existing =
-        (direct && ("playerId" in direct || "teamId" in direct)
+        (direct &&
+        ("playerId" in direct || "ownerId" in direct || "teamId" in direct)
           ? (direct as ConvexRow)
           : null) ??
         (await ctx.db
@@ -1124,7 +1235,9 @@ export const updateById = mutationGeneric({
 
       await ctx.db.patch(existing._id, mapped.doc as never);
       const updated = (await ctx.db.get(existing._id)) as ConvexRow;
-      return publicAwardRow(updated, mapped.kind);
+      return mapped.kind === "team"
+        ? publicTeamAwardRow(ctx, updated)
+        : publicAwardRow(updated, mapped.kind);
     }
 
     const row =
@@ -1166,8 +1279,109 @@ export const upsertByCompositeKey = mutationGeneric({
     if (isAwardsTable(args.table)) {
       return applyAwardsUpsertByCompositeKey(ctx, args);
     }
+    if (isTeamAwardsTable(args.table)) {
+      const rows: Row[] = [];
+      for (const row of args.rows) {
+        const mapped = await toAwardStorageDoc(ctx, row);
+        if ("missing" in mapped || mapped.kind !== "team") {
+          throw new Error(
+            `Unable to resolve team award ${keyPart(row.award)}: missing ${
+              "missing" in mapped ? mapped.missing : "ownerId"
+            }`,
+          );
+        }
+        rows.push(mapped.doc);
+      }
+      return applyUpsertByCompositeKey(ctx, {
+        ...args,
+        keyColumns: args.keyColumns.map((column) =>
+          column === "teamId" || column === "winnerId" ? "ownerId" : column,
+        ),
+        rows,
+      });
+    }
 
     return applyUpsertByCompositeKey(ctx, args);
+  },
+});
+
+export const migrateTeamAwardsToOwners = mutationGeneric({
+  args: { serverSecret: v.string(), apply: v.optional(v.boolean()) },
+  handler: async (ctx, args) => {
+    requireServerSecret(args.serverSecret);
+    const rows = (await ctx.db
+      .query(TEAM_AWARDS_TABLE as never)
+      .collect()) as ConvexRow[];
+    const resolved: Array<{
+      row: ConvexRow;
+      ownerId: string;
+      nomineeIds: string[] | null;
+    }> = [];
+    const missing: Array<{ id: string; award: unknown; field: string }> = [];
+
+    for (const row of rows) {
+      const ownerId = await resolveTeamAwardOwnerId(
+        ctx,
+        row.seasonId,
+        row.ownerId ?? row.teamId,
+      );
+      const nomineeIds = await resolveAwardNomineeIds(
+        ctx,
+        "team",
+        row.seasonId,
+        row.nomineeIds,
+      );
+      if (!ownerId) {
+        missing.push({ id: row._id, award: row.award, field: "ownerId" });
+        continue;
+      }
+      if (nomineeIds === null && normalizeIdList(row.nomineeIds).length > 0) {
+        missing.push({ id: row._id, award: row.award, field: "nomineeIds" });
+        continue;
+      }
+      resolved.push({ row, ownerId, nomineeIds });
+    }
+
+    if (missing.length > 0) {
+      throw new Error(
+        `Team award owner migration could not resolve references: ${JSON.stringify(missing)}`,
+      );
+    }
+
+    let updated = 0;
+    let unchanged = 0;
+    for (const entry of resolved) {
+      const nextNominees = entry.nomineeIds ?? [];
+      const changed =
+        !equals(entry.row.ownerId, entry.ownerId) ||
+        !equals(entry.row.nomineeIds, nextNominees) ||
+        entry.row.teamId !== undefined;
+      if (!changed) {
+        unchanged += 1;
+        continue;
+      }
+      if (args.apply !== true) {
+        updated += 1;
+        continue;
+      }
+      await ctx.db.patch(
+        entry.row._id as never,
+        {
+          ownerId: entry.ownerId,
+          nomineeIds: nextNominees,
+          teamId: undefined,
+          updatedAt: new Date().toISOString(),
+        } as never,
+      );
+      updated += 1;
+    }
+    return {
+      apply: args.apply === true,
+      total: rows.length,
+      updated: args.apply === true ? updated : 0,
+      wouldUpdate: args.apply === true ? 0 : updated,
+      unchanged,
+    };
   },
 });
 

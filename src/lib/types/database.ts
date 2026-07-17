@@ -260,7 +260,9 @@ export interface PlayerAward {
 export interface TeamAward {
   id: string;
   seasonId: string;
-  teamId: string;
+  ownerId: string;
+  /** Present only while legacy team-based rows are being migrated. */
+  teamId?: string;
   nomineeIds: string[];
   award: AwardsList;
   createdAt: Date;

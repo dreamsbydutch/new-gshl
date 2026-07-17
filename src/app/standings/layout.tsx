@@ -1,11 +1,7 @@
 "use client";
 
 import { useStandingsNavigation } from "@gshl-hooks";
-import {
-  SeasonToggleNav,
-  SecondaryPageToolbar,
-  HorizontalToggle,
-} from "@gshl-nav";
+import { SeasonToggleNav, DropdownToggle } from "@gshl-nav";
 import type { LabeledToggleOption } from "@gshl-types";
 
 export default function Layout({ children }: { children: React.ReactNode }) {
@@ -24,18 +20,38 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     standingsTypes.find((type) => type.key === selectedType) ?? null;
 
   return (
-    <div className="pb-24 font-varela lg:pb-8 lg:pt-12">
+    <div className="pb-24 font-varela lg:pb-8">
+      <div className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur lg:top-16">
+        <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-3 px-3 py-3 sm:px-6">
+          <div className="min-w-0">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+              League
+            </p>
+            <p className="truncate text-base font-semibold tracking-tight text-slate-950">
+              Standings
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <SeasonToggleNav
+              className="m-0 w-[132px] sm:w-[160px]"
+              dropdownPosition="below"
+            />
+            <DropdownToggle<LabeledToggleOption>
+              items={standingsTypes}
+              selectedItem={selectedStandingsType}
+              onSelect={(type) => setSelectedType(type.key)}
+              getItemKey={(type) => type.key}
+              getItemLabel={(type) => type.label}
+              className="m-0 w-[118px] sm:w-[140px]"
+              buttonClassName="h-9 rounded-lg border-slate-200 bg-white px-3 font-medium shadow-none"
+              dropdownClassName="right-0 min-w-[150px]"
+              dropdownPosition="below"
+              placeholder="View"
+            />
+          </div>
+        </div>
+      </div>
       {children}
-      <SecondaryPageToolbar>
-        <SeasonToggleNav />
-        <HorizontalToggle<LabeledToggleOption>
-          items={standingsTypes}
-          selectedItem={selectedStandingsType}
-          onSelect={(type: LabeledToggleOption) => setSelectedType(type.key)}
-          getItemKey={(type: LabeledToggleOption) => type.key}
-          getItemLabel={(type: LabeledToggleOption) => type.label}
-        />
-      </SecondaryPageToolbar>
     </div>
   );
 }
