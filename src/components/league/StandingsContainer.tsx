@@ -5,7 +5,14 @@ import { useMemo, useState } from "react";
 import { ArrowDown, Info } from "lucide-react";
 
 import { Select } from "@gshl-ui";
-import type { Season, StandingsGroup, TeamSeasonStatLine } from "@gshl-types";
+import type {
+  Season,
+  StandingsGroup,
+  StandingsStatView,
+  StandingsTableColumn,
+  StandingsTeamRow,
+  TeamSeasonStatLine,
+} from "@gshl-types";
 import {
   calculateStandingsPoints,
   cn,
@@ -15,19 +22,8 @@ import {
   formatStandingsSvp,
 } from "@gshl-utils";
 
-type StatView = "standings" | "skaters" | "goalies" | "roster";
-type TeamRow = StandingsGroup["teams"][number];
-
-type Column = {
-  key: keyof TeamSeasonStatLine | "record" | "standingsPoints";
-  label: string;
-  description: string;
-  align?: "left" | "center";
-  format?: "gaa" | "svp" | "rating";
-};
-
 const VIEW_OPTIONS: Array<{
-  key: StatView;
+  key: StandingsStatView;
   label: string;
   description: string;
 }> = [
@@ -53,7 +49,7 @@ const VIEW_OPTIONS: Array<{
   },
 ];
 
-const COLUMNS: Record<StatView, Column[]> = {
+const COLUMNS: Record<StandingsStatView, StandingsTableColumn[]> = {
   standings: [
     { key: "GP", label: "GP", description: "Games played" },
     { key: "record", label: "Record", description: "Team record" },
@@ -111,7 +107,7 @@ const COLUMNS: Record<StatView, Column[]> = {
 };
 
 const SORT_OPTIONS: Record<
-  StatView,
+  StandingsStatView,
   Array<{ value: string; label: string }>
 > = {
   standings: [
@@ -140,7 +136,11 @@ const SORT_OPTIONS: Record<
   ],
 };
 
-function getRank(team: TeamRow, standingsType: string, groupTitle: string) {
+function getRank(
+  team: StandingsTeamRow,
+  standingsType: string,
+  groupTitle: string,
+) {
   const stats = team.seasonStats;
   if (!stats) return null;
   if (standingsType === "conference") return stats.conferenceRk;
@@ -152,7 +152,11 @@ function getRank(team: TeamRow, standingsType: string, groupTitle: string) {
   return stats.overallRk;
 }
 
-function getCellValue(column: Column, team: TeamRow, season: Season) {
+function getCellValue(
+  column: StandingsTableColumn,
+  team: StandingsTeamRow,
+  season: Season,
+) {
   const stats = team.seasonStats;
   if (!stats) return "—";
   if (column.key === "record") return formatStandingsRecord(stats, season);
@@ -175,8 +179,8 @@ function getCellValue(column: Column, team: TeamRow, season: Season) {
 }
 
 function compareTeams(
-  a: TeamRow,
-  b: TeamRow,
+  a: StandingsTeamRow,
+  b: StandingsTeamRow,
   sortKey: string,
   season: Season,
   standingsType: string,
@@ -216,7 +220,7 @@ function StandingsGroupTable({
   group: StandingsGroup;
   season: Season;
   standingsType: string;
-  view: StatView;
+  view: StandingsStatView;
   sortKey: string;
 }) {
   const columns = COLUMNS[view];
@@ -304,7 +308,7 @@ function StandingsGroupTable({
                           {team.name}
                         </div>
                         <div className="mt-0.5 text-[11px] text-slate-500">
-                          {team.confAbbr || "League"}
+                          {team.confAbbr ?? "League"}
                         </div>
                       </div>
                     </div>
@@ -341,8 +345,10 @@ export function StandingsTable({
   selectedSeason: Season | null;
   standingsType: string;
 }) {
-  const [view, setView] = useState<StatView>("standings");
-  const [sortByView, setSortByView] = useState<Record<StatView, string>>({
+  const [view, setView] = useState<StandingsStatView>("standings");
+  const [sortByView, setSortByView] = useState<
+    Record<StandingsStatView, string>
+  >({
     standings: "rank",
     skaters: "P",
     goalies: "W",

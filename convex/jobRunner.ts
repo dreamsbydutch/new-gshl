@@ -12,6 +12,7 @@ import {
   canonicalJobName,
   isExternalJob,
 } from "./jobCatalog";
+import { calculateTeamAwards } from "./awardCalculations";
 
 const mutationRef = (name: string) =>
   makeFunctionReference<"mutation">(name) as unknown as FunctionReference<
@@ -153,8 +154,6 @@ function targetTable(jobName: string) {
       return "teamWeekStatLines";
     case "standings-backfill":
       return "matchups";
-    case "awards-backfill":
-      return "teamSeasonStatLines";
     case "lineup-recalculation":
       return "playerDayStatLines";
     default:
@@ -246,6 +245,177 @@ export const processNativeBatch = internalMutationGeneric({
       createdAt: Date.now(),
     });
     return { done: page.isDone, cancelled: false, progress: nextProgress };
+  },
+});
+
+export const processAwardsBackfill = internalMutationGeneric({
+  args: { runId: v.id("jobRuns") },
+  handler: async (ctx, args) => {
+    const run = await ctx.db.get(args.runId);
+    if (!run) throw new Error("Run not found");
+    if (run.status === "cancelling") return { cancelled: true };
+    const jobArgs = asRecord(run.args);
+    const requestedSeasonId =
+      typeof jobArgs.seasonId === "string" ? jobArgs.seasonId : undefined;
+    const allSeasons = await ctx.db.query("seasons" as never).collect();
+    const seasons = requestedSeasonId
+      ? allSeasons.filter(
+          (season) =>
+            String(season._id) === requestedSeasonId ||
+            String(season.legacyId ?? "") === requestedSeasonId,
+        )
+      : allSeasons.filter((season) => {
+          const endDate = String(season.endDate ?? "");
+          return (
+            endDate !== "" && endDate < new Date().toISOString().slice(0, 10)
+          );
+        });
+    if (seasons.length === 0) {
+      throw new Error(
+        requestedSeasonId
+          ? `Season ${requestedSeasonId} was not found`
+          : "No completed seasons were found",
+      );
+    }
+
+    const [franchises, conferences] = await Promise.all([
+      ctx.db.query("franchises" as never).collect(),
+      ctx.db.query("conferences" as never).collect(),
+    ]);
+    const totals = emptyProgress();
+    const summaries: Array<Record<string, unknown>> = [];
+    const now = new Date().toISOString();
+
+    for (const season of seasons) {
+      const seasonId = String(season._id);
+      const [teamSeasonRows, teams, matchups, weeks, existingAwards] =
+        await Promise.all([
+          ctx.db
+            .query("teamSeasonStatLines" as never)
+            .withIndex("by_seasonId" as never, (q) =>
+              q.eq("seasonId" as never, seasonId),
+            )
+            .collect(),
+          ctx.db
+            .query("teams" as never)
+            .withIndex("by_seasonId" as never, (q) =>
+              q.eq("seasonId" as never, seasonId),
+            )
+            .collect(),
+          ctx.db
+            .query("matchups" as never)
+            .withIndex("by_seasonId" as never, (q) =>
+              q.eq("seasonId" as never, seasonId),
+            )
+            .collect(),
+          ctx.db
+            .query("weeks" as never)
+            .withIndex("by_seasonId" as never, (q) =>
+              q.eq("seasonId" as never, seasonId),
+            )
+            .collect(),
+          ctx.db
+            .query("teamAwards" as never)
+            .withIndex("by_seasonId" as never, (q) =>
+              q.eq("seasonId" as never, seasonId),
+            )
+            .collect(),
+        ]);
+      const calculated = calculateTeamAwards({
+        seasonId,
+        seasonLegacyId:
+          typeof season.legacyId === "string" ? season.legacyId : undefined,
+        teamSeasonRows,
+        teams,
+        franchises,
+        conferences,
+        matchups,
+        weeks,
+      });
+      const existingByKey = new Map(
+        existingAwards.map((award) => [
+          `${String(award.award)}|${String(award.ownerId ?? "")}`,
+          award,
+        ]),
+      );
+      const incomingKeys = new Set<string>();
+      let inserted = 0;
+      let updated = 0;
+      let unchanged = 0;
+      for (const award of calculated) {
+        const key = `${award.award}|${award.ownerId}`;
+        incomingKeys.add(key);
+        const existing = existingByKey.get(key);
+        if (!existing) {
+          inserted += 1;
+          if (run.apply) {
+            await ctx.db.insert(
+              "teamAwards" as never,
+              {
+                ...award,
+                createdAt: now,
+                updatedAt: now,
+              } as never,
+            );
+          }
+          continue;
+        }
+        const changed =
+          JSON.stringify(existing.nomineeIds ?? []) !==
+            JSON.stringify(award.nomineeIds) || existing.teamId !== undefined;
+        if (!changed) {
+          unchanged += 1;
+          continue;
+        }
+        updated += 1;
+        if (run.apply) {
+          await ctx.db.patch(
+            existing._id as never,
+            {
+              ownerId: award.ownerId,
+              nomineeIds: award.nomineeIds,
+              teamId: undefined,
+              updatedAt: now,
+            } as never,
+          );
+        }
+      }
+      const deletedRows = existingAwards.filter(
+        (award) =>
+          !incomingKeys.has(
+            `${String(award.award)}|${String(award.ownerId ?? "")}`,
+          ),
+      );
+      if (run.apply) {
+        for (const award of deletedRows) {
+          await ctx.db.delete(award._id as never);
+        }
+      }
+      totals.processed += teamSeasonRows.length;
+      totals.inserted += inserted;
+      totals.updated += updated;
+      totals.deleted += deletedRows.length;
+      totals.unchanged += unchanged;
+      summaries.push({
+        seasonId,
+        legacyId: season.legacyId,
+        computed: calculated.length,
+        inserted,
+        updated,
+        deleted: deletedRows.length,
+        unchanged,
+      });
+    }
+    await ctx.db.patch(args.runId, {
+      progress: totals,
+      heartbeatAt: Date.now(),
+    });
+    return {
+      cancelled: false,
+      apply: run.apply,
+      counts: totals,
+      seasons: summaries,
+    };
   },
 });
 
@@ -451,6 +621,30 @@ export const run = internalActionGeneric({
           ...args,
           kind: jobName,
           payload: asRecord(run.args),
+        });
+        return;
+      }
+
+      if (jobName === "awards-backfill") {
+        const result = (await ctx.runMutation(
+          mutationRef("jobRunner:processAwardsBackfill"),
+          args,
+        )) as {
+          cancelled: boolean;
+          apply?: boolean;
+          counts?: Progress;
+          seasons?: Array<Record<string, unknown>>;
+        };
+        await ctx.runMutation(mutationRef("jobRunner:finish"), {
+          ...args,
+          status: result.cancelled ? "cancelled" : "succeeded",
+          result: result.cancelled
+            ? undefined
+            : {
+                apply: result.apply,
+                counts: result.counts,
+                seasons: result.seasons,
+              },
         });
         return;
       }

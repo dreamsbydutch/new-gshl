@@ -23,6 +23,17 @@ export interface StandingsGroup {
   })[];
 }
 
+export type StandingsStatView = "standings" | "skaters" | "goalies" | "roster";
+
+export type StandingsTeamRow = StandingsGroup["teams"][number];
+
+export interface StandingsTableColumn {
+  key: keyof TeamSeasonStatLine | "record" | "standingsPoints";
+  label: string;
+  description: string;
+  format?: "gaa" | "svp" | "rating";
+}
+
 export interface StandingsContainerProps {
   standingsType: string;
 }

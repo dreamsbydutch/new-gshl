@@ -9,6 +9,7 @@
  */
 
 import type * as authUsers from "../authUsers.js";
+import type * as awardCalculations from "../awardCalculations.js";
 import type * as crons from "../crons.js";
 import type * as data from "../data.js";
 import type * as externalWorker from "../externalWorker.js";
@@ -24,6 +25,7 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   authUsers: typeof authUsers;
+  awardCalculations: typeof awardCalculations;
   crons: typeof crons;
   data: typeof data;
   externalWorker: typeof externalWorker;
