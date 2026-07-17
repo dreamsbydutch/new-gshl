@@ -18,6 +18,7 @@ import { playerStatsRouter } from "./routers/playerStats";
 import { teamStatsRouter } from "./routers/teamStats";
 import { snapshotRouter } from "./routers/snapshot";
 import { authUserRouter } from "./routers/authUser";
+import { jobRouter } from "./routers/job";
 // import { archivedStatsRouter } from "./routers/archivedStats"; // Disabled for performance
 
 /**
@@ -53,6 +54,7 @@ export const appRouter = createTRPCRouter({
   // System utilities
   system: systemRouter,
   authUser: authUserRouter,
+  job: jobRouter,
 
   // Archived stats (disabled for performance)
   // archivedStats: archivedStatsRouter,

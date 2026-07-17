@@ -1,4 +1,6 @@
-import type { GSHLTeam } from "./database";
+import type { GSHLTeam, TeamAward } from "./database";
+
+export type ConferenceContestRatingMode = "current" | "allTime";
 
 export interface ConferenceContestConferenceInfo {
   id: string;
@@ -10,11 +12,41 @@ export interface ConferenceContestConferenceInfo {
 export interface ConferenceContestRecord {
   wins: number;
   losses: number;
+  ties: number;
 }
 
-export interface ConferenceContestSeasonViewModel {
+export interface ConferenceContestRatingComponents {
+  headToHead: number;
+  playoffs: number;
+  cups: number;
+  awards: number;
+}
+
+export type ConferenceContestComponentKey =
+  keyof ConferenceContestRatingComponents;
+
+export interface ConferenceContestRating {
+  ratingByConferenceId: Record<string, number>;
+  componentsByConferenceId: Record<
+    string,
+    ConferenceContestRatingComponents
+  >;
+}
+
+export interface ConferenceContestAwardSummary {
+  awardsByConferenceId: Record<string, TeamAward[]>;
+  awardPointsByConferenceId: Record<string, number>;
+  coachAwardsByConferenceId: Record<string, TeamAward[]>;
+  gmAwardsByConferenceId: Record<string, TeamAward[]>;
+}
+
+export interface ConferenceContestSeasonViewModel
+  extends ConferenceContestAwardSummary,
+    ConferenceContestRating {
   seasonId: string;
   seasonName: string;
+  seasonYear: number;
+  isActive: boolean;
   leftConference: ConferenceContestConferenceInfo;
   rightConference: ConferenceContestConferenceInfo;
   championTeamsByConferenceId: Record<string, GSHLTeam[]>;
@@ -25,9 +57,20 @@ export interface ConferenceContestSeasonViewModel {
   headToHeadRecordByConferenceId: Record<string, ConferenceContestRecord>;
 }
 
-export interface ConferenceContestOverallViewModel {
+export interface ConferenceContestTrendPoint {
+  seasonId: string;
+  seasonName: string;
+  seasonYear: number;
+  ratingByConferenceId: Record<string, number>;
+}
+
+export interface ConferenceContestOverallViewModel
+  extends ConferenceContestAwardSummary {
   leftConference: ConferenceContestConferenceInfo;
   rightConference: ConferenceContestConferenceInfo;
+  currentRating: ConferenceContestRating;
+  allTimeRating: ConferenceContestRating;
+  trend: ConferenceContestTrendPoint[];
   championTeamsByConferenceId: Record<string, GSHLTeam[]>;
   finalsTeamsByConferenceId: Record<string, GSHLTeam[]>;
   playoffTeamsByConferenceId: Record<string, GSHLTeam[]>;

@@ -15,6 +15,8 @@
     "ranking-engine:check": "node tools/ranking-engine-sync.mjs check",
     "ranking-engine:sync": "node tools/ranking-engine-sync.mjs sync",
     "start": "next start",
+    "test:conference": "tsx --test src/lib/utils/features/conference-contest.test.ts",
+    "test:owners": "tsx --test src/lib/utils/features/owner-rankings.test.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

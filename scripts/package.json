@@ -27,6 +27,7 @@
     "convex:migrate": "tsx src/commands/convex/migrate-sheets-to-convex.ts",
     "yahoo:check-weekly-player-days": "tsx src/commands/yahoo/check-yahoo-weekly-player-days.ts",
     "yahoo:check-weekly-matchups": "tsx src/commands/yahoo/check-yahoo-weekly-matchup-stats.ts",
+    "worker:browser": "tsx src/workers/convex-browser-worker.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "devDependencies": {

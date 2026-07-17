@@ -1,5 +1,6 @@
 export * from "./contract-table";
 export * from "./conference-contest";
+export * from "./owner-rankings";
 export * from "./draft-classes";
 export * from "./draft-board-list";
 export * from "./draft-admin";

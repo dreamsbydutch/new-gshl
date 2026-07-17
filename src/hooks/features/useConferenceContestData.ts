@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { useMatchups, useSeasons, useTeams } from "@gshl-hooks";
+import { useMatchups, useSeasons, useTeamAwards, useTeams } from "@gshl-hooks";
 import {
   buildConferenceContestOverallViewModel,
   buildConferenceContestSeasonViewModels,
@@ -30,38 +30,48 @@ export function useConferenceContestData() {
     isLoading: teamsLoading,
     error: teamsError,
   } = useTeams();
+  const {
+    data: teamAwards = [],
+    isLoading: teamAwardsLoading,
+    error: teamAwardsError,
+  } = useTeamAwards();
 
   const teams = useMemo(() => teamsRaw.filter(isGshlTeam), [teamsRaw]);
 
   const seasonViewModels: ConferenceContestSeasonViewModel[] = useMemo(() => {
-    if (!seasons.length || !matchups.length || !teams.length) return [];
+    if (!seasons.length || !teams.length) return [];
     return buildConferenceContestSeasonViewModels({
       seasons,
       matchups,
       gshlTeams: teams,
+      teamAwards,
     });
-  }, [seasons, matchups, teams]);
+  }, [seasons, matchups, teams, teamAwards]);
 
   const overall: ConferenceContestOverallViewModel | null = useMemo(() => {
-    if (!seasons.length || !matchups.length || !teams.length) return null;
+    if (!seasons.length || !teams.length) return null;
     return buildConferenceContestOverallViewModel({
       seasons,
       matchups,
       gshlTeams: teams,
+      teamAwards,
     });
-  }, [seasons, matchups, teams]);
+  }, [seasons, matchups, teams, teamAwards]);
 
   const isLoading = Boolean(
     (seasonsLoading ?? false) ||
       (matchupsLoading ?? false) ||
-      (teamsLoading ?? false),
+      (teamsLoading ?? false) ||
+      (teamAwardsLoading ?? false),
   );
-  const error = seasonsError ?? matchupsError ?? teamsError ?? null;
+  const error =
+    seasonsError ?? matchupsError ?? teamsError ?? teamAwardsError ?? null;
   const ready = !isLoading;
 
   return {
     overall,
     seasons: seasonViewModels,
+    teams,
     isLoading,
     error,
     ready,

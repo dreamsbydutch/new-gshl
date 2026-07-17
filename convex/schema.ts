@@ -81,14 +81,21 @@ const skaterGoalieStatFields = {
   TOI: statValue,
 } satisfies TableShape;
 
-function table(fields: TableShape, indexes: readonly string[] = []) {
+function table(
+  fields: TableShape,
+  indexes: readonly (string | readonly string[])[] = [],
+) {
   let definition = defineTable({
     legacyId,
     ...fields,
   }).index("by_legacyId", ["legacyId"]);
 
-  for (const field of indexes) {
-    definition = definition.index(`by_${field}` as never, [field as never]);
+  for (const index of indexes) {
+    const fields = typeof index === "string" ? [index] : [...index];
+    definition = definition.index(
+      `by_${fields.join("_")}` as never,
+      fields as never,
+    );
   }
 
   return definition;
@@ -171,7 +178,7 @@ export default defineSchema({
       createdAt: timestampValue,
       updatedAt: timestampValue,
     },
-    ["seasonId", "franchiseId", "confId"],
+    ["seasonId", "franchiseId", "confId", ["seasonId", "franchiseId"]],
   ),
 
   players: table(
@@ -250,7 +257,7 @@ export default defineSchema({
       createdAt: timestampValue,
       updatedAt: timestampValue,
     },
-    ["seasonId"],
+    ["seasonId", ["seasonId", "weekNum"], ["seasonId", "startDate"]],
   ),
 
   matchups: table(
@@ -277,7 +284,15 @@ export default defineSchema({
       createdAt: timestampValue,
       updatedAt: timestampValue,
     },
-    ["seasonId", "weekId", "homeTeamId", "awayTeamId"],
+    [
+      "seasonId",
+      "weekId",
+      "homeTeamId",
+      "awayTeamId",
+      ["seasonId", "weekId"],
+      ["seasonId", "homeTeamId"],
+      ["seasonId", "awayTeamId"],
+    ],
   ),
 
   events: table(
@@ -372,7 +387,16 @@ export default defineSchema({
       score: optionalNullableString,
       ...statFields,
     },
-    ["seasonId", "gshlTeamId", "playerId", "weekId", "date"],
+    [
+      "seasonId",
+      "gshlTeamId",
+      "playerId",
+      "weekId",
+      "date",
+      ["seasonId", "date"],
+      ["seasonId", "weekId", "gshlTeamId"],
+      ["seasonId", "playerId", "date"],
+    ],
   ),
 
   playerWeekStatLines: table(
@@ -386,7 +410,14 @@ export default defineSchema({
       nhlTeam: optionalNullableStringArray,
       ...statFields,
     },
-    ["seasonId", "gshlTeamId", "playerId", "weekId"],
+    [
+      "seasonId",
+      "gshlTeamId",
+      "playerId",
+      "weekId",
+      ["seasonId", "weekId", "gshlTeamId"],
+      ["seasonId", "playerId"],
+    ],
   ),
 
   playerSplitStatLines: table(
@@ -400,7 +431,13 @@ export default defineSchema({
       seasonType: stringValue,
       ...statFields,
     },
-    ["seasonId", "gshlTeamId", "playerId", "seasonType"],
+    [
+      "seasonId",
+      "gshlTeamId",
+      "playerId",
+      "seasonType",
+      ["seasonId", "seasonType", "gshlTeamId", "playerId"],
+    ],
   ),
 
   playerTotalStatLines: table(
@@ -414,7 +451,12 @@ export default defineSchema({
       seasonType: stringValue,
       ...statFields,
     },
-    ["seasonId", "playerId", "seasonType"],
+    [
+      "seasonId",
+      "playerId",
+      "seasonType",
+      ["seasonId", "seasonType", "playerId"],
+    ],
   ),
 
   playerCareerSplitStatLines: table(
@@ -458,7 +500,7 @@ export default defineSchema({
       createdAt: timestampValue,
       updatedAt: timestampValue,
     },
-    ["seasonId", "playerId"],
+    ["seasonId", "playerId", ["seasonId", "playerId"]],
   ),
 
   teamDayStatLines: table(
@@ -469,7 +511,14 @@ export default defineSchema({
       date: dateOnlyValue,
       ...statFields,
     },
-    ["seasonId", "gshlTeamId", "weekId", "date"],
+    [
+      "seasonId",
+      "gshlTeamId",
+      "weekId",
+      "date",
+      ["seasonId", "date"],
+      ["seasonId", "weekId", "gshlTeamId"],
+    ],
   ),
 
   teamWeekStatLines: table(
@@ -492,7 +541,7 @@ export default defineSchema({
       powerComposite: optionalNullableNumber,
       powerRk: optionalNullableNumber,
     },
-    ["seasonId", "gshlTeamId", "weekId"],
+    ["seasonId", "gshlTeamId", "weekId", ["seasonId", "weekId", "gshlTeamId"]],
   ),
 
   teamSeasonStatLines: table(
@@ -530,6 +579,108 @@ export default defineSchema({
       GMOYRating: ratingValue,
       GMOYRk: optionalNullableNumber,
     },
-    ["seasonId", "seasonType", "gshlTeamId"],
+    [
+      "seasonId",
+      "seasonType",
+      "gshlTeamId",
+      ["seasonId", "seasonType", "gshlTeamId"],
+    ],
   ),
+
+  jobRuns: defineTable({
+    jobName: v.string(),
+    args: v.any(),
+    apply: v.boolean(),
+    mode: v.union(
+      v.literal("manual"),
+      v.literal("scheduled"),
+      v.literal("pipeline"),
+      v.literal("retry"),
+    ),
+    status: v.union(
+      v.literal("queued"),
+      v.literal("running"),
+      v.literal("waiting_external"),
+      v.literal("succeeded"),
+      v.literal("failed"),
+      v.literal("cancelling"),
+      v.literal("cancelled"),
+    ),
+    lockKey: v.string(),
+    progress: v.optional(v.any()),
+    cursor: v.optional(v.string()),
+    result: v.optional(v.any()),
+    error: v.optional(v.string()),
+    parentRunId: v.optional(id("jobRuns")),
+    pipelineStage: v.optional(v.number()),
+    attempt: v.number(),
+    requestedBy: v.optional(v.string()),
+    createdAt: v.number(),
+    startedAt: v.optional(v.number()),
+    heartbeatAt: v.optional(v.number()),
+    finishedAt: v.optional(v.number()),
+  })
+    .index("by_status", ["status"])
+    .index("by_jobName_createdAt", ["jobName", "createdAt"])
+    .index("by_lockKey_status", ["lockKey", "status"])
+    .index("by_parentRunId", ["parentRunId"]),
+
+  jobEvents: defineTable({
+    runId: id("jobRuns"),
+    level: v.union(
+      v.literal("debug"),
+      v.literal("info"),
+      v.literal("warning"),
+      v.literal("error"),
+    ),
+    message: v.string(),
+    data: v.optional(v.any()),
+    createdAt: v.number(),
+  }).index("by_runId_createdAt", ["runId", "createdAt"]),
+
+  jobSchedules: defineTable({
+    name: v.string(),
+    jobName: v.string(),
+    args: v.any(),
+    apply: v.boolean(),
+    enabled: v.boolean(),
+    intervalMinutes: v.number(),
+    nextRunAt: v.number(),
+    lastRunAt: v.optional(v.number()),
+    lastRunId: v.optional(id("jobRuns")),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_enabled_nextRunAt", ["enabled", "nextRunAt"])
+    .index("by_name", ["name"]),
+
+  externalTasks: defineTable({
+    runId: id("jobRuns"),
+    kind: v.string(),
+    payload: v.any(),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("leased"),
+      v.literal("completed"),
+      v.literal("failed"),
+    ),
+    leaseOwner: v.optional(v.string()),
+    leaseExpiresAt: v.optional(v.number()),
+    heartbeatAt: v.optional(v.number()),
+    resultChunks: v.optional(v.array(v.any())),
+    error: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_status_createdAt", ["status", "createdAt"])
+    .index("by_runId", ["runId"]),
+
+  jobArtifacts: defineTable({
+    runId: id("jobRuns"),
+    storageId: id("_storage"),
+    kind: v.string(),
+    name: v.string(),
+    contentType: v.optional(v.string()),
+    createdAt: v.number(),
+  }).index("by_runId", ["runId"]),
 });

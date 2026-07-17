@@ -35,11 +35,21 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         value: "Conf v Conf",
         setter: (type: string | null) => setSelectedType(type ?? ""),
       },
+      {
+        key: "ownerRankings",
+        value: "Owner Ladder",
+        setter: (type: string | null) => setSelectedType(type ?? ""),
+      },
       ...(session?.user.role === "commissioner"
         ? [
             {
               key: "users",
               value: "User Access",
+              setter: (type: string | null) => setSelectedType(type ?? ""),
+            },
+            {
+              key: "jobs",
+              value: "Jobs",
               setter: (type: string | null) => setSelectedType(type ?? ""),
             },
           ]

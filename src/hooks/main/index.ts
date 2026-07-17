@@ -14,6 +14,7 @@
 
 // Contract hooks - sophisticated filtering and aggregation
 export { useAuthUserAdmin, useUpdateAuthUserAccess } from "./useAuthUsers";
+export { useJobAdmin } from "./useJobs";
 export {
   useContracts,
   useAllContracts,

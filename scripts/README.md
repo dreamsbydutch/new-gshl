@@ -3,6 +3,24 @@
 Standalone Node/TypeScript tooling for historical backfills, repair jobs,
 Yahoo validation, ratings rebuilds, and Convex database maintenance.
 
+## Convex operational jobs
+
+Commissioners now start and monitor managed runs from **League Office → Jobs**.
+Runs default to dry-run mode; selecting **Apply changes** is required for a
+write-capable run. Production schedules should remain disabled until dry-run
+parity and a repeated idempotency apply check pass.
+
+The command wrappers below remain available for parity validation. Remove each
+wrapper only after its Convex job passes completed-season, historical-season,
+and active-season comparisons.
+
+External jobs try direct HTTP first. Yahoo, PuckPedia, and Hockey Reference jobs
+can fall back to the outbound browser worker by running `npm run worker:browser`.
+Configure `CONVEX_URL`, `BROWSER_WORKER_SECRET`, and
+`BROWSER_EXECUTABLE_PATH`; set `YAHOO_BROWSER_PROFILE_PATH` to the existing
+authenticated Yahoo profile. The worker only leases source tasks and returns
+bounded captures. It never writes league tables.
+
 This package is intentionally separate from both the Next.js app and
 `apps-script/`:
 

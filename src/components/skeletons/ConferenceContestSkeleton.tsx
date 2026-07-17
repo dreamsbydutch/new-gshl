@@ -1,56 +1,35 @@
 import { Skeleton } from "../ui/skeleton";
 
-const ConferenceContestRowSkeleton = () => (
-  <tr className="border-b">
-    <td className="p-2">
-      <Skeleton className="h-4 w-24" />
-    </td>
-    <td className="p-2">
-      <div className="flex gap-1">
-        <Skeleton className="h-6 w-6 rounded-md" />
-        <Skeleton className="h-6 w-6 rounded-md" />
-        <Skeleton className="h-6 w-6 rounded-md" />
-      </div>
-    </td>
-    <td className="p-2">
-      <div className="flex gap-1">
-        <Skeleton className="h-6 w-6 rounded-md" />
-        <Skeleton className="h-6 w-6 rounded-md" />
-        <Skeleton className="h-6 w-6 rounded-md" />
-      </div>
-    </td>
-  </tr>
-);
-
 export function ConferenceContestSkeleton() {
   return (
-    <div>
-      <Skeleton className="mb-4 h-8 w-52" />
-      <div className="mb-8">
-        <Skeleton className="mb-2 h-6 w-20" />
-        <div className="overflow-x-auto">
-          <table className="w-full table-auto border-collapse text-sm">
-            <thead>
-              <tr className="border-b">
-                <th className="p-2 text-left">
-                  <Skeleton className="h-4 w-12" />
-                </th>
-                <th className="p-2 text-left">
-                  <Skeleton className="h-4 w-24" />
-                </th>
-                <th className="p-2 text-left">
-                  <Skeleton className="h-4 w-24" />
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {Array.from({ length: 8 }).map((_, i) => (
-                <ConferenceContestRowSkeleton key={i} />
-              ))}
-            </tbody>
-          </table>
+    <div className="mx-auto max-w-6xl space-y-6">
+      <div className="overflow-hidden rounded-[2rem] border bg-slate-100 p-5 shadow-default sm:p-8">
+        <div className="flex justify-center">
+          <Skeleton className="h-7 w-40 rounded-full" />
+        </div>
+        <div className="mt-8 grid grid-cols-[1fr_auto_1fr] items-center gap-4">
+          <div className="flex flex-col items-center gap-3">
+            <Skeleton className="h-20 w-20 rounded-3xl" />
+            <Skeleton className="h-7 w-28" />
+          </div>
+          <div className="flex items-center gap-3">
+            <Skeleton className="h-20 w-16" />
+            <Skeleton className="h-10 w-4" />
+            <Skeleton className="h-20 w-16" />
+          </div>
+          <div className="flex flex-col items-center gap-3">
+            <Skeleton className="h-20 w-20 rounded-3xl" />
+            <Skeleton className="h-7 w-28" />
+          </div>
         </div>
       </div>
+      <div className="grid gap-4 sm:grid-cols-2">
+        {Array.from({ length: 4 }).map((_, index) => (
+          <Skeleton key={index} className="h-32 rounded-3xl" />
+        ))}
+      </div>
+      <Skeleton className="h-80 rounded-[2rem]" />
+      <Skeleton className="h-96 rounded-[2rem]" />
     </div>
   );
 }
