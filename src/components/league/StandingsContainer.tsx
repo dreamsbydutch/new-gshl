@@ -208,13 +208,24 @@ function StandingsGroupTable({
       </div>
 
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[680px] border-collapse text-sm lg:text-base">
+        <table
+          className={cn(
+            "w-full table-fixed border-collapse text-sm lg:text-base",
+            view === "skaters"
+              ? "min-w-[860px]"
+              : view === "roster"
+                ? "min-w-[820px]"
+                : view === "goalies"
+                  ? "min-w-[760px]"
+                  : "min-w-[680px]",
+          )}
+        >
           <thead>
             <tr className="border-b border-slate-200 bg-white text-[11px] uppercase tracking-wider text-slate-500 lg:text-sm">
-              <th className="sticky left-0 z-20 w-12 bg-white px-3 py-3 text-center font-medium lg:py-4">
+              <th className="sticky left-0 z-20 w-9 bg-white px-1 py-3 text-center font-medium sm:w-11 lg:w-12 lg:py-4">
                 #
               </th>
-              <th className="sticky left-12 z-20 min-w-[220px] bg-white px-3 py-3 text-left font-medium lg:min-w-[260px] lg:py-4">
+              <th className="sticky left-9 z-20 w-[136px] bg-white px-2 py-3 text-left font-medium sm:left-11 sm:w-[190px] sm:px-3 lg:left-12 lg:w-[260px] lg:py-4">
                 Team
               </th>
               {columns.map((column) => {
@@ -280,19 +291,19 @@ function StandingsGroupTable({
                     playoffCut && "border-b-2 border-b-slate-400",
                   )}
                 >
-                  <td className="sticky left-0 z-10 bg-white px-3 py-3 text-center font-mono text-xs tabular-nums text-slate-500 group-hover:bg-slate-50 lg:py-4 lg:text-sm">
+                  <td className="sticky left-0 z-10 w-9 bg-white px-1 py-3 text-center font-mono text-xs tabular-nums text-slate-500 group-hover:bg-slate-50 sm:w-11 lg:w-12 lg:py-4 lg:text-sm">
                     {rank ?? index + 1}
                   </td>
-                  <td className="sticky left-12 z-10 bg-white px-3 py-2.5 group-hover:bg-slate-50">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-100 bg-slate-50">
+                  <td className="sticky left-9 z-10 w-[136px] max-w-[136px] bg-white px-2 py-2.5 group-hover:bg-slate-50 sm:left-11 sm:w-[190px] sm:max-w-[190px] sm:px-3 lg:left-12 lg:w-[260px] lg:max-w-[260px]">
+                    <div className="flex min-w-0 items-center gap-2 lg:gap-3">
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-slate-100 bg-slate-50 lg:h-9 lg:w-9 lg:rounded-lg">
                         {team.logoUrl ? (
                           <Image
                             src={team.logoUrl}
                             alt=""
                             width={32}
                             height={32}
-                            className="h-8 w-8 object-contain"
+                            className="h-7 w-7 object-contain lg:h-8 lg:w-8"
                           />
                         ) : (
                           <span className="text-xs font-semibold text-slate-400">
@@ -301,10 +312,13 @@ function StandingsGroupTable({
                         )}
                       </div>
                       <div className="min-w-0">
-                        <div className="truncate font-semibold text-slate-900 lg:text-base">
+                        <div
+                          className="truncate text-xs font-semibold text-slate-900 sm:text-sm lg:text-base"
+                          title={team.name ?? undefined}
+                        >
                           {team.name}
                         </div>
-                        <div className="mt-0.5 text-[11px] text-slate-500 lg:text-xs">
+                        <div className="mt-0.5 hidden text-[11px] text-slate-500 sm:block lg:text-xs">
                           {team.confAbbr ?? "League"}
                         </div>
                       </div>

@@ -12,9 +12,10 @@ import type {
 } from "@gshl-types";
 import { AwardsList, MatchupType } from "@gshl-types";
 
-export const OWNER_LADDER_MIN_RATING = 0;
-export const OWNER_LADDER_MAX_RATING = 1000;
-export const OWNER_LADDER_BASE_RATING = OWNER_LADDER_MIN_RATING;
+/** The ladder's normal reference band. These are guideposts, not hard limits. */
+export const OWNER_LADDER_REFERENCE_FLOOR = 0;
+export const OWNER_LADDER_REFERENCE_CEILING = 1000;
+export const OWNER_LADDER_BASE_RATING = 250;
 
 export const OWNER_LADDER_BONUSES = {
   playoffAppearance: 8,
@@ -22,6 +23,7 @@ export const OWNER_LADDER_BONUSES = {
   cup: 40,
   leadershipAward: 20,
   otherAward: 5,
+  brophy: -10,
 } as const;
 
 const PLAYOFF_TYPES = new Set<MatchupType>([
@@ -107,13 +109,8 @@ const performanceAdjustment = (state: OwnerLadderState) =>
   (bayesianPercentage(state.conference, 10) - 0.5) * 60 +
   (bayesianPercentage(state.playoffs, 6) - 0.5) * 100;
 
-const clampRating = (rating: number) =>
-  Math.min(OWNER_LADDER_MAX_RATING, Math.max(OWNER_LADDER_MIN_RATING, rating));
-
 const ladderRating = (state: OwnerLadderState) =>
-  clampRating(
-    state.elo + state.achievementBonus + performanceAdjustment(state),
-  );
+  state.elo + state.achievementBonus + performanceAdjustment(state);
 
 const expectedScore = (ratingA: number, ratingB: number) =>
   1 / (1 + 10 ** ((ratingB - ratingA) / 400));
@@ -306,8 +303,8 @@ export function buildOwnerRankings(params: {
         matchupK(matchup.gameType) *
         marginMultiplier *
         (actualHome - expectedHome);
-      const nextHomeElo = clampRating(homeState.elo + rawDelta);
-      const nextAwayElo = clampRating(awayState.elo - rawDelta);
+      const nextHomeElo = homeState.elo + rawDelta;
+      const nextAwayElo = awayState.elo - rawDelta;
       const homeDelta = nextHomeElo - homeState.elo;
       const awayDelta = nextAwayElo - awayState.elo;
       homeState.elo = nextHomeElo;
@@ -430,6 +427,10 @@ export function buildOwnerRankings(params: {
       if (!state) continue;
       state.totalAwards += 1;
       if (award.award === AwardsList.GSHL_CUP) continue;
+      if (award.award === AwardsList.BROPHY) {
+        state.achievementBonus += OWNER_LADDER_BONUSES.brophy;
+        continue;
+      }
       if (award.award === AwardsList.JACK_ADAMS) {
         state.coachAwards += 1;
         state.achievementBonus += OWNER_LADDER_BONUSES.leadershipAward;

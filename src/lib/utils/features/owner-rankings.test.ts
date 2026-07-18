@@ -3,8 +3,9 @@ import test from "node:test";
 
 import {
   buildOwnerRankings,
-  OWNER_LADDER_MAX_RATING,
-  OWNER_LADDER_MIN_RATING,
+  OWNER_LADDER_BASE_RATING,
+  OWNER_LADDER_REFERENCE_CEILING,
+  OWNER_LADDER_REFERENCE_FLOOR,
 } from "./owner-rankings";
 import {
   AwardsList,
@@ -123,7 +124,7 @@ const award = (
   updatedAt: now,
 });
 
-void test("seeds every newcomer at zero alongside active and inactive owners", () => {
+void test("seeds every newcomer at the entry baseline alongside active and inactive owners", () => {
   const owners = [
     owner("legacy", false),
     owner("active", true),
@@ -157,15 +158,11 @@ void test("seeds every newcomer at zero alongside active and inactive owners", (
   });
   const rookie = result.rankings.find((entry) => entry.owner.id === "rookie");
   assert.ok(rookie);
-  assert.equal(rookie.seedRating, OWNER_LADDER_MIN_RATING);
-  assert.equal(rookie.rating, OWNER_LADDER_MIN_RATING);
+  assert.equal(rookie.seedRating, OWNER_LADDER_BASE_RATING);
+  assert.equal(rookie.rating, OWNER_LADDER_BASE_RATING);
   assert.ok(result.rankings.some((entry) => !entry.isActive));
-  assert.ok(
-    result.rankings.every((entry) => entry.rating >= OWNER_LADDER_MIN_RATING),
-  );
-  assert.ok(
-    result.rankings.every((entry) => entry.rating <= OWNER_LADDER_MAX_RATING),
-  );
+  assert.ok(result.rankings.some((entry) => entry.rating > rookie.rating));
+  assert.ok(result.rankings.some((entry) => entry.rating < rookie.rating));
 });
 
 void test("weights playoff stages, Cups, and leadership awards", () => {
@@ -206,12 +203,82 @@ void test("weights playoff stages, Cups, and leadership awards", () => {
   assert.equal(winner.gmAwards, 1);
   assert.equal(winner.totalAwards, 3);
   assert.ok(winner.achievementBonus >= 106);
-  assert.ok(winner.rating <= OWNER_LADDER_MAX_RATING);
-  assert.ok(
-    result.rankings.every((entry) => entry.elo >= OWNER_LADDER_MIN_RATING),
-  );
-  assert.ok(
-    result.rankings.every((entry) => entry.elo <= OWNER_LADDER_MAX_RATING),
-  );
+  assert.ok(winner.rating > OWNER_LADDER_BASE_RATING);
   assert.equal(result.recentBattles[0]?.gameType, MatchupType.FINAL);
+});
+
+void test("penalizes the last-place Brophy Trophy", () => {
+  const result = buildOwnerRankings({
+    owners: [owner("last-place", true)],
+    seasons: [season("s1", 2025)],
+    teams: [team("last-place-team", "s1", "last-place")],
+    weeks: [],
+    matchups: [],
+    teamAwards: [
+      award("brophy", "s1", "last-place", AwardsList.BROPHY),
+    ],
+  });
+  const lastPlace = result.rankings.find(
+    (entry) => entry.owner.id === "last-place",
+  );
+
+  assert.ok(lastPlace);
+  assert.equal(lastPlace.totalAwards, 1);
+  assert.equal(lastPlace.otherAwards, 0);
+  assert.equal(lastPlace.achievementBonus, -10);
+  assert.equal(lastPlace.rating, OWNER_LADDER_BASE_RATING - 10);
+});
+
+void test("treats zero and 1000 as reference points rather than hard limits", () => {
+  const owners = [owner("dominant", true), owner("struggling", true)];
+  const seasons = Array.from({ length: 12 }, (_, index) =>
+    season(`s${index + 1}`, 2014 + index),
+  );
+  const teams = seasons.flatMap((item) => [
+    team(`dominant-${item.id}`, item.id, "dominant"),
+    team(`struggling-${item.id}`, item.id, "struggling"),
+  ]);
+  const weeks = seasons.flatMap((item) =>
+    Array.from({ length: 30 }, (_, index) =>
+      week(`${item.id}-w${index + 1}`, item.id, index + 1),
+    ),
+  );
+  const matchups = seasons.flatMap((item) =>
+    Array.from({ length: 30 }, (_, index) =>
+      matchup(
+        `${item.id}-m${index + 1}`,
+        item.id,
+        `${item.id}-w${index + 1}`,
+        `dominant-${item.id}`,
+        `struggling-${item.id}`,
+        MatchupType.CONFERENCE,
+        10,
+        0,
+      ),
+    ),
+  );
+  const teamAwards = seasons.flatMap((item) => [
+    award(`${item.id}-cup`, item.id, "dominant", AwardsList.GSHL_CUP),
+    award(`${item.id}-gm`, item.id, "dominant", AwardsList.GM_OF_THE_YEAR),
+  ]);
+
+  const result = buildOwnerRankings({
+    owners,
+    seasons,
+    teams,
+    weeks,
+    matchups,
+    teamAwards,
+  });
+  const dominant = result.rankings.find(
+    (entry) => entry.owner.id === "dominant",
+  );
+  const struggling = result.rankings.find(
+    (entry) => entry.owner.id === "struggling",
+  );
+
+  assert.ok(dominant);
+  assert.ok(struggling);
+  assert.ok(dominant.rating > OWNER_LADDER_REFERENCE_CEILING);
+  assert.ok(struggling.rating < OWNER_LADDER_REFERENCE_FLOOR);
 });

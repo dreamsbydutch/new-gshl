@@ -124,7 +124,7 @@ function ChampionHero({ champion }: { champion: OwnerRankingEntry }) {
           </p>
         </div>
         <div className="text-center sm:text-right">
-          <p className="font-barlow text-[10px] uppercase tracking-[0.25em] text-white/45">Ladder rating · 0-1000</p>
+          <p className="font-barlow text-[10px] uppercase tracking-[0.25em] text-white/45">Ladder rating · 0-1000 standard range</p>
           <p className="mt-1 font-oswald text-6xl font-bold tabular-nums text-amber-300 sm:text-7xl">{formatRating(champion.rating)}</p>
           <div className="mt-1 flex items-center justify-center gap-2 sm:justify-end">
             <Movement entry={champion} />
@@ -238,7 +238,7 @@ function OwnerProfile({ entry }: { entry: OwnerRankingEntry }) {
       <div className="mt-5 rounded-3xl bg-slate-950 p-4 text-white">
         <div className="flex items-end justify-between">
           <div>
-            <p className="font-barlow text-[9px] uppercase tracking-[0.2em] text-white/40">Ladder rating · 0-1000</p>
+            <p className="font-barlow text-[9px] uppercase tracking-[0.2em] text-white/40">Ladder rating · 0-1000 standard range</p>
             <p className="font-oswald text-5xl tabular-nums text-amber-300">{formatRating(entry.rating)}</p>
           </div>
           <Movement entry={entry} />
@@ -343,7 +343,7 @@ export function OwnerRankings() {
         <p className="font-barlow text-xs uppercase tracking-[0.3em] text-slate-400">GSHL Owner Ladder</p>
         <h1 className="mt-1 font-oswald text-4xl uppercase leading-none text-slate-950 sm:text-6xl">Climb or get passed</h1>
         <p className="mx-auto mt-3 max-w-3xl text-sm text-slate-500 sm:mx-0 sm:text-base">
-          Every owner, every era, one living ladder. Newcomers begin behind the legends and earn every place through matchups, consistency, playoff runs and hardware.
+          Every owner, every era, one living ladder. Newcomers enter at 250 and earn every place through matchups, consistency, playoff runs and hardware.
         </p>
       </header>
 
@@ -413,7 +413,7 @@ export function OwnerRankings() {
         <div className="grid gap-4 border-t border-slate-100 p-5 text-sm leading-6 text-slate-600 sm:grid-cols-3 sm:p-6">
           <div><Swords className="mb-2 h-5 w-5 text-sky-600" /><h3 className="font-oswald text-lg text-slate-950">Matchup Elo</h3><p>Every completed matchup transfers rating points based on opponent strength. Playoff rounds carry progressively larger stakes, and decisive wins move the ladder a little more.</p></div>
           <div><History className="mb-2 h-5 w-5 text-emerald-600" /><h3 className="font-oswald text-lg text-slate-950">Career consistency</h3><p>All-time, conference and playoff winning percentages add a confidence-adjusted performance score. A Bayesian baseline prevents tiny samples from jumping the queue.</p></div>
-          <div><Medal className="mb-2 h-5 w-5 text-amber-600" /><h3 className="font-oswald text-lg text-slate-950">Legacy bonuses</h3><p>Playoff berth +8, Finals +18, Cup +40, Coach or GM of the Year +20, and other awards +5. Every owner enters at 0, and the rating can never fall below 0 or rise above 1000.</p></div>
+          <div><Medal className="mb-2 h-5 w-5 text-amber-600" /><h3 className="font-oswald text-lg text-slate-950">Legacy score</h3><p>Playoff berth +8, Finals +18, Cup +40, Coach or GM of the Year +20, and other competitive awards +5. The last-place Brophy Trophy is -10. Every owner enters at 250, and extreme careers can move beyond the standard 0-1000 range.</p></div>
         </div>
       </details>
     </div>
