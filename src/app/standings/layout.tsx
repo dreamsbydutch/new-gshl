@@ -1,7 +1,13 @@
 "use client";
 
 import { useStandingsNavigation } from "@gshl-hooks";
-import { SeasonToggleNav, DropdownToggle } from "@gshl-nav";
+import {
+  DropdownToggle,
+  HorizontalToggle,
+  SeasonToggleNav,
+  SecondaryPageToolbar,
+  TertiaryPageToolbar,
+} from "@gshl-nav";
 import type { LabeledToggleOption } from "@gshl-types";
 
 export default function Layout({ children }: { children: React.ReactNode }) {
@@ -20,8 +26,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     standingsTypes.find((type) => type.key === selectedType) ?? null;
 
   return (
-    <div className="pb-24 font-varela lg:pb-8">
-      <div className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur lg:top-16">
+    <div className="pb-28 font-varela lg:pb-8">
+      <div className="sticky top-16 z-30 hidden border-b border-slate-200 bg-white/95 backdrop-blur lg:block">
         <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-3 px-3 py-3 sm:px-6">
           <div className="min-w-0">
             <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">
@@ -52,6 +58,19 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         </div>
       </div>
       {children}
+      <SecondaryPageToolbar className="lg:hidden">
+        <SeasonToggleNav dropdownPosition="above" />
+      </SecondaryPageToolbar>
+      <TertiaryPageToolbar className="lg:hidden">
+        <HorizontalToggle<LabeledToggleOption>
+          items={standingsTypes}
+          selectedItem={selectedStandingsType}
+          onSelect={(type) => setSelectedType(type.key)}
+          getItemKey={(type) => type.key}
+          getItemLabel={(type) => type.label}
+          itemClassName="py-0.5 text-xs"
+        />
+      </TertiaryPageToolbar>
     </div>
   );
 }

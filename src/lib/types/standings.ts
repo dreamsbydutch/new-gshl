@@ -34,6 +34,13 @@ export interface StandingsTableColumn {
   format?: "gaa" | "svp" | "rating";
 }
 
+export type StandingsSortDirection = "asc" | "desc";
+
+export type StandingsSortState = {
+  key: keyof TeamSeasonStatLine;
+  direction: StandingsSortDirection;
+} | null;
+
 export interface StandingsContainerProps {
   standingsType: string;
 }

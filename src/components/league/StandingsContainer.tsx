@@ -2,12 +2,12 @@
 
 import Image from "next/image";
 import { useMemo, useState } from "react";
-import { ArrowDown, Info } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, Info } from "lucide-react";
 
-import { Select } from "@gshl-ui";
 import type {
   Season,
   StandingsGroup,
+  StandingsSortState,
   StandingsStatView,
   StandingsTableColumn,
   StandingsTeamRow,
@@ -106,36 +106,6 @@ const COLUMNS: Record<StandingsStatView, StandingsTableColumn[]> = {
   ],
 };
 
-const SORT_OPTIONS: Record<
-  StandingsStatView,
-  Array<{ value: string; label: string }>
-> = {
-  standings: [
-    { value: "rank", label: "Standing" },
-    { value: "standingsPoints", label: "Points" },
-    { value: "teamW", label: "Wins" },
-    { value: "name", label: "Team name" },
-  ],
-  skaters: [
-    { value: "P", label: "Points" },
-    { value: "G", label: "Goals" },
-    { value: "A", label: "Assists" },
-    { value: "SOG", label: "Shots" },
-  ],
-  goalies: [
-    { value: "W", label: "Wins" },
-    { value: "SVP", label: "Save percentage" },
-    { value: "GAA", label: "GAA (lowest)" },
-    { value: "SV", label: "Saves" },
-  ],
-  roster: [
-    { value: "Rating", label: "Rating" },
-    { value: "playersUsed", label: "Players used" },
-    { value: "days", label: "Roster days" },
-    { value: "MG", label: "Man games" },
-  ],
-};
-
 function getRank(
   team: StandingsTeamRow,
   standingsType: string,
@@ -181,33 +151,20 @@ function getCellValue(
 function compareTeams(
   a: StandingsTeamRow,
   b: StandingsTeamRow,
-  sortKey: string,
-  season: Season,
-  standingsType: string,
-  groupTitle: string,
+  sortState: Exclude<StandingsSortState, null>,
 ) {
-  if (sortKey === "name") return (a.name ?? "").localeCompare(b.name ?? "");
-  if (sortKey === "rank") {
-    return (
-      (getRank(a, standingsType, groupTitle) ?? Number.POSITIVE_INFINITY) -
-      (getRank(b, standingsType, groupTitle) ?? Number.POSITIVE_INFINITY)
-    );
-  }
-
+  const aRaw = a.seasonStats?.[sortState.key];
+  const bRaw = b.seasonStats?.[sortState.key];
   const aValue =
-    sortKey === "standingsPoints"
-      ? calculateStandingsPoints(a.seasonStats, season)
-      : Number(
-          a.seasonStats?.[sortKey as keyof TeamSeasonStatLine] ?? -Infinity,
-        );
+    typeof aRaw === "number" && Number.isFinite(aRaw) ? aRaw : null;
   const bValue =
-    sortKey === "standingsPoints"
-      ? calculateStandingsPoints(b.seasonStats, season)
-      : Number(
-          b.seasonStats?.[sortKey as keyof TeamSeasonStatLine] ?? -Infinity,
-        );
+    typeof bRaw === "number" && Number.isFinite(bRaw) ? bRaw : null;
 
-  return sortKey === "GAA" ? aValue - bValue : bValue - aValue;
+  if (aValue === null && bValue === null) return 0;
+  if (aValue === null) return 1;
+  if (bValue === null) return -1;
+
+  return sortState.direction === "asc" ? aValue - bValue : bValue - aValue;
 }
 
 function StandingsGroupTable({
@@ -215,31 +172,35 @@ function StandingsGroupTable({
   season,
   standingsType,
   view,
-  sortKey,
+  sortState,
+  onSort,
 }: {
   group: StandingsGroup;
   season: Season;
   standingsType: string;
   view: StandingsStatView;
-  sortKey: string;
+  sortState: StandingsSortState;
+  onSort: (key: keyof TeamSeasonStatLine) => void;
 }) {
   const columns = COLUMNS[view];
   const rows = useMemo(
     () =>
-      [...group.teams].sort((a, b) =>
-        compareTeams(a, b, sortKey, season, standingsType, group.title),
-      ),
-    [group, season, sortKey, standingsType],
+      sortState
+        ? [...group.teams].sort((a, b) => compareTeams(a, b, sortState))
+        : group.teams,
+    [group.teams, sortState],
   );
 
   return (
     <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
       <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50/80 px-4 py-3">
         <div>
-          <h2 className="text-sm font-semibold text-slate-900">
+          <h2 className="text-sm font-semibold text-slate-900 lg:text-base">
             {group.title}
           </h2>
-          <p className="mt-0.5 text-xs text-slate-500">{rows.length} teams</p>
+          <p className="mt-0.5 text-xs text-slate-500 lg:text-sm">
+            {rows.length} teams
+          </p>
         </div>
         <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-medium uppercase tracking-wide text-slate-500">
           Regular season
@@ -247,24 +208,60 @@ function StandingsGroupTable({
       </div>
 
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[680px] border-collapse text-sm">
+        <table className="w-full min-w-[680px] border-collapse text-sm lg:text-base">
           <thead>
-            <tr className="border-b border-slate-200 bg-white text-[11px] uppercase tracking-wider text-slate-500">
-              <th className="sticky left-0 z-20 w-12 bg-white px-3 py-3 text-center font-medium">
+            <tr className="border-b border-slate-200 bg-white text-[11px] uppercase tracking-wider text-slate-500 lg:text-sm">
+              <th className="sticky left-0 z-20 w-12 bg-white px-3 py-3 text-center font-medium lg:py-4">
                 #
               </th>
-              <th className="sticky left-12 z-20 min-w-[220px] bg-white px-3 py-3 text-left font-medium">
+              <th className="sticky left-12 z-20 min-w-[220px] bg-white px-3 py-3 text-left font-medium lg:min-w-[260px] lg:py-4">
                 Team
               </th>
-              {columns.map((column) => (
-                <th
-                  key={column.key}
-                  className="whitespace-nowrap px-3 py-3 text-center font-medium"
-                  title={column.description}
-                >
-                  {column.label}
-                </th>
-              ))}
+              {columns.map((column) => {
+                const isSortable = view !== "standings";
+                const isActive = sortState?.key === column.key;
+                const ariaSort = isActive
+                  ? sortState.direction === "asc"
+                    ? "ascending"
+                    : "descending"
+                  : "none";
+
+                return (
+                  <th
+                    key={column.key}
+                    className="whitespace-nowrap px-2 py-3 text-center font-medium lg:px-4 lg:py-4"
+                    title={column.description}
+                    aria-sort={isSortable ? ariaSort : undefined}
+                  >
+                    {isSortable ? (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          onSort(column.key as keyof TeamSeasonStatLine)
+                        }
+                        className={cn(
+                          "mx-auto flex items-center justify-center gap-1.5 rounded-md px-1.5 py-1 transition-colors hover:bg-slate-100 hover:text-slate-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400",
+                          isActive && "text-slate-950",
+                        )}
+                        title={`Sort by ${column.description}`}
+                      >
+                        <span>{column.label}</span>
+                        {isActive ? (
+                          sortState.direction === "asc" ? (
+                            <ArrowUp className="h-3.5 w-3.5" />
+                          ) : (
+                            <ArrowDown className="h-3.5 w-3.5" />
+                          )
+                        ) : (
+                          <ArrowUpDown className="h-3.5 w-3.5 text-slate-300" />
+                        )}
+                      </button>
+                    ) : (
+                      column.label
+                    )}
+                  </th>
+                );
+              })}
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -283,7 +280,7 @@ function StandingsGroupTable({
                     playoffCut && "border-b-2 border-b-slate-400",
                   )}
                 >
-                  <td className="sticky left-0 z-10 bg-white px-3 py-3 text-center font-mono text-xs tabular-nums text-slate-500 group-hover:bg-slate-50">
+                  <td className="sticky left-0 z-10 bg-white px-3 py-3 text-center font-mono text-xs tabular-nums text-slate-500 group-hover:bg-slate-50 lg:py-4 lg:text-sm">
                     {rank ?? index + 1}
                   </td>
                   <td className="sticky left-12 z-10 bg-white px-3 py-2.5 group-hover:bg-slate-50">
@@ -304,10 +301,10 @@ function StandingsGroupTable({
                         )}
                       </div>
                       <div className="min-w-0">
-                        <div className="truncate font-semibold text-slate-900">
+                        <div className="truncate font-semibold text-slate-900 lg:text-base">
                           {team.name}
                         </div>
-                        <div className="mt-0.5 text-[11px] text-slate-500">
+                        <div className="mt-0.5 text-[11px] text-slate-500 lg:text-xs">
                           {team.confAbbr ?? "League"}
                         </div>
                       </div>
@@ -317,7 +314,7 @@ function StandingsGroupTable({
                     <td
                       key={column.key}
                       className={cn(
-                        "whitespace-nowrap px-3 py-3 text-center font-mono text-xs tabular-nums text-slate-700",
+                        "whitespace-nowrap px-3 py-3 text-center font-mono text-xs tabular-nums text-slate-700 lg:px-4 lg:py-4 lg:text-base",
                         (column.key === "standingsPoints" ||
                           column.key === "P") &&
                           "font-bold text-slate-950",
@@ -347,13 +344,27 @@ export function StandingsTable({
 }) {
   const [view, setView] = useState<StandingsStatView>("standings");
   const [sortByView, setSortByView] = useState<
-    Record<StandingsStatView, string>
+    Record<StandingsStatView, StandingsSortState>
   >({
-    standings: "rank",
-    skaters: "P",
-    goalies: "W",
-    roster: "Rating",
+    standings: null,
+    skaters: null,
+    goalies: null,
+    roster: null,
   });
+
+  const handleSort = (key: keyof TeamSeasonStatLine) => {
+    setSortByView((current) => {
+      const activeSort = current[view];
+      const nextSort: StandingsSortState =
+        activeSort?.key !== key
+          ? { key, direction: "asc" }
+          : activeSort.direction === "asc"
+            ? { key, direction: "desc" }
+            : null;
+
+      return { ...current, [view]: nextSort };
+    });
+  };
 
   if (!selectedSeason) {
     return (
@@ -370,39 +381,21 @@ export function StandingsTable({
       <div className="flex flex-col gap-4 rounded-xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <p className="text-xs font-medium uppercase tracking-[0.16em] text-slate-500">
+            <p className="text-xs font-medium uppercase tracking-[0.16em] text-slate-500 lg:text-sm">
               Team statistics
             </p>
-            <h1 className="mt-1 text-xl font-semibold tracking-tight text-slate-950 sm:text-2xl">
+            <h1 className="mt-1 text-xl font-semibold tracking-tight text-slate-950 sm:text-2xl lg:text-3xl">
               {selectedSeason.name} standings
             </h1>
-            <p className="mt-1 text-sm text-slate-500">
+            <p className="mt-1 text-sm text-slate-500 lg:text-base">
               {activeView.description}
             </p>
           </div>
-
-          <label className="flex min-w-[190px] flex-col gap-1.5 text-xs font-medium text-slate-500">
-            Sort teams by
-            <div className="relative">
-              <Select
-                value={sortByView[view]}
-                onChange={(event) =>
-                  setSortByView((current) => ({
-                    ...current,
-                    [view]: event.target.value,
-                  }))
-                }
-                className="h-9 appearance-none rounded-lg border-slate-200 bg-white pr-9 text-sm font-medium text-slate-800 shadow-none"
-              >
-                {SORT_OPTIONS[view].map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </Select>
-              <ArrowDown className="pointer-events-none absolute right-3 top-2.5 h-4 w-4 text-slate-400" />
-            </div>
-          </label>
+          {view !== "standings" ? (
+            <p className="hidden text-sm text-slate-500 lg:block">
+              Select a column to sort · select again to reverse
+            </p>
+          ) : null}
         </div>
 
         <div
@@ -418,7 +411,7 @@ export function StandingsTable({
               aria-selected={view === option.key}
               onClick={() => setView(option.key)}
               className={cn(
-                "shrink-0 rounded-lg px-3.5 py-2 text-sm font-medium transition-colors",
+                "shrink-0 rounded-lg px-3.5 py-2 text-sm font-medium transition-colors lg:px-4 lg:text-base",
                 view === option.key
                   ? "bg-slate-950 text-white"
                   : "text-slate-500 hover:bg-slate-100 hover:text-slate-900",
@@ -443,7 +436,8 @@ export function StandingsTable({
             season={selectedSeason}
             standingsType={standingsType}
             view={view}
-            sortKey={sortByView[view]}
+            sortState={sortByView[view]}
+            onSort={handleSort}
           />
         ))}
       </div>
