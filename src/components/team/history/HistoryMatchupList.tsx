@@ -38,7 +38,7 @@ export function HistoryMatchupList({
 
           return (
             <div key={`matchup-${matchup.id}-${index}`}>
-              {showSeasonDivider ? (
+              {index === 0 || showSeasonDivider ? (
                 <div className="border-b border-slate-300 bg-slate-100 px-3 py-2 font-varela text-xs font-semibold uppercase tracking-[0.12em] text-slate-600">
                   {matchup.season?.name ?? "Previous season"}
                 </div>
