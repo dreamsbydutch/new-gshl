@@ -51,10 +51,6 @@ export function Rulebook() {
             code: "1.2",
             text: "Teams have 1 IR slot and 1 IR+ slot for injury relief",
           },
-          {
-            code: "1.3",
-            text: "Maximum of two healthy goalies are allowed on a roster at any point. The third goalie to be added will not be allowed to accumulate stats for the team, even if they start games on Yahoo their stats will be deleted from the official record.",
-          },
         ]),
       },
       {
@@ -103,7 +99,7 @@ export function Rulebook() {
           },
           {
             code: "3.2",
-            text: "Trade deadline is 2.5 weeks prior to the end of the regular season",
+            text: "Trade deadline is 2.5 weeks prior to the end of the GSHL regular season",
           },
           {
             code: "3.3",
@@ -126,7 +122,7 @@ export function Rulebook() {
         content: renderItems([
           {
             code: "4.1",
-            text: "The GSHL season will be the length of the NHL regular season minus 3 playoff weeks. 21-23 weeks depending on the year.",
+            text: "The GSHL season will be the entire length of the NHL regular season minus 3 playoff weeks. 21-23 weeks depending on the year.",
           },
           {
             code: "4.2",
@@ -138,19 +134,20 @@ export function Rulebook() {
           },
           {
             code: "4.4",
-            text: "Tiebreak points are awarded using a 3 point system, Win = 3 pts, Home-ice win = 2 pts, Home-ice loss = 1 pt, Loss = 0 pts",
+            text: "Points are awarded using a 3 point system, Win = 3 pts, Home-ice win = 2 pts, Home-ice loss = 1 pt, Loss = 0 pts",
           },
           {
             code: "4.5",
             text: "Standings Tiebreakers",
             subitems: [
-              { code: "4.5.1", text: "Total Points" },
-              { code: "4.5.2", text: "Head-to-Head Points" },
-              { code: "4.5.3", text: "Head-to-Head Category Differential" },
-              { code: "4.5.4", text: "Overall Category Differential" },
-              { code: "4.5.5", text: "Conference Points" },
-              { code: "4.5.6", text: "Conference Category Differential" },
-              { code: "4.5.7", text: "Coin Flip" },
+              { code: "4.5.1", text: "Total Wins" },
+              { code: "4.5.2", text: "Total Points" },
+              { code: "4.5.3", text: "Head-to-Head Points" },
+              { code: "4.5.4", text: "Head-to-Head Category Differential" },
+              { code: "4.5.5", text: "Overall Category Differential" },
+              { code: "4.5.6", text: "Conference Points" },
+              { code: "4.5.7", text: "Conference Category Differential" },
+              { code: "4.5.8", text: "Owner ladder ranking" },
             ],
           },
         ]),
@@ -188,7 +185,7 @@ export function Rulebook() {
           },
           {
             code: "5.4",
-            text: "When a team is eliminated from the playoffs their roster is locked immediately and there are no consolation games",
+            text: "When a team is eliminated from the playoffs their roster is locked immediately",
           },
           {
             code: "5.5",
@@ -203,7 +200,7 @@ export function Rulebook() {
         content: renderItems([
           {
             code: "6.1",
-            text: "The GSHL Draft will be held on Thanksgiving Friday night",
+            text: "The GSHL Draft date will be chosen by owner pool as soon as the NHL opening day is announced",
           },
           {
             code: "6.2",
@@ -217,92 +214,36 @@ export function Rulebook() {
       },
       {
         id: "lottery",
-        title: "Draft Lottery/Loser's Tournament",
-        keywords: ["lottery", "losers", "tournament", "draft points"],
+        title: "Draft Order",
+        keywords: ["draft order"],
         content: renderItems([
           {
             code: "7.1",
-            text: "Loser's Tournament",
+            text: "Draft Order",
             subitems: [
               {
                 code: "7.1.1",
-                text: "Four worst teams at the end of the regular season will play a 3-week round robin during the three playoff weeks",
+                text: "All teams will continue to play matchups through the 3 playoff weeks to set the draft order",
               },
               {
                 code: "7.1.2",
-                text: "Rosters will be frozen on the final day of the regular season and lineups wll be auto set",
+                text: "Rosters will be frozen on the final day of the regular season and lineups wll be auto set for these draft order matchups",
               },
               {
                 code: "7.1.3",
-                text: "1st Place earns the #1 Pick in the draft, 2nd place gets the #3 Pick, 3rd place gets the #5 pick, and the loser gets the Adam Brophy Trophy and the #8 pick",
-              },
-            ],
-          },
-          {
-            code: "7.2",
-            text: "Draft Points",
-            subitems: [
-              {
-                code: "7.2.1",
-                text: "Each team gets a base number of ponts based on their regular season and playoff finish",
+                text: "9th and 10th play in week 1, 11th and 12th play in week 1, winners move on the final four, losers play a two week matchup for the 5th and 6th pick. 13th and 14th also play in week 1 for placement, winner of that matchup gets the winner of the 11th/ 12th game in week 2, the loser gets the winner of the 9th/0th game in week 2. WInners of these two week 2 matchups then play in week 3 for the 1st overall pick with the winenr getting #1, losers of the week 2 matchups then play for the 3rd and 4th pick in week 3",
               },
               {
-                code: "7.2.2",
-                text: "Teams lose 2 points for every missed start throughout the season",
+                code: "7.1.4",
+                text: "The two first round losers in each conference play in week 2, winners then matchup and play for 7th and 8th pick in week 3, losers play for 9th and 10th pick in week 3",
               },
               {
-                code: "7.2.3",
-                text: "First Team All-GSHL players earn 15 points each for their team",
+                code: "7.1.5",
+                text: "The two conference finals losers matchup in the final week for picks 11th and 12th, winner gets 11th and loser gets 12th pick",
               },
               {
-                code: "7.2.4",
-                text: "Second Team All-GSHL players earn 5 points each for their team",
-              },
-              {
-                code: "7.2.5",
-                text: "Playoff All-GSHL players earn 10 points each for their team",
-              },
-              {
-                code: "7.2.6",
-                text: "Counting Stat Awards earn a team 50 points",
-              },
-              {
-                code: "7.2.7",
-                text: "Performance Awards earn a team 100 points",
-              },
-              {
-                code: "7.2.8",
-                text: "Nominated Awards earn a team 150 points",
-              },
-              {
-                code: "7.2.9",
-                text: "The Commissioner has the ability to award a positive or negative draft point adjustment to each owner",
-              },
-            ],
-          },
-          {
-            code: "7.3",
-            text: "Draft Lottery Operation",
-            subitems: [
-              {
-                code: "7.3.1",
-                text: "The lottery for the second and fourth picks will include the 9th to 12th teams in the standings",
-              },
-              {
-                code: "7.3.2",
-                text: "Teams that lost in the first round of the playoffs will be added for the sixth and seventh pick lotteries",
-              },
-              {
-                code: "7.3.3",
-                text: "Teams that lost in the conference finals will be added for the ninth and tenth pick lotteries",
-              },
-              {
-                code: "7.3.4",
-                text: "Teams that lost in the conference finals will be added for the eleventh and twelvth pick lotteries",
-              },
-              {
-                code: "7.3.5",
-                text: "All remaining teams will be involved in the lotteries for picks 13 through 16",
+                code: "7.1.6",
+                text: "The GSHL Champion receives the 14th pick and runner up receives the 13th pick",
               },
             ],
           },
@@ -315,47 +256,47 @@ export function Rulebook() {
         content: renderItems([
           {
             code: "8.1",
-            text: "Counting Stat Awards",
+            text: "Team Trophies",
             subitems: [
-              { code: "8.1.1", text: "Rocket Richard - Most Goals" },
-              { code: "8.1.2", text: "Art Ross - Most Points" },
-              { code: "8.1.3", text: "Selke - Most Hits + Blocks" },
-              { code: "8.1.4", text: "Lady Byng - Most Players Used" },
+              { code: "8.1.1", text: "GSHL Cup Champion" },
+              {
+                code: "8.1.2",
+                text: "President's Trophy - Best Regular Season Record",
+              },
+              {
+                code: "8.1.3",
+                text: "Two-Seven-Six Trophy - Sunview Regular Season Title",
+              },
+              {
+                code: "8.1.4",
+                text: "Unit 4 Trophy - Hickory Hotel Regular Season Title",
+              },
+              {
+                code: "8.1.5",
+                text: "Adam Brophy Award - Loser's Tournament 'Winner'",
+              },
             ],
           },
           {
             code: "8.2",
-            text: "Performance Awards",
+            text: "Tier 1 Awards",
             subitems: [
-              {
-                code: "8.2.1",
-                text: "Adam Brophy Award - Loser's Tournament 'Winner'",
-              },
-              {
-                code: "8.2.2",
-                text: "President's Trophy - Best Regular Season Record",
-              },
-              {
-                code: "8.2.3",
-                text: "Two-Seven-Six Trophy - Sunview Regular Season Title",
-              },
-              {
-                code: "8.2.4",
-                text: "Unit 4 Trophy - Hickory Hotel Regular Season Title",
-              },
-              { code: "8.2.5", text: "GSHL Cup Champion" },
+              { code: "8.2.1", text: "Jack Adams - Coach of the Year" },
+              { code: "8.2.2", text: "GM of the Year" },
+              { code: "8.2.3", text: "Vezina - Best Goaltending" },
+              { code: "8.2.4", text: "Norris - Best Defensemen" },
+              { code: "8.2.5", text: "Hart - Best Team" },
+              { code: "8.2.6", text: "Calder - Best Draft" },
             ],
           },
           {
             code: "8.3",
-            text: "Nominated Awards",
+            text: "Tier 2 Awards",
             subitems: [
-              { code: "8.3.1", text: "Vezina - Best Goaltending" },
-              { code: "8.3.2", text: "Norris - Best Defensemen" },
-              { code: "8.3.3", text: "Hart - Best Team" },
-              { code: "8.3.4", text: "Calder - Best Draft" },
-              { code: "8.3.5", text: "Jack Adams - Coach of the Year" },
-              { code: "8.3.6", text: "GM of the Year" },
+              { code: "8.3.1", text: "Rocket Richard - Most Goals" },
+              { code: "8.3.2", text: "Art Ross - Most Points" },
+              { code: "8.3.3", text: "Selke - Most Hits + Blocks" },
+              { code: "8.3.4", text: "Lady Byng - Most Players Used" },
             ],
           },
         ]),
@@ -367,7 +308,7 @@ export function Rulebook() {
         content: renderItems([
           {
             code: "9.1",
-            text: "The Salary Cap only applies to your players under contract each year or 'keepers'",
+            text: "The Salary Cap only applies to your players under contract each year or 'keepers', the rest of your roster is filled in through the yearly GSHL draft. Generally 2-4 keepers per team",
           },
           {
             code: "9.2",
@@ -383,7 +324,7 @@ export function Rulebook() {
           },
           {
             code: "9.5",
-            text: "Buyouts are when a player under contract is dropped by the team. That players salary is cut in half for the same number of years, minimum 1 year",
+            text: "Buyouts are when a player under contract is dropped by the team. That players salary is cut in half for the same number of years, if a buyout is done in the final year of a contract a year is added and the buyout ends at the end of the following season",
           },
           {
             code: "9.6",
@@ -433,11 +374,11 @@ export function Rulebook() {
           },
           {
             code: "9.14",
-            text: "UFAs can be signed by any team for a 125% premium through a lottery process",
+            text: "UFAs can be signed by any team for a 125% premium",
           },
           {
             code: "9.15",
-            text: "UFA contract offers can be submitted at any time. UFA signings are processed on the 1st of each month throughout the summer",
+            text: "UFA contract offers can be submitted at any time. Once a UFA contract offer is posted to the league, any other owner has 7 days to match the offer. If no other owner matches the offer, then the UFA is signed to that team. If another owner matches the offer, then the UFA makes a decision on which team to sign with via a signing algorithm. The algorithm is based on things like owner ladder ranking, previous season performance, other players under contract, length of contract",
           },
         ]),
       },
