@@ -9,6 +9,7 @@ import type {
 import type { ContractStatus } from "./enums";
 
 export type MaybeArray<T> = T | T[] | null | undefined;
+export type ContractLength = 1 | 2 | 3;
 
 export interface ContractFilters {
   ids?: MaybeArray<string>;

@@ -20,6 +20,7 @@ export {
   useContracts,
   useAllContracts,
   useContractData,
+  useCreateContract,
   type ContractFilters,
   type ContractSortOption,
   type ContractSummary,

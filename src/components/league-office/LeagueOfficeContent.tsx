@@ -7,7 +7,7 @@ import { OwnerRankings } from "./OwnerRankings";
 import { Rulebook } from "./Rulebook";
 import { DraftClasses } from "./DraftClasses";
 import { UserManagement } from "@gshl-components/auth";
-import { JobManagement } from "@gshl-components/admin";
+import { ContractManagement, JobManagement } from "@gshl-components/admin";
 
 export function LeagueOfficeContent() {
   const { selectedType } = useLeagueOfficeNavigation();
@@ -24,6 +24,9 @@ export function LeagueOfficeContent() {
       ) : null}
       {selectedType === "jobs" && session?.user.role === "commissioner" ? (
         <JobManagement />
+      ) : null}
+      {selectedType === "contracts" && session?.user.role === "commissioner" ? (
+        <ContractManagement />
       ) : null}
     </div>
   );

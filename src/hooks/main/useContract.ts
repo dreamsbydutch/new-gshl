@@ -36,6 +36,18 @@ export type {
 const EMPTY_CONTRACTS: Contract[] = [];
 const DEFAULT_SELECT_DEPS = [] as const;
 
+export function useCreateContract() {
+  const utils = api.useUtils();
+  return api.contract.create.useMutation({
+    onSuccess: async () => {
+      await Promise.all([
+        utils.contract.getAll.invalidate(),
+        utils.player.getAll.invalidate(),
+      ]);
+    },
+  });
+}
+
 /**
  * Hook for fetching and filtering contracts with advanced options.
  *
@@ -154,12 +166,14 @@ export function useContracts<T = Contract, S = undefined>(
       take?: number;
       map: (contract: Contract) => U;
     }): U[];
-    function getScopedContracts<U>(options: {
-      filters?: ContractFilters;
-      sort?: ContractSortOption;
-      take?: number;
-      map?: (contract: Contract) => U;
-    } = {}) {
+    function getScopedContracts<U>(
+      options: {
+        filters?: ContractFilters;
+        sort?: ContractSortOption;
+        take?: number;
+        map?: (contract: Contract) => U;
+      } = {},
+    ) {
       const {
         filters: scopedFilters,
         sort: scopedSort,

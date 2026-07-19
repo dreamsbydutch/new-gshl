@@ -43,6 +43,11 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       ...(session?.user.role === "commissioner"
         ? [
             {
+              key: "contracts",
+              value: "Contracts",
+              setter: (type: string | null) => setSelectedType(type ?? ""),
+            },
+            {
               key: "users",
               value: "User Access",
               setter: (type: string | null) => setSelectedType(type ?? ""),

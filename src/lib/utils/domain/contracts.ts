@@ -10,11 +10,200 @@ import type {
   ContractSortOption,
   ContractSummary,
   MaybeArray,
+  Player,
+  Season,
 } from "@gshl-types";
-import { SALARY_CAP } from "@gshl-types";
-import { formatDate } from "../core/date";
+import {
+  ContractStatus,
+  ContractType,
+  ResignableStatus,
+  SALARY_CAP,
+} from "@gshl-types";
+import { formatDate, normalizeDateOnlyValue } from "../core/date";
 
 type ContractComparableValue = Date | number | string | null | undefined;
+
+export type ContractCreationTerms = {
+  signingSeason: Season;
+  startSeason: Season;
+  expirySeason: Season;
+  contractType: ContractType;
+  contractSalary: number;
+  signingStatus: ContractStatus;
+  expiryStatus: ContractStatus;
+  startDate: string;
+  expiryDate: string;
+};
+
+const NON_PLAYING_CONTRACT_STATUSES = new Set<string>([
+  String(ContractStatus.BUYOUT),
+  String(ContractStatus.RETIRED),
+  String(ContractStatus.INJURED),
+]);
+
+function seasonYear(season: Season): number {
+  const year = Number(season.year);
+  return Number.isFinite(year) ? year : Number.NEGATIVE_INFINITY;
+}
+
+/** Returns the league-local date used for signing-period decisions. */
+export function getTorontoDate(referenceDate: Date = new Date()): string {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Toronto",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(referenceDate);
+  const value = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((part) => part.type === type)?.value ?? "";
+  return `${value("year")}-${value("month")}-${value("day")}`;
+}
+
+/** Free agency opens on the first Toronto date after the signing deadline. */
+export function isUfaFreeAgencyOpen(
+  signingSeason: Pick<Season, "signingEndDate"> | null | undefined,
+  referenceDate: Date = new Date(),
+): boolean {
+  const signingEndDate = normalizeDateOnlyValue(signingSeason?.signingEndDate);
+  return Boolean(
+    signingEndDate && getTorontoDate(referenceDate) > signingEndDate,
+  );
+}
+
+/** Orders seasons chronologically, with their ids as a stable tie-breaker. */
+export function orderContractSeasons(seasons: Season[]): Season[] {
+  return [...seasons].sort((left, right) => {
+    const yearDelta = seasonYear(left) - seasonYear(right);
+    return yearDelta || String(left.id).localeCompare(String(right.id));
+  });
+}
+
+/** Returns the seasons covered by a contract signed in season S for N years. */
+export function getContractCoveredSeasonIds(
+  contract: Pick<Contract, "seasonId" | "contractLength">,
+  seasons: Season[],
+): string[] {
+  const ordered = orderContractSeasons(seasons);
+  const signingIndex = ordered.findIndex(
+    (season) => String(season.id) === String(contract.seasonId),
+  );
+  const length = Number(contract.contractLength);
+  if (signingIndex < 0 || !Number.isInteger(length) || length < 1) return [];
+
+  return ordered
+    .slice(signingIndex + 1, signingIndex + 1 + length)
+    .map((season) => String(season.id));
+}
+
+/** Identifies contracts that represent a player occupying a roster spot. */
+export function isPlayingContract(
+  contract: Pick<Contract, "contractType" | "expiryStatus">,
+): boolean {
+  if (NON_PLAYING_CONTRACT_STATUSES.has(String(contract.expiryStatus))) {
+    return false;
+  }
+
+  const types = Array.isArray(contract.contractType)
+    ? contract.contractType.map(String)
+    : [String(contract.contractType)];
+  return types.some(
+    (type) =>
+      type === String(ContractType.STANDARD) ||
+      type === String(ContractType.EXTENSION),
+  );
+}
+
+/** Checks whether a prior playing contract covers the new signing season. */
+export function hasContractContinuity(
+  playerId: string,
+  signingSeasonId: string,
+  contracts: Contract[],
+  seasons: Season[],
+): boolean {
+  return contracts.some(
+    (contract) =>
+      String(contract.playerId) === String(playerId) &&
+      isPlayingContract(contract) &&
+      getContractCoveredSeasonIds(contract, seasons).includes(
+        String(signingSeasonId),
+      ),
+  );
+}
+
+/** Derives every business field needed to create a new contract. */
+export function deriveContractCreationTerms(options: {
+  player: Pick<Player, "id" | "salary" | "isResignable">;
+  signingSeason: Season;
+  contractLength: 1 | 2 | 3;
+  contracts: Contract[];
+  seasons: Season[];
+}): ContractCreationTerms {
+  const { player, signingSeason, contractLength, contracts, seasons } = options;
+  const ordered = orderContractSeasons(seasons);
+  const signingIndex = ordered.findIndex(
+    (season) => String(season.id) === String(signingSeason.id),
+  );
+  if (signingIndex < 0)
+    throw new Error("Signing season could not be resolved.");
+
+  const startSeason = ordered[signingIndex + 1];
+  const expirySeason = ordered[signingIndex + contractLength];
+  if (!startSeason || !expirySeason) {
+    throw new Error("The required future seasons have not been configured.");
+  }
+  if (!startSeason.startDate || !expirySeason.endDate) {
+    throw new Error("The required future season dates are missing.");
+  }
+
+  const baseSalary = Number(player.salary);
+  if (!Number.isFinite(baseSalary) || baseSalary <= 0) {
+    throw new Error("The player does not have a valid salary.");
+  }
+
+  const status = String(player.isResignable ?? "").toUpperCase();
+  const continuous = hasContractContinuity(
+    String(player.id),
+    String(signingSeason.id),
+    contracts,
+    ordered,
+  );
+
+  let multiplier: number;
+  let contractType: ContractType;
+  let signingStatus: ContractStatus;
+  let expiryStatus: ContractStatus;
+
+  if (status === String(ResignableStatus.DRAFT)) {
+    multiplier = 1;
+    contractType = ContractType.STANDARD;
+    signingStatus = ContractStatus.DRAFTED;
+    expiryStatus = ContractStatus.RFA;
+  } else if (status === String(ResignableStatus.RFA)) {
+    multiplier = 1.15;
+    contractType = ContractType.EXTENSION;
+    signingStatus = ContractStatus.RFA;
+    expiryStatus = ContractStatus.UFA;
+  } else if (status === String(ResignableStatus.UFA)) {
+    multiplier = 1.25;
+    contractType = continuous ? ContractType.EXTENSION : ContractType.STANDARD;
+    signingStatus = ContractStatus.UFA;
+    expiryStatus = continuous ? ContractStatus.UFA : ContractStatus.RFA;
+  } else {
+    throw new Error("The player does not have a valid signing status.");
+  }
+
+  return {
+    signingSeason,
+    startSeason,
+    expirySeason,
+    contractType,
+    contractSalary: Math.round(baseSalary * multiplier),
+    signingStatus,
+    expiryStatus,
+    startDate: startSeason.startDate,
+    expiryDate: expirySeason.endDate,
+  };
+}
 
 /**
  * Identity.
@@ -221,8 +410,7 @@ export function computeContractSummary(contracts: Contract[]): ContractSummary {
  */
 export const isValidContractDate = (
   value: ContractComparableValue,
-): value is Date =>
-  value instanceof Date && !Number.isNaN(value.getTime());
+): value is Date => value instanceof Date && !Number.isNaN(value.getTime());
 
 /**
  * Returns timestamp token.
