@@ -12,6 +12,10 @@ import {
   type RulebookRule,
   type RulebookSection,
 } from "../../content/rulebook";
+import {
+  DraftOrderStructureBracket,
+  PlayoffStructureBracket,
+} from "./RulebookBrackets";
 
 const calloutLabels: Record<RulebookCalloutType, string> = {
   official: "Official source",
@@ -238,6 +242,10 @@ function Section({
         hidden={!expanded}
         className="px-4 sm:px-5"
       >
+        {section.visual === "playoffs" ? <PlayoffStructureBracket /> : null}
+        {section.visual === "draft-order" ? (
+          <DraftOrderStructureBracket />
+        ) : null}
         {rules.map((rule) => (
           <Rule key={rule.id} rule={rule} query={query} />
         ))}

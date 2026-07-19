@@ -35,6 +35,7 @@ export type RulebookSection = {
   number: string;
   title: string;
   intro?: string;
+  visual?: "playoffs" | "draft-order";
   rules: RulebookRule[];
 };
 
@@ -399,6 +400,7 @@ export const rulebookSections: RulebookSection[] = [
     id: "playoffs-payouts",
     number: "5",
     title: "Playoffs and Payouts",
+    visual: "playoffs",
     rules: [
       {
         id: "playoff-qualification",
@@ -557,6 +559,7 @@ export const rulebookSections: RulebookSection[] = [
     id: "draft-order-tournament",
     number: "7",
     title: "Draft Order Tournament",
+    visual: "draft-order",
     rules: [
       {
         id: "draft-order-matchups",
