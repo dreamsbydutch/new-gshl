@@ -5,7 +5,12 @@ import { ArrowDown, ArrowUp, Minus, Shield, Users } from "lucide-react";
 
 import { Skeleton } from "@gshl-components/ui/skeleton";
 import { useOwnerRankingsData } from "@gshl-hooks";
-import type { OwnerRankingEntry, OwnerRankingRecord } from "@gshl-types";
+import { AWARD_CATALOG_BY_KEY } from "@gshl-lib/config/awards";
+import {
+  AwardsList,
+  type OwnerRankingEntry,
+  type OwnerRankingRecord,
+} from "@gshl-types";
 import { cn } from "@gshl-utils";
 
 const formatRating = (value: number) => Math.round(value).toLocaleString();
@@ -85,6 +90,77 @@ function SignedCell({ value }: { value: number }) {
   );
 }
 
+function AwardMark({
+  award,
+  label,
+  size = 18,
+}: {
+  award: AwardsList;
+  label: string;
+  size?: number;
+}) {
+  const imageUrl = AWARD_CATALOG_BY_KEY.get(award)?.imageUrl;
+  return imageUrl ? (
+    <Image
+      src={imageUrl}
+      alt=""
+      width={size}
+      height={size}
+      className="h-auto shrink-0 object-contain"
+      title={label}
+    />
+  ) : null;
+}
+
+function AwardMarks({
+  award,
+  count,
+  label,
+  negative = false,
+}: {
+  award: AwardsList;
+  count: number;
+  label: string;
+  negative?: boolean;
+}) {
+  if (!count) return <span className="text-slate-300">—</span>;
+
+  return (
+    <div
+      className={cn(
+        "flex min-w-10 flex-wrap justify-center gap-0.5",
+        negative && "rounded bg-red-50 px-1 py-0.5",
+      )}
+      aria-label={`${count} ${label}${count === 1 ? "" : "s"}`}
+      title={`${count} ${label}${count === 1 ? "" : "s"}`}
+    >
+      {Array.from({ length: count }, (_, index) => (
+        <AwardMark
+          key={`${award}-${index}`}
+          award={award}
+          label={label}
+          size={18}
+        />
+      ))}
+    </div>
+  );
+}
+
+function AwardHeading({
+  award,
+  label,
+}: {
+  award: AwardsList;
+  label: string;
+}) {
+  return (
+    <div className="flex items-center justify-center gap-1.5" title={label}>
+      <AwardMark award={award} label={label} size={20} />
+      <span>{label}</span>
+    </div>
+  );
+}
+
 function OwnerRankingsSkeleton() {
   return (
     <div className="mx-auto max-w-[100rem] space-y-4">
@@ -148,10 +224,9 @@ export function OwnerRankings() {
 
       <div className="mt-4 overflow-hidden rounded-lg border border-slate-200 bg-white">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[1420px] border-collapse text-left text-xs">
+          <table className="w-full min-w-[1160px] border-collapse text-left text-xs">
             <caption className="sr-only">
-              All-time GM ladder with rating components, records, playoff
-              results, and awards
+              All-time GM ladder with records, playoff results, and awards
             </caption>
             <thead className="border-b border-slate-200 bg-slate-50 text-[10px] uppercase tracking-[0.11em] text-slate-500">
               <tr>
@@ -165,16 +240,7 @@ export function OwnerRankings() {
                   Rating
                 </th>
                 <th scope="col" className="px-3 py-3 text-right">
-                  Elo
-                </th>
-                <th scope="col" className="px-3 py-3 text-right">
                   Last
-                </th>
-                <th scope="col" className="px-3 py-3 text-right">
-                  Consistency
-                </th>
-                <th scope="col" className="px-3 py-3 text-right">
-                  Legacy
                 </th>
                 <th scope="col" className="px-3 py-3">
                   Overall
@@ -192,19 +258,25 @@ export function OwnerRankings() {
                   Finals
                 </th>
                 <th scope="col" className="px-3 py-3 text-center">
-                  Cups
+                  <AwardHeading award={AwardsList.GSHL_CUP} label="Cups" />
                 </th>
                 <th scope="col" className="px-3 py-3 text-center">
-                  GMOTY
+                  <AwardHeading
+                    award={AwardsList.GM_OF_THE_YEAR}
+                    label="GMOTY"
+                  />
                 </th>
                 <th scope="col" className="px-3 py-3 text-center">
-                  COTY
+                  <AwardHeading
+                    award={AwardsList.JACK_ADAMS}
+                    label="COTY"
+                  />
                 </th>
                 <th scope="col" className="px-3 py-3 text-center">
                   Other
                 </th>
                 <th scope="col" className="px-3 py-3 text-center">
-                  Brophy
+                  <AwardHeading award={AwardsList.BROPHY} label="Brophy" />
                 </th>
                 <th scope="col" className="px-3 py-3 text-center">
                   Seasons
@@ -241,17 +313,8 @@ export function OwnerRankings() {
                   <td className="px-3 py-3 text-right font-oswald text-xl font-semibold tabular-nums text-slate-950">
                     {formatRating(entry.rating)}
                   </td>
-                  <td className="px-3 py-3 text-right font-medium tabular-nums text-slate-700">
-                    {formatRating(entry.elo)}
-                  </td>
                   <td className="px-3 py-3 text-right">
                     <SignedCell value={entry.matchupDelta} />
-                  </td>
-                  <td className="px-3 py-3 text-right">
-                    <SignedCell value={entry.performanceAdjustment} />
-                  </td>
-                  <td className="px-3 py-3 text-right">
-                    <SignedCell value={entry.achievementBonus} />
                   </td>
                   <td className="px-3 py-3">
                     <RecordCell record={entry.overallRecord} />
@@ -268,20 +331,37 @@ export function OwnerRankings() {
                   <td className="px-3 py-3 text-center tabular-nums">
                     {entry.finalsAppearances}
                   </td>
-                  <td className="px-3 py-3 text-center font-semibold tabular-nums text-amber-700">
-                    {entry.cups}
+                  <td className="px-3 py-3 text-center">
+                    <AwardMarks
+                      award={AwardsList.GSHL_CUP}
+                      count={entry.cups}
+                      label="GSHL Cup"
+                    />
                   </td>
-                  <td className="px-3 py-3 text-center tabular-nums">
-                    {entry.gmAwards}
+                  <td className="px-3 py-3 text-center">
+                    <AwardMarks
+                      award={AwardsList.GM_OF_THE_YEAR}
+                      count={entry.gmAwards}
+                      label="GM of the Year"
+                    />
                   </td>
-                  <td className="px-3 py-3 text-center tabular-nums">
-                    {entry.coachAwards}
+                  <td className="px-3 py-3 text-center">
+                    <AwardMarks
+                      award={AwardsList.JACK_ADAMS}
+                      count={entry.coachAwards}
+                      label="Coach of the Year"
+                    />
                   </td>
                   <td className="px-3 py-3 text-center tabular-nums">
                     {entry.otherAwards}
                   </td>
-                  <td className="px-3 py-3 text-center font-medium tabular-nums text-red-600">
-                    {entry.brophyAwards}
+                  <td className="px-3 py-3 text-center">
+                    <AwardMarks
+                      award={AwardsList.BROPHY}
+                      count={entry.brophyAwards}
+                      label="Brophy Trophy"
+                      negative
+                    />
                   </td>
                   <td className="px-3 py-3 text-center tabular-nums">
                     {entry.seasonsPlayed}
