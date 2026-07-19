@@ -225,6 +225,7 @@ void test("penalizes the last-place Brophy Trophy", () => {
   assert.ok(lastPlace);
   assert.equal(lastPlace.totalAwards, 1);
   assert.equal(lastPlace.otherAwards, 0);
+  assert.equal(lastPlace.brophyAwards, 1);
   assert.equal(lastPlace.achievementBonus, -10);
   assert.equal(lastPlace.rating, OWNER_LADDER_BASE_RATING - 10);
 });

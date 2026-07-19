@@ -57,6 +57,7 @@ interface OwnerLadderState {
   coachAwards: number;
   gmAwards: number;
   otherAwards: number;
+  brophyAwards: number;
 }
 
 const emptyRecord = (): MutableRecord => ({ wins: 0, losses: 0, ties: 0 });
@@ -174,6 +175,7 @@ const makeState = (
     coachAwards: 0,
     gmAwards: 0,
     otherAwards: 0,
+    brophyAwards: 0,
   };
 };
 
@@ -428,6 +430,7 @@ export function buildOwnerRankings(params: {
       state.totalAwards += 1;
       if (award.award === AwardsList.GSHL_CUP) continue;
       if (award.award === AwardsList.BROPHY) {
+        state.brophyAwards += 1;
         state.achievementBonus += OWNER_LADDER_BONUSES.brophy;
         continue;
       }
@@ -479,6 +482,7 @@ export function buildOwnerRankings(params: {
       coachAwards: state.coachAwards,
       gmAwards: state.gmAwards,
       otherAwards: state.otherAwards,
+      brophyAwards: state.brophyAwards,
     };
   });
 

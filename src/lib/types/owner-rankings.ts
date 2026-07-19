@@ -33,6 +33,7 @@ export interface OwnerRankingEntry {
   coachAwards: number;
   gmAwards: number;
   otherAwards: number;
+  brophyAwards: number;
 }
 
 export interface OwnerLadderBattle {
