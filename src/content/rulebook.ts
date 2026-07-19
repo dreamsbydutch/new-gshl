@@ -85,12 +85,12 @@ export const rulebookSections: RulebookSection[] = [
         number: "0.2",
         title: "Official Platforms",
         blocks: [
-          callout("official", "Yahoo Fantasy Hockey", [
+          paragraph(
             "Yahoo Fantasy Hockey is the official source for lineup eligibility, positional eligibility, player statistics, category scoring, waivers, trades, and standard regular-season matchup results.",
-          ]),
-          callout("official", "GSHL App", [
+          ),
+          paragraph(
             "The GSHL App is the official source for contracts, player salaries, salary-cap calculations, buyouts, signing periods, signing eligibility, free-agent signing results, draft procedures, draft order, draft-order tournament matchups, home-team designations, and additional matchup results caused by NHL games not acknowledged by Yahoo.",
-          ]),
+          ),
         ],
       },
       {
@@ -111,9 +111,9 @@ export const rulebookSections: RulebookSection[] = [
         number: "0.4",
         title: "Commissioner Authority and Rule Changes",
         blocks: [
-          callout("commissioner", "Commissioner authority", [
+          paragraph(
             "The Commissioner has final authority over league administration and interpretation of the rulebook.",
-          ]),
+          ),
           bullets([
             "Rule changes may be discussed during the offseason.",
             "The Commissioner makes final decisions on rule changes after league discussion.",
@@ -136,19 +136,15 @@ export const rulebookSections: RulebookSection[] = [
         title: "Active Roster",
         blocks: [
           paragraph("Each team has the following active lineup:"),
-          table(
-            ["Position", "Slots"],
-            [
-              ["Center", "2"],
-              ["Left Wing", "2"],
-              ["Right Wing", "2"],
-              ["Defense", "3"],
-              ["Utility Skater", "1"],
-              ["Goalie", "1"],
-              ["Bench", "4"],
-            ],
-            [1],
-          ),
+          bullets([
+            "2 Centers",
+            "2 Left Wingers",
+            "2 Right Wingers",
+            "3 Defensemen",
+            "1 Utility Skater",
+            "1 Goalie",
+            "4 Bench spots",
+          ]),
         ],
       },
       {
@@ -187,39 +183,31 @@ export const rulebookSections: RulebookSection[] = [
         number: "2.1",
         title: "Skater Categories",
         blocks: [
-          table(
-            ["Category"],
-            [
-              ["Goals"],
-              ["Assists"],
-              ["Points"],
-              ["Power-Play Points"],
-              ["Shots"],
-              ["Hits"],
-              ["Blocks"],
-            ],
-          ),
+          bullets([
+            "Goals",
+            "Assists",
+            "Points",
+            "Power-Play Points",
+            "Shots",
+            "Hits",
+            "Blocks",
+          ]),
         ],
       },
       {
         id: "goaltender-categories",
         number: "2.2",
         title: "Goaltender Categories",
-        blocks: [
-          table(
-            ["Category"],
-            [["Wins"], ["Goals Against Average"], ["Save Percentage"]],
-          ),
-        ],
+        blocks: [bullets(["Wins", "Goals Against Average", "Save Percentage"])],
       },
       {
         id: "home-ice-advantage",
         number: "2.3",
         title: "Home-Ice Advantage",
         blocks: [
-          callout("important", "Tied matchups", [
+          paragraph(
             "If a matchup ends tied in total categories, the designated home team wins the matchup.",
-          ]),
+          ),
           bullets([
             "Home-team designations are tracked and displayed in the GSHL App.",
             "Home-team assignments for the full season are published before the regular season begins.",
@@ -233,9 +221,9 @@ export const rulebookSections: RulebookSection[] = [
         number: "2.4",
         title: "Goaltender Appearance Minimum",
         blocks: [
-          callout("important", "Two appearances required", [
+          paragraph(
             "Teams must receive at least two goalie appearances during each matchup. Any goalie appearance counts, whether the goalie started or appeared in relief.",
-          ]),
+          ),
           bullets([
             "A team that fails to reach two goalie appearances concedes Wins, Goals Against Average, and Save Percentage.",
             "If both teams fail to meet the two-appearance minimum, all three goalie categories are recorded as ties.",
@@ -287,9 +275,9 @@ export const rulebookSections: RulebookSection[] = [
         number: "3.4",
         title: "Collusion and Bad-Faith Transactions",
         blocks: [
-          callout("commissioner", "Investigation authority", [
+          paragraph(
             "The Commissioner may investigate any transaction involving suspected collusion, roster lending, side agreements, deliberate competitive manipulation, salary-cap circumvention, or other bad-faith conduct.",
-          ]),
+          ),
           paragraph("Potential penalties include:"),
           bullets([
             "Transaction reversal",
@@ -399,7 +387,7 @@ export const rulebookSections: RulebookSection[] = [
             "Conference category differential",
             "Owner Ladder Ranking",
           ]),
-          callout("info", "Definitions", [
+          bullets([
             "“Standings points” refers to the 3-2-1-0 standings system.",
             "“Category differential” means categories won minus categories lost during the applicable period.",
           ]),
@@ -443,9 +431,9 @@ export const rulebookSections: RulebookSection[] = [
         number: "5.3",
         title: "Crossover Procedure",
         blocks: [
-          callout("important", "When crossover applies", [
+          paragraph(
             "A crossover occurs only when one conference has five playoff teams and the other conference has three.",
-          ]),
+          ),
           bullets([
             "The lower-seeded wildcard from the five-team conference crosses over.",
             "The higher-seeded wildcard remains in its original conference.",
@@ -540,9 +528,9 @@ export const rulebookSections: RulebookSection[] = [
             "Round 4: Picks 1 through 14",
             "Remaining rounds alternate direction in standard snake format",
           ]),
-          callout("example", "Example", [
-            "The snake begins after Round 2. The team selecting first overall also selects first in Round 2, last in Round 3, and first in Round 4.",
-          ]),
+          paragraph(
+            "Example: The snake begins after Round 2. The team selecting first overall also selects first in Round 2, last in Round 3, and first in Round 4.",
+          ),
         ],
       },
       {
@@ -555,9 +543,9 @@ export const rulebookSections: RulebookSection[] = [
             "Each contracted player consumes one draft selection.",
             "Buyouts do not consume draft picks.",
           ]),
-          callout("example", "Example", [
-            "A team with three players under contract forfeits its 15th-, 14th-, and 13th-round selections.",
-          ]),
+          paragraph(
+            "Example: A team with three players under contract forfeits its 15th-, 14th-, and 13th-round selections.",
+          ),
           paragraph(
             "If a team has more players under contract than available draft selections, it must resolve excess contracts through trades or buyouts before the draft.",
           ),
@@ -637,9 +625,9 @@ export const rulebookSections: RulebookSection[] = [
             "GSHL Cup Runner-Up receives pick 13.",
             "GSHL Cup Champion receives pick 14.",
           ]),
-          callout("info", "Current bracket", [
+          paragraph(
             "The current Draft-Order Tournament bracket is available during the playoffs.",
-          ]),
+          ),
         ],
       },
     ],
@@ -759,12 +747,12 @@ export const rulebookSections: RulebookSection[] = [
         number: "8.8",
         title: "Award Definitions",
         blocks: [
-          callout("info", "Most Players Used", [
-            "Awarded to the team with the most unique players who spent at least one day on that team’s roster during the GSHL season.",
-          ]),
-          callout("algorithm", "Best Draft", [
-            "Determined by the GSHL Draft Evaluation Algorithm, which considers draft capital available to the team, perceived player value entering the season, performance of drafted players during the season, and overall value gained from the draft class.",
-          ]),
+          paragraph(
+            "Most Players Used: Awarded to the team with the most unique players who spent at least one day on that team’s roster during the GSHL season.",
+          ),
+          paragraph(
+            "Best Draft: Determined by the GSHL Draft Evaluation Algorithm, which considers draft capital available to the team, perceived player value entering the season, performance of drafted players during the season, and overall value gained from the draft class.",
+          ),
         ],
       },
     ],
@@ -826,9 +814,9 @@ export const rulebookSections: RulebookSection[] = [
         number: "9.5",
         title: "Buyouts",
         blocks: [
-          callout("important", "Immediate cap impact", [
+          paragraph(
             "A buyout occurs immediately when a team drops a player who is under contract. The cap charge begins immediately and counts against the hard cap.",
-          ]),
+          ),
           bullets([
             "The player’s salary is reduced by 50%.",
             "The buyout cap hit lasts for the same number of contract years remaining.",
@@ -836,9 +824,9 @@ export const rulebookSections: RulebookSection[] = [
             "Buyout cap charges cannot be traded or retained.",
             "Buyouts do not consume draft picks.",
           ]),
-          callout("example", "Example", [
-            "A player earning $4,000,000 with two years remaining is bought out. The team carries a $2,000,000 cap charge in each of the next two seasons.",
-          ]),
+          paragraph(
+            "Example: A player earning $4,000,000 with two years remaining is bought out. The team carries a $2,000,000 cap charge in each of the next two seasons.",
+          ),
         ],
       },
       {
@@ -872,20 +860,11 @@ export const rulebookSections: RulebookSection[] = [
         number: "9.8",
         title: "Signing Periods",
         blocks: [
-          table(
-            ["Signing Period", "Timing"],
-            [
-              ["Early Signing Period", "December 15 through December 31"],
-              [
-                "Late Signing Period",
-                "End of GSHL Playoffs through the end of the NHL Playoffs",
-              ],
-              [
-                "Summer Free Agency",
-                "Stanley Cup awarded through the GSHL Draft",
-              ],
-            ],
-          ),
+          bullets([
+            "Early Signing Period — December 15 through December 31",
+            "Late Signing Period — End of GSHL Playoffs through the end of the NHL Playoffs",
+            "Summer Free Agency — Stanley Cup awarded through the GSHL Draft",
+          ]),
           paragraph(
             "Contracts may be signed at any time during an active signing period.",
           ),
@@ -929,9 +908,9 @@ export const rulebookSections: RulebookSection[] = [
           paragraph(
             "This rule ensures a player was either used consistently in the GSHL or properly stashed and held by an owner for most of the season. It prevents teams from adding an injured player near the end of the season solely to create contract eligibility.",
           ),
-          callout("info", "Player-day", [
+          paragraph(
             "A player-day is one player occupying a GSHL roster spot for one calendar day.",
-          ]),
+          ),
         ],
       },
       {

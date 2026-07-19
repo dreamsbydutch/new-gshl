@@ -13,34 +13,13 @@ import {
   type RulebookSection,
 } from "../../content/rulebook";
 
-const calloutStyles: Record<
-  RulebookCalloutType,
-  { className: string; label: string }
-> = {
-  official: {
-    className: "border-l-sunview-500",
-    label: "Official source",
-  },
-  important: {
-    className: "border-l-hotel-500",
-    label: "Important",
-  },
-  example: {
-    className: "border-l-champ-800",
-    label: "Example",
-  },
-  commissioner: {
-    className: "border-l-brown-600",
-    label: "Commissioner discretion",
-  },
-  algorithm: {
-    className: "border-l-violet-500",
-    label: "System-generated result",
-  },
-  info: {
-    className: "border-l-slate-400",
-    label: "Note",
-  },
+const calloutLabels: Record<RulebookCalloutType, string> = {
+  official: "Official source",
+  important: "Important",
+  example: "Example",
+  commissioner: "Commissioner discretion",
+  algorithm: "System-generated result",
+  info: "Note",
 };
 
 function escapeRegExp(value: string) {
@@ -127,18 +106,12 @@ function RulebookCallout({
   block: Extract<RulebookBlock, { type: "callout" }>;
   query: string;
 }) {
-  const style = calloutStyles[block.variant];
-
   return (
-    <aside
-      className={cn(
-        "rounded-md border border-l-4 bg-muted/30 px-4 py-3",
-        style.className,
-      )}
-    >
+    <aside className="border-l-2 border-foreground/25 py-0.5 pl-3">
       <div className="space-y-1.5">
         <p className="text-xs font-semibold text-muted-foreground">
-          {style.label} · <Highlight text={block.title} query={query} />
+          {calloutLabels[block.variant]} ·{" "}
+          <Highlight text={block.title} query={query} />
         </p>
         {block.content.map((content) => (
           <p key={content} className="text-sm leading-6 text-foreground/80">
@@ -249,6 +222,9 @@ function Section({
             <Highlight text={section.title} query={query} />
           </span>
         </span>
+        <span className="hidden text-xs text-muted-foreground sm:block">
+          {rules.length} {rules.length === 1 ? "rule" : "rules"}
+        </span>
         <ChevronDown
           className={cn(
             "h-5 w-5 shrink-0 text-muted-foreground transition-transform",
@@ -274,7 +250,7 @@ export function Rulebook() {
   const [query, setQuery] = useState("");
   const [activeSection, setActiveSection] = useState(rulebookSections[0]!.id);
   const [expanded, setExpanded] = useState<Record<string, boolean>>(() =>
-    Object.fromEntries(rulebookSections.map((section) => [section.id, true])),
+    Object.fromEntries(rulebookSections.map((section) => [section.id, false])),
   );
 
   const normalizedQuery = query.trim().toLocaleLowerCase();
@@ -442,14 +418,14 @@ export function Rulebook() {
         </select>
       </div>
 
-      <p
-        className="mb-4 text-center text-xs text-muted-foreground"
-        aria-live="polite"
-      >
-        {normalizedQuery
-          ? `${totalMatches} matching ${totalMatches === 1 ? "rule" : "rules"}`
-          : `${rulebookSections.length} sections`}
-      </p>
+      {normalizedQuery ? (
+        <p
+          className="mb-4 text-center text-xs text-muted-foreground"
+          aria-live="polite"
+        >
+          {totalMatches} matching {totalMatches === 1 ? "rule" : "rules"}
+        </p>
+      ) : null}
 
       <div className="min-w-0 space-y-3">
         {filteredSections.map(({ section, rules }) => (
@@ -457,12 +433,12 @@ export function Rulebook() {
             key={section.id}
             section={section}
             rules={rules}
-            expanded={expanded[section.id] ?? true}
+            expanded={expanded[section.id] ?? false}
             query={query}
             onToggle={() =>
               setExpanded((current) => ({
                 ...current,
-                [section.id]: !(current[section.id] ?? true),
+                [section.id]: !(current[section.id] ?? false),
               }))
             }
           />
