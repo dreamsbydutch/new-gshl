@@ -8,10 +8,14 @@ export default async function Home() {
 
   await serverApi.season.getAll.prefetch({ orderBy: { year: "asc" } });
 
+  await Promise.all([
+    serverApi.player.getAll.prefetch({}),
+    serverApi.contract.getAll.prefetch({}),
+    serverApi.team.getAll.prefetch({}),
+  ]);
+
   if (isBetweenSeasons(seasons) && offseasonWindow?.upcomingSeason.id) {
     await Promise.all([
-      serverApi.player.getAll.prefetch({}),
-      serverApi.contract.getAll.prefetch({}),
       serverApi.draftPick.getAll.prefetch({}),
       serverApi.team.getAll.prefetch({
         where: { seasonId: String(offseasonWindow.upcomingSeason.id) },

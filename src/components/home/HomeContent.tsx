@@ -3,6 +3,7 @@
 import { MockDraftPreview } from "@gshl-components/draft/DraftBoardList";
 import { useSeasonState } from "@gshl-hooks";
 import { findOffseasonWindow, isBetweenSeasons } from "@gshl-utils";
+import { RecentSigningsCard } from "./RecentSigningsCard";
 
 export function HomeContent() {
   const { seasons, isLoading } = useSeasonState();
@@ -15,7 +16,8 @@ export function HomeContent() {
   const showOffseasonContent = isBetweenSeasons(seasons);
 
   return (
-    <main className="container mx-auto px-2 py-4 sm:px-4">
+    <main className="container mx-auto space-y-8 px-2 py-4 sm:px-4">
+      <RecentSigningsCard />
       {showOffseasonContent && offseasonWindow ? (
         <MockDraftPreview
           seasonId={String(offseasonWindow.upcomingSeason.id)}
