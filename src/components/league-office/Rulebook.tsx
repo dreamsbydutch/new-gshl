@@ -429,12 +429,6 @@ export function Rulebook() {
           >
             <div className="mb-2 flex items-center justify-between gap-3">
               <h2 className="text-base font-semibold">{section.title}</h2>
-              <a
-                href={`#${section.id}`}
-                className="text-xs text-muted-foreground hover:underline"
-              >
-                Link
-              </a>
             </div>
             <div id={section.id}>{section.content}</div>
           </div>
