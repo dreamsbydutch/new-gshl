@@ -74,3 +74,47 @@
   -ms-overflow-style: none; /* Internet Explorer 10+ */
   scrollbar-width: none; /* Firefox */
 }
+
+@media print {
+  @page {
+    margin: 0.55in;
+  }
+
+  body {
+    background: white !important;
+    color: black !important;
+  }
+
+  .fixed,
+  .rulebook-actions,
+  .rulebook-toc,
+  .rulebook-search-panel,
+  .rulebook-mobile-jump {
+    display: none !important;
+  }
+
+  .rulebook-page {
+    max-width: none !important;
+  }
+
+  .rulebook-page header {
+    background: #0f172a !important;
+    color: white !important;
+    print-color-adjust: exact;
+  }
+
+  .rulebook-page section {
+    break-inside: avoid-page;
+    box-shadow: none !important;
+  }
+
+  .rulebook-page section > div[hidden] {
+    display: block !important;
+  }
+
+  .rulebook-page article,
+  .rulebook-page aside,
+  .rulebook-page table {
+    break-inside: avoid;
+  }
+}

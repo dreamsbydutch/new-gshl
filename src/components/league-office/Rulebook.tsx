@@ -1,447 +1,587 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { cn, normalizeSearchQuery } from "@gshl-utils";
-import type { RulebookItem, RulebookSection } from "@gshl-types";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  BookOpen,
+  Check,
+  ChevronDown,
+  CircleAlert,
+  Copy,
+  FileCheck2,
+  Info,
+  Printer,
+  Search,
+  ShieldAlert,
+  Sparkles,
+  X,
+} from "lucide-react";
+import { cn } from "@gshl-utils";
+import {
+  getRulebookSearchText,
+  RULEBOOK_LAST_UPDATED,
+  rulebookSections,
+  type RulebookBlock,
+  type RulebookCalloutType,
+  type RulebookRule,
+  type RulebookSection,
+} from "../../content/rulebook";
+
+const calloutStyles: Record<
+  RulebookCalloutType,
+  { className: string; icon: typeof Info }
+> = {
+  official: {
+    className:
+      "border-sunview-300 bg-sunview-50 text-sunview-900 dark:border-sunview-600 dark:bg-sunview-900/40 dark:text-sunview-100",
+    icon: FileCheck2,
+  },
+  important: {
+    className:
+      "border-hotel-300 bg-hotel-50 text-hotel-900 dark:border-hotel-600 dark:bg-hotel-900/40 dark:text-hotel-100",
+    icon: CircleAlert,
+  },
+  example: {
+    className:
+      "border-champ-700 bg-champ-100 text-amber-950 dark:border-champ-700 dark:bg-amber-950/50 dark:text-champ-100",
+    icon: Sparkles,
+  },
+  commissioner: {
+    className:
+      "border-brown-400 bg-brown-100 text-brown-900 dark:border-brown-600 dark:bg-brown-900/50 dark:text-brown-100",
+    icon: ShieldAlert,
+  },
+  algorithm: {
+    className:
+      "border-violet-300 bg-violet-50 text-violet-950 dark:border-violet-600 dark:bg-violet-950/50 dark:text-violet-100",
+    icon: Sparkles,
+  },
+  info: {
+    className:
+      "border-slate-300 bg-slate-50 text-slate-900 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100",
+    icon: Info,
+  },
+};
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function Highlight({ text, query }: { text: string; query: string }) {
+  const tokens = query.trim().split(/\s+/).filter(Boolean);
+  if (tokens.length === 0) return text;
+
+  const expression = new RegExp(
+    `(${tokens.map(escapeRegExp).join("|")})`,
+    "gi",
+  );
+  return text.split(expression).map((part, index) =>
+    tokens.some(
+      (token) => part.toLocaleLowerCase() === token.toLocaleLowerCase(),
+    ) ? (
+      <mark
+        key={`${part}-${index}`}
+        className="rounded-sm bg-champ-500 px-0.5 text-inherit"
+      >
+        {part}
+      </mark>
+    ) : (
+      part
+    ),
+  );
+}
+
+function RulebookTable({
+  block,
+  query,
+}: {
+  block: Extract<RulebookBlock, { type: "table" }>;
+  query: string;
+}) {
+  return (
+    <div className="overflow-x-auto rounded-lg border bg-background">
+      <table className="w-full min-w-[28rem] border-collapse text-left text-sm">
+        <thead className="bg-slate-100 text-xs uppercase tracking-wider text-slate-600 dark:bg-slate-900 dark:text-slate-300">
+          <tr>
+            {block.headers.map((header, index) => (
+              <th
+                key={header}
+                scope="col"
+                className={cn(
+                  "px-4 py-3 font-semibold",
+                  block.numericColumns?.includes(index) && "text-right",
+                )}
+              >
+                <Highlight text={header} query={query} />
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody className="divide-y">
+          {block.rows.map((row, rowIndex) => (
+            <tr
+              key={`${row[0]}-${rowIndex}`}
+              className="even:bg-slate-50/60 dark:even:bg-slate-900/60"
+            >
+              {row.map((cell, columnIndex) => (
+                <td
+                  key={`${cell}-${columnIndex}`}
+                  className={cn(
+                    "px-4 py-2.5 text-foreground/85",
+                    block.numericColumns?.includes(columnIndex) &&
+                      "text-right font-mono tabular-nums",
+                  )}
+                >
+                  <Highlight text={cell} query={query} />
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function RulebookCallout({
+  block,
+  query,
+}: {
+  block: Extract<RulebookBlock, { type: "callout" }>;
+  query: string;
+}) {
+  const style = calloutStyles[block.variant];
+  const Icon = style.icon;
+
+  return (
+    <aside className={cn("rounded-lg border-l-4 p-4", style.className)}>
+      <div className="flex gap-3">
+        <Icon className="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" />
+        <div className="space-y-1.5">
+          <p className="text-sm font-bold uppercase tracking-wide">
+            <Highlight text={block.title} query={query} />
+          </p>
+          {block.content.map((content) => (
+            <p key={content} className="text-sm leading-6">
+              <Highlight text={content} query={query} />
+            </p>
+          ))}
+        </div>
+      </div>
+    </aside>
+  );
+}
+
+function Block({ block, query }: { block: RulebookBlock; query: string }) {
+  if (block.type === "paragraph") {
+    return (
+      <p className="leading-7 text-foreground/80">
+        <Highlight text={block.text} query={query} />
+      </p>
+    );
+  }
+
+  if (block.type === "bullets") {
+    return (
+      <ul className="ml-5 list-disc space-y-2 text-foreground/80 marker:text-sunview-500">
+        {block.items.map((item) => (
+          <li key={item} className="pl-1 leading-7">
+            <Highlight text={item} query={query} />
+          </li>
+        ))}
+      </ul>
+    );
+  }
+
+  if (block.type === "ordered") {
+    return (
+      <ol className="ml-5 list-decimal space-y-2 text-foreground/80 marker:font-bold marker:text-sunview-600">
+        {block.items.map((item) => (
+          <li key={item} className="pl-1 leading-7">
+            <Highlight text={item} query={query} />
+          </li>
+        ))}
+      </ol>
+    );
+  }
+
+  if (block.type === "table") {
+    return <RulebookTable block={block} query={query} />;
+  }
+
+  return <RulebookCallout block={block} query={query} />;
+}
+
+function Rule({ rule, query }: { rule: RulebookRule; query: string }) {
+  return (
+    <article
+      id={rule.id}
+      tabIndex={-1}
+      className="scroll-mt-28 border-t py-7 first:border-t-0 first:pt-2 focus:outline-none"
+    >
+      <h3 className="mb-4 flex items-baseline gap-3 text-xl font-bold tracking-tight">
+        <span className="font-barlow text-sunview-600">
+          <Highlight text={rule.number} query={query} />
+        </span>
+        <span>
+          <Highlight text={rule.title} query={query} />
+        </span>
+      </h3>
+      <div className="space-y-4 text-[0.975rem]">
+        {rule.blocks.map((block, index) => (
+          <Block key={`${rule.id}-${index}`} block={block} query={query} />
+        ))}
+      </div>
+    </article>
+  );
+}
+
+function Section({
+  section,
+  rules,
+  expanded,
+  query,
+  onToggle,
+}: {
+  section: RulebookSection;
+  rules: RulebookRule[];
+  expanded: boolean;
+  query: string;
+  onToggle: () => void;
+}) {
+  return (
+    <section
+      id={section.id}
+      data-rulebook-section
+      tabIndex={-1}
+      className="scroll-mt-24 overflow-hidden rounded-xl border bg-card shadow-sm focus:outline-none focus:ring-2 focus:ring-sunview-400"
+    >
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={expanded}
+        aria-controls={`${section.id}-rules`}
+        className="group flex w-full items-center gap-4 bg-gradient-to-r from-sunview-50 via-background to-hotel-50 px-5 py-5 text-left transition-colors hover:from-sunview-100 hover:to-hotel-100 dark:from-sunview-900/50 dark:to-hotel-900/50 dark:hover:from-sunview-900/70 dark:hover:to-hotel-900/70 sm:px-7"
+      >
+        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-sunview-700 font-barlow text-2xl text-white shadow-sm">
+          {section.number}
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block font-barlow text-xs uppercase tracking-[0.18em] text-muted-foreground">
+            Section {section.number}
+          </span>
+          <span className="mt-0.5 block text-lg font-bold leading-tight sm:text-xl">
+            <Highlight text={section.title} query={query} />
+          </span>
+        </span>
+        <ChevronDown
+          className={cn(
+            "h-5 w-5 shrink-0 text-muted-foreground transition-transform",
+            expanded && "rotate-180",
+          )}
+          aria-hidden="true"
+        />
+      </button>
+      <div
+        id={`${section.id}-rules`}
+        hidden={!expanded}
+        className="px-5 sm:px-7"
+      >
+        {rules.map((rule) => (
+          <Rule key={rule.id} rule={rule} query={query} />
+        ))}
+      </div>
+    </section>
+  );
+}
 
 export function Rulebook() {
   const [query, setQuery] = useState("");
-  const normalized = useMemo(() => normalizeSearchQuery(query), [query]);
-
-  const renderItems = (items: RulebookItem[]) => {
-    return (
-      <div className="space-y-2">
-        {items.map((item) => (
-          <div key={item.code} className="text-center">
-            <div className="py-1 text-sm leading-6 text-foreground/90">
-              <span className="pr-2 font-bold">{item.code}</span>
-              {item.text}
-            </div>
-            {item.subitems && item.subitems.length > 0 ? (
-              <div className="pt-1">
-                {item.subitems.map((sub) => (
-                  <div
-                    key={sub.code}
-                    className="py-1 text-xs leading-5 text-muted-foreground"
-                  >
-                    <span className="pr-2 font-bold">{sub.code}</span>
-                    {sub.text}
-                  </div>
-                ))}
-              </div>
-            ) : null}
-          </div>
-        ))}
-      </div>
-    );
-  };
-
-  const sections: RulebookSection[] = useMemo(
-    () => [
-      {
-        id: "rosters",
-        title: "Rosters",
-        keywords: ["roster", "lineup", "bench", "ir", "goalies"],
-        content: renderItems([
-          {
-            code: "1.1",
-            text: "2 Centers, 2 Left Wingers, 2 Right Wingers, 3 Defensemen, 1 Utility Skater, 1 Goalie, 4 Bench Spots",
-          },
-          {
-            code: "1.2",
-            text: "Teams have 1 IR slot and 1 IR+ slot for injury relief",
-          },
-        ]),
-      },
-      {
-        id: "scoring",
-        title: "Scoring/Categories",
-        keywords: ["scoring", "categories", "skater", "goalie", "tiebreak"],
-        content: renderItems([
-          {
-            code: "2.1",
-            text: "7 skater categories",
-            subitems: [
-              {
-                code: "2.1.1",
-                text: "Goals, Assists, Points, Powerplay Points, Shots, Hits, Blocks",
-              },
-            ],
-          },
-          {
-            code: "2.2",
-            text: "3 goalie categories",
-            subitems: [
-              {
-                code: "2.2.1",
-                text: "Wins, Goals Against Average, Save Percentage",
-              },
-            ],
-          },
-          {
-            code: "2.3",
-            text: 'Tiebreaker for all matchups is "home-ice advantage". The designated home team wins any ties.',
-          },
-          {
-            code: "2.4",
-            text: "Teams must have a minimum of 2 goalie starts during a matchup. If a team does not meet this minimum, then all 3 goalie categories are conceded",
-          },
-        ]),
-      },
-      {
-        id: "waivers-trades",
-        title: "Waivers/Trades",
-        keywords: ["waivers", "trades", "deadline", "collusion"],
-        content: renderItems([
-          {
-            code: "3.1",
-            text: "Dropped players remain on waivers for 2 days beore being processed using Yahoo's continuous rolling list system",
-          },
-          {
-            code: "3.2",
-            text: "Trade deadline is 2.5 weeks prior to the end of the GSHL regular season",
-          },
-          {
-            code: "3.3",
-            text: "Trades are not subject to any league or commissioner approval and are processed immediately",
-          },
-          {
-            code: "3.4",
-            text: "Any trades with suspected foul play or collusion will be investigated immediately and violaters will be punished at commissioners discretion",
-          },
-          {
-            code: "3.5",
-            text: "Players under contract can be traded with their contract fully intact. No salary retention allowed.",
-          },
-        ]),
-      },
-      {
-        id: "schedule",
-        title: "Schedule/Tiebreakers",
-        keywords: ["schedule", "tiebreak", "standings", "points"],
-        content: renderItems([
-          {
-            code: "4.1",
-            text: "The GSHL season will be the entire length of the NHL regular season minus 3 playoff weeks. 21-23 weeks depending on the year.",
-          },
-          {
-            code: "4.2",
-            text: "Each team plays a home-and-home with every team in their conference for a 14 game conference schedule",
-          },
-          {
-            code: "4.3",
-            text: "The rest of the schedule is made up of non-conference games that rotate home and away yearly",
-          },
-          {
-            code: "4.4",
-            text: "Points are awarded using a 3 point system, Win = 3 pts, Home-ice win = 2 pts, Home-ice loss = 1 pt, Loss = 0 pts",
-          },
-          {
-            code: "4.5",
-            text: "Standings Tiebreakers",
-            subitems: [
-              { code: "4.5.1", text: "Total Wins" },
-              { code: "4.5.2", text: "Total Points" },
-              { code: "4.5.3", text: "Head-to-Head Points" },
-              { code: "4.5.4", text: "Head-to-Head Category Differential" },
-              { code: "4.5.5", text: "Overall Category Differential" },
-              { code: "4.5.6", text: "Conference Points" },
-              { code: "4.5.7", text: "Conference Category Differential" },
-              { code: "4.5.8", text: "Owner ladder ranking" },
-            ],
-          },
-        ]),
-      },
-      {
-        id: "playoffs",
-        title: "Playoffs/Payouts",
-        keywords: ["playoffs", "payouts", "buy-in", "wildcards"],
-        content: renderItems([
-          {
-            code: "5.1",
-            text: "Top 8 teams qualify for the playoffs",
-            subitems: [
-              {
-                code: "5.1.1",
-                text: "The top 3 teams in each conference along with the best two remaining teams as wildcards",
-              },
-              {
-                code: "5.1.2",
-                text: "Each conference will play 1 v 4 and 2 v 3",
-              },
-              {
-                code: "5.1.3",
-                text: "If a crossover is required then the #1 overall team will play the second wildcard and the other Conference champion will play the first wildacrd",
-              },
-            ],
-          },
-          {
-            code: "5.2",
-            text: "Second round playoff matchups are the Conference Championship games",
-          },
-          {
-            code: "5.3",
-            text: "Both Conference Championship winners will play in the annual GSHL Cup Final",
-          },
-          {
-            code: "5.4",
-            text: "When a team is eliminated from the playoffs their roster is locked immediately",
-          },
-          {
-            code: "5.5",
-            text: "The yearly buy-in for each team is $60. Yearly Payouts are $600 for the GSHL Cup champion, $150 for the GSHL Cup runner up, and the final $210 go to admin fees (engraving, draft food, etc.)",
-          },
-        ]),
-      },
-      {
-        id: "draft",
-        title: "Draft",
-        keywords: ["draft", "thanksgiving", "snake"],
-        content: renderItems([
-          {
-            code: "6.1",
-            text: "The GSHL Draft date will be chosen by owner pool as soon as the NHL opening day is announced",
-          },
-          {
-            code: "6.2",
-            text: "The GSHL Draft is 15 rounds long and follows a delayed snake draft format. The snake does not begin until after the 2nd round",
-          },
-          {
-            code: "6.3",
-            text: "Players under contract at the start of the draft will be slotted in to a teams draft class from their worst pick and up",
-          },
-        ]),
-      },
-      {
-        id: "lottery",
-        title: "Draft Order",
-        keywords: ["draft order"],
-        content: renderItems([
-          {
-            code: "7.1",
-            text: "Draft Order",
-            subitems: [
-              {
-                code: "7.1.1",
-                text: "All teams will continue to play matchups through the 3 playoff weeks to set the draft order",
-              },
-              {
-                code: "7.1.2",
-                text: "Rosters will be frozen on the final day of the regular season and lineups wll be auto set for these draft order matchups",
-              },
-              {
-                code: "7.1.3",
-                text: "9th and 10th play in week 1, 11th and 12th play in week 1, winners move on the final four, losers play a two week matchup for the 5th and 6th pick. 13th and 14th also play in week 1 for placement, winner of that matchup gets the winner of the 11th/ 12th game in week 2, the loser gets the winner of the 9th/0th game in week 2. WInners of these two week 2 matchups then play in week 3 for the 1st overall pick with the winenr getting #1, losers of the week 2 matchups then play for the 3rd and 4th pick in week 3",
-              },
-              {
-                code: "7.1.4",
-                text: "The two first round losers in each conference play in week 2, winners then matchup and play for 7th and 8th pick in week 3, losers play for 9th and 10th pick in week 3",
-              },
-              {
-                code: "7.1.5",
-                text: "The two conference finals losers matchup in the final week for picks 11th and 12th, winner gets 11th and loser gets 12th pick",
-              },
-              {
-                code: "7.1.6",
-                text: "The GSHL Champion receives the 14th pick and runner up receives the 13th pick",
-              },
-            ],
-          },
-        ]),
-      },
-      {
-        id: "awards",
-        title: "Awards",
-        keywords: ["awards", "rocket richard", "hart", "vezina", "norris"],
-        content: renderItems([
-          {
-            code: "8.1",
-            text: "Team Trophies",
-            subitems: [
-              { code: "8.1.1", text: "GSHL Cup Champion" },
-              {
-                code: "8.1.2",
-                text: "President's Trophy - Best Regular Season Record",
-              },
-              {
-                code: "8.1.3",
-                text: "Two-Seven-Six Trophy - Sunview Regular Season Title",
-              },
-              {
-                code: "8.1.4",
-                text: "Unit 4 Trophy - Hickory Hotel Regular Season Title",
-              },
-              {
-                code: "8.1.5",
-                text: "Adam Brophy Award - Loser's Tournament 'Winner'",
-              },
-            ],
-          },
-          {
-            code: "8.2",
-            text: "Tier 1 Awards",
-            subitems: [
-              { code: "8.2.1", text: "Jack Adams - Coach of the Year" },
-              { code: "8.2.2", text: "GM of the Year" },
-              { code: "8.2.3", text: "Vezina - Best Goaltending" },
-              { code: "8.2.4", text: "Norris - Best Defensemen" },
-              { code: "8.2.5", text: "Hart - Best Team" },
-              { code: "8.2.6", text: "Calder - Best Draft" },
-            ],
-          },
-          {
-            code: "8.3",
-            text: "Tier 2 Awards",
-            subitems: [
-              { code: "8.3.1", text: "Rocket Richard - Most Goals" },
-              { code: "8.3.2", text: "Art Ross - Most Points" },
-              { code: "8.3.3", text: "Selke - Most Hits + Blocks" },
-              { code: "8.3.4", text: "Lady Byng - Most Players Used" },
-            ],
-          },
-        ]),
-      },
-      {
-        id: "salary-cap",
-        title: "Salary Cap System",
-        keywords: ["salary", "cap", "contracts", "ufa", "rfa", "signing"],
-        content: renderItems([
-          {
-            code: "9.1",
-            text: "The Salary Cap only applies to your players under contract each year or 'keepers', the rest of your roster is filled in through the yearly GSHL draft. Generally 2-4 keepers per team",
-          },
-          {
-            code: "9.2",
-            text: "The Salary Cap has a hard limit of $25,000,000",
-          },
-          {
-            code: "9.3",
-            text: "There is a 3-year maximum on all contracts and teams can sign as many contracts as they would like",
-          },
-          {
-            code: "9.4",
-            text: "There is no retention, proration, or exceptions allowed with salaries or the salary cap",
-          },
-          {
-            code: "9.5",
-            text: "Buyouts are when a player under contract is dropped by the team. That players salary is cut in half for the same number of years, if a buyout is done in the final year of a contract a year is added and the buyout ends at the end of the following season",
-          },
-          {
-            code: "9.6",
-            text: "Every player to play in the NHL in the past 2 years is assigned a salary between $10,000,000 and $1,000,000 at the start of each signing period",
-          },
-          {
-            code: "9.7",
-            text: "A players salary does not change for the length of the contract",
-          },
-          {
-            code: "9.8",
-            text: "There are two signing periods every year and the summer free agency period",
-            subitems: [
-              {
-                code: "9.8.1",
-                text: "Early Signing Period starts on December 15th and finishes on December 31st",
-              },
-              {
-                code: "9.8.2",
-                text: "Late Signing Period starts at the end of the GSHL Playoffs and finishes at the end of the NHL playoffs. (GSHL Cup to Stanley Cup)",
-              },
-              {
-                code: "9.8.3",
-                text: "Free Agency starts when the Stanley Cup is awarded and finishes at the GSHL Draft",
-              },
-            ],
-          },
-          {
-            code: "9.9",
-            text: "Contracts can be signed at any point during a signing period",
-          },
-          {
-            code: "9.10",
-            text: "Players can only play under 2 consecutive contracts. Players coming off of their second consecutive contract must go back in to the draft pool",
-          },
-          {
-            code: "9.11",
-            text: "Players coming off of their first contract are considered RFAs and can be signed for 115% of their updated salary",
-          },
-          {
-            code: "9.12",
-            text: "Players are only eligible to be signed to a contract if they have been on a GSHL roster for over 2/3 of the season or on that GSHL roster for over 1/3 of the season",
-          },
-          {
-            code: "9.13",
-            text: "At the end of the late signing period, every player that is not under contract becomes a UFA",
-          },
-          {
-            code: "9.14",
-            text: "UFAs can be signed by any team for a 125% premium",
-          },
-          {
-            code: "9.15",
-            text: "UFA contract offers can be submitted at any time. Once a UFA contract offer is posted to the league, any other owner has 7 days to match the offer. If no other owner matches the offer, then the UFA is signed to that team. If another owner matches the offer, then the UFA makes a decision on which team to sign with via a signing algorithm. The algorithm is based on things like owner ladder ranking, previous season performance, other players under contract, length of contract",
-          },
-        ]),
-      },
-    ],
-    [],
+  const [activeSection, setActiveSection] = useState(rulebookSections[0]!.id);
+  const [copied, setCopied] = useState(false);
+  const [expanded, setExpanded] = useState<Record<string, boolean>>(() =>
+    Object.fromEntries(rulebookSections.map((section) => [section.id, true])),
   );
 
-  const filtered = useMemo(() => {
-    if (!normalized) return sections;
+  const normalizedQuery = query.trim().toLocaleLowerCase();
+  const queryTokens = useMemo(
+    () => normalizedQuery.split(/\s+/).filter(Boolean),
+    [normalizedQuery],
+  );
 
-    return sections.filter((section) => {
-      const inTitle = section.title.toLowerCase().includes(normalized);
-      const inKeywords = (section.keywords ?? []).some((k) =>
-        k.toLowerCase().includes(normalized),
-      );
-      return inTitle || inKeywords;
-    });
-  }, [normalized, sections]);
+  const filteredSections = useMemo(() => {
+    if (queryTokens.length === 0) {
+      return rulebookSections.map((section) => ({
+        section,
+        rules: section.rules,
+      }));
+    }
+
+    return rulebookSections
+      .map((section) => ({
+        section,
+        rules: section.rules.filter((rule) => {
+          const searchText = getRulebookSearchText(section, rule);
+          return queryTokens.every((token) => searchText.includes(token));
+        }),
+      }))
+      .filter(({ rules }) => rules.length > 0);
+  }, [queryTokens]);
+
+  const totalMatches = filteredSections.reduce(
+    (sum, section) => sum + section.rules.length,
+    0,
+  );
+
+  const openAndFocusHash = useCallback(() => {
+    const id = window.location.hash.slice(1);
+    if (!id) return;
+
+    const parentSection = rulebookSections.find(
+      (section) =>
+        section.id === id || section.rules.some((rule) => rule.id === id),
+    );
+    if (!parentSection) return;
+
+    setExpanded((current) => ({ ...current, [parentSection.id]: true }));
+    window.setTimeout(() => {
+      const target = document.getElementById(id);
+      target?.scrollIntoView({ behavior: "smooth", block: "start" });
+      target?.focus({ preventScroll: true });
+    }, 40);
+  }, []);
+
+  useEffect(() => {
+    openAndFocusHash();
+    window.addEventListener("hashchange", openAndFocusHash);
+    return () => window.removeEventListener("hashchange", openAndFocusHash);
+  }, [openAndFocusHash]);
+
+  useEffect(() => {
+    if (normalizedQuery) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries
+          .filter((entry) => entry.isIntersecting)
+          .sort(
+            (a, b) => a.boundingClientRect.top - b.boundingClientRect.top,
+          )[0];
+        if (visible?.target.id) setActiveSection(visible.target.id);
+      },
+      { rootMargin: "-18% 0px -72% 0px", threshold: 0 },
+    );
+
+    document
+      .querySelectorAll<HTMLElement>("[data-rulebook-section]")
+      .forEach((section) => observer.observe(section));
+    return () => observer.disconnect();
+  }, [normalizedQuery]);
+
+  useEffect(() => {
+    if (!normalizedQuery) return;
+    setExpanded((current) => ({
+      ...current,
+      ...Object.fromEntries(
+        filteredSections.map(({ section }) => [section.id, true]),
+      ),
+    }));
+  }, [filteredSections, normalizedQuery]);
+
+  const goToSection = (id: string) => {
+    setExpanded((current) => ({ ...current, [id]: true }));
+    window.history.replaceState(null, "", `#${id}`);
+    window.setTimeout(() => {
+      const target = document.getElementById(id);
+      target?.scrollIntoView({ behavior: "smooth", block: "start" });
+      target?.focus({ preventScroll: true });
+    }, 20);
+  };
+
+  const copyPageLink = async () => {
+    await navigator.clipboard.writeText(window.location.href);
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1800);
+  };
 
   return (
-    <div className="mx-auto w-full max-w-4xl">
-      <div className="mb-5 flex flex-col gap-3">
-        <div className="space-y-1 text-center">
-          <h1 className="text-2xl font-bold tracking-tight">Rulebook</h1>
-          <p className="text-sm text-muted-foreground">
-            League rules and reference information
-          </p>
-        </div>
-
-        <div className="flex items-center justify-center">
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search sections (e.g., draft, contracts, playoffs)"
-            className={cn(
-              "w-full max-w-xl rounded-md border bg-background px-3 py-2 text-sm",
-              "focus:outline-none focus:ring-2 focus:ring-ring",
-            )}
-          />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 gap-3">
-        {filtered.map((section) => (
-          <div
-            key={section.id}
-            className="rounded-lg border bg-card p-4 shadow-sm"
-          >
-            <div className="mb-2 flex items-center justify-between gap-3">
-              <h2 className="text-base font-semibold">{section.title}</h2>
+    <main className="rulebook-page mx-auto w-full max-w-7xl font-varela">
+      <header className="relative mb-8 overflow-hidden rounded-2xl border bg-slate-950 px-6 py-9 text-white shadow-lg sm:px-10 sm:py-11">
+        <div className="absolute inset-y-0 left-0 w-1.5 bg-sunview-400" />
+        <div className="absolute inset-y-0 right-0 w-1.5 bg-hotel-400" />
+        <div className="relative">
+          <div className="mb-4 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.22em] text-slate-300">
+            <BookOpen className="h-4 w-4" aria-hidden="true" />
+            Official league reference
+          </div>
+          <div className="flex flex-col justify-between gap-6 lg:flex-row lg:items-end">
+            <div>
+              <h1 className="font-barlow text-4xl font-bold tracking-tight sm:text-5xl">
+                GSHL Rulebook
+              </h1>
+              <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300 sm:text-base">
+                League rules, scoring, salary cap, contracts, and draft
+                procedures
+              </p>
+              <p className="mt-4 text-xs font-semibold uppercase tracking-widest text-slate-400">
+                Last updated {RULEBOOK_LAST_UPDATED}
+              </p>
             </div>
-            <div id={section.id}>{section.content}</div>
+            <div className="rulebook-actions flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => void copyPageLink()}
+                className="inline-flex items-center gap-2 rounded-lg border border-white/20 bg-white/10 px-3.5 py-2 text-sm font-semibold transition hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-white"
+              >
+                {copied ? (
+                  <Check className="h-4 w-4" />
+                ) : (
+                  <Copy className="h-4 w-4" />
+                )}
+                {copied ? "Copied" : "Copy link"}
+              </button>
+              <button
+                type="button"
+                onClick={() => window.print()}
+                className="inline-flex items-center gap-2 rounded-lg bg-white px-3.5 py-2 text-sm font-semibold text-slate-950 transition hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-slate-950"
+              >
+                <Printer className="h-4 w-4" />
+                Print
+              </button>
+            </div>
           </div>
-        ))}
+        </div>
+      </header>
 
-        {filtered.length === 0 ? (
-          <div className="rounded-lg border bg-card p-6 text-center">
-            <p className="text-sm text-muted-foreground">
-              No matching sections.
-            </p>
-          </div>
-        ) : null}
+      <div className="rulebook-search-panel mb-6 rounded-xl border bg-card p-4 shadow-sm sm:p-5">
+        <label
+          htmlFor="rulebook-search"
+          className="mb-2 block text-sm font-bold"
+        >
+          Search the rulebook
+        </label>
+        <div className="relative">
+          <Search
+            className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground"
+            aria-hidden="true"
+          />
+          <input
+            id="rulebook-search"
+            type="search"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Try ‘buyouts’, ‘9.15’, or ‘goalie appearances’"
+            className="h-11 w-full rounded-lg border bg-background pl-10 pr-11 text-sm outline-none transition placeholder:text-muted-foreground focus:border-sunview-400 focus:ring-2 focus:ring-sunview-200"
+          />
+          {query ? (
+            <button
+              type="button"
+              onClick={() => setQuery("")}
+              aria-label="Clear rulebook search"
+              className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-2 text-muted-foreground hover:bg-muted hover:text-foreground focus:outline-none focus:ring-2 focus:ring-sunview-400"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          ) : null}
+        </div>
+        <p className="mt-2 text-xs text-muted-foreground" aria-live="polite">
+          {normalizedQuery
+            ? `${totalMatches} matching ${totalMatches === 1 ? "rule" : "rules"}`
+            : "Search by rule number, title, or wording."}
+        </p>
       </div>
-    </div>
+
+      <div className="rulebook-mobile-jump mb-5 lg:hidden">
+        <label htmlFor="rulebook-jump" className="mb-2 block text-sm font-bold">
+          Jump to section
+        </label>
+        <select
+          id="rulebook-jump"
+          value={activeSection}
+          onChange={(event) => goToSection(event.target.value)}
+          className="h-11 w-full rounded-lg border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-sunview-400"
+        >
+          {rulebookSections.map((section) => (
+            <option key={section.id} value={section.id}>
+              {section.number}. {section.title}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div className="grid gap-7 lg:grid-cols-[16rem_minmax(0,1fr)] lg:items-start">
+        <nav
+          className="rulebook-toc sticky top-20 hidden max-h-[calc(100vh-6rem)] overflow-y-auto rounded-xl border bg-card p-3 shadow-sm lg:block"
+          aria-label="Rulebook table of contents"
+        >
+          <p className="px-3 pb-2 pt-1 font-barlow text-xs font-bold uppercase tracking-[0.2em] text-muted-foreground">
+            Contents
+          </p>
+          <ol className="space-y-1">
+            {rulebookSections.map((section) => (
+              <li key={section.id}>
+                <a
+                  href={`#${section.id}`}
+                  onClick={(event) => {
+                    event.preventDefault();
+                    goToSection(section.id);
+                  }}
+                  aria-current={
+                    activeSection === section.id ? "location" : undefined
+                  }
+                  className={cn(
+                    "flex gap-2 rounded-lg px-3 py-2 text-sm leading-5 transition-colors focus:outline-none focus:ring-2 focus:ring-sunview-400",
+                    activeSection === section.id
+                      ? "bg-sunview-100 font-bold text-sunview-800"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                  )}
+                >
+                  <span className="w-5 shrink-0 font-barlow font-bold">
+                    {section.number}
+                  </span>
+                  <span>{section.title}</span>
+                </a>
+              </li>
+            ))}
+          </ol>
+        </nav>
+
+        <div className="min-w-0 space-y-5">
+          {filteredSections.map(({ section, rules }) => (
+            <Section
+              key={section.id}
+              section={section}
+              rules={rules}
+              expanded={expanded[section.id] ?? true}
+              query={query}
+              onToggle={() =>
+                setExpanded((current) => ({
+                  ...current,
+                  [section.id]: !(current[section.id] ?? true),
+                }))
+              }
+            />
+          ))}
+
+          {filteredSections.length === 0 ? (
+            <div className="rounded-xl border border-dashed bg-card px-6 py-16 text-center">
+              <Search
+                className="mx-auto h-8 w-8 text-muted-foreground"
+                aria-hidden="true"
+              />
+              <h2 className="mt-4 text-lg font-bold">No matching rules</h2>
+              <p className="mt-2 text-sm text-muted-foreground">
+                Try a broader term or search by a rule number.
+              </p>
+              <button
+                type="button"
+                onClick={() => setQuery("")}
+                className="mt-5 rounded-lg bg-sunview-700 px-4 py-2 text-sm font-bold text-white hover:bg-sunview-800 focus:outline-none focus:ring-2 focus:ring-sunview-400 focus:ring-offset-2"
+              >
+                Clear search
+              </button>
+            </div>
+          ) : null}
+        </div>
+      </div>
+    </main>
   );
 }
