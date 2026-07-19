@@ -10,6 +10,7 @@ export * from "./playoff-bracket";
 export * from "./season-awards";
 
 export * from "./locker-room-header";
+export * from "./league-activity";
 
 export {
   OVERALL_SEED_FIELDS,
