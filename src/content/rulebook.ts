@@ -567,7 +567,10 @@ export const rulebookSections: RulebookSection[] = [
         title: "Draft-Order Matchups",
         blocks: [
           paragraph(
-            "All teams continue to play during the three GSHL playoff weeks to determine the following season’s draft order.",
+            "All teams continue to play matchups through the three GSHL playoff weeks to determine the following season’s draft order.",
+          ),
+          paragraph(
+            "Draft-order placement games determine all 14 selections in the following season’s draft.",
           ),
         ],
       },
@@ -578,7 +581,7 @@ export const rulebookSections: RulebookSection[] = [
         blocks: [
           bullets([
             "Rosters freeze on the final day of the GSHL regular season.",
-            "Draft-order matchups use auto-set lineups based on each team’s final regular-season roster.",
+            "Lineups are automatically set for all draft-order placement matchups using each team’s final regular-season roster.",
             "No additions, drops, trades, waiver claims, or manual lineup changes are allowed after the roster freeze for draft-order competition.",
           ]),
         ],
@@ -586,37 +589,38 @@ export const rulebookSections: RulebookSection[] = [
       {
         id: "picks-1-6",
         number: "7.3",
-        title: "Picks 1–6",
+        title: "Picks 1–6 Placement Games",
         blocks: [
-          paragraph(
-            "Teams finishing 9th through 14th enter the Draft-Order Tournament.",
-          ),
           bullets([
-            "The tournament determines picks 1–6.",
-            "The winner of the final matchup receives the 1st overall pick.",
-            "The GSHL App will display the full bracket, seeding, home assignments, and matchup paths before playoff week one.",
+            "Week 1: 9th place plays 10th place, 11th place plays 12th place, and 13th place plays 14th place.",
+            "The losers of the 9th/10th and 11th/12th matchups begin a two-week matchup in Week 2. The winner receives pick 5 and the loser receives pick 6.",
+            "Week 2: The winner of the 13th/14th matchup plays the winner of the 11th/12th matchup.",
+            "Week 2: The loser of the 13th/14th matchup plays the winner of the 9th/10th matchup.",
+            "Week 3: The two Week 2 semifinal winners play for picks 1 and 2. The winner receives pick 1 and the loser receives pick 2.",
+            "Week 3: The two Week 2 semifinal losers play for picks 3 and 4. The winner receives pick 3 and the loser receives pick 4.",
           ]),
         ],
       },
       {
         id: "picks-7-10",
         number: "7.4",
-        title: "Picks 7–10",
+        title: "Picks 7–10 Placement Games",
         blocks: [
-          paragraph(
-            "The four teams eliminated in the first playoff round enter a consolation bracket to determine picks 7–10.",
-          ),
+          bullets([
+            "Week 2: The two first-round playoff losers in each conference play one another.",
+            "Week 3: The two Week 2 winners play for picks 7 and 8. The winner receives pick 7 and the loser receives pick 8.",
+            "Week 3: The two Week 2 losers play for picks 9 and 10. The winner receives pick 9 and the loser receives pick 10.",
+          ]),
         ],
       },
       {
         id: "picks-11-12",
         number: "7.5",
-        title: "Picks 11–12",
+        title: "Picks 11–12 Placement Game",
         blocks: [
           paragraph(
-            "The two Conference Championship losers play during the final playoff week.",
+            "The two Conference Championship losers play during the final playoff week. The winner receives pick 11 and the loser receives pick 12.",
           ),
-          bullets(["Winner receives pick 11.", "Loser receives pick 12."]),
         ],
       },
       {
@@ -628,9 +632,6 @@ export const rulebookSections: RulebookSection[] = [
             "GSHL Cup Runner-Up receives pick 13.",
             "GSHL Cup Champion receives pick 14.",
           ]),
-          paragraph(
-            "The current Draft-Order Tournament bracket is available during the playoffs.",
-          ),
         ],
       },
     ],

@@ -77,29 +77,6 @@ export function PlayoffStructureBracket() {
   );
 }
 
-const draftOrderPaths = [
-  {
-    entrants: "Teams finishing 9th–14th",
-    stage: "Draft-Order Tournament",
-    result: "Picks 1–6",
-  },
-  {
-    entrants: "First-round playoff losers",
-    stage: "Consolation bracket",
-    result: "Picks 7–10",
-  },
-  {
-    entrants: "Conference Championship losers",
-    stage: "Final-week matchup",
-    result: "Picks 11–12",
-  },
-  {
-    entrants: "Cup Runner-Up / Champion",
-    stage: "Final placement",
-    result: "Picks 13 / 14",
-  },
-];
-
 export function DraftOrderStructureBracket() {
   return (
     <figure
@@ -110,34 +87,65 @@ export function DraftOrderStructureBracket() {
         id="draft-order-bracket-caption"
         className="mb-3 text-sm font-semibold"
       >
-        Draft-order structure
+        Draft-order placement games
       </figcaption>
-      <div className="overflow-x-auto pb-1">
-        <div className="min-w-[40rem] space-y-2 rounded-md bg-muted/25 p-3">
-          <div className="grid grid-cols-[1fr_2rem_1fr_2rem_0.65fr] gap-2 px-1 text-center text-[0.6875rem] font-semibold uppercase tracking-wide text-muted-foreground">
-            <span>Entrants</span>
-            <span />
-            <span>Competition</span>
-            <span />
-            <span>Draft picks</span>
-          </div>
-          {draftOrderPaths.map((path) => (
-            <div
-              key={path.result}
-              className="grid grid-cols-[1fr_2rem_1fr_2rem_0.65fr] gap-2"
-            >
-              <Matchup>{path.entrants}</Matchup>
-              <Connector />
-              <Matchup>{path.stage}</Matchup>
-              <Connector />
-              <Matchup>{path.result}</Matchup>
+      <div className="space-y-4">
+        <div>
+          <p className="mb-2 text-xs font-semibold">Picks 1–6</p>
+          <div className="overflow-x-auto pb-1">
+            <div className="grid min-w-[48rem] grid-cols-[1fr_2rem_1.15fr_2rem_1fr] gap-2 rounded-md bg-muted/25 p-3">
+              <Stage title="Week 1">
+                <Matchup>9th vs. 10th</Matchup>
+                <Matchup>11th vs. 12th</Matchup>
+                <Matchup>13th vs. 14th</Matchup>
+              </Stage>
+              <Connector afterLabel />
+              <Stage title="Week 2">
+                <Matchup>Winner 11/12 vs. Winner 13/14</Matchup>
+                <Matchup>Winner 9/10 vs. Loser 13/14</Matchup>
+                <Matchup>
+                  Loser 9/10 vs. Loser 11/12 begins two-week matchup
+                </Matchup>
+              </Stage>
+              <Connector afterLabel />
+              <Stage title="Week 3">
+                <Matchup>Semifinal winners → Winner: 1 / Loser: 2</Matchup>
+                <Matchup>Semifinal losers → Winner: 3 / Loser: 4</Matchup>
+                <Matchup>Two-week matchup → Winner: 5 / Loser: 6</Matchup>
+              </Stage>
             </div>
-          ))}
+          </div>
+        </div>
+
+        <div>
+          <p className="mb-2 text-xs font-semibold">Picks 7–10</p>
+          <div className="overflow-x-auto pb-1">
+            <div className="grid min-w-[34rem] grid-cols-[1fr_2rem_1fr] gap-2 rounded-md bg-muted/25 p-3">
+              <Stage title="Week 2">
+                <Matchup>Sunview first-round losers play</Matchup>
+                <Matchup>Hickory Hotel first-round losers play</Matchup>
+              </Stage>
+              <Connector afterLabel />
+              <Stage title="Week 3">
+                <Matchup>Week 2 winners → Winner: 7 / Loser: 8</Matchup>
+                <Matchup>Week 2 losers → Winner: 9 / Loser: 10</Matchup>
+              </Stage>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <p className="mb-2 text-xs font-semibold">Picks 11–14</p>
+          <div className="grid gap-2 rounded-md bg-muted/25 p-3 sm:grid-cols-3">
+            <Matchup>Conference Championship losers</Matchup>
+            <Matchup>Winner → Pick 11 · Loser → Pick 12</Matchup>
+            <Matchup>Runner-Up → Pick 13 · Champion → Pick 14</Matchup>
+          </div>
         </div>
       </div>
       <p className="mt-2 text-xs text-muted-foreground">
-        The GSHL App publishes the detailed picks 1–6 matchup paths before
-        playoff week one.
+        The GSHL App publishes the seeded bracket and home-team assignments
+        before playoff week one.
       </p>
     </figure>
   );
