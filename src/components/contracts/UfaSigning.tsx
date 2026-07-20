@@ -345,6 +345,7 @@ export function UfaHomeCard() {
 
 export function UfaLeagueOffice() {
   const [filter, setFilter] = useState("ALL");
+  const [visibleCount, setVisibleCount] = useState(50);
   const query = useUfaOverview();
   const players = useMemo(
     () =>
@@ -353,6 +354,7 @@ export function UfaLeagueOffice() {
       ) ?? [],
     [filter, query.data?.freeAgents],
   );
+  const visiblePlayers = players.slice(0, visibleCount);
   if (query.isLoading)
     return <div className="h-80 animate-pulse rounded-xl bg-muted/40" />;
   if (query.error || !query.data)
@@ -375,7 +377,10 @@ export function UfaLeagueOffice() {
           <button
             key={value}
             type="button"
-            onClick={() => setFilter(value)}
+            onClick={() => {
+              setFilter(value);
+              setVisibleCount(50);
+            }}
             className={`rounded-full border px-4 py-2 text-sm font-semibold ${filter === value ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
           >
             {value === "ALL" ? "All" : value}
@@ -387,7 +392,18 @@ export function UfaLeagueOffice() {
           {query.data.window.reason}
         </p>
       ) : null}
-      <PlayerTable players={players} showStats />
+      <PlayerTable players={visiblePlayers} showStats />
+      {visibleCount < players.length ? (
+        <div className="flex justify-center">
+          <button
+            type="button"
+            className="min-h-11 rounded-md border bg-white px-5 py-2 text-sm font-semibold shadow-sm"
+            onClick={() => setVisibleCount((count) => count + 50)}
+          >
+            Load more free agents
+          </button>
+        </div>
+      ) : null}
       <ActiveOffers groups={query.data.offerGroups} />
     </div>
   );

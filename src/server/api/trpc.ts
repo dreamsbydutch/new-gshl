@@ -100,25 +100,26 @@ function describeError(error: unknown): Record<string, unknown> {
 }
 
 const timingMiddleware = t.middleware(async ({ next, path }) => {
-  const start = Date.now();
+  const start = performance.now();
 
   try {
     const result = await next();
 
-    const end = Date.now();
+    const durationMs = Math.round(performance.now() - start);
     if (!result.ok) {
-      console.error(`[TRPC] ${path} failed after ${end - start}ms`, {
+      console.error(`[TRPC] ${path} failed after ${durationMs}ms`, {
         backend: env.GSHL_DATA_BACKEND,
         error: describeError(result.error),
       });
-    } else {
-      console.log(`[TRPC] ${path} took ${end - start}ms to execute`);
+    } else if (env.NODE_ENV === "development") {
+      const responseBytes = Buffer.byteLength(JSON.stringify(result.data));
+      console.info(`[TRPC] ${path}`, { durationMs, responseBytes });
     }
 
     return result;
   } catch (error) {
-    const end = Date.now();
-    console.error(`[TRPC] ${path} threw after ${end - start}ms`, {
+    const durationMs = Math.round(performance.now() - start);
+    console.error(`[TRPC] ${path} threw after ${durationMs}ms`, {
       backend: env.GSHL_DATA_BACKEND,
       error: describeError(error),
     });

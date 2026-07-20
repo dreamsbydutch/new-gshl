@@ -9,16 +9,12 @@ export default async function LockerRoomPage() {
   const contractSeason = resolveContractDefaultSeason(seasons);
 
   await Promise.all([
-    serverApi.player.getAll.prefetch({}),
-    serverApi.contract.getAll.prefetch({}),
-    serverApi.draftPick.getAll.prefetch({}),
     serverApi.season.getAll.prefetch({ orderBy: { year: "asc" } }),
-    serverApi.team.getAll.prefetch(
-      contractSeason?.id
-        ? { where: { seasonId: String(contractSeason.id) } }
-        : {},
-    ),
-    serverApi.team.getNHLTeams.prefetch(),
+    contractSeason?.id
+      ? serverApi.team.getAll.prefetch({
+          where: { seasonId: String(contractSeason.id) },
+        })
+      : Promise.resolve(),
   ]);
 
   return (

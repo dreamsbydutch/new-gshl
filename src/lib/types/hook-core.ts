@@ -67,6 +67,13 @@ export interface UsePlayersOptions {
   refetchOnWindowFocus?: boolean;
 }
 
+export interface UsePlayerPagesOptions {
+  active?: boolean;
+  positionGroup?: string;
+  enabled?: boolean;
+  limit?: number;
+}
+
 export type PlayerRankField = "overallRk" | "seasonRk" | "preDraftRk";
 
 export interface UseRankedPlayersOptions extends UsePlayersOptions {

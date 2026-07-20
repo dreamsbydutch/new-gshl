@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { createTRPCRouter, publicProcedure } from "../trpc";
-import { baseQuerySchema } from "./_schemas";
+import { baseQuerySchema, requireQueryScope } from "./_schemas";
 import {
   type TeamDayStatLine,
   type TeamSeasonStatLine,
@@ -16,6 +16,7 @@ const teamStatsWhereSchema = z
     seasonId: z.string().optional(),
     weekId: z.string().optional(),
     seasonType: z.nativeEnum(SeasonType).optional(),
+    date: z.string().optional(),
   })
   .optional();
 
@@ -25,6 +26,12 @@ export const teamStatsRouter = createTRPCRouter({
     getAll: publicProcedure
       .input(baseQuerySchema.extend({ where: teamStatsWhereSchema }))
       .query(async ({ input }): Promise<TeamDayStatLine[]> => {
+        requireQueryScope(input.where, [
+          "gshlTeamId",
+          "seasonId",
+          "weekId",
+          "date",
+        ]);
         return getMany<TeamDayStatLine>("TeamDayStatLine", input);
       }),
 
@@ -82,6 +89,7 @@ export const teamStatsRouter = createTRPCRouter({
     getAll: publicProcedure
       .input(baseQuerySchema.extend({ where: teamStatsWhereSchema }))
       .query(async ({ input }): Promise<TeamWeekStatLine[]> => {
+        requireQueryScope(input.where, ["gshlTeamId", "seasonId", "weekId"]);
         return getMany<TeamWeekStatLine>("TeamWeekStatLine", input);
       }),
 
@@ -123,6 +131,7 @@ export const teamStatsRouter = createTRPCRouter({
     getAll: publicProcedure
       .input(baseQuerySchema.extend({ where: teamStatsWhereSchema }))
       .query(async ({ input }): Promise<TeamSeasonStatLine[]> => {
+        requireQueryScope(input.where, ["gshlTeamId", "seasonId"]);
         return getMany<TeamSeasonStatLine>("TeamSeasonStatLine", input);
       }),
 

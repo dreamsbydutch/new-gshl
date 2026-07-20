@@ -9,9 +9,14 @@ export default async function DraftBoardPage() {
   const contractSeason = resolveContractDefaultSeason(seasons);
 
   await Promise.all([
-    serverApi.player.getAll.prefetch({}),
+    serverApi.player.listPage.prefetch({ active: true, limit: 50 }),
     serverApi.contract.getAll.prefetch({}),
-    serverApi.draftPick.getAll.prefetch({}),
+    contractSeason?.id
+      ? serverApi.draftPick.listPage.prefetch({
+          seasonId: String(contractSeason.id),
+          limit: 50,
+        })
+      : Promise.resolve(),
     serverApi.season.getAll.prefetch({ orderBy: { year: "asc" } }),
     serverApi.team.getAll.prefetch(
       contractSeason?.id

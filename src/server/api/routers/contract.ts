@@ -28,6 +28,7 @@ import { getById, getCount, getFirst, getMany } from "../sheets-store";
 const contractWhereSchema = z
   .object({
     playerId: z.string().optional(),
+    ownerId: z.string().optional(),
     teamId: z.string().optional(),
     seasonId: z.string().optional(),
     isActive: z.boolean().optional(),

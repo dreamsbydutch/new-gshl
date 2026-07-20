@@ -3,6 +3,35 @@ import { clientApi as api } from "@gshl-trpc";
 
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
 
+export function useDraftPickPages(options: {
+  seasonId?: string | null;
+  enabled?: boolean;
+  limit?: number;
+}) {
+  const { seasonId, enabled = true, limit = 50 } = options;
+  const query = api.draftPick.listPage.useInfiniteQuery(
+    {
+      seasonId: seasonId ?? "",
+      limit: Math.min(Math.max(limit, 1), 50),
+    },
+    {
+      enabled: enabled && Boolean(seasonId),
+      getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
+      staleTime: 5 * 60 * 1000,
+      gcTime: 15 * 60 * 1000,
+      refetchOnWindowFocus: false,
+    },
+  );
+
+  return {
+    ...query,
+    data: query.data?.pages.flatMap((page) => page.items) ?? [],
+    hasMore: query.hasNextPage,
+    loadMore: query.fetchNextPage,
+    isLoadingMore: query.isFetchingNextPage,
+  };
+}
+
 /**
  * Hook for fetching draft picks with optional filtering.
  *

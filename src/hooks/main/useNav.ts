@@ -27,3 +27,7 @@ export function useNav() {
 export function useNavigationReset() {
   return useNavStore((state) => state.resetNavigation);
 }
+
+export function useSelectedSeasonId() {
+  return useNavStore((state) => state.selectedSeasonId);
+}

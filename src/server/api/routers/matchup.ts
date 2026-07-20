@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { createTRPCRouter, publicProcedure } from "../trpc";
-import { idSchema, baseQuerySchema } from "./_schemas";
+import { idSchema, baseQuerySchema, requireQueryScope } from "./_schemas";
 import type {
   Matchup,
   MatchupLiveState,
@@ -109,6 +109,13 @@ export const matchupRouter = createTRPCRouter({
   getMetadata: publicProcedure
     .input(baseQuerySchema.extend({ where: matchupWhereSchema }))
     .query(async ({ input }): Promise<MatchupMetadata[]> => {
+      requireQueryScope(input.where, [
+        "id",
+        "seasonId",
+        "weekId",
+        "homeTeamId",
+        "awayTeamId",
+      ]);
       const matchups = await getMany<Matchup>("Matchup", input);
       return matchups.map(toMatchupMetadata);
     }),
@@ -116,6 +123,13 @@ export const matchupRouter = createTRPCRouter({
   getLiveStates: publicProcedure
     .input(baseQuerySchema.extend({ where: matchupWhereSchema }))
     .query(async ({ input }): Promise<MatchupLiveState[]> => {
+      requireQueryScope(input.where, [
+        "id",
+        "seasonId",
+        "weekId",
+        "homeTeamId",
+        "awayTeamId",
+      ]);
       const matchups = await getMany<Matchup>("Matchup", input);
       return matchups.map(toMatchupLiveState);
     }),
@@ -123,6 +137,13 @@ export const matchupRouter = createTRPCRouter({
   getAll: publicProcedure
     .input(baseQuerySchema.extend({ where: matchupWhereSchema }))
     .query(async ({ input }): Promise<Matchup[]> => {
+      requireQueryScope(input.where, [
+        "id",
+        "seasonId",
+        "weekId",
+        "homeTeamId",
+        "awayTeamId",
+      ]);
       const matchups = await getMany<Matchup>("Matchup", input);
       return matchups.map(normalizePlayoffMatchupOutcome);
     }),

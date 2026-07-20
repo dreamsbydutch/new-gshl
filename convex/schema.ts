@@ -221,7 +221,12 @@ export default defineSchema({
       updatedAt: timestampValue,
       nhlApiId: optionalNullableString,
     },
-    ["gshlTeamId"],
+    [
+      "gshlTeamId",
+      "isActive",
+      ["isActive", "overallRk"],
+      ["isActive", "isSignable", "isResignable"],
+    ],
   ),
 
   contracts: table(
@@ -400,7 +405,7 @@ export default defineSchema({
       createdAt: timestampValue,
       updatedAt: timestampValue,
     },
-    ["seasonId", "gshlTeamId", "playerId"],
+    ["seasonId", "gshlTeamId", "playerId", ["seasonId", "round", "pick"]],
   ),
 
   nhlTeams: table({

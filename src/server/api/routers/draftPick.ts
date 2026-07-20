@@ -1,9 +1,13 @@
 import { z } from "zod";
-import { commissionerProcedure, createTRPCRouter, publicProcedure } from "../trpc";
+import {
+  commissionerProcedure,
+  createTRPCRouter,
+  publicProcedure,
+} from "../trpc";
 import { idSchema, baseQuerySchema } from "./_schemas";
 import type { DraftPick } from "@gshl-types";
 import { minimalSheetsWriter } from "@gshl-sheets";
-import { getById, getCount, getMany } from "../sheets-store";
+import { getById, getCount, getMany, getPage } from "../sheets-store";
 
 // Draft Pick router
 const draftPickWhereSchema = z
@@ -26,6 +30,23 @@ const draftPickUpdateSchema = z.object({
 });
 
 export const draftPickRouter = createTRPCRouter({
+  listPage: publicProcedure
+    .input(
+      z.object({
+        seasonId: z.string().min(1),
+        cursor: z.string().nullish(),
+        limit: z.number().int().positive().max(50).default(50),
+      }),
+    )
+    .query(({ input }) =>
+      getPage<DraftPick>("DraftPick", {
+        cursor: input.cursor,
+        limit: input.limit,
+        where: { seasonId: input.seasonId },
+        orderBy: { round: "asc", pick: "asc" },
+      }),
+    ),
+
   getAll: publicProcedure
     .input(baseQuerySchema.extend({ where: draftPickWhereSchema }))
     .query(async ({ input }): Promise<DraftPick[]> => {

@@ -26,8 +26,12 @@ function orderRecords<T extends object>(
   }
 
   return [...records].sort((left, right) => {
-    const leftValue = (left as Record<string, string | number | null | undefined>)[field];
-    const rightValue = (right as Record<string, string | number | null | undefined>)[field];
+    const leftValue = (
+      left as Record<string, string | number | null | undefined>
+    )[field];
+    const rightValue = (
+      right as Record<string, string | number | null | undefined>
+    )[field];
     if (leftValue === rightValue) return 0;
 
     if (leftValue == null || rightValue == null) {
@@ -293,7 +297,9 @@ export function useTeams(options: UseTeamsOptions = {}) {
   // Daily stats
   if (date && statsLevel === "daily") {
     const dateStr =
-      typeof date === "string" ? date : (date.toISOString().split("T")[0] ?? "");
+      typeof date === "string"
+        ? date
+        : (date.toISOString().split("T")[0] ?? "");
     if (dateStr) {
       statsWhere.date = dateStr;
     }
@@ -499,8 +505,8 @@ export function useTeams(options: UseTeamsOptions = {}) {
  * const { data: nhlTeams, isLoading } = useNHLTeams();
  * ```
  */
-export function useNHLTeams() {
-  return useTeams({ teamType: "nhl" });
+export function useNHLTeams(options: Omit<UseTeamsOptions, "teamType"> = {}) {
+  return useTeams({ ...options, teamType: "nhl" });
 }
 
 /**

@@ -1,15 +1,14 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useMemo } from "react";
 import { LockerRoomHeader } from "@gshl-components/team/LockerRoomHeader";
-import { TeamRecordBook } from "@gshl-components/team/TeamRecordBook";
-import { TeamDraftPickList } from "@gshl-components/team/TeamDraftPickList";
-import { TrophyCase } from "@gshl-components/team/TrophyCase";
 import {
   useCareerSplits,
   useDraftPicks,
   usePlayers,
-  usePlayerStats,
+  usePlayersByIds,
+  usePlayerTotalsByPlayers,
   usePlayerAwards,
   useSeasonState,
   useTeams,
@@ -20,12 +19,64 @@ import {
 } from "@gshl-hooks";
 import { resolveContractDefaultSeason } from "@gshl-utils";
 import type { GSHLTeam, NHLTeam } from "@gshl-types";
-import { TeamHistoryContainer } from "@gshl-components/team/TeamHistory";
-import { TeamRoster } from "@gshl-components/team/TeamRoster";
-import { TeamContractTable } from "@gshl-components/contracts/ContractTable";
-import { FranchiseContractHistory } from "@gshl-components/contracts/ContractHistory";
-import { FranchiseDraftPickSummary } from "@gshl-components/contracts/FranchiseDraftPickSummary";
 import { LockerRoomSkeleton, TeamRosterSkeleton } from "@gshl-skeletons";
+
+const TeamRecordBook = dynamic(
+  () =>
+    import("@gshl-components/team/TeamRecordBook").then(
+      (module) => module.TeamRecordBook,
+    ),
+  { loading: () => <LockerRoomSkeleton /> },
+);
+const TeamDraftPickList = dynamic(
+  () =>
+    import("@gshl-components/team/TeamDraftPickList").then(
+      (module) => module.TeamDraftPickList,
+    ),
+  { loading: () => <LockerRoomSkeleton /> },
+);
+const TrophyCase = dynamic(
+  () =>
+    import("@gshl-components/team/TrophyCase").then(
+      (module) => module.TrophyCase,
+    ),
+  { loading: () => <LockerRoomSkeleton /> },
+);
+const TeamHistoryContainer = dynamic(
+  () =>
+    import("@gshl-components/team/TeamHistory").then(
+      (module) => module.TeamHistoryContainer,
+    ),
+  { loading: () => <LockerRoomSkeleton /> },
+);
+const TeamRoster = dynamic(
+  () =>
+    import("@gshl-components/team/TeamRoster").then(
+      (module) => module.TeamRoster,
+    ),
+  { loading: () => <TeamRosterSkeleton /> },
+);
+const TeamContractTable = dynamic(
+  () =>
+    import("@gshl-components/contracts/ContractTable").then(
+      (module) => module.TeamContractTable,
+    ),
+  { loading: () => <LockerRoomSkeleton /> },
+);
+const FranchiseContractHistory = dynamic(
+  () =>
+    import("@gshl-components/contracts/ContractHistory").then(
+      (module) => module.FranchiseContractHistory,
+    ),
+  { loading: () => <LockerRoomSkeleton /> },
+);
+const FranchiseDraftPickSummary = dynamic(
+  () =>
+    import("@gshl-components/contracts/FranchiseDraftPickSummary").then(
+      (module) => module.FranchiseDraftPickSummary,
+    ),
+  { loading: () => <LockerRoomSkeleton /> },
+);
 
 const SHOW_LOCKER_ROOM_ROSTER_SALARIES = true;
 
@@ -45,20 +96,41 @@ export function LockerRoomContent() {
     selectedLockerRoomType === "roster";
   const lockerRoomSeason = needsContractData ? contractSeason : activeSeason;
 
-  const { data: draftPicks } = useDraftPicks();
-  const { data: players = [], isLoading: playersLoading } = usePlayers();
-  const { data: teamsRaw = [], isLoading: teamsLoading } = useTeams();
-  const allTeams = teamsRaw as GSHLTeam[];
-  const teams = useMemo(
-    () => allTeams.filter((team) => team.seasonId == lockerRoomSeason?.id),
-    [allTeams, lockerRoomSeason?.id],
-  );
-  const { data: nhlTeamsRaw = [], isLoading: nhlTeamsLoading } = useNHLTeams();
-  const nhlTeams = nhlTeamsRaw as NHLTeam[];
+  const needsDraftPicks =
+    selectedLockerRoomType === "salary" || selectedLockerRoomType === "draft";
+  const { data: draftPicks } = useDraftPicks({
+    seasonId: lockerRoomSeason?.id,
+    enabled: needsDraftPicks && Boolean(lockerRoomSeason?.id),
+  });
+  const { data: teamsRaw = [], isLoading: teamsLoading } = useTeams({
+    seasonId: lockerRoomSeason?.id,
+    enabled: Boolean(lockerRoomSeason?.id),
+  });
+  const teams = teamsRaw as GSHLTeam[];
 
   const currentTeam = teams?.find((t) => t.ownerId === selectedOwnerId);
   const isTrophyTab = selectedLockerRoomType === "trophy";
   const isRecordBookTab = selectedLockerRoomType === "recordbook";
+  const needsHistoricalTeams = isTrophyTab || isRecordBookTab;
+  const { data: historicalTeamsRaw = [] } = useTeams({
+    enabled: needsHistoricalTeams,
+  });
+  const allTeams = needsHistoricalTeams
+    ? (historicalTeamsRaw as GSHLTeam[])
+    : teams;
+  const needsPlayers = needsContractData || isRecordBookTab;
+  const { data: players = [], isLoading: playersLoading } = usePlayers({
+    gshlTeamId: currentTeam?.franchiseId,
+    enabled: needsPlayers && Boolean(currentTeam?.franchiseId),
+  });
+  const needsNhlTeams =
+    selectedLockerRoomType === "roster" ||
+    selectedLockerRoomType === "salary" ||
+    isRecordBookTab;
+  const { data: nhlTeamsRaw = [], isLoading: nhlTeamsLoading } = useNHLTeams({
+    enabled: needsNhlTeams,
+  });
+  const nhlTeams = nhlTeamsRaw as NHLTeam[];
   const { data: teamAwards = [], isLoading: teamAwardsLoading } = useTeamAwards(
     {
       enabled: isTrophyTab,
@@ -70,16 +142,45 @@ export function LockerRoomContent() {
       enabled: isRecordBookTab,
       orderBy: { seasonId: "desc" },
     });
-  const playerTotalsQuery = usePlayerStats({
+  const franchiseTeamIds = useMemo(
+    () =>
+      allTeams
+        .filter(
+          (team) =>
+            String(team.franchiseId) === String(currentTeam?.franchiseId ?? ""),
+        )
+        .map((team) => String(team.id)),
+    [allTeams, currentTeam?.franchiseId],
+  );
+  const careerSplitsQuery = useCareerSplits({
     enabled: isRecordBookTab,
-    includeDaily: false,
-    includeWeekly: false,
-    includeSplits: false,
-    includeTotals: true,
+    teamIds: franchiseTeamIds,
   });
-  const playerTotals = playerTotalsQuery.totals;
-  const careerSplitsQuery = useCareerSplits(isRecordBookTab);
-  const careerSplits = careerSplitsQuery.data ?? [];
+  const careerSplits = careerSplitsQuery.data;
+  const recordBookPlayerIds = useMemo(
+    () => [
+      ...new Set(
+        careerSplits.map((row) => String(row.playerId)).filter(Boolean),
+      ),
+    ],
+    [careerSplits],
+  );
+  const playerTotalsQuery = usePlayerTotalsByPlayers(
+    recordBookPlayerIds,
+    isRecordBookTab,
+  );
+  const recordBookPlayersQuery = usePlayersByIds(
+    recordBookPlayerIds,
+    isRecordBookTab,
+  );
+  const recordBookPlayers = useMemo(
+    () =>
+      [...players, ...recordBookPlayersQuery.data].filter(
+        (player, index, rows) =>
+          rows.findIndex((candidate) => candidate.id === player.id) === index,
+      ),
+    [players, recordBookPlayersQuery.data],
+  );
 
   const {
     table: teamContractTableData,
@@ -100,12 +201,13 @@ export function LockerRoomContent() {
 
   const isLoading =
     teamsLoading ||
-    playersLoading ||
-    nhlTeamsLoading ||
+    (needsPlayers && playersLoading) ||
+    (needsNhlTeams && nhlTeamsLoading) ||
     (isTrophyTab && teamAwardsLoading) ||
     (isRecordBookTab &&
       (playerAwardsLoading ||
-        playerTotalsQuery.status.isLoading ||
+        playerTotalsQuery.isLoading ||
+        recordBookPlayersQuery.isLoading ||
         careerSplitsQuery.isLoading));
 
   if (isLoading) {
@@ -189,8 +291,8 @@ export function LockerRoomContent() {
           careerSplits={careerSplits}
           currentTeam={currentTeam}
           nhlTeams={nhlTeams}
-          playerTotals={playerTotals}
-          players={players}
+          playerTotals={playerTotalsQuery.data}
+          players={recordBookPlayers}
           seasons={seasons}
         />
       )}

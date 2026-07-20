@@ -7,6 +7,7 @@
 
 import { useNavStore } from "./store";
 import { useWeeks, useSeasonState } from "@gshl-hooks";
+import { isIsoDateInRange, toLocalIsoDateOnly } from "@gshl-utils";
 import { useEffect } from "react";
 
 type NavStoreState = ReturnType<typeof useNavStore.getState>;
@@ -139,30 +140,26 @@ export function useSeasonNavigation() {
  * @returns Week data, ID, and setter with intelligent fallback logic
  */
 export function useWeekNavigation() {
-  const { selectedWeekId, setWeekId, selectedSeasonId } = useNavStore();
-
-  const { data: currentWeekData, isLoading: isCurrentWeekLoading } = useWeeks({
+  const selectedWeekId = useNavStore((state) => state.selectedWeekId);
+  const setWeekId = useNavStore((state) => state.setWeekId);
+  const selectedSeasonId = useNavStore((state) => state.selectedSeasonId);
+  const { data: weeks = [], isLoading } = useWeeks({
     seasonId: selectedSeasonId,
-    timeMode: "current",
+    orderBy: { startDate: "asc" },
+    enabled: Boolean(selectedSeasonId),
   });
-  const { data: nextWeekData, isLoading: isNextWeekLoading } = useWeeks({
-    seasonId: selectedSeasonId,
-    timeMode: "next",
-  });
-  const { data: previousWeekData, isLoading: isPreviousWeekLoading } = useWeeks(
-    { seasonId: selectedSeasonId, timeMode: "previous" },
+  const today = toLocalIsoDateOnly(new Date());
+  const currentWeek = weeks.find((week) =>
+    isIsoDateInRange(today, week.startDate, week.endDate),
   );
-
-  // Extract first week from array results
-  const currentWeek = currentWeekData?.[0];
-  const nextWeek = nextWeekData?.[0];
-  const previousWeek = previousWeekData?.[0];
+  const nextWeek = weeks.find((week) => week.startDate > today);
+  const previousWeek = [...weeks]
+    .reverse()
+    .find((week) => week.endDate < today);
 
   useEffect(() => {
     if (selectedWeekId || !selectedSeasonId) return;
 
-    const isLoading =
-      isCurrentWeekLoading || isNextWeekLoading || isPreviousWeekLoading;
     if (isLoading) return;
 
     if (currentWeek?.id) {
@@ -185,9 +182,7 @@ export function useWeekNavigation() {
     currentWeek,
     nextWeek,
     previousWeek,
-    isCurrentWeekLoading,
-    isNextWeekLoading,
-    isPreviousWeekLoading,
+    isLoading,
     setWeekId,
   ]);
 

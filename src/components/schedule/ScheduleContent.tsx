@@ -1,20 +1,31 @@
 "use client";
 
-import { Suspense } from "react";
+import dynamic from "next/dynamic";
 import { useNav } from "@gshl-hooks";
-import { WeeklySchedule } from "@gshl-components/league/WeeklySchedule";
-import { TeamSchedule } from "@gshl-components/team/TeamSchedule";
 import { ScheduleSkeleton } from "@gshl-skeletons";
+
+const WeeklySchedule = dynamic(
+  () =>
+    import("@gshl-components/league/WeeklySchedule").then(
+      (module) => module.WeeklySchedule,
+    ),
+  { loading: () => <ScheduleSkeleton /> },
+);
+const TeamSchedule = dynamic(
+  () =>
+    import("@gshl-components/team/TeamSchedule").then(
+      (module) => module.TeamSchedule,
+    ),
+  { loading: () => <ScheduleSkeleton /> },
+);
 
 export function ScheduleContent() {
   const { selectedScheduleType: scheduleType } = useNav();
 
   return (
     <div className="mx-auto max-w-2xl">
-      <Suspense fallback={<ScheduleSkeleton />}>
-        {scheduleType === "week" && <WeeklySchedule />}
-        {(scheduleType === "team" || !scheduleType) && <TeamSchedule />}
-      </Suspense>
+      {scheduleType === "week" && <WeeklySchedule />}
+      {(scheduleType === "team" || !scheduleType) && <TeamSchedule />}
     </div>
   );
 }

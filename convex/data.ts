@@ -16,6 +16,17 @@ const queryArgs = {
   skip: v.optional(v.number()),
 };
 
+const pageQueryArgs = {
+  serverSecret: v.string(),
+  table: v.string(),
+  where: v.optional(v.record(v.string(), v.any())),
+  orderBy: v.optional(
+    v.record(v.string(), v.union(v.literal("asc"), v.literal("desc"))),
+  ),
+  cursor: v.optional(v.string()),
+  limit: v.number(),
+};
+
 function requireServerSecret(serverSecret: string) {
   const expected = process.env.CONVEX_SERVER_SECRET;
   if (!expected || serverSecret !== expected) {
@@ -81,7 +92,7 @@ const TABLE_INDEX_FIELDS: Record<string, Set<string>> = {
   franchises: new Set(["legacyId", "ownerId", "confId"]),
   teams: new Set(["legacyId", "seasonId", "franchiseId", "confId"]),
   owners: new Set(defaultIndexes),
-  players: new Set(["legacyId", "gshlTeamId"]),
+  players: new Set(["legacyId", "gshlTeamId", "isActive"]),
   contracts: new Set(["legacyId", "playerId", "ownerId", "seasonId"]),
   weeks: new Set(["legacyId", "seasonId"]),
   matchups: new Set([
@@ -149,6 +160,60 @@ const TABLE_INDEX_FIELDS: Record<string, Set<string>> = {
   ]),
 };
 
+const TABLE_PAGE_INDEXES: Record<
+  string,
+  Array<{ name: string; equalityField: string; orderFields: string[] }>
+> = {
+  players: [
+    {
+      name: "by_isActive_overallRk",
+      equalityField: "isActive",
+      orderFields: ["overallRk"],
+    },
+  ],
+  draftPicks: [
+    {
+      name: "by_seasonId_round_pick",
+      equalityField: "seasonId",
+      orderFields: ["round", "pick"],
+    },
+  ],
+};
+
+const TABLE_EXACT_INDEXES: Record<
+  string,
+  Array<{ name: string; fields: string[] }>
+> = {
+  players: [
+    {
+      name: "by_isActive_isSignable_isResignable",
+      fields: ["isActive", "isSignable", "isResignable"],
+    },
+  ],
+};
+
+function resolveExactIndex(table: string, where?: Record<string, unknown>) {
+  return TABLE_EXACT_INDEXES[table]?.find((index) =>
+    index.fields.every((field) => where?.[field] !== undefined),
+  );
+}
+
+function resolvePageIndex(
+  table: string,
+  where?: Record<string, unknown>,
+  orderBy?: Record<string, "asc" | "desc">,
+) {
+  const orderFields = Object.keys(orderBy ?? {});
+  return TABLE_PAGE_INDEXES[table]?.find(
+    (index) =>
+      where?.[index.equalityField] !== undefined &&
+      orderFields.length === index.orderFields.length &&
+      orderFields.every(
+        (field, position) => field === index.orderFields[position],
+      ),
+  );
+}
+
 function indexesForTable(table: string) {
   return TABLE_INDEX_FIELDS[table] ?? new Set(defaultIndexes);
 }
@@ -176,6 +241,20 @@ async function readCandidateRows(
     skip?: number;
   },
 ): Promise<ConvexRow[]> {
+  const exactIndex = resolveExactIndex(table, args.where);
+  if (exactIndex) {
+    return (await ctx.db
+      .query(table as never)
+      .withIndex(exactIndex.name as never, (q: any) => {
+        let range = q;
+        for (const field of exactIndex.fields) {
+          range = range.eq(field as never, args.where?.[field]);
+        }
+        return range;
+      })
+      .collect()) as ConvexRow[];
+  }
+
   const indexedWhere = firstIndexedWhere(table, args.where);
   const needsInMemoryFiltering =
     Boolean(
@@ -1006,6 +1085,53 @@ export const list = queryGeneric({
     const start = args.skip ?? 0;
     const end = args.take === undefined ? undefined : start + args.take;
     return filtered.slice(start, end);
+  },
+});
+
+/**
+ * Bounded, cursor-based collection reads for user-facing lists. The cursor is
+ * the opaque Convex continuation token and never depends on a client offset.
+ */
+export const listPage = queryGeneric({
+  args: pageQueryArgs,
+  handler: async (ctx, args) => {
+    requireServerSecret(args.serverSecret);
+    if (!Number.isInteger(args.limit) || args.limit < 1 || args.limit > 50) {
+      throw new Error("Page limit must be between 1 and 50");
+    }
+
+    const pageIndex = resolvePageIndex(args.table, args.where, args.orderBy);
+    const orderDirection = Object.values(args.orderBy ?? {})[0] ?? "asc";
+    let query: any = ctx.db.query(args.table as never);
+
+    if (pageIndex) {
+      const expected = args.where?.[pageIndex.equalityField];
+      query = query.withIndex(pageIndex.name as never, (q: any) =>
+        q.eq(pageIndex.equalityField as never, expected),
+      );
+    } else {
+      const indexedWhere = firstIndexedWhere(args.table, args.where);
+      if (indexedWhere) {
+        const [field, expected] = indexedWhere;
+        query = query.withIndex(`by_${field}` as never, (q: any) =>
+          q.eq(field as never, expected),
+        );
+      }
+    }
+
+    const result = await query.order(orderDirection).paginate({
+      cursor: args.cursor ?? null,
+      numItems: args.limit,
+    });
+    const items = result.page
+      .map((row: ConvexRow) => publicRow(row))
+      .filter((row: Row) => matchesWhere(row, args.where));
+
+    return {
+      items,
+      nextCursor: result.isDone ? null : result.continueCursor,
+      hasMore: !result.isDone,
+    };
   },
 });
 

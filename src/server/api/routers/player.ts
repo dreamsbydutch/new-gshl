@@ -8,7 +8,7 @@ import {
 import { minimalSheetsWriter } from "@gshl-sheets";
 import { idSchema, baseQuerySchema } from "./_schemas";
 import { RosterPosition, type Player } from "@gshl-types";
-import { getById, getCount, getMany } from "../sheets-store";
+import { getById, getCount, getMany, getPage } from "../sheets-store";
 
 const normalizeGshlTeamId = (
   value: string | null | undefined,
@@ -57,6 +57,36 @@ const playerUpdateSchema = z.object({
 });
 
 export const playerRouter = createTRPCRouter({
+  getByIds: publicProcedure
+    .input(z.object({ ids: z.array(z.string().min(1)).max(500) }))
+    .query(async ({ input }): Promise<Player[]> => {
+      const rows = await Promise.all(
+        [...new Set(input.ids)].map((id) => getById<Player>("Player", id)),
+      );
+      return rows.filter((row): row is Player => row !== null);
+    }),
+
+  listPage: publicProcedure
+    .input(
+      z.object({
+        cursor: z.string().nullish(),
+        limit: z.number().int().positive().max(50).default(50),
+        active: z.boolean().optional(),
+        positionGroup: z.string().optional(),
+      }),
+    )
+    .query(async ({ input }) => {
+      const where: Record<string, string | boolean> = {};
+      if (input.active !== undefined) where.isActive = input.active;
+      if (input.positionGroup) where.posGroup = input.positionGroup;
+      return getPage<Player>("Player", {
+        cursor: input.cursor,
+        limit: input.limit,
+        where,
+        orderBy: { overallRk: "asc" },
+      });
+    }),
+
   // Get all players with filtering and pagination
   getAll: publicProcedure
     .input(
@@ -143,8 +173,13 @@ export const playerRouter = createTRPCRouter({
             where: { ownerId: user.ownerId, isActive: true },
           }),
         ]);
-        const franchiseIds = new Set(franchises.map((franchise) => franchise.id));
-        if (!player?.gshlTeamId || !franchiseIds.has(String(player.gshlTeamId))) {
+        const franchiseIds = new Set(
+          franchises.map((franchise) => franchise.id),
+        );
+        if (
+          !player?.gshlTeamId ||
+          !franchiseIds.has(String(player.gshlTeamId))
+        ) {
           throw new TRPCError({ code: "FORBIDDEN" });
         }
       }

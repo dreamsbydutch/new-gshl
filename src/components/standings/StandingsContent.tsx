@@ -1,10 +1,6 @@
 "use client";
 
-import {
-  PlayoffBracket,
-  SeasonAwards,
-  StandingsTable,
-} from "@gshl-components/league";
+import dynamic from "next/dynamic";
 import {
   usePlayerAwards,
   usePlayers,
@@ -13,6 +9,28 @@ import {
   useTeamAwards,
 } from "@gshl-hooks";
 import { StandingsSkeleton } from "@gshl-skeletons";
+
+const PlayoffBracket = dynamic(
+  () =>
+    import("@gshl-components/league/PlayoffBracket").then(
+      (module) => module.PlayoffBracket,
+    ),
+  { loading: () => <StandingsSkeleton /> },
+);
+const SeasonAwards = dynamic(
+  () =>
+    import("@gshl-components/league/SeasonAwards").then(
+      (module) => module.SeasonAwards,
+    ),
+  { loading: () => <StandingsSkeleton /> },
+);
+const StandingsTable = dynamic(
+  () =>
+    import("@gshl-components/league/StandingsContainer").then(
+      (module) => module.StandingsTable,
+    ),
+  { loading: () => <StandingsSkeleton /> },
+);
 
 export function StandingsContent() {
   const {

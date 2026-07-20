@@ -1,15 +1,61 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useSession } from "next-auth/react";
 import { useLeagueOfficeNavigation } from "@gshl-hooks";
-import { ConferenceContest } from "./ConferenceContest";
-import { OwnerRankings } from "./OwnerRankings";
-import { Rulebook } from "./Rulebook";
-import { DraftClasses } from "./DraftClasses";
-import { UserManagement } from "@gshl-components/auth";
-import { ContractManagement, JobManagement } from "@gshl-components/admin";
-import { UfaLeagueOffice } from "@gshl-components/contracts";
-import { ImageUpload } from "./ImageUpload";
+
+const TabLoading = () => (
+  <div className="mx-auto h-48 max-w-3xl animate-pulse rounded-xl bg-muted" />
+);
+const ConferenceContest = dynamic(
+  () =>
+    import("./ConferenceContest").then((module) => module.ConferenceContest),
+  { loading: TabLoading },
+);
+const OwnerRankings = dynamic(
+  () => import("./OwnerRankings").then((module) => module.OwnerRankings),
+  { loading: TabLoading },
+);
+const Rulebook = dynamic(
+  () => import("./Rulebook").then((module) => module.Rulebook),
+  { loading: TabLoading },
+);
+const DraftClasses = dynamic(
+  () => import("./DraftClasses").then((module) => module.DraftClasses),
+  { loading: TabLoading },
+);
+const UserManagement = dynamic(
+  () =>
+    import("@gshl-components/auth/UserManagement").then(
+      (module) => module.UserManagement,
+    ),
+  { loading: TabLoading },
+);
+const ContractManagement = dynamic(
+  () =>
+    import("@gshl-components/admin/ContractManagement").then(
+      (module) => module.ContractManagement,
+    ),
+  { loading: TabLoading },
+);
+const JobManagement = dynamic(
+  () =>
+    import("@gshl-components/admin/JobManagement").then(
+      (module) => module.JobManagement,
+    ),
+  { loading: TabLoading },
+);
+const UfaLeagueOffice = dynamic(
+  () =>
+    import("@gshl-components/contracts/UfaSigning").then(
+      (module) => module.UfaLeagueOffice,
+    ),
+  { loading: TabLoading },
+);
+const ImageUpload = dynamic(
+  () => import("./ImageUpload").then((module) => module.ImageUpload),
+  { loading: TabLoading },
+);
 
 export function LeagueOfficeContent() {
   const { selectedType } = useLeagueOfficeNavigation();

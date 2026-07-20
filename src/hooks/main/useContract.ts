@@ -36,6 +36,18 @@ export type {
 const EMPTY_CONTRACTS: Contract[] = [];
 const DEFAULT_SELECT_DEPS = [] as const;
 
+function singleFilterValue(value: unknown): string | undefined {
+  if (typeof value === "string") return value;
+  if (
+    Array.isArray(value) &&
+    value.length === 1 &&
+    typeof value[0] === "string"
+  ) {
+    return value[0];
+  }
+  return undefined;
+}
+
 export function useCreateContract() {
   const utils = api.useUtils();
   return api.contract.create.useMutation({
@@ -120,8 +132,16 @@ export function useContracts<T = Contract, S = undefined>(
   } = options;
 
   const queryOptions = enabled === undefined ? undefined : { enabled };
+  const serverWhere = {
+    playerId: singleFilterValue(filters?.playerIds),
+    ownerId: singleFilterValue(filters?.ownerIds),
+    seasonId: singleFilterValue(filters?.seasonIds),
+  };
+  const hasServerWhere = Object.values(serverWhere).some(
+    (value) => value !== undefined,
+  );
   const { data: queryData, ...queryRest } = api.contract.getAll.useQuery(
-    {},
+    hasServerWhere ? { where: serverWhere } : {},
     queryOptions,
   );
 
@@ -265,16 +285,19 @@ export function useContractData(
     enabled = true,
   } = options;
 
-  const {
-    data: contracts,
-    isLoading: contractsLoading,
-    error: contractsError,
-  } = useAllContracts({ enabled });
   const currentOwnerId = ownerId
     ? String(ownerId)
     : currentTeam?.ownerId
       ? String(currentTeam.ownerId)
       : null;
+  const {
+    data: contracts,
+    isLoading: contractsLoading,
+    error: contractsError,
+  } = useAllContracts({
+    enabled: enabled && Boolean(currentOwnerId),
+    filters: currentOwnerId ? { ownerIds: currentOwnerId } : undefined,
+  });
   const currentFranchiseId = currentTeam?.franchiseId
     ? String(currentTeam.franchiseId)
     : null;
@@ -284,15 +307,46 @@ export function useContractData(
   );
   const teamPool = useMemo(() => allTeams ?? teams ?? [], [allTeams, teams]);
 
+  const ownerContracts = useMemo(() => {
+    if (!currentOwnerId) return [] as Contract[];
+    return dedupeContracts(
+      (contracts ?? []).filter(
+        (contract) => String(contract.ownerId) === currentOwnerId,
+      ),
+    );
+  }, [contracts, currentOwnerId]);
+
+  const relevantPlayerIds = useMemo(
+    () => [
+      ...new Set(
+        ownerContracts
+          .map((contract) => String(contract.playerId ?? ""))
+          .filter(Boolean),
+      ),
+    ],
+    [ownerContracts],
+  );
+  const relatedPlayersQuery = api.player.getByIds.useQuery(
+    { ids: relevantPlayerIds },
+    {
+      enabled: enabled && relevantPlayerIds.length > 0,
+      staleTime: 5 * 60 * 1000,
+      gcTime: 15 * 60 * 1000,
+      refetchOnWindowFocus: false,
+    },
+  );
+
   const playerById = useMemo(() => {
     const map = new Map<string, Player>();
-    players?.forEach((player) => {
-      if (player?.id) {
-        map.set(player.id, player);
-      }
-    });
+    [...(players ?? []), ...(relatedPlayersQuery.data ?? [])].forEach(
+      (player) => {
+        if (player?.id) {
+          map.set(player.id, player);
+        }
+      },
+    );
     return map;
-  }, [players]);
+  }, [players, relatedPlayersQuery.data]);
 
   const franchiseById = useMemo(() => {
     const map = new Map<string, GSHLTeam>();
@@ -326,10 +380,10 @@ export function useContractData(
     data: playerNhlStatLines = [],
     isLoading: playerNhlStatsLoading,
     error: playerNhlStatsError,
-  } = api.playerStats.nhl.getAll.useQuery(
-    {},
+  } = api.playerStats.nhl.getByPlayers.useQuery(
+    { playerIds: relevantPlayerIds },
     {
-      enabled,
+      enabled: enabled && relevantPlayerIds.length > 0,
       staleTime: 5 * 60 * 1000,
       gcTime: 15 * 60 * 1000,
       refetchOnWindowFocus: true,
@@ -337,27 +391,15 @@ export function useContractData(
     },
   );
 
-  const ownerContracts = useMemo(() => {
-    if (!currentOwnerId) return [] as Contract[];
-    return dedupeContracts(
-      (contracts ?? []).filter(
-        (contract) => String(contract.ownerId) === currentOwnerId,
-      ),
-    );
-  }, [contracts, currentOwnerId]);
-
   const franchiseRelevantContracts = useMemo(
     () => dedupeContracts(ownerContracts),
     [ownerContracts],
   );
 
-  const relevantPlayerIds = useMemo(() => {
-    return new Set(
-      franchiseRelevantContracts
-        .map((contract) => String(contract.playerId ?? ""))
-        .filter(Boolean),
-    );
-  }, [franchiseRelevantContracts]);
+  const relevantPlayerIdSet = useMemo(
+    () => new Set(relevantPlayerIds),
+    [relevantPlayerIds],
+  );
 
   const relevantSeasonEndYears = useMemo(() => {
     const years = new Set<number>();
@@ -374,7 +416,7 @@ export function useContractData(
 
     playerNhlStatLines.forEach((row) => {
       const playerId = String(row.playerId ?? "");
-      if (!playerId || !relevantPlayerIds.has(playerId)) return;
+      if (!playerId || !relevantPlayerIdSet.has(playerId)) return;
 
       const season = seasonById.get(String(row.seasonId));
       const seasonEndYear = getSeasonEndYear(season);
@@ -396,7 +438,7 @@ export function useContractData(
     return map;
   }, [
     playerNhlStatLines,
-    relevantPlayerIds,
+    relevantPlayerIdSet,
     relevantSeasonEndYears,
     seasonById,
   ]);

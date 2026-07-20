@@ -211,11 +211,18 @@ export function usePlayerStats(
 /**
  * Fetches full-career split aggregates for record-book style views.
  */
-export function useCareerSplits(enabled = true) {
-  const query = api.playerStats.careerSplits.getAll.useQuery(
-    {},
+export function useCareerSplits(
+  options: {
+    enabled?: boolean;
+    teamIds?: string[];
+  } = {},
+) {
+  const { enabled = true, teamIds = [] } = options;
+  const uniqueTeamIds = useMemo(() => [...new Set(teamIds)].sort(), [teamIds]);
+  const query = api.playerStats.careerSplits.getByTeams.useQuery(
+    { teamIds: uniqueTeamIds },
     {
-      enabled,
+      enabled: enabled && uniqueTeamIds.length > 0,
       staleTime: DEFAULT_STALE_TIME,
       gcTime: DEFAULT_GC_TIME,
       refetchOnWindowFocus: true,
@@ -228,4 +235,22 @@ export function useCareerSplits(enabled = true) {
     isLoading: query.isLoading,
     error: query.error ?? null,
   };
+}
+
+export function usePlayerTotalsByPlayers(playerIds: string[], enabled = true) {
+  const uniquePlayerIds = useMemo(
+    () => [...new Set(playerIds)].sort(),
+    [playerIds],
+  );
+  const query = api.playerStats.totals.getByPlayers.useQuery(
+    { playerIds: uniquePlayerIds },
+    {
+      enabled: enabled && uniquePlayerIds.length > 0,
+      staleTime: DEFAULT_STALE_TIME,
+      gcTime: DEFAULT_GC_TIME,
+      refetchOnWindowFocus: false,
+      refetchOnMount: false,
+    },
+  );
+  return { ...query, data: query.data ?? [] };
 }

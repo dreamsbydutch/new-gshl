@@ -38,7 +38,7 @@ export type {
 } from "@gshl-types";
 
 // Draft pick hooks
-export { useDraftPicks } from "./useDraftPick";
+export { useDraftPicks, useDraftPickPages } from "./useDraftPick";
 export { useAwards } from "./useAward";
 export { usePlayerAwards } from "./usePlayerAward";
 export { useTeamAwards } from "./useTeamAward";
@@ -56,6 +56,8 @@ export type { UseMatchupsOptions } from "@gshl-types";
 // Player hooks
 export {
   usePlayers,
+  usePlayerPages,
+  usePlayersByIds,
   useActivePlayers,
   useRankedPlayers,
   useRosterPlayers,
@@ -70,22 +72,16 @@ export type {
 export {
   usePlayerStats,
   useCareerSplits,
+  usePlayerTotalsByPlayers,
 } from "./usePlayerStats";
 export type { UsePlayerStatsOptions, UsePlayerStatsResult } from "@gshl-types";
 
 // Season management hooks
-export {
-  useSeasons,
-  useSeasonState,
-} from "./useSeason";
+export { useSeasons, useSeasonState } from "./useSeason";
 export type { UseSeasonStateOptions, UseSeasonsOptions } from "@gshl-types";
 
 // Team and franchise hooks - now unified with statsLevel and teamType options
-export {
-  useTeams,
-  useNHLTeams,
-  useFranchises,
-} from "./useTeam";
+export { useTeams, useNHLTeams, useFranchises } from "./useTeam";
 export type {
   EnrichedFranchise,
   TeamStatsLevel,
@@ -98,7 +94,7 @@ export { useWeeks } from "./useWeek";
 export type { UseWeeksOptions, WeekTimeMode } from "@gshl-types";
 
 // Navigation selection hooks
-export { useNav, useNavigationReset } from "./useNav";
+export { useNav, useNavigationReset, useSelectedSeasonId } from "./useNav";
 export { useAppPathname, useAppRouter } from "./useNextNavigation";
 export {
   useLeagueOfficeNavigation,

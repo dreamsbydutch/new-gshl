@@ -6,6 +6,7 @@ import {
   MODEL_TO_CONVEX_TABLE,
   type ModelName,
 } from "./model-map";
+import { normalizePageLimit } from "./pagination";
 
 type AnyRow = Record<string, unknown>;
 
@@ -14,6 +15,17 @@ export type BaseQueryInput = {
   orderBy?: Record<string, "asc" | "desc"> | undefined;
   take?: number | undefined;
   skip?: number | undefined;
+};
+
+export type PageQueryInput = Omit<BaseQueryInput, "take" | "skip"> & {
+  cursor?: string | null;
+  limit?: number;
+};
+
+export type PageResult<T> = {
+  items: T[];
+  nextCursor: string | null;
+  hasMore: boolean;
 };
 
 type UpsertOptions = {
@@ -61,7 +73,9 @@ function describeUnknownError(error: unknown): string {
   if (error instanceof Error) {
     const message = error.message || String(error);
     const cause =
-      error.cause === undefined ? "" : ` cause=${describeUnknownError(error.cause)}`;
+      error.cause === undefined
+        ? ""
+        : ` cause=${describeUnknownError(error.cause)}`;
     return `${error.name}: ${message}${cause}`;
   }
 
@@ -202,6 +216,26 @@ export async function getMany<T>(
   return rows.map(hydrateRow<T>);
 }
 
+export async function getPage<T>(
+  model: ModelName,
+  input: PageQueryInput = {},
+): Promise<PageResult<T>> {
+  const args = {
+    table: getConvexTableName(model),
+    where: input.where,
+    orderBy: input.orderBy,
+    cursor: input.cursor ?? undefined,
+    limit: normalizePageLimit(input.limit),
+  };
+  const result = await runConvex("query data:listPage", model, args, () =>
+    callConvex<PageResult<AnyRow>>("query", "data:listPage", args),
+  );
+  return {
+    ...result,
+    items: result.items.map(hydrateRow<T>),
+  };
+}
+
 export async function getFirst<T>(
   model: ModelName,
   input: BaseQueryInput = {},
@@ -296,6 +330,7 @@ export async function upsertByCompositeKey<T extends Record<string, unknown>>(
 export const convexDataStore = {
   models: MODEL_TO_CONVEX_TABLE,
   getMany,
+  getPage,
   getFirst,
   getById,
   getCount,

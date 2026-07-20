@@ -23,9 +23,12 @@ export default async function Home() {
 
   if (isBetweenSeasons(seasons) && offseasonWindow?.upcomingSeason.id) {
     await Promise.all([
-      serverApi.player.getAll.prefetch({}),
+      serverApi.player.listPage.prefetch({ active: true, limit: 50 }),
       serverApi.contract.getAll.prefetch({}),
-      serverApi.draftPick.getAll.prefetch({}),
+      serverApi.draftPick.listPage.prefetch({
+        seasonId: String(offseasonWindow.upcomingSeason.id),
+        limit: 50,
+      }),
       serverApi.team.getAll.prefetch({
         where: { seasonId: String(offseasonWindow.upcomingSeason.id) },
       }),

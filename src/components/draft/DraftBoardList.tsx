@@ -106,12 +106,18 @@ function DraftBoardTable({
   draftPlayers,
   nhlTeams,
   toolbarProps,
+  hasMore,
+  isLoadingMore,
+  onLoadMore,
 }: {
   navbar?: boolean;
   draftPlayers: DraftBoardPlayer[];
   totalCount: number;
   nhlTeams: NHLTeam[];
   toolbarProps: DraftBoardToolbarProps;
+  hasMore?: boolean;
+  isLoadingMore?: boolean;
+  onLoadMore?: () => void;
 }) {
   return (
     <div className="mt-8">
@@ -161,6 +167,18 @@ function DraftBoardTable({
           ))}
         </tbody>
       </Table>
+      {hasMore ? (
+        <div className="mt-4 flex justify-center">
+          <button
+            type="button"
+            className="min-h-11 rounded-md border bg-white px-5 py-2 text-sm font-semibold shadow-sm disabled:opacity-60"
+            disabled={isLoadingMore}
+            onClick={onLoadMore}
+          >
+            {isLoadingMore ? "Loading…" : "Load more players"}
+          </button>
+        </div>
+      ) : null}
       {!navbar && (
         <SecondaryPageToolbar>
           <HorizontalToggle<ToggleItem<string | null>>
@@ -377,6 +395,9 @@ export function DraftBoardList({
     filteredPlayers,
     nhlTeams,
     projectedDraftPicks,
+    hasMore,
+    loadMore,
+    isLoadingMore,
   } = useDraftBoardData({ seasonId, selectedType });
 
   if (isLoading) {
@@ -466,6 +487,9 @@ export function DraftBoardList({
       totalCount={draftPlayers.length}
       nhlTeams={nhlTeams}
       toolbarProps={pageToolbarProps}
+      hasMore={hasMore}
+      isLoadingMore={isLoadingMore}
+      onLoadMore={() => void loadMore()}
     />
   );
 }

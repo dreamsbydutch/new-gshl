@@ -164,31 +164,81 @@ function capEligibility(options: {
 }
 
 export const ufaRouter = createTRPCRouter({
+  getLiveState: publicProcedure.query(async () => {
+    const [signingSeason, state] = await Promise.all([
+      getFirst<Season>("Season", { where: { isActive: true } }),
+      callConvex<OperationalState>("query", "ufa:listState", {}),
+    ]);
+
+    return {
+      window: getWindow(signingSeason),
+      groups: state.groups
+        .filter((group) => group.status === "open")
+        .sort((left, right) => left.deadlineAt - right.deadlineAt)
+        .map((group) => {
+          const odds = state.oddsByGroup[group.id] ?? [];
+          return {
+            id: group.id,
+            playerId: group.playerId,
+            deadlineAt: group.deadlineAt,
+            offers: state.offers
+              .filter(
+                (offer) =>
+                  offer.groupId === group.id && offer.status === "pending",
+              )
+              .map((offer) => ({
+                id: offer.id,
+                franchiseId: offer.franchiseId,
+                years: offer.contractLength,
+                salary: offer.salary,
+                probability:
+                  odds.find((entry) => entry.offerId === offer.id)
+                    ?.probability ?? 0,
+              })),
+          };
+        }),
+    };
+  }),
+
   getOverview: publicProcedure.query(async ({ ctx }) => {
-    const [
-      signingSeason,
-      seasons,
-      players,
-      nhlTeams,
-      nhlStats,
-      franchises,
-      teams,
-      contracts,
-      state,
-    ] = await Promise.all([
+    const [signingSeason, seasons, franchises, state] = await Promise.all([
       getFirst<Season>("Season", { where: { isActive: true } }),
       getMany<Season>("Season", { orderBy: { year: "asc" } }),
-      getMany<Player>("Player"),
-      getMany<NHLTeam>("NHLTeam"),
-      getMany<PlayerNHLStatLine>("PlayerNHLStatLine"),
       getMany<Franchise>("Franchise"),
-      getMany<Team>("Team"),
-      getMany<Contract>("Contract"),
       callConvex<OperationalState>("query", "ufa:listState", {}),
+    ]);
+    const statsSeason = [...seasons]
+      .filter(
+        (season) =>
+          season.year <= (signingSeason?.year ?? Number.POSITIVE_INFINITY),
+      )
+      .sort((left, right) => right.year - left.year)[0];
+    const ownerId = ctx.session?.user?.ownerId;
+    const [players, nhlTeams, nhlStats, teams, contracts] = await Promise.all([
+      getMany<Player>("Player", {
+        where: {
+          isActive: true,
+          isSignable: true,
+          isResignable: String(ResignableStatus.UFA),
+        },
+      }),
+      getMany<NHLTeam>("NHLTeam"),
+      statsSeason
+        ? getMany<PlayerNHLStatLine>("PlayerNHLStatLine", {
+            where: { seasonId: String(statsSeason.id) },
+          })
+        : Promise.resolve([]),
+      signingSeason
+        ? getMany<Team>("Team", {
+            where: { seasonId: String(signingSeason.id) },
+          })
+        : Promise.resolve([]),
+      ownerId
+        ? getMany<Contract>("Contract", { where: { ownerId } })
+        : Promise.resolve([]),
     ]);
     const window = getWindow(signingSeason);
     const statByPlayer = latestNhlStats(nhlStats, seasons, signingSeason);
-    const ownerId = ctx.session?.user?.ownerId;
     const ownerFranchise = franchises.find(
       (franchise) =>
         String(franchise.ownerId) === String(ownerId ?? "") &&
@@ -348,6 +398,11 @@ export const ufaRouter = createTRPCRouter({
       freeAgents,
       topFreeAgents: freeAgents.slice(0, 10),
       offerGroups,
+      franchises: franchises.map((franchise) => ({
+        id: String(franchise.id),
+        name: franchise.name,
+        logoUrl: franchise.logoUrl ?? null,
+      })),
     };
   }),
 

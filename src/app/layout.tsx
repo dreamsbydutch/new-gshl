@@ -1,34 +1,14 @@
 import "@gshl-styles";
 
 import { type Metadata } from "next";
-import { Barlow_Condensed, Oswald, Varela, Yellowtail } from "next/font/google";
+import { GeistSans } from "geist/font/sans";
 
 import { cn } from "@gshl-utils";
 import { TRPCReactProvider } from "@gshl-trpc";
 import { Navbar } from "@gshl-nav";
 import NavDefaults from "@gshl-components/nav/NavDefaults";
 import { AuthProvider } from "@gshl-components/auth";
-
-const varela = Varela({
-  weight: ["400"],
-  subsets: ["latin"],
-  variable: "--font-varela",
-});
-const yellowtail = Yellowtail({
-  weight: ["400"],
-  subsets: ["latin"],
-  variable: "--font-yellowtail",
-});
-const barlow = Barlow_Condensed({
-  weight: ["400"],
-  subsets: ["latin"],
-  variable: "--font-barlow",
-});
-const oswald = Oswald({
-  weight: ["400"],
-  subsets: ["latin"],
-  variable: "--font-oswald",
-});
+import { PerformanceVitals } from "@gshl-components/performance/PerformanceVitals";
 
 export const metadata: Metadata = {
   title: {
@@ -54,10 +34,10 @@ export default function RootLayout({
       </head>
       <body
         className={cn(
-          varela.variable,
-          yellowtail.variable,
-          barlow.variable,
-          oswald.variable,
+          GeistSans.variable,
+          // Preserve the existing Tailwind font contracts while using one
+          // locally bundled, variable font file.
+          "[--font-barlow:var(--font-geist-sans)] [--font-oswald:var(--font-geist-sans)] [--font-varela:var(--font-geist-sans)] [--font-yellowtail:var(--font-geist-sans)]",
           "font-sans",
         )}
       >
@@ -66,6 +46,7 @@ export default function RootLayout({
             <NavDefaults />
             <div className="pb-20 lg:pb-8 lg:pt-16">{children}</div>
             <Navbar />
+            <PerformanceVitals />
           </TRPCReactProvider>
         </AuthProvider>
       </body>

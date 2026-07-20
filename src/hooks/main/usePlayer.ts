@@ -4,12 +4,54 @@ import type {
   Player,
   PlayerRankField,
   UsePlayersOptions,
+  UsePlayerPagesOptions,
   UseRankedPlayersOptions,
   UseRosterPlayersOptions,
 } from "@gshl-types";
 import { clientApi as api } from "@gshl-trpc";
 
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
+
+/** Cursor-paginated player collection for large user-facing lists. */
+export function usePlayerPages(options: UsePlayerPagesOptions = {}) {
+  const { active, positionGroup, enabled = true, limit = 50 } = options;
+  const query = api.player.listPage.useInfiniteQuery(
+    {
+      active,
+      positionGroup,
+      limit: Math.min(Math.max(limit, 1), 50),
+    },
+    {
+      enabled,
+      getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
+      staleTime: 5 * 60 * 1000,
+      gcTime: 15 * 60 * 1000,
+      refetchOnWindowFocus: false,
+    },
+  );
+
+  return {
+    ...query,
+    data: query.data?.pages.flatMap((page) => page.items) ?? [],
+    hasMore: query.hasNextPage,
+    loadMore: query.fetchNextPage,
+    isLoadingMore: query.isFetchingNextPage,
+  };
+}
+
+export function usePlayersByIds(ids: string[], enabled = true) {
+  const uniqueIds = useMemo(() => [...new Set(ids)].sort(), [ids]);
+  const query = api.player.getByIds.useQuery(
+    { ids: uniqueIds },
+    {
+      enabled: enabled && uniqueIds.length > 0,
+      staleTime: 5 * 60 * 1000,
+      gcTime: 15 * 60 * 1000,
+      refetchOnWindowFocus: false,
+    },
+  );
+  return { ...query, data: query.data ?? [] };
+}
 
 export function useUpdatePlayerLineup() {
   const utils = api.useUtils();

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { createTRPCRouter, publicProcedure } from "../trpc";
-import { baseQuerySchema } from "./_schemas";
+import { baseQuerySchema, requireQueryScope } from "./_schemas";
 import {
   type PlayerCareerSplitStatLine,
   type PlayerCareerTotalStatLine,
@@ -19,6 +19,8 @@ const playerStatsWhereSchema = z
     seasonId: z.string().optional(),
     weekId: z.string().optional(),
     teamId: z.string().optional(),
+    gshlTeamId: z.string().optional(),
+    date: z.string().optional(),
     position: z.string().optional(),
   })
   .optional();
@@ -34,6 +36,12 @@ export const playerStatsRouter = createTRPCRouter({
         }),
       )
       .query(async ({ input }): Promise<PlayerDayStatLine[]> => {
+        requireQueryScope(input.where, [
+          "playerId",
+          "seasonId",
+          "weekId",
+          "date",
+        ]);
         return getMany<PlayerDayStatLine>("PlayerDayStatLine", input);
       }),
 
@@ -84,6 +92,7 @@ export const playerStatsRouter = createTRPCRouter({
         }),
       )
       .query(async ({ input }): Promise<PlayerWeekStatLine[]> => {
+        requireQueryScope(input.where, ["playerId", "seasonId", "weekId"]);
         return getMany<PlayerWeekStatLine>("PlayerWeekStatLine", input);
       }),
 
@@ -155,6 +164,7 @@ export const playerStatsRouter = createTRPCRouter({
         }),
       )
       .query(async ({ input }): Promise<PlayerSplitStatLine[]> => {
+        requireQueryScope(input.where, ["playerId", "seasonId", "gshlTeamId"]);
         return getMany<PlayerSplitStatLine>("PlayerSplitStatLine", input);
       }),
 
@@ -178,6 +188,19 @@ export const playerStatsRouter = createTRPCRouter({
 
   // Season totals operations
   totals: createTRPCRouter({
+    getByPlayers: publicProcedure
+      .input(z.object({ playerIds: z.array(z.string().min(1)).max(500) }))
+      .query(async ({ input }): Promise<PlayerTotalStatLine[]> => {
+        const rows = await Promise.all(
+          [...new Set(input.playerIds)].map((playerId) =>
+            getMany<PlayerTotalStatLine>("PlayerTotalStatLine", {
+              where: { playerId },
+            }),
+          ),
+        );
+        return rows.flat();
+      }),
+
     // Get all season totals
     getAll: publicProcedure
       .input(
@@ -191,6 +214,7 @@ export const playerStatsRouter = createTRPCRouter({
         }),
       )
       .query(async ({ input }): Promise<PlayerTotalStatLine[]> => {
+        requireQueryScope(input.where, ["playerId", "seasonId"]);
         return getMany<PlayerTotalStatLine>("PlayerTotalStatLine", input);
       }),
 
@@ -230,6 +254,19 @@ export const playerStatsRouter = createTRPCRouter({
   }),
 
   careerSplits: createTRPCRouter({
+    getByTeams: publicProcedure
+      .input(z.object({ teamIds: z.array(z.string().min(1)).max(50) }))
+      .query(async ({ input }): Promise<PlayerCareerSplitStatLine[]> => {
+        const rows = await Promise.all(
+          [...new Set(input.teamIds)].map((gshlTeamId) =>
+            getMany<PlayerCareerSplitStatLine>("PlayerCareerSplitStatLine", {
+              where: { gshlTeamId },
+            }),
+          ),
+        );
+        return rows.flat();
+      }),
+
     getAll: publicProcedure
       .input(
         baseQuerySchema.extend({
@@ -243,6 +280,7 @@ export const playerStatsRouter = createTRPCRouter({
         }),
       )
       .query(async ({ input }): Promise<PlayerCareerSplitStatLine[]> => {
+        requireQueryScope(input.where, ["playerId", "gshlTeamId"]);
         return getMany<PlayerCareerSplitStatLine>(
           "PlayerCareerSplitStatLine",
           input,
@@ -279,6 +317,7 @@ export const playerStatsRouter = createTRPCRouter({
         }),
       )
       .query(async ({ input }): Promise<PlayerCareerTotalStatLine[]> => {
+        requireQueryScope(input.where, ["playerId"]);
         return getMany<PlayerCareerTotalStatLine>(
           "PlayerCareerTotalStatLine",
           input,
@@ -303,6 +342,23 @@ export const playerStatsRouter = createTRPCRouter({
   }),
 
   nhl: createTRPCRouter({
+    getByPlayers: publicProcedure
+      .input(
+        z.object({
+          playerIds: z.array(z.string().min(1)).max(100),
+        }),
+      )
+      .query(async ({ input }): Promise<PlayerNHLStatLine[]> => {
+        const pages = await Promise.all(
+          [...new Set(input.playerIds)].map((playerId) =>
+            getMany<PlayerNHLStatLine>("PlayerNHLStatLine", {
+              where: { playerId },
+            }),
+          ),
+        );
+        return pages.flat();
+      }),
+
     getAll: publicProcedure
       .input(
         baseQuerySchema.extend({
@@ -315,6 +371,7 @@ export const playerStatsRouter = createTRPCRouter({
         }),
       )
       .query(async ({ input }): Promise<PlayerNHLStatLine[]> => {
+        requireQueryScope(input.where, ["playerId", "seasonId"]);
         return getMany<PlayerNHLStatLine>("PlayerNHLStatLine", input);
       }),
 

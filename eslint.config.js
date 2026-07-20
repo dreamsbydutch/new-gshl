@@ -31,7 +31,7 @@ export default tseslint.config(
   {
     languageOptions: {
       parserOptions: {
-        project: true,
+        project: "./tsconfig.eslint.json",
         tsconfigRootDir: __dirname,
       },
     },
@@ -160,16 +160,15 @@ export default tseslint.config(
         "error",
         {
           selector: "Program",
-          message: "Keep src/app limited to route files and route-only helpers.",
+          message:
+            "Keep src/app limited to route files and route-only helpers.",
         },
       ],
     },
   },
   {
     files: ["src/app/**/*.{ts,tsx}"],
-    ignores: [
-      "src/app/api/**",
-    ],
+    ignores: ["src/app/api/**"],
     rules: {
       "no-restricted-syntax": [
         "error",

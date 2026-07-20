@@ -1,6 +1,10 @@
 import { fastSheetsReader, type SheetsModelName } from "@gshl-sheets";
 import { env } from "@gshl-env";
 import * as convexStore from "@gshl-lib/data/convex-store";
+import {
+  createOffsetPage,
+  normalizePageLimit,
+} from "@gshl-lib/data/pagination";
 
 type AnyRow = Record<string, unknown>;
 
@@ -9,6 +13,17 @@ export type BaseQueryInput = {
   orderBy?: Record<string, "asc" | "desc"> | undefined;
   take?: number | undefined;
   skip?: number | undefined;
+};
+
+export type PageQueryInput = Omit<BaseQueryInput, "take" | "skip"> & {
+  cursor?: string | null;
+  limit?: number;
+};
+
+export type PageResult<T> = {
+  items: T[];
+  nextCursor: string | null;
+  hasMore: boolean;
 };
 
 function toComparable(value: unknown): string | number | boolean | null {
@@ -124,6 +139,22 @@ export async function getMany<T>(
   const filtered = applyWhere(all, input.where);
   const ordered = applyOrderBy(filtered, input.orderBy);
   return applyPagination(ordered, input.skip, input.take);
+}
+
+export async function getPage<T>(
+  model: SheetsModelName,
+  input: PageQueryInput = {},
+): Promise<PageResult<T>> {
+  const limit = normalizePageLimit(input.limit);
+  if (env.GSHL_DATA_BACKEND === "convex") {
+    return convexStore.getPage<T>(model, { ...input, limit });
+  }
+
+  const rows = await getMany<T>(model, {
+    where: input.where,
+    orderBy: input.orderBy,
+  });
+  return createOffsetPage(rows, input.cursor, limit);
 }
 
 export async function getFirst<T>(

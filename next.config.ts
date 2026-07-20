@@ -6,6 +6,12 @@ import "./src/env.js";
 import type { NextConfig } from "next";
 
 const config: NextConfig = {
+  // Keep tracing and cache discovery inside this app. A lockfile in the parent
+  // apps directory previously made Next treat that directory as the workspace.
+  outputFileTracingRoot: process.cwd(),
+  experimental: {
+    optimizePackageImports: ["lucide-react", "recharts"],
+  },
   images: {
     remotePatterns: [
       { protocol: "https", hostname: "qzcw4d2n1l.ufs.sh" },

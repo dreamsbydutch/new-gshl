@@ -1,0 +1,22 @@
+{
+  "extends": "./tsconfig.json",
+  "include": [
+    "next-env.d.ts",
+    "auth.ts",
+    "middleware.ts",
+    "next.config.ts",
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "convex/*.ts",
+    "convex/_generated/**/*.d.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    ".next",
+    "apps-script",
+    "scripts",
+    "tools",
+    "docs",
+    "convex/_generated/**/*.js"
+  ]
+}

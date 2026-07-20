@@ -3,8 +3,8 @@
 import { useMemo } from "react";
 import {
   useContracts,
-  useDraftPicks,
-  usePlayers,
+  useDraftPickPages,
+  usePlayerPages,
   useNHLTeams,
   useSeasons,
   useTeams,
@@ -20,7 +20,12 @@ import {
   type DraftBoardPlayer,
   type ProjectedDraftPick,
 } from "@gshl-utils";
-import type { DraftPick, GSHLTeam, NHLTeam, UseDraftBoardDataOptions } from "@gshl-types";
+import type {
+  DraftPick,
+  GSHLTeam,
+  NHLTeam,
+  UseDraftBoardDataOptions,
+} from "@gshl-types";
 
 /**
  * useDraftBoardData Hook
@@ -49,7 +54,24 @@ import type { DraftPick, GSHLTeam, NHLTeam, UseDraftBoardDataOptions } from "@gs
 export function useDraftBoardData(options: UseDraftBoardDataOptions) {
   const { seasonId, selectedType = null } = options;
 
-  const { data: players, isLoading: playersLoading } = usePlayers();
+  const positionGroup =
+    selectedType === "goalie"
+      ? "G"
+      : selectedType === "defense"
+        ? "D"
+        : selectedType === "forward" ||
+            selectedType === "center" ||
+            selectedType === "leftwing" ||
+            selectedType === "rightwing"
+          ? "F"
+          : undefined;
+  const {
+    data: players,
+    isLoading: playersLoading,
+    hasMore,
+    loadMore,
+    isLoadingMore,
+  } = usePlayerPages({ active: true, positionGroup });
   const { data: contracts = [], isLoading: contractsLoading } = useContracts();
   const { data: nhlTeamsRaw, isLoading: nhlTeamsLoading } = useNHLTeams();
   const { data: seasons = [], isLoading: seasonsLoading } = useSeasons({
@@ -59,7 +81,9 @@ export function useDraftBoardData(options: UseDraftBoardDataOptions) {
     seasonId,
     enabled: Boolean(seasonId),
   });
-  const { data: draftPicks, isLoading: draftPicksLoading } = useDraftPicks();
+  const { data: draftPicks, isLoading: draftPicksLoading } = useDraftPickPages({
+    seasonId,
+  });
 
   const nhlTeams = useMemo(
     () => (nhlTeamsRaw as NHLTeam[]) ?? [],
@@ -148,5 +172,8 @@ export function useDraftBoardData(options: UseDraftBoardDataOptions) {
     isLoading,
     error: null,
     ready: !isLoading,
+    hasMore,
+    loadMore,
+    isLoadingMore,
   };
 }

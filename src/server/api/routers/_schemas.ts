@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { TRPCError } from "@trpc/server";
 
 // Common validation schemas
 export const idSchema = z.object({
@@ -26,6 +27,23 @@ export const dateSchema = z.date().or(z.string().datetime());
 export const countResponseSchema = z.object({
   count: z.number().int().nonnegative(),
 });
+
+/** Prevent accidental full-table reads from high-volume user-facing routes. */
+export function requireQueryScope(
+  where: Record<string, unknown> | undefined,
+  fields: readonly string[],
+) {
+  const isScoped = fields.some((field) => {
+    const value = where?.[field];
+    return value !== undefined && value !== null && value !== "";
+  });
+  if (!isScoped) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: `This collection requires one of: ${fields.join(", ")}`,
+    });
+  }
+}
 
 // Generic batch operation schemas
 export const batchDeleteSchema = z.object({
