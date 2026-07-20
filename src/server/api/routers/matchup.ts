@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { createTRPCRouter, publicProcedure } from "../trpc";
+import { createTRPCRouter, protectedProcedure, publicProcedure } from "../trpc";
 import { idSchema, baseQuerySchema, requireQueryScope } from "./_schemas";
 import type {
   Matchup,
@@ -106,6 +106,18 @@ export function calculateMatchupScores(
 }
 
 export const matchupRouter = createTRPCRouter({
+  /**
+   * Full matchup records for authenticated all-time views such as the GM
+   * Ladder and Team History. High-traffic schedule views should use the
+   * scoped metadata/live-state endpoints below.
+   */
+  getHistory: protectedProcedure
+    .input(baseQuerySchema)
+    .query(async ({ input }): Promise<Matchup[]> => {
+      const matchups = await getMany<Matchup>("Matchup", input);
+      return matchups.map(normalizePlayoffMatchupOutcome);
+    }),
+
   getMetadata: publicProcedure
     .input(baseQuerySchema.extend({ where: matchupWhereSchema }))
     .query(async ({ input }): Promise<MatchupMetadata[]> => {

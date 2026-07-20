@@ -76,9 +76,21 @@ export function useMatchups(options: UseMatchupsOptions = {}) {
 
   const queryInput =
     Object.keys(where).length > 0 ? { where, orderBy } : { orderBy };
+  const hasQueryScope = Object.keys(where).length > 0;
+
+  const historyQuery = api.matchup.getHistory.useQuery(
+    { orderBy },
+    {
+      enabled: enabled && !hasQueryScope,
+      staleTime: DAY_IN_MS,
+      gcTime: DAY_IN_MS,
+      refetchOnMount: false,
+      refetchOnWindowFocus: false,
+    },
+  );
 
   const metadataQuery = api.matchup.getMetadata.useQuery(queryInput, {
-    enabled,
+    enabled: enabled && hasQueryScope,
     staleTime: DAY_IN_MS,
     gcTime: DAY_IN_MS,
     refetchOnMount: false,
@@ -86,7 +98,7 @@ export function useMatchups(options: UseMatchupsOptions = {}) {
   });
 
   const liveStatesQuery = api.matchup.getLiveStates.useQuery(queryInput, {
-    enabled,
+    enabled: enabled && hasQueryScope,
     staleTime: FIFTEEN_MINUTES_IN_MS,
     gcTime: FIFTEEN_MINUTES_IN_MS,
     refetchOnMount: true,
@@ -94,13 +106,25 @@ export function useMatchups(options: UseMatchupsOptions = {}) {
   });
 
   const data = useMemo(() => {
+    if (!hasQueryScope) return historyQuery.data ?? [];
     return mergeMatchups(metadataQuery.data ?? [], liveStatesQuery.data ?? []);
-  }, [metadataQuery.data, liveStatesQuery.data]);
+  }, [
+    hasQueryScope,
+    historyQuery.data,
+    metadataQuery.data,
+    liveStatesQuery.data,
+  ]);
 
   return {
     data,
-    isLoading: metadataQuery.isLoading || liveStatesQuery.isLoading,
-    isFetching: metadataQuery.isFetching || liveStatesQuery.isFetching,
-    error: metadataQuery.error ?? liveStatesQuery.error ?? null,
+    isLoading: hasQueryScope
+      ? metadataQuery.isLoading || liveStatesQuery.isLoading
+      : historyQuery.isLoading,
+    isFetching: hasQueryScope
+      ? metadataQuery.isFetching || liveStatesQuery.isFetching
+      : historyQuery.isFetching,
+    error: hasQueryScope
+      ? (metadataQuery.error ?? liveStatesQuery.error ?? null)
+      : (historyQuery.error ?? null),
   };
 }
