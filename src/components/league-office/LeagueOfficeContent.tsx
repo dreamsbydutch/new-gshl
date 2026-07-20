@@ -8,6 +8,7 @@ import { Rulebook } from "./Rulebook";
 import { DraftClasses } from "./DraftClasses";
 import { UserManagement } from "@gshl-components/auth";
 import { ContractManagement, JobManagement } from "@gshl-components/admin";
+import { ImageUpload } from "./ImageUpload";
 
 export function LeagueOfficeContent() {
   const { selectedType } = useLeagueOfficeNavigation();
@@ -27,6 +28,10 @@ export function LeagueOfficeContent() {
       ) : null}
       {selectedType === "contracts" && session?.user.role === "commissioner" ? (
         <ContractManagement />
+      ) : null}
+      {selectedType === "imageUpload" &&
+      session?.user.role === "commissioner" ? (
+        <ImageUpload />
       ) : null}
     </div>
   );

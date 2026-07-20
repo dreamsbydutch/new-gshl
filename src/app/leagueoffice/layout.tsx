@@ -57,6 +57,11 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               value: "Jobs",
               setter: (type: string | null) => setSelectedType(type ?? ""),
             },
+            {
+              key: "imageUpload",
+              value: "Image Upload",
+              setter: (type: string | null) => setSelectedType(type ?? ""),
+            },
           ]
         : []),
     ],

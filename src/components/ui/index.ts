@@ -73,7 +73,12 @@ export {
 } from "./toast";
 
 export { Toaster } from "./toaster";
-export { UploadButton, UploadDropzone } from "./uploadthing";
+export {
+  UploadButton,
+  UploadDropzone,
+  uploadFiles,
+  useUploadThing,
+} from "./uploadthing";
 
 // NHL Logo Component
 export { NHLLogo } from "./nhlLogo";
