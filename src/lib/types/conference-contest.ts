@@ -15,6 +15,12 @@ export interface ConferenceContestRecord {
   ties: number;
 }
 
+export interface ConferenceContestRawStatRow {
+  label: string;
+  left: string | number;
+  right: string | number;
+}
+
 export interface ConferenceContestRatingComponents {
   headToHead: number;
   playoffs: number;
@@ -27,10 +33,7 @@ export type ConferenceContestComponentKey =
 
 export interface ConferenceContestRating {
   ratingByConferenceId: Record<string, number>;
-  componentsByConferenceId: Record<
-    string,
-    ConferenceContestRatingComponents
-  >;
+  componentsByConferenceId: Record<string, ConferenceContestRatingComponents>;
 }
 
 export interface ConferenceContestAwardSummary {
