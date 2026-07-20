@@ -1,6 +1,6 @@
 /**
  * Usage:
- *   npm run stats:backfill-yahoo-matchup-days -- --seasonId 12 [--apply]
+ *   npm run stats:backfill-yahoo-matchup-days -- --seasonId 12 [--matchupId 123] [--apply]
  *   npm run stats:backfill-yahoo-matchup-days -- --weekIds 101,102 --teamIds 5,6
  *   npm run stats:backfill-yahoo-matchup-days -- --seasonIds 11,12 --weekNums 1,2
  *
@@ -28,7 +28,7 @@ loadEnv();
 
 const HELP_TEXT = `
 Usage:
-  npm run stats:backfill-yahoo-matchup-days -- --seasonId 12 [--apply]
+  npm run stats:backfill-yahoo-matchup-days -- --seasonId 12 [--matchupId 123] [--apply]
   npm run stats:backfill-yahoo-matchup-days -- --weekIds 101,102 --teamIds 5,6
   npm run stats:backfill-yahoo-matchup-days -- --seasonIds 11,12 --weekNums 1,2
 
@@ -39,7 +39,7 @@ Options:
   --startDate <date>                Optional YYYY-MM-DD lower date bound.
   --endDate <date>                  Optional YYYY-MM-DD upper date bound.
   --teamIds <list>                  Optional comma-separated GSHL team ids.
-  --matchupIds <list>               Optional comma-separated matchup ids.
+  --matchupId, --matchupIds <list>  Optional matchup id or comma-separated matchup ids.
   --include-lt                      Include LT matchups. By default LT matchups are skipped.
   --concurrency <n>                 Concurrent matchup/date fetches. Default: 1.
   --requestDelayMs <ms>             Minimum delay between Yahoo requests.

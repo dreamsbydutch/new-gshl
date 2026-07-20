@@ -110,6 +110,7 @@ type MatchupDateReconciliation = {
   flags: InvestigationFlag[];
   matchedYahooRows: number;
   pageScanned: boolean;
+  teamSlicesScanned: number;
 };
 
 type SideAssignment = {
@@ -1025,6 +1026,7 @@ async function reconcileMatchupDate(params: {
   existingByBaseKey: ReadonlyMap<string, LoadedPlayerDayRow>;
   existingByPlayerDateKey: ReadonlyMap<string, LoadedPlayerDayRow>;
   existingByTeamDate: ReadonlyMap<string, LoadedPlayerDayRow[]>;
+  targetTeamIdSet: ReadonlySet<string>;
   taskLabel: string;
   logProgress?: ProgressLogger;
 }): Promise<MatchupDateReconciliation> {
@@ -1045,6 +1047,7 @@ async function reconcileMatchupDate(params: {
     existingByBaseKey,
     existingByPlayerDateKey,
     existingByTeamDate,
+    targetTeamIdSet,
     taskLabel,
     logProgress,
   } = params;
@@ -1059,6 +1062,7 @@ async function reconcileMatchupDate(params: {
       deletes: [],
       matchedYahooRows: 0,
       pageScanned: false,
+      teamSlicesScanned: 0,
       flags: [
         {
           kind: "date-missing-week",
@@ -1102,6 +1106,7 @@ async function reconcileMatchupDate(params: {
       deletes: [],
       matchedYahooRows: 0,
       pageScanned: false,
+      teamSlicesScanned: 0,
       flags: [
         {
           kind: "fetch-failure",
@@ -1130,6 +1135,7 @@ async function reconcileMatchupDate(params: {
       deletes: [],
       matchedYahooRows: 0,
       pageScanned: true,
+      teamSlicesScanned: 0,
       flags: [
         {
           kind: "parse-failure",
@@ -1181,62 +1187,64 @@ async function reconcileMatchupDate(params: {
     );
   }
 
-  const homeResult = reconcileTeamDate({
-    seasonId,
-    weekId,
-    matchupId,
-    date: normalizedDate,
-    team: sideAssignment.leftTeam,
-    yahooRows: [...parsed.home.skaters, ...parsed.home.goalies],
-    players,
-    playersById,
-    playersByYahooId,
-    playersByNormalizedName,
-    existingByBaseKey,
-    existingByPlayerDateKey,
-    existingRows:
-      existingByTeamDate.get(
-        buildTeamDateKey(
-          toTrimmedString(sideAssignment.leftTeam.id),
-          normalizedDate,
-        ),
-      ) ?? [],
-    logProgress,
-  });
-  const awayResult = reconcileTeamDate({
-    seasonId,
-    weekId,
-    matchupId,
-    date: normalizedDate,
-    team: sideAssignment.rightTeam,
-    yahooRows: [...parsed.away.skaters, ...parsed.away.goalies],
-    players,
-    playersById,
-    playersByYahooId,
-    playersByNormalizedName,
-    existingByBaseKey,
-    existingByPlayerDateKey,
-    existingRows:
-      existingByTeamDate.get(
-        buildTeamDateKey(
-          toTrimmedString(sideAssignment.rightTeam.id),
-          normalizedDate,
-        ),
-      ) ?? [],
-    logProgress,
-  });
+  const teamResults = [
+    {
+      team: sideAssignment.leftTeam,
+      yahooRows: [...parsed.home.skaters, ...parsed.home.goalies],
+    },
+    {
+      team: sideAssignment.rightTeam,
+      yahooRows: [...parsed.away.skaters, ...parsed.away.goalies],
+    },
+  ]
+    .filter(
+      ({ team }) =>
+        targetTeamIdSet.size === 0 ||
+        targetTeamIdSet.has(toTrimmedString(team.id)),
+    )
+    .map(({ team, yahooRows }) =>
+      reconcileTeamDate({
+        seasonId,
+        weekId,
+        matchupId,
+        date: normalizedDate,
+        team,
+        yahooRows,
+        players,
+        playersById,
+        playersByYahooId,
+        playersByNormalizedName,
+        existingByBaseKey,
+        existingByPlayerDateKey,
+        existingRows:
+          existingByTeamDate.get(
+            buildTeamDateKey(toTrimmedString(team.id), normalizedDate),
+          ) ?? [],
+        logProgress,
+      }),
+    );
+
+  const updates = teamResults.flatMap((result) => result.updates);
+  const creates = teamResults.flatMap((result) => result.creates);
+  const deletes = teamResults.flatMap((result) => result.deletes);
+  const flags = teamResults.flatMap((result) => result.flags);
+  const matchedYahooRows = teamResults.reduce(
+    (sum, result) => sum + result.matchedYahooRows,
+    0,
+  );
 
   logProgress?.(
-    `${formatProgressPrefix(taskLabel)} parsed ${homeResult.matchedYahooRows + awayResult.matchedYahooRows} Yahoo rows, updates=${homeResult.updates.length + awayResult.updates.length}, creates=${homeResult.creates.length + awayResult.creates.length}, deletes=${homeResult.deletes.length + awayResult.deletes.length}`,
+    `${formatProgressPrefix(taskLabel)} parsed ${matchedYahooRows} Yahoo rows across ${teamResults.length} selected team slice(s), updates=${updates.length}, creates=${creates.length}, deletes=${deletes.length}`,
   );
 
   return {
-    updates: [...homeResult.updates, ...awayResult.updates],
-    creates: [...homeResult.creates, ...awayResult.creates],
-    deletes: [...homeResult.deletes, ...awayResult.deletes],
-    flags: [...homeResult.flags, ...awayResult.flags],
-    matchedYahooRows: homeResult.matchedYahooRows + awayResult.matchedYahooRows,
+    updates,
+    creates,
+    deletes,
+    flags,
+    matchedYahooRows,
     pageScanned: true,
+    teamSlicesScanned: teamResults.length,
   };
 }
 
@@ -1360,7 +1368,9 @@ export function parseYahooMatchupBackfillOptions(
     startDate,
     endDate,
     teamIds: parseCsvList(getArgValue(args, "--teamIds")),
-    matchupIds: parseCsvList(getArgValue(args, "--matchupIds")),
+    matchupIds: parseCsvList(
+      getArgValue(args, "--matchupIds") ?? getArgValue(args, "--matchupId"),
+    ),
     includeLt: hasFlag(args, "--include-lt") || hasFlag(args, "--includeLt"),
     concurrency: parsePositiveInteger(getArgValue(args, "--concurrency"), 1),
     requestDelayMs: parsePositiveInteger(
@@ -1561,6 +1571,7 @@ export async function runYahooMatchupPlayerDayBackfill(
       ),
     );
     const limiter = pLimit(options.concurrency);
+    const targetTeamIdSet = new Set(options.teamIds);
     const matchupDateTasks = seasonMatchups.flatMap((matchup) => {
       const week = targetWeeks.find(
         (entry) =>
@@ -1605,6 +1616,7 @@ export async function runYahooMatchupPlayerDayBackfill(
           existingByBaseKey,
           existingByPlayerDateKey,
           existingByTeamDate,
+          targetTeamIdSet,
           taskLabel,
           logProgress,
         }).then((result) => {
@@ -1629,6 +1641,10 @@ export async function runYahooMatchupPlayerDayBackfill(
     const pageScannedCount = results.filter(
       (result) => result.pageScanned,
     ).length;
+    const teamSlicesScanned = results.reduce(
+      (sum, result) => sum + result.teamSlicesScanned,
+      0,
+    );
     const deletedRows = deletes.length;
     const updatedRows = updates.length;
     const createdRows = creates.length;
@@ -1661,7 +1677,7 @@ export async function runYahooMatchupPlayerDayBackfill(
       ).size,
       matchupsScanned: seasonMatchups.length,
       pagesScanned: pageScannedCount,
-      teamSlicesScanned: pageScannedCount * 2,
+      teamSlicesScanned,
       matchedYahooRows,
       updatedRows,
       createdRows,

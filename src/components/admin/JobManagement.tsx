@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useJobAdmin } from "@gshl-hooks";
+import { useJobAdmin, useSeasons, useTeams, useWeeks } from "@gshl-hooks";
+import type { GSHLTeam } from "@gshl-types";
 import { Button } from "@gshl-ui";
 
 const activeStatuses = new Set([
@@ -19,8 +20,61 @@ export function JobManagement() {
   const { catalog, runs, start, cancel, retry } = useJobAdmin();
   const [jobName, setJobName] = useState("season-stat-aggregation");
   const [seasonId, setSeasonId] = useState("");
+  const [weekNum, setWeekNum] = useState("");
+  const [teamId, setTeamId] = useState("");
+  const [matchupId, setMatchupId] = useState("");
   const [apply, setApply] = useState(false);
   const sortedRuns = useMemo(() => runs.data ?? [], [runs.data]);
+  const isYahooPlayerDayBackfill =
+    jobName === "yahoo-matchup-player-day-backfill";
+  const seasonsQuery = useSeasons({ orderBy: { year: "desc" } });
+  const weeksQuery = useWeeks({
+    seasonId,
+    enabled: isYahooPlayerDayBackfill && Boolean(seasonId),
+  });
+  const teamsQuery = useTeams({
+    seasonId,
+    enabled: isYahooPlayerDayBackfill && Boolean(seasonId),
+  });
+  const weeks = useMemo(
+    () =>
+      [...weeksQuery.data].sort((left, right) => left.weekNum - right.weekNum),
+    [weeksQuery.data],
+  );
+  const teams = useMemo(
+    () =>
+      ([...teamsQuery.data] as GSHLTeam[]).sort((left, right) =>
+        String(left.name ?? left.abbr ?? "").localeCompare(
+          String(right.name ?? right.abbr ?? ""),
+        ),
+      ),
+    [teamsQuery.data],
+  );
+
+  const selectSeason = (value: string) => {
+    setSeasonId(value);
+    setWeekNum("");
+    setTeamId("");
+  };
+
+  const startJob = () => {
+    const args: Record<string, string> = {};
+    const normalizedSeasonId = seasonId.trim();
+    const normalizedWeekNum = weekNum.trim();
+    const normalizedTeamId = teamId.trim();
+    const normalizedMatchupId = matchupId.trim();
+    if (normalizedSeasonId) args.seasonId = normalizedSeasonId;
+    if (isYahooPlayerDayBackfill && normalizedWeekNum) {
+      args.weekNum = normalizedWeekNum;
+    }
+    if (isYahooPlayerDayBackfill && normalizedTeamId) {
+      args.teamIds = normalizedTeamId;
+    }
+    if (isYahooPlayerDayBackfill && normalizedMatchupId) {
+      args.matchupId = normalizedMatchupId;
+    }
+    start.mutate({ jobName, apply, args });
+  };
 
   return (
     <section className="mx-auto max-w-6xl space-y-6 py-6">
@@ -31,7 +85,7 @@ export function JobManagement() {
         </p>
       </div>
 
-      <div className="grid gap-3 rounded-lg border p-4 md:grid-cols-[1fr_1fr_auto_auto]">
+      <div className="grid gap-3 rounded-lg border p-4 md:grid-cols-2 xl:grid-cols-4">
         <label className="text-sm">
           <span className="mb-1 block font-medium">Job</span>
           <select
@@ -46,15 +100,82 @@ export function JobManagement() {
             ))}
           </select>
         </label>
-        <label className="text-sm">
-          <span className="mb-1 block font-medium">Season ID (optional)</span>
-          <input
-            className="w-full rounded border px-3 py-2"
-            value={seasonId}
-            onChange={(event) => setSeasonId(event.target.value)}
-            placeholder="Convex season ID"
-          />
-        </label>
+        {isYahooPlayerDayBackfill ? (
+          <label className="text-sm">
+            <span className="mb-1 block font-medium">Season</span>
+            <select
+              className="w-full rounded border bg-white px-3 py-2"
+              value={seasonId}
+              onChange={(event) => selectSeason(event.target.value)}
+            >
+              <option value="">Choose a season</option>
+              {seasonsQuery.data.map((season) => (
+                <option key={season.id} value={season.id}>
+                  {season.name || season.year}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : (
+          <label className="text-sm">
+            <span className="mb-1 block font-medium">Season ID (optional)</span>
+            <input
+              className="w-full rounded border px-3 py-2"
+              value={seasonId}
+              onChange={(event) => setSeasonId(event.target.value)}
+              placeholder="Convex season ID"
+            />
+          </label>
+        )}
+        {isYahooPlayerDayBackfill ? (
+          <label className="text-sm">
+            <span className="mb-1 block font-medium">Week</span>
+            <select
+              className="w-full rounded border bg-white px-3 py-2"
+              value={weekNum}
+              onChange={(event) => setWeekNum(event.target.value)}
+              disabled={!seasonId || weeksQuery.isLoading}
+            >
+              <option value="">All weeks</option>
+              {weeks.map((week) => (
+                <option key={week.id} value={String(week.weekNum)}>
+                  Week {week.weekNum}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : null}
+        {isYahooPlayerDayBackfill ? (
+          <label className="text-sm">
+            <span className="mb-1 block font-medium">Team / franchise</span>
+            <select
+              className="w-full rounded border bg-white px-3 py-2"
+              value={teamId}
+              onChange={(event) => setTeamId(event.target.value)}
+              disabled={!seasonId || teamsQuery.isLoading}
+            >
+              <option value="">All teams</option>
+              {teams.map((team) => (
+                <option key={team.id} value={team.id}>
+                  {team.name ?? team.abbr ?? team.franchiseId}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : null}
+        {isYahooPlayerDayBackfill ? (
+          <label className="text-sm">
+            <span className="mb-1 block font-medium">
+              Matchup ID (optional)
+            </span>
+            <input
+              className="w-full rounded border px-3 py-2"
+              value={matchupId}
+              onChange={(event) => setMatchupId(event.target.value)}
+              placeholder="Matchup ID"
+            />
+          </label>
+        ) : null}
         <label className="flex items-end gap-2 pb-2 text-sm font-medium">
           <input
             type="checkbox"
@@ -65,10 +186,12 @@ export function JobManagement() {
         </label>
         <Button
           className="self-end"
-          disabled={start.isPending || !jobName}
-          onClick={() =>
-            start.mutate({ jobName, apply, args: seasonId ? { seasonId } : {} })
+          disabled={
+            start.isPending ||
+            !jobName ||
+            (isYahooPlayerDayBackfill && !seasonId.trim())
           }
+          onClick={startJob}
         >
           {start.isPending
             ? "Starting…"
