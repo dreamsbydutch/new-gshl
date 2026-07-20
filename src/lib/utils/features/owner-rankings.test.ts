@@ -207,6 +207,36 @@ void test("weights playoff stages, Cups, and leadership awards", () => {
   assert.equal(result.recentBattles[0]?.gameType, MatchupType.FINAL);
 });
 
+void test("awards an equal-score playoff game to the home owner", () => {
+  const result = buildOwnerRankings({
+    owners: [owner("home", true), owner("away", true)],
+    seasons: [season("s1", 2025)],
+    teams: [team("home-team", "s1", "home"), team("away-team", "s1", "away")],
+    weeks: [week("playoff-week", "s1", 1)],
+    matchups: [
+      matchup(
+        "semi",
+        "s1",
+        "playoff-week",
+        "home-team",
+        "away-team",
+        MatchupType.SEMI_FINAL,
+        5,
+        5,
+      ),
+    ],
+    teamAwards: [],
+  });
+  const home = result.rankings.find((entry) => entry.owner.id === "home");
+  const away = result.rankings.find((entry) => entry.owner.id === "away");
+
+  assert.equal(home?.playoffRecord.wins, 1);
+  assert.equal(home?.playoffRecord.ties, 0);
+  assert.equal(away?.playoffRecord.losses, 1);
+  assert.equal(away?.playoffRecord.ties, 0);
+  assert.equal(result.recentBattles[0]?.winnerOwnerId, "home");
+});
+
 void test("penalizes the last-place Brophy Trophy", () => {
   const result = buildOwnerRankings({
     owners: [owner("last-place", true)],
@@ -214,9 +244,7 @@ void test("penalizes the last-place Brophy Trophy", () => {
     teams: [team("last-place-team", "s1", "last-place")],
     weeks: [],
     matchups: [],
-    teamAwards: [
-      award("brophy", "s1", "last-place", AwardsList.BROPHY),
-    ],
+    teamAwards: [award("brophy", "s1", "last-place", AwardsList.BROPHY)],
   });
   const lastPlace = result.rankings.find(
     (entry) => entry.owner.id === "last-place",

@@ -349,7 +349,13 @@ var MatchupHandler = (function buildMatchupHandler() {
     return map;
   }
 
-  function computeTeamPointsFromRecord(teamW, teamHW, teamHL, teamT, usesLegacyTies) {
+  function computeTeamPointsFromRecord(
+    teamW,
+    teamHW,
+    teamHL,
+    teamT,
+    usesLegacyTies,
+  ) {
     var W = toNumber(teamW);
     var HW = toNumber(teamHW);
     var HL = toNumber(teamHL);
@@ -365,6 +371,28 @@ var MatchupHandler = (function buildMatchupHandler() {
     var awayScore = parseScore(matchup && matchup.awayScore);
     var hasScores = homeScore !== null && awayScore !== null;
     var scoresWereEqual = hasScores && homeScore === awayScore;
+    var gameType = String((matchup && matchup.gameType) || "");
+    var isPlayoff = ["QF", "SF", "F"].indexOf(gameType) !== -1;
+
+    if (isPlayoff && hasScores) {
+      return {
+        hasOutcome: true,
+        homeWin: homeScore >= awayScore,
+        awayWin: awayScore > homeScore,
+        tie: false,
+        scoresWereEqual: scoresWereEqual,
+      };
+    }
+
+    if (isPlayoff && toBool(matchup && matchup.tie)) {
+      return {
+        hasOutcome: true,
+        homeWin: true,
+        awayWin: false,
+        tie: false,
+        scoresWereEqual: false,
+      };
+    }
 
     if (toBool(matchup && matchup.tie)) {
       return {

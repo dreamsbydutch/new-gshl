@@ -8,6 +8,7 @@ import type {
   TeamWeekStatLine,
 } from "@gshl-types";
 import { getById, getCount, getMany } from "../sheets-store";
+import { normalizePlayoffMatchupOutcome } from "@gshl-utils/domain/matchup";
 
 // Matchup router
 const idStringSchema = z.coerce.string();
@@ -122,27 +123,33 @@ export const matchupRouter = createTRPCRouter({
   getAll: publicProcedure
     .input(baseQuerySchema.extend({ where: matchupWhereSchema }))
     .query(async ({ input }): Promise<Matchup[]> => {
-      return getMany<Matchup>("Matchup", input);
+      const matchups = await getMany<Matchup>("Matchup", input);
+      return matchups.map(normalizePlayoffMatchupOutcome);
     }),
 
   getById: publicProcedure
     .input(idSchema)
     .query(async ({ input }): Promise<Matchup | null> => {
-      return getById<Matchup>("Matchup", input.id);
+      const matchup = await getById<Matchup>("Matchup", input.id);
+      return matchup ? normalizePlayoffMatchupOutcome(matchup) : null;
     }),
 
   getByWeek: publicProcedure
     .input(z.object({ weekId: idStringSchema }))
     .query(async ({ input }): Promise<Matchup[]> => {
-      return getMany<Matchup>("Matchup", { where: { weekId: input.weekId } });
+      const matchups = await getMany<Matchup>("Matchup", {
+        where: { weekId: input.weekId },
+      });
+      return matchups.map(normalizePlayoffMatchupOutcome);
     }),
 
   getByTeam: publicProcedure
     .input(z.object({ teamId: idStringSchema }))
     .query(async ({ input }): Promise<Matchup[]> => {
-      return getMany<Matchup>("Matchup", {
+      const matchups = await getMany<Matchup>("Matchup", {
         where: { homeTeamId: input.teamId },
       });
+      return matchups.map(normalizePlayoffMatchupOutcome);
     }),
   count: publicProcedure
     .input(z.object({ where: matchupWhereSchema }))

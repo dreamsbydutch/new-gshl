@@ -23,7 +23,7 @@ import type { DatabaseRecord } from "@gshl-lib/sheets/config/config";
 import { getCompositeKeyColumnsForModel } from "@gshl-lib/sheets/config/config";
 import { fastSheetsReader } from "@gshl-lib/sheets/reader/fast-reader";
 import { minimalSheetsWriter } from "@gshl-lib/sheets/writer/minimal-writer";
-import { SeasonType } from "@gshl-lib/types/enums";
+import { MatchupType, SeasonType } from "@gshl-lib/types/enums";
 import type { Matchup } from "@gshl-lib/types/database";
 
 type BackfillOptions = {
@@ -455,6 +455,32 @@ function resolveMatchupOutcome(matchup: DatabaseRecord) {
   const awayScore = toNullableNumber(matchup.awayScore);
   const scoresWereEqual =
     homeScore !== null && awayScore !== null && homeScore === awayScore;
+  const gameType = normalizeRecordId(matchup.gameType);
+  const isPlayoff = [
+    MatchupType.QUARTER_FINAL,
+    MatchupType.SEMI_FINAL,
+    MatchupType.FINAL,
+  ].includes(gameType as MatchupType);
+
+  if (isPlayoff && homeScore !== null && awayScore !== null) {
+    return {
+      hasOutcome: true,
+      homeWin: homeScore >= awayScore,
+      awayWin: awayScore > homeScore,
+      tie: false,
+      scoresWereEqual,
+    };
+  }
+
+  if (isPlayoff && toBooleanFlag(matchup.tie)) {
+    return {
+      hasOutcome: true,
+      homeWin: true,
+      awayWin: false,
+      tie: false,
+      scoresWereEqual: false,
+    };
+  }
 
   if (toBooleanFlag(matchup.tie)) {
     return {
@@ -840,13 +866,13 @@ function computeMatchupScore(
   let awayScore = 0;
   const goalieStartMinimum = getGoalieStartMinimumForSeasonId(seasonId);
   const homeHasGoalies =
-    (homeGoalieStarts !== null
+    homeGoalieStarts !== null
       ? homeGoalieStarts >= goalieStartMinimum
-      : hasQualifiedGoalieStats(homeWeek));
+      : hasQualifiedGoalieStats(homeWeek);
   const awayHasGoalies =
-    (awayGoalieStarts !== null
+    awayGoalieStarts !== null
       ? awayGoalieStarts >= goalieStartMinimum
-      : hasQualifiedGoalieStats(awayWeek));
+      : hasQualifiedGoalieStats(awayWeek);
 
   for (const rule of matchupCategoryRules) {
     const isGoalieCategory = GOALIE_CATEGORY_SET.has(rule.field);
@@ -1069,8 +1095,12 @@ export async function rebuildSeasonStandingsForSeasonId(
 
             return {
               tie: isLegacyTie,
-              homeWin: isLegacyTie ? false : scores.homeScore >= scores.awayScore,
-              awayWin: isLegacyTie ? false : scores.homeScore < scores.awayScore,
+              homeWin: isLegacyTie
+                ? false
+                : scores.homeScore >= scores.awayScore,
+              awayWin: isLegacyTie
+                ? false
+                : scores.homeScore < scores.awayScore,
             };
           })()
         : {}),

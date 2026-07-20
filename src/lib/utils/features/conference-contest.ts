@@ -14,6 +14,7 @@ import type {
 } from "@gshl-types";
 import { AwardsList, MatchupType } from "@gshl-types";
 import { getTeamAwardTeam } from "@gshl-lib/config/awards";
+import { isPlayoffMatchupType } from "@gshl-utils/domain/matchup";
 
 export type {
   ConferenceContestConferenceInfo,
@@ -85,22 +86,22 @@ const isComplete = (matchup: Pick<Matchup, "homeScore" | "awayScore">) =>
   normalizeScore(matchup.homeScore) != null &&
   normalizeScore(matchup.awayScore) != null;
 
-const isPlayoffGameType = (gameType: MatchupType) =>
-  gameType === MatchupType.QUARTER_FINAL ||
-  gameType === MatchupType.SEMI_FINAL ||
-  gameType === MatchupType.FINAL;
-
 const getMatchupWinner = (
   matchup: Pick<
     Matchup,
-    "homeWin" | "awayWin" | "tie" | "homeScore" | "awayScore"
+    "gameType" | "homeWin" | "awayWin" | "tie" | "homeScore" | "awayScore"
   >,
 ): ConferenceContestWinner => {
+  const playoff = isPlayoffMatchupType(matchup.gameType);
+  const homeScore = normalizeScore(matchup.homeScore);
+  const awayScore = normalizeScore(matchup.awayScore);
+  if (playoff && homeScore != null && awayScore != null) {
+    return homeScore >= awayScore ? "home" : "away";
+  }
+  if (playoff && normalizeBoolean(matchup.tie) === true) return "home";
   if (normalizeBoolean(matchup.homeWin) === true) return "home";
   if (normalizeBoolean(matchup.awayWin) === true) return "away";
   if (normalizeBoolean(matchup.tie) === true) return "tie";
-  const homeScore = normalizeScore(matchup.homeScore);
-  const awayScore = normalizeScore(matchup.awayScore);
   if (homeScore == null || awayScore == null) return "unknown";
   if (homeScore > awayScore) return "home";
   if (awayScore > homeScore) return "away";
@@ -115,7 +116,7 @@ const emptyRecordMap = (conferenceIds: string[]) =>
 const applyResultToRecord = (
   matchup: Pick<
     Matchup,
-    "homeWin" | "awayWin" | "tie" | "homeScore" | "awayScore"
+    "gameType" | "homeWin" | "awayWin" | "tie" | "homeScore" | "awayScore"
   >,
   homeConfId: string,
   awayConfId: string,
@@ -353,7 +354,7 @@ export const buildConferenceContestSeasonViewModel = (params: {
         seasonRecordByConferenceId,
       );
     }
-    if (isPlayoffGameType(matchup.gameType)) {
+    if (isPlayoffMatchupType(matchup.gameType)) {
       applyResultToRecord(
         matchup,
         homeConferenceId,

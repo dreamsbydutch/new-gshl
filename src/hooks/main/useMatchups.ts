@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import type { Matchup, MatchupLiveState, MatchupMetadata } from "@gshl-types";
 import type { UseMatchupsOptions } from "@gshl-types";
 import { clientApi as api } from "@gshl-trpc";
+import { normalizePlayoffMatchupOutcome } from "@gshl-utils/domain/matchup";
 
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
 const FIFTEEN_MINUTES_IN_MS = 15 * 60 * 1000;
@@ -19,7 +20,7 @@ function mergeMatchups(
   return metadata.map((matchup) => {
     const liveState = liveStateById.get(matchup.id);
 
-    return {
+    return normalizePlayoffMatchupOutcome({
       ...matchup,
       homeScore: liveState?.homeScore ?? null,
       awayScore: liveState?.awayScore ?? null,
@@ -28,7 +29,7 @@ function mergeMatchups(
       tie: liveState?.tie ?? null,
       isComplete: liveState?.isComplete ?? false,
       updatedAt: liveState?.updatedAt ?? matchup.createdAt,
-    };
+    });
   });
 }
 

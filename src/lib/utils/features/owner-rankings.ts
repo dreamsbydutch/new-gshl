@@ -11,6 +11,7 @@ import type {
   Week,
 } from "@gshl-types";
 import { AwardsList, MatchupType } from "@gshl-types";
+import { isPlayoffMatchupType } from "@gshl-utils/domain/matchup";
 
 /** The ladder's normal reference band. These are guideposts, not hard limits. */
 export const OWNER_LADDER_REFERENCE_FLOOR = 0;
@@ -123,10 +124,14 @@ const matchupK = (gameType: MatchupType) => {
   return 20;
 };
 
-const matchupActual = (homeScore: number, awayScore: number) => {
+const matchupActual = (
+  homeScore: number,
+  awayScore: number,
+  gameType: MatchupType,
+) => {
   if (homeScore > awayScore) return 1;
   if (awayScore > homeScore) return 0;
-  return 0.5;
+  return isPlayoffMatchupType(gameType) ? 1 : 0.5;
 };
 
 const applyRecordResult = (
@@ -297,7 +302,7 @@ export function buildOwnerRankings(params: {
       if (!homeState || !awayState || homeScore == null || awayScore == null)
         continue;
 
-      const actualHome = matchupActual(homeScore, awayScore);
+      const actualHome = matchupActual(homeScore, awayScore, matchup.gameType);
       const expectedHome = expectedScore(homeState.elo, awayState.elo);
       const marginMultiplier =
         1 + Math.min(Math.abs(homeScore - awayScore), 4) * 0.08;
@@ -403,9 +408,9 @@ export function buildOwnerRankings(params: {
     if (!cupOwnerIds.size && seasonFinal) {
       const homeScore = numericScore(seasonFinal.homeScore);
       const awayScore = numericScore(seasonFinal.awayScore);
-      if (homeScore != null && awayScore != null && homeScore !== awayScore) {
+      if (homeScore != null && awayScore != null) {
         const winningTeamId =
-          homeScore > awayScore
+          homeScore >= awayScore
             ? seasonFinal.homeTeamId
             : seasonFinal.awayTeamId;
         const ownerId = normalizeId(
