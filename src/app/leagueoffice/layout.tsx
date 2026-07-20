@@ -7,19 +7,18 @@ import {
 } from "@gshl-components/ui/nav";
 import type { ToggleItem } from "@gshl-types";
 import { useSession } from "next-auth/react";
-import { useSearchParams } from "next/navigation";
 import { useEffect } from "react";
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const { selectedType, setSelectedType } = useLeagueOfficeNavigation();
   const { data: session } = useSession();
-  const searchParams = useSearchParams();
 
   useEffect(() => {
-    if (searchParams.get("view") === "freeAgents") {
+    const view = new URLSearchParams(window.location.search).get("view");
+    if (view === "freeAgents") {
       setSelectedType("freeAgents");
     }
-  }, [searchParams, setSelectedType]);
+  }, [setSelectedType]);
 
   const pageToolbarProps: {
     toolbarKeys: ToggleItem<string | null>[];
