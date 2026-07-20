@@ -30,7 +30,7 @@ export function TeamHistoryContainer({ teamInfo }: TeamHistoryProps) {
   }
 
   return (
-    <>
+    <section className="mx-auto w-full max-w-5xl px-4 sm:px-6">
       <FilterDropdowns
         seasonValue={seasonValue}
         setSeasonValue={setSeasonValue}
@@ -46,6 +46,6 @@ export function TeamHistoryContainer({ teamInfo }: TeamHistoryProps) {
       <RecordDisplay winLossRecord={winLossRecord} />
 
       <HistoryMatchupList rows={rows} teams={teams} teamInfo={teamInfo} />
-    </>
+    </section>
   );
 }

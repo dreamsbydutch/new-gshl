@@ -13,10 +13,14 @@ export function FilterDropdowns({
   gameTypeOptions,
   ownerOptions,
 }: FilterDropdownsProps) {
+  const selectClassName =
+    "w-full min-w-0 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm sm:max-w-56";
+
   return (
-    <div className="mx-20 flex flex-col gap-1">
+    <div className="mx-auto grid w-full max-w-3xl gap-2 sm:grid-cols-3 sm:justify-items-center">
       <select
-        className="border p-2"
+        aria-label="Filter history by season"
+        className={selectClassName}
         value={seasonValue}
         onChange={(event) => setSeasonValue(event.target.value)}
       >
@@ -29,7 +33,8 @@ export function FilterDropdowns({
       </select>
 
       <select
-        className="border p-2"
+        aria-label="Filter history by game type"
+        className={selectClassName}
         value={gameTypeValue}
         onChange={(event) => setGameTypeValue(event.target.value)}
       >
@@ -44,7 +49,8 @@ export function FilterDropdowns({
       </select>
 
       <select
-        className="border p-2"
+        aria-label="Filter history by owner"
+        className={selectClassName}
         value={ownerValue}
         onChange={(event) => setOwnerValue(event.target.value)}
       >

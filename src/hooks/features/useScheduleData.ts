@@ -119,13 +119,7 @@ export function useScheduleData(
       });
     }
 
-    // Sort by season and then by week number for consistent display
-    return filtered.sort((a, b) => {
-      if (a.seasonId !== b.seasonId) {
-        return +b.seasonId - +a.seasonId; // Most recent season first
-      }
-      return +a.weekId - +b.weekId; // Early weeks first within the same season
-    });
+    return filtered;
   }, [
     allMatchups,
     teams,
@@ -138,10 +132,21 @@ export function useScheduleData(
   ]);
 
   const sortedSchedule = useMemo(() => {
-    return filteredSchedule
-      .slice()
-      .sort((a, b) => (a.week?.weekNum ?? 0) - (b.week?.weekNum ?? 0))
-      .sort((a, b) => +a.seasonId - +b.seasonId);
+    return filteredSchedule.slice().sort((a, b) => {
+      const seasonDifference =
+        (a.season?.year ?? Number.MAX_SAFE_INTEGER) -
+        (b.season?.year ?? Number.MAX_SAFE_INTEGER);
+
+      if (seasonDifference !== 0) return seasonDifference;
+
+      const weekDifference =
+        (a.week?.weekNum ?? Number.MAX_SAFE_INTEGER) -
+        (b.week?.weekNum ?? Number.MAX_SAFE_INTEGER);
+
+      if (weekDifference !== 0) return weekDifference;
+
+      return a.id.localeCompare(b.id);
+    });
   }, [filteredSchedule]);
 
   const ready = Boolean(allMatchups && teams);

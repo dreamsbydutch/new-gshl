@@ -69,7 +69,7 @@ function TrophyImage({
   const [errored, setErrored] = useState(false);
   if (!imageUrl || errored) {
     return (
-      <div className="flex h-28 w-full items-center justify-center rounded-[2rem] border border-gray-200 bg-gradient-to-b from-gray-50 to-white px-4 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_12px_28px_rgba(15,23,42,0.08)]">
+      <div className="flex h-24 w-full items-center justify-center rounded-[1.75rem] border border-gray-200 bg-gradient-to-b from-gray-50 to-white px-3 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_10px_24px_rgba(15,23,42,0.08)]">
         <span className="font-barlow text-sm uppercase tracking-[0.2em] text-gray-400">
           {fallbackLabel}
         </span>
@@ -78,7 +78,7 @@ function TrophyImage({
   }
   return (
     <img
-      className="h-28 w-full object-contain"
+      className="h-24 w-full object-contain"
       src={imageUrl}
       alt={alt}
       onError={() => setErrored(true)}
@@ -96,7 +96,7 @@ function FranchiseLogo({
   const [errored, setErrored] = useState(false);
   if (!logoUrl || errored) {
     return (
-      <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/80 bg-white/90 shadow-lg">
+      <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/80 bg-white/90 shadow-lg">
         <span className="font-barlow text-[10px] uppercase tracking-[0.2em] text-gray-400">
           GSHL
         </span>
@@ -105,7 +105,7 @@ function FranchiseLogo({
   }
   return (
     <img
-      className="h-10 w-10 rounded-xl bg-white/90 object-cover p-1 shadow-lg"
+      className="h-9 w-9 rounded-xl bg-white/90 object-cover p-1 shadow-lg"
       src={logoUrl}
       alt={`${teamName ?? "Franchise"} logo`}
       onError={() => setErrored(true)}
@@ -115,8 +115,8 @@ function FranchiseLogo({
 
 function TrophyCard({ card }: { card: TrophyCaseCard }) {
   return (
-    <article className="mx-auto flex w-full max-w-[10.5rem] flex-col items-center text-center">
-      <div className="relative flex w-full items-end justify-center pb-4">
+    <article className="mx-auto flex w-full max-w-36 flex-col items-center text-center">
+      <div className="relative flex w-full items-end justify-center pb-3">
         <TrophyImage
           imageUrl={card.catalog.imageUrl}
           alt={card.catalog.fullName}
@@ -129,10 +129,10 @@ function TrophyCard({ card }: { card: TrophyCaseCard }) {
           />
         </div>
       </div>
-      <div className="mt-2 font-oswald text-3xl font-bold leading-none text-black">
+      <div className="mt-2 font-oswald text-2xl font-bold leading-none text-black">
         {card.seasonYear}
       </div>
-      <div className="mt-1 font-oswald text-xl leading-tight text-black">
+      <div className="mt-1 font-oswald text-lg leading-tight text-black">
         {card.catalog.fullName}
       </div>
       {card.franchiseName ? (
@@ -166,8 +166,8 @@ export function TrophyCase(props: TrophyCaseProps) {
             <TrophySectionDivider label={group} />
             <div
               className={cn(
-                "mx-auto grid max-w-6xl grid-cols-2 gap-x-2 gap-y-5 px-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5",
-                groupCards.length === 1 && "max-w-sm",
+                "mx-auto grid max-w-7xl grid-cols-2 gap-x-2 gap-y-5 px-4 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6",
+                groupCards.length === 1 && "max-w-xs",
               )}
             >
               {groupCards.map((card) => (

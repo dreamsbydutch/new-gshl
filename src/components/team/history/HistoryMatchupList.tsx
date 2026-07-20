@@ -23,7 +23,7 @@ export function HistoryMatchupList({
   );
 
   return (
-    <div className="mx-2 mb-40 mt-8">
+    <div className="mx-auto mb-40 mt-8 w-full max-w-5xl overflow-hidden rounded-md border border-slate-200">
       <TeamScheduleHeader />
       <div>
         {rows.map(({ matchup, showSeasonDivider }, index) => {
