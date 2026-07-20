@@ -705,13 +705,9 @@ export const rulebookSections: RulebookSection[] = [
         number: "8.5",
         title: "First Team All-Stars",
         blocks: [
-          bullets([
-            "Best Center",
-            "Best Left Winger",
-            "Best Right Winger",
-            "Two Best Defensemen",
-            "Best Goaltender",
-          ]),
+          paragraph(
+            "The First Team recognizes the best regular-season players at each position, with two defensemen selected.",
+          ),
         ],
       },
       {
@@ -719,14 +715,9 @@ export const rulebookSections: RulebookSection[] = [
         number: "8.6",
         title: "Second Team All-Stars",
         blocks: [
-          bullets([
-            "Second-Best Center",
-            "Second-Best Left Winger",
-            "Second-Best Right Winger",
-            "Third-Best Defenseman",
-            "Fourth-Best Defenseman",
-            "Second-Best Goaltender",
-          ]),
+          paragraph(
+            "The Second Team recognizes the next-best regular-season players at each position, with two additional defensemen selected.",
+          ),
         ],
       },
       {
@@ -735,15 +726,8 @@ export const rulebookSections: RulebookSection[] = [
         title: "Playoff All-Stars",
         blocks: [
           paragraph(
-            "The GSHL Playoff All-Star Team recognizes the best playoff lineup:",
+            "The Playoff All-Star Team recognizes the best playoff performers at each position, with two defensemen selected.",
           ),
-          bullets([
-            "1 Center",
-            "1 Left Winger",
-            "1 Right Winger",
-            "2 Defensemen",
-            "1 Goaltender",
-          ]),
         ],
       },
       {
