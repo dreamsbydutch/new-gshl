@@ -8,7 +8,7 @@ import { Input } from "@gshl-components/ui/input";
 import { useUploadThing } from "@gshl-components/ui/uploadthing";
 import { cn } from "@gshl-utils";
 
-const MAX_FILE_SIZE = 4 * 1024 * 1024;
+const MAX_FILE_SIZE = 8 * 1024 * 1024;
 
 export function ImageUpload() {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -49,7 +49,7 @@ export function ImageUpload() {
     }
     if (nextFile.size > MAX_FILE_SIZE) {
       setFile(null);
-      setError("The image must be 4 MB or smaller.");
+      setError("The image must be 8 MB or smaller.");
       return;
     }
 
@@ -148,7 +148,7 @@ export function ImageUpload() {
                 Drop an image here or click to choose
               </span>
               <span className="mt-2 text-sm text-slate-500">
-                One image, up to 4 MB
+                One image, up to 8 MB
               </span>
             </>
           )}
