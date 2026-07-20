@@ -43,7 +43,7 @@ const getGameTypeFilter = (gameTypeCategory: string): MatchupType[] => {
  * ```tsx
  * const { data: schedule, ready } = useScheduleData({
  *   ownerID: 'owner-123',
- *   seasonID: 15,
+ *   seasonID: 'season-15',
  *   gameType: 'RS',
  *   allMatchups: matchups,
  *   teams: allTeams,
@@ -86,8 +86,10 @@ export function useScheduleData(
     }
 
     // Filter by season
-    if (seasonID !== undefined && seasonID > 0) {
-      filtered = filtered.filter((matchup) => +matchup.seasonId === seasonID);
+    if (seasonID) {
+      filtered = filtered.filter(
+        (matchup) => String(matchup.seasonId) === seasonID,
+      );
     }
 
     // Filter by game type
@@ -101,19 +103,17 @@ export function useScheduleData(
     }
 
     // Filter by opponent owner ID
-    if (oppOwnerID !== undefined && oppOwnerID > 0) {
+    if (oppOwnerID) {
       filtered = filtered.filter((matchup) => {
         const homeTeam = teams.find((team) => team.id === matchup.homeTeamId);
         const awayTeam = teams.find((team) => team.id === matchup.awayTeamId);
 
         // If the current team is home, check if the opponent owner is away
         // If the current team is away, check if the opponent owner is home
-        // Convert oppOwnerID to string for comparison with ownerId
-        const oppOwnerIdStr = String(oppOwnerID);
         if (homeTeam?.ownerId === ownerID) {
-          return awayTeam?.ownerId === oppOwnerIdStr;
+          return awayTeam?.ownerId === oppOwnerID;
         } else if (awayTeam?.ownerId === ownerID) {
-          return homeTeam?.ownerId === oppOwnerIdStr;
+          return homeTeam?.ownerId === oppOwnerID;
         }
         return false;
       });

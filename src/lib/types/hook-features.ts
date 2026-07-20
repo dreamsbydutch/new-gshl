@@ -69,9 +69,9 @@ export interface UseScheduleDataEnhancedMatchup extends Matchup {
 
 export interface UseScheduleDataOptions {
   ownerID?: string;
-  seasonID?: number;
+  seasonID?: string;
   gameType?: string;
-  oppOwnerID?: number;
+  oppOwnerID?: string;
   allMatchups?: Matchup[];
   teams?: GSHLTeam[];
   weeks?: Week[];

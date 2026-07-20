@@ -152,15 +152,13 @@ export const parseGameTypeValue = (
 };
 
 /**
- * Parses numeric value.
+ * Parses an ID from a delimited filter value.
  *
  * @param value - The source value to process.
- * @returns The parsed numeric value.
+ * @returns The parsed ID.
  */
-export const parseNumericValue = (value: string): number => {
-  const parsedValue = parseDelimitedValue(value);
-  return parsedValue ? +parsedValue : 0;
-};
+export const parseIdValue = (value: string): string | undefined =>
+  parseDelimitedValue(value) || undefined;
 
 /**
  * Builds owner options.

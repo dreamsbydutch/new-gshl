@@ -3,12 +3,16 @@
 import { useState, useMemo } from "react";
 import {
   parseGameTypeValue,
-  parseNumericValue,
+  parseIdValue,
   buildOwnerOptions,
   calculateWinLossRecord,
   GAME_TYPE_OPTIONS,
 } from "@gshl-utils";
-import type { GSHLTeam, UseTeamHistoryDataOptions, UseTeamHistoryDataResult } from "@gshl-types";
+import type {
+  GSHLTeam,
+  UseTeamHistoryDataOptions,
+  UseTeamHistoryDataResult,
+} from "@gshl-types";
 import { useMatchups, useSeasons, useTeams, useWeeks } from "@gshl-hooks";
 import { useScheduleData } from "./useScheduleData";
 
@@ -53,9 +57,9 @@ export function useTeamHistoryData(
 
   const { data: schedule } = useScheduleData({
     ownerID: teamInfo.ownerId ?? undefined,
-    seasonID: parseNumericValue(seasonValue),
+    seasonID: parseIdValue(seasonValue),
     gameType,
-    oppOwnerID: parseNumericValue(ownerValue),
+    oppOwnerID: parseIdValue(ownerValue),
     allMatchups: fullSchedule,
     teams,
     weeks,

@@ -50,7 +50,7 @@ export {
   calculateWinLossRecord,
   calculateWinPercentage,
   parseGameTypeValue,
-  parseNumericValue,
+  parseIdValue,
   buildOwnerOptions,
   getMatchupHeaderText,
   getMatchupBackgroundColor,
