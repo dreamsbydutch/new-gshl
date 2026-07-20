@@ -146,13 +146,7 @@ function AwardMarks({
   );
 }
 
-function AwardHeading({
-  award,
-  label,
-}: {
-  award: AwardsList;
-  label: string;
-}) {
+function AwardHeading({ award, label }: { award: AwardsList; label: string }) {
   return (
     <div className="flex items-center justify-center gap-1.5" title={label}>
       <AwardMark award={award} label={label} size={20} />
@@ -217,7 +211,9 @@ export function OwnerRankings() {
             GM Ladder
           </h1>
           <p className="mt-2 text-xs text-slate-500">
-            Rating = matchup Elo + consistency + legacy. New GMs start at 250.
+            Career results, playoff performance, and legacy lead the rating;
+            matchup Elo contributes a small form adjustment. New GMs start at
+            250.
           </p>
         </div>
       </header>
@@ -267,10 +263,7 @@ export function OwnerRankings() {
                   />
                 </th>
                 <th scope="col" className="px-3 py-3 text-center">
-                  <AwardHeading
-                    award={AwardsList.JACK_ADAMS}
-                    label="COTY"
-                  />
+                  <AwardHeading award={AwardsList.JACK_ADAMS} label="COTY" />
                 </th>
                 <th scope="col" className="px-3 py-3 text-center">
                   Other
@@ -374,6 +367,7 @@ export function OwnerRankings() {
         <div className="flex flex-wrap items-center gap-x-5 gap-y-1 border-t border-slate-200 bg-slate-50 px-4 py-3 text-[10px] text-slate-500">
           <span>Standard range: 0–1000</span>
           <span>Entry rating: 250</span>
+          <span>Elo form: 15%</span>
           <span>Playoffs +8</span>
           <span>Finals +18</span>
           <span>Cup +40</span>

@@ -18,6 +18,13 @@ export const OWNER_LADDER_REFERENCE_FLOOR = 0;
 export const OWNER_LADDER_REFERENCE_CEILING = 1000;
 export const OWNER_LADDER_BASE_RATING = 250;
 
+/**
+ * Elo is useful for recent form and opponent strength, but the owner ladder is
+ * a career resume. Keeping only a small share of the Elo movement prevents a
+ * favorable run or schedule from outweighing years of results.
+ */
+const OWNER_LADDER_ELO_WEIGHT = 0.15;
+
 export const OWNER_LADDER_BONUSES = {
   playoffAppearance: 8,
   finalsAppearance: 18,
@@ -107,12 +114,15 @@ const bayesianPercentage = (record: MutableRecord, priorGames: number) => {
 };
 
 const performanceAdjustment = (state: OwnerLadderState) =>
-  (bayesianPercentage(state.overall, 20) - 0.5) * 160 +
-  (bayesianPercentage(state.conference, 10) - 0.5) * 60 +
-  (bayesianPercentage(state.playoffs, 6) - 0.5) * 100;
+  (bayesianPercentage(state.overall, 20) - 0.5) * 300 +
+  (bayesianPercentage(state.conference, 10) - 0.5) * 80 +
+  (bayesianPercentage(state.playoffs, 6) - 0.5) * 120;
 
 const ladderRating = (state: OwnerLadderState) =>
-  state.elo + state.achievementBonus + performanceAdjustment(state);
+  OWNER_LADDER_BASE_RATING +
+  (state.elo - OWNER_LADDER_BASE_RATING) * OWNER_LADDER_ELO_WEIGHT +
+  state.achievementBonus +
+  performanceAdjustment(state);
 
 const expectedScore = (ratingA: number, ratingB: number) =>
   1 / (1 + 10 ** ((ratingB - ratingA) / 400));

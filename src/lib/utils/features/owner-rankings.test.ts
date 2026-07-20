@@ -258,6 +258,66 @@ void test("penalizes the last-place Brophy Trophy", () => {
   assert.equal(lastPlace.rating, OWNER_LADDER_BASE_RATING - 10);
 });
 
+void test("ranks the stronger career resume above a weaker late Elo run", () => {
+  const owners = [
+    owner("stronger-resume", true),
+    owner("weaker-resume", true),
+    owner("benchmark", true),
+  ];
+  const teams = owners.map((item) => team(`${item.id}-team`, "s1", item.id));
+  const weeks = Array.from({ length: 40 }, (_, index) =>
+    week(`w${index + 1}`, "s1", index + 1),
+  );
+  const matchups: Matchup[] = [];
+  let game = 0;
+  const addGames = (ownerId: string, count: number, ownerWins: boolean) => {
+    for (let index = 0; index < count; index += 1) {
+      game += 1;
+      matchups.push(
+        matchup(
+          `m${game}`,
+          "s1",
+          `w${game}`,
+          `${ownerId}-team`,
+          "benchmark-team",
+          MatchupType.CONFERENCE,
+          ownerWins ? 6 : 2,
+          ownerWins ? 2 : 6,
+        ),
+      );
+    }
+  };
+
+  // The weaker owner finishes hot, while the stronger owner has the clearly
+  // better full-season record. Recency should not reverse their career order.
+  addGames("stronger-resume", 8, true);
+  addGames("weaker-resume", 14, false);
+  addGames("stronger-resume", 12, false);
+  addGames("weaker-resume", 6, true);
+
+  const result = buildOwnerRankings({
+    owners,
+    seasons: [season("s1", 2025)],
+    teams,
+    weeks,
+    matchups,
+    teamAwards: [],
+  });
+  const stronger = result.rankings.find(
+    (entry) => entry.owner.id === "stronger-resume",
+  );
+  const weaker = result.rankings.find(
+    (entry) => entry.owner.id === "weaker-resume",
+  );
+
+  assert.ok(stronger);
+  assert.ok(weaker);
+  assert.equal(stronger.overallRecord.winPercentage, 0.4);
+  assert.equal(weaker.overallRecord.winPercentage, 0.3);
+  assert.ok(stronger.rating > weaker.rating);
+  assert.ok(stronger.rank < weaker.rank);
+});
+
 void test("treats zero and 1000 as reference points rather than hard limits", () => {
   const owners = [owner("dominant", true), owner("struggling", true)];
   const seasons = Array.from({ length: 12 }, (_, index) =>
@@ -289,6 +349,7 @@ void test("treats zero and 1000 as reference points rather than hard limits", ()
   const teamAwards = seasons.flatMap((item) => [
     award(`${item.id}-cup`, item.id, "dominant", AwardsList.GSHL_CUP),
     award(`${item.id}-gm`, item.id, "dominant", AwardsList.GM_OF_THE_YEAR),
+    award(`${item.id}-brophy`, item.id, "struggling", AwardsList.BROPHY),
   ]);
 
   const result = buildOwnerRankings({
