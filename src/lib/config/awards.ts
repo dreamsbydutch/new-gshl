@@ -161,9 +161,18 @@ export const ALL_STAR_AWARD_LABELS = new Map<AwardsList, string>([
   [AwardsList.PLAYOFF_AS, "Playoff All-Star"],
 ]);
 
+export const PLAYER_TROPHY_LABELS = new Map<AwardsList, string>([
+  [AwardsList.CROSBY, "Crosby Trophy"],
+  [AwardsList.ORR, "Orr Trophy"],
+  [AwardsList.BRODEUR, "Brodeur Trophy"],
+  [AwardsList.GRETZKY, "Gretzky Trophy"],
+  [AwardsList.OVECHKIN, "Ovechkin Trophy"],
+]);
+
 export function getAwardLabel(award: AwardsList | string): string {
   return (
     AWARD_CATALOG_BY_KEY.get(award as AwardsList)?.fullName ??
+    PLAYER_TROPHY_LABELS.get(award as AwardsList) ??
     ALL_STAR_AWARD_LABELS.get(award as AwardsList) ??
     String(award)
   );

@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  calculatePlayerAwards,
   calculatePlayerAllStarAwards,
+  calculatePlayerTrophyAwards,
   calculateTeamAwards,
 } from "./awardCalculations";
 
@@ -135,4 +137,94 @@ void test("calculates first, second, and playoff player All-Star teams", () => {
     "g-po",
   ]);
   assert.ok(awards.every((award) => award.nomineeIds.length === 0));
+});
+
+void test("calculates the five regular-season player trophies", () => {
+  const row = (
+    playerId: string,
+    nhlPos: string[],
+    rating: number,
+    goals: number,
+    assists: number,
+    posGroup = "S",
+    seasonType = "RS",
+  ) => ({
+    playerId,
+    nhlPos,
+    posGroup,
+    Rating: rating,
+    G: goals,
+    A: assists,
+    P: goals + assists,
+    seasonType,
+  });
+  const playerTotalRows = [
+    row("forward-one", ["C"], 100, 50, 30),
+    row("forward-two", ["LW"], 90, 60, 40),
+    row("defense-one", ["D"], 95, 20, 70),
+    row("defense-two", ["D"], 85, 10, 50),
+    row("goalie-one", ["G"], 98, 0, 0, "G"),
+    row("goalie-two", ["G"], 80, 0, 0, "G"),
+    row("playoff-only", ["C"], 200, 100, 100, "S", "PO"),
+  ];
+  const awards = calculatePlayerTrophyAwards({
+    seasonId: "season",
+    playerTotalRows,
+  });
+  const award = (key: string) => awards.find((row) => row.award === key);
+
+  assert.equal(award("crosby")?.playerId, "forward-one");
+  assert.deepEqual(award("crosby")?.nomineeIds, ["goalie-one", "defense-one"]);
+  assert.equal(award("orr")?.playerId, "defense-one");
+  assert.deepEqual(award("orr")?.nomineeIds, ["defense-two"]);
+  assert.equal(award("brodeur")?.playerId, "goalie-one");
+  assert.deepEqual(award("brodeur")?.nomineeIds, ["goalie-two"]);
+  assert.equal(award("gretzky")?.playerId, "forward-two");
+  assert.deepEqual(award("gretzky")?.nomineeIds, [
+    "defense-one",
+    "forward-one",
+  ]);
+  assert.equal(award("ovechkin")?.playerId, "forward-two");
+  assert.deepEqual(award("ovechkin")?.nomineeIds, [
+    "forward-one",
+    "defense-one",
+  ]);
+  assert.ok(
+    calculatePlayerAwards({ seasonId: "season", playerTotalRows }).length >=
+      awards.length,
+  );
+});
+
+void test("derives Gretzky points from goals and assists for legacy seasons 1 and 2", () => {
+  const awards = calculatePlayerTrophyAwards({
+    seasonId: "season",
+    seasonLegacyId: "2",
+    playerTotalRows: [
+      {
+        playerId: "derived-leader",
+        seasonType: "RS",
+        nhlPos: ["C"],
+        posGroup: "S",
+        Rating: 10,
+        G: 8,
+        A: 7,
+        P: 1,
+      },
+      {
+        playerId: "stored-leader",
+        seasonType: "RS",
+        nhlPos: ["C"],
+        posGroup: "S",
+        Rating: 9,
+        G: 3,
+        A: 2,
+        P: 20,
+      },
+    ],
+  });
+
+  assert.equal(
+    awards.find((row) => row.award === "gretzky")?.playerId,
+    "derived-leader",
+  );
 });

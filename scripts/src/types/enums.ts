@@ -97,4 +97,9 @@ export enum AwardsList {
   FIRST_AS = "firstAS",
   SECOND_AS = "secondAS",
   PLAYOFF_AS = "playoffAS",
+  CROSBY = "crosby",
+  ORR = "orr",
+  BRODEUR = "brodeur",
+  GRETZKY = "gretzky",
+  OVECHKIN = "ovechkin",
 }

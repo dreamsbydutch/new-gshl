@@ -11,7 +11,15 @@ export type PlayerAwardOutput = {
   seasonId: string;
   playerId: string;
   nomineeIds: string[];
-  award: "firstAS" | "secondAS" | "playoffAS";
+  award:
+    | "crosby"
+    | "orr"
+    | "brodeur"
+    | "gretzky"
+    | "ovechkin"
+    | "firstAS"
+    | "secondAS"
+    | "playoffAS";
 };
 
 type Candidate = {
@@ -295,6 +303,14 @@ type AllStarPlayer = {
   rating: number;
 };
 
+type PlayerTrophyKey = "crosby" | "orr" | "brodeur" | "gretzky" | "ovechkin";
+
+type PlayerTrophyCandidate = {
+  playerId: string;
+  value: number;
+  rating: number | null;
+};
+
 function positionList(value: unknown): string[] {
   if (Array.isArray(value)) return value.flatMap(positionList);
   const raw = text(value);
@@ -309,6 +325,97 @@ function positionList(value: unknown): string[] {
     .split(",")
     .map((value) => value.trim().toUpperCase())
     .filter(Boolean);
+}
+
+function playerTrophyPodium(
+  rows: Row[],
+  value: (row: Row) => number | null,
+  eligible: (row: Row) => boolean = () => true,
+): { playerId: string; nomineeIds: string[] } | null {
+  const candidates = rows
+    .filter(regularSeason)
+    .filter(eligible)
+    .flatMap((row): PlayerTrophyCandidate[] => {
+      const playerId = text(row.playerId);
+      const result = value(row);
+      return playerId && result !== null
+        ? [{ playerId, value: result, rating: number(row.Rating) }]
+        : [];
+    })
+    .sort(
+      (left, right) =>
+        right.value - left.value ||
+        (right.rating ?? Number.NEGATIVE_INFINITY) -
+          (left.rating ?? Number.NEGATIVE_INFINITY) ||
+        left.playerId.localeCompare(right.playerId),
+    );
+  const winner = candidates[0];
+  return winner
+    ? {
+        playerId: winner.playerId,
+        nomineeIds: candidates.slice(1, 3).map((row) => row.playerId),
+      }
+    : null;
+}
+
+export function calculatePlayerTrophyAwards(input: {
+  seasonId: string;
+  seasonLegacyId?: string;
+  playerTotalRows: Row[];
+}): PlayerAwardOutput[] {
+  const isDefenseman = (row: Row) => positionList(row.nhlPos).includes("D");
+  const isGoaltender = (row: Row) =>
+    token(row.posGroup) === "g" || positionList(row.nhlPos).includes("G");
+  const points = (row: Row) => {
+    const explicit = number(row.P);
+    const goals = number(row.G);
+    const assists = number(row.A);
+    const legacyId = Number.parseInt(input.seasonLegacyId ?? "", 10);
+    const derive = Number.isFinite(legacyId) && legacyId >= 1 && legacyId <= 2;
+    if (derive) {
+      return goals === null && assists === null
+        ? explicit
+        : (goals ?? 0) + (assists ?? 0);
+    }
+    return (
+      explicit ??
+      (goals === null && assists === null
+        ? null
+        : (goals ?? 0) + (assists ?? 0))
+    );
+  };
+  const definitions: Array<
+    [PlayerTrophyKey, { playerId: string; nomineeIds: string[] } | null]
+  > = [
+    [
+      "crosby",
+      playerTrophyPodium(input.playerTotalRows, (row) => number(row.Rating)),
+    ],
+    [
+      "orr",
+      playerTrophyPodium(
+        input.playerTotalRows,
+        (row) => number(row.Rating),
+        isDefenseman,
+      ),
+    ],
+    [
+      "brodeur",
+      playerTrophyPodium(
+        input.playerTotalRows,
+        (row) => number(row.Rating),
+        isGoaltender,
+      ),
+    ],
+    ["gretzky", playerTrophyPodium(input.playerTotalRows, points)],
+    [
+      "ovechkin",
+      playerTrophyPodium(input.playerTotalRows, (row) => number(row.G)),
+    ],
+  ];
+  return definitions.flatMap(([award, result]) =>
+    result ? [{ seasonId: input.seasonId, award, ...result }] : [],
+  );
 }
 
 function allStarPool(rows: Row[]): AllStarPlayer[] {
@@ -398,5 +505,16 @@ export function calculatePlayerAllStarAwards(input: {
       nomineeIds: [],
       award: "playoffAS" as const,
     })),
+  ];
+}
+
+export function calculatePlayerAwards(input: {
+  seasonId: string;
+  seasonLegacyId?: string;
+  playerTotalRows: Row[];
+}): PlayerAwardOutput[] {
+  return [
+    ...calculatePlayerTrophyAwards(input),
+    ...calculatePlayerAllStarAwards(input),
   ];
 }

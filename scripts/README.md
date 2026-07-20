@@ -186,10 +186,11 @@ npm run player-bios:backfill-yahoo-ids -- --season-id 1 --apply
 
 #### `awards:backfill`
 
-Rebuilds split award data from season standings, rating outputs, and playoff
-final results. All-star selections are upserted into `playerAwards` using
-`playerId`; league, playoff, and management awards are upserted into
-`teamAwards` using the season-specific `teamId`.
+Rebuilds split award data from season standings, player and team rating outputs,
+and playoff final results. Crosby, Orr, Brodeur, Gretzky, Ovechkin, and All-Star
+selections are upserted into `playerAwards` using `playerId`; league, playoff,
+and management awards are upserted into `teamAwards` using the season-specific
+owner.
 
 Notable flags:
 

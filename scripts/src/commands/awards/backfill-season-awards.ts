@@ -47,7 +47,19 @@ type AwardKey =
   | "hickory"
   | "firstAS"
   | "secondAS"
-  | "playoffAS";
+  | "playoffAS"
+  | "crosby"
+  | "orr"
+  | "brodeur"
+  | "gretzky"
+  | "ovechkin";
+
+type PlayerTrophyKey = "crosby" | "orr" | "brodeur" | "gretzky" | "ovechkin";
+
+type TeamAwardKey = Exclude<
+  AwardKey,
+  PlayerTrophyKey | "firstAS" | "secondAS" | "playoffAS"
+>;
 
 type AwardsBackfillOptions = {
   seasonIds: string[];
@@ -104,6 +116,9 @@ type PlayerTotalRecord = DatabaseRecord & {
   seasonType?: string | null;
   nhlPos?: string | string[] | null;
   posGroup?: string | null;
+  G?: string | number | null;
+  A?: string | number | null;
+  P?: string | number | null;
   Rating?: string | number | null;
 };
 
@@ -174,6 +189,12 @@ type AllStarPlayer = {
   Rating: number;
 };
 
+type PlayerTrophyCandidate = {
+  playerId: string;
+  value: number;
+  rating: number | null;
+};
+
 type AwardsDataSnapshot = {
   teamSeasons: TeamSeasonRecord[];
   playerTotals: PlayerTotalRecord[];
@@ -208,7 +229,7 @@ type AwardsBackfillSummary = {
   seasons: AwardsSeasonSummary[];
 };
 
-const AWARD_KEYS: readonly AwardKey[] = [
+const TEAM_AWARD_KEYS: readonly TeamAwardKey[] = [
   "rocket",
   "artRoss",
   "selke",
@@ -224,6 +245,19 @@ const AWARD_KEYS: readonly AwardKey[] = [
   "president",
   "sunview",
   "hickory",
+];
+
+const PLAYER_TROPHY_KEYS: readonly PlayerTrophyKey[] = [
+  "crosby",
+  "orr",
+  "brodeur",
+  "gretzky",
+  "ovechkin",
+];
+
+const AWARD_KEYS: readonly AwardKey[] = [
+  ...TEAM_AWARD_KEYS,
+  ...PLAYER_TROPHY_KEYS,
   "firstAS",
   "secondAS",
   "playoffAS",
@@ -735,6 +769,97 @@ function normalizeNhlPosList(value: unknown): string[] {
     .filter(Boolean);
 }
 
+function selectPlayerTrophy(
+  rows: PlayerTotalRecord[],
+  valueForRow: (row: PlayerTotalRecord) => number | null,
+  eligible: (row: PlayerTotalRecord) => boolean = () => true,
+): { playerId: string; nomineeIds: string[] } | null {
+  const candidates = rows
+    .filter(eligible)
+    .map((row): PlayerTrophyCandidate | null => {
+      const playerId = normalizeRecordId(row.playerId);
+      const value = valueForRow(row);
+      if (!playerId || value === null) return null;
+      return { playerId, value, rating: toFiniteNumber(row.Rating) };
+    })
+    .filter(
+      (candidate): candidate is PlayerTrophyCandidate => candidate !== null,
+    )
+    .sort(
+      (left, right) =>
+        right.value - left.value ||
+        (right.rating ?? Number.NEGATIVE_INFINITY) -
+          (left.rating ?? Number.NEGATIVE_INFINITY) ||
+        left.playerId.localeCompare(right.playerId),
+    );
+  const winner = candidates[0];
+  return winner
+    ? {
+        playerId: winner.playerId,
+        nomineeIds: candidates.slice(1, 3).map((row) => row.playerId),
+      }
+    : null;
+}
+
+function buildPlayerTrophyAwardRows(
+  seasonId: string,
+  playerTotals: PlayerTotalRecord[],
+): PlayerAwardRecord[] {
+  const rows = playerTotals.filter(
+    (row) =>
+      normalizeRecordId(row.seasonId) === seasonId &&
+      matchesSeasonType(row.seasonType, SeasonType.REGULAR_SEASON),
+  );
+  const isDefenseman = (row: PlayerTotalRecord) =>
+    normalizeNhlPosList(row.nhlPos).includes("D");
+  const isGoaltender = (row: PlayerTotalRecord) =>
+    normalizeSearchToken(row.posGroup) === "g" ||
+    normalizeNhlPosList(row.nhlPos).includes("G");
+  const points = (row: PlayerTotalRecord) => {
+    const explicitPoints = toFiniteNumber(row.P);
+    const goals = toFiniteNumber(row.G);
+    const assists = toFiniteNumber(row.A);
+    if (shouldDeriveArtRossPointsFromGoalsAndAssists(seasonId)) {
+      return goals === null && assists === null
+        ? explicitPoints
+        : (goals ?? 0) + (assists ?? 0);
+    }
+    return (
+      explicitPoints ??
+      (goals === null && assists === null
+        ? null
+        : (goals ?? 0) + (assists ?? 0))
+    );
+  };
+  const definitions: Array<
+    [PlayerTrophyKey, { playerId: string; nomineeIds: string[] } | null]
+  > = [
+    ["crosby", selectPlayerTrophy(rows, (row) => toFiniteNumber(row.Rating))],
+    [
+      "orr",
+      selectPlayerTrophy(
+        rows,
+        (row) => toFiniteNumber(row.Rating),
+        isDefenseman,
+      ),
+    ],
+    [
+      "brodeur",
+      selectPlayerTrophy(
+        rows,
+        (row) => toFiniteNumber(row.Rating),
+        isGoaltender,
+      ),
+    ],
+    ["gretzky", selectPlayerTrophy(rows, points)],
+    ["ovechkin", selectPlayerTrophy(rows, (row) => toFiniteNumber(row.G))],
+  ];
+
+  return definitions.flatMap(([award, podium]) =>
+    podium ? [{ seasonId, award, ...podium }] : [],
+  );
+}
+
 function buildAllStarPlayers(rows: PlayerTotalRecord[]): AllStarPlayer[] {
   return rows
     .map((row): AllStarPlayer | null => {
@@ -925,7 +1050,7 @@ async function computeAwardsForSeason(
     ),
   );
 
-  const awardPodiums: Record<AwardKey, AwardPodium | null> = {
+  const awardPodiums: Record<TeamAwardKey, AwardPodium | null> = {
     rocket: selectNumericAward(regularRows, (row) => toFiniteNumber(row.G)),
     artRoss: selectNumericAward(regularRows, (row) =>
       getArtRossPointsValue(row, seasonId),
@@ -971,29 +1096,26 @@ async function computeAwardsForSeason(
       "asc",
       { includeNominees: false },
     ),
-    firstAS: null,
-    secondAS: null,
-    playoffAS: null,
   };
+  const playerTrophyAwards = buildPlayerTrophyAwardRows(
+    seasonId,
+    snapshot.playerTotals,
+  );
   const allStarAwards = await buildAllStarAwardRows(
     seasonId,
     snapshot.playerTotals,
   );
 
   const awards = [
-    ...AWARD_KEYS.filter(
-      (award) =>
-        award !== "firstAS" && award !== "secondAS" && award !== "playoffAS",
-    )
-      .map((award) =>
-        makeTeamAwardRecord(
-          seasonId,
-          award,
-          awardPodiums[award],
-          ownerIdByTeamId,
-        ),
-      )
-      .filter((award): award is TeamAwardRecord => award !== null),
+    ...TEAM_AWARD_KEYS.map((award) =>
+      makeTeamAwardRecord(
+        seasonId,
+        award,
+        awardPodiums[award],
+        ownerIdByTeamId,
+      ),
+    ).filter((award): award is TeamAwardRecord => award !== null),
+    ...playerTrophyAwards,
     ...allStarAwards.firstAS,
     ...allStarAwards.secondAS,
     ...allStarAwards.playoffAS,

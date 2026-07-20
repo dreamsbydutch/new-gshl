@@ -13,7 +13,7 @@ import {
   isExternalJob,
 } from "./jobCatalog";
 import {
-  calculatePlayerAllStarAwards,
+  calculatePlayerAwards,
   calculateTeamAwards,
 } from "./awardCalculations";
 
@@ -354,8 +354,10 @@ export const processAwardsBackfill = internalMutationGeneric({
         matchups,
         weeks,
       });
-      const calculatedPlayerAwards = calculatePlayerAllStarAwards({
+      const calculatedPlayerAwards = calculatePlayerAwards({
         seasonId,
+        seasonLegacyId:
+          typeof season.legacyId === "string" ? season.legacyId : undefined,
         playerTotalRows,
       });
       const existingTeamByKey = new Map(
@@ -418,12 +420,21 @@ export const processAwardsBackfill = internalMutationGeneric({
         }
       }
 
-      const allStarAwards = new Set(["firstAS", "secondAS", "playoffAS"]);
-      const existingAllStars = existingPlayerAwards.filter((award) =>
-        allStarAwards.has(String(award.award)),
+      const managedPlayerAwards = new Set([
+        "crosby",
+        "orr",
+        "brodeur",
+        "gretzky",
+        "ovechkin",
+        "firstAS",
+        "secondAS",
+        "playoffAS",
+      ]);
+      const existingManagedPlayerAwards = existingPlayerAwards.filter((award) =>
+        managedPlayerAwards.has(String(award.award)),
       );
       const existingPlayerByKey = new Map(
-        existingAllStars.map((award) => [
+        existingManagedPlayerAwards.map((award) => [
           `${String(award.award)}|${String(award.playerId)}`,
           award,
         ]),
@@ -462,7 +473,7 @@ export const processAwardsBackfill = internalMutationGeneric({
           );
         }
       }
-      const deletedPlayerRows = existingAllStars.filter(
+      const deletedPlayerRows = existingManagedPlayerAwards.filter(
         (award) =>
           !incomingPlayerKeys.has(
             `${String(award.award)}|${String(award.playerId)}`,

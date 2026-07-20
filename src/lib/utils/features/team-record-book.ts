@@ -1,4 +1,4 @@
-import { AWARD_CATALOG_BY_KEY } from "@gshl-lib/config/awards";
+import { getAwardLabel } from "@gshl-lib/config/awards";
 import { AwardsList, PositionGroup, SeasonType } from "@gshl-types";
 import type {
   AwardSummaryRow,
@@ -22,6 +22,11 @@ import { formatNumber, toNumber } from "../core";
 import { getAllStarSeasonType } from "./season-awards";
 
 const PLAYER_AWARD_KEYS = new Set<AwardsList>([
+  AwardsList.CROSBY,
+  AwardsList.ORR,
+  AwardsList.BRODEUR,
+  AwardsList.GRETZKY,
+  AwardsList.OVECHKIN,
   AwardsList.FIRST_AS,
   AwardsList.SECOND_AS,
   AwardsList.PLAYOFF_AS,
@@ -88,7 +93,7 @@ export function getPlayerAwardLabel(awardKey: AwardsList): string {
     return "Playoff All-Star";
   }
 
-  return AWARD_CATALOG_BY_KEY.get(awardKey)?.fullName ?? awardKey;
+  return getAwardLabel(awardKey);
 }
 
 /**
