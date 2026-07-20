@@ -12,6 +12,7 @@ export default async function Home() {
   const activitySeason = resolveDefaultSeason(seasons);
 
   await serverApi.season.getAll.prefetch({ orderBy: { year: "asc" } });
+  await serverApi.ufa.getOverview.prefetch();
 
   if (activitySeason?.id) {
     await serverApi.activity.getRecent.prefetch({

@@ -16,6 +16,7 @@ import type * as externalWorker from "../externalWorker.js";
 import type * as jobCatalog from "../jobCatalog.js";
 import type * as jobRunner from "../jobRunner.js";
 import type * as jobs from "../jobs.js";
+import type * as ufa from "../ufa.js";
 
 import type {
   ApiFromModules,
@@ -32,6 +33,7 @@ declare const fullApi: ApiFromModules<{
   jobCatalog: typeof jobCatalog;
   jobRunner: typeof jobRunner;
   jobs: typeof jobs;
+  ufa: typeof ufa;
 }>;
 
 /**

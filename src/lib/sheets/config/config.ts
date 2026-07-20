@@ -338,6 +338,7 @@ export const SHEETS_CONFIG = {
       "isActive",
       "usesLegacyTies",
       "signingEndDate",
+      "draftStartAt",
       "createdAt",
       "updatedAt",
     ],

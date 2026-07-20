@@ -2,7 +2,11 @@
 
 import { useEffect, useMemo, useState } from "react";
 
-import type { Season, UseSeasonStateOptions, UseSeasonsOptions } from "@gshl-types";
+import type {
+  Season,
+  UseSeasonStateOptions,
+  UseSeasonsOptions,
+} from "@gshl-types";
 import {
   resolveDefaultSeason,
   findCurrentSeason,
@@ -27,6 +31,8 @@ function orderSeasons(
     const leftValue = left[field as keyof Season];
     const rightValue = right[field as keyof Season];
     if (leftValue === rightValue) return 0;
+    if (leftValue == null) return 1;
+    if (rightValue == null) return -1;
     const result = leftValue > rightValue ? 1 : -1;
     return direction === "desc" ? -result : result;
   });

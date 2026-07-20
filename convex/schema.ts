@@ -132,6 +132,7 @@ export default defineSchema({
     isActive: boolValue,
     usesLegacyTies: boolValue,
     signingEndDate: dateOnlyValue,
+    draftStartAt: timestampValue,
     createdAt: timestampValue,
     updatedAt: timestampValue,
   }),
@@ -243,6 +244,45 @@ export default defineSchema({
     },
     ["playerId", "ownerId", "seasonId"],
   ),
+
+  ufaOfferGroups: defineTable({
+    playerId: v.id("players"),
+    seasonId: v.id("seasons"),
+    deadlineAt: v.number(),
+    status: v.union(
+      v.literal("open"),
+      v.literal("resolving"),
+      v.literal("resolved"),
+      v.literal("failed"),
+    ),
+    winningOfferId: v.optional(v.id("ufaOffers")),
+    finalOdds: v.optional(v.string()),
+    randomRoll: v.optional(v.number()),
+    failureReason: v.optional(v.string()),
+    createdAt: v.number(),
+    resolvedAt: v.optional(v.number()),
+    updatedAt: v.number(),
+  })
+    .index("by_player_season", ["playerId", "seasonId"])
+    .index("by_status_deadline", ["status", "deadlineAt"]),
+
+  ufaOffers: defineTable({
+    groupId: v.id("ufaOfferGroups"),
+    playerId: v.id("players"),
+    seasonId: v.id("seasons"),
+    ownerId: v.id("owners"),
+    franchiseId: v.id("franchises"),
+    teamId: v.id("teams"),
+    contractLength: v.number(),
+    salary: v.number(),
+    status: v.union(v.literal("pending"), v.literal("won"), v.literal("lost")),
+    factorSnapshot: v.optional(v.string()),
+    submittedAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_group", ["groupId"])
+    .index("by_group_franchise", ["groupId", "franchiseId"])
+    .index("by_owner_status", ["ownerId", "status"]),
 
   weeks: table(
     {

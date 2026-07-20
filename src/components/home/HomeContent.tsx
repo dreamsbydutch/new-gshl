@@ -4,6 +4,7 @@ import { MockDraftPreview } from "@gshl-components/draft/DraftBoardList";
 import { useSeasonState } from "@gshl-hooks";
 import { findOffseasonWindow, isBetweenSeasons } from "@gshl-utils";
 import { LeagueActivityCard } from "./LeagueActivityCard";
+import { UfaHomeCard } from "@gshl-components/contracts";
 
 export function HomeContent() {
   const { seasons, defaultSeason, isLoading } = useSeasonState();
@@ -17,6 +18,7 @@ export function HomeContent() {
 
   return (
     <main className="container mx-auto space-y-8 px-2 py-4 sm:px-4">
+      <UfaHomeCard />
       <LeagueActivityCard
         seasonId={defaultSeason?.id ? String(defaultSeason.id) : undefined}
       />

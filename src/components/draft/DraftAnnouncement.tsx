@@ -1,6 +1,7 @@
 "use client";
 
 import { useDraftCountdown } from "@gshl-hooks";
+import { useSeasonState } from "@gshl-hooks";
 
 const AnnouncementBadge = () => (
   <div className="flex items-center gap-2">
@@ -38,8 +39,11 @@ const CountdownDisplay = ({ countdown }: { countdown: string }) => (
 );
 
 export function DraftAnnouncement() {
-  const draftDate = new Date("2025-10-04T20:00:00");
+  const { defaultSeason } = useSeasonState();
+  const draftDate = new Date(defaultSeason?.draftStartAt ?? Number.NaN);
   const { isLive, isPast, countdown } = useDraftCountdown({ draftDate });
+
+  if (Number.isNaN(draftDate.getTime())) return null;
 
   return (
     <section
@@ -55,10 +59,14 @@ export function DraftAnnouncement() {
           id="draft-announcement-title"
           className="bg-gradient-to-br from-white via-white to-amber-200 bg-clip-text text-4xl font-extrabold tracking-tight text-transparent drop-shadow-sm md:text-5xl"
         >
-          2025 GSHL Draft
+          {defaultSeason?.year ?? "GSHL"} GSHL Draft
         </h1>
         <p className="text-lg font-medium text-white/90 md:text-xl">
-          October 4th @ 8:00 PM
+          {new Intl.DateTimeFormat("en-CA", {
+            timeZone: "America/Toronto",
+            dateStyle: "long",
+            timeStyle: "short",
+          }).format(draftDate)}
         </p>
         {isLive ? <LiveIndicator /> : null}
         {isPast ? <CompletionMessage /> : null}

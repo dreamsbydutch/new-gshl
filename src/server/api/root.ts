@@ -20,6 +20,7 @@ import { snapshotRouter } from "./routers/snapshot";
 import { authUserRouter } from "./routers/authUser";
 import { jobRouter } from "./routers/job";
 import { activityRouter } from "./routers/activity";
+import { ufaRouter } from "./routers/ufa";
 // import { archivedStatsRouter } from "./routers/archivedStats"; // Disabled for performance
 
 /**
@@ -57,6 +58,7 @@ export const appRouter = createTRPCRouter({
   authUser: authUserRouter,
   job: jobRouter,
   activity: activityRouter,
+  ufa: ufaRouter,
 
   // Archived stats (disabled for performance)
   // archivedStats: archivedStatsRouter,

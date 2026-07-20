@@ -23,6 +23,7 @@ export interface Season {
   isActive: boolean;
   usesLegacyTies: boolean;
   signingEndDate: string;
+  draftStartAt?: string | null;
   createdAt: Date;
   updatedAt: Date;
 }

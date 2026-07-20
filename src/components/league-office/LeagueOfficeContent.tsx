@@ -8,6 +8,7 @@ import { Rulebook } from "./Rulebook";
 import { DraftClasses } from "./DraftClasses";
 import { UserManagement } from "@gshl-components/auth";
 import { ContractManagement, JobManagement } from "@gshl-components/admin";
+import { UfaLeagueOffice } from "@gshl-components/contracts";
 import { ImageUpload } from "./ImageUpload";
 
 export function LeagueOfficeContent() {
@@ -20,6 +21,7 @@ export function LeagueOfficeContent() {
       {selectedType === "draft" ? <DraftClasses /> : null}
       {selectedType === "confBattle" ? <ConferenceContest /> : null}
       {selectedType === "ownerRankings" ? <OwnerRankings /> : null}
+      {selectedType === "freeAgents" ? <UfaLeagueOffice /> : null}
       {selectedType === "users" && session?.user.role === "commissioner" ? (
         <UserManagement />
       ) : null}

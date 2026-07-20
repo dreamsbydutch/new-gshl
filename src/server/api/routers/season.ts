@@ -1,8 +1,13 @@
 import { z } from "zod";
-import { createTRPCRouter, publicProcedure } from "../trpc";
+import {
+  commissionerProcedure,
+  createTRPCRouter,
+  publicProcedure,
+} from "../trpc";
 import { idSchema, baseQuerySchema } from "./_schemas";
 import type { Season } from "@gshl-types";
 import { getById, getCount, getFirst, getMany } from "../sheets-store";
+import { minimalSheetsWriter } from "@gshl-sheets";
 
 // Season-specific schemas
 const seasonWhereSchema = z
@@ -35,6 +40,33 @@ export const seasonRouter = createTRPCRouter({
   // Get active season
   getActive: publicProcedure.query(async (): Promise<Season | null> => {
     return getFirst<Season>("Season", { where: { isActive: true } });
+  }),
+
+  setDraftStartAt: commissionerProcedure
+    .input(
+      z.object({
+        seasonId: z.string().min(1),
+        draftStartAt: z.string().datetime({ offset: true }),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      const draftStartAt = new Date(input.draftStartAt).toISOString();
+      await minimalSheetsWriter.updateById("Season", input.seasonId, {
+        draftStartAt,
+        updatedAt: new Date(),
+      });
+      return { seasonId: input.seasonId, draftStartAt };
+    }),
+
+  backfillLegacyDraftStart: commissionerProcedure.mutation(async () => {
+    const season = await getFirst<Season>("Season", { where: { year: 2025 } });
+    if (!season || season.draftStartAt) return { updated: false };
+    const draftStartAt = "2025-10-05T00:00:00.000Z";
+    await minimalSheetsWriter.updateById("Season", season.id, {
+      draftStartAt,
+      updatedAt: new Date(),
+    });
+    return { updated: true, seasonId: season.id, draftStartAt };
   }),
 
   // Count seasons

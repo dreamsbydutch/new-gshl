@@ -19,7 +19,6 @@
  */
 export * from "./database";
 
-
 // ============================================================================
 // ENUMS & CONSTANTS
 // ============================================================================
@@ -79,6 +78,7 @@ export * from "./sheets";
  * - Ensures type safety during data transformation processes
  */
 export * from "./transforms";
+export * from "./ufa";
 
 // ============================================================================
 // NAVIGATION & UI TYPES

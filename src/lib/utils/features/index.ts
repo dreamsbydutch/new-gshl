@@ -107,6 +107,7 @@ export {
   getScoreClass,
   isValidMatchup,
 } from "./weekly-schedule";
+export * from "./ufa";
 export type {
   WeekScheduleItemProps,
   TeamDisplayProps,
