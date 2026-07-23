@@ -11,6 +11,7 @@ import {
   resolveDefaultSeason,
   findCurrentSeason,
   findSeasonById,
+  isSeasonPickable,
   toSeasonSummary,
   buildSeasonSummaries,
 } from "@gshl-utils";
@@ -244,7 +245,10 @@ export function useSeasonState(options: UseSeasonStateOptions = {}) {
     error,
   } = useSeasons({ orderBy: { year: "asc" } });
   const seasons = useMemo(() => seasonsData ?? [], [seasonsData]);
-  const seasonOptions = useMemo(() => buildSeasonSummaries(seasons), [seasons]);
+  const seasonOptions = useMemo(
+    () => buildSeasonSummaries(seasons, referenceDate),
+    [seasons, referenceDate],
+  );
 
   // Nav store integration
   const selectedSeasonId = useNavStore((state) => state.selectedSeasonId);
@@ -256,7 +260,7 @@ export function useSeasonState(options: UseSeasonStateOptions = {}) {
     [seasons, referenceDate],
   );
 
-  const selectedSeason = useMemo(
+  const storedSelectedSeason = useMemo(
     () => findSeasonById(seasons, selectedSeasonId),
     [seasons, selectedSeasonId],
   );
@@ -274,17 +278,30 @@ export function useSeasonState(options: UseSeasonStateOptions = {}) {
     refetch: refetchSelectedSeason,
   } = api.season.getById.useQuery(
     { id: String(selectedSeasonId ?? "") },
-    { enabled: Boolean(selectedSeasonId && !selectedSeason) },
+    { enabled: Boolean(selectedSeasonId && !storedSelectedSeason) },
   );
 
-  const resolvedSelectedSeason = selectedSeason ?? selectedSeasonData;
+  const resolvedStoredSeason = storedSelectedSeason ?? selectedSeasonData;
+  const selectableDefaultSeason = useMemo(
+    () =>
+      resolveDefaultSeason(
+        seasons.filter((season) => isSeasonPickable(season, referenceDate)),
+        referenceDate,
+      ),
+    [seasons, referenceDate],
+  );
+  const selectedSeason =
+    resolvedStoredSeason &&
+    isSeasonPickable(resolvedStoredSeason, referenceDate)
+      ? resolvedStoredSeason
+      : selectableDefaultSeason;
 
   // Replace persisted legacy selections with the canonical Convex document id.
   useEffect(() => {
-    if (!selectedSeason?.id || !selectedSeasonId) return;
-    if (String(selectedSeason.id) === String(selectedSeasonId)) return;
-    setSelectedSeasonId(String(selectedSeason.id));
-  }, [selectedSeason, selectedSeasonId, setSelectedSeasonId]);
+    if (!storedSelectedSeason?.id || !selectedSeasonId) return;
+    if (String(storedSelectedSeason.id) === String(selectedSeasonId)) return;
+    setSelectedSeasonId(String(storedSelectedSeason.id));
+  }, [storedSelectedSeason, selectedSeasonId, setSelectedSeasonId]);
 
   // Build summaries
   const currentSeasonSummary = useMemo(
@@ -293,8 +310,8 @@ export function useSeasonState(options: UseSeasonStateOptions = {}) {
   );
 
   const selectedSeasonSummary = useMemo(
-    () => toSeasonSummary(resolvedSelectedSeason),
-    [resolvedSelectedSeason],
+    () => toSeasonSummary(selectedSeason),
+    [selectedSeason],
   );
 
   const defaultSeasonSummary = useMemo(
@@ -302,21 +319,26 @@ export function useSeasonState(options: UseSeasonStateOptions = {}) {
     [defaultSeason],
   );
 
-  // Auto-select default season if none is selected
+  // Replace empty, stale, sentinel, and too-early future selections.
   useEffect(() => {
     if (!autoSelect) return;
     if (isLoading) return;
-    if (selectedSeasonId) return;
     if (!seasons.length) return;
-    if (!defaultSeason?.id) return;
+    if (selectedSeasonId && !resolvedStoredSeason && isSelectedSeasonLoading) {
+      return;
+    }
+    if (!selectedSeason?.id) return;
+    if (String(selectedSeason.id) === String(selectedSeasonId)) return;
 
-    setSelectedSeasonId(String(defaultSeason.id));
+    setSelectedSeasonId(String(selectedSeason.id));
   }, [
     autoSelect,
     isLoading,
     selectedSeasonId,
     seasons,
-    defaultSeason,
+    resolvedStoredSeason,
+    selectedSeason,
+    isSelectedSeasonLoading,
     setSelectedSeasonId,
   ]);
 
@@ -328,7 +350,7 @@ export function useSeasonState(options: UseSeasonStateOptions = {}) {
     seasons,
     currentSeason,
     currentSeasonSummary,
-    selectedSeason: resolvedSelectedSeason,
+    selectedSeason,
     selectedSeasonSummary,
     defaultSeason,
     defaultSeasonSummary,
