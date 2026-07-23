@@ -5,6 +5,9 @@ import {
   calculateUfaProbabilities,
   calculateUfaSalary,
   getUfaWindow,
+  indexLatestUfaNhlStats,
+  rankUfas,
+  selectTopAffordableUfas,
   selectUfaOffer,
 } from "./ufa";
 
@@ -30,13 +33,51 @@ void test("UFA window opens after signing regardless of draft configuration", ()
 
 void test("first offers always receive a seven-day window", () => {
   const referenceDate = new Date("2026-10-01T12:00:00.000Z");
-  const window = getUfaWindow(
-    { signingEndDate: "2026-06-30" },
-    referenceDate,
-  );
+  const window = getUfaWindow({ signingEndDate: "2026-06-30" }, referenceDate);
   assert.equal(
     window.deadlineForFirstOffer,
     referenceDate.getTime() + 7 * 24 * 60 * 60 * 1_000,
+  );
+});
+
+void test("UFAs rank by salary and the home list keeps only affordable players", () => {
+  const ranked = rankUfas([
+    { fullName: "Affordable Two", salary: 8_000_000, affordableTerms: [1] },
+    { fullName: "Too Expensive", salary: 12_000_000, affordableTerms: [] },
+    { fullName: "Affordable One", salary: 10_000_000, affordableTerms: [1, 2] },
+  ]);
+
+  assert.deepEqual(
+    ranked.map((player) => player.fullName),
+    ["Too Expensive", "Affordable One", "Affordable Two"],
+  );
+  assert.deepEqual(
+    selectTopAffordableUfas(ranked, 2).map((player) => player.fullName),
+    ["Affordable One", "Affordable Two"],
+  );
+});
+
+void test("UFA NHL stats use the latest populated season with normalized years", () => {
+  const latestStats = indexLatestUfaNhlStats(
+    [
+      { playerId: "player-1", seasonId: "season-2025", GP: "70" },
+      { playerId: "player-1", seasonId: "season-2026", GP: "82" },
+      { playerId: "player-2", seasonId: "season-2026", GP: "80" },
+    ],
+    [
+      { id: "season-2025", year: "2025" },
+      { id: "season-2026", year: "2026" },
+      { id: "season-2027", year: "2027" },
+    ],
+    "2027",
+  );
+
+  assert.deepEqual(
+    [...latestStats.entries()].map(([playerId, stats]) => [playerId, stats.GP]),
+    [
+      ["player-1", "82"],
+      ["player-2", "80"],
+    ],
   );
 });
 

@@ -81,6 +81,20 @@ function contractAffectsSeason(contract: any, season: any, seasons: any[]) {
   return coveredSeasonIds(contract, seasons).includes(season._id);
 }
 
+async function resolveUfaPlayer(db: any, playerId: string) {
+  try {
+    const direct = await db.get(playerId);
+    if (direct && "fullName" in direct && "isActive" in direct) return direct;
+  } catch {
+    // Legacy ids are not valid Convex document ids.
+  }
+
+  return db
+    .query("players")
+    .withIndex("by_legacyId", (q: any) => q.eq("legacyId", playerId))
+    .first();
+}
+
 function isUnsignedAfterSigningDeadline(
   playerId: any,
   signingSeasonId: any,
@@ -446,7 +460,7 @@ export const submitOffer = mutation({
   args: {
     serverSecret: v.string(),
     ownerId: v.id("owners"),
-    playerId: v.id("players"),
+    playerId: v.string(),
     contractLength: v.number(),
   },
   handler: async (ctx, args) => {
@@ -456,7 +470,7 @@ export const submitOffer = mutation({
       throw new Error("Contract length must be 1, 2, or 3 years.");
     const now = Date.now();
     const [player, seasons, franchises, teams, contracts] = await Promise.all([
-      db.get(args.playerId),
+      resolveUfaPlayer(db, args.playerId),
       db.query("seasons").collect(),
       db.query("franchises").collect(),
       db.query("teams").collect(),
@@ -507,7 +521,7 @@ export const submitOffer = mutation({
     let group = await db
       .query("ufaOfferGroups")
       .withIndex("by_player_season", (q: any) =>
-        q.eq("playerId", args.playerId).eq("seasonId", signingSeason._id),
+        q.eq("playerId", player._id).eq("seasonId", signingSeason._id),
       )
       .first();
     if (group && (group.status !== "open" || group.deadlineAt <= now)) {
@@ -573,7 +587,7 @@ export const submitOffer = mutation({
     if (!group) {
       const deadlineAt = now + 7 * DAY;
       const groupId = await db.insert("ufaOfferGroups", {
-        playerId: args.playerId,
+        playerId: player._id,
         seasonId: signingSeason._id,
         deadlineAt,
         status: "open",
@@ -588,7 +602,7 @@ export const submitOffer = mutation({
     if (!group) throw new Error("Unable to create the offer group.");
     const offerId = await db.insert("ufaOffers", {
       groupId: group._id,
-      playerId: args.playerId,
+      playerId: player._id,
       seasonId: signingSeason._id,
       ownerId: args.ownerId,
       franchiseId: franchise._id,

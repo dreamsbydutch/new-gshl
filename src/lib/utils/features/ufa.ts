@@ -78,14 +78,53 @@ export function selectUfaOffer(
 
 export function rankUfas<
   T extends Pick<Player, "fullName"> & {
-    overallRating: number;
-    seasonRating: number;
+    salary: number;
   },
 >(players: T[]): T[] {
   return [...players].sort(
     (left, right) =>
-      right.overallRating - left.overallRating ||
-      right.seasonRating - left.seasonRating ||
-      left.fullName.localeCompare(right.fullName),
+      right.salary - left.salary || left.fullName.localeCompare(right.fullName),
+  );
+}
+
+export function selectTopAffordableUfas<
+  T extends { affordableTerms: readonly unknown[] },
+>(players: T[], limit = 15): T[] {
+  return players
+    .filter((player) => player.affordableTerms.length > 0)
+    .slice(0, limit);
+}
+
+export function indexLatestUfaNhlStats<
+  T extends { playerId: string | number; seasonId: string | number },
+>(
+  stats: T[],
+  seasons: Array<{ id: string | number; year: unknown }>,
+  signingSeasonYear?: unknown,
+): Map<string, T> {
+  const seasonYearById = new Map(
+    seasons.map((season) => [String(season.id), Number(season.year)]),
+  );
+  const maximumYear = Number(signingSeasonYear);
+  const eligible = stats.flatMap((row) => {
+    const year = seasonYearById.get(String(row.seasonId));
+    if (
+      year === undefined ||
+      !Number.isFinite(year) ||
+      (Number.isFinite(maximumYear) && year > maximumYear)
+    ) {
+      return [];
+    }
+    return [{ row, year }];
+  });
+  const latestYear = Math.max(
+    Number.NEGATIVE_INFINITY,
+    ...eligible.map(({ year }) => year),
+  );
+
+  return new Map(
+    eligible
+      .filter(({ year }) => year === latestYear)
+      .map(({ row }) => [String(row.playerId), row]),
   );
 }

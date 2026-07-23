@@ -15,7 +15,10 @@ import {
   findNhlTeamByAbbreviation,
   getContractCoveredSeasonIds,
   getTorontoDate,
+  indexLatestUfaNhlStats,
   isUnsignedForSigningSeason,
+  rankUfas,
+  selectTopAffordableUfas,
 } from "@gshl-utils";
 import { callConvex } from "@gshl-lib/data/convex-store";
 import {
@@ -76,34 +79,26 @@ function getWindow(season: Season | null) {
   };
 }
 
-function latestNhlStats(
-  stats: PlayerNHLStatLine[],
+async function getLatestPopulatedNhlStats(
   seasons: Season[],
   signingSeason: Season | null,
-) {
-  const seasonById = new Map(
-    seasons.map((season) => [String(season.id), season]),
+): Promise<PlayerNHLStatLine[]> {
+  const maximumYear = numberValue(
+    signingSeason?.year,
+    Number.POSITIVE_INFINITY,
   );
-  const eligible = stats.filter(
-    (row) =>
-      (seasonById.get(String(row.seasonId))?.year ??
-        Number.POSITIVE_INFINITY) <=
-      (signingSeason?.year ?? Number.POSITIVE_INFINITY),
-  );
-  const latestYear = Math.max(
-    Number.NEGATIVE_INFINITY,
-    ...eligible.map(
-      (row) =>
-        seasonById.get(String(row.seasonId))?.year ?? Number.NEGATIVE_INFINITY,
-    ),
-  );
-  return new Map(
-    eligible
-      .filter(
-        (row) => seasonById.get(String(row.seasonId))?.year === latestYear,
-      )
-      .map((row) => [String(row.playerId), row]),
-  );
+  const candidates = [...seasons]
+    .filter((season) => numberValue(season.year) <= maximumYear)
+    .sort((left, right) => numberValue(right.year) - numberValue(left.year));
+
+  for (const season of candidates) {
+    const stats = await getMany<PlayerNHLStatLine>("PlayerNHLStatLine", {
+      where: { seasonId: String(season.id) },
+    });
+    if (stats.length > 0) return stats;
+  }
+
+  return [];
 }
 
 function capEligibility(options: {
@@ -197,12 +192,6 @@ export const ufaRouter = createTRPCRouter({
       getMany<Franchise>("Franchise"),
       callConvex<OperationalState>("query", "ufa:listState", {}),
     ]);
-    const statsSeason = [...seasons]
-      .filter(
-        (season) =>
-          season.year <= (signingSeason?.year ?? Number.POSITIVE_INFINITY),
-      )
-      .sort((left, right) => right.year - left.year)[0];
     const ownerId = ctx.session?.user?.ownerId;
     const [players, nhlTeams, nhlStats, teams, contracts] = await Promise.all([
       getMany<Player>("Player", {
@@ -211,11 +200,7 @@ export const ufaRouter = createTRPCRouter({
         },
       }),
       getMany<NHLTeam>("NHLTeam"),
-      statsSeason
-        ? getMany<PlayerNHLStatLine>("PlayerNHLStatLine", {
-            where: { seasonId: String(statsSeason.id) },
-          })
-        : Promise.resolve([]),
+      getLatestPopulatedNhlStats(seasons, signingSeason),
       signingSeason
         ? getMany<Team>("Team", {
             where: { seasonId: String(signingSeason.id) },
@@ -224,7 +209,11 @@ export const ufaRouter = createTRPCRouter({
       getMany<Contract>("Contract"),
     ]);
     const window = getWindow(signingSeason);
-    const statByPlayer = latestNhlStats(nhlStats, seasons, signingSeason);
+    const statByPlayer = indexLatestUfaNhlStats(
+      nhlStats,
+      seasons,
+      signingSeason?.year,
+    );
     const ownerFranchise = franchises.find(
       (franchise) =>
         String(franchise.ownerId) === String(ownerId ?? "") &&
@@ -235,121 +224,117 @@ export const ufaRouter = createTRPCRouter({
         String(team.franchiseId) === String(ownerFranchise?.id ?? "") &&
         String(team.seasonId) === String(signingSeason?.id ?? ""),
     );
-    const freeAgents = players
-      .filter(
-        (player) =>
-          player.isActive &&
-          Boolean(signingSeason) &&
-          isUnsignedForSigningSeason(
-            String(player.id),
-            String(signingSeason?.id ?? ""),
-            contracts,
-            seasons,
-          ) &&
-          numberValue(player.salary) > 0,
-      )
-      .map((player) => {
-        const stats = statByPlayer.get(String(player.id));
-        const salary = Math.round(numberValue(player.salary) * 1.25);
-        const group = state.groups.find(
-          (candidate) =>
-            candidate.playerId === String(player.id) &&
-            candidate.status === "open",
-        );
-        const existingOffer = state.offers.find(
-          (offer) =>
-            offer.groupId === group?.id &&
-            offer.ownerId === String(ownerId ?? ""),
-        );
-        const affordableTerms = ([1, 2, 3] as const).filter((length) =>
-          capEligibility({
-            ownerId,
+    const freeAgents = rankUfas(
+      players
+        .filter(
+          (player) =>
+            player.isActive &&
+            Boolean(signingSeason) &&
+            isUnsignedForSigningSeason(
+              String(player.id),
+              String(signingSeason?.id ?? ""),
+              contracts,
+              seasons,
+            ) &&
+            numberValue(player.salary) > 0,
+        )
+        .map((player) => {
+          const stats = statByPlayer.get(String(player.id));
+          const salary = Math.round(numberValue(player.salary) * 1.25);
+          const group = state.groups.find(
+            (candidate) =>
+              candidate.playerId === String(player.id) &&
+              candidate.status === "open",
+          );
+          const existingOffer = state.offers.find(
+            (offer) =>
+              offer.groupId === group?.id &&
+              offer.ownerId === String(ownerId ?? ""),
+          );
+          const affordableTerms = ([1, 2, 3] as const).filter((length) =>
+            capEligibility({
+              ownerId,
+              salary,
+              length,
+              signingSeason,
+              seasons,
+              contracts,
+              state,
+            }),
+          );
+          const nhlTeam = findNhlTeamByAbbreviation(nhlTeams, player.nhlTeam);
+          return {
+            id: String(player.id),
+            fullName: player.fullName,
+            nhlTeam: player.nhlTeam,
+            nhlTeamLogoUrl: nhlTeam?.logoUrl ?? null,
+            positions: Array.isArray(player.nhlPos)
+              ? player.nhlPos.map(String)
+              : [],
+            positionGroup: String(player.posGroup),
             salary,
-            length,
-            signingSeason,
-            seasons,
-            contracts,
-            state,
-          }),
-        );
-        const nhlTeam = findNhlTeamByAbbreviation(nhlTeams, player.nhlTeam);
-        return {
-          id: String(player.id),
-          fullName: player.fullName,
-          nhlTeam: player.nhlTeam,
-          nhlTeamLogoUrl: nhlTeam?.logoUrl ?? null,
-          positions: Array.isArray(player.nhlPos)
-            ? player.nhlPos.map(String)
-            : [],
-          positionGroup: String(player.posGroup),
-          salary,
-          seasonRating: numberValue(
-            stats?.seasonRating,
-            numberValue(player.seasonRating),
-          ),
-          overallRating: numberValue(
-            stats?.overallRating,
-            numberValue(player.overallRating),
-          ),
-          stats: stats
-            ? {
-                GP: stats.GP,
-                G: stats.G,
-                A: stats.A,
-                P: stats.P,
-                PM: stats.PM,
-                PIM: stats.PIM,
-                PPP: stats.PPP,
-                SOG: stats.SOG,
-                HIT: stats.HIT,
-                BLK: stats.BLK,
-                W: stats.W,
-                GA: stats.GA,
-                GAA: stats.GAA,
-                SV: stats.SV,
-                SA: stats.SA,
-                SVP: stats.SVP,
-                SO: stats.SO,
-                QS: stats.QS,
-                RBS: stats.RBS,
-              }
-            : null,
-          affordableTerms,
-          existingOffer: existingOffer
-            ? {
-                years: existingOffer.contractLength,
-                status: existingOffer.status,
-              }
-            : null,
-          canOffer:
-            window.isOpen &&
-            (ctx.session?.user?.role === "owner" ||
-              ctx.session?.user?.role === "commissioner") &&
-            Boolean(ownerFranchise && ownerTeam) &&
-            !existingOffer &&
-            affordableTerms.length > 0,
-          disabledReason: !window.isOpen
-            ? window.reason
-            : !ctx.session?.user
-              ? "Sign in as a franchise owner to make an offer."
-              : ctx.session.user.role !== "owner" &&
-                  ctx.session.user.role !== "commissioner"
-                ? "Only franchise owners can make UFA offers."
-                : !ownerFranchise || !ownerTeam
-                  ? "Your account is not linked to an active franchise."
-                  : existingOffer
-                    ? "Your franchise already made a binding offer."
-                    : affordableTerms.length === 0
-                      ? "Your franchise does not have enough available cap space."
-                      : null,
-        };
-      })
-      .sort(
-        (left, right) =>
-          right.overallRating - left.overallRating ||
-          right.seasonRating - left.seasonRating ||
-          left.fullName.localeCompare(right.fullName),
-      );
+            seasonRating: numberValue(
+              stats?.seasonRating,
+              numberValue(player.seasonRating),
+            ),
+            overallRating: numberValue(
+              stats?.overallRating,
+              numberValue(player.overallRating),
+            ),
+            stats: stats
+              ? {
+                  GP: stats.GP,
+                  G: stats.G,
+                  A: stats.A,
+                  P: stats.P,
+                  PM: stats.PM,
+                  PIM: stats.PIM,
+                  PPP: stats.PPP,
+                  SOG: stats.SOG,
+                  HIT: stats.HIT,
+                  BLK: stats.BLK,
+                  W: stats.W,
+                  GA: stats.GA,
+                  GAA: stats.GAA,
+                  SV: stats.SV,
+                  SA: stats.SA,
+                  SVP: stats.SVP,
+                  SO: stats.SO,
+                  QS: stats.QS,
+                  RBS: stats.RBS,
+                }
+              : null,
+            affordableTerms,
+            existingOffer: existingOffer
+              ? {
+                  years: existingOffer.contractLength,
+                  status: existingOffer.status,
+                }
+              : null,
+            canOffer:
+              window.isOpen &&
+              (ctx.session?.user?.role === "owner" ||
+                ctx.session?.user?.role === "commissioner") &&
+              Boolean(ownerFranchise && ownerTeam) &&
+              !existingOffer &&
+              affordableTerms.length > 0,
+            disabledReason: !window.isOpen
+              ? window.reason
+              : !ctx.session?.user
+                ? "Sign in as a franchise owner to make an offer."
+                : ctx.session.user.role !== "owner" &&
+                    ctx.session.user.role !== "commissioner"
+                  ? "Only franchise owners can make UFA offers."
+                  : !ownerFranchise || !ownerTeam
+                    ? "Your account is not linked to an active franchise."
+                    : existingOffer
+                      ? "Your franchise already made a binding offer."
+                      : affordableTerms.length === 0
+                        ? "Your franchise does not have enough available cap space."
+                        : null,
+          };
+        }),
+    );
     const offerGroups = state.groups
       .filter((group) => group.status === "open")
       .sort((a, b) => a.deadlineAt - b.deadlineAt)
@@ -385,13 +370,13 @@ export const ufaRouter = createTRPCRouter({
         };
       });
     const isSignedInOwner = ctx.session?.user?.role === "owner";
-    const homeFreeAgents = isSignedInOwner
-      ? freeAgents.filter((player) => player.affordableTerms.length > 0)
-      : freeAgents;
+    const topFreeAgents = isSignedInOwner
+      ? selectTopAffordableUfas(freeAgents, HOME_UFA_LIMIT)
+      : freeAgents.slice(0, HOME_UFA_LIMIT);
     return {
       window,
       freeAgents,
-      topFreeAgents: homeFreeAgents.slice(0, HOME_UFA_LIMIT),
+      topFreeAgents,
       offerGroups,
       viewer: {
         isSignedInOwner,
