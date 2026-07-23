@@ -43,6 +43,8 @@ export type ContractCapCheck = {
   requiredSalary: number;
 };
 
+type ReservedCapBySeason = ReadonlyMap<string, number>;
+
 const NON_PLAYING_CONTRACT_STATUSES = new Set<string>([
   String(ContractStatus.BUYOUT),
   String(ContractStatus.RETIRED),
@@ -103,6 +105,44 @@ export function getContractCoveredSeasonIds(
     .map((season) => String(season.id));
 }
 
+/**
+ * Returns whether a recorded cap charge overlaps a configured season.
+ * Contract dates are authoritative; legacy season/length coverage is retained
+ * only as a fallback for incomplete historical rows.
+ */
+export function doesContractAffectSeason(
+  contract: Pick<
+    Contract,
+    "seasonId" | "contractLength" | "startDate" | "expiryDate" | "capHitEndDate"
+  >,
+  season: Season,
+  seasons: Season[],
+): boolean {
+  const seasonStart = normalizeDateOnlyValue(season.startDate);
+  const seasonEnd = normalizeDateOnlyValue(season.endDate);
+  const contractStart = normalizeDateOnlyValue(contract.startDate);
+  const contractEnd = normalizeDateOnlyValue(
+    contract.capHitEndDate ?? contract.expiryDate,
+  );
+
+  if (seasonStart && seasonEnd && contractStart && contractEnd) {
+    return contractStart <= seasonEnd && contractEnd >= seasonStart;
+  }
+
+  return getContractCoveredSeasonIds(contract, seasons).includes(
+    String(season.id),
+  );
+}
+
+function reservedCapForSeason(
+  reservedCapBySeasonId: ReservedCapBySeason | undefined,
+  seasonId: string,
+): number {
+  const raw = reservedCapBySeasonId?.get(seasonId) ?? 0;
+  const value = Number(raw ?? 0);
+  return Number.isFinite(value) ? value : 0;
+}
+
 /** Checks a proposed contract against an owner's cap in every covered season. */
 export function checkContractCapSpace(options: {
   ownerId: string;
@@ -112,6 +152,7 @@ export function checkContractCapSpace(options: {
   contracts: Contract[];
   seasons: Season[];
   salaryCap?: number;
+  reservedCapBySeasonId?: ReservedCapBySeason;
 }): ContractCapCheck {
   const {
     ownerId,
@@ -121,6 +162,7 @@ export function checkContractCapSpace(options: {
     contracts,
     seasons,
     salaryCap = SALARY_CAP,
+    reservedCapBySeasonId,
   } = options;
   const coveredSeasonIds = getContractCoveredSeasonIds(
     { seasonId: signingSeasonId, contractLength },
@@ -131,15 +173,21 @@ export function checkContractCapSpace(options: {
   let availableCapSpace = salaryCap;
 
   for (const seasonId of coveredSeasonIds) {
+    const season = seasons.find(
+      (candidate) => String(candidate.id) === seasonId,
+    );
     const committed = contracts.reduce((total, contract) => {
       if (String(contract.ownerId) !== String(ownerId)) return total;
-      if (!getContractCoveredSeasonIds(contract, seasons).includes(seasonId)) {
+      if (!season || !doesContractAffectSeason(contract, season, seasons)) {
         return total;
       }
       const capHit = Number(contract.capHit ?? contract.contractSalary ?? 0);
       return total + (Number.isFinite(capHit) ? capHit : 0);
     }, 0);
-    const seasonCapSpace = salaryCap - committed;
+    const seasonCapSpace =
+      salaryCap -
+      committed -
+      reservedCapForSeason(reservedCapBySeasonId, seasonId);
 
     if (limitingSeasonId == null || seasonCapSpace < availableCapSpace) {
       limitingSeasonId = seasonId;
@@ -235,6 +283,40 @@ export function isUnsignedForSigningSeason(
         String(contractSeason.id),
       ),
   );
+}
+
+/**
+ * Resolves the only signing status a player may use at the current point in
+ * the calendar. Once the signing period ends, every unsigned player is a UFA
+ * regardless of a stale RFA/DRAFT tag on the player row.
+ */
+export function getEffectiveSigningStatus(options: {
+  player: Pick<Player, "id" | "isResignable">;
+  signingSeason: Season;
+  contracts: Contract[];
+  seasons: Season[];
+  referenceDate?: Date;
+}): ResignableStatus | null {
+  const {
+    player,
+    signingSeason,
+    contracts,
+    seasons,
+    referenceDate = new Date(),
+  } = options;
+
+  if (!isUfaFreeAgencyOpen(signingSeason, referenceDate)) {
+    return player.isResignable ?? null;
+  }
+
+  return isUnsignedForSigningSeason(
+    String(player.id),
+    String(signingSeason.id),
+    contracts,
+    seasons,
+  )
+    ? ResignableStatus.UFA
+    : null;
 }
 
 /** Derives every business field needed to create a new contract. */

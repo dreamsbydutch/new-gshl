@@ -11,6 +11,7 @@ import {
   SALARY_CAP,
 } from "@gshl-types";
 import {
+  checkContractCapSpace,
   findNhlTeamByAbbreviation,
   getContractCoveredSeasonIds,
   getTorontoDate,
@@ -118,41 +119,38 @@ function capEligibility(options: {
     options;
   if (!ownerId || !signingSeason) return false;
   const ordered = [...seasons].sort((a, b) => a.year - b.year);
-  const signingIndex = ordered.findIndex(
-    (season) => String(season.id) === String(signingSeason.id),
-  );
-  const covered = ordered.slice(signingIndex + 1, signingIndex + 1 + length);
-  if (covered.length !== length) return false;
-  return covered.every((season) => {
-    const committed = contracts
-      .filter(
-        (contract) =>
-          String(contract.ownerId) === ownerId &&
-          getContractCoveredSeasonIds(contract, ordered).includes(
-            String(season.id),
-          ),
-      )
-      .reduce(
-        (sum, contract) =>
-          sum +
-          numberValue(contract.capHit, numberValue(contract.contractSalary)),
-        0,
-      );
-    const reserved = state.offers
-      .filter(
-        (offer) => offer.ownerId === ownerId && offer.status === "pending",
-      )
-      .filter((offer) => {
-        const index = ordered.findIndex(
-          (candidate) => String(candidate.id) === String(offer.seasonId),
+  const reservedCapBySeasonId = new Map<string, number>();
+
+  state.offers
+    .filter(
+      (offer) =>
+        String(offer.ownerId) === String(ownerId) && offer.status === "pending",
+    )
+    .forEach((offer) => {
+      getContractCoveredSeasonIds(
+        {
+          seasonId: offer.seasonId,
+          contractLength: offer.contractLength,
+        },
+        ordered,
+      ).forEach((seasonId) => {
+        reservedCapBySeasonId.set(
+          seasonId,
+          (reservedCapBySeasonId.get(seasonId) ?? 0) + offer.salary,
         );
-        return ordered
-          .slice(index + 1, index + 1 + offer.contractLength)
-          .some((candidate) => String(candidate.id) === String(season.id));
-      })
-      .reduce((sum, offer) => sum + offer.salary, 0);
-    return committed + reserved + salary <= SALARY_CAP;
-  });
+      });
+    });
+
+  return checkContractCapSpace({
+    ownerId,
+    signingSeasonId: String(signingSeason.id),
+    contractLength: length as 1 | 2 | 3,
+    contractSalary: salary,
+    contracts,
+    seasons: ordered,
+    salaryCap: SALARY_CAP,
+    reservedCapBySeasonId,
+  }).affordable;
 }
 
 export const ufaRouter = createTRPCRouter({

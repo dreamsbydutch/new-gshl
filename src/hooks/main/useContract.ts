@@ -17,6 +17,7 @@ import {
 } from "@gshl-types";
 import {
   applyContractFilters,
+  doesContractAffectSeason,
   sortContracts,
   mergeContractFilters,
   computeContractSummary,
@@ -55,6 +56,7 @@ export function useCreateContract() {
       await Promise.all([
         utils.contract.getAll.invalidate(),
         utils.player.getAll.invalidate(),
+        utils.ufa.getOverview.invalidate(),
       ]);
     },
   });
@@ -346,10 +348,7 @@ export function useContractData(
     );
     return map;
   }, [players, relatedPlayersQuery.data]);
-  const contractPlayers = useMemo(
-    () => [...playerById.values()],
-    [playerById],
-  );
+  const contractPlayers = useMemo(() => [...playerById.values()], [playerById]);
 
   const franchiseById = useMemo(() => {
     const map = new Map<string, GSHLTeam>();
@@ -494,8 +493,13 @@ export function useContractData(
     const dataset = sortedContracts;
 
     const calcRemaining = (year: number) => {
+      const displaySeason = seasons?.find(
+        (season) => getSeasonEndYear(season) === year,
+      );
       const active = dataset.filter((contract) =>
-        isContractActiveForDisplayYear(contract, year),
+        displaySeason
+          ? doesContractAffectSeason(contract, displaySeason, seasons ?? [])
+          : isContractActiveForDisplayYear(contract, year),
       );
       const total = active.reduce((sum, c) => sum + toNumber(c.capHit, 0), 0);
       return CAP_CEILING - total;
@@ -509,7 +513,7 @@ export function useContractData(
         remaining: calcRemaining(year),
       };
     });
-  }, [sortedContracts, currentSeason, activeSeasonEndYear]);
+  }, [sortedContracts, currentSeason, activeSeasonEndYear, seasons]);
 
   const activeCurrentContractKeys = useMemo(
     () => new Set(activeCurrentContracts.map(getContractUniqueKey)),

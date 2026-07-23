@@ -19,15 +19,12 @@ import {
 import {
   checkContractCapSpace,
   deriveContractCreationTerms,
+  getEffectiveSigningStatus,
   formatMoney,
   isUnsignedForSigningSeason,
   isUfaFreeAgencyOpen,
 } from "@gshl-utils";
-import {
-  ResignableStatus,
-  type ContractLength,
-  type GSHLTeam,
-} from "@gshl-types";
+import { type ContractLength, type GSHLTeam } from "@gshl-types";
 
 const LENGTHS: readonly ContractLength[] = [1, 2, 3];
 
@@ -80,7 +77,7 @@ export function ContractManagement() {
     return playersQuery.data
       .flatMap((player) => {
         const belongsToTeam =
-          String(player.gshlTeamId) === String(selectedTeam.franchiseId);
+          String(player.gshlTeamId) === String(selectedTeam.id);
         const isLeagueUfa =
           freeAgencyOpen &&
           isUnsignedForSigningSeason(
@@ -99,10 +96,14 @@ export function ContractManagement() {
         if (!eligible) return [];
 
         try {
+          const effectiveSigningStatus = getEffectiveSigningStatus({
+            player,
+            signingSeason,
+            contracts: contractsQuery.data,
+            seasons: seasonsQuery.data,
+          });
           const terms = deriveContractCreationTerms({
-            player: freeAgencyOpen
-              ? { ...player, isResignable: ResignableStatus.UFA }
-              : player,
+            player: { ...player, isResignable: effectiveSigningStatus },
             signingSeason,
             contractLength,
             contracts: contractsQuery.data,

@@ -7,7 +7,6 @@ import {
 } from "../trpc";
 import { idSchema, baseQuerySchema } from "./_schemas";
 import {
-  ResignableStatus,
   SALARY_CAP,
   type Contract,
   type Franchise,
@@ -19,6 +18,7 @@ import {
 import {
   checkContractCapSpace,
   deriveContractCreationTerms,
+  getEffectiveSigningStatus,
   getTorontoDate,
   isUnsignedForSigningSeason,
   isUfaFreeAgencyOpen,
@@ -96,8 +96,7 @@ export const contractRouter = createTRPCRouter({
       if (!resolvedOwner?.isActive) {
         reject("The selected team does not have an active league owner.");
       }
-      const belongsToTeam =
-        String(player.gshlTeamId) === String(team.franchiseId);
+      const belongsToTeam = String(player.gshlTeamId) === String(team.id);
       const summerFreeAgencyOpen = isUfaFreeAgencyOpen(signingSeason);
       const isUnsignedSummerUfa =
         summerFreeAgencyOpen &&
@@ -108,6 +107,12 @@ export const contractRouter = createTRPCRouter({
           seasons,
         );
       const isCrossTeamUfa = !belongsToTeam && isUnsignedSummerUfa;
+      const effectiveSigningStatus = getEffectiveSigningStatus({
+        player,
+        signingSeason,
+        contracts: playerContracts,
+        seasons,
+      });
 
       const duplicate = playerContracts.find(
         (contract) => String(contract.seasonId) === String(signingSeason.id),
@@ -144,9 +149,7 @@ export const contractRouter = createTRPCRouter({
       let terms: ContractCreationTerms;
       try {
         terms = deriveContractCreationTerms({
-          player: isUnsignedSummerUfa
-            ? { ...player, isResignable: ResignableStatus.UFA }
-            : player,
+          player: { ...player, isResignable: effectiveSigningStatus },
           signingSeason,
           contractLength: input.contractLength,
           contracts: playerContracts,

@@ -50,9 +50,7 @@ function coveredSeasonIds(contract: any, seasons: any[]) {
 }
 
 function isPlayingContract(contract: any) {
-  if (
-    ["Buyout", "Retired", "Injured"].includes(String(contract.expiryStatus))
-  )
+  if (["Buyout", "Retired", "Injured"].includes(String(contract.expiryStatus)))
     return false;
   const types = Array.isArray(contract.contractType)
     ? contract.contractType.map(String)
@@ -66,6 +64,21 @@ function normalizeDateOnly(value: unknown) {
   if (typeof value !== "string") return null;
   const trimmed = value.trim();
   return trimmed ? trimmed.slice(0, 10) : null;
+}
+
+function contractAffectsSeason(contract: any, season: any, seasons: any[]) {
+  const seasonStart = normalizeDateOnly(season.startDate);
+  const seasonEnd = normalizeDateOnly(season.endDate);
+  const contractStart = normalizeDateOnly(contract.startDate);
+  const contractEnd = normalizeDateOnly(
+    contract.capHitEndDate ?? contract.expiryDate,
+  );
+
+  if (seasonStart && seasonEnd && contractStart && contractEnd) {
+    return contractStart <= seasonEnd && contractEnd >= seasonStart;
+  }
+
+  return coveredSeasonIds(contract, seasons).includes(season._id);
 }
 
 function isUnsignedAfterSigningDeadline(
@@ -533,7 +546,7 @@ export const submitOffer = mutation({
         .filter(
           (contract: any) =>
             contract.ownerId === args.ownerId &&
-            coveredSeasonIds(contract, orderedSeasons).includes(season._id),
+            contractAffectsSeason(contract, season, orderedSeasons),
         )
         .reduce(
           (sum: number, contract: any) =>

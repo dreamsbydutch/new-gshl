@@ -5,6 +5,8 @@ import { ContractStatus, ContractType, ResignableStatus } from "@gshl-types";
 import {
   checkContractCapSpace,
   deriveContractCreationTerms,
+  doesContractAffectSeason,
+  getEffectiveSigningStatus,
   getContractCoveredSeasonIds,
   hasContractContinuity,
   isUnsignedForSigningSeason,
@@ -177,6 +179,58 @@ void test("UFA free agency opens after the signing deadline", () => {
   );
 });
 
+void test("unsigned RFA tags become UFA after the signing deadline", () => {
+  const signingSeason = seasons[1]!;
+  const rfa = player(ResignableStatus.RFA);
+
+  assert.equal(
+    getEffectiveSigningStatus({
+      player: rfa,
+      signingSeason,
+      contracts: [],
+      seasons,
+      referenceDate: new Date("2020-06-20T16:00:00Z"),
+    }),
+    ResignableStatus.RFA,
+  );
+  const afterDeadlineStatus = getEffectiveSigningStatus({
+    player: rfa,
+    signingSeason,
+    contracts: [],
+    seasons,
+    referenceDate: new Date("2020-06-21T16:00:00Z"),
+  });
+  assert.equal(afterDeadlineStatus, ResignableStatus.UFA);
+  assert.equal(
+    deriveContractCreationTerms({
+      player: { ...rfa, isResignable: afterDeadlineStatus },
+      signingSeason,
+      contractLength: 1,
+      contracts: [],
+      seasons,
+    }).contractSalary,
+    5_000_000,
+  );
+  assert.equal(
+    getEffectiveSigningStatus({
+      player: rfa,
+      signingSeason,
+      contracts: [
+        contract({
+          seasonId: "6",
+          contractLength: 1,
+          startDate: "2020-10-01",
+          expiryDate: "2021-04-20",
+          capHitEndDate: "2021-04-20",
+        }),
+      ],
+      seasons,
+      referenceDate: new Date("2020-06-21T16:00:00Z"),
+    }),
+    null,
+  );
+});
+
 void test("unsigned Summer UFA eligibility uses contract history", () => {
   assert.equal(isUnsignedForSigningSeason("player-1", "6", [], seasons), true);
   assert.equal(
@@ -242,6 +296,9 @@ void test("cap checks accept the exact cap and reject one dollar over", () => {
     playerId: "other-player",
     seasonId: "6",
     contractLength: 1,
+    startDate: "2020-10-01",
+    expiryDate: "2021-04-20",
+    capHitEndDate: "2021-04-20",
     capHit: 20_000_000,
   });
 
@@ -272,6 +329,9 @@ void test("cap checks every season covered by a multi-year contract", () => {
     playerId: "other-player",
     seasonId: "7",
     contractLength: 1,
+    startDate: "2021-10-01",
+    expiryDate: "2022-04-20",
+    capHitEndDate: "2022-04-20",
     capHit: 23_000_000,
   });
   const result = checkContractCapSpace({
@@ -286,4 +346,32 @@ void test("cap checks every season covered by a multi-year contract", () => {
   assert.equal(result.affordable, false);
   assert.equal(result.limitingSeasonId, "8");
   assert.equal(result.availableCapSpace, 2_000_000);
+});
+
+void test("cap checks use actual cap-charge dates and pending reservations", () => {
+  const targetSeason = seasons[2]!;
+  const expired = contract({
+    playerId: "expired-player",
+    seasonId: "6",
+    contractLength: 3,
+    startDate: "2018-10-01",
+    expiryDate: "2020-04-20",
+    capHitEndDate: "2020-04-20",
+    capHit: 20_000_000,
+  });
+
+  assert.equal(doesContractAffectSeason(expired, targetSeason, seasons), false);
+
+  const result = checkContractCapSpace({
+    ownerId: "owner-1",
+    signingSeasonId: "6",
+    contractLength: 1,
+    contractSalary: 5_000_001,
+    contracts: [expired],
+    seasons,
+    reservedCapBySeasonId: new Map([[String(targetSeason.id), 20_000_000]]),
+  });
+
+  assert.equal(result.affordable, false);
+  assert.equal(result.availableCapSpace, 5_000_000);
 });

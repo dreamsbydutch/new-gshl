@@ -5,10 +5,10 @@ import { clientApi as api } from "@gshl-trpc";
 
 export function useUfaOverview() {
   const catalog = api.ufa.getOverview.useQuery(undefined, {
-    staleTime: 24 * 60 * 60 * 1000,
-    gcTime: 24 * 60 * 60 * 1000,
-    refetchOnWindowFocus: false,
-    refetchOnMount: false,
+    staleTime: 60_000,
+    gcTime: 15 * 60_000,
+    refetchOnWindowFocus: true,
+    refetchOnMount: true,
   });
   const live = api.ufa.getLiveState.useQuery(undefined, {
     staleTime: 15_000,
