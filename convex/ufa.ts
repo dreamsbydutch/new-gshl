@@ -7,9 +7,9 @@ import {
   mutation,
   query,
 } from "./_generated/server";
+import { getUfaOfferGroupDeadline } from "../src/lib/utils/features/ufa-deadline";
 
 const CAP = 25_000_000;
-const DAY = 86_400_000;
 
 function requireServerSecret(secret: string) {
   const expected = process.env.CONVEX_SERVER_SECRET;
@@ -559,16 +559,34 @@ export const submitOffer = mutation({
         q.eq("playerId", player._id).eq("seasonId", signingSeason._id),
       )
       .first();
-    if (group && (group.status !== "open" || group.deadlineAt <= now)) {
-      throw new Error("Offers for this player are closed.");
-    }
     if (group) {
-      const duplicate = await db
+      const existingOffers = await db
         .query("ufaOffers")
-        .withIndex("by_group_franchise", (q: any) =>
-          q.eq("groupId", group!._id).eq("franchiseId", franchise._id),
-        )
-        .first();
+        .withIndex("by_group", (q: any) => q.eq("groupId", group!._id))
+        .collect();
+      const sharedDeadlineAt = getUfaOfferGroupDeadline({
+        submittedAt: now,
+        existingDeadlineAt: group.deadlineAt,
+        existingOfferSubmittedAt: existingOffers.map(
+          (offer: any) => offer.submittedAt,
+        ),
+      });
+      if (group.status !== "open" || sharedDeadlineAt <= now) {
+        throw new Error("Offers for this player are closed.");
+      }
+      if (sharedDeadlineAt !== group.deadlineAt) {
+        await db.patch(group._id, {
+          deadlineAt: sharedDeadlineAt,
+          updatedAt: now,
+        });
+        group = { ...group, deadlineAt: sharedDeadlineAt, updatedAt: now };
+        await ctx.scheduler.runAt(sharedDeadlineAt, internal.ufa.resolveGroup, {
+          groupId: group._id,
+        });
+      }
+      const duplicate = existingOffers.find(
+        (offer: any) => offer.franchiseId === franchise._id,
+      );
       if (duplicate)
         throw new Error(
           "Your franchise has already made a binding offer to this player.",
@@ -620,7 +638,7 @@ export const submitOffer = mutation({
     }
 
     if (!group) {
-      const deadlineAt = now + 7 * DAY;
+      const deadlineAt = getUfaOfferGroupDeadline({ submittedAt: now });
       const groupId = await db.insert("ufaOfferGroups", {
         playerId: player._id,
         seasonId: signingSeason._id,
