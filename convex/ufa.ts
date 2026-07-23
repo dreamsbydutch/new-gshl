@@ -140,6 +140,40 @@ function softmaxOdds(scores: Array<{ offerId: string; score: number }>) {
   }));
 }
 
+async function latestNhlStatsForSigningSeason(
+  db: any,
+  seasons: any[],
+  signingIndex: number,
+) {
+  for (let index = signingIndex; index >= 0; index -= 1) {
+    const season = seasons[index];
+    if (!season) continue;
+    const stats = await db
+      .query("playerNhlStatLines")
+      .withIndex("by_seasonId", (q: any) => q.eq("seasonId", season._id))
+      .collect();
+    if (stats.length) return stats;
+  }
+  return [];
+}
+
+async function draftPicksForSigningWindow(
+  db: any,
+  seasons: any[],
+  signingIndex: number,
+) {
+  const futureSeasons = seasons.slice(signingIndex + 1, signingIndex + 4);
+  const picksBySeason = await Promise.all(
+    futureSeasons.map((season) =>
+      db
+        .query("draftPicks")
+        .withIndex("by_seasonId", (q: any) => q.eq("seasonId", season._id))
+        .collect(),
+    ),
+  );
+  return picksBySeason.flat();
+}
+
 async function calculateOdds(ctx: any, groupId: any) {
   const db: any = ctx.db;
   const offers = await db
@@ -149,13 +183,21 @@ async function calculateOdds(ctx: any, groupId: any) {
   const pending = offers.filter((offer: any) => offer.status === "pending");
   if (!pending.length) return { odds: [], factors: new Map<string, unknown>() };
 
+  const [group, seasons] = await Promise.all([
+    db.get(groupId),
+    db.query("seasons").collect(),
+  ]);
+  if (!group) return { odds: [], factors: new Map<string, unknown>() };
+  const orderedSeasons = [...seasons].sort((a, b) => num(a.year) - num(b.year));
+  const signingIndex = orderedSeasons.findIndex(
+    (season) => season._id === group.seasonId,
+  );
+
   const [
-    group,
     players,
     contracts,
     teams,
     franchises,
-    seasons,
     picks,
     matchups,
     nhlStats,
@@ -166,17 +208,11 @@ async function calculateOdds(ctx: any, groupId: any) {
     db.query("contracts").collect(),
     db.query("teams").collect(),
     db.query("franchises").collect(),
-    db.query("seasons").collect(),
-    db.query("draftPicks").collect(),
+    draftPicksForSigningWindow(db, orderedSeasons, signingIndex),
     db.query("matchups").collect(),
-    db.query("playerNhlStatLines").collect(),
+    latestNhlStatsForSigningSeason(db, orderedSeasons, signingIndex),
     db.query("teamAwards").collect(),
   ]);
-  if (!group) return { odds: [], factors: new Map<string, unknown>() };
-  const orderedSeasons = [...seasons].sort((a, b) => num(a.year) - num(b.year));
-  const signingIndex = orderedSeasons.findIndex(
-    (season) => season._id === group.seasonId,
-  );
   const player = players.find(
     (candidate: any) => candidate._id === group.playerId,
   );
