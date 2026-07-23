@@ -62,6 +62,10 @@ export function useTeamScheduleData(
     error: seasonDataError,
   } = useSeasonDataBundle({
     seasonId: optionSeasonId,
+    // The team layout shows the selected team's entire season. Do not inherit
+    // the navigation's selected week, which is only a filter for the weekly
+    // layout.
+    weekId: null,
     includeWeeks: true,
   });
 

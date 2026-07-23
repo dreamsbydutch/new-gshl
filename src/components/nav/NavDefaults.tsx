@@ -43,8 +43,10 @@ export default function NavDefaults(): null {
     if (isLoading) return;
     if (!weeks || weeks.length === 0) return;
 
-    // If user already has a selected week (non-default), don't override
-    if (selectedWeekId && selectedWeekId !== "0") return;
+    // Keep an existing selection only when it belongs to this season. This
+    // also repairs persisted navigation state created before season changes
+    // reset the selected week.
+    if (weeks.some((week) => week.id === selectedWeekId)) return;
 
     const today = toLocalIsoDateOnly(new Date());
 

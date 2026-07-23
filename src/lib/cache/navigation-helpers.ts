@@ -158,9 +158,11 @@ export function useWeekNavigation() {
     .find((week) => week.endDate < today);
 
   useEffect(() => {
-    if (selectedWeekId || !selectedSeasonId) return;
+    if (!selectedSeasonId) return;
 
     if (isLoading) return;
+
+    if (weeks.some((week) => week.id === selectedWeekId)) return;
 
     if (currentWeek?.id) {
       setWeekId(currentWeek.id);
@@ -182,6 +184,7 @@ export function useWeekNavigation() {
     currentWeek,
     nextWeek,
     previousWeek,
+    weeks,
     isLoading,
     setWeekId,
   ]);

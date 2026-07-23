@@ -39,7 +39,15 @@ export const useNavStore = create<NavState>()(
       ...DEFAULT_STORE_STATE,
 
       setScheduleType: (type) => set({ selectedScheduleType: type }),
-      setSeasonId: (id) => set({ selectedSeasonId: id }),
+      // Week ids belong to a season. Reset the week whenever the season
+      // changes so schedule queries never combine a new season with a stale
+      // week from the previously selected season.
+      setSeasonId: (id) =>
+        set((state) =>
+          state.selectedSeasonId === id
+            ? { selectedSeasonId: id }
+            : { selectedSeasonId: id, selectedWeekId: "0" },
+        ),
       setWeekId: (id) => set({ selectedWeekId: id }),
       setOwnerId: (id) => set({ selectedOwnerId: id }),
       setLockerRoomType: (type) => set({ selectedLockerRoomType: type }),
