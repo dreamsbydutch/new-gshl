@@ -26,9 +26,11 @@ import {
   hasFlag,
   toBoolean,
 } from "@gshl-lib/ranking/player-rating-support";
-import { fastSheetsReader } from "@gshl-lib/sheets/reader/fast-reader";
-import { minimalSheetsWriter } from "@gshl-lib/sheets/writer/minimal-writer";
-import { getCompositeKeyColumnsForModel } from "@gshl-lib/sheets/config/config";
+import {
+  fetchModel,
+  fetchPlayerNhlSeason,
+  upsertAggregateRows,
+} from "@gshl-lib/data/convex-store";
 import type {
   Player,
   PlayerNHLStatLine,
@@ -93,7 +95,7 @@ type InvestigationRow = {
   sourceIndex: number;
 };
 
-type SeasonExecutionSummary = {
+export type SeasonExecutionSummary = {
   seasonId: string;
   seasonYear: string;
   apply: boolean;
@@ -950,6 +952,34 @@ function makeSeasonPlayerKey(seasonId: unknown, playerId: unknown): string {
   return `${normalizeCompositeKeyPart(seasonId)}|${normalizeCompositeKeyPart(playerId)}`;
 }
 
+function normalizePlayerNhlRowForWrite(
+  row: Partial<PlayerNHLStatLine>,
+): Record<string, unknown> {
+  const normalized = { ...row } as Record<string, unknown>;
+  for (const field of ["nhlPos", "nhlTeam"] as const) {
+    const value = normalized[field];
+    if (typeof value === "string") {
+      normalized[field] = value
+        .split(",")
+        .map((entry) => entry.trim())
+        .filter(Boolean);
+    }
+  }
+  return normalized;
+}
+
+function hasPlayerNhlRowChanges(
+  existing: PlayerNHLStatLine,
+  incoming: Record<string, unknown>,
+): boolean {
+  return Object.entries(incoming).some(([field, nextValue]) => {
+    const previousValue = (existing as unknown as Record<string, unknown>)[
+      field
+    ];
+    return JSON.stringify(previousValue) !== JSON.stringify(nextValue);
+  });
+}
+
 function auditExistingDuplicates(
   seasonId: string,
   rows: PlayerNHLStatLine[],
@@ -1056,9 +1086,7 @@ async function parseOptions(args: string[]): Promise<BackfillOptions> {
     ...parseCsvList(getArgValue(args, "--season-id")),
     ...parseCsvList(getArgValue(args, "--season-ids")),
   ];
-  const seasons = (await fastSheetsReader.fetchModel(
-    "Season",
-  )) as unknown as Season[];
+  const seasons = (await fetchModel("Season")) as unknown as Season[];
   const resolvedSeasonIds = seasonIds.length
     ? Array.from(new Set(seasonIds))
     : seasons
@@ -1142,10 +1170,13 @@ async function executeSeason(
     seasonId,
     existingStatLines,
   );
-  const existingKeys = new Set(
+  const existingByKey = new Map(
     existingStatLines
       .filter((row) => String(row.seasonId) === String(seasonId))
-      .map((row) => makeSeasonPlayerKey(row.seasonId, row.playerId)),
+      .map(
+        (row) =>
+          [makeSeasonPlayerKey(row.seasonId, row.playerId), row] as const,
+      ),
   );
   const incomingRows = new Map<string, Partial<PlayerNHLStatLine>>();
   for (const row of matchedRows) {
@@ -1153,11 +1184,21 @@ async function executeSeason(
     incomingRows.set(key, row);
   }
 
-  const rowsToUpdate = Array.from(incomingRows.keys()).filter((key) =>
-    existingKeys.has(key),
+  const normalizedRows = Array.from(incomingRows.entries()).map(
+    ([key, row]) => ({
+      key,
+      row: normalizePlayerNhlRowForWrite(row),
+    }),
+  );
+  const changedRows = normalizedRows.filter(({ key, row }) => {
+    const existing = existingByKey.get(key);
+    return !existing || hasPlayerNhlRowChanges(existing, row);
+  });
+  const rowsToUpdate = changedRows.filter(({ key }) =>
+    existingByKey.has(key),
   ).length;
-  const rowsToInsert = Array.from(incomingRows.keys()).filter(
-    (key) => !existingKeys.has(key),
+  const rowsToInsert = changedRows.filter(
+    ({ key }) => !existingByKey.has(key),
   ).length;
 
   if (options.apply && duplicateExisting.count > 0) {
@@ -1166,21 +1207,32 @@ async function executeSeason(
     );
   }
 
-  if (options.apply && incomingRows.size > 0) {
-    const result = await minimalSheetsWriter.upsertByCompositeKey(
-      "PlayerNHLStatLine",
-      getCompositeKeyColumnsForModel("PlayerNHLStatLine"),
-      Array.from(incomingRows.values()),
-      {
-        merge: true,
-        idColumn: "id",
-        createdAtColumn: "createdAt",
-        updatedAtColumn: "updatedAt",
-      },
-    );
+  if (options.apply && changedRows.length > 0) {
+    const rowsToWrite = changedRows.map(({ row }) => row);
+    let updated = 0;
+    let inserted = 0;
+    for (let offset = 0; offset < rowsToWrite.length; offset += 25) {
+      const batch = rowsToWrite.slice(offset, offset + 25);
+      let result: { updated: number; inserted: number };
+      try {
+        result = await upsertAggregateRows("PlayerNHLStatLine", batch);
+      } catch (error) {
+        const playerIds = batch
+          .map((row) => String(row.playerId ?? ""))
+          .filter(Boolean)
+          .slice(0, 5)
+          .join(", ");
+        throw new Error(
+          `[stats:backfill-hockey-reference] PlayerNHLStatLine write failed for season ${seasonId}, batch ${Math.floor(offset / 25) + 1}, rows ${offset + 1}-${offset + batch.length}, sample playerIds=${playerIds || "none"}: ${error instanceof Error ? error.message : String(error)}`,
+          { cause: error },
+        );
+      }
+      updated += result.updated;
+      inserted += result.inserted;
+    }
     log(
       options,
-      `Season ${seasonId}: wrote ${result.total} rows (${result.updated} updates, ${result.inserted} inserts).`,
+      `Season ${seasonId}: wrote ${updated + inserted} rows (${updated} updates, ${inserted} inserts).`,
     );
   }
 
@@ -1203,20 +1255,39 @@ async function executeSeason(
   };
 }
 
-async function main(): Promise<void> {
+export async function refreshPlayerNhlSeason(
+  seasonId: string,
+  options: { apply: boolean; logToConsole: boolean; yearOverride?: string },
+): Promise<SeasonExecutionSummary> {
+  const seasons = (await fetchModel("Season")) as unknown as Season[];
+  const players = (await fetchModel("Player")) as unknown as Player[];
+  const existingStatLines = (await fetchPlayerNhlSeason(
+    seasonId,
+  )) as unknown as PlayerNHLStatLine[];
+  const summary = await executeSeason(
+    {
+      seasonIds: [seasonId],
+      apply: options.apply,
+      logToConsole: options.logToConsole,
+      yearOverride: options.yearOverride,
+      stopOnError: true,
+    },
+    seasonId,
+    seasons,
+    players,
+    existingStatLines,
+  );
+  await writeMismatchReport([...summary.unmatched, ...summary.ambiguous]);
+  return summary;
+}
+
+export async function runHockeyReferenceBackfillCli(): Promise<void> {
   process.env.USE_GOOGLE_SHEETS ??= "true";
   process.env.GOOGLE_SERVICE_ACCOUNT_KEY_FILE ??= "credentials.json";
 
   const options = await parseOptions(process.argv.slice(2));
-  const seasons = (await fastSheetsReader.fetchModel(
-    "Season",
-  )) as unknown as Season[];
-  const players = (await fastSheetsReader.fetchModel(
-    "Player",
-  )) as unknown as Player[];
-  const existingStatLines = (await fastSheetsReader.fetchModel(
-    "PlayerNHLStatLine",
-  )) as unknown as PlayerNHLStatLine[];
+  const seasons = (await fetchModel("Season")) as unknown as Season[];
+  const players = (await fetchModel("Player")) as unknown as Player[];
 
   log(
     options,
@@ -1229,6 +1300,9 @@ async function main(): Promise<void> {
 
   for (const seasonId of options.seasonIds) {
     try {
+      const existingStatLines = (await fetchPlayerNhlSeason(
+        seasonId,
+      )) as unknown as PlayerNHLStatLine[];
       const summary = await executeSeason(
         options,
         seasonId,
@@ -1275,10 +1349,3 @@ async function main(): Promise<void> {
     process.exitCode = 1;
   }
 }
-
-void main().catch((error: unknown) => {
-  const message =
-    error instanceof Error ? (error.stack ?? error.message) : String(error);
-  console.error(message);
-  process.exitCode = 1;
-});

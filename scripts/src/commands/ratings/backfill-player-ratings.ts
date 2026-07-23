@@ -43,6 +43,7 @@ async function main(): Promise<void> {
         seasonType: options.seasonType || null,
         weekIds: options.weekIds,
         weekNums: options.weekNums,
+        teamIds: options.teamIds,
         matchedRows,
         updatedRows,
         models: summaries,

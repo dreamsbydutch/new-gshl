@@ -1,0 +1,30 @@
+[
+  {
+    "seasonId": "m97315j0mqzb4z25vz528vtxqd8ampm0",
+    "seasonYear": "2017",
+    "fullName": "Mikkel Bødker",
+    "posGroup": "F",
+    "nhlTeam": "SJS",
+    "sourceType": "skater",
+    "reason": "no-player-match",
+    "rawPos": "LW",
+    "nhlPos": "LW",
+    "age": "27",
+    "gp": "81",
+    "sourceIndex": 298
+  },
+  {
+    "seasonId": "m97315j0mqzb4z25vz528vtxqd8ampm0",
+    "seasonYear": "2017",
+    "fullName": "Nikolai Kulemin",
+    "posGroup": "F",
+    "nhlTeam": "NYI",
+    "sourceType": "skater",
+    "reason": "no-player-match",
+    "rawPos": "LW",
+    "nhlPos": "LW",
+    "age": "30",
+    "gp": "72",
+    "sourceIndex": 339
+  }
+]

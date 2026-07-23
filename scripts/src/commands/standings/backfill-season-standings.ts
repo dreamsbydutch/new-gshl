@@ -17,12 +17,13 @@
  *   --stop-on-error        Stop immediately after the first failed season.
  *   --help                 Print the built-in help text and exit.
  */
-import path from "node:path";
 import { pathToFileURL } from "node:url";
 import type { DatabaseRecord } from "@gshl-lib/sheets/config/config";
-import { getCompositeKeyColumnsForModel } from "@gshl-lib/sheets/config/config";
-import { fastSheetsReader } from "@gshl-lib/sheets/reader/fast-reader";
-import { minimalSheetsWriter } from "@gshl-lib/sheets/writer/minimal-writer";
+import {
+  fetchModel,
+  fetchSeasonModel,
+  updateRowsById,
+} from "@gshl-lib/data/convex-store";
 import { MatchupType, SeasonType } from "@gshl-lib/types/enums";
 import type { Matchup } from "@gshl-lib/types/database";
 
@@ -247,7 +248,7 @@ Options:
   --help                 Show this message and exit.
 
 Requirements:
-  NEXT_PUBLIC_CONVEX_URL (or CONVEX_URL) must be configured locally.
+  CONVEX_PROD_URL and CONVEX_SERVER_SECRET must target production.
 `.trim();
 
 function getArgValue(args: string[], flagName: string): string | undefined {
@@ -936,11 +937,7 @@ function resolveCurrentSeasonId(seasons: SeasonRecord[]): string {
 }
 
 async function getDefaultSeasonIds(includeActive: boolean): Promise<string[]> {
-  process.env.USE_GOOGLE_SHEETS ??= "true";
-  process.env.GOOGLE_SERVICE_ACCOUNT_KEY_FILE ??=
-    path.resolve("credentials.json");
-
-  const seasons = await fastSheetsReader.fetchModel<SeasonRecord>("Season");
+  const seasons = await fetchModel<SeasonRecord>("Season");
   const currentSeasonId = resolveCurrentSeasonId(seasons);
 
   return seasons
@@ -966,8 +963,22 @@ async function parseOptions(args: string[]): Promise<BackfillOptions> {
   ).sort(compareSeasonIds);
 
   const includeActive = hasFlag(args, "--include-active");
+  const seasonRows = await fetchModel<SeasonRecord>("Season");
   const seasonIds = requestedSeasonIds.length
-    ? requestedSeasonIds
+    ? requestedSeasonIds.map((requestedId) => {
+        const season = seasonRows.find((row) =>
+          [row.id, row.legacyId].some(
+            (value) => toTrimmedString(value) === requestedId,
+          ),
+        );
+        const resolvedId = toTrimmedString(season?.id);
+        if (!resolvedId) {
+          throw new Error(
+            `[standings:backfill] Season ${requestedId} was not found in production Convex.`,
+          );
+        }
+        return resolvedId;
+      })
     : await getDefaultSeasonIds(includeActive);
 
   if (!seasonIds.length) {
@@ -984,15 +995,22 @@ async function parseOptions(args: string[]): Promise<BackfillOptions> {
 }
 
 export async function rebuildSeasonStandingsForSeasonId(
-  seasonId: string,
+  requestedSeasonId: string,
   apply: boolean,
 ): Promise<StandingsBackfillSeasonSummary> {
-  process.env.USE_GOOGLE_SHEETS ??= "true";
-  process.env.GOOGLE_SERVICE_ACCOUNT_KEY_FILE ??=
-    path.resolve("credentials.json");
-
+  const seasons = await fetchModel<SeasonRecord>("Season");
+  const season = seasons.find((candidate) =>
+    [candidate.id, candidate.legacyId].some(
+      (value) => normalizeRecordId(value) === requestedSeasonId,
+    ),
+  );
+  const seasonId = normalizeRecordId(season?.id);
+  if (!seasonId) {
+    throw new Error(
+      `[standings:backfill] Season ${requestedSeasonId} was not found in production Convex.`,
+    );
+  }
   const [
-    seasons,
     weeks,
     teams,
     franchises,
@@ -1001,19 +1019,14 @@ export async function rebuildSeasonStandingsForSeasonId(
     matchups,
     teamSeasons,
   ] = await Promise.all([
-    fastSheetsReader.fetchModel<SeasonRecord>("Season"),
-    fastSheetsReader.fetchModel<WeekRecord>("Week"),
-    fastSheetsReader.fetchModel<TeamRecord>("Team"),
-    fastSheetsReader.fetchModel<FranchiseRecord>("Franchise"),
-    fastSheetsReader.fetchModel<TeamWeekRecord>("TeamWeekStatLine"),
-    fastSheetsReader.fetchModel<PlayerWeekRecord>("PlayerWeekStatLine"),
-    fastSheetsReader.fetchModel<DatabaseRecord>("Matchup"),
-    fastSheetsReader.fetchModel<TeamSeasonRecord>("TeamSeasonStatLine"),
+    fetchSeasonModel<WeekRecord>("Week", seasonId),
+    fetchSeasonModel<TeamRecord>("Team", seasonId),
+    fetchModel<FranchiseRecord>("Franchise"),
+    fetchSeasonModel<TeamWeekRecord>("TeamWeekStatLine", seasonId),
+    fetchSeasonModel<PlayerWeekRecord>("PlayerWeekStatLine", seasonId),
+    fetchSeasonModel<DatabaseRecord>("Matchup", seasonId),
+    fetchSeasonModel<TeamSeasonRecord>("TeamSeasonStatLine", seasonId),
   ]);
-
-  const season = seasons.find(
-    (candidate) => normalizeRecordId(candidate.id) === seasonId,
-  );
   const usesLegacyTies = seasonUsesLegacyTies(season);
   const matchupCategoryRules = getMatchupCategoryRulesForSeason(season);
 
@@ -1375,50 +1388,33 @@ export async function rebuildSeasonStandingsForSeasonId(
     }
   }
 
-  const appliedMatchupWrite =
-    apply && matchupUpdates.length > 0
-      ? await minimalSheetsWriter.upsertByCompositeKey(
-          "Matchup",
-          ["id"],
-          matchupUpdates,
-          {
-            merge: true,
-            idColumn: "id",
-            createdAtColumn: "createdAt",
-            updatedAtColumn: "updatedAt",
-          },
-        )
-      : undefined;
+  async function applyUpdates(
+    model: "Matchup" | "TeamSeasonStatLine",
+    rows: DatabaseRecord[],
+  ): Promise<{ updated: number; inserted: number; total: number } | undefined> {
+    if (!apply || rows.length === 0) return undefined;
+    const patches = rows.map((row) => {
+      const id = normalizeRecordId(row.id);
+      if (!id) throw new Error(`[standings:backfill] Missing ${model} row id.`);
+      const { id: _id, ...data } = row;
+      return { id, data: { ...data, updatedAt: new Date() } };
+    });
+    const updated = await updateRowsById(model, patches);
+    return { updated, inserted: 0, total: updated };
+  }
 
-  const appliedMatchupRankWrite =
-    apply && matchupRankUpdates.length > 0
-      ? await minimalSheetsWriter.upsertByCompositeKey(
-          "Matchup",
-          ["id"],
-          matchupRankUpdates,
-          {
-            merge: true,
-            idColumn: "id",
-            createdAtColumn: "createdAt",
-            updatedAtColumn: "updatedAt",
-          },
-        )
-      : undefined;
-
-  const appliedStandingsWrite =
-    apply && standingsUpdates.length > 0
-      ? await minimalSheetsWriter.upsertByCompositeKey(
-          "TeamSeasonStatLine",
-          getCompositeKeyColumnsForModel("TeamSeasonStatLine"),
-          standingsUpdates,
-          {
-            merge: true,
-            idColumn: "id",
-            createdAtColumn: "createdAt",
-            updatedAtColumn: "updatedAt",
-          },
-        )
-      : undefined;
+  const appliedMatchupWrite = await applyUpdates(
+    "Matchup",
+    matchupUpdates as DatabaseRecord[],
+  );
+  const appliedMatchupRankWrite = await applyUpdates(
+    "Matchup",
+    matchupRankUpdates as DatabaseRecord[],
+  );
+  const appliedStandingsWrite = await applyUpdates(
+    "TeamSeasonStatLine",
+    standingsUpdates as DatabaseRecord[],
+  );
 
   return {
     seasonId,

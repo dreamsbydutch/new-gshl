@@ -37,6 +37,41 @@ const refs = {
   list: makeFunctionReference<"query", Record<string, unknown>, AnyRow[]>(
     "data:list",
   ),
+  playerDayBackfillPage: makeFunctionReference<
+    "query",
+    Record<string, unknown>,
+    { items: AnyRow[]; nextCursor: string | null; hasMore: boolean }
+  >("yahooBackfill:listPlayerDayRows"),
+  maintenanceWeekPage: makeFunctionReference<
+    "query",
+    Record<string, unknown>,
+    { items: AnyRow[]; nextCursor: string | null; hasMore: boolean }
+  >("maintenanceScope:listWeekRows"),
+  maintenanceSeasonPage: makeFunctionReference<
+    "query",
+    Record<string, unknown>,
+    { items: AnyRow[]; nextCursor: string | null; hasMore: boolean }
+  >("maintenanceScope:listSeasonRows"),
+  maintenanceAggregatePage: makeFunctionReference<
+    "query",
+    Record<string, unknown>,
+    { items: AnyRow[]; nextCursor: string | null; hasMore: boolean }
+  >("maintenanceScope:listAggregateRows"),
+  maintenanceAggregateUpsert: makeFunctionReference<
+    "mutation",
+    Record<string, unknown>,
+    { updated: number; inserted: number }
+  >("maintenanceScope:upsertAggregateRows"),
+  maintenanceAggregateDelete: makeFunctionReference<
+    "mutation",
+    Record<string, unknown>,
+    { deleted: number }
+  >("maintenanceScope:deleteAggregateRows"),
+  maintenancePatchRows: makeFunctionReference<
+    "mutation",
+    Record<string, unknown>,
+    { updated: number }
+  >("maintenanceScope:patchRowsById"),
   snapshot: makeFunctionReference<
     "query",
     Record<string, unknown>,
@@ -130,28 +165,273 @@ function compactRecord(
 export async function fetchModel<T extends AnyRow>(
   model: ModelName,
 ): Promise<T[]> {
-  const rows = await getClient().query(refs.list, serverArgs({
-    table: getConvexTableName(model),
-  }));
+  const rows = await getClient().query(
+    refs.list,
+    serverArgs({
+      table: getConvexTableName(model),
+    }),
+  );
   return rows.map(hydrateRow<T>);
 }
 
 export async function fetchPlayerDaySeason<T extends AnyRow>(
   seasonId: string | number,
 ): Promise<T[]> {
-  const rows = await getClient().query(refs.list, serverArgs({
-    table: getConvexTableName("PlayerDayStatLine"),
-    where: { seasonId: String(seasonId) },
-  }));
+  const rows = await getClient().query(
+    refs.list,
+    serverArgs({
+      table: getConvexTableName("PlayerDayStatLine"),
+      where: { seasonId: String(seasonId) },
+    }),
+  );
   return rows.map(hydrateRow<T>);
+}
+
+export async function fetchPlayerDayWeeks<T extends AnyRow>(
+  seasonId: string | number,
+  weekIds: readonly string[],
+  teamIds: readonly string[] = [],
+): Promise<T[]> {
+  const rows: T[] = [];
+  for (const weekId of new Set(weekIds)) {
+    const teamScopes =
+      teamIds.length > 0 ? Array.from(new Set(teamIds)) : [null];
+    for (const gshlTeamId of teamScopes) {
+      let cursor: string | null = null;
+      do {
+        const args: Record<string, unknown> = {
+          seasonId: String(seasonId),
+          weekId,
+          cursor,
+        };
+        if (gshlTeamId) args.gshlTeamId = gshlTeamId;
+        const page = await getClient().query(
+          refs.playerDayBackfillPage,
+          serverArgs(args),
+        );
+        rows.push(...page.items.map(hydrateRow<T>));
+        cursor = page.hasMore ? page.nextCursor : null;
+      } while (cursor);
+    }
+  }
+  return rows;
+}
+
+export async function fetchWeekScopedModel<T extends AnyRow>(
+  model: Extract<
+    ModelName,
+    | "PlayerDayStatLine"
+    | "PlayerWeekStatLine"
+    | "TeamDayStatLine"
+    | "TeamWeekStatLine"
+  >,
+  seasonId: string,
+  weekIds: readonly string[],
+  teamIds: readonly string[] = [],
+): Promise<T[]> {
+  const rows: T[] = [];
+  for (const weekId of new Set(weekIds)) {
+    const teamScopes =
+      teamIds.length > 0 ? Array.from(new Set(teamIds)) : [null];
+    for (const gshlTeamId of teamScopes) {
+      let cursor: string | null = null;
+      do {
+        const args: Record<string, unknown> = { seasonId, weekId, cursor };
+        if (gshlTeamId) args.gshlTeamId = gshlTeamId;
+        const page = await getClient().query(
+          refs.maintenanceWeekPage,
+          serverArgs({
+            ...args,
+            table: getConvexTableName(model),
+          }),
+        );
+        rows.push(...page.items.map(hydrateRow<T>));
+        cursor = page.hasMore ? page.nextCursor : null;
+      } while (cursor);
+    }
+  }
+  return rows;
+}
+
+export async function fetchPlayerNhlSeason<T extends AnyRow>(
+  seasonId: string,
+): Promise<T[]> {
+  return fetchSeasonModel<T>("PlayerNHLStatLine", seasonId);
+}
+
+export type SeasonScopedModelName = Extract<
+  ModelName,
+  | "Week"
+  | "Team"
+  | "Matchup"
+  | "PlayerDayStatLine"
+  | "PlayerWeekStatLine"
+  | "PlayerSplitStatLine"
+  | "PlayerTotalStatLine"
+  | "PlayerNHLStatLine"
+  | "TeamDayStatLine"
+  | "TeamWeekStatLine"
+  | "TeamSeasonStatLine"
+>;
+
+export async function fetchSeasonModel<T extends AnyRow>(
+  model: SeasonScopedModelName,
+  seasonId: string,
+): Promise<T[]> {
+  const rows: T[] = [];
+  let cursor: string | null = null;
+  try {
+    do {
+      const page: {
+        items: AnyRow[];
+        nextCursor: string | null;
+        hasMore: boolean;
+      } = await getClient().query(
+        refs.maintenanceSeasonPage,
+        serverArgs({
+          table: getConvexTableName(model),
+          seasonId,
+          cursor,
+        }),
+      );
+      rows.push(...page.items.map(hydrateRow<T>));
+      cursor = page.hasMore ? page.nextCursor : null;
+    } while (cursor);
+  } catch (error) {
+    throw new Error(
+      `[production-convex] maintenanceScope:listSeasonRows failed for ${model}, season ${seasonId}. Run "npx convex deploy" if the maintenance functions changed. ${error instanceof Error ? error.message : String(error)}`,
+      { cause: error },
+    );
+  }
+  return rows;
+}
+
+export type AggregateModelName = Extract<
+  ModelName,
+  | "PlayerDayStatLine"
+  | "PlayerWeekStatLine"
+  | "PlayerSplitStatLine"
+  | "PlayerTotalStatLine"
+  | "PlayerCareerSplitStatLine"
+  | "PlayerCareerTotalStatLine"
+  | "PlayerNHLStatLine"
+  | "TeamDayStatLine"
+  | "TeamWeekStatLine"
+  | "TeamSeasonStatLine"
+>;
+
+export async function fetchAggregateRows<T extends AnyRow>(
+  model: AggregateModelName,
+  seasonId?: string,
+): Promise<T[]> {
+  const rows: T[] = [];
+  let cursor: string | null = null;
+  do {
+    const args: Record<string, unknown> = {
+      table: getConvexTableName(model),
+      cursor,
+    };
+    if (seasonId) args.seasonId = seasonId;
+    const page: {
+      items: AnyRow[];
+      nextCursor: string | null;
+      hasMore: boolean;
+    } = await getClient().query(
+      refs.maintenanceAggregatePage,
+      serverArgs(args),
+    );
+    rows.push(...page.items.map(hydrateRow<T>));
+    cursor = page.hasMore ? page.nextCursor : null;
+  } while (cursor);
+  return rows;
+}
+
+export async function upsertAggregateRows<T extends AnyRow>(
+  model: AggregateModelName,
+  rows: readonly T[],
+): Promise<{ updated: number; inserted: number }> {
+  try {
+    return await getClient().mutation(
+      refs.maintenanceAggregateUpsert,
+      serverArgs({
+        table: getConvexTableName(model),
+        rows: rows.map((row) => compactRecord(row)),
+      }),
+    );
+  } catch (error) {
+    const errorData =
+      typeof error === "object" && error !== null && "data" in error
+        ? JSON.stringify((error as { data: unknown }).data)
+        : null;
+    const message =
+      errorData ?? (error instanceof Error ? error.message : String(error));
+    throw new Error(
+      `[production-convex] maintenanceScope:upsertAggregateRows failed for ${model} (${rows.length} row(s)): ${message}`,
+      { cause: error },
+    );
+  }
+}
+
+export async function verifyAggregateMaintenanceFunctions(
+  seasonId: string,
+): Promise<void> {
+  try {
+    await Promise.all([
+      upsertAggregateRows("PlayerDayStatLine", []),
+      fetchSeasonModel("Week", seasonId),
+    ]);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(
+      `[stats:aggregate-season] Production Convex does not have the required aggregate maintenance functions available. Run "npx convex deploy" from the repository root, then retry. Preflight error: ${message}`,
+      { cause: error },
+    );
+  }
+}
+
+export async function deleteAggregateRows(
+  model: AggregateModelName,
+  ids: readonly string[],
+): Promise<{ deleted: number }> {
+  return getClient().mutation(
+    refs.maintenanceAggregateDelete,
+    serverArgs({ table: getConvexTableName(model), ids }),
+  );
+}
+
+export type MaintenancePatchModelName = Extract<
+  ModelName,
+  "Matchup" | "TeamDayStatLine" | "TeamWeekStatLine" | "TeamSeasonStatLine"
+>;
+
+export async function updateRowsById(
+  model: MaintenancePatchModelName,
+  rows: ReadonlyArray<{ id: string; data: AnyRow }>,
+): Promise<number> {
+  let updated = 0;
+  for (let offset = 0; offset < rows.length; offset += 25) {
+    const batch = rows.slice(offset, offset + 25).map((row) => ({
+      id: row.id,
+      data: compactRecord(row.data),
+    }));
+    const result = await getClient().mutation(
+      refs.maintenancePatchRows,
+      serverArgs({ table: getConvexTableName(model), rows: batch }),
+    );
+    updated += result.updated;
+  }
+  return updated;
 }
 
 export async function fetchSnapshot<M extends readonly ModelName[]>(
   models: M,
 ): Promise<Record<M[number], AnyRow[]>> {
-  const snapshot = await getClient().query(refs.snapshot, serverArgs({
-    tables: models.map(getConvexTableName),
-  }));
+  const snapshot = await getClient().query(
+    refs.snapshot,
+    serverArgs({
+      tables: models.map(getConvexTableName),
+    }),
+  );
   const output: Partial<Record<ModelName, AnyRow[]>> = {};
   for (const [table, rows] of Object.entries(snapshot)) {
     const model = CONVEX_TABLE_TO_MODEL[table];
@@ -165,11 +445,14 @@ export async function updateById<T extends AnyRow>(
   id: string,
   data: Partial<T>,
 ): Promise<void> {
-  await getClient().mutation(refs.updateById, serverArgs({
-    table: getConvexTableName(model),
-    id,
-    data: compactRecord(data),
-  }));
+  await getClient().mutation(
+    refs.updateById,
+    serverArgs({
+      table: getConvexTableName(model),
+      id,
+      data: compactRecord(data),
+    }),
+  );
 }
 
 export async function upsertByCompositeKey<T extends AnyRow>(

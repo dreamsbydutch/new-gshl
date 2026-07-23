@@ -10,7 +10,7 @@
  *
  * Options:
  *   --season-id <id>       Backfill one season.
- *   --season-ids <list>    Backfill a comma-separated list of seasons. Default: all Season rows.
+ *   --season-ids <list>    Backfill a comma-separated list. Default: completed seasons.
  *   --apply                Persist award rows to Convex.
  *   --log <true|false>     Enable or disable console logging. Default: true.
  *   --stop-on-error        Stop immediately after the first failed season.
@@ -19,7 +19,6 @@
 import type { DatabaseRecord } from "@gshl-lib/sheets/config/config";
 import { getAppsScriptLineupBuilder } from "@gshl-lib/lineup/apps-script-lineup-builder";
 import * as convexStore from "@gshl-lib/data/convex-store";
-import { fastSheetsReader } from "@gshl-lib/sheets/reader/fast-reader";
 import { MatchupType, SeasonType } from "@gshl-lib/types/enums";
 import {
   getArgValue,
@@ -281,7 +280,7 @@ Usage:
 
 Options:
   --season-id <id>       Backfill one season.
-  --season-ids <list>    Backfill comma-separated season ids. Default: all Season rows.
+  --season-ids <list>    Backfill comma-separated season ids. Default: completed seasons.
   --apply                Write Awards rows back to Convex. Omit for dry-run.
   --log <true|false>     Enable or disable console logging. Default: true.
   --stop-on-error        Abort immediately on the first season failure.
@@ -1130,7 +1129,7 @@ async function computeAwardsForSeason(
   };
 }
 
-async function loadSnapshot(): Promise<AwardsDataSnapshot> {
+async function loadSnapshot(seasonIds: string[]): Promise<AwardsDataSnapshot> {
   const [
     teamSeasons,
     playerTotals,
@@ -1140,13 +1139,39 @@ async function loadSnapshot(): Promise<AwardsDataSnapshot> {
     matchups,
     weeks,
   ] = await Promise.all([
-    fastSheetsReader.fetchModel<TeamSeasonRecord>("TeamSeasonStatLine"),
-    fastSheetsReader.fetchModel<PlayerTotalRecord>("PlayerTotalStatLine"),
-    fastSheetsReader.fetchModel<TeamRecord>("Team"),
-    fastSheetsReader.fetchModel<FranchiseRecord>("Franchise"),
-    fastSheetsReader.fetchModel<ConferenceRecord>("Conference"),
-    fastSheetsReader.fetchModel<MatchupRecord>("Matchup"),
-    fastSheetsReader.fetchModel<WeekRecord>("Week"),
+    Promise.all(
+      seasonIds.map((seasonId) =>
+        convexStore.fetchSeasonModel<TeamSeasonRecord>(
+          "TeamSeasonStatLine",
+          seasonId,
+        ),
+      ),
+    ).then((rows) => rows.flat()),
+    Promise.all(
+      seasonIds.map((seasonId) =>
+        convexStore.fetchSeasonModel<PlayerTotalRecord>(
+          "PlayerTotalStatLine",
+          seasonId,
+        ),
+      ),
+    ).then((rows) => rows.flat()),
+    Promise.all(
+      seasonIds.map((seasonId) =>
+        convexStore.fetchSeasonModel<TeamRecord>("Team", seasonId),
+      ),
+    ).then((rows) => rows.flat()),
+    convexStore.fetchModel<FranchiseRecord>("Franchise"),
+    convexStore.fetchModel<ConferenceRecord>("Conference"),
+    Promise.all(
+      seasonIds.map((seasonId) =>
+        convexStore.fetchSeasonModel<MatchupRecord>("Matchup", seasonId),
+      ),
+    ).then((rows) => rows.flat()),
+    Promise.all(
+      seasonIds.map((seasonId) =>
+        convexStore.fetchSeasonModel<WeekRecord>("Week", seasonId),
+      ),
+    ).then((rows) => rows.flat()),
   ]);
 
   return {
@@ -1187,7 +1212,7 @@ function log(
 
 async function getCompletedSeasonIds(): Promise<string[]> {
   const today = getTodayDateString();
-  const seasons = await fastSheetsReader.fetchModel<SeasonRecord>("Season");
+  const seasons = await convexStore.fetchModel<SeasonRecord>("Season");
 
   return seasons
     .filter((season) => {
@@ -1214,10 +1239,27 @@ async function parseOptions(args: string[]): Promise<AwardsBackfillOptions> {
       ].filter(Boolean),
     ),
   ).sort(compareSeasonIds);
+  const seasonRows = await convexStore.fetchModel<SeasonRecord>("Season");
+  const resolvedRequestedSeasonIds = requestedSeasonIds.map((requestedId) => {
+    const season = seasonRows.find((row) =>
+      [row.id, row.legacyId].some(
+        (value) => normalizeRecordId(value) === requestedId,
+      ),
+    );
+    const resolvedId = normalizeRecordId(season?.id);
+    if (!resolvedId) {
+      throw new Error(
+        `[awards:backfill] Season ${requestedId} was not found in production Convex.`,
+      );
+    }
+    return resolvedId;
+  });
   const completedSeasonIds = await getCompletedSeasonIds();
   const completedSeasonIdSet = new Set(completedSeasonIds);
   const seasonIds = (
-    requestedSeasonIds.length ? requestedSeasonIds : completedSeasonIds
+    resolvedRequestedSeasonIds.length
+      ? resolvedRequestedSeasonIds
+      : completedSeasonIds
   ).filter((seasonId) => completedSeasonIdSet.has(seasonId));
 
   if (!seasonIds.length) {
@@ -1237,7 +1279,7 @@ async function parseOptions(args: string[]): Promise<AwardsBackfillOptions> {
 async function runAwardsBackfill(
   options: AwardsBackfillOptions,
 ): Promise<AwardsBackfillSummary> {
-  const snapshot = await loadSnapshot();
+  const snapshot = await loadSnapshot(options.seasonIds);
   const seasons: AwardsSeasonSummary[] = [];
   const failures: Array<{ seasonId: string; message: string }> = [];
 

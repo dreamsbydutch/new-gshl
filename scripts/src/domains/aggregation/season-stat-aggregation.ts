@@ -1,14 +1,20 @@
 import path from "node:path";
 import {
   getCompositeKeyColumnsForModel,
-  getWriteSpreadsheetIdForModel,
   SHEETS_CONFIG,
   type DatabaseRecord,
   type CompositeKeyModelName,
 } from "@gshl-lib/sheets/config/config";
 import { optimizedSheetsClient } from "@gshl-lib/sheets/client/optimized-client";
 import { fastSheetsReader } from "@gshl-lib/sheets/reader/fast-reader";
-import { minimalSheetsWriter } from "@gshl-lib/sheets/writer/minimal-writer";
+import {
+  deleteAggregateRows,
+  fetchAggregateRows,
+  fetchModel,
+  fetchWeekScopedModel,
+  upsertAggregateRows,
+  verifyAggregateMaintenanceFunctions,
+} from "@gshl-lib/data/convex-store";
 import { rankRowsWithAppsScriptEngine } from "@gshl-lib/ranking/apps-script-engine";
 import { SeasonType } from "@gshl-lib/types/enums";
 import { toNumber } from "@gshl-lib/utils/core/data";
@@ -17,6 +23,10 @@ import {
   rebuildSeasonStandingsForSeasonId,
   type StandingsBackfillSeasonSummary,
 } from "../../commands/standings/backfill-season-standings";
+import {
+  refreshPlayerNhlSeason,
+  type SeasonExecutionSummary as PlayerNhlRefreshSummary,
+} from "../hockey-reference/backfill-season";
 
 const TEAM_STAT_FIELDS = [
   "GP",
@@ -151,6 +161,8 @@ type SeasonAggregationOptions = {
   seasonId: string;
   apply: boolean;
   logToConsole: boolean;
+  refreshPlayerNhl: boolean;
+  deleteStale: boolean;
 };
 
 type SeasonAggregationSummary = {
@@ -166,6 +178,7 @@ type SeasonAggregationSummary = {
   teamWeeks: number;
   teamSeasons: number;
   standings?: StandingsBackfillSeasonSummary;
+  playerNhlRefresh?: PlayerNhlRefreshSummary;
   writes: Array<{
     modelName: WritableSeasonStatModelName;
     spreadsheetId: string;
@@ -177,6 +190,7 @@ type SeasonAggregationSummary = {
     unchangedRows: number;
     deletedRows: number;
     duplicateDeletes: number;
+    staleRowsPreserved: number;
     diagnostics?: {
       changedColumns: Array<{ column: string; count: number }>;
       sampleUpdates: Array<{
@@ -258,7 +272,7 @@ const TEAM_SEASON_STAT_FIELDS = new Set<string>([
   "days",
   ...TEAM_STAT_FIELDS,
   "Rating",
-  "rating",
+  "playersUsed",
 ]);
 
 function getManagedFieldsForModel(
@@ -282,6 +296,9 @@ Usage:
 Options:
   --season-id <id>    Required season id to aggregate.
   --apply             Write the generated season rows back to Convex.
+  --preserve-stale    Keep stored derived aggregate rows that are not regenerated.
+                      By default, stale derived rows are deleted with --apply.
+  --skip-player-nhl   Skip the authoritative Hockey Reference PlayerNHL refresh.
   --log <true|false>  Enable or disable console logging. Default: true.
   --help              Show this message and exit.
 `.trim();
@@ -390,6 +407,9 @@ export function parseSeasonAggregationOptions(
     seasonId,
     apply: hasFlag(args, "--apply"),
     logToConsole: toBoolean(getArgValue(args, "--log"), true),
+    refreshPlayerNhl: !hasFlag(args, "--skip-player-nhl"),
+    deleteStale:
+      hasFlag(args, "--delete-stale") || !hasFlag(args, "--preserve-stale"),
   };
 }
 
@@ -1527,6 +1547,7 @@ function buildTeamSeasonRowsFromWeeks(
 
 function aggregateTeamStats(
   playerDays: DatabaseRecord[],
+  playerWeeks: DatabaseRecord[],
   playerSplits: DatabaseRecord[],
   teamRows: DatabaseRecord[],
   weekRows: DatabaseRecord[],
@@ -1623,6 +1644,48 @@ function aggregateTeamStats(
     }
     for (const field of TEAM_STAT_FIELDS) {
       bucket[field] += teamDay[field];
+    }
+  }
+
+  // PlayerWeek rows have already applied the player-day starter rules and are
+  // the authoritative weekly goalie rollups. Use those same counting totals
+  // for TeamWeek so its GAA/SVP cannot diverge from the goalie PlayerWeeks.
+  const goalieWeekTotals = new Map<
+    string,
+    { goalieStarts: number } & Record<
+      (typeof TEAM_GOALIE_STARTER_FIELDS)[number],
+      number
+    >
+  >();
+  for (const playerWeek of playerWeeks) {
+    if (toTrimmedString(playerWeek.posGroup) !== "G") continue;
+    const weekId = toTrimmedString(playerWeek.weekId);
+    const gshlTeamId = toTrimmedString(playerWeek.gshlTeamId);
+    if (!weekId || !gshlTeamId) continue;
+    const key = `${weekId}|${gshlTeamId}`;
+    let totals = goalieWeekTotals.get(key);
+    if (!totals) {
+      totals = { goalieStarts: 0 } as { goalieStarts: number } & Record<
+        (typeof TEAM_GOALIE_STARTER_FIELDS)[number],
+        number
+      >;
+      for (const field of TEAM_GOALIE_STARTER_FIELDS) {
+        totals[field] = 0;
+      }
+      goalieWeekTotals.set(key, totals);
+    }
+    totals.goalieStarts += toNumber(playerWeek.GS);
+    for (const field of TEAM_GOALIE_STARTER_FIELDS) {
+      totals[field] += toNumber(playerWeek[field]);
+    }
+  }
+
+  for (const [key, totals] of goalieWeekTotals) {
+    const teamWeek = teamWeekMap.get(key);
+    if (!teamWeek) continue;
+    teamWeek.goalieStarts = totals.goalieStarts;
+    for (const field of TEAM_GOALIE_STARTER_FIELDS) {
+      teamWeek[field] = totals[field];
     }
   }
 
@@ -1811,10 +1874,38 @@ function dedupeRowsByCompositeKey(
   return sortRows(modelName, Array.from(byKey.values()));
 }
 
+function normalizeValueForComparison(value: unknown): unknown {
+  if (value instanceof Date) return value.toISOString();
+  if (Array.isArray(value)) return value.map(normalizeValueForComparison);
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>)
+        .filter(([, entry]) => entry !== undefined)
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([key, entry]) => [key, normalizeValueForComparison(entry)]),
+    );
+  }
+  return value;
+}
+
+function hasAggregateRowChanges(
+  existing: DatabaseRecord,
+  incoming: DatabaseRecord,
+): boolean {
+  return Object.entries(incoming).some(([field, nextValue]) => {
+    const previousValue = existing[field];
+    return (
+      JSON.stringify(normalizeValueForComparison(previousValue)) !==
+      JSON.stringify(normalizeValueForComparison(nextValue))
+    );
+  });
+}
+
 async function rankBaseStatRows(
   rows: DatabaseRecord[],
   sheetName: WritableSeasonStatModelName,
   outputField = "Rating",
+  seasonRows: DatabaseRecord[] = [],
 ): Promise<void> {
   if (rows.length === 0) return;
 
@@ -1822,6 +1913,7 @@ async function rankBaseStatRows(
     sheetName,
     outputField,
     mutate: true,
+    dataContext: { seasonRows },
   });
 
   for (const row of rows) {
@@ -1840,10 +1932,10 @@ async function rankBaseStatRows(
 }
 
 function getSpreadsheetIdForSeasonWrite(
-  modelName: WritableSeasonStatModelName,
-  seasonId: string,
+  _modelName: WritableSeasonStatModelName,
+  _seasonId: string,
 ): string {
-  return getWriteSpreadsheetIdForModel(modelName, { seasonId });
+  return "production-convex";
 }
 
 function isCareerPlayerStatModel(
@@ -1859,6 +1951,7 @@ async function replaceModelRowsForSeason(
   modelName: WritableSeasonStatModelName,
   seasonId: string,
   generatedRows: DatabaseRecord[],
+  deleteStale: boolean,
 ): Promise<{
   modelName: WritableSeasonStatModelName;
   spreadsheetId: string;
@@ -1870,6 +1963,7 @@ async function replaceModelRowsForSeason(
   unchangedRows: number;
   deletedRows: number;
   duplicateDeletes: number;
+  staleRowsPreserved: number;
   diagnostics?: {
     changedColumns: Array<{ column: string; count: number }>;
     sampleUpdates: Array<{
@@ -1883,49 +1977,102 @@ async function replaceModelRowsForSeason(
     }>;
   };
 }> {
-  const spreadsheetId = getSpreadsheetIdForSeasonWrite(modelName, seasonId);
+  const spreadsheetId = "production-convex";
   const sheetName = SHEETS_CONFIG.SHEETS[modelName];
   const preparedRows = dedupeRowsByCompositeKey(
     modelName,
     sortRows(modelName, generatedRows),
   );
-  const writeResult = await minimalSheetsWriter.upsertByCompositeKey(
+  const managedFields = getManagedFieldsForModel(modelName);
+  const normalizedRows = preparedRows.map((row) => {
+    const next = managedFields
+      ? Object.fromEntries(
+          Object.entries(row).filter(([field]) => managedFields.has(field)),
+        )
+      : { ...row };
+    if (isCareerPlayerStatModel(modelName)) {
+      // Career rows span every season. The legacy Sheets shape retained a
+      // blank seasonId column, but Convex correctly omits that field.
+      delete next.seasonId;
+    }
+    for (const field of ["nhlPos", "nhlTeam", "gshlTeamIds"] as const) {
+      if (typeof next[field] === "string") {
+        next[field] = next[field]
+          .split(",")
+          .map((value) => value.trim())
+          .filter(Boolean);
+      }
+    }
+    return next;
+  });
+  const existingRows = await fetchAggregateRows<DatabaseRecord>(
     modelName,
-    getCompositeKeyColumnsForModel(modelName as CompositeKeyModelName),
-    preparedRows,
-    {
-      merge: true,
-      idColumn: "id",
-      createdAtColumn: "createdAt",
-      updatedAtColumn: "updatedAt",
-      spreadsheetId,
-      deleteMissing: isCareerPlayerStatModel(modelName)
-        ? true
-        : {
-            filter: { seasonId },
-          },
-      diagnostics:
-        modelName === "PlayerDayStatLine"
-          ? {
-              maxSamples: 5,
-              maxFieldsPerSample: 8,
-            }
-          : false,
-    },
+    isCareerPlayerStatModel(modelName) ? undefined : seasonId,
   );
+  const existingByKey = new Map<string, DatabaseRecord[]>();
+  for (const row of existingRows) {
+    const key = buildCompositeKey(modelName, row);
+    const bucket = existingByKey.get(key) ?? [];
+    bucket.push(row);
+    existingByKey.set(key, bucket);
+  }
+
+  const rowsToWrite = normalizedRows.filter((row) => {
+    const key = buildCompositeKey(modelName, row);
+    const existing = existingByKey.get(key)?.[0];
+    return !existing || hasAggregateRowChanges(existing, row);
+  });
+  const unchangedRows = normalizedRows.length - rowsToWrite.length;
+
+  let updatedRows = 0;
+  let insertedRows = 0;
+  for (let offset = 0; offset < rowsToWrite.length; offset += 25) {
+    const result = await upsertAggregateRows(
+      modelName,
+      rowsToWrite.slice(offset, offset + 25),
+    );
+    updatedRows += result.updated;
+    insertedRows += result.inserted;
+  }
+
+  const incomingKeys = new Set(
+    normalizedRows.map((row) => buildCompositeKey(modelName, row)),
+  );
+  const staleIds: string[] = [];
+  let duplicateDeletes = 0;
+  for (const [key, rows] of existingByKey) {
+    if (!incomingKeys.has(key)) {
+      staleIds.push(...rows.map((row) => toTrimmedString(row.id)));
+      continue;
+    }
+    const duplicates = rows.slice(1);
+    staleIds.push(...duplicates.map((row) => toTrimmedString(row.id)));
+    duplicateDeletes += duplicates.length;
+  }
+  const validStaleIds = staleIds.filter(Boolean);
+  let deletedRows = 0;
+  if (deleteStale) {
+    for (let offset = 0; offset < validStaleIds.length; offset += 50) {
+      const result = await deleteAggregateRows(
+        modelName,
+        validStaleIds.slice(offset, offset + 50),
+      );
+      deletedRows += result.deleted;
+    }
+  }
 
   return {
     modelName,
     spreadsheetId,
     sheetName,
     seasonRows: preparedRows.length,
-    totalRows: writeResult.total,
-    updatedRows: writeResult.updated,
-    insertedRows: writeResult.inserted,
-    unchangedRows: writeResult.unchanged,
-    deletedRows: writeResult.deleted,
-    duplicateDeletes: writeResult.duplicateDeletes,
-    diagnostics: writeResult.diagnostics,
+    totalRows: updatedRows + insertedRows,
+    updatedRows,
+    insertedRows,
+    unchangedRows,
+    deletedRows,
+    duplicateDeletes: deleteStale ? duplicateDeletes : 0,
+    staleRowsPreserved: deleteStale ? 0 : validStaleIds.length,
   };
 }
 
@@ -1938,14 +2085,11 @@ async function replaceModelRowsForSeason(
 export async function aggregateSeasonStats(
   seasonId: string,
 ): Promise<SeasonStatsAggregationResult> {
-  const [seasonRows, weekRows, teamRows, loadedPlayerDays, loadedPlayerWeeks] =
-    await Promise.all([
-      fastSheetsReader.fetchModel<DatabaseRecord>("Season"),
-      fastSheetsReader.fetchModel<DatabaseRecord>("Week"),
-      fastSheetsReader.fetchModel<DatabaseRecord>("Team"),
-      fastSheetsReader.fetchPlayerDaySeason<DatabaseRecord>(seasonId),
-      fastSheetsReader.fetchModel<DatabaseRecord>("PlayerWeekStatLine"),
-    ]);
+  const [seasonRows, weekRows, teamRows] = await Promise.all([
+    fetchModel<DatabaseRecord>("Season"),
+    fetchModel<DatabaseRecord>("Week"),
+    fetchModel<DatabaseRecord>("Team"),
+  ]);
 
   const hasSeason = seasonRows.some(
     (row) => toTrimmedString(row.id) === seasonId,
@@ -1962,6 +2106,35 @@ export async function aggregateSeasonStats(
       `[stats:aggregate-season] No Week rows were found for season ${seasonId}.`,
     );
   }
+  const seasonWeekIds = weekRows
+    .filter((week) => toTrimmedString(week.seasonId) === seasonId)
+    .map((week) => toTrimmedString(week.id))
+    .filter(Boolean);
+  const [loadedPlayerDays, loadedPlayerWeeks] = await Promise.all([
+    fetchWeekScopedModel<DatabaseRecord>(
+      "PlayerDayStatLine",
+      seasonId,
+      seasonWeekIds,
+    ),
+    (async () => {
+      const historyRows: DatabaseRecord[] = [];
+      for (const season of seasonRows) {
+        const historySeasonId = toTrimmedString(season.id);
+        const historyWeekIds = weekRows
+          .filter((week) => toTrimmedString(week.seasonId) === historySeasonId)
+          .map((week) => toTrimmedString(week.id))
+          .filter(Boolean);
+        historyRows.push(
+          ...(await fetchWeekScopedModel<DatabaseRecord>(
+            "PlayerWeekStatLine",
+            historySeasonId,
+            historyWeekIds,
+          )),
+        );
+      }
+      return historyRows;
+    })(),
+  ]);
 
   const seasonRow = seasonRows.find(
     (row) => toTrimmedString(row.id) === seasonId,
@@ -2019,6 +2192,7 @@ export async function aggregateSeasonStats(
   );
   const { teamDays, teamWeeks, teamSeasons } = aggregateTeamStats(
     playerDays,
+    playerWeeks,
     splits,
     teamRows,
     weekRows.filter((week) => toTrimmedString(week.seasonId) === seasonId),
@@ -2027,15 +2201,35 @@ export async function aggregateSeasonStats(
     fieldConfig,
   );
 
-  await rankBaseStatRows(playerDays, "PlayerDayStatLine");
-  await rankBaseStatRows(playerWeeks, "PlayerWeekStatLine");
-  await rankBaseStatRows(splits, "PlayerSplitStatLine");
-  await rankBaseStatRows(totals, "PlayerTotalStatLine");
-  await rankBaseStatRows(careerSplits, "PlayerCareerSplitStatLine");
-  await rankBaseStatRows(careerTotals, "PlayerCareerTotalStatLine");
-  await rankBaseStatRows(teamDays, "TeamDayStatLine");
-  await rankBaseStatRows(teamWeeks, "TeamWeekStatLine");
-  await rankBaseStatRows(teamSeasons, "TeamSeasonStatLine");
+  await rankBaseStatRows(playerDays, "PlayerDayStatLine", "Rating", seasonRows);
+  await rankBaseStatRows(
+    playerWeeks,
+    "PlayerWeekStatLine",
+    "Rating",
+    seasonRows,
+  );
+  await rankBaseStatRows(splits, "PlayerSplitStatLine", "Rating", seasonRows);
+  await rankBaseStatRows(totals, "PlayerTotalStatLine", "Rating", seasonRows);
+  await rankBaseStatRows(
+    careerSplits,
+    "PlayerCareerSplitStatLine",
+    "Rating",
+    seasonRows,
+  );
+  await rankBaseStatRows(
+    careerTotals,
+    "PlayerCareerTotalStatLine",
+    "Rating",
+    seasonRows,
+  );
+  await rankBaseStatRows(teamDays, "TeamDayStatLine", "Rating", seasonRows);
+  await rankBaseStatRows(teamWeeks, "TeamWeekStatLine", "Rating", seasonRows);
+  await rankBaseStatRows(
+    teamSeasons,
+    "TeamSeasonStatLine",
+    "Rating",
+    seasonRows,
+  );
 
   return {
     playerDays,
@@ -2060,12 +2254,16 @@ export async function aggregateSeasonStatsForSeasonId(
   options?: {
     apply?: boolean;
     logToConsole?: boolean;
+    refreshPlayerNhl?: boolean;
+    deleteStale?: boolean;
   },
 ): Promise<SeasonAggregationSummary> {
   return runSeasonStatsAggregation({
     seasonId,
     apply: options?.apply ?? false,
     logToConsole: options?.logToConsole ?? true,
+    refreshPlayerNhl: options?.refreshPlayerNhl ?? true,
+    deleteStale: options?.deleteStale ?? true,
   });
 }
 
@@ -2117,17 +2315,45 @@ export async function runSeasonStatsAggregation(
   process.env.GOOGLE_SERVICE_ACCOUNT_KEY_FILE ??=
     path.resolve("credentials.json");
 
+  const seasons = await fetchModel<DatabaseRecord>("Season");
+  const requestedSeason = seasons.find((season) =>
+    [season.id, season.legacyId].some(
+      (value) => toTrimmedString(value) === options.seasonId,
+    ),
+  );
+  const resolvedSeasonId = toTrimmedString(requestedSeason?.id);
+  if (!resolvedSeasonId) {
+    throw new Error(
+      `[stats:aggregate-season] Season ${options.seasonId} was not found in production Convex.`,
+    );
+  }
+  options = { ...options, seasonId: resolvedSeasonId };
+
+  await verifyAggregateMaintenanceFunctions(options.seasonId);
+
   log(
     options,
     `Starting ${options.apply ? "apply" : "dry-run"} for season ${options.seasonId}.`,
   );
 
   const generated = await aggregateSeasonStats(options.seasonId);
+  let playerNhlRefresh: PlayerNhlRefreshSummary | undefined;
+  if (options.refreshPlayerNhl) {
+    playerNhlRefresh = await refreshPlayerNhlSeason(options.seasonId, {
+      apply: options.apply,
+      logToConsole: options.logToConsole,
+    });
+    log(
+      options,
+      `PlayerNHLStatLine: matched=${playerNhlRefresh.matchedRows} updates=${playerNhlRefresh.rowsToUpdate} inserts=${playerNhlRefresh.rowsToInsert} unmatched=${playerNhlRefresh.unmatched.length} ambiguous=${playerNhlRefresh.ambiguous.length}`,
+    );
+  } else {
+    log(options, "PlayerNHLStatLine: skipped by request.");
+  }
   const writeInputs: Array<{
     modelName: WritableSeasonStatModelName;
     rows: DatabaseRecord[];
   }> = [
-    { modelName: "PlayerDayStatLine", rows: generated.playerDays },
     { modelName: "PlayerWeekStatLine", rows: generated.playerWeeks },
     { modelName: "PlayerSplitStatLine", rows: generated.playerSplits },
     { modelName: "PlayerTotalStatLine", rows: generated.playerTotals },
@@ -2143,6 +2369,10 @@ export async function runSeasonStatsAggregation(
     { modelName: "TeamWeekStatLine", rows: generated.teamWeeks },
     { modelName: "TeamSeasonStatLine", rows: generated.teamSeasons },
   ];
+  log(
+    options,
+    `PlayerDayStatLine: read-only sourceRows=${generated.playerDays.length}; no writes performed.`,
+  );
 
   const writes: SeasonAggregationSummary["writes"] = [];
   let standings: StandingsBackfillSeasonSummary | undefined;
@@ -2153,11 +2383,12 @@ export async function runSeasonStatsAggregation(
           input.modelName,
           options.seasonId,
           input.rows,
+          options.deleteStale,
         );
         writes.push({ ...result, applied: true });
         log(
           options,
-          `${input.modelName}: wrote seasonRows=${result.seasonRows} updated=${result.updatedRows} inserted=${result.insertedRows} unchanged=${result.unchangedRows} deleted=${result.deletedRows} duplicateDeletes=${result.duplicateDeletes} totalRows=${result.totalRows} sheet=${result.sheetName}`,
+          `${input.modelName}: wrote seasonRows=${result.seasonRows} updated=${result.updatedRows} inserted=${result.insertedRows} unchanged=${result.unchangedRows} deleted=${result.deletedRows} duplicateDeletes=${result.duplicateDeletes} stalePreserved=${result.staleRowsPreserved} totalRows=${result.totalRows} sheet=${result.sheetName}`,
         );
         if (result.diagnostics) {
           for (const diagnosticLine of formatWriteDiagnostics(
@@ -2198,6 +2429,7 @@ export async function runSeasonStatsAggregation(
         unchangedRows: -1,
         deletedRows: -1,
         duplicateDeletes: -1,
+        staleRowsPreserved: -1,
         applied: false,
       });
       log(
@@ -2228,6 +2460,7 @@ export async function runSeasonStatsAggregation(
     teamWeeks: generated.teamWeeks.length,
     teamSeasons: generated.teamSeasons.length,
     standings,
+    playerNhlRefresh,
     writes,
   };
 }

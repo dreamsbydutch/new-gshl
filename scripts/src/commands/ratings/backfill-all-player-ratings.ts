@@ -115,6 +115,7 @@ async function executeSeason(
     seasonType: "",
     weekIds: [],
     weekNums: [],
+    teamIds: [],
   });
 
   return {

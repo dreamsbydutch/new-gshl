@@ -7,18 +7,16 @@ import type {
   Player,
   PlayerDayStatLine,
   Season,
+  Team,
   Week,
 } from "@gshl-lib/types/database";
 import { PositionGroup, type RosterPosition } from "@gshl-lib/types/enums";
 import {
-  getCompositeKeyColumnsForModel,
-  getPlayerDayWorkbookId,
   serializeCsvMultiValue,
-  type CompositeKeyModelName,
   type DatabaseRecord,
 } from "@gshl-lib/sheets/config/config";
 import { fastSheetsReader } from "@gshl-lib/sheets/reader/fast-reader";
-import { minimalSheetsWriter } from "@gshl-lib/sheets/writer/minimal-writer";
+import { fetchPlayerDayWeeks, updateById } from "@gshl-lib/data/convex-store";
 import { rankRowsWithAppsScriptEngine } from "@gshl-lib/ranking/apps-script-engine";
 import { applyPlayerDayDerivedColumns } from "@gshl-lib/stats/player-day-flags";
 import { normalizeDateOnlyValue } from "@gshl-lib/utils/core/date";
@@ -44,10 +42,13 @@ Usage:
   npm run stats:sync-nhl-daily -- --season-id 12 --date 2026-06-04
   npm run stats:sync-nhl-daily -- --season-id 12 --start-date 2026-06-01 --end-date 2026-06-07 --apply
   npm run stats:sync-nhl-daily -- --week-ids 101,102 --apply --aggregate
+  npm run stats:sync-nhl-daily -- --season-id 3 --week-num 22 --team-ids 108 --apply
 
 Options:
   --season-id <id>        Optional season id. Defaults to the active season for the target date.
   --week-id, --week-ids   Optional week id list. Uses every date in those weeks.
+  --week-num, --week-nums Optional week number list. Requires a season id.
+  --team-id, --team-ids   Optional team id list. Only updates existing rows for those teams.
   --date <yyyy-mm-dd>     Sync one date. Defaults to today if no date range is provided.
   --start-date <date>     Inclusive lower date bound.
   --end-date <date>       Inclusive upper date bound.
@@ -164,6 +165,8 @@ const FULL_NAME_ALIAS_MAP = buildFullNameAliasMap(FULL_NAME_ALIAS_FAMILIES);
 export type DailyNhlPlayerStatSyncOptions = {
   seasonId?: string;
   weekIds: string[];
+  weekNums: string[];
+  teamIds: string[];
   date?: string;
   startDate?: string;
   endDate?: string;
@@ -609,7 +612,9 @@ function getLatestPlayerDayProfiles(
     profiles.set(playerId, {
       player,
       nhlTeam: getPrimaryTeamAbbr(latestRow?.nhlTeam || player.nhlTeam),
-      nhlPos: latestNhlPos.length ? latestNhlPos : splitPosTokens(player.nhlPos),
+      nhlPos: latestNhlPos.length
+        ? latestNhlPos
+        : splitPosTokens(player.nhlPos),
       posGroup: latestPosGroup || inferPosGroup(player.nhlPos, player.posGroup),
     });
   }
@@ -642,7 +647,10 @@ function buildPlayersByNhlApiId(players: Player[]): Map<string, Player[]> {
   return index;
 }
 
-function isEligiblePlayerForNhlApiId(player: Player, nhlApiId: string): boolean {
+function isEligiblePlayerForNhlApiId(
+  player: Player,
+  nhlApiId: string,
+): boolean {
   const existingNhlApiId = toTrimmedString(player.nhlApiId);
   return !existingNhlApiId || existingNhlApiId === toTrimmedString(nhlApiId);
 }
@@ -662,7 +670,8 @@ function getPlayersForExternalStat(
       seen.add(playerId);
       if (!isEligiblePlayerForNhlApiId(player, stat.nhlPlayerId)) continue;
       const profile = profilesByPlayerId.get(playerId);
-      const posGroup = profile?.posGroup ?? inferPosGroup(player.nhlPos, player.posGroup);
+      const posGroup =
+        profile?.posGroup ?? inferPosGroup(player.nhlPos, player.posGroup);
       if (posGroup === stat.posGroup || allowPosGroupMismatch(player, stat)) {
         matches.push(player);
       }
@@ -685,7 +694,8 @@ function findFallbackPlayers(
       return false;
     }
     const profile = profilesByPlayerId.get(String(player.id));
-    const posGroup = profile?.posGroup ?? inferPosGroup(player.nhlPos, player.posGroup);
+    const posGroup =
+      profile?.posGroup ?? inferPosGroup(player.nhlPos, player.posGroup);
     if (posGroup !== stat.posGroup && !allowPosGroupMismatch(player, stat)) {
       return false;
     }
@@ -709,16 +719,22 @@ function scorePlayerForExternalStat(
   const profile = profilesByPlayerId.get(String(player.id));
   const playerName = getComparableNameParts(buildPlayerFullName(player));
   const statName = getComparableNameParts(stat.fullName);
-  const playerPosGroup = profile?.posGroup ?? inferPosGroup(player.nhlPos, player.posGroup);
+  const playerPosGroup =
+    profile?.posGroup ?? inferPosGroup(player.nhlPos, player.posGroup);
   const playerTeam = profile?.nhlTeam ?? getPrimaryTeamAbbr(player.nhlTeam);
   const statTeam = normalizeTeamAbbr(stat.nhlTeam);
 
   if (playerPosGroup === stat.posGroup) score += 4;
   else if (allowPosGroupMismatch(player, stat)) score += 4;
-  if (areFullNamesCompatible(buildPlayerFullName(player), stat.fullName)) score += 4;
+  if (areFullNamesCompatible(buildPlayerFullName(player), stat.fullName))
+    score += 4;
   if (areFirstNamesCompatible(playerName.first, statName.first)) score += 2;
   if (playerName.last && playerName.last === statName.last) score += 2;
-  if ((profile?.nhlPos ?? splitPosTokens(player.nhlPos)).includes(normalizePosToken(stat.positionCode))) {
+  if (
+    (profile?.nhlPos ?? splitPosTokens(player.nhlPos)).includes(
+      normalizePosToken(stat.positionCode),
+    )
+  ) {
     score += 2;
   }
   if (playerTeam && statTeam && playerTeam === statTeam) score += 3;
@@ -957,7 +973,7 @@ function resolveTargetRowNhlTeam(params: {
   if (historyTeam) return historyTeam;
 
   const uniqueSeasonRosterTeam = playerNhlApiId
-    ? uniqueSeasonRosterTeamByNhlPlayerId.get(playerNhlApiId) ?? ""
+    ? (uniqueSeasonRosterTeamByNhlPlayerId.get(playerNhlApiId) ?? "")
     : "";
   if (uniqueSeasonRosterTeam) return uniqueSeasonRosterTeam;
 
@@ -969,7 +985,11 @@ function sumIntegerStrings(left: unknown, right: unknown): string {
   return sum === 0 ? "0" : String(Math.round(sum));
 }
 
-function sumDecimalStrings(left: unknown, right: unknown, decimals: number): string {
+function sumDecimalStrings(
+  left: unknown,
+  right: unknown,
+  decimals: number,
+): string {
   const sum = toFiniteNumber(left) + toFiniteNumber(right);
   if (sum === 0) return "";
   const factor = 10 ** decimals;
@@ -1074,7 +1094,9 @@ function normalizeGoalieShutoutValue(
   return cleanWhitespace(so) === "1" ? "1" : "0";
 }
 
-function createEmptyDailyStatRow(existing: PlayerDayStatLine): MatchedExternalStat {
+function createEmptyDailyStatRow(
+  existing: PlayerDayStatLine,
+): MatchedExternalStat {
   return {
     date: normalizeDateKey(existing.date),
     gameId: "",
@@ -1122,7 +1144,8 @@ function buildUpdatedPlayerDayRow(
   const gp = cleanWhitespace(stat.GP);
   const gs = computeStartedGame(dailyPos, gp, teamGame);
   const mg = teamGame && gp !== "1" ? "1" : "";
-  const resolvedOpp = cleanWhitespace(stat.opp) || cleanWhitespace(teamGame?.opp);
+  const resolvedOpp =
+    cleanWhitespace(stat.opp) || cleanWhitespace(teamGame?.opp);
   const resolvedScore =
     cleanWhitespace(stat.score) || cleanWhitespace(teamGame?.score);
   const ir = teamGame && gp !== "1" && isIrSlot(dailyPos) ? "1" : "";
@@ -1134,8 +1157,15 @@ function buildUpdatedPlayerDayRow(
       : Array.isArray(existing.nhlPos)
         ? (existing.nhlPos as RosterPosition[])
         : [],
-    posGroup: (stat.posGroup || cleanWhitespace(existing.posGroup) || PositionGroup.F) as PlayerDayStatLine["posGroup"],
-    nhlTeam: normalizeTeamAbbr(resolvedNhlTeam),
+    posGroup: (stat.posGroup ||
+      cleanWhitespace(existing.posGroup) ||
+      PositionGroup.F) as PlayerDayStatLine["posGroup"],
+    nhlTeam: (normalizeTeamAbbr(resolvedNhlTeam)
+      ? [normalizeTeamAbbr(resolvedNhlTeam)]
+      : serializeCsvMultiValue(existing.nhlTeam)
+          .split(",")
+          .map((value) => normalizeTeamAbbr(value))
+          .filter(Boolean)) as unknown as string,
     opp: resolvedOpp,
     score: resolvedScore,
     GP: gp,
@@ -1186,9 +1216,12 @@ function buildUpdatedPlayerDayRow(
   return row;
 }
 
-function normalizeComparableValue(column: keyof PlayerDayStatLine, value: unknown): string {
+function normalizeComparableValue(
+  column: keyof PlayerDayStatLine,
+  value: unknown,
+): string {
   if (value === null || value === undefined) return "";
-  if (column === "nhlPos") {
+  if (column === "nhlPos" || column === "nhlTeam") {
     return serializeCsvMultiValue(value);
   }
   if (typeof value === "string") return value.trim();
@@ -1199,7 +1232,10 @@ function normalizeComparableValue(column: keyof PlayerDayStatLine, value: unknow
     return value.toISOString();
   }
   if (Array.isArray(value)) {
-    return value.map((entry) => toTrimmedString(entry)).filter(Boolean).join(",");
+    return value
+      .map((entry) => toTrimmedString(entry))
+      .filter(Boolean)
+      .join(",");
   }
   return JSON.stringify(value);
 }
@@ -1259,8 +1295,12 @@ function resolveExplicitTargetDates(
   }
 
   const today = format(new Date(), "yyyy-MM-dd");
-  const startDate = normalizeDateKey(options.startDate ?? options.endDate ?? today);
-  const endDate = normalizeDateKey(options.endDate ?? options.startDate ?? today);
+  const startDate = normalizeDateKey(
+    options.startDate ?? options.endDate ?? today,
+  );
+  const endDate = normalizeDateKey(
+    options.endDate ?? options.startDate ?? today,
+  );
   const start = parseISO(startDate);
   const end = parseISO(endDate);
   if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
@@ -1276,15 +1316,17 @@ function resolveExplicitTargetDates(
   return dates;
 }
 
-function resolveCurrentSeasonId(
-  seasons: Season[],
-  targetDate: string,
-): string {
+function resolveCurrentSeasonId(seasons: Season[], targetDate: string): string {
   const normalizedTargetDate = normalizeDateKey(targetDate);
   const dateMatched = seasons.filter((season) => {
     const startDate = normalizeDateKey(season.startDate);
     const endDate = normalizeDateKey(season.endDate);
-    return !!startDate && !!endDate && startDate <= normalizedTargetDate && normalizedTargetDate <= endDate;
+    return (
+      !!startDate &&
+      !!endDate &&
+      startDate <= normalizedTargetDate &&
+      normalizedTargetDate <= endDate
+    );
   });
   if (dateMatched.length === 1) {
     return toTrimmedString(dateMatched[0]?.id);
@@ -1322,8 +1364,15 @@ async function fetchExternalPlayerStats(
   options: Pick<DailyNhlPlayerStatSyncOptions, "pythonBin" | "sslVerify">,
 ): Promise<PythonFetcherPayload> {
   const payloads: PythonFetcherPayload[] = [];
-  for (let index = 0; index < dates.length; index += EXTERNAL_FETCH_DATE_BATCH_SIZE) {
-    const batchDates = dates.slice(index, index + EXTERNAL_FETCH_DATE_BATCH_SIZE);
+  for (
+    let index = 0;
+    index < dates.length;
+    index += EXTERNAL_FETCH_DATE_BATCH_SIZE
+  ) {
+    const batchDates = dates.slice(
+      index,
+      index + EXTERNAL_FETCH_DATE_BATCH_SIZE,
+    );
     const args = [
       PYTHON_FETCHER_PATH,
       "--dates",
@@ -1347,7 +1396,10 @@ async function fetchExternalPlayerStats(
   const mergedPlayers: ExternalPlayerStat[] = [];
   const mergedTeamGames: ExternalTeamGame[] = [];
   const mergedRosterPlayers: ExternalRosterPlayer[] = [];
-  const mergedSeasonRosterPlayers = new Map<string, ExternalSeasonRosterPlayer>();
+  const mergedSeasonRosterPlayers = new Map<
+    string,
+    ExternalSeasonRosterPlayer
+  >();
 
   for (const payload of payloads) {
     Object.assign(mergedGamesByDate, payload.gamesByDate ?? {});
@@ -1423,9 +1475,7 @@ function parseExternalSeasonRosterPlayers(
   }));
 }
 
-function normalizeTargetRows(
-  rows: DatabaseRecord[],
-): PlayerDayStatLine[] {
+function normalizeTargetRows(rows: DatabaseRecord[]): PlayerDayStatLine[] {
   return rows.map((row) => ({
     ...(row as unknown as PlayerDayStatLine),
     date: normalizeDateKey(row.date),
@@ -1436,6 +1486,39 @@ function normalizeTargetRows(
           .map((entry) => entry.trim())
           .filter(Boolean) as RosterPosition[]),
   }));
+}
+
+function recordMatchesRequestedId(
+  record: object,
+  requestedId: string,
+): boolean {
+  const row = record as Record<string, unknown>;
+  return [row.id, row.legacyId].some(
+    (value) => toTrimmedString(value) === requestedId,
+  );
+}
+
+function resolveRequestedRecordIds<T extends object>(
+  records: readonly T[],
+  requestedIds: readonly string[],
+  label: string,
+): string[] {
+  const resolved: string[] = [];
+  const missing: string[] = [];
+  for (const requestedId of requestedIds) {
+    const match = records.find((record) =>
+      recordMatchesRequestedId(record, requestedId),
+    ) as (T & { id?: unknown }) | undefined;
+    const id = toTrimmedString(match?.id);
+    if (id) resolved.push(id);
+    else missing.push(requestedId);
+  }
+  if (missing.length > 0) {
+    throw new Error(
+      `[stats:sync-nhl-daily] ${label} rows not found in production Convex for ids: ${missing.join(", ")}.`,
+    );
+  }
+  return Array.from(new Set(resolved));
 }
 
 export function parseDailyNhlPlayerStatSyncOptions(
@@ -1453,10 +1536,42 @@ export function parseDailyNhlPlayerStatSyncOptions(
       ),
     ),
   );
+  const weekNums = Array.from(
+    new Set(
+      parseCsvList(
+        getArgValue(args, "--week-nums") ??
+          getArgValue(args, "--week-num") ??
+          getArgValue(args, "--weekNums") ??
+          getArgValue(args, "--weekNum"),
+      ),
+    ),
+  );
+  const teamIds = Array.from(
+    new Set(
+      parseCsvList(
+        getArgValue(args, "--team-ids") ??
+          getArgValue(args, "--team-id") ??
+          getArgValue(args, "--teamIds") ??
+          getArgValue(args, "--teamId"),
+      ),
+    ),
+  );
+
+  const seasonId =
+    toTrimmedString(
+      getArgValue(args, "--season-id") ?? getArgValue(args, "--seasonId"),
+    ) || undefined;
+  if (weekNums.length > 0 && !seasonId) {
+    throw new Error(
+      "[stats:sync-nhl-daily] --week-num/--week-nums requires --season-id.",
+    );
+  }
 
   return {
-    seasonId: toTrimmedString(getArgValue(args, "--season-id")) || undefined,
+    seasonId,
     weekIds,
+    weekNums,
+    teamIds,
     date: normalizeDateKey(getArgValue(args, "--date")),
     startDate: normalizeDateKey(getArgValue(args, "--start-date")),
     endDate: normalizeDateKey(getArgValue(args, "--end-date")),
@@ -1471,16 +1586,21 @@ export function parseDailyNhlPlayerStatSyncOptions(
 export async function runDailyNhlPlayerStatSync(
   options: DailyNhlPlayerStatSyncOptions,
 ): Promise<DailyNhlPlayerStatSyncSummary> {
-  const [seasonRows, weekRows, playerRows] = (await Promise.all([
+  const [seasonRows, weekRows, teamRows, playerRows] = (await Promise.all([
     fastSheetsReader.fetchModel<DatabaseRecord>("Season"),
     fastSheetsReader.fetchModel<DatabaseRecord>("Week"),
+    fastSheetsReader.fetchModel<DatabaseRecord>("Team"),
     fastSheetsReader.fetchModel<DatabaseRecord>("Player"),
-  ])) as unknown as [Season[], Week[], Player[]];
+  ])) as unknown as [Season[], Week[], Team[], Player[]];
 
   const targetDateHint =
-    options.date || options.startDate || options.endDate || format(new Date(), "yyyy-MM-dd");
-  const resolvedSeasonId =
-    options.seasonId || resolveCurrentSeasonId(seasonRows, targetDateHint);
+    options.date ||
+    options.startDate ||
+    options.endDate ||
+    format(new Date(), "yyyy-MM-dd");
+  const resolvedSeasonId = options.seasonId
+    ? resolveRequestedRecordIds(seasonRows, [options.seasonId], "Season")[0]!
+    : resolveCurrentSeasonId(seasonRows, targetDateHint);
   const season = seasonRows.find(
     (row) => toTrimmedString(row.id) === resolvedSeasonId,
   );
@@ -1492,44 +1612,95 @@ export async function runDailyNhlPlayerStatSync(
   const activeSeasonCategories = buildSeasonCategorySet(season);
   const nhlSeasonToken = resolveNhlSeasonTokenFromSeason(season);
 
-  const selectedWeeks = options.weekIds.length
-    ? weekRows.filter((week) => options.weekIds.includes(toTrimmedString(week.id)))
-    : [];
-  if (options.weekIds.length > 0 && selectedWeeks.length !== options.weekIds.length) {
-    const selectedWeekIdSet = new Set(
-      selectedWeeks.map((week) => toTrimmedString(week.id)),
+  const resolvedWeekIds = resolveRequestedRecordIds(
+    weekRows,
+    options.weekIds,
+    "Week",
+  );
+  const selectedWeekIdSet = new Set(resolvedWeekIds);
+  const selectedWeeks = weekRows.filter((week) => {
+    if (toTrimmedString(week.seasonId) !== resolvedSeasonId) return false;
+    return (
+      selectedWeekIdSet.has(toTrimmedString(week.id)) ||
+      options.weekNums.includes(toTrimmedString(week.weekNum))
     );
-    const missingWeekIds = options.weekIds.filter(
-      (weekId) => !selectedWeekIdSet.has(weekId),
-    );
+  });
+  const missingWeekNums = options.weekNums.filter(
+    (weekNum) =>
+      !selectedWeeks.some((week) => toTrimmedString(week.weekNum) === weekNum),
+  );
+  if (missingWeekNums.length > 0) {
     throw new Error(
-      `[stats:sync-nhl-daily] Week rows not found for ids: ${missingWeekIds.join(", ")}.`,
+      `[stats:sync-nhl-daily] Week rows not found in season ${resolvedSeasonId} for week numbers: ${missingWeekNums.join(", ")}.`,
     );
   }
   if (
-    selectedWeeks.some((week) => toTrimmedString(week.seasonId) !== resolvedSeasonId)
+    resolvedWeekIds.some(
+      (weekId) =>
+        !selectedWeeks.some((week) => toTrimmedString(week.id) === weekId),
+    )
   ) {
     throw new Error(
       `[stats:sync-nhl-daily] Selected week ids must all belong to season ${resolvedSeasonId}.`,
     );
   }
 
-  const targetDates = options.weekIds.length
+  const resolvedTeamIds = resolveRequestedRecordIds(
+    teamRows,
+    options.teamIds,
+    "Team",
+  );
+  const outOfScopeTeamIds = resolvedTeamIds.filter((teamId) => {
+    const team = teamRows.find((row) => toTrimmedString(row.id) === teamId);
+    return !team || toTrimmedString(team.seasonId) !== resolvedSeasonId;
+  });
+  if (outOfScopeTeamIds.length > 0) {
+    throw new Error(
+      `[stats:sync-nhl-daily] Selected team ids must belong to season ${resolvedSeasonId}: ${outOfScopeTeamIds.join(", ")}.`,
+    );
+  }
+
+  const targetDates = selectedWeeks.length
     ? buildTargetDatesFromWeeks(selectedWeeks)
     : resolveExplicitTargetDates(options);
+
+  const targetDateSet = new Set(targetDates);
+  const seasonWeeks = weekRows.filter(
+    (week) => toTrimmedString(week.seasonId) === resolvedSeasonId,
+  );
+  const readWeeks = selectedWeeks.length
+    ? selectedWeeks
+    : seasonWeeks.filter((week) =>
+        buildTargetDatesFromWeeks([week]).some((date) =>
+          targetDateSet.has(date),
+        ),
+      );
+  if (readWeeks.length === 0) {
+    throw new Error(
+      `[stats:sync-nhl-daily] No Week rows cover the requested dates in season ${resolvedSeasonId}.`,
+    );
+  }
 
   log(
     options,
     `Loading PlayerDay rows for season ${resolvedSeasonId} across ${targetDates.length} target date(s).`,
   );
   const seasonPlayerDayRows = normalizeTargetRows(
-    await fastSheetsReader.fetchPlayerDaySeason<DatabaseRecord>(resolvedSeasonId),
+    await fetchPlayerDayWeeks<DatabaseRecord>(
+      resolvedSeasonId,
+      readWeeks.map((week) => toTrimmedString(week.id)),
+      resolvedTeamIds,
+    ),
   );
   const availableDateSet = new Set(
-    seasonPlayerDayRows.map((row) => normalizeDateKey(row.date)).filter(Boolean),
+    seasonPlayerDayRows
+      .map((row) => normalizeDateKey(row.date))
+      .filter(Boolean),
   );
   const datesSynced = targetDates.filter((date) => availableDateSet.has(date));
-  const skippedDates = targetDates.filter((date) => !availableDateSet.has(date));
+  const skippedDates = targetDates.filter(
+    (date) => !availableDateSet.has(date),
+  );
   if (skippedDates.length > 0) {
     log(
       options,
@@ -1559,9 +1730,13 @@ export async function runDailyNhlPlayerStatSync(
       ],
     };
   }
-  const targetDateSet = new Set(datesSynced);
-  const targetPlayerDayRows = seasonPlayerDayRows.filter((row) =>
-    targetDateSet.has(normalizeDateKey(row.date)),
+  const datesSyncedSet = new Set(datesSynced);
+  const resolvedTeamIdSet = new Set(resolvedTeamIds);
+  const targetPlayerDayRows = seasonPlayerDayRows.filter(
+    (row) =>
+      datesSyncedSet.has(normalizeDateKey(row.date)) &&
+      (resolvedTeamIdSet.size === 0 ||
+        resolvedTeamIdSet.has(toTrimmedString(row.gshlTeamId))),
   );
 
   log(
@@ -1587,9 +1762,8 @@ export async function runDailyNhlPlayerStatSync(
   const playersById = new Map(
     playerRows.map((player) => [toTrimmedString(player.id), player] as const),
   );
-  const knownPlayerDayTeamHistory = buildKnownPlayerDayTeamHistory(
-    seasonPlayerDayRows,
-  );
+  const knownPlayerDayTeamHistory =
+    buildKnownPlayerDayTeamHistory(seasonPlayerDayRows);
   const profilesByPlayerId = getLatestPlayerDayProfiles(
     seasonPlayerDayRows,
     playersById,
@@ -1600,7 +1774,8 @@ export async function runDailyNhlPlayerStatSync(
   const matchedExternalRows: MatchedExternalStat[] = [];
 
   for (const externalRow of externalRows) {
-    const directIdMatches = playersByNhlApiId.get(externalRow.nhlPlayerId) ?? [];
+    const directIdMatches =
+      playersByNhlApiId.get(externalRow.nhlPlayerId) ?? [];
     if (directIdMatches.length > 1) {
       flags.push({
         kind: "ambiguous-nhl-stat",
@@ -1670,7 +1845,8 @@ export async function runDailyNhlPlayerStatSync(
 
   const preparedRows = targetPlayerDayRows.map((existing) => {
     const key = `${toTrimmedString(existing.playerId)}|${normalizeDateKey(existing.date)}`;
-    const stat = matchedStatByPlayerDate.get(key) ?? createEmptyDailyStatRow(existing);
+    const stat =
+      matchedStatByPlayerDate.get(key) ?? createEmptyDailyStatRow(existing);
     const player = playersById.get(toTrimmedString(existing.playerId));
     const rosterPlayer = player?.nhlApiId
       ? gameRosterByPlayerDate.get(
@@ -1719,17 +1895,29 @@ export async function runDailyNhlPlayerStatSync(
     preparedRows as unknown as DatabaseRecord[],
     untouchedSeasonRows,
   );
-  await rankRowsWithAppsScriptEngine(preparedRows as unknown as DatabaseRecord[], {
-    sheetName: PLAYER_DAY_MODEL,
-    outputField: "Rating",
-    mutate: true,
-  });
+  const isScopedExistingRowRun =
+    selectedWeeks.length > 0 || resolvedTeamIds.length > 0;
+  if (isScopedExistingRowRun) {
+    log(
+      options,
+      "Preserving existing Rating values for scoped week/team sync; global rating rebuild was not requested.",
+    );
+  } else {
+    await rankRowsWithAppsScriptEngine(
+      preparedRows as unknown as DatabaseRecord[],
+      {
+        sheetName: PLAYER_DAY_MODEL,
+        outputField: "Rating",
+        mutate: true,
+      },
+    );
 
-  for (const row of preparedRows) {
-    row.Rating =
-      row.Rating === "" || row.Rating === null || row.Rating === undefined
-        ? ("0" as PlayerDayStatLine["Rating"])
-        : (String(row.Rating) as PlayerDayStatLine["Rating"]);
+    for (const row of preparedRows) {
+      row.Rating =
+        row.Rating === "" || row.Rating === null || row.Rating === undefined
+          ? ("0" as PlayerDayStatLine["Rating"])
+          : (String(row.Rating) as PlayerDayStatLine["Rating"]);
+    }
   }
 
   const now = new Date();
@@ -1742,20 +1930,27 @@ export async function runDailyNhlPlayerStatSync(
   });
 
   if (options.apply && rowsToWrite.length > 0) {
-    await minimalSheetsWriter.upsertByCompositeKey(
-      PLAYER_DAY_MODEL,
-      getCompositeKeyColumnsForModel(
-        PLAYER_DAY_MODEL as CompositeKeyModelName,
-      ),
-      rowsToWrite as unknown as DatabaseRecord[],
-      {
-        merge: true,
-        idColumn: "id",
-        createdAtColumn: "createdAt",
-        updatedAtColumn: "updatedAt",
-        spreadsheetId: getPlayerDayWorkbookId(resolvedSeasonId),
-      },
-    );
+    for (const row of rowsToWrite) {
+      const id = toTrimmedString(row.id);
+      if (!id) {
+        throw new Error(
+          "[stats:sync-nhl-daily] Cannot update a PlayerDayStatLine row without a Convex id.",
+        );
+      }
+      try {
+        await updateById<DatabaseRecord>(PLAYER_DAY_MODEL, id, {
+          ...Object.fromEntries(
+            PLAYER_DAY_WRITE_FIELDS.map((field) => [field, row[field]]),
+          ),
+          updatedAt: row.updatedAt,
+        });
+      } catch (error) {
+        throw new Error(
+          `[stats:sync-nhl-daily] Failed to update PlayerDayStatLine ${id} for player ${toTrimmedString(row.playerId)} on ${normalizeDateKey(row.date)}: ${error instanceof Error ? error.message : String(error)}`,
+          { cause: error },
+        );
+      }
+    }
     fastSheetsReader.clearCache(PLAYER_DAY_MODEL);
   }
 
@@ -1765,6 +1960,8 @@ export async function runDailyNhlPlayerStatSync(
       seasonId: resolvedSeasonId,
       apply: true,
       logToConsole: options.logToConsole,
+      refreshPlayerNhl: false,
+      deleteStale: true,
     });
     aggregateSummary = {
       playerDays: aggregation.playerDays,

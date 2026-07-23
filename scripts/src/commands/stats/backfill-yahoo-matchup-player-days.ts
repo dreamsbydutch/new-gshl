@@ -6,9 +6,9 @@
  *
  * What it does:
  *   Pulls Yahoo daily matchup pages, reconciles their player rows against
- *   PlayerDayStatLine, and reports updates, creations, deletions, and
- *   investigation flags for each processed season. Runs as a dry-run unless
- *   --apply is passed.
+ *   PlayerDayStatLine in the production Convex database, and reports updates,
+ *   creations, deletions, and investigation flags for each processed season.
+ *   Runs as a dry-run unless --apply is passed.
  */
 import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
@@ -52,7 +52,7 @@ Options:
   --browser-wait-ms <ms>            Browser fallback wait timeout. Default: 180000.
   --browser-import-cookie <true|false> Best-effort import of YAHOO_COOKIE into the browser profile. Default: false.
   --report-file <path>              Optional file path for the full JSON report.
-  --apply                           Persist reconciled changes to Convex.
+  --apply                           Persist reconciled changes to production Convex.
   --help                            Show this message and exit.
 `.trim();
 
@@ -114,6 +114,7 @@ async function main(): Promise<void> {
         JSON.stringify(
           {
             event: "start",
+            dataTarget: "production-convex",
             seasonIds: options.seasonIds,
             weekIds: options.weekIds,
             weekNums: options.weekNums,
@@ -136,6 +137,7 @@ async function main(): Promise<void> {
     mkdirSync(path.dirname(reportFilePath), { recursive: true });
 
     const fullReport = {
+      dataTarget: "production-convex",
       seasonIds: options.seasonIds,
       weekIds: options.weekIds,
       weekNums: options.weekNums,
@@ -155,6 +157,7 @@ async function main(): Promise<void> {
     console.log(
       JSON.stringify(
         {
+          dataTarget: "production-convex",
           seasonIds: options.seasonIds,
           weekIds: options.weekIds,
           weekNums: options.weekNums,

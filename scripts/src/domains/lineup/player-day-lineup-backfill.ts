@@ -1,10 +1,6 @@
-import type { DatabaseRecord, CompositeKeyModelName } from "@gshl-lib/sheets/config/config";
-import {
-  getCompositeKeyColumnsForModel,
-  getWriteSpreadsheetIdForModel,
-} from "@gshl-lib/sheets/config/config";
+import type { DatabaseRecord } from "@gshl-lib/sheets/config/config";
 import { fastSheetsReader } from "@gshl-lib/sheets/reader/fast-reader";
-import { minimalSheetsWriter } from "@gshl-lib/sheets/writer/minimal-writer";
+import { fetchWeekScopedModel, updateById } from "@gshl-lib/data/convex-store";
 import { applyPlayerDayDerivedColumns } from "@gshl-lib/stats/player-day-flags";
 import { normalizeDateOnlyValue } from "@gshl-lib/utils/core/date";
 import { getAppsScriptLineupBuilder } from "@gshl-lib/lineup/apps-script-lineup-builder";
@@ -90,6 +86,30 @@ function normalizeOptionalDate(value: unknown): string | undefined {
   return normalized || undefined;
 }
 
+function recordMatchesId(record: DatabaseRecord, requestedId: string): boolean {
+  return [record.id, record.legacyId].some(
+    (value) => toTrimmedString(value) === requestedId,
+  );
+}
+
+function resolveIds(
+  records: DatabaseRecord[],
+  requestedIds: string[],
+  label: string,
+): string[] {
+  const resolved = requestedIds.map((requestedId) => {
+    const record = records.find((row) => recordMatchesId(row, requestedId));
+    const id = toTrimmedString(record?.id);
+    if (!id) {
+      throw new Error(
+        `[lineup:update-all] ${label} ${requestedId} was not found in production Convex.`,
+      );
+    }
+    return id;
+  });
+  return Array.from(new Set(resolved));
+}
+
 function arraysEqual(left: unknown[], right: unknown[]): boolean {
   if (left.length !== right.length) return false;
   for (let index = 0; index < left.length; index += 1) {
@@ -151,12 +171,11 @@ function buildLineupSlotsForSeason(
   return buildDefaultLineupSlots();
 }
 
-function buildLineupSlotConfig(
-  slots: readonly LineupSlot[],
-): LineupSlotConfig {
-  const safeSlots = Array.isArray(slots) && slots.length > 0
-    ? slots
-    : buildDefaultLineupSlots();
+function buildLineupSlotConfig(slots: readonly LineupSlot[]): LineupSlotConfig {
+  const safeSlots =
+    Array.isArray(slots) && slots.length > 0
+      ? slots
+      : buildDefaultLineupSlots();
   const startingPositions = new Set<string>();
   const slotLimits: Record<string, number> = {};
   const slotEligibility: Record<string, string[]> = {};
@@ -167,8 +186,8 @@ function buildLineupSlotConfig(
     startingPositions.add(position);
     slotLimits[position] = (slotLimits[position] ?? 0) + 1;
     if (!slotEligibility[position]) {
-      slotEligibility[position] = (slot?.eligiblePositions ?? []).map((entry: string) =>
-        toUpperToken(entry),
+      slotEligibility[position] = (slot?.eligiblePositions ?? []).map(
+        (entry: string) => toUpperToken(entry),
       );
     }
   }
@@ -182,7 +201,9 @@ function buildLineupSlotConfig(
 }
 
 function getGroupKey(row: DatabaseRecord): string {
-  return [normalizeDateKey(row.date), toTrimmedString(row.gshlTeamId)].join("|");
+  return [normalizeDateKey(row.date), toTrimmedString(row.gshlTeamId)].join(
+    "|",
+  );
 }
 
 function buildWeekIdAllowList(
@@ -332,7 +353,7 @@ export function parsePlayerDayLineupBackfillOptions(
       [
         "Usage:",
         "  npm run lineup:update-all -- --season-id <id>",
-        "  npm run lineup:update-all -- --season-id <id> --week-nums 1,2 --apply",
+        "  npm run lineup:update-all -- --season-id <id> --week-num 22 --team-id 108 --apply",
         "",
         "Options:",
         "  --season-id <id>          Required season id.",
@@ -349,7 +370,7 @@ export function parsePlayerDayLineupBackfillOptions(
     process.exit(0);
   }
 
-  const seasonId = readArg("--season-id");
+  const seasonId = readArg("--season-id") || readArg("--seasonId");
   if (!seasonId) {
     throw new Error("[lineup:update-all] --season-id is required.");
   }
@@ -357,11 +378,17 @@ export function parsePlayerDayLineupBackfillOptions(
   const startDate = normalizeOptionalDate(readArg("--start-date"));
   const endDate = normalizeOptionalDate(readArg("--end-date"));
   if (startDate && endDate && startDate > endDate) {
-    throw new Error("[lineup:update-all] --start-date cannot be after --end-date.");
+    throw new Error(
+      "[lineup:update-all] --start-date cannot be after --end-date.",
+    );
   }
 
-  const weekIds = parseCsv(readArg("--week-ids"));
-  const weekNums = parseCsv(readArg("--week-nums"));
+  const weekIds = parseCsv(
+    readArg("--week-ids") || readArg("--week-id") || readArg("--weekIds"),
+  );
+  const weekNums = parseCsv(
+    readArg("--week-nums") || readArg("--week-num") || readArg("--weekNums"),
+  );
   if ((startDate || endDate) && (weekIds.length > 0 || weekNums.length > 0)) {
     throw new Error(
       "[lineup:update-all] Date filters cannot be combined with week filters.",
@@ -377,7 +404,9 @@ export function parsePlayerDayLineupBackfillOptions(
     logToConsole,
     weekIds,
     weekNums,
-    teamIds: parseCsv(readArg("--team-ids")),
+    teamIds: parseCsv(
+      readArg("--team-ids") || readArg("--team-id") || readArg("--teamIds"),
+    ),
     startDate,
     endDate,
     applyLtAutoLineups: hasFlag("--apply-lt-auto-lineups"),
@@ -387,15 +416,54 @@ export function parsePlayerDayLineupBackfillOptions(
 export async function runPlayerDayLineupBackfill(
   options: PlayerDayLineupBackfillOptions,
 ): Promise<PlayerDayLineupBackfillSummary> {
-  const [weeks, matchups, seasons, seasonRows, lineupBuilder] = await Promise.all([
+  const [weeks, matchups, seasons, teams, lineupBuilder] = await Promise.all([
     fastSheetsReader.fetchModel<WeekRecord>("Week"),
     fastSheetsReader.fetchModel<MatchupRecord>("Matchup"),
     fastSheetsReader.fetchModel<DatabaseRecord>("Season"),
-    fastSheetsReader.fetchPlayerDaySeason<DatabaseRecord>(options.seasonId),
+    fastSheetsReader.fetchModel<DatabaseRecord>("Team"),
     getAppsScriptLineupBuilder(),
   ]);
+  const resolvedSeasonId = resolveIds(
+    seasons,
+    [options.seasonId],
+    "Season",
+  )[0]!;
+  const resolvedWeekIds = resolveIds(weeks, options.weekIds, "Week");
+  const resolvedTeamIds = resolveIds(teams, options.teamIds, "Team");
+  const resolvedOptions: PlayerDayLineupBackfillOptions = {
+    ...options,
+    seasonId: resolvedSeasonId,
+    weekIds: resolvedWeekIds,
+    teamIds: resolvedTeamIds,
+  };
+  if (
+    resolvedWeekIds.some((weekId) =>
+      weeks.some(
+        (week) =>
+          toTrimmedString(week.id) === weekId &&
+          toTrimmedString(week.seasonId) !== resolvedSeasonId,
+      ),
+    )
+  ) {
+    throw new Error(
+      "[lineup:update-all] Selected weeks must belong to the season.",
+    );
+  }
+  if (
+    resolvedTeamIds.some((teamId) =>
+      teams.some(
+        (team) =>
+          toTrimmedString(team.id) === teamId &&
+          toTrimmedString(team.seasonId) !== resolvedSeasonId,
+      ),
+    )
+  ) {
+    throw new Error(
+      "[lineup:update-all] Selected teams must belong to the season.",
+    );
+  }
   const seasonRow = seasons.find(
-    (row) => toTrimmedString(row.id) === options.seasonId,
+    (row) => toTrimmedString(row.id) === resolvedSeasonId,
   );
   const lineupSlots = buildLineupSlotsForSeason(
     seasonRow?.rosterSpots,
@@ -404,14 +472,55 @@ export async function runPlayerDayLineupBackfill(
   const lineupSlotConfig = buildLineupSlotConfig(lineupSlots);
 
   const weekIdAllowList = buildWeekIdAllowList(
-    options.seasonId,
+    resolvedSeasonId,
     weeks,
-    options.weekIds,
+    resolvedWeekIds,
     options.weekNums,
   );
+  const scopedWeekIds = weekIdAllowList ? Array.from(weekIdAllowList) : [];
+  if (
+    (resolvedWeekIds.length > 0 || options.weekNums.length > 0) &&
+    scopedWeekIds.length === 0
+  ) {
+    throw new Error(
+      "[lineup:update-all] No weeks matched the requested scope.",
+    );
+  }
+  const earliestScopedStart = weeks
+    .filter((week) => scopedWeekIds.includes(toTrimmedString(week.id)))
+    .map((week) => normalizeDateKey(week.startDate))
+    .filter(Boolean)
+    .sort()[0];
+  const previousWeekId = earliestScopedStart
+    ? weeks
+        .filter(
+          (week) =>
+            toTrimmedString(week.seasonId) === resolvedSeasonId &&
+            normalizeDateKey(week.endDate) < earliestScopedStart,
+        )
+        .sort((left, right) =>
+          normalizeDateKey(right.endDate).localeCompare(
+            normalizeDateKey(left.endDate),
+          ),
+        )
+        .map((week) => toTrimmedString(week.id))[0]
+    : undefined;
+  const contextWeekIds = previousWeekId
+    ? [...scopedWeekIds, previousWeekId]
+    : scopedWeekIds;
+  const seasonRows = scopedWeekIds.length
+    ? await fetchWeekScopedModel<DatabaseRecord>(
+        "PlayerDayStatLine",
+        resolvedSeasonId,
+        contextWeekIds,
+        resolvedTeamIds,
+      )
+    : await fastSheetsReader.fetchPlayerDaySeason<DatabaseRecord>(
+        resolvedSeasonId,
+      );
 
   const seasonRowsForSeason = seasonRows
-    .filter((row) => toTrimmedString(row.seasonId) === options.seasonId)
+    .filter((row) => toTrimmedString(row.seasonId) === resolvedSeasonId)
     .map((row) => {
       const clone = clonePlayerDayRow(row);
       const normalizedDate = normalizeDateKey(clone.date);
@@ -422,12 +531,12 @@ export async function runPlayerDayLineupBackfill(
     });
 
   const targetRows = seasonRowsForSeason.filter((row) =>
-    shouldIncludeRow(row, options, weekIdAllowList),
+    shouldIncludeRow(row, resolvedOptions, weekIdAllowList),
   );
 
   logLineupBackfill(
     options,
-    `Loaded ${seasonRowsForSeason.length} PlayerDay rows for season ${options.seasonId}; ${targetRows.length} match the requested filters.`,
+    `Loaded ${seasonRowsForSeason.length} scoped PlayerDay rows for season ${resolvedSeasonId}; ${targetRows.length} match the requested filters.`,
   );
 
   const groups = new Map<string, DatabaseRecord[]>();
@@ -440,7 +549,7 @@ export async function runPlayerDayLineupBackfill(
   }
 
   const seasonMatchups = matchups.filter(
-    (row) => toTrimmedString(row.seasonId) === options.seasonId,
+    (row) => toTrimmedString(row.seasonId) === resolvedSeasonId,
   );
   const changedRows: DatabaseRecord[] = [];
   let repairedGroups = 0;
@@ -448,11 +557,13 @@ export async function runPlayerDayLineupBackfill(
   for (const [groupKey, players] of groups) {
     lineupBuilder.internals?.validateTeamDayRoster?.(
       players,
-      `seasonId=${options.seasonId} group=${groupKey}`,
+      `seasonId=${resolvedSeasonId} group=${groupKey}`,
     );
 
     const originals = new Map(
-      players.map((row) => [toTrimmedString(row.id), clonePlayerDayRow(row)] as const),
+      players.map(
+        (row) => [toTrimmedString(row.id), clonePlayerDayRow(row)] as const,
+      ),
     );
     let optimized: DatabaseRecord[];
     try {
@@ -483,7 +594,11 @@ export async function runPlayerDayLineupBackfill(
     if (options.applyLtAutoLineups) {
       const teamId = toTrimmedString(optimized[0]?.gshlTeamId);
       const weekId = toTrimmedString(optimized[0]?.weekId);
-      const gameType = getMatchupGameTypeForTeamWeek(seasonMatchups, teamId, weekId);
+      const gameType = getMatchupGameTypeForTeamWeek(
+        seasonMatchups,
+        teamId,
+        weekId,
+      );
       if (gameType === LT_GAME_TYPE) {
         for (const row of optimized) {
           const assignedBestPos = toTrimmedString(row.bestPos);
@@ -524,29 +639,30 @@ export async function runPlayerDayLineupBackfill(
 
   let updatedRows = 0;
   if (options.apply && changedRows.length > 0) {
-    const result = await minimalSheetsWriter.upsertByCompositeKey(
-      PLAYER_DAY_MODEL as CompositeKeyModelName,
-      getCompositeKeyColumnsForModel(PLAYER_DAY_MODEL as CompositeKeyModelName),
-      changedRows,
-      {
-        merge: true,
-        idColumn: "id",
-        createdAtColumn: "createdAt",
-        updatedAtColumn: "updatedAt",
-        spreadsheetId: getWriteSpreadsheetIdForModel(PLAYER_DAY_MODEL, {
-          seasonId: options.seasonId,
-        }),
-      },
-    );
-    updatedRows = result.total;
+    for (const row of changedRows) {
+      const id = toTrimmedString(row.id);
+      if (!id) throw new Error("[lineup:update-all] Missing Convex row id.");
+      await updateById<DatabaseRecord>(PLAYER_DAY_MODEL, id, {
+        dailyPos: row.dailyPos,
+        bestPos: row.bestPos,
+        fullPos: row.fullPos,
+        GS: row.GS,
+        ADD: row.ADD,
+        MS: row.MS,
+        BS: row.BS,
+        nhlPos: row.nhlPos,
+        updatedAt: new Date(),
+      });
+      updatedRows += 1;
+    }
   }
 
   return {
-    seasonId: options.seasonId,
+    seasonId: resolvedSeasonId,
     apply: options.apply,
-    weekIds: options.weekIds,
+    weekIds: resolvedWeekIds,
     weekNums: options.weekNums,
-    teamIds: options.teamIds,
+    teamIds: resolvedTeamIds,
     startDate: options.startDate ?? null,
     endDate: options.endDate ?? null,
     applyLtAutoLineups: options.applyLtAutoLineups,

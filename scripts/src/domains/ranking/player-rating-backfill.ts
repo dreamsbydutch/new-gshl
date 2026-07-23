@@ -5,6 +5,11 @@ import {
   type CompositeKeyModelName,
 } from "@gshl-lib/sheets/config/config";
 import { minimalSheetsWriter } from "@gshl-lib/sheets/writer/minimal-writer";
+import {
+  fetchModel,
+  fetchWeekScopedModel,
+  updateById,
+} from "@gshl-lib/data/convex-store";
 import { rankRowsWithAppsScriptEngine } from "@gshl-lib/ranking/apps-script-engine";
 import { applyPlayerDayDerivedColumns } from "@gshl-lib/stats/player-day-flags";
 import {
@@ -28,6 +33,7 @@ export type PlayerRatingBackfillOptions = {
   seasonType: string;
   weekIds: string[];
   weekNums: string[];
+  teamIds: string[];
 };
 
 export type PlayerRatingModelExecutionSummary = {
@@ -52,6 +58,7 @@ Options:
   --season-type <value>   Optional seasonType filter for split and total models.
   --week-ids <list>       Optional comma-separated week ids for day/week models.
   --week-nums <list>      Optional comma-separated week numbers for day/week models.
+  --team-ids <list>       Optional comma-separated team ids for scoped day/week updates.
   --include-breakdown     Preserve __ratingDebug payload on in-memory rows during execution.
   --log <true|false>      Enable or disable console logging. Default: true.
   --help                  Show this message and exit.
@@ -84,7 +91,9 @@ export function parsePlayerRatingBackfillOptions(
     process.exit(0);
   }
 
-  const seasonId = toTrimmedString(getArgValue(args, "--season-id"));
+  const seasonId = toTrimmedString(
+    getArgValue(args, "--season-id") ?? getArgValue(args, "--seasonId"),
+  );
   if (!seasonId) {
     throw new Error("[ratings:backfill] --season-id is required.");
   }
@@ -96,11 +105,30 @@ export function parsePlayerRatingBackfillOptions(
     includeBreakdown: hasFlag(args, "--include-breakdown"),
     logToConsole: toBoolean(getArgValue(args, "--log"), true),
     seasonType: toTrimmedString(getArgValue(args, "--season-type")),
-    weekIds: String(getArgValue(args, "--week-ids") ?? "")
+    weekIds: String(
+      getArgValue(args, "--week-ids") ??
+        getArgValue(args, "--week-id") ??
+        getArgValue(args, "--weekIds") ??
+        "",
+    )
       .split(",")
       .map((entry) => entry.trim())
       .filter(Boolean),
-    weekNums: String(getArgValue(args, "--week-nums") ?? "")
+    weekNums: String(
+      getArgValue(args, "--week-nums") ??
+        getArgValue(args, "--week-num") ??
+        getArgValue(args, "--weekNums") ??
+        "",
+    )
+      .split(",")
+      .map((entry) => entry.trim())
+      .filter(Boolean),
+    teamIds: String(
+      getArgValue(args, "--team-ids") ??
+        getArgValue(args, "--team-id") ??
+        getArgValue(args, "--teamIds") ??
+        "",
+    )
       .split(",")
       .map((entry) => entry.trim())
       .filter(Boolean),
@@ -730,10 +758,95 @@ function wrapWritePermissionError(
   );
 }
 
+function matchesRecordId(record: DatabaseRecord, requestedId: string): boolean {
+  return [record.id, record.legacyId].some(
+    (value) => toTrimmedString(value) === requestedId,
+  );
+}
+
+function resolveRecordIds(
+  records: DatabaseRecord[],
+  requestedIds: string[],
+  label: string,
+): string[] {
+  return Array.from(
+    new Set(
+      requestedIds.map((requestedId) => {
+        const record = records.find((row) => matchesRecordId(row, requestedId));
+        const id = toTrimmedString(record?.id);
+        if (!id) {
+          throw new Error(
+            `[ratings:backfill] ${label} ${requestedId} was not found in production Convex.`,
+          );
+        }
+        return id;
+      }),
+    ),
+  );
+}
+
+async function executeScopedPlayerRatingBackfill(
+  options: PlayerRatingBackfillOptions,
+  modelName: "PlayerDayStatLine" | "PlayerWeekStatLine",
+): Promise<PlayerRatingModelExecutionSummary> {
+  const [rows, seasonRows] = await Promise.all([
+    fetchWeekScopedModel<DatabaseRecord>(
+      modelName,
+      options.seasonId,
+      options.weekIds,
+    ),
+    fetchModel<DatabaseRecord>("Season"),
+  ]);
+  await rankRowsWithAppsScriptEngine(rows, {
+    sheetName: modelName,
+    outputField: "Rating",
+    mutate: true,
+    dataContext: { seasonRows },
+  });
+  const teamIdSet = new Set(options.teamIds);
+  const targetRows = rows.filter(
+    (row) =>
+      teamIdSet.size === 0 || teamIdSet.has(toTrimmedString(row.gshlTeamId)),
+  );
+  let updatedRows = 0;
+  if (options.apply) {
+    for (const row of targetRows) {
+      const id = toTrimmedString(row.id);
+      if (!id) throw new Error("[ratings:backfill] Missing Convex row id.");
+      const rating = row.Rating ?? 0;
+      await updateById<DatabaseRecord>(modelName, id, {
+        Rating: rating === "" || rating === null ? 0 : rating,
+        updatedAt: new Date(),
+      });
+      updatedRows += 1;
+    }
+  }
+  return {
+    modelName,
+    spreadsheetId: "production-convex",
+    sheetName: modelName,
+    outputField: "Rating",
+    matchedRows: targetRows.length,
+    updatedRows,
+    dryRun: !options.apply,
+  };
+}
+
 export async function executePlayerRatingModelBackfill(
   options: PlayerRatingBackfillOptions,
   modelName: SupportedPlayerRatingModelName,
 ): Promise<PlayerRatingModelExecutionSummary> {
+  if (options.weekIds.length > 0) {
+    if (
+      modelName !== "PlayerDayStatLine" &&
+      modelName !== "PlayerWeekStatLine"
+    ) {
+      throw new Error(
+        `[ratings:backfill] Week/team scope only supports PlayerDayStatLine and PlayerWeekStatLine, not ${modelName}.`,
+      );
+    }
+    return executeScopedPlayerRatingBackfill(options, modelName);
+  }
   const clientModule = await import("@gshl-lib/sheets/client/optimized-client");
   let prepared: Awaited<ReturnType<typeof preparePlayerRatingModelRows>>;
   try {
@@ -753,7 +866,8 @@ export async function executePlayerRatingModelBackfill(
 
     const configModule = await import("@gshl-lib/sheets/config/config");
     const sheetName = configModule.SHEETS_CONFIG.SHEETS[modelName] ?? modelName;
-    const outputField = modelName === "PlayerNHLStatLine" ? "seasonRating" : "Rating";
+    const outputField =
+      modelName === "PlayerNHLStatLine" ? "seasonRating" : "Rating";
     const reason =
       error instanceof Error ? error.message : formatUnknownMessage(error);
 
@@ -862,27 +976,92 @@ export async function runPlayerRatingBackfill(
   process.env.GOOGLE_SERVICE_ACCOUNT_KEY_FILE ??=
     path.resolve("credentials.json");
 
+  const [seasons, weeks, teams] = await Promise.all([
+    fetchModel<DatabaseRecord>("Season"),
+    fetchModel<DatabaseRecord>("Week"),
+    fetchModel<DatabaseRecord>("Team"),
+  ]);
+  const resolvedSeasonId = resolveRecordIds(
+    seasons,
+    [options.seasonId],
+    "Season",
+  )[0]!;
+  const resolvedWeekIds = resolveRecordIds(weeks, options.weekIds, "Week");
+  for (const weekNum of options.weekNums) {
+    const week = weeks.find(
+      (row) =>
+        toTrimmedString(row.seasonId) === resolvedSeasonId &&
+        toTrimmedString(row.weekNum) === weekNum,
+    );
+    if (!week) {
+      throw new Error(
+        `[ratings:backfill] Week number ${weekNum} was not found in the selected season.`,
+      );
+    }
+    resolvedWeekIds.push(toTrimmedString(week.id));
+  }
+  const resolvedTeamIds = resolveRecordIds(teams, options.teamIds, "Team");
+  if (
+    resolvedWeekIds.some((weekId) =>
+      weeks.some(
+        (row) =>
+          toTrimmedString(row.id) === weekId &&
+          toTrimmedString(row.seasonId) !== resolvedSeasonId,
+      ),
+    ) ||
+    resolvedTeamIds.some((teamId) =>
+      teams.some(
+        (row) =>
+          toTrimmedString(row.id) === teamId &&
+          toTrimmedString(row.seasonId) !== resolvedSeasonId,
+      ),
+    )
+  ) {
+    throw new Error(
+      "[ratings:backfill] Selected weeks and teams must belong to the selected season.",
+    );
+  }
+  if (resolvedTeamIds.length > 0 && resolvedWeekIds.length === 0) {
+    throw new Error(
+      "[ratings:backfill] --team-id/--team-ids requires a week id or week number.",
+    );
+  }
+  const resolvedOptions: PlayerRatingBackfillOptions = {
+    ...options,
+    seasonId: resolvedSeasonId,
+    weekIds: Array.from(new Set(resolvedWeekIds)),
+    teamIds: resolvedTeamIds,
+  };
+  const scoped = resolvedOptions.weekIds.length > 0;
   const effectiveModels = resolveModelsForSeason(
-    options.seasonId,
-    options.models,
+    resolvedSeasonId,
+    scoped
+      ? options.models.filter(
+          (model) =>
+            model === "PlayerDayStatLine" || model === "PlayerWeekStatLine",
+        )
+      : options.models,
   );
 
   logPlayerRatingBackfill(
     options,
-    `Starting ${options.apply ? "apply" : "dry-run"} for season ${options.seasonId} on ${effectiveModels.join(", ")}.`,
+    `Starting ${options.apply ? "apply" : "dry-run"} for season ${resolvedSeasonId} on ${effectiveModels.join(", ")}.`,
   );
 
   if (!effectiveModels.length) {
     logPlayerRatingBackfill(
       options,
-      `No supported rating models for season ${options.seasonId}.`,
+      `No supported rating models for season ${resolvedSeasonId}.`,
     );
     return [];
   }
 
   const summaries: PlayerRatingModelExecutionSummary[] = [];
   for (const modelName of effectiveModels) {
-    const summary = await executePlayerRatingModelBackfill(options, modelName);
+    const summary = await executePlayerRatingModelBackfill(
+      resolvedOptions,
+      modelName,
+    );
     summaries.push(summary);
     logPlayerRatingBackfill(
       options,

@@ -186,11 +186,11 @@ npm run player-bios:backfill-yahoo-ids -- --season-id 1 --apply
 
 #### `awards:backfill`
 
-Rebuilds split award data from season standings, player and team rating outputs,
-and playoff final results. Crosby, Orr, Brodeur, Gretzky, Ovechkin, and All-Star
-selections are upserted into `playerAwards` using `playerId`; league, playoff,
-and management awards are upserted into `teamAwards` using the season-specific
-owner.
+Rebuilds split award data directly from production Convex season standings,
+player and team rating outputs, and playoff final results. Crosby, Orr,
+Brodeur, Gretzky, Ovechkin, and All-Star selections are upserted into
+`playerAwards` using `playerId`; league, playoff, and management awards are
+upserted into `teamAwards` using the season-specific owner.
 
 Notable flags:
 
@@ -202,7 +202,7 @@ Notable flags:
 #### `standings:backfill`
 
 Rebuilds matchup scores, matchup rank snapshots, and `TeamSeasonStatLine`
-standings fields for one or more seasons.
+standings fields directly in production Convex for one or more seasons.
 
 Notable flags:
 
@@ -232,6 +232,7 @@ Example:
 
 ```bash
 npm run lineup:update-all -- --season-id 12 --week-nums 1,2 --team-ids 4,7 --apply
+npm run lineup:update-all -- --season-id 3 --week-num 22 --team-id 108 --apply
 ```
 
 ### Ratings, Power, and Ranking Engine
@@ -248,6 +249,7 @@ Notable flags:
 - `--season-type <value>`
 - `--week-ids <list>`
 - `--week-nums <list>`
+- `--team-ids <list>`
 - `--include-breakdown`
 - `--apply`
 
@@ -264,15 +266,34 @@ Notable flags:
 - `--stop-on-error`
 - `--apply`
 
+Scoped examples:
+
+```bash
+npm run ratings:backfill -- --season-id 3 --week-num 22 --team-id 108
+npm run ratings:backfill -- --season-id 3 --week-num 22 --team-id 108 --apply
+npm run ratings:rebuild-team -- --season-id 3 --week-num 22 --team-id 108
+npm run ratings:rebuild-team -- --season-id 3 --week-num 22 --team-id 108 --apply
+```
+
+For scoped rating runs, the rating comparison is calculated using every row in
+the selected week, but only the selected team's existing rows are updated.
+Scoped team ratings update TeamDay and TeamWeek ratings and intentionally skip
+season-wide team ratings and power refreshes.
+
 #### `ratings:rebuild-team`
 
 Rebuilds `TeamDayStatLine`, `TeamWeekStatLine`, and `TeamSeasonStatLine`
-ratings across one or more seasons. Team-week rebuilds also refresh power and
-matchup ranks/ratings for the same season.
+ratings directly in production Convex. Full-season runs also refresh power and
+matchup ranks/ratings for the same season; week/team-scoped runs do not trigger
+the season-wide power rebuild.
 
 Notable flags:
 
+- `--season-id <id>`
 - `--season-ids <list>`
+- `--week-ids <list>`
+- `--week-nums <list>`
+- `--team-ids <list>`
 - `--include-team-weeks`
 - `--include-team-seasons`
 - `--stop-on-error`
@@ -331,13 +352,19 @@ are still in sync without copying.
 
 #### `stats:aggregate-season`
 
-Rebuilds season-level player and team aggregate rows from `PlayerDayStatLine`
-for a single season, then recalculates standings for that season.
+Rebuilds a single season's player days, player weeks, player splits and totals,
+career splits and totals, team days, team weeks, and team seasons from
+`PlayerDayStatLine`. It also refreshes authoritative `PlayerNHLStatLine` season
+totals from Hockey Reference and recalculates standings, matchup scores, and
+matchup ranks. All writes go to production Convex.
 
 Notable flags:
 
 - `--season-id <id>`
 - `--apply`
+- stale derived aggregate rows are removed by default with `--apply`
+- `--preserve-stale` to keep and report derived rows that are not regenerated
+- `--skip-player-nhl` to omit the external NHL season-total refresh
 
 #### `stats:backfill-hockey-reference`
 
@@ -354,8 +381,10 @@ Notable flags:
 
 #### `stats:backfill-yahoo-matchup-days`
 
-Pulls Yahoo daily matchup pages, reconciles them against `PlayerDayStatLine`,
-and reports updates, creations, deletions, and investigation flags.
+Pulls Yahoo daily matchup pages, reconciles them against `PlayerDayStatLine`
+in the production Convex database, and reports updates, creations, deletions,
+and investigation flags. It does not read from or write to the legacy Sheets
+database.
 
 Notable flags:
 
@@ -388,6 +417,12 @@ Example:
 ```bash
 npm run stats:backfill-yahoo-matchup-days -- --seasonId 12 --apply
 ```
+
+The command defaults to a dry run. Production writes require `--apply`,
+`GSHL_CONVEX_TARGET=production`, `CONVEX_PROD_URL` (or a production deploy
+configuration), and the matching production `CONVEX_SERVER_SECRET`. If either
+production credential has been rotated, refresh the local `.env.local` values
+from the Convex production deployment before running the command.
 
 #### `stats:backfill-yahoo-rosters`
 
@@ -431,6 +466,8 @@ Notable flags:
 
 - `--season-id <id>`
 - `--week-id, --week-ids <list>`
+- `--week-num, --week-nums <list>`
+- `--team-id, --team-ids <list>`
 - `--date <yyyy-mm-dd>`
 - `--start-date <date>`
 - `--end-date <date>`
@@ -445,7 +482,14 @@ Examples:
 npm run stats:sync-nhl-daily -- --season-id 12 --date 2026-06-04
 npm run stats:sync-nhl-daily -- --season-id 12 --date 2026-06-04 --apply
 npm run stats:sync-nhl-daily -- --week-ids 101 --apply --aggregate
+npm run stats:sync-nhl-daily -- --season-id 3 --week-num 22 --team-ids 108
+npm run stats:sync-nhl-daily -- --season-id 3 --week-num 22 --team-ids 108 --apply
 ```
+
+Season, week, and team selectors accept either Convex document IDs or legacy
+IDs. Team-scoped runs read only the selected week/team rows and apply changes
+with Convex document-ID updates, so this command never creates missing
+`PlayerDayStatLine` rows.
 
 ### Yahoo Validation
 

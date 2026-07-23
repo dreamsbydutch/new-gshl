@@ -2,11 +2,8 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import vm from "node:vm";
 import { fileURLToPath } from "node:url";
-import {
-  getPlayerDayWorkbookId,
-  type DatabaseRecord,
-} from "@gshl-lib/sheets/config/config";
-import { fastSheetsReader } from "@gshl-lib/sheets/reader/fast-reader";
+import type { DatabaseRecord } from "@gshl-lib/sheets/config/config";
+import { fetchModel, fetchSeasonModel } from "@gshl-lib/data/convex-store";
 import { SeasonType } from "@gshl-lib/types/enums";
 
 const CURRENT_FILE_DIR = path.dirname(fileURLToPath(import.meta.url));
@@ -98,15 +95,8 @@ function cloneRows(rows: DatabaseRecord[]): DatabaseRecord[] {
   return rows.map((row) => ({ ...row }));
 }
 
-function getOptionalPlayerDayWorkbookId(
-  seasonId: string | number,
-): string | null {
-  try {
-    const workbookId = getPlayerDayWorkbookId(seasonId);
-    return workbookId ? String(workbookId) : null;
-  } catch {
-    return null;
-  }
+function getLocalPlayerDayWorkbookId(seasonId: string): string {
+  return `__LOCAL_POWER_ENGINE_PLAYERDAYS_${seasonId}__`;
 }
 
 async function readPowerEngineSource(): Promise<string> {
@@ -115,7 +105,7 @@ async function readPowerEngineSource(): Promise<string> {
 }
 
 async function loadSheetCache(seasonId: string): Promise<SheetCache> {
-  const playerDayWorkbookId = getOptionalPlayerDayWorkbookId(seasonId);
+  const playerDayWorkbookId = getLocalPlayerDayWorkbookId(seasonId);
   const [
     seasons,
     weeks,
@@ -128,18 +118,16 @@ async function loadSheetCache(seasonId: string): Promise<SheetCache> {
     teamWeeks,
     teamSeasons,
   ] = await Promise.all([
-    fastSheetsReader.fetchModel<DatabaseRecord>("Season"),
-    fastSheetsReader.fetchModel<DatabaseRecord>("Week"),
-    fastSheetsReader.fetchModel<DatabaseRecord>("Team"),
-    fastSheetsReader.fetchModel<DatabaseRecord>("Franchise"),
-    fastSheetsReader.fetchModel<DatabaseRecord>("Player"),
-    playerDayWorkbookId
-      ? fastSheetsReader.fetchPlayerDaySeason<DatabaseRecord>(seasonId)
-      : Promise.resolve<DatabaseRecord[]>([]),
-    fastSheetsReader.fetchModel<DatabaseRecord>("PlayerNHLStatLine"),
-    fastSheetsReader.fetchModel<DatabaseRecord>("Matchup"),
-    fastSheetsReader.fetchModel<DatabaseRecord>("TeamWeekStatLine"),
-    fastSheetsReader.fetchModel<DatabaseRecord>("TeamSeasonStatLine"),
+    fetchModel<DatabaseRecord>("Season"),
+    fetchSeasonModel<DatabaseRecord>("Week", seasonId),
+    fetchSeasonModel<DatabaseRecord>("Team", seasonId),
+    fetchModel<DatabaseRecord>("Franchise"),
+    fetchModel<DatabaseRecord>("Player"),
+    fetchSeasonModel<DatabaseRecord>("PlayerDayStatLine", seasonId),
+    fetchSeasonModel<DatabaseRecord>("PlayerNHLStatLine", seasonId),
+    fetchSeasonModel<DatabaseRecord>("Matchup", seasonId),
+    fetchSeasonModel<DatabaseRecord>("TeamWeekStatLine", seasonId),
+    fetchSeasonModel<DatabaseRecord>("TeamSeasonStatLine", seasonId),
   ]);
 
   const sheetCacheEntries: Array<[string, DatabaseRecord[]]> = [
@@ -155,17 +143,19 @@ async function loadSheetCache(seasonId: string): Promise<SheetCache> {
     [`${TEAMSTATS_SPREADSHEET_ID}:TeamSeasonStatLine`, teamSeasons],
   ];
 
-  if (playerDayWorkbookId) {
-    sheetCacheEntries.push([
-      `${playerDayWorkbookId}:PlayerDayStatLine`,
-      playerDays,
-    ]);
-  }
+  sheetCacheEntries.push([
+    `${playerDayWorkbookId}:PlayerDayStatLine`,
+    playerDays,
+  ]);
 
   return new Map<string, DatabaseRecord[]>(sheetCacheEntries);
 }
 
-function createPowerEngineContext(sheetCache: SheetCache): PowerRankingsContext {
+function createPowerEngineContext(
+  sheetCache: SheetCache,
+  seasonId: string,
+): PowerRankingsContext {
+  const playerDayWorkbookId = getLocalPlayerDayWorkbookId(seasonId);
   return vm.createContext({
     console,
     PowerRankingsAlgo: {},
@@ -175,7 +165,9 @@ function createPowerEngineContext(sheetCache: SheetCache): PowerRankingsContext 
     GshlUtils: {
       domain: {
         workbooks: {
-          getPlayerDayWorkbookId,
+          getPlayerDayWorkbookId(): string {
+            return playerDayWorkbookId;
+          },
         },
       },
       sheets: {
@@ -194,7 +186,11 @@ function createPowerEngineContext(sheetCache: SheetCache): PowerRankingsContext 
           ensureSheetColumns(): string[] {
             return [];
           },
-          upsertSheetByKeys(): { total: number; inserted: number; updated: number } {
+          upsertSheetByKeys(): {
+            total: number;
+            inserted: number;
+            updated: number;
+          } {
             return { total: 0, inserted: 0, updated: 0 };
           },
         },
@@ -224,7 +220,7 @@ async function loadPowerRankingsAlgo(
     readPowerEngineSource(),
   ]);
 
-  const context = createPowerEngineContext(sheetCache);
+  const context = createPowerEngineContext(sheetCache, seasonId);
   vm.runInContext(source, context, { filename: POWER_ENGINE_FILE });
 
   const api = context.PowerRankingsAlgo;

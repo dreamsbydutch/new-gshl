@@ -34,6 +34,17 @@ type RankingEngineContext = vm.Context & {
   RankingEngine?: RankingEngineApi;
 };
 
+export type RankingEngineDataContext = {
+  seasonRows?: RankingEngineRow[];
+  teamSeasonRows?: RankingEngineRow[];
+  playerSplitRows?: RankingEngineRow[];
+  playerTotalRows?: RankingEngineRow[];
+  playerCareerSplitRows?: RankingEngineRow[];
+  playerCareerTotalRows?: RankingEngineRow[];
+  playerNhlRows?: RankingEngineRow[];
+  draftPickRows?: RankingEngineRow[];
+};
+
 const CURRENT_FILE_DIR = path.dirname(fileURLToPath(import.meta.url));
 const APPS_SCRIPT_ENGINE_FILES = [
   path.resolve(
@@ -171,18 +182,16 @@ async function loadRankingEngineRows(): Promise<{
   };
 }
 
-function createRankingEngineContext(
-  rankingRows: {
-    seasonRows: RankingEngineRow[];
-    teamSeasonRows: RankingEngineRow[];
-    playerSplitRows: RankingEngineRow[];
-    playerTotalRows: RankingEngineRow[];
-    playerCareerSplitRows: RankingEngineRow[];
-    playerCareerTotalRows: RankingEngineRow[];
-    playerNhlRows: RankingEngineRow[];
-    draftPickRows: RankingEngineRow[];
-  },
-): RankingEngineContext {
+function createRankingEngineContext(rankingRows: {
+  seasonRows: RankingEngineRow[];
+  teamSeasonRows: RankingEngineRow[];
+  playerSplitRows: RankingEngineRow[];
+  playerTotalRows: RankingEngineRow[];
+  playerCareerSplitRows: RankingEngineRow[];
+  playerCareerTotalRows: RankingEngineRow[];
+  playerNhlRows: RankingEngineRow[];
+  draftPickRows: RankingEngineRow[];
+}): RankingEngineContext {
   const context = vm.createContext({
     console,
     RankingEngine: {},
@@ -282,6 +291,32 @@ async function loadRankingEngine(): Promise<RankingEngineApi> {
   return engine;
 }
 
+async function loadRankingEngineWithContext(
+  dataContext: RankingEngineDataContext,
+): Promise<RankingEngineApi> {
+  const sources = await readRankingEngineSources();
+  const context = createRankingEngineContext({
+    seasonRows: dataContext.seasonRows ?? [],
+    teamSeasonRows: dataContext.teamSeasonRows ?? [],
+    playerSplitRows: dataContext.playerSplitRows ?? [],
+    playerTotalRows: dataContext.playerTotalRows ?? [],
+    playerCareerSplitRows: dataContext.playerCareerSplitRows ?? [],
+    playerCareerTotalRows: dataContext.playerCareerTotalRows ?? [],
+    playerNhlRows: dataContext.playerNhlRows ?? [],
+    draftPickRows: dataContext.draftPickRows ?? [],
+  });
+  for (let index = 0; index < sources.length; index += 1) {
+    vm.runInContext(sources[index] ?? "", context, {
+      filename: APPS_SCRIPT_ENGINE_FILES[index],
+    });
+  }
+  const engine = context.RankingEngine;
+  if (!engine || typeof engine.rankRows !== "function") {
+    throw new Error("[rating-engine] Failed to load scoped ranking engine.");
+  }
+  return engine;
+}
+
 async function getRankingEngine(): Promise<RankingEngineApi> {
   rankingEnginePromise ??= loadRankingEngine();
   return rankingEnginePromise;
@@ -294,9 +329,12 @@ export async function rankRowsWithAppsScriptEngine(
     outputField?: string;
     includeBreakdown?: boolean;
     mutate?: boolean;
+    dataContext?: RankingEngineDataContext;
   },
 ): Promise<RankingEngineRow[]> {
-  const engine = await getRankingEngine();
+  const engine = options.dataContext
+    ? await loadRankingEngineWithContext(options.dataContext)
+    : await getRankingEngine();
   const sheetName = normalizeRankingEngineSheetName(options.sheetName);
   const outputField =
     options.outputField ?? getDefaultRatingOutputField(sheetName);

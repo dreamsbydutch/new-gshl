@@ -18,16 +18,14 @@
  *   --stop-on-error         Abort immediately on the first failed season.
  *   --help                  Show this message and exit.
  */
-import path from "node:path";
 import type { DatabaseRecord } from "@gshl-lib/sheets/config/config";
+import { type CompositeKeyModelName } from "@gshl-lib/sheets/config/config";
 import {
-  getCompositeKeyColumnsForModel,
-  getWriteSpreadsheetIdForModel,
-  SHEETS_CONFIG,
-  type CompositeKeyModelName,
-} from "@gshl-lib/sheets/config/config";
-import { fastSheetsReader } from "@gshl-lib/sheets/reader/fast-reader";
-import { minimalSheetsWriter } from "@gshl-lib/sheets/writer/minimal-writer";
+  fetchModel,
+  fetchSeasonModel,
+  fetchWeekScopedModel,
+  updateRowsById,
+} from "@gshl-lib/data/convex-store";
 import {
   rankRowsWithAppsScriptEngine,
   type RankingEngineSheetName,
@@ -48,6 +46,9 @@ type TeamRatingRebuildOptions = {
   includeTeamWeeks: boolean;
   includeTeamSeasons: boolean;
   stopOnError: boolean;
+  weekIds: string[];
+  weekNums: string[];
+  teamIds: string[];
 };
 
 type TeamRatingModelName = Extract<
@@ -94,6 +95,46 @@ const TEAM_RATING_MODELS: readonly TeamRatingModelName[] = [
   "TeamSeasonStatLine",
 ];
 
+function normalizeNullableNumbers(
+  row: DatabaseRecord,
+  fields: readonly string[],
+): DatabaseRecord {
+  const normalized = { ...row };
+  for (const field of fields) {
+    if (normalized[field] === "" || normalized[field] === undefined) {
+      normalized[field] = null;
+    }
+  }
+  return normalized;
+}
+
+const TEAM_WEEK_POWER_NUMBER_FIELDS = [
+  "powerRating",
+  "powerElo",
+  "powerEloPre",
+  "powerEloPost",
+  "powerEloDelta",
+  "powerEloExpected",
+  "powerEloK",
+  "powerStatScore",
+  "powerStatEwma",
+  "powerTalent",
+  "powerHistoryPrior",
+  "powerComposite",
+  "powerRk",
+] as const;
+
+const MATCHUP_POWER_NUMBER_FIELDS = [
+  "homeRank",
+  "awayRank",
+  "ratingPre",
+  "ratingRealized",
+  "ratingCompetitive",
+  "ratingImportance",
+  "ratingRosterStrength",
+  "rating",
+] as const;
+
 const HELP_TEXT = `
 Usage:
   npm run ratings:rebuild-team
@@ -101,7 +142,11 @@ Usage:
   npm run ratings:rebuild-team -- --season-ids 11,12 --include-team-seasons
 
 Options:
+  --season-id <id>       Optional single season id.
   --season-ids <list>     Optional comma-separated season ids. Default: all Season rows.
+  --week-ids <list>      Optional week ids for TeamDay/TeamWeek ratings.
+  --week-nums <list>      Optional week numbers for TeamDay/TeamWeek ratings.
+  --team-ids <list>       Optional team ids to update after week-wide rating calculation.
   --apply                 Write updated team ratings back to Convex. Omit for dry-run.
   --log <true|false>      Enable or disable console logging. Default: true.
   --include-team-weeks    Accepted for compatibility; TeamWeekStatLine ratings are included by default.
@@ -110,8 +155,8 @@ Options:
   --help                  Show this message and exit.
 
 Requirements:
-  NEXT_PUBLIC_CONVEX_URL (or CONVEX_URL) must be configured for data reads/writes.
-  Team-week rebuilds automatically trigger a power refresh for the same season.
+  CONVEX_PROD_URL and CONVEX_SERVER_SECRET must target production.
+  Unscoped team-week rebuilds trigger a power refresh; week/team-scoped runs do not.
 `.trim();
 
 function parseSeasonIds(value: string | undefined): string[] {
@@ -140,7 +185,9 @@ async function parseOptions(args: string[]): Promise<TeamRatingRebuildOptions> {
     process.exit(0);
   }
 
-  const requestedSeasonIds = parseSeasonIds(getArgValue(args, "--season-ids"));
+  const requestedSeasonIds = parseSeasonIds(
+    getArgValue(args, "--season-ids") ?? getArgValue(args, "--season-id"),
+  );
   const seasonIds = requestedSeasonIds.length
     ? requestedSeasonIds
     : await getAllSeasonIds();
@@ -156,13 +203,52 @@ async function parseOptions(args: string[]): Promise<TeamRatingRebuildOptions> {
     includeTeamWeeks: true,
     includeTeamSeasons: true,
     stopOnError: hasFlag(args, "--stop-on-error"),
+    weekIds: parseSeasonIds(
+      getArgValue(args, "--week-ids") ?? getArgValue(args, "--week-id"),
+    ),
+    weekNums: parseSeasonIds(
+      getArgValue(args, "--week-nums") ?? getArgValue(args, "--week-num"),
+    ),
+    teamIds: parseSeasonIds(
+      getArgValue(args, "--team-ids") ?? getArgValue(args, "--team-id"),
+    ),
   };
+}
+
+function recordMatchesId(record: DatabaseRecord, requestedId: string): boolean {
+  return [record.id, record.legacyId].some(
+    (value) => String(value ?? "").trim() === requestedId,
+  );
+}
+
+function resolveIds(
+  records: DatabaseRecord[],
+  requestedIds: string[],
+  label: string,
+): string[] {
+  return Array.from(
+    new Set(
+      requestedIds.map((requestedId) => {
+        const match = records.find((row) => recordMatchesId(row, requestedId));
+        const id = String(match?.id ?? "").trim();
+        if (!id) {
+          throw new Error(
+            `[ratings:rebuild-team] ${label} ${requestedId} was not found in production Convex.`,
+          );
+        }
+        return id;
+      }),
+    ),
+  );
 }
 
 function getSelectedModels(
   options: TeamRatingRebuildOptions,
 ): TeamRatingModelName[] {
   return TEAM_RATING_MODELS.filter((modelName) => {
+    if (options.weekIds.length > 0 && modelName === "TeamSeasonStatLine") {
+      return false;
+    }
     if (modelName === "TeamDayStatLine") return options.includeTeamDays;
     if (modelName === "TeamWeekStatLine") return options.includeTeamWeeks;
     return options.includeTeamSeasons;
@@ -174,17 +260,71 @@ async function executeTeamRatingModel(
   seasonId: string,
   modelName: TeamRatingModelName,
 ): Promise<TeamRatingSheetSummary> {
-  const spreadsheetId = getWriteSpreadsheetIdForModel(modelName, { seasonId });
-  const sheetName = SHEETS_CONFIG.SHEETS[modelName];
+  if (
+    options.weekIds.length > 0 &&
+    (modelName === "TeamDayStatLine" || modelName === "TeamWeekStatLine")
+  ) {
+    const [rows, seasonRows] = await Promise.all([
+      fetchWeekScopedModel<DatabaseRecord>(
+        modelName,
+        seasonId,
+        options.weekIds,
+      ),
+      fetchModel<DatabaseRecord>("Season"),
+    ]);
+    await rankRowsWithAppsScriptEngine(rows, {
+      sheetName: modelName,
+      outputField: "Rating",
+      mutate: true,
+      dataContext: { seasonRows },
+    });
+    const teamIdSet = new Set(options.teamIds);
+    const targetRows = rows.filter(
+      (row) =>
+        teamIdSet.size === 0 ||
+        teamIdSet.has(String(row.gshlTeamId ?? "").trim()),
+    );
+    let updatedRows = 0;
+    if (options.apply) {
+      const patches = targetRows.map((row) => {
+        const id = String(row.id ?? "").trim();
+        if (!id) {
+          throw new Error("[ratings:rebuild-team] Missing Convex row id.");
+        }
+        const rating = row.Rating ?? 0;
+        return {
+          id,
+          data: {
+            Rating: rating === "" || rating === null ? 0 : rating,
+            updatedAt: new Date(),
+          },
+        };
+      });
+      updatedRows = await updateRowsById(modelName, patches);
+    }
+    return {
+      modelName,
+      spreadsheetId: "production-convex",
+      sheetName: modelName,
+      outputField: "Rating",
+      matchedRows: targetRows.length,
+      updatedRows,
+      dryRun: !options.apply,
+    };
+  }
+  const spreadsheetId = "production-convex";
+  const sheetName = modelName;
   const outputField = "Rating";
-  const rows = (
-    await fastSheetsReader.fetchModel<DatabaseRecord>(modelName)
-  ).filter((row) => String(row.seasonId ?? "") === seasonId);
+  const [rows, seasonRows] = await Promise.all([
+    fetchSeasonModel<DatabaseRecord>(modelName, seasonId),
+    fetchModel<DatabaseRecord>("Season"),
+  ]);
 
   await rankRowsWithAppsScriptEngine(rows, {
     sheetName: modelName satisfies RankingEngineSheetName,
     outputField,
     mutate: true,
+    dataContext: { seasonRows },
   });
 
   for (const row of rows) {
@@ -197,18 +337,16 @@ async function executeTeamRatingModel(
   }
 
   if (options.apply && rows.length > 0) {
-    await minimalSheetsWriter.upsertByCompositeKey(
-      modelName,
-      getCompositeKeyColumnsForModel(modelName),
-      rows,
-      {
-        merge: true,
-        idColumn: "id",
-        createdAtColumn: "createdAt",
-        updatedAtColumn: "updatedAt",
-        spreadsheetId,
-      },
-    );
+    const patches = rows.map((row) => {
+      const id = String(row.id ?? "").trim();
+      if (!id)
+        throw new Error(`[ratings:rebuild-team] Missing ${modelName} id.`);
+      return {
+        id,
+        data: { Rating: row.Rating ?? 0, updatedAt: new Date() },
+      };
+    });
+    await updateRowsById(modelName, patches);
   }
 
   return {
@@ -239,9 +377,9 @@ async function executeSeason(
   }
 
   let powerRefresh: TeamRatingSeasonSummary["powerRefresh"] = null;
-  if (options.includeTeamWeeks) {
+  if (options.includeTeamWeeks && options.weekIds.length === 0) {
     const powerResult = await runLocalPowerRankingsSeason(seasonId, {
-      dryRun: !options.apply,
+      dryRun: true,
       returnRows: true,
       logToConsole: options.logToConsole,
     });
@@ -250,57 +388,72 @@ async function executeSeason(
       const weekUpdates = powerResult.weekUpdates ?? [];
       const seasonUpdates = powerResult.seasonUpdates ?? [];
       const matchupUpdates = powerResult.matchupUpdates ?? [];
+      const [existingWeeks, existingSeasons, existingMatchups] =
+        await Promise.all([
+          fetchSeasonModel<DatabaseRecord>("TeamWeekStatLine", seasonId),
+          fetchSeasonModel<DatabaseRecord>("TeamSeasonStatLine", seasonId),
+          fetchSeasonModel<DatabaseRecord>("Matchup", seasonId),
+        ]);
+      const weekIdByKey = new Map(
+        existingWeeks.map((row) => [
+          `${String(row.seasonId)}|${String(row.weekId)}|${String(row.gshlTeamId)}`,
+          String(row.id ?? ""),
+        ]),
+      );
+      const seasonIdByKey = new Map(
+        existingSeasons.map((row) => [
+          `${String(row.seasonId)}|${String(row.seasonType)}|${String(row.gshlTeamId)}`,
+          String(row.id ?? ""),
+        ]),
+      );
+      const matchupIdSet = new Set(
+        existingMatchups.map((row) => String(row.id ?? "")),
+      );
 
-      if (weekUpdates.length > 0) {
-        await minimalSheetsWriter.upsertByCompositeKey(
-          "TeamWeekStatLine",
-          getCompositeKeyColumnsForModel("TeamWeekStatLine"),
-          weekUpdates,
-          {
-            merge: true,
-            idColumn: "id",
-            createdAtColumn: "createdAt",
-            updatedAtColumn: "updatedAt",
-            spreadsheetId: getWriteSpreadsheetIdForModel("TeamWeekStatLine", {
-              seasonId,
-            }),
-          },
+      const weekPatches = weekUpdates.map((row) => {
+        const id = weekIdByKey.get(
+          `${String(row.seasonId)}|${String(row.weekId)}|${String(row.gshlTeamId)}`,
         );
-      }
-
-      if (seasonUpdates.length > 0) {
-        await minimalSheetsWriter.upsertByCompositeKey(
-          "TeamSeasonStatLine",
-          getCompositeKeyColumnsForModel("TeamSeasonStatLine"),
-          seasonUpdates,
-          {
-            merge: true,
-            idColumn: "id",
-            createdAtColumn: "createdAt",
-            updatedAtColumn: "updatedAt",
-            spreadsheetId: getWriteSpreadsheetIdForModel("TeamSeasonStatLine", {
-              seasonId,
-            }),
+        if (!id)
+          throw new Error("[ratings:rebuild-team] Missing power TeamWeek row.");
+        return {
+          id,
+          data: {
+            ...normalizeNullableNumbers(row, TEAM_WEEK_POWER_NUMBER_FIELDS),
+            updatedAt: new Date(),
           },
+        };
+      });
+      const seasonPatches = seasonUpdates.map((row) => {
+        const id = seasonIdByKey.get(
+          `${String(row.seasonId)}|${String(row.seasonType)}|${String(row.gshlTeamId)}`,
         );
-      }
-
-      if (matchupUpdates.length > 0) {
-        await minimalSheetsWriter.upsertByCompositeKey(
-          "Matchup",
-          ["id"],
-          matchupUpdates,
-          {
-            merge: true,
-            idColumn: "id",
-            createdAtColumn: "createdAt",
-            updatedAtColumn: "updatedAt",
-            spreadsheetId: getWriteSpreadsheetIdForModel("Matchup", {
-              seasonId,
-            }),
+        if (!id)
+          throw new Error(
+            "[ratings:rebuild-team] Missing power TeamSeason row.",
+          );
+        return {
+          id,
+          data: {
+            ...normalizeNullableNumbers(row, ["powerRk"]),
+            updatedAt: new Date(),
           },
+        };
+      });
+      const matchupPatches = matchupUpdates.map((row) => {
+        const id = String(row.id ?? "").trim();
+        if (!id || !matchupIdSet.has(id)) {
+          throw new Error("[ratings:rebuild-team] Missing power Matchup row.");
+        }
+        const { id: _id, ...data } = normalizeNullableNumbers(
+          row,
+          MATCHUP_POWER_NUMBER_FIELDS,
         );
-      }
+        return { id, data: { ...data, updatedAt: new Date() } };
+      });
+      await updateRowsById("TeamWeekStatLine", weekPatches);
+      await updateRowsById("TeamSeasonStatLine", seasonPatches);
+      await updateRowsById("Matchup", matchupPatches);
     }
 
     powerRefresh = {
@@ -331,11 +484,69 @@ async function executeSeason(
 }
 
 async function main(): Promise<void> {
-  process.env.USE_GOOGLE_SHEETS ??= "true";
-  process.env.GOOGLE_SERVICE_ACCOUNT_KEY_FILE ??=
-    path.resolve("credentials.json");
-
-  const options = await parseOptions(process.argv.slice(2));
+  const parsedOptions = await parseOptions(process.argv.slice(2));
+  const [seasonRows, weekRows, teamRows] = await Promise.all([
+    fetchModel<DatabaseRecord>("Season"),
+    fetchModel<DatabaseRecord>("Week"),
+    fetchModel<DatabaseRecord>("Team"),
+  ]);
+  const seasonIds = resolveIds(seasonRows, parsedOptions.seasonIds, "Season");
+  const hasWeekTeamScope =
+    parsedOptions.weekIds.length > 0 ||
+    parsedOptions.weekNums.length > 0 ||
+    parsedOptions.teamIds.length > 0;
+  if (hasWeekTeamScope && seasonIds.length !== 1) {
+    throw new Error(
+      "[ratings:rebuild-team] Week/team scope requires exactly one season id.",
+    );
+  }
+  const seasonId = seasonIds[0] ?? "";
+  const weekIds = resolveIds(weekRows, parsedOptions.weekIds, "Week");
+  for (const weekNum of parsedOptions.weekNums) {
+    const week = weekRows.find(
+      (row) =>
+        String(row.seasonId ?? "").trim() === seasonId &&
+        String(row.weekNum ?? "").trim() === weekNum,
+    );
+    if (!week) {
+      throw new Error(
+        `[ratings:rebuild-team] Week number ${weekNum} was not found in the selected season.`,
+      );
+    }
+    weekIds.push(String(week.id ?? "").trim());
+  }
+  const teamIds = resolveIds(teamRows, parsedOptions.teamIds, "Team");
+  if (
+    weekIds.some((weekId) =>
+      weekRows.some(
+        (row) =>
+          String(row.id ?? "").trim() === weekId &&
+          String(row.seasonId ?? "").trim() !== seasonId,
+      ),
+    ) ||
+    teamIds.some((teamId) =>
+      teamRows.some(
+        (row) =>
+          String(row.id ?? "").trim() === teamId &&
+          String(row.seasonId ?? "").trim() !== seasonId,
+      ),
+    )
+  ) {
+    throw new Error(
+      "[ratings:rebuild-team] Selected weeks and teams must belong to the selected season.",
+    );
+  }
+  if (teamIds.length > 0 && weekIds.length === 0) {
+    throw new Error(
+      "[ratings:rebuild-team] --team-id/--team-ids requires a week id or week number.",
+    );
+  }
+  const options: TeamRatingRebuildOptions = {
+    ...parsedOptions,
+    seasonIds,
+    weekIds: Array.from(new Set(weekIds)),
+    teamIds,
+  };
   const selectedModels = getSelectedModels(options);
   if (!options.apply) {
     warn(
