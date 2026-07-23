@@ -3,9 +3,11 @@ import test from "node:test";
 import type { Contract, Player, Season } from "@gshl-types";
 import { ContractStatus, ContractType, ResignableStatus } from "@gshl-types";
 import {
+  checkContractCapSpace,
   deriveContractCreationTerms,
   getContractCoveredSeasonIds,
   hasContractContinuity,
+  isUnsignedForSigningSeason,
   isUfaFreeAgencyOpen,
 } from "./contracts";
 
@@ -173,4 +175,77 @@ void test("UFA free agency opens after the signing deadline", () => {
     isUfaFreeAgencyOpen(signingSeason, new Date("2020-06-21T16:00:00Z")),
     true,
   );
+});
+
+void test("unsigned Summer UFA eligibility uses contract history", () => {
+  assert.equal(isUnsignedForSigningSeason("player-1", "6", [], seasons), true);
+  assert.equal(
+    isUnsignedForSigningSeason(
+      "player-1",
+      "6",
+      [contract({ seasonId: "6" })],
+      seasons,
+    ),
+    false,
+  );
+  assert.equal(
+    isUnsignedForSigningSeason(
+      "player-1",
+      "6",
+      [contract({ seasonId: "5", contractLength: 1 })],
+      seasons,
+    ),
+    false,
+  );
+});
+
+void test("cap checks accept the exact cap and reject one dollar over", () => {
+  const committed = contract({
+    playerId: "other-player",
+    seasonId: "6",
+    contractLength: 1,
+    capHit: 20_000_000,
+  });
+
+  const exactCap = checkContractCapSpace({
+    ownerId: "owner-1",
+    signingSeasonId: "6",
+    contractLength: 1,
+    contractSalary: 5_000_000,
+    contracts: [committed],
+    seasons,
+  });
+  assert.equal(exactCap.affordable, true);
+  assert.equal(exactCap.availableCapSpace, 5_000_000);
+
+  const overCap = checkContractCapSpace({
+    ownerId: "owner-1",
+    signingSeasonId: "6",
+    contractLength: 1,
+    contractSalary: 5_000_001,
+    contracts: [committed],
+    seasons,
+  });
+  assert.equal(overCap.affordable, false);
+});
+
+void test("cap checks every season covered by a multi-year contract", () => {
+  const futureCommitment = contract({
+    playerId: "other-player",
+    seasonId: "7",
+    contractLength: 1,
+    capHit: 23_000_000,
+  });
+  const result = checkContractCapSpace({
+    ownerId: "owner-1",
+    signingSeasonId: "6",
+    contractLength: 2,
+    contractSalary: 3_000_000,
+    contracts: [futureCommitment],
+    seasons,
+  });
+
+  assert.equal(result.affordable, false);
+  assert.equal(result.limitingSeasonId, "8");
+  assert.equal(result.availableCapSpace, 2_000_000);
 });

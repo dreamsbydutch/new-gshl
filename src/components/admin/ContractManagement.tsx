@@ -8,10 +8,19 @@ import {
   useSeasons,
   useTeams,
 } from "@gshl-hooks";
-import { Button, Select } from "@gshl-ui";
 import {
+  Button,
+  Input,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+  Select,
+} from "@gshl-ui";
+import {
+  checkContractCapSpace,
   deriveContractCreationTerms,
   formatMoney,
+  isUnsignedForSigningSeason,
   isUfaFreeAgencyOpen,
 } from "@gshl-utils";
 import {
@@ -27,6 +36,8 @@ export function ContractManagement() {
   const [playerId, setPlayerId] = useState("");
   const [contractLength, setContractLength] = useState<ContractLength>(1);
   const [success, setSuccess] = useState("");
+  const [playerSearch, setPlayerSearch] = useState("");
+  const [playerPickerOpen, setPlayerPickerOpen] = useState(false);
 
   const seasonsQuery = useSeasons();
   const signingSeason = seasonsQuery.data.find((season) => season.isActive);
@@ -63,55 +74,86 @@ export function ContractManagement() {
       ),
     [contractsQuery.data, signingSeason?.id],
   );
-  const signablePlayers = useMemo(() => {
-    if (!selectedTeam) return [];
+  const signablePlayerOptions = useMemo(() => {
+    if (!selectedTeam?.ownerId || !signingSeason) return [];
+    const ownerId = selectedTeam.ownerId;
     return playersQuery.data
-      .filter((player) => {
+      .flatMap((player) => {
         const belongsToTeam =
           String(player.gshlTeamId) === String(selectedTeam.franchiseId);
         const isLeagueUfa =
           freeAgencyOpen &&
-          String(player.isResignable).toUpperCase() ===
-            String(ResignableStatus.UFA);
-        return (
+          isUnsignedForSigningSeason(
+            String(player.id),
+            String(signingSeason.id),
+            contractsQuery.data,
+            seasonsQuery.data,
+          );
+        const eligible =
           player.isActive &&
-          player.isSignable &&
-          Boolean(player.isResignable) &&
-          (belongsToTeam || isLeagueUfa) &&
-          !playerHasSigningSeasonContract.has(String(player.id))
-        );
-      })
-      .sort((left, right) => left.fullName.localeCompare(right.fullName));
-  }, [
-    freeAgencyOpen,
-    playerHasSigningSeasonContract,
-    playersQuery.data,
-    selectedTeam,
-  ]);
-  const selectedPlayer = signablePlayers.find(
-    (player) => String(player.id) === playerId,
-  );
+          ((player.isSignable &&
+            Boolean(player.isResignable) &&
+            belongsToTeam) ||
+            isLeagueUfa) &&
+          !playerHasSigningSeasonContract.has(String(player.id));
+        if (!eligible) return [];
 
-  const preview = useMemo(() => {
-    if (!selectedPlayer || !signingSeason) return null;
-    try {
-      return deriveContractCreationTerms({
-        player: selectedPlayer,
-        signingSeason,
-        contractLength,
-        contracts: contractsQuery.data,
-        seasons: seasonsQuery.data,
-      });
-    } catch {
-      return null;
-    }
+        try {
+          const terms = deriveContractCreationTerms({
+            player: freeAgencyOpen
+              ? { ...player, isResignable: ResignableStatus.UFA }
+              : player,
+            signingSeason,
+            contractLength,
+            contracts: contractsQuery.data,
+            seasons: seasonsQuery.data,
+          });
+          const capCheck = checkContractCapSpace({
+            ownerId,
+            signingSeasonId: String(signingSeason.id),
+            contractLength,
+            contractSalary: terms.contractSalary,
+            contracts: contractsQuery.data,
+            seasons: seasonsQuery.data,
+          });
+          return capCheck.affordable ? [{ player, terms }] : [];
+        } catch {
+          return [];
+        }
+      })
+      .sort((left, right) =>
+        left.player.fullName.localeCompare(right.player.fullName),
+      );
   }, [
     contractLength,
     contractsQuery.data,
+    freeAgencyOpen,
+    playerHasSigningSeasonContract,
+    playersQuery.data,
     seasonsQuery.data,
-    selectedPlayer,
+    selectedTeam,
     signingSeason,
   ]);
+  const selectedPlayerOption = signablePlayerOptions.find(
+    ({ player }) => String(player.id) === playerId,
+  );
+  const selectedPlayer = selectedPlayerOption?.player;
+  const preview = selectedPlayerOption?.terms ?? null;
+  const filteredPlayerOptions = useMemo(() => {
+    const search = playerSearch.trim().toLocaleLowerCase();
+    if (!search) return signablePlayerOptions;
+    return signablePlayerOptions.filter(({ player }) =>
+      [
+        player.fullName,
+        player.nhlTeam,
+        player.posGroup,
+        ...(player.nhlPos ?? []),
+      ]
+        .join(" ")
+        .toLocaleLowerCase()
+        .includes(search),
+    );
+  }, [playerSearch, signablePlayerOptions]);
 
   const isLoading =
     seasonsQuery.isLoading ||
@@ -130,6 +172,7 @@ export function ContractManagement() {
         onSuccess: () => {
           setSuccess(`${selectedPlayer.fullName}'s contract was created.`);
           setPlayerId("");
+          setPlayerSearch("");
         },
       },
     );
@@ -146,8 +189,8 @@ export function ContractManagement() {
         </p>
         {freeAgencyOpen ? (
           <p className="mt-2 text-sm font-medium text-green-700">
-            UFA free agency is open. Any signable UFA can sign with any team at
-            the 125% premium.
+            UFA free agency is open. Any active player without a current or
+            continuing contract can sign with any team at the 125% premium.
           </p>
         ) : null}
       </div>
@@ -162,6 +205,7 @@ export function ContractManagement() {
               onValueChange={(value) => {
                 setTeamId(value);
                 setPlayerId("");
+                setPlayerSearch("");
                 setSuccess("");
               }}
             >
@@ -174,42 +218,91 @@ export function ContractManagement() {
             </Select>
           </label>
 
-          <label className="space-y-1 text-sm font-medium">
+          <div className="space-y-1 text-sm font-medium">
             <span>Signable player</span>
-            <Select
-              value={playerId}
-              disabled={!selectedTeam || isLoading}
-              onValueChange={(value) => {
-                setPlayerId(value);
-                setSuccess("");
-              }}
-            >
-              <option value="">
-                {selectedTeam && !isLoading && signablePlayers.length === 0
-                  ? "No signable players"
-                  : "Select player"}
-              </option>
-              {signablePlayers.map((player) => (
-                <option key={player.id} value={player.id}>
-                  {player.fullName} ({player.isResignable}
-                  {freeAgencyOpen &&
-                  String(player.gshlTeamId) !==
-                    String(selectedTeam?.franchiseId)
-                    ? " · league-wide"
-                    : ""}
-                  )
-                </option>
-              ))}
-            </Select>
-          </label>
+            <Popover open={playerPickerOpen} onOpenChange={setPlayerPickerOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full justify-start truncate font-normal"
+                  disabled={!selectedTeam || isLoading}
+                  aria-label="Search and select a signable player"
+                >
+                  {selectedPlayer?.fullName ??
+                    (selectedTeam &&
+                    !isLoading &&
+                    signablePlayerOptions.length === 0
+                      ? "No affordable signable players"
+                      : "Search players…")}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-80 p-2" align="start">
+                <Input
+                  value={playerSearch}
+                  onChange={(event) => setPlayerSearch(event.target.value)}
+                  placeholder="Search by name, NHL team, or position"
+                  aria-label="Search signable players"
+                  autoFocus
+                />
+                <div
+                  className="mt-2 max-h-72 space-y-1 overflow-y-auto"
+                  role="listbox"
+                  aria-label="Affordable signable players"
+                >
+                  {filteredPlayerOptions.length === 0 ? (
+                    <p className="px-2 py-3 text-sm text-muted-foreground">
+                      No matching affordable players.
+                    </p>
+                  ) : (
+                    filteredPlayerOptions.map(({ player, terms }) => (
+                      <button
+                        key={player.id}
+                        type="button"
+                        role="option"
+                        aria-selected={String(player.id) === playerId}
+                        className="flex w-full items-center justify-between gap-3 rounded px-2 py-2 text-left text-sm hover:bg-muted focus-visible:bg-muted focus-visible:outline-none"
+                        onClick={() => {
+                          setPlayerId(String(player.id));
+                          setPlayerSearch("");
+                          setPlayerPickerOpen(false);
+                          setSuccess("");
+                        }}
+                      >
+                        <span className="min-w-0">
+                          <span className="block truncate font-medium">
+                            {player.fullName}
+                          </span>
+                          <span className="block text-xs text-muted-foreground">
+                            {player.nhlTeam} · {player.posGroup}
+                          </span>
+                        </span>
+                        <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+                          {formatMoney(terms.contractSalary)}
+                        </span>
+                      </button>
+                    ))
+                  )}
+                </div>
+              </PopoverContent>
+            </Popover>
+            {selectedTeam && !isLoading ? (
+              <span className="block text-xs font-normal text-muted-foreground">
+                Only players affordable for the selected term are shown.
+              </span>
+            ) : null}
+          </div>
 
           <label className="space-y-1 text-sm font-medium">
             <span>Years</span>
             <Select
               value={String(contractLength)}
-              onValueChange={(value) =>
-                setContractLength(Number(value) as ContractLength)
-              }
+              onValueChange={(value) => {
+                setContractLength(Number(value) as ContractLength);
+                setPlayerId("");
+                setPlayerSearch("");
+                setSuccess("");
+              }}
             >
               {LENGTHS.map((length) => (
                 <option key={length} value={length}>

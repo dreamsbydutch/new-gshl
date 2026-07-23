@@ -8,6 +8,7 @@ import {
 import { idSchema, baseQuerySchema } from "./_schemas";
 import {
   ResignableStatus,
+  SALARY_CAP,
   type Contract,
   type Franchise,
   type Owner,
@@ -16,8 +17,10 @@ import {
   type Team,
 } from "@gshl-types";
 import {
+  checkContractCapSpace,
   deriveContractCreationTerms,
   getTorontoDate,
+  isUnsignedForSigningSeason,
   isUfaFreeAgencyOpen,
   type ContractCreationTerms,
 } from "@gshl-utils";
@@ -58,16 +61,18 @@ export const contractRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ input }): Promise<Contract> => {
-      const [team, player, signingSeason, seasons, playerContracts] =
+      const [team, player, signingSeason, seasons, allContracts] =
         await Promise.all([
           getById<Team>("Team", input.teamId),
           getById<Player>("Player", input.playerId),
           getFirst<Season>("Season", { where: { isActive: true } }),
           getMany<Season>("Season"),
-          getMany<Contract>("Contract", {
-            where: { playerId: input.playerId },
-          }),
+          getMany<Contract>("Contract"),
         ]);
+
+      const playerContracts = allContracts.filter(
+        (contract) => String(contract.playerId) === String(input.playerId),
+      );
 
       if (!team) reject("The selected team could not be found.");
       if (!player) reject("The selected player could not be found.");
@@ -93,11 +98,16 @@ export const contractRouter = createTRPCRouter({
       }
       const belongsToTeam =
         String(player.gshlTeamId) === String(team.franchiseId);
-      const isCrossTeamUfa =
-        !belongsToTeam &&
-        String(player.isResignable).toUpperCase() ===
-          String(ResignableStatus.UFA) &&
-        isUfaFreeAgencyOpen(signingSeason);
+      const summerFreeAgencyOpen = isUfaFreeAgencyOpen(signingSeason);
+      const isUnsignedSummerUfa =
+        summerFreeAgencyOpen &&
+        isUnsignedForSigningSeason(
+          String(player.id),
+          String(signingSeason.id),
+          playerContracts,
+          seasons,
+        );
+      const isCrossTeamUfa = !belongsToTeam && isUnsignedSummerUfa;
 
       const duplicate = playerContracts.find(
         (contract) => String(contract.seasonId) === String(signingSeason.id),
@@ -122,7 +132,7 @@ export const contractRouter = createTRPCRouter({
         return duplicate;
       }
 
-      if (!player.isActive || !player.isSignable) {
+      if (!player.isActive || (!player.isSignable && !isUnsignedSummerUfa)) {
         reject("The selected player is no longer signable.", "CONFLICT");
       }
       if (!belongsToTeam && !isCrossTeamUfa) {
@@ -134,7 +144,9 @@ export const contractRouter = createTRPCRouter({
       let terms: ContractCreationTerms;
       try {
         terms = deriveContractCreationTerms({
-          player,
+          player: isUnsignedSummerUfa
+            ? { ...player, isResignable: ResignableStatus.UFA }
+            : player,
           signingSeason,
           contractLength: input.contractLength,
           contracts: playerContracts,
@@ -145,6 +157,38 @@ export const contractRouter = createTRPCRouter({
           error instanceof Error
             ? error.message
             : "Contract terms are invalid.",
+        );
+      }
+
+      const capCheck = checkContractCapSpace({
+        ownerId: String(resolvedOwner.id),
+        signingSeasonId: String(signingSeason.id),
+        contractLength: input.contractLength,
+        contractSalary: terms.contractSalary,
+        contracts: allContracts,
+        seasons,
+      });
+      if (!capCheck.affordable) {
+        const limitingSeason = seasons.find(
+          (season) => String(season.id) === capCheck.limitingSeasonId,
+        );
+        reject(
+          `This contract requires ${terms.contractSalary.toLocaleString(
+            "en-CA",
+            {
+              style: "currency",
+              currency: "CAD",
+              maximumFractionDigits: 0,
+            },
+          )}, but the team only has ${Math.max(
+            0,
+            capCheck.availableCapSpace,
+          ).toLocaleString("en-CA", {
+            style: "currency",
+            currency: "CAD",
+            maximumFractionDigits: 0,
+          })} available${limitingSeason ? ` in ${limitingSeason.name}` : ""}. The ${SALARY_CAP.toLocaleString("en-CA", { style: "currency", currency: "CAD", maximumFractionDigits: 0 })} salary cap cannot be exceeded.`,
+          "CONFLICT",
         );
       }
 

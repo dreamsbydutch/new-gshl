@@ -35,6 +35,14 @@ export type ContractCreationTerms = {
   expiryDate: string;
 };
 
+export type ContractCapCheck = {
+  affordable: boolean;
+  coveredSeasonIds: string[];
+  limitingSeasonId: string | null;
+  availableCapSpace: number;
+  requiredSalary: number;
+};
+
 const NON_PLAYING_CONTRACT_STATUSES = new Set<string>([
   String(ContractStatus.BUYOUT),
   String(ContractStatus.RETIRED),
@@ -95,6 +103,61 @@ export function getContractCoveredSeasonIds(
     .map((season) => String(season.id));
 }
 
+/** Checks a proposed contract against an owner's cap in every covered season. */
+export function checkContractCapSpace(options: {
+  ownerId: string;
+  signingSeasonId: string;
+  contractLength: 1 | 2 | 3;
+  contractSalary: number;
+  contracts: Contract[];
+  seasons: Season[];
+  salaryCap?: number;
+}): ContractCapCheck {
+  const {
+    ownerId,
+    signingSeasonId,
+    contractLength,
+    contractSalary,
+    contracts,
+    seasons,
+    salaryCap = SALARY_CAP,
+  } = options;
+  const coveredSeasonIds = getContractCoveredSeasonIds(
+    { seasonId: signingSeasonId, contractLength },
+    seasons,
+  );
+
+  let limitingSeasonId: string | null = null;
+  let availableCapSpace = salaryCap;
+
+  for (const seasonId of coveredSeasonIds) {
+    const committed = contracts.reduce((total, contract) => {
+      if (String(contract.ownerId) !== String(ownerId)) return total;
+      if (!getContractCoveredSeasonIds(contract, seasons).includes(seasonId)) {
+        return total;
+      }
+      const capHit = Number(contract.capHit ?? contract.contractSalary ?? 0);
+      return total + (Number.isFinite(capHit) ? capHit : 0);
+    }, 0);
+    const seasonCapSpace = salaryCap - committed;
+
+    if (limitingSeasonId == null || seasonCapSpace < availableCapSpace) {
+      limitingSeasonId = seasonId;
+      availableCapSpace = seasonCapSpace;
+    }
+  }
+
+  return {
+    affordable:
+      coveredSeasonIds.length === contractLength &&
+      contractSalary <= availableCapSpace,
+    coveredSeasonIds,
+    limitingSeasonId,
+    availableCapSpace,
+    requiredSalary: contractSalary,
+  };
+}
+
 /** Identifies contracts that represent a player occupying a roster spot. */
 export function isPlayingContract(
   contract: Pick<Contract, "contractType" | "expiryStatus">,
@@ -127,6 +190,33 @@ export function hasContractContinuity(
       getContractCoveredSeasonIds(contract, seasons).includes(
         String(signingSeasonId),
       ),
+  );
+}
+
+/**
+ * Returns whether a player is genuinely unsigned for a signing season.
+ *
+ * A player is not unsigned when they already have a contract created in the
+ * signing season or when an earlier playing contract still covers that season.
+ * Contract history is authoritative here because the denormalized player
+ * signing flags may not yet have been advanced at the start of Summer Free
+ * Agency.
+ */
+export function isUnsignedForSigningSeason(
+  playerId: string,
+  signingSeasonId: string,
+  contracts: Contract[],
+  seasons: Season[],
+): boolean {
+  const hasSigningSeasonContract = contracts.some(
+    (contract) =>
+      String(contract.playerId) === String(playerId) &&
+      String(contract.seasonId) === String(signingSeasonId),
+  );
+
+  return (
+    !hasSigningSeasonContract &&
+    !hasContractContinuity(playerId, signingSeasonId, contracts, seasons)
   );
 }
 
