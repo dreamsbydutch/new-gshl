@@ -61,27 +61,17 @@ const numberValue = (value: unknown, fallback = 0) => {
 };
 
 function getWindow(season: Season | null) {
-  const draftStartAt = season?.draftStartAt
-    ? Date.parse(season.draftStartAt)
-    : Number.NaN;
-  const now = Date.now();
   const afterSigning = Boolean(
     season?.signingEndDate && getTorontoDate() > season.signingEndDate,
   );
-  const configured = Number.isFinite(draftStartAt);
   return {
-    isOpen: afterSigning && configured && now < draftStartAt,
+    isOpen: afterSigning,
     signingEndDate: season?.signingEndDate ?? null,
-    draftStartAt: configured ? new Date(draftStartAt).toISOString() : null,
     reason: !season
       ? "There is no active signing season."
       : !afterSigning
         ? "Summer Free Agency opens after the signing deadline."
-        : !configured
-          ? "The draft start time has not been configured."
-          : now >= draftStartAt
-            ? "Summer Free Agency closed when the draft began."
-            : null,
+        : null,
   };
 }
 

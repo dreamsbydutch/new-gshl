@@ -385,7 +385,15 @@ export function UfaLeagueOffice() {
   const players = useMemo(
     () =>
       query.data?.freeAgents.filter(
-        (player) => filter === "ALL" || player.positionGroup === filter,
+        (player) =>
+          filter === "ALL" ||
+          (filter === "F"
+            ? player.positionGroup === "F"
+            : filter === "D" || filter === "G"
+              ? player.positionGroup === filter
+              : player.positions.some(
+                  (position) => position.toUpperCase() === filter,
+                )),
       ) ?? [],
     [filter, query.data?.freeAgents],
   );
@@ -407,8 +415,11 @@ export function UfaLeagueOffice() {
           125% salary.
         </p>
       </div>
-      <div className="flex gap-2" aria-label="Filter free agents by position">
-        {["ALL", "F", "D", "G"].map((value) => (
+      <div
+        className="flex flex-wrap gap-2"
+        aria-label="Filter free agents by position"
+      >
+        {["ALL", "F", "LW", "RW", "C", "D", "G"].map((value) => (
           <button
             key={value}
             type="button"

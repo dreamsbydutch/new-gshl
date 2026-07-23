@@ -456,12 +456,9 @@ export const submitOffer = mutation({
     );
     const signingSeason = orderedSeasons.find((season: any) => season.isActive);
     if (!signingSeason) throw new Error("There is no active signing season.");
-    const draftAt = Date.parse(String(signingSeason.draftStartAt ?? ""));
     if (
       !signingSeason.signingEndDate ||
-      torontoDate(now) <= String(signingSeason.signingEndDate) ||
-      !Number.isFinite(draftAt) ||
-      now >= draftAt
+      torontoDate(now) <= String(signingSeason.signingEndDate)
     ) {
       throw new Error("Summer Free Agency is not open.");
     }
@@ -561,7 +558,7 @@ export const submitOffer = mutation({
     }
 
     if (!group) {
-      const deadlineAt = Math.min(now + 7 * DAY, draftAt);
+      const deadlineAt = now + 7 * DAY;
       const groupId = await db.insert("ufaOfferGroups", {
         playerId: args.playerId,
         seasonId: signingSeason._id,

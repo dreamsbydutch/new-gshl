@@ -9,24 +9,17 @@ export function calculateUfaSalary(baseSalary: unknown): number {
 }
 
 export function getUfaWindow(
-  season: Pick<Season, "signingEndDate" | "draftStartAt"> | null,
+  season: Pick<Season, "signingEndDate"> | null,
   referenceDate = new Date(),
 ) {
-  const draftStartAt = season?.draftStartAt
-    ? Date.parse(season.draftStartAt)
-    : Number.NaN;
   const afterSigning = Boolean(
     season?.signingEndDate &&
       getTorontoDate(referenceDate) > season.signingEndDate,
   );
-  const configured = Number.isFinite(draftStartAt);
   const now = referenceDate.getTime();
   return {
-    isOpen: afterSigning && configured && now < draftStartAt,
-    draftStartAt: configured ? draftStartAt : null,
-    deadlineForFirstOffer: configured
-      ? Math.min(now + UFA_OFFER_MS, draftStartAt)
-      : null,
+    isOpen: afterSigning,
+    deadlineForFirstOffer: afterSigning ? now + UFA_OFFER_MS : null,
   };
 }
 

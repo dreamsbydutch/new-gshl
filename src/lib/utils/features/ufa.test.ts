@@ -13,7 +13,7 @@ void test("UFA salary applies and rounds the 125 percent premium", () => {
   assert.equal(calculateUfaSalary(null), 0);
 });
 
-void test("UFA window opens after signing and closes at the draft timestamp", () => {
+void test("UFA window opens after signing regardless of draft configuration", () => {
   const season = {
     signingEndDate: "2026-06-30",
     draftStartAt: "2026-10-03T23:00:00.000Z",
@@ -24,17 +24,20 @@ void test("UFA window opens after signing and closes at the draft timestamp", ()
   );
   assert.equal(
     getUfaWindow(season, new Date("2026-10-03T23:00:00.000Z")).isOpen,
-    false,
+    true,
   );
 });
 
-void test("late first offers are shortened to the draft start", () => {
-  const draftStartAt = "2026-10-03T23:00:00.000Z";
+void test("first offers always receive a seven-day window", () => {
+  const referenceDate = new Date("2026-10-01T12:00:00.000Z");
   const window = getUfaWindow(
-    { signingEndDate: "2026-06-30", draftStartAt },
-    new Date("2026-10-01T12:00:00.000Z"),
+    { signingEndDate: "2026-06-30" },
+    referenceDate,
   );
-  assert.equal(window.deadlineForFirstOffer, Date.parse(draftStartAt));
+  assert.equal(
+    window.deadlineForFirstOffer,
+    referenceDate.getTime() + 7 * 24 * 60 * 60 * 1_000,
+  );
 });
 
 void test("weighted odds total one and preserve the five percent floor", () => {
