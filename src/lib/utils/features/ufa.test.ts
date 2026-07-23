@@ -7,6 +7,7 @@ import {
   getUfaWindow,
   indexLatestUfaNhlStats,
   rankUfas,
+  selectAffordableUfas,
   selectTopAffordableUfas,
   selectUfaOffer,
 } from "./ufa";
@@ -53,6 +54,10 @@ void test("UFAs rank by salary and the home list keeps only affordable players",
   );
   assert.deepEqual(
     selectTopAffordableUfas(ranked, 2).map((player) => player.fullName),
+    ["Affordable One", "Affordable Two"],
+  );
+  assert.deepEqual(
+    selectAffordableUfas(ranked).map((player) => player.fullName),
     ["Affordable One", "Affordable Two"],
   );
 });

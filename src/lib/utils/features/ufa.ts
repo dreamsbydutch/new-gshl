@@ -90,9 +90,13 @@ export function rankUfas<
 export function selectTopAffordableUfas<
   T extends { affordableTerms: readonly unknown[] },
 >(players: T[], limit = 15): T[] {
-  return players
-    .filter((player) => player.affordableTerms.length > 0)
-    .slice(0, limit);
+  return selectAffordableUfas(players).slice(0, limit);
+}
+
+export function selectAffordableUfas<
+  T extends { affordableTerms: readonly unknown[] },
+>(players: T[]): T[] {
+  return players.filter((player) => player.affordableTerms.length > 0);
 }
 
 export function indexLatestUfaNhlStats<

@@ -203,7 +203,6 @@ async function calculateOdds(ctx: any, groupId: any) {
     nhlStats,
     teamAwards,
   ] = await Promise.all([
-    db.get(groupId),
     db.query("players").collect(),
     db.query("contracts").collect(),
     db.query("teams").collect(),

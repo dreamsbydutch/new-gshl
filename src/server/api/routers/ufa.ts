@@ -18,7 +18,7 @@ import {
   indexLatestUfaNhlStats,
   isUnsignedForSigningSeason,
   rankUfas,
-  selectTopAffordableUfas,
+  selectAffordableUfas,
 } from "@gshl-utils";
 import { callConvex } from "@gshl-lib/data/convex-store";
 import {
@@ -370,12 +370,13 @@ export const ufaRouter = createTRPCRouter({
         };
       });
     const isSignedInOwner = ctx.session?.user?.role === "owner";
-    const topFreeAgents = isSignedInOwner
-      ? selectTopAffordableUfas(freeAgents, HOME_UFA_LIMIT)
-      : freeAgents.slice(0, HOME_UFA_LIMIT);
+    const visibleFreeAgents = isSignedInOwner
+      ? selectAffordableUfas(freeAgents)
+      : freeAgents;
+    const topFreeAgents = visibleFreeAgents.slice(0, HOME_UFA_LIMIT);
     return {
       window,
-      freeAgents,
+      freeAgents: visibleFreeAgents,
       topFreeAgents,
       offerGroups,
       viewer: {
