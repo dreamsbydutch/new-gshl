@@ -369,7 +369,7 @@ export const ufaRouter = createTRPCRouter({
             }),
         };
       });
-    const isSignedInOwner = ctx.session?.user?.role === "owner";
+    const isSignedInOwner = Boolean(ownerId && ownerFranchise && ownerTeam);
     const visibleFreeAgents = isSignedInOwner
       ? selectAffordableUfas(freeAgents)
       : freeAgents;
