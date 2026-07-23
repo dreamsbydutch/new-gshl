@@ -50,6 +50,7 @@ export interface UseContractDataResult {
     hasData: boolean;
   };
   currentContracts: Contract[];
+  contractPlayers: Player[];
   buyoutContracts: BuyoutContractType[];
   expiredRows: FranchiseContractHistoryRowType[];
   draftPickGroups: FranchiseDraftPickGroupType[];

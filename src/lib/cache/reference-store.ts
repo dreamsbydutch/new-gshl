@@ -212,12 +212,15 @@ class IndexedDbReferenceStore {
     const db = await this.getDb();
     if (!db) return [];
 
-    const transaction = db.transaction(storeName, "readonly");
+    const transaction = db.transaction([META_STORE, storeName], "readonly");
+    const cacheVersion = await requestToPromise<MetaRecord | undefined>(
+      transaction.objectStore(META_STORE).get(CACHE_VERSION_KEY),
+    );
     const result = await requestToPromise<T[]>(
       transaction.objectStore(storeName).getAll(),
     );
     await transactionDone(transaction);
-    return result;
+    return String(cacheVersion?.value ?? "") === CACHE_VERSION ? result : [];
   }
 
   private async putRecords<T extends { id: string }>(

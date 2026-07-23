@@ -274,10 +274,17 @@ export function useSeasonState(options: UseSeasonStateOptions = {}) {
     refetch: refetchSelectedSeason,
   } = api.season.getById.useQuery(
     { id: String(selectedSeasonId ?? "") },
-    { enabled: Boolean(selectedSeasonId) },
+    { enabled: Boolean(selectedSeasonId && !selectedSeason) },
   );
 
-  const resolvedSelectedSeason = selectedSeasonData ?? selectedSeason;
+  const resolvedSelectedSeason = selectedSeason ?? selectedSeasonData;
+
+  // Replace persisted legacy selections with the canonical Convex document id.
+  useEffect(() => {
+    if (!selectedSeason?.id || !selectedSeasonId) return;
+    if (String(selectedSeason.id) === String(selectedSeasonId)) return;
+    setSelectedSeasonId(String(selectedSeason.id));
+  }, [selectedSeason, selectedSeasonId, setSelectedSeasonId]);
 
   // Build summaries
   const currentSeasonSummary = useMemo(

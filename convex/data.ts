@@ -1181,7 +1181,7 @@ export const byId = queryGeneric({
       return legacy ? publicTeamAwardRow(ctx, legacy as never) : null;
     }
 
-    const byId = await ctx.db.get(args.id as never);
+    const byId = await safeGet(ctx, args.id);
     if (byId) return publicRow(byId as never);
 
     const byLegacyId = await ctx.db

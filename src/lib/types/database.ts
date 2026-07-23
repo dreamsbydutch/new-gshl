@@ -14,6 +14,7 @@ import type {
 // Core model types
 export interface Season {
   id: string;
+  legacyId?: string;
   year: number;
   name: string;
   categories: string[];

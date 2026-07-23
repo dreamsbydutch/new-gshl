@@ -414,7 +414,10 @@ export function findSeasonById(
 ): Season | undefined {
   if (!seasons?.length || seasonId == null) return undefined;
   const target = String(seasonId);
-  return seasons.find((season) => String(season.id) === target);
+  return seasons.find(
+    (season) =>
+      String(season.id) === target || String(season.legacyId ?? "") === target,
+  );
 }
 
 /**

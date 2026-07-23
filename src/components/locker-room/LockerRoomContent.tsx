@@ -120,8 +120,8 @@ export function LockerRoomContent() {
     : teams;
   const needsPlayers = needsContractData || isRecordBookTab;
   const { data: players = [], isLoading: playersLoading } = usePlayers({
-    gshlTeamId: currentTeam?.franchiseId,
-    enabled: needsPlayers && Boolean(currentTeam?.franchiseId),
+    gshlTeamId: currentTeam?.id,
+    enabled: needsPlayers && Boolean(currentTeam?.id),
   });
   const needsNhlTeams =
     selectedLockerRoomType === "roster" ||
@@ -187,6 +187,7 @@ export function LockerRoomContent() {
     history: teamContractHistory,
     draft: franchiseDraftSummary,
     currentContracts,
+    contractPlayers,
   } = useContractData({
     currentSeason: contractSeason,
     currentTeam,
@@ -232,7 +233,7 @@ export function LockerRoomContent() {
           <TeamContractTable
             {...{
               currentSeason: contractSeason,
-              players,
+              players: contractPlayers,
               nhlTeams,
               contracts: currentContracts,
               currentTeam,

@@ -1,7 +1,11 @@
 "use client";
 
 import { useEffect } from "react";
-import { referenceStore, CACHE_DURATIONS } from "@gshl-cache";
+import {
+  referenceStore,
+  CACHE_DURATIONS,
+  CACHE_VERSION,
+} from "@gshl-cache";
 import { clientApi as api } from "@gshl-trpc";
 import type {
   Conference,
@@ -100,8 +104,11 @@ function enrichTeamsWithRelations(
  * Returns whether the cached reference snapshot is still within the static
  * freshness window.
  */
-function hasFreshReferenceSnapshot(updatedAt: number | null) {
-  if (!updatedAt) {
+function hasFreshReferenceSnapshot(
+  updatedAt: number | null,
+  cacheVersion: string | null,
+) {
+  if (!updatedAt || cacheVersion !== CACHE_VERSION) {
     return false;
   }
 
@@ -135,7 +142,10 @@ export function useReferenceSnapshotRefresh(enabled: boolean) {
     void referenceStore.getSnapshot().then((snapshot) => {
       if (
         !isMounted ||
-        hasFreshReferenceSnapshot(snapshot?.updatedAt ?? null)
+        hasFreshReferenceSnapshot(
+          snapshot?.updatedAt ?? null,
+          snapshot?.cacheVersion ?? null,
+        )
       ) {
         return;
       }

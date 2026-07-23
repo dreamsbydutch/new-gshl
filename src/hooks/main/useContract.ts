@@ -279,7 +279,6 @@ export function useContractData(
     teams,
     allTeams,
     players,
-    nhlTeams,
     seasons,
     draftPicks,
     enabled = true,
@@ -347,6 +346,10 @@ export function useContractData(
     );
     return map;
   }, [players, relatedPlayersQuery.data]);
+  const contractPlayers = useMemo(
+    () => [...playerById.values()],
+    [playerById],
+  );
 
   const franchiseById = useMemo(() => {
     const map = new Map<string, GSHLTeam>();
@@ -618,9 +621,11 @@ export function useContractData(
     teamPool,
   ]);
 
-  const tableReady = Boolean(
-    currentSeason && currentTeam && players?.length && nhlTeams?.length,
-  );
+  const tableReady =
+    Boolean(currentSeason && currentTeam) &&
+    !contractsLoading &&
+    !relatedPlayersQuery.isLoading &&
+    !playerNhlStatsLoading;
   return {
     table: {
       sortedContracts,
@@ -636,6 +641,7 @@ export function useContractData(
       hasData: draftPickGroups.some((group) => group.picks.length > 0),
     },
     currentContracts,
+    contractPlayers,
     buyoutContracts,
     expiredRows,
     draftPickGroups,
