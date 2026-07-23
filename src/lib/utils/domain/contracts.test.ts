@@ -183,7 +183,13 @@ void test("unsigned Summer UFA eligibility uses contract history", () => {
     isUnsignedForSigningSeason(
       "player-1",
       "6",
-      [contract({ seasonId: "6" })],
+      [
+        contract({
+          seasonId: "6",
+          expiryDate: "2021-04-20",
+          capHitEndDate: "2021-04-20",
+        }),
+      ],
       seasons,
     ),
     false,
@@ -201,7 +207,30 @@ void test("unsigned Summer UFA eligibility uses contract history", () => {
     isUnsignedForSigningSeason(
       "player-1",
       "6",
-      [contract({ seasonId: "5", contractLength: 2 })],
+      [
+        contract({
+          seasonId: "5",
+          contractLength: 2,
+          expiryDate: "2021-04-20",
+          capHitEndDate: "2021-04-20",
+        }),
+      ],
+      seasons,
+    ),
+    false,
+  );
+  assert.equal(
+    isUnsignedForSigningSeason(
+      "player-1",
+      "6",
+      [
+        contract({
+          seasonId: "5",
+          contractLength: 1,
+          expiryDate: "2021-04-20",
+          capHitEndDate: "2021-04-20",
+        }),
+      ],
       seasons,
     ),
     false,

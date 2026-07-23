@@ -62,12 +62,31 @@ function isPlayingContract(contract: any) {
   );
 }
 
-function isUnsignedForUpcomingSeason(
+function normalizeDateOnly(value: unknown) {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  return trimmed ? trimmed.slice(0, 10) : null;
+}
+
+function isUnsignedAfterSigningDeadline(
   playerId: any,
   signingSeasonId: any,
   contracts: any[],
   seasons: any[],
 ) {
+  const signingSeason = seasons.find(
+    (season) => season._id === signingSeasonId,
+  );
+  const signingEndDate = normalizeDateOnly(signingSeason?.signingEndDate);
+  if (signingEndDate) {
+    return !contracts.some((contract) => {
+      if (contract.playerId !== playerId) return false;
+      if (!isPlayingContract(contract)) return false;
+      const expiryDate = normalizeDateOnly(contract.expiryDate);
+      return Boolean(expiryDate && expiryDate > signingEndDate);
+    });
+  }
+
   const signingIndex = seasons.findIndex(
     (season) => season._id === signingSeasonId,
   );
@@ -447,7 +466,7 @@ export const submitOffer = mutation({
       throw new Error("Summer Free Agency is not open.");
     }
     if (
-      !isUnsignedForUpcomingSeason(
+      !isUnsignedAfterSigningDeadline(
         player._id,
         signingSeason._id,
         contracts,
@@ -626,7 +645,7 @@ export const finalizeGroup = internalMutation({
       if (
         !winningOffer ||
         !player ||
-        !isUnsignedForUpcomingSeason(
+        !isUnsignedAfterSigningDeadline(
           player._id,
           group.seasonId,
           priorContracts,

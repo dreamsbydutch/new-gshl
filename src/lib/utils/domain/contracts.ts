@@ -196,10 +196,10 @@ export function hasContractContinuity(
 /**
  * Returns whether a player is genuinely unsigned for the season being signed.
  *
- * Contracts created during signing season S begin in S+1. A player is
- * therefore a Summer UFA when no playing contract covers S+1. Contract history
- * is authoritative because the denormalized player signing flags may not yet
- * have been advanced when Summer Free Agency opens.
+ * A player is therefore a Summer UFA when no playing contract remains active
+ * after the signing deadline. Contract history is authoritative because the
+ * denormalized player signing flags may not yet have been advanced when Summer
+ * Free Agency opens.
  */
 export function isUnsignedForSigningSeason(
   playerId: string,
@@ -207,6 +207,19 @@ export function isUnsignedForSigningSeason(
   contracts: Contract[],
   seasons: Season[],
 ): boolean {
+  const signingSeason = seasons.find(
+    (season) => String(season.id) === String(signingSeasonId),
+  );
+  const signingEndDate = normalizeDateOnlyValue(signingSeason?.signingEndDate);
+  if (signingEndDate) {
+    return !contracts.some((contract) => {
+      if (String(contract.playerId) !== String(playerId)) return false;
+      if (!isPlayingContract(contract)) return false;
+      const expiryDate = normalizeDateOnlyValue(contract.expiryDate);
+      return Boolean(expiryDate && expiryDate > signingEndDate);
+    });
+  }
+
   const ordered = orderContractSeasons(seasons);
   const signingIndex = ordered.findIndex(
     (season) => String(season.id) === String(signingSeasonId),
