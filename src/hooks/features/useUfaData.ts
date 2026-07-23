@@ -25,6 +25,9 @@ export function useUfaOverview() {
     const playerById = new Map(
       catalog.data.freeAgents.map((player) => [player.id, player]),
     );
+    const offerGroupById = new Map(
+      catalog.data.offerGroups.map((group) => [group.id, group]),
+    );
     const franchiseById = new Map(
       catalog.data.franchises.map((franchise) => [franchise.id, franchise]),
     );
@@ -34,7 +37,9 @@ export function useUfaOverview() {
       offerGroups: live.data.groups.map((group) => ({
         id: group.id,
         deadlineAt: group.deadlineAt,
-        player: playerById.get(group.playerId),
+        player:
+          offerGroupById.get(group.id)?.player ??
+          playerById.get(group.playerId),
         offers: group.offers.map((offer) => {
           const franchise = franchiseById.get(offer.franchiseId);
           return {
