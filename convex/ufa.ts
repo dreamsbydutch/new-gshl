@@ -49,6 +49,38 @@ function coveredSeasonIds(contract: any, seasons: any[]) {
     : seasons.slice(index + 1, index + 1 + length).map((season) => season._id);
 }
 
+function isPlayingContract(contract: any) {
+  if (
+    ["Buyout", "Retired", "Injured"].includes(String(contract.expiryStatus))
+  )
+    return false;
+  const types = Array.isArray(contract.contractType)
+    ? contract.contractType.map(String)
+    : [String(contract.contractType)];
+  return types.some(
+    (type: string) => type === "STANDARD" || type === "EXTENSION",
+  );
+}
+
+function isUnsignedForUpcomingSeason(
+  playerId: any,
+  signingSeasonId: any,
+  contracts: any[],
+  seasons: any[],
+) {
+  const signingIndex = seasons.findIndex(
+    (season) => season._id === signingSeasonId,
+  );
+  const contractSeason = seasons[signingIndex + 1];
+  if (!contractSeason) return false;
+  return !contracts.some(
+    (contract) =>
+      contract.playerId === playerId &&
+      isPlayingContract(contract) &&
+      coveredSeasonIds(contract, seasons).includes(contractSeason._id),
+  );
+}
+
 function softmaxOdds(scores: Array<{ offerId: string; score: number }>) {
   if (scores.length === 1)
     return [{ offerId: scores[0]!.offerId, probability: 1 }];
@@ -398,14 +430,8 @@ export const submitOffer = mutation({
       db.query("teams").collect(),
       db.query("contracts").collect(),
     ]);
-    if (
-      !player ||
-      !player.isActive ||
-      !player.isSignable ||
-      String(player.isResignable).toUpperCase() !== "UFA"
-    ) {
+    if (!player || !player.isActive)
       throw new Error("This player is no longer an eligible UFA.");
-    }
     const orderedSeasons = [...seasons].sort(
       (a: any, b: any) => num(a.year) - num(b.year),
     );
@@ -419,6 +445,16 @@ export const submitOffer = mutation({
       now >= draftAt
     ) {
       throw new Error("Summer Free Agency is not open.");
+    }
+    if (
+      !isUnsignedForUpcomingSeason(
+        player._id,
+        signingSeason._id,
+        contracts,
+        orderedSeasons,
+      )
+    ) {
+      throw new Error("This player is already under contract.");
     }
     const franchise = franchises.find(
       (candidate: any) =>
@@ -586,16 +622,21 @@ export const finalizeGroup = internalMutation({
       const startSeason = seasons[signingIndex + 1];
       const expirySeason =
         seasons[signingIndex + num(winningOffer?.contractLength)];
+      const priorContracts = await db.query("contracts").collect();
       if (
         !winningOffer ||
         !player ||
-        !player.isSignable ||
+        !isUnsignedForUpcomingSeason(
+          player._id,
+          group.seasonId,
+          priorContracts,
+          seasons,
+        ) ||
         !startSeason?.startDate ||
         !expirySeason?.endDate
       ) {
         throw new Error("The winning contract can no longer be created.");
       }
-      const priorContracts = await db.query("contracts").collect();
       const continuous = priorContracts.some(
         (contract: any) =>
           contract.playerId === player._id &&

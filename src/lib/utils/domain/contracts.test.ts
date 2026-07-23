@@ -195,6 +195,15 @@ void test("unsigned Summer UFA eligibility uses contract history", () => {
       [contract({ seasonId: "5", contractLength: 1 })],
       seasons,
     ),
+    true,
+  );
+  assert.equal(
+    isUnsignedForSigningSeason(
+      "player-1",
+      "6",
+      [contract({ seasonId: "5", contractLength: 2 })],
+      seasons,
+    ),
     false,
   );
 });

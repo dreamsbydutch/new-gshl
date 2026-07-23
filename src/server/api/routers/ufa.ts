@@ -8,13 +8,13 @@ import {
   type PlayerNHLStatLine,
   type Season,
   type Team,
-  ResignableStatus,
   SALARY_CAP,
 } from "@gshl-types";
 import {
   findNhlTeamByAbbreviation,
   getContractCoveredSeasonIds,
   getTorontoDate,
+  isUnsignedForSigningSeason,
 } from "@gshl-utils";
 import { callConvex } from "@gshl-lib/data/convex-store";
 import {
@@ -220,8 +220,6 @@ export const ufaRouter = createTRPCRouter({
       getMany<Player>("Player", {
         where: {
           isActive: true,
-          isSignable: true,
-          isResignable: String(ResignableStatus.UFA),
         },
       }),
       getMany<NHLTeam>("NHLTeam"),
@@ -235,9 +233,7 @@ export const ufaRouter = createTRPCRouter({
             where: { seasonId: String(signingSeason.id) },
           })
         : Promise.resolve([]),
-      ownerId
-        ? getMany<Contract>("Contract", { where: { ownerId } })
-        : Promise.resolve([]),
+      getMany<Contract>("Contract"),
     ]);
     const window = getWindow(signingSeason);
     const statByPlayer = latestNhlStats(nhlStats, seasons, signingSeason);
@@ -255,9 +251,14 @@ export const ufaRouter = createTRPCRouter({
       .filter(
         (player) =>
           player.isActive &&
-          player.isSignable &&
-          String(player.isResignable).toUpperCase() ===
-            String(ResignableStatus.UFA),
+          Boolean(signingSeason) &&
+          isUnsignedForSigningSeason(
+            String(player.id),
+            String(signingSeason?.id ?? ""),
+            contracts,
+            seasons,
+          ) &&
+          numberValue(player.salary) > 0,
       )
       .map((player) => {
         const stats = statByPlayer.get(String(player.id));
