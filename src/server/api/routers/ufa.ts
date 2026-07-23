@@ -53,6 +53,8 @@ type OperationalState = {
   oddsByGroup: Record<string, Array<{ offerId: string; probability: number }>>;
 };
 
+const HOME_UFA_LIMIT = 15;
+
 const numberValue = (value: unknown, fallback = 0) => {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
@@ -393,11 +395,18 @@ export const ufaRouter = createTRPCRouter({
             }),
         };
       });
+    const isSignedInOwner = ctx.session?.user?.role === "owner";
+    const homeFreeAgents = isSignedInOwner
+      ? freeAgents.filter((player) => player.affordableTerms.length > 0)
+      : freeAgents;
     return {
       window,
       freeAgents,
-      topFreeAgents: freeAgents.slice(0, 10),
+      topFreeAgents: homeFreeAgents.slice(0, HOME_UFA_LIMIT),
       offerGroups,
+      viewer: {
+        isSignedInOwner,
+      },
       franchises: franchises.map((franchise) => ({
         id: String(franchise.id),
         name: franchise.name,
