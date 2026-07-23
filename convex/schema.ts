@@ -444,6 +444,7 @@ export default defineSchema({
       ["seasonId", "date"],
       ["seasonId", "weekId", "gshlTeamId"],
       ["seasonId", "playerId", "date"],
+      ["seasonId", "gshlTeamId", "playerId", "weekId", "date"],
     ],
   ),
 
@@ -465,6 +466,7 @@ export default defineSchema({
       "weekId",
       ["seasonId", "weekId", "gshlTeamId"],
       ["seasonId", "playerId"],
+      ["seasonId", "gshlTeamId", "playerId", "weekId"],
     ],
   ),
 
@@ -517,7 +519,12 @@ export default defineSchema({
       seasonType: stringValue,
       ...statFields,
     },
-    ["gshlTeamId", "playerId", "seasonType"],
+    [
+      "gshlTeamId",
+      "playerId",
+      "seasonType",
+      ["gshlTeamId", "playerId", "seasonType"],
+    ],
   ),
 
   playerCareerTotalStatLines: table(
@@ -530,7 +537,7 @@ export default defineSchema({
       seasonType: stringValue,
       ...statFields,
     },
-    ["playerId", "seasonType"],
+    ["playerId", "seasonType", ["playerId", "seasonType"]],
   ),
 
   playerNhlStatLines: table(
@@ -566,6 +573,7 @@ export default defineSchema({
       "date",
       ["seasonId", "date"],
       ["seasonId", "weekId", "gshlTeamId"],
+      ["seasonId", "gshlTeamId", "weekId", "date"],
     ],
   ),
 
