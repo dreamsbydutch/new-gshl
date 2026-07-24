@@ -1,6 +1,6 @@
 "use client";
 
-import Image from "next/image";
+import { NHLLogo } from "@gshl-components/player/NHLLogo";
 import type { Contract, NHLTeam, Player } from "@gshl-types";
 import { useUpdatePlayerLineup } from "@gshl-hooks";
 import {
@@ -49,17 +49,7 @@ export function RosterPlayerCard({
       <div className="col-span-3 text-sm">{player.fullName}</div>
       <div className="text-2xs">{player.nhlPos?.toString() ?? ""}</div>
       <div>
-        {playerNhlTeam?.logoUrl ? (
-          <Image
-            src={playerNhlTeam.logoUrl}
-            alt={playerNhlTeam.fullName ?? playerNhlAbbr ?? "NHL Team Logo"}
-            className="mx-auto h-4 w-4"
-            width={16}
-            height={16}
-          />
-        ) : (
-          <span className="text-2xs font-semibold">{playerNhlAbbr ?? "-"}</span>
-        )}
+        <NHLLogo team={playerNhlTeam} size={16} />
       </div>
       <div
         className={cn(

@@ -3,6 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { NHLLogo } from "@gshl-components/player/NHLLogo";
 import { useSubmitUfaOffer, useUfaOverview } from "@gshl-hooks";
 import { formatMoney } from "@gshl-utils";
 import type { UfaFreeAgentView, UfaOfferGroupView } from "@gshl-types";
@@ -119,7 +120,16 @@ function PlayerRows({
         return (
           <tr key={player.id} className="border-t align-middle">
             <td className="px-2 py-3">
-              <Logo src={player.nhlTeamLogoUrl} alt={String(player.nhlTeam)} />
+              <NHLLogo
+                team={
+                  player.nhlTeamLogoUrl
+                    ? {
+                        name: player.nhlTeam || "NHL team",
+                        logoUrl: player.nhlTeamLogoUrl,
+                      }
+                    : undefined
+                }
+              />
             </td>
             <td className="whitespace-nowrap px-2 py-3 text-left font-semibold">
               {player.fullName}
@@ -257,9 +267,15 @@ function ActiveOffers({ groups }: { groups: UfaOfferGroupView[] }) {
                 group.offers.map((offer) => (
                   <tr key={offer.id} className="border-t">
                     <td className="p-3">
-                      <Logo
-                        src={group.player?.nhlTeamLogoUrl ?? null}
-                        alt={String(group.player?.nhlTeam ?? "NHL team")}
+                      <NHLLogo
+                        team={
+                          group.player?.nhlTeamLogoUrl
+                            ? {
+                                name: group.player.nhlTeam || "NHL team",
+                                logoUrl: group.player.nhlTeamLogoUrl,
+                              }
+                            : undefined
+                        }
                       />
                     </td>
                     <td className="whitespace-nowrap p-3 text-left font-semibold">

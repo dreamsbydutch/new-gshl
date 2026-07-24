@@ -114,7 +114,7 @@ export function getFreeAgents(
 }
 
 function normalizePlayerTeamToken(value: string): string | null {
-  const team = value.trim();
+  const team = value.trim().toUpperCase();
   return team.length > 0 ? team : null;
 }
 
@@ -179,9 +179,12 @@ export function findNhlTeamByAbbreviation(
   nhlTeams: NHLTeam[],
   abbreviation: PlayerTeamInput,
 ): NHLTeam | undefined {
-  const normalizedAbbreviation = getPlayerNhlAbbreviation(abbreviation);
+  const normalizedAbbreviation =
+    getPlayerNhlAbbreviation(abbreviation)?.toUpperCase();
   return normalizedAbbreviation
-    ? nhlTeams.find((team) => team.abbreviation === normalizedAbbreviation)
+    ? nhlTeams.find(
+        (team) => team.abbr.trim().toUpperCase() === normalizedAbbreviation,
+      )
     : undefined;
 }
 

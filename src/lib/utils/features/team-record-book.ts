@@ -1,30 +1,30 @@
 import { getAwardLabel } from "@gshl-lib/config/awards";
-import {
-  AwardsList,
-  PositionGroup,
-  SeasonType,
-} from "../domain/constants";
 import type {
-  AwardSummaryRow,
   AwardsList as AwardsListType,
-  PlayerAward,
+  BuildRecordBookAwardRowsOptions,
+  BuildRecordBookPlayerRowsOptions,
+  BuildRecordBookPlayerRowsResult,
   FranchiseCareerRow,
-  GSHLTeam,
+  FranchiseSeasonRow,
   NHLTeam,
   Player,
-  PlayerAwardBreakdown,
+  PlayerAward,
   PlayerCareerSplitStatLine,
-  PlayerTotalStatLine,
-  RecordLeader,
-  RecordStatKey,
+  PlayerSplitStatLine,
+  RecordBookAwardRow,
+  RecordBookPlayerRow,
+  RecordBookSortState,
+  RecordBookStatColumn,
+  RecordBookStatLine,
   SeasonType as SeasonTypeValue,
 } from "@gshl-types";
+import { formatNumber, toNumber } from "../core";
 import { normalizeIdList } from "../core/ids";
+import { AwardsList, SeasonType } from "../domain/constants";
 import {
   findNhlTeamByAbbreviation,
   formatPlayerPositionList,
 } from "../domain/player";
-import { formatNumber, toNumber } from "../core";
 import { getAllStarSeasonType } from "./season-awards";
 
 const PLAYER_AWARD_KEYS = new Set<AwardsListType>([
@@ -44,24 +44,13 @@ const ALL_STAR_AWARD_KEYS = new Set<AwardsListType>([
   AwardsList.PLAYOFF_AS,
 ]);
 
-const GOALIE_RATE_MINIMUMS: Record<SeasonTypeValue, number> = {
-  [SeasonType.REGULAR_SEASON]: 10,
-  [SeasonType.PLAYOFFS]: 3,
-  [SeasonType.LOSERS_TOURNAMENT]: 3,
-};
+const RECORD_BOOK_SEASON_TYPES = new Set<SeasonTypeValue>([
+  SeasonType.REGULAR_SEASON,
+  SeasonType.PLAYOFFS,
+  SeasonType.LOSERS_TOURNAMENT,
+]);
 
-const CAREER_TOTAL_FIELDS: Array<
-  keyof Omit<
-    FranchiseCareerRow,
-    | "playerId"
-    | "seasonType"
-    | "posGroup"
-    | "nhlPos"
-    | "nhlTeam"
-    | "GAA"
-    | "SVP"
-  >
-> = [
+const TOTAL_FIELDS: Array<keyof Omit<RecordBookStatLine, "GAA" | "SVP">> = [
   "days",
   "GP",
   "GS",
@@ -82,84 +71,165 @@ const CAREER_TOTAL_FIELDS: Array<
   "TOI",
 ];
 
+export const RECORD_BOOK_SKATER_COLUMNS: RecordBookStatColumn[] = [
+  { key: "days", label: "D", title: "Game days" },
+  { key: "GP", label: "GP", title: "Games played" },
+  { key: "G", label: "G", title: "Goals" },
+  { key: "A", label: "A", title: "Assists" },
+  { key: "P", label: "P", title: "Points" },
+  { key: "PM", label: "+/-", title: "Plus/minus" },
+  { key: "PIM", label: "PIM", title: "Penalty minutes" },
+  { key: "PPP", label: "PPP", title: "Power-play points" },
+  { key: "SOG", label: "SOG", title: "Shots on goal" },
+  { key: "HIT", label: "HIT", title: "Hits" },
+  { key: "BLK", label: "BLK", title: "Blocks" },
+];
+
+export const RECORD_BOOK_GOALIE_COLUMNS: RecordBookStatColumn[] = [
+  { key: "days", label: "D", title: "Game days" },
+  { key: "GP", label: "GP", title: "Games played" },
+  { key: "GS", label: "GS", title: "Games started" },
+  { key: "W", label: "W", title: "Wins" },
+  { key: "GA", label: "GA", title: "Goals against" },
+  { key: "GAA", label: "GAA", title: "Goals-against average", precision: 2 },
+  { key: "SV", label: "SV", title: "Saves" },
+  { key: "SA", label: "SA", title: "Shots against" },
+  { key: "SVP", label: "SV%", title: "Save percentage", precision: 3 },
+  { key: "SO", label: "SO", title: "Shutouts" },
+  { key: "TOI", label: "TOI", title: "Time on ice", precision: 1 },
+];
+
+function isRecordBookSeasonType(value: string): value is SeasonTypeValue {
+  return RECORD_BOOK_SEASON_TYPES.has(value as SeasonTypeValue);
+}
+
+function createEmptyStatLine(): RecordBookStatLine {
+  return {
+    days: 0,
+    GP: 0,
+    GS: 0,
+    G: 0,
+    A: 0,
+    P: 0,
+    PM: 0,
+    PIM: 0,
+    PPP: 0,
+    SOG: 0,
+    HIT: 0,
+    BLK: 0,
+    W: 0,
+    GA: 0,
+    SV: 0,
+    SA: 0,
+    SO: 0,
+    TOI: 0,
+    GAA: null,
+    SVP: null,
+  };
+}
+
+function addStats(
+  target: RecordBookStatLine,
+  source: PlayerCareerSplitStatLine | PlayerSplitStatLine,
+): void {
+  for (const field of TOTAL_FIELDS) {
+    target[field] += toNumber(source[field], 0);
+  }
+}
+
+function finalizeRates<T extends RecordBookStatLine>(row: T): T {
+  return {
+    ...row,
+    GAA: row.TOI > 0 ? (row.GA / row.TOI) * 60 : null,
+    SVP: row.SA > 0 ? row.SV / row.SA : null,
+  };
+}
+
+function getStatLine(row: RecordBookStatLine): RecordBookStatLine {
+  return {
+    days: row.days,
+    GP: row.GP,
+    GS: row.GS,
+    G: row.G,
+    A: row.A,
+    P: row.P,
+    PM: row.PM,
+    PIM: row.PIM,
+    PPP: row.PPP,
+    SOG: row.SOG,
+    HIT: row.HIT,
+    BLK: row.BLK,
+    W: row.W,
+    GA: row.GA,
+    SV: row.SV,
+    SA: row.SA,
+    SO: row.SO,
+    TOI: row.TOI,
+    GAA: row.GAA,
+    SVP: row.SVP,
+  };
+}
+
+function compareYears(left: number | string, right: number | string): number {
+  const leftNumber = Number(left);
+  const rightNumber = Number(right);
+  if (Number.isFinite(leftNumber) && Number.isFinite(rightNumber)) {
+    return leftNumber - rightNumber;
+  }
+  return String(left).localeCompare(String(right), undefined, {
+    numeric: true,
+  });
+}
+
 /**
- * Returns player award label.
- *
- * @param awardKey - The award key to use.
- * @returns The requested player award label.
+ * Returns the display label for a player award.
  */
 export function getPlayerAwardLabel(awardKey: AwardsListType): string {
-  if (awardKey === AwardsList.FIRST_AS) {
-    return "First Team All-Star";
-  }
-  if (awardKey === AwardsList.SECOND_AS) {
-    return "Second Team All-Star";
-  }
-  if (awardKey === AwardsList.PLAYOFF_AS) {
-    return "Playoff All-Star";
-  }
-
+  if (awardKey === AwardsList.FIRST_AS) return "First Team All-Star";
+  if (awardKey === AwardsList.SECOND_AS) return "Second Team All-Star";
+  if (awardKey === AwardsList.PLAYOFF_AS) return "Playoff All-Star";
   return getAwardLabel(awardKey);
 }
 
 /**
- * Returns player positions.
- *
- * @param player - The player to use.
- * @param fallbackPositions - The fallback positions to use.
- * @returns The requested player positions.
+ * Returns a compact player position list with a row-level fallback.
  */
 export function getPlayerPositions(
   player: Player | undefined,
   fallbackPositions: string[],
 ): string {
-  const positions = player?.nhlPos ?? fallbackPositions;
+  const positions =
+    fallbackPositions.length > 0 ? fallbackPositions : player?.nhlPos;
   return formatPlayerPositionList(
     Array.isArray(positions) ? positions : String(positions ?? ""),
   );
 }
 
 /**
- * Returns nhl team for player.
- *
- * @param nhlTeamsByAbbr - The nhl teams by abbr to use.
- * @param player - The player to use.
- * @param fallbackAbbr - The fallback abbr to use.
- * @returns The requested nhl team for player.
+ * Resolves the player's NHL team while preserving historical row data.
  */
 export function getNhlTeamForPlayer(
   nhlTeamsByAbbr: Map<string, NHLTeam>,
   player: Player | undefined,
   fallbackAbbr: string,
+  preferFallback = false,
 ): NHLTeam | undefined {
-  const teamAbbr = String(player?.nhlTeam ?? fallbackAbbr ?? "").trim();
+  const historicalAbbr = String(fallbackAbbr).trim();
+  const currentAbbr = String(player?.nhlTeam ?? "").trim();
+  const teamAbbr =
+    (preferFallback
+      ? [historicalAbbr, currentAbbr]
+      : [currentAbbr, historicalAbbr]
+    ).find((value) => value.length > 0) ?? "";
   if (!teamAbbr) return undefined;
-  return nhlTeamsByAbbr.get(teamAbbr);
+  return findNhlTeamByAbbreviation(
+    Array.from(nhlTeamsByAbbr.values()),
+    teamAbbr,
+  );
 }
 
 /**
- * Formats record value for display.
- *
- * @param stat - The stat to use.
- * @param value - The source value to process.
- * @returns The formatted record value.
- */
-export function formatRecordValue(stat: RecordStatKey, value: number): string {
-  if (stat === "SVP") {
-    return formatNumber(value, 3);
-  }
-  if (stat === "GAA") {
-    return formatNumber(value, 2);
-  }
-  return formatNumber(value, 0);
-}
-
-/**
- * Builds franchise career rows.
- *
- * @param careerSplits - The career splits to use.
- * @param franchiseTeamIds - The franchise team ids to use.
- * @returns The assembled franchise career rows.
+ * Aggregates franchise career split rows by player and season stage.
  */
 export function buildFranchiseCareerRows(
   careerSplits: PlayerCareerSplitStatLine[],
@@ -169,15 +239,13 @@ export function buildFranchiseCareerRows(
 
   for (const row of careerSplits) {
     const teamId = String(row.gshlTeamId ?? "");
-    const seasonType = String(row.seasonType ?? "") as SeasonTypeValue;
+    const seasonType = String(row.seasonType ?? "");
     const playerId = String(row.playerId ?? "");
 
-    if (!franchiseTeamIds.has(teamId) || !playerId) {
-      continue;
-    }
     if (
-      seasonType !== SeasonType.REGULAR_SEASON &&
-      seasonType !== SeasonType.PLAYOFFS
+      !franchiseTeamIds.has(teamId) ||
+      !playerId ||
+      !isRecordBookSeasonType(seasonType)
     ) {
       continue;
     }
@@ -189,306 +257,309 @@ export function buildFranchiseCareerRows(
       posGroup: String(row.posGroup ?? ""),
       nhlPos: normalizeIdList(row.nhlPos),
       nhlTeam: String(row.nhlTeam ?? "").trim(),
-      days: 0,
-      GP: 0,
-      GS: 0,
-      G: 0,
-      A: 0,
-      P: 0,
-      PM: 0,
-      PIM: 0,
-      PPP: 0,
-      SOG: 0,
-      HIT: 0,
-      BLK: 0,
-      W: 0,
-      GA: 0,
-      SV: 0,
-      SA: 0,
-      SO: 0,
-      TOI: 0,
-      GAA: null,
-      SVP: null,
+      ...createEmptyStatLine(),
     };
 
-    if (!grouped.has(key)) {
-      grouped.set(key, existing);
-    }
-
+    if (!grouped.has(key)) grouped.set(key, existing);
     if (!existing.posGroup && row.posGroup) {
       existing.posGroup = String(row.posGroup);
     }
-
     for (const position of normalizeIdList(row.nhlPos)) {
-      if (!existing.nhlPos.includes(position)) {
-        existing.nhlPos.push(position);
-      }
+      if (!existing.nhlPos.includes(position)) existing.nhlPos.push(position);
     }
-
     if (!existing.nhlTeam && row.nhlTeam) {
       existing.nhlTeam = String(row.nhlTeam).trim();
     }
-
-    for (const field of CAREER_TOTAL_FIELDS) {
-      existing[field] += toNumber(row[field], 0);
-    }
+    addStats(existing, row);
   }
 
-  return Array.from(grouped.values()).map((row) => ({
-    ...row,
-    GAA: row.TOI > 0 ? (row.GA / row.TOI) * 60 : null,
-    SVP: row.SA > 0 ? row.SV / row.SA : null,
-  }));
+  return Array.from(grouped.values()).map(finalizeRates);
 }
 
 /**
- * Finds leader.
- *
- * @param rows - The rows to use.
- * @param playersById - The players by id to use.
- * @param nhlTeamsByAbbr - The nhl teams by abbr to use.
- * @param definition - The definition to use.
- * @param options - Configuration options for the operation.
- * @returns The matching leader, if one exists.
+ * Aggregates franchise season split rows by player, year, and season stage.
  */
-export function findLeader(
-  rows: FranchiseCareerRow[],
-  playersById: Map<string, Player>,
-  nhlTeamsByAbbr: Map<string, NHLTeam>,
-  definition: { key: string; label: string; stat: RecordStatKey },
-  options: {
-    seasonType: SeasonTypeValue;
-    group: "all" | "skater" | "goalie";
-  },
-): RecordLeader | null {
-  const filtered = rows.filter((row) => {
-    if (row.seasonType !== options.seasonType) {
-      return false;
-    }
+export function buildFranchiseSeasonRows(
+  seasonSplits: PlayerSplitStatLine[],
+  franchiseTeamIds: Set<string>,
+  seasonsById: Map<string, number>,
+): FranchiseSeasonRow[] {
+  const grouped = new Map<string, FranchiseSeasonRow>();
 
-    const player = playersById.get(row.playerId);
-    const posGroup = player?.posGroup ?? row.posGroup;
-
-    const isGoalie = String(posGroup) === String(PositionGroup.G);
-
-    if (options.group === "skater" && isGoalie) {
-      return false;
-    }
-    if (options.group === "goalie" && !isGoalie) {
-      return false;
-    }
-
-    const value = row[definition.stat];
-    if (value == null || !Number.isFinite(value)) {
-      return false;
-    }
+  for (const row of seasonSplits) {
+    const teamId = String(row.gshlTeamId ?? "");
+    const seasonId = String(row.seasonId ?? "");
+    const seasonType = String(row.seasonType ?? "");
+    const playerId = String(row.playerId ?? "");
 
     if (
-      (definition.stat === "GAA" || definition.stat === "SVP") &&
-      row.GS <= 0
+      !franchiseTeamIds.has(teamId) ||
+      !seasonId ||
+      !playerId ||
+      !isRecordBookSeasonType(seasonType)
     ) {
-      return false;
+      continue;
     }
 
-    if (definition.stat === "GAA" || definition.stat === "SVP") {
-      return row.GS >= GOALIE_RATE_MINIMUMS[options.seasonType];
+    const key = `${playerId}|${seasonId}|${seasonType}`;
+    const existing = grouped.get(key) ?? {
+      playerId,
+      seasonId,
+      seasonYear: seasonsById.get(seasonId) ?? seasonId,
+      seasonType,
+      posGroup: String(row.posGroup ?? ""),
+      nhlPos: normalizeIdList(row.nhlPos),
+      nhlTeam: String(row.nhlTeam ?? "").trim(),
+      ...createEmptyStatLine(),
+    };
+
+    if (!grouped.has(key)) grouped.set(key, existing);
+    if (!existing.posGroup && row.posGroup) {
+      existing.posGroup = String(row.posGroup);
     }
-
-    return value > 0;
-  });
-
-  if (filtered.length === 0) {
-    return null;
+    for (const position of normalizeIdList(row.nhlPos)) {
+      if (!existing.nhlPos.includes(position)) existing.nhlPos.push(position);
+    }
+    if (!existing.nhlTeam && row.nhlTeam) {
+      existing.nhlTeam = String(row.nhlTeam).trim();
+    }
+    addStats(existing, row);
   }
 
-  const sorted = filtered.slice().sort((left, right) => {
-    const leftValue = left[definition.stat];
-    const rightValue = right[definition.stat];
-
-    if (definition.stat === "GAA") {
-      if (leftValue !== rightValue) {
-        return (
-          (leftValue ?? Number.POSITIVE_INFINITY) -
-          (rightValue ?? Number.POSITIVE_INFINITY)
-        );
-      }
-    } else if ((rightValue ?? -Infinity) !== (leftValue ?? -Infinity)) {
-      return (rightValue ?? -Infinity) - (leftValue ?? -Infinity);
-    }
-
-    if (right.GP !== left.GP) {
-      return right.GP - left.GP;
-    }
-
-    const leftName = playersById.get(left.playerId)?.fullName ?? left.playerId;
-    const rightName =
-      playersById.get(right.playerId)?.fullName ?? right.playerId;
-    return leftName.localeCompare(rightName);
-  });
-
-  const leader = sorted[0];
-  if (!leader) {
-    return null;
-  }
-
-  const player = playersById.get(leader.playerId);
-  const nhlTeam = getNhlTeamForPlayer(nhlTeamsByAbbr, player, leader.nhlTeam);
-
-  return {
-    key: definition.key,
-    label: definition.label,
-    playerId: leader.playerId,
-    playerName: player?.fullName ?? `Player ${leader.playerId}`,
-    nhlTeam,
-    positions: getPlayerPositions(player, leader.nhlPos),
-    displayValue: formatRecordValue(
-      definition.stat,
-      toNumber(leader[definition.stat], 0),
-    ),
-    note:
-      definition.stat === "GAA" || definition.stat === "SVP"
-        ? `Min ${GOALIE_RATE_MINIMUMS[options.seasonType]} starts`
-        : undefined,
-  };
+  return Array.from(grouped.values()).map(finalizeRates);
 }
 
 /**
- * Builds award summary rows.
- *
- * @returns The assembled award summary rows.
+ * Builds display-ready career and by-season player history rows.
  */
-export function buildAwardSummaryRows({
-  playerAwards,
+export function buildRecordBookPlayerRows(
+  options: BuildRecordBookPlayerRowsOptions,
+): BuildRecordBookPlayerRowsResult {
+  const {
+    careerSplits,
+    franchiseTeamIds,
+    nhlTeamsByAbbr,
+    playersById,
+    seasonSplits,
+    seasonsById,
+  } = options;
+  const franchiseSeasonRows = buildFranchiseSeasonRows(
+    seasonSplits,
+    franchiseTeamIds,
+    seasonsById,
+  );
+  const seasonsByPlayerStage = new Map<string, FranchiseSeasonRow[]>();
+
+  for (const row of franchiseSeasonRows) {
+    const key = `${row.playerId}|${row.seasonType}`;
+    const rows = seasonsByPlayerStage.get(key) ?? [];
+    rows.push(row);
+    seasonsByPlayerStage.set(key, rows);
+  }
+
+  const seasonRows = franchiseSeasonRows.map((row): RecordBookPlayerRow => {
+    const player = playersById.get(row.playerId);
+    return {
+      id: `${row.playerId}|${row.seasonId}|${row.seasonType}`,
+      playerId: row.playerId,
+      playerName: player?.fullName ?? `Player ${row.playerId}`,
+      nhlTeam: getNhlTeamForPlayer(nhlTeamsByAbbr, player, row.nhlTeam, true),
+      positions: getPlayerPositions(player, row.nhlPos),
+      positionGroup: String(player?.posGroup ?? row.posGroup),
+      seasonType: row.seasonType,
+      seasonId: row.seasonId,
+      seasonYear: row.seasonYear,
+      seasonCount: 1,
+      firstSeason: row.seasonYear,
+      lastSeason: row.seasonYear,
+      ...getStatLine(row),
+    };
+  });
+
+  const careerRows = buildFranchiseCareerRows(
+    careerSplits,
+    franchiseTeamIds,
+  ).map((row): RecordBookPlayerRow => {
+    const player = playersById.get(row.playerId);
+    const playerSeasons =
+      seasonsByPlayerStage.get(`${row.playerId}|${row.seasonType}`) ?? [];
+    const years = [
+      ...new Set(playerSeasons.map((season) => season.seasonYear)),
+    ].sort(compareYears);
+
+    return {
+      id: `${row.playerId}|career|${row.seasonType}`,
+      playerId: row.playerId,
+      playerName: player?.fullName ?? `Player ${row.playerId}`,
+      nhlTeam: getNhlTeamForPlayer(nhlTeamsByAbbr, player, row.nhlTeam),
+      positions: getPlayerPositions(player, row.nhlPos),
+      positionGroup: String(player?.posGroup ?? row.posGroup),
+      seasonType: row.seasonType,
+      seasonCount: years.length,
+      firstSeason: years.at(0),
+      lastSeason: years.at(-1),
+      ...getStatLine(row),
+    };
+  });
+
+  return { careerRows, seasonRows };
+}
+
+function playerAwardBelongsToFranchise(
+  award: PlayerAward,
+  teamId: string,
+  playerTotals: BuildRecordBookAwardRowsOptions["playerTotals"],
+): boolean {
+  const awardKey = String(award.award) as AwardsListType;
+  const seasonType =
+    (ALL_STAR_AWARD_KEYS.has(awardKey)
+      ? getAllStarSeasonType(awardKey)
+      : SeasonType.REGULAR_SEASON) ?? SeasonType.REGULAR_SEASON;
+
+  return playerTotals.some(
+    (row) =>
+      String(row.playerId) === String(award.playerId) &&
+      String(row.seasonId) === String(award.seasonId) &&
+      String(row.seasonType) === String(seasonType) &&
+      normalizeIdList(row.gshlTeamIds).includes(teamId),
+  );
+}
+
+/**
+ * Builds one row for every player award won while attached to the franchise.
+ */
+export function buildRecordBookAwardRows({
   allTeams,
   currentTeam,
   nhlTeamsByAbbr,
+  playerAwards,
   playerTotals,
   playersById,
   seasonsById,
-}: {
-  playerAwards: PlayerAward[];
-  allTeams: GSHLTeam[];
-  currentTeam: GSHLTeam;
-  nhlTeamsByAbbr: Map<string, NHLTeam>;
-  playerTotals: PlayerTotalStatLine[];
-  playersById: Map<string, Player>;
-  seasonsById: Map<string, number>;
-}): AwardSummaryRow[] {
-  const franchiseTeams = allTeams.filter(
-    (team) => String(team.franchiseId) === String(currentTeam.franchiseId),
+}: BuildRecordBookAwardRowsOptions): RecordBookAwardRow[] {
+  const teamIdBySeason = new Map(
+    allTeams
+      .filter(
+        (team) => String(team.franchiseId) === String(currentTeam.franchiseId),
+      )
+      .map((team) => [String(team.seasonId), String(team.id)]),
   );
-  const teamIdBySeason = new Map<string, string>(
-    franchiseTeams.map((team) => [String(team.seasonId), String(team.id)]),
-  );
-  const summaryMap = new Map<string, PlayerAwardBreakdown>();
 
-  for (const award of playerAwards) {
-    const awardKey = String(award.award) as AwardsListType;
-    if (!PLAYER_AWARD_KEYS.has(awardKey)) {
-      continue;
-    }
+  return playerAwards
+    .flatMap((award): RecordBookAwardRow[] => {
+      const awardKey = String(award.award) as AwardsListType;
+      const seasonId = String(award.seasonId);
+      const teamId = teamIdBySeason.get(seasonId);
+      if (
+        !teamId ||
+        !PLAYER_AWARD_KEYS.has(awardKey) ||
+        !playerAwardBelongsToFranchise(award, teamId, playerTotals)
+      ) {
+        return [];
+      }
 
-    const seasonId = String(award.seasonId);
-    const teamId = teamIdBySeason.get(seasonId);
-    if (!teamId) {
-      continue;
-    }
-
-    const playerId = String(award.playerId);
-    const seasonType =
-      (ALL_STAR_AWARD_KEYS.has(awardKey)
-        ? getAllStarSeasonType(awardKey)
-        : SeasonType.REGULAR_SEASON) ?? SeasonType.REGULAR_SEASON;
-
-    const belongsToFranchise = playerTotals.some((row) => {
-      return (
-        String(row.playerId) === playerId &&
-        String(row.seasonId) === seasonId &&
-        String(row.seasonType) === String(seasonType) &&
-        normalizeIdList(row.gshlTeamIds).includes(teamId)
+      const playerId = String(award.playerId);
+      const player = playersById.get(playerId);
+      const historicalTotal = playerTotals.find(
+        (row) =>
+          String(row.playerId) === playerId &&
+          String(row.seasonId) === seasonId &&
+          normalizeIdList(row.gshlTeamIds).includes(teamId),
       );
-    });
 
-    if (!belongsToFranchise) {
-      continue;
-    }
-
-    const seasonYear = seasonsById.get(seasonId) ?? seasonId;
-    const existing = summaryMap.get(playerId) ?? {
-      playerId,
-      counts: new Map<AwardsListType, number>(),
-      totalAwards: 0,
-      firstTeamAllStars: 0,
-      secondTeamAllStars: 0,
-      playoffAllStars: 0,
-      latestYear: seasonYear,
-    };
-
-    if (!summaryMap.has(playerId)) {
-      summaryMap.set(playerId, existing);
-    }
-
-    existing.totalAwards += 1;
-    if (awardKey === AwardsList.FIRST_AS) {
-      existing.firstTeamAllStars += 1;
-    } else if (awardKey === AwardsList.SECOND_AS) {
-      existing.secondTeamAllStars += 1;
-    } else if (awardKey === AwardsList.PLAYOFF_AS) {
-      existing.playoffAllStars += 1;
-    }
-    existing.counts.set(awardKey, (existing.counts.get(awardKey) ?? 0) + 1);
-
-    if (Number(seasonYear) > Number(existing.latestYear)) {
-      existing.latestYear = seasonYear;
-    }
-  }
-
-  return Array.from(summaryMap.values())
-    .map((summary) => {
-      const player = playersById.get(summary.playerId);
-      const breakdown = Array.from(summary.counts.entries())
-        .sort((left, right) => {
-          if (right[1] !== left[1]) {
-            return right[1] - left[1];
-          }
-          return getPlayerAwardLabel(left[0]).localeCompare(
-            getPlayerAwardLabel(right[0]),
-          );
-        })
-        .map(
-          ([awardKey, count]) => `${count}x ${getPlayerAwardLabel(awardKey)}`,
-        )
-        .join(", ");
-
-      return {
-        playerId: summary.playerId,
-        playerName: player?.fullName ?? `Player ${summary.playerId}`,
-        nhlTeam: findNhlTeamByAbbreviation(
-          Array.from(nhlTeamsByAbbr.values()),
-          String(player?.nhlTeam ?? ""),
-        ),
-        positions: getPlayerPositions(player, []),
-        totalAwards: summary.totalAwards,
-        firstTeamAllStars: summary.firstTeamAllStars,
-        secondTeamAllStars: summary.secondTeamAllStars,
-        playoffAllStars: summary.playoffAllStars,
-        latestYear: summary.latestYear,
-        breakdown,
-      };
+      return [
+        {
+          id: String(award.id),
+          playerId,
+          playerName: player?.fullName ?? `Player ${playerId}`,
+          nhlTeam: getNhlTeamForPlayer(
+            nhlTeamsByAbbr,
+            player,
+            String(historicalTotal?.nhlTeam ?? ""),
+            true,
+          ),
+          positions: getPlayerPositions(
+            player,
+            normalizeIdList(historicalTotal?.nhlPos),
+          ),
+          seasonYear: seasonsById.get(seasonId) ?? seasonId,
+          award: awardKey,
+          awardLabel: getPlayerAwardLabel(awardKey),
+        },
+      ];
     })
-    .sort((left, right) => {
-      if (right.totalAwards !== left.totalAwards) {
-        return right.totalAwards - left.totalAwards;
-      }
-      if (right.firstTeamAllStars !== left.firstTeamAllStars) {
-        return right.firstTeamAllStars - left.firstTeamAllStars;
-      }
-      if (right.secondTeamAllStars !== left.secondTeamAllStars) {
-        return right.secondTeamAllStars - left.secondTeamAllStars;
-      }
-      if (right.playoffAllStars !== left.playoffAllStars) {
-        return right.playoffAllStars - left.playoffAllStars;
-      }
-      return left.playerName.localeCompare(right.playerName);
+    .sort(
+      (left, right) =>
+        compareYears(right.seasonYear, left.seasonYear) ||
+        left.awardLabel.localeCompare(right.awardLabel) ||
+        left.playerName.localeCompare(right.playerName),
+    );
+}
+
+function compareSortValues(
+  left: number | string | null | undefined,
+  right: number | string | null | undefined,
+  direction: RecordBookSortState["direction"],
+): number {
+  if (left == null && right == null) return 0;
+  if (left == null) return 1;
+  if (right == null) return -1;
+  let delta: number;
+  if (typeof left === "number" && typeof right === "number") {
+    delta = left - right;
+  } else {
+    delta = String(left).localeCompare(String(right), undefined, {
+      numeric: true,
+      sensitivity: "base",
     });
+  }
+  return direction === "asc" ? delta : -delta;
+}
+
+/**
+ * Sorts player history rows without mutating hook output.
+ */
+export function sortRecordBookPlayerRows(
+  rows: RecordBookPlayerRow[],
+  sort: RecordBookSortState,
+): RecordBookPlayerRow[] {
+  return rows.slice().sort((left, right) => {
+    const key = sort.key === "awardLabel" ? "playerName" : sort.key;
+    const delta = compareSortValues(left[key], right[key], sort.direction);
+    if (delta !== 0) return delta;
+    return left.playerName.localeCompare(right.playerName);
+  });
+}
+
+/**
+ * Sorts player award rows without mutating hook output.
+ */
+export function sortRecordBookAwardRows(
+  rows: RecordBookAwardRow[],
+  sort: RecordBookSortState,
+): RecordBookAwardRow[] {
+  return rows.slice().sort((left, right) => {
+    const key =
+      sort.key === "playerName" ||
+      sort.key === "positions" ||
+      sort.key === "seasonYear" ||
+      sort.key === "awardLabel"
+        ? sort.key
+        : "playerName";
+    const delta = compareSortValues(left[key], right[key], sort.direction);
+    if (delta !== 0) return delta;
+    return left.playerName.localeCompare(right.playerName);
+  });
+}
+
+/**
+ * Formats a record-book statistic for the compact table.
+ */
+export function formatRecordBookStat(
+  row: RecordBookPlayerRow,
+  column: RecordBookStatColumn,
+): string {
+  const value = row[column.key];
+  if (value == null) return "—";
+  return formatNumber(value, column.precision ?? 0);
 }

@@ -20,12 +20,13 @@
  */
 
 import { useMemo } from "react";
-import Image from "next/image";
+import { NHLLogo } from "@gshl-components/player/NHLLogo";
 import {
   TeamContractTableSkeleton,
   PlayerContractRowSkeleton,
 } from "@gshl-skeletons";
 import {
+  findNhlTeamByAbbreviation,
   formatMoney,
   getDateYear,
   getDisplaySeasonYear,
@@ -104,7 +105,7 @@ const PlayerContractRow = ({
 
   const expiryStatus = String(contract.expiryStatus);
   const playerNhlAbbr = getPlayerNhlAbbreviation(player);
-  const playerNhlTeam = nhlTeams.find((t) => t.abbreviation === playerNhlAbbr);
+  const playerNhlTeam = findNhlTeamByAbbreviation(nhlTeams, playerNhlAbbr);
   const year = getDisplaySeasonYear(currentSeason);
   const displayYears = Array.from({ length: 5 }, (_, index) => year + index);
 
@@ -167,17 +168,7 @@ const PlayerContractRow = ({
         {player.nhlPos?.toString() ?? ""}
       </td>
       <td className="sticky left-[11rem] z-20 w-8 whitespace-nowrap border-b border-t border-gray-300 bg-gray-50 p-1 text-center text-xs">
-        {playerNhlTeam?.logoUrl ? (
-          <Image
-            src={playerNhlTeam.logoUrl}
-            alt={playerNhlTeam.fullName ?? playerNhlAbbr ?? "NHL Team"}
-            className="mx-auto h-4 w-4"
-            width={64}
-            height={64}
-          />
-        ) : (
-          <span className="text-2xs font-semibold">{playerNhlAbbr ?? "-"}</span>
-        )}
+        <NHLLogo team={playerNhlTeam} size={16} />
       </td>
       {displayYears.map((displayYear) => renderCapHitCell(displayYear))}
     </tr>
@@ -336,8 +327,9 @@ export function TeamBuyoutTable({
                 const playerNhlAbbr = player
                   ? getPlayerNhlAbbreviation(player)
                   : null;
-                const playerNhlTeam = nhlTeams.find(
-                  (team) => team.abbreviation === playerNhlAbbr,
+                const playerNhlTeam = findNhlTeamByAbbreviation(
+                  nhlTeams,
+                  playerNhlAbbr,
                 );
 
                 return (
@@ -356,23 +348,7 @@ export function TeamBuyoutTable({
                       {player?.nhlPos?.toString() ?? "-"}
                     </td>
                     <td className="px-2 py-1 text-center">
-                      {playerNhlTeam?.logoUrl ? (
-                        <Image
-                          src={playerNhlTeam.logoUrl}
-                          alt={
-                            playerNhlTeam.fullName ??
-                            playerNhlAbbr ??
-                            "NHL Team"
-                          }
-                          className="mx-auto h-4 w-4"
-                          width={16}
-                          height={16}
-                        />
-                      ) : (
-                        <span className="text-2xs font-semibold">
-                          {playerNhlAbbr ?? "-"}
-                        </span>
-                      )}
+                      <NHLLogo team={playerNhlTeam} size={16} />
                     </td>
                     <td className="px-2 py-1 text-center">
                       {formatMoney(contract.capHit)}

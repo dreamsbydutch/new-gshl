@@ -9,6 +9,7 @@ import type {
   Owner,
   Player,
   PlayerCareerSplitStatLine,
+  PlayerSplitStatLine,
   PlayerTotalStatLine,
   Season,
   TeamWeekStatLine,
@@ -103,12 +104,7 @@ export interface MatchupStatsTableProps {
   categories: MatchupCategoryConfig[];
 }
 
-export interface FranchiseCareerRow {
-  playerId: string;
-  seasonType: SeasonType;
-  posGroup: string;
-  nhlPos: string[];
-  nhlTeam: string;
+export interface RecordBookStatLine {
   days: number;
   GP: number;
   GS: number;
@@ -131,46 +127,80 @@ export interface FranchiseCareerRow {
   SVP: number | null;
 }
 
-export type RecordStatKey =
-  | "days"
-  | "GP"
-  | "G"
-  | "A"
-  | "P"
-  | "PM"
-  | "PIM"
-  | "PPP"
-  | "SOG"
-  | "HIT"
-  | "BLK"
-  | "W"
-  | "SV"
-  | "SO"
-  | "GAA"
-  | "SVP";
+export type RecordBookStatKey = keyof RecordBookStatLine;
 
-export interface AwardSummaryRow {
+export interface FranchiseCareerRow extends RecordBookStatLine {
   playerId: string;
-  playerName: string;
-  nhlTeam: NHLTeam | undefined;
-  positions: string;
-  totalAwards: number;
-  firstTeamAllStars: number;
-  secondTeamAllStars: number;
-  playoffAllStars: number;
-  latestYear: number | string;
-  breakdown: string;
+  seasonType: SeasonType;
+  posGroup: string;
+  nhlPos: string[];
+  nhlTeam: string;
 }
 
-export interface RecordLeader {
-  key: string;
-  label: string;
+export interface FranchiseSeasonRow extends RecordBookStatLine {
+  playerId: string;
+  seasonId: string;
+  seasonYear: number | string;
+  seasonType: SeasonType;
+  posGroup: string;
+  nhlPos: string[];
+  nhlTeam: string;
+}
+
+export interface RecordBookPlayerRow extends RecordBookStatLine {
+  id: string;
   playerId: string;
   playerName: string;
   nhlTeam: NHLTeam | undefined;
   positions: string;
-  displayValue: string;
-  note?: string;
+  positionGroup: string;
+  seasonType: SeasonType;
+  seasonId?: string;
+  seasonYear?: number | string;
+  seasonCount: number;
+  firstSeason?: number | string;
+  lastSeason?: number | string;
+}
+
+export interface RecordBookAwardRow {
+  id: string;
+  playerId: string;
+  playerName: string;
+  nhlTeam: NHLTeam | undefined;
+  positions: string;
+  seasonYear: number | string;
+  award: AwardsList;
+  awardLabel: string;
+}
+
+export type RecordBookView = "career" | "season" | "awards";
+export type RecordBookGroup = "skater" | "goalie";
+export type RecordBookSortDirection = "asc" | "desc";
+export type RecordBookPlayerSortKey =
+  | "playerName"
+  | "positions"
+  | "seasonYear"
+  | "seasonCount"
+  | RecordBookStatKey;
+export type RecordBookAwardSortKey =
+  | "playerName"
+  | "positions"
+  | "seasonYear"
+  | "awardLabel";
+export type RecordBookSortKey =
+  | RecordBookPlayerSortKey
+  | RecordBookAwardSortKey;
+
+export interface RecordBookSortState {
+  key: RecordBookSortKey;
+  direction: RecordBookSortDirection;
+}
+
+export interface RecordBookStatColumn {
+  key: RecordBookStatKey;
+  label: string;
+  title: string;
+  precision?: number;
 }
 
 export interface TeamRecordBookProps {
@@ -181,15 +211,85 @@ export interface TeamRecordBookProps {
   nhlTeams: NHLTeam[];
   playerTotals: PlayerTotalStatLine[];
   players: Player[];
+  seasonSplits: PlayerSplitStatLine[];
   seasons: Season[];
 }
 
-export interface PlayerAwardBreakdown {
-  playerId: string;
-  counts: Map<AwardsList, number>;
-  totalAwards: number;
-  firstTeamAllStars: number;
-  secondTeamAllStars: number;
-  playoffAllStars: number;
-  latestYear: number | string;
+export interface BuildRecordBookPlayerRowsOptions {
+  careerSplits: PlayerCareerSplitStatLine[];
+  franchiseTeamIds: Set<string>;
+  nhlTeamsByAbbr: Map<string, NHLTeam>;
+  playersById: Map<string, Player>;
+  seasonSplits: PlayerSplitStatLine[];
+  seasonsById: Map<string, number>;
+}
+
+export interface BuildRecordBookPlayerRowsResult {
+  careerRows: RecordBookPlayerRow[];
+  seasonRows: RecordBookPlayerRow[];
+}
+
+export interface BuildRecordBookAwardRowsOptions {
+  allTeams: GSHLTeam[];
+  currentTeam: GSHLTeam;
+  nhlTeamsByAbbr: Map<string, NHLTeam>;
+  playerAwards: PlayerAward[];
+  playerTotals: PlayerTotalStatLine[];
+  playersById: Map<string, Player>;
+  seasonsById: Map<string, number>;
+}
+
+export interface RecordBookToolbarProps {
+  awardCount: number;
+  group: RecordBookGroup;
+  onGroupChange: (group: RecordBookGroup) => void;
+  onQueryChange: (query: string) => void;
+  onSeasonTypeChange: (seasonType: SeasonType) => void;
+  onViewChange: (view: RecordBookView) => void;
+  playerCount: number;
+  query: string;
+  seasonType: SeasonType;
+  seasonTypes: SeasonType[];
+  view: RecordBookView;
+}
+
+export interface RecordBookSortableHeadProps {
+  activeSort: RecordBookSortState;
+  align?: "left" | "right";
+  className?: string;
+  label: string;
+  onSort: (key: RecordBookSortKey) => void;
+  sortKey: RecordBookSortKey;
+  title?: string;
+}
+
+export interface RecordBookPlayerTableProps {
+  columns: RecordBookStatColumn[];
+  onSort: (key: RecordBookSortKey) => void;
+  rows: RecordBookPlayerRow[];
+  sort: RecordBookSortState;
+  view: Exclude<RecordBookView, "awards">;
+}
+
+export interface RecordBookAwardsTableProps {
+  onSort: (key: RecordBookSortKey) => void;
+  rows: RecordBookAwardRow[];
+  sort: RecordBookSortState;
+}
+
+export interface UseTeamRecordBookViewResult {
+  awardRows: RecordBookAwardRow[];
+  columns: RecordBookStatColumn[];
+  group: RecordBookGroup;
+  onGroupChange: (group: RecordBookGroup) => void;
+  onSeasonTypeChange: (seasonType: SeasonType) => void;
+  onSort: (key: RecordBookSortKey) => void;
+  onViewChange: (view: RecordBookView) => void;
+  playerRows: RecordBookPlayerRow[];
+  query: string;
+  seasonType: SeasonType;
+  seasonTypes: SeasonType[];
+  setQuery: (query: string) => void;
+  sort: RecordBookSortState;
+  view: RecordBookView;
 }

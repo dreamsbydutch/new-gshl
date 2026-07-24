@@ -58,7 +58,7 @@ export function useDraftAdminList(
   const { data: players, isLoading: playersLoading } = usePlayers();
   const { data: nhlTeamsRaw = [] } = useNHLTeams();
   const nhlTeams = nhlTeamsRaw.filter(
-    (team): team is NHLTeam => "abbreviation" in team,
+    (team): team is NHLTeam => "abbr" in team,
   );
   const { data: draftPicks = [] } = useDraftPicks();
   const { data: gshlTeamsRaw = [] } = useTeams({ seasonId });

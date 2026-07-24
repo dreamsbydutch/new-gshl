@@ -1,6 +1,17 @@
 "use client";
 
-import { useMemo } from "react";
+import { ArrowDown, ArrowUp, ArrowUpDown, Search } from "lucide-react";
+import { NHLLogo } from "@gshl-components/player/NHLLogo";
+import { useTeamRecordBookView } from "@gshl-hooks";
+import type {
+  RecordBookAwardsTableProps,
+  RecordBookPlayerTableProps,
+  RecordBookSortableHeadProps,
+  RecordBookToolbarProps,
+  RecordBookView,
+  SeasonType as SeasonTypeValue,
+  TeamRecordBookProps,
+} from "@gshl-types";
 import {
   Table,
   TableBody,
@@ -9,479 +20,467 @@ import {
   TableHeader,
   TableRow,
 } from "@gshl-ui";
-import { NHLLogo } from "@gshl-components/player/NHLLogo";
-import type {
-  AwardSummaryRow,
-  RecordLeader,
-  RecordStatKey,
-  SeasonType as SeasonTypeValue,
-  TeamRecordBookProps,
-} from "@gshl-types";
-import {
-  buildAwardSummaryRows,
-  buildFranchiseCareerRows,
-  cn,
-  findLeader,
-  formatNumber,
-  SeasonType,
-} from "@gshl-utils";
+import { cn, formatRecordBookStat, SeasonType } from "@gshl-utils";
 
-const HEADLINE_RECORDS: Array<{
-  key: string;
+const RECORD_BOOK_VIEWS: Array<{
   label: string;
-  stat: RecordStatKey;
-  seasonType: SeasonTypeValue;
-  group: "all" | "skater" | "goalie";
+  value: RecordBookView;
 }> = [
-  {
-    key: "most-games",
-    label: "Most Games",
-    stat: "GP",
-    seasonType: SeasonType.REGULAR_SEASON,
-    group: "all",
-  },
-  {
-    key: "most-days",
-    label: "Most Days",
-    stat: "days",
-    seasonType: SeasonType.REGULAR_SEASON,
-    group: "all",
-  },
-  {
-    key: "most-points",
-    label: "Most Points",
-    stat: "P",
-    seasonType: SeasonType.REGULAR_SEASON,
-    group: "skater",
-  },
-  {
-    key: "most-wins",
-    label: "Most Wins",
-    stat: "W",
-    seasonType: SeasonType.REGULAR_SEASON,
-    group: "goalie",
-  },
+  { label: "Career", value: "career" },
+  { label: "By year", value: "season" },
+  { label: "Awards", value: "awards" },
 ];
 
-const SKATER_RECORD_DEFS: Array<{ key: RecordStatKey; label: string }> = [
-  { key: "GP", label: "Games Played" },
-  { key: "G", label: "Goals" },
-  { key: "A", label: "Assists" },
-  { key: "P", label: "Points" },
-  { key: "PPP", label: "Power-Play Points" },
-  { key: "SOG", label: "Shots on Goal" },
-  { key: "HIT", label: "Hits" },
-  { key: "BLK", label: "Blocks" },
-  { key: "PM", label: "Plus/Minus" },
-  { key: "PIM", label: "Penalty Minutes" },
-];
-
-const GOALIE_RECORD_DEFS: Array<{ key: RecordStatKey; label: string }> = [
-  { key: "GP", label: "Games Played" },
-  { key: "W", label: "Wins" },
-  { key: "SV", label: "Saves" },
-  { key: "SO", label: "Shutouts" },
-  { key: "GAA", label: "Goals Against Average" },
-  { key: "SVP", label: "Save Percentage" },
-];
-
-function RecordBookDivider({ label }: { label: string }) {
-  return (
-    <div className="mb-6 mt-12 flex items-center gap-4 px-4">
-      <div className="h-0 w-full border-t-4 border-dotted border-gray-300" />
-      <span className="shrink-0 font-barlow text-xs uppercase tracking-[0.28em] text-gray-400">
-        {label}
-      </span>
-      <div className="h-0 w-full border-t-4 border-dotted border-gray-300" />
-    </div>
-  );
+function getSeasonTypeLabel(seasonType: SeasonTypeValue): string {
+  if (seasonType === SeasonType.PLAYOFFS) return "Playoffs";
+  if (seasonType === SeasonType.LOSERS_TOURNAMENT) return "Losers";
+  return "Regular";
 }
 
-function RecordLeaderCard({
-  leader,
+function SortableHead({
+  activeSort,
+  align = "right",
   className,
-}: {
-  leader: RecordLeader;
-  className?: string;
-}) {
+  label,
+  onSort,
+  sortKey,
+  title,
+}: RecordBookSortableHeadProps) {
+  const isActive = activeSort.key === sortKey;
+  const ariaSort = isActive
+    ? activeSort.direction === "asc"
+      ? "ascending"
+      : "descending"
+    : "none";
+
   return (
-    <article
+    <TableHead
+      aria-sort={ariaSort}
       className={cn(
-        "rounded-[1.75rem] border border-gray-200 bg-white/95 p-5 shadow-[0_18px_40px_rgba(15,23,42,0.08)]",
+        "h-11 whitespace-nowrap px-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500 sm:px-3 sm:text-[11px]",
+        align === "left" ? "text-left" : "text-right",
         className,
       )}
+      title={title}
     >
-      <p className="font-barlow text-[11px] uppercase tracking-[0.24em] text-gray-400">
-        {leader.label}
-      </p>
-      <div className="mt-3 flex items-center gap-3">
-        <NHLLogo team={leader.nhlTeam} size={34} className="mx-0 shrink-0" />
-        <div className="min-w-0">
-          <p className="truncate font-oswald text-2xl leading-none text-black">
-            {leader.playerName}
-          </p>
-          <p className="font-barlow text-xs uppercase tracking-[0.18em] text-gray-500">
-            {leader.positions}
-          </p>
+      <button
+        type="button"
+        onClick={() => onSort(sortKey)}
+        className={cn(
+          "flex w-full items-center gap-1 rounded px-1 py-1 transition-colors hover:bg-slate-100 hover:text-slate-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400",
+          align === "left" ? "justify-start" : "justify-end",
+          isActive && "text-slate-950",
+        )}
+        title={title ? `Sort by ${title}` : `Sort by ${label}`}
+      >
+        <span>{label}</span>
+        {isActive ? (
+          activeSort.direction === "asc" ? (
+            <ArrowUp className="h-3 w-3" aria-hidden="true" />
+          ) : (
+            <ArrowDown className="h-3 w-3" aria-hidden="true" />
+          )
+        ) : (
+          <ArrowUpDown className="h-3 w-3 text-slate-300" aria-hidden="true" />
+        )}
+      </button>
+    </TableHead>
+  );
+}
+
+function RecordBookToolbar({
+  awardCount,
+  group,
+  onGroupChange,
+  onQueryChange,
+  onSeasonTypeChange,
+  onViewChange,
+  playerCount,
+  query,
+  seasonType,
+  seasonTypes,
+  view,
+}: RecordBookToolbarProps) {
+  const visibleCount = view === "awards" ? awardCount : playerCount;
+
+  return (
+    <>
+      <div className="flex min-h-14 flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-3 py-2 sm:px-4">
+        <div
+          role="tablist"
+          aria-label="Player record view"
+          className="flex items-center rounded-lg bg-slate-100 p-1"
+        >
+          {RECORD_BOOK_VIEWS.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              role="tab"
+              aria-selected={view === option.value}
+              onClick={() => onViewChange(option.value)}
+              className={cn(
+                "rounded-md px-3 py-1.5 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 sm:text-sm",
+                view === option.value
+                  ? "bg-white text-slate-950 shadow-sm"
+                  : "text-slate-500 hover:text-slate-900",
+              )}
+            >
+              {option.label}
+            </button>
+          ))}
         </div>
+        <span className="font-mono text-xs tabular-nums text-slate-400">
+          {visibleCount} {visibleCount === 1 ? "row" : "rows"}
+        </span>
       </div>
-      <p className="mt-4 font-oswald text-4xl leading-none text-black">
-        {leader.displayValue}
-      </p>
-      {leader.note ? (
-        <p className="mt-2 text-xs text-muted-foreground">{leader.note}</p>
-      ) : null}
-    </article>
+
+      <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-slate-50/70 px-3 py-2.5 sm:px-4">
+        {view !== "awards" ? (
+          <>
+            <div
+              className="flex items-center rounded-md border border-slate-200 bg-white p-0.5"
+              aria-label="Player group"
+            >
+              {(["skater", "goalie"] as const).map((option) => (
+                <button
+                  key={option}
+                  type="button"
+                  aria-pressed={group === option}
+                  onClick={() => onGroupChange(option)}
+                  className={cn(
+                    "rounded px-2.5 py-1 text-[11px] font-semibold capitalize transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 sm:text-xs",
+                    group === option
+                      ? "bg-slate-900 text-white"
+                      : "text-slate-500 hover:text-slate-900",
+                  )}
+                >
+                  {option === "goalie" ? "Goalies" : "Skaters"}
+                </button>
+              ))}
+            </div>
+            <div
+              className="flex items-center rounded-md border border-slate-200 bg-white p-0.5"
+              aria-label="Season stage"
+            >
+              {seasonTypes.map((option) => (
+                <button
+                  key={option}
+                  type="button"
+                  aria-pressed={seasonType === option}
+                  onClick={() => onSeasonTypeChange(option)}
+                  className={cn(
+                    "rounded px-2.5 py-1 text-[11px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 sm:text-xs",
+                    seasonType === option
+                      ? "bg-slate-900 text-white"
+                      : "text-slate-500 hover:text-slate-900",
+                  )}
+                >
+                  {getSeasonTypeLabel(option)}
+                </button>
+              ))}
+            </div>
+          </>
+        ) : null}
+
+        <label className="relative ml-auto min-w-[150px] flex-1 sm:max-w-[240px]">
+          <span className="sr-only">Search player records</span>
+          <Search
+            className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400"
+            aria-hidden="true"
+          />
+          <input
+            type="search"
+            value={query}
+            onChange={(event) => onQueryChange(event.target.value)}
+            placeholder={view === "awards" ? "Player or award" : "Player"}
+            className="h-8 w-full rounded-md border border-slate-200 bg-white pl-8 pr-3 text-xs text-slate-900 outline-none transition-shadow placeholder:text-slate-400 focus:ring-2 focus:ring-slate-300"
+          />
+        </label>
+      </div>
+    </>
   );
 }
 
-function RecordLeadersTable({
-  title,
+function PlayerHistoryTable({
+  columns,
+  onSort,
   rows,
-}: {
-  title: string;
-  rows: RecordLeader[];
-}) {
+  sort,
+  view,
+}: RecordBookPlayerTableProps) {
+  const hasSeasonColumn = view === "season";
+  const playerLeftClass = hasSeasonColumn ? "left-20" : "left-0";
+  const emptyColSpan = columns.length + (hasSeasonColumn ? 3 : 3);
+
   return (
-    <div className="rounded-[1.75rem] border border-gray-200 bg-white/95 p-4 shadow-[0_18px_40px_rgba(15,23,42,0.08)]">
-      <div className="mb-3 px-1">
-        <h3 className="font-oswald text-2xl leading-none text-black">
-          {title}
-        </h3>
-      </div>
-      <Table>
-        <TableHeader>
-          <TableRow className="bg-muted/30 hover:bg-muted/30">
-            <TableHead>Category</TableHead>
-            <TableHead>Player</TableHead>
-            <TableHead>Pos</TableHead>
-            <TableHead className="text-right">Record</TableHead>
+    <Table
+      className={cn(
+        "border-collapse text-xs sm:text-sm",
+        hasSeasonColumn ? "min-w-[1120px]" : "min-w-[1080px]",
+      )}
+    >
+      <TableHeader>
+        <TableRow className="border-b border-slate-200 bg-slate-50 hover:bg-slate-50">
+          {hasSeasonColumn ? (
+            <SortableHead
+              activeSort={sort}
+              align="left"
+              className="sticky left-0 z-30 w-20 bg-slate-50"
+              label="Season"
+              onSort={onSort}
+              sortKey="seasonYear"
+            />
+          ) : null}
+          <SortableHead
+            activeSort={sort}
+            align="left"
+            className={cn(
+              "sticky z-30 min-w-[210px] bg-slate-50 sm:min-w-[240px]",
+              playerLeftClass,
+            )}
+            label="Player"
+            onSort={onSort}
+            sortKey="playerName"
+          />
+          <SortableHead
+            activeSort={sort}
+            align="left"
+            className="w-16"
+            label="Pos"
+            onSort={onSort}
+            sortKey="positions"
+          />
+          {!hasSeasonColumn ? (
+            <SortableHead
+              activeSort={sort}
+              label="Years"
+              onSort={onSort}
+              sortKey="seasonCount"
+              title="Seasons with franchise"
+            />
+          ) : null}
+          {columns.map((column) => (
+            <SortableHead
+              key={column.key}
+              activeSort={sort}
+              label={column.label}
+              onSort={onSort}
+              sortKey={column.key}
+              title={column.title}
+            />
+          ))}
+        </TableRow>
+      </TableHeader>
+      <TableBody className="divide-y divide-slate-100">
+        {rows.length === 0 ? (
+          <TableRow>
+            <TableCell
+              colSpan={emptyColSpan}
+              className="h-40 text-center text-sm text-slate-400"
+            >
+              No player history found.
+            </TableCell>
           </TableRow>
-        </TableHeader>
-        <TableBody>
-          {rows.length > 0 ? (
-            rows.map((row) => (
-              <TableRow key={row.key}>
-                <TableCell className="font-medium">{row.label}</TableCell>
-                <TableCell>
-                  <div className="flex items-center gap-2">
-                    <NHLLogo team={row.nhlTeam} size={18} className="mx-0" />
-                    <span>{row.playerName}</span>
-                  </div>
+        ) : (
+          rows.map((row) => (
+            <TableRow
+              key={row.id}
+              className="group border-0 bg-white hover:bg-slate-50"
+            >
+              {hasSeasonColumn ? (
+                <TableCell className="sticky left-0 z-20 w-20 bg-white px-3 py-2.5 font-mono font-semibold tabular-nums text-slate-700 group-hover:bg-slate-50">
+                  {row.seasonYear}
                 </TableCell>
-                <TableCell>{row.positions}</TableCell>
-                <TableCell className="text-right font-medium">
-                  {row.displayValue}
-                </TableCell>
-              </TableRow>
-            ))
-          ) : (
-            <TableRow>
+              ) : null}
               <TableCell
-                className="py-6 text-center text-sm text-muted-foreground"
-                colSpan={4}
+                className={cn(
+                  "sticky z-20 min-w-[210px] bg-white px-3 py-2.5 group-hover:bg-slate-50 sm:min-w-[240px]",
+                  playerLeftClass,
+                )}
               >
-                No records on file yet.
+                <div className="flex items-center gap-2.5">
+                  <NHLLogo
+                    team={row.nhlTeam}
+                    size={22}
+                    className="mx-0 shrink-0"
+                  />
+                  <span className="truncate font-semibold text-slate-900">
+                    {row.playerName}
+                  </span>
+                </div>
               </TableCell>
+              <TableCell className="whitespace-nowrap px-3 py-2.5 text-left text-slate-500">
+                {row.positions || "—"}
+              </TableCell>
+              {!hasSeasonColumn ? (
+                <TableCell className="whitespace-nowrap px-3 py-2.5 text-right font-mono tabular-nums text-slate-600">
+                  <span className="font-semibold text-slate-900">
+                    {row.seasonCount || "—"}
+                  </span>
+                  {row.firstSeason && row.lastSeason ? (
+                    <span className="ml-1.5 text-[10px] text-slate-400">
+                      {row.firstSeason === row.lastSeason
+                        ? row.firstSeason
+                        : `${row.firstSeason}–${row.lastSeason}`}
+                    </span>
+                  ) : null}
+                </TableCell>
+              ) : null}
+              {columns.map((column) => (
+                <TableCell
+                  key={`${row.id}-${column.key}`}
+                  className="whitespace-nowrap px-3 py-2.5 text-right font-mono tabular-nums text-slate-700"
+                >
+                  {formatRecordBookStat(row, column)}
+                </TableCell>
+              ))}
             </TableRow>
-          )}
-        </TableBody>
-      </Table>
-    </div>
+          ))
+        )}
+      </TableBody>
+    </Table>
   );
 }
 
-function AwardsTable({ rows }: { rows: AwardSummaryRow[] }) {
+function PlayerAwardsTable({ onSort, rows, sort }: RecordBookAwardsTableProps) {
   return (
-    <div className="rounded-[1.75rem] border border-gray-200 bg-white/95 p-4 shadow-[0_18px_40px_rgba(15,23,42,0.08)]">
-      <div className="mb-3 px-1">
-        <h3 className="font-oswald text-2xl leading-none text-black">
-          Franchise All-Star Leaders
-        </h3>
-      </div>
-      <Table>
-        <TableHeader>
-          <TableRow className="bg-muted/30 hover:bg-muted/30">
-            <TableHead>Player</TableHead>
-            <TableHead>Pos</TableHead>
-            <TableHead className="text-right">Total</TableHead>
-            <TableHead className="text-right">1st</TableHead>
-            <TableHead className="text-right">2nd</TableHead>
-            <TableHead className="text-right">Playoff</TableHead>
-            <TableHead>Breakdown</TableHead>
+    <Table className="min-w-[720px] border-collapse text-xs sm:text-sm">
+      <TableHeader>
+        <TableRow className="border-b border-slate-200 bg-slate-50 hover:bg-slate-50">
+          <SortableHead
+            activeSort={sort}
+            align="left"
+            className="sticky left-0 z-30 w-20 bg-slate-50"
+            label="Season"
+            onSort={onSort}
+            sortKey="seasonYear"
+          />
+          <SortableHead
+            activeSort={sort}
+            align="left"
+            className="sticky left-20 z-30 min-w-[220px] bg-slate-50"
+            label="Player"
+            onSort={onSort}
+            sortKey="playerName"
+          />
+          <SortableHead
+            activeSort={sort}
+            align="left"
+            className="w-20"
+            label="Pos"
+            onSort={onSort}
+            sortKey="positions"
+          />
+          <SortableHead
+            activeSort={sort}
+            align="left"
+            label="Award"
+            onSort={onSort}
+            sortKey="awardLabel"
+          />
+        </TableRow>
+      </TableHeader>
+      <TableBody className="divide-y divide-slate-100">
+        {rows.length === 0 ? (
+          <TableRow>
+            <TableCell
+              colSpan={4}
+              className="h-40 text-center text-sm text-slate-400"
+            >
+              No player awards found.
+            </TableCell>
           </TableRow>
-        </TableHeader>
-        <TableBody>
-          {rows.length > 0 ? (
-            rows.map((row) => (
-              <TableRow key={row.playerId}>
-                <TableCell className="font-medium">
-                  <div className="flex items-center gap-2">
-                    <NHLLogo team={row.nhlTeam} size={18} className="mx-0" />
-                    <span>{row.playerName}</span>
-                  </div>
-                </TableCell>
-                <TableCell>{row.positions}</TableCell>
-                <TableCell className="text-right font-medium">
-                  {formatNumber(row.totalAwards, 0)}
-                </TableCell>
-                <TableCell className="text-right">
-                  {formatNumber(row.firstTeamAllStars, 0)}
-                </TableCell>
-                <TableCell className="text-right">
-                  {formatNumber(row.secondTeamAllStars, 0)}
-                </TableCell>
-                <TableCell className="text-right">
-                  {formatNumber(row.playoffAllStars, 0)}
-                </TableCell>
-                <TableCell className="text-xs text-muted-foreground">
-                  {row.breakdown}
-                </TableCell>
-              </TableRow>
-            ))
-          ) : (
-            <TableRow>
-              <TableCell
-                className="py-6 text-center text-sm text-muted-foreground"
-                colSpan={7}
-              >
-                No all-star selections on file for this franchise yet.
+        ) : (
+          rows.map((row) => (
+            <TableRow
+              key={row.id}
+              className="group border-0 bg-white hover:bg-slate-50"
+            >
+              <TableCell className="sticky left-0 z-20 w-20 bg-white px-3 py-2.5 font-mono font-semibold tabular-nums text-slate-700 group-hover:bg-slate-50">
+                {row.seasonYear}
+              </TableCell>
+              <TableCell className="sticky left-20 z-20 min-w-[220px] bg-white px-3 py-2.5 group-hover:bg-slate-50">
+                <div className="flex items-center gap-2.5">
+                  <NHLLogo
+                    team={row.nhlTeam}
+                    size={22}
+                    className="mx-0 shrink-0"
+                  />
+                  <span className="truncate font-semibold text-slate-900">
+                    {row.playerName}
+                  </span>
+                </div>
+              </TableCell>
+              <TableCell className="whitespace-nowrap px-3 py-2.5 text-slate-500">
+                {row.positions || "—"}
+              </TableCell>
+              <TableCell className="whitespace-nowrap px-3 py-2.5 font-medium text-slate-800">
+                {row.awardLabel}
               </TableCell>
             </TableRow>
-          )}
-        </TableBody>
-      </Table>
-    </div>
+          ))
+        )}
+      </TableBody>
+    </Table>
   );
 }
 
 export function TeamRecordBook(props: TeamRecordBookProps) {
   const {
-    playerAwards,
-    allTeams,
-    careerSplits,
-    currentTeam,
-    nhlTeams,
-    playerTotals,
-    players,
-    seasons,
-  } = props;
-
-  const playersById = useMemo(
-    () => new Map(players.map((player) => [String(player.id), player])),
-    [players],
-  );
-  const nhlTeamsByAbbr = useMemo(
-    () => new Map(nhlTeams.map((team) => [team.abbreviation, team])),
-    [nhlTeams],
-  );
-  const seasonsById = useMemo(
-    () => new Map(seasons.map((season) => [String(season.id), season.year])),
-    [seasons],
-  );
-
-  const franchiseTeamIds = useMemo(
-    () =>
-      new Set(
-        allTeams
-          .filter(
-            (team) =>
-              String(team.franchiseId) === String(currentTeam.franchiseId),
-          )
-          .map((team) => String(team.id)),
-      ),
-    [allTeams, currentTeam.franchiseId],
-  );
-
-  const franchiseCareerRows = useMemo(
-    () => buildFranchiseCareerRows(careerSplits, franchiseTeamIds),
-    [careerSplits, franchiseTeamIds],
-  );
-
-  const headlineLeaders = useMemo(
-    () =>
-      HEADLINE_RECORDS.map((definition) =>
-        findLeader(
-          franchiseCareerRows,
-          playersById,
-          nhlTeamsByAbbr,
-          definition,
-          {
-            seasonType: definition.seasonType,
-            group: definition.group,
-          },
-        ),
-      ).filter((leader): leader is RecordLeader => leader !== null),
-    [franchiseCareerRows, nhlTeamsByAbbr, playersById],
-  );
-
-  const regularSeasonSkaterRows = useMemo(
-    () =>
-      SKATER_RECORD_DEFS.map((definition) =>
-        findLeader(
-          franchiseCareerRows,
-          playersById,
-          nhlTeamsByAbbr,
-          {
-            key: `rs-skater-${definition.key}`,
-            label: definition.label,
-            stat: definition.key,
-          },
-          {
-            seasonType: SeasonType.REGULAR_SEASON,
-            group: "skater",
-          },
-        ),
-      ).filter((leader): leader is RecordLeader => leader !== null),
-    [franchiseCareerRows, nhlTeamsByAbbr, playersById],
-  );
-
-  const regularSeasonGoalieRows = useMemo(
-    () =>
-      GOALIE_RECORD_DEFS.map((definition) =>
-        findLeader(
-          franchiseCareerRows,
-          playersById,
-          nhlTeamsByAbbr,
-          {
-            key: `rs-goalie-${definition.key}`,
-            label: definition.label,
-            stat: definition.key,
-          },
-          {
-            seasonType: SeasonType.REGULAR_SEASON,
-            group: "goalie",
-          },
-        ),
-      ).filter((leader): leader is RecordLeader => leader !== null),
-    [franchiseCareerRows, nhlTeamsByAbbr, playersById],
-  );
-
-  const playoffSkaterRows = useMemo(
-    () =>
-      SKATER_RECORD_DEFS.map((definition) =>
-        findLeader(
-          franchiseCareerRows,
-          playersById,
-          nhlTeamsByAbbr,
-          {
-            key: `po-skater-${definition.key}`,
-            label: definition.label,
-            stat: definition.key,
-          },
-          {
-            seasonType: SeasonType.PLAYOFFS,
-            group: "skater",
-          },
-        ),
-      ).filter((leader): leader is RecordLeader => leader !== null),
-    [franchiseCareerRows, nhlTeamsByAbbr, playersById],
-  );
-
-  const playoffGoalieRows = useMemo(
-    () =>
-      GOALIE_RECORD_DEFS.map((definition) =>
-        findLeader(
-          franchiseCareerRows,
-          playersById,
-          nhlTeamsByAbbr,
-          {
-            key: `po-goalie-${definition.key}`,
-            label: definition.label,
-            stat: definition.key,
-          },
-          {
-            seasonType: SeasonType.PLAYOFFS,
-            group: "goalie",
-          },
-        ),
-      ).filter((leader): leader is RecordLeader => leader !== null),
-    [franchiseCareerRows, nhlTeamsByAbbr, playersById],
-  );
-
-  const awardSummaryRows = useMemo(
-    () =>
-      buildAwardSummaryRows({
-        playerAwards,
-        allTeams,
-        currentTeam,
-        nhlTeamsByAbbr,
-        playerTotals,
-        playersById,
-        seasonsById,
-      }),
-    [
-      playerAwards,
-      allTeams,
-      currentTeam,
-      nhlTeamsByAbbr,
-      playerTotals,
-      playersById,
-      seasonsById,
-    ],
-  );
-
-  const awardsLeader = awardSummaryRows[0];
+    awardRows,
+    columns,
+    group,
+    onGroupChange,
+    onSeasonTypeChange,
+    onSort,
+    onViewChange,
+    playerRows,
+    query,
+    seasonType,
+    seasonTypes,
+    setQuery,
+    sort,
+    view,
+  } = useTeamRecordBookView(props);
 
   return (
-    <section className="pb-12">
-      <div className="mx-auto max-w-6xl px-4">
-        <div className="rounded-[2rem] border border-gray-200 bg-[radial-gradient(circle_at_top,#fff_0%,#f8fafc_52%,#eef2ff_100%)] p-6 shadow-[0_24px_60px_rgba(15,23,42,0.08)]">
-          <p className="font-barlow text-xs uppercase tracking-[0.32em] text-gray-400">
-            Team Record Book
-          </p>
-          <h2 className="mt-3 font-oswald text-4xl leading-none text-black sm:text-5xl">
-            Player records, franchise longevity, and individual honors.
+    <section className="pb-12 pt-2">
+      <div className="mx-auto max-w-[96rem] px-3 sm:px-4">
+        <div className="mb-3 flex items-baseline justify-between gap-3 px-1">
+          <h2 className="font-oswald text-2xl text-slate-950 sm:text-3xl">
+            Player history
           </h2>
-          <p className="mt-3 max-w-3xl text-sm text-muted-foreground">
-            All-time franchise leaders built from player career splits across
-            every season this team has been on record.
-          </p>
+          <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400 sm:text-xs">
+            Franchise record book
+          </span>
         </div>
-      </div>
 
-      <RecordBookDivider label="FRANCHISE LEADERS" />
-      <div className="mx-auto grid max-w-6xl gap-4 px-4 sm:grid-cols-2 xl:grid-cols-5">
-        {headlineLeaders.map((leader) => (
-          <RecordLeaderCard key={leader.key} leader={leader} />
-        ))}
-        {awardsLeader ? (
-          <RecordLeaderCard
-            leader={{
-              key: "most-awards",
-              label: "Most All-Star Honors",
-              playerId: awardsLeader.playerId,
-              playerName: awardsLeader.playerName,
-              nhlTeam: awardsLeader.nhlTeam,
-              positions: awardsLeader.positions,
-              displayValue: formatNumber(awardsLeader.totalAwards, 0),
-            }}
-            className="sm:col-span-2 xl:col-span-1"
+        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm sm:rounded-2xl">
+          <RecordBookToolbar
+            awardCount={awardRows.length}
+            group={group}
+            onGroupChange={onGroupChange}
+            onQueryChange={setQuery}
+            onSeasonTypeChange={onSeasonTypeChange}
+            onViewChange={onViewChange}
+            playerCount={playerRows.length}
+            query={query}
+            seasonType={seasonType}
+            seasonTypes={seasonTypes}
+            view={view}
           />
-        ) : null}
-      </div>
-
-      <RecordBookDivider label="REGULAR SEASON" />
-      <div className="mx-auto grid max-w-6xl gap-4 px-4 lg:grid-cols-2">
-        <RecordLeadersTable
-          title="Skater Records"
-          rows={regularSeasonSkaterRows}
-        />
-        <RecordLeadersTable
-          title="Goalie Records"
-          rows={regularSeasonGoalieRows}
-        />
-      </div>
-
-      <RecordBookDivider label="PLAYOFFS" />
-      <div className="mx-auto grid max-w-6xl gap-4 px-4 lg:grid-cols-2">
-        <RecordLeadersTable title="Skater Records" rows={playoffSkaterRows} />
-        <RecordLeadersTable title="Goalie Records" rows={playoffGoalieRows} />
-      </div>
-
-      <RecordBookDivider label="ALL-STAR TEAMS" />
-      <div className="mx-auto max-w-6xl px-4">
-        <AwardsTable rows={awardSummaryRows} />
+          {view === "awards" ? (
+            <PlayerAwardsTable onSort={onSort} rows={awardRows} sort={sort} />
+          ) : (
+            <PlayerHistoryTable
+              columns={columns}
+              onSort={onSort}
+              rows={playerRows}
+              sort={sort}
+              view={view}
+            />
+          )}
+        </div>
       </div>
     </section>
   );

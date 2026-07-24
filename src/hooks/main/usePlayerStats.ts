@@ -108,13 +108,29 @@ export function useCareerSplits(
   };
 }
 
+export function usePlayerSplitsByTeams(
+  options: { enabled?: boolean; teamIds?: string[] } = {},
+) {
+  const { enabled = true, teamIds = [] } = options;
+  const uniqueTeamIds = useMemo(() => [...new Set(teamIds)].sort(), [teamIds]);
+  const result = useQuery(
+    api.frontend.playerSplitsByTeams,
+    enabled && uniqueTeamIds.length
+      ? { teamIds: uniqueTeamIds as Id<"teams">[] }
+      : "skip",
+  );
+  return {
+    data: (result ?? []) as unknown as PlayerSplitStatLine[],
+    isLoading: enabled && uniqueTeamIds.length > 0 && result === undefined,
+    error: null,
+  };
+}
+
 export function usePlayerTotalsByPlayers(playerIds: string[], enabled = true) {
   const ids = useMemo(() => [...new Set(playerIds)].sort(), [playerIds]);
   const result = useQuery(
     api.frontend.playerTotalsByPlayers,
-    enabled && ids.length
-      ? { playerIds: ids as Id<"players">[] }
-      : "skip",
+    enabled && ids.length ? { playerIds: ids as Id<"players">[] } : "skip",
   );
   return {
     data: (result ?? []) as unknown as PlayerTotalStatLine[],

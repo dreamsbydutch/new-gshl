@@ -140,8 +140,8 @@ export interface Franchise {
 }
 export interface NHLTeam {
   id: string;
-  fullName: string;
-  abbreviation: string;
+  name: string;
+  abbr: string;
   logoUrl: string;
   createdAt: Date;
   updatedAt: Date;

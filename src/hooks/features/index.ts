@@ -26,6 +26,7 @@ export * from "./useStandingsData";
 export * from "./useTeamDraftPickListData";
 export * from "./useTeamHistoryData";
 export * from "./useTeamHistoryRows";
+export * from "./useTeamRecordBookView";
 export * from "./useTeamRosterData";
 export * from "./useTeamRosterView";
 export * from "./useTeamScheduleData";

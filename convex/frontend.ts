@@ -375,6 +375,23 @@ export const careerSplitsByTeams = query({
   },
 });
 
+export const playerSplitsByTeams = query({
+  args: { teamIds: v.array(v.id("teams")) },
+  handler: async (ctx, args) => {
+    const pages = await Promise.all(
+      [...new Set(args.teamIds)].map((gshlTeamId) =>
+        ctx.db
+          .query("playerSplitStatLines")
+          .withIndex("by_gshlTeamId", (q) =>
+            q.eq("gshlTeamId", gshlTeamId),
+          )
+          .collect(),
+      ),
+    );
+    return pages.flat().map((row) => publicRow(row as unknown as Row));
+  },
+});
+
 export const draftPicksPage = query({
   args: {
     seasonId: v.id("seasons"),
