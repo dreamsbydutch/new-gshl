@@ -11,6 +11,20 @@ const tickSchedules = makeFunctionReference<"mutation">(
   Record<string, never>,
   unknown
 >;
+const reconcileUfaOffers = makeFunctionReference<"mutation">(
+  "ufa:reconcileDueGroups",
+) as unknown as FunctionReference<
+  "mutation",
+  "internal",
+  Record<string, never>,
+  unknown
+>;
 crons.interval("dispatch due job schedules", { minutes: 1 }, tickSchedules, {});
+crons.interval(
+  "resolve due UFA offer groups",
+  { minutes: 1 },
+  reconcileUfaOffers,
+  {},
+);
 
 export default crons;

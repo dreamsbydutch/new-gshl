@@ -1,5 +1,16 @@
-import type { Player, Season } from "@gshl-types";
-import { getTorontoDate } from "../domain/contracts";
+import type {
+  Contract,
+  Player,
+  Season,
+  UfaPublicGroup,
+  UfaPublicOffer,
+} from "@gshl-types";
+import {
+  checkContractCapSpace,
+  getContractCoveredSeasonIds,
+  getTorontoDate,
+  orderContractSeasons,
+} from "../domain/contracts";
 import { UFA_OFFER_MS } from "./ufa-deadline";
 
 export { UFA_OFFER_MS } from "./ufa-deadline";
@@ -98,6 +109,61 @@ export function selectAffordableUfas<
   T extends { affordableTerms: readonly unknown[] },
 >(players: T[]): T[] {
   return players.filter((player) => player.affordableTerms.length > 0);
+}
+
+export function getAffordableUfaTerms(options: {
+  ownerId: string | undefined;
+  salary: number;
+  signingSeason: Season | null;
+  seasons: Season[];
+  contracts: Contract[];
+  groups: Array<Pick<UfaPublicGroup, "id" | "seasonId">>;
+  offers: Array<
+    Pick<
+      UfaPublicOffer,
+      "contractLength" | "groupId" | "isMine" | "salary" | "status"
+    >
+  >;
+}): Array<1 | 2 | 3> {
+  const { ownerId, salary, signingSeason, seasons, contracts, groups, offers } =
+    options;
+  if (!ownerId || !signingSeason || salary <= 0) return [];
+
+  const orderedSeasons = orderContractSeasons(seasons);
+  const groupById = new Map(groups.map((group) => [group.id, group]));
+  const reservedCapBySeasonId = new Map<string, number>();
+
+  offers
+    .filter((offer) => offer.isMine && offer.status === "pending")
+    .forEach((offer) => {
+      const group = groupById.get(offer.groupId);
+      if (!group) return;
+      getContractCoveredSeasonIds(
+        {
+          seasonId: group.seasonId,
+          contractLength: offer.contractLength,
+        },
+        orderedSeasons,
+      ).forEach((seasonId) => {
+        reservedCapBySeasonId.set(
+          seasonId,
+          (reservedCapBySeasonId.get(seasonId) ?? 0) + offer.salary,
+        );
+      });
+    });
+
+  return ([1, 2, 3] as const).filter(
+    (contractLength) =>
+      checkContractCapSpace({
+        ownerId,
+        signingSeasonId: String(signingSeason.id),
+        contractLength,
+        contractSalary: salary,
+        contracts,
+        seasons: orderedSeasons,
+        reservedCapBySeasonId,
+      }).affordable,
+  );
 }
 
 export function indexLatestUfaNhlStats<

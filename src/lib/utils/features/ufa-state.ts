@@ -30,6 +30,7 @@ function normalizeGroup(value: unknown): UfaPublicGroup | null {
     _id: toStringValue(value._id ?? value.id),
     id,
     playerId: toStringValue(value.playerId),
+    seasonId: toStringValue(value.seasonId),
     deadlineAt: toNumberValue(value.deadlineAt),
     status: toStringValue(value.status),
   };

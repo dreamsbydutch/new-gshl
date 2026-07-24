@@ -57,6 +57,7 @@ export interface UfaPublicGroup {
   _id: string;
   id: string;
   playerId: string;
+  seasonId: string;
   deadlineAt: number;
   status: string;
 }

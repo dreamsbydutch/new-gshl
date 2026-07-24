@@ -1,9 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import type { Contract, Season } from "@gshl-types";
+import { ContractStatus, ContractType } from "../domain/constants";
 import {
   calculateUfaFitScore,
   calculateUfaProbabilities,
   calculateUfaSalary,
+  getAffordableUfaTerms,
   getUfaWindow,
   indexLatestUfaNhlStats,
   rankUfas,
@@ -11,6 +14,43 @@ import {
   selectTopAffordableUfas,
   selectUfaOffer,
 } from "./ufa";
+
+const capSeasons = Array.from(
+  { length: 4 },
+  (_, index): Season => ({
+    id: `season-${2026 + index}`,
+    year: 2026 + index,
+    name: `Season ${2026 + index}`,
+    categories: [],
+    rosterSpots: [],
+    startDate: `${2025 + index}-10-01`,
+    endDate: `${2026 + index}-04-20`,
+    signingEndDate: `${2026 + index}-06-20`,
+    isActive: index === 0,
+    usesLegacyTies: false,
+    createdAt: new Date(0),
+    updatedAt: new Date(0),
+  }),
+);
+
+const committedContract: Contract = {
+  id: "contract-1",
+  playerId: "contracted-player",
+  ownerId: "owner-1",
+  seasonId: "season-2026",
+  contractType: [ContractType.STANDARD],
+  contractLength: 3,
+  contractSalary: 20_000_000,
+  signingDate: "2026-07-01",
+  startDate: "2026-10-01",
+  signingStatus: ContractStatus.UFA,
+  expiryStatus: ContractStatus.RFA,
+  expiryDate: "2029-04-20",
+  capHit: 20_000_000,
+  capHitEndDate: "2029-04-20",
+  createdAt: new Date(0),
+  updatedAt: new Date(0),
+};
 
 void test("UFA salary applies and rounds the 125 percent premium", () => {
   assert.equal(calculateUfaSalary(1_000_001), 1_250_001);
@@ -59,6 +99,34 @@ void test("UFAs rank by salary and the home list keeps only affordable players",
   assert.deepEqual(
     selectAffordableUfas(ranked).map((player) => player.fullName),
     ["Affordable One", "Affordable Two"],
+  );
+});
+
+void test("UFA affordability includes committed cap and pending offer reservations", () => {
+  const common = {
+    ownerId: "owner-1",
+    salary: 4_000_000,
+    signingSeason: capSeasons[0]!,
+    seasons: capSeasons,
+    contracts: [committedContract],
+    groups: [{ id: "group-1", seasonId: "season-2026" }],
+  };
+
+  assert.deepEqual(getAffordableUfaTerms({ ...common, offers: [] }), [1, 2, 3]);
+  assert.deepEqual(
+    getAffordableUfaTerms({
+      ...common,
+      offers: [
+        {
+          groupId: "group-1",
+          contractLength: 1,
+          salary: 2_000_000,
+          status: "pending",
+          isMine: true,
+        },
+      ],
+    }),
+    [],
   );
 });
 
