@@ -13,10 +13,9 @@ import type {
   Season,
   TeamAward,
 } from "@gshl-types";
-import {
-  AwardsList,
-  MatchupType,
-} from "../domain/constants";
+import { AwardsList, MatchupType } from "../domain/constants";
+import { findCurrentSeason, findMostRecentSeason } from "../domain/season";
+import { safeParseSheetDate } from "../core/date";
 import { getTeamAwardTeam } from "@gshl-lib/config/awards";
 import { isPlayoffMatchupType } from "@gshl-utils/domain/matchup";
 
@@ -56,6 +55,39 @@ const EXCLUDED_AWARDS = new Set<AwardsListType>([
   AwardsList.SECOND_AS,
   AwardsList.PLAYOFF_AS,
 ]);
+
+/**
+ * Returns the seasons that can be shown by the conference comparison page.
+ * The current season is preferred as the newest season; when there is no
+ * current season, the most recently started season is preferred instead.
+ * Future seasons are excluded from the comparison.
+ *
+ * @param seasons - The seasons to filter and order.
+ * @param referenceDate - The date used to determine season visibility.
+ * @returns The visible seasons with the default season first.
+ */
+export const getConferenceContestVisibleSeasons = (
+  seasons: Season[],
+  referenceDate: Date = new Date(),
+): Season[] => {
+  const currentSeason = findCurrentSeason(seasons, referenceDate);
+  const defaultSeason =
+    currentSeason ?? findMostRecentSeason(seasons, referenceDate);
+  const defaultSeasonId = normalizeId(defaultSeason?.id);
+  const referenceTime = referenceDate.getTime();
+
+  return [...seasons]
+    .filter((season) => {
+      const startTime = safeParseSheetDate(season.startDate)?.getTime();
+      return startTime == null || startTime <= referenceTime;
+    })
+    .sort((left, right) => {
+      const leftIsDefault = normalizeId(left.id) === defaultSeasonId;
+      const rightIsDefault = normalizeId(right.id) === defaultSeasonId;
+      if (leftIsDefault !== rightIsDefault) return leftIsDefault ? -1 : 1;
+      return right.year - left.year;
+    });
+};
 
 export const isGshlTeam = (team: TeamLike): team is GSHLTeam => {
   if (!team || typeof team !== "object") return false;
@@ -468,8 +500,7 @@ export const buildConferenceContestSeasonViewModels = (params: {
   gshlTeams: GSHLTeam[];
   teamAwards?: TeamAward[];
 }): ConferenceContestSeasonViewModel[] =>
-  [...params.seasons]
-    .sort((a, b) => b.year - a.year)
+  getConferenceContestVisibleSeasons(params.seasons)
     .map((season) =>
       buildConferenceContestSeasonViewModel({ ...params, season }),
     )
