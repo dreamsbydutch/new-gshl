@@ -15,10 +15,15 @@ import { TeamRoster } from "@gshl-components/team/TeamRoster";
 import { DraftBoardSkeleton } from "@gshl-skeletons";
 
 export function DraftBoardContent() {
-  const { defaultSeason, seasons } = useSeasonState();
+  const {
+    defaultSeason,
+    seasons,
+    isLoading: seasonsLoading,
+  } = useSeasonState();
   const contractSeason = resolveContractDefaultSeason(seasons) ?? defaultSeason;
-  const seasonId = contractSeason?.id;
-  const { data: contractsData, isLoading: contractsLoading } = useAllContracts();
+  const seasonId = contractSeason?.id ? String(contractSeason.id) : undefined;
+  const { data: contractsData, isLoading: contractsLoading } =
+    useAllContracts();
   const contracts: Contract[] = contractsData ?? [];
   const { data: players, isLoading: playersLoading } = usePlayers();
   const { data: teamsRaw = [], isLoading: teamsLoading } = useTeams({
@@ -29,9 +34,13 @@ export function DraftBoardContent() {
   const { data: draftPicks, isLoading: draftPicksLoading } = useDraftPicks();
 
   const isLoading =
-    contractsLoading || playersLoading || teamsLoading || draftPicksLoading;
+    seasonsLoading ||
+    contractsLoading ||
+    playersLoading ||
+    teamsLoading ||
+    draftPicksLoading;
 
-  if (isLoading) {
+  if (isLoading || !seasonId) {
     return <DraftBoardSkeleton />;
   }
 
@@ -81,7 +90,7 @@ export function DraftBoardContent() {
             })}
           </div>
         </div>
-        <DraftBoardList navbarToggle />
+        <DraftBoardList seasonId={seasonId} navbarToggle />
       </div>
       <div className="flex flex-col gap-8">
         <div className="flex flex-row flex-wrap items-center justify-center gap-2 rounded-lg bg-gray-50 bg-opacity-25 p-1 shadow-md">
@@ -157,13 +166,17 @@ function DraftBoardRoster({
   return (
     <>
       <div className="mx-2 text-center text-xl font-bold">
-        <Image
-          src={currentTeam.logoUrl ?? ""}
-          alt={currentTeam.name ?? ""}
-          width={50}
-          height={50}
-          className="mx-auto mb-1"
-        />
+        {currentTeam.logoUrl ? (
+          <Image
+            src={currentTeam.logoUrl}
+            alt={currentTeam.name ?? "Team logo"}
+            width={50}
+            height={50}
+            className="mx-auto mb-1"
+          />
+        ) : (
+          <div className="mx-auto mb-1 h-[50px] w-[50px]" aria-hidden="true" />
+        )}
         {currentTeam.name} Roster
       </div>
       <TeamRoster

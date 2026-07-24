@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo } from "react";
-import { useQuery } from "convex/react";
+import { useQueries, useQuery } from "convex/react";
+import type { RequestForQueries } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import type {
@@ -21,6 +22,14 @@ function state<T>(data: T[] | undefined, enabled: boolean) {
     isFetching: enabled && data === undefined,
     error: null,
   };
+}
+
+function normalizeTeamIds(teamIds: string[]) {
+  return [...new Set(teamIds)].sort().join(",");
+}
+
+function parseTeamIds(teamIdsKey: string) {
+  return teamIdsKey ? teamIdsKey.split(",") : [];
 }
 
 export function usePlayerStats(
@@ -94,7 +103,8 @@ export function useCareerSplits(
   options: { enabled?: boolean; teamIds?: string[] } = {},
 ) {
   const { enabled = true, teamIds = [] } = options;
-  const uniqueTeamIds = useMemo(() => [...new Set(teamIds)].sort(), [teamIds]);
+  const teamIdsKey = normalizeTeamIds(teamIds);
+  const uniqueTeamIds = useMemo(() => parseTeamIds(teamIdsKey), [teamIdsKey]);
   const result = useQuery(
     api.frontend.careerSplitsByTeams,
     enabled && uniqueTeamIds.length
@@ -108,13 +118,49 @@ export function useCareerSplits(
   };
 }
 
+export function usePlayerSplitsByTeams(
+  options: { enabled?: boolean; teamIds?: string[] } = {},
+) {
+  const { enabled = true, teamIds = [] } = options;
+  const teamIdsKey = normalizeTeamIds(teamIds);
+  const uniqueTeamIds = useMemo(() => parseTeamIds(teamIdsKey), [teamIdsKey]);
+  const queries = useMemo<RequestForQueries>(
+    () =>
+      enabled
+        ? Object.fromEntries(
+            uniqueTeamIds.map((teamId) => [
+              teamId,
+              {
+                query: api.frontend.playerSplitStats,
+                args: { where: { gshlTeamId: teamId } },
+              },
+            ]),
+          )
+        : {},
+    [enabled, uniqueTeamIds],
+  );
+  const results = useQueries(queries);
+  const values = Object.values(results);
+  const error = values.find((value): value is Error => value instanceof Error);
+
+  return {
+    data: values.flatMap((value) =>
+      Array.isArray(value) ? (value as unknown as PlayerSplitStatLine[]) : [],
+    ),
+    isLoading:
+      enabled &&
+      uniqueTeamIds.length > 0 &&
+      (values.length !== uniqueTeamIds.length ||
+        values.some((value) => value === undefined)),
+    error: error ?? null,
+  };
+}
+
 export function usePlayerTotalsByPlayers(playerIds: string[], enabled = true) {
   const ids = useMemo(() => [...new Set(playerIds)].sort(), [playerIds]);
   const result = useQuery(
     api.frontend.playerTotalsByPlayers,
-    enabled && ids.length
-      ? { playerIds: ids as Id<"players">[] }
-      : "skip",
+    enabled && ids.length ? { playerIds: ids as Id<"players">[] } : "skip",
   );
   return {
     data: (result ?? []) as unknown as PlayerTotalStatLine[],

@@ -1,6 +1,7 @@
 import type {
   GSHLTeam,
   Matchup,
+  NHLTeam,
   Player,
   PlayerWeekStatLine,
   Season,
@@ -17,6 +18,12 @@ export interface LockerRoomHeaderProps {
 
 export interface TeamLogoProps {
   currentTeam: GSHLTeam;
+}
+
+export interface NHLLogoProps {
+  team: Pick<NHLTeam, "name" | "logoUrl"> | undefined;
+  size?: number;
+  className?: string;
 }
 
 export interface TeamInfoProps {

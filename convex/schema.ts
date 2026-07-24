@@ -13,7 +13,6 @@ const optionalNullable = <T extends GenericValidator>(validator: T) =>
 
 const legacyId = optional(v.string());
 const stringValue = v.string();
-const optionalString = optional(v.string());
 const optionalNullableString = optionalNullable(v.string());
 const numberValue = v.number();
 const optionalNullableNumber = optionalNullable(v.number());
@@ -416,10 +415,8 @@ export default defineSchema({
 
   nhlTeams: table({
     name: stringValue,
-    abbr: optionalString,
-    fullName: optionalString,
-    abbreviation: optionalString,
-    logoUrl: optionalNullableString,
+    abbr: stringValue,
+    logoUrl: stringValue,
     createdAt: timestampValue,
     updatedAt: timestampValue,
   }),

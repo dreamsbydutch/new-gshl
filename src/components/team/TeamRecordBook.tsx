@@ -1,6 +1,17 @@
 "use client";
 
-import { useMemo } from "react";
+import { ArrowDown, ArrowUp, ArrowUpDown, Search } from "lucide-react";
+import { NHLLogo } from "@gshl-components/player/NHLLogo";
+import { useTeamRecordBookView } from "@gshl-hooks";
+import type {
+  RecordBookAwardsTableProps,
+  RecordBookPlayerTableProps,
+  RecordBookSortableHeadProps,
+  RecordBookToolbarProps,
+  RecordBookView,
+  SeasonType as SeasonTypeValue,
+  TeamRecordBookProps,
+} from "@gshl-types";
 import {
   Table,
   TableBody,
@@ -193,11 +204,33 @@ function AwardsTable({ rows }: { rows: AwardSummaryRow[] }) {
               >
                 No player honors are on file for this franchise yet.
               </TableCell>
+              {!hasSeasonColumn ? (
+                <TableCell className="whitespace-nowrap px-3 py-2.5 text-right font-mono tabular-nums text-slate-600">
+                  <span className="font-semibold text-slate-900">
+                    {row.seasonCount || "—"}
+                  </span>
+                  {row.firstSeason && row.lastSeason ? (
+                    <span className="ml-1.5 text-[10px] text-slate-400">
+                      {row.firstSeason === row.lastSeason
+                        ? row.firstSeason
+                        : `${row.firstSeason}–${row.lastSeason}`}
+                    </span>
+                  ) : null}
+                </TableCell>
+              ) : null}
+              {columns.map((column) => (
+                <TableCell
+                  key={`${row.id}-${column.key}`}
+                  className="whitespace-nowrap px-3 py-2.5 text-right font-mono tabular-nums text-slate-700"
+                >
+                  {formatRecordBookStat(row, column)}
+                </TableCell>
+              ))}
             </TableRow>
-          )}
-        </TableBody>
-      </Table>
-    </div>
+          ))
+        )}
+      </TableBody>
+    </Table>
   );
 }
 

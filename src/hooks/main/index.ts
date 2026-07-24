@@ -72,6 +72,7 @@ export type {
 export {
   usePlayerStats,
   useCareerSplits,
+  usePlayerSplitsByTeams,
   usePlayerTotalsByPlayers,
 } from "./usePlayerStats";
 export type { UsePlayerStatsOptions, UsePlayerStatsResult } from "@gshl-types";

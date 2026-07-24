@@ -8,6 +8,7 @@ import {
   useDraftPicks,
   usePlayers,
   usePlayersByIds,
+  usePlayerSplitsByTeams,
   usePlayerTotalsByPlayers,
   usePlayerAwards,
   useSeasonState,
@@ -157,13 +158,21 @@ export function LockerRoomContent() {
     teamIds: franchiseTeamIds,
   });
   const careerSplits = careerSplitsQuery.data;
+  const seasonSplitsQuery = usePlayerSplitsByTeams({
+    enabled: isRecordBookTab,
+    teamIds: franchiseTeamIds,
+  });
+  const seasonSplits = seasonSplitsQuery.data;
   const recordBookPlayerIds = useMemo(
     () => [
       ...new Set(
-        careerSplits.map((row) => String(row.playerId)).filter(Boolean),
+        [...careerSplits, ...seasonSplits]
+          .map((row) => String(row.playerId))
+          .concat(playerAwards.map((award) => String(award.playerId)))
+          .filter(Boolean),
       ),
     ],
-    [careerSplits],
+    [careerSplits, playerAwards, seasonSplits],
   );
   const playerTotalsQuery = usePlayerTotalsByPlayers(
     recordBookPlayerIds,
@@ -209,7 +218,8 @@ export function LockerRoomContent() {
       (playerAwardsLoading ||
         playerTotalsQuery.isLoading ||
         recordBookPlayersQuery.isLoading ||
-        careerSplitsQuery.isLoading));
+        careerSplitsQuery.isLoading ||
+        seasonSplitsQuery.isLoading));
 
   if (isLoading) {
     if (selectedLockerRoomType === "roster") {
@@ -294,6 +304,7 @@ export function LockerRoomContent() {
           nhlTeams={nhlTeams}
           playerTotals={playerTotalsQuery.data}
           players={recordBookPlayers}
+          seasonSplits={seasonSplits}
           seasons={seasons}
         />
       )}

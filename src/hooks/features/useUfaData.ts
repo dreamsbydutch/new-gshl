@@ -54,7 +54,7 @@ export function useUfaOverview(): UseUfaOverviewResult {
       return undefined;
     }
     const nhlTeams = nhlTeamsQuery.data.filter(
-      (team): team is NHLTeam => "abbreviation" in team,
+      (team): team is NHLTeam => "abbr" in team,
     );
     const franchises = franchisesQuery.data.filter(
       (team): team is Franchise => "ownerId" in team && !("seasonId" in team),

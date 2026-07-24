@@ -1,18 +1,21 @@
+"use client";
+
 import Image from "next/image";
+import { useState } from "react";
+import type { NHLLogoProps } from "@gshl-types";
 import { cn } from "@gshl-utils";
 
-export function NHLLogo({
-  team,
-  size = 32,
-  className,
-}: {
-  team: { abbreviation: string; logoUrl: string; fullName: string } | undefined;
-  size?: number;
-  className?: string;
-}) {
-  if (!team?.logoUrl) {
+export function NHLLogo({ team, size = 32, className }: NHLLogoProps) {
+  const [erroredUrl, setErroredUrl] = useState<string | null>(null);
+
+  if (!team?.logoUrl || erroredUrl === team.logoUrl) {
     return (
-      <span className={cn("text-[10px] text-gray-400", className)}>-</span>
+      <span
+        aria-label="NHL team logo unavailable"
+        className={cn("inline-block", className)}
+        role="img"
+        style={{ width: size, height: size }}
+      />
     );
   }
 
@@ -21,9 +24,10 @@ export function NHLLogo({
       src={team.logoUrl}
       className={cn("mx-auto object-contain", className)}
       style={{ width: size, height: size }}
-      alt={team.fullName}
+      alt={`${team.name} logo`}
       width={size}
       height={size}
+      onError={() => setErroredUrl(team.logoUrl)}
     />
   );
 }

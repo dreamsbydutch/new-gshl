@@ -4,10 +4,12 @@ import { useMemo, useState, type FormEvent } from "react";
 import {
   useContracts,
   useCreateContract,
+  useNHLTeams,
   usePlayers,
   useSeasons,
   useTeams,
 } from "@gshl-hooks";
+import { NHLLogo } from "@gshl-components/player/NHLLogo";
 import {
   Button,
   Input,
@@ -21,10 +23,11 @@ import {
   deriveContractCreationTerms,
   getEffectiveSigningStatus,
   formatMoney,
+  findNhlTeamByAbbreviation,
   isUnsignedForSigningSeason,
   isUfaFreeAgencyOpen,
 } from "@gshl-utils";
-import { type ContractLength, type GSHLTeam } from "@gshl-types";
+import { type ContractLength, type GSHLTeam, type NHLTeam } from "@gshl-types";
 
 const LENGTHS: readonly ContractLength[] = [1, 2, 3];
 
@@ -44,6 +47,7 @@ export function ContractManagement() {
     enabled: Boolean(signingSeason),
   });
   const playersQuery = usePlayers();
+  const nhlTeamsQuery = useNHLTeams();
   const contractsQuery = useContracts();
   const createContract = useCreateContract();
 
@@ -59,6 +63,9 @@ export function ContractManagement() {
     [teamsQuery.data],
   );
   const selectedTeam = teams.find((team) => String(team.id) === teamId);
+  const nhlTeams = nhlTeamsQuery.data.filter(
+    (team): team is NHLTeam => "abbr" in team,
+  );
   const playerHasSigningSeasonContract = useMemo(
     () =>
       new Set(
@@ -160,6 +167,7 @@ export function ContractManagement() {
     seasonsQuery.isLoading ||
     teamsQuery.isLoading ||
     playersQuery.isLoading ||
+    nhlTeamsQuery.isLoading ||
     contractsQuery.isLoading;
   const canSubmit = Boolean(teamId && playerId && preview && !isLoading);
 
@@ -274,8 +282,16 @@ export function ContractManagement() {
                           <span className="block truncate font-medium">
                             {player.fullName}
                           </span>
-                          <span className="block text-xs text-muted-foreground">
-                            {player.nhlTeam} · {player.posGroup}
+                          <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                            <NHLLogo
+                              team={findNhlTeamByAbbreviation(
+                                nhlTeams,
+                                player.nhlTeam,
+                              )}
+                              size={16}
+                              className="mx-0 shrink-0"
+                            />
+                            {player.posGroup}
                           </span>
                         </span>
                         <span className="shrink-0 text-xs tabular-nums text-muted-foreground">

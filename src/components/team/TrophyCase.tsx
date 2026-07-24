@@ -17,9 +17,9 @@ import {
 
 function TrophySectionDivider({ label }: { label: string }) {
   return (
-    <div className="mb-8 mt-14 flex items-center gap-4 px-4">
+    <div className="mb-5 mt-8 flex items-center gap-2.5 px-3 sm:mb-8 sm:mt-14 sm:gap-4 sm:px-4">
       <div className="h-0 w-full border-t-4 border-dotted border-gray-300" />
-      <span className="shrink-0 font-barlow text-xs uppercase tracking-[0.28em] text-gray-400">
+      <span className="shrink-0 text-[10px] uppercase tracking-[0.2em] text-gray-400 sm:text-xs sm:tracking-[0.28em]">
         {label}
       </span>
       <div className="h-0 w-full border-t-4 border-dotted border-gray-300" />
@@ -96,8 +96,8 @@ function FranchiseLogo({
   const [errored, setErrored] = useState(false);
   if (!logoUrl || errored) {
     return (
-      <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/80 bg-white/90 shadow-lg">
-        <span className="font-barlow text-[10px] uppercase tracking-[0.2em] text-gray-400">
+      <div className="flex h-7 w-7 items-center justify-center rounded-lg border border-white/80 bg-white/90 shadow-md sm:h-9 sm:w-9 sm:rounded-xl sm:shadow-lg">
+        <span className="text-[8px] uppercase tracking-[0.12em] text-gray-400 sm:text-[10px] sm:tracking-[0.2em]">
           GSHL
         </span>
       </div>
@@ -105,7 +105,7 @@ function FranchiseLogo({
   }
   return (
     <img
-      className="h-9 w-9 rounded-xl bg-white/90 object-cover p-1 shadow-lg"
+      className="h-7 w-7 rounded-lg bg-white/90 object-cover p-0.5 shadow-md sm:h-9 sm:w-9 sm:rounded-xl sm:p-1 sm:shadow-lg"
       src={logoUrl}
       alt={`${teamName ?? "Franchise"} logo`}
       onError={() => setErrored(true)}
@@ -154,7 +154,7 @@ export function TrophyCase(props: TrophyCaseProps) {
   );
 
   return (
-    <section className="pb-12">
+    <section className="pb-8 font-varela sm:pb-12">
       <TrophySummary
         ownerName={formatOwnerName(props.currentTeam)}
         summaryLines={summaryLines}
@@ -166,7 +166,7 @@ export function TrophyCase(props: TrophyCaseProps) {
             <TrophySectionDivider label={group} />
             <div
               className={cn(
-                "mx-auto grid max-w-7xl grid-cols-2 gap-x-2 gap-y-5 px-4 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6",
+                "mx-auto grid max-w-7xl grid-cols-3 gap-x-2 gap-y-4 px-3 sm:gap-y-5 sm:px-4 lg:grid-cols-5 xl:grid-cols-6",
                 groupCards.length === 1 && "max-w-xs",
               )}
             >

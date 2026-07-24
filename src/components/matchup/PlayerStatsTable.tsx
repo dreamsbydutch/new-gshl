@@ -71,7 +71,7 @@ export function PlayerStatsTable({
       .filter((nhlTeam): nhlTeam is NHLTeam => Boolean(nhlTeam));
 
     if (playerNhlTeams.length === 0) {
-      return <span className="text-[10px] text-gray-400">-</span>;
+      return <NHLLogo team={undefined} size={20} />;
     }
 
     return (

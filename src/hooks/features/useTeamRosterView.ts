@@ -16,8 +16,8 @@ export function useTeamRosterView(options: UseTeamRosterDataOptions = {}) {
   const nhlTeamByAbbr = useMemo(
     () =>
       (nhlTeams as NHLTeam[]).reduce((map, team) => {
-        if (team.abbreviation) {
-          map.set(team.abbreviation, team);
+        if (team.abbr) {
+          map.set(team.abbr.trim().toUpperCase(), team);
         }
         return map;
       }, new Map<string, NHLTeam>()),

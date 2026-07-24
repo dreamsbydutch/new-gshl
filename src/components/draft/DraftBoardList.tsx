@@ -383,10 +383,10 @@ function MockDraftList({
  * @param navbarToggle - Whether to show navbar-specific filtering
  */
 export function DraftBoardList({
-  seasonId = "12",
+  seasonId,
   navbarToggle = false,
 }: {
-  seasonId?: string;
+  seasonId: string;
   navbarToggle?: boolean;
 }) {
   const [selectedType, setSelectedType] = useState<string>("all");
