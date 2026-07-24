@@ -46,7 +46,7 @@ function TrophySummary({
 
   return (
     <div className="mx-auto max-w-3xl px-6 text-center">
-      <div className="space-y-1 font-oswald leading-tight text-black">
+      <div className="space-y-1 font-varela leading-tight text-black">
         {summaryLines.map((line) => (
           <p key={line.awardKey} className={getSummaryLineClass(line.group)}>
             {line.text}
@@ -69,7 +69,7 @@ function TrophyImage({
   const [errored, setErrored] = useState(false);
   if (!imageUrl || errored) {
     return (
-      <div className="flex h-24 w-full items-center justify-center rounded-[1.75rem] border border-gray-200 bg-gradient-to-b from-gray-50 to-white px-3 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_10px_24px_rgba(15,23,42,0.08)]">
+      <div className="flex h-16 w-full items-center justify-center rounded-[1.25rem] border border-gray-200 bg-gradient-to-b from-gray-50 to-white px-3 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_10px_24px_rgba(15,23,42,0.08)]">
         <span className="font-barlow text-sm uppercase tracking-[0.2em] text-gray-400">
           {fallbackLabel}
         </span>
@@ -78,7 +78,7 @@ function TrophyImage({
   }
   return (
     <img
-      className="h-24 w-full object-contain"
+      className="h-16 w-full object-contain"
       src={imageUrl}
       alt={alt}
       onError={() => setErrored(true)}
@@ -116,7 +116,7 @@ function FranchiseLogo({
 function TrophyCard({ card }: { card: TrophyCaseCard }) {
   return (
     <article className="mx-auto flex w-full max-w-36 flex-col items-center text-center">
-      <div className="relative flex w-full items-end justify-center pb-3">
+      <div className="relative flex w-full items-end justify-center pb-2">
         <TrophyImage
           imageUrl={card.catalog.imageUrl}
           alt={card.catalog.fullName}
@@ -129,14 +129,14 @@ function TrophyCard({ card }: { card: TrophyCaseCard }) {
           />
         </div>
       </div>
-      <div className="mt-2 font-oswald text-2xl font-bold leading-none text-black">
+      <div className="mt-2 font-varela text-xl font-bold leading-none text-black">
         {card.seasonYear}
       </div>
-      <div className="mt-1 font-oswald text-lg leading-tight text-black">
+      <div className="mt-1 font-varela text-sm font-semibold leading-tight text-black">
         {card.catalog.fullName}
       </div>
       {card.franchiseName ? (
-        <div className="mt-1 text-xs leading-tight text-muted-foreground">
+        <div className="mt-1 font-varela text-xs leading-tight text-muted-foreground">
           {card.franchiseName}
         </div>
       ) : null}

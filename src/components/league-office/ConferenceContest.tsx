@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Image from "next/image";
-import { CalendarDays, ChevronDown, Info, Swords } from "lucide-react";
+import { ChevronDown, Info, Swords } from "lucide-react";
 import {
   CartesianGrid,
   Legend,
@@ -38,10 +38,7 @@ const conferenceTone = (conference: ConferenceContestConferenceInfo) => {
     : { line: "#ef4444", text: "text-hotel-800" };
 };
 
-const recordLabel = (record?: ConferenceContestRecord) => {
-  const value = record ?? { wins: 0, losses: 0, ties: 0 };
-  return `${value.wins}-${value.losses}${value.ties ? `-${value.ties}` : ""}`;
-};
+const recordWins = (record?: ConferenceContestRecord) => record?.wins ?? 0;
 
 function ConferenceLogo({
   conference,
@@ -103,7 +100,7 @@ function ConferenceHeader({
           <span className="sr-only">
             {cleanConferenceName(conference.name)} conference
           </span>
-          <ConferenceLogo conference={conference} size={72} decorative />
+          <ConferenceLogo conference={conference} size={96} decorative />
         </div>
       ))}
       <span className="col-start-2 row-start-1 text-[9px] font-semibold uppercase tracking-[0.16em] text-slate-300 sm:text-[10px]">
@@ -115,13 +112,11 @@ function ConferenceHeader({
 
 function RawStatsTable({
   title,
-  description,
   left,
   right,
   rows,
 }: {
   title: string;
-  description?: string;
   left: ConferenceContestConferenceInfo;
   right: ConferenceContestConferenceInfo;
   rows: ConferenceContestRawStatRow[];
@@ -132,11 +127,6 @@ function RawStatsTable({
         <h2 className="font-oswald text-xl text-slate-950 sm:text-2xl">
           {title}
         </h2>
-        {description ? (
-          <p className="mt-1 text-[11px] leading-snug text-slate-500 sm:text-xs">
-            {description}
-          </p>
-        ) : null}
       </div>
       <table className="w-full table-fixed border-collapse">
         <caption className="sr-only">
@@ -222,24 +212,14 @@ function RatingTrend({
   }));
 
   return (
-    <section className="rounded-lg border border-slate-200 bg-white p-4 sm:p-5">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <p className="text-[10px] uppercase tracking-[0.2em] text-slate-400">
-            Season by season
-          </p>
-          <h2 className="mt-1 font-oswald text-xl text-slate-950 sm:text-2xl">
-            The balance of power
-          </h2>
-          <p className="mt-1 text-xs text-slate-500">
-            The adjusted conference rating is shown here only, so the trend is
-            easy to follow over time.
-          </p>
-        </div>
-        <CalendarDays
-          className="mt-1 hidden h-5 w-5 text-slate-400 sm:block"
-          aria-hidden="true"
-        />
+    <section
+      aria-label="Conference rating trend"
+      className="rounded-lg border border-slate-200 bg-white p-4 sm:p-5"
+    >
+      <div>
+        <h2 className="font-oswald text-xl text-slate-950 sm:text-2xl">
+          Ratings
+        </h2>
       </div>
       <div
         className="mt-5 h-72 w-full"
@@ -316,16 +296,14 @@ function SeasonExplorer({
   const rightId = right.id;
   const rows: ConferenceContestRawStatRow[] = [
     {
-      label: "Head-to-head record",
-      left: recordLabel(selectedSeason.headToHeadRecordByConferenceId[leftId]),
-      right: recordLabel(
-        selectedSeason.headToHeadRecordByConferenceId[rightId],
-      ),
+      label: "Head-to-head wins",
+      left: recordWins(selectedSeason.headToHeadRecordByConferenceId[leftId]),
+      right: recordWins(selectedSeason.headToHeadRecordByConferenceId[rightId]),
     },
     {
-      label: "Playoff record",
-      left: recordLabel(selectedSeason.playoffRecordByConferenceId[leftId]),
-      right: recordLabel(selectedSeason.playoffRecordByConferenceId[rightId]),
+      label: "Playoff wins",
+      left: recordWins(selectedSeason.playoffRecordByConferenceId[leftId]),
+      right: recordWins(selectedSeason.playoffRecordByConferenceId[rightId]),
     },
     {
       label: "Playoff teams",
@@ -351,15 +329,7 @@ function SeasonExplorer({
 
   return (
     <section>
-      <div className="mb-3 flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
-        <div>
-          <p className="text-[10px] uppercase tracking-[0.2em] text-slate-400">
-            Season detail
-          </p>
-          <h2 className="mt-1 font-oswald text-xl text-slate-950 sm:text-2xl">
-            Raw season totals
-          </h2>
-        </div>
+      <div className="mb-3 flex justify-end">
         <label className="relative block">
           <span className="sr-only">Choose a season</span>
           <select
@@ -383,7 +353,6 @@ function SeasonExplorer({
 
       <RawStatsTable
         title={selectedSeason.seasonName}
-        description="Recorded results and counts, with no weighting or ratio adjustment."
         left={left}
         right={right}
         rows={rows}
@@ -398,7 +367,7 @@ function SeasonExplorer({
           }}
           className="h-8 rounded-md px-3 text-[11px] sm:h-9 sm:px-4 sm:text-xs"
         >
-          View {selectedSeason.seasonName} standings
+          Standings
         </Button>
       </div>
     </section>
@@ -428,12 +397,8 @@ export function ConferenceContest() {
     return (
       <div className="mx-auto max-w-2xl rounded-lg border border-red-200 bg-red-50 p-8 text-center">
         <Info className="mx-auto h-7 w-7 text-red-500" aria-hidden="true" />
-        <h1 className="mt-3 font-oswald text-2xl text-red-950">
-          Conference comparison is unavailable
-        </h1>
-        <p className="mt-2 text-sm text-red-700">
-          The historical results could not be loaded. Please try again shortly.
-        </p>
+        <h1 className="mt-3 font-oswald text-2xl text-red-950">Unavailable</h1>
+        <p className="mt-2 text-sm text-red-700">Try again shortly.</p>
       </div>
     );
   }
@@ -442,11 +407,9 @@ export function ConferenceContest() {
     return (
       <div className="mx-auto max-w-2xl rounded-lg border border-slate-200 bg-white p-8 text-center">
         <Swords className="mx-auto h-7 w-7 text-slate-400" aria-hidden="true" />
-        <h1 className="mt-3 font-oswald text-2xl text-slate-900">
-          No conference comparison yet
-        </h1>
+        <h1 className="mt-3 font-oswald text-2xl text-slate-900">No data</h1>
         <p className="mt-2 text-sm text-slate-500">
-          Two conferences and at least one season are needed to compare results.
+          Two conferences and one season are required.
         </p>
       </div>
     );
@@ -456,14 +419,14 @@ export function ConferenceContest() {
   const right = overall.rightConference;
   const allTimeRows: ConferenceContestRawStatRow[] = [
     {
-      label: "Head-to-head record",
-      left: recordLabel(overall.headToHeadRecordByConferenceId[left.id]),
-      right: recordLabel(overall.headToHeadRecordByConferenceId[right.id]),
+      label: "Head-to-head wins",
+      left: recordWins(overall.headToHeadRecordByConferenceId[left.id]),
+      right: recordWins(overall.headToHeadRecordByConferenceId[right.id]),
     },
     {
-      label: "Playoff record",
-      left: recordLabel(overall.playoffRecordByConferenceId[left.id]),
-      right: recordLabel(overall.playoffRecordByConferenceId[right.id]),
+      label: "Playoff wins",
+      left: recordWins(overall.playoffRecordByConferenceId[left.id]),
+      right: recordWins(overall.playoffRecordByConferenceId[right.id]),
     },
     {
       label: "Playoff berths",
@@ -500,22 +463,15 @@ export function ConferenceContest() {
   return (
     <div className="mx-auto max-w-5xl space-y-5 pb-8">
       <header className="border-b border-slate-200 pb-4">
-        <p className="font-barlow text-[10px] uppercase tracking-[0.22em] text-slate-400">
-          League Office
-        </p>
-        <h1 className="mt-1 font-oswald text-3xl uppercase leading-none text-slate-950 sm:text-4xl">
-          Conference vs Conference
+        <h1 className="font-oswald text-3xl uppercase leading-none text-slate-950 sm:text-4xl">
+          Conf v Conf
         </h1>
-        <p className="mt-2 text-xs text-slate-500">
-          A direct comparison of recorded results across GSHL history.
-        </p>
       </header>
 
       <ConferenceHeader left={left} right={right} />
 
       <RawStatsTable
-        title="All-time totals"
-        description="Raw records and counts. No category points, weights, or ratio-adjusted scores."
+        title="All-time"
         left={left}
         right={right}
         rows={allTimeRows}

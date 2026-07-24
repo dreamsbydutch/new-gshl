@@ -1,11 +1,9 @@
 import { getAwardLabel } from "@gshl-lib/config/awards";
-import {
-  AwardsList,
-  PositionGroup,
-  SeasonType,
-} from "../domain/constants";
+import { AwardsList, PositionGroup, SeasonType } from "../domain/constants";
 import type {
   AwardSummaryRow,
+  AllTimeRosterEntry,
+  AllTimeRosterSlot,
   AwardsList as AwardsListType,
   PlayerAward,
   FranchiseCareerRow,
@@ -26,6 +24,15 @@ import {
 } from "../domain/player";
 import { formatNumber, toNumber } from "../core";
 import { getAllStarSeasonType } from "./season-awards";
+
+export const ALL_TIME_ROSTER_SLOTS: AllTimeRosterSlot[] = [
+  "C",
+  "LW",
+  "RW",
+  "D",
+  "D",
+  "G",
+];
 
 const PLAYER_AWARD_KEYS = new Set<AwardsListType>([
   AwardsList.CROSBY,
@@ -239,6 +246,117 @@ export function buildFranchiseCareerRows(
     GAA: row.TOI > 0 ? (row.GA / row.TOI) * 60 : null,
     SVP: row.SA > 0 ? row.SV / row.SA : null,
   }));
+}
+
+function getRosterSlotCandidates(
+  rows: FranchiseCareerRow[],
+  playersById: Map<string, Player>,
+  slot: AllTimeRosterSlot,
+): FranchiseCareerRow[] {
+  const eligibleRows = rows.filter((row) => {
+    const player = playersById.get(row.playerId);
+    const positions = new Set([
+      ...row.nhlPos.map(String),
+      ...(player?.nhlPos ?? []).map(String),
+    ]);
+
+    if (slot === "G") {
+      return row.posGroup === PositionGroup.G || positions.has("G");
+    }
+    if (slot === "D") {
+      return row.posGroup === PositionGroup.D || positions.has("D");
+    }
+
+    return (
+      row.posGroup !== PositionGroup.G &&
+      row.posGroup !== PositionGroup.D &&
+      (positions.has(slot) ||
+        row.posGroup === PositionGroup.F ||
+        positions.size === 0)
+    );
+  });
+
+  const exactRows = eligibleRows.filter((row) => {
+    const player = playersById.get(row.playerId);
+    return new Set([
+      ...row.nhlPos.map(String),
+      ...(player?.nhlPos ?? []).map(String),
+    ]).has(slot);
+  });
+
+  return exactRows.length > 0 ? exactRows : eligibleRows;
+}
+
+function compareRosterRows(
+  left: FranchiseCareerRow,
+  right: FranchiseCareerRow,
+  slot: AllTimeRosterSlot,
+  playersById: Map<string, Player>,
+): number {
+  const leftPrimary = slot === "G" ? left.W : left.P;
+  const rightPrimary = slot === "G" ? right.W : right.P;
+  if (rightPrimary !== leftPrimary) return rightPrimary - leftPrimary;
+
+  if (slot === "G") {
+    const leftSavePercentage = left.SVP ?? -Infinity;
+    const rightSavePercentage = right.SVP ?? -Infinity;
+    if (rightSavePercentage !== leftSavePercentage) {
+      return rightSavePercentage - leftSavePercentage;
+    }
+    if (right.SO !== left.SO) return right.SO - left.SO;
+    if (right.GP !== left.GP) return right.GP - left.GP;
+  } else {
+    if (right.G !== left.G) return right.G - left.G;
+    if (right.A !== left.A) return right.A - left.A;
+    if (right.GP !== left.GP) return right.GP - left.GP;
+  }
+
+  const leftName = playersById.get(left.playerId)?.fullName ?? left.playerId;
+  const rightName = playersById.get(right.playerId)?.fullName ?? right.playerId;
+  return leftName.localeCompare(rightName);
+}
+
+/**
+ * Builds the franchise's all-time lineup from regular-season career rows.
+ *
+ * @param rows - Aggregated franchise career rows.
+ * @param playersById - Players keyed by id.
+ * @param nhlTeamsByAbbr - NHL teams keyed by abbreviation.
+ * @returns The best available player for each all-time roster slot.
+ */
+export function buildAllTimeFranchiseRoster(
+  rows: FranchiseCareerRow[],
+  playersById: Map<string, Player>,
+  nhlTeamsByAbbr: Map<string, NHLTeam>,
+): AllTimeRosterEntry[] {
+  const regularSeasonRows = rows.filter(
+    (row) => row.seasonType === SeasonType.REGULAR_SEASON,
+  );
+  const selectedPlayerIds = new Set<string>();
+
+  return ALL_TIME_ROSTER_SLOTS.map((slot) => {
+    const candidates = getRosterSlotCandidates(
+      regularSeasonRows,
+      playersById,
+      slot,
+    )
+      .filter((row) => !selectedPlayerIds.has(row.playerId))
+      .sort((left, right) => compareRosterRows(left, right, slot, playersById));
+    const row = candidates[0];
+
+    if (!row) return null;
+    selectedPlayerIds.add(row.playerId);
+
+    const player = playersById.get(row.playerId);
+    return {
+      slot,
+      playerId: row.playerId,
+      playerName: player?.fullName ?? `Player ${row.playerId}`,
+      nhlTeam: getNhlTeamForPlayer(nhlTeamsByAbbr, player, row.nhlTeam),
+      positions: getPlayerPositions(player, row.nhlPos),
+      row,
+    } satisfies AllTimeRosterEntry;
+  }).filter((entry): entry is AllTimeRosterEntry => entry !== null);
 }
 
 /**

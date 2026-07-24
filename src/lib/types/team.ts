@@ -173,6 +173,17 @@ export interface RecordLeader {
   note?: string;
 }
 
+export type AllTimeRosterSlot = "C" | "LW" | "RW" | "D" | "G";
+
+export interface AllTimeRosterEntry {
+  slot: AllTimeRosterSlot;
+  playerId: string;
+  playerName: string;
+  nhlTeam: NHLTeam | undefined;
+  positions: string;
+  row: FranchiseCareerRow;
+}
+
 export interface TeamRecordBookProps {
   playerAwards: PlayerAward[];
   allTeams: GSHLTeam[];
