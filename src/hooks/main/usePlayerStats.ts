@@ -24,6 +24,14 @@ function state<T>(data: T[] | undefined, enabled: boolean) {
   };
 }
 
+function normalizeTeamIds(teamIds: string[]) {
+  return [...new Set(teamIds)].sort().join(",");
+}
+
+function parseTeamIds(teamIdsKey: string) {
+  return teamIdsKey ? teamIdsKey.split(",") : [];
+}
+
 export function usePlayerStats(
   options: UsePlayerStatsOptions = {},
 ): UsePlayerStatsResult {
@@ -95,7 +103,8 @@ export function useCareerSplits(
   options: { enabled?: boolean; teamIds?: string[] } = {},
 ) {
   const { enabled = true, teamIds = [] } = options;
-  const uniqueTeamIds = useMemo(() => [...new Set(teamIds)].sort(), [teamIds]);
+  const teamIdsKey = normalizeTeamIds(teamIds);
+  const uniqueTeamIds = useMemo(() => parseTeamIds(teamIdsKey), [teamIdsKey]);
   const result = useQuery(
     api.frontend.careerSplitsByTeams,
     enabled && uniqueTeamIds.length
@@ -113,7 +122,8 @@ export function usePlayerSplitsByTeams(
   options: { enabled?: boolean; teamIds?: string[] } = {},
 ) {
   const { enabled = true, teamIds = [] } = options;
-  const uniqueTeamIds = useMemo(() => [...new Set(teamIds)].sort(), [teamIds]);
+  const teamIdsKey = normalizeTeamIds(teamIds);
+  const uniqueTeamIds = useMemo(() => parseTeamIds(teamIdsKey), [teamIdsKey]);
   const queries = useMemo<RequestForQueries>(
     () =>
       enabled
