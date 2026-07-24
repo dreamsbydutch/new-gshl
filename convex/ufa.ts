@@ -8,6 +8,7 @@ import {
   query,
 } from "./_generated/server";
 import { getUfaOfferGroupDeadline } from "../src/lib/utils/features/ufa-deadline";
+import { requireOwnerOrCommissioner } from "./lib/auth";
 
 const CAP = 25_000_000;
 
@@ -491,15 +492,54 @@ export const listState = query({
   },
 });
 
+export const publicState = query({
+  args: {},
+  handler: async (ctx) => {
+    const db: any = ctx.db;
+    const identity = await ctx.auth.getUserIdentity();
+    const currentUser = identity ? await db.get(identity.subject) : null;
+    const groups = await db.query("ufaOfferGroups").collect();
+    const offers = await db.query("ufaOffers").collect();
+    const oddsEntries = await Promise.all(
+      groups
+        .filter((group: any) => group.status === "open")
+        .map(async (group: any) => [
+          String(group._id),
+          (await calculateOdds(ctx, group._id)).odds,
+        ]),
+    );
+    return {
+      groups: groups.map((group: any) => ({ ...group, id: group._id })),
+      offers: offers.map((offer: any) => ({
+        id: offer._id,
+        groupId: offer.groupId,
+        franchiseId: offer.franchiseId,
+        contractLength: offer.contractLength,
+        salary: offer.salary,
+        status: offer.status,
+        isMine: currentUser?.ownerId === offer.ownerId,
+      })),
+      oddsByGroup: Object.fromEntries(oddsEntries),
+    };
+  },
+});
+
 export const submitOffer = mutation({
   args: {
-    serverSecret: v.string(),
-    ownerId: v.id("owners"),
+    serverSecret: v.optional(v.string()),
+    ownerId: v.optional(v.id("owners")),
     playerId: v.string(),
     contractLength: v.number(),
   },
   handler: async (ctx, args) => {
-    requireServerSecret(args.serverSecret);
+    let ownerId = args.ownerId;
+    if (args.serverSecret) {
+      requireServerSecret(args.serverSecret);
+    } else {
+      const user = await requireOwnerOrCommissioner(ctx);
+      ownerId = user.ownerId as typeof ownerId;
+    }
+    if (!ownerId) throw new Error("No owner is linked to this account.");
     const db: any = ctx.db;
     if (![1, 2, 3].includes(args.contractLength))
       throw new Error("Contract length must be 1, 2, or 3 years.");
@@ -536,7 +576,7 @@ export const submitOffer = mutation({
     }
     const franchise = franchises.find(
       (candidate: any) =>
-        candidate.ownerId === args.ownerId && candidate.isActive,
+        candidate.ownerId === ownerId && candidate.isActive,
     );
     if (!franchise)
       throw new Error("Your account is not linked to an active franchise.");
@@ -605,14 +645,14 @@ export const submitOffer = mutation({
     const pendingOffers = await db
       .query("ufaOffers")
       .withIndex("by_owner_status", (q: any) =>
-        q.eq("ownerId", args.ownerId).eq("status", "pending"),
+        q.eq("ownerId", ownerId).eq("status", "pending"),
       )
       .collect();
     for (const season of newCovered) {
       const committed = contracts
         .filter(
           (contract: any) =>
-            contract.ownerId === args.ownerId &&
+            contract.ownerId === ownerId &&
             contractAffectsSeason(contract, season, orderedSeasons),
         )
         .reduce(
@@ -657,7 +697,7 @@ export const submitOffer = mutation({
       groupId: group._id,
       playerId: player._id,
       seasonId: signingSeason._id,
-      ownerId: args.ownerId,
+      ownerId,
       franchiseId: franchise._id,
       teamId: team._id,
       contractLength: args.contractLength,

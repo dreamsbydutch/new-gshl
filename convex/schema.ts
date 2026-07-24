@@ -247,7 +247,13 @@ export default defineSchema({
       createdAt: timestampValue,
       updatedAt: timestampValue,
     },
-    ["playerId", "ownerId", "seasonId"],
+    [
+      "playerId",
+      "ownerId",
+      "seasonId",
+      "signingDate",
+      ["seasonId", "signingDate"],
+    ],
   ),
 
   ufaOfferGroups: defineTable({
