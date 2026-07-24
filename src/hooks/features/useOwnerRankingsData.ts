@@ -1,6 +1,8 @@
 "use client";
 
 import { useMemo } from "react";
+import { useQuery } from "convex/react";
+import { api } from "../../../convex/_generated/api";
 
 import {
   useMatchups,
@@ -9,21 +11,16 @@ import {
   useTeams,
   useWeeks,
 } from "@gshl-hooks";
-import { clientApi as api } from "@gshl-trpc";
 import { buildOwnerRankings, isGshlTeam } from "@gshl-utils";
-
-const DAY_IN_MS = 24 * 60 * 60 * 1000;
+import type { Owner } from "@gshl-types";
 
 export function useOwnerRankingsData() {
-  const ownersQuery = api.owner.getAll.useQuery(
-    {},
-    {
-      staleTime: DAY_IN_MS,
-      gcTime: DAY_IN_MS,
-      refetchOnMount: false,
-      refetchOnWindowFocus: false,
-    },
-  );
+  const ownersResult = useQuery(api.frontend.owners, {});
+  const ownersQuery = {
+    data: (ownersResult ?? []) as unknown as Owner[],
+    isLoading: ownersResult === undefined,
+    error: null,
+  };
   const seasonsQuery = useSeasons();
   const matchupsQuery = useMatchups();
   const weeksQuery = useWeeks();

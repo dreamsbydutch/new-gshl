@@ -12,9 +12,7 @@ type QueryStatusLike = {
  * @param queries - The queries to use.
  * @returns The combined query states.
  */
-export function combineQueryStates(
-  ...queries: QueryStatusLike[]
-): QueryState {
+export function combineQueryStates(...queries: QueryStatusLike[]): QueryState {
   return {
     isLoading: queries.some((query) => Boolean(query?.isLoading)),
     isFetching: queries.some((query) => Boolean(query?.isFetching)),

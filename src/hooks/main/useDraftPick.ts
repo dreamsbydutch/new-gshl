@@ -1,7 +1,9 @@
-import type { UseDraftPicksOptions } from "@gshl-types";
-import { clientApi as api } from "@gshl-trpc";
+"use client";
 
-const DAY_IN_MS = 24 * 60 * 60 * 1000;
+import { usePaginatedQuery, useQuery } from "convex/react";
+import { api } from "../../../convex/_generated/api";
+import type { Id } from "../../../convex/_generated/dataModel";
+import type { DraftPick, UseDraftPicksOptions } from "@gshl-types";
 
 export function useDraftPickPages(options: {
   seasonId?: string | null;
@@ -9,75 +11,39 @@ export function useDraftPickPages(options: {
   limit?: number;
 }) {
   const { seasonId, enabled = true, limit = 50 } = options;
-  const query = api.draftPick.listPage.useInfiniteQuery(
-    {
-      seasonId: seasonId ?? "",
-      limit: Math.min(Math.max(limit, 1), 50),
-    },
-    {
-      enabled: enabled && Boolean(seasonId),
-      getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
-      staleTime: 5 * 60 * 1000,
-      gcTime: 15 * 60 * 1000,
-      refetchOnWindowFocus: false,
-    },
+  const query = usePaginatedQuery(
+    api.frontend.draftPicksPage,
+    enabled && seasonId
+      ? { seasonId: seasonId as Id<"seasons"> }
+      : "skip",
+    { initialNumItems: Math.min(Math.max(limit, 1), 50) },
   );
-
   return {
-    ...query,
-    data: query.data?.pages.flatMap((page) => page.items) ?? [],
-    hasMore: query.hasNextPage,
-    loadMore: query.fetchNextPage,
-    isLoadingMore: query.isFetchingNextPage,
+    data: query.results as unknown as DraftPick[],
+    hasMore: query.status === "CanLoadMore",
+    loadMore: () => query.loadMore(Math.min(Math.max(limit, 1), 50)),
+    isLoading: query.status === "LoadingFirstPage",
+    isLoadingMore: query.status === "LoadingMore",
+    error: null,
   };
 }
 
-/**
- * Hook for fetching draft picks with optional filtering.
- *
- * @param options - Configuration options for filtering draft picks
- * @returns Draft picks data, loading state, and error state
- *
- * @example
- * ```tsx
- * // Fetch all draft picks
- * const { data: picks, isLoading } = useDraftPicks();
- *
- * // Fetch draft picks for a specific season
- * const { data: picks } = useDraftPicks({ seasonId: '123' });
- *
- * // Fetch draft picks for a specific team
- * const { data: picks } = useDraftPicks({ teamId: 'team-456' });
- *
- * // Fetch draft picks by round
- * const { data: firstRound } = useDraftPicks({ round: 1, seasonId: '123' });
- * ```
- */
 export function useDraftPicks(options: UseDraftPicksOptions = {}) {
   const { pickId, seasonId, teamId, round, enabled = true } = options;
-
-  const where: Record<string, string | number> = {};
+  const where: Record<string, unknown> = {};
   if (pickId) where.id = pickId;
   if (seasonId) where.seasonId = seasonId;
   if (teamId) where.teamId = teamId;
   if (round !== undefined) where.round = round;
-
-  const query = api.draftPick.getAll.useQuery(
-    Object.keys(where).length > 0 ? { where } : {},
-    {
-      enabled,
-      staleTime: DAY_IN_MS,
-      gcTime: DAY_IN_MS,
-      refetchOnMount: false,
-      refetchOnWindowFocus: false,
-      refetchInterval: false,
-      refetchIntervalInBackground: false,
-    },
+  const result = useQuery(
+    api.frontend.draftPicks,
+    enabled
+      ? { ...(Object.keys(where).length ? { where } : {}) }
+      : "skip",
   );
-
   return {
-    data: query.data ?? [],
-    isLoading: query.isLoading,
-    error: query.error ?? null,
+    data: (result ?? []) as unknown as DraftPick[],
+    isLoading: enabled && result === undefined,
+    error: null,
   };
 }

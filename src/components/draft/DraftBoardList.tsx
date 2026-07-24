@@ -28,7 +28,8 @@
 import { useState } from "react";
 import Image from "next/image";
 import { type ToggleItem, type NHLTeam } from "@gshl-types";
-import { Table, NHLLogo } from "@gshl-ui";
+import { Table } from "@gshl-ui";
+import { NHLLogo } from "@gshl-components/player/NHLLogo";
 import { HorizontalToggle, SecondaryPageToolbar } from "@gshl-nav";
 import {
   type DraftBoardPlayer,
@@ -478,7 +479,7 @@ export function DraftBoardList({
   // Apply position filter and sorting for table view
   const displayPlayers = navbarToggle
     ? filteredPlayers.filter(excludeGoalies).sort(sortByOverallRank)
-    : filteredPlayers.sort(sortByOverallRank);
+    : [...filteredPlayers].sort(sortByOverallRank);
 
   return (
     <DraftBoardTable

@@ -31,7 +31,7 @@ import {
   resolveMatchupCategories,
   toStatNumber,
 } from "@gshl-utils";
-import { PlayerStatsTable } from "../ui/PlayerStatsTable";
+import { PlayerStatsTable } from "./PlayerStatsTable";
 import { ArrowLeftIcon } from "lucide-react";
 
 function MatchupSummaryTeam({

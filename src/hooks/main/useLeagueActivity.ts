@@ -1,16 +1,18 @@
 "use client";
 
-import { clientApi as api } from "@gshl-trpc";
+import { useQuery } from "convex/react";
+import { api } from "../../../convex/_generated/api";
+import type { Id } from "../../../convex/_generated/dataModel";
 
 export function useLeagueActivity(seasonId?: string, take = 12) {
-  const query = api.activity.getRecent.useQuery(
-    { seasonId: seasonId ?? "", take },
-    { enabled: Boolean(seasonId) },
+  const data = useQuery(
+    api.frontend.activity,
+    seasonId ? { seasonId: seasonId as Id<"seasons">, take } : "skip",
   );
 
   return {
-    data: query.data ?? [],
-    isLoading: query.isLoading,
-    error: query.error ?? null,
+    data: data ?? [],
+    isLoading: Boolean(seasonId) && data === undefined,
+    error: null,
   };
 }

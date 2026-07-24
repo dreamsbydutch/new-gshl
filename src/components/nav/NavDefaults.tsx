@@ -8,7 +8,7 @@ import {
   useWeeks,
 } from "@gshl-hooks";
 import { isIsoDateInRange, toLocalIsoDateOnly } from "@gshl-utils";
-import { canManageOwnTeam } from "@gshl-lib/auth/types";
+import { canManageOwnTeam } from "@gshl-utils";
 import { useSession } from "next-auth/react";
 
 /**
@@ -17,7 +17,7 @@ import { useSession } from "next-auth/react";
  *   based on inclusive YYYY-MM-DD comparisons (local date) if the nav
  *   store does not already have a selection.
  */
-export default function NavDefaults(): null {
+export function NavDefaults(): null {
   const selectedSeasonId = useSelectedSeasonId();
   const { selectedOwnerId, setSelectedOwnerId } = useTeamNavigation();
   const { data: session } = useSession();

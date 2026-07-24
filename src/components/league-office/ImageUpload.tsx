@@ -3,9 +3,9 @@
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import { Check, Copy, ImagePlus, LoaderCircle, Upload, X } from "lucide-react";
-import { Button } from "@gshl-components/ui/button";
-import { Input } from "@gshl-components/ui/input";
-import { useUploadThing } from "@gshl-components/ui/uploadthing";
+import { Button } from "@gshl-components/ui/ButtonPrimitive";
+import { Input } from "@gshl-components/ui/InputPrimitive";
+import { useUploadThing } from "./UploadThing";
 import { cn } from "@gshl-utils";
 
 const MAX_FILE_SIZE = 8 * 1024 * 1024;

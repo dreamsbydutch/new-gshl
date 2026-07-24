@@ -8,22 +8,19 @@
  *
  * Heavy lifting: lib/utils/features (filterMatchupsByWeek, sortMatchupsByRating)
  */
-import { useEffect, useMemo, useState } from "react";
-import { clientApi as trpc } from "@gshl-trpc";
+import { useMemo } from "react";
 import { useSeasonDataBundle } from "./useSeasonDataBundle";
-import { usePlayers, usePlayerStats } from "../main";
+import { usePlayers, usePlayersByIds, usePlayerStats } from "../main";
 import {
   buildPlayerLookup,
   buildPlayerWeekStatsByTeam,
   buildTeamWeekStatsByTeam,
   collectInactivePlayerIds,
   filterMatchupsByWeek,
-  getUpcomingWeekIds,
   sortMatchupsByRating,
 } from "@gshl-utils";
 import {
   type TeamWeekStatLine,
-  type Player,
   type UseWeeklyScheduleDataOptions,
   type UseWeeklyScheduleDataResult,
 } from "@gshl-types";
@@ -51,14 +48,11 @@ export function useWeeklyScheduleData(
   options: UseWeeklyScheduleDataOptions = {},
 ): UseWeeklyScheduleDataResult {
   const { seasonId: optionSeasonId, weekId: optionWeekId } = options;
-  const trpcUtils = trpc.useUtils();
-
   const {
     seasonId: selectedSeasonId,
     weekId: selectedWeekId,
     matchups: allMatchups,
     teams,
-    weeks,
     teamStats,
     status: scheduleStatus,
     ready: scheduleReady,
@@ -69,19 +63,11 @@ export function useWeeklyScheduleData(
     includeWeeks: true,
     teamStatsLevel: "weekly",
     weeksOrderBy: { startDate: "asc" },
-    teamQueryOptions: {
-      staleTime: 60 * 1000,
-      gcTime: 5 * 60 * 1000,
-      refetchOnMount: true,
-      refetchOnWindowFocus: true,
-    },
   });
 
   const activePlayersQuery = usePlayers({
     isActive: true,
     enabled: Boolean(selectedSeasonId),
-    staleTime: 5 * 60 * 1000,
-    gcTime: 30 * 60 * 1000,
   });
   const activePlayers = useMemo(
     () => activePlayersQuery.data ?? [],
@@ -105,79 +91,11 @@ export function useWeeklyScheduleData(
     () => collectInactivePlayerIds(activePlayers, playerWeekStats),
     [activePlayers, playerWeekStats],
   );
-  const [inactivePlayerMap, setInactivePlayerMap] = useState<
-    Record<string, Player | null>
-  >({});
-  const [inactiveFetchState, setInactiveFetchState] = useState<{
-    isLoading: boolean;
-    error: Error | null;
-  }>({ isLoading: false, error: null });
-  useEffect(() => {
-    setInactivePlayerMap({});
-  }, [selectedSeasonId, selectedWeekId]);
-  const pendingInactiveIds = useMemo(() => {
-    return inactivePlayerIds.filter(
-      (id) => id.trim().length > 0 && !(id in inactivePlayerMap),
-    );
-  }, [inactivePlayerIds, inactivePlayerMap]);
-
-  useEffect(() => {
-    if (!pendingInactiveIds.length) {
-      setInactiveFetchState((prev) =>
-        prev.isLoading ? { isLoading: false, error: prev.error } : prev,
-      );
-      return;
-    }
-
-    let cancelled = false;
-    setInactiveFetchState({ isLoading: true, error: null });
-
-    async function fetchInactivePlayers() {
-      try {
-        const results = await Promise.all(
-          pendingInactiveIds.map((playerId) =>
-            trpcUtils.player.getById.fetch({ id: playerId }),
-          ),
-        );
-
-        if (cancelled) return;
-
-        setInactivePlayerMap((prev) => {
-          const next = { ...prev };
-          results.forEach((player, index) => {
-            const playerId = pendingInactiveIds[index];
-            if (playerId) {
-              next[playerId] = player ?? null;
-            }
-          });
-          return next;
-        });
-
-        setInactiveFetchState({ isLoading: false, error: null });
-      } catch (error) {
-        if (cancelled) return;
-        setInactiveFetchState({
-          isLoading: false,
-          error:
-            (error as Error) ?? new Error("Failed to load inactive players"),
-        });
-      }
-    }
-
-    void fetchInactivePlayers();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [pendingInactiveIds, trpcUtils]);
-
-  const inactivePlayers = useMemo(
-    () =>
-      Object.values(inactivePlayerMap).filter((player): player is Player =>
-        Boolean(player),
-      ),
-    [inactivePlayerMap],
+  const inactivePlayersQuery = usePlayersByIds(
+    inactivePlayerIds,
+    inactivePlayerIds.length > 0,
   );
+  const inactivePlayers = inactivePlayersQuery.data;
   const players = useMemo(
     () => [...activePlayers, ...inactivePlayers],
     [activePlayers, inactivePlayers],
@@ -199,14 +117,8 @@ export function useWeeklyScheduleData(
       sortMatchupsByRating(filterMatchupsByWeek(allMatchups, selectedWeekId)),
     [allMatchups, selectedWeekId],
   );
-  const nextWeekIds = useMemo(
-    () => getUpcomingWeekIds(weeks, selectedWeekId),
-    [selectedWeekId, weeks],
-  );
-  const [prefetchedWeekIds] = useState(() => new Set<string>());
-  const [isPrefetching, setIsPrefetching] = useState(false);
-  const inactivePlayersLoading = inactiveFetchState.isLoading;
-  const inactivePlayerError = inactiveFetchState.error;
+  const inactivePlayersLoading = inactivePlayersQuery.isLoading;
+  const inactivePlayerError = inactivePlayersQuery.error;
   const isLoading =
     scheduleStatus.isLoading ||
     playerWeekStatsQuery.status.isLoading ||
@@ -215,7 +127,7 @@ export function useWeeklyScheduleData(
   const combinedError =
     scheduleError ??
     (playerWeekStatsQuery.status.error as Error | null) ??
-    (activePlayersQuery.error as Error | null) ??
+    activePlayersQuery.error ??
     inactivePlayerError ??
     null;
   const ready =
@@ -223,66 +135,6 @@ export function useWeeklyScheduleData(
     playerWeekStatsQuery.ready &&
     !activePlayersQuery.isLoading &&
     !inactivePlayersLoading;
-
-  useEffect(() => {
-    prefetchedWeekIds.clear();
-  }, [prefetchedWeekIds, selectedSeasonId]);
-
-  useEffect(() => {
-    if (!ready || !selectedSeasonId || !selectedWeekId || !nextWeekIds.length) {
-      return;
-    }
-
-    if (typeof navigator !== "undefined" && !navigator.onLine) {
-      return;
-    }
-
-    let cancelled = false;
-
-    async function prefetchWeeks() {
-      setIsPrefetching(true);
-      try {
-        await Promise.all(
-          nextWeekIds.map(async (weekId) => {
-            if (prefetchedWeekIds.has(weekId)) {
-              return;
-            }
-            prefetchedWeekIds.add(weekId);
-            await Promise.all([
-              trpcUtils.matchup.getLiveStates.prefetch({
-                where: { seasonId: selectedSeasonId ?? undefined, weekId },
-              }),
-              trpcUtils.teamStats.weekly.getByWeek.prefetch({
-                weekId,
-                seasonId: selectedSeasonId ?? undefined,
-              }),
-              trpcUtils.playerStats.weekly.getByWeek.prefetch({
-                weekId,
-                seasonId: selectedSeasonId ?? undefined,
-              }),
-            ]);
-          }),
-        );
-      } finally {
-        if (!cancelled) {
-          setIsPrefetching(false);
-        }
-      }
-    }
-
-    void prefetchWeeks();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    nextWeekIds,
-    prefetchedWeekIds,
-    ready,
-    selectedSeasonId,
-    selectedWeekId,
-    trpcUtils,
-  ]);
 
   return {
     selectedSeasonId,
@@ -293,7 +145,7 @@ export function useWeeklyScheduleData(
     teamWeekStatsByTeam,
     playerWeekStatsByTeam,
     allMatchups,
-    isPrefetching,
+    isPrefetching: false,
     isLoading,
     error: combinedError,
     ready,

@@ -4,11 +4,11 @@ import { type Metadata } from "next";
 import { GeistSans } from "geist/font/sans";
 
 import { cn } from "@gshl-utils";
-import { TRPCReactProvider } from "@gshl-trpc";
 import { Navbar } from "@gshl-nav";
-import NavDefaults from "@gshl-components/nav/NavDefaults";
+import { NavDefaults } from "@gshl-components/nav/NavDefaults";
 import { AuthProvider } from "@gshl-components/auth";
 import { PerformanceVitals } from "@gshl-components/performance/PerformanceVitals";
+import { ConvexClientProvider } from "@gshl-components/auth/ConvexClientProvider";
 
 export const metadata: Metadata = {
   title: {
@@ -42,12 +42,12 @@ export default function RootLayout({
         )}
       >
         <AuthProvider>
-          <TRPCReactProvider>
+          <ConvexClientProvider>
             <NavDefaults />
             <div className="pb-20 lg:pb-8 lg:pt-16">{children}</div>
             <Navbar />
             <PerformanceVitals />
-          </TRPCReactProvider>
+          </ConvexClientProvider>
         </AuthProvider>
       </body>
     </html>

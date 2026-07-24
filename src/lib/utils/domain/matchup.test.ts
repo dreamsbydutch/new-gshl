@@ -1,10 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { MatchupType, type Matchup } from "@gshl-types";
+import type { Matchup, MatchupType as MatchupTypeValue } from "@gshl-types";
+import { MatchupType } from "./constants";
 import { normalizePlayoffMatchupOutcome } from "./matchup";
 
-const matchup = (gameType: MatchupType): Matchup => ({
+const matchup = (gameType: MatchupTypeValue): Matchup => ({
   id: "matchup",
   seasonId: "season",
   weekId: "week",

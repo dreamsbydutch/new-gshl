@@ -6,11 +6,10 @@
  * Week selection functionality with playoff styling and horizontal scrollable interface.
  */
 
-import { cn } from "@gshl-utils";
-import { SeasonType, type Week } from "@gshl-types";
-import type { WeeksToggleProps } from "@gshl-types";
+import { cn, SeasonType } from "@gshl-utils";
+import type { Week, WeeksToggleProps } from "@gshl-types";
 import { useNav, useWeekNavigation, useWeeks } from "@gshl-hooks";
-import { HorizontalToggle } from "./toggle";
+import { HorizontalToggle } from "./Toggle";
 
 /**
  * Week selection toggle component with playoff styling

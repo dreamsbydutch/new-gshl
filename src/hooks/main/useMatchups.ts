@@ -1,59 +1,10 @@
-import { useMemo } from "react";
-import type { Matchup, MatchupLiveState, MatchupMetadata } from "@gshl-types";
-import type { UseMatchupsOptions } from "@gshl-types";
-import { clientApi as api } from "@gshl-trpc";
+"use client";
+
+import { useQuery } from "convex/react";
+import { api } from "../../../convex/_generated/api";
+import type { Matchup, UseMatchupsOptions } from "@gshl-types";
 import { normalizePlayoffMatchupOutcome } from "@gshl-utils/domain/matchup";
 
-const DAY_IN_MS = 24 * 60 * 60 * 1000;
-const FIFTEEN_MINUTES_IN_MS = 15 * 60 * 1000;
-
-/**
- * Merges static matchup metadata with live scoring state into a single
- * component-friendly matchup collection.
- */
-function mergeMatchups(
-  metadata: MatchupMetadata[],
-  liveStates: MatchupLiveState[],
-): Matchup[] {
-  const liveStateById = new Map(liveStates.map((state) => [state.id, state]));
-
-  return metadata.map((matchup) => {
-    const liveState = liveStateById.get(matchup.id);
-
-    return normalizePlayoffMatchupOutcome({
-      ...matchup,
-      homeScore: liveState?.homeScore ?? null,
-      awayScore: liveState?.awayScore ?? null,
-      homeWin: liveState?.homeWin ?? null,
-      awayWin: liveState?.awayWin ?? null,
-      tie: liveState?.tie ?? null,
-      isComplete: liveState?.isComplete ?? false,
-      updatedAt: liveState?.updatedAt ?? matchup.createdAt,
-    });
-  });
-}
-
-/**
- * Hook for fetching matchups with optional filtering.
- *
- * @param options - Configuration options for filtering matchups
- * @returns Matchups data, loading state, and error state
- *
- * @example
- * ```tsx
- * // Fetch all matchups
- * const { data: matchups, isLoading } = useMatchups();
- *
- * // Fetch matchup by ID
- * const { data: matchup } = useMatchups({ matchupId: 'matchup-123' });
- *
- * // Fetch matchups for a specific week
- * const { data: matchups } = useMatchups({ weekId: 'week-456' });
- *
- * // Fetch matchups for a specific season
- * const { data: matchups } = useMatchups({ seasonId: 'season-789' });
- * ```
- */
 export function useMatchups(options: UseMatchupsOptions = {}) {
   const {
     matchupId,
@@ -62,69 +13,26 @@ export function useMatchups(options: UseMatchupsOptions = {}) {
     orderBy = { seasonId: "asc" },
     enabled = true,
   } = options;
-
-  // Normalize IDs
-  const normalizedMatchupId = matchupId ? String(matchupId) : null;
-  const normalizedWeekId = weekId ? String(weekId) : null;
-  const normalizedSeasonId = seasonId ? String(seasonId) : null;
-
-  // Build where clause based on filters
-  const where: Record<string, string> = {};
-  if (normalizedMatchupId) where.id = normalizedMatchupId;
-  if (normalizedWeekId) where.weekId = normalizedWeekId;
-  if (normalizedSeasonId) where.seasonId = normalizedSeasonId;
-
-  const queryInput =
-    Object.keys(where).length > 0 ? { where, orderBy } : { orderBy };
-  const hasQueryScope = Object.keys(where).length > 0;
-
-  const historyQuery = api.matchup.getHistory.useQuery(
-    { orderBy },
-    {
-      enabled: enabled && !hasQueryScope,
-      staleTime: DAY_IN_MS,
-      gcTime: DAY_IN_MS,
-      refetchOnMount: false,
-      refetchOnWindowFocus: false,
-    },
+  const where: Record<string, unknown> = {};
+  if (matchupId) where.id = String(matchupId);
+  if (weekId) where.weekId = String(weekId);
+  if (seasonId) where.seasonId = String(seasonId);
+  const result = useQuery(
+    api.frontend.matchups,
+    enabled
+      ? {
+          ...(Object.keys(where).length ? { where } : {}),
+          orderBy,
+        }
+      : "skip",
   );
-
-  const metadataQuery = api.matchup.getMetadata.useQuery(queryInput, {
-    enabled: enabled && hasQueryScope,
-    staleTime: DAY_IN_MS,
-    gcTime: DAY_IN_MS,
-    refetchOnMount: false,
-    refetchOnWindowFocus: false,
-  });
-
-  const liveStatesQuery = api.matchup.getLiveStates.useQuery(queryInput, {
-    enabled: enabled && hasQueryScope,
-    staleTime: FIFTEEN_MINUTES_IN_MS,
-    gcTime: FIFTEEN_MINUTES_IN_MS,
-    refetchOnMount: true,
-    refetchOnWindowFocus: true,
-  });
-
-  const data = useMemo(() => {
-    if (!hasQueryScope) return historyQuery.data ?? [];
-    return mergeMatchups(metadataQuery.data ?? [], liveStatesQuery.data ?? []);
-  }, [
-    hasQueryScope,
-    historyQuery.data,
-    metadataQuery.data,
-    liveStatesQuery.data,
-  ]);
-
+  const data = ((result ?? []) as unknown as Matchup[]).map(
+    normalizePlayoffMatchupOutcome,
+  );
   return {
     data,
-    isLoading: hasQueryScope
-      ? metadataQuery.isLoading || liveStatesQuery.isLoading
-      : historyQuery.isLoading,
-    isFetching: hasQueryScope
-      ? metadataQuery.isFetching || liveStatesQuery.isFetching
-      : historyQuery.isFetching,
-    error: hasQueryScope
-      ? (metadataQuery.error ?? liveStatesQuery.error ?? null)
-      : (historyQuery.error ?? null),
+    isLoading: enabled && result === undefined,
+    isFetching: enabled && result === undefined,
+    error: null,
   };
 }

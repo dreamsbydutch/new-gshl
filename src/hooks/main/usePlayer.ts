@@ -1,92 +1,58 @@
-import { useMemo } from "react";
+"use client";
 
+import { useMemo } from "react";
+import { usePaginatedQuery, useQuery } from "convex/react";
+import { api } from "../../../convex/_generated/api";
+import type { Id } from "../../../convex/_generated/dataModel";
 import type {
   Player,
   PlayerRankField,
-  UsePlayersOptions,
   UsePlayerPagesOptions,
+  UsePlayersOptions,
   UseRankedPlayersOptions,
   UseRosterPlayersOptions,
 } from "@gshl-types";
-import { clientApi as api } from "@gshl-trpc";
+import { useAppMutation } from "./useAppMutation";
 
-const DAY_IN_MS = 24 * 60 * 60 * 1000;
-
-/** Cursor-paginated player collection for large user-facing lists. */
 export function usePlayerPages(options: UsePlayerPagesOptions = {}) {
   const { active, positionGroup, enabled = true, limit = 50 } = options;
-  const query = api.player.listPage.useInfiniteQuery(
-    {
-      active,
-      positionGroup,
-      limit: Math.min(Math.max(limit, 1), 50),
-    },
-    {
-      enabled,
-      getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
-      staleTime: 5 * 60 * 1000,
-      gcTime: 15 * 60 * 1000,
-      refetchOnWindowFocus: false,
-    },
+  const query = usePaginatedQuery(
+    api.frontend.playersPage,
+    enabled ? { active } : "skip",
+    { initialNumItems: Math.min(Math.max(limit, 1), 50) },
   );
-
+  const data = (query.results as unknown as Player[]).filter(
+    (player) => !positionGroup || player.posGroup === positionGroup,
+  );
   return {
-    ...query,
-    data: query.data?.pages.flatMap((page) => page.items) ?? [],
-    hasMore: query.hasNextPage,
-    loadMore: query.fetchNextPage,
-    isLoadingMore: query.isFetchingNextPage,
+    data,
+    hasMore: query.status === "CanLoadMore",
+    loadMore: () => query.loadMore(Math.min(Math.max(limit, 1), 50)),
+    isLoading: query.status === "LoadingFirstPage",
+    isLoadingMore: query.status === "LoadingMore",
+    error: null,
   };
 }
 
 export function usePlayersByIds(ids: string[], enabled = true) {
   const uniqueIds = useMemo(() => [...new Set(ids)].sort(), [ids]);
-  const query = api.player.getByIds.useQuery(
-    { ids: uniqueIds },
-    {
-      enabled: enabled && uniqueIds.length > 0,
-      staleTime: 5 * 60 * 1000,
-      gcTime: 15 * 60 * 1000,
-      refetchOnWindowFocus: false,
-    },
+  const result = useQuery(
+    api.frontend.playersByIds,
+    enabled && uniqueIds.length
+      ? { ids: uniqueIds as Id<"players">[] }
+      : "skip",
   );
-  return { ...query, data: query.data ?? [] };
+  return {
+    data: (result ?? []) as unknown as Player[],
+    isLoading: enabled && uniqueIds.length > 0 && result === undefined,
+    error: null,
+  };
 }
 
 export function useUpdatePlayerLineup() {
-  const utils = api.useUtils();
-  return api.player.update.useMutation({
-    onSuccess: async () => utils.player.getAll.invalidate(),
-  });
+  return useAppMutation(api.frontend.updatePlayer);
 }
 
-/**
- * Hook for fetching players with optional filtering.
- *
- * @param options - Configuration options for filtering players
- * @returns Players data, loading state, and error state
- *
- * @example
- * ```tsx
- * // Fetch all players
- * const { data: players, isLoading } = usePlayers();
- *
- * // Fetch player by ID
- * const { data: players } = usePlayers({ playerId: 'player-123' });
- *
- * // Fetch players by team
- * const { data: players } = usePlayers({ teamId: 'team-456' });
- *
- * // Fetch players by position
- * const { data: players } = usePlayers({ position: 'C' });
- *
- * // Custom caching behavior
- * const { data: players } = usePlayers({
- *   staleTime: 5 * 60 * 1000, // 5 minutes
- *   refetchOnWindowFocus: true,
- * });
- * ```
- */
 export function usePlayers(options: UsePlayersOptions = {}) {
   const {
     playerId,
@@ -97,62 +63,35 @@ export function usePlayers(options: UsePlayersOptions = {}) {
     nhlTeam,
     isActive,
     enabled = true,
-    staleTime = DAY_IN_MS,
-    gcTime = DAY_IN_MS,
-    refetchOnMount = false,
-    refetchOnWindowFocus = false,
   } = options;
-
-  const normalizedPlayerId = playerId ? String(playerId) : null;
-  const normalizedTeamId = teamId ? String(teamId) : null;
-  const normalizedPosition = position ? String(position) : null;
-  const normalizedGshlTeamId = gshlTeamId ? String(gshlTeamId) : null;
-  const normalizedLineupPos = lineupPos ? String(lineupPos) : null;
-  const normalizedNhlTeam = nhlTeam ? String(nhlTeam) : null;
-
-  // Build where clause
-  const where: Record<string, string | boolean> = {};
-  if (normalizedPlayerId) where.id = normalizedPlayerId;
-  if (normalizedTeamId) where.teamId = normalizedTeamId;
-  if (normalizedPosition) where.position = normalizedPosition;
-  if (normalizedGshlTeamId) where.gshlTeamId = normalizedGshlTeamId;
-  if (normalizedLineupPos) where.lineupPos = normalizedLineupPos;
-  if (normalizedNhlTeam) where.nhlTeam = normalizedNhlTeam;
-  if (typeof isActive === "boolean") where.isActive = isActive;
-
-  const query = api.player.getAll.useQuery(
-    Object.keys(where).length > 0 ? { where } : {},
-    {
-      enabled,
-      staleTime,
-      gcTime,
-      refetchOnMount,
-      refetchOnWindowFocus,
-      refetchInterval: false,
-      refetchIntervalInBackground: false,
-    },
+  const where: Record<string, unknown> = {};
+  if (playerId) where.id = String(playerId);
+  if (teamId ?? gshlTeamId) {
+    where.gshlTeamId = String(teamId ?? gshlTeamId);
+  }
+  if (position) where.posGroup = String(position);
+  if (lineupPos) where.lineupPos = String(lineupPos);
+  if (nhlTeam) where.nhlTeam = String(nhlTeam);
+  if (isActive !== undefined) where.isActive = isActive;
+  const result = useQuery(
+    api.frontend.players,
+    enabled
+      ? { ...(Object.keys(where).length ? { where } : {}) }
+      : "skip",
   );
-
   return {
-    data: query.data ?? [],
-    isLoading: query.isLoading,
-    error: query.error ?? null,
+    data: (result ?? []) as unknown as Player[],
+    isLoading: enabled && result === undefined,
+    error: null,
   };
 }
 
-/**
- * Convenience hook for fetching only active players.
- */
 export function useActivePlayers(
   options: Omit<UsePlayersOptions, "isActive"> = {},
 ) {
   return usePlayers({ ...options, isActive: true });
 }
 
-/**
- * Fetches roster-scoped players, optionally keeping inactive players and
- * applying rank-based sorting and limits for lineup-oriented UIs.
- */
 export function useRosterPlayers(options: UseRosterPlayersOptions = {}) {
   const {
     gshlTeamId,
@@ -161,56 +100,33 @@ export function useRosterPlayers(options: UseRosterPlayersOptions = {}) {
     limit,
     minimumRosterSize,
     enabled = true,
-    isActive: requestedIsActive,
-    ...forwardOptions
+    isActive,
+    ...rest
   } = options;
-
-  const derivedIsActive = includeInactive
-    ? requestedIsActive
-    : (requestedIsActive ?? true);
-
-  const baseQuery = usePlayers({
-    ...forwardOptions,
+  const query = usePlayers({
+    ...rest,
     gshlTeamId,
-    isActive: derivedIsActive,
+    isActive: includeInactive ? isActive : (isActive ?? true),
     enabled: enabled && Boolean(gshlTeamId),
   });
-
-  const rosterPlayers = useMemo(() => {
-    if (!gshlTeamId) return [] as Player[];
-    const source = baseQuery.data ?? [];
-    const sorted = [...source].sort((a, b) => {
-      const aRank = getPlayerRankValue(a, rankField);
-      const bRank = getPlayerRankValue(b, rankField);
-      const safeA = aRank ?? Number.POSITIVE_INFINITY;
-      const safeB = bRank ?? Number.POSITIVE_INFINITY;
-      return safeA - safeB;
-    });
-
-    if (typeof limit === "number") {
-      return sorted.slice(0, limit);
-    }
-    return sorted;
-  }, [baseQuery.data, gshlTeamId, rankField, limit]);
-
-  const rosterCount = baseQuery.data?.length ?? 0;
-  const meetsMinimumRoster =
-    typeof minimumRosterSize === "number"
-      ? rosterCount >= minimumRosterSize
-      : true;
-
+  const data = useMemo(() => {
+    const sorted = [...query.data].sort(
+      (a, b) =>
+        (getPlayerRankValue(a, rankField) ?? Number.POSITIVE_INFINITY) -
+        (getPlayerRankValue(b, rankField) ?? Number.POSITIVE_INFINITY),
+    );
+    return typeof limit === "number" ? sorted.slice(0, limit) : sorted;
+  }, [query.data, rankField, limit]);
   return {
-    ...baseQuery,
-    data: rosterPlayers,
-    rosterCount,
-    meetsMinimumRoster,
-  } as const;
+    ...query,
+    data,
+    rosterCount: query.data.length,
+    meetsMinimumRoster:
+      minimumRosterSize === undefined ||
+      query.data.length >= minimumRosterSize,
+  };
 }
 
-/**
- * Fetches players and narrows them to a rank window for draft boards and
- * similar ranking-driven views.
- */
 export function useRankedPlayers(options: UseRankedPlayersOptions = {}) {
   const {
     rankField = "overallRk",
@@ -218,56 +134,29 @@ export function useRankedPlayers(options: UseRankedPlayersOptions = {}) {
     maxRank,
     limit,
     sortDirection = "asc",
-    ...forwardOptions
+    ...rest
   } = options;
-
-  const baseQuery = usePlayers(forwardOptions);
-
-  const rankedPlayers = useMemo(() => {
-    const source = baseQuery.data ?? [];
-    const filtered = source.filter((player) => {
+  const query = usePlayers(rest);
+  const data = useMemo(() => {
+    const filtered = query.data.filter((player) => {
       const rank = getPlayerRankValue(player, rankField);
-      if (rank == null) return false;
-      if (typeof minRank === "number" && rank < minRank) return false;
-      if (typeof maxRank === "number" && rank > maxRank) return false;
-      return true;
+      return (
+        rank != null &&
+        (minRank === undefined || rank >= minRank) &&
+        (maxRank === undefined || rank <= maxRank)
+      );
     });
-
-    const sorted = filtered.sort((a, b) => {
-      const aRank = getPlayerRankValue(a, rankField);
-      const bRank = getPlayerRankValue(b, rankField);
-      const fallback =
-        sortDirection === "asc"
-          ? Number.POSITIVE_INFINITY
-          : Number.NEGATIVE_INFINITY;
-      const safeA = aRank ?? fallback;
-      const safeB = bRank ?? fallback;
-      return sortDirection === "asc" ? safeA - safeB : safeB - safeA;
+    filtered.sort((a, b) => {
+      const delta =
+        (getPlayerRankValue(a, rankField) ?? 0) -
+        (getPlayerRankValue(b, rankField) ?? 0);
+      return sortDirection === "desc" ? -delta : delta;
     });
-
-    if (typeof limit === "number") {
-      return sorted.slice(0, limit);
-    }
-    return sorted;
-  }, [baseQuery.data, rankField, minRank, maxRank, sortDirection, limit]);
-
-  return {
-    ...baseQuery,
-    data: rankedPlayers,
-  } as const;
+    return limit === undefined ? filtered : filtered.slice(0, limit);
+  }, [query.data, rankField, minRank, maxRank, limit, sortDirection]);
+  return { ...query, data };
 }
 
-/**
- * Reads a rank value from a player using the requested ranking field.
- */
 function getPlayerRankValue(player: Player, field: PlayerRankField) {
-  switch (field) {
-    case "preDraftRk":
-      return player.preDraftRk ?? null;
-    case "seasonRk":
-      return player.seasonRk ?? null;
-    case "overallRk":
-    default:
-      return player.overallRk ?? null;
-  }
+  return player[field] ?? null;
 }

@@ -1,7 +1,8 @@
 import type { Player, Season } from "@gshl-types";
 import { getTorontoDate } from "../domain/contracts";
+import { UFA_OFFER_MS } from "./ufa-deadline";
 
-export const UFA_OFFER_MS = 7 * 24 * 60 * 60 * 1_000;
+export { UFA_OFFER_MS } from "./ufa-deadline";
 
 export function calculateUfaSalary(baseSalary: unknown): number {
   const parsed = Number(baseSalary);

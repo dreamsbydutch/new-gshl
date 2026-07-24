@@ -15,7 +15,8 @@
 import Image from "next/image";
 import { RefreshCw, Undo2 } from "lucide-react";
 
-import { Button, Table, NHLLogo } from "@gshl-ui";
+import { Button, Table } from "@gshl-ui";
+import { NHLLogo } from "@gshl-components/player/NHLLogo";
 import {
   findNhlTeamByAbbreviation,
   formatMoney,

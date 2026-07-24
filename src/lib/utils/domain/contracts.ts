@@ -7,10 +7,13 @@
 import type {
   Contract,
   ContractFilters,
+  ContractCapCheck,
+  ContractCreationTerms,
   ContractSortOption,
   ContractSummary,
   MaybeArray,
   Player,
+  ResignableStatus as ResignableStatusType,
   Season,
 } from "@gshl-types";
 import {
@@ -18,30 +21,10 @@ import {
   ContractType,
   ResignableStatus,
   SALARY_CAP,
-} from "@gshl-types";
+} from "./constants";
 import { formatDate, normalizeDateOnlyValue } from "../core/date";
 
 type ContractComparableValue = Date | number | string | null | undefined;
-
-export type ContractCreationTerms = {
-  signingSeason: Season;
-  startSeason: Season;
-  expirySeason: Season;
-  contractType: ContractType;
-  contractSalary: number;
-  signingStatus: ContractStatus;
-  expiryStatus: ContractStatus;
-  startDate: string;
-  expiryDate: string;
-};
-
-export type ContractCapCheck = {
-  affordable: boolean;
-  coveredSeasonIds: string[];
-  limitingSeasonId: string | null;
-  availableCapSpace: number;
-  requiredSalary: number;
-};
 
 type ReservedCapBySeason = ReadonlyMap<string, number>;
 
@@ -296,7 +279,7 @@ export function getEffectiveSigningStatus(options: {
   contracts: Contract[];
   seasons: Season[];
   referenceDate?: Date;
-}): ResignableStatus | null {
+}): ResignableStatusType | null {
   const {
     player,
     signingSeason,
@@ -358,9 +341,9 @@ export function deriveContractCreationTerms(options: {
   );
 
   let multiplier: number;
-  let contractType: ContractType;
-  let signingStatus: ContractStatus;
-  let expiryStatus: ContractStatus;
+  let contractType: ContractCreationTerms["contractType"];
+  let signingStatus: ContractCreationTerms["signingStatus"];
+  let expiryStatus: ContractCreationTerms["expiryStatus"];
 
   if (status === String(ResignableStatus.DRAFT)) {
     multiplier = 1;

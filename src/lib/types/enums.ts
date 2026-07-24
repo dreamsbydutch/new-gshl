@@ -1,105 +1,76 @@
-// Enums and constants used throughout the application
+export type RosterPosition =
+  | "BN"
+  | "IR"
+  | "IRplus"
+  | "LW"
+  | "C"
+  | "RW"
+  | "D"
+  | "G"
+  | "Util";
 
-export enum RosterPosition {
-  BN = "BN",
-  IR = "IR",
-  IRplus = "IRplus",
-  LW = "LW",
-  C = "C",
-  RW = "RW",
-  D = "D",
-  G = "G",
-  Util = "Util",
-}
+export type ResignableStatus = "DRAFT" | "RFA" | "UFA";
 
-export enum ResignableStatus {
-  DRAFT = "DRAFT",
-  RFA = "RFA",
-  UFA = "UFA",
-}
+export type PositionGroup = "F" | "D" | "G" | "TEAM";
 
-export enum PositionGroup {
-  F = "F",
-  D = "D",
-  G = "G",
-  TEAM = "TEAM", // Team-level stats (not individual player)
-}
+export type SeasonType = "RS" | "PO" | "LT";
 
-export enum SeasonType {
-  REGULAR_SEASON = "RS",
-  PLAYOFFS = "PO",
-  LOSERS_TOURNAMENT = "LT",
-}
+export type MatchupType = "CC" | "NC" | "QF" | "SF" | "F" | "LT";
 
-export enum MatchupType {
-  CONFERENCE = "CC",
-  NON_CONFERENCE = "NC",
-  QUARTER_FINAL = "QF",
-  SEMI_FINAL = "SF",
-  FINAL = "F",
-  LOSERS_TOURNAMENT = "LT",
-}
+export type PlayerPosition = "C" | "LW" | "RW" | "D" | "G";
 
-export enum PlayerPosition {
-  CENTER = "C",
-  LEFT_WING = "LW",
-  RIGHT_WING = "RW",
-  DEFENSE = "D",
-  GOALIE = "G",
-}
+export type EventType = "DRAFT" | "MEETINGS";
 
-export enum EventType {
-  DRAFT = "DRAFT",
-  SUMMER_MEETINGS = "MEETINGS",
-}
+export type ContractType = "STANDARD" | "EXTENSION";
 
-export enum ContractType {
-  STANDARD = "STANDARD",
-  EXTENSION = "EXTENSION",
-}
-export enum ContractStatus {
-  DRAFTED = "Drafted",
-  RFA = "RFA",
-  UFA = "UFA",
-  TRADE = "Trade",
-  BUYOUT = "Buyout",
-  RETIRED = "Retired",
-  INJURED = "Injured",
-}
-
-export const SALARY_CAP = 25_000_000;
-
-export const STAT_CATEGORIES = {
-  FORWARD: ["G", "A", "P", "SOG", "HIT", "BLK", "PPP", "PM", "PIM"],
-  DEFENSE: ["G", "A", "P", "SOG", "HIT", "BLK", "PPP", "PM", "PIM"],
-  GOALIE: ["W", "GA", "GAA", "SV", "SA", "SVP", "SO"],
-} as const;
+export type ContractStatus =
+  | "Drafted"
+  | "RFA"
+  | "UFA"
+  | "Trade"
+  | "Buyout"
+  | "Retired"
+  | "Injured";
 
 export type StatCategory =
-  (typeof STAT_CATEGORIES)[keyof typeof STAT_CATEGORIES][number];
+  | "G"
+  | "A"
+  | "P"
+  | "SOG"
+  | "HIT"
+  | "BLK"
+  | "PPP"
+  | "PM"
+  | "PIM"
+  | "W"
+  | "GA"
+  | "GAA"
+  | "SV"
+  | "SA"
+  | "SVP"
+  | "SO";
 
-export enum AwardsList {
-  HART = "hart",
-  ROCKET = "rocket",
-  ART_ROSS = "artRoss",
-  SELKE = "selke",
-  VEZINA = "vezina",
-  NORRIS = "norris",
-  CALDER = "calder",
-  GM_OF_THE_YEAR = "gmoy",
-  JACK_ADAMS = "jackAdams",
-  LADY_BYNG = "ladyByng",
-  GSHL_CUP = "gshlCup",
-  BROPHY = "brophy",
-  PRESIDENT = "president",
-  SUNVIEW = "sunview",
-  HICKORY = "hickory",
-  FIRST_AS = "firstAS",
-  SECOND_AS = "secondAS",
-  PLAYOFF_AS = "playoffAS",
-  CROSBY = "crosby",
-  ORR = "orr",
-  BRODEUR = "brodeur",
-  GRETZKY = "gretzky",
-  OVECHKIN = "ovechkin",
-}
+export type AwardsList =
+  | "hart"
+  | "rocket"
+  | "artRoss"
+  | "selke"
+  | "vezina"
+  | "norris"
+  | "calder"
+  | "gmoy"
+  | "jackAdams"
+  | "ladyByng"
+  | "gshlCup"
+  | "brophy"
+  | "president"
+  | "sunview"
+  | "hickory"
+  | "firstAS"
+  | "secondAS"
+  | "playoffAS"
+  | "crosby"
+  | "orr"
+  | "brodeur"
+  | "gretzky"
+  | "ovechkin";

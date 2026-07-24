@@ -8,7 +8,11 @@
 import Link from "next/link";
 import Image from "next/image";
 import { cn } from "@gshl-utils";
-import type { ClickableNavItemProps, LinkNavItem, NavContainerProps } from "@gshl-types";
+import type {
+  ClickableNavItemProps,
+  LinkNavItem,
+  NavContainerProps,
+} from "@gshl-types";
 
 /**
  * Clickable navigation item component

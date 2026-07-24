@@ -9,7 +9,7 @@
 
 import type { GSHLTeam, TeamsToggleProps } from "@gshl-types";
 import { useNav, useTeamNavigation, useTeams } from "@gshl-hooks";
-import { HorizontalToggle } from "./toggle";
+import { HorizontalToggle } from "./Toggle";
 import Image from "next/image";
 
 /**

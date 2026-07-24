@@ -7,12 +7,16 @@ import type {
   ConferenceContestRecord,
   ConferenceContestSeasonViewModel,
   ConferenceContestWinner,
+  AwardsList as AwardsListType,
   GSHLTeam,
   Matchup,
   Season,
   TeamAward,
 } from "@gshl-types";
-import { AwardsList, MatchupType } from "@gshl-types";
+import {
+  AwardsList,
+  MatchupType,
+} from "../domain/constants";
 import { getTeamAwardTeam } from "@gshl-lib/config/awards";
 import { isPlayoffMatchupType } from "@gshl-utils/domain/matchup";
 
@@ -44,7 +48,7 @@ export const CONFERENCE_PLAYOFF_WEIGHTS = {
 export const CONFERENCE_RECENCY_RETENTION = 0.85;
 
 const EMPTY_RECORD: ConferenceContestRecord = { wins: 0, losses: 0, ties: 0 };
-const EXCLUDED_AWARDS = new Set<AwardsList>([
+const EXCLUDED_AWARDS = new Set<AwardsListType>([
   AwardsList.GSHL_CUP,
   AwardsList.SUNVIEW,
   AwardsList.HICKORY,
@@ -184,7 +188,7 @@ const evidenceShare = (left: number, right: number) => {
 const recordEvidence = (record?: ConferenceContestRecord) =>
   (record?.wins ?? 0) + (record?.ties ?? 0) * 0.5;
 
-const awardWeight = (award: AwardsList) =>
+const awardWeight = (award: AwardsListType) =>
   award === AwardsList.JACK_ADAMS || award === AwardsList.GM_OF_THE_YEAR
     ? 3
     : 1;

@@ -220,6 +220,14 @@ export default tseslint.config(
           selector: "ClassDeclaration",
           message: "Keep runtime logic out of src/lib/types.",
         },
+        {
+          selector: "TSEnumDeclaration",
+          message: "Keep runtime enums out of src/lib/types.",
+        },
+        {
+          selector: "VariableDeclaration",
+          message: "Keep runtime values out of src/lib/types.",
+        },
       ],
     },
   },

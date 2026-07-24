@@ -14,7 +14,7 @@ import {
   ToastProvider,
   ToastTitle,
   ToastViewport,
-} from "./toast";
+} from "./ToastPrimitive";
 import React from "react";
 import { useToast } from "@gshl-hooks";
 

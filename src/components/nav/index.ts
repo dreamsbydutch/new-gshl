@@ -12,4 +12,4 @@ export { SecondaryPageToolbar } from "./SecondaryToolbar";
 export { TertiaryPageToolbar } from "./TertiaryToolbar";
 
 // Toggle Components
-export { HorizontalToggle, DropdownToggle } from "./toggle";
+export { HorizontalToggle, DropdownToggle } from "./Toggle";

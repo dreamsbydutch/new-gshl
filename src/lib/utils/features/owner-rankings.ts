@@ -1,6 +1,7 @@
 import type {
   GSHLTeam,
   Matchup,
+  MatchupType as MatchupTypeValue,
   Owner,
   OwnerLadderBattle,
   OwnerRankingEntry,
@@ -10,7 +11,7 @@ import type {
   TeamAward,
   Week,
 } from "@gshl-types";
-import { AwardsList, MatchupType } from "@gshl-types";
+import { AwardsList, MatchupType } from "../domain/constants";
 import { isPlayoffMatchupType } from "@gshl-utils/domain/matchup";
 
 /** The ladder's normal reference band. These are guideposts, not hard limits. */
@@ -34,7 +35,7 @@ export const OWNER_LADDER_BONUSES = {
   brophy: -10,
 } as const;
 
-const PLAYOFF_TYPES = new Set<MatchupType>([
+const PLAYOFF_TYPES = new Set<MatchupTypeValue>([
   MatchupType.QUARTER_FINAL,
   MatchupType.SEMI_FINAL,
   MatchupType.FINAL,
@@ -127,7 +128,7 @@ const ladderRating = (state: OwnerLadderState) =>
 const expectedScore = (ratingA: number, ratingB: number) =>
   1 / (1 + 10 ** ((ratingB - ratingA) / 400));
 
-const matchupK = (gameType: MatchupType) => {
+const matchupK = (gameType: MatchupTypeValue) => {
   if (gameType === MatchupType.FINAL) return 40;
   if (gameType === MatchupType.SEMI_FINAL) return 34;
   if (gameType === MatchupType.QUARTER_FINAL) return 28;
@@ -137,7 +138,7 @@ const matchupK = (gameType: MatchupType) => {
 const matchupActual = (
   homeScore: number,
   awayScore: number,
-  gameType: MatchupType,
+  gameType: MatchupTypeValue,
 ) => {
   if (homeScore > awayScore) return 1;
   if (awayScore > homeScore) return 0;

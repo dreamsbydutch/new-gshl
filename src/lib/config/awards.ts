@@ -1,11 +1,12 @@
 import type {
   AwardCatalogEntry,
   AwardGroupKey,
+  AwardsList as AwardsListType,
   GSHLTeam,
   PlayerAward,
   TeamAward,
 } from "@gshl-types";
-import { AwardsList } from "@gshl-types";
+import { AwardsList } from "@gshl-utils/domain/constants";
 
 export const AWARD_GROUP_ORDER: AwardGroupKey[] = [
   "TEAM TROPHIES",
@@ -155,13 +156,13 @@ export const AWARD_CATALOG_BY_KEY = new Map(
   AWARD_CATALOG.map((entry) => [entry.key, entry]),
 );
 
-export const ALL_STAR_AWARD_LABELS = new Map<AwardsList, string>([
+export const ALL_STAR_AWARD_LABELS = new Map<AwardsListType, string>([
   [AwardsList.FIRST_AS, "First Team All-Star"],
   [AwardsList.SECOND_AS, "Second Team All-Star"],
   [AwardsList.PLAYOFF_AS, "Playoff All-Star"],
 ]);
 
-export const PLAYER_TROPHY_LABELS = new Map<AwardsList, string>([
+export const PLAYER_TROPHY_LABELS = new Map<AwardsListType, string>([
   [AwardsList.CROSBY, "Crosby Trophy"],
   [AwardsList.ORR, "Orr Trophy"],
   [AwardsList.BRODEUR, "Brodeur Trophy"],
@@ -169,11 +170,11 @@ export const PLAYER_TROPHY_LABELS = new Map<AwardsList, string>([
   [AwardsList.OVECHKIN, "Ovechkin Trophy"],
 ]);
 
-export function getAwardLabel(award: AwardsList | string): string {
+export function getAwardLabel(award: string): string {
   return (
-    AWARD_CATALOG_BY_KEY.get(award as AwardsList)?.fullName ??
-    PLAYER_TROPHY_LABELS.get(award as AwardsList) ??
-    ALL_STAR_AWARD_LABELS.get(award as AwardsList) ??
+    AWARD_CATALOG_BY_KEY.get(award as AwardsListType)?.fullName ??
+    PLAYER_TROPHY_LABELS.get(award as AwardsListType) ??
+    ALL_STAR_AWARD_LABELS.get(award as AwardsListType) ??
     String(award)
   );
 }

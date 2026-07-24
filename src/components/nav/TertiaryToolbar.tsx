@@ -13,10 +13,7 @@ import { NavContainer } from "./BaseComponents";
  * @param props - Component props
  * @returns Tertiary toolbar wrapper with NavContainer styling
  */
-export function TertiaryPageToolbar({
-  children,
-  className,
-}: ToolbarProps) {
+export function TertiaryPageToolbar({ children, className }: ToolbarProps) {
   return (
     <NavContainer
       position="tertiary"

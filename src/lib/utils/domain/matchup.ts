@@ -1,13 +1,13 @@
-import type { Matchup } from "@gshl-types";
-import { MatchupType } from "@gshl-types";
+import type { Matchup, MatchupType as MatchupTypeValue } from "@gshl-types";
+import { MatchupType } from "./constants";
 
-const PLAYOFF_MATCHUP_TYPES = new Set<MatchupType>([
+const PLAYOFF_MATCHUP_TYPES = new Set<MatchupTypeValue>([
   MatchupType.QUARTER_FINAL,
   MatchupType.SEMI_FINAL,
   MatchupType.FINAL,
 ]);
 
-export function isPlayoffMatchupType(gameType: MatchupType): boolean {
+export function isPlayoffMatchupType(gameType: MatchupTypeValue): boolean {
   return PLAYOFF_MATCHUP_TYPES.has(gameType);
 }
 

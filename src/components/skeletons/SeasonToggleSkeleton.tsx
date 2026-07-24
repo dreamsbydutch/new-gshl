@@ -15,7 +15,7 @@
  * ```
  */
 
-import { Skeleton } from "../ui/skeleton";
+import { Skeleton } from "../ui/SkeletonPrimitive";
 
 export function SeasonToggleSkeleton() {
   return <Skeleton className="mr-4 h-6 w-28" />;

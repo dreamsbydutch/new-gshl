@@ -11,7 +11,7 @@ import { useMemo, useState, useEffect } from "react";
 
 import type { SeasonSummary, SeasonToggleNavProps } from "@gshl-types";
 import { useSeasonNavigation, useSeasonState } from "@gshl-hooks";
-import { DropdownToggle } from "./toggle";
+import { DropdownToggle } from "./Toggle";
 
 export function SeasonToggleNav({
   className,

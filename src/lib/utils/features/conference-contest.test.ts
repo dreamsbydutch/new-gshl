@@ -7,14 +7,15 @@ import {
   CONFERENCE_RECENCY_RETENTION,
 } from "./conference-contest";
 import {
-  AwardsList,
-  MatchupType,
+  type AwardsList as AwardsListType,
   type ConferenceContestSeasonViewModel,
   type GSHLTeam,
   type Matchup,
+  type MatchupType as MatchupTypeValue,
   type Season,
   type TeamAward,
 } from "@gshl-types";
+import { AwardsList, MatchupType } from "../domain/constants";
 
 const now = new Date("2026-01-01T00:00:00.000Z");
 
@@ -65,7 +66,7 @@ const matchup = (
   seasonId: string,
   homeTeamId: string,
   awayTeamId: string,
-  gameType: MatchupType,
+  gameType: MatchupTypeValue,
   homeScore: number,
   awayScore: number,
 ): Matchup => ({
@@ -89,7 +90,7 @@ const award = (
   id: string,
   seasonId: string,
   ownerId: string,
-  awardKey: AwardsList,
+  awardKey: AwardsListType,
 ): TeamAward => ({
   id,
   seasonId,

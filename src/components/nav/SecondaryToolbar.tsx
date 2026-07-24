@@ -13,15 +13,12 @@ import { NavContainer } from "./BaseComponents";
  * @param props - Component props
  * @returns Secondary toolbar wrapper with NavContainer styling
  */
-export function SecondaryPageToolbar({
-  children,
-  className,
-}: ToolbarProps) {
+export function SecondaryPageToolbar({ children, className }: ToolbarProps) {
   return (
     <NavContainer
       position="secondary"
       variant="secondary"
-      className={cn( className)}
+      className={cn(className)}
     >
       {children}
     </NavContainer>

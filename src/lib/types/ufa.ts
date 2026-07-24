@@ -52,3 +52,54 @@ export interface UfaOfferGroupView {
   player: UfaFreeAgentView | undefined;
   offers: UfaOfferView[];
 }
+
+export interface UfaPublicGroup {
+  _id: string;
+  id: string;
+  playerId: string;
+  deadlineAt: number;
+  status: string;
+}
+
+export interface UfaPublicOffer {
+  id: string;
+  groupId: string;
+  franchiseId: string;
+  contractLength: number;
+  salary: number;
+  status: string;
+  isMine: boolean;
+}
+
+export interface UfaOfferProbability {
+  offerId: string;
+  probability: number;
+}
+
+export interface UfaPublicState {
+  groups: UfaPublicGroup[];
+  offers: UfaPublicOffer[];
+  oddsByGroup: Record<string, UfaOfferProbability[]>;
+}
+
+export interface UfaOverviewData {
+  window: {
+    isOpen: boolean;
+    signingEndDate: string | null;
+    reason: string | null;
+  };
+  freeAgents: UfaFreeAgentView[];
+  topFreeAgents: UfaFreeAgentView[];
+  offerGroups: UfaOfferGroupView[];
+  franchises: Franchise[];
+  viewer: {
+    isSignedInOwner: boolean;
+  };
+}
+
+export interface UseUfaOverviewResult {
+  data: UfaOverviewData | undefined;
+  isLoading: boolean;
+  error: Error | null;
+}
+import type { Franchise } from "./database";

@@ -9,10 +9,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { cn } from "@gshl-utils";
-import type {
-  DropdownToggleProps,
-  HorizontalToggleProps,
-} from "@gshl-types";
+import type { DropdownToggleProps, HorizontalToggleProps } from "@gshl-types";
 
 /**
  * Horizontal toggle component with scrollable item selector

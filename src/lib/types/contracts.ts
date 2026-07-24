@@ -6,7 +6,7 @@ import type {
   Player,
   Season,
 } from "./database";
-import type { ContractStatus } from "./enums";
+import type { ContractStatus, ContractType } from "./enums";
 
 export type MaybeArray<T> = T | T[] | null | undefined;
 export type ContractLength = 1 | 2 | 3;
@@ -46,6 +46,32 @@ export interface ContractSummary {
   totalCapHit: number;
   totalSalary: number;
   averageCapHit: number;
+}
+
+export interface ContractCreationTerms {
+  signingSeason: Season;
+  startSeason: Season;
+  expirySeason: Season;
+  contractType: ContractType;
+  contractSalary: number;
+  signingStatus: ContractStatus;
+  expiryStatus: ContractStatus;
+  startDate: string;
+  expiryDate: string;
+}
+
+export interface ContractCapCheck {
+  affordable: boolean;
+  coveredSeasonIds: string[];
+  limitingSeasonId: string | null;
+  availableCapSpace: number;
+  requiredSalary: number;
+}
+
+export interface PlayerNhlSalaryRow {
+  playerId: string;
+  seasonId: string;
+  salary: number | string | null;
 }
 
 export interface CapSpaceEntry {

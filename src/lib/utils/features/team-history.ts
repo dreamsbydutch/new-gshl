@@ -1,10 +1,10 @@
-import {
-  MatchupType,
-  type GSHLTeam,
-  type Matchup,
-  type Season,
-  type Week,
+import type {
+  GSHLTeam,
+  Matchup,
+  Season,
+  Week,
 } from "@gshl-types";
+import { MatchupType } from "../domain/constants";
 import { getMatchupOutcomeClass } from "../domain/schedule";
 import type {
   TeamHistoryGameType,

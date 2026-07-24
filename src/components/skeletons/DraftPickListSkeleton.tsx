@@ -15,7 +15,7 @@
  * ```
  */
 
-import { Skeleton } from "../ui/skeleton";
+import { Skeleton } from "../ui/SkeletonPrimitive";
 
 export function DraftPickListSkeleton() {
   return <Skeleton className="mx-auto my-2 h-6 w-3/4" />;

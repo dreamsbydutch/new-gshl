@@ -111,10 +111,6 @@ export interface UseSeasonDataBundleOptions {
     Pick<
       UseTeamsOptions,
       | "seasonType"
-      | "staleTime"
-      | "gcTime"
-      | "refetchOnMount"
-      | "refetchOnWindowFocus"
     >
   >;
 }

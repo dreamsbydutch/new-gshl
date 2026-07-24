@@ -2,7 +2,6 @@
 
 import { useMemo } from "react";
 import {
-  NHLLogo,
   Table,
   TableBody,
   TableCell,
@@ -10,12 +9,13 @@ import {
   TableHeader,
   TableRow,
 } from "@gshl-ui";
-import {
-  SeasonType,
-  type AwardSummaryRow,
-  type RecordLeader,
-  type RecordStatKey,
-  type TeamRecordBookProps,
+import { NHLLogo } from "@gshl-components/player/NHLLogo";
+import type {
+  AwardSummaryRow,
+  RecordLeader,
+  RecordStatKey,
+  SeasonType as SeasonTypeValue,
+  TeamRecordBookProps,
 } from "@gshl-types";
 import {
   buildAwardSummaryRows,
@@ -23,13 +23,14 @@ import {
   cn,
   findLeader,
   formatNumber,
+  SeasonType,
 } from "@gshl-utils";
 
 const HEADLINE_RECORDS: Array<{
   key: string;
   label: string;
   stat: RecordStatKey;
-  seasonType: SeasonType;
+  seasonType: SeasonTypeValue;
   group: "all" | "skater" | "goalie";
 }> = [
   {

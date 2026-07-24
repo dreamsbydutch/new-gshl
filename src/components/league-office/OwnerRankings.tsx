@@ -3,15 +3,15 @@
 import Image from "next/image";
 import { ArrowDown, ArrowUp, Minus, Shield, Users } from "lucide-react";
 
-import { Skeleton } from "@gshl-components/ui/skeleton";
+import { Skeleton } from "@gshl-components/ui/SkeletonPrimitive";
 import { useOwnerRankingsData } from "@gshl-hooks";
 import { AWARD_CATALOG_BY_KEY } from "@gshl-lib/config/awards";
-import {
-  AwardsList,
-  type OwnerRankingEntry,
-  type OwnerRankingRecord,
+import type {
+  AwardsList as AwardsListType,
+  OwnerRankingEntry,
+  OwnerRankingRecord,
 } from "@gshl-types";
-import { cn } from "@gshl-utils";
+import { AwardsList, cn } from "@gshl-utils";
 
 const formatRating = (value: number) => Math.round(value).toLocaleString();
 const formatSigned = (value: number) =>
@@ -95,7 +95,7 @@ function AwardMark({
   label,
   size = 18,
 }: {
-  award: AwardsList;
+  award: AwardsListType;
   label: string;
   size?: number;
 }) {
@@ -118,7 +118,7 @@ function AwardMarks({
   label,
   negative = false,
 }: {
-  award: AwardsList;
+  award: AwardsListType;
   count: number;
   label: string;
   negative?: boolean;
@@ -146,7 +146,13 @@ function AwardMarks({
   );
 }
 
-function AwardHeading({ award, label }: { award: AwardsList; label: string }) {
+function AwardHeading({
+  award,
+  label,
+}: {
+  award: AwardsListType;
+  label: string;
+}) {
   return (
     <div className="flex items-center justify-center gap-1.5" title={label}>
       <AwardMark award={award} label={label} size={20} />

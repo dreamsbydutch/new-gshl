@@ -1,6 +1,9 @@
 "use client";
 
 import { useMemo } from "react";
+import { useQuery } from "convex/react";
+import { api } from "../../../convex/_generated/api";
+import type { Id } from "../../../convex/_generated/dataModel";
 import {
   type Contract,
   type ContractFilters,
@@ -10,7 +13,6 @@ import {
   type GSHLTeam,
   type Player,
   type Season,
-  ContractStatus,
   type UseContractDataOptions,
   type UseContractDataResult,
   type UseContractsOptions,
@@ -20,13 +22,16 @@ import {
   doesContractAffectSeason,
   sortContracts,
   mergeContractFilters,
+  normalizePlayerNhlSalaryRows,
   computeContractSummary,
   getContractDedupeKey,
   CAP_CEILING,
+  ContractStatus,
   formatDate,
   toNumber,
 } from "@gshl-utils";
-import { api } from "@gshl-trpc/react";
+import { usePlayersByIds } from "./usePlayer";
+import { useAppMutation } from "./useAppMutation";
 
 export type {
   ContractFilters,
@@ -50,16 +55,7 @@ function singleFilterValue(value: unknown): string | undefined {
 }
 
 export function useCreateContract() {
-  const utils = api.useUtils();
-  return api.contract.create.useMutation({
-    onSuccess: async () => {
-      await Promise.all([
-        utils.contract.getAll.invalidate(),
-        utils.player.getAll.invalidate(),
-        utils.ufa.getOverview.invalidate(),
-      ]);
-    },
-  });
+  return useAppMutation(api.frontend.createContract);
 }
 
 /**
@@ -133,7 +129,6 @@ export function useContracts<T = Contract, S = undefined>(
     enabled,
   } = options;
 
-  const queryOptions = enabled === undefined ? undefined : { enabled };
   const serverWhere = {
     playerId: singleFilterValue(filters?.playerIds),
     ownerId: singleFilterValue(filters?.ownerIds),
@@ -142,12 +137,16 @@ export function useContracts<T = Contract, S = undefined>(
   const hasServerWhere = Object.values(serverWhere).some(
     (value) => value !== undefined,
   );
-  const { data: queryData, ...queryRest } = api.contract.getAll.useQuery(
-    hasServerWhere ? { where: serverWhere } : {},
-    queryOptions,
+  const queryData = useQuery(
+    api.frontend.contracts,
+    enabled === false ? "skip" : hasServerWhere ? { where: serverWhere } : {},
   );
+  const queryRest = {
+    isLoading: enabled !== false && queryData === undefined,
+    error: null,
+  };
 
-  const rawContracts = queryData ?? EMPTY_CONTRACTS;
+  const rawContracts = (queryData ?? EMPTY_CONTRACTS) as unknown as Contract[];
 
   const filteredContracts = useMemo(
     () => applyContractFilters(rawContracts, filters),
@@ -327,14 +326,9 @@ export function useContractData(
     ],
     [ownerContracts],
   );
-  const relatedPlayersQuery = api.player.getByIds.useQuery(
-    { ids: relevantPlayerIds },
-    {
-      enabled: enabled && relevantPlayerIds.length > 0,
-      staleTime: 5 * 60 * 1000,
-      gcTime: 15 * 60 * 1000,
-      refetchOnWindowFocus: false,
-    },
+  const relatedPlayersQuery = usePlayersByIds(
+    relevantPlayerIds,
+    enabled && relevantPlayerIds.length > 0,
   );
 
   const playerById = useMemo(() => {
@@ -378,20 +372,18 @@ export function useContractData(
     return map;
   }, [seasons]);
 
-  const {
-    data: playerNhlStatLines = [],
-    isLoading: playerNhlStatsLoading,
-    error: playerNhlStatsError,
-  } = api.playerStats.nhl.getByPlayers.useQuery(
-    { playerIds: relevantPlayerIds },
-    {
-      enabled: enabled && relevantPlayerIds.length > 0,
-      staleTime: 5 * 60 * 1000,
-      gcTime: 15 * 60 * 1000,
-      refetchOnWindowFocus: true,
-      refetchOnMount: true,
-    },
+  const playerNhlResult = useQuery(
+    api.frontend.playerNhlByPlayers,
+    enabled && relevantPlayerIds.length > 0
+      ? { playerIds: relevantPlayerIds as Id<"players">[] }
+      : "skip",
   );
+  const playerNhlStatLines = useMemo(
+    () => normalizePlayerNhlSalaryRows(playerNhlResult),
+    [playerNhlResult],
+  );
+  const playerNhlStatsLoading =
+    enabled && relevantPlayerIds.length > 0 && playerNhlResult === undefined;
 
   const franchiseRelevantContracts = useMemo(
     () => dedupeContracts(ownerContracts),
@@ -650,10 +642,7 @@ export function useContractData(
     expiredRows,
     draftPickGroups,
     isLoading: contractsLoading || playerNhlStatsLoading,
-    error:
-      (contractsError as Error | null | undefined) ??
-      (playerNhlStatsError as Error | null | undefined) ??
-      null,
+    error: contractsError ?? null,
   };
 }
 

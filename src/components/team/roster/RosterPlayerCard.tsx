@@ -2,15 +2,16 @@
 
 import Image from "next/image";
 import type { Contract, NHLTeam, Player } from "@gshl-types";
-import { ContractStatus, RosterPosition } from "@gshl-types";
 import { useUpdatePlayerLineup } from "@gshl-hooks";
 import {
   cn,
+  ContractStatus,
   formatMoney,
   formatNumber,
   getDisplayedRosterSalary,
   getPlayerNhlAbbreviation,
   getRosterRatingClass,
+  RosterPosition,
   toNumber,
 } from "@gshl-utils";
 

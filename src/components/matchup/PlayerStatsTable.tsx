@@ -1,5 +1,4 @@
 import {
-  NHLLogo,
   Table,
   TableBody,
   TableCell,
@@ -7,6 +6,7 @@ import {
   TableHeader,
   TableRow,
 } from "@gshl-components/ui";
+import { NHLLogo } from "@gshl-components/player/NHLLogo";
 import type { GSHLTeam, NHLTeam, PlayerStatRow } from "@gshl-types";
 import {
   buildPlayerStatColumns,

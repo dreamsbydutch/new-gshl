@@ -5,6 +5,7 @@ import { useSeasonNavigation, useStandingsNavigation } from "@gshl-cache";
 import { useSeasons } from "../main";
 import {
   groupTeamsByStandingsType,
+  SeasonType,
   type StandingsGroup,
 } from "@gshl-utils";
 import type {
@@ -12,7 +13,6 @@ import type {
   UseStandingsDataOptions,
   UseStandingsDataResult,
 } from "@gshl-types";
-import { SeasonType } from "@gshl-types";
 import { useSeasonDataBundle } from "./useSeasonDataBundle";
 
 /**
@@ -80,11 +80,13 @@ export function useStandingsData(
     useNavigation: false,
     teamQueryOptions: {
       seasonType: SeasonType.REGULAR_SEASON,
-      refetchOnWindowFocus: true,
     },
   });
 
-  const teams = useMemo(() => (teamsResponse ?? []).filter(Boolean), [teamsResponse]);
+  const teams = useMemo(
+    () => (teamsResponse ?? []).filter(Boolean),
+    [teamsResponse],
+  );
 
   const teamStats = useMemo(
     () => (statsResponse ?? []).filter(Boolean),
@@ -114,7 +116,7 @@ export function useStandingsData(
     stats: teamStats,
     standingsType,
     isLoading,
-    error: (error as Error | null | undefined) ?? null,
+    error: error ?? null,
     ready: seasonDataReady && !overrideSeasonLoading && !error,
   };
 }

@@ -1,4 +1,4 @@
-import { Skeleton } from "../ui/skeleton";
+import { Skeleton } from "../ui/SkeletonPrimitive";
 
 const PlayerCardSkeleton = () => (
   <div className="col-span-2 grid grid-cols-2 px-2 text-center">

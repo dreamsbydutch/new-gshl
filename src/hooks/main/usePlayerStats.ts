@@ -1,16 +1,28 @@
+"use client";
+
 import { useMemo } from "react";
+import { useQuery } from "convex/react";
+import { api } from "../../../convex/_generated/api";
+import type { Id } from "../../../convex/_generated/dataModel";
+import type {
+  PlayerCareerSplitStatLine,
+  PlayerDayStatLine,
+  PlayerSplitStatLine,
+  PlayerTotalStatLine,
+  PlayerWeekStatLine,
+  UsePlayerStatsOptions,
+  UsePlayerStatsResult,
+} from "@gshl-types";
 
-import { combineQueryStates } from "@gshl-utils/shared";
-import type { UsePlayerStatsOptions, UsePlayerStatsResult } from "@gshl-types";
-import { clientApi as api } from "@gshl-trpc";
+function state<T>(data: T[] | undefined, enabled: boolean) {
+  return {
+    data,
+    isLoading: enabled && data === undefined,
+    isFetching: enabled && data === undefined,
+    error: null,
+  };
+}
 
-const DEFAULT_STALE_TIME = 5 * 60 * 1000;
-const DEFAULT_GC_TIME = 15 * 60 * 1000;
-
-/**
- * Fetches player stat collections behind one options object and only activates
- * the individual stat queries required by the current view.
- */
 export function usePlayerStats(
   options: UsePlayerStatsOptions = {},
 ): UsePlayerStatsResult {
@@ -24,233 +36,89 @@ export function usePlayerStats(
     includeTotals = true,
     enabled = true,
   } = options;
+  const where: Record<string, unknown> = {};
+  if (playerId) where.playerId = String(playerId);
+  if (seasonId) where.seasonId = String(seasonId);
+  if (weekId) where.weekId = String(weekId);
+  const scoped = Object.keys(where).length > 0;
+  const dailyEnabled = enabled && includeDaily && scoped;
+  const weeklyEnabled = enabled && includeWeekly && scoped;
+  const splitsEnabled =
+    enabled && includeSplits && Boolean(playerId ?? seasonId);
+  const totalsEnabled =
+    enabled && includeTotals && Boolean(playerId ?? seasonId);
 
-  const normalizedPlayerId = playerId ? String(playerId) : null;
-  const normalizedSeasonId = seasonId ? String(seasonId) : null;
-  const normalizedWeekId = weekId ? String(weekId) : null;
-
-  const hasPlayerFilter = Boolean(normalizedPlayerId);
-
-  const sharedQueryOptions = {
-    staleTime: DEFAULT_STALE_TIME,
-    gcTime: DEFAULT_GC_TIME,
-    refetchOnWindowFocus: true,
-    refetchOnMount: true,
-  } as const;
-
-  const shouldFetchDailyByPlayer =
-    enabled && includeDaily && hasPlayerFilter && Boolean(normalizedPlayerId);
-  const shouldFetchDailyByWeek =
-    enabled && includeDaily && !hasPlayerFilter && Boolean(normalizedWeekId);
-  const shouldFetchWeeklyByPlayer =
-    enabled && includeWeekly && hasPlayerFilter && Boolean(normalizedPlayerId);
-  const shouldFetchWeeklyByWeek =
-    enabled && includeWeekly && !hasPlayerFilter && Boolean(normalizedWeekId);
-  const shouldFetchSplitsByPlayer =
-    enabled && includeSplits && hasPlayerFilter && Boolean(normalizedPlayerId);
-  const shouldFetchSplitsAll = enabled && includeSplits && !hasPlayerFilter;
-  const shouldFetchTotalsByPlayer =
-    enabled && includeTotals && hasPlayerFilter && Boolean(normalizedPlayerId);
-  const shouldFetchTotalsAll = enabled && includeTotals && !hasPlayerFilter;
-
-  const dailyByPlayerQuery = api.playerStats.daily.getByPlayer.useQuery(
-    {
-      playerId: normalizedPlayerId ?? "",
-      ...(normalizedSeasonId ? { seasonId: normalizedSeasonId } : {}),
-      ...(normalizedWeekId ? { weekId: normalizedWeekId } : {}),
-    },
-    {
-      ...sharedQueryOptions,
-      enabled: shouldFetchDailyByPlayer,
-    },
+  const dailyResult = useQuery(
+    api.frontend.playerDayStats,
+    dailyEnabled ? { where } : "skip",
+  );
+  const weeklyResult = useQuery(
+    api.frontend.playerWeekStats,
+    weeklyEnabled ? { where } : "skip",
+  );
+  const splitWhere = { ...where };
+  delete splitWhere.weekId;
+  const splitsResult = useQuery(
+    api.frontend.playerSplitStats,
+    splitsEnabled ? { where: splitWhere } : "skip",
+  );
+  const totalsResult = useQuery(
+    api.frontend.playerTotalStats,
+    totalsEnabled ? { where: splitWhere } : "skip",
   );
 
-  const dailyByWeekQuery = api.playerStats.daily.getByWeek.useQuery(
-    {
-      weekId: normalizedWeekId ?? "",
-      ...(normalizedSeasonId ? { seasonId: normalizedSeasonId } : {}),
-    },
-    {
-      ...sharedQueryOptions,
-      enabled: shouldFetchDailyByWeek,
-    },
-  );
-
-  const weeklyByPlayerQuery = api.playerStats.weekly.getByPlayer.useQuery(
-    {
-      playerId: normalizedPlayerId ?? "",
-      ...(normalizedSeasonId ? { seasonId: normalizedSeasonId } : {}),
-    },
-    {
-      ...sharedQueryOptions,
-      enabled: shouldFetchWeeklyByPlayer,
-    },
-  );
-
-  const weeklyByWeekQuery = api.playerStats.weekly.getByWeek.useQuery(
-    {
-      weekId: normalizedWeekId ?? "",
-      ...(normalizedSeasonId ? { seasonId: normalizedSeasonId } : {}),
-    },
-    {
-      ...sharedQueryOptions,
-      enabled: shouldFetchWeeklyByWeek,
-    },
-  );
-
-  const splitsByPlayerQuery = api.playerStats.splits.getByPlayer.useQuery(
-    {
-      playerId: normalizedPlayerId ?? "",
-      ...(normalizedSeasonId ? { seasonId: normalizedSeasonId } : {}),
-    },
-    {
-      ...sharedQueryOptions,
-      enabled: shouldFetchSplitsByPlayer,
-    },
-  );
-
-  const splitsAllQuery = api.playerStats.splits.getAll.useQuery(
-    {
-      where: normalizedSeasonId ? { seasonId: normalizedSeasonId } : {},
-    },
-    {
-      ...sharedQueryOptions,
-      enabled: shouldFetchSplitsAll,
-    },
-  );
-
-  const totalsByPlayerQuery = api.playerStats.totals.getByPlayer.useQuery(
-    {
-      playerId: normalizedPlayerId ?? "",
-      ...(normalizedSeasonId ? { seasonId: normalizedSeasonId } : {}),
-    },
-    {
-      ...sharedQueryOptions,
-      enabled: shouldFetchTotalsByPlayer,
-    },
-  );
-
-  const totalsAllQuery = api.playerStats.totals.getAll.useQuery(
-    {
-      where: normalizedSeasonId ? { seasonId: normalizedSeasonId } : {},
-    },
-    {
-      ...sharedQueryOptions,
-      enabled: shouldFetchTotalsAll,
-    },
-  );
-
-  const status = useMemo(
-    () =>
-      combineQueryStates(
-        dailyByPlayerQuery,
-        dailyByWeekQuery,
-        weeklyByPlayerQuery,
-        weeklyByWeekQuery,
-        splitsByPlayerQuery,
-        splitsAllQuery,
-        totalsByPlayerQuery,
-        totalsAllQuery,
-      ),
-    [
-      dailyByPlayerQuery,
-      dailyByWeekQuery,
-      weeklyByPlayerQuery,
-      weeklyByWeekQuery,
-      splitsByPlayerQuery,
-      splitsAllQuery,
-      totalsByPlayerQuery,
-      totalsAllQuery,
-    ],
-  );
-  const dailyData = hasPlayerFilter
-    ? (dailyByPlayerQuery.data ?? [])
-    : shouldFetchDailyByWeek
-      ? (dailyByWeekQuery.data ?? [])
-      : [];
-  const weeklyData = hasPlayerFilter
-    ? (weeklyByPlayerQuery.data ?? [])
-    : shouldFetchWeeklyByWeek
-      ? (weeklyByWeekQuery.data ?? [])
-      : [];
-  const splitsData = hasPlayerFilter
-    ? (splitsByPlayerQuery.data ?? [])
-    : (splitsAllQuery.data ?? []);
-  const totalsData = hasPlayerFilter
-    ? (totalsByPlayerQuery.data ?? [])
-    : (totalsAllQuery.data ?? []);
-
-  const ready =
-    !status.isLoading &&
-    !status.isFetching &&
-    (!shouldFetchDailyByPlayer || dailyByPlayerQuery.data != null) &&
-    (!shouldFetchDailyByWeek || dailyByWeekQuery.data != null) &&
-    (!shouldFetchWeeklyByPlayer || weeklyByPlayerQuery.data != null) &&
-    (!shouldFetchWeeklyByWeek || weeklyByWeekQuery.data != null) &&
-    (!shouldFetchSplitsByPlayer || splitsByPlayerQuery.data != null) &&
-    (!shouldFetchSplitsAll || splitsAllQuery.data != null) &&
-    (!shouldFetchTotalsByPlayer || totalsByPlayerQuery.data != null) &&
-    (!shouldFetchTotalsAll || totalsAllQuery.data != null);
+  const daily = dailyResult as unknown as PlayerDayStatLine[] | undefined;
+  const weekly = weeklyResult as unknown as PlayerWeekStatLine[] | undefined;
+  const splits = splitsResult as unknown as PlayerSplitStatLine[] | undefined;
+  const totals = totalsResult as unknown as PlayerTotalStatLine[] | undefined;
+  const queries = {
+    daily: state(daily, dailyEnabled),
+    weekly: state(weekly, weeklyEnabled),
+    splits: state(splits, splitsEnabled),
+    totals: state(totals, totalsEnabled),
+  };
+  const isLoading = Object.values(queries).some((query) => query.isLoading);
 
   return {
-    daily: includeDaily ? dailyData : [],
-    weekly: includeWeekly ? weeklyData : [],
-    splits: includeSplits ? splitsData : [],
-    totals: includeTotals ? totalsData : [],
-    ready,
-    status,
-    queries: {
-      daily: hasPlayerFilter ? dailyByPlayerQuery : dailyByWeekQuery,
-      weekly: hasPlayerFilter ? weeklyByPlayerQuery : weeklyByWeekQuery,
-      splits: hasPlayerFilter ? splitsByPlayerQuery : splitsAllQuery,
-      totals: hasPlayerFilter ? totalsByPlayerQuery : totalsAllQuery,
-    },
+    daily: daily ?? [],
+    weekly: weekly ?? [],
+    splits: splits ?? [],
+    totals: totals ?? [],
+    ready: !isLoading,
+    status: { isLoading, isFetching: isLoading, error: null },
+    queries,
   };
 }
 
-/**
- * Fetches full-career split aggregates for record-book style views.
- */
 export function useCareerSplits(
-  options: {
-    enabled?: boolean;
-    teamIds?: string[];
-  } = {},
+  options: { enabled?: boolean; teamIds?: string[] } = {},
 ) {
   const { enabled = true, teamIds = [] } = options;
   const uniqueTeamIds = useMemo(() => [...new Set(teamIds)].sort(), [teamIds]);
-  const query = api.playerStats.careerSplits.getByTeams.useQuery(
-    { teamIds: uniqueTeamIds },
-    {
-      enabled: enabled && uniqueTeamIds.length > 0,
-      staleTime: DEFAULT_STALE_TIME,
-      gcTime: DEFAULT_GC_TIME,
-      refetchOnWindowFocus: true,
-      refetchOnMount: true,
-    },
+  const result = useQuery(
+    api.frontend.careerSplitsByTeams,
+    enabled && uniqueTeamIds.length
+      ? { teamIds: uniqueTeamIds as Id<"teams">[] }
+      : "skip",
   );
-
   return {
-    data: query.data ?? [],
-    isLoading: query.isLoading,
-    error: query.error ?? null,
+    data: (result ?? []) as unknown as PlayerCareerSplitStatLine[],
+    isLoading: enabled && uniqueTeamIds.length > 0 && result === undefined,
+    error: null,
   };
 }
 
 export function usePlayerTotalsByPlayers(playerIds: string[], enabled = true) {
-  const uniquePlayerIds = useMemo(
-    () => [...new Set(playerIds)].sort(),
-    [playerIds],
+  const ids = useMemo(() => [...new Set(playerIds)].sort(), [playerIds]);
+  const result = useQuery(
+    api.frontend.playerTotalsByPlayers,
+    enabled && ids.length
+      ? { playerIds: ids as Id<"players">[] }
+      : "skip",
   );
-  const query = api.playerStats.totals.getByPlayers.useQuery(
-    { playerIds: uniquePlayerIds },
-    {
-      enabled: enabled && uniquePlayerIds.length > 0,
-      staleTime: DEFAULT_STALE_TIME,
-      gcTime: DEFAULT_GC_TIME,
-      refetchOnWindowFocus: false,
-      refetchOnMount: false,
-    },
-  );
-  return { ...query, data: query.data ?? [] };
+  return {
+    data: (result ?? []) as unknown as PlayerTotalStatLine[],
+    isLoading: enabled && ids.length > 0 && result === undefined,
+    error: null,
+  };
 }
