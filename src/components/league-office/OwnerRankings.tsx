@@ -245,7 +245,13 @@ export function OwnerRankings() {
                 </th>
                 <th
                   scope="col"
-                  className="sticky left-12 z-30 w-40 min-w-40 bg-slate-50 px-2 py-2 shadow-[1px_0_0_0_rgb(226_232_240)] sm:static sm:z-auto sm:w-auto sm:min-w-56 sm:px-3 sm:py-3 sm:shadow-none"
+                  className="sticky left-12 z-30 w-10 min-w-10 bg-slate-50 px-1 py-2 shadow-[1px_0_0_0_rgb(226_232_240)] sm:static sm:z-auto sm:w-12 sm:min-w-12 sm:px-2 sm:py-3 sm:shadow-none"
+                >
+                  <span className="sr-only">Franchise logo</span>
+                </th>
+                <th
+                  scope="col"
+                  className="min-w-40 px-2 py-2 sm:min-w-56 sm:px-3 sm:py-3"
                 >
                   GM
                 </th>
@@ -337,19 +343,21 @@ export function OwnerRankings() {
                       <Movement entry={entry} />
                     </div>
                   </td>
+                  <td className="sticky left-12 z-20 w-10 min-w-10 bg-white px-1 py-2 shadow-[1px_0_0_0_rgb(226_232_240)] group-hover:bg-slate-50 sm:static sm:z-auto sm:w-12 sm:min-w-12 sm:bg-transparent sm:px-2 sm:py-3 sm:shadow-none">
+                    <div className="flex justify-center">
+                      <OwnerMark entry={entry} />
+                    </div>
+                  </td>
                   <th
                     scope="row"
-                    className="sticky left-12 z-20 w-40 min-w-40 bg-white px-2 py-2 font-normal shadow-[1px_0_0_0_rgb(226_232_240)] group-hover:bg-slate-50 sm:static sm:z-auto sm:w-auto sm:min-w-0 sm:bg-transparent sm:px-3 sm:py-3 sm:shadow-none"
+                    className="min-w-40 px-2 py-2 font-normal sm:min-w-56 sm:px-3 sm:py-3"
                   >
-                    <div className="flex items-center gap-2.5">
-                      <OwnerMark entry={entry} />
-                      <div className="min-w-0">
-                        <div className="truncate text-[11px] font-semibold text-slate-900 sm:text-xs">
-                          {entry.displayName}
-                        </div>
-                        <div className="max-w-48 truncate text-[9px] text-slate-400 sm:text-[10px]">
-                          {entry.primaryTeam?.name ?? "GSHL GM"}
-                        </div>
+                    <div className="min-w-0">
+                      <div className="truncate text-[11px] font-semibold text-slate-900 sm:text-xs">
+                        {entry.displayName}
+                      </div>
+                      <div className="max-w-48 truncate text-[9px] text-slate-400 sm:text-[10px]">
+                        {entry.primaryTeam?.name ?? "GSHL GM"}
                       </div>
                     </div>
                   </th>
