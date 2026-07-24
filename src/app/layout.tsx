@@ -1,7 +1,6 @@
 import "@gshl-styles";
 
 import { type Metadata } from "next";
-import { GeistSans } from "geist/font/sans";
 import { Varela_Round } from "next/font/google";
 
 import { cn } from "@gshl-utils";
@@ -41,11 +40,10 @@ export default function RootLayout({
       </head>
       <body
         className={cn(
-          GeistSans.variable,
           varelaRound.variable,
-          // Preserve the existing Tailwind font contracts while using one
-          // locally bundled font file for the secondary type treatments.
-          "[--font-barlow:var(--font-geist-sans)] [--font-oswald:var(--font-geist-sans)] [--font-yellowtail:var(--font-geist-sans)]",
+          // Preserve the existing Tailwind font contracts while keeping
+          // Varela Round as the app-wide typeface.
+          "[--font-barlow:var(--font-varela)] [--font-oswald:var(--font-varela)] [--font-yellowtail:var(--font-varela)]",
           "font-varela",
         )}
       >

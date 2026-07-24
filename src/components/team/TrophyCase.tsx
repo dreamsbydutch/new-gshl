@@ -19,7 +19,7 @@ function TrophySectionDivider({ label }: { label: string }) {
   return (
     <div className="mb-5 mt-8 flex items-center gap-2.5 px-3 sm:mb-8 sm:mt-14 sm:gap-4 sm:px-4">
       <div className="h-0 w-full border-t-4 border-dotted border-gray-300" />
-      <span className="shrink-0 font-barlow text-[10px] uppercase tracking-[0.2em] text-gray-400 sm:text-xs sm:tracking-[0.28em]">
+      <span className="shrink-0 text-[10px] uppercase tracking-[0.2em] text-gray-400 sm:text-xs sm:tracking-[0.28em]">
         {label}
       </span>
       <div className="h-0 w-full border-t-4 border-dotted border-gray-300" />
@@ -46,7 +46,7 @@ function TrophySummary({
 
   return (
     <div className="mx-auto max-w-3xl px-6 text-center">
-      <div className="space-y-1 font-oswald leading-tight text-black">
+      <div className="space-y-1 leading-tight text-black">
         {summaryLines.map((line) => (
           <p key={line.awardKey} className={getSummaryLineClass(line.group)}>
             {line.text}
@@ -70,7 +70,7 @@ function TrophyImage({
   if (!imageUrl || errored) {
     return (
       <div className="flex h-16 w-full items-center justify-center rounded-2xl border border-gray-200 bg-gradient-to-b from-gray-50 to-white px-2 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_10px_24px_rgba(15,23,42,0.08)] sm:h-24 sm:rounded-[1.75rem] sm:px-3">
-        <span className="font-barlow text-[10px] uppercase tracking-[0.14em] text-gray-400 sm:text-sm sm:tracking-[0.2em]">
+        <span className="text-[10px] uppercase tracking-[0.14em] text-gray-400 sm:text-sm sm:tracking-[0.2em]">
           {fallbackLabel}
         </span>
       </div>
@@ -97,7 +97,7 @@ function FranchiseLogo({
   if (!logoUrl || errored) {
     return (
       <div className="flex h-7 w-7 items-center justify-center rounded-lg border border-white/80 bg-white/90 shadow-md sm:h-9 sm:w-9 sm:rounded-xl sm:shadow-lg">
-        <span className="font-barlow text-[8px] uppercase tracking-[0.12em] text-gray-400 sm:text-[10px] sm:tracking-[0.2em]">
+        <span className="text-[8px] uppercase tracking-[0.12em] text-gray-400 sm:text-[10px] sm:tracking-[0.2em]">
           GSHL
         </span>
       </div>
@@ -129,10 +129,10 @@ function TrophyCard({ card }: { card: TrophyCaseCard }) {
           />
         </div>
       </div>
-      <div className="mt-1.5 font-oswald text-lg font-bold leading-none text-black sm:mt-2 sm:text-2xl">
+      <div className="mt-1.5 text-lg font-bold leading-none text-black sm:mt-2 sm:text-2xl">
         {card.seasonYear}
       </div>
-      <div className="mt-0.5 font-oswald text-sm leading-tight text-black sm:mt-1 sm:text-lg">
+      <div className="mt-0.5 text-sm leading-tight text-black sm:mt-1 sm:text-lg">
         {card.catalog.fullName}
       </div>
       {card.franchiseName ? (
@@ -154,7 +154,7 @@ export function TrophyCase(props: TrophyCaseProps) {
   );
 
   return (
-    <section className="pb-8 sm:pb-12">
+    <section className="pb-8 font-varela sm:pb-12">
       <TrophySummary
         ownerName={formatOwnerName(props.currentTeam)}
         summaryLines={summaryLines}
