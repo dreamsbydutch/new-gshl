@@ -35,7 +35,7 @@
       "@gshl-components/admin": ["./src/components/admin/index.ts"],
       "@gshl-components/*": ["./src/components/*"],
       "@gshl-ui": ["./src/components/ui/index.ts"],
-      "@gshl-nav": ["./src/components/ui/nav/index.ts"],
+      "@gshl-nav": ["./src/components/nav/index.ts"],
       "@gshl-skeletons": ["./src/components/skeletons/index.ts"],
       "@gshl-hooks": ["./src/hooks/index.ts"],
       "@gshl-hooks/*": ["./src/hooks/*"],
@@ -49,13 +49,8 @@
       "@gshl-nhl": ["./src/lib/nhl/index.ts"],
       "@gshl-nhl/*": ["./src/lib/nhl/*"],
       "@gshl-styles": ["./src/styles/globals.css"],
-      "@gshl-trpc": ["./src/trpc/index.ts"],
-      "@gshl-trpc/*": ["./src/trpc/*"],
-      "@gshl-server": ["./src/server/index.ts"],
-      "@gshl-server/*": ["./src/server/*"],
-      "@gshl-api": ["./src/server/api/index.ts"],
-      "@gshl-api/*": ["./src/server/api/*"],
       "@gshl-actions": ["./src/actions/index.ts"],
+      "@gshl-convex/*": ["./convex/*"],
       "@gshl-app/*": ["./src/app/*"],
       "@gshl-lib/*": ["./src/lib/*"]
     }
