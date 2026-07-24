@@ -8,16 +8,16 @@ import {
   OWNER_LADDER_REFERENCE_FLOOR,
 } from "./owner-rankings";
 import {
-  AwardsList,
-  MatchupType,
-  SeasonType,
+  type AwardsList as AwardsListType,
   type GSHLTeam,
   type Matchup,
+  type MatchupType as MatchupTypeValue,
   type Owner,
   type Season,
   type TeamAward,
   type Week,
 } from "@gshl-types";
+import { AwardsList, MatchupType, SeasonType } from "../domain/constants";
 
 const now = new Date("2026-01-01T00:00:00.000Z");
 
@@ -89,7 +89,7 @@ const matchup = (
   weekId: string,
   homeTeamId: string,
   awayTeamId: string,
-  gameType: MatchupType,
+  gameType: MatchupTypeValue,
   homeScore: number,
   awayScore: number,
 ): Matchup => ({
@@ -113,7 +113,7 @@ const award = (
   id: string,
   seasonId: string,
   ownerId: string,
-  awardKey: AwardsList,
+  awardKey: AwardsListType,
 ): TeamAward => ({
   id,
   seasonId,

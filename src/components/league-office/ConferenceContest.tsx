@@ -46,14 +46,17 @@ const recordLabel = (record?: ConferenceContestRecord) => {
 function ConferenceLogo({
   conference,
   size = 52,
+  decorative = false,
 }: {
   conference: ConferenceContestConferenceInfo;
   size?: number;
+  decorative?: boolean;
 }) {
   if (!conference.logoUrl) {
     return (
       <div
-        className="flex items-center justify-center rounded-lg border border-slate-200 bg-slate-50 font-oswald text-sm font-semibold text-slate-500"
+        aria-hidden={decorative}
+        className="flex items-center justify-center rounded-lg border border-slate-200 bg-slate-50 font-oswald text-base font-semibold text-slate-500"
         style={{ width: size, height: size }}
       >
         {conference.abbr ?? conference.name.slice(0, 2)}
@@ -62,10 +65,13 @@ function ConferenceLogo({
   }
 
   return (
-    <div className="flex items-center justify-center rounded-lg border border-slate-200 bg-white p-1.5">
+    <div
+      aria-hidden={decorative}
+      className="flex items-center justify-center rounded-lg border border-slate-200 bg-white p-1.5"
+    >
       <Image
         src={conference.logoUrl}
-        alt={`${conference.name} logo`}
+        alt={decorative ? "" : `${conference.name} logo`}
         width={size}
         height={size}
         className="object-contain"
@@ -82,29 +88,25 @@ function ConferenceHeader({
   right: ConferenceContestConferenceInfo;
 }) {
   return (
-    <section className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 rounded-lg border border-slate-200 bg-white px-4 py-5 sm:gap-8 sm:px-8">
+    <section
+      aria-label="Conference matchup"
+      className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-4 sm:gap-8 sm:px-8 sm:py-6"
+    >
       {[left, right].map((conference, index) => (
         <div
           key={conference.id}
           className={cn(
-            "row-start-1 flex min-w-0 items-center gap-3",
-            index === 0
-              ? "col-start-1"
-              : "col-start-3 flex-row-reverse text-right",
+            "row-start-1 flex min-w-0 justify-center",
+            index === 0 ? "col-start-1" : "col-start-3",
           )}
         >
-          <ConferenceLogo conference={conference} />
-          <div className="min-w-0">
-            <p className="truncate font-oswald text-xl uppercase text-slate-950 sm:text-2xl">
-              {cleanConferenceName(conference.name)}
-            </p>
-            <p className="text-[10px] uppercase tracking-[0.18em] text-slate-400">
-              {conference.abbr ?? "Conference"}
-            </p>
-          </div>
+          <span className="sr-only">
+            {cleanConferenceName(conference.name)} conference
+          </span>
+          <ConferenceLogo conference={conference} size={72} decorative />
         </div>
       ))}
-      <span className="col-start-2 row-start-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-300">
+      <span className="col-start-2 row-start-1 text-[9px] font-semibold uppercase tracking-[0.16em] text-slate-300 sm:text-[10px]">
         vs
       </span>
     </section>
@@ -126,10 +128,14 @@ function RawStatsTable({
 }) {
   return (
     <section className="overflow-hidden rounded-lg border border-slate-200 bg-white">
-      <div className="border-b border-slate-200 px-4 py-4 sm:px-5">
-        <h2 className="font-oswald text-2xl text-slate-950">{title}</h2>
+      <div className="border-b border-slate-200 px-3 py-3 sm:px-5 sm:py-4">
+        <h2 className="font-oswald text-xl text-slate-950 sm:text-2xl">
+          {title}
+        </h2>
         {description ? (
-          <p className="mt-1 text-xs text-slate-500">{description}</p>
+          <p className="mt-1 text-[11px] leading-snug text-slate-500 sm:text-xs">
+            {description}
+          </p>
         ) : null}
       </div>
       <table className="w-full table-fixed border-collapse">
@@ -139,17 +145,29 @@ function RawStatsTable({
         </caption>
         <thead className="border-b border-slate-200 bg-slate-50 text-[10px] uppercase tracking-[0.12em] text-slate-500">
           <tr>
-            <th scope="col" className="w-[28%] px-3 py-3 text-center sm:px-5">
-              {left.abbr ?? cleanConferenceName(left.name)}
+            <th
+              scope="col"
+              className="w-[25%] px-2 py-2 text-center sm:px-5 sm:py-3"
+            >
+              <span className="sr-only">
+                {cleanConferenceName(left.name)} conference
+              </span>
+              <ConferenceLogo conference={left} size={32} decorative />
             </th>
             <th
               scope="col"
-              className="w-[44%] px-2 py-3 text-center font-medium"
+              className="w-[50%] px-1.5 py-2 text-center text-[9px] font-medium sm:px-2 sm:py-3 sm:text-[10px]"
             >
               Stat
             </th>
-            <th scope="col" className="w-[28%] px-3 py-3 text-center sm:px-5">
-              {right.abbr ?? cleanConferenceName(right.name)}
+            <th
+              scope="col"
+              className="w-[25%] px-2 py-2 text-center sm:px-5 sm:py-3"
+            >
+              <span className="sr-only">
+                {cleanConferenceName(right.name)} conference
+              </span>
+              <ConferenceLogo conference={right} size={32} decorative />
             </th>
           </tr>
         </thead>
@@ -158,7 +176,7 @@ function RawStatsTable({
             <tr key={row.label} className="hover:bg-slate-50/70">
               <td
                 className={cn(
-                  "px-3 py-3 text-center font-oswald text-xl tabular-nums sm:px-5",
+                  "px-2 py-2.5 text-center font-oswald text-lg tabular-nums sm:px-5 sm:py-3 sm:text-xl",
                   conferenceTone(left).text,
                 )}
               >
@@ -166,13 +184,13 @@ function RawStatsTable({
               </td>
               <th
                 scope="row"
-                className="px-2 py-3 text-center text-xs font-medium text-slate-600"
+                className="px-1.5 py-2.5 text-center text-[11px] font-medium leading-tight text-slate-600 sm:px-2 sm:py-3 sm:text-xs"
               >
                 {row.label}
               </th>
               <td
                 className={cn(
-                  "px-3 py-3 text-center font-oswald text-xl tabular-nums sm:px-5",
+                  "px-2 py-2.5 text-center font-oswald text-lg tabular-nums sm:px-5 sm:py-3 sm:text-xl",
                   conferenceTone(right).text,
                 )}
               >
@@ -210,7 +228,7 @@ function RatingTrend({
           <p className="text-[10px] uppercase tracking-[0.2em] text-slate-400">
             Season by season
           </p>
-          <h2 className="mt-1 font-oswald text-2xl text-slate-950">
+          <h2 className="mt-1 font-oswald text-xl text-slate-950 sm:text-2xl">
             The balance of power
           </h2>
           <p className="mt-1 text-xs text-slate-500">
@@ -259,7 +277,7 @@ function RatingTrend({
             <Line
               type="monotone"
               dataKey="left"
-              name={cleanConferenceName(left.name)}
+              name={left.abbr ?? "Left"}
               stroke={leftTone.line}
               strokeWidth={3}
               dot={{ r: 3 }}
@@ -268,7 +286,7 @@ function RatingTrend({
             <Line
               type="monotone"
               dataKey="right"
-              name={cleanConferenceName(right.name)}
+              name={right.abbr ?? "Right"}
               stroke={rightTone.line}
               strokeWidth={3}
               dot={{ r: 3 }}
@@ -338,7 +356,7 @@ function SeasonExplorer({
           <p className="text-[10px] uppercase tracking-[0.2em] text-slate-400">
             Season detail
           </p>
-          <h2 className="mt-1 font-oswald text-2xl text-slate-950">
+          <h2 className="mt-1 font-oswald text-xl text-slate-950 sm:text-2xl">
             Raw season totals
           </h2>
         </div>
@@ -347,7 +365,7 @@ function SeasonExplorer({
           <select
             value={selectedSeason.seasonId}
             onChange={(event) => onSelect(event.target.value)}
-            className="h-10 w-full appearance-none rounded-md border border-slate-200 bg-white py-2 pl-3 pr-9 font-oswald text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 sm:w-52"
+            className="h-9 w-full appearance-none rounded-md border border-slate-200 bg-white py-1.5 pl-3 pr-9 font-oswald text-xs text-slate-900 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 sm:h-10 sm:w-52 sm:py-2 sm:text-sm"
           >
             {seasons.map((season) => (
               <option key={season.seasonId} value={season.seasonId}>
@@ -378,7 +396,7 @@ function SeasonExplorer({
             setSelectedSeasonId(selectedSeason.seasonId);
             router.push("/standings");
           }}
-          className="h-9 rounded-md px-4 text-xs"
+          className="h-8 rounded-md px-3 text-[11px] sm:h-9 sm:px-4 sm:text-xs"
         >
           View {selectedSeason.seasonName} standings
         </Button>
@@ -485,7 +503,7 @@ export function ConferenceContest() {
         <p className="font-barlow text-[10px] uppercase tracking-[0.22em] text-slate-400">
           League Office
         </p>
-        <h1 className="mt-1 font-oswald text-4xl uppercase leading-none text-slate-950">
+        <h1 className="mt-1 font-oswald text-3xl uppercase leading-none text-slate-950 sm:text-4xl">
           Conference vs Conference
         </h1>
         <p className="mt-2 text-xs text-slate-500">

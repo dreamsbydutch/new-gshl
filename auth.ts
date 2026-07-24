@@ -5,7 +5,7 @@ import {
   getAuthUserByGoogleSubject,
   upsertGoogleUser,
 } from "./src/lib/auth/user-store";
-import type { AppRole, UserStatus } from "./src/lib/auth/types";
+import type { AppRole, UserStatus } from "@gshl-types";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   secret: env.AUTH_SECRET,

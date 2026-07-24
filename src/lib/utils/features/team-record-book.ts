@@ -1,7 +1,12 @@
 import { getAwardLabel } from "@gshl-lib/config/awards";
-import { AwardsList, PositionGroup, SeasonType } from "@gshl-types";
+import {
+  AwardsList,
+  PositionGroup,
+  SeasonType,
+} from "../domain/constants";
 import type {
   AwardSummaryRow,
+  AwardsList as AwardsListType,
   PlayerAward,
   FranchiseCareerRow,
   GSHLTeam,
@@ -12,6 +17,7 @@ import type {
   PlayerTotalStatLine,
   RecordLeader,
   RecordStatKey,
+  SeasonType as SeasonTypeValue,
 } from "@gshl-types";
 import { normalizeIdList } from "../core/ids";
 import {
@@ -21,7 +27,7 @@ import {
 import { formatNumber, toNumber } from "../core";
 import { getAllStarSeasonType } from "./season-awards";
 
-const PLAYER_AWARD_KEYS = new Set<AwardsList>([
+const PLAYER_AWARD_KEYS = new Set<AwardsListType>([
   AwardsList.CROSBY,
   AwardsList.ORR,
   AwardsList.BRODEUR,
@@ -32,13 +38,13 @@ const PLAYER_AWARD_KEYS = new Set<AwardsList>([
   AwardsList.PLAYOFF_AS,
 ]);
 
-const ALL_STAR_AWARD_KEYS = new Set<AwardsList>([
+const ALL_STAR_AWARD_KEYS = new Set<AwardsListType>([
   AwardsList.FIRST_AS,
   AwardsList.SECOND_AS,
   AwardsList.PLAYOFF_AS,
 ]);
 
-const GOALIE_RATE_MINIMUMS: Record<SeasonType, number> = {
+const GOALIE_RATE_MINIMUMS: Record<SeasonTypeValue, number> = {
   [SeasonType.REGULAR_SEASON]: 10,
   [SeasonType.PLAYOFFS]: 3,
   [SeasonType.LOSERS_TOURNAMENT]: 3,
@@ -82,7 +88,7 @@ const CAREER_TOTAL_FIELDS: Array<
  * @param awardKey - The award key to use.
  * @returns The requested player award label.
  */
-export function getPlayerAwardLabel(awardKey: AwardsList): string {
+export function getPlayerAwardLabel(awardKey: AwardsListType): string {
   if (awardKey === AwardsList.FIRST_AS) {
     return "First Team All-Star";
   }
@@ -163,7 +169,7 @@ export function buildFranchiseCareerRows(
 
   for (const row of careerSplits) {
     const teamId = String(row.gshlTeamId ?? "");
-    const seasonType = String(row.seasonType ?? "") as SeasonType;
+    const seasonType = String(row.seasonType ?? "") as SeasonTypeValue;
     const playerId = String(row.playerId ?? "");
 
     if (!franchiseTeamIds.has(teamId) || !playerId) {
@@ -251,7 +257,7 @@ export function findLeader(
   nhlTeamsByAbbr: Map<string, NHLTeam>,
   definition: { key: string; label: string; stat: RecordStatKey },
   options: {
-    seasonType: SeasonType;
+    seasonType: SeasonTypeValue;
     group: "all" | "skater" | "goalie";
   },
 ): RecordLeader | null {
@@ -377,7 +383,7 @@ export function buildAwardSummaryRows({
   const summaryMap = new Map<string, PlayerAwardBreakdown>();
 
   for (const award of playerAwards) {
-    const awardKey = String(award.award) as AwardsList;
+    const awardKey = String(award.award) as AwardsListType;
     if (!PLAYER_AWARD_KEYS.has(awardKey)) {
       continue;
     }
@@ -410,7 +416,7 @@ export function buildAwardSummaryRows({
     const seasonYear = seasonsById.get(seasonId) ?? seasonId;
     const existing = summaryMap.get(playerId) ?? {
       playerId,
-      counts: new Map<AwardsList, number>(),
+      counts: new Map<AwardsListType, number>(),
       totalAwards: 0,
       firstTeamAllStars: 0,
       secondTeamAllStars: 0,

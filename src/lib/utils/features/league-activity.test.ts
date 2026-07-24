@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { ContractStatus } from "@gshl-types";
+import { ContractStatus } from "../domain/constants";
 import { buildLeagueActivity } from "./league-activity";
 
 const players = [

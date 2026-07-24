@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { Contract, Player, Season } from "@gshl-types";
-import { ContractStatus, ContractType, ResignableStatus } from "@gshl-types";
+import type {
+  Contract,
+  Player,
+  ResignableStatus as ResignableStatusType,
+  Season,
+} from "@gshl-types";
+import { ContractStatus, ContractType, ResignableStatus } from "./constants";
 import {
   checkContractCapSpace,
   deriveContractCreationTerms,
@@ -31,14 +36,14 @@ const seasons = Array.from(
   }),
 );
 
-function player(status: ResignableStatus): Player {
+function player(status: ResignableStatusType): Player {
   return {
     id: "player-1",
     firstName: "Test",
     lastName: "Player",
     fullName: "Test Player",
     nhlPos: [],
-    posGroup: "F" as Player["posGroup"],
+    posGroup: "F",
     nhlTeam: "TOR",
     isActive: true,
     isSignable: true,

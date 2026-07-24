@@ -14,10 +14,10 @@ import type {
   TrophyCaseSummaryLine,
 } from "./team-ui";
 
-export type AllStarAwardKey =
-  | AwardsList.FIRST_AS
-  | AwardsList.SECOND_AS
-  | AwardsList.PLAYOFF_AS;
+export type AllStarAwardKey = Extract<
+  AwardsList,
+  "firstAS" | "secondAS" | "playoffAS"
+>;
 
 export interface SeasonAwardWinnerCard {
   id: string;

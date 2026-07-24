@@ -3,16 +3,18 @@ import {
   AWARD_GROUP_ORDER,
   getTeamAwardTeam,
 } from "@gshl-lib/config/awards";
-import { AwardsList, SeasonType } from "@gshl-types";
+import { AwardsList, SeasonType } from "../domain/constants";
 import type {
   AllStarAwardKey,
   AllStarTeamCard,
   AllStarWinner,
+  AwardsList as AwardsListType,
   GSHLTeam,
   Player,
   PlayerAward,
   PlayerTotalStatLine,
   SeasonAwardWinnerCard,
+  SeasonType as SeasonTypeValue,
   TeamAward,
 } from "@gshl-types";
 import { normalizeIdList } from "../core/ids";
@@ -31,8 +33,8 @@ export const ALL_STAR_AWARD_ORDER = [
  * @returns The requested all star season type.
  */
 export function getAllStarSeasonType(
-  awardKey: AwardsList,
-): SeasonType | undefined {
+  awardKey: AwardsListType,
+): SeasonTypeValue | undefined {
   switch (awardKey) {
     case AwardsList.FIRST_AS:
     case AwardsList.SECOND_AS:

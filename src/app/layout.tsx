@@ -2,13 +2,20 @@ import "@gshl-styles";
 
 import { type Metadata } from "next";
 import { GeistSans } from "geist/font/sans";
+import { Varela_Round } from "next/font/google";
 
 import { cn } from "@gshl-utils";
-import { TRPCReactProvider } from "@gshl-trpc";
 import { Navbar } from "@gshl-nav";
-import NavDefaults from "@gshl-components/nav/NavDefaults";
+import { NavDefaults } from "@gshl-components/nav/NavDefaults";
 import { AuthProvider } from "@gshl-components/auth";
 import { PerformanceVitals } from "@gshl-components/performance/PerformanceVitals";
+import { ConvexClientProvider } from "@gshl-components/auth/ConvexClientProvider";
+
+const varelaRound = Varela_Round({
+  weight: "400",
+  subsets: ["latin"],
+  variable: "--font-varela",
+});
 
 export const metadata: Metadata = {
   title: {
@@ -35,19 +42,20 @@ export default function RootLayout({
       <body
         className={cn(
           GeistSans.variable,
+          varelaRound.variable,
           // Preserve the existing Tailwind font contracts while using one
-          // locally bundled, variable font file.
-          "[--font-barlow:var(--font-geist-sans)] [--font-oswald:var(--font-geist-sans)] [--font-varela:var(--font-geist-sans)] [--font-yellowtail:var(--font-geist-sans)]",
-          "font-sans",
+          // locally bundled font file for the secondary type treatments.
+          "[--font-barlow:var(--font-geist-sans)] [--font-oswald:var(--font-geist-sans)] [--font-yellowtail:var(--font-geist-sans)]",
+          "font-varela",
         )}
       >
         <AuthProvider>
-          <TRPCReactProvider>
+          <ConvexClientProvider>
             <NavDefaults />
             <div className="pb-20 lg:pb-8 lg:pt-16">{children}</div>
             <Navbar />
             <PerformanceVitals />
-          </TRPCReactProvider>
+          </ConvexClientProvider>
         </AuthProvider>
       </body>
     </html>

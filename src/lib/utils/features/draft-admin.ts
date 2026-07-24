@@ -8,8 +8,14 @@
  * - Player search and filtering for draft context
  */
 
-import type { DraftPick, GSHLTeam, LineupAssignment, Player } from "@gshl-types";
-import { RosterPosition } from "@gshl-types";
+import type {
+  DraftPick,
+  GSHLTeam,
+  LineupAssignment,
+  Player,
+  RosterPosition as RosterPositionType,
+} from "@gshl-types";
+import { RosterPosition } from "../domain/constants";
 
 export type { LineupAssignment } from "@gshl-types";
 
@@ -145,8 +151,8 @@ export function filterFreeAgentsBySearch(
 }
 
 const DEFAULT_LINEUP_SLOTS: Array<{
-  position: RosterPosition;
-  eligible: RosterPosition[];
+  position: RosterPositionType;
+  eligible: RosterPositionType[];
 }> = [
   { position: RosterPosition.LW, eligible: [RosterPosition.LW] },
   { position: RosterPosition.LW, eligible: [RosterPosition.LW] },
@@ -169,7 +175,7 @@ const DEFAULT_LINEUP_SLOTS: Array<{
   { position: RosterPosition.G, eligible: [RosterPosition.G] },
 ];
 
-const PROTECTED_LINEUP_POSITIONS = new Set<RosterPosition>([
+const PROTECTED_LINEUP_POSITIONS = new Set<RosterPositionType>([
   RosterPosition.IR,
   RosterPosition.IRplus,
 ]);
@@ -191,7 +197,7 @@ const getPlayerRating = (player: Player): number => player.overallRating ?? 0;
  */
 const isEligibleForSlot = (
   player: Player,
-  eligiblePositions: RosterPosition[],
+  eligiblePositions: RosterPositionType[],
 ): boolean => {
   const positions = player.nhlPos ?? [];
   return positions.some((position) => eligiblePositions.includes(position));

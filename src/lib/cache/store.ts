@@ -7,7 +7,15 @@
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { DEFAULT_STORE_STATE } from "./config";
+const DEFAULT_STORE_STATE = {
+  selectedScheduleType: "week",
+  selectedSeasonId: "11",
+  selectedWeekId: "0",
+  selectedOwnerId: "1",
+  selectedLockerRoomType: "roster",
+  selectedLeagueOfficeType: "home",
+  selectedStandingsType: "overall",
+} as const;
 
 interface NavState {
   selectedScheduleType: string;

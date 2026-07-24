@@ -1,4 +1,4 @@
-import { Skeleton } from "../ui/skeleton";
+import { Skeleton } from "../ui/SkeletonPrimitive";
 
 const LockerRoomHeaderSkeleton = () => (
   <div className="flex flex-col items-center gap-3 px-4 py-6">

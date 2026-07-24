@@ -1,5 +1,5 @@
 import { callConvex } from "@gshl-lib/data/convex-store";
-import type { AppRole, AuthUser, UserStatus } from "./types";
+import type { AppRole, AuthUser, UserStatus } from "@gshl-types";
 
 export async function upsertGoogleUser(input: {
   googleSubject: string;

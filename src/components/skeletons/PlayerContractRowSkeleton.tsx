@@ -16,7 +16,7 @@
  */
 
 import type { PlayerContractRowSkeletonProps } from "@gshl-types";
-import { Skeleton } from "../ui/skeleton";
+import { Skeleton } from "../ui/SkeletonPrimitive";
 
 export function PlayerContractRowSkeleton({
   contract: _contract,

@@ -107,29 +107,17 @@ function OfferControls({ player }: { player: UfaFreeAgentView }) {
 function PlayerRows({
   players,
   showStats,
-  dimUnaffordable,
 }: {
   players: UfaFreeAgentView[];
   showStats: boolean;
-  dimUnaffordable: boolean;
 }) {
   return (
     <tbody>
       {players.map((player) => {
         const goalie = player.positionGroup === "G";
         const stats = player.stats;
-        const unaffordable =
-          dimUnaffordable && player.affordableTerms.length === 0;
         return (
-          <tr
-            key={player.id}
-            className={`border-t align-middle ${unaffordable ? "bg-muted/30 opacity-50 grayscale" : ""}`}
-            title={
-              unaffordable
-                ? "This player is currently unaffordable under your franchise's cap."
-                : undefined
-            }
-          >
+          <tr key={player.id} className="border-t align-middle">
             <td className="px-2 py-3">
               <Logo src={player.nhlTeamLogoUrl} alt={String(player.nhlTeam)} />
             </td>
@@ -141,11 +129,6 @@ function PlayerRows({
             </td>
             <td className="whitespace-nowrap px-2 py-3 font-medium">
               {formatMoney(player.salary)}
-              {unaffordable ? (
-                <span className="block text-[10px] font-semibold uppercase tracking-wide">
-                  Over cap
-                </span>
-              ) : null}
             </td>
             {showStats
               ? goalie
@@ -195,11 +178,9 @@ function PlayerRows({
 function PlayerTable({
   players,
   showStats = false,
-  dimUnaffordable = false,
 }: {
   players: UfaFreeAgentView[];
   showStats?: boolean;
-  dimUnaffordable?: boolean;
 }) {
   const hasGoalies = players.some((player) => player.positionGroup === "G");
   const hasSkaters = players.some((player) => player.positionGroup !== "G");
@@ -210,12 +191,10 @@ function PlayerTable({
         <PlayerTable
           players={players.filter((player) => player.positionGroup !== "G")}
           showStats
-          dimUnaffordable={dimUnaffordable}
         />
         <PlayerTable
           players={players.filter((player) => player.positionGroup === "G")}
           showStats
-          dimUnaffordable={dimUnaffordable}
         />
       </div>
     );
@@ -242,11 +221,7 @@ function PlayerTable({
             <th className="px-2 py-3">Offer</th>
           </tr>
         </thead>
-        <PlayerRows
-          players={players}
-          showStats={showStats}
-          dimUnaffordable={dimUnaffordable}
-        />
+        <PlayerRows players={players} showStats={showStats} />
       </table>
     </div>
   );
@@ -433,22 +408,12 @@ export function UfaLeagueOffice() {
           </button>
         ))}
       </div>
-      {query.data.viewer.isSignedInOwner ? (
-        <p className="text-xs text-muted-foreground">
-          Muted players marked “Over cap” remain visible because this list also
-          represents the draftable player pool.
-        </p>
-      ) : null}
       {!query.data.window.isOpen ? (
         <p className="rounded-md bg-muted p-3 text-sm">
           {query.data.window.reason}
         </p>
       ) : null}
-      <PlayerTable
-        players={visiblePlayers}
-        showStats
-        dimUnaffordable={query.data.viewer.isSignedInOwner}
-      />
+      <PlayerTable players={visiblePlayers} showStats />
       {visibleCount < players.length ? (
         <div className="flex justify-center">
           <button

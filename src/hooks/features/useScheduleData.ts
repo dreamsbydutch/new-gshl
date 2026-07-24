@@ -1,14 +1,15 @@
 "use client";
 
 import { useMemo } from "react";
-import {
-  MatchupType,
-  type UseScheduleDataOptions,
-  type UseScheduleDataResult,
+import type {
+  MatchupType as MatchupTypeValue,
+  UseScheduleDataOptions,
+  UseScheduleDataResult,
 } from "@gshl-types";
+import { MatchupType } from "@gshl-utils";
 
 // Helper function to map game type categories to actual MatchupType values
-const getGameTypeFilter = (gameTypeCategory: string): MatchupType[] => {
+const getGameTypeFilter = (gameTypeCategory: string): MatchupTypeValue[] => {
   switch (gameTypeCategory) {
     case "RS": // Regular Season
       return [MatchupType.CONFERENCE, MatchupType.NON_CONFERENCE];

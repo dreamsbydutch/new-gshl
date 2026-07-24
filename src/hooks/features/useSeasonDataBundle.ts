@@ -7,7 +7,7 @@ import type {
   UseSeasonDataBundleOptions,
   UseSeasonDataBundleResult,
 } from "@gshl-types";
-import { combineQueryStates } from "@gshl-utils/shared";
+import { combineQueryStates } from "@gshl-utils/core/query";
 
 import { useMatchups, useNav, useTeams, useWeeks } from "../main";
 

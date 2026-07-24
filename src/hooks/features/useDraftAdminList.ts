@@ -1,5 +1,4 @@
 import { useCallback, useMemo, useState } from "react";
-import { RosterPosition } from "@gshl-types";
 import type {
   DraftAdminListViewModel,
   GSHLTeam,
@@ -16,9 +15,10 @@ import {
   type LineupAssignment,
 } from "@gshl-utils/features/draft-admin";
 import { getFreeAgents } from "@gshl-utils/domain/player";
-import { generateLineupAssignments } from "@gshl-utils";
+import { generateLineupAssignments, RosterPosition } from "@gshl-utils";
 import { useDraftPicks, usePlayers, useNHLTeams, useTeams } from "@gshl-hooks";
-import { api } from "@gshl-trpc/react";
+import { useAppMutation } from "../main/useAppMutation";
+import { api } from "../../../convex/_generated/api";
 
 /**
  * Normalizes team and franchise identifiers into trimmed string ids.
@@ -57,42 +57,33 @@ export function useDraftAdminList(
 
   const { data: players, isLoading: playersLoading } = usePlayers();
   const { data: nhlTeamsRaw = [] } = useNHLTeams();
-  const nhlTeams = nhlTeamsRaw as NHLTeam[];
+  const nhlTeams = nhlTeamsRaw.filter(
+    (team): team is NHLTeam => "abbreviation" in team,
+  );
   const { data: draftPicks = [] } = useDraftPicks();
   const { data: gshlTeamsRaw = [] } = useTeams({ seasonId });
-  const gshlTeams = gshlTeamsRaw as GSHLTeam[];
+  const gshlTeams = gshlTeamsRaw.filter(
+    (team): team is GSHLTeam => "seasonId" in team && "ownerId" in team,
+  );
 
-  const utils = api.useUtils();
-  const draftPickQuery = utils.draftPick.getAll;
-  const playerQuery = utils.player.getAll;
+  const draftPickQuery = useMemo(
+    () => ({
+      fetch: async () => draftPicks,
+    }),
+    [draftPicks],
+  );
+  const playerQuery = useMemo(
+    () => ({
+      fetch: async () => players,
+    }),
+    [players],
+  );
 
-  const revalidateCoreData = useCallback(async () => {
-    await Promise.all([draftPickQuery.invalidate(), playerQuery.invalidate()]);
-  }, [draftPickQuery, playerQuery]);
+  const draftMutation = useAppMutation(api.frontend.updateDraftPick);
 
-  const draftMutation = api.draftPick.update.useMutation({
-    onError: (error) => {
-      console.error("Failed to update draft pick:", error);
-      void revalidateCoreData();
-    },
-    onSettled: () => {
-      setDraftingPlayerId(null);
-    },
-  });
+  const undoMutation = useAppMutation(api.frontend.updateDraftPick);
 
-  const undoMutation = api.draftPick.update.useMutation({
-    onError: (error) => {
-      console.error("Failed to undo draft pick:", error);
-      void revalidateCoreData();
-    },
-  });
-
-  const playerUpdateMutation = api.player.update.useMutation({
-    onError: (error) => {
-      console.error("Failed to update player record:", error);
-      void revalidateCoreData();
-    },
-  });
+  const playerUpdateMutation = useAppMutation(api.frontend.updatePlayer);
 
   const updateTeamLineup = useCallback(
     async (teamIdentifier: string | null | undefined) => {
@@ -102,7 +93,7 @@ export function useDraftAdminList(
       }
 
       try {
-        const latestPlayers = await playerQuery.fetch({});
+        const latestPlayers = await playerQuery.fetch();
         const teamPlayers =
           latestPlayers?.filter((teamPlayer) => {
             const playerTeamId = normalizeTeamIdentifier(teamPlayer.gshlTeamId);
@@ -116,7 +107,6 @@ export function useDraftAdminList(
         const assignments: LineupAssignment[] =
           generateLineupAssignments(teamPlayers);
         if (!assignments.length) {
-          await playerQuery.invalidate();
           return;
         }
 
@@ -126,8 +116,6 @@ export function useDraftAdminList(
             data: { lineupPos: assignment.lineupPos },
           });
         }
-
-        await playerQuery.invalidate();
       } catch (error) {
         console.error("Failed to rebuild lineup for franchise", {
           teamIdentifier: normalizedIdentifier,
@@ -206,7 +194,7 @@ export function useDraftAdminList(
       setDraftingPlayerId(player.id);
 
       try {
-        const refreshedPicks = await draftPickQuery.fetch({});
+        const refreshedPicks = await draftPickQuery.fetch();
         const currentPick = refreshedPicks?.find(
           (pick) => pick.id === activeDraftPick.id,
         );
@@ -215,7 +203,6 @@ export function useDraftAdminList(
           alert(
             "Draft pick no longer exists. Data has been refreshed to reflect the latest state.",
           );
-          await revalidateCoreData();
           return;
         }
 
@@ -223,7 +210,6 @@ export function useDraftAdminList(
           alert(
             "This draft pick has already been made. Data has been refreshed.",
           );
-          await revalidateCoreData();
           return;
         }
 
@@ -250,8 +236,6 @@ export function useDraftAdminList(
           },
         });
 
-        void playerQuery.invalidate();
-
         if (!teamIdentifier) {
           console.error(
             "Unable to resolve draft franchise for pick; lineup rebuild skipped",
@@ -261,15 +245,12 @@ export function useDraftAdminList(
           await updateTeamLineup(teamIdentifier);
         }
 
-        await revalidateCoreData();
-
         console.info(
           `Successfully drafted player ${player.fullName} for pick ${currentPick.round}-${currentPick.pick}.`,
         );
       } catch (error) {
         console.error("Draft pick update failed:", error);
         setDraftingPlayerId(null);
-        await revalidateCoreData();
 
         if (error instanceof Error) {
           alert(`Failed to make draft pick: ${error.message}`);
@@ -286,9 +267,7 @@ export function useDraftAdminList(
       isDraftPending,
       isPlayerUpdatePending,
       isUndoPending,
-      playerQuery,
       playerUpdateMutation,
-      revalidateCoreData,
       updateTeamLineup,
     ],
   );
@@ -304,7 +283,7 @@ export function useDraftAdminList(
     }
 
     try {
-      const refreshedPicks = await draftPickQuery.fetch({});
+      const refreshedPicks = await draftPickQuery.fetch();
       const seasonPicks =
         refreshedPicks
           ?.filter((pick) => pick.seasonId === seasonId)
@@ -316,7 +295,6 @@ export function useDraftAdminList(
 
       if (!latestCompletedPick?.playerId) {
         alert("No completed draft picks are available to undo.");
-        await revalidateCoreData();
         return;
       }
 
@@ -336,13 +314,9 @@ export function useDraftAdminList(
         data: { gshlTeamId: null, lineupPos: null },
       });
 
-      void playerQuery.invalidate();
-
       if (teamIdentifier) {
         await updateTeamLineup(teamIdentifier);
       }
-
-      await revalidateCoreData();
 
       const revertedPlayer = players?.find(
         (player) => player.id === latestCompletedPick.playerId,
@@ -353,7 +327,6 @@ export function useDraftAdminList(
       );
     } catch (error) {
       console.error("Failed to undo draft pick:", error);
-      await revalidateCoreData();
 
       if (error instanceof Error) {
         alert(`Failed to undo draft pick: ${error.message}`);
@@ -370,8 +343,6 @@ export function useDraftAdminList(
     playerUpdateMutation,
     players,
     gshlTeams,
-    playerQuery,
-    revalidateCoreData,
     seasonId,
     undoMutation,
     updateTeamLineup,

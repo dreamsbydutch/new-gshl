@@ -1,7 +1,7 @@
 "use client";
 
 import { useLeagueActivity } from "@gshl-hooks";
-import type { LeagueActivityEvent, LeagueActivityType } from "@gshl-utils";
+import type { LeagueActivityEvent, LeagueActivityType } from "@gshl-types";
 import { cn, formatMoney, showDate } from "@gshl-utils";
 
 const ACTIVITY_LIMIT = 12;

@@ -4,12 +4,26 @@ import { internal } from "./_generated/api";
 import {
   internalAction,
   internalMutation,
+  internalQuery,
   mutation,
   query,
 } from "./_generated/server";
+import { getUfaOfferGroupDeadline } from "../src/lib/utils/features/ufa-deadline";
+import { requireOwnerOrCommissioner } from "./lib/auth";
 
 const CAP = 25_000_000;
-const DAY = 86_400_000;
+const resolutionOddsValidator = v.array(
+  v.object({
+    offerId: v.string(),
+    probability: v.number(),
+  }),
+);
+const factorSnapshotsValidator = v.array(
+  v.object({
+    offerId: v.string(),
+    snapshot: v.string(),
+  }),
+);
 
 function requireServerSecret(secret: string) {
   const expected = process.env.CONVEX_SERVER_SECRET;
@@ -203,7 +217,6 @@ async function calculateOdds(ctx: any, groupId: any) {
     nhlStats,
     teamAwards,
   ] = await Promise.all([
-    db.get(groupId),
     db.query("players").collect(),
     db.query("contracts").collect(),
     db.query("teams").collect(),
@@ -492,15 +505,54 @@ export const listState = query({
   },
 });
 
+export const publicState = query({
+  args: {},
+  handler: async (ctx) => {
+    const db: any = ctx.db;
+    const identity = await ctx.auth.getUserIdentity();
+    const currentUser = identity ? await db.get(identity.subject) : null;
+    const groups = await db.query("ufaOfferGroups").collect();
+    const offers = await db.query("ufaOffers").collect();
+    const oddsEntries = await Promise.all(
+      groups
+        .filter((group: any) => group.status === "open")
+        .map(async (group: any) => [
+          String(group._id),
+          (await calculateOdds(ctx, group._id)).odds,
+        ]),
+    );
+    return {
+      groups: groups.map((group: any) => ({ ...group, id: group._id })),
+      offers: offers.map((offer: any) => ({
+        id: offer._id,
+        groupId: offer.groupId,
+        franchiseId: offer.franchiseId,
+        contractLength: offer.contractLength,
+        salary: offer.salary,
+        status: offer.status,
+        isMine: currentUser?.ownerId === offer.ownerId,
+      })),
+      oddsByGroup: Object.fromEntries(oddsEntries),
+    };
+  },
+});
+
 export const submitOffer = mutation({
   args: {
-    serverSecret: v.string(),
-    ownerId: v.id("owners"),
+    serverSecret: v.optional(v.string()),
+    ownerId: v.optional(v.id("owners")),
     playerId: v.string(),
     contractLength: v.number(),
   },
   handler: async (ctx, args) => {
-    requireServerSecret(args.serverSecret);
+    let ownerId = args.ownerId;
+    if (args.serverSecret) {
+      requireServerSecret(args.serverSecret);
+    } else {
+      const user = await requireOwnerOrCommissioner(ctx);
+      ownerId = user.ownerId as typeof ownerId;
+    }
+    if (!ownerId) throw new Error("No owner is linked to this account.");
     const db: any = ctx.db;
     if (![1, 2, 3].includes(args.contractLength))
       throw new Error("Contract length must be 1, 2, or 3 years.");
@@ -536,8 +588,7 @@ export const submitOffer = mutation({
       throw new Error("This player is already under contract.");
     }
     const franchise = franchises.find(
-      (candidate: any) =>
-        candidate.ownerId === args.ownerId && candidate.isActive,
+      (candidate: any) => candidate.ownerId === ownerId && candidate.isActive,
     );
     if (!franchise)
       throw new Error("Your account is not linked to an active franchise.");
@@ -560,16 +611,34 @@ export const submitOffer = mutation({
         q.eq("playerId", player._id).eq("seasonId", signingSeason._id),
       )
       .first();
-    if (group && (group.status !== "open" || group.deadlineAt <= now)) {
-      throw new Error("Offers for this player are closed.");
-    }
     if (group) {
-      const duplicate = await db
+      const existingOffers = await db
         .query("ufaOffers")
-        .withIndex("by_group_franchise", (q: any) =>
-          q.eq("groupId", group!._id).eq("franchiseId", franchise._id),
-        )
-        .first();
+        .withIndex("by_group", (q: any) => q.eq("groupId", group!._id))
+        .collect();
+      const sharedDeadlineAt = getUfaOfferGroupDeadline({
+        submittedAt: now,
+        existingDeadlineAt: group.deadlineAt,
+        existingOfferSubmittedAt: existingOffers.map(
+          (offer: any) => offer.submittedAt,
+        ),
+      });
+      if (group.status !== "open" || sharedDeadlineAt <= now) {
+        throw new Error("Offers for this player are closed.");
+      }
+      if (sharedDeadlineAt !== group.deadlineAt) {
+        await db.patch(group._id, {
+          deadlineAt: sharedDeadlineAt,
+          updatedAt: now,
+        });
+        group = { ...group, deadlineAt: sharedDeadlineAt, updatedAt: now };
+        await ctx.scheduler.runAt(sharedDeadlineAt, internal.ufa.resolveGroup, {
+          groupId: group._id,
+        });
+      }
+      const duplicate = existingOffers.find(
+        (offer: any) => offer.franchiseId === franchise._id,
+      );
       if (duplicate)
         throw new Error(
           "Your franchise has already made a binding offer to this player.",
@@ -588,14 +657,14 @@ export const submitOffer = mutation({
     const pendingOffers = await db
       .query("ufaOffers")
       .withIndex("by_owner_status", (q: any) =>
-        q.eq("ownerId", args.ownerId).eq("status", "pending"),
+        q.eq("ownerId", ownerId).eq("status", "pending"),
       )
       .collect();
     for (const season of newCovered) {
       const committed = contracts
         .filter(
           (contract: any) =>
-            contract.ownerId === args.ownerId &&
+            contract.ownerId === ownerId &&
             contractAffectsSeason(contract, season, orderedSeasons),
         )
         .reduce(
@@ -621,7 +690,7 @@ export const submitOffer = mutation({
     }
 
     if (!group) {
-      const deadlineAt = now + 7 * DAY;
+      const deadlineAt = getUfaOfferGroupDeadline({ submittedAt: now });
       const groupId = await db.insert("ufaOfferGroups", {
         playerId: player._id,
         seasonId: signingSeason._id,
@@ -640,7 +709,7 @@ export const submitOffer = mutation({
       groupId: group._id,
       playerId: player._id,
       seasonId: signingSeason._id,
-      ownerId: args.ownerId,
+      ownerId,
       franchiseId: franchise._id,
       teamId: team._id,
       contractLength: args.contractLength,
@@ -656,146 +725,205 @@ export const submitOffer = mutation({
 export const resolveGroup = internalAction({
   args: { groupId: v.id("ufaOfferGroups") },
   handler: async (ctx, args) => {
-    const values = new Uint32Array(1);
-    crypto.getRandomValues(values);
-    const roll = (values[0] ?? 0) / 2 ** 32;
-    await ctx.runMutation(internal.ufa.finalizeGroup, { ...args, roll });
+    try {
+      const prepared = await ctx.runQuery(internal.ufa.prepareResolution, args);
+      if (!prepared) return;
+      const values = new Uint32Array(1);
+      crypto.getRandomValues(values);
+      const roll = (values[0] ?? 0) / 2 ** 32;
+      await ctx.runMutation(internal.ufa.finalizeGroup, {
+        ...args,
+        ...prepared,
+        roll,
+      });
+    } catch (error) {
+      await ctx.runMutation(internal.ufa.recordResolutionFailure, {
+        ...args,
+        reason: error instanceof Error ? error.message : "Resolution failed",
+      });
+    }
+  },
+});
+
+export const prepareResolution = internalQuery({
+  args: { groupId: v.id("ufaOfferGroups") },
+  handler: async (ctx, args) => {
+    const group = await ctx.db.get(args.groupId);
+    if (!group || group.status !== "open" || Date.now() < group.deadlineAt) {
+      return null;
+    }
+    const { odds, factors } = await calculateOdds(ctx, group._id);
+    if (!odds.length) throw new Error("No valid pending offers remain.");
+    return {
+      odds,
+      factorSnapshots: odds.map((entry) => ({
+        offerId: entry.offerId,
+        snapshot: JSON.stringify(factors.get(entry.offerId) ?? {}),
+      })),
+    };
+  },
+});
+
+export const recordResolutionFailure = internalMutation({
+  args: {
+    groupId: v.id("ufaOfferGroups"),
+    reason: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const group = await ctx.db.get(args.groupId);
+    if (!group || group.status !== "open") return;
+    await ctx.db.patch(group._id, {
+      failureReason: args.reason,
+      updatedAt: Date.now(),
+    });
   },
 });
 
 export const finalizeGroup = internalMutation({
-  args: { groupId: v.id("ufaOfferGroups"), roll: v.number() },
+  args: {
+    groupId: v.id("ufaOfferGroups"),
+    roll: v.number(),
+    odds: resolutionOddsValidator,
+    factorSnapshots: factorSnapshotsValidator,
+  },
   handler: async (ctx, args) => {
     const db: any = ctx.db;
     const group = await db.get(args.groupId);
-    if (!group || group.status === "resolved" || group.status === "resolving")
-      return;
+    if (!group || group.status !== "open") return;
     if (Date.now() < group.deadlineAt) return;
-    await db.patch(group._id, { status: "resolving", updatedAt: Date.now() });
-    try {
-      const { odds, factors } = await calculateOdds(ctx, group._id);
-      if (!odds.length) throw new Error("No valid pending offers remain.");
-      let cumulative = 0;
-      let winningId = odds.at(-1)!.offerId;
-      for (const entry of odds) {
-        cumulative += entry.probability;
-        if (args.roll < cumulative) {
-          winningId = entry.offerId;
-          break;
-        }
+    if (!args.odds.length) throw new Error("No valid pending offers remain.");
+    let cumulative = 0;
+    let winningId = args.odds.at(-1)!.offerId;
+    for (const entry of args.odds) {
+      cumulative += entry.probability;
+      if (args.roll < cumulative) {
+        winningId = entry.offerId;
+        break;
       }
-      const offers = await db
-        .query("ufaOffers")
-        .withIndex("by_group", (q: any) => q.eq("groupId", group._id))
-        .collect();
-      const winningOffer = offers.find(
-        (offer: any) => String(offer._id) === winningId,
-      );
-      const player = await db.get(group.playerId);
-      const seasons = (await db.query("seasons").collect()).sort(
-        (a: any, b: any) => num(a.year) - num(b.year),
-      );
-      const signingIndex = seasons.findIndex(
-        (season: any) => season._id === group.seasonId,
-      );
-      const startSeason = seasons[signingIndex + 1];
-      const expirySeason =
-        seasons[signingIndex + num(winningOffer?.contractLength)];
-      const priorContracts = await db.query("contracts").collect();
-      if (
-        !winningOffer ||
-        !player ||
-        !isUnsignedAfterSigningDeadline(
-          player._id,
-          group.seasonId,
-          priorContracts,
-          seasons,
-        ) ||
-        !startSeason?.startDate ||
-        !expirySeason?.endDate
-      ) {
-        throw new Error("The winning contract can no longer be created.");
-      }
-      const continuous = priorContracts.some(
-        (contract: any) =>
-          contract.playerId === player._id &&
-          coveredSeasonIds(contract, seasons).includes(group.seasonId),
-      );
-      const nowIso = new Date().toISOString();
-      await db.insert("contracts", {
-        playerId: player._id,
-        ownerId: winningOffer.ownerId,
-        seasonId: group.seasonId,
-        contractType: continuous ? "EXTENSION" : "STANDARD",
-        contractLength: winningOffer.contractLength,
-        contractSalary: winningOffer.salary,
-        signingDate: torontoDate(),
-        startDate: startSeason.startDate,
-        signingStatus: "UFA",
-        expiryStatus: continuous ? "UFA" : "RFA",
-        expiryDate: expirySeason.endDate,
-        capHit: winningOffer.salary,
-        capHitEndDate: expirySeason.endDate,
-        createdAt: nowIso,
-        updatedAt: nowIso,
-      });
-      await db.patch(player._id, {
-        gshlTeamId: winningOffer.teamId,
-        isSignable: false,
-        isResignable: null,
-        lineupPos: null,
-        updatedAt: nowIso,
-      });
-      for (const offer of offers) {
-        await db.patch(offer._id, {
-          status: offer._id === winningOffer._id ? "won" : "lost",
-          factorSnapshot: JSON.stringify(factors.get(String(offer._id)) ?? {}),
-          updatedAt: Date.now(),
-        });
-      }
-      await db.patch(group._id, {
-        status: "resolved",
-        winningOfferId: winningOffer._id,
-        finalOdds: JSON.stringify(odds),
-        randomRoll: args.roll,
-        resolvedAt: Date.now(),
-        updatedAt: Date.now(),
-      });
-    } catch (error) {
-      await db.patch(group._id, {
-        status: "failed",
-        failureReason:
-          error instanceof Error ? error.message : "Resolution failed",
-        updatedAt: Date.now(),
-      });
-      return;
     }
+    const offers = await db
+      .query("ufaOffers")
+      .withIndex("by_group", (q: any) => q.eq("groupId", group._id))
+      .collect();
+    const winningOffer = offers.find(
+      (offer: any) =>
+        String(offer._id) === winningId && offer.status === "pending",
+    );
+    const player = await db.get(group.playerId);
+    const seasons = (await db.query("seasons").collect()).sort(
+      (a: any, b: any) => num(a.year) - num(b.year),
+    );
+    const signingIndex = seasons.findIndex(
+      (season: any) => season._id === group.seasonId,
+    );
+    const startSeason = seasons[signingIndex + 1];
+    const expirySeason =
+      seasons[signingIndex + num(winningOffer?.contractLength)];
+    const priorContracts = player
+      ? await db
+          .query("contracts")
+          .withIndex("by_playerId", (q: any) => q.eq("playerId", player._id))
+          .collect()
+      : [];
+    if (
+      !winningOffer ||
+      !player ||
+      !isUnsignedAfterSigningDeadline(
+        player._id,
+        group.seasonId,
+        priorContracts,
+        seasons,
+      ) ||
+      !startSeason?.startDate ||
+      !expirySeason?.endDate
+    ) {
+      throw new Error("The winning contract can no longer be created.");
+    }
+    const continuous = priorContracts.some(
+      (contract: any) =>
+        contract.playerId === player._id &&
+        coveredSeasonIds(contract, seasons).includes(group.seasonId),
+    );
+    const factorByOfferId = new Map(
+      args.factorSnapshots.map((entry) => [entry.offerId, entry.snapshot]),
+    );
+    const now = Date.now();
+    const nowIso = new Date(now).toISOString();
+    await db.insert("contracts", {
+      playerId: player._id,
+      ownerId: winningOffer.ownerId,
+      seasonId: group.seasonId,
+      contractType: continuous ? "EXTENSION" : "STANDARD",
+      contractLength: winningOffer.contractLength,
+      contractSalary: winningOffer.salary,
+      signingDate: torontoDate(now),
+      startDate: startSeason.startDate,
+      signingStatus: "UFA",
+      expiryStatus: continuous ? "UFA" : "RFA",
+      expiryDate: expirySeason.endDate,
+      capHit: winningOffer.salary,
+      capHitEndDate: expirySeason.endDate,
+      createdAt: nowIso,
+      updatedAt: nowIso,
+    });
+    await db.patch(player._id, {
+      gshlTeamId: winningOffer.teamId,
+      isSignable: false,
+      isResignable: null,
+      lineupPos: null,
+      updatedAt: nowIso,
+    });
+    for (const offer of offers) {
+      await db.patch(offer._id, {
+        status: offer._id === winningOffer._id ? "won" : "lost",
+        factorSnapshot: factorByOfferId.get(String(offer._id)) ?? "{}",
+        updatedAt: now,
+      });
+    }
+    await db.patch(group._id, {
+      status: "resolved",
+      winningOfferId: winningOffer._id,
+      finalOdds: JSON.stringify(args.odds),
+      randomRoll: args.roll,
+      failureReason: undefined,
+      resolvedAt: now,
+      updatedAt: now,
+    });
   },
+});
+
+async function queueDueGroups(ctx: any) {
+  const db: any = ctx.db;
+  const groups = await db.query("ufaOfferGroups").collect();
+  const due = groups.filter(
+    (group: any) =>
+      ["open", "failed", "resolving"].includes(String(group.status)) &&
+      group.deadlineAt <= Date.now(),
+  );
+  for (const group of due) {
+    if (group.status !== "open") {
+      await db.patch(group._id, {
+        status: "open",
+        failureReason: undefined,
+        updatedAt: Date.now(),
+      });
+    }
+    await ctx.scheduler.runAfter(0, internal.ufa.resolveGroup, {
+      groupId: group._id,
+    });
+  }
+  return { queued: due.length };
+}
+
+export const reconcileDueGroups = internalMutation({
+  args: {},
+  handler: queueDueGroups,
 });
 
 export const reconcile = mutation({
   args: { serverSecret: v.string() },
   handler: async (ctx, args) => {
     requireServerSecret(args.serverSecret);
-    const db: any = ctx.db;
-    const groups = await db.query("ufaOfferGroups").collect();
-    const due = groups.filter(
-      (group: any) =>
-        (group.status === "open" || group.status === "failed") &&
-        group.deadlineAt <= Date.now(),
-    );
-    for (const group of due) {
-      if (group.status === "failed") {
-        await db.patch(group._id, {
-          status: "open",
-          failureReason: undefined,
-          updatedAt: Date.now(),
-        });
-      }
-      await ctx.scheduler.runAfter(0, internal.ufa.resolveGroup, {
-        groupId: group._id,
-      });
-    }
-    return { queued: due.length };
+    return queueDueGroups(ctx);
   },
 });

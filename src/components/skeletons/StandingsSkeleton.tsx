@@ -1,4 +1,4 @@
-import { Skeleton } from "../ui/skeleton";
+import { Skeleton } from "../ui/SkeletonPrimitive";
 
 const StandingsRowSkeleton = () => (
   <div className="flex items-center gap-2 border-b border-gray-100 px-3 py-2">

@@ -8,7 +8,6 @@ import type {
   PlayerWeekStatLine,
 } from "./database";
 import type { ContractFilters, ContractSortOption } from "./contracts";
-import type { SeasonType } from "./enums";
 import type { QueryLike, QueryState } from "./hook-query";
 
 export interface UseAwardsOptions {
@@ -61,10 +60,6 @@ export interface UsePlayersOptions {
   nhlTeam?: string | null;
   isActive?: boolean;
   enabled?: boolean;
-  staleTime?: number;
-  gcTime?: number;
-  refetchOnMount?: boolean;
-  refetchOnWindowFocus?: boolean;
 }
 
 export interface UsePlayerPagesOptions {
@@ -156,17 +151,13 @@ export interface UseTeamsOptions {
   conferenceId?: string | null;
   weekId?: string | null;
   date?: Date | string | null;
-  seasonType?: SeasonType | string | null;
+  seasonType?: string | null;
   ownerId?: string | null;
   isActive?: boolean;
   statsLevel?: TeamStatsLevel;
   teamType?: TeamType;
   orderBy?: Record<string, "asc" | "desc">;
   enabled?: boolean;
-  staleTime?: number;
-  gcTime?: number;
-  refetchOnMount?: boolean;
-  refetchOnWindowFocus?: boolean;
 }
 
 export interface EnrichedFranchise extends Franchise {

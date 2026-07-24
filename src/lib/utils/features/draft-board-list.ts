@@ -5,12 +5,17 @@
  * Type definitions are sourced from @gshl-types
  */
 
-import { ContractStatus, RosterPosition, PositionGroup } from "@gshl-types";
+import {
+  ContractStatus,
+  PositionGroup,
+  RosterPosition,
+} from "../domain/constants";
 import type {
   Contract,
   DraftBoardPlayer,
   DraftPick,
   ProjectedDraftPick,
+  RosterPosition as RosterPositionType,
 } from "@gshl-types";
 
 // Re-export types for backward compatibility
@@ -25,7 +30,7 @@ export type { DraftBoardToolbarProps, DraftBoardPlayer } from "@gshl-types";
  */
 function hasRosterPosition(
   player: Pick<DraftBoardPlayer, "nhlPos">,
-  pos: RosterPosition,
+  pos: RosterPositionType,
 ): boolean {
   return Array.isArray(player.nhlPos)
     ? player.nhlPos.includes(pos)

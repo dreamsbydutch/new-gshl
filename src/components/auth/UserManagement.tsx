@@ -8,7 +8,7 @@ import type {
   AuthOwnerOption,
   AuthUser,
   UserStatus,
-} from "@gshl-lib/auth/types";
+} from "@gshl-types";
 
 function UserAccessRow({
   user,

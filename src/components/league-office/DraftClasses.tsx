@@ -1,10 +1,11 @@
 "use client";
 
-import { HorizontalToggle, TertiaryPageToolbar } from "@gshl-components/ui/nav";
+import { HorizontalToggle, TertiaryPageToolbar } from "@gshl-nav";
 import { useActivePlayers, useContracts, useSeasonState } from "@gshl-hooks";
-import { ContractStatus, type ToggleItem } from "@gshl-types";
+import type { ToggleItem } from "@gshl-types";
 import {
   cn,
+  ContractStatus,
   findExpiringDraftClassContract,
   filterAvailableDraftPlayers,
   findMostRecentSeason,

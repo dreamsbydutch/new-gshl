@@ -5,16 +5,18 @@ import {
   aggregateConferenceRatings,
   buildConferenceContestSeasonViewModel,
   CONFERENCE_RECENCY_RETENTION,
+  getConferenceContestVisibleSeasons,
 } from "./conference-contest";
 import {
-  AwardsList,
-  MatchupType,
+  type AwardsList as AwardsListType,
   type ConferenceContestSeasonViewModel,
   type GSHLTeam,
   type Matchup,
+  type MatchupType as MatchupTypeValue,
   type Season,
   type TeamAward,
 } from "@gshl-types";
+import { AwardsList, MatchupType } from "../domain/constants";
 
 const now = new Date("2026-01-01T00:00:00.000Z");
 
@@ -65,7 +67,7 @@ const matchup = (
   seasonId: string,
   homeTeamId: string,
   awayTeamId: string,
-  gameType: MatchupType,
+  gameType: MatchupTypeValue,
   homeScore: number,
   awayScore: number,
 ): Matchup => ({
@@ -89,7 +91,7 @@ const award = (
   id: string,
   seasonId: string,
   ownerId: string,
-  awardKey: AwardsList,
+  awardKey: AwardsListType,
 ): TeamAward => ({
   id,
   seasonId,
@@ -114,6 +116,36 @@ void test("builds a complementary neutral rating when evidence is missing", () =
   assert.ok(result);
   assert.equal(result.ratingByConferenceId.A, 50);
   assert.equal(result.ratingByConferenceId.B, 50);
+});
+
+void test("excludes future seasons and puts the current season first", () => {
+  const referenceDate = new Date("2026-07-23T00:00:00.000Z");
+  const visibleSeasons = getConferenceContestVisibleSeasons(
+    [
+      season("future", 2027),
+      season("current", 2026, true),
+      season("recent", 2025),
+    ],
+    referenceDate,
+  );
+
+  assert.deepEqual(
+    visibleSeasons.map(({ id }) => id),
+    ["current", "recent"],
+  );
+});
+
+void test("uses the most recent season first when there is no current season", () => {
+  const referenceDate = new Date("2026-07-23T00:00:00.000Z");
+  const visibleSeasons = getConferenceContestVisibleSeasons(
+    [season("future", 2027), season("recent", 2025), season("old", 2024)],
+    referenceDate,
+  );
+
+  assert.deepEqual(
+    visibleSeasons.map(({ id }) => id),
+    ["recent", "old"],
+  );
 });
 
 void test("counts ties as half a win and weights leadership awards triple", () => {

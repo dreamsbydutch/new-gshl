@@ -19,7 +19,7 @@
  */
 
 import { cn } from "@gshl-utils";
-import { Skeleton } from "../ui/skeleton";
+import { Skeleton } from "../ui/SkeletonPrimitive";
 
 // ============================================================================
 // INTERNAL COMPONENTS

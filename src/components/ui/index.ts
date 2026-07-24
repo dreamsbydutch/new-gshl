@@ -5,13 +5,13 @@
  */
 
 // Button Components
-export { Button, buttonVariants } from "./button";
+export { Button, buttonVariants } from "./ButtonPrimitive";
 export type { ButtonProps } from "@gshl-types";
 
 // Form Controls
-export { Input } from "./input";
-export { Label } from "./label";
-export { Select } from "./select";
+export { Input } from "./InputPrimitive";
+export { Label } from "./LabelPrimitive";
+export { Select } from "./SelectPrimitive";
 export type { InputProps, LabelProps, SelectProps } from "@gshl-types";
 
 // Dropdown Menu Components
@@ -31,10 +31,10 @@ export {
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
   DropdownMenuRadioGroup,
-} from "./dropdown-menu";
+} from "./DropdownMenuPrimitive";
 
 // Loading Components
-export { LoadingSpinner } from "./loadingSpinner";
+export { LoadingSpinner } from "./LoadingSpinnerPrimitive";
 
 // Popover Components
 export {
@@ -42,10 +42,10 @@ export {
   PopoverTrigger,
   PopoverContent,
   PopoverAnchor,
-} from "./popover";
+} from "./PopoverPrimitive";
 
 // Skeleton Components
-export { Skeleton } from "./skeleton";
+export { Skeleton } from "./SkeletonPrimitive";
 
 // Table Components
 export {
@@ -57,7 +57,7 @@ export {
   TableRow,
   TableCell,
   TableCaption,
-} from "./table";
+} from "./TablePrimitive";
 
 // Toast Components
 export {
@@ -70,15 +70,6 @@ export {
   ToastDescription,
   ToastClose,
   ToastAction,
-} from "./toast";
+} from "./ToastPrimitive";
 
-export { Toaster } from "./toaster";
-export {
-  UploadButton,
-  UploadDropzone,
-  uploadFiles,
-  useUploadThing,
-} from "./uploadthing";
-
-// NHL Logo Component
-export { NHLLogo } from "./nhlLogo";
+export { Toaster } from "./ToasterPrimitive";

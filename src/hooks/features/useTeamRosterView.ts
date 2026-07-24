@@ -33,7 +33,7 @@ export function useTeamRosterView(options: UseTeamRosterDataOptions = {}) {
     [options.contracts],
   );
 
-  const error = rosterData.error ?? (nhlTeamsError as Error | null) ?? null;
+  const error = rosterData.error ?? nhlTeamsError ?? null;
   const isLoading = rosterData.isLoading || nhlTeamsLoading;
 
   return {

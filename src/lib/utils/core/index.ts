@@ -6,4 +6,5 @@ export * from "./format";
 export * from "./ids";
 export * from "./string";
 export * from "./validation";
+export * from "./query";
 export * from "./math";

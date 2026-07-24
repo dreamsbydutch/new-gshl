@@ -23,7 +23,7 @@ import type {
   ConferenceAbbr,
   GameTypeConfig,
 } from "@gshl-types";
-import { ResignableStatus as ResignableStatusEnum } from "@gshl-types";
+import { ResignableStatus as ResignableStatusEnum } from "../domain/constants";
 
 export type {
   WeekScheduleItemProps,

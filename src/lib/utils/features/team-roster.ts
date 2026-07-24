@@ -1,10 +1,5 @@
-import {
-  type Contract,
-  ContractStatus,
-  type GSHLTeam,
-  type Player,
-  RosterPosition,
-} from "@gshl-types";
+import type { Contract, GSHLTeam, Player } from "@gshl-types";
+import { ContractStatus, RosterPosition } from "../domain/constants";
 import { CAP_CEILING } from "./contract-table";
 import { toNumber } from "../core";
 import type {
@@ -169,7 +164,7 @@ export const buildTeamLineup = (
 
   const isUtilDefender = !currentRoster
     ?.find((obj) => obj.lineupPos === RosterPosition.Util)
-    ?.nhlPos.includes("D" as RosterPosition);
+    ?.nhlPos.includes("D");
 
   if (isUtilDefender) {
     return [

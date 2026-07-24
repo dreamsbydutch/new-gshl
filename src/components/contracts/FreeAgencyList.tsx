@@ -22,7 +22,8 @@
  */
 
 import { useFreeAgencyData } from "@gshl-hooks";
-import { Table, NHLLogo } from "@gshl-ui";
+import { Table } from "@gshl-ui";
+import { NHLLogo } from "@gshl-components/player/NHLLogo";
 import {
   findNhlTeamByAbbreviation,
   formatMoney,

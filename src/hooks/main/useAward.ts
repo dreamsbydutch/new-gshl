@@ -1,7 +1,7 @@
 import type { UseAwardsOptions } from "@gshl-types";
-import { clientApi as api } from "@gshl-trpc";
-
-const DAY_IN_MS = 24 * 60 * 60 * 1000;
+import { useQuery } from "convex/react";
+import { api } from "../../../convex/_generated/api";
+import type { Awards } from "@gshl-types";
 
 /**
  * Fetches awards with optional filters and stable long-lived caching because
@@ -23,25 +23,19 @@ export function useAwards(options: UseAwardsOptions = {}) {
   if (seasonId) where.seasonId = seasonId;
   if (award) where.award = award;
 
-  const query = api.award.getAll.useQuery(
-    {
+  const data = useQuery(
+    api.frontend.awards,
+    enabled
+      ? {
       ...(Object.keys(where).length > 0 ? { where } : {}),
       ...(orderBy ? { orderBy } : {}),
-    },
-    {
-      enabled,
-      staleTime: DAY_IN_MS,
-      gcTime: DAY_IN_MS,
-      refetchOnMount: false,
-      refetchOnWindowFocus: false,
-      refetchInterval: false,
-      refetchIntervalInBackground: false,
-    },
+        }
+      : "skip",
   );
 
   return {
-    data: query.data ?? [],
-    isLoading: query.isLoading,
-    error: query.error ?? null,
+    data: (data ?? []) as unknown as Awards[],
+    isLoading: enabled && data === undefined,
+    error: null,
   };
 }

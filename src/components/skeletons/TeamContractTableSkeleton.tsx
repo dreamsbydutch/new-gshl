@@ -1,4 +1,4 @@
-import { Skeleton } from "../ui/skeleton";
+import { Skeleton } from "../ui/SkeletonPrimitive";
 
 const ContractRowSkeleton = () => (
   <div className="flex gap-1 border-b border-gray-100 py-1">

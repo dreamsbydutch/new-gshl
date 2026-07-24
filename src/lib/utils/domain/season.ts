@@ -10,6 +10,8 @@ import { formatRecord } from "../core/format";
 
 type SeasonDateInput = Date | string | number | null | undefined;
 
+export const SEASON_PICKER_ADVANCE_DAYS = 15;
+
 /**
  * Coerces date.
  *
@@ -498,17 +500,51 @@ export function toSeasonSummary(
 }
 
 /**
+ * Checks whether a season may be selected from season navigation.
+ *
+ * Season zero is a sentinel and is never selectable. Future seasons become
+ * selectable once their start date is no more than 15 days away.
+ */
+export function isSeasonPickable(
+  season: Season,
+  referenceDate: Date = new Date(),
+): boolean {
+  const identifiers = [season.id, season.legacyId]
+    .filter((identifier): identifier is string => identifier != null)
+    .map((identifier) => identifier.trim())
+    .filter(Boolean);
+  const isSeasonZero = identifiers.some((identifier) => {
+    const numericIdentifier = Number(identifier);
+    return Number.isFinite(numericIdentifier) && numericIdentifier === 0;
+  });
+  if (isSeasonZero) return false;
+
+  const startDate = coerceDate(season.startDate);
+  if (!startDate) return false;
+
+  const latestPickableStart = new Date(referenceDate);
+  latestPickableStart.setUTCDate(
+    latestPickableStart.getUTCDate() + SEASON_PICKER_ADVANCE_DAYS,
+  );
+
+  return startDate.getTime() <= latestPickableStart.getTime();
+}
+
+/**
  * Builds season summaries.
  *
  * @param seasons - The seasons to use.
+ * @param referenceDate - The date used to determine future-season eligibility.
  * @returns The assembled season summaries.
  */
 export function buildSeasonSummaries(
   seasons: Season[] | undefined,
+  referenceDate: Date = new Date(),
 ): SeasonSummary[] {
   if (!seasons?.length) return [];
 
   return seasons
+    .filter((season) => isSeasonPickable(season, referenceDate))
     .map((season) => toSeasonSummary(season))
     .filter((summary): summary is SeasonSummary => Boolean(summary));
 }
