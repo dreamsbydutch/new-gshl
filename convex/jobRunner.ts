@@ -261,23 +261,36 @@ export const processAwardsBackfill = internalMutationGeneric({
     const requestedSeasonId =
       typeof jobArgs.seasonId === "string" ? jobArgs.seasonId : undefined;
     const allSeasons = await ctx.db.query("seasons" as never).collect();
+    const today = new Date().toISOString().slice(0, 10);
+    const isActiveSeasonPipeline = run.mode === "pipeline";
     const seasons = requestedSeasonId
       ? allSeasons.filter(
           (season) =>
             String(season._id) === requestedSeasonId ||
             String(season.legacyId ?? "") === requestedSeasonId,
         )
-      : allSeasons.filter((season) => {
-          const endDate = String(season.endDate ?? "");
-          return (
-            endDate !== "" && endDate < new Date().toISOString().slice(0, 10)
-          );
-        });
+      : isActiveSeasonPipeline
+        ? allSeasons.filter((season) => {
+            const startDate = String(season.startDate ?? "");
+            const endDate = String(season.endDate ?? "");
+            return (
+              startDate !== "" &&
+              endDate !== "" &&
+              startDate <= today &&
+              today <= endDate
+            );
+          })
+        : allSeasons.filter((season) => {
+            const endDate = String(season.endDate ?? "");
+            return endDate !== "" && endDate < today;
+          });
     if (seasons.length === 0) {
       throw new Error(
         requestedSeasonId
           ? `Season ${requestedSeasonId} was not found`
-          : "No completed seasons were found",
+          : isActiveSeasonPipeline
+            ? "No active season was found"
+            : "No completed seasons were found",
       );
     }
 
@@ -422,7 +435,7 @@ export const processAwardsBackfill = internalMutationGeneric({
 
       const managedPlayerAwards = new Set([
         "crosby",
-        "orr",
+        "lidstrom",
         "brodeur",
         "gretzky",
         "ovechkin",

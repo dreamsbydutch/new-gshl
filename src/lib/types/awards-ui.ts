@@ -23,6 +23,7 @@ export interface SeasonAwardWinnerCard {
   winnerName: string;
   winnerDetail: string | null;
   logoUrl: string | null;
+  nomineeNames: string[];
 }
 
 export interface AllStarWinner {
@@ -45,6 +46,7 @@ export interface PlayerAwardWinner {
   positions: string;
   teamName: string | null;
   teamLogoUrl: string | null;
+  nomineeNames: string[];
 }
 
 export interface PlayerAwardSection {

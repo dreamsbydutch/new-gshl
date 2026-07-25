@@ -3,6 +3,7 @@ import {
   AWARD_GROUP_ORDER,
   PLAYER_TROPHY_ICON_URLS,
   getAwardLabel,
+  getTeamAwardNomineeTeams,
   getTeamAwardTeam,
   PLAYER_TROPHY_ICON_AWARDS,
 } from "@gshl-lib/config/awards";
@@ -18,10 +19,12 @@ import type {
   Player,
   PlayerAward,
   PlayerTotalStatLine,
+  Season,
   SeasonAwardWinnerCard,
   SeasonType as SeasonTypeValue,
   TeamAward,
 } from "@gshl-types";
+import { normalizeDateOnlyValue, toLocalIsoDateOnly } from "../core/date";
 import { normalizeIdList } from "../core/ids";
 import { formatPlayerPositionList } from "../domain/player";
 
@@ -70,6 +73,17 @@ const PLAYER_AWARD_ORDER: AwardsListType[] = [
   AwardsList.SELKE,
   AwardsList.LADY_BYNG,
 ];
+
+/**
+ * Returns whether an awards page should show the live contender view.
+ */
+export function isSeasonAwardsInProgress(
+  season: Pick<Season, "endDate"> | null,
+  referenceDate: Date = new Date(),
+): boolean {
+  const endDate = normalizeDateOnlyValue(season?.endDate);
+  return Boolean(endDate && endDate >= toLocalIsoDateOnly(referenceDate));
+}
 
 /**
  * Returns all star season type.
@@ -142,6 +156,9 @@ export function buildSeasonAwardCards(
 
       const winningTeam = getTeamAwardTeam(award, teams);
       const ownerDisplayName = getOwnerDisplayName(winningTeam);
+      const nomineeNames = getTeamAwardNomineeTeams(award, teams)
+        .map((team) => team.name?.trim() ?? getOwnerDisplayName(team) ?? "")
+        .filter(Boolean);
 
       return {
         id: String(award.id),
@@ -154,6 +171,7 @@ export function buildSeasonAwardCards(
             ? ownerDisplayName
             : (winningTeam?.confName?.trim() ?? null),
         logoUrl: winningTeam?.logoUrl ?? null,
+        nomineeNames,
       } satisfies SeasonAwardWinnerCard;
     })
     .filter((card): card is SeasonAwardWinnerCard => card !== null)
@@ -284,6 +302,10 @@ export function buildPlayerAwardSections(
         const team = (total?.gshlTeamIds ?? [])
           .map((teamId) => teamsById.get(String(teamId)))
           .find((candidate): candidate is GSHLTeam => Boolean(candidate));
+        const nomineeNames = normalizeIdList(award.nomineeIds).map(
+          (nomineeId) =>
+            playersById.get(nomineeId)?.fullName ?? `Player ${nomineeId}`,
+        );
 
         return {
           playerId,
@@ -291,6 +313,7 @@ export function buildPlayerAwardSections(
           positions: formatPlayerPositionList(total?.nhlPos ?? player?.nhlPos),
           teamName: team?.name ?? null,
           teamLogoUrl: team?.logoUrl ?? null,
+          nomineeNames,
         };
       })
       .sort((left, right) => left.playerName.localeCompare(right.playerName));

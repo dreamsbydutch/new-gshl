@@ -188,9 +188,11 @@ npm run player-bios:backfill-yahoo-ids -- --season-id 1 --apply
 
 Rebuilds split award data directly from production Convex season standings,
 player and team rating outputs, and playoff final results. Crosby, Lidstrom,
-Brodeur, Gretzky, Ovechkin, and All-Star selections are upserted into
-`playerAwards` using `playerId`; league, playoff, and management awards are
-upserted into `teamAwards` using the season-specific owner.
+Brodeur, Gretzky, Ovechkin, Conn Smythe, and regular-season All-Star selections
+are upserted into `playerAwards` using `playerId`; league, playoff, and
+management awards are upserted into `teamAwards` using the season-specific
+owner. Applying the rebuild replaces each processed season's award set:
+existing player or team award rows absent from the rebuilt output are deleted.
 
 Notable flags:
 

@@ -168,8 +168,8 @@ void test("calculates the regular-season trophies and Conn Smythe", () => {
 
   assert.equal(award("crosby")?.playerId, "forward-one");
   assert.deepEqual(award("crosby")?.nomineeIds, ["goalie-one", "defense-one"]);
-  assert.equal(award("orr")?.playerId, "defense-one");
-  assert.deepEqual(award("orr")?.nomineeIds, ["defense-two"]);
+  assert.equal(award("lidstrom")?.playerId, "defense-one");
+  assert.deepEqual(award("lidstrom")?.nomineeIds, ["defense-two"]);
   assert.equal(award("brodeur")?.playerId, "goalie-one");
   assert.deepEqual(award("brodeur")?.nomineeIds, ["goalie-two"]);
   assert.equal(award("gretzky")?.playerId, "forward-two");

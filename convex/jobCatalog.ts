@@ -107,4 +107,5 @@ export const ACTIVE_REFRESH_STAGES: readonly JobName[] = [
   "team-rating-rebuild",
   "power-rating-rebuild",
   "standings-backfill",
+  "awards-backfill",
 ];

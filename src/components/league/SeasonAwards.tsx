@@ -12,6 +12,7 @@ import {
   buildAllStarTeamCards,
   buildPlayerAwardSections,
   buildSeasonAwardCards,
+  isSeasonAwardsInProgress,
 } from "@gshl-utils";
 
 function AwardIcon({
@@ -82,15 +83,64 @@ function WinnerLogo({
   );
 }
 
-function AwardList({ children }: { children: ReactNode }) {
+function AwardList({
+  children,
+  valueLabel = "Winner",
+}: {
+  children: ReactNode;
+  valueLabel?: string;
+}) {
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
       <div className="hidden grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] border-b border-slate-200 bg-slate-50 px-5 py-2.5 font-barlow text-[10px] uppercase tracking-[0.2em] text-slate-500 sm:grid">
         <span>Award</span>
-        <span>Winner</span>
+        <span>{valueLabel}</span>
       </div>
       <ul className="divide-y divide-slate-100">{children}</ul>
     </div>
+  );
+}
+
+function AwardRaceRow({
+  awardLabel,
+  awardImageUrl,
+  contenderNames,
+}: {
+  awardLabel: string;
+  awardImageUrl: string | null;
+  contenderNames: string[];
+}) {
+  return (
+    <li className="grid gap-3 px-4 py-3.5 sm:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] sm:items-center sm:px-5">
+      <div className="flex min-w-0 items-center gap-3">
+        <AwardIcon
+          imageUrl={awardImageUrl}
+          alt={awardLabel}
+          fallbackLabel="AWD"
+        />
+        <h3 className="min-w-0 truncate font-oswald text-lg leading-tight text-slate-950 sm:text-xl">
+          {awardLabel}
+        </h3>
+      </div>
+      <div className="min-w-0 pl-[3.25rem] sm:pl-0">
+        <span className="mb-2 block font-barlow text-[10px] uppercase tracking-[0.16em] text-slate-400 sm:hidden">
+          Contenders
+        </span>
+        <ul
+          className="flex flex-wrap gap-2"
+          aria-label={`${awardLabel} contenders`}
+        >
+          {contenderNames.map((name) => (
+            <li
+              key={name}
+              className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm text-slate-700"
+            >
+              {name}
+            </li>
+          ))}
+        </ul>
+      </div>
+    </li>
   );
 }
 
@@ -103,6 +153,7 @@ function AwardListRow({
   winnerDetail,
   winnerLogoUrl,
   winnerFallbackLabel = "GSHL",
+  nomineeNames = [],
 }: {
   awardLabel: string;
   awardImageUrl: string | null;
@@ -112,6 +163,7 @@ function AwardListRow({
   winnerDetail: string | null;
   winnerLogoUrl: string | null;
   winnerFallbackLabel?: string;
+  nomineeNames?: string[];
 }) {
   return (
     <li className="grid gap-3 px-4 py-3.5 sm:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] sm:items-center sm:px-5">
@@ -143,6 +195,14 @@ function AwardListRow({
               {winnerDetail}
             </p>
           ) : null}
+          {nomineeNames.length > 0 ? (
+            <p className="mt-1 text-xs leading-snug text-slate-500">
+              <span className="font-barlow text-[9px] font-semibold uppercase tracking-[0.14em] text-slate-400">
+                Nominees
+              </span>{" "}
+              {nomineeNames.join(", ")}
+            </p>
+          ) : null}
         </div>
       </div>
     </li>
@@ -154,11 +214,13 @@ function AwardSection({
   title,
   count,
   children,
+  valueLabel,
 }: {
   eyebrow: string;
   title: string;
   count: number;
   children: ReactNode;
+  valueLabel?: string;
 }) {
   return (
     <section>
@@ -175,7 +237,7 @@ function AwardSection({
           {count} {count === 1 ? "award" : "awards"}
         </span>
       </div>
-      <AwardList>{children}</AwardList>
+      <AwardList valueLabel={valueLabel}>{children}</AwardList>
     </section>
   );
 }
@@ -215,10 +277,22 @@ export function SeasonAwards({
     (count, section) => count + section.winners.length,
     0,
   );
+  const isInProgress = isSeasonAwardsInProgress(season);
+  const hasContenders = awardCards.length > 0 || playerAwardWinnerCount > 0;
   const hasAwards =
     awardCards.length > 0 ||
     playerAwardWinnerCount > 0 ||
     allStarWinnerCount > 0;
+
+  if (isInProgress && !hasContenders) {
+    return (
+      <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6">
+        <div className="rounded-2xl border border-dashed border-slate-300 px-4 py-12 text-center text-sm text-muted-foreground">
+          Award contenders will appear as the season progresses.
+        </div>
+      </div>
+    );
+  }
 
   if (!hasAwards) {
     return (
@@ -227,6 +301,79 @@ export function SeasonAwards({
           No awards are on record for this season yet.
         </div>
       </div>
+    );
+  }
+
+  if (isInProgress) {
+    return (
+      <section className="mx-auto max-w-6xl px-4 pb-12 pt-4 sm:px-6 lg:pt-6">
+        <header className="border-b border-slate-200 pb-6">
+          <p className="font-barlow text-sm uppercase text-slate-400">
+            {season?.year ? `${season.year} Award Races` : "Award Races"}
+          </p>
+          <h1 className="mt-2 font-oswald text-3xl text-slate-950 sm:text-4xl">
+            Contenders
+          </h1>
+          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-500">
+            A live look at the players and teams in contention. Names are
+            presented without ranking until the season is complete.
+          </p>
+        </header>
+
+        <div className="mt-8 space-y-10">
+          {visibleGroups.map((group) => {
+            const groupCards = awardCards.filter(
+              (card) => card.catalog.group === group,
+            );
+
+            return (
+              <AwardSection
+                key={group}
+                eyebrow="Team award races"
+                title={group}
+                count={groupCards.length}
+                valueLabel="Contenders"
+              >
+                {groupCards.map((card) => (
+                  <AwardRaceRow
+                    key={card.id}
+                    awardLabel={card.catalog.fullName}
+                    awardImageUrl={card.catalog.imageUrl}
+                    contenderNames={[
+                      ...new Set([card.winnerName, ...card.nomineeNames]),
+                    ].sort((left, right) => left.localeCompare(right))}
+                  />
+                ))}
+              </AwardSection>
+            );
+          })}
+
+          {playerAwardWinnerCount > 0 ? (
+            <AwardSection
+              eyebrow="Player award races"
+              title="Individual honors"
+              count={playerAwardSections.length}
+              valueLabel="Contenders"
+            >
+              {playerAwardSections.map((section) => (
+                <AwardRaceRow
+                  key={section.awardKey}
+                  awardLabel={section.title}
+                  awardImageUrl={section.iconUrl}
+                  contenderNames={[
+                    ...new Set(
+                      section.winners.flatMap((winner) => [
+                        winner.playerName,
+                        ...winner.nomineeNames,
+                      ]),
+                    ),
+                  ].sort((left, right) => left.localeCompare(right))}
+                />
+              ))}
+            </AwardSection>
+          ) : null}
+        </div>
+      </section>
     );
   }
 
@@ -259,6 +406,7 @@ export function SeasonAwards({
                   winnerName={card.winnerName}
                   winnerDetail={card.winnerDetail}
                   winnerLogoUrl={card.logoUrl}
+                  nomineeNames={card.nomineeNames}
                 />
               ))}
             </AwardSection>
@@ -283,6 +431,7 @@ export function SeasonAwards({
                     (winner.teamName ? ` - ${winner.teamName}` : "")
                   }
                   winnerLogoUrl={winner.teamLogoUrl}
+                  nomineeNames={winner.nomineeNames}
                 />
               )),
             )}

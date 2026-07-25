@@ -46,7 +46,7 @@ type AwardKey =
   | "hickory"
   | "firstAS"
   | "secondAS"
-  | "playoffAS"
+  | "connSmythe"
   | "crosby"
   | "lidstrom"
   | "brodeur"
@@ -58,12 +58,10 @@ type PlayerTrophyKey =
   | "lidstrom"
   | "brodeur"
   | "gretzky"
-  | "ovechkin";
+  | "ovechkin"
+  | "connSmythe";
 
-type TeamAwardKey = Exclude<
-  AwardKey,
-  PlayerTrophyKey | "firstAS" | "secondAS" | "playoffAS"
->;
+type TeamAwardKey = Exclude<AwardKey, PlayerTrophyKey | "firstAS" | "secondAS">;
 
 type AwardsBackfillOptions = {
   seasonIds: string[];
@@ -224,6 +222,7 @@ type AwardsBackfillSummary = {
   write: {
     updated: number;
     inserted: number;
+    deleted: number;
     total: number;
     playerAwards: number;
     teamAwards: number;
@@ -257,6 +256,7 @@ const PLAYER_TROPHY_KEYS: readonly PlayerTrophyKey[] = [
   "brodeur",
   "gretzky",
   "ovechkin",
+  "connSmythe",
 ];
 
 const AWARD_KEYS: readonly AwardKey[] = [
@@ -264,7 +264,6 @@ const AWARD_KEYS: readonly AwardKey[] = [
   ...PLAYER_TROPHY_KEYS,
   "firstAS",
   "secondAS",
-  "playoffAS",
 ];
 
 const ALL_STAR_SLOTS = [
@@ -809,10 +808,15 @@ function buildPlayerTrophyAwardRows(
   seasonId: string,
   playerTotals: PlayerTotalRecord[],
 ): PlayerAwardRecord[] {
-  const rows = playerTotals.filter(
+  const regularSeasonRows = playerTotals.filter(
     (row) =>
       normalizeRecordId(row.seasonId) === seasonId &&
       matchesSeasonType(row.seasonType, SeasonType.REGULAR_SEASON),
+  );
+  const playoffRows = playerTotals.filter(
+    (row) =>
+      normalizeRecordId(row.seasonId) === seasonId &&
+      matchesSeasonType(row.seasonType, SeasonType.PLAYOFFS),
   );
   const isDefenseman = (row: PlayerTotalRecord) =>
     normalizeNhlPosList(row.nhlPos).includes("D");
@@ -838,11 +842,16 @@ function buildPlayerTrophyAwardRows(
   const definitions: Array<
     [PlayerTrophyKey, { playerId: string; nomineeIds: string[] } | null]
   > = [
-    ["crosby", selectPlayerTrophy(rows, (row) => toFiniteNumber(row.Rating))],
+    [
+      "crosby",
+      selectPlayerTrophy(regularSeasonRows, (row) =>
+        toFiniteNumber(row.Rating),
+      ),
+    ],
     [
       "lidstrom",
       selectPlayerTrophy(
-        rows,
+        regularSeasonRows,
         (row) => toFiniteNumber(row.Rating),
         isDefenseman,
       ),
@@ -850,13 +859,20 @@ function buildPlayerTrophyAwardRows(
     [
       "brodeur",
       selectPlayerTrophy(
-        rows,
+        regularSeasonRows,
         (row) => toFiniteNumber(row.Rating),
         isGoaltender,
       ),
     ],
-    ["gretzky", selectPlayerTrophy(rows, points)],
-    ["ovechkin", selectPlayerTrophy(rows, (row) => toFiniteNumber(row.G))],
+    ["gretzky", selectPlayerTrophy(regularSeasonRows, points)],
+    [
+      "ovechkin",
+      selectPlayerTrophy(regularSeasonRows, (row) => toFiniteNumber(row.G)),
+    ],
+    [
+      "connSmythe",
+      selectPlayerTrophy(playoffRows, (row) => toFiniteNumber(row.Rating)),
+    ],
   ];
 
   return definitions.flatMap(([award, podium]) =>
@@ -940,7 +956,7 @@ async function selectAllStarTeam(
 async function buildAllStarAwardRows(
   seasonId: string,
   playerTotals: PlayerTotalRecord[],
-): Promise<Record<"firstAS" | "secondAS" | "playoffAS", PlayerAwardRecord[]>> {
+): Promise<Record<"firstAS" | "secondAS", PlayerAwardRecord[]>> {
   const regularSeasonPool = buildAllStarPlayers(
     playerTotals.filter(
       (row) =>
@@ -954,19 +970,9 @@ async function buildAllStarAwardRows(
     regularSeasonPool.filter((player) => !firstTeamSet.has(player.playerId)),
   );
 
-  const playoffPool = buildAllStarPlayers(
-    playerTotals.filter(
-      (row) =>
-        normalizeRecordId(row.seasonId) === seasonId &&
-        matchesSeasonType(row.seasonType, SeasonType.PLAYOFFS),
-    ),
-  );
-  const playoffTeamIds = await selectAllStarTeam(playoffPool);
-
   return {
     firstAS: makePlayerAwardRecords(seasonId, "firstAS", firstTeamIds),
     secondAS: makePlayerAwardRecords(seasonId, "secondAS", secondTeamIds),
-    playoffAS: makePlayerAwardRecords(seasonId, "playoffAS", playoffTeamIds),
   };
 }
 
@@ -1122,7 +1128,6 @@ async function computeAwardsForSeason(
     ...playerTrophyAwards,
     ...allStarAwards.firstAS,
     ...allStarAwards.secondAS,
-    ...allStarAwards.playoffAS,
   ];
   const computedAwardSet = new Set(awards.map((award) => award.award));
 
@@ -1194,11 +1199,17 @@ function summarizeWrite(
   total: number,
   applied: boolean,
   counts: { playerAwards: number; teamAwards: number },
-  result?: { updated: number; inserted: number; total: number },
+  result?: {
+    updated: number;
+    inserted: number;
+    deleted: number;
+    total: number;
+  },
 ): AwardsBackfillSummary["write"] {
   return {
     updated: result?.updated ?? (applied ? total : 0),
     inserted: result?.inserted ?? 0,
+    deleted: result?.deleted ?? 0,
     total: result?.total ?? total,
     playerAwards: counts.playerAwards,
     teamAwards: counts.teamAwards,
@@ -1315,11 +1326,12 @@ async function runAwardsBackfill(
     (award): award is TeamAwardRecord => "ownerId" in award,
   );
   let writeResult:
-    | { updated: number; inserted: number; total: number }
+    | { updated: number; inserted: number; deleted: number; total: number }
     | undefined;
   if (options.apply) {
     let updated = 0;
     let inserted = 0;
+    let deleted = 0;
     let total = 0;
 
     for (const season of seasons) {
@@ -1357,10 +1369,11 @@ async function runAwardsBackfill(
       );
       updated += playerResult.updated + teamResult.updated;
       inserted += playerResult.inserted + teamResult.inserted;
+      deleted += playerResult.deleted + teamResult.deleted;
       total += playerResult.total + teamResult.total;
     }
 
-    writeResult = { updated, inserted, total };
+    writeResult = { updated, inserted, deleted, total };
   }
 
   return {

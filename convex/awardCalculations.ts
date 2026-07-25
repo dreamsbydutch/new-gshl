@@ -13,7 +13,7 @@ export type PlayerAwardOutput = {
   nomineeIds: string[];
   award:
     | "crosby"
-    | "orr"
+    | "lidstrom"
     | "brodeur"
     | "gretzky"
     | "ovechkin"
@@ -305,7 +305,7 @@ type AllStarPlayer = {
 
 type PlayerTrophyKey =
   | "crosby"
-  | "orr"
+  | "lidstrom"
   | "brodeur"
   | "gretzky"
   | "ovechkin"
@@ -399,7 +399,7 @@ export function calculatePlayerTrophyAwards(input: {
       playerTrophyPodium(input.playerTotalRows, (row) => number(row.Rating)),
     ],
     [
-      "orr",
+      "lidstrom",
       playerTrophyPodium(
         input.playerTotalRows,
         (row) => number(row.Rating),
