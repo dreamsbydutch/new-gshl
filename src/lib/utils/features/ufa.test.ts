@@ -6,9 +6,11 @@ import {
   calculateUfaFitScore,
   calculateUfaProbabilities,
   calculateUfaSalary,
+  formatUfaStat,
   getAffordableUfaTerms,
   getUfaWindow,
   indexLatestUfaNhlStats,
+  isEligibleUfaRank,
   rankUfas,
   selectAffordableUfas,
   selectTopAffordableUfas,
@@ -165,6 +167,20 @@ void test("UFA NHL stats use the latest populated season with normalized years",
       ["player-2", "80"],
     ],
   );
+});
+
+void test("UFA stats hide zero-game lines without hiding real zero values", () => {
+  assert.equal(formatUfaStat({ GP: "0", G: "0" }, "G"), "—");
+  assert.equal(formatUfaStat({ GP: "12", G: "0" }, "G"), "0");
+  assert.equal(formatUfaStat({ GP: "12", G: "4" }, "G"), "4");
+  assert.equal(formatUfaStat({ GP: "12" }, "G"), "—");
+});
+
+void test("UFA eligibility includes only overall ranks 1 through 500", () => {
+  assert.equal(isEligibleUfaRank({ overallRk: 1 }), true);
+  assert.equal(isEligibleUfaRank({ overallRk: 500 }), true);
+  assert.equal(isEligibleUfaRank({ overallRk: 501 }), false);
+  assert.equal(isEligibleUfaRank({ overallRk: null }), false);
 });
 
 void test("weighted odds total one and preserve the five percent floor", () => {

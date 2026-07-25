@@ -6,7 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import { NHLLogo } from "@gshl-components/player/NHLLogo";
 import { useSubmitUfaOffer, useUfaOverview } from "@gshl-hooks";
 import { FreeAgencySkeleton, UfaHomeCardSkeleton } from "@gshl-skeletons";
-import { formatMoney } from "@gshl-utils";
+import { formatMoney, formatUfaStat } from "@gshl-utils";
 import type { UfaFreeAgentView, UfaOfferGroupView } from "@gshl-types";
 
 function Logo({ src, alt }: { src: string | null; alt: string }) {
@@ -184,7 +184,7 @@ function PlayerRows({
                       key={key}
                       className={`whitespace-nowrap text-[9px] sm:px-2 sm:py-3 sm:text-xs ${mobileCellPadding}`}
                     >
-                      {stats?.[key as keyof typeof stats] ?? "—"}
+                      {formatUfaStat(stats, key as keyof typeof stats)}
                     </td>
                   ))
                 : [
@@ -203,7 +203,7 @@ function PlayerRows({
                       key={key}
                       className={`whitespace-nowrap text-[9px] sm:px-2 sm:py-3 sm:text-xs ${mobileCellPadding}`}
                     >
-                      {stats?.[key as keyof typeof stats] ?? "—"}
+                      {formatUfaStat(stats, key as keyof typeof stats)}
                     </td>
                   ))
               : null}

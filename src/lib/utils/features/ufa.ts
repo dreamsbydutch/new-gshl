@@ -4,6 +4,7 @@ import type {
   Season,
   UfaPublicGroup,
   UfaPublicOffer,
+  UfaStatView,
 } from "@gshl-types";
 import {
   checkContractCapSpace,
@@ -112,6 +113,22 @@ export function selectAffordableUfas<
   T extends { affordableTerms: readonly unknown[] },
 >(players: T[]): T[] {
   return players.filter((player) => player.affordableTerms.length > 0);
+}
+
+export function isEligibleUfaRank(player: Pick<Player, "overallRk">): boolean {
+  const rank = Number(player.overallRk);
+  return Number.isFinite(rank) && rank >= 1 && rank <= 500;
+}
+
+export function formatUfaStat(
+  stats: UfaStatView | null,
+  key: keyof UfaStatView,
+): string {
+  const gamesPlayed = Number(stats?.GP);
+  if (!Number.isFinite(gamesPlayed) || gamesPlayed <= 0) return "—";
+
+  const value = stats?.[key];
+  return value === undefined || value === "" ? "—" : String(value);
 }
 
 export function getAffordableUfaTerms(options: {

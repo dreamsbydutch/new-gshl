@@ -27,6 +27,7 @@ import {
   getAffordableUfaTerms,
   getUfaWindow,
   indexLatestUfaNhlStats,
+  isEligibleUfaRank,
   isUnsignedForSigningSeason,
   normalizeUfaPublicState,
   rankUfas,
@@ -102,6 +103,7 @@ export function useUfaOverview(): UseUfaOverviewResult {
         .filter(
           (player) =>
             player.isActive &&
+            isEligibleUfaRank(player) &&
             Boolean(activeSeason) &&
             isUnsignedForSigningSeason(
               String(player.id),
