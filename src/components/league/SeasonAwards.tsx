@@ -3,7 +3,10 @@
 
 import { useMemo, useState } from "react";
 import type { ReactNode } from "react";
-import { AWARD_GROUP_ORDER } from "@gshl-lib/config/awards";
+import {
+  ALL_STAR_MEDAL_EMOJIS,
+  AWARD_GROUP_ORDER,
+} from "@gshl-lib/config/awards";
 import type {
   AllStarTeamCard,
   AllStarWinner,
@@ -54,16 +57,24 @@ function AwardIcon({
   }
 
   return (
-    <img
+    <div
       className={
         featured
-          ? "h-full min-h-[5.5rem] w-20 shrink-0 rounded-xl border border-slate-100 bg-slate-50 object-contain p-2"
-          : "h-9 w-9 shrink-0 rounded-lg border border-slate-100 bg-slate-50 object-contain p-1"
+          ? "flex h-full min-h-[5.5rem] w-20 shrink-0 items-center justify-center rounded-xl border border-slate-100 bg-slate-50"
+          : "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-100 bg-slate-50"
       }
-      src={imageUrl}
-      alt={alt}
-      onError={() => setErrored(true)}
-    />
+    >
+      <img
+        className={
+          featured
+            ? "h-auto max-h-14 w-auto max-w-14 object-contain"
+            : "h-auto max-h-7 w-auto max-w-7 object-contain"
+        }
+        src={imageUrl}
+        alt={alt}
+        onError={() => setErrored(true)}
+      />
+    </div>
   );
 }
 
@@ -178,7 +189,7 @@ function AllStarPlayerTile({
 
   return (
     <div className="col-span-2 min-w-0 px-1 py-2 text-center">
-      <p className="truncate font-oswald text-sm leading-tight text-slate-950 sm:text-base">
+      <p className="break-words font-oswald text-sm leading-tight text-slate-950 sm:text-base">
         {player.playerName}
       </p>
       <div className="mt-1.5 flex items-center justify-center gap-1.5">
@@ -190,11 +201,6 @@ function AllStarPlayerTile({
           fallbackLabel={player.teamName?.slice(0, 3) ?? "GSHL"}
         />
       </div>
-      {player.teamName ? (
-        <p className="mt-1 truncate text-[10px] text-slate-500">
-          {player.teamName}
-        </p>
-      ) : null}
     </div>
   );
 }
@@ -209,7 +215,12 @@ function AllStarLineupCard({ card }: { card: AllStarTeamCard }) {
   return (
     <section className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50 shadow-sm">
       <header className="border-b border-slate-200 bg-white px-4 py-3">
-        <h3 className="font-oswald text-xl text-slate-950">{card.title}</h3>
+        <h3 className="flex items-center gap-2 font-oswald text-xl text-slate-950">
+          <span aria-hidden="true">
+            {ALL_STAR_MEDAL_EMOJIS.get(card.awardKey)}
+          </span>
+          {card.title}
+        </h3>
       </header>
       <div className="py-1">
         <div className="grid grid-cols-6 items-start py-1">
@@ -276,11 +287,11 @@ function AwardListRow({
               fallbackLabel={winnerFallbackLabel}
             />
             <div className="min-w-0">
-              <p className="truncate font-oswald text-lg leading-tight text-slate-950 sm:text-xl">
+              <p className="break-words font-oswald text-lg leading-tight text-slate-950 sm:text-xl">
                 {winnerName}
               </p>
               {winnerDetail ? (
-                <p className="truncate text-xs text-slate-500 sm:text-sm">
+                <p className="break-words text-xs text-slate-500 sm:text-sm">
                   {winnerDetail}
                 </p>
               ) : null}
@@ -303,30 +314,23 @@ function AwardListRow({
 function AwardSection({
   eyebrow,
   title,
-  count,
   children,
   valueLabel,
 }: {
   eyebrow: string;
   title: string;
-  count: number;
   children: ReactNode;
   valueLabel?: string;
 }) {
   return (
     <section>
-      <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="font-barlow text-[10px] uppercase tracking-[0.24em] text-slate-400">
-            {eyebrow}
-          </p>
-          <h2 className="mt-1 font-oswald text-2xl leading-none text-slate-950 sm:text-3xl">
-            {title}
-          </h2>
-        </div>
-        <span className="font-barlow text-[10px] uppercase tracking-[0.16em] text-slate-400">
-          {count} {count === 1 ? "award" : "awards"}
-        </span>
+      <div className="mb-3">
+        <p className="font-barlow text-[10px] uppercase tracking-[0.24em] text-slate-400">
+          {eyebrow}
+        </p>
+        <h2 className="mt-1 font-oswald text-2xl leading-none text-slate-950 sm:text-3xl">
+          {title}
+        </h2>
       </div>
       <AwardList valueLabel={valueLabel}>{children}</AwardList>
     </section>
@@ -422,7 +426,6 @@ export function SeasonAwards({
                 key={group}
                 eyebrow="Team award races"
                 title={group}
-                count={groupCards.length}
                 valueLabel="Contenders"
               >
                 {groupCards.map((card) => (
@@ -443,7 +446,6 @@ export function SeasonAwards({
             <AwardSection
               eyebrow="Player award races"
               title="Individual honors"
-              count={playerAwardSections.length}
               valueLabel="Contenders"
             >
               {playerAwardSections.map((section) => (
@@ -483,12 +485,7 @@ export function SeasonAwards({
           );
 
           return (
-            <AwardSection
-              key={group}
-              eyebrow="Team awards"
-              title={group}
-              count={groupCards.length}
-            >
+            <AwardSection key={group} eyebrow="Team awards" title={group}>
               {groupCards.map((card) => (
                 <AwardListRow
                   key={card.id}
@@ -505,11 +502,7 @@ export function SeasonAwards({
         })}
 
         {playerAwardWinnerCount > 0 ? (
-          <AwardSection
-            eyebrow="Player awards"
-            title="Individual honors"
-            count={playerAwardWinnerCount}
-          >
+          <AwardSection eyebrow="Player awards" title="Individual honors">
             {playerAwardSections.flatMap((section) =>
               section.winners.map((winner) => (
                 <AwardListRow
