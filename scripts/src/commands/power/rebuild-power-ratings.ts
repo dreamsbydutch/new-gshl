@@ -2,13 +2,20 @@ import path from "node:path";
 import {
   getCompositeKeyColumnsForModel,
   getWriteSpreadsheetIdForModel,
+  type DatabaseRecord,
 } from "@gshl-lib/sheets/config/config";
 import { minimalSheetsWriter } from "@gshl-lib/sheets/writer/minimal-writer";
-import { getArgValue, hasFlag, toBoolean } from "@gshl-lib/ranking/player-rating-support";
+import { fetchModel } from "@gshl-lib/data/convex-store";
+import {
+  getArgValue,
+  hasFlag,
+  toBoolean,
+} from "@gshl-lib/ranking/player-rating-support";
 import { runLocalPowerRankingsSeason } from "../../domains/power/apps-script-power-engine";
 
 type RebuildPowerOptions = {
-  seasonId: string;
+  seasonIds: string[];
+  allSeasons: boolean;
   apply: boolean;
   weekTypes: string[];
   seasonType: string;
@@ -18,10 +25,14 @@ type RebuildPowerOptions = {
 const HELP_TEXT = `
 Usage:
   npm run power:rebuild -- --season-id <id>
+  npm run power:rebuild -- --season-ids <list>
+  npm run power:rebuild -- --all-seasons
   npm run power:rebuild -- --season-id <id> --apply
 
 Options:
-  --season-id <id>      Required season id.
+  --season-id <id>      Optional single season id.
+  --season-ids <list>   Optional comma-separated season ids.
+  --all-seasons         Rebuild every season in chronological order.
   --apply               Write power and matchup updates back to Convex.
   --week-types <list>   Optional comma-separated week types.
   --season-type <type>  Optional legacy seasonType filter.
@@ -48,13 +59,22 @@ function parseOptions(args: string[]): RebuildPowerOptions {
     process.exit(0);
   }
 
-  const seasonId = String(getArgValue(args, "--season-id") ?? "").trim();
-  if (!seasonId) {
-    throw new Error("[power:rebuild] --season-id is required.");
+  const seasonIds = Array.from(
+    new Set([
+      ...parseList(getArgValue(args, "--season-ids")),
+      ...parseList(getArgValue(args, "--season-id")),
+    ]),
+  );
+  const allSeasons = hasFlag(args, "--all-seasons");
+  if (!seasonIds.length && !allSeasons) {
+    throw new Error(
+      "[power:rebuild] --season-id, --season-ids, or --all-seasons is required.",
+    );
   }
 
   return {
-    seasonId,
+    seasonIds,
+    allSeasons,
     apply: hasFlag(args, "--apply"),
     weekTypes: parseList(getArgValue(args, "--week-types")),
     seasonType: String(getArgValue(args, "--season-type") ?? "").trim(),
@@ -74,18 +94,13 @@ async function writeRows(
       ? ["id"]
       : getCompositeKeyColumnsForModel(modelName);
 
-  await minimalSheetsWriter.upsertByCompositeKey(
-    modelName,
-    keyColumns,
-    rows,
-    {
-      merge: true,
-      idColumn: "id",
-      createdAtColumn: "createdAt",
-      updatedAtColumn: "updatedAt",
-      spreadsheetId: getWriteSpreadsheetIdForModel(modelName, { seasonId }),
-    },
-  );
+  await minimalSheetsWriter.upsertByCompositeKey(modelName, keyColumns, rows, {
+    merge: true,
+    idColumn: "id",
+    createdAtColumn: "createdAt",
+    updatedAtColumn: "updatedAt",
+    spreadsheetId: getWriteSpreadsheetIdForModel(modelName, { seasonId }),
+  });
 
   return rows.length;
 }
@@ -103,50 +118,81 @@ async function main(): Promise<void> {
     );
   }
 
-  const result = await runLocalPowerRankingsSeason(options.seasonId, {
-    weekTypes: options.weekTypes.length ? options.weekTypes : null,
-    seasonType: options.seasonType || null,
-    dryRun: true,
-    returnRows: true,
-    logToConsole: options.logToConsole,
-  });
+  const seasons = await fetchModel<Record<string, unknown>>("Season");
+  const selectedIds = new Set(options.seasonIds);
+  const seasonIds = seasons
+    .filter(
+      (season) =>
+        options.allSeasons ||
+        selectedIds.has(String(season.id ?? "")) ||
+        selectedIds.has(String(season.legacyId ?? "")),
+    )
+    .sort((left, right) => {
+      const yearDifference =
+        Number(left.year ?? left.seasonYear ?? 0) -
+        Number(right.year ?? right.seasonYear ?? 0);
+      if (yearDifference) return yearDifference;
+      return String(left.startDate ?? "").localeCompare(
+        String(right.startDate ?? ""),
+      );
+    })
+    .map((season) => String(season.id ?? ""))
+    .filter(Boolean);
+  if (!seasonIds.length) {
+    throw new Error("[power:rebuild] No matching seasons were found.");
+  }
 
-  const weekUpdates = result.weekUpdates ?? [];
-  const seasonUpdates = result.seasonUpdates ?? [];
-  const matchupUpdates = result.matchupUpdates ?? [];
+  const summaries = [];
+  const replayedTeamWeeks: DatabaseRecord[] = [];
+  for (const seasonId of seasonIds) {
+    const result = await runLocalPowerRankingsSeason(seasonId, {
+      weekTypes: options.weekTypes.length ? options.weekTypes : null,
+      seasonType: options.seasonType || null,
+      dryRun: true,
+      returnRows: true,
+      logToConsole: options.logToConsole,
+      inputOverrides: replayedTeamWeeks.length
+        ? { teamWeeks: replayedTeamWeeks }
+        : undefined,
+    });
 
-  let writtenWeekRows = 0;
-  let writtenSeasonRows = 0;
-  let writtenMatchupRows = 0;
-  if (options.apply) {
-    writtenWeekRows = await writeRows(
-      "TeamWeekStatLine",
-      weekUpdates,
-      options.seasonId,
-    );
-    writtenSeasonRows = await writeRows(
-      "TeamSeasonStatLine",
-      seasonUpdates,
-      options.seasonId,
-    );
-    writtenMatchupRows = await writeRows(
-      "Matchup",
-      matchupUpdates,
-      options.seasonId,
-    );
+    const weekUpdates = result.weekUpdates ?? [];
+    const seasonUpdates = result.seasonUpdates ?? [];
+    const matchupUpdates = result.matchupUpdates ?? [];
+    replayedTeamWeeks.push(...weekUpdates);
+    let writtenWeekRows = 0;
+    let writtenSeasonRows = 0;
+    let writtenMatchupRows = 0;
+    if (options.apply) {
+      writtenWeekRows = await writeRows(
+        "TeamWeekStatLine",
+        weekUpdates,
+        seasonId,
+      );
+      writtenSeasonRows = await writeRows(
+        "TeamSeasonStatLine",
+        seasonUpdates,
+        seasonId,
+      );
+      writtenMatchupRows = await writeRows("Matchup", matchupUpdates, seasonId);
+    }
+    summaries.push({
+      seasonId,
+      updatedWeekRows: result.updatedWeekRows,
+      updatedSeasonRows: result.updatedSeasonRows,
+      updatedMatchupRows: result.updatedMatchupRows,
+      writtenWeekRows,
+      writtenSeasonRows,
+      writtenMatchupRows,
+    });
   }
 
   console.log(
     JSON.stringify(
       {
-        seasonId: options.seasonId,
+        seasonIds,
         apply: options.apply,
-        updatedWeekRows: result.updatedWeekRows,
-        updatedSeasonRows: result.updatedSeasonRows,
-        updatedMatchupRows: result.updatedMatchupRows,
-        writtenWeekRows,
-        writtenSeasonRows,
-        writtenMatchupRows,
+        summaries,
       },
       null,
       2,

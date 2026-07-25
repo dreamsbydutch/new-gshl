@@ -1,5 +1,9 @@
 import path from "node:path";
-import { getArgValue, hasFlag, toBoolean } from "@gshl-lib/ranking/player-rating-support";
+import {
+  getArgValue,
+  hasFlag,
+  toBoolean,
+} from "@gshl-lib/ranking/player-rating-support";
 import { runAppsScriptFunction } from "@gshl-lib/ranking/apps-script-execution";
 import { runLocalPowerRankingsSeason } from "../../domains/power/apps-script-power-engine";
 
@@ -41,15 +45,15 @@ const TEAM_WEEK_FIELDS = [
   "powerStatScore",
   "powerStatEwma",
   "powerTalent",
+  "gmLadderRating",
+  "powerGmScore",
   "powerHistoryPrior",
   "powerComposite",
   "powerRating",
   "powerRk",
 ] as const;
 
-const TEAM_SEASON_FIELDS = [
-  "powerRk",
-] as const;
+const TEAM_SEASON_FIELDS = ["powerRk"] as const;
 
 const MATCHUP_FIELDS = [
   "homeRank",
@@ -146,7 +150,12 @@ function compareRows(
     const key = buildKey(row, keyFields);
     const remote = remoteByKey.get(key);
     if (!remote) {
-      mismatches.push({ key, field: `${label}:missing`, local: row, remote: null });
+      mismatches.push({
+        key,
+        field: `${label}:missing`,
+        local: row,
+        remote: null,
+      });
       continue;
     }
 
@@ -179,7 +188,10 @@ async function main(): Promise<void> {
     logToConsole: options.logToConsole,
   });
 
-  const localWeekUpdates = takeSample(local.weekUpdates ?? [], options.sampleSize);
+  const localWeekUpdates = takeSample(
+    local.weekUpdates ?? [],
+    options.sampleSize,
+  );
   const localMatchupUpdates = takeSample(
     local.matchupUpdates ?? [],
     options.sampleSize,
@@ -196,7 +208,9 @@ async function main(): Promise<void> {
         (row) => `${String(row.gshlTeamId ?? "")}::${String(row.weekId ?? "")}`,
       ),
       matchupIds: localMatchupUpdates.map((row) => String(row.id ?? "")),
-      seasonTypes: localSeasonUpdates.map((row) => String(row.seasonType ?? "")),
+      seasonTypes: localSeasonUpdates.map((row) =>
+        String(row.seasonType ?? ""),
+      ),
     },
   );
 

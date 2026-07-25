@@ -2103,6 +2103,7 @@ var StatsAggregator = (function StatsAggregatorModule() {
     var getPlayerDayWorkbookId =
       GshlUtils.domain.workbooks.getPlayerDayWorkbookId;
     var isStarter = GshlUtils.domain.players.isStarter;
+    var formatDateOnly = GshlUtils.core.date.formatDateOnly;
     var toNumber = GshlUtils.core.parse.toNumber;
 
     var season = fetchSheetAsObjects(SPREADSHEET_ID, "Season").find(
@@ -2116,11 +2117,29 @@ var StatsAggregator = (function StatsAggregatorModule() {
     }
     var fieldConfig = buildSeasonAggregationFieldConfig(season);
 
-    var weeks = fetchSheetAsObjects(SPREADSHEET_ID, "Week").filter(
-      function (w) {
+    var todayDate = formatDateOnly(new Date());
+    var weeks = fetchSheetAsObjects(SPREADSHEET_ID, "Week")
+      .filter(function (w) {
         return String(w && w.seasonId) === String(season.id);
-      },
-    );
+      })
+      .filter(function (week) {
+        var startDate = formatDateOnly(week && week.startDate);
+        var endDate = formatDateOnly(week && week.endDate);
+        var isComplete =
+          (week && week.isComplete === true) ||
+          !!(endDate && todayDate && endDate < todayDate);
+        var isActive =
+          !isComplete &&
+          ((week && week.isActive === true) ||
+            !!(
+              startDate &&
+              endDate &&
+              todayDate &&
+              todayDate >= startDate &&
+              todayDate <= endDate
+            ));
+        return isComplete || isActive;
+      });
     var activeTeamIds = fetchSheetAsObjects(SPREADSHEET_ID, "Team")
       .filter(function (team) {
         return String(team && team.seasonId) === String(season.id);

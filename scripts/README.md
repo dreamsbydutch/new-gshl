@@ -319,11 +319,15 @@ Notable flags:
 
 #### `power:rebuild`
 
-Recomputes team power ratings and matchup ranking fields for one season.
+Recomputes start-of-week team power snapshots and matchup ranking fields.
+Weeks are processed chronologically, and completed-week results affect only the
+following week's rating.
 
 Notable flags:
 
 - `--season-id <id>`
+- `--season-ids <list>`
+- `--all-seasons`
 - `--week-types <list>`
 - `--season-type <type>`
 - `--apply`
@@ -358,7 +362,9 @@ Rebuilds a single season's player days, player weeks, player splits and totals,
 career splits and totals, team days, team weeks, and team seasons from
 `PlayerDayStatLine`. It also refreshes authoritative `PlayerNHLStatLine` season
 totals from Hockey Reference and recalculates standings, matchup scores, and
-matchup ranks. All writes go to production Convex.
+matchup ranks. It also calculates power snapshots from the newly generated
+player/team rows before writing, so dry runs do not depend on stale stored
+aggregates. All writes go to production Convex.
 
 Notable flags:
 

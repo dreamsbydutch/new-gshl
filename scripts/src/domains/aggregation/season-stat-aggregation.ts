@@ -1,11 +1,13 @@
 import path from "node:path";
 import {
   getCompositeKeyColumnsForModel,
+  getWriteSpreadsheetIdForModel,
   SHEETS_CONFIG,
   type DatabaseRecord,
   type CompositeKeyModelName,
 } from "@gshl-lib/sheets/config/config";
 import { optimizedSheetsClient } from "@gshl-lib/sheets/client/optimized-client";
+import { minimalSheetsWriter } from "@gshl-lib/sheets/writer/minimal-writer";
 import { fastSheetsReader } from "@gshl-lib/sheets/reader/fast-reader";
 import {
   deleteAggregateRows,
@@ -27,6 +29,10 @@ import {
   refreshPlayerNhlSeason,
   type SeasonExecutionSummary as PlayerNhlRefreshSummary,
 } from "../hockey-reference/backfill-season";
+import {
+  runLocalPowerRankingsSeason,
+  type PowerRankingEngineResult,
+} from "../power/apps-script-power-engine";
 
 const TEAM_STAT_FIELDS = [
   "GP",
@@ -179,6 +185,12 @@ type SeasonAggregationSummary = {
   teamSeasons: number;
   standings?: StandingsBackfillSeasonSummary;
   playerNhlRefresh?: PlayerNhlRefreshSummary;
+  powerRefresh?: {
+    weekRows: number;
+    seasonRows: number;
+    matchupRows: number;
+    applied: boolean;
+  };
   writes: Array<{
     modelName: WritableSeasonStatModelName;
     spreadsheetId: string;
@@ -263,6 +275,21 @@ const TEAM_WEEK_MANAGED_FIELDS = new Set<string>([
   "days",
   ...TEAM_STAT_FIELDS,
   "Rating",
+  "powerRating",
+  "powerElo",
+  "powerEloPre",
+  "powerEloPost",
+  "powerEloDelta",
+  "powerEloExpected",
+  "powerEloK",
+  "powerStatScore",
+  "powerStatEwma",
+  "powerTalent",
+  "gmLadderRating",
+  "powerGmScore",
+  "powerHistoryPrior",
+  "powerComposite",
+  "powerRk",
 ]);
 
 const TEAM_SEASON_STAT_FIELDS = new Set<string>([
@@ -273,6 +300,7 @@ const TEAM_SEASON_STAT_FIELDS = new Set<string>([
   ...TEAM_STAT_FIELDS,
   "Rating",
   "playersUsed",
+  "powerRk",
 ]);
 
 function getManagedFieldsForModel(
@@ -1560,6 +1588,28 @@ function aggregateTeamStats(
   teamSeasons: DatabaseRecord[];
 } {
   const teamDayMap = new Map<string, TeamDayBucket>();
+  const now = new Date();
+  const today = [
+    now.getFullYear(),
+    String(now.getMonth() + 1).padStart(2, "0"),
+    String(now.getDate()).padStart(2, "0"),
+  ].join("-");
+  const eligibleWeekRows = weekRows.filter((week) => {
+    const startDate = normalizeDateKey(week.startDate);
+    const endDate = normalizeDateKey(week.endDate);
+    const complete =
+      week.isComplete === true || Boolean(endDate && endDate < today);
+    const active =
+      !complete &&
+      (week.isActive === true ||
+        Boolean(
+          startDate && endDate && today >= startDate && today <= endDate,
+        ));
+    return complete || active;
+  });
+  const eligibleWeekIds = new Set(
+    eligibleWeekRows.map((week) => toTrimmedString(week.id)).filter(Boolean),
+  );
   const activeTeamIds = Array.from(
     new Set(
       teamRows
@@ -1569,7 +1619,7 @@ function aggregateTeamStats(
     ),
   );
 
-  for (const week of weekRows) {
+  for (const week of eligibleWeekRows) {
     const weekId = toTrimmedString(week.id);
     if (!weekId || !weekTypeMap.has(weekId)) continue;
 
@@ -1592,7 +1642,7 @@ function aggregateTeamStats(
     const weekId = toTrimmedString(playerDay.weekId);
     const date = normalizeDateKey(playerDay.date);
     if (!gshlTeamId || !weekId || !date) continue;
-    if (!weekTypeMap.has(weekId)) continue;
+    if (!weekTypeMap.has(weekId) || !eligibleWeekIds.has(weekId)) continue;
 
     const key = `${weekId}|${gshlTeamId}|${date}`;
     let bucket = teamDayMap.get(key);
@@ -2308,6 +2358,89 @@ function wrapWritePermissionError(
   );
 }
 
+const TEAM_WEEK_POWER_FIELDS = [
+  "powerRating",
+  "powerElo",
+  "powerEloPre",
+  "powerEloPost",
+  "powerEloDelta",
+  "powerEloExpected",
+  "powerEloK",
+  "powerStatScore",
+  "powerStatEwma",
+  "powerTalent",
+  "gmLadderRating",
+  "powerGmScore",
+  "powerHistoryPrior",
+  "powerComposite",
+  "powerRk",
+] as const;
+
+export function normalizeOptionalPowerNumber(value: unknown): number | null {
+  if (value === "" || value === null || value === undefined) return null;
+  const numericValue = Number(value);
+  if (!Number.isFinite(numericValue)) {
+    throw new Error(
+      `[stats:aggregate-season] Invalid power snapshot value: ${String(value)}.`,
+    );
+  }
+  return numericValue;
+}
+
+function mergePowerResultIntoAggregates(
+  generated: SeasonStatsAggregationResult,
+  powerResult: PowerRankingEngineResult,
+): void {
+  const weekByKey = new Map(
+    generated.teamWeeks.map((row) => [
+      `${toTrimmedString(row.seasonId)}|${toTrimmedString(row.weekId)}|${toTrimmedString(row.gshlTeamId)}`,
+      row,
+    ]),
+  );
+  for (const update of powerResult.weekUpdates ?? []) {
+    const target = weekByKey.get(
+      `${toTrimmedString(update.seasonId)}|${toTrimmedString(update.weekId)}|${toTrimmedString(update.gshlTeamId)}`,
+    );
+    if (!target) {
+      throw new Error(
+        `[stats:aggregate-season] Missing generated TeamWeek row for power snapshot ${toTrimmedString(update.seasonId)}|${toTrimmedString(update.weekId)}|${toTrimmedString(update.gshlTeamId)}.`,
+      );
+    }
+    for (const field of TEAM_WEEK_POWER_FIELDS) {
+      target[field] = normalizeOptionalPowerNumber(update[field]);
+    }
+  }
+
+  const seasonByKey = new Map(
+    generated.teamSeasons.map((row) => [
+      `${toTrimmedString(row.seasonId)}|${toTrimmedString(row.seasonType)}|${toTrimmedString(row.gshlTeamId)}`,
+      row,
+    ]),
+  );
+  for (const update of powerResult.seasonUpdates ?? []) {
+    const target = seasonByKey.get(
+      `${toTrimmedString(update.seasonId)}|${toTrimmedString(update.seasonType)}|${toTrimmedString(update.gshlTeamId)}`,
+    );
+    if (target) {
+      target.powerRk = normalizeOptionalPowerNumber(update.powerRk);
+    }
+  }
+}
+
+async function writePowerMatchupUpdates(
+  seasonId: string,
+  rows: DatabaseRecord[],
+): Promise<void> {
+  if (!rows.length) return;
+  await minimalSheetsWriter.upsertByCompositeKey("Matchup", ["id"], rows, {
+    merge: true,
+    idColumn: "id",
+    createdAtColumn: "createdAt",
+    updatedAtColumn: "updatedAt",
+    spreadsheetId: getWriteSpreadsheetIdForModel("Matchup", { seasonId }),
+  });
+}
+
 export async function runSeasonStatsAggregation(
   options: SeasonAggregationOptions,
 ): Promise<SeasonAggregationSummary> {
@@ -2350,6 +2483,27 @@ export async function runSeasonStatsAggregation(
   } else {
     log(options, "PlayerNHLStatLine: skipped by request.");
   }
+  const powerRunDate = new Date();
+  const powerTodayDate = [
+    powerRunDate.getFullYear(),
+    String(powerRunDate.getMonth() + 1).padStart(2, "0"),
+    String(powerRunDate.getDate()).padStart(2, "0"),
+  ].join("-");
+  const powerResult = await runLocalPowerRankingsSeason(options.seasonId, {
+    dryRun: true,
+    returnRows: true,
+    logToConsole: options.logToConsole,
+    todayDate: powerTodayDate,
+    inputOverrides: {
+      playerWeeks: generated.playerWeeks,
+      teamWeeks: generated.teamWeeks,
+    },
+  });
+  mergePowerResultIntoAggregates(generated, powerResult);
+  log(
+    options,
+    `Power snapshots: teamWeeks=${powerResult.updatedWeekRows} teamSeasons=${powerResult.updatedSeasonRows} matchups=${powerResult.updatedMatchupRows}.`,
+  );
   const writeInputs: Array<{
     modelName: WritableSeasonStatModelName;
     rows: DatabaseRecord[];
@@ -2408,6 +2562,10 @@ export async function runSeasonStatsAggregation(
         throw error;
       }
     }
+    await writePowerMatchupUpdates(
+      options.seasonId,
+      powerResult.matchupUpdates ?? [],
+    );
     standings = await rebuildSeasonStandingsForSeasonId(options.seasonId, true);
     log(
       options,
@@ -2461,6 +2619,12 @@ export async function runSeasonStatsAggregation(
     teamSeasons: generated.teamSeasons.length,
     standings,
     playerNhlRefresh,
+    powerRefresh: {
+      weekRows: powerResult.updatedWeekRows,
+      seasonRows: powerResult.updatedSeasonRows,
+      matchupRows: powerResult.updatedMatchupRows,
+      applied: options.apply,
+    },
     writes,
   };
 }
