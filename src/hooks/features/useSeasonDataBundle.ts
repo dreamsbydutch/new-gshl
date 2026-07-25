@@ -29,24 +29,25 @@ export function useSeasonDataBundle<TTeamStats = never>(
     teamQueryOptions,
   } = options;
 
-  const { selectedSeasonId: navSeasonId, selectedWeekId: navWeekId } =
-    useNav();
+  const { selectedSeasonId: navSeasonId, selectedWeekId: navWeekId } = useNav();
 
-  const hasSeasonOverride = Object.prototype.hasOwnProperty.call(
-    options,
-    "seasonId",
-  );
-  const hasWeekOverride = Object.prototype.hasOwnProperty.call(
-    options,
-    "weekId",
-  );
+  // Optional values are often forwarded from feature hook options. Treat an
+  // omitted value (including `seasonId: undefined`) as absent so navigation
+  // remains the source of truth. `null` is still an intentional override that
+  // disables that scope, which the team schedule uses to load the full season.
+  const hasSeasonOverride = optionSeasonId !== undefined;
+  const hasWeekOverride = optionWeekId !== undefined;
 
   const seasonId = hasSeasonOverride
     ? (optionSeasonId ?? null)
-    : (useNavigation ? navSeasonId : null);
+    : useNavigation
+      ? navSeasonId
+      : null;
   const weekId = hasWeekOverride
     ? (optionWeekId ?? null)
-    : (useNavigation ? navWeekId : null);
+    : useNavigation
+      ? navWeekId
+      : null;
   const hasSeasonScope = Boolean(seasonId);
   const hasWeekScope = Boolean(weekId);
 
@@ -84,7 +85,14 @@ export function useSeasonDataBundle<TTeamStats = never>(
         includeWeeks ? weeksQuery : {},
         teamStatsLevel ? teamStatsQuery : {},
       ),
-    [includeWeeks, matchupsQuery, teamStatsLevel, teamStatsQuery, teamsQuery, weeksQuery],
+    [
+      includeWeeks,
+      matchupsQuery,
+      teamStatsLevel,
+      teamStatsQuery,
+      teamsQuery,
+      weeksQuery,
+    ],
   );
 
   return {
