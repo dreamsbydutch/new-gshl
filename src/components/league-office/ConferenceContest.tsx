@@ -462,12 +462,7 @@ export function ConferenceContest() {
 
   return (
     <div className="mx-auto max-w-5xl space-y-5 pb-8">
-      <header className="border-b border-slate-200 pb-4">
-        <h1 className="font-oswald text-3xl uppercase leading-none text-slate-950 sm:text-4xl">
-          Conf v Conf
-        </h1>
-      </header>
-
+      
       <ConferenceHeader left={left} right={right} />
 
       <RawStatsTable
