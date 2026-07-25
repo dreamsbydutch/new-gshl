@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowDown, ArrowUp, ArrowUpDown, Search, Trophy } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, Search } from "lucide-react";
 import { NHLLogo } from "@gshl-components/player/NHLLogo";
 import { useTeamRecordBookView } from "@gshl-hooks";
 import type {
@@ -352,74 +352,43 @@ function AwardListing({
   title: string;
 }) {
   return (
-    <section className="mt-5 overflow-hidden rounded-xl border border-amber-100 bg-white/80 shadow-sm">
-      <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-amber-100 px-4 py-3">
-        <h3 className="font-oswald text-xl text-slate-950">{title}</h3>
-        <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-slate-400">
+    <section>
+      <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-slate-200 pb-1">
+        <h3 className="font-oswald text-lg text-slate-950">{title}</h3>
+        <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-slate-500">
           {rows.length} {countLabel}
         </span>
       </div>
       {rows.length === 0 ? (
-        <p className="px-4 py-8 text-center text-sm text-slate-500">
+        <p className="py-3 text-sm text-slate-500">
           Nothing has been recorded yet.
         </p>
       ) : (
-        <div className="overflow-x-auto">
-          <Table className="min-w-[680px] border-collapse text-xs sm:text-sm">
-            <TableHeader>
-              <TableRow className="border-b border-slate-200 bg-slate-50 hover:bg-slate-50">
-                <TableHead className="h-10 px-3 text-left text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-                  Award
-                </TableHead>
-                <TableHead className="h-10 w-20 px-3 text-left text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-                  Season
-                </TableHead>
-                <TableHead className="h-10 min-w-[220px] px-3 text-left text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-                  Player
-                </TableHead>
-                <TableHead className="h-10 w-20 px-3 text-left text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-                  Pos
-                </TableHead>
-                <TableHead className="h-10 w-20 px-3 text-left text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-                  NHL
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody className="divide-y divide-slate-100">
-              {rows.map((row) => (
-                <TableRow
-                  key={row.id}
-                  className="border-0 bg-white hover:bg-amber-50/40"
-                >
-                  <TableCell className="whitespace-nowrap px-3 py-2.5 font-semibold text-slate-900">
-                    {row.awardLabel}
-                  </TableCell>
-                  <TableCell className="whitespace-nowrap px-3 py-2.5 font-mono font-semibold tabular-nums text-slate-600">
-                    {row.seasonYear}
-                  </TableCell>
-                  <TableCell className="px-3 py-2.5">
-                    <div className="flex items-center gap-2.5">
-                      <NHLLogo
-                        team={row.nhlTeam}
-                        size={20}
-                        className="mx-0 shrink-0"
-                      />
-                      <span className="truncate font-semibold text-slate-900">
-                        {row.playerName}
-                      </span>
-                    </div>
-                  </TableCell>
-                  <TableCell className="whitespace-nowrap px-3 py-2.5 text-slate-500">
-                    {row.positions || "-"}
-                  </TableCell>
-                  <TableCell className="whitespace-nowrap px-3 py-2.5 font-mono text-xs font-semibold uppercase text-slate-500">
-                    {row.nhlTeam?.abbr ?? "-"}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+        <>
+          <div className="grid grid-cols-[minmax(0,1fr)_4.5rem_minmax(0,1.15fr)_2.5rem] gap-2 border-b border-slate-100 py-1 text-[9px] font-semibold uppercase tracking-[0.12em] text-slate-400">
+            <span>Award</span>
+            <span>Season</span>
+            <span>Player</span>
+            <span className="text-right">Pos</span>
+          </div>
+          <ul className="divide-y divide-slate-100">
+            {rows.map((row) => (
+              <li
+                key={row.id}
+                className="grid grid-cols-[minmax(0,1fr)_4.5rem_minmax(0,1.15fr)_2.5rem] items-baseline gap-2 py-1.5 text-[11px] leading-tight text-slate-700"
+              >
+                <span className="truncate font-semibold text-slate-950">
+                  {row.awardLabel}
+                </span>
+                <span className="font-mono tabular-nums">{row.seasonYear}</span>
+                <span className="truncate">{row.playerName}</span>
+                <span className="truncate text-right uppercase">
+                  {row.positions || "-"}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </>
       )}
     </section>
   );
@@ -432,23 +401,12 @@ function PlayerAwardTrophyCase({ rows }: { rows: RecordBookAwardRow[] }) {
   const allStarRows = rows.filter((row) => ALL_STAR_AWARD_KEYS.has(row.award));
 
   return (
-    <section className="rounded-2xl border border-amber-200 bg-[radial-gradient(circle_at_top,_rgba(254,243,199,0.9),_rgba(255,251,235,0.68)_42%,_rgba(255,255,255,0.96)_100%)] p-3 font-varela shadow-sm sm:p-5">
+    <section className="mx-auto max-w-5xl border-y border-slate-200 py-3 font-varela sm:py-4">
       <div className="mx-auto max-w-3xl text-center">
-        <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full border border-amber-300 bg-amber-100 text-amber-700 shadow-sm">
-          <Trophy className="h-5 w-5" aria-hidden="true" />
-        </div>
-        <p className="mt-2 text-[10px] font-semibold uppercase tracking-[0.22em] text-amber-700">
-          Player honors
-        </p>
-        <h2 className="mt-1 font-oswald text-2xl text-slate-950 sm:text-3xl">
-          Player Trophy Case
-        </h2>
-        <p className="mt-1 text-xs text-slate-500 sm:text-sm">
-          Every player trophy and all-star selection earned by this owner.
-        </p>
+        <h2 className="font-oswald text-2xl text-slate-950">Player honors</h2>
       </div>
 
-      <div className="mx-auto max-w-6xl">
+      <div className="mx-auto mt-3 grid max-w-5xl gap-5 md:grid-cols-2">
         <AwardListing
           countLabel={playerAwardRows.length === 1 ? "award" : "awards"}
           rows={playerAwardRows}
