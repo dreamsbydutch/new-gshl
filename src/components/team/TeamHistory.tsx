@@ -2,7 +2,7 @@
 
 import type { TeamHistoryProps } from "@gshl-types";
 import { useTeamHistoryData, useTeamHistoryRows } from "@gshl-hooks";
-import { LoadingSpinner } from "@gshl-components/ui";
+import { TeamHistorySkeleton } from "@gshl-skeletons";
 import { FilterDropdowns } from "./history/FilterDropdowns";
 import { HistoryMatchupList } from "./history/HistoryMatchupList";
 import { RecordDisplay } from "./history/RecordDisplay";
@@ -26,7 +26,7 @@ export function TeamHistoryContainer({ teamInfo }: TeamHistoryProps) {
   const rows = useTeamHistoryRows(schedule);
 
   if (!isDataReady) {
-    return <LoadingSpinner />;
+    return <TeamHistorySkeleton />;
   }
 
   return (

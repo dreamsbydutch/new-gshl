@@ -8,21 +8,25 @@ import {
   useStandingsData,
   useTeamAwards,
 } from "@gshl-hooks";
-import { StandingsSkeleton } from "@gshl-skeletons";
+import {
+  PlayoffBracketSkeleton,
+  SeasonAwardsSkeleton,
+  StandingsSkeleton,
+} from "@gshl-skeletons";
 
 const PlayoffBracket = dynamic(
   () =>
     import("@gshl-components/league/PlayoffBracket").then(
       (module) => module.PlayoffBracket,
     ),
-  { loading: () => <StandingsSkeleton /> },
+  { loading: () => <PlayoffBracketSkeleton /> },
 );
 const SeasonAwards = dynamic(
   () =>
     import("@gshl-components/league/SeasonAwards").then(
       (module) => module.SeasonAwards,
     ),
-  { loading: () => <StandingsSkeleton /> },
+  { loading: () => <SeasonAwardsSkeleton /> },
 );
 const StandingsTable = dynamic(
   () =>
@@ -78,6 +82,12 @@ export function StandingsContent() {
         playersLoading ||
         playerTotalsQuery.status.isLoading))
   ) {
+    if (isAwardsView) {
+      return <SeasonAwardsSkeleton />;
+    }
+    if ((standingsType ?? "overall") === "playoff") {
+      return <PlayoffBracketSkeleton />;
+    }
     return <StandingsSkeleton />;
   }
 

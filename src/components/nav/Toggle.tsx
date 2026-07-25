@@ -10,6 +10,7 @@
 import { useState, useRef, useEffect } from "react";
 import { cn } from "@gshl-utils";
 import type { DropdownToggleProps, HorizontalToggleProps } from "@gshl-types";
+import { Skeleton } from "@gshl-ui";
 
 /**
  * Horizontal toggle component with scrollable item selector
@@ -31,10 +32,10 @@ export function HorizontalToggle<T>({
 }: HorizontalToggleProps<T>) {
   if (loading) {
     return (
-      <div className={cn("animate-pulse", className)}>
+      <div className={className}>
         <div className="flex space-x-1">
           {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="h-8 w-16 rounded bg-muted" />
+            <Skeleton key={i} className="h-8 w-16 rounded" />
           ))}
         </div>
       </div>
@@ -192,8 +193,8 @@ export function DropdownToggle<T>({
 
   if (loading) {
     return (
-      <div className={cn("animate-pulse", className)}>
-        <div className="h-8 w-32 rounded bg-muted" />
+      <div className={className}>
+        <Skeleton className="h-8 w-32 rounded" />
       </div>
     );
   }

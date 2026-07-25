@@ -11,6 +11,7 @@ import { useMemo, useState, useEffect } from "react";
 
 import type { SeasonSummary, SeasonToggleNavProps } from "@gshl-types";
 import { useSeasonNavigation, useSeasonState } from "@gshl-hooks";
+import { SeasonToggleSkeleton } from "@gshl-skeletons";
 import { DropdownToggle } from "./Toggle";
 
 export function SeasonToggleNav({
@@ -40,11 +41,7 @@ export function SeasonToggleNav({
 
   // Show loading state during SSR and initial client hydration
   if (!mounted) {
-    return (
-      <div className="mx-2 animate-pulse">
-        <div className="h-8 w-32 rounded bg-muted" />
-      </div>
-    );
+    return <SeasonToggleSkeleton className={className} />;
   }
 
   return (

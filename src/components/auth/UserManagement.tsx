@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Button } from "@gshl-ui";
 import { useAuthUserAdmin, useUpdateAuthUserAccess } from "@gshl-hooks";
+import { UserManagementSkeleton } from "@gshl-skeletons";
 import type {
   AppRole,
   AuthOwnerOption,
@@ -95,7 +96,7 @@ export function UserManagement() {
   const { users, owners } = useAuthUserAdmin();
 
   if (users.isLoading || owners.isLoading) {
-    return <div className="p-8 text-center">Loading user access…</div>;
+    return <UserManagementSkeleton />;
   }
   if (users.error || owners.error) {
     return (
@@ -111,7 +112,8 @@ export function UserManagement() {
         <h1 className="text-2xl font-bold">User Access</h1>
         <p className="text-sm text-muted-foreground">
           New Google accounts begin as viewers. Owners require one linked league
-          owner record; commissioners can optionally link their owner record too.
+          owner record; commissioners can optionally link their owner record
+          too.
         </p>
       </div>
       <table className="w-full min-w-[780px] text-sm">
@@ -126,7 +128,11 @@ export function UserManagement() {
         </thead>
         <tbody>
           {(users.data ?? []).map((user) => (
-            <UserAccessRow key={user.id} user={user} owners={owners.data ?? []} />
+            <UserAccessRow
+              key={user.id}
+              user={user}
+              owners={owners.data ?? []}
+            />
           ))}
         </tbody>
       </table>

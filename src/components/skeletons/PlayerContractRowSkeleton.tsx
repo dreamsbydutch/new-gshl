@@ -1,25 +1,25 @@
-/**
- * PlayerContractRowSkeleton Component
- *
- * Loading skeleton for a single player contract row in the contract table.
- * Displays a placeholder while contract data is being fetched or processed.
- *
- * Features:
- * - Compact horizontal bar
- * - Matches contract row dimensions
- * - Accepts contract prop for potential future use (currently unused)
- *
- * @example
- * ```tsx
- * {isLoading && <PlayerContractRowSkeleton contract={contract} />}
- * ```
- */
-
 import type { PlayerContractRowSkeletonProps } from "@gshl-types";
 import { Skeleton } from "../ui/SkeletonPrimitive";
 
 export function PlayerContractRowSkeleton({
   contract: _contract,
 }: PlayerContractRowSkeletonProps) {
-  return <Skeleton className="mr-4 h-6 w-28" />;
+  return (
+    <tr>
+      <td className="sticky left-0 z-20 w-32 border-y border-gray-300 bg-gray-50 p-1">
+        <Skeleton className="mx-auto h-3 w-24" />
+      </td>
+      <td className="sticky left-[8rem] z-20 w-12 border-y border-gray-300 bg-gray-50 p-1">
+        <Skeleton className="mx-auto h-3 w-7" />
+      </td>
+      <td className="sticky left-[11rem] z-20 w-8 border-y border-gray-300 bg-gray-50 p-1">
+        <Skeleton className="mx-auto h-4 w-4 rounded-sm" />
+      </td>
+      {Array.from({ length: 5 }).map((_, index) => (
+        <td key={index} className="border-y border-gray-300 px-2 py-1">
+          <Skeleton className="mx-auto h-3 w-14" />
+        </td>
+      ))}
+    </tr>
+  );
 }

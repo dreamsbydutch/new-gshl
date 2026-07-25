@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
-import { LoadingSpinner } from "@gshl-ui";
+import { MatchupSkeleton } from "@gshl-skeletons";
 import {
   lighten,
   readableText,
@@ -461,14 +461,7 @@ export function MatchupDetailsContent({
   };
 
   if (scheduleData.isLoading && !matchup) {
-    return (
-      <main className="mx-auto flex min-h-[50vh] max-w-6xl items-center justify-center px-4 py-10">
-        <div className="flex items-center gap-3 text-slate-500">
-          <LoadingSpinner />
-          Loading matchup details...
-        </div>
-      </main>
-    );
+    return <MatchupSkeleton />;
   }
 
   if (scheduleData.error) {

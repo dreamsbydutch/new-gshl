@@ -31,6 +31,7 @@ import { type ToggleItem, type NHLTeam } from "@gshl-types";
 import { Table } from "@gshl-ui";
 import { NHLLogo } from "@gshl-components/player/NHLLogo";
 import { HorizontalToggle, SecondaryPageToolbar } from "@gshl-nav";
+import { DraftBoardTableSkeleton, MockDraftSkeleton } from "@gshl-skeletons";
 import {
   type DraftBoardPlayer,
   type DraftBoardToolbarProps,
@@ -402,12 +403,7 @@ export function DraftBoardList({
   } = useDraftBoardData({ seasonId, selectedType });
 
   if (isLoading) {
-    return (
-      <div className="mt-6">
-        <h2 className="mb-1 text-xl font-semibold">Draft Board</h2>
-        <p className="text-gray-500">Loading players...</p>
-      </div>
-    );
+    return <DraftBoardTableSkeleton />;
   }
 
   const pageToolbarProps: {
@@ -516,12 +512,7 @@ export function MockDraftPreview({
     selectedType: "mockdraft",
   });
   if (isLoading) {
-    return (
-      <div className="mt-6 text-center">
-        <h2 className="mb-1 text-xl font-semibold">GSHL Mock Draft</h2>
-        <p className="text-gray-500">Loading mock draft...</p>
-      </div>
-    );
+    return <MockDraftSkeleton />;
   }
   return (
     <MockDraftList

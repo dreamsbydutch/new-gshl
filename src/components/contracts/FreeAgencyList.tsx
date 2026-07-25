@@ -22,6 +22,7 @@
  */
 
 import { useFreeAgencyData } from "@gshl-hooks";
+import { FreeAgencyListSkeleton } from "@gshl-skeletons";
 import { Table } from "@gshl-ui";
 import { NHLLogo } from "@gshl-components/player/NHLLogo";
 import {
@@ -69,18 +70,6 @@ const FreeAgentRow = ({
   );
 };
 
-/**
- * LoadingState Component
- *
- * Displays loading message while data is being fetched
- */
-const LoadingState = () => (
-  <div className="mt-8">
-    <h2 className="mb-4 text-2xl font-bold">Free Agency List</h2>
-    <p className="text-gray-500">Loading players...</p>
-  </div>
-);
-
 // ============================================================================
 // MAIN EXPORT
 // ============================================================================
@@ -89,7 +78,7 @@ export function FreeAgencyList() {
   const { freeAgents, nhlTeams, isLoading } = useFreeAgencyData();
 
   if (isLoading) {
-    return <LoadingState />;
+    return <FreeAgencyListSkeleton />;
   }
 
   return (

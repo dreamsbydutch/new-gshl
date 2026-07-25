@@ -2,58 +2,64 @@
 
 import dynamic from "next/dynamic";
 import { useAuthSession, useLeagueOfficeNavigation } from "@gshl-hooks";
+import {
+  AdminPanelSkeleton,
+  ConferenceContestSkeleton,
+  DraftClassesSkeleton,
+  FreeAgencySkeleton,
+  OwnerRankingsSkeleton,
+  RulebookSkeleton,
+  UserManagementSkeleton,
+} from "@gshl-skeletons";
 
-const TabLoading = () => (
-  <div className="mx-auto h-48 max-w-3xl animate-pulse rounded-xl bg-muted" />
-);
 const ConferenceContest = dynamic(
   () =>
     import("./ConferenceContest").then((module) => module.ConferenceContest),
-  { loading: TabLoading },
+  { loading: () => <ConferenceContestSkeleton /> },
 );
 const OwnerRankings = dynamic(
   () => import("./OwnerRankings").then((module) => module.OwnerRankings),
-  { loading: TabLoading },
+  { loading: () => <OwnerRankingsSkeleton /> },
 );
 const Rulebook = dynamic(
   () => import("./Rulebook").then((module) => module.Rulebook),
-  { loading: TabLoading },
+  { loading: () => <RulebookSkeleton /> },
 );
 const DraftClasses = dynamic(
   () => import("./DraftClasses").then((module) => module.DraftClasses),
-  { loading: TabLoading },
+  { loading: () => <DraftClassesSkeleton /> },
 );
 const UserManagement = dynamic(
   () =>
     import("@gshl-components/auth/UserManagement").then(
       (module) => module.UserManagement,
     ),
-  { loading: TabLoading },
+  { loading: () => <UserManagementSkeleton /> },
 );
 const ContractManagement = dynamic(
   () =>
     import("@gshl-components/admin/ContractManagement").then(
       (module) => module.ContractManagement,
     ),
-  { loading: TabLoading },
+  { loading: () => <AdminPanelSkeleton /> },
 );
 const JobManagement = dynamic(
   () =>
     import("@gshl-components/admin/JobManagement").then(
       (module) => module.JobManagement,
     ),
-  { loading: TabLoading },
+  { loading: () => <AdminPanelSkeleton /> },
 );
 const UfaLeagueOffice = dynamic(
   () =>
     import("@gshl-components/contracts/UfaSigning").then(
       (module) => module.UfaLeagueOffice,
     ),
-  { loading: TabLoading },
+  { loading: () => <FreeAgencySkeleton /> },
 );
 const ImageUpload = dynamic(
   () => import("./ImageUpload").then((module) => module.ImageUpload),
-  { loading: TabLoading },
+  { loading: () => <AdminPanelSkeleton /> },
 );
 
 export function LeagueOfficeContent() {

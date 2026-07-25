@@ -2,21 +2,21 @@
 
 import dynamic from "next/dynamic";
 import { useNav } from "@gshl-hooks";
-import { ScheduleSkeleton } from "@gshl-skeletons";
+import { TeamScheduleSkeleton, WeeklyScheduleSkeleton } from "@gshl-skeletons";
 
 const WeeklySchedule = dynamic(
   () =>
     import("@gshl-components/league/WeeklySchedule").then(
       (module) => module.WeeklySchedule,
     ),
-  { loading: () => <ScheduleSkeleton /> },
+  { loading: () => <WeeklyScheduleSkeleton /> },
 );
 const TeamSchedule = dynamic(
   () =>
     import("@gshl-components/team/TeamSchedule").then(
       (module) => module.TeamSchedule,
     ),
-  { loading: () => <ScheduleSkeleton /> },
+  { loading: () => <TeamScheduleSkeleton /> },
 );
 
 export function ScheduleContent() {

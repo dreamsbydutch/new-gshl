@@ -3,13 +3,14 @@
 import Link from "next/link";
 import { LogIn, LogOut } from "lucide-react";
 import { useAuthActions, useAuthSession } from "@gshl-hooks";
+import { Skeleton } from "@gshl-ui";
 
 export function AuthNavControl() {
   const { session, status } = useAuthSession();
   const { signOut } = useAuthActions();
 
   if (status === "loading") {
-    return <div className="h-9 w-9 animate-pulse rounded-full bg-gray-300" />;
+    return <Skeleton className="h-9 w-9 rounded-full bg-gray-300" />;
   }
 
   if (!session?.user) {

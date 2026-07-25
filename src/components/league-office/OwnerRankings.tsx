@@ -3,8 +3,8 @@
 import Image from "next/image";
 import { ArrowDown, ArrowUp, Minus, Shield, Users } from "lucide-react";
 
-import { Skeleton } from "@gshl-components/ui/SkeletonPrimitive";
 import { useOwnerRankingsData } from "@gshl-hooks";
+import { OwnerRankingsSkeleton } from "@gshl-skeletons";
 import { AWARD_CATALOG_BY_KEY } from "@gshl-lib/config/awards";
 import type {
   AwardsList as AwardsListType,
@@ -162,21 +162,6 @@ function AwardHeading({
     >
       <AwardMark award={award} label={label} size={20} />
       <span>{label}</span>
-    </div>
-  );
-}
-
-function OwnerRankingsSkeleton() {
-  return (
-    <div className="mx-auto max-w-[100rem] space-y-4">
-      <div className="flex items-end justify-between gap-4">
-        <div className="space-y-2">
-          <Skeleton className="h-4 w-28" />
-          <Skeleton className="h-9 w-52" />
-        </div>
-        <Skeleton className="h-9 w-28 rounded-md" />
-      </div>
-      <Skeleton className="h-[38rem] rounded-lg" />
     </div>
   );
 }

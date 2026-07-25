@@ -9,6 +9,7 @@
 import { cn, SeasonType } from "@gshl-utils";
 import type { Week, WeeksToggleProps } from "@gshl-types";
 import { useNav, useWeekNavigation, useWeeks } from "@gshl-hooks";
+import { WeeksToggleSkeleton } from "@gshl-skeletons";
 import { HorizontalToggle } from "./Toggle";
 
 /**
@@ -18,7 +19,7 @@ import { HorizontalToggle } from "./Toggle";
  */
 export function WeeksToggle({ className }: WeeksToggleProps) {
   const { selectedSeasonId: seasonId } = useNav();
-  const { data: weeks } = useWeeks({ seasonId });
+  const { data: weeks, isLoading } = useWeeks({ seasonId });
   const { selectedWeekId, setSelectedWeekId: setWeekId } = useWeekNavigation();
 
   const selectedWeek = weeks?.find((w) => w.id === selectedWeekId) ?? null;
@@ -55,6 +56,10 @@ export function WeeksToggle({ className }: WeeksToggleProps) {
       </div>
     </div>
   );
+
+  if (isLoading) {
+    return <WeeksToggleSkeleton className={className} />;
+  }
 
   return (
     <HorizontalToggle<Week>

@@ -1,50 +1,54 @@
 import { Skeleton } from "../ui/SkeletonPrimitive";
 
-const PlayerCardSkeleton = () => (
-  <div className="col-span-2 grid grid-cols-2 px-2 text-center">
-    <Skeleton className="col-span-3 mx-auto mb-1 h-3 w-20" />
-    <Skeleton className="mx-auto h-2 w-8" />
-    <Skeleton className="mx-auto h-4 w-4 rounded-full" />
-    <Skeleton className="mx-auto h-2 w-10 rounded-lg" />
-    <Skeleton className="col-span-3 mx-auto mt-1 h-2 w-12 rounded-xl" />
-  </div>
-);
-
-const PositionGroupSkeleton = ({
-  label,
-  count,
-}: {
-  label: string;
-  count: number;
-}) => (
-  <div className="mb-4">
-    <div className="mx-2 grid grid-cols-3 gap-2 text-center text-xs font-semibold text-gray-500">
-      <div className="col-span-3 border-b pb-1">{label}</div>
+function PlayerCardSkeleton({ wide = true }: { wide?: boolean }) {
+  return (
+    <div
+      className={`${wide ? "col-span-2" : ""} grid grid-cols-3 gap-x-1 px-2 py-1 text-center`}
+    >
+      <Skeleton className="col-span-3 mx-auto mb-1 h-3.5 w-24 max-w-full" />
+      <Skeleton className="mx-auto h-2.5 w-7" />
+      <Skeleton className="mx-auto h-4 w-4 rounded-sm" />
+      <Skeleton className="mx-auto h-3 w-9 rounded-lg" />
+      <Skeleton className="col-span-3 mx-auto mt-1 h-5 w-16 rounded-xl" />
     </div>
-    <div className="mx-2 mt-2 grid grid-cols-3 gap-2">
-      {Array.from({ length: count }).map((_, i) => (
-        <PlayerCardSkeleton key={i} />
+  );
+}
+
+function LineupRowSkeleton({ players = 3 }: { players?: number }) {
+  return (
+    <div className="grid min-h-14 grid-cols-6 items-center py-1.5">
+      {Array.from({ length: players }).map((_, index) => (
+        <PlayerCardSkeleton key={index} />
       ))}
     </div>
-  </div>
-);
+  );
+}
 
 export function TeamRosterSkeleton() {
   return (
-    <div className="mx-auto max-w-lg px-2 py-4">
-      <PositionGroupSkeleton label="Forwards" count={9} />
-      <PositionGroupSkeleton label="Defense" count={4} />
-      <PositionGroupSkeleton label="Goalies" count={2} />
-      <div className="mt-4 border-t pt-3">
-        <div className="mb-2 text-center text-xs font-semibold text-gray-500">
-          Bench
-        </div>
-        <div className="mx-2 grid grid-cols-3 gap-2">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <PlayerCardSkeleton key={i} />
+    <>
+      <Skeleton className="mx-auto mt-12 h-6 w-36" />
+      <div className="mx-auto mt-5 flex max-w-md flex-col overflow-hidden rounded-xl border bg-gray-50 px-1 py-2">
+        <LineupRowSkeleton />
+        <LineupRowSkeleton />
+        <div className="mx-auto my-1 w-4/6 border-b border-gray-300" />
+        <LineupRowSkeleton players={2} />
+        <LineupRowSkeleton players={2} />
+        <div className="mx-auto my-1 w-4/6 border-b border-gray-300" />
+        <LineupRowSkeleton players={1} />
+      </div>
+      <div className="mx-auto mt-2 max-w-md rounded-xl border bg-amber-50/50 px-1 py-2">
+        <div className="grid grid-cols-2 items-center">
+          {Array.from({ length: 4 }).map((_, index) => (
+            <PlayerCardSkeleton key={index} wide={false} />
           ))}
         </div>
       </div>
-    </div>
+      <div className="mx-auto mt-4 flex max-w-md justify-center gap-3">
+        {Array.from({ length: 4 }).map((_, index) => (
+          <Skeleton key={index} className="h-4 w-14 rounded-full" />
+        ))}
+      </div>
+    </>
   );
 }

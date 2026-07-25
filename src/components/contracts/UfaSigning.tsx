@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { NHLLogo } from "@gshl-components/player/NHLLogo";
 import { useSubmitUfaOffer, useUfaOverview } from "@gshl-hooks";
+import { FreeAgencySkeleton, UfaHomeCardSkeleton } from "@gshl-skeletons";
 import { formatMoney } from "@gshl-utils";
 import type { UfaFreeAgentView, UfaOfferGroupView } from "@gshl-types";
 
@@ -362,10 +363,7 @@ function ActiveOffers({ groups }: { groups: UfaOfferGroupView[] }) {
 
 export function UfaHomeCard() {
   const query = useUfaOverview();
-  if (query.isLoading)
-    return (
-      <section className="h-56 animate-pulse rounded-xl border bg-muted/40" />
-    );
+  if (query.isLoading) return <UfaHomeCardSkeleton />;
   if (query.error || !query.data)
     return (
       <section className="rounded-xl border border-destructive/40 p-3 text-xs text-destructive sm:p-5 sm:text-sm">
@@ -435,8 +433,7 @@ export function UfaLeagueOffice() {
     [filter, query.data?.freeAgents],
   );
   const visiblePlayers = players.slice(0, visibleCount);
-  if (query.isLoading)
-    return <div className="h-80 animate-pulse rounded-xl bg-muted/40" />;
+  if (query.isLoading) return <FreeAgencySkeleton />;
   if (query.error || !query.data)
     return (
       <p className="text-destructive">

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import type { TeamScheduleItemProps } from "@gshl-types";
 import { useTeamScheduleMatchupDetails } from "@gshl-hooks";
+import { MatchupStatsSkeleton } from "@gshl-skeletons";
 import { formatOpponentDisplay } from "@gshl-utils";
 import { GameResult } from "./GameResult";
 import { MatchupStatsTable } from "./MatchupStatsTable";
@@ -60,14 +61,22 @@ export function TeamScheduleItem({
       >
         <WeekDisplay label={gameDisplay.label} />
         <OpponentDisplay opponentText={opponentText} />
-        <GameResult matchup={matchup} selectedTeamId={selectedTeamId} week={week} />
+        <GameResult
+          matchup={matchup}
+          selectedTeamId={selectedTeamId}
+          week={week}
+        />
       </button>
 
       {isExpanded ? (
         !hasStats ? (
-          <div className="mx-auto w-5/6 py-1.5 text-center text-sm text-gray-600">
-            {isLoadingStats ? "Loading stats..." : "Matchup stats unavailable"}
-          </div>
+          isLoadingStats ? (
+            <MatchupStatsSkeleton />
+          ) : (
+            <div className="mx-auto w-5/6 py-1.5 text-center text-sm text-gray-600">
+              Matchup stats unavailable
+            </div>
+          )
         ) : (
           <div className="pb-2">
             <div className="mx-auto flex w-5/6 justify-end pt-2">

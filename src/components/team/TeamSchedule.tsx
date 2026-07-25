@@ -2,12 +2,28 @@
 
 import { useState } from "react";
 import { useTeamScheduleView } from "@gshl-hooks";
+import { TeamScheduleSkeleton } from "@gshl-skeletons";
 import { TeamScheduleHeader } from "./schedule/TeamScheduleHeader";
 import { TeamScheduleItem } from "./schedule/TeamScheduleItem";
 
 export function TeamSchedule() {
-  const { matchups, matchupCategories, selectedTeam, teams } = useTeamScheduleView();
-  const [expandedMatchupId, setExpandedMatchupId] = useState<string | null>(null);
+  const { error, isLoading, matchups, matchupCategories, selectedTeam, teams } =
+    useTeamScheduleView();
+  const [expandedMatchupId, setExpandedMatchupId] = useState<string | null>(
+    null,
+  );
+
+  if (isLoading) {
+    return <TeamScheduleSkeleton />;
+  }
+
+  if (error) {
+    return (
+      <div className="mx-2 mt-4 rounded-xl border border-rose-200 bg-rose-50 p-6 text-center text-sm text-rose-700">
+        The team schedule could not be loaded.
+      </div>
+    );
+  }
 
   if (!selectedTeam) {
     return (

@@ -17,6 +17,7 @@ import { RefreshCw, Undo2 } from "lucide-react";
 
 import { Button, Table } from "@gshl-ui";
 import { NHLLogo } from "@gshl-components/player/NHLLogo";
+import { DraftAdminListSkeleton } from "@gshl-skeletons";
 import {
   findNhlTeamByAbbreviation,
   formatMoney,
@@ -49,12 +50,7 @@ export function DraftAdminList(): JSX.Element {
   } = useDraftAdminList();
 
   if (playersLoading && !playersReady) {
-    return (
-      <div className="mt-8">
-        <h2 className="mb-4 text-2xl font-bold">Draft Admin List</h2>
-        <p className="text-gray-500">Loading players...</p>
-      </div>
-    );
+    return <DraftAdminListSkeleton />;
   }
 
   return (

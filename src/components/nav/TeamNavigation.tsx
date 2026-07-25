@@ -9,6 +9,7 @@
 
 import type { GSHLTeam, TeamsToggleProps } from "@gshl-types";
 import { useNav, useTeamNavigation, useTeams } from "@gshl-hooks";
+import { TeamsToggleSkeleton } from "@gshl-skeletons";
 import { HorizontalToggle } from "./Toggle";
 import Image from "next/image";
 
@@ -57,6 +58,10 @@ export function TeamsToggle({ className, seasonId }: TeamsToggleProps) {
       </div>
     );
 
+  if (isLoading) {
+    return <TeamsToggleSkeleton className={className} />;
+  }
+
   return (
     <HorizontalToggle<GSHLTeam>
       items={teams
@@ -67,7 +72,6 @@ export function TeamsToggle({ className, seasonId }: TeamsToggleProps) {
       getItemKey={getTeamKey}
       getItemLabel={getTeamLabel}
       renderCustomItem={renderTeamItem}
-      loading={isLoading}
       error={error?.message ?? null}
       className={className}
     />

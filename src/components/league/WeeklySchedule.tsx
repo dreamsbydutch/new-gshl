@@ -3,6 +3,10 @@
 import Image from "next/image";
 import Link from "next/link";
 import { LoadingSpinner } from "@gshl-ui";
+import {
+  WeeklyMatchupRowSkeleton,
+  WeeklyScheduleSkeleton,
+} from "@gshl-skeletons";
 import { cn } from "@gshl-utils";
 import type {
   ScoreDisplayProps,
@@ -95,7 +99,7 @@ const WeekScheduleItem = ({ matchup, teams }: WeekScheduleItemProps) => {
   const awayTeam = findTeamById(teams, matchup.awayTeamId);
 
   if (!homeTeam || !awayTeam || !isValidMatchup(matchup, homeTeam, awayTeam)) {
-    return <LoadingSpinner />;
+    return <WeeklyMatchupRowSkeleton />;
   }
 
   return (
@@ -111,7 +115,11 @@ const WeekScheduleItem = ({ matchup, teams }: WeekScheduleItemProps) => {
       )}
     >
       <div className="grid w-full grid-cols-10 items-center">
-        <TeamDisplay team={awayTeam} rank={matchup.awayRank?.toString()} isAway />
+        <TeamDisplay
+          team={awayTeam}
+          rank={matchup.awayRank?.toString()}
+          isAway
+        />
         <ScoreDisplay matchup={matchup} />
         <TeamDisplay team={homeTeam} rank={matchup.homeRank?.toString()} />
       </div>
@@ -125,6 +133,8 @@ export function WeeklySchedule() {
     teams,
     teamWeekStatsByTeam,
     playerWeekStatsByTeam,
+    error,
+    isLoading,
     isPrefetching,
     selectedSeasonId,
   } = useWeeklyScheduleData();
@@ -133,6 +143,18 @@ export function WeeklySchedule() {
   const showPlusMinus = Number.isFinite(seasonNumericId)
     ? seasonNumericId <= 6
     : true;
+
+  if (isLoading) {
+    return <WeeklyScheduleSkeleton />;
+  }
+
+  if (error) {
+    return (
+      <div className="mx-2 mt-4 rounded-xl border border-rose-200 bg-rose-50 p-6 text-center text-sm text-rose-700">
+        The weekly schedule could not be loaded.
+      </div>
+    );
+  }
 
   return (
     <div className="mx-2 mb-40 mt-4">

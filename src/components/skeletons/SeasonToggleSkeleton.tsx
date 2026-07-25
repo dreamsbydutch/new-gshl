@@ -1,22 +1,10 @@
-/**
- * SeasonToggleSkeleton Component
- *
- * Loading skeleton for the season toggle/selector component.
- * Displays a placeholder while season data is being fetched.
- *
- * Features:
- * - Compact rectangular placeholder
- * - Matches season toggle dimensions
- * - Animated shimmer effect
- *
- * @example
- * ```tsx
- * {!seasonsReady && <SeasonToggleSkeleton />}
- * ```
- */
-
+import { cn } from "@gshl-utils";
 import { Skeleton } from "../ui/SkeletonPrimitive";
 
-export function SeasonToggleSkeleton() {
-  return <Skeleton className="mr-4 h-6 w-28" />;
+export function SeasonToggleSkeleton({ className }: { className?: string }) {
+  return (
+    <div className={cn("relative mx-2", className)}>
+      <Skeleton className="h-8 w-32 rounded" />
+    </div>
+  );
 }

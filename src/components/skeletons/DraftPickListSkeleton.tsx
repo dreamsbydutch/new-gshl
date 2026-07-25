@@ -1,22 +1,26 @@
-/**
- * DraftPickListSkeleton Component
- *
- * Loading skeleton displayed while draft pick data is being fetched.
- * Shows a centered placeholder bar representing a draft pick entry.
- *
- * Features:
- * - Animated shimmer effect
- * - Responsive width (75% of container)
- * - Centered alignment
- *
- * @example
- * ```tsx
- * {isLoading && <DraftPickListSkeleton />}
- * ```
- */
-
 import { Skeleton } from "../ui/SkeletonPrimitive";
 
 export function DraftPickListSkeleton() {
-  return <Skeleton className="mx-auto my-2 h-6 w-3/4" />;
+  return (
+    <section className="pb-8">
+      <div className="mx-auto mt-4 flex items-center justify-center gap-2 py-3">
+        <Skeleton className="h-9 w-28 rounded-md" />
+        <Skeleton className="h-6 w-24" />
+      </div>
+      <div>
+        {Array.from({ length: 10 }).map((_, index) => (
+          <div
+            key={index}
+            className="mx-auto w-5/6 border-t border-gray-300 px-2 py-1"
+          >
+            <Skeleton
+              className={`mx-auto h-3 ${
+                index % 3 === 0 ? "w-56" : index % 3 === 1 ? "w-44" : "w-36"
+              } max-w-full`}
+            />
+          </div>
+        ))}
+      </div>
+    </section>
+  );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useLeagueActivity } from "@gshl-hooks";
+import { LeagueActivityRowsSkeleton } from "@gshl-skeletons";
 import type { LeagueActivityEvent, LeagueActivityType } from "@gshl-types";
 import { cn, formatMoney, showDate } from "@gshl-utils";
 
@@ -61,20 +62,7 @@ export function LeagueActivityCard({ seasonId }: { seasonId?: string }) {
       </header>
 
       {isLoading ? (
-        <div className="divide-y divide-slate-100 px-4 sm:px-5">
-          {Array.from({ length: 5 }).map((_, index) => (
-            <div
-              key={index}
-              className="flex animate-pulse items-center gap-3 py-3"
-            >
-              <div className="h-5 w-16 rounded-full bg-slate-100" />
-              <div className="flex-1 space-y-1.5">
-                <div className="h-3 w-32 rounded bg-slate-100" />
-                <div className="h-2.5 w-24 rounded bg-slate-100" />
-              </div>
-            </div>
-          ))}
-        </div>
+        <LeagueActivityRowsSkeleton />
       ) : error ? (
         <p className="px-5 py-8 text-center text-sm text-slate-500">
           League activity is unavailable right now.

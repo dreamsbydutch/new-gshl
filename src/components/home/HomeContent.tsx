@@ -2,6 +2,7 @@
 
 import { MockDraftPreview } from "@gshl-components/draft/DraftBoardList";
 import { useSeasonState } from "@gshl-hooks";
+import { HomeSkeleton } from "@gshl-skeletons";
 import { findOffseasonWindow, isBetweenSeasons } from "@gshl-utils";
 import { LeagueActivityCard } from "./LeagueActivityCard";
 import { UfaHomeCard } from "@gshl-components/contracts";
@@ -10,7 +11,7 @@ export function HomeContent() {
   const { seasons, defaultSeason, isLoading } = useSeasonState();
 
   if (isLoading) {
-    return <main className="container mx-auto space-y-6 px-4 py-8" />;
+    return <HomeSkeleton />;
   }
 
   const offseasonWindow = findOffseasonWindow(seasons);

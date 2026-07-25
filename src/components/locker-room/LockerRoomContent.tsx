@@ -21,35 +21,47 @@ import {
 } from "@gshl-hooks";
 import { getOwnerTeamIds, resolveContractDefaultSeason } from "@gshl-utils";
 import type { GSHLTeam, NHLTeam } from "@gshl-types";
-import { LockerRoomSkeleton, TeamRosterSkeleton } from "@gshl-skeletons";
+import {
+  CapLabSkeleton,
+  ContractHistorySkeleton,
+  DraftPickListSkeleton,
+  LockerRoomHeaderSkeleton,
+  LockerRoomSalarySkeleton,
+  LockerRoomSkeleton,
+  TeamContractTableSkeleton,
+  TeamHistorySkeleton,
+  TeamRecordBookSkeleton,
+  TeamRosterSkeleton,
+  TrophyCaseSkeleton,
+} from "@gshl-skeletons";
 
 const TeamRecordBook = dynamic(
   () =>
     import("@gshl-components/team/TeamRecordBook").then(
       (module) => module.TeamRecordBook,
     ),
-  { loading: () => <LockerRoomSkeleton /> },
+  { loading: () => <TeamRecordBookSkeleton /> },
 );
 const TeamDraftPickList = dynamic(
   () =>
     import("@gshl-components/team/TeamDraftPickList").then(
       (module) => module.TeamDraftPickList,
     ),
-  { loading: () => <LockerRoomSkeleton /> },
+  { loading: () => <DraftPickListSkeleton /> },
 );
 const TrophyCase = dynamic(
   () =>
     import("@gshl-components/team/TrophyCase").then(
       (module) => module.TrophyCase,
     ),
-  { loading: () => <LockerRoomSkeleton /> },
+  { loading: () => <TrophyCaseSkeleton /> },
 );
 const TeamHistoryContainer = dynamic(
   () =>
     import("@gshl-components/team/TeamHistory").then(
       (module) => module.TeamHistoryContainer,
     ),
-  { loading: () => <LockerRoomSkeleton /> },
+  { loading: () => <TeamHistorySkeleton /> },
 );
 const TeamRoster = dynamic(
   () =>
@@ -63,21 +75,21 @@ const TeamContractTable = dynamic(
     import("@gshl-components/contracts/ContractTable").then(
       (module) => module.TeamContractTable,
     ),
-  { loading: () => <LockerRoomSkeleton /> },
+  { loading: () => <TeamContractTableSkeleton /> },
 );
 const FranchiseContractHistory = dynamic(
   () =>
     import("@gshl-components/contracts/ContractHistory").then(
       (module) => module.FranchiseContractHistory,
     ),
-  { loading: () => <LockerRoomSkeleton /> },
+  { loading: () => <ContractHistorySkeleton /> },
 );
 const InteractiveContractTable = dynamic(
   () =>
     import("@gshl-components/contracts/InteractiveContractTable").then(
       (module) => module.InteractiveContractTable,
     ),
-  { loading: () => <LockerRoomSkeleton /> },
+  { loading: () => <CapLabSkeleton /> },
 );
 
 const SHOW_LOCKER_ROOM_ROSTER_SALARIES = true;
@@ -247,8 +259,40 @@ export function LockerRoomContent() {
         seasonSplitsQuery.isLoading));
 
   if (isLoading) {
-    if (selectedLockerRoomType === "roster") {
-      return <TeamRosterSkeleton />;
+    if (selectedLockerRoomType === "salary") {
+      return <LockerRoomSalarySkeleton />;
+    }
+    if (selectedLockerRoomType === "history") {
+      return (
+        <>
+          <LockerRoomHeaderSkeleton />
+          <TeamHistorySkeleton />
+        </>
+      );
+    }
+    if (selectedLockerRoomType === "trophy") {
+      return (
+        <>
+          <LockerRoomHeaderSkeleton />
+          <TrophyCaseSkeleton />
+        </>
+      );
+    }
+    if (selectedLockerRoomType === "recordbook") {
+      return (
+        <>
+          <LockerRoomHeaderSkeleton />
+          <TeamRecordBookSkeleton />
+        </>
+      );
+    }
+    if (selectedLockerRoomType === "draft") {
+      return (
+        <>
+          <LockerRoomHeaderSkeleton />
+          <DraftPickListSkeleton />
+        </>
+      );
     }
     return <LockerRoomSkeleton />;
   }

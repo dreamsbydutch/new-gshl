@@ -1,78 +1,95 @@
-/**
- * ScheduleSkeleton Component
- *
- * Loading skeleton for the schedule page matchup list. Displays multiple
- * placeholder cards while matchup data is being fetched, providing visual
- * feedback during the loading state.
- *
- * Features:
- * - 5 placeholder matchup cards
- * - Team logo placeholders (circular)
- * - Animated pulse effect
- * - Score and metadata placeholders
- * - Responsive card layout
- *
- * @example
- * ```tsx
- * {isLoading && <ScheduleSkeleton />}
- * ```
- */
+import { Skeleton } from "../ui/SkeletonPrimitive";
 
-// ============================================================================
-// INTERNAL COMPONENTS
-// ============================================================================
-
-/**
- * MatchupCardSkeleton Component
- *
- * Individual matchup card placeholder with team logos and score section
- */
-const MatchupCardSkeleton = () => (
-  <div className="animate-pulse rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-    {/* Header with date and status */}
-    <div className="mb-3 flex items-center justify-between">
-      <div className="h-4 w-24 rounded bg-gray-200"></div>
-      <div className="h-4 w-16 rounded bg-gray-200"></div>
+function ScheduleColumnHeaderSkeleton({
+  variant,
+}: {
+  variant: "team" | "week";
+}) {
+  return variant === "team" ? (
+    <div className="mx-auto mb-2 grid grid-cols-9 gap-2 px-2">
+      <Skeleton className="h-3 w-8 justify-self-center" />
+      <Skeleton className="col-span-6 h-3 w-20 justify-self-center" />
+      <Skeleton className="col-span-2 h-3 w-10 justify-self-center" />
     </div>
-
-    {/* Matchup content */}
-    <div className="flex items-center justify-between">
-      {/* Home team */}
-      <div className="flex items-center space-x-3">
-        <div className="h-12 w-12 rounded-full bg-gray-200"></div>
-        <div>
-          <div className="mb-1 h-5 w-32 rounded bg-gray-200"></div>
-          <div className="h-3 w-20 rounded bg-gray-200"></div>
-        </div>
-      </div>
-
-      {/* Score */}
-      <div className="text-center">
-        <div className="mx-auto h-6 w-16 rounded bg-gray-200"></div>
-      </div>
-
-      {/* Away team */}
-      <div className="flex items-center space-x-3">
-        <div>
-          <div className="mb-1 h-5 w-32 rounded bg-gray-200"></div>
-          <div className="h-3 w-20 rounded bg-gray-200"></div>
-        </div>
-        <div className="h-12 w-12 rounded-full bg-gray-200"></div>
-      </div>
-    </div>
-  </div>
-);
-
-// ============================================================================
-// MAIN EXPORT
-// ============================================================================
-
-export function ScheduleSkeleton() {
-  return (
-    <div className="mx-2 mb-40 mt-4 space-y-4">
-      {Array.from({ length: 5 }, (_, i) => (
-        <MatchupCardSkeleton key={i} />
-      ))}
+  ) : (
+    <div className="mx-auto mb-2 grid grid-cols-10 gap-2 px-2">
+      <Skeleton className="col-span-4 h-3 w-20 justify-self-center" />
+      <Skeleton className="col-span-2 h-3 w-10 justify-self-center" />
+      <Skeleton className="col-span-4 h-3 w-20 justify-self-center" />
     </div>
   );
+}
+
+export function TeamScheduleRowSkeleton() {
+  return (
+    <div className="grid min-h-10 grid-cols-9 items-center border-b py-2">
+      <Skeleton className="h-4 w-8 justify-self-center" />
+      <div className="col-span-6 flex items-center justify-center gap-2">
+        <Skeleton className="h-6 w-6 rounded-md" />
+        <Skeleton className="h-4 w-32 max-w-[70%]" />
+      </div>
+      <Skeleton className="col-span-2 h-4 w-12 justify-self-center" />
+    </div>
+  );
+}
+
+export function WeeklyMatchupRowSkeleton() {
+  return (
+    <div className="mx-1 mb-3 grid min-h-[5.25rem] grid-cols-10 items-center rounded-xl bg-slate-50 py-1 shadow-md">
+      <div className="col-span-4 flex flex-col items-center gap-2 p-2">
+        <Skeleton className="h-9 w-9 rounded-md sm:h-12 sm:w-12" />
+        <Skeleton className="h-4 w-24 max-w-full" />
+      </div>
+      <Skeleton className="col-span-2 h-6 w-14 justify-self-center" />
+      <div className="col-span-4 flex flex-col items-center gap-2 p-2">
+        <Skeleton className="h-9 w-9 rounded-md sm:h-12 sm:w-12" />
+        <Skeleton className="h-4 w-24 max-w-full" />
+      </div>
+    </div>
+  );
+}
+
+export function MatchupStatsSkeleton() {
+  return (
+    <div className="mx-auto w-5/6 overflow-hidden py-2">
+      <div className="grid min-w-[38rem] grid-cols-[2rem_3rem_repeat(8,1fr)] items-center gap-2">
+        {Array.from({ length: 30 }).map((_, index) => (
+          <Skeleton
+            key={index}
+            className={index % 10 === 0 ? "h-6 w-6 rounded-md" : "h-3 w-full"}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export function TeamScheduleSkeleton() {
+  return (
+    <div className="mx-2 mb-40 mt-4">
+      <ScheduleColumnHeaderSkeleton variant="team" />
+      <div>
+        {Array.from({ length: 10 }).map((_, index) => (
+          <TeamScheduleRowSkeleton key={index} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export function WeeklyScheduleSkeleton() {
+  return (
+    <div className="mx-2 mb-40 mt-4">
+      <ScheduleColumnHeaderSkeleton variant="week" />
+      <div>
+        {Array.from({ length: 6 }).map((_, index) => (
+          <WeeklyMatchupRowSkeleton key={index} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export function ScheduleSkeleton() {
+  return <WeeklyScheduleSkeleton />;
 }

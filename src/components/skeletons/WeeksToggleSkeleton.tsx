@@ -1,22 +1,20 @@
-/**
- * WeeksToggleSkeleton Component
- *
- * Loading skeleton for the weeks toggle/selector component.
- * Displays a placeholder while week data is being fetched.
- *
- * Features:
- * - Compact rectangular placeholder
- * - Matches weeks toggle dimensions
- * - Animated shimmer effect
- *
- * @example
- * ```tsx
- * {!weeksReady && <WeeksToggleSkeleton />}
- * ```
- */
-
+import { cn } from "@gshl-utils";
 import { Skeleton } from "../ui/SkeletonPrimitive";
 
-export function WeeksToggleSkeleton() {
-  return <Skeleton className="mr-4 h-6 w-28" />;
+export function WeeksToggleSkeleton({ className }: { className?: string }) {
+  return (
+    <div
+      className={cn(
+        "no-scrollbar mx-auto flex flex-row gap-1 overflow-x-auto overflow-y-hidden",
+        className,
+      )}
+    >
+      {Array.from({ length: 14 }).map((_, index) => (
+        <Skeleton
+          key={index}
+          className={`h-6 shrink-0 rounded-sm ${index < 9 ? "w-6" : "w-7"}`}
+        />
+      ))}
+    </div>
+  );
 }
