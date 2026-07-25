@@ -67,11 +67,11 @@ export function InteractiveContractTable({
   if (!ready) return null;
 
   return (
-    <section className="mx-auto mt-6 w-full max-w-6xl border-t border-slate-200 pt-4">
+    <section className="mx-auto mt-4 w-full max-w-6xl border-t border-slate-200 pt-3">
       <div className="relative text-center">
         <div>
           <h2 className="text-sm font-semibold text-slate-900">Cap Lab</h2>
-          <p className="mt-1 text-xs text-slate-500">
+          <p className="mt-0.5 text-xs text-slate-500">
             Add a signable player or remove a contract to test a trade scenario.
           </p>
         </div>
@@ -89,9 +89,9 @@ export function InteractiveContractTable({
         ) : null}
       </div>
 
-      <div className="mx-auto mt-3 flex max-w-xl flex-col gap-2 sm:flex-row sm:items-end">
+      <div className="mx-auto mt-2 flex max-w-xl flex-col gap-1.5 sm:flex-row sm:items-end">
         <div className="relative min-w-0 flex-1 text-left">
-          <label className="mb-1 block text-xs font-medium text-slate-600">
+          <label className="mb-0.5 block text-xs font-medium text-slate-600">
             Player
           </label>
           <Input
@@ -105,6 +105,7 @@ export function InteractiveContractTable({
               window.setTimeout(() => setIsPickerOpen(false), 150);
             }}
             placeholder="Search players to sign or trade"
+            className="h-9 px-2 py-1.5"
             aria-label="Search players to sign or trade"
             aria-expanded={isPickerOpen}
             aria-controls="cap-lab-player-options"
@@ -113,7 +114,7 @@ export function InteractiveContractTable({
           {isPickerOpen ? (
             <div
               id="cap-lab-player-options"
-              className="absolute z-30 mt-1 max-h-64 w-full overflow-y-auto rounded-md border border-slate-200 bg-white p-1 shadow-lg"
+              className="absolute z-50 mt-1 max-h-64 w-full overflow-y-auto rounded-md border border-slate-200 bg-white p-0.5 shadow-lg"
               role="listbox"
             >
               {filteredPlayers.length > 0 ? (
@@ -121,7 +122,7 @@ export function InteractiveContractTable({
                   <button
                     key={option.player.id}
                     type="button"
-                    className="flex w-full items-center justify-between gap-3 rounded px-3 py-2 text-left text-sm hover:bg-slate-100 focus-visible:bg-slate-100 focus-visible:outline-none"
+                    className="flex w-full items-center justify-between gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-slate-100 focus-visible:bg-slate-100 focus-visible:outline-none"
                     onMouseDown={(event) => event.preventDefault()}
                     onClick={() => choosePlayer(String(option.player.id))}
                     role="option"
@@ -140,7 +141,7 @@ export function InteractiveContractTable({
                   </button>
                 ))
               ) : (
-                <p className="px-3 py-2 text-sm text-slate-500">
+                <p className="px-2 py-1.5 text-sm text-slate-500">
                   No matching players found.
                 </p>
               )}
@@ -148,8 +149,9 @@ export function InteractiveContractTable({
           ) : null}
         </div>
         <label className="w-full text-left text-xs font-medium text-slate-600 sm:w-32">
-          <span className="mb-1 block">Signing years</span>
+          <span className="mb-0.5 block">Signing years</span>
           <Select
+            className="h-9 px-2 py-1.5"
             value={String(interactive.contractLength)}
             onValueChange={(value) =>
               interactive.setContractLength(Number(value) as 1 | 2 | 3)
@@ -165,11 +167,13 @@ export function InteractiveContractTable({
       </div>
 
       {interactive.pickerError ? (
-        <p className="mt-2 text-xs text-amber-700">{interactive.pickerError}</p>
+        <p className="mt-1.5 text-xs text-amber-700">
+          {interactive.pickerError}
+        </p>
       ) : null}
 
       {interactive.hasChanges ? (
-        <div className="mt-4 overflow-x-auto border-t border-slate-200 pt-3">
+        <div className="mt-2 overflow-x-auto border-t border-slate-200 pt-2">
           <TeamContractTable
             currentSeason={currentSeason}
             currentTeam={currentTeam}
@@ -180,7 +184,10 @@ export function InteractiveContractTable({
             capSpaceWindow={interactive.capSpaceWindow}
             ready={ready}
             title="Scenario Cap Table"
+            compact
             onRemovePlayer={interactive.removePlayer}
+            ghostContracts={interactive.ghostContracts}
+            onRestoreContract={interactive.restoreContract}
           />
         </div>
       ) : null}

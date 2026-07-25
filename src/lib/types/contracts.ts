@@ -126,10 +126,12 @@ export interface UseInteractiveContractTableResult {
   addPlayer: (playerId: string) => void;
   removePlayer: (playerId: string) => void;
   resetContracts: () => void;
+  restoreContract: (contractId: string) => void;
   selections: InteractiveContractSelection[];
   simulatedContracts: Contract[];
   contractGroups: Contract[][];
   capSpaceWindow: CapSpaceEntry[];
+  ghostContracts: Contract[];
   hasChanges: boolean;
 }
 
@@ -199,7 +201,10 @@ export interface ContractTableProps {
   capSpaceWindow: CapSpaceEntry[];
   ready: boolean;
   title?: string;
+  compact?: boolean;
   onRemovePlayer?: (playerId: string) => void;
+  ghostContracts?: Contract[];
+  onRestoreContract?: (contractId: string) => void;
 }
 
 export interface PlayerContractRowProps {
@@ -207,17 +212,22 @@ export interface PlayerContractRowProps {
   player?: Player;
   currentSeason: Season;
   nhlTeams: NHLTeam[];
+  compact?: boolean;
   onRemovePlayer?: (playerId: string) => void;
+  isGhost?: boolean;
+  onRestoreContract?: (contractId: string) => void;
 }
 
 export interface TableHeaderProps {
   currentSeason: Season | undefined;
+  compact?: boolean;
   showRemoveAction?: boolean;
 }
 
 export interface CapSpaceRowProps {
   currentTeam: GSHLTeam;
   capSpaceWindow: CapSpaceEntry[];
+  compact?: boolean;
   showRemoveAction?: boolean;
 }
 

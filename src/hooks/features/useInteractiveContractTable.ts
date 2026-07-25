@@ -14,7 +14,6 @@ import {
   deriveContractCreationTerms,
   getCapLabPlayerOptions,
   groupContractsByPlayer,
-  removeContractsForPlayer,
   ResignableStatus,
 } from "@gshl-utils";
 
@@ -35,7 +34,7 @@ export function useInteractiveContractTable(
   const [selections, setSelections] = useState<InteractiveContractSelection[]>(
     [],
   );
-  const [removedPlayerIds, setRemovedPlayerIds] = useState<string[]>([]);
+  const [removedContractIds, setRemovedContractIds] = useState<string[]>([]);
   const [pickerError, setPickerError] = useState<string | null>(null);
   const [contractLength, setContractLength] = useState<ContractLength>(
     DEFAULT_CONTRACT_LENGTH,
@@ -127,13 +126,19 @@ export function useInteractiveContractTable(
 
   const simulatedContracts = useMemo(
     () => [
-      ...removedPlayerIds.reduce(
-        (contracts, playerId) => removeContractsForPlayer(contracts, playerId),
-        existingContracts,
+      ...existingContracts.filter(
+        (contract) => !removedContractIds.includes(String(contract.id)),
       ),
       ...selections.map((selection) => selection.contract),
     ],
-    [existingContracts, removedPlayerIds, selections],
+    [existingContracts, removedContractIds, selections],
+  );
+  const ghostContracts = useMemo(
+    () =>
+      existingContracts.filter((contract) =>
+        removedContractIds.includes(String(contract.id)),
+      ),
+    [existingContracts, removedContractIds],
   );
   const contractGroups = useMemo(
     () => groupContractsByPlayer(simulatedContracts),
@@ -157,16 +162,24 @@ export function useInteractiveContractTable(
           String(selection.contract.playerId) !== normalizedPlayerId,
       ),
     );
-    setRemovedPlayerIds((current) =>
-      current.includes(normalizedPlayerId)
-        ? current
-        : [...current, normalizedPlayerId],
+    const removedIds = existingContracts
+      .filter((contract) => String(contract.playerId) === normalizedPlayerId)
+      .map((contract) => String(contract.id));
+    setRemovedContractIds((current) => [
+      ...new Set([...current, ...removedIds]),
+    ]);
+  };
+
+  const restoreContract = (contractId: string) => {
+    const normalizedContractId = String(contractId);
+    setRemovedContractIds((current) =>
+      current.filter((id) => id !== normalizedContractId),
     );
   };
 
   const resetContracts = () => {
     setSelections([]);
-    setRemovedPlayerIds([]);
+    setRemovedContractIds([]);
     setPickerError(null);
     setContractLength(DEFAULT_CONTRACT_LENGTH);
   };
@@ -179,11 +192,13 @@ export function useInteractiveContractTable(
     addPlayer,
     removePlayer,
     resetContracts,
+    restoreContract,
     selections,
     simulatedContracts,
     contractGroups,
     capSpaceWindow,
-    hasChanges: selections.length > 0 || removedPlayerIds.length > 0,
+    ghostContracts,
+    hasChanges: selections.length > 0 || removedContractIds.length > 0,
   };
 }
 
