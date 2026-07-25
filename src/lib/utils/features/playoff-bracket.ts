@@ -85,24 +85,9 @@ function getConferenceIdsFromActualQuarterfinals(
   const quarterfinals = actualMatchups.filter(
     (matchup) => matchup.gameType === MatchupType.QUARTER_FINAL,
   );
-  const twoVsThree = quarterfinals.filter((matchup) =>
-    hasSeedPair(matchup, 2, 3),
-  );
 
   return quarterfinals
-    .filter((matchup) => hasSeedPair(matchup, 1, 4))
-    .map((oneVsFour) => {
-      const conference = getTeamConference(oneVsFour.homeTeamId, teamsById);
-      if (!conference) return null;
-
-      const matchingTwoVsThree = twoVsThree.find((matchup) => {
-        const homeConference = getTeamConference(matchup.homeTeamId, teamsById);
-        const awayConference = getTeamConference(matchup.awayTeamId, teamsById);
-        return homeConference === conference && awayConference === conference;
-      });
-
-      return matchingTwoVsThree ? conference : null;
-    })
+    .map((matchup) => getTeamConference(matchup.homeTeamId, teamsById))
     .filter((conference): conference is string => Boolean(conference))
     .filter(
       (conference, index, conferences) =>
@@ -217,8 +202,6 @@ function matchesProjectedConference(
   matchup: Matchup,
   projected: BracketMatchup,
   teamsById: Map<string, SeededTeam>,
-  homeSeed: number,
-  awaySeed: number,
 ): boolean {
   if (projected.round !== "QF") return false;
 
@@ -229,20 +212,7 @@ function matchesProjectedConference(
   if (!projectedConference) return false;
 
   const homeConference = getTeamConference(matchup.homeTeamId, teamsById);
-  const awayConference = getTeamConference(matchup.awayTeamId, teamsById);
-  if (homeSeed === 1 && awaySeed === 4) {
-    return homeConference === projectedConference;
-  }
-  if (homeSeed === 2 && awaySeed === 3) {
-    return (
-      homeConference === projectedConference &&
-      awayConference === projectedConference
-    );
-  }
-  return (
-    homeConference === projectedConference ||
-    awayConference === projectedConference
-  );
+  return homeConference === projectedConference;
 }
 
 function actualMatchupToBracket(
@@ -286,7 +256,9 @@ function mergeActualRound(
     const exactMatch = actual.find(
       (matchup) =>
         unused.has(String(matchup.id)) &&
-        projectedPair === pairKey(matchup.homeTeamId, matchup.awayTeamId),
+        projectedPair === pairKey(matchup.homeTeamId, matchup.awayTeamId) &&
+        (slot.round !== "QF" ||
+          matchesProjectedConference(matchup, slot, teamsById)),
     );
     const homeSeed = labelSeed(slot.homeLabel);
     const awaySeed = labelSeed(slot.awayLabel);
@@ -296,13 +268,7 @@ function mergeActualRound(
             (matchup) =>
               unused.has(String(matchup.id)) &&
               hasSeedPair(matchup, homeSeed, awaySeed) &&
-              matchesProjectedConference(
-                matchup,
-                slot,
-                teamsById,
-                homeSeed,
-                awaySeed,
-              ),
+              matchesProjectedConference(matchup, slot, teamsById),
           )
         : undefined;
     const overlappingMatch = actual.find((matchup) => {
@@ -312,10 +278,29 @@ function mergeActualRound(
       const overlapsAway = slot.awayTeam
         ? [matchup.homeTeamId, matchup.awayTeamId].includes(slot.awayTeam.id)
         : false;
-      return unused.has(String(matchup.id)) && (overlapsHome || overlapsAway);
+      const matchesConference =
+        slot.round !== "QF" ||
+        matchesProjectedConference(matchup, slot, teamsById);
+      return (
+        unused.has(String(matchup.id)) &&
+        matchesConference &&
+        (overlapsHome || overlapsAway)
+      );
     });
+    const conferenceMatch =
+      slot.round === "QF"
+        ? actual.find(
+            (matchup) =>
+              unused.has(String(matchup.id)) &&
+              matchesProjectedConference(matchup, slot, teamsById),
+          )
+        : undefined;
     const selected =
-      exactMatch ?? rankMatch ?? overlappingMatch ?? actual[index];
+      exactMatch ??
+      rankMatch ??
+      overlappingMatch ??
+      conferenceMatch ??
+      (slot.round === "QF" ? undefined : actual[index]);
     if (!selected || !unused.has(String(selected.id))) return slot;
 
     unused.delete(String(selected.id));

@@ -266,6 +266,35 @@ void test("uses the played 1-4 and 2-3 matchups to identify conference sides", (
   );
 });
 
+void test("uses the home team's conference when a wildcard crosses over", () => {
+  const { teams, stats } = seasonSevenTeamsAndStats();
+  const bracket = buildPlayoffBracket(
+    teams,
+    stats,
+    [
+      rankedMatchup("team-8", "team-4", 8, 4),
+      rankedMatchup("team-1", "team-5", 1, 5),
+      rankedMatchup("team-9", "team-10", 9, 10),
+      rankedMatchup("team-2", "team-3", 2, 3),
+    ],
+    season("7"),
+  );
+
+  assert.deepEqual(
+    bracket.columns[0]?.matchups.map((currentMatchup) => [
+      currentMatchup.title,
+      currentMatchup.homeTeam?.confAbbr,
+      currentMatchup.awayTeam?.confAbbr,
+    ]),
+    [
+      ["Hickory Hotel SF1", "HH", "SV"],
+      ["Hickory Hotel SF2", "HH", "HH"],
+      ["Sunview SF1", "SV", "SV"],
+      ["Sunview SF2", "SV", "SV"],
+    ],
+  );
+});
+
 void test("uses a played matchup and advances its winner into the bracket", () => {
   const { teams, stats } = seasonSevenTeamsAndStats();
   const bracket = buildPlayoffBracket(
