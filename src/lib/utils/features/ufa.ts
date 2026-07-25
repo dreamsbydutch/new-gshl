@@ -91,11 +91,14 @@ export function selectUfaOffer(
 export function rankUfas<
   T extends Pick<Player, "fullName"> & {
     salary: number;
+    overallRating?: number | null;
   },
 >(players: T[]): T[] {
   return [...players].sort(
     (left, right) =>
-      right.salary - left.salary || left.fullName.localeCompare(right.fullName),
+      right.salary - left.salary ||
+      Number(right.overallRating ?? 0) - Number(left.overallRating ?? 0) ||
+      left.fullName.localeCompare(right.fullName),
   );
 }
 

@@ -43,7 +43,13 @@ function Countdown({ deadlineAt }: { deadlineAt: number }) {
   );
 }
 
-function OfferControls({ player }: { player: UfaFreeAgentView }) {
+function OfferControls({
+  player,
+  compact = false,
+}: {
+  player: UfaFreeAgentView;
+  compact?: boolean;
+}) {
   const [years, setYears] = useState<number>(player.affordableTerms[0] ?? 1);
   const [message, setMessage] = useState<string | null>(null);
   const mutation = useSubmitUfaOffer({
@@ -63,7 +69,7 @@ function OfferControls({ player }: { player: UfaFreeAgentView }) {
       : "Salary is reserved while pending.");
   return (
     <div
-      className="flex min-w-[130px] items-center gap-1 sm:min-w-[180px] sm:flex-col sm:items-stretch sm:gap-1"
+      className={`flex items-center gap-1 sm:min-w-[180px] sm:flex-col sm:items-stretch sm:gap-1 ${compact ? "min-w-[115px]" : "min-w-[130px]"}`}
       title={helperText}
     >
       <div className="flex min-w-0 flex-1 gap-1 sm:flex-none sm:gap-2">
@@ -72,7 +78,7 @@ function OfferControls({ player }: { player: UfaFreeAgentView }) {
           value={years}
           disabled={!player.canOffer || mutation.isPending}
           onChange={(event) => setYears(Number(event.target.value))}
-          className="h-6 min-w-0 flex-1 rounded-md border bg-background px-1 text-[9px] leading-none disabled:opacity-50 sm:h-9 sm:flex-none sm:px-2 sm:text-sm"
+          className={`h-6 min-w-0 flex-1 rounded-md border bg-background text-[9px] leading-none disabled:opacity-50 sm:h-9 sm:flex-none sm:px-2 sm:text-sm ${compact ? "px-0.5" : "px-1"}`}
         >
           {[1, 2, 3].map((term) => (
             <option
@@ -97,7 +103,7 @@ function OfferControls({ player }: { player: UfaFreeAgentView }) {
               contractLength: years as 1 | 2 | 3,
             });
           }}
-          className="h-6 shrink-0 rounded-md bg-primary px-1.5 py-0.5 text-[9px] font-semibold leading-none text-primary-foreground disabled:cursor-not-allowed disabled:opacity-40 sm:h-auto sm:px-3 sm:py-2 sm:text-xs"
+          className={`h-6 shrink-0 rounded-md bg-primary py-0.5 text-[9px] font-semibold leading-none text-primary-foreground disabled:cursor-not-allowed disabled:opacity-40 sm:h-auto sm:px-3 sm:py-2 sm:text-xs ${compact ? "px-1" : "px-1.5"}`}
         >
           {mutation.isPending ? "Offering…" : "Offer Contract"}
         </button>
@@ -119,6 +125,7 @@ function PlayerRows({
   players: UfaFreeAgentView[];
   showStats: boolean;
 }) {
+  const mobileCellPadding = showStats ? "px-1 py-1" : "px-0.5 py-0.5";
   return (
     <tbody>
       {players.map((player) => {
@@ -126,7 +133,9 @@ function PlayerRows({
         const stats = player.stats;
         return (
           <tr key={player.id} className="group border-t align-middle">
-            <td className="sticky left-0 z-20 w-8 min-w-8 border-r bg-background px-0.5 py-1 group-hover:bg-muted sm:static sm:z-auto sm:w-auto sm:min-w-0 sm:border-0 sm:bg-transparent sm:px-2 sm:py-3">
+            <td
+              className={`sticky left-0 z-20 border-r bg-background group-hover:bg-muted sm:static sm:z-auto sm:w-auto sm:min-w-0 sm:border-0 sm:bg-transparent sm:px-2 sm:py-3 ${showStats ? "w-8 min-w-8 px-0.5 py-1" : "w-6 min-w-6 px-0 py-0.5"}`}
+            >
               <NHLLogo
                 team={
                   player.nhlTeamLogoUrl
@@ -136,16 +145,22 @@ function PlayerRows({
                       }
                     : undefined
                 }
-                size={24}
+                size={showStats ? 24 : 20}
               />
             </td>
-            <td className="sticky left-8 z-20 min-w-[7rem] border-r bg-background px-1.5 py-1 text-left text-[10px] font-semibold group-hover:bg-muted sm:static sm:z-auto sm:min-w-0 sm:border-0 sm:bg-transparent sm:px-2 sm:py-3 sm:text-sm">
+            <td
+              className={`sticky z-20 border-r bg-background text-left text-[10px] font-semibold group-hover:bg-muted sm:static sm:z-auto sm:min-w-0 sm:border-0 sm:bg-transparent sm:px-2 sm:py-3 sm:text-sm ${showStats ? "left-8 min-w-[7rem] px-1.5 py-1" : "left-6 min-w-[5.5rem] px-1 py-0.5"}`}
+            >
               {player.fullName}
             </td>
-            <td className="whitespace-nowrap px-1 py-1 text-[9px] sm:px-2 sm:py-3 sm:text-sm">
+            <td
+              className={`whitespace-nowrap text-[9px] sm:px-2 sm:py-3 sm:text-sm ${mobileCellPadding}`}
+            >
               {player.positions.join("/") || player.positionGroup}
             </td>
-            <td className="whitespace-nowrap px-1 py-1 text-[9px] font-medium sm:px-2 sm:py-3 sm:text-sm">
+            <td
+              className={`whitespace-nowrap text-[9px] font-medium sm:px-2 sm:py-3 sm:text-sm ${mobileCellPadding}`}
+            >
               {formatMoney(player.salary)}
             </td>
             {showStats
@@ -164,7 +179,7 @@ function PlayerRows({
                   ].map((key) => (
                     <td
                       key={key}
-                      className="whitespace-nowrap px-1 py-1 text-[9px] sm:px-2 sm:py-3 sm:text-xs"
+                      className={`whitespace-nowrap text-[9px] sm:px-2 sm:py-3 sm:text-xs ${mobileCellPadding}`}
                     >
                       {stats?.[key as keyof typeof stats] ?? "—"}
                     </td>
@@ -183,14 +198,14 @@ function PlayerRows({
                   ].map((key) => (
                     <td
                       key={key}
-                      className="whitespace-nowrap px-1 py-1 text-[9px] sm:px-2 sm:py-3 sm:text-xs"
+                      className={`whitespace-nowrap text-[9px] sm:px-2 sm:py-3 sm:text-xs ${mobileCellPadding}`}
                     >
                       {stats?.[key as keyof typeof stats] ?? "—"}
                     </td>
                   ))
               : null}
-            <td className="px-1 py-1 sm:px-2 sm:py-3">
-              <OfferControls player={player} />
+            <td className={`sm:px-2 sm:py-3 ${mobileCellPadding}`}>
+              <OfferControls player={player} compact={!showStats} />
             </td>
           </tr>
         );
@@ -226,32 +241,45 @@ function PlayerTable({
   const statHeaders = hasGoalies
     ? ["GP", "W", "GA", "GAA", "SV", "SA", "SV%", "SO", "QS", "RBS"]
     : ["GP", "G", "A", "P", "+/−", "PIM", "PPP", "SOG", "HIT", "BLK"];
+  const mobileCellPadding = showStats ? "px-1 py-1" : "px-0.5 py-0.5";
   return (
     <div className="overflow-x-auto overscroll-x-contain rounded-lg border">
-      <table className="w-full min-w-[780px] text-center text-[10px] sm:min-w-0 sm:text-sm">
+      <table className="w-full min-w-0 text-center text-[10px] sm:min-w-0 sm:text-sm">
         <thead className="bg-muted/70 text-[8px] uppercase tracking-wide sm:text-xs">
           <tr>
-            <th className="sticky left-0 z-30 w-8 min-w-8 border-r bg-muted/70 px-0.5 py-1 sm:static sm:z-auto sm:w-auto sm:min-w-0 sm:border-0 sm:bg-transparent sm:px-2 sm:py-3">
+            <th
+              className={`sticky z-30 border-r bg-muted/70 sm:static sm:z-auto sm:w-auto sm:min-w-0 sm:border-0 sm:bg-transparent sm:px-2 sm:py-3 ${showStats ? "left-0 w-8 min-w-8 px-0.5 py-1" : "left-0 w-6 min-w-6 px-0 py-0.5"}`}
+            >
               NHL
             </th>
-            <th className="sticky left-8 z-30 min-w-[7rem] border-r bg-muted/70 px-1.5 py-1 text-left sm:static sm:z-auto sm:min-w-0 sm:border-0 sm:bg-transparent sm:px-2 sm:py-3">
+            <th
+              className={`sticky z-30 border-r bg-muted/70 text-left sm:static sm:z-auto sm:min-w-0 sm:border-0 sm:bg-transparent sm:px-2 sm:py-3 ${showStats ? "left-8 min-w-[7rem] px-1.5 py-1" : "left-6 min-w-[5.5rem] px-1 py-0.5"}`}
+            >
               Player
             </th>
-            <th className="whitespace-nowrap px-1 py-1 sm:px-2 sm:py-3">Pos</th>
-            <th className="whitespace-nowrap px-1 py-1 sm:px-2 sm:py-3">
+            <th
+              className={`whitespace-nowrap sm:px-2 sm:py-3 ${mobileCellPadding}`}
+            >
+              Pos
+            </th>
+            <th
+              className={`whitespace-nowrap sm:px-2 sm:py-3 ${mobileCellPadding}`}
+            >
               UFA Salary
             </th>
             {showStats
               ? statHeaders.map((header) => (
                   <th
                     key={header}
-                    className="whitespace-nowrap px-1 py-1 sm:px-2 sm:py-3"
+                    className={`whitespace-nowrap sm:px-2 sm:py-3 ${mobileCellPadding}`}
                   >
                     {header}
                   </th>
                 ))
               : null}
-            <th className="whitespace-nowrap px-1 py-1 sm:px-2 sm:py-3">
+            <th
+              className={`whitespace-nowrap sm:px-2 sm:py-3 ${mobileCellPadding}`}
+            >
               Offer
             </th>
           </tr>

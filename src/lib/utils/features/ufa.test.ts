@@ -102,6 +102,19 @@ void test("UFAs rank by salary and the home list keeps only affordable players",
   );
 });
 
+void test("UFAs break equal salaries by overall rating before name", () => {
+  const ranked = rankUfas([
+    { fullName: "Lower Rated", salary: 10_000_000, overallRating: 78 },
+    { fullName: "Higher Rated", salary: 10_000_000, overallRating: 84 },
+    { fullName: "Higher Rated Two", salary: 10_000_000, overallRating: 84 },
+  ]);
+
+  assert.deepEqual(
+    ranked.map((player) => player.fullName),
+    ["Higher Rated", "Higher Rated Two", "Lower Rated"],
+  );
+});
+
 void test("UFA affordability includes committed cap and pending offer reservations", () => {
   const common = {
     ownerId: "owner-1",
