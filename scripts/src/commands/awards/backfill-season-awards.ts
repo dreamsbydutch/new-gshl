@@ -48,12 +48,17 @@ type AwardKey =
   | "secondAS"
   | "playoffAS"
   | "crosby"
-  | "orr"
+  | "lidstrom"
   | "brodeur"
   | "gretzky"
   | "ovechkin";
 
-type PlayerTrophyKey = "crosby" | "orr" | "brodeur" | "gretzky" | "ovechkin";
+type PlayerTrophyKey =
+  | "crosby"
+  | "lidstrom"
+  | "brodeur"
+  | "gretzky"
+  | "ovechkin";
 
 type TeamAwardKey = Exclude<
   AwardKey,
@@ -248,7 +253,7 @@ const TEAM_AWARD_KEYS: readonly TeamAwardKey[] = [
 
 const PLAYER_TROPHY_KEYS: readonly PlayerTrophyKey[] = [
   "crosby",
-  "orr",
+  "lidstrom",
   "brodeur",
   "gretzky",
   "ovechkin",
@@ -835,7 +840,7 @@ function buildPlayerTrophyAwardRows(
   > = [
     ["crosby", selectPlayerTrophy(rows, (row) => toFiniteNumber(row.Rating))],
     [
-      "orr",
+      "lidstrom",
       selectPlayerTrophy(
         rows,
         (row) => toFiniteNumber(row.Rating),

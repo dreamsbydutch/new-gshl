@@ -42,7 +42,7 @@ export const ALL_TIME_ROSTER_SLOTS: AllTimeRosterSlot[] = [
 
 const PLAYER_AWARD_KEYS = new Set<AwardsListType>([
   AwardsList.CROSBY,
-  AwardsList.ORR,
+  AwardsList.LIDSTROM,
   AwardsList.BRODEUR,
   AwardsList.GRETZKY,
   AwardsList.OVECHKIN,

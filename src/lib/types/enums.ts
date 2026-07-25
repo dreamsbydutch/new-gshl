@@ -70,7 +70,7 @@ export type AwardsList =
   | "secondAS"
   | "playoffAS"
   | "crosby"
-  | "orr"
+  | "lidstrom"
   | "brodeur"
   | "gretzky"
   | "ovechkin";

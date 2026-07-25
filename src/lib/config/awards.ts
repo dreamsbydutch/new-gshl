@@ -164,7 +164,7 @@ export const ALL_STAR_AWARD_LABELS = new Map<AwardsListType, string>([
 
 export const PLAYER_TROPHY_LABELS = new Map<AwardsListType, string>([
   [AwardsList.CROSBY, "Crosby Trophy"],
-  [AwardsList.ORR, "Orr Trophy"],
+  [AwardsList.LIDSTROM, "Lidstrom Trophy"],
   [AwardsList.BRODEUR, "Brodeur Trophy"],
   [AwardsList.GRETZKY, "Gretzky Trophy"],
   [AwardsList.OVECHKIN, "Ovechkin Trophy"],

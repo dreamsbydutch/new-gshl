@@ -693,7 +693,7 @@ export const rulebookSections: RulebookSection[] = [
           ),
           bullets([
             "Crosby Trophy — Best Overall Player",
-            "Orr Trophy — Best Defenseman",
+            "Lidstrom Trophy — Best Defenseman",
             "Brodeur Trophy — Best Goaltender",
             "Gretzky Trophy — Most Points",
             "Ovechkin Trophy — Most Goals",
