@@ -111,9 +111,10 @@ function BracketColumn({
   return (
     <section
       className={cn(
-        "min-w-[250px]",
-        isSingleMatchup && "pt-16 sm:pt-28",
-        index === 2 && isSingleMatchup && "sm:pt-40",
+        "min-w-0",
+        isSingleMatchup && "md:pt-28",
+        index === 2 && isSingleMatchup && "md:pt-40",
+        "md:min-w-[250px]",
       )}
     >
       <header className="mb-3 flex min-h-14 items-center gap-2 border-b border-slate-200 pb-3">
@@ -185,8 +186,8 @@ export function PlayoffBracket({
           </span>
         </div>
 
-        <div className="mt-5 overflow-x-auto rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:p-5">
-          <div className="grid min-w-max auto-cols-[minmax(250px,1fr)] grid-flow-col gap-5">
+        <div className="mt-5 overflow-hidden rounded-2xl border border-slate-200 bg-white p-2.5 shadow-sm sm:p-5 md:overflow-x-auto">
+          <div className="grid min-w-0 grid-cols-1 gap-6 md:min-w-max md:auto-cols-[minmax(250px,1fr)] md:grid-flow-col md:grid-cols-none md:gap-5">
             {bracket.columns.map((column, index) => (
               <BracketColumn key={column.id} column={column} index={index} />
             ))}

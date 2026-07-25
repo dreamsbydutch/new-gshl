@@ -25,6 +25,8 @@ const STANDINGS_PURPOSES = {
   },
 } as const;
 
+const GSHL_LEAGUE_LOGO_URL = "/favicon.ico";
+
 function getRank(
   team: StandingsTeamRow,
   standingsType: string,
@@ -76,9 +78,11 @@ function getGroupDescription(standingsType: string, groupTitle: string) {
 
 function getGroupCardClass(standingsType: string, groupTitle: string) {
   if (standingsType === "conference" || standingsType === "wildcard") {
-    if (groupTitle === "Sunview") return "border-sky-200 bg-sky-50/70";
+    if (groupTitle === "Sunview") {
+      return "border-sunview-200 bg-sunview-50/70";
+    }
     if (groupTitle === "Hickory Hotel") {
-      return "border-amber-200 bg-amber-50/70";
+      return "border-hotel-200 bg-hotel-50/70";
     }
   }
 
@@ -98,9 +102,11 @@ function StandingsGroupTable({
   season: Season;
   standingsType: string;
 }) {
-  const conferenceLogoUrl = group.teams.find(
-    (team) => team.confLogoUrl,
-  )?.confLogoUrl;
+  const isConferenceGroup =
+    group.title === "Sunview" || group.title === "Hickory Hotel";
+  const logoUrl = isConferenceGroup
+    ? (group.teams.find((team) => team.confLogoUrl)?.confLogoUrl ?? null)
+    : GSHL_LEAGUE_LOGO_URL;
   const purpose = getGroupDescription(standingsType, group.title);
 
   return (
@@ -110,36 +116,48 @@ function StandingsGroupTable({
         getGroupCardClass(standingsType, group.title),
       )}
     >
-      <div className="flex items-center gap-4 border-b border-black/10 px-4 py-4 sm:px-5">
-        {conferenceLogoUrl ? (
+      <div className="flex items-center gap-2.5 border-b border-black/10 px-3 py-3 sm:gap-4 sm:px-5 sm:py-4">
+        {logoUrl ? (
           <Image
-            src={conferenceLogoUrl}
-            alt=""
+            src={logoUrl}
+            alt={isConferenceGroup ? `${group.title} logo` : "GSHL league logo"}
             width={72}
             height={72}
-            className="h-14 w-14 shrink-0 object-contain sm:h-16 sm:w-16"
+            className="h-11 w-11 shrink-0 object-contain sm:h-16 sm:w-16"
           />
         ) : null}
         <div className="min-w-0">
-          <h2 className="text-base font-semibold text-slate-950 sm:text-lg">
+          <h2 className="text-sm font-semibold text-slate-950 sm:text-lg">
             {group.title}
           </h2>
-          <p className="mt-0.5 text-xs text-slate-600 sm:text-sm">{purpose}</p>
+          <p className="mt-0.5 text-[11px] text-slate-600 sm:text-sm">
+            {purpose}
+          </p>
         </div>
-        <span className="ml-auto shrink-0 rounded-full bg-white/80 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+        <span className="ml-auto shrink-0 rounded-full bg-white/80 px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.12em] text-slate-500 sm:px-2.5 sm:text-[10px] sm:tracking-[0.14em]">
           {group.teams.length} teams
         </span>
       </div>
 
       <div className="overflow-x-auto bg-white/85">
-        <table className="w-full min-w-[520px] border-collapse text-sm">
+        <table className="w-full table-fixed border-collapse text-xs sm:min-w-[520px] sm:table-auto sm:text-sm">
           <thead>
             <tr className="border-b border-slate-200 text-[10px] uppercase tracking-[0.16em] text-slate-500">
-              <th className="w-12 px-3 py-3 text-center font-semibold">Rank</th>
-              <th className="px-3 py-3 text-left font-semibold">Team</th>
-              <th className="w-20 px-3 py-3 text-center font-semibold">W</th>
-              <th className="w-20 px-3 py-3 text-center font-semibold">L</th>
-              <th className="w-24 px-3 py-3 text-center font-semibold">PTS</th>
+              <th className="w-10 px-1.5 py-2.5 text-center font-semibold sm:w-12 sm:px-3 sm:py-3">
+                Rank
+              </th>
+              <th className="min-w-0 px-1.5 py-2.5 text-left font-semibold sm:px-3 sm:py-3">
+                Team
+              </th>
+              <th className="w-11 px-1.5 py-2.5 text-center font-semibold sm:w-20 sm:px-3 sm:py-3">
+                W
+              </th>
+              <th className="w-11 px-1.5 py-2.5 text-center font-semibold sm:w-20 sm:px-3 sm:py-3">
+                L
+              </th>
+              <th className="w-14 px-1.5 py-2.5 text-center font-semibold sm:w-24 sm:px-3 sm:py-3">
+                PTS
+              </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -148,7 +166,7 @@ function StandingsGroupTable({
                 key={team.id}
                 className="group transition-colors hover:bg-slate-50"
               >
-                <td className="px-3 py-3 text-center font-mono text-xs font-semibold tabular-nums text-slate-500">
+                <td className="px-1.5 py-2.5 text-center font-mono text-[11px] font-semibold tabular-nums text-slate-500 sm:px-3 sm:py-3 sm:text-xs">
                   {getRank(
                     team,
                     standingsType,
@@ -158,35 +176,35 @@ function StandingsGroupTable({
                       : index + 1,
                   )}
                 </td>
-                <th className="px-3 py-3 text-left font-normal">
-                  <div className="flex min-w-0 items-center gap-2.5">
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-100 bg-slate-50">
+                <th className="min-w-0 px-1.5 py-2.5 text-left font-normal sm:px-3 sm:py-3">
+                  <div className="flex min-w-0 items-center gap-1.5 sm:gap-2.5">
+                    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-slate-100 bg-slate-50 sm:h-8 sm:w-8">
                       {team.logoUrl ? (
                         <Image
                           src={team.logoUrl}
                           alt=""
                           width={30}
                           height={30}
-                          className="h-7 w-7 object-contain"
+                          className="h-6 w-6 object-contain sm:h-7 sm:w-7"
                         />
                       ) : (
-                        <span className="text-[10px] font-semibold text-slate-400">
+                        <span className="text-[9px] font-semibold text-slate-400 sm:text-[10px]">
                           {(team.name ?? "TM").slice(0, 2).toUpperCase()}
                         </span>
                       )}
                     </div>
-                    <span className="truncate font-semibold text-slate-900">
+                    <span className="min-w-0 truncate font-semibold text-slate-900">
                       {team.name}
                     </span>
                   </div>
                 </th>
-                <td className="px-3 py-3 text-center font-mono tabular-nums text-slate-700">
+                <td className="px-1.5 py-2.5 text-center font-mono tabular-nums text-slate-700 sm:px-3 sm:py-3">
                   {getStandingValue("wins", team, season)}
                 </td>
-                <td className="px-3 py-3 text-center font-mono tabular-nums text-slate-700">
+                <td className="px-1.5 py-2.5 text-center font-mono tabular-nums text-slate-700 sm:px-3 sm:py-3">
                   {getStandingValue("losses", team, season)}
                 </td>
-                <td className="px-3 py-3 text-center font-mono font-bold tabular-nums text-slate-950">
+                <td className="px-1.5 py-2.5 text-center font-mono font-bold tabular-nums text-slate-950 sm:px-3 sm:py-3">
                   {getStandingValue("points", team, season)}
                 </td>
               </tr>
@@ -220,13 +238,13 @@ export function StandingsTable({
     STANDINGS_PURPOSES.overall;
 
   return (
-    <div className="mx-auto w-full max-w-6xl space-y-4 px-3 py-4 sm:px-6 lg:py-6">
-      <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4 shadow-sm sm:px-5">
+    <div className="mx-auto w-full max-w-6xl space-y-4 px-2.5 py-3 sm:px-6 sm:py-4 lg:py-6">
+      <div className="rounded-2xl border border-slate-200 bg-white px-3.5 py-3.5 shadow-sm sm:px-5 sm:py-4">
         <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-500">
           {purpose.label}
         </p>
         <div className="mt-1 flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between sm:gap-4">
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl">
+          <h1 className="text-xl font-semibold tracking-tight text-slate-950 sm:text-3xl">
             {selectedSeason.name} standings
           </h1>
           <p className="text-sm text-slate-500">{purpose.description}</p>
