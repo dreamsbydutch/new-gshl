@@ -30,7 +30,7 @@ function AwardIcon({
 
   if (!imageUrl || errored) {
     return (
-      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-slate-50">
+      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-slate-50">
         {fallbackIcon ? (
           <span aria-hidden="true" className="text-xl leading-none">
             {fallbackIcon}
@@ -46,7 +46,7 @@ function AwardIcon({
 
   return (
     <img
-      className="h-10 w-10 shrink-0 rounded-xl border border-slate-100 bg-slate-50 object-contain p-1"
+      className="h-9 w-9 shrink-0 rounded-lg border border-slate-100 bg-slate-50 object-contain p-1"
       src={imageUrl}
       alt={alt}
       onError={() => setErrored(true)}
@@ -85,17 +85,19 @@ function WinnerLogo({
 
 function AwardList({
   children,
-  valueLabel = "Winner",
+  valueLabel,
 }: {
   children: ReactNode;
   valueLabel?: string;
 }) {
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-      <div className="hidden grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] border-b border-slate-200 bg-slate-50 px-5 py-2.5 font-barlow text-[10px] uppercase tracking-[0.2em] text-slate-500 sm:grid">
-        <span>Award</span>
-        <span>{valueLabel}</span>
-      </div>
+      {valueLabel ? (
+        <div className="hidden grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] border-b border-slate-200 bg-slate-50 px-5 py-2.5 font-barlow text-[10px] uppercase tracking-[0.2em] text-slate-500 sm:grid">
+          <span>Award</span>
+          <span>{valueLabel}</span>
+        </div>
+      ) : null}
       <ul className="divide-y divide-slate-100">{children}</ul>
     </div>
   );
@@ -111,7 +113,7 @@ function AwardRaceRow({
   contenderNames: string[];
 }) {
   return (
-    <li className="grid gap-3 px-4 py-3.5 sm:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] sm:items-center sm:px-5">
+    <li className="grid gap-2.5 px-4 py-3 sm:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)] sm:items-center sm:px-5">
       <div className="flex min-w-0 items-center gap-3">
         <AwardIcon
           imageUrl={awardImageUrl}
@@ -166,7 +168,7 @@ function AwardListRow({
   nomineeNames?: string[];
 }) {
   return (
-    <li className="grid gap-3 px-4 py-3.5 sm:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] sm:items-center sm:px-5">
+    <li className="grid gap-2.5 px-4 py-3 sm:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)] sm:items-center sm:px-5">
       <div className="flex min-w-0 items-center gap-3">
         <AwardIcon
           imageUrl={awardImageUrl}
@@ -178,10 +180,7 @@ function AwardListRow({
           {awardLabel}
         </h3>
       </div>
-      <div className="flex min-w-0 items-center gap-2.5 pl-[3.25rem] sm:justify-start sm:pl-0">
-        <span className="font-barlow text-[10px] uppercase tracking-[0.16em] text-slate-400 sm:hidden">
-          Winner
-        </span>
+      <div className="flex min-w-0 items-center gap-2.5">
         <WinnerLogo
           logoUrl={winnerLogoUrl}
           fallbackLabel={winnerFallbackLabel}
