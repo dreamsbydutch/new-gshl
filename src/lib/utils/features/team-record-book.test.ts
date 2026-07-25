@@ -6,9 +6,12 @@ import type {
   NHLTeam,
   Player,
   PlayerSplitStatLine,
+  RecordBookAwardRow,
   RecordBookStatColumn,
+  AwardsList as AwardsListType,
+  SeasonType as SeasonTypeValue,
 } from "@gshl-types";
-import { PositionGroup, SeasonType } from "../domain/constants";
+import { AwardsList, PositionGroup, SeasonType } from "../domain/constants";
 import {
   buildAllTimeFranchiseRoster,
   buildRecordBookPlayerRows,
@@ -74,8 +77,27 @@ function seasonSplitRow(
   };
 }
 
+function awardRow(
+  award: AwardsListType,
+  seasonType: SeasonTypeValue = SeasonType.REGULAR_SEASON,
+): RecordBookAwardRow {
+  return {
+    id: `${award}-${seasonType}`,
+    playerId: "player-1",
+    playerName: "Player 1",
+    nhlTeam: undefined,
+    positions: "C",
+    seasonId: "season-1",
+    seasonYear: 2025,
+    seasonType,
+    award,
+    awardLabel: String(award),
+  };
+}
+
 void test("renders uncounted categories as dashes without hiding counted zeroes", () => {
   const { seasonRows } = buildRecordBookPlayerRows({
+    awardRows: [],
     careerSplits: [],
     nhlTeamsByAbbr: new Map(),
     ownerTeamIds: new Set(["owner-a-team-1"]),
@@ -99,6 +121,42 @@ void test("renders uncounted categories as dashes without hiding counted zeroes"
 
   assert.equal(formatRecordBookStat(row, goalsColumn), "0");
   assert.equal(formatRecordBookStat(row, assistsColumn), "-");
+});
+
+void test("counts all-star and player trophies in the matching table season", () => {
+  const { seasonRows } = buildRecordBookPlayerRows({
+    awardRows: [
+      awardRow(AwardsList.GRETZKY),
+      awardRow(AwardsList.CROSBY),
+      awardRow(AwardsList.FIRST_AS),
+      awardRow(AwardsList.PLAYOFF_AS, SeasonType.PLAYOFFS),
+    ],
+    careerSplits: [],
+    nhlTeamsByAbbr: new Map(),
+    ownerTeamIds: new Set(["owner-a-team-1"]),
+    playersById: new Map(),
+    seasonSplits: [
+      seasonSplitRow(),
+      seasonSplitRow({ id: "split-playoffs", seasonType: SeasonType.PLAYOFFS }),
+    ],
+    seasonsById: new Map([["season-1", 2025]]),
+  });
+
+  const regularRow = seasonRows.find(
+    (row) => row.seasonType === SeasonType.REGULAR_SEASON,
+  );
+  const playoffRow = seasonRows.find(
+    (row) => row.seasonType === SeasonType.PLAYOFFS,
+  );
+  if (!regularRow || !playoffRow) {
+    throw new Error("Expected regular-season and playoff record-book rows");
+  }
+
+  assert.equal(regularRow.awardCounts[AwardsList.GRETZKY], 1);
+  assert.equal(regularRow.awardCounts[AwardsList.CROSBY], 1);
+  assert.equal(regularRow.awardCounts[AwardsList.FIRST_AS], 1);
+  assert.equal(regularRow.awardCounts[AwardsList.PLAYOFF_AS], undefined);
+  assert.equal(playoffRow.awardCounts[AwardsList.PLAYOFF_AS], 1);
 });
 
 function careerRow(

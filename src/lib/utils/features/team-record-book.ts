@@ -210,6 +210,42 @@ function getStatLine(row: RecordBookStatLine): RecordBookStatLine {
   };
 }
 
+function incrementAwardCount(
+  countsByKey: Map<string, Partial<Record<AwardsListType, number>>>,
+  key: string,
+  award: AwardsListType,
+): void {
+  const counts = countsByKey.get(key) ?? {};
+  counts[award] = (counts[award] ?? 0) + 1;
+  countsByKey.set(key, counts);
+}
+
+function buildRecordBookAwardCountMaps(awardRows: RecordBookAwardRow[]) {
+  const careerCounts = new Map<
+    string,
+    Partial<Record<AwardsListType, number>>
+  >();
+  const seasonCounts = new Map<
+    string,
+    Partial<Record<AwardsListType, number>>
+  >();
+
+  for (const row of awardRows) {
+    incrementAwardCount(
+      careerCounts,
+      `${row.playerId}|${row.seasonType}`,
+      row.award,
+    );
+    incrementAwardCount(
+      seasonCounts,
+      `${row.playerId}|${row.seasonId}|${row.seasonType}`,
+      row.award,
+    );
+  }
+
+  return { careerCounts, seasonCounts };
+}
+
 function compareYears(left: number | string, right: number | string): number {
   const leftNumber = Number(left);
   const rightNumber = Number(right);
@@ -501,6 +537,7 @@ export function buildRecordBookPlayerRows(
   options: BuildRecordBookPlayerRowsOptions,
 ): BuildRecordBookPlayerRowsResult {
   const {
+    awardRows,
     careerSplits,
     ownerTeamIds,
     nhlTeamsByAbbr,
@@ -513,6 +550,8 @@ export function buildRecordBookPlayerRows(
     ownerTeamIds,
     seasonsById,
   );
+  const { careerCounts, seasonCounts } =
+    buildRecordBookAwardCountMaps(awardRows);
   const seasonsByPlayerStage = new Map<string, FranchiseSeasonRow[]>();
 
   for (const row of ownerSeasonRows) {
@@ -539,6 +578,9 @@ export function buildRecordBookPlayerRows(
       lastSeason: row.seasonYear,
       ...getStatLine(row),
       notCountedStats: row.notCountedStats,
+      awardCounts:
+        seasonCounts.get(`${row.playerId}|${row.seasonId}|${row.seasonType}`) ??
+        {},
     };
   });
 
@@ -564,6 +606,8 @@ export function buildRecordBookPlayerRows(
         lastSeason: years.at(-1),
         ...getStatLine(row),
         notCountedStats: row.notCountedStats,
+        awardCounts:
+          careerCounts.get(`${row.playerId}|${row.seasonType}`) ?? {},
       };
     },
   );
@@ -646,7 +690,12 @@ export function buildRecordBookAwardRows({
             player,
             normalizeIdList(historicalTotal?.nhlPos),
           ),
+          seasonId,
           seasonYear: seasonsById.get(seasonId) ?? seasonId,
+          seasonType:
+            (ALL_STAR_AWARD_KEYS.has(awardKey)
+              ? getAllStarSeasonType(awardKey)
+              : SeasonType.REGULAR_SEASON) ?? SeasonType.REGULAR_SEASON,
           award: awardKey,
           awardLabel: getPlayerAwardLabel(awardKey),
         },

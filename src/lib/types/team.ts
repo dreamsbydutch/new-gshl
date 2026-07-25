@@ -167,6 +167,7 @@ export interface RecordBookPlayerRow extends RecordBookStatLine {
   firstSeason?: number | string;
   lastSeason?: number | string;
   notCountedStats?: Set<RecordBookStatKey>;
+  awardCounts: Partial<Record<AwardsList, number>>;
 }
 
 export interface RecordBookAwardRow {
@@ -175,7 +176,9 @@ export interface RecordBookAwardRow {
   playerName: string;
   nhlTeam: NHLTeam | undefined;
   positions: string;
+  seasonId: string;
   seasonYear: number | string;
+  seasonType: SeasonType;
   award: AwardsList;
   awardLabel: string;
 }
@@ -227,6 +230,7 @@ export interface TeamRecordBookProps {
 }
 
 export interface BuildRecordBookPlayerRowsOptions {
+  awardRows: RecordBookAwardRow[];
   careerSplits: PlayerCareerSplitStatLine[];
   ownerTeamIds: Set<string>;
   nhlTeamsByAbbr: Map<string, NHLTeam>;
@@ -282,7 +286,6 @@ export interface RecordBookPlayerTableProps {
 }
 
 export interface UseTeamRecordBookViewResult {
-  awardRows: RecordBookAwardRow[];
   columns: RecordBookStatColumn[];
   group: RecordBookGroup;
   onGroupChange: (group: RecordBookGroup) => void;

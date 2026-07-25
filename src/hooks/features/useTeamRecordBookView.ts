@@ -87,25 +87,6 @@ export function useTeamRecordBookView(
     () => getOwnerTeamIds(allTeams, currentTeam),
     [allTeams, currentTeam],
   );
-  const playerRowSets = useMemo(
-    () =>
-      buildRecordBookPlayerRows({
-        careerSplits,
-        ownerTeamIds,
-        nhlTeamsByAbbr,
-        playersById,
-        seasonSplits,
-        seasonsById,
-      }),
-    [
-      careerSplits,
-      ownerTeamIds,
-      nhlTeamsByAbbr,
-      playersById,
-      seasonSplits,
-      seasonsById,
-    ],
-  );
   const allAwardRows = useMemo(
     () =>
       buildRecordBookAwardRows({
@@ -124,6 +105,27 @@ export function useTeamRecordBookView(
       playerAwards,
       playerTotals,
       playersById,
+      seasonsById,
+    ],
+  );
+  const playerRowSets = useMemo(
+    () =>
+      buildRecordBookPlayerRows({
+        awardRows: allAwardRows,
+        careerSplits,
+        ownerTeamIds,
+        nhlTeamsByAbbr,
+        playersById,
+        seasonSplits,
+        seasonsById,
+      }),
+    [
+      careerSplits,
+      allAwardRows,
+      ownerTeamIds,
+      nhlTeamsByAbbr,
+      playersById,
+      seasonSplits,
       seasonsById,
     ],
   );
@@ -197,7 +199,6 @@ export function useTeamRecordBookView(
     }));
   }, []);
   return {
-    awardRows: allAwardRows,
     columns,
     group,
     onGroupChange,

@@ -1,14 +1,16 @@
 "use client";
 
+import Image from "next/image";
 import { ArrowDown, ArrowUp, ArrowUpDown, Search } from "lucide-react";
 import { NHLLogo } from "@gshl-components/player/NHLLogo";
+import { AWARD_CATALOG_BY_KEY } from "@gshl-lib/config/awards";
 import { useTeamRecordBookView } from "@gshl-hooks";
 import type {
-  RecordBookAwardRow,
   RecordBookPlayerTableProps,
   RecordBookSortableHeadProps,
   RecordBookToolbarProps,
   RecordBookView,
+  AwardsList as AwardsListType,
   SeasonType as SeasonTypeValue,
   TeamRecordBookProps,
 } from "@gshl-types";
@@ -29,6 +31,57 @@ const RECORD_BOOK_VIEWS: Array<{
   { label: "Career", value: "career" },
   { label: "By year", value: "season" },
 ];
+
+const ALL_STAR_TABLE_COLUMNS = [
+  {
+    award: AwardsList.FIRST_AS,
+    label: "1st",
+    title: "First Team All-Star selections",
+  },
+  {
+    award: AwardsList.SECOND_AS,
+    label: "2nd",
+    title: "Second Team All-Star selections",
+  },
+  {
+    award: AwardsList.PLAYOFF_AS,
+    label: "PO",
+    title: "Playoff All-Star selections",
+  },
+] as const;
+
+const PLAYER_TROPHY_TABLE_COLUMNS = [
+  {
+    award: AwardsList.CROSBY,
+    iconAward: AwardsList.HART,
+    label: "Crosby",
+    title: "Crosby Trophy",
+  },
+  {
+    award: AwardsList.LIDSTROM,
+    iconAward: AwardsList.NORRIS,
+    label: "Lidstrom",
+    title: "Lidstrom Trophy",
+  },
+  {
+    award: AwardsList.BRODEUR,
+    iconAward: AwardsList.VEZINA,
+    label: "Brodeur",
+    title: "Brodeur Trophy",
+  },
+  {
+    award: AwardsList.GRETZKY,
+    iconAward: AwardsList.ART_ROSS,
+    label: "Gretzky",
+    title: "Gretzky Trophy",
+  },
+  {
+    award: AwardsList.OVECHKIN,
+    iconAward: AwardsList.ROCKET,
+    label: "Ovechkin",
+    title: "Ovechkin Trophy",
+  },
+] as const;
 
 function getSeasonTypeLabel(seasonType: SeasonTypeValue): string {
   if (seasonType === SeasonType.PLAYOFFS) return "Playoffs";
@@ -84,6 +137,86 @@ function SortableHead({
         )}
       </button>
     </TableHead>
+  );
+}
+
+function AwardColumnHeading({
+  iconAward,
+  label,
+  title,
+}: {
+  iconAward?: AwardsListType;
+  label: string;
+  title: string;
+}) {
+  const imageUrl = iconAward
+    ? AWARD_CATALOG_BY_KEY.get(iconAward)?.imageUrl
+    : undefined;
+
+  return (
+    <span
+      className="flex min-w-12 flex-col items-center justify-center gap-0.5"
+      title={title}
+    >
+      {imageUrl ? (
+        <Image
+          src={imageUrl}
+          alt=""
+          width={16}
+          height={16}
+          className="h-4 w-4 object-contain"
+        />
+      ) : null}
+      <span>{label}</span>
+    </span>
+  );
+}
+
+function AwardCountMarks({
+  count,
+  iconAward,
+  label,
+}: {
+  count: number | undefined;
+  iconAward: AwardsListType;
+  label: string;
+}) {
+  const imageUrl = AWARD_CATALOG_BY_KEY.get(iconAward)?.imageUrl;
+  const countLabel = `${count ?? 0} ${label}${count === 1 ? "" : "s"}`;
+
+  if (!count) {
+    return (
+      <span className="font-mono text-xs text-slate-400" title={countLabel}>
+        -
+      </span>
+    );
+  }
+
+  if (!imageUrl) {
+    return (
+      <span className="font-mono text-xs tabular-nums" title={countLabel}>
+        {count}
+      </span>
+    );
+  }
+
+  return (
+    <div
+      className="flex min-w-8 flex-wrap justify-center gap-0.5"
+      aria-label={countLabel}
+      title={countLabel}
+    >
+      {Array.from({ length: count }, (_, index) => (
+        <Image
+          key={`${iconAward}-${index}`}
+          src={imageUrl}
+          alt=""
+          width={14}
+          height={14}
+          className="h-3.5 w-3.5 object-contain"
+        />
+      ))}
+    </div>
   );
 }
 
@@ -204,13 +337,17 @@ function PlayerHistoryTable({
 }: RecordBookPlayerTableProps) {
   const hasSeasonColumn = view === "season";
   const playerLeftClass = hasSeasonColumn ? "left-20" : "left-0";
-  const emptyColSpan = columns.length + (hasSeasonColumn ? 3 : 3);
+  const emptyColSpan =
+    columns.length +
+    ALL_STAR_TABLE_COLUMNS.length +
+    PLAYER_TROPHY_TABLE_COLUMNS.length +
+    3;
 
   return (
     <Table
       className={cn(
         "border-collapse text-xs sm:text-sm",
-        hasSeasonColumn ? "min-w-[1120px]" : "min-w-[1080px]",
+        hasSeasonColumn ? "min-w-[1720px]" : "min-w-[1680px]",
       )}
     >
       <TableHeader>
@@ -262,6 +399,28 @@ function PlayerHistoryTable({
               sortKey={column.key}
               title={column.title}
             />
+          ))}
+          {ALL_STAR_TABLE_COLUMNS.map((column) => (
+            <TableHead
+              key={column.award}
+              className="w-14 px-1 text-center text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500"
+              title={column.title}
+            >
+              <AwardColumnHeading label={column.label} title={column.title} />
+            </TableHead>
+          ))}
+          {PLAYER_TROPHY_TABLE_COLUMNS.map((column) => (
+            <TableHead
+              key={column.award}
+              className="w-16 px-1 text-center text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500"
+              title={column.title}
+            >
+              <AwardColumnHeading
+                iconAward={column.iconAward}
+                label={column.label}
+                title={column.title}
+              />
+            </TableHead>
           ))}
         </TableRow>
       </TableHeader>
@@ -328,6 +487,26 @@ function PlayerHistoryTable({
                   {formatRecordBookStat(row, column)}
                 </TableCell>
               ))}
+              {ALL_STAR_TABLE_COLUMNS.map((column) => (
+                <TableCell
+                  key={`${row.id}-${column.award}`}
+                  className="whitespace-nowrap px-1 py-2.5 text-center font-mono tabular-nums text-slate-700"
+                >
+                  {row.awardCounts[column.award] || "-"}
+                </TableCell>
+              ))}
+              {PLAYER_TROPHY_TABLE_COLUMNS.map((column) => (
+                <TableCell
+                  key={`${row.id}-${column.award}`}
+                  className="px-1 py-2.5 text-center"
+                >
+                  <AwardCountMarks
+                    count={row.awardCounts[column.award]}
+                    iconAward={column.iconAward}
+                    label={column.title}
+                  />
+                </TableCell>
+              ))}
             </TableRow>
           ))
         )}
@@ -336,95 +515,8 @@ function PlayerHistoryTable({
   );
 }
 
-const ALL_STAR_AWARD_KEYS = new Set<RecordBookAwardRow["award"]>([
-  AwardsList.FIRST_AS,
-  AwardsList.SECOND_AS,
-  AwardsList.PLAYOFF_AS,
-]);
-
-function AwardListing({
-  countLabel,
-  rows,
-  title,
-}: {
-  countLabel: string;
-  rows: RecordBookAwardRow[];
-  title: string;
-}) {
-  return (
-    <section>
-      <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-slate-200 pb-1">
-        <h3 className="font-oswald text-lg text-slate-950">{title}</h3>
-        <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-slate-500">
-          {rows.length} {countLabel}
-        </span>
-      </div>
-      {rows.length === 0 ? (
-        <p className="py-3 text-sm text-slate-500">
-          Nothing has been recorded yet.
-        </p>
-      ) : (
-        <>
-          <div className="grid grid-cols-[minmax(0,1fr)_4.5rem_minmax(0,1.15fr)_2.5rem] gap-2 border-b border-slate-100 py-1 text-[9px] font-semibold uppercase tracking-[0.12em] text-slate-400">
-            <span>Award</span>
-            <span>Season</span>
-            <span>Player</span>
-            <span className="text-right">Pos</span>
-          </div>
-          <ul className="divide-y divide-slate-100">
-            {rows.map((row) => (
-              <li
-                key={row.id}
-                className="grid grid-cols-[minmax(0,1fr)_4.5rem_minmax(0,1.15fr)_2.5rem] items-baseline gap-2 py-1.5 text-[11px] leading-tight text-slate-700"
-              >
-                <span className="truncate font-semibold text-slate-950">
-                  {row.awardLabel}
-                </span>
-                <span className="font-mono tabular-nums">{row.seasonYear}</span>
-                <span className="truncate">{row.playerName}</span>
-                <span className="truncate text-right uppercase">
-                  {row.positions || "-"}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </>
-      )}
-    </section>
-  );
-}
-
-function PlayerAwardTrophyCase({ rows }: { rows: RecordBookAwardRow[] }) {
-  const playerAwardRows = rows.filter(
-    (row) => !ALL_STAR_AWARD_KEYS.has(row.award),
-  );
-  const allStarRows = rows.filter((row) => ALL_STAR_AWARD_KEYS.has(row.award));
-
-  return (
-    <section className="mx-auto max-w-5xl border-y border-slate-200 py-3 font-varela sm:py-4">
-      <div className="mx-auto max-w-3xl text-center">
-        <h2 className="font-oswald text-2xl text-slate-950">Player honors</h2>
-      </div>
-
-      <div className="mx-auto mt-3 grid max-w-5xl gap-5 md:grid-cols-2">
-        <AwardListing
-          countLabel={playerAwardRows.length === 1 ? "award" : "awards"}
-          rows={playerAwardRows}
-          title="Player awards"
-        />
-        <AwardListing
-          countLabel={allStarRows.length === 1 ? "selection" : "selections"}
-          rows={allStarRows}
-          title="All-star selections"
-        />
-      </div>
-    </section>
-  );
-}
-
 export function TeamRecordBook(props: TeamRecordBookProps) {
   const {
-    awardRows,
     columns,
     group,
     onGroupChange,
@@ -451,8 +543,6 @@ export function TeamRecordBook(props: TeamRecordBookProps) {
             Owner record book
           </span>
         </div>
-
-        <PlayerAwardTrophyCase rows={awardRows} />
 
         <div className="mt-4 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm sm:rounded-2xl">
           <RecordBookToolbar
