@@ -119,6 +119,8 @@ const TEAM_WEEK_POWER_NUMBER_FIELDS = [
   "powerStatScore",
   "powerStatEwma",
   "powerTalent",
+  "gmLadderRating",
+  "powerGmScore",
   "powerHistoryPrior",
   "powerComposite",
   "powerRk",

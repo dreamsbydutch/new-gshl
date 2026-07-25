@@ -701,6 +701,8 @@ export const SHEETS_CONFIG = {
       "powerStatScore",
       "powerStatEwma",
       "powerTalent",
+      "gmLadderRating",
+      "powerGmScore",
       "powerHistoryPrior",
       "powerComposite",
       "powerRk",

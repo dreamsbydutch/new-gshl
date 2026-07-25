@@ -10,6 +10,16 @@ const FILE_PAIRS = [
   {
     source: path.resolve(
       REPO_ROOT,
+      "scripts/src/runtime/apps-script/features/PowerRankingsAlgo.js",
+    ),
+    destination: path.resolve(
+      REPO_ROOT,
+      "apps-script/features/PowerRankingsAlgo.js",
+    ),
+  },
+  {
+    source: path.resolve(
+      REPO_ROOT,
       "scripts/src/runtime/apps-script/features/RankingEngine/config.js",
     ),
     destination: path.resolve(

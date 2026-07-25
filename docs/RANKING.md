@@ -252,6 +252,24 @@ Team models are percentile-based against season-scoped team pools.
 - Writes `GMOYRating` and `GMOYRk` for roster-management value.
 - Clears those award fields for non-regular-season `TeamSeasonStatLine` rows.
 
+## Team power snapshots
+
+`TeamWeekStatLine.powerRating` and `powerRk` describe the team entering that
+week. The engine snapshots the rating before processing the week's results, so
+partial or final Week N play can affect Week N+1 but never Week N.
+
+The standardized composite weights are:
+
+- previous completed week performance: 25%
+- recent-form EWMA through the previous week: 30%
+- matchup Elo through the previous week: 20%
+- rolling roster talent at the week start: 15%
+- GM ladder rating at the week start: 10%
+
+`gmLadderRating` stores the absolute career-ladder snapshot and
+`powerGmScore` stores its league-standardized signal. Only completed and active
+weeks receive power rows; future scheduled weeks do not.
+
 ## Score scale
 
 The runtime score output is effectively calibrated around a `0-125` style

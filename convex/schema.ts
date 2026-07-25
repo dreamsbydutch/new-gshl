@@ -596,6 +596,8 @@ export default defineSchema({
       powerStatScore: optionalNullableNumber,
       powerStatEwma: optionalNullableNumber,
       powerTalent: optionalNullableNumber,
+      gmLadderRating: optionalNullableNumber,
+      powerGmScore: optionalNullableNumber,
       powerHistoryPrior: optionalNullableNumber,
       powerComposite: optionalNullableNumber,
       powerRk: optionalNullableNumber,

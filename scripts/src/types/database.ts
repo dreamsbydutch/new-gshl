@@ -685,6 +685,8 @@ export interface TeamWeekStatLine {
   powerStatScore: number;
   powerStatEwma: number;
   powerTalent: number;
+  gmLadderRating?: number | null;
+  powerGmScore?: number | null;
   powerHistoryPrior: number;
   powerComposite: number;
   powerRating: number;

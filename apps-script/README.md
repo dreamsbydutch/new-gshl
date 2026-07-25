@@ -76,6 +76,8 @@ Only these globals are intended to be run from Apps Script triggers or manual ex
 - refreshes `PlayerNHL` season stats
 - refreshes current-season ratings
 - refreshes current-season overall talent ratings
+- snapshots start-of-week power ratings for every team in each completed or
+  active week; the current week's play is carried into the following week
 
 ### 3. Current-season finalize
 
@@ -83,7 +85,7 @@ Only these globals are intended to be run from Apps Script triggers or manual ex
 
 - updates matchup outcomes
 - updates standings
-- refreshes power rankings
+- refreshes start-of-week power rankings and entering-week matchup ranks
 - reruns matchup/standing updates so ranking-derived matchup fields stay current
 
 `aggregateCurrentSeason()` runs the refresh phase and schedules the finalize
