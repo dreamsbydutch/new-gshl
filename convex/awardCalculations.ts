@@ -19,7 +19,7 @@ export type PlayerAwardOutput = {
     | "ovechkin"
     | "firstAS"
     | "secondAS"
-    | "playoffAS";
+    | "connSmythe";
 };
 
 type Candidate = {
@@ -303,7 +303,13 @@ type AllStarPlayer = {
   rating: number;
 };
 
-type PlayerTrophyKey = "crosby" | "orr" | "brodeur" | "gretzky" | "ovechkin";
+type PlayerTrophyKey =
+  | "crosby"
+  | "orr"
+  | "brodeur"
+  | "gretzky"
+  | "ovechkin"
+  | "connSmythe";
 
 type PlayerTrophyCandidate = {
   playerId: string;
@@ -331,9 +337,10 @@ function playerTrophyPodium(
   rows: Row[],
   value: (row: Row) => number | null,
   eligible: (row: Row) => boolean = () => true,
+  seasonFilter: (row: Row) => boolean = regularSeason,
 ): { playerId: string; nomineeIds: string[] } | null {
   const candidates = rows
-    .filter(regularSeason)
+    .filter(seasonFilter)
     .filter(eligible)
     .flatMap((row): PlayerTrophyCandidate[] => {
       const playerId = text(row.playerId);
@@ -412,6 +419,15 @@ export function calculatePlayerTrophyAwards(input: {
       "ovechkin",
       playerTrophyPodium(input.playerTotalRows, (row) => number(row.G)),
     ],
+    [
+      "connSmythe",
+      playerTrophyPodium(
+        input.playerTotalRows,
+        (row) => number(row.Rating),
+        undefined,
+        playoffSeason,
+      ),
+    ],
   ];
   return definitions.flatMap(([award, result]) =>
     result ? [{ seasonId: input.seasonId, award, ...result }] : [],
@@ -483,9 +499,6 @@ export function calculatePlayerAllStarAwards(input: {
   const second = selectAllStarLineup(
     regularPool.filter((player) => !firstSet.has(player.playerId)),
   );
-  const playoffs = selectAllStarLineup(
-    allStarPool(input.playerTotalRows.filter(playoffSeason)),
-  );
   return [
     ...first.map((playerId) => ({
       seasonId: input.seasonId,
@@ -498,12 +511,6 @@ export function calculatePlayerAllStarAwards(input: {
       playerId,
       nomineeIds: [],
       award: "secondAS" as const,
-    })),
-    ...playoffs.map((playerId) => ({
-      seasonId: input.seasonId,
-      playerId,
-      nomineeIds: [],
-      award: "playoffAS" as const,
     })),
   ];
 }

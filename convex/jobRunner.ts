@@ -429,6 +429,7 @@ export const processAwardsBackfill = internalMutationGeneric({
         "firstAS",
         "secondAS",
         "playoffAS",
+        "connSmythe",
       ]);
       const existingManagedPlayerAwards = existingPlayerAwards.filter((award) =>
         managedPlayerAwards.has(String(award.award)),

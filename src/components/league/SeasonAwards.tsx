@@ -3,7 +3,10 @@
 
 import { useMemo, useState } from "react";
 import type { ReactNode } from "react";
-import { AWARD_GROUP_ORDER } from "@gshl-lib/config/awards";
+import {
+  ALL_STAR_MEDAL_EMOJIS,
+  AWARD_GROUP_ORDER,
+} from "@gshl-lib/config/awards";
 import type { SeasonAwardsProps } from "@gshl-types";
 import {
   buildAllStarTeamCards,
@@ -15,19 +18,27 @@ function AwardIcon({
   imageUrl,
   alt,
   fallbackLabel = "AWD",
+  fallbackIcon,
 }: {
   imageUrl: string | null;
   alt: string;
   fallbackLabel?: string;
+  fallbackIcon?: string;
 }) {
   const [errored, setErrored] = useState(false);
 
   if (!imageUrl || errored) {
     return (
       <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-slate-50">
-        <span className="font-barlow text-[9px] uppercase tracking-[0.12em] text-slate-400">
-          {fallbackLabel}
-        </span>
+        {fallbackIcon ? (
+          <span aria-hidden="true" className="text-xl leading-none">
+            {fallbackIcon}
+          </span>
+        ) : (
+          <span className="font-barlow text-[9px] uppercase tracking-[0.12em] text-slate-400">
+            {fallbackLabel}
+          </span>
+        )}
       </div>
     );
   }
@@ -87,6 +98,7 @@ function AwardListRow({
   awardLabel,
   awardImageUrl,
   awardFallbackLabel,
+  awardFallbackIcon,
   winnerName,
   winnerDetail,
   winnerLogoUrl,
@@ -95,6 +107,7 @@ function AwardListRow({
   awardLabel: string;
   awardImageUrl: string | null;
   awardFallbackLabel?: string;
+  awardFallbackIcon?: string;
   winnerName: string;
   winnerDetail: string | null;
   winnerLogoUrl: string | null;
@@ -107,6 +120,7 @@ function AwardListRow({
           imageUrl={awardImageUrl}
           alt={awardLabel}
           fallbackLabel={awardFallbackLabel}
+          fallbackIcon={awardFallbackIcon}
         />
         <h3 className="min-w-0 truncate font-oswald text-lg leading-tight text-slate-950 sm:text-xl">
           {awardLabel}
@@ -219,14 +233,8 @@ export function SeasonAwards({
   return (
     <section className="mx-auto max-w-6xl px-4 pb-12 pt-4 sm:px-6 lg:pt-6">
       <header className="border-b border-slate-200 pb-6">
-        <p className="font-barlow text-xs uppercase tracking-[0.3em] text-slate-400">
-          {season?.year ? `${season.year} Season` : "Season"}
-        </p>
-        <h1 className="mt-2 font-oswald text-4xl leading-none text-slate-950 sm:text-5xl">
-          Awards
-        </h1>
-        <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600 sm:text-base">
-          A season-by-season listing of team, player, and all-star honors.
+        <p className="font-barlow text-sm uppercase text-slate-400">
+          {season?.year ? `${season.year} Awards` : "Awards"}
         </p>
       </header>
 
@@ -294,6 +302,7 @@ export function SeasonAwards({
                   awardLabel={card.title}
                   awardImageUrl={null}
                   awardFallbackLabel="AS"
+                  awardFallbackIcon={ALL_STAR_MEDAL_EMOJIS.get(card.awardKey)}
                   winnerName={winner.playerName}
                   winnerDetail={
                     winner.positions +

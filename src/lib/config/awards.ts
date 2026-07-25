@@ -162,12 +162,18 @@ export const ALL_STAR_AWARD_LABELS = new Map<AwardsListType, string>([
   [AwardsList.PLAYOFF_AS, "Playoff All-Star"],
 ]);
 
+export const ALL_STAR_MEDAL_EMOJIS = new Map<AwardsListType, string>([
+  [AwardsList.FIRST_AS, "🥇"],
+  [AwardsList.SECOND_AS, "🥈"],
+]);
+
 export const PLAYER_TROPHY_LABELS = new Map<AwardsListType, string>([
   [AwardsList.CROSBY, "Crosby Trophy"],
   [AwardsList.LIDSTROM, "Lidstrom Trophy"],
   [AwardsList.BRODEUR, "Brodeur Trophy"],
   [AwardsList.GRETZKY, "Gretzky Trophy"],
   [AwardsList.OVECHKIN, "Ovechkin Trophy"],
+  [AwardsList.CONN_SMYTHE, "Conn Smythe Trophy"],
 ]);
 
 export const PLAYER_TROPHY_ICON_AWARDS = new Map<
@@ -179,6 +185,13 @@ export const PLAYER_TROPHY_ICON_AWARDS = new Map<
   [AwardsList.BRODEUR, AwardsList.VEZINA],
   [AwardsList.GRETZKY, AwardsList.ART_ROSS],
   [AwardsList.OVECHKIN, AwardsList.ROCKET],
+]);
+
+export const PLAYER_TROPHY_ICON_URLS = new Map<AwardsListType, string>([
+  [
+    AwardsList.CONN_SMYTHE,
+    "https://qzcw4d2n1l.ufs.sh/f/wTZjIHOpQwiMdFatOuljvrNGugImeAEicjQUD0qyz2nb1B5Z",
+  ],
 ]);
 
 export function getAwardLabel(award: string): string {

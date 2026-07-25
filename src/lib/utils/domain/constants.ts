@@ -107,6 +107,7 @@ export const AwardsList = {
   FIRST_AS: "firstAS",
   SECOND_AS: "secondAS",
   PLAYOFF_AS: "playoffAS",
+  CONN_SMYTHE: "connSmythe",
   CROSBY: "crosby",
   LIDSTROM: "lidstrom",
   BRODEUR: "brodeur",

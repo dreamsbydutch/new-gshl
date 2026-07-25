@@ -69,6 +69,7 @@ export type AwardsList =
   | "firstAS"
   | "secondAS"
   | "playoffAS"
+  | "connSmythe"
   | "crosby"
   | "lidstrom"
   | "brodeur"

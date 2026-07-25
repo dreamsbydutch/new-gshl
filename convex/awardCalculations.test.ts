@@ -72,7 +72,7 @@ void test("calculates Convex team awards with owner winners and nominees", () =>
   assert.ok(awards.every((award) => !Object.hasOwn(award, "teamId")));
 });
 
-void test("calculates first, second, and playoff player All-Star teams", () => {
+void test("calculates first and second player All-Star teams", () => {
   const row = (
     playerId: string,
     nhlPos: string[],
@@ -128,18 +128,11 @@ void test("calculates first, second, and playoff player All-Star teams", () => {
     "d-4",
     "g-2",
   ]);
-  assert.deepEqual(playersFor("playoffAS"), [
-    "c-po",
-    "lw-po",
-    "rw-po",
-    "d-po-1",
-    "d-po-2",
-    "g-po",
-  ]);
+  assert.deepEqual(playersFor("playoffAS"), []);
   assert.ok(awards.every((award) => award.nomineeIds.length === 0));
 });
 
-void test("calculates the five regular-season player trophies", () => {
+void test("calculates the regular-season trophies and Conn Smythe", () => {
   const row = (
     playerId: string,
     nhlPos: string[],
@@ -189,6 +182,8 @@ void test("calculates the five regular-season player trophies", () => {
     "forward-one",
     "defense-one",
   ]);
+  assert.equal(award("connSmythe")?.playerId, "playoff-only");
+  assert.deepEqual(award("connSmythe")?.nomineeIds, []);
   assert.ok(
     calculatePlayerAwards({ seasonId: "season", playerTotalRows }).length >=
       awards.length,

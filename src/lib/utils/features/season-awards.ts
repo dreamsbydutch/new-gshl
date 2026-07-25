@@ -1,6 +1,7 @@
 import {
   AWARD_CATALOG_BY_KEY,
   AWARD_GROUP_ORDER,
+  PLAYER_TROPHY_ICON_URLS,
   getAwardLabel,
   getTeamAwardTeam,
   PLAYER_TROPHY_ICON_AWARDS,
@@ -27,10 +28,31 @@ import { formatPlayerPositionList } from "../domain/player";
 export const ALL_STAR_AWARD_ORDER = [
   AwardsList.FIRST_AS,
   AwardsList.SECOND_AS,
-  AwardsList.PLAYOFF_AS,
 ] as const;
 
 const ALL_STAR_AWARD_KEYS = new Set<AwardsListType>(ALL_STAR_AWARD_ORDER);
+const EXCLUDED_AWARD_KEYS = new Set<AwardsListType>([AwardsList.PLAYOFF_AS]);
+
+const ALL_STAR_POSITION_ORDER: Record<string, number> = {
+  C: 0,
+  LW: 1,
+  RW: 2,
+  D: 3,
+  G: 4,
+};
+
+function getAllStarPositionRank(positions: readonly string[] | undefined) {
+  return (
+    positions?.reduce(
+      (rank, candidate) =>
+        Math.min(
+          rank,
+          ALL_STAR_POSITION_ORDER[candidate] ?? Number.MAX_SAFE_INTEGER,
+        ),
+      Number.MAX_SAFE_INTEGER,
+    ) ?? Number.MAX_SAFE_INTEGER
+  );
+}
 
 const PLAYER_AWARD_ORDER: AwardsListType[] = [
   AwardsList.CROSBY,
@@ -38,6 +60,7 @@ const PLAYER_AWARD_ORDER: AwardsListType[] = [
   AwardsList.GRETZKY,
   AwardsList.LIDSTROM,
   AwardsList.BRODEUR,
+  AwardsList.CONN_SMYTHE,
   AwardsList.HART,
   AwardsList.NORRIS,
   AwardsList.VEZINA,
@@ -98,25 +121,6 @@ export function getAllStarTitle(awardKey: AllStarAwardKey): string {
       return "First Team All-Stars";
     case AwardsList.SECOND_AS:
       return "Second Team All-Stars";
-    case AwardsList.PLAYOFF_AS:
-      return "Playoff All-Stars";
-  }
-}
-
-/**
- * Returns all star card class.
- *
- * @param awardKey - The award key to use.
- * @returns The requested all star card class.
- */
-export function getAllStarCardClass(awardKey: AllStarAwardKey): string {
-  switch (awardKey) {
-    case AwardsList.FIRST_AS:
-      return "border-amber-200 bg-gradient-to-b from-amber-50 to-white";
-    case AwardsList.SECOND_AS:
-      return "border-slate-200 bg-gradient-to-b from-slate-100 to-white";
-    case AwardsList.PLAYOFF_AS:
-      return "border-orange-200 bg-gradient-to-b from-orange-50 to-white";
   }
 }
 
@@ -178,7 +182,7 @@ export function buildAllStarTeamCards(
   teams: GSHLTeam[],
 ): AllStarTeamCard[] {
   const playerById = new Map(
-    players.map((player) => [String(player.id), player.fullName]),
+    players.map((player) => [String(player.id), player]),
   );
   const teamById = new Map(teams.map((team) => [String(team.id), team]));
 
@@ -190,6 +194,7 @@ export function buildAllStarTeamCards(
         const playerTotal = playerTotals.find((row) => {
           return String(row.playerId) === playerId;
         });
+        const player = playerById.get(playerId);
         const gshlTeamIds = normalizeIdList(playerTotal?.gshlTeamIds);
         const gshlTeams = gshlTeamIds
           .map((teamId) => teamById.get(teamId))
@@ -200,15 +205,29 @@ export function buildAllStarTeamCards(
           .filter((teamName): teamName is string => Boolean(teamName))
           .join(", ");
 
-        return {
+        const winner = {
           playerId,
-          playerName: playerById.get(playerId) ?? `Player ${playerId}`,
-          positions: formatPlayerPositionList(playerTotal?.nhlPos),
+          playerName: player?.fullName ?? `Player ${playerId}`,
+          positions: formatPlayerPositionList(
+            playerTotal?.nhlPos ?? player?.nhlPos,
+          ),
           teamName: joinedTeamNames || null,
           teamLogoUrl: primaryTeam?.logoUrl ?? null,
         } satisfies AllStarWinner;
+
+        return {
+          positionRank: getAllStarPositionRank(
+            playerTotal?.nhlPos ?? player?.nhlPos,
+          ),
+          winner,
+        };
       })
-      .sort((left, right) => left.playerName.localeCompare(right.playerName));
+      .sort(
+        (left, right) =>
+          left.positionRank - right.positionRank ||
+          left.winner.playerName.localeCompare(right.winner.playerName),
+      )
+      .map(({ winner }) => winner);
 
     return {
       awardKey,
@@ -239,7 +258,8 @@ export function buildPlayerAwardSections(
       awards
         .map((award) => award.award)
         .filter(
-          (award): award is AwardsListType => !ALL_STAR_AWARD_KEYS.has(award),
+          (award): award is AwardsListType =>
+            !ALL_STAR_AWARD_KEYS.has(award) && !EXCLUDED_AWARD_KEYS.has(award),
         ),
     ),
   ].sort((left, right) => {
@@ -279,7 +299,10 @@ export function buildPlayerAwardSections(
     return {
       awardKey,
       title: getAwardLabel(awardKey),
-      iconUrl: AWARD_CATALOG_BY_KEY.get(iconAward)?.imageUrl ?? null,
+      iconUrl:
+        PLAYER_TROPHY_ICON_URLS.get(awardKey) ??
+        AWARD_CATALOG_BY_KEY.get(iconAward)?.imageUrl ??
+        null,
       winners,
     };
   });
