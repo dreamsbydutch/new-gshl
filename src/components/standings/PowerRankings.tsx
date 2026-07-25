@@ -14,7 +14,7 @@ import {
 } from "recharts";
 
 import type { PowerRankingEntry, PowerRankingsProps } from "@gshl-types";
-import { useDistinctTeamColors } from "@gshl-hooks";
+import { useAuthSession, useDistinctTeamColors } from "@gshl-hooks";
 
 function RankMovement({ entry }: { entry: PowerRankingEntry }) {
   if (entry.rankChange === null) {
@@ -67,6 +67,7 @@ function TeamLogo({ entry }: { entry: PowerRankingEntry }) {
 }
 
 export function PowerRankings({ season, rankings }: PowerRankingsProps) {
+  const { session } = useAuthSession();
   const colorSources = useMemo(
     () =>
       rankings.entries.map((entry) => ({
@@ -92,6 +93,18 @@ export function PowerRankings({ season, rankings }: PowerRankingsProps) {
     : "from the season summary";
   const teamCount = Math.max(rankings.series.length, 1);
   const yTicks = Array.from({ length: teamCount }, (_, index) => index + 1);
+  const signedInTeamId =
+    rankings.entries.find(
+      (entry) =>
+        session?.user.ownerId &&
+        String(entry.team.ownerId) === String(session.user.ownerId),
+    )?.team.id ?? null;
+  const chartSeries = signedInTeamId
+    ? [
+        ...rankings.series.filter((team) => team.teamId !== signedInTeamId),
+        ...rankings.series.filter((team) => team.teamId === signedInTeamId),
+      ]
+    : rankings.series;
 
   return (
     <div className="mx-auto w-full max-w-6xl space-y-4 px-2.5 py-3 sm:px-6 sm:py-4 lg:py-6">
@@ -187,6 +200,9 @@ export function PowerRankings({ season, rankings }: PowerRankingsProps) {
               <p className="mt-0.5 text-[11px] text-slate-500 sm:text-xs">
                 Rank 1 is shown at the top. Hover or tap the chart for weekly
                 positions.
+                {signedInTeamId
+                  ? " Your team is shown with a thicker line."
+                  : ""}
               </p>
             </div>
             {rankings.chartData.length ? (
@@ -232,20 +248,28 @@ export function PowerRankings({ season, rankings }: PowerRankingsProps) {
                         fontSize: 12,
                       }}
                     />
-                    {rankings.series.map((team) => (
-                      <Line
-                        key={team.teamId}
-                        type="monotone"
-                        dataKey={team.teamId}
-                        name={team.teamId}
-                        stroke={teamColors[team.teamId] ?? team.color}
-                        strokeWidth={2}
-                        strokeOpacity={0.72}
-                        dot={false}
-                        activeDot={{ r: 4, strokeWidth: 0 }}
-                        connectNulls
-                      />
-                    ))}
+                    {chartSeries.map((team) => {
+                      const color = teamColors[team.teamId] ?? team.color;
+                      const isSignedInTeam = team.teamId === signedInTeamId;
+                      return (
+                        <Line
+                          key={`${team.teamId}-${color}`}
+                          type="monotone"
+                          dataKey={team.teamId}
+                          name={team.teamId}
+                          stroke={color}
+                          strokeWidth={isSignedInTeam ? 5 : 2}
+                          strokeOpacity={isSignedInTeam ? 1 : 0.68}
+                          dot={false}
+                          activeDot={{
+                            r: isSignedInTeam ? 6 : 4,
+                            strokeWidth: 0,
+                          }}
+                          connectNulls
+                          isAnimationActive={false}
+                        />
+                      );
+                    })}
                   </LineChart>
                 </ResponsiveContainer>
               </div>

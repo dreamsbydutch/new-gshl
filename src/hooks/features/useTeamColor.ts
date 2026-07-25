@@ -15,6 +15,7 @@ import { selectDistinctPowerRankingColors } from "@gshl-utils";
 // Legacy single-color cache (primary) & expanded palette cache
 const colorCache = new Map<string, string>();
 const paletteCache = new Map<string, TeamPaletteCacheEntry>();
+const distinctColorCache = new Map<string, PowerRankingColorMap>();
 
 /**
  * Quantize 8-bit RGB components into a compact 15-bit bucket key (5 bits per channel)
@@ -346,15 +347,27 @@ const loadTeamPalette = (
 export function useDistinctTeamColors(
   sources: PowerRankingColorSource[],
 ): PowerRankingColorMap {
+  const sourceKey = sources
+    .map(
+      (source) =>
+        `${source.teamId}:${source.logoUrl ?? ""}:${source.fallbackColor}`,
+    )
+    .join("|");
   const fallbackColors = useMemo(
-    () => selectDistinctPowerRankingColors(sources, {}),
-    [sources],
+    () =>
+      distinctColorCache.get(sourceKey) ??
+      selectDistinctPowerRankingColors(sources, {}),
+    [sourceKey, sources],
   );
   const [colors, setColors] = useState<PowerRankingColorMap>(fallbackColors);
 
   useEffect(() => {
     let cancelled = false;
-    setColors(fallbackColors);
+    const cached = distinctColorCache.get(sourceKey);
+    if (cached) {
+      setColors(cached);
+      return;
+    }
 
     void Promise.all(
       sources.map(async (source) => {
@@ -376,13 +389,15 @@ export function useDistinctTeamColors(
       for (const [teamId, candidates] of entries) {
         palettes[teamId] = candidates;
       }
-      setColors(selectDistinctPowerRankingColors(sources, palettes));
+      const resolved = selectDistinctPowerRankingColors(sources, palettes);
+      distinctColorCache.set(sourceKey, resolved);
+      setColors(resolved);
     });
 
     return () => {
       cancelled = true;
     };
-  }, [fallbackColors, sources]);
+  }, [sourceKey, sources]);
 
   return colors;
 }
