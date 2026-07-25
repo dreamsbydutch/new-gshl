@@ -80,6 +80,7 @@ export {
   useCareerSplits,
   usePlayerSplitsByTeams,
   usePlayerTotalsByPlayers,
+  usePlayerNhlStatsByPlayers,
 } from "./usePlayerStats";
 export type { UsePlayerStatsOptions, UsePlayerStatsResult } from "@gshl-types";
 

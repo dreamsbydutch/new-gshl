@@ -8,6 +8,7 @@ import type { Id } from "../../../convex/_generated/dataModel";
 import type {
   PlayerCareerSplitStatLine,
   PlayerDayStatLine,
+  PlayerNHLStatLine,
   PlayerSplitStatLine,
   PlayerTotalStatLine,
   PlayerWeekStatLine,
@@ -164,6 +165,22 @@ export function usePlayerTotalsByPlayers(playerIds: string[], enabled = true) {
   );
   return {
     data: (result ?? []) as unknown as PlayerTotalStatLine[],
+    isLoading: enabled && ids.length > 0 && result === undefined,
+    error: null,
+  };
+}
+
+export function usePlayerNhlStatsByPlayers(
+  playerIds: string[],
+  enabled = true,
+) {
+  const ids = useMemo(() => [...new Set(playerIds)].sort(), [playerIds]);
+  const result = useQuery(
+    api.frontend.playerNhlByPlayers,
+    enabled && ids.length ? { playerIds: ids as Id<"players">[] } : "skip",
+  );
+  return {
+    data: (result ?? []) as unknown as PlayerNHLStatLine[],
     isLoading: enabled && ids.length > 0 && result === undefined,
     error: null,
   };

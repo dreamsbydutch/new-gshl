@@ -8,6 +8,7 @@ import {
   useContracts,
   useFranchises,
   useNHLTeams,
+  usePlayerNhlStatsByPlayers,
   usePlayers,
   useSeasons,
   useTeams,
@@ -25,6 +26,7 @@ import {
   findNhlTeamByAbbreviation,
   getAffordableUfaTerms,
   getUfaWindow,
+  indexLatestUfaNhlStats,
   isUnsignedForSigningSeason,
   normalizeUfaPublicState,
   rankUfas,
@@ -36,6 +38,14 @@ export function useUfaOverview(): UseUfaOverviewResult {
   const rawState = useQuery(api.ufa.publicState, {});
   const state = useMemo(() => normalizeUfaPublicState(rawState), [rawState]);
   const players = usePlayers({ isActive: true });
+  const playerIds = useMemo(
+    () => players.data.map((player) => String(player.id)),
+    [players.data],
+  );
+  const nhlStatsQuery = usePlayerNhlStatsByPlayers(
+    playerIds,
+    !players.isLoading,
+  );
   const nhlTeamsQuery = useNHLTeams();
   const franchisesQuery = useFranchises();
   const teamsQuery = useTeams();
@@ -45,6 +55,7 @@ export function useUfaOverview(): UseUfaOverviewResult {
     if (
       rawState === undefined ||
       players.isLoading ||
+      nhlStatsQuery.isLoading ||
       nhlTeamsQuery.isLoading ||
       franchisesQuery.isLoading ||
       teamsQuery.isLoading ||
@@ -68,6 +79,11 @@ export function useUfaOverview(): UseUfaOverviewResult {
         !("seasonType" in team),
     );
     const activeSeason = seasons.data.find((season) => season.isActive);
+    const latestNhlStatsByPlayer = indexLatestUfaNhlStats(
+      nhlStatsQuery.data,
+      seasons.data,
+      activeSeason?.year,
+    );
     const window = getUfaWindow(activeSeason ?? null);
     const ownerId = session?.user?.ownerId;
     const ownerFranchise = franchises.find(
@@ -127,7 +143,7 @@ export function useUfaOverview(): UseUfaOverviewResult {
             salary,
             seasonRating: Number(player.seasonRating ?? 0),
             overallRating: Number(player.overallRating ?? 0),
-            stats: null,
+            stats: latestNhlStatsByPlayer.get(String(player.id)) ?? null,
             affordableTerms,
             existingOffer: mine
               ? { years: mine.contractLength, status: mine.status }
@@ -206,6 +222,8 @@ export function useUfaOverview(): UseUfaOverviewResult {
     franchisesQuery.isLoading,
     nhlTeamsQuery.data,
     nhlTeamsQuery.isLoading,
+    nhlStatsQuery.data,
+    nhlStatsQuery.isLoading,
     players.data,
     players.isLoading,
     seasons.data,
