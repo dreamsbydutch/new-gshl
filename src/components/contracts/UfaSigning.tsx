@@ -226,7 +226,7 @@ function PlayerTable({
   const mixed = showStats && hasGoalies && hasSkaters;
   if (mixed) {
     return (
-      <div className="space-y-6">
+      <div className="w-full min-w-0 max-w-full space-y-6 overflow-hidden">
         <PlayerTable
           players={players.filter((player) => player.positionGroup !== "G")}
           showStats
@@ -243,8 +243,8 @@ function PlayerTable({
     : ["GP", "G", "A", "P", "+/−", "PIM", "PPP", "SOG", "HIT", "BLK"];
   const mobileCellPadding = showStats ? "px-1 py-1" : "px-0.5 py-0.5";
   return (
-    <div className="overflow-x-auto overscroll-x-contain rounded-lg border">
-      <table className="w-full min-w-0 text-center text-[10px] sm:min-w-0 sm:text-sm">
+    <div className="relative block w-full min-w-0 max-w-full touch-pan-x overflow-x-auto overscroll-x-contain rounded-lg border">
+      <table className="w-max min-w-full text-center text-[10px] sm:text-sm">
         <thead className="bg-muted/70 text-[8px] uppercase tracking-wide sm:text-xs">
           <tr>
             <th
@@ -293,7 +293,7 @@ function PlayerTable({
 function ActiveOffers({ groups }: { groups: UfaOfferGroupView[] }) {
   return (
     <section
-      className="space-y-2 sm:space-y-3"
+      className="w-full min-w-0 max-w-full space-y-2 overflow-hidden sm:space-y-3"
       aria-labelledby="ufa-active-offers"
     >
       <h3 id="ufa-active-offers" className="text-base font-bold sm:text-lg">
@@ -304,8 +304,8 @@ function ActiveOffers({ groups }: { groups: UfaOfferGroupView[] }) {
           No UFA offers are currently pending.
         </p>
       ) : (
-        <div className="overflow-x-auto overscroll-x-contain rounded-lg border">
-          <table className="w-full min-w-[720px] text-center text-[10px] sm:min-w-0 sm:text-sm">
+        <div className="relative block w-full min-w-0 max-w-full touch-pan-x overflow-x-auto overscroll-x-contain rounded-lg border">
+          <table className="w-max min-w-[720px] text-center text-[10px] sm:min-w-full sm:text-sm">
             <thead className="bg-muted/70 text-[8px] uppercase sm:text-xs">
               <tr>
                 <th className="sticky left-0 z-30 w-8 min-w-8 border-r bg-muted/70 px-0.5 py-1 sm:static sm:z-auto sm:w-auto sm:min-w-0 sm:border-0 sm:bg-transparent sm:px-3 sm:py-3">
@@ -401,7 +401,7 @@ export function UfaHomeCard() {
   if (!query.data.window.isOpen && query.data.offerGroups.length === 0)
     return null;
   return (
-    <section className="space-y-3 rounded-xl border bg-card p-2 shadow-sm sm:space-y-6 sm:p-6">
+    <section className="w-full min-w-0 max-w-full space-y-3 overflow-hidden rounded-xl border bg-card p-2 shadow-sm sm:space-y-6 sm:p-6">
       <div className="flex flex-wrap items-start justify-between gap-2 sm:gap-3">
         <div>
           <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-primary sm:text-xs sm:tracking-[0.2em]">
@@ -423,7 +423,7 @@ export function UfaHomeCard() {
       </div>
       {query.data.window.isOpen ? (
         query.data.topFreeAgents.length > 0 ? (
-          <PlayerTable players={query.data.topFreeAgents} />
+          <PlayerTable players={query.data.topFreeAgents} showStats />
         ) : (
           <p className="rounded-md border border-dashed p-2 text-xs text-muted-foreground sm:p-4 sm:text-sm">
             {query.data.viewer.isSignedInOwner
@@ -469,7 +469,7 @@ export function UfaLeagueOffice() {
       </p>
     );
   return (
-    <div className="space-y-4 sm:space-y-6">
+    <div className="w-full min-w-0 max-w-full space-y-4 overflow-hidden sm:space-y-6">
       <div>
         <h1 className="text-2xl font-black sm:text-3xl">Free Agents</h1>
         <p className="text-xs text-muted-foreground sm:text-sm">
