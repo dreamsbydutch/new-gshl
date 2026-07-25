@@ -59,7 +59,6 @@ export function useSeasonDataBundle<TTeamStats = never>(
 
   const teamsQuery = useTeams({
     seasonId,
-    weekId,
     enabled: hasSeasonScope || hasWeekScope,
   }) as UseSeasonDataBundleResult<TTeamStats>["teamsQuery"];
 
