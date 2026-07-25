@@ -13,6 +13,7 @@ import {
   type Matchup,
   type MatchupType as MatchupTypeValue,
   type Owner,
+  type OwnerPowerRankingStat,
   type Season,
   type TeamAward,
   type Week,
@@ -122,6 +123,18 @@ const award = (
   nomineeIds: [],
   createdAt: now,
   updatedAt: now,
+});
+
+const powerRank = (
+  seasonId: string,
+  weekId: string,
+  teamId: string,
+  rank: number,
+): OwnerPowerRankingStat => ({
+  seasonId,
+  weekId,
+  gshlTeamId: teamId,
+  powerRk: rank,
 });
 
 void test("seeds every newcomer at the entry baseline alongside active and inactive owners", () => {
@@ -256,6 +269,39 @@ void test("penalizes the last-place Brophy Trophy", () => {
   assert.equal(lastPlace.brophyAwards, 1);
   assert.equal(lastPlace.achievementBonus, -10);
   assert.equal(lastPlace.rating, OWNER_LADDER_BASE_RATING - 10);
+});
+
+void test("rewards power-ranking dominance and penalizes bottom-three weeks", () => {
+  const owners = Array.from({ length: 6 }, (_, index) =>
+    owner(`owner-${index + 1}`, true),
+  );
+  const teams = owners.map((item) => team(`${item.id}-team`, "s1", item.id));
+  const rankingStats = ["w1", "w2"].flatMap((weekId) =>
+    teams.map((item, index) => powerRank("s1", weekId, item.id, index + 1)),
+  );
+  const result = buildOwnerRankings({
+    owners,
+    seasons: [season("s1", 2025)],
+    teams,
+    weeks: [week("w1", "s1", 1), week("w2", "s1", 2)],
+    matchups: [],
+    teamAwards: [],
+    powerRankingStats: rankingStats,
+  });
+  const leader = result.rankings.find((entry) => entry.owner.id === "owner-1");
+  const lastPlace = result.rankings.find(
+    (entry) => entry.owner.id === "owner-6",
+  );
+
+  assert.ok(leader);
+  assert.ok(lastPlace);
+  assert.equal(leader.weeksAtNumberOne, 2);
+  assert.equal(leader.weeksInTopThree, 2);
+  assert.equal(leader.powerRankingAdjustment, 4);
+  assert.equal(lastPlace.weeksInBottomThree, 2);
+  assert.equal(lastPlace.weeksInLastPlace, 2);
+  assert.equal(lastPlace.powerRankingAdjustment, -4);
+  assert.ok(leader.rating > lastPlace.rating);
 });
 
 void test("ranks the stronger career resume above a weaker late Elo run", () => {

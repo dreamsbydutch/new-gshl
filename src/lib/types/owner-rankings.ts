@@ -1,4 +1,9 @@
-import type { GSHLTeam, Owner } from "./database";
+import type { GSHLTeam, Owner, TeamWeekStatLine } from "./database";
+
+export type OwnerPowerRankingStat = Pick<
+  TeamWeekStatLine,
+  "seasonId" | "weekId" | "gshlTeamId" | "powerRk"
+>;
 
 export interface OwnerRankingRecord {
   wins: number;
@@ -23,6 +28,12 @@ export interface OwnerRankingEntry {
   matchupDelta: number;
   performanceAdjustment: number;
   achievementBonus: number;
+  powerRankingAdjustment: number;
+  powerWeeksRanked: number;
+  weeksAtNumberOne: number;
+  weeksInTopThree: number;
+  weeksInBottomThree: number;
+  weeksInLastPlace: number;
   overallRecord: OwnerRankingRecord;
   conferenceRecord: OwnerRankingRecord;
   playoffRecord: OwnerRankingRecord;

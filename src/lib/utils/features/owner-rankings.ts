@@ -4,6 +4,7 @@ import type {
   MatchupType as MatchupTypeValue,
   Owner,
   OwnerLadderBattle,
+  OwnerPowerRankingStat,
   OwnerRankingEntry,
   OwnerRankingRecord,
   OwnerRankingsViewModel,
@@ -35,6 +36,13 @@ export const OWNER_LADDER_BONUSES = {
   brophy: -10,
 } as const;
 
+export const OWNER_LADDER_POWER_WEIGHTS = {
+  numberOne: 1.5,
+  topThree: 0.5,
+  bottomThree: -0.5,
+  lastPlace: -1.5,
+} as const;
+
 const PLAYOFF_TYPES = new Set<MatchupTypeValue>([
   MatchupType.QUARTER_FINAL,
   MatchupType.SEMI_FINAL,
@@ -56,6 +64,11 @@ interface OwnerLadderState {
   seedRating: number;
   lastDelta: number;
   achievementBonus: number;
+  powerWeeksRanked: number;
+  weeksAtNumberOne: number;
+  weeksInTopThree: number;
+  weeksInBottomThree: number;
+  weeksInLastPlace: number;
   overall: MutableRecord;
   conference: MutableRecord;
   playoffs: MutableRecord;
@@ -119,10 +132,17 @@ const performanceAdjustment = (state: OwnerLadderState) =>
   (bayesianPercentage(state.conference, 10) - 0.5) * 80 +
   (bayesianPercentage(state.playoffs, 6) - 0.5) * 120;
 
+const powerRankingAdjustment = (state: OwnerLadderState) =>
+  state.weeksAtNumberOne * OWNER_LADDER_POWER_WEIGHTS.numberOne +
+  state.weeksInTopThree * OWNER_LADDER_POWER_WEIGHTS.topThree +
+  state.weeksInBottomThree * OWNER_LADDER_POWER_WEIGHTS.bottomThree +
+  state.weeksInLastPlace * OWNER_LADDER_POWER_WEIGHTS.lastPlace;
+
 const ladderRating = (state: OwnerLadderState) =>
   OWNER_LADDER_BASE_RATING +
   (state.elo - OWNER_LADDER_BASE_RATING) * OWNER_LADDER_ELO_WEIGHT +
   state.achievementBonus +
+  powerRankingAdjustment(state) +
   performanceAdjustment(state);
 
 const expectedScore = (ratingA: number, ratingB: number) =>
@@ -181,6 +201,11 @@ const makeState = (
     seedRating,
     lastDelta: 0,
     achievementBonus: 0,
+    powerWeeksRanked: 0,
+    weeksAtNumberOne: 0,
+    weeksInTopThree: 0,
+    weeksInBottomThree: 0,
+    weeksInLastPlace: 0,
     overall: emptyRecord(),
     conference: emptyRecord(),
     playoffs: emptyRecord(),
@@ -227,8 +252,16 @@ export function buildOwnerRankings(params: {
   seasons: Season[];
   weeks: Week[];
   teamAwards: TeamAward[];
+  powerRankingStats?: OwnerPowerRankingStat[];
 }): OwnerRankingsViewModel {
-  const { teams, matchups, seasons, weeks, teamAwards } = params;
+  const {
+    teams,
+    matchups,
+    seasons,
+    weeks,
+    teamAwards,
+    powerRankingStats = [],
+  } = params;
   const ownerById = new Map(
     params.owners.map((owner) => [String(owner.id), owner]),
   );
@@ -461,6 +494,46 @@ export function buildOwnerRankings(params: {
         state.achievementBonus += OWNER_LADDER_BONUSES.otherAward;
       }
     }
+
+    const seasonPowerStats = powerRankingStats.filter(
+      (stat) => normalizeId(stat.seasonId) === String(season.id),
+    );
+    const statsByWeek = new Map<string, OwnerPowerRankingStat[]>();
+    for (const stat of seasonPowerStats) {
+      const rank = numericScore(stat.powerRk);
+      if (rank == null || rank <= 0) continue;
+      const weekStats = statsByWeek.get(String(stat.weekId)) ?? [];
+      weekStats.push(stat);
+      statsByWeek.set(String(stat.weekId), weekStats);
+    }
+    for (const weekStats of statsByWeek.values()) {
+      const lastRank = Math.max(
+        ...weekStats.map((stat) => numericScore(stat.powerRk) ?? 0),
+      );
+      if (lastRank <= 0) continue;
+      const bottomThreeThreshold = Math.max(1, lastRank - 2);
+      const rankByOwner = new Map<string, number>();
+      for (const stat of weekStats) {
+        const ownerId = normalizeId(
+          teamById.get(String(stat.gshlTeamId))?.ownerId,
+        );
+        const rank = numericScore(stat.powerRk);
+        if (!ownerId || rank == null || rank <= 0) continue;
+        const existingRank = rankByOwner.get(ownerId);
+        if (existingRank == null || rank < existingRank) {
+          rankByOwner.set(ownerId, rank);
+        }
+      }
+      for (const [ownerId, rank] of rankByOwner) {
+        const state = ensureOwner(ownerId);
+        if (!state) continue;
+        state.powerWeeksRanked += 1;
+        if (rank === 1) state.weeksAtNumberOne += 1;
+        if (rank <= 3) state.weeksInTopThree += 1;
+        if (rank >= bottomThreeThreshold) state.weeksInBottomThree += 1;
+        if (rank === lastRank) state.weeksInLastPlace += 1;
+      }
+    }
   }
 
   const ownerWithoutHistory = [...ownerById.values()]
@@ -488,6 +561,12 @@ export function buildOwnerRankings(params: {
       matchupDelta: state.lastDelta,
       performanceAdjustment: performanceAdjustment(state),
       achievementBonus: state.achievementBonus,
+      powerRankingAdjustment: powerRankingAdjustment(state),
+      powerWeeksRanked: state.powerWeeksRanked,
+      weeksAtNumberOne: state.weeksAtNumberOne,
+      weeksInTopThree: state.weeksInTopThree,
+      weeksInBottomThree: state.weeksInBottomThree,
+      weeksInLastPlace: state.weeksInLastPlace,
       overallRecord: toRecord(state.overall),
       conferenceRecord: toRecord(state.conference),
       playoffRecord: toRecord(state.playoffs),

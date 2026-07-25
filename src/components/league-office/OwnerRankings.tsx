@@ -207,16 +207,16 @@ export function OwnerRankings() {
             GM Ladder
           </h1>
           <p className="mt-2 text-[11px] leading-relaxed text-slate-500 sm:text-xs">
-            Career results, playoff performance, and legacy lead the rating;
-            matchup Elo contributes a small form adjustment. New GMs start at
-            250.
+            Career results, playoff performance, weekly power rankings, and
+            legacy lead the rating; matchup Elo contributes a small form
+            adjustment. New GMs start at 250.
           </p>
         </div>
       </header>
 
       <div className="mt-3 overflow-hidden rounded-lg border border-slate-200 bg-white sm:mt-4">
         <div className="overflow-x-auto overscroll-x-contain">
-          <table className="w-full min-w-[980px] border-separate border-spacing-0 text-left text-[11px] sm:min-w-[1160px] sm:text-xs">
+          <table className="w-full min-w-[1280px] border-separate border-spacing-0 text-left text-[11px] sm:min-w-[1480px] sm:text-xs">
             <caption className="sr-only">
               All-time GM ladder with records, playoff results, and awards
             </caption>
@@ -251,6 +251,41 @@ export function OwnerRankings() {
                   className="px-2 py-2 text-right sm:px-3 sm:py-3"
                 >
                   Last
+                </th>
+                <th
+                  scope="col"
+                  className="px-2 py-2 text-right sm:px-3 sm:py-3"
+                  title="Power-ranking rating adjustment"
+                >
+                  PR +/-
+                </th>
+                <th
+                  scope="col"
+                  className="px-2 py-2 text-center sm:px-3 sm:py-3"
+                  title="Weeks ranked number one"
+                >
+                  #1 Wks
+                </th>
+                <th
+                  scope="col"
+                  className="px-2 py-2 text-center sm:px-3 sm:py-3"
+                  title="Weeks ranked in the top three"
+                >
+                  Top 3
+                </th>
+                <th
+                  scope="col"
+                  className="px-2 py-2 text-center sm:px-3 sm:py-3"
+                  title="Weeks ranked in the bottom three"
+                >
+                  Bottom 3
+                </th>
+                <th
+                  scope="col"
+                  className="px-2 py-2 text-center sm:px-3 sm:py-3"
+                  title="Weeks ranked in last place"
+                >
+                  Last Place
                 </th>
                 <th scope="col" className="px-2 py-2 sm:px-3 sm:py-3">
                   Overall
@@ -352,6 +387,21 @@ export function OwnerRankings() {
                   <td className="px-2 py-2 text-right sm:px-3 sm:py-3">
                     <SignedCell value={entry.matchupDelta} />
                   </td>
+                  <td className="px-2 py-2 text-right sm:px-3 sm:py-3">
+                    <SignedCell value={entry.powerRankingAdjustment} />
+                  </td>
+                  <td className="px-2 py-2 text-center font-medium tabular-nums text-emerald-700 sm:px-3 sm:py-3">
+                    {entry.weeksAtNumberOne}
+                  </td>
+                  <td className="px-2 py-2 text-center tabular-nums text-emerald-700 sm:px-3 sm:py-3">
+                    {entry.weeksInTopThree}
+                  </td>
+                  <td className="px-2 py-2 text-center tabular-nums text-red-600 sm:px-3 sm:py-3">
+                    {entry.weeksInBottomThree}
+                  </td>
+                  <td className="px-2 py-2 text-center font-medium tabular-nums text-red-600 sm:px-3 sm:py-3">
+                    {entry.weeksInLastPlace}
+                  </td>
                   <td className="px-2 py-2 sm:px-3 sm:py-3">
                     <RecordCell record={entry.overallRecord} />
                   </td>
@@ -411,6 +461,10 @@ export function OwnerRankings() {
           <span>Standard range: 0–1000</span>
           <span>Entry rating: 250</span>
           <span>Elo form: 15%</span>
+          <span>#1 week +1.5</span>
+          <span>Top 3 week +0.5</span>
+          <span className="text-red-600">Bottom 3 week -0.5</span>
+          <span className="text-red-600">Last-place week -1.5</span>
           <span>Playoffs +8</span>
           <span>Finals +18</span>
           <span>Cup +40</span>

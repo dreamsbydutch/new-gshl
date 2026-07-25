@@ -12,7 +12,7 @@ import {
   useWeeks,
 } from "@gshl-hooks";
 import { buildOwnerRankings, isGshlTeam } from "@gshl-utils";
-import type { Owner } from "@gshl-types";
+import type { Owner, OwnerPowerRankingStat } from "@gshl-types";
 
 export function useOwnerRankingsData() {
   const ownersResult = useQuery(api.frontend.owners, {});
@@ -25,6 +25,7 @@ export function useOwnerRankingsData() {
   const matchupsQuery = useMatchups();
   const weeksQuery = useWeeks();
   const teamsQuery = useTeams();
+  const powerRankingsQuery = useTeams({ statsLevel: "weekly" });
   const awardsQuery = useTeamAwards();
 
   const teams = useMemo(
@@ -40,11 +41,14 @@ export function useOwnerRankingsData() {
         weeks: weeksQuery.data,
         teams,
         teamAwards: awardsQuery.data,
+        powerRankingStats:
+          powerRankingsQuery.data as unknown as OwnerPowerRankingStat[],
       }),
     [
       awardsQuery.data,
       matchupsQuery.data,
       ownersQuery.data,
+      powerRankingsQuery.data,
       seasonsQuery.data,
       teams,
       weeksQuery.data,
@@ -59,6 +63,7 @@ export function useOwnerRankingsData() {
       matchupsQuery.isLoading ||
       weeksQuery.isLoading ||
       teamsQuery.isLoading ||
+      powerRankingsQuery.isLoading ||
       awardsQuery.isLoading,
     error:
       ownersQuery.error ??
@@ -66,6 +71,7 @@ export function useOwnerRankingsData() {
       matchupsQuery.error ??
       weeksQuery.error ??
       teamsQuery.error ??
+      powerRankingsQuery.error ??
       awardsQuery.error ??
       null,
   };
