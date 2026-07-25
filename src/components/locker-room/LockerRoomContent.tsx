@@ -71,10 +71,10 @@ const FranchiseContractHistory = dynamic(
     ),
   { loading: () => <LockerRoomSkeleton /> },
 );
-const FranchiseDraftPickSummary = dynamic(
+const InteractiveContractTable = dynamic(
   () =>
-    import("@gshl-components/contracts/FranchiseDraftPickSummary").then(
-      (module) => module.FranchiseDraftPickSummary,
+    import("@gshl-components/contracts/InteractiveContractTable").then(
+      (module) => module.InteractiveContractTable,
     ),
   { loading: () => <LockerRoomSkeleton /> },
 );
@@ -97,8 +97,7 @@ export function LockerRoomContent() {
     selectedLockerRoomType === "roster";
   const lockerRoomSeason = needsContractData ? contractSeason : activeSeason;
 
-  const needsDraftPicks =
-    selectedLockerRoomType === "salary" || selectedLockerRoomType === "draft";
+  const needsDraftPicks = selectedLockerRoomType === "draft";
   const { data: draftPicks } = useDraftPicks({
     seasonId: lockerRoomSeason?.id,
     enabled: needsDraftPicks && Boolean(lockerRoomSeason?.id),
@@ -189,7 +188,6 @@ export function LockerRoomContent() {
   const {
     table: teamContractTableData,
     history: teamContractHistory,
-    draft: franchiseDraftSummary,
     currentContracts,
     contractPlayers,
   } = useContractData({
@@ -245,7 +243,16 @@ export function LockerRoomContent() {
               ...teamContractTableData,
             }}
           />
-          <FranchiseDraftPickSummary {...franchiseDraftSummary} />
+          <InteractiveContractTable
+            currentSeason={contractSeason}
+            currentTeam={currentTeam}
+            players={players}
+            contractPlayers={contractPlayers}
+            nhlTeams={nhlTeams}
+            existingContracts={currentContracts}
+            seasons={seasons ?? []}
+            ready={teamContractTableData.ready}
+          />
           <FranchiseContractHistory {...teamContractHistory} />
         </>
       )}

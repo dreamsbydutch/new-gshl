@@ -492,7 +492,9 @@ function PlayerHistoryTable({
                   key={`${row.id}-${column.award}`}
                   className="whitespace-nowrap px-1 py-2.5 text-center font-mono tabular-nums text-slate-700"
                 >
-                  {row.awardCounts[column.award] || "-"}
+                  {(row.awardCounts[column.award] ?? 0) === 0
+                    ? "-"
+                    : row.awardCounts[column.award]}
                 </TableCell>
               ))}
               {PLAYER_TROPHY_TABLE_COLUMNS.map((column) => (

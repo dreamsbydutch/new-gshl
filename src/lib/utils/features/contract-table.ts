@@ -5,7 +5,13 @@
  * Type definitions are sourced from @gshl-types
  */
 
-import type { ContractTableProps } from "@gshl-types";
+import type {
+  CapSpaceEntry,
+  Contract,
+  ContractTableProps,
+  Season,
+} from "@gshl-types";
+import { doesContractAffectSeason } from "../domain/contracts";
 import { toNumber } from "../core";
 
 type DateCandidate = Date | string | number | null | undefined;
@@ -21,6 +27,72 @@ export type {
   TableHeaderProps,
   CapSpaceRowProps,
 } from "@gshl-types";
+
+/**
+ * Groups a franchise's contracts into one chronologically ordered row per
+ * player while preserving the input order of the player groups.
+ */
+export function groupContractsByPlayer(contracts: Contract[]): Contract[][] {
+  const groups = new Map<string, Contract[]>();
+
+  contracts.forEach((contract) => {
+    const playerId = String(contract.playerId);
+    const group = groups.get(playerId);
+
+    if (group) {
+      group.push(contract);
+    } else {
+      groups.set(playerId, [contract]);
+    }
+  });
+
+  return [...groups.values()].map((group) =>
+    [...group].sort((left, right) => {
+      const startDateDelta = String(left.startDate).localeCompare(
+        String(right.startDate),
+      );
+      if (startDateDelta !== 0) return startDateDelta;
+
+      const signingDateDelta = String(left.signingDate).localeCompare(
+        String(right.signingDate),
+      );
+      if (signingDateDelta !== 0) return signingDateDelta;
+
+      return String(left.id).localeCompare(String(right.id));
+    }),
+  );
+}
+
+/** Calculates the remaining cap for the five seasons shown in a cap table. */
+export function calculateContractCapSpaceWindow(
+  contracts: Contract[],
+  currentSeason: ContractTableProps["currentSeason"],
+  seasons: Season[],
+): CapSpaceEntry[] {
+  const displaySeasonYear = getDisplaySeasonYear(currentSeason);
+
+  return Array.from({ length: 5 }, (_, index) => {
+    const year = displaySeasonYear + index;
+    const displaySeason = seasons.find(
+      (season) => getSeasonEndYear(season) === year,
+    );
+    const activeContracts = contracts.filter((contract) =>
+      displaySeason
+        ? doesContractAffectSeason(contract, displaySeason, seasons)
+        : isContractActiveForDisplayYear(contract, year),
+    );
+    const totalCapHit = activeContracts.reduce(
+      (sum, contract) => sum + toNumber(contract.capHit, 0),
+      0,
+    );
+
+    return {
+      label: `${year}`,
+      year,
+      remaining: CAP_CEILING - totalCapHit,
+    };
+  });
+}
 
 /**
  * Returns expiry status class.
@@ -98,4 +170,24 @@ export function getDateYear(
   const matches = String(value).match(/\d{4}/g);
   if (!matches?.length) return null;
   return Number(matches[matches.length - 1]);
+}
+
+function getSeasonEndYear(season: Season): number | null {
+  const explicitYear = toNumber(season.year, Number.NaN);
+  if (Number.isFinite(explicitYear)) return Math.trunc(explicitYear);
+
+  const match = /^(\d{4})/.exec(season.name ?? "");
+  return match ? Number(match[1]) + 1 : null;
+}
+
+function isContractActiveForDisplayYear(
+  contract: Contract,
+  year: number,
+): boolean {
+  const startYear = getDateYear(contract.startDate);
+  const endYear = getDateYear(contract.capHitEndDate);
+
+  if (startYear !== null && year <= startYear) return false;
+  if (endYear === null) return true;
+  return endYear + 1 > year;
 }

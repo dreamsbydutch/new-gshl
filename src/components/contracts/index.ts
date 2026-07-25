@@ -1,4 +1,5 @@
 export { TeamContractTable, TeamBuyoutTable } from "./ContractTable";
+export { InteractiveContractTable } from "./InteractiveContractTable";
 export {
   FranchiseContractHistory,
   OwnerContractHistory,

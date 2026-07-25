@@ -80,6 +80,55 @@ export interface CapSpaceEntry {
   remaining: number;
 }
 
+export interface InteractiveContractTableProps {
+  currentSeason: Season | undefined;
+  currentTeam: GSHLTeam;
+  players: Player[];
+  contractPlayers: Player[];
+  nhlTeams: NHLTeam[];
+  existingContracts: Contract[];
+  seasons: Season[];
+  ready: boolean;
+}
+
+export interface InteractiveContractSelection {
+  id: string;
+  player: Player;
+  contract: Contract;
+  contractLength: ContractLength;
+}
+
+export interface InteractiveContractPreview {
+  player: Player;
+  terms: ContractCreationTerms;
+}
+
+export interface UseInteractiveContractTableOptions {
+  currentSeason?: Season;
+  ownerId?: string;
+  players: Player[];
+  existingContracts: Contract[];
+  seasons: Season[];
+}
+
+export interface UseInteractiveContractTableResult {
+  availablePlayers: Player[];
+  selectedPlayerId: string;
+  contractLength: ContractLength;
+  setSelectedPlayerId: (playerId: string) => void;
+  setContractLength: (length: ContractLength) => void;
+  selectedPreview: InteractiveContractPreview | null;
+  previewError: string | null;
+  canAddContract: boolean;
+  addContract: () => void;
+  removeContract: (id: string) => void;
+  resetContracts: () => void;
+  selections: InteractiveContractSelection[];
+  simulatedContracts: Contract[];
+  contractGroups: Contract[][];
+  capSpaceWindow: CapSpaceEntry[];
+}
+
 export interface FranchiseContractHistoryRowType {
   id: string;
   ownerId: string;
@@ -142,13 +191,14 @@ export interface ContractTableProps {
   nhlTeams: NHLTeam[];
   contracts: Contract[];
   currentTeam: GSHLTeam;
-  sortedContracts: Contract[];
+  contractGroups: Contract[][];
   capSpaceWindow: CapSpaceEntry[];
   ready: boolean;
+  title?: string;
 }
 
 export interface PlayerContractRowProps {
-  contract: Contract;
+  contracts: Contract[];
   player?: Player;
   currentSeason: Season;
   nhlTeams: NHLTeam[];

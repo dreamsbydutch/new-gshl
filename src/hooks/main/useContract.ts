@@ -19,15 +19,16 @@ import {
 } from "@gshl-types";
 import {
   applyContractFilters,
-  doesContractAffectSeason,
+  calculateContractCapSpaceWindow,
   sortContracts,
   mergeContractFilters,
   normalizePlayerNhlSalaryRows,
   computeContractSummary,
   getContractDedupeKey,
-  CAP_CEILING,
+  groupContractsByPlayer,
   ContractStatus,
   formatDate,
+  shouldShowExpiredFreeAgentContract,
   toNumber,
 } from "@gshl-utils";
 import { usePlayersByIds } from "./usePlayer";
@@ -444,10 +445,11 @@ export function useContractData(
           contract,
           currentSeason,
           activeSeasonEndYear,
+          seasons,
         ),
       )
       .sort((a, b) => toNumber(b.capHit, 0) - toNumber(a.capHit, 0));
-  }, [ownerContracts, currentSeason, activeSeasonEndYear]);
+  }, [ownerContracts, currentSeason, activeSeasonEndYear, seasons]);
 
   const activeCurrentContracts = useMemo(() => {
     return ownerContracts.filter((contract) =>
@@ -477,35 +479,18 @@ export function useContractData(
     return [...currentContracts];
   }, [currentContracts]);
 
+  const contractGroups = useMemo(
+    () => groupContractsByPlayer(sortedContracts),
+    [sortedContracts],
+  );
+
   const capSpaceWindow = useMemo(() => {
-    const displaySeasonYear =
-      getContractTableDisplaySeasonYear(currentSeason) ??
-      activeSeasonEndYear ??
-      new Date().getFullYear();
-    const dataset = sortedContracts;
-
-    const calcRemaining = (year: number) => {
-      const displaySeason = seasons?.find(
-        (season) => getSeasonEndYear(season) === year,
-      );
-      const active = dataset.filter((contract) =>
-        displaySeason
-          ? doesContractAffectSeason(contract, displaySeason, seasons ?? [])
-          : isContractActiveForDisplayYear(contract, year),
-      );
-      const total = active.reduce((sum, c) => sum + toNumber(c.capHit, 0), 0);
-      return CAP_CEILING - total;
-    };
-
-    return Array.from({ length: 5 }).map((_, idx) => {
-      const year = displaySeasonYear + idx;
-      return {
-        label: `${year}`,
-        year,
-        remaining: calcRemaining(year),
-      };
-    });
-  }, [sortedContracts, currentSeason, activeSeasonEndYear, seasons]);
+    return calculateContractCapSpaceWindow(
+      sortedContracts,
+      currentSeason,
+      seasons ?? [],
+    );
+  }, [sortedContracts, currentSeason, seasons]);
 
   const activeCurrentContractKeys = useMemo(
     () => new Set(activeCurrentContracts.map(getContractUniqueKey)),
@@ -624,7 +609,7 @@ export function useContractData(
     !playerNhlStatsLoading;
   return {
     table: {
-      sortedContracts,
+      contractGroups,
       capSpaceWindow,
       ready: tableReady,
     },
@@ -683,41 +668,6 @@ function getSeasonEndYear(season?: Season): number | null {
 }
 
 /**
- * Resolves the display year used for contract cap-window tables.
- */
-function getContractTableDisplaySeasonYear(season?: Season): number | null {
-  if (!season) return null;
-
-  const explicitYear = toNumber(season.year, Number.NaN);
-  if (Number.isFinite(explicitYear)) {
-    return Math.trunc(explicitYear);
-  }
-
-  const match = /^(\d{4})/.exec(season.name ?? "");
-  if (!match) return null;
-  return Number(match[1]) + 1;
-}
-
-/**
- * Checks whether a contract should contribute to the displayed cap number for
- * a specific season-ending year.
- */
-function isContractActiveForDisplayYear(contract: Contract, year: number) {
-  const startYear = getDateYear(contract.startDate);
-  const endYear = getDateYear(contract.capHitEndDate);
-
-  if (startYear !== null && year <= startYear) {
-    return false;
-  }
-
-  if (endYear === null) {
-    return true;
-  }
-
-  return endYear + 1 > year;
-}
-
-/**
  * Reads the final cap-hit year from a contract.
  */
 function getContractCapHitEndYear(contract: Contract): number | null {
@@ -744,6 +694,7 @@ function shouldDisplayInCurrentContracts(
   contract: Contract,
   currentSeason: Season | undefined,
   activeSeasonEndYear: number | null,
+  seasons: Season[] | undefined,
   referenceDate: Date = new Date(),
 ): boolean {
   if (hasCurrentOrFutureCapImpact(contract, activeSeasonEndYear)) {
@@ -754,24 +705,43 @@ function shouldDisplayInCurrentContracts(
     contract,
     currentSeason,
     activeSeasonEndYear,
+    seasons,
     referenceDate,
   );
 }
 
 /**
- * Keeps very recent expiries visible until the current season signing deadline.
+ * Keeps very recent free-agent expiries visible until their signing deadline.
  */
 function shouldShowRecentExpiryStatus(
   contract: Contract,
   currentSeason: Season | undefined,
   activeSeasonEndYear: number | null,
+  seasons: Season[] | undefined,
   referenceDate: Date,
 ): boolean {
   if (!currentSeason || activeSeasonEndYear === null) return false;
-  if (contract.expiryStatus === ContractStatus.BUYOUT) return false;
 
-  const signingDeadline = parseDateValue(currentSeason.signingEndDate);
-  if (!signingDeadline || referenceDate > signingDeadline) return false;
+  const isFreeAgentExpiry =
+    contract.expiryStatus === ContractStatus.RFA ||
+    contract.expiryStatus === ContractStatus.UFA;
+  if (isFreeAgentExpiry) {
+    if (
+      !shouldShowExpiredFreeAgentContract({
+        contract,
+        currentSeason,
+        seasons,
+        referenceDate,
+      })
+    ) {
+      return false;
+    }
+  } else {
+    if (contract.expiryStatus === ContractStatus.BUYOUT) return false;
+
+    const signingDeadline = parseDateValue(currentSeason.signingEndDate);
+    if (!signingDeadline || referenceDate > signingDeadline) return false;
+  }
 
   const expiryYear =
     getDateYear(contract.expiryDate) ?? getContractCapHitEndYear(contract);

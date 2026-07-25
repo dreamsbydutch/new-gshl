@@ -16,6 +16,7 @@ import {
   hasContractContinuity,
   isUnsignedForSigningSeason,
   isUfaFreeAgencyOpen,
+  shouldShowExpiredFreeAgentContract,
 } from "./contracts";
 
 const seasons = Array.from(
@@ -181,6 +182,43 @@ void test("UFA free agency opens after the signing deadline", () => {
   assert.equal(
     isUfaFreeAgencyOpen(signingSeason, new Date("2020-06-21T16:00:00Z")),
     true,
+  );
+});
+
+void test("expired free-agent rows use the expired season's signing deadline", () => {
+  const expiredSeason = seasons[1]!;
+  const upcomingSeason = seasons[2]!;
+  const expiredContract = contract({
+    expiryDate: expiredSeason.endDate,
+    capHitEndDate: expiredSeason.endDate,
+  });
+
+  assert.equal(
+    shouldShowExpiredFreeAgentContract({
+      contract: expiredContract,
+      currentSeason: upcomingSeason,
+      seasons,
+      referenceDate: new Date("2020-06-20T16:00:00Z"),
+    }),
+    true,
+  );
+  assert.equal(
+    shouldShowExpiredFreeAgentContract({
+      contract: expiredContract,
+      currentSeason: upcomingSeason,
+      seasons,
+      referenceDate: new Date("2020-06-21T16:00:00Z"),
+    }),
+    false,
+  );
+  assert.equal(
+    shouldShowExpiredFreeAgentContract({
+      contract: { ...expiredContract, expiryStatus: ContractStatus.TRADE },
+      currentSeason: upcomingSeason,
+      seasons,
+      referenceDate: new Date("2020-06-20T16:00:00Z"),
+    }),
+    false,
   );
 });
 

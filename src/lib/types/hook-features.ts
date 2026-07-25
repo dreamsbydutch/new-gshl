@@ -37,7 +37,7 @@ export interface UseContractDataOptions {
 
 export interface UseContractDataResult {
   table: {
-    sortedContracts: Contract[];
+    contractGroups: Contract[][];
     capSpaceWindow: CapSpaceEntry[];
     ready: boolean;
   };
@@ -107,12 +107,7 @@ export interface UseSeasonDataBundleOptions {
   teamStatsLevel?: Exclude<TeamStatsLevel, "none"> | null;
   useNavigation?: boolean;
   weeksOrderBy?: Record<string, "asc" | "desc">;
-  teamQueryOptions?: Partial<
-    Pick<
-      UseTeamsOptions,
-      | "seasonType"
-    >
-  >;
+  teamQueryOptions?: Partial<Pick<UseTeamsOptions, "seasonType">>;
 }
 
 export interface UseSeasonDataBundleResult<TTeamStats = never> {

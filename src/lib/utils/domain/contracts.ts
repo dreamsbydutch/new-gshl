@@ -63,6 +63,59 @@ export function isUfaFreeAgencyOpen(
   );
 }
 
+/**
+ * Returns whether an expired RFA/UFA contract is still visible during the
+ * signing period for the season in which it expired.
+ */
+export function shouldShowExpiredFreeAgentContract(options: {
+  contract: Pick<Contract, "expiryStatus" | "expiryDate" | "capHitEndDate">;
+  currentSeason?: Season;
+  seasons?: Season[];
+  referenceDate?: Date;
+}): boolean {
+  const {
+    contract,
+    currentSeason,
+    seasons = [],
+    referenceDate = new Date(),
+  } = options;
+
+  if (
+    contract.expiryStatus !== ContractStatus.RFA &&
+    contract.expiryStatus !== ContractStatus.UFA
+  ) {
+    return false;
+  }
+
+  const expiryDate =
+    normalizeDateOnlyValue(contract.expiryDate) ??
+    normalizeDateOnlyValue(contract.capHitEndDate);
+  if (!expiryDate) return false;
+
+  const expiryYear = Number(expiryDate.slice(0, 4));
+  const expirySeason =
+    seasons.find(
+      (season) => normalizeDateOnlyValue(season.endDate) === expiryDate,
+    ) ??
+    seasons.find(
+      (season) =>
+        Number(normalizeDateOnlyValue(season.endDate)?.slice(0, 4)) ===
+        expiryYear,
+    );
+  const currentSeasonMatchesExpiry =
+    currentSeason &&
+    Number(normalizeDateOnlyValue(currentSeason.endDate)?.slice(0, 4)) ===
+      expiryYear;
+  const signingEndDate = normalizeDateOnlyValue(
+    expirySeason?.signingEndDate ??
+      (currentSeasonMatchesExpiry ? currentSeason?.signingEndDate : null),
+  );
+
+  return Boolean(
+    signingEndDate && getTorontoDate(referenceDate) <= signingEndDate,
+  );
+}
+
 /** Orders seasons chronologically, with their ids as a stable tie-breaker. */
 export function orderContractSeasons(seasons: Season[]): Season[] {
   return [...seasons].sort((left, right) => {

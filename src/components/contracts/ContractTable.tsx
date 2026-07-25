@@ -96,49 +96,56 @@ const TableHeader = ({ currentSeason }: TableHeaderProps) => {
  * Shows cap hit values for active seasons and expiry status badges when contracts end.
  */
 const PlayerContractRow = ({
-  contract,
+  contracts,
   player,
   currentSeason,
   nhlTeams,
 }: PlayerContractRowProps) => {
-  if (!player) return <PlayerContractRowSkeleton contract={contract} />;
+  const firstContract = contracts[0];
+  if (!player) {
+    return firstContract ? (
+      <PlayerContractRowSkeleton contract={firstContract} />
+    ) : null;
+  }
 
-  const expiryStatus = String(contract.expiryStatus);
+  const hasBuyout = contracts.some(
+    (contract) => String(contract.expiryStatus) === "Buyout",
+  );
   const playerNhlAbbr = getPlayerNhlAbbreviation(player);
   const playerNhlTeam = findNhlTeamByAbbreviation(nhlTeams, playerNhlAbbr);
   const year = getDisplaySeasonYear(currentSeason);
   const displayYears = Array.from({ length: 5 }, (_, index) => year + index);
 
   /**
-   * Render a salary (cap hit) or expiry status cell for a given future season year.
-   * Shows cap hit if the contract extends beyond the cutoff for that season; otherwise
-   * if it expires exactly that season (month match), shows the RFA/UFA/other expiry badge.
+   * Render the cap hit or expiry status for the contract that owns a displayed
+   * season. A new extension's cap hit takes precedence over the prior
+   * contract's expiry badge in the transition season.
    */
   const renderCapHitCell = (year: number) => {
-    const endYear = (getDateYear(contract.capHitEndDate) ?? year) + 1;
-    const startYear = getDateYear(contract.startDate) ?? year;
-    if (endYear > year) {
-      if (year <= startYear) {
-        // Contract not yet started for this season => empty cell
-        return (
-          <td
-            key={`yr-${year}`}
-            className="border-b border-t border-gray-300 px-2 py-1 text-center text-xs"
-          />
-        );
-      }
-      // Contract still active beyond this season's year => show cap hit
+    const activeContract = contracts.find((contract) => {
+      const endYear = (getDateYear(contract.capHitEndDate) ?? year) + 1;
+      const startYear = getDateYear(contract.startDate) ?? year;
+      return endYear > year && year > startYear;
+    });
+
+    if (activeContract) {
       return (
         <td
           key={`yr-${year}`}
           className="border-b border-t border-gray-300 px-2 py-1 text-center text-xs"
         >
-          {formatMoney(contract.capHit)}
+          {formatMoney(activeContract.capHit)}
         </td>
       );
     }
-    if (endYear === year) {
-      // Expiry occurs this displayed season => show status badge
+
+    const expiringContract = contracts.find((contract) => {
+      const endYear = (getDateYear(contract.capHitEndDate) ?? year) + 1;
+      return endYear === year;
+    });
+
+    if (expiringContract) {
+      const expiryStatus = String(expiringContract.expiryStatus);
       return (
         <td
           key={`yr-${year}`}
@@ -158,9 +165,7 @@ const PlayerContractRow = ({
   };
 
   return (
-    <tr
-      className={`${expiryStatus === "Buyout" ? "text-gray-400" : "text-gray-800"}`}
-    >
+    <tr className={`${hasBuyout ? "text-gray-400" : "text-gray-800"}`}>
       <td className="sticky left-0 z-20 w-32 max-w-fit whitespace-nowrap border-b border-t border-gray-300 bg-gray-50 p-1 text-center text-xs">
         {player.fullName}
       </td>
@@ -213,7 +218,7 @@ const CapSpaceRow = ({ currentTeam, capSpaceWindow }: CapSpaceRowProps) => {
  *
  * @param currentSeason - Active season context (required once ready)
  * @param currentTeam - Team whose contracts are displayed
- * @param contracts - Contract list (ideally pre-filtered to team & active/buyout entries)
+ * @param contractGroups - Chronological contract groups, one per player
  * @param players - Player entities used to resolve names / positions / NHL affiliation
  * @param nhlTeams - NHL team metadata for logo and abbreviation mapping
  * @returns JSX element containing the contract table or a skeleton while loading
@@ -223,9 +228,10 @@ export function TeamContractTable({
   currentTeam,
   players,
   nhlTeams,
-  sortedContracts,
+  contractGroups,
   capSpaceWindow,
   ready,
+  title = "Current Contracts",
 }: ContractTableProps) {
   const playerById = useMemo(() => {
     const map = new Map<string, Player>();
@@ -248,19 +254,17 @@ export function TeamContractTable({
 
   return (
     <div className="mx-auto w-full">
-      <div className="mt-4 w-full text-center text-xl font-bold">
-        Current Contracts
-      </div>
+      <div className="mt-4 w-full text-center text-xl font-bold">{title}</div>
       <div className="no-scrollbar mb-8 w-full overflow-x-auto overflow-y-hidden">
         <table className="mx-auto mt-2 min-w-max whitespace-nowrap">
           <TableHeader currentSeason={currentSeason} />
           <tbody>
-            {/* Render each contract row (sorted by cap hit desc) */}
-            {sortedContracts.map((contract, index) => (
+            {/* Render one chronological contract timeline per player. */}
+            {contractGroups.map((contracts) => (
               <PlayerContractRow
-                key={contract.id || `contract-row-${index}`}
-                contract={contract}
-                player={playerById.get(contract.playerId)}
+                key={contracts[0]?.playerId}
+                contracts={contracts}
+                player={playerById.get(contracts[0]?.playerId ?? "")}
                 currentSeason={currentSeason!}
                 nhlTeams={nhlTeams}
               />
