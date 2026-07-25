@@ -131,8 +131,17 @@ function MatchupCard({
     >
       <div className="overflow-hidden rounded-xl">
         <div className="flex items-center justify-between gap-2 border-b border-slate-200 bg-slate-50 px-2.5 py-1.5">
-          <h3 className="truncate text-[9px] font-bold uppercase tracking-[0.14em] text-slate-500">
-            {matchup.title}
+          <h3 className="flex min-w-0 items-center gap-1.5 text-[9px] font-bold uppercase tracking-[0.14em] text-slate-500">
+            {matchup.logoUrl ? (
+              <Image
+                src={matchup.logoUrl}
+                alt=""
+                width={14}
+                height={14}
+                className="h-3.5 w-3.5 shrink-0 object-contain"
+              />
+            ) : null}
+            <span className="truncate">{matchup.title}</span>
           </h3>
           <span
             className={cn(

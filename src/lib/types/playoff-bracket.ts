@@ -10,6 +10,7 @@ export interface BracketMatchup {
   id: string;
   round: PlayoffBracketRound;
   title: string;
+  logoUrl: string | null;
   homeLabel: string;
   awayLabel: string;
   homeTeam: SeededTeam | null;

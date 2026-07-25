@@ -174,6 +174,7 @@ function createProjectedMatchup({
   homeLabel,
   homeTeam,
   id,
+  logoUrl = null,
   round,
   title,
 }: {
@@ -182,6 +183,7 @@ function createProjectedMatchup({
   homeLabel: string;
   homeTeam: SeededTeam | null;
   id: string;
+  logoUrl?: string | null;
   round: PlayoffBracketRound;
   title: string;
 }): BracketMatchup {
@@ -189,6 +191,7 @@ function createProjectedMatchup({
     id,
     round,
     title,
+    logoUrl,
     homeLabel,
     awayLabel,
     homeTeam,
@@ -540,6 +543,7 @@ function buildConferenceBracket(
     return {
       abbr: conference,
       title: sample?.confName ?? conference,
+      logoUrl: sample?.confLogoUrl ?? null,
       seeded: [
         ...sortByRank(
           assigned.filter((team) => topThreeIds.has(team.id)),
@@ -556,7 +560,8 @@ function buildConferenceBracket(
       createProjectedMatchup({
         id: `${conference.abbr}-qf-1`,
         round: "QF",
-        title: `${conference.title} QF1`,
+        title: `${conference.title} SF1`,
+        logoUrl: conference.logoUrl,
         homeLabel: "#1",
         awayLabel: "#4",
         homeTeam: seeded[0] ?? null,
@@ -565,7 +570,8 @@ function buildConferenceBracket(
       createProjectedMatchup({
         id: `${conference.abbr}-qf-2`,
         round: "QF",
-        title: `${conference.title} QF2`,
+        title: `${conference.title} SF2`,
+        logoUrl: conference.logoUrl,
         homeLabel: "#2",
         awayLabel: "#3",
         homeTeam: seeded[1] ?? null,
@@ -587,8 +593,9 @@ function buildConferenceBracket(
         id: `${conference.abbr}-sf`,
         round: "SF",
         title: `${conference.title} Championship`,
-        homeLabel: `Winner ${conference.title} QF1`,
-        awayLabel: `Winner ${conference.title} QF2`,
+        logoUrl: conference.logoUrl,
+        homeLabel: `Winner ${conference.title} SF1`,
+        awayLabel: `Winner ${conference.title} SF2`,
         homeTeam: quarterfinals[offset]?.winnerTeam ?? null,
         awayTeam: quarterfinals[offset + 1]?.winnerTeam ?? null,
       }),
@@ -619,8 +626,8 @@ function buildConferenceBracket(
 
   return [
     createColumn(
-      "conference-quarterfinals",
-      "Conference quarterfinals",
+      "conference-semifinals",
+      "Conference semifinals",
       `${conferenceInfo[0]?.title ?? "First conference"} above · ${conferenceInfo[1]?.title ?? "Second conference"} below`,
       quarterfinals,
     ),

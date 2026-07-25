@@ -192,11 +192,28 @@ void test("builds the season seven conference crossover bracket", () => {
 
   assert.equal(bracket.format, "conference");
   assert.equal(bracket.columns.length, 3);
-  assert.equal(bracket.columns[0]?.title, "Conference quarterfinals");
+  assert.equal(bracket.columns[0]?.title, "Conference semifinals");
   assert.equal(bracket.columns[0]?.matchups.length, 4);
+  assert.deepEqual(
+    bracket.columns[0]?.matchups.map((matchup) => matchup.title),
+    ["Sunview SF1", "Sunview SF2", "Hickory Hotel SF1", "Hickory Hotel SF2"],
+  );
   assert.equal(bracket.columns[1]?.title, "Conference finals");
   assert.equal(bracket.columns[1]?.matchups.length, 2);
+  assert.equal(
+    bracket.columns[1]?.matchups[0]?.homeLabel,
+    "Winner Sunview SF1",
+  );
   assert.equal(bracket.columns[2]?.title, "GSHL Cup Final");
+  assert.deepEqual(
+    bracket.columns[0]?.matchups.map((matchup) => matchup.logoUrl),
+    ["SV.png", "SV.png", "HH.png", "HH.png"],
+  );
+  assert.deepEqual(
+    bracket.columns[1]?.matchups.map((matchup) => matchup.logoUrl),
+    ["SV.png", "HH.png"],
+  );
+  assert.equal(bracket.columns[2]?.matchups[0]?.logoUrl, null);
   assert.deepEqual(
     bracket.columns[0]?.matchups.map((matchup) => matchup.homeTeam?.confAbbr),
     ["SV", "SV", "HH", "HH"],
