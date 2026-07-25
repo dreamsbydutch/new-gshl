@@ -166,7 +166,7 @@ export function TrophyCase(props: TrophyCaseProps) {
             <TrophySectionDivider label={group} />
             <div
               className={cn(
-                "mx-auto grid max-w-7xl grid-cols-3 gap-x-2 gap-y-4 px-3 sm:gap-y-5 sm:px-4 lg:grid-cols-5 xl:grid-cols-6",
+                "mx-auto grid w-full max-w-7xl grid-cols-[repeat(auto-fit,minmax(8.5rem,9rem))] justify-center gap-x-2 gap-y-4 px-3 sm:gap-y-5 sm:px-4",
                 groupCards.length === 1 && "max-w-xs",
               )}
             >
