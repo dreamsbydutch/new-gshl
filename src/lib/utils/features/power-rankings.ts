@@ -1,7 +1,10 @@
 import type {
   BuildPowerRankingsOptions,
   PowerRankingChartPoint,
+  PowerRankingColorMap,
+  PowerRankingColorSource,
   PowerRankingEntry,
+  PowerRankingPaletteMap,
   PowerRankingWeeklyStat,
   PowerRankingsViewModel,
   Week,
@@ -25,6 +28,70 @@ const SERIES_COLORS = [
   "#be123c",
   "#475569",
 ] as const;
+
+const isHexColor = (value: string) => /^#[0-9a-f]{6}$/i.test(value);
+
+const colorDistance = (left: string, right: string) => {
+  const channels = (color: string) => [
+    Number.parseInt(color.slice(1, 3), 16),
+    Number.parseInt(color.slice(3, 5), 16),
+    Number.parseInt(color.slice(5, 7), 16),
+  ];
+  const [leftRed = 0, leftGreen = 0, leftBlue = 0] = channels(left);
+  const [rightRed = 0, rightGreen = 0, rightBlue = 0] = channels(right);
+  return Math.sqrt(
+    (leftRed - rightRed) ** 2 +
+      (leftGreen - rightGreen) ** 2 +
+      (leftBlue - rightBlue) ** 2,
+  );
+};
+
+const isChartColor = (color: string) => {
+  if (!isHexColor(color)) return false;
+  const red = Number.parseInt(color.slice(1, 3), 16);
+  const green = Number.parseInt(color.slice(3, 5), 16);
+  const blue = Number.parseInt(color.slice(5, 7), 16);
+  const brightness = 0.2126 * red + 0.7152 * green + 0.0722 * blue;
+  return brightness >= 35 && brightness <= 215;
+};
+
+export function selectDistinctPowerRankingColors(
+  sources: PowerRankingColorSource[],
+  palettes: PowerRankingPaletteMap,
+): PowerRankingColorMap {
+  const selected: PowerRankingColorMap = {};
+  const usedColors: string[] = [];
+
+  for (const source of sources) {
+    const candidates = [
+      ...(palettes[source.teamId] ?? []),
+      source.fallbackColor,
+    ].filter(
+      (color, index, colors) =>
+        isChartColor(color) && colors.indexOf(color) === index,
+    );
+    const fallback = isChartColor(source.fallbackColor)
+      ? source.fallbackColor
+      : "#475569";
+    const color =
+      candidates
+        .map((candidate, index) => ({
+          candidate,
+          score:
+            (usedColors.length
+              ? Math.min(
+                  ...usedColors.map((used) => colorDistance(candidate, used)),
+                )
+              : 200) + Math.max(0, 24 - index * 4),
+        }))
+        .sort((left, right) => right.score - left.score)[0]?.candidate ??
+      fallback;
+    selected[source.teamId] = color;
+    usedColors.push(color);
+  }
+
+  return selected;
+}
 
 const validRank = (value: unknown): number | null => {
   const rank = Number(value);

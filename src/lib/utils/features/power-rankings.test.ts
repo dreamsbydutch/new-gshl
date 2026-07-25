@@ -8,7 +8,10 @@ import type {
   Week,
 } from "@gshl-types";
 
-import { buildPowerRankings } from "./power-rankings";
+import {
+  buildPowerRankings,
+  selectDistinctPowerRankingColors,
+} from "./power-rankings";
 
 const makeTeam = (id: string, name: string): GSHLTeam => ({
   id,
@@ -114,4 +117,20 @@ void test("falls back to season power ranks when weekly history is absent", () =
       ["a", 2, null],
     ],
   );
+});
+
+void test("selects distinct colors from each team's logo palette", () => {
+  const colors = selectDistinctPowerRankingColors(
+    [
+      { teamId: "a", logoUrl: "a.png", fallbackColor: "#2563eb" },
+      { teamId: "b", logoUrl: "b.png", fallbackColor: "#dc2626" },
+    ],
+    {
+      a: ["#c81e1e", "#f59e0b"],
+      b: ["#c81e1e", "#164eab"],
+    },
+  );
+
+  assert.equal(colors.a, "#c81e1e");
+  assert.equal(colors.b, "#164eab");
 });

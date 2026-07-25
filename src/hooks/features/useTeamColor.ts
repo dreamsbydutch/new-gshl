@@ -1,12 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type {
   Bucket,
+  PowerRankingColorMap,
+  PowerRankingColorSource,
+  PowerRankingPaletteMap,
   TeamPaletteCacheEntry,
   TeamPaletteResult,
   UseTeamColorResult,
 } from "@gshl-types";
+import { selectDistinctPowerRankingColors } from "@gshl-utils";
 
 // Legacy single-color cache (primary) & expanded palette cache
 const colorCache = new Map<string, string>();
@@ -305,6 +309,82 @@ export function useTeamPalette(logoUrl?: string | null): TeamPaletteResult {
 export function useTeamColor(logoUrl?: string | null): UseTeamColorResult {
   const { primary } = useTeamPalette(logoUrl);
   return { teamColor: primary };
+}
+
+const loadTeamPalette = (
+  logoUrl: string,
+): Promise<TeamPaletteCacheEntry | null> => {
+  const cached = paletteCache.get(logoUrl);
+  if (cached) return Promise.resolve(cached);
+  if (typeof window === "undefined") return Promise.resolve(null);
+
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.referrerPolicy = "no-referrer";
+    img.onload = () => {
+      const buckets = extractRawBuckets(img);
+      if (!buckets?.length) {
+        resolve(null);
+        return;
+      }
+      const palette = bucketsToPalette(buckets);
+      const derived = derivePalette(palette, buckets);
+      paletteCache.set(logoUrl, derived);
+      if (derived.primary) colorCache.set(logoUrl, derived.primary);
+      resolve(derived);
+    };
+    img.onerror = () => resolve(null);
+    img.src = logoUrl;
+  });
+};
+
+/**
+ * Resolves one logo-representative chart color per team, preferring alternate
+ * logo colors when primary colors would be difficult to distinguish.
+ */
+export function useDistinctTeamColors(
+  sources: PowerRankingColorSource[],
+): PowerRankingColorMap {
+  const fallbackColors = useMemo(
+    () => selectDistinctPowerRankingColors(sources, {}),
+    [sources],
+  );
+  const [colors, setColors] = useState<PowerRankingColorMap>(fallbackColors);
+
+  useEffect(() => {
+    let cancelled = false;
+    setColors(fallbackColors);
+
+    void Promise.all(
+      sources.map(async (source) => {
+        if (!source.logoUrl) return [source.teamId, [] as string[]] as const;
+        const palette = await loadTeamPalette(source.logoUrl);
+        const candidates = palette
+          ? [
+              palette.primary,
+              palette.secondary,
+              palette.accent,
+              ...palette.palette,
+            ].filter((color): color is string => Boolean(color))
+          : [];
+        return [source.teamId, candidates] as const;
+      }),
+    ).then((entries) => {
+      if (cancelled) return;
+      const palettes: PowerRankingPaletteMap = {};
+      for (const [teamId, candidates] of entries) {
+        palettes[teamId] = candidates;
+      }
+      setColors(selectDistinctPowerRankingColors(sources, palettes));
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [fallbackColors, sources]);
+
+  return colors;
 }
 
 /**

@@ -82,6 +82,15 @@ export interface PowerRankingSeries {
   currentRank: number;
 }
 
+export interface PowerRankingColorSource {
+  teamId: string;
+  logoUrl: string | null;
+  fallbackColor: string;
+}
+
+export type PowerRankingPaletteMap = Record<string, string[]>;
+export type PowerRankingColorMap = Record<string, string>;
+
 export interface PowerRankingsViewModel {
   entries: PowerRankingEntry[];
   chartData: PowerRankingChartPoint[];

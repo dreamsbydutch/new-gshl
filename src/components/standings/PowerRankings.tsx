@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import Image from "next/image";
 import { ArrowDown, ArrowUp, Minus } from "lucide-react";
 import {
@@ -13,6 +14,7 @@ import {
 } from "recharts";
 
 import type { PowerRankingEntry, PowerRankingsProps } from "@gshl-types";
+import { useDistinctTeamColors } from "@gshl-hooks";
 
 function RankMovement({ entry }: { entry: PowerRankingEntry }) {
   if (entry.rankChange === null) {
@@ -65,6 +67,17 @@ function TeamLogo({ entry }: { entry: PowerRankingEntry }) {
 }
 
 export function PowerRankings({ season, rankings }: PowerRankingsProps) {
+  const colorSources = useMemo(
+    () =>
+      rankings.entries.map((entry) => ({
+        teamId: entry.team.id,
+        logoUrl: entry.team.logoUrl,
+        fallbackColor: entry.color,
+      })),
+    [rankings.entries],
+  );
+  const teamColors = useDistinctTeamColors(colorSources);
+
   if (!season) {
     return (
       <div className="rounded-xl border border-dashed p-10 text-center text-sm text-slate-500">
@@ -141,7 +154,10 @@ export function PowerRankings({ season, rankings }: PowerRankingsProps) {
                         <div className="flex min-w-0 items-center gap-2.5">
                           <span
                             className="h-5 w-1 shrink-0 rounded-full"
-                            style={{ backgroundColor: entry.color }}
+                            style={{
+                              backgroundColor:
+                                teamColors[entry.team.id] ?? entry.color,
+                            }}
                             aria-hidden="true"
                           />
                           <TeamLogo entry={entry} />
@@ -222,7 +238,7 @@ export function PowerRankings({ season, rankings }: PowerRankingsProps) {
                         type="monotone"
                         dataKey={team.teamId}
                         name={team.teamId}
-                        stroke={team.color}
+                        stroke={teamColors[team.teamId] ?? team.color}
                         strokeWidth={2}
                         strokeOpacity={0.72}
                         dot={false}

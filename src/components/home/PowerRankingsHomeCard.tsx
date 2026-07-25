@@ -1,10 +1,12 @@
 "use client";
 
+import { useMemo } from "react";
 import Image from "next/image";
 import { ArrowDown, ArrowRight, ArrowUp, Minus } from "lucide-react";
 
 import {
   useAppRouter,
+  useDistinctTeamColors,
   useSeasonNavigation,
   useStandingsData,
   useStandingsNavigation,
@@ -76,6 +78,16 @@ export function PowerRankingsHomeCard({
     seasonId,
     standingsType: "power",
   });
+  const colorSources = useMemo(
+    () =>
+      powerRankings.entries.map((entry) => ({
+        teamId: entry.team.id,
+        logoUrl: entry.team.logoUrl,
+        fallbackColor: entry.color,
+      })),
+    [powerRankings.entries],
+  );
+  const teamColors = useDistinctTeamColors(colorSources);
 
   if (isLoading) return <PowerRankingsHomeCardSkeleton />;
 
@@ -136,7 +148,9 @@ export function PowerRankingsHomeCard({
               <div className="flex min-w-0 items-center gap-2">
                 <span
                   className="h-4 w-1 shrink-0 rounded-full"
-                  style={{ backgroundColor: entry.color }}
+                  style={{
+                    backgroundColor: teamColors[entry.team.id] ?? entry.color,
+                  }}
                   aria-hidden="true"
                 />
                 <TeamMark entry={entry} />
