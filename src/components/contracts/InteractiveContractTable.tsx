@@ -1,203 +1,155 @@
 "use client";
 
-import { useMemo } from "react";
-import { Plus, RotateCcw, Sparkles, X } from "lucide-react";
+import { useMemo, useState } from "react";
+import { RotateCcw } from "lucide-react";
 import { TeamContractTable } from "./ContractTable";
-import { useInteractiveContractTable, CONTRACT_LENGTHS } from "@gshl-hooks";
-import { Button, Select } from "@gshl-ui";
-import { NHLLogo } from "@gshl-components/player/NHLLogo";
+import { useInteractiveContractTable } from "@gshl-hooks";
+import { Button, Input } from "@gshl-ui";
 import type { InteractiveContractTableProps, Player } from "@gshl-types";
-import { findNhlTeamByAbbreviation, formatMoney, showDate } from "@gshl-utils";
+import { formatMoney } from "@gshl-utils";
 
 export function InteractiveContractTable({
   currentSeason,
   currentTeam,
-  players,
+  signablePlayers,
   contractPlayers,
   nhlTeams,
   existingContracts,
   seasons,
   ready,
 }: InteractiveContractTableProps) {
+  const [playerSearch, setPlayerSearch] = useState("");
+  const [isPickerOpen, setIsPickerOpen] = useState(false);
   const tablePlayers = useMemo(() => {
     const byId = new Map<string, Player>();
-    [...players, ...contractPlayers].forEach((player) => {
+    [...signablePlayers, ...contractPlayers].forEach((player) => {
       byId.set(String(player.id), player);
     });
     return [...byId.values()];
-  }, [contractPlayers, players]);
+  }, [contractPlayers, signablePlayers]);
   const interactive = useInteractiveContractTable({
     currentSeason,
     ownerId: String(currentTeam.ownerId ?? ""),
-    players,
+    signablePlayers,
     existingContracts,
     seasons,
   });
+  const filteredPlayers = useMemo(() => {
+    const search = playerSearch.trim().toLocaleLowerCase();
+    if (!search) return interactive.availablePlayers;
+    return interactive.availablePlayers.filter((player) =>
+      [
+        player.fullName,
+        player.nhlTeam,
+        player.posGroup,
+        ...(player.nhlPos ?? []),
+      ]
+        .join(" ")
+        .toLocaleLowerCase()
+        .includes(search),
+    );
+  }, [interactive.availablePlayers, playerSearch]);
+
+  const choosePlayer = (playerId: string) => {
+    interactive.addPlayer(playerId);
+    setPlayerSearch("");
+    setIsPickerOpen(false);
+  };
 
   if (!ready) return null;
 
   return (
-    <section className="mx-auto mt-8 w-full rounded-2xl border border-indigo-200 bg-gradient-to-br from-indigo-50 via-white to-cyan-50 p-4 shadow-sm sm:p-6">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+    <section className="mx-auto mt-6 w-full border-t border-slate-200 pt-4">
+      <div className="flex items-center justify-between gap-3">
         <div>
-          <div className="flex items-center gap-2 text-xl font-bold text-indigo-950">
-            <Sparkles className="h-5 w-5 text-indigo-500" />
-            Cap Lab
-          </div>
-          <p className="mt-1 max-w-2xl text-sm text-slate-600">
-            Add pretend signings to see how your cap table could look. Nothing
-            here changes your real contracts.
+          <h2 className="text-sm font-semibold text-slate-900">Cap Lab</h2>
+          <p className="mt-1 text-xs text-slate-500">
+            Add a signable player or remove a contract to test a trade scenario.
           </p>
         </div>
-        {interactive.selections.length > 0 ? (
+        {interactive.hasChanges ? (
           <Button
             type="button"
             variant="ghost"
             size="sm"
             onClick={interactive.resetContracts}
           >
-            <RotateCcw className="h-4 w-4" />
+            <RotateCcw className="h-3.5 w-3.5" />
             Reset
           </Button>
         ) : null}
       </div>
 
-      <div className="mt-5 grid gap-3 rounded-xl border border-white/80 bg-white/80 p-4 shadow-sm md:grid-cols-[minmax(0,1fr)_8rem_auto] md:items-end">
-        <label className="space-y-1 text-sm font-medium text-slate-700">
-          <span>Player from your team</span>
-          <Select
-            value={interactive.selectedPlayerId}
-            onValueChange={interactive.setSelectedPlayerId}
-          >
-            <option value="">Choose a player</option>
-            {interactive.availablePlayers.map((player) => (
-              <option key={player.id} value={player.id}>
-                {player.fullName} · {formatMoney(Number(player.salary ?? 0))}
-              </option>
-            ))}
-          </Select>
-        </label>
-
-        <label className="space-y-1 text-sm font-medium text-slate-700">
-          <span>Term</span>
-          <Select
-            value={String(interactive.contractLength)}
-            onValueChange={(value) =>
-              interactive.setContractLength(Number(value) as 1 | 2 | 3)
-            }
-          >
-            {CONTRACT_LENGTHS.map((length) => (
-              <option key={length} value={length}>
-                {length} {length === 1 ? "year" : "years"}
-              </option>
-            ))}
-          </Select>
-        </label>
-
-        <Button
-          type="button"
-          className="h-10"
-          onClick={interactive.addContract}
-          disabled={!interactive.canAddContract}
-        >
-          <Plus className="h-4 w-4" />
-          Add signing
-        </Button>
-      </div>
-
-      {interactive.selectedPreview ? (
-        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-indigo-100 bg-indigo-100/60 px-4 py-3 text-sm text-indigo-950">
-          <span className="flex items-center gap-2 font-semibold">
-            <NHLLogo
-              team={findNhlTeamByAbbreviation(
-                nhlTeams,
-                interactive.selectedPreview.player.nhlTeam,
-              )}
-              size={20}
-            />
-            {interactive.selectedPreview.player.fullName}
-          </span>
-          <span>
-            Projected salary:{" "}
-            {formatMoney(interactive.selectedPreview.terms.contractSalary)}
-          </span>
-          <span>
-            Starts {showDate(interactive.selectedPreview.terms.startDate)}
-          </span>
-          <span>
-            Expires {showDate(interactive.selectedPreview.terms.expiryDate)}
-          </span>
-        </div>
-      ) : null}
-
-      {interactive.previewError ? (
-        <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
-          {interactive.previewError}
-        </p>
-      ) : null}
-
-      {interactive.selections.length > 0 ? (
-        <div className="mt-4 rounded-xl border border-indigo-100 bg-white/70 p-4">
-          <div className="mb-2 text-sm font-semibold text-slate-800">
-            Hypothetical signings
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {interactive.selections.map((selection) => (
-              <div
-                key={selection.id}
-                className="flex items-center gap-2 rounded-full bg-indigo-100 px-3 py-1.5 text-sm text-indigo-950"
-              >
-                <span>
-                  {selection.player.fullName} · {selection.contractLength}y ·{" "}
-                  {formatMoney(selection.contract.contractSalary)}
-                </span>
-                <button
-                  type="button"
-                  className="rounded-full p-0.5 hover:bg-indigo-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
-                  onClick={() => interactive.removeContract(selection.id)}
-                  aria-label={`Remove ${selection.player.fullName} signing`}
-                >
-                  <X className="h-3.5 w-3.5" />
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-      ) : null}
-
-      <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
-        {interactive.capSpaceWindow.map((entry, index) => (
-          <div
-            key={entry.year}
-            className={`rounded-xl border px-3 py-2 ${
-              entry.remaining < 0
-                ? "border-rose-200 bg-rose-50 text-rose-800"
-                : "border-emerald-200 bg-emerald-50 text-emerald-800"
-            }`}
-          >
-            <div className="text-xs font-medium uppercase tracking-wide opacity-75">
-              {index === 0 ? "Current cap space" : entry.label}
-            </div>
-            <div className="mt-1 text-lg font-bold tabular-nums">
-              {formatMoney(entry.remaining)}
-            </div>
-          </div>
-        ))}
-      </div>
-
-      <div className="mt-2 overflow-x-auto">
-        <TeamContractTable
-          currentSeason={currentSeason}
-          currentTeam={currentTeam}
-          players={tablePlayers}
-          nhlTeams={nhlTeams}
-          contracts={interactive.simulatedContracts}
-          contractGroups={interactive.contractGroups}
-          capSpaceWindow={interactive.capSpaceWindow}
-          ready={ready}
-          title="What-if Cap Table"
+      <div className="relative mt-3 max-w-xl">
+        <Input
+          value={playerSearch}
+          onChange={(event) => {
+            setPlayerSearch(event.target.value);
+            setIsPickerOpen(true);
+          }}
+          onFocus={() => setIsPickerOpen(true)}
+          onBlur={() => {
+            window.setTimeout(() => setIsPickerOpen(false), 150);
+          }}
+          placeholder="Search signable players"
+          aria-label="Search signable players"
+          aria-expanded={isPickerOpen}
+          aria-controls="cap-lab-player-options"
+          role="combobox"
         />
+        {isPickerOpen ? (
+          <div
+            id="cap-lab-player-options"
+            className="absolute z-30 mt-1 max-h-64 w-full overflow-y-auto rounded-md border border-slate-200 bg-white p-1 shadow-lg"
+            role="listbox"
+          >
+            {filteredPlayers.length > 0 ? (
+              filteredPlayers.map((player) => (
+                <button
+                  key={player.id}
+                  type="button"
+                  className="flex w-full items-center justify-between gap-3 rounded px-3 py-2 text-left text-sm hover:bg-slate-100 focus-visible:bg-slate-100 focus-visible:outline-none"
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => choosePlayer(String(player.id))}
+                  role="option"
+                  aria-selected={false}
+                >
+                  <span className="truncate">{player.fullName}</span>
+                  <span className="shrink-0 text-xs text-slate-500">
+                    {player.posGroup} ·{" "}
+                    {formatMoney(Number(player.salary ?? 0))}
+                  </span>
+                </button>
+              ))
+            ) : (
+              <p className="px-3 py-2 text-sm text-slate-500">
+                No signable players found.
+              </p>
+            )}
+          </div>
+        ) : null}
       </div>
+
+      {interactive.pickerError ? (
+        <p className="mt-2 text-xs text-amber-700">{interactive.pickerError}</p>
+      ) : null}
+
+      {interactive.hasChanges ? (
+        <div className="mt-4 overflow-x-auto border-t border-slate-200 pt-3">
+          <TeamContractTable
+            currentSeason={currentSeason}
+            currentTeam={currentTeam}
+            players={tablePlayers}
+            nhlTeams={nhlTeams}
+            contracts={interactive.simulatedContracts}
+            contractGroups={interactive.contractGroups}
+            capSpaceWindow={interactive.capSpaceWindow}
+            ready={ready}
+            title="Scenario Cap Table"
+            onRemovePlayer={interactive.removePlayer}
+          />
+        </div>
+      ) : null}
     </section>
   );
 }

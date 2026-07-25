@@ -83,7 +83,7 @@ export interface CapSpaceEntry {
 export interface InteractiveContractTableProps {
   currentSeason: Season | undefined;
   currentTeam: GSHLTeam;
-  players: Player[];
+  signablePlayers: Player[];
   contractPlayers: Player[];
   nhlTeams: NHLTeam[];
   existingContracts: Contract[];
@@ -98,35 +98,25 @@ export interface InteractiveContractSelection {
   contractLength: ContractLength;
 }
 
-export interface InteractiveContractPreview {
-  player: Player;
-  terms: ContractCreationTerms;
-}
-
 export interface UseInteractiveContractTableOptions {
   currentSeason?: Season;
   ownerId?: string;
-  players: Player[];
+  signablePlayers: Player[];
   existingContracts: Contract[];
   seasons: Season[];
 }
 
 export interface UseInteractiveContractTableResult {
   availablePlayers: Player[];
-  selectedPlayerId: string;
-  contractLength: ContractLength;
-  setSelectedPlayerId: (playerId: string) => void;
-  setContractLength: (length: ContractLength) => void;
-  selectedPreview: InteractiveContractPreview | null;
-  previewError: string | null;
-  canAddContract: boolean;
-  addContract: () => void;
-  removeContract: (id: string) => void;
+  pickerError: string | null;
+  addPlayer: (playerId: string) => void;
+  removePlayer: (playerId: string) => void;
   resetContracts: () => void;
   selections: InteractiveContractSelection[];
   simulatedContracts: Contract[];
   contractGroups: Contract[][];
   capSpaceWindow: CapSpaceEntry[];
+  hasChanges: boolean;
 }
 
 export interface FranchiseContractHistoryRowType {
@@ -195,6 +185,7 @@ export interface ContractTableProps {
   capSpaceWindow: CapSpaceEntry[];
   ready: boolean;
   title?: string;
+  onRemovePlayer?: (playerId: string) => void;
 }
 
 export interface PlayerContractRowProps {
@@ -202,15 +193,18 @@ export interface PlayerContractRowProps {
   player?: Player;
   currentSeason: Season;
   nhlTeams: NHLTeam[];
+  onRemovePlayer?: (playerId: string) => void;
 }
 
 export interface TableHeaderProps {
   currentSeason: Season | undefined;
+  showRemoveAction?: boolean;
 }
 
 export interface CapSpaceRowProps {
   currentTeam: GSHLTeam;
   capSpaceWindow: CapSpaceEntry[];
+  showRemoveAction?: boolean;
 }
 
 export type TeamContractTableProps = ContractTableProps;

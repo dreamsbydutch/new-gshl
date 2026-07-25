@@ -123,6 +123,11 @@ export function LockerRoomContent() {
     gshlTeamId: currentTeam?.id,
     enabled: needsPlayers && Boolean(currentTeam?.id),
   });
+  const { data: signablePlayers = [], isLoading: signablePlayersLoading } =
+    usePlayers({
+      isActive: true,
+      enabled: needsContractData,
+    });
   const needsNhlTeams =
     selectedLockerRoomType === "roster" ||
     selectedLockerRoomType === "salary" ||
@@ -205,6 +210,7 @@ export function LockerRoomContent() {
   const isLoading =
     teamsLoading ||
     (needsPlayers && playersLoading) ||
+    (needsContractData && signablePlayersLoading) ||
     (needsNhlTeams && nhlTeamsLoading) ||
     (isTrophyTab && teamAwardsLoading) ||
     (isRecordBookTab &&
@@ -246,7 +252,7 @@ export function LockerRoomContent() {
           <InteractiveContractTable
             currentSeason={contractSeason}
             currentTeam={currentTeam}
-            players={players}
+            signablePlayers={signablePlayers}
             contractPlayers={contractPlayers}
             nhlTeams={nhlTeams}
             existingContracts={currentContracts}

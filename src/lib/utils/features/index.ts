@@ -1,4 +1,5 @@
 export * from "./contract-table";
+export * from "./cap-lab";
 export * from "./contract-salary";
 export * from "./conference-contest";
 export * from "./owner-rankings";

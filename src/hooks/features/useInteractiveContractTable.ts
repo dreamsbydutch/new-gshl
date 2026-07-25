@@ -3,7 +3,6 @@
 import { useMemo, useState } from "react";
 import type {
   Contract,
-  ContractLength,
   InteractiveContractSelection,
   UseInteractiveContractTableOptions,
   UseInteractiveContractTableResult,
@@ -11,135 +10,110 @@ import type {
 import {
   calculateContractCapSpaceWindow,
   deriveContractCreationTerms,
+  getCapLabPlayers,
   groupContractsByPlayer,
+  removeContractsForPlayer,
   ResignableStatus,
 } from "@gshl-utils";
 
-const CONTRACT_LENGTHS: readonly ContractLength[] = [1, 2, 3];
+const DEFAULT_CONTRACT_LENGTH = 1 as const;
 
 export function useInteractiveContractTable(
   options: UseInteractiveContractTableOptions,
 ): UseInteractiveContractTableResult {
-  const { currentSeason, ownerId, players, existingContracts, seasons } =
-    options;
-  const [selectedPlayerId, setSelectedPlayerId] = useState("");
-  const [contractLength, setContractLength] = useState<ContractLength>(1);
+  const {
+    currentSeason,
+    ownerId,
+    signablePlayers,
+    existingContracts,
+    seasons,
+  } = options;
   const [selections, setSelections] = useState<InteractiveContractSelection[]>(
     [],
   );
+  const [removedPlayerIds, setRemovedPlayerIds] = useState<string[]>([]);
+  const [pickerError, setPickerError] = useState<string | null>(null);
 
   const availablePlayers = useMemo(
-    () =>
-      players
-        .filter((player) => player.isActive && Number(player.salary ?? 0) > 0)
-        .filter(
-          (player, index, allPlayers) =>
-            allPlayers.findIndex(
-              (candidate) => String(candidate.id) === String(player.id),
-            ) === index,
-        )
-        .sort((left, right) => left.fullName.localeCompare(right.fullName)),
-    [players],
+    () => getCapLabPlayers(signablePlayers),
+    [signablePlayers],
   );
 
-  const selectedPlayer = useMemo(
-    () =>
-      availablePlayers.find((player) => String(player.id) === selectedPlayerId),
-    [availablePlayers, selectedPlayerId],
-  );
-
-  const previewState = useMemo(() => {
-    if (!selectedPlayer || !currentSeason) {
-      return {
-        preview: null,
-        error: currentSeason
-          ? null
-          : "The signing season is not available yet.",
-      };
+  const addPlayer = (playerId: string) => {
+    const player = availablePlayers.find(
+      (candidate) => String(candidate.id) === String(playerId),
+    );
+    if (!player || !currentSeason) {
+      setPickerError("This player cannot be added to the scenario yet.");
+      return;
+    }
+    if (
+      selections.some(
+        (selection) =>
+          String(selection.contract.playerId) === String(player.id),
+      )
+    ) {
+      setPickerError("That player is already in the scenario.");
+      return;
     }
 
     try {
+      const contractLength = DEFAULT_CONTRACT_LENGTH;
       const terms = deriveContractCreationTerms({
         player: {
-          id: selectedPlayer.id,
-          salary: selectedPlayer.salary,
-          isResignable: selectedPlayer.isResignable ?? ResignableStatus.DRAFT,
+          id: player.id,
+          salary: player.salary,
+          isResignable: player.isResignable ?? ResignableStatus.DRAFT,
         },
         signingSeason: currentSeason,
         contractLength,
         contracts: existingContracts,
         seasons,
       });
-
-      return {
-        preview: { player: selectedPlayer, terms },
-        error: null,
-      };
-    } catch (error) {
-      return {
-        preview: null,
-        error:
-          error instanceof Error
-            ? error.message
-            : "This contract cannot be previewed yet.",
-      };
-    }
-  }, [
-    contractLength,
-    currentSeason,
-    existingContracts,
-    seasons,
-    selectedPlayer,
-  ]);
-
-  const hasSelectedPlayer = selections.some(
-    (selection) => String(selection.contract.playerId) === selectedPlayerId,
-  );
-  const canAddContract = Boolean(previewState.preview) && !hasSelectedPlayer;
-
-  const addContract = () => {
-    const preview = previewState.preview;
-    if (!preview || !currentSeason || !canAddContract) return;
-
-    const now = new Date();
-    const id = `interactive-${String(preview.player.id)}`;
-    const contract: Contract = {
-      id,
-      playerId: String(preview.player.id),
-      ownerId: String(ownerId ?? "interactive"),
-      seasonId: String(currentSeason.id),
-      contractType: [preview.terms.contractType],
-      contractLength,
-      contractSalary: preview.terms.contractSalary,
-      signingDate: now.toISOString().slice(0, 10),
-      startDate: preview.terms.startDate,
-      signingStatus: preview.terms.signingStatus,
-      expiryStatus: preview.terms.expiryStatus,
-      expiryDate: preview.terms.expiryDate,
-      capHit: preview.terms.contractSalary,
-      capHitEndDate: preview.terms.expiryDate,
-      createdAt: now,
-      updatedAt: now,
-    };
-
-    setSelections((current) => [
-      ...current,
-      {
+      const now = new Date();
+      const id = `interactive-${String(player.id)}`;
+      const contract: Contract = {
         id,
-        player: preview.player,
-        contract,
+        playerId: String(player.id),
+        ownerId: String(ownerId ?? "interactive"),
+        seasonId: String(currentSeason.id),
+        contractType: [terms.contractType],
         contractLength,
-      },
-    ]);
-    setSelectedPlayerId("");
+        contractSalary: terms.contractSalary,
+        signingDate: now.toISOString().slice(0, 10),
+        startDate: terms.startDate,
+        signingStatus: terms.signingStatus,
+        expiryStatus: terms.expiryStatus,
+        expiryDate: terms.expiryDate,
+        capHit: terms.contractSalary,
+        capHitEndDate: terms.expiryDate,
+        createdAt: now,
+        updatedAt: now,
+      };
+
+      setSelections((current) => [
+        ...current,
+        { id, player, contract, contractLength },
+      ]);
+      setPickerError(null);
+    } catch (error) {
+      setPickerError(
+        error instanceof Error
+          ? error.message
+          : "This player cannot be added to the scenario yet.",
+      );
+    }
   };
 
   const simulatedContracts = useMemo(
     () => [
-      ...existingContracts,
+      ...removedPlayerIds.reduce(
+        (contracts, playerId) => removeContractsForPlayer(contracts, playerId),
+        existingContracts,
+      ),
       ...selections.map((selection) => selection.contract),
     ],
-    [existingContracts, selections],
+    [existingContracts, removedPlayerIds, selections],
   );
   const contractGroups = useMemo(
     () => groupContractsByPlayer(simulatedContracts),
@@ -155,26 +129,37 @@ export function useInteractiveContractTable(
     [currentSeason, seasons, simulatedContracts],
   );
 
+  const removePlayer = (playerId: string) => {
+    const normalizedPlayerId = String(playerId);
+    setSelections((current) =>
+      current.filter(
+        (selection) =>
+          String(selection.contract.playerId) !== normalizedPlayerId,
+      ),
+    );
+    setRemovedPlayerIds((current) =>
+      current.includes(normalizedPlayerId)
+        ? current
+        : [...current, normalizedPlayerId],
+    );
+  };
+
+  const resetContracts = () => {
+    setSelections([]);
+    setRemovedPlayerIds([]);
+    setPickerError(null);
+  };
+
   return {
     availablePlayers,
-    selectedPlayerId,
-    contractLength,
-    setSelectedPlayerId,
-    setContractLength,
-    selectedPreview: previewState.preview,
-    previewError: previewState.error,
-    canAddContract,
-    addContract,
-    removeContract: (id) =>
-      setSelections((current) =>
-        current.filter((selection) => selection.id !== id),
-      ),
-    resetContracts: () => setSelections([]),
+    pickerError,
+    addPlayer,
+    removePlayer,
+    resetContracts,
     selections,
     simulatedContracts,
     contractGroups,
     capSpaceWindow,
+    hasChanges: selections.length > 0 || removedPlayerIds.length > 0,
   };
 }
-
-export { CONTRACT_LENGTHS };

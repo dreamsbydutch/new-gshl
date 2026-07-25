@@ -20,6 +20,7 @@
  */
 
 import { useMemo } from "react";
+import { Trash2 } from "lucide-react";
 import { NHLLogo } from "@gshl-components/player/NHLLogo";
 import {
   TeamContractTableSkeleton,
@@ -54,7 +55,10 @@ import type { Player } from "@gshl-types";
  * Renders the header row for the contract table with season labels.
  * Shows current season and next 4 future seasons.
  */
-const TableHeader = ({ currentSeason }: TableHeaderProps) => {
+const TableHeader = ({
+  currentSeason,
+  showRemoveAction = false,
+}: TableHeaderProps) => {
   if (!currentSeason) return null;
   const seasonName = currentSeason.name ?? "";
   return (
@@ -84,6 +88,11 @@ const TableHeader = ({ currentSeason }: TableHeaderProps) => {
         <th className="bg-gray-800 p-1 text-center text-2xs font-normal text-gray-200">
           {seasonName ? getSeasonDisplay(seasonName, 4) : ""}
         </th>
+        {showRemoveAction ? (
+          <th className="bg-gray-800 p-1 text-center text-2xs font-normal text-gray-200">
+            Remove
+          </th>
+        ) : null}
       </tr>
     </thead>
   );
@@ -100,6 +109,7 @@ const PlayerContractRow = ({
   player,
   currentSeason,
   nhlTeams,
+  onRemovePlayer,
 }: PlayerContractRowProps) => {
   const firstContract = contracts[0];
   if (!player) {
@@ -176,6 +186,21 @@ const PlayerContractRow = ({
         <NHLLogo team={playerNhlTeam} size={16} />
       </td>
       {displayYears.map((displayYear) => renderCapHitCell(displayYear))}
+      {onRemovePlayer ? (
+        <td className="border-b border-t border-gray-300 px-2 py-1 text-center">
+          <button
+            type="button"
+            className="rounded p-1 text-gray-500 hover:bg-gray-200 hover:text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-500"
+            onClick={() =>
+              onRemovePlayer(String(firstContract?.playerId ?? ""))
+            }
+            aria-label={`Remove ${player.fullName} from this scenario`}
+            title="Remove player from scenario"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </button>
+        </td>
+      ) : null}
     </tr>
   );
 };
@@ -186,7 +211,11 @@ const PlayerContractRow = ({
  * Renders the summary row showing remaining cap space for each season.
  * Displays available cap room after accounting for all active contracts.
  */
-const CapSpaceRow = ({ currentTeam, capSpaceWindow }: CapSpaceRowProps) => {
+const CapSpaceRow = ({
+  currentTeam,
+  capSpaceWindow,
+  showRemoveAction = false,
+}: CapSpaceRowProps) => {
   return (
     <tr key={`${currentTeam.franchiseId}CapSpace`}>
       <td className="sticky left-0 z-20 w-32 whitespace-nowrap border-t border-gray-800 bg-gray-200 px-2 py-1 text-center text-xs font-bold">
@@ -202,6 +231,9 @@ const CapSpaceRow = ({ currentTeam, capSpaceWindow }: CapSpaceRowProps) => {
           {formatMoney(c.remaining)}
         </td>
       ))}
+      {showRemoveAction ? (
+        <td className="border-t border-gray-800 bg-gray-200 px-2 py-1" />
+      ) : null}
     </tr>
   );
 };
@@ -232,6 +264,7 @@ export function TeamContractTable({
   capSpaceWindow,
   ready,
   title = "Current Contracts",
+  onRemovePlayer,
 }: ContractTableProps) {
   const playerById = useMemo(() => {
     const map = new Map<string, Player>();
@@ -257,7 +290,10 @@ export function TeamContractTable({
       <div className="mt-4 w-full text-center text-xl font-bold">{title}</div>
       <div className="no-scrollbar mb-8 w-full overflow-x-auto overflow-y-hidden">
         <table className="mx-auto mt-2 min-w-max whitespace-nowrap">
-          <TableHeader currentSeason={currentSeason} />
+          <TableHeader
+            currentSeason={currentSeason}
+            showRemoveAction={Boolean(onRemovePlayer)}
+          />
           <tbody>
             {/* Render one chronological contract timeline per player. */}
             {contractGroups.map((contracts) => (
@@ -267,12 +303,14 @@ export function TeamContractTable({
                 player={playerById.get(contracts[0]?.playerId ?? "")}
                 currentSeason={currentSeason!}
                 nhlTeams={nhlTeams}
+                onRemovePlayer={onRemovePlayer}
               />
             ))}
             {/* Summary row for remaining cap space across seasons */}
             <CapSpaceRow
               currentTeam={currentTeam}
               capSpaceWindow={capSpaceWindow}
+              showRemoveAction={Boolean(onRemovePlayer)}
             />
           </tbody>
         </table>
