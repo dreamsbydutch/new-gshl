@@ -15,6 +15,7 @@ import type {
 } from "./team-ui";
 
 export type AllStarAwardKey = Extract<AwardsList, "firstAS" | "secondAS">;
+export type AllStarLineupPosition = "LW" | "C" | "RW" | "D" | "G";
 
 export interface SeasonAwardWinnerCard {
   id: string;
@@ -32,6 +33,7 @@ export interface AllStarWinner {
   positions: string;
   teamName: string | null;
   teamLogoUrl: string | null;
+  lineupPosition: AllStarLineupPosition | null;
 }
 
 export interface AllStarTeamCard {

@@ -3,11 +3,12 @@
 
 import { useMemo, useState } from "react";
 import type { ReactNode } from "react";
-import {
-  ALL_STAR_MEDAL_EMOJIS,
-  AWARD_GROUP_ORDER,
-} from "@gshl-lib/config/awards";
-import type { SeasonAwardsProps } from "@gshl-types";
+import { AWARD_GROUP_ORDER } from "@gshl-lib/config/awards";
+import type {
+  AllStarTeamCard,
+  AllStarWinner,
+  SeasonAwardsProps,
+} from "@gshl-types";
 import {
   buildAllStarTeamCards,
   buildPlayerAwardSections,
@@ -20,17 +21,25 @@ function AwardIcon({
   alt,
   fallbackLabel = "AWD",
   fallbackIcon,
+  featured = false,
 }: {
   imageUrl: string | null;
   alt: string;
   fallbackLabel?: string;
   fallbackIcon?: string;
+  featured?: boolean;
 }) {
   const [errored, setErrored] = useState(false);
 
   if (!imageUrl || errored) {
     return (
-      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-slate-50">
+      <div
+        className={
+          featured
+            ? "flex h-full min-h-[5.5rem] w-20 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-slate-50"
+            : "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-slate-50"
+        }
+      >
         {fallbackIcon ? (
           <span aria-hidden="true" className="text-xl leading-none">
             {fallbackIcon}
@@ -46,7 +55,11 @@ function AwardIcon({
 
   return (
     <img
-      className="h-9 w-9 shrink-0 rounded-lg border border-slate-100 bg-slate-50 object-contain p-1"
+      className={
+        featured
+          ? "h-full min-h-[5.5rem] w-20 shrink-0 rounded-xl border border-slate-100 bg-slate-50 object-contain p-2"
+          : "h-9 w-9 shrink-0 rounded-lg border border-slate-100 bg-slate-50 object-contain p-1"
+      }
       src={imageUrl}
       alt={alt}
       onError={() => setErrored(true)}
@@ -146,6 +159,82 @@ function AwardRaceRow({
   );
 }
 
+function AllStarPlayerTile({
+  player,
+  position,
+}: {
+  player: AllStarWinner | undefined;
+  position: string;
+}) {
+  if (!player) {
+    return (
+      <div className="col-span-2 px-1 py-2 text-center">
+        <span className="font-barlow text-[10px] uppercase tracking-[0.12em] text-slate-400">
+          {position}
+        </span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="col-span-2 min-w-0 px-1 py-2 text-center">
+      <p className="truncate font-oswald text-sm leading-tight text-slate-950 sm:text-base">
+        {player.playerName}
+      </p>
+      <div className="mt-1.5 flex items-center justify-center gap-1.5">
+        <span className="font-barlow text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">
+          {position}
+        </span>
+        <WinnerLogo
+          logoUrl={player.teamLogoUrl}
+          fallbackLabel={player.teamName?.slice(0, 3) ?? "GSHL"}
+        />
+      </div>
+      {player.teamName ? (
+        <p className="mt-1 truncate text-[10px] text-slate-500">
+          {player.teamName}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+function AllStarLineupCard({ card }: { card: AllStarTeamCard }) {
+  const winnerAt = (position: AllStarWinner["lineupPosition"]) =>
+    card.winners.find((winner) => winner.lineupPosition === position);
+  const defensemen = card.winners.filter(
+    (winner) => winner.lineupPosition === "D",
+  );
+
+  return (
+    <section className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50 shadow-sm">
+      <header className="border-b border-slate-200 bg-white px-4 py-3">
+        <h3 className="font-oswald text-xl text-slate-950">{card.title}</h3>
+      </header>
+      <div className="py-1">
+        <div className="grid grid-cols-6 items-start py-1">
+          <AllStarPlayerTile player={winnerAt("LW")} position="LW" />
+          <AllStarPlayerTile player={winnerAt("C")} position="C" />
+          <AllStarPlayerTile player={winnerAt("RW")} position="RW" />
+        </div>
+        <div className="mx-auto w-4/6 border-b border-slate-300" />
+        <div className="grid grid-cols-6 items-start py-1">
+          <div className="col-span-1" />
+          <AllStarPlayerTile player={defensemen[0]} position="D" />
+          <AllStarPlayerTile player={defensemen[1]} position="D" />
+          <div className="col-span-1" />
+        </div>
+        <div className="mx-auto w-4/6 border-b border-slate-300" />
+        <div className="grid grid-cols-6 items-start py-1">
+          <div className="col-span-2" />
+          <AllStarPlayerTile player={winnerAt("G")} position="G" />
+          <div className="col-span-2" />
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function AwardListRow({
   awardLabel,
   awardImageUrl,
@@ -168,42 +257,45 @@ function AwardListRow({
   nomineeNames?: string[];
 }) {
   return (
-    <li className="grid gap-2.5 px-4 py-3 sm:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)] sm:items-center sm:px-5">
-      <div className="flex min-w-0 items-center gap-3">
+    <li className="px-4 py-3 sm:px-5">
+      <div className="grid grid-cols-[5rem_minmax(0,1fr)] gap-3">
         <AwardIcon
           imageUrl={awardImageUrl}
           alt={awardLabel}
           fallbackLabel={awardFallbackLabel}
           fallbackIcon={awardFallbackIcon}
+          featured
         />
-        <h3 className="min-w-0 truncate font-oswald text-lg leading-tight text-slate-950 sm:text-xl">
-          {awardLabel}
-        </h3>
-      </div>
-      <div className="flex min-w-0 items-center gap-2.5">
-        <WinnerLogo
-          logoUrl={winnerLogoUrl}
-          fallbackLabel={winnerFallbackLabel}
-        />
-        <div className="min-w-0">
-          <p className="truncate font-oswald text-base leading-tight text-slate-950 sm:text-lg">
-            {winnerName}
+        <div className="flex min-h-[5.5rem] min-w-0 flex-col justify-center">
+          <p className="truncate font-barlow text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500 sm:text-[11px]">
+            {awardLabel}
           </p>
-          {winnerDetail ? (
-            <p className="truncate text-xs text-slate-500 sm:text-sm">
-              {winnerDetail}
-            </p>
-          ) : null}
-          {nomineeNames.length > 0 ? (
-            <p className="mt-1 text-xs leading-snug text-slate-500">
-              <span className="font-barlow text-[9px] font-semibold uppercase tracking-[0.14em] text-slate-400">
-                Nominees
-              </span>{" "}
-              {nomineeNames.join(", ")}
-            </p>
-          ) : null}
+          <div className="mt-2 flex min-w-0 items-center gap-2.5">
+            <WinnerLogo
+              logoUrl={winnerLogoUrl}
+              fallbackLabel={winnerFallbackLabel}
+            />
+            <div className="min-w-0">
+              <p className="truncate font-oswald text-lg leading-tight text-slate-950 sm:text-xl">
+                {winnerName}
+              </p>
+              {winnerDetail ? (
+                <p className="truncate text-xs text-slate-500 sm:text-sm">
+                  {winnerDetail}
+                </p>
+              ) : null}
+            </div>
+          </div>
         </div>
       </div>
+      {nomineeNames.length > 0 ? (
+        <p className="mt-3 border-t border-slate-100 pt-2.5 text-xs leading-snug text-slate-500">
+          <span className="mr-2 font-barlow text-[9px] font-semibold uppercase tracking-[0.14em] text-slate-400">
+            Nominees
+          </span>
+          {nomineeNames.join(", ")}
+        </p>
+      ) : null}
     </li>
   );
 }
@@ -438,30 +530,16 @@ export function SeasonAwards({
         ) : null}
 
         {allStarWinnerCount > 0 ? (
-          <AwardSection
-            eyebrow="Player awards"
-            title="All-Star teams"
-            count={allStarWinnerCount}
+          <section
+            className="grid gap-4 lg:grid-cols-2"
+            aria-label="All-Star teams"
           >
-            {allStarCards.flatMap((card) =>
-              card.winners.map((winner) => (
-                <AwardListRow
-                  key={`${card.awardKey}-${winner.playerId}`}
-                  awardLabel={card.title}
-                  awardImageUrl={null}
-                  awardFallbackLabel="AS"
-                  awardFallbackIcon={ALL_STAR_MEDAL_EMOJIS.get(card.awardKey)}
-                  winnerName={winner.playerName}
-                  winnerDetail={
-                    winner.positions +
-                    (winner.teamName ? ` - ${winner.teamName}` : "")
-                  }
-                  winnerLogoUrl={winner.teamLogoUrl}
-                  winnerFallbackLabel="AS"
-                />
-              )),
-            )}
-          </AwardSection>
+            {allStarCards
+              .filter((card) => card.winners.length > 0)
+              .map((card) => (
+                <AllStarLineupCard key={card.awardKey} card={card} />
+              ))}
+          </section>
         ) : null}
       </div>
     </section>

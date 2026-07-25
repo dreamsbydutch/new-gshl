@@ -10,6 +10,7 @@ import {
 import { AwardsList, SeasonType } from "../domain/constants";
 import type {
   AllStarAwardKey,
+  AllStarLineupPosition,
   AllStarTeamCard,
   AllStarWinner,
   PlayerAwardSection,
@@ -43,6 +44,61 @@ const ALL_STAR_POSITION_ORDER: Record<string, number> = {
   D: 3,
   G: 4,
 };
+
+const ALL_STAR_LINEUP_SLOTS: AllStarLineupPosition[] = [
+  "LW",
+  "C",
+  "RW",
+  "D",
+  "D",
+  "G",
+];
+
+function assignAllStarLineupPositions(
+  entries: Array<{
+    eligiblePositions: string[];
+    winner: AllStarWinner;
+  }>,
+): AllStarWinner[] {
+  const assignments = new Map<string, AllStarLineupPosition>();
+  const assignedPlayerIds = new Set<string>();
+
+  const assignSlot = (slotIndex: number): boolean => {
+    const slot = ALL_STAR_LINEUP_SLOTS[slotIndex];
+    if (!slot) return true;
+
+    const candidates = entries
+      .filter(
+        ({ eligiblePositions, winner }) =>
+          !assignedPlayerIds.has(winner.playerId) &&
+          eligiblePositions.includes(slot),
+      )
+      .sort(
+        (left, right) =>
+          Number(right.eligiblePositions.length === 1) -
+            Number(left.eligiblePositions.length === 1) ||
+          left.eligiblePositions.length - right.eligiblePositions.length ||
+          left.winner.playerName.localeCompare(right.winner.playerName),
+      );
+
+    for (const candidate of candidates) {
+      assignedPlayerIds.add(candidate.winner.playerId);
+      assignments.set(candidate.winner.playerId, slot);
+      if (assignSlot(slotIndex + 1)) return true;
+      assignments.delete(candidate.winner.playerId);
+      assignedPlayerIds.delete(candidate.winner.playerId);
+    }
+
+    return false;
+  };
+
+  assignSlot(0);
+
+  return entries.map(({ winner }) => ({
+    ...winner,
+    lineupPosition: assignments.get(winner.playerId) ?? null,
+  }));
+}
 
 function getAllStarPositionRank(positions: readonly string[] | undefined) {
   return (
@@ -205,7 +261,7 @@ export function buildAllStarTeamCards(
   const teamById = new Map(teams.map((team) => [String(team.id), team]));
 
   return ALL_STAR_AWARD_ORDER.map((awardKey) => {
-    const winners = awards
+    const winnerEntries = awards
       .filter((award) => award.award === awardKey)
       .map((award) => {
         const playerId = String(award.playerId);
@@ -213,6 +269,9 @@ export function buildAllStarTeamCards(
           return String(row.playerId) === playerId;
         });
         const player = playerById.get(playerId);
+        const eligiblePositions = [
+          ...(playerTotal?.nhlPos ?? player?.nhlPos ?? []),
+        ].map(String);
         const gshlTeamIds = normalizeIdList(playerTotal?.gshlTeamIds);
         const gshlTeams = gshlTeamIds
           .map((teamId) => teamById.get(teamId))
@@ -231,12 +290,12 @@ export function buildAllStarTeamCards(
           ),
           teamName: joinedTeamNames || null,
           teamLogoUrl: primaryTeam?.logoUrl ?? null,
+          lineupPosition: null,
         } satisfies AllStarWinner;
 
         return {
-          positionRank: getAllStarPositionRank(
-            playerTotal?.nhlPos ?? player?.nhlPos,
-          ),
+          eligiblePositions,
+          positionRank: getAllStarPositionRank(eligiblePositions),
           winner,
         };
       })
@@ -244,8 +303,8 @@ export function buildAllStarTeamCards(
         (left, right) =>
           left.positionRank - right.positionRank ||
           left.winner.playerName.localeCompare(right.winner.playerName),
-      )
-      .map(({ winner }) => winner);
+      );
+    const winners = assignAllStarLineupPositions(winnerEntries);
 
     return {
       awardKey,

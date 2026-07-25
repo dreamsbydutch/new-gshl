@@ -138,6 +138,22 @@ void test("sorts all-star winners by lineup position", () => {
       "Goalie",
     ],
   );
+  assert.deepEqual(
+    Object.fromEntries(
+      firstTeam.winners.map((winner) => [
+        winner.playerName,
+        winner.lineupPosition,
+      ]),
+    ),
+    {
+      Center: "C",
+      "Left Wing": "LW",
+      "Right Wing": "RW",
+      "Defense One": "D",
+      "Defense Two": "D",
+      Goalie: "G",
+    },
+  );
 });
 
 void test("resolves team award nominees for the standings awards page", () => {
