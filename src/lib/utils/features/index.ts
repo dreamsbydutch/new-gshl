@@ -3,6 +3,7 @@ export * from "./cap-lab";
 export * from "./contract-salary";
 export * from "./conference-contest";
 export * from "./owner-rankings";
+export * from "./power-rankings";
 export * from "./draft-classes";
 export * from "./draft-board-list";
 export * from "./draft-admin";

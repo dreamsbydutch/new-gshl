@@ -1,15 +1,17 @@
 "use client";
 
 import { useMemo } from "react";
-import { useSeasons } from "../main";
+import { useSeasons, useTeams } from "../main";
 import { useSeasonNavigation, useStandingsNavigation } from "./useNavigation";
 import {
   groupTeamsByStandingsType,
+  buildPowerRankings,
   SeasonType,
   type StandingsGroup,
 } from "@gshl-utils";
 import type {
   TeamSeasonStatLine,
+  TeamWeekStatLine,
   UseStandingsDataOptions,
   UseStandingsDataResult,
 } from "@gshl-types";
@@ -52,6 +54,7 @@ export function useStandingsData(
   // Use provided seasonId or fall back to navigation context
   const standingsType = optionStandingsType ?? navStandingsType ?? "overall";
   const selectedSeasonId = optionSeasonId ?? navSeasonId;
+  const isPowerRankingsView = standingsType === "power";
 
   const {
     data: overrideSeasonData,
@@ -92,6 +95,15 @@ export function useStandingsData(
     () => (statsResponse ?? []).filter(Boolean),
     [statsResponse],
   );
+  const weeklyStatsQuery = useTeams({
+    seasonId: selectedSeasonId,
+    statsLevel: "weekly",
+    enabled: isPowerRankingsView && Boolean(selectedSeasonId),
+  });
+  const weeklyStats = useMemo(
+    () => (weeklyStatsQuery.data ?? []) as TeamWeekStatLine[],
+    [weeklyStatsQuery.data],
+  );
 
   // Intentionally no logging in production render path
 
@@ -103,8 +115,26 @@ export function useStandingsData(
     });
   }, [teamStats, teams, standingsType]);
 
-  const isLoading = status.isLoading || overrideSeasonLoading;
-  const error = seasonDataError ?? overrideSeasonError ?? null;
+  const powerRankings = useMemo(
+    () =>
+      buildPowerRankings({
+        teams,
+        weeks: weeks ?? [],
+        weeklyStats,
+        seasonStats: teamStats,
+      }),
+    [teamStats, teams, weeklyStats, weeks],
+  );
+
+  const isLoading =
+    status.isLoading ||
+    overrideSeasonLoading ||
+    (isPowerRankingsView && weeklyStatsQuery.isLoading);
+  const error =
+    seasonDataError ??
+    overrideSeasonError ??
+    (isPowerRankingsView ? weeklyStatsQuery.error : null) ??
+    null;
 
   return {
     selectedSeason: resolvedSelectedSeason,
@@ -114,9 +144,14 @@ export function useStandingsData(
     teams,
     groups,
     stats: teamStats,
+    powerRankings,
     standingsType,
     isLoading,
     error: error ?? null,
-    ready: seasonDataReady && !overrideSeasonLoading && !error,
+    ready:
+      seasonDataReady &&
+      !overrideSeasonLoading &&
+      (!isPowerRankingsView || !weeklyStatsQuery.isLoading) &&
+      !error,
   };
 }

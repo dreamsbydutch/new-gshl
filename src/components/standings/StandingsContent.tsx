@@ -35,6 +35,13 @@ const StandingsTable = dynamic(
     ),
   { loading: () => <StandingsSkeleton /> },
 );
+const PowerRankings = dynamic(
+  () =>
+    import("@gshl-components/standings/PowerRankings").then(
+      (module) => module.PowerRankings,
+    ),
+  { loading: () => <StandingsSkeleton /> },
+);
 
 export function StandingsContent() {
   const {
@@ -45,6 +52,7 @@ export function StandingsContent() {
     standingsType,
     teams,
     stats,
+    powerRankings,
     isLoading,
   } = useStandingsData({});
   const isAwardsView = (standingsType ?? "overall") === "awards";
@@ -112,6 +120,12 @@ export function StandingsContent() {
         stats={stats}
         season={selectedSeason ?? null}
       />
+    );
+  }
+
+  if ((standingsType ?? "overall") === "power") {
+    return (
+      <PowerRankings season={selectedSeason ?? null} rankings={powerRankings} />
     );
   }
 

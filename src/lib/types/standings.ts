@@ -4,6 +4,7 @@ import type {
   Matchup,
   Season,
   TeamSeasonStatLine,
+  TeamWeekStatLine,
   Week,
 } from "./database";
 
@@ -56,6 +57,62 @@ export interface StandingsItemProps {
 export interface StandingsTeamInfoProps {
   teamProb: PlayoffProbType;
   standingsType: StandingsOption;
+}
+
+export interface PowerRankingEntry {
+  team: GSHLTeam;
+  rank: number;
+  rating: number | null;
+  previousRank: number | null;
+  rankChange: number | null;
+  color: string;
+}
+
+export type PowerRankingChartPoint = {
+  weekId: string;
+  weekNum: number;
+  label: string;
+} & Record<string, string | number>;
+
+export interface PowerRankingSeries {
+  teamId: string;
+  name: string;
+  abbr: string;
+  color: string;
+  currentRank: number;
+}
+
+export interface PowerRankingsViewModel {
+  entries: PowerRankingEntry[];
+  chartData: PowerRankingChartPoint[];
+  series: PowerRankingSeries[];
+  latestWeek: Week | null;
+}
+
+export interface PowerRankingsProps {
+  season: Season | null;
+  rankings: PowerRankingsViewModel;
+}
+
+export interface PowerRankingsHomeCardProps {
+  seasonId?: string;
+}
+
+export type PowerRankingWeeklyStat = Pick<
+  TeamWeekStatLine,
+  "gshlTeamId" | "weekId" | "powerRating" | "powerRk"
+>;
+
+export type PowerRankingSeasonStat = Pick<
+  TeamSeasonStatLine,
+  "gshlTeamId" | "powerRk"
+>;
+
+export interface BuildPowerRankingsOptions {
+  teams: GSHLTeam[];
+  weeks: Week[];
+  weeklyStats: PowerRankingWeeklyStat[];
+  seasonStats: PowerRankingSeasonStat[];
 }
 
 export interface PlayoffProbType {

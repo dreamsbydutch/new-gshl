@@ -20,7 +20,7 @@ import type {
 import type { ProcessedDraftPick } from "./draft-ui";
 import type { TeamStatsLevel, UseTeamsOptions } from "./hook-core";
 import type { QueryLike, QueryState } from "./hook-query";
-import type { StandingsGroup } from "./standings";
+import type { PowerRankingsViewModel, StandingsGroup } from "./standings";
 
 export interface UseContractDataOptions {
   currentSeason?: Season;
@@ -284,6 +284,7 @@ export interface UseStandingsDataResult {
   teams: GSHLTeam[];
   groups: StandingsGroup[];
   stats: TeamSeasonStatLine[];
+  powerRankings: PowerRankingsViewModel;
   standingsType: string;
   isLoading: boolean;
   error: Error | null;
