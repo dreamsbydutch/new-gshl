@@ -43,62 +43,64 @@ function MatchupSummaryTeam({
   score: number;
   alignment: "left" | "right";
 }) {
+  const fallbackLabel = alignment === "right" ? "Away" : "Home";
+  const logo = team?.logoUrl ? (
+    <Image
+      src={team.logoUrl}
+      alt={team.name ?? "Team Logo"}
+      width={44}
+      height={44}
+      className="h-7 w-7 shrink-0 object-contain sm:h-11 sm:w-11"
+    />
+  ) : (
+    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-200 text-[10px] font-semibold text-slate-600 sm:h-11 sm:w-11 sm:text-sm">
+      {team?.abbr?.slice(0, 3) ?? "?"}
+    </div>
+  );
+  const teamName = (
+    <div className="min-w-0">
+      <div className="truncate text-xs font-semibold leading-tight text-slate-900 sm:text-lg">
+        <span className="sm:hidden">
+          {team?.abbr ?? team?.name ?? fallbackLabel}
+        </span>
+        <span className="hidden sm:inline">{team?.name ?? "Unknown Team"}</span>
+      </div>
+      <div className="hidden text-xs uppercase tracking-[0.18em] text-slate-500 sm:block">
+        {team?.ownerNickname ?? team?.confAbbr ?? "Team"}
+      </div>
+    </div>
+  );
+  const teamScore = (
+    <div className="min-w-7 font-oswald text-2xl leading-none text-slate-900 sm:min-w-12 sm:text-4xl">
+      {score}
+    </div>
+  );
+
   return (
     <div
-      className={`flex items-center gap-2 sm:gap-3 ${alignment === "right" ? "justify-end text-right" : "text-left"}`}
+      className={`grid min-w-0 items-center gap-1.5 sm:flex sm:gap-3 ${
+        alignment === "right"
+          ? "grid-cols-[minmax(0,1fr)_auto] text-right sm:justify-end"
+          : "grid-cols-[auto_minmax(0,1fr)] text-left"
+      }`}
     >
       {alignment === "right" ? (
         <>
-          <div>
-            <div className="text-sm font-semibold leading-tight text-slate-900 sm:text-lg">
-              {team?.name ?? "Unknown Team"}
-            </div>
-            <div className="text-[10px] uppercase tracking-[0.14em] text-slate-500 sm:text-xs sm:tracking-[0.18em]">
-              {team?.ownerNickname ?? team?.confAbbr ?? "Team"}
-            </div>
+          {teamName}
+          <div className="flex items-center gap-1.5 sm:contents">
+            {logo}
+            {teamScore}
           </div>
-          {team?.logoUrl ? (
-            <Image
-              src={team.logoUrl}
-              alt={team.name ?? "Team Logo"}
-              width={44}
-              height={44}
-              className="h-8 w-8 object-contain sm:h-11 sm:w-11"
-            />
-          ) : (
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-200 text-xs font-semibold text-slate-600 sm:h-11 sm:w-11 sm:text-sm">
-              {team?.abbr?.slice(0, 3) ?? "?"}
-            </div>
-          )}
         </>
       ) : (
         <>
-          {team?.logoUrl ? (
-            <Image
-              src={team.logoUrl}
-              alt={team.name ?? "Team Logo"}
-              width={44}
-              height={44}
-              className="h-8 w-8 object-contain sm:h-11 sm:w-11"
-            />
-          ) : (
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-200 text-xs font-semibold text-slate-600 sm:h-11 sm:w-11 sm:text-sm">
-              {team?.abbr?.slice(0, 3) ?? "?"}
-            </div>
-          )}
-          <div>
-            <div className="text-sm font-semibold leading-tight text-slate-900 sm:text-lg">
-              {team?.name ?? "Unknown Team"}
-            </div>
-            <div className="text-[10px] uppercase tracking-[0.14em] text-slate-500 sm:text-xs sm:tracking-[0.18em]">
-              {team?.ownerNickname ?? team?.confAbbr ?? "Team"}
-            </div>
+          <div className="flex items-center gap-1.5 sm:contents">
+            {teamScore}
+            {logo}
           </div>
+          {teamName}
         </>
       )}
-      <div className="min-w-8 font-oswald text-3xl text-slate-900 sm:min-w-12 sm:text-4xl">
-        {score}
-      </div>
     </div>
   );
 }
@@ -115,22 +117,19 @@ function CategoryResultsCard({
   awayTeam: GSHLTeam | null;
 }) {
   return (
-    <section className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm sm:rounded-2xl sm:p-4">
-      <div className="mb-3 flex items-center justify-between gap-2 sm:mb-4">
+    <section className="rounded-lg border border-slate-200 bg-white p-2.5 shadow-sm sm:rounded-2xl sm:p-4">
+      <div className="mb-2 sm:mb-4">
         <h2 className="font-oswald text-xl text-slate-900 sm:text-2xl">
           {title}
         </h2>
-        <div className="text-[10px] uppercase tracking-[0.16em] text-slate-500 sm:text-xs sm:tracking-[0.18em]">
-          Category Results
-        </div>
       </div>
       {categories.length === 0 ? (
         <div className="rounded-xl bg-slate-50 px-4 py-6 text-sm text-slate-500">
           No category data available yet.
         </div>
       ) : (
-        <div className="-mx-1 overflow-x-auto pb-1 sm:mx-0">
-          <table className="min-w-max text-[11px] sm:w-full sm:text-sm">
+        <div className="-mx-0.5 overflow-x-auto pb-1 sm:mx-0">
+          <table className="min-w-max text-[10px] sm:w-full sm:text-sm">
             <tbody>
               <tr>
                 <td className="sticky left-0 whitespace-nowrap bg-white pb-1 pr-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500 sm:text-xs">
@@ -139,7 +138,7 @@ function CategoryResultsCard({
                 {categories.map((cat) => (
                   <td
                     key={cat.key}
-                    className={`whitespace-nowrap px-1 pb-1 text-center text-[11px] sm:text-sm ${
+                    className={`whitespace-nowrap px-0.5 pb-1 text-center text-[10px] sm:px-1 sm:text-sm ${
                       cat.winner === "away"
                         ? "font-semibold text-emerald-600"
                         : cat.winner === "tie"
@@ -155,7 +154,7 @@ function CategoryResultsCard({
                 <td className="sticky left-0 bg-white" />
                 {categories.map((cat) => (
                   <td key={cat.key} className="px-0.5 py-1 text-center">
-                    <span className="inline-block whitespace-nowrap rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-500 sm:text-xs">
+                    <span className="inline-block whitespace-nowrap rounded bg-slate-100 px-1 py-0.5 text-[9px] font-medium text-slate-500 sm:px-1.5 sm:text-xs">
                       {cat.label}
                     </span>
                   </td>
@@ -168,7 +167,7 @@ function CategoryResultsCard({
                 {categories.map((cat) => (
                   <td
                     key={cat.key}
-                    className={`whitespace-nowrap px-1 pt-1 text-center text-[11px] sm:text-sm ${
+                    className={`whitespace-nowrap px-0.5 pt-1 text-center text-[10px] sm:px-1 sm:text-sm ${
                       cat.winner === "home"
                         ? "font-semibold text-emerald-600"
                         : cat.winner === "tie"
@@ -191,19 +190,19 @@ function CategoryResultsCard({
 const STAR_RANK_CONFIG = {
   1: {
     stars: "★",
-    starClass: "text-4xl text-yellow-400",
+    starClass: "text-2xl text-yellow-400 sm:text-4xl",
     label: "1st Star",
     cardClass: "border-yellow-200/60 bg-yellow-50/30",
   },
   2: {
     stars: "★★",
-    starClass: "text-2xl text-slate-300",
+    starClass: "text-lg text-slate-300 sm:text-2xl",
     label: "2nd Star",
     cardClass: "border-slate-200/60 bg-slate-50/30",
   },
   3: {
     stars: "★★★",
-    starClass: "text-sm text-amber-700/70",
+    starClass: "text-xs text-amber-700/70 sm:text-sm",
     label: "3rd Star",
     cardClass: "border-amber-200/50 bg-amber-50/20",
   },
@@ -232,23 +231,26 @@ function StarPodiumCard({ star }: { star: StarPlayer }) {
 
   return (
     <div
-      className={`flex flex-col items-center gap-0.5 rounded-xl border p-2 text-center backdrop-blur-sm sm:gap-1 sm:rounded-2xl sm:p-3 ${config.cardClass}`}
+      className={`flex min-w-0 flex-col items-center gap-0.5 rounded-lg border p-1.5 text-center backdrop-blur-sm sm:gap-1 sm:rounded-2xl sm:p-3 ${config.cardClass}`}
     >
       <div className={`leading-none ${config.starClass}`}>{config.stars}</div>
       <div className="text-[9px] font-medium uppercase tracking-[0.18em] text-slate-400 sm:text-[10px]">
         {config.label}
       </div>
-      <div className="mt-1 text-xs font-semibold leading-tight text-slate-800 sm:text-sm">
+      <div className="mt-1 line-clamp-2 text-[10px] font-semibold leading-tight text-slate-800 sm:text-sm">
         {formatMatchupPlayerName(star)}
       </div>
-      <div className="text-[10px] text-slate-400 sm:text-xs">
+      <div className="max-w-full truncate text-[9px] text-slate-400 sm:text-xs">
         {star.team?.abbr ?? star.team?.name ?? "—"} ·{" "}
         {formatMatchupPlayerPositions(star)}
       </div>
-      <div className="mt-1 text-[11px] font-semibold text-slate-600 sm:text-xs">
-        Rating {formatStatValue(star.numericRating, 2)}
+      <div className="mt-1 text-[10px] font-semibold text-slate-600 sm:text-xs">
+        {formatStatValue(star.numericRating, 2)}
+        <span className="ml-1 text-[8px] font-normal uppercase text-slate-400 sm:text-[10px]">
+          Rating
+        </span>
       </div>
-      <div className="mt-0.5 flex flex-wrap justify-center gap-x-1.5 gap-y-0.5 sm:gap-x-2">
+      <div className="mt-0.5 hidden flex-wrap justify-center gap-x-1.5 gap-y-0.5 sm:flex sm:gap-x-2">
         {statItems.map(({ v, l }) => (
           <span key={l} className="text-[9px] text-slate-400 sm:text-[10px]">
             {v}
@@ -266,43 +268,38 @@ function StarsCard({ stars }: { stars: StarPlayer[] }) {
   const thirdStar = stars.find((s) => s.starRank === 3) ?? null;
 
   return (
-    <section className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm sm:rounded-2xl sm:p-4">
-      <div className="mb-3 flex items-center justify-between gap-2 sm:mb-4">
+    <section className="rounded-lg border border-slate-200 bg-white p-2.5 shadow-sm sm:rounded-2xl sm:p-4">
+      <div className="mb-2 sm:mb-4">
         <h2 className="font-oswald text-xl text-slate-900 sm:text-2xl">
           Three Stars
         </h2>
-        <div className="text-[10px] uppercase tracking-[0.16em] text-slate-500 sm:text-xs sm:tracking-[0.18em]">
-          Ranked by weekly rating
-        </div>
       </div>
       {stars.length === 0 ? (
         <div className="rounded-xl bg-slate-50 px-4 py-6 text-sm text-slate-500">
           No player performances available for this matchup yet.
         </div>
       ) : (
-        <div className="-mx-1 overflow-x-auto pb-1 sm:mx-0">
-          <div className="flex min-w-[520px] items-start gap-2 sm:min-w-0">
-            <div className="flex-1 pt-2 sm:pt-4">
-              {secondStar ? (
-                <StarPodiumCard star={secondStar} />
-              ) : (
-                <div className="h-full rounded-2xl border border-slate-100" />
-              )}
-            </div>
-            <div className="flex-1 pt-0">
-              {firstStar ? (
-                <StarPodiumCard star={firstStar} />
-              ) : (
-                <div className="h-full rounded-2xl border border-slate-100" />
-              )}
-            </div>
-            <div className="flex-1 pt-4 sm:pt-8">
-              {thirdStar ? (
-                <StarPodiumCard star={thirdStar} />
-              ) : (
-                <div className="h-full rounded-2xl border border-slate-100" />
-              )}
-            </div>
+        <div className="grid grid-cols-3 items-start gap-1.5 sm:gap-2">
+          <div className="min-w-0 pt-2 sm:pt-4">
+            {secondStar ? (
+              <StarPodiumCard star={secondStar} />
+            ) : (
+              <div className="h-full rounded-2xl border border-slate-100" />
+            )}
+          </div>
+          <div className="min-w-0 pt-0">
+            {firstStar ? (
+              <StarPodiumCard star={firstStar} />
+            ) : (
+              <div className="h-full rounded-2xl border border-slate-100" />
+            )}
+          </div>
+          <div className="min-w-0 pt-4 sm:pt-8">
+            {thirdStar ? (
+              <StarPodiumCard star={thirdStar} />
+            ) : (
+              <div className="h-full rounded-2xl border border-slate-100" />
+            )}
           </div>
         </div>
       )}
@@ -485,39 +482,36 @@ export function MatchupDetailsContent({
   }
 
   return (
-    <main className="mx-auto max-w-6xl px-3 py-5 pb-24 sm:px-4 sm:py-8 lg:pb-10">
-      <div className="mb-4 flex items-center justify-between gap-3 sm:mb-6">
+    <main className="mx-auto max-w-6xl px-2 py-3 pb-20 sm:px-4 sm:py-8 lg:pb-10">
+      <div className="mb-3 flex items-center justify-between gap-2 sm:mb-6">
         <button
           type="button"
           onClick={handleBack}
-          className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 underline-offset-4 shadow-sm hover:text-slate-900 hover:underline sm:text-sm"
+          className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-600 underline-offset-4 shadow-sm hover:text-slate-900 hover:underline sm:px-3 sm:py-1.5 sm:text-sm"
         >
           <ArrowLeftIcon className="h-4 w-4" />
           Back
         </button>
-        <div className="text-right text-[10px] uppercase tracking-[0.16em] text-slate-500 sm:text-xs sm:tracking-[0.18em]">
+        <div className="line-clamp-2 text-right text-[9px] uppercase leading-tight tracking-[0.12em] text-slate-500 sm:text-xs sm:tracking-[0.18em]">
           {season?.name ?? "Season"}{" "}
           {gameDisplay ? `- ${gameDisplay.label}` : ""}
           {weekRange ? ` - ${weekRange}` : ""}
         </div>
       </div>
 
-      <section className="rounded-2xl border border-slate-200 bg-gradient-to-br from-white via-slate-50 to-slate-100 p-3 shadow-sm sm:rounded-3xl sm:p-5">
-        <div className="mb-4 flex flex-col gap-3 border-b border-slate-200 pb-4 sm:mb-5 sm:pb-5">
-          <div className="text-[10px] uppercase tracking-[0.18em] text-slate-500 sm:text-xs sm:tracking-[0.22em]">
-            Matchup Score
-          </div>
-          <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 sm:gap-4">
+      <section className="rounded-xl border border-slate-200 bg-gradient-to-br from-white via-slate-50 to-slate-100 p-2 shadow-sm sm:rounded-3xl sm:p-5">
+        <div className="mb-2 border-b border-slate-200 pb-2 sm:mb-5 sm:pb-5">
+          <div className="grid grid-cols-[minmax(0,1fr)_2.5rem_minmax(0,1fr)] items-center gap-1.5 sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] sm:gap-4">
             <MatchupSummaryTeam
               team={awayTeam}
               score={matchupScore.away}
               alignment="right"
             />
             <div className="text-center">
-              <div className="font-oswald text-2xl text-slate-800 sm:text-3xl">
+              <div className="font-oswald text-lg text-slate-800 sm:text-3xl">
                 vs
               </div>
-              <div className="mt-1 max-w-24 text-[11px] leading-tight text-slate-500 sm:max-w-none sm:text-sm">
+              <div className="mt-1 hidden max-w-24 text-[11px] leading-tight text-slate-500 sm:block sm:max-w-none sm:text-sm">
                 {matchupStatus}
               </div>
             </div>
@@ -529,7 +523,7 @@ export function MatchupDetailsContent({
           </div>
         </div>
 
-        <div className="space-y-4">
+        <div className="space-y-2 sm:space-y-4">
           <CategoryResultsCard
             title="Matchup Breakdown"
             categories={categoryResults}
@@ -540,8 +534,8 @@ export function MatchupDetailsContent({
         </div>
       </section>
 
-      <section className="mt-5 space-y-3 sm:mt-6 sm:space-y-4">
-        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm sm:rounded-2xl">
+      <section className="mt-3 space-y-2 sm:mt-6 sm:space-y-4">
+        <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm sm:rounded-2xl">
           <div className="grid grid-cols-2">
             {[
               { side: "away" as const, team: awayTeam, label: "Away Team" },
@@ -560,7 +554,7 @@ export function MatchupDetailsContent({
                   aria-pressed={isSelected}
                   onClick={() => setSelectedSide(side)}
                   className={[
-                    "relative flex min-h-16 items-center justify-center gap-2 px-3 py-3 text-left transition-all sm:min-h-24 sm:gap-4 sm:px-4 sm:py-5",
+                    "relative flex min-h-12 min-w-0 items-center justify-center gap-1.5 px-2 py-2 text-left transition-all sm:min-h-24 sm:gap-4 sm:px-4 sm:py-5",
                     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-slate-400",
                     side === "away" ? "border-r border-slate-200" : "",
                   ].join(" ")}
@@ -581,27 +575,19 @@ export function MatchupDetailsContent({
                       alt={team.name ?? label}
                       width={48}
                       height={48}
-                      className="h-8 w-8 object-contain sm:h-12 sm:w-12"
+                      className="h-7 w-7 shrink-0 object-contain sm:h-12 sm:w-12"
                       style={{
                         filter: isSelected ? "none" : "grayscale(0.15)",
                       }}
                     />
                   ) : (
-                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white/50 text-xs font-semibold sm:h-12 sm:w-12 sm:text-sm">
+                    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white/50 text-[10px] font-semibold sm:h-12 sm:w-12 sm:text-sm">
                       {team?.abbr?.slice(0, 3) ?? "?"}
                     </div>
                   )}
-                  <div>
-                    <div className="font-oswald text-lg leading-none sm:text-2xl">
+                  <div className="min-w-0">
+                    <div className="truncate font-oswald text-sm leading-none sm:text-2xl">
                       {team?.name ?? label}
-                    </div>
-                    <div
-                      className={[
-                        "mt-1 text-[10px] font-medium uppercase tracking-[0.14em] sm:text-xs sm:tracking-[0.18em]",
-                        isSelected ? "opacity-100" : "opacity-70",
-                      ].join(" ")}
-                    >
-                      {side === "away" ? "Away" : "Home"}
                     </div>
                   </div>
                 </button>

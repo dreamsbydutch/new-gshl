@@ -51,31 +51,29 @@ function MatchupPanelSkeleton({
 
 export function MatchupSkeleton() {
   return (
-    <main className="mx-auto max-w-6xl px-3 py-5 pb-24 sm:px-4 sm:py-8 lg:pb-10">
-      <div className="mb-4 flex items-center justify-between gap-3 sm:mb-6">
-        <Skeleton className="h-8 w-20 rounded-full" />
+    <main className="mx-auto max-w-6xl px-2 py-3 pb-20 sm:px-4 sm:py-8 lg:pb-10">
+      <div className="mb-3 flex items-center justify-between gap-2 sm:mb-6">
+        <Skeleton className="h-7 w-20 rounded-full sm:h-8" />
         <Skeleton className="h-3 w-44" />
       </div>
-      <section className="rounded-2xl border border-slate-200 bg-gradient-to-br from-white via-slate-50 to-slate-100 p-3 shadow-sm sm:rounded-3xl sm:p-5">
-        <div className="mb-4 space-y-4 border-b border-slate-200 pb-4 sm:mb-5 sm:pb-5">
-          <Skeleton className="h-3 w-24" />
-          <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 sm:gap-4">
+      <section className="rounded-xl border border-slate-200 bg-gradient-to-br from-white via-slate-50 to-slate-100 p-2 shadow-sm sm:rounded-3xl sm:p-5">
+        <div className="mb-2 border-b border-slate-200 pb-2 sm:mb-5 sm:pb-5">
+          <div className="grid grid-cols-[minmax(0,1fr)_2.5rem_minmax(0,1fr)] items-center gap-1.5 sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] sm:gap-4">
             <MatchupTeamSkeleton />
             <div className="space-y-2">
-              <Skeleton className="mx-auto h-8 w-8" />
-              <Skeleton className="h-3 w-20" />
+              <Skeleton className="mx-auto h-6 w-8 sm:h-8" />
+              <Skeleton className="hidden h-3 w-20 sm:block" />
             </div>
             <MatchupTeamSkeleton />
           </div>
         </div>
-        <div className="space-y-4">
+        <div className="space-y-2 sm:space-y-4">
           <MatchupPanelSkeleton />
           <section className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm sm:rounded-2xl sm:p-4">
-            <div className="mb-4 flex items-center justify-between">
+            <div className="mb-2 sm:mb-4">
               <Skeleton className="h-6 w-28" />
-              <Skeleton className="h-3 w-36" />
             </div>
-            <div className="grid min-w-[32rem] grid-cols-3 items-start gap-2">
+            <div className="grid grid-cols-3 items-start gap-1.5 sm:gap-2">
               {Array.from({ length: 3 }).map((_, index) => (
                 <div
                   key={index}
@@ -93,12 +91,12 @@ export function MatchupSkeleton() {
           </section>
         </div>
       </section>
-      <section className="mt-5 space-y-3 sm:mt-6 sm:space-y-4">
-        <div className="grid grid-cols-2 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm sm:rounded-2xl">
+      <section className="mt-3 space-y-2 sm:mt-6 sm:space-y-4">
+        <div className="grid grid-cols-2 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm sm:rounded-2xl">
           {Array.from({ length: 2 }).map((_, index) => (
             <div
               key={index}
-              className="flex min-h-16 items-center justify-center gap-3 border-r p-3 last:border-0 sm:min-h-24"
+              className="flex min-h-12 items-center justify-center gap-2 border-r p-2 last:border-0 sm:min-h-24 sm:gap-3 sm:p-3"
             >
               <Skeleton className="h-9 w-9 rounded-full sm:h-12 sm:w-12" />
               <div className="space-y-2">

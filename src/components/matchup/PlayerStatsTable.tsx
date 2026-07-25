@@ -42,14 +42,14 @@ export function PlayerStatsTable({
     const classes = [
       "whitespace-nowrap",
       isHeader
-        ? "h-8 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500 sm:h-10 sm:px-3 sm:text-xs"
-        : "px-2 py-1 text-[11px] text-slate-700 sm:px-3 sm:py-2 sm:text-sm",
+        ? "h-7 px-1.5 py-1 text-[9px] font-semibold uppercase tracking-[0.12em] text-slate-500 sm:h-10 sm:px-3 sm:text-xs sm:tracking-[0.16em]"
+        : "px-1.5 py-1 text-[10px] text-slate-700 sm:px-3 sm:py-2 sm:text-sm",
       columnClassName ?? "",
     ];
 
     if (columnKey === "player") {
       classes.push(
-        "sticky left-0 z-20 min-w-[150px] bg-white text-left sm:min-w-[180px]",
+        "sticky left-0 z-20 min-w-[116px] max-w-[136px] bg-white text-left sm:min-w-[180px] sm:max-w-none",
       );
     }
 
@@ -88,7 +88,7 @@ export function PlayerStatsTable({
   };
 
   return (
-    <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm sm:rounded-2xl">
+    <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm sm:rounded-2xl">
       {headline && (
         <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-3 py-3 sm:px-4 sm:py-4">
           <div className="flex items-center gap-3">
@@ -119,7 +119,7 @@ export function PlayerStatsTable({
           </div>
         </div>
       )}
-      <Table className="min-w-[960px] text-[11px] sm:min-w-[1180px] sm:text-sm">
+      <Table className="w-max min-w-full text-[10px] sm:min-w-[1180px] sm:text-sm">
         <TableHeader>
           <TableRow>
             {columns.map((column) => (
