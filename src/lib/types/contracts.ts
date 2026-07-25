@@ -10,6 +10,7 @@ import type { ContractStatus, ContractType } from "./enums";
 
 export type MaybeArray<T> = T | T[] | null | undefined;
 export type ContractLength = 1 | 2 | 3;
+export type InteractiveContractAction = "sign" | "trade";
 
 export interface ContractFilters {
   ids?: MaybeArray<string>;
@@ -84,6 +85,8 @@ export interface InteractiveContractTableProps {
   currentSeason: Season | undefined;
   currentTeam: GSHLTeam;
   signablePlayers: Player[];
+  tradePlayers: Player[];
+  tradeContracts: Contract[];
   contractPlayers: Player[];
   nhlTeams: NHLTeam[];
   existingContracts: Contract[];
@@ -96,18 +99,29 @@ export interface InteractiveContractSelection {
   player: Player;
   contract: Contract;
   contractLength: ContractLength;
+  action: InteractiveContractAction;
+}
+
+export interface CapLabPlayerOption {
+  player: Player;
+  action: InteractiveContractAction;
+  contract?: Contract;
 }
 
 export interface UseInteractiveContractTableOptions {
   currentSeason?: Season;
   ownerId?: string;
   signablePlayers: Player[];
+  tradePlayers: Player[];
+  tradeContracts: Contract[];
   existingContracts: Contract[];
   seasons: Season[];
 }
 
 export interface UseInteractiveContractTableResult {
-  availablePlayers: Player[];
+  availablePlayers: CapLabPlayerOption[];
+  contractLength: ContractLength;
+  setContractLength: (length: ContractLength) => void;
   pickerError: string | null;
   addPlayer: (playerId: string) => void;
   removePlayer: (playerId: string) => void;

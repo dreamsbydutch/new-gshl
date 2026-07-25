@@ -1,13 +1,32 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import type { Contract, Player } from "@gshl-types";
+import type { Contract, Player, Season } from "@gshl-types";
 import {
   ContractStatus,
   ContractType,
   ResignableStatus,
 } from "../domain/constants";
-import { getCapLabPlayers, removeContractsForPlayer } from "./cap-lab";
+import {
+  getCapLabPlayerOptions,
+  getCapLabPlayers,
+  removeContractsForPlayer,
+} from "./cap-lab";
+
+const currentSeason: Season = {
+  id: "season-1",
+  year: 2027,
+  name: "2026-27",
+  categories: [],
+  rosterSpots: [],
+  startDate: "2026-10-01",
+  endDate: "2027-04-20",
+  signingEndDate: "2027-06-20",
+  isActive: true,
+  usesLegacyTies: false,
+  createdAt: new Date(0),
+  updatedAt: new Date(0),
+};
 
 function player(id: string, overrides: Partial<Player> = {}): Player {
   return {
@@ -34,13 +53,13 @@ function contract(id: string, playerId: string): Contract {
     id,
     playerId,
     ownerId: "owner-1",
-    seasonId: "season-1",
+    seasonId: String(currentSeason.id),
     contractType: [ContractType.STANDARD],
     contractLength: 1,
     contractSalary: 1_000_000,
     signingDate: "2026-06-01",
     startDate: "2026-10-01",
-    signingStatus: ContractStatus.UFA,
+    signingStatus: ContractStatus.DRAFTED,
     expiryStatus: ContractStatus.RFA,
     expiryDate: "2027-04-20",
     capHit: 1_000_000,
@@ -80,5 +99,33 @@ void test("removing a cap-lab player removes all of that player's contracts", ()
   assert.deepEqual(
     result.map((entry) => entry.id),
     ["two"],
+  );
+});
+
+void test("cap lab exposes another team's active player as a trade choice", () => {
+  const tradePlayer = player("Trade Target", {
+    isSignable: false,
+    isResignable: null,
+  });
+  const options = getCapLabPlayerOptions({
+    signablePlayers: [player("Free Agent")],
+    tradePlayers: [tradePlayer],
+    tradeContracts: [
+      {
+        ...contract("other-team-contract", "Trade Target"),
+        ownerId: "owner-2",
+      },
+    ],
+    ownerId: "owner-1",
+    currentSeason,
+    seasons: [currentSeason],
+  });
+
+  assert.deepEqual(
+    options.map((option) => [option.player.id, option.action]),
+    [
+      ["Free Agent", "sign"],
+      ["Trade Target", "trade"],
+    ],
   );
 });

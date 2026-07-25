@@ -3,14 +3,16 @@
 import { useMemo, useState } from "react";
 import type {
   Contract,
+  ContractLength,
   InteractiveContractSelection,
+  Player,
   UseInteractiveContractTableOptions,
   UseInteractiveContractTableResult,
 } from "@gshl-types";
 import {
   calculateContractCapSpaceWindow,
   deriveContractCreationTerms,
-  getCapLabPlayers,
+  getCapLabPlayerOptions,
   groupContractsByPlayer,
   removeContractsForPlayer,
   ResignableStatus,
@@ -25,6 +27,8 @@ export function useInteractiveContractTable(
     currentSeason,
     ownerId,
     signablePlayers,
+    tradePlayers,
+    tradeContracts,
     existingContracts,
     seasons,
   } = options;
@@ -33,24 +37,42 @@ export function useInteractiveContractTable(
   );
   const [removedPlayerIds, setRemovedPlayerIds] = useState<string[]>([]);
   const [pickerError, setPickerError] = useState<string | null>(null);
+  const [contractLength, setContractLength] = useState<ContractLength>(
+    DEFAULT_CONTRACT_LENGTH,
+  );
 
   const availablePlayers = useMemo(
-    () => getCapLabPlayers(signablePlayers),
-    [signablePlayers],
+    () =>
+      getCapLabPlayerOptions({
+        signablePlayers,
+        tradePlayers,
+        tradeContracts,
+        ownerId,
+        currentSeason,
+        seasons,
+      }),
+    [
+      currentSeason,
+      ownerId,
+      seasons,
+      signablePlayers,
+      tradeContracts,
+      tradePlayers,
+    ],
   );
 
   const addPlayer = (playerId: string) => {
-    const player = availablePlayers.find(
-      (candidate) => String(candidate.id) === String(playerId),
+    const option = availablePlayers.find(
+      (candidate) => String(candidate.player.id) === String(playerId),
     );
-    if (!player || !currentSeason) {
+    if (!option || !currentSeason) {
       setPickerError("This player cannot be added to the scenario yet.");
       return;
     }
     if (
       selections.some(
         (selection) =>
-          String(selection.contract.playerId) === String(player.id),
+          String(selection.contract.playerId) === String(option.player.id),
       )
     ) {
       setPickerError("That player is already in the scenario.");
@@ -58,42 +80,40 @@ export function useInteractiveContractTable(
     }
 
     try {
-      const contractLength = DEFAULT_CONTRACT_LENGTH;
-      const terms = deriveContractCreationTerms({
-        player: {
-          id: player.id,
-          salary: player.salary,
-          isResignable: player.isResignable ?? ResignableStatus.DRAFT,
-        },
-        signingSeason: currentSeason,
-        contractLength,
-        contracts: existingContracts,
-        seasons,
-      });
       const now = new Date();
-      const id = `interactive-${String(player.id)}`;
-      const contract: Contract = {
-        id,
-        playerId: String(player.id),
-        ownerId: String(ownerId ?? "interactive"),
-        seasonId: String(currentSeason.id),
-        contractType: [terms.contractType],
-        contractLength,
-        contractSalary: terms.contractSalary,
-        signingDate: now.toISOString().slice(0, 10),
-        startDate: terms.startDate,
-        signingStatus: terms.signingStatus,
-        expiryStatus: terms.expiryStatus,
-        expiryDate: terms.expiryDate,
-        capHit: terms.contractSalary,
-        capHitEndDate: terms.expiryDate,
-        createdAt: now,
-        updatedAt: now,
-      };
+      const id = `interactive-${option.action}-${String(option.player.id)}`;
+      const contract =
+        option.action === "trade" && option.contract
+          ? {
+              ...option.contract,
+              id,
+              ownerId: String(ownerId ?? "interactive"),
+              createdAt: now,
+              updatedAt: now,
+            }
+          : createSigningContract({
+              player: option.player,
+              currentSeason,
+              ownerId,
+              contractLength,
+              existingContracts,
+              seasons,
+              now,
+              id,
+            });
 
       setSelections((current) => [
         ...current,
-        { id, player, contract, contractLength },
+        {
+          id,
+          player: option.player,
+          contract,
+          contractLength:
+            option.action === "trade"
+              ? normalizeContractLength(contract.contractLength)
+              : contractLength,
+          action: option.action,
+        },
       ]);
       setPickerError(null);
     } catch (error) {
@@ -148,10 +168,13 @@ export function useInteractiveContractTable(
     setSelections([]);
     setRemovedPlayerIds([]);
     setPickerError(null);
+    setContractLength(DEFAULT_CONTRACT_LENGTH);
   };
 
   return {
     availablePlayers,
+    contractLength,
+    setContractLength,
     pickerError,
     addPlayer,
     removePlayer,
@@ -162,4 +185,58 @@ export function useInteractiveContractTable(
     capSpaceWindow,
     hasChanges: selections.length > 0 || removedPlayerIds.length > 0,
   };
+}
+
+function createSigningContract(options: {
+  player: Player;
+  currentSeason: NonNullable<
+    UseInteractiveContractTableOptions["currentSeason"]
+  >;
+  ownerId?: string;
+  contractLength: ContractLength;
+  existingContracts: Contract[];
+  seasons: UseInteractiveContractTableOptions["seasons"];
+  now: Date;
+  id: string;
+}): Contract {
+  const terms = deriveContractCreationTerms({
+    player: {
+      id: options.player.id,
+      salary: options.player.salary,
+      isResignable: options.player.isResignable ?? ResignableStatus.DRAFT,
+    },
+    signingSeason: options.currentSeason,
+    contractLength: options.contractLength,
+    contracts: options.existingContracts,
+    seasons: options.seasons,
+  });
+
+  return {
+    id: options.id,
+    playerId: String(options.player.id),
+    ownerId: String(options.ownerId ?? "interactive"),
+    seasonId: String(options.currentSeason.id),
+    contractType: [terms.contractType],
+    contractLength: options.contractLength,
+    contractSalary: terms.contractSalary,
+    signingDate: options.now.toISOString().slice(0, 10),
+    startDate: terms.startDate,
+    signingStatus: terms.signingStatus,
+    expiryStatus: terms.expiryStatus,
+    expiryDate: terms.expiryDate,
+    capHit: terms.contractSalary,
+    capHitEndDate: terms.expiryDate,
+    createdAt: options.now,
+    updatedAt: options.now,
+  };
+}
+
+function normalizeContractLength(
+  value: number | string | null | undefined,
+): ContractLength {
+  return Number(value) === 2
+    ? 2
+    : Number(value) === 3
+      ? 3
+      : DEFAULT_CONTRACT_LENGTH;
 }

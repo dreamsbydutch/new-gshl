@@ -14,6 +14,7 @@ import {
   useSeasonState,
   useTeams,
   useNHLTeams,
+  useContracts,
   useNav,
   useContractData,
   useTeamAwards,
@@ -128,6 +129,29 @@ export function LockerRoomContent() {
       isActive: true,
       enabled: needsContractData,
     });
+  const needsCapLabData = selectedLockerRoomType === "salary";
+  const {
+    data: allLeagueContracts = [],
+    isLoading: allLeagueContractsLoading,
+  } = useContracts({ enabled: needsCapLabData });
+  const tradePlayerIds = useMemo(() => {
+    if (!currentTeam?.ownerId) return [];
+    return [
+      ...new Set(
+        allLeagueContracts
+          .filter(
+            (contract) =>
+              String(contract.ownerId ?? "") !== String(currentTeam.ownerId),
+          )
+          .map((contract) => String(contract.playerId ?? ""))
+          .filter(Boolean),
+      ),
+    ];
+  }, [allLeagueContracts, currentTeam?.ownerId]);
+  const tradePlayersQuery = usePlayersByIds(
+    tradePlayerIds,
+    needsCapLabData && tradePlayerIds.length > 0,
+  );
   const needsNhlTeams =
     selectedLockerRoomType === "roster" ||
     selectedLockerRoomType === "salary" ||
@@ -211,6 +235,8 @@ export function LockerRoomContent() {
     teamsLoading ||
     (needsPlayers && playersLoading) ||
     (needsContractData && signablePlayersLoading) ||
+    (needsCapLabData &&
+      (allLeagueContractsLoading || tradePlayersQuery.isLoading)) ||
     (needsNhlTeams && nhlTeamsLoading) ||
     (isTrophyTab && teamAwardsLoading) ||
     (isRecordBookTab &&
@@ -253,6 +279,8 @@ export function LockerRoomContent() {
             currentSeason={contractSeason}
             currentTeam={currentTeam}
             signablePlayers={signablePlayers}
+            tradePlayers={tradePlayersQuery.data}
+            tradeContracts={allLeagueContracts}
             contractPlayers={contractPlayers}
             nhlTeams={nhlTeams}
             existingContracts={currentContracts}
