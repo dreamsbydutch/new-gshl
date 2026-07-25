@@ -132,9 +132,12 @@ function PlayerRows({
         const goalie = player.positionGroup === "G";
         const stats = player.stats;
         return (
-          <tr key={player.id} className="group border-t align-middle">
+          <tr
+            key={player.id}
+            className="group border-t border-border/70 align-middle"
+          >
             <td
-              className={`sticky left-0 z-20 border-r bg-background group-hover:bg-muted sm:static sm:z-auto sm:w-auto sm:min-w-0 sm:border-0 sm:bg-transparent sm:px-2 sm:py-3 ${showStats ? "w-8 min-w-8 px-0.5 py-1" : "w-6 min-w-6 px-0 py-0.5"}`}
+              className={`sticky left-0 z-20 border-r !bg-background group-hover:!bg-muted sm:static sm:z-auto sm:w-auto sm:min-w-0 sm:border-0 sm:!bg-transparent sm:px-2 sm:py-3 ${showStats ? "w-8 min-w-8 px-0.5 py-1" : "w-6 min-w-6 px-0 py-0.5"}`}
             >
               <NHLLogo
                 team={
@@ -149,7 +152,7 @@ function PlayerRows({
               />
             </td>
             <td
-              className={`sticky z-20 border-r bg-background text-left text-[10px] font-semibold group-hover:bg-muted sm:static sm:z-auto sm:min-w-0 sm:border-0 sm:bg-transparent sm:px-2 sm:py-3 sm:text-sm ${showStats ? "left-8 min-w-[7rem] px-1.5 py-1" : "left-6 min-w-[5.5rem] px-1 py-0.5"}`}
+              className={`sticky z-20 border-r !bg-background text-left text-[10px] font-semibold group-hover:!bg-muted sm:static sm:z-auto sm:min-w-0 sm:border-0 sm:!bg-transparent sm:px-2 sm:py-3 sm:text-sm ${showStats ? "left-[31px] min-w-[7rem] px-1.5 py-1" : "left-[23px] min-w-[5.5rem] px-1 py-0.5"}`}
             >
               {player.fullName}
             </td>
@@ -159,7 +162,7 @@ function PlayerRows({
               {player.positions.join("/") || player.positionGroup}
             </td>
             <td
-              className={`whitespace-nowrap text-[9px] font-medium sm:px-2 sm:py-3 sm:text-sm ${mobileCellPadding}`}
+              className={`whitespace-nowrap bg-muted/25 text-[9px] font-bold tabular-nums text-foreground sm:px-2 sm:py-3 sm:text-sm ${mobileCellPadding}`}
             >
               {formatMoney(player.salary)}
             </td>
@@ -243,17 +246,17 @@ function PlayerTable({
     : ["GP", "G", "A", "P", "+/−", "PIM", "PPP", "SOG", "HIT", "BLK"];
   const mobileCellPadding = showStats ? "px-1 py-1" : "px-0.5 py-0.5";
   return (
-    <div className="relative block w-full min-w-0 max-w-full touch-pan-x overflow-x-auto overscroll-x-contain rounded-lg border">
+    <div className="relative block w-full min-w-0 max-w-full touch-auto overflow-x-auto overscroll-x-contain rounded-lg border">
       <table className="w-max min-w-full text-center text-[10px] sm:text-sm">
         <thead className="bg-muted/70 text-[8px] uppercase tracking-wide sm:text-xs">
-          <tr>
+          <tr className="border-b border-border/70">
             <th
-              className={`sticky z-30 border-r bg-muted/70 sm:static sm:z-auto sm:w-auto sm:min-w-0 sm:border-0 sm:bg-transparent sm:px-2 sm:py-3 ${showStats ? "left-0 w-8 min-w-8 px-0.5 py-1" : "left-0 w-6 min-w-6 px-0 py-0.5"}`}
+              className={`sticky z-30 border-r !bg-muted sm:static sm:z-auto sm:w-auto sm:min-w-0 sm:border-0 sm:!bg-transparent sm:px-2 sm:py-3 ${showStats ? "left-0 w-8 min-w-8 px-0.5 py-1" : "left-0 w-6 min-w-6 px-0 py-0.5"}`}
             >
               NHL
             </th>
             <th
-              className={`sticky z-30 border-r bg-muted/70 text-left sm:static sm:z-auto sm:min-w-0 sm:border-0 sm:bg-transparent sm:px-2 sm:py-3 ${showStats ? "left-8 min-w-[7rem] px-1.5 py-1" : "left-6 min-w-[5.5rem] px-1 py-0.5"}`}
+              className={`sticky z-30 border-r !bg-muted text-left sm:static sm:z-auto sm:min-w-0 sm:border-0 sm:!bg-transparent sm:px-2 sm:py-3 ${showStats ? "left-[31px] min-w-[7rem] px-1.5 py-1" : "left-[23px] min-w-[5.5rem] px-1 py-0.5"}`}
             >
               Player
             </th>
@@ -263,7 +266,7 @@ function PlayerTable({
               Pos
             </th>
             <th
-              className={`whitespace-nowrap sm:px-2 sm:py-3 ${mobileCellPadding}`}
+              className={`whitespace-nowrap bg-muted/40 font-bold text-foreground sm:px-2 sm:py-3 ${mobileCellPadding}`}
             >
               UFA Salary
             </th>
@@ -304,14 +307,14 @@ function ActiveOffers({ groups }: { groups: UfaOfferGroupView[] }) {
           No UFA offers are currently pending.
         </p>
       ) : (
-        <div className="relative block w-full min-w-0 max-w-full touch-pan-x overflow-x-auto overscroll-x-contain rounded-lg border">
+        <div className="relative block w-full min-w-0 max-w-full touch-auto overflow-x-auto overscroll-x-contain rounded-lg border">
           <table className="w-max min-w-[720px] text-center text-[10px] sm:min-w-full sm:text-sm">
             <thead className="bg-muted/70 text-[8px] uppercase sm:text-xs">
-              <tr>
-                <th className="sticky left-0 z-30 w-8 min-w-8 border-r bg-muted/70 px-0.5 py-1 sm:static sm:z-auto sm:w-auto sm:min-w-0 sm:border-0 sm:bg-transparent sm:px-3 sm:py-3">
+              <tr className="border-b border-border/70">
+                <th className="sticky left-0 z-30 w-8 min-w-8 border-r !bg-muted px-0.5 py-1 sm:static sm:z-auto sm:w-auto sm:min-w-0 sm:border-0 sm:!bg-transparent sm:px-3 sm:py-3">
                   NHL
                 </th>
-                <th className="sticky left-8 z-30 min-w-[7rem] border-r bg-muted/70 px-1.5 py-1 text-left sm:static sm:z-auto sm:min-w-0 sm:border-0 sm:bg-transparent sm:px-3 sm:py-3">
+                <th className="sticky left-[31px] z-30 min-w-[7rem] border-r !bg-muted px-1.5 py-1 text-left sm:static sm:z-auto sm:min-w-0 sm:border-0 sm:!bg-transparent sm:px-3 sm:py-3">
                   Player
                 </th>
                 <th className="whitespace-nowrap px-1 py-1 sm:px-3 sm:py-3">
@@ -337,8 +340,11 @@ function ActiveOffers({ groups }: { groups: UfaOfferGroupView[] }) {
             <tbody>
               {groups.flatMap((group) =>
                 group.offers.map((offer) => (
-                  <tr key={offer.id} className="group border-t">
-                    <td className="sticky left-0 z-20 w-8 min-w-8 border-r bg-background px-0.5 py-1 group-hover:bg-muted sm:static sm:z-auto sm:w-auto sm:min-w-0 sm:border-0 sm:bg-transparent sm:px-3 sm:py-3">
+                  <tr
+                    key={offer.id}
+                    className="group border-t border-border/70"
+                  >
+                    <td className="sticky left-0 z-20 w-8 min-w-8 border-r !bg-background px-0.5 py-1 group-hover:!bg-muted sm:static sm:z-auto sm:w-auto sm:min-w-0 sm:border-0 sm:!bg-transparent sm:px-3 sm:py-3">
                       <NHLLogo
                         team={
                           group.player?.nhlTeamLogoUrl
@@ -351,13 +357,13 @@ function ActiveOffers({ groups }: { groups: UfaOfferGroupView[] }) {
                         size={24}
                       />
                     </td>
-                    <td className="sticky left-8 z-20 min-w-[7rem] border-r bg-background px-1.5 py-1 text-left text-[10px] font-semibold group-hover:bg-muted sm:static sm:z-auto sm:min-w-0 sm:border-0 sm:bg-transparent sm:px-3 sm:py-3 sm:text-sm">
+                    <td className="sticky left-[31px] z-20 min-w-[7rem] border-r !bg-background px-1.5 py-1 text-left text-[10px] font-semibold group-hover:!bg-muted sm:static sm:z-auto sm:min-w-0 sm:border-0 sm:!bg-transparent sm:px-3 sm:py-3 sm:text-sm">
                       {group.player?.fullName ?? "Unavailable player"}
                     </td>
                     <td className="whitespace-nowrap px-1 py-1 sm:px-3 sm:py-3">
                       {group.player?.positions.join("/") ?? "—"}
                     </td>
-                    <td className="whitespace-nowrap px-1 py-1 sm:px-3 sm:py-3">
+                    <td className="whitespace-nowrap bg-muted/25 px-1 py-1 font-bold tabular-nums text-foreground sm:px-3 sm:py-3">
                       {formatMoney(offer.salary)}
                     </td>
                     <td className="whitespace-nowrap px-1 py-1 sm:px-3 sm:py-3">
