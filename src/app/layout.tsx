@@ -50,7 +50,7 @@ export default function RootLayout({
         <AuthProvider>
           <ConvexClientProvider>
             <NavDefaults />
-            <div className="pb-20 lg:pb-8 lg:pt-16">{children}</div>
+            <div className="pb-20 pt-3 lg:pb-8 lg:pt-16">{children}</div>
             <Navbar />
             <PerformanceVitals />
           </ConvexClientProvider>

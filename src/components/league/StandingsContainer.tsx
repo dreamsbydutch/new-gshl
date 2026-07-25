@@ -50,7 +50,7 @@ function getRank(
 }
 
 function getStandingValue(
-  key: "wins" | "losses" | "points",
+  key: "wins" | "losses" | "ties" | "points",
   team: StandingsTeamRow,
   season: Season,
 ): string | number {
@@ -59,6 +59,7 @@ function getStandingValue(
 
   if (key === "wins") return formatStandingsDetailStat(stats.teamW);
   if (key === "losses") return formatStandingsDetailStat(stats.teamL);
+  if (key === "ties") return formatStandingsDetailStat(stats.teamT);
 
   return formatStandingsDetailStat(calculateStandingsPoints(stats, season));
 }
@@ -108,6 +109,7 @@ function StandingsGroupTable({
     ? (group.teams.find((team) => team.confLogoUrl)?.confLogoUrl ?? null)
     : GSHL_LEAGUE_LOGO_URL;
   const purpose = getGroupDescription(standingsType, group.title);
+  const showTies = season.usesLegacyTies;
 
   return (
     <section
@@ -152,6 +154,11 @@ function StandingsGroupTable({
               <th className="w-11 px-1.5 py-2.5 text-center font-semibold sm:w-20 sm:px-3 sm:py-3">
                 L
               </th>
+              {showTies ? (
+                <th className="w-11 px-1.5 py-2.5 text-center font-semibold sm:w-20 sm:px-3 sm:py-3">
+                  T
+                </th>
+              ) : null}
               <th className="w-14 px-1.5 py-2.5 text-center font-semibold sm:w-24 sm:px-3 sm:py-3">
                 PTS
               </th>
@@ -201,6 +208,11 @@ function StandingsGroupTable({
                 <td className="px-1.5 py-2.5 text-center font-mono tabular-nums text-slate-700 sm:px-3 sm:py-3">
                   {getStandingValue("losses", team, season)}
                 </td>
+                {showTies ? (
+                  <td className="px-1.5 py-2.5 text-center font-mono tabular-nums text-slate-700 sm:px-3 sm:py-3">
+                    {getStandingValue("ties", team, season)}
+                  </td>
+                ) : null}
                 <td className="px-1.5 py-2.5 text-center font-mono font-bold tabular-nums text-slate-950 sm:px-3 sm:py-3">
                   {getStandingValue("points", team, season)}
                 </td>
