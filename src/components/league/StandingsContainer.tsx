@@ -72,8 +72,8 @@ function getGroupDescription(standingsType: string, groupTitle: string) {
     return "Top three playoff seeds";
   }
 
-  if (standingsType === "conference") return "Conference standings · 1–7";
-  return "League standings · 1–16";
+  if (standingsType === "conference") return "Conference standings";
+  return "League standings";
 }
 
 function getGroupCardClass(standingsType: string, groupTitle: string) {
