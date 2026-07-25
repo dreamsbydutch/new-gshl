@@ -72,9 +72,9 @@ function TeamSlot({
 }
 
 function getRoundRowSpan(matchupCount: number) {
-  if (matchupCount === 1) return "md:row-span-4 md:self-center";
-  if (matchupCount === 2) return "md:row-span-2 md:self-center";
-  return "md:row-span-1 md:self-center";
+  if (matchupCount === 1) return "row-span-4 self-center";
+  if (matchupCount === 2) return "row-span-2 self-center";
+  return "row-span-1 self-center";
 }
 
 function getConnectorLineClasses(
@@ -86,14 +86,14 @@ function getConnectorLineClasses(
 
   const positionClass =
     matchupCount === 2
-      ? "md:top-[25%] md:h-[50%]"
+      ? "top-[25%] h-[50%]"
       : pairIndex === 0
-        ? "md:top-[12.5%] md:h-[25%]"
-        : "md:top-[62.5%] md:h-[25%]";
-  const sideClass = outputSide === "right" ? "md:-right-5" : "md:-left-5";
+        ? "top-[12.5%] h-[25%]"
+        : "top-[62.5%] h-[25%]";
+  const sideClass = outputSide === "right" ? "-right-5" : "-left-5";
 
   return cn(
-    "pointer-events-none absolute hidden w-px bg-slate-300 md:block",
+    "pointer-events-none absolute w-px bg-slate-300",
     positionClass,
     sideClass,
   );
@@ -121,12 +121,12 @@ function MatchupCard({
   return (
     <article
       className={cn(
-        "relative z-10 min-h-[86px] min-w-0 rounded-xl border border-slate-200 bg-white shadow-[0_8px_22px_-16px_rgba(15,23,42,0.55)] md:h-[86px]",
+        "relative z-10 min-h-[92px] min-w-0 rounded-xl border border-slate-200 bg-white shadow-[0_8px_22px_-16px_rgba(15,23,42,0.55)]",
         rowSpanClass,
         connectsLeft &&
-          "md:before:absolute md:before:-left-5 md:before:top-1/2 md:before:h-px md:before:w-5 md:before:bg-slate-300 md:before:content-['']",
+          "before:absolute before:-left-5 before:top-1/2 before:h-px before:w-5 before:bg-slate-300 before:content-['']",
         connectsRight &&
-          "md:after:absolute md:after:-right-5 md:after:top-1/2 md:after:h-px md:after:w-5 md:after:bg-slate-300 md:after:content-['']",
+          "after:absolute after:-right-5 after:top-1/2 after:h-px after:w-5 after:bg-slate-300 after:content-['']",
       )}
     >
       <div className="overflow-hidden rounded-xl">
@@ -199,7 +199,7 @@ function BracketColumn({
   const rowSpanClass = getRoundRowSpan(matchupCount);
 
   return (
-    <section className="min-w-0 md:min-w-[250px]">
+    <section className="min-w-[280px]">
       <header
         className={cn(
           "flex min-h-14 items-center gap-2 rounded-xl border px-3 py-2.5 shadow-sm",
@@ -222,7 +222,7 @@ function BracketColumn({
           <p className="truncate text-xs text-slate-600">{column.subtitle}</p>
         </div>
       </header>
-      <div className="relative mt-3 flex flex-col gap-3 md:grid md:h-[28rem] md:grid-rows-4 md:gap-4">
+      <div className="relative mt-3 grid h-[28rem] grid-rows-4 gap-4">
         {Array.from({ length: Math.floor(matchupCount / 2) }).map(
           (_, pairIndex) => {
             const lineClass = getConnectorLineClasses(
@@ -270,18 +270,14 @@ export function PlayoffBracket({
       <div className="mx-auto max-w-[96rem] px-3 sm:px-6">
         <div className="flex flex-col gap-3 border-b border-slate-200 pb-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-500">
+            <p className="text-[13px] font-semibold uppercase text-slate-500">
               {season.name} playoff picture
             </p>
-            <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl">
-              Live bracket
-            </h1>
-            <p className="mt-1 text-sm text-slate-500">{bracket.formatLabel}</p>
           </div>
         </div>
 
-        <div className="mt-5 overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-b from-slate-50 to-white p-2.5 shadow-sm sm:p-5 md:overflow-x-auto">
-          <div className="grid min-w-0 grid-cols-1 gap-6 md:min-w-max md:auto-cols-[minmax(250px,1fr)] md:grid-flow-col md:grid-cols-none md:gap-5">
+        <div className="mt-5 overflow-x-auto overflow-y-hidden rounded-2xl border border-slate-200 bg-gradient-to-b from-slate-50 to-white p-2.5 shadow-sm sm:p-5">
+          <div className="grid min-w-[875px] auto-cols-[minmax(280px,1fr)] grid-flow-col gap-5">
             {bracket.columns.map((column, index) => (
               <BracketColumn
                 key={column.id}

@@ -16,7 +16,7 @@ const STANDINGS_PURPOSES = {
   },
   conference: {
     label: "Conference race",
-    description: "Each conference shown independently from 1–7.",
+    description: "Each conference shown independently",
   },
   wildcard: {
     label: "Playoff race",
@@ -134,9 +134,6 @@ function StandingsGroupTable({
             {purpose}
           </p>
         </div>
-        <span className="ml-auto shrink-0 rounded-full bg-white/80 px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.12em] text-slate-500 sm:px-2.5 sm:text-[10px] sm:tracking-[0.14em]">
-          {group.teams.length} teams
-        </span>
       </div>
 
       <div className="overflow-x-auto bg-white/85">
@@ -240,14 +237,10 @@ export function StandingsTable({
   return (
     <div className="mx-auto w-full max-w-6xl space-y-4 px-2.5 py-3 sm:px-6 sm:py-4 lg:py-6">
       <div className="rounded-2xl border border-slate-200 bg-white px-3.5 py-3.5 shadow-sm sm:px-5 sm:py-4">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-500">
-          {purpose.label}
-        </p>
         <div className="mt-1 flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between sm:gap-4">
-          <h1 className="text-xl font-semibold tracking-tight text-slate-950 sm:text-3xl">
-            {selectedSeason.name} standings
-          </h1>
-          <p className="text-sm text-slate-500">{purpose.description}</p>
+          <p className="text-[13px] font-semibold uppercase text-slate-500">
+            {selectedSeason.name} {purpose.label}
+          </p>
         </div>
       </div>
 
