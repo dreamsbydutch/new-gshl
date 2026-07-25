@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { signOut, useSession } from "next-auth/react";
 import { LogIn, LogOut } from "lucide-react";
+import { useAuthActions, useAuthSession } from "@gshl-hooks";
 
 export function AuthNavControl() {
-  const { data: session, status } = useSession();
+  const { session, status } = useAuthSession();
+  const { signOut } = useAuthActions();
 
   if (status === "loading") {
     return <div className="h-9 w-9 animate-pulse rounded-full bg-gray-300" />;
@@ -46,7 +47,7 @@ export function AuthNavControl() {
         type="button"
         aria-label="Sign out"
         title="Sign out"
-        onClick={() => void signOut({ redirectTo: "/" })}
+        onClick={() => void signOut()}
         className="rounded p-1 text-gray-600 hover:bg-gray-100"
       >
         <LogOut className="h-4 w-4" />

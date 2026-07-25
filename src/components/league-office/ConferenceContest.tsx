@@ -288,7 +288,7 @@ function SeasonExplorer({
   selectedSeason: ConferenceContestSeasonViewModel;
   onSelect: (seasonId: string) => void;
 }) {
-  const router = useAppRouter();
+  const { router } = useAppRouter();
   const { setSelectedSeasonId } = useSeasonNavigation();
   const left = selectedSeason.leftConference;
   const right = selectedSeason.rightConference;

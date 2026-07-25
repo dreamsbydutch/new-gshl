@@ -7,6 +7,8 @@
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import type { NavigationStoreState } from "@gshl-types";
+
 const DEFAULT_STORE_STATE = {
   selectedScheduleType: "week",
   selectedSeasonId: "11",
@@ -17,31 +19,11 @@ const DEFAULT_STORE_STATE = {
   selectedStandingsType: "overall",
 } as const;
 
-interface NavState {
-  selectedScheduleType: string;
-  selectedSeasonId: string;
-  selectedWeekId: string;
-  selectedOwnerId: string;
-  selectedLockerRoomType: string;
-  selectedLeagueOfficeType: string;
-  selectedStandingsType: string;
-
-  setScheduleType: (type: string) => void;
-  setSeasonId: (id: string) => void;
-  setWeekId: (id: string) => void;
-  setOwnerId: (id: string) => void;
-  setLockerRoomType: (type: string) => void;
-  setLeagueOfficeType: (type: string) => void;
-  setStandingsType: (type: string) => void;
-  resetNavigation: () => void;
-  setDefaults: (defaults: Partial<NavState>) => void;
-}
-
 /**
  * Navigation state store with persistence
  * @returns Zustand store hook for navigation state
  */
-export const useNavStore = create<NavState>()(
+export const useNavStore = create<NavigationStoreState>()(
   persist(
     (set, get) => ({
       ...DEFAULT_STORE_STATE,

@@ -343,8 +343,8 @@ export function MatchupDetailsContent({
   const awayTeam = matchup
     ? (findTeamById(scheduleData.teams, matchup.awayTeamId) ?? null)
     : null;
-  const awayTeamColor = useTeamColor(awayTeam?.logoUrl);
-  const homeTeamColor = useTeamColor(homeTeam?.logoUrl);
+  const { teamColor: awayTeamColor } = useTeamColor(awayTeam?.logoUrl);
+  const { teamColor: homeTeamColor } = useTeamColor(homeTeam?.logoUrl);
   const homeTeamStats = matchup
     ? (scheduleData.teamWeekStatsByTeam[String(matchup.homeTeamId)] ?? null)
     : null;

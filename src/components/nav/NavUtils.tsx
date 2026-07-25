@@ -12,7 +12,7 @@ import { ClickableNavItem } from "./BaseComponents";
  * @returns Clickable button that resets all navigation state to defaults
  */
 export function NavResetButton() {
-  const resetNavigation = useNavigationReset();
+  const { resetNavigation } = useNavigationReset();
 
   return (
     <ClickableNavItem

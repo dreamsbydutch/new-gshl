@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import {
+  useAuthSession,
   useSelectedSeasonId,
   useTeamNavigation,
   useWeekNavigation,
@@ -9,7 +10,6 @@ import {
 } from "@gshl-hooks";
 import { isIsoDateInRange, toLocalIsoDateOnly } from "@gshl-utils";
 import { canManageOwnTeam } from "@gshl-utils";
-import { useSession } from "next-auth/react";
 
 /**
  * NavDefaults
@@ -18,9 +18,9 @@ import { useSession } from "next-auth/react";
  *   store does not already have a selection.
  */
 export function NavDefaults(): null {
-  const selectedSeasonId = useSelectedSeasonId();
+  const { selectedSeasonId } = useSelectedSeasonId();
   const { selectedOwnerId, setSelectedOwnerId } = useTeamNavigation();
-  const { data: session } = useSession();
+  const { session } = useAuthSession();
   const { selectedWeekId, setSelectedWeekId: setWeekId } = useWeekNavigation();
 
   const { data: weeks, isLoading } = useWeeks({

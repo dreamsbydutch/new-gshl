@@ -1,7 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { Bucket, TeamPaletteCacheEntry, TeamPaletteResult } from "@gshl-types";
+import type {
+  Bucket,
+  TeamPaletteCacheEntry,
+  TeamPaletteResult,
+  UseTeamColorResult,
+} from "@gshl-types";
 
 // Legacy single-color cache (primary) & expanded palette cache
 const colorCache = new Map<string, string>();
@@ -297,9 +302,9 @@ export function useTeamPalette(logoUrl?: string | null): TeamPaletteResult {
  * @param logoUrl Logo image URL
  * @returns Primary hex color or null
  */
-export function useTeamColor(logoUrl?: string | null): string | null {
+export function useTeamColor(logoUrl?: string | null): UseTeamColorResult {
   const { primary } = useTeamPalette(logoUrl);
-  return primary;
+  return { teamColor: primary };
 }
 
 /**

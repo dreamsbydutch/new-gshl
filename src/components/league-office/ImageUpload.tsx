@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { Check, Copy, ImagePlus, LoaderCircle, Upload, X } from "lucide-react";
 import { Button } from "@gshl-components/ui/ButtonPrimitive";
 import { Input } from "@gshl-components/ui/InputPrimitive";
-import { useUploadThing } from "./UploadThing";
+import { useImageUpload } from "@gshl-hooks/main/useImageUpload";
 import { cn } from "@gshl-utils";
 
 const MAX_FILE_SIZE = 8 * 1024 * 1024;
@@ -19,7 +19,7 @@ export function ImageUpload() {
   const [isDragging, setIsDragging] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  const { startUpload, isUploading } = useUploadThing("imageUploader", {
+  const { startUpload, isUploading } = useImageUpload("imageUploader", {
     onUploadError(uploadError) {
       setError(uploadError.message || "The image could not be uploaded.");
     },

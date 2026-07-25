@@ -42,6 +42,10 @@ export interface Bucket {
 
 export type TeamPaletteResult = TeamPaletteCacheEntry;
 
+export interface UseTeamColorResult {
+  teamColor: string | null;
+}
+
 export interface TeamRosterProps {
   players: Player[] | undefined;
   contracts: Contract[];

@@ -25,9 +25,11 @@ export function useNav() {
  * rest of the navigation store state.
  */
 export function useNavigationReset() {
-  return useNavStore((state) => state.resetNavigation);
+  const resetNavigation = useNavStore((state) => state.resetNavigation);
+  return { resetNavigation };
 }
 
 export function useSelectedSeasonId() {
-  return useNavStore((state) => state.selectedSeasonId);
+  const selectedSeasonId = useNavStore((state) => state.selectedSeasonId);
+  return { selectedSeasonId };
 }

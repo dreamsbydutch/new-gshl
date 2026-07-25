@@ -5,7 +5,7 @@ import { useTeamRosterView } from "@gshl-hooks";
 import { BenchPlayers } from "./roster/BenchPlayers";
 import { RatingLegend } from "./roster/RatingLegend";
 import { RosterLineup } from "./roster/RosterLineup";
-import { useSession } from "next-auth/react";
+import { useAuthSession } from "@gshl-hooks";
 
 export function TeamRoster({
   players,
@@ -19,7 +19,7 @@ export function TeamRoster({
       contracts,
       currentTeam,
     });
-  const { data: session } = useSession();
+  const { session } = useAuthSession();
   const canEditLineup =
     session?.user.role === "commissioner" ||
     (session?.user.role === "owner" &&

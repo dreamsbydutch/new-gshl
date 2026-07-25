@@ -1,7 +1,5 @@
 import { getAwardLabel } from "@gshl-lib/config/awards";
-import { AwardsList, PositionGroup, SeasonType } from "../domain/constants";
 import type {
-  AwardSummaryRow,
   AllTimeRosterEntry,
   AllTimeRosterSlot,
   AwardsList as AwardsListType,
@@ -24,7 +22,7 @@ import type {
 } from "@gshl-types";
 import { formatNumber, toNumber } from "../core";
 import { normalizeIdList } from "../core/ids";
-import { AwardsList, SeasonType } from "../domain/constants";
+import { AwardsList, PositionGroup, SeasonType } from "../domain/constants";
 import {
   findNhlTeamByAbbreviation,
   formatPlayerPositionList,
@@ -283,17 +281,10 @@ export function buildFranchiseCareerRows(
     if (!existing.nhlTeam && row.nhlTeam) {
       existing.nhlTeam = String(row.nhlTeam).trim();
     }
-
-    for (const field of CAREER_TOTAL_FIELDS) {
-      existing[field] += toNumber(row[field], 0);
-    }
+    addStats(existing, row);
   }
 
-  return Array.from(grouped.values()).map((row) => ({
-    ...row,
-    GAA: row.TOI > 0 ? (row.GA / row.TOI) * 60 : null,
-    SVP: row.SA > 0 ? row.SV / row.SA : null,
-  }));
+  return Array.from(grouped.values()).map(finalizeRates);
 }
 
 function getRosterSlotCandidates(
@@ -366,11 +357,6 @@ function compareRosterRows(
 
 /**
  * Builds the franchise's all-time lineup from regular-season career rows.
- *
- * @param rows - Aggregated franchise career rows.
- * @param playersById - Players keyed by id.
- * @param nhlTeamsByAbbr - NHL teams keyed by abbreviation.
- * @returns The best available player for each all-time roster slot.
  */
 export function buildAllTimeFranchiseRoster(
   rows: FranchiseCareerRow[],
@@ -408,88 +394,103 @@ export function buildAllTimeFranchiseRoster(
 }
 
 /**
- * Finds leader.
- *
- * @param rows - The rows to use.
- * @param playersById - The players by id to use.
- * @param nhlTeamsByAbbr - The nhl teams by abbr to use.
- * @param definition - The definition to use.
- * @param options - Configuration options for the operation.
- * @returns The matching leader, if one exists.
+ * Aggregates franchise season split rows by player, year, and season stage.
  */
-export function findLeader(
-  rows: FranchiseCareerRow[],
-  playersById: Map<string, Player>,
-  nhlTeamsByAbbr: Map<string, NHLTeam>,
-  definition: { key: string; label: string; stat: RecordStatKey },
-  options: {
-    seasonType: SeasonTypeValue;
-    group: "all" | "skater" | "goalie";
-  },
-): RecordLeader | null {
-  const filtered = rows.filter((row) => {
-    if (row.seasonType !== options.seasonType) {
-      return false;
-    }
+export function buildFranchiseSeasonRows(
+  seasonSplits: PlayerSplitStatLine[],
+  franchiseTeamIds: Set<string>,
+  seasonsById: Map<string, number>,
+): FranchiseSeasonRow[] {
+  const grouped = new Map<string, FranchiseSeasonRow>();
 
-    const player = playersById.get(row.playerId);
-    const posGroup = player?.posGroup ?? row.posGroup;
-
-    const isGoalie = String(posGroup) === String(PositionGroup.G);
-
-    if (options.group === "skater" && isGoalie) {
-      return false;
-    }
-    if (options.group === "goalie" && !isGoalie) {
-      return false;
-    }
-
-    const value = row[definition.stat];
-    if (value == null || !Number.isFinite(value)) {
-      return false;
-    }
+  for (const row of seasonSplits) {
+    const teamId = String(row.gshlTeamId ?? "");
+    const seasonId = String(row.seasonId ?? "");
+    const seasonType = String(row.seasonType ?? "");
+    const playerId = String(row.playerId ?? "");
 
     if (
-      (definition.stat === "GAA" || definition.stat === "SVP") &&
-      row.GS <= 0
+      !franchiseTeamIds.has(teamId) ||
+      !seasonId ||
+      !playerId ||
+      !isRecordBookSeasonType(seasonType)
     ) {
-      return false;
+      continue;
     }
 
-    if (definition.stat === "GAA" || definition.stat === "SVP") {
-      return row.GS >= GOALIE_RATE_MINIMUMS[options.seasonType];
+    const key = `${playerId}|${seasonId}|${seasonType}`;
+    const existing = grouped.get(key) ?? {
+      playerId,
+      seasonId,
+      seasonYear: seasonsById.get(seasonId) ?? seasonId,
+      seasonType,
+      posGroup: String(row.posGroup ?? ""),
+      nhlPos: normalizeIdList(row.nhlPos),
+      nhlTeam: String(row.nhlTeam ?? "").trim(),
+      ...createEmptyStatLine(),
+    };
+
+    if (!grouped.has(key)) grouped.set(key, existing);
+    if (!existing.posGroup && row.posGroup) {
+      existing.posGroup = String(row.posGroup);
     }
-
-    return value > 0;
-  });
-
-  if (filtered.length === 0) {
-    return null;
+    for (const position of normalizeIdList(row.nhlPos)) {
+      if (!existing.nhlPos.includes(position)) existing.nhlPos.push(position);
+    }
+    if (!existing.nhlTeam && row.nhlTeam) {
+      existing.nhlTeam = String(row.nhlTeam).trim();
+    }
+    addStats(existing, row);
   }
 
-  const sorted = filtered.slice().sort((left, right) => {
-    const leftValue = left[definition.stat];
-    const rightValue = right[definition.stat];
+  return Array.from(grouped.values()).map(finalizeRates);
+}
 
-    if (definition.stat === "GAA") {
-      if (leftValue !== rightValue) {
-        return (
-          (leftValue ?? Number.POSITIVE_INFINITY) -
-          (rightValue ?? Number.POSITIVE_INFINITY)
-        );
-      }
-    } else if ((rightValue ?? -Infinity) !== (leftValue ?? -Infinity)) {
-      return (rightValue ?? -Infinity) - (leftValue ?? -Infinity);
-    }
+/**
+ * Builds display-ready career and by-season player history rows.
+ */
+export function buildRecordBookPlayerRows(
+  options: BuildRecordBookPlayerRowsOptions,
+): BuildRecordBookPlayerRowsResult {
+  const {
+    careerSplits,
+    franchiseTeamIds,
+    nhlTeamsByAbbr,
+    playersById,
+    seasonSplits,
+    seasonsById,
+  } = options;
+  const franchiseSeasonRows = buildFranchiseSeasonRows(
+    seasonSplits,
+    franchiseTeamIds,
+    seasonsById,
+  );
+  const seasonsByPlayerStage = new Map<string, FranchiseSeasonRow[]>();
 
-    if (right.GP !== left.GP) {
-      return right.GP - left.GP;
-    }
+  for (const row of franchiseSeasonRows) {
+    const key = `${row.playerId}|${row.seasonType}`;
+    const rows = seasonsByPlayerStage.get(key) ?? [];
+    rows.push(row);
+    seasonsByPlayerStage.set(key, rows);
+  }
 
-    const leftName = playersById.get(left.playerId)?.fullName ?? left.playerId;
-    const rightName =
-      playersById.get(right.playerId)?.fullName ?? right.playerId;
-    return leftName.localeCompare(rightName);
+  const seasonRows = franchiseSeasonRows.map((row): RecordBookPlayerRow => {
+    const player = playersById.get(row.playerId);
+    return {
+      id: `${row.playerId}|${row.seasonId}|${row.seasonType}`,
+      playerId: row.playerId,
+      playerName: player?.fullName ?? `Player ${row.playerId}`,
+      nhlTeam: getNhlTeamForPlayer(nhlTeamsByAbbr, player, row.nhlTeam, true),
+      positions: getPlayerPositions(player, row.nhlPos),
+      positionGroup: String(player?.posGroup ?? row.posGroup),
+      seasonType: row.seasonType,
+      seasonId: row.seasonId,
+      seasonYear: row.seasonYear,
+      seasonCount: 1,
+      firstSeason: row.seasonYear,
+      lastSeason: row.seasonYear,
+      ...getStatLine(row),
+    };
   });
 
   const careerRows = buildFranchiseCareerRows(

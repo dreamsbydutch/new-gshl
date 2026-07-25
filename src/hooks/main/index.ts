@@ -1,20 +1,26 @@
 /**
  * Main Hooks
  * ----------
- * Core data fetching hooks that wrap tRPC queries for type-safe backend access.
+ * Stable data, mutation, navigation, and integration hooks.
  *
  * Responsibilities:
- * - Query the tRPC API layer
+ * - Query the remote data layer
  * - Provide simple filtering/selection options
  * - Return raw or lightly-adapted data structures
- * - Handle loading/error states via TanStack Query
+ * - Normalize loading and error states
  *
  * All hooks follow the options object pattern for consistent, flexible configuration.
  */
 
 // Contract hooks - sophisticated filtering and aggregation
 export { useAuthUserAdmin, useUpdateAuthUserAccess } from "./useAuthUsers";
+export {
+  useAuthActions,
+  useAuthSession,
+  useConvexAuth,
+} from "./useAuthSession";
 export { useJobAdmin } from "./useJobs";
+export { useImageUpload } from "./useImageUpload";
 export { useLeagueActivity } from "./useLeagueActivity";
 export {
   useContracts,
@@ -97,12 +103,3 @@ export type { UseWeeksOptions, WeekTimeMode } from "@gshl-types";
 // Navigation selection hooks
 export { useNav, useNavigationReset, useSelectedSeasonId } from "./useNav";
 export { useAppPathname, useAppRouter } from "./useNextNavigation";
-export {
-  useLeagueOfficeNavigation,
-  useLockerRoomNavigation,
-  useScheduleNavigation,
-  useSeasonNavigation,
-  useStandingsNavigation,
-  useTeamNavigation,
-  useWeekNavigation,
-} from "@gshl-cache";

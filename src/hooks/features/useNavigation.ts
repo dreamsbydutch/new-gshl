@@ -5,18 +5,11 @@
  * Each hook provides getters, setters, and smart defaults for its navigation section.
  */
 
-import { useNavStore } from "./store";
-import { useWeeks, useSeasonState } from "@gshl-hooks";
+import { useNavStore } from "@gshl-cache";
+import { useSeasonState, useWeeks } from "../main";
 import { isIsoDateInRange, toLocalIsoDateOnly } from "@gshl-utils";
 import { useEffect } from "react";
-
-type NavStoreState = ReturnType<typeof useNavStore.getState>;
-
-type NavigationSelectionOptions = {
-  fallback?: string;
-  selector: (state: NavStoreState) => string;
-  setter: (state: NavStoreState) => (value: string) => void;
-};
+import type { NavigationSelectionOptions } from "@gshl-types";
 
 function useNavigationSelection(options: NavigationSelectionOptions) {
   const selectedValue = useNavStore(options.selector);
@@ -100,7 +93,7 @@ export function useLeagueOfficeNavigation() {
 
 /**
  * Season navigation hook with smart defaults
- * Automatically selects current season → next season → most recent season
+ * Automatically selects current season â†’ next season â†’ most recent season
  * @returns Season data, ID, and setter with intelligent fallback logic
  */
 export function useSeasonNavigation() {
@@ -136,7 +129,7 @@ export function useSeasonNavigation() {
 
 /**
  * Week navigation hook with smart defaults
- * Automatically selects current week → next week → previous week
+ * Automatically selects current week â†’ next week â†’ previous week
  * @returns Week data, ID, and setter with intelligent fallback logic
  */
 export function useWeekNavigation() {

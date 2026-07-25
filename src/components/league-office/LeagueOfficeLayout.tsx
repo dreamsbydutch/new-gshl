@@ -1,9 +1,8 @@
 "use client";
 
-import { useLeagueOfficeNavigation } from "@gshl-hooks";
+import { useAuthSession, useLeagueOfficeNavigation } from "@gshl-hooks";
 import { HorizontalToggle, SecondaryPageToolbar } from "@gshl-nav";
 import type { ToggleItem } from "@gshl-types";
-import { useSession } from "next-auth/react";
 import { useEffect } from "react";
 
 export function LeagueOfficeLayout({
@@ -12,7 +11,7 @@ export function LeagueOfficeLayout({
   children: React.ReactNode;
 }) {
   const { selectedType, setSelectedType } = useLeagueOfficeNavigation();
-  const { data: session } = useSession();
+  const { session } = useAuthSession();
 
   useEffect(() => {
     const view = new URLSearchParams(window.location.search).get("view");

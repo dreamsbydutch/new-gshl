@@ -12,7 +12,7 @@
  *
  * Folder Organization:
  * -------------------
- * - main: Core TRPC data fetching hooks that query the backend
+ * - main: Stable remote-data, mutation, navigation, and integration hooks
  * - features: Orchestration hooks that compose data + utils for UI features
  */
 

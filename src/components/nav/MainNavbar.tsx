@@ -18,7 +18,7 @@ import { AuthNavControl } from "@gshl-components/auth";
  * @returns Primary navigation bar with route-based active states
  */
 export function MainNavbar({ className }: NavbarProps) {
-  const pathname = useAppPathname();
+  const { pathname } = useAppPathname();
 
   const navItems: LinkNavItemType[] = [
     {

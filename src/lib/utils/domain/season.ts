@@ -360,7 +360,7 @@ function deriveProjectedNextSeason(
   const nextSeasonId = Number.isFinite(Number(season.id))
     ? String(Number(season.id) + 1)
     : season.id;
-      /**
+  /**
    * Shifts year.
    *
    * @param value - The source value to process.
@@ -588,23 +588,9 @@ export function findWeekByDate(
     const endDateStr = end.toISOString().split("T")[0]!;
     const normalizedEnd = new Date(endDateStr + "T00:00:00.000Z");
 
-    const isMatch =
-      normalizedStart.getTime() <= refTime &&
-      refTime <= normalizedEnd.getTime();
-
-    // Debug logging for week matching issues
-    if (process.env.NODE_ENV === "development") {
-      const daysDiff =
-        (refTime - normalizedEnd.getTime()) / (1000 * 60 * 60 * 24);
-      if (Math.abs(daysDiff) <= 2) {
-        // Log if within 2 days of this week
-        console.log(
-          `[findWeekByDate] Week ${week.weekNum}: ${startDateStr} to ${endDateStr} | Target: ${refDateStr} | Match: ${isMatch}`,
-        );
-      }
-    }
-
-    return isMatch;
+    return (
+      normalizedStart.getTime() <= refTime && refTime <= normalizedEnd.getTime()
+    );
   });
 
   return matchedWeek;

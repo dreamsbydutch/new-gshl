@@ -9,6 +9,33 @@
 
 import type { ReactNode } from "react";
 
+export interface NavigationStoreState {
+  selectedScheduleType: string;
+  selectedSeasonId: string;
+  selectedWeekId: string;
+  selectedOwnerId: string;
+  selectedLockerRoomType: string;
+  selectedLeagueOfficeType: string;
+  selectedStandingsType: string;
+  setScheduleType: (type: string) => void;
+  setSeasonId: (id: string) => void;
+  setWeekId: (id: string) => void;
+  setOwnerId: (id: string) => void;
+  setLockerRoomType: (type: string) => void;
+  setLeagueOfficeType: (type: string) => void;
+  setStandingsType: (type: string) => void;
+  resetNavigation: () => void;
+  setDefaults: (defaults: Partial<NavigationStoreState>) => void;
+}
+
+export interface NavigationSelectionOptions {
+  fallback?: string;
+  selector: (state: NavigationStoreState) => string;
+  setter: (
+    state: NavigationStoreState,
+  ) => NavigationStoreState["setScheduleType"];
+}
+
 // ============================================================================
 // CORE NAVIGATION TYPES
 // ============================================================================

@@ -218,7 +218,7 @@ function MockDraftPickCard({
   nhlTeams: NHLTeam[];
 }) {
   const { pick, projectedPlayer, gshlTeam } = projectedPick;
-  const teamColor = useTeamColor(gshlTeam?.logoUrl);
+  const { teamColor } = useTeamColor(gshlTeam?.logoUrl);
   const base = teamColor ? lighten(teamColor, 0.82) : "#f1f5f9"; // lightened background
   const accent = teamColor ?? "#cbd5e1"; // border uses original or neutral
   // Determine readable text against the actual background (base), not the original team color

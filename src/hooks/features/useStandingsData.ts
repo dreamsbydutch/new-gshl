@@ -1,8 +1,8 @@
 "use client";
 
 import { useMemo } from "react";
-import { useSeasonNavigation, useStandingsNavigation } from "@gshl-cache";
 import { useSeasons } from "../main";
+import { useSeasonNavigation, useStandingsNavigation } from "./useNavigation";
 import {
   groupTeamsByStandingsType,
   SeasonType,

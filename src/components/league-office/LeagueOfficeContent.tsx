@@ -1,8 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useSession } from "next-auth/react";
-import { useLeagueOfficeNavigation } from "@gshl-hooks";
+import { useAuthSession, useLeagueOfficeNavigation } from "@gshl-hooks";
 
 const TabLoading = () => (
   <div className="mx-auto h-48 max-w-3xl animate-pulse rounded-xl bg-muted" />
@@ -59,7 +58,7 @@ const ImageUpload = dynamic(
 
 export function LeagueOfficeContent() {
   const { selectedType } = useLeagueOfficeNavigation();
-  const { data: session } = useSession();
+  const { session } = useAuthSession();
 
   return (
     <div className="container mx-auto px-4 py-8">

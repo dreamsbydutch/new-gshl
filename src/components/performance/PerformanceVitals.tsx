@@ -8,7 +8,7 @@ const NAVIGATION_MARK = "gshl-navigation-start";
 
 /** Development-only Core Web Vitals and client-navigation diagnostics. */
 export function PerformanceVitals() {
-  const pathname = useAppPathname();
+  const { pathname } = useAppPathname();
   const previousPathname = useRef(pathname);
 
   useReportWebVitals((metric: unknown) => {

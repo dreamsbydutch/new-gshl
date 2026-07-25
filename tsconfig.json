@@ -50,6 +50,7 @@
       "@gshl-nhl/*": ["./src/lib/nhl/*"],
       "@gshl-styles": ["./src/styles/globals.css"],
       "@gshl-actions": ["./src/actions/index.ts"],
+      "@gshl-server/*": ["./src/server/*"],
       "@gshl-convex/*": ["./convex/*"],
       "@gshl-app/*": ["./src/app/*"],
       "@gshl-lib/*": ["./src/lib/*"]

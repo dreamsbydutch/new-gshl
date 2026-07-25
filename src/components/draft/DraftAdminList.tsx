@@ -23,11 +23,10 @@ import {
   formatNumber,
 } from "@gshl-utils";
 import type { Player } from "@gshl-types";
-import { useDraftAdminList } from "@gshl-hooks";
-import { useSession } from "next-auth/react";
+import { useAuthSession, useDraftAdminList } from "@gshl-hooks";
 
 export function DraftAdminList(): JSX.Element {
-  const { data: session } = useSession();
+  const { session } = useAuthSession();
   const canManageDraft = session?.user.role === "commissioner";
   const {
     searchTerm,
@@ -67,30 +66,32 @@ export function DraftAdminList(): JSX.Element {
             {freeAgentsCount} signable players available
           </p>
         </div>
-        {canManageDraft ? <Button
-          size="sm"
-          variant="outline"
-          disabled={undoDisabled}
-          onClick={() => void handleUndoLastPick()}
-          className="inline-flex items-center gap-1"
-        >
-          {isUndoPending ? (
-            <>
-              <RefreshCw className="h-4 w-4 animate-spin" />
-              <span>Undoing...</span>
-            </>
-          ) : (
-            <>
-              <Undo2 className="h-4 w-4" />
-              <span>
-                Undo Last Pick
-                {lastCompletedPlayer?.fullName
-                  ? ` (${lastCompletedPlayer.fullName})`
-                  : ""}
-              </span>
-            </>
-          )}
-        </Button> : null}
+        {canManageDraft ? (
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={undoDisabled}
+            onClick={() => void handleUndoLastPick()}
+            className="inline-flex items-center gap-1"
+          >
+            {isUndoPending ? (
+              <>
+                <RefreshCw className="h-4 w-4 animate-spin" />
+                <span>Undoing...</span>
+              </>
+            ) : (
+              <>
+                <Undo2 className="h-4 w-4" />
+                <span>
+                  Undo Last Pick
+                  {lastCompletedPlayer?.fullName
+                    ? ` (${lastCompletedPlayer.fullName})`
+                    : ""}
+                </span>
+              </>
+            )}
+          </Button>
+        ) : null}
       </div>
 
       <div className="mb-2 text-sm">
@@ -174,19 +175,25 @@ export function DraftAdminList(): JSX.Element {
                     {formatMoney((Number(player.salary) || 0) * 1.25, true)}
                   </td>
                   <td className="whitespace-nowrap">
-                    {canManageDraft ? <Button
-                      size="sm"
-                      variant="secondary"
-                      disabled={isDisabled}
-                      onClick={() => void handleDraftPlayer(player)}
-                      className="inline-flex items-center gap-1"
-                    >
-                      {isDraftingThisPlayer || isDraftPending ? (
-                        <RefreshCw className="h-3 w-3 animate-spin" />
-                      ) : (
-                        "Draft"
-                      )}
-                    </Button> : <span className="text-xs text-muted-foreground">Read only</span>}
+                    {canManageDraft ? (
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        disabled={isDisabled}
+                        onClick={() => void handleDraftPlayer(player)}
+                        className="inline-flex items-center gap-1"
+                      >
+                        {isDraftingThisPlayer || isDraftPending ? (
+                          <RefreshCw className="h-3 w-3 animate-spin" />
+                        ) : (
+                          "Draft"
+                        )}
+                      </Button>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">
+                        Read only
+                      </span>
+                    )}
                   </td>
                 </tr>
               );

@@ -1,35 +1,8 @@
 "use client";
 
-import { useCallback, useMemo } from "react";
-import { useSession } from "next-auth/react";
-import {
-  ConvexProviderWithAuth,
-  ConvexReactClient,
-} from "convex/react";
-
-function useNextAuthForConvex() {
-  const { data: session, status } = useSession();
-  const isAuthenticated =
-    status === "authenticated" && session.user.status === "active";
-
-  const fetchAccessToken = useCallback(async () => {
-    if (!isAuthenticated) return null;
-
-    const response = await fetch("/api/convex/token", {
-      method: "POST",
-      cache: "no-store",
-    });
-    if (!response.ok) return null;
-    const payload = (await response.json()) as { token?: string };
-    return payload.token ?? null;
-  }, [isAuthenticated]);
-
-  return {
-    isLoading: status === "loading",
-    isAuthenticated,
-    fetchAccessToken,
-  };
-}
+import { useMemo } from "react";
+import { ConvexProviderWithAuth, ConvexReactClient } from "convex/react";
+import { useConvexAuth } from "@gshl-hooks";
 
 export function ConvexClientProvider({
   children,
@@ -43,7 +16,7 @@ export function ConvexClientProvider({
   }, []);
 
   return (
-    <ConvexProviderWithAuth client={client} useAuth={useNextAuthForConvex}>
+    <ConvexProviderWithAuth client={client} useAuth={useConvexAuth}>
       {children}
     </ConvexProviderWithAuth>
   );
