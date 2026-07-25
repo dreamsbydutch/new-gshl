@@ -1,6 +1,8 @@
 import { type Metadata } from "next";
 import { Varela_Round } from "next/font/google";
 
+import "@gshl-styles";
+
 import { cn } from "@gshl-utils";
 import { Navbar } from "@gshl-nav";
 import { NavDefaults } from "@gshl-components/nav/NavDefaults";
