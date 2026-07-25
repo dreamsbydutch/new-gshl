@@ -1,13 +1,17 @@
 import {
   AWARD_CATALOG_BY_KEY,
   AWARD_GROUP_ORDER,
+  getAwardLabel,
   getTeamAwardTeam,
+  PLAYER_TROPHY_ICON_AWARDS,
 } from "@gshl-lib/config/awards";
 import { AwardsList, SeasonType } from "../domain/constants";
 import type {
   AllStarAwardKey,
   AllStarTeamCard,
   AllStarWinner,
+  PlayerAwardSection,
+  PlayerAwardWinner,
   AwardsList as AwardsListType,
   GSHLTeam,
   Player,
@@ -25,6 +29,24 @@ export const ALL_STAR_AWARD_ORDER = [
   AwardsList.SECOND_AS,
   AwardsList.PLAYOFF_AS,
 ] as const;
+
+const ALL_STAR_AWARD_KEYS = new Set<AwardsListType>(ALL_STAR_AWARD_ORDER);
+
+const PLAYER_AWARD_ORDER: AwardsListType[] = [
+  AwardsList.CROSBY,
+  AwardsList.OVECHKIN,
+  AwardsList.GRETZKY,
+  AwardsList.LIDSTROM,
+  AwardsList.BRODEUR,
+  AwardsList.HART,
+  AwardsList.NORRIS,
+  AwardsList.VEZINA,
+  AwardsList.ROCKET,
+  AwardsList.ART_ROSS,
+  AwardsList.CALDER,
+  AwardsList.SELKE,
+  AwardsList.LADY_BYNG,
+];
 
 /**
  * Returns all star season type.
@@ -191,6 +213,73 @@ export function buildAllStarTeamCards(
     return {
       awardKey,
       title: getAllStarTitle(awardKey),
+      winners,
+    };
+  });
+}
+
+/**
+ * Builds grouped player-award winners for the season awards page.
+ */
+export function buildPlayerAwardSections(
+  awards: PlayerAward[],
+  players: Player[],
+  playerTotals: PlayerTotalStatLine[],
+  teams: GSHLTeam[],
+): PlayerAwardSection[] {
+  const playersById = new Map(
+    players.map((player) => [String(player.id), player]),
+  );
+  const totalsByPlayerId = new Map(
+    playerTotals.map((total) => [String(total.playerId), total]),
+  );
+  const teamsById = new Map(teams.map((team) => [String(team.id), team]));
+  const awardKeys = [
+    ...new Set(
+      awards
+        .map((award) => award.award)
+        .filter(
+          (award): award is AwardsListType => !ALL_STAR_AWARD_KEYS.has(award),
+        ),
+    ),
+  ].sort((left, right) => {
+    const leftIndex = PLAYER_AWARD_ORDER.indexOf(left);
+    const rightIndex = PLAYER_AWARD_ORDER.indexOf(right);
+    if (leftIndex !== -1 || rightIndex !== -1) {
+      return (
+        (leftIndex === -1 ? Number.MAX_SAFE_INTEGER : leftIndex) -
+        (rightIndex === -1 ? Number.MAX_SAFE_INTEGER : rightIndex)
+      );
+    }
+    return getAwardLabel(left).localeCompare(getAwardLabel(right));
+  });
+
+  return awardKeys.map((awardKey): PlayerAwardSection => {
+    const winners = awards
+      .filter((award) => award.award === awardKey)
+      .map((award): PlayerAwardWinner => {
+        const playerId = String(award.playerId);
+        const player = playersById.get(playerId);
+        const total = totalsByPlayerId.get(playerId);
+        const team = (total?.gshlTeamIds ?? [])
+          .map((teamId) => teamsById.get(String(teamId)))
+          .find((candidate): candidate is GSHLTeam => Boolean(candidate));
+
+        return {
+          playerId,
+          playerName: player?.fullName ?? `Player ${playerId}`,
+          positions: formatPlayerPositionList(total?.nhlPos ?? player?.nhlPos),
+          teamName: team?.name ?? null,
+          teamLogoUrl: team?.logoUrl ?? null,
+        };
+      })
+      .sort((left, right) => left.playerName.localeCompare(right.playerName));
+    const iconAward = PLAYER_TROPHY_ICON_AWARDS.get(awardKey) ?? awardKey;
+
+    return {
+      awardKey,
+      title: getAwardLabel(awardKey),
+      iconUrl: AWARD_CATALOG_BY_KEY.get(iconAward)?.imageUrl ?? null,
       winners,
     };
   });

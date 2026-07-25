@@ -215,64 +215,48 @@ export const groupTeamsByStandingsType = (
       break;
 
     case STANDINGS_TYPES.WILDCARD:
-      groups = [
-        {
-          title: CONFERENCE_TITLES.SUNVIEW,
-          teams: filterTeamsByConference(
-            teamsWithStats,
-            CONFERENCE_ABBREVIATIONS.SUNVIEW,
+      {
+        const sunviewTeams = filterTeamsByConference(
+          teamsWithStats,
+          CONFERENCE_ABBREVIATIONS.SUNVIEW,
+        )
+          .sort(
+            (a, b) =>
+              +(a.seasonStats?.conferenceRk ?? 0) -
+              +(b.seasonStats?.conferenceRk ?? 0),
           )
-            .sort(
-              (a, b) =>
-                +(a.seasonStats?.conferenceRk ?? 0) -
-                +(b.seasonStats?.conferenceRk ?? 0),
-            )
-            .slice(0, 3),
-        },
-        {
-          title: CONFERENCE_TITLES.HICKORY_HOTEL,
-          teams: filterTeamsByConference(
-            teamsWithStats,
-            CONFERENCE_ABBREVIATIONS.HICKORY_HOTEL,
+          .slice(0, 3);
+        const hickoryHotelTeams = filterTeamsByConference(
+          teamsWithStats,
+          CONFERENCE_ABBREVIATIONS.HICKORY_HOTEL,
+        )
+          .sort(
+            (a, b) =>
+              +(a.seasonStats?.conferenceRk ?? 0) -
+              +(b.seasonStats?.conferenceRk ?? 0),
           )
-            .sort(
-              (a, b) =>
-                +(a.seasonStats?.conferenceRk ?? 0) -
-                +(b.seasonStats?.conferenceRk ?? 0),
-            )
-            .slice(0, 3),
-        },
-        {
-          title: "Wildcard",
-          teams: teamsWithStats
-            .filter(
-              (a) =>
-                a.seasonStats?.wildcardRk !== null &&
-                a.seasonStats?.wildcardRk !== undefined,
-            )
-            .sort(
-              (a, b) =>
-                +(a.seasonStats?.wildcardRk ?? 0) -
-                +(b.seasonStats?.wildcardRk ?? 0),
-            )
-            .slice(0, 2),
-        },
-        {
-          title: "Out of the Playoffs",
-          teams: teamsWithStats
-            .filter(
-              (a) =>
-                a.seasonStats?.wildcardRk !== null &&
-                a.seasonStats?.wildcardRk !== undefined,
-            )
-            .sort(
-              (a, b) =>
-                +(a.seasonStats?.wildcardRk ?? 0) -
-                +(b.seasonStats?.wildcardRk ?? 0),
-            )
-            .slice(2),
-        },
-      ];
+          .slice(0, 3);
+        const conferencePlayoffTeamIds = new Set(
+          [...sunviewTeams, ...hickoryHotelTeams].map((team) => team.id),
+        );
+        const wildcardPool = teamsWithStats
+          .filter((team) => !conferencePlayoffTeamIds.has(team.id))
+          .sort(
+            (a, b) =>
+              +(a.seasonStats?.overallRk ?? 0) -
+              +(b.seasonStats?.overallRk ?? 0),
+          );
+
+        groups = [
+          { title: CONFERENCE_TITLES.SUNVIEW, teams: sunviewTeams },
+          {
+            title: CONFERENCE_TITLES.HICKORY_HOTEL,
+            teams: hickoryHotelTeams,
+          },
+          { title: "Wildcard", teams: wildcardPool.slice(0, 2) },
+          { title: "Out of the Playoffs", teams: wildcardPool.slice(2) },
+        ];
+      }
       break;
 
     default:

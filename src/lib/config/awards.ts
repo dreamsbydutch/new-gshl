@@ -170,6 +170,17 @@ export const PLAYER_TROPHY_LABELS = new Map<AwardsListType, string>([
   [AwardsList.OVECHKIN, "Ovechkin Trophy"],
 ]);
 
+export const PLAYER_TROPHY_ICON_AWARDS = new Map<
+  AwardsListType,
+  AwardsListType
+>([
+  [AwardsList.CROSBY, AwardsList.HART],
+  [AwardsList.LIDSTROM, AwardsList.NORRIS],
+  [AwardsList.BRODEUR, AwardsList.VEZINA],
+  [AwardsList.GRETZKY, AwardsList.ART_ROSS],
+  [AwardsList.OVECHKIN, AwardsList.ROCKET],
+]);
+
 export function getAwardLabel(award: string): string {
   return (
     AWARD_CATALOG_BY_KEY.get(award as AwardsListType)?.fullName ??

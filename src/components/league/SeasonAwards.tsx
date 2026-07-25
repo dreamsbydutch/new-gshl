@@ -5,11 +5,13 @@ import { useMemo, useState } from "react";
 import { AWARD_GROUP_ORDER } from "@gshl-lib/config/awards";
 import type {
   AllStarTeamCard,
+  PlayerAwardSection,
   SeasonAwardsProps,
   SeasonAwardWinnerCard,
 } from "@gshl-types";
 import {
   buildAllStarTeamCards,
+  buildPlayerAwardSections,
   buildSeasonAwardCards,
   cn,
   getAllStarCardClass,
@@ -156,6 +158,48 @@ function AllStarTeamSection({ card }: { card: AllStarTeamCard }) {
   );
 }
 
+function PlayerAwardSectionCard({ section }: { section: PlayerAwardSection }) {
+  return (
+    <article className="rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-[0_12px_28px_rgba(15,23,42,0.06)] sm:rounded-[2rem] sm:p-5">
+      <div className="flex items-center gap-3 border-b border-slate-100 pb-3">
+        {section.iconUrl ? (
+          <img
+            className="h-10 w-10 object-contain"
+            src={section.iconUrl}
+            alt=""
+          />
+        ) : null}
+        <h3 className="min-w-0 flex-1 truncate font-oswald text-xl text-black sm:text-2xl">
+          {section.title}
+        </h3>
+        <span className="font-barlow text-[10px] uppercase tracking-[0.16em] text-gray-400">
+          {section.winners.length} winner
+          {section.winners.length === 1 ? "" : "s"}
+        </span>
+      </div>
+      <div className="mt-3 space-y-2">
+        {section.winners.map((winner) => (
+          <div
+            key={`${section.awardKey}-${winner.playerId}`}
+            className="flex items-center gap-2.5 rounded-xl bg-slate-50 px-3 py-2.5 sm:rounded-2xl"
+          >
+            <WinnerLogo logoUrl={winner.teamLogoUrl} fallbackLabel="GSHL" />
+            <div className="min-w-0 flex-1">
+              <p className="truncate font-oswald text-lg leading-none text-black sm:text-xl">
+                {winner.playerName}
+              </p>
+              <p className="truncate text-xs text-slate-600 sm:text-sm">
+                {winner.positions}
+                {winner.teamName ? ` - ${winner.teamName}` : ""}
+              </p>
+            </div>
+          </div>
+        ))}
+      </div>
+    </article>
+  );
+}
+
 export function SeasonAwards({
   playerAwards,
   teamAwards,
@@ -170,6 +214,10 @@ export function SeasonAwards({
   );
   const allStarCards = useMemo(
     () => buildAllStarTeamCards(playerAwards, players, playerTotals, teams),
+    [playerAwards, players, playerTotals, teams],
+  );
+  const playerAwardSections = useMemo(
+    () => buildPlayerAwardSections(playerAwards, players, playerTotals, teams),
     [playerAwards, players, playerTotals, teams],
   );
   const visibleGroups = useMemo(
@@ -224,6 +272,20 @@ export function SeasonAwards({
           </div>
         );
       })}
+
+      {playerAwardSections.length > 0 ? (
+        <>
+          <TrophySectionDivider label="PLAYER AWARDS" />
+          <div className="mx-auto grid max-w-6xl grid-cols-1 gap-3 px-4 sm:grid-cols-2 sm:gap-4 xl:grid-cols-3">
+            {playerAwardSections.map((section) => (
+              <PlayerAwardSectionCard
+                key={section.awardKey}
+                section={section}
+              />
+            ))}
+          </div>
+        </>
+      ) : null}
 
       <TrophySectionDivider label="ALL-STAR TEAMS" />
       <div className="mx-auto grid max-w-6xl grid-cols-1 gap-3 px-4 sm:gap-4 lg:grid-cols-3">

@@ -42,6 +42,21 @@ export interface AllStarTeamCard {
   winners: AllStarWinner[];
 }
 
+export interface PlayerAwardWinner {
+  playerId: string;
+  playerName: string;
+  positions: string;
+  teamName: string | null;
+  teamLogoUrl: string | null;
+}
+
+export interface PlayerAwardSection {
+  awardKey: AwardsList;
+  title: string;
+  iconUrl: string | null;
+  winners: PlayerAwardWinner[];
+}
+
 export interface SeasonAwardsProps {
   playerAwards: PlayerAward[];
   teamAwards: TeamAward[];

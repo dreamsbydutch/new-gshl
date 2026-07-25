@@ -37,6 +37,7 @@ export function StandingsContent() {
     selectedSeason,
     selectedSeasonId,
     groups,
+    matchups,
     standingsType,
     teams,
     stats,
@@ -96,6 +97,7 @@ export function StandingsContent() {
   if ((standingsType ?? "overall") === "playoff") {
     return (
       <PlayoffBracket
+        matchups={matchups}
         teams={teams}
         stats={stats}
         season={selectedSeason ?? null}

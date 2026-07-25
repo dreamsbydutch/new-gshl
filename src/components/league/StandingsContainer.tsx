@@ -1,345 +1,196 @@
 "use client";
 
 import Image from "next/image";
-import { useMemo, useState } from "react";
-import { ArrowDown, ArrowUp, ArrowUpDown, Info } from "lucide-react";
-
-import type {
-  Season,
-  StandingsGroup,
-  StandingsSortState,
-  StandingsStatView,
-  StandingsTableColumn,
-  StandingsTeamRow,
-  TeamSeasonStatLine,
-} from "@gshl-types";
+import type { Season, StandingsGroup, StandingsTeamRow } from "@gshl-types";
 import {
   calculateStandingsPoints,
   cn,
   formatStandingsDetailStat,
-  formatStandingsGaa,
-  formatStandingsRecord,
-  formatStandingsSvp,
 } from "@gshl-utils";
 
-const VIEW_OPTIONS: Array<{
-  key: StandingsStatView;
-  label: string;
-  description: string;
-}> = [
-  {
-    key: "standings",
-    label: "Standings",
-    description: "Record, points, rank and current form",
+const STANDINGS_PURPOSES = {
+  overall: {
+    label: "League table",
+    description:
+      "The full league ordered 1–16 for the clearest playoff picture.",
   },
-  {
-    key: "skaters",
-    label: "Skaters",
-    description: "Every accumulated skater category",
+  conference: {
+    label: "Conference race",
+    description: "Each conference shown independently from 1–7.",
   },
-  {
-    key: "goalies",
-    label: "Goalies",
-    description: "Wins, saves and rate statistics",
+  wildcard: {
+    label: "Playoff race",
+    description:
+      "The top three in each conference, two wildcards, and the six teams outside the field.",
   },
-  {
-    key: "roster",
-    label: "Roster",
-    description: "Usage, availability and team rating",
-  },
-];
-
-const COLUMNS: Record<StandingsStatView, StandingsTableColumn[]> = {
-  standings: [
-    { key: "GP", label: "GP", description: "Games played" },
-    { key: "record", label: "Record", description: "Team record" },
-    {
-      key: "standingsPoints",
-      label: "PTS",
-      description: "Standings points",
-    },
-    { key: "streak", label: "STRK", description: "Current streak" },
-    { key: "powerRk", label: "PR", description: "Power rank" },
-  ],
-  skaters: [
-    { key: "G", label: "G", description: "Goals" },
-    { key: "A", label: "A", description: "Assists" },
-    { key: "P", label: "P", description: "Points" },
-    { key: "PM", label: "+/−", description: "Plus/minus" },
-    { key: "PIM", label: "PIM", description: "Penalty minutes" },
-    { key: "PPP", label: "PPP", description: "Power-play points" },
-    { key: "SOG", label: "SOG", description: "Shots on goal" },
-    { key: "HIT", label: "HIT", description: "Hits" },
-    { key: "BLK", label: "BLK", description: "Blocks" },
-    { key: "TOI", label: "TOI", description: "Time on ice" },
-  ],
-  goalies: [
-    { key: "GS", label: "GS", description: "Goalie starts" },
-    { key: "W", label: "W", description: "Goalie wins" },
-    { key: "GA", label: "GA", description: "Goals against" },
-    {
-      key: "GAA",
-      label: "GAA",
-      description: "Goals-against average",
-      format: "gaa",
-    },
-    { key: "SV", label: "SV", description: "Saves" },
-    { key: "SA", label: "SA", description: "Shots against" },
-    { key: "SVP", label: "SV%", description: "Save percentage", format: "svp" },
-    { key: "SO", label: "SO", description: "Shutouts" },
-  ],
-  roster: [
-    { key: "playersUsed", label: "USED", description: "Players used" },
-    { key: "days", label: "DAYS", description: "Roster days used" },
-    { key: "MG", label: "MG", description: "Man games" },
-    { key: "IR", label: "IR", description: "Injured reserve" },
-    { key: "IRplus", label: "IR+", description: "Injured reserve plus" },
-    {
-      key: "Rating",
-      label: "RTG",
-      description: "Team rating",
-      format: "rating",
-    },
-    { key: "ADD", label: "ADD", description: "Adds" },
-    { key: "MS", label: "MS", description: "Moves" },
-    { key: "BS", label: "BS", description: "Bench spots" },
-  ],
-};
+} as const;
 
 function getRank(
   team: StandingsTeamRow,
   standingsType: string,
   groupTitle: string,
-) {
+  fallbackRank: number,
+): number | string {
   const stats = team.seasonStats;
-  if (!stats) return null;
-  if (standingsType === "conference") return stats.conferenceRk;
-  if (standingsType === "wildcard") {
-    return groupTitle === "Wildcard" || groupTitle === "Out of the Playoffs"
-      ? stats.wildcardRk
-      : stats.conferenceRk;
-  }
-  return stats.overallRk;
+  if (!stats) return fallbackRank;
+
+  const rank =
+    standingsType === "conference"
+      ? stats.conferenceRk
+      : standingsType === "wildcard" &&
+          (groupTitle === "Wildcard" || groupTitle === "Out of the Playoffs")
+        ? stats.wildcardRk
+        : stats.overallRk;
+  const numericRank = Number(rank);
+  return Number.isFinite(numericRank) && numericRank > 0
+    ? numericRank
+    : fallbackRank;
 }
 
-function getCellValue(
-  column: StandingsTableColumn,
+function getStandingValue(
+  key: "wins" | "losses" | "points",
   team: StandingsTeamRow,
   season: Season,
-) {
+): string | number {
   const stats = team.seasonStats;
-  if (!stats) return "—";
-  if (column.key === "record") return formatStandingsRecord(stats, season);
-  if (column.key === "standingsPoints") {
-    return formatStandingsDetailStat(calculateStandingsPoints(stats, season));
-  }
+  if (!stats) return "-";
 
-  const value = stats[column.key];
-  if (column.format === "gaa") return formatStandingsGaa(value as number);
-  if (column.format === "svp") return formatStandingsSvp(value as number);
-  if (column.format === "rating") {
-    return typeof value === "number" && Number.isFinite(value)
-      ? value.toFixed(1)
-      : "—";
-  }
-  return formatStandingsDetailStat(
-    value as string | number | null | undefined,
-    "—",
-  );
+  if (key === "wins") return formatStandingsDetailStat(stats.teamW);
+  if (key === "losses") return formatStandingsDetailStat(stats.teamL);
+
+  return formatStandingsDetailStat(calculateStandingsPoints(stats, season));
 }
 
-function compareTeams(
-  a: StandingsTeamRow,
-  b: StandingsTeamRow,
-  sortState: Exclude<StandingsSortState, null>,
-) {
-  const aRaw = a.seasonStats?.[sortState.key];
-  const bRaw = b.seasonStats?.[sortState.key];
-  const aValue =
-    typeof aRaw === "number" && Number.isFinite(aRaw) ? aRaw : null;
-  const bValue =
-    typeof bRaw === "number" && Number.isFinite(bRaw) ? bRaw : null;
+function getGroupDescription(standingsType: string, groupTitle: string) {
+  if (standingsType === "wildcard") {
+    if (groupTitle === "Wildcard") return "Two best remaining teams";
+    if (groupTitle === "Out of the Playoffs") {
+      return "Six teams outside the playoff field";
+    }
+    return "Top three playoff seeds";
+  }
 
-  if (aValue === null && bValue === null) return 0;
-  if (aValue === null) return 1;
-  if (bValue === null) return -1;
+  if (standingsType === "conference") return "Conference standings · 1–7";
+  return "League standings · 1–16";
+}
 
-  return sortState.direction === "asc" ? aValue - bValue : bValue - aValue;
+function getGroupCardClass(standingsType: string, groupTitle: string) {
+  if (standingsType === "conference" || standingsType === "wildcard") {
+    if (groupTitle === "Sunview") return "border-sky-200 bg-sky-50/70";
+    if (groupTitle === "Hickory Hotel") {
+      return "border-amber-200 bg-amber-50/70";
+    }
+  }
+
+  if (groupTitle === "Wildcard") return "border-violet-200 bg-violet-50/70";
+  if (groupTitle === "Out of the Playoffs") {
+    return "border-slate-200 bg-slate-50";
+  }
+  return "border-slate-200 bg-white";
 }
 
 function StandingsGroupTable({
   group,
   season,
   standingsType,
-  view,
-  sortState,
-  onSort,
 }: {
   group: StandingsGroup;
   season: Season;
   standingsType: string;
-  view: StandingsStatView;
-  sortState: StandingsSortState;
-  onSort: (key: keyof TeamSeasonStatLine) => void;
 }) {
-  const columns = COLUMNS[view];
-  const rows = useMemo(
-    () =>
-      sortState
-        ? [...group.teams].sort((a, b) => compareTeams(a, b, sortState))
-        : group.teams,
-    [group.teams, sortState],
-  );
+  const conferenceLogoUrl = group.teams.find(
+    (team) => team.confLogoUrl,
+  )?.confLogoUrl;
+  const purpose = getGroupDescription(standingsType, group.title);
 
   return (
-    <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-      <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50/80 px-4 py-3">
-        <div>
-          <h2 className="text-sm font-semibold text-slate-900 lg:text-base">
+    <section
+      className={cn(
+        "overflow-hidden rounded-2xl border shadow-sm",
+        getGroupCardClass(standingsType, group.title),
+      )}
+    >
+      <div className="flex items-center gap-4 border-b border-black/10 px-4 py-4 sm:px-5">
+        {conferenceLogoUrl ? (
+          <Image
+            src={conferenceLogoUrl}
+            alt=""
+            width={72}
+            height={72}
+            className="h-14 w-14 shrink-0 object-contain sm:h-16 sm:w-16"
+          />
+        ) : null}
+        <div className="min-w-0">
+          <h2 className="text-base font-semibold text-slate-950 sm:text-lg">
             {group.title}
           </h2>
-          <p className="mt-0.5 text-xs text-slate-500 lg:text-sm">
-            {rows.length} teams
-          </p>
+          <p className="mt-0.5 text-xs text-slate-600 sm:text-sm">{purpose}</p>
         </div>
-        <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-medium uppercase tracking-wide text-slate-500">
-          Regular season
+        <span className="ml-auto shrink-0 rounded-full bg-white/80 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+          {group.teams.length} teams
         </span>
       </div>
 
-      <div className="overflow-x-auto">
-        <table
-          className={cn(
-            "w-full table-fixed border-collapse text-sm lg:text-base",
-            view === "skaters"
-              ? "min-w-[860px]"
-              : view === "roster"
-                ? "min-w-[820px]"
-                : view === "goalies"
-                  ? "min-w-[760px]"
-                  : "min-w-[680px]",
-          )}
-        >
+      <div className="overflow-x-auto bg-white/85">
+        <table className="w-full min-w-[520px] border-collapse text-sm">
           <thead>
-            <tr className="border-b border-slate-200 bg-white text-[11px] uppercase tracking-wider text-slate-500 lg:text-sm">
-              <th className="sticky left-0 z-20 w-9 bg-white px-1 py-3 text-center font-medium sm:w-11 lg:w-12 lg:py-4">
-                #
-              </th>
-              <th className="sticky left-9 z-20 w-[136px] bg-white px-2 py-3 text-left font-medium sm:left-11 sm:w-[190px] sm:px-3 lg:left-12 lg:w-[260px] lg:py-4">
-                Team
-              </th>
-              {columns.map((column) => {
-                const isSortable = view !== "standings";
-                const isActive = sortState?.key === column.key;
-                const ariaSort = isActive
-                  ? sortState.direction === "asc"
-                    ? "ascending"
-                    : "descending"
-                  : "none";
-
-                return (
-                  <th
-                    key={column.key}
-                    className="whitespace-nowrap px-2 py-3 text-center font-medium lg:px-4 lg:py-4"
-                    title={column.description}
-                    aria-sort={isSortable ? ariaSort : undefined}
-                  >
-                    {isSortable ? (
-                      <button
-                        type="button"
-                        onClick={() =>
-                          onSort(column.key as keyof TeamSeasonStatLine)
-                        }
-                        className={cn(
-                          "mx-auto flex items-center justify-center gap-1.5 rounded-md px-1.5 py-1 transition-colors hover:bg-slate-100 hover:text-slate-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400",
-                          isActive && "text-slate-950",
-                        )}
-                        title={`Sort by ${column.description}`}
-                      >
-                        <span>{column.label}</span>
-                        {isActive ? (
-                          sortState.direction === "asc" ? (
-                            <ArrowUp className="h-3.5 w-3.5" />
-                          ) : (
-                            <ArrowDown className="h-3.5 w-3.5" />
-                          )
-                        ) : (
-                          <ArrowUpDown className="h-3.5 w-3.5 text-slate-300" />
-                        )}
-                      </button>
-                    ) : (
-                      column.label
-                    )}
-                  </th>
-                );
-              })}
+            <tr className="border-b border-slate-200 text-[10px] uppercase tracking-[0.16em] text-slate-500">
+              <th className="w-12 px-3 py-3 text-center font-semibold">Rank</th>
+              <th className="px-3 py-3 text-left font-semibold">Team</th>
+              <th className="w-20 px-3 py-3 text-center font-semibold">W</th>
+              <th className="w-20 px-3 py-3 text-center font-semibold">L</th>
+              <th className="w-24 px-3 py-3 text-center font-semibold">PTS</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {rows.map((team, index) => {
-              const rank = getRank(team, standingsType, group.title);
-              const playoffCut =
-                standingsType === "wildcard" &&
-                group.title === "Wildcard" &&
-                index === 1;
-
-              return (
-                <tr
-                  key={team.id}
-                  className={cn(
-                    "group transition-colors hover:bg-slate-50",
-                    playoffCut && "border-b-2 border-b-slate-400",
+            {group.teams.map((team, index) => (
+              <tr
+                key={team.id}
+                className="group transition-colors hover:bg-slate-50"
+              >
+                <td className="px-3 py-3 text-center font-mono text-xs font-semibold tabular-nums text-slate-500">
+                  {getRank(
+                    team,
+                    standingsType,
+                    group.title,
+                    group.title === "Out of the Playoffs"
+                      ? index + 3
+                      : index + 1,
                   )}
-                >
-                  <td className="sticky left-0 z-10 w-9 bg-white px-1 py-3 text-center font-mono text-xs tabular-nums text-slate-500 group-hover:bg-slate-50 sm:w-11 lg:w-12 lg:py-4 lg:text-sm">
-                    {rank ?? index + 1}
-                  </td>
-                  <td className="sticky left-9 z-10 w-[136px] max-w-[136px] bg-white px-2 py-2.5 group-hover:bg-slate-50 sm:left-11 sm:w-[190px] sm:max-w-[190px] sm:px-3 lg:left-12 lg:w-[260px] lg:max-w-[260px]">
-                    <div className="flex min-w-0 items-center gap-2 lg:gap-3">
-                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-slate-100 bg-slate-50 lg:h-9 lg:w-9 lg:rounded-lg">
-                        {team.logoUrl ? (
-                          <Image
-                            src={team.logoUrl}
-                            alt=""
-                            width={32}
-                            height={32}
-                            className="h-7 w-7 object-contain lg:h-8 lg:w-8"
-                          />
-                        ) : (
-                          <span className="text-xs font-semibold text-slate-400">
-                            {(team.name ?? "TM").slice(0, 2).toUpperCase()}
-                          </span>
-                        )}
-                      </div>
-                      <div className="min-w-0">
-                        <div
-                          className="truncate text-xs font-semibold text-slate-900 sm:text-sm lg:text-base"
-                          title={team.name ?? undefined}
-                        >
-                          {team.name}
-                        </div>
-                        <div className="mt-0.5 hidden text-[11px] text-slate-500 sm:block lg:text-xs">
-                          {team.confAbbr ?? "League"}
-                        </div>
-                      </div>
-                    </div>
-                  </td>
-                  {columns.map((column) => (
-                    <td
-                      key={column.key}
-                      className={cn(
-                        "whitespace-nowrap px-3 py-3 text-center font-mono text-xs tabular-nums text-slate-700 lg:px-4 lg:py-4 lg:text-base",
-                        (column.key === "standingsPoints" ||
-                          column.key === "P") &&
-                          "font-bold text-slate-950",
+                </td>
+                <th className="px-3 py-3 text-left font-normal">
+                  <div className="flex min-w-0 items-center gap-2.5">
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-100 bg-slate-50">
+                      {team.logoUrl ? (
+                        <Image
+                          src={team.logoUrl}
+                          alt=""
+                          width={30}
+                          height={30}
+                          className="h-7 w-7 object-contain"
+                        />
+                      ) : (
+                        <span className="text-[10px] font-semibold text-slate-400">
+                          {(team.name ?? "TM").slice(0, 2).toUpperCase()}
+                        </span>
                       )}
-                    >
-                      {getCellValue(column, team, season)}
-                    </td>
-                  ))}
-                </tr>
-              );
-            })}
+                    </div>
+                    <span className="truncate font-semibold text-slate-900">
+                      {team.name}
+                    </span>
+                  </div>
+                </th>
+                <td className="px-3 py-3 text-center font-mono tabular-nums text-slate-700">
+                  {getStandingValue("wins", team, season)}
+                </td>
+                <td className="px-3 py-3 text-center font-mono tabular-nums text-slate-700">
+                  {getStandingValue("losses", team, season)}
+                </td>
+                <td className="px-3 py-3 text-center font-mono font-bold tabular-nums text-slate-950">
+                  {getStandingValue("points", team, season)}
+                </td>
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>
@@ -356,30 +207,6 @@ export function StandingsTable({
   selectedSeason: Season | null;
   standingsType: string;
 }) {
-  const [view, setView] = useState<StandingsStatView>("standings");
-  const [sortByView, setSortByView] = useState<
-    Record<StandingsStatView, StandingsSortState>
-  >({
-    standings: null,
-    skaters: null,
-    goalies: null,
-    roster: null,
-  });
-
-  const handleSort = (key: keyof TeamSeasonStatLine) => {
-    setSortByView((current) => {
-      const activeSort = current[view];
-      const nextSort: StandingsSortState =
-        activeSort?.key !== key
-          ? { key, direction: "asc" }
-          : activeSort.direction === "asc"
-            ? { key, direction: "desc" }
-            : null;
-
-      return { ...current, [view]: nextSort };
-    });
-  };
-
   if (!selectedSeason) {
     return (
       <div className="rounded-xl border border-dashed p-10 text-center text-sm text-slate-500">
@@ -388,58 +215,22 @@ export function StandingsTable({
     );
   }
 
-  const activeView = VIEW_OPTIONS.find((option) => option.key === view)!;
+  const purpose =
+    STANDINGS_PURPOSES[standingsType as keyof typeof STANDINGS_PURPOSES] ??
+    STANDINGS_PURPOSES.overall;
 
   return (
-    <div className="mx-auto w-full max-w-7xl space-y-4 px-3 py-4 sm:px-6 lg:py-6">
-      <div className="flex flex-col gap-4 rounded-xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <p className="text-xs font-medium uppercase tracking-[0.16em] text-slate-500 lg:text-sm">
-              Team statistics
-            </p>
-            <h1 className="mt-1 text-xl font-semibold tracking-tight text-slate-950 sm:text-2xl lg:text-3xl">
-              {selectedSeason.name} standings
-            </h1>
-            <p className="mt-1 text-sm text-slate-500 lg:text-base">
-              {activeView.description}
-            </p>
-          </div>
-          {view !== "standings" ? (
-            <p className="hidden text-sm text-slate-500 lg:block">
-              Select a column to sort · select again to reverse
-            </p>
-          ) : null}
+    <div className="mx-auto w-full max-w-6xl space-y-4 px-3 py-4 sm:px-6 lg:py-6">
+      <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4 shadow-sm sm:px-5">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-500">
+          {purpose.label}
+        </p>
+        <div className="mt-1 flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between sm:gap-4">
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl">
+            {selectedSeason.name} standings
+          </h1>
+          <p className="text-sm text-slate-500">{purpose.description}</p>
         </div>
-
-        <div
-          className="no-scrollbar flex gap-1 overflow-x-auto border-t border-slate-100 pt-3"
-          role="tablist"
-          aria-label="Standings statistics"
-        >
-          {VIEW_OPTIONS.map((option) => (
-            <button
-              key={option.key}
-              type="button"
-              role="tab"
-              aria-selected={view === option.key}
-              onClick={() => setView(option.key)}
-              className={cn(
-                "shrink-0 rounded-lg px-3.5 py-2 text-sm font-medium transition-colors lg:px-4 lg:text-base",
-                view === option.key
-                  ? "bg-slate-950 text-white"
-                  : "text-slate-500 hover:bg-slate-100 hover:text-slate-900",
-              )}
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="flex items-center gap-2 px-1 text-xs text-slate-500 sm:hidden">
-        <Info className="h-3.5 w-3.5" />
-        Swipe the table to compare every statistic.
       </div>
 
       <div className="space-y-4">
@@ -449,9 +240,6 @@ export function StandingsTable({
             group={group}
             season={selectedSeason}
             standingsType={standingsType}
-            view={view}
-            sortState={sortByView[view]}
-            onSort={handleSort}
           />
         ))}
       </div>
