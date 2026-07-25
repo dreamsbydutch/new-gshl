@@ -21,11 +21,14 @@ const TeamSchedule = dynamic(
 
 export function ScheduleContent() {
   const { selectedScheduleType: scheduleType } = useNav();
+  const isTeamSchedule = scheduleType === "team" || !scheduleType;
 
   return (
-    <div className="mx-auto max-w-2xl">
+    <div
+      className={`mx-auto w-full ${isTeamSchedule ? "max-w-5xl" : "max-w-2xl"}`}
+    >
       {scheduleType === "week" && <WeeklySchedule />}
-      {(scheduleType === "team" || !scheduleType) && <TeamSchedule />}
+      {isTeamSchedule && <TeamSchedule />}
     </div>
   );
 }

@@ -16,17 +16,17 @@ import {
 
 function TeamLogoCell({ team }: { team?: GSHLTeam | null }) {
   if (!team?.logoUrl) {
-    return <td className="w-6" />;
+    return <td className="w-8 min-w-8" />;
   }
 
   return (
-    <td className="w-6">
+    <td className="w-8 min-w-8">
       <Image
         src={team.logoUrl}
         alt={team.name ?? "Team"}
         width={24}
         height={24}
-        className="h-6 w-6"
+        className="h-6 w-6 max-w-none object-contain"
       />
     </td>
   );
@@ -64,7 +64,10 @@ export function TeamStatsRow({
       <TeamLogoCell team={team} />
       <td className={getScoreCellClass(scoreWon)}>{teamScore}</td>
       {categoryStates.map((categoryState) => (
-        <td key={categoryState.key} className={getStatCellClass(categoryState.won)}>
+        <td
+          key={categoryState.key}
+          className={getStatCellClass(categoryState.won)}
+        >
           {categoryState.display}
         </td>
       ))}

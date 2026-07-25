@@ -9,7 +9,9 @@ function StatHeadersRow({ headers }: { headers: string[] }) {
       {headers.map((header, index) => (
         <td
           key={`${header}-${index}`}
-          className={`py-1 text-center text-[10px] ${index > 1 ? "min-w-4" : ""}`}
+          className={`whitespace-nowrap py-1 text-center text-[10px] ${
+            index === 0 ? "min-w-8" : "min-w-12"
+          }`}
         >
           {header}
         </td>
@@ -27,11 +29,15 @@ export function MatchupStatsTable({
   opponentScore,
   categories,
 }: MatchupStatsTableProps) {
-  const headers = ["", "Score", ...categories.map((category) => category.label)];
+  const headers = [
+    "",
+    "Score",
+    ...categories.map((category) => category.label),
+  ];
 
   return (
-    <div className="mx-auto w-5/6 py-1.5">
-      <table className="w-full text-xs">
+    <div className="w-full overflow-x-auto overscroll-x-contain py-1.5">
+      <table className="w-max min-w-full text-xs">
         <tbody>
           <TeamStatsRow
             team={selectedTeam}
