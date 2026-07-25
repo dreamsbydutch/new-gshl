@@ -20,7 +20,7 @@ import {
   TableHeader,
   TableRow,
 } from "@gshl-ui";
-import { cn, formatRecordBookStat, SeasonType } from "@gshl-utils";
+import { AwardsList, cn, formatRecordBookStat, SeasonType } from "@gshl-utils";
 
 const RECORD_BOOK_VIEWS: Array<{
   label: string;
@@ -336,23 +336,100 @@ function PlayerHistoryTable({
   );
 }
 
-function getPlayerAwardGroups(rows: RecordBookAwardRow[]) {
-  const groupedRows = rows.reduce((groups, row) => {
-    const awardRows = groups.get(row.award) ?? [];
-    awardRows.push(row);
-    groups.set(row.award, awardRows);
-    return groups;
-  }, new Map<RecordBookAwardRow["award"], RecordBookAwardRow[]>());
+const ALL_STAR_AWARD_KEYS = new Set<RecordBookAwardRow["award"]>([
+  AwardsList.FIRST_AS,
+  AwardsList.SECOND_AS,
+  AwardsList.PLAYOFF_AS,
+]);
 
-  return Array.from(groupedRows, ([award, awardRows]) => ({
-    award,
-    awardLabel: awardRows[0]?.awardLabel ?? award,
-    rows: awardRows,
-  })).sort((left, right) => left.awardLabel.localeCompare(right.awardLabel));
+function AwardListing({
+  countLabel,
+  rows,
+  title,
+}: {
+  countLabel: string;
+  rows: RecordBookAwardRow[];
+  title: string;
+}) {
+  return (
+    <section className="mt-5 overflow-hidden rounded-xl border border-amber-100 bg-white/80 shadow-sm">
+      <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-amber-100 px-4 py-3">
+        <h3 className="font-oswald text-xl text-slate-950">{title}</h3>
+        <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-slate-400">
+          {rows.length} {countLabel}
+        </span>
+      </div>
+      {rows.length === 0 ? (
+        <p className="px-4 py-8 text-center text-sm text-slate-500">
+          Nothing has been recorded yet.
+        </p>
+      ) : (
+        <div className="overflow-x-auto">
+          <Table className="min-w-[680px] border-collapse text-xs sm:text-sm">
+            <TableHeader>
+              <TableRow className="border-b border-slate-200 bg-slate-50 hover:bg-slate-50">
+                <TableHead className="h-10 px-3 text-left text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                  Award
+                </TableHead>
+                <TableHead className="h-10 w-20 px-3 text-left text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                  Season
+                </TableHead>
+                <TableHead className="h-10 min-w-[220px] px-3 text-left text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                  Player
+                </TableHead>
+                <TableHead className="h-10 w-20 px-3 text-left text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                  Pos
+                </TableHead>
+                <TableHead className="h-10 w-20 px-3 text-left text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                  NHL
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody className="divide-y divide-slate-100">
+              {rows.map((row) => (
+                <TableRow
+                  key={row.id}
+                  className="border-0 bg-white hover:bg-amber-50/40"
+                >
+                  <TableCell className="whitespace-nowrap px-3 py-2.5 font-semibold text-slate-900">
+                    {row.awardLabel}
+                  </TableCell>
+                  <TableCell className="whitespace-nowrap px-3 py-2.5 font-mono font-semibold tabular-nums text-slate-600">
+                    {row.seasonYear}
+                  </TableCell>
+                  <TableCell className="px-3 py-2.5">
+                    <div className="flex items-center gap-2.5">
+                      <NHLLogo
+                        team={row.nhlTeam}
+                        size={20}
+                        className="mx-0 shrink-0"
+                      />
+                      <span className="truncate font-semibold text-slate-900">
+                        {row.playerName}
+                      </span>
+                    </div>
+                  </TableCell>
+                  <TableCell className="whitespace-nowrap px-3 py-2.5 text-slate-500">
+                    {row.positions || "-"}
+                  </TableCell>
+                  <TableCell className="whitespace-nowrap px-3 py-2.5 font-mono text-xs font-semibold uppercase text-slate-500">
+                    {row.nhlTeam?.abbr ?? "-"}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      )}
+    </section>
+  );
 }
 
 function PlayerAwardTrophyCase({ rows }: { rows: RecordBookAwardRow[] }) {
-  const awardGroups = getPlayerAwardGroups(rows);
+  const playerAwardRows = rows.filter(
+    (row) => !ALL_STAR_AWARD_KEYS.has(row.award),
+  );
+  const allStarRows = rows.filter((row) => ALL_STAR_AWARD_KEYS.has(row.award));
 
   return (
     <section className="rounded-2xl border border-amber-200 bg-[radial-gradient(circle_at_top,_rgba(254,243,199,0.9),_rgba(255,251,235,0.68)_42%,_rgba(255,255,255,0.96)_100%)] p-3 font-varela shadow-sm sm:p-5">
@@ -371,58 +448,18 @@ function PlayerAwardTrophyCase({ rows }: { rows: RecordBookAwardRow[] }) {
         </p>
       </div>
 
-      {awardGroups.length === 0 ? (
-        <div className="mx-auto mt-5 max-w-xl rounded-xl border border-dashed border-amber-300 bg-white/70 px-4 py-8 text-center text-sm text-slate-500">
-          No player honors have been recorded yet.
-        </div>
-      ) : (
-        <div className="mx-auto mt-5 grid max-w-6xl gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          {awardGroups.map((group) => (
-            <article
-              key={group.award}
-              className="mx-auto flex w-full max-w-[20rem] flex-col items-center rounded-xl border border-amber-100 bg-white/80 p-3 text-center shadow-sm"
-            >
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-700">
-                <Trophy className="h-5 w-5" aria-hidden="true" />
-              </span>
-              <h3 className="mt-2 text-sm font-bold text-slate-900">
-                {group.awardLabel}
-              </h3>
-              <div className="mt-1 border-b border-amber-100 pb-2">
-                <span className="shrink-0 font-mono text-[10px] uppercase tracking-[0.12em] text-slate-400">
-                  {group.rows.length}{" "}
-                  {group.rows.length === 1 ? "honor" : "honors"}
-                </span>
-              </div>
-              <div className="mt-2 w-full space-y-2 text-left">
-                {group.rows.map((row) => (
-                  <div
-                    key={row.id}
-                    className="flex items-center gap-2.5 rounded-lg border border-slate-100 bg-white px-2.5 py-2"
-                  >
-                    <span className="w-12 shrink-0 font-mono text-xs font-semibold tabular-nums text-slate-500">
-                      {row.seasonYear}
-                    </span>
-                    <NHLLogo
-                      team={row.nhlTeam}
-                      size={20}
-                      className="mx-0 shrink-0"
-                    />
-                    <div className="min-w-0">
-                      <p className="truncate text-xs font-semibold text-slate-900">
-                        {row.playerName}
-                      </p>
-                      <p className="text-[10px] font-medium uppercase tracking-[0.12em] text-slate-400">
-                        {row.positions || "—"}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </article>
-          ))}
-        </div>
-      )}
+      <div className="mx-auto max-w-6xl">
+        <AwardListing
+          countLabel={playerAwardRows.length === 1 ? "award" : "awards"}
+          rows={playerAwardRows}
+          title="Player awards"
+        />
+        <AwardListing
+          countLabel={allStarRows.length === 1 ? "selection" : "selections"}
+          rows={allStarRows}
+          title="All-star selections"
+        />
+      </div>
     </section>
   );
 }
