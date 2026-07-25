@@ -397,8 +397,7 @@ export function TeamContractTable({
                     colSpan={onRemovePlayer ? 9 : 8}
                     className={`border-t border-gray-300 bg-gray-100 text-left text-xs font-semibold text-gray-400 ${compact ? "px-1.5 py-1" : "px-2 py-2"}`}
                   >
-                    Removed from preview - these contracts still exist in real
-                    life
+                    Removed from preview
                   </td>
                 </tr>
                 {ghostContractGroups.map((contracts) => (
