@@ -28,6 +28,108 @@ function sortByRank(
   );
 }
 
+function getConferenceIdsInLeaderOrder(teams: SeededTeam[]): string[] {
+  const conferenceIds = [
+    ...new Set(
+      teams.map((team) => String(team.confAbbr ?? "").trim()).filter(Boolean),
+    ),
+  ];
+
+  return conferenceIds
+    .map((id) => {
+      const conferenceTeams = teams.filter(
+        (team) => String(team.confAbbr ?? "").trim() === id,
+      );
+      return {
+        id,
+        leader: sortByRank(conferenceTeams, "conferenceRk")[0] ?? null,
+      };
+    })
+    .sort((left, right) => {
+      const leftOverallRank =
+        safeRank(left.leader?.seasonStats?.overallRk) ?? 999;
+      const rightOverallRank =
+        safeRank(right.leader?.seasonStats?.overallRk) ?? 999;
+      return (
+        leftOverallRank - rightOverallRank || left.id.localeCompare(right.id)
+      );
+    })
+    .slice(0, 2)
+    .map(({ id }) => id);
+}
+
+function getTeamConference(
+  teamId: string | null | undefined,
+  teamsById: Map<string, SeededTeam>,
+): string | null {
+  const conference = teamsById.get(String(teamId ?? ""))?.confAbbr;
+  const normalized = String(conference ?? "").trim();
+  return normalized || null;
+}
+
+function hasSeedPair(
+  matchup: Matchup,
+  firstSeed: number,
+  secondSeed: number,
+): boolean {
+  const seeds = [safeRank(matchup.homeRank), safeRank(matchup.awayRank)].sort(
+    (left, right) => (left ?? 999) - (right ?? 999),
+  );
+  return seeds[0] === firstSeed && seeds[1] === secondSeed;
+}
+
+function getConferenceIdsFromActualQuarterfinals(
+  actualMatchups: Matchup[],
+  teamsById: Map<string, SeededTeam>,
+): string[] {
+  const quarterfinals = actualMatchups.filter(
+    (matchup) => matchup.gameType === MatchupType.QUARTER_FINAL,
+  );
+  const twoVsThree = quarterfinals.filter((matchup) =>
+    hasSeedPair(matchup, 2, 3),
+  );
+
+  return quarterfinals
+    .filter((matchup) => hasSeedPair(matchup, 1, 4))
+    .map((oneVsFour) => {
+      const conference = getTeamConference(oneVsFour.homeTeamId, teamsById);
+      if (!conference) return null;
+
+      const matchingTwoVsThree = twoVsThree.find((matchup) => {
+        const homeConference = getTeamConference(matchup.homeTeamId, teamsById);
+        const awayConference = getTeamConference(matchup.awayTeamId, teamsById);
+        return homeConference === conference && awayConference === conference;
+      });
+
+      return matchingTwoVsThree ? conference : null;
+    })
+    .filter((conference): conference is string => Boolean(conference))
+    .filter(
+      (conference, index, conferences) =>
+        conferences.indexOf(conference) === index,
+    )
+    .slice(0, 2);
+}
+
+function getConferenceIdsInBracketOrder(
+  teams: SeededTeam[],
+  actualMatchups: Matchup[],
+  teamsById: Map<string, SeededTeam>,
+): string[] {
+  const actualOrder = getConferenceIdsFromActualQuarterfinals(
+    actualMatchups,
+    teamsById,
+  );
+  const leaderOrder = getConferenceIdsInLeaderOrder(teams);
+
+  return [...actualOrder, ...leaderOrder]
+    .filter(
+      (conference, index, conferences) =>
+        conferences.indexOf(conference) === index,
+    )
+    .slice(0, 2);
+}
+
 function getPlayoffMatchups(matchups: Matchup[], season: Season | null) {
   return matchups.filter(
     (matchup) =>
@@ -104,6 +206,42 @@ function teamSeedLabel(team: SeededTeam | null): string {
   return seed ? `#${seed}` : "TBD";
 }
 
+function labelSeed(label: string): number | null {
+  return safeRank(label.replace(/^#/, ""));
+}
+
+function matchesProjectedConference(
+  matchup: Matchup,
+  projected: BracketMatchup,
+  teamsById: Map<string, SeededTeam>,
+  homeSeed: number,
+  awaySeed: number,
+): boolean {
+  if (projected.round !== "QF") return false;
+
+  const projectedConference = getTeamConference(
+    projected.homeTeam?.id,
+    teamsById,
+  );
+  if (!projectedConference) return false;
+
+  const homeConference = getTeamConference(matchup.homeTeamId, teamsById);
+  const awayConference = getTeamConference(matchup.awayTeamId, teamsById);
+  if (homeSeed === 1 && awaySeed === 4) {
+    return homeConference === projectedConference;
+  }
+  if (homeSeed === 2 && awaySeed === 3) {
+    return (
+      homeConference === projectedConference &&
+      awayConference === projectedConference
+    );
+  }
+  return (
+    homeConference === projectedConference ||
+    awayConference === projectedConference
+  );
+}
+
 function actualMatchupToBracket(
   matchup: Matchup,
   projected: BracketMatchup,
@@ -147,6 +285,23 @@ function mergeActualRound(
         unused.has(String(matchup.id)) &&
         projectedPair === pairKey(matchup.homeTeamId, matchup.awayTeamId),
     );
+    const homeSeed = labelSeed(slot.homeLabel);
+    const awaySeed = labelSeed(slot.awayLabel);
+    const rankMatch =
+      homeSeed && awaySeed
+        ? actual.find(
+            (matchup) =>
+              unused.has(String(matchup.id)) &&
+              hasSeedPair(matchup, homeSeed, awaySeed) &&
+              matchesProjectedConference(
+                matchup,
+                slot,
+                teamsById,
+                homeSeed,
+                awaySeed,
+              ),
+          )
+        : undefined;
     const overlappingMatch = actual.find((matchup) => {
       const overlapsHome = slot.homeTeam
         ? [matchup.homeTeamId, matchup.awayTeamId].includes(slot.homeTeam.id)
@@ -156,7 +311,8 @@ function mergeActualRound(
         : false;
       return unused.has(String(matchup.id)) && (overlapsHome || overlapsAway);
     });
-    const selected = exactMatch ?? overlappingMatch ?? actual[index];
+    const selected =
+      exactMatch ?? rankMatch ?? overlappingMatch ?? actual[index];
     if (!selected || !unused.has(String(selected.id))) return slot;
 
     unused.delete(String(selected.id));
@@ -325,13 +481,11 @@ function buildConferenceBracket(
   teamsById: Map<string, SeededTeam>,
 ): PlayoffBracketColumn[] {
   const leagueSorted = sortByRank(teams, "overallRk");
-  const conferences = [
-    ...new Set(
-      leagueSorted
-        .map((team) => String(team.confAbbr ?? "").trim())
-        .filter(Boolean),
-    ),
-  ].slice(0, 2);
+  const conferences = getConferenceIdsInBracketOrder(
+    leagueSorted,
+    actualMatchups,
+    teamsById,
+  );
   const firstConferenceId = conferences[0] ?? "first";
   const secondConferenceId = conferences[1] ?? "second";
   const topThreeByConference = new Map<string, SeededTeam[]>();
@@ -340,7 +494,9 @@ function buildConferenceBracket(
     topThreeByConference.set(
       conference,
       sortByRank(
-        leagueSorted.filter((team) => team.confAbbr === conference),
+        leagueSorted.filter(
+          (team) => String(team.confAbbr ?? "").trim() === conference,
+        ),
         "conferenceRk",
       ).slice(0, 3),
     );
@@ -360,7 +516,9 @@ function buildConferenceBracket(
   );
 
   for (const wildcard of wildcards) {
-    assignedByConference.get(String(wildcard.confAbbr))?.push(wildcard);
+    assignedByConference
+      .get(String(wildcard.confAbbr ?? "").trim())
+      ?.push(wildcard);
   }
 
   if (conferences.length === 2) {
@@ -375,14 +533,13 @@ function buildConferenceBracket(
 
   const conferenceInfo = conferences.map((conference) => {
     const conferenceTeams = leagueSorted.filter(
-      (team) => team.confAbbr === conference,
+      (team) => String(team.confAbbr ?? "").trim() === conference,
     );
     const sample = conferenceTeams[0];
     const assigned = assignedByConference.get(conference) ?? [];
     return {
       abbr: conference,
       title: sample?.confName ?? conference,
-      logoUrl: sample?.confLogoUrl ?? null,
       seeded: [
         ...sortByRank(
           assigned.filter((team) => topThreeIds.has(team.id)),
@@ -450,8 +607,8 @@ function buildConferenceBracket(
         id: "conference-final",
         round: "F",
         title: "GSHL Cup Final",
-        homeLabel: "Winner Conference Final 1",
-        awayLabel: "Winner Conference Final 2",
+        homeLabel: `Winner ${conferenceInfo[0]?.title ?? "First conference"} Championship`,
+        awayLabel: `Winner ${conferenceInfo[1]?.title ?? "Second conference"} Championship`,
         homeTeam: semifinals[0]?.winnerTeam ?? null,
         awayTeam: semifinals[1]?.winnerTeam ?? null,
       }),
@@ -460,47 +617,24 @@ function buildConferenceBracket(
     teamsById,
   );
 
-  const firstConference = conferenceInfo[0];
-  const secondConference = conferenceInfo[1];
-  const firstQuarterfinals = quarterfinals.slice(0, 2);
-  const secondQuarterfinals = quarterfinals.slice(2, 4);
-  const firstSemifinal = semifinals.slice(0, 1);
-  const secondSemifinal = semifinals.slice(1, 2);
-
   return [
     createColumn(
-      `${firstConference?.abbr ?? "first"}-quarterfinals`,
-      firstConference?.title ?? "First conference",
-      "Quarterfinals",
-      firstQuarterfinals,
-      firstConference?.logoUrl ?? null,
+      "conference-quarterfinals",
+      "Conference quarterfinals",
+      `${conferenceInfo[0]?.title ?? "First conference"} above · ${conferenceInfo[1]?.title ?? "Second conference"} below`,
+      quarterfinals,
     ),
     createColumn(
-      `${firstConference?.abbr ?? "first"}-championship`,
-      firstConference?.title ?? "First conference",
-      "Conference championship",
-      firstSemifinal,
-      firstConference?.logoUrl ?? null,
+      "conference-championships",
+      "Conference finals",
+      "Each conference winner advances",
+      semifinals,
     ),
     createColumn(
       "conference-final",
       "GSHL Cup Final",
       "Conference winners meet here",
       final,
-    ),
-    createColumn(
-      `${secondConference?.abbr ?? "second"}-championship`,
-      secondConference?.title ?? "Second conference",
-      "Conference championship",
-      secondSemifinal,
-      secondConference?.logoUrl ?? null,
-    ),
-    createColumn(
-      `${secondConference?.abbr ?? "second"}-quarterfinals`,
-      secondConference?.title ?? "Second conference",
-      "Quarterfinals",
-      secondQuarterfinals,
-      secondConference?.logoUrl ?? null,
     ),
   ];
 }

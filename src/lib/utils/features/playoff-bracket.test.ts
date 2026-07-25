@@ -137,6 +137,20 @@ function matchup(
   };
 }
 
+function rankedMatchup(
+  homeTeamId: string,
+  awayTeamId: string,
+  homeRank: number,
+  awayRank: number,
+): Matchup {
+  return {
+    ...matchup(homeTeamId, awayTeamId),
+    id: `${homeTeamId}-${awayTeamId}-${homeRank}-vs-${awayRank}`,
+    homeRank,
+    awayRank,
+  };
+}
+
 function seasonSevenTeamsAndStats() {
   const teams = Array.from({ length: 14 }, (_, index) =>
     team(`team-${index + 1}`, index < 7 ? "SV" : "HH"),
@@ -177,11 +191,62 @@ void test("builds the season seven conference crossover bracket", () => {
   const bracket = buildPlayoffBracket(teams, stats, [], season("7"));
 
   assert.equal(bracket.format, "conference");
-  assert.equal(bracket.columns.length, 5);
-  assert.equal(bracket.columns[0]?.title, "Sunview");
-  assert.equal(bracket.columns[4]?.title, "Hickory Hotel");
+  assert.equal(bracket.columns.length, 3);
+  assert.equal(bracket.columns[0]?.title, "Conference quarterfinals");
+  assert.equal(bracket.columns[0]?.matchups.length, 4);
+  assert.equal(bracket.columns[1]?.title, "Conference finals");
+  assert.equal(bracket.columns[1]?.matchups.length, 2);
+  assert.equal(bracket.columns[2]?.title, "GSHL Cup Final");
+  assert.deepEqual(
+    bracket.columns[0]?.matchups.map((matchup) => matchup.homeTeam?.confAbbr),
+    ["SV", "SV", "HH", "HH"],
+  );
   assert.equal(bracket.columns[0]?.matchups[0]?.awayTeam?.id, "team-4");
-  assert.equal(bracket.columns[4]?.matchups[0]?.awayTeam?.id, "team-5");
+  assert.equal(bracket.columns[0]?.matchups[2]?.awayTeam?.id, "team-5");
+});
+
+void test("orders conference sides from each conference leader", () => {
+  const { teams, stats } = seasonSevenTeamsAndStats();
+  const flippedStats = stats.map((row) => {
+    if (row.gshlTeamId === "team-1") return { ...row, overallRk: 2 };
+    if (row.gshlTeamId === "team-8") return { ...row, overallRk: 1 };
+    return row;
+  });
+  const bracket = buildPlayoffBracket(teams, flippedStats, [], season("7"));
+
+  assert.deepEqual(
+    bracket.columns[0]?.matchups.map((matchup) => matchup.homeTeam?.confAbbr),
+    ["HH", "HH", "SV", "SV"],
+  );
+});
+
+void test("uses the played 1-4 and 2-3 matchups to identify conference sides", () => {
+  const { teams, stats } = seasonSevenTeamsAndStats();
+  const flippedStats = stats.map((row) => {
+    if (row.gshlTeamId === "team-1") return { ...row, overallRk: 2 };
+    if (row.gshlTeamId === "team-8") return { ...row, overallRk: 1 };
+    return row;
+  });
+  const bracket = buildPlayoffBracket(
+    teams,
+    flippedStats,
+    [
+      rankedMatchup("team-8", "team-5", 1, 4),
+      rankedMatchup("team-1", "team-4", 1, 4),
+      rankedMatchup("team-9", "team-10", 2, 3),
+      rankedMatchup("team-2", "team-3", 2, 3),
+    ],
+    season("7"),
+  );
+
+  assert.deepEqual(
+    bracket.columns[0]?.matchups.map((matchup) => matchup.homeTeam?.id),
+    ["team-8", "team-9", "team-1", "team-2"],
+  );
+  assert.deepEqual(
+    bracket.columns[0]?.matchups.map((matchup) => matchup.awayTeam?.id),
+    ["team-5", "team-10", "team-4", "team-3"],
+  );
 });
 
 void test("uses a played matchup and advances its winner into the bracket", () => {
