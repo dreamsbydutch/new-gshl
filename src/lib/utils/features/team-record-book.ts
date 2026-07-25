@@ -8,6 +8,7 @@ import type {
   BuildRecordBookPlayerRowsResult,
   FranchiseCareerRow,
   FranchiseSeasonRow,
+  GSHLTeam,
   NHLTeam,
   Player,
   PlayerAward,
@@ -15,6 +16,7 @@ import type {
   PlayerSplitStatLine,
   RecordBookAwardRow,
   RecordBookPlayerRow,
+  RecordBookStatKey,
   RecordBookSortState,
   RecordBookStatColumn,
   RecordBookStatLine,
@@ -139,20 +141,47 @@ function createEmptyStatLine(): RecordBookStatLine {
   };
 }
 
+function hasCountedStatValue(value: Parameters<typeof toNumber>[0]): boolean {
+  if (typeof value === "number") return Number.isFinite(value);
+  if (typeof value === "string") {
+    const normalizedValue = value.trim();
+    return (
+      normalizedValue.length > 0 &&
+      Number.isFinite(Number.parseFloat(normalizedValue))
+    );
+  }
+  return false;
+}
+
 function addStats(
-  target: RecordBookStatLine,
+  target: RecordBookStatLine & { notCountedStats?: Set<RecordBookStatKey> },
   source: PlayerCareerSplitStatLine | PlayerSplitStatLine,
 ): void {
   for (const field of TOTAL_FIELDS) {
-    target[field] += toNumber(source[field], 0);
+    const value = source[field];
+    if (!hasCountedStatValue(value)) continue;
+    target[field] += toNumber(value, 0);
+    target.notCountedStats?.delete(field);
   }
 }
 
-function finalizeRates<T extends RecordBookStatLine>(row: T): T {
+function finalizeRates<
+  T extends RecordBookStatLine & { notCountedStats?: Set<RecordBookStatKey> },
+>(row: T): T {
+  const notCountedStats = row.notCountedStats ?? new Set<RecordBookStatKey>();
+  const GAA = row.TOI > 0 ? (row.GA / row.TOI) * 60 : null;
+  const SVP = row.SA > 0 ? row.SV / row.SA : null;
+
+  if (GAA == null) notCountedStats.add("GAA");
+  else notCountedStats.delete("GAA");
+  if (SVP == null) notCountedStats.add("SVP");
+  else notCountedStats.delete("SVP");
+
   return {
     ...row,
-    GAA: row.TOI > 0 ? (row.GA / row.TOI) * 60 : null,
-    SVP: row.SA > 0 ? row.SV / row.SA : null,
+    GAA,
+    SVP,
+    notCountedStats,
   };
 }
 
@@ -240,11 +269,28 @@ export function getNhlTeamForPlayer(
 }
 
 /**
- * Aggregates franchise career split rows by player and season stage.
+ * Returns every historical team id owned by the selected owner.
+ */
+export function getOwnerTeamIds(
+  allTeams: ReadonlyArray<Pick<GSHLTeam, "id" | "ownerId">>,
+  currentTeam: Pick<GSHLTeam, "ownerId">,
+): Set<string> {
+  const ownerId = String(currentTeam.ownerId ?? "");
+  if (!ownerId) return new Set<string>();
+
+  return new Set(
+    allTeams
+      .filter((team) => String(team.ownerId ?? "") === ownerId)
+      .map((team) => String(team.id)),
+  );
+}
+
+/**
+ * Aggregates owner career split rows by player and season stage.
  */
 export function buildFranchiseCareerRows(
   careerSplits: PlayerCareerSplitStatLine[],
-  franchiseTeamIds: Set<string>,
+  ownerTeamIds: Set<string>,
 ): FranchiseCareerRow[] {
   const grouped = new Map<string, FranchiseCareerRow>();
 
@@ -254,7 +300,7 @@ export function buildFranchiseCareerRows(
     const playerId = String(row.playerId ?? "");
 
     if (
-      !franchiseTeamIds.has(teamId) ||
+      !ownerTeamIds.has(teamId) ||
       !playerId ||
       !isRecordBookSeasonType(seasonType)
     ) {
@@ -269,6 +315,7 @@ export function buildFranchiseCareerRows(
       nhlPos: normalizeIdList(row.nhlPos),
       nhlTeam: String(row.nhlTeam ?? "").trim(),
       ...createEmptyStatLine(),
+      notCountedStats: new Set<RecordBookStatKey>(TOTAL_FIELDS),
     };
 
     if (!grouped.has(key)) grouped.set(key, existing);
@@ -394,11 +441,11 @@ export function buildAllTimeFranchiseRoster(
 }
 
 /**
- * Aggregates franchise season split rows by player, year, and season stage.
+ * Aggregates owner season split rows by player, year, and season stage.
  */
 export function buildFranchiseSeasonRows(
   seasonSplits: PlayerSplitStatLine[],
-  franchiseTeamIds: Set<string>,
+  ownerTeamIds: Set<string>,
   seasonsById: Map<string, number>,
 ): FranchiseSeasonRow[] {
   const grouped = new Map<string, FranchiseSeasonRow>();
@@ -410,7 +457,7 @@ export function buildFranchiseSeasonRows(
     const playerId = String(row.playerId ?? "");
 
     if (
-      !franchiseTeamIds.has(teamId) ||
+      !ownerTeamIds.has(teamId) ||
       !seasonId ||
       !playerId ||
       !isRecordBookSeasonType(seasonType)
@@ -428,6 +475,7 @@ export function buildFranchiseSeasonRows(
       nhlPos: normalizeIdList(row.nhlPos),
       nhlTeam: String(row.nhlTeam ?? "").trim(),
       ...createEmptyStatLine(),
+      notCountedStats: new Set<RecordBookStatKey>(TOTAL_FIELDS),
     };
 
     if (!grouped.has(key)) grouped.set(key, existing);
@@ -454,27 +502,27 @@ export function buildRecordBookPlayerRows(
 ): BuildRecordBookPlayerRowsResult {
   const {
     careerSplits,
-    franchiseTeamIds,
+    ownerTeamIds,
     nhlTeamsByAbbr,
     playersById,
     seasonSplits,
     seasonsById,
   } = options;
-  const franchiseSeasonRows = buildFranchiseSeasonRows(
+  const ownerSeasonRows = buildFranchiseSeasonRows(
     seasonSplits,
-    franchiseTeamIds,
+    ownerTeamIds,
     seasonsById,
   );
   const seasonsByPlayerStage = new Map<string, FranchiseSeasonRow[]>();
 
-  for (const row of franchiseSeasonRows) {
+  for (const row of ownerSeasonRows) {
     const key = `${row.playerId}|${row.seasonType}`;
     const rows = seasonsByPlayerStage.get(key) ?? [];
     rows.push(row);
     seasonsByPlayerStage.set(key, rows);
   }
 
-  const seasonRows = franchiseSeasonRows.map((row): RecordBookPlayerRow => {
+  const seasonRows = ownerSeasonRows.map((row): RecordBookPlayerRow => {
     const player = playersById.get(row.playerId);
     return {
       id: `${row.playerId}|${row.seasonId}|${row.seasonType}`,
@@ -490,39 +538,40 @@ export function buildRecordBookPlayerRows(
       firstSeason: row.seasonYear,
       lastSeason: row.seasonYear,
       ...getStatLine(row),
+      notCountedStats: row.notCountedStats,
     };
   });
 
-  const careerRows = buildFranchiseCareerRows(
-    careerSplits,
-    franchiseTeamIds,
-  ).map((row): RecordBookPlayerRow => {
-    const player = playersById.get(row.playerId);
-    const playerSeasons =
-      seasonsByPlayerStage.get(`${row.playerId}|${row.seasonType}`) ?? [];
-    const years = [
-      ...new Set(playerSeasons.map((season) => season.seasonYear)),
-    ].sort(compareYears);
+  const careerRows = buildFranchiseCareerRows(careerSplits, ownerTeamIds).map(
+    (row): RecordBookPlayerRow => {
+      const player = playersById.get(row.playerId);
+      const playerSeasons =
+        seasonsByPlayerStage.get(`${row.playerId}|${row.seasonType}`) ?? [];
+      const years = [
+        ...new Set(playerSeasons.map((season) => season.seasonYear)),
+      ].sort(compareYears);
 
-    return {
-      id: `${row.playerId}|career|${row.seasonType}`,
-      playerId: row.playerId,
-      playerName: player?.fullName ?? `Player ${row.playerId}`,
-      nhlTeam: getNhlTeamForPlayer(nhlTeamsByAbbr, player, row.nhlTeam),
-      positions: getPlayerPositions(player, row.nhlPos),
-      positionGroup: String(player?.posGroup ?? row.posGroup),
-      seasonType: row.seasonType,
-      seasonCount: years.length,
-      firstSeason: years.at(0),
-      lastSeason: years.at(-1),
-      ...getStatLine(row),
-    };
-  });
+      return {
+        id: `${row.playerId}|career|${row.seasonType}`,
+        playerId: row.playerId,
+        playerName: player?.fullName ?? `Player ${row.playerId}`,
+        nhlTeam: getNhlTeamForPlayer(nhlTeamsByAbbr, player, row.nhlTeam),
+        positions: getPlayerPositions(player, row.nhlPos),
+        positionGroup: String(player?.posGroup ?? row.posGroup),
+        seasonType: row.seasonType,
+        seasonCount: years.length,
+        firstSeason: years.at(0),
+        lastSeason: years.at(-1),
+        ...getStatLine(row),
+        notCountedStats: row.notCountedStats,
+      };
+    },
+  );
 
   return { careerRows, seasonRows };
 }
 
-function playerAwardBelongsToFranchise(
+function playerAwardBelongsToOwner(
   award: PlayerAward,
   teamId: string,
   playerTotals: BuildRecordBookAwardRowsOptions["playerTotals"],
@@ -543,7 +592,7 @@ function playerAwardBelongsToFranchise(
 }
 
 /**
- * Builds one row for every player award won while attached to the franchise.
+ * Builds one row for every player award won while attached to the owner.
  */
 export function buildRecordBookAwardRows({
   allTeams,
@@ -556,9 +605,7 @@ export function buildRecordBookAwardRows({
 }: BuildRecordBookAwardRowsOptions): RecordBookAwardRow[] {
   const teamIdBySeason = new Map(
     allTeams
-      .filter(
-        (team) => String(team.franchiseId) === String(currentTeam.franchiseId),
-      )
+      .filter((team) => String(team.ownerId) === String(currentTeam.ownerId))
       .map((team) => [String(team.seasonId), String(team.id)]),
   );
 
@@ -570,7 +617,7 @@ export function buildRecordBookAwardRows({
       if (
         !teamId ||
         !PLAYER_AWARD_KEYS.has(awardKey) ||
-        !playerAwardBelongsToFranchise(award, teamId, playerTotals)
+        !playerAwardBelongsToOwner(award, teamId, playerTotals)
       ) {
         return [];
       }
@@ -641,29 +688,11 @@ export function sortRecordBookPlayerRows(
   sort: RecordBookSortState,
 ): RecordBookPlayerRow[] {
   return rows.slice().sort((left, right) => {
-    const key = sort.key === "awardLabel" ? "playerName" : sort.key;
-    const delta = compareSortValues(left[key], right[key], sort.direction);
-    if (delta !== 0) return delta;
-    return left.playerName.localeCompare(right.playerName);
-  });
-}
-
-/**
- * Sorts player award rows without mutating hook output.
- */
-export function sortRecordBookAwardRows(
-  rows: RecordBookAwardRow[],
-  sort: RecordBookSortState,
-): RecordBookAwardRow[] {
-  return rows.slice().sort((left, right) => {
-    const key =
-      sort.key === "playerName" ||
-      sort.key === "positions" ||
-      sort.key === "seasonYear" ||
-      sort.key === "awardLabel"
-        ? sort.key
-        : "playerName";
-    const delta = compareSortValues(left[key], right[key], sort.direction);
+    const delta = compareSortValues(
+      left[sort.key],
+      right[sort.key],
+      sort.direction,
+    );
     if (delta !== 0) return delta;
     return left.playerName.localeCompare(right.playerName);
   });
@@ -676,7 +705,8 @@ export function formatRecordBookStat(
   row: RecordBookPlayerRow,
   column: RecordBookStatColumn,
 ): string {
+  if (row.notCountedStats?.has(column.key)) return "-";
   const value = row[column.key];
-  if (value == null) return "—";
+  if (value == null) return "-";
   return formatNumber(value, column.precision ?? 0);
 }

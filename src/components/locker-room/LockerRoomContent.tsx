@@ -18,7 +18,7 @@ import {
   useContractData,
   useTeamAwards,
 } from "@gshl-hooks";
-import { resolveContractDefaultSeason } from "@gshl-utils";
+import { getOwnerTeamIds, resolveContractDefaultSeason } from "@gshl-utils";
 import type { GSHLTeam, NHLTeam } from "@gshl-types";
 import { LockerRoomSkeleton, TeamRosterSkeleton } from "@gshl-skeletons";
 
@@ -143,24 +143,19 @@ export function LockerRoomContent() {
       enabled: isRecordBookTab,
       orderBy: { seasonId: "desc" },
     });
-  const franchiseTeamIds = useMemo(
+  const ownerTeamIds = useMemo(
     () =>
-      allTeams
-        .filter(
-          (team) =>
-            String(team.franchiseId) === String(currentTeam?.franchiseId ?? ""),
-        )
-        .map((team) => String(team.id)),
-    [allTeams, currentTeam?.franchiseId],
+      currentTeam ? getOwnerTeamIds(allTeams, currentTeam) : new Set<string>(),
+    [allTeams, currentTeam],
   );
   const careerSplitsQuery = useCareerSplits({
     enabled: isRecordBookTab,
-    teamIds: franchiseTeamIds,
+    teamIds: [...ownerTeamIds],
   });
   const careerSplits = careerSplitsQuery.data;
   const seasonSplitsQuery = usePlayerSplitsByTeams({
     enabled: isRecordBookTab,
-    teamIds: franchiseTeamIds,
+    teamIds: [...ownerTeamIds],
   });
   const seasonSplits = seasonSplitsQuery.data;
   const recordBookPlayerIds = useMemo(

@@ -1,9 +1,105 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import type { FranchiseCareerRow, NHLTeam, Player } from "@gshl-types";
-import { SeasonType } from "../domain/constants";
-import { buildAllTimeFranchiseRoster } from "./team-record-book";
+import type {
+  FranchiseCareerRow,
+  NHLTeam,
+  Player,
+  PlayerSplitStatLine,
+  RecordBookStatColumn,
+} from "@gshl-types";
+import { PositionGroup, SeasonType } from "../domain/constants";
+import {
+  buildAllTimeFranchiseRoster,
+  buildRecordBookPlayerRows,
+  formatRecordBookStat,
+  getOwnerTeamIds,
+} from "./team-record-book";
+
+void test("scopes record-book team history to the selected owner", () => {
+  const ownerTeamIds = getOwnerTeamIds(
+    [
+      { id: "owner-a-team-1", ownerId: "owner-a" },
+      { id: "owner-b-team-1", ownerId: "owner-b" },
+      { id: "owner-a-team-2", ownerId: "owner-a" },
+    ],
+    { ownerId: "owner-a" },
+  );
+
+  assert.deepEqual([...ownerTeamIds], ["owner-a-team-1", "owner-a-team-2"]);
+});
+
+function seasonSplitRow(
+  overrides: Partial<PlayerSplitStatLine> = {},
+): PlayerSplitStatLine {
+  return {
+    id: "split-1",
+    seasonId: "season-1",
+    gshlTeamId: "owner-a-team-1",
+    playerId: "player-1",
+    nhlPos: [],
+    posGroup: PositionGroup.F,
+    nhlTeam: "TOR",
+    seasonType: SeasonType.REGULAR_SEASON,
+    days: "10",
+    GP: "1",
+    MG: "",
+    IR: "",
+    IRplus: "",
+    GS: "",
+    G: "0",
+    A: "",
+    P: "",
+    PM: "",
+    PIM: "",
+    PPP: "",
+    SOG: "",
+    HIT: "",
+    BLK: "",
+    W: "",
+    GA: "",
+    GAA: "",
+    SV: "",
+    SA: "",
+    SVP: "",
+    SO: "",
+    TOI: "",
+    Rating: "",
+    ADD: "",
+    MS: "",
+    BS: "",
+    createdAt: new Date(0),
+    updatedAt: new Date(0),
+    ...overrides,
+  };
+}
+
+void test("renders uncounted categories as dashes without hiding counted zeroes", () => {
+  const { seasonRows } = buildRecordBookPlayerRows({
+    careerSplits: [],
+    nhlTeamsByAbbr: new Map(),
+    ownerTeamIds: new Set(["owner-a-team-1"]),
+    playersById: new Map(),
+    seasonSplits: [seasonSplitRow()],
+    seasonsById: new Map([["season-1", 2025]]),
+  });
+  const row = seasonRows[0];
+  if (!row) throw new Error("Expected a season record-book row");
+
+  const goalsColumn = {
+    key: "G",
+    label: "G",
+    title: "Goals",
+  } satisfies RecordBookStatColumn;
+  const assistsColumn = {
+    key: "A",
+    label: "A",
+    title: "Assists",
+  } satisfies RecordBookStatColumn;
+
+  assert.equal(formatRecordBookStat(row, goalsColumn), "0");
+  assert.equal(formatRecordBookStat(row, assistsColumn), "-");
+});
 
 function careerRow(
   playerId: string,

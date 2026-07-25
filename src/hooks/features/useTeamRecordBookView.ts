@@ -13,11 +13,11 @@ import type {
 import {
   buildRecordBookAwardRows,
   buildRecordBookPlayerRows,
+  getOwnerTeamIds,
   PositionGroup,
   RECORD_BOOK_GOALIE_COLUMNS,
   RECORD_BOOK_SKATER_COLUMNS,
   SeasonType,
-  sortRecordBookAwardRows,
   sortRecordBookPlayerRows,
 } from "@gshl-utils";
 
@@ -35,17 +35,14 @@ function getDefaultSort(
   view: RecordBookView,
   group: RecordBookGroup,
 ): RecordBookSortState {
-  if (view === "season" || view === "awards") {
+  if (view === "season") {
     return { key: "seasonYear", direction: "desc" };
   }
   return { key: getDefaultPlayerSortKey(group), direction: "desc" };
 }
 
 function getNewSortDirection(key: RecordBookSortKey): "asc" | "desc" {
-  return key === "playerName" ||
-    key === "positions" ||
-    key === "awardLabel" ||
-    key === "GAA"
+  return key === "playerName" || key === "positions" || key === "GAA"
     ? "asc"
     : "desc";
 }
@@ -86,23 +83,15 @@ export function useTeamRecordBookView(
     () => new Map(seasons.map((season) => [String(season.id), season.year])),
     [seasons],
   );
-  const franchiseTeamIds = useMemo(
-    () =>
-      new Set(
-        allTeams
-          .filter(
-            (team) =>
-              String(team.franchiseId) === String(currentTeam.franchiseId),
-          )
-          .map((team) => String(team.id)),
-      ),
-    [allTeams, currentTeam.franchiseId],
+  const ownerTeamIds = useMemo(
+    () => getOwnerTeamIds(allTeams, currentTeam),
+    [allTeams, currentTeam],
   );
   const playerRowSets = useMemo(
     () =>
       buildRecordBookPlayerRows({
         careerSplits,
-        franchiseTeamIds,
+        ownerTeamIds,
         nhlTeamsByAbbr,
         playersById,
         seasonSplits,
@@ -110,7 +99,7 @@ export function useTeamRecordBookView(
       }),
     [
       careerSplits,
-      franchiseTeamIds,
+      ownerTeamIds,
       nhlTeamsByAbbr,
       playersById,
       seasonSplits,
@@ -179,18 +168,6 @@ export function useTeamRecordBookView(
     });
     return sortRecordBookPlayerRows(filtered, sort);
   }, [group, normalizedQuery, playerRowSets, selectedSeasonType, sort, view]);
-  const awardRows = useMemo(() => {
-    const filtered = normalizedQuery
-      ? allAwardRows.filter((row) =>
-          [row.playerName, row.positions, row.seasonYear, row.awardLabel].some(
-            (value) =>
-              String(value).toLocaleLowerCase().includes(normalizedQuery),
-          ),
-        )
-      : allAwardRows;
-    return sortRecordBookAwardRows(filtered, sort);
-  }, [allAwardRows, normalizedQuery, sort]);
-
   const onViewChange = useCallback(
     (nextView: RecordBookView) => {
       setView(nextView);
@@ -220,7 +197,7 @@ export function useTeamRecordBookView(
     }));
   }, []);
   return {
-    awardRows,
+    awardRows: allAwardRows,
     columns,
     group,
     onGroupChange,

@@ -139,6 +139,7 @@ export interface FranchiseCareerRow extends RecordBookStatLine {
   posGroup: string;
   nhlPos: string[];
   nhlTeam: string;
+  notCountedStats?: Set<RecordBookStatKey>;
 }
 
 export interface FranchiseSeasonRow extends RecordBookStatLine {
@@ -149,6 +150,7 @@ export interface FranchiseSeasonRow extends RecordBookStatLine {
   posGroup: string;
   nhlPos: string[];
   nhlTeam: string;
+  notCountedStats?: Set<RecordBookStatKey>;
 }
 
 export interface RecordBookPlayerRow extends RecordBookStatLine {
@@ -164,6 +166,7 @@ export interface RecordBookPlayerRow extends RecordBookStatLine {
   seasonCount: number;
   firstSeason?: number | string;
   lastSeason?: number | string;
+  notCountedStats?: Set<RecordBookStatKey>;
 }
 
 export interface RecordBookAwardRow {
@@ -177,7 +180,7 @@ export interface RecordBookAwardRow {
   awardLabel: string;
 }
 
-export type RecordBookView = "career" | "season" | "awards";
+export type RecordBookView = "career" | "season";
 export type RecordBookGroup = "skater" | "goalie";
 export type RecordBookSortDirection = "asc" | "desc";
 export type RecordBookPlayerSortKey =
@@ -186,14 +189,7 @@ export type RecordBookPlayerSortKey =
   | "seasonYear"
   | "seasonCount"
   | RecordBookStatKey;
-export type RecordBookAwardSortKey =
-  | "playerName"
-  | "positions"
-  | "seasonYear"
-  | "awardLabel";
-export type RecordBookSortKey =
-  | RecordBookPlayerSortKey
-  | RecordBookAwardSortKey;
+export type RecordBookSortKey = RecordBookPlayerSortKey;
 
 export interface RecordBookSortState {
   key: RecordBookSortKey;
@@ -232,7 +228,7 @@ export interface TeamRecordBookProps {
 
 export interface BuildRecordBookPlayerRowsOptions {
   careerSplits: PlayerCareerSplitStatLine[];
-  franchiseTeamIds: Set<string>;
+  ownerTeamIds: Set<string>;
   nhlTeamsByAbbr: Map<string, NHLTeam>;
   playersById: Map<string, Player>;
   seasonSplits: PlayerSplitStatLine[];
@@ -255,7 +251,6 @@ export interface BuildRecordBookAwardRowsOptions {
 }
 
 export interface RecordBookToolbarProps {
-  awardCount: number;
   group: RecordBookGroup;
   onGroupChange: (group: RecordBookGroup) => void;
   onQueryChange: (query: string) => void;
@@ -283,13 +278,7 @@ export interface RecordBookPlayerTableProps {
   onSort: (key: RecordBookSortKey) => void;
   rows: RecordBookPlayerRow[];
   sort: RecordBookSortState;
-  view: Exclude<RecordBookView, "awards">;
-}
-
-export interface RecordBookAwardsTableProps {
-  onSort: (key: RecordBookSortKey) => void;
-  rows: RecordBookAwardRow[];
-  sort: RecordBookSortState;
+  view: RecordBookView;
 }
 
 export interface UseTeamRecordBookViewResult {
