@@ -54,15 +54,24 @@ function OfferControls({ player }: { player: UfaFreeAgentView }) {
   const selectedAffordable = player.affordableTerms.includes(
     years as 1 | 2 | 3,
   );
+  const helperText =
+    message ??
+    player.disabledReason ??
+    (player.existingOffer
+      ? "Binding offer submitted."
+      : "Salary is reserved while pending.");
   return (
-    <div className="flex min-w-[180px] flex-col items-stretch gap-1">
-      <div className="flex gap-2">
+    <div
+      className="flex min-w-[130px] items-center gap-1 sm:min-w-[180px] sm:flex-col sm:items-stretch sm:gap-1"
+      title={helperText}
+    >
+      <div className="flex min-w-0 flex-1 gap-1 sm:flex-none sm:gap-2">
         <select
           aria-label={`Contract years for ${player.fullName}`}
           value={years}
           disabled={!player.canOffer || mutation.isPending}
           onChange={(event) => setYears(Number(event.target.value))}
-          className="h-9 rounded-md border bg-background px-2 text-sm disabled:opacity-50"
+          className="h-6 min-w-0 flex-1 rounded-md border bg-background px-1 text-[9px] leading-none disabled:opacity-50 sm:h-9 sm:flex-none sm:px-2 sm:text-sm"
         >
           {[1, 2, 3].map((term) => (
             <option
@@ -87,19 +96,16 @@ function OfferControls({ player }: { player: UfaFreeAgentView }) {
               contractLength: years as 1 | 2 | 3,
             });
           }}
-          className="rounded-md bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-40"
+          className="h-6 shrink-0 rounded-md bg-primary px-1.5 py-0.5 text-[9px] font-semibold leading-none text-primary-foreground disabled:cursor-not-allowed disabled:opacity-40 sm:h-auto sm:px-3 sm:py-2 sm:text-xs"
         >
           {mutation.isPending ? "Offering…" : "Offer Contract"}
         </button>
       </div>
       <span
-        className={`max-w-[260px] text-[10px] ${message?.includes("submitted") ? "text-emerald-600" : "text-muted-foreground"}`}
+        aria-live="polite"
+        className={`sr-only max-w-[220px] text-[9px] leading-tight sm:not-sr-only sm:max-w-[260px] sm:text-[10px] ${message?.includes("submitted") ? "text-emerald-600" : "text-muted-foreground"}`}
       >
-        {message ??
-          player.disabledReason ??
-          (player.existingOffer
-            ? "Binding offer submitted."
-            : "Salary is reserved while pending.")}
+        {helperText}
       </span>
     </div>
   );
@@ -118,8 +124,8 @@ function PlayerRows({
         const goalie = player.positionGroup === "G";
         const stats = player.stats;
         return (
-          <tr key={player.id} className="border-t align-middle">
-            <td className="px-2 py-3">
+          <tr key={player.id} className="group border-t align-middle">
+            <td className="sticky left-0 z-20 w-8 min-w-8 border-r bg-background px-0.5 py-1 group-hover:bg-muted sm:static sm:z-auto sm:w-auto sm:min-w-0 sm:border-0 sm:bg-transparent sm:px-2 sm:py-3">
               <NHLLogo
                 team={
                   player.nhlTeamLogoUrl
@@ -129,15 +135,16 @@ function PlayerRows({
                       }
                     : undefined
                 }
+                size={24}
               />
             </td>
-            <td className="whitespace-nowrap px-2 py-3 text-left font-semibold">
+            <td className="sticky left-8 z-20 min-w-[7rem] border-r bg-background px-1.5 py-1 text-left text-[10px] font-semibold group-hover:bg-muted sm:static sm:z-auto sm:min-w-0 sm:border-0 sm:bg-transparent sm:px-2 sm:py-3 sm:text-sm">
               {player.fullName}
             </td>
-            <td className="whitespace-nowrap px-2 py-3">
+            <td className="whitespace-nowrap px-1 py-1 text-[9px] sm:px-2 sm:py-3 sm:text-sm">
               {player.positions.join("/") || player.positionGroup}
             </td>
-            <td className="whitespace-nowrap px-2 py-3 font-medium">
+            <td className="whitespace-nowrap px-1 py-1 text-[9px] font-medium sm:px-2 sm:py-3 sm:text-sm">
               {formatMoney(player.salary)}
             </td>
             {showStats
@@ -154,7 +161,10 @@ function PlayerRows({
                     "QS",
                     "RBS",
                   ].map((key) => (
-                    <td key={key} className="px-2 py-3 text-xs">
+                    <td
+                      key={key}
+                      className="whitespace-nowrap px-1 py-1 text-[9px] sm:px-2 sm:py-3 sm:text-xs"
+                    >
                       {stats?.[key as keyof typeof stats] ?? "—"}
                     </td>
                   ))
@@ -170,12 +180,15 @@ function PlayerRows({
                     "HIT",
                     "BLK",
                   ].map((key) => (
-                    <td key={key} className="px-2 py-3 text-xs">
+                    <td
+                      key={key}
+                      className="whitespace-nowrap px-1 py-1 text-[9px] sm:px-2 sm:py-3 sm:text-xs"
+                    >
                       {stats?.[key as keyof typeof stats] ?? "—"}
                     </td>
                   ))
               : null}
-            <td className="px-2 py-3">
+            <td className="px-1 py-1 sm:px-2 sm:py-3">
               <OfferControls player={player} />
             </td>
           </tr>
@@ -213,22 +226,33 @@ function PlayerTable({
     ? ["GP", "W", "GA", "GAA", "SV", "SA", "SV%", "SO", "QS", "RBS"]
     : ["GP", "G", "A", "P", "+/−", "PIM", "PPP", "SOG", "HIT", "BLK"];
   return (
-    <div className="overflow-x-auto rounded-lg border">
-      <table className="w-full text-center text-sm">
-        <thead className="bg-muted/70 text-xs uppercase tracking-wide">
+    <div className="overflow-x-auto overscroll-x-contain rounded-lg border">
+      <table className="w-full min-w-[780px] text-center text-[10px] sm:min-w-0 sm:text-sm">
+        <thead className="bg-muted/70 text-[8px] uppercase tracking-wide sm:text-xs">
           <tr>
-            <th className="px-2 py-3">NHL</th>
-            <th className="px-2 py-3 text-left">Player</th>
-            <th className="px-2 py-3">Pos</th>
-            <th className="px-2 py-3">UFA Salary</th>
+            <th className="sticky left-0 z-30 w-8 min-w-8 border-r bg-muted/70 px-0.5 py-1 sm:static sm:z-auto sm:w-auto sm:min-w-0 sm:border-0 sm:bg-transparent sm:px-2 sm:py-3">
+              NHL
+            </th>
+            <th className="sticky left-8 z-30 min-w-[7rem] border-r bg-muted/70 px-1.5 py-1 text-left sm:static sm:z-auto sm:min-w-0 sm:border-0 sm:bg-transparent sm:px-2 sm:py-3">
+              Player
+            </th>
+            <th className="whitespace-nowrap px-1 py-1 sm:px-2 sm:py-3">Pos</th>
+            <th className="whitespace-nowrap px-1 py-1 sm:px-2 sm:py-3">
+              UFA Salary
+            </th>
             {showStats
               ? statHeaders.map((header) => (
-                  <th key={header} className="px-2 py-3">
+                  <th
+                    key={header}
+                    className="whitespace-nowrap px-1 py-1 sm:px-2 sm:py-3"
+                  >
                     {header}
                   </th>
                 ))
               : null}
-            <th className="px-2 py-3">Offer</th>
+            <th className="whitespace-nowrap px-1 py-1 sm:px-2 sm:py-3">
+              Offer
+            </th>
           </tr>
         </thead>
         <PlayerRows players={players} showStats={showStats} />
@@ -239,34 +263,53 @@ function PlayerTable({
 
 function ActiveOffers({ groups }: { groups: UfaOfferGroupView[] }) {
   return (
-    <section className="space-y-3" aria-labelledby="ufa-active-offers">
-      <h3 id="ufa-active-offers" className="text-lg font-bold">
+    <section
+      className="space-y-2 sm:space-y-3"
+      aria-labelledby="ufa-active-offers"
+    >
+      <h3 id="ufa-active-offers" className="text-base font-bold sm:text-lg">
         UFA Contract Offers
       </h3>
       {groups.length === 0 ? (
-        <p className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
+        <p className="rounded-lg border border-dashed p-2 text-xs text-muted-foreground sm:p-4 sm:text-sm">
           No UFA offers are currently pending.
         </p>
       ) : (
-        <div className="overflow-x-auto rounded-lg border">
-          <table className="w-full text-center text-sm">
-            <thead className="bg-muted/70 text-xs uppercase">
+        <div className="overflow-x-auto overscroll-x-contain rounded-lg border">
+          <table className="w-full min-w-[720px] text-center text-[10px] sm:min-w-0 sm:text-sm">
+            <thead className="bg-muted/70 text-[8px] uppercase sm:text-xs">
               <tr>
-                <th className="p-3">NHL</th>
-                <th className="p-3 text-left">Player</th>
-                <th className="p-3">Pos</th>
-                <th className="p-3">Salary</th>
-                <th className="p-3">GSHL Team</th>
-                <th className="p-3">Years</th>
-                <th className="p-3">Odds</th>
-                <th className="p-3">Time Left</th>
+                <th className="sticky left-0 z-30 w-8 min-w-8 border-r bg-muted/70 px-0.5 py-1 sm:static sm:z-auto sm:w-auto sm:min-w-0 sm:border-0 sm:bg-transparent sm:px-3 sm:py-3">
+                  NHL
+                </th>
+                <th className="sticky left-8 z-30 min-w-[7rem] border-r bg-muted/70 px-1.5 py-1 text-left sm:static sm:z-auto sm:min-w-0 sm:border-0 sm:bg-transparent sm:px-3 sm:py-3">
+                  Player
+                </th>
+                <th className="whitespace-nowrap px-1 py-1 sm:px-3 sm:py-3">
+                  Pos
+                </th>
+                <th className="whitespace-nowrap px-1 py-1 sm:px-3 sm:py-3">
+                  Salary
+                </th>
+                <th className="whitespace-nowrap px-1 py-1 sm:px-3 sm:py-3">
+                  GSHL Team
+                </th>
+                <th className="whitespace-nowrap px-1 py-1 sm:px-3 sm:py-3">
+                  Years
+                </th>
+                <th className="whitespace-nowrap px-1 py-1 sm:px-3 sm:py-3">
+                  Odds
+                </th>
+                <th className="whitespace-nowrap px-1 py-1 sm:px-3 sm:py-3">
+                  Time Left
+                </th>
               </tr>
             </thead>
             <tbody>
               {groups.flatMap((group) =>
                 group.offers.map((offer) => (
-                  <tr key={offer.id} className="border-t">
-                    <td className="p-3">
+                  <tr key={offer.id} className="group border-t">
+                    <td className="sticky left-0 z-20 w-8 min-w-8 border-r bg-background px-0.5 py-1 group-hover:bg-muted sm:static sm:z-auto sm:w-auto sm:min-w-0 sm:border-0 sm:bg-transparent sm:px-3 sm:py-3">
                       <NHLLogo
                         team={
                           group.player?.nhlTeamLogoUrl
@@ -276,16 +319,19 @@ function ActiveOffers({ groups }: { groups: UfaOfferGroupView[] }) {
                               }
                             : undefined
                         }
+                        size={24}
                       />
                     </td>
-                    <td className="whitespace-nowrap p-3 text-left font-semibold">
+                    <td className="sticky left-8 z-20 min-w-[7rem] border-r bg-background px-1.5 py-1 text-left text-[10px] font-semibold group-hover:bg-muted sm:static sm:z-auto sm:min-w-0 sm:border-0 sm:bg-transparent sm:px-3 sm:py-3 sm:text-sm">
                       {group.player?.fullName ?? "Unavailable player"}
                     </td>
-                    <td className="p-3">
+                    <td className="whitespace-nowrap px-1 py-1 sm:px-3 sm:py-3">
                       {group.player?.positions.join("/") ?? "—"}
                     </td>
-                    <td className="p-3">{formatMoney(offer.salary)}</td>
-                    <td className="p-3">
+                    <td className="whitespace-nowrap px-1 py-1 sm:px-3 sm:py-3">
+                      {formatMoney(offer.salary)}
+                    </td>
+                    <td className="whitespace-nowrap px-1 py-1 sm:px-3 sm:py-3">
                       <div className="flex items-center justify-center gap-2">
                         <Logo
                           src={offer.franchiseLogoUrl}
@@ -296,11 +342,11 @@ function ActiveOffers({ groups }: { groups: UfaOfferGroupView[] }) {
                         </span>
                       </div>
                     </td>
-                    <td className="p-3">{offer.years}</td>
-                    <td className="p-3 font-bold">
+                    <td className="px-1 py-1 sm:px-3 sm:py-3">{offer.years}</td>
+                    <td className="px-1 py-1 font-bold sm:px-3 sm:py-3">
                       {Math.round(offer.probability * 1000) / 10}%
                     </td>
-                    <td className="p-3">
+                    <td className="px-1 py-1 sm:px-3 sm:py-3">
                       <Countdown deadlineAt={group.deadlineAt} />
                     </td>
                   </tr>
@@ -322,29 +368,29 @@ export function UfaHomeCard() {
     );
   if (query.error || !query.data)
     return (
-      <section className="rounded-xl border border-destructive/40 p-5 text-sm text-destructive">
+      <section className="rounded-xl border border-destructive/40 p-3 text-xs text-destructive sm:p-5 sm:text-sm">
         UFA information could not be loaded: {query.error?.message}
       </section>
     );
   if (!query.data.window.isOpen && query.data.offerGroups.length === 0)
     return null;
   return (
-    <section className="space-y-6 rounded-xl border bg-card p-4 shadow-sm sm:p-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
+    <section className="space-y-3 rounded-xl border bg-card p-2 shadow-sm sm:space-y-6 sm:p-6">
+      <div className="flex flex-wrap items-start justify-between gap-2 sm:gap-3">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-primary sm:text-xs sm:tracking-[0.2em]">
             Summer Free Agency
           </p>
-          <h2 className="text-2xl font-black">
+          <h2 className="text-lg font-black leading-tight sm:text-2xl">
             Top 15 Unrestricted Free Agents
           </h2>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <p className="mt-0.5 text-[10px] leading-tight text-muted-foreground sm:mt-1 sm:text-sm">
             UFA salaries include the required 125% premium. Offers are binding.
           </p>
         </div>
         <Link
           href="/leagueoffice?view=freeAgents"
-          className="rounded-md border px-4 py-2 text-sm font-semibold hover:bg-muted"
+          className="rounded-md border px-2 py-1 text-[10px] font-semibold hover:bg-muted sm:px-4 sm:py-2 sm:text-sm"
         >
           View all free agents
         </Link>
@@ -353,14 +399,14 @@ export function UfaHomeCard() {
         query.data.topFreeAgents.length > 0 ? (
           <PlayerTable players={query.data.topFreeAgents} />
         ) : (
-          <p className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
+          <p className="rounded-md border border-dashed p-2 text-xs text-muted-foreground sm:p-4 sm:text-sm">
             {query.data.viewer.isSignedInOwner
               ? "No available UFAs currently fit within your franchise's cap space."
               : "No UFAs are currently available."}
           </p>
         )
       ) : (
-        <p className="rounded-md bg-muted p-3 text-sm">
+        <p className="rounded-md bg-muted p-2 text-xs sm:p-3 sm:text-sm">
           {query.data.window.reason}
         </p>
       )}
@@ -398,16 +444,16 @@ export function UfaLeagueOffice() {
       </p>
     );
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <div>
-        <h1 className="text-3xl font-black">Free Agents</h1>
-        <p className="text-sm text-muted-foreground">
+        <h1 className="text-2xl font-black sm:text-3xl">Free Agents</h1>
+        <p className="text-xs text-muted-foreground sm:text-sm">
           All eligible UFAs with their previous NHL season statistics and fixed
           125% salary.
         </p>
       </div>
       <div
-        className="flex flex-wrap gap-2"
+        className="flex flex-wrap gap-1.5 sm:gap-2"
         aria-label="Filter free agents by position"
       >
         {["ALL", "F", "LW", "RW", "C", "D", "G"].map((value) => (
@@ -418,14 +464,14 @@ export function UfaLeagueOffice() {
               setFilter(value);
               setVisibleCount(50);
             }}
-            className={`rounded-full border px-4 py-2 text-sm font-semibold ${filter === value ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
+            className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${filter === value ? "bg-primary text-primary-foreground" : "hover:bg-muted"} sm:px-4 sm:py-2 sm:text-sm`}
           >
             {value === "ALL" ? "All" : value}
           </button>
         ))}
       </div>
       {!query.data.window.isOpen ? (
-        <p className="rounded-md bg-muted p-3 text-sm">
+        <p className="rounded-md bg-muted p-2 text-xs sm:p-3 sm:text-sm">
           {query.data.window.reason}
         </p>
       ) : null}
