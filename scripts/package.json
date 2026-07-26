@@ -18,7 +18,7 @@
     "power:parity": "node --use-system-ca --dns-result-order=ipv4first ../node_modules/tsx/dist/cli.mjs src/commands/power/power-ratings-parity.ts",
     "test:power": "node ../node_modules/tsx/dist/cli.mjs --test src/domains/power/apps-script-power-engine.test.ts src/domains/aggregation/season-stat-aggregation.test.ts",
     "standings:backfill": "node --use-system-ca --dns-result-order=ipv4first ../node_modules/tsx/dist/cli.mjs src/commands/standings/backfill-season-standings.ts",
-    "stats:aggregate-season": "node --use-system-ca --dns-result-order=ipv4first ../node_modules/tsx/dist/cli.mjs src/commands/stats/aggregate-season-stats.ts",
+    "stats:aggregate-season": "node --use-system-ca --dns-result-order=ipv4first --import tsx src/commands/stats/aggregate-season-stats.ts",
     "stats:backfill-hockey-reference": "node --use-system-ca --dns-result-order=ipv4first ../node_modules/tsx/dist/cli.mjs src/commands/stats/backfill-hockey-reference-season.ts",
     "stats:backfill-yahoo-matchup-days": "node --use-system-ca --dns-result-order=ipv4first ../node_modules/tsx/dist/cli.mjs src/commands/stats/backfill-yahoo-matchup-player-days.ts",
     "stats:debug-yahoo-matchup-table": "tsx src/commands/stats/debug-yahoo-matchup-table.ts",

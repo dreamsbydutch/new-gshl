@@ -874,11 +874,11 @@ function canonicalizePlayerDayRows(
 
 function buildWeekTypeMap(
   weekRows: DatabaseRecord[],
-  seasonId: string,
+  seasonId?: string,
 ): Map<string, string> {
   const weekTypeMap = new Map<string, string>();
   for (const week of weekRows) {
-    if (toTrimmedString(week.seasonId) !== seasonId) continue;
+    if (seasonId && toTrimmedString(week.seasonId) !== seasonId) continue;
     const weekId = toTrimmedString(week.id);
     if (!weekId) continue;
     const normalized = normalizeSeasonType(week.weekType);
@@ -886,6 +886,15 @@ function buildWeekTypeMap(
     weekTypeMap.set(weekId, normalized);
   }
   return weekTypeMap;
+}
+
+export function resolveCareerPlayerWeekSeasonType(
+  weekId: unknown,
+  storedSeasonType: unknown,
+  weekTypeMap: ReadonlyMap<string, string>,
+): string | null {
+  const authoritativeSeasonType = weekTypeMap.get(toTrimmedString(weekId));
+  return normalizeSeasonType(authoritativeSeasonType ?? storedSeasonType);
 }
 
 function createPlayerWeekBucket(
@@ -1165,6 +1174,7 @@ function buildPlayerSplitsAndTotals(
 function buildPlayerCareerSplitsAndTotals(
   playerWeeks: DatabaseRecord[],
   fieldConfig: SeasonAggregationFieldConfig,
+  weekTypeMap: ReadonlyMap<string, string>,
 ): { careerSplits: DatabaseRecord[]; careerTotals: DatabaseRecord[] } {
   const careerSplitMap = new Map<string, DatabaseRecord[]>();
   const careerTotalMap = new Map<string, DatabaseRecord[]>();
@@ -1172,7 +1182,11 @@ function buildPlayerCareerSplitsAndTotals(
   for (const playerWeek of playerWeeks) {
     const playerId = toTrimmedString(playerWeek.playerId);
     const gshlTeamId = toTrimmedString(playerWeek.gshlTeamId);
-    const seasonType = normalizeSeasonType(playerWeek.seasonType);
+    const seasonType = resolveCareerPlayerWeekSeasonType(
+      playerWeek.weekId,
+      playerWeek.seasonType,
+      weekTypeMap,
+    );
     if (!playerId || !gshlTeamId || !seasonType) continue;
 
     const splitKey = [playerId, gshlTeamId, seasonType].join("|");
@@ -2151,6 +2165,7 @@ export async function aggregateSeasonStats(
   }
 
   const weekTypeMap = buildWeekTypeMap(weekRows, seasonId);
+  const careerWeekTypeMap = buildWeekTypeMap(weekRows);
   if (weekTypeMap.size === 0) {
     throw new Error(
       `[stats:aggregate-season] No Week rows were found for season ${seasonId}.`,
@@ -2239,6 +2254,7 @@ export async function aggregateSeasonStats(
   const { careerSplits, careerTotals } = buildPlayerCareerSplitsAndTotals(
     mergedCareerPlayerWeeks,
     fieldConfig,
+    careerWeekTypeMap,
   );
   const { teamDays, teamWeeks, teamSeasons } = aggregateTeamStats(
     playerDays,
