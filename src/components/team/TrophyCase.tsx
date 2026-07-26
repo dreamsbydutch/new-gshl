@@ -117,30 +117,28 @@ function FeaturedCupShowcase({ section }: { section: TrophyCaseAwardSection }) {
   const layout = buildTrophyCupShowcaseLayout(section.cards.length);
 
   return (
-    <section
-      className="overflow-hidden pt-3"
-      aria-label="GSHL Cup championships"
-    >
+    <section className="pt-3" aria-label="GSHL Cup championships">
       <div
-        className="relative mx-auto h-40 w-[calc(100%-1.5rem)]"
+        className="relative mx-auto grid w-[calc(100%-1.5rem)] grid-cols-1 justify-items-center pb-4"
         style={{ maxWidth: layout.maxWidth }}
       >
         {layout.positions.map((position) => {
           const card = section.cards[position.itemIndex];
           if (!card) return null;
+          const offsetFromCenter = position.offsetRatio - 0.5;
           const left =
             section.cards.length === 1
-              ? "50%"
-              : `calc(42.5px + ${(position.offsetRatio * 100).toFixed(4)}% - ${(position.offsetRatio * 85).toFixed(4)}px)`;
+              ? "0"
+              : `calc(${(offsetFromCenter * 100).toFixed(4)}% - ${(offsetFromCenter * 85).toFixed(4)}px)`;
 
           return (
             <article
               key={card.id}
-              className="absolute top-0 flex w-[85px] origin-center flex-col items-center text-center"
+              className="relative col-start-1 row-start-1 flex w-[85px] origin-center flex-col items-center text-center"
               style={{
                 left,
                 zIndex: position.zIndex,
-                transform: `translateX(-50%) translateY(${position.translateY}px) scale(${position.scale})`,
+                transform: `translateY(${position.translateY}px) scale(${position.scale})`,
               }}
               title={`GSHL Cup, ${card.seasonYear}${
                 card.franchiseName ? ` - ${card.franchiseName}` : ""
