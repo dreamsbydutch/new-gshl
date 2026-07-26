@@ -9,11 +9,15 @@ import type {
   BuildTrophyCaseDataResult,
   TrophyCaseCard,
   TrophyCaseProps,
+  TrophyCupShowcaseLayout,
 } from "@gshl-types";
 
 const groupOrderMap = new Map(
   AWARD_GROUP_ORDER.map((group, index) => [group, index]),
 );
+const FEATURED_CUP_WIDTH = 85;
+const FEATURED_CUP_OVERLAP_STEP = 60;
+const FEATURED_CUP_MAX_WIDTH = 640;
 
 export function getSeasonYearMap(seasons: TrophyCaseProps["seasons"]) {
   return new Map(seasons.map((season) => [String(season.id), season.year]));
@@ -46,6 +50,65 @@ export function formatYearRanges(years: Array<number | string>): string {
   }
   ranges.push(formatYearRange(rangeStart, rangeEnd));
   return ranges.join(", ");
+}
+
+export function buildTrophyCupShowcaseLayout(
+  count: number,
+): TrophyCupShowcaseLayout {
+  if (count <= 0) return { maxWidth: 0, positions: [] };
+
+  const slotOrder: number[] = [];
+  if (count % 2 === 1) {
+    const centerSlot = Math.floor(count / 2);
+    slotOrder.push(centerSlot);
+    for (let distance = 1; slotOrder.length < count; distance += 1) {
+      slotOrder.push(centerSlot - distance);
+      if (slotOrder.length < count) slotOrder.push(centerSlot + distance);
+    }
+  } else {
+    const leftCenterSlot = count / 2 - 1;
+    const rightCenterSlot = count / 2;
+    for (let distance = 0; slotOrder.length < count; distance += 1) {
+      slotOrder.push(leftCenterSlot - distance);
+      if (slotOrder.length < count) {
+        slotOrder.push(rightCenterSlot + distance);
+      }
+    }
+  }
+
+  const hasDepth = count >= 4;
+  const maximumDistance = Math.max((count - 1) / 2, 1);
+  const minimumDistance = count % 2 === 0 ? 0.5 : 0;
+  const depthRange = Math.max(maximumDistance - minimumDistance, 1);
+  const maxWidth =
+    count === 1
+      ? FEATURED_CUP_WIDTH
+      : count === 2
+        ? FEATURED_CUP_WIDTH * 2 + 15
+        : count === 3
+          ? FEATURED_CUP_WIDTH * 3 + 20
+          : Math.min(
+              FEATURED_CUP_WIDTH + FEATURED_CUP_OVERLAP_STEP * (count - 1),
+              FEATURED_CUP_MAX_WIDTH,
+            );
+
+  return {
+    maxWidth,
+    positions: slotOrder.map((slotIndex, itemIndex) => {
+      const distanceFromCenter = Math.abs(slotIndex - (count - 1) / 2);
+      const prominence =
+        1 - (distanceFromCenter - minimumDistance) / depthRange;
+
+      return {
+        itemIndex,
+        slotIndex,
+        offsetRatio: count === 1 ? 0.5 : slotIndex / (count - 1),
+        translateY: hasDepth ? Math.round(prominence * 16) : 0,
+        scale: hasDepth ? 0.84 + prominence * 0.16 : 1,
+        zIndex: hasDepth ? Math.round(prominence * 100) + 1 : 1,
+      };
+    }),
+  };
 }
 
 export function buildTrophyCaseData({

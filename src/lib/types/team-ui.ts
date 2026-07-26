@@ -59,6 +59,20 @@ export interface TrophyCaseAwardSection {
   seasonRange: string;
 }
 
+export interface TrophyCupPosition {
+  itemIndex: number;
+  slotIndex: number;
+  offsetRatio: number;
+  translateY: number;
+  scale: number;
+  zIndex: number;
+}
+
+export interface TrophyCupShowcaseLayout {
+  maxWidth: number;
+  positions: TrophyCupPosition[];
+}
+
 export interface TrophyCaseProps {
   teamAwards: TeamAward[];
   allTeams: GSHLTeam[];

@@ -106,6 +106,11 @@ export function TeamHistorySkeleton() {
 export function TrophyCaseSkeleton() {
   return (
     <section className="pb-8 sm:pb-12">
+      <div className="flex h-40 flex-col items-center pt-3">
+        <Skeleton className="h-24 w-[85px] rounded-2xl" />
+        <Skeleton className="-mt-2 h-6 w-6 rounded-full bg-slate-200" />
+        <Skeleton className="mt-2 h-3 w-8" />
+      </div>
       {Array.from({ length: 2 }).map((_, sectionIndex) => (
         <div key={sectionIndex}>
           <div className="mb-4 mt-8 flex items-center gap-3 px-3 sm:mb-6 sm:mt-12">

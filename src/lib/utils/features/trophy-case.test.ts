@@ -3,7 +3,11 @@ import test from "node:test";
 
 import type { GSHLTeam, Season, TeamAward } from "@gshl-types";
 import { AwardsList } from "../domain/constants";
-import { buildTrophyCaseData, formatYearRanges } from "./trophy-case";
+import {
+  buildTrophyCaseData,
+  buildTrophyCupShowcaseLayout,
+  formatYearRanges,
+} from "./trophy-case";
 
 const now = new Date(0);
 
@@ -64,6 +68,26 @@ const currentTeam: GSHLTeam = {
 
 void test("formats consecutive trophy seasons as compact ranges", () => {
   assert.equal(formatYearRanges([2024, 2022, 2021, 2024]), "2021-22, 2024");
+});
+
+void test("places newest cups in the prominent center positions", () => {
+  const fourCupLayout = buildTrophyCupShowcaseLayout(4);
+  assert.deepEqual(
+    fourCupLayout.positions.map((position) => position.slotIndex),
+    [1, 2, 0, 3],
+  );
+  assert.ok(
+    fourCupLayout.positions[0]!.zIndex > fourCupLayout.positions[2]!.zIndex,
+  );
+
+  const fiveCupLayout = buildTrophyCupShowcaseLayout(5);
+  assert.deepEqual(
+    fiveCupLayout.positions.map((position) => position.slotIndex),
+    [2, 1, 3, 0, 4],
+  );
+  assert.equal(fiveCupLayout.positions[0]?.scale, 1);
+  assert.equal(fiveCupLayout.positions[0]?.translateY, 16);
+  assert.equal(fiveCupLayout.positions[3]?.scale, 0.84);
 });
 
 void test("groups trophy wins by award with count and season range metadata", () => {

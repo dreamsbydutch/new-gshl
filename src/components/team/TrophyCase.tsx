@@ -8,7 +8,13 @@ import type {
   TrophyCaseCard,
   TrophyCaseProps,
 } from "@gshl-types";
-import { buildTrophyCaseData, formatOwnerName } from "@gshl-utils";
+import {
+  AwardsList,
+  buildTrophyCaseData,
+  buildTrophyCupShowcaseLayout,
+  cn,
+  formatOwnerName,
+} from "@gshl-utils";
 
 function TrophySectionDivider({ label }: { label: string }) {
   return (
@@ -50,23 +56,117 @@ function TrophyImage({ imageUrl, alt }: { imageUrl: string; alt: string }) {
 function FranchiseLogo({
   logoUrl,
   teamName,
+  className,
 }: {
   logoUrl: string | null;
   teamName: string | null;
+  className?: string;
 }) {
   const [errored, setErrored] = useState(false);
   if (!logoUrl || errored) {
     return (
-      <div className="h-4 w-4 rounded-full border border-white bg-gray-200 shadow-sm" />
+      <div
+        className={cn(
+          "h-4 w-4 rounded-full border border-white bg-gray-200 shadow-sm",
+          className,
+        )}
+      />
     );
   }
   return (
     <img
-      className="h-4 w-4 rounded-full border border-white bg-white object-cover shadow-sm"
+      className={cn(
+        "h-4 w-4 rounded-full border border-white bg-white object-cover shadow-sm",
+        className,
+      )}
       src={logoUrl}
       alt={`${teamName ?? "Franchise"} logo`}
       onError={() => setErrored(true)}
     />
+  );
+}
+
+function FeaturedCupImage({
+  imageUrl,
+  alt,
+}: {
+  imageUrl: string;
+  alt: string;
+}) {
+  const [errored, setErrored] = useState(false);
+  if (!imageUrl || errored) {
+    return (
+      <div className="flex h-24 w-[85px] items-center justify-center">
+        <span className="font-barlow text-[9px] uppercase tracking-wide text-gray-300">
+          Cup
+        </span>
+      </div>
+    );
+  }
+  return (
+    <img
+      className="h-auto w-[85px] max-w-none drop-shadow-[0_10px_12px_rgba(15,23,42,0.18)]"
+      src={imageUrl}
+      alt={alt}
+      onError={() => setErrored(true)}
+    />
+  );
+}
+
+function FeaturedCupShowcase({ section }: { section: TrophyCaseAwardSection }) {
+  const layout = buildTrophyCupShowcaseLayout(section.cards.length);
+
+  return (
+    <section
+      className="overflow-hidden pt-3"
+      aria-label="GSHL Cup championships"
+    >
+      <div
+        className="relative mx-auto h-40 w-[calc(100%-1.5rem)]"
+        style={{ maxWidth: layout.maxWidth }}
+      >
+        {layout.positions.map((position) => {
+          const card = section.cards[position.itemIndex];
+          if (!card) return null;
+          const left =
+            section.cards.length === 1
+              ? "50%"
+              : `calc(42.5px + ${(position.offsetRatio * 100).toFixed(4)}% - ${(position.offsetRatio * 85).toFixed(4)}px)`;
+
+          return (
+            <article
+              key={card.id}
+              className="absolute top-0 flex w-[85px] origin-center flex-col items-center text-center"
+              style={{
+                left,
+                zIndex: position.zIndex,
+                transform: `translateX(-50%) translateY(${position.translateY}px) scale(${position.scale})`,
+              }}
+              title={`GSHL Cup, ${card.seasonYear}${
+                card.franchiseName ? ` - ${card.franchiseName}` : ""
+              }`}
+            >
+              <div className="relative">
+                <FeaturedCupImage
+                  imageUrl={card.catalog.imageUrl}
+                  alt={`GSHL Cup, ${card.seasonYear}`}
+                />
+                <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/3">
+                  <FranchiseLogo
+                    logoUrl={card.franchiseLogoUrl}
+                    teamName={card.franchiseName}
+                    className="h-6 w-6 border-2 shadow-md"
+                  />
+                </div>
+              </div>
+              <div className="mt-2 font-varela text-xs font-bold leading-none text-slate-800">
+                {card.seasonYear}
+              </div>
+            </article>
+          );
+        })}
+      </div>
+    </section>
   );
 }
 
@@ -102,7 +202,7 @@ function TrophyAwardRow({ section }: { section: TrophyCaseAwardSection }) {
     <section>
       <div className="px-3 sm:px-4">
         <div className="flex min-w-0 items-baseline gap-1.5 whitespace-nowrap font-varela uppercase text-black">
-          <h3 className="min-w-0 truncate text-[11px] font-bold tracking-[0.06em] sm:text-sm">
+          <h3 className="min-w-0 truncate text-[13px] font-bold tracking-[0.05em] sm:text-[15px]">
             {section.catalog.fullName}
           </h3>
           <span className="shrink-0 text-[10px] font-semibold tracking-[0.04em] text-slate-500 sm:text-xs">
@@ -124,8 +224,14 @@ function TrophyAwardRow({ section }: { section: TrophyCaseAwardSection }) {
 
 export function TrophyCase(props: TrophyCaseProps) {
   const { awardSections } = useMemo(() => buildTrophyCaseData(props), [props]);
+  const featuredCupSection = awardSections.find(
+    (section) => section.awardKey === AwardsList.GSHL_CUP,
+  );
+  const regularAwardSections = awardSections.filter(
+    (section) => section.awardKey !== AwardsList.GSHL_CUP,
+  );
   const visibleGroups = AWARD_GROUP_ORDER.filter((group) =>
-    awardSections.some((section) => section.catalog.group === group),
+    regularAwardSections.some((section) => section.catalog.group === group),
   );
 
   if (awardSections.length === 0) {
@@ -143,8 +249,11 @@ export function TrophyCase(props: TrophyCaseProps) {
 
   return (
     <section className="pb-8 font-varela sm:pb-12">
+      {featuredCupSection ? (
+        <FeaturedCupShowcase section={featuredCupSection} />
+      ) : null}
       {visibleGroups.map((group) => {
-        const groupSections = awardSections.filter(
+        const groupSections = regularAwardSections.filter(
           (section) => section.catalog.group === group,
         );
         return (
