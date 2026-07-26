@@ -5,8 +5,20 @@
  * Type definitions are sourced from @gshl-types
  */
 
-import type { GSHLTeam, Matchup, TeamSeasonStatLine, Week } from "@gshl-types";
-import type { StandingsGroup } from "@gshl-types";
+import type {
+  GSHLTeam,
+  Matchup,
+  Player,
+  PlayerTotalStatLine,
+  StandingsCategoryRank,
+  StandingsGroup,
+  StandingsTeamCardViewModel,
+  StandingsTeamGameContext,
+  StandingsTeamRow,
+  StandingsTopPlayer,
+  TeamSeasonStatLine,
+  Week,
+} from "@gshl-types";
 import { keyBy } from "../core";
 
 // Re-export types for backward compatibility
@@ -83,11 +95,6 @@ export const LOSERS_TOURNEY_FIELDS = [
 ] as const;
 
 type StandingsDisplayValue = string | number | boolean | null | undefined;
-type StandingsCategoryResult = {
-  label: string;
-  value: number | null | undefined;
-  rank: number | null;
-};
 type StandingsTeamWithStats = GSHLTeam & { seasonStats?: TeamSeasonStatLine };
 type GroupTeamsOptions = {
   includeContext?: boolean;
@@ -177,12 +184,11 @@ export const groupTeamsByStandingsType = (
       groups = [
         {
           title: "Overall",
-          teams: teamsWithStats
-            .sort(
-              (a, b) =>
-                +(a.seasonStats?.overallRk ?? 0) -
-                +(b.seasonStats?.overallRk ?? 0),
-            ),
+          teams: teamsWithStats.sort(
+            (a, b) =>
+              +(a.seasonStats?.overallRk ?? 0) -
+              +(b.seasonStats?.overallRk ?? 0),
+          ),
         },
       ];
       break;
@@ -446,10 +452,10 @@ export function buildStandingsCategories(
   teamId: string,
   seasonStats: TeamSeasonStatLine | undefined,
   allTeamsStats?: TeamSeasonStatLine[],
-) : StandingsCategoryResult[] {
-  const categories: StandingsCategoryResult[] = [];
+): StandingsCategoryRank[] {
+  const categories: StandingsCategoryRank[] = [];
 
-      /**
+  /**
    * Add.
    *
    * @param label - The label to use.
@@ -469,7 +475,7 @@ export function buildStandingsCategories(
   }
 
   if (Array.isArray(allTeamsStats) && allTeamsStats.length > 0) {
-            /**
+    /**
      * Rank map desc.
      *
      * @param key - The key to use for the operation.
@@ -483,14 +489,17 @@ export function buildStandingsCategories(
       return map;
     };
 
-            /**
+    /**
      * Rank map asc.
      *
      * @param key - The key to use for the operation.
      */
     const rankMapAsc = (key: keyof TeamSeasonStatLine) => {
       const sorted = [...allTeamsStats].sort((left, right) =>
-        compareNumericAsc(getNumericStat(left, key), getNumericStat(right, key)),
+        compareNumericAsc(
+          getNumericStat(left, key),
+          getNumericStat(right, key),
+        ),
       );
       const map = new Map<string, number>();
       sorted.forEach((row, index) => map.set(row.gshlTeamId, index + 1));
@@ -573,7 +582,10 @@ export function getStandingsMatchupWindow(
   weeks.forEach((week) => weekNumById.set(week.id, week.weekNum));
 
   const teamMatchups = matchups
-    .filter((matchup) => matchup.homeTeamId === teamId || matchup.awayTeamId === teamId)
+    .filter(
+      (matchup) =>
+        matchup.homeTeamId === teamId || matchup.awayTeamId === teamId,
+    )
     .map((matchup) => ({
       matchup,
       weekNum: weekNumById.get(matchup.weekId) ?? null,
@@ -592,4 +604,156 @@ export function getStandingsMatchupWindow(
     firstUpcomingIndex === -1 ? teamMatchups.length : firstUpcomingIndex;
 
   return teamMatchups.slice(Math.max(0, pivotIndex - 4), pivotIndex + 2);
+}
+
+function formatMatchupContext(
+  teamId: string,
+  matchup: Matchup,
+  weekNumById: Map<string, number>,
+  teamById: Map<string, GSHLTeam>,
+): StandingsTeamGameContext {
+  const isHome = matchup.homeTeamId === teamId;
+  const opponentId = isHome ? matchup.awayTeamId : matchup.homeTeamId;
+  const opponent = teamById.get(opponentId);
+  const teamScore = isHome ? matchup.homeScore : matchup.awayScore;
+  const opponentScore = isHome ? matchup.awayScore : matchup.homeScore;
+  const hasScore = teamScore != null && opponentScore != null;
+  let resultLabel = isHome ? "vs" : "@";
+  let resultTone: StandingsTeamGameContext["resultTone"] = "upcoming";
+
+  if (matchup.isComplete) {
+    if (!hasScore || teamScore === opponentScore) {
+      resultTone = "tie";
+    } else {
+      resultTone = teamScore > opponentScore ? "win" : "loss";
+    }
+
+    const resultPrefix =
+      resultTone === "win" ? "W" : resultTone === "loss" ? "L" : "T";
+    resultLabel = hasScore
+      ? `${resultPrefix} ${teamScore}-${opponentScore}`
+      : "Final";
+  }
+
+  return {
+    id: matchup.id,
+    isComplete: matchup.isComplete,
+    opponentLogoUrl: opponent?.logoUrl ?? null,
+    opponentName: opponent?.name ?? opponent?.abbr ?? "Opponent",
+    resultLabel,
+    resultTone,
+    weekLabel: `W${weekNumById.get(matchup.weekId) ?? "-"}`,
+  };
+}
+
+export function buildStandingsTeamGames(
+  teamId: string,
+  matchups: Matchup[],
+  weeks: Week[],
+  allTeams: GSHLTeam[],
+): Pick<StandingsTeamCardViewModel, "previousGames" | "upcomingGames"> {
+  const weekNumById = new Map(
+    weeks.map((week) => [week.id, week.weekNum] as const),
+  );
+  const teamById = keyBy(allTeams, (team) => team.id);
+  const games = matchups
+    .filter(
+      (matchup) =>
+        matchup.homeTeamId === teamId || matchup.awayTeamId === teamId,
+    )
+    .sort(
+      (left, right) =>
+        (weekNumById.get(left.weekId) ?? Number.MAX_SAFE_INTEGER) -
+        (weekNumById.get(right.weekId) ?? Number.MAX_SAFE_INTEGER),
+    );
+
+  return {
+    previousGames: games
+      .filter((matchup) => matchup.isComplete)
+      .slice(-2)
+      .reverse()
+      .map((matchup) =>
+        formatMatchupContext(teamId, matchup, weekNumById, teamById),
+      ),
+    upcomingGames: games
+      .filter((matchup) => !matchup.isComplete)
+      .slice(0, 2)
+      .map((matchup) =>
+        formatMatchupContext(teamId, matchup, weekNumById, teamById),
+      ),
+  };
+}
+
+function buildStandingsTopPlayers(
+  team: StandingsTeamRow,
+  players: Player[],
+  playerTotals: PlayerTotalStatLine[],
+): StandingsTopPlayer[] {
+  const playerById = keyBy(players, (player) => player.id);
+  const teamIds = new Set([String(team.id), String(team.franchiseId)]);
+
+  return playerTotals
+    .filter((total) =>
+      total.gshlTeamIds.some((teamId) => teamIds.has(String(teamId))),
+    )
+    .sort((left, right) => {
+      const ratingDifference =
+        Number(right.Rating ?? 0) - Number(left.Rating ?? 0);
+      return ratingDifference !== 0
+        ? ratingDifference
+        : Number(right.P ?? 0) - Number(left.P ?? 0);
+    })
+    .slice(0, 3)
+    .map((total) => {
+      const player = playerById.get(total.playerId);
+      const isGoalie = String(total.posGroup) === "G";
+      return {
+        id: total.playerId,
+        name: player?.fullName ?? "Unknown player",
+        position: total.nhlPos.join("/") || String(total.posGroup),
+        ratingLabel: Number.isFinite(Number(total.Rating))
+          ? `${Number(total.Rating).toFixed(1)} RTG`
+          : "—",
+        statLabel: isGoalie ? `${total.W || 0} W` : `${total.P || 0} PTS`,
+      };
+    });
+}
+
+export function buildStandingsTeamCardViewModel(
+  team: StandingsTeamRow,
+  matchups: Matchup[],
+  weeks: Week[],
+  allTeams: GSHLTeam[],
+  allTeamStats: TeamSeasonStatLine[],
+  players: Player[],
+  playerTotals: PlayerTotalStatLine[],
+): StandingsTeamCardViewModel {
+  const games = buildStandingsTeamGames(team.id, matchups, weeks, allTeams);
+  const ownerName =
+    [
+      team.ownerNickname,
+      [team.ownerFirstName, team.ownerLastName].filter(Boolean).join(" "),
+    ].find((value) => value?.trim()) ?? "Owner unavailable";
+  const powerRank = Number(team.seasonStats?.powerRk);
+  const categoryRanks = buildStandingsCategories(
+    team.id,
+    team.seasonStats,
+    allTeamStats,
+  )
+    .filter((category) => category.value != null && category.rank != null)
+    .sort(
+      (left, right) =>
+        (left.rank ?? Number.MAX_SAFE_INTEGER) -
+        (right.rank ?? Number.MAX_SAFE_INTEGER),
+    )
+    .slice(0, 6);
+
+  return {
+    ...games,
+    categoryRanks,
+    conferenceLabel: team.confName ?? team.confAbbr ?? "Independent",
+    ownerName,
+    powerRank: Number.isFinite(powerRank) && powerRank > 0 ? powerRank : null,
+    topPlayers: buildStandingsTopPlayers(team, players, playerTotals),
+  };
 }

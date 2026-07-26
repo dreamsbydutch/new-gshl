@@ -23,6 +23,8 @@ export {
   LOSERS_TOURNEY_FIELDS,
   buildStandingsCategories,
   buildStandingsOpponentLookup,
+  buildStandingsTeamCardViewModel,
+  buildStandingsTeamGames,
   formatStandingsRank,
   formatStandingsDetailStat,
   formatStandingsGaa,

@@ -1,7 +1,15 @@
 "use client";
 
+import { Fragment, useState } from "react";
 import Image from "next/image";
-import type { Season, StandingsGroup, StandingsTeamRow } from "@gshl-types";
+import { ChevronDown } from "lucide-react";
+import { StandingsTeamCard } from "@gshl-components/standings/StandingsTeamCard";
+import type {
+  Season,
+  StandingsGroupTableProps,
+  StandingsTableProps,
+  StandingsTeamRow,
+} from "@gshl-types";
 import {
   calculateStandingsPoints,
   cn,
@@ -95,14 +103,17 @@ function getGroupCardClass(standingsType: string, groupTitle: string) {
 }
 
 function StandingsGroupTable({
+  allTeamStats,
+  allTeams,
   group,
+  matchups,
+  playerTotals,
+  players,
   season,
   standingsType,
-}: {
-  group: StandingsGroup;
-  season: Season;
-  standingsType: string;
-}) {
+  weeks,
+}: StandingsGroupTableProps) {
+  const [openTeamId, setOpenTeamId] = useState<string | null>(null);
   const isConferenceGroup =
     group.title === "Sunview" || group.title === "Hickory Hotel";
   const logoUrl = isConferenceGroup
@@ -165,59 +176,105 @@ function StandingsGroupTable({
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {group.teams.map((team, index) => (
-              <tr
-                key={team.id}
-                className="group transition-colors hover:bg-slate-50"
-              >
-                <td className="px-1.5 py-2.5 text-center font-mono text-[11px] font-semibold tabular-nums text-slate-500 sm:px-3 sm:py-3 sm:text-xs">
-                  {getRank(
-                    team,
-                    standingsType,
-                    group.title,
-                    group.title === "Out of the Playoffs"
-                      ? index + 3
-                      : index + 1,
-                  )}
-                </td>
-                <th className="min-w-0 px-1.5 py-2.5 text-left font-normal sm:px-3 sm:py-3">
-                  <div className="flex min-w-0 items-center gap-1.5 sm:gap-2.5">
-                    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-slate-100 bg-slate-50 sm:h-8 sm:w-8">
-                      {team.logoUrl ? (
-                        <Image
-                          src={team.logoUrl}
-                          alt=""
-                          width={30}
-                          height={30}
-                          className="h-6 w-6 object-contain sm:h-7 sm:w-7"
-                        />
-                      ) : (
-                        <span className="text-[9px] font-semibold text-slate-400 sm:text-[10px]">
-                          {(team.name ?? "TM").slice(0, 2).toUpperCase()}
-                        </span>
+            {group.teams.map((team, index) => {
+              const isOpen = openTeamId === team.id;
+              const detailsId = `standings-team-${group.title
+                .toLowerCase()
+                .replaceAll(" ", "-")}-${team.id}`;
+
+              return (
+                <Fragment key={team.id}>
+                  <tr
+                    className={cn(
+                      "group transition-colors hover:bg-slate-50",
+                      isOpen && "bg-slate-50",
+                    )}
+                  >
+                    <td className="px-1.5 py-2.5 text-center font-mono text-[11px] font-semibold tabular-nums text-slate-500 sm:px-3 sm:py-3 sm:text-xs">
+                      {getRank(
+                        team,
+                        standingsType,
+                        group.title,
+                        group.title === "Out of the Playoffs"
+                          ? index + 3
+                          : index + 1,
                       )}
-                    </div>
-                    <span className="min-w-0 truncate font-semibold text-slate-900">
-                      {team.name}
-                    </span>
-                  </div>
-                </th>
-                <td className="px-1.5 py-2.5 text-center font-mono tabular-nums text-slate-700 sm:px-3 sm:py-3">
-                  {getStandingValue("wins", team, season)}
-                </td>
-                <td className="px-1.5 py-2.5 text-center font-mono tabular-nums text-slate-700 sm:px-3 sm:py-3">
-                  {getStandingValue("losses", team, season)}
-                </td>
-                {showTies ? (
-                  <td className="px-1.5 py-2.5 text-center font-mono tabular-nums text-slate-700 sm:px-3 sm:py-3">
-                    {getStandingValue("ties", team, season)}
-                  </td>
-                ) : null}
-                <td className="px-1.5 py-2.5 text-center font-mono font-bold tabular-nums text-slate-950 sm:px-3 sm:py-3">
-                  {getStandingValue("points", team, season)}
-                </td>
-              </tr>
-            ))}
+                    </td>
+                    <th className="min-w-0 px-1 py-1.5 text-left font-normal sm:px-2 sm:py-2">
+                      <button
+                        type="button"
+                        aria-expanded={isOpen}
+                        aria-controls={detailsId}
+                        onClick={() =>
+                          setOpenTeamId((currentTeamId) =>
+                            currentTeamId === team.id ? null : team.id,
+                          )
+                        }
+                        className="flex w-full min-w-0 items-center gap-1.5 rounded-lg px-0.5 py-1 text-left outline-none transition-colors hover:bg-white focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-1 sm:gap-2.5 sm:px-1"
+                      >
+                        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-slate-100 bg-slate-50 sm:h-8 sm:w-8">
+                          {team.logoUrl ? (
+                            <Image
+                              src={team.logoUrl}
+                              alt=""
+                              width={30}
+                              height={30}
+                              className="h-6 w-6 object-contain sm:h-7 sm:w-7"
+                            />
+                          ) : (
+                            <span className="text-[9px] font-semibold text-slate-400 sm:text-[10px]">
+                              {(team.name ?? "TM").slice(0, 2).toUpperCase()}
+                            </span>
+                          )}
+                        </div>
+                        <span className="min-w-0 flex-1 truncate font-semibold text-slate-900">
+                          {team.name}
+                        </span>
+                        <ChevronDown
+                          aria-hidden="true"
+                          className={cn(
+                            "mr-0.5 h-3.5 w-3.5 shrink-0 text-slate-400 transition-transform duration-200",
+                            isOpen && "rotate-180",
+                          )}
+                        />
+                      </button>
+                    </th>
+                    <td className="px-1.5 py-2.5 text-center font-mono tabular-nums text-slate-700 sm:px-3 sm:py-3">
+                      {getStandingValue("wins", team, season)}
+                    </td>
+                    <td className="px-1.5 py-2.5 text-center font-mono tabular-nums text-slate-700 sm:px-3 sm:py-3">
+                      {getStandingValue("losses", team, season)}
+                    </td>
+                    {showTies ? (
+                      <td className="px-1.5 py-2.5 text-center font-mono tabular-nums text-slate-700 sm:px-3 sm:py-3">
+                        {getStandingValue("ties", team, season)}
+                      </td>
+                    ) : null}
+                    <td className="px-1.5 py-2.5 text-center font-mono font-bold tabular-nums text-slate-950 sm:px-3 sm:py-3">
+                      {getStandingValue("points", team, season)}
+                    </td>
+                  </tr>
+                  {isOpen ? (
+                    <tr id={detailsId}>
+                      <td
+                        colSpan={showTies ? 6 : 5}
+                        className="bg-white px-2 pb-3 pt-1 sm:px-4 sm:pb-4"
+                      >
+                        <StandingsTeamCard
+                          team={team}
+                          matchups={matchups}
+                          weeks={weeks}
+                          allTeams={allTeams}
+                          allTeamStats={allTeamStats}
+                          players={players}
+                          playerTotals={playerTotals}
+                        />
+                      </td>
+                    </tr>
+                  ) : null}
+                </Fragment>
+              );
+            })}
           </tbody>
         </table>
       </div>
@@ -226,14 +283,16 @@ function StandingsGroupTable({
 }
 
 export function StandingsTable({
+  allTeamStats,
+  allTeams,
   groups,
+  matchups,
+  playerTotals,
+  players,
   selectedSeason,
   standingsType,
-}: {
-  groups: StandingsGroup[];
-  selectedSeason: Season | null;
-  standingsType: string;
-}) {
+  weeks,
+}: StandingsTableProps) {
   if (!selectedSeason) {
     return (
       <div className="rounded-xl border border-dashed p-10 text-center text-sm text-slate-500">
@@ -260,9 +319,15 @@ export function StandingsTable({
         {groups.map((group) => (
           <StandingsGroupTable
             key={group.title}
+            allTeamStats={allTeamStats}
+            allTeams={allTeams}
             group={group}
+            matchups={matchups}
+            playerTotals={playerTotals}
+            players={players}
             season={selectedSeason}
             standingsType={standingsType}
+            weeks={weeks}
           />
         ))}
       </div>

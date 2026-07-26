@@ -2,6 +2,8 @@ import type {
   Franchise,
   GSHLTeam,
   Matchup,
+  Player,
+  PlayerTotalStatLine,
   Season,
   TeamSeasonStatLine,
   TeamWeekStatLine,
@@ -27,6 +29,88 @@ export interface StandingsGroup {
 export type StandingsStatView = "standings" | "skaters" | "goalies" | "roster";
 
 export type StandingsTeamRow = StandingsGroup["teams"][number];
+
+export interface StandingsCategoryRank {
+  label: string;
+  value: number | null | undefined;
+  rank: number | null;
+}
+
+export interface StandingsTeamGameContext {
+  id: string;
+  isComplete: boolean;
+  opponentLogoUrl: string | null;
+  opponentName: string;
+  resultLabel: string;
+  resultTone: "win" | "loss" | "tie" | "upcoming";
+  weekLabel: string;
+}
+
+export interface StandingsTopPlayer {
+  id: string;
+  name: string;
+  position: string;
+  ratingLabel: string;
+  statLabel: string;
+}
+
+export interface StandingsTeamCardViewModel {
+  categoryRanks: StandingsCategoryRank[];
+  conferenceLabel: string;
+  ownerName: string;
+  powerRank: number | null;
+  previousGames: StandingsTeamGameContext[];
+  topPlayers: StandingsTopPlayer[];
+  upcomingGames: StandingsTeamGameContext[];
+}
+
+export interface StandingsTeamCardProps {
+  allTeamStats: TeamSeasonStatLine[];
+  allTeams: GSHLTeam[];
+  matchups: Matchup[];
+  playerTotals: PlayerTotalStatLine[];
+  players: Player[];
+  team: StandingsTeamRow;
+  weeks: Week[];
+}
+
+export interface StandingsGameListProps {
+  emptyLabel: string;
+  games: StandingsTeamGameContext[];
+  title: string;
+}
+
+export interface StandingsCategoryRanksProps {
+  categories: StandingsCategoryRank[];
+}
+
+export interface StandingsTopPlayersProps {
+  players: StandingsTopPlayer[];
+}
+
+export interface StandingsGroupTableProps {
+  allTeamStats: TeamSeasonStatLine[];
+  allTeams: GSHLTeam[];
+  group: StandingsGroup;
+  matchups: Matchup[];
+  playerTotals: PlayerTotalStatLine[];
+  players: Player[];
+  season: Season;
+  standingsType: string;
+  weeks: Week[];
+}
+
+export interface StandingsTableProps {
+  allTeamStats: TeamSeasonStatLine[];
+  allTeams: GSHLTeam[];
+  groups: StandingsGroup[];
+  matchups: Matchup[];
+  playerTotals: PlayerTotalStatLine[];
+  players: Player[];
+  selectedSeason: Season | null;
+  standingsType: string;
+  weeks: Week[];
+}
 
 export interface StandingsTableColumn {
   key: keyof TeamSeasonStatLine | "record" | "standingsPoints";

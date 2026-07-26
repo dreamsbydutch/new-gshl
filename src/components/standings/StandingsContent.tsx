@@ -49,6 +49,7 @@ export function StandingsContent() {
     selectedSeasonId,
     groups,
     matchups,
+    weeks,
     standingsType,
     teams,
     stats,
@@ -56,6 +57,9 @@ export function StandingsContent() {
     isLoading,
   } = useStandingsData({});
   const isAwardsView = (standingsType ?? "overall") === "awards";
+  const isTeamStandingsView = ["overall", "conference", "wildcard"].includes(
+    standingsType ?? "overall",
+  );
 
   const { data: playerAwards = [], isLoading: playerAwardsLoading } =
     usePlayerAwards({
@@ -71,11 +75,11 @@ export function StandingsContent() {
     },
   );
   const { data: players = [], isLoading: playersLoading } = usePlayers({
-    enabled: isAwardsView,
+    enabled: isAwardsView || isTeamStandingsView,
   });
   const playerTotalsQuery = usePlayerStats({
     seasonId: selectedSeasonId ?? undefined,
-    enabled: isAwardsView && Boolean(selectedSeasonId),
+    enabled: (isAwardsView || isTeamStandingsView) && Boolean(selectedSeasonId),
     includeDaily: false,
     includeWeekly: false,
     includeSplits: false,
@@ -132,6 +136,12 @@ export function StandingsContent() {
   return (
     <StandingsTable
       groups={groups}
+      matchups={matchups}
+      weeks={weeks}
+      allTeams={teams}
+      allTeamStats={stats}
+      players={players}
+      playerTotals={playerTotalsQuery.totals}
       selectedSeason={selectedSeason ?? null}
       standingsType={standingsType ?? "overall"}
     />
