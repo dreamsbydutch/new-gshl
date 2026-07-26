@@ -17,6 +17,7 @@ import {
   buildRecordBookPlayerRows,
   formatRecordBookStat,
   getOwnerTeamIds,
+  getRecordBookAwardSeasonType,
 } from "./team-record-book";
 
 void test("scopes record-book team history to the selected owner", () => {
@@ -130,6 +131,7 @@ void test("counts all-star and player trophies in the matching table season", ()
       awardRow(AwardsList.CROSBY),
       awardRow(AwardsList.FIRST_AS),
       awardRow(AwardsList.PLAYOFF_AS, SeasonType.PLAYOFFS),
+      awardRow(AwardsList.CONN_SMYTHE, SeasonType.PLAYOFFS),
     ],
     careerSplits: [],
     nhlTeamsByAbbr: new Map(),
@@ -157,6 +159,18 @@ void test("counts all-star and player trophies in the matching table season", ()
   assert.equal(regularRow.awardCounts[AwardsList.FIRST_AS], 1);
   assert.equal(regularRow.awardCounts[AwardsList.PLAYOFF_AS], undefined);
   assert.equal(playoffRow.awardCounts[AwardsList.PLAYOFF_AS], 1);
+  assert.equal(playoffRow.awardCounts[AwardsList.CONN_SMYTHE], 1);
+});
+
+void test("assigns the Conn Smythe to playoff record-book rows", () => {
+  assert.equal(
+    getRecordBookAwardSeasonType(AwardsList.CONN_SMYTHE),
+    SeasonType.PLAYOFFS,
+  );
+  assert.equal(
+    getRecordBookAwardSeasonType(AwardsList.CROSBY),
+    SeasonType.REGULAR_SEASON,
+  );
 });
 
 function careerRow(

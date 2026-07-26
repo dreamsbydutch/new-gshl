@@ -46,6 +46,7 @@ const PLAYER_AWARD_KEYS = new Set<AwardsListType>([
   AwardsList.BRODEUR,
   AwardsList.GRETZKY,
   AwardsList.OVECHKIN,
+  AwardsList.CONN_SMYTHE,
   AwardsList.FIRST_AS,
   AwardsList.SECOND_AS,
   AwardsList.PLAYOFF_AS,
@@ -62,6 +63,16 @@ const RECORD_BOOK_SEASON_TYPES = new Set<SeasonTypeValue>([
   SeasonType.PLAYOFFS,
   SeasonType.LOSERS_TOURNAMENT,
 ]);
+
+export function getRecordBookAwardSeasonType(
+  awardKey: AwardsListType,
+): SeasonTypeValue {
+  if (awardKey === AwardsList.CONN_SMYTHE) return SeasonType.PLAYOFFS;
+  if (ALL_STAR_AWARD_KEYS.has(awardKey)) {
+    return getAllStarSeasonType(awardKey) ?? SeasonType.REGULAR_SEASON;
+  }
+  return SeasonType.REGULAR_SEASON;
+}
 
 const TOTAL_FIELDS: Array<keyof Omit<RecordBookStatLine, "GAA" | "SVP">> = [
   "days",
@@ -621,10 +632,7 @@ function playerAwardBelongsToOwner(
   playerTotals: BuildRecordBookAwardRowsOptions["playerTotals"],
 ): boolean {
   const awardKey = String(award.award) as AwardsListType;
-  const seasonType =
-    (ALL_STAR_AWARD_KEYS.has(awardKey)
-      ? getAllStarSeasonType(awardKey)
-      : SeasonType.REGULAR_SEASON) ?? SeasonType.REGULAR_SEASON;
+  const seasonType = getRecordBookAwardSeasonType(awardKey);
 
   return playerTotals.some(
     (row) =>
@@ -692,10 +700,7 @@ export function buildRecordBookAwardRows({
           ),
           seasonId,
           seasonYear: seasonsById.get(seasonId) ?? seasonId,
-          seasonType:
-            (ALL_STAR_AWARD_KEYS.has(awardKey)
-              ? getAllStarSeasonType(awardKey)
-              : SeasonType.REGULAR_SEASON) ?? SeasonType.REGULAR_SEASON,
+          seasonType: getRecordBookAwardSeasonType(awardKey),
           award: awardKey,
           awardLabel: getPlayerAwardLabel(awardKey),
         },

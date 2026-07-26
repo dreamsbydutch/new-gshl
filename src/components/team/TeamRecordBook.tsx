@@ -3,7 +3,10 @@
 import Image from "next/image";
 import { ArrowDown, ArrowUp, ArrowUpDown, Search } from "lucide-react";
 import { NHLLogo } from "@gshl-components/player/NHLLogo";
-import { AWARD_CATALOG_BY_KEY } from "@gshl-lib/config/awards";
+import {
+  AWARD_CATALOG_BY_KEY,
+  PLAYER_TROPHY_ICON_URLS,
+} from "@gshl-lib/config/awards";
 import { useTeamRecordBookView } from "@gshl-hooks";
 import type {
   RecordBookPlayerTableProps,
@@ -43,11 +46,6 @@ const ALL_STAR_TABLE_COLUMNS = [
     label: "2nd",
     title: "Second Team All-Star selections",
   },
-  {
-    award: AwardsList.PLAYOFF_AS,
-    label: "PO",
-    title: "Playoff All-Star selections",
-  },
 ] as const;
 
 const PLAYER_TROPHY_TABLE_COLUMNS = [
@@ -80,6 +78,12 @@ const PLAYER_TROPHY_TABLE_COLUMNS = [
     iconAward: AwardsList.ROCKET,
     label: "Ovechkin",
     title: "Ovechkin Trophy",
+  },
+  {
+    award: AwardsList.CONN_SMYTHE,
+    iconAward: AwardsList.CONN_SMYTHE,
+    label: "Conn Smythe",
+    title: "Conn Smythe Trophy",
   },
 ] as const;
 
@@ -150,7 +154,8 @@ function AwardColumnHeading({
   title: string;
 }) {
   const imageUrl = iconAward
-    ? AWARD_CATALOG_BY_KEY.get(iconAward)?.imageUrl
+    ? (PLAYER_TROPHY_ICON_URLS.get(iconAward) ??
+      AWARD_CATALOG_BY_KEY.get(iconAward)?.imageUrl)
     : undefined;
 
   return (
@@ -181,7 +186,9 @@ function AwardCountMarks({
   iconAward: AwardsListType;
   label: string;
 }) {
-  const imageUrl = AWARD_CATALOG_BY_KEY.get(iconAward)?.imageUrl;
+  const imageUrl =
+    PLAYER_TROPHY_ICON_URLS.get(iconAward) ??
+    AWARD_CATALOG_BY_KEY.get(iconAward)?.imageUrl;
   const countLabel = `${count ?? 0} ${label}${count === 1 ? "" : "s"}`;
 
   if (!count) {
