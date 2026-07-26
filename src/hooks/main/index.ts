@@ -74,7 +74,6 @@ export {
   useActivePlayers,
   useRankedPlayers,
   useRosterPlayers,
-  useUpdatePlayerLineup,
 } from "./usePlayer";
 export type {
   PlayerRankField,

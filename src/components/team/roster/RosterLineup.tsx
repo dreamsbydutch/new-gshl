@@ -8,20 +8,21 @@ export function RosterLineup({
   contractByPlayerId,
   showSalaries,
   nhlTeamByAbbr,
-  canEditLineup,
 }: {
   teamLineup: Array<Array<Array<Player | null>>>;
   contractByPlayerId: Map<string, Contract>;
   showSalaries: boolean;
   nhlTeamByAbbr: Map<string, NHLTeam>;
-  canEditLineup: boolean;
 }) {
   return (
     <div className="mx-auto flex max-w-md flex-col rounded-xl border bg-gray-50">
       {teamLineup.map((lineupSection, sectionIndex) => (
         <div key={sectionIndex}>
           {lineupSection.map((positionalArray, rowIndex) => (
-            <div key={rowIndex} className="grid grid-cols-6 items-center py-1.5">
+            <div
+              key={rowIndex}
+              className="grid grid-cols-6 items-center py-1.5"
+            >
               {positionalArray.map((player, playerIndex) =>
                 player ? (
                   <RosterPlayerCard
@@ -31,7 +32,6 @@ export function RosterLineup({
                     showSalaries={showSalaries}
                     nhlTeamByAbbr={nhlTeamByAbbr}
                     className="col-span-2"
-                    canEditLineup={canEditLineup}
                   />
                 ) : (
                   <div

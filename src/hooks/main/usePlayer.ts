@@ -12,7 +12,6 @@ import type {
   UseRankedPlayersOptions,
   UseRosterPlayersOptions,
 } from "@gshl-types";
-import { useAppMutation } from "./useAppMutation";
 
 export function usePlayerPages(options: UsePlayerPagesOptions = {}) {
   const { active, positionGroup, enabled = true, limit = 50 } = options;
@@ -47,10 +46,6 @@ export function usePlayersByIds(ids: string[], enabled = true) {
     isLoading: enabled && uniqueIds.length > 0 && result === undefined,
     error: null,
   };
-}
-
-export function useUpdatePlayerLineup() {
-  return useAppMutation(api.frontend.updatePlayer);
 }
 
 export function usePlayers(options: UsePlayersOptions = {}) {
