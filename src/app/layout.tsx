@@ -4,8 +4,7 @@ import { Varela_Round } from "next/font/google";
 import "@gshl-styles";
 
 import { cn } from "@gshl-utils";
-import { Navbar } from "@gshl-nav";
-import { NavDefaults } from "@gshl-components/nav/NavDefaults";
+import { AppShell } from "@gshl-nav";
 import { AuthProvider } from "@gshl-components/auth";
 import { PerformanceVitals } from "@gshl-components/performance/PerformanceVitals";
 import { ConvexClientProvider } from "@gshl-components/auth/ConvexClientProvider";
@@ -50,9 +49,7 @@ export default function RootLayout({
       >
         <AuthProvider>
           <ConvexClientProvider>
-            <NavDefaults />
-            <div className="pb-20 pt-5 lg:pb-8 lg:pt-16">{children}</div>
-            <Navbar />
+            <AppShell>{children}</AppShell>
             <Toaster />
             <PerformanceVitals />
           </ConvexClientProvider>

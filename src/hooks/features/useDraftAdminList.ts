@@ -139,7 +139,10 @@ export function useDraftAdminList(
   );
 
   const activeDraftPick = useMemo(
-    () => seasonDraftPicks.find((pick) => !pickHasAssignedPlayer(pick)) ?? null,
+    () =>
+      seasonDraftPicks.find(
+        (pick) => !pick.isSigning && !pickHasAssignedPlayer(pick),
+      ) ?? null,
     [seasonDraftPicks],
   );
 

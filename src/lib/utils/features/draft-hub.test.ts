@@ -124,6 +124,48 @@ void test("selects the first unfilled pick and skips completed picks", () => {
   );
 });
 
+void test("excludes signing slots from active, recent, and upcoming picks", () => {
+  const state = resolveDraftClockState(
+    [
+      pick("1", 1, "signed-player", { isSigning: true }),
+      pick("2", 2, "drafted-player"),
+      pick("3", 3, null, { isSigning: true }),
+      pick("4", 4),
+      pick("5", 5),
+    ],
+    start,
+    new Date("2026-09-01T23:02:00.000Z"),
+  );
+
+  assert.equal(state.activePick?.id, "4");
+  assert.equal(state.completedCount, 1);
+  assert.equal(state.remainingCount, 2);
+  assert.deepEqual(
+    state.recentPicks.map((draftPick) => draftPick.id),
+    ["2"],
+  );
+  assert.deepEqual(
+    state.upcomingPicks.map((draftPick) => draftPick.id),
+    ["5"],
+  );
+});
+
+void test("an unfilled signing slot does not prevent draft completion", () => {
+  const state = resolveDraftClockState(
+    [pick("1", 1, "drafted-player"), pick("2", 2, null, { isSigning: true })],
+    start,
+    new Date("2026-09-02T00:00:00.000Z"),
+  );
+
+  assert.equal(state.status, "complete");
+  assert.equal(state.completedCount, 1);
+  assert.equal(state.remainingCount, 0);
+  assert.deepEqual(
+    state.recentPicks.map((draftPick) => draftPick.id),
+    ["1"],
+  );
+});
+
 void test("uses the season start for the first clock and expires after four minutes", () => {
   const upcoming = resolveDraftClockState(
     [pick("1", 1)],
@@ -141,8 +183,20 @@ void test("uses the season start for the first clock and expires after four minu
     new Date("2026-09-01T23:04:00.000Z"),
   );
   assert.equal(upcoming.status, "upcoming");
+  assert.deepEqual(upcoming.recentPicks, []);
   assert.equal(live.status, "on_clock");
   assert.equal(expired.status, "commissioner_required");
+});
+
+void test("hides completed picks until the configured draft has started", () => {
+  const state = resolveDraftClockState(
+    [pick("1", 1, "player-1"), pick("2", 2)],
+    start,
+    new Date("2026-09-01T22:30:00.000Z"),
+  );
+
+  assert.equal(state.status, "upcoming");
+  assert.deepEqual(state.recentPicks, []);
 });
 
 void test("returns only the next five open picks", () => {
@@ -176,6 +230,7 @@ void test("marks the draft complete when every pick has a player", () => {
   const state = resolveDraftClockState(
     [pick("1", 1, "player-1"), pick("2", 2, "player-2")],
     start,
+    new Date("2026-09-02T00:00:00.000Z"),
   );
   assert.equal(state.status, "complete");
   assert.equal(state.remainingCount, 0);

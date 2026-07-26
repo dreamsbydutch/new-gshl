@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type {
   DraftHubBoardViewModel,
+  DraftHubPickView,
   DraftHubStateData,
   NHLTeam,
   Player,
@@ -39,11 +40,33 @@ function withLiveStatus(
   now: number,
   serverOffset: number,
 ): DraftHubStateData | undefined {
-  if (state?.status !== "on_clock" || !state.clockExpiresAt) {
+  if (!state) return state;
+
+  const serverNow = now + serverOffset;
+  const expiresAt = state.clockExpiresAt
+    ? new Date(state.clockExpiresAt).getTime()
+    : null;
+
+  if (state.status === "upcoming") {
+    if (serverNow < state.season.draftStartAt) return state;
+    if (!state.activePickId) return { ...state, status: "complete" };
+    return {
+      ...state,
+      status:
+        expiresAt !== null && serverNow >= expiresAt
+          ? "commissioner_required"
+          : "on_clock",
+    };
+  }
+
+  if (
+    state.status !== "on_clock" ||
+    expiresAt === null ||
+    Number.isNaN(expiresAt) ||
+    serverNow < expiresAt
+  ) {
     return state;
   }
-  const expiresAt = new Date(state.clockExpiresAt).getTime();
-  if (Number.isNaN(expiresAt) || now + serverOffset < expiresAt) return state;
   return { ...state, status: "commissioner_required" };
 }
 
@@ -94,10 +117,21 @@ export function useDraftHubBoard(): DraftHubBoardViewModel {
   );
   const recentPicks = (state?.recentPickIds ?? [])
     .map((id) => picksById.get(id))
-    .filter((pick) => pick !== undefined);
+    .filter(
+      (pick): pick is DraftHubPickView =>
+        pick !== undefined &&
+        state?.status !== "upcoming" &&
+        !pick.pick.isSigning &&
+        String(pick.pick.seasonId) === String(season?.id),
+    );
   const upcomingPicks = (state?.upcomingPickIds ?? [])
     .map((id) => picksById.get(id))
-    .filter((pick) => pick !== undefined);
+    .filter(
+      (pick): pick is DraftHubPickView =>
+        pick !== undefined &&
+        !pick.pick.isSigning &&
+        String(pick.pick.seasonId) === String(season?.id),
+    );
   const latestNhlStatsByPlayer = useMemo(
     () => indexLatestUfaNhlStats(nhlStatsQuery.data, seasons, season?.year),
     [nhlStatsQuery.data, season?.year, seasons],
@@ -168,6 +202,12 @@ export function useDraftHubBoard(): DraftHubBoardViewModel {
         ),
       )
     : 0;
+  const draftStartRemainingSeconds = state?.season.draftStartAt
+    ? Math.max(
+        0,
+        Math.ceil((state.season.draftStartAt - (now + serverOffset)) / 1000),
+      )
+    : 0;
 
   const submitPlayer = useCallback(
     async (playerId: string) => {
@@ -223,6 +263,7 @@ export function useDraftHubBoard(): DraftHubBoardViewModel {
     isCommissioner: session?.user.role === "commissioner",
     canSubmitActivePick,
     clockRemainingSeconds,
+    draftStartRemainingSeconds,
     isSubmitting: submitMutation.isPending,
     submittingPlayerId,
     submitPlayer,

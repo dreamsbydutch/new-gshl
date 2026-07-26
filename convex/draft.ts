@@ -192,7 +192,8 @@ export const submitPick = mutation({
     if (!player) throw new Error("Player not found");
 
     const orderedRows = [...pickRows].sort(compareRows);
-    const activeRow = orderedRows.find((pick) => !pick.playerId) ?? null;
+    const activeRow =
+      orderedRows.find((pick) => !pick.isSigning && !pick.playerId) ?? null;
     if (!activeRow) throw new Error("The draft is complete");
     if (activeRow._id !== args.pickId) {
       throw new Error("That pick is no longer on the clock");
@@ -275,6 +276,7 @@ export const submitPick = mutation({
         toUtcTimestamp(clock.clockExpiresAt) ??
         nowTimestamp + DRAFT_PICK_CLOCK_MS,
       onClockEndedAt: nowTimestamp,
+      isSigning: false,
       updatedAt: nowTimestamp,
     });
     await ctx.db.patch(player._id, {
@@ -286,7 +288,8 @@ export const submitPick = mutation({
 
     const nextPick =
       orderedRows.find(
-        (pick) => pick._id !== activeRow._id && !pick.playerId,
+        (pick) =>
+          pick._id !== activeRow._id && !pick.isSigning && !pick.playerId,
       ) ?? null;
     if (nextPick) {
       await ctx.db.patch(nextPick._id, {

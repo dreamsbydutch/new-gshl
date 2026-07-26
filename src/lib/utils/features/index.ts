@@ -8,6 +8,7 @@ export * from "./draft-classes";
 export * from "./draft-board-list";
 export * from "./draft-admin";
 export * from "./draft-hub";
+export * from "./draft-roster-board";
 export * from "./matchup-details";
 export * from "./mock-draft";
 export * from "./playoff-bracket";

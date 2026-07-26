@@ -18,6 +18,7 @@ export * from "./useDraftAdminList";
 export * from "./useDraftCountdown";
 export * from "./useDraftHubBoard";
 export * from "./useDraftHubTeamData";
+export * from "./useDraftRosterBoard";
 export * from "./useFreeAgencyData";
 export * from "./useNavigation";
 export * from "./useConferenceContestData";

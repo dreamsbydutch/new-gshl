@@ -22,6 +22,12 @@ export function draftPickHasPlayer(pick: Pick<DraftPick, "playerId">): boolean {
   return typeof pick.playerId === "string" && pick.playerId.trim().length > 0;
 }
 
+export function isLiveDraftSelection(
+  pick: Pick<DraftPick, "isSigning">,
+): boolean {
+  return !pick.isSigning;
+}
+
 export function compareDraftPickOrder(
   left: Pick<DraftPick, "round" | "pick">,
   right: Pick<DraftPick, "round" | "pick">,
@@ -78,12 +84,13 @@ export function resolveDraftClockState(
   now: Date = new Date(),
 ): DraftClockState {
   const orderedPicks = orderDraftPicks(picks);
-  const completedPicks = orderedPicks.filter(draftPickHasPlayer);
-  const activeIndex = orderedPicks.findIndex(
+  const liveDraftPicks = orderedPicks.filter(isLiveDraftSelection);
+  const completedPicks = liveDraftPicks.filter(draftPickHasPlayer);
+  const activeIndex = liveDraftPicks.findIndex(
     (pick) => !draftPickHasPlayer(pick),
   );
   const activePick =
-    activeIndex >= 0 ? (orderedPicks[activeIndex] ?? null) : null;
+    activeIndex >= 0 ? (liveDraftPicks[activeIndex] ?? null) : null;
   const recentPicks = [...completedPicks].reverse().slice(0, 5);
 
   if (orderedPicks.length === 0 || !draftStartAt) {
@@ -91,15 +98,31 @@ export function resolveDraftClockState(
       status: "unavailable",
       activePick,
       completedCount: completedPicks.length,
-      remainingCount: orderedPicks.length - completedPicks.length,
+      remainingCount: liveDraftPicks.length - completedPicks.length,
       clockStartedAt: null,
       clockExpiresAt: null,
-      recentPicks,
+      recentPicks: [],
       upcomingPicks: [],
     };
   }
 
+  const draftStart = timestamp(draftStartAt);
+  const nowTime = now.getTime();
+
   if (!activePick) {
+    if (draftStart !== null && nowTime < draftStart) {
+      return {
+        status: "upcoming",
+        activePick: null,
+        completedCount: completedPicks.length,
+        remainingCount: 0,
+        clockStartedAt: null,
+        clockExpiresAt: null,
+        recentPicks: [],
+        upcomingPicks: [],
+      };
+    }
+
     return {
       status: "complete",
       activePick: null,
@@ -112,9 +135,8 @@ export function resolveDraftClockState(
     };
   }
 
-  const draftStart = timestamp(draftStartAt);
   const startedAt = effectiveClockStart(
-    orderedPicks,
+    liveDraftPicks,
     activeIndex,
     draftStartAt,
   );
@@ -122,7 +144,6 @@ export function resolveDraftClockState(
   const expiresAt =
     storedExpiry ??
     (startedAt === null ? null : startedAt + DRAFT_PICK_CLOCK_MS);
-  const nowTime = now.getTime();
   let status: DraftHubStatus = "unavailable";
 
   if (draftStart !== null && nowTime < draftStart) {
@@ -137,11 +158,11 @@ export function resolveDraftClockState(
     status,
     activePick,
     completedCount: completedPicks.length,
-    remainingCount: orderedPicks.length - completedPicks.length,
+    remainingCount: liveDraftPicks.length - completedPicks.length,
     clockStartedAt: startedAt,
     clockExpiresAt: expiresAt,
-    recentPicks,
-    upcomingPicks: orderedPicks
+    recentPicks: status === "upcoming" ? [] : recentPicks,
+    upcomingPicks: liveDraftPicks
       .slice(activeIndex + 1)
       .filter((pick) => !draftPickHasPlayer(pick))
       .slice(0, 5),

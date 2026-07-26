@@ -11,3 +11,4 @@ export { DraftBoardList, MockDraftPreview } from "./DraftBoardList";
 export { DraftHubBoard } from "./DraftHubBoard";
 export { DraftHubNavbar } from "./DraftHubNavbar";
 export { DraftHubTeamPage } from "./DraftHubTeamPage";
+export { DraftRosterBoard } from "./DraftRosterBoard";

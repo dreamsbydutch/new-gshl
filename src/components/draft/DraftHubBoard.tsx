@@ -6,7 +6,6 @@ import {
   ArrowDown,
   ArrowUp,
   CheckCircle2,
-  Clock3,
   Search,
   ShieldAlert,
 } from "lucide-react";
@@ -23,6 +22,25 @@ function formatClock(totalSeconds: number): string {
   return `${minutes.toString().padStart(2, "0")}:${seconds
     .toString()
     .padStart(2, "0")}`;
+}
+
+function formatDraftStartCountdown(totalSeconds: number): string {
+  const days = Math.floor(totalSeconds / 86_400);
+  const hours = Math.floor((totalSeconds % 86_400) / 3_600);
+  const minutes = Math.floor((totalSeconds % 3_600) / 60);
+  const seconds = totalSeconds % 60;
+
+  if (days > 0) {
+    return `${days}d ${hours.toString().padStart(2, "0")}:${minutes
+      .toString()
+      .padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
+  }
+  if (hours > 0) {
+    return `${hours.toString().padStart(2, "0")}:${minutes
+      .toString()
+      .padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
+  }
+  return formatClock(totalSeconds);
 }
 
 function TeamLogo({
@@ -78,7 +96,7 @@ function DraftFlowPick({
         <TeamLogo pick={pick} size={28} />
       </div>
       <div className="min-w-0">
-        <p className="truncate text-[11px] font-bold leading-tight sm:text-sm">
+        <p className="line-clamp-2 break-words text-[11px] font-bold leading-tight sm:text-sm">
           {isRecent
             ? (pick.player?.fullName ?? "Player unavailable")
             : (pick.team?.name ?? "Team TBD")}
@@ -152,6 +170,7 @@ function DraftStatusHero({
   completedCount,
   remainingCount,
   remainingSeconds,
+  draftStartRemainingSeconds,
   draftStartAt,
 }: {
   activePick: DraftHubPickView | null;
@@ -164,6 +183,7 @@ function DraftStatusHero({
   completedCount: number;
   remainingCount: number;
   remainingSeconds: number;
+  draftStartRemainingSeconds: number;
   draftStartAt: number;
 }) {
   if (status === "complete") {
@@ -178,24 +198,6 @@ function DraftStatusHero({
     );
   }
 
-  if (status === "upcoming") {
-    return (
-      <section className="rounded-2xl border bg-gradient-to-br from-slate-900 to-slate-700 p-6 text-center text-white shadow-lg">
-        <Clock3 className="mx-auto h-9 w-9 text-amber-300" />
-        <p className="mt-2 text-sm font-semibold uppercase tracking-[0.2em] text-slate-300">
-          Draft opens
-        </p>
-        <h1 className="mt-1 text-2xl font-bold">
-          {new Intl.DateTimeFormat("en-CA", {
-            dateStyle: "full",
-            timeStyle: "short",
-            timeZone: "America/Toronto",
-          }).format(new Date(draftStartAt))}
-        </h1>
-      </section>
-    );
-  }
-
   if (!activePick) {
     return (
       <section className="rounded-2xl border border-amber-300 bg-amber-50 p-6 text-center">
@@ -205,7 +207,11 @@ function DraftStatusHero({
     );
   }
 
+  const upcoming = status === "upcoming";
   const expired = status === "commissioner_required";
+  const displayedSeconds = upcoming
+    ? draftStartRemainingSeconds
+    : remainingSeconds;
   return (
     <section
       className={cn(
@@ -220,7 +226,11 @@ function DraftStatusHero({
           <TeamLogo pick={activePick} size={72} />
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-white/65">
-              {expired ? "Commissioner pick required" : "On the clock"}
+              {expired
+                ? "Commissioner pick required"
+                : upcoming
+                  ? "First selection"
+                  : "On the clock"}
             </p>
             <h1 className="mt-1 text-2xl font-bold sm:text-3xl">
               {activePick.team?.name ?? "Team TBD"}
@@ -233,26 +243,52 @@ function DraftStatusHero({
             </p>
           </div>
         </div>
-        <div
-          className={cn(
-            "rounded-xl border px-6 py-3 text-center font-mono text-4xl font-black tabular-nums shadow-inner",
-            expired
-              ? "border-red-300/40 bg-red-950/40 text-red-100"
-              : "border-white/20 bg-black/25 text-amber-300",
-          )}
-          aria-label={
-            expired
-              ? "Draft clock expired"
-              : `${remainingSeconds} seconds remaining`
-          }
-        >
-          {expired ? "00:00" : formatClock(remainingSeconds)}
+        <div className="text-center">
+          <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.18em] text-white/65">
+            {upcoming ? "Clock starts in" : "Pick clock"}
+          </p>
+          <div
+            className={cn(
+              "rounded-xl border px-4 py-3 text-center font-mono text-3xl font-black tabular-nums shadow-inner sm:px-6 sm:text-4xl",
+              expired
+                ? "border-red-300/40 bg-red-950/40 text-red-100"
+                : "border-white/20 bg-black/25 text-amber-300",
+            )}
+            aria-label={
+              expired
+                ? "Draft clock expired"
+                : upcoming
+                  ? `${displayedSeconds} seconds until the draft starts`
+                  : `${displayedSeconds} seconds remaining`
+            }
+          >
+            {expired
+              ? "00:00"
+              : upcoming
+                ? formatDraftStartCountdown(displayedSeconds)
+                : formatClock(displayedSeconds)}
+          </div>
         </div>
         <div className="text-left md:text-right">
-          <p className="text-sm text-white/70">
-            {completedCount} picks completed
-          </p>
-          <p className="text-lg font-bold">{remainingCount} remaining</p>
+          {upcoming ? (
+            <>
+              <p className="text-sm text-white/70">Draft starts</p>
+              <p className="text-sm font-bold sm:text-base">
+                {new Intl.DateTimeFormat("en-CA", {
+                  dateStyle: "medium",
+                  timeStyle: "short",
+                  timeZone: "America/Toronto",
+                }).format(new Date(draftStartAt))}
+              </p>
+            </>
+          ) : (
+            <>
+              <p className="text-sm text-white/70">
+                {completedCount} picks completed
+              </p>
+              <p className="text-lg font-bold">{remainingCount} remaining</p>
+            </>
+          )}
           {expired ? (
             <p className="mt-2 inline-flex items-center gap-1 text-sm font-semibold text-red-100">
               <ShieldAlert className="h-4 w-4" />
@@ -473,6 +509,7 @@ export function DraftHubBoard() {
         completedCount={board.state.completedCount}
         remainingCount={board.state.remainingCount}
         remainingSeconds={board.clockRemainingSeconds}
+        draftStartRemainingSeconds={board.draftStartRemainingSeconds}
         draftStartAt={board.state.season.draftStartAt}
       />
 

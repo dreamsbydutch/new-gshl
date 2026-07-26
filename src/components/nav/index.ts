@@ -5,6 +5,7 @@
 
 // Main Navigation
 export { AppNavbar as Navbar } from "./AppNavbar";
+export { AppShell } from "./AppShell";
 export { LinkNavItem, NavContainer } from "./BaseComponents";
 export { SeasonToggleNav } from "./SeasonNavigation";
 export { WeeksToggle } from "./WeekNavigation";

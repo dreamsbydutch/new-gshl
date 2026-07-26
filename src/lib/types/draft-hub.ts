@@ -111,6 +111,7 @@ export interface DraftHubBoardViewModel {
   isCommissioner: boolean;
   canSubmitActivePick: boolean;
   clockRemainingSeconds: number;
+  draftStartRemainingSeconds: number;
   isSubmitting: boolean;
   submittingPlayerId: string | null;
   submitPlayer: (playerId: string) => Promise<void>;
@@ -153,4 +154,20 @@ export interface DraftHubNavbarProps {
 
 export interface DraftHubCardProps {
   season: Season;
+}
+
+export interface DraftRosterConferenceView {
+  id: string;
+  name: string;
+  abbr: string | null;
+  logoUrl: string | null;
+  teams: GSHLTeam[];
+}
+
+export interface DraftRosterBoardViewModel {
+  season: Season | undefined;
+  conferences: DraftRosterConferenceView[];
+  players: Player[];
+  nhlTeams: NHLTeam[];
+  isLoading: boolean;
 }
