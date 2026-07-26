@@ -51,9 +51,10 @@ const SIGNING_STATUSES = new Set<ContractStatusType>([
 
 const TYPE_PRIORITY: Record<LeagueActivityType, number> = {
   signing: 0,
-  add: 1,
-  drop: 2,
-  missed_start: 3,
+  trade: 1,
+  add: 2,
+  drop: 3,
+  missed_start: 4,
 };
 
 function previousCalendarDate(date: string): string {
@@ -107,7 +108,10 @@ export function buildLeagueActivity({
 
   contracts.forEach((contract) => {
     const date = normalizeDateOnlyValue(contract.signingDate);
-    if (!date || !SIGNING_STATUSES.has(contract.signingStatus)) return;
+    const isTrade = contract.signingStatus === ContractStatus.TRADE;
+    if (!date || (!SIGNING_STATUSES.has(contract.signingStatus) && !isTrade)) {
+      return;
+    }
 
     const franchise = franchiseByOwnerId.get(String(contract.ownerId));
     const team = teams.find(
@@ -117,7 +121,7 @@ export function buildLeagueActivity({
     );
     push({
       id: `signing:${contract.id}`,
-      type: "signing",
+      type: isTrade ? "trade" : "signing",
       date,
       playerId: String(contract.playerId),
       playerName: playerName(String(contract.playerId)),

@@ -1,4 +1,9 @@
-export type LeagueActivityType = "signing" | "add" | "drop" | "missed_start";
+export type LeagueActivityType =
+  | "signing"
+  | "trade"
+  | "add"
+  | "drop"
+  | "missed_start";
 
 export interface LeagueActivityEvent {
   id: string;

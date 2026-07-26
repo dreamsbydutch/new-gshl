@@ -15,6 +15,10 @@ const activityStyle: Record<
     label: "Signed",
     badge: "bg-violet-50 text-violet-700 ring-violet-200",
   },
+  trade: {
+    label: "Traded",
+    badge: "bg-blue-50 text-blue-700 ring-blue-200",
+  },
   add: {
     label: "Added",
     badge: "bg-emerald-50 text-emerald-700 ring-emerald-200",
@@ -30,7 +34,9 @@ const activityStyle: Record<
 };
 
 function activityDetail(event: LeagueActivityEvent): string {
-  if (event.type !== "signing") return event.teamName;
+  if (event.type !== "signing" && event.type !== "trade") {
+    return event.teamName;
+  }
 
   const terms = [
     event.contractLength

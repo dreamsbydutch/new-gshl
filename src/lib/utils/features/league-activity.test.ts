@@ -32,7 +32,7 @@ const teams = [
   { id: "t2", seasonId: "s1", franchiseId: "f2" },
 ];
 
-void test("builds a chronological feed from signings, adds, drops, and missed starts", () => {
+void test("builds a chronological feed from signings, trades, adds, drops, and missed starts", () => {
   const activity = buildLeagueActivity({
     players,
     franchises,
@@ -47,6 +47,16 @@ void test("builds a chronological feed from signings, adds, drops, and missed st
         signingStatus: ContractStatus.UFA,
         contractLength: 2,
         contractSalary: 2_000_000,
+      },
+      {
+        id: "c2",
+        playerId: "p1",
+        ownerId: "o2",
+        seasonId: "s1",
+        signingDate: "2026-01-02",
+        signingStatus: ContractStatus.TRADE,
+        contractLength: 1,
+        contractSalary: 1_500_000,
       },
     ],
     playerDays: [
@@ -105,6 +115,7 @@ void test("builds a chronological feed from signings, adds, drops, and missed st
     activity.map((event) => [event.type, event.playerId]),
     [
       ["signing", "p5"],
+      ["trade", "p1"],
       ["add", "p4"],
       ["drop", "p2"],
       ["missed_start", "p3"],
