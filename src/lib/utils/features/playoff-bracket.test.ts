@@ -186,6 +186,41 @@ void test("uses the league-wide 1–8 bracket through season six", () => {
   assert.equal(bracket.columns.length, 3);
 });
 
+void test("renders every recorded legacy quarterfinal when historical pairings differ", () => {
+  const { teams, stats } = seasonSevenTeamsAndStats();
+  const legacyQuarterfinals = [
+    rankedMatchup("team-2", "team-8", 2, 10),
+    rankedMatchup("team-1", "team-3", 1, 6),
+    rankedMatchup("team-5", "team-4", 3, 4),
+    rankedMatchup("team-7", "team-6", 8, 9),
+  ].map((currentMatchup) => ({
+    ...currentMatchup,
+    seasonId: "season-2",
+  }));
+  const bracket = buildPlayoffBracket(
+    teams.slice(0, 8),
+    stats.slice(0, 8),
+    legacyQuarterfinals,
+    season("2"),
+  );
+
+  assert.deepEqual(
+    bracket.columns[0]?.matchups.map((currentMatchup) => currentMatchup.source),
+    ["played", "played", "played", "played"],
+  );
+  assert.deepEqual(
+    new Set(
+      bracket.columns[0]?.matchups.map((currentMatchup) => currentMatchup.id),
+    ),
+    new Set([
+      "team-2-team-8-2-vs-10",
+      "team-1-team-3-1-vs-6",
+      "team-5-team-4-3-vs-4",
+      "team-7-team-6-8-vs-9",
+    ]),
+  );
+});
+
 void test("builds the season seven conference crossover bracket", () => {
   const { teams, stats } = seasonSevenTeamsAndStats();
   const bracket = buildPlayoffBracket(teams, stats, [], season("7"));

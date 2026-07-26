@@ -245,6 +245,7 @@ function mergeActualRound(
   projected: BracketMatchup[],
   actual: Matchup[],
   teamsById: Map<string, SeededTeam>,
+  useHomeConference = false,
 ): BracketMatchup[] {
   const unused = new Set(actual.map((matchup) => String(matchup.id)));
 
@@ -257,7 +258,7 @@ function mergeActualRound(
       (matchup) =>
         unused.has(String(matchup.id)) &&
         projectedPair === pairKey(matchup.homeTeamId, matchup.awayTeamId) &&
-        (slot.round !== "QF" ||
+        (!useHomeConference ||
           matchesProjectedConference(matchup, slot, teamsById)),
     );
     const homeSeed = labelSeed(slot.homeLabel);
@@ -268,7 +269,8 @@ function mergeActualRound(
             (matchup) =>
               unused.has(String(matchup.id)) &&
               hasSeedPair(matchup, homeSeed, awaySeed) &&
-              matchesProjectedConference(matchup, slot, teamsById),
+              (!useHomeConference ||
+                matchesProjectedConference(matchup, slot, teamsById)),
           )
         : undefined;
     const overlappingMatch = actual.find((matchup) => {
@@ -279,7 +281,7 @@ function mergeActualRound(
         ? [matchup.homeTeamId, matchup.awayTeamId].includes(slot.awayTeam.id)
         : false;
       const matchesConference =
-        slot.round !== "QF" ||
+        !useHomeConference ||
         matchesProjectedConference(matchup, slot, teamsById);
       return (
         unused.has(String(matchup.id)) &&
@@ -287,20 +289,19 @@ function mergeActualRound(
         (overlapsHome || overlapsAway)
       );
     });
-    const conferenceMatch =
-      slot.round === "QF"
-        ? actual.find(
-            (matchup) =>
-              unused.has(String(matchup.id)) &&
-              matchesProjectedConference(matchup, slot, teamsById),
-          )
-        : undefined;
+    const conferenceMatch = useHomeConference
+      ? actual.find(
+          (matchup) =>
+            unused.has(String(matchup.id)) &&
+            matchesProjectedConference(matchup, slot, teamsById),
+        )
+      : undefined;
     const selected =
       exactMatch ??
       rankMatch ??
       overlappingMatch ??
       conferenceMatch ??
-      (slot.round === "QF" ? undefined : actual[index]);
+      (useHomeConference ? undefined : actual[index]);
     if (!selected || !unused.has(String(selected.id))) return slot;
 
     unused.delete(String(selected.id));
@@ -570,6 +571,7 @@ function buildConferenceBracket(
       (matchup) => matchup.gameType === MatchupType.QUARTER_FINAL,
     ),
     teamsById,
+    true,
   );
   const projectedSemifinals = conferenceInfo.flatMap((conference, index) => {
     const offset = index * 2;
