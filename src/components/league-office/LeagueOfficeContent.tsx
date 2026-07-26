@@ -61,6 +61,10 @@ const ImageUpload = dynamic(
   () => import("./ImageUpload").then((module) => module.ImageUpload),
   { loading: () => <AdminPanelSkeleton /> },
 );
+const Newsroom = dynamic(
+  () => import("./Newsroom").then((module) => module.Newsroom),
+  { loading: () => <AdminPanelSkeleton /> },
+);
 
 export function LeagueOfficeContent() {
   const { selectedType } = useLeagueOfficeNavigation();
@@ -85,6 +89,9 @@ export function LeagueOfficeContent() {
       {selectedType === "imageUpload" &&
       session?.user.role === "commissioner" ? (
         <ImageUpload />
+      ) : null}
+      {selectedType === "newsroom" && session?.user.role === "commissioner" ? (
+        <Newsroom />
       ) : null}
     </div>
   );

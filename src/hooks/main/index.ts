@@ -23,6 +23,12 @@ export { useJobAdmin } from "./useJobs";
 export { useImageUpload } from "./useImageUpload";
 export { useLeagueActivity } from "./useLeagueActivity";
 export {
+  useLatestWeeklyEdition,
+  useWeeklyEdition,
+  useWeeklyEditionArchive,
+  useWeeklyEditionNewsroom,
+} from "./useWeeklyEditions";
+export {
   useContracts,
   useAllContracts,
   useContractData,

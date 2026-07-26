@@ -71,6 +71,11 @@ export function LeagueOfficeLayout({
               setter: (type: string | null) => setSelectedType(type ?? ""),
             },
             {
+              key: "newsroom",
+              value: "Newsroom",
+              setter: (type: string | null) => setSelectedType(type ?? ""),
+            },
+            {
               key: "imageUpload",
               value: "Image Upload",
               setter: (type: string | null) => setSelectedType(type ?? ""),
