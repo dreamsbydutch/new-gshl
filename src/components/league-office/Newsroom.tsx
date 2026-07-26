@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   Check,
-  Clipboard,
+  Download,
   Eye,
   EyeOff,
   FileClock,
@@ -68,10 +68,25 @@ export function Newsroom() {
     window.setTimeout(() => setNotice(""), 3500);
   };
 
-  const copyPrompt = async () => {
-    if (!newsroom.prompt) return;
-    await navigator.clipboard.writeText(newsroom.prompt);
-    showNotice("ChatGPT prompt copied.");
+  const downloadPrompt = () => {
+    if (!newsroom.prompt || !selectedEdition) return;
+    const safeLabel =
+      `${selectedEdition.seasonName}-${selectedEdition.issueLabel}`
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-|-$/g, "");
+    const blob = new Blob([newsroom.prompt], {
+      type: "text/plain;charset=utf-8",
+    });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `gshl-weekly-${safeLabel || selectedEdition.id}-chatgpt-prompt.txt`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 0);
+    showNotice("ChatGPT prompt downloaded.");
   };
 
   const validateImport = () => {
@@ -152,9 +167,9 @@ export function Newsroom() {
         </h1>
         <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
           Weekly and season-milestone editions publish automatically. ChatGPT is
-          optional: copy the grounded prompt, use it in ChatGPT Free or Plus,
-          then paste only its JSON response here. No API key or paid API call is
-          involved.
+          optional: download the grounded prompt, attach the text file in
+          ChatGPT Free or Plus, then paste only its JSON response here. No API
+          key or paid API call is involved.
         </p>
       </header>
 
@@ -291,11 +306,11 @@ export function Newsroom() {
             <div className="flex flex-wrap gap-2">
               <Button
                 type="button"
-                onClick={() => void copyPrompt()}
+                onClick={downloadPrompt}
                 disabled={!newsroom.prompt}
               >
-                <Clipboard />
-                Copy ChatGPT prompt
+                <Download />
+                Download ChatGPT prompt
               </Button>
               <Button
                 type="button"
