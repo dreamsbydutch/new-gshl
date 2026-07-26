@@ -243,7 +243,7 @@ export function Newsroom() {
           ) : (
             <Sparkles />
           )}
-          Generate template
+          Generate or refresh template
         </Button>
       </div>
 
@@ -364,8 +364,8 @@ export function Newsroom() {
                       role="status"
                       className="mt-3 text-sm font-medium text-emerald-700"
                     >
-                      Validated against the frozen fact packet. Review the
-                      preview below before publishing.
+                      JSON structure and verified links passed validation.
+                      Review the preview below before publishing.
                     </p>
                   ) : (
                     <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-red-700">

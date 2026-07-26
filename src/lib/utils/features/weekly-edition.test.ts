@@ -2,14 +2,19 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import type { BuildWeeklyEditionFactPacketInput } from "@gshl-types";
 import {
+  buildWeeklyEditionCareerRecordFacts,
   buildMilestoneEditionFactPacket,
   buildTemplateWeeklyEdition,
   buildWeeklyEditionCategoryMargins,
   buildWeeklyEditionChatGptPrompt,
   buildWeeklyEditionFactPacket,
+  buildWeeklyEditionMilestoneFacts,
   buildWeeklyEditionMilestoneSchedule,
+  buildWeeklyEditionPeriodRecordFacts,
   hashWeeklyEditionSource,
+  isWeeklyEditionPlayingContract,
   validateWeeklyEditionImport,
+  weeklyEditionContractAffectsSeason,
 } from "./weekly-edition";
 
 function source(): BuildWeeklyEditionFactPacketInput {
@@ -137,17 +142,6 @@ function source(): BuildWeeklyEditionFactPacketInput {
         awayRank: 3,
       },
     ],
-    knownEntityNames: [
-      "Aurora",
-      "Bears",
-      "Comets",
-      "Dragons",
-      "Alex North",
-      "Blake West",
-      "Casey East",
-      "Devon South",
-      "Fabricated Player",
-    ],
   };
 }
 
@@ -229,16 +223,168 @@ void test("template generation is varied but deterministic and activity-aware", 
   );
 });
 
-void test("prompt contains the immutable facts and exact response shape", () => {
-  const packet = buildWeeklyEditionFactPacket(source());
-  const prompt = buildWeeklyEditionChatGptPrompt(packet);
-  assert.match(prompt, /FACT_PACKET=/);
-  assert.match(prompt, /RESPONSE_SHAPE=/);
-  assert.match(prompt, /Return only one JSON object/);
-  assert.match(prompt, /Alex North/);
+void test("lets records and elite performances compete for the weekly lead", () => {
+  const packet = buildWeeklyEditionFactPacket({
+    ...source(),
+    performances: [
+      {
+        id: "player-day-elite",
+        entityType: "player",
+        scope: "day",
+        occurredAt: "2026-01-08",
+        playerId: "player-1",
+        playerName: "Alex North",
+        teamId: "team-a",
+        teamName: "Aurora",
+        rating: 91.2,
+        stats: { G: 3, P: 5 },
+      },
+    ],
+    records: [
+      {
+        id: "career-points-record",
+        entityType: "player",
+        recordScope: "league",
+        period: "career",
+        playerId: "player-1",
+        playerName: "Alex North",
+        franchiseId: "franchise-a",
+        franchiseName: "Aurora",
+        metric: {
+          key: "P",
+          label: "Points",
+          value: 401,
+          previousValue: 399,
+        },
+      },
+    ],
+  });
+
+  assert.equal(packet.editorialCandidates[0]?.kind, "record");
+  assert.ok(
+    packet.editorialCandidates.some(
+      (candidate) =>
+        candidate.kind === "player_performance" &&
+        candidate.metrics.some(
+          (metric) => metric.key === "Rating" && metric.value === 91.2,
+        ),
+    ),
+  );
+  const content = buildTemplateWeeklyEdition(packet);
+  assert.match(content.headline, /record/);
+  assert.match(buildWeeklyEditionChatGptPrompt(packet), /career-points-record/);
 });
 
-void test("accepts a grounded response and rejects malformed or fabricated copy", () => {
+void test("detects newly crossed period, career, and franchise milestones", () => {
+  const periodRecords = buildWeeklyEditionPeriodRecordFacts({
+    current: [
+      {
+        id: "current-team-week",
+        entityType: "team",
+        period: "week",
+        periodId: "week-7",
+        teamId: "team-a",
+        teamName: "Aurora",
+        franchiseId: "franchise-a",
+        franchiseName: "Aurora",
+        metrics: { G: 26 },
+      },
+    ],
+    historical: [
+      {
+        id: "old-team-week",
+        entityType: "team",
+        period: "week",
+        periodId: "week-old",
+        teamId: "team-b",
+        teamName: "Bears",
+        franchiseId: "franchise-b",
+        franchiseName: "Bears",
+        metrics: { G: 25 },
+      },
+    ],
+    metricLabels: { G: "Goals" },
+  });
+  assert.equal(periodRecords[0]?.recordScope, "league");
+  assert.equal(periodRecords[0]?.metric.previousValue, 25);
+
+  const careerRecords = buildWeeklyEditionCareerRecordFacts({
+    snapshots: [
+      {
+        id: "alex-career",
+        entityType: "player",
+        period: "career",
+        periodId: "career",
+        playerId: "player-1",
+        playerName: "Alex North",
+        franchiseId: "franchise-a",
+        franchiseName: "Aurora",
+        metrics: { P: 101 },
+        deltaMetrics: { P: 2 },
+      },
+      {
+        id: "blake-career",
+        entityType: "player",
+        period: "career",
+        periodId: "career",
+        playerId: "player-2",
+        playerName: "Blake West",
+        franchiseId: "franchise-b",
+        franchiseName: "Bears",
+        metrics: { P: 100 },
+        deltaMetrics: { P: 0 },
+      },
+    ],
+    metricLabels: { P: "Points" },
+    recordScopes: ["league"],
+  });
+  assert.equal(careerRecords[0]?.playerName, "Alex North");
+  assert.equal(careerRecords[0]?.metric.previousValue, 100);
+
+  const milestones = buildWeeklyEditionMilestoneFacts([
+    {
+      id: "franchise-a",
+      teamId: "team-a",
+      teamName: "Aurora",
+      franchiseId: "franchise-a",
+      franchiseName: "Aurora",
+      metrics: {
+        all_time_wins: 50,
+        conference_wins: 29,
+        playoff_wins: 4,
+        playoff_appearances: 1,
+      },
+      deltaMetrics: {
+        all_time_wins: 1,
+        conference_wins: 1,
+        playoff_wins: 0,
+        playoff_appearances: 1,
+      },
+    },
+  ]);
+  assert.deepEqual(
+    milestones.map((milestone) => milestone.milestone),
+    ["all_time_wins", "playoff_appearances"],
+  );
+});
+
+void test("prompt contains only relevant edition facts and a compact section plan", () => {
+  const packet = buildWeeklyEditionFactPacket(source());
+  packet.teams.push({
+    teamId: "database-only-team",
+    name: "Database Only Team",
+    abbr: "DOT",
+  });
+  const prompt = buildWeeklyEditionChatGptPrompt(packet);
+  assert.match(prompt, /EDITION_FACTS=/);
+  assert.match(prompt, /SECTION_PLAN=/);
+  assert.match(prompt, /Return only one JSON object/);
+  assert.match(prompt, /Alex North/);
+  assert.doesNotMatch(prompt, /Database Only Team/);
+  assert.doesNotMatch(prompt, /knownEntityNames|allowedNames|allowedNumbers/);
+});
+
+void test("accepts a grounded response and rejects malformed JSON", () => {
   const packet = buildWeeklyEditionFactPacket(source());
   const content = buildTemplateWeeklyEdition(packet);
   assert.equal(
@@ -246,25 +392,9 @@ void test("accepts a grounded response and rejects malformed or fabricated copy"
     true,
   );
   assert.equal(validateWeeklyEditionImport("{bad", packet).valid, false);
-
-  const fabricated = {
-    ...content,
-    deck: `${content.deck} Fabricated Player scored 99 points.`,
-  };
-  const result = validateWeeklyEditionImport(
-    JSON.stringify(fabricated),
-    packet,
-  );
-  assert.equal(result.valid, false);
-  assert.ok(
-    result.errors.some((error) => error.includes("Unsupported league name")),
-  );
-  assert.ok(
-    result.errors.some((error) => error.includes("Unsupported numeric claim")),
-  );
 });
 
-void test("rejects HTML, unknown sections, invented links, and oversized text", () => {
+void test("rejects HTML, altered structure, invented links, and oversized text", () => {
   const packet = buildWeeklyEditionFactPacket(source());
   const content = buildTemplateWeeklyEdition(packet);
   const html = structuredClone(content);
@@ -278,6 +408,23 @@ void test("rejects HTML, unknown sections, invented links, and oversized text", 
   unknownSection.sections[0]!.id = "rumour_mill";
   assert.equal(
     validateWeeklyEditionImport(JSON.stringify(unknownSection), packet).valid,
+    false,
+  );
+
+  const reordered = structuredClone(content);
+  [reordered.sections[0], reordered.sections[1]] = [
+    reordered.sections[1]!,
+    reordered.sections[0]!,
+  ];
+  assert.equal(
+    validateWeeklyEditionImport(JSON.stringify(reordered), packet).valid,
+    false,
+  );
+
+  const alteredEyebrow = structuredClone(content);
+  alteredEyebrow.sections[0]!.eyebrow = "Rumour Mill";
+  assert.equal(
+    validateWeeklyEditionImport(JSON.stringify(alteredEyebrow), packet).valid,
     false,
   );
 
@@ -312,6 +459,12 @@ void test("builds each season milestone from contract, cap, draft, and roster fa
       issueType,
       issueLabel: issueType.replaceAll("_", " "),
       triggerDate: "2026-10-04",
+      analysisSeason: {
+        id: "season-2",
+        name: "2026-27 GSHL",
+        signingEndDate: "2026-06-30",
+        draftStartAt: "2026-10-03T23:00:00.000Z",
+      },
       season: {
         id: "season-1",
         name: "2026 GSHL",
@@ -383,17 +536,118 @@ void test("builds each season milestone from contract, cap, draft, and roster fa
           selectedPlayerName: "Casey East",
         },
       ],
-      knownEntityNames: source().knownEntityNames,
     });
     const content = buildTemplateWeeklyEdition(packet);
     assert.equal(packet.issueType, issueType);
     assert.ok(content.sections.length >= 5);
+    if (issueType !== "final_recap") {
+      assert.match(
+        `${content.headline} ${content.deck} ${content.sections
+          .map((section) => section.body)
+          .join(" ")}`,
+        /2026-27 GSHL/,
+      );
+    }
+    const prompt = buildWeeklyEditionChatGptPrompt(packet);
+    if (issueType === "final_recap") {
+      assert.match(prompt, /completedSeason/);
+      assert.doesNotMatch(prompt, /analysisSeason/);
+    } else {
+      assert.match(prompt, /"analysisSeason"/);
+      assert.match(prompt, /2026-27 GSHL/);
+    }
+    if (issueType === "resigning_outlook") {
+      assert.match(prompt, /expiringContracts/);
+      assert.doesNotMatch(prompt, /draftPicks|recentSignings/);
+    }
+    if (issueType === "pre_draft") {
+      assert.match(prompt, /draftPicks/);
+      assert.doesNotMatch(prompt, /expiringContracts|finalMatchups/);
+    }
     const validation = validateWeeklyEditionImport(
       JSON.stringify(content),
       packet,
     );
     assert.deepEqual(validation.errors, [], issueType);
   }
+});
+
+void test("uses upcoming-season contract coverage for offseason roster and cap facts", () => {
+  const completedSeason = {
+    id: "season-2025",
+    year: "2025",
+    startDate: "2025-10-01",
+    endDate: "2026-04-20",
+  };
+  const upcomingSeason = {
+    id: "season-2026",
+    year: "2026",
+    startDate: "2026-10-01",
+    endDate: "2027-04-20",
+  };
+  const seasons = [completedSeason, upcomingSeason];
+  const signedForUpcomingSeason = {
+    seasonId: completedSeason.id,
+    contractLength: 1,
+    startDate: "2026-10-01",
+    expiryDate: "2027-04-20",
+    contractType: "STANDARD",
+    expiryStatus: "UFA",
+  };
+  const expiringAfterCompletedSeason = {
+    seasonId: "season-2024",
+    contractLength: 1,
+    startDate: "2025-10-01",
+    expiryDate: "2026-04-20",
+    contractType: "STANDARD",
+    expiryStatus: "UFA",
+  };
+  const upcomingBuyout = {
+    ...signedForUpcomingSeason,
+    expiryStatus: "Buyout",
+  };
+
+  assert.equal(
+    weeklyEditionContractAffectsSeason(
+      signedForUpcomingSeason,
+      upcomingSeason,
+      seasons,
+    ),
+    true,
+  );
+  assert.equal(
+    weeklyEditionContractAffectsSeason(
+      signedForUpcomingSeason,
+      completedSeason,
+      seasons,
+    ),
+    false,
+  );
+  assert.equal(
+    weeklyEditionContractAffectsSeason(
+      expiringAfterCompletedSeason,
+      upcomingSeason,
+      seasons,
+    ),
+    false,
+  );
+  assert.equal(isWeeklyEditionPlayingContract(signedForUpcomingSeason), true);
+  assert.equal(isWeeklyEditionPlayingContract(upcomingBuyout), false);
+
+  const legacyContractWithoutDates = {
+    seasonId: completedSeason.id,
+    contractLength: 1,
+    contractType: "EXTENSION",
+    expiryStatus: "RFA",
+  };
+  assert.equal(
+    weeklyEditionContractAffectsSeason(
+      legacyContractWithoutDates,
+      upcomingSeason,
+      seasons,
+    ),
+    true,
+  );
 });
 
 void test("schedules the season editorial calendar from league dates", () => {

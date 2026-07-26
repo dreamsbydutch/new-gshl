@@ -12,15 +12,20 @@ import { buildLeagueActivity } from "../src/lib/utils/features/league-activity";
 import type { ContractStatus, WeeklyEditionIssueType } from "../src/lib/types";
 import { ContractStatus as ContractStatusValues } from "../src/lib/utils/domain/constants";
 import {
+  buildWeeklyEditionCareerRecordFacts,
   buildMilestoneEditionFactPacket,
   buildTemplateWeeklyEdition,
+  buildWeeklyEditionMilestoneFacts,
   buildWeeklyEditionMilestoneSchedule,
   buildWeeklyEditionCategoryMargins,
   buildWeeklyEditionChatGptPrompt,
   buildWeeklyEditionFactPacket,
+  buildWeeklyEditionPeriodRecordFacts,
   hashWeeklyEditionSource,
+  isWeeklyEditionPlayingContract,
   validateWeeklyEditionContent,
   validateWeeklyEditionImport,
+  weeklyEditionContractAffectsSeason,
 } from "../src/lib/utils/features/weekly-edition";
 import { toUtcTimestamp, utcTimestampToDateKey } from "./lib/timestamps";
 
@@ -79,6 +84,29 @@ const asNumber = (value: unknown) => {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : 0;
 };
+const EDITORIAL_STAT_KEYS = [
+  "G",
+  "A",
+  "P",
+  "PPP",
+  "SOG",
+  "HIT",
+  "BLK",
+  "W",
+  "SV",
+  "SO",
+  "Rating",
+] as const;
+const EDITORIAL_RECORD_LABELS = Object.fromEntries(
+  EDITORIAL_STAT_KEYS.map((key) => [key, key === "Rating" ? "Rating" : key]),
+);
+const EDITORIAL_CAREER_RECORD_LABELS = Object.fromEntries(
+  Object.entries(EDITORIAL_RECORD_LABELS).filter(([key]) => key !== "Rating"),
+);
+const editorialMetrics = (row: Record<string, unknown>) =>
+  Object.fromEntries(
+    EDITORIAL_STAT_KEYS.map((key) => [key, asNumber(row[key])]),
+  );
 const contractStatuses = new Set<unknown>(Object.values(ContractStatusValues));
 const isContractStatus = (value: unknown): value is ContractStatus =>
   contractStatuses.has(value);
@@ -144,30 +172,62 @@ async function buildSource(
     weekIndex >= 0 && weekIndex + 1 < orderedWeeks.length
       ? orderedWeeks[weekIndex + 1]
       : null;
-  const [previousPower, nextMatchups, playerDays, contracts, players] =
-    await Promise.all([
-      previousWeek
-        ? ctx.db
-            .query("teamWeekStatLines")
-            .withIndex("by_weekId", (q) => q.eq("weekId", previousWeek._id))
-            .collect()
-        : [],
-      nextWeek
-        ? ctx.db
-            .query("matchups")
-            .withIndex("by_weekId", (q) => q.eq("weekId", nextWeek._id))
-            .collect()
-        : [],
-      ctx.db
-        .query("playerDayStatLines")
-        .withIndex("by_weekId", (q) => q.eq("weekId", week._id))
-        .collect(),
-      ctx.db
-        .query("contracts")
-        .withIndex("by_seasonId", (q) => q.eq("seasonId", season._id))
-        .collect(),
-      ctx.db.query("players").collect(),
-    ]);
+  const [
+    previousPower,
+    nextMatchups,
+    playerDays,
+    teamDays,
+    contracts,
+    players,
+    allTeams,
+    allMatchups,
+    allTeamWeeks,
+    teamSeasonRows,
+    careerSplits,
+    playerAwards,
+    teamAwards,
+    playerTotals,
+  ] = await Promise.all([
+    previousWeek
+      ? ctx.db
+          .query("teamWeekStatLines")
+          .withIndex("by_weekId", (q) => q.eq("weekId", previousWeek._id))
+          .collect()
+      : [],
+    nextWeek
+      ? ctx.db
+          .query("matchups")
+          .withIndex("by_weekId", (q) => q.eq("weekId", nextWeek._id))
+          .collect()
+      : [],
+    ctx.db
+      .query("playerDayStatLines")
+      .withIndex("by_weekId", (q) => q.eq("weekId", week._id))
+      .collect(),
+    ctx.db
+      .query("teamDayStatLines")
+      .withIndex("by_weekId", (q) => q.eq("weekId", week._id))
+      .collect(),
+    ctx.db
+      .query("contracts")
+      .withIndex("by_seasonId", (q) => q.eq("seasonId", season._id))
+      .collect(),
+    ctx.db.query("players").collect(),
+    ctx.db.query("teams").collect(),
+    ctx.db.query("matchups").collect(),
+    ctx.db.query("teamWeekStatLines").collect(),
+    ctx.db.query("teamSeasonStatLines").collect(),
+    ctx.db.query("playerCareerSplitStatLines").collect(),
+    ctx.db
+      .query("playerAwards")
+      .withIndex("by_seasonId", (q) => q.eq("seasonId", season._id))
+      .collect(),
+    ctx.db
+      .query("teamAwards")
+      .withIndex("by_seasonId", (q) => q.eq("seasonId", season._id))
+      .collect(),
+    ctx.db.query("playerTotalStatLines").collect(),
+  ]);
 
   const franchiseById = new Map(
     franchises.map((franchise) => [String(franchise._id), franchise]),
@@ -183,6 +243,31 @@ async function buildSource(
           abbr: franchise?.abbr ?? "GSHL",
           logoUrl: franchise?.logoUrl ?? undefined,
         },
+      ];
+    }),
+  );
+  const allTeamById = new Map(
+    allTeams.map((team) => {
+      const franchise = franchiseById.get(String(team.franchiseId));
+      return [
+        String(team._id),
+        {
+          teamId: String(team._id),
+          name: franchise?.name ?? "Unknown team",
+          franchiseId: String(team.franchiseId),
+          franchiseName: franchise?.name ?? "Unknown team",
+          ownerId: String(franchise?.ownerId ?? ""),
+          seasonId: String(team.seasonId),
+        },
+      ];
+    }),
+  );
+  const currentTeamByOwnerId = new Map(
+    [...teamById.entries()].map(([teamId, team]) => {
+      const source = allTeamById.get(teamId);
+      return [
+        source?.ownerId ?? "",
+        { ...team, franchiseId: source?.franchiseId ?? "" },
       ];
     }),
   );
@@ -246,7 +331,8 @@ async function buildSource(
             playerName: event.playerName,
             teamName: event.teamName,
             detail:
-              event.type === "signing" && event.signingStatus
+              (event.type === "signing" || event.type === "trade") &&
+              event.signingStatus
                 ? event.signingStatus
                 : undefined,
           },
@@ -270,6 +356,512 @@ async function buildSource(
       });
     });
   const missedStarts = [...missedStartGroups.values()];
+  const performanceStats = (row: Record<string, unknown>) =>
+    Object.fromEntries(
+      EDITORIAL_STAT_KEYS.filter((key) => key !== "Rating").map((key) => [
+        key,
+        asNumber(row[key]),
+      ]),
+    );
+  const selectStandouts = <
+    Row extends {
+      id: string;
+      rating: number;
+    },
+  >(
+    rows: Row[],
+  ) =>
+    rows
+      .filter((row) => row.rating > 0)
+      .sort(
+        (left, right) =>
+          right.rating - left.rating || left.id.localeCompare(right.id),
+      )
+      .filter((row, index) => row.rating >= 85 || index < 3);
+  const playerWeekPerformances = selectStandouts(
+    playerWeekRows.map((row) => ({
+      id: `player-week:${String(row._id)}`,
+      entityType: "player" as const,
+      scope: "week" as const,
+      playerId: String(row.playerId),
+      playerName:
+        playerById.get(String(row.playerId))?.fullName ?? "Unknown player",
+      teamId: String(row.gshlTeamId),
+      teamName: teamById.get(String(row.gshlTeamId))?.name ?? "Unknown team",
+      rating: asNumber(row.Rating),
+      stats: performanceStats(row),
+    })),
+  );
+  const playerDayPerformances = selectStandouts(
+    playerDays.map((row) => ({
+      id: `player-day:${String(row._id)}`,
+      entityType: "player" as const,
+      scope: "day" as const,
+      occurredAt: dateKey(row.date),
+      playerId: String(row.playerId),
+      playerName:
+        playerById.get(String(row.playerId))?.fullName ?? "Unknown player",
+      teamId: String(row.gshlTeamId),
+      teamName: teamById.get(String(row.gshlTeamId))?.name ?? "Unknown team",
+      rating: asNumber(row.Rating),
+      stats: performanceStats(row),
+    })),
+  );
+  const teamWeekPerformances = selectStandouts(
+    currentPower.map((row) => ({
+      id: `team-week:${String(row._id)}`,
+      entityType: "team" as const,
+      scope: "week" as const,
+      teamId: String(row.gshlTeamId),
+      teamName: teamById.get(String(row.gshlTeamId))?.name ?? "Unknown team",
+      rating: asNumber(row.Rating),
+      stats: performanceStats(row),
+    })),
+  );
+  const teamDayPerformances = selectStandouts(
+    teamDays.map((row) => ({
+      id: `team-day:${String(row._id)}`,
+      entityType: "team" as const,
+      scope: "day" as const,
+      occurredAt: dateKey(row.date),
+      teamId: String(row.gshlTeamId),
+      teamName: teamById.get(String(row.gshlTeamId))?.name ?? "Unknown team",
+      rating: asNumber(row.Rating),
+      stats: performanceStats(row),
+    })),
+  );
+  const isFinalWeek =
+    orderedWeeks.at(-1)?._id === week._id ||
+    dateKey(week.endDate) === dateKey(season.endDate);
+  const currentPlayerTotals = playerTotals.filter(
+    (row) => row.seasonId === season._id && String(row.seasonType) === "RS",
+  );
+  const currentTeamSeasonRows = teamSeasonRows.filter(
+    (row) => row.seasonId === season._id && String(row.seasonType) === "RS",
+  );
+  const seasonPerformances = isFinalWeek
+    ? [
+        ...selectStandouts(
+          currentPlayerTotals.map((row) => {
+            const teamId = String(row.gshlTeamIds?.[0] ?? "");
+            return {
+              id: `player-season:${String(row._id)}`,
+              entityType: "player" as const,
+              scope: "season" as const,
+              playerId: String(row.playerId),
+              playerName:
+                playerById.get(String(row.playerId))?.fullName ??
+                "Unknown player",
+              teamId,
+              teamName: teamById.get(teamId)?.name ?? "Unknown team",
+              rating: asNumber(row.Rating),
+              stats: performanceStats(row),
+            };
+          }),
+        ),
+        ...selectStandouts(
+          currentTeamSeasonRows.map((row) => ({
+            id: `team-season:${String(row._id)}`,
+            entityType: "team" as const,
+            scope: "season" as const,
+            teamId: String(row.gshlTeamId),
+            teamName:
+              teamById.get(String(row.gshlTeamId))?.name ?? "Unknown team",
+            rating: asNumber(row.Rating),
+            stats: performanceStats(row),
+          })),
+        ),
+      ]
+    : [];
+
+  const teamWeekCurrentObservations = currentPower.map((row) => {
+    const team = allTeamById.get(String(row.gshlTeamId));
+    return {
+      id: String(row._id),
+      entityType: "team" as const,
+      period: "week" as const,
+      periodId: String(row.weekId),
+      teamId: String(row.gshlTeamId),
+      teamName: team?.name ?? "Unknown team",
+      franchiseId: team?.franchiseId,
+      franchiseName: team?.franchiseName,
+      metrics: editorialMetrics(row),
+    };
+  });
+  const teamWeekHistoricalObservations = allTeamWeeks
+    .filter((row) => row.weekId !== week._id)
+    .map((row) => {
+      const team = allTeamById.get(String(row.gshlTeamId));
+      return {
+        id: String(row._id),
+        entityType: "team" as const,
+        period: "week" as const,
+        periodId: String(row.weekId),
+        teamId: String(row.gshlTeamId),
+        teamName: team?.name ?? "Unknown team",
+        franchiseId: team?.franchiseId,
+        franchiseName: team?.franchiseName,
+        metrics: editorialMetrics(row),
+      };
+    });
+  const teamWeekRecords = buildWeeklyEditionPeriodRecordFacts({
+    current: teamWeekCurrentObservations,
+    historical: teamWeekHistoricalObservations,
+    metricLabels: EDITORIAL_RECORD_LABELS,
+  });
+
+  const playerSeasonRecords = buildWeeklyEditionPeriodRecordFacts({
+    current: currentPlayerTotals.map((row) => {
+      const teamId = String(row.gshlTeamIds?.[0] ?? "");
+      const team = allTeamById.get(teamId);
+      const delta = playerWeekRows.find(
+        (weekRow) => weekRow.playerId === row.playerId,
+      );
+      return {
+        id: String(row._id),
+        entityType: "player" as const,
+        period: "season" as const,
+        periodId: String(row.seasonId),
+        playerId: String(row.playerId),
+        playerName:
+          playerById.get(String(row.playerId))?.fullName ?? "Unknown player",
+        teamId,
+        teamName: team?.name,
+        franchiseId: team?.franchiseId,
+        franchiseName: team?.franchiseName,
+        metrics: editorialMetrics(row),
+        deltaMetrics: delta ? editorialMetrics(delta) : {},
+      };
+    }),
+    historical: playerTotals
+      .filter(
+        (row) => row.seasonId !== season._id && String(row.seasonType) === "RS",
+      )
+      .map((row) => {
+        const teamId = String(row.gshlTeamIds?.[0] ?? "");
+        const team = allTeamById.get(teamId);
+        return {
+          id: String(row._id),
+          entityType: "player" as const,
+          period: "season" as const,
+          periodId: String(row.seasonId),
+          playerId: String(row.playerId),
+          playerName:
+            playerById.get(String(row.playerId))?.fullName ?? "Unknown player",
+          teamId,
+          teamName: team?.name,
+          franchiseId: team?.franchiseId,
+          franchiseName: team?.franchiseName,
+          metrics: editorialMetrics(row),
+        };
+      }),
+    metricLabels: EDITORIAL_RECORD_LABELS,
+  });
+  const teamSeasonRecords = buildWeeklyEditionPeriodRecordFacts({
+    current: currentTeamSeasonRows.map((row) => {
+      const team = allTeamById.get(String(row.gshlTeamId));
+      const delta = currentPowerByTeam.get(String(row.gshlTeamId));
+      return {
+        id: String(row._id),
+        entityType: "team" as const,
+        period: "season" as const,
+        periodId: String(row.seasonId),
+        teamId: String(row.gshlTeamId),
+        teamName: team?.name ?? "Unknown team",
+        franchiseId: team?.franchiseId,
+        franchiseName: team?.franchiseName,
+        metrics: editorialMetrics(row),
+        deltaMetrics: delta ? editorialMetrics(delta) : {},
+      };
+    }),
+    historical: teamSeasonRows
+      .filter(
+        (row) => row.seasonId !== season._id && String(row.seasonType) === "RS",
+      )
+      .map((row) => {
+        const team = allTeamById.get(String(row.gshlTeamId));
+        return {
+          id: String(row._id),
+          entityType: "team" as const,
+          period: "season" as const,
+          periodId: String(row.seasonId),
+          teamId: String(row.gshlTeamId),
+          teamName: team?.name ?? "Unknown team",
+          franchiseId: team?.franchiseId,
+          franchiseName: team?.franchiseName,
+          metrics: editorialMetrics(row),
+        };
+      }),
+    metricLabels: EDITORIAL_RECORD_LABELS,
+  });
+
+  const careerByFranchisePlayer = new Map<
+    string,
+    {
+      id: string;
+      entityType: "player";
+      period: "career";
+      periodId: string;
+      playerId: string;
+      playerName: string;
+      franchiseId: string;
+      franchiseName: string;
+      metrics: Record<string, number>;
+      deltaMetrics: Record<string, number>;
+    }
+  >();
+  for (const row of careerSplits.filter(
+    (item) => String(item.seasonType) === "RS",
+  )) {
+    const team = allTeamById.get(String(row.gshlTeamId));
+    if (!team) continue;
+    const playerId = String(row.playerId);
+    const key = `${team.franchiseId}:${playerId}`;
+    const current = careerByFranchisePlayer.get(key) ?? {
+      id: key,
+      entityType: "player" as const,
+      period: "career" as const,
+      periodId: "career",
+      playerId,
+      playerName: playerById.get(playerId)?.fullName ?? "Unknown player",
+      franchiseId: team.franchiseId,
+      franchiseName: team.franchiseName,
+      metrics: {},
+      deltaMetrics: {},
+    };
+    for (const stat of EDITORIAL_STAT_KEYS) {
+      current.metrics[stat] =
+        (current.metrics[stat] ?? 0) + asNumber(row[stat]);
+    }
+    careerByFranchisePlayer.set(key, current);
+  }
+  for (const row of playerWeekRows) {
+    const team = allTeamById.get(String(row.gshlTeamId));
+    const snapshot = team
+      ? careerByFranchisePlayer.get(
+          `${team.franchiseId}:${String(row.playerId)}`,
+        )
+      : undefined;
+    if (!snapshot) continue;
+    snapshot.deltaMetrics = editorialMetrics(row);
+  }
+  const franchiseCareerSnapshots = [...careerByFranchisePlayer.values()];
+  const leagueCareerByPlayer = new Map<
+    string,
+    (typeof franchiseCareerSnapshots)[number]
+  >();
+  for (const snapshot of franchiseCareerSnapshots) {
+    const existing = leagueCareerByPlayer.get(snapshot.playerId) ?? {
+      ...snapshot,
+      id: `league:${snapshot.playerId}`,
+      franchiseId: "",
+      franchiseName: "",
+      metrics: {},
+      deltaMetrics: {},
+    };
+    for (const stat of EDITORIAL_STAT_KEYS) {
+      existing.metrics[stat] =
+        (existing.metrics[stat] ?? 0) + (snapshot.metrics[stat] ?? 0);
+      existing.deltaMetrics[stat] =
+        (existing.deltaMetrics[stat] ?? 0) + (snapshot.deltaMetrics[stat] ?? 0);
+    }
+    leagueCareerByPlayer.set(snapshot.playerId, existing);
+  }
+  const careerRecords = [
+    ...buildWeeklyEditionCareerRecordFacts({
+      snapshots: franchiseCareerSnapshots,
+      metricLabels: EDITORIAL_CAREER_RECORD_LABELS,
+      recordScopes: ["franchise"],
+    }),
+    ...buildWeeklyEditionCareerRecordFacts({
+      snapshots: [...leagueCareerByPlayer.values()],
+      metricLabels: EDITORIAL_CAREER_RECORD_LABELS,
+      recordScopes: ["league"],
+    }),
+  ];
+
+  const achievementByFranchise = new Map<
+    string,
+    {
+      id: string;
+      teamId?: string;
+      teamName: string;
+      franchiseId: string;
+      franchiseName: string;
+      metrics: {
+        all_time_wins: number;
+        conference_wins: number;
+        playoff_wins: number;
+        playoff_appearances: number;
+      };
+      deltaMetrics: {
+        all_time_wins: number;
+        conference_wins: number;
+        playoff_wins: number;
+        playoff_appearances: number;
+      };
+    }
+  >();
+  const ensureAchievement = (franchiseId: string) => {
+    const currentTeam = [...teamById.entries()].find(
+      ([teamId]) => allTeamById.get(teamId)?.franchiseId === franchiseId,
+    );
+    const franchise = franchiseById.get(franchiseId);
+    const existing = achievementByFranchise.get(franchiseId) ?? {
+      id: franchiseId,
+      teamId: currentTeam?.[0],
+      teamName: currentTeam?.[1].name ?? franchise?.name ?? "Unknown team",
+      franchiseId,
+      franchiseName: franchise?.name ?? "Unknown team",
+      metrics: {
+        all_time_wins: 0,
+        conference_wins: 0,
+        playoff_wins: 0,
+        playoff_appearances: 0,
+      },
+      deltaMetrics: {
+        all_time_wins: 0,
+        conference_wins: 0,
+        playoff_wins: 0,
+        playoff_appearances: 0,
+      },
+    };
+    achievementByFranchise.set(franchiseId, existing);
+    return existing;
+  };
+  const playoffAppearances = new Set<string>();
+  const currentWeekPlayoffAppearances = new Set<string>();
+  for (const matchup of allMatchups.filter((item) => item.isComplete)) {
+    const homeTeam = allTeamById.get(String(matchup.homeTeamId));
+    const awayTeam = allTeamById.get(String(matchup.awayTeamId));
+    if (!homeTeam || !awayTeam) continue;
+    const isCurrentWeek = matchup.weekId === week._id;
+    const homeScore = asNumber(matchup.homeScore);
+    const awayScore = asNumber(matchup.awayScore);
+    const winner =
+      homeScore === awayScore
+        ? undefined
+        : homeScore > awayScore
+          ? homeTeam
+          : awayTeam;
+    if (winner && ["CC", "NC"].includes(String(matchup.gameType))) {
+      ensureAchievement(winner.franchiseId).metrics.all_time_wins += 1;
+      if (isCurrentWeek) {
+        ensureAchievement(winner.franchiseId).deltaMetrics.all_time_wins += 1;
+      }
+    }
+    if (winner && String(matchup.gameType) === "CC") {
+      ensureAchievement(winner.franchiseId).metrics.conference_wins += 1;
+      if (isCurrentWeek) {
+        ensureAchievement(winner.franchiseId).deltaMetrics.conference_wins += 1;
+      }
+    }
+    if (winner && ["QF", "SF", "F"].includes(String(matchup.gameType))) {
+      ensureAchievement(winner.franchiseId).metrics.playoff_wins += 1;
+      if (isCurrentWeek) {
+        ensureAchievement(winner.franchiseId).deltaMetrics.playoff_wins += 1;
+      }
+    }
+    if (["QF", "SF", "F"].includes(String(matchup.gameType))) {
+      for (const team of [homeTeam, awayTeam]) {
+        const key = `${String(matchup.seasonId)}:${team.franchiseId}`;
+        playoffAppearances.add(key);
+        if (isCurrentWeek) currentWeekPlayoffAppearances.add(key);
+      }
+    }
+  }
+  for (const key of playoffAppearances) {
+    const [, franchiseId = ""] = key.split(":");
+    if (!franchiseId) continue;
+    ensureAchievement(franchiseId).metrics.playoff_appearances += 1;
+    if (currentWeekPlayoffAppearances.has(key)) {
+      const appearedBeforeThisWeek = allMatchups.some((matchup) => {
+        if (
+          !matchup.isComplete ||
+          matchup.weekId === week._id ||
+          String(matchup.seasonId) !== key.split(":")[0] ||
+          !["QF", "SF", "F"].includes(String(matchup.gameType))
+        ) {
+          return false;
+        }
+        return [matchup.homeTeamId, matchup.awayTeamId].some(
+          (teamId) =>
+            allTeamById.get(String(teamId))?.franchiseId === franchiseId,
+        );
+      });
+      if (!appearedBeforeThisWeek) {
+        ensureAchievement(franchiseId).deltaMetrics.playoff_appearances += 1;
+      }
+    }
+  }
+  const achievementSnapshots = [...achievementByFranchise.values()];
+  const milestones = buildWeeklyEditionMilestoneFacts(achievementSnapshots);
+  const achievementRecords = buildWeeklyEditionCareerRecordFacts({
+    snapshots: achievementSnapshots.map((snapshot) => ({
+      id: snapshot.id,
+      entityType: "team" as const,
+      period: "career" as const,
+      periodId: "career",
+      teamId: snapshot.teamId,
+      teamName: snapshot.teamName,
+      franchiseId: snapshot.franchiseId,
+      franchiseName: snapshot.franchiseName,
+      metrics: snapshot.metrics,
+      deltaMetrics: snapshot.deltaMetrics,
+    })),
+    metricLabels: {
+      all_time_wins: "All-time wins",
+      conference_wins: "Conference wins",
+      playoff_wins: "Playoff wins",
+      playoff_appearances: "Playoff appearances",
+    },
+    recordScopes: ["league"],
+  });
+
+  const awardsAreFinal = dateKey(week.endDate) >= dateKey(season.endDate);
+  const awardName = (key: string) =>
+    key
+      .replace(/([a-z])([A-Z])/g, "$1 $2")
+      .replace(/^./, (value) => value.toUpperCase());
+  const awardFacts = [
+    ...playerAwards.map((award) => ({
+      id: String(award._id),
+      awardKey: String(award.award),
+      awardName: awardName(String(award.award)),
+      status: awardsAreFinal ? ("won" as const) : ("race" as const),
+      leaderId: String(award.playerId),
+      leaderName:
+        playerById.get(String(award.playerId))?.fullName ?? "Unknown player",
+      leaderType: "player" as const,
+      nomineeNames: (award.nomineeIds ?? []).map(
+        (id) => playerById.get(String(id))?.fullName ?? "Unknown player",
+      ),
+    })),
+    ...teamAwards.flatMap((award) => {
+      const leader =
+        (award.ownerId
+          ? currentTeamByOwnerId.get(String(award.ownerId))
+          : undefined) ??
+        (award.teamId ? teamById.get(String(award.teamId)) : undefined);
+      if (!leader) return [];
+      return [
+        {
+          id: String(award._id),
+          awardKey: String(award.award),
+          awardName: awardName(String(award.award)),
+          status: awardsAreFinal ? ("won" as const) : ("race" as const),
+          leaderId: leader.teamId,
+          leaderName: leader.name,
+          leaderType: "team" as const,
+          nomineeNames: (award.nomineeIds ?? []).flatMap((id) => {
+            const nominee =
+              currentTeamByOwnerId.get(String(id)) ?? teamById.get(String(id));
+            return nominee ? [nominee.name] : [];
+          }),
+        },
+      ];
+    }),
+  ];
 
   return buildWeeklyEditionFactPacket({
     season: {
@@ -289,6 +881,7 @@ async function buildSource(
     teams: [...teamById.values()],
     matchups: matchups.map((matchup) => ({
       matchupId: String(matchup._id),
+      gameType: String(matchup.gameType),
       homeTeamId: String(matchup.homeTeamId),
       homeTeamName:
         teamById.get(String(matchup.homeTeamId))?.name ?? "Unknown team",
@@ -350,6 +943,22 @@ async function buildSource(
     }),
     activity,
     missedStarts,
+    performances: [
+      ...playerWeekPerformances,
+      ...playerDayPerformances,
+      ...teamWeekPerformances,
+      ...teamDayPerformances,
+      ...seasonPerformances,
+    ],
+    records: [
+      ...careerRecords,
+      ...achievementRecords,
+      ...playerSeasonRecords,
+      ...teamSeasonRecords,
+      ...teamWeekRecords,
+    ],
+    milestones,
+    awards: awardFacts,
     nextMatchups: nextMatchups.map((matchup) => ({
       matchupId: String(matchup._id),
       homeTeamName:
@@ -365,10 +974,6 @@ async function buildSource(
           ? undefined
           : asNumber(matchup.awayRank),
     })),
-    knownEntityNames: [
-      ...[...teamById.values()].map((team) => team.name),
-      ...players.map((player) => player.fullName),
-    ],
   });
 }
 
@@ -464,6 +1069,19 @@ function milestoneSchedule(season: Doc<"seasons">, finalWeek: Doc<"weeks">) {
   });
 }
 
+function nextChronologicalSeason(
+  seasons: Doc<"seasons">[],
+  season: Doc<"seasons">,
+) {
+  const ordered = [...seasons].sort(
+    (left, right) =>
+      asNumber(left.year) - asNumber(right.year) ||
+      String(left._id).localeCompare(String(right._id)),
+  );
+  const index = ordered.findIndex((candidate) => candidate._id === season._id);
+  return index >= 0 ? (ordered[index + 1] ?? season) : season;
+}
+
 async function buildMilestoneSource(
   ctx: MutationCtx,
   season: Doc<"seasons">,
@@ -471,8 +1089,11 @@ async function buildMilestoneSource(
   issueType: Exclude<WeeklyEditionIssueType, "weekly">,
   triggerDate: string,
 ) {
+  const allSeasons = await ctx.db.query("seasons").collect();
+  const analysisSeason = nextChronologicalSeason(allSeasons, season);
   const [
     teams,
+    sourceTeams,
     franchises,
     players,
     contracts,
@@ -484,6 +1105,10 @@ async function buildMilestoneSource(
   ] = await Promise.all([
     ctx.db
       .query("teams")
+      .withIndex("by_seasonId", (q) => q.eq("seasonId", analysisSeason._id))
+      .collect(),
+    ctx.db
+      .query("teams")
       .withIndex("by_seasonId", (q) => q.eq("seasonId", season._id))
       .collect(),
     ctx.db.query("franchises").collect(),
@@ -491,7 +1116,7 @@ async function buildMilestoneSource(
     ctx.db.query("contracts").collect(),
     ctx.db
       .query("draftPicks")
-      .withIndex("by_seasonId", (q) => q.eq("seasonId", season._id))
+      .withIndex("by_seasonId", (q) => q.eq("seasonId", analysisSeason._id))
       .collect(),
     ctx.db
       .query("weeks")
@@ -546,6 +1171,21 @@ async function buildMilestoneSource(
       ];
     }),
   );
+  const sourceTeamById = new Map(
+    sourceTeams.map((team) => {
+      const franchise = franchiseById.get(String(team.franchiseId));
+      return [
+        String(team._id),
+        {
+          teamId: String(team._id),
+          name: franchise?.name ?? "Unknown team",
+          abbr: franchise?.abbr ?? "GSHL",
+          logoUrl: franchise?.logoUrl ?? undefined,
+          ownerId: String(franchise?.ownerId ?? ""),
+        },
+      ];
+    }),
+  );
   const teamByOwnerId = new Map(
     [...teamById.values()].map((team) => [team.ownerId, team]),
   );
@@ -569,24 +1209,61 @@ async function buildMilestoneSource(
   });
 
   const seasonEnd = dateKey(season.endDate);
-  const signingEnd = dateKey(season.signingEndDate);
+  const signingEnd = dateKey(analysisSeason.signingEndDate);
+  const contractSeasons = allSeasons.map((candidate) => ({
+    id: String(candidate._id),
+    year: candidate.year,
+    startDate: candidate.startDate,
+    endDate: candidate.endDate,
+  }));
+  const completedContractSeason = {
+    id: String(season._id),
+    year: season.year,
+    startDate: season.startDate,
+    endDate: season.endDate,
+  };
+  const analysisContractSeason = {
+    id: String(analysisSeason._id),
+    year: analysisSeason.year,
+    startDate: analysisSeason.startDate,
+    endDate: analysisSeason.endDate,
+  };
   const teamContracts = contracts.filter((contract) =>
     teamByOwnerId.has(String(contract.ownerId)),
   );
-  const relevantContracts = teamContracts.filter((contract) => {
-    const capEnd = dateKey(contract.capHitEndDate ?? contract.expiryDate);
-    return capEnd > seasonEnd;
-  });
-  const expiringRows = teamContracts.filter((contract) => {
-    const expiryDate = dateKey(contract.expiryDate);
-    return (
-      expiryDate === seasonEnd ||
-      (expiryDate > seasonEnd && signingEnd && expiryDate <= signingEnd)
-    );
-  });
+  const relevantContracts = teamContracts.filter((contract) =>
+    weeklyEditionContractAffectsSeason(
+      contract,
+      analysisContractSeason,
+      contractSeasons,
+    ),
+  );
+  const expiringRows = teamContracts.filter(
+    (contract) =>
+      isWeeklyEditionPlayingContract(contract) &&
+      weeklyEditionContractAffectsSeason(
+        contract,
+        completedContractSeason,
+        contractSeasons,
+      ) &&
+      !weeklyEditionContractAffectsSeason(
+        contract,
+        analysisContractSeason,
+        contractSeasons,
+      ),
+  );
   const recentRows = teamContracts.filter((contract) => {
     const signingDate = dateKey(contract.signingDate);
-    return signingDate > seasonEnd && signingDate <= triggerDate;
+    return (
+      isWeeklyEditionPlayingContract(contract) &&
+      weeklyEditionContractAffectsSeason(
+        contract,
+        analysisContractSeason,
+        contractSeasons,
+      ) &&
+      signingDate > seasonEnd &&
+      signingDate <= triggerDate
+    );
   });
   const contractFact = (contract: Doc<"contracts">) => ({
     contractId: String(contract._id),
@@ -611,9 +1288,26 @@ async function buildMilestoneSource(
       : undefined,
   }));
   const teamOutlooks = [...teamById.values()].map((team) => {
-    const roster = players.filter(
-      (player) => String(player.ownerId ?? "") === team.ownerId,
+    const rosterPlayerIds = new Set(
+      relevantContracts
+        .filter(
+          (contract) =>
+            String(contract.ownerId) === team.ownerId &&
+            isWeeklyEditionPlayingContract(contract),
+        )
+        .map((contract) => String(contract.playerId)),
     );
+    if (issueType === "preseason") {
+      draftPicks
+        .filter(
+          (pick) =>
+            String(pick.gshlTeamId) === team.teamId && Boolean(pick.playerId),
+        )
+        .forEach((pick) => rosterPlayerIds.add(String(pick.playerId)));
+    }
+    const roster = [...rosterPlayerIds]
+      .map((playerId) => playerById.get(playerId))
+      .filter((player) => player !== undefined);
     const ratings = roster
       .map((player) =>
         asNumber(player.overallRating ?? player.seasonRating ?? 0),
@@ -653,21 +1347,31 @@ async function buildMilestoneSource(
   const currentPowerByTeam = new Map(
     [...latestPowerByTeam.entries()].map(([teamId, row]) => [teamId, row]),
   );
+  const finalEditorialCandidates =
+    issueType === "final_recap"
+      ? (await buildSource(ctx, season, anchorWeek)).editorialCandidates
+      : [];
 
   return buildMilestoneEditionFactPacket({
     issueType,
     issueLabel:
-      milestoneSchedule(season, anchorWeek).find(
+      milestoneSchedule(analysisSeason, anchorWeek).find(
         (item) => item.issueType === issueType,
       )?.issueLabel ?? issueType,
     triggerDate,
+    analysisSeason: {
+      id: String(analysisSeason._id),
+      name: analysisSeason.name,
+      signingEndDate: signingEnd,
+      draftStartAt: isoTimestamp(analysisSeason.draftStartAt),
+    },
     season: {
       id: String(season._id),
       name: season.name,
       year: String(season.year),
       endDate: seasonEnd,
       signingEndDate: signingEnd,
-      draftStartAt: isoTimestamp(season.draftStartAt),
+      draftStartAt: isoTimestamp(analysisSeason.draftStartAt),
     },
     week: {
       id: String(anchorWeek._id),
@@ -682,10 +1386,12 @@ async function buildMilestoneSource(
             matchupId: String(matchup._id),
             homeTeamId: String(matchup.homeTeamId),
             homeTeamName:
-              teamById.get(String(matchup.homeTeamId))?.name ?? "Unknown team",
+              sourceTeamById.get(String(matchup.homeTeamId))?.name ??
+              "Unknown team",
             awayTeamId: String(matchup.awayTeamId),
             awayTeamName:
-              teamById.get(String(matchup.awayTeamId))?.name ?? "Unknown team",
+              sourceTeamById.get(String(matchup.awayTeamId))?.name ??
+              "Unknown team",
             homeScore: asNumber(matchup.homeScore),
             awayScore: asNumber(matchup.awayScore),
             homeRank: asNumber(matchup.homeRank),
@@ -698,10 +1404,10 @@ async function buildMilestoneSource(
             categoryMargins: buildWeeklyEditionCategoryMargins({
               categories: season.categories ?? [],
               homeTeamName:
-                teamById.get(String(matchup.homeTeamId))?.name ??
+                sourceTeamById.get(String(matchup.homeTeamId))?.name ??
                 "Unknown team",
               awayTeamName:
-                teamById.get(String(matchup.awayTeamId))?.name ??
+                sourceTeamById.get(String(matchup.awayTeamId))?.name ??
                 "Unknown team",
               homeStats:
                 currentPowerByTeam.get(String(matchup.homeTeamId)) ?? {},
@@ -719,7 +1425,8 @@ async function buildMilestoneSource(
               "Unknown player",
             teamId: String(row.gshlTeamId),
             teamName:
-              teamById.get(String(row.gshlTeamId))?.name ?? "Unknown team",
+              sourceTeamById.get(String(row.gshlTeamId))?.name ??
+              "Unknown team",
             rating: row.Rating,
             points: row.P,
             wins: row.W,
@@ -727,7 +1434,7 @@ async function buildMilestoneSource(
         : [],
     power: [...latestPowerByTeam.entries()].map(([teamId, row]) => ({
       teamId,
-      teamName: teamById.get(teamId)?.name ?? "Unknown team",
+      teamName: sourceTeamById.get(teamId)?.name ?? "Unknown team",
       currentRank: row.powerRk,
       previousRank: row.powerRk,
       currentElo: row.powerEloPost ?? row.powerElo,
@@ -737,10 +1444,7 @@ async function buildMilestoneSource(
     expiringContracts: expiringRows.map(contractFact),
     recentSignings: recentRows.map(contractFact),
     draftPicks: draftFacts,
-    knownEntityNames: [
-      ...[...teamById.values()].map((team) => team.name),
-      ...players.map((player) => player.fullName),
-    ],
+    editorialCandidates: finalEditorialCandidates,
   });
 }
 
@@ -793,10 +1497,7 @@ async function generateMilestoneForSeason(
   const values = {
     editionKey,
     issueType,
-    issueLabel:
-      milestoneSchedule(season, anchorWeek).find(
-        (item) => item.issueType === issueType,
-      )?.issueLabel ?? issueType,
+    issueLabel: facts.issueLabel,
     seasonName: season.name,
     weekNum: asNumber(anchorWeek.weekNum),
     startDate: anchorStart,
@@ -933,15 +1634,17 @@ export const generateHistorical = mutation({
   },
   handler: async (ctx, args) => {
     const user = await requireCommissioner(ctx);
-    const [season, week] = await Promise.all([
+    const [season, week, allSeasons] = await Promise.all([
       ctx.db.get(args.seasonId),
       ctx.db.get(args.weekId),
+      ctx.db.query("seasons").collect(),
     ]);
     if (!season || !week || week.seasonId !== season._id)
       throw new Error("Season or week not found");
     const issueType = args.issueType ?? "weekly";
+    const analysisSeason = nextChronologicalSeason(allSeasons, season);
     const scheduledFor =
-      milestoneSchedule(season, week).find(
+      milestoneSchedule(analysisSeason, week).find(
         (item) => item.issueType === issueType,
       )?.scheduledFor ?? dateKey(week.endDate);
     const result =
@@ -1110,9 +1813,11 @@ export const processGenerationJob = internalMutation({
         (left, right) => asNumber(right.weekNum) - asNumber(left.weekNum),
       )[0];
       if (!finalWeek) continue;
-      for (const milestone of milestoneSchedule(season, finalWeek).filter(
-        (item) => item.scheduledFor <= today,
-      )) {
+      const analysisSeason = nextChronologicalSeason(allSeasons, season);
+      for (const milestone of milestoneSchedule(
+        analysisSeason,
+        finalWeek,
+      ).filter((item) => item.scheduledFor <= today)) {
         counts.processed += 1;
         try {
           const result = await generateMilestoneForSeason(
@@ -1160,9 +1865,11 @@ export const scanDueMilestones = internalMutation({
         (left, right) => asNumber(right.weekNum) - asNumber(left.weekNum),
       )[0];
       if (!finalWeek) continue;
-      for (const milestone of milestoneSchedule(season, finalWeek).filter(
-        (item) => item.scheduledFor <= today,
-      )) {
+      const analysisSeason = nextChronologicalSeason(seasons, season);
+      for (const milestone of milestoneSchedule(
+        analysisSeason,
+        finalWeek,
+      ).filter((item) => item.scheduledFor <= today)) {
         result.processed += 1;
         try {
           const generated = await generateMilestoneForSeason(

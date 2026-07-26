@@ -58,6 +58,7 @@ export interface WeeklyEditionTeamFact {
 
 export interface WeeklyEditionMatchupFact {
   matchupId: string;
+  gameType?: string;
   homeTeamId: string;
   homeTeamName: string;
   awayTeamId: string;
@@ -106,7 +107,7 @@ export interface WeeklyEditionPowerMoverFact {
 
 export interface WeeklyEditionActivityFact {
   id: string;
-  kind: "add" | "drop" | "signing";
+  kind: "add" | "drop" | "signing" | "trade";
   date: string;
   playerName: string;
   teamName: string;
@@ -127,6 +128,140 @@ export interface WeeklyEditionNextMatchupFact {
   awayTeamName: string;
   homeRank?: number;
   awayRank?: number;
+}
+
+export type WeeklyEditionEditorialCandidateKind =
+  | "matchup"
+  | "player_performance"
+  | "team_performance"
+  | "record"
+  | "milestone"
+  | "award_race"
+  | "award"
+  | "transaction"
+  | "missed_start";
+
+export type WeeklyEditionEditorialCandidateScope =
+  | "day"
+  | "week"
+  | "season"
+  | "career"
+  | "franchise"
+  | "league";
+
+export interface WeeklyEditionEditorialMetric {
+  key: string;
+  label: string;
+  value: number;
+  previousValue?: number;
+  threshold?: number;
+}
+
+export interface WeeklyEditionEditorialCandidate {
+  id: string;
+  kind: WeeklyEditionEditorialCandidateKind;
+  scope: WeeklyEditionEditorialCandidateScope;
+  importance: number;
+  occurredAt?: string;
+  headlineHint: string;
+  summary: string;
+  playerId?: string;
+  playerName?: string;
+  teamId?: string;
+  teamName?: string;
+  franchiseId?: string;
+  franchiseName?: string;
+  metrics: WeeklyEditionEditorialMetric[];
+  links: WeeklyEditionLink[];
+}
+
+export interface WeeklyEditionPerformanceFact {
+  id: string;
+  entityType: "player" | "team";
+  scope: "day" | "week" | "season";
+  occurredAt?: string;
+  playerId?: string;
+  playerName?: string;
+  teamId?: string;
+  teamName?: string;
+  rating: number;
+  stats: Record<string, number>;
+}
+
+export interface WeeklyEditionRecordFact {
+  id: string;
+  entityType: "player" | "team";
+  recordScope: "franchise" | "league";
+  period: "day" | "week" | "season" | "career";
+  playerId?: string;
+  playerName?: string;
+  teamId?: string;
+  teamName?: string;
+  franchiseId?: string;
+  franchiseName?: string;
+  metric: WeeklyEditionEditorialMetric;
+}
+
+export interface WeeklyEditionMilestoneFact {
+  id: string;
+  teamId?: string;
+  teamName: string;
+  franchiseId: string;
+  franchiseName: string;
+  milestone:
+    | "all_time_wins"
+    | "conference_wins"
+    | "playoff_wins"
+    | "playoff_appearances";
+  metric: WeeklyEditionEditorialMetric;
+}
+
+export interface WeeklyEditionAwardFact {
+  id: string;
+  awardKey: string;
+  awardName: string;
+  status: "race" | "won";
+  leaderId: string;
+  leaderName: string;
+  leaderType: "player" | "team";
+  nomineeNames: string[];
+}
+
+export interface WeeklyEditionRecordObservation {
+  id: string;
+  entityType: "player" | "team";
+  period: "day" | "week" | "season" | "career";
+  periodId: string;
+  playerId?: string;
+  playerName?: string;
+  teamId?: string;
+  teamName?: string;
+  franchiseId?: string;
+  franchiseName?: string;
+  metrics: Record<string, number>;
+  deltaMetrics?: Record<string, number>;
+}
+
+export interface WeeklyEditionAchievementSnapshot {
+  id: string;
+  teamId?: string;
+  teamName: string;
+  franchiseId: string;
+  franchiseName: string;
+  metrics: Record<
+    | "all_time_wins"
+    | "conference_wins"
+    | "playoff_wins"
+    | "playoff_appearances",
+    number
+  >;
+  deltaMetrics: Record<
+    | "all_time_wins"
+    | "conference_wins"
+    | "playoff_wins"
+    | "playoff_appearances",
+    number
+  >;
 }
 
 export interface WeeklyEditionFactPacket {
@@ -153,9 +288,7 @@ export interface WeeklyEditionFactPacket {
   activity: WeeklyEditionActivityFact[];
   missedStarts: WeeklyEditionMissedStartFact[];
   nextMatchups: WeeklyEditionNextMatchupFact[];
-  knownEntityNames: string[];
-  allowedNames: string[];
-  allowedNumbers: string[];
+  editorialCandidates: WeeklyEditionEditorialCandidate[];
   issueType: WeeklyEditionIssueType;
   issueLabel: string;
   milestone?: WeeklyEditionMilestoneFacts;
@@ -192,6 +325,10 @@ export interface WeeklyEditionDraftPickFact {
 
 export interface WeeklyEditionMilestoneFacts {
   triggerDate: string;
+  analysisSeasonId: string;
+  analysisSeasonName: string;
+  analysisSeasonSigningEndDate?: string;
+  analysisSeasonDraftStartAt?: string;
   salaryCap: number;
   teamOutlooks: WeeklyEditionTeamOutlookFact[];
   expiringContracts: WeeklyEditionContractFact[];
@@ -257,6 +394,23 @@ export interface WeeklyEditionSourcePower {
   previousElo?: unknown;
 }
 
+export interface WeeklyEditionContractSeasonSource {
+  id: string;
+  year: string | number;
+  startDate?: string | number | null;
+  endDate?: string | number | null;
+}
+
+export interface WeeklyEditionContractCoverageSource {
+  seasonId: string;
+  contractLength?: string | number | null;
+  startDate?: string | number | null;
+  expiryDate?: string | number | null;
+  capHitEndDate?: string | number | null;
+  contractType?: string | string[] | null;
+  expiryStatus?: string | null;
+}
+
 export interface BuildWeeklyEditionFactPacketInput {
   season: WeeklyEditionFactPacket["season"];
   week: WeeklyEditionFactPacket["week"];
@@ -267,13 +421,22 @@ export interface BuildWeeklyEditionFactPacketInput {
   activity: WeeklyEditionActivityFact[];
   missedStarts: WeeklyEditionMissedStartFact[];
   nextMatchups: WeeklyEditionNextMatchupFact[];
-  knownEntityNames: string[];
+  performances?: WeeklyEditionPerformanceFact[];
+  records?: WeeklyEditionRecordFact[];
+  milestones?: WeeklyEditionMilestoneFact[];
+  awards?: WeeklyEditionAwardFact[];
 }
 
 export interface BuildMilestoneEditionFactPacketInput {
   issueType: Exclude<WeeklyEditionIssueType, "weekly">;
   issueLabel: string;
   triggerDate: string;
+  analysisSeason: {
+    id: string;
+    name: string;
+    signingEndDate?: string;
+    draftStartAt?: string;
+  };
   season: WeeklyEditionFactPacket["season"];
   week: WeeklyEditionFactPacket["week"];
   teams: WeeklyEditionTeamFact[];
@@ -284,7 +447,7 @@ export interface BuildMilestoneEditionFactPacketInput {
   expiringContracts: WeeklyEditionContractFact[];
   recentSignings: WeeklyEditionContractFact[];
   draftPicks: WeeklyEditionDraftPickFact[];
-  knownEntityNames: string[];
+  editorialCandidates?: WeeklyEditionEditorialCandidate[];
 }
 
 export interface BuildWeeklyEditionCategoryMarginsInput {

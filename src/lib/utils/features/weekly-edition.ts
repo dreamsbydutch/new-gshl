@@ -3,15 +3,24 @@ import type {
   BuildWeeklyEditionFactPacketInput,
   BuildWeeklyEditionCategoryMarginsInput,
   BuildMilestoneEditionFactPacketInput,
+  WeeklyEditionContractCoverageSource,
+  WeeklyEditionContractSeasonSource,
   WeeklyEditionContent,
+  WeeklyEditionEditorialCandidate,
+  WeeklyEditionEditorialMetric,
   WeeklyEditionFactPacket,
+  WeeklyEditionAchievementSnapshot,
   WeeklyEditionMatchupFact,
   WeeklyEditionMilestoneScheduleEntry,
   WeeklyEditionMilestoneScheduleInput,
   WeeklyEditionSection,
   WeeklyEditionSectionKind,
+  WeeklyEditionRecordFact,
+  WeeklyEditionRecordObservation,
   WeeklyEditionValidationResult,
 } from "@gshl-types";
+import { normalizeDateOnlyValue } from "../core/date";
+import { ContractStatus, ContractType } from "../domain/constants";
 
 export const WEEKLY_EDITION_SECTION_KINDS = [
   "biggest_story",
@@ -117,6 +126,61 @@ const optionalNumber = (value: unknown) => {
 };
 
 const INVERSE_CATEGORIES = new Set(["GAA"]);
+const NON_PLAYING_CONTRACT_STATUSES = new Set<string>([
+  String(ContractStatus.BUYOUT),
+  String(ContractStatus.RETIRED),
+  String(ContractStatus.INJURED),
+]);
+
+export function isWeeklyEditionPlayingContract(
+  contract: WeeklyEditionContractCoverageSource,
+) {
+  if (NON_PLAYING_CONTRACT_STATUSES.has(String(contract.expiryStatus))) {
+    return false;
+  }
+  const types = Array.isArray(contract.contractType)
+    ? contract.contractType.map(String)
+    : [String(contract.contractType)];
+  return types.some(
+    (type) =>
+      type === String(ContractType.STANDARD) ||
+      type === String(ContractType.EXTENSION),
+  );
+}
+
+export function weeklyEditionContractAffectsSeason(
+  contract: WeeklyEditionContractCoverageSource,
+  season: WeeklyEditionContractSeasonSource,
+  seasons: WeeklyEditionContractSeasonSource[],
+) {
+  const seasonStart = normalizeDateOnlyValue(season.startDate);
+  const seasonEnd = normalizeDateOnlyValue(season.endDate);
+  const contractStart = normalizeDateOnlyValue(contract.startDate);
+  const contractEnd = normalizeDateOnlyValue(
+    contract.capHitEndDate ?? contract.expiryDate,
+  );
+  if (seasonStart && seasonEnd && contractStart && contractEnd) {
+    return contractStart <= seasonEnd && contractEnd >= seasonStart;
+  }
+
+  const ordered = [...seasons].sort(
+    (left, right) =>
+      numberValue(left.year) - numberValue(right.year) ||
+      left.id.localeCompare(right.id),
+  );
+  const signingIndex = ordered.findIndex(
+    (candidate) => candidate.id === contract.seasonId,
+  );
+  const seasonIndex = ordered.findIndex(
+    (candidate) => candidate.id === season.id,
+  );
+  const length = numberValue(contract.contractLength);
+  return (
+    signingIndex >= 0 &&
+    seasonIndex > signingIndex &&
+    seasonIndex <= signingIndex + length
+  );
+}
 
 export function buildWeeklyEditionCategoryMargins({
   categories,
@@ -231,37 +295,516 @@ function selectHeroMatchup(matchups: WeeklyEditionMatchupFact[]) {
   })[0];
 }
 
-function collectAllowedNumbers(
-  packet: Omit<WeeklyEditionFactPacket, "allowedNumbers">,
-) {
-  const values = new Set<string>([
-    "0",
-    "1",
-    "2",
-    "3",
-    String(packet.week.number),
-    packet.season.year,
-  ]);
-  packet.teams.forEach((_team, index) => values.add(String(index + 1)));
-  const visit = (value: unknown) => {
-    if (typeof value === "number" && Number.isFinite(value)) {
-      values.add(String(value));
-      values.add(value.toFixed(1));
-      values.add(value.toFixed(2));
-      values.add((value / 1_000_000).toFixed(1));
-    } else if (typeof value === "string") {
-      (value.match(/-?\d+(?:\.\d+)?/g) ?? []).forEach((number) => {
-        values.add(number);
-        values.add(number.replace(/^-/, ""));
-      });
-    } else if (Array.isArray(value)) {
-      value.forEach(visit);
-    } else if (value && typeof value === "object") {
-      Object.values(value).forEach(visit);
-    }
+const metricText = (metric: WeeklyEditionEditorialMetric) =>
+  `${metric.label}: ${metric.value}${
+    metric.previousValue === undefined
+      ? ""
+      : ` (previous record ${metric.previousValue})`
+  }`;
+
+const candidateImportance = (value: number) =>
+  Math.max(0, Math.min(100, Math.round(value)));
+
+function recordFact(
+  observation: WeeklyEditionRecordObservation,
+  recordScope: "franchise" | "league",
+  key: string,
+  label: string,
+  value: number,
+  previousValue: number,
+): WeeklyEditionRecordFact {
+  return {
+    id: `${observation.id}:${recordScope}:${key}`,
+    entityType: observation.entityType,
+    recordScope,
+    period: observation.period,
+    playerId: observation.playerId,
+    playerName: observation.playerName,
+    teamId: observation.teamId,
+    teamName: observation.teamName,
+    franchiseId: observation.franchiseId,
+    franchiseName: observation.franchiseName,
+    metric: { key, label, value, previousValue },
   };
-  visit(packet);
-  return [...values].sort();
+}
+
+export function buildWeeklyEditionPeriodRecordFacts({
+  current,
+  historical,
+  metricLabels,
+}: {
+  current: WeeklyEditionRecordObservation[];
+  historical: WeeklyEditionRecordObservation[];
+  metricLabels: Record<string, string>;
+}) {
+  const records: WeeklyEditionRecordFact[] = [];
+  for (const observation of current) {
+    for (const [key, label] of Object.entries(metricLabels)) {
+      const value = observation.metrics[key] ?? 0;
+      if (value <= 0) continue;
+      const comparable = historical.filter(
+        (row) =>
+          row.entityType === observation.entityType &&
+          row.period === observation.period,
+      );
+      const leaguePrevious = Math.max(
+        0,
+        ...comparable.map((row) => row.metrics[key] ?? 0),
+      );
+      const delta = observation.deltaMetrics?.[key];
+      const crossedLeagueRecord =
+        delta === undefined || value - delta <= leaguePrevious;
+      if (leaguePrevious > 0 && value > leaguePrevious && crossedLeagueRecord) {
+        records.push(
+          recordFact(observation, "league", key, label, value, leaguePrevious),
+        );
+        continue;
+      }
+      if (!observation.franchiseId) continue;
+      const franchisePrevious = Math.max(
+        0,
+        ...comparable
+          .filter((row) => row.franchiseId === observation.franchiseId)
+          .map((row) => row.metrics[key] ?? 0),
+      );
+      const crossedFranchiseRecord =
+        delta === undefined || value - delta <= franchisePrevious;
+      if (
+        franchisePrevious > 0 &&
+        value > franchisePrevious &&
+        crossedFranchiseRecord
+      ) {
+        records.push(
+          recordFact(
+            observation,
+            "franchise",
+            key,
+            label,
+            value,
+            franchisePrevious,
+          ),
+        );
+      }
+    }
+  }
+  return records;
+}
+
+export function buildWeeklyEditionCareerRecordFacts({
+  snapshots,
+  metricLabels,
+  recordScopes = ["league", "franchise"],
+}: {
+  snapshots: WeeklyEditionRecordObservation[];
+  metricLabels: Record<string, string>;
+  recordScopes?: Array<"league" | "franchise">;
+}) {
+  const records: WeeklyEditionRecordFact[] = [];
+  for (const snapshot of snapshots) {
+    for (const [key, label] of Object.entries(metricLabels)) {
+      const value = snapshot.metrics[key] ?? 0;
+      const delta = snapshot.deltaMetrics?.[key] ?? 0;
+      if (value <= 0 || delta <= 0) continue;
+      const before = value - delta;
+      const peers = snapshots.filter(
+        (row) =>
+          row.entityType === snapshot.entityType && row.id !== snapshot.id,
+      );
+      const leagueAfter = Math.max(
+        0,
+        ...peers.map((row) => row.metrics[key] ?? 0),
+      );
+      const leagueBefore = Math.max(
+        0,
+        ...peers.map(
+          (row) => (row.metrics[key] ?? 0) - (row.deltaMetrics?.[key] ?? 0),
+        ),
+      );
+      if (
+        recordScopes.includes("league") &&
+        leagueAfter > 0 &&
+        value > leagueAfter &&
+        before <= leagueBefore
+      ) {
+        records.push(
+          recordFact(snapshot, "league", key, label, value, leagueBefore),
+        );
+        continue;
+      }
+      if (!recordScopes.includes("franchise") || !snapshot.franchiseId) {
+        continue;
+      }
+      const franchisePeers = peers.filter(
+        (row) => row.franchiseId === snapshot.franchiseId,
+      );
+      const franchiseAfter = Math.max(
+        0,
+        ...franchisePeers.map((row) => row.metrics[key] ?? 0),
+      );
+      const franchiseBefore = Math.max(
+        0,
+        ...franchisePeers.map(
+          (row) => (row.metrics[key] ?? 0) - (row.deltaMetrics?.[key] ?? 0),
+        ),
+      );
+      if (
+        franchiseAfter > 0 &&
+        value > franchiseAfter &&
+        before <= franchiseBefore
+      ) {
+        records.push(
+          recordFact(snapshot, "franchise", key, label, value, franchiseBefore),
+        );
+      }
+    }
+  }
+  return records;
+}
+
+export function buildWeeklyEditionMilestoneFacts(
+  snapshots: WeeklyEditionAchievementSnapshot[],
+) {
+  const intervals = {
+    all_time_wins: 10,
+    conference_wins: 10,
+    playoff_wins: 5,
+    playoff_appearances: 5,
+  } as const;
+  const labels = {
+    all_time_wins: "All-time wins",
+    conference_wins: "Conference wins",
+    playoff_wins: "Playoff wins",
+    playoff_appearances: "Playoff appearances",
+  } as const;
+  return snapshots.flatMap((snapshot) =>
+    (Object.keys(intervals) as Array<keyof typeof intervals>).flatMap((key) => {
+      const value = snapshot.metrics[key];
+      const delta = snapshot.deltaMetrics[key];
+      const previousValue = value - delta;
+      const interval = intervals[key];
+      const threshold =
+        key === "playoff_appearances" && previousValue === 0 && value === 1
+          ? 1
+          : Math.floor(value / interval) * interval;
+      if (
+        delta <= 0 ||
+        threshold <= 0 ||
+        previousValue >= threshold ||
+        value < threshold
+      ) {
+        return [];
+      }
+      return [
+        {
+          id: `${snapshot.id}:${key}:${threshold}`,
+          teamId: snapshot.teamId,
+          teamName: snapshot.teamName,
+          franchiseId: snapshot.franchiseId,
+          franchiseName: snapshot.franchiseName,
+          milestone: key,
+          metric: {
+            key,
+            label: labels[key],
+            value,
+            previousValue,
+            threshold,
+          },
+        },
+      ];
+    }),
+  );
+}
+
+export function buildWeeklyEditionEditorialCandidates(
+  input: BuildWeeklyEditionFactPacketInput,
+  matchups: WeeklyEditionMatchupFact[],
+): WeeklyEditionEditorialCandidate[] {
+  const candidates: WeeklyEditionEditorialCandidate[] = [];
+  for (const matchup of matchups) {
+    const playoffWeight =
+      matchup.gameType === "F"
+        ? 100
+        : matchup.gameType === "SF"
+          ? 94
+          : matchup.gameType === "QF"
+            ? 90
+            : 0;
+    const importance = Math.max(
+      playoffWeight,
+      candidateImportance(
+        58 +
+          matchup.rankUpset * 5 +
+          Math.min(matchup.competitiveRating ?? 0, 20),
+      ),
+    );
+    candidates.push({
+      id: `matchup:${matchup.matchupId}`,
+      kind: "matchup",
+      scope: "week",
+      importance,
+      headlineHint: matchup.winnerTeamName
+        ? `${matchup.winnerTeamName} defeats ${matchup.loserTeamName}`
+        : `${matchup.homeTeamName} and ${matchup.awayTeamName} finish level`,
+      summary: matchupSummary(matchup),
+      teamId: matchup.winnerTeamId,
+      teamName: matchup.winnerTeamName,
+      metrics: [
+        {
+          key: "homeScore",
+          label: matchup.homeTeamName,
+          value: matchup.homeScore,
+        },
+        {
+          key: "awayScore",
+          label: matchup.awayTeamName,
+          value: matchup.awayScore,
+        },
+        ...(matchup.rankUpset > 0
+          ? [
+              {
+                key: "rankUpset",
+                label: "Ranking places overcome",
+                value: matchup.rankUpset,
+              },
+            ]
+          : []),
+      ],
+      links: [
+        {
+          label: "Open matchup",
+          href: `/matchup/${matchup.matchupId}`,
+        },
+      ],
+    });
+  }
+
+  const performances = [...(input.performances ?? [])];
+  const existingPlayerWeekIds = new Set(
+    performances
+      .filter(
+        (performance) =>
+          performance.entityType === "player" && performance.scope === "week",
+      )
+      .map((performance) => performance.playerId),
+  );
+  performances.push(
+    ...input.players
+      .filter((player) => !existingPlayerWeekIds.has(player.playerId))
+      .map((player) => ({
+        id: `weekly-star:${player.playerId}`,
+        entityType: "player" as const,
+        scope: "week" as const,
+        playerId: player.playerId,
+        playerName: player.playerName,
+        teamId: player.teamId,
+        teamName: player.teamName,
+        rating: numberValue(player.rating),
+        stats: {
+          P: numberValue(player.points),
+          W: numberValue(player.wins),
+        },
+      }))
+      .sort(
+        (left, right) =>
+          right.rating - left.rating ||
+          left.playerName.localeCompare(right.playerName),
+      )
+      .filter((performance, index) => performance.rating >= 85 || index < 3),
+  );
+  for (const performance of performances) {
+    const ratingBonus =
+      performance.rating >= 95
+        ? 98
+        : performance.rating >= 90
+          ? 93
+          : performance.rating >= 85
+            ? 88
+            : performance.scope === "season"
+              ? 76
+              : 70;
+    const metrics = [
+      {
+        key: "Rating",
+        label: "Rating",
+        value: performance.rating,
+      },
+      ...Object.entries(performance.stats)
+        .filter(([, value]) => value !== 0)
+        .slice(0, 6)
+        .map(([key, value]) => ({ key, label: key, value })),
+    ];
+    const entityName =
+      performance.entityType === "player"
+        ? performance.playerName
+        : performance.teamName;
+    const statSummary = metrics.slice(1).map(metricText).join(", ");
+    candidates.push({
+      id: `performance:${performance.id}`,
+      kind:
+        performance.entityType === "player"
+          ? "player_performance"
+          : "team_performance",
+      scope: performance.scope,
+      importance: ratingBonus,
+      occurredAt: performance.occurredAt,
+      headlineHint: `${entityName ?? "GSHL standout"} posts a ${performance.rating.toFixed(1)} rating`,
+      summary: `${entityName ?? "GSHL standout"} produced a ${performance.rating.toFixed(1)} ${performance.scope} rating.${statSummary ? ` ${statSummary}.` : ""}`,
+      playerId: performance.playerId,
+      playerName: performance.playerName,
+      teamId: performance.teamId,
+      teamName: performance.teamName,
+      metrics,
+      links: [],
+    });
+  }
+
+  for (const record of input.records ?? []) {
+    const subjectName =
+      record.entityType === "player" ? record.playerName : record.teamName;
+    candidates.push({
+      id: `record:${record.id}`,
+      kind: "record",
+      scope: record.recordScope,
+      importance:
+        record.recordScope === "league"
+          ? record.period === "career"
+            ? 100
+            : 97
+          : record.period === "career"
+            ? 96
+            : 92,
+      headlineHint: `${subjectName ?? "A GSHL standout"} sets a ${record.recordScope} ${record.period} record`,
+      summary: `${subjectName ?? "A GSHL standout"} set a new ${record.recordScope} ${record.period} record in ${record.metric.label}: ${record.metric.value}, passing ${record.metric.previousValue ?? 0}.`,
+      playerId: record.playerId,
+      playerName: record.playerName,
+      teamId: record.teamId,
+      teamName: record.teamName,
+      franchiseId: record.franchiseId,
+      franchiseName: record.franchiseName,
+      metrics: [record.metric],
+      links: [],
+    });
+  }
+
+  for (const milestone of input.milestones ?? []) {
+    const label = milestone.milestone.replaceAll("_", " ");
+    candidates.push({
+      id: `milestone:${milestone.id}`,
+      kind: "milestone",
+      scope: "franchise",
+      importance: milestone.milestone === "playoff_appearances" ? 91 : 89,
+      headlineHint: `${milestone.franchiseName} reaches ${milestone.metric.value} ${label}`,
+      summary: `${milestone.franchiseName} reached ${milestone.metric.value} ${label}, crossing the ${milestone.metric.threshold ?? milestone.metric.value} milestone.`,
+      teamId: milestone.teamId,
+      teamName: milestone.teamName,
+      franchiseId: milestone.franchiseId,
+      franchiseName: milestone.franchiseName,
+      metrics: [milestone.metric],
+      links: [],
+    });
+  }
+
+  for (const award of input.awards ?? []) {
+    candidates.push({
+      id: `award:${award.id}`,
+      kind: award.status === "won" ? "award" : "award_race",
+      scope: "season",
+      importance: award.status === "won" ? 95 : 78,
+      headlineHint:
+        award.status === "won"
+          ? `${award.leaderName} wins the ${award.awardName}`
+          : `${award.leaderName} leads the ${award.awardName} race`,
+      summary:
+        award.status === "won"
+          ? `${award.leaderName} won the ${award.awardName}.`
+          : `${award.leaderName} leads the ${award.awardName} race ahead of ${award.nomineeNames.join(", ") || "the field"}.`,
+      playerId: award.leaderType === "player" ? award.leaderId : undefined,
+      playerName: award.leaderType === "player" ? award.leaderName : undefined,
+      teamId: award.leaderType === "team" ? award.leaderId : undefined,
+      teamName: award.leaderType === "team" ? award.leaderName : undefined,
+      metrics: [],
+      links: [],
+    });
+  }
+
+  for (const activity of input.activity) {
+    const importance =
+      activity.kind === "trade"
+        ? 82
+        : activity.kind === "signing"
+          ? 72
+          : activity.kind === "add"
+            ? 55
+            : 48;
+    candidates.push({
+      id: `transaction:${activity.id}`,
+      kind: "transaction",
+      scope: "week",
+      importance,
+      occurredAt: activity.date,
+      headlineHint: `${activity.teamName} ${activity.kind === "trade" ? "acquires" : activity.kind === "drop" ? "drops" : "adds"} ${activity.playerName}`,
+      summary: `${activity.teamName} recorded a ${activity.kind} involving ${activity.playerName}${activity.detail ? ` (${activity.detail})` : ""}.`,
+      playerName: activity.playerName,
+      teamName: activity.teamName,
+      metrics: [],
+      links: [],
+    });
+  }
+
+  for (const missed of input.missedStarts) {
+    candidates.push({
+      id: `missed-start:${missed.id}`,
+      kind: "missed_start",
+      scope: "week",
+      importance: candidateImportance(42 + missed.count * 5),
+      occurredAt: missed.date,
+      headlineHint: `${missed.teamName} leaves ${missed.count} start${missed.count === 1 ? "" : "s"} unused`,
+      summary: `${missed.playerName} accounted for ${missed.count} missed start${missed.count === 1 ? "" : "s"} for ${missed.teamName}.`,
+      playerName: missed.playerName,
+      teamName: missed.teamName,
+      metrics: [
+        {
+          key: "missedStarts",
+          label: "Missed starts",
+          value: missed.count,
+        },
+      ],
+      links: [],
+    });
+  }
+
+  for (const mover of input.power) {
+    const currentRank = numberValue(mover.currentRank);
+    const previousRank = numberValue(mover.previousRank);
+    const rankChange = previousRank - currentRank;
+    if (rankChange === 0) continue;
+    candidates.push({
+      id: `power:${mover.teamId}`,
+      kind: "team_performance",
+      scope: "week",
+      importance: candidateImportance(60 + Math.abs(rankChange) * 4),
+      headlineHint: `${mover.teamName} ${rankChange > 0 ? "climbs" : "slides"} ${Math.abs(rankChange)} power-ranking spot${Math.abs(rankChange) === 1 ? "" : "s"}`,
+      summary: `${mover.teamName} moved from No. ${previousRank} to No. ${currentRank} in the weekly power rankings.`,
+      teamId: mover.teamId,
+      teamName: mover.teamName,
+      metrics: [
+        {
+          key: "powerRank",
+          label: "Power rank",
+          value: currentRank,
+          previousValue: previousRank,
+        },
+      ],
+      links: [],
+    });
+  }
+
+  return candidates
+    .sort(
+      (left, right) =>
+        right.importance - left.importance || left.id.localeCompare(right.id),
+    )
+    .slice(0, 40);
 }
 
 export function buildWeeklyEditionFactPacket(
@@ -318,34 +861,7 @@ export function buildWeeklyEditionFactPacket(
     )
     .slice(0, 4);
 
-  const allowedNames = new Set<string>();
-  const addName = (name: string | undefined) => {
-    if (name?.trim()) allowedNames.add(name.trim());
-  };
-  input.teams.forEach((team) => addName(team.name));
-  matchups.forEach((matchup) => {
-    addName(matchup.homeTeamName);
-    addName(matchup.awayTeamName);
-  });
-  stars.forEach((star) => {
-    addName(star.playerName);
-    addName(star.teamName);
-  });
-  powerMovers.forEach((mover) => addName(mover.teamName));
-  input.activity.forEach((event) => {
-    addName(event.playerName);
-    addName(event.teamName);
-  });
-  input.missedStarts.forEach((event) => {
-    addName(event.playerName);
-    addName(event.teamName);
-  });
-  input.nextMatchups.forEach((matchup) => {
-    addName(matchup.homeTeamName);
-    addName(matchup.awayTeamName);
-  });
-
-  const withoutNumbers = {
+  return {
     version: 1 as const,
     season: input.season,
     week: input.week,
@@ -359,14 +875,9 @@ export function buildWeeklyEditionFactPacket(
       (a, b) => b.count - a.count || a.playerName.localeCompare(b.playerName),
     ),
     nextMatchups: input.nextMatchups,
-    knownEntityNames: [...new Set(input.knownEntityNames)].sort(),
-    allowedNames: [...allowedNames].sort(),
+    editorialCandidates: buildWeeklyEditionEditorialCandidates(input, matchups),
     issueType: "weekly" as const,
     issueLabel: `Week ${input.week.number}`,
-  };
-  return {
-    ...withoutNumbers,
-    allowedNumbers: collectAllowedNumbers(withoutNumbers),
   };
 }
 
@@ -407,24 +918,7 @@ export function buildMilestoneEditionFactPacket(
       };
     })
     .sort((left, right) => left.currentRank - right.currentRank);
-  const allowedNames = new Set<string>();
-  input.teams.forEach((team) => allowedNames.add(team.name));
-  input.teamOutlooks.forEach((team) => allowedNames.add(team.teamName));
-  input.expiringContracts.forEach((contract) => {
-    allowedNames.add(contract.playerName);
-    allowedNames.add(contract.teamName);
-  });
-  input.recentSignings.forEach((contract) => {
-    allowedNames.add(contract.playerName);
-    allowedNames.add(contract.teamName);
-  });
-  input.draftPicks.forEach((pick) => {
-    allowedNames.add(pick.teamName);
-    if (pick.selectedPlayerName) allowedNames.add(pick.selectedPlayerName);
-  });
-  stars.forEach((star) => allowedNames.add(star.playerName));
-
-  const withoutNumbers = {
+  return {
     version: 1 as const,
     season: input.season,
     week: input.week,
@@ -436,12 +930,15 @@ export function buildMilestoneEditionFactPacket(
     activity: [],
     missedStarts: [],
     nextMatchups: [],
-    knownEntityNames: [...new Set(input.knownEntityNames)].sort(),
-    allowedNames: [...allowedNames].sort(),
+    editorialCandidates: input.editorialCandidates ?? [],
     issueType: input.issueType,
     issueLabel: input.issueLabel,
     milestone: {
       triggerDate: input.triggerDate,
+      analysisSeasonId: input.analysisSeason.id,
+      analysisSeasonName: input.analysisSeason.name,
+      analysisSeasonSigningEndDate: input.analysisSeason.signingEndDate,
+      analysisSeasonDraftStartAt: input.analysisSeason.draftStartAt,
       salaryCap: 25_000_000,
       teamOutlooks: [...input.teamOutlooks].sort(
         (left, right) =>
@@ -463,10 +960,6 @@ export function buildMilestoneEditionFactPacket(
           left.round - right.round || (left.pick ?? 999) - (right.pick ?? 999),
       ),
     },
-  };
-  return {
-    ...withoutNumbers,
-    allowedNumbers: collectAllowedNumbers(withoutNumbers),
   };
 }
 
@@ -539,18 +1032,30 @@ export function buildTemplateWeeklyEdition(
           ],
           "lead",
         );
-  const deck = `${scoreline(hero)} led a Week ${packet.week.number} slate with ${packet.matchups.length} completed matchup${packet.matchups.length === 1 ? "" : "s"}.`;
+  const leadCandidate = packet.editorialCandidates?.[0];
+  const leadIsMatchup = leadCandidate?.kind === "matchup";
+  const leadHeadline = leadCandidate?.headlineHint ?? upsetHeadline;
+  const deckText =
+    leadCandidate && !leadIsMatchup
+      ? `${leadCandidate.summary} It leads a Week ${packet.week.number} edition built from ${packet.editorialCandidates?.length ?? 0} verified story candidates.`
+      : `${scoreline(hero)} led a Week ${packet.week.number} slate with ${packet.matchups.length} completed matchup${packet.matchups.length === 1 ? "" : "s"}.`;
+  const deck =
+    deckText.length <= 240 ? deckText : `${deckText.slice(0, 237).trim()}…`;
   const sections: WeeklyEditionSection[] = [
     section(
       "biggest_story",
       "Biggest Story",
-      upsetHeadline,
-      `${matchupSummary(hero)} ${
-        hero.rankUpset > 0
-          ? `The winner entered ${hero.rankUpset} ranking spot${hero.rankUpset === 1 ? "" : "s"} behind the opposition, which is exactly why the standings never get the final word.`
-          : "It was the week’s most competitive result, and neither side left much room for a comfortable Sunday night."
-      }`,
-      [{ label: "Open matchup", href: `/matchup/${hero.matchupId}` }],
+      leadHeadline,
+      leadCandidate && !leadIsMatchup
+        ? leadCandidate.summary
+        : `${matchupSummary(hero)} ${
+            hero.rankUpset > 0
+              ? `The winner entered ${hero.rankUpset} ranking spot${hero.rankUpset === 1 ? "" : "s"} behind the opposition, which is exactly why the standings never get the final word.`
+              : "It was the week’s most competitive result, and neither side left much room for a comfortable Sunday night."
+          }`,
+      leadCandidate?.links ?? [
+        { label: "Open matchup", href: `/matchup/${hero.matchupId}` },
+      ],
     ),
     section(
       "matchup_roundup",
@@ -650,7 +1155,7 @@ export function buildTemplateWeeklyEdition(
     ),
   );
 
-  return { headline: upsetHeadline, deck, sections };
+  return { headline: leadHeadline, deck, sections };
 }
 
 function money(value: number) {
@@ -691,9 +1196,13 @@ function buildMilestoneTemplateEdition(
     const hero = packet.matchups.find(
       (matchup) => matchup.matchupId === packet.heroMatchupId,
     );
-    const headline = hero?.winnerTeamName
-      ? `${hero.winnerTeamName} puts the final stamp on ${packet.season.name}`
-      : `${packet.season.name}: the final word`;
+    const leadCandidate = packet.editorialCandidates?.[0];
+    const headline =
+      leadCandidate && leadCandidate.kind !== "matchup"
+        ? leadCandidate.headlineHint
+        : hero?.winnerTeamName
+          ? `${hero.winnerTeamName} puts the final stamp on ${packet.season.name}`
+          : `${packet.season.name}: the final word`;
     return {
       headline,
       deck: `The season is complete. GSHL Weekly looks back at the final results, standout players and the pecking order the league carries into the offseason.`,
@@ -702,17 +1211,21 @@ function buildMilestoneTemplateEdition(
           "season_recap",
           "Final Recap",
           headline,
-          hero
-            ? `${matchupSummary(hero)} It was the closing result in a season that rarely followed the tidy version of the script.`
-            : "The final week is in the books and the season ledger is closed.",
-          hero
-            ? [
-                {
-                  label: "Open final matchup",
-                  href: `/matchup/${hero.matchupId}`,
-                },
-              ]
-            : standingsLink,
+          leadCandidate && leadCandidate.kind !== "matchup"
+            ? leadCandidate.summary
+            : hero
+              ? `${matchupSummary(hero)} It was the closing result in a season that rarely followed the tidy version of the script.`
+              : "The final week is in the books and the season ledger is closed.",
+          leadCandidate && leadCandidate.kind !== "matchup"
+            ? leadCandidate.links
+            : hero
+              ? [
+                  {
+                    label: "Open final matchup",
+                    href: `/matchup/${hero.matchupId}`,
+                  },
+                ]
+              : standingsLink,
         ),
         section(
           "three_stars",
@@ -766,7 +1279,7 @@ function buildMilestoneTemplateEdition(
       headline: lead
         ? `${lead.teamName} faces the summer’s first big call`
         : "The re-signing board is open",
-      deck: `${facts.expiringContracts.length} expiring contracts meet a $25.0M hard cap. Here are the decisions, pressure points and roster holes facing every front office.`,
+      deck: `${facts.expiringContracts.length} expiring contracts meet a $25.0M hard cap as teams build for ${facts.analysisSeasonName}. Here are the decisions, pressure points and roster holes facing every front office.`,
       sections: [
         section(
           "expiring_contracts",
@@ -814,7 +1327,7 @@ function buildMilestoneTemplateEdition(
         section(
           "next_week",
           "Dates to Know",
-          `The signing window closes ${packet.season.signingEndDate ?? facts.triggerDate}`,
+          `The signing window closes ${facts.analysisSeasonSigningEndDate ?? facts.triggerDate}`,
           "When the deadline arrives, the newspaper will reset the market and identify which teams can make the loudest UFA moves.",
           [],
         ),
@@ -827,7 +1340,7 @@ function buildMilestoneTemplateEdition(
       headline: capLeader
         ? `${capLeader.teamName} enters UFA season with room to swing`
         : "The offseason market is open",
-      deck: `The signing deadline has passed. Cap space, completed deals and open roster spots now tell us which teams can shape the UFA market.`,
+      deck: `The signing deadline has passed. Cap space, completed deals and open roster spots now tell us which teams can shape the ${facts.analysisSeasonName} UFA market.`,
       sections: [
         section(
           "ufa_market",
@@ -888,7 +1401,7 @@ function buildMilestoneTemplateEdition(
       headline: draftLeader
         ? `${draftLeader.teamName} brings the biggest stack to draft night`
         : "The GSHL draft board is set",
-      deck: `${facts.draftPicks.length} picks are on the board. We break down draft capital, first-round leverage and the roster needs each team can attack.`,
+      deck: `${facts.draftPicks.length} picks are on the ${facts.analysisSeasonName} board. We break down draft capital, first-round leverage and the roster needs each team can attack.`,
       sections: [
         section(
           "draft_capital",
@@ -935,7 +1448,7 @@ function buildMilestoneTemplateEdition(
         section(
           "next_week",
           "Draft Countdown",
-          `The draft begins ${packet.season.draftStartAt ?? facts.triggerDate}`,
+          `The draft begins ${facts.analysisSeasonDraftStartAt ?? facts.triggerDate}`,
           "Once the board is complete, the preseason issue will grade the fully formed rosters and make the predictions everyone can screenshot for later.",
           [],
         ),
@@ -947,7 +1460,7 @@ function buildMilestoneTemplateEdition(
     headline: topTeam
       ? `${topTeam.teamName} opens as the team to catch`
       : "The new GSHL season takes shape",
-    deck: `The draft is complete and the rosters are formed. Talent ratings, cap construction and team depth point to the contenders—and the teams ready to surprise.`,
+    deck: `The ${facts.analysisSeasonName} draft is complete and the rosters are formed. Talent ratings, cap construction and team depth point to the contenders—and the teams ready to surprise.`,
     sections: [
       section(
         "season_predictions",
@@ -1042,13 +1555,19 @@ export function validateWeeklyEditionContent(
     expected.sections.map((item) => [item.id, item]),
   );
   const seen = new Set<string>();
-  for (const item of content.sections) {
+  for (const [index, item] of content.sections.entries()) {
     if (seen.has(item.id)) errors.push(`Duplicate section ID: ${item.id}.`);
     seen.add(item.id);
     const expectedSection = expectedById.get(item.id);
     if (expectedSection?.kind !== item.kind) {
       errors.push(`Unsupported section or kind: ${item.id}.`);
       continue;
+    }
+    if (expected.sections[index]?.id !== item.id) {
+      errors.push(`Section ${item.id} is out of order.`);
+    }
+    if (item.eyebrow !== expectedSection.eyebrow) {
+      errors.push(`Eyebrow in ${item.id} must match the section plan.`);
     }
     if (JSON.stringify(item.links) !== JSON.stringify(expectedSection.links))
       errors.push(`Links in ${item.id} must match the verified fact packet.`);
@@ -1058,21 +1577,6 @@ export function validateWeeklyEditionContent(
       errors.push(`Missing required section: ${expectedSection.id}.`);
   }
 
-  for (const entityName of packet.knownEntityNames) {
-    if (
-      !packet.allowedNames.includes(entityName) &&
-      text.toLocaleLowerCase().includes(entityName.toLocaleLowerCase())
-    ) {
-      errors.push(`Unsupported league name: ${entityName}.`);
-    }
-  }
-
-  const numberClaims = text.match(/(?<![\w/])-?\d+(?:\.\d+)?/g) ?? [];
-  const allowedNumbers = new Set(packet.allowedNumbers);
-  for (const claim of new Set(numberClaims)) {
-    if (!allowedNumbers.has(claim))
-      errors.push(`Unsupported numeric claim: ${claim}.`);
-  }
   return {
     valid: errors.length === 0,
     errors,
@@ -1100,15 +1604,107 @@ export function buildWeeklyEditionChatGptPrompt(
   packet: WeeklyEditionFactPacket,
 ) {
   const template = buildTemplateWeeklyEdition(packet);
+  const milestone = packet.milestone;
+  const analysisSeason = milestone
+    ? {
+        id: milestone.analysisSeasonId,
+        name: milestone.analysisSeasonName,
+        signingEndDate: milestone.analysisSeasonSigningEndDate,
+        draftStartAt: milestone.analysisSeasonDraftStartAt,
+      }
+    : undefined;
+  const milestoneContext = milestone
+    ? {
+        issueType: packet.issueType,
+        issueLabel: packet.issueLabel,
+        analysisSeason,
+        triggerDate: milestone.triggerDate,
+        salaryCap: milestone.salaryCap,
+      }
+    : undefined;
+  let facts: object;
+  switch (packet.issueType) {
+    case "weekly":
+      facts = {
+        issueType: packet.issueType,
+        issueLabel: packet.issueLabel,
+        season: packet.season,
+        week: packet.week,
+        matchups: packet.matchups,
+        editorialCandidates: packet.editorialCandidates ?? [],
+        nextMatchups: packet.nextMatchups,
+      };
+      break;
+    case "final_recap":
+      facts = {
+        issueType: packet.issueType,
+        issueLabel: packet.issueLabel,
+        completedSeason: {
+          id: packet.season.id,
+          name: packet.season.name,
+          year: packet.season.year,
+          endDate: packet.season.endDate,
+        },
+        finalWeek: packet.week,
+        finalMatchups: packet.matchups,
+        finalStars: packet.stars,
+        finalPowerRankings: packet.powerMovers,
+        editorialCandidates: packet.editorialCandidates ?? [],
+        upcomingSeason: analysisSeason,
+        salaryCap: milestone?.salaryCap,
+        teamOutlooks: milestone?.teamOutlooks ?? [],
+        expiringContracts: milestone?.expiringContracts ?? [],
+      };
+      break;
+    case "resigning_outlook":
+      facts = {
+        ...milestoneContext,
+        teamOutlooks: milestone?.teamOutlooks ?? [],
+        expiringContracts: milestone?.expiringContracts ?? [],
+      };
+      break;
+    case "offseason_market":
+      facts = {
+        ...milestoneContext,
+        teamOutlooks: milestone?.teamOutlooks ?? [],
+        expiringContracts: milestone?.expiringContracts ?? [],
+        recentSignings: milestone?.recentSignings ?? [],
+      };
+      break;
+    case "pre_draft":
+      facts = {
+        ...milestoneContext,
+        teamOutlooks: milestone?.teamOutlooks ?? [],
+        draftPicks: milestone?.draftPicks ?? [],
+      };
+      break;
+    case "preseason":
+      facts = {
+        ...milestoneContext,
+        teamOutlooks: milestone?.teamOutlooks ?? [],
+        draftedPlayers: (milestone?.draftPicks ?? []).filter(
+          (pick) => pick.selectedPlayerName,
+        ),
+      };
+      break;
+  }
+  const sectionPlan = template.sections.map((section) => ({
+    id: section.id,
+    kind: section.kind,
+    eyebrow: section.eyebrow,
+    links: section.links,
+  }));
   return [
     "You are the editor of GSHL Weekly, a friendly fantasy-hockey league newspaper.",
     "Rewrite the supplied edition with energetic, concise sportswriting and gentle chirps. Never insult a person, speculate about motives, or add facts.",
-    "Use only the names, numbers, outcomes, and links in FACT_PACKET. Do not add HTML, Markdown links, new sections, new IDs, or new URLs.",
-    "Return only one JSON object matching RESPONSE_SHAPE. Keep every section id, kind, and links value exactly unchanged.",
+    "EDITION_FACTS may contain ranked story candidates from matchups, performances, records, milestones, awards, and league activity. Use editorial judgment to choose the most important lead and supporting angles; importance is guidance, not a command.",
+    "Use only the names, numbers, outcomes, and links in EDITION_FACTS. Do not add HTML, Markdown links, new sections, new IDs, or new URLs.",
+    "Return only one JSON object. It must contain headline, deck, and sections. Each section must contain id, kind, eyebrow, headline, body, and links.",
+    "Keep every section id, kind, eyebrow, and links value from SECTION_PLAN exactly unchanged and in the same order.",
     "Limits: headline 110 characters; deck 240; section headline 110; section body 900; eyebrow 40.",
     "",
-    `FACT_PACKET=${JSON.stringify(packet, null, 2)}`,
+    `EDITION_FACTS=${JSON.stringify(facts, null, 2)}`,
     "",
-    `RESPONSE_SHAPE=${JSON.stringify(template, null, 2)}`,
+    `SECTION_PLAN=${JSON.stringify(sectionPlan, null, 2)}`,
   ].join("\n");
 }
