@@ -197,23 +197,7 @@ export function OwnerRankings() {
   }
 
   return (
-    <div className="mx-auto max-w-[100rem] pb-8">
-      <header className="border-b border-slate-200 pb-4">
-        <div>
-          <p className="font-barlow text-[10px] uppercase tracking-[0.22em] text-slate-400">
-            League Office
-          </p>
-          <h1 className="mt-1 font-oswald text-3xl uppercase leading-none text-slate-950 sm:text-4xl">
-            GM Ladder
-          </h1>
-          <p className="mt-2 text-[11px] leading-relaxed text-slate-500 sm:text-xs">
-            Career results, playoff performance, weekly power rankings, and
-            legacy lead the rating; matchup Elo contributes a small form
-            adjustment. New GMs start at 250.
-          </p>
-        </div>
-      </header>
-
+    <div className="mx-auto max-w-[100rem] pb-8 pt-4">
       <div className="mt-3 overflow-hidden rounded-lg border border-slate-200 bg-white sm:mt-4">
         <div className="overflow-x-auto overscroll-x-contain">
           <table className="w-full min-w-[1280px] border-separate border-spacing-0 text-left text-[11px] sm:min-w-[1480px] sm:text-xs">
@@ -245,19 +229,6 @@ export function OwnerRankings() {
                   className="px-2 py-2 text-right sm:px-3 sm:py-3"
                 >
                   Rating
-                </th>
-                <th
-                  scope="col"
-                  className="px-2 py-2 text-right sm:px-3 sm:py-3"
-                >
-                  Last
-                </th>
-                <th
-                  scope="col"
-                  className="px-2 py-2 text-right sm:px-3 sm:py-3"
-                  title="Power-ranking rating adjustment"
-                >
-                  PR +/-
                 </th>
                 <th
                   scope="col"
@@ -383,12 +354,6 @@ export function OwnerRankings() {
                   </th>
                   <td className="px-2 py-2 text-right font-oswald text-lg font-semibold tabular-nums text-slate-950 sm:px-3 sm:py-3 sm:text-xl">
                     {formatRating(entry.rating)}
-                  </td>
-                  <td className="px-2 py-2 text-right sm:px-3 sm:py-3">
-                    <SignedCell value={entry.matchupDelta} />
-                  </td>
-                  <td className="px-2 py-2 text-right sm:px-3 sm:py-3">
-                    <SignedCell value={entry.powerRankingAdjustment} />
                   </td>
                   <td className="px-2 py-2 text-center font-medium tabular-nums text-emerald-700 sm:px-3 sm:py-3">
                     {entry.weeksAtNumberOne}
