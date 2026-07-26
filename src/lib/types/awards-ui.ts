@@ -9,9 +9,9 @@ import type {
 } from "./database";
 import type {
   AwardCatalogEntry,
+  TrophyCaseAwardSection,
   TrophyCaseCard,
   TrophyCaseProps,
-  TrophyCaseSummaryLine,
 } from "./team-ui";
 
 export type AllStarAwardKey = Extract<AwardsList, "firstAS" | "secondAS">;
@@ -78,5 +78,5 @@ export type BuildTrophyCaseDataInput = TrophyCaseProps;
 
 export interface BuildTrophyCaseDataResult {
   cards: TrophyCaseCard[];
-  summaryLines: TrophyCaseSummaryLine[];
+  awardSections: TrophyCaseAwardSection[];
 }

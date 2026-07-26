@@ -51,11 +51,12 @@ export interface TrophyCaseCard {
   franchiseName: string | null;
 }
 
-export interface TrophyCaseSummaryLine {
+export interface TrophyCaseAwardSection {
   awardKey: AwardsList;
-  group: AwardGroupKey;
-  sortOrder: number;
-  text: string;
+  catalog: AwardCatalogEntry;
+  cards: TrophyCaseCard[];
+  winnerLabel: string;
+  seasonRange: string;
 }
 
 export interface TrophyCaseProps {

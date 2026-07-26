@@ -106,26 +106,35 @@ export function TeamHistorySkeleton() {
 export function TrophyCaseSkeleton() {
   return (
     <section className="pb-8 sm:pb-12">
-      <div className="mx-auto max-w-3xl space-y-2 px-6 text-center">
-        <Skeleton className="mx-auto h-4 w-72 max-w-full" />
-        <Skeleton className="mx-auto h-4 w-56 max-w-[80%]" />
-      </div>
       {Array.from({ length: 2 }).map((_, sectionIndex) => (
         <div key={sectionIndex}>
-          <div className="mb-5 mt-8 flex items-center gap-3 px-3 sm:mb-8 sm:mt-14">
+          <div className="mb-4 mt-8 flex items-center gap-3 px-3 sm:mb-6 sm:mt-12">
             <div className="h-0 flex-1 border-t-4 border-dotted border-gray-200" />
             <Skeleton className="h-3 w-28" />
             <div className="h-0 flex-1 border-t-4 border-dotted border-gray-200" />
           </div>
-          <div className="mx-auto grid max-w-7xl grid-cols-[repeat(auto-fit,minmax(8.5rem,9rem))] justify-center gap-x-2 gap-y-5 px-3">
-            {Array.from({ length: sectionIndex === 0 ? 5 : 3 }).map(
-              (_, cardIndex) => (
-                <div key={cardIndex} className="flex flex-col items-center">
-                  <Skeleton className="h-16 w-32 rounded-2xl" />
-                  <Skeleton className="-mt-3 h-8 w-8 rounded-lg bg-slate-200" />
-                  <Skeleton className="mt-2 h-5 w-10" />
-                  <Skeleton className="mt-1 h-4 w-28" />
-                  <Skeleton className="mt-1 h-3 w-24" />
+          <div className="mx-auto max-w-7xl space-y-6 sm:space-y-8">
+            {Array.from({ length: sectionIndex === 0 ? 3 : 2 }).map(
+              (_, awardIndex) => (
+                <div key={awardIndex}>
+                  <div className="px-3 sm:px-4">
+                    <Skeleton className="h-3 w-52 max-w-[80%] sm:h-4" />
+                    <Skeleton className="mt-1 h-2.5 w-32" />
+                  </div>
+                  <div className="mt-2 grid grid-cols-6 border-y border-slate-200 bg-slate-50/80 sm:grid-cols-8 md:grid-cols-10 lg:grid-cols-12">
+                    {Array.from({ length: awardIndex + 2 }).map(
+                      (_, trophyIndex) => (
+                        <div
+                          key={trophyIndex}
+                          className="flex flex-col items-center border-r border-slate-200 px-1 py-2"
+                        >
+                          <Skeleton className="h-8 w-8" />
+                          <Skeleton className="-mt-1 h-4 w-4 rounded-full bg-slate-200" />
+                          <Skeleton className="mt-1 h-2.5 w-7" />
+                        </div>
+                      ),
+                    )}
+                  </div>
                 </div>
               ),
             )}

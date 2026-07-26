@@ -5,7 +5,6 @@ import {
 } from "@gshl-lib/config/awards";
 import type {
   AwardCatalogEntry,
-  AwardGroupKey,
   BuildTrophyCaseDataInput,
   BuildTrophyCaseDataResult,
   TrophyCaseCard,
@@ -47,37 +46,6 @@ export function formatYearRanges(years: Array<number | string>): string {
   }
   ranges.push(formatYearRange(rangeStart, rangeEnd));
   return ranges.join(", ");
-}
-
-export function resolveSummaryText(
-  count: number,
-  latestYear: number | string,
-  summaryLabel: string,
-  years: Array<number | string>,
-) {
-  const trimmedLabel = summaryLabel.trim();
-  const hasSuffix = /(winner|champ|champion)$/i.test(trimmedLabel);
-  if (count > 1) {
-    const baseText = hasSuffix
-      ? `${count}-time ${trimmedLabel}`
-      : `${count}-time ${trimmedLabel} Winner`;
-    const formattedYears = formatYearRanges(years);
-    return formattedYears ? `${baseText} (${formattedYears})` : baseText;
-  }
-  return hasSuffix
-    ? `${latestYear} ${trimmedLabel}`
-    : `${latestYear} ${trimmedLabel} Winner`;
-}
-
-export function getSummaryLineClass(group: AwardGroupKey) {
-  switch (group) {
-    case "TEAM TROPHIES":
-      return "text-xl sm:text-2xl";
-    case "TIER 1 AWARDS":
-      return "text-lg sm:text-xl";
-    case "TIER 2 AWARDS":
-      return "text-base sm:text-lg";
-  }
 }
 
 export function buildTrophyCaseData({
@@ -129,37 +97,33 @@ export function buildTrophyCaseData({
       );
     });
 
-  const summary = new Map<
+  const groupedCards = new Map<
     string,
-    { catalog: AwardCatalogEntry; years: Array<number | string> }
+    { catalog: AwardCatalogEntry; cards: TrophyCaseCard[] }
   >();
   for (const card of cards) {
-    const item = summary.get(card.catalog.key) ?? {
+    const item = groupedCards.get(card.catalog.key) ?? {
       catalog: card.catalog,
-      years: [],
+      cards: [],
     };
-    item.years.push(card.seasonYear);
-    summary.set(card.catalog.key, item);
+    item.cards.push(card);
+    groupedCards.set(card.catalog.key, item);
   }
 
-  const summaryLines = Array.from(summary.values())
-    .map(({ catalog, years }) => ({
+  const awardSections = Array.from(groupedCards.values())
+    .map(({ catalog, cards: awardCards }) => ({
       awardKey: catalog.key,
-      group: catalog.group,
-      sortOrder: catalog.sortOrder,
-      text: resolveSummaryText(
-        years.length,
-        years.slice().sort((a, b) => Number(b) - Number(a))[0] ?? "",
-        catalog.summaryLabel,
-        years,
-      ),
+      catalog,
+      cards: awardCards,
+      winnerLabel: `${awardCards.length}-time winner`,
+      seasonRange: formatYearRanges(awardCards.map((card) => card.seasonYear)),
     }))
     .sort(
       (left, right) =>
-        (groupOrderMap.get(left.group) ?? 0) -
-          (groupOrderMap.get(right.group) ?? 0) ||
-        left.sortOrder - right.sortOrder,
+        (groupOrderMap.get(left.catalog.group) ?? 0) -
+          (groupOrderMap.get(right.catalog.group) ?? 0) ||
+        left.catalog.sortOrder - right.catalog.sortOrder,
     );
 
-  return { cards, summaryLines };
+  return { cards, awardSections };
 }
