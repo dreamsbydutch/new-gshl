@@ -7,7 +7,6 @@ import { AWARD_CATALOG_BY_KEY } from "@gshl-lib/config/awards";
 import { useTeamRecordBookView } from "@gshl-hooks";
 import type {
   RecordBookPlayerTableProps,
-  RecordBookSortKey,
   RecordBookSortableHeadProps,
   RecordBookToolbarProps,
   RecordBookView,
@@ -88,22 +87,6 @@ function getSeasonTypeLabel(seasonType: SeasonTypeValue): string {
   if (seasonType === SeasonType.PLAYOFFS) return "Playoffs";
   if (seasonType === SeasonType.LOSERS_TOURNAMENT) return "Losers";
   return "Regular";
-}
-
-function getRecordBookSortKey(
-  value: string,
-  columns: RecordBookPlayerTableProps["columns"],
-): RecordBookSortKey | undefined {
-  if (
-    value === "playerName" ||
-    value === "positions" ||
-    value === "seasonYear" ||
-    value === "seasonCount"
-  ) {
-    return value;
-  }
-
-  return columns.find((column) => column.key === value)?.key;
 }
 
 function SortableHead({
@@ -326,7 +309,7 @@ function RecordBookToolbar({
           ))}
         </div>
 
-        <label className="relative w-full flex-none sm:ml-auto sm:min-w-[150px] sm:max-w-[240px] sm:flex-1">
+        <label className="relative ml-auto min-w-[150px] flex-1 sm:max-w-[240px]">
           <span className="sr-only">Search player records</span>
           <Search
             className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400"
@@ -345,171 +328,6 @@ function RecordBookToolbar({
   );
 }
 
-function MobilePlayerHistoryCards({
-  columns,
-  onSort,
-  rows,
-  sort,
-  view,
-}: RecordBookPlayerTableProps) {
-  const hasSeasonColumn = view === "season";
-
-  return (
-    <div className="md:hidden">
-      <div className="flex items-center gap-2 border-b border-slate-200 bg-white px-3 py-2.5">
-        <label className="flex min-w-0 flex-1 items-center gap-2">
-          <span className="shrink-0 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-            Sort
-          </span>
-          <select
-            value={sort.key}
-            onChange={(event) => {
-              const nextSortKey = getRecordBookSortKey(
-                event.target.value,
-                columns,
-              );
-              if (nextSortKey) onSort(nextSortKey);
-            }}
-            className="h-8 min-w-0 flex-1 rounded-md border border-slate-200 bg-slate-50 px-2 text-xs font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-slate-300"
-            aria-label="Sort player records by"
-          >
-            <option value="playerName">Player</option>
-            <option value="positions">Position</option>
-            {hasSeasonColumn ? (
-              <option value="seasonYear">Season</option>
-            ) : (
-              <option value="seasonCount">Seasons played</option>
-            )}
-            {columns.map((column) => (
-              <option key={column.key} value={column.key}>
-                {column.title}
-              </option>
-            ))}
-          </select>
-        </label>
-        <button
-          type="button"
-          onClick={() => onSort(sort.key)}
-          className="flex h-8 shrink-0 items-center gap-1.5 rounded-md border border-slate-200 bg-slate-50 px-2.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
-          aria-label={`Sort order: ${
-            sort.direction === "asc" ? "ascending" : "descending"
-          }. Activate to reverse.`}
-        >
-          {sort.direction === "asc" ? (
-            <ArrowUp className="h-3.5 w-3.5" aria-hidden="true" />
-          ) : (
-            <ArrowDown className="h-3.5 w-3.5" aria-hidden="true" />
-          )}
-          {sort.direction === "asc" ? "Asc" : "Desc"}
-        </button>
-      </div>
-
-      {rows.length === 0 ? (
-        <div className="flex h-40 items-center justify-center px-4 text-center text-sm text-slate-400">
-          No player history found.
-        </div>
-      ) : (
-        <div className="divide-y divide-slate-200">
-          {rows.map((row) => {
-            const allStarAwards = ALL_STAR_TABLE_COLUMNS.filter(
-              (column) => (row.awardCounts[column.award] ?? 0) > 0,
-            );
-            const trophyAwards = PLAYER_TROPHY_TABLE_COLUMNS.filter(
-              (column) => (row.awardCounts[column.award] ?? 0) > 0,
-            );
-            const hasAwards =
-              allStarAwards.length > 0 || trophyAwards.length > 0;
-
-            return (
-              <article key={row.id} className="bg-white px-3 py-4">
-                <header className="flex items-start justify-between gap-3">
-                  <div className="flex min-w-0 items-center gap-2.5">
-                    <NHLLogo
-                      team={row.nhlTeam}
-                      size={30}
-                      className="mx-0 shrink-0"
-                    />
-                    <div className="min-w-0">
-                      <h3 className="truncate text-sm font-semibold text-slate-950">
-                        {row.playerName}
-                      </h3>
-                      <p className="mt-0.5 text-[11px] text-slate-500">
-                        {row.positions || "Position unavailable"}
-                        {!hasSeasonColumn && row.seasonCount > 0
-                          ? ` · ${row.seasonCount} ${
-                              row.seasonCount === 1 ? "season" : "seasons"
-                            }`
-                          : ""}
-                      </p>
-                    </div>
-                  </div>
-                  {hasSeasonColumn ? (
-                    <span className="shrink-0 rounded-md bg-slate-100 px-2 py-1 font-mono text-xs font-semibold tabular-nums text-slate-700">
-                      {row.seasonYear}
-                    </span>
-                  ) : row.firstSeason && row.lastSeason ? (
-                    <span className="shrink-0 font-mono text-[10px] tabular-nums text-slate-400">
-                      {row.firstSeason === row.lastSeason
-                        ? row.firstSeason
-                        : `${row.firstSeason}–${row.lastSeason}`}
-                    </span>
-                  ) : null}
-                </header>
-
-                <dl className="mt-3 grid grid-cols-3 overflow-hidden rounded-lg border border-slate-200 min-[420px]:grid-cols-4">
-                  {columns.map((column) => (
-                    <div
-                      key={`${row.id}-${column.key}`}
-                      className="border-b border-r border-slate-100 px-2 py-2.5 last:border-r-0"
-                      title={column.title}
-                    >
-                      <dt className="text-[9px] font-semibold uppercase tracking-[0.1em] text-slate-400">
-                        {column.label}
-                      </dt>
-                      <dd className="mt-0.5 font-mono text-sm font-semibold tabular-nums text-slate-800">
-                        {formatRecordBookStat(row, column)}
-                      </dd>
-                    </div>
-                  ))}
-                </dl>
-
-                {hasAwards ? (
-                  <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3">
-                    <span className="mr-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-slate-400">
-                      Awards
-                    </span>
-                    {allStarAwards.map((column) => (
-                      <span
-                        key={`${row.id}-${column.award}`}
-                        className="rounded-full bg-slate-100 px-2 py-1 font-mono text-[10px] font-semibold tabular-nums text-slate-600"
-                        title={column.title}
-                      >
-                        {column.label} × {row.awardCounts[column.award]}
-                      </span>
-                    ))}
-                    {trophyAwards.map((column) => (
-                      <div
-                        key={`${row.id}-${column.award}`}
-                        className="flex items-center rounded-full bg-amber-50 px-2 py-1"
-                      >
-                        <AwardCountMarks
-                          count={row.awardCounts[column.award]}
-                          iconAward={column.iconAward}
-                          label={column.title}
-                        />
-                      </div>
-                    ))}
-                  </div>
-                ) : null}
-              </article>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
-
 function PlayerHistoryTable({
   columns,
   onSort,
@@ -518,7 +336,7 @@ function PlayerHistoryTable({
   view,
 }: RecordBookPlayerTableProps) {
   const hasSeasonColumn = view === "season";
-  const playerLeftClass = hasSeasonColumn ? "left-20" : "left-0";
+  const playerLeftClass = hasSeasonColumn ? "left-14 sm:left-20" : "left-0";
   const emptyColSpan =
     columns.length +
     ALL_STAR_TABLE_COLUMNS.length +
@@ -529,7 +347,9 @@ function PlayerHistoryTable({
     <Table
       className={cn(
         "border-collapse text-xs sm:text-sm",
-        hasSeasonColumn ? "min-w-[1720px]" : "min-w-[1680px]",
+        hasSeasonColumn
+          ? "min-w-[1400px] sm:min-w-[1720px]"
+          : "min-w-[1380px] sm:min-w-[1680px]",
       )}
     >
       <TableHeader>
@@ -538,7 +358,7 @@ function PlayerHistoryTable({
             <SortableHead
               activeSort={sort}
               align="left"
-              className="sticky left-0 z-30 w-20 bg-slate-50"
+              className="sticky left-0 z-30 w-14 bg-slate-50 px-1 sm:w-20 sm:px-3"
               label="Season"
               onSort={onSort}
               sortKey="seasonYear"
@@ -548,7 +368,7 @@ function PlayerHistoryTable({
             activeSort={sort}
             align="left"
             className={cn(
-              "sticky z-30 min-w-[210px] bg-slate-50 sm:min-w-[240px]",
+              "sticky z-30 w-[140px] min-w-[140px] max-w-[140px] bg-slate-50 px-1 sm:w-[180px] sm:min-w-[180px] sm:max-w-[180px] sm:px-3 lg:w-[240px] lg:min-w-[240px] lg:max-w-[240px]",
               playerLeftClass,
             )}
             label="Player"
@@ -558,7 +378,7 @@ function PlayerHistoryTable({
           <SortableHead
             activeSort={sort}
             align="left"
-            className="w-16"
+            className="w-12 sm:w-16"
             label="Pos"
             onSort={onSort}
             sortKey="positions"
@@ -623,37 +443,37 @@ function PlayerHistoryTable({
               className="group border-0 bg-white hover:bg-slate-50"
             >
               {hasSeasonColumn ? (
-                <TableCell className="sticky left-0 z-20 w-20 bg-white px-3 py-2.5 font-mono font-semibold tabular-nums text-slate-700 group-hover:bg-slate-50">
+                <TableCell className="sticky left-0 z-20 w-14 bg-white px-1 py-2.5 font-mono text-[10px] font-semibold tabular-nums text-slate-700 group-hover:bg-slate-50 sm:w-20 sm:px-3 sm:text-xs">
                   {row.seasonYear}
                 </TableCell>
               ) : null}
               <TableCell
                 className={cn(
-                  "sticky z-20 min-w-[210px] bg-white px-3 py-2.5 group-hover:bg-slate-50 sm:min-w-[240px]",
+                  "sticky z-20 w-[140px] min-w-[140px] max-w-[140px] bg-white px-1.5 py-2.5 group-hover:bg-slate-50 sm:w-[180px] sm:min-w-[180px] sm:max-w-[180px] sm:px-3 lg:w-[240px] lg:min-w-[240px] lg:max-w-[240px]",
                   playerLeftClass,
                 )}
               >
-                <div className="flex items-center gap-2.5">
+                <div className="flex min-w-0 items-center gap-1.5 sm:gap-2.5">
                   <NHLLogo
                     team={row.nhlTeam}
                     size={22}
                     className="mx-0 shrink-0"
                   />
-                  <span className="truncate font-semibold text-slate-900">
+                  <span className="min-w-0 truncate font-semibold text-slate-900">
                     {row.playerName}
                   </span>
                 </div>
               </TableCell>
-              <TableCell className="whitespace-nowrap px-3 py-2.5 text-left text-slate-500">
+              <TableCell className="w-12 whitespace-nowrap px-2 py-2.5 text-left text-slate-500 sm:w-16 sm:px-3">
                 {row.positions || "—"}
               </TableCell>
               {!hasSeasonColumn ? (
-                <TableCell className="whitespace-nowrap px-3 py-2.5 text-right font-mono tabular-nums text-slate-600">
+                <TableCell className="whitespace-nowrap px-2 py-2.5 text-right font-mono tabular-nums text-slate-600 sm:px-3">
                   <span className="font-semibold text-slate-900">
                     {row.seasonCount || "—"}
                   </span>
                   {row.firstSeason && row.lastSeason ? (
-                    <span className="ml-1.5 text-[10px] text-slate-400">
+                    <span className="ml-1.5 hidden text-[10px] text-slate-400 sm:inline">
                       {row.firstSeason === row.lastSeason
                         ? row.firstSeason
                         : `${row.firstSeason}–${row.lastSeason}`}
@@ -664,7 +484,7 @@ function PlayerHistoryTable({
               {columns.map((column) => (
                 <TableCell
                   key={`${row.id}-${column.key}`}
-                  className="whitespace-nowrap px-3 py-2.5 text-right font-mono tabular-nums text-slate-700"
+                  className="whitespace-nowrap px-2 py-2.5 text-right font-mono tabular-nums text-slate-700 sm:px-3"
                 >
                   {formatRecordBookStat(row, column)}
                 </TableCell>
@@ -741,16 +561,7 @@ export function TeamRecordBook(props: TeamRecordBookProps) {
             seasonTypes={seasonTypes}
             view={view}
           />
-          <div className="hidden md:block">
-            <PlayerHistoryTable
-              columns={columns}
-              onSort={onSort}
-              rows={playerRows}
-              sort={sort}
-              view={view}
-            />
-          </div>
-          <MobilePlayerHistoryCards
+          <PlayerHistoryTable
             columns={columns}
             onSort={onSort}
             rows={playerRows}
