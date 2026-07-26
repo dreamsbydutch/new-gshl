@@ -1,5 +1,6 @@
 import type {
   DraftClockState,
+  DraftHubDraftPick,
   DraftHubPickView,
   DraftHubStatus,
   DraftPick,
@@ -12,7 +13,9 @@ import {
 
 export const DRAFT_PICK_CLOCK_MS = 4 * 60 * 1000;
 
-function timestamp(value: Date | string | null | undefined): number | null {
+function timestamp(
+  value: Date | string | number | null | undefined,
+): number | null {
   if (!value) return null;
   const parsed = value instanceof Date ? value : new Date(value);
   const valueOf = parsed.getTime();
@@ -39,10 +42,21 @@ export function orderDraftPicks<T extends Pick<DraftPick, "round" | "pick">>(
   return [...picks].sort(compareDraftPickOrder);
 }
 
+export function serializeDraftHubPick(pick: DraftPick): DraftHubDraftPick {
+  return {
+    ...pick,
+    onClockStartedAt: timestamp(pick.onClockStartedAt),
+    onClockExpiresAt: timestamp(pick.onClockExpiresAt),
+    onClockEndedAt: timestamp(pick.onClockEndedAt),
+    createdAt: pick.createdAt.getTime(),
+    updatedAt: pick.updatedAt.getTime(),
+  };
+}
+
 function effectiveClockStart(
   orderedPicks: DraftPick[],
   activeIndex: number,
-  draftStartAt: string,
+  draftStartAt: Date | string | number,
 ): number | null {
   const activePick = orderedPicks[activeIndex];
   const storedStart = timestamp(activePick?.onClockStartedAt);
@@ -64,7 +78,7 @@ function effectiveClockStart(
 
 export function resolveDraftClockState(
   picks: readonly DraftPick[],
-  draftStartAt: string | null | undefined,
+  draftStartAt: Date | string | number | null | undefined,
   now: Date = new Date(),
 ): DraftClockState {
   const orderedPicks = orderDraftPicks(picks);
@@ -128,10 +142,8 @@ export function resolveDraftClockState(
     activePick,
     completedCount: completedPicks.length,
     remainingCount: orderedPicks.length - completedPicks.length,
-    clockStartedAt:
-      startedAt === null ? null : new Date(startedAt).toISOString(),
-    clockExpiresAt:
-      expiresAt === null ? null : new Date(expiresAt).toISOString(),
+    clockStartedAt: startedAt,
+    clockExpiresAt: expiresAt,
     recentPicks,
     upcomingPicks: orderedPicks
       .slice(activeIndex + 1)

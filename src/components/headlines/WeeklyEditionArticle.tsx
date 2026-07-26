@@ -3,6 +3,7 @@
 import { ArrowLeft, CalendarDays } from "lucide-react";
 import { useAppRouter } from "@gshl-hooks";
 import type { WeeklyEditionArticleProps } from "@gshl-types";
+import { formatDisplayDate } from "@gshl-utils";
 import { WeeklyEditionSectionCard } from "./WeeklyEditionSectionCard";
 
 export function WeeklyEditionArticle({
@@ -27,8 +28,8 @@ export function WeeklyEditionArticle({
           <span className="inline-flex items-center gap-1.5">
             <CalendarDays className="h-4 w-4" aria-hidden="true" />
             {edition.issueType === "weekly"
-              ? `${edition.startDate} to ${edition.endDate}`
-              : `Published for ${edition.scheduledFor}`}
+              ? `${formatDisplayDate(new Date(edition.startDate))} to ${formatDisplayDate(new Date(edition.endDate))}`
+              : `Published for ${formatDisplayDate(new Date(edition.scheduledFor))}`}
           </span>
         </div>
         <div className="py-5 text-center">

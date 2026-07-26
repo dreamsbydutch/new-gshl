@@ -208,17 +208,17 @@ export interface WeeklyEdition {
   issueLabel: string;
   seasonName: string;
   weekNum: number;
-  startDate: string;
-  endDate: string;
+  startDate: number;
+  endDate: number;
   status: WeeklyEditionStatus;
   generationMode: WeeklyEditionGenerationMode;
   content: WeeklyEditionContent;
   facts: WeeklyEditionFactPacket;
   sourceHash: string;
-  publishedAt: string;
-  scheduledFor: string;
-  createdAt: string;
-  updatedAt: string;
+  publishedAt: number;
+  scheduledFor: number;
+  createdAt: number;
+  updatedAt: number;
   editedBy?: string;
 }
 
@@ -228,7 +228,7 @@ export interface WeeklyEditionRevision {
   generationMode: WeeklyEditionGenerationMode;
   content: WeeklyEditionContent;
   sourceHash: string;
-  createdAt: string;
+  createdAt: number;
   editedBy?: string;
 }
 

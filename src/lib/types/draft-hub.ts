@@ -20,8 +20,8 @@ export interface DraftClockState {
   activePick: DraftPick | null;
   completedCount: number;
   remainingCount: number;
-  clockStartedAt: string | null;
-  clockExpiresAt: string | null;
+  clockStartedAt: number | null;
+  clockExpiresAt: number | null;
   recentPicks: DraftPick[];
   upcomingPicks: DraftPick[];
 }
@@ -42,8 +42,23 @@ export interface DraftHubPlayerSummary {
   nhlTeam: string[];
 }
 
+export type DraftHubDraftPick = Omit<
+  DraftPick,
+  | "createdAt"
+  | "updatedAt"
+  | "onClockStartedAt"
+  | "onClockExpiresAt"
+  | "onClockEndedAt"
+> & {
+  onClockStartedAt: number | null;
+  onClockExpiresAt: number | null;
+  onClockEndedAt: number | null;
+  createdAt: number;
+  updatedAt: number;
+};
+
 export interface DraftHubPickView {
-  pick: DraftPick;
+  pick: DraftHubDraftPick;
   team: DraftHubTeamSummary | null;
   originalTeam: DraftHubTeamSummary | null;
   player: DraftHubPlayerSummary | null;
@@ -53,19 +68,19 @@ export interface DraftHubSeasonSummary {
   id: string;
   name: string;
   year: number;
-  startDate: string;
-  draftStartAt: string;
+  startDate: number;
+  draftStartAt: number;
 }
 
 export interface DraftHubStateData {
   season: DraftHubSeasonSummary;
-  serverNow: string;
+  serverNow: number;
   status: DraftHubStatus;
   activePickId: string | null;
   completedCount: number;
   remainingCount: number;
-  clockStartedAt: string | null;
-  clockExpiresAt: string | null;
+  clockStartedAt: number | null;
+  clockExpiresAt: number | null;
   recentPickIds: string[];
   upcomingPickIds: string[];
   picks: DraftHubPickView[];

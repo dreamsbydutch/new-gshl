@@ -10,12 +10,18 @@ import type {
 import {
   DRAFT_PICK_CLOCK_MS,
   resolveDraftClockState,
+  serializeDraftHubPick,
 } from "../src/lib/utils/features/draft-hub";
 import { ContractStatus } from "../src/lib/utils/domain/constants";
+import { toUtcTimestamp } from "./lib/timestamps";
 
-function toDate(value: string | null | undefined, fallback: number): Date {
-  const parsed = value ? new Date(value) : new Date(fallback);
-  return Number.isNaN(parsed.getTime()) ? new Date(fallback) : parsed;
+function toDate(value: unknown, fallback: number): Date {
+  return new Date(toUtcTimestamp(value) ?? fallback);
+}
+
+function toIsoTimestamp(value: unknown): string | null {
+  const timestamp = toUtcTimestamp(value);
+  return timestamp === null ? null : new Date(timestamp).toISOString();
 }
 
 function toDraftPick(row: Doc<"draftPicks">): DraftPick {
@@ -27,9 +33,9 @@ function toDraftPick(row: Doc<"draftPicks">): DraftPick {
     round: String(row.round ?? ""),
     pick: String(row.pick ?? ""),
     playerId: row.playerId ? String(row.playerId) : null,
-    onClockStartedAt: row.onClockStartedAt ?? null,
-    onClockExpiresAt: row.onClockExpiresAt ?? null,
-    onClockEndedAt: row.onClockEndedAt ?? null,
+    onClockStartedAt: toIsoTimestamp(row.onClockStartedAt),
+    onClockExpiresAt: toIsoTimestamp(row.onClockExpiresAt),
+    onClockEndedAt: toIsoTimestamp(row.onClockEndedAt),
     isTraded: row.isTraded,
     isSigning: row.isSigning,
     createdAt: toDate(row.createdAt, row._creationTime),
@@ -84,10 +90,8 @@ function playerSummary(
   };
 }
 
-function parseTime(value: string | null | undefined): number | null {
-  if (!value) return null;
-  const parsed = new Date(value).getTime();
-  return Number.isNaN(parsed) ? null : parsed;
+function parseTime(value: unknown): number | null {
+  return toUtcTimestamp(value);
 }
 
 function contractCoversDraft(
@@ -129,7 +133,8 @@ export const state = query({
     const orderedRows = [...draftPickRows].sort(compareRows);
     const draftPicks = orderedRows.map(toDraftPick);
     const now = new Date();
-    const clock = resolveDraftClockState(draftPicks, season.draftStartAt, now);
+    const draftStartAt = toUtcTimestamp(season.draftStartAt);
+    const clock = resolveDraftClockState(draftPicks, draftStartAt, now);
     const selectedPlayers = await Promise.all(
       orderedRows.map((row) =>
         row.playerId ? ctx.db.get(row.playerId) : Promise.resolve(null),
@@ -141,20 +146,20 @@ export const state = query({
         id: String(season._id),
         name: season.name,
         year: Number(season.year),
-        startDate: String(season.startDate ?? ""),
-        draftStartAt: String(season.draftStartAt ?? ""),
+        startDate: toUtcTimestamp(season.startDate) ?? 0,
+        draftStartAt: toUtcTimestamp(season.draftStartAt) ?? 0,
       },
-      serverNow: now.toISOString(),
+      serverNow: now.getTime(),
       status: clock.status,
       activePickId: clock.activePick?.id ?? null,
       completedCount: clock.completedCount,
       remainingCount: clock.remainingCount,
-      clockStartedAt: clock.clockStartedAt,
-      clockExpiresAt: clock.clockExpiresAt,
+      clockStartedAt: toUtcTimestamp(clock.clockStartedAt),
+      clockExpiresAt: toUtcTimestamp(clock.clockExpiresAt),
       recentPickIds: clock.recentPicks.map((pick) => pick.id),
       upcomingPickIds: clock.upcomingPicks.map((pick) => pick.id),
       picks: draftPicks.map((pick, index) => ({
-        pick,
+        pick: serializeDraftHubPick(pick),
         team: teamById.get(String(pick.gshlTeamId)) ?? null,
         originalTeam: pick.originalTeamId
           ? (teamById.get(String(pick.originalTeamId)) ?? null)
@@ -194,10 +199,10 @@ export const submitPick = mutation({
     }
 
     const now = new Date();
-    const nowIso = now.toISOString();
+    const nowTimestamp = now.getTime();
     const clock = resolveDraftClockState(
       orderedRows.map(toDraftPick),
-      season.draftStartAt,
+      toUtcTimestamp(season.draftStartAt),
       now,
     );
     if (clock.status === "upcoming") {
@@ -262,19 +267,21 @@ export const submitPick = mutation({
     await ctx.db.patch(activeRow._id, {
       playerId: args.playerId,
       onClockStartedAt:
-        activeRow.onClockStartedAt ?? clock.clockStartedAt ?? nowIso,
+        toUtcTimestamp(activeRow.onClockStartedAt) ??
+        toUtcTimestamp(clock.clockStartedAt) ??
+        nowTimestamp,
       onClockExpiresAt:
-        activeRow.onClockExpiresAt ??
-        clock.clockExpiresAt ??
-        new Date(now.getTime() + DRAFT_PICK_CLOCK_MS).toISOString(),
-      onClockEndedAt: nowIso,
-      updatedAt: nowIso,
+        toUtcTimestamp(activeRow.onClockExpiresAt) ??
+        toUtcTimestamp(clock.clockExpiresAt) ??
+        nowTimestamp + DRAFT_PICK_CLOCK_MS,
+      onClockEndedAt: nowTimestamp,
+      updatedAt: nowTimestamp,
     });
     await ctx.db.patch(player._id, {
       ownerId: franchise.ownerId,
       gshlTeamId: undefined,
       lineupPos: "BN",
-      updatedAt: nowIso,
+      updatedAt: nowTimestamp,
     });
 
     const nextPick =
@@ -283,12 +290,10 @@ export const submitPick = mutation({
       ) ?? null;
     if (nextPick) {
       await ctx.db.patch(nextPick._id, {
-        onClockStartedAt: nowIso,
-        onClockExpiresAt: new Date(
-          now.getTime() + DRAFT_PICK_CLOCK_MS,
-        ).toISOString(),
+        onClockStartedAt: nowTimestamp,
+        onClockExpiresAt: nowTimestamp + DRAFT_PICK_CLOCK_MS,
         onClockEndedAt: null,
-        updatedAt: nowIso,
+        updatedAt: nowTimestamp,
       });
     }
 

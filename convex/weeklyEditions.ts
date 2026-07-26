@@ -22,6 +22,7 @@ import {
   validateWeeklyEditionContent,
   validateWeeklyEditionImport,
 } from "../src/lib/utils/features/weekly-edition";
+import { toUtcTimestamp, utcTimestampToDateKey } from "./lib/timestamps";
 
 type EditionRow = Doc<"weeklyEditions">;
 type GenerationOptions = {
@@ -30,8 +31,50 @@ type GenerationOptions = {
   replaceEditorial?: boolean;
 };
 
-const publicRow = <Row extends { _id: string }>(row: Row | null) =>
-  row ? { ...row, id: row._id } : null;
+const PUBLIC_TIMESTAMP_FIELDS = [
+  "startDate",
+  "endDate",
+  "publishedAt",
+  "scheduledFor",
+  "createdAt",
+  "updatedAt",
+] as const;
+type PublicTimestampField = (typeof PUBLIC_TIMESTAMP_FIELDS)[number];
+type PublicRow<Row extends { _id: string }> = Omit<
+  Row,
+  "_id" | "_creationTime" | PublicTimestampField
+> & {
+  id: string;
+} & Record<Extract<keyof Row, PublicTimestampField>, number>;
+
+const isoTimestamp = (value: unknown) => {
+  const timestamp = toUtcTimestamp(value);
+  return timestamp === null ? "" : new Date(timestamp).toISOString();
+};
+const dateKey = (value: unknown) => utcTimestampToDateKey(value) ?? "";
+const descendingTimestamp = (
+  left: { publishedAt?: unknown },
+  right: { publishedAt?: unknown },
+) =>
+  (toUtcTimestamp(right.publishedAt) ?? 0) -
+  (toUtcTimestamp(left.publishedAt) ?? 0);
+const publicRow = <Row extends { _id: string }>(
+  row: Row | null,
+): PublicRow<Row> | null => {
+  if (!row) return null;
+  const output: Record<string, unknown> = { ...row, id: row._id };
+  delete output._id;
+  delete output._creationTime;
+  for (const field of PUBLIC_TIMESTAMP_FIELDS) {
+    if (!(field in output)) continue;
+    const timestamp = toUtcTimestamp(output[field]);
+    if (timestamp === null) {
+      throw new Error(`Weekly edition ${field} is not a valid UTC timestamp`);
+    }
+    output[field] = timestamp;
+  }
+  return output as PublicRow<Row>;
+};
 const asNumber = (value: unknown) => {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : 0;
@@ -50,7 +93,7 @@ async function saveRevision(
     generationMode: edition.generationMode,
     content: edition.content,
     sourceHash: edition.sourceHash,
-    createdAt: new Date().toISOString(),
+    createdAt: Date.now(),
     editedBy,
   });
 }
@@ -161,7 +204,7 @@ async function buildSource(
               playerId: String(row.playerId),
               ownerId: String(row.ownerId),
               seasonId: String(row.seasonId),
-              signingDate: String(row.signingDate ?? ""),
+              signingDate: dateKey(row.signingDate),
               signingStatus: row.signingStatus,
               contractLength: asNumber(row.contractLength),
               contractSalary: asNumber(row.contractSalary),
@@ -187,8 +230,10 @@ async function buildSource(
     limit: 100,
   }).filter(
     (event) =>
-      event.date >= String(week.startDate) &&
-      event.date <= String(week.endDate),
+      (toUtcTimestamp(event.date) ?? -Infinity) >=
+        (toUtcTimestamp(week.startDate) ?? Infinity) &&
+      (toUtcTimestamp(event.date) ?? Infinity) <=
+        (toUtcTimestamp(week.endDate) ?? -Infinity),
   );
   const activity = activityRows.flatMap((event) =>
     event.type === "missed_start"
@@ -231,15 +276,15 @@ async function buildSource(
       id: String(season._id),
       name: season.name,
       year: String(season.year),
-      endDate: String(season.endDate ?? ""),
-      signingEndDate: String(season.signingEndDate ?? ""),
-      draftStartAt: String(season.draftStartAt ?? ""),
+      endDate: dateKey(season.endDate),
+      signingEndDate: dateKey(season.signingEndDate),
+      draftStartAt: isoTimestamp(season.draftStartAt),
     },
     week: {
       id: String(week._id),
       number: asNumber(week.weekNum),
-      startDate: String(week.startDate),
-      endDate: String(week.endDate),
+      startDate: dateKey(week.startDate),
+      endDate: dateKey(week.endDate),
     },
     teams: [...teamById.values()],
     matchups: matchups.map((matchup) => ({
@@ -333,8 +378,16 @@ async function generateForWeek(
   week: Doc<"weeks">,
   options: GenerationOptions = {},
 ) {
-  const today = new Date().toISOString().slice(0, 10);
-  if (!week.endDate || String(week.endDate) >= today)
+  const today = dateKey(Date.now());
+  const weekStart = toUtcTimestamp(week.startDate);
+  const weekEnd = toUtcTimestamp(week.endDate);
+  const weekEndDate = dateKey(week.endDate);
+  if (
+    weekStart === null ||
+    weekEnd === null ||
+    !weekEndDate ||
+    weekEndDate >= today
+  )
     throw new Error("The selected week has not ended");
 
   const facts = await buildSource(ctx, season, week);
@@ -356,7 +409,7 @@ async function generateForWeek(
     return { state: "protected", existing };
   }
 
-  const now = new Date().toISOString();
+  const now = Date.now();
   const content = buildTemplateWeeklyEdition(facts);
   if (existing) {
     await saveRevision(ctx, existing, options.editedBy);
@@ -366,14 +419,14 @@ async function generateForWeek(
       issueLabel: `Week ${asNumber(week.weekNum)}`,
       seasonName: season.name,
       weekNum: asNumber(week.weekNum),
-      startDate: String(week.startDate),
-      endDate: String(week.endDate),
+      startDate: weekStart,
+      endDate: weekEnd,
       status: "published",
       generationMode: "template",
       content,
       facts,
       sourceHash,
-      scheduledFor: String(week.endDate),
+      scheduledFor: weekEnd,
       updatedAt: now,
       editedBy: options.editedBy,
     });
@@ -387,15 +440,15 @@ async function generateForWeek(
     issueLabel: `Week ${asNumber(week.weekNum)}`,
     seasonName: season.name,
     weekNum: asNumber(week.weekNum),
-    startDate: String(week.startDate),
-    endDate: String(week.endDate),
+    startDate: weekStart,
+    endDate: weekEnd,
     status: "published",
     generationMode: "template",
     content,
     facts,
     sourceHash,
     publishedAt: now,
-    scheduledFor: String(week.endDate),
+    scheduledFor: weekEnd,
     createdAt: now,
     updatedAt: now,
     editedBy: options.editedBy,
@@ -405,9 +458,9 @@ async function generateForWeek(
 
 function milestoneSchedule(season: Doc<"seasons">, finalWeek: Doc<"weeks">) {
   return buildWeeklyEditionMilestoneSchedule({
-    finalWeekEnd: String(finalWeek.endDate ?? ""),
-    signingEndDate: String(season.signingEndDate ?? ""),
-    draftStartAt: String(season.draftStartAt ?? ""),
+    finalWeekEnd: dateKey(finalWeek.endDate),
+    signingEndDate: dateKey(season.signingEndDate),
+    draftStartAt: isoTimestamp(season.draftStartAt),
   });
 }
 
@@ -515,24 +568,24 @@ async function buildMilestoneSource(
     }
   });
 
-  const seasonEnd = String(season.endDate ?? "");
-  const signingEnd = String(season.signingEndDate ?? "");
+  const seasonEnd = dateKey(season.endDate);
+  const signingEnd = dateKey(season.signingEndDate);
   const teamContracts = contracts.filter((contract) =>
     teamByOwnerId.has(String(contract.ownerId)),
   );
   const relevantContracts = teamContracts.filter((contract) => {
-    const capEnd = String(contract.capHitEndDate ?? contract.expiryDate ?? "");
+    const capEnd = dateKey(contract.capHitEndDate ?? contract.expiryDate);
     return capEnd > seasonEnd;
   });
   const expiringRows = teamContracts.filter((contract) => {
-    const expiryDate = String(contract.expiryDate ?? "");
+    const expiryDate = dateKey(contract.expiryDate);
     return (
       expiryDate === seasonEnd ||
       (expiryDate > seasonEnd && signingEnd && expiryDate <= signingEnd)
     );
   });
   const recentRows = teamContracts.filter((contract) => {
-    const signingDate = String(contract.signingDate ?? "");
+    const signingDate = dateKey(contract.signingDate);
     return signingDate > seasonEnd && signingDate <= triggerDate;
   });
   const contractFact = (contract: Doc<"contracts">) => ({
@@ -543,7 +596,7 @@ async function buildMilestoneSource(
       teamByOwnerId.get(String(contract.ownerId))?.name ?? "Unknown team",
     salary: asNumber(contract.capHit ?? contract.contractSalary),
     expiryStatus: String(contract.expiryStatus ?? ""),
-    expiryDate: String(contract.expiryDate ?? ""),
+    expiryDate: dateKey(contract.expiryDate),
   });
   const draftFacts = draftPicks.map((pick) => ({
     pickId: String(pick._id),
@@ -614,13 +667,13 @@ async function buildMilestoneSource(
       year: String(season.year),
       endDate: seasonEnd,
       signingEndDate: signingEnd,
-      draftStartAt: String(season.draftStartAt ?? ""),
+      draftStartAt: isoTimestamp(season.draftStartAt),
     },
     week: {
       id: String(anchorWeek._id),
       number: asNumber(anchorWeek.weekNum),
-      startDate: String(anchorWeek.startDate ?? ""),
-      endDate: String(anchorWeek.endDate ?? ""),
+      startDate: dateKey(anchorWeek.startDate),
+      endDate: dateKey(anchorWeek.endDate),
     },
     teams: [...teamById.values()].map(({ ownerId: _ownerId, ...team }) => team),
     matchups:
@@ -725,7 +778,17 @@ async function generateMilestoneForSeason(
   ) {
     return { state: "protected", existing };
   }
-  const now = new Date().toISOString();
+  const now = Date.now();
+  const scheduledForTimestamp = toUtcTimestamp(scheduledFor);
+  const anchorStart = toUtcTimestamp(anchorWeek.startDate);
+  const anchorEnd = toUtcTimestamp(anchorWeek.endDate);
+  if (
+    scheduledForTimestamp === null ||
+    anchorStart === null ||
+    anchorEnd === null
+  ) {
+    throw new Error("The weekly edition schedule contains an invalid date");
+  }
   const content = buildTemplateWeeklyEdition(facts);
   const values = {
     editionKey,
@@ -736,14 +799,14 @@ async function generateMilestoneForSeason(
       )?.issueLabel ?? issueType,
     seasonName: season.name,
     weekNum: asNumber(anchorWeek.weekNum),
-    startDate: String(anchorWeek.startDate ?? ""),
-    endDate: String(anchorWeek.endDate ?? ""),
+    startDate: anchorStart,
+    endDate: anchorEnd,
     status: "published" as const,
     generationMode: "template" as const,
     content,
     facts,
     sourceHash,
-    scheduledFor,
+    scheduledFor: scheduledForTimestamp,
     updatedAt: now,
     editedBy: options.editedBy,
   };
@@ -767,19 +830,20 @@ export const latestPublished = query({
   handler: async (ctx, args) => {
     const seasonId = args.seasonId;
     if (seasonId) {
-      const rows = await ctx.db
-        .query("weeklyEditions")
-        .withIndex("by_seasonId_publishedAt", (q) => q.eq("seasonId", seasonId))
-        .order("desc")
-        .take(20);
-      return publicRow(rows.find((row) => row.status === "published") ?? null);
+      const rows = await ctx.db.query("weeklyEditions").collect();
+      return publicRow(
+        rows
+          .filter(
+            (row) => row.seasonId === seasonId && row.status === "published",
+          )
+          .sort(descendingTimestamp)[0] ?? null,
+      );
     }
+    const rows = await ctx.db.query("weeklyEditions").collect();
     return publicRow(
-      await ctx.db
-        .query("weeklyEditions")
-        .withIndex("by_status_publishedAt", (q) => q.eq("status", "published"))
-        .order("desc")
-        .first(),
+      rows
+        .filter((row) => row.status === "published")
+        .sort(descendingTimestamp)[0] ?? null,
     );
   },
 });
@@ -790,13 +854,15 @@ export const publishedArchive = query({
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    const rows = await ctx.db
-      .query("weeklyEditions")
-      .withIndex("by_status_publishedAt", (q) => q.eq("status", "published"))
-      .order("desc")
-      .take(Math.min(Math.max(args.limit ?? 40, 1), 100));
+    const rows = await ctx.db.query("weeklyEditions").collect();
     return rows
-      .filter((row) => !args.seasonId || row.seasonId === args.seasonId)
+      .filter(
+        (row) =>
+          row.status === "published" &&
+          (!args.seasonId || row.seasonId === args.seasonId),
+      )
+      .sort(descendingTimestamp)
+      .slice(0, Math.min(Math.max(args.limit ?? 40, 1), 100))
       .map(publicRow);
   },
 });
@@ -823,15 +889,19 @@ export const revisions = query({
   args: { editionId: v.id("weeklyEditions") },
   handler: async (ctx, args) => {
     await requireCommissioner(ctx);
-    return (
-      await ctx.db
-        .query("weeklyEditionRevisions")
-        .withIndex("by_editionId_createdAt", (q) =>
-          q.eq("editionId", args.editionId),
-        )
-        .order("desc")
-        .collect()
-    ).map(publicRow);
+    const rows = await ctx.db
+      .query("weeklyEditionRevisions")
+      .withIndex("by_editionId_createdAt", (q) =>
+        q.eq("editionId", args.editionId),
+      )
+      .collect();
+    return rows
+      .sort(
+        (left, right) =>
+          (toUtcTimestamp(right.createdAt) ?? 0) -
+          (toUtcTimestamp(left.createdAt) ?? 0),
+      )
+      .map(publicRow);
   },
 });
 
@@ -873,7 +943,7 @@ export const generateHistorical = mutation({
     const scheduledFor =
       milestoneSchedule(season, week).find(
         (item) => item.issueType === issueType,
-      )?.scheduledFor ?? String(week.endDate);
+      )?.scheduledFor ?? dateKey(week.endDate);
     const result =
       issueType === "weekly"
         ? await generateForWeek(ctx, season, week, {
@@ -911,7 +981,7 @@ export const publishImport = mutation({
       generationMode: "chatgpt_import",
       status: "published",
       editedBy: user._id,
-      updatedAt: new Date().toISOString(),
+      updatedAt: Date.now(),
     });
     return publicRow(await ctx.db.get(edition._id));
   },
@@ -931,7 +1001,7 @@ export const updateManual = mutation({
       content: result.content,
       generationMode: "manual",
       editedBy: user._id,
-      updatedAt: new Date().toISOString(),
+      updatedAt: Date.now(),
     });
     return publicRow(await ctx.db.get(edition._id));
   },
@@ -949,7 +1019,7 @@ export const setVisibility = mutation({
     await ctx.db.patch(args.editionId, {
       status: args.status,
       editedBy: user._id,
-      updatedAt: new Date().toISOString(),
+      updatedAt: Date.now(),
     });
     return publicRow(await ctx.db.get(args.editionId));
   },
@@ -969,7 +1039,7 @@ export const restoreRevision = mutation({
       generationMode: revision.generationMode,
       sourceHash: revision.sourceHash,
       editedBy: user._id,
-      updatedAt: new Date().toISOString(),
+      updatedAt: Date.now(),
     });
     return publicRow(await ctx.db.get(edition._id));
   },
@@ -1010,14 +1080,14 @@ export const processGenerationJob = internalMutation({
       unchanged: 0,
       skipped: 0,
     };
-    const today = new Date().toISOString().slice(0, 10);
+    const today = dateKey(Date.now());
     for (const season of seasons) {
       const weeks = await ctx.db
         .query("weeks")
         .withIndex("by_seasonId", (q) => q.eq("seasonId", season._id))
         .collect();
       for (const week of weeks.filter(
-        (item) => item.endDate && String(item.endDate) < today,
+        (item) => dateKey(item.endDate) < today,
       )) {
         counts.processed += 1;
         try {
@@ -1072,7 +1142,7 @@ export const processGenerationJob = internalMutation({
 export const scanDueMilestones = internalMutation({
   args: {},
   handler: async (ctx) => {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = dateKey(Date.now());
     const seasons = await ctx.db.query("seasons").collect();
     const result = {
       processed: 0,

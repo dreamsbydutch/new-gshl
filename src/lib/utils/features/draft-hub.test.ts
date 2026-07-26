@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { DraftPick } from "@gshl-types";
-import { canSubmitDraftPick, resolveDraftClockState } from "./draft-hub";
+import {
+  canSubmitDraftPick,
+  resolveDraftClockState,
+  serializeDraftHubPick,
+} from "./draft-hub";
 
 const start = "2026-09-01T23:00:00.000Z";
 
@@ -25,6 +29,15 @@ function pick(
     ...fields,
   };
 }
+
+void test("serializes draft pick dates for Convex responses", () => {
+  const serialized = serializeDraftHubPick(pick("1", 1));
+
+  assert.equal(serialized.createdAt, Date.parse(start));
+  assert.equal(serialized.updatedAt, Date.parse(start));
+  assert.equal(typeof serialized.createdAt, "number");
+  assert.equal(typeof serialized.updatedAt, "number");
+});
 
 void test("selects the first unfilled pick and skips completed picks", () => {
   const state = resolveDraftClockState(
@@ -84,8 +97,8 @@ void test("falls back to the latest completed timestamp for legacy picks", () =>
     start,
     new Date("2026-09-01T23:02:00.000Z"),
   );
-  assert.equal(state.clockStartedAt, "2026-09-01T23:01:00.000Z");
-  assert.equal(state.clockExpiresAt, "2026-09-01T23:05:00.000Z");
+  assert.equal(state.clockStartedAt, Date.parse("2026-09-01T23:01:00.000Z"));
+  assert.equal(state.clockExpiresAt, Date.parse("2026-09-01T23:05:00.000Z"));
 });
 
 void test("marks the draft complete when every pick has a player", () => {

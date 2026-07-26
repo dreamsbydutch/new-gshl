@@ -129,7 +129,7 @@ function DraftStatusHero({
   completedCount: number;
   remainingCount: number;
   remainingSeconds: number;
-  draftStartAt: string;
+  draftStartAt: number;
 }) {
   if (status === "complete") {
     return (
