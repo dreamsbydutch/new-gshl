@@ -8,6 +8,17 @@ import {
 } from "./model-map";
 
 type AnyRow = Record<string, unknown>;
+const UTC_DATE_FIELD_NAMES = new Set([
+  "birthday",
+  "capHitEndDate",
+  "date",
+  "endDate",
+  "expiryDate",
+  "nhlSigningDate",
+  "signingDate",
+  "signingEndDate",
+  "startDate",
+]);
 
 export type UpsertOptions = {
   merge?: boolean;
@@ -148,6 +159,14 @@ function hydrateRow<T>(row: AnyRow): T {
     if (key.endsWith("At") && typeof value === "string" && value.trim()) {
       const date = new Date(value);
       hydrated[key] = Number.isNaN(date.getTime()) ? value : date;
+      continue;
+    }
+    if (key.endsWith("At") && typeof value === "number") {
+      hydrated[key] = new Date(value);
+      continue;
+    }
+    if (typeof value === "number" && UTC_DATE_FIELD_NAMES.has(key)) {
+      hydrated[key] = new Date(value).toISOString().slice(0, 10);
     }
   }
   return hydrated as T;

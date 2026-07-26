@@ -10,6 +10,7 @@ import {
 } from "./_generated/server";
 import { getUfaOfferGroupDeadline } from "../src/lib/utils/features/ufa-deadline";
 import { requireOwnerOrCommissioner } from "./lib/auth";
+import { utcTimestampToDateKey } from "./lib/timestamps";
 
 const CAP = 25_000_000;
 const resolutionOddsValidator = v.array(
@@ -74,11 +75,7 @@ function isPlayingContract(contract: any) {
   );
 }
 
-function normalizeDateOnly(value: unknown) {
-  if (typeof value !== "string") return null;
-  const trimmed = value.trim();
-  return trimmed ? trimmed.slice(0, 10) : null;
-}
+const normalizeDateOnly = utcTimestampToDateKey;
 
 function contractAffectsSeason(contract: any, season: any, seasons: any[]) {
   const seasonStart = normalizeDateOnly(season.startDate);
@@ -571,10 +568,8 @@ export const submitOffer = mutation({
     );
     const signingSeason = orderedSeasons.find((season: any) => season.isActive);
     if (!signingSeason) throw new Error("There is no active signing season.");
-    if (
-      !signingSeason.signingEndDate ||
-      torontoDate(now) <= String(signingSeason.signingEndDate)
-    ) {
+    const signingEndDate = normalizeDateOnly(signingSeason.signingEndDate);
+    if (!signingEndDate || torontoDate(now) <= signingEndDate) {
       throw new Error("Summer Free Agency is not open.");
     }
     if (
@@ -848,7 +843,6 @@ export const finalizeGroup = internalMutation({
       args.factorSnapshots.map((entry) => [entry.offerId, entry.snapshot]),
     );
     const now = Date.now();
-    const nowIso = new Date(now).toISOString();
     await db.insert("contracts", {
       playerId: player._id,
       ownerId: winningOffer.ownerId,
@@ -856,15 +850,15 @@ export const finalizeGroup = internalMutation({
       contractType: continuous ? "EXTENSION" : "STANDARD",
       contractLength: winningOffer.contractLength,
       contractSalary: winningOffer.salary,
-      signingDate: torontoDate(now),
+      signingDate: now,
       startDate: startSeason.startDate,
       signingStatus: "UFA",
       expiryStatus: continuous ? "UFA" : "RFA",
       expiryDate: expirySeason.endDate,
       capHit: winningOffer.salary,
       capHitEndDate: expirySeason.endDate,
-      createdAt: nowIso,
-      updatedAt: nowIso,
+      createdAt: now,
+      updatedAt: now,
     });
     await db.patch(player._id, {
       ownerId: winningOffer.ownerId,
@@ -872,7 +866,7 @@ export const finalizeGroup = internalMutation({
       isSignable: false,
       isResignable: null,
       lineupPos: null,
-      updatedAt: nowIso,
+      updatedAt: now,
     });
     for (const offer of offers) {
       await db.patch(offer._id, {

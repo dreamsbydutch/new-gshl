@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return */
 import { mutationGeneric, queryGeneric } from "convex/server";
 import { ConvexError, v } from "convex/values";
+import { normalizeTimestampFields } from "./lib/timestamps";
 
 const TABLES = new Set([
   "playerDayStatLines",
@@ -56,6 +57,7 @@ function requireAggregateTable(table: string): string[] {
 }
 
 function normalizeAggregateDoc(
+  table: string,
   row: Record<string, unknown>,
 ): Record<string, unknown> {
   const doc = { ...row };
@@ -65,7 +67,7 @@ function normalizeAggregateDoc(
   delete doc._creationTime;
   doc.legacyId ??=
     typeof id === "string" || typeof id === "number" ? String(id) : undefined;
-  return doc;
+  return normalizeTimestampFields(table, doc);
 }
 
 function diagnosticValue(value: unknown): string {
@@ -256,11 +258,11 @@ export const upsertAggregateRows = mutationGeneric({
       throw new Error("Aggregate writes are limited to 25 rows per mutation");
     }
     const indexName = `by_${keyFields.join("_")}`;
-    const now = new Date().toISOString();
+    const now = Date.now();
     let updated = 0;
     let inserted = 0;
     for (const rawRow of args.rows) {
-      const doc = normalizeAggregateDoc(rawRow);
+      const doc = normalizeAggregateDoc(args.table, rawRow);
       try {
         const existing = (await ctx.db
           .query(args.table as never)

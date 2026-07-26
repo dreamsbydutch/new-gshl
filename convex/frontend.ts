@@ -12,6 +12,12 @@ import {
   JOB_NAMES,
   JOB_STATUSES,
 } from "./jobCatalog";
+import {
+  normalizeTimestampFields,
+  timestampFieldsForTable,
+  toUtcTimestamp,
+  utcTimestampToDateKey,
+} from "./lib/timestamps";
 
 type Row = Record<string, unknown> & {
   _id: string;
@@ -117,16 +123,32 @@ function equal(left: unknown, right: unknown) {
 }
 
 function publicRow(row: Row): Record<string, any> {
-  return { ...row, id: row._id };
+  const output: Record<string, unknown> = { ...row, id: row._id };
+  for (const [field, value] of Object.entries(output)) {
+    if (typeof value !== "number") continue;
+    if (field.endsWith("At")) {
+      output[field] = new Date(value).toISOString();
+      continue;
+    }
+    if (field === "birthday" || field === "date" || field.endsWith("Date")) {
+      output[field] = utcTimestampToDateKey(value);
+    }
+  }
+  return output;
 }
 
 function matches(
+  table: string,
   row: Record<string, unknown>,
   where?: Record<string, unknown>,
 ) {
+  const timestampFields = new Set(timestampFieldsForTable(table));
   return Object.entries(where ?? {}).every(
     ([field, expected]) =>
-      expected === undefined || equal(row[field], expected),
+      expected === undefined ||
+      (timestampFields.has(field)
+        ? toUtcTimestamp(row[field]) === toUtcTimestamp(expected)
+        : equal(row[field], expected)),
   );
 }
 
@@ -163,7 +185,7 @@ async function rows(
   if ("id" in where && typeof where.id === "string") {
     try {
       const row = (await ctx.db.get(where.id)) as Row | null;
-      return row && matches(publicRow(row), where) ? [publicRow(row)] : [];
+      return row && matches(table, row, where) ? [publicRow(row)] : [];
     } catch {
       return [];
     }
@@ -174,8 +196,12 @@ async function rows(
     delete where.teamId;
   }
 
+  const timestampFields = new Set(timestampFieldsForTable(table));
   const indexed = Object.entries(where).find(
-    ([field, value]) => value !== undefined && indexedFields[table]?.has(field),
+    ([field, value]) =>
+      value !== undefined &&
+      indexedFields[table]?.has(field) &&
+      !timestampFields.has(field),
   );
   let query: any = ctx.db.query(table as never);
   if (indexed) {
@@ -188,8 +214,8 @@ async function rows(
       ? await query.take(args.take)
       : await query.collect();
   const result = (candidates as Row[])
+    .filter((row) => matches(table, row, where))
     .map(publicRow)
-    .filter((row) => matches(row, where))
     .sort((a, b) => compare(a, b, args.orderBy));
   return args.take ? result.slice(0, args.take) : result;
 }
@@ -394,9 +420,16 @@ export const activity = query({
     const [contracts, playerDays, teams, franchises] = await Promise.all([
       (ctx.db as any)
         .query("contracts")
-        .withIndex("by_signingDate")
-        .order("desc")
-        .take(100),
+        .collect()
+        .then((rows: Row[]) =>
+          rows
+            .sort(
+              (left, right) =>
+                (toUtcTimestamp(right.signingDate) ?? 0) -
+                (toUtcTimestamp(left.signingDate) ?? 0),
+            )
+            .slice(0, 100),
+        ),
       (ctx.db as any)
         .query("playerDayStatLines")
         .withIndex("by_seasonId_date", (q) => q.eq("seasonId", args.seasonId))
@@ -466,8 +499,11 @@ export const updatePlayer = mutation({
       }
       patch.gshlTeamId = undefined;
     }
-    patch.updatedAt = new Date().toISOString();
-    await ctx.db.patch(args.id, patch as never);
+    patch.updatedAt = Date.now();
+    await ctx.db.patch(
+      args.id,
+      normalizeTimestampFields("players", patch) as never,
+    );
     return publicRow((await ctx.db.get(args.id)) as unknown as Row);
   },
 });
@@ -495,8 +531,11 @@ export const updateDraftPick = mutation({
       patch.gshlTeamId = patch.teamId;
       delete patch.teamId;
     }
-    patch.updatedAt = new Date().toISOString();
-    await ctx.db.patch(args.id, patch as never);
+    patch.updatedAt = Date.now();
+    await ctx.db.patch(
+      args.id,
+      normalizeTimestampFields("draftPicks", patch) as never,
+    );
     return publicRow((await ctx.db.get(args.id)) as unknown as Row);
   },
 });
@@ -530,7 +569,7 @@ export const updateAuthUserAccess = mutation({
         args.role === "owner" || args.role === "commissioner"
           ? args.ownerId
           : undefined,
-      updatedAt: new Date().toISOString(),
+      updatedAt: Date.now(),
     });
     return publicRow((await ctx.db.get(args.id)) as unknown as Row);
   },
@@ -570,7 +609,12 @@ export const createContract = mutation({
     );
     const expirySeason =
       ordered[seasonIndex + args.contractLength - 1] ?? signingSeason;
-    const now = new Date().toISOString();
+    const now = Date.now();
+    const startDate = toUtcTimestamp(signingSeason.startDate);
+    const expiryDate = toUtcTimestamp(expirySeason.endDate);
+    if (startDate === null || expiryDate === null) {
+      throw new Error("The selected contract seasons have invalid dates");
+    }
     const id = await ctx.db.insert("contracts", {
       playerId: args.playerId,
       ownerId: franchise.ownerId,
@@ -578,13 +622,13 @@ export const createContract = mutation({
       contractType: "STANDARD",
       contractLength: args.contractLength,
       contractSalary: Number(player.salary ?? 0),
-      signingDate: now.slice(0, 10),
-      startDate: String(signingSeason.startDate),
+      signingDate: now,
+      startDate,
       signingStatus: "Drafted",
       expiryStatus: "UFA",
-      expiryDate: String(expirySeason.endDate),
+      expiryDate,
       capHit: Number(player.salary ?? 0),
-      capHitEndDate: String(expirySeason.endDate),
+      capHitEndDate: expiryDate,
       createdAt: now,
       updatedAt: now,
     });

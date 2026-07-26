@@ -12,6 +12,7 @@ import {
   canonicalJobName,
   isExternalJob,
 } from "./jobCatalog";
+import { utcTimestampToDateKey } from "./lib/timestamps";
 import {
   calculatePlayerAwards,
   calculateTeamAwards,
@@ -261,7 +262,7 @@ export const processAwardsBackfill = internalMutationGeneric({
     const requestedSeasonId =
       typeof jobArgs.seasonId === "string" ? jobArgs.seasonId : undefined;
     const allSeasons = await ctx.db.query("seasons" as never).collect();
-    const today = new Date().toISOString().slice(0, 10);
+    const today = utcTimestampToDateKey(Date.now())!;
     const isActiveSeasonPipeline = run.mode === "pipeline";
     const seasons = requestedSeasonId
       ? allSeasons.filter(
@@ -271,18 +272,18 @@ export const processAwardsBackfill = internalMutationGeneric({
         )
       : isActiveSeasonPipeline
         ? allSeasons.filter((season) => {
-            const startDate = String(season.startDate ?? "");
-            const endDate = String(season.endDate ?? "");
+            const startDate = utcTimestampToDateKey(season.startDate);
+            const endDate = utcTimestampToDateKey(season.endDate);
             return (
-              startDate !== "" &&
-              endDate !== "" &&
+              startDate !== null &&
+              endDate !== null &&
               startDate <= today &&
               today <= endDate
             );
           })
         : allSeasons.filter((season) => {
-            const endDate = String(season.endDate ?? "");
-            return endDate !== "" && endDate < today;
+            const endDate = utcTimestampToDateKey(season.endDate);
+            return endDate !== null && endDate < today;
           });
     if (seasons.length === 0) {
       throw new Error(
@@ -300,7 +301,7 @@ export const processAwardsBackfill = internalMutationGeneric({
     ]);
     const totals = emptyProgress();
     const summaries: Array<Record<string, unknown>> = [];
-    const now = new Date().toISOString();
+    const now = Date.now();
 
     for (const season of seasons) {
       const seasonId = String(season._id);

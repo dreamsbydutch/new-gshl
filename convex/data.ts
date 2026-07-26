@@ -1,6 +1,11 @@
 /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-base-to-string, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unnecessary-type-assertion */
 import { mutationGeneric, queryGeneric } from "convex/server";
 import { v } from "convex/values";
+import {
+  normalizeTimestampFields,
+  timestampFieldsForTable,
+  toUtcTimestamp,
+} from "./lib/timestamps";
 
 type Row = Record<string, unknown>;
 type ConvexRow = Row & { _id: string; _creationTime: number };
@@ -56,10 +61,18 @@ function equals(left: unknown, right: unknown): boolean {
   return toComparable(left) === toComparable(right);
 }
 
-function matchesWhere(row: Row, where?: Record<string, unknown>): boolean {
+function matchesWhere(
+  table: string,
+  row: Row,
+  where?: Record<string, unknown>,
+): boolean {
   if (!where) return true;
+  const timestampFields = new Set(timestampFieldsForTable(table));
   return Object.entries(where).every(([field, expected]) => {
     if (expected === undefined) return true;
+    if (timestampFields.has(field)) {
+      return toUtcTimestamp(row[field]) === toUtcTimestamp(expected);
+    }
     return equals(row[field], expected);
   });
 }
@@ -224,9 +237,13 @@ function firstIndexedWhere(
 ): [string, unknown] | null {
   if (!where) return null;
   const indexedFields = indexesForTable(table);
+  const timestampFields = new Set(timestampFieldsForTable(table));
   return (
     Object.entries(where).find(
-      ([field, value]) => value !== undefined && indexedFields.has(field),
+      ([field, value]) =>
+        value !== undefined &&
+        indexedFields.has(field) &&
+        !timestampFields.has(field),
     ) ?? null
   );
 }
@@ -280,18 +297,25 @@ async function readCandidateRows(
   return (await ctx.db.query(table as never).collect()) as ConvexRow[];
 }
 
-function normalizeDoc(input: Row): Row {
+function normalizeDoc(table: string, input: Row): Row {
   const { id, ...rest } = input;
   delete rest._id;
   delete rest._creationTime;
-  return {
+  return normalizeTimestampFields(table, {
     ...rest,
     legacyId:
       rest.legacyId ??
       (typeof id === "string" || typeof id === "number"
         ? String(id)
         : undefined),
-  };
+  });
+}
+
+function normalizeWhere(
+  table: string,
+  where: Record<string, unknown> | undefined,
+): Record<string, unknown> | undefined {
+  return where ? normalizeTimestampFields(table, where) : undefined;
 }
 
 function keyPart(value: unknown): string {
@@ -714,7 +738,7 @@ async function toAwardStorageDoc(
   | { table: typeof TEAM_AWARDS_TABLE; kind: "team"; doc: Row }
   | { missing: string }
 > {
-  const row = normalizeDoc(rawRow);
+  const row = normalizeDoc(AWARDS_TABLE, rawRow);
   const seasonId = normalizeId(row.seasonId);
   const award = normalizeId(row.award);
   if (!seasonId) return { missing: "seasonId" };
@@ -877,7 +901,7 @@ async function readAwardRows(
         );
 
   return rows
-    .filter((row) => matchesWhere(row, args.where))
+    .filter((row) => matchesWhere(AWARDS_TABLE, row, args.where))
     .sort((left, right) => compareRows(left, right, args.orderBy));
 }
 
@@ -892,7 +916,7 @@ async function deleteAllRows(ctx: { db: any }, table: string): Promise<number> {
 async function applyUpsertByCompositeKey(ctx: { db: any }, args: UpsertArgs) {
   const deleteMissingFilter =
     args.deleteMissing && typeof args.deleteMissing === "object"
-      ? args.deleteMissing.filter
+      ? normalizeWhere(args.table, args.deleteMissing.filter)
       : undefined;
   const rowIndexedFilter = Object.fromEntries(
     Object.entries(args.rows[0] ?? {}).filter(([field, value]) => {
@@ -916,10 +940,10 @@ async function applyUpsertByCompositeKey(ctx: { db: any }, args: UpsertArgs) {
   let updated = 0;
   let inserted = 0;
   let unchanged = 0;
-  const nowIso = new Date().toISOString();
+  const now = Date.now();
 
   for (const rawRow of args.rows) {
-    const row = normalizeDoc(rawRow);
+    const row = normalizeDoc(args.table, rawRow);
     const key = compositeKey(row, args.keyColumns);
     if (!key || incomingKeys.has(key)) continue;
     incomingKeys.add(key);
@@ -933,7 +957,7 @@ async function applyUpsertByCompositeKey(ctx: { db: any }, args: UpsertArgs) {
               Object.keys(existing).map((k) => [k, undefined]),
             )),
         ...row,
-        updatedAt: row.updatedAt ?? nowIso,
+        updatedAt: row.updatedAt ?? now,
       };
       const changed = Object.entries(patch).some(([field, value]) => {
         if (field === "_id" || field === "_creationTime") return false;
@@ -952,8 +976,8 @@ async function applyUpsertByCompositeKey(ctx: { db: any }, args: UpsertArgs) {
       args.table as never,
       {
         ...row,
-        createdAt: row.createdAt ?? nowIso,
-        updatedAt: row.updatedAt ?? nowIso,
+        createdAt: row.createdAt ?? now,
+        updatedAt: row.updatedAt ?? now,
       } as never,
     );
     inserted += 1;
@@ -963,7 +987,7 @@ async function applyUpsertByCompositeKey(ctx: { db: any }, args: UpsertArgs) {
   if (args.deleteMissing) {
     const filter = deleteMissingFilter;
     for (const row of existingRows) {
-      if (filter && !matchesWhere(row, filter)) continue;
+      if (filter && !matchesWhere(args.table, row, filter)) continue;
       if (incomingKeys.has(compositeKey(row, args.keyColumns))) continue;
       await ctx.db.delete(row._id as never);
       deleted += 1;
@@ -1042,30 +1066,32 @@ export const list = queryGeneric({
   args: queryArgs,
   handler: async (ctx, args) => {
     requireServerSecret(args.serverSecret);
+    const where = normalizeWhere(args.table, args.where);
+    const normalizedArgs = { ...args, where };
     if (isAwardsTable(args.table)) {
-      const rows = await readAwardRows(ctx, args);
+      const rows = await readAwardRows(ctx, normalizedArgs);
       const start = args.skip ?? 0;
       const end = args.take === undefined ? undefined : start + args.take;
       return rows.slice(start, end);
     }
 
     if (isTeamAwardsTable(args.table)) {
-      const rows = await readCandidateRows(ctx, args.table, args);
+      const rows = await readCandidateRows(ctx, args.table, normalizedArgs);
       const normalized = await Promise.all(
         rows.map((row) => publicTeamAwardRow(ctx, row)),
       );
       const filtered = normalized
-        .filter((row) => matchesWhere(row, args.where))
+        .filter((row) => matchesWhere(args.table, row, where))
         .sort((left, right) => compareRows(left, right, args.orderBy));
       const start = args.skip ?? 0;
       const end = args.take === undefined ? undefined : start + args.take;
       return filtered.slice(start, end);
     }
 
-    const rows = await readCandidateRows(ctx, args.table, args);
+    const rows = await readCandidateRows(ctx, args.table, normalizedArgs);
     const filtered = rows
       .map((row) => publicRow(row as never))
-      .filter((row) => matchesWhere(row, args.where))
+      .filter((row) => matchesWhere(args.table, row, where))
       .sort((left, right) => compareRows(left, right, args.orderBy));
 
     const start = args.skip ?? 0;
@@ -1086,17 +1112,18 @@ export const listPage = queryGeneric({
       throw new Error("Page limit must be between 1 and 50");
     }
 
-    const pageIndex = resolvePageIndex(args.table, args.where, args.orderBy);
+    const where = normalizeWhere(args.table, args.where);
+    const pageIndex = resolvePageIndex(args.table, where, args.orderBy);
     const orderDirection = Object.values(args.orderBy ?? {})[0] ?? "asc";
     let query: any = ctx.db.query(args.table as never);
 
     if (pageIndex) {
-      const expected = args.where?.[pageIndex.equalityField];
+      const expected = where?.[pageIndex.equalityField];
       query = query.withIndex(pageIndex.name as never, (q: any) =>
         q.eq(pageIndex.equalityField as never, expected),
       );
     } else {
-      const indexedWhere = firstIndexedWhere(args.table, args.where);
+      const indexedWhere = firstIndexedWhere(args.table, where);
       if (indexedWhere) {
         const [field, expected] = indexedWhere;
         query = query.withIndex(`by_${field}` as never, (q: any) =>
@@ -1111,7 +1138,7 @@ export const listPage = queryGeneric({
     });
     const items = result.page
       .map((row: ConvexRow) => publicRow(row))
-      .filter((row: Row) => matchesWhere(row, args.where));
+      .filter((row: Row) => matchesWhere(args.table, row, where));
 
     return {
       items,
@@ -1188,8 +1215,9 @@ export const count = queryGeneric({
   },
   handler: async (ctx, args) => {
     requireServerSecret(args.serverSecret);
+    const where = normalizeWhere(args.table, args.where);
     if (isAwardsTable(args.table)) {
-      const rows = await readAwardRows(ctx, { where: args.where });
+      const rows = await readAwardRows(ctx, { where });
       return rows.length;
     }
 
@@ -1198,13 +1226,15 @@ export const count = queryGeneric({
       const normalized = await Promise.all(
         rows.map((row) => publicTeamAwardRow(ctx, row)),
       );
-      return normalized.filter((row) => matchesWhere(row, args.where)).length;
+      return normalized.filter((row) => matchesWhere(args.table, row, where))
+        .length;
     }
 
     const rows = await readCandidateRows(ctx, args.table, {
-      where: args.where,
+      where,
     });
-    return rows.filter((row) => matchesWhere(row as never, args.where)).length;
+    return rows.filter((row) => matchesWhere(args.table, row as never, where))
+      .length;
   },
 });
 
@@ -1295,7 +1325,7 @@ export const insertMany = mutationGeneric({
         continue;
       }
 
-      const doc = normalizeDoc(row);
+      const doc = normalizeDoc(args.table, row);
       const id = await ctx.db.insert(args.table as never, doc as never);
       inserted.push({
         legacyId: typeof doc.legacyId === "string" ? doc.legacyId : null,
@@ -1365,7 +1395,7 @@ export const updateById = mutationGeneric({
       throw new Error(`${args.table} row ${args.id} not found`);
     }
 
-    await ctx.db.patch(row._id, normalizeDoc(args.data) as never);
+    await ctx.db.patch(row._id, normalizeDoc(args.table, args.data) as never);
     return publicRow((await ctx.db.get(row._id)) as never);
   },
 });
@@ -1482,7 +1512,7 @@ export const migrateTeamAwardsToOwners = mutationGeneric({
           ownerId: entry.ownerId,
           nomineeIds: nextNominees,
           teamId: undefined,
-          updatedAt: new Date().toISOString(),
+          updatedAt: Date.now(),
         } as never,
       );
       updated += 1;

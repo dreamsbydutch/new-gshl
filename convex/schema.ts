@@ -68,8 +68,12 @@ const stringArray = v.array(v.string());
 const optionalNullableStringArray = optionalNullable(stringArray);
 const statValue = optional(v.union(v.number(), v.string(), v.null()));
 const ratingValue = optional(v.union(v.number(), v.string(), v.null()));
-const timestampValue = optionalNullableString;
-const dateOnlyValue = optionalNullableString;
+// Timestamp fields accept legacy strings only during the online backfill.
+// New writes are normalized to epoch milliseconds at every storage boundary.
+const requiredTimestampValue = v.union(v.number(), v.string());
+const timestampValue = optionalNullable(requiredTimestampValue);
+const dateOnlyValue = timestampValue;
+const dateKeyValue = optionalNullableString;
 
 const statFields = {
   days: statValue,
@@ -168,9 +172,9 @@ export default defineSchema({
     ),
     ownerId: v.optional(id("owners")),
     status: v.union(v.literal("active"), v.literal("disabled")),
-    createdAt: v.string(),
-    updatedAt: v.string(),
-    lastLoginAt: v.string(),
+    createdAt: requiredTimestampValue,
+    updatedAt: requiredTimestampValue,
+    lastLoginAt: requiredTimestampValue,
   })
     .index("by_googleSubject", ["googleSubject"])
     .index("by_email", ["email"])
@@ -495,7 +499,7 @@ export default defineSchema({
       gshlTeamId: id("teams"),
       playerId: id("players"),
       weekId: id("weeks"),
-      date: dateOnlyValue,
+      date: dateKeyValue,
       nhlPos: optionalNullableStringArray,
       posGroup: stringValue,
       nhlTeam: optionalNullableStringArray,
@@ -634,7 +638,7 @@ export default defineSchema({
       seasonId: id("seasons"),
       gshlTeamId: id("teams"),
       weekId: id("weeks"),
-      date: dateOnlyValue,
+      date: dateKeyValue,
       ...statFields,
     },
     [
@@ -731,8 +735,8 @@ export default defineSchema({
     issueLabel: v.string(),
     seasonName: v.string(),
     weekNum: v.number(),
-    startDate: v.string(),
-    endDate: v.string(),
+    startDate: requiredTimestampValue,
+    endDate: requiredTimestampValue,
     status: v.union(v.literal("published"), v.literal("hidden")),
     generationMode: v.union(
       v.literal("template"),
@@ -742,10 +746,10 @@ export default defineSchema({
     content: v.any(),
     facts: v.any(),
     sourceHash: v.string(),
-    publishedAt: v.string(),
-    scheduledFor: v.string(),
-    createdAt: v.string(),
-    updatedAt: v.string(),
+    publishedAt: requiredTimestampValue,
+    scheduledFor: requiredTimestampValue,
+    createdAt: requiredTimestampValue,
+    updatedAt: requiredTimestampValue,
     editedBy: v.optional(v.id("authUsers")),
   })
     .index("by_seasonId_weekId", ["seasonId", "weekId"])
@@ -762,7 +766,7 @@ export default defineSchema({
     ),
     content: v.any(),
     sourceHash: v.string(),
-    createdAt: v.string(),
+    createdAt: requiredTimestampValue,
     editedBy: v.optional(v.id("authUsers")),
   }).index("by_editionId_createdAt", ["editionId", "createdAt"]),
 

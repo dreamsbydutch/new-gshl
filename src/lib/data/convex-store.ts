@@ -9,6 +9,21 @@ import {
 import { normalizePageLimit } from "./pagination";
 
 type AnyRow = Record<string, unknown>;
+const UTC_DATE_FIELD_NAMES = new Set([
+  "birthday",
+  "capHitEndDate",
+  "date",
+  "endDate",
+  "expiryDate",
+  "nhlSigningDate",
+  "signingDate",
+  "signingEndDate",
+  "startDate",
+]);
+const DATE_KEY_MODELS = new Set<ModelName>([
+  "PlayerDayStatLine",
+  "TeamDayStatLine",
+]);
 
 export type BaseQueryInput = {
   where?: Record<string, unknown> | undefined;
@@ -99,6 +114,28 @@ function summarizeArgs(args: Record<string, unknown>): string {
     : serialized;
 }
 
+function toConvexSafeValue(value: unknown): unknown {
+  if (value instanceof Date) {
+    const timestamp = value.getTime();
+    if (!Number.isFinite(timestamp)) {
+      throw new Error("Cannot send an invalid Date to Convex");
+    }
+    return timestamp;
+  }
+  if (Array.isArray(value)) {
+    return value.map(toConvexSafeValue);
+  }
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, entry]) => [
+        key,
+        toConvexSafeValue(entry),
+      ]),
+    );
+  }
+  return value;
+}
+
 async function runConvex<T>(
   operation: string,
   model: ModelName,
@@ -142,10 +179,12 @@ export async function callConvex<T>(
       path,
       format: "convex_encoded_json",
       args: [
-        convexToJson({
-          ...args,
-          serverSecret: env.CONVEX_SERVER_SECRET ?? "",
-        }),
+        convexToJson(
+          toConvexSafeValue({
+            ...args,
+            serverSecret: env.CONVEX_SERVER_SECRET ?? "",
+          }) as Parameters<typeof convexToJson>[0],
+        ),
       ],
     }),
   });
@@ -190,7 +229,7 @@ export async function callConvex<T>(
   throw new Error(`Unexpected Convex response: ${responseText}`);
 }
 
-function hydrateRow<T>(row: AnyRow): T {
+function hydrateRow<T>(model: ModelName, row: AnyRow): T {
   const hydrated: AnyRow = { ...row };
   for (const [key, value] of Object.entries(hydrated)) {
     if (
@@ -200,6 +239,18 @@ function hydrateRow<T>(row: AnyRow): T {
     ) {
       const date = new Date(value);
       hydrated[key] = Number.isNaN(date.getTime()) ? value : date;
+      continue;
+    }
+    if (key.endsWith("At") && typeof value === "number") {
+      hydrated[key] = new Date(value);
+      continue;
+    }
+    if (
+      typeof value === "number" &&
+      UTC_DATE_FIELD_NAMES.has(key) &&
+      !(key === "date" && DATE_KEY_MODELS.has(model))
+    ) {
+      hydrated[key] = new Date(value).toISOString().slice(0, 10);
     }
   }
   return hydrated as T;
@@ -213,7 +264,7 @@ export async function getMany<T>(
   const rows = await runConvex("query data:list", model, args, () =>
     callConvex<AnyRow[]>("query", "data:list", args),
   );
-  return rows.map(hydrateRow<T>);
+  return rows.map((row) => hydrateRow<T>(model, row));
 }
 
 export async function getPage<T>(
@@ -232,7 +283,7 @@ export async function getPage<T>(
   );
   return {
     ...result,
-    items: result.items.map(hydrateRow<T>),
+    items: result.items.map((row) => hydrateRow<T>(model, row)),
   };
 }
 
@@ -252,7 +303,7 @@ export async function getById<T>(
   const row = await runConvex("query data:byId", model, args, () =>
     callConvex<AnyRow | null>("query", "data:byId", args),
   );
-  return row ? hydrateRow<T>(row) : null;
+  return row ? hydrateRow<T>(model, row) : null;
 }
 
 export async function getCount(
@@ -288,7 +339,7 @@ export async function fetchSnapshot<M extends readonly ModelName[]>(
   for (const [table, rows] of Object.entries(snapshot)) {
     const model = CONVEX_TABLE_TO_MODEL[table];
     if (!model) continue;
-    output[model] = rows.map((row) => hydrateRow<AnyRow>(row));
+    output[model] = rows.map((row) => hydrateRow<AnyRow>(model, row));
   }
 
   return output as Record<M[number], AnyRow[]>;

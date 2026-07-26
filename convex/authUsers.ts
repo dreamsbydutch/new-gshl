@@ -24,11 +24,17 @@ function publicUser(user: {
   role: "viewer" | "owner" | "commissioner";
   ownerId?: string;
   status: "active" | "disabled";
-  createdAt: string;
-  updatedAt: string;
-  lastLoginAt: string;
+  createdAt: string | number;
+  updatedAt: string | number;
+  lastLoginAt: string | number;
 }) {
-  return { ...user, id: user._id };
+  return {
+    ...user,
+    id: user._id,
+    createdAt: new Date(user.createdAt).toISOString(),
+    updatedAt: new Date(user.updatedAt).toISOString(),
+    lastLoginAt: new Date(user.lastLoginAt).toISOString(),
+  };
 }
 
 export const upsertGoogleUser = mutation({
@@ -41,7 +47,7 @@ export const upsertGoogleUser = mutation({
   },
   handler: async (ctx, args) => {
     requireServerSecret(args.serverSecret);
-    const now = new Date().toISOString();
+    const now = Date.now();
     const normalizedEmail = args.email.trim().toLowerCase();
     const bySubject = await ctx.db
       .query("authUsers")
@@ -129,8 +135,11 @@ export const updateAccess = mutation({
     }
 
     if (canHaveOwnerLink && args.ownerId) {
-      const owner = (await ctx.db.get(args.ownerId)) as { isActive?: boolean } | null;
-      if (!owner?.isActive) throw new Error("Owner link must reference an active owner");
+      const owner = (await ctx.db.get(args.ownerId)) as {
+        isActive?: boolean;
+      } | null;
+      if (!owner?.isActive)
+        throw new Error("Owner link must reference an active owner");
       const linked = await ctx.db
         .query("authUsers")
         .withIndex("by_ownerId", (q) => q.eq("ownerId", args.ownerId))
@@ -144,7 +153,7 @@ export const updateAccess = mutation({
       role: args.role,
       status: args.status,
       ownerId: canHaveOwnerLink ? args.ownerId : undefined,
-      updatedAt: new Date().toISOString(),
+      updatedAt: Date.now(),
     });
     return publicUser((await ctx.db.get(args.id))!);
   },
