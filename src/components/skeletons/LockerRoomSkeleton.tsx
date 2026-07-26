@@ -108,8 +108,8 @@ export function TrophyCaseSkeleton() {
     <section className="pb-8 sm:pb-12">
       <div className="flex h-40 flex-col items-center pt-3">
         <Skeleton className="h-24 w-[85px] rounded-2xl" />
-        <Skeleton className="-mt-2 h-6 w-6 rounded-full bg-slate-200" />
-        <Skeleton className="mt-2 h-3 w-8" />
+        <Skeleton className="-mt-3 h-10 w-10 rounded-full bg-slate-200" />
+        <Skeleton className="mt-3 h-5 w-12" />
       </div>
       {Array.from({ length: 2 }).map((_, sectionIndex) => (
         <div key={sectionIndex}>

@@ -153,11 +153,11 @@ function FeaturedCupShowcase({ section }: { section: TrophyCaseAwardSection }) {
                   <FranchiseLogo
                     logoUrl={card.franchiseLogoUrl}
                     teamName={card.franchiseName}
-                    className="h-6 w-6 border-2 shadow-md"
+                    className="h-10 w-10 border-2 shadow-md"
                   />
                 </div>
               </div>
-              <div className="mt-2 font-varela text-xs font-bold leading-none text-slate-800">
+              <div className="mt-4 font-varela text-xl font-bold leading-none text-slate-800">
                 {card.seasonYear}
               </div>
             </article>
