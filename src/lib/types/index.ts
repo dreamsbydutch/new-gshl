@@ -110,6 +110,7 @@ export * from "./matchup";
 export * from "./playoff-bracket";
 export * from "./season";
 export * from "./team";
+export * from "./weekly-edition";
 
 // ============================================================================
 // USAGE EXAMPLES

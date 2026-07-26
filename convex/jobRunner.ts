@@ -759,6 +759,25 @@ export const run = internalActionGeneric({
         return;
       }
 
+      if (jobName === "weekly-edition-generation") {
+        const result = (await ctx.runMutation(
+          mutationRef("weeklyEditions:processGenerationJob"),
+          args,
+        )) as {
+          cancelled: boolean;
+          apply?: boolean;
+          counts?: Progress;
+        };
+        await ctx.runMutation(mutationRef("jobRunner:finish"), {
+          ...args,
+          status: result.cancelled ? "cancelled" : "succeeded",
+          result: result.cancelled
+            ? undefined
+            : { apply: result.apply, counts: result.counts },
+        });
+        return;
+      }
+
       const batch = (await ctx.runMutation(
         mutationRef("jobRunner:processNativeBatch"),
         args,

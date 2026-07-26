@@ -19,11 +19,25 @@ const reconcileUfaOffers = makeFunctionReference<"mutation">(
   Record<string, never>,
   unknown
 >;
+const scanDueWeeklyEditionMilestones = makeFunctionReference<"mutation">(
+  "weeklyEditions:scanDueMilestones",
+) as unknown as FunctionReference<
+  "mutation",
+  "internal",
+  Record<string, never>,
+  unknown
+>;
 crons.interval("dispatch due job schedules", { minutes: 1 }, tickSchedules, {});
 crons.interval(
   "resolve due UFA offer groups",
   { minutes: 1 },
   reconcileUfaOffers,
+  {},
+);
+crons.interval(
+  "publish due GSHL Weekly milestone editions",
+  { hours: 6 },
+  scanDueWeeklyEditionMilestones,
   {},
 );
 

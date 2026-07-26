@@ -550,7 +550,7 @@ export const submitOffer = mutation({
       requireServerSecret(args.serverSecret);
     } else {
       const user = await requireOwnerOrCommissioner(ctx);
-      ownerId = user.ownerId as typeof ownerId;
+      ownerId = user.ownerId;
     }
     if (!ownerId) throw new Error("No owner is linked to this account.");
     const db: any = ctx.db;

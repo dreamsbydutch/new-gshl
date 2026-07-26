@@ -37,6 +37,7 @@ export const JOB_NAMES = [
   "yahoo-matchup-player-day-backfill",
   "yahoo-weekly-validation",
   "puckpedia-player-bio-sync",
+  "weekly-edition-generation",
   "active-season-refresh",
 ] as const;
 
@@ -108,4 +109,5 @@ export const ACTIVE_REFRESH_STAGES: readonly JobName[] = [
   "power-rating-rebuild",
   "standings-backfill",
   "awards-backfill",
+  "weekly-edition-generation",
 ];

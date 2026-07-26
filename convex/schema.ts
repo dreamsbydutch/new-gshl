@@ -1,9 +1,52 @@
-import { defineSchema, defineTable } from "convex/server";
+import { defineSchema, defineTable, type TableDefinition } from "convex/server";
 import { v, type GenericValidator } from "convex/values";
 
 type TableShape = Record<string, GenericValidator>;
+type IndexSpec = string | readonly string[];
+type JoinIndexFields<Fields extends readonly string[]> =
+  Fields extends readonly []
+    ? ""
+    : Fields extends readonly [infer Field extends string]
+      ? Field
+      : Fields extends readonly [
+            infer Field extends string,
+            ...infer Rest extends readonly string[],
+          ]
+        ? `${Field}_${JoinIndexFields<Rest>}`
+        : string;
+type IndexName<Spec extends IndexSpec> = Spec extends string
+  ? `by_${Spec}`
+  : Spec extends readonly string[]
+    ? `by_${JoinIndexFields<Spec>}`
+    : never;
+type IndexFields<Spec extends IndexSpec> = Spec extends string
+  ? [Spec, "_creationTime"]
+  : Spec extends readonly string[]
+    ? [...Spec, "_creationTime"]
+    : never;
+type IndexNames<Indexes extends readonly IndexSpec[]> =
+  Indexes[number] extends infer Spec extends IndexSpec
+    ? IndexName<Spec>
+    : never;
+type MatchingIndexSpec<
+  Spec extends IndexSpec,
+  Name extends string,
+> = Spec extends IndexSpec
+  ? IndexName<Spec> extends Name
+    ? Spec
+    : never
+  : never;
+type IndexSpecForName<
+  Indexes extends readonly IndexSpec[],
+  Name extends string,
+> = MatchingIndexSpec<Indexes[number], Name>;
+type TableIndexes<Indexes extends readonly IndexSpec[]> = {
+  by_legacyId: ["legacyId", "_creationTime"];
+} & {
+  [Name in IndexNames<Indexes>]: IndexFields<IndexSpecForName<Indexes, Name>>;
+};
 
-const id = (tableName: string) => v.id(tableName);
+const id = <TableName extends string>(tableName: TableName) => v.id(tableName);
 const nullable = <T extends GenericValidator>(validator: T) =>
   v.union(validator, v.null());
 const optional = <T extends GenericValidator>(validator: T) =>
@@ -12,6 +55,9 @@ const optionalNullable = <T extends GenericValidator>(validator: T) =>
   v.optional(nullable(validator));
 
 const legacyId = optional(v.string());
+type TableValidator<Fields extends TableShape> = ReturnType<
+  typeof v.object<{ legacyId: typeof legacyId } & Fields>
+>;
 const stringValue = v.string();
 const optionalNullableString = optionalNullable(v.string());
 const numberValue = v.number();
@@ -80,14 +126,20 @@ const skaterGoalieStatFields = {
   TOI: statValue,
 } satisfies TableShape;
 
-function table(
-  fields: TableShape,
-  indexes: readonly (string | readonly string[])[] = [],
-) {
-  let definition = defineTable({
+function table<
+  Fields extends TableShape,
+  const Indexes extends readonly IndexSpec[] = readonly [],
+>(
+  fields: Fields,
+  indexes: Indexes = [] as unknown as Indexes,
+): TableDefinition<TableValidator<Fields>, TableIndexes<Indexes>> {
+  const documentFields: { legacyId: typeof legacyId } & Fields = {
     legacyId,
     ...fields,
-  }).index("by_legacyId", ["legacyId"]);
+  };
+  let definition = defineTable(documentFields).index("by_legacyId", [
+    "legacyId",
+  ]);
 
   for (const index of indexes) {
     const fields = typeof index === "string" ? [index] : [...index];
@@ -97,7 +149,10 @@ function table(
     );
   }
 
-  return definition;
+  return definition as unknown as TableDefinition<
+    TableValidator<Fields>,
+    TableIndexes<Indexes>
+  >;
 }
 
 export default defineSchema({
@@ -647,6 +702,56 @@ export default defineSchema({
       ["seasonId", "seasonType", "gshlTeamId"],
     ],
   ),
+
+  weeklyEditions: defineTable({
+    seasonId: v.id("seasons"),
+    weekId: v.id("weeks"),
+    editionKey: v.string(),
+    issueType: v.union(
+      v.literal("weekly"),
+      v.literal("final_recap"),
+      v.literal("resigning_outlook"),
+      v.literal("offseason_market"),
+      v.literal("pre_draft"),
+      v.literal("preseason"),
+    ),
+    issueLabel: v.string(),
+    seasonName: v.string(),
+    weekNum: v.number(),
+    startDate: v.string(),
+    endDate: v.string(),
+    status: v.union(v.literal("published"), v.literal("hidden")),
+    generationMode: v.union(
+      v.literal("template"),
+      v.literal("chatgpt_import"),
+      v.literal("manual"),
+    ),
+    content: v.any(),
+    facts: v.any(),
+    sourceHash: v.string(),
+    publishedAt: v.string(),
+    scheduledFor: v.string(),
+    createdAt: v.string(),
+    updatedAt: v.string(),
+    editedBy: v.optional(v.id("authUsers")),
+  })
+    .index("by_seasonId_weekId", ["seasonId", "weekId"])
+    .index("by_seasonId_editionKey", ["seasonId", "editionKey"])
+    .index("by_status_publishedAt", ["status", "publishedAt"])
+    .index("by_seasonId_publishedAt", ["seasonId", "publishedAt"]),
+
+  weeklyEditionRevisions: defineTable({
+    editionId: v.id("weeklyEditions"),
+    generationMode: v.union(
+      v.literal("template"),
+      v.literal("chatgpt_import"),
+      v.literal("manual"),
+    ),
+    content: v.any(),
+    sourceHash: v.string(),
+    createdAt: v.string(),
+    editedBy: v.optional(v.id("authUsers")),
+  }).index("by_editionId_createdAt", ["editionId", "createdAt"]),
 
   jobRuns: defineTable({
     jobName: v.string(),

@@ -20,6 +20,7 @@ import type * as jobs from "../jobs.js";
 import type * as lib_auth from "../lib/auth.js";
 import type * as maintenanceScope from "../maintenanceScope.js";
 import type * as ufa from "../ufa.js";
+import type * as weeklyEditions from "../weeklyEditions.js";
 import type * as yahooBackfill from "../yahooBackfill.js";
 
 import type {
@@ -41,6 +42,7 @@ declare const fullApi: ApiFromModules<{
   "lib/auth": typeof lib_auth;
   maintenanceScope: typeof maintenanceScope;
   ufa: typeof ufa;
+  weeklyEditions: typeof weeklyEditions;
   yahooBackfill: typeof yahooBackfill;
 }>;
 
