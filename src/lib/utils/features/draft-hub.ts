@@ -1,15 +1,11 @@
 import type {
   DraftClockState,
   DraftHubDraftPick,
-  DraftHubPickView,
   DraftHubStatus,
   DraftPick,
   Season,
 } from "@gshl-types";
-import {
-  findOffseasonWindow,
-  resolveContractDefaultSeason,
-} from "../domain/season";
+import { findCurrentSeason, findUpcomingSeason } from "../domain/season";
 
 export const DRAFT_PICK_CLOCK_MS = 4 * 60 * 1000;
 
@@ -152,22 +148,6 @@ export function resolveDraftClockState(
   };
 }
 
-export function groupDraftHubPicks(
-  picks: readonly DraftHubPickView[],
-): Array<{ round: string; picks: DraftHubPickView[] }> {
-  const grouped = new Map<string, DraftHubPickView[]>();
-  for (const pickView of [...picks].sort((left, right) =>
-    compareDraftPickOrder(left.pick, right.pick),
-  )) {
-    const round = String(pickView.pick.round);
-    grouped.set(round, [...(grouped.get(round) ?? []), pickView]);
-  }
-  return [...grouped.entries()].map(([round, roundPicks]) => ({
-    round,
-    picks: roundPicks,
-  }));
-}
-
 export function canSubmitDraftPick(options: {
   role: "viewer" | "owner" | "commissioner" | undefined;
   userOwnerId?: string | null;
@@ -189,32 +169,10 @@ export function resolveDraftHubSeason(
   seasons: readonly Season[],
   referenceDate: Date = new Date(),
 ): Season | undefined {
-  const offseasonSeason = findOffseasonWindow(
-    [...seasons],
-    referenceDate,
-  )?.upcomingSeason;
-  if (offseasonSeason?.draftStartAt) return offseasonSeason;
+  const realSeasons = [...seasons];
+  const currentSeason = findCurrentSeason(realSeasons, referenceDate);
+  if (currentSeason?.draftStartAt) return currentSeason;
 
-  const contractSeason = resolveContractDefaultSeason(
-    [...seasons],
-    referenceDate,
-  );
-  if (contractSeason?.draftStartAt) return contractSeason;
-
-  return [...seasons]
-    .filter((season) => {
-      const draftTime = season.draftStartAt
-        ? new Date(season.draftStartAt).getTime()
-        : Number.NaN;
-      return !Number.isNaN(draftTime);
-    })
-    .sort((left, right) => {
-      const leftDistance = Math.abs(
-        new Date(left.draftStartAt ?? 0).getTime() - referenceDate.getTime(),
-      );
-      const rightDistance = Math.abs(
-        new Date(right.draftStartAt ?? 0).getTime() - referenceDate.getTime(),
-      );
-      return leftDistance - rightDistance;
-    })[0];
+  const upcomingSeason = findUpcomingSeason(realSeasons, referenceDate);
+  return upcomingSeason?.draftStartAt ? upcomingSeason : undefined;
 }

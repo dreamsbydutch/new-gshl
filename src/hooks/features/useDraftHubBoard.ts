@@ -9,7 +9,8 @@ import type {
 } from "@gshl-types";
 import {
   canSubmitDraftPick,
-  groupDraftHubPicks,
+  findNhlTeamByAbbreviation,
+  indexLatestUfaNhlStats,
   prepareDraftBoardPlayers,
   resolveDraftHubSeason,
 } from "@gshl-utils";
@@ -18,6 +19,7 @@ import {
   useContracts,
   useDraftHubState,
   useNHLTeams,
+  usePlayerNhlStatsByPlayers,
   usePlayerPages,
   useSeasonState,
   useSubmitDraftPick,
@@ -61,6 +63,14 @@ export function useDraftHubBoard(): DraftHubBoardViewModel {
   );
   const [now, setNow] = useState(() => Date.now());
   const playersQuery = usePlayerPages({ active: true, limit: 50 });
+  const playerIds = useMemo(
+    () => playersQuery.data.map((player) => String(player.id)),
+    [playersQuery.data],
+  );
+  const nhlStatsQuery = usePlayerNhlStatsByPlayers(
+    playerIds,
+    !playersQuery.isLoading,
+  );
   const contractsQuery = useContracts();
   const nhlTeamsQuery = useNHLTeams();
   const submitMutation = useSubmitDraftPick();
@@ -88,6 +98,14 @@ export function useDraftHubBoard(): DraftHubBoardViewModel {
   const upcomingPicks = (state?.upcomingPickIds ?? [])
     .map((id) => picksById.get(id))
     .filter((pick) => pick !== undefined);
+  const latestNhlStatsByPlayer = useMemo(
+    () => indexLatestUfaNhlStats(nhlStatsQuery.data, seasons, season?.year),
+    [nhlStatsQuery.data, season?.year, seasons],
+  );
+  const nhlTeams = useMemo(
+    () => nhlTeamsQuery.data.filter((team): team is NHLTeam => "abbr" in team),
+    [nhlTeamsQuery.data],
+  );
   const eligiblePlayers = useMemo(() => {
     const draftedPlayerIds = new Set(
       (state?.picks ?? [])
@@ -118,9 +136,17 @@ export function useDraftHubBoard(): DraftHubBoardViewModel {
           Number(left.overallRk ?? Number.MAX_SAFE_INTEGER) -
             Number(right.overallRk ?? Number.MAX_SAFE_INTEGER) ||
           left.fullName.localeCompare(right.fullName),
-      );
+      )
+      .map((player) => ({
+        ...player,
+        nhlTeamLogoUrl:
+          findNhlTeamByAbbreviation(nhlTeams, player.nhlTeam)?.logoUrl ?? null,
+        stats: latestNhlStatsByPlayer.get(String(player.id)) ?? null,
+      }));
   }, [
     contractsQuery.data,
+    latestNhlStatsByPlayer,
+    nhlTeams,
     playersQuery.data,
     positionFilter,
     searchTerm,
@@ -189,9 +215,7 @@ export function useDraftHubBoard(): DraftHubBoardViewModel {
     activePick,
     recentPicks,
     upcomingPicks,
-    groupedPicks: groupDraftHubPicks(state?.picks ?? []),
     eligiblePlayers,
-    nhlTeams: (nhlTeamsQuery.data as NHLTeam[]) ?? [],
     searchTerm,
     setSearchTerm,
     positionFilter,
@@ -208,6 +232,7 @@ export function useDraftHubBoard(): DraftHubBoardViewModel {
     isLoading:
       stateQuery.isLoading ||
       playersQuery.isLoading ||
+      nhlStatsQuery.isLoading ||
       contractsQuery.isLoading ||
       nhlTeamsQuery.isLoading,
     error: submitMutation.error?.message ?? null,

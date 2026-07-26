@@ -50,6 +50,8 @@ export interface BaseNavItem {
   label: string;
   /** Optional icon URL or component */
   icon?: string | ReactNode;
+  /** Keep image icons in their original colors when the item is active. */
+  preserveIconColors?: boolean;
   /** Whether the item is currently active */
   isActive?: boolean;
   /** Whether the item is disabled */

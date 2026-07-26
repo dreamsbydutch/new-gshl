@@ -74,6 +74,7 @@ export function LinkNavItem({
   icon,
   href,
   isActive = false,
+  preserveIconColors = false,
   className,
 }: LinkNavItem) {
   return (
@@ -94,7 +95,7 @@ export function LinkNavItem({
           height={32}
           className={cn(
             "h-10 w-10 transition-all duration-200",
-            isActive && "brightness-0 invert",
+            isActive && !preserveIconColors && "brightness-0 invert",
             href === "/" && "h-12 w-12",
           )}
         />

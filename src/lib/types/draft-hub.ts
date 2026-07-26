@@ -7,6 +7,7 @@ import type {
   Season,
 } from "./database";
 import type { CapSpaceEntry } from "./contracts";
+import type { UfaStatView } from "./ufa";
 
 export type DraftHubStatus =
   | "unavailable"
@@ -86,6 +87,11 @@ export interface DraftHubStateData {
   picks: DraftHubPickView[];
 }
 
+export interface DraftHubEligiblePlayerView extends Player {
+  nhlTeamLogoUrl: string | null;
+  stats: UfaStatView | null;
+}
+
 export interface UseDraftHubStateOptions {
   seasonId?: string | null;
   enabled?: boolean;
@@ -97,9 +103,7 @@ export interface DraftHubBoardViewModel {
   activePick: DraftHubPickView | null;
   recentPicks: DraftHubPickView[];
   upcomingPicks: DraftHubPickView[];
-  groupedPicks: Array<{ round: string; picks: DraftHubPickView[] }>;
-  eligiblePlayers: Player[];
-  nhlTeams: NHLTeam[];
+  eligiblePlayers: DraftHubEligiblePlayerView[];
   searchTerm: string;
   setSearchTerm: (value: string) => void;
   positionFilter: string;

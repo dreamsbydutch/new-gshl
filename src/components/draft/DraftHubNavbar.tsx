@@ -50,6 +50,7 @@ export function DraftHubNavbar() {
             label: "My Team",
             href: "/draft/my-team",
             icon: ownTeam.logoUrl ?? undefined,
+            preserveIconColors: true,
           },
         ]
       : []),

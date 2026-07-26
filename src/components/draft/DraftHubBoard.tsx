@@ -3,17 +3,19 @@
 import Image from "next/image";
 import {
   AlertTriangle,
+  ArrowDown,
+  ArrowUp,
   CheckCircle2,
   Clock3,
   Search,
   ShieldAlert,
 } from "lucide-react";
-import { Button, Table } from "@gshl-ui";
+import { Button } from "@gshl-ui";
 import { NHLLogo } from "@gshl-components/player/NHLLogo";
 import { DraftBoardSkeleton } from "@gshl-skeletons";
 import { useDraftHubBoard } from "@gshl-hooks";
-import { cn, findNhlTeamByAbbreviation, formatNumber } from "@gshl-utils";
-import type { DraftHubPickView, Player } from "@gshl-types";
+import { cn, formatNumber, formatUfaStat } from "@gshl-utils";
+import type { DraftHubEligiblePlayerView, DraftHubPickView } from "@gshl-types";
 
 function formatClock(totalSeconds: number): string {
   const minutes = Math.floor(totalSeconds / 60);
@@ -52,61 +54,94 @@ function TeamLogo({
   );
 }
 
-function PickCard({
+function DraftFlowPick({
   pick,
-  active = false,
+  isRecent,
 }: {
   pick: DraftHubPickView;
-  active?: boolean;
+  isRecent: boolean;
 }) {
+  const playerPosition = pick.player?.nhlPos.length
+    ? pick.player.nhlPos.join("/")
+    : undefined;
+
   return (
     <div
       className={cn(
-        "flex min-w-0 items-center gap-3 rounded-lg border bg-white p-3 shadow-sm",
-        active && "border-primary bg-primary/5 ring-2 ring-primary/20",
+        "flex min-h-14 min-w-0 items-center gap-1.5 rounded-md border bg-white px-1.5 py-1.5 shadow-sm sm:gap-2 sm:px-2",
+        isRecent
+          ? "border-l-2 border-l-emerald-500"
+          : "border-r-2 border-r-primary",
       )}
     >
-      <TeamLogo pick={pick} size={34} />
+      <div className="shrink-0">
+        <TeamLogo pick={pick} size={28} />
+      </div>
       <div className="min-w-0">
-        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          Round {pick.pick.round} · Pick {pick.pick.pick}
+        <p className="truncate text-[11px] font-bold leading-tight sm:text-sm">
+          {isRecent
+            ? (pick.player?.fullName ?? "Player unavailable")
+            : (pick.team?.name ?? "Team TBD")}
         </p>
-        <p className="truncate font-semibold">
-          {pick.team?.name ?? "Team TBD"}
-        </p>
-        <p className="truncate text-sm text-muted-foreground">
-          {pick.player?.fullName ?? "Available"}
+        <p className="mt-0.5 truncate text-[10px] leading-tight text-muted-foreground sm:text-xs">
+          {isRecent
+            ? (playerPosition ?? `Pick ${pick.pick.pick}`)
+            : `Round ${pick.pick.round} · Pick ${pick.pick.pick}`}
         </p>
       </div>
     </div>
   );
 }
 
-function PickStrip({
-  title,
-  picks,
-  emptyMessage,
+function DraftPickFlow({
+  recentPicks,
+  upcomingPicks,
 }: {
-  title: string;
-  picks: DraftHubPickView[];
-  emptyMessage: string;
+  recentPicks: DraftHubPickView[];
+  upcomingPicks: DraftHubPickView[];
 }) {
   return (
-    <section className="min-w-0">
-      <h2 className="mb-2 text-sm font-bold uppercase tracking-wide text-slate-600">
-        {title}
-      </h2>
-      {picks.length ? (
-        <div className="no-scrollbar grid gap-2 overflow-x-auto sm:grid-cols-2 xl:grid-cols-5">
-          {picks.map((pick) => (
-            <PickCard key={pick.pick.id} pick={pick} />
-          ))}
+    <section className="mx-auto w-full max-w-4xl">
+      <div className="grid grid-cols-2 gap-1 sm:gap-2">
+        <div className="min-w-0">
+          <h2 className="mb-1 flex h-6 items-center justify-center gap-1 text-[10px] font-bold uppercase tracking-wide text-emerald-700 sm:mb-2 sm:text-xs">
+            Recent
+            <ArrowDown className="h-3.5 w-3.5" aria-hidden="true" />
+          </h2>
+          {recentPicks.length ? (
+            <div className="space-y-1 sm:space-y-2">
+              {recentPicks.map((pick) => (
+                <DraftFlowPick key={pick.pick.id} pick={pick} isRecent={true} />
+              ))}
+            </div>
+          ) : (
+            <div className="grid min-h-14 place-items-center rounded-md border border-dashed bg-slate-50 px-1.5 text-center text-[10px] leading-tight text-muted-foreground sm:text-xs">
+              No selections yet
+            </div>
+          )}
         </div>
-      ) : (
-        <div className="rounded-lg border border-dashed bg-slate-50 p-4 text-sm text-muted-foreground">
-          {emptyMessage}
+        <div className="min-w-0">
+          <h2 className="mb-1 flex h-6 items-center justify-center gap-1 text-[10px] font-bold uppercase tracking-wide text-primary sm:mb-2 sm:text-xs">
+            <ArrowUp className="h-3.5 w-3.5" aria-hidden="true" />
+            Coming up
+          </h2>
+          {upcomingPicks.length ? (
+            <div className="space-y-1 sm:space-y-2">
+              {upcomingPicks.map((pick) => (
+                <DraftFlowPick
+                  key={pick.pick.id}
+                  pick={pick}
+                  isRecent={false}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="grid min-h-14 place-items-center rounded-md border border-dashed bg-slate-50 px-1.5 text-center text-[10px] leading-tight text-muted-foreground sm:text-xs">
+              No later picks
+            </div>
+          )}
         </div>
-      )}
+      </div>
     </section>
   );
 }
@@ -230,83 +265,89 @@ function DraftStatusHero({
   );
 }
 
-function LeagueBoard({
-  groups,
-  activePickId,
-}: {
-  groups: Array<{ round: string; picks: DraftHubPickView[] }>;
-  activePickId: string | null;
-}) {
-  return (
-    <section>
-      <div className="mb-3 flex items-end justify-between gap-3">
-        <div>
-          <p className="text-xs font-bold uppercase tracking-widest text-primary">
-            League-wide
-          </p>
-          <h2 className="text-2xl font-bold">Draft Board</h2>
-        </div>
-        <p className="text-xs text-muted-foreground">Updates live</p>
-      </div>
-      <div className="space-y-4">
-        {groups.map((group) => (
-          <div key={group.round}>
-            <h3 className="mb-2 text-sm font-bold text-slate-600">
-              Round {group.round}
-            </h3>
-            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {group.picks.map((pick) => (
-                <PickCard
-                  key={pick.pick.id}
-                  pick={pick}
-                  active={pick.pick.id === activePickId}
-                />
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
-    </section>
-  );
-}
+const SKATER_STAT_KEYS = [
+  "GP",
+  "G",
+  "A",
+  "P",
+  "PM",
+  "PIM",
+  "PPP",
+  "SOG",
+  "HIT",
+  "BLK",
+] as const;
+const GOALIE_STAT_KEYS = [
+  "GP",
+  "W",
+  "GA",
+  "GAA",
+  "SV",
+  "SA",
+  "SVP",
+  "SO",
+  "QS",
+  "RBS",
+] as const;
 
 function PlayerRow({
   player,
-  nhlTeams,
   canSubmit,
   commissionerRequired,
   isSubmitting,
   onSubmit,
 }: {
-  player: Player;
-  nhlTeams: ReturnType<typeof useDraftHubBoard>["nhlTeams"];
+  player: DraftHubEligiblePlayerView;
   canSubmit: boolean;
   commissionerRequired: boolean;
   isSubmitting: boolean;
   onSubmit: () => void;
 }) {
-  const nhlTeam = findNhlTeamByAbbreviation(nhlTeams, player.nhlTeam);
+  const statKeys =
+    player.posGroup === "G" ? GOALIE_STAT_KEYS : SKATER_STAT_KEYS;
   return (
-    <tr>
-      <td>{player.overallRk ?? "—"}</td>
-      <td>
-        <NHLLogo team={nhlTeam} />
+    <tr className="group border-t border-border/70 align-middle">
+      <td className="sticky left-0 z-20 w-8 min-w-8 border-r !bg-background px-0.5 py-1 group-hover:!bg-muted sm:static sm:z-auto sm:w-auto sm:min-w-0 sm:border-0 sm:!bg-transparent sm:px-2 sm:py-3">
+        <NHLLogo
+          team={
+            player.nhlTeamLogoUrl
+              ? {
+                  name: player.nhlTeam.length > 0 ? player.nhlTeam : "NHL team",
+                  logoUrl: player.nhlTeamLogoUrl,
+                }
+              : undefined
+          }
+          size={24}
+        />
       </td>
-      <td className="whitespace-nowrap text-left font-semibold">
+      <td className="sticky left-[31px] z-20 min-w-[7rem] border-r !bg-background px-1.5 py-1 text-left text-[10px] font-semibold group-hover:!bg-muted sm:static sm:z-auto sm:min-w-0 sm:border-0 sm:!bg-transparent sm:px-2 sm:py-3 sm:text-sm">
         {player.fullName}
       </td>
-      <td>{player.nhlPos.join("/")}</td>
-      <td>{formatNumber(player.age ?? 0, 1)}</td>
-      <td className="font-semibold">
+      <td className="whitespace-nowrap px-1 py-1 text-[9px] sm:px-2 sm:py-3 sm:text-sm">
+        {player.nhlPos.length > 0 ? player.nhlPos.join("/") : player.posGroup}
+      </td>
+      <td className="whitespace-nowrap px-1 py-1 text-[9px] tabular-nums sm:px-2 sm:py-3 sm:text-sm">
+        {player.overallRk ?? "—"}
+      </td>
+      <td className="whitespace-nowrap bg-muted/25 px-1 py-1 text-[9px] font-bold tabular-nums text-foreground sm:px-2 sm:py-3 sm:text-sm">
         {formatNumber(player.overallRating ?? 0, 2)}
       </td>
-      <td>
+      {statKeys.map((key) => (
+        <td
+          key={key}
+          className="whitespace-nowrap px-1 py-1 text-[9px] sm:px-2 sm:py-3 sm:text-xs"
+        >
+          {formatUfaStat(player.stats, key)}
+        </td>
+      ))}
+      <td className="px-1 py-1 sm:px-2 sm:py-3">
         <Button
           size="sm"
           variant={commissionerRequired ? "destructive" : "secondary"}
           disabled={!canSubmit || isSubmitting}
           onClick={onSubmit}
           aria-label={`Draft ${player.fullName}`}
+          className="h-7 px-2 text-[10px] sm:h-9 sm:px-3 sm:text-xs"
         >
           {isSubmitting
             ? "Submitting…"
@@ -316,6 +357,95 @@ function PlayerRow({
         </Button>
       </td>
     </tr>
+  );
+}
+
+function DraftPlayerTable({
+  players,
+  canSubmit,
+  commissionerRequired,
+  submittingPlayerId,
+  onSubmit,
+}: {
+  players: DraftHubEligiblePlayerView[];
+  canSubmit: boolean;
+  commissionerRequired: boolean;
+  submittingPlayerId: string | null;
+  onSubmit: (playerId: string) => void;
+}) {
+  const hasGoalies = players.some((player) => player.posGroup === "G");
+  const hasSkaters = players.some((player) => player.posGroup !== "G");
+
+  if (hasGoalies && hasSkaters) {
+    return (
+      <div className="w-full min-w-0 max-w-full space-y-5 overflow-hidden">
+        <DraftPlayerTable
+          players={players.filter((player) => player.posGroup !== "G")}
+          canSubmit={canSubmit}
+          commissionerRequired={commissionerRequired}
+          submittingPlayerId={submittingPlayerId}
+          onSubmit={onSubmit}
+        />
+        <DraftPlayerTable
+          players={players.filter((player) => player.posGroup === "G")}
+          canSubmit={canSubmit}
+          commissionerRequired={commissionerRequired}
+          submittingPlayerId={submittingPlayerId}
+          onSubmit={onSubmit}
+        />
+      </div>
+    );
+  }
+
+  const statHeaders = hasGoalies
+    ? ["GP", "W", "GA", "GAA", "SV", "SA", "SV%", "SO", "QS", "RBS"]
+    : ["GP", "G", "A", "P", "+/−", "PIM", "PPP", "SOG", "HIT", "BLK"];
+
+  return (
+    <div className="relative block w-full min-w-0 max-w-full touch-auto overflow-x-auto overscroll-x-contain rounded-lg border">
+      <table className="w-max min-w-full text-center text-[10px] sm:text-sm">
+        <thead className="bg-muted/70 text-[8px] uppercase tracking-wide sm:text-xs">
+          <tr className="border-b border-border/70">
+            <th className="sticky left-0 z-30 w-8 min-w-8 border-r !bg-muted px-0.5 py-1 sm:static sm:z-auto sm:w-auto sm:min-w-0 sm:border-0 sm:!bg-transparent sm:px-2 sm:py-3">
+              NHL
+            </th>
+            <th className="sticky left-[31px] z-30 min-w-[7rem] border-r !bg-muted px-1.5 py-1 text-left sm:static sm:z-auto sm:min-w-0 sm:border-0 sm:!bg-transparent sm:px-2 sm:py-3">
+              Player
+            </th>
+            <th className="whitespace-nowrap px-1 py-1 sm:px-2 sm:py-3">Pos</th>
+            <th className="whitespace-nowrap px-1 py-1 sm:px-2 sm:py-3">
+              Rank
+            </th>
+            <th className="whitespace-nowrap bg-muted/40 px-1 py-1 font-bold text-foreground sm:px-2 sm:py-3">
+              OVR
+            </th>
+            {statHeaders.map((header) => (
+              <th
+                key={header}
+                className="whitespace-nowrap px-1 py-1 sm:px-2 sm:py-3"
+              >
+                {header}
+              </th>
+            ))}
+            <th className="whitespace-nowrap px-1 py-1 sm:px-2 sm:py-3">
+              Selection
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {players.map((player) => (
+            <PlayerRow
+              key={player.id}
+              player={player}
+              canSubmit={canSubmit}
+              commissionerRequired={commissionerRequired}
+              isSubmitting={submittingPlayerId === player.id}
+              onSubmit={() => onSubmit(player.id)}
+            />
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
 
@@ -346,22 +476,9 @@ export function DraftHubBoard() {
         draftStartAt={board.state.season.draftStartAt}
       />
 
-      <div className="grid gap-5 xl:grid-cols-2">
-        <PickStrip
-          title="Recent selections"
-          picks={board.recentPicks}
-          emptyMessage="No players have been selected yet."
-        />
-        <PickStrip
-          title="Coming up"
-          picks={board.upcomingPicks}
-          emptyMessage="There are no later picks in the queue."
-        />
-      </div>
-
-      <LeagueBoard
-        groups={board.groupedPicks}
-        activePickId={board.state.activePickId}
+      <DraftPickFlow
+        recentPicks={board.recentPicks}
+        upcomingPicks={board.upcomingPicks}
       />
 
       <section>
@@ -401,43 +518,21 @@ export function DraftHubBoard() {
             ))}
           </div>
         </div>
-        <div className="overflow-x-auto rounded-xl border bg-white shadow-sm">
-          <Table className="min-w-[760px] text-center">
-            <thead>
-              <tr>
-                <th>Rank</th>
-                <th>NHL</th>
-                <th className="text-left">Player</th>
-                <th>Position</th>
-                <th>Age</th>
-                <th>Overall</th>
-                <th>Selection</th>
-              </tr>
-            </thead>
-            <tbody>
-              {board.eligiblePlayers.map((player) => (
-                <PlayerRow
-                  key={player.id}
-                  player={player}
-                  nhlTeams={board.nhlTeams}
-                  canSubmit={board.canSubmitActivePick}
-                  commissionerRequired={commissionerRequired}
-                  isSubmitting={
-                    board.isSubmitting && board.submittingPlayerId === player.id
-                  }
-                  onSubmit={() => void board.submitPlayer(player.id)}
-                />
-              ))}
-              {board.eligiblePlayers.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="py-10 text-muted-foreground">
-                    No eligible players match these filters.
-                  </td>
-                </tr>
-              ) : null}
-            </tbody>
-          </Table>
-        </div>
+        {board.eligiblePlayers.length ? (
+          <DraftPlayerTable
+            players={board.eligiblePlayers}
+            canSubmit={board.canSubmitActivePick}
+            commissionerRequired={commissionerRequired}
+            submittingPlayerId={
+              board.isSubmitting ? board.submittingPlayerId : null
+            }
+            onSubmit={(playerId) => void board.submitPlayer(playerId)}
+          />
+        ) : (
+          <div className="rounded-lg border border-dashed bg-slate-50 p-6 text-center text-sm text-muted-foreground">
+            No eligible players match these filters.
+          </div>
+        )}
         {board.hasMore ? (
           <div className="mt-4 text-center">
             <Button

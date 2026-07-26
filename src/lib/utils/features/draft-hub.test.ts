@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { DraftPick } from "@gshl-types";
+import type { DraftPick, Season } from "@gshl-types";
 import {
   canSubmitDraftPick,
   resolveDraftClockState,
+  resolveDraftHubSeason,
   serializeDraftHubPick,
 } from "./draft-hub";
 
@@ -29,6 +30,76 @@ function pick(
     ...fields,
   };
 }
+
+function season(
+  id: string,
+  startDate: string,
+  endDate: string,
+  draftStartAt: string | null,
+): Season {
+  return {
+    id,
+    year: Number(endDate.slice(0, 4)),
+    name: id,
+    categories: [],
+    rosterSpots: [],
+    startDate,
+    endDate,
+    isActive: false,
+    usesLegacyTies: false,
+    signingEndDate: startDate,
+    draftStartAt,
+    createdAt: new Date(startDate),
+    updatedAt: new Date(startDate),
+  };
+}
+
+void test("selects only the real current or upcoming draft season", () => {
+  const previousSeason = season(
+    "previous",
+    "2025-10-01",
+    "2026-06-01",
+    "2025-09-15T23:00:00.000Z",
+  );
+  const upcomingSeason = season(
+    "upcoming",
+    "2026-10-01",
+    "2027-06-01",
+    "2026-09-15T23:00:00.000Z",
+  );
+
+  assert.equal(
+    resolveDraftHubSeason(
+      [previousSeason, upcomingSeason],
+      new Date("2026-07-26T12:00:00.000Z"),
+    )?.id,
+    "upcoming",
+  );
+  assert.equal(
+    resolveDraftHubSeason(
+      [upcomingSeason],
+      new Date("2026-11-01T12:00:00.000Z"),
+    )?.id,
+    "upcoming",
+  );
+});
+
+void test("does not fall back to a previous season's completed draft", () => {
+  const previousSeason = season(
+    "previous",
+    "2025-10-01",
+    "2026-06-01",
+    "2025-09-15T23:00:00.000Z",
+  );
+
+  assert.equal(
+    resolveDraftHubSeason(
+      [previousSeason],
+      new Date("2026-07-26T12:00:00.000Z"),
+    ),
+    undefined,
+  );
+});
 
 void test("serializes draft pick dates for Convex responses", () => {
   const serialized = serializeDraftHubPick(pick("1", 1));
