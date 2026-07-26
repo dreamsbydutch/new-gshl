@@ -12,6 +12,7 @@ import type * as authUsers from "../authUsers.js";
 import type * as awardCalculations from "../awardCalculations.js";
 import type * as crons from "../crons.js";
 import type * as data from "../data.js";
+import type * as draft from "../draft.js";
 import type * as externalWorker from "../externalWorker.js";
 import type * as frontend from "../frontend.js";
 import type * as jobCatalog from "../jobCatalog.js";
@@ -34,6 +35,7 @@ declare const fullApi: ApiFromModules<{
   awardCalculations: typeof awardCalculations;
   crons: typeof crons;
   data: typeof data;
+  draft: typeof draft;
   externalWorker: typeof externalWorker;
   frontend: typeof frontend;
   jobCatalog: typeof jobCatalog;

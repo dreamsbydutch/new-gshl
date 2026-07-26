@@ -114,6 +114,7 @@ export function TeamDraftPickList({
   seasons, // optional: used to scope to next upcoming draft / historical selection
   gshlTeamId,
   selectedSeasonId,
+  fixedSeason = false,
 }: TeamDraftPickListProps & { seasons?: Season[] }) {
   const seasonOptions = useMemo<Season[]>(() => {
     const knownSeasons = [...(seasons ?? [])].sort(
@@ -184,22 +185,24 @@ export function TeamDraftPickList({
     <>
       <div className="mx-auto mt-4 flex flex-col items-center gap-2">
         <div className="flex items-center gap-2 py-3 text-xl font-bold">
-          {seasonOptions.length > 0 && localSeasonId != null && (
-            <DropdownToggle
-              items={[...seasonOptions].sort((a, b) => {
-                return (
-                  new Date(b.startDate).getTime() -
-                  new Date(a.startDate).getTime()
-                );
-              })}
-              selectedItem={seasonOptions.find((s) => s.id === localSeasonId)}
-              onSelect={(s: Season) => setLocalSeasonId(s.id)}
-              getItemKey={(s: Season) => String(s.id)}
-              getItemLabel={(s: Season) => s.name}
-              className="min-w-28 bg-white text-base"
-              dropdownPosition="auto"
-            />
-          )}
+          {!fixedSeason &&
+            seasonOptions.length > 0 &&
+            localSeasonId != null && (
+              <DropdownToggle
+                items={[...seasonOptions].sort((a, b) => {
+                  return (
+                    new Date(b.startDate).getTime() -
+                    new Date(a.startDate).getTime()
+                  );
+                })}
+                selectedItem={seasonOptions.find((s) => s.id === localSeasonId)}
+                onSelect={(s: Season) => setLocalSeasonId(s.id)}
+                getItemKey={(s: Season) => String(s.id)}
+                getItemLabel={(s: Season) => s.name}
+                className="min-w-28 bg-white text-base"
+                dropdownPosition="auto"
+              />
+            )}
           <span>Draft Picks</span>
         </div>
       </div>

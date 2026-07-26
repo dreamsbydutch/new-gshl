@@ -1,7 +1,7 @@
-import { DraftBoardContent } from "@gshl-components/draft/DraftBoardContent";
 import { requireActiveUser } from "@gshl-lib/auth/require-user";
+import { redirect } from "next/navigation";
 
 export default async function DraftBoardPage() {
   await requireActiveUser("/draftboard");
-  return <DraftBoardContent />;
+  redirect("/draft");
 }

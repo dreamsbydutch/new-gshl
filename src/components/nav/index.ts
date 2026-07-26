@@ -4,7 +4,8 @@
  */
 
 // Main Navigation
-export { MainNavbar as Navbar } from "./MainNavbar";
+export { AppNavbar as Navbar } from "./AppNavbar";
+export { LinkNavItem, NavContainer } from "./BaseComponents";
 export { SeasonToggleNav } from "./SeasonNavigation";
 export { WeeksToggle } from "./WeekNavigation";
 export { TeamsToggle } from "./TeamNavigation";

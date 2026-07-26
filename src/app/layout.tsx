@@ -9,6 +9,7 @@ import { NavDefaults } from "@gshl-components/nav/NavDefaults";
 import { AuthProvider } from "@gshl-components/auth";
 import { PerformanceVitals } from "@gshl-components/performance/PerformanceVitals";
 import { ConvexClientProvider } from "@gshl-components/auth/ConvexClientProvider";
+import { Toaster } from "@gshl-ui";
 
 const varelaRound = Varela_Round({
   weight: "400",
@@ -52,6 +53,7 @@ export default function RootLayout({
             <NavDefaults />
             <div className="pb-20 pt-5 lg:pb-8 lg:pt-16">{children}</div>
             <Navbar />
+            <Toaster />
             <PerformanceVitals />
           </ConvexClientProvider>
         </AuthProvider>

@@ -1,0 +1,137 @@
+import type {
+  Contract,
+  DraftPick,
+  GSHLTeam,
+  NHLTeam,
+  Player,
+  Season,
+} from "./database";
+import type { CapSpaceEntry } from "./contracts";
+
+export type DraftHubStatus =
+  | "unavailable"
+  | "upcoming"
+  | "on_clock"
+  | "commissioner_required"
+  | "complete";
+
+export interface DraftClockState {
+  status: DraftHubStatus;
+  activePick: DraftPick | null;
+  completedCount: number;
+  remainingCount: number;
+  clockStartedAt: string | null;
+  clockExpiresAt: string | null;
+  recentPicks: DraftPick[];
+  upcomingPicks: DraftPick[];
+}
+
+export interface DraftHubTeamSummary {
+  id: string;
+  franchiseId: string;
+  ownerId: string | null;
+  name: string;
+  abbr: string;
+  logoUrl: string | null;
+}
+
+export interface DraftHubPlayerSummary {
+  id: string;
+  fullName: string;
+  nhlPos: string[];
+  nhlTeam: string[];
+}
+
+export interface DraftHubPickView {
+  pick: DraftPick;
+  team: DraftHubTeamSummary | null;
+  originalTeam: DraftHubTeamSummary | null;
+  player: DraftHubPlayerSummary | null;
+}
+
+export interface DraftHubSeasonSummary {
+  id: string;
+  name: string;
+  year: number;
+  startDate: string;
+  draftStartAt: string;
+}
+
+export interface DraftHubStateData {
+  season: DraftHubSeasonSummary;
+  serverNow: string;
+  status: DraftHubStatus;
+  activePickId: string | null;
+  completedCount: number;
+  remainingCount: number;
+  clockStartedAt: string | null;
+  clockExpiresAt: string | null;
+  recentPickIds: string[];
+  upcomingPickIds: string[];
+  picks: DraftHubPickView[];
+}
+
+export interface UseDraftHubStateOptions {
+  seasonId?: string | null;
+  enabled?: boolean;
+}
+
+export interface DraftHubBoardViewModel {
+  season: Season | undefined;
+  state: DraftHubStateData | undefined;
+  activePick: DraftHubPickView | null;
+  recentPicks: DraftHubPickView[];
+  upcomingPicks: DraftHubPickView[];
+  groupedPicks: Array<{ round: string; picks: DraftHubPickView[] }>;
+  eligiblePlayers: Player[];
+  nhlTeams: NHLTeam[];
+  searchTerm: string;
+  setSearchTerm: (value: string) => void;
+  positionFilter: string;
+  setPositionFilter: (value: string) => void;
+  isCommissioner: boolean;
+  canSubmitActivePick: boolean;
+  clockRemainingSeconds: number;
+  isSubmitting: boolean;
+  submittingPlayerId: string | null;
+  submitPlayer: (playerId: string) => Promise<void>;
+  hasMore: boolean;
+  isLoadingMore: boolean;
+  loadMore: () => void;
+  isLoading: boolean;
+  error: string | null;
+}
+
+export interface DraftHubTeamData {
+  season: Season | undefined;
+  teams: GSHLTeam[];
+  selectedTeam: GSHLTeam | undefined;
+  players: Player[];
+  contracts: Contract[];
+  contractPlayers: Player[];
+  nhlTeams: NHLTeam[];
+  draftPicks: DraftPick[];
+  contractTable: {
+    contractGroups: Contract[][];
+    capSpaceWindow: CapSpaceEntry[];
+    ready: boolean;
+  };
+  isLoading: boolean;
+}
+
+export interface DraftHubTeamPageProps {
+  mode: "my-team" | "other-team";
+}
+
+export interface DraftHubTeamToggleProps {
+  seasonId?: string;
+  excludedOwnerId?: string | null;
+}
+
+export interface DraftHubNavbarProps {
+  seasonId?: string;
+}
+
+export interface DraftHubCardProps {
+  season: Season;
+}
