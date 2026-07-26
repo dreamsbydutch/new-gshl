@@ -56,8 +56,7 @@ export function useUpdatePlayerLineup() {
 export function usePlayers(options: UsePlayersOptions = {}) {
   const {
     playerId,
-    teamId,
-    gshlTeamId,
+    ownerId,
     position,
     lineupPos,
     nhlTeam,
@@ -66,18 +65,14 @@ export function usePlayers(options: UsePlayersOptions = {}) {
   } = options;
   const where: Record<string, unknown> = {};
   if (playerId) where.id = String(playerId);
-  if (teamId ?? gshlTeamId) {
-    where.gshlTeamId = String(teamId ?? gshlTeamId);
-  }
+  if (ownerId) where.ownerId = String(ownerId);
   if (position) where.posGroup = String(position);
   if (lineupPos) where.lineupPos = String(lineupPos);
   if (nhlTeam) where.nhlTeam = String(nhlTeam);
   if (isActive !== undefined) where.isActive = isActive;
   const result = useQuery(
     api.frontend.players,
-    enabled
-      ? { ...(Object.keys(where).length ? { where } : {}) }
-      : "skip",
+    enabled ? { ...(Object.keys(where).length ? { where } : {}) } : "skip",
   );
   return {
     data: (result ?? []) as unknown as Player[],
@@ -94,7 +89,7 @@ export function useActivePlayers(
 
 export function useRosterPlayers(options: UseRosterPlayersOptions = {}) {
   const {
-    gshlTeamId,
+    ownerId,
     includeInactive = false,
     rankField = "overallRk",
     limit,
@@ -105,9 +100,9 @@ export function useRosterPlayers(options: UseRosterPlayersOptions = {}) {
   } = options;
   const query = usePlayers({
     ...rest,
-    gshlTeamId,
+    ownerId,
     isActive: includeInactive ? isActive : (isActive ?? true),
-    enabled: enabled && Boolean(gshlTeamId),
+    enabled: enabled && Boolean(ownerId),
   });
   const data = useMemo(() => {
     const sorted = [...query.data].sort(
@@ -122,8 +117,7 @@ export function useRosterPlayers(options: UseRosterPlayersOptions = {}) {
     data,
     rosterCount: query.data.length,
     meetsMinimumRoster:
-      minimumRosterSize === undefined ||
-      query.data.length >= minimumRosterSize,
+      minimumRosterSize === undefined || query.data.length >= minimumRosterSize,
   };
 }
 

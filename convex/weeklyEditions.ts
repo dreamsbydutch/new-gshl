@@ -559,7 +559,7 @@ async function buildMilestoneSource(
   }));
   const teamOutlooks = [...teamById.values()].map((team) => {
     const roster = players.filter(
-      (player) => String(player.gshlTeamId ?? "") === team.teamId,
+      (player) => String(player.ownerId ?? "") === team.ownerId,
     );
     const ratings = roster
       .map((player) =>

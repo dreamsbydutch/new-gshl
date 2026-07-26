@@ -101,7 +101,7 @@ export function DraftBoardContent() {
                 <DraftBoardRoster
                   key={team.id}
                   players={playerList.filter(
-                    (player) => player.gshlTeamId === team.franchiseId,
+                    (player) => player.ownerId === team.ownerId,
                   )}
                   contracts={contracts.filter(
                     (contract) => contract.ownerId === team.ownerId,
@@ -119,7 +119,7 @@ export function DraftBoardContent() {
                 <DraftBoardRoster
                   key={team.id}
                   players={playerList.filter(
-                    (player) => player.gshlTeamId === team.franchiseId,
+                    (player) => player.ownerId === team.ownerId,
                   )}
                   contracts={contracts.filter(
                     (contract) => contract.ownerId === team.ownerId,
@@ -137,7 +137,7 @@ export function DraftBoardContent() {
                 <DraftBoardRoster
                   key={team.id}
                   players={playerList.filter(
-                    (player) => player.gshlTeamId === team.franchiseId,
+                    (player) => player.ownerId === team.ownerId,
                   )}
                   contracts={contracts.filter(
                     (contract) => contract.ownerId === team.ownerId,

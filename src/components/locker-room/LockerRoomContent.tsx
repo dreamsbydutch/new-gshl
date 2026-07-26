@@ -133,8 +133,8 @@ export function LockerRoomContent() {
     : teams;
   const needsPlayers = needsContractData || isRecordBookTab;
   const { data: players = [], isLoading: playersLoading } = usePlayers({
-    gshlTeamId: currentTeam?.id,
-    enabled: needsPlayers && Boolean(currentTeam?.id),
+    ownerId: currentTeam?.ownerId,
+    enabled: needsPlayers && Boolean(currentTeam?.ownerId),
   });
   const { data: signablePlayers = [], isLoading: signablePlayersLoading } =
     usePlayers({

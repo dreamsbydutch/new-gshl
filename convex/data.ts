@@ -92,7 +92,7 @@ const TABLE_INDEX_FIELDS: Record<string, Set<string>> = {
   franchises: new Set(["legacyId", "ownerId", "confId"]),
   teams: new Set(["legacyId", "seasonId", "franchiseId", "confId"]),
   owners: new Set(defaultIndexes),
-  players: new Set(["legacyId", "gshlTeamId", "isActive"]),
+  players: new Set(["legacyId", "ownerId", "isActive"]),
   contracts: new Set(["legacyId", "playerId", "ownerId", "seasonId"]),
   weeks: new Set(["legacyId", "seasonId"]),
   matchups: new Set([
@@ -558,29 +558,15 @@ async function resolveTeamIdFromPlayerContract(
   );
 }
 
-async function resolveTeamIdFromPlayerCurrentTeam(
+async function resolveTeamIdFromPlayerOwner(
   ctx: { db: any },
   seasonId: unknown,
   player: Row | null,
 ): Promise<string | null> {
   const normalizedSeasonId = normalizeId(seasonId);
-  const currentTeamId = normalizeId(player?.gshlTeamId);
-  if (!normalizedSeasonId || !currentTeamId) return null;
-
-  const currentTeam = await safeGet(ctx, currentTeamId);
-  const franchiseId = normalizeId(currentTeam?.franchiseId);
-  if (!franchiseId) return null;
-
-  const seasonTeams = (await ctx.db
-    .query("teams" as never)
-    .withIndex("by_seasonId" as never, (q: any) =>
-      q.eq("seasonId" as never, normalizedSeasonId),
-    )
-    .collect()) as ConvexRow[];
-  const matchingTeam = seasonTeams.find((team) =>
-    equals(team.franchiseId, franchiseId),
-  );
-  return matchingTeam?._id ?? null;
+  const ownerId = normalizeId(player?.ownerId);
+  if (!normalizedSeasonId || !ownerId) return null;
+  return resolveTeamIdFromOwner(ctx, normalizedSeasonId, ownerId);
 }
 
 async function resolveTeamAwardOwnerId(
@@ -625,13 +611,13 @@ async function resolveTeamAwardOwnerId(
       if (ownerId) return ownerId;
     }
 
-    const currentFranchiseTeamId = await resolveTeamIdFromPlayerCurrentTeam(
+    const ownerTeamId = await resolveTeamIdFromPlayerOwner(
       ctx,
       normalizedSeasonId,
       direct,
     );
-    if (currentFranchiseTeamId) {
-      const team = await safeGet(ctx, currentFranchiseTeamId);
+    if (ownerTeamId) {
+      const team = await safeGet(ctx, ownerTeamId);
       const franchise = await safeGet(ctx, team?.franchiseId);
       const ownerId = await resolveOwnerId(ctx, franchise?.ownerId);
       if (ownerId) return ownerId;
@@ -680,13 +666,13 @@ async function resolveTeamAwardOwnerId(
       if (ownerId) return ownerId;
     }
 
-    const currentFranchiseTeamId = await resolveTeamIdFromPlayerCurrentTeam(
+    const ownerTeamId = await resolveTeamIdFromPlayerOwner(
       ctx,
       normalizedSeasonId,
       playerByLegacyId,
     );
-    if (currentFranchiseTeamId) {
-      const team = await safeGet(ctx, currentFranchiseTeamId);
+    if (ownerTeamId) {
+      const team = await safeGet(ctx, ownerTeamId);
       const franchise = await safeGet(ctx, team?.franchiseId);
       const ownerId = await resolveOwnerId(ctx, franchise?.ownerId);
       if (ownerId) return ownerId;

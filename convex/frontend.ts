@@ -4,10 +4,7 @@ import { makeFunctionReference, paginationOptsValidator } from "convex/server";
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
-import {
-  requireCommissioner,
-  requireOwnerOrCommissioner,
-} from "./lib/auth";
+import { requireCommissioner, requireOwnerOrCommissioner } from "./lib/auth";
 import { buildLeagueActivity } from "../src/lib/utils/features/league-activity";
 import {
   buildLockKey,
@@ -37,7 +34,7 @@ const indexedFields: Record<string, Set<string>> = {
   franchises: new Set(["legacyId", "ownerId", "confId"]),
   conferences: new Set(["legacyId"]),
   owners: new Set(["legacyId"]),
-  players: new Set(["legacyId", "gshlTeamId", "isActive"]),
+  players: new Set(["legacyId", "ownerId", "isActive"]),
   contracts: new Set(["legacyId", "playerId", "ownerId", "seasonId"]),
   draftPicks: new Set(["legacyId", "seasonId", "gshlTeamId", "playerId"]),
   matchups: new Set([
@@ -86,11 +83,7 @@ const indexedFields: Record<string, Set<string>> = {
     "playerId",
     "seasonType",
   ]),
-  playerCareerTotalStatLines: new Set([
-    "legacyId",
-    "playerId",
-    "seasonType",
-  ]),
+  playerCareerTotalStatLines: new Set(["legacyId", "playerId", "seasonType"]),
   playerNhlStatLines: new Set(["legacyId", "seasonId", "playerId"]),
   teamDayStatLines: new Set([
     "legacyId",
@@ -99,12 +92,7 @@ const indexedFields: Record<string, Set<string>> = {
     "weekId",
     "date",
   ]),
-  teamWeekStatLines: new Set([
-    "legacyId",
-    "seasonId",
-    "gshlTeamId",
-    "weekId",
-  ]),
+  teamWeekStatLines: new Set(["legacyId", "seasonId", "gshlTeamId", "weekId"]),
   teamSeasonStatLines: new Set([
     "legacyId",
     "seasonId",
@@ -132,9 +120,13 @@ function publicRow(row: Row): Record<string, any> {
   return { ...row, id: row._id };
 }
 
-function matches(row: Record<string, unknown>, where?: Record<string, unknown>) {
+function matches(
+  row: Record<string, unknown>,
+  where?: Record<string, unknown>,
+) {
   return Object.entries(where ?? {}).every(
-    ([field, expected]) => expected === undefined || equal(row[field], expected),
+    ([field, expected]) =>
+      expected === undefined || equal(row[field], expected),
   );
 }
 
@@ -177,18 +169,13 @@ async function rows(
     }
   }
 
-  if (table === "players" && where.teamId !== undefined) {
-    where.gshlTeamId = where.teamId;
-    delete where.teamId;
-  }
   if (table === "draftPicks" && where.teamId !== undefined) {
     where.gshlTeamId = where.teamId;
     delete where.teamId;
   }
 
   const indexed = Object.entries(where).find(
-    ([field, value]) =>
-      value !== undefined && indexedFields[table]?.has(field),
+    ([field, value]) => value !== undefined && indexedFields[table]?.has(field),
   );
   let query: any = ctx.db.query(table as never);
   if (indexed) {
@@ -196,9 +183,10 @@ async function rows(
     query = query.withIndex(`by_${field}`, (q: any) => q.eq(field, value));
   }
 
-  const candidates = args.take && !args.orderBy && !Object.keys(where).length
-    ? await query.take(args.take)
-    : await query.collect();
+  const candidates =
+    args.take && !args.orderBy && !Object.keys(where).length
+      ? await query.take(args.take)
+      : await query.collect();
   const result = (candidates as Row[])
     .map(publicRow)
     .filter((row) => matches(row, where))
@@ -268,9 +256,7 @@ export const teams = query({
     const includePrivate = user?.status === "active";
     const franchisesById = new Map(franchiseRows.map((row) => [row.id, row]));
     const ownersById = new Map(ownerRows.map((row) => [row.id, row]));
-    const conferencesById = new Map(
-      conferenceRows.map((row) => [row.id, row]),
-    );
+    const conferencesById = new Map(conferenceRows.map((row) => [row.id, row]));
 
     return teamRows.map((team) => {
       const franchise = franchisesById.get(String(team.franchiseId));
@@ -306,11 +292,15 @@ export const playersPage = query({
   },
   handler: async (ctx, args) => {
     const db = ctx.db as any;
-    const query = args.active === undefined
-      ? db.query("players")
-      : db
-          .query("players")
-          .withIndex("by_isActive", (q) => q.eq("isActive", args.active!));
+    const query =
+      args.active === undefined
+        ? db.query("players")
+        : db
+            .query("players")
+            .withIndex("by_isActive_overallRating", (q) =>
+              q.eq("isActive", args.active!),
+            )
+            .order("desc");
     const page = await query.paginate(args.paginationOpts);
     return { ...page, page: page.page.map((row) => publicRow(row as Row)) };
   },
@@ -319,11 +309,7 @@ export const playersPage = query({
 export const playersByIds = query({
   args: { ids: v.array(v.id("players")) },
   handler: async (ctx, args) =>
-    (
-      await Promise.all(
-        [...new Set(args.ids)].map((id) => ctx.db.get(id)),
-      )
-    )
+    (await Promise.all([...new Set(args.ids)].map((id) => ctx.db.get(id))))
       .filter((row) => row !== null)
       .map((row) => publicRow(row as unknown as Row)),
 });
@@ -365,9 +351,7 @@ export const careerSplitsByTeams = query({
       [...new Set(args.teamIds)].map((gshlTeamId) =>
         ctx.db
           .query("playerCareerSplitStatLines")
-          .withIndex("by_gshlTeamId", (q) =>
-            q.eq("gshlTeamId", gshlTeamId),
-          )
+          .withIndex("by_gshlTeamId", (q) => q.eq("gshlTeamId", gshlTeamId))
           .collect(),
       ),
     );
@@ -408,7 +392,11 @@ export const activity = query({
   },
   handler: async (ctx, args) => {
     const [contracts, playerDays, teams, franchises] = await Promise.all([
-      (ctx.db as any).query("contracts").withIndex("by_signingDate").order("desc").take(100),
+      (ctx.db as any)
+        .query("contracts")
+        .withIndex("by_signingDate")
+        .order("desc")
+        .take(100),
       (ctx.db as any)
         .query("playerDayStatLines")
         .withIndex("by_seasonId_date", (q) => q.eq("seasonId", args.seasonId))
@@ -430,11 +418,17 @@ export const activity = query({
     ).filter((row) => row !== null);
 
     return buildLeagueActivity({
-      contracts: contracts.map((row) => publicRow(row as unknown as Row)) as never,
-      playerDays: playerDays.map((row) => publicRow(row as unknown as Row)) as never,
+      contracts: contracts.map((row) =>
+        publicRow(row as unknown as Row),
+      ) as never,
+      playerDays: playerDays.map((row) =>
+        publicRow(row as unknown as Row),
+      ) as never,
       players: players.map((row) => publicRow(row as unknown as Row)) as never,
       teams: teams.map((row) => publicRow(row as unknown as Row)) as never,
-      franchises: franchises.map((row) => publicRow(row as unknown as Row)) as never,
+      franchises: franchises.map((row) =>
+        publicRow(row as unknown as Row),
+      ) as never,
       limit: Math.min(Math.max(args.take, 1), 30),
     });
   },
@@ -457,17 +451,19 @@ export const updatePlayer = mutation({
       if (fields.length !== 1 || fields[0] !== "lineupPos" || !user.ownerId) {
         throw new Error("Forbidden");
       }
-      const team = player.gshlTeamId
-        ? await ctx.db.get(player.gshlTeamId)
-        : null;
-      const franchise = team ? await ctx.db.get(team.franchiseId) : null;
-      if (!franchise || franchise.ownerId !== user.ownerId) {
+      if (player.ownerId !== user.ownerId) {
         throw new Error("Forbidden");
       }
     }
 
     const patch: Record<string, unknown> = { ...args.data };
-    if (patch.gshlTeamId === null || patch.gshlTeamId === "") {
+    if (patch.ownerId === "") {
+      patch.ownerId = null;
+    }
+    if ("gshlTeamId" in patch) {
+      if (patch.gshlTeamId !== null && patch.gshlTeamId !== "") {
+        throw new Error("Player ownership must be assigned through ownerId");
+      }
       patch.gshlTeamId = undefined;
     }
     patch.updatedAt = new Date().toISOString();
@@ -484,6 +480,17 @@ export const updateDraftPick = mutation({
   handler: async (ctx, args) => {
     await requireCommissioner(ctx);
     const patch = { ...args.data };
+    const protectedFields = new Set([
+      "playerId",
+      "onClockStartedAt",
+      "onClockExpiresAt",
+      "onClockEndedAt",
+    ]);
+    if (Object.keys(patch).some((field) => protectedFields.has(field))) {
+      throw new Error(
+        "Live draft selections must use the transactional draft mutation",
+      );
+    }
     if ("teamId" in patch) {
       patch.gshlTeamId = patch.teamId;
       delete patch.teamId;
@@ -582,7 +589,8 @@ export const createContract = mutation({
       updatedAt: now,
     });
     await ctx.db.patch(args.playerId, {
-      gshlTeamId: args.teamId,
+      ownerId: franchise.ownerId,
+      gshlTeamId: undefined,
       updatedAt: now,
     });
     return publicRow((await ctx.db.get(id)) as unknown as Row);

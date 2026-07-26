@@ -60,7 +60,7 @@ const RELATIONS: Partial<
   Franchise: { ownerId: "Owner", confId: "Conference" },
   Team: { seasonId: "Season", franchiseId: "Franchise", confId: "Conference" },
   Week: { seasonId: "Season" },
-  Player: { gshlTeamId: "Team" },
+  Player: { ownerId: "Owner" },
   Contract: { playerId: "Player", ownerId: "Owner", seasonId: "Season" },
   Event: { seasonId: "Season" },
   Matchup: {

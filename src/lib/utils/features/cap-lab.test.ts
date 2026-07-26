@@ -37,7 +37,7 @@ function player(id: string, overrides: Partial<Player> = {}): Player {
     nhlPos: ["C"],
     posGroup: "F",
     nhlTeam: "TOR",
-    gshlTeamId: null,
+    ownerId: null,
     isActive: true,
     isSignable: true,
     isResignable: ResignableStatus.UFA,

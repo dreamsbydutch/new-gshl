@@ -84,7 +84,7 @@ export function ContractManagement() {
     return playersQuery.data
       .flatMap((player) => {
         const belongsToTeam =
-          String(player.gshlTeamId) === String(selectedTeam.id);
+          String(player.ownerId) === String(selectedTeam.ownerId);
         const isLeagueUfa =
           freeAgencyOpen &&
           isUnsignedForSigningSeason(

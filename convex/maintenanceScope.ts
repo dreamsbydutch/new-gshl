@@ -42,6 +42,7 @@ const SEASON_TABLES = new Set([
 ]);
 
 const PATCH_TABLES = new Set([
+  "players",
   "matchups",
   "teamDayStatLines",
   "teamWeekStatLines",
@@ -145,6 +146,53 @@ export const listSeasonRows = queryGeneric({
         q.eq("seasonId", args.seasonId),
       )
       .paginate({ cursor: args.cursor, numItems: 50 });
+    return {
+      items: page.page.map(
+        (row: Record<string, unknown> & { _id: string }) => ({
+          ...row,
+          id: row._id,
+        }),
+      ),
+      nextCursor: page.isDone ? null : page.continueCursor,
+      hasMore: !page.isDone,
+    };
+  },
+});
+
+export const latestPlayerDayDate = queryGeneric({
+  args: {
+    serverSecret: v.string(),
+    seasonId: v.id("seasons"),
+    onOrBefore: v.string(),
+  },
+  handler: async (ctx, args) => {
+    requireServerSecret(args.serverSecret);
+    const row = (await ctx.db
+      .query("playerDayStatLines")
+      .withIndex("by_seasonId_date", (q: any) =>
+        q.eq("seasonId", args.seasonId).lte("date", args.onOrBefore),
+      )
+      .order("desc")
+      .first()) as unknown as { date?: unknown } | null;
+    return typeof row?.date === "string" ? row.date.slice(0, 10) : null;
+  },
+});
+
+export const listPlayerDayDateRows = queryGeneric({
+  args: {
+    serverSecret: v.string(),
+    seasonId: v.id("seasons"),
+    date: v.string(),
+    cursor: v.union(v.string(), v.null()),
+  },
+  handler: async (ctx, args) => {
+    requireServerSecret(args.serverSecret);
+    const page = await ctx.db
+      .query("playerDayStatLines")
+      .withIndex("by_seasonId_date", (q: any) =>
+        q.eq("seasonId", args.seasonId).eq("date", args.date),
+      )
+      .paginate({ cursor: args.cursor, numItems: 100 });
     return {
       items: page.page.map(
         (row: Record<string, unknown> & { _id: string }) => ({
@@ -320,7 +368,11 @@ export const patchRowsById = mutationGeneric({
           id: entry.id,
         });
       }
-      await ctx.db.patch(id as never, entry.data);
+      const patch = { ...entry.data };
+      if (args.table === "players" && patch.gshlTeamId === null) {
+        patch.gshlTeamId = undefined;
+      }
+      await ctx.db.patch(id as never, patch);
       updated += 1;
     }
     return { updated };

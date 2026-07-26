@@ -867,7 +867,8 @@ export const finalizeGroup = internalMutation({
       updatedAt: nowIso,
     });
     await db.patch(player._id, {
-      gshlTeamId: winningOffer.teamId,
+      ownerId: winningOffer.ownerId,
+      gshlTeamId: undefined,
       isSignable: false,
       isResignable: null,
       lineupPos: null,

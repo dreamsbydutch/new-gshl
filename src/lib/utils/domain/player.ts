@@ -43,7 +43,7 @@ export function filterFreeAgents(
   let result = players.filter((p) => isActivePlayer(p) && isSignablePlayer(p));
 
   if (checkTeamAssignment) {
-    result = result.filter((p) => !p.gshlTeamId || p.gshlTeamId.trim() === "");
+    result = result.filter((p) => !p.ownerId || p.ownerId.trim() === "");
   }
 
   return result;

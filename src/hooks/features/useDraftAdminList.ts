@@ -85,10 +85,10 @@ export function useDraftAdminList(
 
   const playerUpdateMutation = useAppMutation(api.frontend.updatePlayer);
 
-  const updateTeamLineup = useCallback(
-    async (teamIdentifier: string | null | undefined) => {
-      const normalizedIdentifier = normalizeTeamIdentifier(teamIdentifier);
-      if (!normalizedIdentifier) {
+  const updateOwnerLineup = useCallback(
+    async (ownerId: string | null | undefined) => {
+      const normalizedOwnerId = normalizeTeamIdentifier(ownerId);
+      if (!normalizedOwnerId) {
         return;
       }
 
@@ -96,8 +96,8 @@ export function useDraftAdminList(
         const latestPlayers = await playerQuery.fetch();
         const teamPlayers =
           latestPlayers?.filter((teamPlayer) => {
-            const playerTeamId = normalizeTeamIdentifier(teamPlayer.gshlTeamId);
-            return playerTeamId === normalizedIdentifier;
+            const playerOwnerId = normalizeTeamIdentifier(teamPlayer.ownerId);
+            return playerOwnerId === normalizedOwnerId;
           }) ?? [];
 
         if (teamPlayers.length === 0) {
@@ -117,8 +117,8 @@ export function useDraftAdminList(
           });
         }
       } catch (error) {
-        console.error("Failed to rebuild lineup for franchise", {
-          teamIdentifier: normalizedIdentifier,
+        console.error("Failed to rebuild lineup for owner", {
+          ownerId: normalizedOwnerId,
           error,
         });
       }
@@ -214,14 +214,7 @@ export function useDraftAdminList(
         }
 
         const draftTeam = resolveTeamFromPick(currentPick, gshlTeams);
-        const franchiseIdentifier = normalizeTeamIdentifier(
-          draftTeam?.franchiseId,
-        );
-        const fallbackIdentifier =
-          normalizeTeamIdentifier(draftTeam?.id) ??
-          normalizeTeamIdentifier(currentPick.gshlTeamId);
-        const teamIdentifier =
-          franchiseIdentifier ?? fallbackIdentifier ?? null;
+        const ownerId = normalizeTeamIdentifier(draftTeam?.ownerId);
 
         await draftMutation.mutateAsync({
           id: currentPick.id,
@@ -231,18 +224,18 @@ export function useDraftAdminList(
         await playerUpdateMutation.mutateAsync({
           id: player.id,
           data: {
-            gshlTeamId: teamIdentifier,
+            ownerId,
             lineupPos: RosterPosition.BN,
           },
         });
 
-        if (!teamIdentifier) {
+        if (!ownerId) {
           console.error(
-            "Unable to resolve draft franchise for pick; lineup rebuild skipped",
+            "Unable to resolve draft owner for pick; lineup rebuild skipped",
             { currentPick, draftTeam },
           );
         } else {
-          await updateTeamLineup(teamIdentifier);
+          await updateOwnerLineup(ownerId);
         }
 
         console.info(
@@ -268,7 +261,7 @@ export function useDraftAdminList(
       isPlayerUpdatePending,
       isUndoPending,
       playerUpdateMutation,
-      updateTeamLineup,
+      updateOwnerLineup,
     ],
   );
 
@@ -304,18 +297,15 @@ export function useDraftAdminList(
       });
 
       const teamForPick = resolveTeamFromPick(latestCompletedPick, gshlTeams);
-      const teamIdentifier =
-        normalizeTeamIdentifier(latestCompletedPick.gshlTeamId) ??
-        normalizeTeamIdentifier(teamForPick?.franchiseId) ??
-        normalizeTeamIdentifier(teamForPick?.id);
+      const ownerId = normalizeTeamIdentifier(teamForPick?.ownerId);
 
       await playerUpdateMutation.mutateAsync({
         id: latestCompletedPick.playerId,
-        data: { gshlTeamId: null, lineupPos: null },
+        data: { ownerId: null, lineupPos: null },
       });
 
-      if (teamIdentifier) {
-        await updateTeamLineup(teamIdentifier);
+      if (ownerId) {
+        await updateOwnerLineup(ownerId);
       }
 
       const revertedPlayer = players?.find(
@@ -345,7 +335,7 @@ export function useDraftAdminList(
     gshlTeams,
     seasonId,
     undoMutation,
-    updateTeamLineup,
+    updateOwnerLineup,
   ]);
 
   const undoDisabled =

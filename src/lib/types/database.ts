@@ -207,12 +207,16 @@ export interface Player {
   weight?: number | null;
   height?: number | null;
   lineupPos?: RosterPosition | null;
-  gshlTeamId?: string | null;
+  ownerId?: string | null;
   nhlContractStatus?: string | null;
   nhlContractLength?: number | null;
+  nhlSalary?: number | null;
   nhlCapHit?: number | null;
   nhlClauses?: string | null;
   nhlStartYear?: number | null;
+  nhlSigningDate?: string | null;
+  nhlSigningAgent?: string | null;
+  nhlSigningGm?: string | null;
   nhlSigningStatus?: string | null;
   nhlExpiryYear?: number | null;
   nhlExpiryStatus?: string | null;
@@ -278,6 +282,9 @@ export interface DraftPick {
   round: string;
   pick: string;
   playerId?: string | null;
+  onClockStartedAt?: string | null;
+  onClockExpiresAt?: string | null;
+  onClockEndedAt?: string | null;
   isTraded: boolean;
   isSigning: boolean;
   createdAt: Date;

@@ -107,14 +107,14 @@ export function buildCurrentRoster(
   players: Player[] | undefined,
   currentTeam: GSHLTeam | undefined,
 ): Player[] {
-  if (!players || !currentTeam) {
+  if (!players || !currentTeam?.ownerId) {
     return [];
   }
 
   return players
     .filter(
       (player) =>
-        String(player.gshlTeamId ?? "") === String(currentTeam.franchiseId),
+        String(player.ownerId ?? "") === String(currentTeam.ownerId ?? ""),
     )
     .map((player) => normalizeRosterPlayer(player))
     .sort((a, b) => {

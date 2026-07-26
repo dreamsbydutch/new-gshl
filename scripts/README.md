@@ -109,14 +109,47 @@ All commands below are available through `npm run <name>`.
 
 #### `player-bios:sync`
 
-Scrapes PuckPedia player bios and roster context, matches the results to the
-`Player` table, and prepares player updates or inserts.
+Fetches PuckPedia's complete NHL-contracted skater and goalie directories,
+matches players to the Convex `Player` table using stable NHL ids plus guarded
+name/birthdate/position fallbacks, and prepares updates and inserts. Dry-run
+output lists every proposed insert with close existing-player candidates and
+audits active database players absent from the feed. An unmatched player is only
+deactivated when the current and previous GSHL seasons resolve and their
+`PlayerNHLStatLine.GP` is zero in both seasons. Presence in either PuckPedia
+directory is treated as NHL-contract evidence. The audit lists the season IDs,
+games played, and decision for each proposed deactivation. It refreshes
+birthdate, age, height, weight, handedness, NHL team, jersey number, position,
+and current NHL contract fields including salary, signing date, signing agent,
+signing GM, length, clauses, cap hit, signing status, expiry year, and expiry
+status. These fields are authoritative: stale values are cleared when the
+current PuckPedia row has no value, and players absent from both directories
+have their old NHL team, jersey number, and contract fields cleared. Writes
+remain field-diffed, so unchanged values are not patched.
+
+The same run reconciles each player's current `ownerId`. PlayerDay and draft
+records retain their historical team IDs, but those teams are resolved through
+their franchise to the owner before a Player row is changed. During the season
+the sync uses the current PlayerDay date, then the previous calendar date, then
+the latest available in-season date. During the post-season signing window it
+uses the final recorded roster from the completed season. After the signing
+deadline it uses playing contracts; once the upcoming season's draft begins,
+assigned draft picks are added as well. Players absent from the resolved roster
+have both `ownerId` and `lineupPos` cleared. The deprecated Player
+`gshlTeamId` is cleared during this migration. Overlapping contracts use the
+newest applicable signing, and conflicting owner evidence aborts the run before
+any writes. Because ownership is canonical, players remain with an owner when
+that owner changes franchises or team branding.
+
+After resolving the roster, every team is passed through the shared lineup
+optimizer using `Player.seasonRating` as its `Rating` value and the target
+season's configured roster spots. Optimized starters receive their eligible
+lineup position, remaining roster players receive `BN`, and all players outside
+a GSHL roster have `lineupPos` cleared.
 
 Notable flags:
 
 - `--apply`
 - `--headless`
-- `--gshl-season-id <id>`
 - `--focus-season <value>`
 - `--stat-season <value>`
 - `--page-size <value>`

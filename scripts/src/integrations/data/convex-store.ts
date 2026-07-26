@@ -52,6 +52,16 @@ const refs = {
     Record<string, unknown>,
     { items: AnyRow[]; nextCursor: string | null; hasMore: boolean }
   >("maintenanceScope:listSeasonRows"),
+  latestPlayerDayDate: makeFunctionReference<
+    "query",
+    Record<string, unknown>,
+    string | null
+  >("maintenanceScope:latestPlayerDayDate"),
+  playerDayDatePage: makeFunctionReference<
+    "query",
+    Record<string, unknown>,
+    { items: AnyRow[]; nextCursor: string | null; hasMore: boolean }
+  >("maintenanceScope:listPlayerDayDateRows"),
   maintenanceAggregatePage: makeFunctionReference<
     "query",
     Record<string, unknown>,
@@ -259,6 +269,37 @@ export async function fetchPlayerNhlSeason<T extends AnyRow>(
   return fetchSeasonModel<T>("PlayerNHLStatLine", seasonId);
 }
 
+export async function fetchLatestPlayerDayDate(
+  seasonId: string,
+  onOrBefore: string,
+): Promise<string | null> {
+  return getClient().query(
+    refs.latestPlayerDayDate,
+    serverArgs({ seasonId, onOrBefore }),
+  );
+}
+
+export async function fetchPlayerDayDate<T extends AnyRow>(
+  seasonId: string,
+  date: string,
+): Promise<T[]> {
+  const rows: T[] = [];
+  let cursor: string | null = null;
+  do {
+    const page: {
+      items: AnyRow[];
+      nextCursor: string | null;
+      hasMore: boolean;
+    } = await getClient().query(
+      refs.playerDayDatePage,
+      serverArgs({ seasonId, date, cursor }),
+    );
+    rows.push(...page.items.map(hydrateRow<T>));
+    cursor = page.hasMore ? page.nextCursor : null;
+  } while (cursor);
+  return rows;
+}
+
 export type SeasonScopedModelName = Extract<
   ModelName,
   | "Week"
@@ -401,7 +442,11 @@ export async function deleteAggregateRows(
 
 export type MaintenancePatchModelName = Extract<
   ModelName,
-  "Matchup" | "TeamDayStatLine" | "TeamWeekStatLine" | "TeamSeasonStatLine"
+  | "Player"
+  | "Matchup"
+  | "TeamDayStatLine"
+  | "TeamWeekStatLine"
+  | "TeamSeasonStatLine"
 >;
 
 export async function updateRowsById(

@@ -53,8 +53,7 @@ export interface UseMatchupsOptions {
 
 export interface UsePlayersOptions {
   playerId?: string | null;
-  teamId?: string | null;
-  gshlTeamId?: string | null;
+  ownerId?: string | null;
   position?: string | null;
   lineupPos?: string | null;
   nhlTeam?: string | null;
@@ -80,8 +79,8 @@ export interface UseRankedPlayersOptions extends UsePlayersOptions {
 }
 
 export interface UseRosterPlayersOptions
-  extends Omit<UsePlayersOptions, "gshlTeamId" | "teamId"> {
-  gshlTeamId?: string | null;
+  extends Omit<UsePlayersOptions, "ownerId"> {
+  ownerId?: string | null;
   includeInactive?: boolean;
   rankField?: PlayerRankField;
   limit?: number;
