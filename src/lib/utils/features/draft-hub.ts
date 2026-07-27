@@ -1,13 +1,97 @@
 import type {
   DraftClockState,
   DraftHubDraftPick,
+  DraftHubEligiblePlayerView,
   DraftHubStatus,
+  DraftPlayerSortDirection,
+  DraftPlayerSortKey,
   DraftPick,
   Season,
 } from "@gshl-types";
 import { findCurrentSeason, findUpcomingSeason } from "../domain/season";
 
 export const DRAFT_PICK_CLOCK_MS = 4 * 60 * 1000;
+
+const DRAFT_RANK_SORT_KEYS = new Set<DraftPlayerSortKey>([
+  "overallRk",
+  "yahooDraftRk",
+  "otherDraftRk",
+]);
+
+const DRAFT_TEXT_SORT_KEYS = new Set<DraftPlayerSortKey>([
+  "nhlTeam",
+  "fullName",
+  "nhlPosition",
+]);
+
+export function getDefaultDraftPlayerSortDirection(
+  key: DraftPlayerSortKey,
+): DraftPlayerSortDirection {
+  return DRAFT_RANK_SORT_KEYS.has(key) || DRAFT_TEXT_SORT_KEYS.has(key)
+    ? "asc"
+    : "desc";
+}
+
+function getDraftPlayerSortValue(
+  player: DraftHubEligiblePlayerView,
+  key: DraftPlayerSortKey,
+): number | string | null {
+  if (key === "nhlTeam") return player.nhlTeam;
+  if (key === "fullName") return player.fullName;
+  if (key === "nhlPosition") {
+    return player.nhlPos.length > 0 ? player.nhlPos.join("/") : player.posGroup;
+  }
+
+  const rawValue =
+    key === "overallRk" ||
+    key === "yahooDraftRk" ||
+    key === "otherDraftRk" ||
+    key === "overallRating"
+      ? player[key]
+      : player.stats?.[key];
+  if (rawValue === null || rawValue === undefined || rawValue === "") {
+    return null;
+  }
+
+  const numericValue = Number(rawValue);
+  return Number.isFinite(numericValue) ? numericValue : null;
+}
+
+function compareDraftPlayerSortValues(
+  left: number | string | null,
+  right: number | string | null,
+  direction: DraftPlayerSortDirection,
+): number {
+  if (left === null && right === null) return 0;
+  if (left === null) return 1;
+  if (right === null) return -1;
+
+  const comparison =
+    typeof left === "string" && typeof right === "string"
+      ? left.localeCompare(right)
+      : Number(left) - Number(right);
+  return direction === "asc" ? comparison : -comparison;
+}
+
+export function sortDraftEligiblePlayers(
+  players: readonly DraftHubEligiblePlayerView[],
+  key: DraftPlayerSortKey,
+  direction: DraftPlayerSortDirection,
+): DraftHubEligiblePlayerView[] {
+  return [...players].sort((left, right) => {
+    const primary = compareDraftPlayerSortValues(
+      getDraftPlayerSortValue(left, key),
+      getDraftPlayerSortValue(right, key),
+      direction,
+    );
+    if (primary !== 0) return primary;
+
+    const rank =
+      Number(left.overallRk ?? Number.MAX_SAFE_INTEGER) -
+      Number(right.overallRk ?? Number.MAX_SAFE_INTEGER);
+    return rank || left.fullName.localeCompare(right.fullName);
+  });
+}
 
 export function getDraftYear(
   season: Pick<Season, "draftStartAt" | "startDate" | "year">,
@@ -57,6 +141,15 @@ export function orderDraftPicks<T extends Pick<DraftPick, "round" | "pick">>(
   picks: readonly T[],
 ): T[] {
   return [...picks].sort(compareDraftPickOrder);
+}
+
+export function findLatestCompletedLiveDraftPick<
+  T extends Pick<DraftPick, "round" | "pick" | "playerId" | "isSigning">,
+>(picks: readonly T[]): T | null {
+  const completedPicks = orderDraftPicks(picks).filter(
+    (pick) => isLiveDraftSelection(pick) && draftPickHasPlayer(pick),
+  );
+  return completedPicks.at(-1) ?? null;
 }
 
 export function serializeDraftHubPick(pick: DraftPick): DraftHubDraftPick {

@@ -1,12 +1,19 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { DraftPick, Season } from "@gshl-types";
+import type {
+  DraftHubEligiblePlayerView,
+  DraftPick,
+  Season,
+} from "@gshl-types";
 import {
   canSubmitDraftPick,
+  findLatestCompletedLiveDraftPick,
+  getDefaultDraftPlayerSortDirection,
   getDraftYear,
   resolveDraftClockState,
   resolveDraftHubSeason,
   serializeDraftHubPick,
+  sortDraftEligiblePlayers,
 } from "./draft-hub";
 
 const start = "2026-09-01T23:00:00.000Z";
@@ -54,6 +61,83 @@ function season(
     updatedAt: new Date(startDate),
   };
 }
+
+function eligiblePlayer(
+  id: string,
+  fields: Partial<DraftHubEligiblePlayerView> = {},
+): DraftHubEligiblePlayerView {
+  return {
+    id,
+    firstName: id,
+    lastName: "Player",
+    fullName: `${id} Player`,
+    nhlPos: ["C"],
+    posGroup: "F",
+    nhlTeam: "TOR",
+    isActive: true,
+    isSignable: true,
+    isResignable: null,
+    createdAt: new Date(start),
+    updatedAt: new Date(start),
+    nhlTeamLogoUrl: null,
+    stats: null,
+    ...fields,
+  };
+}
+
+void test("uses intuitive initial directions for every draft player column", () => {
+  assert.equal(getDefaultDraftPlayerSortDirection("fullName"), "asc");
+  assert.equal(getDefaultDraftPlayerSortDirection("yahooDraftRk"), "asc");
+  assert.equal(getDefaultDraftPlayerSortDirection("otherDraftRk"), "asc");
+  assert.equal(getDefaultDraftPlayerSortDirection("overallRating"), "desc");
+  assert.equal(getDefaultDraftPlayerSortDirection("GP"), "desc");
+});
+
+void test("sorts draft rankings numerically and always leaves empty ranks last", () => {
+  const players = [
+    eligiblePlayer("unranked"),
+    eligiblePlayer("second", { yahooDraftRk: 2 }),
+    eligiblePlayer("first", { yahooDraftRk: 1 }),
+  ];
+
+  assert.deepEqual(
+    sortDraftEligiblePlayers(players, "yahooDraftRk", "asc").map(
+      (player) => player.id,
+    ),
+    ["first", "second", "unranked"],
+  );
+  assert.deepEqual(
+    sortDraftEligiblePlayers(players, "yahooDraftRk", "desc").map(
+      (player) => player.id,
+    ),
+    ["second", "first", "unranked"],
+  );
+});
+
+void test("sorts NHL statistic columns numerically with deterministic ties", () => {
+  const players = [
+    eligiblePlayer("missing"),
+    eligiblePlayer("alpha", {
+      fullName: "Alpha Player",
+      overallRk: 2,
+      stats: { GP: "40", P: "30" },
+    }),
+    eligiblePlayer("bravo", {
+      fullName: "Bravo Player",
+      overallRk: 1,
+      stats: { GP: "40", P: "60" },
+    }),
+  ];
+
+  assert.deepEqual(
+    sortDraftEligiblePlayers(players, "GP", "desc").map((player) => player.id),
+    ["bravo", "alpha", "missing"],
+  );
+  assert.deepEqual(
+    sortDraftEligiblePlayers(players, "P", "desc").map((player) => player.id),
+    ["bravo", "alpha", "missing"],
+  );
+});
 
 void test("selects only the real current or upcoming draft season", () => {
   const previousSeason = season(
@@ -134,6 +218,17 @@ void test("selects the first unfilled pick and skips completed picks", () => {
     state.recentPicks.map((draftPick) => draftPick.id),
     ["2", "1"],
   );
+});
+
+void test("finds only the latest completed live selection for commissioner undo", () => {
+  const latest = findLatestCompletedLiveDraftPick([
+    pick("4", 4, "signing-player", { isSigning: true }),
+    pick("2", 2, "player-2"),
+    pick("1", 1, "player-1"),
+    pick("3", 3),
+  ]);
+
+  assert.equal(latest?.id, "2");
 });
 
 void test("excludes signing slots from active, recent, and upcoming picks", () => {

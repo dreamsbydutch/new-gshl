@@ -1,18 +1,29 @@
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { mutation, query, type MutationCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
-import { requireActiveUser, requireOwnerOrCommissioner } from "./lib/auth";
+import {
+  requireActiveUser,
+  requireCommissioner,
+  requireOwnerOrCommissioner,
+} from "./lib/auth";
 import type {
   DraftHubPlayerSummary,
   DraftHubTeamSummary,
   DraftPick,
+  LineupCandidate,
+  RosterPosition as RosterPositionType,
 } from "../src/lib/types";
 import {
   DRAFT_PICK_CLOCK_MS,
+  findLatestCompletedLiveDraftPick,
   resolveDraftClockState,
   serializeDraftHubPick,
 } from "../src/lib/utils/features/draft-hub";
-import { ContractStatus } from "../src/lib/utils/domain/constants";
+import { generateLineupAssignments } from "../src/lib/utils/features/draft-admin";
+import {
+  ContractStatus,
+  RosterPosition,
+} from "../src/lib/utils/domain/constants";
 import { toUtcTimestamp } from "./lib/timestamps";
 
 function toDate(value: unknown, fallback: number): Date {
@@ -92,6 +103,81 @@ function playerSummary(
 
 function parseTime(value: unknown): number | null {
   return toUtcTimestamp(value);
+}
+
+function toRosterPosition(value: unknown): RosterPositionType | null {
+  switch (value) {
+    case RosterPosition.BN:
+      return RosterPosition.BN;
+    case RosterPosition.IR:
+      return RosterPosition.IR;
+    case RosterPosition.IRplus:
+      return RosterPosition.IRplus;
+    case RosterPosition.LW:
+      return RosterPosition.LW;
+    case RosterPosition.C:
+      return RosterPosition.C;
+    case RosterPosition.RW:
+      return RosterPosition.RW;
+    case RosterPosition.D:
+      return RosterPosition.D;
+    case RosterPosition.G:
+      return RosterPosition.G;
+    case RosterPosition.Util:
+      return RosterPosition.Util;
+    default:
+      return null;
+  }
+}
+
+function toLineupCandidate(player: Doc<"players">): LineupCandidate {
+  const parsedRating =
+    player.overallRating === null || player.overallRating === undefined
+      ? null
+      : Number(player.overallRating);
+  return {
+    id: String(player._id),
+    nhlPos: (player.nhlPos ?? [])
+      .map(toRosterPosition)
+      .filter((position): position is RosterPositionType => position !== null),
+    lineupPos: toRosterPosition(player.lineupPos),
+    overallRating: Number.isFinite(parsedRating) ? parsedRating : null,
+  };
+}
+
+async function rebuildTeamLineup(
+  ctx: MutationCtx,
+  ownerId: Id<"owners">,
+  teamId: Id<"teams">,
+  updatedAt: number,
+): Promise<void> {
+  const [ownerRosterRows, teamRosterRows] = await Promise.all([
+    ctx.db
+      .query("players")
+      .withIndex("by_ownerId", (range) => range.eq("ownerId", ownerId))
+      .collect(),
+    ctx.db
+      .query("players")
+      .withIndex("by_gshlTeamId", (range) => range.eq("gshlTeamId", teamId))
+      .collect(),
+  ]);
+  const rosterById = new Map<string, Doc<"players">>();
+  for (const rosterPlayer of [...ownerRosterRows, ...teamRosterRows]) {
+    rosterById.set(String(rosterPlayer._id), rosterPlayer);
+  }
+  const lineupAssignments = generateLineupAssignments(
+    [...rosterById.values()]
+      .filter((rosterPlayer) => rosterPlayer.isActive)
+      .map(toLineupCandidate),
+  );
+  for (const assignment of lineupAssignments) {
+    const rosterPlayer = rosterById.get(assignment.playerId);
+    if (!rosterPlayer) continue;
+    await ctx.db.patch(rosterPlayer._id, {
+      lineupPos: assignment.lineupPos,
+      updatedAt,
+    });
+  }
 }
 
 function contractCoversDraft(
@@ -265,6 +351,20 @@ export const submitPick = mutation({
       throw new Error("That player already has a contract for this season");
     }
 
+    await ctx.db.patch(player._id, {
+      ownerId: franchise.ownerId,
+      gshlTeamId: activeTeam._id,
+      lineupPos: "BN",
+      updatedAt: nowTimestamp,
+    });
+
+    await rebuildTeamLineup(
+      ctx,
+      franchise.ownerId,
+      activeTeam._id,
+      nowTimestamp,
+    );
+
     await ctx.db.patch(activeRow._id, {
       playerId: args.playerId,
       onClockStartedAt:
@@ -277,12 +377,6 @@ export const submitPick = mutation({
         nowTimestamp + DRAFT_PICK_CLOCK_MS,
       onClockEndedAt: nowTimestamp,
       isSigning: false,
-      updatedAt: nowTimestamp,
-    });
-    await ctx.db.patch(player._id, {
-      ownerId: franchise.ownerId,
-      gshlTeamId: undefined,
-      lineupPos: "BN",
       updatedAt: nowTimestamp,
     });
 
@@ -304,6 +398,96 @@ export const submitPick = mutation({
       completedPickId: String(activeRow._id),
       nextPickId: nextPick ? String(nextPick._id) : null,
       isComplete: nextPick === null,
+    };
+  },
+});
+
+export const undoPick = mutation({
+  args: {
+    seasonId: v.id("seasons"),
+    pickId: v.id("draftPicks"),
+  },
+  handler: async (ctx, args) => {
+    await requireCommissioner(ctx);
+    const [season, pickRows] = await Promise.all([
+      ctx.db.get(args.seasonId),
+      ctx.db
+        .query("draftPicks")
+        .withIndex("by_seasonId_round_pick", (range) =>
+          range.eq("seasonId", args.seasonId),
+        )
+        .collect(),
+    ]);
+    if (!season) throw new Error("Draft season not found");
+
+    const orderedRows = [...pickRows].sort(compareRows);
+    const latestCompletedDraftPick = findLatestCompletedLiveDraftPick(
+      orderedRows.map(toDraftPick),
+    );
+    const latestCompletedPick = latestCompletedDraftPick
+      ? (orderedRows.find(
+          (pick) => String(pick._id) === latestCompletedDraftPick.id,
+        ) ?? null)
+      : null;
+    if (!latestCompletedPick?.playerId) {
+      throw new Error("There are no completed draft picks to undo");
+    }
+    if (latestCompletedPick._id !== args.pickId) {
+      throw new Error("Only the latest completed draft pick can be undone");
+    }
+    if (!latestCompletedPick.gshlTeamId) {
+      throw new Error("The selected pick does not have a team");
+    }
+
+    const [team, player] = await Promise.all([
+      ctx.db.get(latestCompletedPick.gshlTeamId),
+      ctx.db.get(latestCompletedPick.playerId),
+    ]);
+    const franchise = team ? await ctx.db.get(team.franchiseId) : null;
+    if (!team || !franchise || !player) {
+      throw new Error("The selected pick roster could not be resolved");
+    }
+    const playerStillOnDraftTeam =
+      player.gshlTeamId === team._id || player.ownerId === franchise.ownerId;
+    if (!playerStillOnDraftTeam) {
+      throw new Error(
+        "That player's roster assignment changed after the pick and cannot be undone safely",
+      );
+    }
+
+    const nowTimestamp = Date.now();
+    await ctx.db.patch(player._id, {
+      ownerId: null,
+      gshlTeamId: undefined,
+      lineupPos: null,
+      updatedAt: nowTimestamp,
+    });
+    await rebuildTeamLineup(ctx, franchise.ownerId, team._id, nowTimestamp);
+
+    for (const openPick of orderedRows.filter(
+      (pick) => !pick.isSigning && !pick.playerId,
+    )) {
+      await ctx.db.patch(openPick._id, {
+        onClockStartedAt: null,
+        onClockExpiresAt: null,
+        onClockEndedAt: null,
+        updatedAt: nowTimestamp,
+      });
+    }
+
+    const draftStartAt = toUtcTimestamp(season.draftStartAt) ?? nowTimestamp;
+    const restartedAt = Math.max(nowTimestamp, draftStartAt);
+    await ctx.db.patch(latestCompletedPick._id, {
+      playerId: null,
+      onClockStartedAt: restartedAt,
+      onClockExpiresAt: restartedAt + DRAFT_PICK_CLOCK_MS,
+      onClockEndedAt: null,
+      updatedAt: nowTimestamp,
+    });
+
+    return {
+      undonePickId: String(latestCompletedPick._id),
+      releasedPlayerId: String(player._id),
     };
   },
 });

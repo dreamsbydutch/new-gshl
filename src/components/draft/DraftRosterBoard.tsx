@@ -16,7 +16,7 @@ import {
 } from "@gshl-utils";
 import type {
   DraftRosterConferenceView,
-  GSHLTeam,
+  DraftRosterTeamView,
   NHLTeam,
   Player,
 } from "@gshl-types";
@@ -67,7 +67,7 @@ function TeamRosterCard({
   players,
   nhlTeamByAbbr,
 }: {
-  team: GSHLTeam;
+  team: DraftRosterTeamView;
   players: Player[];
   nhlTeamByAbbr: Map<string, NHLTeam>;
 }) {
@@ -97,6 +97,19 @@ function TeamRosterCard({
           </h3>
           <p className="text-[8px] leading-none text-slate-500">
             {roster.length} players
+          </p>
+        </div>
+        <div
+          className="ml-auto shrink-0 text-right"
+          title="Live talent rating. Starting players count twice as much as bench players."
+        >
+          <p className="text-[7px] font-bold uppercase tracking-wide text-slate-500">
+            Talent
+          </p>
+          <p className="text-[10px] font-black tabular-nums text-primary">
+            {team.talentRating === null
+              ? "--"
+              : formatNumber(team.talentRating, 2)}
           </p>
         </div>
       </header>

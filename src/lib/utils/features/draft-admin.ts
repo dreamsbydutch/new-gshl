@@ -12,6 +12,7 @@ import type {
   DraftPick,
   GSHLTeam,
   LineupAssignment,
+  LineupCandidate,
   Player,
   RosterPosition as RosterPositionType,
 } from "@gshl-types";
@@ -186,7 +187,8 @@ const PROTECTED_LINEUP_POSITIONS = new Set<RosterPositionType>([
  * @param player - The player to use.
  * @returns The requested player rating.
  */
-const getPlayerRating = (player: Player): number => player.overallRating ?? 0;
+const getPlayerRating = (player: LineupCandidate): number =>
+  player.overallRating ?? 0;
 
 /**
  * Checks whether eligible for slot.
@@ -196,7 +198,7 @@ const getPlayerRating = (player: Player): number => player.overallRating ?? 0;
  * @returns True when eligible for slot; otherwise false.
  */
 const isEligibleForSlot = (
-  player: Player,
+  player: LineupCandidate,
   eligiblePositions: RosterPositionType[],
 ): boolean => {
   const positions = player.nhlPos ?? [];
@@ -210,7 +212,7 @@ const isEligibleForSlot = (
  * @returns The resulting generate lineup assignments.
  */
 export function generateLineupAssignments(
-  players: Player[] | null | undefined,
+  players: readonly LineupCandidate[] | null | undefined,
 ): LineupAssignment[] {
   if (!players?.length) {
     return [];

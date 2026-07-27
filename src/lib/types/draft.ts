@@ -7,6 +7,13 @@ export interface LineupAssignment {
   lineupPos: RosterPosition;
 }
 
+export interface LineupCandidate {
+  id: string;
+  nhlPos: RosterPosition[];
+  lineupPos?: RosterPosition | null;
+  overallRating?: number | null;
+}
+
 export interface ProjectedDraftPick<
   TPlayer extends DraftBoardPlayer = DraftBoardPlayer,
 > {

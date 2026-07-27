@@ -364,6 +364,8 @@ export const SHEETS_CONFIG = {
       "isSignable",
       "isResignable",
       "preDraftRk",
+      "yahooDraftRk",
+      "otherDraftRk",
       "seasonRk",
       "seasonRating",
       "overallRk",

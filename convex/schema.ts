@@ -255,6 +255,8 @@ export default defineSchema({
       isSignable: boolValue,
       isResignable: v.union(v.boolean(), v.string(), v.null()),
       preDraftRk: statValue,
+      yahooDraftRk: statValue,
+      otherDraftRk: statValue,
       seasonRk: statValue,
       seasonRating: statValue,
       overallRk: statValue,
@@ -269,9 +271,8 @@ export default defineSchema({
       height: optionalNullableString,
       lineupPos: optionalNullableString,
       ownerId: optionalNullable(id("owners")),
-      // Deprecated migration field. Current roster ownership is stored in
-      // ownerId; this remains temporarily so existing rows can be cleared
-      // without blocking the schema deployment.
+      // Current season team assignment. ownerId remains the stable owner link
+      // used by roster views that span season-specific team rows.
       gshlTeamId: optionalNullable(id("teams")),
       nhlContractStatus: optionalNullableString,
       nhlContractLength: optionalNullableString,

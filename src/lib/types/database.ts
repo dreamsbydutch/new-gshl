@@ -196,6 +196,8 @@ export interface Player {
   isSignable: boolean;
   isResignable: ResignableStatus | null;
   preDraftRk?: number | null;
+  yahooDraftRk?: number | null;
+  otherDraftRk?: number | null;
   seasonRk?: number | null;
   seasonRating?: number | null;
   overallRk?: number | null;
@@ -210,6 +212,7 @@ export interface Player {
   height?: number | null;
   lineupPos?: RosterPosition | null;
   ownerId?: string | null;
+  gshlTeamId?: string | null;
   nhlContractStatus?: string | null;
   nhlContractLength?: number | null;
   nhlSalary?: number | null;

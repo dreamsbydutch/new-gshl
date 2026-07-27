@@ -51,7 +51,11 @@ export type {
 
 // Draft pick hooks
 export { useDraftPicks, useDraftPickPages } from "./useDraftPick";
-export { useDraftHubState, useSubmitDraftPick } from "./useDraftHub";
+export {
+  useDraftHubState,
+  useSubmitDraftPick,
+  useUndoDraftPick,
+} from "./useDraftHub";
 export { useAwards } from "./useAward";
 export { usePlayerAwards } from "./usePlayerAward";
 export { useTeamAwards } from "./useTeamAward";

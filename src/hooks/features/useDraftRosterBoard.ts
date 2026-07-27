@@ -54,8 +54,8 @@ export function useDraftRosterBoard(): DraftRosterBoardViewModel {
     [franchises, seasons, teamRows],
   );
   const conferences = useMemo(
-    () => groupDraftRosterTeamsByConference(teams),
-    [teams],
+    () => groupDraftRosterTeamsByConference(teams, playersQuery.data),
+    [playersQuery.data, teams],
   );
   const nhlTeams = useMemo(
     () => nhlTeamsQuery.data.filter((team): team is NHLTeam => "abbr" in team),

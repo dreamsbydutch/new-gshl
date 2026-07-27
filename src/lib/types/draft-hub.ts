@@ -92,6 +92,18 @@ export interface DraftHubEligiblePlayerView extends Player {
   stats: UfaStatView | null;
 }
 
+export type DraftPlayerSortKey =
+  | "nhlTeam"
+  | "fullName"
+  | "nhlPosition"
+  | "overallRk"
+  | "yahooDraftRk"
+  | "otherDraftRk"
+  | "overallRating"
+  | keyof UfaStatView;
+
+export type DraftPlayerSortDirection = "asc" | "desc";
+
 export interface UseDraftHubStateOptions {
   seasonId?: string | null;
   enabled?: boolean;
@@ -104,17 +116,23 @@ export interface DraftHubBoardViewModel {
   recentPicks: DraftHubPickView[];
   upcomingPicks: DraftHubPickView[];
   eligiblePlayers: DraftHubEligiblePlayerView[];
+  playerSortKey: DraftPlayerSortKey;
+  playerSortDirection: DraftPlayerSortDirection;
+  setPlayerSort: (key: DraftPlayerSortKey) => void;
   searchTerm: string;
   setSearchTerm: (value: string) => void;
   positionFilter: string;
   setPositionFilter: (value: string) => void;
   isCommissioner: boolean;
   canSubmitActivePick: boolean;
+  canUndoLastPick: boolean;
   clockRemainingSeconds: number;
   draftStartRemainingSeconds: number;
   isSubmitting: boolean;
   submittingPlayerId: string | null;
   submitPlayer: (playerId: string) => Promise<void>;
+  isUndoing: boolean;
+  undoLastPick: () => Promise<void>;
   hasMore: boolean;
   isLoadingMore: boolean;
   loadMore: () => void;
@@ -156,12 +174,16 @@ export interface DraftHubCardProps {
   season: Season;
 }
 
+export interface DraftRosterTeamView extends GSHLTeam {
+  talentRating: number | null;
+}
+
 export interface DraftRosterConferenceView {
   id: string;
   name: string;
   abbr: string | null;
   logoUrl: string | null;
-  teams: GSHLTeam[];
+  teams: DraftRosterTeamView[];
 }
 
 export interface DraftRosterBoardViewModel {

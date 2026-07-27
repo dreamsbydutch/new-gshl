@@ -5,15 +5,19 @@ import type {
   DraftHubBoardViewModel,
   DraftHubPickView,
   DraftHubStateData,
+  DraftPlayerSortDirection,
+  DraftPlayerSortKey,
   NHLTeam,
   Player,
 } from "@gshl-types";
 import {
   canSubmitDraftPick,
   findNhlTeamByAbbreviation,
+  getDefaultDraftPlayerSortDirection,
   indexLatestUfaNhlStats,
   prepareDraftBoardPlayers,
   resolveDraftHubSeason,
+  sortDraftEligiblePlayers,
 } from "@gshl-utils";
 import {
   useAuthSession,
@@ -25,6 +29,7 @@ import {
   useSeasonState,
   useSubmitDraftPick,
   useToast,
+  useUndoDraftPick,
 } from "@gshl-hooks";
 
 function matchesPosition(player: Player, filter: string): boolean {
@@ -81,6 +86,10 @@ export function useDraftHubBoard(): DraftHubBoardViewModel {
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
   const [positionFilter, setPositionFilter] = useState("all");
+  const [playerSortKey, setPlayerSortKey] =
+    useState<DraftPlayerSortKey>("overallRating");
+  const [playerSortDirection, setPlayerSortDirection] =
+    useState<DraftPlayerSortDirection>("desc");
   const [submittingPlayerId, setSubmittingPlayerId] = useState<string | null>(
     null,
   );
@@ -97,6 +106,7 @@ export function useDraftHubBoard(): DraftHubBoardViewModel {
   const contractsQuery = useContracts();
   const nhlTeamsQuery = useNHLTeams();
   const submitMutation = useSubmitDraftPick();
+  const undoMutation = useUndoDraftPick();
 
   useEffect(() => {
     const interval = window.setInterval(() => setNow(Date.now()), 1000);
@@ -140,6 +150,20 @@ export function useDraftHubBoard(): DraftHubBoardViewModel {
     () => nhlTeamsQuery.data.filter((team): team is NHLTeam => "abbr" in team),
     [nhlTeamsQuery.data],
   );
+  const setPlayerSort = useCallback(
+    (key: DraftPlayerSortKey) => {
+      if (key === playerSortKey) {
+        setPlayerSortDirection((current) =>
+          current === "asc" ? "desc" : "asc",
+        );
+        return;
+      }
+
+      setPlayerSortKey(key);
+      setPlayerSortDirection(getDefaultDraftPlayerSortDirection(key));
+    },
+    [playerSortKey],
+  );
   const eligiblePlayers = useMemo(() => {
     const draftedPlayerIds = new Set(
       (state?.picks ?? [])
@@ -152,7 +176,7 @@ export function useDraftHubBoard(): DraftHubBoardViewModel {
       season?.startDate,
     );
     const normalizedSearch = searchTerm.trim().toLowerCase();
-    return prepared
+    const playerViews = prepared
       .filter((player) => player.isSignable)
       .filter((player) => !draftedPlayerIds.has(player.id))
       .filter((player) => matchesPosition(player, positionFilter))
@@ -164,23 +188,23 @@ export function useDraftHubBoard(): DraftHubBoardViewModel {
           String(player.nhlTeam).toLowerCase().includes(normalizedSearch)
         );
       })
-      .sort(
-        (left, right) =>
-          Number(right.overallRating ?? 0) - Number(left.overallRating ?? 0) ||
-          Number(left.overallRk ?? Number.MAX_SAFE_INTEGER) -
-            Number(right.overallRk ?? Number.MAX_SAFE_INTEGER) ||
-          left.fullName.localeCompare(right.fullName),
-      )
       .map((player) => ({
         ...player,
         nhlTeamLogoUrl:
           findNhlTeamByAbbreviation(nhlTeams, player.nhlTeam)?.logoUrl ?? null,
         stats: latestNhlStatsByPlayer.get(String(player.id)) ?? null,
       }));
+    return sortDraftEligiblePlayers(
+      playerViews,
+      playerSortKey,
+      playerSortDirection,
+    );
   }, [
     contractsQuery.data,
     latestNhlStatsByPlayer,
     nhlTeams,
+    playerSortDirection,
+    playerSortKey,
     playersQuery.data,
     positionFilter,
     searchTerm,
@@ -193,6 +217,9 @@ export function useDraftHubBoard(): DraftHubBoardViewModel {
     activeTeamOwnerId: activePick?.team?.ownerId,
     status: state?.status ?? "unavailable",
   });
+  const latestCompletedPick = recentPicks[0] ?? null;
+  const canUndoLastPick =
+    session?.user.role === "commissioner" && latestCompletedPick !== null;
   const clockRemainingSeconds = state?.clockExpiresAt
     ? Math.max(
         0,
@@ -211,7 +238,15 @@ export function useDraftHubBoard(): DraftHubBoardViewModel {
 
   const submitPlayer = useCallback(
     async (playerId: string) => {
-      if (!season?.id || !activePick || !canSubmitActivePick) return;
+      if (
+        !season?.id ||
+        !activePick ||
+        !canSubmitActivePick ||
+        submitMutation.isPending ||
+        undoMutation.isPending
+      ) {
+        return;
+      }
       setSubmittingPlayerId(playerId);
       try {
         await submitMutation.mutateAsync({
@@ -246,8 +281,46 @@ export function useDraftHubBoard(): DraftHubBoardViewModel {
       season?.id,
       submitMutation,
       toast,
+      undoMutation.isPending,
     ],
   );
+  const undoLastPick = useCallback(async () => {
+    if (
+      !season?.id ||
+      !latestCompletedPick ||
+      !canUndoLastPick ||
+      submitMutation.isPending
+    ) {
+      return;
+    }
+
+    try {
+      await undoMutation.mutateAsync({
+        seasonId: season.id,
+        pickId: latestCompletedPick.pick.id,
+      });
+      toast({
+        title: "Pick undone",
+        description: latestCompletedPick.player
+          ? `${latestCompletedPick.player.fullName} has been returned to Best Available.`
+          : "The latest selection has been reversed.",
+      });
+    } catch (caught) {
+      toast({
+        title: "Pick could not be undone",
+        description:
+          caught instanceof Error ? caught.message : "Please try again.",
+        variant: "destructive",
+      });
+    }
+  }, [
+    canUndoLastPick,
+    latestCompletedPick,
+    season?.id,
+    submitMutation.isPending,
+    toast,
+    undoMutation,
+  ]);
 
   return {
     season,
@@ -256,17 +329,23 @@ export function useDraftHubBoard(): DraftHubBoardViewModel {
     recentPicks,
     upcomingPicks,
     eligiblePlayers,
+    playerSortKey,
+    playerSortDirection,
+    setPlayerSort,
     searchTerm,
     setSearchTerm,
     positionFilter,
     setPositionFilter,
     isCommissioner: session?.user.role === "commissioner",
     canSubmitActivePick,
+    canUndoLastPick,
     clockRemainingSeconds,
     draftStartRemainingSeconds,
-    isSubmitting: submitMutation.isPending,
+    isSubmitting: submitMutation.isPending || undoMutation.isPending,
     submittingPlayerId,
     submitPlayer,
+    isUndoing: undoMutation.isPending,
+    undoLastPick,
     hasMore: playersQuery.hasMore,
     isLoadingMore: playersQuery.isLoadingMore,
     loadMore: playersQuery.loadMore,
@@ -276,6 +355,6 @@ export function useDraftHubBoard(): DraftHubBoardViewModel {
       nhlStatsQuery.isLoading ||
       contractsQuery.isLoading ||
       nhlTeamsQuery.isLoading,
-    error: submitMutation.error?.message ?? null,
+    error: submitMutation.error?.message ?? undoMutation.error?.message ?? null,
   };
 }

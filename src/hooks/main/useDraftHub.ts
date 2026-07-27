@@ -22,3 +22,7 @@ export function useDraftHubState(options: UseDraftHubStateOptions = {}) {
 export function useSubmitDraftPick() {
   return useAppMutation(api.draft.submitPick);
 }
+
+export function useUndoDraftPick() {
+  return useAppMutation(api.draft.undoPick);
+}

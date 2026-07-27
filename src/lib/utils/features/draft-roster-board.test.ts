@@ -1,7 +1,14 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { Franchise, GSHLTeam, Season } from "@gshl-types";
+import type {
+  Franchise,
+  GSHLTeam,
+  Player,
+  RosterPosition,
+  Season,
+} from "@gshl-types";
 import {
+  calculateDraftRosterTalentRating,
   groupDraftRosterTeamsByConference,
   selectLatestActiveFranchiseTeams,
 } from "./draft-roster-board";
@@ -68,12 +75,54 @@ function season(id: string, year: number): Season {
   };
 }
 
-void test("groups and sorts all draft roster teams by conference", () => {
-  const conferences = groupDraftRosterTeamsByConference([
+function player(
+  id: string,
+  ownerId: string,
+  overallRating: number | null,
+  lineupPos: RosterPosition | null,
+): Player {
+  return {
+    id,
+    firstName: id,
+    lastName: "Player",
+    fullName: `${id} Player`,
+    nhlPos: ["C"],
+    posGroup: "F",
+    nhlTeam: "TOR",
+    isActive: true,
+    isSignable: false,
+    isResignable: null,
+    ownerId,
+    lineupPos,
+    overallRating,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  };
+}
+
+void test("calculates live roster talent with starters weighted twice as much as bench players", () => {
+  const rating = calculateDraftRosterTalentRating([
+    player("starter-one", "owner", 90, "C"),
+    player("starter-two", "owner", 80, "D"),
+    player("bench", "owner", 70, "BN"),
+    player("injured", "owner", 100, "IR"),
+  ]);
+
+  assert.equal(rating, 82);
+});
+
+void test("groups conferences and sorts teams by live roster talent", () => {
+  const teams = [
     team("b", "Beryl", "west", "West"),
     team("a", "Amber", "west", "West"),
     team("d", "Diamond", "east", "East"),
     team("c", "Crystal", "east", "East"),
+  ];
+  const conferences = groupDraftRosterTeamsByConference(teams, [
+    player("beryl-starter", "owner-b", 92, "C"),
+    player("amber-starter", "owner-a", 84, "C"),
+    player("diamond-starter", "owner-d", 89, "C"),
+    player("crystal-starter", "owner-c", 81, "C"),
   ]);
 
   assert.deepEqual(
@@ -85,9 +134,36 @@ void test("groups and sorts all draft roster teams by conference", () => {
       conference.teams.map((conferenceTeam) => conferenceTeam.name),
     ),
     [
-      ["Crystal", "Diamond"],
-      ["Amber", "Beryl"],
+      ["Diamond", "Crystal"],
+      ["Beryl", "Amber"],
     ],
+  );
+});
+
+void test("reorders a conference when a newly drafted bench player changes its talent rating", () => {
+  const teams = [
+    team("a", "Amber", "west", "West"),
+    team("b", "Beryl", "west", "West"),
+    team("c", "Crystal", "west", "West"),
+  ];
+  const initialPlayers = [
+    player("amber-starter", "owner-a", 86, "C"),
+    player("beryl-starter", "owner-b", 85, "C"),
+  ];
+
+  assert.deepEqual(
+    groupDraftRosterTeamsByConference(teams, initialPlayers)[0]?.teams.map(
+      (conferenceTeam) => conferenceTeam.name,
+    ),
+    ["Amber", "Beryl", "Crystal"],
+  );
+
+  assert.deepEqual(
+    groupDraftRosterTeamsByConference(teams, [
+      ...initialPlayers,
+      player("beryl-pick", "owner-b", 90, "BN"),
+    ])[0]?.teams.map((conferenceTeam) => conferenceTeam.name),
+    ["Beryl", "Amber", "Crystal"],
   );
 });
 
