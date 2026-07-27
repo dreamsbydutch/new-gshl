@@ -14,6 +14,12 @@ const options = {
   browserExecutablePath: "chrome",
   userDataDir: "profile",
   waitForManualClearanceMs: 300_000,
+  yahooPositions: true,
+  yahooSeasonYear: "",
+  yahooLeagueId: "",
+  yahooRequestDelayMs: 3_500,
+  yahooMaxPages: 80,
+  yahooBrowserFallback: false,
 };
 
 test("builds the skater state used by PuckPedia's own page loader", () => {

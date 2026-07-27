@@ -1,5 +1,7 @@
 export type RosterSeason = Record<string, unknown> & {
   id: string;
+  legacyId?: unknown;
+  name?: unknown;
   year?: unknown;
   startDate?: unknown;
   endDate?: unknown;

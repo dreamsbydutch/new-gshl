@@ -131,6 +131,7 @@ export type ReconciliationIssue = {
 export type PlayerReconciliation = {
   updates: PlayerUpdate[];
   inserts: PlayerInsert[];
+  matchedPlayerIds: ReadonlySet<string>;
   insertReviews: PlayerInsertReview[];
   unmatchedActivePlayers: UnmatchedActivePlayerReview[];
   deactivationReviews: PlayerDeactivationReview[];
@@ -1074,6 +1075,7 @@ export function reconcilePlayerDirectory(
   return {
     updates,
     inserts,
+    matchedPlayerIds: matchedExistingIds,
     insertReviews,
     unmatchedActivePlayers,
     deactivationReviews,

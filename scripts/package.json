@@ -17,7 +17,7 @@
     "power:rebuild": "node --use-system-ca --dns-result-order=ipv4first ../node_modules/tsx/dist/cli.mjs src/commands/power/rebuild-power-ratings.ts",
     "power:parity": "node --use-system-ca --dns-result-order=ipv4first ../node_modules/tsx/dist/cli.mjs src/commands/power/power-ratings-parity.ts",
     "test:power": "node ../node_modules/tsx/dist/cli.mjs --test src/domains/power/apps-script-power-engine.test.ts src/domains/aggregation/season-stat-aggregation.test.ts",
-    "test:player-bios": "node ../node_modules/tsx/dist/cli.mjs --test src/domains/maintenance/player-activity.test.ts src/domains/maintenance/player-directory.test.ts src/domains/maintenance/player-lineup.test.ts src/domains/maintenance/player-roster.test.ts src/domains/maintenance/sync-player-bios-from-puckpedia.test.ts",
+    "test:player-bios": "node ../node_modules/tsx/dist/cli.mjs --test src/domains/maintenance/player-activity.test.ts src/domains/maintenance/player-directory.test.ts src/domains/maintenance/player-lineup.test.ts src/domains/maintenance/player-position.test.ts src/domains/maintenance/player-roster.test.ts src/domains/maintenance/sync-player-bios-from-puckpedia.test.ts src/domains/yahoo/player-yahoo-id-backfill.test.ts",
     "standings:backfill": "node --use-system-ca --dns-result-order=ipv4first ../node_modules/tsx/dist/cli.mjs src/commands/standings/backfill-season-standings.ts",
     "stats:aggregate-season": "node --use-system-ca --dns-result-order=ipv4first --import tsx src/commands/stats/aggregate-season-stats.ts",
     "stats:backfill-hockey-reference": "node --use-system-ca --dns-result-order=ipv4first ../node_modules/tsx/dist/cli.mjs src/commands/stats/backfill-hockey-reference-season.ts",

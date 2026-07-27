@@ -208,6 +208,42 @@ export const listPlayerDayDateRows = queryGeneric({
   },
 });
 
+export const latestPlayerDayPositions = queryGeneric({
+  args: {
+    serverSecret: v.string(),
+    seasonId: v.id("seasons"),
+    playerIds: v.array(v.id("players")),
+  },
+  handler: async (ctx, args) => {
+    requireServerSecret(args.serverSecret);
+    if (args.playerIds.length > 100) {
+      throw new Error("Latest PlayerDay positions are limited to 100 players");
+    }
+    const rows = await Promise.all(
+      [...new Set(args.playerIds)].map(async (playerId) => {
+        const row = (await ctx.db
+          .query("playerDayStatLines")
+          .withIndex("by_seasonId_playerId_date", (q: any) =>
+            q.eq("seasonId", args.seasonId).eq("playerId", playerId),
+          )
+          .order("desc")
+          .first()) as unknown as {
+          date?: unknown;
+          nhlPos?: unknown;
+          playerId?: unknown;
+        } | null;
+        if (!row) return null;
+        return {
+          date: typeof row.date === "string" ? row.date.slice(0, 10) : "",
+          nhlPos: row.nhlPos,
+          playerId,
+        };
+      }),
+    );
+    return rows.filter((row) => row !== null);
+  },
+});
+
 export const listAggregateRows = queryGeneric({
   args: {
     serverSecret: v.string(),

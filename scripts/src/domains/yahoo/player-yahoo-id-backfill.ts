@@ -22,7 +22,8 @@ import {
 
 type PrimitiveCellValue = string | number | boolean | null;
 
-type YahooHistoricalPlayerGroup = "skater" | "goalie";
+export type YahooHistoricalPlayerGroup = "skater" | "goalie";
+export type YahooEligiblePosition = "C" | "LW" | "RW" | "D" | "G";
 type SheetPositionGroup = "F" | "D" | "G";
 
 type PlayerSheetRow = {
@@ -32,10 +33,11 @@ type PlayerSheetRow = {
 
 type YahooPlayerSource = {
   group: YahooHistoricalPlayerGroup;
+  position?: YahooEligiblePosition;
   url: string;
 };
 
-type ScrapedYahooPlayer = {
+export type ScrapedYahooPlayer = {
   yahooId: string;
   playerName: string;
   normalizedName: string;
@@ -72,6 +74,22 @@ type InvestigationFlag = {
   yahooId?: string;
   fullName?: string;
   details: string;
+};
+
+export type YahooPlayerDirectoryOptions = {
+  seasonYear: string;
+  leagueId: string;
+  maxPages: number;
+  pageSize: number;
+  requestDelayMs: number;
+  logToConsole: boolean;
+};
+
+export type YahooPlayerDirectoryResult = {
+  pagesFetched: Record<YahooHistoricalPlayerGroup, number>;
+  players: ScrapedYahooPlayer[];
+  scrapedPlayers: Record<YahooHistoricalPlayerGroup, number>;
+  warnings: string[];
 };
 
 export type YahooPlayerIdBackfillOptions = {
@@ -328,14 +346,22 @@ function buildNameKeys(value: unknown): string[] {
 }
 
 function normalizeYahooTeamAbbr(value: unknown): string {
-  const cleaned = cleanWhitespace(value).replace(/[^A-Za-z]/g, "").toUpperCase();
+  const cleaned = cleanWhitespace(value)
+    .replace(/[^A-Za-z]/g, "")
+    .toUpperCase();
   if (!cleaned) return "";
   return NHL_TEAM_ALIASES[cleaned] ?? cleaned;
 }
 
 function normalizeYahooPosition(value: unknown): string {
   const upper = cleanWhitespace(value).toUpperCase();
-  if (upper === "LW" || upper === "C" || upper === "RW" || upper === "D" || upper === "G") {
+  if (
+    upper === "LW" ||
+    upper === "C" ||
+    upper === "RW" ||
+    upper === "D" ||
+    upper === "G"
+  ) {
     return upper;
   }
   return "";
@@ -361,8 +387,13 @@ function deriveSheetPositionGroup(
   return "F";
 }
 
-function buildPlayerFullName(player: Pick<Player, "fullName" | "firstName" | "lastName">): string {
-  return cleanWhitespace(player.fullName) || cleanWhitespace(`${player.firstName} ${player.lastName}`);
+function buildPlayerFullName(
+  player: Pick<Player, "fullName" | "firstName" | "lastName">,
+): string {
+  return (
+    cleanWhitespace(player.fullName) ||
+    cleanWhitespace(`${player.firstName} ${player.lastName}`)
+  );
 }
 
 function splitPlayerName(fullName: string): {
@@ -442,6 +473,7 @@ function parseScrapedYahooPlayerRow(
   fallbackGroup: YahooHistoricalPlayerGroup,
   sourceUrl: string,
   countOffset: number,
+  fallbackPosition?: YahooEligiblePosition,
 ): ScrapedYahooPlayer | null {
   const $ = loadHtml(`<table>${rowHtml}</table>`);
   const row = $("tr").first();
@@ -469,7 +501,13 @@ function parseScrapedYahooPlayerRow(
   if (!yahooId) return null;
 
   const playerCell = playerAnchor.closest("td");
-  const { nhlTeam, positions } = extractPlayerCellDetails(playerCell.html() ?? "");
+  const details = extractPlayerCellDetails(playerCell.html() ?? "");
+  const positions =
+    details.positions.length > 0
+      ? details.positions
+      : fallbackPosition
+        ? [fallbackPosition]
+        : [];
   const posGroup = deriveSheetPositionGroup(positions, fallbackGroup);
   const nameKeys = buildNameKeys(playerName);
   if (!nameKeys.length) return null;
@@ -481,25 +519,32 @@ function parseScrapedYahooPlayerRow(
     nameKeys,
     posGroup,
     positions,
-    nhlTeam,
+    nhlTeam: details.nhlTeam,
     sourceGroup: fallbackGroup,
     sourceUrl,
     countOffset,
   };
 }
 
-function parseHistoricalYahooPlayersPage(
+export function parseHistoricalYahooPlayersPage(
   html: string,
   group: YahooHistoricalPlayerGroup,
   sourceUrl: string,
   countOffset: number,
+  fallbackPosition?: YahooEligiblePosition,
 ): ScrapedYahooPlayer[] {
   const $ = loadHtml(html);
   const seenYahooIds = new Set<string>();
   const players: ScrapedYahooPlayer[] = [];
 
   $("tr").each((_, element) => {
-    const parsed = parseScrapedYahooPlayerRow($.html(element), group, sourceUrl, countOffset);
+    const parsed = parseScrapedYahooPlayerRow(
+      $.html(element),
+      group,
+      sourceUrl,
+      countOffset,
+      fallbackPosition,
+    );
     if (!parsed || seenYahooIds.has(parsed.yahooId)) {
       return;
     }
@@ -514,6 +559,7 @@ function buildYahooPlayersUrl(
   seasonYear: string,
   leagueId: string,
   group: YahooHistoricalPlayerGroup,
+  eligiblePosition?: YahooEligiblePosition,
 ): string {
   const url = new URL(
     `https://hockey.fantasysports.yahoo.com/${seasonYear}/hockey/${leagueId}/players`,
@@ -526,12 +572,17 @@ function buildYahooPlayersUrl(
   url.searchParams.set("stat1", `S_S_${seasonYear}`);
   url.searchParams.set("jsenabled", "1");
 
-  if (group === "goalie") {
+  if (eligiblePosition) {
+    url.searchParams.set("pos", eligiblePosition);
+  } else if (group === "goalie") {
     url.searchParams.set("pos", "G");
-    url.searchParams.set("cut_type", "33");
-    url.searchParams.set("myteam", "0");
   } else {
     url.searchParams.set("pos", "P");
+  }
+
+  if (group === "goalie") {
+    url.searchParams.set("cut_type", "33");
+    url.searchParams.set("myteam", "0");
   }
 
   return url.toString();
@@ -543,7 +594,9 @@ function withCountOffset(urlValue: string, countOffset: number): string {
   return url.toString();
 }
 
-function normalizeWriteValue(value: PrimitiveCellValue | undefined): PrimitiveCellValue {
+function normalizeWriteValue(
+  value: PrimitiveCellValue | undefined,
+): PrimitiveCellValue {
   if (value === undefined || value === null) return "";
   return value;
 }
@@ -593,7 +646,9 @@ async function loadPlayerSheetRows(): Promise<{
   return { spreadsheetId, header, rowsByPlayerId };
 }
 
-function parsePlayerGroups(rawValue: string | undefined): YahooHistoricalPlayerGroup[] {
+function parsePlayerGroups(
+  rawValue: string | undefined,
+): YahooHistoricalPlayerGroup[] {
   const normalized = cleanWhitespace(rawValue).toLowerCase();
   if (!normalized) return ["skater", "goalie"];
 
@@ -650,7 +705,9 @@ function describeYahooFetchProgress(event: YahooFetchProgressEvent): string {
   }
 }
 
-async function resolveSeasonContext(options: YahooPlayerIdBackfillOptions): Promise<{
+async function resolveSeasonContext(
+  options: YahooPlayerIdBackfillOptions,
+): Promise<{
   seasonId?: string;
   seasonYear?: string;
   leagueId?: string;
@@ -663,7 +720,9 @@ async function resolveSeasonContext(options: YahooPlayerIdBackfillOptions): Prom
     return { seasonId, seasonYear, leagueId };
   }
 
-  const seasons = (await fastSheetsReader.fetchModel<DatabaseRecord>("Season")) as unknown as Season[];
+  const seasons = (await fastSheetsReader.fetchModel<DatabaseRecord>(
+    "Season",
+  )) as unknown as Season[];
   const season = seasons.find((row) => toTrimmedString(row.id) === seasonId);
   if (!season) {
     throw new Error(
@@ -740,6 +799,7 @@ async function fetchAllHistoricalYahooPlayers(
       source.group,
       pageUrl,
       countOffset,
+      source.position,
     );
     pagesFetched += 1;
 
@@ -790,7 +850,85 @@ async function fetchAllHistoricalYahooPlayers(
   };
 }
 
-function getNextPlayerId(rowsByPlayerId: ReadonlyMap<string, PlayerSheetRow>): number {
+export function mergeYahooPlayerPositionRows(
+  players: readonly ScrapedYahooPlayer[],
+): ScrapedYahooPlayer[] {
+  const playersByYahooId = new Map<string, ScrapedYahooPlayer>();
+  for (const player of players) {
+    const existing = playersByYahooId.get(player.yahooId);
+    if (!existing) {
+      playersByYahooId.set(player.yahooId, player);
+      continue;
+    }
+    const positions = ["C", "LW", "RW", "D", "G"].filter(
+      (position) =>
+        existing.positions.includes(position) ||
+        player.positions.includes(position),
+    );
+    playersByYahooId.set(player.yahooId, {
+      ...existing,
+      positions,
+      posGroup: deriveSheetPositionGroup(positions, existing.sourceGroup),
+    });
+  }
+  return [...playersByYahooId.values()];
+}
+
+export async function fetchYahooPlayerDirectory(
+  options: YahooPlayerDirectoryOptions,
+): Promise<YahooPlayerDirectoryResult> {
+  const flags: InvestigationFlag[] = [];
+  const positions: YahooEligiblePosition[] = ["C", "LW", "RW", "D", "G"];
+  const sources: YahooPlayerSource[] = positions.map((position) => {
+    const group = position === "G" ? "goalie" : "skater";
+    return {
+      group,
+      position,
+      url: buildYahooPlayersUrl(
+        options.seasonYear,
+        options.leagueId,
+        group,
+        position,
+      ),
+    };
+  });
+  const results = await Promise.all(
+    sources.map((source) =>
+      fetchAllHistoricalYahooPlayers(source, options, flags),
+    ),
+  );
+  const pagesFetched: Record<YahooHistoricalPlayerGroup, number> = {
+    skater: 0,
+    goalie: 0,
+  };
+  const scrapedPlayers: Record<YahooHistoricalPlayerGroup, number> = {
+    skater: 0,
+    goalie: 0,
+  };
+
+  results.forEach((result, index) => {
+    const group = sources[index]?.group ?? "skater";
+    pagesFetched[group] += result.pagesFetched;
+  });
+  const players = mergeYahooPlayerPositionRows(
+    results.flatMap((result) => result.players),
+  );
+  for (const player of players) {
+    const group = player.posGroup === "G" ? "goalie" : "skater";
+    scrapedPlayers[group] += 1;
+  }
+
+  return {
+    pagesFetched,
+    players,
+    scrapedPlayers,
+    warnings: flags.map((flag) => flag.details),
+  };
+}
+
+function getNextPlayerId(
+  rowsByPlayerId: ReadonlyMap<string, PlayerSheetRow>,
+): number {
   let maxPlayerId = 0;
   for (const playerId of rowsByPlayerId.keys()) {
     const numericId = Number(playerId);
@@ -839,7 +977,7 @@ function buildPlayerInsertSource(
     weight: "",
     height: "",
     lineupPos: "",
-    gshlTeamId: "",
+    ownerId: "",
     createdAt: timestamp,
     updatedAt: timestamp,
     nhlApiId: "",
@@ -903,7 +1041,8 @@ function getCandidatePlayers(
   index: ReturnType<typeof buildPlayerIndexes>,
 ): Player[] {
   const groupedCandidates = scraped.nameKeys.flatMap(
-    (key) => index.playersByNameAndGroup.get(`${key}|${scraped.posGroup}`) ?? [],
+    (key) =>
+      index.playersByNameAndGroup.get(`${key}|${scraped.posGroup}`) ?? [],
   );
   if (groupedCandidates.length > 0) {
     return dedupePlayers(groupedCandidates);
@@ -914,12 +1053,18 @@ function getCandidatePlayers(
   );
 }
 
-function playerHasMatchingName(player: Player, scraped: ScrapedYahooPlayer): boolean {
+function playerHasMatchingName(
+  player: Player,
+  scraped: ScrapedYahooPlayer,
+): boolean {
   const playerKeys = new Set(getPlayerNameKeys(player));
   return scraped.nameKeys.some((key) => playerKeys.has(key));
 }
 
-function scorePlayerCandidate(player: Player, scraped: ScrapedYahooPlayer): number {
+function scorePlayerCandidate(
+  player: Player,
+  scraped: ScrapedYahooPlayer,
+): number {
   let score = 0;
 
   if (normalizeName(buildPlayerFullName(player)) === scraped.normalizedName) {
@@ -942,7 +1087,10 @@ function scorePlayerCandidate(player: Player, scraped: ScrapedYahooPlayer): numb
     score += 3;
   }
 
-  if (scraped.nhlTeam && normalizeYahooTeamAbbr(player.nhlTeam) === scraped.nhlTeam) {
+  if (
+    scraped.nhlTeam &&
+    normalizeYahooTeamAbbr(player.nhlTeam) === scraped.nhlTeam
+  ) {
     score += 2;
   }
 
@@ -1004,7 +1152,8 @@ export function parseYahooPlayerIdBackfillOptions(
 
   return {
     seasonId: cleanWhitespace(getArgValue(args, "--season-id")) || undefined,
-    seasonYear: cleanWhitespace(getArgValue(args, "--season-year")) || undefined,
+    seasonYear:
+      cleanWhitespace(getArgValue(args, "--season-year")) || undefined,
     leagueId: cleanWhitespace(getArgValue(args, "--league-id")) || undefined,
     skaterUrl: cleanWhitespace(getArgValue(args, "--skater-url")) || undefined,
     goalieUrl: cleanWhitespace(getArgValue(args, "--goalie-url")) || undefined,
@@ -1012,8 +1161,14 @@ export function parseYahooPlayerIdBackfillOptions(
     apply: hasFlag(args, "--apply"),
     overwriteExisting: hasFlag(args, "--overwrite-existing"),
     logToConsole: toBoolean(getArgValue(args, "--log"), true),
-    pageSize: toPositiveInteger(getArgValue(args, "--page-size"), DEFAULT_PAGE_SIZE),
-    maxPages: toPositiveInteger(getArgValue(args, "--max-pages"), DEFAULT_MAX_PAGES),
+    pageSize: toPositiveInteger(
+      getArgValue(args, "--page-size"),
+      DEFAULT_PAGE_SIZE,
+    ),
+    maxPages: toPositiveInteger(
+      getArgValue(args, "--max-pages"),
+      DEFAULT_MAX_PAGES,
+    ),
     requestDelayMs: toPositiveInteger(
       getArgValue(args, "--request-delay-ms"),
       DEFAULT_REQUEST_DELAY_MS,
@@ -1207,7 +1362,11 @@ export async function runYahooPlayerIdBackfill(
       continue;
     }
 
-    if (existingYahooId && existingYahooId !== match.scraped.yahooId && !options.overwriteExisting) {
+    if (
+      existingYahooId &&
+      existingYahooId !== match.scraped.yahooId &&
+      !options.overwriteExisting
+    ) {
       existingIdConflicts += 1;
       flags.push({
         kind: "existing-id-conflict",
@@ -1219,7 +1378,9 @@ export async function runYahooPlayerIdBackfill(
       continue;
     }
 
-    const nextValues = playerSheet.header.map((_, index) => sheetRow.values[index] ?? "");
+    const nextValues = playerSheet.header.map(
+      (_, index) => sheetRow.values[index] ?? "",
+    );
     nextValues[yahooIdIndex] = match.scraped.yahooId;
     if (updatedAtIndex >= 0) {
       nextValues[updatedAtIndex] = new Date().toISOString();

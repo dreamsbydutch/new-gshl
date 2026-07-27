@@ -73,6 +73,11 @@ const refs = {
     Record<string, unknown>,
     { items: AnyRow[]; nextCursor: string | null; hasMore: boolean }
   >("maintenanceScope:listPlayerDayDateRows"),
+  latestPlayerDayPositions: makeFunctionReference<
+    "query",
+    Record<string, unknown>,
+    AnyRow[]
+  >("maintenanceScope:latestPlayerDayPositions"),
   maintenanceAggregatePage: makeFunctionReference<
     "query",
     Record<string, unknown>,
@@ -316,6 +321,43 @@ export async function fetchPlayerDayDate<T extends AnyRow>(
     rows.push(...page.items.map(hydrateRow<T>));
     cursor = page.hasMore ? page.nextCursor : null;
   } while (cursor);
+  return rows;
+}
+
+export async function fetchLatestPlayerDayPositions<T extends AnyRow>(
+  seasonId: string,
+  playerIds: readonly string[],
+): Promise<T[]> {
+  const rows: T[] = [];
+  const uniquePlayerIds = [...new Set(playerIds.filter(Boolean))];
+  for (let offset = 0; offset < uniquePlayerIds.length; offset += 100) {
+    const batch = uniquePlayerIds.slice(offset, offset + 100);
+    let result: AnyRow[] | null = null;
+    let lastError: unknown;
+    for (let attempt = 1; attempt <= 3; attempt += 1) {
+      try {
+        result = await getClient().query(
+          refs.latestPlayerDayPositions,
+          serverArgs({ seasonId, playerIds: batch }),
+        );
+        break;
+      } catch (error) {
+        lastError = error;
+        if (attempt < 3) {
+          await new Promise((resolve) =>
+            setTimeout(resolve, 250 * 2 ** (attempt - 1)),
+          );
+        }
+      }
+    }
+    if (!result) {
+      throw new Error(
+        `[production-convex] Could not read latest PlayerDay positions for season ${seasonId}, player batch ${offset + 1}-${offset + batch.length} after 3 attempts. ${lastError instanceof Error ? lastError.message : String(lastError)}`,
+        { cause: lastError },
+      );
+    }
+    rows.push(...result.map(hydrateRow<T>));
+  }
   return rows;
 }
 

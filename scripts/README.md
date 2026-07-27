@@ -126,6 +126,15 @@ current PuckPedia row has no value, and players absent from both directories
 have their old NHL team, jersey number, and contract fields cleared. Writes
 remain field-diffed, so unchanged values are not patched.
 
+Positional eligibility is resolved separately from PuckPedia's single primary
+position. The sync checks Yahoo's C, LW, RW, D, and G player-table filters and
+unions the filters containing each player, matching by Yahoo ID and then by a
+unique normalized player name. If Yahoo does not contain a player, it falls
+back to that player's latest PlayerDay position from the single most recent
+season that has started. It never searches older seasons for positions.
+PuckPedia's primary position is the third fallback. Existing eligibility is
+only preserved for players absent from all three current sources.
+
 The same run reconciles each player's current `ownerId`. PlayerDay and draft
 records retain their historical team IDs, but those teams are resolved through
 their franchise to the owner before a Player row is changed. During the season
@@ -158,6 +167,12 @@ Notable flags:
 - `--browser-path <path>`
 - `--user-data-dir <path>`
 - `--wait-ms <value>`
+- `--skip-yahoo-positions`
+- `--yahoo-season-year <yyyy>`
+- `--yahoo-league-id <id>`
+- `--yahoo-request-delay-ms <value>`
+- `--yahoo-max-pages <value>`
+- `--yahoo-browser-fallback`
 
 Example:
 

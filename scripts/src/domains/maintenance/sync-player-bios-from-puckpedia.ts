@@ -8,6 +8,7 @@ import type { Browser, Page } from "puppeteer-core";
 import { getAppsScriptLineupBuilder } from "../lineup/apps-script-lineup-builder";
 import {
   fetchLatestPlayerDayDate,
+  fetchLatestPlayerDayPositions,
   fetchModel,
   fetchPlayerDayDate,
   fetchPlayerNhlSeason,
@@ -15,6 +16,7 @@ import {
   upsertByCompositeKey,
 } from "../../integrations/data/convex-store";
 import {
+  canonicalName,
   mapPuckPediaPlayer,
   reconcilePlayerDirectory,
   type DirectoryPlayer,
@@ -26,6 +28,14 @@ import {
   type ActivitySeason,
   type ActivityStatLine,
 } from "./player-activity";
+import {
+  normalizeEligiblePositions,
+  reconcilePlayerPositions,
+  resolveMostRecentPositionSeason,
+  type LatestPlayerDayPosition,
+  type PlayerPositionReconciliation,
+  type PositionSeason,
+} from "./player-position";
 import {
   reconcileRosterLineups,
   type LineupReconciliation,
@@ -43,6 +53,15 @@ import {
   type RosterSource,
   type RosterTeam,
 } from "./player-roster";
+import {
+  fetchYahooPlayerDirectory,
+  type ScrapedYahooPlayer,
+  type YahooPlayerDirectoryResult,
+} from "../yahoo/player-yahoo-id-backfill";
+import {
+  closeYahooBrowserSession,
+  resolveLeagueId,
+} from "../yahoo/matchup-utils";
 
 type PlayerBioSyncOptions = {
   apply: boolean;
@@ -56,6 +75,12 @@ type PlayerBioSyncOptions = {
   browserExecutablePath: string;
   userDataDir: string;
   waitForManualClearanceMs: number;
+  yahooPositions: boolean;
+  yahooSeasonYear: string;
+  yahooLeagueId: string;
+  yahooRequestDelayMs: number;
+  yahooMaxPages: number;
+  yahooBrowserFallback: boolean;
 };
 
 type PuckPediaPage = {
@@ -168,6 +193,28 @@ export type PlayerBioSyncSummary = {
     teams: LineupReconciliation["teams"];
     updateDetails: LineupReconciliation["updateReviews"];
   };
+  positionEligibility: {
+    seasonId: string;
+    seasonYear: string;
+    yahooLeagueId: string;
+    yahooAttempted: boolean;
+    yahooError: string;
+    yahooPagesFetched: YahooPlayerDirectoryResult["pagesFetched"];
+    yahooRows: number;
+    yahooWarnings: string[];
+    playerDayError: string;
+    yahooMatches: number;
+    yahooIdMatches: number;
+    yahooNameMatches: number;
+    playerDayFallbacks: number;
+    puckPediaFallbacks: number;
+    preservedExisting: number;
+    missingEligibility: number;
+    ambiguousYahooRows: number;
+    updatedPlayers: number;
+    insertedPlayersFromYahoo: number;
+    updateDetails: PlayerPositionReconciliation["reviews"];
+  };
   appliedUpdates?: number;
   appliedInserts?: number;
 };
@@ -176,6 +223,8 @@ const DEFAULT_PAGE_SIZE = 100;
 const MAX_PAGE_SIZE = 100;
 const DEFAULT_MAX_PAGES_PER_ROLE = 20;
 const DEFAULT_WAIT_FOR_MANUAL_CLEARANCE_MS = 5 * 60 * 1000;
+const DEFAULT_YAHOO_REQUEST_DELAY_MS = 3_500;
+const DEFAULT_YAHOO_MAX_PAGES = 80;
 const DEFAULT_USER_DATA_DIR = path.join(
   os.homedir(),
   ".gshl-puckpedia-browser",
@@ -214,6 +263,14 @@ Options:
   --browser-path <path>   Explicit Chrome or Edge executable path.
   --user-data-dir <path>  Persistent browser profile directory.
   --wait-ms <value>       Max wait for manual Cloudflare clearance.
+  --skip-yahoo-positions  Skip Yahoo and use recent PlayerDay eligibility.
+  --yahoo-season-year     Override the Yahoo fantasy season year.
+  --yahoo-league-id       Override the Yahoo fantasy league id.
+  --yahoo-request-delay-ms
+                          Delay between Yahoo page requests. Default: 3500.
+  --yahoo-max-pages       Yahoo pagination safety cap. Default: 80.
+  --yahoo-browser-fallback
+                          Allow an interactive Yahoo browser login fallback.
   --log <true|false>      Enable progress logging. Default: true.
   --help                  Show this help text.
 `.trim();
@@ -324,6 +381,20 @@ export function parsePlayerBioSyncOptions(
       getArgValue(argv, "--wait-ms"),
       DEFAULT_WAIT_FOR_MANUAL_CLEARANCE_MS,
     ),
+    yahooPositions: !hasFlag(argv, "--skip-yahoo-positions"),
+    yahooSeasonYear: toText(getArgValue(argv, "--yahoo-season-year")),
+    yahooLeagueId: toText(getArgValue(argv, "--yahoo-league-id")),
+    yahooRequestDelayMs: positiveInteger(
+      getArgValue(argv, "--yahoo-request-delay-ms"),
+      DEFAULT_YAHOO_REQUEST_DELAY_MS,
+    ),
+    yahooMaxPages: positiveInteger(
+      getArgValue(argv, "--yahoo-max-pages"),
+      DEFAULT_YAHOO_MAX_PAGES,
+    ),
+    yahooBrowserFallback:
+      hasFlag(argv, "--yahoo-browser-fallback") ||
+      parseBoolean(process.env.YAHOO_BROWSER_FALLBACK, false),
   };
 }
 
@@ -751,6 +822,142 @@ async function resolveRosterSource(
   };
 }
 
+type YahooPositionFetch = {
+  attempted: boolean;
+  error: string;
+  leagueId: string;
+  players: ScrapedYahooPlayer[];
+  result: YahooPlayerDirectoryResult;
+  seasonYear: string;
+};
+
+function emptyYahooDirectoryResult(): YahooPlayerDirectoryResult {
+  return {
+    pagesFetched: { skater: 0, goalie: 0 },
+    players: [],
+    scrapedPlayers: { skater: 0, goalie: 0 },
+    warnings: [],
+  };
+}
+
+function resolveYahooSeasonYear(
+  season: PositionSeason,
+  override: string,
+): string {
+  if (override) return override;
+  const legacyId = toText(season.legacyId);
+  const numericLegacyId = Number(legacyId);
+  if (Number.isInteger(numericLegacyId) && numericLegacyId > 0) {
+    return String(2013 + numericLegacyId);
+  }
+  const nameMatch = /(\d{4})\s*-\s*(?:\d{2}|\d{4})/.exec(toText(season.name));
+  if (nameMatch?.[1]) return nameMatch[1];
+  const startDateMatch = /^(\d{4})-\d{2}-\d{2}/.exec(toText(season.startDate));
+  return startDateMatch?.[1] ?? "";
+}
+
+async function fetchYahooPositions(
+  season: PositionSeason | null,
+  options: PlayerBioSyncOptions,
+): Promise<YahooPositionFetch> {
+  const emptyResult = emptyYahooDirectoryResult();
+  if (!options.yahooPositions) {
+    return {
+      attempted: false,
+      error: "Skipped by --skip-yahoo-positions.",
+      leagueId: "",
+      players: [],
+      result: emptyResult,
+      seasonYear: "",
+    };
+  }
+  if (!season) {
+    return {
+      attempted: false,
+      error: "No started GSHL season is available for Yahoo eligibility.",
+      leagueId: "",
+      players: [],
+      result: emptyResult,
+      seasonYear: "",
+    };
+  }
+
+  const seasonKey = toText(season.legacyId) || season.id;
+  const seasonYear = resolveYahooSeasonYear(season, options.yahooSeasonYear);
+  const leagueId =
+    options.yahooLeagueId ||
+    resolveLeagueId(seasonKey) ||
+    resolveLeagueId(season.id);
+  if (!seasonYear || !leagueId) {
+    return {
+      attempted: false,
+      error:
+        "Yahoo season/league could not be resolved. Set YAHOO_LEAGUE_ID or pass --yahoo-league-id.",
+      leagueId,
+      players: [],
+      result: emptyResult,
+      seasonYear,
+    };
+  }
+
+  process.env.YAHOO_BROWSER_FALLBACK = options.yahooBrowserFallback
+    ? "true"
+    : "false";
+  process.env.YAHOO_BROWSER_PATH ??= options.browserExecutablePath;
+  log(
+    options,
+    `fetching Yahoo positional eligibility for season ${seasonYear}, league ${leagueId}`,
+  );
+  try {
+    const result = await fetchYahooPlayerDirectory({
+      seasonYear,
+      leagueId,
+      maxPages: options.yahooMaxPages,
+      pageSize: 25,
+      requestDelayMs: options.yahooRequestDelayMs,
+      logToConsole: options.logToConsole,
+    });
+    return {
+      attempted: true,
+      error: "",
+      leagueId,
+      players: result.players,
+      result,
+      seasonYear,
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    log(
+      options,
+      `Yahoo eligibility unavailable; using PlayerDay fallback. ${message}`,
+    );
+    return {
+      attempted: true,
+      error: message,
+      leagueId,
+      players: [],
+      result: emptyResult,
+      seasonYear,
+    };
+  }
+}
+
+async function fetchRecentPlayerDayPositions(
+  season: PositionSeason | null,
+  players: readonly StoredPlayer[],
+): Promise<{ error: string; rows: LatestPlayerDayPosition[] }> {
+  if (!season) {
+    throw new Error(
+      "[player-bio-sync] No started GSHL season is available for PlayerDay positional eligibility.",
+    );
+  }
+  const rows = await fetchLatestPlayerDayPositions<LatestPlayerDayPosition>(
+    season.id,
+    players.map((player) => player.id),
+  );
+  return { error: "", rows };
+}
+
 export async function runPlayerBioSync(
   initialOptions: PlayerBioSyncOptions,
 ): Promise<PlayerBioSyncSummary> {
@@ -776,6 +983,10 @@ export async function runPlayerBioSync(
       seasonRows,
       options.currentDate,
     );
+    const positionSeason = resolveMostRecentPositionSeason(
+      seasonRows,
+      options.currentDate,
+    );
     const seasonContext = buildPlayerActivityContext({
       players: [],
       seasons: seasonRows,
@@ -796,6 +1007,8 @@ export async function runPlayerBioSync(
       franchises,
       draftPicks,
       rosterSource,
+      playerDayPositionFetch,
+      yahooPositionFetch,
     ] = await Promise.all([
       Promise.all(
         activitySeasonIds.map((seasonId) =>
@@ -807,6 +1020,8 @@ export async function runPlayerBioSync(
       fetchModel<RosterFranchise>("Franchise"),
       fetchModel<RosterDraftPick>("DraftPick"),
       resolveRosterSource(rosterCalendar),
+      fetchRecentPlayerDayPositions(positionSeason, existingPlayers),
+      fetchYahooPositions(positionSeason, options),
     ]);
     const playerNhlStatLines = playerNhlSeasonRows.flat();
     const activityContext = buildPlayerActivityContext({
@@ -824,6 +1039,34 @@ export async function runPlayerBioSync(
         activityEvidenceByPlayerId: activityContext.evidenceByPlayerId,
       },
     );
+    const positionReconciliation = reconcilePlayerPositions({
+      players: existingPlayers,
+      playerDays: playerDayPositionFetch.rows,
+      yahooPlayers: yahooPositionFetch.players,
+    });
+    const puckPediaFallbacks = [...reconciliation.matchedPlayerIds].filter(
+      (playerId) => !positionReconciliation.eligibilityByPlayerId.has(playerId),
+    ).length;
+    const playersOutsideCurrentSources = existingPlayers.filter(
+      (player) =>
+        !positionReconciliation.eligibilityByPlayerId.has(player.id) &&
+        !reconciliation.matchedPlayerIds.has(player.id),
+    );
+    const preservedExistingPositions = playersOutsideCurrentSources.filter(
+      (player) => normalizeEligiblePositions(player.nhlPos).length > 0,
+    ).length;
+    const missingEligibility =
+      playersOutsideCurrentSources.length - preservedExistingPositions;
+    for (const update of reconciliation.updates) {
+      if (update.reason === "missingFromPuckPedia") continue;
+      const eligibility = positionReconciliation.eligibilityByPlayerId.get(
+        update.id,
+      );
+      if (eligibility) {
+        update.data.nhlPos = eligibility.positions;
+        update.data.posGroup = eligibility.posGroup;
+      }
+    }
     const rosterReconciliation = reconcileCurrentRoster({
       calendar: rosterCalendar,
       source: rosterSource,
@@ -858,8 +1101,20 @@ export async function runPlayerBioSync(
       lineupBuilder.internals?.buildLineupStructureFromRosterSpots?.(
         rosterSpots,
       );
+    const playersForLineup = existingPlayers.map((player) => {
+      const eligibility = positionReconciliation.eligibilityByPlayerId.get(
+        player.id,
+      );
+      return eligibility
+        ? {
+            ...player,
+            nhlPos: eligibility.positions,
+            posGroup: eligibility.posGroup,
+          }
+        : player;
+    });
     const lineupReconciliation = reconcileRosterLineups({
-      players: existingPlayers,
+      players: playersForLineup,
       rosterAssignments: rosterReconciliation.assignments,
       findBestLineup: (players) =>
         lineupBuilder.findBestLineup(players as never, false, lineupSlots),
@@ -874,6 +1129,12 @@ export async function runPlayerBioSync(
     const updatePatches = new Map(
       reconciliation.updates.map((update) => [update.id, { ...update.data }]),
     );
+    for (const update of positionReconciliation.updates) {
+      updatePatches.set(update.id, {
+        ...(updatePatches.get(update.id) ?? {}),
+        ...update.data,
+      });
+    }
     for (const update of rosterReconciliation.updates) {
       updatePatches.set(update.id, {
         ...(updatePatches.get(update.id) ?? {}),
@@ -890,11 +1151,26 @@ export async function runPlayerBioSync(
       id,
       data: { ...data, updatedAt: now },
     }));
-    const inserts = reconciliation.inserts.map((insert) => ({
-      ...insert,
-      createdAt: now,
-      updatedAt: now,
-    }));
+    let insertedPlayersFromYahoo = 0;
+    const inserts = reconciliation.inserts.map((insert) => {
+      const eligibility =
+        positionReconciliation.uniqueYahooEligibilityByName.get(
+          canonicalName(insert.fullName),
+        );
+      if (eligibility) insertedPlayersFromYahoo += 1;
+      return {
+        ...insert,
+        ...(eligibility
+          ? {
+              yahooId: eligibility.yahooId,
+              nhlPos: eligibility.positions,
+              posGroup: eligibility.posGroup,
+            }
+          : {}),
+        createdAt: now,
+        updatedAt: now,
+      };
+    });
     const unmatchedActive = reconciliation.unmatchedActivePlayers;
     const deactivationReviews = reconciliation.deactivationReviews;
     const deactivatedPlayerDetails = deactivationReviews.filter(
@@ -992,6 +1268,30 @@ export async function runPlayerBioSync(
         teams: lineupReconciliation.teams,
         updateDetails: lineupReconciliation.updateReviews,
       },
+      positionEligibility: {
+        seasonId: positionSeason?.id ?? "",
+        seasonYear: yahooPositionFetch.seasonYear,
+        yahooLeagueId: yahooPositionFetch.leagueId,
+        yahooAttempted: yahooPositionFetch.attempted,
+        yahooError: yahooPositionFetch.error,
+        yahooPagesFetched: yahooPositionFetch.result.pagesFetched,
+        yahooRows: yahooPositionFetch.players.length,
+        yahooWarnings: yahooPositionFetch.result.warnings.slice(0, 25),
+        playerDayError: playerDayPositionFetch.error,
+        yahooMatches: positionReconciliation.yahooMatches,
+        yahooIdMatches: positionReconciliation.yahooIdMatches,
+        yahooNameMatches: positionReconciliation.yahooNameMatches,
+        playerDayFallbacks: positionReconciliation.playerDayFallbacks,
+        puckPediaFallbacks,
+        preservedExisting: preservedExistingPositions,
+        missingEligibility,
+        ambiguousYahooRows: positionReconciliation.ambiguousYahooRows,
+        updatedPlayers: positionReconciliation.updates.length,
+        insertedPlayersFromYahoo,
+        updateDetails: positionReconciliation.reviews.filter(
+          (review) => review.changed,
+        ),
+      },
     };
 
     if (!options.apply) return summary;
@@ -1005,6 +1305,7 @@ export async function runPlayerBioSync(
     summary.appliedInserts = insertResult.inserted;
     return summary;
   } finally {
+    await closeYahooBrowserSession().catch(() => undefined);
     await page.close().catch(() => undefined);
     await browser.close().catch(() => undefined);
   }
