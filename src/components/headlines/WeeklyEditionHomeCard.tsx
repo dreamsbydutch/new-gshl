@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from "react";
 import Image from "next/image";
-import { ArrowRight, BookOpen, Newspaper } from "lucide-react";
+import { ArrowRight, BookOpen } from "lucide-react";
 import { useAppRouter, useLatestWeeklyEdition } from "@gshl-hooks";
 import { Skeleton } from "@gshl-ui";
+import { WEEKLY_EDITION_LOGO_URL } from "@gshl-utils";
 import { WeeklyEditionArticle } from "./WeeklyEditionArticle";
 
 export function WeeklyEditionHomeCard() {
@@ -57,8 +58,14 @@ export function WeeklyEditionHomeCard() {
           onClick={() => setIsOpen(true)}
           className="group flex min-w-0 flex-1 items-center gap-3 px-3 py-2.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-cyan-400 sm:px-4"
         >
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-cyan-400 text-white shadow-inner">
-            <Newspaper className="h-4 w-4" aria-hidden="true" />
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white p-0.5 shadow-inner">
+            <Image
+              src={WEEKLY_EDITION_LOGO_URL}
+              alt=""
+              width={40}
+              height={40}
+              className="h-full w-full object-contain"
+            />
           </span>
           <span className="min-w-0 flex-1">
             <span className="flex items-center gap-2 text-[9px] font-bold uppercase tracking-[0.18em] text-cyan-300">

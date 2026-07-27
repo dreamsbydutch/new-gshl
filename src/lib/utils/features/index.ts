@@ -118,6 +118,7 @@ export {
 export * from "./ufa";
 export * from "./ufa-state";
 export * from "./weekly-edition";
+export * from "./weekly-edition-brand";
 export type {
   WeekScheduleItemProps,
   TeamDisplayProps,

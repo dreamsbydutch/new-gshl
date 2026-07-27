@@ -1,10 +1,10 @@
 "use client";
 
 import Image from "next/image";
-import { ArrowLeft, CalendarDays, Newspaper, X } from "lucide-react";
+import { ArrowLeft, CalendarDays, X } from "lucide-react";
 import { useAppRouter } from "@gshl-hooks";
 import type { WeeklyEditionArticleProps } from "@gshl-types";
-import { formatDisplayDate } from "@gshl-utils";
+import { formatDisplayDate, WEEKLY_EDITION_LOGO_URL } from "@gshl-utils";
 import { WeeklyEditionSectionCard } from "./WeeklyEditionSectionCard";
 
 export function WeeklyEditionArticle({
@@ -79,8 +79,15 @@ export function WeeklyEditionArticle({
 
         <div className="flex items-center justify-between gap-4 px-4 py-3 sm:px-6">
           <div className="flex min-w-0 items-center gap-2.5">
-            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-slate-950 text-white">
-              <Newspaper className="h-4 w-4" aria-hidden="true" />
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-white p-0.5 shadow-sm">
+              <Image
+                src={WEEKLY_EDITION_LOGO_URL}
+                alt=""
+                width={44}
+                height={44}
+                className="h-full w-full object-contain"
+                priority
+              />
             </span>
             <div className="min-w-0">
               <p className="font-oswald text-lg font-bold uppercase leading-none tracking-tight text-slate-950">
