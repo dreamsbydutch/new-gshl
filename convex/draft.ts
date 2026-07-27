@@ -10,6 +10,7 @@ import type {
   DraftHubPlayerSummary,
   DraftHubTeamSummary,
   DraftPick,
+  LineupAssignment,
   LineupCandidate,
   RosterPosition as RosterPositionType,
 } from "../src/lib/types";
@@ -150,7 +151,8 @@ async function rebuildTeamLineup(
   ownerId: Id<"owners">,
   teamId: Id<"teams">,
   updatedAt: number,
-): Promise<void> {
+  explicitlyIncludedPlayers: readonly Doc<"players">[] = [],
+): Promise<LineupAssignment[]> {
   const [ownerRosterRows, teamRosterRows] = await Promise.all([
     ctx.db
       .query("players")
@@ -162,7 +164,11 @@ async function rebuildTeamLineup(
       .collect(),
   ]);
   const rosterById = new Map<string, Doc<"players">>();
-  for (const rosterPlayer of [...ownerRosterRows, ...teamRosterRows]) {
+  for (const rosterPlayer of [
+    ...ownerRosterRows,
+    ...teamRosterRows,
+    ...explicitlyIncludedPlayers,
+  ]) {
     rosterById.set(String(rosterPlayer._id), rosterPlayer);
   }
   const lineupAssignments = generateLineupAssignments(
@@ -178,6 +184,7 @@ async function rebuildTeamLineup(
       updatedAt,
     });
   }
+  return lineupAssignments;
 }
 
 function contractCoversDraft(
@@ -354,16 +361,30 @@ export const submitPick = mutation({
     await ctx.db.patch(player._id, {
       ownerId: franchise.ownerId,
       gshlTeamId: activeTeam._id,
-      lineupPos: "BN",
+      lineupPos: null,
       updatedAt: nowTimestamp,
     });
 
-    await rebuildTeamLineup(
+    const draftedPlayerRow: Doc<"players"> = {
+      ...player,
+      ownerId: franchise.ownerId,
+      gshlTeamId: activeTeam._id,
+      lineupPos: null,
+      updatedAt: nowTimestamp,
+    };
+    const lineupAssignments = await rebuildTeamLineup(
       ctx,
       franchise.ownerId,
       activeTeam._id,
       nowTimestamp,
+      [draftedPlayerRow],
     );
+    const draftedPlayerAssignment = lineupAssignments.find(
+      (assignment) => assignment.playerId === String(player._id),
+    );
+    if (!draftedPlayerAssignment) {
+      throw new Error("The drafted player could not be placed in the lineup");
+    }
 
     await ctx.db.patch(activeRow._id, {
       playerId: args.playerId,
@@ -398,6 +419,7 @@ export const submitPick = mutation({
       completedPickId: String(activeRow._id),
       nextPickId: nextPick ? String(nextPick._id) : null,
       isComplete: nextPick === null,
+      lineupPos: draftedPlayerAssignment.lineupPos,
     };
   },
 });
