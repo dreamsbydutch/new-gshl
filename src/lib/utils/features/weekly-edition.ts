@@ -1695,11 +1695,23 @@ function buildMilestoneTemplateEditionCopy(
   const capLeader = [...facts.teamOutlooks].sort(
     (left, right) => right.capSpace - left.capSpace,
   )[0];
-  const draftLeader = [...facts.teamOutlooks].sort(
-    (left, right) =>
-      right.draftPickCount - left.draftPickCount ||
-      right.firstRoundPickCount - left.firstRoundPickCount,
-  )[0];
+  const firstRoundPickByTeam = new Map<string, number>();
+  for (const pick of facts.draftPicks) {
+    if (pick.round !== 1 || pick.pick === undefined) continue;
+    const current = firstRoundPickByTeam.get(pick.teamName);
+    if (current === undefined || pick.pick < current) {
+      firstRoundPickByTeam.set(pick.teamName, pick.pick);
+    }
+  }
+  const draftLeader = facts.teamOutlooks
+    .filter((team) => firstRoundPickByTeam.has(team.teamName))
+    .sort(
+      (left, right) =>
+        (firstRoundPickByTeam.get(left.teamName) ?? Number.MAX_SAFE_INTEGER) -
+          (firstRoundPickByTeam.get(right.teamName) ??
+            Number.MAX_SAFE_INTEGER) ||
+        left.teamName.localeCompare(right.teamName),
+    )[0];
   const expiring = facts.expiringContracts.slice(0, 8);
   const signings = facts.recentSignings.slice(0, 8);
   const standingsLink = [{ label: "View standings", href: "/standings" }];
@@ -1901,7 +1913,7 @@ function buildMilestoneTemplateEditionCopy(
           "next_week",
           "Next Stop",
           "The draft board is waiting",
-          "One week before draft night, the GSHL Press Box will count the picks, identify the teams with leverage and map the biggest roster needs.",
+          "One week before draft night, the GSHL Press Box will examine early draft position, roster fit and the teams facing the most interesting choices.",
           [],
         ),
       ],
@@ -1909,28 +1921,32 @@ function buildMilestoneTemplateEditionCopy(
   }
 
   if (packet.issueType === "pre_draft") {
+    const orderedTeams = [...facts.teamOutlooks].sort(
+      (left, right) =>
+        (firstRoundPickByTeam.get(left.teamName) ?? Number.MAX_SAFE_INTEGER) -
+          (firstRoundPickByTeam.get(right.teamName) ??
+            Number.MAX_SAFE_INTEGER) ||
+        left.teamName.localeCompare(right.teamName),
+    );
     return {
       headline: draftLeader
-        ? `${draftLeader.teamName} brings the biggest stack to draft night`
+        ? `${draftLeader.teamName} owns the first pressure point of draft night`
         : "The GSHL draft board is set",
-      deck: `${facts.draftPicks.length} picks are on the ${facts.analysisSeasonName} board. We break down draft capital, first-round leverage and the roster needs each team can attack.`,
+      deck: `The ${facts.analysisSeasonName} draft order is set. We break down early position, roster needs and the choices that can change how the first rounds unfold.`,
       sections: [
         section(
           "draft_capital",
-          "Draft Capital",
+          "Draft Position",
           draftLeader
-            ? `${draftLeader.teamName} controls the board`
-            : "Who controls the board?",
-          [...facts.teamOutlooks]
-            .sort(
-              (left, right) =>
-                right.draftPickCount - left.draftPickCount ||
-                right.firstRoundPickCount - left.firstRoundPickCount,
-            )
-            .map(
-              (team) =>
-                `${team.teamName}: ${team.draftPickCount} picks, including ${team.firstRoundPickCount} in Round 1.`,
-            )
+            ? `${draftLeader.teamName} gets the earliest first-round decision`
+            : "The early board takes shape",
+          orderedTeams
+            .map((team) => {
+              const firstRoundPick = firstRoundPickByTeam.get(team.teamName);
+              return firstRoundPick === undefined
+                ? `${team.teamName}: first-round position is still unconfirmed.`
+                : `${team.teamName}: first-round pick No. ${firstRoundPick}.`;
+            })
             .join(" "),
           [],
         ),
@@ -1953,8 +1969,8 @@ function buildMilestoneTemplateEditionCopy(
         section(
           "ufa_market",
           "Trade Watch",
-          "Draft capital creates options",
-          "Teams with extra selections can move around the board; teams with thinner pick totals may need to choose certainty over volume.",
+          "Position, fit and nerve create the options",
+          "The intrigue comes from where a team selects, who remains available and whether a front office values certainty over waiting for its turn.",
           [],
         ),
         section(
@@ -2177,6 +2193,16 @@ export function buildWeeklyEditionChatGptPrompt(
         salaryCap: milestone.salaryCap,
       }
     : undefined;
+  const promptTeamOutlooks = (milestone?.teamOutlooks ?? []).map((team) => ({
+    teamId: team.teamId,
+    teamName: team.teamName,
+    capSpace: team.capSpace,
+    committedSalary: team.committedSalary,
+    rosterSize: team.rosterSize,
+    rosterTalent: team.rosterTalent,
+    expiringCount: team.expiringCount,
+    firstRoundPickCount: team.firstRoundPickCount,
+  }));
   let facts: object;
   switch (packet.issueType) {
     case "weekly":
@@ -2207,21 +2233,21 @@ export function buildWeeklyEditionChatGptPrompt(
         editorialCandidates,
         upcomingSeason: analysisSeason,
         salaryCap: milestone?.salaryCap,
-        teamOutlooks: milestone?.teamOutlooks ?? [],
+        teamOutlooks: promptTeamOutlooks,
         expiringContracts: milestone?.expiringContracts ?? [],
       };
       break;
     case "resigning_outlook":
       facts = {
         ...milestoneContext,
-        teamOutlooks: milestone?.teamOutlooks ?? [],
+        teamOutlooks: promptTeamOutlooks,
         expiringContracts: milestone?.expiringContracts ?? [],
       };
       break;
     case "offseason_market":
       facts = {
         ...milestoneContext,
-        teamOutlooks: milestone?.teamOutlooks ?? [],
+        teamOutlooks: promptTeamOutlooks,
         expiringContracts: milestone?.expiringContracts ?? [],
         recentSignings: milestone?.recentSignings ?? [],
       };
@@ -2229,14 +2255,16 @@ export function buildWeeklyEditionChatGptPrompt(
     case "pre_draft":
       facts = {
         ...milestoneContext,
-        teamOutlooks: milestone?.teamOutlooks ?? [],
-        draftPicks: milestone?.draftPicks ?? [],
+        teamOutlooks: promptTeamOutlooks,
+        earlyDraftBoard: (milestone?.draftPicks ?? []).filter(
+          (pick) => pick.round <= 3,
+        ),
       };
       break;
     case "preseason":
       facts = {
         ...milestoneContext,
-        teamOutlooks: milestone?.teamOutlooks ?? [],
+        teamOutlooks: promptTeamOutlooks,
         draftedPlayers: (milestone?.draftPicks ?? []).filter(
           (pick) => pick.selectedPlayerName,
         ),
@@ -2251,14 +2279,21 @@ export function buildWeeklyEditionChatGptPrompt(
     links: section.links,
   }));
   return [
-    "PROMPT_FORMAT=editorial_context_v3",
+    "PROMPT_FORMAT=editorial_context_v4",
     "You are the editor of the GSHL Press Box, a fantasy-hockey league newspaper covering the Gem Stone Hockey League.",
-    "Rewrite the supplied edition with comedic, concise sportswriting and subtle chirps. Use the supplied facts to support your copy. Do not invent new facts or make up player names, team names, scores, or statistics.",
+    "Write a polished edition with the confidence, rhythm and specificity of a modern hockey feature desk. It should feel authored, not assembled: vary sentence length, avoid generic recap language and stat-listing, and give every article a distinct reason to exist.",
+    "Create original storylines from the supplied facts by finding tension, contrast, momentum, pressure, irony and plausible stakes. Add small recurring quirks, callbacks, colorful metaphors, playful labels for situations and subtle chirps so the edition develops its own personality.",
+    "Creative framing may be invented; factual claims may not. Do not invent events, quotes, relationships, motives, injuries, rules, player or team names, scores, statistics, transactions or historical claims. A joke or narrative flourish must remain clearly rhetorical and must not masquerade as a new fact.",
     `NEWSROOM STAFF: ${WEEKLY_EDITION_STAFF.editorInChief.name}, Editor-in-Chief, writes only rarely about league process or rule changes; ${WEEKLY_EDITION_STAFF.headOfAnalytics.name}, Head of Analytics, handles only the biggest and less frequent performance, record, and data-led lead stories; ${WEEKLY_EDITION_STAFF.analyticsReporter.name}, Analytics Reporter, handles the regular standout daily and weekly performance coverage; ${WEEKLY_EDITION_STAFF.headInsider.name}, GSHL Head Insider, handles only the biggest and less frequent signings, trades, and roster moves; ${WEEKLY_EDITION_STAFF.insider.name}, GSHL Insider, handles the regular transaction wire.`,
     "Every section has an assigned author in SECTION_PLAN. Preserve that author object exactly. When scope is team, write with a very light preference for that team and give its perspective slightly more attention without becoming a fan blog, attacking opponents, or changing the facts. Conference reporters may frame a story through their conference, but remain fair.",
     "Every article must have a different reporter. Never reuse a byline within the same edition; the six unique assignments in SECTION_PLAN are final.",
     "EDITION_FACTS may contain ranked story candidates from matchups, performances, records, milestones, awards, and league activity. Use editorial judgment to choose the most important lead and supporting angles; importance is guidance, not a command.",
     "LEAGUE CONTRACT RULES: An expiring UFA cannot be re-signed by the current team and cannot be signed by any team during the summer. Every expired UFA automatically returns to the draft. An expiring RFA may be re-signed by the current team at exactly 115% of the prior salary. Never describe an expired UFA as a summer signing target or imply that cap space can be used to sign one directly.",
+    ...(packet.issueType === "weekly"
+      ? []
+      : [
+          "DRAFT CONTEXT: Every team always has exactly 15 draft picks. That equal allotment is routine infrastructure, not a storyline, advantage, disadvantage or measure of draft capital. Never compare teams by total pick count. Focus draft coverage on selection order, early-round position, roster need, player fit and the decisions created by the board.",
+        ]),
     "MATCHUP PRIORITY RULES: QF means quarterfinal, SF means semifinal, F means final, and LT means Loser Tournament. Playoff games are always major stories, ordered F, then SF, then QF. Loser Tournament games should not be a headline, lead, primary article, or meaningful supporting focus; they have been omitted from the supplied matchup facts.",
     "Use only the names, numbers, outcomes, and links in EDITION_FACTS. Do not add HTML, Markdown links, new sections, new IDs, or new URLs.",
     "Return only one JSON object. It must contain headline, deck, and exactly six sections. Each section must contain id, kind, eyebrow, headline, body, author, and links.",

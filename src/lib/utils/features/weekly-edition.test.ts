@@ -519,7 +519,7 @@ void test("prompt contains only relevant edition facts and a compact section pla
     abbr: "DOT",
   });
   const prompt = buildWeeklyEditionChatGptPrompt(packet);
-  assert.match(prompt, /^PROMPT_FORMAT=editorial_context_v3/);
+  assert.match(prompt, /^PROMPT_FORMAT=editorial_context_v4/);
   assert.match(prompt, /EDITION_FACTS=/);
   assert.match(prompt, /SECTION_PLAN=/);
   assert.match(prompt, /Return only one JSON object/);
@@ -530,6 +530,11 @@ void test("prompt contains only relevant edition facts and a compact section pla
   assert.match(prompt, /Darren Leclair/);
   assert.match(prompt, /Mike Halvorsen/);
   assert.match(prompt, /Every article must have a different reporter/);
+  assert.match(prompt, /Create original storylines from the supplied facts/);
+  assert.match(
+    prompt,
+    /Creative framing may be invented; factual claims may not/,
+  );
   assert.match(prompt, /Bruce McAllister|Gord McKenzie|Darren Whitmore/);
   assert.match(prompt, /Every expired UFA automatically returns to the draft/);
   assert.match(prompt, /exactly 115% of the prior salary/);
@@ -770,7 +775,7 @@ void test("builds each season milestone from contract, cap, draft, and roster fa
           rosterSize: 18,
           rosterTalent: 87.4,
           expiringCount: 2,
-          draftPickCount: 5,
+          draftPickCount: 15,
           firstRoundPickCount: 2,
         },
         {
@@ -781,7 +786,7 @@ void test("builds each season milestone from contract, cap, draft, and roster fa
           rosterSize: 20,
           rosterTalent: 82.1,
           expiringCount: 1,
-          draftPickCount: 3,
+          draftPickCount: 15,
           firstRoundPickCount: 1,
         },
       ],
@@ -870,8 +875,23 @@ void test("builds each season milestone from contract, cap, draft, and roster fa
       );
     }
     if (issueType === "pre_draft") {
-      assert.match(prompt, /draftPicks/);
+      assert.match(prompt, /earlyDraftBoard/);
+      assert.match(prompt, /Every team always has exactly 15 draft picks/);
+      assert.doesNotMatch(prompt, /draftPickCount/);
       assert.doesNotMatch(prompt, /expiringContracts|finalMatchups/);
+      assert.doesNotMatch(
+        `${content.headline} ${content.deck} ${content.sections
+          .map((section) => `${section.headline} ${section.body}`)
+          .join(" ")}`,
+        /15 picks|pick totals|extra selections|biggest stack/i,
+      );
+
+      const noConfirmedPicks = structuredClone(packet);
+      noConfirmedPicks.milestone!.draftPicks = [];
+      assert.equal(
+        buildTemplateWeeklyEdition(noConfirmedPicks).headline,
+        "The GSHL draft board is set",
+      );
     }
     const validation = validateWeeklyEditionImport(
       JSON.stringify(content),
