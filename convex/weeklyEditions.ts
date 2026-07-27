@@ -940,6 +940,7 @@ async function buildSource(
     awards: awardFacts,
     nextMatchups: nextMatchups.map((matchup) => ({
       matchupId: String(matchup._id),
+      gameType: String(matchup.gameType),
       homeTeamName:
         teamById.get(String(matchup.homeTeamId))?.name ?? "Unknown team",
       awayTeamName:
@@ -1261,16 +1262,26 @@ async function buildMilestoneSource(
       signingDate <= triggerDate
     );
   });
-  const contractFact = (contract: Doc<"contracts">) => ({
-    contractId: String(contract._id),
-    playerName:
-      playerById.get(String(contract.playerId))?.fullName ?? "Unknown player",
-    teamName:
-      teamByOwnerId.get(String(contract.ownerId))?.name ?? "Unknown team",
-    salary: asNumber(contract.capHit ?? contract.contractSalary),
-    expiryStatus: String(contract.expiryStatus ?? ""),
-    expiryDate: dateKey(contract.expiryDate),
-  });
+  const contractFact = (contract: Doc<"contracts">) => {
+    const salary = asNumber(contract.capHit ?? contract.contractSalary);
+    const expiryStatus = String(contract.expiryStatus ?? "").toUpperCase();
+    const canBeReSigned = expiryStatus === "RFA";
+    return {
+      contractId: String(contract._id),
+      playerName:
+        playerById.get(String(contract.playerId))?.fullName ?? "Unknown player",
+      teamName:
+        teamByOwnerId.get(String(contract.ownerId))?.name ?? "Unknown team",
+      salary,
+      expiryStatus,
+      expiryDate: dateKey(contract.expiryDate),
+      canBeReSigned,
+      requiredReSigningSalary: canBeReSigned
+        ? Math.round(salary * 1.15)
+        : undefined,
+      returnsToDraft: expiryStatus === "UFA",
+    };
+  };
   const draftFacts = draftPicks.map((pick) => ({
     pickId: String(pick._id),
     teamName: teamById.get(String(pick.gshlTeamId))?.name ?? "Unknown team",
@@ -1380,6 +1391,7 @@ async function buildMilestoneSource(
       issueType === "final_recap"
         ? finalMatchups.map((matchup) => ({
             matchupId: String(matchup._id),
+            gameType: String(matchup.gameType),
             homeTeamId: String(matchup.homeTeamId),
             homeTeamName:
               sourceTeamById.get(String(matchup.homeTeamId))?.name ??

@@ -143,6 +143,7 @@ export interface WeeklyEditionMissedStartFact {
 
 export interface WeeklyEditionNextMatchupFact {
   matchupId: string;
+  gameType?: string;
   homeTeamName: string;
   awayTeamName: string;
   homeRank?: number;
@@ -322,6 +323,9 @@ export interface WeeklyEditionContractFact {
   salary: number;
   expiryStatus: string;
   expiryDate: string;
+  canBeReSigned?: boolean;
+  requiredReSigningSalary?: number;
+  returnsToDraft?: boolean;
 }
 
 export interface WeeklyEditionTeamOutlookFact {

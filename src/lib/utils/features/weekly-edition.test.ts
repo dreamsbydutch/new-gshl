@@ -202,6 +202,116 @@ void test("falls back to competitiveness when no matchup is an upset", () => {
   assert.equal(packet.heroMatchupId, "matchup-2");
 });
 
+void test("prioritizes playoff rounds and removes Loser Tournament coverage", () => {
+  const input = source();
+  const packet = buildWeeklyEditionFactPacket({
+    ...input,
+    matchups: [
+      { ...input.matchups[0]!, gameType: "LT" },
+      { ...input.matchups[1]!, gameType: "QF" },
+    ],
+    nextMatchups: input.nextMatchups.map((matchup) => ({
+      ...matchup,
+      gameType: "LT",
+    })),
+  });
+
+  assert.equal(packet.heroMatchupId, "matchup-2");
+  assert.ok(
+    packet.editorialCandidates.some(
+      (candidate) => candidate.id === "matchup:matchup-2",
+    ),
+  );
+  assert.ok(
+    packet.editorialCandidates.every(
+      (candidate) => candidate.id !== "matchup:matchup-1",
+    ),
+  );
+
+  packet.editorialCandidates.unshift({
+    id: "matchup:matchup-1",
+    kind: "matchup",
+    scope: "week",
+    importance: 100,
+    headlineHint: "Loser Tournament result",
+    summary: "A stale candidate from an older fact packet.",
+    metrics: [],
+    links: [{ label: "Open matchup", href: "/matchup/matchup-1" }],
+  });
+  const content = buildTemplateWeeklyEdition(packet);
+  const roundup = content.sections.find(
+    (section) => section.kind === "matchup_roundup",
+  );
+  assert.match(roundup?.body ?? "", /Quarterfinal:/);
+  assert.doesNotMatch(roundup?.body ?? "", /Aurora|Bears/);
+  assert.doesNotMatch(content.headline, /Loser Tournament/);
+
+  const prompt = buildWeeklyEditionChatGptPrompt(packet);
+  assert.doesNotMatch(prompt, /"matchupId": "matchup-1"/);
+  assert.doesNotMatch(prompt, /"id": "matchup:matchup-1"/);
+  assert.doesNotMatch(prompt, /"matchupId": "matchup-3"/);
+  assert.match(prompt, /QF means quarterfinal/);
+  assert.match(prompt, /Loser Tournament games should not be a headline/);
+});
+
+void test("does not select a hero when a week contains only Loser Tournament games", () => {
+  const input = source();
+  const packet = buildWeeklyEditionFactPacket({
+    ...input,
+    matchups: input.matchups.map((matchup) => ({
+      ...matchup,
+      gameType: "LT",
+    })),
+  });
+
+  assert.equal(packet.heroMatchupId, undefined);
+  assert.ok(
+    packet.editorialCandidates.every(
+      (candidate) => candidate.kind !== "matchup",
+    ),
+  );
+  assert.match(buildWeeklyEditionChatGptPrompt(packet), /"matchups": \[\]/);
+});
+
+void test("orders playoff previews and excludes upcoming Loser Tournament games", () => {
+  const input = source();
+  const packet = buildWeeklyEditionFactPacket({
+    ...input,
+    activity: [],
+    missedStarts: [],
+    nextMatchups: [
+      {
+        matchupId: "next-lt",
+        gameType: "LT",
+        awayTeamName: "Aurora",
+        homeTeamName: "Bears",
+      },
+      {
+        matchupId: "next-qf",
+        gameType: "QF",
+        awayTeamName: "Comets",
+        homeTeamName: "Dragons",
+      },
+      {
+        matchupId: "next-final",
+        gameType: "F",
+        awayTeamName: "Bears",
+        homeTeamName: "Comets",
+      },
+    ],
+  });
+  const preview = buildTemplateWeeklyEdition(packet).sections.find(
+    (section) => section.kind === "next_week",
+  );
+
+  assert.match(preview?.body ?? "", /^Final:/);
+  assert.match(preview?.body ?? "", /Quarterfinal:/);
+  assert.doesNotMatch(preview?.body ?? "", /Aurora at Bears/);
+  const prompt = buildWeeklyEditionChatGptPrompt(packet);
+  assert.ok(prompt.indexOf("next-final") < prompt.indexOf("next-qf"));
+  assert.doesNotMatch(prompt, /next-lt/);
+});
+
 void test("handles ties and inverse goalie categories", () => {
   const margins = buildWeeklyEditionCategoryMargins({
     categories: ["G", "GAA"],
@@ -419,7 +529,10 @@ void test("prompt contains only relevant edition facts and a compact section pla
   assert.match(prompt, /Nate Carlson/);
   assert.match(prompt, /Darren Leclair/);
   assert.match(prompt, /Mike Halvorsen/);
-  assert.match(prompt, /Gord McKenzie/);
+  assert.match(prompt, /Every article must have a different reporter/);
+  assert.match(prompt, /Bruce McAllister|Gord McKenzie|Darren Whitmore/);
+  assert.match(prompt, /Every expired UFA automatically returns to the draft/);
+  assert.match(prompt, /exactly 115% of the prior salary/);
   assert.doesNotMatch(prompt, /Database Only Team/);
   assert.doesNotMatch(prompt, /knownEntityNames|allowedNames|allowedNumbers/);
 });
@@ -428,6 +541,8 @@ void test("accepts a grounded response and rejects malformed JSON", () => {
   const packet = buildWeeklyEditionFactPacket(source());
   const content = buildTemplateWeeklyEdition(packet);
   assert.ok(content.sections.every((section) => section.author));
+  const authorNames = content.sections.map((section) => section.author?.name);
+  assert.equal(new Set(authorNames).size, content.sections.length);
   assert.equal(
     content.sections.find((section) => section.kind === "three_stars")?.author
       ?.name,
@@ -443,6 +558,29 @@ void test("accepts a grounded response and rejects malformed JSON", () => {
     true,
   );
   assert.equal(validateWeeklyEditionImport("{bad", packet).valid, false);
+});
+
+void test("rotates six unique bylines between editions", () => {
+  const first = buildTemplateWeeklyEdition(
+    buildWeeklyEditionFactPacket(source()),
+  ).sections.map((section) => section.author?.name);
+  const nextSource = source();
+  const second = buildTemplateWeeklyEdition(
+    buildWeeklyEditionFactPacket({
+      ...nextSource,
+      week: {
+        ...nextSource.week,
+        id: "week-8",
+        number: 8,
+        startDate: "2026-01-12",
+        endDate: "2026-01-18",
+      },
+    }),
+  ).sections.map((section) => section.author?.name);
+
+  assert.equal(new Set(first).size, 6);
+  assert.equal(new Set(second).size, 6);
+  assert.notDeepEqual(first, second);
 });
 
 void test("reserves department heads for major primary stories", () => {
@@ -548,6 +686,19 @@ void test("rejects HTML, altered structure, invented links, and oversized text",
     false,
   );
 
+  const duplicateAuthor = structuredClone(content);
+  duplicateAuthor.sections[1]!.author = duplicateAuthor.sections[0]!.author;
+  const duplicateResult = validateWeeklyEditionImport(
+    JSON.stringify(duplicateAuthor),
+    packet,
+  );
+  assert.equal(duplicateResult.valid, false);
+  assert.ok(
+    duplicateResult.errors.some((error) =>
+      error.includes("cannot be assigned to more than one article"),
+    ),
+  );
+
   const inventedLink = structuredClone(content);
   inventedLink.sections[0]!.links = [
     { label: "Elsewhere", href: "https://example.com" },
@@ -642,6 +793,19 @@ void test("builds each season milestone from contract, cap, draft, and roster fa
           salary: 5_000_000,
           expiryStatus: "UFA",
           expiryDate: "2026-04-20",
+          canBeReSigned: false,
+          returnsToDraft: true,
+        },
+        {
+          contractId: "contract-rfa",
+          playerName: "Casey East",
+          teamName: "Aurora",
+          salary: 4_000_000,
+          expiryStatus: "RFA",
+          expiryDate: "2026-04-20",
+          canBeReSigned: true,
+          requiredReSigningSalary: 4_600_000,
+          returnsToDraft: false,
         },
       ],
       recentSignings: [
@@ -667,6 +831,10 @@ void test("builds each season milestone from contract, cap, draft, and roster fa
     const content = buildTemplateWeeklyEdition(packet);
     assert.equal(packet.issueType, issueType);
     assert.equal(content.sections.length, 6);
+    assert.equal(
+      new Set(content.sections.map((section) => section.author?.name)).size,
+      6,
+    );
     if (issueType !== "final_recap") {
       assert.match(
         `${content.headline} ${content.deck} ${content.sections
@@ -686,6 +854,15 @@ void test("builds each season milestone from contract, cap, draft, and roster fa
     if (issueType === "resigning_outlook") {
       assert.match(prompt, /expiringContracts/);
       assert.doesNotMatch(prompt, /draftPicks|recentSignings/);
+      assert.match(
+        content.sections.map((section) => section.body).join(" "),
+        /automatically back to the draft/,
+      );
+      assert.match(
+        content.sections.map((section) => section.body).join(" "),
+        /115% of the prior \$4\.0M salary/,
+      );
+      assert.match(prompt, /"requiredReSigningSalary": 4600000/);
       assert.equal(
         content.sections.find((section) => section.kind === "next_week")?.author
           ?.position,

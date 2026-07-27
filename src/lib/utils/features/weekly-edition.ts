@@ -3,6 +3,7 @@ import type {
   BuildWeeklyEditionFactPacketInput,
   BuildWeeklyEditionCategoryMarginsInput,
   BuildMilestoneEditionFactPacketInput,
+  WeeklyEditionContractFact,
   WeeklyEditionContractCoverageSource,
   WeeklyEditionContractSeasonSource,
   WeeklyEditionContent,
@@ -296,7 +297,10 @@ function winnerForMatchup(
 }
 
 function selectHeroMatchup(matchups: WeeklyEditionMatchupFact[]) {
-  return [...matchups].sort((left, right) => {
+  return [...pressBoxMatchups(matchups)].sort((left, right) => {
+    const stageDifference =
+      playoffMatchupPriority(right) - playoffMatchupPriority(left);
+    if (stageDifference !== 0) return stageDifference;
     if (right.rankUpset !== left.rankUpset)
       return right.rankUpset - left.rankUpset;
     const ratingDifference =
@@ -307,6 +311,44 @@ function selectHeroMatchup(matchups: WeeklyEditionMatchupFact[]) {
     if (leftMargin !== rightMargin) return leftMargin - rightMargin;
     return left.matchupId.localeCompare(right.matchupId);
   })[0];
+}
+
+function playoffMatchupPriority(matchup: WeeklyEditionMatchupFact) {
+  return playoffGameTypePriority(matchup.gameType);
+}
+
+function playoffGameTypePriority(gameType?: string) {
+  if (gameType === "F") return 3;
+  if (gameType === "SF") return 2;
+  if (gameType === "QF") return 1;
+  return 0;
+}
+
+function pressBoxMatchups(matchups: WeeklyEditionMatchupFact[]) {
+  return matchups.filter((matchup) => matchup.gameType !== "LT");
+}
+
+function pressBoxNextMatchups(
+  matchups: WeeklyEditionFactPacket["nextMatchups"],
+) {
+  return matchups
+    .filter((matchup) => matchup.gameType !== "LT")
+    .sort(
+      (left, right) =>
+        playoffGameTypePriority(right.gameType) -
+        playoffGameTypePriority(left.gameType),
+    );
+}
+
+function pressBoxEditorialCandidates(packet: WeeklyEditionFactPacket) {
+  const loserTournamentCandidateIds = new Set(
+    packet.matchups
+      .filter((matchup) => matchup.gameType === "LT")
+      .map((matchup) => `matchup:${matchup.matchupId}`),
+  );
+  return (packet.editorialCandidates ?? []).filter(
+    (candidate) => !loserTournamentCandidateIds.has(candidate.id),
+  );
 }
 
 const metricText = (metric: WeeklyEditionEditorialMetric) =>
@@ -534,7 +576,7 @@ export function buildWeeklyEditionEditorialCandidates(
   matchups: WeeklyEditionMatchupFact[],
 ): WeeklyEditionEditorialCandidate[] {
   const candidates: WeeklyEditionEditorialCandidate[] = [];
-  for (const matchup of matchups) {
+  for (const matchup of pressBoxMatchups(matchups)) {
     const playoffWeight =
       matchup.gameType === "F"
         ? 100
@@ -556,9 +598,16 @@ export function buildWeeklyEditionEditorialCandidates(
       kind: "matchup",
       scope: "week",
       importance,
-      headlineHint: matchup.winnerTeamName
-        ? `${matchup.winnerTeamName} defeats ${matchup.loserTeamName}`
-        : `${matchup.homeTeamName} and ${matchup.awayTeamName} finish level`,
+      headlineHint:
+        matchup.gameType === "F" && matchup.winnerTeamName
+          ? `${matchup.winnerTeamName} wins the GSHL Final`
+          : matchup.gameType === "SF" && matchup.winnerTeamName
+            ? `${matchup.winnerTeamName} advances through the semifinal`
+            : matchup.gameType === "QF" && matchup.winnerTeamName
+              ? `${matchup.winnerTeamName} wins its quarterfinal`
+              : matchup.winnerTeamName
+                ? `${matchup.winnerTeamName} defeats ${matchup.loserTeamName}`
+                : `${matchup.homeTeamName} and ${matchup.awayTeamName} finish level`,
       summary: matchupSummary(matchup),
       teamId: matchup.winnerTeamId,
       teamName: matchup.winnerTeamName,
@@ -826,7 +875,7 @@ export function buildWeeklyEditionFactPacket(
 ): WeeklyEditionFactPacket {
   const matchups = input.matchups.map(winnerForMatchup);
   const hero = selectHeroMatchup(matchups);
-  if (!hero) throw new Error("A completed matchup is required");
+  if (matchups.length === 0) throw new Error("A completed matchup is required");
 
   const stars = input.players
     .map((player) => ({
@@ -881,7 +930,7 @@ export function buildWeeklyEditionFactPacket(
     week: input.week,
     teams: [...input.teams].sort((a, b) => a.name.localeCompare(b.name)),
     matchups,
-    heroMatchupId: hero.matchupId,
+    heroMatchupId: hero?.matchupId,
     stars,
     powerMovers,
     activity: [...input.activity].sort((a, b) => a.date.localeCompare(b.date)),
@@ -993,7 +1042,20 @@ function scoreline(matchup: WeeklyEditionMatchupFact) {
   return `${matchup.awayTeamName} ${matchup.awayScore}–${matchup.homeScore} ${matchup.homeTeamName}`;
 }
 
+function matchupStageLabel(matchup: WeeklyEditionMatchupFact) {
+  return matchupStageLabelForGameType(matchup.gameType);
+}
+
+function matchupStageLabelForGameType(gameType?: string) {
+  if (gameType === "F") return "Final";
+  if (gameType === "SF") return "Semifinal";
+  if (gameType === "QF") return "Quarterfinal";
+  return undefined;
+}
+
 function matchupSummary(matchup: WeeklyEditionMatchupFact) {
+  const stage = matchupStageLabel(matchup);
+  const stagePrefix = stage ? `${stage}: ` : "";
   const categoryNote = matchup.categoryMargins.find(
     (category) => category.winnerTeamName === matchup.winnerTeamName,
   );
@@ -1001,9 +1063,9 @@ function matchupSummary(matchup: WeeklyEditionMatchupFact) {
     ? ` ${categoryNote.winnerTeamName} created its widest category edge in ${categoryNote.category}, ${categoryNote.homeValue}–${categoryNote.awayValue}.`
     : "";
   if (!matchup.winnerTeamName) {
-    return `${matchup.homeTeamName} and ${matchup.awayTeamName} finished level at ${matchup.homeScore}–${matchup.awayScore}.`;
+    return `${stagePrefix}${matchup.homeTeamName} and ${matchup.awayTeamName} finished level at ${matchup.homeScore}–${matchup.awayScore}.`;
   }
-  return `${matchup.winnerTeamName} beat ${matchup.loserTeamName} ${Math.max(matchup.homeScore, matchup.awayScore)}–${Math.min(matchup.homeScore, matchup.awayScore)}.${categorySentence}`;
+  return `${stagePrefix}${matchup.winnerTeamName} beat ${matchup.loserTeamName} ${Math.max(matchup.homeScore, matchup.awayScore)}–${Math.min(matchup.homeScore, matchup.awayScore)}.${categorySentence}`;
 }
 
 export const WEEKLY_EDITION_STAFF = {
@@ -1117,16 +1179,68 @@ function conferenceAuthor(
   };
 }
 
-function authorForSection(
+function uniqueAuthors(authors: Array<WeeklyEditionAuthor | undefined>) {
+  const seen = new Set<string>();
+  return authors.filter((author): author is WeeklyEditionAuthor => {
+    if (!author) return false;
+    const key = author.name.trim().toLowerCase();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function rotateAuthors(
+  authors: WeeklyEditionAuthor[],
+  packet: WeeklyEditionFactPacket,
+  item: WeeklyEditionSection,
+  salt: string,
+) {
+  return [...authors].sort((left, right) => {
+    const leftHash = hashWeeklyEditionSource(
+      `${packet.season.id}:${packet.week.id}:${packet.issueType}:${item.id}:${salt}:${left.name}`,
+    );
+    const rightHash = hashWeeklyEditionSource(
+      `${packet.season.id}:${packet.week.id}:${packet.issueType}:${item.id}:${salt}:${right.name}`,
+    );
+    return (
+      leftHash.localeCompare(rightHash) || left.name.localeCompare(right.name)
+    );
+  });
+}
+
+function contextualAuthors(
+  item: WeeklyEditionSection,
+  packet: WeeklyEditionFactPacket,
+) {
+  const matches = referencedTeams(item, packet);
+  if (matches.length === 0) return [];
+  const primary = matches[0]!.team;
+  const teamAuthors = matches.map((match) => teamAuthor(match.team));
+  const conferenceAuthors = matches.map((match) =>
+    conferenceAuthor(match.team),
+  );
+  const authors =
+    item.kind === "matchup_roundup" &&
+    matches.length > 1 &&
+    matches.every((match) => match.team.conferenceId === primary.conferenceId)
+      ? [...conferenceAuthors, ...teamAuthors]
+      : [...teamAuthors, ...conferenceAuthors];
+  return rotateAuthors(
+    uniqueAuthors(authors),
+    packet,
+    item,
+    "contextual-reporters",
+  );
+}
+
+function isMajorAnalyticsAssignment(
   item: WeeklyEditionSection,
   packet: WeeklyEditionFactPacket,
   isPrimary: boolean,
-): WeeklyEditionAuthor {
-  const leadCandidate = packet.editorialCandidates?.[0];
-  if (packet.issueType === "resigning_outlook" && item.kind === "next_week") {
-    return { ...WEEKLY_EDITION_STAFF.editorInChief };
-  }
-  if (
+) {
+  const leadCandidate = pressBoxEditorialCandidates(packet)[0];
+  return (
     (isPrimary &&
       (item.kind === "three_stars" ||
         item.kind === "power_movers" ||
@@ -1137,56 +1251,134 @@ function authorForSection(
         leadCandidate?.kind === "record" ||
         leadCandidate?.kind === "milestone") &&
       (leadCandidate.importance ?? 0) >= 90)
-  ) {
-    return { ...WEEKLY_EDITION_STAFF.headOfAnalytics };
-  }
-  if (
-    item.kind === "three_stars" ||
-    item.kind === "power_movers" ||
-    item.kind === "season_predictions" ||
+  );
+}
+
+function isAnalyticsAssignment(
+  item: WeeklyEditionSection,
+  packet: WeeklyEditionFactPacket,
+) {
+  const leadCandidate = pressBoxEditorialCandidates(packet)[0];
+  return (
+    ANALYTICS_SECTION_KINDS.has(item.kind) ||
     (item.kind === "biggest_story" &&
       (leadCandidate?.kind === "player_performance" ||
         leadCandidate?.kind === "team_performance" ||
         leadCandidate?.kind === "record" ||
         leadCandidate?.kind === "milestone"))
-  ) {
-    return { ...WEEKLY_EDITION_STAFF.analyticsReporter };
-  }
-  if (
+  );
+}
+
+function isMajorInsiderAssignment(
+  item: WeeklyEditionSection,
+  packet: WeeklyEditionFactPacket,
+  isPrimary: boolean,
+) {
+  const leadCandidate = pressBoxEditorialCandidates(packet)[0];
+  return (
     (isPrimary && INSIDER_SECTION_KINDS.has(item.kind)) ||
     (item.kind === "biggest_story" &&
       leadCandidate?.kind === "transaction" &&
       (leadCandidate.importance ?? 0) >= 80)
-  ) {
-    return { ...WEEKLY_EDITION_STAFF.headInsider };
-  }
-  if (
+  );
+}
+
+function isInsiderAssignment(
+  item: WeeklyEditionSection,
+  packet: WeeklyEditionFactPacket,
+) {
+  const leadCandidate = pressBoxEditorialCandidates(packet)[0];
+  return (
     INSIDER_SECTION_KINDS.has(item.kind) ||
     (item.kind === "biggest_story" && leadCandidate?.kind === "transaction")
-  ) {
-    return { ...WEEKLY_EDITION_STAFF.insider };
-  }
-
-  const matches = referencedTeams(item, packet);
-  const primary = matches[0]?.team;
-  if (!primary) return getWeeklyEditionFallbackAuthor(item.kind);
-
-  if (
-    item.kind === "matchup_roundup" &&
-    matches.length > 1 &&
-    matches.every((match) => match.team.conferenceId === primary.conferenceId)
-  ) {
-    return (
-      conferenceAuthor(primary) ??
-      teamAuthor(primary) ??
-      getWeeklyEditionFallbackAuthor(item.kind)
-    );
-  }
-  return (
-    teamAuthor(primary) ??
-    conferenceAuthor(primary) ??
-    getWeeklyEditionFallbackAuthor(item.kind)
   );
+}
+
+function specialistAuthors(
+  item: WeeklyEditionSection,
+  packet: WeeklyEditionFactPacket,
+  isPrimary: boolean,
+) {
+  if (packet.issueType === "resigning_outlook" && item.kind === "next_week") {
+    return [{ ...WEEKLY_EDITION_STAFF.editorInChief }];
+  }
+  if (isMajorAnalyticsAssignment(item, packet, isPrimary)) {
+    return [
+      { ...WEEKLY_EDITION_STAFF.headOfAnalytics },
+      { ...WEEKLY_EDITION_STAFF.analyticsReporter },
+    ];
+  }
+  if (isAnalyticsAssignment(item, packet)) {
+    return [{ ...WEEKLY_EDITION_STAFF.analyticsReporter }];
+  }
+  if (isMajorInsiderAssignment(item, packet, isPrimary)) {
+    return [
+      { ...WEEKLY_EDITION_STAFF.headInsider },
+      { ...WEEKLY_EDITION_STAFF.insider },
+    ];
+  }
+  if (isInsiderAssignment(item, packet)) {
+    return [{ ...WEEKLY_EDITION_STAFF.insider }];
+  }
+  return [];
+}
+
+function allAvailableAuthors(
+  packet: WeeklyEditionFactPacket,
+  item: WeeklyEditionSection,
+) {
+  const teamAuthors = packet.teams.map(teamAuthor);
+  const conferenceAuthors = packet.teams.map(conferenceAuthor);
+  const standardStaff = Object.values(WEEKLY_EDITION_STAFF).filter(
+    (author) => author.position !== "Editor-in-Chief",
+  );
+  return [
+    ...rotateAuthors(
+      uniqueAuthors([...teamAuthors, ...conferenceAuthors, ...standardStaff]),
+      packet,
+      item,
+      "full-newsroom",
+    ),
+    { ...WEEKLY_EDITION_STAFF.editorInChief },
+  ];
+}
+
+function authorCandidatesForSection(
+  item: WeeklyEditionSection,
+  packet: WeeklyEditionFactPacket,
+  isPrimary: boolean,
+) {
+  const specialists = specialistAuthors(item, packet, isPrimary);
+  const contextual = contextualAuthors(item, packet);
+  const general = rotateAuthors(
+    uniqueAuthors([
+      ...contextual,
+      { ...WEEKLY_EDITION_STAFF.nationalReporter },
+    ]),
+    packet,
+    item,
+    "general-reporters",
+  );
+  return uniqueAuthors([
+    ...specialists,
+    ...general,
+    ...allAvailableAuthors(packet, item),
+  ]);
+}
+
+function authorForSection(
+  item: WeeklyEditionSection,
+  packet: WeeklyEditionFactPacket,
+  isPrimary: boolean,
+  usedAuthorNames: Set<string>,
+): WeeklyEditionAuthor {
+  const author = authorCandidatesForSection(item, packet, isPrimary).find(
+    (candidate) => !usedAuthorNames.has(candidate.name.trim().toLowerCase()),
+  );
+  if (!author) {
+    throw new Error("A unique reporter could not be assigned to every article");
+  }
+  return author;
 }
 
 function addTeamReporterPerspective(
@@ -1206,7 +1398,8 @@ export function normalizeWeeklyEditionArticleGrid(
 ): WeeklyEditionContent {
   const sections = content.sections.slice(0, 6);
   if (sections.length < 6) {
-    const supporting = (packet.editorialCandidates ?? [])
+    const editorialCandidates = pressBoxEditorialCandidates(packet);
+    const supporting = editorialCandidates
       .slice(1, 3)
       .map((candidate) => candidate.summary)
       .join(" ");
@@ -1217,11 +1410,11 @@ export function normalizeWeeklyEditionArticleGrid(
       section(
         "league_notebook",
         "Press Box Notebook",
-        packet.editorialCandidates?.[1]?.headlineHint ??
+        editorialCandidates[1]?.headlineHint ??
           "What else caught the Press Box eye",
         supporting ||
           "The next GSHL story is already taking shape across the standings, transaction wire and weekly performance board.",
-        packet.editorialCandidates?.[1]?.links ?? [],
+        editorialCandidates[1]?.links ?? [],
         notebookId,
       ),
     );
@@ -1234,10 +1427,12 @@ function assignWeeklyEditionAuthors(
   packet: WeeklyEditionFactPacket,
 ): WeeklyEditionContent {
   const normalized = normalizeWeeklyEditionArticleGrid(content, packet);
+  const usedAuthorNames = new Set<string>();
   return {
     ...normalized,
     sections: normalized.sections.map((item, index) => {
-      const author = authorForSection(item, packet, index < 2);
+      const author = authorForSection(item, packet, index < 2, usedAuthorNames);
+      usedAuthorNames.add(author.name.trim().toLowerCase());
       return {
         ...item,
         body: addTeamReporterPerspective(item, author),
@@ -1264,12 +1459,14 @@ export function buildTemplateWeeklyEdition(
   if (packet.issueType !== "weekly") {
     return buildMilestoneTemplateEdition(packet);
   }
+  const roundupMatchups = pressBoxMatchups(packet.matchups);
+  const previewMatchups = pressBoxNextMatchups(packet.nextMatchups);
   const hero =
-    packet.matchups.find(
+    roundupMatchups.find(
       (matchup) => matchup.matchupId === packet.heroMatchupId,
-    ) ?? packet.matchups[0]!;
+    ) ?? roundupMatchups[0];
   const upsetHeadline =
-    hero.rankUpset > 0 && hero.winnerTeamName
+    hero && hero.rankUpset > 0 && hero.winnerTeamName
       ? choose(
           packet,
           [
@@ -1279,22 +1476,27 @@ export function buildTemplateWeeklyEdition(
           ],
           "lead",
         )
-      : choose(
-          packet,
-          [
-            `${hero.homeTeamName} and ${hero.awayTeamName} own the spotlight`,
-            `A week decided at the margins`,
-            `${hero.winnerTeamName ?? hero.homeTeamName} headlines Week ${packet.week.number}`,
-          ],
-          "lead",
-        );
-  const leadCandidate = packet.editorialCandidates?.[0];
+      : hero
+        ? choose(
+            packet,
+            [
+              `${hero.homeTeamName} and ${hero.awayTeamName} own the spotlight`,
+              `A week decided at the margins`,
+              `${hero.winnerTeamName ?? hero.homeTeamName} headlines Week ${packet.week.number}`,
+            ],
+            "lead",
+          )
+        : `Week ${packet.week.number}: the main competition takes the week off`;
+  const editorialCandidates = pressBoxEditorialCandidates(packet);
+  const leadCandidate = editorialCandidates[0];
   const leadIsMatchup = leadCandidate?.kind === "matchup";
   const leadHeadline = leadCandidate?.headlineHint ?? upsetHeadline;
   const deckText =
     leadCandidate && !leadIsMatchup
-      ? `${leadCandidate.summary} It leads a Week ${packet.week.number} edition built from ${packet.editorialCandidates?.length ?? 0} verified story candidates.`
-      : `${scoreline(hero)} led a Week ${packet.week.number} slate with ${packet.matchups.length} completed matchup${packet.matchups.length === 1 ? "" : "s"}.`;
+      ? `${leadCandidate.summary} It leads a Week ${packet.week.number} edition built from ${editorialCandidates.length} verified story candidates.`
+      : hero
+        ? `${scoreline(hero)} led a Week ${packet.week.number} slate with ${roundupMatchups.length} completed main-competition matchup${roundupMatchups.length === 1 ? "" : "s"}.`
+        : `Week ${packet.week.number} had no completed main-competition matchups, so the Press Box is looking elsewhere for the stories that matter.`;
   const deck =
     deckText.length <= 220 ? deckText : `${deckText.slice(0, 217).trim()}…`;
   const sections: WeeklyEditionSection[] = [
@@ -1304,14 +1506,17 @@ export function buildTemplateWeeklyEdition(
       leadHeadline,
       leadCandidate && !leadIsMatchup
         ? leadCandidate.summary
-        : `${matchupSummary(hero)} ${
-            hero.rankUpset > 0
-              ? `The winner entered ${hero.rankUpset} ranking spot${hero.rankUpset === 1 ? "" : "s"} behind the opposition, which is exactly why the standings never get the final word.`
-              : "It was the week’s most competitive result, and neither side left much room for a comfortable Sunday night."
-          }`,
-      leadCandidate?.links ?? [
-        { label: "Open matchup", href: `/matchup/${hero.matchupId}` },
-      ],
+        : hero
+          ? `${matchupSummary(hero)} ${
+              hero.rankUpset > 0
+                ? `The winner entered ${hero.rankUpset} ranking spot${hero.rankUpset === 1 ? "" : "s"} behind the opposition, which is exactly why the standings never get the final word.`
+                : "It was the week’s most competitive result, and neither side left much room for a comfortable Sunday night."
+            }`
+          : "Loser Tournament results remain available on the schedule, while the Press Box keeps its editorial focus on the main competition and the week’s player, team and league-wide developments.",
+      leadCandidate?.links ??
+        (hero
+          ? [{ label: "Open matchup", href: `/matchup/${hero.matchupId}` }]
+          : [{ label: "View schedule", href: "/schedule" }]),
     ),
     section(
       "matchup_roundup",
@@ -1321,7 +1526,8 @@ export function buildTemplateWeeklyEdition(
         ["Around the league", "The rest of the scores", "How the week was won"],
         "roundup",
       ),
-      packet.matchups.map(matchupSummary).join(" "),
+      roundupMatchups.map(matchupSummary).join(" ") ||
+        "The Loser Tournament results are recorded in the schedule, but the Press Box is keeping its attention on the main competition.",
       [{ label: "View schedule", href: "/schedule" }],
     ),
     section(
@@ -1396,15 +1602,15 @@ export function buildTemplateWeeklyEdition(
     section(
       "next_week",
       "Next Week Preview",
-      packet.nextMatchups.length > 0
-        ? `${packet.nextMatchups[0]!.awayTeamName} meets ${packet.nextMatchups[0]!.homeTeamName}`
+      previewMatchups.length > 0
+        ? `${previewMatchups[0]!.awayTeamName} meets ${previewMatchups[0]!.homeTeamName}`
         : "The next puck drop awaits",
-      packet.nextMatchups.length > 0
-        ? packet.nextMatchups
-            .map(
-              (matchup) =>
-                `${matchup.awayTeamName} at ${matchup.homeTeamName}${matchup.awayRank && matchup.homeRank ? ` pairs No. ${matchup.awayRank} with No. ${matchup.homeRank}` : ""}.`,
-            )
+      previewMatchups.length > 0
+        ? previewMatchups
+            .map((matchup) => {
+              const stage = matchupStageLabelForGameType(matchup.gameType);
+              return `${stage ? `${stage}: ` : ""}${matchup.awayTeamName} at ${matchup.homeTeamName}${matchup.awayRank && matchup.homeRank ? ` pairs No. ${matchup.awayRank} with No. ${matchup.homeRank}` : ""}.`;
+            })
             .join(" ")
         : "The next slate has not been posted yet. Check the schedule when the matchups lock in.",
       [{ label: "See next week", href: "/schedule" }],
@@ -1419,6 +1625,53 @@ export function buildTemplateWeeklyEdition(
 
 function money(value: number) {
   return `$${(value / 1_000_000).toFixed(1)}M`;
+}
+
+function normalizedExpiryStatus(contract: {
+  expiryStatus: string;
+  canBeReSigned?: boolean;
+  returnsToDraft?: boolean;
+}) {
+  return contract.expiryStatus.trim().toUpperCase();
+}
+
+function contractCanBeReSigned(contract: {
+  expiryStatus: string;
+  canBeReSigned?: boolean;
+  returnsToDraft?: boolean;
+}) {
+  return (
+    contract.canBeReSigned ??
+    normalizedExpiryStatus(contract) === String(ContractStatus.RFA)
+  );
+}
+
+function contractReturnsToDraft(contract: {
+  expiryStatus: string;
+  canBeReSigned?: boolean;
+  returnsToDraft?: boolean;
+}) {
+  return (
+    contract.returnsToDraft ??
+    normalizedExpiryStatus(contract) === String(ContractStatus.UFA)
+  );
+}
+
+function requiredReSigningSalary(contract: {
+  salary: number;
+  requiredReSigningSalary?: number;
+}) {
+  return contract.requiredReSigningSalary ?? Math.round(contract.salary * 1.15);
+}
+
+function contractOutcomeSummary(contract: WeeklyEditionContractFact) {
+  if (contractReturnsToDraft(contract)) {
+    return `${contract.playerName}'s UFA expiry sends the player automatically back to the draft; the player cannot be re-signed or signed during the summer.`;
+  }
+  if (contractCanBeReSigned(contract)) {
+    return `${contract.playerName} can be re-signed at ${money(requiredReSigningSalary(contract))}, exactly 115% of the prior ${money(contract.salary)} salary.`;
+  }
+  return `${contract.playerName}'s ${contract.expiryStatus || "contract"} expiry requires no re-signing projection from the Press Box.`;
 }
 
 function teamOutlookSummary(packet: WeeklyEditionFactPacket) {
@@ -1455,7 +1708,7 @@ function buildMilestoneTemplateEditionCopy(
     const hero = packet.matchups.find(
       (matchup) => matchup.matchupId === packet.heroMatchupId,
     );
-    const leadCandidate = packet.editorialCandidates?.[0];
+    const leadCandidate = pressBoxEditorialCandidates(packet)[0];
     const headline =
       leadCandidate && leadCandidate.kind !== "matchup"
         ? leadCandidate.headlineHint
@@ -1516,7 +1769,7 @@ function buildMilestoneTemplateEditionCopy(
           expiring
             .map(
               (contract) =>
-                `${contract.teamName} has ${contract.playerName} (${money(contract.salary)}, ${contract.expiryStatus}) approaching expiry.`,
+                `${contract.teamName}: ${contractOutcomeSummary(contract)}`,
             )
             .join(" ") || "No expiring contracts were found.",
           [],
@@ -1549,7 +1802,7 @@ function buildMilestoneTemplateEditionCopy(
           expiring
             .map(
               (contract) =>
-                `${contract.teamName}: ${contract.playerName}, ${money(contract.salary)}, ${contract.expiryStatus}.`,
+                `${contract.teamName}: ${contractOutcomeSummary(contract)}`,
             )
             .join(" ") || "No expiring contracts were found.",
           [],
@@ -1579,15 +1832,15 @@ function buildMilestoneTemplateEditionCopy(
         section(
           "ufa_market",
           "Potential Market",
-          "Today’s unsigned questions become tomorrow’s UFA board",
-          "Teams with both cap room and roster openings can be aggressive. Teams near the ceiling will need their pencils—and perhaps their group chats—working overtime.",
+          "Expired UFAs are draft-bound, not summer targets",
+          "Only RFAs can be retained in the re-signing window, at exactly 115% of their prior salary. Every expired UFA returns automatically to the draft, where cap room and open roster spots become draft-day leverage.",
           [],
         ),
         section(
           "next_week",
           "Dates to Know",
           `The signing window closes ${facts.analysisSeasonSigningEndDate ?? facts.triggerDate}`,
-          "When the deadline arrives, the newspaper will reset the market and identify which teams can make the loudest UFA moves.",
+          "When the deadline arrives, the newspaper will reset the board: completed RFA re-signings on one side, draft-bound UFAs and the teams with the most buying power on the other.",
           [],
         ),
       ],
@@ -1597,19 +1850,19 @@ function buildMilestoneTemplateEditionCopy(
   if (packet.issueType === "offseason_market") {
     return {
       headline: capLeader
-        ? `${capLeader.teamName} enters UFA season with room to swing`
-        : "The offseason market is open",
-      deck: `The signing deadline has passed. Cap space, completed deals and open roster spots now tell us which teams can shape the ${facts.analysisSeasonName} UFA market.`,
+        ? `${capLeader.teamName} brings the most buying power to the draft`
+        : "The offseason board is taking shape",
+      deck: `The re-signing deadline has passed. Expired UFAs are headed to the draft, and cap space, completed RFA deals and open roster spots show which teams can shape ${facts.analysisSeasonName}.`,
       sections: [
         section(
           "ufa_market",
-          "UFA Market",
-          "The teams with money to spend",
+          "Draft-Bound UFAs",
+          "The teams with money to spend on draft day",
           [...facts.teamOutlooks]
             .sort((left, right) => right.capSpace - left.capSpace)
             .map(
               (team) =>
-                `${team.teamName}: ${money(team.capSpace)} available and ${team.rosterSize} players currently rostered.`,
+                `${team.teamName}: ${money(team.capSpace)} available and ${team.rosterSize} players currently rostered; expired UFAs cannot be signed directly and must be acquired through the draft.`,
             )
             .join(" "),
           [],
@@ -1827,6 +2080,7 @@ export function validateWeeklyEditionContent(
     errors.push("HTML is not allowed in edition copy.");
 
   const seen = new Set<string>();
+  const seenAuthorNames = new Set<string>();
   for (const [index, item] of content.sections.entries()) {
     if (seen.has(item.id)) errors.push(`Duplicate section ID: ${item.id}.`);
     seen.add(item.id);
@@ -1845,6 +2099,15 @@ export function validateWeeklyEditionContent(
       JSON.stringify(item.author) !== JSON.stringify(expectedSection.author)
     ) {
       errors.push(`Author in ${item.id} must match the section plan.`);
+    }
+    if (item.author) {
+      const authorKey = item.author.name.trim().toLowerCase();
+      if (seenAuthorNames.has(authorKey)) {
+        errors.push(
+          `${item.author.name} cannot be assigned to more than one article.`,
+        );
+      }
+      seenAuthorNames.add(authorKey);
     }
     if (JSON.stringify(item.links) !== JSON.stringify(expectedSection.links))
       errors.push(`Links in ${item.id} must match the verified fact packet.`);
@@ -1893,6 +2156,9 @@ export function buildWeeklyEditionChatGptPrompt(
   packet: WeeklyEditionFactPacket,
 ) {
   const template = buildTemplateWeeklyEdition(packet);
+  const editorialMatchups = pressBoxMatchups(packet.matchups);
+  const previewMatchups = pressBoxNextMatchups(packet.nextMatchups);
+  const editorialCandidates = pressBoxEditorialCandidates(packet);
   const milestone = packet.milestone;
   const analysisSeason = milestone
     ? {
@@ -1919,9 +2185,9 @@ export function buildWeeklyEditionChatGptPrompt(
         issueLabel: packet.issueLabel,
         season: packet.season,
         week: packet.week,
-        matchups: packet.matchups,
-        editorialCandidates: packet.editorialCandidates ?? [],
-        nextMatchups: packet.nextMatchups,
+        matchups: editorialMatchups,
+        editorialCandidates,
+        nextMatchups: previewMatchups,
       };
       break;
     case "final_recap":
@@ -1935,10 +2201,10 @@ export function buildWeeklyEditionChatGptPrompt(
           endDate: packet.season.endDate,
         },
         finalWeek: packet.week,
-        finalMatchups: packet.matchups,
+        finalMatchups: editorialMatchups,
         finalStars: packet.stars,
         finalPowerRankings: packet.powerMovers,
-        editorialCandidates: packet.editorialCandidates ?? [],
+        editorialCandidates,
         upcomingSeason: analysisSeason,
         salaryCap: milestone?.salaryCap,
         teamOutlooks: milestone?.teamOutlooks ?? [],
@@ -1990,7 +2256,10 @@ export function buildWeeklyEditionChatGptPrompt(
     "Rewrite the supplied edition with comedic, concise sportswriting and subtle chirps. Use the supplied facts to support your copy. Do not invent new facts or make up player names, team names, scores, or statistics.",
     `NEWSROOM STAFF: ${WEEKLY_EDITION_STAFF.editorInChief.name}, Editor-in-Chief, writes only rarely about league process or rule changes; ${WEEKLY_EDITION_STAFF.headOfAnalytics.name}, Head of Analytics, handles only the biggest and less frequent performance, record, and data-led lead stories; ${WEEKLY_EDITION_STAFF.analyticsReporter.name}, Analytics Reporter, handles the regular standout daily and weekly performance coverage; ${WEEKLY_EDITION_STAFF.headInsider.name}, GSHL Head Insider, handles only the biggest and less frequent signings, trades, and roster moves; ${WEEKLY_EDITION_STAFF.insider.name}, GSHL Insider, handles the regular transaction wire.`,
     "Every section has an assigned author in SECTION_PLAN. Preserve that author object exactly. When scope is team, write with a very light preference for that team and give its perspective slightly more attention without becoming a fan blog, attacking opponents, or changing the facts. Conference reporters may frame a story through their conference, but remain fair.",
+    "Every article must have a different reporter. Never reuse a byline within the same edition; the six unique assignments in SECTION_PLAN are final.",
     "EDITION_FACTS may contain ranked story candidates from matchups, performances, records, milestones, awards, and league activity. Use editorial judgment to choose the most important lead and supporting angles; importance is guidance, not a command.",
+    "LEAGUE CONTRACT RULES: An expiring UFA cannot be re-signed by the current team and cannot be signed by any team during the summer. Every expired UFA automatically returns to the draft. An expiring RFA may be re-signed by the current team at exactly 115% of the prior salary. Never describe an expired UFA as a summer signing target or imply that cap space can be used to sign one directly.",
+    "MATCHUP PRIORITY RULES: QF means quarterfinal, SF means semifinal, F means final, and LT means Loser Tournament. Playoff games are always major stories, ordered F, then SF, then QF. Loser Tournament games should not be a headline, lead, primary article, or meaningful supporting focus; they have been omitted from the supplied matchup facts.",
     "Use only the names, numbers, outcomes, and links in EDITION_FACTS. Do not add HTML, Markdown links, new sections, new IDs, or new URLs.",
     "Return only one JSON object. It must contain headline, deck, and exactly six sections. Each section must contain id, kind, eyebrow, headline, body, author, and links.",
     "Keep every section id, kind, eyebrow, author, and links value from SECTION_PLAN exactly unchanged and in the same order.",
