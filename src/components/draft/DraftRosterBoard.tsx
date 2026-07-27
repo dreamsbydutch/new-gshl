@@ -10,6 +10,7 @@ import {
   cn,
   formatNumber,
   getBenchPlayers,
+  getDraftYear,
   getPlayerNhlAbbreviation,
   getRosterRatingClass,
 } from "@gshl-utils";
@@ -29,11 +30,16 @@ function RosterPlayer({
 }) {
   const nhlAbbr = getPlayerNhlAbbreviation(player);
   const nhlTeam = nhlAbbr ? nhlTeamByAbbr.get(nhlAbbr) : undefined;
+  const rating =
+    typeof player.seasonRating === "number" &&
+    Number.isFinite(player.seasonRating)
+      ? formatNumber(player.seasonRating, 2)
+      : "--";
 
   return (
     <div
       className="min-w-0 rounded border border-slate-200 bg-white px-1 py-0.5 text-center shadow-sm"
-      title={`${player.fullName} · ${player.nhlPos.join("/")} · ${formatNumber(player.seasonRating ?? 0, 2)}`}
+      title={`${player.fullName} · ${player.nhlPos.join("/")} · ${rating}`}
     >
       <p className="truncate text-[9px] font-bold leading-tight text-slate-900">
         {player.fullName}
@@ -49,7 +55,7 @@ function RosterPlayer({
             getRosterRatingClass(player.seasonRk),
           )}
         >
-          {formatNumber(player.seasonRating ?? 0, 2)}
+          {rating}
         </span>
       </div>
     </div>
@@ -70,8 +76,8 @@ function TeamRosterCard({
   const bench = getBenchPlayers(roster);
 
   return (
-    <article className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-slate-300 bg-slate-100 shadow-sm">
-      <header className="flex h-9 shrink-0 items-center gap-1.5 border-b border-slate-300 bg-white px-1.5">
+    <article className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+      <header className="flex h-9 shrink-0 items-center gap-1.5 border-b border-slate-200 bg-slate-50 px-1.5">
         {team.logoUrl ? (
           <Image
             src={team.logoUrl}
@@ -165,8 +171,8 @@ function ConferenceRosterCard({
   nhlTeamByAbbr: Map<string, NHLTeam>;
 }) {
   return (
-    <section className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-slate-700 bg-slate-900 p-1.5 shadow-xl">
-      <header className="flex h-9 shrink-0 items-center justify-center gap-2 text-white">
+    <section className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white p-1.5 shadow-sm">
+      <header className="mb-1 flex h-9 shrink-0 items-center justify-center gap-2 rounded-lg border-b border-slate-200 bg-slate-50 text-slate-900">
         {conference.logoUrl ? (
           <Image
             src={conference.logoUrl}
@@ -196,33 +202,34 @@ function ConferenceRosterCard({
 
 export function DraftRosterBoard() {
   const board = useDraftRosterBoard();
+  const draftYear = board.season ? getDraftYear(board.season) : null;
   const nhlTeamByAbbr = new Map(
     board.nhlTeams.map((team) => [team.abbr.trim().toUpperCase(), team]),
   );
 
   return (
     <>
-      <div className="grid min-h-screen place-items-center bg-slate-950 px-6 text-center text-white xl:hidden">
+      <div className="grid min-h-screen place-items-center bg-white px-6 text-center text-slate-900 xl:hidden">
         <div>
-          <MonitorUp className="mx-auto h-12 w-12 text-amber-300" />
+          <MonitorUp className="mx-auto h-12 w-12 text-primary" />
           <h1 className="mt-4 text-2xl font-black">Desktop display required</h1>
-          <p className="mt-2 text-sm text-slate-300">
+          <p className="mt-2 text-sm text-muted-foreground">
             Open this roster board on a screen at least 1280px wide.
           </p>
         </div>
       </div>
 
-      <main className="hidden h-screen min-h-[700px] flex-col overflow-hidden bg-slate-950 p-2 text-slate-950 xl:flex">
-        <header className="flex h-12 shrink-0 items-center justify-between px-2 text-white">
+      <main className="hidden h-screen min-h-[700px] flex-col overflow-hidden bg-white p-2 text-slate-950 xl:flex">
+        <header className="mb-2 flex h-12 shrink-0 items-center justify-between rounded-xl border border-slate-200 bg-white px-3 shadow-sm">
           <div>
-            <p className="text-[9px] font-bold uppercase tracking-[0.22em] text-amber-300">
-              GSHL Draft
+            <p className="text-[9px] font-bold uppercase tracking-[0.22em] text-primary">
+              {draftYear ? `${draftYear} GSHL Draft` : "GSHL Draft"}
             </p>
             <h1 className="text-xl font-black leading-tight">
               League Roster Board
             </h1>
           </div>
-          <p className="text-right text-xs text-slate-300">
+          <p className="text-right text-xs text-muted-foreground">
             {board.season?.name ?? "Current draft season"}
             <br />
             {board.conferences.reduce(
@@ -238,7 +245,7 @@ export function DraftRosterBoard() {
             {[0, 1].map((conference) => (
               <div
                 key={conference}
-                className="animate-pulse rounded-xl border border-slate-700 bg-slate-900"
+                className="animate-pulse rounded-xl border border-slate-200 bg-slate-100"
               />
             ))}
           </div>
@@ -254,7 +261,7 @@ export function DraftRosterBoard() {
             ))}
           </div>
         ) : (
-          <div className="grid min-h-0 flex-1 place-items-center rounded-xl border border-dashed border-slate-700 text-slate-300">
+          <div className="grid min-h-0 flex-1 place-items-center rounded-xl border border-dashed border-slate-300 text-muted-foreground">
             No current conference rosters are available.
           </div>
         )}

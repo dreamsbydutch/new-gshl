@@ -1,26 +1,35 @@
 "use client";
 
 import { useMemo } from "react";
-import type { DraftRosterBoardViewModel, GSHLTeam, NHLTeam } from "@gshl-types";
+import type {
+  DraftRosterBoardViewModel,
+  Franchise,
+  GSHLTeam,
+  NHLTeam,
+} from "@gshl-types";
 import {
   groupDraftRosterTeamsByConference,
   resolveDraftHubSeason,
+  selectLatestActiveFranchiseTeams,
 } from "@gshl-utils";
-import { useNHLTeams, usePlayers, useSeasonState, useTeams } from "@gshl-hooks";
+import {
+  useFranchises,
+  useNHLTeams,
+  usePlayers,
+  useSeasonState,
+  useTeams,
+} from "@gshl-hooks";
 
 export function useDraftRosterBoard(): DraftRosterBoardViewModel {
   const { seasons, isLoading: seasonsLoading } = useSeasonState({
     autoSelect: false,
   });
   const season = useMemo(() => resolveDraftHubSeason(seasons), [seasons]);
-  const teamsQuery = useTeams({
-    seasonId: season?.id,
-    isActive: true,
-    enabled: Boolean(season?.id),
-  });
+  const teamsQuery = useTeams();
+  const franchisesQuery = useFranchises({ isActive: true });
   const playersQuery = usePlayers({ isActive: true });
   const nhlTeamsQuery = useNHLTeams();
-  const teams = useMemo(
+  const teamRows = useMemo(
     () =>
       teamsQuery.data.filter(
         (team): team is GSHLTeam =>
@@ -31,6 +40,18 @@ export function useDraftRosterBoard(): DraftRosterBoardViewModel {
           !("seasonType" in team),
       ),
     [teamsQuery.data],
+  );
+  const franchises = useMemo(
+    () =>
+      franchisesQuery.data.filter(
+        (franchise): franchise is Franchise =>
+          "ownerId" in franchise && !("seasonId" in franchise),
+      ),
+    [franchisesQuery.data],
+  );
+  const teams = useMemo(
+    () => selectLatestActiveFranchiseTeams(teamRows, franchises, seasons),
+    [franchises, seasons, teamRows],
   );
   const conferences = useMemo(
     () => groupDraftRosterTeamsByConference(teams),
@@ -49,6 +70,7 @@ export function useDraftRosterBoard(): DraftRosterBoardViewModel {
     isLoading:
       seasonsLoading ||
       teamsQuery.isLoading ||
+      franchisesQuery.isLoading ||
       playersQuery.isLoading ||
       nhlTeamsQuery.isLoading,
   };

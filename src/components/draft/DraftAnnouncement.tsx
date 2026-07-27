@@ -2,6 +2,7 @@
 
 import { useDraftCountdown } from "@gshl-hooks";
 import { useSeasonState } from "@gshl-hooks";
+import { getDraftYear } from "@gshl-utils";
 
 const AnnouncementBadge = () => (
   <div className="flex items-center gap-2">
@@ -44,6 +45,7 @@ export function DraftAnnouncement() {
   const { isLive, isPast, countdown } = useDraftCountdown({ draftDate });
 
   if (Number.isNaN(draftDate.getTime())) return null;
+  const draftYear = defaultSeason ? getDraftYear(defaultSeason) : "GSHL";
 
   return (
     <section
@@ -59,7 +61,7 @@ export function DraftAnnouncement() {
           id="draft-announcement-title"
           className="bg-gradient-to-br from-white via-white to-amber-200 bg-clip-text text-4xl font-extrabold tracking-tight text-transparent drop-shadow-sm md:text-5xl"
         >
-          {defaultSeason?.year ?? "GSHL"} GSHL Draft
+          {draftYear} GSHL Draft
         </h1>
         <p className="text-lg font-medium text-white/90 md:text-xl">
           {new Intl.DateTimeFormat("en-CA", {

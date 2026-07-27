@@ -3,6 +3,7 @@ import test from "node:test";
 import type { DraftPick, Season } from "@gshl-types";
 import {
   canSubmitDraftPick,
+  getDraftYear,
   resolveDraftClockState,
   resolveDraftHubSeason,
   serializeDraftHubPick,
@@ -82,6 +83,17 @@ void test("selects only the real current or upcoming draft season", () => {
     )?.id,
     "upcoming",
   );
+});
+
+void test("uses the draft start year instead of the season ending year", () => {
+  const draftSeason = season(
+    "2026-27",
+    "2026-10-01",
+    "2027-06-01",
+    "2026-09-15T23:00:00.000Z",
+  );
+
+  assert.equal(getDraftYear(draftSeason), 2026);
 });
 
 void test("does not fall back to a previous season's completed draft", () => {

@@ -9,6 +9,7 @@ import {
   useDraftHubState,
 } from "@gshl-hooks";
 import type { DraftHubCardProps } from "@gshl-types";
+import { getDraftYear } from "@gshl-utils";
 
 export function DraftHubCard({ season }: DraftHubCardProps) {
   const { session, status: sessionStatus } = useAuthSession();
@@ -21,6 +22,7 @@ export function DraftHubCard({ season }: DraftHubCardProps) {
   const draftDate = new Date(season.draftStartAt ?? Number.NaN);
   const countdown = useDraftCountdown({ draftDate });
   if (Number.isNaN(draftDate.getTime())) return null;
+  const draftYear = getDraftYear(season);
 
   const isComplete = draftState.data?.status === "complete";
   const isLive =
@@ -47,7 +49,7 @@ export function DraftHubCard({ season }: DraftHubCardProps) {
             {isComplete ? "Draft complete" : isLive ? "Live now" : "Upcoming"}
           </div>
           <h2 className="text-3xl font-black sm:text-4xl">
-            {season.year} GSHL Draft Hub
+            {draftYear} GSHL Draft Hub
           </h2>
           <p className="mt-2 max-w-2xl text-sm text-slate-300 sm:text-base">
             Follow every selection live, see the full league board, and track

@@ -9,6 +9,21 @@ import { findCurrentSeason, findUpcomingSeason } from "../domain/season";
 
 export const DRAFT_PICK_CLOCK_MS = 4 * 60 * 1000;
 
+export function getDraftYear(
+  season: Pick<Season, "draftStartAt" | "startDate" | "year">,
+): number {
+  const draftDate = season.draftStartAt
+    ? new Date(season.draftStartAt)
+    : new Date(season.startDate);
+  const dateYear = draftDate.getUTCFullYear();
+  if (Number.isFinite(dateYear)) return dateYear;
+
+  const seasonYear = Number(season.year);
+  return Number.isFinite(seasonYear)
+    ? seasonYear - 1
+    : new Date().getFullYear();
+}
+
 function timestamp(
   value: Date | string | number | null | undefined,
 ): number | null {
