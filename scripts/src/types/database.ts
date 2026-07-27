@@ -32,6 +32,7 @@ export interface Conference {
   name: string;
   logoUrl: string;
   abbr: string;
+  leadReporter?: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -134,6 +135,7 @@ export interface Franchise {
   abbr: string;
   logoUrl: string;
   confId: string;
+  beatWriter?: string | null;
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;

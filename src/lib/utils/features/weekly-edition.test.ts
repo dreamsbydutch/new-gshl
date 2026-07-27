@@ -11,6 +11,7 @@ import {
   buildWeeklyEditionMilestoneFacts,
   buildWeeklyEditionMilestoneSchedule,
   buildWeeklyEditionPeriodRecordFacts,
+  filterWeeklyEditionContent,
   hashWeeklyEditionSource,
   isWeeklyEditionPlayingContract,
   validateWeeklyEditionImport,
@@ -27,10 +28,42 @@ function source(): BuildWeeklyEditionFactPacketInput {
       endDate: "2026-01-11",
     },
     teams: [
-      { teamId: "team-a", name: "Aurora", abbr: "AUR" },
-      { teamId: "team-b", name: "Bears", abbr: "BEA" },
-      { teamId: "team-c", name: "Comets", abbr: "COM" },
-      { teamId: "team-d", name: "Dragons", abbr: "DRA" },
+      {
+        teamId: "team-a",
+        name: "Aurora",
+        abbr: "AUR",
+        conferenceId: "east",
+        conferenceName: "Crystal",
+        beatWriter: "Gord McKenzie",
+        leadReporter: "Bruce McAllister",
+      },
+      {
+        teamId: "team-b",
+        name: "Bears",
+        abbr: "BEA",
+        conferenceId: "east",
+        conferenceName: "Crystal",
+        beatWriter: "Darren Whitmore",
+        leadReporter: "Bruce McAllister",
+      },
+      {
+        teamId: "team-c",
+        name: "Comets",
+        abbr: "COM",
+        conferenceId: "west",
+        conferenceName: "Diamond",
+        beatWriter: "Scott Callahan",
+        leadReporter: "Ken Brodie",
+      },
+      {
+        teamId: "team-d",
+        name: "Dragons",
+        abbr: "DRA",
+        conferenceId: "west",
+        conferenceName: "Diamond",
+        beatWriter: "Mike Bouchard",
+        leadReporter: "Ken Brodie",
+      },
     ],
     matchups: [
       {
@@ -376,10 +409,17 @@ void test("prompt contains only relevant edition facts and a compact section pla
     abbr: "DOT",
   });
   const prompt = buildWeeklyEditionChatGptPrompt(packet);
+  assert.match(prompt, /^PROMPT_FORMAT=editorial_context_v3/);
   assert.match(prompt, /EDITION_FACTS=/);
   assert.match(prompt, /SECTION_PLAN=/);
   assert.match(prompt, /Return only one JSON object/);
   assert.match(prompt, /Alex North/);
+  assert.match(prompt, /Graham MacIntyre/);
+  assert.match(prompt, /Evan Soderberg/);
+  assert.match(prompt, /Nate Carlson/);
+  assert.match(prompt, /Darren Leclair/);
+  assert.match(prompt, /Mike Halvorsen/);
+  assert.match(prompt, /Gord McKenzie/);
   assert.doesNotMatch(prompt, /Database Only Team/);
   assert.doesNotMatch(prompt, /knownEntityNames|allowedNames|allowedNumbers/);
 });
@@ -387,11 +427,80 @@ void test("prompt contains only relevant edition facts and a compact section pla
 void test("accepts a grounded response and rejects malformed JSON", () => {
   const packet = buildWeeklyEditionFactPacket(source());
   const content = buildTemplateWeeklyEdition(packet);
+  assert.ok(content.sections.every((section) => section.author));
+  assert.equal(
+    content.sections.find((section) => section.kind === "three_stars")?.author
+      ?.name,
+    "Nate Carlson",
+  );
+  assert.equal(
+    content.sections.find((section) => section.kind === "transaction_wire")
+      ?.author?.name,
+    "Mike Halvorsen",
+  );
   assert.equal(
     validateWeeklyEditionImport(JSON.stringify(content), packet).valid,
     true,
   );
   assert.equal(validateWeeklyEditionImport("{bad", packet).valid, false);
+});
+
+void test("reserves department heads for major primary stories", () => {
+  const packet = buildWeeklyEditionFactPacket(source());
+  packet.editorialCandidates = [
+    {
+      id: "record-major",
+      kind: "record",
+      scope: "league",
+      importance: 100,
+      headlineHint: "Aurora resets the league record book",
+      summary: "Aurora set a verified league record.",
+      teamId: "team-a",
+      teamName: "Aurora",
+      metrics: [],
+      links: [],
+    },
+  ];
+  assert.equal(
+    buildTemplateWeeklyEdition(packet).sections[0]?.author?.position,
+    "Head of Analytics",
+  );
+
+  packet.editorialCandidates = [
+    {
+      id: "trade-major",
+      kind: "transaction",
+      scope: "week",
+      importance: 82,
+      headlineHint: "Aurora lands the week’s biggest trade",
+      summary: "Aurora completed the week’s biggest verified trade.",
+      teamId: "team-a",
+      teamName: "Aurora",
+      metrics: [],
+      links: [],
+    },
+  ];
+  assert.equal(
+    buildTemplateWeeklyEdition(packet).sections[0]?.author?.position,
+    "GSHL Head Insider",
+  );
+});
+
+void test("filters inactive articles without mutating the stored edition", () => {
+  const packet = buildWeeklyEditionFactPacket(source());
+  const content = buildTemplateWeeklyEdition(packet);
+  const hiddenId = content.sections[1]!.id;
+  const visible = filterWeeklyEditionContent(content, [hiddenId]);
+
+  assert.equal(
+    visible.sections.some((section) => section.id === hiddenId),
+    false,
+  );
+  assert.equal(content.sections.length, visible.sections.length + 1);
+  assert.equal(
+    content.sections.some((section) => section.id === hiddenId),
+    true,
+  );
 });
 
 void test("rejects HTML, altered structure, invented links, and oversized text", () => {
@@ -428,6 +537,17 @@ void test("rejects HTML, altered structure, invented links, and oversized text",
     false,
   );
 
+  const alteredAuthor = structuredClone(content);
+  alteredAuthor.sections[0]!.author = {
+    name: "Invented Reporter",
+    position: "Beat Writer",
+    scope: "league",
+  };
+  assert.equal(
+    validateWeeklyEditionImport(JSON.stringify(alteredAuthor), packet).valid,
+    false,
+  );
+
   const inventedLink = structuredClone(content);
   inventedLink.sections[0]!.links = [
     { label: "Elsewhere", href: "https://example.com" },
@@ -438,10 +558,17 @@ void test("rejects HTML, altered structure, invented links, and oversized text",
   );
 
   const oversized = structuredClone(content);
-  oversized.deck = "x".repeat(241);
+  oversized.deck = "x".repeat(221);
   assert.equal(
     validateWeeklyEditionImport(JSON.stringify(oversized), packet).valid,
     false,
+  );
+
+  const promptLimitBody = structuredClone(content);
+  promptLimitBody.sections[0]!.body = "x".repeat(1000);
+  assert.equal(
+    validateWeeklyEditionImport(JSON.stringify(promptLimitBody), packet).valid,
+    true,
   );
 });
 
@@ -539,7 +666,7 @@ void test("builds each season milestone from contract, cap, draft, and roster fa
     });
     const content = buildTemplateWeeklyEdition(packet);
     assert.equal(packet.issueType, issueType);
-    assert.ok(content.sections.length >= 5);
+    assert.equal(content.sections.length, 6);
     if (issueType !== "final_recap") {
       assert.match(
         `${content.headline} ${content.deck} ${content.sections
@@ -559,6 +686,11 @@ void test("builds each season milestone from contract, cap, draft, and roster fa
     if (issueType === "resigning_outlook") {
       assert.match(prompt, /expiringContracts/);
       assert.doesNotMatch(prompt, /draftPicks|recentSignings/);
+      assert.equal(
+        content.sections.find((section) => section.kind === "next_week")?.author
+          ?.position,
+        "Editor-in-Chief",
+      );
     }
     if (issueType === "pre_draft") {
       assert.match(prompt, /draftPicks/);

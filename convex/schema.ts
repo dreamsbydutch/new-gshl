@@ -199,6 +199,7 @@ export default defineSchema({
     name: stringValue,
     logoUrl: optionalNullableString,
     abbr: stringValue,
+    leadReporter: optionalNullableString,
     createdAt: timestampValue,
     updatedAt: timestampValue,
   }),
@@ -221,6 +222,7 @@ export default defineSchema({
       abbr: stringValue,
       logoUrl: optionalNullableString,
       confId: id("conferences"),
+      beatWriter: optionalNullableString,
       isActive: boolValue,
       createdAt: timestampValue,
       updatedAt: timestampValue,
@@ -751,10 +753,13 @@ export default defineSchema({
     createdAt: requiredTimestampValue,
     updatedAt: requiredTimestampValue,
     editedBy: v.optional(v.id("authUsers")),
+    isHomeActive: v.optional(v.boolean()),
+    inactiveSectionIds: v.optional(v.array(v.string())),
   })
     .index("by_seasonId_weekId", ["seasonId", "weekId"])
     .index("by_seasonId_editionKey", ["seasonId", "editionKey"])
     .index("by_status_publishedAt", ["status", "publishedAt"])
+    .index("by_homeActive_publishedAt", ["isHomeActive", "publishedAt"])
     .index("by_seasonId_publishedAt", ["seasonId", "publishedAt"]),
 
   weeklyEditionRevisions: defineTable({

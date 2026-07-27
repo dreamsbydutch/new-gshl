@@ -27,7 +27,7 @@ export function WeeklyEditionEditor({
         <input
           value={content.headline}
           disabled={disabled}
-          maxLength={110}
+          maxLength={90}
           onChange={(event) =>
             onChange({ ...content, headline: event.target.value })
           }
@@ -39,7 +39,7 @@ export function WeeklyEditionEditor({
         <textarea
           value={content.deck}
           disabled={disabled}
-          maxLength={240}
+          maxLength={220}
           rows={3}
           onChange={(event) =>
             onChange({ ...content, deck: event.target.value })
@@ -57,11 +57,16 @@ export function WeeklyEditionEditor({
             {section.kind.replaceAll("_", " ")}
           </legend>
           <div className="grid gap-3">
+            {section.author ? (
+              <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-500">
+                By {section.author.name} · {section.author.position}
+              </p>
+            ) : null}
             <label className="text-xs font-medium text-slate-700">
               Eyebrow
               <input
                 value={section.eyebrow}
-                maxLength={40}
+                maxLength={50}
                 onChange={(event) =>
                   updateSection(section.id, "eyebrow", event.target.value)
                 }
@@ -72,7 +77,7 @@ export function WeeklyEditionEditor({
               Headline
               <input
                 value={section.headline}
-                maxLength={110}
+                maxLength={90}
                 onChange={(event) =>
                   updateSection(section.id, "headline", event.target.value)
                 }
@@ -83,7 +88,7 @@ export function WeeklyEditionEditor({
               Story
               <textarea
                 value={section.body}
-                maxLength={900}
+                maxLength={1000}
                 rows={5}
                 onChange={(event) =>
                   updateSection(section.id, "body", event.target.value)

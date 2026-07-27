@@ -27,9 +27,7 @@ export function HomeContent() {
 
   return (
     <main className="container mx-auto space-y-8 px-2 py-4 sm:px-4">
-      <WeeklyEditionHomeCard
-        seasonId={defaultSeason?.id ? String(defaultSeason.id) : undefined}
-      />
+      <WeeklyEditionHomeCard />
       <UfaHomeCard />
       <PowerRankingsHomeCard
         seasonId={defaultSeason?.id ? String(defaultSeason.id) : undefined}

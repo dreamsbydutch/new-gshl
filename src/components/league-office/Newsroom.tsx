@@ -7,10 +7,13 @@ import {
   Eye,
   EyeOff,
   FileClock,
+  House,
   LoaderCircle,
   Newspaper,
   Save,
   Sparkles,
+  ToggleLeft,
+  ToggleRight,
 } from "lucide-react";
 import { useSeasons, useWeeklyEditionNewsroom, useWeeks } from "@gshl-hooks";
 import type {
@@ -48,6 +51,10 @@ export function Newsroom() {
     () => newsroom.editions?.find((edition) => edition.id === editionId),
     [editionId, newsroom.editions],
   );
+  const activeArticleCount =
+    selectedEdition?.content.sections.filter(
+      (section) => !selectedEdition.inactiveSectionIds?.includes(section.id),
+    ).length ?? 0;
 
   useEffect(() => {
     if (!editionId && newsroom.editions?.[0]) {
@@ -137,11 +144,47 @@ export function Newsroom() {
     );
   };
 
+  const toggleHomeActive = async () => {
+    if (!selectedEdition) return;
+    await newsroom.setHomeActive.mutateAsync({
+      editionId: selectedEdition.isHomeActive ? undefined : selectedEdition.id,
+    });
+    showNotice(
+      selectedEdition.isHomeActive
+        ? "No newsletter is active on the homepage."
+        : "This is now the only newsletter active on the homepage.",
+    );
+  };
+
+  const clearHomeActive = async () => {
+    await newsroom.setHomeActive.mutateAsync({});
+    showNotice("No newsletter is active on the homepage.");
+  };
+
+  const toggleSectionActive = async (
+    sectionId: string,
+    currentlyActive: boolean,
+  ) => {
+    if (!selectedEdition) return;
+    await newsroom.setSectionActive.mutateAsync({
+      editionId: selectedEdition.id,
+      sectionId,
+      active: !currentlyActive,
+    });
+    showNotice(
+      currentlyActive
+        ? "Article turned off for readers."
+        : "Article turned on for readers.",
+    );
+  };
+
   const mutationError =
     newsroom.generateHistorical.error ??
     newsroom.publishImport.error ??
     newsroom.updateManual.error ??
     newsroom.setVisibility.error ??
+    newsroom.setHomeActive.error ??
+    newsroom.setSectionActive.error ??
     newsroom.restoreRevision.error;
 
   return (
@@ -152,7 +195,7 @@ export function Newsroom() {
         </p>
         <h1 className="mt-1 flex items-center gap-2 font-oswald text-3xl font-bold text-slate-950">
           <Newspaper className="h-7 w-7" aria-hidden="true" />
-          GSHL Weekly Newsroom
+          GSHL Press Box Newsroom
         </h1>
         <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
           Weekly and season-milestone editions publish automatically. ChatGPT is
@@ -279,6 +322,7 @@ export function Newsroom() {
                   >
                     {edition.generationMode.replaceAll("_", " ")} ·{" "}
                     {edition.status}
+                    {edition.isHomeActive ? " · home active" : ""}
                   </span>
                 </button>
               ))}
@@ -310,10 +354,86 @@ export function Newsroom() {
                 {selectedEdition.status === "published" ? <EyeOff /> : <Eye />}
                 {selectedEdition.status === "published" ? "Hide" : "Restore"}
               </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => void toggleHomeActive()}
+                disabled={
+                  selectedEdition.status !== "published" ||
+                  newsroom.setHomeActive.isPending
+                }
+              >
+                <House />
+                {selectedEdition.isHomeActive
+                  ? "Remove from Home"
+                  : "Make active on Home"}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => void clearHomeActive()}
+                disabled={newsroom.setHomeActive.isPending}
+              >
+                <EyeOff />
+                No newsletter on Home
+              </Button>
               <span className="self-center rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
                 {selectedEdition.generationMode.replaceAll("_", " ")}
               </span>
             </div>
+
+            <details
+              open
+              className="rounded-xl border border-slate-200 bg-white shadow-sm"
+            >
+              <summary className="cursor-pointer px-5 py-4 font-semibold text-slate-900">
+                Article visibility ({activeArticleCount} of{" "}
+                {selectedEdition.content.sections.length} active)
+              </summary>
+              <div className="divide-y border-t border-slate-200">
+                {selectedEdition.content.sections.map((section) => {
+                  const isActive =
+                    !selectedEdition.inactiveSectionIds?.includes(section.id);
+                  return (
+                    <div
+                      key={section.id}
+                      className="flex items-center justify-between gap-3 px-5 py-3"
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-slate-900">
+                          {section.headline}
+                        </p>
+                        <p className="mt-0.5 text-[10px] font-medium uppercase tracking-[0.1em] text-slate-500">
+                          {section.eyebrow}
+                          {section.author ? ` · ${section.author.name}` : ""}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={isActive}
+                        disabled={newsroom.setSectionActive.isPending}
+                        onClick={() =>
+                          void toggleSectionActive(section.id, isActive)
+                        }
+                        className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:opacity-50 ${
+                          isActive
+                            ? "bg-emerald-100 text-emerald-800"
+                            : "bg-slate-100 text-slate-500"
+                        }`}
+                      >
+                        {isActive ? (
+                          <ToggleRight className="h-4 w-4" aria-hidden="true" />
+                        ) : (
+                          <ToggleLeft className="h-4 w-4" aria-hidden="true" />
+                        )}
+                        {isActive ? "Active" : "Off"}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </details>
 
             <details
               open

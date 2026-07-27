@@ -19,10 +19,13 @@ import type * as jobCatalog from "../jobCatalog.js";
 import type * as jobRunner from "../jobRunner.js";
 import type * as jobs from "../jobs.js";
 import type * as lib_auth from "../lib/auth.js";
+import type * as lib_reporterDirectory from "../lib/reporterDirectory.js";
 import type * as lib_timestamps from "../lib/timestamps.js";
 import type * as maintenanceScope from "../maintenanceScope.js";
+import type * as reporterBackfill from "../reporterBackfill.js";
 import type * as timestampMigration from "../timestampMigration.js";
 import type * as ufa from "../ufa.js";
+import type * as weeklyEditionBackfill from "../weeklyEditionBackfill.js";
 import type * as weeklyEditions from "../weeklyEditions.js";
 import type * as yahooBackfill from "../yahooBackfill.js";
 
@@ -44,10 +47,13 @@ declare const fullApi: ApiFromModules<{
   jobRunner: typeof jobRunner;
   jobs: typeof jobs;
   "lib/auth": typeof lib_auth;
+  "lib/reporterDirectory": typeof lib_reporterDirectory;
   "lib/timestamps": typeof lib_timestamps;
   maintenanceScope: typeof maintenanceScope;
+  reporterBackfill: typeof reporterBackfill;
   timestampMigration: typeof timestampMigration;
   ufa: typeof ufa;
+  weeklyEditionBackfill: typeof weeklyEditionBackfill;
   weeklyEditions: typeof weeklyEditions;
   yahooBackfill: typeof yahooBackfill;
 }>;

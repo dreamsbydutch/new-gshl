@@ -27,11 +27,24 @@ export type WeeklyEditionSectionKind =
   | "roster_outlook"
   | "ufa_market"
   | "draft_capital"
-  | "season_predictions";
+  | "season_predictions"
+  | "league_notebook";
 
 export interface WeeklyEditionLink {
   label: string;
   href: string;
+}
+
+export type WeeklyEditionAuthorScope = "league" | "conference" | "team";
+
+export interface WeeklyEditionAuthor {
+  name: string;
+  position: string;
+  scope: WeeklyEditionAuthorScope;
+  teamId?: string;
+  teamName?: string;
+  conferenceId?: string;
+  conferenceName?: string;
 }
 
 export interface WeeklyEditionSection {
@@ -41,6 +54,7 @@ export interface WeeklyEditionSection {
   headline: string;
   body: string;
   links: WeeklyEditionLink[];
+  author?: WeeklyEditionAuthor;
 }
 
 export interface WeeklyEditionContent {
@@ -54,6 +68,11 @@ export interface WeeklyEditionTeamFact {
   name: string;
   abbr: string;
   logoUrl?: string;
+  conferenceId?: string;
+  conferenceName?: string;
+  conferenceLogoUrl?: string;
+  beatWriter?: string;
+  leadReporter?: string;
 }
 
 export interface WeeklyEditionMatchupFact {
@@ -139,6 +158,8 @@ export type WeeklyEditionEditorialCandidateKind =
   | "award_race"
   | "award"
   | "transaction"
+  | "activity"
+  | "performance"
   | "missed_start";
 
 export type WeeklyEditionEditorialCandidateScope =
@@ -357,6 +378,8 @@ export interface WeeklyEdition {
   createdAt: number;
   updatedAt: number;
   editedBy?: string;
+  isHomeActive?: boolean;
+  inactiveSectionIds?: string[];
 }
 
 export interface WeeklyEditionRevision {
@@ -458,10 +481,6 @@ export interface BuildWeeklyEditionCategoryMarginsInput {
   awayStats: Record<string, unknown>;
 }
 
-export interface WeeklyEditionHomeCardProps {
-  seasonId?: string;
-}
-
 export interface WeeklyEditionPageProps {
   editionId: string;
 }
@@ -473,6 +492,8 @@ export interface WeeklyEditionRouteProps {
 export interface WeeklyEditionArticleProps {
   edition: WeeklyEdition;
   preview?: boolean;
+  modal?: boolean;
+  onClose?: () => void;
 }
 
 export interface WeeklyEditionEditorProps {
@@ -484,6 +505,7 @@ export interface WeeklyEditionEditorProps {
 export interface WeeklyEditionSectionCardProps {
   section: WeeklyEditionSection;
   featured?: boolean;
+  teams?: WeeklyEditionTeamFact[];
 }
 
 export interface WeeklyEditionQueryState<T> {

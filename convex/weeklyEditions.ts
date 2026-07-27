@@ -20,6 +20,7 @@ import {
   buildWeeklyEditionCategoryMargins,
   buildWeeklyEditionChatGptPrompt,
   buildWeeklyEditionFactPacket,
+  filterWeeklyEditionContent,
   buildWeeklyEditionPeriodRecordFacts,
   hashWeeklyEditionSource,
   isWeeklyEditionPlayingContract,
@@ -80,6 +81,17 @@ const publicRow = <Row extends { _id: string }>(
   }
   return output as PublicRow<Row>;
 };
+const publicReaderRow = (row: EditionRow | null) => {
+  const output = publicRow(row);
+  if (!output || !row) return null;
+  return {
+    ...output,
+    content: filterWeeklyEditionContent(
+      row.content,
+      row.inactiveSectionIds ?? [],
+    ),
+  };
+};
 const asNumber = (value: unknown) => {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : 0;
@@ -131,30 +143,38 @@ async function buildSource(
   season: Doc<"seasons">,
   week: Doc<"weeks">,
 ) {
-  const [teams, franchises, matchups, playerWeekRows, currentPower, weeks] =
-    await Promise.all([
-      ctx.db
-        .query("teams")
-        .withIndex("by_seasonId", (q) => q.eq("seasonId", season._id))
-        .collect(),
-      ctx.db.query("franchises").collect(),
-      ctx.db
-        .query("matchups")
-        .withIndex("by_weekId", (q) => q.eq("weekId", week._id))
-        .collect(),
-      ctx.db
-        .query("playerWeekStatLines")
-        .withIndex("by_weekId", (q) => q.eq("weekId", week._id))
-        .collect(),
-      ctx.db
-        .query("teamWeekStatLines")
-        .withIndex("by_weekId", (q) => q.eq("weekId", week._id))
-        .collect(),
-      ctx.db
-        .query("weeks")
-        .withIndex("by_seasonId", (q) => q.eq("seasonId", season._id))
-        .collect(),
-    ]);
+  const [
+    teams,
+    franchises,
+    conferences,
+    matchups,
+    playerWeekRows,
+    currentPower,
+    weeks,
+  ] = await Promise.all([
+    ctx.db
+      .query("teams")
+      .withIndex("by_seasonId", (q) => q.eq("seasonId", season._id))
+      .collect(),
+    ctx.db.query("franchises").collect(),
+    ctx.db.query("conferences").collect(),
+    ctx.db
+      .query("matchups")
+      .withIndex("by_weekId", (q) => q.eq("weekId", week._id))
+      .collect(),
+    ctx.db
+      .query("playerWeekStatLines")
+      .withIndex("by_weekId", (q) => q.eq("weekId", week._id))
+      .collect(),
+    ctx.db
+      .query("teamWeekStatLines")
+      .withIndex("by_weekId", (q) => q.eq("weekId", week._id))
+      .collect(),
+    ctx.db
+      .query("weeks")
+      .withIndex("by_seasonId", (q) => q.eq("seasonId", season._id))
+      .collect(),
+  ]);
 
   if (matchups.length === 0 || matchups.some((item) => !item.isComplete)) {
     throw new Error("The week still has incomplete matchups");
@@ -179,14 +199,10 @@ async function buildSource(
     teamDays,
     contracts,
     players,
-    allTeams,
-    allMatchups,
-    allTeamWeeks,
-    teamSeasonRows,
-    careerSplits,
     playerAwards,
     teamAwards,
     playerTotals,
+    teamSeasonRowsForSeason,
   ] = await Promise.all([
     previousWeek
       ? ctx.db
@@ -213,11 +229,6 @@ async function buildSource(
       .withIndex("by_seasonId", (q) => q.eq("seasonId", season._id))
       .collect(),
     ctx.db.query("players").collect(),
-    ctx.db.query("teams").collect(),
-    ctx.db.query("matchups").collect(),
-    ctx.db.query("teamWeekStatLines").collect(),
-    ctx.db.query("teamSeasonStatLines").collect(),
-    ctx.db.query("playerCareerSplitStatLines").collect(),
     ctx.db
       .query("playerAwards")
       .withIndex("by_seasonId", (q) => q.eq("seasonId", season._id))
@@ -226,15 +237,26 @@ async function buildSource(
       .query("teamAwards")
       .withIndex("by_seasonId", (q) => q.eq("seasonId", season._id))
       .collect(),
-    ctx.db.query("playerTotalStatLines").collect(),
+    ctx.db
+      .query("playerTotalStatLines")
+      .withIndex("by_seasonId", (q) => q.eq("seasonId", season._id))
+      .collect(),
+    ctx.db
+      .query("teamSeasonStatLines")
+      .withIndex("by_seasonId", (q) => q.eq("seasonId", season._id))
+      .collect(),
   ]);
 
   const franchiseById = new Map(
     franchises.map((franchise) => [String(franchise._id), franchise]),
   );
+  const conferenceById = new Map(
+    conferences.map((conference) => [String(conference._id), conference]),
+  );
   const teamById = new Map(
     teams.map((team) => {
       const franchise = franchiseById.get(String(team.franchiseId));
+      const conference = conferenceById.get(String(team.confId));
       return [
         String(team._id),
         {
@@ -242,12 +264,17 @@ async function buildSource(
           name: franchise?.name ?? "Unknown team",
           abbr: franchise?.abbr ?? "GSHL",
           logoUrl: franchise?.logoUrl ?? undefined,
+          conferenceId: String(team.confId),
+          conferenceName: conference?.name,
+          conferenceLogoUrl: conference?.logoUrl ?? undefined,
+          beatWriter: franchise?.beatWriter ?? undefined,
+          leadReporter: conference?.leadReporter ?? undefined,
         },
       ];
     }),
   );
-  const allTeamById = new Map(
-    allTeams.map((team) => {
+  const currentTeamContextById = new Map(
+    teams.map((team) => {
       const franchise = franchiseById.get(String(team.franchiseId));
       return [
         String(team._id),
@@ -257,20 +284,30 @@ async function buildSource(
           franchiseId: String(team.franchiseId),
           franchiseName: franchise?.name ?? "Unknown team",
           ownerId: String(franchise?.ownerId ?? ""),
-          seasonId: String(team.seasonId),
         },
       ];
     }),
   );
   const currentTeamByOwnerId = new Map(
-    [...teamById.entries()].map(([teamId, team]) => {
-      const source = allTeamById.get(teamId);
+    [...currentTeamContextById.values()].map((team) => {
       return [
-        source?.ownerId ?? "",
-        { ...team, franchiseId: source?.franchiseId ?? "" },
+        team.ownerId,
+        {
+          teamId: team.teamId,
+          name: team.name,
+          franchiseId: team.franchiseId,
+        },
       ];
     }),
   );
+  // Historical records are materialized separately. Interactive generation
+  // must stay on indexed current-week/current-season reads to remain below
+  // Convex's one-second mutation limit.
+  const allTeamById = currentTeamContextById;
+  const allTeamWeeks = currentPower;
+  const teamSeasonRows = teamSeasonRowsForSeason;
+  const careerTotals: typeof playerTotals = [];
+  const allMatchups: typeof matchups = [];
   const playerById = new Map(
     players.map((player) => [String(player._id), player]),
   );
@@ -595,90 +632,32 @@ async function buildSource(
     metricLabels: EDITORIAL_RECORD_LABELS,
   });
 
-  const careerByFranchisePlayer = new Map<
-    string,
-    {
-      id: string;
-      entityType: "player";
-      period: "career";
-      periodId: string;
-      playerId: string;
-      playerName: string;
-      franchiseId: string;
-      franchiseName: string;
-      metrics: Record<string, number>;
-      deltaMetrics: Record<string, number>;
-    }
-  >();
-  for (const row of careerSplits.filter(
-    (item) => String(item.seasonType) === "RS",
-  )) {
-    const team = allTeamById.get(String(row.gshlTeamId));
-    if (!team) continue;
-    const playerId = String(row.playerId);
-    const key = `${team.franchiseId}:${playerId}`;
-    const current = careerByFranchisePlayer.get(key) ?? {
-      id: key,
-      entityType: "player" as const,
-      period: "career" as const,
-      periodId: "career",
-      playerId,
-      playerName: playerById.get(playerId)?.fullName ?? "Unknown player",
-      franchiseId: team.franchiseId,
-      franchiseName: team.franchiseName,
-      metrics: {},
-      deltaMetrics: {},
-    };
-    for (const stat of EDITORIAL_STAT_KEYS) {
-      current.metrics[stat] =
-        (current.metrics[stat] ?? 0) + asNumber(row[stat]);
-    }
-    careerByFranchisePlayer.set(key, current);
-  }
+  const careerDeltaByPlayer = new Map<string, Record<string, number>>();
   for (const row of playerWeekRows) {
-    const team = allTeamById.get(String(row.gshlTeamId));
-    const snapshot = team
-      ? careerByFranchisePlayer.get(
-          `${team.franchiseId}:${String(row.playerId)}`,
-        )
-      : undefined;
-    if (!snapshot) continue;
-    snapshot.deltaMetrics = editorialMetrics(row);
-  }
-  const franchiseCareerSnapshots = [...careerByFranchisePlayer.values()];
-  const leagueCareerByPlayer = new Map<
-    string,
-    (typeof franchiseCareerSnapshots)[number]
-  >();
-  for (const snapshot of franchiseCareerSnapshots) {
-    const existing = leagueCareerByPlayer.get(snapshot.playerId) ?? {
-      ...snapshot,
-      id: `league:${snapshot.playerId}`,
-      franchiseId: "",
-      franchiseName: "",
-      metrics: {},
-      deltaMetrics: {},
-    };
+    const playerId = String(row.playerId);
+    const current = careerDeltaByPlayer.get(playerId) ?? {};
     for (const stat of EDITORIAL_STAT_KEYS) {
-      existing.metrics[stat] =
-        (existing.metrics[stat] ?? 0) + (snapshot.metrics[stat] ?? 0);
-      existing.deltaMetrics[stat] =
-        (existing.deltaMetrics[stat] ?? 0) + (snapshot.deltaMetrics[stat] ?? 0);
+      current[stat] = (current[stat] ?? 0) + asNumber(row[stat]);
     }
-    leagueCareerByPlayer.set(snapshot.playerId, existing);
+    careerDeltaByPlayer.set(playerId, current);
   }
-  const careerRecords = [
-    ...buildWeeklyEditionCareerRecordFacts({
-      snapshots: franchiseCareerSnapshots,
-      metricLabels: EDITORIAL_CAREER_RECORD_LABELS,
-      recordScopes: ["franchise"],
+  const careerRecords = buildWeeklyEditionCareerRecordFacts({
+    snapshots: careerTotals.map((row) => {
+      const playerId = String(row.playerId);
+      return {
+        id: `league:${playerId}`,
+        entityType: "player" as const,
+        period: "career" as const,
+        periodId: "career",
+        playerId,
+        playerName: playerById.get(playerId)?.fullName ?? "Unknown player",
+        metrics: editorialMetrics(row),
+        deltaMetrics: careerDeltaByPlayer.get(playerId) ?? {},
+      };
     }),
-    ...buildWeeklyEditionCareerRecordFacts({
-      snapshots: [...leagueCareerByPlayer.values()],
-      metricLabels: EDITORIAL_CAREER_RECORD_LABELS,
-      recordScopes: ["league"],
-    }),
-  ];
+    metricLabels: EDITORIAL_CAREER_RECORD_LABELS,
+    recordScopes: ["league"],
+  });
 
   const achievementByFranchise = new Map<
     string,
@@ -1095,6 +1074,7 @@ async function buildMilestoneSource(
     teams,
     sourceTeams,
     franchises,
+    conferences,
     players,
     contracts,
     draftPicks,
@@ -1112,6 +1092,7 @@ async function buildMilestoneSource(
       .withIndex("by_seasonId", (q) => q.eq("seasonId", season._id))
       .collect(),
     ctx.db.query("franchises").collect(),
+    ctx.db.query("conferences").collect(),
     ctx.db.query("players").collect(),
     ctx.db.query("contracts").collect(),
     ctx.db
@@ -1156,9 +1137,13 @@ async function buildMilestoneSource(
   const franchiseById = new Map(
     franchises.map((franchise) => [String(franchise._id), franchise]),
   );
+  const conferenceById = new Map(
+    conferences.map((conference) => [String(conference._id), conference]),
+  );
   const teamById = new Map(
     teams.map((team) => {
       const franchise = franchiseById.get(String(team.franchiseId));
+      const conference = conferenceById.get(String(team.confId));
       return [
         String(team._id),
         {
@@ -1166,6 +1151,11 @@ async function buildMilestoneSource(
           name: franchise?.name ?? "Unknown team",
           abbr: franchise?.abbr ?? "GSHL",
           logoUrl: franchise?.logoUrl ?? undefined,
+          conferenceId: String(team.confId),
+          conferenceName: conference?.name,
+          conferenceLogoUrl: conference?.logoUrl ?? undefined,
+          beatWriter: franchise?.beatWriter ?? undefined,
+          leadReporter: conference?.leadReporter ?? undefined,
           ownerId: String(franchise?.ownerId ?? ""),
         },
       ];
@@ -1174,6 +1164,7 @@ async function buildMilestoneSource(
   const sourceTeamById = new Map(
     sourceTeams.map((team) => {
       const franchise = franchiseById.get(String(team.franchiseId));
+      const conference = conferenceById.get(String(team.confId));
       return [
         String(team._id),
         {
@@ -1181,6 +1172,11 @@ async function buildMilestoneSource(
           name: franchise?.name ?? "Unknown team",
           abbr: franchise?.abbr ?? "GSHL",
           logoUrl: franchise?.logoUrl ?? undefined,
+          conferenceId: String(team.confId),
+          conferenceName: conference?.name,
+          conferenceLogoUrl: conference?.logoUrl ?? undefined,
+          beatWriter: franchise?.beatWriter ?? undefined,
+          leadReporter: conference?.leadReporter ?? undefined,
           ownerId: String(franchise?.ownerId ?? ""),
         },
       ];
@@ -1527,25 +1523,14 @@ async function generateMilestoneForSeason(
 }
 
 export const latestPublished = query({
-  args: { seasonId: v.optional(v.id("seasons")) },
-  handler: async (ctx, args) => {
-    const seasonId = args.seasonId;
-    if (seasonId) {
-      const rows = await ctx.db.query("weeklyEditions").collect();
-      return publicRow(
-        rows
-          .filter(
-            (row) => row.seasonId === seasonId && row.status === "published",
-          )
-          .sort(descendingTimestamp)[0] ?? null,
-      );
-    }
-    const rows = await ctx.db.query("weeklyEditions").collect();
-    return publicRow(
-      rows
-        .filter((row) => row.status === "published")
-        .sort(descendingTimestamp)[0] ?? null,
-    );
+  args: {},
+  handler: async (ctx) => {
+    const active = await ctx.db
+      .query("weeklyEditions")
+      .withIndex("by_homeActive_publishedAt", (q) => q.eq("isHomeActive", true))
+      .order("desc")
+      .first();
+    return active?.status === "published" ? publicReaderRow(active) : null;
   },
 });
 
@@ -1564,7 +1549,7 @@ export const publishedArchive = query({
       )
       .sort(descendingTimestamp)
       .slice(0, Math.min(Math.max(args.limit ?? 40, 1), 100))
-      .map(publicRow);
+      .map((row) => publicReaderRow(row)!);
   },
 });
 
@@ -1572,7 +1557,7 @@ export const publishedById = query({
   args: { editionId: v.id("weeklyEditions") },
   handler: async (ctx, args) => {
     const edition = await ctx.db.get(args.editionId);
-    return edition?.status === "published" ? publicRow(edition) : null;
+    return edition?.status === "published" ? publicReaderRow(edition) : null;
   },
 });
 
@@ -1721,10 +1706,73 @@ export const setVisibility = mutation({
     if (!edition) throw new Error("Edition not found");
     await ctx.db.patch(args.editionId, {
       status: args.status,
+      isHomeActive: args.status === "hidden" ? false : edition.isHomeActive,
       editedBy: user._id,
       updatedAt: Date.now(),
     });
     return publicRow(await ctx.db.get(args.editionId));
+  },
+});
+
+export const setHomeActive = mutation({
+  args: { editionId: v.optional(v.id("weeklyEditions")) },
+  handler: async (ctx, args) => {
+    const user = await requireCommissioner(ctx);
+    const target = args.editionId ? await ctx.db.get(args.editionId) : null;
+    if (args.editionId && !target) throw new Error("Edition not found");
+    if (target && target.status !== "published") {
+      throw new Error("Only a published edition can appear on the homepage");
+    }
+
+    const activeEditions = await ctx.db
+      .query("weeklyEditions")
+      .withIndex("by_homeActive_publishedAt", (q) => q.eq("isHomeActive", true))
+      .collect();
+    const now = Date.now();
+    for (const edition of activeEditions) {
+      if (edition._id === args.editionId) continue;
+      await ctx.db.patch(edition._id, {
+        isHomeActive: false,
+        editedBy: user._id,
+        updatedAt: now,
+      });
+    }
+    if (target) {
+      await ctx.db.patch(target._id, {
+        isHomeActive: true,
+        editedBy: user._id,
+        updatedAt: now,
+      });
+    }
+    return {
+      activeEditionId: target ? String(target._id) : null,
+    };
+  },
+});
+
+export const setSectionActive = mutation({
+  args: {
+    editionId: v.id("weeklyEditions"),
+    sectionId: v.string(),
+    active: v.boolean(),
+  },
+  handler: async (ctx, args) => {
+    const user = await requireCommissioner(ctx);
+    const edition = await ctx.db.get(args.editionId);
+    if (!edition) throw new Error("Edition not found");
+    const sections = edition.content.sections as Array<{ id: string }>;
+    if (!sections.some((section) => section.id === args.sectionId)) {
+      throw new Error("Article not found in this edition");
+    }
+    const inactive = new Set(edition.inactiveSectionIds ?? []);
+    if (args.active) inactive.delete(args.sectionId);
+    else inactive.add(args.sectionId);
+    await ctx.db.patch(edition._id, {
+      inactiveSectionIds: [...inactive],
+      editedBy: user._id,
+      updatedAt: Date.now(),
+    });
+    return publicRow(await ctx.db.get(edition._id));
   },
 });
 

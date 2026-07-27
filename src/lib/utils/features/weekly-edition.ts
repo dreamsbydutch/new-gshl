@@ -10,6 +10,7 @@ import type {
   WeeklyEditionEditorialMetric,
   WeeklyEditionFactPacket,
   WeeklyEditionAchievementSnapshot,
+  WeeklyEditionAuthor,
   WeeklyEditionMatchupFact,
   WeeklyEditionMilestoneScheduleEntry,
   WeeklyEditionMilestoneScheduleInput,
@@ -37,6 +38,7 @@ export const WEEKLY_EDITION_SECTION_KINDS = [
   "ufa_market",
   "draft_capital",
   "season_predictions",
+  "league_notebook",
 ] as const satisfies readonly WeeklyEditionSectionKind[];
 
 export const WEEKLY_EDITION_ISSUE_LABELS = {
@@ -97,21 +99,33 @@ const linkSchema = z
     href: z.string().trim().min(1).max(200),
   })
   .strict();
+const authorSchema = z
+  .object({
+    name: z.string().trim().min(1).max(80),
+    position: z.string().trim().min(1).max(100),
+    scope: z.enum(["league", "conference", "team"]),
+    teamId: z.string().trim().min(1).max(80).optional(),
+    teamName: z.string().trim().min(1).max(100).optional(),
+    conferenceId: z.string().trim().min(1).max(80).optional(),
+    conferenceName: z.string().trim().min(1).max(100).optional(),
+  })
+  .strict();
 const sectionSchema = z
   .object({
     id: z.string().trim().min(1).max(64),
     kind: sectionKindSchema,
-    eyebrow: z.string().trim().min(1).max(40),
-    headline: z.string().trim().min(1).max(110),
-    body: z.string().trim().min(1).max(900),
+    eyebrow: z.string().trim().min(1).max(50),
+    headline: z.string().trim().min(1).max(90),
+    body: z.string().trim().min(1).max(1000),
     links: z.array(linkSchema).max(4),
+    author: authorSchema.optional(),
   })
   .strict();
 const contentSchema = z
   .object({
-    headline: z.string().trim().min(1).max(110),
-    deck: z.string().trim().min(1).max(240),
-    sections: z.array(sectionSchema).min(5).max(7),
+    headline: z.string().trim().min(1).max(90),
+    deck: z.string().trim().min(1).max(220),
+    sections: z.array(sectionSchema).length(6),
   })
   .strict();
 
@@ -992,14 +1006,256 @@ function matchupSummary(matchup: WeeklyEditionMatchupFact) {
   return `${matchup.winnerTeamName} beat ${matchup.loserTeamName} ${Math.max(matchup.homeScore, matchup.awayScore)}–${Math.min(matchup.homeScore, matchup.awayScore)}.${categorySentence}`;
 }
 
+export const WEEKLY_EDITION_STAFF = {
+  editorInChief: {
+    name: "Graham MacIntyre",
+    position: "Editor-in-Chief",
+    scope: "league",
+  },
+  headOfAnalytics: {
+    name: "Evan Soderberg",
+    position: "Head of Analytics",
+    scope: "league",
+  },
+  headInsider: {
+    name: "Darren Leclair",
+    position: "GSHL Head Insider",
+    scope: "league",
+  },
+  insider: {
+    name: "Mike Halvorsen",
+    position: "GSHL Insider",
+    scope: "league",
+  },
+  nationalReporter: {
+    name: "Scott Bannerman",
+    position: "National Reporter",
+    scope: "league",
+  },
+  analyticsReporter: {
+    name: "Nate Carlson",
+    position: "Analytics Reporter",
+    scope: "league",
+  },
+} as const satisfies Record<string, WeeklyEditionAuthor>;
+
+const ANALYTICS_SECTION_KINDS = new Set<WeeklyEditionSectionKind>([
+  "three_stars",
+  "power_movers",
+  "season_predictions",
+]);
+const INSIDER_SECTION_KINDS = new Set<WeeklyEditionSectionKind>([
+  "transaction_wire",
+  "expiring_contracts",
+  "ufa_market",
+]);
+
+export function getWeeklyEditionFallbackAuthor(
+  kind: WeeklyEditionSectionKind,
+): WeeklyEditionAuthor {
+  if (ANALYTICS_SECTION_KINDS.has(kind)) {
+    return { ...WEEKLY_EDITION_STAFF.analyticsReporter };
+  }
+  if (INSIDER_SECTION_KINDS.has(kind)) {
+    return { ...WEEKLY_EDITION_STAFF.insider };
+  }
+  return { ...WEEKLY_EDITION_STAFF.nationalReporter };
+}
+
+function referencedTeams(
+  item: WeeklyEditionSection,
+  packet: WeeklyEditionFactPacket,
+) {
+  const headline = item.headline.toLowerCase();
+  const body = item.body.toLowerCase();
+  return packet.teams
+    .map((team) => {
+      const name = team.name.toLowerCase();
+      const headlineIndex = headline.indexOf(name);
+      const bodyIndex = body.indexOf(name);
+      return {
+        team,
+        index:
+          headlineIndex >= 0
+            ? headlineIndex
+            : bodyIndex >= 0
+              ? headline.length + bodyIndex
+              : Number.POSITIVE_INFINITY,
+      };
+    })
+    .filter((match) => Number.isFinite(match.index))
+    .sort((left, right) => left.index - right.index);
+}
+
+function teamAuthor(
+  team: WeeklyEditionFactPacket["teams"][number],
+): WeeklyEditionAuthor | undefined {
+  if (!team.beatWriter) return undefined;
+  return {
+    name: team.beatWriter,
+    position: `${team.name} Beat Writer`,
+    scope: "team",
+    teamId: team.teamId,
+    teamName: team.name,
+    conferenceId: team.conferenceId,
+    conferenceName: team.conferenceName,
+  };
+}
+
+function conferenceAuthor(
+  team: WeeklyEditionFactPacket["teams"][number],
+): WeeklyEditionAuthor | undefined {
+  if (!team.leadReporter || !team.conferenceId || !team.conferenceName) {
+    return undefined;
+  }
+  return {
+    name: team.leadReporter,
+    position: `${team.conferenceName} Lead Reporter`,
+    scope: "conference",
+    conferenceId: team.conferenceId,
+    conferenceName: team.conferenceName,
+  };
+}
+
+function authorForSection(
+  item: WeeklyEditionSection,
+  packet: WeeklyEditionFactPacket,
+  isPrimary: boolean,
+): WeeklyEditionAuthor {
+  const leadCandidate = packet.editorialCandidates?.[0];
+  if (packet.issueType === "resigning_outlook" && item.kind === "next_week") {
+    return { ...WEEKLY_EDITION_STAFF.editorInChief };
+  }
+  if (
+    (isPrimary &&
+      (item.kind === "three_stars" ||
+        item.kind === "power_movers" ||
+        item.kind === "season_predictions")) ||
+    (item.kind === "biggest_story" &&
+      (leadCandidate?.kind === "player_performance" ||
+        leadCandidate?.kind === "team_performance" ||
+        leadCandidate?.kind === "record" ||
+        leadCandidate?.kind === "milestone") &&
+      (leadCandidate.importance ?? 0) >= 90)
+  ) {
+    return { ...WEEKLY_EDITION_STAFF.headOfAnalytics };
+  }
+  if (
+    item.kind === "three_stars" ||
+    item.kind === "power_movers" ||
+    item.kind === "season_predictions" ||
+    (item.kind === "biggest_story" &&
+      (leadCandidate?.kind === "player_performance" ||
+        leadCandidate?.kind === "team_performance" ||
+        leadCandidate?.kind === "record" ||
+        leadCandidate?.kind === "milestone"))
+  ) {
+    return { ...WEEKLY_EDITION_STAFF.analyticsReporter };
+  }
+  if (
+    (isPrimary && INSIDER_SECTION_KINDS.has(item.kind)) ||
+    (item.kind === "biggest_story" &&
+      leadCandidate?.kind === "transaction" &&
+      (leadCandidate.importance ?? 0) >= 80)
+  ) {
+    return { ...WEEKLY_EDITION_STAFF.headInsider };
+  }
+  if (
+    INSIDER_SECTION_KINDS.has(item.kind) ||
+    (item.kind === "biggest_story" && leadCandidate?.kind === "transaction")
+  ) {
+    return { ...WEEKLY_EDITION_STAFF.insider };
+  }
+
+  const matches = referencedTeams(item, packet);
+  const primary = matches[0]?.team;
+  if (!primary) return getWeeklyEditionFallbackAuthor(item.kind);
+
+  if (
+    item.kind === "matchup_roundup" &&
+    matches.length > 1 &&
+    matches.every((match) => match.team.conferenceId === primary.conferenceId)
+  ) {
+    return (
+      conferenceAuthor(primary) ??
+      teamAuthor(primary) ??
+      getWeeklyEditionFallbackAuthor(item.kind)
+    );
+  }
+  return (
+    teamAuthor(primary) ??
+    conferenceAuthor(primary) ??
+    getWeeklyEditionFallbackAuthor(item.kind)
+  );
+}
+
+function addTeamReporterPerspective(
+  item: WeeklyEditionSection,
+  author: WeeklyEditionAuthor,
+) {
+  if (author.scope !== "team" || !author.teamName) return item.body;
+  const note = ` From the ${author.teamName} side of the story, that is the detail worth circling.`;
+  return item.body.length + note.length <= 1000
+    ? `${item.body}${note}`
+    : item.body;
+}
+
+export function normalizeWeeklyEditionArticleGrid(
+  content: WeeklyEditionContent,
+  packet: WeeklyEditionFactPacket,
+): WeeklyEditionContent {
+  const sections = content.sections.slice(0, 6);
+  if (sections.length < 6) {
+    const supporting = (packet.editorialCandidates ?? [])
+      .slice(1, 3)
+      .map((candidate) => candidate.summary)
+      .join(" ");
+    const notebookId = sections.some((item) => item.id === "league_notebook")
+      ? "league_notebook_extra"
+      : "league_notebook";
+    sections.push(
+      section(
+        "league_notebook",
+        "Press Box Notebook",
+        packet.editorialCandidates?.[1]?.headlineHint ??
+          "What else caught the Press Box eye",
+        supporting ||
+          "The next GSHL story is already taking shape across the standings, transaction wire and weekly performance board.",
+        packet.editorialCandidates?.[1]?.links ?? [],
+        notebookId,
+      ),
+    );
+  }
+  return { ...content, sections };
+}
+
+function assignWeeklyEditionAuthors(
+  content: WeeklyEditionContent,
+  packet: WeeklyEditionFactPacket,
+): WeeklyEditionContent {
+  const normalized = normalizeWeeklyEditionArticleGrid(content, packet);
+  return {
+    ...normalized,
+    sections: normalized.sections.map((item, index) => {
+      const author = authorForSection(item, packet, index < 2);
+      return {
+        ...item,
+        body: addTeamReporterPerspective(item, author),
+        author,
+      };
+    }),
+  };
+}
+
 function section(
   kind: WeeklyEditionSectionKind,
   eyebrow: string,
   headline: string,
   body: string,
   links: WeeklyEditionSection["links"],
+  id: string = kind,
 ): WeeklyEditionSection {
-  return { id: kind, kind, eyebrow, headline, body, links };
+  return { id, kind, eyebrow, headline, body, links };
 }
 
 export function buildTemplateWeeklyEdition(
@@ -1040,7 +1296,7 @@ export function buildTemplateWeeklyEdition(
       ? `${leadCandidate.summary} It leads a Week ${packet.week.number} edition built from ${packet.editorialCandidates?.length ?? 0} verified story candidates.`
       : `${scoreline(hero)} led a Week ${packet.week.number} slate with ${packet.matchups.length} completed matchup${packet.matchups.length === 1 ? "" : "s"}.`;
   const deck =
-    deckText.length <= 240 ? deckText : `${deckText.slice(0, 237).trim()}…`;
+    deckText.length <= 220 ? deckText : `${deckText.slice(0, 217).trim()}…`;
   const sections: WeeklyEditionSection[] = [
     section(
       "biggest_story",
@@ -1155,7 +1411,10 @@ export function buildTemplateWeeklyEdition(
     ),
   );
 
-  return { headline: leadHeadline, deck, sections };
+  return assignWeeklyEditionAuthors(
+    { headline: leadHeadline, deck, sections },
+    packet,
+  );
 }
 
 function money(value: number) {
@@ -1174,7 +1433,7 @@ function teamOutlookSummary(packet: WeeklyEditionFactPacket) {
   );
 }
 
-function buildMilestoneTemplateEdition(
+function buildMilestoneTemplateEditionCopy(
   packet: WeeklyEditionFactPacket,
 ): WeeklyEditionContent {
   const facts = packet.milestone;
@@ -1205,7 +1464,7 @@ function buildMilestoneTemplateEdition(
           : `${packet.season.name}: the final word`;
     return {
       headline,
-      deck: `The season is complete. GSHL Weekly looks back at the final results, standout players and the pecking order the league carries into the offseason.`,
+      deck: `The season is complete. The GSHL Press Box looks back at the final results, standout players and the pecking order the league carries into the offseason.`,
       sections: [
         section(
           "season_recap",
@@ -1266,7 +1525,7 @@ function buildMilestoneTemplateEdition(
           "next_week",
           "Next Edition",
           "The re-signing questions are coming",
-          "GSHL Weekly returns one week after the final with a team-by-team look at expiring contracts, cap room and the decisions that will define the summer.",
+          "The GSHL Press Box returns one week after the final with a team-by-team look at expiring contracts, cap room and the decisions that will define the summer.",
           [],
         ),
       ],
@@ -1389,7 +1648,7 @@ function buildMilestoneTemplateEdition(
           "next_week",
           "Next Stop",
           "The draft board is waiting",
-          "One week before draft night, GSHL Weekly will count the picks, identify the teams with leverage and map the biggest roster needs.",
+          "One week before draft night, the GSHL Press Box will count the picks, identify the teams with leverage and map the biggest roster needs.",
           [],
         ),
       ],
@@ -1517,6 +1776,13 @@ function buildMilestoneTemplateEdition(
   };
 }
 
+function buildMilestoneTemplateEdition(packet: WeeklyEditionFactPacket) {
+  return assignWeeklyEditionAuthors(
+    buildMilestoneTemplateEditionCopy(packet),
+    packet,
+  );
+}
+
 function allText(content: WeeklyEditionContent) {
   return [
     content.headline,
@@ -1545,15 +1811,21 @@ export function validateWeeklyEditionContent(
     return { valid: false, errors: formatZodErrors(parsed.error) };
 
   const errors: string[] = [];
-  const content = parsed.data;
-  const text = allText(content);
-  if (/<\/?[a-z][^>]*>/i.test(text))
-    errors.push("HTML is not allowed in edition copy.");
-
   const expected = buildTemplateWeeklyEdition(packet);
   const expectedById = new Map(
     expected.sections.map((item) => [item.id, item]),
   );
+  const content = {
+    ...parsed.data,
+    sections: parsed.data.sections.map((item) => ({
+      ...item,
+      author: item.author ?? expectedById.get(item.id)?.author,
+    })),
+  };
+  const text = allText(content);
+  if (/<\/?[a-z][^>]*>/i.test(text))
+    errors.push("HTML is not allowed in edition copy.");
+
   const seen = new Set<string>();
   for (const [index, item] of content.sections.entries()) {
     if (seen.has(item.id)) errors.push(`Duplicate section ID: ${item.id}.`);
@@ -1568,6 +1840,11 @@ export function validateWeeklyEditionContent(
     }
     if (item.eyebrow !== expectedSection.eyebrow) {
       errors.push(`Eyebrow in ${item.id} must match the section plan.`);
+    }
+    if (
+      JSON.stringify(item.author) !== JSON.stringify(expectedSection.author)
+    ) {
+      errors.push(`Author in ${item.id} must match the section plan.`);
     }
     if (JSON.stringify(item.links) !== JSON.stringify(expectedSection.links))
       errors.push(`Links in ${item.id} must match the verified fact packet.`);
@@ -1598,6 +1875,18 @@ export function validateWeeklyEditionImport(
     };
   }
   return validateWeeklyEditionContent(value, packet);
+}
+
+export function filterWeeklyEditionContent(
+  content: WeeklyEditionContent,
+  inactiveSectionIds: readonly string[] = [],
+): WeeklyEditionContent {
+  if (inactiveSectionIds.length === 0) return content;
+  const inactive = new Set(inactiveSectionIds);
+  return {
+    ...content,
+    sections: content.sections.filter((section) => !inactive.has(section.id)),
+  };
 }
 
 export function buildWeeklyEditionChatGptPrompt(
@@ -1692,16 +1981,20 @@ export function buildWeeklyEditionChatGptPrompt(
     id: section.id,
     kind: section.kind,
     eyebrow: section.eyebrow,
+    author: section.author,
     links: section.links,
   }));
   return [
-    "You are the editor of GSHL Weekly, a friendly fantasy-hockey league newspaper.",
-    "Rewrite the supplied edition with energetic, concise sportswriting and gentle chirps. Never insult a person, speculate about motives, or add facts.",
+    "PROMPT_FORMAT=editorial_context_v3",
+    "You are the editor of the GSHL Press Box, a fantasy-hockey league newspaper covering the Gem Stone Hockey League.",
+    "Rewrite the supplied edition with comedic, concise sportswriting and subtle chirps. Use the supplied facts to support your copy. Do not invent new facts or make up player names, team names, scores, or statistics.",
+    `NEWSROOM STAFF: ${WEEKLY_EDITION_STAFF.editorInChief.name}, Editor-in-Chief, writes only rarely about league process or rule changes; ${WEEKLY_EDITION_STAFF.headOfAnalytics.name}, Head of Analytics, handles only the biggest and less frequent performance, record, and data-led lead stories; ${WEEKLY_EDITION_STAFF.analyticsReporter.name}, Analytics Reporter, handles the regular standout daily and weekly performance coverage; ${WEEKLY_EDITION_STAFF.headInsider.name}, GSHL Head Insider, handles only the biggest and less frequent signings, trades, and roster moves; ${WEEKLY_EDITION_STAFF.insider.name}, GSHL Insider, handles the regular transaction wire.`,
+    "Every section has an assigned author in SECTION_PLAN. Preserve that author object exactly. When scope is team, write with a very light preference for that team and give its perspective slightly more attention without becoming a fan blog, attacking opponents, or changing the facts. Conference reporters may frame a story through their conference, but remain fair.",
     "EDITION_FACTS may contain ranked story candidates from matchups, performances, records, milestones, awards, and league activity. Use editorial judgment to choose the most important lead and supporting angles; importance is guidance, not a command.",
     "Use only the names, numbers, outcomes, and links in EDITION_FACTS. Do not add HTML, Markdown links, new sections, new IDs, or new URLs.",
-    "Return only one JSON object. It must contain headline, deck, and sections. Each section must contain id, kind, eyebrow, headline, body, and links.",
-    "Keep every section id, kind, eyebrow, and links value from SECTION_PLAN exactly unchanged and in the same order.",
-    "Limits: headline 110 characters; deck 240; section headline 110; section body 900; eyebrow 40.",
+    "Return only one JSON object. It must contain headline, deck, and exactly six sections. Each section must contain id, kind, eyebrow, headline, body, author, and links.",
+    "Keep every section id, kind, eyebrow, author, and links value from SECTION_PLAN exactly unchanged and in the same order.",
+    "Limits: headline 110 characters; deck 220; section headline 90; section body 1000; eyebrow 50.",
     "",
     `EDITION_FACTS=${JSON.stringify(facts, null, 2)}`,
     "",

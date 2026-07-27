@@ -10,12 +10,8 @@ import type {
 } from "@gshl-types";
 import { useAppMutation } from "./useAppMutation";
 
-export function useLatestWeeklyEdition(
-  seasonId?: string,
-): WeeklyEditionQueryState<WeeklyEdition | null> {
-  const data = useQuery(api.weeklyEditions.latestPublished, {
-    seasonId: seasonId as Id<"seasons"> | undefined,
-  });
+export function useLatestWeeklyEdition(): WeeklyEditionQueryState<WeeklyEdition | null> {
+  const data = useQuery(api.weeklyEditions.latestPublished, {});
   return {
     data,
     isLoading: data === undefined,
@@ -30,7 +26,7 @@ export function useWeeklyEditionArchive(
     limit: 100,
   });
   return {
-    data: data as WeeklyEdition[] | undefined,
+    data,
     isLoading: data === undefined,
   };
 }
@@ -65,6 +61,8 @@ export function useWeeklyEditionNewsroom(editionId?: string) {
     publishImport: useAppMutation(api.weeklyEditions.publishImport),
     updateManual: useAppMutation(api.weeklyEditions.updateManual),
     setVisibility: useAppMutation(api.weeklyEditions.setVisibility),
+    setHomeActive: useAppMutation(api.weeklyEditions.setHomeActive),
+    setSectionActive: useAppMutation(api.weeklyEditions.setSectionActive),
     restoreRevision: useAppMutation(api.weeklyEditions.restoreRevision),
   };
 }

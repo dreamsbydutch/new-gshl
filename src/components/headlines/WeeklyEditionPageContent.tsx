@@ -13,7 +13,7 @@ export function WeeklyEditionPageContent({
   if (isLoading) {
     return (
       <main className="container mx-auto px-3 py-6 sm:px-5">
-        <Skeleton className="mx-auto h-[42rem] max-w-5xl rounded-2xl" />
+        <Skeleton className="mx-auto h-[42rem] max-w-4xl rounded-2xl" />
       </main>
     );
   }
@@ -21,10 +21,10 @@ export function WeeklyEditionPageContent({
   if (!edition) {
     return (
       <main className="container mx-auto px-3 py-12 text-center sm:px-5">
-        <h1 className="font-oswald text-4xl text-slate-950">
+        <h1 className="font-oswald text-3xl text-slate-950">
           Edition not found
         </h1>
-        <p className="mt-2 text-slate-500">
+        <p className="mt-2 text-sm text-slate-500">
           This issue may be hidden or may not have been published.
         </p>
       </main>
@@ -32,7 +32,7 @@ export function WeeklyEditionPageContent({
   }
 
   return (
-    <main className="container mx-auto px-3 py-6 sm:px-5 sm:py-10">
+    <main className="container mx-auto px-3 py-5 sm:px-5 sm:py-8">
       <WeeklyEditionArticle edition={edition} />
     </main>
   );
