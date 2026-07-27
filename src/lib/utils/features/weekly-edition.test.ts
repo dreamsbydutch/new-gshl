@@ -539,6 +539,8 @@ void test("prompt contains only relevant edition facts and a compact section pla
     prompt,
     /Creative framing may be invented; factual claims may not/,
   );
+  assert.match(prompt, /must never exceed 90/);
+  assert.match(prompt, /Each section body should be 450–750/);
   assert.match(prompt, /Bruce McAllister|Gord McKenzie|Darren Whitmore/);
   assert.match(prompt, /Every expired UFA automatically returns to the draft/);
   assert.match(prompt, /exactly 115% of the prior salary/);
@@ -679,7 +681,7 @@ void test("filters inactive articles without mutating the stored edition", () =>
   );
 });
 
-void test("rejects HTML, altered structure, invented links, and oversized text", () => {
+void test("rejects unsafe structure and normalizes oversized AI copy", () => {
   const packet = buildWeeklyEditionFactPacket(source());
   const content = buildTemplateWeeklyEdition(packet);
   const html = structuredClone(content);
@@ -747,10 +749,24 @@ void test("rejects HTML, altered structure, invented links, and oversized text",
   );
 
   const oversized = structuredClone(content);
-  oversized.deck = "x".repeat(221);
-  assert.equal(
-    validateWeeklyEditionImport(JSON.stringify(oversized), packet).valid,
-    false,
+  oversized.headline = `${"A long headline ".repeat(10)}with a clean ending.`;
+  oversized.deck = `${"A detailed deck sentence. ".repeat(15)}Final thought.`;
+  oversized.sections = oversized.sections.map((section) => ({
+    ...section,
+    headline: `${"A long section headline ".repeat(8)}Ending.`,
+    body: `${"A complete sentence about the verified story. ".repeat(35)}Final thought.`,
+  }));
+  const normalized = validateWeeklyEditionImport(
+    JSON.stringify(oversized),
+    packet,
+  );
+  assert.equal(normalized.valid, true);
+  assert.ok((normalized.content?.headline.length ?? 0) <= 90);
+  assert.ok((normalized.content?.deck.length ?? 0) <= 220);
+  assert.ok(
+    normalized.content?.sections.every(
+      (section) => section.headline.length <= 90 && section.body.length <= 1000,
+    ),
   );
 
   const promptLimitBody = structuredClone(content);

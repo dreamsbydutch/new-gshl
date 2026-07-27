@@ -2217,6 +2217,9 @@ export function validateWeeklyEditionImport(
   raw: string,
   packet: WeeklyEditionFactPacket,
 ): WeeklyEditionValidationResult {
+  if (/<\/?[a-z][^>]*>/i.test(raw)) {
+    return { valid: false, errors: ["HTML is not allowed in edition copy."] };
+  }
   let value: unknown;
   try {
     value = JSON.parse(raw);
@@ -2226,7 +2229,57 @@ export function validateWeeklyEditionImport(
       errors: ["The response is not valid JSON. Paste only the JSON object."],
     };
   }
-  return validateWeeklyEditionContent(value, packet);
+  return validateWeeklyEditionContent(
+    normalizeWeeklyEditionImportLengths(value),
+    packet,
+  );
+}
+
+function isUnknownRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function shortenImportedText(value: unknown, maximum: number) {
+  if (typeof value !== "string") return value;
+  const text = value.trim();
+  if (text.length <= maximum) return text;
+
+  const available = maximum - 1;
+  const prefix = text.slice(0, available);
+  const sentenceBreak = Math.max(
+    prefix.lastIndexOf(". "),
+    prefix.lastIndexOf("! "),
+    prefix.lastIndexOf("? "),
+  );
+  const wordBreak = prefix.lastIndexOf(" ");
+  const boundary =
+    sentenceBreak >= Math.floor(maximum * 0.55)
+      ? sentenceBreak + 1
+      : wordBreak >= Math.floor(maximum * 0.7)
+        ? wordBreak
+        : available;
+  return `${prefix.slice(0, boundary).trimEnd()}…`;
+}
+
+function normalizeWeeklyEditionImportLengths(value: unknown): unknown {
+  if (!isUnknownRecord(value)) return value;
+  const sections = Array.isArray(value.sections)
+    ? value.sections.map((section: unknown) =>
+        isUnknownRecord(section)
+          ? {
+              ...section,
+              headline: shortenImportedText(section.headline, 90),
+              body: shortenImportedText(section.body, 1000),
+            }
+          : section,
+      )
+    : value.sections;
+  return {
+    ...value,
+    headline: shortenImportedText(value.headline, 90),
+    deck: shortenImportedText(value.deck, 220),
+    sections,
+  };
 }
 
 export function filterWeeklyEditionContent(
@@ -2379,7 +2432,7 @@ export function buildWeeklyEditionChatGptPrompt(
     "Use only the names, numbers, outcomes, and links in EDITION_FACTS. Do not add HTML, Markdown links, new sections, new IDs, or new URLs.",
     "Return only one JSON object. It must contain headline, deck, and exactly six sections. Each section must contain id, kind, eyebrow, headline, body, author, and links.",
     "Keep every section id, kind, eyebrow, author, and links value from SECTION_PLAN exactly unchanged and in the same order.",
-    "Limits: headline 110 characters; deck 220; section headline 90; section body 1000; eyebrow 50.",
+    "LENGTH TARGETS: Count characters before replying. Main headline should be 55–80 characters and must never exceed 90. Deck should be 120–180 and must never exceed 220. Each section headline should be 35–70 and must never exceed 90. Each section body should be 450–750 and must never exceed 1000. Eyebrow must never exceed 50. These are hard per-field limits, not approximate word counts; do not use all available space.",
     "",
     `EDITION_FACTS=${JSON.stringify(facts, null, 2)}`,
     "",
