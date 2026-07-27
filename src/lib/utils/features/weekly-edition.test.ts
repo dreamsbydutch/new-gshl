@@ -530,6 +530,10 @@ void test("prompt contains only relevant edition facts and a compact section pla
   assert.match(prompt, /Darren Leclair/);
   assert.match(prompt, /Mike Halvorsen/);
   assert.match(prompt, /Every article must have a different reporter/);
+  assert.match(
+    prompt,
+    /team beat writer appears only when the article is specifically centered/,
+  );
   assert.match(prompt, /Create original storylines from the supplied facts/);
   assert.match(
     prompt,
@@ -586,6 +590,35 @@ void test("rotates six unique bylines between editions", () => {
   assert.equal(new Set(first).size, 6);
   assert.equal(new Set(second).size, 6);
   assert.notDeepEqual(first, second);
+});
+
+void test("uses team beat writers only for stories centered on their team", () => {
+  let teamBylineCount = 0;
+  for (let weekNumber = 1; weekNumber <= 20; weekNumber += 1) {
+    const input = source();
+    const content = buildTemplateWeeklyEdition(
+      buildWeeklyEditionFactPacket({
+        ...input,
+        week: {
+          ...input.week,
+          id: `beat-week-${weekNumber}`,
+          number: weekNumber,
+        },
+      }),
+    );
+    for (const item of content.sections) {
+      if (item.author?.scope !== "team") continue;
+      teamBylineCount += 1;
+      assert.ok(
+        ["biggest_story", "missed_start", "season_recap"].includes(item.kind),
+      );
+      assert.match(
+        item.headline.toLowerCase(),
+        new RegExp(item.author.teamName?.toLowerCase() ?? "$^"),
+      );
+    }
+  }
+  assert.ok(teamBylineCount > 0);
 });
 
 void test("reserves department heads for major primary stories", () => {
@@ -872,6 +905,27 @@ void test("builds each season milestone from contract, cap, draft, and roster fa
         content.sections.find((section) => section.kind === "next_week")?.author
           ?.position,
         "Editor-in-Chief",
+      );
+    }
+    if (issueType === "offseason_market") {
+      assert.deepEqual(
+        content.sections.slice(0, 4).map((section) => section.kind),
+        ["ufa_market", "cap_space", "roster_outlook", "draft_capital"],
+      );
+      assert.match(prompt, /OFFSEASON REVIEW PRIORITIES/);
+      assert.match(
+        prompt,
+        /which draft-bound UFAs they could realistically afford/,
+      );
+      assert.match(prompt, /earlyDraftBoard/);
+      assert.doesNotMatch(prompt, /draftPickCount/);
+      assert.match(
+        content.sections.find((section) => section.kind === "ufa_market")
+          ?.body ?? "",
+        /Aurora.*Alex North.*plausible draft-board target/,
+      );
+      assert.ok(
+        content.sections.every((section) => section.author?.scope !== "team"),
       );
     }
     if (issueType === "pre_draft") {

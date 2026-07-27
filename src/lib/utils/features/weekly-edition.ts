@@ -1179,6 +1179,34 @@ function conferenceAuthor(
   };
 }
 
+function teamFocusForSection(
+  item: WeeklyEditionSection,
+  packet: WeeklyEditionFactPacket,
+) {
+  if (item.kind === "biggest_story") {
+    const leadCandidate = pressBoxEditorialCandidates(packet)[0];
+    if (leadCandidate?.teamId) {
+      return packet.teams.find((team) => team.teamId === leadCandidate.teamId);
+    }
+  }
+  if (item.kind === "season_recap") {
+    const leadCandidate = pressBoxEditorialCandidates(packet)[0];
+    const hero = packet.matchups.find(
+      (matchup) => matchup.matchupId === packet.heroMatchupId,
+    );
+    const teamId = leadCandidate?.teamId ?? hero?.winnerTeamId;
+    if (teamId) {
+      return packet.teams.find((team) => team.teamId === teamId);
+    }
+  }
+  if (item.kind === "missed_start") {
+    return referencedTeams(item, packet).find((match) =>
+      item.headline.toLowerCase().includes(match.team.name.toLowerCase()),
+    )?.team;
+  }
+  return undefined;
+}
+
 function uniqueAuthors(authors: Array<WeeklyEditionAuthor | undefined>) {
   const seen = new Set<string>();
   return authors.filter((author): author is WeeklyEditionAuthor => {
@@ -1216,7 +1244,8 @@ function contextualAuthors(
   const matches = referencedTeams(item, packet);
   if (matches.length === 0) return [];
   const primary = matches[0]!.team;
-  const teamAuthors = matches.map((match) => teamAuthor(match.team));
+  const focusedTeam = teamFocusForSection(item, packet);
+  const teamAuthors = focusedTeam ? [teamAuthor(focusedTeam)] : [];
   const conferenceAuthors = matches.map((match) =>
     conferenceAuthor(match.team),
   );
@@ -1327,14 +1356,13 @@ function allAvailableAuthors(
   packet: WeeklyEditionFactPacket,
   item: WeeklyEditionSection,
 ) {
-  const teamAuthors = packet.teams.map(teamAuthor);
   const conferenceAuthors = packet.teams.map(conferenceAuthor);
   const standardStaff = Object.values(WEEKLY_EDITION_STAFF).filter(
     (author) => author.position !== "Editor-in-Chief",
   );
   return [
     ...rotateAuthors(
-      uniqueAuthors([...teamAuthors, ...conferenceAuthors, ...standardStaff]),
+      uniqueAuthors([...conferenceAuthors, ...standardStaff]),
       packet,
       item,
       "full-newsroom",
@@ -1714,6 +1742,38 @@ function buildMilestoneTemplateEditionCopy(
     )[0];
   const expiring = facts.expiringContracts.slice(0, 8);
   const signings = facts.recentSignings.slice(0, 8);
+  const draftBoundUfas = facts.expiringContracts
+    .filter(contractReturnsToDraft)
+    .sort(
+      (left, right) =>
+        right.salary - left.salary ||
+        left.playerName.localeCompare(right.playerName),
+    );
+  const ufaFitSummary = [...facts.teamOutlooks]
+    .sort((left, right) => right.capSpace - left.capSpace)
+    .slice(0, 6)
+    .map((team) => {
+      const target = draftBoundUfas.find(
+        (contract) => contract.salary <= team.capSpace,
+      );
+      if (!target) {
+        return `${team.teamName} has ${money(team.capSpace)} in cap space, but no draft-bound UFA on the current board fits beneath that amount based on prior salary.`;
+      }
+      return `${team.teamName} has ${money(team.capSpace)} in cap space, making ${target.playerName}—previously at ${money(target.salary)}—a plausible draft-board target rather than a direct summer signing.`;
+    })
+    .join(" ");
+  const draftPositionSummary = facts.teamOutlooks
+    .filter((team) => firstRoundPickByTeam.has(team.teamName))
+    .sort(
+      (left, right) =>
+        (firstRoundPickByTeam.get(left.teamName) ?? Number.MAX_SAFE_INTEGER) -
+        (firstRoundPickByTeam.get(right.teamName) ?? Number.MAX_SAFE_INTEGER),
+    )
+    .map(
+      (team) =>
+        `${team.teamName} holds first-round pick No. ${firstRoundPickByTeam.get(team.teamName)}.`,
+    )
+    .join(" ");
   const standingsLink = [{ label: "View standings", href: "/standings" }];
 
   if (packet.issueType === "final_recap") {
@@ -1868,36 +1928,25 @@ function buildMilestoneTemplateEditionCopy(
       sections: [
         section(
           "ufa_market",
-          "Draft-Bound UFAs",
-          "The teams with money to spend on draft day",
-          [...facts.teamOutlooks]
-            .sort((left, right) => right.capSpace - left.capSpace)
-            .map(
-              (team) =>
-                `${team.teamName}: ${money(team.capSpace)} available and ${team.rosterSize} players currently rostered; expired UFAs cannot be signed directly and must be acquired through the draft.`,
-            )
-            .join(" "),
-          [],
-        ),
-        section(
-          "transaction_wire",
-          "Deals Already Done",
-          signings[0]
-            ? `${signings[0].playerName} tops the early signing board`
-            : "The early signing board",
-          signings
-            .map(
-              (contract) =>
-                `${contract.teamName} signed ${contract.playerName} at ${money(contract.salary)}.`,
-            )
-            .join(" ") || "No completed signings were found in this window.",
+          "UFA Fits",
+          "Cap space points toward the most plausible draft targets",
+          ufaFitSummary ||
+            "No draft-bound UFA and cap-space pairings were available.",
           [],
         ),
         section(
           "cap_space",
           "Buying Power",
-          "Room is useful; roster fit decides what comes next",
-          teamOutlookSummary(packet),
+          capLeader
+            ? `${capLeader.teamName} has the widest path through the board`
+            : "Room is useful; roster fit decides what comes next",
+          [...facts.teamOutlooks]
+            .sort((left, right) => right.capSpace - left.capSpace)
+            .map(
+              (team) =>
+                `${team.teamName}: ${money(team.capSpace)} available against ${money(team.committedSalary)} committed.`,
+            )
+            .join(" "),
           [],
         ),
         section(
@@ -1908,6 +1957,30 @@ function buildMilestoneTemplateEditionCopy(
             : "The early roster picture",
           teamOutlookSummary(packet),
           standingsLink,
+        ),
+        section(
+          "draft_capital",
+          "Early Draft Position",
+          draftLeader
+            ? `${draftLeader.teamName} gets the first major decision`
+            : "The early board is still taking shape",
+          draftPositionSummary ||
+            "First-round positions have not been confirmed yet.",
+          [],
+        ),
+        section(
+          "transaction_wire",
+          "Deals Already Done",
+          signings[0]
+            ? `${signings[0].playerName} tops the completed business`
+            : "The completed business",
+          signings
+            .map(
+              (contract) =>
+                `${contract.teamName} signed ${contract.playerName} at ${money(contract.salary)}.`,
+            )
+            .join(" ") || "No completed signings were found in this window.",
+          [],
         ),
         section(
           "next_week",
@@ -2250,6 +2323,9 @@ export function buildWeeklyEditionChatGptPrompt(
         teamOutlooks: promptTeamOutlooks,
         expiringContracts: milestone?.expiringContracts ?? [],
         recentSignings: milestone?.recentSignings ?? [],
+        earlyDraftBoard: (milestone?.draftPicks ?? []).filter(
+          (pick) => pick.round <= 3,
+        ),
       };
       break;
     case "pre_draft":
@@ -2285,7 +2361,7 @@ export function buildWeeklyEditionChatGptPrompt(
     "Create original storylines from the supplied facts by finding tension, contrast, momentum, pressure, irony and plausible stakes. Add small recurring quirks, callbacks, colorful metaphors, playful labels for situations and subtle chirps so the edition develops its own personality.",
     "Creative framing may be invented; factual claims may not. Do not invent events, quotes, relationships, motives, injuries, rules, player or team names, scores, statistics, transactions or historical claims. A joke or narrative flourish must remain clearly rhetorical and must not masquerade as a new fact.",
     `NEWSROOM STAFF: ${WEEKLY_EDITION_STAFF.editorInChief.name}, Editor-in-Chief, writes only rarely about league process or rule changes; ${WEEKLY_EDITION_STAFF.headOfAnalytics.name}, Head of Analytics, handles only the biggest and less frequent performance, record, and data-led lead stories; ${WEEKLY_EDITION_STAFF.analyticsReporter.name}, Analytics Reporter, handles the regular standout daily and weekly performance coverage; ${WEEKLY_EDITION_STAFF.headInsider.name}, GSHL Head Insider, handles only the biggest and less frequent signings, trades, and roster moves; ${WEEKLY_EDITION_STAFF.insider.name}, GSHL Insider, handles the regular transaction wire.`,
-    "Every section has an assigned author in SECTION_PLAN. Preserve that author object exactly. When scope is team, write with a very light preference for that team and give its perspective slightly more attention without becoming a fan blog, attacking opponents, or changing the facts. Conference reporters may frame a story through their conference, but remain fair.",
+    "Every section has an assigned author in SECTION_PLAN. Preserve that author object exactly. A team beat writer appears only when the article is specifically centered on that writer’s team; keep the article anchored to that team’s perspective with a very light preference, without becoming a fan blog, attacking opponents or changing the facts. Never make a team beat writer narrate a broad league roundup. Conference reporters may frame a story through their conference, but remain fair.",
     "Every article must have a different reporter. Never reuse a byline within the same edition; the six unique assignments in SECTION_PLAN are final.",
     "EDITION_FACTS may contain ranked story candidates from matchups, performances, records, milestones, awards, and league activity. Use editorial judgment to choose the most important lead and supporting angles; importance is guidance, not a command.",
     "LEAGUE CONTRACT RULES: An expiring UFA cannot be re-signed by the current team and cannot be signed by any team during the summer. Every expired UFA automatically returns to the draft. An expiring RFA may be re-signed by the current team at exactly 115% of the prior salary. Never describe an expired UFA as a summer signing target or imply that cap space can be used to sign one directly.",
@@ -2294,6 +2370,11 @@ export function buildWeeklyEditionChatGptPrompt(
       : [
           "DRAFT CONTEXT: Every team always has exactly 15 draft picks. That equal allotment is routine infrastructure, not a storyline, advantage, disadvantage or measure of draft capital. Never compare teams by total pick count. Focus draft coverage on selection order, early-round position, roster need, player fit and the decisions created by the board.",
         ]),
+    ...(packet.issueType === "offseason_market"
+      ? [
+          "OFFSEASON REVIEW PRIORITIES: Lead with which teams have meaningful cap space and which draft-bound UFAs they could realistically afford based on the supplied prior salaries. Then examine early-round draft position and the strongest rosters entering next season. Connect cap room, UFA targets, draft order and roster quality into specific team storylines instead of treating them as four disconnected lists. Remember that expired UFAs are targets on the draft board, not direct summer signings.",
+        ]
+      : []),
     "MATCHUP PRIORITY RULES: QF means quarterfinal, SF means semifinal, F means final, and LT means Loser Tournament. Playoff games are always major stories, ordered F, then SF, then QF. Loser Tournament games should not be a headline, lead, primary article, or meaningful supporting focus; they have been omitted from the supplied matchup facts.",
     "Use only the names, numbers, outcomes, and links in EDITION_FACTS. Do not add HTML, Markdown links, new sections, new IDs, or new URLs.",
     "Return only one JSON object. It must contain headline, deck, and exactly six sections. Each section must contain id, kind, eyebrow, headline, body, author, and links.",
