@@ -4,22 +4,107 @@ import type {
   Franchise,
   GSHLTeam,
   Player,
+  RosterPosition as RosterPositionType,
   Season,
 } from "@gshl-types";
 import { RosterPosition } from "../domain/constants";
 import { buildCurrentRoster } from "./team-roster";
 
-export const DRAFT_ROSTER_STARTER_WEIGHT = 2;
+export const DRAFT_ROSTER_PRIMARY_WEIGHT = 4;
+export const DRAFT_ROSTER_SECONDARY_WEIGHT = 3;
+export const DRAFT_ROSTER_UTILITY_WEIGHT = 2;
 export const DRAFT_ROSTER_BENCH_WEIGHT = 1;
 
-const STARTING_LINEUP_POSITIONS = new Set<string>([
-  RosterPosition.LW,
-  RosterPosition.C,
-  RosterPosition.RW,
-  RosterPosition.D,
-  RosterPosition.G,
-  RosterPosition.Util,
-]);
+export const DRAFT_ROSTER_LINEUP_SLOTS: readonly {
+  position: RosterPositionType;
+  eligible: readonly RosterPositionType[];
+  weight: number;
+}[] = [
+  {
+    position: RosterPosition.LW,
+    eligible: [RosterPosition.LW],
+    weight: DRAFT_ROSTER_PRIMARY_WEIGHT,
+  },
+  {
+    position: RosterPosition.C,
+    eligible: [RosterPosition.C],
+    weight: DRAFT_ROSTER_PRIMARY_WEIGHT,
+  },
+  {
+    position: RosterPosition.RW,
+    eligible: [RosterPosition.RW],
+    weight: DRAFT_ROSTER_PRIMARY_WEIGHT,
+  },
+  {
+    position: RosterPosition.D,
+    eligible: [RosterPosition.D],
+    weight: DRAFT_ROSTER_PRIMARY_WEIGHT,
+  },
+  {
+    position: RosterPosition.D,
+    eligible: [RosterPosition.D],
+    weight: DRAFT_ROSTER_PRIMARY_WEIGHT,
+  },
+  {
+    position: RosterPosition.LW,
+    eligible: [RosterPosition.LW],
+    weight: DRAFT_ROSTER_SECONDARY_WEIGHT,
+  },
+  {
+    position: RosterPosition.C,
+    eligible: [RosterPosition.C],
+    weight: DRAFT_ROSTER_SECONDARY_WEIGHT,
+  },
+  {
+    position: RosterPosition.RW,
+    eligible: [RosterPosition.RW],
+    weight: DRAFT_ROSTER_SECONDARY_WEIGHT,
+  },
+  {
+    position: RosterPosition.D,
+    eligible: [RosterPosition.D],
+    weight: DRAFT_ROSTER_SECONDARY_WEIGHT,
+  },
+  {
+    position: RosterPosition.G,
+    eligible: [RosterPosition.G],
+    weight: DRAFT_ROSTER_SECONDARY_WEIGHT,
+  },
+  {
+    position: RosterPosition.Util,
+    eligible: [
+      RosterPosition.LW,
+      RosterPosition.C,
+      RosterPosition.RW,
+      RosterPosition.D,
+    ],
+    weight: DRAFT_ROSTER_UTILITY_WEIGHT,
+  },
+];
+
+function getPositionWeights(lineupPos: string): readonly number[] {
+  if (
+    lineupPos === RosterPosition.LW ||
+    lineupPos === RosterPosition.C ||
+    lineupPos === RosterPosition.RW
+  ) {
+    return [DRAFT_ROSTER_PRIMARY_WEIGHT, DRAFT_ROSTER_SECONDARY_WEIGHT];
+  }
+  if (lineupPos === RosterPosition.D) {
+    return [
+      DRAFT_ROSTER_PRIMARY_WEIGHT,
+      DRAFT_ROSTER_PRIMARY_WEIGHT,
+      DRAFT_ROSTER_SECONDARY_WEIGHT,
+    ];
+  }
+  if (lineupPos === RosterPosition.G) {
+    return [DRAFT_ROSTER_SECONDARY_WEIGHT];
+  }
+  if (lineupPos === RosterPosition.Util) {
+    return [DRAFT_ROSTER_UTILITY_WEIGHT];
+  }
+  return [];
+}
 
 export function calculateDraftRosterTalentRating(
   roster: readonly {
@@ -29,6 +114,7 @@ export function calculateDraftRosterTalentRating(
 ): number | null {
   let weightedRating = 0;
   let totalWeight = 0;
+  const ratingsByLineupPosition = new Map<string, number[]>();
 
   for (const player of roster) {
     if (player.overallRating === null || player.overallRating === undefined) {
@@ -37,17 +123,28 @@ export function calculateDraftRosterTalentRating(
     const rating = Number(player.overallRating);
     if (!Number.isFinite(rating)) continue;
 
-    const weight =
-      typeof player.lineupPos === "string" &&
-      STARTING_LINEUP_POSITIONS.has(player.lineupPos)
-        ? DRAFT_ROSTER_STARTER_WEIGHT
-        : player.lineupPos === RosterPosition.BN
-          ? DRAFT_ROSTER_BENCH_WEIGHT
-          : 0;
-    if (weight === 0) continue;
+    if (player.lineupPos === RosterPosition.BN) {
+      weightedRating += rating * DRAFT_ROSTER_BENCH_WEIGHT;
+      totalWeight += DRAFT_ROSTER_BENCH_WEIGHT;
+      continue;
+    }
+    if (typeof player.lineupPos !== "string") continue;
+    if (getPositionWeights(player.lineupPos).length === 0) continue;
 
-    weightedRating += rating * weight;
-    totalWeight += weight;
+    const positionRatings = ratingsByLineupPosition.get(player.lineupPos) ?? [];
+    positionRatings.push(rating);
+    ratingsByLineupPosition.set(player.lineupPos, positionRatings);
+  }
+
+  for (const [lineupPos, ratings] of ratingsByLineupPosition) {
+    const positionWeights = getPositionWeights(lineupPos);
+    ratings.sort((left, right) => right - left);
+
+    for (const [index, rating] of ratings.entries()) {
+      const weight = positionWeights[index] ?? DRAFT_ROSTER_BENCH_WEIGHT;
+      weightedRating += rating * weight;
+      totalWeight += weight;
+    }
   }
 
   return totalWeight > 0 ? weightedRating / totalWeight : null;

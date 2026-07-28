@@ -2803,7 +2803,7 @@ export function buildWeeklyEditionChatGptPrompt(
       playerRating:
         "Overall player rating. Higher is better and it is the baseline measure of individual quality.",
       teamTalentRating:
-        "The same weighted roster-talent rating shown in the Draft Hub: starters count twice and bench players once. Higher is better.",
+        "The same tiered roster-talent rating shown in the Draft Hub: primary starters count most, followed by secondary starters and goalie, utility, then bench. Higher is better.",
       gmRating:
         "The historical GM Ladder rating based on results and accomplishments. It measures the manager's record, not current roster talent.",
     },

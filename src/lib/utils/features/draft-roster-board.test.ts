@@ -100,15 +100,20 @@ function player(
   };
 }
 
-void test("calculates live roster talent with starters weighted twice as much as bench players", () => {
+void test("calculates live roster talent with tiered lineup weights", () => {
   const rating = calculateDraftRosterTalentRating([
-    player("starter-one", "owner", 90, "C"),
-    player("starter-two", "owner", 80, "D"),
-    player("bench", "owner", 70, "BN"),
+    player("primary-center", "owner", 90, "C"),
+    player("secondary-center", "owner", 80, "C"),
+    player("primary-defense-one", "owner", 85, "D"),
+    player("primary-defense-two", "owner", 75, "D"),
+    player("secondary-defense", "owner", 70, "D"),
+    player("goalie", "owner", 65, "G"),
+    player("utility", "owner", 60, "Util"),
+    player("bench", "owner", 55, "BN"),
     player("injured", "owner", 100, "IR"),
   ]);
 
-  assert.equal(rating, 82);
+  assert.equal(rating, 1820 / 24);
 });
 
 void test("normalizes database string ratings for newsroom talent snapshots", () => {
@@ -118,7 +123,7 @@ void test("normalizes database string ratings for newsroom talent snapshots", ()
       { overallRating: "75", lineupPos: "BN" },
       { overallRating: "not-a-rating", lineupPos: "RW" },
     ]),
-    85,
+    87,
   );
 });
 
@@ -172,7 +177,7 @@ void test("reorders a conference when a newly drafted bench player changes its t
   assert.deepEqual(
     groupDraftRosterTeamsByConference(teams, [
       ...initialPlayers,
-      player("beryl-pick", "owner-b", 90, "BN"),
+      player("beryl-pick", "owner-b", 91, "BN"),
     ])[0]?.teams.map((conferenceTeam) => conferenceTeam.name),
     ["Beryl", "Amber", "Crystal"],
   );

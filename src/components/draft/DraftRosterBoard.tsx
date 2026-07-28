@@ -101,7 +101,7 @@ function TeamRosterCard({
         </div>
         <div
           className="ml-auto shrink-0 text-right"
-          title="Live talent rating. Starting players count twice as much as bench players."
+          title="Live talent rating. Primary starters count most, followed by secondary starters and goalie, utility, then bench."
         >
           <p className="text-[7px] font-bold uppercase tracking-wide text-slate-500">
             Talent

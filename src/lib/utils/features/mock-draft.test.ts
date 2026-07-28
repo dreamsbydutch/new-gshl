@@ -204,6 +204,28 @@ void test("reaches for positional help when it improves roster talent more than 
   assert.ok(Number(projection[0]?.score) > Number(projection[1]?.score));
 });
 
+void test("rebuilds the full lineup when a candidate moves players into lower tiers", () => {
+  const projection = buildMockDraftProjection({
+    seasonDraftPicks: [pick("pick-1", 1)],
+    draftPlayers: [
+      player("higher-rated-goalie", 99, ["G"], { overallRk: 1 }),
+      player("lineup-moving-center", 95, ["C"], { overallRk: 2 }),
+    ],
+    rosterPlayers: [
+      player("primary-center", 100, ["C"], { ownerId: "owner-a" }),
+      player("secondary-center", 90, ["C"], { ownerId: "owner-a" }),
+      player("utility-center", 80, ["C"], { ownerId: "owner-a" }),
+      player("bench-center", 70, ["C"], { ownerId: "owner-a" }),
+    ],
+    teams: [team()],
+  });
+
+  assert.equal(projection[0]?.projectedPlayer?.id, "lineup-moving-center");
+  assert.ok(
+    Math.abs(Number(projection[0]?.score) - (1015 / 11 - 90)) < Number.EPSILON,
+  );
+});
+
 void test("reprojects future picks around completed live-draft selections", () => {
   const eliteCenter = player("elite-center", 99, ["C"], { overallRk: 1 });
   const neededGoalie = player("needed-goalie", 90, ["G"], { overallRk: 2 });

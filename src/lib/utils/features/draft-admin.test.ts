@@ -36,3 +36,21 @@ void test("regenerates the whole lineup after a stronger player is drafted", () 
   assert.equal(lineupByPlayerId.get("displaced-center"), "Util");
   assert.equal(lineupByPlayerId.get("injured-center"), "IR");
 });
+
+void test("optimizes multi-position players across the tiered lineup", () => {
+  const assignments = generateLineupAssignments([
+    candidate("dual-star", 100, ["LW", "C"], null),
+    candidate("left-wing", 99, ["LW"], null),
+    candidate("center", 10, ["C"], null),
+  ]);
+  const lineupByPlayerId = new Map(
+    assignments.map((assignment) => [
+      assignment.playerId,
+      assignment.lineupPos,
+    ]),
+  );
+
+  assert.equal(lineupByPlayerId.get("dual-star"), "C");
+  assert.equal(lineupByPlayerId.get("left-wing"), "LW");
+  assert.equal(lineupByPlayerId.get("center"), "C");
+});

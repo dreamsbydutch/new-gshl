@@ -17,6 +17,10 @@ import type {
   RosterPosition as RosterPositionType,
 } from "@gshl-types";
 import { RosterPosition } from "../domain/constants";
+import {
+  DRAFT_ROSTER_BENCH_WEIGHT,
+  DRAFT_ROSTER_LINEUP_SLOTS,
+} from "./draft-roster-board";
 
 export type { LineupAssignment } from "@gshl-types";
 
@@ -151,31 +155,6 @@ export function filterFreeAgentsBySearch(
   });
 }
 
-const DEFAULT_LINEUP_SLOTS: Array<{
-  position: RosterPositionType;
-  eligible: RosterPositionType[];
-}> = [
-  { position: RosterPosition.LW, eligible: [RosterPosition.LW] },
-  { position: RosterPosition.LW, eligible: [RosterPosition.LW] },
-  { position: RosterPosition.C, eligible: [RosterPosition.C] },
-  { position: RosterPosition.C, eligible: [RosterPosition.C] },
-  { position: RosterPosition.RW, eligible: [RosterPosition.RW] },
-  { position: RosterPosition.RW, eligible: [RosterPosition.RW] },
-  { position: RosterPosition.D, eligible: [RosterPosition.D] },
-  { position: RosterPosition.D, eligible: [RosterPosition.D] },
-  { position: RosterPosition.D, eligible: [RosterPosition.D] },
-  {
-    position: RosterPosition.Util,
-    eligible: [
-      RosterPosition.LW,
-      RosterPosition.C,
-      RosterPosition.RW,
-      RosterPosition.D,
-    ],
-  },
-  { position: RosterPosition.G, eligible: [RosterPosition.G] },
-];
-
 const PROTECTED_LINEUP_POSITIONS = new Set<RosterPositionType>([
   RosterPosition.IR,
   RosterPosition.IRplus,
@@ -199,7 +178,7 @@ const getPlayerRating = (player: LineupCandidate): number =>
  */
 const isEligibleForSlot = (
   player: LineupCandidate,
-  eligiblePositions: RosterPositionType[],
+  eligiblePositions: readonly RosterPositionType[],
 ): boolean => {
   const positions = player.nhlPos ?? [];
   return positions.some((position) => eligiblePositions.includes(position));
@@ -221,7 +200,8 @@ export function generateLineupAssignments(
   const assignments: LineupAssignment[] = [];
   const usedPlayerIds = new Set<string>();
   const sortedPlayers = [...players].sort(
-    (a, b) => getPlayerRating(b) - getPlayerRating(a),
+    (a, b) =>
+      getPlayerRating(b) - getPlayerRating(a) || a.id.localeCompare(b.id),
   );
 
   // Preserve IR slots so they are never reassigned automatically.
@@ -232,21 +212,69 @@ export function generateLineupAssignments(
     }
   }
 
-  for (const slot of DEFAULT_LINEUP_SLOTS) {
-    const candidate = sortedPlayers.find((player) => {
-      if (usedPlayerIds.has(player.id)) {
-        return false;
+  const availablePlayers = sortedPlayers.filter(
+    (player) => !usedPlayerIds.has(player.id),
+  );
+  const emptySlotAssignments = Array<string | null>(
+    DRAFT_ROSTER_LINEUP_SLOTS.length,
+  ).fill(null);
+  let states = new Map<
+    number,
+    { score: number; playerIdBySlot: Array<string | null> }
+  >([[0, { score: 0, playerIdBySlot: emptySlotAssignments }]]);
+
+  for (const player of availablePlayers) {
+    const nextStates = new Map(states);
+
+    for (const [mask, state] of states) {
+      for (
+        let slotIndex = 0;
+        slotIndex < DRAFT_ROSTER_LINEUP_SLOTS.length;
+        slotIndex += 1
+      ) {
+        const slot = DRAFT_ROSTER_LINEUP_SLOTS[slotIndex];
+        const slotBit = 1 << slotIndex;
+        if (!slot || (mask & slotBit) !== 0) continue;
+        if (!isEligibleForSlot(player, slot.eligible)) continue;
+
+        const nextMask = mask | slotBit;
+        const nextScore =
+          state.score +
+          getPlayerRating(player) * (slot.weight - DRAFT_ROSTER_BENCH_WEIGHT);
+        const existing = nextStates.get(nextMask);
+        if (existing && existing.score >= nextScore) continue;
+
+        const playerIdBySlot = [...state.playerIdBySlot];
+        playerIdBySlot[slotIndex] = player.id;
+        nextStates.set(nextMask, { score: nextScore, playerIdBySlot });
       }
-
-      return isEligibleForSlot(player, slot.eligible);
-    });
-
-    if (!candidate) {
-      continue;
     }
 
-    assignments.push({ playerId: candidate.id, lineupPos: slot.position });
-    usedPlayerIds.add(candidate.id);
+    states = nextStates;
+  }
+
+  const bestState = [...states.entries()].reduce(
+    (best, candidate) => {
+      const [bestMask, bestValue] = best;
+      const [candidateMask, candidateValue] = candidate;
+      return candidateValue.score > bestValue.score ||
+        (candidateValue.score === bestValue.score &&
+          candidateMask.toString(2).replaceAll("0", "").length >
+            bestMask.toString(2).replaceAll("0", "").length)
+        ? candidate
+        : best;
+    },
+    [0, { score: 0, playerIdBySlot: emptySlotAssignments }] as [
+      number,
+      { score: number; playerIdBySlot: Array<string | null> },
+    ],
+  )[1];
+
+  for (const [slotIndex, playerId] of bestState.playerIdBySlot.entries()) {
+    const slot = DRAFT_ROSTER_LINEUP_SLOTS[slotIndex];
+    if (!playerId || !slot) continue;
+    assignments.push({ playerId, lineupPos: slot.position });
+    usedPlayerIds.add(playerId);
   }
 
   for (const player of sortedPlayers) {

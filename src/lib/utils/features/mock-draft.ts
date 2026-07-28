@@ -52,6 +52,36 @@ function hasTalentRating(
   );
 }
 
+function selectHighestRatedPlayerAtEachPosition<
+  TPlayer extends DraftBoardPlayer,
+>(players: readonly TPlayer[]): TPlayer[] {
+  const highestRatedByPosition = new Map<RosterPosition, TPlayer>();
+
+  for (const player of players) {
+    for (const position of normalizePlayerPositions(player)) {
+      const current = highestRatedByPosition.get(position);
+      const playerRating = Number(player.overallRating);
+      const currentRating = Number(current?.overallRating);
+      if (
+        !current ||
+        playerRating > currentRating ||
+        (playerRating === currentRating && comparePlayers(player, current) < 0)
+      ) {
+        highestRatedByPosition.set(position, player);
+      }
+    }
+  }
+
+  return [
+    ...new Map(
+      [...highestRatedByPosition.values()].map((player) => [
+        String(player.id),
+        player,
+      ]),
+    ).values(),
+  ].sort(comparePlayers);
+}
+
 /**
  * Sorts projected picks.
  *
@@ -77,7 +107,12 @@ function normalizePlayerPositions(player: DraftBoardPlayer): RosterPosition[] {
   return Array.isArray(player.nhlPos) ? player.nhlPos : [player.nhlPos];
 }
 
-function calculateOptimizedRosterTalent(
+/**
+ * Rebuilds the entire lineup and then scores every player at their resulting
+ * tier. Adding one player may therefore move several existing players between
+ * primary, secondary, utility, and bench weights.
+ */
+function calculateTalentAfterFullLineupOptimization(
   roster: readonly DraftBoardPlayer[],
 ): number | null {
   const assignments = generateLineupAssignments(
@@ -189,12 +224,13 @@ export function buildMockDraftProjection<
     const teamRoster = gshlTeam
       ? (rosterByTeamKey.get(getTeamRosterKey(gshlTeam)) ?? [])
       : [];
-    const currentTalent = calculateOptimizedRosterTalent(teamRoster) ?? 0;
+    const currentTalent =
+      calculateTalentAfterFullLineupOptimization(teamRoster) ?? 0;
     let projectedPlayer: TPlayer | undefined;
     let bestTalentGain = Number.NEGATIVE_INFINITY;
     const ratedCandidates = remainingPlayers.filter(hasTalentRating);
     const candidatePool = ratedCandidates.length
-      ? ratedCandidates
+      ? selectHighestRatedPlayerAtEachPosition(ratedCandidates)
       : remainingPlayers;
 
     for (const candidate of candidatePool) {
@@ -202,7 +238,10 @@ export function buildMockDraftProjection<
         ? asDraftedRosterPlayer(candidate, gshlTeam)
         : candidate;
       const resultingTalent =
-        calculateOptimizedRosterTalent([...teamRoster, draftedCandidate]) ?? 0;
+        calculateTalentAfterFullLineupOptimization([
+          ...teamRoster,
+          draftedCandidate,
+        ]) ?? 0;
       const talentGain = resultingTalent - currentTalent;
       const isBetterGain = talentGain > bestTalentGain;
       const winsTie =
