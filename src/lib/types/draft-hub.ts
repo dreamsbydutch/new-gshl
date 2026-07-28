@@ -98,6 +98,12 @@ export interface DraftHubEligiblePlayerView extends Player {
   stats: UfaStatView | null;
 }
 
+export interface DraftHubNextPickNotice {
+  pick: DraftHubPickView;
+  picksAway: number;
+  estimatedAt: number;
+}
+
 export type DraftPlayerSortKey =
   | "nhlTeam"
   | "fullName"
@@ -121,6 +127,7 @@ export interface DraftHubBoardViewModel {
   activePick: DraftHubPickView | null;
   recentPicks: DraftHubPickView[];
   upcomingPicks: DraftHubPickView[];
+  nextUserPick: DraftHubNextPickNotice | null;
   mockProjectionByPickId: Record<string, DraftHubMockProjection>;
   eligiblePlayers: DraftHubEligiblePlayerView[];
   playerSortKey: DraftPlayerSortKey;

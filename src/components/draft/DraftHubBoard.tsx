@@ -7,6 +7,7 @@ import {
   ArrowUp,
   ArrowUpDown,
   CheckCircle2,
+  Clock3,
   Search,
   ShieldAlert,
   Undo2,
@@ -19,6 +20,7 @@ import { cn, formatNumber, formatUfaStat } from "@gshl-utils";
 import type {
   DraftHubEligiblePlayerView,
   DraftHubMockProjection,
+  DraftHubNextPickNotice,
   DraftHubPickView,
   DraftPlayerSortDirection,
   DraftPlayerSortKey,
@@ -49,6 +51,38 @@ function formatDraftStartCountdown(totalSeconds: number): string {
       .padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
   }
   return formatClock(totalSeconds);
+}
+
+function NextUserPickNotice({ notice }: { notice: DraftHubNextPickNotice }) {
+  const pickLabel = `Round ${notice.pick.pick.round}, Pick ${notice.pick.pick.pick}`;
+  const estimatedTime = new Intl.DateTimeFormat("en-CA", {
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone: "America/Toronto",
+  }).format(new Date(notice.estimatedAt));
+
+  return (
+    <aside className="flex items-center gap-2 rounded-xl border border-primary/25 bg-primary/5 px-3 py-2.5 text-sm text-slate-800 shadow-sm sm:px-4">
+      <Clock3 className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+      <p className="min-w-0 leading-snug">
+        {notice.picksAway === 0 ? (
+          <>
+            <span className="font-bold">You are on the clock</span>
+            {` — ${pickLabel}`}
+          </>
+        ) : (
+          <>
+            Your next pick is in{" "}
+            <span className="font-bold">
+              {notice.picksAway} {notice.picksAway === 1 ? "pick" : "picks"}
+            </span>
+            {`, ${pickLabel}, est. `}
+            <span className="font-bold">{estimatedTime}</span>
+          </>
+        )}
+      </p>
+    </aside>
+  );
 }
 
 function TeamLogo({
@@ -700,6 +734,10 @@ export function DraftHubBoard() {
 
   return (
     <main className="container mx-auto space-y-8 px-3 py-5 sm:px-4">
+      {board.nextUserPick ? (
+        <NextUserPickNotice notice={board.nextUserPick} />
+      ) : null}
+
       <DraftStatusHero
         activePick={board.activePick}
         status={board.state.status}

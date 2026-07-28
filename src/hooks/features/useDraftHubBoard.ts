@@ -19,6 +19,7 @@ import {
   canSubmitDraftPick,
   findNhlTeamByAbbreviation,
   getDefaultDraftPlayerSortDirection,
+  getNextOwnerDraftPickNotice,
   indexLatestUfaNhlStats,
   prepareDraftBoardPlayers,
   resolveDraftHubSeason,
@@ -324,6 +325,13 @@ export function useDraftHubBoard(): DraftHubBoardViewModel {
   const latestCompletedPick = recentPicks[0] ?? null;
   const canUndoLastPick =
     session?.user.role === "commissioner" && latestCompletedPick !== null;
+  const nextUserPick = getNextOwnerDraftPickNotice(
+    state?.picks ?? [],
+    session?.user.ownerId,
+    state?.status === "upcoming"
+      ? state.season.draftStartAt
+      : now + serverOffset,
+  );
   const clockRemainingSeconds = state?.clockExpiresAt
     ? Math.max(
         0,
@@ -432,6 +440,7 @@ export function useDraftHubBoard(): DraftHubBoardViewModel {
     activePick,
     recentPicks,
     upcomingPicks,
+    nextUserPick,
     mockProjectionByPickId,
     eligiblePlayers,
     playerSortKey,

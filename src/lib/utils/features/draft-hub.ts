@@ -2,6 +2,8 @@ import type {
   DraftClockState,
   DraftHubDraftPick,
   DraftHubEligiblePlayerView,
+  DraftHubNextPickNotice,
+  DraftHubPickView,
   DraftHubStatus,
   DraftPlayerSortDirection,
   DraftPlayerSortKey,
@@ -11,6 +13,7 @@ import type {
 import { findCurrentSeason, findUpcomingSeason } from "../domain/season";
 
 export const DRAFT_PICK_CLOCK_MS = 4 * 60 * 1000;
+export const ESTIMATED_DRAFT_PICK_MS = 82 * 1000;
 
 const DRAFT_RANK_SORT_KEYS = new Set<DraftPlayerSortKey>([
   "overallRk",
@@ -91,6 +94,30 @@ export function sortDraftEligiblePlayers(
       Number(right.overallRk ?? Number.MAX_SAFE_INTEGER);
     return rank || left.fullName.localeCompare(right.fullName);
   });
+}
+
+export function getNextOwnerDraftPickNotice(
+  picks: readonly DraftHubPickView[],
+  ownerId: string | null | undefined,
+  estimateBaseTime: number,
+): DraftHubNextPickNotice | null {
+  if (!ownerId) return null;
+
+  const openPicks = [...picks]
+    .filter((pick) => !pick.pick.isSigning && !pick.pick.playerId)
+    .sort((left, right) => compareDraftPickOrder(left.pick, right.pick));
+  const nextPickIndex = openPicks.findIndex(
+    (pick) => String(pick.team?.ownerId ?? "") === String(ownerId),
+  );
+  if (nextPickIndex < 0) return null;
+
+  const pick = openPicks[nextPickIndex];
+  if (!pick) return null;
+  return {
+    pick,
+    picksAway: nextPickIndex,
+    estimatedAt: estimateBaseTime + nextPickIndex * ESTIMATED_DRAFT_PICK_MS,
+  };
 }
 
 export function getDraftYear(

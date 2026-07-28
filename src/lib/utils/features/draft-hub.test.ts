@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import type {
   DraftHubEligiblePlayerView,
+  DraftHubPickView,
   DraftPick,
   Season,
 } from "@gshl-types";
@@ -10,6 +11,7 @@ import {
   findLatestCompletedLiveDraftPick,
   getDefaultDraftPlayerSortDirection,
   getDraftYear,
+  getNextOwnerDraftPickNotice,
   resolveDraftClockState,
   resolveDraftHubSeason,
   serializeDraftHubPick,
@@ -84,6 +86,61 @@ function eligiblePlayer(
     ...fields,
   };
 }
+
+function pickView(
+  id: string,
+  overall: number,
+  ownerId: string,
+  fields: Partial<DraftPick> = {},
+): DraftHubPickView {
+  const draftPick = pick(id, overall, null, fields);
+  return {
+    pick: {
+      ...draftPick,
+      onClockStartedAt: null,
+      onClockExpiresAt: null,
+      onClockEndedAt: null,
+      createdAt: draftPick.createdAt.getTime(),
+      updatedAt: draftPick.updatedAt.getTime(),
+    },
+    team: {
+      id: `team-${id}`,
+      franchiseId: `franchise-${id}`,
+      ownerId,
+      name: `Team ${id}`,
+      abbr: id.toUpperCase(),
+      logoUrl: null,
+    },
+    originalTeam: null,
+    player: null,
+  };
+}
+
+void test("estimates the logged-in owner's next open draft pick", () => {
+  const estimateBaseTime = Date.parse("2026-09-01T00:45:00.000Z");
+  const picks = Array.from({ length: 13 }, (_, index) =>
+    pickView(
+      String(index + 1),
+      index + 1,
+      index === 12 ? "owner-me" : `owner-${index}`,
+    ),
+  );
+  picks.splice(
+    3,
+    0,
+    pickView("signing", 4, "owner-signing", { isSigning: true }),
+  );
+
+  const notice = getNextOwnerDraftPickNotice(
+    picks,
+    "owner-me",
+    estimateBaseTime,
+  );
+
+  assert.equal(notice?.picksAway, 12);
+  assert.equal(notice?.pick.pick.pick, "13");
+  assert.equal(notice?.estimatedAt, estimateBaseTime + 12 * 82 * 1000);
+});
 
 void test("uses intuitive initial directions for every draft player column", () => {
   assert.equal(getDefaultDraftPlayerSortDirection("fullName"), "asc");
