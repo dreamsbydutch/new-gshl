@@ -12,7 +12,7 @@ import { buildCurrentRoster } from "./team-roster";
 export const DRAFT_ROSTER_STARTER_WEIGHT = 2;
 export const DRAFT_ROSTER_BENCH_WEIGHT = 1;
 
-const STARTING_LINEUP_POSITIONS = new Set<Player["lineupPos"]>([
+const STARTING_LINEUP_POSITIONS = new Set<string>([
   RosterPosition.LW,
   RosterPosition.C,
   RosterPosition.RW,
@@ -22,7 +22,10 @@ const STARTING_LINEUP_POSITIONS = new Set<Player["lineupPos"]>([
 ]);
 
 export function calculateDraftRosterTalentRating(
-  roster: readonly Player[],
+  roster: readonly {
+    lineupPos?: string | null;
+    overallRating?: string | number | null;
+  }[],
 ): number | null {
   let weightedRating = 0;
   let totalWeight = 0;
@@ -34,11 +37,13 @@ export function calculateDraftRosterTalentRating(
     const rating = Number(player.overallRating);
     if (!Number.isFinite(rating)) continue;
 
-    const weight = STARTING_LINEUP_POSITIONS.has(player.lineupPos)
-      ? DRAFT_ROSTER_STARTER_WEIGHT
-      : player.lineupPos === RosterPosition.BN
-        ? DRAFT_ROSTER_BENCH_WEIGHT
-        : 0;
+    const weight =
+      typeof player.lineupPos === "string" &&
+      STARTING_LINEUP_POSITIONS.has(player.lineupPos)
+        ? DRAFT_ROSTER_STARTER_WEIGHT
+        : player.lineupPos === RosterPosition.BN
+          ? DRAFT_ROSTER_BENCH_WEIGHT
+          : 0;
     if (weight === 0) continue;
 
     weightedRating += rating * weight;

@@ -111,6 +111,17 @@ void test("calculates live roster talent with starters weighted twice as much as
   assert.equal(rating, 82);
 });
 
+void test("normalizes database string ratings for newsroom talent snapshots", () => {
+  assert.equal(
+    calculateDraftRosterTalentRating([
+      { overallRating: "90", lineupPos: "C" },
+      { overallRating: "75", lineupPos: "BN" },
+      { overallRating: "not-a-rating", lineupPos: "RW" },
+    ]),
+    85,
+  );
+});
+
 void test("groups conferences and sorts teams by live roster talent", () => {
   const teams = [
     team("b", "Beryl", "west", "West"),
