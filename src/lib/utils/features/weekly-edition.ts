@@ -2209,6 +2209,32 @@ function allText(content: WeeklyEditionContent) {
   ].join("\n");
 }
 
+function hasPlayerOutcomeClaim(
+  sentence: string,
+  playerName: string,
+  outcomePattern: RegExp,
+  playerNames: readonly string[],
+) {
+  const playerMentions = playerNames.flatMap((name) => {
+    const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    return [...sentence.matchAll(new RegExp(escapedName, "gi"))].map(
+      (match) => ({ name, index: match.index }),
+    );
+  });
+  const flags = outcomePattern.flags.includes("g")
+    ? outcomePattern.flags
+    : `${outcomePattern.flags}g`;
+
+  return [...sentence.matchAll(new RegExp(outcomePattern.source, flags))].some(
+    (outcomeMatch) => {
+      const closestPlayer = playerMentions
+        .filter((mention) => mention.index <= outcomeMatch.index)
+        .sort((left, right) => right.index - left.index)[0];
+      return closestPlayer?.name === playerName;
+    },
+  );
+}
+
 function validateWeeklyEditionRuleClaims(
   content: WeeklyEditionContent,
   packet: WeeklyEditionFactPacket,
@@ -2261,7 +2287,11 @@ function validateWeeklyEditionRuleClaims(
     );
   }
 
-  for (const contract of packet.milestone?.expiringContracts ?? []) {
+  const expiringContracts = packet.milestone?.expiringContracts ?? [];
+  const expiringPlayerNames = expiringContracts.map(
+    (contract) => contract.playerName,
+  );
+  for (const contract of expiringContracts) {
     const name = contract.playerName.toLowerCase();
     const related = sentences.filter((sentence) =>
       sentence.toLowerCase().includes(name),
@@ -2270,8 +2300,11 @@ function validateWeeklyEditionRuleClaims(
     for (const sentence of related) {
       if (
         expiryStatus === String(ContractStatus.RFA) &&
-        /(?:cannot|can't|may not|not eligible to).{0,35}re-?sign|(?:must|will|automatically).{0,35}(?:return|go|head).{0,20}(?:the\s+)?draft|draft-bound/i.test(
+        hasPlayerOutcomeClaim(
           sentence,
+          contract.playerName,
+          /(?:cannot|can't|may not|not eligible to).{0,35}re-?sign|(?:must|will|automatically).{0,35}(?:return|go|head).{0,20}(?:the\s+)?draft|draft-bound/i,
+          expiringPlayerNames,
         )
       ) {
         errors.push(
@@ -2280,8 +2313,11 @@ function validateWeeklyEditionRuleClaims(
       }
       if (
         expiryStatus === String(ContractStatus.UFA) &&
-        /(?:can|could|may|eligible to).{0,35}(?:be\s+)?re-?sign|(?:summer\s+ufa|summer\s+free\s+agency).{0,35}(?:target|option|fit|signing)|(?:target|option|fit).{0,35}(?:summer\s+ufa|summer\s+free\s+agency)/i.test(
+        hasPlayerOutcomeClaim(
           sentence,
+          contract.playerName,
+          /(?:can|could|may|eligible to).{0,35}(?:be\s+)?re-?sign|(?:summer\s+ufa|summer\s+free\s+agency).{0,35}(?:target|option|fit|signing)|(?:target|option|fit).{0,35}(?:summer\s+ufa|summer\s+free\s+agency)/i,
+          expiringPlayerNames,
         )
       ) {
         errors.push(

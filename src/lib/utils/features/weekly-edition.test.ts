@@ -1077,6 +1077,32 @@ void test("builds each season milestone from contract, cap, draft, and roster fa
         /RFA expiry/,
       );
 
+      const separateRfaAndUfaOutcomes = structuredClone(content);
+      separateRfaAndUfaOutcomes.sections[0]!.body =
+        "Alex North is draft-bound at expiry, while Casey East is an RFA with a $4.83 million required re-signing salary.";
+      assert.equal(
+        validateWeeklyEditionImport(
+          JSON.stringify(separateRfaAndUfaOutcomes),
+          packet,
+        ).errors.some((error) =>
+          error.includes("Casey East has an RFA expiry"),
+        ),
+        false,
+      );
+
+      const separateOutcomesInReverse = structuredClone(content);
+      separateOutcomesInReverse.sections[0]!.body =
+        "Alex North is draft-bound at expiry, while Casey East may be re-signed at the required RFA salary.";
+      const separateOutcomeErrors = validateWeeklyEditionImport(
+        JSON.stringify(separateOutcomesInReverse),
+        packet,
+      ).errors.join(" ");
+      assert.doesNotMatch(separateOutcomeErrors, /Alex North has a UFA expiry/);
+      assert.doesNotMatch(
+        separateOutcomeErrors,
+        /Casey East has an RFA expiry/,
+      );
+
       const wrongUfaOutcome = structuredClone(content);
       wrongUfaOutcome.sections[0]!.body =
         "Alex North is a Summer UFA target and may be re-signed.";
