@@ -427,6 +427,7 @@ export function UfaHomeCard() {
           View all free agents
         </Link>
       </div>
+      <ActiveOffers groups={query.data.offerGroups} />
       {query.data.window.isOpen ? (
         query.data.topFreeAgents.length > 0 ? (
           <PlayerTable players={query.data.topFreeAgents} showStats />
@@ -442,7 +443,6 @@ export function UfaHomeCard() {
           {query.data.window.reason}
         </p>
       )}
-      <ActiveOffers groups={query.data.offerGroups} />
     </section>
   );
 }
@@ -506,6 +506,7 @@ export function UfaLeagueOffice() {
           {query.data.window.reason}
         </p>
       ) : null}
+      <ActiveOffers groups={query.data.offerGroups} />
       <PlayerTable players={visiblePlayers} showStats />
       {visibleCount < players.length ? (
         <div className="flex justify-center">
@@ -518,7 +519,6 @@ export function UfaLeagueOffice() {
           </button>
         </div>
       ) : null}
-      <ActiveOffers groups={query.data.offerGroups} />
     </div>
   );
 }
