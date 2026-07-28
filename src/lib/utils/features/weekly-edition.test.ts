@@ -799,6 +799,15 @@ void test("allows creative article choices while rejecting unsafe imports", () =
     false,
   );
 
+  const leagueOfficeLink = structuredClone(content);
+  leagueOfficeLink.sections[0]!.links = [
+    { label: "Open League Office", href: "/leagueoffice" },
+  ];
+  assert.equal(
+    validateWeeklyEditionImport(JSON.stringify(leagueOfficeLink), packet).valid,
+    true,
+  );
+
   const oversized = structuredClone(content);
   oversized.headline = `${"A long headline ".repeat(10)}with a clean ending.`;
   oversized.deck = `${"A detailed deck sentence. ".repeat(15)}Final thought.`;

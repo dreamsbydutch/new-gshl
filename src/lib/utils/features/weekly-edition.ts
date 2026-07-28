@@ -2372,6 +2372,7 @@ function formatZodErrors(error: z.ZodError) {
 
 function weeklyEditionAvailableLinks(packet: WeeklyEditionFactPacket) {
   const links = [
+    { label: "Open League Office", href: "/leagueoffice" },
     { label: "View schedule", href: "/schedule" },
     { label: "View standings", href: "/standings" },
     ...pressBoxMatchups(packet.matchups).map((matchup) => ({
