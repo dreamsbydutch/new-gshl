@@ -132,38 +132,43 @@ function parseDate(value: string | Date | null | undefined): Date | null {
  * @param activeOn - The active on to use.
  * @returns True when upcoming season contract; otherwise false.
  */
+function contractCoversDate(
+  contract: Contract,
+  activeOn: Date | null,
+): boolean {
+  if (
+    contract.expiryStatus === ContractStatus.BUYOUT ||
+    contract.signingStatus === ContractStatus.BUYOUT
+  ) {
+    return false;
+  }
+
+  if (!activeOn) {
+    return true;
+  }
+
+  const startDate = parseDate(contract.startDate);
+  const expiryDate = parseDate(contract.expiryDate);
+  if (!startDate || !expiryDate) {
+    return false;
+  }
+
+  return (
+    startDate.getTime() <= activeOn.getTime() &&
+    expiryDate.getTime() >= activeOn.getTime()
+  );
+}
+
 function hasUpcomingSeasonContract(
   playerId: string,
   contracts: Contract[],
   activeOn: Date | null,
 ): boolean {
-  return contracts.some((contract) => {
-    if (String(contract.playerId) !== String(playerId)) {
-      return false;
-    }
-
-    if (
-      contract.expiryStatus === ContractStatus.BUYOUT ||
-      contract.signingStatus === ContractStatus.BUYOUT
-    ) {
-      return false;
-    }
-
-    if (!activeOn) {
-      return true;
-    }
-
-    const startDate = parseDate(contract.startDate);
-    const expiryDate = parseDate(contract.expiryDate);
-    if (!startDate || !expiryDate) {
-      return false;
-    }
-
-    return (
-      startDate.getTime() < activeOn.getTime() &&
-      expiryDate.getTime() >= activeOn.getTime()
-    );
-  });
+  return contracts.some(
+    (contract) =>
+      String(contract.playerId) === String(playerId) &&
+      contractCoversDate(contract, activeOn),
+  );
 }
 
 /**
@@ -184,6 +189,33 @@ export function filterAvailableDraftPlayers<
       player.isActive &&
       !hasUpcomingSeasonContract(String(player.id), contracts, activeDate),
   );
+}
+
+/**
+ * Builds season rosters from contracts that cover the requested season date.
+ */
+export function buildContractedSeasonRosterPlayers<T extends DraftBoardPlayer>(
+  players: T[],
+  contracts: Contract[],
+  activeOn: string | Date,
+): T[] {
+  const activeDate = parseDate(activeOn);
+  if (!activeDate) return [];
+
+  const ownerIdByPlayerId = new Map<string, string>();
+  for (const contract of contracts) {
+    if (contractCoversDate(contract, activeDate)) {
+      ownerIdByPlayerId.set(
+        String(contract.playerId),
+        String(contract.ownerId),
+      );
+    }
+  }
+
+  return players.flatMap((player) => {
+    const ownerId = ownerIdByPlayerId.get(String(player.id));
+    return ownerId ? [{ ...player, ownerId }] : [];
+  });
 }
 
 /**

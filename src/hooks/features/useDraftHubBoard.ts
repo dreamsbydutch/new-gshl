@@ -2,15 +2,20 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type {
+  DraftBoardPlayer,
   DraftHubBoardViewModel,
   DraftHubPickView,
   DraftHubStateData,
   DraftPlayerSortDirection,
   DraftPlayerSortKey,
+  DraftPick,
+  GSHLTeam,
   NHLTeam,
   Player,
 } from "@gshl-types";
 import {
+  buildContractedSeasonRosterPlayers,
+  buildMockDraftProjection,
   canSubmitDraftPick,
   findNhlTeamByAbbreviation,
   getDefaultDraftPlayerSortDirection,
@@ -26,8 +31,10 @@ import {
   useNHLTeams,
   usePlayerNhlStatsByPlayers,
   usePlayerPages,
+  usePlayers,
   useSeasonState,
   useSubmitDraftPick,
+  useTeams,
   useToast,
   useUndoDraftPick,
 } from "@gshl-hooks";
@@ -95,6 +102,14 @@ export function useDraftHubBoard(): DraftHubBoardViewModel {
   );
   const [now, setNow] = useState(() => Date.now());
   const playersQuery = usePlayerPages({ active: true, limit: 50 });
+  const allPlayersQuery = usePlayers({
+    isActive: true,
+    enabled: Boolean(season?.id),
+  });
+  const teamsQuery = useTeams({
+    seasonId: season?.id,
+    enabled: Boolean(season?.id),
+  });
   const playerIds = useMemo(
     () => playersQuery.data.map((player) => String(player.id)),
     [playersQuery.data],
@@ -150,6 +165,98 @@ export function useDraftHubBoard(): DraftHubBoardViewModel {
     () => nhlTeamsQuery.data.filter((team): team is NHLTeam => "abbr" in team),
     [nhlTeamsQuery.data],
   );
+  const teams = useMemo(
+    () =>
+      teamsQuery.data.filter(
+        (team): team is GSHLTeam =>
+          "franchiseId" in team &&
+          "ownerId" in team &&
+          !("date" in team) &&
+          !("weekId" in team) &&
+          !("seasonType" in team),
+      ),
+    [teamsQuery.data],
+  );
+  const mockProjectionByPickId = useMemo(() => {
+    if (!season?.startDate || !state) {
+      return {};
+    }
+
+    const draftPicks: DraftPick[] = state.picks
+      .filter((pickView) => !pickView.pick.isSigning)
+      .map(({ pick }) => ({
+        id: pick.id,
+        seasonId: pick.seasonId,
+        gshlTeamId: pick.gshlTeamId,
+        originalTeamId: pick.originalTeamId,
+        round: pick.round,
+        pick: pick.pick,
+        playerId: pick.playerId,
+        isTraded: pick.isTraded,
+        isSigning: pick.isSigning,
+        createdAt: new Date(pick.createdAt),
+        updatedAt: new Date(pick.updatedAt),
+      }));
+    const draftPickById = new Map(
+      draftPicks.map((draftPick) => [String(draftPick.id), draftPick]),
+    );
+    const playerById = new Map(
+      allPlayersQuery.data.map((player) => [String(player.id), player]),
+    );
+    const completedPicks = state.picks.flatMap((pickView) => {
+      const completedPlayer = pickView.player
+        ? playerById.get(String(pickView.player.id))
+        : undefined;
+      const completedPick = draftPickById.get(String(pickView.pick.id));
+      return completedPlayer && completedPick
+        ? [{ pick: completedPick, player: completedPlayer }]
+        : [];
+    });
+    const draftPlayers = prepareDraftBoardPlayers(
+      allPlayersQuery.data,
+      contractsQuery.data,
+      season.startDate,
+    );
+    const rosterPlayers: DraftBoardPlayer[] =
+      buildContractedSeasonRosterPlayers(
+        allPlayersQuery.data,
+        contractsQuery.data,
+        season.startDate,
+      );
+    const projections = buildMockDraftProjection({
+      seasonDraftPicks: draftPicks,
+      draftPlayers,
+      rosterPlayers,
+      completedPicks,
+      teams,
+    });
+
+    return Object.fromEntries(
+      projections.flatMap((projection) => {
+        const projectedPlayer = projection.projectedPlayer;
+        if (!projectedPlayer) return [];
+
+        return [
+          [
+            String(projection.pick.id),
+            {
+              playerId: String(projectedPlayer.id),
+              fullName: projectedPlayer.fullName,
+              nhlPos: Array.isArray(projectedPlayer.nhlPos)
+                ? projectedPlayer.nhlPos
+                : [projectedPlayer.nhlPos],
+            },
+          ],
+        ];
+      }),
+    );
+  }, [
+    allPlayersQuery.data,
+    contractsQuery.data,
+    season?.startDate,
+    state,
+    teams,
+  ]);
   const setPlayerSort = useCallback(
     (key: DraftPlayerSortKey) => {
       if (key === playerSortKey) {
@@ -328,6 +435,7 @@ export function useDraftHubBoard(): DraftHubBoardViewModel {
     activePick,
     recentPicks,
     upcomingPicks,
+    mockProjectionByPickId,
     eligiblePlayers,
     playerSortKey,
     playerSortDirection,
@@ -352,6 +460,8 @@ export function useDraftHubBoard(): DraftHubBoardViewModel {
     isLoading:
       stateQuery.isLoading ||
       playersQuery.isLoading ||
+      allPlayersQuery.isLoading ||
+      teamsQuery.isLoading ||
       nhlStatsQuery.isLoading ||
       contractsQuery.isLoading ||
       nhlTeamsQuery.isLoading,

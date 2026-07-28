@@ -65,6 +65,12 @@ export interface DraftHubPickView {
   player: DraftHubPlayerSummary | null;
 }
 
+export interface DraftHubMockProjection {
+  playerId: string;
+  fullName: string;
+  nhlPos: string[];
+}
+
 export interface DraftHubSeasonSummary {
   id: string;
   name: string;
@@ -115,6 +121,7 @@ export interface DraftHubBoardViewModel {
   activePick: DraftHubPickView | null;
   recentPicks: DraftHubPickView[];
   upcomingPicks: DraftHubPickView[];
+  mockProjectionByPickId: Record<string, DraftHubMockProjection>;
   eligiblePlayers: DraftHubEligiblePlayerView[];
   playerSortKey: DraftPlayerSortKey;
   playerSortDirection: DraftPlayerSortDirection;

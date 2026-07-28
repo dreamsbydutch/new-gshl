@@ -23,11 +23,20 @@ export interface ProjectedDraftPick<
   score: number | null;
 }
 
+export interface CompletedMockDraftPick<
+  TPlayer extends DraftBoardPlayer = DraftBoardPlayer,
+> {
+  pick: DraftPick;
+  player: TPlayer;
+}
+
 export interface BuildMockDraftProjectionOptions<
   TPlayer extends DraftBoardPlayer = DraftBoardPlayer,
 > {
   seasonDraftPicks: DraftPick[];
   draftPlayers: TPlayer[];
+  rosterPlayers: TPlayer[];
+  completedPicks?: CompletedMockDraftPick<TPlayer>[];
   teams: GSHLTeam[];
   take?: number;
 }

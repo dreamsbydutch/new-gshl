@@ -27,7 +27,14 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import { type ToggleItem, type NHLTeam } from "@gshl-types";
+import Link from "next/link";
+import { ArrowRight } from "lucide-react";
+import {
+  type MockDraftPreviewProps,
+  type MockDraftProps,
+  type ToggleItem,
+  type NHLTeam,
+} from "@gshl-types";
 import { Table } from "@gshl-ui";
 import { NHLLogo } from "@gshl-components/player/NHLLogo";
 import { HorizontalToggle, SecondaryPageToolbar } from "@gshl-nav";
@@ -498,15 +505,7 @@ export function DraftBoardList({
  *
  * @param seasonId - The season ID to display mock draft for
  */
-export function MockDraftPreview({
-  seasonId,
-  limit,
-  title,
-}: {
-  seasonId: string;
-  limit?: number;
-  title?: string;
-}) {
+export function MockDraftPreview({ seasonId }: MockDraftPreviewProps) {
   const { isLoading, nhlTeams, projectedDraftPicks } = useDraftBoardData({
     seasonId,
     selectedType: "mockdraft",
@@ -515,15 +514,46 @@ export function MockDraftPreview({
     return <MockDraftSkeleton />;
   }
   return (
+    <div>
+      <MockDraftList
+        projectedDraftPicks={projectedDraftPicks.filter(
+          (projectedPick) => Number(projectedPick.pick.round) === 1,
+        )}
+        toolbarProps={undefined}
+        nhlTeams={nhlTeams}
+        title="GSHL Mock Draft"
+      />
+      <div className="mt-5 flex justify-center">
+        <Link
+          href="/leagueoffice/mock-draft"
+          className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800 shadow-sm transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+        >
+          See the full mock draft
+          <ArrowRight className="h-4 w-4" aria-hidden="true" />
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Full mock draft view for the League Office.
+ */
+export function MockDraft({ seasonId }: MockDraftProps) {
+  const { isLoading, nhlTeams, projectedDraftPicks } = useDraftBoardData({
+    seasonId,
+    selectedType: "mockdraft",
+  });
+
+  if (isLoading) {
+    return <MockDraftSkeleton />;
+  }
+
+  return (
     <MockDraftList
-      projectedDraftPicks={
-        typeof limit === "number"
-          ? projectedDraftPicks.slice(0, limit)
-          : projectedDraftPicks
-      }
+      projectedDraftPicks={projectedDraftPicks}
       toolbarProps={undefined}
       nhlTeams={nhlTeams}
-      title={title}
     />
   );
 }

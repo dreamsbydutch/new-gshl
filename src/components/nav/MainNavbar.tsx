@@ -67,7 +67,9 @@ export function MainNavbar({ className }: NavbarProps) {
           <LinkNavItem
             key={item.id}
             {...item}
-            isActive={pathname === item.href}
+            isActive={
+              pathname === item.href || pathname.startsWith(`${item.href}/`)
+            }
           />
         ))}
         <div className="fixed right-2 top-2 z-[60] lg:absolute lg:right-4">

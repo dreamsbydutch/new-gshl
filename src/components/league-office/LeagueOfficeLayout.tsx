@@ -1,6 +1,11 @@
 "use client";
 
-import { useAuthSession, useLeagueOfficeNavigation } from "@gshl-hooks";
+import {
+  useAppPathname,
+  useAppRouter,
+  useAuthSession,
+  useLeagueOfficeNavigation,
+} from "@gshl-hooks";
 import { HorizontalToggle, SecondaryPageToolbar } from "@gshl-nav";
 import type { ToggleItem } from "@gshl-types";
 import { useEffect } from "react";
@@ -12,13 +17,29 @@ export function LeagueOfficeLayout({
 }) {
   const { selectedType, setSelectedType } = useLeagueOfficeNavigation();
   const { session } = useAuthSession();
+  const { pathname } = useAppPathname();
+  const { router } = useAppRouter();
+  const isMockDraftPage = pathname === "/leagueoffice/mock-draft";
 
   useEffect(() => {
+    if (isMockDraftPage) {
+      setSelectedType("mockDraft");
+      return;
+    }
+
     const view = new URLSearchParams(window.location.search).get("view");
     if (view === "freeAgents") {
       setSelectedType("freeAgents");
     }
-  }, [setSelectedType]);
+  }, [isMockDraftPage, setSelectedType]);
+
+  const selectView = (type: string | null) => {
+    const nextType = type ?? "";
+    setSelectedType(nextType);
+    router.push(
+      nextType === "mockDraft" ? "/leagueoffice/mock-draft" : "/leagueoffice",
+    );
+  };
 
   const pageToolbarProps: {
     toolbarKeys: ToggleItem<string | null>[];
@@ -26,59 +47,64 @@ export function LeagueOfficeLayout({
     className?: [string?, string?, string?];
   } = {
     className: ["bottom-24 h-8", "h-6", "text-xs"],
-    activeKey: selectedType,
+    activeKey: isMockDraftPage ? "mockDraft" : selectedType,
     toolbarKeys: [
+      {
+        key: "mockDraft",
+        value: "Mock Draft",
+        setter: selectView,
+      },
       {
         key: "draft",
         value: "Draft Classes",
-        setter: (type: string | null) => setSelectedType(type ?? ""),
+        setter: selectView,
       },
       {
         key: "freeAgents",
         value: "Free Agents",
-        setter: (type: string | null) => setSelectedType(type ?? ""),
+        setter: selectView,
       },
       {
         key: "rules",
         value: "Rulebook",
-        setter: (type: string | null) => setSelectedType(type ?? ""),
+        setter: selectView,
       },
       {
         key: "confBattle",
         value: "Conf v Conf",
-        setter: (type: string | null) => setSelectedType(type ?? ""),
+        setter: selectView,
       },
       {
         key: "ownerRankings",
         value: "Owner Ladder",
-        setter: (type: string | null) => setSelectedType(type ?? ""),
+        setter: selectView,
       },
       ...(session?.user.role === "commissioner"
         ? [
             {
               key: "contracts",
               value: "Contracts",
-              setter: (type: string | null) => setSelectedType(type ?? ""),
+              setter: selectView,
             },
             {
               key: "users",
               value: "User Access",
-              setter: (type: string | null) => setSelectedType(type ?? ""),
+              setter: selectView,
             },
             {
               key: "jobs",
               value: "Jobs",
-              setter: (type: string | null) => setSelectedType(type ?? ""),
+              setter: selectView,
             },
             {
               key: "newsroom",
               value: "Newsroom",
-              setter: (type: string | null) => setSelectedType(type ?? ""),
+              setter: selectView,
             },
             {
               key: "imageUpload",
               value: "Image Upload",
-              setter: (type: string | null) => setSelectedType(type ?? ""),
+              setter: selectView,
             },
           ]
         : []),

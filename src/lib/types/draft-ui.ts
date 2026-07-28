@@ -8,6 +8,14 @@ export interface DraftBoardToolbarProps {
   className?: [string?, string?, string?];
 }
 
+export interface MockDraftProps {
+  seasonId: string;
+}
+
+export interface MockDraftPreviewProps {
+  seasonId: string;
+}
+
 /**
  * Allow for legacy single-position string as well as current array form
  */

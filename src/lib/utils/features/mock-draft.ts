@@ -1,8 +1,12 @@
 import type {
   BuildMockDraftProjectionOptions,
   DraftBoardPlayer,
+  GSHLTeam,
   ProjectedDraftPick,
+  RosterPosition,
 } from "@gshl-types";
+import { generateLineupAssignments } from "./draft-admin";
+import { calculateDraftRosterTalentRating } from "./draft-roster-board";
 
 export type {
   BuildMockDraftProjectionOptions,
@@ -55,20 +59,113 @@ function sortProjectedPicks(
   );
 }
 
+function getTeamRosterKey(team: GSHLTeam): string {
+  return team.ownerId ? `owner:${team.ownerId}` : `team:${team.id}`;
+}
+
+function normalizePlayerPositions(player: DraftBoardPlayer): RosterPosition[] {
+  return Array.isArray(player.nhlPos) ? player.nhlPos : [player.nhlPos];
+}
+
+function calculateOptimizedRosterTalent(
+  roster: readonly DraftBoardPlayer[],
+): number | null {
+  const assignments = generateLineupAssignments(
+    roster.map((player) => ({
+      id: String(player.id),
+      nhlPos: normalizePlayerPositions(player),
+      lineupPos: player.lineupPos,
+      overallRating: player.overallRating,
+    })),
+  );
+  const lineupPositionByPlayerId = new Map(
+    assignments.map((assignment) => [
+      String(assignment.playerId),
+      assignment.lineupPos,
+    ]),
+  );
+
+  return calculateDraftRosterTalentRating(
+    roster.map((player) => ({
+      overallRating: player.overallRating,
+      lineupPos: lineupPositionByPlayerId.get(String(player.id)) ?? null,
+    })),
+  );
+}
+
+function asDraftedRosterPlayer<TPlayer extends DraftBoardPlayer>(
+  player: TPlayer,
+  team: GSHLTeam,
+): TPlayer {
+  return {
+    ...player,
+    ownerId: team.ownerId,
+    gshlTeamId: team.id,
+    lineupPos: null,
+  };
+}
+
 /**
  * Builds mock draft projection.
  *
  * @param options - Configuration options for the operation.
- * @returns The assembled mock draft projection.
+ * @returns The sequential roster-optimized mock draft projection.
  */
 export function buildMockDraftProjection<
   TPlayer extends DraftBoardPlayer = DraftBoardPlayer,
 >(
   options: BuildMockDraftProjectionOptions<TPlayer>,
 ): ProjectedDraftPick<TPlayer>[] {
-  const { seasonDraftPicks, draftPlayers, teams, take } = options;
+  const {
+    seasonDraftPicks,
+    draftPlayers,
+    rosterPlayers,
+    completedPicks = [],
+    teams,
+    take,
+  } = options;
   const teamById = new Map(teams.map((team) => [String(team.id), team]));
-  const remainingPlayers = [...draftPlayers].sort(comparePlayers);
+  const completedPlayerIds = new Set(
+    completedPicks.map(({ player }) => String(player.id)),
+  );
+  const remainingPlayers = draftPlayers
+    .filter((player) => !completedPlayerIds.has(String(player.id)))
+    .sort(comparePlayers);
+  const rosterByTeamKey = new Map<string, TPlayer[]>();
+  for (const team of teams) {
+    const teamRoster = rosterPlayers.filter(
+      (player) =>
+        team.ownerId && String(player.ownerId ?? "") === String(team.ownerId),
+    );
+    rosterByTeamKey.set(getTeamRosterKey(team), teamRoster);
+  }
+
+  for (const completedPick of [...completedPicks].sort(
+    (left, right) =>
+      Number(left.pick.round ?? 0) - Number(right.pick.round ?? 0) ||
+      Number(left.pick.pick ?? 0) - Number(right.pick.pick ?? 0),
+  )) {
+    const completedPickTeam = teamById.get(
+      String(completedPick.pick.gshlTeamId),
+    );
+    if (!completedPickTeam) continue;
+
+    const teamKey = getTeamRosterKey(completedPickTeam);
+    const teamRoster = rosterByTeamKey.get(teamKey) ?? [];
+    if (
+      teamRoster.some(
+        (rosterPlayer) =>
+          String(rosterPlayer.id) === String(completedPick.player.id),
+      )
+    ) {
+      continue;
+    }
+
+    rosterByTeamKey.set(teamKey, [
+      ...teamRoster,
+      asDraftedRosterPlayer(completedPick.player, completedPickTeam),
+    ]);
+  }
   const projectedPicks: ProjectedDraftPick<TPlayer>[] = [];
 
   for (const pick of [...seasonDraftPicks]
@@ -79,27 +176,54 @@ export function buildMockDraftProjection<
         Number(left.pick ?? 0) - Number(right.pick ?? 0),
     )) {
     const gshlTeam = teamById.get(String(pick.gshlTeamId));
-    const projectedPlayer = remainingPlayers[0];
+    const teamRoster = gshlTeam
+      ? (rosterByTeamKey.get(getTeamRosterKey(gshlTeam)) ?? [])
+      : [];
+    const currentTalent = calculateOptimizedRosterTalent(teamRoster) ?? 0;
+    let projectedPlayer: TPlayer | undefined;
+    let bestTalentGain = Number.NEGATIVE_INFINITY;
+
+    for (const candidate of remainingPlayers) {
+      const draftedCandidate = gshlTeam
+        ? asDraftedRosterPlayer(candidate, gshlTeam)
+        : candidate;
+      const resultingTalent =
+        calculateOptimizedRosterTalent([...teamRoster, draftedCandidate]) ?? 0;
+      const talentGain = resultingTalent - currentTalent;
+      const isBetterGain = talentGain > bestTalentGain;
+      const winsTie =
+        talentGain === bestTalentGain &&
+        (!projectedPlayer || comparePlayers(candidate, projectedPlayer) < 0);
+
+      if (isBetterGain || winsTie) {
+        projectedPlayer = candidate;
+        bestTalentGain = talentGain;
+      }
+    }
+
     const projectedPick: ProjectedDraftPick<TPlayer> = {
       pick,
       gshlTeam,
       projectedPlayer,
-      score: projectedPlayer
-        ? (projectedPlayer.overallRating ?? projectedPlayer.seasonRating ?? 0)
-        : null,
+      score: projectedPlayer ? bestTalentGain : null,
     };
 
     projectedPicks.push(projectedPick);
 
-    if (!projectedPlayer) {
-      continue;
-    }
+    if (projectedPlayer) {
+      const selectedIndex = remainingPlayers.findIndex(
+        (player) => player.id === projectedPlayer.id,
+      );
+      if (selectedIndex >= 0) {
+        remainingPlayers.splice(selectedIndex, 1);
+      }
 
-    const selectedIndex = remainingPlayers.findIndex(
-      (player) => player.id === projectedPlayer.id,
-    );
-    if (selectedIndex >= 0) {
-      remainingPlayers.splice(selectedIndex, 1);
+      if (gshlTeam) {
+        rosterByTeamKey.set(getTeamRosterKey(gshlTeam), [
+          ...teamRoster,
+          asDraftedRosterPlayer(projectedPlayer, gshlTeam),
+        ]);
+      }
     }
 
     if (typeof take === "number" && projectedPicks.length >= take) {

@@ -15,7 +15,7 @@ import { WeeklyEditionHomeCard } from "@gshl-components/headlines/WeeklyEditionH
 import { DraftHubCard } from "./DraftHubCard";
 
 export function HomeContent() {
-  const { seasons, defaultSeason, isLoading } = useSeasonState();
+  const { seasons, currentSeason, defaultSeason, isLoading } = useSeasonState();
 
   if (isLoading) {
     return <HomeSkeleton />;
@@ -29,9 +29,9 @@ export function HomeContent() {
     <main className="container mx-auto space-y-8 px-2 py-4 sm:px-4">
       <WeeklyEditionHomeCard />
       <UfaHomeCard />
-      <PowerRankingsHomeCard
-        seasonId={defaultSeason?.id ? String(defaultSeason.id) : undefined}
-      />
+      {currentSeason ? (
+        <PowerRankingsHomeCard seasonId={String(currentSeason.id)} />
+      ) : null}
       <LeagueActivityCard
         seasonId={defaultSeason?.id ? String(defaultSeason.id) : undefined}
       />

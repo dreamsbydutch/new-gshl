@@ -18,6 +18,7 @@ import { useDraftHubBoard } from "@gshl-hooks";
 import { cn, formatNumber, formatUfaStat } from "@gshl-utils";
 import type {
   DraftHubEligiblePlayerView,
+  DraftHubMockProjection,
   DraftHubPickView,
   DraftPlayerSortDirection,
   DraftPlayerSortKey,
@@ -82,11 +83,13 @@ function TeamLogo({
 function DraftFlowPick({
   pick,
   isRecent,
+  mockProjection,
   isUndoing = false,
   onUndo,
 }: {
   pick: DraftHubPickView;
   isRecent: boolean;
+  mockProjection?: DraftHubMockProjection;
   isUndoing?: boolean;
   onUndo?: () => void;
 }) {
@@ -117,6 +120,11 @@ function DraftFlowPick({
             ? (playerPosition ?? `Pick ${pick.pick.pick}`)
             : `Round ${pick.pick.round} · Pick ${pick.pick.pick}`}
         </p>
+        {!isRecent && mockProjection ? (
+          <p className="mt-0.5 truncate text-[9px] leading-tight text-slate-400 sm:text-[10px]">
+            Mock: {mockProjection.fullName}
+          </p>
+        ) : null}
       </div>
       {onUndo ? (
         <Button
@@ -142,12 +150,14 @@ function DraftFlowPick({
 function DraftPickFlow({
   recentPicks,
   upcomingPicks,
+  mockProjectionByPickId,
   canUndoLastPick,
   isUndoing,
   onUndoLastPick,
 }: {
   recentPicks: DraftHubPickView[];
   upcomingPicks: DraftHubPickView[];
+  mockProjectionByPickId: Record<string, DraftHubMockProjection>;
   canUndoLastPick: boolean;
   isUndoing: boolean;
   onUndoLastPick: () => void;
@@ -192,6 +202,7 @@ function DraftPickFlow({
                   key={pick.pick.id}
                   pick={pick}
                   isRecent={false}
+                  mockProjection={mockProjectionByPickId[String(pick.pick.id)]}
                 />
               ))}
             </div>
@@ -214,6 +225,7 @@ function DraftStatusHero({
   remainingSeconds,
   draftStartRemainingSeconds,
   draftStartAt,
+  mockProjection,
 }: {
   activePick: DraftHubPickView | null;
   status:
@@ -227,6 +239,7 @@ function DraftStatusHero({
   remainingSeconds: number;
   draftStartRemainingSeconds: number;
   draftStartAt: number;
+  mockProjection?: DraftHubMockProjection;
 }) {
   if (status === "complete") {
     return (
@@ -283,6 +296,17 @@ function DraftStatusHero({
                 ? ` · via ${activePick.originalTeam.name}`
                 : ""}
             </p>
+            {mockProjection ? (
+              <p className="mt-2 text-xs text-white/55">
+                Potential auto-pick:{" "}
+                <span className="font-semibold text-white/80">
+                  {mockProjection.fullName}
+                  {mockProjection.nhlPos.length
+                    ? ` · ${mockProjection.nhlPos.join("/")}`
+                    : ""}
+                </span>
+              </p>
+            ) : null}
           </div>
         </div>
         <div className="text-center">
@@ -684,11 +708,17 @@ export function DraftHubBoard() {
         remainingSeconds={board.clockRemainingSeconds}
         draftStartRemainingSeconds={board.draftStartRemainingSeconds}
         draftStartAt={board.state.season.draftStartAt}
+        mockProjection={
+          board.activePick
+            ? board.mockProjectionByPickId[String(board.activePick.pick.id)]
+            : undefined
+        }
       />
 
       <DraftPickFlow
         recentPicks={board.recentPicks}
         upcomingPicks={board.upcomingPicks}
+        mockProjectionByPickId={board.mockProjectionByPickId}
         canUndoLastPick={board.canUndoLastPick}
         isUndoing={board.isUndoing}
         onUndoLastPick={() => void board.undoLastPick()}

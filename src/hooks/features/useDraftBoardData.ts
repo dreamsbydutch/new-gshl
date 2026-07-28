@@ -5,12 +5,14 @@ import {
   useContracts,
   useDraftPickPages,
   usePlayerPages,
+  usePlayers,
   useNHLTeams,
   useSeasons,
   useTeams,
 } from "@gshl-hooks";
 import {
   buildMockDraftProjection,
+  buildContractedSeasonRosterPlayers,
   findOffseasonWindow,
   findSeasonById,
   matchesFilter,
@@ -53,6 +55,7 @@ import type {
  */
 export function useDraftBoardData(options: UseDraftBoardDataOptions) {
   const { seasonId, selectedType = null } = options;
+  const isMockDraft = selectedType === "mockdraft";
 
   const positionGroup =
     selectedType === "goalie"
@@ -65,13 +68,20 @@ export function useDraftBoardData(options: UseDraftBoardDataOptions) {
             selectedType === "rightwing"
           ? "F"
           : undefined;
-  const {
-    data: players,
-    isLoading: playersLoading,
-    hasMore,
-    loadMore,
-    isLoadingMore,
-  } = usePlayerPages({ active: true, positionGroup });
+  const playerPages = usePlayerPages({
+    active: true,
+    positionGroup,
+    enabled: !isMockDraft,
+  });
+  const allPlayersQuery = usePlayers({
+    isActive: true,
+    enabled: isMockDraft,
+  });
+  const { hasMore, loadMore, isLoadingMore } = playerPages;
+  const players = isMockDraft ? allPlayersQuery.data : playerPages.data;
+  const playersLoading = isMockDraft
+    ? allPlayersQuery.isLoading
+    : playerPages.isLoading;
   const { data: contracts = [], isLoading: contractsLoading } = useContracts();
   const { data: nhlTeamsRaw, isLoading: nhlTeamsLoading } = useNHLTeams();
   const { data: seasons = [], isLoading: seasonsLoading } = useSeasons({
@@ -137,14 +147,27 @@ export function useDraftBoardData(options: UseDraftBoardDataOptions) {
     [draftPlayers, selectedType],
   );
 
+  const rosterPlayers: DraftBoardPlayer[] = useMemo(
+    () =>
+      activeSeason?.startDate
+        ? buildContractedSeasonRosterPlayers(
+            (players ?? []) as DraftBoardPlayer[],
+            contracts,
+            activeSeason.startDate,
+          )
+        : [],
+    [activeSeason, contracts, players],
+  );
+
   const projectedDraftPicks: ProjectedDraftPick[] = useMemo(
     () =>
       buildMockDraftProjection({
         seasonDraftPicks,
         draftPlayers,
+        rosterPlayers,
         teams: gshlTeams,
       }),
-    [seasonDraftPicks, draftPlayers, gshlTeams],
+    [seasonDraftPicks, draftPlayers, rosterPlayers, gshlTeams],
   );
 
   const hasHydratedData =
@@ -153,14 +176,16 @@ export function useDraftBoardData(options: UseDraftBoardDataOptions) {
     gshlTeamsData !== undefined &&
     draftPicks !== undefined;
 
-  const isLoading =
-    !hasHydratedData &&
-    (playersLoading ||
-      contractsLoading ||
-      nhlTeamsLoading ||
-      seasonsLoading ||
-      gshlTeamsLoading ||
-      draftPicksLoading);
+  const hasLoadingQuery =
+    playersLoading ||
+    contractsLoading ||
+    nhlTeamsLoading ||
+    seasonsLoading ||
+    gshlTeamsLoading ||
+    draftPicksLoading;
+  const isLoading = isMockDraft
+    ? hasLoadingQuery
+    : !hasHydratedData && hasLoadingQuery;
 
   return {
     draftPlayers,
@@ -172,7 +197,7 @@ export function useDraftBoardData(options: UseDraftBoardDataOptions) {
     isLoading,
     error: null,
     ready: !isLoading,
-    hasMore,
+    hasMore: isMockDraft ? false : hasMore,
     loadMore,
     isLoadingMore,
   };
