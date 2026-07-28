@@ -52,34 +52,29 @@ function hasTalentRating(
   );
 }
 
-function selectHighestRatedPlayerAtEachPosition<
+function selectHighestRatedCandidateByEligibility<
   TPlayer extends DraftBoardPlayer,
 >(players: readonly TPlayer[]): TPlayer[] {
-  const highestRatedByPosition = new Map<RosterPosition, TPlayer>();
+  const candidateByEligibility = new Map<string, TPlayer>();
 
   for (const player of players) {
-    for (const position of normalizePlayerPositions(player)) {
-      const current = highestRatedByPosition.get(position);
-      const playerRating = Number(player.overallRating);
-      const currentRating = Number(current?.overallRating);
-      if (
-        !current ||
-        playerRating > currentRating ||
-        (playerRating === currentRating && comparePlayers(player, current) < 0)
-      ) {
-        highestRatedByPosition.set(position, player);
-      }
+    const eligibilityKey = [...new Set(normalizePlayerPositions(player))]
+      .sort()
+      .join("|");
+    const current = candidateByEligibility.get(eligibilityKey);
+    const playerRating = Number(player.overallRating);
+    const currentRating = Number(current?.overallRating);
+
+    if (
+      !current ||
+      playerRating > currentRating ||
+      (playerRating === currentRating && comparePlayers(player, current) < 0)
+    ) {
+      candidateByEligibility.set(eligibilityKey, player);
     }
   }
 
-  return [
-    ...new Map(
-      [...highestRatedByPosition.values()].map((player) => [
-        String(player.id),
-        player,
-      ]),
-    ).values(),
-  ].sort(comparePlayers);
+  return [...candidateByEligibility.values()].sort(comparePlayers);
 }
 
 /**
@@ -229,8 +224,12 @@ export function buildMockDraftProjection<
     let projectedPlayer: TPlayer | undefined;
     let bestTalentGain = Number.NEGATIVE_INFINITY;
     const ratedCandidates = remainingPlayers.filter(hasTalentRating);
+    // Evaluate the best-rated candidate for every distinct eligibility
+    // profile. A lower-rated player with identical eligibility cannot produce
+    // a better optimized lineup, but every multi-position combination must be
+    // tested independently.
     const candidatePool = ratedCandidates.length
-      ? selectHighestRatedPlayerAtEachPosition(ratedCandidates)
+      ? selectHighestRatedCandidateByEligibility(ratedCandidates)
       : remainingPlayers;
 
     for (const candidate of candidatePool) {

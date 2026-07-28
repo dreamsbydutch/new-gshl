@@ -226,6 +226,24 @@ void test("rebuilds the full lineup when a candidate moves players into lower ti
   );
 });
 
+void test("never suggests a talent loss when another rated candidate produces a gain", () => {
+  const projection = buildMockDraftProjection({
+    seasonDraftPicks: [pick("pick-1", 1)],
+    draftPlayers: [
+      player("talent-losing-goalie", 40, ["G"], { overallRk: 1 }),
+      player("talent-gaining-center", 50, ["C"], { overallRk: 2 }),
+    ],
+    rosterPlayers: [
+      player("primary-center", 100, ["C"], { ownerId: "owner-a" }),
+      player("secondary-center", 10, ["C"], { ownerId: "owner-a" }),
+    ],
+    teams: [team()],
+  });
+
+  assert.equal(projection[0]?.projectedPlayer?.id, "talent-gaining-center");
+  assert.ok(Number(projection[0]?.score) > 0);
+});
+
 void test("reprojects future picks around completed live-draft selections", () => {
   const eliteCenter = player("elite-center", 99, ["C"], { overallRk: 1 });
   const neededGoalie = player("needed-goalie", 90, ["G"], { overallRk: 2 });
