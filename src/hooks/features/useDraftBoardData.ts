@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import {
   useContracts,
   useDraftPickPages,
+  useDraftPicks,
   usePlayerPages,
   usePlayers,
   useNHLTeams,
@@ -91,9 +92,20 @@ export function useDraftBoardData(options: UseDraftBoardDataOptions) {
     seasonId,
     enabled: Boolean(seasonId),
   });
-  const { data: draftPicks, isLoading: draftPicksLoading } = useDraftPickPages({
+  const draftPickPages = useDraftPickPages({
     seasonId,
+    enabled: !isMockDraft,
   });
+  const allDraftPicksQuery = useDraftPicks({
+    seasonId,
+    enabled: isMockDraft,
+  });
+  const draftPicks = isMockDraft
+    ? allDraftPicksQuery.data
+    : draftPickPages.data;
+  const draftPicksLoading = isMockDraft
+    ? allDraftPicksQuery.isLoading
+    : draftPickPages.isLoading;
 
   const nhlTeams = useMemo(
     () => (nhlTeamsRaw as NHLTeam[]) ?? [],

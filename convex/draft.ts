@@ -198,11 +198,11 @@ function contractCoversDraft(
     return false;
   }
   const startDate = parseTime(contract.startDate);
-  const expiryDate = parseTime(contract.expiryDate);
+  const expiryDate = parseTime(contract.capHitEndDate ?? contract.expiryDate);
   return (
     startDate !== null &&
     expiryDate !== null &&
-    startDate < draftDate &&
+    startDate <= draftDate &&
     expiryDate >= draftDate
   );
 }
@@ -331,7 +331,7 @@ export const submitPick = mutation({
       throw new Error("The clock expired; a commissioner must make this pick");
     }
 
-    if (!player.isActive || !player.isSignable) {
+    if (!player.isActive) {
       throw new Error("That player is not draft eligible");
     }
     if (

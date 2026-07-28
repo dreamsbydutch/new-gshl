@@ -30,7 +30,6 @@ import {
   useDraftHubState,
   useNHLTeams,
   usePlayerNhlStatsByPlayers,
-  usePlayerPages,
   usePlayers,
   useSeasonState,
   useSubmitDraftPick,
@@ -101,7 +100,6 @@ export function useDraftHubBoard(): DraftHubBoardViewModel {
     null,
   );
   const [now, setNow] = useState(() => Date.now());
-  const playersQuery = usePlayerPages({ active: true, limit: 50 });
   const allPlayersQuery = usePlayers({
     isActive: true,
     enabled: Boolean(season?.id),
@@ -111,12 +109,12 @@ export function useDraftHubBoard(): DraftHubBoardViewModel {
     enabled: Boolean(season?.id),
   });
   const playerIds = useMemo(
-    () => playersQuery.data.map((player) => String(player.id)),
-    [playersQuery.data],
+    () => allPlayersQuery.data.map((player) => String(player.id)),
+    [allPlayersQuery.data],
   );
   const nhlStatsQuery = usePlayerNhlStatsByPlayers(
     playerIds,
-    !playersQuery.isLoading,
+    !allPlayersQuery.isLoading,
   );
   const contractsQuery = useContracts();
   const nhlTeamsQuery = useNHLTeams();
@@ -278,13 +276,12 @@ export function useDraftHubBoard(): DraftHubBoardViewModel {
         .filter((playerId): playerId is string => Boolean(playerId)),
     );
     const prepared = prepareDraftBoardPlayers(
-      playersQuery.data,
+      allPlayersQuery.data,
       contractsQuery.data,
       season?.startDate,
     );
     const normalizedSearch = searchTerm.trim().toLowerCase();
     const playerViews = prepared
-      .filter((player) => player.isSignable)
       .filter((player) => !draftedPlayerIds.has(player.id))
       .filter((player) => matchesPosition(player, positionFilter))
       .filter((player) => {
@@ -312,7 +309,7 @@ export function useDraftHubBoard(): DraftHubBoardViewModel {
     nhlTeams,
     playerSortDirection,
     playerSortKey,
-    playersQuery.data,
+    allPlayersQuery.data,
     positionFilter,
     searchTerm,
     season?.startDate,
@@ -454,12 +451,11 @@ export function useDraftHubBoard(): DraftHubBoardViewModel {
     submitPlayer,
     isUndoing: undoMutation.isPending,
     undoLastPick,
-    hasMore: playersQuery.hasMore,
-    isLoadingMore: playersQuery.isLoadingMore,
-    loadMore: playersQuery.loadMore,
+    hasMore: false,
+    isLoadingMore: false,
+    loadMore: () => undefined,
     isLoading:
       stateQuery.isLoading ||
-      playersQuery.isLoading ||
       allPlayersQuery.isLoading ||
       teamsQuery.isLoading ||
       nhlStatsQuery.isLoading ||

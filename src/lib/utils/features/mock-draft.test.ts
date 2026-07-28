@@ -17,7 +17,7 @@ const timestamp = new Date("2026-07-27T12:00:00.000Z");
 
 function player(
   id: string,
-  overallRating: number,
+  overallRating: number | null,
   nhlPos: RosterPosition[],
   fields: Partial<DraftBoardPlayer> = {},
 ): DraftBoardPlayer {
@@ -64,7 +64,11 @@ function team(): GSHLTeam {
   };
 }
 
-function pick(id: string, overallPick: number): DraftPick {
+function pick(
+  id: string,
+  overallPick: number,
+  fields: Partial<DraftPick> = {},
+): DraftPick {
   return {
     id,
     seasonId: "2027",
@@ -76,6 +80,7 @@ function pick(id: string, overallPick: number): DraftPick {
     isSigning: false,
     createdAt: timestamp,
     updatedAt: timestamp,
+    ...fields,
   };
 }
 
@@ -92,7 +97,7 @@ function contract(playerId: string): Contract {
     startDate: "2026-10-01",
     signingStatus: "Drafted",
     expiryStatus: "UFA",
-    expiryDate: "2027-06-30",
+    expiryDate: "2026-06-30",
     capHit: 1_000_000,
     capHitEndDate: "2027-06-30",
     createdAt: timestamp,
@@ -102,7 +107,10 @@ function contract(playerId: string): Contract {
 
 void test("uses every unsigned player and treats a contract starting on opening day as signed", () => {
   const signed = player("signed", 90, ["C"]);
-  const unsigned = player("unsigned", 85, ["D"]);
+  const unsigned = player("unsigned", 85, ["D"], {
+    isSignable: false,
+    isResignable: "UFA",
+  });
   const contracts = [contract(signed.id)];
   const activeOn = "2026-10-01";
 
@@ -122,7 +130,47 @@ void test("uses every unsigned player and treats a contract starting on opening 
   );
 });
 
-void test("simulates picks sequentially by maximizing the roster talent rating", () => {
+void test("sorts the complete mock draft numerically across double-digit rounds", () => {
+  const projection = buildMockDraftProjection({
+    seasonDraftPicks: [
+      pick("round-12", 1, { round: "12" }),
+      pick("round-2", 1, { round: "2" }),
+      pick("round-15", 1, { round: "15" }),
+      pick("round-10", 1, { round: "10" }),
+      pick("round-1", 1, { round: "1" }),
+    ],
+    draftPlayers: [
+      player("player-1", 95, ["C"], { overallRk: 1 }),
+      player("player-2", 94, ["C"], { overallRk: 2 }),
+      player("player-3", 93, ["C"], { overallRk: 3 }),
+      player("player-4", 92, ["C"], { overallRk: 4 }),
+      player("player-5", 91, ["C"], { overallRk: 5 }),
+    ],
+    rosterPlayers: [],
+    teams: [team()],
+  });
+
+  assert.deepEqual(
+    projection.map((projectedPick) => projectedPick.pick.round),
+    ["1", "2", "10", "12", "15"],
+  );
+});
+
+void test("does not let a missing talent rating beat a rated roster upgrade", () => {
+  const projection = buildMockDraftProjection({
+    seasonDraftPicks: [pick("pick-1", 1)],
+    draftPlayers: [
+      player("ranked-player", 70, ["C"], { overallRk: 100 }),
+      player("unranked-player", null, ["C"], { overallRk: null }),
+    ],
+    rosterPlayers: [player("current-star", 100, ["C"], { ownerId: "owner-a" })],
+    teams: [team()],
+  });
+
+  assert.equal(projection[0]?.projectedPlayer?.id, "ranked-player");
+});
+
+void test("reaches for positional help when it improves roster talent more than the top-ranked player", () => {
   const rosterPlayers = [
     player("lw-1", 95, ["LW"], { ownerId: "owner-a" }),
     player("lw-2", 94, ["LW"], { ownerId: "owner-a" }),

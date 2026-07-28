@@ -42,6 +42,16 @@ function comparePlayers(
   return String(left.id).localeCompare(String(right.id));
 }
 
+function hasTalentRating(
+  player: Pick<DraftBoardPlayer, "overallRating">,
+): boolean {
+  return (
+    player.overallRating !== null &&
+    player.overallRating !== undefined &&
+    Number.isFinite(Number(player.overallRating))
+  );
+}
+
 /**
  * Sorts projected picks.
  *
@@ -182,8 +192,12 @@ export function buildMockDraftProjection<
     const currentTalent = calculateOptimizedRosterTalent(teamRoster) ?? 0;
     let projectedPlayer: TPlayer | undefined;
     let bestTalentGain = Number.NEGATIVE_INFINITY;
+    const ratedCandidates = remainingPlayers.filter(hasTalentRating);
+    const candidatePool = ratedCandidates.length
+      ? ratedCandidates
+      : remainingPlayers;
 
-    for (const candidate of remainingPlayers) {
+    for (const candidate of candidatePool) {
       const draftedCandidate = gshlTeam
         ? asDraftedRosterPlayer(candidate, gshlTeam)
         : candidate;

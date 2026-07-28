@@ -148,7 +148,7 @@ function contractCoversDate(
   }
 
   const startDate = parseDate(contract.startDate);
-  const expiryDate = parseDate(contract.expiryDate);
+  const expiryDate = parseDate(contract.capHitEndDate ?? contract.expiryDate);
   if (!startDate || !expiryDate) {
     return false;
   }
@@ -309,10 +309,16 @@ export function groupProjectedDraftPicksByRound(
     rounds.set(round, picks);
   }
 
-  return Array.from(rounds.entries()).map(([round, picks]) => ({
-    round,
-    picks,
-  }));
+  return Array.from(rounds.entries())
+    .map(([round, picks]) => ({
+      round,
+      picks: [...picks].sort(
+        (left, right) =>
+          Number(left.pick.round) - Number(right.pick.round) ||
+          Number(left.pick.pick) - Number(right.pick.pick),
+      ),
+    }))
+    .sort((left, right) => Number(left.round) - Number(right.round));
 }
 
 export const draftBoardFilters = { matchesFilter };
