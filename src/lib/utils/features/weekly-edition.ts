@@ -2630,6 +2630,16 @@ export function buildWeeklyEditionRuleContext(packet: WeeklyEditionFactPacket) {
     interpretation:
       "Negative capSpace means a team is over the cap; do not silently convert it to zero. A team cannot complete a signing or trade that puts it over the hard cap in any covered season.",
   };
+  const rosterConstructionRules = {
+    annualRoster:
+      "Each team builds a 15-player roster every year. The salary cap generally lets a team retain or add only about two to four players on GSHL contracts; the remaining roster spots are filled through the annual draft.",
+    contractedCore:
+      "The two-to-four range is a normal cap-driven roster pattern, not a guaranteed quota. The actual number depends on contract salaries and existing buyout charges.",
+    capConstraint:
+      "Low or insufficient cap space means the team cannot sign every player it wants. It does not prevent the team from completing a 15-player roster because unsigned spots are filled in the draft.",
+    unsignedPath:
+      "An eligible player a team cannot afford to retain may enter Summer Free Agency after the re-signing deadline and, if still unsigned when that market closes, returns to the draft.",
+  };
   const signingRules = {
     terms: "Every new GSHL contract is one, two, or three years.",
     salaryBasis:
@@ -2657,6 +2667,26 @@ export function buildWeeklyEditionRuleContext(packet: WeeklyEditionFactPacket) {
     algorithm:
       "The algorithm considers Owner Ladder ranking, previous-season performance, other contracted players, contract length, team situation and roster construction, plus randomized weighting. No destination is guaranteed.",
   };
+  const resigningOutlookRules = {
+    marketStage:
+      "The Late Signing Period is still open. This is the stage for comparing each team's remaining cap space with the exact 115% re-signing costs of its expiryStatus=RFA players.",
+    decisionFrame:
+      "Evaluate which individual RFAs and combinations of RFAs fit under each team's cap. A team may be able to keep some but not all of them.",
+    unaffordablePlayers:
+      "If an RFA re-signing would exceed the hard cap, the team cannot complete that deal. The consequence is losing the exclusive re-signing opportunity, not a roster emergency: that player proceeds to Summer Free Agency and potentially the draft.",
+  };
+  const offseasonMarketRules = {
+    marketStage:
+      "The Late Signing Period and all RFA re-signing rights have ended. No unsigned player remains an RFA in the current market; every currently available player must be an explicitly listed Summer UFA.",
+    activeContractStatuses:
+      "An expiryStatus on a contract already signed for a future season describes how that active contract will eventually expire. It does not make the signed player an RFA or UFA in the current summer market.",
+    choices:
+      "Teams may pursue affordable Summer UFAs who improve their rated roster, leave cap space unused to preserve future flexibility, or explore trades. Spending available cap space is optional, not automatically the best decision.",
+    rareTrades:
+      "Trades involving an existing contract and future draft picks are permitted but rare. The receiving team must remain under the hard cap in every covered season, and no such trade should be assumed unless EDITION_FACTS confirms it.",
+    draftFallback:
+      "A Summer UFA who is not signed before the summer market closes returns to the annual draft.",
+  };
   const draftRules = {
     format:
       "The draft has 15 rounds. The standard order is Round 1 forward, Round 2 forward, Round 3 reverse, Round 4 forward, then alternating.",
@@ -2683,20 +2713,27 @@ export function buildWeeklyEditionRuleContext(packet: WeeklyEditionFactPacket) {
     case "final_recap":
       return { ...common, matchupRules };
     case "resigning_outlook":
-      return { ...common, statusFields, capRules, signingRules };
-    case "offseason_market":
       return {
         ...common,
         statusFields,
         capRules,
+        rosterConstructionRules,
         signingRules,
+        resigningOutlookRules,
+      };
+    case "offseason_market":
+      return {
+        ...common,
+        capRules,
+        rosterConstructionRules,
         summerRules,
+        offseasonMarketRules,
         draftRules,
       };
     case "pre_draft":
-      return { ...common, capRules, draftRules };
+      return { ...common, capRules, rosterConstructionRules, draftRules };
     case "preseason":
-      return { ...common, capRules, draftRules };
+      return { ...common, capRules, rosterConstructionRules, draftRules };
   }
 }
 
@@ -2794,6 +2831,12 @@ export function buildWeeklyEditionChatGptPrompt(
     draftBoundExpiries: expiringContracts.filter(
       (contract) =>
         contract.teamName === team.teamName && contractReturnsToDraft(contract),
+    ),
+  }));
+  const offseasonTeamProfiles = promptTeamOutlooks.map((team) => ({
+    ...team,
+    signedPlayers: signedPlayers.filter(
+      (contract) => contract.teamName === team.teamName,
     ),
   }));
   const championshipMatchup = editorialMatchups.find(
@@ -2906,7 +2949,7 @@ export function buildWeeklyEditionChatGptPrompt(
       facts = {
         ...leagueSnapshot,
         ...milestoneContext,
-        teams: teamProfiles,
+        teams: offseasonTeamProfiles,
         recentSignings: milestone?.recentSignings ?? [],
         summerUfas: milestone?.summerUfas ?? [],
         buyoutCharges: milestone?.buyoutCharges ?? [],
@@ -2955,14 +2998,14 @@ export function buildWeeklyEditionChatGptPrompt(
     "Factual claims must be supported by EDITION_FACTS or RULEBOOK_CONTEXT. Do not invent events, quotes, relationships, motives, injuries, rules, names, scores, statistics, transactions or historical claims. Clearly rhetorical color is allowed when it does not imply a new fact.",
     "Use the supplied ratings as the baseline for league hierarchy and broad judgments, then use the surrounding events and details to explain or challenge that baseline. Ratings may support playful hockey-style chirps about strong and weak players, rosters, and GM track records, but keep the chirps proportionate to the evidence and distinguish player quality, roster talent, and GM performance.",
     "Use RULEBOOK_CONTEXT as the source of truth for league process. Apply only the rule blocks included for this edition. Do not substitute NHL rules or ordinary fantasy-hockey assumptions.",
-    ...(["resigning_outlook", "offseason_market"].includes(packet.issueType)
+    ...(packet.issueType === "resigning_outlook"
       ? [
           "CONTRACT FIELD RULE: signingStatus tells you how the current contract was signed. expiryStatus tells you whether that contract may be re-signed when it expires. These fields are independent; never infer one from the other.",
         ]
       : []),
-    ...(["resigning_outlook", "offseason_market"].includes(packet.issueType)
+    ...(packet.issueType === "resigning_outlook"
       ? [
-          "A contract with expiryStatus=UFA is draft-bound and is not a Summer UFA target. A Summer UFA is a separate, confirmed post-deadline player listed in EDITION_FACTS.summerUfas.",
+          "A contract with expiryStatus=UFA is draft-bound and cannot be re-signed. Summer UFA is a separate post-deadline status that must be explicitly confirmed in a later market snapshot.",
         ]
       : []),
     "Use only the people, teams, amounts, dates, outcomes, transactions, and links in EDITION_FACTS, plus the league process and timelines in RULEBOOK_CONTEXT. Do not add HTML, Markdown links, extra sections, or new URLs.",

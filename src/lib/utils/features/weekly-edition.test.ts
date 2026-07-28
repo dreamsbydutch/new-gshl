@@ -1016,7 +1016,7 @@ void test("builds each season milestone from contract, cap, draft, and roster fa
     const prompt = buildWeeklyEditionChatGptPrompt(packet);
     const ruleContext = JSON.stringify(buildWeeklyEditionRuleContext(packet));
     assert.match(ruleContext, /America\/Toronto/);
-    if (["resigning_outlook", "offseason_market"].includes(issueType)) {
+    if (issueType === "resigning_outlook") {
       assert.match(ruleContext, /signingStatus/);
       assert.match(ruleContext, /expiryStatus/);
       assert.match(ruleContext, /two consecutive contracts/);
@@ -1045,6 +1045,11 @@ void test("builds each season milestone from contract, cap, draft, and roster fa
       assert.match(ruleContext, /more than two-thirds/);
       assert.match(ruleContext, /one, two, or three years/);
       assert.match(ruleContext, /salary retention/);
+      assert.match(ruleContext, /15-player roster every year/);
+      assert.match(ruleContext, /two to four players/);
+      assert.match(ruleContext, /comparing each team's remaining cap space/);
+      assert.match(ruleContext, /some but not all/);
+      assert.match(ruleContext, /losing the exclusive re-signing opportunity/);
       assert.match(prompt, /expiringContracts/);
       assert.match(prompt, /"signedPlayers"/);
       assert.match(prompt, /"draftBoundExpiries"/);
@@ -1151,6 +1156,12 @@ void test("builds each season milestone from contract, cap, draft, and roster fa
       assert.match(ruleContext, /Summer UFA/);
       assert.match(ruleContext, /125%/);
       assert.match(ruleContext, /seven days/);
+      assert.match(ruleContext, /all RFA re-signing rights have ended/);
+      assert.match(ruleContext, /No unsigned player remains an RFA/);
+      assert.match(ruleContext, /leave cap space unused/);
+      assert.match(ruleContext, /future draft picks are permitted but rare/);
+      assert.match(ruleContext, /returns to the annual draft/);
+      assert.doesNotMatch(ruleContext, /two consecutive contracts/);
       assert.deepEqual(
         content.sections.slice(0, 4).map((section) => section.kind),
         ["ufa_market", "cap_space", "roster_outlook", "draft_capital"],
@@ -1158,7 +1169,7 @@ void test("builds each season milestone from contract, cap, draft, and roster fa
       assert.doesNotMatch(prompt, /OFFSEASON REVIEW PRIORITIES/);
       assert.match(prompt, /confirmed Summer UFA/);
       assert.match(prompt, /"signedPlayers"/);
-      assert.match(prompt, /"draftBoundExpiries"/);
+      assert.doesNotMatch(prompt, /"draftBoundExpiries"|"expiringContracts"/);
       assert.match(prompt, /"requiredUfaSalary": 7500000/);
       assert.match(prompt, /"opens": "2026-07-01"/);
       assert.match(prompt, /seven days/);
