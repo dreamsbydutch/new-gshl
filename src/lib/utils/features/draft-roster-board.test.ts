@@ -113,18 +113,37 @@ void test("calculates live roster talent with tiered lineup weights", () => {
     player("injured", "owner", 100, "IR"),
   ]);
 
-  assert.equal(rating, 1820 / 24);
+  assert.ok(Math.abs(Number(rating) - 669.3 / 16.87) < 1e-10);
 });
 
 void test("normalizes database string ratings for newsroom talent snapshots", () => {
-  assert.equal(
-    calculateDraftRosterTalentRating([
-      { overallRating: "90", lineupPos: "C" },
-      { overallRating: "75", lineupPos: "BN" },
-      { overallRating: "not-a-rating", lineupPos: "RW" },
-    ]),
-    87,
+  assert.ok(
+    Math.abs(
+      Number(
+        calculateDraftRosterTalentRating([
+          { overallRating: "90", lineupPos: "C" },
+          { overallRating: "75", lineupPos: "BN" },
+          { overallRating: "not-a-rating", lineupPos: "RW" },
+        ]),
+      ) -
+        184.8 / 16.87,
+    ) < 1e-10,
   );
+});
+
+void test("counts empty full-roster slots as zero so added players lift the rating", () => {
+  const emptyRating = calculateDraftRosterTalentRating([]);
+  const onePlayerRating = calculateDraftRosterTalentRating([
+    { overallRating: 80, lineupPos: "RW" },
+  ]);
+  const twoPlayerRating = calculateDraftRosterTalentRating([
+    { overallRating: 80, lineupPos: "RW" },
+    { overallRating: 70, lineupPos: "BN" },
+  ]);
+
+  assert.equal(emptyRating, 0);
+  assert.ok(Number(onePlayerRating) > Number(emptyRating));
+  assert.ok(Number(twoPlayerRating) > Number(onePlayerRating));
 });
 
 void test("groups conferences and sorts teams by live roster talent", () => {

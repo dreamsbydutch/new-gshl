@@ -6,7 +6,7 @@ import type {
   RosterPosition,
 } from "@gshl-types";
 import { generateLineupAssignments } from "./draft-admin";
-import { calculateDraftRosterTalentRating } from "./draft-roster-board";
+import { calculateDraftRosterTalentPoints } from "./draft-roster-board";
 
 export type {
   BuildMockDraftProjectionOptions,
@@ -107,9 +107,9 @@ function normalizePlayerPositions(player: DraftBoardPlayer): RosterPosition[] {
  * tier. Adding one player may therefore move several existing players between
  * primary, secondary, utility, and bench weights.
  */
-function calculateTalentAfterFullLineupOptimization(
+function calculatePointsAfterFullLineupOptimization(
   roster: readonly DraftBoardPlayer[],
-): number | null {
+): number {
   const assignments = generateLineupAssignments(
     roster.map((player) => ({
       id: String(player.id),
@@ -125,7 +125,7 @@ function calculateTalentAfterFullLineupOptimization(
     ]),
   );
 
-  return calculateDraftRosterTalentRating(
+  return calculateDraftRosterTalentPoints(
     roster.map((player) => ({
       overallRating: player.overallRating,
       lineupPos: lineupPositionByPlayerId.get(String(player.id)) ?? null,
@@ -219,8 +219,8 @@ export function buildMockDraftProjection<
     const teamRoster = gshlTeam
       ? (rosterByTeamKey.get(getTeamRosterKey(gshlTeam)) ?? [])
       : [];
-    const currentTalent =
-      calculateTalentAfterFullLineupOptimization(teamRoster) ?? 0;
+    const currentTalentPoints =
+      calculatePointsAfterFullLineupOptimization(teamRoster);
     let projectedPlayer: TPlayer | undefined;
     let bestTalentGain = Number.NEGATIVE_INFINITY;
     const ratedCandidates = remainingPlayers.filter(hasTalentRating);
@@ -236,12 +236,11 @@ export function buildMockDraftProjection<
       const draftedCandidate = gshlTeam
         ? asDraftedRosterPlayer(candidate, gshlTeam)
         : candidate;
-      const resultingTalent =
-        calculateTalentAfterFullLineupOptimization([
-          ...teamRoster,
-          draftedCandidate,
-        ]) ?? 0;
-      const talentGain = resultingTalent - currentTalent;
+      const resultingTalentPoints = calculatePointsAfterFullLineupOptimization([
+        ...teamRoster,
+        draftedCandidate,
+      ]);
+      const talentGain = resultingTalentPoints - currentTalentPoints;
       const isBetterGain = talentGain > bestTalentGain;
       const winsTie =
         talentGain === bestTalentGain &&

@@ -204,29 +204,50 @@ void test("reaches for positional help when it improves roster talent more than 
   assert.ok(Number(projection[0]?.score) > Number(projection[1]?.score));
 });
 
-void test("rebuilds the full lineup when a candidate moves players into lower tiers", () => {
+void test("prefers a primary RW over a slightly higher-rated utility defenseman", () => {
   const projection = buildMockDraftProjection({
     seasonDraftPicks: [pick("pick-1", 1)],
     draftPlayers: [
-      player("higher-rated-goalie", 99, ["G"], { overallRk: 1 }),
-      player("lineup-moving-center", 95, ["C"], { overallRk: 2 }),
+      player("utility-defenseman", 89, ["D"], { overallRk: 1 }),
+      player("primary-right-wing", 80, ["RW"], { overallRk: 2 }),
     ],
     rosterPlayers: [
-      player("primary-center", 100, ["C"], { ownerId: "owner-a" }),
-      player("secondary-center", 90, ["C"], { ownerId: "owner-a" }),
-      player("utility-center", 80, ["C"], { ownerId: "owner-a" }),
-      player("bench-center", 70, ["C"], { ownerId: "owner-a" }),
+      player("defense-one", 100, ["D"], { ownerId: "owner-a" }),
+      player("defense-two", 99, ["D"], { ownerId: "owner-a" }),
+      player("defense-three", 98, ["D"], { ownerId: "owner-a" }),
     ],
     teams: [team()],
   });
 
-  assert.equal(projection[0]?.projectedPlayer?.id, "lineup-moving-center");
-  assert.ok(
-    Math.abs(Number(projection[0]?.score) - (1015 / 11 - 90)) < Number.EPSILON,
-  );
+  assert.equal(projection[0]?.projectedPlayer?.id, "primary-right-wing");
+  assert.ok(Math.abs(Number(projection[0]?.score) - 80 * 1.22) < 1e-10);
 });
 
-void test("never suggests a talent loss when another rated candidate produces a gain", () => {
+void test("uses roughly a 5-to-6-point threshold between adjacent lineup tiers", () => {
+  const rosterPlayers = [
+    player("primary-center", 100, ["C"], { ownerId: "owner-a" }),
+  ];
+  const buildProjection = (secondaryCenterRating: number) =>
+    buildMockDraftProjection({
+      seasonDraftPicks: [pick("pick-1", 1)],
+      draftPlayers: [
+        player("secondary-center", secondaryCenterRating, ["C"], {
+          overallRk: 1,
+        }),
+        player("primary-right-wing", 80, ["RW"], { overallRk: 2 }),
+      ],
+      rosterPlayers,
+      teams: [team()],
+    });
+
+  assert.equal(
+    buildProjection(85)[0]?.projectedPlayer?.id,
+    "primary-right-wing",
+  );
+  assert.equal(buildProjection(86)[0]?.projectedPlayer?.id, "secondary-center");
+});
+
+void test("selects the candidate with the greatest marginal weighted points", () => {
   const projection = buildMockDraftProjection({
     seasonDraftPicks: [pick("pick-1", 1)],
     draftPlayers: [

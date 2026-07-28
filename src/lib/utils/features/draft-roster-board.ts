@@ -10,10 +10,11 @@ import type {
 import { RosterPosition } from "../domain/constants";
 import { buildCurrentRoster } from "./team-roster";
 
-export const DRAFT_ROSTER_PRIMARY_WEIGHT = 4;
-export const DRAFT_ROSTER_SECONDARY_WEIGHT = 3;
-export const DRAFT_ROSTER_UTILITY_WEIGHT = 2;
+export const DRAFT_ROSTER_PRIMARY_WEIGHT = 1.22;
+export const DRAFT_ROSTER_SECONDARY_WEIGHT = 1.14;
+export const DRAFT_ROSTER_UTILITY_WEIGHT = 1.07;
 export const DRAFT_ROSTER_BENCH_WEIGHT = 1;
+export const DRAFT_ROSTER_BENCH_SLOTS = 4;
 
 export const DRAFT_ROSTER_LINEUP_SLOTS: readonly {
   position: RosterPositionType;
@@ -82,6 +83,10 @@ export const DRAFT_ROSTER_LINEUP_SLOTS: readonly {
   },
 ];
 
+export const DRAFT_ROSTER_FULL_TEAM_WEIGHT =
+  DRAFT_ROSTER_LINEUP_SLOTS.reduce((total, slot) => total + slot.weight, 0) +
+  DRAFT_ROSTER_BENCH_SLOTS * DRAFT_ROSTER_BENCH_WEIGHT;
+
 function getPositionWeights(lineupPos: string): readonly number[] {
   if (
     lineupPos === RosterPosition.LW ||
@@ -106,15 +111,15 @@ function getPositionWeights(lineupPos: string): readonly number[] {
   return [];
 }
 
-export function calculateDraftRosterTalentRating(
+function calculateDraftRosterTalentMetrics(
   roster: readonly {
     lineupPos?: string | null;
     overallRating?: string | number | null;
   }[],
-): number | null {
+): { points: number; weight: number } {
   let weightedRating = 0;
-  let totalWeight = 0;
   const ratingsByLineupPosition = new Map<string, number[]>();
+  const benchRatings: number[] = [];
 
   for (const player of roster) {
     if (player.overallRating === null || player.overallRating === undefined) {
@@ -124,8 +129,7 @@ export function calculateDraftRosterTalentRating(
     if (!Number.isFinite(rating)) continue;
 
     if (player.lineupPos === RosterPosition.BN) {
-      weightedRating += rating * DRAFT_ROSTER_BENCH_WEIGHT;
-      totalWeight += DRAFT_ROSTER_BENCH_WEIGHT;
+      benchRatings.push(rating);
       continue;
     }
     if (typeof player.lineupPos !== "string") continue;
@@ -141,13 +145,43 @@ export function calculateDraftRosterTalentRating(
     ratings.sort((left, right) => right - left);
 
     for (const [index, rating] of ratings.entries()) {
-      const weight = positionWeights[index] ?? DRAFT_ROSTER_BENCH_WEIGHT;
+      const weight = positionWeights[index];
+      if (weight === undefined) {
+        benchRatings.push(rating);
+        continue;
+      }
       weightedRating += rating * weight;
-      totalWeight += weight;
     }
   }
 
-  return totalWeight > 0 ? weightedRating / totalWeight : null;
+  benchRatings.sort((left, right) => right - left);
+  for (const rating of benchRatings.slice(0, DRAFT_ROSTER_BENCH_SLOTS)) {
+    weightedRating += rating * DRAFT_ROSTER_BENCH_WEIGHT;
+  }
+
+  return {
+    points: weightedRating,
+    weight: DRAFT_ROSTER_FULL_TEAM_WEIGHT,
+  };
+}
+
+export function calculateDraftRosterTalentPoints(
+  roster: readonly {
+    lineupPos?: string | null;
+    overallRating?: string | number | null;
+  }[],
+): number {
+  return calculateDraftRosterTalentMetrics(roster).points;
+}
+
+export function calculateDraftRosterTalentRating(
+  roster: readonly {
+    lineupPos?: string | null;
+    overallRating?: string | number | null;
+  }[],
+): number | null {
+  const { points, weight } = calculateDraftRosterTalentMetrics(roster);
+  return weight > 0 ? points / weight : null;
 }
 
 export function selectLatestActiveFranchiseTeams(
