@@ -10,10 +10,12 @@ import {
   buildWeeklyEditionFactPacket,
   buildWeeklyEditionMilestoneFacts,
   buildWeeklyEditionMilestoneSchedule,
+  buildWeeklyEditionRuleContext,
   buildWeeklyEditionPeriodRecordFacts,
   filterWeeklyEditionContent,
   hashWeeklyEditionSource,
   isWeeklyEditionPlayingContract,
+  isWeeklyEditionSummerUfaPoolAvailable,
   validateWeeklyEditionImport,
   weeklyEditionContractAffectsSeason,
 } from "./weekly-edition";
@@ -32,6 +34,7 @@ function source(): BuildWeeklyEditionFactPacketInput {
         teamId: "team-a",
         name: "Aurora",
         abbr: "AUR",
+        talentRating: 88.4,
         conferenceId: "east",
         conferenceName: "Crystal",
         beatWriter: "Gord McKenzie",
@@ -41,6 +44,7 @@ function source(): BuildWeeklyEditionFactPacketInput {
         teamId: "team-b",
         name: "Bears",
         abbr: "BEA",
+        talentRating: 76.2,
         conferenceId: "east",
         conferenceName: "Crystal",
         beatWriter: "Darren Whitmore",
@@ -50,6 +54,7 @@ function source(): BuildWeeklyEditionFactPacketInput {
         teamId: "team-c",
         name: "Comets",
         abbr: "COM",
+        talentRating: 83.7,
         conferenceId: "west",
         conferenceName: "Diamond",
         beatWriter: "Scott Callahan",
@@ -59,6 +64,7 @@ function source(): BuildWeeklyEditionFactPacketInput {
         teamId: "team-d",
         name: "Dragons",
         abbr: "DRA",
+        talentRating: 79.5,
         conferenceId: "west",
         conferenceName: "Diamond",
         beatWriter: "Mike Bouchard",
@@ -250,8 +256,8 @@ void test("prioritizes playoff rounds and removes Loser Tournament coverage", ()
   assert.doesNotMatch(prompt, /"matchupId": "matchup-1"/);
   assert.doesNotMatch(prompt, /"id": "matchup:matchup-1"/);
   assert.doesNotMatch(prompt, /"matchupId": "matchup-3"/);
-  assert.match(prompt, /QF means quarterfinal/);
-  assert.match(prompt, /Loser Tournament games should not be a headline/);
+  assert.match(prompt, /QF means Quarterfinal/);
+  assert.match(prompt, /LT games must not be a lead/);
 });
 
 void test("does not select a hero when a week contains only Loser Tournament games", () => {
@@ -511,7 +517,7 @@ void test("detects newly crossed period, career, and franchise milestones", () =
   );
 });
 
-void test("prompt contains only relevant edition facts and a compact section plan", () => {
+void test("prompt contains a raw newsroom brief without an article plan", () => {
   const packet = buildWeeklyEditionFactPacket(source());
   packet.teams.push({
     teamId: "database-only-team",
@@ -519,9 +525,12 @@ void test("prompt contains only relevant edition facts and a compact section pla
     abbr: "DOT",
   });
   const prompt = buildWeeklyEditionChatGptPrompt(packet);
-  assert.match(prompt, /^PROMPT_FORMAT=editorial_context_v4/);
+  assert.match(prompt, /^PROMPT_FORMAT=league_snapshot_v6/);
+  assert.match(prompt, /RULEBOOK_CONTEXT=/);
   assert.match(prompt, /EDITION_FACTS=/);
-  assert.match(prompt, /SECTION_PLAN=/);
+  assert.match(prompt, /NEWSROOM_AUTHORS=/);
+  assert.match(prompt, /OUTPUT_CONTRACT=/);
+  assert.doesNotMatch(prompt, /SECTION_PLAN=/);
   assert.match(prompt, /Return only one JSON object/);
   assert.match(prompt, /Alex North/);
   assert.match(prompt, /Graham MacIntyre/);
@@ -529,21 +538,34 @@ void test("prompt contains only relevant edition facts and a compact section pla
   assert.match(prompt, /Nate Carlson/);
   assert.match(prompt, /Darren Leclair/);
   assert.match(prompt, /Mike Halvorsen/);
-  assert.match(prompt, /Every article must have a different reporter/);
+  assert.match(prompt, /never use one reporter twice/);
   assert.match(
     prompt,
-    /team beat writer appears only when the article is specifically centered/,
+    /team beat writer is eligible only for an article centered/,
   );
-  assert.match(prompt, /Create original storylines from the supplied facts/);
-  assert.match(
-    prompt,
-    /Creative framing may be invented; factual claims may not/,
-  );
+  assert.match(prompt, /timestamped snapshot of the league/);
+  assert.match(prompt, /context, not an article assignment or outline/);
+  assert.match(prompt, /Use your own editorial judgment and creativity/);
+  assert.match(prompt, /"snapshotAt"/);
+  assert.match(prompt, /"ratingGuide"/);
+  assert.match(prompt, /"teamTalentRatings"/);
+  assert.match(prompt, /"talentRating": 88\.4/);
+  assert.match(prompt, /baseline for league hierarchy/);
+  assert.match(prompt, /playful hockey-style chirps/);
+  assert.doesNotMatch(prompt, /"leagueDirectory"|"gameTypeLegend"/);
+  assert.match(prompt, /"kind": "primary_article"/);
+  assert.match(prompt, /"kind": "standard_article"/);
+  assert.doesNotMatch(prompt, /"sectionKinds"/);
+  assert.doesNotMatch(prompt, /finding tension|predetermined article menu/);
   assert.match(prompt, /must never exceed 90/);
   assert.match(prompt, /Each section body should be 450–750/);
   assert.match(prompt, /Bruce McAllister|Gord McKenzie|Darren Whitmore/);
-  assert.match(prompt, /Every expired UFA automatically returns to the draft/);
-  assert.match(prompt, /exactly 115% of the prior salary/);
+  assert.doesNotMatch(prompt, /signingStatus tells you/);
+  assert.doesNotMatch(prompt, /115% of the player's updated GSHL salary/);
+  assert.match(prompt, /LT means Loser Tournament/);
+  assert.match(prompt, /"standoutPlayers"/);
+  assert.match(prompt, /"notableFacts"/);
+  assert.doesNotMatch(prompt, /headlineHint|importance/);
   assert.doesNotMatch(prompt, /Database Only Team/);
   assert.doesNotMatch(prompt, /knownEntityNames|allowedNames|allowedNumbers/);
 });
@@ -681,7 +703,7 @@ void test("filters inactive articles without mutating the stored edition", () =>
   );
 });
 
-void test("rejects unsafe structure and normalizes oversized AI copy", () => {
+void test("allows creative article choices while rejecting unsafe imports", () => {
   const packet = buildWeeklyEditionFactPacket(source());
   const content = buildTemplateWeeklyEdition(packet);
   const html = structuredClone(content);
@@ -693,9 +715,24 @@ void test("rejects unsafe structure and normalizes oversized AI copy", () => {
 
   const unknownSection = structuredClone(content);
   unknownSection.sections[0]!.id = "rumour_mill";
-  assert.equal(
-    validateWeeklyEditionImport(JSON.stringify(unknownSection), packet).valid,
-    false,
+  const normalizedSlots = validateWeeklyEditionImport(
+    JSON.stringify(unknownSection),
+    packet,
+  );
+  assert.equal(normalizedSlots.valid, true);
+  assert.deepEqual(
+    normalizedSlots.content?.sections.map((section) => [
+      section.id,
+      section.kind,
+    ]),
+    [
+      ["article_1", "primary_article"],
+      ["article_2", "primary_article"],
+      ["article_3", "standard_article"],
+      ["article_4", "standard_article"],
+      ["article_5", "standard_article"],
+      ["article_6", "standard_article"],
+    ],
   );
 
   const reordered = structuredClone(content);
@@ -705,14 +742,28 @@ void test("rejects unsafe structure and normalizes oversized AI copy", () => {
   ];
   assert.equal(
     validateWeeklyEditionImport(JSON.stringify(reordered), packet).valid,
-    false,
+    true,
   );
 
   const alteredEyebrow = structuredClone(content);
   alteredEyebrow.sections[0]!.eyebrow = "Rumour Mill";
   assert.equal(
     validateWeeklyEditionImport(JSON.stringify(alteredEyebrow), packet).valid,
-    false,
+    true,
+  );
+
+  const changedApprovedBylines = structuredClone(content);
+  [
+    changedApprovedBylines.sections[2]!.author,
+    changedApprovedBylines.sections[3]!.author,
+  ] = [
+    changedApprovedBylines.sections[3]!.author,
+    changedApprovedBylines.sections[2]!.author,
+  ];
+  assert.equal(
+    validateWeeklyEditionImport(JSON.stringify(changedApprovedBylines), packet)
+      .valid,
+    true,
   );
 
   const alteredAuthor = structuredClone(content);
@@ -754,7 +805,7 @@ void test("rejects unsafe structure and normalizes oversized AI copy", () => {
   oversized.sections = oversized.sections.map((section) => ({
     ...section,
     headline: `${"A long section headline ".repeat(8)}Ending.`,
-    body: `${"A complete sentence about the verified story. ".repeat(35)}Final thought.`,
+    body: `${section.body} ${"A complete sentence about the verified story. ".repeat(35)}Final thought.`,
   }));
   const normalized = validateWeeklyEditionImport(
     JSON.stringify(oversized),
@@ -812,7 +863,10 @@ void test("builds each season milestone from contract, cap, draft, and roster fa
         endDate: "2026-04-20",
       },
       teams: source().teams,
-      matchups: source().matchups,
+      matchups: source().matchups.map((matchup, index) => ({
+        ...matchup,
+        gameType: index === 0 ? "F" : "SF",
+      })),
       stars: source().players,
       power: source().power,
       teamOutlooks: [
@@ -826,6 +880,7 @@ void test("builds each season milestone from contract, cap, draft, and roster fa
           expiringCount: 2,
           draftPickCount: 15,
           firstRoundPickCount: 2,
+          draftSelectionsConsumed: 3,
         },
         {
           teamId: "team-b",
@@ -837,6 +892,7 @@ void test("builds each season milestone from contract, cap, draft, and roster fa
           expiringCount: 1,
           draftPickCount: 15,
           firstRoundPickCount: 1,
+          draftSelectionsConsumed: 2,
         },
       ],
       expiringContracts: [
@@ -845,8 +901,10 @@ void test("builds each season milestone from contract, cap, draft, and roster fa
           playerName: "Alex North",
           teamName: "Aurora",
           salary: 5_000_000,
+          signingStatus: "RFA",
           expiryStatus: "UFA",
           expiryDate: "2026-04-20",
+          updatedSalary: 5_500_000,
           canBeReSigned: false,
           returnsToDraft: true,
         },
@@ -855,10 +913,12 @@ void test("builds each season milestone from contract, cap, draft, and roster fa
           playerName: "Casey East",
           teamName: "Aurora",
           salary: 4_000_000,
+          signingStatus: "Drafted",
           expiryStatus: "RFA",
           expiryDate: "2026-04-20",
+          updatedSalary: 4_200_000,
           canBeReSigned: true,
-          requiredReSigningSalary: 4_600_000,
+          requiredReSigningSalary: 4_830_000,
           returnsToDraft: false,
         },
       ],
@@ -868,8 +928,64 @@ void test("builds each season milestone from contract, cap, draft, and roster fa
           playerName: "Blake West",
           teamName: "Bears",
           salary: 4_000_000,
+          signingStatus: "UFA",
           expiryStatus: "RFA",
           expiryDate: "2028-04-20",
+          updatedSalary: 4_400_000,
+        },
+      ],
+      signedPlayers: [
+        {
+          contractId: "signed-1",
+          playerName: "Jordan Frost",
+          teamName: "Aurora",
+          salary: 5_200_000,
+          signingStatus: "Drafted",
+          expiryStatus: "RFA",
+          expiryDate: "2027-04-20",
+          updatedSalary: 5_500_000,
+        },
+        {
+          contractId: "signed-2",
+          playerName: "Ryan Lake",
+          teamName: "Bears",
+          salary: 4_800_000,
+          signingStatus: "UFA",
+          expiryStatus: "RFA",
+          expiryDate: "2027-04-20",
+          updatedSalary: 5_000_000,
+        },
+      ],
+      summerUfas: [
+        {
+          playerId: "player-ufa",
+          playerName: "Devon South",
+          previousTeamName: "Bears",
+          updatedSalary: 6_000_000,
+          requiredUfaSalary: 7_500_000,
+          rosterTalent: 88.2,
+        },
+      ],
+      buyoutCharges: [
+        {
+          contractId: "buyout-1",
+          playerName: "Morgan Vale",
+          teamName: "Bears",
+          capHit: 1_000_000,
+          capHitEndDate: "2027-04-20",
+        },
+      ],
+      gmRankings: [
+        {
+          rank: 1,
+          gmName: "Pat Brennan",
+          teamName: "Aurora",
+          rating: 1625,
+          rankChange: 1,
+          overallWins: 88,
+          overallLosses: 54,
+          playoffAppearances: 5,
+          cups: 2,
         },
       ],
       draftPicks: [
@@ -898,55 +1014,169 @@ void test("builds each season milestone from contract, cap, draft, and roster fa
       );
     }
     const prompt = buildWeeklyEditionChatGptPrompt(packet);
+    const ruleContext = JSON.stringify(buildWeeklyEditionRuleContext(packet));
+    assert.match(ruleContext, /America\/Toronto/);
+    if (["resigning_outlook", "offseason_market"].includes(issueType)) {
+      assert.match(ruleContext, /signingStatus/);
+      assert.match(ruleContext, /expiryStatus/);
+      assert.match(ruleContext, /two consecutive contracts/);
+    } else {
+      assert.doesNotMatch(ruleContext, /signingStatus/);
+    }
+    if (issueType !== "final_recap") {
+      assert.match(ruleContext, /25000000/);
+      assert.match(ruleContext, /50% of salary/);
+    } else {
+      assert.doesNotMatch(ruleContext, /25000000/);
+    }
     if (issueType === "final_recap") {
+      assert.doesNotMatch(ruleContext, /upcomingSeason/);
       assert.match(prompt, /completedSeason/);
+      assert.match(prompt, /"championTeamName": "Aurora"/);
+      assert.match(prompt, /"seasonResults"/);
+      assert.match(prompt, /"seasonHighlights"/);
       assert.doesNotMatch(prompt, /analysisSeason/);
     } else {
+      assert.match(ruleContext, /upcomingSeason/);
       assert.match(prompt, /"analysisSeason"/);
       assert.match(prompt, /2026-27 GSHL/);
     }
     if (issueType === "resigning_outlook") {
+      assert.match(ruleContext, /more than two-thirds/);
+      assert.match(ruleContext, /one, two, or three years/);
+      assert.match(ruleContext, /salary retention/);
       assert.match(prompt, /expiringContracts/);
-      assert.doesNotMatch(prompt, /draftPicks|recentSignings/);
+      assert.match(prompt, /"signedPlayers"/);
+      assert.match(prompt, /"draftBoundExpiries"/);
+      assert.doesNotMatch(prompt, /earlyDraftBoard|recentSignings/);
       assert.match(
         content.sections.map((section) => section.body).join(" "),
-        /automatically back to the draft/,
+        /returns to the draft/,
       );
       assert.match(
         content.sections.map((section) => section.body).join(" "),
-        /115% of the prior \$4\.0M salary/,
+        /115% of the updated \$4\.2M salary/,
       );
-      assert.match(prompt, /"requiredReSigningSalary": 4600000/);
+      assert.match(prompt, /"signingStatus": "Drafted"/);
+      assert.match(prompt, /"requiredReSigningSalary": 4830000/);
+      assert.match(prompt, /"deadline": "2026-06-30"/);
       assert.equal(
         content.sections.find((section) => section.kind === "next_week")?.author
           ?.position,
         "Editor-in-Chief",
       );
+
+      const wrongRfaOutcome = structuredClone(content);
+      wrongRfaOutcome.sections[0]!.body =
+        "Casey East cannot be re-signed and must return to the draft.";
+      assert.match(
+        validateWeeklyEditionImport(
+          JSON.stringify(wrongRfaOutcome),
+          packet,
+        ).errors.join(" "),
+        /RFA expiry/,
+      );
+
+      const wrongUfaOutcome = structuredClone(content);
+      wrongUfaOutcome.sections[0]!.body =
+        "Alex North is a Summer UFA target and may be re-signed.";
+      assert.match(
+        validateWeeklyEditionImport(
+          JSON.stringify(wrongUfaOutcome),
+          packet,
+        ).errors.join(" "),
+        /UFA expiry/,
+      );
+
+      const wrongSigningProvenance = structuredClone(content);
+      wrongSigningProvenance.sections[0]!.body =
+        "Alex North signed as a UFA before reaching this expiry.";
+      assert.match(
+        validateWeeklyEditionImport(
+          JSON.stringify(wrongSigningProvenance),
+          packet,
+        ).errors.join(" "),
+        /signing status is RFA/,
+      );
+
+      const wrongSalaryBasis = structuredClone(content);
+      wrongSalaryBasis.sections[0]!.body =
+        "Casey East costs 115% of the prior salary.";
+      assert.match(
+        validateWeeklyEditionImport(
+          JSON.stringify(wrongSalaryBasis),
+          packet,
+        ).errors.join(" "),
+        /updated GSHL salary/,
+      );
+
+      const wrongRfaPremium = structuredClone(content);
+      wrongRfaPremium.sections[0]!.body =
+        "Casey East's RFA renewal costs 125% of the updated salary.";
+      assert.match(
+        validateWeeklyEditionImport(
+          JSON.stringify(wrongRfaPremium),
+          packet,
+        ).errors.join(" "),
+        /costs 115%/,
+      );
     }
     if (issueType === "offseason_market") {
+      assert.match(ruleContext, /Summer UFA/);
+      assert.match(ruleContext, /125%/);
+      assert.match(ruleContext, /seven days/);
       assert.deepEqual(
         content.sections.slice(0, 4).map((section) => section.kind),
         ["ufa_market", "cap_space", "roster_outlook", "draft_capital"],
       );
-      assert.match(prompt, /OFFSEASON REVIEW PRIORITIES/);
-      assert.match(
-        prompt,
-        /which draft-bound UFAs they could realistically afford/,
-      );
-      assert.match(prompt, /earlyDraftBoard/);
+      assert.doesNotMatch(prompt, /OFFSEASON REVIEW PRIORITIES/);
+      assert.match(prompt, /confirmed Summer UFA/);
+      assert.match(prompt, /"signedPlayers"/);
+      assert.match(prompt, /"draftBoundExpiries"/);
+      assert.match(prompt, /"requiredUfaSalary": 7500000/);
+      assert.match(prompt, /"opens": "2026-07-01"/);
+      assert.match(prompt, /seven days/);
+      assert.doesNotMatch(prompt, /earlyDraftBoard/);
       assert.doesNotMatch(prompt, /draftPickCount/);
       assert.match(
         content.sections.find((section) => section.kind === "ufa_market")
           ?.body ?? "",
-        /Aurora.*Alex North.*plausible draft-board target/,
+        /Aurora.*Devon South.*\$7\.5M/,
       );
       assert.ok(
         content.sections.every((section) => section.author?.scope !== "team"),
       );
+
+      const guaranteedUfa = structuredClone(content);
+      guaranteedUfa.sections[0]!.body =
+        "Devon South will sign with Aurora as a Summer UFA.";
+      assert.match(
+        validateWeeklyEditionImport(
+          JSON.stringify(guaranteedUfa),
+          packet,
+        ).errors.join(" "),
+        /cannot be guaranteed/,
+      );
+
+      const wrongUfaPremium = structuredClone(content);
+      wrongUfaPremium.sections[0]!.body =
+        "Summer UFA Devon South costs 115% of the updated salary.";
+      assert.match(
+        validateWeeklyEditionImport(
+          JSON.stringify(wrongUfaPremium),
+          packet,
+        ).errors.join(" "),
+        /costs 125%/,
+      );
     }
     if (issueType === "pre_draft") {
-      assert.match(prompt, /earlyDraftBoard/);
-      assert.match(prompt, /Every team always has exactly 15 draft picks/);
+      assert.doesNotMatch(ruleContext, /seven days/);
+      assert.match(prompt, /teamDraftProfiles/);
+      assert.match(prompt, /signedRosterTalent/);
+      assert.match(prompt, /earlyDraftPicks/);
+      assert.match(prompt, /Jordan Frost/);
+      assert.match(prompt, /draft has 15 rounds/);
+      assert.match(prompt, /consumes one of the team's latest available/);
       assert.doesNotMatch(prompt, /draftPickCount/);
       assert.doesNotMatch(prompt, /expiringContracts|finalMatchups/);
       assert.doesNotMatch(
@@ -962,6 +1192,12 @@ void test("builds each season milestone from contract, cap, draft, and roster fa
         buildTemplateWeeklyEdition(noConfirmedPicks).headline,
         "The GSHL draft board is set",
       );
+    }
+    if (issueType === "preseason") {
+      assert.match(prompt, /teamRosterProfiles/);
+      assert.match(prompt, /"gmLadder"/);
+      assert.match(prompt, /Pat Brennan/);
+      assert.match(prompt, /Jordan Frost/);
     }
     const validation = validateWeeklyEditionImport(
       JSON.stringify(content),
@@ -1050,6 +1286,18 @@ void test("uses upcoming-season contract coverage for offseason roster and cap f
 });
 
 void test("schedules the season editorial calendar from league dates", () => {
+  assert.equal(
+    isWeeklyEditionSummerUfaPoolAvailable("2026-06-29", "2026-06-30"),
+    false,
+  );
+  assert.equal(
+    isWeeklyEditionSummerUfaPoolAvailable("2026-06-30", "2026-06-30"),
+    false,
+  );
+  assert.equal(
+    isWeeklyEditionSummerUfaPoolAvailable("2026-07-01", "2026-06-30"),
+    true,
+  );
   assert.deepEqual(
     buildWeeklyEditionMilestoneSchedule({
       finalWeekEnd: "2026-04-20",

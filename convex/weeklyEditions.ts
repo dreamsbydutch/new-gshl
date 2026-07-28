@@ -9,7 +9,15 @@ import {
 import type { Doc, Id } from "./_generated/dataModel";
 import { requireCommissioner } from "./lib/auth";
 import { buildLeagueActivity } from "../src/lib/utils/features/league-activity";
-import type { ContractStatus, WeeklyEditionIssueType } from "../src/lib/types";
+import { buildOwnerRankings } from "../src/lib/utils/features/owner-rankings";
+import { calculateDraftRosterTalentRating } from "../src/lib/utils/features/draft-roster-board";
+import type {
+  AwardsList,
+  ContractStatus,
+  MatchupType,
+  SeasonType,
+  WeeklyEditionIssueType,
+} from "../src/lib/types";
 import { ContractStatus as ContractStatusValues } from "../src/lib/utils/domain/constants";
 import {
   buildWeeklyEditionCareerRecordFacts,
@@ -24,6 +32,7 @@ import {
   buildWeeklyEditionPeriodRecordFacts,
   hashWeeklyEditionSource,
   isWeeklyEditionPlayingContract,
+  isWeeklyEditionSummerUfaPoolAvailable,
   validateWeeklyEditionContent,
   validateWeeklyEditionImport,
   weeklyEditionContractAffectsSeason,
@@ -310,6 +319,17 @@ async function buildSource(
   const allMatchups: typeof matchups = [];
   const playerById = new Map(
     players.map((player) => [String(player._id), player]),
+  );
+  const teamTalentById = new Map(
+    [...currentTeamContextById.values()].map((team) => [
+      team.teamId,
+      calculateDraftRosterTalentRating(
+        players.filter(
+          (player) =>
+            String(player.ownerId ?? "") === team.ownerId && player.isActive,
+        ),
+      ),
+    ]),
   );
   const previousByTeam = new Map(
     previousPower.map((row) => [String(row.gshlTeamId), row]),
@@ -857,7 +877,10 @@ async function buildSource(
       startDate: dateKey(week.startDate),
       endDate: dateKey(week.endDate),
     },
-    teams: [...teamById.values()],
+    teams: [...teamById.values()].map((team) => ({
+      ...team,
+      talentRating: teamTalentById.get(team.teamId) ?? undefined,
+    })),
     matchups: matchups.map((matchup) => ({
       matchupId: String(matchup._id),
       gameType: String(matchup.gameType),
@@ -918,6 +941,7 @@ async function buildSource(
         previousRank: previous?.powerRk ?? row.powerRk,
         currentElo: row.powerEloPost ?? row.powerElo,
         previousElo: previous?.powerEloPost ?? previous?.powerElo,
+        talentRating: teamTalentById.get(String(row.gshlTeamId)) ?? undefined,
       };
     }),
     activity,
@@ -1062,6 +1086,172 @@ function nextChronologicalSeason(
   return index >= 0 ? (ordered[index + 1] ?? season) : season;
 }
 
+async function buildPreseasonGmRankingFacts(
+  ctx: MutationCtx,
+  seasons: Doc<"seasons">[],
+  franchises: Doc<"franchises">[],
+  conferences: Doc<"conferences">[],
+) {
+  const [
+    owners,
+    allTeams,
+    allWeeks,
+    allMatchups,
+    allTeamAwards,
+    allPowerRankingStats,
+  ] = await Promise.all([
+    ctx.db.query("owners").collect(),
+    ctx.db.query("teams").collect(),
+    ctx.db.query("weeks").collect(),
+    ctx.db.query("matchups").collect(),
+    ctx.db.query("teamAwards").collect(),
+    ctx.db.query("teamWeekStatLines").collect(),
+  ]);
+  const franchiseById = new Map(
+    franchises.map((franchise) => [String(franchise._id), franchise]),
+  );
+  const conferenceById = new Map(
+    conferences.map((conference) => [String(conference._id), conference]),
+  );
+  const ownerById = new Map(owners.map((owner) => [String(owner._id), owner]));
+  const allowedSeasonIds = new Set(
+    seasons.map((candidate) => String(candidate._id)),
+  );
+  const rankings = buildOwnerRankings({
+    owners: owners.map((owner) => ({
+      ...owner,
+      id: String(owner._id),
+      nickName: String(owner.nickName ?? ""),
+      email: owner.email ?? undefined,
+      owing: asNumber(owner.owing),
+      createdAt: new Date(toUtcTimestamp(owner.createdAt) ?? 0),
+      updatedAt: new Date(toUtcTimestamp(owner.updatedAt) ?? 0),
+    })),
+    seasons: seasons.map((season) => ({
+      ...season,
+      id: String(season._id),
+      year: asNumber(season.year),
+      categories: season.categories ?? [],
+      rosterSpots: season.rosterSpots ?? [],
+      startDate: dateKey(season.startDate),
+      endDate: dateKey(season.endDate),
+      signingEndDate: dateKey(season.signingEndDate),
+      draftStartAt: isoTimestamp(season.draftStartAt),
+      createdAt: new Date(toUtcTimestamp(season.createdAt) ?? 0),
+      updatedAt: new Date(toUtcTimestamp(season.updatedAt) ?? 0),
+    })),
+    teams: allTeams
+      .filter((team) => allowedSeasonIds.has(String(team.seasonId)))
+      .map((team) => {
+        const franchise = franchiseById.get(String(team.franchiseId));
+        const conference = conferenceById.get(String(team.confId));
+        const owner = franchise
+          ? ownerById.get(String(franchise.ownerId))
+          : undefined;
+        return {
+          id: String(team._id),
+          seasonId: String(team.seasonId),
+          franchiseId: String(team.franchiseId),
+          name: franchise?.name ?? null,
+          abbr: franchise?.abbr ?? null,
+          logoUrl: franchise?.logoUrl ?? null,
+          isActive: franchise?.isActive ?? false,
+          yahooId: team.yahooId ?? null,
+          confId: String(team.confId),
+          confName: conference?.name ?? null,
+          confAbbr: conference?.abbr ?? null,
+          confLogoUrl: conference?.logoUrl ?? null,
+          ownerId: owner ? String(owner._id) : null,
+          ownerFirstName: owner?.firstName ?? null,
+          ownerLastName: owner?.lastName ?? null,
+          ownerNickname: owner?.nickName ?? null,
+          ownerEmail: owner?.email ?? null,
+          ownerOwing: owner ? asNumber(owner.owing) : null,
+          ownerIsActive: owner?.isActive ?? false,
+        };
+      }),
+    weeks: allWeeks
+      .filter((week) => allowedSeasonIds.has(String(week.seasonId)))
+      .map((week) => ({
+        id: String(week._id),
+        seasonId: String(week.seasonId),
+        weekNum: asNumber(week.weekNum),
+        weekType: week.weekType as SeasonType,
+        gameDays: asNumber(week.gameDays),
+        startDate: dateKey(week.startDate),
+        endDate: dateKey(week.endDate),
+        isActive: week.isActive,
+        isPlayoffs: week.isPlayoffs,
+        createdAt: new Date(toUtcTimestamp(week.createdAt) ?? 0),
+        updatedAt: new Date(toUtcTimestamp(week.updatedAt) ?? 0),
+      })),
+    matchups: allMatchups
+      .filter((matchup) => allowedSeasonIds.has(String(matchup.seasonId)))
+      .map((matchup) => ({
+        id: String(matchup._id),
+        seasonId: String(matchup.seasonId),
+        weekId: String(matchup.weekId),
+        homeTeamId: String(matchup.homeTeamId),
+        awayTeamId: String(matchup.awayTeamId),
+        gameType: matchup.gameType as MatchupType,
+        homeRank: asNumber(matchup.homeRank),
+        awayRank: asNumber(matchup.awayRank),
+        homeScore: asNumber(matchup.homeScore),
+        awayScore: asNumber(matchup.awayScore),
+        homeWin: Boolean(matchup.homeWin),
+        awayWin: Boolean(matchup.awayWin),
+        tie: Boolean(matchup.tie),
+        isComplete: Boolean(matchup.isComplete),
+        rating: asNumber(matchup.rating),
+        ratingPre: asNumber(matchup.ratingPre),
+        ratingRealized: asNumber(matchup.ratingRealized),
+        ratingCompetitive: asNumber(matchup.ratingCompetitive),
+        ratingImportance: asNumber(matchup.ratingImportance),
+        ratingRosterStrength: asNumber(matchup.ratingRosterStrength),
+        createdAt: new Date(toUtcTimestamp(matchup.createdAt) ?? 0),
+        updatedAt: new Date(toUtcTimestamp(matchup.updatedAt) ?? 0),
+      })),
+    teamAwards: allTeamAwards.flatMap((award) =>
+      award.ownerId && allowedSeasonIds.has(String(award.seasonId))
+        ? [
+            {
+              ...award,
+              id: String(award._id),
+              seasonId: String(award.seasonId),
+              ownerId: String(award.ownerId),
+              teamId: award.teamId ? String(award.teamId) : undefined,
+              nomineeIds: (award.nomineeIds ?? []).map(String),
+              award: award.award as AwardsList,
+              createdAt: new Date(toUtcTimestamp(award.createdAt) ?? 0),
+              updatedAt: new Date(toUtcTimestamp(award.updatedAt) ?? 0),
+            },
+          ]
+        : [],
+    ),
+    powerRankingStats: allPowerRankingStats
+      .filter((row) => allowedSeasonIds.has(String(row.seasonId)))
+      .map((row) => ({
+        seasonId: String(row.seasonId),
+        weekId: String(row.weekId),
+        gshlTeamId: String(row.gshlTeamId),
+        powerRk: asNumber(row.powerRk),
+      })),
+  });
+  return rankings.rankings
+    .filter((entry) => entry.isActive)
+    .map((entry) => ({
+      rank: entry.rank,
+      gmName: entry.displayName,
+      teamName: entry.primaryTeam?.name ?? undefined,
+      rating: entry.rating,
+      rankChange: entry.rankChange,
+      overallWins: entry.overallRecord.wins,
+      overallLosses: entry.overallRecord.losses,
+      playoffAppearances: entry.playoffAppearances,
+      cups: entry.cups,
+    }));
+}
+
 async function buildMilestoneSource(
   ctx: MutationCtx,
   season: Doc<"seasons">,
@@ -1081,7 +1271,7 @@ async function buildMilestoneSource(
     draftPicks,
     weeks,
     teamWeekRows,
-    finalMatchups,
+    seasonMatchups,
     finalPlayerRows,
   ] = await Promise.all([
     ctx.db
@@ -1108,10 +1298,12 @@ async function buildMilestoneSource(
       .query("teamWeekStatLines")
       .withIndex("by_seasonId", (q) => q.eq("seasonId", season._id))
       .collect(),
-    ctx.db
-      .query("matchups")
-      .withIndex("by_weekId", (q) => q.eq("weekId", anchorWeek._id))
-      .collect(),
+    issueType === "final_recap"
+      ? ctx.db
+          .query("matchups")
+          .withIndex("by_seasonId", (q) => q.eq("seasonId", season._id))
+          .collect()
+      : [],
     ctx.db
       .query("playerWeekStatLines")
       .withIndex("by_weekId", (q) => q.eq("weekId", anchorWeek._id))
@@ -1120,8 +1312,8 @@ async function buildMilestoneSource(
   if (teams.length === 0) throw new Error("Season teams are not available");
   if (
     issueType === "final_recap" &&
-    (finalMatchups.length === 0 ||
-      finalMatchups.some((matchup) => !matchup.isComplete))
+    (seasonMatchups.length === 0 ||
+      seasonMatchups.some((matchup) => !matchup.isComplete))
   ) {
     throw new Error("The final week is not complete");
   }
@@ -1228,14 +1420,18 @@ async function buildMilestoneSource(
   const teamContracts = contracts.filter((contract) =>
     teamByOwnerId.has(String(contract.ownerId)),
   );
-  const relevantContracts = teamContracts.filter((contract) =>
+  const snapshotContracts = teamContracts.filter((contract) => {
+    const signingDate = dateKey(contract.signingDate);
+    return !signingDate || signingDate <= triggerDate;
+  });
+  const relevantContracts = snapshotContracts.filter((contract) =>
     weeklyEditionContractAffectsSeason(
       contract,
       analysisContractSeason,
       contractSeasons,
     ),
   );
-  const expiringRows = teamContracts.filter(
+  const expiringRows = snapshotContracts.filter(
     (contract) =>
       isWeeklyEditionPlayingContract(contract) &&
       weeklyEditionContractAffectsSeason(
@@ -1249,7 +1445,7 @@ async function buildMilestoneSource(
         contractSeasons,
       ),
   );
-  const recentRows = teamContracts.filter((contract) => {
+  const recentRows = snapshotContracts.filter((contract) => {
     const signingDate = dateKey(contract.signingDate);
     return (
       isWeeklyEditionPlayingContract(contract) &&
@@ -1263,25 +1459,101 @@ async function buildMilestoneSource(
     );
   });
   const contractFact = (contract: Doc<"contracts">) => {
+    const player = playerById.get(String(contract.playerId));
     const salary = asNumber(contract.capHit ?? contract.contractSalary);
-    const expiryStatus = String(contract.expiryStatus ?? "").toUpperCase();
-    const canBeReSigned = expiryStatus === "RFA";
+    const signingStatus = String(contract.signingStatus ?? "").trim();
+    const expiryStatus = String(contract.expiryStatus ?? "").trim();
+    const normalizedExpiryStatus = expiryStatus.toUpperCase();
+    const updatedSalary = asNumber(player?.salary) || salary;
+    const canBeReSigned = normalizedExpiryStatus === "RFA";
     return {
+      contractId: String(contract._id),
+      playerName: player?.fullName ?? "Unknown player",
+      teamName:
+        teamByOwnerId.get(String(contract.ownerId))?.name ?? "Unknown team",
+      salary,
+      signingStatus,
+      expiryStatus,
+      expiryDate: dateKey(contract.expiryDate),
+      updatedSalary,
+      signedAt: dateKey(contract.signingDate),
+      canBeReSigned,
+      requiredReSigningSalary: canBeReSigned
+        ? Math.round(updatedSalary * 1.15)
+        : undefined,
+      returnsToDraft: normalizedExpiryStatus === "UFA",
+      playerRating:
+        asNumber(player?.overallRating ?? player?.seasonRating) || undefined,
+    };
+  };
+  const draftBoundPlayerIds = new Set(
+    expiringRows
+      .filter(
+        (contract) =>
+          String(contract.expiryStatus ?? "")
+            .trim()
+            .toUpperCase() === "UFA",
+      )
+      .map((contract) => String(contract.playerId)),
+  );
+  const summerUfas = isWeeklyEditionSummerUfaPoolAvailable(
+    triggerDate,
+    signingEnd,
+  )
+    ? players
+        .filter((player) => {
+          const playerId = String(player._id);
+          return (
+            player.isActive &&
+            player.isSignable &&
+            asNumber(player.salary) > 0 &&
+            !draftBoundPlayerIds.has(playerId) &&
+            !relevantContracts.some(
+              (contract) =>
+                String(contract.playerId) === playerId &&
+                isWeeklyEditionPlayingContract(contract),
+            )
+          );
+        })
+        .map((player) => {
+          const updatedSalary = asNumber(player.salary);
+          return {
+            playerId: String(player._id),
+            playerName: player.fullName,
+            previousTeamName: player.ownerId
+              ? teamByOwnerId.get(String(player.ownerId))?.name
+              : undefined,
+            updatedSalary,
+            requiredUfaSalary: Math.round(updatedSalary * 1.25),
+            rosterTalent:
+              asNumber(player.overallRating ?? player.seasonRating) ||
+              undefined,
+          };
+        })
+        .sort(
+          (left, right) =>
+            (right.rosterTalent ?? 0) - (left.rosterTalent ?? 0) ||
+            right.requiredUfaSalary - left.requiredUfaSalary ||
+            left.playerName.localeCompare(right.playerName),
+        )
+        .slice(0, 24)
+    : [];
+  const buyoutCharges = relevantContracts
+    .filter(
+      (contract) =>
+        String(contract.expiryStatus ?? "")
+          .trim()
+          .toUpperCase() === "BUYOUT",
+    )
+    .map((contract) => ({
       contractId: String(contract._id),
       playerName:
         playerById.get(String(contract.playerId))?.fullName ?? "Unknown player",
       teamName:
         teamByOwnerId.get(String(contract.ownerId))?.name ?? "Unknown team",
-      salary,
-      expiryStatus,
-      expiryDate: dateKey(contract.expiryDate),
-      canBeReSigned,
-      requiredReSigningSalary: canBeReSigned
-        ? Math.round(salary * 1.15)
-        : undefined,
-      returnsToDraft: expiryStatus === "UFA",
-    };
-  };
+      capHit: asNumber(contract.capHit ?? contract.contractSalary),
+      capHitEndDate: dateKey(contract.capHitEndDate ?? contract.expiryDate),
+    }));
   const draftFacts = draftPicks.map((pick) => ({
     pickId: String(pick._id),
     teamName: teamById.get(String(pick.gshlTeamId))?.name ?? "Unknown team",
@@ -1290,9 +1562,17 @@ async function buildMilestoneSource(
       pick.pick === null || pick.pick === undefined
         ? undefined
         : asNumber(pick.pick),
-    selectedPlayerName: pick.playerId
-      ? playerById.get(String(pick.playerId))?.fullName
-      : undefined,
+    selectedPlayerName:
+      issueType === "preseason" && pick.playerId
+        ? playerById.get(String(pick.playerId))?.fullName
+        : undefined,
+    selectedPlayerRating:
+      issueType === "preseason" && pick.playerId
+        ? asNumber(
+            playerById.get(String(pick.playerId))?.overallRating ??
+              playerById.get(String(pick.playerId))?.seasonRating,
+          ) || undefined
+        : undefined,
   }));
   const teamOutlooks = [...teamById.values()].map((team) => {
     const rosterPlayerIds = new Set(
@@ -1315,13 +1595,11 @@ async function buildMilestoneSource(
     const roster = [...rosterPlayerIds]
       .map((playerId) => playerById.get(playerId))
       .filter((player) => player !== undefined);
-    const ratings = roster
-      .map((player) =>
-        asNumber(player.overallRating ?? player.seasonRating ?? 0),
-      )
-      .filter((rating) => rating > 0);
     const ownerContracts = relevantContracts.filter(
       (contract) => String(contract.ownerId) === team.ownerId,
+    );
+    const playingOwnerContracts = ownerContracts.filter(
+      isWeeklyEditionPlayingContract,
     );
     const committedSalary = ownerContracts.reduce(
       (total, contract) =>
@@ -1334,14 +1612,12 @@ async function buildMilestoneSource(
     return {
       teamId: team.teamId,
       teamName: team.name,
-      capSpace: Math.max(0, 25_000_000 - committedSalary),
+      capSpace: 25_000_000 - committedSalary,
       committedSalary,
       rosterSize: roster.length,
       rosterTalent:
-        ratings.length > 0
-          ? ratings.reduce((total, rating) => total + rating, 0) /
-            ratings.length
-          : asNumber(latestPowerByTeam.get(team.teamId)?.powerTalent),
+        calculateDraftRosterTalentRating(roster) ??
+        asNumber(latestPowerByTeam.get(team.teamId)?.powerTalent),
       expiringCount: expiringRows.filter(
         (contract) => String(contract.ownerId) === team.ownerId,
       ).length,
@@ -1349,14 +1625,60 @@ async function buildMilestoneSource(
       firstRoundPickCount: teamDraftPicks.filter(
         (pick) => asNumber(pick.round) === 1,
       ).length,
+      draftSelectionsConsumed: playingOwnerContracts.length,
     };
   });
-  const currentPowerByTeam = new Map(
-    [...latestPowerByTeam.entries()].map(([teamId, row]) => [teamId, row]),
+  const teamWeekByTeamAndWeek = new Map(
+    teamWeekRows.map((row) => [
+      `${String(row.gshlTeamId)}:${String(row.weekId)}`,
+      row,
+    ]),
   );
+  const recapMatchups =
+    issueType === "final_recap"
+      ? [
+          ...seasonMatchups
+            .filter(
+              (matchup) =>
+                matchup.isComplete &&
+                ["F", "SF", "QF"].includes(String(matchup.gameType)),
+            )
+            .sort(
+              (left, right) =>
+                (weekNumById.get(String(left.weekId)) ?? 0) -
+                  (weekNumById.get(String(right.weekId)) ?? 0) ||
+                String(left._id).localeCompare(String(right._id)),
+            ),
+          ...seasonMatchups
+            .filter(
+              (matchup) =>
+                matchup.isComplete &&
+                ["CC", "NC"].includes(String(matchup.gameType)),
+            )
+            .sort(
+              (left, right) =>
+                asNumber(right.ratingImportance) -
+                  asNumber(left.ratingImportance) ||
+                asNumber(right.ratingCompetitive) -
+                  asNumber(left.ratingCompetitive),
+            )
+            .slice(0, 18),
+        ]
+      : [];
   const finalEditorialCandidates =
     issueType === "final_recap"
       ? (await buildSource(ctx, season, anchorWeek)).editorialCandidates
+      : [];
+  const gmRankings =
+    issueType === "preseason"
+      ? await buildPreseasonGmRankingFacts(
+          ctx,
+          allSeasons.filter(
+            (candidate) => asNumber(candidate.year) <= asNumber(season.year),
+          ),
+          franchises,
+          conferences,
+        )
       : [];
 
   return buildMilestoneEditionFactPacket({
@@ -1389,7 +1711,7 @@ async function buildMilestoneSource(
     teams: [...teamById.values()].map(({ ownerId: _ownerId, ...team }) => team),
     matchups:
       issueType === "final_recap"
-        ? finalMatchups.map((matchup) => ({
+        ? recapMatchups.map((matchup) => ({
             matchupId: String(matchup._id),
             gameType: String(matchup.gameType),
             homeTeamId: String(matchup.homeTeamId),
@@ -1418,9 +1740,13 @@ async function buildMilestoneSource(
                 sourceTeamById.get(String(matchup.awayTeamId))?.name ??
                 "Unknown team",
               homeStats:
-                currentPowerByTeam.get(String(matchup.homeTeamId)) ?? {},
+                teamWeekByTeamAndWeek.get(
+                  `${String(matchup.homeTeamId)}:${String(matchup.weekId)}`,
+                ) ?? {},
               awayStats:
-                currentPowerByTeam.get(String(matchup.awayTeamId)) ?? {},
+                teamWeekByTeamAndWeek.get(
+                  `${String(matchup.awayTeamId)}:${String(matchup.weekId)}`,
+                ) ?? {},
             }),
           }))
         : [],
@@ -1447,10 +1773,17 @@ async function buildMilestoneSource(
       previousRank: row.powerRk,
       currentElo: row.powerEloPost ?? row.powerElo,
       previousElo: row.powerEloPost ?? row.powerElo,
+      talentRating: row.powerTalent,
     })),
     teamOutlooks,
     expiringContracts: expiringRows.map(contractFact),
     recentSignings: recentRows.map(contractFact),
+    signedPlayers: relevantContracts
+      .filter(isWeeklyEditionPlayingContract)
+      .map(contractFact),
+    summerUfas,
+    buyoutCharges,
+    gmRankings,
     draftPicks: draftFacts,
     editorialCandidates: finalEditorialCandidates,
   });

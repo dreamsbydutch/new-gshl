@@ -25,6 +25,8 @@ import { normalizeDateOnlyValue } from "../core/date";
 import { ContractStatus, ContractType } from "../domain/constants";
 
 export const WEEKLY_EDITION_SECTION_KINDS = [
+  "primary_article",
+  "standard_article",
   "biggest_story",
   "matchup_roundup",
   "three_stars",
@@ -50,6 +52,15 @@ export const WEEKLY_EDITION_ISSUE_LABELS = {
   pre_draft: "Pre-Draft Issue",
   preseason: "Preseason Preview",
 } as const;
+
+const WEEKLY_EDITION_ARTICLE_SLOTS = [
+  { id: "article_1", kind: "primary_article" },
+  { id: "article_2", kind: "primary_article" },
+  { id: "article_3", kind: "standard_article" },
+  { id: "article_4", kind: "standard_article" },
+  { id: "article_5", kind: "standard_article" },
+  { id: "article_6", kind: "standard_article" },
+] as const;
 
 function shiftEditionDate(value: string, days: number) {
   const date = new Date(`${value.slice(0, 10)}T12:00:00.000Z`);
@@ -902,6 +913,7 @@ export function buildWeeklyEditionFactPacket(
       const previousRank = numberValue(team.previousRank);
       const currentElo = optionalNumber(team.currentElo);
       const previousElo = optionalNumber(team.previousElo);
+      const talentRating = optionalNumber(team.talentRating);
       return {
         teamId: team.teamId,
         teamName: team.teamName,
@@ -909,6 +921,7 @@ export function buildWeeklyEditionFactPacket(
         previousRank,
         rankChange: previousRank - currentRank,
         currentElo,
+        talentRating,
         eloChange:
           currentElo !== undefined && previousElo !== undefined
             ? currentElo - previousElo
@@ -967,6 +980,7 @@ export function buildMilestoneEditionFactPacket(
       const previousRank = numberValue(team.previousRank);
       const currentElo = optionalNumber(team.currentElo);
       const previousElo = optionalNumber(team.previousElo);
+      const talentRating = optionalNumber(team.talentRating);
       return {
         teamId: team.teamId,
         teamName: team.teamName,
@@ -974,6 +988,7 @@ export function buildMilestoneEditionFactPacket(
         previousRank,
         rankChange: previousRank - currentRank,
         currentElo,
+        talentRating,
         eloChange:
           currentElo !== undefined && previousElo !== undefined
             ? currentElo - previousElo
@@ -1017,6 +1032,26 @@ export function buildMilestoneEditionFactPacket(
         (left, right) =>
           right.salary - left.salary ||
           left.playerName.localeCompare(right.playerName),
+      ),
+      signedPlayers: [...(input.signedPlayers ?? [])].sort(
+        (left, right) =>
+          left.teamName.localeCompare(right.teamName) ||
+          right.salary - left.salary ||
+          left.playerName.localeCompare(right.playerName),
+      ),
+      summerUfas: [...(input.summerUfas ?? [])].sort(
+        (left, right) =>
+          (right.rosterTalent ?? 0) - (left.rosterTalent ?? 0) ||
+          right.requiredUfaSalary - left.requiredUfaSalary ||
+          left.playerName.localeCompare(right.playerName),
+      ),
+      buyoutCharges: [...(input.buyoutCharges ?? [])].sort(
+        (left, right) =>
+          right.capHit - left.capHit ||
+          left.playerName.localeCompare(right.playerName),
+      ),
+      gmRankings: [...(input.gmRankings ?? [])].sort(
+        (left, right) => left.rank - right.rank,
       ),
       draftPicks: [...input.draftPicks].sort(
         (left, right) =>
@@ -1177,6 +1212,44 @@ function conferenceAuthor(
     conferenceId: team.conferenceId,
     conferenceName: team.conferenceName,
   };
+}
+
+function weeklyEditionAuthorCoverage(author: WeeklyEditionAuthor) {
+  if (author.name === WEEKLY_EDITION_STAFF.editorInChief.name) {
+    return "Rare league-process, governance, rule-change, or major institutional stories only.";
+  }
+  if (author.name === WEEKLY_EDITION_STAFF.headOfAnalytics.name) {
+    return "Only the edition's biggest performance, record, milestone, ranking, or data-led investigation.";
+  }
+  if (author.name === WEEKLY_EDITION_STAFF.analyticsReporter.name) {
+    return "Regular standout player and team performances, category results, records, milestones, and statistical trends.";
+  }
+  if (author.name === WEEKLY_EDITION_STAFF.headInsider.name) {
+    return "Only the edition's biggest signing, trade, contract, cap, or roster-management story.";
+  }
+  if (author.name === WEEKLY_EDITION_STAFF.insider.name) {
+    return "Regular signings, trades, adds, drops, contract decisions, cap developments, and transaction analysis.";
+  }
+  if (author.name === WEEKLY_EDITION_STAFF.nationalReporter.name) {
+    return "League-wide results, championship and season narratives, power structure, draft outlooks, and preseason forecasts.";
+  }
+  if (author.scope === "team") {
+    return `Only stories specifically centered on ${author.teamName ?? "the assigned team"}, written from that team's perspective with a very light favourable bias.`;
+  }
+  return `Stories centered on ${author.conferenceName ?? "the assigned conference"}, framed through that conference while remaining fair to the rest of the league.`;
+}
+
+export function buildWeeklyEditionAuthorRoster(
+  packet: WeeklyEditionFactPacket,
+) {
+  return uniqueAuthors([
+    ...Object.values(WEEKLY_EDITION_STAFF).map((author) => ({ ...author })),
+    ...packet.teams.map(conferenceAuthor),
+    ...packet.teams.map(teamAuthor),
+  ]).map((author) => ({
+    author,
+    writesAbout: weeklyEditionAuthorCoverage(author),
+  }));
 }
 
 function teamFocusForSection(
@@ -1687,17 +1760,21 @@ function contractReturnsToDraft(contract: {
 
 function requiredReSigningSalary(contract: {
   salary: number;
+  updatedSalary?: number;
   requiredReSigningSalary?: number;
 }) {
-  return contract.requiredReSigningSalary ?? Math.round(contract.salary * 1.15);
+  return (
+    contract.requiredReSigningSalary ??
+    Math.round((contract.updatedSalary ?? contract.salary) * 1.15)
+  );
 }
 
 function contractOutcomeSummary(contract: WeeklyEditionContractFact) {
   if (contractReturnsToDraft(contract)) {
-    return `${contract.playerName}'s UFA expiry sends the player automatically back to the draft; the player cannot be re-signed or signed during the summer.`;
+    return `${contract.playerName}'s expiry status is UFA, so this contract is not renewable and the player returns to the draft instead of entering Summer Free Agency from this expiry.`;
   }
   if (contractCanBeReSigned(contract)) {
-    return `${contract.playerName} can be re-signed at ${money(requiredReSigningSalary(contract))}, exactly 115% of the prior ${money(contract.salary)} salary.`;
+    return `${contract.playerName}'s expiry status is RFA, so the eligible current team may re-sign the player at ${money(requiredReSigningSalary(contract))}, exactly 115% of the updated ${money(contract.updatedSalary ?? contract.salary)} salary.`;
   }
   return `${contract.playerName}'s ${contract.expiryStatus || "contract"} expiry requires no re-signing projection from the Press Box.`;
 }
@@ -1742,24 +1819,18 @@ function buildMilestoneTemplateEditionCopy(
     )[0];
   const expiring = facts.expiringContracts.slice(0, 8);
   const signings = facts.recentSignings.slice(0, 8);
-  const draftBoundUfas = facts.expiringContracts
-    .filter(contractReturnsToDraft)
-    .sort(
-      (left, right) =>
-        right.salary - left.salary ||
-        left.playerName.localeCompare(right.playerName),
-    );
+  const summerUfas = facts.summerUfas ?? [];
   const ufaFitSummary = [...facts.teamOutlooks]
     .sort((left, right) => right.capSpace - left.capSpace)
     .slice(0, 6)
     .map((team) => {
-      const target = draftBoundUfas.find(
-        (contract) => contract.salary <= team.capSpace,
+      const target = summerUfas.find(
+        (player) => player.requiredUfaSalary <= team.capSpace,
       );
       if (!target) {
-        return `${team.teamName} has ${money(team.capSpace)} in cap space, but no draft-bound UFA on the current board fits beneath that amount based on prior salary.`;
+        return `${team.teamName} has ${money(team.capSpace)} in cap space, but no confirmed Summer UFA in the supplied market fits beneath that amount at the required 125% salary.`;
       }
-      return `${team.teamName} has ${money(team.capSpace)} in cap space, making ${target.playerName}—previously at ${money(target.salary)}—a plausible draft-board target rather than a direct summer signing.`;
+      return `${team.teamName} has ${money(team.capSpace)} in cap space, enough for a possible offer to confirmed Summer UFA ${target.playerName} at ${money(target.requiredUfaSalary)}; the seven-day matching process means the destination is not guaranteed.`;
     })
     .join(" ");
   const draftPositionSummary = facts.teamOutlooks
@@ -1904,8 +1975,8 @@ function buildMilestoneTemplateEditionCopy(
         section(
           "ufa_market",
           "Potential Market",
-          "Expired UFAs are draft-bound, not summer targets",
-          "Only RFAs can be retained in the re-signing window, at exactly 115% of their prior salary. Every expired UFA returns automatically to the draft, where cap room and open roster spots become draft-day leverage.",
+          "Expiry status decides the re-signing board",
+          "An RFA expiry may be renewed by the eligible current team at 115% of the player's updated salary. A UFA expiry is not renewable and returns to the draft. Summer Free Agency is a separate pool formed from eligible players who remain unsigned after the late deadline.",
           [],
         ),
         section(
@@ -1929,9 +2000,9 @@ function buildMilestoneTemplateEditionCopy(
         section(
           "ufa_market",
           "UFA Fits",
-          "Cap space points toward the most plausible draft targets",
+          "Cap space points toward possible Summer UFA offers",
           ufaFitSummary ||
-            "No draft-bound UFA and cap-space pairings were available.",
+            "No confirmed Summer UFA and cap-space pairings were available.",
           [],
         ),
         section(
@@ -2138,9 +2209,150 @@ function allText(content: WeeklyEditionContent) {
   ].join("\n");
 }
 
+function validateWeeklyEditionRuleClaims(
+  content: WeeklyEditionContent,
+  packet: WeeklyEditionFactPacket,
+) {
+  const errors: string[] = [];
+  const text = allText(content);
+  const sentences = text
+    .split(/\n|(?<=[.!?])\s+/)
+    .map((sentence) => sentence.trim())
+    .filter(Boolean);
+
+  if (
+    /115%\s+of\s+(?:the\s+)?(?:prior|previous|old|expiring|contract)\s+salary/i.test(
+      text,
+    )
+  ) {
+    errors.push(
+      "RFA re-signing salary must be based on the updated GSHL salary, not the prior contract salary.",
+    );
+  }
+  if (
+    /(?:drafted|draft-selected)\s+players?.{0,45}(?:count|counts|counting)\s+against\s+the\s+(?:salary\s+)?cap/i.test(
+      text,
+    )
+  ) {
+    errors.push(
+      "Drafted players do not count against the salary cap unless they later sign a GSHL contract.",
+    );
+  }
+  if (
+    sentences.some((sentence) =>
+      /\brfa(?:\s+\w+){0,4}\s+(?:costs?|at|requires?|is|would\s+be)\s+125%/i.test(
+        sentence,
+      ),
+    )
+  ) {
+    errors.push(
+      "An RFA re-signing costs 115% of the updated GSHL salary, not 125%.",
+    );
+  }
+  if (
+    sentences.some((sentence) =>
+      /summer\s+(?:ufa|free\s+agent|free\s+agency)(?:\s+\w+){0,5}\s+(?:costs?|at|requires?|is|would\s+be)\s+115%/i.test(
+        sentence,
+      ),
+    )
+  ) {
+    errors.push(
+      "A Summer UFA contract costs 125% of the updated GSHL salary, not 115%.",
+    );
+  }
+
+  for (const contract of packet.milestone?.expiringContracts ?? []) {
+    const name = contract.playerName.toLowerCase();
+    const related = sentences.filter((sentence) =>
+      sentence.toLowerCase().includes(name),
+    );
+    const expiryStatus = normalizedExpiryStatus(contract);
+    for (const sentence of related) {
+      if (
+        expiryStatus === String(ContractStatus.RFA) &&
+        /(?:cannot|can't|may not|not eligible to).{0,35}re-?sign|(?:must|will|automatically).{0,35}(?:return|go|head).{0,20}(?:the\s+)?draft|draft-bound/i.test(
+          sentence,
+        )
+      ) {
+        errors.push(
+          `${contract.playerName} has an RFA expiry and cannot be described as ineligible to re-sign or automatically draft-bound.`,
+        );
+      }
+      if (
+        expiryStatus === String(ContractStatus.UFA) &&
+        /(?:can|could|may|eligible to).{0,35}(?:be\s+)?re-?sign|(?:summer\s+ufa|summer\s+free\s+agency).{0,35}(?:target|option|fit|signing)|(?:target|option|fit).{0,35}(?:summer\s+ufa|summer\s+free\s+agency)/i.test(
+          sentence,
+        )
+      ) {
+        errors.push(
+          `${contract.playerName} has a UFA expiry and must be treated as draft-bound, not re-signable or available in Summer Free Agency.`,
+        );
+      }
+
+      const statedSigningStatus =
+        /signed\s+(?:as|via|through)\s+(?:an?\s+)?(drafted|rfa|ufa)\b/i.exec(
+          sentence,
+        )?.[1];
+      if (statedSigningStatus && contract.signingStatus) {
+        const expected = contract.signingStatus.toLowerCase();
+        const stated =
+          statedSigningStatus.toLowerCase() === "drafted"
+            ? "drafted"
+            : statedSigningStatus.toLowerCase();
+        if (expected !== stated) {
+          errors.push(
+            `${contract.playerName}'s signing status is ${contract.signingStatus}; signing status cannot be inferred from expiry status.`,
+          );
+        }
+      }
+    }
+  }
+
+  for (const player of packet.milestone?.summerUfas ?? []) {
+    const related = sentences.filter((sentence) =>
+      sentence.toLowerCase().includes(player.playerName.toLowerCase()),
+    );
+    if (
+      related.some((sentence) =>
+        /(?:will|is certain to|is guaranteed to)\s+sign\s+with|guaranteed\s+(?:destination|signing)/i.test(
+          sentence,
+        ),
+      )
+    ) {
+      errors.push(
+        `${player.playerName}'s Summer UFA destination cannot be guaranteed before the seven-day matching process and signing algorithm are complete.`,
+      );
+    }
+  }
+
+  return errors;
+}
+
 function formatZodErrors(error: z.ZodError) {
   return error.issues.map(
     (issue) => `${issue.path.join(".") || "response"}: ${issue.message}`,
+  );
+}
+
+function weeklyEditionAvailableLinks(packet: WeeklyEditionFactPacket) {
+  const links = [
+    { label: "View schedule", href: "/schedule" },
+    { label: "View standings", href: "/standings" },
+    ...pressBoxMatchups(packet.matchups).map((matchup) => ({
+      label: "Open matchup",
+      href: `/matchup/${matchup.matchupId}`,
+    })),
+    ...pressBoxNextMatchups(packet.nextMatchups).map((matchup) => ({
+      label: "Open matchup",
+      href: `/matchup/${matchup.matchupId}`,
+    })),
+    ...pressBoxEditorialCandidates(packet).flatMap(
+      (candidate) => candidate.links,
+    ),
+  ];
+  return links.filter(
+    (link, index) =>
+      links.findIndex((candidate) => candidate.href === link.href) === index,
   );
 }
 
@@ -2153,42 +2365,26 @@ export function validateWeeklyEditionContent(
     return { valid: false, errors: formatZodErrors(parsed.error) };
 
   const errors: string[] = [];
-  const expected = buildTemplateWeeklyEdition(packet);
-  const expectedById = new Map(
-    expected.sections.map((item) => [item.id, item]),
+  const allowedAuthors = new Map(
+    buildWeeklyEditionAuthorRoster(packet).map(({ author }) => [
+      author.name.trim().toLowerCase(),
+      author,
+    ]),
   );
-  const content = {
-    ...parsed.data,
-    sections: parsed.data.sections.map((item) => ({
-      ...item,
-      author: item.author ?? expectedById.get(item.id)?.author,
-    })),
-  };
+  const allowedHrefs = new Set(
+    weeklyEditionAvailableLinks(packet).map((link) => link.href),
+  );
+  const content = parsed.data;
   const text = allText(content);
   if (/<\/?[a-z][^>]*>/i.test(text))
     errors.push("HTML is not allowed in edition copy.");
+  errors.push(...validateWeeklyEditionRuleClaims(content, packet));
 
   const seen = new Set<string>();
   const seenAuthorNames = new Set<string>();
   for (const [index, item] of content.sections.entries()) {
     if (seen.has(item.id)) errors.push(`Duplicate section ID: ${item.id}.`);
     seen.add(item.id);
-    const expectedSection = expectedById.get(item.id);
-    if (expectedSection?.kind !== item.kind) {
-      errors.push(`Unsupported section or kind: ${item.id}.`);
-      continue;
-    }
-    if (expected.sections[index]?.id !== item.id) {
-      errors.push(`Section ${item.id} is out of order.`);
-    }
-    if (item.eyebrow !== expectedSection.eyebrow) {
-      errors.push(`Eyebrow in ${item.id} must match the section plan.`);
-    }
-    if (
-      JSON.stringify(item.author) !== JSON.stringify(expectedSection.author)
-    ) {
-      errors.push(`Author in ${item.id} must match the section plan.`);
-    }
     if (item.author) {
       const authorKey = item.author.name.trim().toLowerCase();
       if (seenAuthorNames.has(authorKey)) {
@@ -2197,13 +2393,36 @@ export function validateWeeklyEditionContent(
         );
       }
       seenAuthorNames.add(authorKey);
+      const allowedAuthor = allowedAuthors.get(authorKey);
+      if (!allowedAuthor) {
+        errors.push(`${item.author.name} is not an approved Press Box author.`);
+      } else if (
+        JSON.stringify(item.author) !== JSON.stringify(allowedAuthor)
+      ) {
+        errors.push(
+          `Author details for ${item.author.name} must match the newsroom roster.`,
+        );
+      } else {
+        const matches = referencedTeams(item, packet);
+        if (
+          allowedAuthor.scope === "team" &&
+          !matches.some((match) => match.team.teamId === allowedAuthor.teamId)
+        ) {
+          errors.push(
+            `${allowedAuthor.name} may write only an article specifically centered on ${allowedAuthor.teamName}.`,
+          );
+        }
+      }
+    } else {
+      errors.push(`Article ${index + 1} must have an approved author.`);
     }
-    if (JSON.stringify(item.links) !== JSON.stringify(expectedSection.links))
-      errors.push(`Links in ${item.id} must match the verified fact packet.`);
-  }
-  for (const expectedSection of expected.sections) {
-    if (!seen.has(expectedSection.id))
-      errors.push(`Missing required section: ${expectedSection.id}.`);
+    for (const link of item.links) {
+      if (!allowedHrefs.has(link.href)) {
+        errors.push(
+          `Link ${link.href} is not available in the verified fact packet.`,
+        );
+      }
+    }
   }
 
   return {
@@ -2264,10 +2483,11 @@ function shortenImportedText(value: unknown, maximum: number) {
 function normalizeWeeklyEditionImportLengths(value: unknown): unknown {
   if (!isUnknownRecord(value)) return value;
   const sections = Array.isArray(value.sections)
-    ? value.sections.map((section: unknown) =>
-        isUnknownRecord(section)
+    ? value.sections.map((section: unknown, index: number) =>
+        isUnknownRecord(section) && WEEKLY_EDITION_ARTICLE_SLOTS[index]
           ? {
               ...section,
+              ...WEEKLY_EDITION_ARTICLE_SLOTS[index],
               headline: shortenImportedText(section.headline, 90),
               body: shortenImportedText(section.body, 1000),
             }
@@ -2294,13 +2514,187 @@ export function filterWeeklyEditionContent(
   };
 }
 
+function dayAfter(dateKey: string | undefined) {
+  if (!dateKey) return undefined;
+  const parsed = new Date(`${dateKey}T12:00:00.000Z`);
+  if (Number.isNaN(parsed.getTime())) return undefined;
+  parsed.setUTCDate(parsed.getUTCDate() + 1);
+  return parsed.toISOString().slice(0, 10);
+}
+
+export function isWeeklyEditionSummerUfaPoolAvailable(
+  triggerDate: string,
+  signingDeadline: string | undefined,
+) {
+  return Boolean(signingDeadline && triggerDate > signingDeadline);
+}
+
+export function buildWeeklyEditionRuleContext(packet: WeeklyEditionFactPacket) {
+  const milestone = packet.milestone;
+  const signingDeadline = milestone?.analysisSeasonSigningEndDate;
+  const draftStartAt = milestone?.analysisSeasonDraftStartAt;
+  const seasonFrame = milestone
+    ? packet.issueType === "final_recap"
+      ? {
+          completedSeason: {
+            id: packet.season.id,
+            name: packet.season.name,
+            endDate: packet.season.endDate,
+          },
+          issueTriggerDate: milestone.triggerDate,
+          timeZone: "America/Toronto",
+        }
+      : {
+          completedSeason: {
+            id: packet.season.id,
+            name: packet.season.name,
+            endDate: packet.season.endDate,
+          },
+          upcomingSeason: {
+            id: milestone.analysisSeasonId,
+            name: milestone.analysisSeasonName,
+          },
+          issueTriggerDate: milestone.triggerDate,
+          timeZone: "America/Toronto",
+          contractCoverage:
+            "A contract signed during the completed season's signing cycle starts with the upcoming season and covers one, two, or three future GSHL seasons.",
+        }
+    : {
+        activeSeason: {
+          id: packet.season.id,
+          name: packet.season.name,
+        },
+        coveredWeek: packet.week,
+        timeZone: "America/Toronto",
+      };
+  const statusFields = {
+    signingStatus:
+      "Records how the current contract was signed. It is provenance only and must never be used to decide whether the player can be re-signed when the contract expires.",
+    expiryStatus:
+      "Records the player's re-signing rights when this contract expires. It is authoritative for renewal eligibility and must never be used to claim how the current contract was originally signed.",
+    rfaExpiry:
+      "expiryStatus=RFA means the eligible current team may re-sign the player during an active signing period at exactly 115% of the player's updated GSHL salary.",
+    ufaExpiry:
+      "expiryStatus=UFA means the contract cannot be renewed. The player returns to the GSHL Draft and must not be presented as a Summer Free Agency target.",
+    consecutiveContractLimit:
+      "A player may play under no more than two consecutive contracts. The expiryStatus supplied in EDITION_FACTS is the authoritative result of that lifecycle; do not recalculate it from signingStatus.",
+    summerUfa:
+      "Summer UFA is a separate post-deadline player state, not an inference from expiryStatus=UFA. Only players explicitly listed in summerUfas are confirmed Summer Free Agency targets.",
+  };
+  const capRules = {
+    hardCap: milestone?.salaryCap ?? 25_000_000,
+    counts:
+      "Players under GSHL contract and active buyout cap charges count against the cap in every season they cover.",
+    doesNotCount:
+      "Ordinary drafted players do not count against the salary cap unless they later sign a GSHL contract.",
+    noRelief:
+      "There is no salary retention, proration, cap exception, retained salary, or other cap-relief mechanism.",
+    buyouts:
+      "Dropping a contracted player triggers an immediate buyout. The cap charge is 50% of salary for the remaining contract years; a final-year buyout also carries that 50% charge through the following GSHL season. Buyout charges cannot be traded or retained and do not consume draft selections.",
+    interpretation:
+      "Negative capSpace means a team is over the cap; do not silently convert it to zero. A team cannot complete a signing or trade that puts it over the hard cap in any covered season.",
+  };
+  const signingRules = {
+    terms: "Every new GSHL contract is one, two, or three years.",
+    salaryBasis:
+      "Use the player's updated GSHL salary for a new contract. Do not calculate a new deal from the salary on the expiring contract.",
+    eligibility:
+      "A player is eligible only after spending more than two-thirds of the regular season on the signing team's roster by player-days, or more than two-thirds on any GSHL roster by player-days. A player-day is one roster spot for one calendar day.",
+    earlySigningPeriod: "December 15 through December 31.",
+    lateSigningPeriod: {
+      description:
+        "Runs from the end of the GSHL Playoffs through the end of the NHL Playoffs.",
+      deadline: signingDeadline,
+    },
+  };
+  const summerRules = {
+    window: {
+      opens: dayAfter(signingDeadline),
+      closes: draftStartAt,
+      timeZone: "America/Toronto",
+    },
+    pool: "At the end of the Late Signing Period, each eligible player who is still unsigned becomes a Summer UFA. This does not override an expiryStatus=UFA instruction that sends a completed contract back to the draft.",
+    price:
+      "A confirmed Summer UFA costs exactly 125% of the player's updated GSHL salary for a one-, two-, or three-year term.",
+    offerProcess:
+      "An offer is binding and remains open for seven days. Other teams may match it. With no match, the original team signs the player; with multiple matching offers, the probabilistic UFA Signing Algorithm chooses the team.",
+    algorithm:
+      "The algorithm considers Owner Ladder ranking, previous-season performance, other contracted players, contract length, team situation and roster construction, plus randomized weighting. No destination is guaranteed.",
+  };
+  const draftRules = {
+    format:
+      "The draft has 15 rounds. The standard order is Round 1 forward, Round 2 forward, Round 3 reverse, Round 4 forward, then alternating.",
+    keeperCost:
+      "Each contracted player consumes one of the team's latest available draft selections. Buyout charges do not consume draft selections.",
+    editorialUse:
+      "The routine 15-slot allotment is not an advantage or storyline. Discuss actual selection order, early position, keeper-consumed selections, roster needs, player fit and board decisions.",
+  };
+  const matchupRules = {
+    playoffOrder:
+      "F means Final, SF means Semifinal and QF means Quarterfinal. Playoff games are major stories ordered F, then SF, then QF.",
+    loserTournament:
+      "LT means Loser Tournament. LT games must not be a lead, headline, primary article or meaningful supporting focus.",
+  };
+
+  const common = {
+    authority:
+      "This RULEBOOK_CONTEXT is authoritative. EDITION_FACTS is authoritative for people, teams, amounts, dates and events. If either source does not establish a claim, write it conditionally or say it is unknown.",
+    seasonFrame,
+  };
+  switch (packet.issueType) {
+    case "weekly":
+      return { ...common, matchupRules };
+    case "final_recap":
+      return { ...common, matchupRules };
+    case "resigning_outlook":
+      return { ...common, statusFields, capRules, signingRules };
+    case "offseason_market":
+      return {
+        ...common,
+        statusFields,
+        capRules,
+        signingRules,
+        summerRules,
+        draftRules,
+      };
+    case "pre_draft":
+      return { ...common, capRules, draftRules };
+    case "preseason":
+      return { ...common, capRules, draftRules };
+  }
+}
+
 export function buildWeeklyEditionChatGptPrompt(
   packet: WeeklyEditionFactPacket,
 ) {
-  const template = buildTemplateWeeklyEdition(packet);
+  const ruleContext = buildWeeklyEditionRuleContext(packet);
   const editorialMatchups = pressBoxMatchups(packet.matchups);
   const previewMatchups = pressBoxNextMatchups(packet.nextMatchups);
   const editorialCandidates = pressBoxEditorialCandidates(packet);
+  const newsroomAuthors = buildWeeklyEditionAuthorRoster(packet);
+  const availableLinks = weeklyEditionAvailableLinks(packet);
+  const notableFacts = editorialCandidates
+    .filter(
+      (candidate) =>
+        candidate.kind !== "matchup" &&
+        candidate.kind !== "transaction" &&
+        candidate.kind !== "missed_start" &&
+        !candidate.id.startsWith("power:") &&
+        !candidate.id.startsWith("performance:weekly-star:"),
+    )
+    .map((candidate) => ({
+      id: candidate.id,
+      type: candidate.kind,
+      scope: candidate.scope,
+      occurredAt: candidate.occurredAt,
+      playerId: candidate.playerId,
+      playerName: candidate.playerName,
+      teamId: candidate.teamId,
+      teamName: candidate.teamName,
+      summary: candidate.summary,
+      metrics: candidate.metrics,
+      links: candidate.links,
+    }));
   const milestone = packet.milestone;
   const analysisSeason = milestone
     ? {
@@ -2319,6 +2713,27 @@ export function buildWeeklyEditionChatGptPrompt(
         salaryCap: milestone.salaryCap,
       }
     : undefined;
+  const leagueSnapshot = {
+    snapshotAt:
+      milestone?.triggerDate ??
+      packet.week.endDate ??
+      packet.season.endDate ??
+      "",
+    publication: {
+      name: "GSHL Press Box",
+      leagueName: "Gem Stone Hockey League",
+      issueType: packet.issueType,
+      issueLabel: packet.issueLabel,
+    },
+    ratingGuide: {
+      playerRating:
+        "Overall player rating. Higher is better and it is the baseline measure of individual quality.",
+      teamTalentRating:
+        "The same weighted roster-talent rating shown in the Draft Hub: starters count twice and bench players once. Higher is better.",
+      gmRating:
+        "The historical GM Ladder rating based on results and accomplishments. It measures the manager's record, not current roster talent.",
+    },
+  };
   const promptTeamOutlooks = (milestone?.teamOutlooks ?? []).map((team) => ({
     teamId: team.teamId,
     teamName: team.teamName,
@@ -2328,22 +2743,95 @@ export function buildWeeklyEditionChatGptPrompt(
     rosterTalent: team.rosterTalent,
     expiringCount: team.expiringCount,
     firstRoundPickCount: team.firstRoundPickCount,
+    draftSelectionsConsumed: team.draftSelectionsConsumed,
+  }));
+  const signedPlayers = milestone?.signedPlayers ?? [];
+  const expiringContracts = milestone?.expiringContracts ?? [];
+  const teamProfiles = promptTeamOutlooks.map((team) => ({
+    ...team,
+    signedPlayers: signedPlayers.filter(
+      (contract) => contract.teamName === team.teamName,
+    ),
+    expiringContracts: expiringContracts.filter(
+      (contract) => contract.teamName === team.teamName,
+    ),
+    draftBoundExpiries: expiringContracts.filter(
+      (contract) =>
+        contract.teamName === team.teamName && contractReturnsToDraft(contract),
+    ),
+  }));
+  const championshipMatchup = editorialMatchups.find(
+    (matchup) => matchup.gameType === "F",
+  );
+  const draftProfiles = promptTeamOutlooks.map((team) => ({
+    teamId: team.teamId,
+    teamName: team.teamName,
+    signedRosterTalent: team.rosterTalent,
+    signedPlayerCount: team.rosterSize,
+    signedPlayers: signedPlayers.filter(
+      (contract) => contract.teamName === team.teamName,
+    ),
+    draftSelectionsConsumed: team.draftSelectionsConsumed,
+    earlyDraftPicks: (milestone?.draftPicks ?? [])
+      .filter((pick) => pick.teamName === team.teamName && pick.round <= 5)
+      .map((pick) => ({
+        round: pick.round,
+        pick: pick.pick,
+        selectedPlayerName: pick.selectedPlayerName,
+      })),
+  }));
+  const preseasonProfiles = promptTeamOutlooks.map((team) => ({
+    teamId: team.teamId,
+    teamName: team.teamName,
+    rosterTalent: team.rosterTalent,
+    rosterSize: team.rosterSize,
+    signedPlayers: signedPlayers.filter(
+      (contract) => contract.teamName === team.teamName,
+    ),
+    draftedPlayers: (milestone?.draftPicks ?? [])
+      .filter(
+        (pick) =>
+          pick.teamName === team.teamName && Boolean(pick.selectedPlayerName),
+      )
+      .map((pick) => ({
+        round: pick.round,
+        pick: pick.pick,
+        playerName: pick.selectedPlayerName,
+        playerRating: pick.selectedPlayerRating,
+      })),
   }));
   let facts: object;
   switch (packet.issueType) {
     case "weekly":
       facts = {
+        ...leagueSnapshot,
         issueType: packet.issueType,
         issueLabel: packet.issueLabel,
         season: packet.season,
         week: packet.week,
         matchups: editorialMatchups,
-        editorialCandidates,
+        standoutPlayers: packet.stars,
+        teamTalentRatings: packet.teams.flatMap((team) =>
+          team.talentRating === undefined
+            ? []
+            : [
+                {
+                  teamId: team.teamId,
+                  teamName: team.name,
+                  talentRating: team.talentRating,
+                },
+              ],
+        ),
+        powerMovement: packet.powerMovers,
+        transactions: packet.activity,
+        missedStarts: packet.missedStarts,
+        notableFacts,
         nextMatchups: previewMatchups,
       };
       break;
     case "final_recap":
       facts = {
+        ...leagueSnapshot,
         issueType: packet.issueType,
         issueLabel: packet.issueLabel,
         completedSeason: {
@@ -2352,90 +2840,107 @@ export function buildWeeklyEditionChatGptPrompt(
           year: packet.season.year,
           endDate: packet.season.endDate,
         },
-        finalWeek: packet.week,
-        finalMatchups: editorialMatchups,
-        finalStars: packet.stars,
+        championship: championshipMatchup
+          ? {
+              championTeamId: championshipMatchup.winnerTeamId,
+              championTeamName: championshipMatchup.winnerTeamName,
+              finalistTeamName: championshipMatchup.loserTeamName,
+              score: {
+                home: championshipMatchup.homeScore,
+                away: championshipMatchup.awayScore,
+              },
+              matchupId: championshipMatchup.matchupId,
+            }
+          : undefined,
+        seasonResults: editorialMatchups,
+        seasonHighlights: notableFacts,
+        seasonEndingPlayerPerformances: packet.stars,
         finalPowerRankings: packet.powerMovers,
-        editorialCandidates,
-        upcomingSeason: analysisSeason,
-        salaryCap: milestone?.salaryCap,
-        teamOutlooks: promptTeamOutlooks,
-        expiringContracts: milestone?.expiringContracts ?? [],
       };
       break;
     case "resigning_outlook":
       facts = {
+        ...leagueSnapshot,
         ...milestoneContext,
-        teamOutlooks: promptTeamOutlooks,
-        expiringContracts: milestone?.expiringContracts ?? [],
+        teams: teamProfiles,
+        buyoutCharges: milestone?.buyoutCharges ?? [],
       };
       break;
     case "offseason_market":
       facts = {
+        ...leagueSnapshot,
         ...milestoneContext,
-        teamOutlooks: promptTeamOutlooks,
-        expiringContracts: milestone?.expiringContracts ?? [],
+        teams: teamProfiles,
         recentSignings: milestone?.recentSignings ?? [],
-        earlyDraftBoard: (milestone?.draftPicks ?? []).filter(
-          (pick) => pick.round <= 3,
-        ),
+        summerUfas: milestone?.summerUfas ?? [],
+        buyoutCharges: milestone?.buyoutCharges ?? [],
       };
       break;
     case "pre_draft":
       facts = {
+        ...leagueSnapshot,
         ...milestoneContext,
-        teamOutlooks: promptTeamOutlooks,
-        earlyDraftBoard: (milestone?.draftPicks ?? []).filter(
-          (pick) => pick.round <= 3,
-        ),
+        teamDraftProfiles: draftProfiles,
       };
       break;
     case "preseason":
       facts = {
+        ...leagueSnapshot,
         ...milestoneContext,
-        teamOutlooks: promptTeamOutlooks,
-        draftedPlayers: (milestone?.draftPicks ?? []).filter(
-          (pick) => pick.selectedPlayerName,
-        ),
+        teamRosterProfiles: preseasonProfiles,
+        gmLadder: milestone?.gmRankings ?? [],
       };
       break;
   }
-  const sectionPlan = template.sections.map((section) => ({
-    id: section.id,
-    kind: section.kind,
-    eyebrow: section.eyebrow,
-    author: section.author,
-    links: section.links,
-  }));
+  const outputContract = {
+    layout:
+      "Exactly six articles in order. Articles 1 and 2 are the two primary stories shown side by side. Articles 3 through 6 are standard stories in the two-column grid.",
+    articleSlots: WEEKLY_EDITION_ARTICLE_SLOTS,
+    requiredArticleFields: [
+      "id",
+      "kind",
+      "eyebrow",
+      "headline",
+      "body",
+      "author",
+      "links",
+    ],
+    authorRule:
+      "Choose one approved NEWSROOM_AUTHORS author per article and copy that author object exactly. All six bylines must be different.",
+    linksRule:
+      "Use zero or more entries from AVAILABLE_LINKS. Never invent a URL.",
+  };
   return [
-    "PROMPT_FORMAT=editorial_context_v4",
+    "PROMPT_FORMAT=league_snapshot_v6",
     "You are the editor of the GSHL Press Box, a fantasy-hockey league newspaper covering the Gem Stone Hockey League.",
-    "Write a polished edition with the confidence, rhythm and specificity of a modern hockey feature desk. It should feel authored, not assembled: vary sentence length, avoid generic recap language and stat-listing, and give every article a distinct reason to exist.",
-    "Create original storylines from the supplied facts by finding tension, contrast, momentum, pressure, irony and plausible stakes. Add small recurring quirks, callbacks, colorful metaphors, playful labels for situations and subtle chirps so the edition develops its own personality.",
-    "Creative framing may be invented; factual claims may not. Do not invent events, quotes, relationships, motives, injuries, rules, player or team names, scores, statistics, transactions or historical claims. A joke or narrative flourish must remain clearly rhetorical and must not masquerade as a new fact.",
-    `NEWSROOM STAFF: ${WEEKLY_EDITION_STAFF.editorInChief.name}, Editor-in-Chief, writes only rarely about league process or rule changes; ${WEEKLY_EDITION_STAFF.headOfAnalytics.name}, Head of Analytics, handles only the biggest and less frequent performance, record, and data-led lead stories; ${WEEKLY_EDITION_STAFF.analyticsReporter.name}, Analytics Reporter, handles the regular standout daily and weekly performance coverage; ${WEEKLY_EDITION_STAFF.headInsider.name}, GSHL Head Insider, handles only the biggest and less frequent signings, trades, and roster moves; ${WEEKLY_EDITION_STAFF.insider.name}, GSHL Insider, handles the regular transaction wire.`,
-    "Every section has an assigned author in SECTION_PLAN. Preserve that author object exactly. A team beat writer appears only when the article is specifically centered on that writer’s team; keep the article anchored to that team’s perspective with a very light preference, without becoming a fan blog, attacking opponents or changing the facts. Never make a team beat writer narrate a broad league roundup. Conference reporters may frame a story through their conference, but remain fair.",
-    "Every article must have a different reporter. Never reuse a byline within the same edition; the six unique assignments in SECTION_PLAN are final.",
-    "EDITION_FACTS may contain ranked story candidates from matchups, performances, records, milestones, awards, and league activity. Use editorial judgment to choose the most important lead and supporting angles; importance is guidance, not a command.",
-    "LEAGUE CONTRACT RULES: An expiring UFA cannot be re-signed by the current team and cannot be signed by any team during the summer. Every expired UFA automatically returns to the draft. An expiring RFA may be re-signed by the current team at exactly 115% of the prior salary. Never describe an expired UFA as a summer signing target or imply that cap space can be used to sign one directly.",
-    ...(packet.issueType === "weekly"
-      ? []
-      : [
-          "DRAFT CONTEXT: Every team always has exactly 15 draft picks. That equal allotment is routine infrastructure, not a storyline, advantage, disadvantage or measure of draft capital. Never compare teams by total pick count. Focus draft coverage on selection order, early-round position, roster need, player fit and the decisions created by the board.",
-        ]),
-    ...(packet.issueType === "offseason_market"
+    "EDITION_FACTS is a timestamped snapshot of the league at publication time. It is context, not an article assignment or outline. Use your own editorial judgment and creativity to decide every story, angle, headline, connection and emphasis.",
+    "NEWSROOM_AUTHORS is the complete author roster. Each entry describes that reporter's role and eligible beat. Choose authors after choosing the stories, copy each selected author object exactly, and never use one reporter twice in the edition.",
+    "A team beat writer is eligible only for an article centered on that writer's team. A conference reporter is eligible only for an article centered on that conference.",
+    "Factual claims must be supported by EDITION_FACTS or RULEBOOK_CONTEXT. Do not invent events, quotes, relationships, motives, injuries, rules, names, scores, statistics, transactions or historical claims. Clearly rhetorical color is allowed when it does not imply a new fact.",
+    "Use the supplied ratings as the baseline for league hierarchy and broad judgments, then use the surrounding events and details to explain or challenge that baseline. Ratings may support playful hockey-style chirps about strong and weak players, rosters, and GM track records, but keep the chirps proportionate to the evidence and distinguish player quality, roster talent, and GM performance.",
+    "Use RULEBOOK_CONTEXT as the source of truth for league process. Apply only the rule blocks included for this edition. Do not substitute NHL rules or ordinary fantasy-hockey assumptions.",
+    ...(["resigning_outlook", "offseason_market"].includes(packet.issueType)
       ? [
-          "OFFSEASON REVIEW PRIORITIES: Lead with which teams have meaningful cap space and which draft-bound UFAs they could realistically afford based on the supplied prior salaries. Then examine early-round draft position and the strongest rosters entering next season. Connect cap room, UFA targets, draft order and roster quality into specific team storylines instead of treating them as four disconnected lists. Remember that expired UFAs are targets on the draft board, not direct summer signings.",
+          "CONTRACT FIELD RULE: signingStatus tells you how the current contract was signed. expiryStatus tells you whether that contract may be re-signed when it expires. These fields are independent; never infer one from the other.",
         ]
       : []),
-    "MATCHUP PRIORITY RULES: QF means quarterfinal, SF means semifinal, F means final, and LT means Loser Tournament. Playoff games are always major stories, ordered F, then SF, then QF. Loser Tournament games should not be a headline, lead, primary article, or meaningful supporting focus; they have been omitted from the supplied matchup facts.",
-    "Use only the names, numbers, outcomes, and links in EDITION_FACTS. Do not add HTML, Markdown links, new sections, new IDs, or new URLs.",
-    "Return only one JSON object. It must contain headline, deck, and exactly six sections. Each section must contain id, kind, eyebrow, headline, body, author, and links.",
-    "Keep every section id, kind, eyebrow, author, and links value from SECTION_PLAN exactly unchanged and in the same order.",
+    ...(["resigning_outlook", "offseason_market"].includes(packet.issueType)
+      ? [
+          "A contract with expiryStatus=UFA is draft-bound and is not a Summer UFA target. A Summer UFA is a separate, confirmed post-deadline player listed in EDITION_FACTS.summerUfas.",
+        ]
+      : []),
+    "Use only the people, teams, amounts, dates, outcomes, transactions, and links in EDITION_FACTS, plus the league process and timelines in RULEBOOK_CONTEXT. Do not add HTML, Markdown links, extra sections, or new URLs.",
+    "Return only one JSON object with headline, deck, and exactly six sections. OUTPUT_CONTRACT defines only the display structure and required fields; it does not define the subjects of the articles.",
     "LENGTH TARGETS: Count characters before replying. Main headline should be 55–80 characters and must never exceed 90. Deck should be 120–180 and must never exceed 220. Each section headline should be 35–70 and must never exceed 90. Each section body should be 450–750 and must never exceed 1000. Eyebrow must never exceed 50. These are hard per-field limits, not approximate word counts; do not use all available space.",
+    "",
+    `RULEBOOK_CONTEXT=${JSON.stringify(ruleContext, null, 2)}`,
+    "",
+    `NEWSROOM_AUTHORS=${JSON.stringify(newsroomAuthors, null, 2)}`,
     "",
     `EDITION_FACTS=${JSON.stringify(facts, null, 2)}`,
     "",
-    `SECTION_PLAN=${JSON.stringify(sectionPlan, null, 2)}`,
+    `AVAILABLE_LINKS=${JSON.stringify(availableLinks, null, 2)}`,
+    "",
+    `OUTPUT_CONTRACT=${JSON.stringify(outputContract, null, 2)}`,
   ].join("\n");
 }

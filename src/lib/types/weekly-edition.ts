@@ -14,6 +14,8 @@ export type WeeklyEditionIssueType =
   | "preseason";
 
 export type WeeklyEditionSectionKind =
+  | "primary_article"
+  | "standard_article"
   | "biggest_story"
   | "matchup_roundup"
   | "three_stars"
@@ -67,6 +69,7 @@ export interface WeeklyEditionTeamFact {
   teamId: string;
   name: string;
   abbr: string;
+  talentRating?: number;
   logoUrl?: string;
   conferenceId?: string;
   conferenceName?: string;
@@ -122,6 +125,7 @@ export interface WeeklyEditionPowerMoverFact {
   rankChange: number;
   currentElo?: number;
   eloChange?: number;
+  talentRating?: number;
 }
 
 export interface WeeklyEditionActivityFact {
@@ -321,11 +325,44 @@ export interface WeeklyEditionContractFact {
   playerName: string;
   teamName: string;
   salary: number;
+  signingStatus?: string;
   expiryStatus: string;
   expiryDate: string;
+  updatedSalary?: number;
+  signedAt?: string;
   canBeReSigned?: boolean;
   requiredReSigningSalary?: number;
   returnsToDraft?: boolean;
+  playerRating?: number;
+}
+
+export interface WeeklyEditionSummerUfaFact {
+  playerId: string;
+  playerName: string;
+  previousTeamName?: string;
+  updatedSalary: number;
+  requiredUfaSalary: number;
+  rosterTalent?: number;
+}
+
+export interface WeeklyEditionBuyoutFact {
+  contractId: string;
+  playerName: string;
+  teamName: string;
+  capHit: number;
+  capHitEndDate: string;
+}
+
+export interface WeeklyEditionGmRankingFact {
+  rank: number;
+  gmName: string;
+  teamName?: string;
+  rating: number;
+  rankChange: number;
+  overallWins: number;
+  overallLosses: number;
+  playoffAppearances: number;
+  cups: number;
 }
 
 export interface WeeklyEditionTeamOutlookFact {
@@ -338,6 +375,7 @@ export interface WeeklyEditionTeamOutlookFact {
   expiringCount: number;
   draftPickCount: number;
   firstRoundPickCount: number;
+  draftSelectionsConsumed?: number;
 }
 
 export interface WeeklyEditionDraftPickFact {
@@ -346,6 +384,7 @@ export interface WeeklyEditionDraftPickFact {
   round: number;
   pick?: number;
   selectedPlayerName?: string;
+  selectedPlayerRating?: number;
 }
 
 export interface WeeklyEditionMilestoneFacts {
@@ -358,6 +397,10 @@ export interface WeeklyEditionMilestoneFacts {
   teamOutlooks: WeeklyEditionTeamOutlookFact[];
   expiringContracts: WeeklyEditionContractFact[];
   recentSignings: WeeklyEditionContractFact[];
+  signedPlayers?: WeeklyEditionContractFact[];
+  summerUfas?: WeeklyEditionSummerUfaFact[];
+  buyoutCharges?: WeeklyEditionBuyoutFact[];
+  gmRankings?: WeeklyEditionGmRankingFact[];
   draftPicks: WeeklyEditionDraftPickFact[];
 }
 
@@ -419,6 +462,7 @@ export interface WeeklyEditionSourcePower {
   previousRank: unknown;
   currentElo?: unknown;
   previousElo?: unknown;
+  talentRating?: unknown;
 }
 
 export interface WeeklyEditionContractSeasonSource {
@@ -473,6 +517,10 @@ export interface BuildMilestoneEditionFactPacketInput {
   teamOutlooks: WeeklyEditionTeamOutlookFact[];
   expiringContracts: WeeklyEditionContractFact[];
   recentSignings: WeeklyEditionContractFact[];
+  signedPlayers?: WeeklyEditionContractFact[];
+  summerUfas?: WeeklyEditionSummerUfaFact[];
+  buyoutCharges?: WeeklyEditionBuyoutFact[];
+  gmRankings?: WeeklyEditionGmRankingFact[];
   draftPicks: WeeklyEditionDraftPickFact[];
   editorialCandidates?: WeeklyEditionEditorialCandidate[];
 }
