@@ -60,6 +60,10 @@ app → components → feature hooks → main hooks / cache / tRPC
 
 ## Code Rules
 
+- Never commit secrets under any circumstances, including temporarily or on a
+  preview branch. Keep credentials, tokens, keys, cookies, service-account
+  material, and real environment values out of Git; if exposure occurs, stop
+  and rotate or revoke the secret immediately.
 - Prefer Server Components. Add `"use client"` only at the lowest boundary
   that requires client behavior.
 - Put substantial route UI in `components/<feature>`.
