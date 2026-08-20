@@ -1,0 +1,169 @@
+# Frontend architecture
+
+[Wiki home](../README.md) · [Implemented features](../product/features.md) · [Route reference](../reference/routes.md)
+
+## Runtime shape
+
+The active frontend is a Next.js 15 App Router application using React 18, strict TypeScript, Tailwind CSS, Convex realtime queries, Auth.js, and Zustand.
+
+```text
+src/app route
+  → src/components feature entry
+    → src/hooks/features orchestration hook
+      → src/hooks/main data or mutation hook
+        → Convex generated API
+
+feature component / hook
+  → src/lib/utils pure transforms
+    → src/lib/types shared contracts
+```
+
+There is no active tRPC frontend. `src/trpc/` is empty. Browser data hooks call Convex directly through generated function references.
+
+## Application bootstrap
+
+`src/app/layout.tsx` owns the global HTML metadata and provider order:
+
+1. `AuthProvider` exposes the Auth.js session.
+2. `ConvexClientProvider` creates the browser Convex client and exchanges an active Auth.js session for a custom Convex JWT.
+3. `AppShell` applies navigation and persisted defaults.
+4. `Toaster` mounts shared mutation feedback.
+5. `PerformanceVitals` records development-only diagnostics.
+
+`AppShell` omits navigation and spacing only for `/draft-roster-board`. Every other route uses one persistent shell: a safe-area-aware mobile header, a labeled mobile bottom navigation, and the equivalent desktop top navigation. Draft destinations remain in that global shell and expose Draft Board, My Draft Team, and Other Teams through route-level context navigation.
+
+Typography is served from the bundled Geist Sans and Geist Mono files. Legacy `font-varela`, `font-barlow`, `font-oswald`, and `font-yellowtail` utilities remain compatibility aliases to the local sans variable, so rendering never depends on a font-network request and numeric tables can use the dedicated mono face.
+
+## Layer responsibilities
+
+### `src/app`
+
+Contains framework route files and API handlers only. Page and layout files should authenticate, redirect, set metadata, or compose a feature entry point. Reusable rendering and business rules belong below this layer.
+
+### `src/components`
+
+Contains rendering and interaction grouped by product domain. Components consume hooks instead of Convex, the navigation store, `next/navigation`, server modules, or API route implementations directly. `components/ui` is domain-agnostic; `components/skeletons` supplies shared loading shapes.
+
+The Auth.js and Convex provider components are explicit integration exceptions to the component import restrictions.
+
+### `src/hooks/main`
+
+Owns stable remote-data, mutation, Auth.js, navigation-adapter, and integration hooks. Main data hooks use Convex `useQuery`, `usePaginatedQuery`, or the shared `useAppMutation` wrapper and return named state objects.
+
+### `src/hooks/features`
+
+Combines main hooks, local interaction state, and pure utilities into feature-ready view models. Feature hooks never import components. Some hooks are transform-only; most active page hooks orchestrate several Convex subscriptions.
+
+### `src/lib/utils`
+
+- `core`: generic array, date, formatting, ID, validation, query-state, and math helpers.
+- `domain`: shared hockey, season, contract, player, matchup, schedule, team, authorization, and runtime-constant rules.
+- `features`: deterministic calculations for concrete UI features such as standings, draft, records, cap planning, UFA, and weekly editions.
+
+Utilities are framework-free and should receive all inputs explicitly.
+
+### `src/lib/types`
+
+Holds shared frontend and domain types only. Runtime values that correspond to union types live in `src/lib/utils/domain/constants.ts`.
+
+### Supporting `src/lib` areas
+
+- `auth`: server-only route guards, custom Convex tokens, Auth.js augmentation, and user storage access.
+- `cache`: the persisted Zustand navigation store.
+- `config`: runtime display catalogs, currently awards.
+- `data`: server-side Convex data adapter and model mapping.
+- `sheets`: Google Sheets compatibility and operational adapters, not the active browser query layer.
+
+`src/server` contains server-only integrations such as UploadThing.
+
+## Data flow
+
+`ConvexClientProvider` uses `useConvexAuth` to POST to `/api/convex/token`. The server signs a short-lived JWT whose subject is the application user ID; Convex resolves that subject against `authUsers` for authorization.
+
+Main hooks call generated functions in `convex/_generated/api`. Feature hooks then join domain collections and apply utilities. Components render the returned view model and skeleton state. Convex subscriptions update those hooks without a React Query cache or manual refetch layer.
+
+Most league collections are readable without authentication. `convex/frontend.ts` redacts private owner fields for anonymous readers. Draft state, commissioner queries, and every privileged mutation enforce access inside Convex or the relevant server integration.
+
+Server-side Auth.js user upsert and lookup use `src/lib/data/convex-store.ts` with the shared Convex server secret. This path is separate from browser Convex authentication.
+
+## Navigation state
+
+`src/lib/cache/store.ts` persists `gshl-nav-state` with:
+
+- schedule, standings, Locker Room, and League Office view keys;
+- selected season and week IDs; and
+- selected owner ID.
+
+Feature navigation hooks expose narrow named objects. `NavDefaults` and season/week hooks replace invalid stored defaults once current data is available. Changing season resets the selected week because week IDs are season-specific. An owner or commissioner linked to an owner record is moved from the legacy owner default to their own team.
+
+Contextual routes also mirror their active state into validated query parameters: `view`, `season`, `week`, and `owner`. A valid explicit URL wins over hydrated persistence; missing values may reuse persisted context, while invalid values resolve to a route or data default. User choices push a history entry, but hydration, automatic defaults, and invalid-value repair replace the current entry. URL-to-store synchronization waits for Zustand hydration and the season/week/team/auth data needed to validate each value, so shared links and browser Back/Forward do not briefly render a different persisted context.
+
+Matchup links add allowlisted `from` and `side` values. The source restores a deterministic Schedule, Locker Room, or Press Box return destination, while Away/Home player-stat switches replace the current URL because they are presentational tabs rather than navigation milestones. Auth callbacks normalize same-origin absolute URLs back to safe internal paths so protected contextual links retain their query state through sign-in.
+
+Components that need App Router behavior use `useAppPathname` or `useAppRouter`, keeping `next/navigation` in the hook layer.
+
+## Authentication and roles
+
+Auth.js accepts only verified Google identities. A successful first sign-in creates an active viewer. The session carries application user ID, role, optional owner ID, and status.
+
+- `viewer`: protected read access, no owner or commissioner mutations.
+- `owner`: viewer access plus authorized actions for the linked owner.
+- `commissioner`: administrative access and recovery actions.
+
+Route guards improve navigation behavior, but server-side checks in `convex/lib/auth.ts`, feature mutations, and `src/server/uploadthing.ts` are authoritative. Never rely on a hidden button as an authorization control.
+
+## Rendering and loading
+
+Routes are kept as Server Components where possible, but active feature entries are generally client components because they consume realtime queries and persisted navigation. Heavy subviews in the schedule, standings, League Office, and Locker Room are dynamically imported with matching skeletons.
+
+There is currently no server prefetch/hydration layer. Do not document or introduce one as an existing convention.
+
+## Imports and aliases
+
+Prefer the narrow active aliases from `tsconfig.json`:
+
+| Alias                              | Purpose                                       |
+| ---------------------------------- | --------------------------------------------- |
+| `@gshl-components/*`               | Feature and shared components                 |
+| `@gshl-ui`                         | Domain-agnostic UI barrel                     |
+| `@gshl-nav`                        | Navigation barrel                             |
+| `@gshl-skeletons`                  | Loading-state barrel                          |
+| `@gshl-hooks`, `@gshl-hooks/*`     | Hook barrels or narrow hook modules           |
+| `@gshl-types`                      | Shared type barrel                            |
+| `@gshl-utils`, `@gshl-utils/*`     | Pure utility barrels or narrow modules        |
+| `@gshl-cache`                      | Persisted navigation store                    |
+| `@gshl-lib/*`                      | Other library modules                         |
+| `@gshl-auth`, `@gshl-env`          | Root authentication and validated environment |
+| `@gshl-server/*`, `@gshl-convex/*` | Server or Convex-only modules                 |
+
+Use relative imports inside a small feature subtree. Several configured aliases point to missing or inactive areas, so configuration alone is not evidence that a layer is active. `components.json` also contains legacy `~` aliases that TypeScript does not currently define.
+
+## Styling and accessibility
+
+Tailwind is the only styling system. Reuse primitives from `components/ui`, CSS variables from `src/styles/globals.css`, and existing skeletons before adding new foundations. The shell owns global safe-area and primary-navigation clearance; feature layouts place one sticky `PageContextNavigation` before their content instead of stacking fixed bottom bars. Mobile primary destinations retain visible labels; shared controls provide 44px mobile targets and strong focus indicators; season dropdowns use native select behavior. A global reduced-motion fallback disables nonessential animation and smooth scrolling.
+
+Wide comparison tables use `TableViewport`, which supplies a labelled, keyboard-focusable horizontal region, native scrolling, overflow hints, and edge fades without owning feature data or sticky-column offsets. Transactional Draft and UFA player pools use decision cards below `lg`, keeping identity, priority metrics, disclosure of full statistics, visible eligibility feedback, and staged 44px actions together. Matchup category results become vertical comparisons and player statistics become expandable performance cards below `lg`; their comprehensive tables remain available at larger widths. Salary Cap keeps its cross-season table at every width, drops sticky identity columns below `lg`, and surfaces remaining cap in a compact mobile summary, while franchise contract history and Record Book use identity-first cards below `lg`. Power Rankings pair a mobile list and semantic desktop table with an aria-hidden chart plus an exact keyboard-accessible history table. Playoff rounds stack in reading order below `lg` and retain the connected bracket at larger widths.
+
+The Home dashboard limits preview inventory instead of rendering complete feature lists: five UFAs, eight power rankings, five recent events, and four first-round mock-draft projections. Full destinations and an activity expansion remain explicit. The Press Box reader portals its modal outside inert application content, traps keyboard focus, supports Escape, and restores focus to its trigger.
+
+## Verification
+
+The focused frontend gates are:
+
+```text
+npm run check:architecture
+npm run lint
+npm run typecheck
+npx tsx --test <affected-test-file>
+```
+
+Tests use Node's built-in test runner and are colocated primarily with pure utilities. A narrow source-contract test protects page landmarks, disclosure semantics, native selection, reduced-motion policy, and Press Box modal behavior until a component test harness exists. There is no component, hook, browser, or end-to-end harness. `npm run check` does not run tests, and the repository currently has no general frontend CI workflow.
+
+## Known edges, not preferred patterns
+
+- `convex/frontend.ts` is a compatibility-heavy module using `@ts-nocheck`, broad `any`, and domain casts; new code should not copy that style.
+- Many main hooks bridge generated Convex values to frontend domain types with `as unknown as`. Treat this as typing debt.
+- Query hooks commonly expose `error: null`; do not promise React Query-style error/refetch objects.
+- `src/trpc/` and some configured aliases are inactive.
+- Similar legacy draft and free-agency components remain in the tree. Begin from an active route and follow imports before editing.
+- `npm run format:check` does not include ordinary Markdown files.

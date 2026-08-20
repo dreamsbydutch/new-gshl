@@ -1,5 +1,8 @@
 # Ranking Engine
 
+[Wiki home](README.md) | [Apps Script runtime](operations/apps-script.md) |
+[Data operations](operations/data-pipelines.md)
+
 ## Overview
 
 The ranking engine is the shared scoring runtime used to assign ratings across
@@ -56,6 +59,9 @@ The intended authoring model is now:
 
 - Hand-edited source: `scripts/src/runtime/apps-script/features/RankingEngine/*`
 - Synced Apps Script copy: `apps-script/features/RankingEngine/*`
+- Hand-edited power source:
+  `scripts/src/runtime/apps-script/features/PowerRankingsAlgo.js`
+- Synced Apps Script power copy: `apps-script/features/PowerRankingsAlgo.js`
 
 The repo includes a small sync/check utility:
 
@@ -66,7 +72,8 @@ Those commands are available from the repo root and from `scripts/`.
 
 `tools/ranking-engine-sync.mjs` now:
 
-- copies all four engine files from `scripts` to `apps-script`
+- copies all four ranking-engine files and `PowerRankingsAlgo.js` from
+  `scripts` to `apps-script`
 - verifies file parity with SHA-256 hashes
 - retries transient `EBUSY`, `EPERM`, and `ENOENT` file access issues
 
@@ -74,7 +81,9 @@ There is also a CI guard:
 
 - `.github/workflows/ranking-engine-sync-check.yml`
 
-That workflow fails if the two checked-in engine copies drift apart.
+When it runs, that workflow fails if any synchronized pair drifts. Its current
+path filters omit both `PowerRankingsAlgo.js` paths, so power-only changes must
+run `npm run ranking-engine:check` locally even when CI does not start.
 
 ## Public API
 
@@ -328,7 +337,8 @@ The following suggested improvements are now done:
   source.
 - Sync and parity verification are automated with
   `tools/ranking-engine-sync.mjs`.
-- CI now fails if the two checked-in engine copies diverge.
+- CI fails on synchronized ranking-engine drift when the workflow is triggered;
+  power-only paths are a known trigger-filter gap.
 - Tunable constants and profiles were moved into structured config in
   `config.js`.
 - Dense player and team ranking math was split out of the main runtime file
@@ -358,7 +368,7 @@ two places with no guardrails. It is now:
 
 - authored in one place
 - synced into Apps Script
-- checked in CI
+- checked locally and, for configured paths, in CI
 - tuned through structured config
 - split into smaller pure helpers
 
