@@ -13,6 +13,7 @@
 
 export * from "./ConferenceContestSkeleton";
 export * from "./DraftBoardSkeleton";
+export * from "./DraftHubBoardSkeleton";
 export * from "./DraftClassesSkeleton";
 export * from "./DraftPickListSkeleton";
 export * from "./HomeSkeleton";

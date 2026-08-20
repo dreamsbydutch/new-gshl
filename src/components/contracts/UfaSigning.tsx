@@ -4,10 +4,18 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { NHLLogo } from "@gshl-components/player/NHLLogo";
-import { useSubmitUfaOffer, useUfaOverview } from "@gshl-hooks";
+import { useDesktopViewport, useUfaOverview } from "@gshl-hooks";
 import { FreeAgencySkeleton, UfaHomeCardSkeleton } from "@gshl-skeletons";
-import { formatMoney, formatUfaStat } from "@gshl-utils";
+import { TableViewport } from "@gshl-ui";
+import {
+  formatMoney,
+  formatUfaStat,
+  HOME_UFA_PREVIEW_LIMIT,
+  selectHomeUfaPreview,
+} from "@gshl-utils";
 import type { UfaFreeAgentView, UfaOfferGroupView } from "@gshl-types";
+import { UfaOfferForm } from "./UfaOfferForm";
+import { UfaPlayerDecisionList } from "./UfaPlayerDecisionList";
 
 function Logo({ src, alt }: { src: string | null; alt: string }) {
   return src ? (
@@ -34,87 +42,19 @@ function Countdown({ deadlineAt }: { deadlineAt: number }) {
   const hours = Math.floor((seconds % 86_400) / 3_600);
   const minutes = Math.floor((seconds % 3_600) / 60);
   const remainder = seconds % 60;
+  const accessibleTime =
+    seconds === 0
+      ? "Offer resolution pending"
+      : `${days} days, ${hours} hours, ${minutes} minutes, ${remainder} seconds remaining`;
   return (
-    <span className="whitespace-nowrap font-mono text-xs font-semibold">
+    <span
+      className="whitespace-nowrap font-mono text-xs font-semibold"
+      aria-label={accessibleTime}
+    >
       {seconds === 0
         ? "Resolving…"
         : `${days}d ${String(hours).padStart(2, "0")}h ${String(minutes).padStart(2, "0")}m ${String(remainder).padStart(2, "0")}s`}
     </span>
-  );
-}
-
-function OfferControls({
-  player,
-  compact = false,
-}: {
-  player: UfaFreeAgentView;
-  compact?: boolean;
-}) {
-  const [years, setYears] = useState<number>(player.affordableTerms[0] ?? 1);
-  const [message, setMessage] = useState<string | null>(null);
-  const mutation = useSubmitUfaOffer({
-    onSuccess: () => {
-      setMessage("Binding offer submitted.");
-    },
-    onError: setMessage,
-  });
-  const selectedAffordable = player.affordableTerms.includes(
-    years as 1 | 2 | 3,
-  );
-  const helperText =
-    message ??
-    player.disabledReason ??
-    (player.existingOffer
-      ? "Binding offer submitted."
-      : "Salary is reserved while pending.");
-  return (
-    <div
-      className={`flex items-center gap-1 sm:min-w-[180px] sm:flex-col sm:items-stretch sm:gap-1 ${compact ? "min-w-[115px]" : "min-w-[130px]"}`}
-      title={helperText}
-    >
-      <div className="flex min-w-0 flex-1 gap-1 sm:flex-none sm:gap-2">
-        <select
-          aria-label={`Contract years for ${player.fullName}`}
-          value={years}
-          disabled={!player.canOffer || mutation.isPending}
-          onChange={(event) => setYears(Number(event.target.value))}
-          className={`h-6 min-w-0 flex-1 rounded-md border bg-background text-[9px] leading-none disabled:opacity-50 sm:h-9 sm:flex-none sm:px-2 sm:text-sm ${compact ? "px-0.5" : "px-1"}`}
-        >
-          {[1, 2, 3].map((term) => (
-            <option
-              key={term}
-              value={term}
-              disabled={!player.affordableTerms.includes(term as 1 | 2 | 3)}
-            >
-              {term} year{term === 1 ? "" : "s"}
-            </option>
-          ))}
-        </select>
-        <button
-          type="button"
-          disabled={
-            !player.canOffer || !selectedAffordable || mutation.isPending
-          }
-          title={player.disabledReason ?? undefined}
-          onClick={() => {
-            setMessage(null);
-            mutation.mutate({
-              playerId: player.id,
-              contractLength: years as 1 | 2 | 3,
-            });
-          }}
-          className={`h-6 shrink-0 rounded-md bg-primary py-0.5 text-[9px] font-semibold leading-none text-primary-foreground disabled:cursor-not-allowed disabled:opacity-40 sm:h-auto sm:px-3 sm:py-2 sm:text-xs ${compact ? "px-1" : "px-1.5"}`}
-        >
-          {mutation.isPending ? "Offering…" : "Offer Contract"}
-        </button>
-      </div>
-      <span
-        aria-live="polite"
-        className={`sr-only max-w-[220px] text-[9px] leading-tight sm:not-sr-only sm:max-w-[260px] sm:text-[10px] ${message?.includes("submitted") ? "text-emerald-600" : "text-muted-foreground"}`}
-      >
-        {helperText}
-      </span>
-    </div>
   );
 }
 
@@ -151,11 +91,12 @@ function PlayerRows({
                 size={showStats ? 24 : 20}
               />
             </td>
-            <td
+            <th
+              scope="row"
               className={`sticky z-20 border-r !bg-background text-left text-[10px] font-semibold group-hover:!bg-muted sm:static sm:z-auto sm:min-w-0 sm:border-0 sm:!bg-transparent sm:px-2 sm:py-3 sm:text-sm ${showStats ? "left-[31px] min-w-[7rem] px-1.5 py-1" : "left-[23px] min-w-[5.5rem] px-1 py-0.5"}`}
             >
               {player.fullName}
-            </td>
+            </th>
             <td
               className={`whitespace-nowrap text-[9px] sm:px-2 sm:py-3 sm:text-sm ${mobileCellPadding}`}
             >
@@ -208,7 +149,7 @@ function PlayerRows({
                   ))
               : null}
             <td className={`sm:px-2 sm:py-3 ${mobileCellPadding}`}>
-              <OfferControls player={player} compact={!showStats} />
+              <UfaOfferForm player={player} />
             </td>
           </tr>
         );
@@ -220,24 +161,34 @@ function PlayerRows({
 function PlayerTable({
   players,
   showStats = false,
+  desktopOnly = false,
 }: {
   players: UfaFreeAgentView[];
   showStats?: boolean;
+  desktopOnly?: boolean;
 }) {
+  const isDesktopViewport = useDesktopViewport();
   const hasGoalies = players.some((player) => player.positionGroup === "G");
   const hasSkaters = players.some((player) => player.positionGroup !== "G");
   const mixed = showStats && hasGoalies && hasSkaters;
   if (mixed) {
+    if (!isDesktopViewport && !desktopOnly) {
+      return <UfaPlayerDecisionList players={players} />;
+    }
     return (
       <div className="w-full min-w-0 max-w-full space-y-6 overflow-hidden">
-        <PlayerTable
-          players={players.filter((player) => player.positionGroup !== "G")}
-          showStats
-        />
-        <PlayerTable
-          players={players.filter((player) => player.positionGroup === "G")}
-          showStats
-        />
+        <div className="space-y-6">
+          <PlayerTable
+            players={players.filter((player) => player.positionGroup !== "G")}
+            showStats
+            desktopOnly
+          />
+          <PlayerTable
+            players={players.filter((player) => player.positionGroup === "G")}
+            showStats
+            desktopOnly
+          />
+        </div>
       </div>
     );
   }
@@ -245,27 +196,41 @@ function PlayerTable({
     ? ["GP", "W", "GA", "GAA", "SV", "SA", "SV%", "SO", "QS", "RBS"]
     : ["GP", "G", "A", "P", "+/−", "PIM", "PPP", "SOG", "HIT", "BLK"];
   const mobileCellPadding = showStats ? "px-1 py-1" : "px-0.5 py-0.5";
+  if (!isDesktopViewport && !desktopOnly) {
+    return <UfaPlayerDecisionList players={players} />;
+  }
   return (
-    <div className="relative block w-full min-w-0 max-w-full touch-auto overflow-x-auto overscroll-x-contain rounded-lg border">
+    <TableViewport
+      ariaLabel={`Available unrestricted free-agent ${hasGoalies ? "goalies" : "skaters"}`}
+      scrollHint="Scroll to compare all salaries and statistics"
+    >
       <table className="w-max min-w-full text-center text-[10px] sm:text-sm">
+        <caption className="sr-only">
+          Available unrestricted free-agent {hasGoalies ? "goalies" : "skaters"}
+          , salaries, previous-season statistics, and binding-offer action
+        </caption>
         <thead className="bg-muted/70 text-[8px] uppercase tracking-wide sm:text-xs">
           <tr className="border-b border-border/70">
             <th
+              scope="col"
               className={`sticky z-30 border-r !bg-muted sm:static sm:z-auto sm:w-auto sm:min-w-0 sm:border-0 sm:!bg-transparent sm:px-2 sm:py-3 ${showStats ? "left-0 w-8 min-w-8 px-0.5 py-1" : "left-0 w-6 min-w-6 px-0 py-0.5"}`}
             >
               NHL
             </th>
             <th
+              scope="col"
               className={`sticky z-30 border-r !bg-muted text-left sm:static sm:z-auto sm:min-w-0 sm:border-0 sm:!bg-transparent sm:px-2 sm:py-3 ${showStats ? "left-[31px] min-w-[7rem] px-1.5 py-1" : "left-[23px] min-w-[5.5rem] px-1 py-0.5"}`}
             >
               Player
             </th>
             <th
+              scope="col"
               className={`whitespace-nowrap sm:px-2 sm:py-3 ${mobileCellPadding}`}
             >
               Pos
             </th>
             <th
+              scope="col"
               className={`whitespace-nowrap bg-muted/40 font-bold text-foreground sm:px-2 sm:py-3 ${mobileCellPadding}`}
             >
               UFA Salary
@@ -274,6 +239,7 @@ function PlayerTable({
               ? statHeaders.map((header) => (
                   <th
                     key={header}
+                    scope="col"
                     className={`whitespace-nowrap sm:px-2 sm:py-3 ${mobileCellPadding}`}
                   >
                     {header}
@@ -281,6 +247,7 @@ function PlayerTable({
                 ))
               : null}
             <th
+              scope="col"
               className={`whitespace-nowrap sm:px-2 sm:py-3 ${mobileCellPadding}`}
             >
               Offer
@@ -289,11 +256,101 @@ function PlayerTable({
         </thead>
         <PlayerRows players={players} showStats={showStats} />
       </table>
+    </TableViewport>
+  );
+}
+
+function ActiveOfferCards({ groups }: { groups: UfaOfferGroupView[] }) {
+  return (
+    <div className="space-y-3 lg:hidden">
+      {groups.map((group) => {
+        const headingId = `ufa-offer-group-${group.id}`;
+        return (
+          <article
+            key={group.id}
+            aria-labelledby={headingId}
+            className="rounded-xl border bg-card p-3 shadow-sm"
+          >
+            <div className="flex items-start gap-3">
+              <div className="grid h-11 w-11 shrink-0 place-items-center rounded-lg bg-muted/60">
+                <NHLLogo
+                  team={
+                    group.player?.nhlTeamLogoUrl
+                      ? {
+                          name: group.player.nhlTeam || "NHL team",
+                          logoUrl: group.player.nhlTeamLogoUrl,
+                        }
+                      : undefined
+                  }
+                  size={32}
+                />
+              </div>
+              <div className="min-w-0 flex-1">
+                <h4 id={headingId} className="break-words text-sm font-bold">
+                  {group.player?.fullName ?? "Unavailable player"}
+                </h4>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {group.player?.positions.length
+                    ? group.player.positions.join("/")
+                    : "Position unavailable"}
+                </p>
+              </div>
+              <Countdown deadlineAt={group.deadlineAt} />
+            </div>
+
+            <ul className="mt-3 space-y-2" aria-label="Pending offers">
+              {group.offers.map((offer) => (
+                <li
+                  key={offer.id}
+                  className="rounded-lg border border-slate-200 bg-background p-3"
+                >
+                  <div className="flex min-w-0 items-center gap-2">
+                    <Logo
+                      src={offer.franchiseLogoUrl}
+                      alt={offer.franchiseName}
+                    />
+                    <p className="min-w-0 flex-1 break-words text-sm font-semibold">
+                      {offer.franchiseName}
+                    </p>
+                  </div>
+                  <dl className="mt-3 grid grid-cols-3 gap-2 text-center">
+                    <div>
+                      <dt className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                        Salary
+                      </dt>
+                      <dd className="mt-0.5 text-sm font-bold tabular-nums">
+                        {formatMoney(offer.salary)}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                        Term
+                      </dt>
+                      <dd className="mt-0.5 text-sm font-bold">
+                        {offer.years} year{offer.years === 1 ? "" : "s"}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                        Odds
+                      </dt>
+                      <dd className="mt-0.5 text-sm font-bold tabular-nums">
+                        {Math.round(offer.probability * 1000) / 10}%
+                      </dd>
+                    </div>
+                  </dl>
+                </li>
+              ))}
+            </ul>
+          </article>
+        );
+      })}
     </div>
   );
 }
 
 function ActiveOffers({ groups }: { groups: UfaOfferGroupView[] }) {
+  const isDesktopViewport = useDesktopViewport();
   return (
     <section
       className="w-full min-w-0 max-w-full space-y-2 overflow-hidden sm:space-y-3"
@@ -306,33 +363,63 @@ function ActiveOffers({ groups }: { groups: UfaOfferGroupView[] }) {
         <p className="rounded-lg border border-dashed p-2 text-xs text-muted-foreground sm:p-4 sm:text-sm">
           No UFA offers are currently pending.
         </p>
-      ) : (
-        <div className="relative block w-full min-w-0 max-w-full touch-auto overflow-x-auto overscroll-x-contain rounded-lg border">
+      ) : isDesktopViewport ? (
+        <TableViewport
+          ariaLabel="Pending unrestricted free-agent offers"
+          scrollHint="Scroll to compare every pending offer"
+        >
           <table className="w-max min-w-[720px] text-center text-[10px] sm:min-w-full sm:text-sm">
+            <caption className="sr-only">
+              Pending unrestricted free-agent offers by player and franchise
+            </caption>
             <thead className="bg-muted/70 text-[8px] uppercase sm:text-xs">
               <tr className="border-b border-border/70">
-                <th className="sticky left-0 z-30 w-8 min-w-8 border-r !bg-muted px-0.5 py-1 sm:static sm:z-auto sm:w-auto sm:min-w-0 sm:border-0 sm:!bg-transparent sm:px-3 sm:py-3">
+                <th
+                  scope="col"
+                  className="sticky left-0 z-30 w-8 min-w-8 border-r !bg-muted px-0.5 py-1 sm:static sm:z-auto sm:w-auto sm:min-w-0 sm:border-0 sm:!bg-transparent sm:px-3 sm:py-3"
+                >
                   NHL
                 </th>
-                <th className="sticky left-[31px] z-30 min-w-[7rem] border-r !bg-muted px-1.5 py-1 text-left sm:static sm:z-auto sm:min-w-0 sm:border-0 sm:!bg-transparent sm:px-3 sm:py-3">
+                <th
+                  scope="col"
+                  className="sticky left-[31px] z-30 min-w-[7rem] border-r !bg-muted px-1.5 py-1 text-left sm:static sm:z-auto sm:min-w-0 sm:border-0 sm:!bg-transparent sm:px-3 sm:py-3"
+                >
                   Player
                 </th>
-                <th className="whitespace-nowrap px-1 py-1 sm:px-3 sm:py-3">
+                <th
+                  scope="col"
+                  className="whitespace-nowrap px-1 py-1 sm:px-3 sm:py-3"
+                >
                   Pos
                 </th>
-                <th className="whitespace-nowrap px-1 py-1 sm:px-3 sm:py-3">
+                <th
+                  scope="col"
+                  className="whitespace-nowrap px-1 py-1 sm:px-3 sm:py-3"
+                >
                   Salary
                 </th>
-                <th className="whitespace-nowrap px-1 py-1 sm:px-3 sm:py-3">
+                <th
+                  scope="col"
+                  className="whitespace-nowrap px-1 py-1 sm:px-3 sm:py-3"
+                >
                   GSHL Team
                 </th>
-                <th className="whitespace-nowrap px-1 py-1 sm:px-3 sm:py-3">
+                <th
+                  scope="col"
+                  className="whitespace-nowrap px-1 py-1 sm:px-3 sm:py-3"
+                >
                   Years
                 </th>
-                <th className="whitespace-nowrap px-1 py-1 sm:px-3 sm:py-3">
+                <th
+                  scope="col"
+                  className="whitespace-nowrap px-1 py-1 sm:px-3 sm:py-3"
+                >
                   Odds
                 </th>
-                <th className="whitespace-nowrap px-1 py-1 sm:px-3 sm:py-3">
+                <th
+                  scope="col"
+                  className="whitespace-nowrap px-1 py-1 sm:px-3 sm:py-3"
+                >
                   Time Left
                 </th>
               </tr>
@@ -357,9 +444,12 @@ function ActiveOffers({ groups }: { groups: UfaOfferGroupView[] }) {
                         size={24}
                       />
                     </td>
-                    <td className="sticky left-[31px] z-20 min-w-[7rem] border-r !bg-background px-1.5 py-1 text-left text-[10px] font-semibold group-hover:!bg-muted sm:static sm:z-auto sm:min-w-0 sm:border-0 sm:!bg-transparent sm:px-3 sm:py-3 sm:text-sm">
+                    <th
+                      scope="row"
+                      className="sticky left-[31px] z-20 min-w-[7rem] border-r !bg-background px-1.5 py-1 text-left text-[10px] font-semibold group-hover:!bg-muted sm:static sm:z-auto sm:min-w-0 sm:border-0 sm:!bg-transparent sm:px-3 sm:py-3 sm:text-sm"
+                    >
                       {group.player?.fullName ?? "Unavailable player"}
-                    </td>
+                    </th>
                     <td className="whitespace-nowrap px-1 py-1 sm:px-3 sm:py-3">
                       {group.player?.positions.join("/") ?? "—"}
                     </td>
@@ -389,7 +479,9 @@ function ActiveOffers({ groups }: { groups: UfaOfferGroupView[] }) {
               )}
             </tbody>
           </table>
-        </div>
+        </TableViewport>
+      ) : (
+        <ActiveOfferCards groups={groups} />
       )}
     </section>
   );
@@ -406,31 +498,38 @@ export function UfaHomeCard() {
     );
   if (!query.data.window.isOpen && query.data.offerGroups.length === 0)
     return null;
+  const previewFreeAgents = selectHomeUfaPreview(query.data.topFreeAgents);
   return (
-    <section className="w-full min-w-0 max-w-full space-y-3 overflow-hidden rounded-xl border bg-card p-2 shadow-sm sm:space-y-6 sm:p-6">
+    <section
+      aria-labelledby="home-ufa-heading"
+      className="w-full min-w-0 max-w-full space-y-3 overflow-hidden rounded-xl border bg-card p-2 shadow-sm sm:space-y-6 sm:p-6"
+    >
       <div className="flex flex-wrap items-start justify-between gap-2 sm:gap-3">
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-primary sm:text-xs sm:tracking-[0.2em]">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary sm:tracking-[0.2em]">
             Summer Free Agency
           </p>
-          <h2 className="text-lg font-black leading-tight sm:text-2xl">
-            Top 15 Unrestricted Free Agents
+          <h2
+            id="home-ufa-heading"
+            className="text-lg font-black leading-tight sm:text-2xl"
+          >
+            Top {HOME_UFA_PREVIEW_LIMIT} Unrestricted Free Agents
           </h2>
-          <p className="mt-0.5 text-[10px] leading-tight text-muted-foreground sm:mt-1 sm:text-sm">
+          <p className="mt-0.5 text-xs leading-4 text-muted-foreground sm:mt-1 sm:text-sm">
             UFA salaries include the required 125% premium. Offers are binding.
           </p>
         </div>
         <Link
           href="/leagueoffice?view=freeAgents"
-          className="rounded-md border px-2 py-1 text-[10px] font-semibold hover:bg-muted sm:px-4 sm:py-2 sm:text-sm"
+          className="inline-flex min-h-11 items-center rounded-md border px-3 py-2 text-xs font-semibold hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:px-4 sm:text-sm"
         >
           View all free agents
         </Link>
       </div>
       <ActiveOffers groups={query.data.offerGroups} />
       {query.data.window.isOpen ? (
-        query.data.topFreeAgents.length > 0 ? (
-          <PlayerTable players={query.data.topFreeAgents} showStats />
+        previewFreeAgents.length > 0 ? (
+          <PlayerTable players={previewFreeAgents} showStats />
         ) : (
           <p className="rounded-md border border-dashed p-2 text-xs text-muted-foreground sm:p-4 sm:text-sm">
             {query.data.viewer.isSignedInOwner
@@ -477,15 +576,16 @@ export function UfaLeagueOffice() {
   return (
     <div className="w-full min-w-0 max-w-full space-y-4 overflow-hidden sm:space-y-6">
       <div>
-        <h1 className="text-2xl font-black sm:text-3xl">Free Agents</h1>
+        <h2 className="text-2xl font-black sm:text-3xl">Free Agents</h2>
         <p className="text-xs text-muted-foreground sm:text-sm">
-          All eligible UFAs with their previous NHL season statistics and fixed
-          125% salary.
+          Available UFAs with their previous NHL season statistics and fixed
+          125% salary. Linked owners see players their franchise can afford.
         </p>
       </div>
       <div
         className="flex flex-wrap gap-1.5 sm:gap-2"
         aria-label="Filter free agents by position"
+        role="group"
       >
         {["ALL", "F", "LW", "RW", "C", "D", "G"].map((value) => (
           <button
@@ -495,7 +595,8 @@ export function UfaLeagueOffice() {
               setFilter(value);
               setVisibleCount(50);
             }}
-            className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${filter === value ? "bg-primary text-primary-foreground" : "hover:bg-muted"} sm:px-4 sm:py-2 sm:text-sm`}
+            aria-pressed={filter === value}
+            className={`min-h-11 min-w-11 rounded-full border px-3 py-2 text-xs font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${filter === value ? "bg-primary text-primary-foreground" : "hover:bg-muted"} sm:px-4 sm:text-sm`}
           >
             {value === "ALL" ? "All" : value}
           </button>
@@ -507,7 +608,14 @@ export function UfaLeagueOffice() {
         </p>
       ) : null}
       <ActiveOffers groups={query.data.offerGroups} />
-      <PlayerTable players={visiblePlayers} showStats />
+      {visiblePlayers.length > 0 ? (
+        <PlayerTable players={visiblePlayers} showStats />
+      ) : (
+        <p className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
+          No available free agents match the{" "}
+          {filter === "ALL" ? "current" : filter} filter.
+        </p>
+      )}
       {visibleCount < players.length ? (
         <div className="flex justify-center">
           <button

@@ -208,6 +208,7 @@ export interface DraftRosterBoardViewModel {
   season: Season | undefined;
   conferences: DraftRosterConferenceView[];
   players: Player[];
+  availablePlayers: DraftHubEligiblePlayerView[];
   nhlTeams: NHLTeam[];
   isLoading: boolean;
 }

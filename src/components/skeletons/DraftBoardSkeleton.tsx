@@ -149,12 +149,14 @@ function MockDraftPickSkeleton() {
   );
 }
 
-export function MockDraftSkeleton() {
+export function MockDraftSkeleton({
+  compact = false,
+}: { compact?: boolean } = {}) {
   return (
     <div className="mt-8">
       <Skeleton className="mx-auto h-7 w-48" />
       <div className="mt-6 space-y-6">
-        {Array.from({ length: 2 }).map((_, roundIndex) => (
+        {Array.from({ length: compact ? 1 : 2 }).map((_, roundIndex) => (
           <section
             key={roundIndex}
             className="rounded-2xl border border-slate-200 bg-white/70 p-4 shadow-sm"
@@ -172,6 +174,9 @@ export function MockDraftSkeleton() {
           </section>
         ))}
       </div>
+      {compact ? (
+        <Skeleton className="mx-auto mt-5 h-11 w-48 rounded-lg" />
+      ) : null}
     </div>
   );
 }
