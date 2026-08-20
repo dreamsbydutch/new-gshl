@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildPuckPediaQuery } from "./sync-player-bios-from-puckpedia";
+import {
+  buildPuckPediaQuery,
+  resolveSalarySeasonRequests,
+} from "./sync-player-bios-from-puckpedia";
 
 const options = {
   apply: false,
@@ -45,4 +48,19 @@ test("builds goalie state without retaining the skater shot filter", () => {
   assert.deepEqual(query.bio_shot, []);
   assert.equal(query.player_role, "0");
   assert.equal(query.curPage, 3);
+});
+
+test("maps requested future NHL years to sequential PuckPedia tokens", () => {
+  assert.deepEqual(
+    resolveSalarySeasonRequests({
+      ...options,
+      focusSeasonStartYear: 2026,
+      salarySeasonSpecs: ["2027", "2028=170"],
+    }),
+    [
+      { seasonToken: "163", seasonStartYear: 2026 },
+      { seasonToken: "164", seasonStartYear: 2027 },
+      { seasonToken: "170", seasonStartYear: 2028 },
+    ],
+  );
 });

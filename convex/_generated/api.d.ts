@@ -22,6 +22,7 @@ import type * as lib_auth from "../lib/auth.js";
 import type * as lib_reporterDirectory from "../lib/reporterDirectory.js";
 import type * as lib_timestamps from "../lib/timestamps.js";
 import type * as maintenanceScope from "../maintenanceScope.js";
+import type * as playerDayArchive from "../playerDayArchive.js";
 import type * as reporterBackfill from "../reporterBackfill.js";
 import type * as timestampMigration from "../timestampMigration.js";
 import type * as ufa from "../ufa.js";
@@ -50,6 +51,7 @@ declare const fullApi: ApiFromModules<{
   "lib/reporterDirectory": typeof lib_reporterDirectory;
   "lib/timestamps": typeof lib_timestamps;
   maintenanceScope: typeof maintenanceScope;
+  playerDayArchive: typeof playerDayArchive;
   reporterBackfill: typeof reporterBackfill;
   timestampMigration: typeof timestampMigration;
   ufa: typeof ufa;

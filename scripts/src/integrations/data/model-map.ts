@@ -1,7 +1,11 @@
 import type { SHEETS_CONFIG } from "../sheets/config/config";
 
 export type SheetModelName = keyof typeof SHEETS_CONFIG.SHEETS;
-export type ModelName = SheetModelName | "PlayerAward" | "TeamAward";
+export type ModelName =
+  | SheetModelName
+  | "PlayerAward"
+  | "TeamAward"
+  | "PlayerNHLSalary";
 
 export const MODEL_TO_CONVEX_TABLE = {
   Season: "seasons",
@@ -10,6 +14,7 @@ export const MODEL_TO_CONVEX_TABLE = {
   Team: "teams",
   Owner: "owners",
   Player: "players",
+  PlayerNHLSalary: "playerNhlSalaries",
   Contract: "contracts",
   Week: "weeks",
   Matchup: "matchups",

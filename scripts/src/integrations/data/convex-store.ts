@@ -113,9 +113,63 @@ const refs = {
     Record<string, unknown>,
     UpsertResult
   >("data:upsertByCompositeKey"),
+  activity: makeFunctionReference<"query", Record<string, unknown>, AnyRow[]>(
+    "frontend:activity",
+  ),
+  archiveGet: makeFunctionReference<
+    "query",
+    Record<string, unknown>,
+    AnyRow | null
+  >("playerDayArchive:getArchiveState"),
+  archiveBegin: makeFunctionReference<
+    "mutation",
+    Record<string, unknown>,
+    string
+  >("playerDayArchive:beginArchive"),
+  archiveUpsertHighlights: makeFunctionReference<
+    "mutation",
+    Record<string, unknown>,
+    { updated: number; inserted: number }
+  >("playerDayArchive:upsertHighlightsBatch"),
+  archiveRemoveStaleHighlights: makeFunctionReference<
+    "mutation",
+    Record<string, unknown>,
+    { deleted: number }
+  >("playerDayArchive:removeStaleHighlightsBatch"),
+  archiveFinalize: makeFunctionReference<
+    "mutation",
+    Record<string, unknown>,
+    AnyRow
+  >("playerDayArchive:finalizeVerification"),
+  archivePrepareDeletion: makeFunctionReference<
+    "mutation",
+    Record<string, unknown>,
+    AnyRow
+  >("playerDayArchive:prepareDeletion"),
+  archiveDeleteBatch: makeFunctionReference<
+    "mutation",
+    Record<string, unknown>,
+    { deleted: number; missing: number }
+  >("playerDayArchive:deleteVerifiedSourceBatch"),
+  archiveCompleteDeletion: makeFunctionReference<
+    "mutation",
+    Record<string, unknown>,
+    AnyRow
+  >("playerDayArchive:completeDeletion"),
+  archiveCompleteRestore: makeFunctionReference<
+    "mutation",
+    Record<string, unknown>,
+    AnyRow
+  >("playerDayArchive:completeRestore"),
+  archiveMarkFailed: makeFunctionReference<
+    "mutation",
+    Record<string, unknown>,
+    AnyRow
+  >("playerDayArchive:markFailed"),
 };
 
 let client: ConvexHttpClient | null = null;
+let configuredTarget: "development" | "production" | null = null;
 
 function productionUrlFromDeployment(): string | null {
   const deployment =
@@ -127,7 +181,8 @@ function productionUrlFromDeployment(): string | null {
 }
 
 function resolveConvexUrl(): string {
-  if (env.GSHL_CONVEX_TARGET === "production") {
+  const target = configuredTarget ?? env.GSHL_CONVEX_TARGET;
+  if (target === "production") {
     const url = env.CONVEX_PROD_URL ?? productionUrlFromDeployment();
     if (!url) {
       throw new Error(
@@ -144,6 +199,15 @@ function resolveConvexUrl(): string {
     );
   }
   return url;
+}
+
+export function configureConvexTarget(target: "development" | "production") {
+  if (client && configuredTarget !== target) {
+    throw new Error(
+      "Convex target cannot change after the client is initialized",
+    );
+  }
+  configuredTarget = target;
 }
 
 function getClient(): ConvexHttpClient {
@@ -206,6 +270,112 @@ export async function fetchModel<T extends AnyRow>(
     }),
   );
   return rows.map(hydrateRow<T>);
+}
+
+export async function fetchRawPlayerDaySeason(
+  seasonId: string,
+): Promise<AnyRow[]> {
+  const rows: AnyRow[] = [];
+  let cursor: string | null = null;
+  do {
+    const page: {
+      items: AnyRow[];
+      nextCursor: string | null;
+      hasMore: boolean;
+    } = await getClient().query(
+      refs.maintenanceSeasonPage,
+      serverArgs({ table: "playerDayStatLines", seasonId, cursor }),
+    );
+    rows.push(...page.items);
+    cursor = page.hasMore ? page.nextCursor : null;
+  } while (cursor);
+  return rows;
+}
+
+export async function fetchSeasonActivity(seasonId: string): Promise<AnyRow[]> {
+  return getClient().query(refs.activity, { seasonId, take: 30 });
+}
+
+export async function getPlayerDayArchiveState(
+  seasonId: string,
+): Promise<AnyRow | null> {
+  return getClient().query(refs.archiveGet, serverArgs({ seasonId }));
+}
+
+export async function beginPlayerDayArchive(args: AnyRow): Promise<string> {
+  return getClient().mutation(refs.archiveBegin, serverArgs(args));
+}
+
+export async function upsertPlayerDayHighlights(
+  seasonId: string,
+  sourceChecksum: string,
+  rows: readonly AnyRow[],
+): Promise<void> {
+  for (let offset = 0; offset < rows.length; offset += 20) {
+    await getClient().mutation(
+      refs.archiveUpsertHighlights,
+      serverArgs({
+        seasonId,
+        sourceChecksum,
+        rows: rows.slice(offset, offset + 20).map(compactRecord),
+      }),
+    );
+  }
+}
+
+export async function removeStalePlayerDayHighlights(
+  seasonId: string,
+  sourceChecksum: string,
+): Promise<void> {
+  for (;;) {
+    const result = await getClient().mutation(
+      refs.archiveRemoveStaleHighlights,
+      serverArgs({ seasonId, sourceChecksum }),
+    );
+    if (!result.deleted) return;
+  }
+}
+
+export async function finalizePlayerDayArchive(
+  seasonId: string,
+  sourceChecksum: string,
+): Promise<void> {
+  await getClient().mutation(
+    refs.archiveFinalize,
+    serverArgs({ seasonId, sourceChecksum }),
+  );
+}
+
+export async function preparePlayerDayDeletion(args: AnyRow): Promise<void> {
+  await getClient().mutation(refs.archivePrepareDeletion, serverArgs(args));
+}
+
+export async function deleteVerifiedPlayerDayBatch(args: AnyRow) {
+  return getClient().mutation(refs.archiveDeleteBatch, serverArgs(args));
+}
+
+export async function completePlayerDayDeletion(
+  seasonId: string,
+  sourceChecksum: string,
+): Promise<void> {
+  await getClient().mutation(
+    refs.archiveCompleteDeletion,
+    serverArgs({ seasonId, sourceChecksum }),
+  );
+}
+
+export async function completePlayerDayRestore(
+  seasonId: string,
+  sourceChecksum: string,
+): Promise<void> {
+  await getClient().mutation(
+    refs.archiveCompleteRestore,
+    serverArgs({ seasonId, sourceChecksum }),
+  );
+}
+
+export async function markPlayerDayArchiveFailed(seasonId: string) {
+  return getClient().mutation(refs.archiveMarkFailed, serverArgs({ seasonId }));
 }
 
 export async function fetchPlayerDaySeason<T extends AnyRow>(

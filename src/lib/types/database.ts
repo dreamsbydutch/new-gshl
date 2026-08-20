@@ -341,6 +341,22 @@ export interface PlayerDayStatLine {
   createdAt: Date;
   updatedAt: Date;
 }
+export interface PlayerDayHighlight extends PlayerDayStatLine {
+  sourcePlayerDayId: string;
+  sourceKey: string;
+  ratingRank?: number | null;
+  categoryRanks: Array<{ category: string; rank: number; value: number }>;
+  selectionReasons: string[];
+  archiveChecksum: string;
+}
+
+export type SeasonDataArchiveStatus =
+  | "exporting"
+  | "verified"
+  | "deleting"
+  | "archived"
+  | "restored"
+  | "failed";
 export interface PlayerWeekStatLine {
   id: string;
   seasonId: string;

@@ -300,6 +300,30 @@ export default defineSchema({
     ],
   ),
 
+  playerNhlSalaries: table(
+    {
+      playerId: id("players"),
+      nhlApiId: optionalNullableString,
+      season: stringValue,
+      seasonStartYear: numberValue,
+      salary: numberValue,
+      capHit: optionalNullableNumber,
+      salaryCap: optionalNullableNumber,
+      normalizedSalary: optionalNullableNumber,
+      source: stringValue,
+      sourceRef: optionalNullableString,
+      createdAt: timestampValue,
+      updatedAt: timestampValue,
+    },
+    [
+      "playerId",
+      "nhlApiId",
+      "seasonStartYear",
+      ["playerId", "seasonStartYear"],
+      ["seasonStartYear", "normalizedSalary"],
+    ],
+  ),
+
   contracts: table(
     {
       playerId: id("players"),
@@ -524,6 +548,75 @@ export default defineSchema({
       ["seasonId", "playerId", "date"],
       ["seasonId", "gshlTeamId", "playerId", "weekId", "date"],
     ],
+  ),
+
+  playerDayHighlights: table(
+    {
+      seasonId: id("seasons"),
+      gshlTeamId: id("teams"),
+      playerId: id("players"),
+      weekId: id("weeks"),
+      date: dateKeyValue,
+      nhlPos: optionalNullableStringArray,
+      posGroup: stringValue,
+      nhlTeam: optionalNullableStringArray,
+      dailyPos: optionalNullableString,
+      bestPos: optionalNullableString,
+      fullPos: optionalNullableString,
+      opp: optionalNullableString,
+      score: optionalNullableString,
+      ...statFields,
+      sourcePlayerDayId: stringValue,
+      sourceKey: stringValue,
+      ratingRank: optionalNullableNumber,
+      categoryRanks: v.array(
+        v.object({
+          category: stringValue,
+          rank: numberValue,
+          value: numberValue,
+        }),
+      ),
+      selectionReasons: stringArray,
+      archiveChecksum: stringValue,
+    },
+    [
+      "seasonId",
+      ["seasonId", "date"],
+      ["seasonId", "ratingRank"],
+      ["seasonId", "sourcePlayerDayId"],
+    ],
+  ),
+
+  seasonDataArchives: table(
+    {
+      seasonId: id("seasons"),
+      status: v.union(
+        v.literal("exporting"),
+        v.literal("verified"),
+        v.literal("deleting"),
+        v.literal("archived"),
+        v.literal("restored"),
+        v.literal("failed"),
+      ),
+      archiveVersion: numberValue,
+      archiveKey: stringValue,
+      sourceRowCount: numberValue,
+      sourceChecksum: stringValue,
+      firstDate: optionalNullableString,
+      lastDate: optionalNullableString,
+      highlightCount: numberValue,
+      aggregateChecksums: v.record(v.string(), v.string()),
+      activitySnapshot: v.array(v.any()),
+      preDeleteBackupName: optionalNullableString,
+      preDeleteBackupChecksum: optionalNullableString,
+      exportedAt: timestampValue,
+      verifiedAt: timestampValue,
+      deletedAt: timestampValue,
+      restoredAt: timestampValue,
+      createdAt: timestampValue,
+      updatedAt: timestampValue,
+    },
+    ["seasonId", "status"],
   ),
 
   playerWeekStatLines: table(
