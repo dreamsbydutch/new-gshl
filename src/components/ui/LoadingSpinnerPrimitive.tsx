@@ -14,10 +14,12 @@ import { cn } from "@gshl-utils";
 export function LoadingSpinner({ className }: { className?: string }) {
   return (
     <div
+      role="status"
+      aria-label="Loading"
       className={cn(
-        "m-auto h-10 w-10 animate-spin place-self-center rounded-full border border-solid border-gray-500 border-t-transparent shadow-md",
+        "m-auto h-10 w-10 animate-spin place-self-center rounded-full border border-solid border-gray-500 border-t-transparent shadow-md motion-reduce:animate-none",
         className,
       )}
-    ></div>
+    />
   );
 }

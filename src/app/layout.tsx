@@ -1,5 +1,6 @@
-import { type Metadata } from "next";
-import { Varela_Round } from "next/font/google";
+import { type Metadata, type Viewport } from "next";
+import { GeistSans } from "geist/font/sans";
+import { GeistMono } from "geist/font/mono";
 
 import "@gshl-styles";
 
@@ -10,12 +11,6 @@ import { PerformanceVitals } from "@gshl-components/performance/PerformanceVital
 import { ConvexClientProvider } from "@gshl-components/auth/ConvexClientProvider";
 import { Toaster } from "@gshl-ui";
 
-const varelaRound = Varela_Round({
-  weight: "400",
-  subsets: ["latin"],
-  variable: "--font-varela",
-});
-
 export const metadata: Metadata = {
   title: {
     template: "%s | GSHL",
@@ -23,6 +18,12 @@ export const metadata: Metadata = {
   },
   description: "Gem Stone Hockey League",
   icons: [{ rel: "icon", url: "/favicon.ico" }],
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({
@@ -40,11 +41,12 @@ export default function RootLayout({
       </head>
       <body
         className={cn(
-          varelaRound.variable,
-          // Preserve the existing Tailwind font contracts while keeping
-          // Varela Round as the app-wide typeface.
-          "[--font-barlow:var(--font-varela)] [--font-oswald:var(--font-varela)] [--font-yellowtail:var(--font-varela)]",
-          "font-varela",
+          GeistSans.variable,
+          GeistMono.variable,
+          // Preserve legacy utility names while moving every text role onto
+          // bundled, locally served font files.
+          "[--font-barlow:var(--font-geist-sans)] [--font-oswald:var(--font-geist-sans)] [--font-varela:var(--font-geist-sans)] [--font-yellowtail:var(--font-geist-sans)]",
+          "font-sans antialiased",
         )}
       >
         <AuthProvider>

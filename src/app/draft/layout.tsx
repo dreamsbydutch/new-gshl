@@ -1,9 +1,12 @@
 import { DraftHubLayout } from "@gshl-components/draft/DraftHubLayout";
-import { requireActiveUser } from "@gshl-lib/auth/require-user";
+import { Suspense } from "react";
 
-export default async function DraftLayout({
+export default function DraftLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
-  await requireActiveUser("/draft");
-  return <DraftHubLayout>{children}</DraftHubLayout>;
+  return (
+    <Suspense fallback={null}>
+      <DraftHubLayout>{children}</DraftHubLayout>
+    </Suspense>
+  );
 }

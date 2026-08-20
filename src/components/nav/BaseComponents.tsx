@@ -28,25 +28,19 @@ export function ClickableNavItem({
   className,
 }: ClickableNavItemProps) {
   return (
-    <div
+    <button
+      type="button"
       onClick={isDisabled ? undefined : onClick}
       className={cn(
-        "flex cursor-pointer items-center gap-2 rounded px-3 py-2 text-sm transition-colors",
+        "flex min-h-11 cursor-pointer items-center gap-2 rounded px-3 py-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-2 motion-reduce:transition-none",
         isActive
           ? "bg-blue-100 text-blue-700"
           : "text-gray-700 hover:bg-gray-100",
         isDisabled && "cursor-not-allowed opacity-50",
         className,
       )}
-      role="button"
-      tabIndex={isDisabled ? -1 : 0}
+      disabled={isDisabled}
       aria-disabled={isDisabled}
-      onKeyDown={(e) => {
-        if (!isDisabled && (e.key === "Enter" || e.key === " ")) {
-          e.preventDefault();
-          onClick();
-        }
-      }}
     >
       {typeof icon === "string" ? (
         <Image
@@ -60,7 +54,7 @@ export function ClickableNavItem({
         icon
       )}
       <span>{label}</span>
-    </div>
+    </button>
   );
 }
 
@@ -80,29 +74,31 @@ export function LinkNavItem({
   return (
     <Link
       href={href}
+      aria-current={isActive ? "page" : undefined}
       className={cn(
-        "flex items-center gap-2 rounded-lg p-1.5 text-sm transition-colors",
-        href === "/" && "p-0.5",
-        isActive ? "bg-primary text-white" : "text-gray-700 hover:bg-gray-100",
+        "flex min-h-11 items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-2 motion-reduce:transition-none",
+        isActive
+          ? "bg-slate-900 text-white"
+          : "text-slate-700 hover:bg-slate-100",
         className,
       )}
     >
       {typeof icon === "string" ? (
         <Image
           src={icon}
-          alt={`${label} icon`}
-          width={32}
-          height={32}
+          alt=""
+          aria-hidden="true"
+          width={24}
+          height={24}
           className={cn(
-            "h-10 w-10 transition-all duration-200",
+            "h-6 w-6 object-contain transition-all duration-200 motion-reduce:transition-none",
             isActive && !preserveIconColors && "brightness-0 invert",
-            href === "/" && "h-12 w-12",
           )}
         />
       ) : (
         icon
       )}
-      {label && <span className="hidden sm:inline">{label}</span>}
+      {label && <span className="truncate">{label}</span>}
     </Link>
   );
 }
@@ -115,35 +111,17 @@ export function LinkNavItem({
 export function NavContainer({
   children,
   className,
-  position = "bottom",
-  variant = "primary",
+  ariaLabel = "Primary",
 }: NavContainerProps) {
-  const baseClasses =
-    "fixed flex items-center justify-center transition-all duration-200 shadow-lg";
-
-  const positionClasses = {
-    top: "top-0 left-0 right-0",
-    bottom: "bottom-0 left-0 right-0 lg:bottom-auto lg:top-0",
-    secondary: "bottom-14 left-0 right-0 lg:bottom-auto lg:top-14",
-    tertiary: "bottom-24 left-0 right-0 lg:bottom-auto lg:top-24",
-  };
-
-  const variantClasses = {
-    primary: "bg-gray-100 border-t h-14 z-50 lg:border-b lg:border-t-0",
-    secondary: "bg-gray-100 border-t h-10 z-50 lg:border-b lg:border-t-0",
-    tertiary: "bg-gray-100 border-t h-7 text-sm z-50 lg:border-b lg:border-t-0",
-  };
-
   return (
-    <div
+    <nav
+      aria-label={ariaLabel}
       className={cn(
-        baseClasses,
-        positionClasses[position],
-        variantClasses[variant],
+        "fixed inset-x-0 bottom-0 z-50 flex items-center justify-center border-t border-slate-200 bg-white/95 pb-[env(safe-area-inset-bottom)] shadow-[0_-8px_24px_rgba(15,23,42,0.08)] backdrop-blur lg:bottom-auto lg:top-0 lg:border-b lg:border-t-0 lg:pb-0 lg:pt-[env(safe-area-inset-top)] lg:shadow-sm print:hidden",
         className,
       )}
     >
       {children}
-    </div>
+    </nav>
   );
 }

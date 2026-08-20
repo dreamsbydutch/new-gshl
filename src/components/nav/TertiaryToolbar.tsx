@@ -6,7 +6,6 @@
 
 import { cn } from "@gshl-utils";
 import type { ToolbarProps } from "@gshl-types";
-import { NavContainer } from "./BaseComponents";
 
 /**
  * Tertiary page toolbar component with consistent styling and positioning
@@ -15,14 +14,15 @@ import { NavContainer } from "./BaseComponents";
  */
 export function TertiaryPageToolbar({ children, className }: ToolbarProps) {
   return (
-    <NavContainer
-      position="tertiary"
-      variant="tertiary"
-      className={cn("justify-start", className)}
+    <div
+      className={cn(
+        "flex min-h-12 items-center border-t border-slate-100",
+        className,
+      )}
     >
       <div className="no-scrollbar flex w-full flex-row items-stretch gap-1 overflow-x-auto overflow-y-hidden whitespace-nowrap px-2">
         {children}
       </div>
-    </NavContainer>
+    </div>
   );
 }

@@ -20,6 +20,7 @@ export * from "./useDraftHubBoard";
 export * from "./useDraftHubTeamData";
 export * from "./useDraftRosterBoard";
 export * from "./useFreeAgencyData";
+export * from "./useContextualNavigation";
 export * from "./useNavigation";
 export * from "./useConferenceContestData";
 export * from "./useOwnerRankingsData";

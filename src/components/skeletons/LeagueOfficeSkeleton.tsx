@@ -93,10 +93,34 @@ export function FreeAgencySkeleton() {
       </div>
       <div className="flex flex-wrap gap-2">
         {Array.from({ length: 7 }).map((_, index) => (
-          <Skeleton key={index} className="h-8 w-12 rounded-full sm:h-10" />
+          <Skeleton key={index} className="h-11 w-12 rounded-full" />
         ))}
       </div>
-      <div className="overflow-hidden rounded-xl border bg-white">
+      <div className="space-y-3 lg:hidden">
+        {Array.from({ length: 5 }).map((_, index) => (
+          <div key={index} className="rounded-xl border bg-white p-3 shadow-sm">
+            <div className="flex items-center gap-3">
+              <Skeleton className="h-11 w-11 shrink-0 rounded-lg" />
+              <div className="min-w-0 flex-1 space-y-2">
+                <Skeleton className="h-5 w-40 max-w-[80%]" />
+                <Skeleton className="h-3 w-28" />
+              </div>
+              <Skeleton className="h-4 w-16" />
+            </div>
+            <div className="mt-3 grid grid-cols-3 gap-2 rounded-lg bg-muted/40 p-2">
+              {Array.from({ length: 5 }).map((_, metricIndex) => (
+                <Skeleton key={metricIndex} className="mx-auto h-7 w-10" />
+              ))}
+            </div>
+            <Skeleton className="mt-2 h-11 w-full" />
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <Skeleton className="h-11 w-full" />
+              <Skeleton className="h-11 w-full" />
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="hidden overflow-hidden rounded-xl border bg-white lg:block">
         <TableRowsSkeleton columns={8} rows={10} />
       </div>
     </div>
@@ -140,11 +164,22 @@ export function AdminPanelSkeleton() {
   );
 }
 
-export function LeagueOfficeRouteSkeleton() {
+export function LeagueOfficeSkeleton() {
   return (
     <div className="container mx-auto px-4 py-8">
       <AdminPanelSkeleton />
     </div>
+  );
+}
+
+export function LeagueOfficeRouteSkeleton() {
+  return (
+    <main aria-labelledby="league-office-loading-heading">
+      <h1 id="league-office-loading-heading" className="sr-only">
+        League Office
+      </h1>
+      <LeagueOfficeSkeleton />
+    </main>
   );
 }
 

@@ -4,6 +4,7 @@
  */
 import { useShallow } from "zustand/react/shallow";
 import { useNavStore } from "@gshl-cache";
+import { useEffect, useState } from "react";
 
 export function useNav() {
   return useNavStore(
@@ -32,4 +33,30 @@ export function useNavigationReset() {
 export function useSelectedSeasonId() {
   const selectedSeasonId = useNavStore((state) => state.selectedSeasonId);
   return { selectedSeasonId };
+}
+
+/**
+ * Persistence hydrates after the server/client render boundary. Contextual URL
+ * defaults must wait for this signal or they can replace a user's stored state
+ * with the store's legacy placeholder defaults.
+ */
+export function useNavigationHydration() {
+  const [hasHydrated, setHasHydrated] = useState(false);
+
+  useEffect(() => {
+    setHasHydrated(useNavStore.persist.hasHydrated());
+    const stopHydrating = useNavStore.persist.onHydrate(() => {
+      setHasHydrated(false);
+    });
+    const finishHydrating = useNavStore.persist.onFinishHydration(() => {
+      setHasHydrated(true);
+    });
+
+    return () => {
+      stopHydrating();
+      finishHydrating();
+    };
+  }, []);
+
+  return { hasHydrated };
 }

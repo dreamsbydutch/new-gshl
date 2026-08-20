@@ -17,10 +17,14 @@ import { DropdownToggle } from "./Toggle";
 export function SeasonToggleNav({
   className,
   dropdownPosition,
+  selectedSeasonId,
+  onSelectSeason,
 }: SeasonToggleNavProps) {
   const [mounted, setMounted] = useState(false);
   const { seasonOptions } = useSeasonState({ autoSelect: false });
-  const { setSelectedSeasonId, selectedSeasonSummary } = useSeasonNavigation();
+  const { setSelectedSeasonId, selectedSeasonSummary } = useSeasonNavigation({
+    autoSelect: selectedSeasonId === undefined,
+  });
 
   // Prevent hydration mismatch by only rendering with store data on client
   useEffect(() => {
@@ -28,6 +32,10 @@ export function SeasonToggleNav({
   }, []);
 
   const handleSeasonSelect = (season: SeasonSummary) => {
+    if (onSelectSeason) {
+      onSelectSeason(season.id);
+      return;
+    }
     setSelectedSeasonId(season.id);
   };
 
@@ -38,6 +46,12 @@ export function SeasonToggleNav({
     () => [...seasonOptions].sort((a, b) => b.year - a.year),
     [seasonOptions],
   );
+  const selectedOption =
+    selectedSeasonId !== undefined
+      ? (sortedOptions.find(
+          (season) => String(season.id) === String(selectedSeasonId),
+        ) ?? null)
+      : (selectedSeasonSummary ?? null);
 
   // Show loading state during SSR and initial client hydration
   if (!mounted) {
@@ -47,10 +61,11 @@ export function SeasonToggleNav({
   return (
     <DropdownToggle<SeasonSummary>
       items={sortedOptions}
-      selectedItem={selectedSeasonSummary ?? null}
+      selectedItem={selectedOption}
       onSelect={handleSeasonSelect}
       getItemKey={getSeasonKey}
       getItemLabel={getSeasonLabel}
+      ariaLabel="Season"
       className={className}
       dropdownPosition={dropdownPosition}
     />

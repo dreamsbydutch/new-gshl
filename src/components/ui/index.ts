@@ -58,6 +58,7 @@ export {
   TableCell,
   TableCaption,
 } from "./TablePrimitive";
+export { TableViewport } from "./TableViewport";
 
 // Toast Components
 export {

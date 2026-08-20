@@ -27,6 +27,14 @@ export type InputProps = React.InputHTMLAttributes<HTMLInputElement>;
 
 export type LabelProps = React.LabelHTMLAttributes<HTMLLabelElement>;
 
+export interface TableViewportProps {
+  children: React.ReactNode;
+  ariaLabel: string;
+  className?: string;
+  viewportClassName?: string;
+  scrollHint?: string;
+}
+
 export type ToastVariant = "default" | "destructive";
 
 export interface ToastProps

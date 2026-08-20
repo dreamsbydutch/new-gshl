@@ -9,6 +9,97 @@
 
 import type { ReactNode } from "react";
 
+export type ScheduleNavigationView = "week" | "team";
+
+export type StandingsNavigationView =
+  | "overall"
+  | "conference"
+  | "wildcard"
+  | "power"
+  | "playoff"
+  | "awards";
+
+export type LockerRoomNavigationView =
+  | "roster"
+  | "salary"
+  | "history"
+  | "trophy"
+  | "recordbook"
+  | "draft";
+
+export type LeagueOfficeNavigationView =
+  | "draft"
+  | "freeAgents"
+  | "rules"
+  | "confBattle"
+  | "ownerRankings"
+  | "contracts"
+  | "users"
+  | "jobs"
+  | "newsroom"
+  | "imageUpload";
+
+export type MatchupNavigationSource = "schedule" | "lockerroom" | "headlines";
+
+export type MatchupNavigationSide = "away" | "home";
+
+export interface ContextualNavigationQuery {
+  view: string | null;
+  season: string | null;
+  week: string | null;
+  owner: string | null;
+  from: string | null;
+  side: string | null;
+}
+
+export interface ContextualSelectionOptions<T extends string> {
+  explicitValue: string | null;
+  persistedValue: string | null | undefined;
+  validValues: readonly T[];
+  fallbackValue: T;
+}
+
+export interface ContextualSelection<T extends string> {
+  value: T;
+  source: "url" | "persisted" | "default";
+  urlWasInvalid: boolean;
+}
+
+export interface ScheduleNavigationContext {
+  view: ScheduleNavigationView;
+  season?: string | null;
+  week?: string | null;
+  owner?: string | null;
+}
+
+export interface StandingsNavigationContext {
+  view: StandingsNavigationView;
+  season?: string | null;
+}
+
+export interface LockerRoomNavigationContext {
+  view: LockerRoomNavigationView;
+  owner?: string | null;
+}
+
+export interface LeagueOfficeNavigationContext {
+  view: LeagueOfficeNavigationView;
+}
+
+export interface MatchupNavigationContext {
+  from: MatchupNavigationSource;
+  view?: ScheduleNavigationView | LockerRoomNavigationView;
+  season?: string | null;
+  week?: string | null;
+  owner?: string | null;
+  side?: MatchupNavigationSide | null;
+}
+
+export interface MatchupNavigationFallback {
+  season?: string | null;
+  week?: string | null;
+}
+
 export interface NavigationStoreState {
   selectedScheduleType: string;
   selectedSeasonId: string;
@@ -186,8 +277,7 @@ export type NavSize = "sm" | "md" | "lg";
 export interface NavContainerProps {
   children: ReactNode;
   className?: string;
-  position?: "top" | "bottom" | "secondary" | "tertiary";
-  variant?: "primary" | "secondary" | "tertiary";
+  ariaLabel?: string;
 }
 
 export interface ClickableNavItemProps {
@@ -202,6 +292,17 @@ export interface ClickableNavItemProps {
 
 export interface NavbarProps {
   className?: string;
+  search?: string;
+}
+
+export interface MainNavbarMoreMenuProps {
+  isActive: boolean;
+  pathname: string;
+  placement: "mobile" | "desktop";
+}
+
+export interface AuthNavControlProps {
+  compact?: boolean;
 }
 
 export interface ToolbarProps {
@@ -209,18 +310,31 @@ export interface ToolbarProps {
   className?: string;
 }
 
+export interface PageContextNavigationProps {
+  children: ReactNode;
+  ariaLabel: string;
+  className?: string;
+}
+
 export interface SeasonToggleNavProps {
   className?: string;
   dropdownPosition?: "above" | "below" | "auto";
+  selectedSeasonId?: string | null;
+  onSelectSeason?: (seasonId: string) => void;
 }
 
 export interface TeamsToggleProps {
   className?: string;
-  seasonId?: string;
+  seasonId?: string | null;
+  selectedOwnerId?: string | null;
+  onSelectOwner?: (ownerId: string) => void;
 }
 
 export interface WeeksToggleProps {
   className?: string;
+  seasonId?: string | null;
+  selectedWeekId?: string | null;
+  onSelectWeek?: (weekId: string) => void;
 }
 
 export interface LabeledToggleOption {
@@ -246,6 +360,7 @@ export interface HorizontalToggleProps<T> extends BaseToggleProps<T> {
 }
 
 export interface DropdownToggleProps<T> extends BaseToggleProps<T> {
+  ariaLabel?: string;
   renderSelectedItem?: (item: T) => ReactNode;
   buttonClassName?: string;
   dropdownClassName?: string;

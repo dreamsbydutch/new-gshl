@@ -1,8 +1,9 @@
 "use client";
 
-import { useScheduleNavigation } from "@gshl-hooks";
+import { useScheduleContextNavigation } from "@gshl-hooks";
 import {
   HorizontalToggle,
+  PageContextNavigation,
   SeasonToggleNav,
   SecondaryPageToolbar,
   TeamsToggle,
@@ -10,9 +11,11 @@ import {
   TertiaryPageToolbar,
 } from "@gshl-nav";
 import type { LabeledToggleOption } from "@gshl-types";
+import { ScheduleSkeleton } from "@gshl-skeletons";
+
 export function ScheduleLayout({ children }: { children: React.ReactNode }) {
-  const { selectedType: scheduleType, setSelectedType: setScheduleType } =
-    useScheduleNavigation();
+  const navigation = useScheduleContextNavigation();
+  const scheduleType = navigation.selectedView;
 
   // Schedule type navigation items
   const scheduleTypes: LabeledToggleOption[] = [
@@ -23,29 +26,48 @@ export function ScheduleLayout({ children }: { children: React.ReactNode }) {
   const selectedScheduleType =
     scheduleTypes.find((type) => type.key === scheduleType) ?? null;
   return (
-    <div className="pb-24 font-varela lg:pb-8 lg:pt-20">
-      {children}
-      <SecondaryPageToolbar className="mx-auto text-center">
-        <SeasonToggleNav />
-        {scheduleType === "team" && (
-          <>
-            <TeamsToggle />
-          </>
-        )}
-        {(!scheduleType ||
-          scheduleType === "week" ||
-          scheduleType === "playoff") && <WeeksToggle />}
-      </SecondaryPageToolbar>
-      <TertiaryPageToolbar>
-        <HorizontalToggle<LabeledToggleOption>
-          items={scheduleTypes}
-          selectedItem={selectedScheduleType}
-          onSelect={(type: LabeledToggleOption) => setScheduleType(type.key)}
-          getItemKey={(type: LabeledToggleOption) => type.key}
-          getItemLabel={(type: LabeledToggleOption) => type.label}
-          itemClassName="py-0.5 text-sm"
-        />
-      </TertiaryPageToolbar>
+    <div className="font-varela">
+      <PageContextNavigation ariaLabel="Schedule controls">
+        <SecondaryPageToolbar className="text-center sm:justify-center">
+          <HorizontalToggle<LabeledToggleOption>
+            items={scheduleTypes}
+            selectedItem={selectedScheduleType}
+            onSelect={(type: LabeledToggleOption) =>
+              navigation.selectView(type.key === "team" ? "team" : "week")
+            }
+            getItemKey={(type: LabeledToggleOption) => type.key}
+            getItemLabel={(type: LabeledToggleOption) => type.label}
+            itemClassName="text-sm"
+          />
+          <SeasonToggleNav
+            className="shrink-0"
+            selectedSeasonId={navigation.selectedSeasonId}
+            onSelectSeason={navigation.selectSeason}
+          />
+        </SecondaryPageToolbar>
+        <TertiaryPageToolbar>
+          {scheduleType === "team" && (
+            <TeamsToggle
+              seasonId={navigation.selectedSeasonId}
+              selectedOwnerId={navigation.selectedOwnerId}
+              onSelectOwner={navigation.selectOwner}
+            />
+          )}
+          {scheduleType === "week" && (
+            <WeeksToggle
+              seasonId={navigation.selectedSeasonId}
+              selectedWeekId={navigation.selectedWeekId}
+              onSelectWeek={navigation.selectWeek}
+            />
+          )}
+        </TertiaryPageToolbar>
+      </PageContextNavigation>
+      <main aria-labelledby="schedule-page-heading">
+        <h1 id="schedule-page-heading" className="sr-only">
+          Schedule
+        </h1>
+        {navigation.isReady ? children : <ScheduleSkeleton />}
+      </main>
     </div>
   );
 }

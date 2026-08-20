@@ -6,7 +6,6 @@
 
 import { cn } from "@gshl-utils";
 import type { ToolbarProps } from "@gshl-types";
-import { NavContainer } from "./BaseComponents";
 
 /**
  * Secondary page toolbar component with consistent styling and positioning
@@ -15,12 +14,13 @@ import { NavContainer } from "./BaseComponents";
  */
 export function SecondaryPageToolbar({ children, className }: ToolbarProps) {
   return (
-    <NavContainer
-      position="secondary"
-      variant="secondary"
-      className={cn(className)}
+    <div
+      className={cn(
+        "no-scrollbar mx-auto flex min-h-14 w-full items-center gap-2 overflow-x-auto overflow-y-hidden px-2",
+        className,
+      )}
     >
       {children}
-    </NavContainer>
+    </div>
   );
 }

@@ -10,7 +10,7 @@ export function TeamsToggleSkeleton({ className }: { className?: string }) {
       )}
     >
       {Array.from({ length: 16 }).map((_, index) => (
-        <Skeleton key={index} className="h-8 w-8 shrink-0 rounded-md" />
+        <Skeleton key={index} className="h-11 w-11 shrink-0 rounded-md" />
       ))}
     </div>
   );
