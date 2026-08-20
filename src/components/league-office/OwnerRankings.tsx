@@ -175,9 +175,9 @@ export function OwnerRankings() {
     return (
       <div className="mx-auto max-w-2xl rounded-lg border border-red-200 bg-red-50 p-8 text-center">
         <Shield className="mx-auto h-6 w-6 text-red-500" />
-        <h1 className="mt-3 font-oswald text-2xl text-red-950">
+        <h2 className="mt-3 font-oswald text-2xl text-red-950">
           The GM Ladder is unavailable
-        </h1>
+        </h2>
         <p className="mt-1 text-sm text-red-700">
           The league history could not be assembled right now.
         </p>
@@ -189,9 +189,9 @@ export function OwnerRankings() {
     return (
       <div className="mx-auto max-w-2xl rounded-lg border border-slate-200 bg-white p-8 text-center">
         <Users className="mx-auto h-6 w-6 text-slate-400" />
-        <h1 className="mt-3 font-oswald text-2xl text-slate-900">
+        <h2 className="mt-3 font-oswald text-2xl text-slate-900">
           No GMs are on the ladder yet
-        </h1>
+        </h2>
       </div>
     );
   }

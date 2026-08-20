@@ -10,6 +10,7 @@ import {
 } from "@gshl-hooks";
 import {
   PlayoffBracketSkeleton,
+  PowerRankingsSkeleton,
   SeasonAwardsSkeleton,
   StandingsSkeleton,
 } from "@gshl-skeletons";
@@ -40,7 +41,7 @@ const PowerRankings = dynamic(
     import("@gshl-components/standings/PowerRankings").then(
       (module) => module.PowerRankings,
     ),
-  { loading: () => <StandingsSkeleton /> },
+  { loading: () => <PowerRankingsSkeleton /> },
 );
 
 export function StandingsContent() {
@@ -99,6 +100,9 @@ export function StandingsContent() {
     }
     if ((standingsType ?? "overall") === "playoff") {
       return <PlayoffBracketSkeleton />;
+    }
+    if ((standingsType ?? "overall") === "power") {
+      return <PowerRankingsSkeleton />;
     }
     return <StandingsSkeleton />;
   }

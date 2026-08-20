@@ -51,6 +51,68 @@ export function StandingsSkeleton() {
   );
 }
 
+export function PowerRankingsSkeleton() {
+  return (
+    <div
+      className="mx-auto w-full max-w-6xl space-y-4 px-2.5 py-3 sm:px-6 sm:py-4 lg:py-6"
+      aria-label="Loading power rankings"
+      aria-busy="true"
+    >
+      <div className="rounded-2xl border border-slate-200 bg-white px-3.5 py-3.5 shadow-sm sm:px-5 sm:py-4">
+        <Skeleton className="h-4 w-52 max-w-[80%]" />
+        <Skeleton className="mt-2 h-3 w-72 max-w-full" />
+      </div>
+
+      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div className="space-y-2 border-b border-slate-200 px-3 py-3 sm:px-5 sm:py-4">
+          <Skeleton className="h-6 w-36" />
+          <Skeleton className="h-3 w-60 max-w-full" />
+        </div>
+        <div className="divide-y divide-slate-100 md:hidden">
+          {Array.from({ length: 6 }).map((_, index) => (
+            <div key={index} className="p-3">
+              <div className="flex items-center gap-3">
+                <Skeleton className="h-10 w-10 shrink-0 rounded-lg" />
+                <Skeleton className="h-8 w-8 shrink-0 rounded-lg" />
+                <Skeleton className="h-4 w-32 max-w-[55%]" />
+              </div>
+              <Skeleton className="mt-2 h-12 w-full rounded-lg" />
+            </div>
+          ))}
+        </div>
+        <div className="hidden md:block">
+          <div className="grid grid-cols-[4rem_minmax(12rem,1fr)_6rem_6rem] gap-3 bg-slate-50 px-3 py-3">
+            {Array.from({ length: 4 }).map((_, index) => (
+              <Skeleton key={index} className="h-3 w-full" />
+            ))}
+          </div>
+          {Array.from({ length: 8 }).map((_, index) => (
+            <div
+              key={index}
+              className="grid grid-cols-[4rem_minmax(12rem,1fr)_6rem_6rem] items-center gap-3 border-t border-slate-100 px-3 py-2.5"
+            >
+              <Skeleton className="h-5 w-5 justify-self-center" />
+              <div className="flex items-center gap-2">
+                <Skeleton className="h-8 w-8 rounded-lg" />
+                <Skeleton className="h-4 w-32" />
+              </div>
+              <Skeleton className="h-3 w-10 justify-self-center" />
+              <Skeleton className="h-3 w-10 justify-self-end" />
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:p-5">
+        <Skeleton className="h-6 w-36" />
+        <Skeleton className="mt-2 h-3 w-72 max-w-full" />
+        <Skeleton className="mt-4 h-72 w-full rounded-xl sm:h-[28rem]" />
+        <Skeleton className="mt-4 h-11 w-full rounded-xl" />
+      </section>
+    </div>
+  );
+}
+
 function BracketMatchupSkeleton() {
   return (
     <div className="min-h-[92px] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
@@ -75,7 +137,7 @@ function BracketMatchupSkeleton() {
 
 function BracketColumnSkeleton({ cards }: { cards: number }) {
   return (
-    <section className="min-w-[280px]">
+    <section className="min-w-0 lg:min-w-[280px]">
       <div className="flex min-h-14 items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
         <Skeleton className="h-10 w-10 rounded-lg" />
         <div className="flex-1 space-y-1.5">
@@ -84,12 +146,12 @@ function BracketColumnSkeleton({ cards }: { cards: number }) {
         </div>
       </div>
       <div
-        className={`mt-3 grid h-[28rem] gap-4 ${
+        className={`mt-3 grid gap-3 lg:h-[28rem] lg:gap-4 ${
           cards === 1
-            ? "content-center"
+            ? "lg:content-center"
             : cards === 2
-              ? "content-around"
-              : "grid-rows-4"
+              ? "lg:content-around"
+              : "lg:grid-rows-4"
         }`}
       >
         {Array.from({ length: cards }).map((_, index) => (
@@ -107,8 +169,8 @@ export function PlayoffBracketSkeleton() {
         <div className="border-b border-slate-200 pb-4">
           <Skeleton className="h-4 w-48" />
         </div>
-        <div className="mt-5 overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-b from-slate-50 to-white p-2.5 shadow-sm sm:p-5">
-          <div className="grid min-w-[875px] grid-cols-3 gap-5">
+        <div className="mt-5 rounded-2xl border border-slate-200 bg-gradient-to-b from-slate-50 to-white p-2.5 shadow-sm sm:p-5">
+          <div className="grid gap-5 lg:grid-cols-3">
             <BracketColumnSkeleton cards={4} />
             <BracketColumnSkeleton cards={2} />
             <BracketColumnSkeleton cards={1} />

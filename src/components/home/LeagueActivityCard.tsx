@@ -1,11 +1,18 @@
 "use client";
 
+import { useState } from "react";
+import { ChevronDown, ChevronUp } from "lucide-react";
 import { useLeagueActivity } from "@gshl-hooks";
 import { LeagueActivityRowsSkeleton } from "@gshl-skeletons";
 import type { LeagueActivityEvent, LeagueActivityType } from "@gshl-types";
-import { cn, formatMoney, showDate } from "@gshl-utils";
-
-const ACTIVITY_LIMIT = 12;
+import {
+  cn,
+  formatMoney,
+  HOME_LEAGUE_ACTIVITY_PREVIEW_LIMIT,
+  HOME_LEAGUE_ACTIVITY_QUERY_LIMIT,
+  selectHomeLeagueActivity,
+  showDate,
+} from "@gshl-utils";
 
 const activityStyle: Record<
   LeagueActivityType,
@@ -50,16 +57,28 @@ function activityDetail(event: LeagueActivityEvent): string {
 }
 
 export function LeagueActivityCard({ seasonId }: { seasonId?: string }) {
+  const [showAllActivity, setShowAllActivity] = useState(false);
   const {
     data: activity,
     isLoading,
     error,
-  } = useLeagueActivity(seasonId, ACTIVITY_LIMIT);
+  } = useLeagueActivity(seasonId, HOME_LEAGUE_ACTIVITY_QUERY_LIMIT);
+  const visibleActivity = selectHomeLeagueActivity(activity, showAllActivity);
+  const hiddenActivityCount = Math.max(
+    0,
+    activity.length - HOME_LEAGUE_ACTIVITY_PREVIEW_LIMIT,
+  );
 
   return (
-    <section className="mx-auto w-full max-w-3xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-      <header className="border-b border-slate-100 px-4 py-3.5 sm:px-5">
-        <h2 className="font-oswald text-xl text-slate-950">
+    <section
+      aria-labelledby="league-activity-heading"
+      className="h-full min-w-0 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm sm:rounded-2xl"
+    >
+      <header className="border-b border-slate-100 px-3 py-3 sm:px-5">
+        <h2
+          id="league-activity-heading"
+          className="font-oswald text-lg text-slate-950 sm:text-xl"
+        >
           Recent league activity
         </h2>
         <p className="mt-0.5 text-xs text-slate-500">
@@ -70,49 +89,78 @@ export function LeagueActivityCard({ seasonId }: { seasonId?: string }) {
       {isLoading ? (
         <LeagueActivityRowsSkeleton />
       ) : error ? (
-        <p className="px-5 py-8 text-center text-sm text-slate-500">
+        <p className="px-4 py-6 text-center text-sm text-slate-500 sm:px-5">
           League activity is unavailable right now.
         </p>
       ) : activity.length === 0 ? (
-        <p className="px-5 py-8 text-center text-sm text-slate-500">
+        <p className="px-4 py-6 text-center text-sm text-slate-500 sm:px-5">
           No recent league activity has been recorded.
         </p>
       ) : (
-        <ul className="divide-y divide-slate-100 px-4 sm:px-5">
-          {activity.map((event) => {
+        <ul
+          id="home-league-activity-list"
+          aria-label="Latest league transactions and roster events"
+          className="divide-y divide-slate-100 px-3 sm:px-5"
+        >
+          {visibleActivity.map((event) => {
             const style = activityStyle[event.type];
             return (
               <li
                 key={event.id}
-                className="flex min-w-0 items-center gap-3 py-2.5"
+                className="flex min-w-0 items-start gap-2.5 py-2.5"
               >
                 <span
                   className={cn(
-                    "w-[5.25rem] shrink-0 rounded-full px-2 py-1 text-center font-barlow text-[9px] font-semibold uppercase tracking-wide ring-1 ring-inset",
+                    "mt-0.5 w-24 shrink-0 rounded-full px-2 py-1 text-center font-barlow text-xs font-semibold uppercase tracking-wide ring-1 ring-inset",
                     style.badge,
                   )}
                 >
                   {style.label}
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold text-slate-900">
-                    {event.playerName}
-                  </p>
-                  <p className="truncate text-xs text-slate-500">
+                  <div className="flex min-w-0 flex-col sm:flex-row sm:items-baseline sm:gap-2">
+                    <p className="min-w-0 flex-1 truncate text-sm font-semibold text-slate-900">
+                      {event.playerName}
+                    </p>
+                    <time
+                      dateTime={event.date}
+                      className="shrink-0 text-xs tabular-nums text-slate-400"
+                    >
+                      {showDate(event.date)}
+                    </time>
+                  </div>
+                  <p className="line-clamp-2 text-xs leading-4 text-slate-500">
                     {activityDetail(event)}
                   </p>
                 </div>
-                <time
-                  dateTime={event.date}
-                  className="shrink-0 text-[11px] tabular-nums text-slate-400"
-                >
-                  {showDate(event.date)}
-                </time>
               </li>
             );
           })}
         </ul>
       )}
+      {!isLoading && !error && hiddenActivityCount > 0 ? (
+        <footer className="border-t border-slate-100 px-3 py-2 sm:px-5">
+          <button
+            type="button"
+            aria-controls="home-league-activity-list"
+            aria-expanded={showAllActivity}
+            onClick={() => setShowAllActivity((isExpanded) => !isExpanded)}
+            className="inline-flex min-h-11 w-full items-center justify-center gap-1.5 rounded-lg text-xs font-semibold text-blue-700 transition-colors hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+          >
+            {showAllActivity ? (
+              <>
+                Show fewer
+                <ChevronUp className="h-4 w-4" aria-hidden="true" />
+              </>
+            ) : (
+              <>
+                Show {hiddenActivityCount} more
+                <ChevronDown className="h-4 w-4" aria-hidden="true" />
+              </>
+            )}
+          </button>
+        </footer>
+      ) : null}
     </section>
   );
 }

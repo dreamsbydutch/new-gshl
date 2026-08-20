@@ -193,10 +193,10 @@ export function Newsroom() {
         <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-blue-700">
           Commissioner tools
         </p>
-        <h1 className="mt-1 flex items-center gap-2 font-oswald text-3xl font-bold text-slate-950">
+        <h2 className="mt-1 flex items-center gap-2 font-oswald text-3xl font-bold text-slate-950">
           <Newspaper className="h-7 w-7" aria-hidden="true" />
           GSHL Press Box Newsroom
-        </h1>
+        </h2>
         <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
           Weekly and season-milestone editions publish automatically. ChatGPT is
           optional: copy the grounded prompt, use it in ChatGPT Free or Plus,
@@ -291,7 +291,7 @@ export function Newsroom() {
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[18rem_minmax(0,1fr)]">
-        <aside className="self-start rounded-xl border border-slate-200 bg-white p-3 shadow-sm xl:sticky xl:top-20">
+        <aside className="self-start rounded-xl border border-slate-200 bg-white p-3 shadow-sm xl:sticky xl:top-[calc(var(--app-primary-nav-height)+var(--app-page-context-row-height)+env(safe-area-inset-top)+1rem)]">
           <h2 className="px-2 pb-2 text-xs font-bold uppercase tracking-[0.18em] text-slate-500">
             Editions
           </h2>

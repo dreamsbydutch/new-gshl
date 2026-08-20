@@ -36,11 +36,14 @@ export function DraftHubCard({ season }: DraftHubCardProps) {
       : "Open Draft Hub";
 
   return (
-    <section className="relative overflow-hidden rounded-2xl border border-slate-700 bg-gradient-to-br from-slate-950 via-slate-900 to-primary p-5 text-white shadow-xl sm:p-7">
+    <section
+      aria-labelledby="draft-hub-home-heading"
+      className="relative overflow-hidden rounded-xl border border-slate-700 bg-gradient-to-br from-slate-950 via-slate-900 to-primary p-4 text-white shadow-lg sm:rounded-2xl sm:p-5"
+    >
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_85%_15%,rgba(251,191,36,0.22),transparent_32%)]" />
-      <div className="relative grid items-center gap-5 md:grid-cols-[1fr_auto]">
+      <div className="relative grid items-center gap-3 md:grid-cols-[1fr_auto] md:gap-5">
         <div>
-          <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-bold uppercase tracking-[0.18em] text-amber-200">
+          <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-bold uppercase tracking-[0.18em] text-amber-200">
             {isComplete ? (
               <Trophy className="h-3.5 w-3.5" />
             ) : (
@@ -48,14 +51,17 @@ export function DraftHubCard({ season }: DraftHubCardProps) {
             )}
             {isComplete ? "Draft complete" : isLive ? "Live now" : "Upcoming"}
           </div>
-          <h2 className="text-3xl font-black sm:text-4xl">
+          <h2
+            id="draft-hub-home-heading"
+            className="text-2xl font-black sm:text-3xl"
+          >
             {draftYear} GSHL Draft Hub
           </h2>
-          <p className="mt-2 max-w-2xl text-sm text-slate-300 sm:text-base">
+          <p className="mt-1 max-w-2xl text-sm leading-5 text-slate-300">
             Follow every selection live, see the full league board, and track
             each team&apos;s roster and draft capital.
           </p>
-          <p className="mt-3 text-sm font-semibold text-white/85">
+          <p className="mt-2 text-xs font-semibold text-white/85 sm:text-sm">
             {new Intl.DateTimeFormat("en-CA", {
               timeZone: "America/Toronto",
               dateStyle: "full",
@@ -74,7 +80,7 @@ export function DraftHubCard({ season }: DraftHubCardProps) {
               </p>
             </div>
           ) : null}
-          <Button asChild variant="secondary" className="gap-2">
+          <Button asChild variant="secondary" className="min-h-11 gap-2">
             <Link href="/draft">
               {actionLabel}
               <ArrowRight className="h-4 w-4" />

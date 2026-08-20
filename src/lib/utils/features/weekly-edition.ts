@@ -53,6 +53,29 @@ export const WEEKLY_EDITION_ISSUE_LABELS = {
   preseason: "Preseason Preview",
 } as const;
 
+/**
+ * Keeps links stored in published editions intact while identifying Matchup
+ * navigation as originating from the Press Box. Existing query values and
+ * fragments are retained, and any stale source is replaced deterministically.
+ */
+export function buildWeeklyEditionCtaHref(href: string): string {
+  const hashIndex = href.indexOf("#");
+  const hash = hashIndex >= 0 ? href.slice(hashIndex) : "";
+  const hrefWithoutHash = hashIndex >= 0 ? href.slice(0, hashIndex) : href;
+  const queryIndex = hrefWithoutHash.indexOf("?");
+  const pathname =
+    queryIndex >= 0 ? hrefWithoutHash.slice(0, queryIndex) : hrefWithoutHash;
+
+  if (!/^\/matchup\/[^/?#]+\/?$/.test(pathname)) return href;
+
+  const params = new URLSearchParams(
+    queryIndex >= 0 ? hrefWithoutHash.slice(queryIndex + 1) : "",
+  );
+  params.set("from", "headlines");
+
+  return `${pathname}?${params.toString()}${hash}`;
+}
+
 const WEEKLY_EDITION_ARTICLE_SLOTS = [
   { id: "article_1", kind: "primary_article" },
   { id: "article_2", kind: "primary_article" },

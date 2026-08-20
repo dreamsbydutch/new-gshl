@@ -63,9 +63,7 @@ export function DraftClasses() {
   const pageToolbarProps: {
     toolbarKeys: ToggleItem<string | null>[];
     activeKey: string | null;
-    className?: [string?, string?, string?];
   } = {
-    className: ["bottom-24 h-8", "h-6", "text-xs"],
     activeKey: selectedType,
     toolbarKeys: [
       {
@@ -91,7 +89,21 @@ export function DraftClasses() {
     ],
   };
   return (
-    <div className="pb-20 lg:pb-8 lg:pt-8">
+    <div>
+      <TertiaryPageToolbar className="mb-3 border-y bg-slate-50 print:hidden">
+        <HorizontalToggle<ToggleItem<string | null>>
+          items={pageToolbarProps.toolbarKeys}
+          selectedItem={
+            pageToolbarProps.toolbarKeys.find(
+              (item) => item.key === pageToolbarProps.activeKey,
+            ) ?? null
+          }
+          onSelect={(type: ToggleItem<string | null>) => type.setter(type.key)}
+          getItemKey={(type: ToggleItem<string | null>) => type.key}
+          getItemLabel={(type: ToggleItem<string | null>) => type.value}
+          itemClassName="text-nowrap text-sm"
+        />
+      </TertiaryPageToolbar>
       <div className="mb-2 flex flex-col gap-4 text-center">
         <span className="text-2xs font-semibold">
           *Bold - UFAs guaranteed to be in draft class
@@ -152,22 +164,6 @@ export function DraftClasses() {
             })}
         </tbody>
       </table>
-
-      <TertiaryPageToolbar>
-        <HorizontalToggle<ToggleItem<string | null>>
-          items={pageToolbarProps.toolbarKeys}
-          selectedItem={
-            pageToolbarProps.toolbarKeys.find(
-              (item) => item.key === pageToolbarProps.activeKey,
-            ) ?? null
-          }
-          onSelect={(type: ToggleItem<string | null>) => type.setter(type.key)}
-          getItemKey={(type: ToggleItem<string | null>) => type.key}
-          getItemLabel={(type: ToggleItem<string | null>) => type.value}
-          itemClassName="text-sm text-nowrap"
-          className="no-scrollbar flex flex-row overflow-scroll"
-        />
-      </TertiaryPageToolbar>
     </div>
   );
 }

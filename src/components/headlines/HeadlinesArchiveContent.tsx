@@ -1,11 +1,11 @@
 "use client";
 
+import Link from "next/link";
 import { ArrowRight, Newspaper } from "lucide-react";
-import { useAppRouter, useWeeklyEditionArchive } from "@gshl-hooks";
+import { useWeeklyEditionArchive } from "@gshl-hooks";
 import { Skeleton } from "@gshl-ui";
 
 export function HeadlinesArchiveContent() {
-  const { router } = useAppRouter();
   const { data: editions, isLoading } = useWeeklyEditionArchive();
 
   return (
@@ -18,7 +18,7 @@ export function HeadlinesArchiveContent() {
           <h1 className="mt-4 font-oswald text-3xl font-bold uppercase tracking-tight sm:text-4xl">
             GSHL Press Box
           </h1>
-          <p className="mt-1.5 max-w-lg text-[10px] font-semibold uppercase leading-4 tracking-[0.16em] text-slate-300">
+          <p className="mt-2 max-w-lg text-xs font-semibold uppercase leading-5 tracking-[0.12em] text-slate-200">
             Results, movement, transactions and the occasional gentle chirp
           </p>
         </header>
@@ -32,15 +32,14 @@ export function HeadlinesArchiveContent() {
         ) : editions?.length ? (
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
             {editions.map((edition, index) => (
-              <button
+              <Link
                 key={edition.id}
-                type="button"
-                onClick={() => router.push(`/headlines/${edition.id}`)}
-                className={`group rounded-xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
+                href={`/headlines/${edition.id}`}
+                className={`group block rounded-xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 motion-reduce:transform-none motion-reduce:transition-none ${
                   index === 0 ? "sm:col-span-2 sm:p-5" : ""
                 }`}
               >
-                <p className="text-[8px] font-bold uppercase tracking-[0.18em] text-blue-700">
+                <p className="text-xs font-bold uppercase tracking-[0.12em] text-blue-700">
                   {edition.seasonName} · {edition.issueLabel}
                 </p>
                 <h2
@@ -50,14 +49,14 @@ export function HeadlinesArchiveContent() {
                 >
                   {edition.content.headline}
                 </h2>
-                <p className="mt-2 line-clamp-3 text-[12px] leading-[1.55] text-slate-600">
+                <p className="mt-2 line-clamp-3 text-sm leading-6 text-slate-600">
                   {edition.content.deck}
                 </p>
-                <span className="mt-3 inline-flex items-center gap-1 text-[9px] font-bold text-blue-700">
+                <span className="mt-3 inline-flex min-h-11 items-center gap-1 text-xs font-bold text-blue-700">
                   Open issue
                   <ArrowRight className="h-3 w-3" aria-hidden="true" />
                 </span>
-              </button>
+              </Link>
             ))}
           </div>
         ) : (
@@ -65,7 +64,7 @@ export function HeadlinesArchiveContent() {
             <h2 className="font-oswald text-xl text-slate-900">
               The presses are warming up
             </h2>
-            <p className="mt-2 text-[12px] leading-5 text-slate-500">
+            <p className="mt-2 text-sm leading-6 text-slate-600">
               The first edition publishes after a completed week has all of its
               statistics.
             </p>

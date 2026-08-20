@@ -1,8 +1,8 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { ArrowLeft, CalendarDays, X } from "lucide-react";
-import { useAppRouter } from "@gshl-hooks";
 import type { WeeklyEditionArticleProps } from "@gshl-types";
 import { formatDisplayDate, WEEKLY_EDITION_LOGO_URL } from "@gshl-utils";
 import { WeeklyEditionSectionCard } from "./WeeklyEditionSectionCard";
@@ -13,7 +13,6 @@ export function WeeklyEditionArticle({
   modal = false,
   onClose,
 }: WeeklyEditionArticleProps) {
-  const { router } = useAppRouter();
   const [firstPrimary, secondPrimary, ...standardArticles] =
     edition.content.sections;
   const primaryArticles = [firstPrimary, secondPrimary].filter(
@@ -43,7 +42,7 @@ export function WeeklyEditionArticle({
     >
       <header className="border-b border-slate-200 bg-white">
         <div
-          className={`z-10 flex items-center justify-between gap-3 border-b border-slate-100 bg-white/95 px-4 py-2 text-[10px] text-slate-500 backdrop-blur ${
+          className={`z-10 flex min-h-14 items-center justify-between gap-3 border-b border-slate-100 bg-white/95 px-4 py-1.5 text-xs text-slate-600 backdrop-blur ${
             modal ? "sticky top-0" : ""
           }`}
         >
@@ -52,20 +51,19 @@ export function WeeklyEditionArticle({
               type="button"
               onClick={onClose}
               autoFocus
-              className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-700 transition hover:bg-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+              className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-slate-100 text-slate-700 transition hover:bg-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 motion-reduce:transition-none"
               aria-label="Close newsletter"
             >
               <X className="h-4 w-4" aria-hidden="true" />
             </button>
           ) : (
-            <button
-              type="button"
-              onClick={() => router.push("/headlines")}
-              className="inline-flex items-center gap-1 font-semibold text-slate-600 hover:text-slate-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+            <Link
+              href="/headlines"
+              className="inline-flex min-h-11 items-center gap-1 rounded-md px-1 font-semibold text-slate-600 hover:text-slate-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
             >
               <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
               Editions
-            </button>
+            </Link>
           )}
           <span className="inline-flex min-w-0 items-center gap-1.5">
             <CalendarDays className="h-3 w-3 shrink-0" aria-hidden="true" />
@@ -93,7 +91,7 @@ export function WeeklyEditionArticle({
               <p className="font-oswald text-lg font-bold uppercase leading-none tracking-tight text-slate-950">
                 GSHL Press Box
               </p>
-              <p className="mt-1 truncate text-[9px] font-bold uppercase tracking-[0.16em] text-blue-700">
+              <p className="mt-1 truncate text-[11px] font-bold uppercase tracking-[0.12em] text-blue-700 sm:text-xs">
                 {preview ? "Newsroom preview" : edition.seasonName} ·{" "}
                 {edition.issueLabel}
               </p>
@@ -122,13 +120,13 @@ export function WeeklyEditionArticle({
       </header>
 
       <div className="px-4 py-5 sm:px-6 sm:py-7">
-        <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-blue-700">
+        <p className="text-xs font-bold uppercase tracking-[0.14em] text-blue-700">
           The lead
         </p>
         <h1 className="mt-2 max-w-2xl font-oswald text-2xl font-bold leading-[1.05] tracking-tight text-slate-950 sm:text-3xl">
           {edition.content.headline}
         </h1>
-        <p className="mt-2.5 max-w-2xl text-[13px] leading-5 text-slate-600">
+        <p className="mt-2.5 max-w-2xl text-sm leading-6 text-slate-600">
           {edition.content.deck}
         </p>
 
@@ -158,14 +156,14 @@ export function WeeklyEditionArticle({
         ) : null}
         {primaryArticles.length === 0 ? (
           <div className="mt-5 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-center">
-            <p className="text-[11px] font-semibold text-slate-500">
+            <p className="text-sm font-semibold text-slate-600">
               No articles are currently active in this issue.
             </p>
           </div>
         ) : null}
       </div>
 
-      <footer className="border-t border-slate-200 bg-slate-50 px-4 py-3 text-center text-[8px] font-semibold uppercase tracking-[0.14em] text-slate-400">
+      <footer className="border-t border-slate-200 bg-slate-50 px-4 py-3 text-center text-[11px] font-semibold uppercase leading-5 tracking-[0.1em] text-slate-600 sm:text-xs">
         Verified from GSHL results · Template, imported, or edited copy
       </footer>
     </article>

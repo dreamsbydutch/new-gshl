@@ -16,18 +16,14 @@ import {
 
 import { Button } from "@gshl-components/ui";
 import { ConferenceContestSkeleton } from "@gshl-skeletons";
-import {
-  useAppRouter,
-  useConferenceContestData,
-  useSeasonNavigation,
-} from "@gshl-hooks";
+import { useAppRouter, useConferenceContestData } from "@gshl-hooks";
 import type {
   ConferenceContestConferenceInfo,
   ConferenceContestRawStatRow,
   ConferenceContestRecord,
   ConferenceContestSeasonViewModel,
 } from "@gshl-types";
-import { cn } from "@gshl-utils";
+import { buildStandingsNavigationHref, cn } from "@gshl-utils";
 
 const cleanConferenceName = (name: string) => name.replace(" Hotel", "");
 
@@ -289,7 +285,6 @@ function SeasonExplorer({
   onSelect: (seasonId: string) => void;
 }) {
   const { router } = useAppRouter();
-  const { setSelectedSeasonId } = useSeasonNavigation();
   const left = selectedSeason.leftConference;
   const right = selectedSeason.rightConference;
   const leftId = left.id;
@@ -362,8 +357,12 @@ function SeasonExplorer({
         <Button
           variant="outline"
           onClick={() => {
-            setSelectedSeasonId(selectedSeason.seasonId);
-            router.push("/standings");
+            router.push(
+              buildStandingsNavigationHref("", {
+                view: "overall",
+                season: selectedSeason.seasonId,
+              }),
+            );
           }}
           className="h-8 rounded-md px-3 text-[11px] sm:h-9 sm:px-4 sm:text-xs"
         >
@@ -397,7 +396,7 @@ export function ConferenceContest() {
     return (
       <div className="mx-auto max-w-2xl rounded-lg border border-red-200 bg-red-50 p-8 text-center">
         <Info className="mx-auto h-7 w-7 text-red-500" aria-hidden="true" />
-        <h1 className="mt-3 font-oswald text-2xl text-red-950">Unavailable</h1>
+        <h2 className="mt-3 font-oswald text-2xl text-red-950">Unavailable</h2>
         <p className="mt-2 text-sm text-red-700">Try again shortly.</p>
       </div>
     );
@@ -407,7 +406,7 @@ export function ConferenceContest() {
     return (
       <div className="mx-auto max-w-2xl rounded-lg border border-slate-200 bg-white p-8 text-center">
         <Swords className="mx-auto h-7 w-7 text-slate-400" aria-hidden="true" />
-        <h1 className="mt-3 font-oswald text-2xl text-slate-900">No data</h1>
+        <h2 className="mt-3 font-oswald text-2xl text-slate-900">No data</h2>
         <p className="mt-2 text-sm text-slate-500">
           Two conferences and one season are required.
         </p>
@@ -462,7 +461,6 @@ export function ConferenceContest() {
 
   return (
     <div className="mx-auto max-w-5xl space-y-5 pb-8">
-      
       <ConferenceHeader left={left} right={right} />
 
       <RawStatsTable

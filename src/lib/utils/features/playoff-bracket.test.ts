@@ -343,3 +343,20 @@ void test("uses a played matchup and advances its winner into the bracket", () =
   assert.equal(bracket.columns[0]?.matchups[0]?.source, "played");
   assert.equal(bracket.columns[1]?.matchups[0]?.homeTeam?.id, "team-1");
 });
+
+void test("keeps an incomplete playoff matchup scheduled without a winner", () => {
+  const { teams, stats } = seasonSevenTeamsAndStats();
+  const bracket = buildPlayoffBracket(
+    teams,
+    stats,
+    [matchup("team-1", "team-7", false)],
+    season("7"),
+  );
+  const scheduled = bracket.columns[0]?.matchups[0];
+
+  assert.equal(bracket.hasPlayedMatchups, false);
+  assert.equal(scheduled?.source, "scheduled");
+  assert.equal(scheduled?.homeScore, null);
+  assert.equal(scheduled?.awayScore, null);
+  assert.equal(scheduled?.winnerTeam, null);
+});
