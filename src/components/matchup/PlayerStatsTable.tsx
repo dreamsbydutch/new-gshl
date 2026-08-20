@@ -1,12 +1,5 @@
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@gshl-components/ui";
 import { NHLLogo } from "@gshl-components/player/NHLLogo";
+import { TableViewport } from "@gshl-ui";
 import type { GSHLTeam, NHLTeam, PlayerStatRow } from "@gshl-types";
 import {
   buildPlayerStatColumns,
@@ -15,6 +8,7 @@ import {
   renderPlayerStatCell,
 } from "@gshl-utils";
 import Image from "next/image";
+import { MatchupPlayerPerformanceList } from "./MatchupPlayerPerformanceList";
 
 export function PlayerStatsTable({
   team,
@@ -42,14 +36,16 @@ export function PlayerStatsTable({
     const classes = [
       "whitespace-nowrap",
       isHeader
-        ? "h-7 px-1.5 py-1 text-[9px] font-semibold uppercase tracking-[0.12em] text-slate-500 sm:h-10 sm:px-3 sm:text-xs sm:tracking-[0.16em]"
-        : "px-1.5 py-1 text-[10px] text-slate-700 sm:px-3 sm:py-2 sm:text-sm",
+        ? "h-10 px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500"
+        : "px-3 py-2 text-sm text-slate-700",
       columnClassName ?? "",
     ];
 
     if (columnKey === "player") {
       classes.push(
-        "sticky left-0 z-20 min-w-[116px] max-w-[136px] bg-white text-left sm:min-w-[180px] sm:max-w-none",
+        `sticky left-0 min-w-[180px] text-left ${
+          isHeader ? "z-30 bg-slate-50" : "z-20 bg-white"
+        }`,
       );
     }
 
@@ -87,86 +83,128 @@ export function PlayerStatsTable({
     );
   };
 
+  const teamName = team?.name ?? "Unknown Team";
+  const sectionLabel = headline ?? "Player statistics";
+
   return (
     <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm sm:rounded-2xl">
-      {headline && (
-        <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-3 py-3 sm:px-4 sm:py-4">
-          <div className="flex items-center gap-3">
-            {team?.logoUrl ? (
-              <Image
-                src={team.logoUrl}
-                alt={team.name ?? "Team Logo"}
-                width={36}
-                height={36}
-                className="h-8 w-8 object-contain sm:h-9 sm:w-9"
-              />
-            ) : (
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-200 text-[10px] font-semibold text-slate-600 sm:h-9 sm:w-9 sm:text-xs">
-                {team?.abbr?.slice(0, 3) ?? "?"}
-              </div>
-            )}
-            <div>
-              <h2 className="font-oswald text-xl text-slate-900 sm:text-2xl">
-                {team?.name ?? "Unknown Team"}
-              </h2>
-              <div className="text-[10px] uppercase tracking-[0.18em] text-slate-500 sm:text-xs">
-                {headline}
-              </div>
+      <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-3 py-3 sm:px-4 sm:py-4">
+        <div className="flex min-w-0 items-center gap-3">
+          {team?.logoUrl ? (
+            <Image
+              src={team.logoUrl}
+              alt=""
+              width={36}
+              height={36}
+              className="h-8 w-8 shrink-0 object-contain sm:h-9 sm:w-9"
+            />
+          ) : (
+            <div
+              aria-hidden="true"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-200 text-[10px] font-semibold text-slate-600 sm:h-9 sm:w-9 sm:text-xs"
+            >
+              {team?.abbr?.slice(0, 3) ?? "?"}
+            </div>
+          )}
+          <div className="min-w-0">
+            <h2 className="truncate font-oswald text-xl text-slate-900 sm:text-2xl">
+              {teamName}
+            </h2>
+            <div className="text-xs uppercase tracking-[0.14em] text-slate-500 sm:tracking-[0.18em]">
+              {sectionLabel}
             </div>
           </div>
-          <div className="text-[10px] uppercase tracking-[0.18em] text-slate-500 sm:text-xs">
-            {players.length} Players
-          </div>
         </div>
-      )}
-      <Table className="w-max min-w-full text-[10px] sm:min-w-[1180px] sm:text-sm">
-        <TableHeader>
-          <TableRow>
-            {columns.map((column) => (
-              <TableHead
-                key={column.key}
-                className={getColumnClassName(
-                  column.key,
-                  column.className,
-                  true,
-                )}
-              >
-                {column.label}
-              </TableHead>
-            ))}
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {players.length === 0 ? (
-            <TableRow>
-              <TableCell
-                colSpan={columns.length}
-                className="py-8 text-center text-sm text-slate-500"
-              >
-                No player stats available yet.
-              </TableCell>
-            </TableRow>
-          ) : (
-            players.map((player) => (
-              <TableRow key={player.id} className="group">
-                {columns.map((column) => (
-                  <TableCell
-                    key={`${player.id}-${column.key}`}
-                    className={[
+        <div className="shrink-0 text-xs uppercase tracking-[0.14em] text-slate-500 sm:tracking-[0.18em]">
+          {players.length} {players.length === 1 ? "Player" : "Players"}
+        </div>
+      </div>
+
+      <div className="lg:hidden">
+        <MatchupPlayerPerformanceList
+          columns={columns}
+          nhlTeams={nhlTeams}
+          players={players}
+          teamName={teamName}
+        />
+      </div>
+
+      <TableViewport
+        ariaLabel={`${teamName} comprehensive player statistics`}
+        className="hidden lg:block"
+        scrollHint="Scroll to review every player statistic"
+        viewportClassName="rounded-none border-0 focus-visible:ring-inset focus-visible:ring-offset-0"
+      >
+        <table className="w-max min-w-[1180px] border-collapse text-sm">
+          <caption className="sr-only">
+            {teamName} comprehensive player statistics
+          </caption>
+          <thead className="bg-slate-50">
+            <tr className="border-b border-slate-200">
+              {columns.map((column) => (
+                <th
+                  key={column.key}
+                  scope="col"
+                  className={getColumnClassName(
+                    column.key,
+                    column.className,
+                    true,
+                  )}
+                >
+                  {column.label}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {players.length === 0 ? (
+              <tr>
+                <td
+                  colSpan={columns.length}
+                  className="py-8 text-center text-sm text-slate-500"
+                >
+                  No player stats available yet.
+                </td>
+              </tr>
+            ) : (
+              players.map((player) => (
+                <tr
+                  key={player.id}
+                  className="group border-b border-slate-200 transition-colors last:border-0 hover:bg-slate-50"
+                >
+                  {columns.map((column) => {
+                    const cellClassName = [
                       getColumnClassName(column.key, column.className),
                       column.key === "player" ? "group-hover:bg-slate-50" : "",
-                    ].join(" ")}
-                  >
-                    {column.key === "nhlTeam"
-                      ? renderNhlTeamCell(player)
-                      : renderPlayerStatCell(player, column.key)}
-                  </TableCell>
-                ))}
-              </TableRow>
-            ))
-          )}
-        </TableBody>
-      </Table>
+                    ].join(" ");
+                    const content =
+                      column.key === "nhlTeam"
+                        ? renderNhlTeamCell(player)
+                        : renderPlayerStatCell(player, column.key);
+
+                    return column.key === "player" ? (
+                      <th
+                        key={`${player.id}-${column.key}`}
+                        scope="row"
+                        className={cellClassName}
+                      >
+                        {content}
+                      </th>
+                    ) : (
+                      <td
+                        key={`${player.id}-${column.key}`}
+                        className={cellClassName}
+                      >
+                        {content}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </TableViewport>
     </section>
   );
 }

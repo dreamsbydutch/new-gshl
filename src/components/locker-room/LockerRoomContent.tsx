@@ -231,6 +231,7 @@ export function LockerRoomContent() {
     history: teamContractHistory,
     currentContracts,
     contractPlayers,
+    isLoading: contractDataLoading,
   } = useContractData({
     currentSeason: contractSeason,
     currentTeam,
@@ -246,6 +247,7 @@ export function LockerRoomContent() {
   const isLoading =
     teamsLoading ||
     (needsPlayers && playersLoading) ||
+    (needsContractData && contractDataLoading) ||
     (needsContractData && signablePlayersLoading) ||
     (needsCapLabData &&
       (allLeagueContractsLoading || tradePlayersQuery.isLoading)) ||
@@ -306,7 +308,7 @@ export function LockerRoomContent() {
   }
   return (
     <>
-      <LockerRoomHeader currentTeam={currentTeam} />
+      <LockerRoomHeader currentTeam={currentTeam} headingLevel={2} />
       {selectedLockerRoomType === "salary" && (
         <>
           <TeamContractTable

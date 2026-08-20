@@ -15,6 +15,7 @@ import type {
 } from "@gshl-types";
 import {
   getGameBackgroundClass,
+  buildMatchupNavigationHref,
   getScoreClass,
   isMatchupCompleted,
   isValidMatchup,
@@ -94,7 +95,11 @@ const TeamDisplay = ({ team, rank, isAway = false }: TeamDisplayProps) => {
   );
 };
 
-const WeekScheduleItem = ({ matchup, teams }: WeekScheduleItemProps) => {
+const WeekScheduleItem = ({
+  matchup,
+  teams,
+  matchupHref,
+}: WeekScheduleItemProps) => {
   const homeTeam = findTeamById(teams, matchup.homeTeamId);
   const awayTeam = findTeamById(teams, matchup.awayTeamId);
 
@@ -104,7 +109,7 @@ const WeekScheduleItem = ({ matchup, teams }: WeekScheduleItemProps) => {
 
   return (
     <Link
-      href={`/matchup/${matchup.id}`}
+      href={matchupHref}
       className={cn(
         "mx-1 mb-3 flex flex-col items-center rounded-xl py-1 shadow-md transition hover:-translate-y-0.5 hover:shadow-lg",
         getGameBackgroundClass(
@@ -137,6 +142,7 @@ export function WeeklySchedule() {
     isLoading,
     isPrefetching,
     selectedSeasonId,
+    selectedWeekId,
   } = useWeeklyScheduleData();
 
   const seasonNumericId = Number(selectedSeasonId ?? "");
@@ -157,7 +163,7 @@ export function WeeklySchedule() {
   }
 
   return (
-    <div className="mx-2 mb-40 mt-4">
+    <div className="mx-2 mb-8 mt-4">
       <ScheduleHeader />
       {isPrefetching ? (
         <div className="mb-2 flex items-center justify-center gap-2 text-xs font-semibold text-slate-500">
@@ -171,6 +177,13 @@ export function WeeklySchedule() {
             key={`week-${matchup.id}`}
             matchup={matchup}
             teams={teams}
+            matchupHref={buildMatchupNavigationHref(String(matchup.id), {
+              from: "schedule",
+              view: "week",
+              season: selectedSeasonId,
+              week: selectedWeekId,
+              side: "away",
+            })}
             teamWeekStatsByTeam={teamWeekStatsByTeam}
             playerWeekStatsByTeam={playerWeekStatsByTeam}
             showPlusMinus={showPlusMinus}

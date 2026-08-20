@@ -42,3 +42,4 @@ export * from "./useTeamColor";
 export * from "./useToast";
 export * from "./useUfaData";
 export * from "./useInteractiveContractTable";
+export * from "./useMatchupContextNavigation";

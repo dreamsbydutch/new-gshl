@@ -14,6 +14,7 @@ import type { MatchupCategoryConfig } from "./team";
 
 export interface LockerRoomHeaderProps {
   currentTeam: GSHLTeam;
+  headingLevel?: 1 | 2;
 }
 
 export interface TeamLogoProps {
@@ -29,6 +30,7 @@ export interface NHLLogoProps {
 export interface TeamInfoProps {
   currentTeam: GSHLTeam;
   formattedOwnerName: string;
+  headingLevel?: 1 | 2;
 }
 
 export type AwardGroupKey = "TEAM TROPHIES" | "TIER 1 AWARDS" | "TIER 2 AWARDS";
@@ -140,6 +142,7 @@ export interface TeamScheduleItemProps {
   teams: GSHLTeam[];
   selectedTeamId: string;
   categories: MatchupCategoryConfig[];
+  matchupHref?: string;
 }
 
 export interface OpponentDisplayProps {
@@ -180,6 +183,7 @@ export interface WeekScheduleItemProps {
   teamWeekStatsByTeam: Record<string, TeamWeekStatLine>;
   playerWeekStatsByTeam: Record<string, (PlayerWeekStatLine & Player)[]>;
   showPlusMinus?: boolean;
+  matchupHref: string;
 }
 
 export interface TeamDisplayProps {
