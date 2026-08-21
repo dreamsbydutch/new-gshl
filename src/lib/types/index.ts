@@ -111,7 +111,10 @@ export * from "./matchup";
 export * from "./playoff-bracket";
 export * from "./season";
 export * from "./team";
+export * from "./team-history";
+export * from "./team-schedule";
 export * from "./weekly-edition";
+export * from "./weekly-schedule";
 
 // ============================================================================
 // USAGE EXAMPLES

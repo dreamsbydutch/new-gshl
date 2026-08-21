@@ -185,3 +185,15 @@ export function usePlayerNhlStatsByPlayers(
     error: null,
   };
 }
+
+export function useLatestPlayerNhlStats(seasonId?: string, enabled = true) {
+  const result = useQuery(
+    api.frontend.latestPlayerNhlStats,
+    enabled && seasonId ? { seasonId: seasonId as Id<"seasons"> } : "skip",
+  );
+  return {
+    data: (result ?? []) as unknown as PlayerNHLStatLine[],
+    isLoading: enabled && Boolean(seasonId) && result === undefined,
+    error: null,
+  };
+}

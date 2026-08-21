@@ -30,6 +30,8 @@ import {
 import type {
   DraftPick,
   GSHLTeam,
+  MockDraftDisplayNhlTeam,
+  MockDraftDisplayPick,
   NHLTeam,
   UseDraftBoardDataOptions,
 } from "@gshl-types";
@@ -44,11 +46,14 @@ export function useMockDraftPreview(seasonId: string) {
         }
       : "skip",
   );
+  const nhlTeams: MockDraftDisplayNhlTeam[] = result?.nhlTeams ?? [];
+  const projectedDraftPicks: MockDraftDisplayPick[] =
+    result?.projectedDraftPicks ?? [];
 
   return {
     isLoading: result === undefined,
-    nhlTeams: (result?.nhlTeams ?? []) as unknown as NHLTeam[],
-    projectedDraftPicks: result?.projectedDraftPicks ?? [],
+    nhlTeams,
+    projectedDraftPicks,
   };
 }
 

@@ -30,7 +30,7 @@ import {
   useContracts,
   useDraftHubState,
   useNHLTeams,
-  usePlayerNhlStatsByPlayers,
+  useLatestPlayerNhlStats,
   usePlayers,
   useSeasonState,
   useSubmitDraftPick,
@@ -109,13 +109,9 @@ export function useDraftHubBoard(): DraftHubBoardViewModel {
     seasonId: season?.id,
     enabled: Boolean(season?.id),
   });
-  const playerIds = useMemo(
-    () => allPlayersQuery.data.map((player) => String(player.id)),
-    [allPlayersQuery.data],
-  );
-  const nhlStatsQuery = usePlayerNhlStatsByPlayers(
-    playerIds,
-    !allPlayersQuery.isLoading,
+  const nhlStatsQuery = useLatestPlayerNhlStats(
+    season?.id,
+    Boolean(season?.id),
   );
   const contractsQuery = useContracts();
   const nhlTeamsQuery = useNHLTeams();

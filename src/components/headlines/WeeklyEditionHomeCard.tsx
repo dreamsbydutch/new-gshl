@@ -4,8 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { createPortal } from "react-dom";
-import { ArrowRight, BookOpen } from "lucide-react";
-import { useLatestWeeklyEdition } from "@gshl-hooks";
+import { ArrowRight, BookOpen, X } from "lucide-react";
+import { useLatestWeeklyEdition, useWeeklyEdition } from "@gshl-hooks";
 import { Skeleton } from "@gshl-ui";
 import { WEEKLY_EDITION_LOGO_URL } from "@gshl-utils";
 import { WeeklyEditionArticle } from "./WeeklyEditionArticle";
@@ -13,6 +13,7 @@ import { WeeklyEditionArticle } from "./WeeklyEditionArticle";
 export function WeeklyEditionHomeCard() {
   const { data: edition, isLoading } = useLatestWeeklyEdition();
   const [isOpen, setIsOpen] = useState(false);
+  const fullEdition = useWeeklyEdition(isOpen ? (edition?.id ?? "") : "");
   const triggerRef = useRef<HTMLButtonElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
 
@@ -81,6 +82,13 @@ export function WeeklyEditionHomeCard() {
     };
   }, [isOpen]);
 
+  useEffect(() => {
+    if (!isOpen || fullEdition.isLoading) return;
+    dialogRef.current
+      ?.querySelector<HTMLButtonElement>('[aria-label="Close newsletter"]')
+      ?.focus();
+  }, [fullEdition.isLoading, isOpen]);
+
   if (isLoading) {
     return (
       <section className="mx-auto flex h-16 w-full max-w-5xl items-center gap-3 rounded-2xl border border-slate-200 bg-white px-3">
@@ -91,18 +99,6 @@ export function WeeklyEditionHomeCard() {
     );
   }
   if (!edition) return null;
-
-  const hero = edition.facts.matchups.find(
-    (matchup) => matchup.matchupId === edition.facts.heroMatchupId,
-  );
-  const heroTeams = hero
-    ? [
-        edition.facts.teams.find((team) => team.teamId === hero.awayTeamId),
-        edition.facts.teams.find((team) => team.teamId === hero.homeTeamId),
-      ].flatMap((team) =>
-        team?.logoUrl ? [{ ...team, logoUrl: team.logoUrl }] : [],
-      )
-    : [];
 
   return (
     <>
@@ -131,12 +127,12 @@ export function WeeklyEditionHomeCard() {
               </span>
             </span>
             <span className="mt-0.5 block truncate text-[13px] font-semibold leading-5 text-white sm:text-sm">
-              {edition.content.headline}
+              {edition.headline}
             </span>
           </span>
-          {heroTeams.length > 0 ? (
+          {edition.heroTeams.length > 0 ? (
             <span className="hidden shrink-0 items-center -space-x-1 sm:flex">
-              {heroTeams.map((team) => (
+              {edition.heroTeams.map((team) => (
                 <span
                   key={team.teamId}
                   className="flex h-7 w-7 items-center justify-center rounded-full border border-slate-700 bg-white p-1"
@@ -178,15 +174,43 @@ export function WeeklyEditionHomeCard() {
                 ref={dialogRef}
                 role="dialog"
                 aria-modal="true"
-                aria-label={`${edition.issueLabel}: ${edition.content.headline}`}
+                aria-label={`${edition.issueLabel}: ${edition.headline}`}
+                aria-busy={fullEdition.isLoading}
                 tabIndex={-1}
                 className="h-full overflow-y-auto bg-slate-100 outline-none sm:mx-auto sm:max-w-4xl sm:rounded-3xl sm:shadow-2xl"
               >
-                <WeeklyEditionArticle
-                  edition={edition}
-                  modal
-                  onClose={() => setIsOpen(false)}
-                />
+                {fullEdition.data ? (
+                  <WeeklyEditionArticle
+                    edition={fullEdition.data}
+                    modal
+                    onClose={() => setIsOpen(false)}
+                  />
+                ) : (
+                  <div className="min-h-full px-4 py-4 sm:px-8 sm:py-6">
+                    <div className="flex justify-end">
+                      <button
+                        type="button"
+                        aria-label="Close newsletter"
+                        onClick={() => setIsOpen(false)}
+                        className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-300 bg-white text-slate-700 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                      >
+                        <X className="h-5 w-5" aria-hidden="true" />
+                      </button>
+                    </div>
+                    {fullEdition.isLoading ? (
+                      <div className="mx-auto mt-8 max-w-3xl space-y-4">
+                        <Skeleton className="h-8 w-2/3" />
+                        <Skeleton className="h-5 w-full" />
+                        <Skeleton className="h-5 w-5/6" />
+                        <Skeleton className="mt-8 h-64 w-full rounded-2xl" />
+                      </div>
+                    ) : (
+                      <p className="mx-auto mt-16 max-w-xl text-center text-sm text-slate-600">
+                        This Press Box issue is no longer available.
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
             </div>,
             document.body,

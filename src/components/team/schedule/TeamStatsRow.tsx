@@ -2,9 +2,9 @@
 
 import Image from "next/image";
 import type {
-  GSHLTeam,
+  MatchupTeamWeekStats,
   MatchupCategoryConfig,
-  TeamWeekStatLine,
+  TeamScheduleTeamSummary,
 } from "@gshl-types";
 import {
   didWinCategory,
@@ -14,7 +14,7 @@ import {
   toCategoryNumber,
 } from "@gshl-utils";
 
-function TeamLogoCell({ team }: { team?: GSHLTeam | null }) {
+function TeamLogoCell({ team }: { team?: TeamScheduleTeamSummary | null }) {
   if (!team?.logoUrl) {
     return <td className="w-8 min-w-8" />;
   }
@@ -40,9 +40,9 @@ export function TeamStatsRow({
   opponentScore,
   categories,
 }: {
-  team?: GSHLTeam | null;
-  teamStats: TeamWeekStatLine;
-  opponentStats: TeamWeekStatLine;
+  team?: TeamScheduleTeamSummary | null;
+  teamStats: MatchupTeamWeekStats;
+  opponentStats: MatchupTeamWeekStats;
   teamScore: number | null;
   opponentScore: number | null;
   categories: MatchupCategoryConfig[];

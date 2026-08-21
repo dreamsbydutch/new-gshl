@@ -1,6 +1,6 @@
 "use client";
 
-import type { FilterDropdownsProps } from "@gshl-types";
+import type { TeamHistoryFilterDropdownsProps } from "@gshl-types";
 
 export function FilterDropdowns({
   seasonValue,
@@ -12,7 +12,7 @@ export function FilterDropdowns({
   seasonOptions,
   gameTypeOptions,
   ownerOptions,
-}: FilterDropdownsProps) {
+}: TeamHistoryFilterDropdownsProps) {
   const selectClassName =
     "w-full min-w-0 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm sm:max-w-56";
 

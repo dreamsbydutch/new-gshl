@@ -14,6 +14,8 @@ import type {
   Season,
   TeamWeekStatLine,
 } from "./database";
+import type { MatchupTeamWeekStats } from "./matchup";
+import type { TeamScheduleTeamSummary } from "./team-schedule";
 
 export type TeamRelations = {
   franchises?: Franchise[];
@@ -90,20 +92,20 @@ export type MatchupCategoryConfig = {
 };
 
 export interface TeamStatsRowProps {
-  team?: GSHLTeam | null;
-  teamStats: TeamWeekStatLine;
-  opponentStats: TeamWeekStatLine;
+  team?: TeamScheduleTeamSummary | null;
+  teamStats: MatchupTeamWeekStats;
+  opponentStats: MatchupTeamWeekStats;
   teamScore: number | null;
   opponentScore: number | null;
   categories: MatchupCategoryConfig[];
 }
 
 export interface MatchupStatsTableProps {
-  selectedTeam: GSHLTeam | null;
-  selectedTeamStats: TeamWeekStatLine;
+  selectedTeam: TeamScheduleTeamSummary | null;
+  selectedTeamStats: MatchupTeamWeekStats;
   selectedTeamScore: number | null;
-  opponentTeam: GSHLTeam | null;
-  opponentStats: TeamWeekStatLine;
+  opponentTeam: TeamScheduleTeamSummary | null;
+  opponentStats: MatchupTeamWeekStats;
   opponentScore: number | null;
   categories: MatchupCategoryConfig[];
 }

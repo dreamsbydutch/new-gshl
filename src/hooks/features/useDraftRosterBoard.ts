@@ -21,7 +21,7 @@ import {
   useDraftPicks,
   useFranchises,
   useNHLTeams,
-  usePlayerNhlStatsByPlayers,
+  useLatestPlayerNhlStats,
   usePlayers,
   useSeasonState,
   useTeams,
@@ -37,13 +37,9 @@ export function useDraftRosterBoard(): DraftRosterBoardViewModel {
   const playersQuery = usePlayers({ isActive: true });
   const contractsQuery = useContracts();
   const nhlTeamsQuery = useNHLTeams();
-  const playerIds = useMemo(
-    () => playersQuery.data.map((player) => String(player.id)),
-    [playersQuery.data],
-  );
-  const nhlStatsQuery = usePlayerNhlStatsByPlayers(
-    playerIds,
-    !playersQuery.isLoading,
+  const nhlStatsQuery = useLatestPlayerNhlStats(
+    season?.id,
+    Boolean(season?.id),
   );
   const draftPicksQuery = useDraftPicks({
     seasonId: season?.id,

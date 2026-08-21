@@ -2,15 +2,21 @@ import type {
   GSHLTeam,
   Matchup,
   NHLTeam,
-  Player,
-  PlayerWeekStatLine,
   Season,
   TeamAward,
-  TeamWeekStatLine,
   Week,
 } from "./database";
 import type { AwardsList, MatchupType } from "./enums";
 import type { MatchupCategoryConfig } from "./team";
+import type {
+  WeeklyScheduleMatchupSummary,
+  WeeklyScheduleTeamSummary,
+} from "./weekly-schedule";
+import type {
+  TeamScheduleMatchupSummary,
+  TeamScheduleTeamSummary,
+  TeamScheduleWeekSummary,
+} from "./team-schedule";
 
 export interface LockerRoomHeaderProps {
   currentTeam: GSHLTeam;
@@ -137,25 +143,25 @@ export interface TeamHistoryMatchupLineProps {
 }
 
 export interface TeamScheduleItemProps {
-  matchup: Matchup;
-  week: Week | undefined;
-  teams: GSHLTeam[];
+  matchup: TeamScheduleMatchupSummary;
+  week: TeamScheduleWeekSummary | null | undefined;
+  teams: TeamScheduleTeamSummary[];
   selectedTeamId: string;
   categories: MatchupCategoryConfig[];
   matchupHref?: string;
 }
 
 export interface OpponentDisplayProps {
-  matchup: Matchup;
-  homeTeam: GSHLTeam | undefined;
-  awayTeam: GSHLTeam | undefined;
+  matchup: TeamScheduleMatchupSummary;
+  homeTeam: TeamScheduleTeamSummary | undefined;
+  awayTeam: TeamScheduleTeamSummary | undefined;
   gameLocation: GameLocation;
 }
 
 export interface GameResultProps {
-  matchup: Matchup;
+  matchup: TeamScheduleMatchupSummary;
   selectedTeamId: string;
-  week: Week | undefined;
+  week: TeamScheduleWeekSummary | null | undefined;
 }
 
 export interface WeekDisplayProps {
@@ -178,22 +184,19 @@ export interface ConferenceConfig {
 }
 
 export interface WeekScheduleItemProps {
-  matchup: Matchup;
-  teams: GSHLTeam[];
-  teamWeekStatsByTeam: Record<string, TeamWeekStatLine>;
-  playerWeekStatsByTeam: Record<string, (PlayerWeekStatLine & Player)[]>;
-  showPlusMinus?: boolean;
+  matchup: WeeklyScheduleMatchupSummary;
+  teams: WeeklyScheduleTeamSummary[];
   matchupHref: string;
 }
 
 export interface TeamDisplayProps {
-  team: GSHLTeam;
+  team: WeeklyScheduleTeamSummary;
   rank: number | string | undefined;
   isAway?: boolean;
 }
 
 export interface ScoreDisplayProps {
-  matchup: Matchup;
+  matchup: WeeklyScheduleMatchupSummary;
 }
 
 export type WeeklyGameType = "RS" | "CC" | "NC" | "QF" | "SF" | "F" | "LT";

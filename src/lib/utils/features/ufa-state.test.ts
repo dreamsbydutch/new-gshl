@@ -7,7 +7,7 @@ void test("normalizes the untyped public UFA query boundary", () => {
   const state = normalizeUfaPublicState({
     groups: [
       {
-        _id: "group-1",
+        id: "group-1",
         playerId: "player-1",
         seasonId: "season-1",
         deadlineAt: 123,

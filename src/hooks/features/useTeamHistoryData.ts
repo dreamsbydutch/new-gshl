@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useMemo, useState } from "react";
 import {
   parseGameTypeValue,
   parseIdValue,
@@ -9,11 +9,10 @@ import {
   GAME_TYPE_OPTIONS,
 } from "@gshl-utils";
 import type {
-  GSHLTeam,
   UseTeamHistoryDataOptions,
   UseTeamHistoryDataResult,
 } from "@gshl-types";
-import { useMatchups, useSeasons, useTeams, useWeeks } from "@gshl-hooks";
+import { useTeamHistorySummary } from "@gshl-hooks";
 import { useScheduleData } from "./useScheduleData";
 
 /**
@@ -43,12 +42,11 @@ export function useTeamHistoryData(
   const [seasonValue, setSeasonValue] = useState("");
   const [ownerValue, setOwnerValue] = useState("");
 
-  const { data: fullSchedule, isLoading: scheduleLoading } = useMatchups();
-  const { data: seasons, isLoading: seasonsLoading } = useSeasons();
-  const { data: teamsData, isLoading: teamsLoading } = useTeams();
-  const { data: weeks, isLoading: weeksLoading } = useWeeks();
-
-  const teams = useMemo(() => (teamsData as GSHLTeam[]) ?? [], [teamsData]);
+  const historyQuery = useTeamHistorySummary({
+    ownerId: teamInfo.ownerId,
+    enabled: Boolean(teamInfo.ownerId),
+  });
+  const { matchups: fullSchedule, seasons, teams, weeks } = historyQuery.data;
 
   const gameType = useMemo(
     () => parseGameTypeValue(gameTypeValue),
@@ -67,22 +65,16 @@ export function useTeamHistoryData(
   });
 
   const ownerOptions = useMemo(() => {
-    if (!fullSchedule || !teams) return [["All", ""]];
     return buildOwnerOptions(fullSchedule, teams, teamInfo);
   }, [fullSchedule, teams, teamInfo]);
 
   const winLossRecord = useMemo(() => {
-    if (!schedule || !teams || teamInfo.ownerId == null)
-      return [0, 0, 0] as [number, number, number];
+    if (teamInfo.ownerId == null) return [0, 0, 0] as [number, number, number];
     return calculateWinLossRecord(schedule, teamInfo.ownerId, teams);
   }, [schedule, teams, teamInfo.ownerId]);
 
-  const isLoading =
-    (scheduleLoading ?? false) ||
-    (seasonsLoading ?? false) ||
-    (teamsLoading ?? false) ||
-    (weeksLoading ?? false);
-  const isDataReady = Boolean(schedule && teams && fullSchedule) && !isLoading;
+  const isLoading = historyQuery.isLoading;
+  const isDataReady = historyQuery.ready && !isLoading;
 
   return {
     // Filter states
@@ -95,13 +87,13 @@ export function useTeamHistoryData(
 
     // Options
     gameTypeOptions: GAME_TYPE_OPTIONS,
-    seasonOptions: seasons ?? [],
+    seasonOptions: seasons,
     ownerOptions,
 
     // Data
     schedule,
-    teams: teams ?? [],
-    fullSchedule: fullSchedule ?? [],
+    teams,
+    fullSchedule,
     winLossRecord,
     isDataReady,
     isLoading,

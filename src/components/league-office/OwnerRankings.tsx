@@ -8,19 +8,17 @@ import { OwnerRankingsSkeleton } from "@gshl-skeletons";
 import { AWARD_CATALOG_BY_KEY } from "@gshl-lib/config/awards";
 import type {
   AwardsList as AwardsListType,
-  OwnerRankingEntry,
+  OwnerRankingBrowserEntry,
   OwnerRankingRecord,
 } from "@gshl-types";
 import { AwardsList, cn } from "@gshl-utils";
 
 const formatRating = (value: number) => Math.round(value).toLocaleString();
-const formatSigned = (value: number) =>
-  `${value > 0 ? "+" : ""}${Math.round(value).toLocaleString()}`;
 const formatPercentage = (value: number) => `${(value * 100).toFixed(1)}%`;
 const recordLabel = (record: OwnerRankingRecord) =>
   `${record.wins}-${record.losses}${record.ties ? `-${record.ties}` : ""}`;
 
-function OwnerMark({ entry }: { entry: OwnerRankingEntry }) {
+function OwnerMark({ entry }: { entry: OwnerRankingBrowserEntry }) {
   if (entry.primaryTeam?.logoUrl) {
     return (
       <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-white p-0.5 sm:h-8 sm:w-8 sm:p-1">
@@ -42,7 +40,7 @@ function OwnerMark({ entry }: { entry: OwnerRankingEntry }) {
   );
 }
 
-function Movement({ entry }: { entry: OwnerRankingEntry }) {
+function Movement({ entry }: { entry: OwnerRankingBrowserEntry }) {
   if (entry.rankChange > 0) {
     return (
       <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-emerald-600">
@@ -72,23 +70,6 @@ function RecordCell({ record }: { record: OwnerRankingRecord }) {
         {formatPercentage(record.winPercentage)}
       </div>
     </div>
-  );
-}
-
-function SignedCell({ value }: { value: number }) {
-  return (
-    <span
-      className={cn(
-        "font-medium tabular-nums",
-        value > 0
-          ? "text-emerald-700"
-          : value < 0
-            ? "text-red-600"
-            : "text-slate-400",
-      )}
-    >
-      {formatSigned(value)}
-    </span>
   );
 }
 

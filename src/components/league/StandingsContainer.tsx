@@ -103,15 +103,9 @@ function getGroupCardClass(standingsType: string, groupTitle: string) {
 }
 
 function StandingsGroupTable({
-  allTeamStats,
-  allTeams,
   group,
-  matchups,
-  playerTotals,
-  players,
   season,
   standingsType,
-  weeks,
 }: StandingsGroupTableProps) {
   const [openTeamId, setOpenTeamId] = useState<string | null>(null);
   const isConferenceGroup =
@@ -261,13 +255,8 @@ function StandingsGroupTable({
                         className="bg-white px-2 pb-3 pt-1 sm:px-4 sm:pb-4"
                       >
                         <StandingsTeamCard
-                          team={team}
-                          matchups={matchups}
-                          weeks={weeks}
-                          allTeams={allTeams}
-                          allTeamStats={allTeamStats}
-                          players={players}
-                          playerTotals={playerTotals}
+                          seasonId={season.id}
+                          teamId={team.id}
                         />
                       </td>
                     </tr>
@@ -283,15 +272,9 @@ function StandingsGroupTable({
 }
 
 export function StandingsTable({
-  allTeamStats,
-  allTeams,
   groups,
-  matchups,
-  playerTotals,
-  players,
   selectedSeason,
   standingsType,
-  weeks,
 }: StandingsTableProps) {
   if (!selectedSeason) {
     return (
@@ -319,15 +302,9 @@ export function StandingsTable({
         {groups.map((group) => (
           <StandingsGroupTable
             key={group.title}
-            allTeamStats={allTeamStats}
-            allTeams={allTeams}
             group={group}
-            matchups={matchups}
-            playerTotals={playerTotals}
-            players={players}
             season={selectedSeason}
             standingsType={standingsType}
-            weeks={weeks}
           />
         ))}
       </div>

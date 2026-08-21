@@ -141,30 +141,29 @@ export const buildPlayerWeekStatsByTeam = (
   playerWeekStats: PlayerWeekStatLine[],
   playerLookup: Map<string, Player>,
 ): Record<string, (PlayerWeekStatLine & Player)[]> => {
-  return playerWeekStats.reduce<Record<string, (PlayerWeekStatLine & Player)[]>>(
-    (acc, stat) => {
-      const playerId = stat.playerId?.trim();
-      const player = playerId ? playerLookup.get(playerId) : null;
-      if (!stat.gshlTeamId) {
-        return acc;
-      }
-
-      const teamRows = (acc[stat.gshlTeamId] ??= []);
-      teamRows.push({
-        ...stat,
-        ...player,
-        gshlTeamId: stat.gshlTeamId,
-        firstName: player?.firstName ?? "",
-        lastName: player?.lastName ?? "",
-        fullName: player?.fullName ?? "",
-        isActive: player?.isActive ?? false,
-        isSignable: player?.isSignable ?? false,
-        isResignable: player?.isResignable ?? ResignableStatusEnum.DRAFT,
-      });
+  return playerWeekStats.reduce<
+    Record<string, (PlayerWeekStatLine & Player)[]>
+  >((acc, stat) => {
+    const playerId = stat.playerId?.trim();
+    const player = playerId ? playerLookup.get(playerId) : null;
+    if (!stat.gshlTeamId) {
       return acc;
-    },
-    {},
-  );
+    }
+
+    const teamRows = (acc[stat.gshlTeamId] ??= []);
+    teamRows.push({
+      ...stat,
+      ...player,
+      gshlTeamId: stat.gshlTeamId,
+      firstName: player?.firstName ?? "",
+      lastName: player?.lastName ?? "",
+      fullName: player?.fullName ?? "",
+      isActive: player?.isActive ?? false,
+      isSignable: player?.isSignable ?? false,
+      isResignable: player?.isResignable ?? ResignableStatusEnum.DRAFT,
+    });
+    return acc;
+  }, {});
 };
 
 /**
@@ -233,7 +232,9 @@ export const shouldDisplayRanking = (rank?: string | number): boolean => {
  * @param matchup - The matchup to use.
  * @returns True when matchup completed; otherwise false.
  */
-export const isMatchupCompleted = (matchup: Matchup): boolean => {
+export const isMatchupCompleted = (
+  matchup: Pick<Matchup, "awayScore" | "homeScore">,
+): boolean => {
   return isScheduleItemComplete({ matchup, mode: "scores" });
 };
 
@@ -262,9 +263,9 @@ export const getScoreClass = (isWinner: boolean, isLoser: boolean): string => {
  * @returns True when valid matchup; otherwise false.
  */
 export const isValidMatchup = (
-  matchup: Matchup,
-  homeTeam?: GSHLTeam,
-  awayTeam?: GSHLTeam,
+  matchup: Pick<Matchup, "awayTeamId" | "homeTeamId">,
+  homeTeam?: Pick<GSHLTeam, "id">,
+  awayTeam?: Pick<GSHLTeam, "id">,
 ): boolean => {
   return !!(homeTeam && awayTeam && homeTeam.id !== awayTeam.id);
 };

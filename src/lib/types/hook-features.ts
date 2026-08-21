@@ -5,10 +5,8 @@ import type {
   Matchup,
   NHLTeam,
   Player,
-  PlayerWeekStatLine,
   Season,
   TeamSeasonStatLine,
-  TeamWeekStatLine,
   Week,
 } from "./database";
 import type {
@@ -21,6 +19,17 @@ import type { ProcessedDraftPick } from "./draft-ui";
 import type { TeamStatsLevel, UseTeamsOptions } from "./hook-core";
 import type { QueryLike, QueryState } from "./hook-query";
 import type { PowerRankingsViewModel, StandingsGroup } from "./standings";
+import type {
+  TeamHistoryMatchupSummary,
+  TeamHistorySeasonSummary,
+  TeamHistoryTeamSummary,
+  TeamHistoryWeekSummary,
+} from "./team-history";
+import type {
+  WeeklyScheduleMatchupSummary,
+  WeeklyScheduleTeamSummary,
+} from "./weekly-schedule";
+import type { TeamScheduleRow, TeamScheduleTeamSummary } from "./team-schedule";
 
 export interface UseContractDataOptions {
   currentSeason?: Season;
@@ -64,9 +73,10 @@ export interface UseStandingsDataOptions {
   includeMatchups?: boolean;
 }
 
-export interface UseScheduleDataEnhancedMatchup extends Matchup {
-  week: Week | undefined;
-  season: Season | undefined;
+export interface UseScheduleDataEnhancedMatchup
+  extends TeamHistoryMatchupSummary {
+  week: TeamHistoryWeekSummary | undefined;
+  season: TeamHistorySeasonSummary | undefined;
 }
 
 export interface UseScheduleDataOptions {
@@ -74,10 +84,10 @@ export interface UseScheduleDataOptions {
   seasonID?: string;
   gameType?: string;
   oppOwnerID?: string;
-  allMatchups?: Matchup[];
-  teams?: GSHLTeam[];
-  weeks?: Week[];
-  seasons?: Season[];
+  allMatchups?: TeamHistoryMatchupSummary[];
+  teams?: TeamHistoryTeamSummary[];
+  weeks?: TeamHistoryWeekSummary[];
+  seasons?: TeamHistorySeasonSummary[];
 }
 
 export interface UseScheduleDataResult {
@@ -215,10 +225,7 @@ export interface UseTeamDraftPickListDataResult {
   error: Error | null;
 }
 
-export interface UseTeamScheduleEnhancedMatchup {
-  matchup: Matchup;
-  week: Week | undefined;
-}
+export type UseTeamScheduleEnhancedMatchup = TeamScheduleRow;
 
 export interface UseTeamScheduleDataOptions {
   seasonId?: string | null;
@@ -228,11 +235,10 @@ export interface UseTeamScheduleDataOptions {
 export interface UseTeamScheduleDataResult {
   selectedSeasonId: string | null;
   selectedOwnerId: string | null;
-  selectedTeam: GSHLTeam | null;
+  selectedTeam: TeamScheduleTeamSummary | null;
   matchups: UseTeamScheduleEnhancedMatchup[];
-  teams: GSHLTeam[];
-  weeks: Week[];
-  allMatchups: Matchup[];
+  teams: TeamScheduleTeamSummary[];
+  seasonCategories: string[];
   isLoading: boolean;
   error: Error | null;
   ready: boolean;
@@ -246,13 +252,8 @@ export interface UseWeeklyScheduleDataOptions {
 export interface UseWeeklyScheduleDataResult {
   selectedSeasonId: string | null;
   selectedWeekId: string | null;
-  matchups: Matchup[];
-  teams: GSHLTeam[];
-  teamWeekStats: TeamWeekStatLine[];
-  teamWeekStatsByTeam: Record<string, TeamWeekStatLine>;
-  playerWeekStatsByTeam: Record<string, (PlayerWeekStatLine & Player)[]>;
-  allMatchups: Matchup[];
-  isPrefetching: boolean;
+  matchups: WeeklyScheduleMatchupSummary[];
+  teams: WeeklyScheduleTeamSummary[];
   isLoading: boolean;
   error: Error | null;
   ready: boolean;
@@ -266,11 +267,11 @@ export interface UseTeamHistoryDataResult {
   ownerValue: string;
   setOwnerValue: (value: string) => void;
   gameTypeOptions: string[][];
-  seasonOptions: Season[];
+  seasonOptions: TeamHistorySeasonSummary[];
   ownerOptions: string[][];
   schedule: UseScheduleDataEnhancedMatchup[];
-  teams: GSHLTeam[];
-  fullSchedule: Matchup[];
+  teams: TeamHistoryTeamSummary[];
+  fullSchedule: TeamHistoryMatchupSummary[];
   winLossRecord: [number, number, number];
   isDataReady: boolean;
   isLoading: boolean;

@@ -1,7 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import type { GSHLTeam, UseScheduleDataEnhancedMatchup } from "@gshl-types";
+import type {
+  GSHLTeam,
+  TeamHistoryTeamSummary,
+  UseScheduleDataEnhancedMatchup,
+} from "@gshl-types";
 import {
   buildMatchupNavigationHref,
   resolveMatchupCategories,
@@ -18,7 +22,7 @@ export function HistoryMatchupList({
     matchup: UseScheduleDataEnhancedMatchup;
     showSeasonDivider: boolean;
   }>;
-  teams: GSHLTeam[];
+  teams: TeamHistoryTeamSummary[];
   teamInfo: GSHLTeam;
 }) {
   const [expandedMatchupId, setExpandedMatchupId] = useState<string | null>(

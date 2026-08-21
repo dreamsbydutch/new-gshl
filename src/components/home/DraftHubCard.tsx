@@ -6,7 +6,7 @@ import { Button } from "@gshl-ui";
 import {
   useAuthSession,
   useDraftCountdown,
-  useDraftHubState,
+  useDraftHubStatus,
 } from "@gshl-hooks";
 import type { DraftHubCardProps } from "@gshl-types";
 import { getDraftYear } from "@gshl-utils";
@@ -15,7 +15,7 @@ export function DraftHubCard({ season }: DraftHubCardProps) {
   const { session, status: sessionStatus } = useAuthSession();
   const isAuthenticated =
     sessionStatus === "authenticated" && session?.user.status === "active";
-  const draftState = useDraftHubState({
+  const draftStatus = useDraftHubStatus({
     seasonId: season.id,
     enabled: isAuthenticated,
   });
@@ -24,10 +24,10 @@ export function DraftHubCard({ season }: DraftHubCardProps) {
   if (Number.isNaN(draftDate.getTime())) return null;
   const draftYear = getDraftYear(season);
 
-  const isComplete = draftState.data?.status === "complete";
+  const isComplete = draftStatus.data?.status === "complete";
   const isLive =
-    draftState.data?.status === "on_clock" ||
-    draftState.data?.status === "commissioner_required" ||
+    draftStatus.data?.status === "on_clock" ||
+    draftStatus.data?.status === "commissioner_required" ||
     (!isComplete && countdown.isLive);
   const actionLabel = isComplete
     ? "View Draft Results"

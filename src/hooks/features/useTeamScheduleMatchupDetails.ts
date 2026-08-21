@@ -1,10 +1,13 @@
 "use client";
 
 import { useMemo } from "react";
-import type { GSHLTeam, Matchup, TeamWeekStatLine, Week } from "@gshl-types";
+import type {
+  TeamScheduleMatchupSummary,
+  TeamScheduleTeamSummary,
+  TeamScheduleWeekSummary,
+} from "@gshl-types";
 import { getGameLocation, getGameTypeDisplay } from "@gshl-utils";
-import { findTeamById } from "@gshl-utils/domain/team";
-import { useTeams } from "../main";
+import { useTeamScheduleStats } from "../main";
 
 export function useTeamScheduleMatchupDetails({
   enabled,
@@ -14,17 +17,17 @@ export function useTeamScheduleMatchupDetails({
   selectedTeamId,
 }: {
   enabled: boolean;
-  matchup: Matchup;
-  week: Week | undefined;
-  teams: GSHLTeam[];
+  matchup: TeamScheduleMatchupSummary;
+  week: TeamScheduleWeekSummary | null | undefined;
+  teams: TeamScheduleTeamSummary[];
   selectedTeamId: string;
 }) {
   const homeTeam = useMemo(
-    () => findTeamById(teams, matchup.homeTeamId),
+    () => teams.find((team) => team.id === matchup.homeTeamId),
     [matchup.homeTeamId, teams],
   );
   const awayTeam = useMemo(
-    () => findTeamById(teams, matchup.awayTeamId),
+    () => teams.find((team) => team.id === matchup.awayTeamId),
     [matchup.awayTeamId, teams],
   );
   const gameLocation = useMemo(
@@ -39,29 +42,15 @@ export function useTeamScheduleMatchupDetails({
   const hasRecordedScore =
     matchup.homeScore !== null || matchup.awayScore !== null;
 
-  const { data: teamWeeksRaw = [], isLoading: teamWeeksLoading } = useTeams({
-    statsLevel: "weekly",
+  const statsQuery = useTeamScheduleStats({
+    seasonId: String(matchup.seasonId),
     weekId: String(matchup.weekId),
-    enabled: enabled && hasRecordedScore && Boolean(matchup.weekId),
+    homeTeamId: String(matchup.homeTeamId),
+    awayTeamId: String(matchup.awayTeamId),
+    enabled: enabled && hasRecordedScore,
   });
-
-  const teamWeeks = teamWeeksRaw as TeamWeekStatLine[];
-  const homeTeamStats = useMemo(
-    () =>
-      teamWeeks.find(
-        (teamWeek) =>
-          String(teamWeek.gshlTeamId) === String(matchup.homeTeamId),
-      ),
-    [matchup.homeTeamId, teamWeeks],
-  );
-  const awayTeamStats = useMemo(
-    () =>
-      teamWeeks.find(
-        (teamWeek) =>
-          String(teamWeek.gshlTeamId) === String(matchup.awayTeamId),
-      ),
-    [matchup.awayTeamId, teamWeeks],
-  );
+  const homeTeamStats = statsQuery.data.home;
+  const awayTeamStats = statsQuery.data.away;
 
   const selectedTeamStats = isHomeTeamSelected ? homeTeamStats : awayTeamStats;
   const opponentStats = isHomeTeamSelected ? awayTeamStats : homeTeamStats;
@@ -76,7 +65,7 @@ export function useTeamScheduleMatchupDetails({
     () =>
       getGameTypeDisplay(
         String(matchup.gameType),
-        week,
+        week ?? undefined,
         gameLocation,
         awayTeam,
         homeTeam,
@@ -91,7 +80,7 @@ export function useTeamScheduleMatchupDetails({
     gameLocation,
     hasStats: Boolean(selectedTeamStats && opponentStats),
     homeTeam,
-    isLoadingStats: teamWeeksLoading,
+    isLoadingStats: statsQuery.isLoading,
     opponentScore: opponentScore ?? null,
     opponentStats,
     opponentTeam,

@@ -10,8 +10,13 @@ import type {
 import {
   buildContractedSeasonRosterPlayers,
   filterAvailableDraftPlayers,
+  groupProjectedDraftPicksByRound,
 } from "./draft-board-list";
-import { buildMockDraftProjection } from "./mock-draft";
+import {
+  buildMockDraftProjection,
+  compactMockDraftProjection,
+  getMockDraftReferencedNhlAbbreviations,
+} from "./mock-draft";
 
 const timestamp = new Date("2026-07-27T12:00:00.000Z");
 
@@ -175,6 +180,51 @@ void test("stops a preview projection at the requested pick limit", () => {
   assert.deepEqual(
     projection.map((projectedPick) => projectedPick.pick.id),
     ["pick-1", "pick-2", "pick-3", "pick-4"],
+  );
+});
+
+void test("compacts Home mock-draft cards to their exact display shape", () => {
+  const projectedPlayer = player("player-1", 95, ["C", "RW"], {
+    nhlTeam: "TOR/MTL",
+    age: 22.5,
+    seasonRating: 88.25,
+    seasonRk: 12,
+    overallRk: 3,
+  });
+  const projectedPick = {
+    pick: pick("pick-1", 1),
+    gshlTeam: { ...team(), logoUrl: "https://example.com/team.png" },
+    projectedPlayer,
+    score: 42.5,
+  };
+
+  const compact = compactMockDraftProjection([projectedPick]);
+
+  assert.deepEqual(compact, [
+    {
+      pick: { id: "pick-1", round: "1", pick: "1" },
+      gshlTeam: {
+        name: "Team A",
+        logoUrl: "https://example.com/team.png",
+      },
+      projectedPlayer: {
+        fullName: "player-1 Player",
+        nhlTeam: "TOR/MTL",
+        nhlPos: ["C", "RW"],
+        age: 22.5,
+        seasonRating: 88.25,
+        seasonRk: 12,
+        overallRating: 95,
+        overallRk: 3,
+      },
+    },
+  ]);
+  assert.equal("score" in compact[0]!, false);
+  assert.deepEqual(getMockDraftReferencedNhlAbbreviations(compact), ["TOR"]);
+  assert.equal(
+    groupProjectedDraftPicksByRound(compact)[0]?.picks[0]?.projectedPlayer
+      ?.fullName,
+    "player-1 Player",
   );
 });
 

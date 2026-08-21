@@ -135,14 +135,14 @@ export function useScheduleData(
   const sortedSchedule = useMemo(() => {
     return filteredSchedule.slice().sort((a, b) => {
       const seasonDifference =
-        (a.season?.year ?? Number.MAX_SAFE_INTEGER) -
-        (b.season?.year ?? Number.MAX_SAFE_INTEGER);
+        Number(a.season?.year ?? Number.MAX_SAFE_INTEGER) -
+        Number(b.season?.year ?? Number.MAX_SAFE_INTEGER);
 
       if (seasonDifference !== 0) return seasonDifference;
 
       const weekDifference =
-        (a.week?.weekNum ?? Number.MAX_SAFE_INTEGER) -
-        (b.week?.weekNum ?? Number.MAX_SAFE_INTEGER);
+        Number(a.week?.weekNum ?? Number.MAX_SAFE_INTEGER) -
+        Number(b.week?.weekNum ?? Number.MAX_SAFE_INTEGER);
 
       if (weekDifference !== 0) return weekDifference;
 

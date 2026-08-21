@@ -7,11 +7,11 @@ import { ArrowDown, ArrowRight, ArrowUp, Minus } from "lucide-react";
 import {
   useAppRouter,
   useDistinctTeamColors,
-  useStandingsData,
+  usePowerRankingsPreview,
 } from "@gshl-hooks";
 import { PowerRankingsHomeCardSkeleton } from "@gshl-skeletons";
 import type {
-  PowerRankingEntry,
+  PowerRankingPreviewEntry,
   PowerRankingsHomeCardProps,
 } from "@gshl-types";
 import {
@@ -19,7 +19,7 @@ import {
   selectHomePowerRankingPreview,
 } from "@gshl-utils";
 
-function Movement({ entry }: { entry: PowerRankingEntry }) {
+function Movement({ entry }: { entry: PowerRankingPreviewEntry }) {
   if (entry.rankChange === null) {
     return <span className="text-xs text-slate-400">New</span>;
   }
@@ -48,7 +48,7 @@ function Movement({ entry }: { entry: PowerRankingEntry }) {
   return <Minus className="h-3 w-3 text-slate-300" aria-label="No movement" />;
 }
 
-function TeamMark({ entry }: { entry: PowerRankingEntry }) {
+function TeamMark({ entry }: { entry: PowerRankingPreviewEntry }) {
   return (
     <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-slate-100 bg-slate-50">
       {entry.team.logoUrl ? (
@@ -74,19 +74,17 @@ export function PowerRankingsHomeCard({
   seasonId,
 }: PowerRankingsHomeCardProps) {
   const { router } = useAppRouter();
-  const { selectedSeason, powerRankings, isLoading, error } = useStandingsData({
-    seasonId,
-    standingsType: "power",
-    includeMatchups: false,
-  });
+  const { data, isLoading, error } = usePowerRankingsPreview(seasonId);
+  const selectedSeason = data?.season ?? null;
+  const entries = useMemo(() => data?.entries ?? [], [data?.entries]);
   const colorSources = useMemo(
     () =>
-      powerRankings.entries.map((entry) => ({
+      entries.map((entry) => ({
         teamId: entry.team.id,
         logoUrl: entry.team.logoUrl,
         fallbackColor: entry.color,
       })),
-    [powerRankings.entries],
+    [entries],
   );
   const teamColors = useDistinctTeamColors(colorSources);
 
@@ -101,12 +99,12 @@ export function PowerRankingsHomeCard({
     );
   };
 
-  const latestLabel = powerRankings.latestWeek
-    ? `Week ${powerRankings.latestWeek.weekNum}`
+  const latestLabel = data?.latestWeek
+    ? `Week ${data.latestWeek.weekNum}`
     : selectedSeason?.isActive
       ? "Current"
       : "Final";
-  const previewEntries = selectHomePowerRankingPreview(powerRankings.entries);
+  const previewEntries = selectHomePowerRankingPreview(entries);
 
   return (
     <section
@@ -143,7 +141,7 @@ export function PowerRankingsHomeCard({
         <p className="px-4 py-6 text-center text-sm text-slate-500 sm:px-5">
           Power rankings are unavailable right now.
         </p>
-      ) : !powerRankings.entries.length ? (
+      ) : !entries.length ? (
         <p className="px-4 py-6 text-center text-sm text-slate-500 sm:px-5">
           No power rankings have been published for this season.
         </p>

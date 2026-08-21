@@ -139,7 +139,7 @@ export function LockerRoomContent() {
   const { data: signablePlayers = [], isLoading: signablePlayersLoading } =
     usePlayers({
       isActive: true,
-      enabled: needsContractData,
+      enabled: selectedLockerRoomType === "salary",
     });
   const needsCapLabData = selectedLockerRoomType === "salary";
   const {
@@ -164,10 +164,7 @@ export function LockerRoomContent() {
     tradePlayerIds,
     needsCapLabData && tradePlayerIds.length > 0,
   );
-  const needsNhlTeams =
-    selectedLockerRoomType === "roster" ||
-    selectedLockerRoomType === "salary" ||
-    isRecordBookTab;
+  const needsNhlTeams = selectedLockerRoomType === "salary" || isRecordBookTab;
   const { data: nhlTeamsRaw = [], isLoading: nhlTeamsLoading } = useNHLTeams({
     enabled: needsNhlTeams,
   });
@@ -248,7 +245,7 @@ export function LockerRoomContent() {
     teamsLoading ||
     (needsPlayers && playersLoading) ||
     (needsContractData && contractDataLoading) ||
-    (needsContractData && signablePlayersLoading) ||
+    (selectedLockerRoomType === "salary" && signablePlayersLoading) ||
     (needsCapLabData &&
       (allLeagueContractsLoading || tradePlayersQuery.isLoading)) ||
     (needsNhlTeams && nhlTeamsLoading) ||

@@ -93,6 +93,10 @@ export interface DraftHubStateData {
   picks: DraftHubPickView[];
 }
 
+export interface DraftHubStatusData {
+  status: DraftHubStatus;
+}
+
 export interface DraftHubEligiblePlayerView extends Player {
   nhlTeamLogoUrl: string | null;
   stats: UfaStatView | null;
@@ -117,6 +121,11 @@ export type DraftPlayerSortKey =
 export type DraftPlayerSortDirection = "asc" | "desc";
 
 export interface UseDraftHubStateOptions {
+  seasonId?: string | null;
+  enabled?: boolean;
+}
+
+export interface UseDraftHubStatusOptions {
   seasonId?: string | null;
   enabled?: boolean;
 }

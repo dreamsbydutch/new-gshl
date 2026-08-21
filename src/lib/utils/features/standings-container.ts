@@ -49,6 +49,25 @@ const STANDINGS_TYPES = {
   PLAYOFF: "playoff",
 } as const;
 
+export function getStandingsViewDataRequirements(
+  standingsType: string,
+  allowMatchups = true,
+) {
+  const isPower = standingsType === "power";
+  const isPlayoff = standingsType === "playoff";
+  const isAwards = standingsType === "awards";
+  const isTeamStandings = ["overall", "conference", "wildcard"].includes(
+    standingsType,
+  );
+
+  return {
+    includeMatchups: allowMatchups && isPlayoff,
+    includeSeasonStats: !isAwards && (isTeamStandings || isPower || isPlayoff),
+    includeWeeklyStats: isPower,
+    includeWeeks: isPower,
+  };
+}
+
 export const OVERALL_SEED_FIELDS = [
   "OneSeed",
   "TwoSeed",

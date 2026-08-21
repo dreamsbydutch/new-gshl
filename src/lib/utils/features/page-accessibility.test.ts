@@ -97,9 +97,6 @@ void test("matchup loading, error, empty, and success states retain an h1", () =
   const content = readSource(
     "src/components/matchup/MatchupDetailsContent.tsx",
   );
-  const routeContent = readSource(
-    "src/components/matchup/MatchupPageContent.tsx",
-  );
   const skeleton = readSource("src/components/skeletons/MatchupSkeleton.tsx");
 
   for (const headingId of [
@@ -113,11 +110,6 @@ void test("matchup loading, error, empty, and success states retain an h1", () =
 
   assert.match(skeleton, /aria-labelledby="matchup-loading-heading"/);
   assert.match(skeleton, /<h1[^>]*id="matchup-loading-heading"/);
-  assert.match(
-    routeContent,
-    /aria-labelledby="matchup-route-not-found-heading"/,
-  );
-  assert.match(routeContent, /<h1[^>]*id="matchup-route-not-found-heading"/);
 });
 
 void test("team schedule rows implement a labelled disclosure", () => {

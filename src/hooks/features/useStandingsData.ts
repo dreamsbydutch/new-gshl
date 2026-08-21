@@ -1,17 +1,17 @@
 "use client";
 
 import { useMemo } from "react";
-import { useSeasons, useTeams } from "../main";
+import { useSeasons, useStandingsPowerHistory } from "../main";
 import { useSeasonNavigation, useStandingsNavigation } from "./useNavigation";
 import {
   groupTeamsByStandingsType,
   buildPowerRankings,
+  getStandingsViewDataRequirements,
   SeasonType,
   type StandingsGroup,
 } from "@gshl-utils";
 import type {
   TeamSeasonStatLine,
-  TeamWeekStatLine,
   UseStandingsDataOptions,
   UseStandingsDataResult,
 } from "@gshl-types";
@@ -57,7 +57,11 @@ export function useStandingsData(
   // Use provided seasonId or fall back to navigation context
   const standingsType = optionStandingsType ?? navStandingsType ?? "overall";
   const selectedSeasonId = optionSeasonId ?? navSeasonId;
-  const isPowerRankingsView = standingsType === "power";
+  const requirements = getStandingsViewDataRequirements(
+    standingsType,
+    includeMatchups,
+  );
+  const isPowerRankingsView = requirements.includeWeeklyStats;
 
   const {
     data: overrideSeasonData,
@@ -81,13 +85,13 @@ export function useStandingsData(
     error: seasonDataError,
   } = useSeasonDataBundle<TeamSeasonStatLine>({
     seasonId: selectedSeasonId,
-    includeMatchups,
-    includeWeeks: true,
-    teamStatsLevel: "season",
+    includeMatchups: requirements.includeMatchups,
+    includeWeeks: requirements.includeWeeks && !isPowerRankingsView,
+    teamStatsLevel: requirements.includeSeasonStats ? "season" : null,
     useNavigation: false,
-    teamQueryOptions: {
-      seasonType: SeasonType.REGULAR_SEASON,
-    },
+    teamQueryOptions: requirements.includeSeasonStats
+      ? { seasonType: SeasonType.REGULAR_SEASON }
+      : undefined,
   });
 
   const teams = useMemo(
@@ -99,14 +103,17 @@ export function useStandingsData(
     () => (statsResponse ?? []).filter(Boolean),
     [statsResponse],
   );
-  const weeklyStatsQuery = useTeams({
-    seasonId: selectedSeasonId,
-    statsLevel: "weekly",
-    enabled: isPowerRankingsView && Boolean(selectedSeasonId),
-  });
+  const powerHistoryQuery = useStandingsPowerHistory(
+    selectedSeasonId,
+    isPowerRankingsView,
+  );
+  const powerWeeks = useMemo(
+    () => powerHistoryQuery.data?.weeks ?? [],
+    [powerHistoryQuery.data?.weeks],
+  );
   const weeklyStats = useMemo(
-    () => (weeklyStatsQuery.data ?? []) as TeamWeekStatLine[],
-    [weeklyStatsQuery.data],
+    () => powerHistoryQuery.data?.weeklyStats ?? [],
+    [powerHistoryQuery.data?.weeklyStats],
   );
 
   // Intentionally no logging in production render path
@@ -123,21 +130,21 @@ export function useStandingsData(
     () =>
       buildPowerRankings({
         teams,
-        weeks: weeks ?? [],
+        weeks: isPowerRankingsView ? powerWeeks : [],
         weeklyStats,
         seasonStats: teamStats,
       }),
-    [teamStats, teams, weeklyStats, weeks],
+    [isPowerRankingsView, powerWeeks, teamStats, teams, weeklyStats],
   );
 
   const isLoading =
     status.isLoading ||
     overrideSeasonLoading ||
-    (isPowerRankingsView && weeklyStatsQuery.isLoading);
+    (isPowerRankingsView && powerHistoryQuery.isLoading);
   const error =
     seasonDataError ??
     overrideSeasonError ??
-    (isPowerRankingsView ? weeklyStatsQuery.error : null) ??
+    (isPowerRankingsView ? powerHistoryQuery.error : null) ??
     null;
 
   return {
@@ -155,7 +162,7 @@ export function useStandingsData(
     ready:
       seasonDataReady &&
       !overrideSeasonLoading &&
-      (!isPowerRankingsView || !weeklyStatsQuery.isLoading) &&
+      (!isPowerRankingsView || !powerHistoryQuery.isLoading) &&
       !error,
   };
 }

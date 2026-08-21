@@ -15,6 +15,13 @@ import type {
   WeeklyEditionMatchupFact,
   WeeklyEditionMilestoneScheduleEntry,
   WeeklyEditionMilestoneScheduleInput,
+  WeeklyEdition,
+  WeeklyEditionArchiveSummary,
+  WeeklyEditionHomeSummary,
+  WeeklyEditionNewsroomSummary,
+  WeeklyEditionReaderDetail,
+  WeeklyEditionRevision,
+  WeeklyEditionRevisionSummary,
   WeeklyEditionSection,
   WeeklyEditionSectionKind,
   WeeklyEditionRecordFact,
@@ -74,6 +81,121 @@ export function buildWeeklyEditionCtaHref(href: string): string {
   params.set("from", "headlines");
 
   return `${pathname}?${params.toString()}${hash}`;
+}
+
+export function buildWeeklyEditionHomeSummary(
+  edition: Pick<WeeklyEdition, "id" | "issueLabel" | "content" | "facts">,
+): WeeklyEditionHomeSummary {
+  const heroMatchup = edition.facts.matchups.find(
+    (matchup) => matchup.matchupId === edition.facts.heroMatchupId,
+  );
+  const heroTeamIds = heroMatchup
+    ? [heroMatchup.awayTeamId, heroMatchup.homeTeamId]
+    : [];
+
+  return {
+    id: edition.id,
+    issueLabel: edition.issueLabel,
+    headline: edition.content.headline,
+    heroTeams: heroTeamIds.flatMap((teamId) => {
+      const team = edition.facts.teams.find(
+        (candidate) => candidate.teamId === teamId,
+      );
+      return team?.logoUrl
+        ? [{ teamId: team.teamId, logoUrl: team.logoUrl }]
+        : [];
+    }),
+  };
+}
+
+/** Projects a published issue to the exact fields rendered by the reader. */
+export function buildWeeklyEditionReaderDetail(
+  edition: Pick<
+    WeeklyEdition,
+    | "issueType"
+    | "issueLabel"
+    | "seasonName"
+    | "startDate"
+    | "endDate"
+    | "scheduledFor"
+    | "content"
+    | "facts"
+    | "inactiveSectionIds"
+  >,
+): WeeklyEditionReaderDetail {
+  return {
+    issueType: edition.issueType,
+    issueLabel: edition.issueLabel,
+    seasonName: edition.seasonName,
+    startDate: edition.startDate,
+    endDate: edition.endDate,
+    scheduledFor: edition.scheduledFor,
+    content: filterWeeklyEditionContent(
+      edition.content,
+      edition.inactiveSectionIds ?? [],
+    ),
+    facts: {
+      teams: edition.facts.teams.map((team) => ({
+        teamId: team.teamId,
+        name: team.name,
+        ...(team.logoUrl === undefined ? {} : { logoUrl: team.logoUrl }),
+        ...(team.conferenceId === undefined
+          ? {}
+          : { conferenceId: team.conferenceId }),
+        ...(team.conferenceName === undefined
+          ? {}
+          : { conferenceName: team.conferenceName }),
+        ...(team.conferenceLogoUrl === undefined
+          ? {}
+          : { conferenceLogoUrl: team.conferenceLogoUrl }),
+      })),
+    },
+  };
+}
+
+export function buildWeeklyEditionArchiveSummary(
+  edition: Pick<WeeklyEdition, "id" | "seasonName" | "issueLabel" | "content">,
+): WeeklyEditionArchiveSummary {
+  return {
+    id: edition.id,
+    seasonName: edition.seasonName,
+    issueLabel: edition.issueLabel,
+    headline: edition.content.headline,
+    deck: edition.content.deck,
+  };
+}
+
+export function buildWeeklyEditionNewsroomSummary(
+  edition: Pick<
+    WeeklyEdition,
+    | "id"
+    | "seasonName"
+    | "issueLabel"
+    | "generationMode"
+    | "status"
+    | "isHomeActive"
+  >,
+): WeeklyEditionNewsroomSummary {
+  return {
+    id: edition.id,
+    seasonName: edition.seasonName,
+    issueLabel: edition.issueLabel,
+    generationMode: edition.generationMode,
+    status: edition.status,
+    ...(edition.isHomeActive === undefined
+      ? {}
+      : { isHomeActive: edition.isHomeActive }),
+  };
+}
+
+export function buildWeeklyEditionRevisionSummary(
+  revision: Pick<WeeklyEditionRevision, "id" | "generationMode" | "createdAt">,
+): WeeklyEditionRevisionSummary {
+  return {
+    id: revision.id,
+    generationMode: revision.generationMode,
+    createdAt: revision.createdAt,
+  };
 }
 
 const WEEKLY_EDITION_ARTICLE_SLOTS = [

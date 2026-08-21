@@ -175,10 +175,12 @@ export function getPlayerNhlAbbreviation(
  * @param abbreviation - The abbreviation to use.
  * @returns The matching nhl team by abbreviation, if one exists.
  */
-export function findNhlTeamByAbbreviation(
-  nhlTeams: NHLTeam[],
+export function findNhlTeamByAbbreviation<
+  TNhlTeam extends Pick<NHLTeam, "abbr">,
+>(
+  nhlTeams: readonly TNhlTeam[],
   abbreviation: PlayerTeamInput,
-): NHLTeam | undefined {
+): TNhlTeam | undefined {
   const normalizedAbbreviation =
     getPlayerNhlAbbreviation(abbreviation)?.toUpperCase();
   return normalizedAbbreviation

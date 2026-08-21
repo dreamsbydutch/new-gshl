@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { GSHLTeam, Matchup, Week } from "@gshl-types";
-import { buildStandingsTeamGames } from "./standings-container";
+import {
+  buildStandingsTeamGames,
+  getStandingsViewDataRequirements,
+} from "./standings-container";
 
 const timestamp = new Date("2026-01-01T00:00:00.000Z");
 
@@ -110,5 +113,36 @@ void test("buildStandingsTeamGames returns the two latest finals and two next ga
       ["W4", "Bears", "@"],
       ["W5", "Comets", "vs"],
     ],
+  );
+});
+
+void test("standings views subscribe only to their rendered datasets", () => {
+  assert.deepEqual(getStandingsViewDataRequirements("overall"), {
+    includeMatchups: false,
+    includeSeasonStats: true,
+    includeWeeklyStats: false,
+    includeWeeks: false,
+  });
+  assert.deepEqual(getStandingsViewDataRequirements("power"), {
+    includeMatchups: false,
+    includeSeasonStats: true,
+    includeWeeklyStats: true,
+    includeWeeks: true,
+  });
+  assert.deepEqual(getStandingsViewDataRequirements("playoff"), {
+    includeMatchups: true,
+    includeSeasonStats: true,
+    includeWeeklyStats: false,
+    includeWeeks: false,
+  });
+  assert.deepEqual(getStandingsViewDataRequirements("awards"), {
+    includeMatchups: false,
+    includeSeasonStats: false,
+    includeWeeklyStats: false,
+    includeWeeks: false,
+  });
+  assert.equal(
+    getStandingsViewDataRequirements("playoff", false).includeMatchups,
+    false,
   );
 });

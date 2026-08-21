@@ -1,6 +1,7 @@
 import type {
   CategoryResult,
-  MatchupPlayerStat,
+  MatchupDetailsTeam,
+  MatchupTeamWeekStats,
   PlayerStatColumn,
   PlayerStatCategoryKey,
   PlayerStatColumnKey,
@@ -8,16 +9,14 @@ import type {
   PlayerStatRow,
   StarPlayer,
 } from "@gshl-types";
-import type {
-  GSHLTeam,
-  MatchupCategoryConfig,
-  TeamWeekStatLine,
-} from "@gshl-types";
+import type { MatchupCategoryConfig, TeamWeekStatLine } from "@gshl-types";
 import { formatPlayerPositionList } from "../domain/player";
 
 type MatchupStatCategoryConfig = MatchupCategoryConfig & {
   field: PlayerStatCategoryKey;
 };
+
+type MatchupCategoryStats = MatchupTeamWeekStats | TeamWeekStatLine;
 
 export const MATCHUP_CATEGORY_MAP: Record<
   PlayerStatCategoryKey,
@@ -386,7 +385,7 @@ export function getScoreCellClass(won: boolean): string {
  * @returns The converted category number.
  */
 export function toCategoryNumber(
-  stats: TeamWeekStatLine,
+  stats: MatchupCategoryStats,
   category: MatchupCategoryConfig,
 ): number {
   if (!isPlayerStatCategoryKey(category.field)) return 0;
@@ -401,7 +400,7 @@ export function toCategoryNumber(
  * @returns The formatted category value.
  */
 export function formatCategoryValue(
-  stats: TeamWeekStatLine,
+  stats: MatchupCategoryStats,
   category: MatchupCategoryConfig,
 ): string {
   if (!isPlayerStatCategoryKey(category.field)) return "0";
@@ -416,8 +415,8 @@ export function formatCategoryValue(
  * @returns The formatted week range.
  */
 export function formatWeekRange(
-  startDate?: string,
-  endDate?: string,
+  startDate?: string | null,
+  endDate?: string | null,
 ): string | null {
   if (!startDate || !endDate) return null;
 
@@ -469,8 +468,8 @@ export function formatMatchupPlayerPositions(player: PlayerStatRow): string {
  * @returns The requested star players.
  */
 export function getStarPlayers(
-  players: MatchupPlayerStat[],
-  teamLookup: Map<string, GSHLTeam>,
+  players: PlayerStatRow[],
+  teamLookup: Map<string, MatchupDetailsTeam>,
 ): StarPlayer[] {
   return players
     .filter((player) => {
@@ -564,8 +563,8 @@ export function renderPlayerStatCell(
  * @returns The assembled category results.
  */
 export function buildCategoryResults(
-  homeTeamStats: TeamWeekStatLine,
-  awayTeamStats: TeamWeekStatLine,
+  homeTeamStats: MatchupCategoryStats,
+  awayTeamStats: MatchupCategoryStats,
   matchupCategories: MatchupCategoryConfig[],
 ): CategoryResult[] {
   return matchupCategories.map((category) => {

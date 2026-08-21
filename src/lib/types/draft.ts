@@ -1,4 +1,4 @@
-import type { DraftPick, GSHLTeam } from "./database";
+import type { DraftPick, GSHLTeam, NHLTeam } from "./database";
 import type { RosterPosition } from "./enums";
 import type { DraftBoardPlayer } from "./draft-ui";
 
@@ -22,6 +22,28 @@ export interface ProjectedDraftPick<
   projectedPlayer?: TPlayer;
   score: number | null;
 }
+
+export interface MockDraftDisplayPlayer {
+  fullName: string;
+  nhlTeam?: string | string[] | null;
+  nhlPos?: string | string[] | null;
+  age?: number | string | null;
+  seasonRating?: number | string | null;
+  seasonRk?: number | string | null;
+  overallRating?: number | string | null;
+  overallRk?: number | string | null;
+}
+
+export interface MockDraftDisplayPick {
+  pick: Pick<DraftPick, "id" | "round" | "pick">;
+  gshlTeam?: Pick<GSHLTeam, "name" | "logoUrl">;
+  projectedPlayer?: MockDraftDisplayPlayer;
+}
+
+export type MockDraftDisplayNhlTeam = Pick<
+  NHLTeam,
+  "abbr" | "name" | "logoUrl"
+>;
 
 export interface CompletedMockDraftPick<
   TPlayer extends DraftBoardPlayer = DraftBoardPlayer,

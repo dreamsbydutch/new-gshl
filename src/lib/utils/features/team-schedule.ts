@@ -1,4 +1,10 @@
-import type { GSHLTeam, Matchup, Week } from "@gshl-types";
+import type {
+  GSHLTeam,
+  Matchup,
+  TeamScheduleMatchupSummary,
+  TeamScheduleTeamSummary,
+  Week,
+} from "@gshl-types";
 import {
   filterMatchups,
   formatMatchupScore,
@@ -107,7 +113,7 @@ export const findWeekById = (
  * @returns The requested game location.
  */
 export const getGameLocation = (
-  matchup: Matchup,
+  matchup: Pick<TeamScheduleMatchupSummary, "homeTeamId">,
   selectedTeamId: string,
 ): GameLocation => {
   return matchup.homeTeamId === selectedTeamId ? "HOME" : "AWAY";
@@ -125,10 +131,10 @@ export const getGameLocation = (
  */
 export const getGameTypeDisplay = (
   gameType: string,
-  week: Week | undefined,
+  week: { weekNum: number | string } | undefined,
   gameLocation: GameLocation,
-  awayTeam: GSHLTeam | undefined,
-  homeTeam: GSHLTeam | undefined,
+  awayTeam: Pick<GSHLTeam, "confAbbr"> | undefined,
+  homeTeam: Pick<GSHLTeam, "confAbbr"> | undefined,
 ): GameTypeDisplay => {
   const gameTypeStr = String(gameType);
 
@@ -154,8 +160,8 @@ export const getGameTypeDisplay = (
  */
 function getConferenceColor(
   gameLocation: GameLocation,
-  awayTeam: GSHLTeam | undefined,
-  homeTeam: GSHLTeam | undefined,
+  awayTeam: Pick<GSHLTeam, "confAbbr"> | undefined,
+  homeTeam: Pick<GSHLTeam, "confAbbr"> | undefined,
 ): string {
   const opponentConf =
     gameLocation === "HOME" ? awayTeam?.confAbbr : homeTeam?.confAbbr;
@@ -163,7 +169,7 @@ function getConferenceColor(
   return opponentConf === CONFERENCES.HICKORY_HOTEL.abbr
     ? CONFERENCES.HICKORY_HOTEL.textColor
     : CONFERENCES.SUNVIEW.textColor;
-};
+}
 
 /**
  * Formats opponent display for display.
@@ -176,9 +182,9 @@ function getConferenceColor(
  */
 export const formatOpponentDisplay = (
   gameLocation: GameLocation,
-  matchup: Matchup,
-  homeTeam: GSHLTeam | undefined,
-  awayTeam: GSHLTeam | undefined,
+  matchup: Pick<TeamScheduleMatchupSummary, "awayRank" | "homeRank">,
+  homeTeam: Pick<TeamScheduleTeamSummary, "name"> | undefined,
+  awayTeam: Pick<TeamScheduleTeamSummary, "name"> | undefined,
 ): string => {
   if (gameLocation === "HOME") {
     const rankPrefix = shouldShowRank(matchup.awayRank)
@@ -211,8 +217,10 @@ export const shouldShowRank = (rank: number | null | undefined): boolean => {
  * @param week - The week to use.
  * @returns True when game completed; otherwise false.
  */
-export const isGameCompleted = (week: Week | undefined): boolean => {
-  return isScheduleItemComplete({ mode: "weekEnd", week });
+export const isGameCompleted = (
+  week: { endDate: string | null } | null | undefined,
+): boolean => {
+  return isScheduleItemComplete({ mode: "weekEnd", week: week ?? undefined });
 };
 
 /**
@@ -223,7 +231,10 @@ export const isGameCompleted = (week: Week | undefined): boolean => {
  * @returns The requested result style class.
  */
 export const getResultStyleClass = (
-  matchup: Matchup,
+  matchup: Pick<
+    TeamScheduleMatchupSummary,
+    "awayTeamId" | "awayWin" | "homeTeamId" | "homeWin" | "tie"
+  >,
   selectedTeamId: string,
 ): string => {
   return getMatchupOutcomeClass({
@@ -242,7 +253,10 @@ export const getResultStyleClass = (
  * @returns The formatted team score.
  */
 export const formatTeamScore = (
-  matchup: Matchup,
+  matchup: Pick<
+    TeamScheduleMatchupSummary,
+    "awayScore" | "awayTeamId" | "homeScore" | "homeTeamId"
+  >,
   selectedTeamId: string,
 ): string => {
   return formatMatchupScore({

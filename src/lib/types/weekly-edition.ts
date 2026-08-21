@@ -429,6 +429,58 @@ export interface WeeklyEdition {
   inactiveSectionIds?: string[];
 }
 
+export interface WeeklyEditionHeroTeamBrand {
+  teamId: string;
+  logoUrl: string;
+}
+
+export interface WeeklyEditionHomeSummary {
+  id: string;
+  issueLabel: string;
+  headline: string;
+  heroTeams: WeeklyEditionHeroTeamBrand[];
+}
+
+export type WeeklyEditionReaderTeam = Pick<
+  WeeklyEditionTeamFact,
+  | "teamId"
+  | "name"
+  | "logoUrl"
+  | "conferenceId"
+  | "conferenceName"
+  | "conferenceLogoUrl"
+>;
+
+export interface WeeklyEditionReaderDetail {
+  issueType: WeeklyEditionIssueType;
+  issueLabel: string;
+  seasonName: string;
+  startDate: number;
+  endDate: number;
+  scheduledFor: number;
+  content: WeeklyEditionContent;
+  facts: {
+    teams: WeeklyEditionReaderTeam[];
+  };
+}
+
+export interface WeeklyEditionArchiveSummary {
+  id: string;
+  seasonName: string;
+  issueLabel: string;
+  headline: string;
+  deck: string;
+}
+
+export interface WeeklyEditionNewsroomSummary {
+  id: string;
+  seasonName: string;
+  issueLabel: string;
+  generationMode: WeeklyEditionGenerationMode;
+  status: WeeklyEditionStatus;
+  isHomeActive?: boolean;
+}
+
 export interface WeeklyEditionRevision {
   id: string;
   editionId: string;
@@ -437,6 +489,12 @@ export interface WeeklyEditionRevision {
   sourceHash: string;
   createdAt: number;
   editedBy?: string;
+}
+
+export interface WeeklyEditionRevisionSummary {
+  id: string;
+  generationMode: WeeklyEditionGenerationMode;
+  createdAt: number;
 }
 
 export interface WeeklyEditionValidationResult {
@@ -542,7 +600,7 @@ export interface WeeklyEditionRouteProps {
 }
 
 export interface WeeklyEditionArticleProps {
-  edition: WeeklyEdition;
+  edition: WeeklyEditionReaderDetail;
   preview?: boolean;
   modal?: boolean;
   onClose?: () => void;
@@ -557,7 +615,7 @@ export interface WeeklyEditionEditorProps {
 export interface WeeklyEditionSectionCardProps {
   section: WeeklyEditionSection;
   featured?: boolean;
-  teams?: WeeklyEditionTeamFact[];
+  teams?: WeeklyEditionReaderTeam[];
 }
 
 export interface WeeklyEditionQueryState<T> {

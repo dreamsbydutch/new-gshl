@@ -2,6 +2,8 @@ import type {
   GSHLTeam,
   Matchup,
   Season,
+  TeamHistoryMatchupSummary,
+  TeamHistoryTeamSummary,
   Week,
 } from "@gshl-types";
 import { MatchupType } from "../domain/constants";
@@ -92,9 +94,9 @@ function parseDelimitedValue(value: string): string {
  * @returns The calculated win loss record.
  */
 export const calculateWinLossRecord = (
-  schedule: Matchup[],
+  schedule: TeamHistoryMatchupSummary[],
   teamOwnerId: string,
-  teams: GSHLTeam[],
+  teams: TeamHistoryTeamSummary[],
 ): [number, number, number] => {
   const winLossRecord: [number, number, number] = [0, 0, 0];
 
@@ -169,16 +171,20 @@ export const parseIdValue = (value: string): string | undefined =>
  * @returns The assembled owner options.
  */
 export const buildOwnerOptions = (
-  fullSchedule: Matchup[],
-  teams: GSHLTeam[],
+  fullSchedule: TeamHistoryMatchupSummary[],
+  teams: TeamHistoryTeamSummary[],
   teamInfo: GSHLTeam,
 ): string[][] => {
   const options = fullSchedule
     .map((matchup) => {
+      const homeTeam = teams.find((team) => team.id === matchup.homeTeamId);
+      const awayTeam = teams.find((team) => team.id === matchup.awayTeamId);
       const opp =
-        teamInfo.id === matchup.homeTeamId
-          ? teams.find((team) => team.id === matchup.awayTeamId)
-          : teams.find((team) => team.id === matchup.homeTeamId);
+        homeTeam?.ownerId === teamInfo.ownerId
+          ? awayTeam
+          : awayTeam?.ownerId === teamInfo.ownerId
+            ? homeTeam
+            : undefined;
 
       return opp
         ? [

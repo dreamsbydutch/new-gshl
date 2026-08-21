@@ -16,19 +16,25 @@ import type {
   ContractStatus,
   MatchupType,
   SeasonType,
+  WeeklyEditionContent,
+  WeeklyEditionFactPacket,
   WeeklyEditionIssueType,
 } from "../src/lib/types";
 import { ContractStatus as ContractStatusValues } from "../src/lib/utils/domain/constants";
 import {
   buildWeeklyEditionCareerRecordFacts,
+  buildWeeklyEditionArchiveSummary,
   buildMilestoneEditionFactPacket,
   buildTemplateWeeklyEdition,
+  buildWeeklyEditionHomeSummary,
   buildWeeklyEditionMilestoneFacts,
   buildWeeklyEditionMilestoneSchedule,
   buildWeeklyEditionCategoryMargins,
   buildWeeklyEditionChatGptPrompt,
   buildWeeklyEditionFactPacket,
-  filterWeeklyEditionContent,
+  buildWeeklyEditionNewsroomSummary,
+  buildWeeklyEditionReaderDetail,
+  buildWeeklyEditionRevisionSummary,
   buildWeeklyEditionPeriodRecordFacts,
   hashWeeklyEditionSource,
   isWeeklyEditionPlayingContract,
@@ -67,12 +73,16 @@ const isoTimestamp = (value: unknown) => {
   return timestamp === null ? "" : new Date(timestamp).toISOString();
 };
 const dateKey = (value: unknown) => utcTimestampToDateKey(value) ?? "";
-const descendingTimestamp = (
-  left: { publishedAt?: unknown },
-  right: { publishedAt?: unknown },
-) =>
-  (toUtcTimestamp(right.publishedAt) ?? 0) -
-  (toUtcTimestamp(left.publishedAt) ?? 0);
+const requiredPublicTimestamp = (
+  field: PublicTimestampField,
+  value: unknown,
+) => {
+  const timestamp = toUtcTimestamp(value);
+  if (timestamp === null) {
+    throw new Error(`Weekly edition ${field} is not a valid UTC timestamp`);
+  }
+  return timestamp;
+};
 const publicRow = <Row extends { _id: string }>(
   row: Row | null,
 ): PublicRow<Row> | null => {
@@ -82,24 +92,23 @@ const publicRow = <Row extends { _id: string }>(
   delete output._creationTime;
   for (const field of PUBLIC_TIMESTAMP_FIELDS) {
     if (!(field in output)) continue;
-    const timestamp = toUtcTimestamp(output[field]);
-    if (timestamp === null) {
-      throw new Error(`Weekly edition ${field} is not a valid UTC timestamp`);
-    }
-    output[field] = timestamp;
+    output[field] = requiredPublicTimestamp(field, output[field]);
   }
   return output as PublicRow<Row>;
 };
 const publicReaderRow = (row: EditionRow | null) => {
-  const output = publicRow(row);
-  if (!output || !row) return null;
-  return {
-    ...output,
-    content: filterWeeklyEditionContent(
-      row.content,
-      row.inactiveSectionIds ?? [],
-    ),
-  };
+  if (!row) return null;
+  return buildWeeklyEditionReaderDetail({
+    issueType: row.issueType,
+    issueLabel: row.issueLabel,
+    seasonName: row.seasonName,
+    startDate: requiredPublicTimestamp("startDate", row.startDate),
+    endDate: requiredPublicTimestamp("endDate", row.endDate),
+    scheduledFor: requiredPublicTimestamp("scheduledFor", row.scheduledFor),
+    content: row.content as WeeklyEditionContent,
+    facts: row.facts as WeeklyEditionFactPacket,
+    inactiveSectionIds: row.inactiveSectionIds,
+  });
 };
 const asNumber = (value: unknown) => {
   const parsed = Number(value);
@@ -1875,7 +1884,14 @@ export const latestPublished = query({
       .withIndex("by_homeActive_publishedAt", (q) => q.eq("isHomeActive", true))
       .order("desc")
       .first();
-    return active?.status === "published" ? publicReaderRow(active) : null;
+    return active?.status === "published"
+      ? buildWeeklyEditionHomeSummary({
+          id: String(active._id),
+          issueLabel: active.issueLabel,
+          content: active.content as WeeklyEditionContent,
+          facts: active.facts as WeeklyEditionFactPacket,
+        })
+      : null;
   },
 });
 
@@ -1885,16 +1901,31 @@ export const publishedArchive = query({
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    const rows = await ctx.db.query("weeklyEditions").collect();
-    return rows
-      .filter(
-        (row) =>
-          row.status === "published" &&
-          (!args.seasonId || row.seasonId === args.seasonId),
-      )
-      .sort(descendingTimestamp)
-      .slice(0, Math.min(Math.max(args.limit ?? 40, 1), 100))
-      .map((row) => publicReaderRow(row)!);
+    const limit = Math.min(Math.max(Math.trunc(args.limit ?? 40), 1), 100);
+    const seasonId = args.seasonId;
+    const rows = seasonId
+      ? await ctx.db
+          .query("weeklyEditions")
+          .withIndex("by_seasonId_status_publishedAt", (q) =>
+            q.eq("seasonId", seasonId).eq("status", "published"),
+          )
+          .order("desc")
+          .take(limit)
+      : await ctx.db
+          .query("weeklyEditions")
+          .withIndex("by_status_publishedAt", (q) =>
+            q.eq("status", "published"),
+          )
+          .order("desc")
+          .take(limit);
+    return rows.map((row) =>
+      buildWeeklyEditionArchiveSummary({
+        id: String(row._id),
+        seasonName: row.seasonName,
+        issueLabel: row.issueLabel,
+        content: row.content as WeeklyEditionContent,
+      }),
+    );
   },
 });
 
@@ -1911,8 +1942,24 @@ export const newsroom = query({
   handler: async (ctx) => {
     await requireCommissioner(ctx);
     return (await ctx.db.query("weeklyEditions").order("desc").take(100)).map(
-      publicRow,
+      (row) =>
+        buildWeeklyEditionNewsroomSummary({
+          id: String(row._id),
+          seasonName: row.seasonName,
+          issueLabel: row.issueLabel,
+          generationMode: row.generationMode,
+          status: row.status,
+          isHomeActive: row.isHomeActive,
+        }),
     );
+  },
+});
+
+export const newsroomById = query({
+  args: { editionId: v.id("weeklyEditions") },
+  handler: async (ctx, args) => {
+    await requireCommissioner(ctx);
+    return publicRow(await ctx.db.get(args.editionId));
   },
 });
 
@@ -1925,14 +1972,15 @@ export const revisions = query({
       .withIndex("by_editionId_createdAt", (q) =>
         q.eq("editionId", args.editionId),
       )
-      .collect();
-    return rows
-      .sort(
-        (left, right) =>
-          (toUtcTimestamp(right.createdAt) ?? 0) -
-          (toUtcTimestamp(left.createdAt) ?? 0),
-      )
-      .map(publicRow);
+      .order("desc")
+      .take(100);
+    return rows.map((row) =>
+      buildWeeklyEditionRevisionSummary({
+        id: String(row._id),
+        generationMode: row.generationMode,
+        createdAt: requiredPublicTimestamp("createdAt", row.createdAt),
+      }),
+    );
   },
 });
 

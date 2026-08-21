@@ -82,4 +82,39 @@ export interface ConferenceContestOverallViewModel
   headToHeadRecordByConferenceId: Record<string, ConferenceContestRecord>;
 }
 
+export interface ConferenceContestBrowserCounts {
+  headToHeadWinsByConferenceId: Record<string, number>;
+  playoffWinsByConferenceId: Record<string, number>;
+  playoffTeamsByConferenceId: Record<string, number>;
+  finalistsByConferenceId: Record<string, number>;
+  championsByConferenceId: Record<string, number>;
+  awardsByConferenceId: Record<string, number>;
+}
+
+/** Exact season payload rendered by the Conference Contest browser view. */
+export interface ConferenceContestBrowserSeason
+  extends ConferenceContestBrowserCounts {
+  seasonId: string;
+  seasonName: string;
+  seasonYear: number;
+  isActive: boolean;
+  leftConference: ConferenceContestConferenceInfo;
+  rightConference: ConferenceContestConferenceInfo;
+  ratingByConferenceId: Record<string, number>;
+}
+
+/** Exact all-time payload rendered above the season explorer. */
+export interface ConferenceContestBrowserOverall
+  extends ConferenceContestBrowserCounts {
+  leftConference: ConferenceContestConferenceInfo;
+  rightConference: ConferenceContestConferenceInfo;
+  coachAwardsByConferenceId: Record<string, number>;
+  gmAwardsByConferenceId: Record<string, number>;
+}
+
+export interface ConferenceContestBrowserView {
+  overall: ConferenceContestBrowserOverall | null;
+  seasons: ConferenceContestBrowserSeason[];
+}
+
 export type ConferenceContestWinner = "home" | "away" | "tie" | "unknown";

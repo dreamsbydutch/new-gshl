@@ -1,5 +1,9 @@
 import type {
   ConferenceContestAwardSummary,
+  ConferenceContestBrowserCounts,
+  ConferenceContestBrowserOverall,
+  ConferenceContestBrowserSeason,
+  ConferenceContestBrowserView,
   ConferenceContestConferenceInfo,
   ConferenceContestOverallViewModel,
   ConferenceContestRating,
@@ -593,8 +597,14 @@ export const buildConferenceContestOverallViewModel = (params: {
   matchups: Matchup[];
   gshlTeams: GSHLTeam[];
   teamAwards?: TeamAward[];
-}): ConferenceContestOverallViewModel | null => {
-  const seasonModels = buildConferenceContestSeasonViewModels(params);
+}): ConferenceContestOverallViewModel | null =>
+  buildConferenceContestOverallFromSeasonModels(
+    buildConferenceContestSeasonViewModels(params),
+  );
+
+export const buildConferenceContestOverallFromSeasonModels = (
+  seasonModels: ConferenceContestSeasonViewModel[],
+): ConferenceContestOverallViewModel | null => {
   const newest = seasonModels[0];
   const ratings = aggregateConferenceRatings(seasonModels);
   if (!newest || !ratings) return null;
@@ -660,3 +670,106 @@ export const buildConferenceContestOverallViewModel = (params: {
     ),
   };
 };
+
+type ConferenceContestCountSource = Pick<
+  ConferenceContestSeasonViewModel | ConferenceContestOverallViewModel,
+  | "headToHeadRecordByConferenceId"
+  | "playoffRecordByConferenceId"
+  | "playoffTeamsByConferenceId"
+  | "finalsTeamsByConferenceId"
+  | "championTeamsByConferenceId"
+  | "awardsByConferenceId"
+>;
+
+const projectConferenceCounts = (
+  source: ConferenceContestCountSource,
+  conferenceIds: readonly string[],
+): ConferenceContestBrowserCounts => {
+  const count = (rows: Record<string, readonly unknown[]>, id: string) =>
+    rows[id]?.length ?? 0;
+  return {
+    headToHeadWinsByConferenceId: Object.fromEntries(
+      conferenceIds.map((id) => [
+        id,
+        source.headToHeadRecordByConferenceId[id]?.wins ?? 0,
+      ]),
+    ),
+    playoffWinsByConferenceId: Object.fromEntries(
+      conferenceIds.map((id) => [
+        id,
+        source.playoffRecordByConferenceId[id]?.wins ?? 0,
+      ]),
+    ),
+    playoffTeamsByConferenceId: Object.fromEntries(
+      conferenceIds.map((id) => [
+        id,
+        count(source.playoffTeamsByConferenceId, id),
+      ]),
+    ),
+    finalistsByConferenceId: Object.fromEntries(
+      conferenceIds.map((id) => [
+        id,
+        count(source.finalsTeamsByConferenceId, id),
+      ]),
+    ),
+    championsByConferenceId: Object.fromEntries(
+      conferenceIds.map((id) => [
+        id,
+        count(source.championTeamsByConferenceId, id),
+      ]),
+    ),
+    awardsByConferenceId: Object.fromEntries(
+      conferenceIds.map((id) => [id, count(source.awardsByConferenceId, id)]),
+    ),
+  };
+};
+
+export function projectConferenceContestBrowserView(params: {
+  overall: ConferenceContestOverallViewModel | null;
+  seasons: ConferenceContestSeasonViewModel[];
+}): ConferenceContestBrowserView {
+  const seasons: ConferenceContestBrowserSeason[] = params.seasons.map(
+    (season) => {
+      const conferenceIds = [
+        season.leftConference.id,
+        season.rightConference.id,
+      ];
+      return {
+        seasonId: season.seasonId,
+        seasonName: season.seasonName,
+        seasonYear: season.seasonYear,
+        isActive: season.isActive,
+        leftConference: season.leftConference,
+        rightConference: season.rightConference,
+        ratingByConferenceId: season.ratingByConferenceId,
+        ...projectConferenceCounts(season, conferenceIds),
+      };
+    },
+  );
+  const source = params.overall;
+  let overall: ConferenceContestBrowserOverall | null = null;
+  if (source) {
+    const conferenceIds = [source.leftConference.id, source.rightConference.id];
+    const count = (rows: Record<string, readonly unknown[]>, id: string) =>
+      rows[id]?.length ?? 0;
+    overall = {
+      leftConference: source.leftConference,
+      rightConference: source.rightConference,
+      ...projectConferenceCounts(source, conferenceIds),
+      coachAwardsByConferenceId: Object.fromEntries(
+        conferenceIds.map((id) => [
+          id,
+          count(source.coachAwardsByConferenceId, id),
+        ]),
+      ),
+      gmAwardsByConferenceId: Object.fromEntries(
+        conferenceIds.map((id) => [
+          id,
+          count(source.gmAwardsByConferenceId, id),
+        ]),
+      ),
+    };
+  }
+
+  return { overall, seasons };
+}

@@ -5,9 +5,9 @@ import type {
   PowerRankingColorSource,
   PowerRankingEntry,
   PowerRankingPaletteMap,
+  PowerRankingWeek,
   PowerRankingWeeklyStat,
   PowerRankingsViewModel,
-  Week,
 } from "@gshl-types";
 
 const SERIES_COLORS = [
@@ -103,13 +103,13 @@ const validRating = (value: unknown): number | null => {
   return Number.isFinite(rating) ? rating : null;
 };
 
-const compareWeeks = (left: Week, right: Week) => {
+const compareWeeks = (left: PowerRankingWeek, right: PowerRankingWeek) => {
   const dateDifference =
     new Date(left.startDate).getTime() - new Date(right.startDate).getTime();
   return dateDifference || left.weekNum - right.weekNum;
 };
 
-const getWeekLabel = (week: Week) => {
+const getWeekLabel = (week: PowerRankingWeek) => {
   if (week.weekType === "PO") return `Playoffs ${week.weekNum}`;
   if (week.weekType === "LT") return `Losers ${week.weekNum}`;
   return `Week ${week.weekNum}`;

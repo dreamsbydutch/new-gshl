@@ -3,6 +3,7 @@ import test from "node:test";
 import type { Contract, Season } from "@gshl-types";
 import { ContractStatus, ContractType } from "../domain/constants";
 import {
+  buildUfaCatalogCandidates,
   calculateUfaFitScore,
   calculateUfaProbabilities,
   calculateUfaSalary,
@@ -12,7 +13,9 @@ import {
   indexLatestUfaNhlStats,
   isEligibleUfaRank,
   rankUfas,
+  resolveUfaViewerContext,
   selectAffordableUfas,
+  selectUfaHomeCatalogPlayerIds,
   selectTopAffordableUfas,
   selectUfaOffer,
 } from "./ufa";
@@ -142,6 +145,136 @@ void test("UFA affordability includes committed cap and pending offer reservatio
       ],
     }),
     [],
+  );
+});
+
+void test("Home UFA selection matches the full preview and retains active-offer players", () => {
+  const players = [
+    {
+      id: "unaffordable",
+      fullName: "Highest Unaffordable",
+      isActive: true,
+      overallRk: 1,
+      overallRating: 95,
+      salary: 5_000_000,
+    },
+    {
+      id: "affordable-one",
+      fullName: "First Affordable",
+      isActive: true,
+      overallRk: 2,
+      overallRating: 90,
+      salary: 4_000_000,
+    },
+    {
+      id: "affordable-two",
+      fullName: "Second Affordable",
+      isActive: true,
+      overallRk: 3,
+      overallRating: 85,
+      salary: 3_000_000,
+    },
+    {
+      id: "offer-only",
+      fullName: "Offer Group Player",
+      isActive: true,
+      overallRk: 4,
+      overallRating: 80,
+      salary: 2_000_000,
+    },
+    {
+      id: "contracted-player",
+      fullName: "Already Signed",
+      isActive: true,
+      overallRk: 5,
+      overallRating: 99,
+      salary: 10_000_000,
+    },
+  ];
+  const groups = [{ id: "group-1", seasonId: "season-2026" }];
+  const candidates = buildUfaCatalogCandidates({
+    players,
+    signingSeason: capSeasons[0]!,
+    seasons: capSeasons,
+    contracts: [committedContract],
+    ownerId: "owner-1",
+    groups,
+    offers: [],
+  });
+  const anonymousCandidates = buildUfaCatalogCandidates({
+    players,
+    signingSeason: capSeasons[0]!,
+    seasons: capSeasons,
+    contracts: [committedContract],
+    ownerId: undefined,
+    groups,
+    offers: [],
+  });
+
+  assert.equal(
+    candidates.some(({ player }) => player.id === "contracted-player"),
+    false,
+  );
+  assert.deepEqual(
+    selectUfaHomeCatalogPlayerIds({
+      candidates: anonymousCandidates,
+      isSignedInOwner: false,
+      offerGroupPlayerIds: ["offer-only"],
+      limit: 2,
+    }),
+    ["unaffordable", "affordable-one", "offer-only"],
+  );
+  assert.deepEqual(
+    selectUfaHomeCatalogPlayerIds({
+      candidates,
+      isSignedInOwner: true,
+      offerGroupPlayerIds: ["offer-only"],
+      limit: 2,
+    }),
+    ["affordable-one", "affordable-two", "offer-only"],
+  );
+
+  const reservedCandidates = buildUfaCatalogCandidates({
+    players,
+    signingSeason: capSeasons[0]!,
+    seasons: capSeasons,
+    contracts: [committedContract],
+    ownerId: "owner-1",
+    groups,
+    offers: [
+      {
+        groupId: "group-1",
+        contractLength: 1,
+        salary: 2_000_000,
+        status: "pending",
+        isMine: true,
+      },
+    ],
+  });
+  assert.deepEqual(
+    selectUfaHomeCatalogPlayerIds({
+      candidates: reservedCandidates,
+      isSignedInOwner: true,
+      offerGroupPlayerIds: ["offer-only"],
+      limit: 2,
+    }),
+    ["offer-only"],
+  );
+
+  assert.equal(
+    resolveUfaViewerContext({
+      ownerId: "owner-1",
+      signingSeasonId: "season-2026",
+      franchises: [
+        {
+          id: "franchise-1",
+          ownerId: "owner-1",
+          isActive: true,
+        },
+      ],
+      teams: [{ franchiseId: "franchise-1", seasonId: "season-2026" }],
+    }).isSignedInOwner,
+    true,
   );
 });
 

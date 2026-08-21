@@ -18,12 +18,35 @@ import {
   toUtcTimestamp,
   utcTimestampToDateKey,
 } from "./lib/timestamps";
-import { loadUfaCatalog } from "./lib/ufaCatalog";
+import { loadLatestNhlStats, loadUfaCatalog } from "./lib/ufaCatalog";
+import {
+  canTakeFrontendRowsBeforeFiltering,
+  selectFrontendIndexPlan,
+} from "./lib/frontendQuery";
+import {
+  pickDefinedFields,
+  PLAYER_NHL_DISPLAY_FIELDS,
+} from "./lib/publicProjection";
 import {
   buildContractedSeasonRosterPlayers,
   prepareDraftBoardPlayers,
 } from "../src/lib/utils/features/draft-board-list";
-import { buildMockDraftProjection } from "../src/lib/utils/features/mock-draft";
+import {
+  buildMockDraftProjection,
+  compactMockDraftProjection,
+  getMockDraftReferencedNhlAbbreviations,
+} from "../src/lib/utils/features/mock-draft";
+import {
+  buildOwnerRankings,
+  compactOwnerRankings,
+} from "../src/lib/utils/features/owner-rankings";
+import { buildPowerRankings } from "../src/lib/utils/features/power-rankings";
+import { projectStandingsPowerHistory } from "./lib/standingsProjection";
+import {
+  buildUfaCatalogCandidates,
+  resolveUfaViewerContext,
+  selectUfaHomeCatalogPlayerIds,
+} from "../src/lib/utils/features/ufa";
 
 type Row = Record<string, unknown> & {
   _id: string;
@@ -39,93 +62,178 @@ const listArgs = {
   take: v.optional(v.number()),
 };
 
-const indexedFields: Record<string, Set<string>> = {
-  seasons: new Set(["legacyId"]),
-  weeks: new Set(["legacyId", "seasonId", "isActive"]),
-  teams: new Set(["legacyId", "seasonId", "franchiseId", "confId"]),
-  franchises: new Set(["legacyId", "ownerId", "confId"]),
-  conferences: new Set(["legacyId"]),
-  owners: new Set(["legacyId"]),
-  players: new Set(["legacyId", "ownerId", "isActive"]),
-  playerNhlSalaries: new Set([
-    "legacyId",
-    "playerId",
-    "nhlApiId",
-    "seasonStartYear",
-  ]),
-  contracts: new Set(["legacyId", "playerId", "ownerId", "seasonId"]),
-  draftPicks: new Set(["legacyId", "seasonId", "gshlTeamId", "playerId"]),
-  matchups: new Set([
-    "legacyId",
-    "seasonId",
-    "weekId",
-    "homeTeamId",
-    "awayTeamId",
-  ]),
-  events: new Set(["legacyId", "seasonId", "date"]),
-  awards: new Set(["legacyId", "seasonId", "winnerId"]),
-  playerAwards: new Set(["legacyId", "seasonId", "playerId"]),
-  teamAwards: new Set(["legacyId", "seasonId", "ownerId", "teamId"]),
-  nhlTeams: new Set(["legacyId"]),
-  playerDayStatLines: new Set([
-    "legacyId",
-    "seasonId",
-    "gshlTeamId",
-    "playerId",
-    "weekId",
-    "date",
-  ]),
-  playerDayHighlights: new Set([
-    "legacyId",
-    "seasonId",
-    "gshlTeamId",
-    "playerId",
-    "weekId",
-    "date",
-    "sourcePlayerDayId",
-  ]),
-  playerWeekStatLines: new Set([
-    "legacyId",
-    "seasonId",
-    "gshlTeamId",
-    "playerId",
-    "weekId",
-  ]),
-  playerSplitStatLines: new Set([
-    "legacyId",
-    "seasonId",
-    "gshlTeamId",
-    "playerId",
-    "seasonType",
-  ]),
-  playerTotalStatLines: new Set([
-    "legacyId",
-    "seasonId",
-    "playerId",
-    "seasonType",
-  ]),
-  playerCareerSplitStatLines: new Set([
-    "legacyId",
-    "gshlTeamId",
-    "playerId",
-    "seasonType",
-  ]),
-  playerCareerTotalStatLines: new Set(["legacyId", "playerId", "seasonType"]),
-  playerNhlStatLines: new Set(["legacyId", "seasonId", "playerId"]),
-  teamDayStatLines: new Set([
-    "legacyId",
-    "seasonId",
-    "gshlTeamId",
-    "weekId",
-    "date",
-  ]),
-  teamWeekStatLines: new Set(["legacyId", "seasonId", "gshlTeamId", "weekId"]),
-  teamSeasonStatLines: new Set([
-    "legacyId",
-    "seasonId",
-    "gshlTeamId",
-    "seasonType",
-  ]),
+const indexFieldsByTable: Record<string, readonly (readonly string[])[]> = {
+  seasons: [["legacyId"]],
+  weeks: [
+    ["legacyId"],
+    ["seasonId"],
+    ["seasonId", "weekNum"],
+    ["seasonId", "startDate"],
+  ],
+  teams: [
+    ["legacyId"],
+    ["seasonId"],
+    ["franchiseId"],
+    ["confId"],
+    ["seasonId", "franchiseId"],
+  ],
+  franchises: [["legacyId"], ["ownerId"], ["confId"]],
+  conferences: [["legacyId"]],
+  owners: [["legacyId"]],
+  players: [
+    ["legacyId"],
+    ["ownerId"],
+    ["gshlTeamId"],
+    ["isActive"],
+    ["isActive", "overallRk"],
+    ["isActive", "overallRating"],
+    ["isActive", "isSignable", "isResignable"],
+  ],
+  playerNhlSalaries: [
+    ["legacyId"],
+    ["playerId"],
+    ["nhlApiId"],
+    ["seasonStartYear"],
+    ["playerId", "seasonStartYear"],
+    ["seasonStartYear", "normalizedSalary"],
+  ],
+  contracts: [
+    ["legacyId"],
+    ["playerId"],
+    ["ownerId"],
+    ["seasonId"],
+    ["signingDate"],
+    ["seasonId", "signingDate"],
+  ],
+  draftPicks: [
+    ["legacyId"],
+    ["seasonId"],
+    ["gshlTeamId"],
+    ["playerId"],
+    ["seasonId", "round", "pick"],
+  ],
+  matchups: [
+    ["legacyId"],
+    ["seasonId"],
+    ["weekId"],
+    ["homeTeamId"],
+    ["awayTeamId"],
+    ["seasonId", "weekId"],
+    ["seasonId", "homeTeamId"],
+    ["seasonId", "awayTeamId"],
+  ],
+  events: [["legacyId"], ["seasonId"], ["date"]],
+  awards: [["legacyId"], ["seasonId"], ["winnerId"]],
+  playerAwards: [["legacyId"], ["seasonId"], ["playerId"]],
+  teamAwards: [
+    ["legacyId"],
+    ["seasonId"],
+    ["ownerId"],
+    ["teamId"],
+    ["seasonId", "ownerId"],
+  ],
+  nhlTeams: [["legacyId"], ["abbr"]],
+  playerDayStatLines: [
+    ["legacyId"],
+    ["seasonId"],
+    ["gshlTeamId"],
+    ["playerId"],
+    ["weekId"],
+    ["date"],
+    ["seasonId", "date"],
+    ["seasonId", "weekId", "gshlTeamId"],
+    ["seasonId", "playerId", "date"],
+    ["seasonId", "gshlTeamId", "playerId", "weekId", "date"],
+  ],
+  playerDayHighlights: [
+    ["legacyId"],
+    ["seasonId"],
+    ["seasonId", "date"],
+    ["seasonId", "ratingRank"],
+    ["seasonId", "sourcePlayerDayId"],
+  ],
+  playerWeekStatLines: [
+    ["legacyId"],
+    ["seasonId"],
+    ["gshlTeamId"],
+    ["playerId"],
+    ["weekId"],
+    ["seasonId", "weekId", "gshlTeamId"],
+    ["seasonId", "playerId"],
+    ["seasonId", "gshlTeamId", "playerId", "weekId"],
+  ],
+  playerSplitStatLines: [
+    ["legacyId"],
+    ["seasonId"],
+    ["gshlTeamId"],
+    ["playerId"],
+    ["seasonType"],
+    ["seasonId", "seasonType", "gshlTeamId", "playerId"],
+  ],
+  playerTotalStatLines: [
+    ["legacyId"],
+    ["seasonId"],
+    ["playerId"],
+    ["seasonType"],
+    ["seasonId", "seasonType", "playerId"],
+  ],
+  playerCareerSplitStatLines: [
+    ["legacyId"],
+    ["gshlTeamId"],
+    ["playerId"],
+    ["seasonType"],
+    ["gshlTeamId", "playerId", "seasonType"],
+  ],
+  playerCareerTotalStatLines: [
+    ["legacyId"],
+    ["playerId"],
+    ["seasonType"],
+    ["playerId", "seasonType"],
+  ],
+  playerNhlStatLines: [
+    ["legacyId"],
+    ["seasonId"],
+    ["playerId"],
+    ["seasonId", "playerId"],
+  ],
+  teamDayStatLines: [
+    ["legacyId"],
+    ["seasonId"],
+    ["gshlTeamId"],
+    ["weekId"],
+    ["date"],
+    ["seasonId", "date"],
+    ["seasonId", "weekId", "gshlTeamId"],
+    ["seasonId", "gshlTeamId", "weekId", "date"],
+  ],
+  teamWeekStatLines: [
+    ["legacyId"],
+    ["seasonId"],
+    ["gshlTeamId"],
+    ["weekId"],
+    ["seasonId", "weekId", "gshlTeamId"],
+  ],
+  teamSeasonStatLines: [
+    ["legacyId"],
+    ["seasonId"],
+    ["seasonType"],
+    ["gshlTeamId"],
+    ["seasonId", "seasonType", "gshlTeamId"],
+  ],
+};
+
+// The generic facade preserves compatibility equality between numeric strings
+// and numbers, and between legacy date strings and UTC timestamps. Convex index
+// equality is type-exact, so these fields may only be filtered after the last
+// safe index prefix or valid legacy rows would be omitted.
+const nonExactIndexFieldsByTable: Record<string, readonly string[]> = {
+  weeks: ["weekNum", "startDate"],
+  players: ["overallRk", "overallRating"],
+  playerNhlSalaries: ["seasonStartYear", "normalizedSalary"],
+  contracts: ["signingDate"],
+  draftPicks: ["round", "pick"],
+  events: ["date"],
+  playerDayHighlights: ["ratingRank"],
 };
 
 function comparable(value: unknown): string | number | boolean | null {
@@ -145,6 +253,8 @@ function equal(left: unknown, right: unknown) {
 
 function publicRow(row: Row): Record<string, any> {
   const output: Record<string, unknown> = { ...row, id: row._id };
+  delete output._id;
+  delete output._creationTime;
   for (const [field, value] of Object.entries(output)) {
     if (typeof value !== "number") continue;
     if (field.endsWith("At")) {
@@ -222,20 +332,30 @@ async function rows(
   }
 
   const timestampFields = new Set(timestampFieldsForTable(table));
-  const indexed = Object.entries(where).find(
-    ([field, value]) =>
-      value !== undefined &&
-      indexedFields[table]?.has(field) &&
-      !timestampFields.has(field),
+  const nonExactIndexFields = new Set(nonExactIndexFieldsByTable[table] ?? []);
+  const indexPlan = selectFrontendIndexPlan(
+    indexFieldsByTable[table] ?? [],
+    where,
+    nonExactIndexFields,
   );
   let query: any = ctx.db.query(table as never);
-  if (indexed) {
-    const [field, value] = indexed;
-    query = query.withIndex(`by_${field}`, (q: any) => q.eq(field, value));
+  if (indexPlan) {
+    query = query.withIndex(indexPlan.indexName, (range: any) => {
+      let constrainedRange = range;
+      for (const field of indexPlan.constrainedFields) {
+        const value = timestampFields.has(field)
+          ? (toUtcTimestamp(where[field]) ?? where[field])
+          : where[field];
+        constrainedRange = constrainedRange.eq(field, value);
+      }
+      return constrainedRange;
+    });
   }
 
   const candidates =
-    args.take && !args.orderBy && !Object.keys(where).length
+    args.take &&
+    !args.orderBy &&
+    canTakeFrontendRowsBeforeFiltering(where, indexPlan)
       ? await query.take(args.take)
       : await query.collect();
   const result = (candidates as Row[])
@@ -292,49 +412,191 @@ export const owners = query({
   },
 });
 
+async function enrichTeamRows(
+  ctx: any,
+  teamRows: Record<string, any>[],
+  includePrivate: boolean,
+) {
+  if (!teamRows.length) return [];
+
+  const franchiseIds = [
+    ...new Set(teamRows.map((team) => String(team.franchiseId))),
+  ];
+  const franchises = (
+    await Promise.all(
+      franchiseIds.map((id) => ctx.db.get(id as Id<"franchises">)),
+    )
+  ).filter((row) => row !== null);
+  const ownerIds = [
+    ...new Set(franchises.map((franchise) => String(franchise.ownerId))),
+  ];
+  const conferenceIds = [
+    ...new Set([
+      ...teamRows.map((team) => String(team.confId)),
+      ...franchises.map((franchise) => String(franchise.confId)),
+    ]),
+  ];
+  const [owners, conferences] = await Promise.all([
+    Promise.all(ownerIds.map((id) => ctx.db.get(id as Id<"owners">))),
+    Promise.all(conferenceIds.map((id) => ctx.db.get(id as Id<"conferences">))),
+  ]);
+  const franchisesById = new Map(
+    franchises.map((row) => [String(row._id), row]),
+  );
+  const ownersById = new Map(
+    owners.filter((row) => row !== null).map((row) => [String(row._id), row]),
+  );
+  const conferencesById = new Map(
+    conferences
+      .filter((row) => row !== null)
+      .map((row) => [String(row._id), row]),
+  );
+
+  return teamRows.map((team) => {
+    const franchise = franchisesById.get(String(team.franchiseId));
+    const owner = ownersById.get(String(franchise?.ownerId));
+    const conference = conferencesById.get(
+      String(team.confId ?? franchise?.confId),
+    );
+    return {
+      ...team,
+      name: franchise?.name ?? null,
+      abbr: franchise?.abbr ?? null,
+      logoUrl: franchise?.logoUrl ?? null,
+      isActive: franchise?.isActive ?? false,
+      confName: conference?.name ?? null,
+      confAbbr: conference?.abbr ?? null,
+      confLogoUrl: conference?.logoUrl ?? null,
+      ownerId: owner?._id ?? null,
+      ownerFirstName: owner?.firstName ?? null,
+      ownerLastName: owner?.lastName ?? null,
+      ownerNickname: owner?.nickName ?? null,
+      ownerEmail: includePrivate ? (owner?.email ?? null) : null,
+      ownerOwing: includePrivate ? (owner?.owing ?? null) : null,
+      ownerIsActive: owner?.isActive ?? false,
+    };
+  });
+}
+
 export const teams = query({
   args: listArgs,
   handler: async (ctx, args) => {
     const teamRows = await rows(ctx, "teams", args);
     if (!teamRows.length) return [];
-    const [franchiseRows, ownerRows, conferenceRows] = await Promise.all([
-      rows(ctx, "franchises", {}),
-      rows(ctx, "owners", {}),
-      rows(ctx, "conferences", {}),
-    ]);
     const identity = await ctx.auth.getUserIdentity();
     const user = identity
       ? await ctx.db.get(identity.subject as Id<"authUsers">)
       : null;
     const includePrivate = user?.status === "active";
-    const franchisesById = new Map(franchiseRows.map((row) => [row.id, row]));
-    const ownersById = new Map(ownerRows.map((row) => [row.id, row]));
-    const conferencesById = new Map(conferenceRows.map((row) => [row.id, row]));
+    return enrichTeamRows(ctx, teamRows, includePrivate);
+  },
+});
 
-    return teamRows.map((team) => {
-      const franchise = franchisesById.get(String(team.franchiseId));
-      const owner = ownersById.get(String(franchise?.ownerId));
-      const conference = conferencesById.get(
-        String(team.confId ?? franchise?.confId),
-      );
-      return {
-        ...team,
-        name: franchise?.name ?? null,
-        abbr: franchise?.abbr ?? null,
-        logoUrl: franchise?.logoUrl ?? null,
-        isActive: franchise?.isActive ?? false,
-        confName: conference?.name ?? null,
-        confAbbr: conference?.abbr ?? null,
-        confLogoUrl: conference?.logoUrl ?? null,
-        ownerId: owner?.id ?? null,
-        ownerFirstName: owner?.firstName ?? null,
-        ownerLastName: owner?.lastName ?? null,
-        ownerNickname: owner?.nickName ?? null,
-        ownerEmail: includePrivate ? (owner?.email ?? null) : null,
-        ownerOwing: includePrivate ? (owner?.owing ?? null) : null,
-        ownerIsActive: owner?.isActive ?? false,
-      };
+export const ownerRankings = query({
+  args: {},
+  handler: async (ctx) => {
+    const [owners, seasons, matchups, weeks, rawTeams, teamAwards, powerStats] =
+      await Promise.all([
+        rows(ctx, "owners", {}),
+        rows(ctx, "seasons", {}),
+        rows(ctx, "matchups", {}),
+        rows(ctx, "weeks", {}),
+        rows(ctx, "teams", {}),
+        rows(ctx, "teamAwards", {}),
+        rows(ctx, "teamWeekStatLines", {}),
+      ]);
+    const teamRows = await enrichTeamRows(ctx, rawTeams, false);
+    const view = buildOwnerRankings({
+      owners,
+      seasons,
+      matchups,
+      weeks,
+      teams: teamRows,
+      teamAwards,
+      powerRankingStats: powerStats,
     });
+
+    return compactOwnerRankings(view);
+  },
+});
+
+export const powerRankingsPreview = query({
+  args: { seasonId: v.id("seasons"), take: v.number() },
+  handler: async (ctx, args) => {
+    const season = await ctx.db.get(args.seasonId);
+    if (!season) return null;
+
+    const [rawTeams, weeks, seasonStats] = await Promise.all([
+      rows(ctx, "teams", { where: { seasonId: args.seasonId } }),
+      ctx.db
+        .query("weeks")
+        .withIndex("by_seasonId_startDate", (range) =>
+          range.eq("seasonId", args.seasonId),
+        )
+        .order("desc")
+        .collect(),
+      rows(ctx, "teamSeasonStatLines", {
+        where: { seasonId: args.seasonId, seasonType: "RS" },
+      }),
+    ]);
+    const teamRows = await enrichTeamRows(ctx, rawTeams, false);
+    const teamIds = new Set(teamRows.map((team) => String(team.id)));
+    const rankedWeeks = [];
+    const rankedWeeklyStats = [];
+
+    for (const week of weeks) {
+      const projected = projectStandingsPowerHistory({
+        weeks: [week],
+        weeklyStats: await ctx.db
+          .query("teamWeekStatLines")
+          .withIndex("by_seasonId_weekId_gshlTeamId", (range) =>
+            range.eq("seasonId", args.seasonId).eq("weekId", week._id),
+          )
+          .collect(),
+      });
+      const currentTeamStats = projected.weeklyStats.filter((stat) =>
+        teamIds.has(String(stat.gshlTeamId)),
+      );
+      if (!currentTeamStats.length) continue;
+
+      rankedWeeks.push(...projected.weeks);
+      rankedWeeklyStats.push(...currentTeamStats);
+      if (rankedWeeks.length === 2) break;
+    }
+
+    const rankings = buildPowerRankings({
+      teams: teamRows,
+      weeks: rankedWeeks,
+      weeklyStats: rankedWeeklyStats,
+      seasonStats,
+    });
+    const requestedTake = Number.isFinite(args.take) ? args.take : 8;
+    const limit = Math.min(Math.max(Math.trunc(requestedTake), 1), 16);
+
+    return {
+      season: {
+        id: String(season._id),
+        name: season.name,
+        isActive: season.isActive,
+      },
+      latestWeek: rankings.latestWeek
+        ? {
+            weekNum: rankings.latestWeek.weekNum,
+          }
+        : null,
+      entries: rankings.entries.slice(0, limit).map((entry) => ({
+        team: {
+          id: entry.team.id,
+          name: entry.team.name,
+          abbr: entry.team.abbr,
+          logoUrl: entry.team.logoUrl,
+        },
+        rank: entry.rank,
+        rating: entry.rating,
+        rankChange: entry.rankChange,
+        color: entry.color,
+      })),
+    };
   },
 });
 
@@ -397,23 +659,264 @@ export const playerNhlByPlayers = query({
   },
 });
 
+export const playerNhlSalaryHistory = query({
+  args: { playerIds: v.array(v.id("players")) },
+  handler: async (ctx, args) => {
+    const pages = await Promise.all(
+      [...new Set(args.playerIds)].map((playerId) =>
+        ctx.db
+          .query("playerNhlStatLines")
+          .withIndex("by_playerId", (q) => q.eq("playerId", playerId))
+          .collect(),
+      ),
+    );
+    return pages
+      .flat()
+      .map((row) =>
+        pickDefinedFields(publicRow(row as unknown as Row), [
+          "playerId",
+          "seasonId",
+          "salary",
+        ]),
+      );
+  },
+});
+
+export const latestPlayerNhlStats = query({
+  args: { seasonId: v.id("seasons") },
+  handler: async (ctx, args) => {
+    const [targetSeason, seasons] = await Promise.all([
+      ctx.db.get(args.seasonId),
+      ctx.db.query("seasons").collect(),
+    ]);
+    if (!targetSeason) return [];
+    const targetYear = Number(targetSeason.year);
+    const orderedSeasons = seasons
+      .filter((season) => Number(season.year) <= targetYear)
+      .sort((left, right) => Number(left.year) - Number(right.year));
+    const stats = await loadLatestNhlStats(
+      ctx.db,
+      orderedSeasons,
+      targetSeason,
+    );
+    return stats.map((row) =>
+      pickDefinedFields(
+        publicRow(row as unknown as Row),
+        PLAYER_NHL_DISPLAY_FIELDS,
+      ),
+    );
+  },
+});
+
+const UFA_SEASON_FIELDS = [
+  "id",
+  "year",
+  "startDate",
+  "endDate",
+  "isActive",
+  "signingEndDate",
+] as const;
+const UFA_PLAYER_FIELDS = [
+  "id",
+  "fullName",
+  "nhlPos",
+  "posGroup",
+  "nhlTeam",
+  "isActive",
+  "overallRk",
+  "salary",
+  "seasonRating",
+  "overallRating",
+] as const;
+const UFA_NHL_TEAM_FIELDS = ["abbr", "logoUrl"] as const;
+const UFA_FRANCHISE_FIELDS = [
+  "id",
+  "ownerId",
+  "name",
+  "logoUrl",
+  "isActive",
+] as const;
+const UFA_TEAM_FIELDS = ["seasonId", "franchiseId"] as const;
+const UFA_CONTRACT_FIELDS = [
+  "playerId",
+  "ownerId",
+  "seasonId",
+  "contractType",
+  "contractLength",
+  "contractSalary",
+  "startDate",
+  "expiryStatus",
+  "expiryDate",
+  "capHit",
+  "capHitEndDate",
+] as const;
+
+const projectUfaRows = (rows: any[], fields: readonly string[]) =>
+  rows.map((row) =>
+    pickDefinedFields(publicRow(row as unknown as Row), fields),
+  );
+
+function projectUfaCatalog(
+  catalog: Awaited<ReturnType<typeof loadUfaCatalog>>,
+  overrides: {
+    players?: any[];
+    nhlStats?: any[];
+    contracts?: any[];
+  } = {},
+) {
+  return {
+    seasons: projectUfaRows(catalog.seasons, UFA_SEASON_FIELDS),
+    players: projectUfaRows(
+      overrides.players ?? catalog.players,
+      UFA_PLAYER_FIELDS,
+    ),
+    nhlStats: projectUfaRows(
+      overrides.nhlStats ?? catalog.nhlStats,
+      PLAYER_NHL_DISPLAY_FIELDS,
+    ),
+    nhlTeams: projectUfaRows(catalog.nhlTeams, UFA_NHL_TEAM_FIELDS),
+    franchises: projectUfaRows(catalog.franchises, UFA_FRANCHISE_FIELDS),
+    teams: projectUfaRows(catalog.teams, UFA_TEAM_FIELDS),
+    contracts: projectUfaRows(
+      overrides.contracts ?? catalog.contracts,
+      UFA_CONTRACT_FIELDS,
+    ),
+  };
+}
+
+async function activeViewerOwnerId(ctx: any) {
+  const identity = await ctx.auth.getUserIdentity();
+  const user = identity
+    ? await ctx.db.get(identity.subject as Id<"authUsers">)
+    : null;
+  return user?.status === "active" && user.ownerId ? user.ownerId : null;
+}
+
+async function unresolvedUfaOfferGroups(ctx: any) {
+  const pages = await Promise.all(
+    ["open", "failed", "resolving"].map((status) =>
+      ctx.db
+        .query("ufaOfferGroups")
+        .withIndex("by_status_deadline", (range: any) =>
+          range.eq("status", status),
+        )
+        .collect(),
+    ),
+  );
+  return pages.flat();
+}
+
 export const ufaCatalog = query({
   args: {},
   handler: async (ctx) => {
-    const catalog = await loadUfaCatalog(ctx.db);
-    return {
-      seasons: catalog.seasons.map((row) => publicRow(row as unknown as Row)),
-      players: catalog.players.map((row) => publicRow(row as unknown as Row)),
-      nhlStats: catalog.nhlStats.map((row) => publicRow(row as unknown as Row)),
-      nhlTeams: catalog.nhlTeams.map((row) => publicRow(row as unknown as Row)),
-      franchises: catalog.franchises.map((row) =>
-        publicRow(row as unknown as Row),
-      ),
-      teams: catalog.teams.map((row) => publicRow(row as unknown as Row)),
-      contracts: catalog.contracts.map((row) =>
-        publicRow(row as unknown as Row),
-      ),
-    };
+    const [catalog, viewerOwnerId] = await Promise.all([
+      loadUfaCatalog(ctx.db),
+      activeViewerOwnerId(ctx),
+    ]);
+    const activePlayerIds = new Set(
+      catalog.players.map((player) => String(player._id)),
+    );
+    const contracts = catalog.contracts.filter(
+      (contract) =>
+        activePlayerIds.has(String(contract.playerId)) ||
+        (viewerOwnerId !== null &&
+          String(contract.ownerId) === String(viewerOwnerId)),
+    );
+    return projectUfaCatalog(catalog, { contracts });
+  },
+});
+
+export const ufaHomeCatalog = query({
+  args: {},
+  handler: async (ctx) => {
+    const [catalog, viewerOwnerId, groups] = await Promise.all([
+      loadUfaCatalog(ctx.db),
+      activeViewerOwnerId(ctx),
+      unresolvedUfaOfferGroups(ctx),
+    ]);
+    const unresolvedGroupIds = new Set(
+      groups.map((group) => String(group._id)),
+    );
+    const viewerPendingOffers = viewerOwnerId
+      ? (
+          await ctx.db
+            .query("ufaOffers")
+            .withIndex("by_owner_status", (range) =>
+              range.eq("ownerId", viewerOwnerId).eq("status", "pending"),
+            )
+            .collect()
+        ).filter((offer) => unresolvedGroupIds.has(String(offer.groupId)))
+      : [];
+    const selectionCatalog = projectUfaCatalog(catalog, {
+      nhlStats: [],
+      contracts: catalog.contracts,
+    });
+    const activeSeason = selectionCatalog.seasons.find(
+      (season) => season.isActive,
+    );
+    const viewer = resolveUfaViewerContext({
+      ownerId: viewerOwnerId ? String(viewerOwnerId) : undefined,
+      signingSeasonId: activeSeason?.id,
+      franchises: selectionCatalog.franchises,
+      teams: selectionCatalog.teams,
+    });
+    const candidates = buildUfaCatalogCandidates({
+      players: selectionCatalog.players,
+      signingSeason: activeSeason ?? null,
+      seasons: selectionCatalog.seasons,
+      contracts: selectionCatalog.contracts,
+      ownerId: viewerOwnerId ? String(viewerOwnerId) : undefined,
+      groups: groups.map((group) => ({
+        id: String(group._id),
+        seasonId: String(group.seasonId),
+      })),
+      offers: viewerPendingOffers.map((offer) => ({
+        groupId: String(offer.groupId),
+        contractLength: offer.contractLength,
+        salary: offer.salary,
+        status: offer.status,
+        isMine: true,
+      })),
+    });
+    const selectedPlayerIds = selectUfaHomeCatalogPlayerIds({
+      candidates,
+      isSignedInOwner: viewer.isSignedInOwner,
+      offerGroupPlayerIds: groups.map((group) => group.playerId),
+    });
+    const catalogPlayerById = new Map(
+      catalog.players.map((player) => [String(player._id), player]),
+    );
+    const missingPlayers = (
+      await Promise.all(
+        selectedPlayerIds
+          .filter((playerId) => !catalogPlayerById.has(playerId))
+          .map((playerId) => ctx.db.get(playerId as Id<"players">)),
+      )
+    ).filter((player) => player !== null);
+    const selectedPlayerById = new Map([
+      ...catalogPlayerById,
+      ...missingPlayers.map((player) => [String(player._id), player] as const),
+    ]);
+    const selectedPlayers = selectedPlayerIds.flatMap((playerId) => {
+      const player = selectedPlayerById.get(playerId);
+      return player ? [player] : [];
+    });
+    const selectedPlayerIdSet = new Set(selectedPlayerIds);
+    const nhlStats = catalog.nhlStats.filter((row) =>
+      selectedPlayerIdSet.has(String(row.playerId)),
+    );
+    const contracts = catalog.contracts.filter(
+      (contract) =>
+        selectedPlayerIdSet.has(String(contract.playerId)) ||
+        (viewerOwnerId !== null &&
+          String(contract.ownerId) === String(viewerOwnerId)),
+    );
+
+    return projectUfaCatalog(catalog, {
+      players: selectedPlayers,
+      nhlStats,
+      contracts,
+    });
   },
 });
 
@@ -425,30 +928,27 @@ export const mockDraftPreview = query({
     const season = await ctx.db.get(args.seasonId);
     if (!season) return { projectedDraftPicks: [], nhlTeams: [] };
 
-    const [players, contracts, picks, teamRows, franchises, nhlTeams] =
-      await Promise.all([
-        ctx.db
-          .query("players")
-          .withIndex("by_isActive_overallRating", (query) =>
-            query.eq("isActive", true),
-          )
-          .collect(),
-        ctx.db.query("contracts").collect(),
-        ctx.db
-          .query("draftPicks")
-          .withIndex("by_seasonId_round_pick", (query) =>
-            query.eq("seasonId", args.seasonId),
-          )
-          .collect(),
-        ctx.db
-          .query("teams")
-          .withIndex("by_seasonId", (query) =>
-            query.eq("seasonId", args.seasonId),
-          )
-          .collect(),
-        ctx.db.query("franchises").collect(),
-        ctx.db.query("nhlTeams").collect(),
-      ]);
+    const [players, contracts, picks, teamRows] = await Promise.all([
+      ctx.db
+        .query("players")
+        .withIndex("by_isActive_overallRating", (query) =>
+          query.eq("isActive", true),
+        )
+        .collect(),
+      ctx.db.query("contracts").collect(),
+      ctx.db
+        .query("draftPicks")
+        .withIndex("by_seasonId_round_pick", (query) =>
+          query.eq("seasonId", args.seasonId),
+        )
+        .collect(),
+      ctx.db
+        .query("teams")
+        .withIndex("by_seasonId", (query) =>
+          query.eq("seasonId", args.seasonId),
+        )
+        .collect(),
+    ]);
     const publicSeason = publicRow(season as unknown as Row);
     const publicPlayers = players.map((row) =>
       publicRow(row as unknown as Row),
@@ -457,6 +957,12 @@ export const mockDraftPreview = query({
       publicRow(row as unknown as Row),
     );
     const publicPicks = picks.map((row) => publicRow(row as unknown as Row));
+    const franchiseIds = [...new Set(teamRows.map((row) => row.franchiseId))];
+    const franchises = (
+      await Promise.all(
+        franchiseIds.map((franchiseId) => ctx.db.get(franchiseId)),
+      )
+    ).filter((row) => row !== null);
     const franchiseById = new Map(
       franchises.map((row) => [String(row._id), row]),
     );
@@ -481,22 +987,41 @@ export const mockDraftPreview = query({
       publicContracts,
       publicSeason.startDate,
     );
-    const projectedDraftPicks = buildMockDraftProjection({
-      seasonDraftPicks: publicPicks,
-      draftPlayers,
-      rosterPlayers,
-      teams,
-      take: limit,
-    }).map(({ pick, gshlTeam, projectedPlayer, score }) => ({
-      pick,
-      ...(gshlTeam ? { gshlTeam } : {}),
-      ...(projectedPlayer ? { projectedPlayer } : {}),
-      score,
-    }));
+    const projectedDraftPicks = compactMockDraftProjection(
+      buildMockDraftProjection({
+        seasonDraftPicks: publicPicks,
+        draftPlayers,
+        rosterPlayers,
+        teams,
+        take: limit,
+      }),
+    );
+    const referencedNhlAbbreviations =
+      getMockDraftReferencedNhlAbbreviations(projectedDraftPicks);
+    const nhlTeams = (
+      await Promise.all(
+        referencedNhlAbbreviations.map((abbr) =>
+          ctx.db
+            .query("nhlTeams")
+            .withIndex("by_abbr", (query) => query.eq("abbr", abbr))
+            .first(),
+        ),
+      )
+    ).flatMap((row) =>
+      row
+        ? [
+            {
+              abbr: row.abbr,
+              name: row.name,
+              logoUrl: row.logoUrl,
+            },
+          ]
+        : [],
+    );
 
     return {
       projectedDraftPicks,
-      nhlTeams: nhlTeams.map((row) => publicRow(row as unknown as Row)),
+      nhlTeams,
     };
   },
 });

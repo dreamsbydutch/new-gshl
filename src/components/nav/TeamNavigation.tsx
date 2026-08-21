@@ -37,7 +37,10 @@ export function TeamsToggle({
     data: teamsRaw = [],
     isLoading,
     error,
-  } = useTeams({ seasonId: selectedSeasonId });
+  } = useTeams({
+    seasonId: selectedSeasonId,
+    enabled: Boolean(selectedSeasonId),
+  });
   const teams = teamsRaw as GSHLTeam[];
 
   const selectedTeam = teams.find((t) => t.ownerId === selectedOwnerId) ?? null;
@@ -72,7 +75,7 @@ export function TeamsToggle({
       </div>
     );
 
-  if (isLoading) {
+  if (!selectedSeasonId || isLoading) {
     return <TeamsToggleSkeleton className={className} />;
   }
 

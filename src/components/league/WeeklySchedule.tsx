@@ -2,7 +2,6 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { LoadingSpinner } from "@gshl-ui";
 import {
   WeeklyMatchupRowSkeleton,
   WeeklyScheduleSkeleton,
@@ -22,7 +21,6 @@ import {
   shouldDisplayRanking,
   TEAM_LOGO_DIMENSIONS,
 } from "@gshl-utils";
-import { findTeamById } from "@gshl-utils/domain/team";
 import { useWeeklyScheduleData } from "@gshl-hooks";
 
 const ScheduleHeader = () => (
@@ -100,8 +98,8 @@ const WeekScheduleItem = ({
   teams,
   matchupHref,
 }: WeekScheduleItemProps) => {
-  const homeTeam = findTeamById(teams, matchup.homeTeamId);
-  const awayTeam = findTeamById(teams, matchup.awayTeamId);
+  const homeTeam = teams.find((team) => team.id === matchup.homeTeamId);
+  const awayTeam = teams.find((team) => team.id === matchup.awayTeamId);
 
   if (!homeTeam || !awayTeam || !isValidMatchup(matchup, homeTeam, awayTeam)) {
     return <WeeklyMatchupRowSkeleton />;
@@ -136,19 +134,11 @@ export function WeeklySchedule() {
   const {
     matchups,
     teams,
-    teamWeekStatsByTeam,
-    playerWeekStatsByTeam,
     error,
     isLoading,
-    isPrefetching,
     selectedSeasonId,
     selectedWeekId,
   } = useWeeklyScheduleData();
-
-  const seasonNumericId = Number(selectedSeasonId ?? "");
-  const showPlusMinus = Number.isFinite(seasonNumericId)
-    ? seasonNumericId <= 6
-    : true;
 
   if (isLoading) {
     return <WeeklyScheduleSkeleton />;
@@ -165,12 +155,6 @@ export function WeeklySchedule() {
   return (
     <div className="mx-2 mb-8 mt-4">
       <ScheduleHeader />
-      {isPrefetching ? (
-        <div className="mb-2 flex items-center justify-center gap-2 text-xs font-semibold text-slate-500">
-          <LoadingSpinner />
-          Prefetching upcoming weeks...
-        </div>
-      ) : null}
       <div>
         {matchups.map((matchup) => (
           <WeekScheduleItem
@@ -184,9 +168,6 @@ export function WeeklySchedule() {
               week: selectedWeekId,
               side: "away",
             })}
-            teamWeekStatsByTeam={teamWeekStatsByTeam}
-            playerWeekStatsByTeam={playerWeekStatsByTeam}
-            showPlusMinus={showPlusMinus}
           />
         ))}
       </div>

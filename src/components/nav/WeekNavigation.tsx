@@ -26,7 +26,10 @@ export function WeeksToggle({
   const { selectedSeasonId: storedSeasonId } = useNav();
   const seasonId =
     seasonIdOverride !== undefined ? seasonIdOverride : storedSeasonId;
-  const { data: weeks, isLoading } = useWeeks({ seasonId });
+  const { data: weeks, isLoading } = useWeeks({
+    seasonId,
+    enabled: Boolean(seasonId),
+  });
   const { selectedWeekId: storedWeekId, setSelectedWeekId: setWeekId } =
     useWeekNavigation({
       autoSelect: selectedWeekIdOverride === undefined,
@@ -76,7 +79,7 @@ export function WeeksToggle({
     </div>
   );
 
-  if (isLoading) {
+  if (!seasonId || isLoading) {
     return <WeeksToggleSkeleton className={className} />;
   }
 

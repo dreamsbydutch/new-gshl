@@ -5,6 +5,7 @@ import type {
   Owner,
   OwnerLadderBattle,
   OwnerPowerRankingStat,
+  OwnerRankingsBrowserViewModel,
   OwnerRankingEntry,
   OwnerRankingRecord,
   OwnerRankingsViewModel,
@@ -588,5 +589,41 @@ export function buildOwnerRankings(params: {
     latestSeasonName: latestSeason?.name ?? null,
     activeOwnerCount: rankings.filter((entry) => entry.isActive).length,
     inactiveOwnerCount: rankings.filter((entry) => !entry.isActive).length,
+  };
+}
+
+/** Removes owner-private and full historical team fields from the browser DTO. */
+export function compactOwnerRankings(
+  view: OwnerRankingsViewModel,
+): OwnerRankingsBrowserViewModel {
+  return {
+    rankings: view.rankings.map((ranking) => ({
+      owner: { id: ranking.owner.id },
+      rank: ranking.rank,
+      rankChange: ranking.rankChange,
+      displayName: ranking.displayName,
+      primaryTeam: ranking.primaryTeam
+        ? {
+            name: ranking.primaryTeam.name,
+            logoUrl: ranking.primaryTeam.logoUrl,
+          }
+        : null,
+      seasonsPlayed: ranking.seasonsPlayed,
+      rating: ranking.rating,
+      weeksAtNumberOne: ranking.weeksAtNumberOne,
+      weeksInTopThree: ranking.weeksInTopThree,
+      weeksInBottomThree: ranking.weeksInBottomThree,
+      weeksInLastPlace: ranking.weeksInLastPlace,
+      overallRecord: ranking.overallRecord,
+      conferenceRecord: ranking.conferenceRecord,
+      playoffRecord: ranking.playoffRecord,
+      playoffAppearances: ranking.playoffAppearances,
+      finalsAppearances: ranking.finalsAppearances,
+      cups: ranking.cups,
+      coachAwards: ranking.coachAwards,
+      gmAwards: ranking.gmAwards,
+      otherAwards: ranking.otherAwards,
+      brophyAwards: ranking.brophyAwards,
+    })),
   };
 }

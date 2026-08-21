@@ -35,6 +35,7 @@ export {
   formatStandingsDetailStat,
   formatStandingsGaa,
   formatStandingsSvp,
+  getStandingsViewDataRequirements,
   getStandingsMatchupWindow,
   groupTeamsByStandingsType,
   filterTeamsByConference,

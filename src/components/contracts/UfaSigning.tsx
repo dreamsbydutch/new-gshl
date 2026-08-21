@@ -488,7 +488,7 @@ function ActiveOffers({ groups }: { groups: UfaOfferGroupView[] }) {
 }
 
 export function UfaHomeCard() {
-  const query = useUfaOverview();
+  const query = useUfaOverview("home");
   if (query.isLoading) return <UfaHomeCardSkeleton />;
   if (query.error || !query.data)
     return (

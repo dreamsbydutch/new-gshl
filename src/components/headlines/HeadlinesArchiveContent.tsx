@@ -47,10 +47,10 @@ export function HeadlinesArchiveContent() {
                     index === 0 ? "text-2xl sm:text-3xl" : "text-xl"
                   }`}
                 >
-                  {edition.content.headline}
+                  {edition.headline}
                 </h2>
                 <p className="mt-2 line-clamp-3 text-sm leading-6 text-slate-600">
-                  {edition.content.deck}
+                  {edition.deck}
                 </p>
                 <span className="mt-3 inline-flex min-h-11 items-center gap-1 text-xs font-bold text-blue-700">
                   Open issue

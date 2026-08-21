@@ -14,7 +14,8 @@ import type {
   StandingsTeamCardProps,
   StandingsTopPlayersProps,
 } from "@gshl-types";
-import { buildStandingsTeamCardViewModel, cn } from "@gshl-utils";
+import { useStandingsTeamDetail } from "@gshl-hooks";
+import { cn } from "@gshl-utils";
 
 const RESULT_TONE_CLASS = {
   win: "bg-emerald-50 text-emerald-700",
@@ -160,23 +161,33 @@ function StandingsTopPlayers({ players }: StandingsTopPlayersProps) {
 }
 
 export function StandingsTeamCard({
-  allTeamStats,
-  allTeams,
-  matchups,
-  playerTotals,
-  players,
-  team,
-  weeks,
+  seasonId,
+  teamId,
 }: StandingsTeamCardProps) {
-  const context = buildStandingsTeamCardViewModel(
-    team,
-    matchups,
-    weeks,
-    allTeams,
-    allTeamStats,
-    players,
-    playerTotals,
-  );
+  const { data: context, isLoading } = useStandingsTeamDetail({
+    seasonId,
+    teamId,
+  });
+
+  if (isLoading) {
+    return (
+      <div
+        role="status"
+        aria-live="polite"
+        className="rounded-xl border border-slate-200 bg-slate-50/80 p-4 text-sm text-slate-500 shadow-inner"
+      >
+        Loading franchise snapshot…
+      </div>
+    );
+  }
+
+  if (!context) {
+    return (
+      <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/80 p-4 text-sm text-slate-500">
+        Franchise snapshot is unavailable.
+      </div>
+    );
+  }
 
   return (
     <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-3 shadow-inner sm:p-4">

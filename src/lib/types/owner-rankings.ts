@@ -1,4 +1,4 @@
-import type { GSHLTeam, Owner, TeamWeekStatLine } from "./database";
+import type { TeamWeekStatLine } from "./database";
 
 export type OwnerPowerRankingStat = Pick<
   TeamWeekStatLine,
@@ -13,14 +13,23 @@ export interface OwnerRankingRecord {
   winPercentage: number;
 }
 
+export interface OwnerRankingOwnerSummary {
+  id: string;
+}
+
+export interface OwnerRankingTeamSummary {
+  name: string | null;
+  logoUrl: string | null;
+}
+
 export interface OwnerRankingEntry {
-  owner: Owner;
+  owner: OwnerRankingOwnerSummary;
   rank: number;
   previousRank: number;
   rankChange: number;
   displayName: string;
   isActive: boolean;
-  primaryTeam: GSHLTeam | null;
+  primaryTeam: OwnerRankingTeamSummary | null;
   seasonsPlayed: number;
   rating: number;
   elo: number;
@@ -70,4 +79,33 @@ export interface OwnerRankingsViewModel {
   latestSeasonName: string | null;
   activeOwnerCount: number;
   inactiveOwnerCount: number;
+}
+
+export type OwnerRankingBrowserEntry = Pick<
+  OwnerRankingEntry,
+  | "owner"
+  | "rank"
+  | "rankChange"
+  | "displayName"
+  | "primaryTeam"
+  | "seasonsPlayed"
+  | "rating"
+  | "weeksAtNumberOne"
+  | "weeksInTopThree"
+  | "weeksInBottomThree"
+  | "weeksInLastPlace"
+  | "overallRecord"
+  | "conferenceRecord"
+  | "playoffRecord"
+  | "playoffAppearances"
+  | "finalsAppearances"
+  | "cups"
+  | "coachAwards"
+  | "gmAwards"
+  | "otherAwards"
+  | "brophyAwards"
+>;
+
+export interface OwnerRankingsBrowserViewModel {
+  rankings: OwnerRankingBrowserEntry[];
 }

@@ -1,5 +1,7 @@
 import type {
   Contract,
+  Franchise,
+  GSHLTeam,
   Player,
   Season,
   UfaPublicGroup,
@@ -10,9 +12,11 @@ import {
   checkContractCapSpace,
   getContractCoveredSeasonIds,
   getTorontoDate,
+  isUnsignedForSigningSeason,
   orderContractSeasons,
 } from "../domain/contracts";
 import { UFA_OFFER_MS } from "./ufa-deadline";
+import { HOME_UFA_PREVIEW_LIMIT } from "./home-dashboard";
 
 export { UFA_OFFER_MS } from "./ufa-deadline";
 
@@ -113,6 +117,143 @@ export function selectAffordableUfas<
   T extends { affordableTerms: readonly unknown[] },
 >(players: T[]): T[] {
   return players.filter((player) => player.affordableTerms.length > 0);
+}
+
+export function resolveUfaViewerContext<
+  TFranchise extends Pick<Franchise, "id" | "ownerId" | "isActive">,
+  TTeam extends Pick<GSHLTeam, "franchiseId" | "seasonId">,
+>(options: {
+  ownerId: string | undefined;
+  signingSeasonId: string | undefined;
+  franchises: TFranchise[];
+  teams: TTeam[];
+}) {
+  const { ownerId, signingSeasonId, franchises, teams } = options;
+  const ownerFranchise = franchises.find(
+    (franchise) =>
+      String(franchise.ownerId) === String(ownerId ?? "") && franchise.isActive,
+  );
+  const ownerTeam = teams.find(
+    (team) =>
+      String(team.franchiseId) === String(ownerFranchise?.id ?? "") &&
+      String(team.seasonId) === String(signingSeasonId ?? ""),
+  );
+
+  return {
+    ownerFranchise,
+    ownerTeam,
+    isSignedInOwner: Boolean(ownerId && ownerFranchise && ownerTeam),
+  };
+}
+
+export function buildUfaCatalogCandidates<
+  TPlayer extends Pick<
+    Player,
+    "id" | "fullName" | "isActive" | "overallRk" | "overallRating" | "salary"
+  >,
+>(options: {
+  players: TPlayer[];
+  signingSeason: Season | null;
+  seasons: Season[];
+  contracts: Contract[];
+  ownerId: string | undefined;
+  groups: Array<Pick<UfaPublicGroup, "id" | "seasonId">>;
+  offers: Array<
+    Pick<
+      UfaPublicOffer,
+      "contractLength" | "groupId" | "isMine" | "salary" | "status"
+    >
+  >;
+}): Array<{
+  player: TPlayer;
+  salary: number;
+  affordableTerms: Array<1 | 2 | 3>;
+}> {
+  const {
+    players,
+    signingSeason,
+    seasons,
+    contracts,
+    ownerId,
+    groups,
+    offers,
+  } = options;
+  if (!signingSeason) return [];
+
+  return rankUfas(
+    players.flatMap((player) => {
+      const salary = calculateUfaSalary(player.salary);
+      if (
+        !player.isActive ||
+        !isEligibleUfaRank(player) ||
+        !isUnsignedForSigningSeason(
+          String(player.id),
+          String(signingSeason.id),
+          contracts,
+          seasons,
+        ) ||
+        salary <= 0
+      ) {
+        return [];
+      }
+
+      return [
+        {
+          player,
+          fullName: player.fullName,
+          overallRating: player.overallRating,
+          salary,
+          affordableTerms: getAffordableUfaTerms({
+            ownerId,
+            salary,
+            signingSeason,
+            seasons,
+            contracts,
+            groups,
+            offers,
+          }),
+        },
+      ];
+    }),
+  ).map(({ player, salary, affordableTerms }) => ({
+    player,
+    salary,
+    affordableTerms,
+  }));
+}
+
+export function selectUfaHomeCatalogPlayerIds<
+  TPlayer extends { id: unknown },
+>(options: {
+  candidates: Array<{
+    player: TPlayer;
+    affordableTerms: readonly unknown[];
+  }>;
+  isSignedInOwner: boolean;
+  offerGroupPlayerIds: readonly unknown[];
+  limit?: number;
+}): string[] {
+  const {
+    candidates,
+    isSignedInOwner,
+    offerGroupPlayerIds,
+    limit = HOME_UFA_PREVIEW_LIMIT,
+  } = options;
+  const requestedLimit = Number.isFinite(limit)
+    ? Math.max(0, Math.trunc(limit))
+    : HOME_UFA_PREVIEW_LIMIT;
+  const visibleCandidates = isSignedInOwner
+    ? selectAffordableUfas(candidates)
+    : candidates;
+
+  return [
+    ...new Set([
+      ...visibleCandidates
+        .slice(0, requestedLimit)
+        .map(({ player }) => String(player.id)),
+      ...offerGroupPlayerIds.map(String),
+    ]),
+  ];
 }
 
 export function isEligibleUfaRank(player: Pick<Player, "overallRk">): boolean {

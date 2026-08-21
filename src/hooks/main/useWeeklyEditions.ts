@@ -5,12 +5,16 @@ import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import type {
   WeeklyEdition,
-  WeeklyEditionRevision,
+  WeeklyEditionArchiveSummary,
+  WeeklyEditionHomeSummary,
+  WeeklyEditionNewsroomSummary,
   WeeklyEditionQueryState,
+  WeeklyEditionReaderDetail,
+  WeeklyEditionRevisionSummary,
 } from "@gshl-types";
 import { useAppMutation } from "./useAppMutation";
 
-export function useLatestWeeklyEdition(): WeeklyEditionQueryState<WeeklyEdition | null> {
+export function useLatestWeeklyEdition(): WeeklyEditionQueryState<WeeklyEditionHomeSummary | null> {
   const data = useQuery(api.weeklyEditions.latestPublished, {});
   return {
     data,
@@ -20,7 +24,7 @@ export function useLatestWeeklyEdition(): WeeklyEditionQueryState<WeeklyEdition 
 
 export function useWeeklyEditionArchive(
   seasonId?: string,
-): WeeklyEditionQueryState<WeeklyEdition[]> {
+): WeeklyEditionQueryState<WeeklyEditionArchiveSummary[]> {
   const data = useQuery(api.weeklyEditions.publishedArchive, {
     seasonId: seasonId as Id<"seasons"> | undefined,
     limit: 100,
@@ -31,32 +35,38 @@ export function useWeeklyEditionArchive(
   };
 }
 
-export function useWeeklyEdition(editionId: string) {
+export function useWeeklyEdition(
+  editionId: string,
+): WeeklyEditionQueryState<WeeklyEditionReaderDetail | null> {
   const data = useQuery(
     api.weeklyEditions.publishedById,
     editionId ? { editionId: editionId as Id<"weeklyEditions"> } : "skip",
   );
   return {
-    data: data as WeeklyEdition | null | undefined,
+    data,
     isLoading: Boolean(editionId) && data === undefined,
   };
 }
 
 export function useWeeklyEditionNewsroom(editionId?: string) {
-  const editions = useQuery(api.weeklyEditions.newsroom, {});
-  const prompt = useQuery(
-    api.weeklyEditions.prompt,
+  const editions: WeeklyEditionNewsroomSummary[] | undefined = useQuery(
+    api.weeklyEditions.newsroom,
+    {},
+  );
+  const selectedEdition = useQuery(
+    api.weeklyEditions.newsroomById,
     editionId ? { editionId: editionId as Id<"weeklyEditions"> } : "skip",
   );
-  const revisions = useQuery(
+  const revisions: WeeklyEditionRevisionSummary[] | undefined = useQuery(
     api.weeklyEditions.revisions,
     editionId ? { editionId: editionId as Id<"weeklyEditions"> } : "skip",
   );
   return {
-    editions: editions as WeeklyEdition[] | undefined,
-    prompt,
-    revisions: revisions as WeeklyEditionRevision[] | undefined,
+    editions,
+    selectedEdition: selectedEdition as WeeklyEdition | null | undefined,
+    revisions,
     isLoading: editions === undefined,
+    isEditionLoading: Boolean(editionId) && selectedEdition === undefined,
     generateHistorical: useAppMutation(api.weeklyEditions.generateHistorical),
     publishImport: useAppMutation(api.weeklyEditions.publishImport),
     updateManual: useAppMutation(api.weeklyEditions.updateManual),

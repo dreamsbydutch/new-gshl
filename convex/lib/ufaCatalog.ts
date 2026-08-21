@@ -6,7 +6,7 @@ const seasonYear = (season: Doc<"seasons">): number => {
   return Number.isFinite(year) ? year : Number.NEGATIVE_INFINITY;
 };
 
-async function latestNhlStats(
+export async function loadLatestNhlStats(
   db: DatabaseReader,
   orderedSeasons: readonly Doc<"seasons">[],
   signingSeason: Doc<"seasons"> | undefined,
@@ -59,7 +59,7 @@ export async function loadUfaCatalog(db: DatabaseReader) {
             .collect()
         : Promise.resolve([]),
       db.query("contracts").collect(),
-      latestNhlStats(db, orderedSeasons, signingSeason),
+      loadLatestNhlStats(db, orderedSeasons, signingSeason),
     ]);
 
   return {

@@ -519,7 +519,13 @@ export const publicState = query({
       );
     const oddsEntries = await calculateOddsEntries(ctx, groups, offers);
     return {
-      groups: groups.map((group: any) => ({ ...group, id: group._id })),
+      groups: groups.map((group: any) => ({
+        id: group._id,
+        playerId: group.playerId,
+        seasonId: group.seasonId,
+        deadlineAt: group.deadlineAt,
+        status: group.status,
+      })),
       offers: offers.map((offer: any) => ({
         id: offer._id,
         groupId: offer.groupId,

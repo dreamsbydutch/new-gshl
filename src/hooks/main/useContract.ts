@@ -374,7 +374,7 @@ export function useContractData(
   }, [seasons]);
 
   const playerNhlResult = useQuery(
-    api.frontend.playerNhlByPlayers,
+    api.frontend.playerNhlSalaryHistory,
     enabled && relevantPlayerIds.length > 0
       ? { playerIds: relevantPlayerIds as Id<"players">[] }
       : "skip",

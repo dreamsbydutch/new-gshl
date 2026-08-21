@@ -3,9 +3,11 @@ import test from "node:test";
 
 import {
   aggregateConferenceRatings,
+  buildConferenceContestOverallFromSeasonModels,
   buildConferenceContestSeasonViewModel,
   CONFERENCE_RECENCY_RETENTION,
   getConferenceContestVisibleSeasons,
+  projectConferenceContestBrowserView,
 } from "./conference-contest";
 import {
   type AwardsList as AwardsListType,
@@ -232,5 +234,57 @@ void test("applies exact 85% current-form retention and equal all-time weighting
     (result.currentRating.ratingByConferenceId.A ?? 0) +
       (result.currentRating.ratingByConferenceId.B ?? 0),
     100,
+  );
+});
+
+void test("projects historical arrays into the exact browser counts", () => {
+  const teams = [
+    team("left", "s1", "A", "Alpha"),
+    team("right", "s1", "B", "Beta"),
+  ];
+  const seasonModel = buildConferenceContestSeasonViewModel({
+    season: season("s1", 2025),
+    gshlTeams: teams,
+    matchups: [
+      matchup(
+        "quarter",
+        "s1",
+        "left",
+        "right",
+        MatchupType.QUARTER_FINAL,
+        7,
+        4,
+      ),
+      matchup("final", "s1", "left", "right", MatchupType.FINAL, 8, 5),
+    ],
+    teamAwards: [
+      award("cup", "s1", "left", AwardsList.GSHL_CUP),
+      award("coach", "s1", "right", AwardsList.JACK_ADAMS),
+    ],
+  });
+  assert.ok(seasonModel);
+  const overall = buildConferenceContestOverallFromSeasonModels([seasonModel]);
+  assert.ok(overall);
+
+  const browser = projectConferenceContestBrowserView({
+    overall,
+    seasons: [seasonModel],
+  });
+  const projectedSeason = browser.seasons[0];
+  assert.ok(projectedSeason);
+  assert.equal(projectedSeason.playoffTeamsByConferenceId.A, 1);
+  assert.equal(projectedSeason.finalistsByConferenceId.A, 1);
+  assert.equal(projectedSeason.championsByConferenceId.A, 1);
+  assert.equal(projectedSeason.awardsByConferenceId.B, 1);
+  assert.equal(
+    "championTeamsByConferenceId" in projectedSeason,
+    false,
+    "full team arrays must not cross the browser boundary",
+  );
+  assert.equal(browser.overall?.coachAwardsByConferenceId.B, 1);
+  assert.equal(
+    browser.overall ? "currentRating" in browser.overall : true,
+    false,
+    "unused aggregate rating structures must stay server-side",
   );
 });

@@ -1,6 +1,10 @@
 import { NHLLogo } from "@gshl-components/player/NHLLogo";
 import { TableViewport } from "@gshl-ui";
-import type { GSHLTeam, NHLTeam, PlayerStatRow } from "@gshl-types";
+import type {
+  MatchupDetailsNhlTeam,
+  MatchupDetailsTeam,
+  PlayerStatRow,
+} from "@gshl-types";
 import {
   buildPlayerStatColumns,
   findNhlTeamByAbbreviation,
@@ -17,8 +21,8 @@ export function PlayerStatsTable({
   headline,
   seasonCategories,
 }: {
-  team: GSHLTeam | null;
-  nhlTeams: NHLTeam[];
+  team: MatchupDetailsTeam | null;
+  nhlTeams: MatchupDetailsNhlTeam[];
   players: PlayerStatRow[];
   headline?: string;
   seasonCategories?: readonly string[];
@@ -64,7 +68,7 @@ export function PlayerStatsTable({
   const renderNhlTeamCell = (player: PlayerStatRow) => {
     const playerNhlTeams = getPlayerNhlAbbreviations(player.nhlTeam)
       .map((abbreviation) => findNhlTeamByAbbreviation(nhlTeams, abbreviation))
-      .filter((nhlTeam): nhlTeam is NHLTeam => Boolean(nhlTeam));
+      .filter((nhlTeam): nhlTeam is MatchupDetailsNhlTeam => Boolean(nhlTeam));
 
     if (playerNhlTeams.length === 0) {
       return <NHLLogo team={undefined} size={20} />;

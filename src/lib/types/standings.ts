@@ -2,11 +2,8 @@ import type {
   Franchise,
   GSHLTeam,
   Matchup,
-  Player,
-  PlayerTotalStatLine,
   Season,
   TeamSeasonStatLine,
-  TeamWeekStatLine,
   Week,
 } from "./database";
 
@@ -32,7 +29,7 @@ export type StandingsTeamRow = StandingsGroup["teams"][number];
 
 export interface StandingsCategoryRank {
   label: string;
-  value: number | null | undefined;
+  value: number | string | null | undefined;
   rank: number | null;
 }
 
@@ -65,13 +62,14 @@ export interface StandingsTeamCardViewModel {
 }
 
 export interface StandingsTeamCardProps {
-  allTeamStats: TeamSeasonStatLine[];
-  allTeams: GSHLTeam[];
-  matchups: Matchup[];
-  playerTotals: PlayerTotalStatLine[];
-  players: Player[];
-  team: StandingsTeamRow;
-  weeks: Week[];
+  seasonId: string;
+  teamId: string;
+}
+
+export interface UseStandingsTeamDetailOptions {
+  seasonId?: string | null;
+  teamId?: string | null;
+  enabled?: boolean;
 }
 
 export interface StandingsGameListProps {
@@ -89,27 +87,15 @@ export interface StandingsTopPlayersProps {
 }
 
 export interface StandingsGroupTableProps {
-  allTeamStats: TeamSeasonStatLine[];
-  allTeams: GSHLTeam[];
   group: StandingsGroup;
-  matchups: Matchup[];
-  playerTotals: PlayerTotalStatLine[];
-  players: Player[];
   season: Season;
   standingsType: string;
-  weeks: Week[];
 }
 
 export interface StandingsTableProps {
-  allTeamStats: TeamSeasonStatLine[];
-  allTeams: GSHLTeam[];
   groups: StandingsGroup[];
-  matchups: Matchup[];
-  playerTotals: PlayerTotalStatLine[];
-  players: Player[];
   selectedSeason: Season | null;
   standingsType: string;
-  weeks: Week[];
 }
 
 export interface StandingsTableColumn {
@@ -143,8 +129,18 @@ export interface StandingsTeamInfoProps {
   standingsType: StandingsOption;
 }
 
+export type PowerRankingTeam = Pick<
+  GSHLTeam,
+  "id" | "name" | "abbr" | "logoUrl" | "ownerId"
+>;
+
+export type PowerRankingWeek = Pick<
+  Week,
+  "id" | "weekNum" | "weekType" | "startDate"
+>;
+
 export interface PowerRankingEntry {
-  team: GSHLTeam;
+  team: PowerRankingTeam;
   rank: number;
   rating: number | null;
   previousRank: number | null;
@@ -179,7 +175,7 @@ export interface PowerRankingsViewModel {
   entries: PowerRankingEntry[];
   chartData: PowerRankingChartPoint[];
   series: PowerRankingSeries[];
-  latestWeek: Week | null;
+  latestWeek: PowerRankingWeek | null;
 }
 
 export interface PowerRankingsProps {
@@ -191,19 +187,40 @@ export interface PowerRankingsHomeCardProps {
   seasonId?: string;
 }
 
-export type PowerRankingWeeklyStat = Pick<
-  TeamWeekStatLine,
-  "gshlTeamId" | "weekId" | "powerRating" | "powerRk"
->;
+export interface PowerRankingPreviewEntry {
+  team: Pick<GSHLTeam, "id" | "name" | "abbr" | "logoUrl">;
+  rank: number;
+  rating: number | null;
+  rankChange: number | null;
+  color: string;
+}
+
+export interface PowerRankingsPreview {
+  season: Pick<Season, "id" | "name" | "isActive">;
+  latestWeek: Pick<Week, "weekNum"> | null;
+  entries: PowerRankingPreviewEntry[];
+}
+
+export interface PowerRankingWeeklyStat {
+  gshlTeamId: string;
+  weekId: string;
+  powerRating?: number | null;
+  powerRk?: number | null;
+}
 
 export type PowerRankingSeasonStat = Pick<
   TeamSeasonStatLine,
   "gshlTeamId" | "powerRk"
 >;
 
+export interface StandingsPowerHistory {
+  weeks: PowerRankingWeek[];
+  weeklyStats: PowerRankingWeeklyStat[];
+}
+
 export interface BuildPowerRankingsOptions {
-  teams: GSHLTeam[];
-  weeks: Week[];
+  teams: PowerRankingTeam[];
+  weeks: PowerRankingWeek[];
   weeklyStats: PowerRankingWeeklyStat[];
   seasonStats: PowerRankingSeasonStat[];
 }

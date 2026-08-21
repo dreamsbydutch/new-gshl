@@ -14,7 +14,6 @@ import type {
   Contract,
   DraftBoardPlayer,
   DraftPick,
-  ProjectedDraftPick,
   RosterPosition as RosterPositionType,
 } from "@gshl-types";
 
@@ -294,13 +293,15 @@ export function getSeasonDraftPicks<
  * @param projectedDraftPicks - The projected draft picks to use.
  * @returns The grouped projected draft picks by round.
  */
-export function groupProjectedDraftPicksByRound(
-  projectedDraftPicks: ProjectedDraftPick[],
+export function groupProjectedDraftPicksByRound<
+  TProjectedPick extends { pick: Pick<DraftPick, "round" | "pick"> },
+>(
+  projectedDraftPicks: readonly TProjectedPick[],
 ): Array<{
   round: string;
-  picks: ProjectedDraftPick[];
+  picks: TProjectedPick[];
 }> {
-  const rounds = new Map<string, ProjectedDraftPick[]>();
+  const rounds = new Map<string, TProjectedPick[]>();
 
   for (const projectedPick of projectedDraftPicks) {
     const round = String(projectedPick.pick.round);

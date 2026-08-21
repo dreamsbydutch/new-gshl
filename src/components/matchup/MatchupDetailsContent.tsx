@@ -8,21 +8,16 @@ import { TableViewport } from "@gshl-ui";
 import {
   lighten,
   readableText,
-  useNHLTeams,
   useMatchupContextNavigation,
-  useSeasons,
+  useMatchupDetails,
   useTeamColor,
-  useWeeks,
-  useWeeklyScheduleData,
 } from "@gshl-hooks";
 import type {
   CategoryResult,
-  GSHLTeam,
   MatchupDetailsContentProps,
-  NHLTeam,
+  MatchupDetailsTeam,
   StarPlayer,
 } from "@gshl-types";
-import { findTeamById } from "@gshl-utils/domain/team";
 import {
   buildCategoryResults,
   formatMatchupPlayerName,
@@ -42,7 +37,7 @@ function MatchupSummaryTeam({
   score,
   alignment,
 }: {
-  team: GSHLTeam | null;
+  team: MatchupDetailsTeam | null;
   score: number;
   alignment: "left" | "right";
 }) {
@@ -116,8 +111,8 @@ function CategoryResultsCard({
 }: {
   title: string;
   categories: CategoryResult[];
-  homeTeam: GSHLTeam | null;
-  awayTeam: GSHLTeam | null;
+  homeTeam: MatchupDetailsTeam | null;
+  awayTeam: MatchupDetailsTeam | null;
 }) {
   const awayLabel = awayTeam?.abbr ?? awayTeam?.name ?? "Away";
   const homeLabel = homeTeam?.abbr ?? homeTeam?.name ?? "Home";
@@ -293,7 +288,7 @@ const STAR_RANK_CONFIG = {
 
 function StarPodiumCard({ star }: { star: StarPlayer }) {
   const config = STAR_RANK_CONFIG[star.starRank];
-  const isGoalie = (star.posGroup as string) === "G";
+  const isGoalie = star.posGroup === "G";
 
   const statItems = isGoalie
     ? [
@@ -392,46 +387,31 @@ function StarsCard({ stars }: { stars: StarPlayer[] }) {
 
 export function MatchupDetailsContent({
   matchupId,
-  seasonId,
-  weekId,
 }: MatchupDetailsContentProps) {
-  const { data: nhlTeamsData = [] } = useNHLTeams();
-  const scheduleData = useWeeklyScheduleData({ seasonId, weekId });
-  const { data: seasonData = [] } = useSeasons({
-    seasonId,
-    enabled: Boolean(seasonId),
-  });
-  const { data: weekData = [] } = useWeeks({
-    weekId,
-    enabled: Boolean(weekId),
-  });
-  const matchupNavigation = useMatchupContextNavigation(seasonId, weekId);
-
-  const matchup = useMemo(
-    () => scheduleData.matchups.find((entry) => String(entry.id) === matchupId),
-    [matchupId, scheduleData.matchups],
+  const matchupQuery = useMatchupDetails(matchupId);
+  const details = matchupQuery.data;
+  const matchup = details?.matchup ?? null;
+  const season = details?.season ?? null;
+  const week = details?.week ?? null;
+  const homeTeam = details?.teams.home ?? null;
+  const awayTeam = details?.teams.away ?? null;
+  const homeTeamStats = details?.teamStats.home ?? null;
+  const awayTeamStats = details?.teamStats.away ?? null;
+  const matchupNavigation = useMatchupContextNavigation(
+    matchup?.seasonId ?? "",
+    matchup?.weekId ?? "",
   );
-  const season = seasonData[0] ?? null;
-  const week = weekData[0] ?? null;
   const teamLookup = useMemo(() => {
-    return new Map(scheduleData.teams.map((team) => [String(team.id), team]));
-  }, [scheduleData.teams]);
+    return new Map(
+      [homeTeam, awayTeam]
+        .filter((team): team is MatchupDetailsTeam => Boolean(team))
+        .map((team) => [String(team.id), team]),
+    );
+  }, [awayTeam, homeTeam]);
   const selectedSide = matchupNavigation.selectedSide;
 
-  const homeTeam = matchup
-    ? (findTeamById(scheduleData.teams, matchup.homeTeamId) ?? null)
-    : null;
-  const awayTeam = matchup
-    ? (findTeamById(scheduleData.teams, matchup.awayTeamId) ?? null)
-    : null;
   const { teamColor: awayTeamColor } = useTeamColor(awayTeam?.logoUrl);
   const { teamColor: homeTeamColor } = useTeamColor(homeTeam?.logoUrl);
-  const homeTeamStats = matchup
-    ? (scheduleData.teamWeekStatsByTeam[String(matchup.homeTeamId)] ?? null)
-    : null;
-  const awayTeamStats = matchup
-    ? (scheduleData.teamWeekStatsByTeam[String(matchup.awayTeamId)] ?? null)
-    : null;
 
   const matchupCategories = useMemo(
     () => resolveMatchupCategories(season?.categories),
@@ -476,10 +456,7 @@ export function MatchupDetailsContent({
   }, [awayTeam?.name, homeTeam?.name, matchup]);
 
   const homePlayers = useMemo(() => {
-    const players =
-      (matchup
-        ? scheduleData.playerWeekStatsByTeam[String(matchup.homeTeamId)]
-        : []) ?? [];
+    const players = details?.players.home ?? [];
 
     return [...players].sort((left, right) => {
       const ratingDelta =
@@ -489,13 +466,10 @@ export function MatchupDetailsContent({
         formatMatchupPlayerName(right),
       );
     });
-  }, [matchup, scheduleData.playerWeekStatsByTeam]);
+  }, [details?.players.home]);
 
   const awayPlayers = useMemo(() => {
-    const players =
-      (matchup
-        ? scheduleData.playerWeekStatsByTeam[String(matchup.awayTeamId)]
-        : []) ?? [];
+    const players = details?.players.away ?? [];
 
     return [...players].sort((left, right) => {
       const ratingDelta =
@@ -505,7 +479,7 @@ export function MatchupDetailsContent({
         formatMatchupPlayerName(right),
       );
     });
-  }, [matchup, scheduleData.playerWeekStatsByTeam]);
+  }, [details?.players.away]);
 
   const stars = useMemo(
     () => getStarPlayers([...awayPlayers, ...homePlayers], teamLookup),
@@ -526,11 +500,11 @@ export function MatchupDetailsContent({
       )
     : null;
 
-  if (scheduleData.isLoading) {
+  if (matchupQuery.isLoading) {
     return <MatchupSkeleton />;
   }
 
-  if (scheduleData.error) {
+  if (matchupQuery.error) {
     return (
       <main
         aria-labelledby="matchup-error-heading"
@@ -717,7 +691,7 @@ export function MatchupDetailsContent({
         >
           <PlayerStatsTable
             team={selectedTeam}
-            nhlTeams={nhlTeamsData as NHLTeam[]}
+            nhlTeams={details?.nhlTeams ?? []}
             players={selectedPlayers}
             seasonCategories={season?.categories}
           />

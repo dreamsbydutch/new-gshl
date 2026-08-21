@@ -207,6 +207,31 @@ function contractCoversDraft(
   );
 }
 
+export const status = query({
+  args: { seasonId: v.id("seasons") },
+  handler: async (ctx, args) => {
+    await requireActiveUser(ctx);
+    const [season, draftPickRows] = await Promise.all([
+      ctx.db.get(args.seasonId),
+      ctx.db
+        .query("draftPicks")
+        .withIndex("by_seasonId_round_pick", (range) =>
+          range.eq("seasonId", args.seasonId),
+        )
+        .collect(),
+    ]);
+    if (!season) throw new Error("Draft season not found");
+
+    const clock = resolveDraftClockState(
+      [...draftPickRows].sort(compareRows).map(toDraftPick),
+      toUtcTimestamp(season.draftStartAt),
+      new Date(),
+    );
+
+    return { status: clock.status };
+  },
+});
+
 export const state = query({
   args: { seasonId: v.id("seasons") },
   handler: async (ctx, args) => {

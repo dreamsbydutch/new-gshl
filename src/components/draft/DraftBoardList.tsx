@@ -30,6 +30,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import {
+  type MockDraftDisplayNhlTeam,
+  type MockDraftDisplayPick,
   type MockDraftPreviewProps,
   type MockDraftProps,
   type ToggleItem,
@@ -42,7 +44,6 @@ import { DraftBoardTableSkeleton, MockDraftSkeleton } from "@gshl-skeletons";
 import {
   type DraftBoardPlayer,
   type DraftBoardToolbarProps,
-  type ProjectedDraftPick,
   findNhlTeamByAbbreviation,
   formatNumber,
   groupProjectedDraftPicksByRound,
@@ -224,8 +225,8 @@ function MockDraftPickCard({
   projectedPick,
   nhlTeams,
 }: {
-  projectedPick: ProjectedDraftPick;
-  nhlTeams: NHLTeam[];
+  projectedPick: MockDraftDisplayPick;
+  nhlTeams: MockDraftDisplayNhlTeam[];
 }) {
   const { pick, projectedPlayer, gshlTeam } = projectedPick;
   const { teamColor } = useTeamColor(gshlTeam?.logoUrl);
@@ -278,7 +279,7 @@ function MockDraftPickCard({
                 {projectedPlayer.fullName}
               </span>
               <span className="whitespace-nowrap text-[10px] opacity-75">
-                {projectedPlayer.nhlPos.toString()} • Age{" "}
+                {projectedPlayer.nhlPos?.toString() ?? ""} • Age{" "}
                 {(+formatNumber(projectedPlayer.age, 1)).toFixed(1)}
               </span>
             </div>
@@ -321,8 +322,8 @@ function MockDraftList({
   toolbarProps,
   title = "GSHL Mock Draft",
 }: {
-  projectedDraftPicks: ProjectedDraftPick[];
-  nhlTeams: NHLTeam[];
+  projectedDraftPicks: MockDraftDisplayPick[];
+  nhlTeams: MockDraftDisplayNhlTeam[];
   toolbarProps?: DraftBoardToolbarProps;
   title?: string;
 }) {

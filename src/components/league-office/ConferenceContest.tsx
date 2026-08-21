@@ -19,9 +19,8 @@ import { ConferenceContestSkeleton } from "@gshl-skeletons";
 import { useAppRouter, useConferenceContestData } from "@gshl-hooks";
 import type {
   ConferenceContestConferenceInfo,
+  ConferenceContestBrowserSeason,
   ConferenceContestRawStatRow,
-  ConferenceContestRecord,
-  ConferenceContestSeasonViewModel,
 } from "@gshl-types";
 import { buildStandingsNavigationHref, cn } from "@gshl-utils";
 
@@ -33,8 +32,6 @@ const conferenceTone = (conference: ConferenceContestConferenceInfo) => {
     ? { line: "#3b82f6", text: "text-sunview-800" }
     : { line: "#ef4444", text: "text-hotel-800" };
 };
-
-const recordWins = (record?: ConferenceContestRecord) => record?.wins ?? 0;
 
 function ConferenceLogo({
   conference,
@@ -195,7 +192,7 @@ function RatingTrend({
   left,
   right,
 }: {
-  seasons: ConferenceContestSeasonViewModel[];
+  seasons: ConferenceContestBrowserSeason[];
   left: ConferenceContestConferenceInfo;
   right: ConferenceContestConferenceInfo;
 }) {
@@ -280,8 +277,8 @@ function SeasonExplorer({
   selectedSeason,
   onSelect,
 }: {
-  seasons: ConferenceContestSeasonViewModel[];
-  selectedSeason: ConferenceContestSeasonViewModel;
+  seasons: ConferenceContestBrowserSeason[];
+  selectedSeason: ConferenceContestBrowserSeason;
   onSelect: (seasonId: string) => void;
 }) {
   const { router } = useAppRouter();
@@ -292,33 +289,33 @@ function SeasonExplorer({
   const rows: ConferenceContestRawStatRow[] = [
     {
       label: "Head-to-head wins",
-      left: recordWins(selectedSeason.headToHeadRecordByConferenceId[leftId]),
-      right: recordWins(selectedSeason.headToHeadRecordByConferenceId[rightId]),
+      left: selectedSeason.headToHeadWinsByConferenceId[leftId] ?? 0,
+      right: selectedSeason.headToHeadWinsByConferenceId[rightId] ?? 0,
     },
     {
       label: "Playoff wins",
-      left: recordWins(selectedSeason.playoffRecordByConferenceId[leftId]),
-      right: recordWins(selectedSeason.playoffRecordByConferenceId[rightId]),
+      left: selectedSeason.playoffWinsByConferenceId[leftId] ?? 0,
+      right: selectedSeason.playoffWinsByConferenceId[rightId] ?? 0,
     },
     {
       label: "Playoff teams",
-      left: selectedSeason.playoffTeamsByConferenceId[leftId]?.length ?? 0,
-      right: selectedSeason.playoffTeamsByConferenceId[rightId]?.length ?? 0,
+      left: selectedSeason.playoffTeamsByConferenceId[leftId] ?? 0,
+      right: selectedSeason.playoffTeamsByConferenceId[rightId] ?? 0,
     },
     {
       label: "Finalists",
-      left: selectedSeason.finalsTeamsByConferenceId[leftId]?.length ?? 0,
-      right: selectedSeason.finalsTeamsByConferenceId[rightId]?.length ?? 0,
+      left: selectedSeason.finalistsByConferenceId[leftId] ?? 0,
+      right: selectedSeason.finalistsByConferenceId[rightId] ?? 0,
     },
     {
       label: "GSHL Cups",
-      left: selectedSeason.championTeamsByConferenceId[leftId]?.length ?? 0,
-      right: selectedSeason.championTeamsByConferenceId[rightId]?.length ?? 0,
+      left: selectedSeason.championsByConferenceId[leftId] ?? 0,
+      right: selectedSeason.championsByConferenceId[rightId] ?? 0,
     },
     {
       label: "League awards",
-      left: selectedSeason.awardsByConferenceId[leftId]?.length ?? 0,
-      right: selectedSeason.awardsByConferenceId[rightId]?.length ?? 0,
+      left: selectedSeason.awardsByConferenceId[leftId] ?? 0,
+      right: selectedSeason.awardsByConferenceId[rightId] ?? 0,
     },
   ];
 
@@ -419,43 +416,43 @@ export function ConferenceContest() {
   const allTimeRows: ConferenceContestRawStatRow[] = [
     {
       label: "Head-to-head wins",
-      left: recordWins(overall.headToHeadRecordByConferenceId[left.id]),
-      right: recordWins(overall.headToHeadRecordByConferenceId[right.id]),
+      left: overall.headToHeadWinsByConferenceId[left.id] ?? 0,
+      right: overall.headToHeadWinsByConferenceId[right.id] ?? 0,
     },
     {
       label: "Playoff wins",
-      left: recordWins(overall.playoffRecordByConferenceId[left.id]),
-      right: recordWins(overall.playoffRecordByConferenceId[right.id]),
+      left: overall.playoffWinsByConferenceId[left.id] ?? 0,
+      right: overall.playoffWinsByConferenceId[right.id] ?? 0,
     },
     {
       label: "Playoff berths",
-      left: overall.playoffTeamsByConferenceId[left.id]?.length ?? 0,
-      right: overall.playoffTeamsByConferenceId[right.id]?.length ?? 0,
+      left: overall.playoffTeamsByConferenceId[left.id] ?? 0,
+      right: overall.playoffTeamsByConferenceId[right.id] ?? 0,
     },
     {
       label: "Finals appearances",
-      left: overall.finalsTeamsByConferenceId[left.id]?.length ?? 0,
-      right: overall.finalsTeamsByConferenceId[right.id]?.length ?? 0,
+      left: overall.finalistsByConferenceId[left.id] ?? 0,
+      right: overall.finalistsByConferenceId[right.id] ?? 0,
     },
     {
       label: "GSHL Cups",
-      left: overall.championTeamsByConferenceId[left.id]?.length ?? 0,
-      right: overall.championTeamsByConferenceId[right.id]?.length ?? 0,
+      left: overall.championsByConferenceId[left.id] ?? 0,
+      right: overall.championsByConferenceId[right.id] ?? 0,
     },
     {
       label: "League awards",
-      left: overall.awardsByConferenceId[left.id]?.length ?? 0,
-      right: overall.awardsByConferenceId[right.id]?.length ?? 0,
+      left: overall.awardsByConferenceId[left.id] ?? 0,
+      right: overall.awardsByConferenceId[right.id] ?? 0,
     },
     {
       label: "Coach of the Year",
-      left: overall.coachAwardsByConferenceId[left.id]?.length ?? 0,
-      right: overall.coachAwardsByConferenceId[right.id]?.length ?? 0,
+      left: overall.coachAwardsByConferenceId[left.id] ?? 0,
+      right: overall.coachAwardsByConferenceId[right.id] ?? 0,
     },
     {
       label: "GM of the Year",
-      left: overall.gmAwardsByConferenceId[left.id]?.length ?? 0,
-      right: overall.gmAwardsByConferenceId[right.id]?.length ?? 0,
+      left: overall.gmAwardsByConferenceId[left.id] ?? 0,
+      right: overall.gmAwardsByConferenceId[right.id] ?? 0,
     },
   ];
 

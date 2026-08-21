@@ -1,6 +1,10 @@
 import { ChevronDown } from "lucide-react";
 import { NHLLogo } from "@gshl-components/player/NHLLogo";
-import type { NHLTeam, PlayerStatColumn, PlayerStatRow } from "@gshl-types";
+import type {
+  MatchupDetailsNhlTeam,
+  PlayerStatColumn,
+  PlayerStatRow,
+} from "@gshl-types";
 import {
   findNhlTeamByAbbreviation,
   formatMatchupPlayerName,
@@ -17,12 +21,12 @@ function PlayerNhlTeams({
   nhlTeams,
 }: {
   player: PlayerStatRow;
-  nhlTeams: NHLTeam[];
+  nhlTeams: MatchupDetailsNhlTeam[];
 }) {
   const abbreviations = getPlayerNhlAbbreviations(player.nhlTeam);
   const teams = abbreviations
     .map((abbreviation) => findNhlTeamByAbbreviation(nhlTeams, abbreviation))
-    .filter((team): team is NHLTeam => Boolean(team));
+    .filter((team): team is MatchupDetailsNhlTeam => Boolean(team));
 
   if (teams.length === 0) {
     return (
@@ -49,7 +53,7 @@ export function MatchupPlayerPerformanceList({
   teamName,
 }: {
   columns: PlayerStatColumn[];
-  nhlTeams: NHLTeam[];
+  nhlTeams: MatchupDetailsNhlTeam[];
   players: PlayerStatRow[];
   teamName: string;
 }) {

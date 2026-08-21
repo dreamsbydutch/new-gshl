@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   buildOwnerRankings,
+  compactOwnerRankings,
   OWNER_LADDER_BASE_RATING,
   OWNER_LADDER_REFERENCE_CEILING,
   OWNER_LADDER_REFERENCE_FLOOR,
@@ -176,6 +177,16 @@ void test("seeds every newcomer at the entry baseline alongside active and inact
   assert.ok(result.rankings.some((entry) => !entry.isActive));
   assert.ok(result.rankings.some((entry) => entry.rating > rookie.rating));
   assert.ok(result.rankings.some((entry) => entry.rating < rookie.rating));
+
+  const compact = compactOwnerRankings(result);
+  assert.deepEqual(Object.keys(compact.rankings[0]!.owner), ["id"]);
+  assert.deepEqual(Object.keys(compact.rankings[0]!.primaryTeam ?? {}).sort(), [
+    "logoUrl",
+    "name",
+  ]);
+  assert.equal("elo" in compact.rankings[0]!, false);
+  assert.equal("previousRank" in compact.rankings[0]!, false);
+  assert.equal("totalAwards" in compact.rankings[0]!, false);
 });
 
 void test("weights playoff stages, Cups, and leadership awards", () => {

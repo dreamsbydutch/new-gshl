@@ -98,6 +98,8 @@ export interface UfaOverviewData {
   };
 }
 
+export type UfaOverviewMode = "full" | "home";
+
 export interface UseUfaOverviewResult {
   data: UfaOverviewData | undefined;
   isLoading: boolean;

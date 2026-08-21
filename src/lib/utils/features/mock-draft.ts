@@ -2,16 +2,86 @@ import type {
   BuildMockDraftProjectionOptions,
   DraftBoardPlayer,
   GSHLTeam,
+  MockDraftDisplayPick,
+  MockDraftDisplayPlayer,
   ProjectedDraftPick,
   RosterPosition,
 } from "@gshl-types";
+import { getPlayerNhlAbbreviation } from "../domain/player";
 import { generateLineupAssignments } from "./draft-admin";
 import { calculateDraftRosterTalentPoints } from "./draft-roster-board";
 
 export type {
   BuildMockDraftProjectionOptions,
+  MockDraftDisplayPick,
+  MockDraftDisplayPlayer,
   ProjectedDraftPick,
 } from "@gshl-types";
+
+type MockDraftProjectionSource = {
+  pick: MockDraftDisplayPick["pick"];
+  gshlTeam?: MockDraftDisplayPick["gshlTeam"];
+  projectedPlayer?: MockDraftDisplayPlayer;
+};
+
+function compactMockDraftPlayer(
+  player: MockDraftDisplayPlayer,
+): MockDraftDisplayPlayer {
+  return {
+    fullName: player.fullName,
+    ...(player.nhlTeam !== undefined ? { nhlTeam: player.nhlTeam } : {}),
+    ...(player.nhlPos !== undefined ? { nhlPos: player.nhlPos } : {}),
+    ...(player.age !== undefined ? { age: player.age } : {}),
+    ...(player.seasonRating !== undefined
+      ? { seasonRating: player.seasonRating }
+      : {}),
+    ...(player.seasonRk !== undefined ? { seasonRk: player.seasonRk } : {}),
+    ...(player.overallRating !== undefined
+      ? { overallRating: player.overallRating }
+      : {}),
+    ...(player.overallRk !== undefined ? { overallRk: player.overallRk } : {}),
+  };
+}
+
+/** Projects the mock-draft algorithm output to the fields rendered by its card. */
+export function compactMockDraftProjection(
+  projectedPicks: readonly MockDraftProjectionSource[],
+): MockDraftDisplayPick[] {
+  return projectedPicks.map(({ pick, gshlTeam, projectedPlayer }) => ({
+    pick: {
+      id: pick.id,
+      round: pick.round,
+      pick: pick.pick,
+    },
+    ...(gshlTeam
+      ? {
+          gshlTeam: {
+            name: gshlTeam.name,
+            logoUrl: gshlTeam.logoUrl,
+          },
+        }
+      : {}),
+    ...(projectedPlayer
+      ? {
+          projectedPlayer: compactMockDraftPlayer(projectedPlayer),
+        }
+      : {}),
+  }));
+}
+
+/** Lists NHL abbreviations referenced by the compact cards in first-use order. */
+export function getMockDraftReferencedNhlAbbreviations(
+  projectedPicks: readonly MockDraftDisplayPick[],
+): string[] {
+  return [
+    ...new Set(
+      projectedPicks.flatMap(({ projectedPlayer }) => {
+        const abbreviation = getPlayerNhlAbbreviation(projectedPlayer?.nhlTeam);
+        return abbreviation ? [abbreviation] : [];
+      }),
+    ),
+  ];
+}
 
 /**
  * Creates a comparison result for players.

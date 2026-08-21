@@ -6,21 +6,26 @@
 
 `convex/` is the deployed backend. It contains the schema, public functions, shared-secret functions, internal orchestration, cron registration, and generated bindings.
 
-| Path                                                      | Responsibility                                                         |
-| --------------------------------------------------------- | ---------------------------------------------------------------------- |
-| [`schema.ts`](../../convex/schema.ts)                     | Tables, validators, and indexes                                        |
-| [`frontend.ts`](../../convex/frontend.ts)                 | Main browser-facing league query and mutation facade                   |
-| [`draft.ts`](../../convex/draft.ts)                       | Transactional live draft state, submission, and undo                   |
-| [`ufa.ts`](../../convex/ufa.ts)                           | UFA offers, odds, cap checks, scheduling, and resolution               |
-| [`weeklyEditions.ts`](../../convex/weeklyEditions.ts)     | Publication facts, templates, editing, revisions, and scheduled issues |
-| [`data.ts`](../../convex/data.ts)                         | High-privilege generic migration/read/write adapter                    |
-| [`maintenanceScope.ts`](../../convex/maintenanceScope.ts) | Bounded season/week aggregate reads and writes for scripts             |
-| [`jobs.ts`](../../convex/jobs.ts)                         | Shared-secret job and schedule administration                          |
-| [`jobRunner.ts`](../../convex/jobRunner.ts)               | Internal job state machine and processors                              |
-| [`externalWorker.ts`](../../convex/externalWorker.ts)     | Shared-secret task leases for the local browser worker                 |
-| [`crons.ts`](../../convex/crons.ts)                       | Convex cron registration                                               |
-| [`lib/`](../../convex/lib/)                               | Auth and timestamp primitives used by multiple functions               |
-| [`_generated/`](../../convex/_generated/)                 | Generated API, server, and data-model bindings; never hand-edit        |
+| Path                                                        | Responsibility                                                         |
+| ----------------------------------------------------------- | ---------------------------------------------------------------------- |
+| [`schema.ts`](../../convex/schema.ts)                       | Tables, validators, and indexes                                        |
+| [`frontend.ts`](../../convex/frontend.ts)                   | Main browser-facing league query and mutation facade                   |
+| [`draft.ts`](../../convex/draft.ts)                         | Transactional live draft state, submission, and undo                   |
+| [`schedule.ts`](../../convex/schedule.ts)                   | Page-shaped weekly and owner-team schedule projections                 |
+| [`matchup.ts`](../../convex/matchup.ts)                     | Matchup details with referenced teams and player statistics            |
+| [`standings.ts`](../../convex/standings.ts)                 | Lazy public team snapshots for expanded standings rows                 |
+| [`teamHistory.ts`](../../convex/teamHistory.ts)             | Owner-scoped historical matchup and public relation projection         |
+| [`conferenceContest.ts`](../../convex/conferenceContest.ts) | Derived cross-season conference-contest view                           |
+| [`ufa.ts`](../../convex/ufa.ts)                             | UFA offers, odds, cap checks, scheduling, and resolution               |
+| [`weeklyEditions.ts`](../../convex/weeklyEditions.ts)       | Publication facts, templates, editing, revisions, and scheduled issues |
+| [`data.ts`](../../convex/data.ts)                           | High-privilege generic migration/read/write adapter                    |
+| [`maintenanceScope.ts`](../../convex/maintenanceScope.ts)   | Bounded season/week aggregate reads and writes for scripts             |
+| [`jobs.ts`](../../convex/jobs.ts)                           | Shared-secret job and schedule administration                          |
+| [`jobRunner.ts`](../../convex/jobRunner.ts)                 | Internal job state machine and processors                              |
+| [`externalWorker.ts`](../../convex/externalWorker.ts)       | Shared-secret task leases for the local browser worker                 |
+| [`crons.ts`](../../convex/crons.ts)                         | Convex cron registration                                               |
+| [`lib/`](../../convex/lib/)                                 | Auth and timestamp primitives used by multiple functions               |
+| [`_generated/`](../../convex/_generated/)                   | Generated API, server, and data-model bindings; never hand-edit        |
 
 One-off internal migrations and compatibility readers live beside these modules: `reporterBackfill.ts`, `weeklyEditionBackfill.ts`, `timestampMigration.ts`, and `yahooBackfill.ts`.
 
@@ -35,20 +40,36 @@ Browser code imports `api` from [`convex/_generated/api`](../../convex/_generate
 - Public lists for seasons, weeks, franchises, conferences, players, salaries, contracts, picks, results, events, awards, NHL teams, and stat tables.
 - Privacy-aware owner and enriched team queries. Anonymous callers receive redacted owner email and owing values; active users receive private fields.
 - Indexed pagination and batched lookups for high-volume player and draft screens.
-- A UFA catalog that reads active players and one latest populated NHL-stat
-  season, plus a capped mock-draft preview for Home. These projections replace
-  browser fan-out across full historical collections while the full feature
-  routes retain their complete views.
+- A full UFA catalog for League Office and a Home-only catalog that returns the
+  server-ranked preview candidates plus players in unresolved offer groups.
+  Both use one latest populated NHL-stat season; Home retains all viewer-owner
+  contracts needed for cap checks while filtering player contracts and stats to
+  its selected players. A separate capped Home mock-draft projection returns
+  only card fields and NHL branding referenced by those projected players.
 - League activity assembled from current rows, or from `seasonDataArchives.activitySnapshot` after a season is archived.
 - Role-gated mutations for lineup changes, draft administration, user access, contract creation, and jobs.
 
-Generic list helpers use the first applicable index and then filter or sort remaining criteria in memory. A filtered query is not automatically cheap. Scope large datasets by indexed fields and prefer purpose-built paginated or fixed-size preview queries. League activity restricts contract candidates to the selected season before normalizing legacy date values and selecting the newest rows.
+Generic list helpers choose the longest compound-index prefix fully constrained by the request. They apply a row limit before collection only when every filter is covered by that index, project public rows without Convex metadata, and resolve team relations by referenced IDs. High-traffic views still use purpose-built queries with exact response contracts, explicit compound indexes, and bounded reads. League activity restricts contract candidates to the selected season before normalizing legacy date values and selecting the newest rows.
+
+The generic planner stops before mixed numeric/string or legacy timestamp
+fields because its compatibility equality is broader than Convex's type-exact
+index equality. It still uses any safe leading prefix, then applies the
+compatibility filter before honoring a row limit.
 
 ### Domain APIs
 
-- `draft:state` requires an active user. `submitPick` requires the on-clock owner or commissioner; an expired clock is commissioner-only. `undoPick` is commissioner-only and limited to the latest safely reversible pick.
+- `draft:status` and `draft:state` require an active user. The status query returns only the shared clock status for compact Home rendering; the state query retains the joined board. `submitPick` requires the on-clock owner or commissioner; an expired clock is commissioner-only. `undoPick` is commissioner-only and limited to the latest safely reversible pick.
+- `schedule:weeklySchedule` returns one selected week with its season, matchups, referenced teams, and only the player and team statistics rendered by the schedule. `schedule:teamSchedule` resolves one owner-season team and its indexed matchups; expanded rows lazily request the exact two team-week statistic fragments.
+- `matchup:details` replaces browser fan-out with one matchup-shaped payload containing the selected matchup, its two teams, public owner labels, week, season categories, and exact player and team statistics.
+- `standings:teamDetail` is public and returns one compact season/team snapshot only after its standings row expands. It projects the rendered matchup window, category ranks, and top three players without exposing private owner fields.
+- `teamHistory:byOwner` returns one owner's indexed franchise history plus only the opponent teams, public identities, weeks, and seasons referenced by those matchups. Owner contact and financial fields, source metadata, and unused calendar/team fields are excluded.
+- `conferenceContest:view` derives rendered cross-season ratings, head-to-head results, finalist and champion counts, awards, and coach and GM counts on the server. The browser receives count and branding maps instead of the historical source collections used to compute them.
+- `frontend:ownerRankings` returns an exact public ranking projection, but its
+  career calculation still reads the complete historical inputs. Reducing its
+  backend reads and reactive dependency set requires a maintained aggregate or
+  snapshot; the current change reduces its browser payload only.
 - `ufa:publicState` is anonymous but masks owner identity and returns unresolved groups with their offers so pending cap reservations survive resolution retries. Odds are shown for open groups only, with formula-wide inputs shared across groups and selective inputs scoped by bidder-owner and season indexes. `submitOffer` requires an owner/commissioner identity unless the trusted server-secret path is used. Resolution functions are internal.
-- Weekly edition read endpoints return only published, active content. Newsroom, prompt, editing, visibility, homepage selection, section activation, and revision restoration are commissioner-only.
+- Weekly edition reader endpoints return only published, active content. Archive, Home, Newsroom, and revision lists use compact projections; full edition content is fetched by ID only for an opened reader or a commissioner-selected Newsroom issue. Published archive reads are bounded by status/season publication indexes, and Newsroom and revision lists are capped at 100 rows. Newsroom, prompt, editing, visibility, homepage selection, section activation, and revision restoration are commissioner-only.
 
 Authorization is a handler responsibility. Do not infer permission from whether a function appears in generated `api`.
 

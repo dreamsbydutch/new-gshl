@@ -81,7 +81,7 @@ type ScheduleCompletionOptions = {
   matchup?: Pick<Matchup, "awayScore" | "homeScore">;
   mode: "scores" | "weekEnd";
   referenceDate?: Date;
-  week?: Pick<Week, "endDate">;
+  week?: { endDate: string | null };
 };
 
 type MatchupOutcomeClassOptions = {
@@ -94,7 +94,10 @@ type MatchupOutcomeClassOptions = {
 };
 
 type MatchupScoreFormatOptions = {
-  matchup: Pick<Matchup, "awayScore" | "awayTeamId" | "homeScore" | "homeTeamId">;
+  matchup: Pick<
+    Matchup,
+    "awayScore" | "awayTeamId" | "homeScore" | "homeTeamId"
+  >;
   perspectiveTeamId: string;
 };
 
@@ -108,7 +111,9 @@ type RankDisplayOptions = {
  * @param value - The source value to process.
  * @returns True when empty filter value; otherwise false.
  */
-function isEmptyFilterValue(value: string | number | null | undefined): boolean {
+function isEmptyFilterValue(
+  value: string | number | null | undefined,
+): boolean {
   return value === null || value === undefined || value === "";
 }
 
@@ -259,4 +264,3 @@ export function formatMatchupScore({
     ? `${matchup.homeScore} - ${matchup.awayScore}`
     : `${matchup.awayScore} - ${matchup.homeScore}`;
 }
-

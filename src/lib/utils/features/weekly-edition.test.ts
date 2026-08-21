@@ -1,10 +1,20 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { BuildWeeklyEditionFactPacketInput } from "@gshl-types";
+import type {
+  BuildWeeklyEditionFactPacketInput,
+  WeeklyEdition,
+  WeeklyEditionContent,
+  WeeklyEditionFactPacket,
+} from "@gshl-types";
 import {
+  buildWeeklyEditionArchiveSummary,
   buildWeeklyEditionCareerRecordFacts,
   buildWeeklyEditionCtaHref,
+  buildWeeklyEditionHomeSummary,
+  buildWeeklyEditionReaderDetail,
   buildMilestoneEditionFactPacket,
+  buildWeeklyEditionNewsroomSummary,
+  buildWeeklyEditionRevisionSummary,
   buildTemplateWeeklyEdition,
   buildWeeklyEditionCategoryMargins,
   buildWeeklyEditionChatGptPrompt,
@@ -42,6 +52,203 @@ void test("leaves non-Matchup edition links unchanged", () => {
   assert.equal(
     buildWeeklyEditionCtaHref("https://example.com/matchup/matchup-1"),
     "https://example.com/matchup/matchup-1",
+  );
+});
+
+void test("projects compact Press Box reader, list, Home, and revision contracts", () => {
+  const content: WeeklyEditionContent = {
+    headline: "Aurora and Bears steal the week",
+    deck: "The short archive deck.",
+    sections: [
+      {
+        id: "article-1",
+        kind: "primary_article",
+        eyebrow: "Lead",
+        headline: "A full article headline",
+        body: "Full article copy that compact responses must omit.",
+        links: [],
+      },
+    ],
+  };
+  const facts: WeeklyEditionFactPacket = {
+    version: 1,
+    season: { id: "season-1", name: "2026 GSHL", year: "2026" },
+    week: {
+      id: "week-7",
+      number: 7,
+      startDate: "2026-01-05",
+      endDate: "2026-01-11",
+    },
+    teams: [
+      {
+        teamId: "team-away",
+        name: "Aurora",
+        abbr: "AUR",
+        logoUrl: "https://example.com/away.png",
+      },
+      {
+        teamId: "team-home",
+        name: "Bears",
+        abbr: "BEA",
+        logoUrl: "https://example.com/home.png",
+      },
+    ],
+    matchups: [
+      {
+        matchupId: "matchup-1",
+        homeTeamId: "team-home",
+        homeTeamName: "Bears",
+        awayTeamId: "team-away",
+        awayTeamName: "Aurora",
+        homeScore: 6,
+        awayScore: 7,
+        winnerTeamId: "team-away",
+        winnerTeamName: "Aurora",
+        loserTeamId: "team-home",
+        loserTeamName: "Bears",
+        rankUpset: 2,
+        categoryMargins: [],
+      },
+    ],
+    heroMatchupId: "matchup-1",
+    stars: [],
+    powerMovers: [],
+    activity: [],
+    missedStarts: [],
+    nextMatchups: [],
+    editorialCandidates: [],
+    issueType: "weekly",
+    issueLabel: "Weekly Recap",
+  };
+
+  const readerSource: WeeklyEdition = {
+    id: "edition-1",
+    seasonId: "season-1",
+    weekId: "week-7",
+    editionKey: "season-1:week-7:weekly",
+    issueType: "weekly",
+    issueLabel: "Weekly Recap",
+    seasonName: "2026 GSHL",
+    weekNum: 7,
+    startDate: 1_767_571_200_000,
+    endDate: 1_768_089_600_000,
+    status: "published",
+    generationMode: "manual",
+    content,
+    facts,
+    sourceHash: "private-source-hash",
+    publishedAt: 1_768_176_000_000,
+    scheduledFor: 1_768_176_000_000,
+    createdAt: 1_768_176_000_000,
+    updatedAt: 1_768_176_000_000,
+    editedBy: "private-auth-user-id",
+    isHomeActive: true,
+    inactiveSectionIds: ["article-1"],
+  };
+  assert.deepEqual(buildWeeklyEditionReaderDetail(readerSource), {
+    issueType: "weekly",
+    issueLabel: "Weekly Recap",
+    seasonName: "2026 GSHL",
+    startDate: 1_767_571_200_000,
+    endDate: 1_768_089_600_000,
+    scheduledFor: 1_768_176_000_000,
+    content: {
+      ...content,
+      sections: [],
+    },
+    facts: {
+      teams: [
+        {
+          teamId: "team-away",
+          name: "Aurora",
+          logoUrl: "https://example.com/away.png",
+        },
+        {
+          teamId: "team-home",
+          name: "Bears",
+          logoUrl: "https://example.com/home.png",
+        },
+      ],
+    },
+  });
+
+  assert.deepEqual(
+    buildWeeklyEditionHomeSummary({
+      id: "edition-1",
+      issueLabel: "Weekly Recap",
+      content,
+      facts,
+    }),
+    {
+      id: "edition-1",
+      issueLabel: "Weekly Recap",
+      headline: content.headline,
+      heroTeams: [
+        { teamId: "team-away", logoUrl: "https://example.com/away.png" },
+        { teamId: "team-home", logoUrl: "https://example.com/home.png" },
+      ],
+    },
+  );
+  assert.deepEqual(
+    buildWeeklyEditionArchiveSummary({
+      id: "edition-1",
+      seasonName: "2026 GSHL",
+      issueLabel: "Weekly Recap",
+      content,
+    }),
+    {
+      id: "edition-1",
+      seasonName: "2026 GSHL",
+      issueLabel: "Weekly Recap",
+      headline: content.headline,
+      deck: content.deck,
+    },
+  );
+  assert.deepEqual(
+    buildWeeklyEditionNewsroomSummary({
+      id: "edition-1",
+      seasonName: "2026 GSHL",
+      issueLabel: "Weekly Recap",
+      generationMode: "manual",
+      status: "published",
+      isHomeActive: true,
+    }),
+    {
+      id: "edition-1",
+      seasonName: "2026 GSHL",
+      issueLabel: "Weekly Recap",
+      generationMode: "manual",
+      status: "published",
+      isHomeActive: true,
+    },
+  );
+  assert.deepEqual(
+    buildWeeklyEditionNewsroomSummary({
+      id: "edition-2",
+      seasonName: "2026 GSHL",
+      issueLabel: "Weekly Recap",
+      generationMode: "template",
+      status: "hidden",
+    }),
+    {
+      id: "edition-2",
+      seasonName: "2026 GSHL",
+      issueLabel: "Weekly Recap",
+      generationMode: "template",
+      status: "hidden",
+    },
+  );
+  assert.deepEqual(
+    buildWeeklyEditionRevisionSummary({
+      id: "revision-1",
+      generationMode: "chatgpt_import",
+      createdAt: 1_768_176_000_000,
+    }),
+    {
+      id: "revision-1",
+      generationMode: "chatgpt_import",
+      createdAt: 1_768_176_000_000,
+    },
   );
 });
 

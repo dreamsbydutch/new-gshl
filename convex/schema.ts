@@ -512,13 +512,16 @@ export default defineSchema({
     ["seasonId", "gshlTeamId", "playerId", ["seasonId", "round", "pick"]],
   ),
 
-  nhlTeams: table({
-    name: stringValue,
-    abbr: stringValue,
-    logoUrl: stringValue,
-    createdAt: timestampValue,
-    updatedAt: timestampValue,
-  }),
+  nhlTeams: table(
+    {
+      name: stringValue,
+      abbr: stringValue,
+      logoUrl: stringValue,
+      createdAt: timestampValue,
+      updatedAt: timestampValue,
+    },
+    ["abbr"],
+  ),
 
   playerDayStatLines: table(
     {
@@ -854,7 +857,11 @@ export default defineSchema({
     .index("by_seasonId_editionKey", ["seasonId", "editionKey"])
     .index("by_status_publishedAt", ["status", "publishedAt"])
     .index("by_homeActive_publishedAt", ["isHomeActive", "publishedAt"])
-    .index("by_seasonId_publishedAt", ["seasonId", "publishedAt"]),
+    .index("by_seasonId_status_publishedAt", [
+      "seasonId",
+      "status",
+      "publishedAt",
+    ]),
 
   weeklyEditionRevisions: defineTable({
     editionId: v.id("weeklyEditions"),

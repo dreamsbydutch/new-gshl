@@ -22,6 +22,7 @@ import type {
   WeeklyEditionValidationResult,
 } from "@gshl-types";
 import {
+  buildWeeklyEditionChatGptPrompt,
   validateWeeklyEditionContent,
   validateWeeklyEditionImport,
 } from "@gshl-utils";
@@ -47,9 +48,13 @@ export function Newsroom() {
     seasonId,
     enabled: Boolean(seasonId),
   });
-  const selectedEdition = useMemo(
-    () => newsroom.editions?.find((edition) => edition.id === editionId),
-    [editionId, newsroom.editions],
+  const selectedEdition = newsroom.selectedEdition;
+  const prompt = useMemo(
+    () =>
+      selectedEdition
+        ? buildWeeklyEditionChatGptPrompt(selectedEdition.facts)
+        : null,
+    [selectedEdition],
   );
   const activeArticleCount =
     selectedEdition?.content.sections.filter(
@@ -76,9 +81,9 @@ export function Newsroom() {
   };
 
   const copyPrompt = async () => {
-    if (!newsroom.prompt) return;
+    if (!prompt) return;
     try {
-      await navigator.clipboard.writeText(newsroom.prompt);
+      await navigator.clipboard.writeText(prompt);
       showNotice("ChatGPT prompt copied.");
     } catch {
       showNotice("Unable to copy the ChatGPT prompt.");
@@ -334,13 +339,21 @@ export function Newsroom() {
           )}
         </aside>
 
-        {selectedEdition && manualContent ? (
+        {newsroom.isEditionLoading ? (
+          <div
+            role="status"
+            className="flex min-h-48 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white p-6 text-sm text-slate-500 shadow-sm"
+          >
+            <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />
+            Loading edition...
+          </div>
+        ) : selectedEdition && manualContent ? (
           <div className="min-w-0 space-y-6">
             <div className="flex flex-wrap gap-2">
               <Button
                 type="button"
                 onClick={() => void copyPrompt()}
-                disabled={!newsroom.prompt}
+                disabled={!prompt}
               >
                 <Clipboard />
                 Copy ChatGPT prompt
@@ -584,6 +597,10 @@ export function Newsroom() {
               </div>
             </details>
           </div>
+        ) : editionId ? (
+          <p className="rounded-xl border border-slate-200 bg-white p-6 text-sm text-slate-500 shadow-sm">
+            This edition is no longer available.
+          </p>
         ) : null}
       </div>
     </section>
