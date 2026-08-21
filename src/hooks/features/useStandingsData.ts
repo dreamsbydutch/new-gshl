@@ -41,8 +41,11 @@ import { useSeasonDataBundle } from "./useSeasonDataBundle";
 export function useStandingsData(
   options: UseStandingsDataOptions = {},
 ): UseStandingsDataResult {
-  const { standingsType: optionStandingsType, seasonId: optionSeasonId } =
-    options;
+  const {
+    standingsType: optionStandingsType,
+    seasonId: optionSeasonId,
+    includeMatchups = true,
+  } = options;
 
   const { selectedType: navStandingsType } = useStandingsNavigation();
   const { selectedSeason, selectedSeasonId: navSeasonId } =
@@ -78,6 +81,7 @@ export function useStandingsData(
     error: seasonDataError,
   } = useSeasonDataBundle<TeamSeasonStatLine>({
     seasonId: selectedSeasonId,
+    includeMatchups,
     includeWeeks: true,
     teamStatsLevel: "season",
     useNavigation: false,

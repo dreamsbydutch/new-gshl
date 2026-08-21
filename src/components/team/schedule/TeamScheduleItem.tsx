@@ -38,6 +38,7 @@ export function TeamScheduleItem({
     selectedTeamScore,
     selectedTeamStats,
   } = useTeamScheduleMatchupDetails({
+    enabled: isExpanded,
     matchup,
     week,
     teams,

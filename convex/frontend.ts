@@ -18,6 +18,12 @@ import {
   toUtcTimestamp,
   utcTimestampToDateKey,
 } from "./lib/timestamps";
+import { loadUfaCatalog } from "./lib/ufaCatalog";
+import {
+  buildContractedSeasonRosterPlayers,
+  prepareDraftBoardPlayers,
+} from "../src/lib/utils/features/draft-board-list";
+import { buildMockDraftProjection } from "../src/lib/utils/features/mock-draft";
 
 type Row = Record<string, unknown> & {
   _id: string;
@@ -391,6 +397,110 @@ export const playerNhlByPlayers = query({
   },
 });
 
+export const ufaCatalog = query({
+  args: {},
+  handler: async (ctx) => {
+    const catalog = await loadUfaCatalog(ctx.db);
+    return {
+      seasons: catalog.seasons.map((row) => publicRow(row as unknown as Row)),
+      players: catalog.players.map((row) => publicRow(row as unknown as Row)),
+      nhlStats: catalog.nhlStats.map((row) => publicRow(row as unknown as Row)),
+      nhlTeams: catalog.nhlTeams.map((row) => publicRow(row as unknown as Row)),
+      franchises: catalog.franchises.map((row) =>
+        publicRow(row as unknown as Row),
+      ),
+      teams: catalog.teams.map((row) => publicRow(row as unknown as Row)),
+      contracts: catalog.contracts.map((row) =>
+        publicRow(row as unknown as Row),
+      ),
+    };
+  },
+});
+
+export const mockDraftPreview = query({
+  args: { seasonId: v.id("seasons"), take: v.number() },
+  handler: async (ctx, args) => {
+    const requestedTake = Number.isFinite(args.take) ? args.take : 4;
+    const limit = Math.min(Math.max(Math.trunc(requestedTake), 1), 12);
+    const season = await ctx.db.get(args.seasonId);
+    if (!season) return { projectedDraftPicks: [], nhlTeams: [] };
+
+    const [players, contracts, picks, teamRows, franchises, nhlTeams] =
+      await Promise.all([
+        ctx.db
+          .query("players")
+          .withIndex("by_isActive_overallRating", (query) =>
+            query.eq("isActive", true),
+          )
+          .collect(),
+        ctx.db.query("contracts").collect(),
+        ctx.db
+          .query("draftPicks")
+          .withIndex("by_seasonId_round_pick", (query) =>
+            query.eq("seasonId", args.seasonId),
+          )
+          .collect(),
+        ctx.db
+          .query("teams")
+          .withIndex("by_seasonId", (query) =>
+            query.eq("seasonId", args.seasonId),
+          )
+          .collect(),
+        ctx.db.query("franchises").collect(),
+        ctx.db.query("nhlTeams").collect(),
+      ]);
+    const publicSeason = publicRow(season as unknown as Row);
+    const publicPlayers = players.map((row) =>
+      publicRow(row as unknown as Row),
+    );
+    const publicContracts = contracts.map((row) =>
+      publicRow(row as unknown as Row),
+    );
+    const publicPicks = picks.map((row) => publicRow(row as unknown as Row));
+    const franchiseById = new Map(
+      franchises.map((row) => [String(row._id), row]),
+    );
+    const teams = teamRows.map((row) => {
+      const franchise = franchiseById.get(String(row.franchiseId));
+      return {
+        ...publicRow(row as unknown as Row),
+        name: franchise?.name ?? null,
+        abbr: franchise?.abbr ?? null,
+        logoUrl: franchise?.logoUrl ?? null,
+        isActive: franchise?.isActive ?? false,
+        ownerId: franchise?.ownerId ?? null,
+      };
+    });
+    const draftPlayers = prepareDraftBoardPlayers(
+      publicPlayers,
+      publicContracts,
+      publicSeason.startDate,
+    );
+    const rosterPlayers = buildContractedSeasonRosterPlayers(
+      publicPlayers,
+      publicContracts,
+      publicSeason.startDate,
+    );
+    const projectedDraftPicks = buildMockDraftProjection({
+      seasonDraftPicks: publicPicks,
+      draftPlayers,
+      rosterPlayers,
+      teams,
+      take: limit,
+    }).map(({ pick, gshlTeam, projectedPlayer, score }) => ({
+      pick,
+      ...(gshlTeam ? { gshlTeam } : {}),
+      ...(projectedPlayer ? { projectedPlayer } : {}),
+      score,
+    }));
+
+    return {
+      projectedDraftPicks,
+      nhlTeams: nhlTeams.map((row) => publicRow(row as unknown as Row)),
+    };
+  },
+});
+
 export const careerSplitsByTeams = query({
   args: { teamIds: v.array(v.id("teams")) },
   handler: async (ctx, args) => {
@@ -451,6 +561,7 @@ export const activity = query({
     const [contracts, playerDays, teams, franchises] = await Promise.all([
       (ctx.db as any)
         .query("contracts")
+        .withIndex("by_seasonId", (q) => q.eq("seasonId", args.seasonId))
         .collect()
         .then((rows: Row[]) =>
           rows

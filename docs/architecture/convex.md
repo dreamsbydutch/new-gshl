@@ -35,10 +35,14 @@ Browser code imports `api` from [`convex/_generated/api`](../../convex/_generate
 - Public lists for seasons, weeks, franchises, conferences, players, salaries, contracts, picks, results, events, awards, NHL teams, and stat tables.
 - Privacy-aware owner and enriched team queries. Anonymous callers receive redacted owner email and owing values; active users receive private fields.
 - Indexed pagination and batched lookups for high-volume player and draft screens.
+- A UFA catalog that reads active players and one latest populated NHL-stat
+  season, plus a capped mock-draft preview for Home. These projections replace
+  browser fan-out across full historical collections while the full feature
+  routes retain their complete views.
 - League activity assembled from current rows, or from `seasonDataArchives.activitySnapshot` after a season is archived.
 - Role-gated mutations for lineup changes, draft administration, user access, contract creation, and jobs.
 
-Generic list helpers use the first applicable index and then filter or sort remaining criteria in memory. A filtered query is not automatically cheap. Scope large datasets by indexed fields and prefer purpose-built paginated queries.
+Generic list helpers use the first applicable index and then filter or sort remaining criteria in memory. A filtered query is not automatically cheap. Scope large datasets by indexed fields and prefer purpose-built paginated or fixed-size preview queries. League activity restricts contract candidates to the selected season before normalizing legacy date values and selecting the newest rows.
 
 ### Domain APIs
 

@@ -4,20 +4,15 @@ import { useMemo } from "react";
 import { useQuery } from "convex/react";
 import { useSession } from "next-auth/react";
 import { api } from "../../../convex/_generated/api";
-import {
-  useContracts,
-  useFranchises,
-  useNHLTeams,
-  usePlayerNhlStatsByPlayers,
-  usePlayers,
-  useSeasons,
-  useTeams,
-} from "../main";
 import { useAppMutation } from "../main/useAppMutation";
 import type {
+  Contract,
   Franchise,
   GSHLTeam,
   NHLTeam,
+  Player,
+  PlayerNHLStatLine,
+  Season,
   UfaFreeAgentView,
   UfaOfferGroupView,
   UseUfaOverviewResult,
@@ -37,52 +32,23 @@ import {
 export function useUfaOverview(): UseUfaOverviewResult {
   const { data: session } = useSession();
   const rawState = useQuery(api.ufa.publicState, {});
+  const rawCatalog = useQuery(api.frontend.ufaCatalog, {});
   const state = useMemo(() => normalizeUfaPublicState(rawState), [rawState]);
-  const players = usePlayers({ isActive: true });
-  const playerIds = useMemo(
-    () => players.data.map((player) => String(player.id)),
-    [players.data],
-  );
-  const nhlStatsQuery = usePlayerNhlStatsByPlayers(
-    playerIds,
-    !players.isLoading,
-  );
-  const nhlTeamsQuery = useNHLTeams();
-  const franchisesQuery = useFranchises();
-  const teamsQuery = useTeams();
-  const seasons = useSeasons({ orderBy: { year: "asc" } });
-  const contracts = useContracts();
   const data = useMemo(() => {
-    if (
-      rawState === undefined ||
-      players.isLoading ||
-      nhlStatsQuery.isLoading ||
-      nhlTeamsQuery.isLoading ||
-      franchisesQuery.isLoading ||
-      teamsQuery.isLoading ||
-      seasons.isLoading ||
-      contracts.isLoading
-    ) {
+    if (rawState === undefined || rawCatalog === undefined) {
       return undefined;
     }
-    const nhlTeams = nhlTeamsQuery.data.filter(
-      (team): team is NHLTeam => "abbr" in team,
-    );
-    const franchises = franchisesQuery.data.filter(
-      (team): team is Franchise => "ownerId" in team && !("seasonId" in team),
-    );
-    const teams = teamsQuery.data.filter(
-      (team): team is GSHLTeam =>
-        "seasonId" in team &&
-        "franchiseId" in team &&
-        !("date" in team) &&
-        !("weekId" in team) &&
-        !("seasonType" in team),
-    );
-    const activeSeason = seasons.data.find((season) => season.isActive);
+    const players = rawCatalog.players as unknown as Player[];
+    const nhlStats = rawCatalog.nhlStats as unknown as PlayerNHLStatLine[];
+    const nhlTeams = rawCatalog.nhlTeams as unknown as NHLTeam[];
+    const franchises = rawCatalog.franchises as unknown as Franchise[];
+    const teams = rawCatalog.teams as unknown as GSHLTeam[];
+    const seasons = rawCatalog.seasons as unknown as Season[];
+    const contracts = rawCatalog.contracts as unknown as Contract[];
+    const activeSeason = seasons.find((season) => season.isActive);
     const latestNhlStatsByPlayer = indexLatestUfaNhlStats(
-      nhlStatsQuery.data,
-      seasons.data,
+      nhlStats,
+      seasons,
       activeSeason?.year,
     );
     const window = getUfaWindow(activeSeason ?? null);
@@ -99,7 +65,7 @@ export function useUfaOverview(): UseUfaOverviewResult {
     );
     const isSignedInOwner = Boolean(ownerId && ownerFranchise && ownerTeam);
     const rankedFreeAgents = rankUfas(
-      players.data
+      players
         .filter(
           (player) =>
             player.isActive &&
@@ -108,8 +74,8 @@ export function useUfaOverview(): UseUfaOverviewResult {
             isUnsignedForSigningSeason(
               String(player.id),
               String(activeSeason?.id ?? ""),
-              contracts.data,
-              seasons.data,
+              contracts,
+              seasons,
             ) &&
             Number(player.salary ?? 0) > 0,
         )
@@ -128,8 +94,8 @@ export function useUfaOverview(): UseUfaOverviewResult {
             ownerId,
             salary,
             signingSeason: activeSeason ?? null,
-            seasons: seasons.data,
-            contracts: contracts.data,
+            seasons,
+            contracts,
             groups: state.groups,
             offers: state.offers,
           });
@@ -217,25 +183,7 @@ export function useUfaOverview(): UseUfaOverviewResult {
         isSignedInOwner,
       },
     };
-  }, [
-    contracts.data,
-    contracts.isLoading,
-    franchisesQuery.data,
-    franchisesQuery.isLoading,
-    nhlTeamsQuery.data,
-    nhlTeamsQuery.isLoading,
-    nhlStatsQuery.data,
-    nhlStatsQuery.isLoading,
-    players.data,
-    players.isLoading,
-    seasons.data,
-    seasons.isLoading,
-    session?.user?.ownerId,
-    rawState,
-    state,
-    teamsQuery.data,
-    teamsQuery.isLoading,
-  ]);
+  }, [rawCatalog, rawState, session?.user?.ownerId, state]);
   const error: Error | null = null;
   return {
     data,

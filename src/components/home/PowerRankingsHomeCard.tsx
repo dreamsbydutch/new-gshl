@@ -77,6 +77,7 @@ export function PowerRankingsHomeCard({
   const { selectedSeason, powerRankings, isLoading, error } = useStandingsData({
     seasonId,
     standingsType: "power",
+    includeMatchups: false,
   });
   const colorSources = useMemo(
     () =>

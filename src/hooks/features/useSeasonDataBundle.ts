@@ -22,6 +22,7 @@ export function useSeasonDataBundle<TTeamStats = never>(
   const {
     seasonId: optionSeasonId,
     weekId: optionWeekId,
+    includeMatchups = true,
     includeWeeks = false,
     teamStatsLevel = null,
     useNavigation = true,
@@ -54,7 +55,7 @@ export function useSeasonDataBundle<TTeamStats = never>(
   const matchupsQuery = useMatchups({
     seasonId,
     weekId,
-    enabled: hasSeasonScope || hasWeekScope,
+    enabled: includeMatchups && (hasSeasonScope || hasWeekScope),
   });
 
   const teamsQuery = useTeams({

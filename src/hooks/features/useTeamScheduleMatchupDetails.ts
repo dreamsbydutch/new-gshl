@@ -7,11 +7,13 @@ import { findTeamById } from "@gshl-utils/domain/team";
 import { useTeams } from "../main";
 
 export function useTeamScheduleMatchupDetails({
+  enabled,
   matchup,
   week,
   teams,
   selectedTeamId,
 }: {
+  enabled: boolean;
   matchup: Matchup;
   week: Week | undefined;
   teams: GSHLTeam[];
@@ -40,21 +42,23 @@ export function useTeamScheduleMatchupDetails({
   const { data: teamWeeksRaw = [], isLoading: teamWeeksLoading } = useTeams({
     statsLevel: "weekly",
     weekId: String(matchup.weekId),
-    enabled: hasRecordedScore && Boolean(matchup.weekId),
+    enabled: enabled && hasRecordedScore && Boolean(matchup.weekId),
   });
 
   const teamWeeks = teamWeeksRaw as TeamWeekStatLine[];
   const homeTeamStats = useMemo(
     () =>
       teamWeeks.find(
-        (teamWeek) => String(teamWeek.gshlTeamId) === String(matchup.homeTeamId),
+        (teamWeek) =>
+          String(teamWeek.gshlTeamId) === String(matchup.homeTeamId),
       ),
     [matchup.homeTeamId, teamWeeks],
   );
   const awayTeamStats = useMemo(
     () =>
       teamWeeks.find(
-        (teamWeek) => String(teamWeek.gshlTeamId) === String(matchup.awayTeamId),
+        (teamWeek) =>
+          String(teamWeek.gshlTeamId) === String(matchup.awayTeamId),
       ),
     [matchup.awayTeamId, teamWeeks],
   );

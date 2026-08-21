@@ -61,6 +61,7 @@ export interface UseContractDataResult {
 export interface UseStandingsDataOptions {
   standingsType?: string;
   seasonId?: string;
+  includeMatchups?: boolean;
 }
 
 export interface UseScheduleDataEnhancedMatchup extends Matchup {
@@ -103,6 +104,7 @@ export interface UseSeasonMatchupsAndTeamsResult {
 export interface UseSeasonDataBundleOptions {
   seasonId?: string | null;
   weekId?: string | null;
+  includeMatchups?: boolean;
   includeWeeks?: boolean;
   teamStatsLevel?: Exclude<TeamStatsLevel, "none"> | null;
   useNavigation?: boolean;

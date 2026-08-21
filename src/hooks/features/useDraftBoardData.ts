@@ -1,6 +1,9 @@
 "use client";
 
 import { useMemo } from "react";
+import { useQuery } from "convex/react";
+import { api } from "../../../convex/_generated/api";
+import type { Id } from "../../../convex/_generated/dataModel";
 import {
   useContracts,
   useDraftPickPages,
@@ -20,6 +23,7 @@ import {
   prepareDraftBoardPlayers,
   getSeasonDraftPicks,
   resolveContractDefaultSeason,
+  HOME_MOCK_DRAFT_PREVIEW_LIMIT,
   type DraftBoardPlayer,
   type ProjectedDraftPick,
 } from "@gshl-utils";
@@ -29,6 +33,24 @@ import type {
   NHLTeam,
   UseDraftBoardDataOptions,
 } from "@gshl-types";
+
+export function useMockDraftPreview(seasonId: string) {
+  const result = useQuery(
+    api.frontend.mockDraftPreview,
+    seasonId
+      ? {
+          seasonId: seasonId as Id<"seasons">,
+          take: HOME_MOCK_DRAFT_PREVIEW_LIMIT,
+        }
+      : "skip",
+  );
+
+  return {
+    isLoading: result === undefined,
+    nhlTeams: (result?.nhlTeams ?? []) as unknown as NHLTeam[],
+    projectedDraftPicks: result?.projectedDraftPicks ?? [],
+  };
+}
 
 /**
  * useDraftBoardData Hook

@@ -52,6 +52,7 @@ import {
 } from "@gshl-utils";
 import {
   useDraftBoardData,
+  useMockDraftPreview,
   useTeamColor,
   lighten,
   readableText,
@@ -505,10 +506,8 @@ export function DraftBoardList({
  * @param seasonId - The season ID to display mock draft for
  */
 export function MockDraftPreview({ seasonId }: MockDraftPreviewProps) {
-  const { isLoading, nhlTeams, projectedDraftPicks } = useDraftBoardData({
-    seasonId,
-    selectedType: "mockdraft",
-  });
+  const { isLoading, nhlTeams, projectedDraftPicks } =
+    useMockDraftPreview(seasonId);
   if (isLoading) {
     return <MockDraftSkeleton compact />;
   }

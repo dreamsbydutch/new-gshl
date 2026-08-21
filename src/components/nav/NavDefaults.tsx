@@ -1,33 +1,19 @@
 "use client";
 
 import { useEffect } from "react";
-import {
-  useAuthSession,
-  useSelectedSeasonId,
-  useTeamNavigation,
-  useWeekNavigation,
-  useWeeks,
-} from "@gshl-hooks";
-import { isIsoDateInRange, toLocalIsoDateOnly } from "@gshl-utils";
+import { useAuthSession, useTeamNavigation } from "@gshl-hooks";
 import { canManageOwnTeam } from "@gshl-utils";
 
 /**
  * NavDefaults
- * - Runs on client mount and sets `selectedWeekId` to the "current" week
- *   based on inclusive YYYY-MM-DD comparisons (local date) if the nav
- *   store does not already have a selection.
+ * - Runs on client mount and replaces the legacy owner default with the
+ *   authenticated user's team when their role permits it.
+ * - Season and week defaults are owned by the route navigation hooks so the
+ *   application shell does not subscribe to route-specific data.
  */
 export function NavDefaults(): null {
-  const { selectedSeasonId } = useSelectedSeasonId();
   const { selectedOwnerId, setSelectedOwnerId } = useTeamNavigation();
   const { session } = useAuthSession();
-  const { selectedWeekId, setSelectedWeekId: setWeekId } = useWeekNavigation();
-
-  const { data: weeks, isLoading } = useWeeks({
-    seasonId: selectedSeasonId,
-    orderBy: { startDate: "asc" },
-    enabled: Boolean(selectedSeasonId),
-  });
 
   useEffect(() => {
     if (
@@ -38,39 +24,6 @@ export function NavDefaults(): null {
       setSelectedOwnerId(session.user.ownerId);
     }
   }, [selectedOwnerId, session, setSelectedOwnerId]);
-
-  useEffect(() => {
-    if (isLoading) return;
-    if (!weeks || weeks.length === 0) return;
-
-    // Keep an existing selection only when it belongs to this season. This
-    // also repairs persisted navigation state created before season changes
-    // reset the selected week.
-    if (weeks.some((week) => week.id === selectedWeekId)) return;
-
-    const today = toLocalIsoDateOnly(new Date());
-
-    // Find inclusive match
-    const current = weeks.find((w) =>
-      isIsoDateInRange(today, w.startDate, w.endDate),
-    );
-    if (current) {
-      setWeekId(current.id);
-      return;
-    }
-
-    // Fallback: most recent previous week (endDate < today)
-    const previous = weeks
-      .filter((w) => w.endDate < today)
-      .sort((a, b) => (a.endDate < b.endDate ? 1 : -1))[0];
-    if (previous) {
-      setWeekId(previous.id);
-      return;
-    }
-
-    // Final fallback: first week in the season
-    setWeekId(weeks[0]!.id);
-  }, [isLoading, weeks, selectedWeekId, selectedSeasonId, setWeekId]);
 
   return null;
 }

@@ -156,6 +156,28 @@ void test("sorts the complete mock draft numerically across double-digit rounds"
   );
 });
 
+void test("stops a preview projection at the requested pick limit", () => {
+  const projection = buildMockDraftProjection({
+    seasonDraftPicks: Array.from({ length: 8 }, (_, index) =>
+      pick(`pick-${index + 1}`, index + 1),
+    ),
+    draftPlayers: Array.from({ length: 8 }, (_, index) =>
+      player(`player-${index + 1}`, 100 - index, ["C"], {
+        overallRk: index + 1,
+      }),
+    ),
+    rosterPlayers: [],
+    teams: [team()],
+    take: 4,
+  });
+
+  assert.equal(projection.length, 4);
+  assert.deepEqual(
+    projection.map((projectedPick) => projectedPick.pick.id),
+    ["pick-1", "pick-2", "pick-3", "pick-4"],
+  );
+});
+
 void test("does not let a missing talent rating beat a rated roster upgrade", () => {
   const projection = buildMockDraftProjection({
     seasonDraftPicks: [pick("pick-1", 1)],
