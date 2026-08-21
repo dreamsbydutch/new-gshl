@@ -21,6 +21,18 @@ function isRoute(pathname: string, route: string): boolean {
   return pathname === route || pathname.startsWith(`${route}/`);
 }
 
+export function calculatePageScrollProgress(
+  scrollTop: number,
+  scrollHeight: number,
+  viewportHeight: number,
+): number {
+  const scrollableHeight = Math.max(0, scrollHeight - viewportHeight);
+  if (scrollableHeight === 0) return 0;
+
+  const progress = (scrollTop / scrollableHeight) * 100;
+  return Math.round(Math.min(100, Math.max(0, progress)));
+}
+
 /**
  * Resolves global shell state without coupling navigation components to the
  * App Router. More-specific child routes must be checked before their parent.

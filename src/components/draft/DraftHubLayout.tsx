@@ -67,7 +67,10 @@ export function DraftHubLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div>
-      <PageContextNavigation ariaLabel="Draft navigation">
+      <PageContextNavigation
+        ariaLabel="Draft navigation"
+        mobileRows={showTeamToggle ? 2 : 1}
+      >
         <SecondaryPageToolbar className="sm:justify-center">
           {draftLinks.map(({ href, label, icon: Icon, isActive }) => (
             <Link

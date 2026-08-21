@@ -61,13 +61,14 @@ export function DraftHubTeamToggle({
         team.logoUrl ? (
           <Image
             src={team.logoUrl}
-            alt={`${team.name ?? "Team"} logo`}
-            width={34}
-            height={34}
-            className="h-9 w-9 rounded-md object-contain p-1"
+            alt=""
+            aria-hidden="true"
+            width={40}
+            height={40}
+            className="h-10 w-10 rounded-md object-contain"
           />
         ) : (
-          <span className="grid h-9 w-9 place-items-center text-xs font-bold">
+          <span className="grid h-10 w-10 place-items-center text-xs font-bold">
             {team.abbr ?? "?"}
           </span>
         )

@@ -55,7 +55,7 @@ export function LockerRoomLayout({ children }: { children: React.ReactNode }) {
   };
   return (
     <div className="font-varela">
-      <PageContextNavigation ariaLabel="My Team controls">
+      <PageContextNavigation ariaLabel="My Team controls" mobileRows={2}>
         <SecondaryPageToolbar>
           <TeamsToggle
             seasonId={navigation.activeSeasonId}

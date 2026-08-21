@@ -1,6 +1,18 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { getAppShellRouteContext } from "./app-shell";
+import {
+  calculatePageScrollProgress,
+  getAppShellRouteContext,
+} from "./app-shell";
+
+void test("calculates bounded page scroll progress", () => {
+  assert.equal(calculatePageScrollProgress(0, 2000, 1000), 0);
+  assert.equal(calculatePageScrollProgress(500, 2000, 1000), 50);
+  assert.equal(calculatePageScrollProgress(1000, 2000, 1000), 100);
+  assert.equal(calculatePageScrollProgress(1500, 2000, 1000), 100);
+  assert.equal(calculatePageScrollProgress(-100, 2000, 1000), 0);
+  assert.equal(calculatePageScrollProgress(0, 800, 1000), 0);
+});
 
 void test("maps primary routes to the correct persistent navigation item", () => {
   assert.equal(getAppShellRouteContext("/").activeNavId, "home");

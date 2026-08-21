@@ -314,6 +314,7 @@ export interface PageContextNavigationProps {
   children: ReactNode;
   ariaLabel: string;
   className?: string;
+  mobileRows?: 1 | 2;
 }
 
 export interface SeasonToggleNavProps {

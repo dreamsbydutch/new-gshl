@@ -27,7 +27,7 @@ export function ScheduleLayout({ children }: { children: React.ReactNode }) {
     scheduleTypes.find((type) => type.key === scheduleType) ?? null;
   return (
     <div className="font-varela">
-      <PageContextNavigation ariaLabel="Schedule controls">
+      <PageContextNavigation ariaLabel="Schedule controls" mobileRows={2}>
         <SecondaryPageToolbar className="text-center sm:justify-center">
           <HorizontalToggle<LabeledToggleOption>
             items={scheduleTypes}
