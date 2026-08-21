@@ -1,17 +1,19 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
-import { useAppRouter } from "@gshl-hooks";
 import type { WeeklyEditionSectionCardProps } from "@gshl-types";
-import { getWeeklyEditionFallbackAuthor } from "@gshl-utils";
+import {
+  buildWeeklyEditionCtaHref,
+  getWeeklyEditionFallbackAuthor,
+} from "@gshl-utils";
 
 export function WeeklyEditionSectionCard({
   section,
   featured = false,
   teams = [],
 }: WeeklyEditionSectionCardProps) {
-  const { router } = useAppRouter();
   const author = section.author ?? getWeeklyEditionFallbackAuthor(section.kind);
   const storyText = `${section.headline} ${section.body}`.toLowerCase();
   const teamMarks = teams
@@ -46,7 +48,7 @@ export function WeeklyEditionSectionCard({
     >
       <div className="flex items-center justify-between gap-3">
         <p
-          className={`text-[8px] font-bold uppercase tracking-[0.18em] ${
+          className={`text-[11px] font-bold uppercase tracking-[0.12em] sm:text-xs ${
             featured ? "text-cyan-300" : "text-blue-700"
           }`}
         >
@@ -98,13 +100,17 @@ export function WeeklyEditionSectionCard({
       >
         {section.headline}
       </h2>
-      <p className="mt-1.5 text-[8px] font-medium uppercase tracking-[0.08em] text-slate-400">
+      <p
+        className={`mt-1.5 text-[11px] font-medium uppercase leading-5 tracking-[0.06em] sm:text-xs ${
+          featured ? "text-slate-300" : "text-slate-600"
+        }`}
+      >
         By <span className="font-bold">{author.name}</span>
         <span aria-hidden="true"> · </span>
         {author.position}
       </p>
       <p
-        className={`mt-2 whitespace-pre-line text-[12px] leading-[1.55] ${
+        className={`mt-2 whitespace-pre-line text-sm leading-6 ${
           featured ? "text-slate-200" : "text-slate-600"
         }`}
       >
@@ -113,11 +119,10 @@ export function WeeklyEditionSectionCard({
       {section.links.length > 0 ? (
         <div className="mt-auto flex flex-wrap gap-2 pt-4">
           {section.links.map((link) => (
-            <button
+            <Link
               key={`${section.id}-${link.href}`}
-              type="button"
-              onClick={() => router.push(link.href)}
-              className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[9px] font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
+              href={buildWeeklyEditionCtaHref(link.href)}
+              className={`inline-flex min-h-11 items-center gap-1 rounded-full px-3 py-2 text-xs font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 motion-reduce:transition-none ${
                 featured
                   ? "bg-white/10 text-white hover:bg-white/20"
                   : "border border-slate-200 bg-white text-slate-600 hover:border-slate-400 hover:text-slate-950"
@@ -125,7 +130,7 @@ export function WeeklyEditionSectionCard({
             >
               {link.label}
               <ArrowUpRight className="h-3 w-3" aria-hidden="true" />
-            </button>
+            </Link>
           ))}
         </div>
       ) : null}

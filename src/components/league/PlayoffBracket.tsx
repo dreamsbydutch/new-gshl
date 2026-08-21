@@ -30,7 +30,7 @@ function TeamSlot({
     >
       <span
         className={cn(
-          "w-9 shrink-0 truncate text-[10px] font-semibold uppercase tracking-wide text-slate-400",
+          "w-10 shrink-0 truncate text-[11px] font-semibold uppercase tracking-wide text-slate-500",
           winner && "text-emerald-700",
         )}
       >
@@ -52,14 +52,24 @@ function TeamSlot({
         </div>
         <span
           className={cn(
-            "min-w-0 truncate text-xs font-medium text-slate-700",
+            "min-w-0 break-words text-xs font-medium leading-4 text-slate-700 lg:truncate",
             winner && "font-bold text-slate-950",
           )}
         >
           {team?.name ?? "TBD"}
         </span>
       </div>
+      {winner ? (
+        <span
+          className="inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded bg-emerald-100 px-1 text-[11px] font-bold text-emerald-800"
+          title="Winner"
+        >
+          <span aria-hidden="true">W</span>
+          <span className="sr-only">Winner</span>
+        </span>
+      ) : null}
       <span
+        aria-label={score === null ? "Score unavailable" : `${score} points`}
         className={cn(
           "w-7 shrink-0 text-right font-mono text-sm font-bold tabular-nums text-slate-900",
           winner && "text-emerald-700",
@@ -72,9 +82,9 @@ function TeamSlot({
 }
 
 function getRoundRowSpan(matchupCount: number) {
-  if (matchupCount === 1) return "row-span-4 self-center";
-  if (matchupCount === 2) return "row-span-2 self-center";
-  return "row-span-1 self-center";
+  if (matchupCount === 1) return "lg:row-span-4 lg:self-center";
+  if (matchupCount === 2) return "lg:row-span-2 lg:self-center";
+  return "lg:row-span-1 lg:self-center";
 }
 
 function getConnectorLineClasses(
@@ -93,7 +103,7 @@ function getConnectorLineClasses(
   const sideClass = outputSide === "right" ? "-right-5" : "-left-5";
 
   return cn(
-    "pointer-events-none absolute w-px bg-slate-300",
+    "pointer-events-none absolute hidden w-px bg-slate-300 lg:block",
     positionClass,
     sideClass,
   );
@@ -117,21 +127,23 @@ function MatchupCard({
         ? "Scheduled"
         : "Projected";
   const winnerId = matchup.winnerTeam?.id ?? null;
+  const matchupLabel = `${matchup.title}: ${matchup.homeTeam?.name ?? "to be determined"} versus ${matchup.awayTeam?.name ?? "to be determined"}, ${statusLabel}`;
 
   return (
     <article
+      aria-label={matchupLabel}
       className={cn(
         "relative z-10 min-h-[92px] min-w-0 rounded-xl border border-slate-200 bg-white shadow-[0_8px_22px_-16px_rgba(15,23,42,0.55)]",
         rowSpanClass,
         connectsLeft &&
-          "before:absolute before:-left-5 before:top-1/2 before:h-px before:w-5 before:bg-slate-300 before:content-['']",
+          "lg:before:absolute lg:before:-left-5 lg:before:top-1/2 lg:before:h-px lg:before:w-5 lg:before:bg-slate-300 lg:before:content-['']",
         connectsRight &&
-          "after:absolute after:-right-5 after:top-1/2 after:h-px after:w-5 after:bg-slate-300 after:content-['']",
+          "lg:after:absolute lg:after:-right-5 lg:after:top-1/2 lg:after:h-px lg:after:w-5 lg:after:bg-slate-300 lg:after:content-['']",
       )}
     >
       <div className="overflow-hidden rounded-xl">
         <div className="flex items-center justify-between gap-2 border-b border-slate-200 bg-slate-50 px-2.5 py-1.5">
-          <h3 className="flex min-w-0 items-center gap-1.5 text-[9px] font-bold uppercase tracking-[0.14em] text-slate-500">
+          <h3 className="flex min-w-0 items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.12em] text-slate-600">
             {matchup.logoUrl ? (
               <Image
                 src={matchup.logoUrl}
@@ -141,16 +153,16 @@ function MatchupCard({
                 className="h-3.5 w-3.5 shrink-0 object-contain"
               />
             ) : null}
-            <span className="truncate">{matchup.title}</span>
+            <span className="break-words lg:truncate">{matchup.title}</span>
           </h3>
           <span
             className={cn(
-              "shrink-0 text-[9px] font-semibold uppercase tracking-wide",
+              "shrink-0 text-[11px] font-semibold uppercase tracking-wide",
               matchup.source === "played"
-                ? "text-emerald-600"
+                ? "text-emerald-700"
                 : matchup.source === "scheduled"
-                  ? "text-sky-600"
-                  : "text-slate-400",
+                  ? "text-sky-700"
+                  : "text-slate-500",
             )}
           >
             {statusLabel}
@@ -208,7 +220,7 @@ function BracketColumn({
   const rowSpanClass = getRoundRowSpan(matchupCount);
 
   return (
-    <section className="min-w-[280px]">
+    <section className="min-w-0 lg:min-w-[280px]">
       <header
         className={cn(
           "flex min-h-14 items-center gap-2 rounded-xl border px-3 py-2.5 shadow-sm",
@@ -231,7 +243,7 @@ function BracketColumn({
           <p className="truncate text-xs text-slate-600">{column.subtitle}</p>
         </div>
       </header>
-      <div className="relative mt-3 grid h-[28rem] grid-rows-4 gap-4">
+      <div className="relative mt-3 grid gap-3 lg:h-[28rem] lg:grid-rows-4 lg:gap-4">
         {Array.from({ length: Math.floor(matchupCount / 2) }).map(
           (_, pairIndex) => {
             const lineClass = getConnectorLineClasses(
@@ -275,18 +287,22 @@ export function PlayoffBracket({
   }
 
   return (
-    <section className="pb-12 pt-4">
+    <section className="pb-12 pt-4" aria-labelledby="playoff-picture-title">
       <div className="mx-auto max-w-[96rem] px-3 sm:px-6">
         <div className="flex flex-col gap-3 border-b border-slate-200 pb-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <p className="text-[13px] font-semibold uppercase text-slate-500">
+            <h2
+              id="playoff-picture-title"
+              className="font-oswald text-2xl text-slate-950 sm:text-3xl"
+            >
               {season.name} playoff picture
-            </p>
+            </h2>
+            <p className="mt-1 text-sm text-slate-500">{bracket.formatLabel}</p>
           </div>
         </div>
 
-        <div className="mt-5 overflow-x-auto overflow-y-hidden rounded-2xl border border-slate-200 bg-gradient-to-b from-slate-50 to-white p-2.5 shadow-sm sm:p-5">
-          <div className="grid min-w-[875px] auto-cols-[minmax(280px,1fr)] grid-flow-col gap-5">
+        <div className="mt-5 rounded-2xl border border-slate-200 bg-gradient-to-b from-slate-50 to-white p-2.5 shadow-sm sm:p-5">
+          <div className="grid gap-5 lg:min-w-[875px] lg:auto-cols-[minmax(280px,1fr)] lg:grid-flow-col">
             {bracket.columns.map((column, index) => (
               <BracketColumn
                 key={column.id}

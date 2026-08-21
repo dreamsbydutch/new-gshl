@@ -12,6 +12,8 @@
 # database
 
 db.sqlite
+/.local-data/
+/salaryHistory.json
 
 # next.js
 /.next/

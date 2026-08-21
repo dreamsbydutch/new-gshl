@@ -2,7 +2,10 @@
 
 import { useState } from "react";
 import type { GSHLTeam, UseScheduleDataEnhancedMatchup } from "@gshl-types";
-import { resolveMatchupCategories } from "@gshl-utils";
+import {
+  buildMatchupNavigationHref,
+  resolveMatchupCategories,
+} from "@gshl-utils";
 import { TeamScheduleHeader } from "../schedule/TeamScheduleHeader";
 import { TeamScheduleItem } from "../schedule/TeamScheduleItem";
 
@@ -23,7 +26,7 @@ export function HistoryMatchupList({
   );
 
   return (
-    <div className="mx-auto mb-40 mt-8 w-full max-w-5xl overflow-hidden rounded-md border border-slate-200">
+    <div className="mx-auto mb-8 mt-8 w-full max-w-5xl overflow-hidden rounded-md border border-slate-200">
       <TeamScheduleHeader />
       <div>
         {rows.map(({ matchup, showSeasonDivider }, index) => {
@@ -48,6 +51,15 @@ export function HistoryMatchupList({
                 week={matchup.week}
                 teams={teams}
                 selectedTeamId={historicalTeam.id}
+                matchupHref={buildMatchupNavigationHref(String(matchup.id), {
+                  from: "lockerroom",
+                  view: "history",
+                  owner: teamInfo.ownerId,
+                  side:
+                    String(matchup.homeTeamId) === String(historicalTeam.id)
+                      ? "home"
+                      : "away",
+                })}
                 categories={resolveMatchupCategories(
                   matchup.season?.categories,
                 )}

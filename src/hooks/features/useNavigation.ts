@@ -76,13 +76,13 @@ export function useLockerRoomNavigation() {
 
 /**
  * League office type navigation hook
- * @returns League office type state and setter with default fallback to "home"
+ * @returns League office type state and setter with default fallback to Draft Classes
  */
 export function useLeagueOfficeNavigation() {
   const { selectedValue, setSelectedValue } = useNavigationSelection({
     selector: (state) => state.selectedLeagueOfficeType,
     setter: (state) => state.setLeagueOfficeType,
-    fallback: "home",
+    fallback: "draft",
   });
 
   return {
@@ -96,7 +96,7 @@ export function useLeagueOfficeNavigation() {
  * Automatically selects current season â†’ next season â†’ most recent season
  * @returns Season data, ID, and setter with intelligent fallback logic
  */
-export function useSeasonNavigation() {
+export function useSeasonNavigation(options: { autoSelect?: boolean } = {}) {
   const {
     selectedSeason,
     currentSeason,
@@ -110,7 +110,7 @@ export function useSeasonNavigation() {
     isSelectedSeasonLoading,
     isSelectedSeasonFetching,
     refetchSelectedSeason,
-  } = useSeasonState();
+  } = useSeasonState({ autoSelect: options.autoSelect ?? true });
 
   return {
     selectedSeason: selectedSeason ?? currentSeason ?? defaultSeason,
@@ -132,10 +132,14 @@ export function useSeasonNavigation() {
  * Automatically selects current week â†’ next week â†’ previous week
  * @returns Week data, ID, and setter with intelligent fallback logic
  */
-export function useWeekNavigation() {
+export function useWeekNavigation(
+  options: { autoSelect?: boolean; seasonId?: string | null } = {},
+) {
   const selectedWeekId = useNavStore((state) => state.selectedWeekId);
   const setWeekId = useNavStore((state) => state.setWeekId);
-  const selectedSeasonId = useNavStore((state) => state.selectedSeasonId);
+  const storedSeasonId = useNavStore((state) => state.selectedSeasonId);
+  const selectedSeasonId =
+    options.seasonId !== undefined ? options.seasonId : storedSeasonId;
   const { data: weeks = [], isLoading } = useWeeks({
     seasonId: selectedSeasonId,
     orderBy: { startDate: "asc" },
@@ -151,6 +155,7 @@ export function useWeekNavigation() {
     .find((week) => week.endDate < today);
 
   useEffect(() => {
+    if (options.autoSelect === false) return;
     if (!selectedSeasonId) return;
 
     if (isLoading) return;
@@ -180,6 +185,7 @@ export function useWeekNavigation() {
     weeks,
     isLoading,
     setWeekId,
+    options.autoSelect,
   ]);
 
   return {

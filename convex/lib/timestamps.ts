@@ -50,6 +50,7 @@ export const UTC_TIMESTAMP_TABLE_FIELDS = {
   ],
   nhlTeams: ["createdAt", "updatedAt"],
   playerDayStatLines: ["createdAt", "updatedAt"],
+  playerDayHighlights: ["createdAt", "updatedAt"],
   playerWeekStatLines: ["createdAt", "updatedAt"],
   playerSplitStatLines: ["createdAt", "updatedAt"],
   playerTotalStatLines: ["createdAt", "updatedAt"],
@@ -59,6 +60,14 @@ export const UTC_TIMESTAMP_TABLE_FIELDS = {
   teamDayStatLines: ["createdAt", "updatedAt"],
   teamWeekStatLines: ["createdAt", "updatedAt"],
   teamSeasonStatLines: ["createdAt", "updatedAt"],
+  seasonDataArchives: [
+    "exportedAt",
+    "verifiedAt",
+    "deletedAt",
+    "restoredAt",
+    "createdAt",
+    "updatedAt",
+  ],
   weeklyEditions: [
     "startDate",
     "endDate",

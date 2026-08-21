@@ -109,7 +109,7 @@ export function UserManagement() {
   return (
     <section className="mx-auto max-w-6xl overflow-x-auto py-6">
       <div className="mb-4">
-        <h1 className="text-2xl font-bold">User Access</h1>
+        <h2 className="text-2xl font-bold">User Access</h2>
         <p className="text-sm text-muted-foreground">
           New Google accounts begin as viewers. Owners require one linked league
           owner record; commissioners can optionally link their owner record

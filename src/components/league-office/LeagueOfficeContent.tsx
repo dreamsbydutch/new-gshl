@@ -11,6 +11,7 @@ import {
   RulebookSkeleton,
   UserManagementSkeleton,
 } from "@gshl-skeletons";
+import { resolveLeagueOfficeView } from "@gshl-utils";
 
 const ConferenceContest = dynamic(
   () =>
@@ -69,28 +70,28 @@ const Newsroom = dynamic(
 export function LeagueOfficeContent() {
   const { selectedType } = useLeagueOfficeNavigation();
   const { session } = useAuthSession();
+  const activeType = resolveLeagueOfficeView(selectedType, session?.user.role);
 
   return (
     <div className="container mx-auto px-4 py-8">
-      {selectedType === "rules" ? <Rulebook /> : null}
-      {selectedType === "draft" ? <DraftClasses /> : null}
-      {selectedType === "confBattle" ? <ConferenceContest /> : null}
-      {selectedType === "ownerRankings" ? <OwnerRankings /> : null}
-      {selectedType === "freeAgents" ? <UfaLeagueOffice /> : null}
-      {selectedType === "users" && session?.user.role === "commissioner" ? (
+      {activeType === "rules" ? <Rulebook /> : null}
+      {activeType === "draft" ? <DraftClasses /> : null}
+      {activeType === "confBattle" ? <ConferenceContest /> : null}
+      {activeType === "ownerRankings" ? <OwnerRankings /> : null}
+      {activeType === "freeAgents" ? <UfaLeagueOffice /> : null}
+      {activeType === "users" && session?.user.role === "commissioner" ? (
         <UserManagement />
       ) : null}
-      {selectedType === "jobs" && session?.user.role === "commissioner" ? (
+      {activeType === "jobs" && session?.user.role === "commissioner" ? (
         <JobManagement />
       ) : null}
-      {selectedType === "contracts" && session?.user.role === "commissioner" ? (
+      {activeType === "contracts" && session?.user.role === "commissioner" ? (
         <ContractManagement />
       ) : null}
-      {selectedType === "imageUpload" &&
-      session?.user.role === "commissioner" ? (
+      {activeType === "imageUpload" && session?.user.role === "commissioner" ? (
         <ImageUpload />
       ) : null}
-      {selectedType === "newsroom" && session?.user.role === "commissioner" ? (
+      {activeType === "newsroom" && session?.user.role === "commissioner" ? (
         <Newsroom />
       ) : null}
     </div>

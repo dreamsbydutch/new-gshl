@@ -11,6 +11,7 @@ import {
 import { getUfaOfferGroupDeadline } from "../src/lib/utils/features/ufa-deadline";
 import { requireOwnerOrCommissioner } from "./lib/auth";
 import { utcTimestampToDateKey } from "./lib/timestamps";
+import { loadUfaOddsData, type UfaOddsData } from "./ufaOdds";
 
 const CAP = 25_000_000;
 const resolutionOddsValidator = v.array(
@@ -151,81 +152,31 @@ function softmaxOdds(scores: Array<{ offerId: string; score: number }>) {
   }));
 }
 
-async function latestNhlStatsForSigningSeason(
-  db: any,
-  seasons: any[],
-  signingIndex: number,
+export async function calculateOddsForGroup(
+  group: any,
+  offers: any[],
+  oddsData: UfaOddsData,
 ) {
-  for (let index = signingIndex; index >= 0; index -= 1) {
-    const season = seasons[index];
-    if (!season) continue;
-    const stats = await db
-      .query("playerNhlStatLines")
-      .withIndex("by_seasonId", (q: any) => q.eq("seasonId", season._id))
-      .collect();
-    if (stats.length) return stats;
-  }
-  return [];
-}
-
-async function draftPicksForSigningWindow(
-  db: any,
-  seasons: any[],
-  signingIndex: number,
-) {
-  const futureSeasons = seasons.slice(signingIndex + 1, signingIndex + 4);
-  const picksBySeason = await Promise.all(
-    futureSeasons.map((season) =>
-      db
-        .query("draftPicks")
-        .withIndex("by_seasonId", (q: any) => q.eq("seasonId", season._id))
-        .collect(),
-    ),
+  const pending = offers.filter(
+    (offer: any) => offer.groupId === group._id && offer.status === "pending",
   );
-  return picksBySeason.flat();
-}
-
-async function calculateOdds(ctx: any, groupId: any) {
-  const db: any = ctx.db;
-  const offers = await db
-    .query("ufaOffers")
-    .withIndex("by_group", (q: any) => q.eq("groupId", groupId))
-    .collect();
-  const pending = offers.filter((offer: any) => offer.status === "pending");
   if (!pending.length) return { odds: [], factors: new Map<string, unknown>() };
 
-  const [group, seasons] = await Promise.all([
-    db.get(groupId),
-    db.query("seasons").collect(),
-  ]);
-  if (!group) return { odds: [], factors: new Map<string, unknown>() };
-  const orderedSeasons = [...seasons].sort((a, b) => num(a.year) - num(b.year));
+  const {
+    contracts,
+    franchises,
+    matchups,
+    orderedSeasons,
+    playerById,
+    players,
+    teamAwards,
+    teams,
+  } = oddsData;
   const signingIndex = orderedSeasons.findIndex(
     (season) => season._id === group.seasonId,
   );
-
-  const [
-    players,
-    contracts,
-    teams,
-    franchises,
-    picks,
-    matchups,
-    nhlStats,
-    teamAwards,
-  ] = await Promise.all([
-    db.query("players").collect(),
-    db.query("contracts").collect(),
-    db.query("teams").collect(),
-    db.query("franchises").collect(),
-    draftPicksForSigningWindow(db, orderedSeasons, signingIndex),
-    db.query("matchups").collect(),
-    latestNhlStatsForSigningSeason(db, orderedSeasons, signingIndex),
-    db.query("teamAwards").collect(),
-  ]);
-  const player = players.find(
-    (candidate: any) => candidate._id === group.playerId,
-  );
+  const { nhlStats, picks } = await oddsData.loadSigningWindow(group.seasonId);
+  const player = playerById.get(String(group.playerId));
   const position = String(player?.posGroup ?? "F");
   const relevantStats = nhlStats.filter((row: any) => {
     const index = orderedSeasons.findIndex(
@@ -260,6 +211,12 @@ async function calculateOdds(ctx: any, groupId: any) {
       ),
     );
   const playerPercentile = percentile(playerRating, peerRatings);
+  const ratingPopulation = players.map((candidate: any) =>
+    num(
+      statByPlayer.get(String(candidate._id))?.overallRating,
+      num(candidate.overallRating, 0),
+    ),
+  );
 
   const franchiseById = new Map<string, any>(
     franchises.map((franchise: any) => [String(franchise._id), franchise]),
@@ -416,9 +373,7 @@ async function calculateOdds(ctx: any, groupId: any) {
         ),
     );
     const contractedPlayers = ownerContracts
-      .map((contract: any) =>
-        players.find((candidate: any) => candidate._id === contract.playerId),
-      )
+      .map((contract: any) => playerById.get(String(contract.playerId)))
       .filter(Boolean);
     const qualityValues = contractedPlayers
       .map((candidate: any) =>
@@ -427,12 +382,7 @@ async function calculateOdds(ctx: any, groupId: any) {
             statByPlayer.get(String(candidate._id))?.overallRating,
             num(candidate.overallRating, 0),
           ),
-          players.map((item: any) =>
-            num(
-              statByPlayer.get(String(item._id))?.overallRating,
-              num(item.overallRating, 0),
-            ),
-          ),
+          ratingPopulation,
         ),
       )
       .sort((a: number, b: number) => b - a)
@@ -476,6 +426,47 @@ async function calculateOdds(ctx: any, groupId: any) {
   return { odds: softmaxOdds(scores), factors };
 }
 
+async function calculateOdds(ctx: any, groupId: any) {
+  const db: any = ctx.db;
+  const [group, offers] = await Promise.all([
+    db.get(groupId),
+    db
+      .query("ufaOffers")
+      .withIndex("by_group", (q: any) => q.eq("groupId", groupId))
+      .collect(),
+  ]);
+  if (!group || !offers.some((offer: any) => offer.status === "pending")) {
+    return { odds: [], factors: new Map<string, unknown>() };
+  }
+  const oddsData = await loadUfaOddsData(db, [group], offers);
+  return calculateOddsForGroup(group, offers, oddsData);
+}
+
+async function calculateOddsEntries(ctx: any, groups: any[], offers: any[]) {
+  const openGroups = groups.filter((group: any) => group.status === "open");
+  if (!openGroups.length) return [];
+  const oddsData = await loadUfaOddsData(ctx.db, openGroups, offers);
+  const offersByGroup = new Map<string, any[]>();
+  for (const offer of offers) {
+    const groupId = String(offer.groupId);
+    const current = offersByGroup.get(groupId) ?? [];
+    current.push(offer);
+    offersByGroup.set(groupId, current);
+  }
+  return Promise.all(
+    openGroups.map(async (group: any) => [
+      String(group._id),
+      (
+        await calculateOddsForGroup(
+          group,
+          offersByGroup.get(String(group._id)) ?? [],
+          oddsData,
+        )
+      ).odds,
+    ]),
+  );
+}
+
 export const listState = query({
   args: { serverSecret: v.string() },
   handler: async (ctx, args) => {
@@ -483,17 +474,7 @@ export const listState = query({
     const db: any = ctx.db;
     const groups = await db.query("ufaOfferGroups").collect();
     const offers = await db.query("ufaOffers").collect();
-    const oddsEntries = await Promise.all(
-      groups
-        .filter((group: any) => group.status === "open")
-        .map(
-          async (group: any) =>
-            [
-              String(group._id),
-              (await calculateOdds(ctx, group._id)).odds,
-            ] as const,
-        ),
-    );
+    const oddsEntries = await calculateOddsEntries(ctx, groups, offers);
     return {
       groups: groups.map((group: any) => ({ ...group, id: group._id })),
       offers: offers.map((offer: any) => ({ ...offer, id: offer._id })),
@@ -508,16 +489,35 @@ export const publicState = query({
     const db: any = ctx.db;
     const identity = await ctx.auth.getUserIdentity();
     const currentUser = identity ? await db.get(identity.subject) : null;
-    const groups = await db.query("ufaOfferGroups").collect();
-    const offers = await db.query("ufaOffers").collect();
-    const oddsEntries = await Promise.all(
-      groups
-        .filter((group: any) => group.status === "open")
-        .map(async (group: any) => [
-          String(group._id),
-          (await calculateOdds(ctx, group._id)).odds,
-        ]),
+    const groupPages = await Promise.all(
+      ["open", "failed", "resolving"].map((status) =>
+        db
+          .query("ufaOfferGroups")
+          .withIndex("by_status_deadline", (q: any) => q.eq("status", status))
+          .collect(),
+      ),
     );
+    const groups = groupPages
+      .flat()
+      .sort(
+        (left: any, right: any) =>
+          num(left._creationTime) - num(right._creationTime),
+      );
+    const offerPages = await Promise.all(
+      groups.map((group: any) =>
+        db
+          .query("ufaOffers")
+          .withIndex("by_group", (q: any) => q.eq("groupId", group._id))
+          .collect(),
+      ),
+    );
+    const offers = offerPages
+      .flat()
+      .sort(
+        (left: any, right: any) =>
+          num(left._creationTime) - num(right._creationTime),
+      );
+    const oddsEntries = await calculateOddsEntries(ctx, groups, offers);
     return {
       groups: groups.map((group: any) => ({ ...group, id: group._id })),
       offers: offers.map((offer: any) => ({

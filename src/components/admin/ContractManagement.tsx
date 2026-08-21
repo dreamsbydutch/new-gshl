@@ -190,7 +190,7 @@ export function ContractManagement() {
   return (
     <section className="mx-auto max-w-3xl space-y-6 py-6">
       <div>
-        <h1 className="text-2xl font-bold">Create Contract</h1>
+        <h2 className="text-2xl font-bold">Create Contract</h2>
         <p className="text-sm text-muted-foreground">
           Contracts signed in {signingSeason?.name ?? "the active season"} begin
           next season. Salary, dates, type, and expiry status are calculated

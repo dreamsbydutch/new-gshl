@@ -40,6 +40,8 @@ export default {
         "2xs": ["0.625rem", "1rem"],
       },
       fontFamily: {
+        sans: ["var(--font-geist-sans)"],
+        mono: ["var(--font-geist-mono)"],
         varela: ["var(--font-varela)"],
         yellowtail: ["var(--font-yellowtail)"],
         barlow: ["var(--font-barlow)"],

@@ -106,6 +106,12 @@ const TABLE_INDEX_FIELDS: Record<string, Set<string>> = {
   teams: new Set(["legacyId", "seasonId", "franchiseId", "confId"]),
   owners: new Set(defaultIndexes),
   players: new Set(["legacyId", "ownerId", "isActive"]),
+  playerNhlSalaries: new Set([
+    "legacyId",
+    "playerId",
+    "nhlApiId",
+    "seasonStartYear",
+  ]),
   contracts: new Set(["legacyId", "playerId", "ownerId", "seasonId"]),
   weeks: new Set(["legacyId", "seasonId"]),
   matchups: new Set([

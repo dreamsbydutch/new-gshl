@@ -115,6 +115,28 @@ const NON_NUMERIC_PLAYER_STAT_KEYS = new Set([
   "score",
 ]);
 
+const SKATER_CARD_STAT_KEYS = new Set<PlayerStatCategoryKey>([
+  "G",
+  "A",
+  "P",
+  "PM",
+  "PIM",
+  "PPP",
+  "SOG",
+  "HIT",
+  "BLK",
+]);
+
+const GOALIE_CARD_STAT_KEYS = new Set<PlayerStatCategoryKey>([
+  "W",
+  "GA",
+  "GAA",
+  "SV",
+  "SA",
+  "SVP",
+  "SO",
+]);
+
 type SeasonCategoryList = readonly string[] | undefined;
 type NumericStatValue = string | number | null | undefined;
 type PlayerStatCellValue = PlayerStatRow[
@@ -230,6 +252,31 @@ export function buildPlayerStatColumns({
 export const PLAYER_STAT_COLUMNS = buildPlayerStatColumns({
   players: [],
 });
+
+/**
+ * Selects the season-scoring columns that deserve immediate space on a compact
+ * matchup player card. The comprehensive disclosure still owns every column.
+ */
+export function getPlayerStatCardColumns(
+  player: PlayerStatRow,
+  columns: readonly PlayerStatColumn[],
+  limit = 4,
+): PlayerStatColumn[] {
+  if (limit <= 0) return [];
+
+  const eligibleKeys =
+    String(player.posGroup) === "G"
+      ? GOALIE_CARD_STAT_KEYS
+      : SKATER_CARD_STAT_KEYS;
+
+  return columns
+    .filter(
+      (column) =>
+        eligibleKeys.has(column.key as PlayerStatCategoryKey) &&
+        column.key in MATCHUP_CATEGORY_MAP,
+    )
+    .slice(0, limit);
+}
 
 /**
  * Converts input into stat number.

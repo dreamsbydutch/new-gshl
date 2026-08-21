@@ -356,11 +356,11 @@ export function Rulebook() {
   };
 
   return (
-    <main className="rulebook-page mx-auto w-full max-w-4xl font-varela">
+    <article className="rulebook-page mx-auto w-full max-w-4xl font-varela">
       <header className="mb-6 text-center">
         <div className="flex items-start justify-center gap-2">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">GSHL Rulebook</h1>
+            <h2 className="text-2xl font-bold tracking-tight">GSHL Rulebook</h2>
             <p className="mt-1 text-sm text-muted-foreground">
               League rules and reference information
             </p>
@@ -472,6 +472,6 @@ export function Rulebook() {
           </div>
         ) : null}
       </div>
-    </main>
+    </article>
   );
 }

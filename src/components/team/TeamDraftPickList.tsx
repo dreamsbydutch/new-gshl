@@ -199,6 +199,7 @@ export function TeamDraftPickList({
                 onSelect={(s: Season) => setLocalSeasonId(s.id)}
                 getItemKey={(s: Season) => String(s.id)}
                 getItemLabel={(s: Season) => s.name}
+                ariaLabel="Draft season"
                 className="min-w-28 bg-white text-base"
                 dropdownPosition="auto"
               />

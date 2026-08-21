@@ -1,4 +1,5 @@
 import { Skeleton } from "../ui/SkeletonPrimitive";
+import { TableViewport } from "../ui/TableViewport";
 import { TeamContractTableSkeleton } from "./TeamContractTableSkeleton";
 import { TeamRosterSkeleton } from "./TeamRosterSkeleton";
 
@@ -37,9 +38,46 @@ export function CapLabSkeleton() {
 
 export function ContractHistorySkeleton() {
   return (
-    <section className="py-6">
+    <section
+      id="contract-history"
+      aria-label="Loading franchise contract history"
+      className="scroll-mt-44 py-6"
+    >
       <Skeleton className="mx-auto mb-2 h-5 w-52" />
-      <div className="no-scrollbar overflow-x-auto">
+
+      <div className="space-y-3 px-3 lg:hidden">
+        {Array.from({ length: 4 }).map((_, index) => (
+          <div
+            key={index}
+            className="overflow-hidden rounded-xl border border-slate-200 bg-white"
+          >
+            <div className="flex items-start justify-between gap-3 border-b border-slate-100 px-3 py-3">
+              <div className="space-y-1.5">
+                <Skeleton className="h-4 w-36" />
+                <Skeleton className="h-3 w-16" />
+              </div>
+              <Skeleton className="h-7 w-16 rounded-full" />
+            </div>
+            <div className="grid grid-cols-2 gap-3 px-3 py-3">
+              {Array.from({ length: 3 }).map((_, metricIndex) => (
+                <div key={metricIndex} className="space-y-1">
+                  <Skeleton className="h-3 w-16" />
+                  <Skeleton className="h-4 w-20" />
+                </div>
+              ))}
+            </div>
+            <div className="flex min-h-11 items-center border-t border-slate-100 px-3">
+              <Skeleton className="h-4 w-28" />
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <TableViewport
+        ariaLabel="Loading franchise contract history"
+        className="hidden lg:block"
+        scrollHint="Scroll for complete contract details"
+      >
         <div className="mx-auto min-w-[64rem]">
           <div className="grid grid-cols-11 gap-2 bg-gray-800 px-2 py-1">
             {Array.from({ length: 11 }).map((_, index) => (
@@ -57,7 +95,7 @@ export function ContractHistorySkeleton() {
             </div>
           ))}
         </div>
-      </div>
+      </TableViewport>
     </section>
   );
 }
@@ -81,7 +119,7 @@ export function TeamHistorySkeleton() {
           </div>
         ))}
       </div>
-      <div className="mx-auto mb-40 mt-8 w-full overflow-hidden rounded-md border border-slate-200">
+      <div className="mx-auto mb-8 mt-8 w-full overflow-hidden rounded-md border border-slate-200">
         <div className="grid grid-cols-9 px-2 py-2">
           <Skeleton className="h-3 w-8 justify-self-center" />
           <Skeleton className="col-span-6 h-3 w-20 justify-self-center" />
@@ -162,12 +200,47 @@ export function TeamRecordBookSkeleton() {
           <div className="space-y-3 border-b border-slate-200 p-3 sm:p-4">
             <div className="flex flex-wrap gap-2">
               {Array.from({ length: 5 }).map((_, index) => (
-                <Skeleton key={index} className="h-8 w-20 rounded-md" />
+                <Skeleton key={index} className="h-11 w-20 rounded-md" />
               ))}
-              <Skeleton className="ml-auto h-8 w-44 rounded-md" />
+              <Skeleton className="ml-auto h-11 w-44 rounded-md" />
             </div>
           </div>
-          <div className="overflow-x-auto">
+          <div className="space-y-3 bg-slate-50/70 p-3 lg:hidden">
+            <div className="grid grid-cols-[minmax(0,1fr)_7rem] gap-2">
+              <Skeleton className="h-11 w-full rounded-md" />
+              <Skeleton className="h-11 w-full rounded-md" />
+            </div>
+            {Array.from({ length: 5 }).map((_, rowIndex) => (
+              <div
+                key={rowIndex}
+                className="overflow-hidden rounded-xl border border-slate-200 bg-white"
+              >
+                <div className="flex items-center gap-3 px-3 py-3">
+                  <Skeleton className="h-8 w-8 rounded-lg" />
+                  <div className="space-y-1.5">
+                    <Skeleton className="h-4 w-36" />
+                    <Skeleton className="h-3 w-24" />
+                  </div>
+                </div>
+                <div className="grid grid-cols-4 gap-2 border-y border-slate-100 bg-slate-50 px-2 py-2.5">
+                  {Array.from({ length: 4 }).map((_, cellIndex) => (
+                    <Skeleton
+                      key={cellIndex}
+                      className="h-7 w-8 justify-self-center"
+                    />
+                  ))}
+                </div>
+                <div className="flex min-h-11 items-center px-3">
+                  <Skeleton className="h-3 w-32" />
+                </div>
+              </div>
+            ))}
+          </div>
+          <TableViewport
+            ariaLabel="Loading complete player record-book statistics"
+            className="hidden lg:block"
+            viewportClassName="rounded-none border-0"
+          >
             <div className="min-w-[105rem]">
               <div className="grid grid-cols-[15rem_4rem_repeat(14,5rem)] gap-2 bg-slate-50 px-3 py-3">
                 {Array.from({ length: 16 }).map((_, index) => (
@@ -188,7 +261,7 @@ export function TeamRecordBookSkeleton() {
                 </div>
               ))}
             </div>
-          </div>
+          </TableViewport>
         </div>
       </div>
     </section>
@@ -212,5 +285,16 @@ export function LockerRoomSkeleton() {
       <LockerRoomHeaderSkeleton />
       <TeamRosterSkeleton />
     </>
+  );
+}
+
+export function LockerRoomRouteSkeleton() {
+  return (
+    <main aria-labelledby="locker-room-loading-heading">
+      <h1 id="locker-room-loading-heading" className="sr-only">
+        Locker Room
+      </h1>
+      <LockerRoomSkeleton />
+    </main>
   );
 }

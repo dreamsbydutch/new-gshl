@@ -15,6 +15,7 @@ import type {
   PlayerCareerSplitStatLine,
   PlayerSplitStatLine,
   RecordBookAwardRow,
+  RecordBookGroup,
   RecordBookPlayerRow,
   RecordBookStatKey,
   RecordBookSortState,
@@ -122,6 +123,29 @@ export const RECORD_BOOK_GOALIE_COLUMNS: RecordBookStatColumn[] = [
   { key: "SO", label: "SO", title: "Shutouts" },
   { key: "TOI", label: "TOI", title: "Time on ice", precision: 1 },
 ];
+
+const RECORD_BOOK_PRIORITY_COLUMN_KEYS: Record<
+  RecordBookGroup,
+  RecordBookStatKey[]
+> = {
+  skater: ["GP", "G", "A", "P"],
+  goalie: ["GP", "W", "GAA", "SVP"],
+};
+
+/**
+ * Keeps the most decision-useful record-book stats visible on narrow screens.
+ * The complete column set remains available in each card's disclosure.
+ */
+export function getRecordBookPriorityColumns(
+  group: RecordBookGroup,
+  columns: RecordBookStatColumn[],
+): RecordBookStatColumn[] {
+  const columnsByKey = new Map(columns.map((column) => [column.key, column]));
+  return RECORD_BOOK_PRIORITY_COLUMN_KEYS[group].flatMap((key) => {
+    const column = columnsByKey.get(key);
+    return column ? [column] : [];
+  });
+}
 
 function isRecordBookSeasonType(value: string): value is SeasonTypeValue {
   return RECORD_BOOK_SEASON_TYPES.has(value as SeasonTypeValue);

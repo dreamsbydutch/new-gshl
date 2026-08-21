@@ -3,6 +3,11 @@
 Standalone Node/TypeScript tooling for historical backfills, repair jobs,
 Yahoo validation, ratings rebuilds, and Convex database maintenance.
 
+Use the [wiki command index](../docs/reference/commands.md) for package-wide
+command scope and the [data-pipeline guide](../docs/operations/data-pipelines.md)
+for architecture and safety. This file remains the detailed flag and example
+manual.
+
 ## Convex operational jobs
 
 Commissioners now start and monitor managed runs from **League Office → Jobs**.
@@ -45,6 +50,22 @@ Most commands also support:
 
 - `--help` to print built-in usage
 - `--log false` to reduce console noise
+
+On Windows PowerShell, invoke argument-bearing commands with `npm.cmd`, for
+example `npm.cmd run ratings:parity -- --help`. In this workspace the
+`npm.ps1` shim can consume forwarded names such as `--help` or `--season-id`.
+Verify the parsed help/arguments before any `--apply` run. The repository
+declares npm 10.1.0; check the resolved npm version instead of assuming the
+package-manager declaration is active.
+
+The `bash` blocks below are POSIX-shell examples. In Windows PowerShell,
+replace the leading `npm` with `npm.cmd` for every command that forwards
+arguments after `--`; do not paste an argument-bearing `npm run` line unchanged.
+
+Several package entries also pass Node's `--use-system-ca` flag. Node 20 cannot
+launch those commands. Verify that the `node` runtime resolved by the package
+lists that flag in `node --help` before running dry-run, apply, archive, or
+parity commands that use it.
 
 ## Prerequisites
 
@@ -126,6 +147,13 @@ current PuckPedia row has no value, and players absent from both directories
 have their old NHL team, jersey number, and contract fields cleared. Writes
 remain field-diffed, so unchanged values are not patched.
 
+Each applied run also upserts the focus season's total salary and cap hit into
+`playerNhlSalaries`. Rows store the NHL salary cap for their season and the
+salary normalized to a $100 million cap. Use `--salary-seasons 2027,2028` to
+load future PuckPedia focus seasons in the same run. If PuckPedia's season
+tokens are not sequential, use `YEAR=TOKEN`. Unknown future caps are stored as
+null and can be supplied with repeated `--salary-cap YEAR=VALUE` flags.
+
 Positional eligibility is resolved separately from PuckPedia's single primary
 position. The sync checks Yahoo's C, LW, RW, D, and G player-table filters and
 unions the filters containing each player, matching by Yahoo ID and then by a
@@ -160,7 +188,10 @@ Notable flags:
 - `--apply`
 - `--headless`
 - `--focus-season <value>`
+- `--focus-season-year <yyyy>`
 - `--stat-season <value>`
+- `--salary-seasons <yyyy,yyyy,...>`
+- `--salary-cap <yyyy=value>`
 - `--page-size <value>`
 - `--max-pages <value>`
 - `--current-date <value>`
@@ -178,6 +209,19 @@ Example:
 
 ```bash
 npm run player-bios:sync -- --apply
+```
+
+#### `nhl-salaries:import`
+
+Validates and imports `salaryHistory.json` into `playerNhlSalaries`. It accepts
+flat salary rows and player-centric year maps, resolves players by Convex ID,
+legacy ID, NHL API ID, or a unique normalized name, and refuses all writes when
+an identity is missing or ambiguous. The command is a dry run unless `--apply`
+is passed.
+
+```bash
+npm run nhl-salaries:import
+npm run nhl-salaries:import -- --apply
 ```
 
 #### `player-bios:backfill-nhl-ids`
@@ -584,6 +628,75 @@ npm run yahoo:check-weekly-player-days -- --season-id 12 --matchup-ids 1871 --ap
 Legacy alias for `yahoo:check-weekly-player-days`.
 
 ### Maintenance
+
+#### Completed-season player-day archives
+
+Completed seasons can be staged in the gitignored, OneDrive-synced SQLite
+archive at `.local-data/gshl-history.sqlite`. Commands always require an
+explicit Convex target and are dry-run only unless `--apply` is supplied.
+
+```bash
+npm run stats:archive-player-days -- --target production --season-id <convex-season-id>
+npm run stats:archive-player-days -- --target production --season-id <convex-season-id> --apply
+npm run stats:verify-player-day-archive -- --target production --season-id <convex-season-id>
+```
+
+Deleting the verified Convex source is a distinct, confirmed operation. It
+first creates a complete Convex snapshot under `.local-data/convex-snapshots`.
+
+```bash
+npm run stats:archive-player-days -- --target production --season-id <convex-season-id> --apply --delete-source --confirm-season-id <convex-season-id>
+```
+
+Restore is also a dry-run by default:
+
+```bash
+npm run stats:restore-player-days -- --target development --season-id <convex-season-id>
+npm run stats:restore-player-days -- --target development --season-id <convex-season-id> --apply --confirm-season-id <convex-season-id>
+```
+
+Set `GSHL_ARCHIVE_DB_PATH` to override the default SQLite path. Never use
+`--replace-existing-archive` or `--replace-conflicts` without first reviewing
+the corresponding dry-run output.
+
+The `.local-data/` directory is gitignored. OneDrive synchronization is useful
+transport, but it is not a retention policy or independently verified backup.
+
+#### `convex:migrate`
+
+Destructively replaces every mapped table in the selected Convex deployment
+with data read from Google Sheets. This command is the major exception to the
+package's normal safety model: it has no dry-run and no `--apply` gate. It
+clears target tables before importing them in dependency order and writes
+`reports/convex-migration-latest.json`.
+
+Do not run it without explicit authorization, exact target confirmation, and a
+verified backup.
+
+```bash
+npm run convex:migrate
+```
+
+#### `worker:browser`
+
+Runs the outbound browser worker used by managed Yahoo, PuckPedia, and Hockey
+Reference source tasks. It leases allowlisted tasks, heartbeats ownership, and
+returns bounded page captures; it never writes league tables itself.
+
+```bash
+npm run worker:browser
+```
+
+#### Focused tests
+
+```bash
+npm run test:power
+npm run test:player-bios
+npm run test:archive
+```
+
+These do not represent every test file in the package. Use
+`npx tsx --test <target.test.ts>` for other focused suites.
 
 #### `typecheck`
 

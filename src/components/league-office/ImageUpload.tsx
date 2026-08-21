@@ -97,7 +97,7 @@ export function ImageUpload() {
   return (
     <section className="mx-auto max-w-2xl">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-slate-900">Image Upload</h1>
+        <h2 className="text-2xl font-bold text-slate-900">Image Upload</h2>
         <p className="mt-1 text-sm text-slate-600">
           Upload one image to UploadThing and copy its permanent URL.
         </p>

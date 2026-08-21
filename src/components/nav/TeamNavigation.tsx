@@ -18,11 +18,20 @@ import Image from "next/image";
  * @param props - Component props
  * @returns Team selection interface with horizontal toggle
  */
-export function TeamsToggle({ className, seasonId }: TeamsToggleProps) {
+export function TeamsToggle({
+  className,
+  seasonId,
+  selectedOwnerId: selectedOwnerIdOverride,
+  onSelectOwner,
+}: TeamsToggleProps) {
   const { selectedSeasonId: storeSeasonId } = useNav();
-  const selectedSeasonId = seasonId ?? storeSeasonId;
-  const { selectedOwnerId, setSelectedOwnerId: setOwnerId } =
+  const selectedSeasonId = seasonId !== undefined ? seasonId : storeSeasonId;
+  const { selectedOwnerId: storedOwnerId, setSelectedOwnerId: setOwnerId } =
     useTeamNavigation();
+  const selectedOwnerId =
+    selectedOwnerIdOverride !== undefined
+      ? selectedOwnerIdOverride
+      : storedOwnerId;
 
   const {
     data: teamsRaw = [],
@@ -35,6 +44,10 @@ export function TeamsToggle({ className, seasonId }: TeamsToggleProps) {
 
   const handleTeamSelect = (team: GSHLTeam) => {
     if (team.ownerId) {
+      if (onSelectOwner) {
+        onSelectOwner(team.ownerId);
+        return;
+      }
       setOwnerId(team.ownerId);
     }
   };
@@ -64,7 +77,7 @@ export function TeamsToggle({ className, seasonId }: TeamsToggleProps) {
 
   return (
     <HorizontalToggle<GSHLTeam>
-      items={teams
+      items={[...teams]
         .sort((a, b) => (a.name ?? "").localeCompare(b.name ?? ""))
         .sort((a, b) => (b.confName ?? "").localeCompare(a.confName ?? ""))}
       selectedItem={selectedTeam}

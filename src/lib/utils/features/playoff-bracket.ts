@@ -123,14 +123,20 @@ function getPlayoffMatchups(matchups: Matchup[], season: Season | null) {
   );
 }
 
+function safeScore(value: unknown): number | null {
+  if (value === null || value === undefined || value === "") return null;
+  const score = Number(value);
+  return Number.isFinite(score) ? score : null;
+}
+
 function isMatchupComplete(matchup: Matchup): boolean {
-  const homeScore = Number(matchup.homeScore);
-  const awayScore = Number(matchup.awayScore);
+  const homeScore = safeScore(matchup.homeScore);
+  const awayScore = safeScore(matchup.awayScore);
   return (
     matchup.isComplete ||
     matchup.homeWin === true ||
     matchup.awayWin === true ||
-    (Number.isFinite(homeScore) && Number.isFinite(awayScore))
+    (homeScore !== null && awayScore !== null)
   );
 }
 
@@ -147,9 +153,9 @@ function getMatchupWinner(
   if (matchup.awayWin === true) return awayTeam;
   if (matchup.tie === true) return homeTeam;
 
-  const homeScore = Number(matchup.homeScore);
-  const awayScore = Number(matchup.awayScore);
-  if (!Number.isFinite(homeScore) || !Number.isFinite(awayScore)) return null;
+  const homeScore = safeScore(matchup.homeScore);
+  const awayScore = safeScore(matchup.awayScore);
+  if (homeScore === null || awayScore === null) return null;
   return homeScore >= awayScore ? homeTeam : awayTeam;
 }
 
@@ -222,8 +228,8 @@ function actualMatchupToBracket(
 ): BracketMatchup {
   const homeTeam = teamsById.get(String(matchup.homeTeamId)) ?? null;
   const awayTeam = teamsById.get(String(matchup.awayTeamId)) ?? null;
-  const homeScore = Number(matchup.homeScore);
-  const awayScore = Number(matchup.awayScore);
+  const homeScore = safeScore(matchup.homeScore);
+  const awayScore = safeScore(matchup.awayScore);
   const complete = isMatchupComplete(matchup);
 
   return {
@@ -233,8 +239,8 @@ function actualMatchupToBracket(
     awayLabel: teamSeedLabel(awayTeam),
     homeTeam,
     awayTeam,
-    homeScore: Number.isFinite(homeScore) ? homeScore : null,
-    awayScore: Number.isFinite(awayScore) ? awayScore : null,
+    homeScore,
+    awayScore,
     isComplete: complete,
     source: complete ? "played" : "scheduled",
     winnerTeam: complete ? getMatchupWinner(matchup, homeTeam, awayTeam) : null,

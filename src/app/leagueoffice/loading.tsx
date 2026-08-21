@@ -1,10 +1,10 @@
-import { LeagueOfficeRouteSkeleton } from "@gshl-skeletons";
+import { LeagueOfficeSkeleton } from "@gshl-skeletons";
 import { RouteLoading } from "@gshl-components/skeletons/RouteLoading";
 
 export default function Loading() {
   return (
     <RouteLoading label="Loading league office">
-      <LeagueOfficeRouteSkeleton />
+      <LeagueOfficeSkeleton />
     </RouteLoading>
   );
 }

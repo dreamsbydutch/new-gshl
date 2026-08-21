@@ -454,7 +454,7 @@ function normalizeDailyPosToken(value: unknown): string {
   return token;
 }
 
-function isStarter(playerDay: DatabaseRecord): boolean {
+export function isStarter(playerDay: DatabaseRecord): boolean {
   if (toTrimmedString(playerDay.GP) !== "1") {
     return false;
   }
@@ -483,7 +483,7 @@ function normalizeSeasonCategory(category: unknown): string | null {
   return supportedCategories.has(alias) ? alias : null;
 }
 
-function parseSeasonCategories(rawValue: unknown): string[] {
+export function parseSeasonCategories(rawValue: unknown): string[] {
   if (Array.isArray(rawValue)) {
     return rawValue
       .map((category) => normalizeSeasonCategory(category))

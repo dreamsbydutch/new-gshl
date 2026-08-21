@@ -119,6 +119,23 @@ void test("falls back to season power ranks when weekly history is absent", () =
   );
 });
 
+void test("labels playoff snapshots for the accessible history table", () => {
+  const playoffWeek: Week = {
+    ...makeWeek(3),
+    weekType: "PO",
+    isPlayoffs: true,
+  };
+  const result = buildPowerRankings({
+    teams: [makeTeam("a", "Alpha")],
+    weeks: [playoffWeek],
+    weeklyStats: [weekly("a", 3, 1, 58)],
+    seasonStats: [],
+  });
+
+  assert.equal(result.chartData[0]?.label, "Playoffs 3");
+  assert.equal(result.chartData[0]?.a, 1);
+});
+
 void test("selects distinct colors from each team's logo palette", () => {
   const colors = selectDistinctPowerRankingColors(
     [

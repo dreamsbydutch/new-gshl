@@ -18,6 +18,9 @@ import {
   formatRecordBookStat,
   getOwnerTeamIds,
   getRecordBookAwardSeasonType,
+  getRecordBookPriorityColumns,
+  RECORD_BOOK_GOALIE_COLUMNS,
+  RECORD_BOOK_SKATER_COLUMNS,
 } from "./team-record-book";
 
 void test("scopes record-book team history to the selected owner", () => {
@@ -171,6 +174,23 @@ void test("assigns the Conn Smythe to playoff record-book rows", () => {
     getRecordBookAwardSeasonType(AwardsList.CROSBY),
     SeasonType.REGULAR_SEASON,
   );
+});
+
+void test("selects useful mobile summaries without dropping table columns", () => {
+  assert.deepEqual(
+    getRecordBookPriorityColumns("skater", RECORD_BOOK_SKATER_COLUMNS).map(
+      (column) => column.key,
+    ),
+    ["GP", "G", "A", "P"],
+  );
+  assert.deepEqual(
+    getRecordBookPriorityColumns("goalie", RECORD_BOOK_GOALIE_COLUMNS).map(
+      (column) => column.key,
+    ),
+    ["GP", "W", "GAA", "SVP"],
+  );
+  assert.equal(RECORD_BOOK_SKATER_COLUMNS.length, 11);
+  assert.equal(RECORD_BOOK_GOALIE_COLUMNS.length, 11);
 });
 
 function careerRow(

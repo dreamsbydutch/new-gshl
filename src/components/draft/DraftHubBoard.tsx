@@ -12,10 +12,10 @@ import {
   ShieldAlert,
   Undo2,
 } from "lucide-react";
-import { Button } from "@gshl-ui";
+import { Button, TableViewport } from "@gshl-ui";
 import { NHLLogo } from "@gshl-components/player/NHLLogo";
-import { DraftBoardSkeleton } from "@gshl-skeletons";
-import { useDraftHubBoard } from "@gshl-hooks";
+import { DraftHubBoardSkeleton } from "@gshl-skeletons";
+import { useDesktopViewport, useDraftHubBoard } from "@gshl-hooks";
 import { cn, formatNumber, formatUfaStat } from "@gshl-utils";
 import type {
   DraftHubEligiblePlayerView,
@@ -25,6 +25,7 @@ import type {
   DraftPlayerSortDirection,
   DraftPlayerSortKey,
 } from "@gshl-types";
+import { DraftPlayerDecisionList } from "./DraftPlayerDecisionList";
 
 function formatClock(totalSeconds: number): string {
   const minutes = Math.floor(totalSeconds / 60);
@@ -167,7 +168,7 @@ function DraftFlowPick({
           variant="ghost"
           disabled={isUndoing}
           onClick={onUndo}
-          className="h-7 w-7 shrink-0 p-0 text-red-700 hover:bg-red-50 hover:text-red-800"
+          className="h-11 w-11 shrink-0 p-0 text-red-700 hover:bg-red-50 hover:text-red-800"
           aria-label={`Undo pick of ${pick.player?.fullName ?? "selected player"}`}
           title="Undo latest pick"
         >
@@ -446,6 +447,7 @@ function SortableHeader({
   const isActive = activeSortKey === sortKey;
   return (
     <th
+      scope="col"
       className={className}
       aria-sort={
         isActive
@@ -524,9 +526,12 @@ function PlayerRow({
           size={24}
         />
       </td>
-      <td className="sticky left-[31px] z-20 min-w-[7rem] border-r !bg-background px-1.5 py-1 text-left text-[10px] font-semibold group-hover:!bg-muted sm:static sm:z-auto sm:min-w-0 sm:border-0 sm:!bg-transparent sm:px-2 sm:py-3 sm:text-sm">
+      <th
+        scope="row"
+        className="sticky left-[31px] z-20 min-w-[7rem] border-r !bg-background px-1.5 py-1 text-left text-[10px] font-semibold group-hover:!bg-muted sm:static sm:z-auto sm:min-w-0 sm:border-0 sm:!bg-transparent sm:px-2 sm:py-3 sm:text-sm"
+      >
         {player.fullName}
-      </td>
+      </th>
       <td className="whitespace-nowrap px-1 py-1 text-[9px] sm:px-2 sm:py-3 sm:text-sm">
         {player.nhlPos.length > 0 ? player.nhlPos.join("/") : player.posGroup}
       </td>
@@ -557,7 +562,7 @@ function PlayerRow({
           disabled={!canSubmit || isSubmitting}
           onClick={onSubmit}
           aria-label={`Draft ${player.fullName}`}
-          className="h-7 px-2 text-[10px] sm:h-9 sm:px-3 sm:text-xs"
+          className="min-h-11 px-3 text-xs"
         >
           {isSubmitting
             ? "Submitting…"
@@ -622,8 +627,15 @@ function DraftPlayerTable({
   const statKeys = hasGoalies ? GOALIE_STAT_KEYS : SKATER_STAT_KEYS;
 
   return (
-    <div className="relative block w-full min-w-0 max-w-full touch-auto overflow-x-auto overscroll-x-contain rounded-lg border">
+    <TableViewport
+      ariaLabel={`Available draft ${hasGoalies ? "goalies" : "skaters"}`}
+      scrollHint="Scroll to compare all rankings and statistics"
+    >
       <table className="w-max min-w-full text-center text-[10px] sm:text-sm">
+        <caption className="sr-only">
+          Available draft {hasGoalies ? "goalies" : "skaters"}, rankings, season
+          statistics, and selection action
+        </caption>
         <thead className="bg-muted/70 text-[8px] uppercase tracking-wide sm:text-xs">
           <tr className="border-b border-border/70">
             <SortableHeader
@@ -694,7 +706,10 @@ function DraftPlayerTable({
                 className="whitespace-nowrap px-1 py-1 sm:px-2 sm:py-3"
               />
             ))}
-            <th className="whitespace-nowrap px-1 py-1 sm:px-2 sm:py-3">
+            <th
+              scope="col"
+              className="whitespace-nowrap px-1 py-1 sm:px-2 sm:py-3"
+            >
               Selection
             </th>
           </tr>
@@ -712,13 +727,14 @@ function DraftPlayerTable({
           ))}
         </tbody>
       </table>
-    </div>
+    </TableViewport>
   );
 }
 
 export function DraftHubBoard() {
   const board = useDraftHubBoard();
-  if (board.isLoading) return <DraftBoardSkeleton />;
+  const isDesktopViewport = useDesktopViewport();
+  if (board.isLoading) return <DraftHubBoardSkeleton />;
   if (!board.season || !board.state) {
     return (
       <main className="container mx-auto px-3 py-8">
@@ -731,6 +747,19 @@ export function DraftHubBoard() {
 
   const filters = ["all", "F", "C", "LW", "RW", "D", "G"];
   const commissionerRequired = board.state.status === "commissioner_required";
+  const hasActivePlayerFilters =
+    board.positionFilter !== "all" || board.searchTerm.trim().length > 0;
+  const draftDecisionDisabledReason = board.isSubmitting
+    ? "Another draft update is being processed."
+    : board.state.status === "upcoming"
+      ? "Selections unlock when the draft begins."
+      : board.state.status === "complete"
+        ? "The draft is complete."
+        : board.state.status === "commissioner_required"
+          ? "The clock expired; a commissioner must make this selection."
+          : board.state.status === "on_clock" && board.activePick?.team
+            ? `Only ${board.activePick.team.name}'s owner or a commissioner can make this pick.`
+            : "No draft selection is available right now.";
 
   return (
     <main className="container mx-auto space-y-8 px-3 py-5 sm:px-4">
@@ -769,21 +798,25 @@ export function DraftHubBoard() {
           </p>
           <h2 className="text-2xl font-bold">Best Available</h2>
           <p className="text-sm text-muted-foreground">
-            Select any column heading to sort the available players.
+            Search, filter, and sort the available players.
           </p>
         </div>
         <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <label className="relative block min-w-0 flex-1 sm:max-w-md">
-            <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Search className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-muted-foreground" />
             <span className="sr-only">Search eligible players</span>
             <input
               value={board.searchTerm}
               onChange={(event) => board.setSearchTerm(event.target.value)}
               placeholder="Search player, position, or NHL team"
-              className="h-10 w-full rounded-md border bg-white pl-9 pr-3 text-sm"
+              className="h-11 w-full rounded-md border bg-white pl-9 pr-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             />
           </label>
-          <div className="no-scrollbar flex gap-1 overflow-x-auto">
+          <div
+            className="no-scrollbar flex gap-1 overflow-x-auto"
+            role="group"
+            aria-label="Filter draft players by position"
+          >
             {filters.map((filter) => (
               <Button
                 key={filter}
@@ -793,28 +826,58 @@ export function DraftHubBoard() {
                   board.positionFilter === filter ? "default" : "outline"
                 }
                 onClick={() => board.setPositionFilter(filter)}
+                aria-pressed={board.positionFilter === filter}
+                className="min-h-11 min-w-11"
               >
                 {filter === "all" ? "All" : filter}
               </Button>
             ))}
           </div>
         </div>
+        {board.error ? (
+          <p
+            role="alert"
+            className="mb-3 rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive"
+          >
+            {board.error}
+          </p>
+        ) : null}
         {board.eligiblePlayers.length ? (
-          <DraftPlayerTable
-            players={board.eligiblePlayers}
-            canSubmit={board.canSubmitActivePick && !board.isSubmitting}
-            commissionerRequired={commissionerRequired}
-            submittingPlayerId={
-              board.isSubmitting ? board.submittingPlayerId : null
-            }
-            sortKey={board.playerSortKey}
-            sortDirection={board.playerSortDirection}
-            onSort={board.setPlayerSort}
-            onSubmit={(playerId) => void board.submitPlayer(playerId)}
-          />
+          isDesktopViewport ? (
+            <DraftPlayerTable
+              players={board.eligiblePlayers}
+              canSubmit={board.canSubmitActivePick && !board.isSubmitting}
+              commissionerRequired={commissionerRequired}
+              submittingPlayerId={
+                board.isSubmitting ? board.submittingPlayerId : null
+              }
+              sortKey={board.playerSortKey}
+              sortDirection={board.playerSortDirection}
+              onSort={board.setPlayerSort}
+              onSubmit={(playerId) => void board.submitPlayer(playerId)}
+            />
+          ) : (
+            <DraftPlayerDecisionList
+              key={board.activePick?.pick.id ?? "no-active-pick"}
+              players={board.eligiblePlayers}
+              activePick={board.activePick}
+              canSubmit={board.canSubmitActivePick && !board.isSubmitting}
+              commissionerRequired={commissionerRequired}
+              disabledReason={draftDecisionDisabledReason}
+              submittingPlayerId={
+                board.isSubmitting ? board.submittingPlayerId : null
+              }
+              sortKey={board.playerSortKey}
+              sortDirection={board.playerSortDirection}
+              onSort={board.setPlayerSort}
+              onSubmit={(playerId) => void board.submitPlayer(playerId)}
+            />
+          )
         ) : (
           <div className="rounded-lg border border-dashed bg-slate-50 p-6 text-center text-sm text-muted-foreground">
-            No eligible players match these filters.
+            {hasActivePlayerFilters
+              ? "No eligible players match these filters."
+              : "No eligible players remain."}
           </div>
         )}
         {board.hasMore ? (

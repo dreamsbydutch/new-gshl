@@ -7,7 +7,7 @@
  * support, loading states, and accessibility features.
  */
 
-import { useState, useRef, useEffect } from "react";
+import { useRef, useEffect } from "react";
 import { cn } from "@gshl-utils";
 import type { DropdownToggleProps, HorizontalToggleProps } from "@gshl-types";
 import { Skeleton } from "@gshl-ui";
@@ -30,6 +30,16 @@ export function HorizontalToggle<T>({
   className,
   itemClassName,
 }: HorizontalToggleProps<T>) {
+  const selectedItemRef = useRef<HTMLButtonElement>(null);
+  const selectedItemKey = selectedItem ? getItemKey(selectedItem) : null;
+
+  useEffect(() => {
+    selectedItemRef.current?.scrollIntoView({
+      block: "nearest",
+      inline: "center",
+    });
+  }, [selectedItemKey]);
+
   if (loading) {
     return (
       <div className={className}>
@@ -73,25 +83,35 @@ export function HorizontalToggle<T>({
 
         if (renderCustomItem) {
           return (
-            <div
+            <button
+              type="button"
               key={key}
+              ref={isSelected ? selectedItemRef : undefined}
               onClick={() => onSelect(item)}
+              aria-pressed={isSelected}
+              aria-label={label}
+              title={description}
               className={cn(
-                "flex-shrink-0 cursor-pointer rounded-md transition-colors",
-                isSelected ? "bg-primary" : "bg-transparent hover:bg-gray-200",
+                "flex min-h-11 min-w-11 flex-shrink-0 cursor-pointer items-center justify-center rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-1 motion-reduce:transition-none",
+                isSelected
+                  ? "bg-slate-200 ring-1 ring-slate-400"
+                  : "bg-transparent hover:bg-slate-100",
               )}
             >
               {renderCustomItem(item, isSelected)}
-            </div>
+            </button>
           );
         }
 
         return (
           <button
+            type="button"
             key={key}
+            ref={isSelected ? selectedItemRef : undefined}
             onClick={() => onSelect(item)}
+            aria-pressed={isSelected}
             className={cn(
-              "rounded px-3 py-1 text-sm transition-colors",
+              "min-h-11 rounded px-3 py-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-1 motion-reduce:transition-none",
               isSelected
                 ? "bg-primary text-primary-foreground"
                 : "bg-muted hover:bg-muted/80",
@@ -108,9 +128,9 @@ export function HorizontalToggle<T>({
 }
 
 /**
- * Dropdown toggle component with intelligent positioning
+ * Native dropdown selector with platform keyboard and assistive-technology behavior
  * @param props - Component props
- * @returns Dropdown toggle interface with positioning logic
+ * @returns Labelled native select interface
  */
 export function DropdownToggle<T>({
   items,
@@ -118,79 +138,13 @@ export function DropdownToggle<T>({
   onSelect,
   getItemKey = (item: T) => String(item),
   getItemLabel = (item: T) => String(item),
-  getItemDescription,
-  renderCustomItem,
-  renderSelectedItem,
   loading = false,
   error = null,
   className,
   buttonClassName,
-  dropdownClassName,
+  ariaLabel = "Select an option",
   placeholder = "Select an option",
-  maxHeight = "200px",
-  dropdownPosition = "auto",
 }: DropdownToggleProps<T>) {
-  const [isOpen, setIsOpen] = useState(false);
-  const [shouldOpenAbove, setShouldOpenAbove] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
-  const buttonRef = useRef<HTMLButtonElement>(null);
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        dropdownRef.current &&
-        !dropdownRef.current.contains(event.target as Node) &&
-        buttonRef.current &&
-        !buttonRef.current.contains(event.target as Node)
-      ) {
-        setIsOpen(false);
-      }
-    };
-
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setIsOpen(false);
-      }
-    };
-
-    if (isOpen) {
-      document.addEventListener("keydown", handleKeyDown);
-      return () => document.removeEventListener("keydown", handleKeyDown);
-    }
-  }, [isOpen]);
-
-  useEffect(() => {
-    if (dropdownPosition === "auto" && isOpen && buttonRef.current) {
-      const buttonRect = buttonRef.current.getBoundingClientRect();
-      const viewportHeight = window.innerHeight;
-      const spaceBelow = viewportHeight - buttonRect.bottom;
-      const spaceAbove = buttonRect.top;
-      const dropdownHeight = parseInt(maxHeight, 10) || 200;
-
-      setShouldOpenAbove(
-        spaceBelow < dropdownHeight && spaceAbove > dropdownHeight,
-      );
-    } else {
-      setShouldOpenAbove(dropdownPosition === "above");
-    }
-  }, [isOpen, dropdownPosition, maxHeight]);
-
-  const handleSelect = (item: T) => {
-    onSelect(item);
-    setIsOpen(false);
-  };
-
-  const toggleDropdown = () => {
-    if (!loading && !error && items?.length) {
-      setIsOpen(!isOpen);
-    }
-  };
-
   if (loading) {
     return (
       <div className={className}>
@@ -207,103 +161,33 @@ export function DropdownToggle<T>({
     );
   }
 
-  const selectedLabel = selectedItem
-    ? renderSelectedItem
-      ? renderSelectedItem(selectedItem)
-      : getItemLabel(selectedItem)
-    : placeholder;
+  const selectedKey = selectedItem != null ? getItemKey(selectedItem) : "";
 
   return (
     <div className={cn("relative mx-2", className)}>
-      <button
-        ref={buttonRef}
-        onClick={toggleDropdown}
+      <select
+        aria-label={ariaLabel}
+        value={selectedKey}
+        onChange={(event) => {
+          const nextItem = items.find(
+            (item) => getItemKey(item) === event.target.value,
+          );
+          if (nextItem) onSelect(nextItem);
+        }}
         disabled={!items?.length}
         className={cn(
-          "flex w-full items-center justify-between rounded border bg-slate-100 px-2 py-1 text-sm transition-colors",
-          "hover:bg-muted focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
+          "min-h-11 w-full rounded border bg-slate-100 px-3 py-2 pr-8 text-sm transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 motion-reduce:transition-none",
           !items?.length && "cursor-not-allowed opacity-50",
           buttonClassName,
         )}
-        aria-expanded={isOpen}
-        aria-haspopup="listbox"
       >
-        <span className="truncate">
-          {typeof selectedLabel === "string" ? selectedLabel : selectedLabel}
-        </span>
-
-        <svg
-          className={cn(
-            "ml-2 h-4 w-4 transition-transform",
-            isOpen && shouldOpenAbove ? "rotate-0" : isOpen && "rotate-180",
-          )}
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M19 9l-7 7-7-7"
-          />
-        </svg>
-      </button>
-
-      {isOpen && items?.length && (
-        <div
-          ref={dropdownRef}
-          className={cn(
-            "absolute z-50 w-full rounded border bg-popover shadow-lg",
-            shouldOpenAbove ? "bottom-full mb-1" : "top-full mt-1",
-            dropdownClassName,
-          )}
-          style={{ maxHeight }}
-        >
-          <div
-            className="overflow-y-auto p-1"
-            style={{ maxHeight: `calc(${maxHeight} - 8px)` }}
-          >
-            {items.map((item) => {
-              const key = getItemKey(item);
-              const isSelected = selectedItem === item;
-              const label = getItemLabel(item);
-              const description = getItemDescription?.(item);
-
-              if (renderCustomItem) {
-                return (
-                  <div
-                    key={key}
-                    onClick={() => handleSelect(item)}
-                    className="cursor-pointer"
-                    role="option"
-                    aria-selected={isSelected}
-                  >
-                    {renderCustomItem(item, isSelected)}
-                  </div>
-                );
-              }
-
-              return (
-                <button
-                  key={key}
-                  onClick={() => handleSelect(item)}
-                  className={cn(
-                    "w-full rounded px-3 py-2 text-left text-sm transition-colors",
-                    "hover:bg-muted focus:bg-muted focus:outline-none",
-                    isSelected && "bg-primary text-primary-foreground",
-                  )}
-                  title={description}
-                  role="option"
-                  aria-selected={isSelected}
-                >
-                  {label}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
+        {selectedItem == null ? <option value="">{placeholder}</option> : null}
+        {items.map((item) => (
+          <option key={getItemKey(item)} value={getItemKey(item)}>
+            {getItemLabel(item)}
+          </option>
+        ))}
+      </select>
     </div>
   );
 }

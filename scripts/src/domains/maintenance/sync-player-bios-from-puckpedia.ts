@@ -24,6 +24,15 @@ import {
   type StoredPlayer,
 } from "./player-directory";
 import {
+  candidatesFromPuckPedia,
+  parseSalaryCapOverrides,
+  reconcileSalaryCandidates,
+  seasonLabel,
+  seasonStartYear,
+  type PlayerNhlSalaryWrite,
+  type StoredSalaryPlayer,
+} from "./nhl-salaries";
+import {
   buildPlayerActivityContext,
   type ActivitySeason,
   type ActivityStatLine,
@@ -81,6 +90,9 @@ type PlayerBioSyncOptions = {
   yahooRequestDelayMs: number;
   yahooMaxPages: number;
   yahooBrowserFallback: boolean;
+  salarySeasonSpecs?: string[];
+  focusSeasonStartYear?: number | null;
+  salaryCapOverrides?: Record<number, number>;
 };
 
 type PuckPediaPage = {
@@ -107,6 +119,12 @@ type SourceFetchSummary = {
   expectedSkaters: number;
   expectedGoalies: number;
   invalidRows: number;
+  players: DirectoryPlayer[];
+};
+
+type SalarySeasonSource = {
+  seasonToken: string;
+  seasonStartYear: number;
   players: DirectoryPlayer[];
 };
 
@@ -215,6 +233,18 @@ export type PlayerBioSyncSummary = {
     insertedPlayersFromYahoo: number;
     updateDetails: PlayerPositionReconciliation["reviews"];
   };
+  nhlSalaries: {
+    seasons: string[];
+    sourceRows: number;
+    readyRows: number;
+    unmatchedRows: number;
+    ambiguousRows: number;
+    duplicateRows: number;
+    missingCapRows: number;
+    appliedInserted?: number;
+    appliedUpdated?: number;
+    appliedUnchanged?: number;
+  };
   appliedUpdates?: number;
   appliedInserts?: number;
 };
@@ -257,6 +287,11 @@ Options:
   --headless              Run Chrome or Edge without a visible window.
   --focus-season <value>  Override PuckPedia's current focus-season token.
   --stat-season <value>   Override PuckPedia's current stat-season token.
+  --focus-season-year Y   NHL start year represented by --focus-season.
+                          Otherwise it is inferred from the current date.
+  --salary-seasons <csv>  Future NHL start years (for example 2027,2028), or
+                          YEAR=PUCKPEDIA_TOKEN when tokens are not sequential.
+  --salary-cap Y=VALUE    Override/add an NHL season cap; repeat as needed.
   --page-size <value>     Requested rows per page. Default: 100; maximum: 100.
   --max-pages <value>     Pagination safety cap per role. Default: 20.
   --current-date <value>  Override the date used to calculate age.
@@ -293,6 +328,18 @@ function getArgValue(args: string[], name: string): string | undefined {
   const prefix = `${name}=`;
   const match = args.find((arg) => arg.startsWith(prefix));
   return match?.slice(prefix.length);
+}
+
+function getArgValues(args: readonly string[], name: string): string[] {
+  const output: string[] = [];
+  for (let index = 0; index < args.length; index += 1) {
+    const argument = args[index]!;
+    if (argument === name && args[index + 1]) output.push(args[index + 1]!);
+    if (argument.startsWith(`${name}=`)) {
+      output.push(argument.slice(name.length + 1));
+    }
+  }
+  return output;
 }
 
 function hasFlag(args: string[], name: string): boolean {
@@ -395,6 +442,15 @@ export function parsePlayerBioSyncOptions(
     yahooBrowserFallback:
       hasFlag(argv, "--yahoo-browser-fallback") ||
       parseBoolean(process.env.YAHOO_BROWSER_FALLBACK, false),
+    salarySeasonSpecs: (getArgValue(argv, "--salary-seasons") ?? "")
+      .split(",")
+      .map((value) => value.trim())
+      .filter(Boolean),
+    focusSeasonStartYear:
+      seasonStartYear(getArgValue(argv, "--focus-season-year")) ?? null,
+    salaryCapOverrides: parseSalaryCapOverrides(
+      getArgValues(argv, "--salary-cap"),
+    ),
   };
 }
 
@@ -528,6 +584,30 @@ async function waitForPuckPediaStore(page: Page): Promise<void> {
     },
     { timeout: 30_000 },
   );
+}
+
+async function readPuckPediaFocusSeason(
+  page: Page,
+): Promise<{ label: string; value: string } | null> {
+  return page.evaluate(() => {
+    const alpine = (
+      globalThis as unknown as {
+        Alpine?: {
+          store?: (
+            name: string,
+          ) =>
+            | { focus_season?: { label?: unknown; value?: unknown } }
+            | undefined;
+        };
+      }
+    ).Alpine;
+    const focusSeason = alpine?.store?.("puck")?.focus_season;
+    if (!focusSeason) return null;
+    return {
+      label: String(focusSeason.label ?? ""),
+      value: String(focusSeason.value ?? ""),
+    };
+  });
 }
 
 async function fetchPuckPediaPage(
@@ -722,6 +802,104 @@ async function fetchCompleteDirectory(
   }
 
   return summary;
+}
+
+function salaryCandidatesForSources(
+  sources: readonly SalarySeasonSource[],
+  capOverrides: Readonly<Record<number, number>>,
+) {
+  return sources.flatMap((source) =>
+    candidatesFromPuckPedia(
+      source.players,
+      source.seasonStartYear,
+      source.seasonToken,
+      capOverrides,
+    ),
+  );
+}
+
+function inferredNhlSeasonStartYear(date: Date): number {
+  const year = date.getUTCFullYear();
+  return date.getUTCMonth() >= 6 ? year : year - 1;
+}
+
+export function resolveSalarySeasonRequests(
+  options: PlayerBioSyncOptions,
+): Array<{ seasonToken: string; seasonStartYear: number }> {
+  const focusStartYear =
+    options.focusSeasonStartYear ??
+    inferredNhlSeasonStartYear(options.currentDate);
+  const requests = new Map<
+    string,
+    { seasonToken: string; seasonStartYear: number }
+  >();
+  requests.set(options.focusSeason, {
+    seasonToken: options.focusSeason,
+    seasonStartYear: focusStartYear,
+  });
+
+  for (const spec of options.salarySeasonSpecs ?? []) {
+    const [left, right] = spec.split("=", 2);
+    let seasonToken = spec;
+    let startYear: number | null = null;
+    if (right) {
+      startYear = seasonStartYear(left);
+      seasonToken = right.trim();
+    } else {
+      const tokenNumber = Number(spec);
+      const focusTokenNumber = Number(options.focusSeason);
+      const requestedYear = seasonStartYear(spec);
+      if (
+        requestedYear !== null &&
+        Number.isInteger(focusTokenNumber) &&
+        Number(spec) >= 1900
+      ) {
+        startYear = requestedYear;
+        seasonToken = String(focusTokenNumber + requestedYear - focusStartYear);
+      } else if (
+        Number.isInteger(tokenNumber) &&
+        Number.isInteger(focusTokenNumber)
+      ) {
+        startYear = focusStartYear + tokenNumber - focusTokenNumber;
+      }
+    }
+    if (startYear === null || !seasonToken) {
+      throw new Error(
+        `[player-bio-sync] Invalid salary season "${spec}". Use a start year or YEAR=PUCKPEDIA_TOKEN.`,
+      );
+    }
+    requests.set(seasonToken, { seasonToken, seasonStartYear: startYear });
+  }
+
+  return [...requests.values()].sort(
+    (left, right) => left.seasonStartYear - right.seasonStartYear,
+  );
+}
+
+async function upsertPuckPediaSalaryRows(
+  rows: readonly PlayerNhlSalaryWrite[],
+): Promise<{ inserted: number; updated: number; unchanged: number }> {
+  let inserted = 0;
+  let updated = 0;
+  let unchanged = 0;
+  const years = Array.from(
+    new Set(rows.map((row) => row.seasonStartYear)),
+  ).sort((left, right) => left - right);
+  for (const year of years) {
+    const seasonRows = rows
+      .filter((row) => row.seasonStartYear === year)
+      .map((row) => ({ ...row }));
+    const result = await upsertByCompositeKey(
+      "PlayerNHLSalary",
+      ["playerId", "seasonStartYear"],
+      seasonRows,
+      { merge: true },
+    );
+    inserted += result.inserted;
+    updated += result.updated;
+    unchanged += result.unchanged;
+  }
+  return { inserted, updated, unchanged };
 }
 
 async function launchBrowser(options: PlayerBioSyncOptions): Promise<Browser> {
@@ -967,14 +1145,52 @@ export async function runPlayerBioSync(
   try {
     const searchHtml = await waitForSearchPage(page, initialOptions);
     const seasons = resolveSeasonTokens(searchHtml, initialOptions);
-    const options = { ...initialOptions, ...seasons };
+    let options = { ...initialOptions, ...seasons };
     await waitForPuckPediaStore(page);
+    const detectedFocusSeason = await readPuckPediaFocusSeason(page);
+    const detectedFocusStartYear =
+      detectedFocusSeason?.value === options.focusSeason
+        ? seasonStartYear(detectedFocusSeason.label)
+        : null;
+    options = {
+      ...options,
+      focusSeasonStartYear:
+        options.focusSeasonStartYear ?? detectedFocusStartYear,
+    };
     log(
       options,
       `fetching NHL-contracted players for PuckPedia season ${options.focusSeason}`,
     );
 
     const source = await fetchCompleteDirectory(page, options);
+    const salarySeasonRequests = resolveSalarySeasonRequests(options);
+    const focusSalarySeason = salarySeasonRequests.find(
+      (request) => request.seasonToken === options.focusSeason,
+    )!;
+    const salarySources: SalarySeasonSource[] = [
+      {
+        ...focusSalarySeason,
+        players: source.players,
+      },
+    ];
+    for (const request of salarySeasonRequests.filter(
+      (candidate) => candidate.seasonToken !== options.focusSeason,
+    )) {
+      const { seasonToken } = request;
+      log(options, `fetching PuckPedia salaries for season ${seasonToken}`);
+      const salarySource = await fetchCompleteDirectory(page, {
+        ...options,
+        focusSeason: seasonToken,
+      });
+      salarySources.push({
+        ...request,
+        players: salarySource.players,
+      });
+    }
+    const salaryCandidates = salaryCandidatesForSources(
+      salarySources,
+      options.salaryCapOverrides ?? {},
+    );
     const [existingPlayers, seasonRows] = await Promise.all([
       fetchModel<StoredPlayer>("Player"),
       fetchModel<ActivitySeason & RosterSeason>("Season"),
@@ -1292,6 +1508,26 @@ export async function runPlayerBioSync(
           (review) => review.changed,
         ),
       },
+      nhlSalaries: (() => {
+        const salaryReconciliation = reconcileSalaryCandidates(
+          salaryCandidates,
+          existingPlayers,
+          options.salaryCapOverrides ?? {},
+        );
+        return {
+          seasons: salarySeasonRequests.map((request) =>
+            seasonLabel(request.seasonStartYear),
+          ),
+          sourceRows: salaryCandidates.length,
+          readyRows: salaryReconciliation.rows.length,
+          unmatchedRows: salaryReconciliation.unmatched.length,
+          ambiguousRows: salaryReconciliation.ambiguous.length,
+          duplicateRows: salaryReconciliation.duplicateRows,
+          missingCapRows: salaryReconciliation.rows.filter(
+            (row) => row.salaryCap === null,
+          ).length,
+        };
+      })(),
     };
 
     if (!options.apply) return summary;
@@ -1303,6 +1539,30 @@ export async function runPlayerBioSync(
         })
       : { inserted: 0 };
     summary.appliedInserts = insertResult.inserted;
+    const persistedPlayers = await fetchModel<
+      StoredPlayer & StoredSalaryPlayer
+    >("Player");
+    const salaryReconciliation = reconcileSalaryCandidates(
+      salaryCandidates,
+      persistedPlayers,
+      options.salaryCapOverrides ?? {},
+    );
+    const salaryResult = await upsertPuckPediaSalaryRows(
+      salaryReconciliation.rows,
+    );
+    summary.nhlSalaries = {
+      ...summary.nhlSalaries,
+      readyRows: salaryReconciliation.rows.length,
+      unmatchedRows: salaryReconciliation.unmatched.length,
+      ambiguousRows: salaryReconciliation.ambiguous.length,
+      duplicateRows: salaryReconciliation.duplicateRows,
+      missingCapRows: salaryReconciliation.rows.filter(
+        (row) => row.salaryCap === null,
+      ).length,
+      appliedInserted: salaryResult.inserted,
+      appliedUpdated: salaryResult.updated,
+      appliedUnchanged: salaryResult.unchanged,
+    };
     return summary;
   } finally {
     await closeYahooBrowserSession().catch(() => undefined);

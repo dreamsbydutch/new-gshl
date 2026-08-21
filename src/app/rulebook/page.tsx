@@ -9,8 +9,14 @@ export const metadata: Metadata = {
 
 export default function RulebookPage() {
   return (
-    <div className="px-4 py-7 sm:px-6 sm:py-9">
+    <main
+      aria-labelledby="rulebook-page-heading"
+      className="px-4 py-7 sm:px-6 sm:py-9"
+    >
+      <h1 id="rulebook-page-heading" className="sr-only">
+        Rulebook
+      </h1>
       <Rulebook />
-    </div>
+    </main>
   );
 }

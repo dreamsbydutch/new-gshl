@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import Image from "next/image";
-import { ArrowDown, ArrowUp, Minus } from "lucide-react";
+import { ArrowDown, ArrowUp, ChevronDown, Minus } from "lucide-react";
 import {
   CartesianGrid,
   Line,
@@ -13,16 +13,29 @@ import {
   YAxis,
 } from "recharts";
 
-import type { PowerRankingEntry, PowerRankingsProps } from "@gshl-types";
+import type {
+  PowerRankingColorMap,
+  PowerRankingEntry,
+  PowerRankingsProps,
+  PowerRankingsViewModel,
+} from "@gshl-types";
 import { useAuthSession, useDistinctTeamColors } from "@gshl-hooks";
+import { TableViewport } from "@gshl-ui";
 
 function RankMovement({ entry }: { entry: PowerRankingEntry }) {
   if (entry.rankChange === null) {
-    return <span className="text-[10px] text-slate-400">First rank</span>;
+    return (
+      <span className="text-xs text-slate-500" aria-label="No prior ranking">
+        First rank
+      </span>
+    );
   }
   if (entry.rankChange > 0) {
     return (
-      <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-emerald-600">
+      <span
+        className="inline-flex items-center gap-0.5 text-xs font-semibold text-emerald-700"
+        aria-label={`Up ${entry.rankChange} ${entry.rankChange === 1 ? "place" : "places"}`}
+      >
         <ArrowUp className="h-3 w-3" aria-hidden="true" />
         {entry.rankChange}
       </span>
@@ -30,17 +43,235 @@ function RankMovement({ entry }: { entry: PowerRankingEntry }) {
   }
   if (entry.rankChange < 0) {
     return (
-      <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-red-600">
+      <span
+        className="inline-flex items-center gap-0.5 text-xs font-semibold text-red-700"
+        aria-label={`Down ${Math.abs(entry.rankChange)} ${Math.abs(entry.rankChange) === 1 ? "place" : "places"}`}
+      >
         <ArrowDown className="h-3 w-3" aria-hidden="true" />
         {Math.abs(entry.rankChange)}
       </span>
     );
   }
   return (
-    <span className="inline-flex items-center gap-0.5 text-[10px] text-slate-400">
+    <span
+      className="inline-flex items-center gap-0.5 text-xs text-slate-500"
+      aria-label="No rank movement"
+    >
       <Minus className="h-3 w-3" aria-hidden="true" />
       Even
     </span>
+  );
+}
+
+function CurrentRanking({
+  entries,
+  seasonName,
+  snapshotLabel,
+  teamColors,
+}: {
+  entries: PowerRankingEntry[];
+  seasonName: string;
+  snapshotLabel: string;
+  teamColors: PowerRankingColorMap;
+}) {
+  return (
+    <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <div className="border-b border-slate-200 px-3 py-3 sm:px-5 sm:py-4">
+        <h2 className="font-oswald text-xl text-slate-950 sm:text-2xl">
+          {snapshotLabel} ranking
+        </h2>
+        <p className="mt-0.5 text-xs text-slate-500">
+          Movement compares the two most recent ranked weeks.
+        </p>
+      </div>
+
+      <ol
+        className="divide-y divide-slate-100 md:hidden"
+        aria-label={`${snapshotLabel} team power rankings for ${seasonName}`}
+      >
+        {entries.map((entry) => (
+          <li key={entry.team.id} className="p-3">
+            <article className="grid grid-cols-[2.5rem_minmax(0,1fr)] gap-x-3 gap-y-2">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-950 font-oswald text-lg font-semibold tabular-nums text-white">
+                <span className="sr-only">Rank </span>
+                {entry.rank}
+              </div>
+              <div className="flex min-w-0 items-center gap-2.5">
+                <span
+                  className="h-7 w-1 shrink-0 rounded-full"
+                  style={{
+                    backgroundColor: teamColors[entry.team.id] ?? entry.color,
+                  }}
+                  aria-hidden="true"
+                />
+                <TeamLogo entry={entry} />
+                <h3 className="min-w-0 break-words text-sm font-semibold leading-5 text-slate-950">
+                  {entry.team.name ?? entry.team.abbr ?? "Team"}
+                </h3>
+              </div>
+              <dl className="col-span-2 grid grid-cols-2 rounded-lg bg-slate-50">
+                <div className="px-3 py-2">
+                  <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                    Movement
+                  </dt>
+                  <dd className="mt-0.5">
+                    <RankMovement entry={entry} />
+                  </dd>
+                </div>
+                <div className="border-l border-slate-200 px-3 py-2 text-right">
+                  <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                    Rating
+                  </dt>
+                  <dd className="mt-0.5 font-mono text-sm font-semibold tabular-nums text-slate-800">
+                    {entry.rating === null ? "—" : entry.rating.toFixed(1)}
+                  </dd>
+                </div>
+              </dl>
+            </article>
+          </li>
+        ))}
+      </ol>
+
+      <TableViewport
+        ariaLabel={`${snapshotLabel} team power rankings for ${seasonName}`}
+        className="hidden md:block"
+        viewportClassName="rounded-none border-0 focus-visible:ring-inset focus-visible:ring-offset-0"
+      >
+        <table className="w-full min-w-[560px] border-collapse text-sm">
+          <caption className="sr-only">
+            {snapshotLabel} team power rankings for {seasonName}
+          </caption>
+          <thead className="border-b border-slate-200 bg-slate-50 text-[11px] uppercase tracking-[0.14em] text-slate-500">
+            <tr>
+              <th scope="col" className="w-16 px-3 py-2.5 text-center">
+                Rank
+              </th>
+              <th scope="col" className="px-3 py-2.5 text-left">
+                Team
+              </th>
+              <th scope="col" className="w-24 px-3 py-2.5 text-center">
+                Movement
+              </th>
+              <th scope="col" className="w-24 px-3 py-2.5 text-right">
+                Rating
+              </th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {entries.map((entry) => (
+              <tr
+                key={entry.team.id}
+                className="transition-colors hover:bg-slate-50"
+              >
+                <td className="px-3 py-2.5 text-center font-oswald text-lg font-semibold tabular-nums text-slate-950">
+                  {entry.rank}
+                </td>
+                <th scope="row" className="px-3 py-2.5 text-left font-normal">
+                  <div className="flex min-w-0 items-center gap-2.5">
+                    <span
+                      className="h-5 w-1 shrink-0 rounded-full"
+                      style={{
+                        backgroundColor:
+                          teamColors[entry.team.id] ?? entry.color,
+                      }}
+                      aria-hidden="true"
+                    />
+                    <TeamLogo entry={entry} />
+                    <span className="min-w-0 font-semibold text-slate-900">
+                      {entry.team.name ?? entry.team.abbr ?? "Team"}
+                    </span>
+                  </div>
+                </th>
+                <td className="px-3 py-2.5 text-center">
+                  <RankMovement entry={entry} />
+                </td>
+                <td className="px-3 py-2.5 text-right font-mono font-semibold tabular-nums text-slate-700">
+                  {entry.rating === null ? "—" : entry.rating.toFixed(1)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </TableViewport>
+    </section>
+  );
+}
+
+function RankingHistoryData({
+  rankings,
+  seasonName,
+  signedInTeamId,
+}: {
+  rankings: PowerRankingsViewModel;
+  seasonName: string;
+  signedInTeamId: string | null;
+}) {
+  return (
+    <details className="group mt-4 overflow-hidden rounded-xl border border-slate-200 bg-slate-50/60">
+      <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-3 py-2 text-sm font-semibold text-slate-700 marker:content-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-slate-400 [&::-webkit-details-marker]:hidden">
+        Weekly ranking data
+        <ChevronDown
+          className="h-4 w-4 shrink-0 transition-transform group-open:rotate-180"
+          aria-hidden="true"
+        />
+      </summary>
+      <TableViewport
+        ariaLabel={`Weekly power-ranking data for ${seasonName}`}
+        scrollHint="Scroll to compare every team"
+        viewportClassName="rounded-none border-x-0 border-b-0 focus-visible:ring-inset focus-visible:ring-offset-0"
+      >
+        <table className="w-max min-w-full border-collapse text-xs">
+          <caption className="sr-only">
+            Exact weekly power-ranking positions for {seasonName}
+          </caption>
+          <thead className="border-y border-slate-200 bg-white text-[11px] uppercase tracking-wide text-slate-500">
+            <tr>
+              <th
+                scope="col"
+                className="sticky left-0 z-10 bg-white px-3 py-2.5 text-left"
+              >
+                Week
+              </th>
+              {rankings.series.map((team) => (
+                <th
+                  key={team.teamId}
+                  scope="col"
+                  className="min-w-28 px-3 py-2.5 text-center"
+                >
+                  {team.name}
+                  {team.teamId === signedInTeamId ? (
+                    <span className="sr-only"> (your team)</span>
+                  ) : null}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-200 bg-white">
+            {rankings.chartData.map((point) => (
+              <tr key={point.weekId}>
+                <th
+                  scope="row"
+                  className="sticky left-0 z-10 whitespace-nowrap bg-white px-3 py-2.5 text-left font-semibold text-slate-700"
+                >
+                  {point.label}
+                </th>
+                {rankings.series.map((team) => {
+                  const value = point[team.teamId];
+                  return (
+                    <td
+                      key={`${point.weekId}-${team.teamId}`}
+                      className="px-3 py-2.5 text-center font-mono font-semibold tabular-nums text-slate-800"
+                    >
+                      {typeof value === "number" ? `#${value}` : "—"}
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </TableViewport>
+    </details>
   );
 }
 
@@ -109,9 +340,9 @@ export function PowerRankings({ season, rankings }: PowerRankingsProps) {
   return (
     <div className="mx-auto w-full max-w-6xl space-y-4 px-2.5 py-3 sm:px-6 sm:py-4 lg:py-6">
       <header className="rounded-2xl border border-slate-200 bg-white px-3.5 py-3.5 shadow-sm sm:px-5 sm:py-4">
-        <p className="text-[13px] font-semibold uppercase text-slate-500">
+        <h2 className="font-oswald text-2xl text-slate-950 sm:text-3xl">
           {season.name} power rankings
-        </p>
+        </h2>
         <p className="mt-1 text-xs text-slate-500">
           {snapshotLabel} order {latestWeekLabel}, plus every available weekly
           snapshot.
@@ -129,87 +360,28 @@ export function PowerRankings({ season, rankings }: PowerRankingsProps) {
         </section>
       ) : (
         <>
-          <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-            <div className="border-b border-slate-200 px-3 py-3 sm:px-5 sm:py-4">
-              <h2 className="font-oswald text-xl text-slate-950 sm:text-2xl">
-                {snapshotLabel} ranking
-              </h2>
-              <p className="mt-0.5 text-[11px] text-slate-500 sm:text-xs">
-                Movement compares the two most recent ranked weeks.
-              </p>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[420px] border-collapse text-xs sm:text-sm">
-                <caption className="sr-only">
-                  {snapshotLabel} team power rankings for {season.name}
-                </caption>
-                <thead className="border-b border-slate-200 bg-slate-50 text-[10px] uppercase tracking-[0.14em] text-slate-500">
-                  <tr>
-                    <th className="w-16 px-3 py-2.5 text-center">Rank</th>
-                    <th className="px-3 py-2.5 text-left">Team</th>
-                    <th className="w-24 px-3 py-2.5 text-center">Movement</th>
-                    <th className="w-24 px-3 py-2.5 text-right">Rating</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {rankings.entries.map((entry) => (
-                    <tr
-                      key={entry.team.id}
-                      className="transition-colors hover:bg-slate-50"
-                    >
-                      <td className="px-3 py-2.5 text-center font-oswald text-lg font-semibold tabular-nums text-slate-950">
-                        {entry.rank}
-                      </td>
-                      <th
-                        scope="row"
-                        className="px-3 py-2.5 text-left font-normal"
-                      >
-                        <div className="flex min-w-0 items-center gap-2.5">
-                          <span
-                            className="h-5 w-1 shrink-0 rounded-full"
-                            style={{
-                              backgroundColor:
-                                teamColors[entry.team.id] ?? entry.color,
-                            }}
-                            aria-hidden="true"
-                          />
-                          <TeamLogo entry={entry} />
-                          <span className="min-w-0 truncate font-semibold text-slate-900">
-                            {entry.team.name ?? entry.team.abbr ?? "Team"}
-                          </span>
-                        </div>
-                      </th>
-                      <td className="px-3 py-2.5 text-center">
-                        <RankMovement entry={entry} />
-                      </td>
-                      <td className="px-3 py-2.5 text-right font-mono font-semibold tabular-nums text-slate-700">
-                        {entry.rating === null ? "—" : entry.rating.toFixed(1)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </section>
+          <CurrentRanking
+            entries={rankings.entries}
+            seasonName={season.name}
+            snapshotLabel={snapshotLabel}
+            teamColors={teamColors}
+          />
 
           <section className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:p-5">
             <div>
               <h2 className="font-oswald text-xl text-slate-950 sm:text-2xl">
                 Ranking history
               </h2>
-              <p className="mt-0.5 text-[11px] text-slate-500 sm:text-xs">
-                Rank 1 is shown at the top. Hover or tap the chart for weekly
-                positions.
+              <p className="mt-0.5 text-xs text-slate-500">
+                Rank 1 is shown at the top. Open the weekly data below for an
+                exact keyboard-accessible table.
                 {signedInTeamId
                   ? " Your team is shown with a thicker line."
                   : ""}
               </p>
             </div>
             {rankings.chartData.length ? (
-              <div
-                className="mt-4 h-[28rem] w-full"
-                aria-label={`Weekly power-ranking history for ${season.name}`}
-              >
+              <div className="mt-4 h-72 w-full sm:h-[28rem]" aria-hidden="true">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart
                     data={rankings.chartData}
@@ -278,6 +450,13 @@ export function PowerRankings({ season, rankings }: PowerRankingsProps) {
                 Weekly ranking history is not available for this season.
               </p>
             )}
+            {rankings.chartData.length ? (
+              <RankingHistoryData
+                rankings={rankings}
+                seasonName={season.name}
+                signedInTeamId={signedInTeamId}
+              />
+            ) : null}
           </section>
         </>
       )}

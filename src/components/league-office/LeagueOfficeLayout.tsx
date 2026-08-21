@@ -1,52 +1,47 @@
 "use client";
 
+import { useAuthSession, useLeagueOfficeContextNavigation } from "@gshl-hooks";
 import {
-  useAppPathname,
-  useAppRouter,
-  useAuthSession,
-  useLeagueOfficeNavigation,
-} from "@gshl-hooks";
-import { HorizontalToggle, SecondaryPageToolbar } from "@gshl-nav";
+  HorizontalToggle,
+  PageContextNavigation,
+  SecondaryPageToolbar,
+} from "@gshl-nav";
 import type { ToggleItem } from "@gshl-types";
-import { useEffect } from "react";
+import { LeagueOfficeSkeleton } from "@gshl-skeletons";
 
 export function LeagueOfficeLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const { selectedType, setSelectedType } = useLeagueOfficeNavigation();
+  const navigation = useLeagueOfficeContextNavigation();
   const { session } = useAuthSession();
-  const { pathname } = useAppPathname();
-  const { router } = useAppRouter();
-  const isMockDraftPage = pathname === "/leagueoffice/mock-draft";
-
-  useEffect(() => {
-    if (isMockDraftPage) {
-      setSelectedType("mockDraft");
-      return;
-    }
-
-    const view = new URLSearchParams(window.location.search).get("view");
-    if (view === "freeAgents") {
-      setSelectedType("freeAgents");
-    }
-  }, [isMockDraftPage, setSelectedType]);
+  const selectedType = navigation.selectedView;
+  const isMockDraftPage = navigation.isMockDraftPage;
 
   const selectView = (type: string | null) => {
-    const nextType = type ?? "";
-    setSelectedType(nextType);
-    router.push(
-      nextType === "mockDraft" ? "/leagueoffice/mock-draft" : "/leagueoffice",
-    );
+    const nextType = type ?? "draft";
+    if (
+      nextType === "mockDraft" ||
+      nextType === "draft" ||
+      nextType === "freeAgents" ||
+      nextType === "rules" ||
+      nextType === "confBattle" ||
+      nextType === "ownerRankings" ||
+      nextType === "contracts" ||
+      nextType === "users" ||
+      nextType === "jobs" ||
+      nextType === "newsroom" ||
+      nextType === "imageUpload"
+    ) {
+      navigation.selectView(nextType);
+    }
   };
 
   const pageToolbarProps: {
     toolbarKeys: ToggleItem<string | null>[];
     activeKey: string | null;
-    className?: [string?, string?, string?];
   } = {
-    className: ["bottom-24 h-8", "h-6", "text-xs"],
     activeKey: isMockDraftPage ? "mockDraft" : selectedType,
     toolbarKeys: [
       {
@@ -112,23 +107,31 @@ export function LeagueOfficeLayout({
   };
 
   return (
-    <div className="pb-24 font-varela lg:pb-8 lg:pt-12">
-      {children}
-      <SecondaryPageToolbar>
-        <HorizontalToggle<ToggleItem<string | null>>
-          items={pageToolbarProps.toolbarKeys}
-          selectedItem={
-            pageToolbarProps.toolbarKeys.find(
-              (item) => item.key === pageToolbarProps.activeKey,
-            ) ?? null
-          }
-          onSelect={(type: ToggleItem<string | null>) => type.setter(type.key)}
-          getItemKey={(type: ToggleItem<string | null>) => type.key}
-          getItemLabel={(type: ToggleItem<string | null>) => type.value}
-          itemClassName="text-sm text-nowrap"
-          className="no-scrollbar flex flex-row overflow-scroll"
-        />
-      </SecondaryPageToolbar>
+    <div className="font-varela">
+      <PageContextNavigation ariaLabel="League Office views">
+        <SecondaryPageToolbar>
+          <HorizontalToggle<ToggleItem<string | null>>
+            items={pageToolbarProps.toolbarKeys}
+            selectedItem={
+              pageToolbarProps.toolbarKeys.find(
+                (item) => item.key === pageToolbarProps.activeKey,
+              ) ?? null
+            }
+            onSelect={(type: ToggleItem<string | null>) =>
+              type.setter(type.key)
+            }
+            getItemKey={(type: ToggleItem<string | null>) => type.key}
+            getItemLabel={(type: ToggleItem<string | null>) => type.value}
+            itemClassName="text-nowrap text-sm"
+          />
+        </SecondaryPageToolbar>
+      </PageContextNavigation>
+      <main aria-labelledby="league-office-page-heading">
+        <h1 id="league-office-page-heading" className="sr-only">
+          League Office
+        </h1>
+        {navigation.isReady ? children : <LeagueOfficeSkeleton />}
+      </main>
     </div>
   );
 }

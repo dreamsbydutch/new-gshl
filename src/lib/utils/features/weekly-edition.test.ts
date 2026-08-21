@@ -3,6 +3,7 @@ import test from "node:test";
 import type { BuildWeeklyEditionFactPacketInput } from "@gshl-types";
 import {
   buildWeeklyEditionCareerRecordFacts,
+  buildWeeklyEditionCtaHref,
   buildMilestoneEditionFactPacket,
   buildTemplateWeeklyEdition,
   buildWeeklyEditionCategoryMargins,
@@ -19,6 +20,30 @@ import {
   validateWeeklyEditionImport,
   weeklyEditionContractAffectsSeason,
 } from "./weekly-edition";
+
+void test("makes Press Box matchup CTAs source-aware", () => {
+  assert.equal(
+    buildWeeklyEditionCtaHref("/matchup/matchup-1"),
+    "/matchup/matchup-1?from=headlines",
+  );
+  assert.equal(
+    buildWeeklyEditionCtaHref(
+      "/matchup/matchup-1?side=home&from=schedule&panel=players#stats",
+    ),
+    "/matchup/matchup-1?side=home&from=headlines&panel=players#stats",
+  );
+});
+
+void test("leaves non-Matchup edition links unchanged", () => {
+  assert.equal(
+    buildWeeklyEditionCtaHref("/schedule?view=week#current"),
+    "/schedule?view=week#current",
+  );
+  assert.equal(
+    buildWeeklyEditionCtaHref("https://example.com/matchup/matchup-1"),
+    "https://example.com/matchup/matchup-1",
+  );
+});
 
 function source(): BuildWeeklyEditionFactPacketInput {
   return {

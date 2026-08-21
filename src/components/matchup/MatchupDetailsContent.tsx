@@ -1,12 +1,15 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { MatchupSkeleton } from "@gshl-skeletons";
+import { TableViewport } from "@gshl-ui";
 import {
   lighten,
   readableText,
   useNHLTeams,
+  useMatchupContextNavigation,
   useSeasons,
   useTeamColor,
   useWeeks,
@@ -116,6 +119,22 @@ function CategoryResultsCard({
   homeTeam: GSHLTeam | null;
   awayTeam: GSHLTeam | null;
 }) {
+  const awayLabel = awayTeam?.abbr ?? awayTeam?.name ?? "Away";
+  const homeLabel = homeTeam?.abbr ?? homeTeam?.name ?? "Home";
+  const outcomeFor = (
+    category: CategoryResult,
+    side: "away" | "home",
+  ): "Win" | "Loss" | "Tie" => {
+    if (category.winner === "tie") return "Tie";
+    return category.winner === side ? "Win" : "Loss";
+  };
+  const valueClassFor = (category: CategoryResult, side: "away" | "home") => {
+    const outcome = outcomeFor(category, side);
+    if (outcome === "Win") return "font-semibold text-emerald-700";
+    if (outcome === "Tie") return "font-medium text-slate-700";
+    return "text-slate-500";
+  };
+
   return (
     <section className="rounded-lg border border-slate-200 bg-white p-2.5 shadow-sm sm:rounded-2xl sm:p-4">
       <div className="mb-2 sm:mb-4">
@@ -128,60 +147,124 @@ function CategoryResultsCard({
           No category data available yet.
         </div>
       ) : (
-        <div className="-mx-0.5 overflow-x-auto pb-1 sm:mx-0">
-          <table className="min-w-max text-[10px] sm:w-full sm:text-sm">
-            <tbody>
-              <tr>
-                <td className="sticky left-0 whitespace-nowrap bg-white pb-1 pr-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500 sm:text-xs">
-                  {awayTeam?.abbr ?? awayTeam?.name ?? "Away"}
-                </td>
-                {categories.map((cat) => (
-                  <td
-                    key={cat.key}
-                    className={`whitespace-nowrap px-0.5 pb-1 text-center text-[10px] sm:px-1 sm:text-sm ${
-                      cat.winner === "away"
-                        ? "font-semibold text-emerald-600"
-                        : cat.winner === "tie"
-                          ? "text-slate-500"
-                          : "text-slate-300"
-                    }`}
+        <>
+          <div className="lg:hidden">
+            <div
+              aria-hidden="true"
+              className="grid grid-cols-[minmax(0,1fr)_5rem_minmax(0,1fr)] items-center gap-2 border-b border-slate-200 px-2 pb-2 text-center text-xs font-semibold uppercase tracking-[0.12em] text-slate-500"
+            >
+              <span className="truncate">{awayLabel}</span>
+              <span>Category</span>
+              <span className="truncate">{homeLabel}</span>
+            </div>
+            <dl>
+              {categories.map((category) => {
+                const awayOutcome = outcomeFor(category, "away");
+                const homeOutcome = outcomeFor(category, "home");
+
+                return (
+                  <div
+                    key={category.key}
+                    className="grid min-h-14 grid-cols-[minmax(0,1fr)_5rem_minmax(0,1fr)] items-center gap-2 border-b border-slate-100 px-2 py-2 text-center last:border-0"
                   >
-                    {cat.awayValue}
-                  </td>
-                ))}
-              </tr>
-              <tr>
-                <td className="sticky left-0 bg-white" />
-                {categories.map((cat) => (
-                  <td key={cat.key} className="px-0.5 py-1 text-center">
-                    <span className="inline-block whitespace-nowrap rounded bg-slate-100 px-1 py-0.5 text-[9px] font-medium text-slate-500 sm:px-1.5 sm:text-xs">
-                      {cat.label}
-                    </span>
-                  </td>
-                ))}
-              </tr>
-              <tr>
-                <td className="sticky left-0 whitespace-nowrap bg-white pr-3 pt-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500 sm:text-xs">
-                  {homeTeam?.abbr ?? homeTeam?.name ?? "Home"}
-                </td>
-                {categories.map((cat) => (
-                  <td
-                    key={cat.key}
-                    className={`whitespace-nowrap px-0.5 pt-1 text-center text-[10px] sm:px-1 sm:text-sm ${
-                      cat.winner === "home"
-                        ? "font-semibold text-emerald-600"
-                        : cat.winner === "tie"
-                          ? "text-slate-500"
-                          : "text-slate-300"
-                    }`}
+                    <dt className="col-start-2 row-start-1 rounded-md bg-slate-100 px-1.5 py-1 text-xs font-semibold text-slate-600">
+                      {category.label}
+                    </dt>
+                    <dd
+                      aria-label={`${awayLabel}: ${category.awayValue}, ${awayOutcome}`}
+                      className={`col-start-1 row-start-1 flex flex-col items-center text-sm ${valueClassFor(category, "away")}`}
+                    >
+                      <span>{category.awayValue}</span>
+                      <span className="mt-0.5 text-xs font-medium">
+                        {awayOutcome}
+                      </span>
+                    </dd>
+                    <dd
+                      aria-label={`${homeLabel}: ${category.homeValue}, ${homeOutcome}`}
+                      className={`col-start-3 row-start-1 flex flex-col items-center text-sm ${valueClassFor(category, "home")}`}
+                    >
+                      <span>{category.homeValue}</span>
+                      <span className="mt-0.5 text-xs font-medium">
+                        {homeOutcome}
+                      </span>
+                    </dd>
+                  </div>
+                );
+              })}
+            </dl>
+          </div>
+
+          <TableViewport
+            ariaLabel={`${awayLabel} and ${homeLabel} matchup category comparison`}
+            className="hidden lg:block"
+            scrollHint="Scroll to compare every matchup category"
+          >
+            <table className="w-max min-w-full border-collapse text-sm">
+              <caption className="sr-only">
+                {awayLabel} and {homeLabel} matchup category comparison
+              </caption>
+              <thead className="bg-slate-50">
+                <tr className="border-b border-slate-200">
+                  <th
+                    scope="col"
+                    className="sticky left-0 z-30 min-w-24 bg-slate-50 px-3 py-2 text-left text-xs font-semibold uppercase tracking-[0.14em] text-slate-500"
                   >
-                    {cat.homeValue}
-                  </td>
+                    Team
+                  </th>
+                  {categories.map((category) => (
+                    <th
+                      key={category.key}
+                      scope="col"
+                      className="min-w-14 whitespace-nowrap px-2 py-2 text-center text-xs font-semibold uppercase tracking-[0.14em] text-slate-500"
+                    >
+                      {category.label}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {(
+                  [
+                    {
+                      side: "away" as const,
+                      label: awayLabel,
+                      value: (category: CategoryResult) => category.awayValue,
+                    },
+                    {
+                      side: "home" as const,
+                      label: homeLabel,
+                      value: (category: CategoryResult) => category.homeValue,
+                    },
+                  ] as const
+                ).map((row) => (
+                  <tr
+                    key={row.side}
+                    className="border-b border-slate-100 last:border-0"
+                  >
+                    <th
+                      scope="row"
+                      className="sticky left-0 z-20 bg-white px-3 py-3 text-left text-xs font-semibold uppercase tracking-[0.14em] text-slate-600"
+                    >
+                      {row.label}
+                    </th>
+                    {categories.map((category) => {
+                      const outcome = outcomeFor(category, row.side);
+                      return (
+                        <td
+                          key={category.key}
+                          className={`whitespace-nowrap px-2 py-3 text-center ${valueClassFor(category, row.side)}`}
+                        >
+                          {row.value(category)}
+                          <span className="sr-only">, {outcome}</span>
+                        </td>
+                      );
+                    })}
+                  </tr>
                 ))}
-              </tr>
-            </tbody>
-          </table>
-        </div>
+              </tbody>
+            </table>
+          </TableViewport>
+        </>
       )}
     </section>
   );
@@ -322,6 +405,7 @@ export function MatchupDetailsContent({
     weekId,
     enabled: Boolean(weekId),
   });
+  const matchupNavigation = useMatchupContextNavigation(seasonId, weekId);
 
   const matchup = useMemo(
     () => scheduleData.matchups.find((entry) => String(entry.id) === matchupId),
@@ -332,7 +416,7 @@ export function MatchupDetailsContent({
   const teamLookup = useMemo(() => {
     return new Map(scheduleData.teams.map((team) => [String(team.id), team]));
   }, [scheduleData.teams]);
-  const [selectedSide, setSelectedSide] = useState<"away" | "home">("away");
+  const selectedSide = matchupNavigation.selectedSide;
 
   const homeTeam = matchup
     ? (findTeamById(scheduleData.teams, matchup.homeTeamId) ?? null)
@@ -428,10 +512,6 @@ export function MatchupDetailsContent({
     [awayPlayers, homePlayers, teamLookup],
   );
 
-  useEffect(() => {
-    setSelectedSide("away");
-  }, [matchupId]);
-
   const selectedTeam = selectedSide === "away" ? awayTeam : homeTeam;
   const selectedPlayers = selectedSide === "away" ? awayPlayers : homePlayers;
 
@@ -446,26 +526,21 @@ export function MatchupDetailsContent({
       )
     : null;
 
-  const handleBack = () => {
-    if (typeof window !== "undefined" && window.history.length > 1) {
-      window.history.back();
-      return;
-    }
-
-    if (typeof window !== "undefined") {
-      window.location.assign("/schedule");
-    }
-  };
-
-  if (scheduleData.isLoading && !matchup) {
+  if (scheduleData.isLoading) {
     return <MatchupSkeleton />;
   }
 
   if (scheduleData.error) {
     return (
-      <main className="mx-auto max-w-3xl px-4 py-10">
+      <main
+        aria-labelledby="matchup-error-heading"
+        className="mx-auto max-w-3xl px-4 py-10"
+      >
         <div className="rounded-2xl border border-rose-200 bg-rose-50 p-6 text-rose-800">
-          Couldn&apos;t load this matchup right now.
+          <h1 id="matchup-error-heading" className="text-xl font-bold">
+            Matchup unavailable
+          </h1>
+          <p className="mt-2">Couldn&apos;t load this matchup right now.</p>
         </div>
       </main>
     );
@@ -473,26 +548,40 @@ export function MatchupDetailsContent({
 
   if (!matchup) {
     return (
-      <main className="mx-auto max-w-3xl px-4 py-10">
+      <main
+        aria-labelledby="matchup-not-found-heading"
+        className="mx-auto max-w-3xl px-4 py-10"
+      >
         <div className="rounded-2xl border border-slate-200 bg-white p-6 text-slate-600 shadow-sm">
-          Matchup details were not found for this week.
+          <h1
+            id="matchup-not-found-heading"
+            className="text-xl font-bold text-slate-900"
+          >
+            Matchup not found
+          </h1>
+          <p className="mt-2">Matchup details were not found for this week.</p>
         </div>
       </main>
     );
   }
 
   return (
-    <main className="mx-auto max-w-6xl px-2 py-3 pb-20 sm:px-4 sm:py-8 lg:pb-10">
+    <main
+      aria-labelledby="matchup-page-heading"
+      className="mx-auto max-w-6xl px-2 py-3 sm:px-4 sm:py-8"
+    >
+      <h1 id="matchup-page-heading" className="sr-only">
+        {awayTeam?.name ?? "Away team"} at {homeTeam?.name ?? "Home team"}
+      </h1>
       <div className="mb-3 flex items-center justify-between gap-2 sm:mb-6">
-        <button
-          type="button"
-          onClick={handleBack}
-          className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-600 underline-offset-4 shadow-sm hover:text-slate-900 hover:underline sm:px-3 sm:py-1.5 sm:text-sm"
+        <Link
+          href={matchupNavigation.backHref}
+          className="hidden min-h-11 items-center gap-1 rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-600 underline-offset-4 shadow-sm hover:text-slate-900 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 lg:inline-flex lg:text-sm"
         >
-          <ArrowLeftIcon className="h-4 w-4" />
-          Back
-        </button>
-        <div className="line-clamp-2 text-right text-[9px] uppercase leading-tight tracking-[0.12em] text-slate-500 sm:text-xs sm:tracking-[0.18em]">
+          <ArrowLeftIcon aria-hidden="true" className="h-4 w-4" />
+          {matchupNavigation.backLabel}
+        </Link>
+        <div className="ml-auto line-clamp-2 text-right text-[9px] uppercase leading-tight tracking-[0.12em] text-slate-500 sm:text-xs sm:tracking-[0.18em]">
           {season?.name ?? "Season"}{" "}
           {gameDisplay ? `- ${gameDisplay.label}` : ""}
           {weekRange ? ` - ${weekRange}` : ""}
@@ -521,6 +610,9 @@ export function MatchupDetailsContent({
               alignment="left"
             />
           </div>
+          <p className="mt-2 text-center text-xs leading-tight text-slate-600 sm:hidden">
+            {matchupStatus}
+          </p>
         </div>
 
         <div className="space-y-2 sm:space-y-4">
@@ -536,7 +628,11 @@ export function MatchupDetailsContent({
 
       <section className="mt-3 space-y-2 sm:mt-6 sm:space-y-4">
         <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm sm:rounded-2xl">
-          <div className="grid grid-cols-2">
+          <div
+            role="tablist"
+            aria-label="Select a team for player statistics"
+            className="grid grid-cols-2"
+          >
             {[
               { side: "away" as const, team: awayTeam, label: "Away Team" },
               { side: "home" as const, team: homeTeam, label: "Home Team" },
@@ -550,9 +646,27 @@ export function MatchupDetailsContent({
               return (
                 <button
                   key={side}
+                  id={`matchup-${side}-players-tab`}
                   type="button"
-                  aria-pressed={isSelected}
-                  onClick={() => setSelectedSide(side)}
+                  role="tab"
+                  aria-controls="matchup-player-statistics-panel"
+                  aria-selected={isSelected}
+                  tabIndex={isSelected ? 0 : -1}
+                  onClick={() => matchupNavigation.selectSide(side)}
+                  onKeyDown={(event) => {
+                    const nextSide =
+                      event.key === "ArrowLeft" || event.key === "Home"
+                        ? "away"
+                        : event.key === "ArrowRight" || event.key === "End"
+                          ? "home"
+                          : null;
+                    if (!nextSide) return;
+                    event.preventDefault();
+                    matchupNavigation.selectSide(nextSide);
+                    document
+                      .getElementById(`matchup-${nextSide}-players-tab`)
+                      ?.focus();
+                  }}
                   className={[
                     "relative flex min-h-12 min-w-0 items-center justify-center gap-1.5 px-2 py-2 text-left transition-all sm:min-h-24 sm:gap-4 sm:px-4 sm:py-5",
                     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-slate-400",
@@ -596,12 +710,18 @@ export function MatchupDetailsContent({
           </div>
         </div>
 
-        <PlayerStatsTable
-          team={selectedTeam}
-          nhlTeams={nhlTeamsData as NHLTeam[]}
-          players={selectedPlayers}
-          seasonCategories={season?.categories}
-        />
+        <div
+          id="matchup-player-statistics-panel"
+          role="tabpanel"
+          aria-labelledby={`matchup-${selectedSide}-players-tab`}
+        >
+          <PlayerStatsTable
+            team={selectedTeam}
+            nhlTeams={nhlTeamsData as NHLTeam[]}
+            players={selectedPlayers}
+            seasonCategories={season?.categories}
+          />
+        </div>
       </section>
     </main>
   );

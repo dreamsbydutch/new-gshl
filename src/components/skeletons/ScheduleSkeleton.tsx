@@ -66,7 +66,7 @@ export function MatchupStatsSkeleton() {
 
 export function TeamScheduleSkeleton() {
   return (
-    <div className="mx-2 mb-40 mt-4">
+    <div className="mx-2 mb-8 mt-4">
       <ScheduleColumnHeaderSkeleton variant="team" />
       <div>
         {Array.from({ length: 10 }).map((_, index) => (
@@ -79,7 +79,7 @@ export function TeamScheduleSkeleton() {
 
 export function WeeklyScheduleSkeleton() {
   return (
-    <div className="mx-2 mb-40 mt-4">
+    <div className="mx-2 mb-8 mt-4">
       <ScheduleColumnHeaderSkeleton variant="week" />
       <div>
         {Array.from({ length: 6 }).map((_, index) => (

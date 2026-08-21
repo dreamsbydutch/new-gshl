@@ -74,8 +74,15 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       return session;
     },
     authorized({ auth: session, request }) {
-      const isProtected = ["/lockerroom", "/draftboard", "/leagueoffice"].some(
-        (path) => request.nextUrl.pathname.startsWith(path),
+      const isProtected = [
+        "/lockerroom",
+        "/draft",
+        "/draftboard",
+        "/leagueoffice",
+      ].some(
+        (path) =>
+          request.nextUrl.pathname === path ||
+          request.nextUrl.pathname.startsWith(`${path}/`),
       );
       if (!isProtected) return true;
       return session?.user?.status === "active";

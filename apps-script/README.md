@@ -1,41 +1,29 @@
-# GSHL Apps Script
+# GSHL Apps Script runtime
 
-This Apps Script project is the production writer for the active GSHL season.
-It is intentionally limited to:
+This package is the Google Apps Script runtime for active-season Yahoo ingest,
+lineup assignment, aggregation, ratings, standings, and power snapshots written
+to Google Sheets. It is a separate operational surface from the Convex-backed
+web application.
 
-- Daily Yahoo roster ingestion for the current scrape window
-- Current-season lineup assignment and daily stat writes
-- Current-season aggregation, ratings, standings, and power rankings
+Read the [Apps Script wiki page](../docs/operations/apps-script.md) for system
+context and [AGENTS.md](../AGENTS.md) before changing the runtime.
 
-Historical rebuilds, repair tooling, and player-maintenance sidecars have been
-removed from Apps Script. Those workflows now live in local scripts.
+## Runtime boundary
 
-## Runtime Model
+```text
+Yahoo Fantasy -> Google Apps Script -> Google Sheets
 
+Next.js browser -> Convex
 ```
-Yahoo Fantasy -> Apps Script -> Google Sheets -> Next.js
-```
 
-- Apps Script writes data
-- Google Sheets stores the canonical tables
-- Next.js reads only
+Google Sheets is authoritative for this runtime's configured jobs; it is not
+the current browser data path. Historical rebuilds, repairs, imports, parity
+checks, and archives belong in the local [`scripts/`](../scripts/README.md)
+package unless a managed Convex job has proven equivalent behavior.
 
-## Active Season Resolution
+## Public trigger surface
 
-The Apps Script jobs resolve the active season automatically.
-
-Selection rules:
-
-1. Use the `Season` row whose `startDate <= targetDate <= endDate`
-2. If no date-range match exists, fall back to exactly one `Season` row with `isActive=true`
-3. If neither rule yields exactly one season, the job throws
-
-`targetDate` defaults to `GshlUtils.core.date.getTargetDateForScraping()`, which
-uses the current Eastern Time scrape date.
-
-## Public Trigger Surface
-
-Only these globals are intended to be run from Apps Script triggers or manual execution:
+Only these globals are intended for manual runs or Apps Script triggers:
 
 - `scrapeYahoo()`
 - `aggregateCurrentSeason()`
@@ -44,142 +32,116 @@ Only these globals are intended to be run from Apps Script triggers or manual ex
 - `finalizeCurrentSeasonAggregation()`
 - `runScheduledCurrentSeasonFinalize()`
 
-## Main Flow
+`aggregateCurrentSeason()` runs the refresh phase and schedules finalize as a
+one-time follow-up after clearing duplicate follow-up triggers.
 
-### 1. Daily ingest
+## Active-season resolution
 
-`scrapeYahoo()`:
+Jobs resolve the season for the Eastern Time target date:
 
-- resolves the active scrape date
-- resolves the active season and week
-- fetches Yahoo roster pages for current teams
-- builds `PlayerDayStatLine` rows
-- computes lineup fields and daily ratings
-- writes `PlayerDayStatLine` and `TeamDayStatLine`
+1. Prefer the one season where `startDate <= targetDate <= endDate`.
+2. Otherwise require exactly one row with `isActive=true`.
+3. Throw when neither rule produces exactly one season.
 
-### 2. Current-season refresh
+The scrape target defaults to `GshlUtils.core.date.getTargetDateForScraping()`.
 
-`aggregateCurrentSeasonStatsOnly()`:
+## Main flows
 
-- resolves the active season
-- rolls `PlayerDayStatLine` into `PlayerWeekStatLine`
-- rolls player aggregates into `PlayerSplitStatLine` and `PlayerTotalStatLine`
-- rolls team aggregates into `TeamDayStatLine`, `TeamWeekStatLine`, and `TeamSeasonStatLine`
-- assigns regular-season team-season award ratings/ranks
+### Daily ingest
 
-`aggregateCurrentSeasonRefreshOnly()`:
+`scrapeYahoo()` resolves the date, season, week, and teams; reads Yahoo roster
+pages; builds player-day rows; assigns lineups and daily ratings; and writes
+player/team day stat lines.
 
-- rolls `PlayerDayStatLine` into `PlayerWeekStatLine`
-- rolls player aggregates into `PlayerSplitStatLine` and `PlayerTotalStatLine`
-- rolls team aggregates into `TeamWeekStatLine` and `TeamSeasonStatLine`
-- assigns regular-season team-season award ratings/ranks
-- refreshes `PlayerNHL` season stats
-- refreshes current-season ratings
-- refreshes current-season overall talent ratings
-- snapshots start-of-week power ratings for every team in each completed or
-  active week; the current week's play is carried into the following week
+### Refresh
 
-### 3. Current-season finalize
+The refresh entry points aggregate player days into player week, split, total,
+and team day/week/season rows. The full refresh also updates NHL totals,
+current-season ratings, overall talent, and entering-week power snapshots.
 
-`finalizeCurrentSeasonAggregation()`:
+Power is an entering-week snapshot: Week N play may change Week N+1, but never
+Week N's stored starting power.
 
-- updates matchup outcomes
-- updates standings
-- refreshes start-of-week power rankings and entering-week matchup ranks
-- reruns matchup/standing updates so ranking-derived matchup fields stay current
+### Finalize
 
-`aggregateCurrentSeason()` runs the refresh phase and schedules the finalize
-phase as a one-time follow-up trigger.
+Finalize updates matchup outcomes, standings, start-of-week power, and matchup
+ranks, then reruns result/standing updates so ranking-derived fields remain
+consistent.
 
-## File Layout
+## Layout
 
-```
+```text
 apps-script/
-  AggregationJobs.js
-  Config/
-  Core/
+  AggregationJobs.js          public trigger wrappers
+  Config/Config.js            workbook, league, and default flags
+  Core/                       environment, schemas, constants, utilities
   features/
-    LineupBuilder.js
-    MatchupHandler.js
-    PlayerNhlStatsUpdater.js
+    YahooScraper.js           Yahoo ingestion
+    LineupBuilder.js          lineup assignment
+    StatsAggregator.js        current-season rollups
+    MatchupHandler.js         results and standings inputs
+    PlayerNhlStatsUpdater.js  NHL season totals
     PlayerOverallRatingUpdater.js
-    PowerRankingsAlgo.js
     RatingUpdater.js
-    StatsAggregator.js
-    YahooScraper.js
-    RankingEngine/
+    PowerRankingsAlgo.js      synchronized power runtime
+    RankingEngine/            synchronized rating runtime
 ```
 
-## Ranking Engine Sync
+Use JavaScript compatible with the Apps Script V8 runtime. Do not introduce
+Node filesystem/process APIs or import the Next.js/Convex client runtime.
 
-Current ranking outputs also include team-season award-style ratings:
+## Ranking and power synchronization
 
-- `hartRating` / `hartRk` for pure team-season value
-- `norrisRating` / `norrisRk` for defense-driven team performance
-- `vezinaRating` / `vezinaRk` for goalie-driven team performance
-- `calderRating` / `calderRk` for draft value
-- `jackAdamsRating` / `jackAdamsRk` for coaching value
-- `GMOYRating` / `GMOYRk` for roster-management value
+The hand-edited sources live under `scripts/src/runtime/apps-script/`. The
+following Apps Script files are synchronized output:
 
-These are calculated by the shared ranking engine from regular-season team,
-player, draft, and standings data and written onto `TeamSeasonStatLine`.
+- `features/PowerRankingsAlgo.js`
+- `features/RankingEngine/config.js`
+- `features/RankingEngine/player-pure.js`
+- `features/RankingEngine/team-pure.js`
+- `features/RankingEngine/index.js`
 
-The ranking engine is hand-edited in `scripts/src/runtime/apps-script/features/RankingEngine/`.
+From the repository root:
 
-`apps-script/features/RankingEngine/` is the deployed copy and should be treated
-as generated/synced output.
-
-From the repo root:
-
-```bash
-npm run ranking-engine:check
+```powershell
 npm run ranking-engine:sync
+npm run ranking-engine:check
 ```
 
-What these commands do:
+Do not patch only the Apps Script copy. See [the ranking reference](../docs/RANKING.md).
 
-- `ranking-engine:check` fails if the `scripts` source copy and the `apps-script`
-  deployed copy differ
-- `ranking-engine:sync` copies `config.js`, `player-pure.js`,
-  `team-pure.js`, and `index.js` from `scripts` into `apps-script`, then
-  verifies the hashes match
+## Configuration and Script Properties
 
-CI also runs the sync check automatically for ranking-engine changes.
-
-## Setup
-
-Install and authenticate `clasp`:
-
-```bash
-npm install -g @google/clasp
-clasp login
-```
-
-Create or connect the Apps Script project from `apps-script/`, then push:
-
-```bash
-cd apps-script
-clasp push
-clasp open
-```
-
-## Configuration
-
-Project-level constants live in `Config/Config.js`.
-
-Important values:
-
-- `SPREADSHEET_ID`
-- Player-day workbook ids
-- player/team stats workbook ids
-- `YAHOO_LEAGUE_ID`
-- default verbose and dry-run flags
-
-## Script Properties
-
-Supported runtime flags:
+Workbook IDs, the Yahoo league ID, and default logging/dry-run behavior live in
+`Config/Config.js`. Runtime overrides use these Script Properties:
 
 - `VERBOSE_LOGGING`
 - `DRY_RUN_MODE`
 
-If unset, Apps Script uses the defaults from `Config/Config.js`.
+Use the existing environment helpers and preserve dry-run behavior on write-heavy
+paths.
+
+`DRY_RUN_MODE` defaults to false and is not a transaction boundary. In
+particular, `aggregateCurrentSeason()` replaces its follow-up trigger even in
+dry-run mode, and power setup may add missing sheet columns before reaching its
+dry-run branch. Confirm the connected project, configuration, Script Properties,
+and full call path before running an entry point.
+
+## Local clasp commands
+
+From `apps-script/`:
+
+```powershell
+npm install
+npm run login
+npm run push
+npm run open
+npm run logs
+```
+
+`npm run create` creates a standalone project named `GSHL Cron Jobs`.
+`npm run deploy` runs `clasp push` and prints a success message; it does not
+create a versioned Apps Script deployment.
+
+Remote pushes, trigger edits, and Script Property changes require target
+confirmation and authorization. Inspect `clasp logs` after an authorized run.

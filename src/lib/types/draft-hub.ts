@@ -178,6 +178,10 @@ export interface DraftHubTeamPageProps {
 export interface DraftHubTeamToggleProps {
   seasonId?: string;
   excludedOwnerId?: string | null;
+  isLoading?: boolean;
+  teams?: readonly GSHLTeam[];
+  selectedOwnerId?: string | null;
+  onSelectOwner?: (ownerId: string) => void;
 }
 
 export interface DraftHubNavbarProps {
@@ -204,6 +208,7 @@ export interface DraftRosterBoardViewModel {
   season: Season | undefined;
   conferences: DraftRosterConferenceView[];
   players: Player[];
+  availablePlayers: DraftHubEligiblePlayerView[];
   nhlTeams: NHLTeam[];
   isLoading: boolean;
 }

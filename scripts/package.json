@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "player-bios:sync": "tsx src/commands/player-bios/sync-player-bios-from-puckpedia.ts",
+    "nhl-salaries:import": "tsx src/commands/player-bios/import-nhl-salary-history.ts",
     "player-bios:backfill-nhl-ids": "tsx src/commands/player-bios/backfill-nhl-api-ids.ts",
     "player-bios:backfill-yahoo-ids": "tsx src/commands/player-bios/backfill-yahoo-ids.ts",
     "awards:backfill": "node --use-system-ca --dns-result-order=ipv4first ../node_modules/tsx/dist/cli.mjs src/commands/awards/backfill-season-awards.ts",
@@ -17,7 +18,8 @@
     "power:rebuild": "node --use-system-ca --dns-result-order=ipv4first ../node_modules/tsx/dist/cli.mjs src/commands/power/rebuild-power-ratings.ts",
     "power:parity": "node --use-system-ca --dns-result-order=ipv4first ../node_modules/tsx/dist/cli.mjs src/commands/power/power-ratings-parity.ts",
     "test:power": "node ../node_modules/tsx/dist/cli.mjs --test src/domains/power/apps-script-power-engine.test.ts src/domains/aggregation/season-stat-aggregation.test.ts",
-    "test:player-bios": "node ../node_modules/tsx/dist/cli.mjs --test src/domains/maintenance/player-activity.test.ts src/domains/maintenance/player-directory.test.ts src/domains/maintenance/player-lineup.test.ts src/domains/maintenance/player-position.test.ts src/domains/maintenance/player-roster.test.ts src/domains/maintenance/sync-player-bios-from-puckpedia.test.ts src/domains/yahoo/player-yahoo-id-backfill.test.ts",
+    "test:player-bios": "node ../node_modules/tsx/dist/cli.mjs --test src/domains/maintenance/player-activity.test.ts src/domains/maintenance/player-directory.test.ts src/domains/maintenance/player-lineup.test.ts src/domains/maintenance/player-position.test.ts src/domains/maintenance/player-roster.test.ts src/domains/maintenance/nhl-salaries.test.ts src/domains/maintenance/sync-player-bios-from-puckpedia.test.ts src/domains/yahoo/player-yahoo-id-backfill.test.ts",
+    "test:archive": "node ../node_modules/tsx/dist/cli.mjs --test src/domains/maintenance/player-day-archive.test.ts src/integrations/data/sqlite-player-day-archive.test.ts",
     "standings:backfill": "node --use-system-ca --dns-result-order=ipv4first ../node_modules/tsx/dist/cli.mjs src/commands/standings/backfill-season-standings.ts",
     "stats:aggregate-season": "node --use-system-ca --dns-result-order=ipv4first --import tsx src/commands/stats/aggregate-season-stats.ts",
     "stats:backfill-hockey-reference": "node --use-system-ca --dns-result-order=ipv4first ../node_modules/tsx/dist/cli.mjs src/commands/stats/backfill-hockey-reference-season.ts",
@@ -25,6 +27,9 @@
     "stats:debug-yahoo-matchup-table": "tsx src/commands/stats/debug-yahoo-matchup-table.ts",
     "stats:backfill-yahoo-rosters": "npm run stats:backfill-yahoo-matchup-days --",
     "stats:sync-nhl-daily": "node --use-system-ca --dns-result-order=ipv4first ../node_modules/tsx/dist/cli.mjs src/commands/stats/sync-nhl-daily-stats.ts",
+    "stats:archive-player-days": "node --use-system-ca --dns-result-order=ipv4first ../node_modules/tsx/dist/cli.mjs src/commands/stats/archive-player-days.ts",
+    "stats:verify-player-day-archive": "node --use-system-ca --dns-result-order=ipv4first ../node_modules/tsx/dist/cli.mjs src/commands/stats/verify-player-day-archive.ts",
+    "stats:restore-player-days": "node --use-system-ca --dns-result-order=ipv4first ../node_modules/tsx/dist/cli.mjs src/commands/stats/restore-player-days.ts",
     "lineup:update-all": "node --use-system-ca --dns-result-order=ipv4first --expose-gc --max-old-space-size=4096 ../node_modules/tsx/dist/cli.mjs src/commands/lineup/update-all-lineups.ts",
     "convex:migrate": "tsx src/commands/convex/migrate-sheets-to-convex.ts",
     "yahoo:check-weekly-player-days": "tsx src/commands/yahoo/check-yahoo-weekly-player-days.ts",
@@ -33,10 +38,12 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
     "tsx": "^4.19.4",
     "typescript": "^5.5.3"
   },
   "dependencies": {
+    "better-sqlite3": "^12.2.0",
     "convex": "^1.42.0",
     "dotenv": "^16.5.0"
   }

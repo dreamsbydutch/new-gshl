@@ -79,7 +79,7 @@ export function JobManagement() {
   return (
     <section className="mx-auto max-w-6xl space-y-6 py-6">
       <div>
-        <h1 className="text-2xl font-bold">Operational Jobs</h1>
+        <h2 className="text-2xl font-bold">Operational Jobs</h2>
         <p className="text-sm text-muted-foreground">
           Runs are dry-run by default. Apply must be selected explicitly.
         </p>

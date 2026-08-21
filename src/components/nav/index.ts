@@ -12,6 +12,7 @@ export { WeeksToggle } from "./WeekNavigation";
 export { TeamsToggle } from "./TeamNavigation";
 export { SecondaryPageToolbar } from "./SecondaryToolbar";
 export { TertiaryPageToolbar } from "./TertiaryToolbar";
+export { PageContextNavigation } from "./PageContextNavigation";
 
 // Toggle Components
 export { HorizontalToggle, DropdownToggle } from "./Toggle";

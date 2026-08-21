@@ -41,6 +41,12 @@ const indexedFields: Record<string, Set<string>> = {
   conferences: new Set(["legacyId"]),
   owners: new Set(["legacyId"]),
   players: new Set(["legacyId", "ownerId", "isActive"]),
+  playerNhlSalaries: new Set([
+    "legacyId",
+    "playerId",
+    "nhlApiId",
+    "seasonStartYear",
+  ]),
   contracts: new Set(["legacyId", "playerId", "ownerId", "seasonId"]),
   draftPicks: new Set(["legacyId", "seasonId", "gshlTeamId", "playerId"]),
   matchups: new Set([
@@ -62,6 +68,15 @@ const indexedFields: Record<string, Set<string>> = {
     "playerId",
     "weekId",
     "date",
+  ]),
+  playerDayHighlights: new Set([
+    "legacyId",
+    "seasonId",
+    "gshlTeamId",
+    "playerId",
+    "weekId",
+    "date",
+    "sourcePlayerDayId",
   ]),
   playerWeekStatLines: new Set([
     "legacyId",
@@ -184,7 +199,11 @@ async function rows(
   const where = { ...args.where };
   if ("id" in where && typeof where.id === "string") {
     try {
-      const row = (await ctx.db.get(where.id)) as Row | null;
+      const normalizedId = ctx.db.normalizeId(table as never, where.id);
+      if (!normalizedId) return [];
+
+      const row = (await ctx.db.get(normalizedId)) as Row | null;
+      delete where.id;
       return row && matches(table, row, where) ? [publicRow(row)] : [];
     } catch {
       return [];
@@ -232,6 +251,7 @@ export const weeks = list("weeks");
 export const franchises = list("franchises");
 export const conferences = list("conferences");
 export const players = list("players");
+export const playerNhlSalaries = list("playerNhlSalaries");
 export const contracts = list("contracts");
 export const draftPicks = list("draftPicks");
 export const matchups = list("matchups");
@@ -241,6 +261,7 @@ export const playerAwards = list("playerAwards");
 export const teamAwards = list("teamAwards");
 export const nhlTeams = list("nhlTeams");
 export const playerDayStats = list("playerDayStatLines");
+export const playerDayHighlights = list("playerDayHighlights");
 export const playerWeekStats = list("playerWeekStatLines");
 export const playerSplitStats = list("playerSplitStatLines");
 export const playerTotalStats = list("playerTotalStatLines");
@@ -417,6 +438,16 @@ export const activity = query({
     take: v.number(),
   },
   handler: async (ctx, args) => {
+    const archived = await ctx.db
+      .query("seasonDataArchives")
+      .withIndex("by_seasonId", (q) => q.eq("seasonId", args.seasonId))
+      .first();
+    if (archived?.status === "archived") {
+      return archived.activitySnapshot.slice(
+        0,
+        Math.min(Math.max(args.take, 1), 30),
+      ) as ReturnType<typeof buildLeagueActivity>;
+    }
     const [contracts, playerDays, teams, franchises] = await Promise.all([
       (ctx.db as any)
         .query("contracts")

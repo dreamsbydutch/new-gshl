@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useMemo } from "react";
 import Image from "next/image";
 import { useNav, useTeamNavigation, useTeams } from "@gshl-hooks";
 import { HorizontalToggle } from "../nav/Toggle";
@@ -10,16 +10,24 @@ import type { DraftHubTeamToggleProps, GSHLTeam } from "@gshl-types";
 export function DraftHubTeamToggle({
   seasonId,
   excludedOwnerId,
+  isLoading: isLoadingOverride,
+  teams: teamsOverride,
+  selectedOwnerId: selectedOwnerIdOverride,
+  onSelectOwner,
 }: DraftHubTeamToggleProps) {
-  const { selectedOwnerId } = useNav();
+  const { selectedOwnerId: storedOwnerId } = useNav();
   const { setSelectedOwnerId } = useTeamNavigation();
   const { data: teamRows = [], isLoading } = useTeams({
     seasonId,
-    enabled: Boolean(seasonId),
+    enabled: teamsOverride === undefined && Boolean(seasonId),
   });
+  const selectedOwnerId =
+    selectedOwnerIdOverride !== undefined
+      ? selectedOwnerIdOverride
+      : storedOwnerId;
   const teams = useMemo(
     () =>
-      (teamRows as GSHLTeam[])
+      ([...(teamsOverride ?? (teamRows as GSHLTeam[]))] as GSHLTeam[])
         .filter(
           (team) =>
             !excludedOwnerId ||
@@ -28,25 +36,24 @@ export function DraftHubTeamToggle({
         .sort((left, right) =>
           String(left.name ?? "").localeCompare(String(right.name ?? "")),
         ),
-    [excludedOwnerId, teamRows],
+    [excludedOwnerId, teamRows, teamsOverride],
   );
   const selectedTeam =
     teams.find((team) => String(team.ownerId) === selectedOwnerId) ?? null;
 
-  useEffect(() => {
-    if (!selectedTeam && teams[0]?.ownerId) {
-      setSelectedOwnerId(String(teams[0].ownerId));
-    }
-  }, [selectedTeam, setSelectedOwnerId, teams]);
-
-  if (isLoading) return <TeamsToggleSkeleton />;
+  if (isLoadingOverride ?? isLoading) return <TeamsToggleSkeleton />;
 
   return (
     <HorizontalToggle<GSHLTeam>
       items={teams}
       selectedItem={selectedTeam}
       onSelect={(team) => {
-        if (team.ownerId) setSelectedOwnerId(String(team.ownerId));
+        if (!team.ownerId) return;
+        if (onSelectOwner) {
+          onSelectOwner(String(team.ownerId));
+          return;
+        }
+        setSelectedOwnerId(String(team.ownerId));
       }}
       getItemKey={(team) => team.id}
       getItemLabel={(team) => team.name ?? "Team"}

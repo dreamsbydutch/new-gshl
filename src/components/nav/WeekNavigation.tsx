@@ -17,14 +17,33 @@ import { HorizontalToggle } from "./Toggle";
  * @param props - Component props
  * @returns Horizontal scrollable week selection interface
  */
-export function WeeksToggle({ className }: WeeksToggleProps) {
-  const { selectedSeasonId: seasonId } = useNav();
+export function WeeksToggle({
+  className,
+  seasonId: seasonIdOverride,
+  selectedWeekId: selectedWeekIdOverride,
+  onSelectWeek,
+}: WeeksToggleProps) {
+  const { selectedSeasonId: storedSeasonId } = useNav();
+  const seasonId =
+    seasonIdOverride !== undefined ? seasonIdOverride : storedSeasonId;
   const { data: weeks, isLoading } = useWeeks({ seasonId });
-  const { selectedWeekId, setSelectedWeekId: setWeekId } = useWeekNavigation();
+  const { selectedWeekId: storedWeekId, setSelectedWeekId: setWeekId } =
+    useWeekNavigation({
+      autoSelect: selectedWeekIdOverride === undefined,
+      seasonId,
+    });
+  const selectedWeekId =
+    selectedWeekIdOverride !== undefined
+      ? selectedWeekIdOverride
+      : storedWeekId;
 
   const selectedWeek = weeks?.find((w) => w.id === selectedWeekId) ?? null;
 
   const handleWeekSelect = (week: Week) => {
+    if (onSelectWeek) {
+      onSelectWeek(week.id);
+      return;
+    }
     setWeekId(week.id);
   };
 

@@ -46,6 +46,7 @@ import {
   findNhlTeamByAbbreviation,
   formatNumber,
   groupProjectedDraftPicksByRound,
+  selectHomeMockDraftPreview,
   sortByOverallRank,
   excludeGoalies,
 } from "@gshl-utils";
@@ -416,9 +417,7 @@ export function DraftBoardList({
   const pageToolbarProps: {
     toolbarKeys: ToggleItem<string | null>[];
     activeKey: string | null;
-    className?: [string?, string?, string?];
   } = {
-    className: ["bottom-24 h-8", "h-6", "text-xs"],
     activeKey: selectedType,
     toolbarKeys: [
       {
@@ -511,14 +510,13 @@ export function MockDraftPreview({ seasonId }: MockDraftPreviewProps) {
     selectedType: "mockdraft",
   });
   if (isLoading) {
-    return <MockDraftSkeleton />;
+    return <MockDraftSkeleton compact />;
   }
+  const previewPicks = selectHomeMockDraftPreview(projectedDraftPicks);
   return (
-    <div>
+    <section aria-label="GSHL mock draft preview">
       <MockDraftList
-        projectedDraftPicks={projectedDraftPicks.filter(
-          (projectedPick) => Number(projectedPick.pick.round) === 1,
-        )}
+        projectedDraftPicks={previewPicks}
         toolbarProps={undefined}
         nhlTeams={nhlTeams}
         title="GSHL Mock Draft"
@@ -532,7 +530,7 @@ export function MockDraftPreview({ seasonId }: MockDraftPreviewProps) {
           <ArrowRight className="h-4 w-4" aria-hidden="true" />
         </Link>
       </div>
-    </div>
+    </section>
   );
 }
 

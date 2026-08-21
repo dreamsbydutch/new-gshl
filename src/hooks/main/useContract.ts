@@ -626,7 +626,10 @@ export function useContractData(
     buyoutContracts,
     expiredRows,
     draftPickGroups,
-    isLoading: contractsLoading || playerNhlStatsLoading,
+    isLoading:
+      contractsLoading ||
+      relatedPlayersQuery.isLoading ||
+      playerNhlStatsLoading,
     error: contractsError ?? null,
   };
 }

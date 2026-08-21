@@ -112,5 +112,15 @@ export { useWeeks } from "./useWeek";
 export type { UseWeeksOptions, WeekTimeMode } from "@gshl-types";
 
 // Navigation selection hooks
-export { useNav, useNavigationReset, useSelectedSeasonId } from "./useNav";
-export { useAppPathname, useAppRouter } from "./useNextNavigation";
+export {
+  useNav,
+  useNavigationHydration,
+  useNavigationReset,
+  useSelectedSeasonId,
+} from "./useNav";
+export {
+  useAppPathname,
+  useAppRouter,
+  useAppSearchParams,
+} from "./useNextNavigation";
+export { useDesktopViewport } from "./useDesktopViewport";

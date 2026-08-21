@@ -243,6 +243,22 @@ export interface Contract {
   updatedAt: Date;
 }
 
+export interface PlayerNHLSalary {
+  id: string;
+  playerId: string;
+  nhlApiId?: string | null;
+  season: string;
+  seasonStartYear: number;
+  salary: number;
+  capHit?: number | null;
+  salaryCap?: number | null;
+  normalizedSalary?: number | null;
+  source: "historical-json" | "puckpedia";
+  sourceRef?: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 export interface Awards {
   id: string;
   seasonId: string;
@@ -311,6 +327,22 @@ export interface PlayerDayStatLine {
   createdAt: Date;
   updatedAt: Date;
 }
+export interface PlayerDayHighlight extends PlayerDayStatLine {
+  sourcePlayerDayId: string;
+  sourceKey: string;
+  ratingRank?: number | null;
+  categoryRanks: Array<{ category: string; rank: number; value: number }>;
+  selectionReasons: string[];
+  archiveChecksum: string;
+}
+
+export type SeasonDataArchiveStatus =
+  | "exporting"
+  | "verified"
+  | "deleting"
+  | "archived"
+  | "restored"
+  | "failed";
 export interface PlayerWeekStatLine {
   id: string;
   seasonId: string;

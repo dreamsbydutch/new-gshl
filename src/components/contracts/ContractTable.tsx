@@ -22,10 +22,8 @@
 import { useMemo } from "react";
 import { Trash2 } from "lucide-react";
 import { NHLLogo } from "@gshl-components/player/NHLLogo";
-import {
-  TeamContractTableSkeleton,
-  PlayerContractRowSkeleton,
-} from "@gshl-skeletons";
+import { TeamContractTableSkeleton } from "@gshl-skeletons";
+import { TableViewport } from "@gshl-ui";
 import {
   findNhlTeamByAbbreviation,
   formatMoney,
@@ -68,47 +66,56 @@ const TableHeader = ({
     <thead>
       <tr>
         <th
-          className={`sticky left-0 z-30 w-32 bg-gray-800 text-center text-2xs font-normal text-gray-200 ${headerPadding}`}
+          scope="col"
+          className={`w-32 bg-gray-800 text-center text-2xs font-normal text-gray-200 lg:sticky lg:left-0 lg:z-30 ${headerPadding}`}
         >
           Name
         </th>
         <th
-          className={`sticky left-[8rem] z-30 w-12 bg-gray-800 text-center text-2xs font-normal text-gray-200 ${headerPadding}`}
+          scope="col"
+          className={`w-12 bg-gray-800 text-center text-2xs font-normal text-gray-200 lg:sticky lg:left-[8rem] lg:z-30 ${headerPadding}`}
         >
           Pos
         </th>
         <th
-          className={`sticky left-[11rem] z-30 w-8 bg-gray-800 text-center text-2xs font-normal text-gray-200 ${headerPadding}`}
+          scope="col"
+          className={`w-8 bg-gray-800 text-center text-2xs font-normal text-gray-200 lg:sticky lg:left-[11rem] lg:z-30 ${headerPadding}`}
         >
           Team
         </th>
         <th
+          scope="col"
           className={`bg-gray-800 text-center text-2xs font-normal text-gray-200 ${headerPadding}`}
         >
           {seasonName}
         </th>
         <th
+          scope="col"
           className={`bg-gray-800 text-center text-2xs font-normal text-gray-200 ${headerPadding}`}
         >
           {seasonName ? getSeasonDisplay(seasonName, 1) : ""}
         </th>
         <th
+          scope="col"
           className={`bg-gray-800 text-center text-2xs font-normal text-gray-200 ${headerPadding}`}
         >
           {seasonName ? getSeasonDisplay(seasonName, 2) : ""}
         </th>
         <th
+          scope="col"
           className={`bg-gray-800 text-center text-2xs font-normal text-gray-200 ${headerPadding}`}
         >
           {seasonName ? getSeasonDisplay(seasonName, 3) : ""}
         </th>
         <th
+          scope="col"
           className={`bg-gray-800 text-center text-2xs font-normal text-gray-200 ${headerPadding}`}
         >
           {seasonName ? getSeasonDisplay(seasonName, 4) : ""}
         </th>
         {showRemoveAction ? (
           <th
+            scope="col"
             className={`bg-gray-800 text-center text-2xs font-normal text-gray-200 ${headerPadding}`}
           >
             Remove
@@ -136,9 +143,35 @@ const PlayerContractRow = ({
   onRestoreContract,
 }: PlayerContractRowProps) => {
   const firstContract = contracts[0];
+  const rowCellPadding = compact ? "px-1.5 py-0.5" : "px-2 py-1";
+  const stickyCellPadding = compact ? "p-0.5" : "p-1";
   if (!player) {
     return firstContract ? (
-      <PlayerContractRowSkeleton contract={firstContract} />
+      <tr className="text-gray-400">
+        <th
+          scope="row"
+          className={`w-32 whitespace-nowrap border-b border-t border-gray-300 bg-gray-50 text-center text-xs font-normal lg:sticky lg:left-0 lg:z-20 ${stickyCellPadding}`}
+        >
+          Loading player…
+        </th>
+        <td
+          className={`w-12 border-b border-t border-gray-300 bg-gray-50 lg:sticky lg:left-[8rem] lg:z-20 ${stickyCellPadding}`}
+        />
+        <td
+          className={`w-8 border-b border-t border-gray-300 bg-gray-50 lg:sticky lg:left-[11rem] lg:z-20 ${stickyCellPadding}`}
+        />
+        {Array.from({ length: 5 }, (_, index) => (
+          <td
+            key={`loading-contract-cell-${index}`}
+            className={`border-b border-t border-gray-300 ${rowCellPadding}`}
+          />
+        ))}
+        {onRemovePlayer || onRestoreContract ? (
+          <td
+            className={`border-b border-t border-gray-300 ${rowCellPadding}`}
+          />
+        ) : null}
+      </tr>
     ) : null;
   }
 
@@ -149,8 +182,6 @@ const PlayerContractRow = ({
   const playerNhlTeam = findNhlTeamByAbbreviation(nhlTeams, playerNhlAbbr);
   const year = getDisplaySeasonYear(currentSeason);
   const displayYears = Array.from({ length: 5 }, (_, index) => year + index);
-  const rowCellPadding = compact ? "px-1.5 py-0.5" : "px-2 py-1";
-  const stickyCellPadding = compact ? "p-0.5" : "p-1";
   const ghostCellClassName = isGhost
     ? `border-b border-t border-gray-300 bg-gray-100 text-center text-xs text-gray-400 ${rowCellPadding}`
     : `border-b border-t border-gray-300 text-center text-xs ${rowCellPadding}`;
@@ -201,18 +232,19 @@ const PlayerContractRow = ({
 
   return (
     <tr className={isGhost || hasBuyout ? "text-gray-400" : "text-gray-800"}>
-      <td
-        className={`sticky left-0 z-20 w-32 max-w-fit whitespace-nowrap border-b border-t border-gray-300 text-center text-xs ${stickyCellPadding} ${isGhost ? "bg-gray-100" : "bg-gray-50"}`}
+      <th
+        scope="row"
+        className={`w-32 max-w-fit whitespace-nowrap border-b border-t border-gray-300 text-center text-xs font-normal lg:sticky lg:left-0 lg:z-20 ${stickyCellPadding} ${isGhost ? "bg-gray-100" : "bg-gray-50"}`}
       >
         {player.fullName}
-      </td>
+      </th>
       <td
-        className={`sticky left-[8rem] z-20 w-12 whitespace-nowrap border-b border-t border-gray-300 text-center text-xs ${stickyCellPadding} ${isGhost ? "bg-gray-100" : "bg-gray-50"}`}
+        className={`w-12 whitespace-nowrap border-b border-t border-gray-300 text-center text-xs lg:sticky lg:left-[8rem] lg:z-20 ${stickyCellPadding} ${isGhost ? "bg-gray-100" : "bg-gray-50"}`}
       >
         {player.nhlPos?.toString() ?? ""}
       </td>
       <td
-        className={`sticky left-[11rem] z-20 w-8 whitespace-nowrap border-b border-t border-gray-300 text-center text-xs ${stickyCellPadding} ${isGhost ? "bg-gray-100" : "bg-gray-50"}`}
+        className={`w-8 whitespace-nowrap border-b border-t border-gray-300 text-center text-xs lg:sticky lg:left-[11rem] lg:z-20 ${stickyCellPadding} ${isGhost ? "bg-gray-100" : "bg-gray-50"}`}
       >
         <NHLLogo team={playerNhlTeam} size={16} />
       </td>
@@ -223,7 +255,7 @@ const PlayerContractRow = ({
         >
           <button
             type="button"
-            className="rounded p-1 text-gray-500 hover:bg-gray-200 hover:text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-500"
+            className="inline-flex min-h-11 min-w-11 items-center justify-center rounded p-2 text-gray-500 hover:bg-gray-200 hover:text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-500"
             onClick={() =>
               onRemovePlayer(String(firstContract?.playerId ?? ""))
             }
@@ -242,7 +274,7 @@ const PlayerContractRow = ({
               <button
                 key={contract.id}
                 type="button"
-                className={`rounded border border-gray-400 text-[10px] text-gray-500 hover:bg-gray-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 ${compact ? "px-1.5 py-0.5" : "px-2 py-1"}`}
+                className={`min-h-11 min-w-11 rounded border border-gray-400 text-[10px] text-gray-500 hover:bg-gray-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 ${compact ? "px-1.5 py-1" : "px-2 py-1"}`}
                 onClick={() => onRestoreContract(String(contract.id))}
                 aria-label={`Add back ${player.fullName}'s contract starting ${showDate(contract.startDate)}`}
                 title={`Add back contract starting ${showDate(contract.startDate)}`}
@@ -272,16 +304,17 @@ const CapSpaceRow = ({
   const cellPadding = compact ? "px-1.5 py-0.5" : "px-2 py-1";
   return (
     <tr key={`${currentTeam.franchiseId}CapSpace`}>
-      <td
-        className={`sticky left-0 z-20 w-32 whitespace-nowrap border-t border-gray-800 bg-gray-200 text-center text-xs font-bold ${cellPadding}`}
+      <th
+        scope="row"
+        className={`w-32 whitespace-nowrap border-t border-gray-800 bg-gray-200 text-center text-xs font-bold lg:sticky lg:left-0 lg:z-20 ${cellPadding}`}
       >
         Cap Space
-      </td>
+      </th>
       <td
-        className={`sticky left-[8rem] z-20 w-12 whitespace-nowrap border-t border-gray-800 bg-gray-200 text-center text-xs ${cellPadding}`}
+        className={`w-12 whitespace-nowrap border-t border-gray-800 bg-gray-200 text-center text-xs lg:sticky lg:left-[8rem] lg:z-20 ${cellPadding}`}
       ></td>
       <td
-        className={`sticky left-[11rem] z-20 w-8 whitespace-nowrap border-t border-gray-800 bg-gray-200 text-center text-xs ${cellPadding}`}
+        className={`w-8 whitespace-nowrap border-t border-gray-800 bg-gray-200 text-center text-xs lg:sticky lg:left-[11rem] lg:z-20 ${cellPadding}`}
       ></td>
       {capSpaceWindow.map((c) => (
         <td
@@ -342,6 +375,12 @@ export function TeamContractTable({
     () => groupContractsByPlayer(ghostContracts),
     [ghostContracts],
   );
+  const headingId = compact
+    ? "cap-lab-scenario-heading"
+    : "cap-overview-heading";
+  const viewportLabel = `${title} cap commitments for ${currentTeam.name}`;
+  const hasVisibleContracts =
+    contractGroups.length > 0 || ghostContractGroups.length > 0;
 
   if (!ready) {
     // Skeleton placeholder while any required dataset is still undefined / empty.
@@ -353,18 +392,62 @@ export function TeamContractTable({
   }
 
   return (
-    <div className="mx-auto w-full">
-      <div
-        className={`w-full text-center font-bold ${compact ? "mt-2 text-lg" : "mt-4 text-xl"}`}
-      >
-        {title}
-      </div>
-      <div
-        className={`no-scrollbar w-full overflow-x-auto overflow-y-hidden ${compact ? "mb-4" : "mb-8"}`}
-      >
-        <table
-          className={`mx-auto min-w-max whitespace-nowrap ${compact ? "mt-1" : "mt-2"}`}
+    <section
+      id={compact ? undefined : "cap-overview"}
+      aria-labelledby={headingId}
+      className="mx-auto w-full scroll-mt-44"
+    >
+      {compact ? (
+        <h3
+          id={headingId}
+          className="mt-2 w-full text-center text-lg font-bold"
         >
+          {title}
+        </h3>
+      ) : (
+        <h2
+          id={headingId}
+          className="mt-4 w-full text-center text-xl font-bold"
+        >
+          {title}
+        </h2>
+      )}
+
+      <div className="mx-auto mt-3 max-w-xl px-3 lg:hidden">
+        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          Remaining cap by season
+        </p>
+        <dl className="grid grid-cols-2 gap-2 min-[420px]:grid-cols-3">
+          {capSpaceWindow.map((entry) => (
+            <div
+              key={`mobile-cap-${entry.year}`}
+              className="rounded-lg border bg-slate-50 px-3 py-2"
+            >
+              <dt className="text-xs text-muted-foreground">{entry.label}</dt>
+              <dd
+                className={`mt-0.5 text-sm font-semibold ${entry.remaining < 0 ? "text-red-600" : "text-slate-900"}`}
+              >
+                {formatMoney(entry.remaining)}
+              </dd>
+            </div>
+          ))}
+        </dl>
+      </div>
+
+      {!hasVisibleContracts ? (
+        <p className="mt-3 px-3 text-center text-sm text-muted-foreground">
+          No active contracts. The full cap window is available.
+        </p>
+      ) : null}
+
+      <TableViewport
+        ariaLabel={viewportLabel}
+        scrollHint="Scroll to compare cap seasons"
+        className={`w-full ${compact ? "mt-2" : "mt-4"}`}
+        viewportClassName="rounded-md"
+      >
+        <table className="mx-auto min-w-max whitespace-nowrap font-normal">
+          <caption className="sr-only">{viewportLabel}</caption>
           <TableHeader
             currentSeason={currentSeason}
             compact={compact}
@@ -416,8 +499,8 @@ export function TeamContractTable({
             ) : null}
           </tbody>
         </table>
-      </div>
-    </div>
+      </TableViewport>
+    </section>
   );
 }
 
@@ -441,28 +524,56 @@ export function TeamBuyoutTable({
   if (!ready) return null;
 
   return (
-    <div className="mx-auto mb-8 w-full max-w-4xl">
-      <div className="mt-4 w-full text-center text-lg font-bold">Buyouts</div>
+    <section
+      aria-labelledby="buyout-contracts-heading"
+      className="mx-auto mb-8 w-full max-w-4xl"
+    >
+      <h2
+        id="buyout-contracts-heading"
+        className="mt-4 w-full text-center text-lg font-bold"
+      >
+        Buyouts
+      </h2>
       {buyoutContracts.length === 0 ? (
-        <div className="mt-2 text-center text-sm text-muted-foreground">
+        <p className="mt-2 text-center text-sm text-muted-foreground">
           No buyouts for {currentTeam.name}.
-        </div>
+        </p>
       ) : (
-        <div className="no-scrollbar mt-2 overflow-x-auto">
+        <TableViewport
+          ariaLabel={`Buyout contracts for ${currentTeam.name}`}
+          className="mt-2"
+          scrollHint="Scroll for complete buyout details"
+        >
           <table className="mx-auto min-w-max whitespace-nowrap text-xs">
+            <caption className="sr-only">
+              Buyout contracts for {currentTeam.name}
+            </caption>
             <thead>
               <tr className="bg-gray-800 text-gray-200">
-                <th className="sticky left-0 bg-gray-800 px-2 py-1 text-center font-normal">
+                <th
+                  scope="col"
+                  className="bg-gray-800 px-2 py-1 text-center font-normal lg:sticky lg:left-0 lg:z-30"
+                >
                   Player
                 </th>
-                <th className="px-2 py-1 text-center font-normal">Pos</th>
-                <th className="px-2 py-1 text-center font-normal">Team</th>
-                <th className="px-2 py-1 text-center font-normal">Cap Hit</th>
-                <th className="px-2 py-1 text-center font-normal">Expiry</th>
-                <th className="px-2 py-1 text-center font-normal">
+                <th scope="col" className="px-2 py-1 text-center font-normal">
+                  Pos
+                </th>
+                <th scope="col" className="px-2 py-1 text-center font-normal">
+                  Team
+                </th>
+                <th scope="col" className="px-2 py-1 text-center font-normal">
+                  Cap Hit
+                </th>
+                <th scope="col" className="px-2 py-1 text-center font-normal">
+                  Expiry
+                </th>
+                <th scope="col" className="px-2 py-1 text-center font-normal">
                   Buyout End
                 </th>
-                <th className="px-2 py-1 text-center font-normal">Status</th>
+                <th scope="col" className="px-2 py-1 text-center font-normal">
+                  Status
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -485,9 +596,12 @@ export function TeamBuyoutTable({
                         : "text-gray-400"
                     }
                   >
-                    <td className="sticky left-0 bg-white px-2 py-1 text-center">
+                    <th
+                      scope="row"
+                      className="bg-white px-2 py-1 text-center font-normal lg:sticky lg:left-0 lg:z-20"
+                    >
                       {player?.fullName ?? "Unknown"}
-                    </td>
+                    </th>
                     <td className="px-2 py-1 text-center">
                       {player?.nhlPos?.toString() ?? "-"}
                     </td>
@@ -519,8 +633,8 @@ export function TeamBuyoutTable({
               })}
             </tbody>
           </table>
-        </div>
+        </TableViewport>
       )}
-    </div>
+    </section>
   );
 }

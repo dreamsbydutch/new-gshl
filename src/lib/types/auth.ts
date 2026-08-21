@@ -27,3 +27,11 @@ export interface AuthOwnerOption {
 export interface SignInPageProps {
   searchParams: Promise<{ callbackUrl?: string; error?: string }>;
 }
+
+export type RouteSearchParams = Readonly<
+  Record<string, string | readonly string[] | undefined>
+>;
+
+export interface ProtectedRoutePageProps {
+  searchParams: Promise<RouteSearchParams>;
+}
