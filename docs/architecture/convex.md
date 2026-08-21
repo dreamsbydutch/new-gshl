@@ -43,7 +43,7 @@ Generic list helpers use the first applicable index and then filter or sort rema
 ### Domain APIs
 
 - `draft:state` requires an active user. `submitPick` requires the on-clock owner or commissioner; an expired clock is commissioner-only. `undoPick` is commissioner-only and limited to the latest safely reversible pick.
-- `ufa:publicState` is anonymous but masks owner identity. `submitOffer` requires an owner/commissioner identity unless the trusted server-secret path is used. Resolution functions are internal.
+- `ufa:publicState` is anonymous but masks owner identity and returns unresolved groups with their offers so pending cap reservations survive resolution retries. Odds are shown for open groups only, with formula-wide inputs shared across groups and selective inputs scoped by bidder-owner and season indexes. `submitOffer` requires an owner/commissioner identity unless the trusted server-secret path is used. Resolution functions are internal.
 - Weekly edition read endpoints return only published, active content. Newsroom, prompt, editing, visibility, homepage selection, section activation, and revision restoration are commissioner-only.
 
 Authorization is a handler responsibility. Do not infer permission from whether a function appears in generated `api`.

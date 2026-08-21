@@ -26,6 +26,7 @@ import type * as playerDayArchive from "../playerDayArchive.js";
 import type * as reporterBackfill from "../reporterBackfill.js";
 import type * as timestampMigration from "../timestampMigration.js";
 import type * as ufa from "../ufa.js";
+import type * as ufaOdds from "../ufaOdds.js";
 import type * as weeklyEditionBackfill from "../weeklyEditionBackfill.js";
 import type * as weeklyEditions from "../weeklyEditions.js";
 import type * as yahooBackfill from "../yahooBackfill.js";
@@ -55,6 +56,7 @@ declare const fullApi: ApiFromModules<{
   reporterBackfill: typeof reporterBackfill;
   timestampMigration: typeof timestampMigration;
   ufa: typeof ufa;
+  ufaOdds: typeof ufaOdds;
   weeklyEditionBackfill: typeof weeklyEditionBackfill;
   weeklyEditions: typeof weeklyEditions;
   yahooBackfill: typeof yahooBackfill;
