@@ -5,6 +5,25 @@ export interface WhatsAppShareMessageInput {
   url?: string | null;
 }
 
+function formatWhatsAppLines(value: string, marker: "*" | "_"): string {
+  return value
+    .trim()
+    .split("\n")
+    .map((line) => {
+      const text = line.trim();
+      return text ? `${marker}${text}${marker}` : "";
+    })
+    .join("\n");
+}
+
+function formatWhatsAppBold(value: string): string {
+  return formatWhatsAppLines(value, "*");
+}
+
+function formatWhatsAppItalic(value: string): string {
+  return formatWhatsAppLines(value, "_");
+}
+
 export function buildWhatsAppShareMessage({
   title,
   summary,
@@ -16,8 +35,19 @@ export function buildWhatsAppShareMessage({
     .filter((line): line is string => Boolean(line))
     .join("\n");
 
-  return [title.trim(), summary?.trim(), details, url?.trim()]
+  return [
+    formatWhatsAppBold(title),
+    summary ? formatWhatsAppItalic(summary) : undefined,
+    details,
+    url?.trim(),
+  ]
     .filter((section): section is string => Boolean(section))
+    .join("\n\n");
+}
+
+export function appendWhatsAppShareLink(message: string, url: string): string {
+  return [message.trim(), url.trim()]
+    .filter((section) => Boolean(section))
     .join("\n\n");
 }
 

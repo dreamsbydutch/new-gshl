@@ -3,7 +3,7 @@
 import { MessageCircle } from "lucide-react";
 import type { WhatsAppShareButtonProps } from "@gshl-types";
 import {
-  buildWhatsAppShareMessage,
+  appendWhatsAppShareLink,
   buildWhatsAppShareUrl,
   resolveWhatsAppShareLink,
 } from "@gshl-utils/features/whatsapp-share";
@@ -26,7 +26,7 @@ export function WhatsAppShareButton({
       window.location.href,
       window.location.origin,
     );
-    const text = buildWhatsAppShareMessage({ title: message, url });
+    const text = appendWhatsAppShareLink(message, url);
     window.open(buildWhatsAppShareUrl(text), "_blank", "noopener,noreferrer");
   };
 

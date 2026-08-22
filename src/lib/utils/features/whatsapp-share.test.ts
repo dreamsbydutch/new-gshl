@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  appendWhatsAppShareLink,
   buildWhatsAppShareMessage,
   buildWhatsAppShareUrl,
   canShareCommissionerContent,
@@ -18,10 +19,34 @@ void test("builds a readable WhatsApp message without empty sections", () => {
       url: "https://gshl.example/schedule?week=8",
     }),
     [
-      "GSHL Weekly Schedule",
-      "Week 8",
+      "*GSHL Weekly Schedule*",
+      "_Week 8_",
       "1. Diamonds at Emeralds\n2. Rubies at Pearls",
       "https://gshl.example/schedule?week=8",
+    ].join("\n\n"),
+  );
+});
+
+void test("formats headings and multiline context with WhatsApp cues", () => {
+  assert.equal(
+    buildWhatsAppShareMessage({
+      title: " GSHL Press Box ",
+      summary: " Opening Night\n2026 · Issue 1 ",
+    }),
+    "*GSHL Press Box*\n\n_Opening Night_\n_2026 · Issue 1_",
+  );
+});
+
+void test("appends a direct link without changing existing formatting", () => {
+  assert.equal(
+    appendWhatsAppShareLink(
+      "*GSHL Signing*\n\n_Jane Doe signed by Diamonds_",
+      "https://gshl.example",
+    ),
+    [
+      "*GSHL Signing*",
+      "_Jane Doe signed by Diamonds_",
+      "https://gshl.example",
     ].join("\n\n"),
   );
 });
