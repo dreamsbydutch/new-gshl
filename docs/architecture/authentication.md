@@ -63,6 +63,7 @@ There is no pending status. “Viewer until approved” means the account has ac
 | Protected app routes and private owner fields      |    No     |      Yes      |     Yes      |           Yes           |             N/A             |
 | Authenticated draft state                          |    No     |      Yes      |     Yes      |           Yes           |             N/A             |
 | Change own roster `lineupPos`                      |    No     |      No       |     Yes      |           Yes           |      Via operator APIs      |
+| Manage own trade block                             |    No     |      No       | Linked owner | Linked owner if present |             No              |
 | Submit on-clock draft pick                         |    No     |      No       |   Own team   |           Yes           |      No dedicated path      |
 | Submit UFA offer                                   |    No     |      No       | Linked owner | Linked owner if present | Trusted explicit owner path |
 | Draft undo/admin, contracts, users, jobs, newsroom |    No     |      No       |      No      |           Yes           |      Via operator APIs      |

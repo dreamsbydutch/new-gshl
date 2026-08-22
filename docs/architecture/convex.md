@@ -11,6 +11,7 @@
 | [`schema.ts`](../../convex/schema.ts)                       | Tables, validators, and indexes                                        |
 | [`frontend.ts`](../../convex/frontend.ts)                   | Main browser-facing league query and mutation facade                   |
 | [`draft.ts`](../../convex/draft.ts)                         | Transactional live draft state, submission, and undo                   |
+| [`tradeBlock.ts`](../../convex/tradeBlock.ts)               | Authenticated trade market projection and owner-controlled listings    |
 | [`schedule.ts`](../../convex/schedule.ts)                   | Page-shaped weekly and owner-team schedule projections                 |
 | [`matchup.ts`](../../convex/matchup.ts)                     | Matchup details with referenced teams and player statistics            |
 | [`standings.ts`](../../convex/standings.ts)                 | Lazy public team snapshots for expanded standings rows                 |
@@ -59,6 +60,7 @@ compatibility filter before honoring a row limit.
 ### Domain APIs
 
 - `draft:status` and `draft:state` require an active user. The status query returns only the shared clock status for compact Home rendering; the state query retains the joined board. `submitPick` requires the on-clock owner or commissioner; an expired clock is commissioner-only. `undoPick` is commissioner-only and limited to the latest safely reversible pick.
+- `tradeBlock:market` requires an active user and returns compact valid listings plus the linked owner's eligible roster candidates. `save` derives the owner from the authenticated account and rechecks player ownership and an active playing contract; `remove` applies the owner-access guard.
 - `schedule:weeklySchedule` returns one selected week with its season, matchups, referenced teams, and only the player and team statistics rendered by the schedule. `schedule:teamSchedule` resolves one owner-season team and its indexed matchups; expanded rows lazily request the exact two team-week statistic fragments.
 - `matchup:details` replaces browser fan-out with one matchup-shaped payload containing the selected matchup, its two teams, public owner labels, week, season categories, and exact player and team statistics.
 - `standings:teamDetail` is public and returns one compact season/team snapshot only after its standings row expands. It projects the rendered matchup window, category ranks, and top three players without exposing private owner fields.

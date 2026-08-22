@@ -53,15 +53,19 @@ The public rulebook is generated from structured content in `src/content/ruleboo
 The Locker Room uses a selected owner and an appropriate active or contract season to provide:
 
 - current roster and lineup presentation;
-- salary-cap table, future cap commitments, contract history, and an in-browser cap scenario lab;
+- salary-cap table, future cap commitments, contract history, and an in-browser roster planner;
 - franchise matchup history and filters;
 - team trophies and awards;
 - player and franchise record books; and
 - current and future draft capital.
 
-The cap lab is a simulation. It does not persist its hypothetical signings, trades, or removals.
+The roster planner is a private simulation. It supports incoming signings and
+trades, outgoing contracts, before/after cap space for every covered season,
+cap-compliance warnings, and a full scenario table. It does not persist its
+hypothetical roster moves. Owners can separately publish or remove their own
+contracted players on the persistent league trade block.
 
-The cross-season cap table remains scrollable at every width, with nonsticky identity columns and a compact remaining-cap summary below `lg`. Franchise contract history becomes expandable cards below `lg`, while complete tables remain keyboard-scrollable in the shared viewport on larger screens. Cap Lab search, term, reset, remove, and restore interactions use touch-sized controls.
+The cross-season cap table remains scrollable at every width, with nonsticky identity columns and a compact remaining-cap summary below `lg`. Franchise contract history becomes expandable cards below `lg`, while complete tables remain keyboard-scrollable in the shared viewport on larger screens. Roster Planner search, term, reset, move, restore, and trade-block interactions use touch-sized controls.
 
 The Record Book follows the same responsive priority model: full player names, context, and position-specific headline statistics stay visible in mobile cards; sorting and disclosures expose every statistic and honor. The complete sortable record table remains available in `TableViewport` at `lg` and above.
 
@@ -88,11 +92,17 @@ The standalone `/draft-roster-board` removes the normal application shell and la
 All active users can access:
 
 - offseason mock drafts;
+- a realtime trade block with inherited cap terms, team identity, and owner notes;
 - projected draft classes for several years;
 - the full free-agent market;
 - the rulebook;
 - conference-versus-conference records and rating history; and
 - the historical owner ladder.
+
+Draft Classes provides four year-selectable projections with search, position
+and certainty filters. Guaranteed UFAs are visually distinct from other
+projected players; summary counts, mobile cards, and a complete desktop table
+keep the class usable across screen sizes.
 
 Commissioners additionally receive:
 
