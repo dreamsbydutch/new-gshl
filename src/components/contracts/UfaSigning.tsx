@@ -16,14 +16,14 @@ import {
 import type { UfaFreeAgentView, UfaOfferGroupView } from "@gshl-types";
 import { UfaOfferForm } from "./UfaOfferForm";
 
-function Logo({ src, alt }: { src: string | null; alt: string }) {
+function GshlTeamLogo({ src, alt }: { src: string | null; alt: string }) {
   return src ? (
     <Image
       src={src}
       alt={alt}
-      width={32}
-      height={32}
-      className="h-8 w-8 shrink-0 object-contain"
+      width={36}
+      height={36}
+      className="h-8 w-8 shrink-0 object-contain sm:h-9 sm:w-9"
     />
   ) : (
     <span className="text-xs text-muted-foreground">—</span>
@@ -89,7 +89,8 @@ function PlayerRows({
                         }
                       : undefined
                   }
-                  size={showStats ? 20 : 18}
+                  size={16}
+                  className="mx-0 shrink-0"
                 />
                 <span className="truncate" title={player.fullName}>
                   {player.fullName}
@@ -331,7 +332,8 @@ function ActiveOffers({ groups }: { groups: UfaOfferGroupView[] }) {
                                 }
                               : undefined
                           }
-                          size={20}
+                          size={16}
+                          className="mx-0 shrink-0"
                         />
                         <span
                           className="truncate"
@@ -349,7 +351,7 @@ function ActiveOffers({ groups }: { groups: UfaOfferGroupView[] }) {
                     </td>
                     <td className="whitespace-nowrap px-1 py-1 sm:px-3 sm:py-3">
                       <div className="flex items-center justify-center gap-2">
-                        <Logo
+                        <GshlTeamLogo
                           src={offer.franchiseLogoUrl}
                           alt={offer.franchiseName}
                         />
@@ -404,31 +406,35 @@ function HomeActiveOffers({ groups }: { groups: UfaOfferGroupView[] }) {
               key={offer.id}
               className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-x-3 gap-y-2 px-2 py-2.5 md:grid-cols-[minmax(13rem,1.35fr)_minmax(10rem,1fr)_minmax(8rem,auto)_5rem_9rem] md:gap-4 md:py-2"
             >
-              <div className="col-span-2 flex min-w-0 items-center gap-2 md:col-span-1 md:col-start-1 md:row-start-1">
-                <NHLLogo
-                  team={
-                    group.player?.nhlTeamLogoUrl
-                      ? {
-                          name: group.player.nhlTeam || "NHL team",
-                          logoUrl: group.player.nhlTeamLogoUrl,
-                        }
-                      : undefined
-                  }
-                  size={28}
-                />
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold">
+              <div className="col-span-2 min-w-0 md:col-span-1 md:col-start-1 md:row-start-1">
+                <div className="flex min-w-0 items-center gap-1.5">
+                  <NHLLogo
+                    team={
+                      group.player?.nhlTeamLogoUrl
+                        ? {
+                            name: group.player.nhlTeam || "NHL team",
+                            logoUrl: group.player.nhlTeamLogoUrl,
+                          }
+                        : undefined
+                    }
+                    size={16}
+                    className="mx-0 shrink-0"
+                  />
+                  <p className="min-w-0 truncate text-sm font-semibold">
                     {group.player?.fullName ?? "Unavailable player"}
                   </p>
-                  <p className="truncate text-xs text-muted-foreground">
-                    {group.player?.positions.length
-                      ? group.player.positions.join("/")
-                      : "Position unavailable"}
-                  </p>
                 </div>
+                <p className="mt-0.5 truncate pl-[22px] text-xs text-muted-foreground">
+                  {group.player?.positions.length
+                    ? group.player.positions.join("/")
+                    : "Position unavailable"}
+                </p>
               </div>
               <div className="col-start-1 row-start-2 flex min-w-0 items-center gap-2 md:col-start-2 md:row-start-1">
-                <Logo src={offer.franchiseLogoUrl} alt={offer.franchiseName} />
+                <GshlTeamLogo
+                  src={offer.franchiseLogoUrl}
+                  alt={offer.franchiseName}
+                />
                 <span className="truncate text-xs font-medium sm:text-sm">
                   {offer.franchiseName}
                 </span>
@@ -461,7 +467,7 @@ function HomeFreeAgents({ players }: { players: UfaFreeAgentView[] }) {
       {players.map((player) => (
         <li
           key={player.id}
-          className="grid grid-cols-[2rem_minmax(0,1fr)_auto] items-center gap-2 py-2"
+          className="grid grid-cols-[1rem_minmax(0,1fr)_auto] items-center gap-1.5 py-2"
         >
           <NHLLogo
             team={
@@ -472,7 +478,8 @@ function HomeFreeAgents({ players }: { players: UfaFreeAgentView[] }) {
                   }
                 : undefined
             }
-            size={28}
+            size={16}
+            className="mx-0 shrink-0"
           />
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold">{player.fullName}</p>

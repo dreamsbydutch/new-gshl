@@ -5,7 +5,7 @@ import { useState } from "react";
 import type { NHLLogoProps } from "@gshl-types";
 import { cn } from "@gshl-utils";
 
-export function NHLLogo({ team, size = 32, className }: NHLLogoProps) {
+export function NHLLogo({ team, size = 18, className }: NHLLogoProps) {
   const [erroredUrl, setErroredUrl] = useState<string | null>(null);
 
   if (!team?.logoUrl || erroredUrl === team.logoUrl) {

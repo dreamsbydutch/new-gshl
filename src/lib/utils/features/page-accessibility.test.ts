@@ -138,6 +138,7 @@ void test("shared dropdown navigation uses a labelled native select", () => {
 
 void test("UFA and matchup statistics retain compact scrollable tables on phones", () => {
   const ufa = readSource("src/components/contracts/UfaSigning.tsx");
+  const nhlLogo = readSource("src/components/player/NHLLogo.tsx");
   const matchup = readSource(
     "src/components/matchup/MatchupDetailsContent.tsx",
   );
@@ -145,6 +146,14 @@ void test("UFA and matchup statistics retain compact scrollable tables on phones
 
   assert.doesNotMatch(ufa, /UfaPlayerDecisionList|ActiveOfferCards/);
   assert.match(ufa, /w-28 min-w-28 max-w-28/);
+  assert.match(nhlLogo, /size = 18/);
+  assert.match(ufa, /function GshlTeamLogo/);
+  assert.doesNotMatch(ufa, /size=\{(?:20|24|28|32)\}/);
+  assert.match(ufa, /size=\{16\}\s+className="mx-0 shrink-0"/);
+  assert.match(
+    ufa,
+    /className="h-8 w-8 shrink-0 object-contain sm:h-9 sm:w-9"/,
+  );
   assert.match(
     matchup,
     /ariaLabel=\{`\$\{awayLabel\} and \$\{homeLabel\} matchup category comparison`\}\s+scrollHint=/,
@@ -155,6 +164,8 @@ void test("UFA and matchup statistics retain compact scrollable tables on phones
     /ariaLabel=\{`\$\{teamName\} comprehensive player statistics`\}\s+scrollHint=/,
   );
   assert.match(playerStats, /w-28 min-w-28 max-w-28/);
+  assert.match(playerStats, /size=\{playerNhlTeams\.length > 1 \? 14 : 16\}/);
+  assert.match(matchup, /h-6 w-6 shrink-0 object-contain sm:h-7 sm:w-7/);
 });
 
 void test("global styles respect reduced-motion preferences", () => {

@@ -205,9 +205,9 @@ function CategoryResultsCard({
                         <Image
                           src={row.team.logoUrl}
                           alt=""
-                          width={20}
-                          height={20}
-                          className="h-5 w-5 shrink-0 object-contain"
+                          width={28}
+                          height={28}
+                          className="h-6 w-6 shrink-0 object-contain sm:h-7 sm:w-7"
                         />
                       ) : null}
                       <span

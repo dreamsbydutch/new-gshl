@@ -81,7 +81,7 @@ export function PlayerStatsTable({
       .filter((nhlTeam): nhlTeam is MatchupDetailsNhlTeam => Boolean(nhlTeam));
 
     if (playerNhlTeams.length === 0) {
-      return <NHLLogo team={undefined} size={20} />;
+      return <NHLLogo team={undefined} size={16} />;
     }
 
     return (
@@ -90,7 +90,8 @@ export function PlayerStatsTable({
           <NHLLogo
             key={nhlTeam.id}
             team={nhlTeam}
-            size={playerNhlTeams.length > 1 ? 16 : 20}
+            size={playerNhlTeams.length > 1 ? 14 : 16}
+            className="mx-0 shrink-0"
           />
         ))}
       </div>

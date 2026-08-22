@@ -78,9 +78,9 @@ export function UfaHomeCardSkeleton() {
         {Array.from({ length: 5 }).map((_, index) => (
           <div
             key={index}
-            className="grid grid-cols-[2rem_minmax(0,1fr)_auto] items-center gap-2 py-2"
+            className="grid grid-cols-[1rem_minmax(0,1fr)_auto] items-center gap-1.5 py-2"
           >
-            <Skeleton className="h-7 w-7 rounded-md" />
+            <Skeleton className="h-4 w-4 rounded-sm" />
             <div className="min-w-0 space-y-1.5">
               <Skeleton className="h-4 w-36 max-w-[70%]" />
               <Skeleton className="h-3 w-20" />
