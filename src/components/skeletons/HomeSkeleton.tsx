@@ -65,7 +65,7 @@ export function PowerRankingsHomeCardSkeleton() {
 
 export function UfaHomeCardSkeleton() {
   return (
-    <section className="space-y-4 rounded-xl border bg-card p-2 shadow-sm sm:space-y-6 sm:p-6">
+    <section className="space-y-3 overflow-hidden border-y border-slate-300 py-3 sm:py-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1 space-y-2">
           <Skeleton className="h-3 w-32" />
@@ -74,44 +74,18 @@ export function UfaHomeCardSkeleton() {
         </div>
         <Skeleton className="h-11 w-28 shrink-0 rounded-md sm:w-36" />
       </div>
-      <div className="space-y-3 lg:hidden">
+      <div className="divide-y divide-slate-200 border-y border-slate-200">
         {Array.from({ length: 5 }).map((_, index) => (
-          <div key={index} className="rounded-xl border bg-white p-3 shadow-sm">
-            <div className="flex items-center gap-3">
-              <Skeleton className="h-11 w-11 shrink-0 rounded-lg" />
-              <div className="min-w-0 flex-1 space-y-2">
-                <Skeleton className="h-5 w-36 max-w-[80%]" />
-                <Skeleton className="h-3 w-24" />
-              </div>
-              <Skeleton className="h-4 w-14" />
-            </div>
-            <div className="mt-3 grid grid-cols-3 gap-2 rounded-lg bg-muted/40 p-2">
-              {Array.from({ length: 5 }).map((_, metricIndex) => (
-                <Skeleton key={metricIndex} className="mx-auto h-7 w-10" />
-              ))}
-            </div>
-            <Skeleton className="mt-2 h-11 w-full" />
-            <Skeleton className="mt-3 h-11 w-full" />
-          </div>
-        ))}
-      </div>
-      <div className="hidden overflow-hidden rounded-lg border lg:block">
-        <div className="grid grid-cols-[2rem_minmax(7rem,1.5fr)_3rem_repeat(3,minmax(4rem,0.8fr))] gap-2 bg-muted/60 px-2 py-2">
-          {Array.from({ length: 6 }).map((_, index) => (
-            <Skeleton key={index} className="h-3 w-full" />
-          ))}
-        </div>
-        {Array.from({ length: 5 }).map((_, rowIndex) => (
           <div
-            key={rowIndex}
-            className="grid grid-cols-[2rem_minmax(7rem,1.5fr)_3rem_repeat(3,minmax(4rem,0.8fr))] items-center gap-2 border-t px-2 py-2"
+            key={index}
+            className="grid grid-cols-[2rem_minmax(0,1fr)_auto] items-center gap-2 py-2"
           >
-            <Skeleton className="h-6 w-6 rounded-full" />
-            <Skeleton className="h-4 w-28 max-w-full" />
-            <Skeleton className="h-3 w-7" />
-            <Skeleton className="h-3 w-12" />
-            <Skeleton className="h-3 w-14" />
-            <Skeleton className="h-7 w-16 rounded-md" />
+            <Skeleton className="h-7 w-7 rounded-md" />
+            <div className="min-w-0 space-y-1.5">
+              <Skeleton className="h-4 w-36 max-w-[70%]" />
+              <Skeleton className="h-3 w-20" />
+            </div>
+            <Skeleton className="h-4 w-16" />
           </div>
         ))}
       </div>
@@ -124,20 +98,22 @@ export function HomeSkeleton() {
     <main
       aria-label="Loading GSHL league dashboard"
       aria-busy="true"
-      className="container mx-auto w-full space-y-3 px-3 py-3 sm:space-y-4 sm:px-5 sm:py-5 lg:space-y-5 lg:px-6"
+      className="mx-auto w-full max-w-7xl px-3 py-3 sm:px-5 sm:py-5"
     >
-      <section className="flex h-16 w-full items-center gap-3 rounded-xl border border-slate-200 bg-white px-3 sm:rounded-2xl">
-        <Skeleton className="h-9 w-9 shrink-0 rounded-xl" />
-        <div className="min-w-0 flex-1 space-y-2">
-          <Skeleton className="h-2.5 w-36 max-w-full" />
-          <Skeleton className="h-4 w-72 max-w-[90%]" />
+      <div className="space-y-3 sm:space-y-4 lg:space-y-5">
+        <section className="flex h-14 w-full items-center gap-3 border-y border-slate-200 px-3">
+          <Skeleton className="h-9 w-9 shrink-0 rounded-xl" />
+          <div className="min-w-0 flex-1 space-y-2">
+            <Skeleton className="h-2.5 w-36 max-w-full" />
+            <Skeleton className="h-4 w-72 max-w-[90%]" />
+          </div>
+          <Skeleton className="h-11 w-20 shrink-0 rounded-full" />
+        </section>
+        <UfaHomeCardSkeleton />
+        <div className="grid min-w-0 items-start gap-3 sm:gap-4 xl:grid-cols-2">
+          <PowerRankingsHomeCardSkeleton />
+          <LeagueActivityCardSkeleton />
         </div>
-        <Skeleton className="h-11 w-20 shrink-0 rounded-full" />
-      </section>
-      <UfaHomeCardSkeleton />
-      <div className="grid min-w-0 items-start gap-3 sm:gap-4 xl:grid-cols-2">
-        <PowerRankingsHomeCardSkeleton />
-        <LeagueActivityCardSkeleton />
       </div>
     </main>
   );

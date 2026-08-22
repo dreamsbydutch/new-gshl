@@ -44,6 +44,7 @@ import { DraftBoardTableSkeleton, MockDraftSkeleton } from "@gshl-skeletons";
 import {
   type DraftBoardPlayer,
   type DraftBoardToolbarProps,
+  cn,
   findNhlTeamByAbbreviation,
   formatNumber,
   groupProjectedDraftPicksByRound,
@@ -321,22 +322,36 @@ function MockDraftList({
   nhlTeams,
   toolbarProps,
   title = "GSHL Mock Draft",
+  compact = false,
 }: {
   projectedDraftPicks: MockDraftDisplayPick[];
   nhlTeams: MockDraftDisplayNhlTeam[];
   toolbarProps?: DraftBoardToolbarProps;
   title?: string;
+  compact?: boolean;
 }) {
   const rounds = groupProjectedDraftPicksByRound(projectedDraftPicks);
 
   return (
-    <div className="mt-8">
-      <h2 className="text-center text-2xl font-bold">{title}</h2>
-      <div className="mt-6 flex flex-col gap-6">
+    <div className={compact ? "mt-0" : "mt-8"}>
+      <h2
+        className={cn(
+          "text-center font-bold",
+          compact ? "text-xl sm:text-2xl" : "text-2xl",
+        )}
+      >
+        {title}
+      </h2>
+      <div
+        className={cn("flex flex-col", compact ? "mt-4 gap-4" : "mt-6 gap-6")}
+      >
         {rounds.map(({ round, picks }) => (
           <section
             key={round}
-            className="flex h-full flex-col rounded-2xl border border-slate-200 bg-white/70 p-4 text-left shadow-sm"
+            className={cn(
+              "flex h-full flex-col rounded-2xl border border-slate-200 bg-white/70 text-left shadow-sm",
+              compact ? "p-3" : "p-4",
+            )}
           >
             <div className="flex items-center gap-3">
               <div className="h-px flex-1 bg-slate-300" />
@@ -345,7 +360,14 @@ function MockDraftList({
               </span>
               <div className="h-px flex-1 bg-slate-300" />
             </div>
-            <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-[repeat(auto-fit,minmax(18rem,1fr))] xl:grid-cols-[repeat(auto-fit,minmax(22rem,1fr))]">
+            <div
+              className={cn(
+                "grid grid-cols-1 gap-3",
+                compact
+                  ? "mt-3 sm:grid-cols-2 xl:grid-cols-4"
+                  : "mt-4 sm:grid-cols-[repeat(auto-fit,minmax(18rem,1fr))] xl:grid-cols-[repeat(auto-fit,minmax(22rem,1fr))]",
+              )}
+            >
               {picks.map((projectedPick) => (
                 <MockDraftPickCard
                   key={projectedPick.pick.id}
@@ -520,6 +542,7 @@ export function MockDraftPreview({ seasonId }: MockDraftPreviewProps) {
         toolbarProps={undefined}
         nhlTeams={nhlTeams}
         title="GSHL Mock Draft"
+        compact
       />
       <div className="mt-5 flex justify-center">
         <Link

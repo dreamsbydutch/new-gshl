@@ -29,32 +29,36 @@ export function HomeContent() {
   return (
     <main
       aria-labelledby="home-dashboard-heading"
-      className="container mx-auto w-full space-y-3 px-3 py-3 sm:space-y-4 sm:px-5 sm:py-5 lg:space-y-5 lg:px-6"
+      className="mx-auto w-full max-w-7xl px-3 py-3 sm:px-5 sm:py-5"
     >
       <h1 id="home-dashboard-heading" className="sr-only">
         GSHL league dashboard
       </h1>
-      <WeeklyEditionHomeCard />
-      <UfaHomeCard />
-      <div
-        className={cn(
-          "grid min-w-0 items-start gap-3 sm:gap-4",
-          currentSeason && "xl:grid-cols-2",
-        )}
-      >
-        {currentSeason ? (
-          <PowerRankingsHomeCard seasonId={String(currentSeason.id)} />
+      <div className="space-y-3 sm:space-y-4 lg:space-y-5">
+        <WeeklyEditionHomeCard />
+        <UfaHomeCard />
+        <div
+          className={cn(
+            "grid min-w-0 items-start gap-3 sm:gap-4",
+            currentSeason && "xl:grid-cols-2",
+          )}
+        >
+          {currentSeason ? (
+            <PowerRankingsHomeCard seasonId={String(currentSeason.id)} />
+          ) : null}
+          <LeagueActivityCard
+            seasonId={defaultSeason?.id ? String(defaultSeason.id) : undefined}
+          />
+        </div>
+        {draftSeason?.draftStartAt ? (
+          <DraftHubCard season={draftSeason} />
         ) : null}
-        <LeagueActivityCard
-          seasonId={defaultSeason?.id ? String(defaultSeason.id) : undefined}
-        />
+        {showOffseasonContent && offseasonWindow ? (
+          <MockDraftPreview
+            seasonId={String(offseasonWindow.upcomingSeason.id)}
+          />
+        ) : null}
       </div>
-      {draftSeason?.draftStartAt ? <DraftHubCard season={draftSeason} /> : null}
-      {showOffseasonContent && offseasonWindow ? (
-        <MockDraftPreview
-          seasonId={String(offseasonWindow.upcomingSeason.id)}
-        />
-      ) : null}
     </main>
   );
 }

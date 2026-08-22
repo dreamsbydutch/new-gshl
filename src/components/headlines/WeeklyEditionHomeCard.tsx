@@ -91,7 +91,7 @@ export function WeeklyEditionHomeCard() {
 
   if (isLoading) {
     return (
-      <section className="mx-auto flex h-14 w-full max-w-5xl items-center gap-3 border-y border-slate-200 px-3">
+      <section className="flex h-14 w-full items-center gap-3 border-y border-slate-200 px-3">
         <Skeleton className="h-9 w-9 rounded-xl" />
         <Skeleton className="h-4 flex-1" />
         <Skeleton className="h-8 w-20 rounded-full" />
@@ -102,7 +102,7 @@ export function WeeklyEditionHomeCard() {
 
   return (
     <>
-      <section className="mx-auto flex w-full max-w-5xl items-stretch overflow-hidden border-y border-slate-300 bg-white text-slate-950">
+      <section className="flex w-full items-stretch overflow-hidden border-y border-slate-300 bg-white text-slate-950">
         <button
           ref={triggerRef}
           type="button"

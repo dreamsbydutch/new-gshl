@@ -153,20 +153,22 @@ export function MockDraftSkeleton({
   compact = false,
 }: { compact?: boolean } = {}) {
   return (
-    <div className="mt-8">
+    <div className={compact ? "mt-0" : "mt-8"}>
       <Skeleton className="mx-auto h-7 w-48" />
-      <div className="mt-6 space-y-6">
+      <div className={compact ? "mt-4 space-y-4" : "mt-6 space-y-6"}>
         {Array.from({ length: compact ? 1 : 2 }).map((_, roundIndex) => (
           <section
             key={roundIndex}
-            className="rounded-2xl border border-slate-200 bg-white/70 p-4 shadow-sm"
+            className={`rounded-2xl border border-slate-200 bg-white/70 shadow-sm ${compact ? "p-3" : "p-4"}`}
           >
             <div className="flex items-center gap-3">
               <div className="h-px flex-1 bg-slate-200" />
               <Skeleton className="h-4 w-20" />
               <div className="h-px flex-1 bg-slate-200" />
             </div>
-            <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-[repeat(auto-fit,minmax(18rem,1fr))]">
+            <div
+              className={`${compact ? "mt-3 sm:grid-cols-2 xl:grid-cols-4" : "mt-4 sm:grid-cols-[repeat(auto-fit,minmax(18rem,1fr))]"} grid grid-cols-1 gap-3`}
+            >
               {Array.from({ length: 4 }).map((_, pickIndex) => (
                 <MockDraftPickSkeleton key={pickIndex} />
               ))}
