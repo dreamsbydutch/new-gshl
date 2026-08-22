@@ -81,6 +81,22 @@ export interface CapSpaceEntry {
   remaining: number;
 }
 
+export interface CapScenarioImpactEntry {
+  label: string;
+  year: number;
+  before: number;
+  after: number;
+  change: number;
+}
+
+export interface CapScenarioMoveListRow {
+  id: string;
+  name: string;
+  detail: string;
+  direction: "in" | "out";
+  onUndo: () => void;
+}
+
 export interface InteractiveContractTableProps {
   currentSeason: Season | undefined;
   currentTeam: GSHLTeam;
@@ -131,6 +147,8 @@ export interface UseInteractiveContractTableResult {
   simulatedContracts: Contract[];
   contractGroups: Contract[][];
   capSpaceWindow: CapSpaceEntry[];
+  baselineCapSpaceWindow: CapSpaceEntry[];
+  capImpact: CapScenarioImpactEntry[];
   ghostContracts: Contract[];
   hasChanges: boolean;
 }

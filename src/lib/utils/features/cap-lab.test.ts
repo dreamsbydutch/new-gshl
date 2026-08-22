@@ -8,6 +8,8 @@ import {
   ResignableStatus,
 } from "../domain/constants";
 import {
+  buildCapScenarioImpact,
+  getCapLabRemovableContractIds,
   getCapLabPlayerOptions,
   getCapLabPlayers,
   removeContractsForPlayer,
@@ -86,6 +88,37 @@ void test("cap lab players are active, signable, valid-salary players", () => {
   );
 });
 
+void test("cap scenario impact preserves before and after values by season", () => {
+  assert.deepEqual(
+    buildCapScenarioImpact(
+      [
+        { year: 2027, label: "2026-27", remaining: 2_000_000 },
+        { year: 2028, label: "2027-28", remaining: 8_000_000 },
+      ],
+      [
+        { year: 2027, label: "2026-27", remaining: -1_000_000 },
+        { year: 2028, label: "2027-28", remaining: 5_000_000 },
+      ],
+    ),
+    [
+      {
+        year: 2027,
+        label: "2026-27",
+        before: 2_000_000,
+        after: -1_000_000,
+        change: -3_000_000,
+      },
+      {
+        year: 2028,
+        label: "2027-28",
+        before: 8_000_000,
+        after: 5_000_000,
+        change: -3_000_000,
+      },
+    ],
+  );
+});
+
 void test("removing a cap-lab player removes all of that player's contracts", () => {
   const result = removeContractsForPlayer(
     [
@@ -100,6 +133,22 @@ void test("removing a cap-lab player removes all of that player's contracts", ()
     result.map((entry) => entry.id),
     ["two"],
   );
+});
+
+void test("cap scenarios keep a player's buyout obligation in the cap table", () => {
+  const result = getCapLabRemovableContractIds(
+    [
+      contract("playing", "player-1"),
+      {
+        ...contract("buyout", "player-1"),
+        expiryStatus: ContractStatus.BUYOUT,
+      },
+      contract("other-player", "player-2"),
+    ],
+    "player-1",
+  );
+
+  assert.deepEqual(result, ["playing"]);
 });
 
 void test("cap lab exposes another team's active player as a trade choice", () => {
