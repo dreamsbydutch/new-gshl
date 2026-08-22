@@ -157,6 +157,13 @@ app -> components -> feature hooks -> main hooks -> Convex
   using one.
 - Reuse existing UI primitives and skeletons. Use Tailwind only. Preserve
   accessibility, mobile behavior, overflow handling, and loading states.
+- Use `unslop` to keep UI copy brief.
+- Match the app's low-profile style: tight vertical spacing, grayscale, sparse
+  backgrounds, and plain headings. Reserve gradient-backed headings for
+  established patterns.
+- Prefer sections and dividers. Use cards only when their boundary clarifies
+  grouping or interaction.
+- Let one component layer own outer spacing; avoid stacked padding and margins.
 - Never mutate props, Convex results, or hook output. Clone before sorting.
 - Navigation state is persisted in `src/lib/cache/store.ts`; access it through
   hooks rather than importing the store into components.
