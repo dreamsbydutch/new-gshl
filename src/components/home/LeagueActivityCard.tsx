@@ -78,7 +78,7 @@ export function LeagueActivityCard({ seasonId }: { seasonId?: string }) {
   return (
     <section
       aria-labelledby="league-activity-heading"
-      className="h-full min-w-0 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm sm:rounded-2xl"
+      className="h-full min-w-0 overflow-hidden rounded-lg border border-slate-200 bg-white"
     >
       <header className="border-b border-slate-100 px-3 py-3 sm:px-5">
         <h2

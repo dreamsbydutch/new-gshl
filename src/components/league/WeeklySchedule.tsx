@@ -7,14 +7,12 @@ import {
   WeeklyMatchupRowSkeleton,
   WeeklyScheduleSkeleton,
 } from "@gshl-skeletons";
-import { cn } from "@gshl-utils";
 import type {
   ScoreDisplayProps,
   TeamDisplayProps,
   WeekScheduleItemProps,
 } from "@gshl-types";
 import {
-  getGameBackgroundClass,
   buildMatchupNavigationHref,
   buildScheduleNavigationHref,
   getScoreClass,
@@ -60,41 +58,29 @@ const ScoreDisplay = ({ matchup }: ScoreDisplayProps) => {
 };
 
 const TeamDisplay = ({ team, rank, isAway = false }: TeamDisplayProps) => {
-  const logoAlt = `${isAway ? "Away" : "Home"} Team Logo`;
+  const logoAlt = `${team.name ?? (isAway ? "Away team" : "Home team")} logo`;
 
   return (
-    <div className="col-span-4 flex flex-col items-center justify-center gap-2 whitespace-nowrap p-2 text-center">
+    <div className="col-span-4 flex min-w-0 items-center justify-center gap-1.5 p-1 text-center">
       {shouldDisplayRanking(rank) ? (
-        <div className="flex flex-row">
-          <span className="xs:text-base pr-1 font-oswald text-sm font-bold text-black">
-            #{rank}
-          </span>
-          {team.logoUrl ? (
-            <Image
-              className="xs:w-12 w-8"
-              src={team.logoUrl}
-              alt={logoAlt}
-              width={TEAM_LOGO_DIMENSIONS.width}
-              height={TEAM_LOGO_DIMENSIONS.height}
-            />
-          ) : (
-            <div className="xs:w-12 xs:h-12 flex h-8 w-8 items-center justify-center rounded bg-gray-200" />
-          )}
-        </div>
-      ) : team.logoUrl ? (
+        <span className="font-oswald text-xs font-bold text-slate-500">
+          #{rank}
+        </span>
+      ) : null}
+      {team.logoUrl ? (
         <Image
-          className="xs:w-12 w-8"
+          className="h-9 w-9 object-contain"
           src={team.logoUrl}
           alt={logoAlt}
           width={TEAM_LOGO_DIMENSIONS.width}
           height={TEAM_LOGO_DIMENSIONS.height}
         />
       ) : (
-        <div className="xs:w-12 xs:h-12 flex h-8 w-8 items-center justify-center rounded bg-gray-200" />
+        <div className="flex h-9 w-9 items-center justify-center rounded bg-gray-100" />
       )}
-      <div className="xs:text-base text-wrap font-oswald text-sm">
+      <span className="sr-only font-oswald text-sm sm:not-sr-only sm:max-w-28 sm:truncate">
         {team.name}
-      </div>
+      </span>
     </div>
   );
 };
@@ -114,14 +100,7 @@ const WeekScheduleItem = ({
   return (
     <Link
       href={matchupHref}
-      className={cn(
-        "mx-1 mb-3 flex flex-col items-center rounded-xl py-1 shadow-md transition hover:-translate-y-0.5 hover:shadow-lg",
-        getGameBackgroundClass(
-          matchup.gameType,
-          awayTeam.confAbbr ?? "",
-          homeTeam.confAbbr ?? "",
-        ),
-      )}
+      className="flex flex-col items-center py-1 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-slate-500"
     >
       <div className="grid w-full grid-cols-10 items-center">
         <TeamDisplay
@@ -172,14 +151,14 @@ export function WeeklySchedule() {
 
   if (error) {
     return (
-      <div className="mx-2 mt-4 rounded-xl border border-rose-200 bg-rose-50 p-6 text-center text-sm text-rose-700">
+      <div className="mx-2 mt-4 border-y border-rose-200 py-4 text-center text-sm text-rose-700">
         The weekly schedule could not be loaded.
       </div>
     );
   }
 
   return (
-    <div className="mx-2 mb-8 mt-4">
+    <div className="mx-2 mb-6 mt-3">
       {canShareCommissionerContent(session?.user.role) ? (
         <div className="mb-3 flex justify-end">
           <WhatsAppShareButton
@@ -191,7 +170,7 @@ export function WeeklySchedule() {
         </div>
       ) : null}
       <ScheduleHeader />
-      <div>
+      <div className="divide-y divide-slate-200 border-y border-slate-200">
         {matchups.map((matchup) => (
           <WeekScheduleItem
             key={`week-${matchup.id}`}

@@ -1,23 +1,19 @@
 "use client";
 
-import {
-  Search,
-  ShieldCheck,
-  SlidersHorizontal,
-  Sparkles,
-  Target,
-  Users,
-} from "lucide-react";
+import Image from "next/image";
+import { Search, SlidersHorizontal } from "lucide-react";
 
+import { NHLLogo } from "@gshl-components/player/NHLLogo";
 import { useDraftClassExplorer } from "@gshl-hooks";
 import { DraftClassesSkeleton } from "@gshl-skeletons";
 import type {
   DraftClassCertainty,
   DraftClassPosition,
   DraftClassRow,
+  NHLTeam,
 } from "@gshl-types";
 import { Button, Input, Select, TableViewport } from "@gshl-ui";
-import { cn, formatMoney } from "@gshl-utils";
+import { cn, findNhlTeamByAbbreviation, formatMoney } from "@gshl-utils";
 
 const CLASS_OFFSETS = [0, 1, 2, 3] as const;
 
@@ -27,39 +23,33 @@ export function DraftClasses() {
   if (explorer.isLoading) return <DraftClassesSkeleton />;
 
   return (
-    <div className="mx-auto max-w-7xl pb-12">
-      <header className="overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 text-white shadow-sm">
-        <div className="grid gap-6 px-5 py-6 sm:px-7 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
+    <div className="mx-auto max-w-7xl pb-6">
+      <header className="flex flex-col gap-2 border-b border-slate-200 pb-3 sm:flex-row sm:items-end sm:justify-between">
+        <div className="flex items-center gap-3">
+          <Image
+            src="/favicon.ico"
+            alt=""
+            width={40}
+            height={40}
+            className="h-10 w-10 rounded-md object-contain"
+          />
           <div>
-            <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-white/10 text-indigo-200">
-              <Sparkles className="h-5 w-5" aria-hidden="true" />
-            </div>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-indigo-200">
-              Future player pool
-            </p>
-            <h2 className="mt-1 text-3xl font-bold tracking-tight sm:text-4xl">
-              Draft Class Explorer
+            <h2 className="text-2xl font-bold tracking-tight text-slate-950">
+              Draft Classes
             </h2>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300 sm:text-base">
-              Look ahead four drafts, separate confirmed UFAs from projections,
-              and find the positions or players worth planning around.
-            </p>
-          </div>
-          <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-            <p className="text-xs text-slate-400">Viewing class</p>
-            <p className="mt-1 text-3xl font-bold">{explorer.selectedYear}</p>
-            <p className="mt-1 text-xs text-slate-400">
-              {explorer.summary.available} projected players
-            </p>
+            <p className="text-sm text-slate-500">Four-year projections</p>
           </div>
         </div>
+        <p className="text-sm text-slate-500">
+          <span className="font-semibold text-slate-950">
+            {explorer.selectedYear}
+          </span>{" "}
+          · {explorer.summary.available} players
+        </p>
       </header>
 
-      <section
-        aria-label="Draft class controls"
-        className="relative z-10 mx-3 -mt-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-md sm:mx-6 sm:p-5"
-      >
-        <div className="flex flex-wrap gap-2" aria-label="Draft class year">
+      <section aria-label="Draft class controls" className="border-b py-3">
+        <div className="flex gap-1.5" aria-label="Draft class year">
           {CLASS_OFFSETS.map((offset) => (
             <Button
               key={offset}
@@ -76,7 +66,7 @@ export function DraftClasses() {
             </Button>
           ))}
         </div>
-        <div className="mt-4 grid gap-2 md:grid-cols-[minmax(14rem,1fr)_12rem_12rem]">
+        <div className="mt-2 grid gap-2 md:grid-cols-[minmax(14rem,1fr)_12rem_12rem]">
           <label className="relative block">
             <span className="sr-only">Search draft class</span>
             <Search
@@ -86,7 +76,7 @@ export function DraftClasses() {
             <Input
               value={explorer.search}
               onChange={(event) => explorer.setSearch(event.target.value)}
-              placeholder="Search player, NHL team, or position"
+              placeholder="Player, NHL team, or position"
               className="pl-9"
             />
           </label>
@@ -123,155 +113,156 @@ export function DraftClasses() {
         </div>
       </section>
 
-      <dl className="mt-6 grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <SummaryCard
-          icon={Users}
+      <dl className="grid grid-cols-2 gap-x-5 gap-y-2 border-b border-slate-200 py-3 sm:grid-cols-4">
+        <SummaryStat
           label="Class size"
           value={String(explorer.summary.available)}
         />
-        <SummaryCard
-          icon={ShieldCheck}
+        <SummaryStat
           label="Guaranteed UFAs"
           value={String(explorer.summary.guaranteedUfas)}
-          accent
         />
-        <SummaryCard
-          icon={Target}
+        <SummaryStat
           label="Average rating"
           value={explorer.summary.averageRating?.toFixed(1) ?? "—"}
         />
-        <SummaryCard
-          icon={Sparkles}
-          label="Goalies"
-          value={String(explorer.summary.goalies)}
-        />
+        <SummaryStat label="Goalies" value={String(explorer.summary.goalies)} />
       </dl>
 
-      <section aria-labelledby="draft-class-results-heading" className="mt-7">
-        <div className="flex items-baseline justify-between gap-3">
+      <section aria-labelledby="draft-class-results-heading" className="mt-4">
+        <div className="flex items-start justify-between gap-3">
           <div>
             <h3
               id="draft-class-results-heading"
-              className="text-xl font-bold text-slate-950"
+              className="text-lg font-semibold text-slate-950"
             >
               {explorer.selectedYear} player pool
             </h3>
-            <p className="mt-1 text-sm text-slate-500">
-              Guaranteed means the current contract expires as a UFA before this
-              draft. Every other row remains a projection.
+            <p className="text-xs text-slate-500">
+              Guaranteed: UFA contract expires before this draft.
             </p>
           </div>
-          <span className="shrink-0 text-xs font-medium text-slate-500">
+          <span className="shrink-0 pt-1 text-xs text-slate-500">
             {explorer.visibleRows.length} shown
           </span>
         </div>
 
         {explorer.visibleRows.length ? (
           <>
-            <div className="mt-4 space-y-2 lg:hidden">
+            <div className="mt-3 divide-y divide-slate-100 rounded-lg border border-slate-200 lg:hidden">
               {explorer.visibleRows.slice(0, 300).map((row, index) => (
-                <DraftClassCard
+                <DraftClassListItem
                   key={row.player.id}
                   row={row}
                   rank={index + 1}
+                  nhlTeam={findNhlTeamByAbbreviation(
+                    explorer.nhlTeams,
+                    row.player.nhlTeam,
+                  )}
                 />
               ))}
             </div>
             <TableViewport
               ariaLabel={explorer.selectedYear + " projected GSHL draft class"}
-              scrollHint="Scroll for complete player projections"
-              className="mt-4 hidden lg:block"
-              viewportClassName="rounded-2xl border border-slate-200 bg-white"
+              scrollHint="Scroll for all projections"
+              className="mt-3 hidden lg:block"
+              viewportClassName="rounded-lg border-slate-200"
             >
               <table className="w-full min-w-[56rem] text-sm">
                 <caption className="sr-only">
                   {explorer.selectedYear} projected draft class
                 </caption>
-                <thead className="bg-slate-950 text-left text-xs uppercase tracking-wide text-slate-300">
+                <thead className="border-b border-slate-200 bg-slate-100 text-left text-xs font-medium text-slate-600">
                   <tr>
-                    <th scope="col" className="px-3 py-3 text-center">
+                    <th scope="col" className="px-3 py-2 text-center">
                       #
                     </th>
-                    <th scope="col" className="px-3 py-3">
+                    <th scope="col" className="px-3 py-2">
                       Player
                     </th>
-                    <th scope="col" className="px-3 py-3">
+                    <th scope="col" className="px-3 py-2">
                       Status
                     </th>
-                    <th scope="col" className="px-3 py-3 text-center">
+                    <th scope="col" className="px-3 py-2 text-center">
                       Pos
                     </th>
-                    <th scope="col" className="px-3 py-3 text-center">
+                    <th scope="col" className="px-3 py-2 text-center">
                       NHL
                     </th>
-                    <th scope="col" className="px-3 py-3 text-right">
+                    <th scope="col" className="px-3 py-2 text-right">
                       Overall
                     </th>
-                    <th scope="col" className="px-3 py-3 text-right">
-                      This year
+                    <th scope="col" className="px-3 py-2 text-right">
+                      Season
                     </th>
-                    <th scope="col" className="px-3 py-3 text-right">
+                    <th scope="col" className="px-3 py-2 text-right">
                       Salary
                     </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {explorer.visibleRows.slice(0, 300).map((row, index) => (
-                    <tr key={row.player.id} className="hover:bg-slate-50">
-                      <td className="px-3 py-3 text-center font-mono text-xs text-slate-400">
-                        {index + 1}
-                      </td>
-                      <td className="px-3 py-3">
-                        <p
-                          className={cn(
-                            "font-medium text-slate-950",
-                            row.isGuaranteedUfa && "font-bold",
+                  {explorer.visibleRows.slice(0, 300).map((row, index) => {
+                    const nhlTeam = findNhlTeamByAbbreviation(
+                      explorer.nhlTeams,
+                      row.player.nhlTeam,
+                    );
+                    return (
+                      <tr key={row.player.id} className="hover:bg-slate-50">
+                        <td className="px-3 py-2 text-center font-mono text-xs text-slate-400">
+                          {index + 1}
+                        </td>
+                        <th scope="row" className="px-3 py-2 text-left">
+                          <span
+                            className={cn(
+                              "font-medium text-slate-950",
+                              row.isGuaranteedUfa && "font-semibold",
+                            )}
+                          >
+                            {row.player.fullName}
+                          </span>
+                          <span className="ml-2 text-xs font-normal text-slate-400">
+                            Rk {row.player.overallRk ?? "—"}
+                          </span>
+                        </th>
+                        <td className="px-3 py-2">
+                          <StatusBadge guaranteed={row.isGuaranteedUfa} />
+                        </td>
+                        <td className="px-3 py-2 text-center">
+                          {row.player.nhlPos?.join("/") || row.player.posGroup}
+                        </td>
+                        <td className="px-3 py-2 text-center">
+                          {nhlTeam ? (
+                            <NHLLogo team={nhlTeam} size={24} />
+                          ) : (
+                            row.player.nhlTeam || "FA"
                           )}
-                        >
-                          {row.player.fullName}
-                        </p>
-                        <p className="mt-0.5 text-xs text-slate-500">
-                          Overall rank {row.player.overallRk ?? "—"}
-                        </p>
-                      </td>
-                      <td className="px-3 py-3">
-                        <StatusBadge guaranteed={row.isGuaranteedUfa} />
-                      </td>
-                      <td className="px-3 py-3 text-center">
-                        {row.player.nhlPos?.join("/") || row.player.posGroup}
-                      </td>
-                      <td className="px-3 py-3 text-center">
-                        {row.player.nhlTeam || "FA"}
-                      </td>
-                      <td className="px-3 py-3 text-right font-mono font-semibold">
-                        {formatRating(row.player.overallRating)}
-                      </td>
-                      <td className="px-3 py-3 text-right font-mono">
-                        {formatRating(row.player.seasonRating)}
-                      </td>
-                      <td className="px-3 py-3 text-right font-mono">
-                        {row.player.salary
-                          ? formatMoney(Number(row.player.salary))
-                          : "—"}
-                      </td>
-                    </tr>
-                  ))}
+                        </td>
+                        <td className="px-3 py-2 text-right font-mono font-semibold">
+                          {formatRating(row.player.overallRating)}
+                        </td>
+                        <td className="px-3 py-2 text-right font-mono">
+                          {formatRating(row.player.seasonRating)}
+                        </td>
+                        <td className="px-3 py-2 text-right font-mono">
+                          {row.player.salary
+                            ? formatMoney(Number(row.player.salary))
+                            : "—"}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </TableViewport>
           </>
         ) : (
-          <div className="mt-4 rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-5 py-12 text-center">
+          <div className="mt-3 border-y border-dashed border-slate-300 py-6 text-center">
             <Search
-              className="mx-auto h-8 w-8 text-slate-400"
+              className="mx-auto h-6 w-6 text-slate-400"
               aria-hidden="true"
             />
-            <h4 className="mt-3 font-semibold text-slate-900">
-              No players match these filters
-            </h4>
-            <p className="mt-1 text-sm text-slate-500">
-              Try another position, projection type, or a broader search.
-            </p>
+            <h4 className="mt-2 font-medium text-slate-900">No matches</h4>
+            <p className="text-sm text-slate-500">Change a filter or search.</p>
           </div>
         )}
       </section>
@@ -279,86 +270,81 @@ export function DraftClasses() {
   );
 }
 
-function SummaryCard({
-  icon: Icon,
-  label,
-  value,
-  accent = false,
-}: {
-  icon: typeof Users;
-  label: string;
-  value: string;
-  accent?: boolean;
-}) {
+function SummaryStat({ label, value }: { label: string; value: string }) {
   return (
-    <div
-      className={cn(
-        "rounded-xl border p-3 sm:p-4",
-        accent
-          ? "border-emerald-200 bg-emerald-50"
-          : "border-slate-200 bg-white",
-      )}
-    >
-      <div className="flex items-center gap-2 text-xs font-medium text-slate-500">
-        <Icon
-          className={cn("h-4 w-4", accent && "text-emerald-700")}
-          aria-hidden="true"
-        />
-        {label}
-      </div>
-      <p className="mt-2 text-2xl font-bold text-slate-950">{value}</p>
+    <div className="flex items-baseline justify-between gap-2 sm:block">
+      <dt className="text-xs text-slate-500">{label}</dt>
+      <dd className="font-mono text-lg font-semibold text-slate-950 sm:mt-0.5">
+        {value}
+      </dd>
     </div>
   );
 }
 
-function DraftClassCard({ row, rank }: { row: DraftClassRow; rank: number }) {
+function DraftClassListItem({
+  row,
+  rank,
+  nhlTeam,
+}: {
+  row: DraftClassRow;
+  rank: number;
+  nhlTeam: NHLTeam | undefined;
+}) {
+  const position = row.player.nhlPos?.join("/") || row.player.posGroup;
   return (
-    <article className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-      <div className="flex items-start gap-3 p-3">
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-100 font-mono text-xs font-semibold text-slate-600">
+    <article className="px-3 py-2.5">
+      <div className="flex items-center gap-2.5">
+        <span className="w-5 shrink-0 text-center font-mono text-xs text-slate-400">
           {rank}
         </span>
+        {nhlTeam ? (
+          <NHLLogo team={nhlTeam} size={26} className="mx-0 shrink-0" />
+        ) : (
+          <span className="flex h-[26px] w-[26px] shrink-0 items-center justify-center text-[10px] text-slate-400">
+            {row.player.nhlTeam || "FA"}
+          </span>
+        )}
         <div className="min-w-0 flex-1">
-          <div className="flex items-start justify-between gap-2">
-            <div className="min-w-0">
-              <h4
-                className={cn(
-                  "truncate font-semibold text-slate-950",
-                  row.isGuaranteedUfa && "font-bold",
-                )}
-              >
-                {row.player.fullName}
-              </h4>
-              <p className="mt-0.5 text-xs text-slate-500">
-                {row.player.nhlPos?.join("/") || row.player.posGroup} ·{" "}
-                {row.player.nhlTeam || "FA"}
-              </p>
-            </div>
-            <StatusBadge guaranteed={row.isGuaranteedUfa} />
-          </div>
+          <h4
+            className={cn(
+              "truncate text-sm font-medium text-slate-950",
+              row.isGuaranteedUfa && "font-semibold",
+            )}
+          >
+            {row.player.fullName}
+          </h4>
+          <p className="text-xs text-slate-500">
+            {position} · Rk {row.player.overallRk ?? "—"}
+          </p>
         </div>
+        <StatusBadge guaranteed={row.isGuaranteedUfa} />
       </div>
-      <dl className="grid grid-cols-3 divide-x divide-slate-100 border-t border-slate-100 bg-slate-50/70 text-center">
-        <div className="px-2 py-2.5">
-          <dt className="text-[11px] text-slate-500">Overall</dt>
-          <dd className="mt-0.5 font-mono text-sm font-semibold text-slate-900">
-            {formatRating(row.player.overallRating)}
-          </dd>
-        </div>
-        <div className="px-2 py-2.5">
-          <dt className="text-[11px] text-slate-500">This year</dt>
-          <dd className="mt-0.5 font-mono text-sm font-semibold text-slate-900">
-            {formatRating(row.player.seasonRating)}
-          </dd>
-        </div>
-        <div className="px-2 py-2.5">
-          <dt className="text-[11px] text-slate-500">Salary</dt>
-          <dd className="mt-0.5 font-mono text-sm font-semibold text-slate-900">
-            {row.player.salary ? formatMoney(Number(row.player.salary)) : "—"}
-          </dd>
-        </div>
+      <dl className="mt-2 grid grid-cols-3 gap-2 pl-[4.125rem] text-xs">
+        <CompactStat
+          label="Overall"
+          value={formatRating(row.player.overallRating)}
+        />
+        <CompactStat
+          label="Season"
+          value={formatRating(row.player.seasonRating)}
+        />
+        <CompactStat
+          label="Salary"
+          value={
+            row.player.salary ? formatMoney(Number(row.player.salary)) : "—"
+          }
+        />
       </dl>
     </article>
+  );
+}
+
+function CompactStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <dt className="text-[10px] text-slate-400">{label}</dt>
+      <dd className="font-mono font-medium text-slate-700">{value}</dd>
+    </div>
   );
 }
 
@@ -366,13 +352,13 @@ function StatusBadge({ guaranteed }: { guaranteed: boolean }) {
   return (
     <span
       className={cn(
-        "inline-flex shrink-0 rounded-full px-2 py-1 text-[11px] font-semibold",
+        "inline-flex shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-medium",
         guaranteed
-          ? "bg-emerald-100 text-emerald-800"
-          : "bg-slate-100 text-slate-600",
+          ? "border-slate-400 bg-slate-100 text-slate-800"
+          : "border-slate-200 text-slate-500",
       )}
     >
-      {guaranteed ? "Guaranteed UFA" : "Projected"}
+      {guaranteed ? "UFA" : "Projected"}
     </span>
   );
 }

@@ -2,8 +2,17 @@
 
 import { useMemo, useState } from "react";
 
-import { useActivePlayers, useContracts, useSeasonState } from "../main";
-import type { DraftClassCertainty, DraftClassPosition } from "@gshl-types";
+import {
+  useActivePlayers,
+  useContracts,
+  useNHLTeams,
+  useSeasonState,
+} from "../main";
+import type {
+  DraftClassCertainty,
+  DraftClassPosition,
+  NHLTeam,
+} from "@gshl-types";
 import {
   buildDraftClassRows,
   filterDraftClassRows,
@@ -24,6 +33,11 @@ export function useDraftClassExplorer() {
   const draftYear = Number(draftClassSeason?.year ?? new Date().getFullYear());
   const playersQuery = useActivePlayers();
   const contractsQuery = useContracts();
+  const nhlTeamsQuery = useNHLTeams();
+  const nhlTeams = useMemo(
+    () => nhlTeamsQuery.data.filter((team): team is NHLTeam => "abbr" in team),
+    [nhlTeamsQuery.data],
+  );
   const rows = useMemo(
     () =>
       buildDraftClassRows({
@@ -54,6 +68,7 @@ export function useDraftClassExplorer() {
     rows,
     visibleRows,
     summary,
+    nhlTeams,
     isLoading: playersQuery.isLoading || contractsQuery.isLoading,
   };
 }

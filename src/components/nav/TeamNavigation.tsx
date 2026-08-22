@@ -65,12 +65,12 @@ export function TeamsToggle({
         src={team.logoUrl}
         alt=""
         aria-hidden="true"
-        height={40}
-        width={40}
-        className="h-10 w-10 rounded-md object-contain"
+        height={32}
+        width={32}
+        className="h-8 w-8 rounded object-contain"
       />
     ) : (
-      <div className="flex h-10 w-10 items-center justify-center rounded-md bg-gray-200">
+      <div className="flex h-8 w-8 items-center justify-center rounded bg-gray-100">
         <span className="text-xs text-gray-400">?</span>
       </div>
     );

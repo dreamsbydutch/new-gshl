@@ -12,7 +12,7 @@ export function WeeksToggleSkeleton({ className }: { className?: string }) {
       {Array.from({ length: 14 }).map((_, index) => (
         <Skeleton
           key={index}
-          className={`h-11 shrink-0 rounded-sm ${index < 9 ? "w-11" : "w-12"}`}
+          className={`h-9 shrink-0 rounded-sm ${index < 9 ? "w-9" : "w-10"}`}
         />
       ))}
     </div>

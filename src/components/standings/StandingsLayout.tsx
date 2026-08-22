@@ -19,7 +19,7 @@ export function StandingsLayout({ children }: { children: React.ReactNode }) {
     { key: "overall", label: "Overall" },
     { key: "conference", label: "Conference" },
     { key: "wildcard", label: "Wildcard" },
-    { key: "power", label: "Power Ranks" },
+    { key: "power", label: "Power" },
     { key: "playoff", label: "Playoff" },
     { key: "awards", label: "Awards" },
   ];

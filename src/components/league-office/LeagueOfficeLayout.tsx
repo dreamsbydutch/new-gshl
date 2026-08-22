@@ -47,22 +47,22 @@ export function LeagueOfficeLayout({
     toolbarKeys: [
       {
         key: "mockDraft",
-        value: "Mock Draft",
+        value: "Mock",
         setter: selectView,
       },
       {
         key: "draft",
-        value: "Draft Classes",
+        value: "Classes",
         setter: selectView,
       },
       {
         key: "tradeBlock",
-        value: "Trade Block",
+        value: "Trade",
         setter: selectView,
       },
       {
         key: "freeAgents",
-        value: "Free Agents",
+        value: "UFA",
         setter: selectView,
       },
       {
@@ -77,7 +77,7 @@ export function LeagueOfficeLayout({
       },
       {
         key: "ownerRankings",
-        value: "Owner Ladder",
+        value: "Owners",
         setter: selectView,
       },
       ...(session?.user.role === "commissioner"
@@ -89,7 +89,7 @@ export function LeagueOfficeLayout({
             },
             {
               key: "users",
-              value: "User Access",
+              value: "Users",
               setter: selectView,
             },
             {
@@ -104,7 +104,7 @@ export function LeagueOfficeLayout({
             },
             {
               key: "imageUpload",
-              value: "Image Upload",
+              value: "Images",
               setter: selectView,
             },
           ]

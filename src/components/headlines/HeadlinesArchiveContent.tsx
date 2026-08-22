@@ -1,30 +1,36 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, Newspaper } from "lucide-react";
+import Image from "next/image";
+import { ArrowRight } from "lucide-react";
 import { useWeeklyEditionArchive } from "@gshl-hooks";
 import { Skeleton } from "@gshl-ui";
+import { WEEKLY_EDITION_LOGO_URL } from "@gshl-utils";
 
 export function HeadlinesArchiveContent() {
   const { data: editions, isLoading } = useWeeklyEditionArchive();
 
   return (
-    <main className="container mx-auto px-3 py-5 sm:px-5 sm:py-8">
+    <main className="container mx-auto px-3 py-4 sm:px-5 sm:py-6">
       <div className="mx-auto max-w-3xl">
-        <header className="overflow-hidden rounded-2xl bg-gradient-to-br from-slate-950 via-slate-900 to-blue-950 px-5 py-6 text-white shadow-lg shadow-slate-950/10 sm:px-7 sm:py-8">
-          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-cyan-400">
-            <Newspaper className="h-4 w-4" aria-hidden="true" />
-          </span>
-          <h1 className="mt-4 font-oswald text-3xl font-bold uppercase tracking-tight sm:text-4xl">
-            GSHL Press Box
-          </h1>
-          <p className="mt-2 max-w-lg text-xs font-semibold uppercase leading-5 tracking-[0.12em] text-slate-200">
-            Results, movement, transactions and the occasional gentle chirp
-          </p>
+        <header className="flex items-center gap-3 border-b border-slate-300 pb-3">
+          <Image
+            src={WEEKLY_EDITION_LOGO_URL}
+            alt="GSHL Press Box"
+            width={48}
+            height={48}
+            className="h-12 w-12 shrink-0 object-contain"
+          />
+          <div>
+            <h1 className="font-oswald text-2xl font-bold uppercase tracking-tight sm:text-3xl">
+              Press Box
+            </h1>
+            <p className="text-xs text-slate-500">News and league updates</p>
+          </div>
         </header>
 
         {isLoading ? (
-          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <div className="mt-3 divide-y divide-slate-200 border-y border-slate-200">
             {[0, 1, 2, 3].map((item) => (
               <Skeleton key={item} className="h-40 rounded-xl" />
             ))}
@@ -35,11 +41,9 @@ export function HeadlinesArchiveContent() {
               <Link
                 key={edition.id}
                 href={`/headlines/${edition.id}`}
-                className={`group block rounded-xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 motion-reduce:transform-none motion-reduce:transition-none ${
-                  index === 0 ? "sm:col-span-2 sm:p-5" : ""
-                }`}
+                className={`group block px-1 py-3 text-left transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-1 motion-reduce:transition-none ${index === 0 ? "sm:py-4" : ""}`}
               >
-                <p className="text-xs font-bold uppercase tracking-[0.12em] text-blue-700">
+                <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500">
                   {edition.seasonName} · {edition.issueLabel}
                 </p>
                 <h2
@@ -49,24 +53,23 @@ export function HeadlinesArchiveContent() {
                 >
                   {edition.headline}
                 </h2>
-                <p className="mt-2 line-clamp-3 text-sm leading-6 text-slate-600">
+                <p className="mt-1 line-clamp-2 text-sm leading-5 text-slate-600">
                   {edition.deck}
                 </p>
-                <span className="mt-3 inline-flex min-h-11 items-center gap-1 text-xs font-bold text-blue-700">
-                  Open issue
+                <span className="mt-2 inline-flex items-center gap-1 text-xs font-bold text-slate-700">
+                  Read
                   <ArrowRight className="h-3 w-3" aria-hidden="true" />
                 </span>
               </Link>
             ))}
           </div>
         ) : (
-          <div className="mt-4 rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center">
+          <div className="mt-4 border-y border-dashed border-slate-300 py-6 text-center">
             <h2 className="font-oswald text-xl text-slate-900">
-              The presses are warming up
+              No editions yet
             </h2>
             <p className="mt-2 text-sm leading-6 text-slate-600">
-              The first edition publishes after a completed week has all of its
-              statistics.
+              The first edition follows a completed week.
             </p>
           </div>
         )}

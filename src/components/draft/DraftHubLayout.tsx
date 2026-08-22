@@ -43,7 +43,7 @@ export function DraftHubLayout({ children }: { children: React.ReactNode }) {
   const draftLinks = [
     {
       href: teamNavigation.draftHref,
-      label: "Draft Board",
+      label: "Board",
       icon: ClipboardList,
       isActive: pathname === "/draft",
     },
@@ -51,7 +51,7 @@ export function DraftHubLayout({ children }: { children: React.ReactNode }) {
       ? [
           {
             href: teamNavigation.myTeamHref,
-            label: "My Draft Team",
+            label: "My team",
             icon: Shield,
             isActive: pathname === "/draft/my-team",
           },
@@ -59,7 +59,7 @@ export function DraftHubLayout({ children }: { children: React.ReactNode }) {
       : []),
     {
       href: teamNavigation.teamsHref,
-      label: "Other Teams",
+      label: "Teams",
       icon: UsersRound,
       isActive: showTeamToggle,
     },
@@ -78,7 +78,7 @@ export function DraftHubLayout({ children }: { children: React.ReactNode }) {
               href={href}
               aria-current={isActive ? "page" : undefined}
               className={cn(
-                "flex min-h-11 shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 motion-reduce:transition-none",
+                "flex min-h-9 shrink-0 items-center gap-1.5 rounded px-2.5 py-1 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 motion-reduce:transition-none",
                 isActive
                   ? "bg-slate-900 text-white"
                   : "text-slate-700 hover:bg-slate-100",

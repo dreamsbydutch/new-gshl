@@ -47,6 +47,12 @@ Place work at the narrowest layer that owns it:
 - Preserve loading, empty, error, overflow, keyboard, and mobile states.
 - Use existing Tailwind tokens and primitives; do not introduce a styling or
   state-management alternative for a local change.
+- Use existing league, conference, GSHL team, and NHL team logos for color and
+  compact identification before adding colored surfaces or repeated names.
+  Preserve an accessible name when a logo replaces visible text.
+- Keep secondary and tertiary navigation low-profile. Use compact 36px rows and
+  controls; reserve the larger mobile target treatment for primary navigation
+  and consequential actions. Keep focus states visible at every size.
 
 ## Verify
 

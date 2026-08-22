@@ -63,12 +63,12 @@ export function DraftHubTeamToggle({
             src={team.logoUrl}
             alt=""
             aria-hidden="true"
-            width={40}
-            height={40}
-            className="h-10 w-10 rounded-md object-contain"
+            width={32}
+            height={32}
+            className="h-8 w-8 rounded object-contain"
           />
         ) : (
-          <span className="grid h-10 w-10 place-items-center text-xs font-bold">
+          <span className="grid h-8 w-8 place-items-center text-xs font-bold">
             {team.abbr ?? "?"}
           </span>
         )

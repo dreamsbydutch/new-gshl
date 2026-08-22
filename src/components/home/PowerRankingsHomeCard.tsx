@@ -109,7 +109,7 @@ export function PowerRankingsHomeCard({
   return (
     <section
       aria-labelledby="power-rankings-home-heading"
-      className="h-full min-w-0 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm sm:rounded-2xl"
+      className="h-full min-w-0 overflow-hidden rounded-lg border border-slate-200 bg-white"
     >
       <header className="flex items-center justify-between gap-2 border-b border-slate-100 px-3 py-3 sm:gap-3 sm:px-5">
         <div className="min-w-0">

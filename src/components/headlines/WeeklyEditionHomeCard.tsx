@@ -91,7 +91,7 @@ export function WeeklyEditionHomeCard() {
 
   if (isLoading) {
     return (
-      <section className="mx-auto flex h-16 w-full max-w-5xl items-center gap-3 rounded-2xl border border-slate-200 bg-white px-3">
+      <section className="mx-auto flex h-14 w-full max-w-5xl items-center gap-3 border-y border-slate-200 px-3">
         <Skeleton className="h-9 w-9 rounded-xl" />
         <Skeleton className="h-4 flex-1" />
         <Skeleton className="h-8 w-20 rounded-full" />
@@ -102,12 +102,12 @@ export function WeeklyEditionHomeCard() {
 
   return (
     <>
-      <section className="mx-auto flex w-full max-w-5xl items-stretch overflow-hidden rounded-2xl border border-slate-800 bg-slate-950 text-white shadow-lg shadow-slate-950/10">
+      <section className="mx-auto flex w-full max-w-5xl items-stretch overflow-hidden border-y border-slate-300 bg-white text-slate-950">
         <button
           ref={triggerRef}
           type="button"
           onClick={() => setIsOpen(true)}
-          className="group flex min-w-0 flex-1 items-center gap-3 px-3 py-2.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-cyan-400 sm:px-4"
+          className="group flex min-w-0 flex-1 items-center gap-3 px-2 py-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-slate-500 sm:px-3"
         >
           <span className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white p-0.5 shadow-inner">
             <Image
@@ -119,14 +119,14 @@ export function WeeklyEditionHomeCard() {
             />
           </span>
           <span className="min-w-0 flex-1">
-            <span className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.12em] text-cyan-200 sm:text-xs">
-              New from the Press Box
+            <span className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500 sm:text-xs">
+              Press Box
               <span className="text-slate-400">·</span>
-              <span className="truncate text-slate-300">
+              <span className="truncate text-slate-500">
                 {edition.issueLabel}
               </span>
             </span>
-            <span className="mt-0.5 block truncate text-[13px] font-semibold leading-5 text-white sm:text-sm">
+            <span className="mt-0.5 block truncate text-[13px] font-semibold leading-5 text-slate-950 sm:text-sm">
               {edition.headline}
             </span>
           </span>
@@ -135,7 +135,7 @@ export function WeeklyEditionHomeCard() {
               {edition.heroTeams.map((team) => (
                 <span
                   key={team.teamId}
-                  className="flex h-7 w-7 items-center justify-center rounded-full border border-slate-700 bg-white p-1"
+                  className="flex h-7 w-7 items-center justify-center rounded-full border border-slate-200 bg-white p-1"
                 >
                   <Image
                     src={team.logoUrl}
@@ -148,14 +148,14 @@ export function WeeklyEditionHomeCard() {
               ))}
             </span>
           ) : null}
-          <span className="inline-flex min-h-11 shrink-0 items-center gap-1 rounded-full bg-white px-3 py-2 text-xs font-bold text-slate-950 transition group-hover:bg-cyan-100 motion-reduce:transition-none">
+          <span className="inline-flex min-h-11 shrink-0 items-center gap-1 px-2 text-xs font-bold text-slate-700 transition group-hover:bg-slate-100 motion-reduce:transition-none">
             Read
             <BookOpen className="h-3 w-3" aria-hidden="true" />
           </span>
         </button>
         <Link
           href="/headlines"
-          className="hidden min-h-11 shrink-0 items-center gap-1 border-l border-slate-800 px-3 text-xs font-semibold text-slate-300 transition hover:bg-slate-900 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-cyan-400 motion-reduce:transition-none sm:flex"
+          className="hidden min-h-11 shrink-0 items-center gap-1 border-l border-slate-200 px-3 text-xs font-semibold text-slate-600 transition hover:bg-slate-100 hover:text-slate-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-slate-500 motion-reduce:transition-none sm:flex"
         >
           Archive
           <ArrowRight className="h-3 w-3" aria-hidden="true" />

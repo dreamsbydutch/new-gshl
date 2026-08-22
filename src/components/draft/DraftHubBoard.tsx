@@ -278,7 +278,7 @@ function DraftStatusHero({
 }) {
   if (status === "complete") {
     return (
-      <section className="rounded-2xl border border-emerald-300 bg-gradient-to-br from-emerald-50 to-white p-6 text-center shadow-sm">
+      <section className="border-y border-emerald-300 py-5 text-center">
         <CheckCircle2 className="mx-auto h-10 w-10 text-emerald-600" />
         <h1 className="mt-2 text-3xl font-bold">Draft Complete</h1>
         <p className="mt-1 text-muted-foreground">
@@ -290,7 +290,7 @@ function DraftStatusHero({
 
   if (!activePick) {
     return (
-      <section className="rounded-2xl border border-amber-300 bg-amber-50 p-6 text-center">
+      <section className="border-y border-amber-300 py-5 text-center">
         <AlertTriangle className="mx-auto h-8 w-8 text-amber-700" />
         <h1 className="mt-2 text-xl font-bold">Draft data unavailable</h1>
       </section>
@@ -305,17 +305,20 @@ function DraftStatusHero({
   return (
     <section
       className={cn(
-        "overflow-hidden rounded-2xl border p-5 shadow-lg sm:p-7",
-        expired
-          ? "border-red-400 bg-gradient-to-br from-red-950 to-red-700 text-white"
-          : "border-primary/40 bg-gradient-to-br from-slate-950 via-slate-900 to-primary text-white",
+        "overflow-hidden rounded-lg border bg-white p-3 text-slate-950 sm:p-4",
+        expired ? "border-red-300" : "border-slate-300",
       )}
     >
-      <div className="grid items-center gap-5 md:grid-cols-[1fr_auto_1fr]">
-        <div className="flex items-center gap-4">
+      <div className="grid items-center gap-3 md:grid-cols-[1fr_auto_1fr]">
+        <div className="flex items-center gap-3">
           <TeamLogo pick={activePick} size={72} />
           <div>
-            <p className="text-xs font-bold uppercase tracking-[0.2em] text-white/65">
+            <p
+              className={cn(
+                "text-xs font-bold uppercase tracking-[0.16em]",
+                expired ? "text-red-700" : "text-slate-500",
+              )}
+            >
               {expired
                 ? "Commissioner pick required"
                 : upcoming
@@ -325,16 +328,16 @@ function DraftStatusHero({
             <h1 className="mt-1 text-2xl font-bold sm:text-3xl">
               {activePick.team?.name ?? "Team TBD"}
             </h1>
-            <p className="mt-1 text-sm text-white/75">
+            <p className="mt-1 text-sm text-slate-600">
               Round {activePick.pick.round}, Pick {activePick.pick.pick}
               {activePick.pick.isTraded && activePick.originalTeam
                 ? ` · via ${activePick.originalTeam.name}`
                 : ""}
             </p>
             {mockProjection ? (
-              <p className="mt-2 text-xs text-white/55">
+              <p className="mt-1 text-xs text-slate-500">
                 Potential auto-pick:{" "}
-                <span className="font-semibold text-white/80">
+                <span className="font-semibold text-slate-700">
                   {mockProjection.fullName}
                   {mockProjection.nhlPos.length
                     ? ` · ${mockProjection.nhlPos.join("/")}`
@@ -345,15 +348,15 @@ function DraftStatusHero({
           </div>
         </div>
         <div className="text-center">
-          <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.18em] text-white/65">
+          <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">
             {upcoming ? "Clock starts in" : "Pick clock"}
           </p>
           <div
             className={cn(
-              "rounded-xl border px-4 py-3 text-center font-mono text-3xl font-black tabular-nums shadow-inner sm:px-6 sm:text-4xl",
+              "border-y px-4 py-2 text-center font-mono text-3xl font-black tabular-nums sm:px-6 sm:text-4xl",
               expired
-                ? "border-red-300/40 bg-red-950/40 text-red-100"
-                : "border-white/20 bg-black/25 text-amber-300",
+                ? "border-red-300 text-red-700"
+                : "border-slate-200 text-slate-950",
             )}
             aria-label={
               expired
@@ -373,7 +376,7 @@ function DraftStatusHero({
         <div className="text-left md:text-right">
           {upcoming ? (
             <>
-              <p className="text-sm text-white/70">Draft starts</p>
+              <p className="text-sm text-slate-500">Draft starts</p>
               <p className="text-sm font-bold sm:text-base">
                 {new Intl.DateTimeFormat("en-CA", {
                   dateStyle: "medium",
@@ -384,14 +387,14 @@ function DraftStatusHero({
             </>
           ) : (
             <>
-              <p className="text-sm text-white/70">
+              <p className="text-sm text-slate-500">
                 {completedCount} picks completed
               </p>
               <p className="text-lg font-bold">{remainingCount} remaining</p>
             </>
           )}
           {expired ? (
-            <p className="mt-2 inline-flex items-center gap-1 text-sm font-semibold text-red-100">
+            <p className="mt-2 inline-flex items-center gap-1 text-sm font-semibold text-red-700">
               <ShieldAlert className="h-4 w-4" />
               Only a commissioner can submit
             </p>
