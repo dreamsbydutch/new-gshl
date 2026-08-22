@@ -1,6 +1,6 @@
 "use client";
 
-import { MessageCircle } from "lucide-react";
+import Image from "next/image";
 import type { WhatsAppShareButtonProps } from "@gshl-types";
 import {
   appendWhatsAppShareLink,
@@ -8,6 +8,9 @@ import {
   resolveWhatsAppShareLink,
 } from "@gshl-utils/features/whatsapp-share";
 import { Button } from "./ButtonPrimitive";
+
+const WHATSAPP_SHARE_ICON_URL =
+  "https://qzcw4d2n1l.ufs.sh/f/wTZjIHOpQwiMXk35G8s9eUFO1XWmtTViK8j9IM3506pqAgZN";
 
 export function WhatsAppShareButton({
   message,
@@ -40,7 +43,14 @@ export function WhatsAppShareButton({
       disabled={disabled === true || !message.trim()}
       onClick={share}
     >
-      <MessageCircle aria-hidden="true" />
+      <Image
+        src={WHATSAPP_SHARE_ICON_URL}
+        alt=""
+        width={18}
+        height={18}
+        className="h-[18px] w-[18px] shrink-0 rounded-[3px] object-contain"
+        aria-hidden="true"
+      />
       {label}
     </Button>
   );

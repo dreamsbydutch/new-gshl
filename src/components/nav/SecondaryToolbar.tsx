@@ -20,7 +20,9 @@ export function SecondaryPageToolbar({ children, className }: ToolbarProps) {
         className,
       )}
     >
-      {children}
+      <div className="mx-auto flex shrink-0 items-center gap-1 [&>*]:mx-0">
+        {children}
+      </div>
     </div>
   );
 }

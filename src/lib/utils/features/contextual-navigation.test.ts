@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   buildContextualNavigationHref,
   buildDraftTeamsNavigationHref,
+  buildGlobalSeasonNavigationHref,
   buildLeagueOfficeNavigationHref,
   buildLockerRoomNavigationHref,
   buildMatchupNavigationHref,
@@ -81,17 +82,44 @@ void test("each contextual route gets only its relevant state", () => {
   assert.equal(
     buildLockerRoomNavigationHref("?season=old", {
       view: "salary",
+      season: "12",
       owner: "owner-2",
     }),
-    "/lockerroom?view=salary&owner=owner-2",
+    "/lockerroom?view=salary&season=12&owner=owner-2",
   );
   assert.equal(
-    buildLeagueOfficeNavigationHref("?owner=old", { view: "freeAgents" }),
-    "/leagueoffice?view=freeAgents",
+    buildLeagueOfficeNavigationHref("?owner=old", {
+      view: "freeAgents",
+      season: "12",
+    }),
+    "/leagueoffice?view=freeAgents&season=12",
   );
   assert.equal(
     buildDraftTeamsNavigationHref("?view=old", "owner-3"),
     "/draft/teams?owner=owner-3",
+  );
+});
+
+void test("global season updates preserve route context and clear stale weeks", () => {
+  assert.equal(
+    buildGlobalSeasonNavigationHref(
+      "/schedule",
+      "?view=week&season=11&week=week-4&utm=league",
+      "12",
+    ),
+    "/schedule?view=week&season=12&utm=league",
+  );
+  assert.equal(
+    buildGlobalSeasonNavigationHref(
+      "/lockerroom",
+      "?view=history&owner=owner-2",
+      "12",
+    ),
+    "/lockerroom?view=history&owner=owner-2&season=12",
+  );
+  assert.equal(
+    buildGlobalSeasonNavigationHref("/rulebook", "?section=trades", "12"),
+    null,
   );
 });
 
@@ -143,9 +171,9 @@ void test("matchup back links restore schedule and Locker Room context", () => {
   );
   assert.equal(
     resolveMatchupBackHref(
-      "?from=lockerroom&view=history&owner=owner-2&side=home",
+      "?from=lockerroom&view=history&season=12&owner=owner-2&side=home",
     ),
-    "/lockerroom?view=history&owner=owner-2",
+    "/lockerroom?view=history&season=12&owner=owner-2",
   );
   assert.equal(resolveMatchupBackHref("?from=headlines"), "/headlines");
 });

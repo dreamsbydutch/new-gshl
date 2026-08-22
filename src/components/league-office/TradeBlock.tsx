@@ -6,7 +6,12 @@ import { Search, ShieldCheck, SlidersHorizontal } from "lucide-react";
 
 import { NHLLogo } from "@gshl-components/player/NHLLogo";
 import { WhatsAppShareButton } from "@gshl-components/ui/WhatsAppShareButton";
-import { useNHLTeams, useToast, useTradeBlockMarket } from "@gshl-hooks";
+import {
+  useAuthSession,
+  useNHLTeams,
+  useToast,
+  useTradeBlockMarket,
+} from "@gshl-hooks";
 import type { NHLTeam } from "@gshl-types";
 import { Button, Input, Select, Skeleton } from "@gshl-ui";
 import {
@@ -14,7 +19,8 @@ import {
   formatMoney,
   TRADE_BLOCK_NOTE_LIMIT,
 } from "@gshl-utils";
-import { buildWhatsAppShareMessage } from "@gshl-utils/features/whatsapp-share";
+import { buildTradeBlockWhatsAppShareMessage } from "@gshl-utils/features/whatsapp-messages";
+import { canShareOwnerContent } from "@gshl-utils/features/whatsapp-share";
 
 const POSITION_FILTERS = [
   { value: "all", label: "All players" },
@@ -24,6 +30,7 @@ const POSITION_FILTERS = [
 ] as const;
 
 export function TradeBlock() {
+  const { session } = useAuthSession();
   const market = useTradeBlockMarket();
   const nhlTeamsQuery = useNHLTeams();
   const { toast } = useToast();
@@ -88,6 +95,7 @@ export function TradeBlock() {
   const listedTeams = new Set(
     (market.data?.listings ?? []).map((listing) => listing.ownerId),
   ).size;
+  const canShare = canShareOwnerContent(session?.user.role);
 
   const saveListing = async () => {
     if (!selectedCandidate) return;
@@ -252,6 +260,15 @@ export function TradeBlock() {
             Available players
           </h3>
           <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+            {canShare && (market.data?.listings.length ?? 0) > 0 ? (
+              <WhatsAppShareButton
+                message={buildTradeBlockWhatsAppShareMessage(
+                  market.data?.listings ?? [],
+                )}
+                path="/leagueoffice?view=tradeBlock"
+                label="Share trade block"
+              />
+            ) : null}
             <label className="relative block min-w-0 sm:w-64">
               <span className="sr-only">Search the trade block</span>
               <Search
@@ -296,7 +313,7 @@ export function TradeBlock() {
               return (
                 <article
                   key={listing.listingId}
-                  className="grid gap-3 px-3 py-3 sm:grid-cols-[minmax(12rem,1fr)_minmax(15rem,1.2fr)_auto] sm:items-center"
+                  className="grid gap-3 px-3 py-3 sm:grid-cols-[minmax(12rem,1fr)_minmax(15rem,1.2fr)] sm:items-center"
                 >
                   <div className="flex min-w-0 items-center gap-2.5">
                     <span
@@ -360,27 +377,6 @@ export function TradeBlock() {
                       {listing.note ?? "Open to offers."}
                     </p>
                   </div>
-
-                  {market.data?.canManage ? (
-                    <div className="justify-self-start sm:justify-self-end">
-                      <WhatsAppShareButton
-                        message={buildWhatsAppShareMessage({
-                          title: "GSHL Trade Block Update",
-                          summary: `${listing.fullName} is available from ${listing.team.name}`,
-                          lines: [
-                            `${listing.nhlPos.join("/") || listing.posGroup} · ${listing.nhlTeam.join("/") || "FA"}`,
-                            `Cap hit: ${formatMoney(listing.capHit)} · Through ${listing.expiryDate?.slice(0, 4) ?? "TBD"}`,
-                            listing.note
-                              ? `GM note: ${listing.note}`
-                              : "GM note: Open to offers.",
-                          ],
-                        })}
-                        path="/leagueoffice?view=tradeBlock"
-                        label="Share"
-                        ariaLabel={`Share ${listing.fullName} trade-block listing to WhatsApp`}
-                      />
-                    </div>
-                  ) : null}
                 </article>
               );
             })}

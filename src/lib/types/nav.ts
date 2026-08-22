@@ -80,11 +80,13 @@ export interface StandingsNavigationContext {
 
 export interface LockerRoomNavigationContext {
   view: LockerRoomNavigationView;
+  season?: string | null;
   owner?: string | null;
 }
 
 export interface LeagueOfficeNavigationContext {
   view: LeagueOfficeNavigationView;
+  season?: string | null;
 }
 
 export interface MatchupNavigationContext {
@@ -316,13 +318,6 @@ export interface PageContextNavigationProps {
   ariaLabel: string;
   className?: string;
   mobileRows?: 1 | 2;
-}
-
-export interface SeasonToggleNavProps {
-  className?: string;
-  dropdownPosition?: "above" | "below" | "auto";
-  selectedSeasonId?: string | null;
-  onSelectSeason?: (seasonId: string) => void;
 }
 
 export interface TeamsToggleProps {

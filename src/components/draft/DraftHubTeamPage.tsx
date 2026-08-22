@@ -63,7 +63,6 @@ export function DraftHubTeamPage({ mode }: DraftHubTeamPageProps) {
           seasons={[data.season]}
           gshlTeamId={data.selectedTeam.id}
           selectedSeasonId={data.season.id}
-          fixedSeason
         />
       </section>
     </main>

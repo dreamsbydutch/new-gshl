@@ -262,12 +262,9 @@ export interface UseWeeklyScheduleDataResult {
 export interface UseTeamHistoryDataResult {
   gameTypeValue: string;
   setGameTypeValue: (value: string) => void;
-  seasonValue: string;
-  setSeasonValue: (value: string) => void;
   ownerValue: string;
   setOwnerValue: (value: string) => void;
   gameTypeOptions: string[][];
-  seasonOptions: TeamHistorySeasonSummary[];
   ownerOptions: string[][];
   schedule: UseScheduleDataEnhancedMatchup[];
   teams: TeamHistoryTeamSummary[];

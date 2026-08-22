@@ -4,7 +4,6 @@ import { useStandingsContextNavigation } from "@gshl-hooks";
 import {
   HorizontalToggle,
   PageContextNavigation,
-  SeasonToggleNav,
   SecondaryPageToolbar,
 } from "@gshl-nav";
 import type { LabeledToggleOption } from "@gshl-types";
@@ -31,11 +30,6 @@ export function StandingsLayout({ children }: { children: React.ReactNode }) {
     <div className="font-varela">
       <PageContextNavigation ariaLabel="Standings controls">
         <SecondaryPageToolbar className="text-center sm:justify-center">
-          <SeasonToggleNav
-            className="shrink-0"
-            selectedSeasonId={navigation.selectedSeasonId}
-            onSelectSeason={navigation.selectSeason}
-          />
           <HorizontalToggle<LabeledToggleOption>
             items={standingsTypes}
             selectedItem={selectedStandingsType}

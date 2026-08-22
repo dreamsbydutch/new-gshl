@@ -4,7 +4,6 @@ import { useScheduleContextNavigation } from "@gshl-hooks";
 import {
   HorizontalToggle,
   PageContextNavigation,
-  SeasonToggleNav,
   SecondaryPageToolbar,
   TeamsToggle,
   WeeksToggle,
@@ -38,11 +37,6 @@ export function ScheduleLayout({ children }: { children: React.ReactNode }) {
             getItemKey={(type: LabeledToggleOption) => type.key}
             getItemLabel={(type: LabeledToggleOption) => type.label}
             itemClassName="text-sm"
-          />
-          <SeasonToggleNav
-            className="shrink-0"
-            selectedSeasonId={navigation.selectedSeasonId}
-            onSelectSeason={navigation.selectSeason}
           />
         </SecondaryPageToolbar>
         <TertiaryPageToolbar>

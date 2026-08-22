@@ -16,7 +16,8 @@ import { WeeklyEditionHomeCard } from "@gshl-components/headlines/WeeklyEditionH
 import { DraftHubCard } from "./DraftHubCard";
 
 export function HomeContent() {
-  const { seasons, currentSeason, defaultSeason, isLoading } = useSeasonState();
+  const { seasons, selectedSeason, currentSeason, defaultSeason, isLoading } =
+    useSeasonState();
 
   if (isLoading) {
     return <HomeSkeleton />;
@@ -25,6 +26,7 @@ export function HomeContent() {
   const offseasonWindow = findOffseasonWindow(seasons);
   const showOffseasonContent = isBetweenSeasons(seasons);
   const draftSeason = resolveDraftHubSeason(seasons);
+  const dashboardSeason = selectedSeason ?? currentSeason ?? defaultSeason;
 
   return (
     <main
@@ -40,14 +42,16 @@ export function HomeContent() {
         <div
           className={cn(
             "mx-auto grid w-full min-w-0 max-w-5xl items-start gap-3 sm:gap-4",
-            currentSeason && "xl:grid-cols-2",
+            dashboardSeason && "xl:grid-cols-2",
           )}
         >
-          {currentSeason ? (
-            <PowerRankingsHomeCard seasonId={String(currentSeason.id)} />
+          {dashboardSeason ? (
+            <PowerRankingsHomeCard seasonId={String(dashboardSeason.id)} />
           ) : null}
           <LeagueActivityCard
-            seasonId={defaultSeason?.id ? String(defaultSeason.id) : undefined}
+            seasonId={
+              dashboardSeason?.id ? String(dashboardSeason.id) : undefined
+            }
           />
         </div>
         {draftSeason?.draftStartAt ? (

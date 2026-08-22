@@ -4,7 +4,6 @@ import type {
   TeamScheduleTeamSummary,
   TeamScheduleWeekSummary,
 } from "./team-schedule";
-import type { FilterDropdownsProps } from "./team-ui";
 
 export interface TeamHistoryMatchupSummary extends TeamScheduleMatchupSummary {
   gameType: MatchupType;
@@ -39,9 +38,11 @@ export interface UseTeamHistorySummaryOptions {
   enabled?: boolean;
 }
 
-export type TeamHistoryFilterDropdownsProps = Omit<
-  FilterDropdownsProps,
-  "seasonOptions"
-> & {
-  seasonOptions: TeamHistorySeasonSummary[] | undefined;
-};
+export interface TeamHistoryFilterDropdownsProps {
+  gameTypeValue: string;
+  setGameTypeValue: (value: string) => void;
+  ownerValue: string;
+  setOwnerValue: (value: string) => void;
+  gameTypeOptions: string[][];
+  ownerOptions: string[][];
+}

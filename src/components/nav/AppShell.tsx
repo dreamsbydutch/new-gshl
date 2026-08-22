@@ -3,6 +3,7 @@
 import { Suspense } from "react";
 import { useAppPathname } from "@gshl-hooks";
 import { AppNavbar } from "./AppNavbar";
+import { GlobalSeasonBar, GlobalSeasonBarFallback } from "./SeasonNavigation";
 import { NavDefaults } from "./NavDefaults";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -25,10 +26,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <Suspense fallback={null}>
         <AppNavbar />
       </Suspense>
+      <Suspense fallback={<GlobalSeasonBarFallback />}>
+        <GlobalSeasonBar />
+      </Suspense>
       <div
         id="app-content"
         tabIndex={-1}
-        className="min-h-dvh pb-[calc(var(--app-primary-nav-height)+env(safe-area-inset-bottom))] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] pt-[calc(var(--app-mobile-header-height)+env(safe-area-inset-top))] outline-none has-[[data-page-context-double]]:pb-[calc(var(--app-primary-nav-height)+var(--app-page-context-row-height)+var(--app-page-context-row-height)+env(safe-area-inset-bottom))] has-[[data-page-context-single]]:pb-[calc(var(--app-primary-nav-height)+var(--app-page-context-row-height)+env(safe-area-inset-bottom))] lg:pb-0 lg:pt-[calc(var(--app-primary-nav-height)+env(safe-area-inset-top))] lg:has-[[data-page-context-double]]:pb-0 lg:has-[[data-page-context-single]]:pb-0 print:min-h-0 print:p-0"
+        className="min-h-dvh pb-[calc(var(--app-primary-nav-height)+env(safe-area-inset-bottom))] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] pt-[calc(var(--app-mobile-header-height)+var(--app-season-bar-height)+env(safe-area-inset-top))] outline-none has-[[data-page-context-double]]:pb-[calc(var(--app-primary-nav-height)+var(--app-page-context-row-height)+var(--app-page-context-row-height)+env(safe-area-inset-bottom))] has-[[data-page-context-single]]:pb-[calc(var(--app-primary-nav-height)+var(--app-page-context-row-height)+env(safe-area-inset-bottom))] lg:pb-0 lg:pt-[calc(var(--app-primary-nav-height)+var(--app-season-bar-height)+env(safe-area-inset-top))] lg:has-[[data-page-context-double]]:pb-0 lg:has-[[data-page-context-single]]:pb-0 print:min-h-0 print:p-0"
       >
         {children}
       </div>

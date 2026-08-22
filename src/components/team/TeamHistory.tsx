@@ -11,12 +11,9 @@ export function TeamHistoryContainer({ teamInfo }: TeamHistoryProps) {
   const {
     gameTypeValue,
     setGameTypeValue,
-    seasonValue,
-    setSeasonValue,
     ownerValue,
     setOwnerValue,
     gameTypeOptions,
-    seasonOptions,
     ownerOptions,
     schedule,
     teams,
@@ -32,13 +29,10 @@ export function TeamHistoryContainer({ teamInfo }: TeamHistoryProps) {
   return (
     <section className="mx-auto w-full max-w-5xl px-4 sm:px-6">
       <FilterDropdowns
-        seasonValue={seasonValue}
-        setSeasonValue={setSeasonValue}
         gameTypeValue={gameTypeValue}
         setGameTypeValue={setGameTypeValue}
         ownerValue={ownerValue}
         setOwnerValue={setOwnerValue}
-        seasonOptions={seasonOptions}
         gameTypeOptions={gameTypeOptions}
         ownerOptions={ownerOptions}
       />

@@ -23,7 +23,7 @@ The home page assembles season-aware cards rather than maintaining independent p
 
 - the active Press Box edition in a modal reader;
 - the UFA window, active offers, and top free agents;
-- current-season power rankings;
+- power rankings for the globally selected season;
 - recent signings, trades, roster moves, and missed starts;
 - a countdown or link to the live Draft Hub; and
 - an offseason mock-draft preview.
@@ -50,7 +50,7 @@ The public rulebook is generated from structured content in `src/content/ruleboo
 
 ### Locker Room
 
-The Locker Room uses a selected owner and an appropriate active or contract season to provide:
+The Locker Room uses the selected owner and global league season to provide:
 
 - current roster and lineup presentation;
 - salary-cap table, future cap commitments, contract history, and an in-browser roster planner;
@@ -114,7 +114,8 @@ Commissioners additionally receive:
 
 ## Shared behavior
 
-- WhatsApp share controls open the user's normal WhatsApp conversation chooser with editable, prefilled GSHL text, bold headings, italic context, and a direct application link. Commissioners can share Press Box editions, weekly schedules, power rankings, missed-start reports, standings, and composed league notes. Linked owners and commissioners can share signings, trade-block listings, matchup scores and player performances, season awards, and trophy-case results. Sharing is user-initiated; the application does not use a WhatsApp bot, Business account, or automated group posting.
+- WhatsApp share controls use the league-provided WhatsApp mark and open the user's normal conversation chooser with editable, prefilled GSHL text and a direct application link. Detailed views use one section-level share when an aggregate message is useful: matchup shares include live or final status, score, winner emphasis, and three stars; contract-offer and trade-block shares summarize their current markets; season awards and trophy cases share one overall report. Commissioners can use every owner share control in addition to sharing Press Box editions, weekly schedules, power rankings, missed-start reports, standings, and composed league notes. Sharing is user-initiated; the application does not use a WhatsApp bot, Business account, or automated group posting.
+- One global season picker stays visible throughout the normal application shell. The selection presets season-aware pages and feature panels across navigation; historical selections use a distinct status treatment with a one-click return to the current season. Live Draft Hub, UFA, and commissioner job targets continue to use their configured operational seasons.
 - Navigation state persists season, week, owner, and active view selections in the browser and mirrors contextual routes into validated query parameters. Shared URLs outrank hydrated persistence, Back/Forward restores user choices, and automatic default/invalid-state repairs do not add history noise.
 - Route-level and feature-level skeletons preserve layout while realtime Convex queries initialize.
 - The persistent shell uses a safe-area-aware, labeled bottom navigation and route header on mobile, then presents the same information architecture as a top navigation on large screens.

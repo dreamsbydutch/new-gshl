@@ -3,7 +3,7 @@
 /**
  * @fileoverview Team Draft Pick List Component
  *
- * Displays a team's draft picks with season selection, showing both
+ * Displays a team's draft picks for the global season context, showing both
  * available picks and already-selected players. Includes pick details
  * like round, overall number, and original team if traded.
  *
@@ -13,9 +13,8 @@
  * @module components/team/TeamDraftPickList
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import { DraftPickListSkeleton } from "@gshl-skeletons";
-import { DropdownToggle } from "@gshl-nav";
 import type {
   DraftPickItemProps,
   Season,
@@ -71,19 +70,17 @@ const DraftPickItem = ({ processedPick, teams }: DraftPickItemProps) => {
 /**
  * TeamDraftPickList Component
  *
- * Displays a team's draft picks with season selection and availability status.
+ * Displays a team's draft picks for the selected league season.
  * Shows both available picks and already-selected players with full details.
  *
  * **Component Responsibilities:**
- * - Manage local season selection state
  * - Display skeleton during data loading
  * - Render list of draft picks with availability status
- * - Provide season selection dropdown
  *
  * **Data Flow:**
  * - Uses `useTeamDraftPickListData` hook for data processing
  * - Hook handles: pick sorting, availability calculation, player lookups
- * - Component handles: rendering and local UI state
+ * - Component handles rendering
  *
  * @param teams - Teams for the selected season
  * @param allTeams - All teams across all seasons
@@ -92,8 +89,8 @@ const DraftPickItem = ({ processedPick, teams }: DraftPickItemProps) => {
  * @param players - All players
  * @param seasons - Optional season list for filtering
  * @param gshlTeamId - The team ID to display picks for
- * @param selectedSeasonId - Initially selected season
- * @returns Draft pick list with season selector
+ * @param selectedSeasonId - Globally selected season
+ * @returns Draft pick list for the selected season
  *
  * @example
  * ```tsx
@@ -114,7 +111,6 @@ export function TeamDraftPickList({
   seasons, // optional: used to scope to next upcoming draft / historical selection
   gshlTeamId,
   selectedSeasonId,
-  fixedSeason = false,
 }: TeamDraftPickListProps & { seasons?: Season[] }) {
   const seasonOptions = useMemo<Season[]>(() => {
     const knownSeasons = [...(seasons ?? [])].sort(
@@ -147,28 +143,6 @@ export function TeamDraftPickList({
     return orderedSeasons;
   }, [draftPicks, seasons]);
 
-  // Local (component-scoped) season selection so the toggle only affects this list.
-  const [localSeasonId, setLocalSeasonId] = useState<string | undefined>(
-    selectedSeasonId,
-  );
-
-  // If no explicit season provided, default to most recent season (by startDate)
-  useEffect(() => {
-    if (!seasonOptions.length) return;
-
-    if (
-      localSeasonId != null &&
-      seasonOptions.some((season) => season.id === localSeasonId)
-    ) {
-      return;
-    }
-
-    const mostRecent = [...seasonOptions].sort((a, b) => {
-      return new Date(b.startDate).getTime() - new Date(a.startDate).getTime();
-    })[0];
-    if (mostRecent) setLocalSeasonId(mostRecent.id);
-  }, [seasonOptions, localSeasonId]);
-
   const { processedDraftPicks, ready } = useTeamDraftPickListData({
     teams,
     draftPicks,
@@ -176,7 +150,7 @@ export function TeamDraftPickList({
     players,
     seasons: seasonOptions,
     gshlTeamId,
-    selectedSeasonId: localSeasonId,
+    selectedSeasonId,
     allTeams,
   });
   if (!ready) return <DraftPickListSkeleton />;
@@ -185,25 +159,6 @@ export function TeamDraftPickList({
     <>
       <div className="mx-auto mt-4 flex flex-col items-center gap-2">
         <div className="flex items-center gap-2 py-3 text-xl font-bold">
-          {!fixedSeason &&
-            seasonOptions.length > 0 &&
-            localSeasonId != null && (
-              <DropdownToggle
-                items={[...seasonOptions].sort((a, b) => {
-                  return (
-                    new Date(b.startDate).getTime() -
-                    new Date(a.startDate).getTime()
-                  );
-                })}
-                selectedItem={seasonOptions.find((s) => s.id === localSeasonId)}
-                onSelect={(s: Season) => setLocalSeasonId(s.id)}
-                getItemKey={(s: Season) => String(s.id)}
-                getItemLabel={(s: Season) => s.name}
-                ariaLabel="Draft season"
-                className="min-w-28 bg-white text-base"
-                dropdownPosition="auto"
-              />
-            )}
           <span>Draft Picks</span>
         </div>
       </div>

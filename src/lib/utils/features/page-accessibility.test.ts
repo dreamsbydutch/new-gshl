@@ -136,6 +136,25 @@ void test("shared dropdown navigation uses a labelled native select", () => {
   assert.match(source, /<option key=\{getItemKey\(item\)\}/);
 });
 
+void test("the application shell owns one accessible global season control", () => {
+  const shell = readSource("src/components/nav/AppShell.tsx");
+  const seasonNavigation = readSource(
+    "src/components/nav/SeasonNavigation.tsx",
+  );
+
+  assert.match(shell, /<GlobalSeasonBar \/>/);
+  assert.match(shell, /--app-season-bar-height/);
+  assert.match(seasonNavigation, /aria-label="League season"/);
+  assert.match(seasonNavigation, /Return to \{currentSeason\.name\}/);
+
+  for (const path of [
+    "src/components/schedule/ScheduleLayout.tsx",
+    "src/components/standings/StandingsLayout.tsx",
+  ]) {
+    assert.doesNotMatch(readSource(path), /SeasonToggleNav/);
+  }
+});
+
 void test("UFA and matchup statistics retain compact scrollable tables on phones", () => {
   const ufa = readSource("src/components/contracts/UfaSigning.tsx");
   const nhlLogo = readSource("src/components/player/NHLLogo.tsx");

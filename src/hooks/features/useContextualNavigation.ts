@@ -14,12 +14,14 @@ import type {
 import {
   buildContextualNavigationHref,
   buildDraftTeamsNavigationHref,
+  buildGlobalSeasonNavigationHref,
   buildLeagueOfficeNavigationHref,
   buildLockerRoomNavigationHref,
   buildScheduleNavigationHref,
   buildStandingsNavigationHref,
   getCurrentNavigationHref,
   getLeagueOfficeNavigationViews,
+  isGlobalSeasonUrlPath,
   isIsoDateInRange,
   isLockerRoomNavigationView,
   isScheduleNavigationView,
@@ -152,6 +154,83 @@ function useResolvedSeasonId(explicitSeasonId: string | null) {
     ),
     isSeasonDataReady: !seasonState.isLoading,
     persistedSeasonId,
+  };
+}
+
+export function useGlobalSeasonContextNavigation() {
+  const navigation = useContextualRouter();
+  const { hasHydrated } = useNavigationHydration();
+  const seasonState = useSeasonState();
+  const query = useMemo(
+    () => readContextualNavigationQuery(navigation.search),
+    [navigation.search],
+  );
+  const routeSeasonSummary = useMemo(() => {
+    if (!isGlobalSeasonUrlPath(navigation.pathname) || !query.season) {
+      return null;
+    }
+    return (
+      seasonState.seasonOptions.find(
+        (season) => String(season.id) === String(query.season),
+      ) ?? null
+    );
+  }, [navigation.pathname, query.season, seasonState.seasonOptions]);
+  const selectedSeasonSummary =
+    routeSeasonSummary ??
+    seasonState.selectedSeasonSummary ??
+    seasonState.currentSeasonSummary ??
+    seasonState.defaultSeasonSummary;
+  const currentSeasonSummary =
+    seasonState.currentSeasonSummary ??
+    seasonState.selectableDefaultSeasonSummary ??
+    seasonState.defaultSeasonSummary;
+  const setSelectedSeasonId = seasonState.setSelectedSeasonId;
+
+  useEffect(() => {
+    if (
+      !hasHydrated ||
+      !navigation.shouldSyncCurrentUrl ||
+      !routeSeasonSummary ||
+      String(seasonState.selectedSeasonId) === String(routeSeasonSummary.id)
+    ) {
+      return;
+    }
+    setSelectedSeasonId(routeSeasonSummary.id);
+  }, [
+    hasHydrated,
+    navigation.shouldSyncCurrentUrl,
+    routeSeasonSummary,
+    seasonState.selectedSeasonId,
+    setSelectedSeasonId,
+  ]);
+
+  const selectSeason = useCallback(
+    (seasonId: string) => {
+      const href = buildGlobalSeasonNavigationHref(
+        navigation.pathname,
+        navigation.search,
+        seasonId,
+      );
+      if (href && href !== navigation.currentHref) {
+        navigation.push(href, () => setSelectedSeasonId(seasonId));
+        return;
+      }
+      setSelectedSeasonId(seasonId);
+    },
+    [navigation, setSelectedSeasonId],
+  );
+
+  return {
+    currentSeasonSummary,
+    isHistoricalSeason: Boolean(
+      selectedSeasonSummary &&
+        currentSeasonSummary &&
+        String(selectedSeasonSummary.id) !== String(currentSeasonSummary.id),
+    ),
+    isReady: hasHydrated && !seasonState.isLoading,
+    seasonOptions: seasonState.seasonOptions,
+    selectedSeasonSummary,
+    selectSeason,
   };
 }
 
@@ -436,13 +515,13 @@ export function useLockerRoomContextNavigation() {
   const persistedView = useNavStore((state) => state.selectedLockerRoomType);
   const persistedOwnerId = useNavStore((state) => state.selectedOwnerId);
   const setView = useNavStore((state) => state.setLockerRoomType);
+  const setSeasonId = useNavStore((state) => state.setSeasonId);
   const setOwnerId = useNavStore((state) => state.setOwnerId);
-  const seasonState = useSeasonState({ autoSelect: false });
-  const activeSeason = seasonState.currentSeason ?? seasonState.defaultSeason;
-  const activeSeasonId = activeSeason?.id ? String(activeSeason.id) : null;
+  const { effectiveSeasonId, isSeasonDataReady, persistedSeasonId } =
+    useResolvedSeasonId(query.season);
   const teamsQuery = useTeams({
-    seasonId: activeSeasonId,
-    enabled: Boolean(activeSeasonId),
+    seasonId: effectiveSeasonId,
+    enabled: Boolean(effectiveSeasonId),
   });
   const validOwnerIds = useMemo(
     () => uniqueOwnerIds((teamsQuery.data ?? []) as GSHLTeam[]),
@@ -469,31 +548,39 @@ export function useLockerRoomContextNavigation() {
   }).value;
   const routeDataReady =
     hasHydrated &&
-    !seasonState.isLoading &&
+    isSeasonDataReady &&
     !teamsQuery.isLoading &&
     authStatus !== "loading";
   const storeMatches =
     persistedView === view &&
+    (effectiveSeasonId === null || persistedSeasonId === effectiveSeasonId) &&
     (ownerId === null || persistedOwnerId === ownerId);
 
   useEffect(() => {
     if (!routeDataReady || !navigation.shouldSyncCurrentUrl) return;
     if (persistedView !== view) setView(view);
+    if (effectiveSeasonId && persistedSeasonId !== effectiveSeasonId) {
+      setSeasonId(effectiveSeasonId);
+    }
     if (ownerId && persistedOwnerId !== ownerId) setOwnerId(ownerId);
     const canonicalHref = buildLockerRoomNavigationHref(navigation.search, {
       view,
+      season: effectiveSeasonId,
       owner: ownerId,
     });
     if (navigation.currentHref !== canonicalHref) {
       navigation.replace(canonicalHref);
     }
   }, [
+    effectiveSeasonId,
     navigation,
     ownerId,
     persistedOwnerId,
+    persistedSeasonId,
     persistedView,
     routeDataReady,
     setOwnerId,
+    setSeasonId,
     setView,
     view,
   ]);
@@ -503,27 +590,29 @@ export function useLockerRoomContextNavigation() {
       if (!isLockerRoomNavigationView(nextView)) return;
       const href = buildLockerRoomNavigationHref(navigation.search, {
         view: nextView,
+        season: effectiveSeasonId,
         owner: ownerId,
       });
       navigation.push(href, () => setView(nextView));
     },
-    [navigation, ownerId, setView],
+    [effectiveSeasonId, navigation, ownerId, setView],
   );
   const selectOwner = useCallback(
     (nextOwnerId: string) => {
       const href = buildLockerRoomNavigationHref(navigation.search, {
         view,
+        season: effectiveSeasonId,
         owner: nextOwnerId,
       });
       navigation.push(href, () => setOwnerId(nextOwnerId));
     },
-    [navigation, setOwnerId, view],
+    [effectiveSeasonId, navigation, setOwnerId, view],
   );
 
   return {
-    activeSeasonId,
     isReady: routeDataReady && storeMatches,
     selectedOwnerId: ownerId,
+    selectedSeasonId: effectiveSeasonId,
     selectedView: view,
     selectOwner,
     selectView,
@@ -540,6 +629,7 @@ export function useLeagueOfficeContextNavigation() {
   );
   const persistedView = useNavStore((state) => state.selectedLeagueOfficeType);
   const setView = useNavStore((state) => state.setLeagueOfficeType);
+  const setSeasonId = useNavStore((state) => state.setSeasonId);
   const isMockDraftPage = navigation.pathname === "/leagueoffice/mock-draft";
   const validViews = getLeagueOfficeNavigationViews(session?.user.role);
   const view = resolveContextualSelection({
@@ -548,13 +638,21 @@ export function useLeagueOfficeContextNavigation() {
     validValues: validViews,
     fallbackValue: "draft",
   }).value;
-  const routeDataReady = hasHydrated && status !== "loading";
+  const { effectiveSeasonId, isSeasonDataReady, persistedSeasonId } =
+    useResolvedSeasonId(query.season);
+  const routeDataReady =
+    hasHydrated && isSeasonDataReady && status !== "loading";
   const storeMatches = isMockDraftPage
-    ? persistedView === "mockDraft"
-    : persistedView === view;
+    ? persistedView === "mockDraft" &&
+      (effectiveSeasonId === null || persistedSeasonId === effectiveSeasonId)
+    : persistedView === view &&
+      (effectiveSeasonId === null || persistedSeasonId === effectiveSeasonId);
 
   useEffect(() => {
     if (!routeDataReady || !navigation.shouldSyncCurrentUrl) return;
+    if (effectiveSeasonId && persistedSeasonId !== effectiveSeasonId) {
+      setSeasonId(effectiveSeasonId);
+    }
     if (isMockDraftPage) {
       if (persistedView !== "mockDraft") setView("mockDraft");
       return;
@@ -562,15 +660,19 @@ export function useLeagueOfficeContextNavigation() {
     if (persistedView !== view) setView(view);
     const canonicalHref = buildLeagueOfficeNavigationHref(navigation.search, {
       view,
+      season: effectiveSeasonId,
     });
     if (navigation.currentHref !== canonicalHref) {
       navigation.replace(canonicalHref);
     }
   }, [
+    effectiveSeasonId,
     isMockDraftPage,
     navigation,
+    persistedSeasonId,
     persistedView,
     routeDataReady,
+    setSeasonId,
     setView,
     view,
   ]);
@@ -582,7 +684,7 @@ export function useLeagueOfficeContextNavigation() {
           buildContextualNavigationHref(
             "/leagueoffice/mock-draft",
             navigation.search,
-            {},
+            { season: effectiveSeasonId },
           ),
           () => setView("mockDraft"),
         );
@@ -591,15 +693,17 @@ export function useLeagueOfficeContextNavigation() {
       if (!validViews.includes(nextView)) return;
       const href = buildLeagueOfficeNavigationHref(navigation.search, {
         view: nextView,
+        season: effectiveSeasonId,
       });
       navigation.push(href, () => setView(nextView));
     },
-    [navigation, setView, validViews],
+    [effectiveSeasonId, navigation, setView, validViews],
   );
 
   return {
     isMockDraftPage,
     isReady: routeDataReady && storeMatches,
+    selectedSeasonId: effectiveSeasonId,
     selectedView: isMockDraftPage ? ("mockDraft" as const) : view,
     selectView,
   };

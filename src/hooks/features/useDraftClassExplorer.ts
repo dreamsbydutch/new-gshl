@@ -25,10 +25,15 @@ export function useDraftClassExplorer() {
   const [search, setSearch] = useState("");
   const [position, setPosition] = useState<DraftClassPosition>("all");
   const [certainty, setCertainty] = useState<DraftClassCertainty>("all");
-  const { currentSeason, defaultSeason, seasons } = useSeasonState();
+  const { selectedSeason, currentSeason, defaultSeason, seasons } =
+    useSeasonState();
   const draftClassSeason = useMemo(
-    () => currentSeason ?? findMostRecentSeason(seasons) ?? defaultSeason,
-    [currentSeason, defaultSeason, seasons],
+    () =>
+      selectedSeason ??
+      currentSeason ??
+      findMostRecentSeason(seasons) ??
+      defaultSeason,
+    [currentSeason, defaultSeason, seasons, selectedSeason],
   );
   const draftYear = Number(draftClassSeason?.year ?? new Date().getFullYear());
   const playersQuery = useActivePlayers();

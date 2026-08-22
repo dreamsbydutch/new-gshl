@@ -95,12 +95,14 @@ const InteractiveContractTable = dynamic(
 const SHOW_LOCKER_ROOM_ROSTER_SALARIES = true;
 
 export function LockerRoomContent() {
-  const { currentSeason, defaultSeason, seasons } = useSeasonState();
-  const activeSeason = currentSeason ?? defaultSeason;
+  const { selectedSeason, currentSeason, defaultSeason, seasons } =
+    useSeasonState();
+  const contextSeason = selectedSeason ?? currentSeason ?? defaultSeason;
   const { selectedLockerRoomType, selectedOwnerId } = useNav();
   const contractSeason = useMemo(
-    () => resolveContractDefaultSeason(seasons) ?? defaultSeason,
-    [defaultSeason, seasons],
+    () =>
+      contextSeason ?? resolveContractDefaultSeason(seasons) ?? defaultSeason,
+    [contextSeason, defaultSeason, seasons],
   );
 
   // Only fetch contract data when on a tab that needs it
@@ -108,7 +110,7 @@ export function LockerRoomContent() {
     selectedLockerRoomType === "salary" ||
     selectedLockerRoomType === "draft" ||
     selectedLockerRoomType === "roster";
-  const lockerRoomSeason = needsContractData ? contractSeason : activeSeason;
+  const lockerRoomSeason = contextSeason ?? contractSeason;
 
   const needsDraftPicks = selectedLockerRoomType === "draft";
   const { data: draftPicks } = useDraftPicks({

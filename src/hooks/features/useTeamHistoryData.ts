@@ -12,7 +12,7 @@ import type {
   UseTeamHistoryDataOptions,
   UseTeamHistoryDataResult,
 } from "@gshl-types";
-import { useTeamHistorySummary } from "@gshl-hooks";
+import { useSeasonState, useTeamHistorySummary } from "@gshl-hooks";
 import { useScheduleData } from "./useScheduleData";
 
 /**
@@ -39,8 +39,8 @@ export function useTeamHistoryData(
   const { teamInfo } = options;
 
   const [gameTypeValue, setGameTypeValue] = useState("");
-  const [seasonValue, setSeasonValue] = useState("");
   const [ownerValue, setOwnerValue] = useState("");
+  const { selectedSeason } = useSeasonState();
 
   const historyQuery = useTeamHistorySummary({
     ownerId: teamInfo.ownerId,
@@ -55,7 +55,7 @@ export function useTeamHistoryData(
 
   const { data: schedule } = useScheduleData({
     ownerID: teamInfo.ownerId ?? undefined,
-    seasonID: parseIdValue(seasonValue),
+    seasonID: selectedSeason?.id,
     gameType,
     oppOwnerID: parseIdValue(ownerValue),
     allMatchups: fullSchedule,
@@ -80,14 +80,11 @@ export function useTeamHistoryData(
     // Filter states
     gameTypeValue,
     setGameTypeValue,
-    seasonValue,
-    setSeasonValue,
     ownerValue,
     setOwnerValue,
 
     // Options
     gameTypeOptions: GAME_TYPE_OPTIONS,
-    seasonOptions: seasons,
     ownerOptions,
 
     // Data

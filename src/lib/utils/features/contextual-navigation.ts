@@ -167,6 +167,32 @@ export function getCurrentNavigationHref(
   return query ? `${pathname}?${query}` : pathname;
 }
 
+export function isGlobalSeasonUrlPath(pathname: string): boolean {
+  return (
+    pathname === "/schedule" ||
+    pathname === "/standings" ||
+    pathname === "/lockerroom" ||
+    pathname === "/leagueoffice" ||
+    pathname === "/leagueoffice/mock-draft" ||
+    pathname.startsWith("/matchup/")
+  );
+}
+
+/** Updates the global season on routes that expose their context in the URL. */
+export function buildGlobalSeasonNavigationHref(
+  pathname: string,
+  currentSearch: string | URLSearchParams,
+  seasonId: string,
+): string | null {
+  const season = cleanValue(seasonId);
+  if (!season || !isGlobalSeasonUrlPath(pathname)) return null;
+
+  const params = toSearchParams(currentSearch);
+  params.set("season", season);
+  params.delete("week");
+  return getCurrentNavigationHref(pathname, params);
+}
+
 export function buildScheduleNavigationHref(
   currentSearch: string | URLSearchParams,
   context: ScheduleNavigationContext,
@@ -195,6 +221,7 @@ export function buildLockerRoomNavigationHref(
 ): string {
   return buildContextualNavigationHref("/lockerroom", currentSearch, {
     view: context.view,
+    season: context.season ?? null,
     owner: context.owner ?? null,
   });
 }
@@ -205,6 +232,7 @@ export function buildLeagueOfficeNavigationHref(
 ): string {
   return buildContextualNavigationHref("/leagueoffice", currentSearch, {
     view: context.view,
+    season: context.season ?? null,
   });
 }
 
@@ -271,6 +299,7 @@ export function resolveMatchupBackHref(
       : "history";
     return buildLockerRoomNavigationHref("", {
       view,
+      season: cleanValue(query.season) ?? cleanValue(fallback.season),
       owner: cleanValue(query.owner),
     });
   }

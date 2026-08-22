@@ -1,8 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import Image from "next/image";
-import { ChevronDown, Info, Swords } from "lucide-react";
+import { Info, Swords } from "lucide-react";
 import {
   CartesianGrid,
   Legend,
@@ -16,7 +15,11 @@ import {
 
 import { Button } from "@gshl-components/ui";
 import { ConferenceContestSkeleton } from "@gshl-skeletons";
-import { useAppRouter, useConferenceContestData } from "@gshl-hooks";
+import {
+  useAppRouter,
+  useConferenceContestData,
+  useSeasonState,
+} from "@gshl-hooks";
 import type {
   ConferenceContestConferenceInfo,
   ConferenceContestBrowserSeason,
@@ -273,13 +276,9 @@ function RatingTrend({
 }
 
 function SeasonExplorer({
-  seasons,
   selectedSeason,
-  onSelect,
 }: {
-  seasons: ConferenceContestBrowserSeason[];
   selectedSeason: ConferenceContestBrowserSeason;
-  onSelect: (seasonId: string) => void;
 }) {
   const { router } = useAppRouter();
   const left = selectedSeason.leftConference;
@@ -320,29 +319,7 @@ function SeasonExplorer({
   ];
 
   return (
-    <section>
-      <div className="mb-3 flex justify-end">
-        <label className="relative block">
-          <span className="sr-only">Choose a season</span>
-          <select
-            value={selectedSeason.seasonId}
-            onChange={(event) => onSelect(event.target.value)}
-            className="h-9 w-full appearance-none rounded-md border border-slate-200 bg-white py-1.5 pl-3 pr-9 font-oswald text-xs text-slate-900 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 sm:h-10 sm:w-52 sm:py-2 sm:text-sm"
-          >
-            {seasons.map((season) => (
-              <option key={season.seasonId} value={season.seasonId}>
-                {season.seasonName}
-                {season.isActive ? " · Live" : ""}
-              </option>
-            ))}
-          </select>
-          <ChevronDown
-            className="pointer-events-none absolute right-3 top-3 h-4 w-4 text-slate-400"
-            aria-hidden="true"
-          />
-        </label>
-      </div>
-
+    <section aria-label={`${selectedSeason.seasonName} conference results`}>
       <RawStatsTable
         title={selectedSeason.seasonName}
         left={left}
@@ -372,22 +349,13 @@ function SeasonExplorer({
 
 export function ConferenceContest() {
   const { overall, seasons, isLoading, error } = useConferenceContestData();
-  const [selectedSeasonId, setSelectedSeasonId] = useState("");
+  const { selectedSeason: globalSeason, isLoading: seasonLoading } =
+    useSeasonState();
+  const selectedSeason = seasons.find(
+    (season) => season.seasonId === String(globalSeason?.id ?? ""),
+  );
 
-  useEffect(() => {
-    if (
-      seasons.length &&
-      !seasons.some((season) => season.seasonId === selectedSeasonId)
-    ) {
-      setSelectedSeasonId(seasons[0]?.seasonId ?? "");
-    }
-  }, [seasons, selectedSeasonId]);
-
-  const selectedSeason =
-    seasons.find((season) => season.seasonId === selectedSeasonId) ??
-    seasons[0];
-
-  if (isLoading) return <ConferenceContestSkeleton />;
+  if (isLoading || seasonLoading) return <ConferenceContestSkeleton />;
 
   if (error) {
     return (
@@ -405,7 +373,7 @@ export function ConferenceContest() {
         <Swords className="mx-auto h-7 w-7 text-slate-400" aria-hidden="true" />
         <h2 className="mt-3 font-oswald text-2xl text-slate-900">No data</h2>
         <p className="mt-2 text-sm text-slate-500">
-          Two conferences and one season are required.
+          No conference data is available for this season.
         </p>
       </div>
     );
@@ -469,11 +437,7 @@ export function ConferenceContest() {
 
       <RatingTrend seasons={seasons} left={left} right={right} />
 
-      <SeasonExplorer
-        seasons={seasons}
-        selectedSeason={selectedSeason}
-        onSelect={setSelectedSeasonId}
-      />
+      <SeasonExplorer selectedSeason={selectedSeason} />
     </div>
   );
 }

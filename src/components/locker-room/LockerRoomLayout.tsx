@@ -58,7 +58,7 @@ export function LockerRoomLayout({ children }: { children: React.ReactNode }) {
       <PageContextNavigation ariaLabel="My Team controls" mobileRows={2}>
         <SecondaryPageToolbar>
           <TeamsToggle
-            seasonId={navigation.activeSeasonId}
+            seasonId={navigation.selectedSeasonId}
             selectedOwnerId={navigation.selectedOwnerId}
             onSelectOwner={navigation.selectOwner}
           />

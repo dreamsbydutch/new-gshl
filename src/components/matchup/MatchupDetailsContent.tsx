@@ -31,10 +31,8 @@ import {
   resolveMatchupCategories,
   toStatNumber,
 } from "@gshl-utils";
-import {
-  buildWhatsAppShareMessage,
-  canShareOwnerContent,
-} from "@gshl-utils/features/whatsapp-share";
+import { canShareOwnerContent } from "@gshl-utils/features/whatsapp-share";
+import { buildMatchupWhatsAppShareMessage } from "@gshl-utils/features/whatsapp-messages";
 import { PlayerStatsTable } from "./PlayerStatsTable";
 import { ArrowLeftIcon } from "lucide-react";
 
@@ -430,15 +428,6 @@ export function MatchupDetailsContent({
     if (matchup.isComplete) return "Matchup complete";
     return "Matchup in progress";
   }, [awayTeam?.name, homeTeam?.name, matchup]);
-  const matchupShareMessage = buildWhatsAppShareMessage({
-    title: "GSHL Matchup",
-    summary: `${awayTeam?.name ?? "Away team"} ${matchupScore.away} - ${matchupScore.home} ${homeTeam?.name ?? "Home team"}`,
-    lines: [
-      matchupStatus,
-      `${season?.name ?? "Season"}${week ? ` · Week ${week.weekNum}` : ""}`,
-    ],
-  });
-
   const homePlayers = useMemo(() => {
     const players = details?.players.home ?? [];
 
@@ -469,6 +458,23 @@ export function MatchupDetailsContent({
     () => getStarPlayers([...awayPlayers, ...homePlayers], teamLookup),
     [awayPlayers, homePlayers, teamLookup],
   );
+  const matchupShareMessage = buildMatchupWhatsAppShareMessage({
+    awayTeam: {
+      name: awayTeam?.name ?? "Away team",
+      score: matchupScore.away,
+      isWinner: matchup?.awayWin === true,
+    },
+    homeTeam: {
+      name: homeTeam?.name ?? "Home team",
+      score: matchupScore.home,
+      isWinner: matchup?.homeWin === true,
+    },
+    isComplete: matchup?.isComplete === true,
+    isTie: matchup?.tie === true,
+    seasonLabel: season?.name ?? "Season",
+    weekNumber: week?.weekNum,
+    stars,
+  });
 
   const selectedTeam = selectedSide === "away" ? awayTeam : homeTeam;
   const selectedPlayers = selectedSide === "away" ? awayPlayers : homePlayers;

@@ -212,15 +212,7 @@ function AllStarPlayerTile({
   );
 }
 
-function AllStarLineupCard({
-  card,
-  shareMessage,
-  sharePath,
-}: {
-  card: AllStarTeamCard;
-  shareMessage?: string;
-  sharePath?: string;
-}) {
+function AllStarLineupCard({ card }: { card: AllStarTeamCard }) {
   const winnerAt = (position: AllStarWinner["lineupPosition"]) =>
     card.winners.find((winner) => winner.lineupPosition === position);
   const defensemen = card.winners.filter(
@@ -236,13 +228,6 @@ function AllStarLineupCard({
           </span>
           {card.title}
         </h3>
-        {shareMessage ? (
-          <WhatsAppShareButton
-            message={shareMessage}
-            path={sharePath}
-            label="Share team"
-          />
-        ) : null}
       </header>
       <div className="py-1">
         <div className="grid grid-cols-6 items-start py-1">
@@ -278,8 +263,6 @@ function AwardListRow({
   winnerLogoUrl,
   winnerFallbackLabel = "GSHL",
   nomineeNames = [],
-  shareMessage,
-  sharePath,
 }: {
   awardLabel: string;
   awardImageUrl: string | null;
@@ -290,8 +273,6 @@ function AwardListRow({
   winnerLogoUrl: string | null;
   winnerFallbackLabel?: string;
   nomineeNames?: string[];
-  shareMessage?: string;
-  sharePath?: string;
 }) {
   return (
     <li className="px-4 py-3 sm:px-5">
@@ -332,15 +313,6 @@ function AwardListRow({
           </span>
           {nomineeNames.join(", ")}
         </p>
-      ) : null}
-      {shareMessage ? (
-        <div className="mt-3 flex justify-end border-t border-slate-100 pt-3">
-          <WhatsAppShareButton
-            message={shareMessage}
-            path={sharePath}
-            label="Share award"
-          />
-        </div>
       ) : null}
     </li>
   );
@@ -567,16 +539,6 @@ export function SeasonAwards({
                   winnerDetail={card.winnerDetail}
                   winnerLogoUrl={card.logoUrl}
                   nomineeNames={card.nomineeNames}
-                  shareMessage={
-                    canShare
-                      ? buildWhatsAppShareMessage({
-                          title: `GSHL ${seasonLabel} ${card.catalog.fullName}`,
-                          summary: card.winnerName,
-                          lines: [card.winnerDetail],
-                        })
-                      : undefined
-                  }
-                  sharePath={sharePath}
                 />
               ))}
             </AwardSection>
@@ -598,16 +560,6 @@ export function SeasonAwards({
                   }
                   winnerLogoUrl={winner.teamLogoUrl}
                   nomineeNames={winner.nomineeNames}
-                  shareMessage={
-                    canShare
-                      ? buildWhatsAppShareMessage({
-                          title: `GSHL ${seasonLabel} ${section.title}`,
-                          summary: winner.playerName,
-                          lines: [winner.positions, winner.teamName],
-                        })
-                      : undefined
-                  }
-                  sharePath={sharePath}
                 />
               )),
             )}
@@ -622,22 +574,7 @@ export function SeasonAwards({
             {allStarCards
               .filter((card) => card.winners.length > 0)
               .map((card) => (
-                <AllStarLineupCard
-                  key={card.awardKey}
-                  card={card}
-                  shareMessage={
-                    canShare
-                      ? buildWhatsAppShareMessage({
-                          title: `GSHL ${seasonLabel} ${card.title}`,
-                          lines: card.winners.map(
-                            (winner) =>
-                              `${winner.lineupPosition ?? winner.positions}: ${winner.playerName}${winner.teamName ? ` · ${winner.teamName}` : ""}`,
-                          ),
-                        })
-                      : undefined
-                  }
-                  sharePath={sharePath}
-                />
+                <AllStarLineupCard key={card.awardKey} card={card} />
               ))}
           </section>
         ) : null}

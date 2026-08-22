@@ -3,13 +3,10 @@
 import type { TeamHistoryFilterDropdownsProps } from "@gshl-types";
 
 export function FilterDropdowns({
-  seasonValue,
-  setSeasonValue,
   gameTypeValue,
   setGameTypeValue,
   ownerValue,
   setOwnerValue,
-  seasonOptions,
   gameTypeOptions,
   ownerOptions,
 }: TeamHistoryFilterDropdownsProps) {
@@ -17,21 +14,7 @@ export function FilterDropdowns({
     "w-full min-w-0 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm sm:max-w-56";
 
   return (
-    <div className="mx-auto grid w-full max-w-3xl gap-2 sm:grid-cols-3 sm:justify-items-center">
-      <select
-        aria-label="Filter history by season"
-        className={selectClassName}
-        value={seasonValue}
-        onChange={(event) => setSeasonValue(event.target.value)}
-      >
-        <option value="">Select a Season</option>
-        {seasonOptions?.map((season) => (
-          <option key={season.id} value={[season.name, season.id].join(",")}>
-            {season.name}
-          </option>
-        ))}
-      </select>
-
+    <div className="mx-auto grid w-full max-w-xl gap-2 sm:grid-cols-2 sm:justify-items-center">
       <select
         aria-label="Filter history by game type"
         className={selectClassName}

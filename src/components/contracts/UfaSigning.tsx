@@ -4,7 +4,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { NHLLogo } from "@gshl-components/player/NHLLogo";
-import { useUfaOverview } from "@gshl-hooks";
+import { WhatsAppShareButton } from "@gshl-components/ui/WhatsAppShareButton";
+import { useAuthSession, useUfaOverview } from "@gshl-hooks";
 import { FreeAgencySkeleton, UfaHomeCardSkeleton } from "@gshl-skeletons";
 import { TableViewport } from "@gshl-ui";
 import {
@@ -13,6 +14,8 @@ import {
   HOME_UFA_PREVIEW_LIMIT,
   selectHomeUfaPreview,
 } from "@gshl-utils";
+import { buildUfaOffersWhatsAppShareMessage } from "@gshl-utils/features/whatsapp-messages";
+import { canShareOwnerContent } from "@gshl-utils/features/whatsapp-share";
 import type { UfaFreeAgentView, UfaOfferGroupView } from "@gshl-types";
 import { UfaOfferForm } from "./UfaOfferForm";
 
@@ -243,15 +246,30 @@ function PlayerTable({
   );
 }
 
-function ActiveOffers({ groups }: { groups: UfaOfferGroupView[] }) {
+function ActiveOffers({
+  groups,
+  canShare,
+}: {
+  groups: UfaOfferGroupView[];
+  canShare: boolean;
+}) {
   return (
     <section
       className="w-full min-w-0 max-w-full space-y-2 overflow-hidden sm:space-y-3"
       aria-labelledby="ufa-active-offers"
     >
-      <h3 id="ufa-active-offers" className="text-base font-bold sm:text-lg">
-        UFA Contract Offers
-      </h3>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h3 id="ufa-active-offers" className="text-base font-bold sm:text-lg">
+          UFA Contract Offers
+        </h3>
+        {canShare && groups.length > 0 ? (
+          <WhatsAppShareButton
+            message={buildUfaOffersWhatsAppShareMessage(groups)}
+            path="/leagueoffice?view=freeAgents"
+            label="Share offers"
+          />
+        ) : null}
+      </div>
       {groups.length === 0 ? (
         <p className="rounded-lg border border-dashed p-2 text-xs text-muted-foreground sm:p-4 sm:text-sm">
           No UFA offers are currently pending.
@@ -567,6 +585,7 @@ export function UfaHomeCard() {
 export function UfaLeagueOffice() {
   const [filter, setFilter] = useState("ALL");
   const [visibleCount, setVisibleCount] = useState(50);
+  const { session } = useAuthSession();
   const query = useUfaOverview();
   const players = useMemo(
     () =>
@@ -625,7 +644,10 @@ export function UfaLeagueOffice() {
           {query.data.window.reason}
         </p>
       ) : null}
-      <ActiveOffers groups={query.data.offerGroups} />
+      <ActiveOffers
+        groups={query.data.offerGroups}
+        canShare={canShareOwnerContent(session?.user.role)}
+      />
       {visiblePlayers.length > 0 ? (
         <PlayerTable players={visiblePlayers} showStats />
       ) : (

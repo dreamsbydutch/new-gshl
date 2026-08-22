@@ -123,6 +123,8 @@ export function useSeasonState(options: UseSeasonStateOptions = {}) {
     selectedSeasonSummary: toSeasonSummary(selectedSeason),
     defaultSeason,
     defaultSeasonSummary: toSeasonSummary(defaultSeason),
+    selectableDefaultSeason,
+    selectableDefaultSeasonSummary: toSeasonSummary(selectableDefaultSeason),
     seasonOptions: buildSeasonSummaries(seasons, referenceDate),
     selectedSeasonId,
     setSelectedSeasonId,
