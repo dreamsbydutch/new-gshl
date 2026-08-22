@@ -29,9 +29,7 @@ export const TEAM_LOGO_SIZE = {
  * @param team - The team to use.
  */
 export const formatOwnerName = (team: GSHLTeam) => {
-  const { ownerFirstName, ownerNickname, ownerLastName } = team;
+  const { ownerFirstName, ownerLastName } = team;
 
-  return `${ownerFirstName}${
-    ownerNickname ? ` '${ownerNickname}' ` : " "
-  }${ownerLastName}`;
+  return `${ownerFirstName} ${ownerLastName}`;
 };

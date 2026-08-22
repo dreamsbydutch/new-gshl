@@ -14,7 +14,6 @@ const TeamLogo = ({ currentTeam }: TeamLogoProps) => {
 
   return currentTeam.logoUrl && !errored ? (
     <Image
-      className="rounded-lg bg-gray-100 shadow-emboss"
       src={currentTeam.logoUrl}
       alt={`${currentTeam.name} logo`}
       width={TEAM_LOGO_SIZE.width}
