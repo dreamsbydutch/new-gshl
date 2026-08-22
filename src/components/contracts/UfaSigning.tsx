@@ -578,56 +578,65 @@ export function UfaHomeCard() {
   if (query.isLoading) return <UfaHomeCardSkeleton />;
   if (query.error || !query.data)
     return (
-      <section className="rounded-xl border border-destructive/40 p-3 text-xs text-destructive sm:p-5 sm:text-sm">
+      <section className="mx-auto w-full max-w-5xl rounded-xl border border-destructive/40 p-3 text-xs text-destructive sm:p-5 sm:text-sm">
         UFA information could not be loaded: {query.error?.message}
       </section>
     );
   if (!query.data.window.isOpen && query.data.offerGroups.length === 0)
     return null;
   const previewFreeAgents = selectHomeUfaPreview(query.data.topFreeAgents);
+  const showOwnerFreeAgentTable =
+    query.data.viewer.isSignedInOwner && previewFreeAgents.length > 0;
   return (
     <section
       aria-labelledby="home-ufa-heading"
-      className="w-full min-w-0 max-w-full space-y-3 overflow-hidden border-y border-slate-300 py-3 sm:py-4"
+      className="w-full min-w-0 max-w-full space-y-3 sm:space-y-4"
     >
-      <div className="flex flex-wrap items-start justify-between gap-2 sm:gap-3">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary sm:tracking-[0.2em]">
-            Free agency
-          </p>
-          <h2
-            id="home-ufa-heading"
-            className="text-lg font-black leading-tight sm:text-2xl"
+      <div className="mx-auto w-full max-w-5xl space-y-3 overflow-hidden border-y border-slate-300 py-3 sm:py-4">
+        <div className="flex flex-wrap items-start justify-between gap-2 sm:gap-3">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary sm:tracking-[0.2em]">
+              Free agency
+            </p>
+            <h2
+              id="home-ufa-heading"
+              className="text-lg font-black leading-tight sm:text-2xl"
+            >
+              Top {HOME_UFA_PREVIEW_LIMIT} UFAs
+            </h2>
+            <p className="mt-0.5 text-xs leading-4 text-muted-foreground sm:mt-1 sm:text-sm">
+              Salaries include the 125% premium.
+            </p>
+          </div>
+          <Link
+            href="/leagueoffice?view=freeAgents"
+            className="inline-flex min-h-11 items-center rounded-md border px-3 py-2 text-xs font-semibold hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:px-4 sm:text-sm"
           >
-            Top {HOME_UFA_PREVIEW_LIMIT} UFAs
-          </h2>
-          <p className="mt-0.5 text-xs leading-4 text-muted-foreground sm:mt-1 sm:text-sm">
-            Salaries include the 125% premium.
-          </p>
+            View all
+          </Link>
         </div>
-        <Link
-          href="/leagueoffice?view=freeAgents"
-          className="inline-flex min-h-11 items-center rounded-md border px-3 py-2 text-xs font-semibold hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:px-4 sm:text-sm"
-        >
-          View all
-        </Link>
-      </div>
-      <HomeActiveOffers groups={query.data.offerGroups} />
-      {query.data.window.isOpen ? (
-        previewFreeAgents.length > 0 ? (
-          <HomeFreeAgents players={previewFreeAgents} />
+        <HomeActiveOffers groups={query.data.offerGroups} />
+        {query.data.window.isOpen ? (
+          previewFreeAgents.length > 0 ? (
+            showOwnerFreeAgentTable ? null : (
+              <HomeFreeAgents players={previewFreeAgents} />
+            )
+          ) : (
+            <p className="rounded-md border border-dashed p-2 text-xs text-muted-foreground sm:p-4 sm:text-sm">
+              {query.data.viewer.isSignedInOwner
+                ? "No available UFAs currently fit within your franchise's cap space."
+                : "No UFAs are currently available."}
+            </p>
+          )
         ) : (
-          <p className="rounded-md border border-dashed p-2 text-xs text-muted-foreground sm:p-4 sm:text-sm">
-            {query.data.viewer.isSignedInOwner
-              ? "No available UFAs currently fit within your franchise's cap space."
-              : "No UFAs are currently available."}
+          <p className="rounded-md bg-muted p-2 text-xs sm:p-3 sm:text-sm">
+            {query.data.window.reason}
           </p>
-        )
-      ) : (
-        <p className="rounded-md bg-muted p-2 text-xs sm:p-3 sm:text-sm">
-          {query.data.window.reason}
-        </p>
-      )}
+        )}
+      </div>
+      {showOwnerFreeAgentTable ? (
+        <PlayerTable players={previewFreeAgents} showStats />
+      ) : null}
     </section>
   );
 }

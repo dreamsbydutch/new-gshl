@@ -65,7 +65,7 @@ export function PowerRankingsHomeCardSkeleton() {
 
 export function UfaHomeCardSkeleton() {
   return (
-    <section className="space-y-3 overflow-hidden border-y border-slate-300 py-3 sm:py-4">
+    <section className="mx-auto w-full max-w-5xl space-y-3 overflow-hidden border-y border-slate-300 py-3 sm:py-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1 space-y-2">
           <Skeleton className="h-3 w-32" />
@@ -101,7 +101,7 @@ export function HomeSkeleton() {
       className="mx-auto w-full max-w-7xl px-3 py-3 sm:px-5 sm:py-5"
     >
       <div className="space-y-3 sm:space-y-4 lg:space-y-5">
-        <section className="flex h-14 w-full items-center gap-3 border-y border-slate-200 px-3">
+        <section className="mx-auto flex h-14 w-full max-w-5xl items-center gap-3 border-y border-slate-200 px-3">
           <Skeleton className="h-9 w-9 shrink-0 rounded-xl" />
           <div className="min-w-0 flex-1 space-y-2">
             <Skeleton className="h-2.5 w-36 max-w-full" />
@@ -110,7 +110,7 @@ export function HomeSkeleton() {
           <Skeleton className="h-11 w-20 shrink-0 rounded-full" />
         </section>
         <UfaHomeCardSkeleton />
-        <div className="grid min-w-0 items-start gap-3 sm:gap-4 xl:grid-cols-2">
+        <div className="mx-auto grid w-full min-w-0 max-w-5xl items-start gap-3 sm:gap-4 xl:grid-cols-2">
           <PowerRankingsHomeCardSkeleton />
           <LeagueActivityCardSkeleton />
         </div>

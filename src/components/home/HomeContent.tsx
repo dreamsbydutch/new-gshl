@@ -39,7 +39,7 @@ export function HomeContent() {
         <UfaHomeCard />
         <div
           className={cn(
-            "grid min-w-0 items-start gap-3 sm:gap-4",
+            "mx-auto grid w-full min-w-0 max-w-5xl items-start gap-3 sm:gap-4",
             currentSeason && "xl:grid-cols-2",
           )}
         >
@@ -51,12 +51,16 @@ export function HomeContent() {
           />
         </div>
         {draftSeason?.draftStartAt ? (
-          <DraftHubCard season={draftSeason} />
+          <div className="mx-auto w-full max-w-5xl">
+            <DraftHubCard season={draftSeason} />
+          </div>
         ) : null}
         {showOffseasonContent && offseasonWindow ? (
-          <MockDraftPreview
-            seasonId={String(offseasonWindow.upcomingSeason.id)}
-          />
+          <div className="mx-auto w-full max-w-5xl">
+            <MockDraftPreview
+              seasonId={String(offseasonWindow.upcomingSeason.id)}
+            />
+          </div>
         ) : null}
       </div>
     </main>

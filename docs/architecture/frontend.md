@@ -158,6 +158,8 @@ Weekly Schedule, Team Schedule, and Matchup Details each subscribe to a page-sha
 
 The Home dashboard limits preview inventory instead of rendering complete feature lists: five UFAs, eight power rankings, five recent events, and four first-round mock-draft projections. Home UFA data uses a server-selected catalog containing its ranked preview candidates and any players in unresolved offer groups, while League Office retains the full projected catalog; NHL statistics still come from the latest populated season. The mock-draft and power-ranking cards each use capped server projections that return only rendered fields and referenced branding, while Draft Status uses the clock-only query rather than the joined draft board. Full destinations and an activity expansion remain explicit. Press Box cards and Newsroom lists receive compact metadata, then subscribe to one full edition only after the reader opens it or a commissioner selects it. The Press Box reader portals its modal outside inert application content, traps keyboard focus, supports Escape, and restores focus to its trigger.
 
+Home's compact modules use a centered reading measure. When a linked owner has affordable UFA candidates, the player decision surface breaks out to the full dashboard width so its comprehensive desktop statistics and offer controls remain visible; phones and tablets retain the existing decision cards.
+
 ## Verification
 
 The focused frontend gates are:

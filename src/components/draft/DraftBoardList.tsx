@@ -364,7 +364,7 @@ function MockDraftList({
               className={cn(
                 "grid grid-cols-1 gap-3",
                 compact
-                  ? "mt-3 sm:grid-cols-2 xl:grid-cols-4"
+                  ? "mt-3 sm:grid-cols-2"
                   : "mt-4 sm:grid-cols-[repeat(auto-fit,minmax(18rem,1fr))] xl:grid-cols-[repeat(auto-fit,minmax(22rem,1fr))]",
               )}
             >

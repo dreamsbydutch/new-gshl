@@ -167,7 +167,7 @@ export function MockDraftSkeleton({
               <div className="h-px flex-1 bg-slate-200" />
             </div>
             <div
-              className={`${compact ? "mt-3 sm:grid-cols-2 xl:grid-cols-4" : "mt-4 sm:grid-cols-[repeat(auto-fit,minmax(18rem,1fr))]"} grid grid-cols-1 gap-3`}
+              className={`${compact ? "mt-3 sm:grid-cols-2" : "mt-4 sm:grid-cols-[repeat(auto-fit,minmax(18rem,1fr))]"} grid grid-cols-1 gap-3`}
             >
               {Array.from({ length: 4 }).map((_, pickIndex) => (
                 <MockDraftPickSkeleton key={pickIndex} />
