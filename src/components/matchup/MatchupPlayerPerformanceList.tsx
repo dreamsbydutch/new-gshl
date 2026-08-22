@@ -1,5 +1,6 @@
 import { ChevronDown } from "lucide-react";
 import { NHLLogo } from "@gshl-components/player/NHLLogo";
+import { WhatsAppShareButton } from "@gshl-components/ui/WhatsAppShareButton";
 import type {
   MatchupDetailsNhlTeam,
   PlayerStatColumn,
@@ -51,11 +52,13 @@ export function MatchupPlayerPerformanceList({
   nhlTeams,
   players,
   teamName,
+  getPlayerShareMessage,
 }: {
   columns: PlayerStatColumn[];
   nhlTeams: MatchupDetailsNhlTeam[];
   players: PlayerStatRow[];
   teamName: string;
+  getPlayerShareMessage?: (player: PlayerStatRow) => string;
 }) {
   if (players.length === 0) {
     return (
@@ -123,6 +126,16 @@ export function MatchupPlayerPerformanceList({
                     </div>
                   ))}
                 </dl>
+              ) : null}
+
+              {getPlayerShareMessage ? (
+                <div className="mt-3 flex justify-end">
+                  <WhatsAppShareButton
+                    message={getPlayerShareMessage(player)}
+                    label="Share stats"
+                    ariaLabel={`Share ${playerName} matchup stats to WhatsApp`}
+                  />
+                </div>
               ) : null}
 
               {detailColumns.length > 0 ? (

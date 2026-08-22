@@ -13,6 +13,8 @@ import {
 import { useToast, useTradeBlockMarket } from "@gshl-hooks";
 import { Button, Input, Select, Skeleton } from "@gshl-ui";
 import { cn, formatMoney, TRADE_BLOCK_NOTE_LIMIT } from "@gshl-utils";
+import { WhatsAppShareButton } from "@gshl-components/ui/WhatsAppShareButton";
+import { buildWhatsAppShareMessage } from "@gshl-utils/features/whatsapp-share";
 
 const POSITION_FILTERS = [
   { value: "all", label: "All players" },
@@ -370,6 +372,26 @@ export function TradeBlock() {
                     {listing.note ?? "Open to ideas — make an offer."}
                   </p>
                 </div>
+                {market.data?.canManage ? (
+                  <div className="flex justify-end border-t border-slate-100 px-4 py-3">
+                    <WhatsAppShareButton
+                      message={buildWhatsAppShareMessage({
+                        title: "GSHL Trade Block Update",
+                        summary: `${listing.fullName} is available from ${listing.team.name}`,
+                        lines: [
+                          `${listing.nhlPos.join("/") || listing.posGroup} · ${listing.nhlTeam.join("/") || "FA"}`,
+                          `Cap hit: ${formatMoney(listing.capHit)} · Through ${listing.expiryDate?.slice(0, 4) ?? "TBD"}`,
+                          listing.note
+                            ? `GM note: ${listing.note}`
+                            : "GM note: Open to ideas — make an offer.",
+                        ],
+                      })}
+                      path="/leagueoffice?view=tradeBlock"
+                      label="Share listing"
+                      ariaLabel={`Share ${listing.fullName} trade-block listing to WhatsApp`}
+                    />
+                  </div>
+                ) : null}
               </article>
             ))}
           </div>

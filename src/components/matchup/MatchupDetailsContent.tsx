@@ -3,11 +3,13 @@
 import { useMemo } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { WhatsAppShareButton } from "@gshl-components/ui/WhatsAppShareButton";
 import { MatchupSkeleton } from "@gshl-skeletons";
 import { TableViewport } from "@gshl-ui";
 import {
   lighten,
   readableText,
+  useAuthSession,
   useMatchupContextNavigation,
   useMatchupDetails,
   useTeamColor,
@@ -29,6 +31,10 @@ import {
   resolveMatchupCategories,
   toStatNumber,
 } from "@gshl-utils";
+import {
+  buildWhatsAppShareMessage,
+  canShareOwnerContent,
+} from "@gshl-utils/features/whatsapp-share";
 import { PlayerStatsTable } from "./PlayerStatsTable";
 import { ArrowLeftIcon } from "lucide-react";
 
@@ -388,6 +394,7 @@ function StarsCard({ stars }: { stars: StarPlayer[] }) {
 export function MatchupDetailsContent({
   matchupId,
 }: MatchupDetailsContentProps) {
+  const { session } = useAuthSession();
   const matchupQuery = useMatchupDetails(matchupId);
   const details = matchupQuery.data;
   const matchup = details?.matchup ?? null;
@@ -454,6 +461,14 @@ export function MatchupDetailsContent({
     if (matchup.isComplete) return "Matchup complete";
     return "Matchup in progress";
   }, [awayTeam?.name, homeTeam?.name, matchup]);
+  const matchupShareMessage = buildWhatsAppShareMessage({
+    title: "GSHL Matchup",
+    summary: `${awayTeam?.name ?? "Away team"} ${matchupScore.away} - ${matchupScore.home} ${homeTeam?.name ?? "Home team"}`,
+    lines: [
+      matchupStatus,
+      `${season?.name ?? "Season"}${week ? ` · Week ${week.weekNum}` : ""}`,
+    ],
+  });
 
   const homePlayers = useMemo(() => {
     const players = details?.players.home ?? [];
@@ -555,10 +570,20 @@ export function MatchupDetailsContent({
           <ArrowLeftIcon aria-hidden="true" className="h-4 w-4" />
           {matchupNavigation.backLabel}
         </Link>
-        <div className="ml-auto line-clamp-2 text-right text-[9px] uppercase leading-tight tracking-[0.12em] text-slate-500 sm:text-xs sm:tracking-[0.18em]">
-          {season?.name ?? "Season"}{" "}
-          {gameDisplay ? `- ${gameDisplay.label}` : ""}
-          {weekRange ? ` - ${weekRange}` : ""}
+        <div className="ml-auto flex min-w-0 items-center justify-end gap-2">
+          {canShareOwnerContent(session?.user.role) ? (
+            <WhatsAppShareButton
+              message={matchupShareMessage}
+              path={`/matchup/${encodeURIComponent(matchupId)}`}
+              label="Share matchup"
+              className="shrink-0"
+            />
+          ) : null}
+          <div className="line-clamp-2 text-right text-[9px] uppercase leading-tight tracking-[0.12em] text-slate-500 sm:text-xs sm:tracking-[0.18em]">
+            {season?.name ?? "Season"}{" "}
+            {gameDisplay ? `- ${gameDisplay.label}` : ""}
+            {weekRange ? ` - ${weekRange}` : ""}
+          </div>
         </div>
       </div>
 

@@ -2,6 +2,8 @@
 /* eslint-disable @next/next/no-img-element */
 
 import { useMemo, useState } from "react";
+import { WhatsAppShareButton } from "@gshl-components/ui/WhatsAppShareButton";
+import { useAuthSession } from "@gshl-hooks";
 import { AWARD_GROUP_ORDER } from "@gshl-lib/config/awards";
 import type {
   TrophyCaseAwardSection,
@@ -10,11 +12,16 @@ import type {
 } from "@gshl-types";
 import {
   AwardsList,
+  buildLockerRoomNavigationHref,
   buildTrophyCaseData,
   buildTrophyCupShowcaseLayout,
   cn,
   formatOwnerName,
 } from "@gshl-utils";
+import {
+  buildWhatsAppShareMessage,
+  canShareOwnerContent,
+} from "@gshl-utils/features/whatsapp-share";
 
 function TrophySectionDivider({ label }: { label: string }) {
   return (
@@ -113,11 +120,28 @@ function FeaturedCupImage({
   );
 }
 
-function FeaturedCupShowcase({ section }: { section: TrophyCaseAwardSection }) {
+function FeaturedCupShowcase({
+  section,
+  shareMessage,
+  sharePath,
+}: {
+  section: TrophyCaseAwardSection;
+  shareMessage?: string;
+  sharePath?: string;
+}) {
   const layout = buildTrophyCupShowcaseLayout(section.cards.length);
 
   return (
     <section className="pt-3" aria-label="GSHL Cup championships">
+      {shareMessage ? (
+        <div className="mx-auto mb-3 flex max-w-7xl justify-end px-3 sm:px-4">
+          <WhatsAppShareButton
+            message={shareMessage}
+            path={sharePath}
+            label="Share GSHL Cups"
+          />
+        </div>
+      ) : null}
       <div
         className="relative mx-auto grid w-[calc(100%-1.5rem)] grid-cols-1 justify-items-center pb-4"
         style={{ maxWidth: layout.maxWidth }}
@@ -195,21 +219,38 @@ function TrophyWin({ card }: { card: TrophyCaseCard }) {
   );
 }
 
-function TrophyAwardRow({ section }: { section: TrophyCaseAwardSection }) {
+function TrophyAwardRow({
+  section,
+  shareMessage,
+  sharePath,
+}: {
+  section: TrophyCaseAwardSection;
+  shareMessage?: string;
+  sharePath?: string;
+}) {
   return (
     <section>
-      <div className="px-3 sm:px-4">
-        <div className="flex min-w-0 items-baseline gap-1.5 whitespace-nowrap font-varela uppercase text-black">
-          <h3 className="min-w-0 truncate text-[13px] font-bold tracking-[0.05em] sm:text-[15px]">
-            {section.catalog.fullName}
-          </h3>
-          <span className="shrink-0 text-[10px] font-semibold tracking-[0.04em] text-slate-500 sm:text-xs">
-            - {section.winnerLabel}
-          </span>
+      <div className="flex flex-wrap items-start justify-between gap-2 px-3 sm:px-4">
+        <div className="min-w-0">
+          <div className="flex min-w-0 items-baseline gap-1.5 whitespace-nowrap font-varela uppercase text-black">
+            <h3 className="min-w-0 truncate text-[13px] font-bold tracking-[0.05em] sm:text-[15px]">
+              {section.catalog.fullName}
+            </h3>
+            <span className="shrink-0 text-[10px] font-semibold tracking-[0.04em] text-slate-500 sm:text-xs">
+              - {section.winnerLabel}
+            </span>
+          </div>
+          <p className="mt-0.5 truncate font-barlow text-[9px] uppercase tracking-[0.16em] text-slate-400 sm:text-[10px]">
+            Seasons {section.seasonRange}
+          </p>
         </div>
-        <p className="mt-0.5 truncate font-barlow text-[9px] uppercase tracking-[0.16em] text-slate-400 sm:text-[10px]">
-          Seasons {section.seasonRange}
-        </p>
+        {shareMessage ? (
+          <WhatsAppShareButton
+            message={shareMessage}
+            path={sharePath}
+            label="Share trophy"
+          />
+        ) : null}
       </div>
       <div className="mt-2 grid grid-cols-6 overflow-hidden border-y border-slate-200 bg-slate-50/80 sm:grid-cols-8 md:grid-cols-10 lg:grid-cols-12">
         {section.cards.map((card) => (
@@ -221,6 +262,7 @@ function TrophyAwardRow({ section }: { section: TrophyCaseAwardSection }) {
 }
 
 export function TrophyCase(props: TrophyCaseProps) {
+  const { session } = useAuthSession();
   const { awardSections } = useMemo(() => buildTrophyCaseData(props), [props]);
   const featuredCupSection = awardSections.find(
     (section) => section.awardKey === AwardsList.GSHL_CUP,
@@ -231,6 +273,29 @@ export function TrophyCase(props: TrophyCaseProps) {
   const visibleGroups = AWARD_GROUP_ORDER.filter((group) =>
     regularAwardSections.some((section) => section.catalog.group === group),
   );
+  const canShare = canShareOwnerContent(session?.user.role);
+  const ownerLabel = formatOwnerName(props.currentTeam);
+  const sharePath = buildLockerRoomNavigationHref("", {
+    view: "trophy",
+    owner: props.currentTeam.ownerId,
+  });
+  const messageForSection = (section: TrophyCaseAwardSection) =>
+    buildWhatsAppShareMessage({
+      title: `GSHL ${section.catalog.fullName}`,
+      summary: ownerLabel,
+      lines: section.cards.map(
+        (card) =>
+          `${card.seasonYear}${card.franchiseName ? ` · ${card.franchiseName}` : ""}`,
+      ),
+    });
+  const overallShareMessage = buildWhatsAppShareMessage({
+    title: "GSHL Trophy Case",
+    summary: ownerLabel,
+    lines: awardSections.map(
+      (section) =>
+        `${section.catalog.fullName}: ${section.cards.map((card) => card.seasonYear).join(", ")}`,
+    ),
+  });
 
   if (awardSections.length === 0) {
     return (
@@ -247,8 +312,23 @@ export function TrophyCase(props: TrophyCaseProps) {
 
   return (
     <section className="pb-8 font-varela sm:pb-12">
+      {canShare ? (
+        <div className="mx-auto flex max-w-7xl justify-end px-3 pb-3 sm:px-4">
+          <WhatsAppShareButton
+            message={overallShareMessage}
+            path={sharePath}
+            label="Share trophy case"
+          />
+        </div>
+      ) : null}
       {featuredCupSection ? (
-        <FeaturedCupShowcase section={featuredCupSection} />
+        <FeaturedCupShowcase
+          section={featuredCupSection}
+          shareMessage={
+            canShare ? messageForSection(featuredCupSection) : undefined
+          }
+          sharePath={sharePath}
+        />
       ) : null}
       {visibleGroups.map((group) => {
         const groupSections = regularAwardSections.filter(
@@ -259,7 +339,14 @@ export function TrophyCase(props: TrophyCaseProps) {
             <TrophySectionDivider label={group} />
             <div className="mx-auto max-w-7xl space-y-6 sm:space-y-8">
               {groupSections.map((section) => (
-                <TrophyAwardRow key={section.awardKey} section={section} />
+                <TrophyAwardRow
+                  key={section.awardKey}
+                  section={section}
+                  shareMessage={
+                    canShare ? messageForSection(section) : undefined
+                  }
+                  sharePath={sharePath}
+                />
               ))}
             </div>
           </div>

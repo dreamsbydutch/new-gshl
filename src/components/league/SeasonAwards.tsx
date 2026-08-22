@@ -3,6 +3,8 @@
 
 import { useMemo, useState } from "react";
 import type { ReactNode } from "react";
+import { WhatsAppShareButton } from "@gshl-components/ui/WhatsAppShareButton";
+import { useAuthSession } from "@gshl-hooks";
 import {
   ALL_STAR_MEDAL_EMOJIS,
   AWARD_GROUP_ORDER,
@@ -14,10 +16,15 @@ import type {
 } from "@gshl-types";
 import {
   buildAllStarTeamCards,
+  buildStandingsNavigationHref,
   buildPlayerAwardSections,
   buildSeasonAwardCards,
   isSeasonAwardsInProgress,
 } from "@gshl-utils";
+import {
+  buildWhatsAppShareMessage,
+  canShareOwnerContent,
+} from "@gshl-utils/features/whatsapp-share";
 
 function AwardIcon({
   imageUrl,
@@ -205,7 +212,15 @@ function AllStarPlayerTile({
   );
 }
 
-function AllStarLineupCard({ card }: { card: AllStarTeamCard }) {
+function AllStarLineupCard({
+  card,
+  shareMessage,
+  sharePath,
+}: {
+  card: AllStarTeamCard;
+  shareMessage?: string;
+  sharePath?: string;
+}) {
   const winnerAt = (position: AllStarWinner["lineupPosition"]) =>
     card.winners.find((winner) => winner.lineupPosition === position);
   const defensemen = card.winners.filter(
@@ -214,13 +229,20 @@ function AllStarLineupCard({ card }: { card: AllStarTeamCard }) {
 
   return (
     <section className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50 shadow-sm">
-      <header className="border-b border-slate-200 bg-white px-4 py-3">
+      <header className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-white px-4 py-3">
         <h3 className="flex items-center gap-2 font-oswald text-xl text-slate-950">
           <span aria-hidden="true">
             {ALL_STAR_MEDAL_EMOJIS.get(card.awardKey)}
           </span>
           {card.title}
         </h3>
+        {shareMessage ? (
+          <WhatsAppShareButton
+            message={shareMessage}
+            path={sharePath}
+            label="Share team"
+          />
+        ) : null}
       </header>
       <div className="py-1">
         <div className="grid grid-cols-6 items-start py-1">
@@ -256,6 +278,8 @@ function AwardListRow({
   winnerLogoUrl,
   winnerFallbackLabel = "GSHL",
   nomineeNames = [],
+  shareMessage,
+  sharePath,
 }: {
   awardLabel: string;
   awardImageUrl: string | null;
@@ -266,6 +290,8 @@ function AwardListRow({
   winnerLogoUrl: string | null;
   winnerFallbackLabel?: string;
   nomineeNames?: string[];
+  shareMessage?: string;
+  sharePath?: string;
 }) {
   return (
     <li className="px-4 py-3 sm:px-5">
@@ -307,6 +333,15 @@ function AwardListRow({
           {nomineeNames.join(", ")}
         </p>
       ) : null}
+      {shareMessage ? (
+        <div className="mt-3 flex justify-end border-t border-slate-100 pt-3">
+          <WhatsAppShareButton
+            message={shareMessage}
+            path={sharePath}
+            label="Share award"
+          />
+        </div>
+      ) : null}
     </li>
   );
 }
@@ -345,6 +380,7 @@ export function SeasonAwards({
   season,
   teams,
 }: SeasonAwardsProps) {
+  const { session } = useAuthSession();
   const awardCards = useMemo(
     () => buildSeasonAwardCards(teamAwards, teams),
     [teamAwards, teams],
@@ -378,6 +414,33 @@ export function SeasonAwards({
     awardCards.length > 0 ||
     playerAwardWinnerCount > 0 ||
     allStarWinnerCount > 0;
+  const canShare = canShareOwnerContent(session?.user.role);
+  const sharePath = season
+    ? buildStandingsNavigationHref("", {
+        view: "awards",
+        season: season.id,
+      })
+    : undefined;
+  const seasonLabel = season?.year ? String(season.year) : "Season";
+  const overallShareMessage = buildWhatsAppShareMessage({
+    title: `GSHL ${seasonLabel} Awards`,
+    lines: [
+      ...awardCards.map(
+        (card) => `${card.catalog.fullName}: ${card.winnerName}`,
+      ),
+      ...playerAwardSections.flatMap((section) =>
+        section.winners.map(
+          (winner) => `${section.title}: ${winner.playerName}`,
+        ),
+      ),
+      ...allStarCards
+        .filter((card) => card.winners.length > 0)
+        .map(
+          (card) =>
+            `${card.title}: ${card.winners.map((winner) => winner.playerName).join(", ")}`,
+        ),
+    ],
+  });
 
   if (isInProgress && !hasContenders) {
     return (
@@ -473,9 +536,18 @@ export function SeasonAwards({
   return (
     <section className="mx-auto max-w-6xl px-4 pb-12 pt-4 sm:px-6 lg:pt-6">
       <header className="border-b border-slate-200 pb-6">
-        <p className="font-barlow text-sm uppercase text-slate-400">
-          {season?.year ? `${season.year} Awards` : "Awards"}
-        </p>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="font-barlow text-sm uppercase text-slate-400">
+            {season?.year ? `${season.year} Awards` : "Awards"}
+          </p>
+          {canShare ? (
+            <WhatsAppShareButton
+              message={overallShareMessage}
+              path={sharePath}
+              label="Share season awards"
+            />
+          ) : null}
+        </div>
       </header>
 
       <div className="mt-8 space-y-10">
@@ -495,6 +567,16 @@ export function SeasonAwards({
                   winnerDetail={card.winnerDetail}
                   winnerLogoUrl={card.logoUrl}
                   nomineeNames={card.nomineeNames}
+                  shareMessage={
+                    canShare
+                      ? buildWhatsAppShareMessage({
+                          title: `GSHL ${seasonLabel} ${card.catalog.fullName}`,
+                          summary: card.winnerName,
+                          lines: [card.winnerDetail],
+                        })
+                      : undefined
+                  }
+                  sharePath={sharePath}
                 />
               ))}
             </AwardSection>
@@ -516,6 +598,16 @@ export function SeasonAwards({
                   }
                   winnerLogoUrl={winner.teamLogoUrl}
                   nomineeNames={winner.nomineeNames}
+                  shareMessage={
+                    canShare
+                      ? buildWhatsAppShareMessage({
+                          title: `GSHL ${seasonLabel} ${section.title}`,
+                          summary: winner.playerName,
+                          lines: [winner.positions, winner.teamName],
+                        })
+                      : undefined
+                  }
+                  sharePath={sharePath}
                 />
               )),
             )}
@@ -530,7 +622,22 @@ export function SeasonAwards({
             {allStarCards
               .filter((card) => card.winners.length > 0)
               .map((card) => (
-                <AllStarLineupCard key={card.awardKey} card={card} />
+                <AllStarLineupCard
+                  key={card.awardKey}
+                  card={card}
+                  shareMessage={
+                    canShare
+                      ? buildWhatsAppShareMessage({
+                          title: `GSHL ${seasonLabel} ${card.title}`,
+                          lines: card.winners.map(
+                            (winner) =>
+                              `${winner.lineupPosition ?? winner.positions}: ${winner.playerName}${winner.teamName ? ` · ${winner.teamName}` : ""}`,
+                          ),
+                        })
+                      : undefined
+                  }
+                  sharePath={sharePath}
+                />
               ))}
           </section>
         ) : null}

@@ -4,6 +4,8 @@ import { Fragment, useState } from "react";
 import Image from "next/image";
 import { ChevronDown } from "lucide-react";
 import { StandingsTeamCard } from "@gshl-components/standings/StandingsTeamCard";
+import { WhatsAppShareButton } from "@gshl-components/ui/WhatsAppShareButton";
+import { useAuthSession } from "@gshl-hooks";
 import type {
   Season,
   StandingsGroupTableProps,
@@ -12,9 +14,14 @@ import type {
 } from "@gshl-types";
 import {
   calculateStandingsPoints,
+  buildStandingsNavigationHref,
   cn,
   formatStandingsDetailStat,
 } from "@gshl-utils";
+import {
+  buildWhatsAppShareMessage,
+  canShareCommissionerContent,
+} from "@gshl-utils/features/whatsapp-share";
 
 const STANDINGS_PURPOSES = {
   overall: {
@@ -276,6 +283,8 @@ export function StandingsTable({
   selectedSeason,
   standingsType,
 }: StandingsTableProps) {
+  const { session } = useAuthSession();
+
   if (!selectedSeason) {
     return (
       <div className="rounded-xl border border-dashed p-10 text-center text-sm text-slate-500">
@@ -287,14 +296,47 @@ export function StandingsTable({
   const purpose =
     STANDINGS_PURPOSES[standingsType as keyof typeof STANDINGS_PURPOSES] ??
     STANDINGS_PURPOSES.overall;
+  const shareView =
+    standingsType === "conference" || standingsType === "wildcard"
+      ? standingsType
+      : "overall";
+  const shareMessage = buildWhatsAppShareMessage({
+    title: `GSHL ${selectedSeason.name} ${purpose.label}`,
+    lines: groups.flatMap((group) => [
+      group.title,
+      ...group.teams.map((team, index) => {
+        const fallbackRank =
+          group.title === "Out of the Playoffs" ? index + 3 : index + 1;
+        const rank = getRank(team, standingsType, group.title, fallbackRank);
+        const wins = getStandingValue("wins", team, selectedSeason);
+        const losses = getStandingValue("losses", team, selectedSeason);
+        const ties = selectedSeason.usesLegacyTies
+          ? `-${getStandingValue("ties", team, selectedSeason)}`
+          : "";
+        const points = getStandingValue("points", team, selectedSeason);
+        return `${rank}. ${team.name ?? team.abbr ?? "Team"} · ${wins}-${losses}${ties} · ${points} pts`;
+      }),
+    ]),
+  });
 
   return (
     <div className="mx-auto w-full max-w-6xl space-y-4 px-2.5 py-3 sm:px-6 sm:py-4 lg:py-6">
       <div className="rounded-2xl border border-slate-200 bg-white px-3.5 py-3.5 shadow-sm sm:px-5 sm:py-4">
-        <div className="mt-1 flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between sm:gap-4">
+        <div className="mt-1 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
           <p className="text-[13px] font-semibold uppercase text-slate-500">
             {selectedSeason.name} {purpose.label}
           </p>
+          {canShareCommissionerContent(session?.user.role) ? (
+            <WhatsAppShareButton
+              message={shareMessage}
+              path={buildStandingsNavigationHref("", {
+                view: shareView,
+                season: selectedSeason.id,
+              })}
+              label="Share standings"
+              disabled={groups.length === 0}
+            />
+          ) : null}
         </div>
       </div>
 
