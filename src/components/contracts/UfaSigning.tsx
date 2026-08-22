@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { NHLLogo } from "@gshl-components/player/NHLLogo";
-import { useDesktopViewport, useUfaOverview } from "@gshl-hooks";
+import { useUfaOverview } from "@gshl-hooks";
 import { FreeAgencySkeleton, UfaHomeCardSkeleton } from "@gshl-skeletons";
 import { TableViewport } from "@gshl-ui";
 import {
@@ -15,7 +15,6 @@ import {
 } from "@gshl-utils";
 import type { UfaFreeAgentView, UfaOfferGroupView } from "@gshl-types";
 import { UfaOfferForm } from "./UfaOfferForm";
-import { UfaPlayerDecisionList } from "./UfaPlayerDecisionList";
 
 function Logo({ src, alt }: { src: string | null; alt: string }) {
   return src ? (
@@ -24,7 +23,7 @@ function Logo({ src, alt }: { src: string | null; alt: string }) {
       alt={alt}
       width={32}
       height={32}
-      className="mx-auto h-8 w-8 object-contain"
+      className="h-8 w-8 shrink-0 object-contain"
     />
   ) : (
     <span className="text-xs text-muted-foreground">—</span>
@@ -74,28 +73,28 @@ function PlayerRows({
         return (
           <tr
             key={player.id}
-            className="group border-t border-border/70 align-middle"
+            className="group border-b border-border align-middle odd:bg-background even:bg-muted/25 hover:bg-muted/60"
           >
-            <td
-              className={`sticky left-0 z-20 border-r !bg-background group-hover:!bg-muted sm:static sm:z-auto sm:w-auto sm:min-w-0 sm:border-0 sm:!bg-transparent sm:px-2 sm:py-3 ${showStats ? "w-8 min-w-8 px-0.5 py-1" : "w-6 min-w-6 px-0 py-0.5"}`}
-            >
-              <NHLLogo
-                team={
-                  player.nhlTeamLogoUrl
-                    ? {
-                        name: player.nhlTeam || "NHL team",
-                        logoUrl: player.nhlTeamLogoUrl,
-                      }
-                    : undefined
-                }
-                size={showStats ? 24 : 20}
-              />
-            </td>
             <th
               scope="row"
-              className={`sticky z-20 border-r !bg-background text-left text-[10px] font-semibold group-hover:!bg-muted sm:static sm:z-auto sm:min-w-0 sm:border-0 sm:!bg-transparent sm:px-2 sm:py-3 sm:text-sm ${showStats ? "left-[31px] min-w-[7rem] px-1.5 py-1" : "left-[23px] min-w-[5.5rem] px-1 py-0.5"}`}
+              className={`sticky left-0 z-20 border-r bg-inherit text-left text-[10px] font-semibold group-hover:bg-muted sm:static sm:z-auto sm:w-auto sm:min-w-[10rem] sm:max-w-none sm:border-0 sm:px-2 sm:py-3 sm:text-sm ${showStats ? "w-28 min-w-28 max-w-28 px-1.5 py-1" : "w-24 min-w-24 max-w-24 px-1 py-0.5"}`}
             >
-              {player.fullName}
+              <div className="flex min-w-0 items-center gap-1.5">
+                <NHLLogo
+                  team={
+                    player.nhlTeamLogoUrl
+                      ? {
+                          name: player.nhlTeam || "NHL team",
+                          logoUrl: player.nhlTeamLogoUrl,
+                        }
+                      : undefined
+                  }
+                  size={showStats ? 20 : 18}
+                />
+                <span className="truncate" title={player.fullName}>
+                  {player.fullName}
+                </span>
+              </div>
             </th>
             <td
               className={`whitespace-nowrap text-[9px] sm:px-2 sm:py-3 sm:text-sm ${mobileCellPadding}`}
@@ -161,32 +160,24 @@ function PlayerRows({
 function PlayerTable({
   players,
   showStats = false,
-  desktopOnly = false,
 }: {
   players: UfaFreeAgentView[];
   showStats?: boolean;
-  desktopOnly?: boolean;
 }) {
-  const isDesktopViewport = useDesktopViewport();
   const hasGoalies = players.some((player) => player.positionGroup === "G");
   const hasSkaters = players.some((player) => player.positionGroup !== "G");
   const mixed = showStats && hasGoalies && hasSkaters;
   if (mixed) {
-    if (!isDesktopViewport && !desktopOnly) {
-      return <UfaPlayerDecisionList players={players} />;
-    }
     return (
       <div className="w-full min-w-0 max-w-full space-y-6 overflow-hidden">
         <div className="space-y-6">
           <PlayerTable
             players={players.filter((player) => player.positionGroup !== "G")}
             showStats
-            desktopOnly
           />
           <PlayerTable
             players={players.filter((player) => player.positionGroup === "G")}
             showStats
-            desktopOnly
           />
         </div>
       </div>
@@ -196,9 +187,6 @@ function PlayerTable({
     ? ["GP", "W", "GA", "GAA", "SV", "SA", "SV%", "SO", "QS", "RBS"]
     : ["GP", "G", "A", "P", "+/−", "PIM", "PPP", "SOG", "HIT", "BLK"];
   const mobileCellPadding = showStats ? "px-1 py-1" : "px-0.5 py-0.5";
-  if (!isDesktopViewport && !desktopOnly) {
-    return <UfaPlayerDecisionList players={players} />;
-  }
   return (
     <TableViewport
       ariaLabel={`Available unrestricted free-agent ${hasGoalies ? "goalies" : "skaters"}`}
@@ -213,13 +201,7 @@ function PlayerTable({
           <tr className="border-b border-border/70">
             <th
               scope="col"
-              className={`sticky z-30 border-r !bg-muted sm:static sm:z-auto sm:w-auto sm:min-w-0 sm:border-0 sm:!bg-transparent sm:px-2 sm:py-3 ${showStats ? "left-0 w-8 min-w-8 px-0.5 py-1" : "left-0 w-6 min-w-6 px-0 py-0.5"}`}
-            >
-              NHL
-            </th>
-            <th
-              scope="col"
-              className={`sticky z-30 border-r !bg-muted text-left sm:static sm:z-auto sm:min-w-0 sm:border-0 sm:!bg-transparent sm:px-2 sm:py-3 ${showStats ? "left-[31px] min-w-[7rem] px-1.5 py-1" : "left-[23px] min-w-[5.5rem] px-1 py-0.5"}`}
+              className={`sticky left-0 z-30 border-r bg-muted text-left sm:static sm:z-auto sm:w-auto sm:min-w-[10rem] sm:max-w-none sm:border-0 sm:px-2 sm:py-3 ${showStats ? "w-28 min-w-28 max-w-28 px-1.5 py-1" : "w-24 min-w-24 max-w-24 px-1 py-0.5"}`}
             >
               Player
             </th>
@@ -260,97 +242,7 @@ function PlayerTable({
   );
 }
 
-function ActiveOfferCards({ groups }: { groups: UfaOfferGroupView[] }) {
-  return (
-    <div className="space-y-3 lg:hidden">
-      {groups.map((group) => {
-        const headingId = `ufa-offer-group-${group.id}`;
-        return (
-          <article
-            key={group.id}
-            aria-labelledby={headingId}
-            className="rounded-xl border bg-card p-3 shadow-sm"
-          >
-            <div className="flex items-start gap-3">
-              <div className="grid h-11 w-11 shrink-0 place-items-center rounded-lg bg-muted/60">
-                <NHLLogo
-                  team={
-                    group.player?.nhlTeamLogoUrl
-                      ? {
-                          name: group.player.nhlTeam || "NHL team",
-                          logoUrl: group.player.nhlTeamLogoUrl,
-                        }
-                      : undefined
-                  }
-                  size={32}
-                />
-              </div>
-              <div className="min-w-0 flex-1">
-                <h4 id={headingId} className="break-words text-sm font-bold">
-                  {group.player?.fullName ?? "Unavailable player"}
-                </h4>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {group.player?.positions.length
-                    ? group.player.positions.join("/")
-                    : "Position unavailable"}
-                </p>
-              </div>
-              <Countdown deadlineAt={group.deadlineAt} />
-            </div>
-
-            <ul className="mt-3 space-y-2" aria-label="Pending offers">
-              {group.offers.map((offer) => (
-                <li
-                  key={offer.id}
-                  className="rounded-lg border border-slate-200 bg-background p-3"
-                >
-                  <div className="flex min-w-0 items-center gap-2">
-                    <Logo
-                      src={offer.franchiseLogoUrl}
-                      alt={offer.franchiseName}
-                    />
-                    <p className="min-w-0 flex-1 break-words text-sm font-semibold">
-                      {offer.franchiseName}
-                    </p>
-                  </div>
-                  <dl className="mt-3 grid grid-cols-3 gap-2 text-center">
-                    <div>
-                      <dt className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                        Salary
-                      </dt>
-                      <dd className="mt-0.5 text-sm font-bold tabular-nums">
-                        {formatMoney(offer.salary)}
-                      </dd>
-                    </div>
-                    <div>
-                      <dt className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                        Term
-                      </dt>
-                      <dd className="mt-0.5 text-sm font-bold">
-                        {offer.years} year{offer.years === 1 ? "" : "s"}
-                      </dd>
-                    </div>
-                    <div>
-                      <dt className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                        Odds
-                      </dt>
-                      <dd className="mt-0.5 text-sm font-bold tabular-nums">
-                        {Math.round(offer.probability * 1000) / 10}%
-                      </dd>
-                    </div>
-                  </dl>
-                </li>
-              ))}
-            </ul>
-          </article>
-        );
-      })}
-    </div>
-  );
-}
-
 function ActiveOffers({ groups }: { groups: UfaOfferGroupView[] }) {
-  const isDesktopViewport = useDesktopViewport();
   return (
     <section
       className="w-full min-w-0 max-w-full space-y-2 overflow-hidden sm:space-y-3"
@@ -363,12 +255,12 @@ function ActiveOffers({ groups }: { groups: UfaOfferGroupView[] }) {
         <p className="rounded-lg border border-dashed p-2 text-xs text-muted-foreground sm:p-4 sm:text-sm">
           No UFA offers are currently pending.
         </p>
-      ) : isDesktopViewport ? (
+      ) : (
         <TableViewport
           ariaLabel="Pending unrestricted free-agent offers"
           scrollHint="Scroll to compare every pending offer"
         >
-          <table className="w-max min-w-[720px] text-center text-[10px] sm:min-w-full sm:text-sm">
+          <table className="w-max min-w-[640px] text-center text-[10px] sm:min-w-full sm:text-sm">
             <caption className="sr-only">
               Pending unrestricted free-agent offers by player and franchise
             </caption>
@@ -376,13 +268,7 @@ function ActiveOffers({ groups }: { groups: UfaOfferGroupView[] }) {
               <tr className="border-b border-border/70">
                 <th
                   scope="col"
-                  className="sticky left-0 z-30 w-8 min-w-8 border-r !bg-muted px-0.5 py-1 sm:static sm:z-auto sm:w-auto sm:min-w-0 sm:border-0 sm:!bg-transparent sm:px-3 sm:py-3"
-                >
-                  NHL
-                </th>
-                <th
-                  scope="col"
-                  className="sticky left-[31px] z-30 min-w-[7rem] border-r !bg-muted px-1.5 py-1 text-left sm:static sm:z-auto sm:min-w-0 sm:border-0 sm:!bg-transparent sm:px-3 sm:py-3"
+                  className="sticky left-0 z-30 w-28 min-w-28 max-w-28 border-r bg-muted px-1.5 py-1 text-left sm:static sm:z-auto sm:w-auto sm:min-w-[10rem] sm:max-w-none sm:border-0 sm:px-3 sm:py-3"
                 >
                   Player
                 </th>
@@ -429,26 +315,31 @@ function ActiveOffers({ groups }: { groups: UfaOfferGroupView[] }) {
                 group.offers.map((offer) => (
                   <tr
                     key={offer.id}
-                    className="group border-t border-border/70"
+                    className="group border-b border-border odd:bg-background even:bg-muted/35 hover:bg-muted/60"
                   >
-                    <td className="sticky left-0 z-20 w-8 min-w-8 border-r !bg-background px-0.5 py-1 group-hover:!bg-muted sm:static sm:z-auto sm:w-auto sm:min-w-0 sm:border-0 sm:!bg-transparent sm:px-3 sm:py-3">
-                      <NHLLogo
-                        team={
-                          group.player?.nhlTeamLogoUrl
-                            ? {
-                                name: group.player.nhlTeam || "NHL team",
-                                logoUrl: group.player.nhlTeamLogoUrl,
-                              }
-                            : undefined
-                        }
-                        size={24}
-                      />
-                    </td>
                     <th
                       scope="row"
-                      className="sticky left-[31px] z-20 min-w-[7rem] border-r !bg-background px-1.5 py-1 text-left text-[10px] font-semibold group-hover:!bg-muted sm:static sm:z-auto sm:min-w-0 sm:border-0 sm:!bg-transparent sm:px-3 sm:py-3 sm:text-sm"
+                      className="sticky left-0 z-20 w-28 min-w-28 max-w-28 border-r bg-inherit px-1.5 py-1 text-left text-[10px] font-semibold group-hover:bg-muted sm:static sm:z-auto sm:w-auto sm:min-w-[10rem] sm:max-w-none sm:border-0 sm:px-3 sm:py-3 sm:text-sm"
                     >
-                      {group.player?.fullName ?? "Unavailable player"}
+                      <div className="flex min-w-0 items-center gap-1.5">
+                        <NHLLogo
+                          team={
+                            group.player?.nhlTeamLogoUrl
+                              ? {
+                                  name: group.player.nhlTeam || "NHL team",
+                                  logoUrl: group.player.nhlTeamLogoUrl,
+                                }
+                              : undefined
+                          }
+                          size={20}
+                        />
+                        <span
+                          className="truncate"
+                          title={group.player?.fullName ?? "Unavailable player"}
+                        >
+                          {group.player?.fullName ?? "Unavailable player"}
+                        </span>
+                      </div>
                     </th>
                     <td className="whitespace-nowrap px-1 py-1 sm:px-3 sm:py-3">
                       {group.player?.positions.join("/") ?? "—"}
@@ -462,7 +353,10 @@ function ActiveOffers({ groups }: { groups: UfaOfferGroupView[] }) {
                           src={offer.franchiseLogoUrl}
                           alt={offer.franchiseName}
                         />
-                        <span className="whitespace-nowrap">
+                        <span
+                          className="max-w-28 truncate"
+                          title={offer.franchiseName}
+                        >
                           {offer.franchiseName}
                         </span>
                       </div>
@@ -480,8 +374,6 @@ function ActiveOffers({ groups }: { groups: UfaOfferGroupView[] }) {
             </tbody>
           </table>
         </TableViewport>
-      ) : (
-        <ActiveOfferCards groups={groups} />
       )}
     </section>
   );
@@ -495,39 +387,63 @@ function HomeActiveOffers({ groups }: { groups: UfaOfferGroupView[] }) {
       <h3 id="home-ufa-offers" className="mb-1.5 text-sm font-bold">
         Pending offers
       </h3>
+      <div
+        aria-hidden="true"
+        className="hidden grid-cols-[minmax(13rem,1.35fr)_minmax(10rem,1fr)_minmax(8rem,auto)_5rem_9rem] items-center gap-4 border-t border-slate-200 px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground md:grid"
+      >
+        <span>Player</span>
+        <span>Offer from</span>
+        <span>Contract</span>
+        <span>Odds</span>
+        <span className="text-right">Time left</span>
+      </div>
       <ul className="divide-y divide-slate-200 border-y border-slate-200">
         {groups.flatMap((group) =>
           group.offers.map((offer) => (
             <li
               key={offer.id}
-              className="grid grid-cols-[2rem_minmax(0,1fr)_auto] items-center gap-2 py-2"
+              className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-x-3 gap-y-2 px-2 py-2.5 md:grid-cols-[minmax(13rem,1.35fr)_minmax(10rem,1fr)_minmax(8rem,auto)_5rem_9rem] md:gap-4 md:py-2"
             >
-              <NHLLogo
-                team={
-                  group.player?.nhlTeamLogoUrl
-                    ? {
-                        name: group.player.nhlTeam || "NHL team",
-                        logoUrl: group.player.nhlTeamLogoUrl,
-                      }
-                    : undefined
-                }
-                size={28}
-              />
-              <div className="min-w-0">
-                <p className="truncate text-sm font-semibold">
-                  {group.player?.fullName ?? "Unavailable player"}
-                </p>
-                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                  <Logo
-                    src={offer.franchiseLogoUrl}
-                    alt={offer.franchiseName}
-                  />
-                  <span>{offer.years}y</span>
-                  <span>{formatMoney(offer.salary)}</span>
-                  <span>{Math.round(offer.probability * 1000) / 10}%</span>
+              <div className="col-span-2 flex min-w-0 items-center gap-2 md:col-span-1 md:col-start-1 md:row-start-1">
+                <NHLLogo
+                  team={
+                    group.player?.nhlTeamLogoUrl
+                      ? {
+                          name: group.player.nhlTeam || "NHL team",
+                          logoUrl: group.player.nhlTeamLogoUrl,
+                        }
+                      : undefined
+                  }
+                  size={28}
+                />
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold">
+                    {group.player?.fullName ?? "Unavailable player"}
+                  </p>
+                  <p className="truncate text-xs text-muted-foreground">
+                    {group.player?.positions.length
+                      ? group.player.positions.join("/")
+                      : "Position unavailable"}
+                  </p>
                 </div>
               </div>
-              <Countdown deadlineAt={group.deadlineAt} />
+              <div className="col-start-1 row-start-2 flex min-w-0 items-center gap-2 md:col-start-2 md:row-start-1">
+                <Logo src={offer.franchiseLogoUrl} alt={offer.franchiseName} />
+                <span className="truncate text-xs font-medium sm:text-sm">
+                  {offer.franchiseName}
+                </span>
+              </div>
+              <p className="col-start-2 row-start-2 whitespace-nowrap text-xs tabular-nums md:col-start-3 md:row-start-1 md:text-sm">
+                <span className="sr-only">Contract: </span>
+                {offer.years}y · {formatMoney(offer.salary)}
+              </p>
+              <p className="col-start-3 row-start-2 whitespace-nowrap text-right text-xs font-semibold tabular-nums md:col-start-4 md:row-start-1 md:text-left md:text-sm">
+                <span className="sr-only">Signing odds: </span>
+                {Math.round(offer.probability * 1000) / 10}%
+              </p>
+              <div className="col-start-3 row-start-1 text-right md:col-start-5 md:row-start-1">
+                <Countdown deadlineAt={group.deadlineAt} />
+              </div>
             </li>
           )),
         )}

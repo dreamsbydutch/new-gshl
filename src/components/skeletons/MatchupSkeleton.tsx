@@ -17,45 +17,23 @@ function CategoryComparisonSkeleton() {
   return (
     <section className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm sm:rounded-2xl sm:p-4">
       <Skeleton className="mb-4 h-6 w-40" />
-      <div className="lg:hidden">
-        <div className="grid grid-cols-[minmax(0,1fr)_5rem_minmax(0,1fr)] gap-2 border-b border-slate-200 px-2 pb-2">
-          <Skeleton className="mx-auto h-3 w-12" />
-          <Skeleton className="mx-auto h-3 w-14" />
-          <Skeleton className="mx-auto h-3 w-12" />
+      <div className="overflow-x-auto rounded-lg border border-slate-200">
+        <div className="min-w-[44rem]">
+          {Array.from({ length: 3 }).map((_, rowIndex) => (
+            <div
+              key={rowIndex}
+              className="grid grid-cols-[5rem_repeat(10,minmax(3.5rem,1fr))] items-center gap-2 border-b border-slate-100 px-2 py-3 last:border-0 sm:grid-cols-[7rem_repeat(10,minmax(3.5rem,1fr))] sm:px-3"
+            >
+              <Skeleton className="h-3 w-14" />
+              {Array.from({ length: 10 }).map((_, cellIndex) => (
+                <Skeleton
+                  key={cellIndex}
+                  className={rowIndex === 0 ? "h-3" : "h-4"}
+                />
+              ))}
+            </div>
+          ))}
         </div>
-        {Array.from({ length: 6 }).map((_, rowIndex) => (
-          <div
-            key={rowIndex}
-            className="grid min-h-14 grid-cols-[minmax(0,1fr)_5rem_minmax(0,1fr)] items-center gap-2 border-b border-slate-100 px-2 py-2 last:border-0"
-          >
-            <div className="space-y-1.5">
-              <Skeleton className="mx-auto h-4 w-10" />
-              <Skeleton className="mx-auto h-3 w-8" />
-            </div>
-            <Skeleton className="h-7 w-full rounded-md" />
-            <div className="space-y-1.5">
-              <Skeleton className="mx-auto h-4 w-10" />
-              <Skeleton className="mx-auto h-3 w-8" />
-            </div>
-          </div>
-        ))}
-      </div>
-
-      <div className="hidden overflow-hidden rounded-lg border border-slate-200 lg:block">
-        {Array.from({ length: 3 }).map((_, rowIndex) => (
-          <div
-            key={rowIndex}
-            className="grid min-w-[44rem] grid-cols-[6rem_repeat(10,minmax(3.5rem,1fr))] items-center gap-2 border-b border-slate-100 px-3 py-3 last:border-0"
-          >
-            <Skeleton className="h-3 w-14" />
-            {Array.from({ length: 10 }).map((_, cellIndex) => (
-              <Skeleton
-                key={cellIndex}
-                className={rowIndex === 0 ? "h-3" : "h-4"}
-              />
-            ))}
-          </div>
-        ))}
       </div>
     </section>
   );
@@ -75,44 +53,23 @@ function PlayerPerformanceSkeleton() {
         <Skeleton className="h-3 w-16 shrink-0" />
       </div>
 
-      <div className="space-y-2 p-2 sm:p-3 lg:hidden">
-        {Array.from({ length: 5 }).map((_, playerIndex) => (
-          <div
-            key={playerIndex}
-            className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm"
-          >
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0 space-y-2">
-                <Skeleton className="h-4 w-36 max-w-full" />
-                <Skeleton className="h-3 w-28 max-w-full" />
-              </div>
-              <Skeleton className="h-10 w-14 shrink-0 rounded-lg" />
-            </div>
-            <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
-              {Array.from({ length: 4 }).map((_, statIndex) => (
-                <Skeleton key={statIndex} className="h-12 rounded-lg" />
+      <div className="overflow-x-auto">
+        <div className="min-w-[64rem]">
+          {Array.from({ length: 9 }).map((_, rowIndex) => (
+            <div
+              key={rowIndex}
+              className="grid grid-cols-[7rem_repeat(12,minmax(3.25rem,1fr))] items-center gap-2 border-b border-slate-100 px-2 py-2.5 last:border-0 sm:grid-cols-[10rem_repeat(12,minmax(3.25rem,1fr))] sm:px-3"
+            >
+              <Skeleton className="h-4 w-24 sm:w-32" />
+              {Array.from({ length: 12 }).map((_, cellIndex) => (
+                <Skeleton
+                  key={cellIndex}
+                  className={rowIndex === 0 ? "h-3" : "h-4"}
+                />
               ))}
             </div>
-            <Skeleton className="mt-2 h-11 w-full rounded-lg" />
-          </div>
-        ))}
-      </div>
-
-      <div className="hidden overflow-hidden lg:block">
-        {Array.from({ length: 9 }).map((_, rowIndex) => (
-          <div
-            key={rowIndex}
-            className="grid min-w-[72rem] grid-cols-[11rem_repeat(12,minmax(3.25rem,1fr))] items-center gap-2 border-b border-slate-100 px-3 py-2.5 last:border-0"
-          >
-            <Skeleton className="h-4 w-32" />
-            {Array.from({ length: 12 }).map((_, cellIndex) => (
-              <Skeleton
-                key={cellIndex}
-                className={rowIndex === 0 ? "h-3" : "h-4"}
-              />
-            ))}
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
     </section>
   );

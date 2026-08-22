@@ -21,7 +21,6 @@ import {
   canShareOwnerContent,
 } from "@gshl-utils/features/whatsapp-share";
 import Image from "next/image";
-import { MatchupPlayerPerformanceList } from "./MatchupPlayerPerformanceList";
 
 export function PlayerStatsTable({
   team,
@@ -41,6 +40,7 @@ export function PlayerStatsTable({
     players,
     categories: seasonCategories,
   });
+  const tableColumns = columns.filter((column) => column.key !== "nhlTeam");
 
   const getColumnClassName = (
     columnKey: string,
@@ -50,15 +50,15 @@ export function PlayerStatsTable({
     const classes = [
       "whitespace-nowrap",
       isHeader
-        ? "h-10 px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500"
-        : "px-3 py-2 text-sm text-slate-700",
-      columnClassName ?? "",
+        ? "h-9 px-2 py-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500 sm:h-10 sm:px-3 sm:text-xs sm:tracking-[0.16em]"
+        : "px-2 py-2 text-xs text-slate-700 sm:px-3 sm:text-sm",
+      columnKey === "player" ? "" : (columnClassName ?? ""),
     ];
 
     if (columnKey === "player") {
       classes.push(
-        `sticky left-0 min-w-[180px] text-left ${
-          isHeader ? "z-30 bg-slate-50" : "z-20 bg-white"
+        `sticky left-0 w-28 min-w-28 max-w-28 overflow-hidden border-r border-slate-200 text-left sm:w-40 sm:min-w-40 sm:max-w-40 lg:w-auto lg:min-w-[180px] lg:max-w-none ${
+          isHeader ? "z-30 bg-slate-50" : "z-20 bg-inherit"
         }`,
       );
     }
@@ -85,7 +85,7 @@ export function PlayerStatsTable({
     }
 
     return (
-      <div className="flex items-center justify-center gap-1">
+      <div className="flex shrink-0 items-center gap-0.5">
         {playerNhlTeams.map((nhlTeam) => (
           <NHLLogo
             key={nhlTeam.id}
@@ -150,29 +150,18 @@ export function PlayerStatsTable({
         </div>
       </div>
 
-      <div className="lg:hidden">
-        <MatchupPlayerPerformanceList
-          columns={columns}
-          nhlTeams={nhlTeams}
-          players={players}
-          teamName={teamName}
-          getPlayerShareMessage={canShare ? getPlayerShareMessage : undefined}
-        />
-      </div>
-
       <TableViewport
         ariaLabel={`${teamName} comprehensive player statistics`}
-        className="hidden lg:block"
         scrollHint="Scroll to review every player statistic"
         viewportClassName="rounded-none border-0 focus-visible:ring-inset focus-visible:ring-offset-0"
       >
-        <table className="w-max min-w-[1180px] border-collapse text-sm">
+        <table className="w-max min-w-full border-collapse text-xs sm:text-sm">
           <caption className="sr-only">
             {teamName} comprehensive player statistics
           </caption>
           <thead className="bg-slate-50">
             <tr className="border-b border-slate-200">
-              {columns.map((column) => (
+              {tableColumns.map((column) => (
                 <th
                   key={column.key}
                   scope="col"
@@ -185,13 +174,21 @@ export function PlayerStatsTable({
                   {column.label}
                 </th>
               ))}
+              {canShare ? (
+                <th
+                  scope="col"
+                  className="h-9 whitespace-nowrap px-2 py-2 text-center text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500 sm:h-10 sm:px-3 sm:text-xs sm:tracking-[0.16em]"
+                >
+                  Share
+                </th>
+              ) : null}
             </tr>
           </thead>
           <tbody>
             {players.length === 0 ? (
               <tr>
                 <td
-                  colSpan={columns.length}
+                  colSpan={tableColumns.length + (canShare ? 1 : 0)}
                   className="py-8 text-center text-sm text-slate-500"
                 >
                   No player stats available yet.
@@ -201,17 +198,14 @@ export function PlayerStatsTable({
               players.map((player) => (
                 <tr
                   key={player.id}
-                  className="group border-b border-slate-200 transition-colors last:border-0 hover:bg-slate-50"
+                  className="group border-b border-slate-200 transition-colors last:border-0 odd:bg-white even:bg-slate-50/70 hover:bg-slate-100"
                 >
-                  {columns.map((column) => {
+                  {tableColumns.map((column) => {
                     const cellClassName = [
                       getColumnClassName(column.key, column.className),
-                      column.key === "player" ? "group-hover:bg-slate-50" : "",
+                      column.key === "player" ? "group-hover:bg-slate-100" : "",
                     ].join(" ");
-                    const content =
-                      column.key === "nhlTeam"
-                        ? renderNhlTeamCell(player)
-                        : renderPlayerStatCell(player, column.key);
+                    const content = renderPlayerStatCell(player, column.key);
 
                     return column.key === "player" ? (
                       <th
@@ -219,16 +213,14 @@ export function PlayerStatsTable({
                         scope="row"
                         className={cellClassName}
                       >
-                        <div className="flex items-center justify-between gap-2">
-                          <span>{content}</span>
-                          {canShare ? (
-                            <WhatsAppShareButton
-                              message={getPlayerShareMessage(player)}
-                              label="Share"
-                              ariaLabel={`Share ${formatMatchupPlayerName(player)} matchup stats to WhatsApp`}
-                              className="shrink-0"
-                            />
-                          ) : null}
+                        <div className="flex min-w-0 items-center gap-1.5">
+                          {renderNhlTeamCell(player)}
+                          <span
+                            className="truncate"
+                            title={formatMatchupPlayerName(player)}
+                          >
+                            {content}
+                          </span>
                         </div>
                       </th>
                     ) : (
@@ -240,6 +232,16 @@ export function PlayerStatsTable({
                       </td>
                     );
                   })}
+                  {canShare ? (
+                    <td className="px-2 py-1 text-center sm:px-3">
+                      <WhatsAppShareButton
+                        message={getPlayerShareMessage(player)}
+                        label=""
+                        ariaLabel={`Share ${formatMatchupPlayerName(player)} matchup stats to WhatsApp`}
+                        className="h-9 w-9 shrink-0 p-0"
+                      />
+                    </td>
+                  ) : null}
                 </tr>
               ))
             )}

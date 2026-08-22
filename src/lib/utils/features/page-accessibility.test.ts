@@ -136,6 +136,27 @@ void test("shared dropdown navigation uses a labelled native select", () => {
   assert.match(source, /<option key=\{getItemKey\(item\)\}/);
 });
 
+void test("UFA and matchup statistics retain compact scrollable tables on phones", () => {
+  const ufa = readSource("src/components/contracts/UfaSigning.tsx");
+  const matchup = readSource(
+    "src/components/matchup/MatchupDetailsContent.tsx",
+  );
+  const playerStats = readSource("src/components/matchup/PlayerStatsTable.tsx");
+
+  assert.doesNotMatch(ufa, /UfaPlayerDecisionList|ActiveOfferCards/);
+  assert.match(ufa, /w-28 min-w-28 max-w-28/);
+  assert.match(
+    matchup,
+    /ariaLabel=\{`\$\{awayLabel\} and \$\{homeLabel\} matchup category comparison`\}\s+scrollHint=/,
+  );
+  assert.doesNotMatch(playerStats, /MatchupPlayerPerformanceList/);
+  assert.match(
+    playerStats,
+    /ariaLabel=\{`\$\{teamName\} comprehensive player statistics`\}\s+scrollHint=/,
+  );
+  assert.match(playerStats, /w-28 min-w-28 max-w-28/);
+});
+
 void test("global styles respect reduced-motion preferences", () => {
   const source = readSource("src/styles/globals.css");
 
