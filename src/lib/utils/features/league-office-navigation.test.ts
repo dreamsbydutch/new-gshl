@@ -14,6 +14,7 @@ void test("uses Draft Classes for empty and legacy League Office defaults", () =
 
 void test("preserves member views and role-valid commissioner views", () => {
   assert.equal(resolveLeagueOfficeView("freeAgents", "owner"), "freeAgents");
+  assert.equal(resolveLeagueOfficeView("tradeBlock", "owner"), "tradeBlock");
   assert.equal(resolveLeagueOfficeView("rules", "viewer"), "rules");
   assert.equal(resolveLeagueOfficeView("jobs", "commissioner"), "jobs");
 });

@@ -85,6 +85,7 @@ export type { UseStandingsTeamDetailOptions } from "@gshl-types";
 // Team history hooks
 export { useTeamHistorySummary } from "./useTeamHistory";
 export type { UseTeamHistorySummaryOptions } from "@gshl-types";
+export { useTradeBlockMarket } from "./useTradeBlock";
 
 // Player hooks
 export {

@@ -38,6 +38,7 @@ import type * as schedule from "../schedule.js";
 import type * as standings from "../standings.js";
 import type * as teamHistory from "../teamHistory.js";
 import type * as timestampMigration from "../timestampMigration.js";
+import type * as tradeBlock from "../tradeBlock.js";
 import type * as ufa from "../ufa.js";
 import type * as ufaOdds from "../ufaOdds.js";
 import type * as weeklyEditionBackfill from "../weeklyEditionBackfill.js";
@@ -81,6 +82,7 @@ declare const fullApi: ApiFromModules<{
   standings: typeof standings;
   teamHistory: typeof teamHistory;
   timestampMigration: typeof timestampMigration;
+  tradeBlock: typeof tradeBlock;
   ufa: typeof ufa;
   ufaOdds: typeof ufaOdds;
   weeklyEditionBackfill: typeof weeklyEditionBackfill;

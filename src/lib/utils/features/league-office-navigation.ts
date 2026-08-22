@@ -2,6 +2,7 @@ export const DEFAULT_LEAGUE_OFFICE_VIEW = "draft";
 
 const MEMBER_LEAGUE_OFFICE_VIEWS = new Set([
   "draft",
+  "tradeBlock",
   "freeAgents",
   "rules",
   "confBattle",

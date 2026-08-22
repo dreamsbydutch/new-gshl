@@ -37,6 +37,7 @@ export const LOCKER_ROOM_NAVIGATION_VIEWS = [
 
 export const MEMBER_LEAGUE_OFFICE_NAVIGATION_VIEWS = [
   "draft",
+  "tradeBlock",
   "freeAgents",
   "rules",
   "confBattle",

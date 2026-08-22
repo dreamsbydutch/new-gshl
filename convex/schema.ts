@@ -351,6 +351,17 @@ export default defineSchema({
     ],
   ),
 
+  tradeBlockEntries: defineTable({
+    ownerId: v.id("owners"),
+    playerId: v.id("players"),
+    note: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_ownerId", ["ownerId"])
+    .index("by_playerId", ["playerId"])
+    .index("by_ownerId_playerId", ["ownerId", "playerId"]),
+
   ufaOfferGroups: defineTable({
     playerId: v.id("players"),
     seasonId: v.id("seasons"),
