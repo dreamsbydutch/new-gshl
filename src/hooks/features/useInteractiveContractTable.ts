@@ -11,7 +11,9 @@ import type {
 } from "@gshl-types";
 import {
   calculateContractCapSpaceWindow,
+  buildCapScenarioImpact,
   deriveContractCreationTerms,
+  getCapLabRemovableContractIds,
   getCapLabPlayerOptions,
   groupContractsByPlayer,
   ResignableStatus,
@@ -153,6 +155,19 @@ export function useInteractiveContractTable(
       ),
     [currentSeason, seasons, simulatedContracts],
   );
+  const baselineCapSpaceWindow = useMemo(
+    () =>
+      calculateContractCapSpaceWindow(
+        existingContracts,
+        currentSeason,
+        seasons,
+      ),
+    [currentSeason, existingContracts, seasons],
+  );
+  const capImpact = useMemo(
+    () => buildCapScenarioImpact(baselineCapSpaceWindow, capSpaceWindow),
+    [baselineCapSpaceWindow, capSpaceWindow],
+  );
 
   const removePlayer = (playerId: string) => {
     const normalizedPlayerId = String(playerId);
@@ -162,9 +177,10 @@ export function useInteractiveContractTable(
           String(selection.contract.playerId) !== normalizedPlayerId,
       ),
     );
-    const removedIds = existingContracts
-      .filter((contract) => String(contract.playerId) === normalizedPlayerId)
-      .map((contract) => String(contract.id));
+    const removedIds = getCapLabRemovableContractIds(
+      existingContracts,
+      normalizedPlayerId,
+    );
     setRemovedContractIds((current) => [
       ...new Set([...current, ...removedIds]),
     ]);
@@ -197,6 +213,8 @@ export function useInteractiveContractTable(
     simulatedContracts,
     contractGroups,
     capSpaceWindow,
+    baselineCapSpaceWindow,
+    capImpact,
     ghostContracts,
     hasChanges: selections.length > 0 || removedContractIds.length > 0,
   };

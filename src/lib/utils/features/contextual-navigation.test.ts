@@ -108,6 +108,10 @@ void test("generic updates clean duplicate owned params without dropping unknown
 
 void test("commissioner League Office views remain role gated", () => {
   assert.equal(
+    getLeagueOfficeNavigationViews("viewer").includes("tradeBlock"),
+    true,
+  );
+  assert.equal(
     getLeagueOfficeNavigationViews("owner").includes("contracts"),
     false,
   );

@@ -24,6 +24,7 @@ export function LeagueOfficeLayout({
     if (
       nextType === "mockDraft" ||
       nextType === "draft" ||
+      nextType === "tradeBlock" ||
       nextType === "freeAgents" ||
       nextType === "rules" ||
       nextType === "confBattle" ||
@@ -52,6 +53,11 @@ export function LeagueOfficeLayout({
       {
         key: "draft",
         value: "Draft Classes",
+        setter: selectView,
+      },
+      {
+        key: "tradeBlock",
+        value: "Trade Block",
         setter: selectView,
       },
       {

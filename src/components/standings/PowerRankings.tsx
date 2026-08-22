@@ -21,6 +21,12 @@ import type {
 } from "@gshl-types";
 import { useAuthSession, useDistinctTeamColors } from "@gshl-hooks";
 import { TableViewport } from "@gshl-ui";
+import { WhatsAppShareButton } from "@gshl-components/ui/WhatsAppShareButton";
+import { buildStandingsNavigationHref } from "@gshl-utils";
+import {
+  buildWhatsAppShareMessage,
+  canShareCommissionerContent,
+} from "@gshl-utils/features/whatsapp-share";
 
 function RankMovement({ entry }: { entry: PowerRankingEntry }) {
   if (entry.rankChange === null) {
@@ -322,6 +328,26 @@ export function PowerRankings({ season, rankings }: PowerRankingsProps) {
   const latestWeekLabel = rankings.latestWeek
     ? `through Week ${rankings.latestWeek.weekNum}`
     : "from the season summary";
+  const shareMessage = buildWhatsAppShareMessage({
+    title: `GSHL ${snapshotLabel} Power Rankings`,
+    summary: `${season.name} · ${latestWeekLabel}`,
+    lines: rankings.entries.map((entry) => {
+      const teamName = entry.team.name ?? entry.team.abbr ?? "Team";
+      const movement =
+        entry.rankChange === null || entry.rankChange === 0
+          ? ""
+          : entry.rankChange > 0
+            ? ` (up ${entry.rankChange})`
+            : ` (down ${Math.abs(entry.rankChange)})`;
+      const rating =
+        entry.rating === null ? "" : ` · ${entry.rating.toFixed(1)}`;
+      return `${entry.rank}. ${teamName}${rating}${movement}`;
+    }),
+  });
+  const sharePath = buildStandingsNavigationHref("", {
+    view: "power",
+    season: String(season.id),
+  });
   const teamCount = Math.max(rankings.series.length, 1);
   const yTicks = Array.from({ length: teamCount }, (_, index) => index + 1);
   const signedInTeamId =
@@ -340,13 +366,25 @@ export function PowerRankings({ season, rankings }: PowerRankingsProps) {
   return (
     <div className="mx-auto w-full max-w-6xl space-y-4 px-2.5 py-3 sm:px-6 sm:py-4 lg:py-6">
       <header className="rounded-2xl border border-slate-200 bg-white px-3.5 py-3.5 shadow-sm sm:px-5 sm:py-4">
-        <h2 className="font-oswald text-2xl text-slate-950 sm:text-3xl">
-          {season.name} power rankings
-        </h2>
-        <p className="mt-1 text-xs text-slate-500">
-          {snapshotLabel} order {latestWeekLabel}, plus every available weekly
-          snapshot.
-        </p>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="font-oswald text-2xl text-slate-950 sm:text-3xl">
+              {season.name} power rankings
+            </h2>
+            <p className="mt-1 text-xs text-slate-500">
+              {snapshotLabel} order {latestWeekLabel}, plus every available
+              weekly snapshot.
+            </p>
+          </div>
+          {canShareCommissionerContent(session?.user.role) ? (
+            <WhatsAppShareButton
+              message={shareMessage}
+              path={sharePath}
+              label="Share rankings"
+              disabled={rankings.entries.length === 0}
+            />
+          ) : null}
+        </div>
       </header>
 
       {!rankings.entries.length ? (

@@ -1,4 +1,6 @@
 import { NHLLogo } from "@gshl-components/player/NHLLogo";
+import { WhatsAppShareButton } from "@gshl-components/ui/WhatsAppShareButton";
+import { useAuthSession } from "@gshl-hooks";
 import { TableViewport } from "@gshl-ui";
 import type {
   MatchupDetailsNhlTeam,
@@ -8,9 +10,16 @@ import type {
 import {
   buildPlayerStatColumns,
   findNhlTeamByAbbreviation,
+  formatMatchupPlayerName,
+  formatMatchupPlayerPositions,
+  getPlayerStatCardColumns,
   getPlayerNhlAbbreviations,
   renderPlayerStatCell,
 } from "@gshl-utils";
+import {
+  buildWhatsAppShareMessage,
+  canShareOwnerContent,
+} from "@gshl-utils/features/whatsapp-share";
 import Image from "next/image";
 import { MatchupPlayerPerformanceList } from "./MatchupPlayerPerformanceList";
 
@@ -27,6 +36,7 @@ export function PlayerStatsTable({
   headline?: string;
   seasonCategories?: readonly string[];
 }) {
+  const { session } = useAuthSession();
   const columns = buildPlayerStatColumns({
     players,
     categories: seasonCategories,
@@ -89,6 +99,22 @@ export function PlayerStatsTable({
 
   const teamName = team?.name ?? "Unknown Team";
   const sectionLabel = headline ?? "Player statistics";
+  const canShare = canShareOwnerContent(session?.user.role);
+  const getPlayerShareMessage = (player: PlayerStatRow) => {
+    const highlights = getPlayerStatCardColumns(player, columns).map(
+      (column) =>
+        `${column.label}: ${renderPlayerStatCell(player, column.key)}`,
+    );
+    return buildWhatsAppShareMessage({
+      title: "GSHL Matchup Performance",
+      summary: `${formatMatchupPlayerName(player)} · ${teamName}`,
+      lines: [
+        formatMatchupPlayerPositions(player),
+        `Rating: ${renderPlayerStatCell(player, "Rating")} · GP: ${renderPlayerStatCell(player, "GP")}`,
+        ...highlights,
+      ],
+    });
+  };
 
   return (
     <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm sm:rounded-2xl">
@@ -130,6 +156,7 @@ export function PlayerStatsTable({
           nhlTeams={nhlTeams}
           players={players}
           teamName={teamName}
+          getPlayerShareMessage={canShare ? getPlayerShareMessage : undefined}
         />
       </div>
 
@@ -192,7 +219,17 @@ export function PlayerStatsTable({
                         scope="row"
                         className={cellClassName}
                       >
-                        {content}
+                        <div className="flex items-center justify-between gap-2">
+                          <span>{content}</span>
+                          {canShare ? (
+                            <WhatsAppShareButton
+                              message={getPlayerShareMessage(player)}
+                              label="Share"
+                              ariaLabel={`Share ${formatMatchupPlayerName(player)} matchup stats to WhatsApp`}
+                              className="shrink-0"
+                            />
+                          ) : null}
+                        </div>
                       </th>
                     ) : (
                       <td

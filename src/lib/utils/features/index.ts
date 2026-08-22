@@ -81,6 +81,7 @@ export type {
 } from "./team-history";
 
 export * from "./team-roster";
+export * from "./trade-block";
 export * from "./trophy-case";
 
 export {

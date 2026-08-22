@@ -1,4 +1,11 @@
-import type { CapLabPlayerOption, Contract, Player, Season } from "@gshl-types";
+import type {
+  CapLabPlayerOption,
+  CapScenarioImpactEntry,
+  CapSpaceEntry,
+  Contract,
+  Player,
+  Season,
+} from "@gshl-types";
 import {
   doesContractAffectSeason,
   isPlayingContract,
@@ -103,4 +110,46 @@ export function removeContractsForPlayer(
   return contracts.filter(
     (contract) => String(contract.playerId ?? "") !== normalizedPlayerId,
   );
+}
+
+/** Returns the playing-contract IDs that may be moved out in a cap scenario. */
+export function getCapLabRemovableContractIds(
+  contracts: Contract[],
+  playerId: string,
+): string[] {
+  const normalizedPlayerId = String(playerId);
+  return contracts
+    .filter(
+      (contract) =>
+        String(contract.playerId ?? "") === normalizedPlayerId &&
+        isPlayingContract(contract),
+    )
+    .map((contract) => String(contract.id));
+}
+
+/** Compares a scenario's remaining cap to the untouched team baseline. */
+export function buildCapScenarioImpact(
+  baseline: readonly CapSpaceEntry[],
+  scenario: readonly CapSpaceEntry[],
+): CapScenarioImpactEntry[] {
+  const baselineByYear = new Map(baseline.map((entry) => [entry.year, entry]));
+  const scenarioByYear = new Map(scenario.map((entry) => [entry.year, entry]));
+  const years = [
+    ...new Set([...baselineByYear.keys(), ...scenarioByYear.keys()]),
+  ].sort((left, right) => left - right);
+
+  return years.map((year) => {
+    const before = baselineByYear.get(year)?.remaining ?? 0;
+    const after = scenarioByYear.get(year)?.remaining ?? before;
+    return {
+      year,
+      label:
+        scenarioByYear.get(year)?.label ??
+        baselineByYear.get(year)?.label ??
+        String(year),
+      before,
+      after,
+      change: after - before,
+    };
+  });
 }

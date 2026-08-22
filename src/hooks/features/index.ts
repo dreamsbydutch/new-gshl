@@ -16,6 +16,7 @@
 export * from "./useDraftBoardData";
 export * from "./useDraftAdminList";
 export * from "./useDraftCountdown";
+export * from "./useDraftClassExplorer";
 export * from "./useDraftHubBoard";
 export * from "./useDraftHubTeamData";
 export * from "./useDraftRosterBoard";

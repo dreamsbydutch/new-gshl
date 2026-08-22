@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { WhatsAppShareButton } from "@gshl-components/ui/WhatsAppShareButton";
 import {
   WeeklyMatchupRowSkeleton,
   WeeklyScheduleSkeleton,
@@ -15,13 +16,18 @@ import type {
 import {
   getGameBackgroundClass,
   buildMatchupNavigationHref,
+  buildScheduleNavigationHref,
   getScoreClass,
   isMatchupCompleted,
   isValidMatchup,
   shouldDisplayRanking,
   TEAM_LOGO_DIMENSIONS,
 } from "@gshl-utils";
-import { useWeeklyScheduleData } from "@gshl-hooks";
+import { useAuthSession, useWeeklyScheduleData } from "@gshl-hooks";
+import {
+  buildWhatsAppShareMessage,
+  canShareCommissionerContent,
+} from "@gshl-utils/features/whatsapp-share";
 
 const ScheduleHeader = () => (
   <div className="mx-auto mb-2 grid grid-cols-10 text-center font-varela text-xs font-semibold">
@@ -131,6 +137,7 @@ const WeekScheduleItem = ({
 };
 
 export function WeeklySchedule() {
+  const { session } = useAuthSession();
   const {
     matchups,
     teams,
@@ -139,6 +146,25 @@ export function WeeklySchedule() {
     selectedSeasonId,
     selectedWeekId,
   } = useWeeklyScheduleData();
+  const shareLines = matchups.map((matchup, index) => {
+    const awayTeam = teams.find((team) => team.id === matchup.awayTeamId);
+    const homeTeam = teams.find((team) => team.id === matchup.homeTeamId);
+    const awayName = awayTeam?.name ?? "Away team";
+    const homeName = homeTeam?.name ?? "Home team";
+    const matchupLabel = isMatchupCompleted(matchup)
+      ? `${awayName} ${matchup.awayScore} - ${matchup.homeScore} ${homeName}`
+      : `${awayName} at ${homeName}`;
+    return `${index + 1}. ${matchupLabel}`;
+  });
+  const shareMessage = buildWhatsAppShareMessage({
+    title: "GSHL Weekly Schedule",
+    lines: shareLines,
+  });
+  const sharePath = buildScheduleNavigationHref("", {
+    view: "week",
+    season: selectedSeasonId,
+    week: selectedWeekId,
+  });
 
   if (isLoading) {
     return <WeeklyScheduleSkeleton />;
@@ -154,6 +180,16 @@ export function WeeklySchedule() {
 
   return (
     <div className="mx-2 mb-8 mt-4">
+      {canShareCommissionerContent(session?.user.role) ? (
+        <div className="mb-3 flex justify-end">
+          <WhatsAppShareButton
+            message={shareMessage}
+            path={sharePath}
+            label="Share schedule"
+            disabled={matchups.length === 0}
+          />
+        </div>
+      ) : null}
       <ScheduleHeader />
       <div>
         {matchups.map((matchup) => (

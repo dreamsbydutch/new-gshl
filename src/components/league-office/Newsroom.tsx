@@ -27,6 +27,8 @@ import {
   validateWeeklyEditionImport,
 } from "@gshl-utils";
 import { Button } from "@gshl-ui";
+import { WhatsAppShareButton } from "@gshl-components/ui/WhatsAppShareButton";
+import { buildWhatsAppShareMessage } from "@gshl-utils/features/whatsapp-share";
 import { WeeklyEditionArticle } from "../headlines/WeeklyEditionArticle";
 import { WeeklyEditionEditor } from "../headlines/WeeklyEditionEditor";
 
@@ -43,6 +45,9 @@ export function Newsroom() {
   const [seasonId, setSeasonId] = useState("");
   const [weekId, setWeekId] = useState("");
   const [issueType, setIssueType] = useState("weekly");
+  const [messageType, setMessageType] = useState("Commissioner note");
+  const [messageSubject, setMessageSubject] = useState("");
+  const [messageBody, setMessageBody] = useState("");
   const seasons = useSeasons({ orderBy: { year: "desc" } });
   const weeks = useWeeks({
     seasonId,
@@ -60,6 +65,27 @@ export function Newsroom() {
     selectedEdition?.content.sections.filter(
       (section) => !selectedEdition.inactiveSectionIds?.includes(section.id),
     ).length ?? 0;
+  const pressBoxShareMessage = selectedEdition
+    ? buildWhatsAppShareMessage({
+        title: "GSHL Press Box",
+        summary: `${selectedEdition.content.headline}\n${selectedEdition.seasonName} · ${selectedEdition.issueLabel}`,
+      })
+    : "";
+  const missedStartsShareMessage = selectedEdition
+    ? buildWhatsAppShareMessage({
+        title: "GSHL Missed Starts Report",
+        summary: `${selectedEdition.seasonName} · ${selectedEdition.issueLabel}`,
+        lines: selectedEdition.facts.missedStarts.map(
+          (missedStart) =>
+            `${missedStart.playerName} · ${missedStart.teamName} · ${missedStart.count} missed ${missedStart.count === 1 ? "start" : "starts"}`,
+        ),
+      })
+    : "";
+  const commissionerShareMessage = buildWhatsAppShareMessage({
+    title: `GSHL ${messageType}`,
+    summary: messageSubject,
+    lines: [messageBody],
+  });
 
   useEffect(() => {
     if (!editionId && newsroom.editions?.[0]) {
@@ -228,6 +254,60 @@ export function Newsroom() {
         </p>
       ) : null}
 
+      <details className="rounded-xl border border-slate-200 bg-white shadow-sm">
+        <summary className="cursor-pointer px-4 py-3 font-semibold text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500">
+          Compose a league WhatsApp message
+        </summary>
+        <div className="grid gap-4 border-t border-slate-200 p-4 lg:grid-cols-[13rem_minmax(0,1fr)_auto]">
+          <label className="text-sm font-medium text-slate-700">
+            Message type
+            <select
+              value={messageType}
+              onChange={(event) => setMessageType(event.target.value)}
+              className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2"
+            >
+              <option>Commissioner note</option>
+              <option>League update</option>
+              <option>Deadline reminder</option>
+              <option>Schedule notice</option>
+              <option>Rule clarification</option>
+            </select>
+          </label>
+          <div className="grid gap-3">
+            <label className="text-sm font-medium text-slate-700">
+              Subject
+              <input
+                value={messageSubject}
+                onChange={(event) => setMessageSubject(event.target.value)}
+                placeholder="Optional short heading"
+                className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2"
+              />
+            </label>
+            <label className="text-sm font-medium text-slate-700">
+              Message
+              <textarea
+                value={messageBody}
+                onChange={(event) => setMessageBody(event.target.value)}
+                placeholder="Write the league update, reminder, or ruling."
+                rows={4}
+                className="mt-1 w-full resize-y rounded-lg border border-slate-300 bg-white px-3 py-2"
+              />
+            </label>
+          </div>
+          <WhatsAppShareButton
+            message={commissionerShareMessage}
+            path="/"
+            label="Share message"
+            disabled={!messageBody.trim()}
+            className="self-end"
+          />
+        </div>
+        <p className="border-t border-slate-100 px-4 py-3 text-xs text-slate-500">
+          This opens WhatsApp with editable text. The message is not saved or
+          sent automatically.
+        </p>
+      </details>
+
       <div className="grid gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm md:grid-cols-2 xl:grid-cols-4">
         <label className="text-sm font-medium text-slate-700">
           Generate a completed week
@@ -390,6 +470,20 @@ export function Newsroom() {
                 <EyeOff />
                 No newsletter on Home
               </Button>
+              {selectedEdition.status === "published" ? (
+                <WhatsAppShareButton
+                  message={pressBoxShareMessage}
+                  path={`/headlines/${encodeURIComponent(selectedEdition.id)}`}
+                  label="Share Press Box"
+                />
+              ) : null}
+              {selectedEdition.facts.missedStarts.length > 0 ? (
+                <WhatsAppShareButton
+                  message={missedStartsShareMessage}
+                  path={`/headlines/${encodeURIComponent(selectedEdition.id)}`}
+                  label="Share missed starts"
+                />
+              ) : null}
               <span className="self-center rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
                 {selectedEdition.generationMode.replaceAll("_", " ")}
               </span>

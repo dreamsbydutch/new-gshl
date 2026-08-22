@@ -18,6 +18,14 @@ export interface ButtonProps
   asChild?: boolean;
 }
 
+export interface WhatsAppShareButtonProps
+  extends Omit<ButtonProps, "children" | "onClick"> {
+  message: string;
+  path?: string;
+  label?: string;
+  ariaLabel?: string;
+}
+
 export interface SelectProps
   extends React.SelectHTMLAttributes<HTMLSelectElement> {
   onValueChange?: (value: string) => void;

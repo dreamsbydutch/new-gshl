@@ -29,6 +29,7 @@ export type LockerRoomNavigationView =
 
 export type LeagueOfficeNavigationView =
   | "draft"
+  | "tradeBlock"
   | "freeAgents"
   | "rules"
   | "confBattle"

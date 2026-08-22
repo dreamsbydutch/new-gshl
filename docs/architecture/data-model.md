@@ -55,12 +55,13 @@ Do not collapse these concepts:
 
 ### Contracts, draft, and free agency
 
-| Table            | Purpose and important relationships                                                                                                                             |
-| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `contracts`      | Player-owner contract signed in a season, with type, term, salary/cap hit, start/expiry dates, and statuses.                                                    |
-| `draftPicks`     | Ordered season pick, current/original team, selected player, live clock timestamps, and trade/signing flags. Canonical live order is `(seasonId, round, pick)`. |
-| `ufaOfferGroups` | One player/season competition, shared deadline, resolution state, winning offer, final odds/roll, and failure details.                                          |
-| `ufaOffers`      | One franchise’s binding term/salary offer within a group, with owner/team references, factor snapshot, and pending/won/lost status.                             |
+| Table               | Purpose and important relationships                                                                                                                               |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `contracts`         | Player-owner contract signed in a season, with type, term, salary/cap hit, start/expiry dates, and statuses.                                                      |
+| `tradeBlockEntries` | One active owner/player market signal with an optional public negotiation note. App-native IDs and owner/player indexes keep writes scoped and listings realtime. |
+| `draftPicks`        | Ordered season pick, current/original team, selected player, live clock timestamps, and trade/signing flags. Canonical live order is `(seasonId, round, pick)`.   |
+| `ufaOfferGroups`    | One player/season competition, shared deadline, resolution state, winning offer, final odds/roll, and failure details.                                            |
+| `ufaOffers`         | One franchise’s binding term/salary offer within a group, with owner/team references, factor snapshot, and pending/won/lost status.                               |
 
 ### Calendar and results
 
@@ -202,6 +203,7 @@ When raw player days are archived, league activity reads the saved `activitySnap
 ## Write rules
 
 - Use explicit domain mutations for user actions so authorization and cross-table invariants stay atomic.
+- Trade-block writes must verify the authenticated owner, current player ownership, and an active playing contract; stale listings are omitted from the market projection.
 - Use `maintenanceScope` for bounded aggregate maintenance.
 - Reserve `data.ts` for trusted migration/adaptation work; it can read or mutate arbitrary named tables.
 - Default operator workflows to dry-run and require `--apply` for persistence.

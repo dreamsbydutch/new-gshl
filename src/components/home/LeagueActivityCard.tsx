@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
-import { useLeagueActivity } from "@gshl-hooks";
+import { WhatsAppShareButton } from "@gshl-components/ui/WhatsAppShareButton";
+import { useAuthSession, useLeagueActivity } from "@gshl-hooks";
 import { LeagueActivityRowsSkeleton } from "@gshl-skeletons";
 import type { LeagueActivityEvent, LeagueActivityType } from "@gshl-types";
 import {
@@ -13,6 +14,10 @@ import {
   selectHomeLeagueActivity,
   showDate,
 } from "@gshl-utils";
+import {
+  buildWhatsAppShareMessage,
+  canShareOwnerContent,
+} from "@gshl-utils/features/whatsapp-share";
 
 const activityStyle: Record<
   LeagueActivityType,
@@ -58,6 +63,7 @@ function activityDetail(event: LeagueActivityEvent): string {
 
 export function LeagueActivityCard({ seasonId }: { seasonId?: string }) {
   const [showAllActivity, setShowAllActivity] = useState(false);
+  const { session } = useAuthSession();
   const {
     data: activity,
     isLoading,
@@ -133,6 +139,20 @@ export function LeagueActivityCard({ seasonId }: { seasonId?: string }) {
                     {activityDetail(event)}
                   </p>
                 </div>
+                {event.type === "signing" &&
+                canShareOwnerContent(session?.user.role) ? (
+                  <WhatsAppShareButton
+                    message={buildWhatsAppShareMessage({
+                      title: "GSHL Signing",
+                      summary: `${event.playerName} signed by ${event.teamName}`,
+                      lines: [activityDetail(event)],
+                    })}
+                    path="/"
+                    label="Share"
+                    ariaLabel={`Share ${event.playerName} signing to WhatsApp`}
+                    className="shrink-0"
+                  />
+                ) : null}
               </li>
             );
           })}

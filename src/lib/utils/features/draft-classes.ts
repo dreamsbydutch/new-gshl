@@ -1,5 +1,14 @@
-import type { Contract } from "@gshl-types";
+import type {
+  Contract,
+  DraftClassCertainty,
+  DraftClassPosition,
+  DraftClassRow,
+  DraftClassSummary,
+  Player,
+} from "@gshl-types";
 import { safeParseSheetDate } from "../core";
+import { ContractStatus } from "../domain/constants";
+import { filterAvailableDraftPlayers } from "./draft-board-list";
 
 /**
  * Returns draft class cutoff.
@@ -8,10 +17,7 @@ import { safeParseSheetDate } from "../core";
  * @param offset - The offset to use.
  * @returns The requested draft class cutoff.
  */
-export function getDraftClassCutoff(
-  draftYear: number,
-  offset: number,
-): Date {
+export function getDraftClassCutoff(draftYear: number, offset: number): Date {
   return new Date(draftYear + offset, 3, 19);
 }
 
@@ -62,4 +68,89 @@ export function findExpiringDraftClassContract(
       const rightExpiry = safeParseSheetDate(right.expiryDate)?.getTime() ?? 0;
       return rightExpiry - leftExpiry;
     })[0];
+}
+
+/** Builds one projected draft class without mutating source player rows. */
+export function buildDraftClassRows(options: {
+  players: Player[];
+  contracts: Contract[];
+  draftYear: number;
+  offset: number;
+}): DraftClassRow[] {
+  const previousCutoff = getDraftClassCutoff(
+    options.draftYear,
+    options.offset - 1,
+  );
+  const cutoff = getDraftClassCutoff(options.draftYear, options.offset);
+
+  return filterAvailableDraftPlayers(options.players, options.contracts, cutoff)
+    .map((player) => {
+      const expiringContract = findExpiringDraftClassContract(
+        options.contracts,
+        String(player.id),
+        previousCutoff,
+        cutoff,
+      );
+      return {
+        player,
+        expiringContract,
+        isGuaranteedUfa: expiringContract?.expiryStatus === ContractStatus.UFA,
+      };
+    })
+    .sort(
+      (left, right) =>
+        Number(right.player.overallRating ?? -1) -
+          Number(left.player.overallRating ?? -1) ||
+        Number(left.player.overallRk ?? Number.MAX_SAFE_INTEGER) -
+          Number(right.player.overallRk ?? Number.MAX_SAFE_INTEGER) ||
+        left.player.fullName.localeCompare(right.player.fullName),
+    );
+}
+
+/** Applies the visible draft-class controls to a precomputed projection. */
+export function filterDraftClassRows(options: {
+  rows: DraftClassRow[];
+  search: string;
+  position: DraftClassPosition;
+  certainty: DraftClassCertainty;
+}): DraftClassRow[] {
+  const search = options.search.trim().toLocaleLowerCase();
+  return options.rows.filter((row) => {
+    if (
+      options.position !== "all" &&
+      row.player.posGroup !== options.position
+    ) {
+      return false;
+    }
+    if (options.certainty === "guaranteed" && !row.isGuaranteedUfa) {
+      return false;
+    }
+    if (options.certainty === "projected" && row.isGuaranteedUfa) {
+      return false;
+    }
+    if (!search) return true;
+    return [
+      row.player.fullName,
+      row.player.nhlTeam,
+      row.player.posGroup,
+      ...(row.player.nhlPos ?? []),
+    ]
+      .join(" ")
+      .toLocaleLowerCase()
+      .includes(search);
+  });
+}
+
+export function summarizeDraftClass(rows: DraftClassRow[]): DraftClassSummary {
+  const ratings = rows
+    .map((row) => Number(row.player.overallRating))
+    .filter(Number.isFinite);
+  return {
+    available: rows.length,
+    guaranteedUfas: rows.filter((row) => row.isGuaranteedUfa).length,
+    goalies: rows.filter((row) => row.player.posGroup === "G").length,
+    averageRating: ratings.length
+      ? ratings.reduce((total, rating) => total + rating, 0) / ratings.length
+      : null,
+  };
 }

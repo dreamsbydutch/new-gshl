@@ -35,6 +35,7 @@ export const UTC_TIMESTAMP_TABLE_FIELDS = {
     "createdAt",
     "updatedAt",
   ],
+  tradeBlockEntries: ["createdAt", "updatedAt"],
   weeks: ["startDate", "endDate", "createdAt", "updatedAt"],
   matchups: ["createdAt", "updatedAt"],
   events: ["date", "createdAt", "updatedAt"],
