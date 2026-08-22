@@ -11,7 +11,7 @@ import {
   RulebookSkeleton,
   UserManagementSkeleton,
 } from "@gshl-skeletons";
-import { resolveLeagueOfficeView } from "@gshl-utils";
+import { cn, resolveLeagueOfficeView } from "@gshl-utils";
 
 const ConferenceContest = dynamic(
   () =>
@@ -75,9 +75,16 @@ export function LeagueOfficeContent() {
   const { selectedType } = useLeagueOfficeNavigation();
   const { session } = useAuthSession();
   const activeType = resolveLeagueOfficeView(selectedType, session?.user.role);
+  const usesCompactLayout =
+    activeType === "draft" || activeType === "tradeBlock";
 
   return (
-    <div className="container mx-auto px-4 py-8">
+    <div
+      className={cn(
+        "container mx-auto px-4",
+        usesCompactLayout ? "py-4" : "py-8",
+      )}
+    >
       {activeType === "rules" ? <Rulebook /> : null}
       {activeType === "draft" ? <DraftClasses /> : null}
       {activeType === "tradeBlock" ? <TradeBlock /> : null}

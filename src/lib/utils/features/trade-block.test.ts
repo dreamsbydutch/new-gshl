@@ -3,7 +3,7 @@ import test from "node:test";
 
 import { normalizeTradeBlockNote, TRADE_BLOCK_NOTE_LIMIT } from "./trade-block";
 
-void test("trade block notes are trimmed and collapsed for compact cards", () => {
+void test("trade block notes are trimmed for compact listings", () => {
   assert.equal(
     normalizeTradeBlockNote("  Looking for   picks\n or cap relief.  "),
     "Looking for picks or cap relief.",

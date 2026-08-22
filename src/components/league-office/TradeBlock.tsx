@@ -2,18 +2,18 @@
 
 import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
-import {
-  ArrowRightLeft,
-  BadgeDollarSign,
-  Search,
-  ShieldCheck,
-  SlidersHorizontal,
-} from "lucide-react";
+import { Search, ShieldCheck, SlidersHorizontal } from "lucide-react";
 
-import { useToast, useTradeBlockMarket } from "@gshl-hooks";
-import { Button, Input, Select, Skeleton } from "@gshl-ui";
-import { cn, formatMoney, TRADE_BLOCK_NOTE_LIMIT } from "@gshl-utils";
+import { NHLLogo } from "@gshl-components/player/NHLLogo";
 import { WhatsAppShareButton } from "@gshl-components/ui/WhatsAppShareButton";
+import { useNHLTeams, useToast, useTradeBlockMarket } from "@gshl-hooks";
+import type { NHLTeam } from "@gshl-types";
+import { Button, Input, Select, Skeleton } from "@gshl-ui";
+import {
+  findNhlTeamByAbbreviation,
+  formatMoney,
+  TRADE_BLOCK_NOTE_LIMIT,
+} from "@gshl-utils";
 import { buildWhatsAppShareMessage } from "@gshl-utils/features/whatsapp-share";
 
 const POSITION_FILTERS = [
@@ -25,12 +25,17 @@ const POSITION_FILTERS = [
 
 export function TradeBlock() {
   const market = useTradeBlockMarket();
+  const nhlTeamsQuery = useNHLTeams();
   const { toast } = useToast();
   const [search, setSearch] = useState("");
   const [position, setPosition] = useState("all");
   const [selectedPlayerId, setSelectedPlayerId] = useState("");
   const [note, setNote] = useState("");
 
+  const nhlTeams = useMemo(
+    () => nhlTeamsQuery.data.filter((team): team is NHLTeam => "abbr" in team),
+    [nhlTeamsQuery.data],
+  );
   const candidates = useMemo(
     () => market.data?.candidates ?? [],
     [market.data?.candidates],
@@ -130,58 +135,53 @@ export function TradeBlock() {
   if (market.isLoading) return <TradeBlockLoading />;
 
   return (
-    <div className="mx-auto max-w-7xl pb-12">
-      <header className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-950 text-white shadow-sm">
-        <div className="grid gap-6 px-5 py-6 sm:px-7 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
+    <div className="mx-auto max-w-7xl pb-6">
+      <header className="flex flex-col gap-2 border-b border-slate-200 pb-3 sm:flex-row sm:items-end sm:justify-between">
+        <div className="flex items-center gap-3">
+          <Image
+            src="/favicon.ico"
+            alt=""
+            width={40}
+            height={40}
+            className="h-10 w-10 rounded-md object-contain"
+          />
           <div>
-            <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-white/10 text-emerald-300">
-              <ArrowRightLeft className="h-5 w-5" aria-hidden="true" />
-            </div>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-300">
-              League market
-            </p>
-            <h2 className="mt-1 text-3xl font-bold tracking-tight sm:text-4xl">
+            <h2 className="text-2xl font-bold tracking-tight text-slate-950">
               Trade Block
             </h2>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300 sm:text-base">
-              See who is genuinely available, the contract you would inherit,
-              and what the other GM wants before starting a conversation.
-            </p>
+            <p className="text-sm text-slate-500">League market</p>
           </div>
-          <dl className="grid grid-cols-2 gap-2 text-center">
-            <div className="min-w-28 rounded-xl border border-white/10 bg-white/5 px-4 py-3">
-              <dt className="text-xs text-slate-400">Available</dt>
-              <dd className="mt-1 text-2xl font-semibold">
-                {market.data?.listings.length ?? 0}
-              </dd>
-            </div>
-            <div className="min-w-28 rounded-xl border border-white/10 bg-white/5 px-4 py-3">
-              <dt className="text-xs text-slate-400">Teams</dt>
-              <dd className="mt-1 text-2xl font-semibold">{listedTeams}</dd>
-            </div>
-          </dl>
         </div>
+        <dl className="flex gap-4 text-sm">
+          <div className="flex items-baseline gap-1.5">
+            <dt className="text-slate-500">Players</dt>
+            <dd className="font-mono font-semibold text-slate-950">
+              {market.data?.listings.length ?? 0}
+            </dd>
+          </div>
+          <div className="flex items-baseline gap-1.5">
+            <dt className="text-slate-500">Teams</dt>
+            <dd className="font-mono font-semibold text-slate-950">
+              {listedTeams}
+            </dd>
+          </div>
+        </dl>
       </header>
 
       {market.data?.canManage && candidates.length > 0 ? (
         <section
           aria-labelledby="manage-trade-block-heading"
-          className="relative z-10 mx-3 -mt-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-md sm:mx-6 sm:p-5"
+          className="border-b border-slate-200 py-3"
         >
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-end">
-            <div className="lg:w-64">
-              <h3
-                id="manage-trade-block-heading"
-                className="text-sm font-semibold text-slate-950"
-              >
-                Manage my trade block
-              </h3>
-              <label
-                htmlFor="trade-block-player"
-                className="mt-2 block text-xs font-medium text-slate-600"
-              >
-                Contracted player
-              </label>
+          <h3
+            id="manage-trade-block-heading"
+            className="mb-2 text-sm font-semibold text-slate-950"
+          >
+            Your listings
+          </h3>
+          <div className="grid gap-2 lg:grid-cols-[16rem_minmax(0,1fr)_auto] lg:items-end">
+            <label className="text-xs font-medium text-slate-600">
+              Player
               <Select
                 id="trade-block-player"
                 value={selectedPlayerId}
@@ -195,10 +195,10 @@ export function TradeBlock() {
                   </option>
                 ))}
               </Select>
-            </div>
-            <label className="min-w-0 flex-1 text-xs font-medium text-slate-600">
+            </label>
+            <label className="min-w-0 text-xs font-medium text-slate-600">
               <span className="flex items-center justify-between gap-3">
-                What are you looking for?
+                Looking for
                 <span className="font-normal text-slate-400">
                   {note.length}/{TRADE_BLOCK_NOTE_LIMIT}
                 </span>
@@ -207,12 +207,12 @@ export function TradeBlock() {
                 value={note}
                 maxLength={TRADE_BLOCK_NOTE_LIMIT}
                 onChange={(event) => setNote(event.target.value)}
-                rows={2}
-                placeholder="Example: Looking for picks or a lower-cap forward."
-                className="mt-1 min-h-20 w-full resize-y rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                rows={1}
+                placeholder="Picks, cap relief, position…"
+                className="mt-1 min-h-11 w-full resize-y rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 lg:min-h-10"
               />
             </label>
-            <div className="flex gap-2 lg:pb-0.5">
+            <div className="flex gap-2">
               {selectedCandidate?.listingId ? (
                 <Button
                   type="button"
@@ -235,27 +235,22 @@ export function TradeBlock() {
                 {market.save.isPending
                   ? "Saving…"
                   : selectedCandidate?.listingId
-                    ? "Update listing"
-                    : "Add to block"}
+                    ? "Update"
+                    : "Add player"}
               </Button>
             </div>
           </div>
         </section>
       ) : null}
 
-      <section aria-labelledby="trade-market-heading" className="mt-8">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <h3
-              id="trade-market-heading"
-              className="text-xl font-bold text-slate-950"
-            >
-              Available players
-            </h3>
-            <p className="mt-1 text-sm text-slate-500">
-              Contract figures are the current inherited cap commitment.
-            </p>
-          </div>
+      <section aria-labelledby="trade-market-heading" className="mt-4">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+          <h3
+            id="trade-market-heading"
+            className="text-lg font-semibold text-slate-950"
+          >
+            Available players
+          </h3>
           <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
             <label className="relative block min-w-0 sm:w-64">
               <span className="sr-only">Search the trade block</span>
@@ -292,124 +287,117 @@ export function TradeBlock() {
         </div>
 
         {listings.length > 0 ? (
-          <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-            {listings.map((listing) => (
-              <article
-                key={listing.listingId}
-                className="group overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition-shadow hover:shadow-md motion-reduce:transition-none"
-              >
-                <div className="flex items-start gap-3 border-b border-slate-100 p-4">
-                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-slate-50">
-                    {listing.team.logoUrl ? (
-                      <Image
-                        src={listing.team.logoUrl}
-                        alt=""
-                        width={40}
-                        height={40}
-                        className="h-10 w-10 object-contain"
-                      />
-                    ) : (
-                      <ArrowRightLeft
-                        className="h-5 w-5 text-slate-400"
-                        aria-hidden="true"
-                      />
-                    )}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <h4 className="truncate font-semibold text-slate-950">
-                          {listing.fullName}
-                        </h4>
-                        <p className="mt-0.5 truncate text-xs text-slate-500">
-                          {listing.nhlPos.join("/") || listing.posGroup} ·{" "}
-                          {listing.nhlTeam.join("/") || "FA"}
-                        </p>
+          <div className="mt-3 divide-y divide-slate-100 rounded-lg border border-slate-200">
+            {listings.map((listing) => {
+              const nhlTeam = findNhlTeamByAbbreviation(
+                nhlTeams,
+                listing.nhlTeam,
+              );
+              return (
+                <article
+                  key={listing.listingId}
+                  className="grid gap-3 px-3 py-3 sm:grid-cols-[minmax(12rem,1fr)_minmax(15rem,1.2fr)_auto] sm:items-center"
+                >
+                  <div className="flex min-w-0 items-center gap-2.5">
+                    <span
+                      className="flex h-10 w-10 shrink-0 items-center justify-center"
+                      title={listing.team.name}
+                    >
+                      {listing.team.logoUrl ? (
+                        <Image
+                          src={listing.team.logoUrl}
+                          alt=""
+                          width={40}
+                          height={40}
+                          className="h-10 w-10 object-contain"
+                        />
+                      ) : (
+                        <span className="text-xs font-semibold text-slate-400">
+                          {listing.team.abbr || "GSHL"}
+                        </span>
+                      )}
+                      <span className="sr-only">{listing.team.name}</span>
+                    </span>
+                    <div className="min-w-0">
+                      <h4 className="truncate text-sm font-semibold text-slate-950">
+                        {listing.fullName}
+                      </h4>
+                      <div className="mt-0.5 flex items-center gap-1.5 text-xs text-slate-500">
+                        {nhlTeam ? (
+                          <NHLLogo
+                            team={nhlTeam}
+                            size={18}
+                            className="mx-0 shrink-0"
+                          />
+                        ) : null}
+                        <span>
+                          {listing.nhlPos.join("/") || listing.posGroup}
+                          {!nhlTeam && listing.nhlTeam.length
+                            ? ` · ${listing.nhlTeam.join("/")}`
+                            : ""}
+                        </span>
                       </div>
-                      <span className="shrink-0 rounded-full bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-700">
-                        Available
-                      </span>
                     </div>
-                    <p className="mt-2 truncate text-xs font-medium text-slate-600">
-                      {listing.team.name}
+                  </div>
+
+                  <div className="min-w-0">
+                    <dl className="grid grid-cols-3 gap-3 text-xs">
+                      <ListingStat
+                        label="Cap hit"
+                        value={formatMoney(listing.capHit)}
+                      />
+                      <ListingStat
+                        label="Through"
+                        value={listing.expiryDate?.slice(0, 4) ?? "—"}
+                      />
+                      <ListingStat
+                        label="Overall"
+                        value={listing.overallRating?.toFixed(1) ?? "—"}
+                      />
+                    </dl>
+                    <p className="mt-1.5 truncate text-xs text-slate-600">
+                      <span className="sr-only">GM note: </span>
+                      {listing.note ?? "Open to offers."}
                     </p>
                   </div>
-                </div>
-                <dl className="grid grid-cols-3 divide-x divide-slate-100 bg-slate-50/70 text-center">
-                  <div className="px-2 py-3">
-                    <dt className="text-[11px] text-slate-500">Cap hit</dt>
-                    <dd className="mt-0.5 text-sm font-semibold text-slate-900">
-                      {formatMoney(listing.capHit)}
-                    </dd>
-                  </div>
-                  <div className="px-2 py-3">
-                    <dt className="text-[11px] text-slate-500">Through</dt>
-                    <dd className="mt-0.5 text-sm font-semibold text-slate-900">
-                      {listing.expiryDate?.slice(0, 4) ?? "—"}
-                    </dd>
-                  </div>
-                  <div className="px-2 py-3">
-                    <dt className="text-[11px] text-slate-500">Overall</dt>
-                    <dd className="mt-0.5 text-sm font-semibold text-slate-900">
-                      {listing.overallRating?.toFixed(1) ?? "—"}
-                    </dd>
-                  </div>
-                </dl>
-                <div className="min-h-20 p-4">
-                  <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                    <BadgeDollarSign
-                      className="h-3.5 w-3.5"
-                      aria-hidden="true"
-                    />
-                    GM note
-                  </div>
-                  <p
-                    className={cn(
-                      "mt-1.5 text-sm leading-5",
-                      listing.note ? "text-slate-700" : "italic text-slate-400",
-                    )}
-                  >
-                    {listing.note ?? "Open to ideas — make an offer."}
-                  </p>
-                </div>
-                {market.data?.canManage ? (
-                  <div className="flex justify-end border-t border-slate-100 px-4 py-3">
-                    <WhatsAppShareButton
-                      message={buildWhatsAppShareMessage({
-                        title: "GSHL Trade Block Update",
-                        summary: `${listing.fullName} is available from ${listing.team.name}`,
-                        lines: [
-                          `${listing.nhlPos.join("/") || listing.posGroup} · ${listing.nhlTeam.join("/") || "FA"}`,
-                          `Cap hit: ${formatMoney(listing.capHit)} · Through ${listing.expiryDate?.slice(0, 4) ?? "TBD"}`,
-                          listing.note
-                            ? `GM note: ${listing.note}`
-                            : "GM note: Open to ideas — make an offer.",
-                        ],
-                      })}
-                      path="/leagueoffice?view=tradeBlock"
-                      label="Share listing"
-                      ariaLabel={`Share ${listing.fullName} trade-block listing to WhatsApp`}
-                    />
-                  </div>
-                ) : null}
-              </article>
-            ))}
+
+                  {market.data?.canManage ? (
+                    <div className="justify-self-start sm:justify-self-end">
+                      <WhatsAppShareButton
+                        message={buildWhatsAppShareMessage({
+                          title: "GSHL Trade Block Update",
+                          summary: `${listing.fullName} is available from ${listing.team.name}`,
+                          lines: [
+                            `${listing.nhlPos.join("/") || listing.posGroup} · ${listing.nhlTeam.join("/") || "FA"}`,
+                            `Cap hit: ${formatMoney(listing.capHit)} · Through ${listing.expiryDate?.slice(0, 4) ?? "TBD"}`,
+                            listing.note
+                              ? `GM note: ${listing.note}`
+                              : "GM note: Open to offers.",
+                          ],
+                        })}
+                        path="/leagueoffice?view=tradeBlock"
+                        label="Share"
+                        ariaLabel={`Share ${listing.fullName} trade-block listing to WhatsApp`}
+                      />
+                    </div>
+                  ) : null}
+                </article>
+              );
+            })}
           </div>
         ) : (
-          <div className="mt-4 rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-5 py-12 text-center">
+          <div className="mt-3 border-y border-dashed border-slate-300 py-6 text-center">
             <ShieldCheck
-              className="mx-auto h-8 w-8 text-slate-400"
+              className="mx-auto h-6 w-6 text-slate-400"
               aria-hidden="true"
             />
-            <h4 className="mt-3 font-semibold text-slate-900">
-              {market.data?.listings.length
-                ? "No players match these filters"
-                : "The trade block is clear"}
+            <h4 className="mt-2 font-medium text-slate-900">
+              {market.data?.listings.length ? "No matches" : "No listings"}
             </h4>
-            <p className="mx-auto mt-1 max-w-md text-sm text-slate-500">
+            <p className="text-sm text-slate-500">
               {market.data?.listings.length
-                ? "Try a broader search or another position."
-                : "Owners can add a contracted player above. Listings update for the whole league in real time."}
+                ? "Change a filter or search."
+                : "Owners can list contracted players above."}
             </p>
           </div>
         )}
@@ -418,16 +406,32 @@ export function TradeBlock() {
   );
 }
 
+function ListingStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <dt className="text-[10px] text-slate-400">{label}</dt>
+      <dd className="font-mono font-medium text-slate-800">{value}</dd>
+    </div>
+  );
+}
+
 function TradeBlockLoading() {
   return (
-    <div
-      className="mx-auto max-w-7xl space-y-5 pb-12"
-      aria-label="Loading trade block"
-    >
-      <Skeleton className="h-60 rounded-2xl" />
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+    <div className="mx-auto max-w-7xl pb-6" aria-label="Loading trade block">
+      <div className="flex items-center gap-3 border-b border-slate-200 pb-3">
+        <Skeleton className="h-10 w-10 rounded-md" />
+        <div className="space-y-1.5">
+          <Skeleton className="h-6 w-36" />
+          <Skeleton className="h-4 w-24" />
+        </div>
+      </div>
+      <div className="mt-4 divide-y divide-slate-100 rounded-lg border border-slate-200">
         {Array.from({ length: 6 }).map((_, index) => (
-          <Skeleton key={index} className="h-64 rounded-2xl" />
+          <div key={index} className="flex items-center gap-3 px-3 py-3">
+            <Skeleton className="h-10 w-10 shrink-0 rounded-md" />
+            <Skeleton className="h-5 flex-1" />
+            <Skeleton className="hidden h-8 w-20 sm:block" />
+          </div>
         ))}
       </div>
     </div>
