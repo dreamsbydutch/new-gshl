@@ -541,7 +541,7 @@ export function MatchupDetailsContent({
         aria-labelledby="matchup-not-found-heading"
         className="mx-auto max-w-3xl px-4 py-10"
       >
-        <div className="rounded-2xl border border-slate-200 bg-white p-6 text-slate-600 shadow-sm">
+        <div className="border-y border-slate-200 py-6 text-slate-600">
           <h1
             id="matchup-not-found-heading"
             className="text-xl font-bold text-slate-900"
@@ -557,7 +557,7 @@ export function MatchupDetailsContent({
   return (
     <main
       aria-labelledby="matchup-page-heading"
-      className="mx-auto max-w-6xl px-2 py-3 sm:px-4 sm:py-8"
+      className="mx-auto max-w-6xl px-2 py-3 sm:px-4 sm:py-5"
     >
       <h1 id="matchup-page-heading" className="sr-only">
         {awayTeam?.name ?? "Away team"} at {homeTeam?.name ?? "Home team"}
@@ -587,7 +587,7 @@ export function MatchupDetailsContent({
         </div>
       </div>
 
-      <section className="rounded-xl border border-slate-200 bg-gradient-to-br from-white via-slate-50 to-slate-100 p-2 shadow-sm sm:rounded-3xl sm:p-5">
+      <section className="rounded-lg border border-slate-200 p-2 sm:p-4">
         <div className="mb-2 border-b border-slate-200 pb-2 sm:mb-5 sm:pb-5">
           <div className="grid grid-cols-[minmax(0,1fr)_2.5rem_minmax(0,1fr)] items-center gap-1.5 sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] sm:gap-4">
             <MatchupSummaryTeam
@@ -626,7 +626,7 @@ export function MatchupDetailsContent({
       </section>
 
       <section className="mt-3 space-y-2 sm:mt-6 sm:space-y-4">
-        <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm sm:rounded-2xl">
+        <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
           <div
             role="tablist"
             aria-label="Select a team for player statistics"

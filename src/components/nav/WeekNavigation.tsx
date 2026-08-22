@@ -68,7 +68,7 @@ export function WeeksToggle({
           "py-0.5",
           week.weekNum < 10 ? "px-1.5" : "px-0.5",
           isSelected
-            ? "rounded-sm bg-slate-200 font-bold text-gray-900 shadow-md"
+            ? "rounded-sm bg-slate-200 font-bold text-gray-900 ring-1 ring-slate-300"
             : "text-gray-700",
           week.weekType === SeasonType.PLAYOFFS && isSelected && "bg-amber-100",
           week.weekType === SeasonType.PLAYOFFS && "font-bold text-amber-900",

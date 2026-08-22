@@ -487,6 +487,92 @@ function ActiveOffers({ groups }: { groups: UfaOfferGroupView[] }) {
   );
 }
 
+function HomeActiveOffers({ groups }: { groups: UfaOfferGroupView[] }) {
+  if (groups.length === 0) return null;
+
+  return (
+    <section aria-labelledby="home-ufa-offers">
+      <h3 id="home-ufa-offers" className="mb-1.5 text-sm font-bold">
+        Pending offers
+      </h3>
+      <ul className="divide-y divide-slate-200 border-y border-slate-200">
+        {groups.flatMap((group) =>
+          group.offers.map((offer) => (
+            <li
+              key={offer.id}
+              className="grid grid-cols-[2rem_minmax(0,1fr)_auto] items-center gap-2 py-2"
+            >
+              <NHLLogo
+                team={
+                  group.player?.nhlTeamLogoUrl
+                    ? {
+                        name: group.player.nhlTeam || "NHL team",
+                        logoUrl: group.player.nhlTeamLogoUrl,
+                      }
+                    : undefined
+                }
+                size={28}
+              />
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold">
+                  {group.player?.fullName ?? "Unavailable player"}
+                </p>
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <Logo
+                    src={offer.franchiseLogoUrl}
+                    alt={offer.franchiseName}
+                  />
+                  <span>{offer.years}y</span>
+                  <span>{formatMoney(offer.salary)}</span>
+                  <span>{Math.round(offer.probability * 1000) / 10}%</span>
+                </div>
+              </div>
+              <Countdown deadlineAt={group.deadlineAt} />
+            </li>
+          )),
+        )}
+      </ul>
+    </section>
+  );
+}
+
+function HomeFreeAgents({ players }: { players: UfaFreeAgentView[] }) {
+  return (
+    <ul
+      aria-label="Top unrestricted free agents"
+      className="divide-y divide-slate-200 border-y border-slate-200"
+    >
+      {players.map((player) => (
+        <li
+          key={player.id}
+          className="grid grid-cols-[2rem_minmax(0,1fr)_auto] items-center gap-2 py-2"
+        >
+          <NHLLogo
+            team={
+              player.nhlTeamLogoUrl
+                ? {
+                    name: player.nhlTeam || "NHL team",
+                    logoUrl: player.nhlTeamLogoUrl,
+                  }
+                : undefined
+            }
+            size={28}
+          />
+          <div className="min-w-0">
+            <p className="truncate text-sm font-semibold">{player.fullName}</p>
+            <p className="text-xs text-muted-foreground">
+              {player.positions.join("/") || "—"}
+            </p>
+          </div>
+          <p className="font-mono text-sm font-semibold tabular-nums">
+            {formatMoney(player.salary)}
+          </p>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 export function UfaHomeCard() {
   const query = useUfaOverview("home");
   if (query.isLoading) return <UfaHomeCardSkeleton />;
@@ -502,34 +588,34 @@ export function UfaHomeCard() {
   return (
     <section
       aria-labelledby="home-ufa-heading"
-      className="w-full min-w-0 max-w-full space-y-3 overflow-hidden rounded-xl border bg-card p-2 shadow-sm sm:space-y-6 sm:p-6"
+      className="w-full min-w-0 max-w-full space-y-3 overflow-hidden border-y border-slate-300 py-3 sm:py-4"
     >
       <div className="flex flex-wrap items-start justify-between gap-2 sm:gap-3">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary sm:tracking-[0.2em]">
-            Summer Free Agency
+            Free agency
           </p>
           <h2
             id="home-ufa-heading"
             className="text-lg font-black leading-tight sm:text-2xl"
           >
-            Top {HOME_UFA_PREVIEW_LIMIT} Unrestricted Free Agents
+            Top {HOME_UFA_PREVIEW_LIMIT} UFAs
           </h2>
           <p className="mt-0.5 text-xs leading-4 text-muted-foreground sm:mt-1 sm:text-sm">
-            UFA salaries include the required 125% premium. Offers are binding.
+            Salaries include the 125% premium.
           </p>
         </div>
         <Link
           href="/leagueoffice?view=freeAgents"
           className="inline-flex min-h-11 items-center rounded-md border px-3 py-2 text-xs font-semibold hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:px-4 sm:text-sm"
         >
-          View all free agents
+          View all
         </Link>
       </div>
-      <ActiveOffers groups={query.data.offerGroups} />
+      <HomeActiveOffers groups={query.data.offerGroups} />
       {query.data.window.isOpen ? (
         previewFreeAgents.length > 0 ? (
-          <PlayerTable players={previewFreeAgents} showStats />
+          <HomeFreeAgents players={previewFreeAgents} />
         ) : (
           <p className="rounded-md border border-dashed p-2 text-xs text-muted-foreground sm:p-4 sm:text-sm">
             {query.data.viewer.isSignedInOwner

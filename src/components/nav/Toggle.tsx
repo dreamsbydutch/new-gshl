@@ -92,7 +92,7 @@ export function HorizontalToggle<T>({
               aria-label={label}
               title={description}
               className={cn(
-                "flex min-h-11 min-w-11 flex-shrink-0 cursor-pointer items-center justify-center rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-1 motion-reduce:transition-none",
+                "flex min-h-9 min-w-9 flex-shrink-0 cursor-pointer items-center justify-center rounded transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-1 motion-reduce:transition-none",
                 isSelected
                   ? "bg-slate-200 ring-1 ring-slate-400"
                   : "bg-transparent hover:bg-slate-100",
@@ -111,7 +111,7 @@ export function HorizontalToggle<T>({
             onClick={() => onSelect(item)}
             aria-pressed={isSelected}
             className={cn(
-              "min-h-11 rounded px-3 py-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-1 motion-reduce:transition-none",
+              "min-h-9 rounded px-2.5 py-1 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-1 motion-reduce:transition-none",
               isSelected
                 ? "bg-primary text-primary-foreground"
                 : "bg-muted hover:bg-muted/80",
@@ -176,7 +176,7 @@ export function DropdownToggle<T>({
         }}
         disabled={!items?.length}
         className={cn(
-          "min-h-11 w-full rounded border bg-slate-100 px-3 py-2 pr-8 text-sm transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 motion-reduce:transition-none",
+          "min-h-9 w-full rounded border bg-slate-100 px-2.5 py-1 pr-8 text-xs font-medium transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 motion-reduce:transition-none",
           !items?.length && "cursor-not-allowed opacity-50",
           buttonClassName,
         )}

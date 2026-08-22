@@ -1,3 +1,5 @@
+import Image from "next/image";
+
 export function SignInContent({
   error,
   isOAuthConfigured,
@@ -8,20 +10,23 @@ export function SignInContent({
   signInAction: () => Promise<void>;
 }) {
   return (
-    <main className="flex min-h-[calc(100vh-5rem)] items-center justify-center bg-gradient-to-b from-slate-100 to-white px-4">
-      <section className="w-full max-w-md rounded-2xl border bg-white p-8 text-center shadow-xl">
-        <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-slate-900 text-xl font-bold text-white">
-          GSHL
-        </div>
-        <h1 className="text-3xl font-bold">Welcome to the league</h1>
+    <main className="flex min-h-[calc(100vh-5rem)] items-center justify-center px-4">
+      <section className="w-full max-w-sm border-y border-slate-200 py-6 text-center">
+        <Image
+          src="/favicon.ico"
+          alt="GSHL"
+          width={64}
+          height={64}
+          className="mx-auto mb-3 h-14 w-14 object-contain"
+        />
+        <h1 className="text-2xl font-bold">Sign in to GSHL</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Sign in with your verified Google account to open the locker room,
-          draft board, and league office.
+          Open My Team, Draft, and League Office.
         </p>
         {error ? (
-          <p className="mt-4 rounded-md bg-red-50 p-3 text-sm text-red-700">
-            Sign-in could not be completed. Confirm that your account is active
-            or ask a commissioner for help.
+          <p className="mt-4 border-y border-red-200 py-2 text-sm text-red-700">
+            Sign-in failed. Confirm your account is active or ask a
+            commissioner.
           </p>
         ) : null}
         {isOAuthConfigured ? (
@@ -34,10 +39,8 @@ export function SignInContent({
             </button>
           </form>
         ) : (
-          <p className="mt-6 rounded-md bg-amber-50 p-3 text-sm text-amber-800">
-            Google sign-in is not configured for this deployment. Add the
-            Auth.js, Google OAuth, and Convex server secrets to the hosting
-            environment, then redeploy.
+          <p className="mt-6 border-y border-amber-200 py-2 text-sm text-amber-800">
+            Google sign-in is not configured for this deployment.
           </p>
         )}
         <p className="mt-5 text-xs text-muted-foreground">

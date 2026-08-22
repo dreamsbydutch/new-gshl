@@ -92,23 +92,6 @@ function getGroupDescription(standingsType: string, groupTitle: string) {
   return "League standings";
 }
 
-function getGroupCardClass(standingsType: string, groupTitle: string) {
-  if (standingsType === "conference" || standingsType === "wildcard") {
-    if (groupTitle === "Sunview") {
-      return "border-sunview-200 bg-sunview-50/70";
-    }
-    if (groupTitle === "Hickory Hotel") {
-      return "border-hotel-200 bg-hotel-50/70";
-    }
-  }
-
-  if (groupTitle === "Wildcard") return "border-violet-200 bg-violet-50/70";
-  if (groupTitle === "Out of the Playoffs") {
-    return "border-slate-200 bg-slate-50";
-  }
-  return "border-slate-200 bg-white";
-}
-
 function StandingsGroupTable({
   group,
   season,
@@ -124,33 +107,26 @@ function StandingsGroupTable({
   const showTies = season.usesLegacyTies;
 
   return (
-    <section
-      className={cn(
-        "overflow-hidden rounded-2xl border shadow-sm",
-        getGroupCardClass(standingsType, group.title),
-      )}
-    >
-      <div className="flex items-center gap-2.5 border-b border-black/10 px-3 py-3 sm:gap-4 sm:px-5 sm:py-4">
+    <section className="overflow-hidden rounded-lg border border-slate-200">
+      <div className="flex items-center gap-2.5 border-b border-slate-200 px-3 py-2 sm:px-4">
         {logoUrl ? (
           <Image
             src={logoUrl}
             alt={isConferenceGroup ? `${group.title} logo` : "GSHL league logo"}
             width={72}
             height={72}
-            className="h-11 w-11 shrink-0 object-contain sm:h-16 sm:w-16"
+            className="h-9 w-9 shrink-0 object-contain"
           />
         ) : null}
         <div className="min-w-0">
           <h2 className="text-sm font-semibold text-slate-950 sm:text-lg">
             {group.title}
           </h2>
-          <p className="mt-0.5 text-[11px] text-slate-600 sm:text-sm">
-            {purpose}
-          </p>
+          <p className="text-[11px] text-slate-500 sm:text-xs">{purpose}</p>
         </div>
       </div>
 
-      <div className="overflow-x-auto bg-white/85">
+      <div className="overflow-x-auto bg-white">
         <table className="w-full table-fixed border-collapse text-xs sm:min-w-[520px] sm:table-auto sm:text-sm">
           <thead>
             <tr className="border-b border-slate-200 text-[10px] uppercase tracking-[0.16em] text-slate-500">
@@ -287,7 +263,7 @@ export function StandingsTable({
 
   if (!selectedSeason) {
     return (
-      <div className="rounded-xl border border-dashed p-10 text-center text-sm text-slate-500">
+      <div className="border-y border-dashed py-6 text-center text-sm text-slate-500">
         Select a season to view its standings.
       </div>
     );
@@ -320,9 +296,9 @@ export function StandingsTable({
   });
 
   return (
-    <div className="mx-auto w-full max-w-6xl space-y-4 px-2.5 py-3 sm:px-6 sm:py-4 lg:py-6">
-      <div className="rounded-2xl border border-slate-200 bg-white px-3.5 py-3.5 shadow-sm sm:px-5 sm:py-4">
-        <div className="mt-1 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+    <div className="mx-auto w-full max-w-6xl space-y-3 px-2.5 py-3 sm:px-6 sm:py-4">
+      <div className="border-b border-slate-300 pb-2">
+        <div className="flex items-center justify-between gap-3">
           <p className="text-[13px] font-semibold uppercase text-slate-500">
             {selectedSeason.name} {purpose.label}
           </p>
@@ -340,7 +316,7 @@ export function StandingsTable({
         </div>
       </div>
 
-      <div className="space-y-4">
+      <div className="space-y-3">
         {groups.map((group) => (
           <StandingsGroupTable
             key={group.title}

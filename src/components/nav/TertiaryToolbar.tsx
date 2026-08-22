@@ -16,7 +16,7 @@ export function TertiaryPageToolbar({ children, className }: ToolbarProps) {
   return (
     <div
       className={cn(
-        "flex min-h-11 items-center border-t border-slate-100",
+        "flex min-h-9 items-center border-t border-slate-100",
         className,
       )}
     >

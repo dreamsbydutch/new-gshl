@@ -16,7 +16,7 @@ export function SecondaryPageToolbar({ children, className }: ToolbarProps) {
   return (
     <div
       className={cn(
-        "no-scrollbar mx-auto flex min-h-11 w-full items-center gap-2 overflow-x-auto overflow-y-hidden px-2",
+        "no-scrollbar mx-auto flex min-h-9 w-full items-center gap-1 overflow-x-auto overflow-y-hidden px-2",
         className,
       )}
     >

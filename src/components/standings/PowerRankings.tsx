@@ -14,7 +14,6 @@ import {
 } from "recharts";
 
 import type {
-  PowerRankingColorMap,
   PowerRankingEntry,
   PowerRankingsProps,
   PowerRankingsViewModel,
@@ -73,16 +72,14 @@ function CurrentRanking({
   entries,
   seasonName,
   snapshotLabel,
-  teamColors,
 }: {
   entries: PowerRankingEntry[];
   seasonName: string;
   snapshotLabel: string;
-  teamColors: PowerRankingColorMap;
 }) {
   return (
-    <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-      <div className="border-b border-slate-200 px-3 py-3 sm:px-5 sm:py-4">
+    <section className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+      <div className="border-b border-slate-200 px-3 py-2">
         <h2 className="font-oswald text-xl text-slate-950 sm:text-2xl">
           {snapshotLabel} ranking
         </h2>
@@ -96,26 +93,19 @@ function CurrentRanking({
         aria-label={`${snapshotLabel} team power rankings for ${seasonName}`}
       >
         {entries.map((entry) => (
-          <li key={entry.team.id} className="p-3">
+          <li key={entry.team.id} className="p-2.5">
             <article className="grid grid-cols-[2.5rem_minmax(0,1fr)] gap-x-3 gap-y-2">
               <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-950 font-oswald text-lg font-semibold tabular-nums text-white">
                 <span className="sr-only">Rank </span>
                 {entry.rank}
               </div>
               <div className="flex min-w-0 items-center gap-2.5">
-                <span
-                  className="h-7 w-1 shrink-0 rounded-full"
-                  style={{
-                    backgroundColor: teamColors[entry.team.id] ?? entry.color,
-                  }}
-                  aria-hidden="true"
-                />
                 <TeamLogo entry={entry} />
                 <h3 className="min-w-0 break-words text-sm font-semibold leading-5 text-slate-950">
                   {entry.team.name ?? entry.team.abbr ?? "Team"}
                 </h3>
               </div>
-              <dl className="col-span-2 grid grid-cols-2 rounded-lg bg-slate-50">
+              <dl className="col-span-2 grid grid-cols-2 border-t border-slate-100">
                 <div className="px-3 py-2">
                   <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
                     Movement
@@ -174,14 +164,6 @@ function CurrentRanking({
                 </td>
                 <th scope="row" className="px-3 py-2.5 text-left font-normal">
                   <div className="flex min-w-0 items-center gap-2.5">
-                    <span
-                      className="h-5 w-1 shrink-0 rounded-full"
-                      style={{
-                        backgroundColor:
-                          teamColors[entry.team.id] ?? entry.color,
-                      }}
-                      aria-hidden="true"
-                    />
                     <TeamLogo entry={entry} />
                     <span className="min-w-0 font-semibold text-slate-900">
                       {entry.team.name ?? entry.team.abbr ?? "Team"}
@@ -318,7 +300,7 @@ export function PowerRankings({ season, rankings }: PowerRankingsProps) {
 
   if (!season) {
     return (
-      <div className="rounded-xl border border-dashed p-10 text-center text-sm text-slate-500">
+      <div className="border-y border-dashed py-6 text-center text-sm text-slate-500">
         Select a season to view its power rankings.
       </div>
     );
@@ -364,16 +346,15 @@ export function PowerRankings({ season, rankings }: PowerRankingsProps) {
     : rankings.series;
 
   return (
-    <div className="mx-auto w-full max-w-6xl space-y-4 px-2.5 py-3 sm:px-6 sm:py-4 lg:py-6">
-      <header className="rounded-2xl border border-slate-200 bg-white px-3.5 py-3.5 shadow-sm sm:px-5 sm:py-4">
+    <div className="mx-auto w-full max-w-6xl space-y-3 px-2.5 py-3 sm:px-6 sm:py-4">
+      <header className="border-b border-slate-300 pb-2">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="font-oswald text-2xl text-slate-950 sm:text-3xl">
               {season.name} power rankings
             </h2>
             <p className="mt-1 text-xs text-slate-500">
-              {snapshotLabel} order {latestWeekLabel}, plus every available
-              weekly snapshot.
+              {snapshotLabel} order {latestWeekLabel}.
             </p>
           </div>
           {canShareCommissionerContent(session?.user.role) ? (
@@ -388,12 +369,12 @@ export function PowerRankings({ season, rankings }: PowerRankingsProps) {
       </header>
 
       {!rankings.entries.length ? (
-        <section className="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center">
+        <section className="border-y border-dashed border-slate-300 py-6 text-center">
           <h2 className="font-oswald text-xl text-slate-900">
             No power rankings available
           </h2>
           <p className="mt-1 text-sm text-slate-500">
-            This season does not have a weekly or season power-ranking snapshot.
+            No ranking snapshot exists for this season.
           </p>
         </section>
       ) : (
@@ -402,17 +383,15 @@ export function PowerRankings({ season, rankings }: PowerRankingsProps) {
             entries={rankings.entries}
             seasonName={season.name}
             snapshotLabel={snapshotLabel}
-            teamColors={teamColors}
           />
 
-          <section className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:p-5">
+          <section className="rounded-lg border border-slate-200 bg-white p-3 sm:p-4">
             <div>
               <h2 className="font-oswald text-xl text-slate-950 sm:text-2xl">
                 Ranking history
               </h2>
               <p className="mt-0.5 text-xs text-slate-500">
-                Rank 1 is shown at the top. Open the weekly data below for an
-                exact keyboard-accessible table.
+                Rank 1 is at the top. Weekly data is available below.
                 {signedInTeamId
                   ? " Your team is shown with a thicker line."
                   : ""}
@@ -484,7 +463,7 @@ export function PowerRankings({ season, rankings }: PowerRankingsProps) {
                 </ResponsiveContainer>
               </div>
             ) : (
-              <p className="mt-4 rounded-xl bg-slate-50 p-6 text-center text-sm text-slate-500">
+              <p className="mt-4 border-y border-slate-200 py-4 text-center text-sm text-slate-500">
                 Weekly ranking history is not available for this season.
               </p>
             )}

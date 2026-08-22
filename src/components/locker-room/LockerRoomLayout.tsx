@@ -23,12 +23,12 @@ export function LockerRoomLayout({ children }: { children: React.ReactNode }) {
     toolbarKeys: [
       {
         key: "roster",
-        value: "Current Roster",
+        value: "Roster",
         setter: () => navigation.selectView("roster"),
       },
       {
         key: "salary",
-        value: "Salary Cap",
+        value: "Cap",
         setter: () => navigation.selectView("salary"),
       },
       {
@@ -38,12 +38,12 @@ export function LockerRoomLayout({ children }: { children: React.ReactNode }) {
       },
       {
         key: "trophy",
-        value: "Trophy Case",
+        value: "Trophies",
         setter: () => navigation.selectView("trophy"),
       },
       {
         key: "recordbook",
-        value: "Record Book",
+        value: "Records",
         setter: () => navigation.selectView("recordbook"),
       },
       {
