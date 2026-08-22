@@ -27,10 +27,10 @@ const scanDueWeeklyEditionMilestones = makeFunctionReference<"mutation">(
   Record<string, never>,
   unknown
 >;
-crons.interval("dispatch due job schedules", { minutes: 1 }, tickSchedules, {});
+crons.interval("dispatch due job schedules", { minutes: 5 }, tickSchedules, {});
 crons.interval(
   "resolve due UFA offer groups",
-  { minutes: 1 },
+  { minutes: 15 },
   reconcileUfaOffers,
   {},
 );

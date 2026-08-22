@@ -101,11 +101,11 @@ Functions declared with `internalQuery`, `internalMutation`, or `internalAction`
 
 Current cron cadence from [`crons.ts`](../../convex/crons.ts):
 
-| Cadence         | Internal function                  | Purpose                                                                  |
-| --------------- | ---------------------------------- | ------------------------------------------------------------------------ |
-| Every minute    | `jobRunner:tickSchedules`          | Queue due enabled job schedules when no conflicting scoped run is active |
-| Every minute    | `ufa:reconcileDueGroups`           | Requeue due or interrupted UFA resolutions                               |
-| Every six hours | `weeklyEditions:scanDueMilestones` | Generate due milestone publications idempotently                         |
+| Cadence          | Internal function                  | Purpose                                                                                   |
+| ---------------- | ---------------------------------- | ----------------------------------------------------------------------------------------- |
+| Every 5 minutes  | `jobRunner:tickSchedules`          | Queue due enabled job schedules when no conflicting scoped run is active                  |
+| Every 15 minutes | `ufa:reconcileDueGroups`           | Recover overdue or interrupted UFA resolutions; ordinary groups are scheduled at deadline |
+| Every six hours  | `weeklyEditions:scanDueMilestones` | Generate due milestone publications idempotently                                          |
 
 Internal backfills should be treated as migrations, not reusable application APIs. Keep them narrowly named and remove or archive them after their rollout is complete.
 

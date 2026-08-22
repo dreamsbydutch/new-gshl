@@ -11,6 +11,7 @@ import {
 import { getUfaOfferGroupDeadline } from "../src/lib/utils/features/ufa-deadline";
 import { requireOwnerOrCommissioner } from "./lib/auth";
 import { utcTimestampToDateKey } from "./lib/timestamps";
+import { loadDueUfaOfferGroups } from "./lib/ufaReconciliation";
 import { loadUfaOddsData, type UfaOddsData } from "./ufaOdds";
 
 const CAP = 25_000_000;
@@ -895,18 +896,14 @@ export const finalizeGroup = internalMutation({
 
 async function queueDueGroups(ctx: any) {
   const db: any = ctx.db;
-  const groups = await db.query("ufaOfferGroups").collect();
-  const due = groups.filter(
-    (group: any) =>
-      ["open", "failed", "resolving"].includes(String(group.status)) &&
-      group.deadlineAt <= Date.now(),
-  );
+  const now = Date.now();
+  const due = await loadDueUfaOfferGroups(db, now);
   for (const group of due) {
     if (group.status !== "open") {
       await db.patch(group._id, {
         status: "open",
         failureReason: undefined,
-        updatedAt: Date.now(),
+        updatedAt: now,
       });
     }
     await ctx.scheduler.runAfter(0, internal.ufa.resolveGroup, {

@@ -121,8 +121,10 @@ Schedules store:
 - interval in minutes
 - next run time
 
-Convex checks due schedules every minute. A schedule advances its next run time
-even when a conflicting active lock prevents a new run, so inspect run and
+Convex checks due schedules every five minutes. A due run can therefore start
+up to one polling window late, and an interval shorter than five minutes cannot
+execute more frequently than the dispatcher. A schedule advances its next run
+time even when a conflicting active lock prevents a new run, so inspect run and
 event history when a scheduled execution appears absent.
 
 Schedule creation defaults to disabled and dry-run unless those states are
@@ -181,7 +183,8 @@ failures are truncated before storage and wake the parent runner.
 
 Separate from managed jobs, Convex currently:
 
-- reconciles due UFA offer groups every minute
+- recovers overdue or interrupted UFA offer groups every 15 minutes; ordinary
+  groups are scheduled for resolution at their exact deadline
 - scans due GSHL Weekly milestone editions every six hours
 
 These are code-defined crons in `convex/crons.ts`, not rows in the managed
