@@ -38,13 +38,10 @@ void test("builds a final matchup message with the winner and three stars", () =
       homeTeam: { name: "Emeralds", score: 5, isWinner: false },
       isComplete: true,
       isTie: false,
-      seasonLabel: "2026 Season",
-      weekNumber: 8,
       stars: [firstStar],
     }),
     [
-      "*GSHL Matchup*",
-      "_FINAL · Diamonds win_\n_2026 Season · Week 8_",
+      "*GSHL Matchup*\n_FINAL · Diamonds win_",
       "Away: *Diamonds — 8* 🏆\nHome: Emeralds — 5\n*Three Stars*\n1. *Alex Star* (DIA · C) — 9.82 rating · 2 G · 3 A · 5 P",
     ].join("\n\n"),
   );
@@ -57,13 +54,10 @@ void test("labels an active matchup and its provisional stars", () => {
       homeTeam: { name: "Emeralds", score: 3, isWinner: false },
       isComplete: false,
       isTie: false,
-      seasonLabel: "2026 Season",
-      weekNumber: 8,
       stars: [],
     }),
     [
-      "*GSHL Matchup*",
-      "_LIVE · Matchup in progress_\n_2026 Season · Week 8_",
+      "*GSHL Matchup*\n_LIVE · Matchup in progress_",
       "Away: Diamonds — 4\nHome: Emeralds — 3\n*Current Three Stars*\nNo player performances yet.",
     ].join("\n\n"),
   );

@@ -18,8 +18,6 @@ interface MatchupWhatsAppShareInput {
   homeTeam: MatchupShareTeam;
   isComplete: boolean;
   isTie: boolean;
-  seasonLabel: string;
-  weekNumber?: string | number | null;
   stars: readonly StarPlayer[];
 }
 
@@ -73,8 +71,6 @@ export function buildMatchupWhatsAppShareMessage({
   homeTeam,
   isComplete,
   isTie,
-  seasonLabel,
-  weekNumber,
   stars,
 }: MatchupWhatsAppShareInput): string {
   const winner = awayTeam.isWinner
@@ -89,22 +85,20 @@ export function buildMatchupWhatsAppShareMessage({
         ? `FINAL · ${winner.name} win`
         : "FINAL"
     : "LIVE · Matchup in progress";
-  const context = `${seasonLabel}${weekNumber != null ? ` · Week ${weekNumber}` : ""}`;
   const starsHeading = isComplete ? "*Three Stars*" : "*Current Three Stars*";
   const starLines =
     stars.length > 0
       ? stars.map(formatStarLine).join("\n")
       : "No player performances yet.";
 
-  return buildWhatsAppShareMessage({
-    title: "GSHL Matchup",
-    summary: `${status}\n${context}`,
-    lines: [
+  return [
+    `*GSHL Matchup*\n_${status}_`,
+    [
       formatMatchupTeamLine("Away", awayTeam, isComplete),
       formatMatchupTeamLine("Home", homeTeam, isComplete),
       `${starsHeading}\n${starLines}`,
-    ],
-  });
+    ].join("\n"),
+  ].join("\n\n");
 }
 
 function formatTorontoDeadline(deadlineAt: number): string | null {

@@ -471,8 +471,6 @@ export function MatchupDetailsContent({
     },
     isComplete: matchup?.isComplete === true,
     isTie: matchup?.tie === true,
-    seasonLabel: season?.name ?? "Season",
-    weekNumber: week?.weekNum,
     stars,
   });
 
