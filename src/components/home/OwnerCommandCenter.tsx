@@ -13,6 +13,7 @@ import {
   Users,
 } from "lucide-react";
 
+import { lighten, useTeamPalette } from "@gshl-hooks";
 import { useOwnerCommandCenter } from "@gshl-hooks/features/useOwnerCommandCenter";
 import { Button, Skeleton } from "@gshl-ui";
 import { cn, formatMoney } from "@gshl-utils";
@@ -67,35 +68,26 @@ function CommandAction({
   icon: Icon,
   label,
   count,
-  primary = false,
 }: {
   href: string;
   icon: typeof ArrowRightLeft;
   label: string;
   count?: number;
-  primary?: boolean;
 }) {
   return (
     <Button
       asChild
       size="sm"
-      variant={primary ? "default" : "outline"}
-      className="h-9 min-w-0 justify-between px-2.5"
+      variant="outline"
+      className="h-9 min-w-0 justify-between gap-1.5 bg-white/80 px-2 hover:bg-white"
     >
       <Link href={href}>
-        <span className="flex min-w-0 items-center gap-2">
+        <span className="flex min-w-0 items-center gap-1.5">
           <Icon aria-hidden="true" />
           <span className="truncate">{label}</span>
         </span>
         {count ? (
-          <span
-            className={cn(
-              "rounded-full px-1.5 py-0.5 font-mono text-[10px]",
-              primary
-                ? "bg-white/15 text-white"
-                : "bg-slate-100 text-slate-600",
-            )}
-          >
+          <span className="rounded-full bg-slate-100 px-1.5 py-0.5 font-mono text-[10px] text-slate-600">
             {count}
           </span>
         ) : null}
@@ -116,19 +108,21 @@ function SnapshotMetric({
   critical?: boolean;
 }) {
   return (
-    <div className="min-w-0 px-2.5 py-1 first:pl-0 sm:px-3 sm:first:pl-0">
+    <div className="min-w-0 px-2 py-0.5 first:pl-0 sm:px-2.5 sm:first:pl-0">
       <dt className="truncate text-[10px] font-semibold uppercase tracking-wide text-slate-400">
         {label}
       </dt>
       <dd
         className={cn(
-          "mt-0.5 truncate font-mono text-sm font-semibold text-slate-950",
+          "truncate font-mono text-sm font-semibold leading-tight text-slate-950",
           critical && "text-rose-700",
         )}
       >
         {value}
       </dd>
-      <dd className="truncate text-[10px] text-slate-500">{detail}</dd>
+      <dd className="truncate text-[10px] leading-tight text-slate-500">
+        {detail}
+      </dd>
     </div>
   );
 }
@@ -164,7 +158,7 @@ function RosterPanel({
   return (
     <section
       aria-labelledby="owner-roster-summary-heading"
-      className="rounded-lg border border-slate-200 p-3 sm:p-4"
+      className="rounded-lg border border-slate-200 p-2"
     >
       <div id="owner-roster-summary-heading">
         <SectionHeading
@@ -173,7 +167,7 @@ function RosterPanel({
           detail={`${roster.count}/${roster.capacity}`}
         />
       </div>
-      <dl className="mt-3 grid grid-cols-3 gap-2">
+      <dl className="mt-2 grid grid-cols-3 gap-2">
         {roster.composition.map((entry) => (
           <div key={entry.position} className="border-l border-slate-200 pl-2">
             <dt className="text-[10px] uppercase tracking-wide text-slate-400">
@@ -185,7 +179,7 @@ function RosterPanel({
           </div>
         ))}
       </dl>
-      <div className="mt-3 flex flex-wrap gap-1.5 text-xs">
+      <div className="mt-2 flex flex-wrap gap-1 text-xs">
         {roster.gaps.length ? (
           roster.gaps.map((gap) => (
             <span
@@ -212,7 +206,7 @@ function RosterPanel({
           </span>
         ) : null}
       </div>
-      <details className="mt-3 border-t border-slate-100 pt-2">
+      <details className="mt-2 border-t border-slate-100 pt-1.5">
         <summary className="flex min-h-9 cursor-pointer items-center text-xs font-medium text-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
           View current roster
         </summary>
@@ -220,7 +214,7 @@ function RosterPanel({
           {roster.players.map((player) => (
             <li
               key={player.id}
-              className="flex min-w-0 items-center justify-between gap-3 py-2 text-xs"
+              className="flex min-w-0 items-center justify-between gap-3 py-1.5 text-xs"
             >
               <span className="truncate font-medium text-slate-900">
                 {player.fullName}
@@ -247,7 +241,7 @@ function CapPanel({
   return (
     <section
       aria-labelledby="owner-cap-summary-heading"
-      className="rounded-lg border border-slate-200 p-3 sm:p-4"
+      className="rounded-lg border border-slate-200 p-2"
     >
       <div id="owner-cap-summary-heading">
         <SectionHeading
@@ -257,11 +251,11 @@ function CapPanel({
         />
       </div>
       {view.cap.length ? (
-        <dl className="mt-3 divide-y divide-slate-100 border-y border-slate-100">
+        <dl className="mt-2 divide-y divide-slate-100 border-y border-slate-100">
           {view.cap.map((season) => (
             <div
               key={season.year}
-              className="flex items-center justify-between gap-3 py-2 text-xs"
+              className="flex items-center justify-between gap-3 py-1.5 text-xs"
             >
               <dt className="text-slate-500">{season.label}</dt>
               <dd
@@ -281,9 +275,9 @@ function CapPanel({
           ))}
         </dl>
       ) : (
-        <p className="mt-3 text-xs text-slate-500">No cap window available.</p>
+        <p className="mt-2 text-xs text-slate-500">No cap window available.</p>
       )}
-      <div className="mt-3">
+      <div className="mt-2">
         <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
           Upcoming decisions
         </p>
@@ -292,7 +286,7 @@ function CapPanel({
             {view.contractDecisions.slice(0, 4).map((decision) => (
               <li
                 key={decision.id}
-                className="flex items-center justify-between gap-3 py-2 text-xs"
+                className="flex items-center justify-between gap-3 py-1.5 text-xs"
               >
                 <div className="min-w-0">
                   <p className="truncate font-medium text-slate-900">
@@ -309,7 +303,7 @@ function CapPanel({
             ))}
           </ul>
         ) : (
-          <p className="mt-2 text-xs text-slate-500">
+          <p className="mt-1.5 text-xs text-slate-500">
             No contracts expire in the next two seasons.
           </p>
         )}
@@ -328,7 +322,7 @@ function MatchupPanel({
   return (
     <section
       aria-labelledby="owner-matchup-summary-heading"
-      className="rounded-lg border border-slate-200 p-3 sm:p-4"
+      className="rounded-lg border border-slate-200 p-2"
     >
       <div id="owner-matchup-summary-heading">
         <SectionHeading
@@ -338,8 +332,8 @@ function MatchupPanel({
         />
       </div>
       {next ? (
-        <div className="mt-3 flex items-center gap-3 border-y border-slate-100 py-3">
-          <TeamMark team={next.opponent} size={42} />
+        <div className="mt-2 flex items-center gap-2 border-y border-slate-100 py-2">
+          <TeamMark team={next.opponent} size={38} />
           <div className="min-w-0 flex-1">
             <p className="text-[10px] uppercase tracking-wide text-slate-400">
               {next.weekNum ? `Week ${next.weekNum}` : "Next matchup"} ·{" "}
@@ -354,11 +348,11 @@ function MatchupPanel({
           </div>
         </div>
       ) : (
-        <p className="mt-3 border-y border-slate-100 py-4 text-xs text-slate-500">
+        <p className="mt-2 border-y border-slate-100 py-3 text-xs text-slate-500">
           No upcoming matchup is scheduled.
         </p>
       )}
-      <div className="mt-3 flex items-center justify-between gap-3">
+      <div className="mt-2 flex items-center justify-between gap-3">
         <div className="flex min-w-0 gap-1.5" aria-label="Recent team results">
           {view.matchup.recent.length ? (
             view.matchup.recent.map((matchup) => (
@@ -400,7 +394,7 @@ function DraftPanel({
   return (
     <section
       aria-labelledby="owner-draft-summary-heading"
-      className="rounded-lg border border-slate-200 p-3 sm:p-4"
+      className="rounded-lg border border-slate-200 p-2"
     >
       <div id="owner-draft-summary-heading">
         <SectionHeading
@@ -410,11 +404,11 @@ function DraftPanel({
         />
       </div>
       {view.draft.groups.length ? (
-        <ul className="mt-3 divide-y divide-slate-100 border-y border-slate-100">
+        <ul className="mt-2 divide-y divide-slate-100 border-y border-slate-100">
           {view.draft.groups.map((group) => (
             <li
               key={group.seasonId}
-              className="flex items-center justify-between gap-3 py-2 text-xs"
+              className="flex items-center justify-between gap-3 py-1.5 text-xs"
             >
               <div>
                 <p className="font-medium text-slate-900">{group.seasonName}</p>
@@ -431,11 +425,11 @@ function DraftPanel({
           ))}
         </ul>
       ) : (
-        <p className="mt-3 border-y border-slate-100 py-4 text-xs text-slate-500">
+        <p className="mt-2 border-y border-slate-100 py-3 text-xs text-slate-500">
           No unspent draft picks are assigned to this franchise.
         </p>
       )}
-      <p className="mt-2 text-xs text-slate-500">
+      <p className="mt-1.5 text-xs text-slate-500">
         {view.draft.acquired > 0
           ? `${view.draft.acquired} acquired pick${view.draft.acquired === 1 ? "" : "s"} in the current inventory.`
           : "No acquired picks in the current inventory."}
@@ -458,7 +452,7 @@ function InboxPanel({
   return (
     <section
       aria-labelledby="owner-inbox-summary-heading"
-      className="rounded-lg border border-slate-200 p-3 sm:col-span-2 sm:p-4"
+      className="rounded-lg border border-slate-200 p-2 sm:col-span-2"
     >
       <div id="owner-inbox-summary-heading">
         <SectionHeading
@@ -467,7 +461,7 @@ function InboxPanel({
           detail={unreadCount ? `${unreadCount} new` : "Caught up"}
         />
       </div>
-      <dl className="mt-3 grid grid-cols-3 divide-x divide-slate-200 border-y border-slate-100 py-2 text-center">
+      <dl className="mt-2 grid grid-cols-3 divide-x divide-slate-200 border-y border-slate-100 py-1.5 text-center">
         <div>
           <dt className="text-[10px] text-slate-400">UFA offers</dt>
           <dd className="font-mono text-sm font-semibold text-slate-950">
@@ -487,7 +481,7 @@ function InboxPanel({
           </dd>
         </div>
       </dl>
-      <div className="mt-3 grid gap-4 sm:grid-cols-2">
+      <div className="mt-2 grid gap-3 sm:grid-cols-2">
         <div>
           <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
             Pending decisions
@@ -495,7 +489,7 @@ function InboxPanel({
           {view.offers.length || view.listedPlayers.length ? (
             <ul className="mt-1 divide-y divide-slate-100">
               {view.offers.slice(0, 3).map((offer) => (
-                <li key={offer.id} className="py-2 text-xs">
+                <li key={offer.id} className="py-1.5 text-xs">
                   <Link
                     href={view.actions.reviewOffer}
                     className="flex items-center justify-between gap-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
@@ -517,7 +511,7 @@ function InboxPanel({
                 </li>
               ))}
               {view.listedPlayers.slice(0, 3).map((listing) => (
-                <li key={listing.listingId} className="py-2 text-xs">
+                <li key={listing.listingId} className="py-1.5 text-xs">
                   <Link
                     href={view.actions.listPlayer}
                     className="flex items-center justify-between gap-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
@@ -531,7 +525,7 @@ function InboxPanel({
               ))}
             </ul>
           ) : (
-            <p className="mt-2 text-xs text-slate-500">
+            <p className="mt-1.5 text-xs text-slate-500">
               No pending UFA offers or active player listings.
             </p>
           )}
@@ -558,7 +552,7 @@ function InboxPanel({
                   lastViewedAt && item.occurredAt > lastViewedAt,
                 );
                 return (
-                  <li key={item.id} className="py-2 text-xs">
+                  <li key={item.id} className="py-1.5 text-xs">
                     <Link
                       href={item.href}
                       className="flex min-w-0 items-start gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
@@ -585,7 +579,7 @@ function InboxPanel({
               })}
             </ul>
           ) : (
-            <p className="mt-2 text-xs text-slate-500">
+            <p className="mt-1.5 text-xs text-slate-500">
               No new trade-market or UFA activity.
             </p>
           )}
@@ -597,6 +591,7 @@ function InboxPanel({
 
 export function OwnerCommandCenter() {
   const commandCenter = useOwnerCommandCenter();
+  const teamPalette = useTeamPalette(commandCenter.data?.team?.logoUrl);
 
   if (!commandCenter.isEligible) return null;
   if (commandCenter.isLoading) return <OwnerCommandCenterSkeleton />;
@@ -621,22 +616,31 @@ export function OwnerCommandCenter() {
   const opponentName =
     nextMatchup?.opponent?.abbr ?? nextMatchup?.opponent?.name ?? "Not set";
   const marketCount = view.offers.length + view.listedPlayers.length;
+  const headerPrimary = teamPalette.primary ?? "#64748b";
+  const headerSecondary =
+    teamPalette.secondary ?? teamPalette.accent ?? headerPrimary;
 
   return (
     <section
       aria-labelledby="owner-command-center-heading"
-      className="mx-auto w-full max-w-5xl border-y border-slate-300 py-2.5"
+      className="mx-auto w-full max-w-5xl border-y border-slate-300 py-1.5"
     >
-      <header className="flex flex-wrap items-center justify-between gap-2.5">
-        <div className="flex min-w-0 flex-1 items-center gap-2.5">
-          <TeamMark team={view.team} size={40} />
+      <header
+        className="flex flex-wrap items-center justify-between gap-1.5 rounded-md border px-2 py-1"
+        style={{
+          backgroundImage: `linear-gradient(180deg, ${lighten(headerPrimary, 0.68)} 0%, ${lighten(headerSecondary, 0.86)} 100%)`,
+          borderColor: lighten(headerPrimary, 0.45),
+        }}
+      >
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+          <TeamMark team={view.team} size={36} />
           <div className="min-w-0">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+            <p className="text-[10px] font-semibold uppercase leading-none tracking-[0.16em] text-slate-600">
               My Team · {view.season?.name ?? "Current season"}
             </p>
             <h2
               id="owner-command-center-heading"
-              className="truncate text-base font-bold tracking-tight text-slate-950 sm:text-lg"
+              className="truncate text-base font-bold leading-tight tracking-tight text-slate-950"
             >
               {view.team?.name ?? `${view.ownerName}'s team`}
             </h2>
@@ -645,13 +649,12 @@ export function OwnerCommandCenter() {
 
         <nav
           aria-label="My Team actions"
-          className="grid w-full grid-cols-2 gap-1.5 sm:w-auto sm:grid-cols-4"
+          className="grid w-full grid-cols-4 gap-1 sm:w-auto"
         >
           <CommandAction
             href={view.actions.exploreTrade}
             icon={ArrowRightLeft}
             label="Trade market"
-            primary
           />
           <CommandAction
             href={view.actions.listPlayer}
@@ -675,7 +678,7 @@ export function OwnerCommandCenter() {
 
       <dl
         aria-label="My Team snapshot"
-        className="mt-2 grid grid-cols-3 gap-y-1 divide-x divide-slate-200 border-y border-slate-100 py-1 sm:grid-cols-5 [&>div:nth-child(4)]:border-l-0 [&>div:nth-child(4)]:pl-0 sm:[&>div:nth-child(4)]:border-l sm:[&>div:nth-child(4)]:pl-3"
+        className="mt-1.5 grid grid-cols-3 divide-x divide-slate-200 border-y border-slate-100 py-0.5 sm:grid-cols-5 [&>div:nth-child(4)]:border-l-0 [&>div:nth-child(4)]:pl-0 sm:[&>div:nth-child(4)]:border-l sm:[&>div:nth-child(4)]:pl-2.5"
       >
         <SnapshotMetric
           label="Roster"
@@ -726,7 +729,7 @@ export function OwnerCommandCenter() {
             />
           </span>
         </summary>
-        <div className="grid gap-2 border-t border-slate-100 pt-2 sm:grid-cols-2">
+        <div className="grid gap-1.5 border-t border-slate-100 pt-1.5 sm:grid-cols-2">
           <RosterPanel view={view} />
           <CapPanel view={view} />
           <MatchupPanel view={view} />
@@ -748,25 +751,25 @@ function OwnerCommandCenterSkeleton() {
     <section
       aria-label="Loading My Team command center"
       aria-busy="true"
-      className="mx-auto w-full max-w-5xl border-y border-slate-300 py-2.5"
+      className="mx-auto w-full max-w-5xl border-y border-slate-300 py-1.5"
     >
-      <div className="flex flex-wrap items-center justify-between gap-2.5">
-        <div className="flex min-w-0 flex-1 items-center gap-2.5">
-          <Skeleton className="h-10 w-10 rounded-md" />
-          <div className="min-w-0 flex-1 space-y-1.5">
+      <div className="flex flex-wrap items-center justify-between gap-1.5 rounded-md border border-slate-200 bg-slate-50 px-2 py-1">
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+          <Skeleton className="h-9 w-9 rounded-md" />
+          <div className="min-w-0 flex-1 space-y-1">
             <Skeleton className="h-2.5 w-28" />
-            <Skeleton className="h-5 w-44 max-w-[80%]" />
+            <Skeleton className="h-4 w-44 max-w-[80%]" />
           </div>
         </div>
-        <div className="grid w-full grid-cols-2 gap-1.5 sm:w-auto sm:grid-cols-4">
+        <div className="grid w-full grid-cols-4 gap-1 sm:w-auto">
           {Array.from({ length: 4 }).map((_, index) => (
-            <Skeleton key={index} className="h-9 rounded-md sm:w-28" />
+            <Skeleton key={index} className="h-9 rounded-md sm:w-24" />
           ))}
         </div>
       </div>
-      <div className="mt-2 grid grid-cols-3 gap-2 border-y border-slate-100 py-2 sm:grid-cols-5">
+      <div className="mt-1.5 grid grid-cols-3 gap-1 border-y border-slate-100 py-1 sm:grid-cols-5">
         {Array.from({ length: 5 }).map((_, index) => (
-          <div key={index} className="space-y-1.5 px-2">
+          <div key={index} className="space-y-1 px-2">
             <Skeleton className="h-2 w-10" />
             <Skeleton className="h-4 w-16 max-w-full" />
             <Skeleton className="h-2 w-20 max-w-full" />
