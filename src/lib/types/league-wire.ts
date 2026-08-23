@@ -8,6 +8,7 @@ export type LeagueWirePostKind =
   | "drop"
   | "missed_start"
   | "matchup_final"
+  | "three_stars"
   | "power_ranking"
   | "press_box"
   | "announcement";

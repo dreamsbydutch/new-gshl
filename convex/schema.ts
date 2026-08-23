@@ -479,6 +479,7 @@ export default defineSchema({
       v.literal("drop"),
       v.literal("missed_start"),
       v.literal("matchup_final"),
+      v.literal("three_stars"),
       v.literal("power_ranking"),
       v.literal("press_box"),
       v.literal("announcement"),

@@ -169,7 +169,21 @@ Locker Room Team History uses one owner-scoped realtime projection instead of su
 
 Weekly Schedule, Team Schedule, and Matchup Details each subscribe to a page-shaped backend response. Their season, week, owner, or matchup selection is sent as the query key; the response contains only referenced relations and rendered statistic fields. Team Schedule and Team History defer the two-team weekly-stat comparison until a matchup row expands. Conference Contest similarly receives derived ratings and count maps instead of the historical source collections used to compute them.
 
-The Home dashboard limits preview inventory instead of rendering complete feature lists: five UFAs, eight power rankings, five League Wire posts, and four first-round mock-draft projections. Home UFA data uses a server-selected catalog containing its ranked preview candidates and any players in unresolved offer groups, while League Office retains the full projected catalog; NHL statistics still come from the latest populated season. The mock-draft and power-ranking cards each use capped server projections that return only rendered fields and referenced branding, while Draft Status uses the clock-only query rather than the joined draft board. The League Wire reads durable posts, expands to the capped query inventory, renders complete trade packages, and exposes each post's stored deep links and share action. Press Box cards and Newsroom lists receive compact metadata, then subscribe to one full edition only after the reader opens it or a commissioner selects it. The Press Box reader portals its modal outside inert application content, traps keyboard focus, supports Escape, and restores focus to its trigger.
+The Home dashboard leads with a full-width League Wire instead of separate
+Press Box and power-ranking previews. It queries 24 durable posts and shows an
+eight-story mix that favors distinct story types before filling with additional
+recent posts. Weekly ranking snapshots, league-wide Three Stars, missed-start
+reports, newsletter headlines, results, roster moves, UFA activity, trades, and
+commissioner posts therefore share one chronological surface. Readers can
+expand the Wire in place, open each stored deep link, inspect complete trade
+packages, and share posts when their role permits. Home still caps its
+actionable inventory at five UFA candidates and four first-round mock-draft
+projections. League Office retains the full UFA catalog, and NHL statistics
+still come from the latest populated season. Press Box archive and Newsroom
+lists receive compact metadata, then subscribe to one full edition only after a
+reader opens it or a commissioner selects it. The Press Box reader portals its
+modal outside inert application content, traps keyboard focus, supports Escape,
+and restores focus to its trigger.
 
 Home's compact modules use a centered reading measure. When a linked owner has affordable UFA candidates, the player decision surface breaks out to the full dashboard width and retains its scrollable statistics and offer table at every breakpoint.
 

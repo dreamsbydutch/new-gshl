@@ -16,6 +16,7 @@ import {
   Gavel,
   Megaphone,
   Newspaper,
+  Star,
   Trophy,
   UserPlus,
 } from "lucide-react";
@@ -97,13 +98,18 @@ const POST_META: Record<
     icon: Trophy,
     badge: "bg-slate-100 text-slate-700 ring-slate-200",
   },
+  three_stars: {
+    label: "Three stars",
+    icon: Star,
+    badge: "bg-yellow-50 text-yellow-800 ring-yellow-200",
+  },
   power_ranking: {
     label: "Power",
     icon: BarChart3,
     badge: "bg-cyan-50 text-cyan-700 ring-cyan-200",
   },
   press_box: {
-    label: "Press Box",
+    label: "Newsletter",
     icon: Newspaper,
     badge: "bg-neutral-100 text-neutral-700 ring-neutral-200",
   },
@@ -425,7 +431,7 @@ export function LeagueWire({ seasonId }: { seasonId?: string }) {
               League Wire
             </h2>
             <p className="mt-0.5 text-xs text-slate-500">
-              Deals, results and league notices
+              Rankings, weekly stars, deals and league stories
             </p>
           </div>
           <ArrowUpFromLine

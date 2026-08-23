@@ -3,7 +3,7 @@ import { Skeleton } from "../ui/SkeletonPrimitive";
 export function LeagueWireRowsSkeleton() {
   return (
     <div className="divide-y divide-slate-100 px-3 sm:px-5">
-      {Array.from({ length: 5 }).map((_, index) => (
+      {Array.from({ length: 8 }).map((_, index) => (
         <div key={index} className="flex items-start gap-2.5 py-2.5">
           <Skeleton className="h-6 w-24 shrink-0 rounded-full" />
           <div className="min-w-0 flex-1 space-y-1.5">
@@ -21,7 +21,7 @@ export function LeagueWireRowsSkeleton() {
 
 export function LeagueWireCardSkeleton() {
   return (
-    <section className="h-full min-w-0 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm sm:rounded-2xl">
+    <section className="h-full min-w-0 overflow-hidden rounded-lg border border-slate-200 bg-white">
       <header className="space-y-2 border-b border-slate-100 px-3 py-3 sm:px-5">
         <Skeleton className="h-6 w-48" />
         <Skeleton className="h-3 w-56 max-w-full" />
@@ -101,19 +101,10 @@ export function HomeSkeleton() {
       className="mx-auto w-full max-w-7xl px-3 py-3 sm:px-5 sm:py-5"
     >
       <div className="space-y-3 sm:space-y-4 lg:space-y-5">
-        <section className="mx-auto flex h-14 w-full max-w-5xl items-center gap-3 border-y border-slate-200 px-3">
-          <Skeleton className="h-9 w-9 shrink-0 rounded-xl" />
-          <div className="min-w-0 flex-1 space-y-2">
-            <Skeleton className="h-2.5 w-36 max-w-full" />
-            <Skeleton className="h-4 w-72 max-w-[90%]" />
-          </div>
-          <Skeleton className="h-11 w-20 shrink-0 rounded-full" />
-        </section>
-        <UfaHomeCardSkeleton />
-        <div className="mx-auto grid w-full min-w-0 max-w-5xl items-start gap-3 sm:gap-4 xl:grid-cols-2">
-          <PowerRankingsHomeCardSkeleton />
+        <div className="mx-auto w-full min-w-0 max-w-5xl">
           <LeagueWireCardSkeleton />
         </div>
+        <UfaHomeCardSkeleton />
       </div>
     </main>
   );

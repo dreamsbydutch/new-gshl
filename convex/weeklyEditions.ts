@@ -102,13 +102,14 @@ const publishEditionWirePost = async (
   edition: Doc<"weeklyEditions"> | null,
 ) => {
   if (!edition || edition.status !== "published") return;
+  const content = edition.content as WeeklyEditionContent;
   await upsertLeagueWirePost(ctx, {
     seasonId: edition.seasonId,
     kind: "press_box",
     sourceKey: `press-box:${String(edition._id)}`,
     occurredAt: requiredPublicTimestamp("publishedAt", edition.publishedAt),
-    title: `Press Box: ${edition.issueLabel}`,
-    summary: edition.seasonName,
+    title: content.headline,
+    summary: content.deck,
     links: [
       {
         label: "Read edition",

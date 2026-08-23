@@ -52,7 +52,8 @@ Browser code imports `api` from [`convex/_generated/api`](../../convex/_generate
 - A season-scoped League Wire backed by durable posts with typed deep links
   and two-sided trade packages. Draft, UFA, trade-block, and Press Box writes
   publish atomically; operator writes schedule week-scoped materialization for
-  roster events, final matchups and three stars, and power movement.
+  roster moves, a weekly missed-start report, final matchups, league-wide Three
+  Stars, and complete power-ranking snapshots.
 - Role-gated mutations for lineup changes, draft administration, user access, contract creation, and jobs.
 
 Generic list helpers choose the longest compound-index prefix fully constrained by the request. They apply a row limit before collection only when every filter is covered by that index, project public rows without Convex metadata, and resolve team relations by referenced IDs. High-traffic views still use purpose-built queries with exact response contracts, explicit compound indexes, and bounded reads. League activity restricts contract candidates to the selected season before normalizing legacy date values and selecting the newest rows.

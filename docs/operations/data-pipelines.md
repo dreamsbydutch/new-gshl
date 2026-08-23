@@ -53,8 +53,9 @@ must map old IDs to Convex document IDs.
 
 Generic Convex writes to player-day, player-week, team-week, or matchup rows
 schedule the affected week's League Wire materializer. The materializer uses
-idempotent source keys, so retries update the same durable roster-event,
-matchup-final, three-star, or power-movement post instead of duplicating it.
+idempotent source keys, so retries update the same durable roster move, weekly
+missed-start report, matchup final, league-wide Three Stars, or power-ranking
+post instead of duplicating it.
 
 ## Operator-script model
 

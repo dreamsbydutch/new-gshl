@@ -10,7 +10,9 @@ import { v } from "convex/values";
 
 import { requireCommissioner } from "./lib/auth";
 import { toUtcTimestamp, utcTimestampToDateKey } from "./lib/timestamps";
+import type { WeeklyEditionContent } from "../src/lib/types/weekly-edition";
 import {
+  buildLeagueWireThreeStarsStory,
   rankLeagueWirePowerMovements,
   selectLeagueWireStars,
 } from "../src/lib/utils/features/league-wire";
@@ -381,6 +383,7 @@ export const withdraw = mutation({
 async function materializeRosterPosts(
   ctx: MutationCtx,
   seasonId: Id<"seasons">,
+  week: Doc<"weeks">,
   playerDays: Doc<"playerDayStatLines">[],
 ) {
   const playerIds = [
@@ -435,20 +438,10 @@ async function materializeRosterPosts(
     } else {
       await withdrawLeagueWirePost(ctx, `player-day:add:${String(row._id)}`);
     }
-    if ((asNumber(row.MS) ?? 0) > 0) {
-      await upsertLeagueWirePost(ctx, {
-        ...base,
-        kind: "missed_start",
-        sourceKey: `player-day:missed-start:${String(row._id)}`,
-        title: `${player.fullName} records a missed start`,
-        summary: team.name,
-      });
-    } else {
-      await withdrawLeagueWirePost(
-        ctx,
-        `player-day:missed-start:${String(row._id)}`,
-      );
-    }
+    await withdrawLeagueWirePost(
+      ctx,
+      `player-day:missed-start:${String(row._id)}`,
+    );
   }
 
   const dates = [
@@ -520,6 +513,75 @@ async function materializeRosterPosts(
       }
     }
   }
+
+  const sourceKey = `missed-starts:${String(week._id)}`;
+  const missedByTeam = new Map<string, { count: number; team: TeamSnapshot }>();
+  const missedByPlayer = new Map<
+    string,
+    { count: number; player: Doc<"players"> }
+  >();
+  for (const row of playerDays) {
+    const count = asNumber(row.MS) ?? 0;
+    const team = teamById.get(String(row.gshlTeamId));
+    const player = playerById.get(String(row.playerId));
+    if (count <= 0 || !team || !player) continue;
+    const teamMisses = missedByTeam.get(String(team.id));
+    missedByTeam.set(String(team.id), {
+      count: (teamMisses?.count ?? 0) + count,
+      team,
+    });
+    const playerMisses = missedByPlayer.get(String(player._id));
+    missedByPlayer.set(String(player._id), {
+      count: (playerMisses?.count ?? 0) + count,
+      player,
+    });
+  }
+  const teamLeaders = [...missedByTeam.values()].sort(
+    (left, right) =>
+      right.count - left.count || left.team.name.localeCompare(right.team.name),
+  );
+  const playerLeaders = [...missedByPlayer.values()].sort(
+    (left, right) =>
+      right.count - left.count ||
+      left.player.fullName.localeCompare(right.player.fullName),
+  );
+  const totalMissedStarts = teamLeaders.reduce(
+    (total, entry) => total + entry.count,
+    0,
+  );
+  if (totalMissedStarts === 0) {
+    await withdrawLeagueWirePost(ctx, sourceKey);
+    return;
+  }
+  const weekNumber = asNumber(week.weekNum);
+  const weekLabel = weekNumber === null ? "This week" : `Week ${weekNumber}`;
+  const onlyMiss = playerLeaders[0];
+  await upsertLeagueWirePost(ctx, {
+    seasonId,
+    kind: "missed_start",
+    sourceKey,
+    occurredAt: dateTimestamp(week.endDate),
+    title:
+      totalMissedStarts === 1 && onlyMiss
+        ? `${onlyMiss.player.fullName} records ${weekLabel}'s only missed start`
+        : `${weekLabel}: ${totalMissedStarts} missed starts across ${teamLeaders.length} ${teamLeaders.length === 1 ? "team" : "teams"}`,
+    summary: teamLeaders
+      .slice(0, 3)
+      .map((entry) => `${entry.team.name}: ${entry.count}`)
+      .join("; "),
+    teamIds: teamLeaders.slice(0, 3).map((entry) => entry.team.id),
+    playerIds: playerLeaders.slice(0, 3).map((entry) => entry.player._id),
+    links: [
+      {
+        label: "View week",
+        href: `/schedule?season=${encodeURIComponent(String(seasonId))}&week=${encodeURIComponent(String(week._id))}`,
+      },
+      ...teamLeaders.slice(0, 2).map((entry) => ({
+        label: entry.team.name,
+        href: publicTeamHref(seasonId, entry.team.ownerId),
+      })),
+    ],
+  });
 }
 
 async function materializeMatchupPosts(
@@ -619,12 +681,124 @@ async function materializeMatchupPosts(
   }
 }
 
+async function materializeThreeStarsPost(
+  ctx: MutationCtx,
+  seasonId: Id<"seasons">,
+  week: Doc<"weeks">,
+  playerWeeks: Doc<"playerWeekStatLines">[],
+  isWeekComplete: boolean,
+) {
+  const sourceKey = `three-stars:${String(week._id)}`;
+  if (!isWeekComplete) {
+    await withdrawLeagueWirePost(ctx, sourceKey);
+    return;
+  }
+  const rowByPlayerId = new Map(
+    playerWeeks.map((row) => [String(row.playerId), row] as const),
+  );
+  const selected = selectLeagueWireStars(
+    playerWeeks
+      .filter((row) =>
+        [row.GP, row.G, row.A, row.W, row.SV].some(
+          (value) => (asNumber(value) ?? 0) > 0,
+        ),
+      )
+      .map((row) => ({
+        playerId: String(row.playerId),
+        teamId: String(row.gshlTeamId),
+        rating: asNumber(row.Rating) ?? 0,
+        points: asNumber(row.P) ?? 0,
+        wins: asNumber(row.W) ?? 0,
+        saves: asNumber(row.SV) ?? 0,
+      })),
+  );
+  if (selected.length < 3) {
+    await withdrawLeagueWirePost(ctx, sourceKey);
+    return;
+  }
+  const loaded = await Promise.all(
+    selected.map(async (candidate) => {
+      const row = rowByPlayerId.get(candidate.playerId);
+      if (!row) return null;
+      const [player, team] = await Promise.all([
+        ctx.db.get(row.playerId),
+        loadTeamSnapshot(ctx, row.gshlTeamId),
+      ]);
+      return player && team ? { candidate, player, team } : null;
+    }),
+  );
+  const stars = loaded.filter(
+    (entry): entry is NonNullable<typeof entry> => entry !== null,
+  );
+  const weekNumber = asNumber(week.weekNum);
+  const story = buildLeagueWireThreeStarsStory(
+    weekNumber === null ? "the week" : `Week ${weekNumber}`,
+    stars.map(({ candidate, player }) => ({
+      ...candidate,
+      playerName: player.fullName,
+    })),
+  );
+  if (!story) {
+    await withdrawLeagueWirePost(ctx, sourceKey);
+    return;
+  }
+  await upsertLeagueWirePost(ctx, {
+    seasonId,
+    kind: "three_stars",
+    sourceKey,
+    occurredAt: dateTimestamp(week.endDate),
+    title: story.title,
+    summary: story.summary,
+    teamIds: stars.map((entry) => entry.team.id),
+    playerIds: stars.map((entry) => entry.player._id),
+    links: [
+      {
+        label: "View week",
+        href: `/schedule?season=${encodeURIComponent(String(seasonId))}&week=${encodeURIComponent(String(week._id))}`,
+      },
+      ...stars.map(({ player, team }) => ({
+        label: player.fullName,
+        href: playerHref(seasonId, team.ownerId, player._id),
+      })),
+    ],
+  });
+}
+
 async function materializePowerPost(
   ctx: MutationCtx,
   seasonId: Id<"seasons">,
   week: Doc<"weeks">,
   rows: Doc<"teamWeekStatLines">[],
 ) {
+  const sourceKey = `power-ranking:${String(week._id)}`;
+  const rankedRows = rows
+    .flatMap((row) => {
+      const rank = asNumber(row.powerRk);
+      return rank === null ? [] : [{ rank, row }];
+    })
+    .sort(
+      (left, right) =>
+        left.rank - right.rank ||
+        String(left.row.gshlTeamId).localeCompare(String(right.row.gshlTeamId)),
+    );
+  if (!rankedRows.length) {
+    await withdrawLeagueWirePost(ctx, sourceKey);
+    return;
+  }
+  const topSnapshots = await Promise.all(
+    rankedRows
+      .slice(0, 3)
+      .map(({ row }) => loadTeamSnapshot(ctx, row.gshlTeamId)),
+  );
+  const topDetails = rankedRows.slice(0, 3).flatMap(({ rank }, index) => {
+    const team = topSnapshots[index];
+    return team ? [{ rank, team }] : [];
+  });
+  if (!topDetails.length) {
+    await withdrawLeagueWirePost(ctx, sourceKey);
+    return;
+  }
+
   const weeks = await ctx.db
     .query("weeks")
     .withIndex("by_seasonId", (range) => range.eq("seasonId", seasonId))
@@ -637,11 +811,12 @@ async function materializePowerPost(
     (candidate) => candidate._id === week._id,
   );
   const previousWeek = currentIndex > 0 ? orderedWeeks[currentIndex - 1] : null;
-  if (!previousWeek) return;
-  const previousRows = await ctx.db
-    .query("teamWeekStatLines")
-    .withIndex("by_weekId", (range) => range.eq("weekId", previousWeek._id))
-    .collect();
+  const previousRows = previousWeek
+    ? await ctx.db
+        .query("teamWeekStatLines")
+        .withIndex("by_weekId", (range) => range.eq("weekId", previousWeek._id))
+        .collect()
+    : [];
   const previousByTeam = new Map(
     previousRows.map((row) => [String(row.gshlTeamId), row] as const),
   );
@@ -669,10 +844,6 @@ async function materializePowerPost(
       ];
     }),
   );
-  if (!movements.length) {
-    await withdrawLeagueWirePost(ctx, `power-ranking:${String(week._id)}`);
-    return;
-  }
   const featured = movements.slice(0, 3).flatMap((movement) => {
     const row = movementRowByTeamId.get(movement.teamId);
     return row ? [{ ...movement, row }] : [];
@@ -690,27 +861,35 @@ async function materializePowerPost(
       },
     ];
   });
-  if (!details.length) return;
+  const topSummary = `Top three: ${topDetails
+    .map((detail) => `${detail.rank}. ${detail.team.name}`)
+    .join("; ")}`;
+  const leader = topDetails[0]!;
+  const linkedTeams = new Map<string, TeamSnapshot>();
+  for (const detail of [...details, ...topDetails]) {
+    linkedTeams.set(String(detail.team.id), detail.team);
+  }
   await upsertLeagueWirePost(ctx, {
     seasonId,
     kind: "power_ranking",
-    sourceKey: `power-ranking:${String(week._id)}`,
-    occurredAt: dateTimestamp(week.startDate),
-    title: details[0]?.text ?? "Power rankings updated",
-    summary:
-      details
-        .slice(1)
-        .map((detail) => detail.text)
-        .join(". ") || undefined,
-    teamIds: details.map((detail) => detail.team.id),
+    sourceKey,
+    occurredAt: dateTimestamp(week.endDate),
+    title:
+      details[0]?.text ??
+      `${leader.team.name} ${previousWeek ? "remains" : "opens"} at No. ${leader.rank}`,
+    summary: [
+      ...details.slice(1).map((detail) => detail.text),
+      topSummary,
+    ].join(". "),
+    teamIds: [...linkedTeams.values()].map((team) => team.id),
     links: [
       {
         label: "View power rankings",
         href: `/standings?view=power&season=${encodeURIComponent(String(seasonId))}`,
       },
-      ...details.map((detail) => ({
-        label: detail.team.name,
-        href: publicTeamHref(seasonId, detail.team.ownerId),
+      ...[...linkedTeams.values()].slice(0, 3).map((team) => ({
+        label: team.name,
+        href: publicTeamHref(seasonId, team.ownerId),
       })),
     ],
   });
@@ -841,13 +1020,14 @@ export const materializeSeasonRecords = internalMutation({
     }
 
     for (const edition of editions) {
+      const content = edition.content as WeeklyEditionContent;
       await upsertLeagueWirePost(ctx, {
         seasonId: args.seasonId,
         kind: "press_box",
         sourceKey: `press-box:${String(edition._id)}`,
         occurredAt: dateTimestamp(edition.publishedAt),
-        title: `Press Box: ${edition.issueLabel}`,
-        summary: edition.seasonName,
+        title: content.headline,
+        summary: content.deck,
         links: [
           {
             label: "Read edition",
@@ -963,13 +1143,20 @@ export const materializeWeek = internalMutation({
         .withIndex("by_weekId", (range) => range.eq("weekId", args.weekId))
         .collect(),
     ]);
-    await materializeRosterPosts(ctx, args.seasonId, playerDays);
+    await materializeRosterPosts(ctx, args.seasonId, week, playerDays);
     await materializeMatchupPosts(
       ctx,
       args.seasonId,
       week,
       matchups,
       playerWeeks,
+    );
+    await materializeThreeStarsPost(
+      ctx,
+      args.seasonId,
+      week,
+      playerWeeks,
+      matchups.length > 0 && matchups.every((matchup) => matchup.isComplete),
     );
     await materializePowerPost(ctx, args.seasonId, week, teamWeeks);
   },
