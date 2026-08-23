@@ -5,6 +5,7 @@ import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import type {
   WeeklyEdition,
+  WeeklyEditionAiStatus,
   WeeklyEditionArchiveSummary,
   WeeklyEditionHomeSummary,
   WeeklyEditionNewsroomSummary,
@@ -12,6 +13,7 @@ import type {
   WeeklyEditionReaderDetail,
   WeeklyEditionRevisionSummary,
 } from "@gshl-types";
+import { useAppAction } from "./useAppAction";
 import { useAppMutation } from "./useAppMutation";
 
 export function useLatestWeeklyEdition(): WeeklyEditionQueryState<WeeklyEditionHomeSummary | null> {
@@ -49,6 +51,10 @@ export function useWeeklyEdition(
 }
 
 export function useWeeklyEditionNewsroom(editionId?: string) {
+  const aiStatus: WeeklyEditionAiStatus | undefined = useQuery(
+    api.weeklyEditions.aiStatus,
+    {},
+  );
   const editions: WeeklyEditionNewsroomSummary[] | undefined = useQuery(
     api.weeklyEditions.newsroom,
     {},
@@ -65,8 +71,11 @@ export function useWeeklyEditionNewsroom(editionId?: string) {
     editions,
     selectedEdition: selectedEdition as WeeklyEdition | null | undefined,
     revisions,
+    aiStatus,
     isLoading: editions === undefined,
+    isAiStatusLoading: aiStatus === undefined,
     isEditionLoading: Boolean(editionId) && selectedEdition === undefined,
+    generateWithAi: useAppAction(api.weeklyEditions.generateWithAi),
     generateHistorical: useAppMutation(api.weeklyEditions.generateHistorical),
     publishImport: useAppMutation(api.weeklyEditions.publishImport),
     updateManual: useAppMutation(api.weeklyEditions.updateManual),

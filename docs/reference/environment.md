@@ -82,6 +82,22 @@ The destructive `convex:migrate` command is an exception: it bypasses
 `NEXT_PUBLIC_CONVEX_URL`. Verify that exact endpoint independently before an
 authorized migration.
 
+### Convex Newsroom AI
+
+These variables belong in each Convex deployment that should write newsletters.
+They are intentionally omitted from `.env.example` because the Next.js runtime
+and browser must never receive the Newsroom credential.
+
+| Name                    | Used for                                                         |
+| ----------------------- | ---------------------------------------------------------------- |
+| `OPENAI_API_KEY`        | Server-only OpenAI Responses API authentication for the Newsroom |
+| `OPENAI_NEWSROOM_MODEL` | Optional model override; defaults to `gpt-5-mini`                |
+
+Set the key against the exact intended Convex deployment without printing it or
+recording it in shell history. Configure preview and production deployments
+separately. The Newsroom reports whether a key is present and which model name
+will be used, but it never returns the credential.
+
 ## Google Sheets and Apps Script access
 
 | Name                              | Used for                                                   |

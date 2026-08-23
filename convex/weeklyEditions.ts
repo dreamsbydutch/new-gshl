@@ -1,11 +1,14 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/prefer-optional-chain */
 import { v } from "convex/values";
 import {
+  action,
   internalMutation,
+  internalQuery,
   mutation,
   query,
   type MutationCtx,
 } from "./_generated/server";
+import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import { requireCommissioner } from "./lib/auth";
 import { buildLeagueActivity } from "../src/lib/utils/features/league-activity";
@@ -16,6 +19,7 @@ import type {
   ContractStatus,
   MatchupType,
   SeasonType,
+  WeeklyEdition,
   WeeklyEditionContent,
   WeeklyEditionFactPacket,
   WeeklyEditionIssueType,
@@ -43,6 +47,10 @@ import {
   validateWeeklyEditionImport,
   weeklyEditionContractAffectsSeason,
 } from "../src/lib/utils/features/weekly-edition";
+import {
+  buildWeeklyEditionOpenAiRequest,
+  extractWeeklyEditionOpenAiText,
+} from "../src/lib/utils/features/weekly-edition-openai";
 import { toUtcTimestamp, utcTimestampToDateKey } from "./lib/timestamps";
 
 type EditionRow = Doc<"weeklyEditions">;
@@ -60,6 +68,57 @@ const PUBLIC_TIMESTAMP_FIELDS = [
   "createdAt",
   "updatedAt",
 ] as const;
+const weeklyEditionIssueTypeValidator = v.union(
+  v.literal("weekly"),
+  v.literal("final_recap"),
+  v.literal("resigning_outlook"),
+  v.literal("offseason_market"),
+  v.literal("pre_draft"),
+  v.literal("preseason"),
+);
+const DEFAULT_NEWSROOM_MODEL = "gpt-5-mini";
+
+function newsroomModel() {
+  const configured = process.env.OPENAI_NEWSROOM_MODEL?.trim();
+  return configured?.length ? configured : DEFAULT_NEWSROOM_MODEL;
+}
+
+function openAiErrorMessage(value: unknown) {
+  if (!value || typeof value !== "object") return "";
+  const error = (value as { error?: unknown }).error;
+  if (!error || typeof error !== "object") return "";
+  const message = (error as { message?: unknown }).message;
+  return typeof message === "string" ? message.trim().slice(0, 300) : "";
+}
+
+async function requestNewsletter({
+  apiKey,
+  model,
+  prompt,
+}: {
+  apiKey: string;
+  model: string;
+  prompt: string;
+}) {
+  const response = await fetch("https://api.openai.com/v1/responses", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(buildWeeklyEditionOpenAiRequest({ model, prompt })),
+  });
+  const payload: unknown = await response.json().catch(() => null);
+  if (!response.ok) {
+    const detail = openAiErrorMessage(payload);
+    throw new Error(
+      `OpenAI could not write the newsletter (${response.status})${
+        detail ? `: ${detail}` : ""
+      }`,
+    );
+  }
+  return extractWeeklyEditionOpenAiText(payload);
+}
 type PublicTimestampField = (typeof PUBLIC_TIMESTAMP_FIELDS)[number];
 type PublicRow<Row extends { _id: string }> = Omit<
   Row,
@@ -1994,20 +2053,290 @@ export const prompt = query({
   },
 });
 
+export const aiStatus = query({
+  args: {},
+  handler: async (ctx) => {
+    await requireCommissioner(ctx);
+    return {
+      configured: Boolean(process.env.OPENAI_API_KEY?.trim()),
+      model: newsroomModel(),
+    };
+  },
+});
+
+export const currentAiCommissioner = internalQuery({
+  args: {},
+  handler: async (ctx) => {
+    const user = await requireCommissioner(ctx);
+    return { userId: user._id };
+  },
+});
+
+export const prepareAiGeneration = internalMutation({
+  args: {
+    seasonId: v.id("seasons"),
+    weekId: v.id("weeks"),
+    issueType: weeklyEditionIssueTypeValidator,
+  },
+  handler: async (ctx, args) => {
+    const [season, week, allSeasons] = await Promise.all([
+      ctx.db.get(args.seasonId),
+      ctx.db.get(args.weekId),
+      ctx.db.query("seasons").collect(),
+    ]);
+    if (!season || !week || week.seasonId !== season._id) {
+      throw new Error("Season or week not found");
+    }
+
+    const analysisSeason = nextChronologicalSeason(allSeasons, season);
+    const scheduledFor =
+      milestoneSchedule(analysisSeason, week).find(
+        (item) => item.issueType === args.issueType,
+      )?.scheduledFor ?? dateKey(week.endDate);
+    const weekStart = toUtcTimestamp(week.startDate);
+    const weekEnd = toUtcTimestamp(week.endDate);
+    if (weekStart === null || weekEnd === null) {
+      throw new Error("The selected week contains an invalid date");
+    }
+
+    let facts: WeeklyEditionFactPacket;
+    let editionKey: string;
+    let issueLabel: string;
+    let scheduledForTimestamp: number;
+    if (args.issueType === "weekly") {
+      const weekEndDate = dateKey(week.endDate);
+      if (!weekEndDate || weekEndDate >= dateKey(Date.now())) {
+        throw new Error("The selected week has not ended");
+      }
+      facts = await buildSource(ctx, season, week);
+      editionKey = `week:${String(week._id)}`;
+      issueLabel = `Week ${asNumber(week.weekNum)}`;
+      scheduledForTimestamp = weekEnd;
+    } else {
+      facts = await buildMilestoneSource(
+        ctx,
+        season,
+        week,
+        args.issueType,
+        scheduledFor,
+      );
+      editionKey = `milestone:${args.issueType}`;
+      issueLabel = facts.issueLabel;
+      const timestamp = toUtcTimestamp(scheduledFor);
+      if (timestamp === null) {
+        throw new Error("The weekly edition schedule contains an invalid date");
+      }
+      scheduledForTimestamp = timestamp;
+    }
+
+    const existing = await ctx.db
+      .query("weeklyEditions")
+      .withIndex("by_seasonId_editionKey", (q) =>
+        q.eq("seasonId", season._id).eq("editionKey", editionKey),
+      )
+      .unique();
+    return {
+      existingEditionId: existing?._id,
+      expectedUpdatedAt: existing
+        ? requiredPublicTimestamp("updatedAt", existing.updatedAt)
+        : undefined,
+      seasonId: season._id,
+      weekId: week._id,
+      editionKey,
+      issueType: args.issueType,
+      issueLabel,
+      seasonName: season.name,
+      weekNum: asNumber(week.weekNum),
+      startDate: weekStart,
+      endDate: weekEnd,
+      scheduledFor: scheduledForTimestamp,
+      facts,
+      sourceHash: hashWeeklyEditionSource(facts),
+    };
+  },
+});
+
+export const finalizeAiGeneration = internalMutation({
+  args: {
+    existingEditionId: v.optional(v.id("weeklyEditions")),
+    expectedUpdatedAt: v.optional(v.number()),
+    seasonId: v.id("seasons"),
+    weekId: v.id("weeks"),
+    editionKey: v.string(),
+    issueType: weeklyEditionIssueTypeValidator,
+    issueLabel: v.string(),
+    seasonName: v.string(),
+    weekNum: v.number(),
+    startDate: v.number(),
+    endDate: v.number(),
+    scheduledFor: v.number(),
+    facts: v.any(),
+    sourceHash: v.string(),
+    raw: v.string(),
+    editedBy: v.id("authUsers"),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.db.get(args.editedBy);
+    if (user?.status !== "active" || user.role !== "commissioner") {
+      throw new Error("Forbidden");
+    }
+
+    const facts = args.facts as WeeklyEditionFactPacket;
+    if (hashWeeklyEditionSource(facts) !== args.sourceHash) {
+      throw new Error("The newsletter fact packet failed its integrity check");
+    }
+    const validation = validateWeeklyEditionImport(args.raw, facts);
+    if (!validation.valid || !validation.content) {
+      throw new Error(validation.errors.join("\n"));
+    }
+
+    const existing = args.existingEditionId
+      ? await ctx.db.get(args.existingEditionId)
+      : null;
+    if (args.existingEditionId && !existing) {
+      throw new Error("The newsletter changed while OpenAI was writing it");
+    }
+    if (
+      existing &&
+      (existing.seasonId !== args.seasonId ||
+        existing.weekId !== args.weekId ||
+        existing.editionKey !== args.editionKey ||
+        requiredPublicTimestamp("updatedAt", existing.updatedAt) !==
+          args.expectedUpdatedAt)
+    ) {
+      throw new Error("The newsletter changed while OpenAI was writing it");
+    }
+    if (!existing) {
+      const concurrent = await ctx.db
+        .query("weeklyEditions")
+        .withIndex("by_seasonId_editionKey", (q) =>
+          q.eq("seasonId", args.seasonId).eq("editionKey", args.editionKey),
+        )
+        .unique();
+      if (concurrent) {
+        throw new Error("The newsletter changed while OpenAI was writing it");
+      }
+    }
+
+    const now = Date.now();
+    const values = {
+      editionKey: args.editionKey,
+      issueType: args.issueType,
+      issueLabel: args.issueLabel,
+      seasonName: args.seasonName,
+      weekNum: args.weekNum,
+      startDate: args.startDate,
+      endDate: args.endDate,
+      status: "published" as const,
+      generationMode: "openai" as const,
+      content: validation.content,
+      facts,
+      sourceHash: args.sourceHash,
+      scheduledFor: args.scheduledFor,
+      updatedAt: now,
+      editedBy: args.editedBy,
+    };
+
+    if (existing) {
+      await saveRevision(ctx, existing, args.editedBy);
+      await ctx.db.patch(existing._id, values);
+      return publicRow(await ctx.db.get(existing._id));
+    }
+
+    const editionId = await ctx.db.insert("weeklyEditions", {
+      seasonId: args.seasonId,
+      weekId: args.weekId,
+      ...values,
+      publishedAt: now,
+      createdAt: now,
+    });
+    return publicRow(await ctx.db.get(editionId));
+  },
+});
+
+export const generateWithAi = action({
+  args: {
+    seasonId: v.id("seasons"),
+    weekId: v.id("weeks"),
+    issueType: weeklyEditionIssueTypeValidator,
+  },
+  handler: async (
+    ctx,
+    args,
+  ): Promise<{
+    state: "inserted" | "updated";
+    model: string;
+    edition: WeeklyEdition;
+  }> => {
+    const commissioner = await ctx.runQuery(
+      internal.weeklyEditions.currentAiCommissioner,
+      {},
+    );
+    const apiKey = process.env.OPENAI_API_KEY?.trim();
+    if (!apiKey) {
+      throw new Error(
+        "OpenAI is not configured. Add OPENAI_API_KEY to this Convex deployment.",
+      );
+    }
+
+    const prepared = await ctx.runMutation(
+      internal.weeklyEditions.prepareAiGeneration,
+      args,
+    );
+    const facts = prepared.facts;
+    const model = newsroomModel();
+    const prompt = buildWeeklyEditionChatGptPrompt(facts);
+    let raw = await requestNewsletter({ apiKey, model, prompt });
+    let validation = validateWeeklyEditionImport(raw, facts);
+
+    if (!validation.valid) {
+      const correctionPrompt = [
+        prompt,
+        "",
+        "REVISION_REQUIRED: The draft below failed the newsroom validator.",
+        "Correct every listed error without changing supported facts, adding claims, or changing the required six-article structure. Return only the corrected JSON object.",
+        `VALIDATION_ERRORS=${JSON.stringify(validation.errors)}`,
+        `REJECTED_DRAFT=${raw}`,
+      ].join("\n");
+      raw = await requestNewsletter({
+        apiKey,
+        model,
+        prompt: correctionPrompt,
+      });
+      validation = validateWeeklyEditionImport(raw, facts);
+    }
+
+    if (!validation.valid) {
+      throw new Error(
+        `OpenAI returned a newsletter that failed validation:\n${validation.errors.join(
+          "\n",
+        )}`,
+      );
+    }
+
+    const edition = await ctx.runMutation(
+      internal.weeklyEditions.finalizeAiGeneration,
+      {
+        ...prepared,
+        raw,
+        editedBy: commissioner.userId,
+      },
+    );
+    if (!edition)
+      throw new Error("The generated newsletter could not be saved");
+    return {
+      state: prepared.existingEditionId ? "updated" : "inserted",
+      model,
+      edition: edition as unknown as WeeklyEdition,
+    };
+  },
+});
+
 export const generateHistorical = mutation({
   args: {
     seasonId: v.id("seasons"),
     weekId: v.id("weeks"),
-    issueType: v.optional(
-      v.union(
-        v.literal("weekly"),
-        v.literal("final_recap"),
-        v.literal("resigning_outlook"),
-        v.literal("offseason_market"),
-        v.literal("pre_draft"),
-        v.literal("preseason"),
-      ),
-    ),
+    issueType: v.optional(weeklyEditionIssueTypeValidator),
     replaceEditorial: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {

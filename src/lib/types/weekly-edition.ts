@@ -1,5 +1,6 @@
 export type WeeklyEditionGenerationMode =
   | "template"
+  | "openai"
   | "chatgpt_import"
   | "manual";
 
@@ -621,6 +622,17 @@ export interface WeeklyEditionSectionCardProps {
 export interface WeeklyEditionQueryState<T> {
   data: T | undefined;
   isLoading: boolean;
+}
+
+export interface WeeklyEditionAiStatus {
+  configured: boolean;
+  model: string;
+}
+
+export interface WeeklyEditionAiGenerationResult {
+  state: "inserted" | "updated";
+  model: string;
+  edition: WeeklyEdition;
 }
 
 export interface WeeklyEditionMilestoneScheduleInput {

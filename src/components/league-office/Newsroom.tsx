@@ -147,19 +147,38 @@ export function Newsroom() {
     showNotice("Manual revision published.");
   };
 
-  const generate = async () => {
+  const generateTemplate = async () => {
     if (!seasonId || !weekId) return;
-    const result = await newsroom.generateHistorical.mutateAsync({
-      seasonId,
-      weekId,
-      issueType,
-    });
-    const generated = result as {
-      state?: string;
-      edition?: WeeklyEdition;
-    };
-    if (generated.edition?.id) setEditionId(generated.edition.id);
-    showNotice(`Edition ${generated.state ?? "generated"}.`);
+    try {
+      const result = await newsroom.generateHistorical.mutateAsync({
+        seasonId,
+        weekId,
+        issueType,
+      });
+      const generated = result as {
+        state?: string;
+        edition?: WeeklyEdition;
+      };
+      if (generated.edition?.id) setEditionId(generated.edition.id);
+      showNotice(`Grounded template ${generated.state ?? "generated"}.`);
+    } catch {
+      // The hook exposes the error in the newsroom alert.
+    }
+  };
+
+  const generateWithAi = async () => {
+    if (!seasonId || !weekId) return;
+    try {
+      const generated = await newsroom.generateWithAi.mutateAsync({
+        seasonId,
+        weekId,
+        issueType,
+      });
+      setEditionId(generated.edition.id);
+      showNotice(`Newsletter written with ${generated.model}.`);
+    } catch {
+      // The hook exposes the error in the newsroom alert.
+    }
   };
 
   const toggleVisibility = async () => {
@@ -210,6 +229,7 @@ export function Newsroom() {
   };
 
   const mutationError =
+    newsroom.generateWithAi.error ??
     newsroom.generateHistorical.error ??
     newsroom.publishImport.error ??
     newsroom.updateManual.error ??
@@ -229,10 +249,9 @@ export function Newsroom() {
           GSHL Press Box Newsroom
         </h2>
         <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-          Weekly and season-milestone editions publish automatically. ChatGPT is
-          optional: copy the grounded prompt, use it in ChatGPT Free or Plus,
-          then paste only its JSON response here. No API key or paid API call is
-          involved.
+          Choose a completed week and the newsroom will collect the verified
+          league record, find six stories, and publish a complete edition. Every
+          draft is checked against the stored facts before it can go live.
         </p>
       </header>
 
@@ -358,21 +377,53 @@ export function Newsroom() {
             <option value="preseason">Preseason preview</option>
           </select>
         </label>
-        <Button
-          type="button"
-          className="self-end"
-          disabled={
-            !seasonId || !weekId || newsroom.generateHistorical.isPending
-          }
-          onClick={() => void generate()}
-        >
-          {newsroom.generateHistorical.isPending ? (
-            <LoaderCircle className="animate-spin" />
-          ) : (
-            <Sparkles />
-          )}
-          Generate or refresh template
-        </Button>
+        <div className="space-y-2 self-end">
+          <Button
+            type="button"
+            className="w-full"
+            disabled={
+              !seasonId ||
+              !weekId ||
+              !newsroom.aiStatus?.configured ||
+              newsroom.generateWithAi.isPending ||
+              newsroom.generateHistorical.isPending
+            }
+            onClick={() => void generateWithAi()}
+          >
+            {newsroom.generateWithAi.isPending ? (
+              <LoaderCircle className="animate-spin" />
+            ) : (
+              <Sparkles />
+            )}
+            Write newsletter with AI
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full"
+            disabled={
+              !seasonId ||
+              !weekId ||
+              newsroom.generateWithAi.isPending ||
+              newsroom.generateHistorical.isPending
+            }
+            onClick={() => void generateTemplate()}
+          >
+            {newsroom.generateHistorical.isPending ? (
+              <LoaderCircle className="animate-spin" />
+            ) : (
+              <Newspaper />
+            )}
+            Build grounded template
+          </Button>
+          <p className="text-xs leading-5 text-slate-500">
+            {newsroom.isAiStatusLoading
+              ? "Checking OpenAI configuration..."
+              : newsroom.aiStatus?.configured
+                ? `OpenAI ready · ${newsroom.aiStatus.model}`
+                : "Add OPENAI_API_KEY to the Convex deployment to enable AI writing."}
+          </p>
+        </div>
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[18rem_minmax(0,1fr)]">
@@ -436,7 +487,7 @@ export function Newsroom() {
                 disabled={!prompt}
               >
                 <Clipboard />
-                Copy ChatGPT prompt
+                Copy fallback prompt
               </Button>
               <Button
                 type="button"

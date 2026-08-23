@@ -42,6 +42,15 @@ One standings surface provides overall, conference, wildcard, power-ranking, pla
 
 Published editions have a public archive and detail page. The current home-active issue can also open directly over the home page. Hidden editions are not returned to public readers. Edition content is grounded in stored fact packets even when wording is imported or manually edited.
 
+Commissioners can ask the Newsroom to write a complete six-article edition from
+the selected week. The Convex backend assembles the existing verified fact
+packet, sends it to the OpenAI Responses API, validates the returned structure,
+authors, links, rule claims, and factual boundaries, then publishes it as one
+atomic revision. One corrective pass is allowed when the first draft fails
+validation; a second failure leaves the current edition unchanged. Grounded
+templates, copyable prompts, validated imports, manual edits, article toggles,
+and revision restoration remain available as fallbacks.
+
 ### Rulebook
 
 The public rulebook is generated from structured content in `src/content/rulebook.ts`. It supports search, section navigation, collapsible content, diagrams, and a print layout. `/rules` is an alias for `/rulebook`.
@@ -109,7 +118,7 @@ Commissioners additionally receive:
 - contract creation with derived terms and cap validation;
 - user role, status, and owner-link management;
 - dry-run/apply operational jobs with progress, cancellation, and retry;
-- Press Box generation, visibility, article toggles, validated imports, manual edits, and revision restoration; and
+- Press Box AI and template generation, visibility, article toggles, validated imports, manual edits, and revision restoration; and
 - authenticated image uploads through UploadThing.
 
 ## Shared behavior
