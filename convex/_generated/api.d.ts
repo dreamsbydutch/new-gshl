@@ -19,6 +19,7 @@ import type * as frontend from "../frontend.js";
 import type * as jobCatalog from "../jobCatalog.js";
 import type * as jobRunner from "../jobRunner.js";
 import type * as jobs from "../jobs.js";
+import type * as leagueWire from "../leagueWire.js";
 import type * as lib_auth from "../lib/auth.js";
 import type * as lib_frontendQuery from "../lib/frontendQuery.js";
 import type * as lib_matchupProjection from "../lib/matchupProjection.js";
@@ -63,6 +64,7 @@ declare const fullApi: ApiFromModules<{
   jobCatalog: typeof jobCatalog;
   jobRunner: typeof jobRunner;
   jobs: typeof jobs;
+  leagueWire: typeof leagueWire;
   "lib/auth": typeof lib_auth;
   "lib/frontendQuery": typeof lib_frontendQuery;
   "lib/matchupProjection": typeof lib_matchupProjection;

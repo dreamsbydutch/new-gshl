@@ -40,7 +40,13 @@ export function RosterPlayerCard({
       : "--";
 
   return (
-    <div className={cn("grid grid-cols-2 px-2 text-center", className)}>
+    <div
+      id={`player-${player.id}`}
+      className={cn(
+        "grid scroll-mt-32 grid-cols-2 px-2 text-center",
+        className,
+      )}
+    >
       <div className="col-span-3 text-sm">{player.fullName}</div>
       <div className="text-2xs">{player.nhlPos?.toString() ?? ""}</div>
       <div>

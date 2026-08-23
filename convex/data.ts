@@ -6,6 +6,7 @@ import {
   timestampFieldsForTable,
   toUtcTimestamp,
 } from "./lib/timestamps";
+import { scheduleLeagueWireMaterialization } from "./leagueWire";
 
 type Row = Record<string, unknown>;
 type ConvexRow = Row & { _id: string; _creationTime: number };
@@ -1338,6 +1339,7 @@ export const insertMany = mutationGeneric({
         id,
       });
     }
+    await scheduleLeagueWireMaterialization(ctx, args.table, args.rows);
     return { inserted };
   },
 });
@@ -1402,7 +1404,9 @@ export const updateById = mutationGeneric({
     }
 
     await ctx.db.patch(row._id, normalizeDoc(args.table, args.data) as never);
-    return publicRow((await ctx.db.get(row._id)) as never);
+    const updated = (await ctx.db.get(row._id)) as ConvexRow;
+    await scheduleLeagueWireMaterialization(ctx, args.table, [updated]);
+    return publicRow(updated);
   },
 });
 
@@ -1449,7 +1453,9 @@ export const upsertByCompositeKey = mutationGeneric({
       });
     }
 
-    return applyUpsertByCompositeKey(ctx, args);
+    const result = await applyUpsertByCompositeKey(ctx, args);
+    await scheduleLeagueWireMaterialization(ctx, args.table, args.rows);
+    return result;
   },
 });
 

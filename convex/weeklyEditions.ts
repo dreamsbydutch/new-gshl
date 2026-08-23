@@ -21,6 +21,7 @@ import type {
   WeeklyEditionIssueType,
 } from "../src/lib/types";
 import { ContractStatus as ContractStatusValues } from "../src/lib/utils/domain/constants";
+import { upsertLeagueWirePost, withdrawLeagueWirePost } from "./leagueWire";
 import {
   buildWeeklyEditionCareerRecordFacts,
   buildWeeklyEditionArchiveSummary,
@@ -95,6 +96,26 @@ const publicRow = <Row extends { _id: string }>(
     output[field] = requiredPublicTimestamp(field, output[field]);
   }
   return output as PublicRow<Row>;
+};
+const publishEditionWirePost = async (
+  ctx: MutationCtx,
+  edition: Doc<"weeklyEditions"> | null,
+) => {
+  if (!edition || edition.status !== "published") return;
+  await upsertLeagueWirePost(ctx, {
+    seasonId: edition.seasonId,
+    kind: "press_box",
+    sourceKey: `press-box:${String(edition._id)}`,
+    occurredAt: requiredPublicTimestamp("publishedAt", edition.publishedAt),
+    title: `Press Box: ${edition.issueLabel}`,
+    summary: edition.seasonName,
+    links: [
+      {
+        label: "Read edition",
+        href: `/headlines/${encodeURIComponent(String(edition._id))}`,
+      },
+    ],
+  });
 };
 const publicReaderRow = (row: EditionRow | null) => {
   if (!row) return null;
@@ -1017,13 +1038,16 @@ async function generateForWeek(
       q.eq("seasonId", season._id).eq("editionKey", editionKey),
     )
     .unique();
-  if (existing?.sourceHash === sourceHash)
+  if (existing?.sourceHash === sourceHash) {
+    await publishEditionWirePost(ctx, existing);
     return { state: "unchanged", existing };
+  }
   if (
     existing &&
     existing.generationMode !== "template" &&
     options.replaceEditorial !== true
   ) {
+    await publishEditionWirePost(ctx, existing);
     return { state: "protected", existing };
   }
 
@@ -1048,7 +1072,9 @@ async function generateForWeek(
       updatedAt: now,
       editedBy: options.editedBy,
     });
-    return { state: "updated", existing: await ctx.db.get(existing._id) };
+    const updated = await ctx.db.get(existing._id);
+    await publishEditionWirePost(ctx, updated);
+    return { state: "updated", existing: updated };
   }
   const editionId = await ctx.db.insert("weeklyEditions", {
     seasonId: season._id,
@@ -1071,7 +1097,9 @@ async function generateForWeek(
     updatedAt: now,
     editedBy: options.editedBy,
   });
-  return { state: "inserted", existing: await ctx.db.get(editionId) };
+  const inserted = await ctx.db.get(editionId);
+  await publishEditionWirePost(ctx, inserted);
+  return { state: "inserted", existing: inserted };
 }
 
 function milestoneSchedule(season: Doc<"seasons">, finalWeek: Doc<"weeks">) {
@@ -1821,15 +1849,20 @@ async function generateMilestoneForSeason(
       q.eq("seasonId", season._id).eq("editionKey", editionKey),
     )
     .unique();
-  if (existing && options.refreshSource !== true)
+  if (existing && options.refreshSource !== true) {
+    await publishEditionWirePost(ctx, existing);
     return { state: "unchanged", existing };
-  if (existing?.sourceHash === sourceHash)
+  }
+  if (existing?.sourceHash === sourceHash) {
+    await publishEditionWirePost(ctx, existing);
     return { state: "unchanged", existing };
+  }
   if (
     existing &&
     existing.generationMode !== "template" &&
     options.replaceEditorial !== true
   ) {
+    await publishEditionWirePost(ctx, existing);
     return { state: "protected", existing };
   }
   const now = Date.now();
@@ -1864,7 +1897,9 @@ async function generateMilestoneForSeason(
   if (existing) {
     await saveRevision(ctx, existing, options.editedBy);
     await ctx.db.patch(existing._id, values);
-    return { state: "updated", existing: await ctx.db.get(existing._id) };
+    const updated = await ctx.db.get(existing._id);
+    await publishEditionWirePost(ctx, updated);
+    return { state: "updated", existing: updated };
   }
   const editionId = await ctx.db.insert("weeklyEditions", {
     seasonId: season._id,
@@ -1873,7 +1908,9 @@ async function generateMilestoneForSeason(
     publishedAt: now,
     createdAt: now,
   });
-  return { state: "inserted", existing: await ctx.db.get(editionId) };
+  const inserted = await ctx.db.get(editionId);
+  await publishEditionWirePost(ctx, inserted);
+  return { state: "inserted", existing: inserted };
 }
 
 export const latestPublished = query({
@@ -2064,7 +2101,9 @@ export const publishImport = mutation({
       editedBy: user._id,
       updatedAt: Date.now(),
     });
-    return publicRow(await ctx.db.get(edition._id));
+    const updated = await ctx.db.get(edition._id);
+    await publishEditionWirePost(ctx, updated);
+    return publicRow(updated);
   },
 });
 
@@ -2084,7 +2123,9 @@ export const updateManual = mutation({
       editedBy: user._id,
       updatedAt: Date.now(),
     });
-    return publicRow(await ctx.db.get(edition._id));
+    const updated = await ctx.db.get(edition._id);
+    await publishEditionWirePost(ctx, updated);
+    return publicRow(updated);
   },
 });
 
@@ -2103,7 +2144,13 @@ export const setVisibility = mutation({
       editedBy: user._id,
       updatedAt: Date.now(),
     });
-    return publicRow(await ctx.db.get(args.editionId));
+    const updated = await ctx.db.get(args.editionId);
+    if (args.status === "published") {
+      await publishEditionWirePost(ctx, updated);
+    } else {
+      await withdrawLeagueWirePost(ctx, `press-box:${String(args.editionId)}`);
+    }
+    return publicRow(updated);
   },
 });
 
@@ -2165,7 +2212,9 @@ export const setSectionActive = mutation({
       editedBy: user._id,
       updatedAt: Date.now(),
     });
-    return publicRow(await ctx.db.get(edition._id));
+    const updated = await ctx.db.get(edition._id);
+    await publishEditionWirePost(ctx, updated);
+    return publicRow(updated);
   },
 });
 
@@ -2185,7 +2234,9 @@ export const restoreRevision = mutation({
       editedBy: user._id,
       updatedAt: Date.now(),
     });
-    return publicRow(await ctx.db.get(edition._id));
+    const updated = await ctx.db.get(edition._id);
+    await publishEditionWirePost(ctx, updated);
+    return publicRow(updated);
   },
 });
 

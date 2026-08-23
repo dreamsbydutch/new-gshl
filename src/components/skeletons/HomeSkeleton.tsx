@@ -1,6 +1,6 @@
 import { Skeleton } from "../ui/SkeletonPrimitive";
 
-export function LeagueActivityRowsSkeleton() {
+export function LeagueWireRowsSkeleton() {
   return (
     <div className="divide-y divide-slate-100 px-3 sm:px-5">
       {Array.from({ length: 5 }).map((_, index) => (
@@ -19,14 +19,14 @@ export function LeagueActivityRowsSkeleton() {
   );
 }
 
-export function LeagueActivityCardSkeleton() {
+export function LeagueWireCardSkeleton() {
   return (
     <section className="h-full min-w-0 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm sm:rounded-2xl">
       <header className="space-y-2 border-b border-slate-100 px-3 py-3 sm:px-5">
         <Skeleton className="h-6 w-48" />
         <Skeleton className="h-3 w-56 max-w-full" />
       </header>
-      <LeagueActivityRowsSkeleton />
+      <LeagueWireRowsSkeleton />
     </section>
   );
 }
@@ -112,7 +112,7 @@ export function HomeSkeleton() {
         <UfaHomeCardSkeleton />
         <div className="mx-auto grid w-full min-w-0 max-w-5xl items-start gap-3 sm:gap-4 xl:grid-cols-2">
           <PowerRankingsHomeCardSkeleton />
-          <LeagueActivityCardSkeleton />
+          <LeagueWireCardSkeleton />
         </div>
       </div>
     </main>

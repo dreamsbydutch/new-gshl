@@ -28,7 +28,14 @@ The home page assembles season-aware cards rather than maintaining independent p
 - a countdown or link to the live Draft Hub; and
 - an offseason mock-draft preview.
 
-The dashboard keeps these modules compact: Home shows five UFA candidates, eight power-ranking entries, five recent events, and four first-round mock-draft projections. Readers can expand the recent activity list in place or follow the visible links to the complete UFA, standings, Press Box, Draft Hub, and mock-draft surfaces.
+The dashboard keeps these modules compact: Home shows five UFA candidates,
+eight power-ranking entries, five League Wire posts, and four first-round
+mock-draft projections. The Wire stores full trades, trade-block updates, draft
+picks, UFA activity, roster moves, final matchups and three stars, power
+movement, Press Box editions, and commissioner announcements. Readers can
+expand it in place, open each post's player, matchup, proposal, or team links,
+and share a post when their role permits. Commissioners can publish a two-sided
+trade package or announcement from the Wire.
 
 ### Schedule and matchup detail
 

@@ -134,8 +134,9 @@ function DraftFlowPick({
 
   return (
     <div
+      id={`draft-pick-${pick.pick.id}`}
       className={cn(
-        "flex min-h-14 min-w-0 items-center gap-1.5 rounded-md border bg-white px-1.5 py-1.5 shadow-sm sm:gap-2 sm:px-2",
+        "flex min-h-14 min-w-0 scroll-mt-32 items-center gap-1.5 rounded-md border bg-white px-1.5 py-1.5 shadow-sm sm:gap-2 sm:px-2",
         isRecent
           ? "border-l-2 border-l-emerald-500"
           : "border-r-2 border-r-primary",

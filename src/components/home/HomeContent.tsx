@@ -9,7 +9,7 @@ import {
   isBetweenSeasons,
   resolveDraftHubSeason,
 } from "@gshl-utils";
-import { LeagueActivityCard } from "./LeagueActivityCard";
+import { LeagueWire } from "./LeagueWire";
 import { PowerRankingsHomeCard } from "./PowerRankingsHomeCard";
 import { UfaHomeCard } from "@gshl-components/contracts";
 import { WeeklyEditionHomeCard } from "@gshl-components/headlines/WeeklyEditionHomeCard";
@@ -48,7 +48,7 @@ export function HomeContent() {
           {dashboardSeason ? (
             <PowerRankingsHomeCard seasonId={String(dashboardSeason.id)} />
           ) : null}
-          <LeagueActivityCard
+          <LeagueWire
             seasonId={
               dashboardSeason?.id ? String(dashboardSeason.id) : undefined
             }

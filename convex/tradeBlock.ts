@@ -4,6 +4,7 @@ import type { Doc, Id } from "./_generated/dataModel";
 import { mutation, query, type QueryCtx } from "./_generated/server";
 import { requireActiveUser, requireOwnerAccess } from "./lib/auth";
 import { toUtcTimestamp, utcTimestampToDateKey } from "./lib/timestamps";
+import { upsertLeagueWirePost, withdrawLeagueWirePost } from "./leagueWire";
 import { normalizeTradeBlockNote } from "../src/lib/utils/features/trade-block";
 
 const INELIGIBLE_EXPIRY_STATUSES = new Set(["Buyout", "Retired", "Injured"]);
@@ -288,17 +289,49 @@ export const save = mutation({
       )
       .first();
     const now = Date.now();
+    const publishListing = async (listingId: Id<"tradeBlockEntries">) => {
+      if (!player.gshlTeamId) return;
+      const team = await ctx.db.get(player.gshlTeamId);
+      if (!team) return;
+      const franchise = await ctx.db.get(team.franchiseId);
+      if (!franchise) return;
+      const teamHref = `/lockerroom?view=roster&season=${encodeURIComponent(String(team.seasonId))}&owner=${encodeURIComponent(String(franchise.ownerId))}`;
+      await upsertLeagueWirePost(ctx, {
+        seasonId: team.seasonId,
+        kind: "trade_block",
+        sourceKey: `trade-block:${String(listingId)}`,
+        occurredAt: now,
+        title: `${player.fullName} is on the trade block`,
+        summary: note ?? `${franchise.name} is open to offers.`,
+        teamIds: [team._id],
+        playerIds: [player._id],
+        links: [
+          {
+            label: "View listing",
+            href: `/leagueoffice?view=tradeBlock&season=${encodeURIComponent(String(team.seasonId))}#trade-block-${encodeURIComponent(String(listingId))}`,
+          },
+          {
+            label: "View player",
+            href: `${teamHref}#player-${encodeURIComponent(String(player._id))}`,
+          },
+        ],
+      });
+    };
     if (existing) {
+      if ((existing.note ?? undefined) === note) return existing._id;
       await ctx.db.patch(existing._id, { note, updatedAt: now });
+      await publishListing(existing._id);
       return existing._id;
     }
-    return ctx.db.insert("tradeBlockEntries", {
+    const listingId = await ctx.db.insert("tradeBlockEntries", {
       ownerId: user.ownerId,
       playerId: player._id,
       note,
       createdAt: now,
       updatedAt: now,
     });
+    await publishListing(listingId);
+    return listingId;
   },
 });
 
@@ -309,6 +342,7 @@ export const remove = mutation({
     if (!listing) return null;
     await requireOwnerAccess(ctx, listing.ownerId);
     await ctx.db.delete(listing._id);
+    await withdrawLeagueWirePost(ctx, `trade-block:${String(listing._id)}`);
     return listing._id;
   },
 });

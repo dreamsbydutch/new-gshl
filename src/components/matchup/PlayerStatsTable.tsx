@@ -156,7 +156,8 @@ export function PlayerStatsTable({
               players.map((player) => (
                 <tr
                   key={player.id}
-                  className="group border-b border-slate-200 transition-colors last:border-0 odd:bg-white even:bg-slate-50/70 hover:bg-slate-100"
+                  id={`player-${player.id}`}
+                  className="group scroll-mt-32 border-b border-slate-200 transition-colors last:border-0 odd:bg-white even:bg-slate-50/70 hover:bg-slate-100"
                 >
                   {tableColumns.map((column) => {
                     const cellClassName = [
