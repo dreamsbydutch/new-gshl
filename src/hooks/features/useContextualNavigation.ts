@@ -31,6 +31,7 @@ import {
   resolveContextualSelection,
   SCHEDULE_NAVIGATION_VIEWS,
   STANDINGS_NAVIGATION_VIEWS,
+  toPersistedNavigationId,
   toLocalIsoDateOnly,
 } from "@gshl-utils";
 import {
@@ -295,6 +296,9 @@ export function useScheduleContextNavigation() {
     view === "team"
       ? resolveId(query.owner, persistedOwnerId, validOwnerIds, ownerFallback)
       : null;
+  const storedSeasonId = toPersistedNavigationId(effectiveSeasonId);
+  const storedWeekId = toPersistedNavigationId(effectiveWeekId);
+  const storedOwnerId = toPersistedNavigationId(effectiveOwnerId);
   const routeDataReady =
     hasHydrated &&
     isSeasonDataReady &&
@@ -303,34 +307,22 @@ export function useScheduleContextNavigation() {
       : !teamsQuery.isLoading && authStatus !== "loading");
   const storeMatches =
     persistedView === view &&
-    (effectiveSeasonId === null || persistedSeasonId === effectiveSeasonId) &&
-    (view !== "week" ||
-      effectiveWeekId === null ||
-      persistedWeekId === effectiveWeekId) &&
-    (view !== "team" ||
-      effectiveOwnerId === null ||
-      persistedOwnerId === effectiveOwnerId);
+    persistedSeasonId === storedSeasonId &&
+    (view !== "week" || persistedWeekId === storedWeekId) &&
+    (view !== "team" || persistedOwnerId === storedOwnerId);
 
   useEffect(() => {
     if (!routeDataReady || !navigation.shouldSyncCurrentUrl) return;
 
     if (persistedView !== view) setView(view);
-    if (effectiveSeasonId && persistedSeasonId !== effectiveSeasonId) {
-      setSeasonId(effectiveSeasonId);
+    if (persistedSeasonId !== storedSeasonId) {
+      setSeasonId(storedSeasonId);
     }
-    if (
-      view === "week" &&
-      effectiveWeekId &&
-      persistedWeekId !== effectiveWeekId
-    ) {
-      setWeekId(effectiveWeekId);
+    if (view === "week" && persistedWeekId !== storedWeekId) {
+      setWeekId(storedWeekId);
     }
-    if (
-      view === "team" &&
-      effectiveOwnerId &&
-      persistedOwnerId !== effectiveOwnerId
-    ) {
-      setOwnerId(effectiveOwnerId);
+    if (view === "team" && persistedOwnerId !== storedOwnerId) {
+      setOwnerId(storedOwnerId);
     }
 
     const canonicalHref = buildScheduleNavigationHref(navigation.search, {
@@ -356,6 +348,9 @@ export function useScheduleContextNavigation() {
     setSeasonId,
     setView,
     setWeekId,
+    storedOwnerId,
+    storedSeasonId,
+    storedWeekId,
     view,
   ]);
 
