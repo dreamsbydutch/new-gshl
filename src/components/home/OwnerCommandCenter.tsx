@@ -6,10 +6,10 @@ import {
   ArrowRightLeft,
   Bell,
   CalendarDays,
+  ChevronDown,
   CircleDollarSign,
   ClipboardList,
   ListPlus,
-  Shield,
   Users,
 } from "lucide-react";
 
@@ -78,8 +78,9 @@ function CommandAction({
   return (
     <Button
       asChild
+      size="sm"
       variant={primary ? "default" : "outline"}
-      className="min-w-0 justify-between px-3"
+      className="h-9 min-w-0 justify-between px-2.5"
     >
       <Link href={href}>
         <span className="flex min-w-0 items-center gap-2">
@@ -100,6 +101,35 @@ function CommandAction({
         ) : null}
       </Link>
     </Button>
+  );
+}
+
+function SnapshotMetric({
+  label,
+  value,
+  detail,
+  critical = false,
+}: {
+  label: string;
+  value: string;
+  detail: string;
+  critical?: boolean;
+}) {
+  return (
+    <div className="min-w-0 px-2.5 py-1 first:pl-0 sm:px-3 sm:first:pl-0">
+      <dt className="truncate text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+        {label}
+      </dt>
+      <dd
+        className={cn(
+          "mt-0.5 truncate font-mono text-sm font-semibold text-slate-950",
+          critical && "text-rose-700",
+        )}
+      >
+        {value}
+      </dd>
+      <dd className="truncate text-[10px] text-slate-500">{detail}</dd>
+    </div>
   );
 }
 
@@ -579,82 +609,136 @@ export function OwnerCommandCenter() {
   }
 
   const view = commandCenter.data;
+  const primaryCap = view.cap[0] ?? null;
+  const rosterDetail = view.roster.gaps.length
+    ? `Need ${view.roster.gaps
+        .map((gap) => `${gap.label} ×${gap.missing}`)
+        .join(", ")}`
+    : view.roster.composition
+        .map((entry) => `${entry.position} ${entry.count}`)
+        .join(" · ");
+  const nextMatchup = view.matchup.next;
+  const opponentName =
+    nextMatchup?.opponent?.abbr ?? nextMatchup?.opponent?.name ?? "Not set";
+  const marketCount = view.offers.length + view.listedPlayers.length;
+
   return (
     <section
       aria-labelledby="owner-command-center-heading"
-      className="mx-auto w-full max-w-5xl border-y border-slate-300 py-3 sm:py-4"
+      className="mx-auto w-full max-w-5xl border-y border-slate-300 py-2.5"
     >
-      <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex min-w-0 items-center gap-3">
-          <TeamMark team={view.team} size={52} />
+      <header className="flex flex-wrap items-center justify-between gap-2.5">
+        <div className="flex min-w-0 flex-1 items-center gap-2.5">
+          <TeamMark team={view.team} size={40} />
           <div className="min-w-0">
             <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">
               My Team · {view.season?.name ?? "Current season"}
             </p>
             <h2
               id="owner-command-center-heading"
-              className="truncate text-xl font-bold tracking-tight text-slate-950 sm:text-2xl"
+              className="truncate text-base font-bold tracking-tight text-slate-950 sm:text-lg"
             >
               {view.team?.name ?? `${view.ownerName}'s team`}
             </h2>
-            <p className="mt-0.5 text-xs text-slate-500">
-              {view.roster.count}/{view.roster.capacity} players
-              {view.cap[0]
-                ? ` · ${formatMoney(view.cap[0].remaining)} available`
-                : ""}
-              {commandCenter.unreadCount
-                ? ` · ${commandCenter.unreadCount} new`
-                : ""}
-            </p>
           </div>
         </div>
-        <div className="flex items-center gap-2 text-xs text-slate-500">
-          <Shield className="h-4 w-4" aria-hidden="true" />
-          Owner command center
-        </div>
+
+        <nav
+          aria-label="My Team actions"
+          className="grid w-full grid-cols-2 gap-1.5 sm:w-auto sm:grid-cols-4"
+        >
+          <CommandAction
+            href={view.actions.exploreTrade}
+            icon={ArrowRightLeft}
+            label="Trade market"
+            primary
+          />
+          <CommandAction
+            href={view.actions.listPlayer}
+            icon={ListPlus}
+            label="List player"
+            count={view.listedPlayers.length}
+          />
+          <CommandAction
+            href={view.actions.reviewOffer}
+            icon={CircleDollarSign}
+            label="UFA offers"
+            count={view.offers.length}
+          />
+          <CommandAction
+            href={view.actions.viewMatchup}
+            icon={CalendarDays}
+            label="Matchup"
+          />
+        </nav>
       </header>
 
-      <nav
-        aria-label="My Team actions"
-        className="mt-3 grid grid-cols-2 gap-2 lg:grid-cols-4"
+      <dl
+        aria-label="My Team snapshot"
+        className="mt-2 grid grid-cols-3 gap-y-1 divide-x divide-slate-200 border-y border-slate-100 py-1 sm:grid-cols-5 [&>div:nth-child(4)]:border-l-0 [&>div:nth-child(4)]:pl-0 sm:[&>div:nth-child(4)]:border-l sm:[&>div:nth-child(4)]:pl-3"
       >
-        <CommandAction
-          href={view.actions.exploreTrade}
-          icon={ArrowRightLeft}
-          label="Explore trade"
-          primary
+        <SnapshotMetric
+          label="Roster"
+          value={`${view.roster.count}/${view.roster.capacity}`}
+          detail={rosterDetail}
         />
-        <CommandAction
-          href={view.actions.listPlayer}
-          icon={ListPlus}
-          label="List player"
-          count={view.listedPlayers.length}
+        <SnapshotMetric
+          label="Cap space"
+          value={primaryCap ? formatMoney(primaryCap.remaining, true) : "—"}
+          detail={`${view.contractDecisions.length} contract decision${view.contractDecisions.length === 1 ? "" : "s"}`}
+          critical={Boolean(primaryCap && primaryCap.remaining < 0)}
         />
-        <CommandAction
-          href={view.actions.reviewOffer}
-          icon={CircleDollarSign}
-          label="Review offer"
-          count={view.offers.length}
+        <SnapshotMetric
+          label="Next matchup"
+          value={opponentName}
+          detail={
+            nextMatchup
+              ? `${view.matchup.record.wins}-${view.matchup.record.losses}-${view.matchup.record.ties} · ${nextMatchup.weekNum ? `W${nextMatchup.weekNum}` : shortDate(nextMatchup.weekStartDate)}`
+              : "No game scheduled"
+          }
         />
-        <CommandAction
-          href={view.actions.viewMatchup}
-          icon={CalendarDays}
-          label="View matchup"
+        <SnapshotMetric
+          label="Draft"
+          value={`${view.draft.count} pick${view.draft.count === 1 ? "" : "s"}`}
+          detail={
+            view.draft.acquired
+              ? `${view.draft.acquired} acquired`
+              : `${view.draft.groups.length} season${view.draft.groups.length === 1 ? "" : "s"}`
+          }
         />
-      </nav>
+        <SnapshotMetric
+          label="Market"
+          value={`${marketCount} active`}
+          detail={`${view.offers.length} offers · ${view.listedPlayers.length} listed${commandCenter.unreadCount ? ` · ${commandCenter.unreadCount} new` : ""}`}
+        />
+      </dl>
 
-      <div className="mt-3 grid gap-3 sm:grid-cols-2">
-        <RosterPanel view={view} />
-        <CapPanel view={view} />
-        <MatchupPanel view={view} />
-        <DraftPanel view={view} />
-        <InboxPanel
-          view={view}
-          lastViewedAt={commandCenter.lastViewedAt}
-          unreadCount={commandCenter.unreadCount}
-          onMarkRead={commandCenter.markActivityRead}
-        />
-      </div>
+      <details className="group">
+        <summary className="flex min-h-9 cursor-pointer list-none items-center justify-between gap-3 text-xs font-medium text-slate-600 marker:content-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
+          <span>Team details</span>
+          <span className="flex min-w-0 items-center gap-2">
+            <span className="hidden truncate text-[10px] font-normal text-slate-400 sm:inline">
+              Roster, cap, schedule, picks, and activity
+            </span>
+            <ChevronDown
+              className="h-4 w-4 shrink-0 transition-transform group-open:rotate-180 motion-reduce:transition-none"
+              aria-hidden="true"
+            />
+          </span>
+        </summary>
+        <div className="grid gap-2 border-t border-slate-100 pt-2 sm:grid-cols-2">
+          <RosterPanel view={view} />
+          <CapPanel view={view} />
+          <MatchupPanel view={view} />
+          <DraftPanel view={view} />
+          <InboxPanel
+            view={view}
+            lastViewedAt={commandCenter.lastViewedAt}
+            unreadCount={commandCenter.unreadCount}
+            onMarkRead={commandCenter.markActivityRead}
+          />
+        </div>
+      </details>
     </section>
   );
 }
@@ -664,28 +748,34 @@ function OwnerCommandCenterSkeleton() {
     <section
       aria-label="Loading My Team command center"
       aria-busy="true"
-      className="mx-auto w-full max-w-5xl border-y border-slate-300 py-3 sm:py-4"
+      className="mx-auto w-full max-w-5xl border-y border-slate-300 py-2.5"
     >
-      <div className="flex items-center gap-3">
-        <Skeleton className="h-[52px] w-[52px] rounded-md" />
-        <div className="min-w-0 flex-1 space-y-2">
-          <Skeleton className="h-2.5 w-28" />
-          <Skeleton className="h-6 w-52 max-w-[80%]" />
-          <Skeleton className="h-3 w-40" />
+      <div className="flex flex-wrap items-center justify-between gap-2.5">
+        <div className="flex min-w-0 flex-1 items-center gap-2.5">
+          <Skeleton className="h-10 w-10 rounded-md" />
+          <div className="min-w-0 flex-1 space-y-1.5">
+            <Skeleton className="h-2.5 w-28" />
+            <Skeleton className="h-5 w-44 max-w-[80%]" />
+          </div>
+        </div>
+        <div className="grid w-full grid-cols-2 gap-1.5 sm:w-auto sm:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, index) => (
+            <Skeleton key={index} className="h-9 rounded-md sm:w-28" />
+          ))}
         </div>
       </div>
-      <div className="mt-3 grid grid-cols-2 gap-2 lg:grid-cols-4">
-        {Array.from({ length: 4 }).map((_, index) => (
-          <Skeleton key={index} className="h-11 rounded-md lg:h-9" />
+      <div className="mt-2 grid grid-cols-3 gap-2 border-y border-slate-100 py-2 sm:grid-cols-5">
+        {Array.from({ length: 5 }).map((_, index) => (
+          <div key={index} className="space-y-1.5 px-2">
+            <Skeleton className="h-2 w-10" />
+            <Skeleton className="h-4 w-16 max-w-full" />
+            <Skeleton className="h-2 w-20 max-w-full" />
+          </div>
         ))}
       </div>
-      <div className="mt-3 grid gap-3 sm:grid-cols-2">
-        {Array.from({ length: 5 }).map((_, index) => (
-          <Skeleton
-            key={index}
-            className={cn("h-48 rounded-lg", index === 4 && "sm:col-span-2")}
-          />
-        ))}
+      <div className="flex min-h-9 items-center justify-between">
+        <Skeleton className="h-3 w-20" />
+        <Skeleton className="h-4 w-4" />
       </div>
     </section>
   );
