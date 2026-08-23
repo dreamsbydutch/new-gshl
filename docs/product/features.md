@@ -28,6 +28,15 @@ The home page assembles season-aware cards rather than maintaining independent p
 - a countdown or link to the live Draft Hub; and
 - an offseason mock-draft preview.
 
+Linked owners see a My Team command center before the league modules. It
+combines the current roster and open lineup slots, a three-season cap window,
+upcoming contract decisions, the next matchup and five-game form, draft-pick
+inventory, pending UFA offers, active trade-block listings, and recent trade
+leads. The four primary actions open the trade market, listing controls, UFA
+offers, and the next matchup. New trade-listing activity is tracked as read per
+owner in that browser; the application does not yet store direct trade
+proposals or cross-device read receipts.
+
 The dashboard keeps these modules compact: Home shows five UFA candidates, eight power-ranking entries, five recent events, and four first-round mock-draft projections. Readers can expand the recent activity list in place or follow the visible links to the complete UFA, standings, Press Box, Draft Hub, and mock-draft surfaces.
 
 ### Schedule and matchup detail

@@ -156,6 +156,27 @@ export function useUfaOverview(
             };
           }),
       }));
+    const pendingOffers = state.offers.flatMap((offer) => {
+      if (!offer.isMine || offer.status !== "pending") return [];
+      const group = state.groups.find(
+        (candidate) => candidate._id === offer.groupId,
+      );
+      const player = group ? playerById.get(String(group.playerId)) : undefined;
+      return group && player
+        ? [
+            {
+              id: offer.id,
+              playerId: String(group.playerId),
+              playerName: player.fullName,
+              seasonId: String(group.seasonId),
+              contractLength: offer.contractLength,
+              salary: offer.salary,
+              deadlineAt: group.deadlineAt,
+              groupStatus: group.status,
+            },
+          ]
+        : [];
+    });
     return {
       window: {
         isOpen: window.isOpen,
@@ -165,6 +186,7 @@ export function useUfaOverview(
       freeAgents,
       topFreeAgents: freeAgents.slice(0, 15),
       offerGroups,
+      pendingOffers,
       franchises,
       viewer: {
         isSignedInOwner,
