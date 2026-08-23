@@ -6,6 +6,7 @@ import { ContractStatus, ContractType } from "../domain/constants";
 import {
   calculateContractCapSpaceWindow,
   groupContractsByPlayer,
+  resolveSalaryCapSeason,
 } from "./contract-table";
 
 function contract(id: string, playerId: string, startDate: string): Contract {
@@ -81,4 +82,40 @@ void test("calculates simulated cap space across future seasons", () => {
 
   assert.equal(window[0]?.remaining, 25_000_000);
   assert.equal(window[1]?.remaining, 24_000_000);
+});
+
+void test("starts the salary-cap table with the upcoming season after the prior season ends", () => {
+  const completedSeason: Season = {
+    id: "season-1",
+    year: 2026,
+    name: "2025-26",
+    categories: [],
+    rosterSpots: [],
+    startDate: "2025-10-01",
+    endDate: "2026-04-20",
+    signingEndDate: "2026-06-20",
+    isActive: false,
+    usesLegacyTies: false,
+    createdAt: new Date(0),
+    updatedAt: new Date(0),
+  };
+  const upcomingSeason: Season = {
+    ...completedSeason,
+    id: "season-2",
+    year: 2027,
+    name: "2026-27",
+    startDate: "2026-10-01",
+    endDate: "2027-04-20",
+    signingEndDate: "2027-06-20",
+  };
+
+  const resolved = resolveSalaryCapSeason(
+    [completedSeason, upcomingSeason],
+    completedSeason,
+    completedSeason,
+    new Date("2026-08-23T12:00:00.000Z"),
+  );
+
+  assert.equal(resolved?.id, upcomingSeason.id);
+  assert.equal(resolved?.name, "2026-27");
 });

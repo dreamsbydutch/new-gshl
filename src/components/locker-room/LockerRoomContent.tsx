@@ -19,7 +19,7 @@ import {
   useContractData,
   useTeamAwards,
 } from "@gshl-hooks";
-import { getOwnerTeamIds, resolveContractDefaultSeason } from "@gshl-utils";
+import { getOwnerTeamIds, resolveSalaryCapSeason } from "@gshl-utils";
 import type { GSHLTeam, NHLTeam } from "@gshl-types";
 import {
   CapLabSkeleton,
@@ -99,11 +99,15 @@ export function LockerRoomContent() {
     useSeasonState();
   const contextSeason = selectedSeason ?? currentSeason ?? defaultSeason;
   const { selectedLockerRoomType, selectedOwnerId } = useNav();
-  const contractSeason = useMemo(
+  const salaryCapSeason = useMemo(
     () =>
-      contextSeason ?? resolveContractDefaultSeason(seasons) ?? defaultSeason,
+      resolveSalaryCapSeason(seasons, contextSeason, defaultSeason),
     [contextSeason, defaultSeason, seasons],
   );
+  const contractSeason =
+    selectedLockerRoomType === "salary"
+      ? salaryCapSeason
+      : contextSeason ?? salaryCapSeason;
 
   // Only fetch contract data when on a tab that needs it
   const needsContractData =

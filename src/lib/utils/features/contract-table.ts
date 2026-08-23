@@ -12,6 +12,7 @@ import type {
   Season,
 } from "@gshl-types";
 import { doesContractAffectSeason } from "../domain/contracts";
+import { resolveContractDefaultSeason } from "../domain/season";
 import { toNumber } from "../core";
 
 type DateCandidate = Date | string | number | null | undefined;
@@ -60,6 +61,24 @@ export function groupContractsByPlayer(contracts: Contract[]): Contract[][] {
 
       return String(left.id).localeCompare(String(right.id));
     }),
+  );
+}
+
+/**
+ * Resolves the operational season that should lead a salary-cap table.
+ * Historical browsing context remains a fallback, but a current or upcoming
+ * contract season takes precedence so completed seasons do not lead the table.
+ */
+export function resolveSalaryCapSeason(
+  seasons: Season[] | undefined,
+  contextSeason: Season | undefined,
+  fallbackSeason: Season | undefined,
+  referenceDate: Date = new Date(),
+): Season | undefined {
+  return (
+    resolveContractDefaultSeason(seasons, referenceDate) ??
+    contextSeason ??
+    fallbackSeason
   );
 }
 
