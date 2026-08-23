@@ -35,6 +35,7 @@ import {
   buildWeeklyEditionMilestoneSchedule,
   buildWeeklyEditionCategoryMargins,
   buildWeeklyEditionChatGptPrompt,
+  buildWeeklyEditionStoryScoutPrompt,
   buildWeeklyEditionFactPacket,
   buildWeeklyEditionNewsroomSummary,
   buildWeeklyEditionReaderDetail,
@@ -43,13 +44,17 @@ import {
   hashWeeklyEditionSource,
   isWeeklyEditionPlayingContract,
   isWeeklyEditionSummerUfaPoolAvailable,
+  selectWeeklyEditionStoryAssignments,
   validateWeeklyEditionContent,
+  validateWeeklyEditionStoryAssignments,
   validateWeeklyEditionImport,
   weeklyEditionContractAffectsSeason,
 } from "../src/lib/utils/features/weekly-edition";
 import {
   buildWeeklyEditionOpenAiRequest,
+  buildWeeklyEditionPitchOpenAiRequest,
   extractWeeklyEditionOpenAiText,
+  parseWeeklyEditionStorySubmissions,
 } from "../src/lib/utils/features/weekly-edition-openai";
 import { toUtcTimestamp, utcTimestampToDateKey } from "./lib/timestamps";
 
@@ -91,14 +96,14 @@ function openAiErrorMessage(value: unknown) {
   return typeof message === "string" ? message.trim().slice(0, 300) : "";
 }
 
-async function requestNewsletter({
+async function requestNewsroomJson({
   apiKey,
-  model,
-  prompt,
+  request,
+  failureLabel,
 }: {
   apiKey: string;
-  model: string;
-  prompt: string;
+  request: object;
+  failureLabel: string;
 }) {
   const response = await fetch("https://api.openai.com/v1/responses", {
     method: "POST",
@@ -106,13 +111,13 @@ async function requestNewsletter({
       Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify(buildWeeklyEditionOpenAiRequest({ model, prompt })),
+    body: JSON.stringify(request),
   });
   const payload: unknown = await response.json().catch(() => null);
   if (!response.ok) {
     const detail = openAiErrorMessage(payload);
     throw new Error(
-      `OpenAI could not write the newsletter (${response.status})${
+      `OpenAI could not ${failureLabel} (${response.status})${
         detail ? `: ${detail}` : ""
       }`,
     );
@@ -2285,30 +2290,90 @@ export const generateWithAi = action({
     );
     const facts = prepared.facts;
     const model = newsroomModel();
-    const prompt = buildWeeklyEditionChatGptPrompt(facts);
-    let raw = await requestNewsletter({ apiKey, model, prompt });
+    const scoutPrompt = buildWeeklyEditionStoryScoutPrompt(facts);
+    let pitchRaw = await requestNewsroomJson({
+      apiKey,
+      failureLabel: "run the newsroom pitch meeting",
+      request: buildWeeklyEditionPitchOpenAiRequest({
+        model,
+        prompt: scoutPrompt,
+      }),
+    });
+    let assignments: ReturnType<typeof selectWeeklyEditionStoryAssignments>;
+    try {
+      assignments = selectWeeklyEditionStoryAssignments(
+        facts,
+        parseWeeklyEditionStorySubmissions(pitchRaw),
+      );
+    } catch (error) {
+      const correctionPrompt = [
+        scoutPrompt,
+        "",
+        "PITCH_REVISION_REQUIRED: The pitch desk response failed validation.",
+        "Return every supplied writer exactly once, keep each pitch inside that writer's beat, use only exact STORY_LEDGER candidate IDs, and provide enough distinct eligible leads for six different writers.",
+        `VALIDATION_ERROR=${error instanceof Error ? error.message : "Invalid pitch response"}`,
+        `REJECTED_PITCHES=${pitchRaw}`,
+      ].join("\n");
+      pitchRaw = await requestNewsroomJson({
+        apiKey,
+        failureLabel: "correct the newsroom pitches",
+        request: buildWeeklyEditionPitchOpenAiRequest({
+          model,
+          prompt: correctionPrompt,
+        }),
+      });
+      assignments = selectWeeklyEditionStoryAssignments(
+        facts,
+        parseWeeklyEditionStorySubmissions(pitchRaw),
+      );
+    }
+    const prompt = buildWeeklyEditionChatGptPrompt(facts, assignments);
+    let raw = await requestNewsroomJson({
+      apiKey,
+      failureLabel: "write the newsletter",
+      request: buildWeeklyEditionOpenAiRequest({ model, prompt }),
+    });
     let validation = validateWeeklyEditionImport(raw, facts);
+    let validationErrors =
+      validation.valid && validation.content
+        ? validateWeeklyEditionStoryAssignments(
+            validation.content,
+            assignments,
+            facts,
+          )
+        : validation.errors;
 
-    if (!validation.valid) {
+    if (!validation.valid || validationErrors.length > 0) {
       const correctionPrompt = [
         prompt,
         "",
         "REVISION_REQUIRED: The draft below failed the newsroom validator.",
         "Correct every listed error without changing supported facts, adding claims, or changing the required six-article structure. Return only the corrected JSON object.",
-        `VALIDATION_ERRORS=${JSON.stringify(validation.errors)}`,
+        `VALIDATION_ERRORS=${JSON.stringify(validationErrors)}`,
         `REJECTED_DRAFT=${raw}`,
       ].join("\n");
-      raw = await requestNewsletter({
+      raw = await requestNewsroomJson({
         apiKey,
-        model,
-        prompt: correctionPrompt,
+        failureLabel: "correct the newsletter",
+        request: buildWeeklyEditionOpenAiRequest({
+          model,
+          prompt: correctionPrompt,
+        }),
       });
       validation = validateWeeklyEditionImport(raw, facts);
+      validationErrors =
+        validation.valid && validation.content
+          ? validateWeeklyEditionStoryAssignments(
+              validation.content,
+              assignments,
+              facts,
+            )
+          : validation.errors;
     }
 
-    if (!validation.valid) {
+    if (!validation.valid || validationErrors.length > 0) {
       throw new Error(
-        `OpenAI returned a newsletter that failed validation:\n${validation.errors.join(
+        `OpenAI returned a newsletter that failed validation:\n${validationErrors.join(
           "\n",
         )}`,
       );

@@ -50,6 +50,34 @@ export interface WeeklyEditionAuthor {
   conferenceName?: string;
 }
 
+export interface WeeklyEditionStoryPitchScores {
+  consequence: number;
+  readerInterest: number;
+  evidenceStrength: number;
+  freshness: number;
+}
+
+export interface WeeklyEditionStoryPitch {
+  pitchId: string;
+  leadCandidateId: string;
+  supportingCandidateIds: string[];
+  proposedHeadline: string;
+  angle: string;
+  scores: WeeklyEditionStoryPitchScores;
+}
+
+export interface WeeklyEditionStorySubmission {
+  author: WeeklyEditionAuthor;
+  pitches: WeeklyEditionStoryPitch[];
+}
+
+export interface WeeklyEditionStoryAssignment extends WeeklyEditionStoryPitch {
+  id: `article_${1 | 2 | 3 | 4 | 5 | 6}`;
+  kind: "primary_article" | "standard_article";
+  author: WeeklyEditionAuthor;
+  editorialScore: number;
+}
+
 export interface WeeklyEditionSection {
   id: string;
   kind: WeeklyEditionSectionKind;
@@ -164,6 +192,11 @@ export type WeeklyEditionEditorialCandidateKind =
   | "award_race"
   | "award"
   | "transaction"
+  | "contract"
+  | "cap"
+  | "ufa"
+  | "draft"
+  | "gm_ranking"
   | "activity"
   | "performance"
   | "missed_start";

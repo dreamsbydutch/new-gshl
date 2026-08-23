@@ -44,12 +44,20 @@ Published editions have a public archive and detail page. The current home-activ
 
 Commissioners can ask the Newsroom to write a complete six-article edition from
 the selected week. The Convex backend assembles the existing verified fact
-packet, sends it to the OpenAI Responses API, validates the returned structure,
-authors, links, rule claims, and factual boundaries, then publishes it as one
-atomic revision. One corrective pass is allowed when the first draft fails
-validation; a second failure leaves the current edition unchanged. Grounded
-templates, copyable prompts, validated imports, manual edits, article toggles,
-and revision restoration remain available as fallbacks.
+packet and runs a two-stage editorial workflow through the OpenAI Responses API.
+Every league specialist, conference reporter, and team beat writer first files
+zero to two pitches from their documented beat. The server rejects unknown
+authors and evidence, ranks valid pitches against the packet's independent
+importance scores, removes duplicate leads, limits repeated teams and subjects,
+and assigns the top six stories to six different writers. A second structured
+response writes only those assignments in each writer's defined voice.
+
+The finished edition must preserve the selected slots and bylines and pass the
+existing structure, author, link, rule, and factual validators before it is
+saved as one atomic revision. The pitch desk and writing desk each get one
+corrective pass; a repeated failure leaves the current edition unchanged.
+Grounded templates, copyable prompts, validated imports, manual edits, article
+toggles, and revision restoration remain available as fallbacks.
 
 ### Rulebook
 

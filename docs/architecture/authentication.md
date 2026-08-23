@@ -154,14 +154,14 @@ After rotation, test sign-in, `/api/convex/token`, one protected Convex query, o
 
 ## Common failure modes
 
-| Symptom                                            | Likely boundary to inspect                                                                                  |
-| -------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| Google sign-in rejected                            | Provider credentials, callback URL, verified email, or disabled `authUsers` record                          |
-| App session exists but Convex says unauthenticated | Issuer mismatch, missing/private signing key, key ID/JWKS mismatch, or stale generated/deployed auth config |
-| Protected page redirects to sign-in                | Missing `AUTH_SECRET`, absent session, or non-active status                                                 |
-| Viewer can see a control but mutation fails        | Expected backend role enforcement; fix UI visibility without weakening the guard                            |
-| Owner mutation says forbidden                      | Missing/wrong `authUsers.ownerId` or resource belongs to a different owner                                  |
-| Trusted script says unauthorized                   | `CONVEX_SERVER_SECRET` mismatch or script pointed at the wrong deployment                                   |
-| Worker cannot lease                                | Worker secret mismatch, wrong Convex URL, or missing browser executable                                     |
-| AI newsletter button is disabled                   | `OPENAI_API_KEY` is absent from the selected Convex deployment                                              |
-| AI generation fails before saving                  | OpenAI access/model error, invalid grounded output after one correction, or a concurrent Newsroom edit      |
+| Symptom                                            | Likely boundary to inspect                                                                                                              |
+| -------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| Google sign-in rejected                            | Provider credentials, callback URL, verified email, or disabled `authUsers` record                                                      |
+| App session exists but Convex says unauthenticated | Issuer mismatch, missing/private signing key, key ID/JWKS mismatch, or stale generated/deployed auth config                             |
+| Protected page redirects to sign-in                | Missing `AUTH_SECRET`, absent session, or non-active status                                                                             |
+| Viewer can see a control but mutation fails        | Expected backend role enforcement; fix UI visibility without weakening the guard                                                        |
+| Owner mutation says forbidden                      | Missing/wrong `authUsers.ownerId` or resource belongs to a different owner                                                              |
+| Trusted script says unauthorized                   | `CONVEX_SERVER_SECRET` mismatch or script pointed at the wrong deployment                                                               |
+| Worker cannot lease                                | Worker secret mismatch, wrong Convex URL, or missing browser executable                                                                 |
+| AI newsletter button is disabled                   | `OPENAI_API_KEY` is absent from the selected Convex deployment                                                                          |
+| AI generation fails before saving                  | OpenAI access/model error, invalid pitches or copy after its correction, fewer than six eligible stories, or a concurrent Newsroom edit |

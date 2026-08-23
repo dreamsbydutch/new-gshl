@@ -1,3 +1,9 @@
+import type {
+  WeeklyEditionAuthor,
+  WeeklyEditionStoryPitch,
+  WeeklyEditionStorySubmission,
+} from "@gshl-types";
+
 const articleAuthorSchema = {
   anyOf: [
     {
@@ -35,6 +41,69 @@ const articleAuthorSchema = {
       required: ["name", "position", "scope", "teamId", "teamName"],
     },
   ],
+} as const;
+
+const pitchScoreSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    consequence: { type: "integer", minimum: 1, maximum: 5 },
+    readerInterest: { type: "integer", minimum: 1, maximum: 5 },
+    evidenceStrength: { type: "integer", minimum: 1, maximum: 5 },
+    freshness: { type: "integer", minimum: 1, maximum: 5 },
+  },
+  required: ["consequence", "readerInterest", "evidenceStrength", "freshness"],
+} as const;
+
+export const WEEKLY_EDITION_PITCH_OPENAI_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    submissions: {
+      type: "array",
+      minItems: 1,
+      maxItems: 64,
+      items: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          author: articleAuthorSchema,
+          pitches: {
+            type: "array",
+            minItems: 0,
+            maxItems: 2,
+            items: {
+              type: "object",
+              additionalProperties: false,
+              properties: {
+                pitchId: { type: "string" },
+                leadCandidateId: { type: "string" },
+                supportingCandidateIds: {
+                  type: "array",
+                  minItems: 0,
+                  maxItems: 2,
+                  items: { type: "string" },
+                },
+                proposedHeadline: { type: "string" },
+                angle: { type: "string" },
+                scores: pitchScoreSchema,
+              },
+              required: [
+                "pitchId",
+                "leadCandidateId",
+                "supportingCandidateIds",
+                "proposedHeadline",
+                "angle",
+                "scores",
+              ],
+            },
+          },
+        },
+        required: ["author", "pitches"],
+      },
+    },
+  },
+  required: ["submissions"],
 } as const;
 
 export const WEEKLY_EDITION_OPENAI_SCHEMA = {
@@ -121,6 +190,149 @@ export function buildWeeklyEditionOpenAiRequest({
       },
     },
   };
+}
+
+export function buildWeeklyEditionPitchOpenAiRequest({
+  model,
+  prompt,
+}: {
+  model: string;
+  prompt: string;
+}) {
+  return {
+    model,
+    store: false,
+    max_output_tokens: 12000,
+    instructions:
+      "Run the GSHL Press Box pitch meeting. Every supplied writer must inspect only their eligible beat and return zero to two grounded pitches. Return JSON matching the response schema and nothing else.",
+    input: prompt,
+    text: {
+      format: {
+        type: "json_schema",
+        name: "gshl_newsroom_pitches",
+        strict: true,
+        schema: WEEKLY_EDITION_PITCH_OPENAI_SCHEMA,
+      },
+    },
+  };
+}
+
+function nonEmptyString(value: unknown, field: string) {
+  if (typeof value !== "string" || !value.trim()) {
+    throw new Error(`OpenAI pitch response has an invalid ${field}`);
+  }
+  return value.trim();
+}
+
+function authorFromJson(value: unknown): WeeklyEditionAuthor {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("OpenAI pitch response has an invalid author");
+  }
+  const row = value as Record<string, unknown>;
+  const scope = row.scope;
+  if (scope !== "league" && scope !== "conference" && scope !== "team") {
+    throw new Error("OpenAI pitch response has an invalid author scope");
+  }
+  const author: WeeklyEditionAuthor = {
+    name: nonEmptyString(row.name, "author name"),
+    position: nonEmptyString(row.position, "author position"),
+    scope,
+  };
+  if (scope === "conference") {
+    author.conferenceId = nonEmptyString(
+      row.conferenceId,
+      "author conferenceId",
+    );
+    author.conferenceName = nonEmptyString(
+      row.conferenceName,
+      "author conferenceName",
+    );
+  }
+  if (scope === "team") {
+    author.teamId = nonEmptyString(row.teamId, "author teamId");
+    author.teamName = nonEmptyString(row.teamName, "author teamName");
+  }
+  return author;
+}
+
+function pitchScore(value: unknown, field: string) {
+  if (!Number.isInteger(value) || Number(value) < 1 || Number(value) > 5) {
+    throw new Error(`OpenAI pitch response has an invalid ${field} score`);
+  }
+  return Number(value);
+}
+
+function pitchFromJson(value: unknown): WeeklyEditionStoryPitch {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("OpenAI pitch response contains an invalid pitch");
+  }
+  const row = value as Record<string, unknown>;
+  const supportingCandidateIds = row.supportingCandidateIds;
+  const scores = row.scores;
+  if (
+    !Array.isArray(supportingCandidateIds) ||
+    supportingCandidateIds.length > 2 ||
+    !supportingCandidateIds.every(
+      (candidateId) => typeof candidateId === "string" && candidateId.trim(),
+    )
+  ) {
+    throw new Error(
+      "OpenAI pitch response has invalid supporting candidate IDs",
+    );
+  }
+  if (!scores || typeof scores !== "object" || Array.isArray(scores)) {
+    throw new Error("OpenAI pitch response has invalid pitch scores");
+  }
+  const scoreRow = scores as Record<string, unknown>;
+  return {
+    pitchId: nonEmptyString(row.pitchId, "pitchId"),
+    leadCandidateId: nonEmptyString(row.leadCandidateId, "leadCandidateId"),
+    supportingCandidateIds: supportingCandidateIds.map((candidateId) =>
+      String(candidateId).trim(),
+    ),
+    proposedHeadline: nonEmptyString(row.proposedHeadline, "proposedHeadline"),
+    angle: nonEmptyString(row.angle, "angle"),
+    scores: {
+      consequence: pitchScore(scoreRow.consequence, "consequence"),
+      readerInterest: pitchScore(scoreRow.readerInterest, "readerInterest"),
+      evidenceStrength: pitchScore(
+        scoreRow.evidenceStrength,
+        "evidenceStrength",
+      ),
+      freshness: pitchScore(scoreRow.freshness, "freshness"),
+    },
+  };
+}
+
+export function parseWeeklyEditionStorySubmissions(
+  raw: string,
+): WeeklyEditionStorySubmission[] {
+  let value: unknown;
+  try {
+    value = JSON.parse(raw) as unknown;
+  } catch {
+    throw new Error("OpenAI returned unreadable newsroom pitches");
+  }
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("OpenAI returned an invalid newsroom pitch desk");
+  }
+  const submissions = (value as { submissions?: unknown }).submissions;
+  if (!Array.isArray(submissions) || submissions.length === 0) {
+    throw new Error("OpenAI returned no newsroom pitch submissions");
+  }
+  return submissions.map((submission) => {
+    if (!submission || typeof submission !== "object") {
+      throw new Error("OpenAI returned an invalid newsroom submission");
+    }
+    const row = submission as { author?: unknown; pitches?: unknown };
+    if (!Array.isArray(row.pitches) || row.pitches.length > 2) {
+      throw new Error("OpenAI returned an invalid newsroom pitch list");
+    }
+    return {
+      author: authorFromJson(row.author),
+      pitches: row.pitches.map(pitchFromJson),
+    };
+  });
 }
 
 type OpenAiOutputContent = {
