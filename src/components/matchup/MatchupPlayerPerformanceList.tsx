@@ -1,5 +1,5 @@
 import { ChevronDown } from "lucide-react";
-import { NHLLogo } from "@gshl-components/player/NHLLogo";
+import { NHLLogoList } from "@gshl-components/player/NHLLogoList";
 import type {
   MatchupDetailsNhlTeam,
   PlayerStatColumn,
@@ -36,13 +36,7 @@ function PlayerNhlTeams({
     );
   }
 
-  return (
-    <span className="flex items-center gap-1">
-      {teams.map((team) => (
-        <NHLLogo key={team.id} team={team} size={20} />
-      ))}
-    </span>
-  );
+  return <NHLLogoList teams={teams} size={teams.length > 1 ? 16 : 20} />;
 }
 
 /** Readable mobile counterpart to the comprehensive matchup player table. */

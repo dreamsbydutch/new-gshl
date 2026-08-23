@@ -29,6 +29,7 @@ import { AwardsList, PositionGroup, SeasonType } from "../domain/constants";
 import {
   findNhlTeamByAbbreviation,
   formatPlayerPositionList,
+  getPlayerNhlAbbreviations,
 } from "../domain/player";
 import { getAllStarSeasonType } from "./season-awards";
 
@@ -322,21 +323,40 @@ export function getPlayerPositions(
 export function getNhlTeamForPlayer(
   nhlTeamsByAbbr: Map<string, NHLTeam>,
   player: Player | undefined,
-  fallbackAbbr: string,
+  fallbackAbbr: string | string[],
   preferFallback = false,
 ): NHLTeam | undefined {
-  const historicalAbbr = String(fallbackAbbr).trim();
-  const currentAbbr = String(player?.nhlTeam ?? "").trim();
-  const teamAbbr =
-    (preferFallback
-      ? [historicalAbbr, currentAbbr]
-      : [currentAbbr, historicalAbbr]
-    ).find((value) => value.length > 0) ?? "";
-  if (!teamAbbr) return undefined;
-  return findNhlTeamByAbbreviation(
-    Array.from(nhlTeamsByAbbr.values()),
-    teamAbbr,
-  );
+  return getNhlTeamsForPlayer(
+    nhlTeamsByAbbr,
+    player,
+    fallbackAbbr,
+    preferFallback,
+  )[0];
+}
+
+/**
+ * Resolves every NHL team captured by a stat row before using live player data.
+ */
+export function getNhlTeamsForPlayer(
+  nhlTeamsByAbbr: Map<string, NHLTeam>,
+  player: Player | undefined,
+  historicalValue: string | string[],
+  preferHistorical = true,
+): NHLTeam[] {
+  const historicalAbbreviations = getPlayerNhlAbbreviations(historicalValue);
+  const currentAbbreviations = getPlayerNhlAbbreviations(player?.nhlTeam);
+  const abbreviations = preferHistorical
+    ? historicalAbbreviations.length > 0
+      ? historicalAbbreviations
+      : currentAbbreviations
+    : currentAbbreviations.length > 0
+      ? currentAbbreviations
+      : historicalAbbreviations;
+
+  const catalog = Array.from(nhlTeamsByAbbr.values());
+  return abbreviations
+    .map((abbreviation) => findNhlTeamByAbbreviation(catalog, abbreviation))
+    .filter((team): team is NHLTeam => Boolean(team));
 }
 
 /**
@@ -384,7 +404,7 @@ export function buildFranchiseCareerRows(
       seasonType,
       posGroup: String(row.posGroup ?? ""),
       nhlPos: normalizeIdList(row.nhlPos),
-      nhlTeam: String(row.nhlTeam ?? "").trim(),
+      nhlTeams: getPlayerNhlAbbreviations(row.nhlTeam),
       ...createEmptyStatLine(),
       notCountedStats: new Set<RecordBookStatKey>(TOTAL_FIELDS),
     };
@@ -396,8 +416,8 @@ export function buildFranchiseCareerRows(
     for (const position of normalizeIdList(row.nhlPos)) {
       if (!existing.nhlPos.includes(position)) existing.nhlPos.push(position);
     }
-    if (!existing.nhlTeam && row.nhlTeam) {
-      existing.nhlTeam = String(row.nhlTeam).trim();
+    for (const nhlTeam of getPlayerNhlAbbreviations(row.nhlTeam)) {
+      if (!existing.nhlTeams.includes(nhlTeam)) existing.nhlTeams.push(nhlTeam);
     }
     addStats(existing, row);
   }
@@ -504,7 +524,7 @@ export function buildAllTimeFranchiseRoster(
       slot,
       playerId: row.playerId,
       playerName: player?.fullName ?? `Player ${row.playerId}`,
-      nhlTeam: getNhlTeamForPlayer(nhlTeamsByAbbr, player, row.nhlTeam),
+      nhlTeam: getNhlTeamForPlayer(nhlTeamsByAbbr, player, row.nhlTeams, true),
       positions: getPlayerPositions(player, row.nhlPos),
       row,
     } satisfies AllTimeRosterEntry;
@@ -544,7 +564,7 @@ export function buildFranchiseSeasonRows(
       seasonType,
       posGroup: String(row.posGroup ?? ""),
       nhlPos: normalizeIdList(row.nhlPos),
-      nhlTeam: String(row.nhlTeam ?? "").trim(),
+      nhlTeams: getPlayerNhlAbbreviations(row.nhlTeam),
       ...createEmptyStatLine(),
       notCountedStats: new Set<RecordBookStatKey>(TOTAL_FIELDS),
     };
@@ -556,8 +576,8 @@ export function buildFranchiseSeasonRows(
     for (const position of normalizeIdList(row.nhlPos)) {
       if (!existing.nhlPos.includes(position)) existing.nhlPos.push(position);
     }
-    if (!existing.nhlTeam && row.nhlTeam) {
-      existing.nhlTeam = String(row.nhlTeam).trim();
+    for (const nhlTeam of getPlayerNhlAbbreviations(row.nhlTeam)) {
+      if (!existing.nhlTeams.includes(nhlTeam)) existing.nhlTeams.push(nhlTeam);
     }
     addStats(existing, row);
   }
@@ -602,7 +622,12 @@ export function buildRecordBookPlayerRows(
       id: `${row.playerId}|${row.seasonId}|${row.seasonType}`,
       playerId: row.playerId,
       playerName: player?.fullName ?? `Player ${row.playerId}`,
-      nhlTeam: getNhlTeamForPlayer(nhlTeamsByAbbr, player, row.nhlTeam, true),
+      nhlTeams: getNhlTeamsForPlayer(
+        nhlTeamsByAbbr,
+        player,
+        row.nhlTeams,
+        true,
+      ),
       positions: getPlayerPositions(player, row.nhlPos),
       positionGroup: String(player?.posGroup ?? row.posGroup),
       seasonType: row.seasonType,
@@ -632,7 +657,12 @@ export function buildRecordBookPlayerRows(
         id: `${row.playerId}|career|${row.seasonType}`,
         playerId: row.playerId,
         playerName: player?.fullName ?? `Player ${row.playerId}`,
-        nhlTeam: getNhlTeamForPlayer(nhlTeamsByAbbr, player, row.nhlTeam),
+        nhlTeams: getNhlTeamsForPlayer(
+          nhlTeamsByAbbr,
+          player,
+          row.nhlTeams,
+          true,
+        ),
         positions: getPlayerPositions(player, row.nhlPos),
         positionGroup: String(player?.posGroup ?? row.posGroup),
         seasonType: row.seasonType,
@@ -715,7 +745,7 @@ export function buildRecordBookAwardRows({
           nhlTeam: getNhlTeamForPlayer(
             nhlTeamsByAbbr,
             player,
-            String(historicalTotal?.nhlTeam ?? ""),
+            historicalTotal?.nhlTeam ?? "",
             true,
           ),
           positions: getPlayerPositions(

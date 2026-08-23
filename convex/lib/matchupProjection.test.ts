@@ -98,14 +98,32 @@ test("player-week projection joins only display identity and scoring fields", ()
   assert.equal(result.id, "player-1");
   assert.equal(result.fullName, "Gem Stone");
   assert.deepEqual(result.nhlPos, ["LW"]);
-  assert.deepEqual(result.nhlTeam, ["NJD", "TOR"]);
+  assert.deepEqual(result.nhlTeam, ["TOR"]);
   assert.equal(result.G, 2);
   assert.equal("salary" in result, false);
   assert.equal("powerMetric" in result, false);
-  assert.deepEqual(collectMatchupNhlAbbreviations([result, result]), [
-    "NJD",
-    "TOR",
-  ]);
+  assert.deepEqual(collectMatchupNhlAbbreviations([result, result]), ["TOR"]);
+});
+
+test("player-week projection falls back to the current NHL team without a snapshot", () => {
+  const result = projectMatchupPlayerWeekRow(
+    {
+      _id: "stat-1",
+      gshlTeamId: "team-1",
+      posGroup: "F",
+      nhlTeam: [],
+    },
+    {
+      _id: "player-1",
+      firstName: "Gem",
+      lastName: "Stone",
+      fullName: "Gem Stone",
+      posGroup: "F",
+      nhlTeam: ["NJD"],
+    },
+  );
+
+  assert.deepEqual(result.nhlTeam, ["NJD"]);
 });
 
 test("team-week projection excludes power and operational fields", () => {

@@ -8,7 +8,7 @@ import {
   ChevronDown,
   Search,
 } from "lucide-react";
-import { NHLLogo } from "@gshl-components/player/NHLLogo";
+import { NHLLogoList } from "@gshl-components/player/NHLLogoList";
 import {
   AWARD_CATALOG_BY_KEY,
   PLAYER_TROPHY_ICON_URLS,
@@ -461,7 +461,10 @@ function PlayerHistoryCard({
   return (
     <article className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
       <header className="flex min-w-0 items-start gap-3 px-3 py-3">
-        <NHLLogo team={row.nhlTeam} size={30} className="mx-0 shrink-0" />
+        <NHLLogoList
+          teams={row.nhlTeams}
+          size={row.nhlTeams.length > 1 ? 22 : 30}
+        />
         <div className="min-w-0 flex-1">
           <h3 className="break-words text-sm font-semibold leading-5 text-slate-950">
             {row.playerName}
@@ -723,10 +726,9 @@ function PlayerHistoryTable({
                 )}
               >
                 <div className="flex min-w-0 items-center gap-1.5 sm:gap-2.5">
-                  <NHLLogo
-                    team={row.nhlTeam}
-                    size={22}
-                    className="mx-0 shrink-0"
+                  <NHLLogoList
+                    teams={row.nhlTeams}
+                    size={row.nhlTeams.length > 1 ? 18 : 22}
                   />
                   <span className="min-w-0 truncate font-semibold text-slate-900">
                     {row.playerName}

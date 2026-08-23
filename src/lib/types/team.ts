@@ -140,7 +140,7 @@ export interface FranchiseCareerRow extends RecordBookStatLine {
   seasonType: SeasonType;
   posGroup: string;
   nhlPos: string[];
-  nhlTeam: string;
+  nhlTeams: string[];
   notCountedStats?: Set<RecordBookStatKey>;
 }
 
@@ -151,7 +151,7 @@ export interface FranchiseSeasonRow extends RecordBookStatLine {
   seasonType: SeasonType;
   posGroup: string;
   nhlPos: string[];
-  nhlTeam: string;
+  nhlTeams: string[];
   notCountedStats?: Set<RecordBookStatKey>;
 }
 
@@ -159,7 +159,7 @@ export interface RecordBookPlayerRow extends RecordBookStatLine {
   id: string;
   playerId: string;
   playerName: string;
-  nhlTeam: NHLTeam | undefined;
+  nhlTeams: NHLTeam[];
   positions: string;
   positionGroup: string;
   seasonType: SeasonType;

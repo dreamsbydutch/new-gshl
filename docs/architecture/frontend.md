@@ -156,6 +156,11 @@ player metadata: normally 16-18px and placed immediately before the player's
 name instead of receiving a separate high-emphasis column or tile. When both
 appear in one row, the GSHL mark must remain clearly larger.
 
+Time-scoped player statistics use the NHL team snapshot stored on that stat
+line before the player's live team. Aggregated season rows render every unique
+NHL team in the stored array as a compact logo group and fall back to live
+player data only when the historical snapshot is empty.
+
 Wide comparison tables use `TableViewport`, which supplies a labelled, keyboard-focusable horizontal region, native scrolling, overflow hints, and edge fades without owning feature data or sticky-column offsets. Transactional Draft player pools use decision cards below `lg`, keeping identity, priority metrics, disclosure of full statistics, visible eligibility feedback, and staged 44px actions together. UFA player pools and pending contract offers retain horizontally scrollable comparison tables at every width; phones use one narrow, truncated, logo-led player identity column instead of separate sticky logo and name columns. Matchup category and player-stat results follow the same table-first pattern, with compact logo-led identity columns preserving context while the statistics scroll. Salary Cap keeps its cross-season table at every width, drops sticky identity columns below `lg`, and surfaces remaining cap in a compact mobile summary. Its Roster Planner uses move cards and before/after cap summaries at every width, with complete scenario commitments in a disclosure. Franchise contract history and Record Book use identity-first cards below `lg`. Draft Classes pairs a compact logo-led list below `lg` with a keyboard-scrollable table above it. Power Rankings pair a mobile list and semantic desktop table with an aria-hidden chart plus an exact keyboard-accessible history table. Playoff rounds stack in reading order below `lg` and retain the connected bracket at larger widths.
 
 Standings subscribes only to inputs used by the selected view. Ordinary tables defer matchup, category, and player-leader detail to a season/team query mounted inside the expanded row; Power, Playoff, and Awards omit each other's unused datasets while retaining their existing loading states.

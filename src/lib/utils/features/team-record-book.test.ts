@@ -81,6 +81,17 @@ function seasonSplitRow(
   };
 }
 
+function nhlTeam(id: string, abbr: string): NHLTeam {
+  return {
+    id,
+    name: `${abbr} team`,
+    abbr,
+    logoUrl: `https://example.com/${abbr}.png`,
+    createdAt: new Date(0),
+    updatedAt: new Date(0),
+  };
+}
+
 function awardRow(
   award: AwardsListType,
   seasonType: SeasonTypeValue = SeasonType.REGULAR_SEASON,
@@ -125,6 +136,46 @@ void test("renders uncounted categories as dashes without hiding counted zeroes"
 
   assert.equal(formatRecordBookStat(row, goalsColumn), "0");
   assert.equal(formatRecordBookStat(row, assistsColumn), "-");
+});
+
+void test("keeps every NHL team from a season stat row ahead of the live team", () => {
+  const toronto = nhlTeam("toronto", "TOR");
+  const montreal = nhlTeam("montreal", "MTL");
+  const newJersey = nhlTeam("new-jersey", "NJD");
+  const { seasonRows } = buildRecordBookPlayerRows({
+    awardRows: [],
+    careerSplits: [],
+    nhlTeamsByAbbr: new Map(
+      [toronto, montreal, newJersey].map((team) => [team.abbr, team]),
+    ),
+    ownerTeamIds: new Set(["owner-a-team-1"]),
+    playersById: new Map([
+      [
+        "player-1",
+        {
+          id: "player-1",
+          firstName: "Gem",
+          lastName: "Stone",
+          fullName: "Gem Stone",
+          nhlPos: [],
+          posGroup: PositionGroup.F,
+          nhlTeam: "NJD",
+          isActive: true,
+          isSignable: true,
+          isResignable: null,
+          createdAt: new Date(0),
+          updatedAt: new Date(0),
+        },
+      ],
+    ]),
+    seasonSplits: [seasonSplitRow({ nhlTeam: ["TOR", "MTL"] })],
+    seasonsById: new Map([["season-1", 2025]]),
+  });
+
+  assert.deepEqual(
+    seasonRows[0]?.nhlTeams.map((team) => team.abbr),
+    ["TOR", "MTL"],
+  );
 });
 
 void test("counts all-star and player trophies in the matching table season", () => {
@@ -204,7 +255,7 @@ function careerRow(
     seasonType: SeasonType.REGULAR_SEASON,
     posGroup,
     nhlPos,
-    nhlTeam: "",
+    nhlTeams: [],
     days: 0,
     GP: 40,
     GS: 0,

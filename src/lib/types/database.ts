@@ -403,7 +403,7 @@ export interface PlayerSplitStatLine {
   playerId: string;
   nhlPos: RosterPosition[];
   posGroup: PositionGroup;
-  nhlTeam: string;
+  nhlTeam: string | string[];
   seasonType: SeasonType;
   days: string;
   GP: string;
@@ -442,7 +442,7 @@ export interface PlayerTotalStatLine {
   playerId: string;
   nhlPos: RosterPosition[];
   posGroup: PositionGroup;
-  nhlTeam: string;
+  nhlTeam: string | string[];
   seasonType: SeasonType;
   days: string;
   GP: string;
@@ -480,7 +480,7 @@ export interface PlayerCareerSplitStatLine {
   playerId: string;
   nhlPos: RosterPosition[];
   posGroup: PositionGroup;
-  nhlTeam: string;
+  nhlTeam: string | string[];
   seasonType: SeasonType;
   days: string;
   GP: string;
@@ -518,7 +518,7 @@ export interface PlayerCareerTotalStatLine {
   playerId: string;
   nhlPos: RosterPosition[];
   posGroup: PositionGroup;
-  nhlTeam: string;
+  nhlTeam: string | string[];
   seasonType: SeasonType;
   days: string;
   GP: string;

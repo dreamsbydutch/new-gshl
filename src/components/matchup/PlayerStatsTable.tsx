@@ -1,4 +1,4 @@
-import { NHLLogo } from "@gshl-components/player/NHLLogo";
+import { NHLLogoList } from "@gshl-components/player/NHLLogoList";
 import { TableViewport } from "@gshl-ui";
 import type {
   MatchupDetailsNhlTeam,
@@ -71,21 +71,11 @@ export function PlayerStatsTable({
       .map((abbreviation) => findNhlTeamByAbbreviation(nhlTeams, abbreviation))
       .filter((nhlTeam): nhlTeam is MatchupDetailsNhlTeam => Boolean(nhlTeam));
 
-    if (playerNhlTeams.length === 0) {
-      return <NHLLogo team={undefined} size={16} />;
-    }
-
     return (
-      <div className="flex shrink-0 items-center gap-0.5">
-        {playerNhlTeams.map((nhlTeam) => (
-          <NHLLogo
-            key={nhlTeam.id}
-            team={nhlTeam}
-            size={playerNhlTeams.length > 1 ? 14 : 16}
-            className="mx-0 shrink-0"
-          />
-        ))}
-      </div>
+      <NHLLogoList
+        teams={playerNhlTeams}
+        size={playerNhlTeams.length > 1 ? 14 : 16}
+      />
     );
   };
 
