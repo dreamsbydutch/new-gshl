@@ -67,11 +67,13 @@ function CommandAction({
   href,
   icon: Icon,
   label,
+  mobileLabel,
   count,
 }: {
   href: string;
   icon: typeof ArrowRightLeft;
   label: string;
+  mobileLabel?: string;
   count?: number;
 }) {
   return (
@@ -79,15 +81,16 @@ function CommandAction({
       asChild
       size="sm"
       variant="outline"
-      className="h-9 min-w-0 justify-between gap-1.5 bg-white/80 px-2 hover:bg-white"
+      className="relative h-9 min-w-0 justify-center gap-1.5 bg-white/80 px-1.5 hover:bg-white sm:justify-between sm:px-2"
     >
-      <Link href={href}>
-        <span className="flex min-w-0 items-center gap-1.5">
+      <Link href={href} aria-label={label}>
+        <span className="flex min-w-0 items-center justify-center gap-1.5 sm:justify-start">
           <Icon aria-hidden="true" />
-          <span className="truncate">{label}</span>
+          <span className="truncate sm:hidden">{mobileLabel ?? label}</span>
+          <span className="hidden truncate sm:inline">{label}</span>
         </span>
         {count ? (
-          <span className="rounded-full bg-slate-100 px-1.5 py-0.5 font-mono text-[10px] text-slate-600">
+          <span className="absolute -right-1 -top-1 rounded-full bg-slate-100 px-1.5 py-0.5 font-mono text-[10px] text-slate-600 ring-1 ring-white sm:static sm:ring-0">
             {count}
           </span>
         ) : null}
@@ -100,15 +103,22 @@ function SnapshotMetric({
   label,
   value,
   detail,
+  className,
   critical = false,
 }: {
   label: string;
   value: string;
   detail: string;
+  className?: string;
   critical?: boolean;
 }) {
   return (
-    <div className="min-w-0 px-2 py-0.5 first:pl-0 sm:px-2.5 sm:first:pl-0">
+    <div
+      className={cn(
+        "min-w-0 px-2 py-0.5 first:pl-0 sm:px-2.5 sm:first:pl-0",
+        className,
+      )}
+    >
       <dt className="truncate text-[10px] font-semibold uppercase tracking-wide text-slate-400">
         {label}
       </dt>
@@ -655,17 +665,20 @@ export function OwnerCommandCenter() {
             href={view.actions.exploreTrade}
             icon={ArrowRightLeft}
             label="Trade market"
+            mobileLabel="Trade"
           />
           <CommandAction
             href={view.actions.listPlayer}
             icon={ListPlus}
             label="List player"
+            mobileLabel="List"
             count={view.listedPlayers.length}
           />
           <CommandAction
             href={view.actions.reviewOffer}
             icon={CircleDollarSign}
             label="UFA offers"
+            mobileLabel="Offers"
             count={view.offers.length}
           />
           <CommandAction
@@ -678,20 +691,23 @@ export function OwnerCommandCenter() {
 
       <dl
         aria-label="My Team snapshot"
-        className="mt-1.5 grid grid-cols-3 divide-x divide-slate-200 border-y border-slate-100 py-0.5 sm:grid-cols-5 [&>div:nth-child(4)]:border-l-0 [&>div:nth-child(4)]:pl-0 sm:[&>div:nth-child(4)]:border-l sm:[&>div:nth-child(4)]:pl-2.5"
+        className="mt-1.5 grid grid-cols-6 border-y border-slate-100 py-0.5 sm:grid-cols-5"
       >
         <SnapshotMetric
+          className="col-span-2 sm:col-span-1"
           label="Roster"
           value={`${view.roster.count}/${view.roster.capacity}`}
           detail={rosterDetail}
         />
         <SnapshotMetric
+          className="col-span-2 border-l border-slate-200 sm:col-span-1"
           label="Cap space"
           value={primaryCap ? formatMoney(primaryCap.remaining, true) : "—"}
           detail={`${view.contractDecisions.length} contract decision${view.contractDecisions.length === 1 ? "" : "s"}`}
           critical={Boolean(primaryCap && primaryCap.remaining < 0)}
         />
         <SnapshotMetric
+          className="col-span-2 border-l border-slate-200 sm:col-span-1"
           label="Next matchup"
           value={opponentName}
           detail={
@@ -701,6 +717,7 @@ export function OwnerCommandCenter() {
           }
         />
         <SnapshotMetric
+          className="col-span-3 pl-0 sm:col-span-1 sm:border-l sm:border-slate-200 sm:pl-2.5"
           label="Draft"
           value={`${view.draft.count} pick${view.draft.count === 1 ? "" : "s"}`}
           detail={
@@ -710,6 +727,7 @@ export function OwnerCommandCenter() {
           }
         />
         <SnapshotMetric
+          className="col-span-3 border-l border-slate-200 sm:col-span-1"
           label="Market"
           value={`${marketCount} active`}
           detail={`${view.offers.length} offers · ${view.listedPlayers.length} listed${commandCenter.unreadCount ? ` · ${commandCenter.unreadCount} new` : ""}`}
@@ -767,9 +785,20 @@ function OwnerCommandCenterSkeleton() {
           ))}
         </div>
       </div>
-      <div className="mt-1.5 grid grid-cols-3 gap-1 border-y border-slate-100 py-1 sm:grid-cols-5">
+      <div className="mt-1.5 grid grid-cols-6 border-y border-slate-100 py-1 sm:grid-cols-5">
         {Array.from({ length: 5 }).map((_, index) => (
-          <div key={index} className="space-y-1 px-2">
+          <div
+            key={index}
+            className={cn(
+              "space-y-1 px-2",
+              index < 3 ? "col-span-2" : "col-span-3",
+              index === 1 || index === 2 || index === 4
+                ? "border-l border-slate-200"
+                : "",
+              index === 3 ? "pl-0 sm:border-l sm:border-slate-200 sm:pl-2" : "",
+              "sm:col-span-1",
+            )}
+          >
             <Skeleton className="h-2 w-10" />
             <Skeleton className="h-4 w-16 max-w-full" />
             <Skeleton className="h-2 w-20 max-w-full" />
