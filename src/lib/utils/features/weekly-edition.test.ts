@@ -3,6 +3,7 @@ import test from "node:test";
 import type {
   BuildWeeklyEditionFactPacketInput,
   WeeklyEdition,
+  WeeklyEditionArticleId,
   WeeklyEditionContent,
   WeeklyEditionFactPacket,
   WeeklyEditionStoryPitch,
@@ -808,7 +809,7 @@ void test("prompt contains a raw newsroom brief without an article plan", () => 
   assert.doesNotMatch(prompt, /knownEntityNames|allowedNames|allowedNumbers/);
 });
 
-void test("newsroom scouts every writer and selects six distinct beat-eligible stories", () => {
+void test("newsroom defaults to eight distinct beat-eligible stories", () => {
   const packet = buildWeeklyEditionFactPacket(source());
   const roster = buildWeeklyEditionAuthorRoster(packet);
   const pitch = (
@@ -829,22 +830,19 @@ void test("newsroom scouts every writer and selects six distinct beat-eligible s
     },
   });
   const pitchesByAuthor = new Map<string, WeeklyEditionStoryPitch[]>([
-    [
-      "Evan Soderberg",
-      [pitch("north-performance", "performance:weekly-star:player-1")],
-    ],
-    [
-      "Gord McKenzie",
-      [pitch("aurora-star", "performance:weekly-star:player-1")],
-    ],
+    ["Graham MacIntyre", [pitch("league-upset", "matchup:matchup-1")]],
+    ["Gord McKenzie", [pitch("aurora-rise", "power:team-a")]],
     ["Mike Halvorsen", [pitch("dragons-add", "transaction:add-1")]],
-    ["Scott Bannerman", [pitch("national-upset", "matchup:matchup-1", 1)]],
+    [
+      "Scott Bannerman",
+      [pitch("north-performance", "performance:weekly-star:player-1", 1)],
+    ],
     [
       "Nate Carlson",
       [pitch("west-performance", "performance:weekly-star:player-2")],
     ],
-    ["Bruce McAllister", [pitch("aurora-rise", "power:team-a")]],
-    ["Darren Whitmore", [pitch("bears-upset-loss", "matchup:matchup-1")]],
+    ["Bruce McAllister", [pitch("bears-slide", "power:team-b")]],
+    ["Darren Whitmore", [pitch("bears-missed-start", "missed-start:missed-1")]],
     ["Scott Callahan", [pitch("comets-edge", "matchup:matchup-2")]],
   ]);
   const submissions: WeeklyEditionStorySubmission[] = roster.map(
@@ -856,7 +854,7 @@ void test("newsroom scouts every writer and selects six distinct beat-eligible s
 
   const assignments = selectWeeklyEditionStoryAssignments(packet, submissions);
 
-  assert.equal(assignments.length, 6);
+  assert.equal(assignments.length, 8);
   assert.deepEqual(
     assignments.map(({ id, kind }) => ({ id, kind })),
     [
@@ -866,10 +864,47 @@ void test("newsroom scouts every writer and selects six distinct beat-eligible s
       { id: "article_4", kind: "standard_article" },
       { id: "article_5", kind: "standard_article" },
       { id: "article_6", kind: "standard_article" },
+      { id: "article_7", kind: "standard_article" },
+      { id: "article_8", kind: "standard_article" },
     ],
   );
-  assert.equal(new Set(assignments.map((row) => row.author.name)).size, 6);
-  assert.equal(new Set(assignments.map((row) => row.leadCandidateId)).size, 6);
+  assert.equal(new Set(assignments.map((row) => row.author.name)).size, 8);
+  assert.equal(new Set(assignments.map((row) => row.leadCandidateId)).size, 8);
+  const eightStoryContent: WeeklyEditionContent = {
+    headline: "Eight stories from the GSHL week",
+    deck: "The newsroom found eight distinct stories in the verified league record.",
+    sections: assignments.map((assignment) => {
+      const candidate = packet.editorialCandidates.find(
+        (row) => row.id === assignment.leadCandidateId,
+      )!;
+      return {
+        id: assignment.id,
+        kind: assignment.kind,
+        eyebrow: "News",
+        headline: candidate.headlineHint,
+        body: candidate.summary,
+        links: candidate.links,
+        author: assignment.author,
+      };
+    }),
+  };
+  const eightStoryImport = validateWeeklyEditionImport(
+    JSON.stringify(eightStoryContent),
+    packet,
+  );
+  assert.equal(
+    eightStoryImport.valid,
+    true,
+    eightStoryImport.errors.join("\n"),
+  );
+  assert.deepEqual(
+    validateWeeklyEditionStoryAssignments(
+      eightStoryContent,
+      assignments,
+      packet,
+    ),
+    [],
+  );
   assert.ok(
     assignments.some((row) => row.author.name === "Darren Whitmore"),
     "the losing team's beat writer should be eligible to pitch a matchup",
@@ -885,11 +920,18 @@ void test("newsroom scouts every writer and selects six distinct beat-eligible s
   assert.match(scoutPrompt, /"passesOn"/);
   assert.match(scoutPrompt, /"voice"/);
   assert.match(scoutPrompt, /"relatedTeams"/);
+  assert.match(scoutPrompt, /select 8 assignments/);
 
   const writingPrompt = buildWeeklyEditionChatGptPrompt(packet, assignments);
   assert.match(writingPrompt, /^PROMPT_FORMAT=assigned_newsroom_edition_v7/);
   assert.match(writingPrompt, /EDITOR_ASSIGNMENTS=/);
   assert.match(writingPrompt, /do not substitute a subject/i);
+  assert.match(writingPrompt, /exactly 8 sections/i);
+
+  assert.equal(
+    selectWeeklyEditionStoryAssignments(packet, submissions, 6).length,
+    6,
+  );
 });
 
 void test("assigned newsletter validation rejects a changed byline", () => {
@@ -898,13 +940,7 @@ void test("assigned newsletter validation rejects a changed byline", () => {
     .slice(0, 6)
     .map(({ author }) => author);
   const assignments = authors.map((author, index) => ({
-    id: `article_${index + 1}` as
-      | "article_1"
-      | "article_2"
-      | "article_3"
-      | "article_4"
-      | "article_5"
-      | "article_6",
+    id: `article_${index + 1}` as WeeklyEditionArticleId,
     kind:
       index < 2 ? ("primary_article" as const) : ("standard_article" as const),
     author,

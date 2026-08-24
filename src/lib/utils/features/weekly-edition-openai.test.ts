@@ -6,8 +6,19 @@ import {
   extractWeeklyEditionOpenAiText,
   parseWeeklyEditionStorySubmissions,
 } from "./weekly-edition-openai";
+import {
+  buildWeeklyEditionArticleSlots,
+  parseWeeklyEditionArticleCount,
+} from "./weekly-edition-articles";
 
-void test("buildWeeklyEditionOpenAiRequest disables storage and requires six articles", () => {
+void test("newsletter article counts accept six through ten", () => {
+  assert.equal(parseWeeklyEditionArticleCount("8"), 8);
+  assert.equal(buildWeeklyEditionArticleSlots(10).at(-1)?.id, "article_10");
+  assert.throws(() => parseWeeklyEditionArticleCount(5), /between 6 and 10/i);
+  assert.throws(() => parseWeeklyEditionArticleCount(11), /between 6 and 10/i);
+});
+
+void test("buildWeeklyEditionOpenAiRequest defaults to eight exact articles", () => {
   const request = buildWeeklyEditionOpenAiRequest({
     model: "gpt-test",
     prompt: "grounded prompt",
@@ -18,8 +29,39 @@ void test("buildWeeklyEditionOpenAiRequest disables storage and requires six art
   assert.equal(request.input, "grounded prompt");
   assert.equal(request.text.format.type, "json_schema");
   assert.equal(request.text.format.strict, true);
-  assert.equal(request.text.format.schema.properties.sections.minItems, 6);
-  assert.equal(request.text.format.schema.properties.sections.maxItems, 6);
+  assert.equal(request.text.format.schema.properties.sections.minItems, 8);
+  assert.equal(request.text.format.schema.properties.sections.maxItems, 8);
+  assert.deepEqual(
+    request.text.format.schema.properties.sections.items.properties.id.enum,
+    [
+      "article_1",
+      "article_2",
+      "article_3",
+      "article_4",
+      "article_5",
+      "article_6",
+      "article_7",
+      "article_8",
+    ],
+  );
+});
+
+void test("buildWeeklyEditionOpenAiRequest uses the selected article count", () => {
+  const request = buildWeeklyEditionOpenAiRequest({
+    model: "gpt-test",
+    prompt: "grounded prompt",
+    articleCount: 10,
+  });
+
+  assert.equal(request.text.format.schema.properties.sections.minItems, 10);
+  assert.equal(request.text.format.schema.properties.sections.maxItems, 10);
+  assert.equal(
+    request.text.format.schema.properties.sections.items.properties.id.enum.at(
+      -1,
+    ),
+    "article_10",
+  );
+  assert.equal(request.max_output_tokens, 12000);
 });
 
 void test("buildWeeklyEditionPitchOpenAiRequest defines a bounded pitch desk", () => {

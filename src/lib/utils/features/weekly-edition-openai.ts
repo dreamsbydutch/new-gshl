@@ -1,8 +1,13 @@
 import type {
+  WeeklyEditionArticleCount,
   WeeklyEditionAuthor,
   WeeklyEditionStoryPitch,
   WeeklyEditionStorySubmission,
 } from "@gshl-types";
+import {
+  buildWeeklyEditionArticleSlots,
+  DEFAULT_WEEKLY_EDITION_ARTICLE_COUNT,
+} from "./weekly-edition-articles";
 
 const articleAuthorSchema = {
   anyOf: [
@@ -106,78 +111,79 @@ export const WEEKLY_EDITION_PITCH_OPENAI_SCHEMA = {
   required: ["submissions"],
 } as const;
 
-export const WEEKLY_EDITION_OPENAI_SCHEMA = {
-  type: "object",
-  additionalProperties: false,
-  properties: {
-    headline: { type: "string" },
-    deck: { type: "string" },
-    sections: {
-      type: "array",
-      minItems: 6,
-      maxItems: 6,
-      items: {
-        type: "object",
-        additionalProperties: false,
-        properties: {
-          id: {
-            type: "string",
-            enum: [
-              "article_1",
-              "article_2",
-              "article_3",
-              "article_4",
-              "article_5",
-              "article_6",
-            ],
-          },
-          kind: {
-            type: "string",
-            enum: ["primary_article", "standard_article"],
-          },
-          eyebrow: { type: "string" },
-          headline: { type: "string" },
-          body: { type: "string" },
-          author: articleAuthorSchema,
-          links: {
-            type: "array",
-            items: {
-              type: "object",
-              additionalProperties: false,
-              properties: {
-                label: { type: "string" },
-                href: { type: "string" },
+export function buildWeeklyEditionOpenAiSchema(
+  articleCount: WeeklyEditionArticleCount = DEFAULT_WEEKLY_EDITION_ARTICLE_COUNT,
+) {
+  return {
+    type: "object",
+    additionalProperties: false,
+    properties: {
+      headline: { type: "string" },
+      deck: { type: "string" },
+      sections: {
+        type: "array",
+        minItems: articleCount,
+        maxItems: articleCount,
+        items: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            id: {
+              type: "string",
+              enum: buildWeeklyEditionArticleSlots(articleCount).map(
+                (slot) => slot.id,
+              ),
+            },
+            kind: {
+              type: "string",
+              enum: ["primary_article", "standard_article"],
+            },
+            eyebrow: { type: "string" },
+            headline: { type: "string" },
+            body: { type: "string" },
+            author: articleAuthorSchema,
+            links: {
+              type: "array",
+              items: {
+                type: "object",
+                additionalProperties: false,
+                properties: {
+                  label: { type: "string" },
+                  href: { type: "string" },
+                },
+                required: ["label", "href"],
               },
-              required: ["label", "href"],
             },
           },
+          required: [
+            "id",
+            "kind",
+            "eyebrow",
+            "headline",
+            "body",
+            "author",
+            "links",
+          ],
         },
-        required: [
-          "id",
-          "kind",
-          "eyebrow",
-          "headline",
-          "body",
-          "author",
-          "links",
-        ],
       },
     },
-  },
-  required: ["headline", "deck", "sections"],
-} as const;
+    required: ["headline", "deck", "sections"],
+  } as const;
+}
 
 export function buildWeeklyEditionOpenAiRequest({
   model,
   prompt,
+  articleCount = DEFAULT_WEEKLY_EDITION_ARTICLE_COUNT,
 }: {
   model: string;
   prompt: string;
+  articleCount?: WeeklyEditionArticleCount;
 }) {
   return {
     model,
     store: false,
-    max_output_tokens: 8000,
+    max_output_tokens: 8000 + (articleCount - 6) * 1000,
     instructions:
       "Write one grounded GSHL Press Box edition. Follow the supplied fact, voice, author, link, and length rules exactly. Return JSON matching the response schema and nothing else.",
     input: prompt,
@@ -186,7 +192,7 @@ export function buildWeeklyEditionOpenAiRequest({
         type: "json_schema",
         name: "gshl_weekly_edition",
         strict: true,
-        schema: WEEKLY_EDITION_OPENAI_SCHEMA,
+        schema: buildWeeklyEditionOpenAiSchema(articleCount),
       },
     },
   };

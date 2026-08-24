@@ -42,15 +42,16 @@ One standings surface provides overall, conference, wildcard, power-ranking, pla
 
 Published editions have a public archive and detail page. The current home-active issue can also open directly over the home page. Hidden editions are not returned to public readers. Edition content is grounded in stored fact packets even when wording is imported or manually edited.
 
-Commissioners can ask the Newsroom to write a complete six-article edition from
-the selected week. The Convex backend assembles the existing verified fact
-packet and runs a two-stage editorial workflow through the OpenAI Responses API.
-Every league specialist, conference reporter, and team beat writer first files
-zero to two pitches from their documented beat. The server rejects unknown
-authors and evidence, ranks valid pitches against the packet's independent
-importance scores, removes duplicate leads, limits repeated teams and subjects,
-and assigns the top six stories to six different writers. A second structured
-response writes only those assignments in each writer's defined voice.
+Commissioners can ask the Newsroom to write a complete edition from the selected
+week, with eight stories by default and a per-run choice of six through ten. The
+Convex backend assembles the existing verified fact packet and runs a two-stage
+editorial workflow through the OpenAI Responses API. Every league specialist,
+conference reporter, and team beat writer first files zero to two pitches from
+their documented beat. The server rejects unknown authors and evidence, ranks
+valid pitches against the packet's independent importance scores, removes
+duplicate leads, limits repeated teams and subjects, and assigns the requested
+number of stories to different writers. A second structured response writes
+only those assignments in each writer's defined voice.
 
 The finished edition must preserve the selected slots and bylines and pass the
 existing structure, author, link, rule, and factual validators before it is

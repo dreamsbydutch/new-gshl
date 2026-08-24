@@ -19,6 +19,7 @@ import type {
   ContractStatus,
   MatchupType,
   SeasonType,
+  WeeklyEditionArticleCount,
   WeeklyEdition,
   WeeklyEditionContent,
   WeeklyEditionFactPacket,
@@ -56,6 +57,7 @@ import {
   extractWeeklyEditionOpenAiText,
   parseWeeklyEditionStorySubmissions,
 } from "../src/lib/utils/features/weekly-edition-openai";
+import { DEFAULT_WEEKLY_EDITION_ARTICLE_COUNT } from "../src/lib/utils/features/weekly-edition-articles";
 import { toUtcTimestamp, utcTimestampToDateKey } from "./lib/timestamps";
 
 type EditionRow = Doc<"weeklyEditions">;
@@ -80,6 +82,13 @@ const weeklyEditionIssueTypeValidator = v.union(
   v.literal("offseason_market"),
   v.literal("pre_draft"),
   v.literal("preseason"),
+);
+const weeklyEditionArticleCountValidator = v.union(
+  v.literal(6),
+  v.literal(7),
+  v.literal(8),
+  v.literal(9),
+  v.literal(10),
 );
 const DEFAULT_NEWSROOM_MODEL = "gpt-5-mini";
 
@@ -2264,6 +2273,7 @@ export const generateWithAi = action({
     seasonId: v.id("seasons"),
     weekId: v.id("weeks"),
     issueType: weeklyEditionIssueTypeValidator,
+    articleCount: v.optional(weeklyEditionArticleCountValidator),
   },
   handler: async (
     ctx,
@@ -2271,6 +2281,7 @@ export const generateWithAi = action({
   ): Promise<{
     state: "inserted" | "updated";
     model: string;
+    articleCount: WeeklyEditionArticleCount;
     edition: WeeklyEdition;
   }> => {
     const commissioner = await ctx.runQuery(
@@ -2284,13 +2295,19 @@ export const generateWithAi = action({
       );
     }
 
+    const articleCount =
+      args.articleCount ?? DEFAULT_WEEKLY_EDITION_ARTICLE_COUNT;
     const prepared = await ctx.runMutation(
       internal.weeklyEditions.prepareAiGeneration,
-      args,
+      {
+        seasonId: args.seasonId,
+        weekId: args.weekId,
+        issueType: args.issueType,
+      },
     );
     const facts = prepared.facts;
     const model = newsroomModel();
-    const scoutPrompt = buildWeeklyEditionStoryScoutPrompt(facts);
+    const scoutPrompt = buildWeeklyEditionStoryScoutPrompt(facts, articleCount);
     let pitchRaw = await requestNewsroomJson({
       apiKey,
       failureLabel: "run the newsroom pitch meeting",
@@ -2304,13 +2321,14 @@ export const generateWithAi = action({
       assignments = selectWeeklyEditionStoryAssignments(
         facts,
         parseWeeklyEditionStorySubmissions(pitchRaw),
+        articleCount,
       );
     } catch (error) {
       const correctionPrompt = [
         scoutPrompt,
         "",
         "PITCH_REVISION_REQUIRED: The pitch desk response failed validation.",
-        "Return every supplied writer exactly once, keep each pitch inside that writer's beat, use only exact STORY_LEDGER candidate IDs, and provide enough distinct eligible leads for six different writers.",
+        `Return every supplied writer exactly once, keep each pitch inside that writer's beat, use only exact STORY_LEDGER candidate IDs, and provide enough distinct eligible leads for ${articleCount} different writers.`,
         `VALIDATION_ERROR=${error instanceof Error ? error.message : "Invalid pitch response"}`,
         `REJECTED_PITCHES=${pitchRaw}`,
       ].join("\n");
@@ -2325,13 +2343,22 @@ export const generateWithAi = action({
       assignments = selectWeeklyEditionStoryAssignments(
         facts,
         parseWeeklyEditionStorySubmissions(pitchRaw),
+        articleCount,
       );
     }
-    const prompt = buildWeeklyEditionChatGptPrompt(facts, assignments);
+    const prompt = buildWeeklyEditionChatGptPrompt(
+      facts,
+      assignments,
+      articleCount,
+    );
     let raw = await requestNewsroomJson({
       apiKey,
       failureLabel: "write the newsletter",
-      request: buildWeeklyEditionOpenAiRequest({ model, prompt }),
+      request: buildWeeklyEditionOpenAiRequest({
+        model,
+        prompt,
+        articleCount,
+      }),
     });
     let validation = validateWeeklyEditionImport(raw, facts);
     let validationErrors =
@@ -2348,7 +2375,7 @@ export const generateWithAi = action({
         prompt,
         "",
         "REVISION_REQUIRED: The draft below failed the newsroom validator.",
-        "Correct every listed error without changing supported facts, adding claims, or changing the required six-article structure. Return only the corrected JSON object.",
+        `Correct every listed error without changing supported facts, adding claims, or changing the required ${articleCount}-article structure. Return only the corrected JSON object.`,
         `VALIDATION_ERRORS=${JSON.stringify(validationErrors)}`,
         `REJECTED_DRAFT=${raw}`,
       ].join("\n");
@@ -2358,6 +2385,7 @@ export const generateWithAi = action({
         request: buildWeeklyEditionOpenAiRequest({
           model,
           prompt: correctionPrompt,
+          articleCount,
         }),
       });
       validation = validateWeeklyEditionImport(raw, facts);
@@ -2392,6 +2420,7 @@ export const generateWithAi = action({
     return {
       state: prepared.existingEditionId ? "updated" : "inserted",
       model,
+      articleCount,
       edition: edition as unknown as WeeklyEdition,
     };
   },

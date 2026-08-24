@@ -11,6 +11,7 @@ import type {
   WeeklyEditionEditorialMetric,
   WeeklyEditionFactPacket,
   WeeklyEditionAchievementSnapshot,
+  WeeklyEditionArticleCount,
   WeeklyEditionAuthor,
   WeeklyEditionMatchupFact,
   WeeklyEditionMilestoneScheduleEntry,
@@ -32,6 +33,14 @@ import type {
 } from "@gshl-types";
 import { normalizeDateOnlyValue } from "../core/date";
 import { ContractStatus, ContractType } from "../domain/constants";
+import {
+  buildWeeklyEditionArticleSlots,
+  DEFAULT_WEEKLY_EDITION_ARTICLE_COUNT,
+  MAX_WEEKLY_EDITION_ARTICLE_COUNT,
+  MIN_WEEKLY_EDITION_ARTICLE_COUNT,
+  parseWeeklyEditionArticleCount,
+  weeklyEditionArticleSlot,
+} from "./weekly-edition-articles";
 
 export const WEEKLY_EDITION_SECTION_KINDS = [
   "primary_article",
@@ -200,15 +209,6 @@ export function buildWeeklyEditionRevisionSummary(
   };
 }
 
-const WEEKLY_EDITION_ARTICLE_SLOTS = [
-  { id: "article_1", kind: "primary_article" },
-  { id: "article_2", kind: "primary_article" },
-  { id: "article_3", kind: "standard_article" },
-  { id: "article_4", kind: "standard_article" },
-  { id: "article_5", kind: "standard_article" },
-  { id: "article_6", kind: "standard_article" },
-] as const;
-
 function shiftEditionDate(value: string, days: number) {
   const date = new Date(`${value.slice(0, 10)}T12:00:00.000Z`);
   if (Number.isNaN(date.getTime())) return "";
@@ -284,7 +284,10 @@ const contentSchema = z
   .object({
     headline: z.string().trim().min(1).max(90),
     deck: z.string().trim().min(1).max(220),
-    sections: z.array(sectionSchema).length(6),
+    sections: z
+      .array(sectionSchema)
+      .min(MIN_WEEKLY_EDITION_ARTICLE_COUNT)
+      .max(MAX_WEEKLY_EDITION_ARTICLE_COUNT),
   })
   .strict();
 
@@ -1919,7 +1922,9 @@ function weeklyEditionPitchScore(
 export function selectWeeklyEditionStoryAssignments(
   packet: WeeklyEditionFactPacket,
   submissions: WeeklyEditionStorySubmission[],
+  articleCount: WeeklyEditionArticleCount = DEFAULT_WEEKLY_EDITION_ARTICLE_COUNT,
 ): WeeklyEditionStoryAssignment[] {
+  const articleSlots = buildWeeklyEditionArticleSlots(articleCount);
   const roster = buildWeeklyEditionAuthorRoster(packet).map(
     ({ author }) => author,
   );
@@ -2003,7 +2008,7 @@ export function selectWeeklyEditionStoryAssignments(
   const kindCounts = new Map<WeeklyEditionEditorialCandidate["kind"], number>();
   const takePitches = (enforceMix: boolean) => {
     for (const pitch of eligible) {
-      if (selected.length === WEEKLY_EDITION_ARTICLE_SLOTS.length) break;
+      if (selected.length === articleSlots.length) break;
       const authorKey = weeklyEditionAuthorKey(pitch.author);
       const teamId = pitch.lead.teamId;
       const kind = pitch.lead.kind;
@@ -2024,13 +2029,13 @@ export function selectWeeklyEditionStoryAssignments(
   };
   takePitches(true);
   takePitches(false);
-  if (selected.length < WEEKLY_EDITION_ARTICLE_SLOTS.length) {
+  if (selected.length < articleSlots.length) {
     throw new Error(
-      `The pitch desk found only ${selected.length} distinct, eligible stories; six are required`,
+      `The pitch desk found only ${selected.length} distinct, eligible stories; ${articleCount} are required`,
     );
   }
 
-  return WEEKLY_EDITION_ARTICLE_SLOTS.map((slot, index) => {
+  return articleSlots.map((slot, index) => {
     const pitch = selected[index]!;
     return {
       ...slot,
@@ -3314,16 +3319,17 @@ function shortenImportedText(value: unknown, maximum: number) {
 function normalizeWeeklyEditionImportLengths(value: unknown): unknown {
   if (!isUnknownRecord(value)) return value;
   const sections = Array.isArray(value.sections)
-    ? value.sections.map((section: unknown, index: number) =>
-        isUnknownRecord(section) && WEEKLY_EDITION_ARTICLE_SLOTS[index]
+    ? value.sections.map((section: unknown, index: number) => {
+        const slot = weeklyEditionArticleSlot(index);
+        return isUnknownRecord(section) && slot
           ? {
               ...section,
-              ...WEEKLY_EDITION_ARTICLE_SLOTS[index],
+              ...slot,
               headline: shortenImportedText(section.headline, 90),
               body: shortenImportedText(section.body, 1000),
             }
-          : section,
-      )
+          : section;
+      })
     : value.sections;
   return {
     ...value,
@@ -3534,6 +3540,7 @@ export function buildWeeklyEditionRuleContext(packet: WeeklyEditionFactPacket) {
 
 export function buildWeeklyEditionStoryScoutPrompt(
   packet: WeeklyEditionFactPacket,
+  articleCount: WeeklyEditionArticleCount = DEFAULT_WEEKLY_EDITION_ARTICLE_COUNT,
 ) {
   const newsroomAuthors = buildWeeklyEditionAuthorRoster(packet);
   const storyLedger = buildWeeklyEditionStoryLedger(packet);
@@ -3545,7 +3552,7 @@ export function buildWeeklyEditionStoryScoutPrompt(
     "Team beat writers may lead only with evidence centered on their team. Conference reporters may lead only with evidence centered on a team in their conference. League specialists must obey scoutsFor and passesOn. Do not stretch a beat to fill space.",
     "The proposedHeadline and angle are an editor's brief, not finished article prose. State what happened, why it matters now, and which evidence carries the story. Do not invent quotes, rumours, motives, injuries, relationships, rules, history, or certainty.",
     "Score each pitch from 1 to 5 for consequence, readerInterest, evidenceStrength, and freshness. Calibrate the scores against the other candidates in this ledger; 5 means among the best available in this edition, not merely publishable.",
-    "The server will validate every author and evidence ID, combine these scores with the ledger's independent importance score, remove duplicate leads, enforce a mix of subjects, and select six assignments. Return only the structured pitch submissions.",
+    `The server will validate every author and evidence ID, combine these scores with the ledger's independent importance score, remove duplicate leads, enforce a mix of subjects, and select ${articleCount} assignments. Return only the structured pitch submissions.`,
     "",
     `ISSUE_CONTEXT=${JSON.stringify(
       {
@@ -3595,8 +3602,14 @@ export function validateWeeklyEditionStoryAssignments(
       errors.push(`The copy uses the banned newsroom phrase "${phrase}"`);
     }
   }
-  if (assignments.length !== WEEKLY_EDITION_ARTICLE_SLOTS.length) {
-    return ["The editor did not assign exactly six stories"];
+  let articleCount: WeeklyEditionArticleCount;
+  try {
+    articleCount = parseWeeklyEditionArticleCount(assignments.length);
+  } catch {
+    return ["The editor assigned an unsupported number of stories"];
+  }
+  if (content.sections.length !== articleCount) {
+    errors.push(`The draft must contain exactly ${articleCount} stories`);
   }
   const candidatesById = new Map(
     pressBoxEditorialCandidates(packet).map((candidate) => [
@@ -3650,7 +3663,12 @@ export function validateWeeklyEditionStoryAssignments(
 export function buildWeeklyEditionChatGptPrompt(
   packet: WeeklyEditionFactPacket,
   assignments?: WeeklyEditionStoryAssignment[],
+  requestedArticleCount: WeeklyEditionArticleCount = DEFAULT_WEEKLY_EDITION_ARTICLE_COUNT,
 ) {
+  const articleCount = assignments
+    ? parseWeeklyEditionArticleCount(assignments.length)
+    : requestedArticleCount;
+  const articleSlots = buildWeeklyEditionArticleSlots(articleCount);
   const ruleContext = buildWeeklyEditionRuleContext(packet);
   const editorialMatchups = pressBoxMatchups(packet.matchups);
   const previewMatchups = pressBoxNextMatchups(packet.nextMatchups);
@@ -3883,9 +3901,8 @@ export function buildWeeklyEditionChatGptPrompt(
       break;
   }
   const outputContract = {
-    layout:
-      "Exactly six articles in order. Articles 1 and 2 are the two primary stories shown side by side. Articles 3 through 6 are standard stories in the two-column grid.",
-    articleSlots: WEEKLY_EDITION_ARTICLE_SLOTS,
+    layout: `Exactly ${articleCount} articles in order. Articles 1 and 2 are the two primary stories shown side by side. Articles 3 through ${articleCount} are standard stories in the two-column grid.`,
+    articleSlots,
     requiredArticleFields: [
       "id",
       "kind",
@@ -3897,10 +3914,10 @@ export function buildWeeklyEditionChatGptPrompt(
     ],
     authorRule: assignments
       ? "Copy the author from each ordered EDITOR_ASSIGNMENTS entry exactly. Do not reassign a story."
-      : "Choose one approved NEWSROOM_AUTHORS author per article and copy that author object exactly. All six bylines must be different.",
+      : `Choose one approved NEWSROOM_AUTHORS author per article and copy that author object exactly. All ${articleCount} bylines must be different.`,
     assignmentRule: assignments
       ? "Write exactly one article for each ordered EDITOR_ASSIGNMENTS entry. Copy its id and kind, use its lead and supporting candidate IDs as the factual spine, and preserve its angle."
-      : "Choose six distinct, consequential stories from the snapshot.",
+      : `Choose ${articleCount} distinct, consequential stories from the snapshot.`,
     linksRule:
       "Use zero or more entries from AVAILABLE_LINKS. Never invent a URL.",
   };
@@ -3910,7 +3927,7 @@ export function buildWeeklyEditionChatGptPrompt(
       : "PROMPT_FORMAT=league_snapshot_v7",
     "You are the editor of the GSHL Press Box, a fantasy-hockey league newspaper covering the Gem Stone Hockey League.",
     assignments
-      ? "The pitch meeting is complete. EDITOR_ASSIGNMENTS contains the six selected stories in publication order. Write those assignments; do not substitute a subject, change a byline, or merge two assignments."
+      ? `The pitch meeting is complete. EDITOR_ASSIGNMENTS contains the ${articleCount} selected stories in publication order. Write those assignments; do not substitute a subject, change a byline, or merge two assignments.`
       : "EDITION_FACTS is a timestamped snapshot of the league at publication time. It is context, not an article assignment or outline. Use your own editorial judgment and creativity to decide every story, angle, headline, connection and emphasis.",
     assignments
       ? "NEWSROOM_AUTHORS is the complete staff directory and defines each selected writer's beat and voice. EDITOR_ASSIGNMENTS already contains the approved bylines."
@@ -3933,7 +3950,7 @@ export function buildWeeklyEditionChatGptPrompt(
         ]
       : []),
     "Use only the people, teams, amounts, dates, outcomes, transactions, and links in EDITION_FACTS, plus the league process and timelines in RULEBOOK_CONTEXT. Do not add HTML, Markdown links, extra sections, or new URLs.",
-    "Return only one JSON object with headline, deck, and exactly six sections. OUTPUT_CONTRACT defines only the display structure and required fields; it does not define the subjects of the articles.",
+    `Return only one JSON object with headline, deck, and exactly ${articleCount} sections. OUTPUT_CONTRACT defines only the display structure and required fields; it does not define the subjects of the articles.`,
     "LENGTH TARGETS: Count characters before replying. Main headline should be 55–80 characters and must never exceed 90. Deck should be 120–180 and must never exceed 220. Each section headline should be 35–70 and must never exceed 90. Each section body should be 450–750 and must never exceed 1000. Eyebrow must never exceed 50. These are hard per-field limits, not approximate word counts; do not use all available space.",
     "",
     `RULEBOOK_CONTEXT=${JSON.stringify(ruleContext, null, 2)}`,

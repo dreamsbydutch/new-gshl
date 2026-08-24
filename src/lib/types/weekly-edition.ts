@@ -71,8 +71,22 @@ export interface WeeklyEditionStorySubmission {
   pitches: WeeklyEditionStoryPitch[];
 }
 
+export type WeeklyEditionArticleCount = 6 | 7 | 8 | 9 | 10;
+
+export type WeeklyEditionArticleId = `article_${
+  | 1
+  | 2
+  | 3
+  | 4
+  | 5
+  | 6
+  | 7
+  | 8
+  | 9
+  | 10}`;
+
 export interface WeeklyEditionStoryAssignment extends WeeklyEditionStoryPitch {
-  id: `article_${1 | 2 | 3 | 4 | 5 | 6}`;
+  id: WeeklyEditionArticleId;
   kind: "primary_article" | "standard_article";
   author: WeeklyEditionAuthor;
   editorialScore: number;
@@ -665,6 +679,7 @@ export interface WeeklyEditionAiStatus {
 export interface WeeklyEditionAiGenerationResult {
   state: "inserted" | "updated";
   model: string;
+  articleCount: WeeklyEditionArticleCount;
   edition: WeeklyEdition;
 }
 

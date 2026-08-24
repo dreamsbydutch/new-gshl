@@ -18,13 +18,17 @@ import {
 import { useSeasons, useWeeklyEditionNewsroom, useWeeks } from "@gshl-hooks";
 import type {
   WeeklyEdition,
+  WeeklyEditionArticleCount,
   WeeklyEditionContent,
   WeeklyEditionValidationResult,
 } from "@gshl-types";
 import {
   buildWeeklyEditionChatGptPrompt,
+  DEFAULT_WEEKLY_EDITION_ARTICLE_COUNT,
+  parseWeeklyEditionArticleCount,
   validateWeeklyEditionContent,
   validateWeeklyEditionImport,
+  WEEKLY_EDITION_ARTICLE_COUNT_OPTIONS,
 } from "@gshl-utils";
 import { Button } from "@gshl-ui";
 import { WhatsAppShareButton } from "@gshl-components/ui/WhatsAppShareButton";
@@ -45,6 +49,9 @@ export function Newsroom() {
   const [seasonId, setSeasonId] = useState("");
   const [weekId, setWeekId] = useState("");
   const [issueType, setIssueType] = useState("weekly");
+  const [articleCount, setArticleCount] = useState<WeeklyEditionArticleCount>(
+    DEFAULT_WEEKLY_EDITION_ARTICLE_COUNT,
+  );
   const [messageType, setMessageType] = useState("Commissioner note");
   const [messageSubject, setMessageSubject] = useState("");
   const [messageBody, setMessageBody] = useState("");
@@ -57,9 +64,13 @@ export function Newsroom() {
   const prompt = useMemo(
     () =>
       selectedEdition
-        ? buildWeeklyEditionChatGptPrompt(selectedEdition.facts)
+        ? buildWeeklyEditionChatGptPrompt(
+            selectedEdition.facts,
+            undefined,
+            articleCount,
+          )
         : null,
-    [selectedEdition],
+    [articleCount, selectedEdition],
   );
   const activeArticleCount =
     selectedEdition?.content.sections.filter(
@@ -173,9 +184,12 @@ export function Newsroom() {
         seasonId,
         weekId,
         issueType,
+        articleCount,
       });
       setEditionId(generated.edition.id);
-      showNotice(`Newsletter written with ${generated.model}.`);
+      showNotice(
+        `${generated.articleCount}-story newsletter written with ${generated.model}.`,
+      );
     } catch {
       // The hook exposes the error in the newsroom alert.
     }
@@ -249,9 +263,9 @@ export function Newsroom() {
           GSHL Press Box Newsroom
         </h2>
         <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-          Choose a completed week and the newsroom will collect the verified
-          league record, find six stories, and publish a complete edition. Every
-          draft is checked against the stored facts before it can go live.
+          Choose a completed week, issue type, and story count. The newsroom
+          builds a grounded draft from the league record, then checks every
+          article against the stored facts before it can go live.
         </p>
       </header>
 
@@ -327,7 +341,7 @@ export function Newsroom() {
         </p>
       </details>
 
-      <div className="grid gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm md:grid-cols-2 xl:grid-cols-5">
         <label className="text-sm font-medium text-slate-700">
           Generate a completed week
           <select
@@ -377,6 +391,24 @@ export function Newsroom() {
             <option value="preseason">Preseason preview</option>
           </select>
         </label>
+        <label className="text-sm font-medium text-slate-700">
+          AI story count
+          <select
+            value={articleCount}
+            onChange={(event) =>
+              setArticleCount(
+                parseWeeklyEditionArticleCount(event.target.value),
+              )
+            }
+            className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2"
+          >
+            {WEEKLY_EDITION_ARTICLE_COUNT_OPTIONS.map((count) => (
+              <option key={count} value={count}>
+                {count} stories
+              </option>
+            ))}
+          </select>
+        </label>
         <div className="space-y-2 self-end">
           <Button
             type="button"
@@ -395,7 +427,7 @@ export function Newsroom() {
             ) : (
               <Sparkles />
             )}
-            Write newsletter with AI
+            Write {articleCount} stories with AI
           </Button>
           <Button
             type="button"
