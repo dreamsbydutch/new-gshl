@@ -108,7 +108,7 @@ export interface OwnerCommandCenterData {
   draftPicks: OwnerCommandCenterDraftPick[];
   pendingOffers: OwnerCommandCenterPendingOffer[];
   listedPlayers: OwnerCommandCenterListedPlayer[];
-  nextMatchup: OwnerCommandCenterMatchup | null;
+  upcomingMatchups: OwnerCommandCenterMatchup[];
   recentMatchups: OwnerCommandCenterMatchup[];
   tradeActivity: OwnerCommandCenterTradeActivity[];
 }

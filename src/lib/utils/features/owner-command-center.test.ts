@@ -164,27 +164,50 @@ const data: OwnerCommandCenterData = {
       updatedAt: "2026-08-20T12:00:00.000Z",
     },
   ],
-  nextMatchup: {
-    id: "matchup-next",
-    weekId: "week-2",
-    weekNum: 2,
-    weekStartDate: "2026-10-08",
-    weekEndDate: "2026-10-14",
-    gameType: "NC",
-    homeTeamId: "team-1",
-    awayTeamId: "team-2",
-    homeScore: null,
-    awayScore: null,
-    homeWin: null,
-    awayWin: null,
-    tie: null,
-    opponent: {
-      id: "team-2",
-      name: "Rivals",
-      abbr: "RIV",
-      logoUrl: null,
+  upcomingMatchups: [
+    {
+      id: "matchup-next",
+      weekId: "week-2",
+      weekNum: 2,
+      weekStartDate: "2026-10-08",
+      weekEndDate: "2026-10-14",
+      gameType: "NC",
+      homeTeamId: "team-1",
+      awayTeamId: "team-2",
+      homeScore: null,
+      awayScore: null,
+      homeWin: null,
+      awayWin: null,
+      tie: null,
+      opponent: {
+        id: "team-2",
+        name: "Rivals",
+        abbr: "RIV",
+        logoUrl: null,
+      },
     },
-  },
+    {
+      id: "matchup-after-next",
+      weekId: "week-3",
+      weekNum: 3,
+      weekStartDate: "2026-10-15",
+      weekEndDate: "2026-10-21",
+      gameType: "NC",
+      homeTeamId: "team-2",
+      awayTeamId: "team-1",
+      homeScore: null,
+      awayScore: null,
+      homeWin: null,
+      awayWin: null,
+      tie: null,
+      opponent: {
+        id: "team-2",
+        name: "Rivals",
+        abbr: "RIV",
+        logoUrl: null,
+      },
+    },
+  ],
   recentMatchups: [
     {
       id: "matchup-last",
@@ -235,12 +258,20 @@ void test("owner command center combines roster, cap, schedule, picks, and decis
     ],
   );
   assert.equal(view.cap[0]?.remaining, 20_000_000);
+  assert.equal(view.cap[0]?.playerCount, 1);
   assert.equal(view.cap[1]?.remaining, 18_000_000);
   assert.equal(view.cap[1]?.reserved, 2_000_000);
+  assert.equal(view.cap[1]?.playerCount, 1);
+  assert.equal(view.cap[2]?.playerCount, 0);
   assert.equal(view.contractDecisions[0]?.playerName, "Center One");
   assert.equal(view.matchup.record.wins, 1);
-  assert.match(view.matchup.href, /matchup\/matchup-next/);
-  assert.match(view.matchup.href, /from=lockerroom/);
+  assert.equal(view.matchup.latest?.id, "matchup-last");
+  assert.equal(view.matchup.upcoming.length, 2);
+  assert.match(view.matchup.latest?.href ?? "", /matchup\/matchup-last/);
+  assert.match(view.matchup.upcoming[0]?.href ?? "", /matchup\/matchup-next/);
+  assert.match(view.matchup.upcoming[0]?.href ?? "", /from=lockerroom/);
+  assert.match(view.actions.viewRoster, /view=roster/);
+  assert.match(view.actions.viewDraftPicks, /view=draft/);
   assert.equal(view.draft.count, 2);
   assert.equal(view.draft.acquired, 1);
   assert.deepEqual(

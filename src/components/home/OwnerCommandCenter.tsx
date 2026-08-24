@@ -7,6 +7,7 @@ import {
   Bell,
   CalendarDays,
   ChevronDown,
+  ChevronRight,
   CircleDollarSign,
   ClipboardList,
   ListPlus,
@@ -67,13 +68,11 @@ function CommandAction({
   href,
   icon: Icon,
   label,
-  mobileLabel,
   count,
 }: {
   href: string;
   icon: typeof ArrowRightLeft;
   label: string;
-  mobileLabel?: string;
   count?: number;
 }) {
   return (
@@ -81,16 +80,13 @@ function CommandAction({
       asChild
       size="sm"
       variant="outline"
-      className="relative h-9 min-w-0 justify-center gap-1.5 bg-white/80 px-1.5 hover:bg-white sm:justify-between sm:px-2"
+      className="h-9 min-w-0 justify-center gap-1 bg-white/80 px-1 text-[11px] hover:bg-white sm:px-2 sm:text-xs"
     >
       <Link href={href} aria-label={label}>
-        <span className="flex min-w-0 items-center justify-center gap-1.5 sm:justify-start">
-          <Icon aria-hidden="true" />
-          <span className="truncate sm:hidden">{mobileLabel ?? label}</span>
-          <span className="hidden truncate sm:inline">{label}</span>
-        </span>
+        <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
+        <span className="whitespace-nowrap">{label}</span>
         {count ? (
-          <span className="absolute -right-1 -top-1 rounded-full bg-slate-100 px-1.5 py-0.5 font-mono text-[10px] text-slate-600 ring-1 ring-white sm:static sm:ring-0">
+          <span className="hidden shrink-0 rounded-full bg-slate-100 px-1 py-0.5 font-mono text-[9px] leading-none text-slate-600 sm:inline">
             {count}
           </span>
         ) : null}
@@ -165,6 +161,9 @@ function RosterPanel({
   view: NonNullable<ReturnType<typeof useOwnerCommandCenter>["data"]>;
 }) {
   const { roster } = view;
+  const rosterNeeds = roster.gaps
+    .map((gap) => `${gap.label} x${gap.missing}`)
+    .join(", ");
   return (
     <section
       aria-labelledby="owner-roster-summary-heading"
@@ -177,59 +176,23 @@ function RosterPanel({
           detail={`${roster.count}/${roster.capacity}`}
         />
       </div>
-      <dl className="mt-2 grid grid-cols-3 gap-2">
-        {roster.composition.map((entry) => (
-          <div key={entry.position} className="border-l border-slate-200 pl-2">
-            <dt className="text-[10px] uppercase tracking-wide text-slate-400">
-              {entry.position}
-            </dt>
-            <dd className="font-mono text-sm font-semibold text-slate-900">
-              {entry.count}
-            </dd>
-          </div>
-        ))}
-      </dl>
-      <div className="mt-2 flex flex-wrap gap-1 text-xs">
-        {roster.gaps.length ? (
-          roster.gaps.map((gap) => (
-            <span
-              key={gap.position}
-              className="rounded-full bg-amber-100 px-2 py-1 font-medium text-amber-900"
-            >
-              Need {gap.label} ×{gap.missing}
-            </span>
-          ))
-        ) : (
-          <span className="rounded-full bg-emerald-50 px-2 py-1 font-medium text-emerald-800">
-            Lineup slots covered
-          </span>
-        )}
-        {roster.openSpots > 0 ? (
-          <span className="rounded-full bg-slate-100 px-2 py-1 text-slate-700">
-            {roster.openSpots} open roster spot
-            {roster.openSpots === 1 ? "" : "s"}
-          </span>
-        ) : null}
-        {roster.unassigned > 0 ? (
-          <span className="rounded-full bg-slate-100 px-2 py-1 text-slate-700">
-            {roster.unassigned} unassigned
-          </span>
-        ) : null}
-      </div>
-      <details className="mt-2 border-t border-slate-100 pt-1.5">
-        <summary className="flex min-h-9 cursor-pointer items-center text-xs font-medium text-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
-          View current roster
-        </summary>
-        <ul className="grid gap-x-4 divide-y divide-slate-100 sm:grid-cols-2 sm:[&>li:nth-child(2)]:border-t-0">
+      {roster.players.length ? (
+        <ul
+          aria-label="Compact current roster"
+          className="mt-1 grid grid-cols-3 gap-x-2 border-y border-slate-100 py-1"
+        >
           {roster.players.map((player) => (
             <li
               key={player.id}
-              className="flex min-w-0 items-center justify-between gap-3 py-1.5 text-xs"
+              className="flex min-w-0 items-baseline gap-1 py-0.5 text-[10px] leading-4"
             >
-              <span className="truncate font-medium text-slate-900">
+              <span
+                className="truncate font-medium text-slate-900"
+                title={player.fullName}
+              >
                 {player.fullName}
               </span>
-              <span className="shrink-0 text-slate-500">
+              <span className="shrink-0 font-mono text-[9px] text-slate-400">
                 {player.lineupPos ??
                   (player.nhlPos.length
                     ? player.nhlPos.join("/")
@@ -238,7 +201,29 @@ function RosterPanel({
             </li>
           ))}
         </ul>
-      </details>
+      ) : (
+        <p className="mt-1 border-y border-slate-100 py-2 text-xs text-slate-500">
+          No active players are assigned.
+        </p>
+      )}
+      <p className="mt-1 text-[10px] leading-tight text-slate-500">
+        {roster.gaps.length ? (
+          <span className="text-amber-800">Needs {rosterNeeds}</span>
+        ) : (
+          <span className="text-emerald-700">Lineup slots covered</span>
+        )}
+        {roster.openSpots > 0
+          ? ` · ${roster.openSpots} open`
+          : " · Roster full"}
+        {roster.unassigned > 0 ? ` · ${roster.unassigned} unassigned` : ""}
+      </p>
+      <Link
+        href={view.actions.viewRoster}
+        className="mt-1 inline-flex min-h-7 items-center gap-1 text-xs font-medium text-slate-700 underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+      >
+        Full roster
+        <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />
+      </Link>
     </section>
   );
 }
@@ -257,7 +242,7 @@ function CapPanel({
         <SectionHeading
           icon={CircleDollarSign}
           title="Cap & contracts"
-          detail={`${view.contractDecisions.length} decisions`}
+          detail={`${view.contractDecisions.length} decision${view.contractDecisions.length === 1 ? "" : "s"}`}
         />
       </div>
       {view.cap.length ? (
@@ -275,6 +260,9 @@ function CapPanel({
                 )}
               >
                 {formatMoney(season.remaining)}
+                <span className="ml-1 font-sans text-[10px] font-normal text-slate-400">
+                  ({season.playerCount})
+                </span>
                 {season.reserved > 0 ? (
                   <span className="ml-1 font-sans font-normal text-slate-400">
                     after offers
@@ -327,124 +315,127 @@ function MatchupPanel({
 }: {
   view: NonNullable<ReturnType<typeof useOwnerCommandCenter>["data"]>;
 }) {
-  const next = view.matchup.next;
   const record = view.matchup.record;
+  const rows: Array<{
+    label: string;
+    matchup: (typeof view.matchup.upcoming)[number];
+    result: "W" | "L" | "T" | null;
+    score: string | null;
+  }> = [];
+
+  if (view.matchup.latest) {
+    rows.push({
+      label: "Last",
+      matchup: view.matchup.latest,
+      result: view.matchup.latest.result,
+      score: view.matchup.latest.score,
+    });
+  }
+  view.matchup.upcoming.forEach((matchup, index) => {
+    rows.push({
+      label: index === 0 ? "Next" : "Following",
+      matchup,
+      result: null,
+      score: null,
+    });
+  });
+
   return (
     <section
       aria-labelledby="owner-matchup-summary-heading"
-      className="rounded-lg border border-slate-200 p-2"
+      className="rounded-lg border border-slate-200 p-2 sm:col-span-2"
     >
       <div id="owner-matchup-summary-heading">
         <SectionHeading
           icon={CalendarDays}
-          title="Matchup"
+          title="Matchups"
           detail={`${record.wins}-${record.losses}-${record.ties}`}
         />
       </div>
-      {next ? (
-        <div className="mt-2 flex items-center gap-2 border-y border-slate-100 py-2">
-          <TeamMark team={next.opponent} size={38} />
-          <div className="min-w-0 flex-1">
-            <p className="text-[10px] uppercase tracking-wide text-slate-400">
-              {next.weekNum ? `Week ${next.weekNum}` : "Next matchup"} ·{" "}
-              {next.homeTeamId === view.team?.id ? "Home" : "Away"}
-            </p>
-            <p className="truncate text-sm font-semibold text-slate-950">
-              {next.opponent?.name ?? "Opponent TBD"}
-            </p>
-            <p className="text-xs text-slate-500">
-              {shortDate(next.weekStartDate)}–{shortDate(next.weekEndDate)}
-            </p>
-          </div>
-        </div>
+      {rows.length ? (
+        <ul className="mt-1 divide-y divide-slate-100 border-y border-slate-100">
+          {rows.map(({ label, matchup, result, score }) => (
+            <li key={matchup.id}>
+              <Link
+                href={matchup.href}
+                aria-label={`${label} matchup against ${matchup.opponent?.name ?? "opponent"}`}
+                className="grid min-h-10 grid-cols-[auto_minmax(0,1fr)_auto_auto] items-center gap-2 py-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+              >
+                <TeamMark team={matchup.opponent} size={26} />
+                <span className="min-w-0">
+                  <span className="block truncate text-[9px] font-semibold uppercase tracking-wide text-slate-400">
+                    {label} ·{" "}
+                    {matchup.weekNum ? `Week ${matchup.weekNum}` : "Week TBD"} ·{" "}
+                    {matchup.homeTeamId === view.team?.id ? "Home" : "Away"}
+                  </span>
+                  <span className="block truncate text-xs font-semibold text-slate-950">
+                    {matchup.opponent?.name ?? "Opponent TBD"}
+                  </span>
+                </span>
+                <span className="text-right">
+                  <span
+                    className={cn(
+                      "block font-mono text-[11px] font-semibold",
+                      result === "W"
+                        ? "text-emerald-700"
+                        : result === "L"
+                          ? "text-rose-700"
+                          : "text-slate-700",
+                    )}
+                  >
+                    {result
+                      ? `${result}${score ? ` ${score}` : ""}`
+                      : shortDate(matchup.weekStartDate)}
+                  </span>
+                  <span className="block text-[9px] text-slate-400">
+                    {result
+                      ? shortDate(matchup.weekStartDate)
+                      : `to ${shortDate(matchup.weekEndDate)}`}
+                  </span>
+                </span>
+                <ChevronRight
+                  className="h-3.5 w-3.5 text-slate-400"
+                  aria-hidden="true"
+                />
+              </Link>
+            </li>
+          ))}
+        </ul>
       ) : (
-        <p className="mt-2 border-y border-slate-100 py-3 text-xs text-slate-500">
-          No upcoming matchup is scheduled.
+        <p className="mt-1 border-y border-slate-100 py-2 text-xs text-slate-500">
+          No matchup is scheduled yet.
         </p>
       )}
-      <div className="mt-2 flex items-center justify-between gap-3">
-        <div className="flex min-w-0 gap-1.5" aria-label="Recent team results">
-          {view.matchup.recent.length ? (
-            view.matchup.recent.map((matchup) => (
-              <span
-                key={matchup.id}
-                title={`${matchup.opponent?.name ?? "Opponent"}${matchup.score ? ` ${matchup.score}` : ""}`}
-                className={cn(
-                  "flex h-7 min-w-7 items-center justify-center rounded-md px-1 font-mono text-xs font-semibold",
-                  matchup.result === "W"
-                    ? "bg-emerald-50 text-emerald-800"
-                    : matchup.result === "L"
-                      ? "bg-rose-50 text-rose-800"
-                      : "bg-slate-100 text-slate-700",
-                )}
-              >
-                {matchup.result}
-              </span>
-            ))
-          ) : (
-            <span className="text-xs text-slate-500">No recent results</span>
-          )}
-        </div>
-        <Link
-          href={view.matchup.href}
-          className="shrink-0 text-xs font-medium text-slate-700 underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-        >
-          Open matchup
-        </Link>
-      </div>
     </section>
   );
 }
 
-function DraftPanel({
+function DraftLink({
   view,
 }: {
   view: NonNullable<ReturnType<typeof useOwnerCommandCenter>["data"]>;
 }) {
   return (
-    <section
-      aria-labelledby="owner-draft-summary-heading"
-      className="rounded-lg border border-slate-200 p-2"
+    <Button
+      asChild
+      size="sm"
+      variant="outline"
+      className="h-9 w-full justify-between px-2 sm:col-span-2"
     >
-      <div id="owner-draft-summary-heading">
-        <SectionHeading
-          icon={ClipboardList}
-          title="Draft capital"
-          detail={`${view.draft.count} picks`}
-        />
-      </div>
-      {view.draft.groups.length ? (
-        <ul className="mt-2 divide-y divide-slate-100 border-y border-slate-100">
-          {view.draft.groups.map((group) => (
-            <li
-              key={group.seasonId}
-              className="flex items-center justify-between gap-3 py-1.5 text-xs"
-            >
-              <div>
-                <p className="font-medium text-slate-900">{group.seasonName}</p>
-                <p className="text-slate-400">
-                  {group.rounds
-                    .map((round) => `R${round.round} ×${round.count}`)
-                    .join(" · ")}
-                </p>
-              </div>
-              <span className="font-mono font-semibold text-slate-700">
-                {group.picks}
-              </span>
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p className="mt-2 border-y border-slate-100 py-3 text-xs text-slate-500">
-          No unspent draft picks are assigned to this franchise.
-        </p>
-      )}
-      <p className="mt-1.5 text-xs text-slate-500">
-        {view.draft.acquired > 0
-          ? `${view.draft.acquired} acquired pick${view.draft.acquired === 1 ? "" : "s"} in the current inventory.`
-          : "No acquired picks in the current inventory."}
-      </p>
-    </section>
+      <Link href={view.actions.viewDraftPicks}>
+        <span className="flex items-center gap-2">
+          <ClipboardList
+            className="h-4 w-4 text-slate-500"
+            aria-hidden="true"
+          />
+          <span>Draft picks</span>
+        </span>
+        <span className="flex items-center gap-1 font-mono text-xs font-normal text-slate-500">
+          {view.draft.count} pick{view.draft.count === 1 ? "" : "s"}
+          <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />
+        </span>
+      </Link>
+    </Button>
   );
 }
 
@@ -659,32 +650,24 @@ export function OwnerCommandCenter() {
 
         <nav
           aria-label="My Team actions"
-          className="grid w-full grid-cols-4 gap-1 sm:w-auto"
+          className="grid w-full grid-cols-3 gap-1 sm:w-auto"
         >
           <CommandAction
             href={view.actions.exploreTrade}
             icon={ArrowRightLeft}
             label="Trade market"
-            mobileLabel="Trade"
           />
           <CommandAction
             href={view.actions.listPlayer}
             icon={ListPlus}
             label="List player"
-            mobileLabel="List"
             count={view.listedPlayers.length}
           />
           <CommandAction
             href={view.actions.reviewOffer}
             icon={CircleDollarSign}
             label="UFA offers"
-            mobileLabel="Offers"
             count={view.offers.length}
-          />
-          <CommandAction
-            href={view.actions.viewMatchup}
-            icon={CalendarDays}
-            label="Matchup"
           />
         </nav>
       </header>
@@ -750,8 +733,8 @@ export function OwnerCommandCenter() {
         <div className="grid gap-1.5 border-t border-slate-100 pt-1.5 sm:grid-cols-2">
           <RosterPanel view={view} />
           <CapPanel view={view} />
-          <MatchupPanel view={view} />
-          <DraftPanel view={view} />
+          {view.season?.isActive ? <MatchupPanel view={view} /> : null}
+          <DraftLink view={view} />
           <InboxPanel
             view={view}
             lastViewedAt={commandCenter.lastViewedAt}
@@ -779,8 +762,8 @@ function OwnerCommandCenterSkeleton() {
             <Skeleton className="h-4 w-44 max-w-[80%]" />
           </div>
         </div>
-        <div className="grid w-full grid-cols-4 gap-1 sm:w-auto">
-          {Array.from({ length: 4 }).map((_, index) => (
+        <div className="grid w-full grid-cols-3 gap-1 sm:w-auto">
+          {Array.from({ length: 3 }).map((_, index) => (
             <Skeleton key={index} className="h-9 rounded-md sm:w-24" />
           ))}
         </div>

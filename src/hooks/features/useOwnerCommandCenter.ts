@@ -224,7 +224,9 @@ export function useOwnerCommandCenter() {
       row.matchup.homeScore !== undefined &&
       row.matchup.awayScore !== null &&
       row.matchup.awayScore !== undefined;
-    const nextRow = orderedSchedule.find((row) => !isComplete(row)) ?? null;
+    const upcomingRows = orderedSchedule
+      .filter((row) => !isComplete(row))
+      .slice(0, 2);
     const recentRows = orderedSchedule.filter(isComplete).reverse().slice(0, 5);
     const matchupOptions = {
       teams: scheduleQuery.data.teams,
@@ -248,13 +250,13 @@ export function useOwnerCommandCenter() {
       draftPicks,
       pendingOffers,
       listedPlayers,
-      nextMatchup: nextRow
-        ? projectMatchup({
-            ...matchupOptions,
-            matchup: nextRow.matchup,
-            fallbackWeek: nextRow.week,
-          })
-        : null,
+      upcomingMatchups: upcomingRows.map((row) =>
+        projectMatchup({
+          ...matchupOptions,
+          matchup: row.matchup,
+          fallbackWeek: row.week,
+        }),
+      ),
       recentMatchups: recentRows.map((row) =>
         projectMatchup({
           ...matchupOptions,

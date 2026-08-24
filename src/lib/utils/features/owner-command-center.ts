@@ -13,7 +13,10 @@ import {
 } from "../domain/contracts";
 import { RosterPosition } from "../domain/constants";
 import { calculateContractCapSpaceWindow } from "./contract-table";
-import { buildMatchupNavigationHref } from "./contextual-navigation";
+import {
+  buildLockerRoomNavigationHref,
+  buildMatchupNavigationHref,
+} from "./contextual-navigation";
 import {
   DRAFT_ROSTER_BENCH_SLOTS,
   DRAFT_ROSTER_LINEUP_SLOTS,
@@ -92,6 +95,21 @@ function matchupScore(matchup: OwnerCommandCenterMatchup, teamId: string) {
     : `${teamScore}-${opponentScore}`;
 }
 
+function matchupHref(
+  matchup: OwnerCommandCenterMatchup,
+  data: OwnerCommandCenterData,
+  teamId: string,
+) {
+  return buildMatchupNavigationHref(matchup.id, {
+    from: "lockerroom",
+    view: "history",
+    season: data.season?.id ?? null,
+    week: matchup.weekId,
+    owner: data.ownerId,
+    side: matchup.homeTeamId === teamId ? "home" : "away",
+  });
+}
+
 function buildRosterView(data: OwnerCommandCenterData) {
   const configuredSpots = data.season?.rosterSpots?.length
     ? data.season.rosterSpots
@@ -166,16 +184,35 @@ function buildCapView(data: OwnerCommandCenterData) {
   const seasonByYear = new Map(
     data.seasons.map((season) => [seasonYear(season), season]),
   );
+  const rosterPlayerIds = new Set(
+    data.roster.map((player) => String(player.id)),
+  );
 
   return capByYear.slice(0, 3).map((entry) => {
     const season = seasonByYear.get(entry.year);
     const reserved = season
       ? (reservedBySeasonId.get(String(season.id)) ?? 0)
       : 0;
+    const playerCount = season
+      ? new Set(
+          data.contracts
+            .filter(
+              (contract) =>
+                rosterPlayerIds.has(String(contract.playerId)) &&
+                doesContractAffectSeason(
+                  contract as unknown as Contract,
+                  season as unknown as Season,
+                  seasons,
+                ),
+            )
+            .map((contract) => String(contract.playerId)),
+        ).size
+      : 0;
     return {
       ...entry,
       label: season?.name ?? entry.label,
       reserved,
+      playerCount,
       remaining: entry.remaining - reserved,
     };
   });
@@ -295,20 +332,15 @@ function buildActivity(data: OwnerCommandCenterData) {
 
 export function buildOwnerCommandCenterView(data: OwnerCommandCenterData) {
   const teamId = data.team?.id ?? "";
-  const matchupHref = data.nextMatchup
-    ? buildMatchupNavigationHref(data.nextMatchup.id, {
-        from: "lockerroom",
-        view: "history",
-        season: data.season?.id ?? null,
-        week: data.nextMatchup.weekId,
-        owner: data.ownerId,
-        side: data.nextMatchup.homeTeamId === teamId ? "home" : "away",
-      })
-    : `/schedule?view=team${data.season ? `&season=${encodeURIComponent(data.season.id)}` : ""}&owner=${encodeURIComponent(data.ownerId)}`;
+  const upcomingMatchups = data.upcomingMatchups.map((matchup) => ({
+    ...matchup,
+    href: matchupHref(matchup, data, teamId),
+  }));
   const recentMatchups = data.recentMatchups.map((matchup) => ({
     ...matchup,
     result: matchupResult(matchup, teamId),
     score: matchupScore(matchup, teamId),
+    href: matchupHref(matchup, data, teamId),
   }));
   const record = recentMatchups.reduce(
     (summary, matchup) => ({
@@ -328,10 +360,11 @@ export function buildOwnerCommandCenterView(data: OwnerCommandCenterData) {
     cap: buildCapView(data),
     contractDecisions: buildContractDecisions(data),
     matchup: {
-      next: data.nextMatchup,
+      next: upcomingMatchups[0] ?? null,
+      upcoming: upcomingMatchups,
+      latest: recentMatchups[0] ?? null,
       recent: recentMatchups,
       record,
-      href: matchupHref,
     },
     draft: buildDraftView(data),
     offers: data.pendingOffers,
@@ -341,7 +374,16 @@ export function buildOwnerCommandCenterView(data: OwnerCommandCenterData) {
       exploreTrade: "/leagueoffice?view=tradeBlock",
       listPlayer: "/leagueoffice?view=tradeBlock#manage-trade-block-heading",
       reviewOffer: "/leagueoffice?view=freeAgents",
-      viewMatchup: matchupHref,
+      viewRoster: buildLockerRoomNavigationHref("", {
+        view: "roster",
+        season: data.season?.id ?? null,
+        owner: data.ownerId,
+      }),
+      viewDraftPicks: buildLockerRoomNavigationHref("", {
+        view: "draft",
+        season: data.season?.id ?? null,
+        owner: data.ownerId,
+      }),
     },
   };
 }
