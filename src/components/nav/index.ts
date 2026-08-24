@@ -7,7 +7,10 @@
 export { AppNavbar as Navbar } from "./AppNavbar";
 export { AppShell } from "./AppShell";
 export { LinkNavItem, NavContainer } from "./BaseComponents";
-export { GlobalSeasonBar, GlobalSeasonBarFallback } from "./SeasonNavigation";
+export {
+  GlobalSeasonSelect,
+  GlobalSeasonSelectFallback,
+} from "./SeasonNavigation";
 export { WeeksToggle } from "./WeekNavigation";
 export { TeamsToggle } from "./TeamNavigation";
 export { SecondaryPageToolbar } from "./SecondaryToolbar";

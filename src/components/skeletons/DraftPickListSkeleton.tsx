@@ -1,12 +1,18 @@
 import { Skeleton } from "../ui/SkeletonPrimitive";
 
-export function DraftPickListSkeleton() {
+export function DraftPickListSkeleton({
+  showHeader = true,
+}: {
+  showHeader?: boolean;
+}) {
   return (
     <section className="pb-8">
-      <div className="mx-auto mt-4 flex items-center justify-center gap-2 py-3">
-        <Skeleton className="h-9 w-28 rounded-md" />
-        <Skeleton className="h-6 w-24" />
-      </div>
+      {showHeader ? (
+        <div className="mx-auto mt-4 flex items-center justify-center gap-2 py-3">
+          <Skeleton className="h-9 w-28 rounded-md" />
+          <Skeleton className="h-6 w-24" />
+        </div>
+      ) : null}
       <div>
         {Array.from({ length: 10 }).map((_, index) => (
           <div

@@ -32,6 +32,13 @@ export interface TeamDraftPickListProps {
   seasons?: Season[];
   gshlTeamId: string;
   selectedSeasonId: string;
+  isLoading?: boolean;
+  onSelectSeason?: (seasonId: string) => void;
+}
+
+export interface TeamDraftPickHistoryProps {
+  currentTeam: GSHLTeam;
+  seasons: Season[];
 }
 
 export interface ProcessedDraftPick {

@@ -5,7 +5,6 @@ import { useMemo } from "react";
 import { LockerRoomHeader } from "@gshl-components/team/LockerRoomHeader";
 import {
   useCareerSplits,
-  useDraftPicks,
   usePlayers,
   usePlayersByIds,
   usePlayerSplitsByTeams,
@@ -42,10 +41,10 @@ const TeamRecordBook = dynamic(
     ),
   { loading: () => <TeamRecordBookSkeleton /> },
 );
-const TeamDraftPickList = dynamic(
+const TeamDraftPickHistory = dynamic(
   () =>
-    import("@gshl-components/team/TeamDraftPickList").then(
-      (module) => module.TeamDraftPickList,
+    import("@gshl-components/team/TeamDraftPickHistory").then(
+      (module) => module.TeamDraftPickHistory,
     ),
   { loading: () => <DraftPickListSkeleton /> },
 );
@@ -100,27 +99,19 @@ export function LockerRoomContent() {
   const contextSeason = selectedSeason ?? currentSeason ?? defaultSeason;
   const { selectedLockerRoomType, selectedOwnerId } = useNav();
   const salaryCapSeason = useMemo(
-    () =>
-      resolveSalaryCapSeason(seasons, contextSeason, defaultSeason),
+    () => resolveSalaryCapSeason(seasons, contextSeason, defaultSeason),
     [contextSeason, defaultSeason, seasons],
   );
   const contractSeason =
     selectedLockerRoomType === "salary"
       ? salaryCapSeason
-      : contextSeason ?? salaryCapSeason;
+      : (contextSeason ?? salaryCapSeason);
 
   // Only fetch contract data when on a tab that needs it
   const needsContractData =
-    selectedLockerRoomType === "salary" ||
-    selectedLockerRoomType === "draft" ||
-    selectedLockerRoomType === "roster";
+    selectedLockerRoomType === "salary" || selectedLockerRoomType === "roster";
   const lockerRoomSeason = contextSeason ?? contractSeason;
 
-  const needsDraftPicks = selectedLockerRoomType === "draft";
-  const { data: draftPicks } = useDraftPicks({
-    seasonId: lockerRoomSeason?.id,
-    enabled: needsDraftPicks && Boolean(lockerRoomSeason?.id),
-  });
   const { data: teamsRaw = [], isLoading: teamsLoading } = useTeams({
     seasonId: lockerRoomSeason?.id,
     enabled: Boolean(lockerRoomSeason?.id),
@@ -243,7 +234,6 @@ export function LockerRoomContent() {
     teams,
     allTeams,
     seasons,
-    draftPicks,
     enabled: needsContractData,
   });
 
@@ -357,20 +347,7 @@ export function LockerRoomContent() {
         />
       )}
       {selectedLockerRoomType === "draft" && (
-        <>
-          <TeamDraftPickList
-            {...{
-              teams,
-              allTeams,
-              draftPicks: draftPicks,
-              contracts: currentContracts,
-              players,
-              seasons,
-              gshlTeamId: currentTeam.id,
-              selectedSeasonId: lockerRoomSeason?.id ?? "",
-            }}
-          />
-        </>
+        <TeamDraftPickHistory currentTeam={currentTeam} seasons={seasons} />
       )}
       {selectedLockerRoomType === "trophy" && (
         <TrophyCase

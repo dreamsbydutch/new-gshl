@@ -459,7 +459,7 @@ export function Newsroom() {
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[18rem_minmax(0,1fr)]">
-        <aside className="self-start rounded-xl border border-slate-200 bg-white p-3 shadow-sm xl:sticky xl:top-[calc(var(--app-primary-nav-height)+var(--app-season-bar-height)+var(--app-page-context-row-height)+env(safe-area-inset-top)+1rem)]">
+        <aside className="self-start rounded-xl border border-slate-200 bg-white p-3 shadow-sm xl:sticky xl:top-[calc(var(--app-primary-nav-height)+var(--app-page-context-row-height)+env(safe-area-inset-top)+1rem)]">
           <h2 className="px-2 pb-2 text-xs font-bold uppercase tracking-[0.18em] text-slate-500">
             Editions
           </h2>

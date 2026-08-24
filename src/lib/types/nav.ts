@@ -8,6 +8,7 @@
  */
 
 import type { ReactNode } from "react";
+import type { SeasonSummary } from "./season";
 
 export type ScheduleNavigationView = "week" | "team";
 
@@ -296,6 +297,19 @@ export interface ClickableNavItemProps {
 export interface NavbarProps {
   className?: string;
   search?: string;
+}
+
+export interface GlobalSeasonSelectProps {
+  currentSeason: SeasonSummary | null | undefined;
+  isHistoricalSeason: boolean;
+  options: SeasonSummary[];
+  placement: "mobile" | "desktop";
+  selectedSeason: SeasonSummary;
+  onSelectSeason: (seasonId: string) => void;
+}
+
+export interface GlobalSeasonSelectFallbackProps {
+  placement: "mobile" | "desktop";
 }
 
 export interface MainNavbarMoreMenuProps {

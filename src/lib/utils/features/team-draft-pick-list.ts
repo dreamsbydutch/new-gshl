@@ -120,3 +120,30 @@ export function buildSyntheticSeason(
     isActive: false,
   };
 }
+
+export function buildDraftPickSeasonOptions(
+  seasons: readonly Season[],
+): Season[] {
+  return [...seasons].sort(
+    (left, right) =>
+      Number(right.year) - Number(left.year) ||
+      String(right.name).localeCompare(String(left.name)),
+  );
+}
+
+export function resolveDraftPickSeasonTeam(
+  teams: readonly GSHLTeam[],
+  referenceTeam: GSHLTeam,
+): GSHLTeam | undefined {
+  if (referenceTeam.franchiseId) {
+    const franchiseTeam = teams.find(
+      (team) => String(team.franchiseId) === String(referenceTeam.franchiseId),
+    );
+    if (franchiseTeam) return franchiseTeam;
+  }
+
+  if (!referenceTeam.ownerId) return undefined;
+  return teams.find(
+    (team) => String(team.ownerId) === String(referenceTeam.ownerId),
+  );
+}

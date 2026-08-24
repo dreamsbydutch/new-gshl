@@ -3,7 +3,7 @@
 /**
  * @fileoverview Team Draft Pick List Component
  *
- * Displays a team's draft picks for the global season context, showing both
+ * Displays a team's draft picks for a selected draft season, showing both
  * available picks and already-selected players. Includes pick details
  * like round, overall number, and original team if traded.
  *
@@ -70,7 +70,7 @@ const DraftPickItem = ({ processedPick, teams }: DraftPickItemProps) => {
 /**
  * TeamDraftPickList Component
  *
- * Displays a team's draft picks for the selected league season.
+ * Displays a team's draft picks for the selected draft season.
  * Shows both available picks and already-selected players with full details.
  *
  * **Component Responsibilities:**
@@ -89,7 +89,7 @@ const DraftPickItem = ({ processedPick, teams }: DraftPickItemProps) => {
  * @param players - All players
  * @param seasons - Optional season list for filtering
  * @param gshlTeamId - The team ID to display picks for
- * @param selectedSeasonId - Globally selected season
+ * @param selectedSeasonId - Selected draft season
  * @returns Draft pick list for the selected season
  *
  * @example
@@ -111,6 +111,8 @@ export function TeamDraftPickList({
   seasons, // optional: used to scope to next upcoming draft / historical selection
   gshlTeamId,
   selectedSeasonId,
+  isLoading = false,
+  onSelectSeason,
 }: TeamDraftPickListProps & { seasons?: Season[] }) {
   const seasonOptions = useMemo<Season[]>(() => {
     const knownSeasons = [...(seasons ?? [])].sort(
@@ -142,6 +144,10 @@ export function TeamDraftPickList({
 
     return orderedSeasons;
   }, [draftPicks, seasons]);
+  const displaySeasonOptions = useMemo(
+    () => [...seasonOptions].sort((a, b) => Number(b.year) - Number(a.year)),
+    [seasonOptions],
+  );
 
   const { processedDraftPicks, ready } = useTeamDraftPickListData({
     teams,
@@ -157,27 +163,51 @@ export function TeamDraftPickList({
 
   return (
     <>
-      <div className="mx-auto mt-4 flex flex-col items-center gap-2">
-        <div className="flex items-center gap-2 py-3 text-xl font-bold">
-          <span>Draft Picks</span>
-        </div>
+      <div className="mx-auto mt-4 flex items-center justify-center gap-2 py-3">
+        <h2 className="text-xl font-bold">Draft Picks</h2>
+        {onSelectSeason ? (
+          <label>
+            <span className="sr-only">Draft season</span>
+            <select
+              aria-label="Draft season"
+              value={selectedSeasonId}
+              onChange={(event) => onSelectSeason(event.target.value)}
+              className="h-8 min-w-24 rounded-md border border-slate-300 bg-white px-2.5 pr-7 text-xs font-semibold text-slate-800 shadow-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-1 motion-reduce:transition-none"
+            >
+              {displaySeasonOptions.map((season) => (
+                <option key={season.id} value={season.id}>
+                  {season.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : null}
       </div>
-      {processedDraftPicks.length === 0 && (
-        <div className="mt-2 text-center text-sm text-muted-foreground">
-          No draft picks found.
-        </div>
-      )}
-      {processedDraftPicks.map((processedPick) => {
-        const { draftPick } = processedPick;
-        const key = draftPick.id ?? `${draftPick.round}-${draftPick.pick}`;
-        return (
-          <DraftPickItem
-            key={key}
-            processedPick={processedPick}
-            teams={teams}
-          />
-        );
-      })}
+      <div aria-busy={isLoading}>
+        {isLoading ? (
+          <DraftPickListSkeleton showHeader={false} />
+        ) : (
+          <>
+            {processedDraftPicks.length === 0 && (
+              <div className="mt-2 text-center text-sm text-muted-foreground">
+                No draft picks found.
+              </div>
+            )}
+            {processedDraftPicks.map((processedPick) => {
+              const { draftPick } = processedPick;
+              const key =
+                draftPick.id ?? `${draftPick.round}-${draftPick.pick}`;
+              return (
+                <DraftPickItem
+                  key={key}
+                  processedPick={processedPick}
+                  teams={teams}
+                />
+              );
+            })}
+          </>
+        )}
+      </div>
     </>
   );
 }

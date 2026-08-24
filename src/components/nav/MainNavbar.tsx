@@ -8,9 +8,9 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, CalendarDays, House, Shirt, Trophy } from "lucide-react";
-import { useAppPathname } from "@gshl-hooks";
+import { useAppPathname, useGlobalSeasonContextNavigation } from "@gshl-hooks";
 import {
   calculatePageScrollProgress,
   cn,
@@ -20,6 +20,10 @@ import { NavContainer, LinkNavItem } from "./BaseComponents";
 import type { LinkNavItem as LinkNavItemType, NavbarProps } from "@gshl-types";
 import { AuthNavControl } from "@gshl-components/auth";
 import { MoreNavigationMenu } from "./MoreNavigationMenu";
+import {
+  GlobalSeasonSelect,
+  GlobalSeasonSelectFallback,
+} from "./SeasonNavigation";
 
 /**
  * Main navigation bar component with responsive design and active state detection
@@ -29,6 +33,11 @@ import { MoreNavigationMenu } from "./MoreNavigationMenu";
 export function MainNavbar({ className, search = "" }: NavbarProps) {
   const { pathname } = useAppPathname();
   const routeContext = getAppShellRouteContext(pathname, search);
+  const seasonNavigation = useGlobalSeasonContextNavigation();
+  const seasonOptions = useMemo(
+    () => [...seasonNavigation.seasonOptions].sort((a, b) => b.year - a.year),
+    [seasonNavigation.seasonOptions],
+  );
   const [scrollProgress, setScrollProgress] = useState(0);
 
   useEffect(() => {
@@ -100,15 +109,24 @@ export function MainNavbar({ className, search = "" }: NavbarProps) {
         ...navItems.slice(1),
       ]
     : navItems;
+  const seasonControlProps = seasonNavigation.selectedSeasonSummary
+    ? {
+        currentSeason: seasonNavigation.currentSeasonSummary,
+        isHistoricalSeason: seasonNavigation.isHistoricalSeason,
+        onSelectSeason: seasonNavigation.selectSeason,
+        options: seasonOptions,
+        selectedSeason: seasonNavigation.selectedSeasonSummary,
+      }
+    : null;
 
   return (
     <>
       <header className="fixed inset-x-0 top-0 z-50 border-b border-slate-800 bg-slate-950 pt-[env(safe-area-inset-top)] text-white shadow-sm lg:hidden print:hidden">
-        <div className="grid h-[var(--app-mobile-header-height)] grid-cols-[5rem_minmax(0,1fr)_5rem] items-center px-[max(0.25rem,env(safe-area-inset-left))] pr-[max(0.25rem,env(safe-area-inset-right))]">
+        <div className="grid h-[var(--app-mobile-header-height)] grid-cols-[4rem_minmax(0,1fr)_5rem] items-center px-[max(0.25rem,env(safe-area-inset-left))] pr-[max(0.25rem,env(safe-area-inset-right))]">
           <Link
             href="/"
             aria-label="GSHL home"
-            className="flex min-h-11 items-center gap-1.5 rounded-lg px-2 text-xs font-bold tracking-wide focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
+            className="flex min-h-11 items-center gap-1 rounded-lg px-1 text-xs font-bold tracking-wide focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
           >
             <Image
               src="/favicon.ico"
@@ -119,11 +137,18 @@ export function MainNavbar({ className, search = "" }: NavbarProps) {
               className="h-7 w-7 rounded-full bg-white object-contain"
               priority
             />
-            <span>GSHL</span>
+            <span className="sr-only">GSHL</span>
           </Link>
-          <p className="truncate px-1 text-center text-sm font-bold">
-            {routeContext.title}
-          </p>
+          <div className="flex min-w-0 items-center justify-center gap-1.5 px-1">
+            <p className="hidden min-w-0 truncate text-center text-xs font-bold min-[360px]:block sm:text-sm">
+              {routeContext.title}
+            </p>
+            {seasonNavigation.isReady && seasonControlProps ? (
+              <GlobalSeasonSelect {...seasonControlProps} placement="mobile" />
+            ) : (
+              <GlobalSeasonSelectFallback placement="mobile" />
+            )}
+          </div>
           <div className="flex justify-end">
             <AuthNavControl compact />
           </div>
@@ -191,6 +216,13 @@ export function MainNavbar({ className, search = "" }: NavbarProps) {
               isActive={routeContext.activeNavId === "more"}
               placement="desktop"
             />
+          </div>
+          <div className="hidden shrink-0 lg:block">
+            {seasonNavigation.isReady && seasonControlProps ? (
+              <GlobalSeasonSelect {...seasonControlProps} placement="desktop" />
+            ) : (
+              <GlobalSeasonSelectFallback placement="desktop" />
+            )}
           </div>
           <div className="hidden shrink-0 lg:block">
             <AuthNavControl />

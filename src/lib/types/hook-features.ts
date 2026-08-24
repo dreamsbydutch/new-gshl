@@ -225,6 +225,23 @@ export interface UseTeamDraftPickListDataResult {
   error: Error | null;
 }
 
+export interface UseTeamDraftPickHistoryDataOptions {
+  currentTeam: GSHLTeam;
+  seasons?: Season[];
+  enabled?: boolean;
+}
+
+export interface UseTeamDraftPickHistoryDataResult {
+  draftPicks: DraftPick[];
+  isLoading: boolean;
+  players: Player[];
+  seasonOptions: Season[];
+  selectedSeasonId: string | null;
+  selectedTeam?: GSHLTeam;
+  selectSeason: (seasonId: string) => void;
+  teams: GSHLTeam[];
+}
+
 export type UseTeamScheduleEnhancedMatchup = TeamScheduleRow;
 
 export interface UseTeamScheduleDataOptions {

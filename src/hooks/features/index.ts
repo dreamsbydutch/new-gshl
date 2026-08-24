@@ -30,6 +30,7 @@ export * from "./useSeasonDataBundle";
 export * from "./useSeasonMatchupsAndTeams";
 export * from "./useStandingsData";
 export * from "./useTeamDraftPickListData";
+export * from "./useTeamDraftPickHistoryData";
 export * from "./useTeamHistoryData";
 export * from "./useTeamHistoryRows";
 export * from "./useTeamRecordBookView";

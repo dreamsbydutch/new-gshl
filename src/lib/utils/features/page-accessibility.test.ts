@@ -136,16 +136,18 @@ void test("shared dropdown navigation uses a labelled native select", () => {
   assert.match(source, /<option key=\{getItemKey\(item\)\}/);
 });
 
-void test("the application shell owns one accessible global season control", () => {
+void test("the application header owns the accessible global season control", () => {
   const shell = readSource("src/components/nav/AppShell.tsx");
+  const navbar = readSource("src/components/nav/MainNavbar.tsx");
   const seasonNavigation = readSource(
     "src/components/nav/SeasonNavigation.tsx",
   );
 
-  assert.match(shell, /<GlobalSeasonBar \/>/);
-  assert.match(shell, /--app-season-bar-height/);
+  assert.doesNotMatch(shell, /GlobalSeasonBar|--app-season-bar-height/);
+  assert.match(navbar, /<GlobalSeasonSelect[^>]*placement="mobile"/);
+  assert.match(navbar, /placement="desktop"/);
   assert.match(seasonNavigation, /aria-label="League season"/);
-  assert.match(seasonNavigation, /Return to \{currentSeason\.name\}/);
+  assert.match(seasonNavigation, /`Return to \$\{currentSeason\.name\}`/);
 
   for (const path of [
     "src/components/schedule/ScheduleLayout.tsx",
@@ -153,6 +155,17 @@ void test("the application shell owns one accessible global season control", () 
   ]) {
     assert.doesNotMatch(readSource(path), /SeasonToggleNav/);
   }
+});
+
+void test("My Team draft picks use their own season control", () => {
+  const content = readSource(
+    "src/components/locker-room/LockerRoomContent.tsx",
+  );
+  const draftPicks = readSource("src/components/team/TeamDraftPickList.tsx");
+
+  assert.match(content, /<TeamDraftPickHistory/);
+  assert.doesNotMatch(content, /useDraftPicks/);
+  assert.match(draftPicks, /aria-label="Draft season"/);
 });
 
 void test("UFA and matchup statistics retain compact scrollable tables on phones", () => {
