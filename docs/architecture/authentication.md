@@ -122,11 +122,13 @@ Credential values never belong in documentation, source control, logs, screensho
 
 ### Convex deployment
 
-| Variable                | Use                                                  |
-| ----------------------- | ---------------------------------------------------- |
-| `CONVEX_SERVER_SECRET`  | Validates trusted operator/server functions          |
-| `CONVEX_AUTH_ISSUER`    | Loads the application JWKS and validates JWT issuer  |
-| `BROWSER_WORKER_SECRET` | Validates outbound browser-worker leases and results |
+| Variable                | Use                                                        |
+| ----------------------- | ---------------------------------------------------------- |
+| `CONVEX_SERVER_SECRET`  | Validates trusted operator/server functions                |
+| `CONVEX_AUTH_ISSUER`    | Loads the application JWKS and validates JWT issuer        |
+| `BROWSER_WORKER_SECRET` | Validates outbound browser-worker leases and results       |
+| `OPENAI_API_KEY`        | Authenticates commissioner-requested Newsroom generation   |
+| `OPENAI_NEWSROOM_MODEL` | Optional Newsroom model override; defaults to `gpt-5-mini` |
 
 ### Browser worker/operator machine
 
@@ -146,17 +148,20 @@ The repository intentionally ignores `.env`, `.env*.local`, `credentials.json`, 
 - Rotating the RSA private key requires publishing a matching JWKS key. Keep `CONVEX_AUTH_KEY_ID` aligned; changing the key invalidates newly verified tokens until Convex sees the matching public key.
 - Rotating `AUTH_SECRET` invalidates existing Auth.js sessions.
 - Rotating `BROWSER_WORKER_SECRET` requires updating both Convex and the worker before it can lease again.
+- Rotating `OPENAI_API_KEY` requires updating only the Convex deployment. The key must never be added to a `NEXT_PUBLIC_*` variable, Vercel client environment, or browser code.
 
 After rotation, test sign-in, `/api/convex/token`, one protected Convex query, one denied role path, and the intended operator/worker connection without printing a token or secret.
 
 ## Common failure modes
 
-| Symptom                                            | Likely boundary to inspect                                                                                  |
-| -------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| Google sign-in rejected                            | Provider credentials, callback URL, verified email, or disabled `authUsers` record                          |
-| App session exists but Convex says unauthenticated | Issuer mismatch, missing/private signing key, key ID/JWKS mismatch, or stale generated/deployed auth config |
-| Protected page redirects to sign-in                | Missing `AUTH_SECRET`, absent session, or non-active status                                                 |
-| Viewer can see a control but mutation fails        | Expected backend role enforcement; fix UI visibility without weakening the guard                            |
-| Owner mutation says forbidden                      | Missing/wrong `authUsers.ownerId` or resource belongs to a different owner                                  |
-| Trusted script says unauthorized                   | `CONVEX_SERVER_SECRET` mismatch or script pointed at the wrong deployment                                   |
-| Worker cannot lease                                | Worker secret mismatch, wrong Convex URL, or missing browser executable                                     |
+| Symptom                                            | Likely boundary to inspect                                                                                                              |
+| -------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| Google sign-in rejected                            | Provider credentials, callback URL, verified email, or disabled `authUsers` record                                                      |
+| App session exists but Convex says unauthenticated | Issuer mismatch, missing/private signing key, key ID/JWKS mismatch, or stale generated/deployed auth config                             |
+| Protected page redirects to sign-in                | Missing `AUTH_SECRET`, absent session, or non-active status                                                                             |
+| Viewer can see a control but mutation fails        | Expected backend role enforcement; fix UI visibility without weakening the guard                                                        |
+| Owner mutation says forbidden                      | Missing/wrong `authUsers.ownerId` or resource belongs to a different owner                                                              |
+| Trusted script says unauthorized                   | `CONVEX_SERVER_SECRET` mismatch or script pointed at the wrong deployment                                                               |
+| Worker cannot lease                                | Worker secret mismatch, wrong Convex URL, or missing browser executable                                                                 |
+| AI newsletter button is disabled                   | `OPENAI_API_KEY` is absent from the selected Convex deployment                                                                          |
+| AI generation fails before saving                  | OpenAI access/model error, invalid pitches or copy after its correction, fewer than six eligible stories, or a concurrent Newsroom edit |

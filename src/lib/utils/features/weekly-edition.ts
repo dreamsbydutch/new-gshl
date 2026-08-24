@@ -11,6 +11,7 @@ import type {
   WeeklyEditionEditorialMetric,
   WeeklyEditionFactPacket,
   WeeklyEditionAchievementSnapshot,
+  WeeklyEditionArticleCount,
   WeeklyEditionAuthor,
   WeeklyEditionMatchupFact,
   WeeklyEditionMilestoneScheduleEntry,
@@ -24,12 +25,22 @@ import type {
   WeeklyEditionRevisionSummary,
   WeeklyEditionSection,
   WeeklyEditionSectionKind,
+  WeeklyEditionStoryAssignment,
+  WeeklyEditionStorySubmission,
   WeeklyEditionRecordFact,
   WeeklyEditionRecordObservation,
   WeeklyEditionValidationResult,
 } from "@gshl-types";
 import { normalizeDateOnlyValue } from "../core/date";
 import { ContractStatus, ContractType } from "../domain/constants";
+import {
+  buildWeeklyEditionArticleSlots,
+  DEFAULT_WEEKLY_EDITION_ARTICLE_COUNT,
+  MAX_WEEKLY_EDITION_ARTICLE_COUNT,
+  MIN_WEEKLY_EDITION_ARTICLE_COUNT,
+  parseWeeklyEditionArticleCount,
+  weeklyEditionArticleSlot,
+} from "./weekly-edition-articles";
 
 export const WEEKLY_EDITION_SECTION_KINDS = [
   "primary_article",
@@ -198,15 +209,6 @@ export function buildWeeklyEditionRevisionSummary(
   };
 }
 
-const WEEKLY_EDITION_ARTICLE_SLOTS = [
-  { id: "article_1", kind: "primary_article" },
-  { id: "article_2", kind: "primary_article" },
-  { id: "article_3", kind: "standard_article" },
-  { id: "article_4", kind: "standard_article" },
-  { id: "article_5", kind: "standard_article" },
-  { id: "article_6", kind: "standard_article" },
-] as const;
-
 function shiftEditionDate(value: string, days: number) {
   const date = new Date(`${value.slice(0, 10)}T12:00:00.000Z`);
   if (Number.isNaN(date.getTime())) return "";
@@ -282,7 +284,10 @@ const contentSchema = z
   .object({
     headline: z.string().trim().min(1).max(90),
     deck: z.string().trim().min(1).max(220),
-    sections: z.array(sectionSchema).length(6),
+    sections: z
+      .array(sectionSchema)
+      .min(MIN_WEEKLY_EDITION_ARTICLE_COUNT)
+      .max(MAX_WEEKLY_EDITION_ARTICLE_COUNT),
   })
   .strict();
 
@@ -947,6 +952,9 @@ export function buildWeeklyEditionEditorialCandidates(
   }
 
   for (const activity of input.activity) {
+    const activityTeam = input.teams.find(
+      (team) => team.name === activity.teamName,
+    );
     const importance =
       activity.kind === "trade"
         ? 82
@@ -964,6 +972,7 @@ export function buildWeeklyEditionEditorialCandidates(
       headlineHint: `${activity.teamName} ${activity.kind === "trade" ? "acquires" : activity.kind === "drop" ? "drops" : "adds"} ${activity.playerName}`,
       summary: `${activity.teamName} recorded a ${activity.kind} involving ${activity.playerName}${activity.detail ? ` (${activity.detail})` : ""}.`,
       playerName: activity.playerName,
+      teamId: activityTeam?.teamId,
       teamName: activity.teamName,
       metrics: [],
       links: [],
@@ -971,6 +980,9 @@ export function buildWeeklyEditionEditorialCandidates(
   }
 
   for (const missed of input.missedStarts) {
+    const missedStartTeam = input.teams.find(
+      (team) => team.name === missed.teamName,
+    );
     candidates.push({
       id: `missed-start:${missed.id}`,
       kind: "missed_start",
@@ -980,6 +992,7 @@ export function buildWeeklyEditionEditorialCandidates(
       headlineHint: `${missed.teamName} leaves ${missed.count} start${missed.count === 1 ? "" : "s"} unused`,
       summary: `${missed.playerName} accounted for ${missed.count} missed start${missed.count === 1 ? "" : "s"} for ${missed.teamName}.`,
       playerName: missed.playerName,
+      teamId: missedStartTeam?.teamId,
       teamName: missed.teamName,
       metrics: [
         {
@@ -1102,6 +1115,328 @@ export function buildWeeklyEditionFactPacket(
   };
 }
 
+function weeklyEditionMoney(value: number) {
+  const amount = Math.abs(value) / 1_000_000;
+  const formatted = amount.toFixed(2).replace(/\.?0+$/, "") || "0";
+  return `${value < 0 ? "-" : ""}$${formatted}M`;
+}
+
+function buildMilestoneEditorialCandidates(
+  input: BuildMilestoneEditionFactPacketInput,
+) {
+  if (input.issueType === "final_recap") {
+    const matchups = (input.matchups ?? []).map(winnerForMatchup);
+    const candidates = buildWeeklyEditionEditorialCandidates(
+      {
+        season: input.season,
+        week: input.week,
+        teams: input.teams,
+        matchups: input.matchups ?? [],
+        players: input.stars ?? [],
+        power: input.power ?? [],
+        activity: [],
+        missedStarts: [],
+        nextMatchups: [],
+      },
+      matchups,
+    );
+    const finalPower = (input.power ?? []).map((team) => {
+      const finalRank = numberValue(team.currentRank);
+      const talentRating = optionalNumber(team.talentRating);
+      return {
+        id: `final-power:${team.teamId}`,
+        kind: "team_performance" as const,
+        scope: "season" as const,
+        importance: candidateImportance(78 - Math.min(finalRank * 2, 20)),
+        headlineHint: `${team.teamName} finishes No. ${finalRank} in the power rankings`,
+        summary: `${team.teamName} finished No. ${finalRank} in the final power rankings${talentRating === undefined ? "" : ` with a ${talentRating.toFixed(1)} roster-talent rating`}.`,
+        teamId: team.teamId,
+        teamName: team.teamName,
+        metrics: [
+          {
+            key: "finalPowerRank",
+            label: "Final power rank",
+            value: finalRank,
+          },
+        ],
+        links: [],
+      };
+    });
+    return [...candidates, ...finalPower]
+      .filter(
+        (candidate, index, rows) =>
+          rows.findIndex((row) => row.id === candidate.id) === index,
+      )
+      .sort(
+        (left, right) =>
+          right.importance - left.importance || left.id.localeCompare(right.id),
+      );
+  }
+  const candidates: WeeklyEditionEditorialCandidate[] = [];
+  const teamIdByName = new Map(
+    input.teams.map((team) => [team.name, team.teamId]),
+  );
+  const teamCandidateKind: WeeklyEditionEditorialCandidate["kind"] =
+    input.issueType === "pre_draft"
+      ? "draft"
+      : input.issueType === "preseason"
+        ? "team_performance"
+        : "cap";
+  for (const team of input.teamOutlooks) {
+    const draftDetail = `${team.draftPickCount} draft pick${team.draftPickCount === 1 ? "" : "s"}, including ${team.firstRoundPickCount} in the first round`;
+    const rosterDetail = `${team.rosterSize} players and a ${team.rosterTalent.toFixed(1)} roster-talent rating`;
+    const capDetail = `${weeklyEditionMoney(team.capSpace)} in cap space with ${team.expiringCount} expiring contract${team.expiringCount === 1 ? "" : "s"}`;
+    const summary =
+      input.issueType === "pre_draft"
+        ? `${team.teamName} enters the draft with ${rosterDetail} plus ${draftDetail}.`
+        : input.issueType === "preseason"
+          ? `${team.teamName} enters the season with ${rosterDetail}; its draft consumed ${team.draftSelectionsConsumed ?? 0} selections.`
+          : `${team.teamName} has ${capDetail}, ${rosterDetail}, and ${draftDetail}.`;
+    candidates.push({
+      id: `outlook:${input.issueType}:${team.teamId}`,
+      kind: teamCandidateKind,
+      scope: "season",
+      importance: candidateImportance(
+        58 +
+          Math.min(team.expiringCount * 3, 18) +
+          Math.min(team.firstRoundPickCount * 5, 15) +
+          Math.min(Math.abs(team.rosterTalent - 75) / 2, 12),
+      ),
+      headlineHint: `${team.teamName}'s ${input.issueLabel.toLowerCase()} outlook`,
+      summary,
+      teamId: team.teamId,
+      teamName: team.teamName,
+      metrics: [
+        { key: "capSpace", label: "Cap space", value: team.capSpace },
+        {
+          key: "rosterTalent",
+          label: "Roster talent",
+          value: team.rosterTalent,
+        },
+        { key: "rosterSize", label: "Roster size", value: team.rosterSize },
+        {
+          key: "expiringCount",
+          label: "Expiring contracts",
+          value: team.expiringCount,
+        },
+        {
+          key: "firstRoundPickCount",
+          label: "First-round picks",
+          value: team.firstRoundPickCount,
+        },
+      ],
+      links: [],
+    });
+  }
+
+  if (input.issueType === "resigning_outlook") {
+    for (const contract of input.expiringContracts.slice(0, 24)) {
+      candidates.push({
+        id: `contract:expiry:${contract.contractId}`,
+        kind: "contract",
+        scope: "season",
+        importance: candidateImportance(
+          64 +
+            Math.min(contract.salary / 500_000, 18) +
+            (contract.returnsToDraft ? 10 : 0),
+        ),
+        occurredAt: contract.expiryDate,
+        headlineHint: `${contract.teamName} faces a decision on ${contract.playerName}`,
+        summary: `${contract.playerName}'s ${weeklyEditionMoney(contract.salary)} contract with ${contract.teamName} expires ${contract.expiryDate}. Expiry status is ${contract.expiryStatus}; ${contract.returnsToDraft ? "the player returns to the draft" : contract.canBeReSigned ? (contract.requiredReSigningSalary === undefined ? "the player may be re-signed, but the packet does not supply the required salary" : `the player may be re-signed at ${weeklyEditionMoney(contract.requiredReSigningSalary)}`) : "the packet does not mark the player as eligible to re-sign"}.`,
+        playerName: contract.playerName,
+        teamId: teamIdByName.get(contract.teamName),
+        teamName: contract.teamName,
+        metrics: [
+          { key: "salary", label: "Current salary", value: contract.salary },
+          ...(contract.requiredReSigningSalary === undefined
+            ? []
+            : [
+                {
+                  key: "requiredReSigningSalary",
+                  label: "Required re-signing salary",
+                  value: contract.requiredReSigningSalary,
+                },
+              ]),
+        ],
+        links: [],
+      });
+    }
+  }
+
+  if (input.issueType === "offseason_market") {
+    for (const contract of input.recentSignings.slice(0, 20)) {
+      candidates.push({
+        id: `contract:signing:${contract.contractId}`,
+        kind: "transaction",
+        scope: "season",
+        importance: candidateImportance(
+          68 + Math.min(contract.salary / 500_000, 22),
+        ),
+        occurredAt: contract.signedAt,
+        headlineHint: `${contract.teamName} signs ${contract.playerName}`,
+        summary: `${contract.teamName} signed ${contract.playerName} for ${weeklyEditionMoney(contract.salary)}${contract.signedAt ? ` on ${contract.signedAt}` : ""}.`,
+        playerName: contract.playerName,
+        teamId: teamIdByName.get(contract.teamName),
+        teamName: contract.teamName,
+        metrics: [
+          { key: "salary", label: "Salary", value: contract.salary },
+          ...(contract.playerRating === undefined
+            ? []
+            : [
+                {
+                  key: "playerRating",
+                  label: "Player rating",
+                  value: contract.playerRating,
+                },
+              ]),
+        ],
+        links: [],
+      });
+    }
+    for (const ufa of (input.summerUfas ?? []).slice(0, 20)) {
+      candidates.push({
+        id: `ufa:${ufa.playerId}`,
+        kind: "ufa",
+        scope: "season",
+        importance: candidateImportance(
+          70 + Math.min((ufa.rosterTalent ?? 0) / 10, 12),
+        ),
+        headlineHint: `${ufa.playerName} reaches the summer market`,
+        summary: `${ufa.playerName} is a summer UFA at an updated salary of ${weeklyEditionMoney(ufa.updatedSalary)} and a required UFA salary of ${weeklyEditionMoney(ufa.requiredUfaSalary)}${ufa.previousTeamName ? ` after playing for ${ufa.previousTeamName}` : ""}.`,
+        playerId: ufa.playerId,
+        playerName: ufa.playerName,
+        teamId: ufa.previousTeamName
+          ? teamIdByName.get(ufa.previousTeamName)
+          : undefined,
+        teamName: ufa.previousTeamName,
+        metrics: [
+          {
+            key: "updatedSalary",
+            label: "Updated salary",
+            value: ufa.updatedSalary,
+          },
+          {
+            key: "requiredUfaSalary",
+            label: "Required UFA salary",
+            value: ufa.requiredUfaSalary,
+          },
+        ],
+        links: [],
+      });
+    }
+  }
+
+  if (
+    input.issueType === "resigning_outlook" ||
+    input.issueType === "offseason_market"
+  ) {
+    for (const buyout of (input.buyoutCharges ?? []).slice(0, 12)) {
+      candidates.push({
+        id: `cap:buyout:${buyout.contractId}`,
+        kind: "cap",
+        scope: "season",
+        importance: candidateImportance(
+          58 + Math.min(buyout.capHit / 250_000, 20),
+        ),
+        headlineHint: `${buyout.teamName} carries a buyout charge for ${buyout.playerName}`,
+        summary: `${buyout.teamName} carries a ${weeklyEditionMoney(buyout.capHit)} buyout charge for ${buyout.playerName} through ${buyout.capHitEndDate}.`,
+        playerName: buyout.playerName,
+        teamId: teamIdByName.get(buyout.teamName),
+        teamName: buyout.teamName,
+        metrics: [
+          { key: "capHit", label: "Buyout cap hit", value: buyout.capHit },
+        ],
+        links: [],
+      });
+    }
+  }
+
+  if (input.issueType === "pre_draft" || input.issueType === "preseason") {
+    for (const pick of input.draftPicks.slice(0, 24)) {
+      const teamId = teamIdByName.get(pick.teamName);
+      candidates.push({
+        id: `draft:${pick.pickId}`,
+        kind: "draft",
+        scope: "season",
+        importance: candidateImportance(
+          88 -
+            Math.min((pick.round - 1) * 6, 30) +
+            (pick.selectedPlayerRating === undefined
+              ? 0
+              : Math.min(pick.selectedPlayerRating / 10, 10)),
+        ),
+        headlineHint: pick.selectedPlayerName
+          ? `${pick.teamName} selects ${pick.selectedPlayerName}`
+          : `${pick.teamName} holds a Round ${pick.round} selection`,
+        summary: pick.selectedPlayerName
+          ? `${pick.teamName} used its Round ${pick.round}${pick.pick ? `, pick ${pick.pick}` : ""} selection on ${pick.selectedPlayerName}${pick.selectedPlayerRating === undefined ? "" : `, rated ${pick.selectedPlayerRating}`}.`
+          : `${pick.teamName} owns a Round ${pick.round}${pick.pick ? `, pick ${pick.pick}` : ""} selection.`,
+        playerName: pick.selectedPlayerName,
+        teamId,
+        teamName: pick.teamName,
+        metrics: [
+          { key: "round", label: "Round", value: pick.round },
+          ...(pick.pick === undefined
+            ? []
+            : [{ key: "pick", label: "Pick", value: pick.pick }]),
+          ...(pick.selectedPlayerRating === undefined
+            ? []
+            : [
+                {
+                  key: "selectedPlayerRating",
+                  label: "Selected player rating",
+                  value: pick.selectedPlayerRating,
+                },
+              ]),
+        ],
+        links: [],
+      });
+    }
+  }
+
+  if (input.issueType === "preseason") {
+    for (const ranking of (input.gmRankings ?? []).slice(0, 12)) {
+      candidates.push({
+        id: `gm-ranking:${ranking.rank}:${ranking.gmName}`,
+        kind: "gm_ranking",
+        scope: "career",
+        importance: candidateImportance(
+          90 -
+            Math.min(ranking.rank * 2, 24) +
+            Math.min(Math.abs(ranking.rankChange) * 2, 10),
+        ),
+        headlineHint: `${ranking.gmName} enters at No. ${ranking.rank} on the GM Ladder`,
+        summary: `${ranking.gmName}${ranking.teamName ? ` of ${ranking.teamName}` : ""} ranks No. ${ranking.rank} with a ${ranking.rating.toFixed(1)} GM rating, ${ranking.overallWins} wins, ${ranking.playoffAppearances} playoff appearances, and ${ranking.cups} cups.`,
+        teamId: ranking.teamName
+          ? teamIdByName.get(ranking.teamName)
+          : undefined,
+        teamName: ranking.teamName,
+        metrics: [
+          { key: "gmRank", label: "GM rank", value: ranking.rank },
+          { key: "gmRating", label: "GM rating", value: ranking.rating },
+          {
+            key: "rankChange",
+            label: "Rank change",
+            value: ranking.rankChange,
+          },
+        ],
+        links: [],
+      });
+    }
+  }
+
+  return candidates
+    .filter(
+      (candidate, index) =>
+        candidates.findIndex((row) => row.id === candidate.id) === index,
+    )
+    .sort(
+      (left, right) =>
+        right.importance - left.importance || left.id.localeCompare(right.id),
+    )
+    .slice(0, 80);
+}
+
 export function buildMilestoneEditionFactPacket(
   input: BuildMilestoneEditionFactPacketInput,
 ): WeeklyEditionFactPacket {
@@ -1141,6 +1476,13 @@ export function buildMilestoneEditionFactPacket(
       };
     })
     .sort((left, right) => left.currentRank - right.currentRank);
+  const editorialCandidates = [
+    ...(input.editorialCandidates ?? []),
+    ...buildMilestoneEditorialCandidates(input),
+  ].filter(
+    (candidate, index, rows) =>
+      rows.findIndex((row) => row.id === candidate.id) === index,
+  );
   return {
     version: 1 as const,
     season: input.season,
@@ -1153,7 +1495,7 @@ export function buildMilestoneEditionFactPacket(
     activity: [],
     missedStarts: [],
     nextMatchups: [],
-    editorialCandidates: input.editorialCandidates ?? [],
+    editorialCandidates,
     issueType: input.issueType,
     issueLabel: input.issueLabel,
     milestone: {
@@ -1339,8 +1681,6 @@ function teamAuthor(
     scope: "team",
     teamId: team.teamId,
     teamName: team.name,
-    conferenceId: team.conferenceId,
-    conferenceName: team.conferenceName,
   };
 }
 
@@ -1359,29 +1699,83 @@ function conferenceAuthor(
   };
 }
 
-function weeklyEditionAuthorCoverage(author: WeeklyEditionAuthor) {
+function weeklyEditionAuthorProfile(author: WeeklyEditionAuthor) {
   if (author.name === WEEKLY_EDITION_STAFF.editorInChief.name) {
-    return "Rare league-process, governance, rule-change, or major institutional stories only.";
+    return {
+      scoutsFor:
+        "Rare league-process, governance, rule-change, championship, or major institutional stories with consequences beyond one club.",
+      passesOn:
+        "Routine results, ordinary roster churn, and specialist stories that belong to a beat reporter.",
+      voice:
+        "Decisive and economical. Establish the league-wide consequence early, explain the governing detail precisely, and avoid grandstanding.",
+    };
   }
   if (author.name === WEEKLY_EDITION_STAFF.headOfAnalytics.name) {
-    return "Only the edition's biggest performance, record, milestone, ranking, or data-led investigation.";
+    return {
+      scoutsFor:
+        "The edition's most consequential performance, record, milestone, ranking shift, or data-led investigation.",
+      passesOn:
+        "Small samples without a baseline, leaderboards with no change, and number dumps that do not alter the league picture.",
+      voice:
+        "Analytical but readable. State the finding, compare it with the right baseline, then explain the hockey consequence without pretending correlation proves motive.",
+    };
   }
   if (author.name === WEEKLY_EDITION_STAFF.analyticsReporter.name) {
-    return "Regular standout player and team performances, category results, records, milestones, and statistical trends.";
+    return {
+      scoutsFor:
+        "Standout player and team performances, category results, records, milestones, power movement, and statistical trends.",
+      passesOn:
+        "Isolated numbers with no comparison, material roster news, and broad claims the sample cannot support.",
+      voice:
+        "Concrete and curious. Lead with the number that changed, supply one useful comparison, and translate the result into league terms.",
+    };
   }
   if (author.name === WEEKLY_EDITION_STAFF.headInsider.name) {
-    return "Only the edition's biggest signing, trade, contract, cap, or roster-management story.";
+    return {
+      scoutsFor:
+        "The edition's biggest signing, trade, contract, cap, or roster-management decision and its league-wide chain reaction.",
+      passesOn:
+        "Routine adds and drops, speculative motives, and any supposed negotiation detail absent from the source packet.",
+      voice:
+        "Direct and sourced to the ledger. Separate what happened from what it changes, and never imitate anonymous-sourcing language or invent a motive.",
+    };
   }
   if (author.name === WEEKLY_EDITION_STAFF.insider.name) {
-    return "Regular signings, trades, adds, drops, contract decisions, cap developments, and transaction analysis.";
+    return {
+      scoutsFor:
+        "Signings, trades, adds, drops, expiring contracts, cap developments, and the next roster decision created by them.",
+      passesOn:
+        "Transaction lists with no consequence, unsupported market rumours, and performance stories with no roster angle.",
+      voice:
+        "Fast and specific. Put the move, amount, status, or deadline first, then follow the roster and cap consequences one step at a time.",
+    };
   }
   if (author.name === WEEKLY_EDITION_STAFF.nationalReporter.name) {
-    return "League-wide results, championship and season narratives, power structure, draft outlooks, and preseason forecasts.";
+    return {
+      scoutsFor:
+        "League-wide results, championship and season narratives, power structure, cross-conference comparisons, draft outlooks, and preseason forecasts.",
+      passesOn:
+        "A local development with no wider stakes and specialist cap or analytics stories better handled by those desks.",
+      voice:
+        "Broad without becoming vague. Connect two or more grounded developments, keep the hierarchy clear, and finish on the next pressure point rather than a moral.",
+    };
   }
   if (author.scope === "team") {
-    return `Only stories specifically centered on ${author.teamName ?? "the assigned team"}, written from that team's perspective with a very light favourable bias.`;
+    return {
+      scoutsFor: `Results, roster moves, contracts, player performances, matchup trends, and decisions specifically centered on ${author.teamName ?? "the assigned team"}.`,
+      passesOn:
+        "League-wide stories where the assigned team is incidental, plus claims that require another club's private perspective.",
+      voice:
+        "Close to the beat, not promotional. Use the team-specific detail another desk might miss, acknowledge the opposing evidence, and explain the next local consequence.",
+    };
   }
-  return `Stories centered on ${author.conferenceName ?? "the assigned conference"}, framed through that conference while remaining fair to the rest of the league.`;
+  return {
+    scoutsFor: `Standings pressure, matchups, trends, and roster decisions centered on ${author.conferenceName ?? "the assigned conference"}, especially stories that connect more than one team.`,
+    passesOn:
+      "Single-team housekeeping with no conference consequence and developments centered outside the assigned conference.",
+    voice:
+      "Comparative and fair. Locate the story inside the conference race, contrast the relevant teams with specific evidence, and resist homer language.",
+  };
 }
 
 export function buildWeeklyEditionAuthorRoster(
@@ -1391,10 +1785,270 @@ export function buildWeeklyEditionAuthorRoster(
     ...Object.values(WEEKLY_EDITION_STAFF).map((author) => ({ ...author })),
     ...packet.teams.map(conferenceAuthor),
     ...packet.teams.map(teamAuthor),
-  ]).map((author) => ({
-    author,
-    writesAbout: weeklyEditionAuthorCoverage(author),
-  }));
+  ]).map((author) => ({ author, ...weeklyEditionAuthorProfile(author) }));
+}
+
+function weeklyEditionAuthorKey(author: WeeklyEditionAuthor) {
+  return author.name.trim().toLowerCase();
+}
+
+function sameWeeklyEditionAuthor(
+  left: WeeklyEditionAuthor,
+  right: WeeklyEditionAuthor,
+) {
+  return (
+    left.name === right.name &&
+    left.position === right.position &&
+    left.scope === right.scope &&
+    left.teamId === right.teamId &&
+    left.teamName === right.teamName &&
+    left.conferenceId === right.conferenceId &&
+    left.conferenceName === right.conferenceName
+  );
+}
+
+const ANALYTICS_CANDIDATE_KINDS = new Set<
+  WeeklyEditionEditorialCandidate["kind"]
+>([
+  "player_performance",
+  "team_performance",
+  "record",
+  "milestone",
+  "award_race",
+  "award",
+  "gm_ranking",
+  "performance",
+  "matchup",
+]);
+
+const INSIDER_CANDIDATE_KINDS = new Set<
+  WeeklyEditionEditorialCandidate["kind"]
+>(["transaction", "contract", "cap", "ufa", "activity"]);
+
+function weeklyEditionCandidateTeamIds(
+  candidate: WeeklyEditionEditorialCandidate,
+  packet: WeeklyEditionFactPacket,
+) {
+  const teamIds = new Set<string>();
+  if (candidate.teamId) teamIds.add(candidate.teamId);
+  if (candidate.kind === "matchup" && candidate.id.startsWith("matchup:")) {
+    const matchup = packet.matchups.find(
+      (row) => `matchup:${row.matchupId}` === candidate.id,
+    );
+    if (matchup) {
+      teamIds.add(matchup.homeTeamId);
+      teamIds.add(matchup.awayTeamId);
+    }
+  }
+  return [...teamIds];
+}
+
+function writerCanLeadCandidate(
+  author: WeeklyEditionAuthor,
+  candidate: WeeklyEditionEditorialCandidate,
+  packet: WeeklyEditionFactPacket,
+) {
+  const candidateTeamIds = weeklyEditionCandidateTeamIds(candidate, packet);
+  if (author.scope === "team") {
+    return Boolean(author.teamId && candidateTeamIds.includes(author.teamId));
+  }
+  if (author.scope === "conference") {
+    return candidateTeamIds.some(
+      (teamId) =>
+        packet.teams.find((row) => row.teamId === teamId)?.conferenceId ===
+        author.conferenceId,
+    );
+  }
+  if (author.name === WEEKLY_EDITION_STAFF.editorInChief.name) {
+    return candidate.importance >= 90;
+  }
+  if (author.name === WEEKLY_EDITION_STAFF.headOfAnalytics.name) {
+    return (
+      candidate.importance >= 90 &&
+      ANALYTICS_CANDIDATE_KINDS.has(candidate.kind)
+    );
+  }
+  if (author.name === WEEKLY_EDITION_STAFF.analyticsReporter.name) {
+    return ANALYTICS_CANDIDATE_KINDS.has(candidate.kind);
+  }
+  if (author.name === WEEKLY_EDITION_STAFF.headInsider.name) {
+    return (
+      candidate.importance >= 80 && INSIDER_CANDIDATE_KINDS.has(candidate.kind)
+    );
+  }
+  if (author.name === WEEKLY_EDITION_STAFF.insider.name) {
+    return INSIDER_CANDIDATE_KINDS.has(candidate.kind);
+  }
+  return true;
+}
+
+export function buildWeeklyEditionStoryLedger(packet: WeeklyEditionFactPacket) {
+  return pressBoxEditorialCandidates(packet).map((candidate) => {
+    const team = packet.teams.find((row) => row.teamId === candidate.teamId);
+    const relatedTeams = weeklyEditionCandidateTeamIds(candidate, packet).map(
+      (teamId) => {
+        const relatedTeam = packet.teams.find((row) => row.teamId === teamId);
+        return {
+          teamId,
+          teamName: relatedTeam?.name,
+          conferenceId: relatedTeam?.conferenceId,
+          conferenceName: relatedTeam?.conferenceName,
+        };
+      },
+    );
+    return {
+      ...candidate,
+      conferenceId: team?.conferenceId,
+      conferenceName: team?.conferenceName,
+      relatedTeams,
+    };
+  });
+}
+
+function weeklyEditionPitchScore(
+  candidate: WeeklyEditionEditorialCandidate,
+  submission: WeeklyEditionStorySubmission["pitches"][number],
+) {
+  const { scores } = submission;
+  return (
+    candidate.importance +
+    scores.consequence * 4 +
+    scores.readerInterest * 3 +
+    scores.evidenceStrength * 2 +
+    scores.freshness
+  );
+}
+
+export function selectWeeklyEditionStoryAssignments(
+  packet: WeeklyEditionFactPacket,
+  submissions: WeeklyEditionStorySubmission[],
+  articleCount: WeeklyEditionArticleCount = DEFAULT_WEEKLY_EDITION_ARTICLE_COUNT,
+): WeeklyEditionStoryAssignment[] {
+  const articleSlots = buildWeeklyEditionArticleSlots(articleCount);
+  const roster = buildWeeklyEditionAuthorRoster(packet).map(
+    ({ author }) => author,
+  );
+  const rosterByKey = new Map(
+    roster.map((author) => [weeklyEditionAuthorKey(author), author]),
+  );
+  const submittedAuthors = new Set<string>();
+  for (const submission of submissions) {
+    const key = weeklyEditionAuthorKey(submission.author);
+    const expected = rosterByKey.get(key);
+    if (!expected || !sameWeeklyEditionAuthor(expected, submission.author)) {
+      throw new Error(
+        `The pitch desk used an unknown author: ${submission.author.name}`,
+      );
+    }
+    if (submittedAuthors.has(key)) {
+      throw new Error(
+        `The pitch desk submitted ${submission.author.name} more than once`,
+      );
+    }
+    submittedAuthors.add(key);
+  }
+  const missingAuthors = roster.filter(
+    (author) => !submittedAuthors.has(weeklyEditionAuthorKey(author)),
+  );
+  if (missingAuthors.length > 0) {
+    throw new Error(
+      `The pitch desk skipped: ${missingAuthors.map((author) => author.name).join(", ")}`,
+    );
+  }
+
+  const candidates = pressBoxEditorialCandidates(packet);
+  const candidatesById = new Map(
+    candidates.map((candidate) => [candidate.id, candidate]),
+  );
+  const seenPitchIds = new Set<string>();
+  const eligible = submissions.flatMap((submission) => {
+    const author = rosterByKey.get(weeklyEditionAuthorKey(submission.author))!;
+    return submission.pitches.flatMap((pitch) => {
+      const pitchKey = `${weeklyEditionAuthorKey(author)}:${pitch.pitchId}`;
+      const lead = candidatesById.get(pitch.leadCandidateId);
+      const supportIds = [...new Set(pitch.supportingCandidateIds)].filter(
+        (candidateId) => candidateId !== pitch.leadCandidateId,
+      );
+      const support = supportIds.map((candidateId) =>
+        candidatesById.get(candidateId),
+      );
+      if (
+        seenPitchIds.has(pitchKey) ||
+        !lead ||
+        support.some((candidate) => !candidate) ||
+        !writerCanLeadCandidate(author, lead, packet) ||
+        pitch.proposedHeadline.length > 120 ||
+        pitch.angle.length > 600
+      ) {
+        return [];
+      }
+      seenPitchIds.add(pitchKey);
+      return [
+        {
+          ...pitch,
+          supportingCandidateIds: supportIds,
+          author,
+          lead,
+          editorialScore: weeklyEditionPitchScore(lead, pitch),
+        },
+      ];
+    });
+  });
+  eligible.sort(
+    (left, right) =>
+      right.editorialScore - left.editorialScore ||
+      right.lead.importance - left.lead.importance ||
+      left.pitchId.localeCompare(right.pitchId),
+  );
+
+  const selected: typeof eligible = [];
+  const usedAuthors = new Set<string>();
+  const usedLeadCandidates = new Set<string>();
+  const teamCounts = new Map<string, number>();
+  const kindCounts = new Map<WeeklyEditionEditorialCandidate["kind"], number>();
+  const takePitches = (enforceMix: boolean) => {
+    for (const pitch of eligible) {
+      if (selected.length === articleSlots.length) break;
+      const authorKey = weeklyEditionAuthorKey(pitch.author);
+      const teamId = pitch.lead.teamId;
+      const kind = pitch.lead.kind;
+      if (
+        usedAuthors.has(authorKey) ||
+        usedLeadCandidates.has(pitch.leadCandidateId) ||
+        (enforceMix && teamId && (teamCounts.get(teamId) ?? 0) >= 2) ||
+        (enforceMix && (kindCounts.get(kind) ?? 0) >= 2)
+      ) {
+        continue;
+      }
+      selected.push(pitch);
+      usedAuthors.add(authorKey);
+      usedLeadCandidates.add(pitch.leadCandidateId);
+      if (teamId) teamCounts.set(teamId, (teamCounts.get(teamId) ?? 0) + 1);
+      kindCounts.set(kind, (kindCounts.get(kind) ?? 0) + 1);
+    }
+  };
+  takePitches(true);
+  takePitches(false);
+  if (selected.length < articleSlots.length) {
+    throw new Error(
+      `The pitch desk found only ${selected.length} distinct, eligible stories; ${articleCount} are required`,
+    );
+  }
+
+  return articleSlots.map((slot, index) => {
+    const pitch = selected[index]!;
+    return {
+      ...slot,
+      author: pitch.author,
+      pitchId: pitch.pitchId,
+      leadCandidateId: pitch.leadCandidateId,
+      supportingCandidateIds: pitch.supportingCandidateIds,
+      proposedHeadline: pitch.proposedHeadline,
+      angle: pitch.angle,
+      scores: pitch.scores,
+      editorialScore: Math.round(pitch.editorialScore * 10) / 10,
+    };
+  });
 }
 
 function teamFocusForSection(
@@ -2665,16 +3319,17 @@ function shortenImportedText(value: unknown, maximum: number) {
 function normalizeWeeklyEditionImportLengths(value: unknown): unknown {
   if (!isUnknownRecord(value)) return value;
   const sections = Array.isArray(value.sections)
-    ? value.sections.map((section: unknown, index: number) =>
-        isUnknownRecord(section) && WEEKLY_EDITION_ARTICLE_SLOTS[index]
+    ? value.sections.map((section: unknown, index: number) => {
+        const slot = weeklyEditionArticleSlot(index);
+        return isUnknownRecord(section) && slot
           ? {
               ...section,
-              ...WEEKLY_EDITION_ARTICLE_SLOTS[index],
+              ...slot,
               headline: shortenImportedText(section.headline, 90),
               body: shortenImportedText(section.body, 1000),
             }
-          : section,
-      )
+          : section;
+      })
     : value.sections;
   return {
     ...value,
@@ -2883,9 +3538,137 @@ export function buildWeeklyEditionRuleContext(packet: WeeklyEditionFactPacket) {
   }
 }
 
-export function buildWeeklyEditionChatGptPrompt(
+export function buildWeeklyEditionStoryScoutPrompt(
+  packet: WeeklyEditionFactPacket,
+  articleCount: WeeklyEditionArticleCount = DEFAULT_WEEKLY_EDITION_ARTICLE_COUNT,
+) {
+  const newsroomAuthors = buildWeeklyEditionAuthorRoster(packet);
+  const storyLedger = buildWeeklyEditionStoryLedger(packet);
+  return [
+    "PROMPT_FORMAT=newsroom_pitch_desk_v1",
+    "You are running the GSHL Press Box pitch meeting. The goal is to discover the strongest supported stories before any newsletter copy is written.",
+    "Every entry in NEWSROOM_AUTHORS is a working writer. Return exactly one submission for every writer, in the supplied order, and copy each author object exactly. A writer may file zero, one, or two pitches. Zero is the correct answer when the ledger has no story inside that writer's beat.",
+    "Each pitch needs one exact leadCandidateId and no more than two exact supportingCandidateIds from STORY_LEDGER. The lead evidence must fit the writer's scoutsFor scope. Do not pitch a subject merely because a name or number exists; look for consequence, surprise, tension, a decision, a changed hierarchy, or a trend supported by a useful comparison.",
+    "Team beat writers may lead only with evidence centered on their team. Conference reporters may lead only with evidence centered on a team in their conference. League specialists must obey scoutsFor and passesOn. Do not stretch a beat to fill space.",
+    "The proposedHeadline and angle are an editor's brief, not finished article prose. State what happened, why it matters now, and which evidence carries the story. Do not invent quotes, rumours, motives, injuries, relationships, rules, history, or certainty.",
+    "Score each pitch from 1 to 5 for consequence, readerInterest, evidenceStrength, and freshness. Calibrate the scores against the other candidates in this ledger; 5 means among the best available in this edition, not merely publishable.",
+    `The server will validate every author and evidence ID, combine these scores with the ledger's independent importance score, remove duplicate leads, enforce a mix of subjects, and select ${articleCount} assignments. Return only the structured pitch submissions.`,
+    "",
+    `ISSUE_CONTEXT=${JSON.stringify(
+      {
+        issueType: packet.issueType,
+        issueLabel: packet.issueLabel,
+        season: packet.season,
+        week: packet.week,
+      },
+      null,
+      2,
+    )}`,
+    "",
+    `NEWSROOM_AUTHORS=${JSON.stringify(newsroomAuthors, null, 2)}`,
+    "",
+    `STORY_LEDGER=${JSON.stringify(storyLedger, null, 2)}`,
+  ].join("\n");
+}
+
+export function validateWeeklyEditionStoryAssignments(
+  content: WeeklyEditionContent,
+  assignments: WeeklyEditionStoryAssignment[],
   packet: WeeklyEditionFactPacket,
 ) {
+  const errors: string[] = [];
+  const copy = [
+    content.headline,
+    content.deck,
+    ...content.sections.flatMap((section) => [
+      section.eyebrow,
+      section.headline,
+      section.body,
+    ]),
+  ].join("\n");
+  const bannedPhrases = [
+    "here is the thing",
+    "in today's landscape",
+    "more than just",
+    "it is important to note",
+    "game-changer",
+    "pivotal moment",
+    "a testament to",
+    "let that sink in",
+    "at the end of the day",
+  ];
+  for (const phrase of bannedPhrases) {
+    if (copy.toLowerCase().includes(phrase)) {
+      errors.push(`The copy uses the banned newsroom phrase "${phrase}"`);
+    }
+  }
+  let articleCount: WeeklyEditionArticleCount;
+  try {
+    articleCount = parseWeeklyEditionArticleCount(assignments.length);
+  } catch {
+    return ["The editor assigned an unsupported number of stories"];
+  }
+  if (content.sections.length !== articleCount) {
+    errors.push(`The draft must contain exactly ${articleCount} stories`);
+  }
+  const candidatesById = new Map(
+    pressBoxEditorialCandidates(packet).map((candidate) => [
+      candidate.id,
+      candidate,
+    ]),
+  );
+  assignments.forEach((assignment, index) => {
+    const section = content.sections[index];
+    if (!section) {
+      errors.push(`Article ${index + 1} is missing`);
+      return;
+    }
+    if (section.id !== assignment.id || section.kind !== assignment.kind) {
+      errors.push(`Article ${index + 1} changed its assigned slot`);
+    }
+    if (
+      !section.author ||
+      !sameWeeklyEditionAuthor(section.author, assignment.author)
+    ) {
+      errors.push(`Article ${index + 1} changed its assigned writer`);
+    }
+    const candidate = candidatesById.get(assignment.leadCandidateId);
+    const matchup =
+      candidate?.kind === "matchup"
+        ? packet.matchups.find(
+            (row) => `matchup:${row.matchupId}` === candidate.id,
+          )
+        : undefined;
+    const requiredSubjectNames = matchup
+      ? [matchup.homeTeamName, matchup.awayTeamName]
+      : candidate?.playerName
+        ? [candidate.playerName]
+        : candidate?.franchiseName
+          ? [candidate.franchiseName]
+          : candidate?.teamName
+            ? [candidate.teamName]
+            : [];
+    const articleCopy = `${section.headline}\n${section.body}`.toLowerCase();
+    if (
+      requiredSubjectNames.some(
+        (name) => !articleCopy.includes(name.toLowerCase()),
+      )
+    ) {
+      errors.push(`Article ${index + 1} changed its assigned subject`);
+    }
+  });
+  return errors;
+}
+
+export function buildWeeklyEditionChatGptPrompt(
+  packet: WeeklyEditionFactPacket,
+  assignments?: WeeklyEditionStoryAssignment[],
+  requestedArticleCount: WeeklyEditionArticleCount = DEFAULT_WEEKLY_EDITION_ARTICLE_COUNT,
+) {
+  const articleCount = assignments
+    ? parseWeeklyEditionArticleCount(assignments.length)
+    : requestedArticleCount;
+  const articleSlots = buildWeeklyEditionArticleSlots(articleCount);
   const ruleContext = buildWeeklyEditionRuleContext(packet);
   const editorialMatchups = pressBoxMatchups(packet.matchups);
   const previewMatchups = pressBoxNextMatchups(packet.nextMatchups);
@@ -3118,9 +3901,8 @@ export function buildWeeklyEditionChatGptPrompt(
       break;
   }
   const outputContract = {
-    layout:
-      "Exactly six articles in order. Articles 1 and 2 are the two primary stories shown side by side. Articles 3 through 6 are standard stories in the two-column grid.",
-    articleSlots: WEEKLY_EDITION_ARTICLE_SLOTS,
+    layout: `Exactly ${articleCount} articles in order. Articles 1 and 2 are the two primary stories shown side by side. Articles 3 through ${articleCount} are standard stories in the two-column grid.`,
+    articleSlots,
     requiredArticleFields: [
       "id",
       "kind",
@@ -3130,17 +3912,30 @@ export function buildWeeklyEditionChatGptPrompt(
       "author",
       "links",
     ],
-    authorRule:
-      "Choose one approved NEWSROOM_AUTHORS author per article and copy that author object exactly. All six bylines must be different.",
+    authorRule: assignments
+      ? "Copy the author from each ordered EDITOR_ASSIGNMENTS entry exactly. Do not reassign a story."
+      : `Choose one approved NEWSROOM_AUTHORS author per article and copy that author object exactly. All ${articleCount} bylines must be different.`,
+    assignmentRule: assignments
+      ? "Write exactly one article for each ordered EDITOR_ASSIGNMENTS entry. Copy its id and kind, use its lead and supporting candidate IDs as the factual spine, and preserve its angle."
+      : `Choose ${articleCount} distinct, consequential stories from the snapshot.`,
     linksRule:
       "Use zero or more entries from AVAILABLE_LINKS. Never invent a URL.",
   };
   return [
-    "PROMPT_FORMAT=league_snapshot_v6",
+    assignments
+      ? "PROMPT_FORMAT=assigned_newsroom_edition_v7"
+      : "PROMPT_FORMAT=league_snapshot_v7",
     "You are the editor of the GSHL Press Box, a fantasy-hockey league newspaper covering the Gem Stone Hockey League.",
-    "EDITION_FACTS is a timestamped snapshot of the league at publication time. It is context, not an article assignment or outline. Use your own editorial judgment and creativity to decide every story, angle, headline, connection and emphasis.",
-    "NEWSROOM_AUTHORS is the complete author roster. Each entry describes that reporter's role and eligible beat. Choose authors after choosing the stories, copy each selected author object exactly, and never use one reporter twice in the edition.",
+    assignments
+      ? `The pitch meeting is complete. EDITOR_ASSIGNMENTS contains the ${articleCount} selected stories in publication order. Write those assignments; do not substitute a subject, change a byline, or merge two assignments.`
+      : "EDITION_FACTS is a timestamped snapshot of the league at publication time. It is context, not an article assignment or outline. Use your own editorial judgment and creativity to decide every story, angle, headline, connection and emphasis.",
+    assignments
+      ? "NEWSROOM_AUTHORS is the complete staff directory and defines each selected writer's beat and voice. EDITOR_ASSIGNMENTS already contains the approved bylines."
+      : "NEWSROOM_AUTHORS is the complete author roster. Each entry describes that reporter's role and eligible beat. Choose authors after choosing the stories, copy each selected author object exactly, and never use one reporter twice in the edition.",
     "A team beat writer is eligible only for an article centered on that writer's team. A conference reporter is eligible only for an article centered on that conference.",
+    "VOICE: Write like an informed hockey reporter, not an assistant. Follow each assigned writer's voice without turning the byline into a caricature. Lead with the concrete news. Use specific names, scores, amounts and ratings as evidence, then explain what they change. Vary sentence length and keep paragraphs to two through five sentences.",
+    "VOICE: Cut throat-clearing, generic transitions, inflated claims and moralizing recap endings. Do not use canned frames such as 'here is the thing', 'in today's landscape', 'more than just', 'it is important to note', 'game-changer', 'pivotal moment' or 'a testament to'. Do not replace them with choppy fragments.",
+    "VOICE: Preserve the packet's scope and uncertainty. Never add a quote, anecdote, motive, conclusion or degree of certainty that the facts do not support.",
     "Factual claims must be supported by EDITION_FACTS or RULEBOOK_CONTEXT. Do not invent events, quotes, relationships, motives, injuries, rules, names, scores, statistics, transactions or historical claims. Clearly rhetorical color is allowed when it does not imply a new fact.",
     "Use the supplied ratings as the baseline for league hierarchy and broad judgments, then use the surrounding events and details to explain or challenge that baseline. Ratings may support playful hockey-style chirps about strong and weak players, rosters, and GM track records, but keep the chirps proportionate to the evidence and distinguish player quality, roster talent, and GM performance.",
     "Use RULEBOOK_CONTEXT as the source of truth for league process. Apply only the rule blocks included for this edition. Do not substitute NHL rules or ordinary fantasy-hockey assumptions.",
@@ -3155,13 +3950,21 @@ export function buildWeeklyEditionChatGptPrompt(
         ]
       : []),
     "Use only the people, teams, amounts, dates, outcomes, transactions, and links in EDITION_FACTS, plus the league process and timelines in RULEBOOK_CONTEXT. Do not add HTML, Markdown links, extra sections, or new URLs.",
-    "Return only one JSON object with headline, deck, and exactly six sections. OUTPUT_CONTRACT defines only the display structure and required fields; it does not define the subjects of the articles.",
+    `Return only one JSON object with headline, deck, and exactly ${articleCount} sections. OUTPUT_CONTRACT defines only the display structure and required fields; it does not define the subjects of the articles.`,
     "LENGTH TARGETS: Count characters before replying. Main headline should be 55–80 characters and must never exceed 90. Deck should be 120–180 and must never exceed 220. Each section headline should be 35–70 and must never exceed 90. Each section body should be 450–750 and must never exceed 1000. Eyebrow must never exceed 50. These are hard per-field limits, not approximate word counts; do not use all available space.",
     "",
     `RULEBOOK_CONTEXT=${JSON.stringify(ruleContext, null, 2)}`,
     "",
     `NEWSROOM_AUTHORS=${JSON.stringify(newsroomAuthors, null, 2)}`,
     "",
+    ...(assignments
+      ? [
+          `EDITOR_ASSIGNMENTS=${JSON.stringify(assignments, null, 2)}`,
+          "",
+          `STORY_LEDGER=${JSON.stringify(buildWeeklyEditionStoryLedger(packet), null, 2)}`,
+          "",
+        ]
+      : []),
     `EDITION_FACTS=${JSON.stringify(facts, null, 2)}`,
     "",
     `AVAILABLE_LINKS=${JSON.stringify(availableLinks, null, 2)}`,

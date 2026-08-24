@@ -7,6 +7,13 @@ export type MutationReference = FunctionReference<
   unknown
 >;
 
+export type ActionReference = FunctionReference<
+  "action",
+  "public",
+  Record<string, unknown>,
+  unknown
+>;
+
 export interface AppMutationOptions {
   onSuccess?: (value: unknown) => void;
   onError?: (error: Error) => void;

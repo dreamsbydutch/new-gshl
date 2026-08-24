@@ -6,27 +6,27 @@
 
 `convex/` is the deployed backend. It contains the schema, public functions, shared-secret functions, internal orchestration, cron registration, and generated bindings.
 
-| Path                                                        | Responsibility                                                         |
-| ----------------------------------------------------------- | ---------------------------------------------------------------------- |
-| [`schema.ts`](../../convex/schema.ts)                       | Tables, validators, and indexes                                        |
-| [`frontend.ts`](../../convex/frontend.ts)                   | Main browser-facing league query and mutation facade                   |
-| [`draft.ts`](../../convex/draft.ts)                         | Transactional live draft state, submission, and undo                   |
-| [`tradeBlock.ts`](../../convex/tradeBlock.ts)               | Authenticated trade market projection and owner-controlled listings    |
-| [`schedule.ts`](../../convex/schedule.ts)                   | Page-shaped weekly and owner-team schedule projections                 |
-| [`matchup.ts`](../../convex/matchup.ts)                     | Matchup details with referenced teams and player statistics            |
-| [`standings.ts`](../../convex/standings.ts)                 | Lazy public team snapshots for expanded standings rows                 |
-| [`teamHistory.ts`](../../convex/teamHistory.ts)             | Owner-scoped historical matchup and public relation projection         |
-| [`conferenceContest.ts`](../../convex/conferenceContest.ts) | Derived cross-season conference-contest view                           |
-| [`ufa.ts`](../../convex/ufa.ts)                             | UFA offers, odds, cap checks, scheduling, and resolution               |
-| [`weeklyEditions.ts`](../../convex/weeklyEditions.ts)       | Publication facts, templates, editing, revisions, and scheduled issues |
-| [`data.ts`](../../convex/data.ts)                           | High-privilege generic migration/read/write adapter                    |
-| [`maintenanceScope.ts`](../../convex/maintenanceScope.ts)   | Bounded season/week aggregate reads and writes for scripts             |
-| [`jobs.ts`](../../convex/jobs.ts)                           | Shared-secret job and schedule administration                          |
-| [`jobRunner.ts`](../../convex/jobRunner.ts)                 | Internal job state machine and processors                              |
-| [`externalWorker.ts`](../../convex/externalWorker.ts)       | Shared-secret task leases for the local browser worker                 |
-| [`crons.ts`](../../convex/crons.ts)                         | Convex cron registration                                               |
-| [`lib/`](../../convex/lib/)                                 | Auth and timestamp primitives used by multiple functions               |
-| [`_generated/`](../../convex/_generated/)                   | Generated API, server, and data-model bindings; never hand-edit        |
+| Path                                                        | Responsibility                                                                         |
+| ----------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| [`schema.ts`](../../convex/schema.ts)                       | Tables, validators, and indexes                                                        |
+| [`frontend.ts`](../../convex/frontend.ts)                   | Main browser-facing league query and mutation facade                                   |
+| [`draft.ts`](../../convex/draft.ts)                         | Transactional live draft state, submission, and undo                                   |
+| [`tradeBlock.ts`](../../convex/tradeBlock.ts)               | Authenticated trade market projection and owner-controlled listings                    |
+| [`schedule.ts`](../../convex/schedule.ts)                   | Page-shaped weekly and owner-team schedule projections                                 |
+| [`matchup.ts`](../../convex/matchup.ts)                     | Matchup details with referenced teams and player statistics                            |
+| [`standings.ts`](../../convex/standings.ts)                 | Lazy public team snapshots for expanded standings rows                                 |
+| [`teamHistory.ts`](../../convex/teamHistory.ts)             | Owner-scoped historical matchup and public relation projection                         |
+| [`conferenceContest.ts`](../../convex/conferenceContest.ts) | Derived cross-season conference-contest view                                           |
+| [`ufa.ts`](../../convex/ufa.ts)                             | UFA offers, odds, cap checks, scheduling, and resolution                               |
+| [`weeklyEditions.ts`](../../convex/weeklyEditions.ts)       | Publication facts, OpenAI writing, templates, editing, revisions, and scheduled issues |
+| [`data.ts`](../../convex/data.ts)                           | High-privilege generic migration/read/write adapter                                    |
+| [`maintenanceScope.ts`](../../convex/maintenanceScope.ts)   | Bounded season/week aggregate reads and writes for scripts                             |
+| [`jobs.ts`](../../convex/jobs.ts)                           | Shared-secret job and schedule administration                                          |
+| [`jobRunner.ts`](../../convex/jobRunner.ts)                 | Internal job state machine and processors                                              |
+| [`externalWorker.ts`](../../convex/externalWorker.ts)       | Shared-secret task leases for the local browser worker                                 |
+| [`crons.ts`](../../convex/crons.ts)                         | Convex cron registration                                                               |
+| [`lib/`](../../convex/lib/)                                 | Auth and timestamp primitives used by multiple functions                               |
+| [`_generated/`](../../convex/_generated/)                   | Generated API, server, and data-model bindings; never hand-edit                        |
 
 One-off internal migrations and compatibility readers live beside these modules: `reporterBackfill.ts`, `weeklyEditionBackfill.ts`, `timestampMigration.ts`, and `yahooBackfill.ts`.
 
@@ -71,7 +71,7 @@ compatibility filter before honoring a row limit.
   backend reads and reactive dependency set requires a maintained aggregate or
   snapshot; the current change reduces its browser payload only.
 - `ufa:publicState` is anonymous but masks owner identity and returns unresolved groups with their offers so pending cap reservations survive resolution retries. Odds are shown for open groups only, with formula-wide inputs shared across groups and selective inputs scoped by bidder-owner and season indexes. `submitOffer` requires an owner/commissioner identity unless the trusted server-secret path is used. Resolution functions are internal.
-- Weekly edition reader endpoints return only published, active content. Archive, Home, Newsroom, and revision lists use compact projections; full edition content is fetched by ID only for an opened reader or a commissioner-selected Newsroom issue. Published archive reads are bounded by status/season publication indexes, and Newsroom and revision lists are capped at 100 rows. Newsroom, prompt, editing, visibility, homepage selection, section activation, and revision restoration are commissioner-only.
+- Weekly edition reader endpoints return only published, active content. Archive, Home, Newsroom, and revision lists use compact projections; full edition content is fetched by ID only for an opened reader or a commissioner-selected Newsroom issue. Published archive reads are bounded by status/season publication indexes, and Newsroom and revision lists are capped at 100 rows. Newsroom, prompt, OpenAI generation, editing, visibility, homepage selection, section activation, and revision restoration are commissioner-only. AI generation reads its API key only from the Convex deployment and uses the Responses API without server-side response storage. Its first structured response gathers beat-scoped pitches from every available writer; pure server logic validates authors and evidence, ranks the pitches, removes duplicate leads, enforces subject diversity, and assigns the requested six to ten stories to different writers, defaulting to eight. A second structured response writes those locked assignments. Each stage may be corrected once, and the edition is saved atomically only after the existing fact-packet validator and assignment validator pass. A concurrent Newsroom edit aborts the save rather than being overwritten.
 
 Authorization is a handler responsibility. Do not infer permission from whether a function appears in generated `api`.
 

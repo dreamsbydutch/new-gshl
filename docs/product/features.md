@@ -42,6 +42,24 @@ One standings surface provides overall, conference, wildcard, power-ranking, pla
 
 Published editions have a public archive and detail page. The current home-active issue can also open directly over the home page. Hidden editions are not returned to public readers. Edition content is grounded in stored fact packets even when wording is imported or manually edited.
 
+Commissioners can ask the Newsroom to write a complete edition from the selected
+week, with eight stories by default and a per-run choice of six through ten. The
+Convex backend assembles the existing verified fact packet and runs a two-stage
+editorial workflow through the OpenAI Responses API. Every league specialist,
+conference reporter, and team beat writer first files zero to two pitches from
+their documented beat. The server rejects unknown authors and evidence, ranks
+valid pitches against the packet's independent importance scores, removes
+duplicate leads, limits repeated teams and subjects, and assigns the requested
+number of stories to different writers. A second structured response writes
+only those assignments in each writer's defined voice.
+
+The finished edition must preserve the selected slots and bylines and pass the
+existing structure, author, link, rule, and factual validators before it is
+saved as one atomic revision. The pitch desk and writing desk each get one
+corrective pass; a repeated failure leaves the current edition unchanged.
+Grounded templates, copyable prompts, validated imports, manual edits, article
+toggles, and revision restoration remain available as fallbacks.
+
 ### Rulebook
 
 The public rulebook is generated from structured content in `src/content/rulebook.ts`. It supports search, section navigation, collapsible content, diagrams, and a print layout. `/rules` is an alias for `/rulebook`.
@@ -109,7 +127,7 @@ Commissioners additionally receive:
 - contract creation with derived terms and cap validation;
 - user role, status, and owner-link management;
 - dry-run/apply operational jobs with progress, cancellation, and retry;
-- Press Box generation, visibility, article toggles, validated imports, manual edits, and revision restoration; and
+- Press Box AI and template generation, visibility, article toggles, validated imports, manual edits, and revision restoration; and
 - authenticated image uploads through UploadThing.
 
 ## Shared behavior

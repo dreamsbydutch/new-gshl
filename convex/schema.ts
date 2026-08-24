@@ -850,6 +850,7 @@ export default defineSchema({
     status: v.union(v.literal("published"), v.literal("hidden")),
     generationMode: v.union(
       v.literal("template"),
+      v.literal("openai"),
       v.literal("chatgpt_import"),
       v.literal("manual"),
     ),
@@ -878,6 +879,7 @@ export default defineSchema({
     editionId: v.id("weeklyEditions"),
     generationMode: v.union(
       v.literal("template"),
+      v.literal("openai"),
       v.literal("chatgpt_import"),
       v.literal("manual"),
     ),

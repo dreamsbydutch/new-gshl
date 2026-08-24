@@ -3,8 +3,11 @@ import test from "node:test";
 import type {
   BuildWeeklyEditionFactPacketInput,
   WeeklyEdition,
+  WeeklyEditionArticleId,
   WeeklyEditionContent,
   WeeklyEditionFactPacket,
+  WeeklyEditionStoryPitch,
+  WeeklyEditionStorySubmission,
 } from "@gshl-types";
 import {
   buildWeeklyEditionArchiveSummary,
@@ -18,16 +21,20 @@ import {
   buildTemplateWeeklyEdition,
   buildWeeklyEditionCategoryMargins,
   buildWeeklyEditionChatGptPrompt,
+  buildWeeklyEditionAuthorRoster,
   buildWeeklyEditionFactPacket,
   buildWeeklyEditionMilestoneFacts,
   buildWeeklyEditionMilestoneSchedule,
   buildWeeklyEditionRuleContext,
+  buildWeeklyEditionStoryScoutPrompt,
   buildWeeklyEditionPeriodRecordFacts,
   filterWeeklyEditionContent,
   hashWeeklyEditionSource,
   isWeeklyEditionPlayingContract,
   isWeeklyEditionSummerUfaPoolAvailable,
+  selectWeeklyEditionStoryAssignments,
   validateWeeklyEditionImport,
+  validateWeeklyEditionStoryAssignments,
   weeklyEditionContractAffectsSeason,
 } from "./weekly-edition";
 
@@ -757,7 +764,7 @@ void test("prompt contains a raw newsroom brief without an article plan", () => 
     abbr: "DOT",
   });
   const prompt = buildWeeklyEditionChatGptPrompt(packet);
-  assert.match(prompt, /^PROMPT_FORMAT=league_snapshot_v6/);
+  assert.match(prompt, /^PROMPT_FORMAT=league_snapshot_v7/);
   assert.match(prompt, /RULEBOOK_CONTEXT=/);
   assert.match(prompt, /EDITION_FACTS=/);
   assert.match(prompt, /NEWSROOM_AUTHORS=/);
@@ -800,6 +807,195 @@ void test("prompt contains a raw newsroom brief without an article plan", () => 
   assert.doesNotMatch(prompt, /headlineHint|importance/);
   assert.doesNotMatch(prompt, /Database Only Team/);
   assert.doesNotMatch(prompt, /knownEntityNames|allowedNames|allowedNumbers/);
+});
+
+void test("newsroom defaults to eight distinct beat-eligible stories", () => {
+  const packet = buildWeeklyEditionFactPacket(source());
+  const roster = buildWeeklyEditionAuthorRoster(packet);
+  const pitch = (
+    pitchId: string,
+    leadCandidateId: string,
+    score = 5,
+  ): WeeklyEditionStoryPitch => ({
+    pitchId,
+    leadCandidateId,
+    supportingCandidateIds: [],
+    proposedHeadline: `Proposed ${pitchId}`,
+    angle: `Grounded angle for ${pitchId}`,
+    scores: {
+      consequence: score,
+      readerInterest: score,
+      evidenceStrength: score,
+      freshness: score,
+    },
+  });
+  const pitchesByAuthor = new Map<string, WeeklyEditionStoryPitch[]>([
+    ["Graham MacIntyre", [pitch("league-upset", "matchup:matchup-1")]],
+    ["Gord McKenzie", [pitch("aurora-rise", "power:team-a")]],
+    ["Mike Halvorsen", [pitch("dragons-add", "transaction:add-1")]],
+    [
+      "Scott Bannerman",
+      [pitch("north-performance", "performance:weekly-star:player-1", 1)],
+    ],
+    [
+      "Nate Carlson",
+      [pitch("west-performance", "performance:weekly-star:player-2")],
+    ],
+    ["Bruce McAllister", [pitch("bears-slide", "power:team-b")]],
+    ["Darren Whitmore", [pitch("bears-missed-start", "missed-start:missed-1")]],
+    ["Scott Callahan", [pitch("comets-edge", "matchup:matchup-2")]],
+  ]);
+  const submissions: WeeklyEditionStorySubmission[] = roster.map(
+    ({ author }) => ({
+      author,
+      pitches: pitchesByAuthor.get(author.name) ?? [],
+    }),
+  );
+
+  const assignments = selectWeeklyEditionStoryAssignments(packet, submissions);
+
+  assert.equal(assignments.length, 8);
+  assert.deepEqual(
+    assignments.map(({ id, kind }) => ({ id, kind })),
+    [
+      { id: "article_1", kind: "primary_article" },
+      { id: "article_2", kind: "primary_article" },
+      { id: "article_3", kind: "standard_article" },
+      { id: "article_4", kind: "standard_article" },
+      { id: "article_5", kind: "standard_article" },
+      { id: "article_6", kind: "standard_article" },
+      { id: "article_7", kind: "standard_article" },
+      { id: "article_8", kind: "standard_article" },
+    ],
+  );
+  assert.equal(new Set(assignments.map((row) => row.author.name)).size, 8);
+  assert.equal(new Set(assignments.map((row) => row.leadCandidateId)).size, 8);
+  const eightStoryContent: WeeklyEditionContent = {
+    headline: "Eight stories from the GSHL week",
+    deck: "The newsroom found eight distinct stories in the verified league record.",
+    sections: assignments.map((assignment) => {
+      const candidate = packet.editorialCandidates.find(
+        (row) => row.id === assignment.leadCandidateId,
+      )!;
+      return {
+        id: assignment.id,
+        kind: assignment.kind,
+        eyebrow: "News",
+        headline: candidate.headlineHint,
+        body: candidate.summary,
+        links: candidate.links,
+        author: assignment.author,
+      };
+    }),
+  };
+  const eightStoryImport = validateWeeklyEditionImport(
+    JSON.stringify(eightStoryContent),
+    packet,
+  );
+  assert.equal(
+    eightStoryImport.valid,
+    true,
+    eightStoryImport.errors.join("\n"),
+  );
+  assert.deepEqual(
+    validateWeeklyEditionStoryAssignments(
+      eightStoryContent,
+      assignments,
+      packet,
+    ),
+    [],
+  );
+  assert.ok(
+    assignments.some((row) => row.author.name === "Darren Whitmore"),
+    "the losing team's beat writer should be eligible to pitch a matchup",
+  );
+  assert.throws(
+    () => selectWeeklyEditionStoryAssignments(packet, submissions.slice(1)),
+    /pitch desk skipped/i,
+  );
+
+  const scoutPrompt = buildWeeklyEditionStoryScoutPrompt(packet);
+  assert.match(scoutPrompt, /^PROMPT_FORMAT=newsroom_pitch_desk_v1/);
+  assert.match(scoutPrompt, /Return exactly one submission for every writer/);
+  assert.match(scoutPrompt, /"passesOn"/);
+  assert.match(scoutPrompt, /"voice"/);
+  assert.match(scoutPrompt, /"relatedTeams"/);
+  assert.match(scoutPrompt, /select 8 assignments/);
+
+  const writingPrompt = buildWeeklyEditionChatGptPrompt(packet, assignments);
+  assert.match(writingPrompt, /^PROMPT_FORMAT=assigned_newsroom_edition_v7/);
+  assert.match(writingPrompt, /EDITOR_ASSIGNMENTS=/);
+  assert.match(writingPrompt, /do not substitute a subject/i);
+  assert.match(writingPrompt, /exactly 8 sections/i);
+
+  assert.equal(
+    selectWeeklyEditionStoryAssignments(packet, submissions, 6).length,
+    6,
+  );
+});
+
+void test("assigned newsletter validation rejects a changed byline", () => {
+  const packet = buildWeeklyEditionFactPacket(source());
+  const authors = buildWeeklyEditionAuthorRoster(packet)
+    .slice(0, 6)
+    .map(({ author }) => author);
+  const assignments = authors.map((author, index) => ({
+    id: `article_${index + 1}` as WeeklyEditionArticleId,
+    kind:
+      index < 2 ? ("primary_article" as const) : ("standard_article" as const),
+    author,
+    pitchId: `pitch-${index + 1}`,
+    leadCandidateId: packet.editorialCandidates[index]!.id,
+    supportingCandidateIds: [],
+    proposedHeadline: `Pitch ${index + 1}`,
+    angle: `Angle ${index + 1}`,
+    scores: {
+      consequence: 5,
+      readerInterest: 5,
+      evidenceStrength: 5,
+      freshness: 5,
+    },
+    editorialScore: 100 - index,
+  }));
+  const content: WeeklyEditionContent = {
+    headline: "Assigned edition",
+    deck: "Assigned deck",
+    sections: assignments.map((assignment) => ({
+      id: assignment.id,
+      kind: assignment.kind,
+      eyebrow: "News",
+      headline:
+        packet.editorialCandidates.find(
+          (candidate) => candidate.id === assignment.leadCandidateId,
+        )?.headlineHint ?? assignment.proposedHeadline,
+      body:
+        packet.editorialCandidates.find(
+          (candidate) => candidate.id === assignment.leadCandidateId,
+        )?.summary ?? assignment.angle,
+      links: [],
+      author: assignment.author,
+    })),
+  };
+
+  assert.deepEqual(
+    validateWeeklyEditionStoryAssignments(content, assignments, packet),
+    [],
+  );
+  content.sections[0]!.author = authors[1];
+  assert.match(
+    validateWeeklyEditionStoryAssignments(content, assignments, packet).join(
+      " ",
+    ),
+    /changed its assigned writer/,
+  );
+  content.sections[0]!.author = authors[0];
+  content.sections[0]!.body = "At the end of the day, Aurora made its move.";
+  assert.match(
+    validateWeeklyEditionStoryAssignments(content, assignments, packet).join(
+      " ",
+    ),
+    /banned newsroom phrase/,
+  );
 });
 
 void test("accepts a grounded response and rejects malformed JSON", () => {
@@ -1241,6 +1437,38 @@ void test("builds each season milestone from contract, cap, draft, and roster fa
     });
     const content = buildTemplateWeeklyEdition(packet);
     assert.equal(packet.issueType, issueType);
+    assert.ok(
+      packet.editorialCandidates.length > 0,
+      `${issueType} should expose story candidates to the pitch desk`,
+    );
+    if (issueType === "resigning_outlook") {
+      assert.ok(
+        packet.editorialCandidates.some(
+          (candidate) => candidate.kind === "contract",
+        ),
+      );
+    }
+    if (issueType === "offseason_market") {
+      assert.ok(
+        packet.editorialCandidates.some(
+          (candidate) => candidate.kind === "ufa",
+        ),
+      );
+    }
+    if (issueType === "pre_draft") {
+      assert.ok(
+        packet.editorialCandidates.some(
+          (candidate) => candidate.kind === "draft",
+        ),
+      );
+    }
+    if (issueType === "preseason") {
+      assert.ok(
+        packet.editorialCandidates.some(
+          (candidate) => candidate.kind === "gm_ranking",
+        ),
+      );
+    }
     assert.equal(content.sections.length, 6);
     assert.equal(
       new Set(content.sections.map((section) => section.author?.name)).size,

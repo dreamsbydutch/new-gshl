@@ -18,13 +18,17 @@ import {
 import { useSeasons, useWeeklyEditionNewsroom, useWeeks } from "@gshl-hooks";
 import type {
   WeeklyEdition,
+  WeeklyEditionArticleCount,
   WeeklyEditionContent,
   WeeklyEditionValidationResult,
 } from "@gshl-types";
 import {
   buildWeeklyEditionChatGptPrompt,
+  DEFAULT_WEEKLY_EDITION_ARTICLE_COUNT,
+  parseWeeklyEditionArticleCount,
   validateWeeklyEditionContent,
   validateWeeklyEditionImport,
+  WEEKLY_EDITION_ARTICLE_COUNT_OPTIONS,
 } from "@gshl-utils";
 import { Button } from "@gshl-ui";
 import { WhatsAppShareButton } from "@gshl-components/ui/WhatsAppShareButton";
@@ -45,6 +49,9 @@ export function Newsroom() {
   const [seasonId, setSeasonId] = useState("");
   const [weekId, setWeekId] = useState("");
   const [issueType, setIssueType] = useState("weekly");
+  const [articleCount, setArticleCount] = useState<WeeklyEditionArticleCount>(
+    DEFAULT_WEEKLY_EDITION_ARTICLE_COUNT,
+  );
   const [messageType, setMessageType] = useState("Commissioner note");
   const [messageSubject, setMessageSubject] = useState("");
   const [messageBody, setMessageBody] = useState("");
@@ -57,9 +64,13 @@ export function Newsroom() {
   const prompt = useMemo(
     () =>
       selectedEdition
-        ? buildWeeklyEditionChatGptPrompt(selectedEdition.facts)
+        ? buildWeeklyEditionChatGptPrompt(
+            selectedEdition.facts,
+            undefined,
+            articleCount,
+          )
         : null,
-    [selectedEdition],
+    [articleCount, selectedEdition],
   );
   const activeArticleCount =
     selectedEdition?.content.sections.filter(
@@ -147,19 +158,41 @@ export function Newsroom() {
     showNotice("Manual revision published.");
   };
 
-  const generate = async () => {
+  const generateTemplate = async () => {
     if (!seasonId || !weekId) return;
-    const result = await newsroom.generateHistorical.mutateAsync({
-      seasonId,
-      weekId,
-      issueType,
-    });
-    const generated = result as {
-      state?: string;
-      edition?: WeeklyEdition;
-    };
-    if (generated.edition?.id) setEditionId(generated.edition.id);
-    showNotice(`Edition ${generated.state ?? "generated"}.`);
+    try {
+      const result = await newsroom.generateHistorical.mutateAsync({
+        seasonId,
+        weekId,
+        issueType,
+      });
+      const generated = result as {
+        state?: string;
+        edition?: WeeklyEdition;
+      };
+      if (generated.edition?.id) setEditionId(generated.edition.id);
+      showNotice(`Grounded template ${generated.state ?? "generated"}.`);
+    } catch {
+      // The hook exposes the error in the newsroom alert.
+    }
+  };
+
+  const generateWithAi = async () => {
+    if (!seasonId || !weekId) return;
+    try {
+      const generated = await newsroom.generateWithAi.mutateAsync({
+        seasonId,
+        weekId,
+        issueType,
+        articleCount,
+      });
+      setEditionId(generated.edition.id);
+      showNotice(
+        `${generated.articleCount}-story newsletter written with ${generated.model}.`,
+      );
+    } catch {
+      // The hook exposes the error in the newsroom alert.
+    }
   };
 
   const toggleVisibility = async () => {
@@ -210,6 +243,7 @@ export function Newsroom() {
   };
 
   const mutationError =
+    newsroom.generateWithAi.error ??
     newsroom.generateHistorical.error ??
     newsroom.publishImport.error ??
     newsroom.updateManual.error ??
@@ -229,10 +263,9 @@ export function Newsroom() {
           GSHL Press Box Newsroom
         </h2>
         <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-          Weekly and season-milestone editions publish automatically. ChatGPT is
-          optional: copy the grounded prompt, use it in ChatGPT Free or Plus,
-          then paste only its JSON response here. No API key or paid API call is
-          involved.
+          Choose a completed week, issue type, and story count. The newsroom
+          builds a grounded draft from the league record, then checks every
+          article against the stored facts before it can go live.
         </p>
       </header>
 
@@ -308,7 +341,7 @@ export function Newsroom() {
         </p>
       </details>
 
-      <div className="grid gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm md:grid-cols-2 xl:grid-cols-5">
         <label className="text-sm font-medium text-slate-700">
           Generate a completed week
           <select
@@ -358,21 +391,71 @@ export function Newsroom() {
             <option value="preseason">Preseason preview</option>
           </select>
         </label>
-        <Button
-          type="button"
-          className="self-end"
-          disabled={
-            !seasonId || !weekId || newsroom.generateHistorical.isPending
-          }
-          onClick={() => void generate()}
-        >
-          {newsroom.generateHistorical.isPending ? (
-            <LoaderCircle className="animate-spin" />
-          ) : (
-            <Sparkles />
-          )}
-          Generate or refresh template
-        </Button>
+        <label className="text-sm font-medium text-slate-700">
+          AI story count
+          <select
+            value={articleCount}
+            onChange={(event) =>
+              setArticleCount(
+                parseWeeklyEditionArticleCount(event.target.value),
+              )
+            }
+            className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2"
+          >
+            {WEEKLY_EDITION_ARTICLE_COUNT_OPTIONS.map((count) => (
+              <option key={count} value={count}>
+                {count} stories
+              </option>
+            ))}
+          </select>
+        </label>
+        <div className="space-y-2 self-end">
+          <Button
+            type="button"
+            className="w-full"
+            disabled={
+              !seasonId ||
+              !weekId ||
+              !newsroom.aiStatus?.configured ||
+              newsroom.generateWithAi.isPending ||
+              newsroom.generateHistorical.isPending
+            }
+            onClick={() => void generateWithAi()}
+          >
+            {newsroom.generateWithAi.isPending ? (
+              <LoaderCircle className="animate-spin" />
+            ) : (
+              <Sparkles />
+            )}
+            Write {articleCount} stories with AI
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full"
+            disabled={
+              !seasonId ||
+              !weekId ||
+              newsroom.generateWithAi.isPending ||
+              newsroom.generateHistorical.isPending
+            }
+            onClick={() => void generateTemplate()}
+          >
+            {newsroom.generateHistorical.isPending ? (
+              <LoaderCircle className="animate-spin" />
+            ) : (
+              <Newspaper />
+            )}
+            Build grounded template
+          </Button>
+          <p className="text-xs leading-5 text-slate-500">
+            {newsroom.isAiStatusLoading
+              ? "Checking OpenAI configuration..."
+              : newsroom.aiStatus?.configured
+                ? `OpenAI ready · ${newsroom.aiStatus.model}`
+                : "Add OPENAI_API_KEY to the Convex deployment to enable AI writing."}
+          </p>
+        </div>
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[18rem_minmax(0,1fr)]">
@@ -436,7 +519,7 @@ export function Newsroom() {
                 disabled={!prompt}
               >
                 <Clipboard />
-                Copy ChatGPT prompt
+                Copy fallback prompt
               </Button>
               <Button
                 type="button"
