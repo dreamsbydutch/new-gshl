@@ -21,7 +21,6 @@ export {
 } from "./useAuthSession";
 export { useJobAdmin } from "./useJobs";
 export { useImageUpload } from "./useImageUpload";
-export { useLeagueActivity } from "./useLeagueActivity";
 export { useConferenceContestView } from "./useConferenceContest";
 export { usePowerRankingsPreview } from "./usePowerRankings";
 export {

@@ -313,7 +313,8 @@ export function TradeBlock() {
               return (
                 <article
                   key={listing.listingId}
-                  className="grid gap-3 px-3 py-3 sm:grid-cols-[minmax(12rem,1fr)_minmax(15rem,1.2fr)] sm:items-center"
+                  id={`trade-block-${listing.listingId}`}
+                  className="grid scroll-mt-32 gap-3 px-3 py-3 sm:grid-cols-[minmax(12rem,1fr)_minmax(15rem,1.2fr)] sm:items-center"
                 >
                   <div className="flex min-w-0 items-center gap-2.5">
                     <span

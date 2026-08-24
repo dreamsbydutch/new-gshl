@@ -51,6 +51,12 @@ The shared frontend database types and scripts database types still contain
 legacy identifiers because imported records and cross-runtime reconciliation
 must map old IDs to Convex document IDs.
 
+Generic Convex writes to player-day, player-week, team-week, or matchup rows
+schedule the affected week's League Wire materializer. The materializer uses
+idempotent source keys, so retries update the same durable roster move, weekly
+missed-start report, matchup final, league-wide Three Stars, or power-ranking
+post instead of duplicating it.
+
 ## Operator-script model
 
 Run scripts from `scripts/`. The package is intentionally independent from the

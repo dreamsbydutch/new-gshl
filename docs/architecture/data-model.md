@@ -65,11 +65,12 @@ Do not collapse these concepts:
 
 ### Calendar and results
 
-| Table      | Purpose and important relationships                                                            |
-| ---------- | ---------------------------------------------------------------------------------------------- |
-| `weeks`    | Season week number/type, game-day count, date range, active/playoff flags.                     |
-| `matchups` | Week and home/away teams, type, score/win/tie state, ranks, completion, and rating components. |
-| `events`   | Dated, typed season event with optional description.                                           |
+| Table             | Purpose and important relationships                                                                                                                        |
+| ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `weeks`           | Season week number/type, game-day count, date range, active/playoff flags.                                                                                 |
+| `matchups`        | Week and home/away teams, type, score/win/tie state, ranks, completion, and rating components.                                                             |
+| `events`          | Dated, typed season event with optional description.                                                                                                       |
+| `leagueWirePosts` | Durable, season-scoped public posts with an idempotent source key, typed event kind, status, snapshots, deep links, and optional two-sided trade packages. |
 
 ### Awards
 
@@ -203,6 +204,9 @@ When raw player days are archived, league activity reads the saved `activitySnap
 ## Write rules
 
 - Use explicit domain mutations for user actions so authorization and cross-table invariants stay atomic.
+- League Wire producers must use an idempotent source key. Withdrawing an
+  undone or hidden source preserves the durable row while removing it from the
+  public query.
 - Trade-block writes must verify the authenticated owner, current player ownership, and an active playing contract; stale listings are omitted from the market projection.
 - Use `maintenanceScope` for bounded aggregate maintenance.
 - Reserve `data.ts` for trusted migration/adaptation work; it can read or mutate arbitrary named tables.

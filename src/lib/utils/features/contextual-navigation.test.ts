@@ -14,6 +14,7 @@ import {
   resolveContextualSelection,
   resolveMatchupBackHref,
   resolveMatchupNavigationSide,
+  toPersistedNavigationId,
 } from "./contextual-navigation";
 
 void test("explicit context wins before persisted context", () => {
@@ -46,6 +47,14 @@ void test("missing values use persistence while invalid explicit values use defa
       fallbackValue: "week",
     }),
     { value: "week", source: "default", urlWasInvalid: true },
+  );
+});
+
+void test("missing route data clears stale persisted document IDs", () => {
+  assert.equal(toPersistedNavigationId(null), "");
+  assert.equal(
+    toPersistedNavigationId("jd7abc123def456ghi789jkl012mno34"),
+    "jd7abc123def456ghi789jkl012mno34",
   );
 });
 

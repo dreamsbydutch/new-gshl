@@ -13,6 +13,7 @@ import { requireOwnerOrCommissioner } from "./lib/auth";
 import { utcTimestampToDateKey } from "./lib/timestamps";
 import { loadDueUfaOfferGroups } from "./lib/ufaReconciliation";
 import { loadUfaOddsData, type UfaOddsData } from "./ufaOdds";
+import { upsertLeagueWirePost } from "./leagueWire";
 
 const CAP = 25_000_000;
 const resolutionOddsValidator = v.array(
@@ -720,6 +721,27 @@ export const submitOffer = mutation({
       submittedAt: now,
       updatedAt: now,
     });
+    const offerCount = (
+      await db
+        .query("ufaOffers")
+        .withIndex("by_group", (q: any) => q.eq("groupId", group._id))
+        .collect()
+    ).length;
+    await upsertLeagueWirePost(ctx, {
+      seasonId: signingSeason._id,
+      kind: "ufa_offer",
+      sourceKey: `ufa-offer:${String(group._id)}`,
+      occurredAt: now,
+      title: `${player.fullName} receives ${offerCount === 1 ? "an offer" : `${offerCount} offers`}`,
+      summary: `Bidding closes ${new Date(group.deadlineAt).toLocaleString("en-CA", { timeZone: "America/Toronto", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}.`,
+      playerIds: [player._id],
+      links: [
+        {
+          label: "View UFA market",
+          href: `/leagueoffice?view=freeAgents&season=${encodeURIComponent(String(signingSeason._id))}#ufa-player-${encodeURIComponent(String(player._id))}`,
+        },
+      ],
+    });
     return { offerId, groupId: group._id, deadlineAt: group.deadlineAt };
   },
 });
@@ -891,6 +913,38 @@ export const finalizeGroup = internalMutation({
       resolvedAt: now,
       updatedAt: now,
     });
+    const winningTeam = await db.get(winningOffer.teamId);
+    const winningFranchise = winningTeam
+      ? await db.get(winningTeam.franchiseId)
+      : null;
+    if (winningTeam && winningFranchise) {
+      const formattedSalary = new Intl.NumberFormat("en-CA", {
+        style: "currency",
+        currency: "CAD",
+        maximumFractionDigits: 0,
+      }).format(winningOffer.salary);
+      const teamHref = `/lockerroom?view=roster&season=${encodeURIComponent(String(group.seasonId))}&owner=${encodeURIComponent(String(winningOffer.ownerId))}`;
+      await upsertLeagueWirePost(ctx, {
+        seasonId: group.seasonId,
+        kind: "ufa_result",
+        sourceKey: `ufa-result:${String(group._id)}`,
+        occurredAt: now,
+        title: `${winningFranchise.name} signs ${player.fullName}`,
+        summary: `${winningOffer.contractLength}-year contract at ${formattedSalary}.`,
+        teamIds: [winningTeam._id],
+        playerIds: [player._id],
+        links: [
+          {
+            label: "View UFA result",
+            href: `/leagueoffice?view=freeAgents&season=${encodeURIComponent(String(group.seasonId))}#ufa-player-${encodeURIComponent(String(player._id))}`,
+          },
+          {
+            label: "View player",
+            href: `${teamHref}#player-${encodeURIComponent(String(player._id))}`,
+          },
+        ],
+      });
+    }
   },
 });
 

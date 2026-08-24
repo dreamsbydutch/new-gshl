@@ -1,17 +1,38 @@
+import { cn } from "@gshl-utils";
+
 import { Skeleton } from "../ui/SkeletonPrimitive";
 
-export function LeagueActivityRowsSkeleton() {
+export function LeagueWireRowsSkeleton() {
   return (
-    <div className="divide-y divide-slate-100 px-3 sm:px-5">
-      {Array.from({ length: 5 }).map((_, index) => (
-        <div key={index} className="flex items-start gap-2.5 py-2.5">
-          <Skeleton className="h-6 w-24 shrink-0 rounded-full" />
-          <div className="min-w-0 flex-1 space-y-1.5">
-            <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between">
-              <Skeleton className="h-3.5 w-36 max-w-full" />
-              <Skeleton className="h-3 w-14 shrink-0" />
+    <div className="divide-y divide-slate-100">
+      {Array.from({ length: 8 }).map((_, index) => (
+        <div
+          key={index}
+          className={cn(
+            "flex items-start",
+            index === 0
+              ? "gap-4 bg-slate-50 px-4 py-5 sm:px-6 sm:py-6"
+              : "gap-3 px-3 py-3 sm:px-5",
+          )}
+        >
+          <Skeleton
+            className={cn(
+              "shrink-0",
+              index === 0 ? "h-12 w-12 sm:h-14 sm:w-14" : "h-10 w-10",
+            )}
+          />
+          <div className="min-w-0 flex-1 space-y-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <Skeleton className="h-5 w-24 rounded-full" />
+              <Skeleton className="h-3 w-14" />
             </div>
-            <Skeleton className="h-3 w-52 max-w-[80%]" />
+            <Skeleton
+              className={cn(
+                "max-w-full",
+                index === 0 ? "h-5 w-96" : "h-3.5 w-64",
+              )}
+            />
+            <Skeleton className="h-3 w-72 max-w-[85%]" />
           </div>
         </div>
       ))}
@@ -19,14 +40,14 @@ export function LeagueActivityRowsSkeleton() {
   );
 }
 
-export function LeagueActivityCardSkeleton() {
+export function LeagueWireCardSkeleton() {
   return (
-    <section className="h-full min-w-0 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm sm:rounded-2xl">
-      <header className="space-y-2 border-b border-slate-100 px-3 py-3 sm:px-5">
-        <Skeleton className="h-6 w-48" />
-        <Skeleton className="h-3 w-56 max-w-full" />
+    <section className="h-full min-w-0 overflow-hidden border-y border-slate-300 bg-white sm:rounded-lg sm:border">
+      <header className="space-y-2 border-b border-slate-800 bg-slate-950 px-4 py-4 sm:px-6 sm:py-5">
+        <Skeleton className="h-7 w-40 bg-slate-700 sm:h-8" />
+        <Skeleton className="h-3 w-64 max-w-full bg-slate-700 sm:h-3.5" />
       </header>
-      <LeagueActivityRowsSkeleton />
+      <LeagueWireRowsSkeleton />
     </section>
   );
 }
@@ -101,19 +122,10 @@ export function HomeSkeleton() {
       className="mx-auto w-full max-w-7xl px-3 py-3 sm:px-5 sm:py-5"
     >
       <div className="space-y-3 sm:space-y-4 lg:space-y-5">
-        <section className="mx-auto flex h-14 w-full max-w-5xl items-center gap-3 border-y border-slate-200 px-3">
-          <Skeleton className="h-9 w-9 shrink-0 rounded-xl" />
-          <div className="min-w-0 flex-1 space-y-2">
-            <Skeleton className="h-2.5 w-36 max-w-full" />
-            <Skeleton className="h-4 w-72 max-w-[90%]" />
-          </div>
-          <Skeleton className="h-11 w-20 shrink-0 rounded-full" />
-        </section>
-        <UfaHomeCardSkeleton />
-        <div className="mx-auto grid w-full min-w-0 max-w-5xl items-start gap-3 sm:gap-4 xl:grid-cols-2">
-          <PowerRankingsHomeCardSkeleton />
-          <LeagueActivityCardSkeleton />
+        <div className="-mx-3 w-[calc(100%+1.5rem)] min-w-0 sm:mx-auto sm:w-full sm:max-w-6xl">
+          <LeagueWireCardSkeleton />
         </div>
+        <UfaHomeCardSkeleton />
       </div>
     </main>
   );

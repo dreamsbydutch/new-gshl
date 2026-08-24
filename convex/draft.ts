@@ -6,6 +6,7 @@ import {
   requireCommissioner,
   requireOwnerOrCommissioner,
 } from "./lib/auth";
+import { upsertLeagueWirePost, withdrawLeagueWirePost } from "./leagueWire";
 import type {
   DraftHubPlayerSummary,
   DraftHubTeamSummary,
@@ -440,6 +441,28 @@ export const submitPick = mutation({
       });
     }
 
+    const teamHref = `/lockerroom?view=roster&season=${encodeURIComponent(String(season._id))}&owner=${encodeURIComponent(String(franchise.ownerId))}`;
+    await upsertLeagueWirePost(ctx, {
+      seasonId: season._id,
+      kind: "draft_pick",
+      sourceKey: `draft-pick:${String(activeRow._id)}`,
+      occurredAt: nowTimestamp,
+      title: `${franchise.name} drafts ${player.fullName}`,
+      summary: `Round ${String(activeRow.round)}, pick ${String(activeRow.pick ?? "-")}`,
+      teamIds: [activeTeam._id],
+      playerIds: [player._id],
+      links: [
+        {
+          label: "View draft",
+          href: `/draft?season=${encodeURIComponent(String(season._id))}#draft-pick-${encodeURIComponent(String(activeRow._id))}`,
+        },
+        {
+          label: "View player",
+          href: `${teamHref}#player-${encodeURIComponent(String(player._id))}`,
+        },
+      ],
+    });
+
     return {
       completedPickId: String(activeRow._id),
       nextPickId: nextPick ? String(nextPick._id) : null,
@@ -531,6 +554,10 @@ export const undoPick = mutation({
       onClockEndedAt: null,
       updatedAt: nowTimestamp,
     });
+    await withdrawLeagueWirePost(
+      ctx,
+      `draft-pick:${String(latestCompletedPick._id)}`,
+    );
 
     return {
       undonePickId: String(latestCompletedPick._id),

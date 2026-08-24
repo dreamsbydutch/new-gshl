@@ -6,27 +6,28 @@
 
 `convex/` is the deployed backend. It contains the schema, public functions, shared-secret functions, internal orchestration, cron registration, and generated bindings.
 
-| Path                                                        | Responsibility                                                         |
-| ----------------------------------------------------------- | ---------------------------------------------------------------------- |
-| [`schema.ts`](../../convex/schema.ts)                       | Tables, validators, and indexes                                        |
-| [`frontend.ts`](../../convex/frontend.ts)                   | Main browser-facing league query and mutation facade                   |
-| [`draft.ts`](../../convex/draft.ts)                         | Transactional live draft state, submission, and undo                   |
-| [`tradeBlock.ts`](../../convex/tradeBlock.ts)               | Authenticated trade market projection and owner-controlled listings    |
-| [`schedule.ts`](../../convex/schedule.ts)                   | Page-shaped weekly and owner-team schedule projections                 |
-| [`matchup.ts`](../../convex/matchup.ts)                     | Matchup details with referenced teams and player statistics            |
-| [`standings.ts`](../../convex/standings.ts)                 | Lazy public team snapshots for expanded standings rows                 |
-| [`teamHistory.ts`](../../convex/teamHistory.ts)             | Owner-scoped historical matchup and public relation projection         |
-| [`conferenceContest.ts`](../../convex/conferenceContest.ts) | Derived cross-season conference-contest view                           |
-| [`ufa.ts`](../../convex/ufa.ts)                             | UFA offers, odds, cap checks, scheduling, and resolution               |
-| [`weeklyEditions.ts`](../../convex/weeklyEditions.ts)       | Publication facts, templates, editing, revisions, and scheduled issues |
-| [`data.ts`](../../convex/data.ts)                           | High-privilege generic migration/read/write adapter                    |
-| [`maintenanceScope.ts`](../../convex/maintenanceScope.ts)   | Bounded season/week aggregate reads and writes for scripts             |
-| [`jobs.ts`](../../convex/jobs.ts)                           | Shared-secret job and schedule administration                          |
-| [`jobRunner.ts`](../../convex/jobRunner.ts)                 | Internal job state machine and processors                              |
-| [`externalWorker.ts`](../../convex/externalWorker.ts)       | Shared-secret task leases for the local browser worker                 |
-| [`crons.ts`](../../convex/crons.ts)                         | Convex cron registration                                               |
-| [`lib/`](../../convex/lib/)                                 | Auth and timestamp primitives used by multiple functions               |
-| [`_generated/`](../../convex/_generated/)                   | Generated API, server, and data-model bindings; never hand-edit        |
+| Path                                                        | Responsibility                                                                   |
+| ----------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| [`schema.ts`](../../convex/schema.ts)                       | Tables, validators, and indexes                                                  |
+| [`frontend.ts`](../../convex/frontend.ts)                   | Main browser-facing league query and mutation facade                             |
+| [`draft.ts`](../../convex/draft.ts)                         | Transactional live draft state, submission, and undo                             |
+| [`tradeBlock.ts`](../../convex/tradeBlock.ts)               | Authenticated trade market projection and owner-controlled listings              |
+| [`schedule.ts`](../../convex/schedule.ts)                   | Page-shaped weekly and owner-team schedule projections                           |
+| [`matchup.ts`](../../convex/matchup.ts)                     | Matchup details with referenced teams and player statistics                      |
+| [`standings.ts`](../../convex/standings.ts)                 | Lazy public team snapshots for expanded standings rows                           |
+| [`teamHistory.ts`](../../convex/teamHistory.ts)             | Owner-scoped historical matchup and public relation projection                   |
+| [`conferenceContest.ts`](../../convex/conferenceContest.ts) | Derived cross-season conference-contest view                                     |
+| [`ufa.ts`](../../convex/ufa.ts)                             | UFA offers, odds, cap checks, scheduling, and resolution                         |
+| [`weeklyEditions.ts`](../../convex/weeklyEditions.ts)       | Publication facts, templates, editing, revisions, and scheduled issues           |
+| [`leagueWire.ts`](../../convex/leagueWire.ts)               | Durable public posts, commissioner publishing, and derived-event materialization |
+| [`data.ts`](../../convex/data.ts)                           | High-privilege generic migration/read/write adapter                              |
+| [`maintenanceScope.ts`](../../convex/maintenanceScope.ts)   | Bounded season/week aggregate reads and writes for scripts                       |
+| [`jobs.ts`](../../convex/jobs.ts)                           | Shared-secret job and schedule administration                                    |
+| [`jobRunner.ts`](../../convex/jobRunner.ts)                 | Internal job state machine and processors                                        |
+| [`externalWorker.ts`](../../convex/externalWorker.ts)       | Shared-secret task leases for the local browser worker                           |
+| [`crons.ts`](../../convex/crons.ts)                         | Convex cron registration                                                         |
+| [`lib/`](../../convex/lib/)                                 | Auth and timestamp primitives used by multiple functions                         |
+| [`_generated/`](../../convex/_generated/)                   | Generated API, server, and data-model bindings; never hand-edit                  |
 
 One-off internal migrations and compatibility readers live beside these modules: `reporterBackfill.ts`, `weeklyEditionBackfill.ts`, `timestampMigration.ts`, and `yahooBackfill.ts`.
 
@@ -48,9 +49,18 @@ Browser code imports `api` from [`convex/_generated/api`](../../convex/_generate
   its selected players. A separate capped Home mock-draft projection returns
   only card fields and NHL branding referenced by those projected players.
 - League activity assembled from current rows, or from `seasonDataArchives.activitySnapshot` after a season is archived.
+- A season-scoped League Wire backed by durable posts with typed deep links
+  and two-sided trade packages. Draft, UFA, trade-block, and Press Box writes
+  publish atomically; operator writes schedule week-scoped materialization for
+  roster moves, a weekly missed-start report, final matchups, league-wide Three
+  Stars, and complete power-ranking snapshots.
 - Role-gated mutations for lineup changes, draft administration, user access, contract creation, and jobs.
 
 Generic list helpers choose the longest compound-index prefix fully constrained by the request. They apply a row limit before collection only when every filter is covered by that index, project public rows without Convex metadata, and resolve team relations by referenced IDs. High-traffic views still use purpose-built queries with exact response contracts, explicit compound indexes, and bounded reads. League activity restricts contract candidates to the selected season before normalizing legacy date values and selecting the newest rows.
+
+`leagueWire:backfillSeason` is commissioner-only and schedules bounded work by
+week plus one season-record pass. It is an application migration path, not a
+production-data authorization; do not invoke it merely to verify code.
 
 The generic planner stops before mixed numeric/string or legacy timestamp
 fields because its compatibility equality is broader than Convex's type-exact

@@ -381,6 +381,7 @@ export default defineSchema({
     updatedAt: v.number(),
   })
     .index("by_player_season", ["playerId", "seasonId"])
+    .index("by_seasonId", ["seasonId"])
     .index("by_status_deadline", ["status", "deadlineAt"]),
 
   ufaOffers: defineTable({
@@ -399,6 +400,7 @@ export default defineSchema({
   })
     .index("by_group", ["groupId"])
     .index("by_group_franchise", ["groupId", "franchiseId"])
+    .index("by_seasonId", ["seasonId"])
     .index("by_owner_status", ["ownerId", "status"]),
 
   weeks: table(
@@ -464,6 +466,65 @@ export default defineSchema({
     },
     ["seasonId", "date"],
   ),
+
+  leagueWirePosts: defineTable({
+    seasonId: v.id("seasons"),
+    kind: v.union(
+      v.literal("trade"),
+      v.literal("trade_block"),
+      v.literal("draft_pick"),
+      v.literal("ufa_offer"),
+      v.literal("ufa_result"),
+      v.literal("add"),
+      v.literal("drop"),
+      v.literal("missed_start"),
+      v.literal("matchup_final"),
+      v.literal("three_stars"),
+      v.literal("power_ranking"),
+      v.literal("press_box"),
+      v.literal("announcement"),
+    ),
+    status: v.union(v.literal("published"), v.literal("withdrawn")),
+    sourceKey: v.string(),
+    occurredAt: v.number(),
+    title: v.string(),
+    summary: v.optional(v.string()),
+    body: v.optional(v.string()),
+    teamIds: v.array(v.id("teams")),
+    playerIds: v.array(v.id("players")),
+    links: v.array(
+      v.object({
+        label: v.string(),
+        href: v.string(),
+      }),
+    ),
+    tradePackages: v.optional(
+      v.array(
+        v.object({
+          teamId: v.id("teams"),
+          teamName: v.string(),
+          assets: v.array(
+            v.object({
+              label: v.string(),
+              playerId: v.optional(v.id("players")),
+              draftPickId: v.optional(v.id("draftPicks")),
+            }),
+          ),
+        }),
+      ),
+    ),
+    authorId: v.optional(v.id("authUsers")),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_sourceKey", ["sourceKey"])
+    .index("by_seasonId_occurredAt", ["seasonId", "occurredAt"])
+    .index("by_seasonId_status_occurredAt", [
+      "seasonId",
+      "status",
+      "occurredAt",
+    ])
+    .index("by_status_occurredAt", ["status", "occurredAt"]),
 
   awards: table(
     {

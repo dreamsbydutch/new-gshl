@@ -19,16 +19,29 @@ New verified Google accounts are currently created as active viewers. Linking an
 
 ### Home
 
-The home page assembles season-aware cards rather than maintaining independent page state. Depending on available data and the league calendar it can show:
+The home page leads with the season-aware League Wire. Depending on available
+data and the league calendar, the Wire can show:
 
-- the active Press Box edition in a modal reader;
+- published Press Box newsletters with their real headline and deck;
+- complete weekly power rankings and the largest moves;
+- league-wide Three Stars and final matchup results;
+- a weekly missed-start report;
+- recent signings, trades, draft picks, UFA bidding, and roster moves; and
+- commissioner announcements and completed trade packages.
+
+Secondary Home modules can show:
+
 - the UFA window, active offers, and top free agents;
-- power rankings for the globally selected season;
-- recent signings, trades, roster moves, and missed starts;
 - a countdown or link to the live Draft Hub; and
 - an offseason mock-draft preview.
 
-The dashboard keeps these modules compact: Home shows five UFA candidates, eight power-ranking entries, five recent events, and four first-round mock-draft projections. Readers can expand the recent activity list in place or follow the visible links to the complete UFA, standings, Press Box, Draft Hub, and mock-draft surfaces.
+The Wire queries 24 posts and starts with an eight-story mix that selects the
+newest post of each available type before repeating a type. This keeps a run of
+finals or missed starts from hiding rankings, newsletters, or weekly stars.
+Readers can expand it in place, open each post's player, matchup, proposal, or
+team links, and share a post when their role permits. Home shows five UFA
+candidates and four first-round mock-draft projections. Commissioners can
+publish a two-sided trade package or announcement from the Wire.
 
 ### Schedule and matchup detail
 

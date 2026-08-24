@@ -4,15 +4,12 @@ import { MockDraftPreview } from "@gshl-components/draft/DraftBoardList";
 import { useSeasonState } from "@gshl-hooks";
 import { HomeSkeleton } from "@gshl-skeletons";
 import {
-  cn,
   findOffseasonWindow,
   isBetweenSeasons,
   resolveDraftHubSeason,
 } from "@gshl-utils";
-import { LeagueActivityCard } from "./LeagueActivityCard";
-import { PowerRankingsHomeCard } from "./PowerRankingsHomeCard";
+import { LeagueWire } from "./LeagueWire";
 import { UfaHomeCard } from "@gshl-components/contracts";
-import { WeeklyEditionHomeCard } from "@gshl-components/headlines/WeeklyEditionHomeCard";
 import { DraftHubCard } from "./DraftHubCard";
 
 export function HomeContent() {
@@ -37,23 +34,14 @@ export function HomeContent() {
         GSHL league dashboard
       </h1>
       <div className="space-y-3 sm:space-y-4 lg:space-y-5">
-        <WeeklyEditionHomeCard />
-        <UfaHomeCard />
-        <div
-          className={cn(
-            "mx-auto grid w-full min-w-0 max-w-5xl items-start gap-3 sm:gap-4",
-            dashboardSeason && "xl:grid-cols-2",
-          )}
-        >
-          {dashboardSeason ? (
-            <PowerRankingsHomeCard seasonId={String(dashboardSeason.id)} />
-          ) : null}
-          <LeagueActivityCard
+        <div className="-mx-3 w-[calc(100%+1.5rem)] min-w-0 sm:mx-auto sm:w-full sm:max-w-6xl">
+          <LeagueWire
             seasonId={
               dashboardSeason?.id ? String(dashboardSeason.id) : undefined
             }
           />
         </div>
+        <UfaHomeCard />
         {draftSeason?.draftStartAt ? (
           <div className="mx-auto w-full max-w-5xl">
             <DraftHubCard season={draftSeason} />

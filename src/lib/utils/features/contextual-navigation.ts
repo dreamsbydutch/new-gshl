@@ -141,6 +141,11 @@ export function resolveContextualSelection<T extends string>({
   };
 }
 
+/** Maps an unresolved data-backed selection to the store's empty sentinel. */
+export function toPersistedNavigationId(value: string | null): string {
+  return value ?? "";
+}
+
 /** Builds a route href while preserving query keys this feature does not own. */
 export function buildContextualNavigationHref(
   pathname: string,
