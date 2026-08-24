@@ -419,23 +419,23 @@ export function LeagueWire({ seasonId }: { seasonId?: string }) {
   return (
     <section
       aria-labelledby="league-wire-heading"
-      className="h-full min-w-0 overflow-hidden rounded-lg border border-slate-200 bg-white"
+      className="h-full min-w-0 overflow-hidden border-y border-slate-300 bg-white sm:rounded-lg sm:border"
     >
-      <header className="border-b border-slate-100 px-3 py-3 sm:px-5">
+      <header className="border-b border-slate-800 bg-slate-950 px-4 py-4 text-white sm:px-6 sm:py-5">
         <div className="flex items-start justify-between gap-3">
           <div>
             <h2
               id="league-wire-heading"
-              className="font-oswald text-lg text-slate-950 sm:text-xl"
+              className="font-oswald text-2xl leading-none sm:text-3xl"
             >
               League Wire
             </h2>
-            <p className="mt-0.5 text-xs text-slate-500">
+            <p className="mt-1.5 text-xs text-slate-300 sm:text-sm">
               Rankings, weekly stars, deals and league stories
             </p>
           </div>
           <ArrowUpFromLine
-            className="mt-0.5 h-5 w-5 text-slate-300"
+            className="mt-0.5 h-6 w-6 text-slate-500"
             aria-hidden="true"
           />
         </div>
@@ -455,31 +455,55 @@ export function LeagueWire({ seasonId }: { seasonId?: string }) {
         </p>
       ) : (
         <div id="home-league-wire-list" className="divide-y divide-slate-100">
-          {visiblePosts.map((post) => {
+          {visiblePosts.map((post, index) => {
             const meta = POST_META[post.kind];
             const Icon = meta.icon;
             const primaryTeam = post.teams[0];
+            const isLeadStory = index === 0;
             const sharePath =
               post.links.find((link) => link.href.startsWith("/"))?.href ?? "/";
             return (
               <article
                 key={post.id}
                 id={`league-wire-post-${post.id}`}
-                className="scroll-mt-32 px-3 py-3 sm:px-5"
+                className={cn(
+                  "scroll-mt-32",
+                  isLeadStory
+                    ? "bg-slate-50 px-4 py-5 sm:px-6 sm:py-6"
+                    : "px-3 py-3 sm:px-5",
+                )}
               >
-                <div className="flex min-w-0 items-start gap-3">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center">
+                <div
+                  className={cn(
+                    "flex min-w-0 items-start",
+                    isLeadStory ? "gap-4" : "gap-3",
+                  )}
+                >
+                  <div
+                    className={cn(
+                      "flex shrink-0 items-center justify-center",
+                      isLeadStory ? "h-12 w-12 sm:h-14 sm:w-14" : "h-10 w-10",
+                    )}
+                  >
                     {primaryTeam?.logoUrl ? (
                       <Image
                         src={primaryTeam.logoUrl}
                         alt=""
-                        width={40}
-                        height={40}
-                        className="h-10 w-10 object-contain"
+                        width={56}
+                        height={56}
+                        className={cn(
+                          "object-contain",
+                          isLeadStory
+                            ? "h-12 w-12 sm:h-14 sm:w-14"
+                            : "h-10 w-10",
+                        )}
                       />
                     ) : (
                       <Icon
-                        className="h-5 w-5 text-slate-400"
+                        className={cn(
+                          "text-slate-400",
+                          isLeadStory ? "h-7 w-7" : "h-5 w-5",
+                        )}
                         aria-hidden="true"
                       />
                     )}
@@ -502,16 +526,37 @@ export function LeagueWire({ seasonId }: { seasonId?: string }) {
                         {showDate(post.occurredAt)}
                       </time>
                     </div>
-                    <h3 className="mt-1 text-sm font-semibold leading-5 text-slate-950">
+                    <h3
+                      className={cn(
+                        "mt-1 font-semibold text-slate-950",
+                        isLeadStory
+                          ? "text-base leading-6 sm:text-xl sm:leading-7"
+                          : "text-sm leading-5",
+                      )}
+                    >
                       {post.title}
                     </h3>
                     {post.summary ? (
-                      <p className="mt-0.5 text-xs leading-5 text-slate-600">
+                      <p
+                        className={cn(
+                          "text-slate-600",
+                          isLeadStory
+                            ? "mt-1 text-sm leading-5 sm:text-base sm:leading-6"
+                            : "mt-0.5 text-xs leading-5",
+                        )}
+                      >
                         {post.summary}
                       </p>
                     ) : null}
                     {post.body ? (
-                      <p className="mt-2 whitespace-pre-line text-sm leading-5 text-slate-700">
+                      <p
+                        className={cn(
+                          "mt-2 whitespace-pre-line text-slate-700",
+                          isLeadStory
+                            ? "text-sm leading-6 sm:text-base"
+                            : "text-sm leading-5",
+                        )}
+                      >
                         {post.body}
                       </p>
                     ) : null}

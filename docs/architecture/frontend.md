@@ -185,6 +185,11 @@ reader opens it or a commissioner selects it. The Press Box reader portals its
 modal outside inert application content, traps keyboard focus, supports Escape,
 and restores focus to its trigger.
 
+The Wire reaches the phone viewport edges and uses a high-contrast masthead at
+every breakpoint. Its newest selected post is the lead story with larger type,
+art, and spacing; the remaining stories stay compact. On wider screens, the
+Wire uses a broader reading measure than the other compact Home modules.
+
 Home's compact modules use a centered reading measure. When a linked owner has affordable UFA candidates, the player decision surface breaks out to the full dashboard width and retains its scrollable statistics and offer table at every breakpoint.
 
 ## Verification

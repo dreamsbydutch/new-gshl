@@ -34,7 +34,7 @@ export function HomeContent() {
         GSHL league dashboard
       </h1>
       <div className="space-y-3 sm:space-y-4 lg:space-y-5">
-        <div className="mx-auto w-full min-w-0 max-w-5xl">
+        <div className="-mx-3 w-[calc(100%+1.5rem)] min-w-0 sm:mx-auto sm:w-full sm:max-w-6xl">
           <LeagueWire
             seasonId={
               dashboardSeason?.id ? String(dashboardSeason.id) : undefined
