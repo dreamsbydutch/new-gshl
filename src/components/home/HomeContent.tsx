@@ -14,6 +14,7 @@ import { PowerRankingsHomeCard } from "./PowerRankingsHomeCard";
 import { UfaHomeCard } from "@gshl-components/contracts";
 import { WeeklyEditionHomeCard } from "@gshl-components/headlines/WeeklyEditionHomeCard";
 import { DraftHubCard } from "./DraftHubCard";
+import { OwnerCommandCenter } from "./OwnerCommandCenter";
 
 export function HomeContent() {
   const { seasons, selectedSeason, currentSeason, defaultSeason, isLoading } =
@@ -37,6 +38,7 @@ export function HomeContent() {
         GSHL league dashboard
       </h1>
       <div className="space-y-3 sm:space-y-4 lg:space-y-5">
+        <OwnerCommandCenter />
         <WeeklyEditionHomeCard />
         <UfaHomeCard />
         <div

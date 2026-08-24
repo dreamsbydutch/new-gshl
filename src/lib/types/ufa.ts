@@ -53,6 +53,17 @@ export interface UfaOfferGroupView {
   offers: UfaOfferView[];
 }
 
+export interface UfaPendingOfferView {
+  id: string;
+  playerId: string;
+  playerName: string;
+  seasonId: string;
+  contractLength: number;
+  salary: number;
+  deadlineAt: number;
+  groupStatus: string;
+}
+
 export interface UfaPublicGroup {
   _id: string;
   id: string;
@@ -92,6 +103,7 @@ export interface UfaOverviewData {
   freeAgents: UfaFreeAgentView[];
   topFreeAgents: UfaFreeAgentView[];
   offerGroups: UfaOfferGroupView[];
+  pendingOffers: UfaPendingOfferView[];
   franchises: Franchise[];
   viewer: {
     isSignedInOwner: boolean;
