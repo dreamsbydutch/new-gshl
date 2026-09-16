@@ -59,50 +59,25 @@ export function ContractHistorySkeleton() {
       aria-label="Loading franchise contract history"
       className="scroll-mt-44 py-1"
     >
-      <Skeleton className="mx-auto mb-2 h-5 w-52" />
-
-      <div className="lg:hidden">
-        {Array.from({ length: 4 }).map((_, index) => (
-          <div key={index} className="border-b border-slate-200 bg-white">
-            <div className="flex items-start justify-between gap-3 border-b border-slate-100 px-3 py-3">
-              <div className="space-y-1.5">
-                <Skeleton className="h-4 w-36" />
-                <Skeleton className="h-3 w-16" />
-              </div>
-              <Skeleton className="h-7 w-16 rounded-full" />
-            </div>
-            <div className="grid grid-cols-2 gap-3 px-3 py-3">
-              {Array.from({ length: 3 }).map((_, metricIndex) => (
-                <div key={metricIndex} className="space-y-1">
-                  <Skeleton className="h-3 w-16" />
-                  <Skeleton className="h-4 w-20" />
-                </div>
-              ))}
-            </div>
-            <div className="flex min-h-11 items-center border-t border-slate-100 px-3">
-              <Skeleton className="h-4 w-28" />
-            </div>
-          </div>
-        ))}
-      </div>
+      <Skeleton className="mb-3 h-6 w-52" />
 
       <TableViewport
         ariaLabel="Loading franchise contract history"
-        className="hidden lg:block"
+        viewportClassName="rounded-none border-0"
         scrollHint="Scroll for complete contract details"
       >
         <div className="mx-auto min-w-[64rem]">
-          <div className="grid grid-cols-11 gap-2 bg-gray-800 px-2 py-1">
-            {Array.from({ length: 11 }).map((_, index) => (
+          <div className="grid grid-cols-12 gap-2 bg-gray-800 px-2 py-1">
+            {Array.from({ length: 12 }).map((_, index) => (
               <Skeleton key={index} className="h-3 w-full bg-gray-600" />
             ))}
           </div>
           {Array.from({ length: 6 }).map((_, rowIndex) => (
             <div
               key={rowIndex}
-              className="grid grid-cols-11 gap-2 border-b px-2 py-1"
+              className="grid grid-cols-12 gap-2 border-b px-2 py-1"
             >
-              {Array.from({ length: 11 }).map((_, cellIndex) => (
+              {Array.from({ length: 12 }).map((_, cellIndex) => (
                 <Skeleton key={cellIndex} className="h-3 w-full" />
               ))}
             </div>
