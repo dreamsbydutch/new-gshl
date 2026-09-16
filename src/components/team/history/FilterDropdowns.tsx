@@ -11,10 +11,10 @@ export function FilterDropdowns({
   ownerOptions,
 }: TeamHistoryFilterDropdownsProps) {
   const selectClassName =
-    "w-full min-w-0 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm sm:max-w-56";
+    "h-9 w-full min-w-0 rounded-md border border-slate-300 bg-white px-2 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500";
 
   return (
-    <div className="mx-auto grid w-full max-w-xl gap-2 sm:grid-cols-2 sm:justify-items-center">
+    <div className="grid w-full grid-cols-2 gap-2">
       <select
         aria-label="Filter history by game type"
         className={selectClassName}

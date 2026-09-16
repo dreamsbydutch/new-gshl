@@ -12,18 +12,36 @@ export function TeamRoster({
   currentTeam,
   showSalaries = false,
 }: TeamRosterProps) {
-  const { benchPlayers, contractByPlayerId, nhlTeamByAbbr, teamLineup } =
-    useTeamRosterView({
-      players,
-      contracts,
-      currentTeam,
-    });
+  const {
+    benchPlayers,
+    contractByPlayerId,
+    currentRoster,
+    nhlTeamByAbbr,
+    teamLineup,
+  } = useTeamRosterView({
+    players,
+    contracts,
+    currentTeam,
+  });
 
   return (
-    <>
-      <div className="mx-auto mt-12 text-center text-xl font-bold">
-        Current Roster
+    <section
+      className="mx-auto max-w-4xl"
+      aria-labelledby="team-roster-heading"
+    >
+      <div className="mb-2 flex items-baseline justify-between gap-3">
+        <h2 id="team-roster-heading" className="text-base font-semibold">
+          Roster
+        </h2>
+        <span className="text-xs text-slate-500">
+          {currentRoster.length} players
+        </span>
       </div>
+      {currentRoster.length === 0 && (
+        <p className="py-6 text-sm text-slate-500">
+          No players on this roster.
+        </p>
+      )}
 
       <RosterLineup
         teamLineup={teamLineup}
@@ -40,6 +58,6 @@ export function TeamRoster({
       />
 
       <RatingLegend />
-    </>
+    </section>
   );
 }

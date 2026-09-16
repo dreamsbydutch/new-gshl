@@ -405,24 +405,18 @@ export function TeamContractTable({
           {title}
         </h3>
       ) : (
-        <h2
-          id={headingId}
-          className="mt-4 w-full text-center text-xl font-bold"
-        >
+        <h2 id={headingId} className="mb-2 text-base font-semibold">
           {title}
         </h2>
       )}
 
-      <div className="mx-auto mt-3 max-w-xl px-3 lg:hidden">
+      <div className="mt-3 lg:hidden">
         <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           Remaining cap by season
         </p>
-        <dl className="grid grid-cols-2 gap-2 min-[420px]:grid-cols-3">
+        <dl className="grid grid-cols-3 gap-x-3 gap-y-2 sm:grid-cols-5">
           {capSpaceWindow.map((entry) => (
-            <div
-              key={`mobile-cap-${entry.year}`}
-              className="rounded-lg border bg-slate-50 px-3 py-2"
-            >
+            <div key={`mobile-cap-${entry.year}`} className="py-1">
               <dt className="text-xs text-muted-foreground">{entry.label}</dt>
               <dd
                 className={`mt-0.5 text-sm font-semibold ${entry.remaining < 0 ? "text-red-600" : "text-slate-900"}`}
@@ -444,7 +438,7 @@ export function TeamContractTable({
         ariaLabel={viewportLabel}
         scrollHint="Scroll to compare cap seasons"
         className={`w-full ${compact ? "mt-2" : "mt-4"}`}
-        viewportClassName="rounded-md"
+        viewportClassName="rounded-none border-x-0"
       >
         <table className="mx-auto min-w-max whitespace-nowrap font-normal">
           <caption className="sr-only">{viewportLabel}</caption>

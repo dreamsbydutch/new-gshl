@@ -19,8 +19,11 @@ export function BenchPlayers({
   }
 
   return (
-    <div className="mx-auto mt-2 flex max-w-md flex-col rounded-xl border bg-brown-50">
-      <div className="mx-2 my-1 grid grid-cols-2 items-center">
+    <section>
+      <h3 className="border-b border-slate-200 py-2 text-xs font-semibold text-slate-500">
+        Bench
+      </h3>
+      <div className="divide-y divide-slate-100">
         {benchPlayers.map((player) => (
           <RosterPlayerCard
             key={player.id}
@@ -28,10 +31,9 @@ export function BenchPlayers({
             contract={contractByPlayerId.get(player.id)}
             showSalaries={showSalaries}
             nhlTeamByAbbr={nhlTeamByAbbr}
-            className="my-2"
           />
         ))}
       </div>
-    </div>
+    </section>
   );
 }

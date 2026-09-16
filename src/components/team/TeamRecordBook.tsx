@@ -273,11 +273,11 @@ function RecordBookToolbar({
 
   return (
     <>
-      <div className="flex min-h-14 flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-3 py-2 sm:px-4">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 py-1">
         <div
           role="group"
           aria-label="Player record view"
-          className="flex items-center rounded-lg bg-slate-100 p-1"
+          className="flex items-center gap-1"
         >
           {RECORD_BOOK_VIEWS.map((option) => (
             <button
@@ -286,9 +286,9 @@ function RecordBookToolbar({
               aria-pressed={view === option.value}
               onClick={() => onViewChange(option.value)}
               className={cn(
-                "min-h-11 rounded-md px-3 py-2 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 sm:text-sm",
+                "min-h-9 rounded px-2 py-1 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 sm:text-sm",
                 view === option.value
-                  ? "bg-white text-slate-950 shadow-sm"
+                  ? "bg-slate-100 text-slate-950"
                   : "text-slate-500 hover:text-slate-900",
               )}
             >
@@ -304,10 +304,10 @@ function RecordBookToolbar({
         </span>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-slate-50/70 px-3 py-2.5 sm:px-4">
+      <div className="flex flex-wrap items-center gap-2 py-2">
         <div
           role="group"
-          className="flex items-center rounded-md border border-slate-200 bg-white p-0.5"
+          className="flex items-center gap-0.5"
           aria-label="Player group"
         >
           {(["skater", "goalie"] as const).map((option) => (
@@ -317,9 +317,9 @@ function RecordBookToolbar({
               aria-pressed={group === option}
               onClick={() => onGroupChange(option)}
               className={cn(
-                "min-h-11 rounded px-2.5 py-2 text-xs font-semibold capitalize transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400",
+                "min-h-9 rounded px-2 py-1 text-xs font-semibold capitalize transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400",
                 group === option
-                  ? "bg-slate-900 text-white"
+                  ? "bg-slate-100 text-slate-950"
                   : "text-slate-500 hover:text-slate-900",
               )}
             >
@@ -329,7 +329,7 @@ function RecordBookToolbar({
         </div>
         <div
           role="group"
-          className="flex items-center rounded-md border border-slate-200 bg-white p-0.5"
+          className="flex items-center gap-0.5"
           aria-label="Season stage"
         >
           {seasonTypes.map((option) => (
@@ -339,9 +339,9 @@ function RecordBookToolbar({
               aria-pressed={seasonType === option}
               onClick={() => onSeasonTypeChange(option)}
               className={cn(
-                "min-h-11 rounded px-2.5 py-2 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400",
+                "min-h-9 rounded px-2 py-1 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400",
                 seasonType === option
-                  ? "bg-slate-900 text-white"
+                  ? "bg-slate-100 text-slate-950"
                   : "text-slate-500 hover:text-slate-900",
               )}
             >
@@ -361,7 +361,7 @@ function RecordBookToolbar({
             value={query}
             onChange={(event) => onQueryChange(event.target.value)}
             placeholder="Player"
-            className="h-11 w-full rounded-md border border-slate-200 bg-white pl-8 pr-3 text-sm text-slate-900 outline-none transition-shadow placeholder:text-slate-400 focus:ring-2 focus:ring-slate-300"
+            className="h-9 w-full rounded-md border border-slate-200 bg-white pl-8 pr-3 text-sm text-slate-900 outline-none transition-shadow placeholder:text-slate-400 focus:ring-2 focus:ring-slate-300"
           />
         </label>
       </div>
@@ -395,7 +395,7 @@ function MobileRecordBookSort({
     sort.direction === "asc" ? "Ascending" : "Descending";
 
   return (
-    <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2 border-b border-slate-200 bg-white p-3 lg:hidden">
+    <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2 border-b border-slate-200 bg-white pb-2 lg:hidden">
       <label className="min-w-0">
         <span className="mb-1 block text-xs font-semibold text-slate-600">
           Sort records by
@@ -403,7 +403,7 @@ function MobileRecordBookSort({
         <select
           value={sort.key}
           onChange={(event) => onSort(event.target.value as RecordBookSortKey)}
-          className="h-11 w-full rounded-md border border-slate-300 bg-white px-3 text-sm font-medium text-slate-900 outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
+          className="h-9 w-full rounded-md border border-slate-300 bg-white px-3 text-sm font-medium text-slate-900 outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
         >
           {sortOptions.map((option) => (
             <option key={option.key} value={option.key}>
@@ -415,7 +415,7 @@ function MobileRecordBookSort({
       <button
         type="button"
         onClick={() => onSort(sort.key)}
-        className="mt-5 inline-flex min-h-11 items-center justify-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
+        className="mt-5 inline-flex min-h-9 items-center justify-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
         aria-label={`Sort ${sortDirectionLabel === "Ascending" ? "descending" : "ascending"}`}
       >
         {sort.direction === "asc" ? (
@@ -459,12 +459,9 @@ function PlayerHistoryCard({
         }`;
 
   return (
-    <article className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-      <header className="flex min-w-0 items-start gap-3 px-3 py-3">
-        <NHLLogoList
-          teams={row.nhlTeams}
-          size={row.nhlTeams.length > 1 ? 22 : 30}
-        />
+    <article className="border-b border-slate-200 bg-white">
+      <header className="flex min-w-0 items-start gap-2 py-2">
+        <NHLLogoList teams={row.nhlTeams} size={16} />
         <div className="min-w-0 flex-1">
           <h3 className="break-words text-sm font-semibold leading-5 text-slate-950">
             {row.playerName}
@@ -475,11 +472,11 @@ function PlayerHistoryCard({
         </div>
       </header>
 
-      <dl className="grid grid-cols-4 border-y border-slate-100 bg-slate-50/80">
+      <dl className="grid grid-cols-4">
         {priorityColumns.map((column) => (
           <div
             key={`${row.id}-priority-${column.key}`}
-            className="min-w-0 border-r border-slate-100 px-1.5 py-2.5 text-center last:border-r-0"
+            className="min-w-0 px-1.5 py-1 text-center"
           >
             <dt
               className="truncate text-[11px] font-semibold text-slate-500"
@@ -561,7 +558,7 @@ function PlayerHistoryCards({
   view,
 }: RecordBookPlayerTableProps & { group: RecordBookGroup }) {
   return (
-    <div className="bg-slate-50/70 lg:hidden">
+    <div className="lg:hidden">
       <MobileRecordBookSort
         columns={columns}
         onSort={onSort}
@@ -576,7 +573,10 @@ function PlayerHistoryCards({
           No player history found.
         </p>
       ) : (
-        <ol className="space-y-3 p-3" aria-label="Player record results">
+        <ol
+          className="divide-y divide-slate-100"
+          aria-label="Player record results"
+        >
           {rows.map((row) => (
             <li key={row.id}>
               <PlayerHistoryCard
@@ -808,10 +808,10 @@ export function TeamRecordBook(props: TeamRecordBookProps) {
   } = useTeamRecordBookView(props);
 
   return (
-    <section className="pb-12 pt-2">
-      <div className="mx-auto max-w-[96rem] px-3 sm:px-4">
+    <section className="pb-4">
+      <div className="mx-auto max-w-[96rem]">
         <div className="mb-3 flex items-baseline justify-between gap-3 px-1">
-          <h2 className="font-oswald text-2xl text-slate-950 sm:text-3xl">
+          <h2 className="text-base font-semibold text-slate-950">
             Player history
           </h2>
           <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400 sm:text-xs">
@@ -819,7 +819,7 @@ export function TeamRecordBook(props: TeamRecordBookProps) {
           </span>
         </div>
 
-        <div className="mt-4 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm sm:rounded-2xl">
+        <div className="bg-white">
           <RecordBookToolbar
             group={group}
             onGroupChange={onGroupChange}

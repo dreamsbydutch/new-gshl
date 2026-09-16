@@ -225,25 +225,22 @@ export function InteractiveContractTable({
     <section
       id="cap-lab"
       aria-labelledby="cap-lab-heading"
-      className="mx-auto mt-8 w-full max-w-7xl scroll-mt-44 px-3 sm:px-4"
+      className="mx-auto w-full max-w-7xl scroll-mt-44"
     >
-      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <header className="bg-slate-950 px-4 py-5 text-white sm:px-6 sm:py-6">
+      <div className="bg-white">
+        <header className="border-b border-slate-200 pb-3 text-slate-950">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <div className="flex items-center gap-2 text-emerald-300">
+              <div className="flex items-center gap-2 text-slate-500">
                 <Calculator className="h-5 w-5" aria-hidden="true" />
                 <span className="text-xs font-semibold uppercase tracking-[0.16em]">
                   Private sandbox
                 </span>
               </div>
-              <h2
-                id="cap-lab-heading"
-                className="mt-2 text-2xl font-bold sm:text-3xl"
-              >
+              <h2 id="cap-lab-heading" className="mt-1 text-base font-semibold">
                 Roster Planner
               </h2>
-              <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-300">
+              <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-500">
                 Build a signing or trade idea, move contracts out, and see the
                 cap result in every covered season. Nothing here changes your
                 roster.
@@ -254,10 +251,10 @@ export function InteractiveContractTable({
                 className={cn(
                   "inline-flex min-h-9 items-center gap-1.5 rounded-full px-3 text-xs font-semibold",
                   !interactive.hasChanges
-                    ? "bg-white/10 text-slate-200"
+                    ? "bg-slate-100 text-slate-600"
                     : isOverCap
-                      ? "bg-red-400/15 text-red-200"
-                      : "bg-emerald-400/15 text-emerald-200",
+                      ? "bg-red-50 text-red-700"
+                      : "bg-emerald-50 text-emerald-700",
                 )}
               >
                 {isOverCap ? (
@@ -276,7 +273,7 @@ export function InteractiveContractTable({
                   type="button"
                   variant="outline"
                   size="sm"
-                  className="border-white/20 bg-white/5 text-white hover:bg-white/10 hover:text-white"
+                  className="border-slate-300 bg-white text-slate-700 hover:bg-slate-100"
                   onClick={interactive.resetContracts}
                 >
                   <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
@@ -288,7 +285,7 @@ export function InteractiveContractTable({
         </header>
 
         <div className="grid lg:grid-cols-[minmax(19rem,0.82fr)_minmax(0,1.18fr)]">
-          <div className="border-b border-slate-200 p-4 sm:p-6 lg:border-b-0 lg:border-r">
+          <div className="border-b border-slate-200 py-3 lg:border-b-0 lg:border-r lg:pr-5">
             <h3 className="font-semibold text-slate-950">
               Add an incoming player
             </h3>
@@ -692,7 +689,7 @@ function MoveList({
   rows: CapScenarioMoveListRow[];
 }) {
   return (
-    <div className="rounded-xl border border-slate-200 p-3">
+    <div className="border-t border-slate-200 py-3">
       <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
         {title}
       </p>

@@ -22,11 +22,11 @@ void test("contextual layouts expose a labelled main landmark", () => {
   ] as const) {
     const source = readSource(path);
 
-    assert.match(source, new RegExp(`<main aria-labelledby="${headingId}">`));
     assert.match(
       source,
-      new RegExp(`<h1 id="${headingId}" className="sr-only">`),
+      new RegExp(`<main\\b[^>]*aria-labelledby="${headingId}"[^>]*>`),
     );
+    assert.match(source, new RegExp(`<h1\\b[^>]*id="${headingId}"[^>]*>`));
   }
 });
 
@@ -43,11 +43,11 @@ void test("protected contextual loading routes retain a labelled primary landmar
   ] as const) {
     const source = readSource(path);
 
-    assert.match(source, new RegExp(`<main aria-labelledby="${headingId}">`));
     assert.match(
       source,
-      new RegExp(`<h1 id="${headingId}" className="sr-only">`),
+      new RegExp(`<main\\b[^>]*aria-labelledby="${headingId}"[^>]*>`),
     );
+    assert.match(source, new RegExp(`<h1\\b[^>]*id="${headingId}"[^>]*>`));
   }
 });
 

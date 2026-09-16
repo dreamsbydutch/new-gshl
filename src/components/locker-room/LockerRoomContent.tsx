@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { LockerRoomHeader } from "@gshl-components/team/LockerRoomHeader";
 import {
   useCareerSplits,
@@ -94,6 +94,7 @@ const InteractiveContractTable = dynamic(
 const SHOW_LOCKER_ROOM_ROSTER_SALARIES = true;
 
 export function LockerRoomContent() {
+  const [capView, setCapView] = useState("contracts");
   const { selectedSeason, currentSeason, defaultSeason, seasons } =
     useSeasonState();
   const contextSeason = selectedSeason ?? currentSeason ?? defaultSeason;
@@ -304,29 +305,58 @@ export function LockerRoomContent() {
       <LockerRoomHeader currentTeam={currentTeam} headingLevel={2} />
       {selectedLockerRoomType === "salary" && (
         <>
-          <TeamContractTable
-            {...{
-              currentSeason: contractSeason,
-              players: contractPlayers,
-              nhlTeams,
-              contracts: currentContracts,
-              currentTeam,
-              ...teamContractTableData,
-            }}
-          />
-          <InteractiveContractTable
-            currentSeason={contractSeason}
-            currentTeam={currentTeam}
-            signablePlayers={signablePlayers}
-            tradePlayers={tradePlayersQuery.data}
-            tradeContracts={allLeagueContracts}
-            contractPlayers={contractPlayers}
-            nhlTeams={nhlTeams}
-            existingContracts={currentContracts}
-            seasons={seasons ?? []}
-            ready={teamContractTableData.ready}
-          />
-          <FranchiseContractHistory {...teamContractHistory} />
+          <div
+            className="mb-3 flex gap-4 border-b border-slate-200"
+            role="group"
+            aria-label="Salary cap views"
+          >
+            {(
+              [
+                ["contracts", "Contracts"],
+                ["planner", "Planner"],
+                ["history", "History"],
+              ] as const
+            ).map(([key, label]) => (
+              <button
+                key={key}
+                type="button"
+                aria-pressed={capView === key}
+                onClick={() => setCapView(key)}
+                className={`min-h-9 border-b-2 px-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 ${capView === key ? "border-slate-950 font-semibold text-slate-950" : "border-transparent text-slate-500"}`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <div hidden={capView !== "contracts"}>
+            <TeamContractTable
+              {...{
+                currentSeason: contractSeason,
+                players: contractPlayers,
+                nhlTeams,
+                contracts: currentContracts,
+                currentTeam,
+                ...teamContractTableData,
+              }}
+            />
+          </div>
+          <div hidden={capView !== "planner"}>
+            <InteractiveContractTable
+              currentSeason={contractSeason}
+              currentTeam={currentTeam}
+              signablePlayers={signablePlayers}
+              tradePlayers={tradePlayersQuery.data}
+              tradeContracts={allLeagueContracts}
+              contractPlayers={contractPlayers}
+              nhlTeams={nhlTeams}
+              existingContracts={currentContracts}
+              seasons={seasons ?? []}
+              ready={teamContractTableData.ready}
+            />
+          </div>
+          <div hidden={capView !== "history"}>
+            <FranchiseContractHistory {...teamContractHistory} />
+          </div>
         </>
       )}
       {selectedLockerRoomType === "roster" && (

@@ -75,8 +75,8 @@ function ContractHistoryCard({
   const termLabel = `${row.length} ${row.length === 1 ? "year" : "years"}`;
 
   return (
-    <article className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-      <header className="flex items-start justify-between gap-3 border-b border-slate-100 px-3 py-3">
+    <article className="border-b border-slate-200 bg-white">
+      <header className="flex items-start justify-between gap-3 py-2">
         <div className="min-w-0">
           <h3 className="truncate text-sm font-semibold text-slate-950">
             {row.playerName}
@@ -88,7 +88,7 @@ function ContractHistoryCard({
         </span>
       </header>
 
-      <dl className="grid grid-cols-2 gap-x-3 gap-y-2 px-3 py-3 text-sm">
+      <dl className="grid grid-cols-3 gap-2 py-2 text-sm">
         <div>
           <dt className="text-xs text-muted-foreground">Salary</dt>
           <dd className="mt-0.5 font-semibold text-slate-900">
@@ -101,7 +101,7 @@ function ContractHistoryCard({
             {formatMoney(row.capHit)}
           </dd>
         </div>
-        <div className="col-span-2">
+        <div className="min-w-0">
           <dt className="text-xs text-muted-foreground">Contract value</dt>
           <dd className={cn("mt-0.5 font-semibold", contractValueClassName)}>
             {row.contractValue === null
@@ -159,11 +159,11 @@ export function FranchiseContractHistory({
     <section
       id="contract-history"
       aria-labelledby="contract-history-heading"
-      className="scroll-mt-44 py-6"
+      className="scroll-mt-44 py-1"
     >
       <h2
         id="contract-history-heading"
-        className="mb-3 text-center text-lg font-bold"
+        className="mb-3 text-base font-semibold"
       >
         Franchise Contract History
       </h2>
@@ -171,7 +171,7 @@ export function FranchiseContractHistory({
       {!hasData && <EmptyState />}
 
       {hasData && (
-        <div className="space-y-3 px-3 lg:hidden">
+        <div className="lg:hidden">
           {rows.map((row, index) => (
             <ContractHistoryCard
               key={row.id || `${row.playerName}-${row.start}-${index}`}

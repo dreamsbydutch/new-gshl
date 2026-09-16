@@ -32,14 +32,11 @@ export function TeamContractTableSkeleton() {
       aria-label="Loading salary cap"
       className="mx-auto w-full scroll-mt-44"
     >
-      <Skeleton className="mx-auto mb-4 mt-4 h-6 w-40" />
+      <Skeleton className="mb-3 h-5 w-40" />
 
-      <div className="mx-auto mb-3 grid max-w-xl grid-cols-2 gap-2 px-3 min-[420px]:grid-cols-3 lg:hidden">
+      <div className="mb-3 grid grid-cols-3 gap-x-3 gap-y-2 sm:grid-cols-5 lg:hidden">
         {Array.from({ length: 5 }).map((_, index) => (
-          <div
-            key={index}
-            className="space-y-1 rounded-lg border bg-slate-50 px-3 py-2"
-          >
+          <div key={index} className="space-y-1 py-1">
             <Skeleton className="h-3 w-12" />
             <Skeleton className="h-4 w-20" />
           </div>

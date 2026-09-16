@@ -16,15 +16,13 @@ const TeamLogo = ({ currentTeam }: TeamLogoProps) => {
     <Image
       src={currentTeam.logoUrl}
       alt={`${currentTeam.name} logo`}
+      className="h-12 w-12 shrink-0 object-contain sm:h-16 sm:w-16"
       width={TEAM_LOGO_SIZE.width}
       height={TEAM_LOGO_SIZE.height}
       onError={() => setErrored(true)}
     />
   ) : (
-    <div
-      className="flex items-center justify-center rounded-lg bg-gray-200 shadow-emboss"
-      style={{ width: TEAM_LOGO_SIZE.width, height: TEAM_LOGO_SIZE.height }}
-    >
+    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded bg-slate-100 sm:h-16 sm:w-16">
       <span className="text-xs font-medium text-gray-400">No Logo</span>
     </div>
   );
@@ -38,16 +36,16 @@ const TeamInfo = ({
   const Heading = headingLevel === 1 ? "h1" : "h2";
 
   return (
-    <div className="flex flex-col items-center">
-      <Heading className="text-center text-3xl font-bold">
+    <div className="flex min-w-0 flex-col">
+      <Heading className="break-words text-lg font-bold leading-tight text-slate-950 sm:text-2xl">
         {currentTeam.name}
       </Heading>
-      <span className="text-center text-lg font-semibold">
+      <span className="mt-1 text-xs text-slate-500 sm:text-sm">
         {formattedOwnerName}
       </span>
       {+(currentTeam.ownerOwing ?? 0) > 0 ? (
-        <span className="mt-1 text-center text-sm font-medium text-red-600">
-          {formatMoney(currentTeam.ownerOwing, true)}
+        <span className="mt-1 text-xs font-medium text-red-600">
+          {formatMoney(currentTeam.ownerOwing, true)} owing
         </span>
       ) : null}
     </div>
@@ -59,7 +57,7 @@ export function LockerRoomHeader({
   headingLevel,
 }: LockerRoomHeaderProps) {
   return (
-    <header className="mx-auto flex max-w-3xl items-center justify-evenly p-4">
+    <header className="mb-3 flex items-center gap-3 border-b border-slate-200 pb-3 pt-1">
       <TeamLogo currentTeam={currentTeam} />
       <TeamInfo
         currentTeam={currentTeam}

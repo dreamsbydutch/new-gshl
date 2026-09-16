@@ -173,6 +173,21 @@ The Home dashboard limits preview inventory instead of rendering complete featur
 
 Home's compact modules use a centered reading measure. When a linked owner has affordable UFA candidates, the player decision surface breaks out to the full dashboard width and retains its scrollable statistics and offer table at every breakpoint.
 
+## My Team layout
+
+The Locker Room uses a single 36px section-navigation row on mobile. Team
+selection lives in the header's **Change team** disclosure; selecting a franchise
+closes it and returns focus to the trigger. The route owns horizontal spacing,
+and the compact team header stays above all six views. Roster players use
+position-grouped rows with inline NHL identity, rating, and salary. Matchups,
+Records, Draft, and contract history use plain rows and section dividers.
+
+Salary Cap separates Contracts, Planner, and History with local view buttons.
+Hidden panels remain mounted so switching within Cap preserves an unfinished
+planner scenario. These local buttons do not change the existing shareable
+`view=salary` route; team, season, and primary section navigation still use the
+validated URL and persisted context. The planner remains a private simulation.
+
 ## Verification
 
 The focused frontend gates are:
