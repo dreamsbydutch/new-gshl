@@ -45,7 +45,7 @@ const DraftPickItem = ({ processedPick, teams }: DraftPickItemProps) => {
   if (isAvailable) {
     return (
       <div className="text-gray-800">
-        <div className="border-b border-slate-100 py-3 text-sm">
+        <div className="border-b border-slate-100 py-1 text-sm leading-5">
           {formatDraftPickDescription(draftPick)}
           {getOriginalTeamName(teams, originalTeam)}
         </div>
@@ -55,7 +55,7 @@ const DraftPickItem = ({ processedPick, teams }: DraftPickItemProps) => {
 
   return (
     <div className="text-slate-500">
-      <div className="border-b border-slate-100 py-3 text-sm">
+      <div className="border-b border-slate-100 py-1 text-sm leading-5">
         {selectedPlayer?.fullName}, {selectedPlayer?.nhlPos?.toString() ?? ""} (
         {formatDraftPickDescription(draftPick)})
       </div>
@@ -163,7 +163,7 @@ export function TeamDraftPickList({
 
   return (
     <>
-      <div className="mb-3 flex items-center justify-between gap-3">
+      <div className="mb-1 flex items-center justify-between gap-3">
         <h2 className="text-base font-semibold">Draft Picks</h2>
         {onSelectSeason ? (
           <label>
