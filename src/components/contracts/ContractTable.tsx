@@ -410,24 +410,6 @@ export function TeamContractTable({
         </h2>
       )}
 
-      <div className="mt-3 lg:hidden">
-        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          Remaining cap by season
-        </p>
-        <dl className="grid grid-cols-3 gap-x-3 gap-y-2 sm:grid-cols-5">
-          {capSpaceWindow.map((entry) => (
-            <div key={`mobile-cap-${entry.year}`} className="py-1">
-              <dt className="text-xs text-muted-foreground">{entry.label}</dt>
-              <dd
-                className={`mt-0.5 text-sm font-semibold ${entry.remaining < 0 ? "text-red-600" : "text-slate-900"}`}
-              >
-                {formatMoney(entry.remaining)}
-              </dd>
-            </div>
-          ))}
-        </dl>
-      </div>
-
       {!hasVisibleContracts ? (
         <p className="mt-3 px-3 text-center text-sm text-muted-foreground">
           No active contracts. The full cap window is available.

@@ -34,15 +34,6 @@ export function TeamContractTableSkeleton() {
     >
       <Skeleton className="mb-3 h-5 w-40" />
 
-      <div className="mb-3 grid grid-cols-3 gap-x-3 gap-y-2 sm:grid-cols-5 lg:hidden">
-        {Array.from({ length: 5 }).map((_, index) => (
-          <div key={index} className="space-y-1 py-1">
-            <Skeleton className="h-3 w-12" />
-            <Skeleton className="h-4 w-20" />
-          </div>
-        ))}
-      </div>
-
       <TableViewport
         ariaLabel="Loading salary cap commitments"
         scrollHint="Scroll to compare cap seasons"
