@@ -173,14 +173,7 @@ export function getCurrentNavigationHref(
 }
 
 export function isGlobalSeasonUrlPath(pathname: string): boolean {
-  return (
-    pathname === "/schedule" ||
-    pathname === "/standings" ||
-    pathname === "/lockerroom" ||
-    pathname === "/leagueoffice" ||
-    pathname === "/leagueoffice/mock-draft" ||
-    pathname.startsWith("/matchup/")
-  );
+  return pathname === "/schedule" || pathname === "/standings";
 }
 
 /** Updates the global season on routes that expose their context in the URL. */

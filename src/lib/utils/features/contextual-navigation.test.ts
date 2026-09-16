@@ -11,6 +11,7 @@ import {
   buildScheduleNavigationHref,
   buildStandingsNavigationHref,
   getLeagueOfficeNavigationViews,
+  isGlobalSeasonUrlPath,
   resolveContextualSelection,
   resolveMatchupBackHref,
   resolveMatchupNavigationSide,
@@ -124,7 +125,7 @@ void test("global season updates preserve route context and clear stale weeks", 
       "?view=history&owner=owner-2",
       "12",
     ),
-    "/lockerroom?view=history&owner=owner-2&season=12",
+    null,
   );
   assert.equal(
     buildGlobalSeasonNavigationHref("/rulebook", "?section=trades", "12"),
@@ -197,4 +198,23 @@ void test("invalid matchup sources cannot become redirect targets", () => {
   );
   assert.equal(resolveMatchupNavigationSide("?side=invalid", "home"), "home");
   assert.equal(resolveMatchupNavigationSide("?side=away", "home"), "away");
+});
+
+void test("only Schedule and Standings share historical season selection", () => {
+  for (const route of ["/schedule", "/standings"])
+    assert.equal(isGlobalSeasonUrlPath(route), true);
+  for (const route of [
+    "/",
+    "/lockerroom",
+    "/leagueoffice",
+    "/leagueoffice/mock-draft",
+    "/matchup/game-1",
+    "/draft/my-team",
+  ]) {
+    assert.equal(isGlobalSeasonUrlPath(route), false);
+    assert.equal(
+      buildGlobalSeasonNavigationHref(route, "?season=old", "new"),
+      null,
+    );
+  }
 });

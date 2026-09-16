@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import {
   parseGameTypeValue,
+  filterTeamHistorySeasons,
   parseIdValue,
   buildOwnerOptions,
   calculateWinLossRecord,
@@ -12,7 +13,7 @@ import type {
   UseTeamHistoryDataOptions,
   UseTeamHistoryDataResult,
 } from "@gshl-types";
-import { useSeasonState, useTeamHistorySummary } from "@gshl-hooks";
+import { useTeamHistorySummary } from "@gshl-hooks";
 import { useScheduleData } from "./useScheduleData";
 
 /**
@@ -40,7 +41,9 @@ export function useTeamHistoryData(
 
   const [gameTypeValue, setGameTypeValue] = useState("");
   const [ownerValue, setOwnerValue] = useState("");
-  const { selectedSeason } = useSeasonState();
+  const [seasonSelection, setSelectedSeasonIds] = useState<string[] | null>(
+    null,
+  );
 
   const historyQuery = useTeamHistorySummary({
     ownerId: teamInfo.ownerId,
@@ -48,14 +51,22 @@ export function useTeamHistoryData(
   });
   const { matchups: fullSchedule, seasons, teams, weeks } = historyQuery.data;
 
+  const seasonOptions = useMemo(
+    () => [...seasons].sort((a, b) => Number(b.year) - Number(a.year)),
+    [seasons],
+  );
+  const selectedSeasonIds = useMemo(
+    () => seasonSelection ?? (seasonOptions[0] ? [seasonOptions[0].id] : []),
+    [seasonSelection, seasonOptions],
+  );
+
   const gameType = useMemo(
     () => parseGameTypeValue(gameTypeValue),
     [gameTypeValue],
   );
 
-  const { data: schedule } = useScheduleData({
+  const { data: unfilteredSchedule } = useScheduleData({
     ownerID: teamInfo.ownerId ?? undefined,
-    seasonID: selectedSeason?.id,
     gameType,
     oppOwnerID: parseIdValue(ownerValue),
     allMatchups: fullSchedule,
@@ -63,6 +74,11 @@ export function useTeamHistoryData(
     weeks,
     seasons,
   });
+
+  const schedule = useMemo(
+    () => filterTeamHistorySeasons(unfilteredSchedule, selectedSeasonIds),
+    [unfilteredSchedule, selectedSeasonIds],
+  );
 
   const ownerOptions = useMemo(() => {
     return buildOwnerOptions(fullSchedule, teams, teamInfo);
@@ -77,6 +93,9 @@ export function useTeamHistoryData(
   const isDataReady = historyQuery.ready && !isLoading;
 
   return {
+    seasonOptions,
+    selectedSeasonIds,
+    setSelectedSeasonIds,
     // Filter states
     gameTypeValue,
     setGameTypeValue,

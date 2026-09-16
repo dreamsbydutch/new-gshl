@@ -140,14 +140,24 @@ export function MainNavbar({ className, search = "" }: NavbarProps) {
             <span className="sr-only">GSHL</span>
           </Link>
           <div className="flex min-w-0 items-center justify-center gap-1.5 px-1">
-            <p className="hidden min-w-0 truncate text-center text-xs font-bold min-[360px]:block sm:text-sm">
+            <p
+              className={cn(
+                "min-w-0 truncate text-center text-xs font-bold sm:text-sm",
+                seasonNavigation.showSeasonControl &&
+                  "hidden min-[360px]:block",
+              )}
+            >
               {routeContext.title}
             </p>
-            {seasonNavigation.isReady && seasonControlProps ? (
-              <GlobalSeasonSelect {...seasonControlProps} placement="mobile" />
-            ) : (
-              <GlobalSeasonSelectFallback placement="mobile" />
-            )}
+            {seasonNavigation.showSeasonControl &&
+              (seasonNavigation.isReady && seasonControlProps ? (
+                <GlobalSeasonSelect
+                  {...seasonControlProps}
+                  placement="mobile"
+                />
+              ) : (
+                <GlobalSeasonSelectFallback placement="mobile" />
+              ))}
           </div>
           <div className="flex justify-end">
             <AuthNavControl compact />
@@ -218,11 +228,15 @@ export function MainNavbar({ className, search = "" }: NavbarProps) {
             />
           </div>
           <div className="hidden shrink-0 lg:block">
-            {seasonNavigation.isReady && seasonControlProps ? (
-              <GlobalSeasonSelect {...seasonControlProps} placement="desktop" />
-            ) : (
-              <GlobalSeasonSelectFallback placement="desktop" />
-            )}
+            {seasonNavigation.showSeasonControl &&
+              (seasonNavigation.isReady && seasonControlProps ? (
+                <GlobalSeasonSelect
+                  {...seasonControlProps}
+                  placement="desktop"
+                />
+              ) : (
+                <GlobalSeasonSelectFallback placement="desktop" />
+              ))}
           </div>
           <div className="hidden shrink-0 lg:block">
             <AuthNavControl />

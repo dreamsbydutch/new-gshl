@@ -39,6 +39,9 @@ export interface UseTeamHistorySummaryOptions {
 }
 
 export interface TeamHistoryFilterDropdownsProps {
+  seasonOptions: TeamHistorySeasonSummary[];
+  selectedSeasonIds: string[];
+  setSelectedSeasonIds: (ids: string[]) => void;
   gameTypeValue: string;
   setGameTypeValue: (value: string) => void;
   ownerValue: string;

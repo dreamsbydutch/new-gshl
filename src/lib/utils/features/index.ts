@@ -63,6 +63,7 @@ export {
   calculateWinLossRecord,
   calculateWinPercentage,
   parseGameTypeValue,
+  filterTeamHistorySeasons,
   parseIdValue,
   buildOwnerOptions,
   getMatchupHeaderText,

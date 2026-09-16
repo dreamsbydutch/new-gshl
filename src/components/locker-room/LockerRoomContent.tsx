@@ -371,6 +371,7 @@ export function LockerRoomContent() {
       )}
       {selectedLockerRoomType === "history" && (
         <TeamHistoryContainer
+          key={currentTeam.ownerId}
           {...{
             teamInfo: currentTeam,
           }}

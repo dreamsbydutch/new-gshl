@@ -30,7 +30,7 @@ There is no active tRPC frontend. `src/trpc/` is empty. Browser data hooks call 
 4. `Toaster` mounts shared mutation feedback.
 5. `PerformanceVitals` records development-only diagnostics.
 
-`AppShell` omits navigation and spacing only for `/draft-roster-board`. Every other route uses one persistent shell: a safe-area-aware mobile header, a labeled mobile bottom navigation, and the equivalent desktop top navigation. The global season selector is embedded in each header instead of occupying a separate row. It highlights historical context and provides a compact return to the current season on desktop. Draft destinations remain in that global shell and expose Draft Board, My Draft Team, and Other Teams through route-level context navigation.
+`AppShell` omits navigation and spacing only for `/draft-roster-board`. Every other route uses one persistent shell: a safe-area-aware mobile header, a labeled mobile bottom navigation, and the equivalent desktop top navigation. The shared season selector is embedded in the header on Schedule and Standings only, instead of occupying a separate row. It highlights historical context and provides a compact return to the current season on desktop. Draft destinations remain in that global shell and expose Draft Board, My Draft Team, and Other Teams through route-level context navigation.
 
 Typography is served from the bundled Geist Sans and Geist Mono files. Legacy `font-varela`, `font-barlow`, `font-oswald`, and `font-yellowtail` utilities remain compatibility aliases to the local sans variable, so rendering never depends on a font-network request and numeric tables can use the dedicated mono face.
 
@@ -96,7 +96,9 @@ Server-side Auth.js user upsert and lookup use `src/lib/data/convex-store.ts` wi
 
 Feature navigation hooks expose narrow named objects. Route-owned season/week hooks replace invalid stored defaults once their data is available; the global `NavDefaults` does not fetch route-specific week data. Changing season resets the selected week because week IDs are season-specific. An owner or commissioner linked to an owner record is moved from the legacy owner default to their own team.
 
-The selected league season is application context rather than a page-local filter. The shell owns its selector, and season-aware Home, Schedule, Standings, Locker Room, League Office, matchup, draft-class, conference, team-history, and award surfaces consume that shared selection. Schedule, Standings, Locker Room, League Office, and matchup URLs also carry it so shared links can establish the global context. The Locker Room Draft Picks view has its own season selector and fetches one franchise season at a time, so browsing pick history does not replace the global season or reload unrelated My Team data. Live Draft Hub, UFA, and commissioner job targets retain their configured operational seasons where changing historical browsing context must not change an active workflow.
+Schedule and Standings share one persisted season selection, including their URL context. The header only exposes the season picker on those two routes. Visiting another page does not replace that remembered selection. Other consumers of `useSeasonState` use the current pickable season (or the existing default-season fallback), so browsing old standings does not change the Home dashboard, My Team, or League Office. My Team and League Office canonicalize old season URLs to their current operational context without writing the shared season store. Matchup detail links retain their own game context and can return to a historical Schedule.
+
+My Team Matchups has a local Years disclosure with multiple season checkboxes, All years, and Latest year. It defaults to the latest season with matchup history for that owner and filters the same rows used to calculate the win/loss/tie record. Game-type and opponent filters combine with that selection. Changing owners resets those local filters. Draft Picks retains its independent single-season selector. Neither local selector changes the shared Schedule/Standings season. Live Draft Hub, UFA, and commissioner job targets retain their configured operational seasons.
 
 Contextual routes also mirror their active state into validated query parameters: `view`, `season`, `week`, and `owner`. A valid explicit URL wins over hydrated persistence; missing values may reuse persisted context, while invalid values resolve to a route or data default. User choices push a history entry, but hydration, automatic defaults, and invalid-value repair replace the current entry. URL-to-store synchronization waits for Zustand hydration and the season/week/team/auth data needed to validate each value, so shared links and browser Back/Forward do not briefly render a different persisted context.
 
@@ -186,8 +188,8 @@ Records, Draft, and contract history use plain rows and section dividers.
 Salary Cap separates Contracts, Planner, and History with local view buttons.
 Hidden panels remain mounted so switching within Cap preserves an unfinished
 planner scenario. These local buttons do not change the existing shareable
-`view=salary` route; team, season, and primary section navigation still use the
-validated URL and persisted context. The planner remains a private simulation.
+`view=salary` route; team and primary section navigation still use the
+validated URL and persisted context. Matchup years are independent local filters. The planner remains a private simulation.
 
 ## Verification
 

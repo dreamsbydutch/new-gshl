@@ -123,6 +123,8 @@ function useContextualRouter() {
 }
 
 function useResolvedSeasonId(explicitSeasonId: string | null) {
+  const { pathname } = useAppPathname();
+  const usesSharedSeason = isGlobalSeasonUrlPath(pathname);
   const seasonState = useSeasonState({ autoSelect: false });
   const persistedSeasonId = useNavStore((state) => state.selectedSeasonId);
   const validSeasonIds = useMemo(
@@ -147,12 +149,14 @@ function useResolvedSeasonId(explicitSeasonId: string | null) {
   ]);
 
   return {
-    effectiveSeasonId: resolveId(
-      explicitSeasonId,
-      persistedSeasonId,
-      validSeasonIds,
-      fallbackSeasonId,
-    ),
+    effectiveSeasonId: usesSharedSeason
+      ? resolveId(
+          explicitSeasonId,
+          persistedSeasonId,
+          validSeasonIds,
+          fallbackSeasonId,
+        )
+      : (seasonState.selectedSeason?.id ?? fallbackSeasonId),
     isSeasonDataReady: !seasonState.isLoading,
     persistedSeasonId,
   };
@@ -222,6 +226,7 @@ export function useGlobalSeasonContextNavigation() {
   );
 
   return {
+    showSeasonControl: isGlobalSeasonUrlPath(navigation.pathname),
     currentSeasonSummary,
     isHistoricalSeason: Boolean(
       selectedSeasonSummary &&
@@ -510,10 +515,10 @@ export function useLockerRoomContextNavigation() {
   const persistedView = useNavStore((state) => state.selectedLockerRoomType);
   const persistedOwnerId = useNavStore((state) => state.selectedOwnerId);
   const setView = useNavStore((state) => state.setLockerRoomType);
-  const setSeasonId = useNavStore((state) => state.setSeasonId);
   const setOwnerId = useNavStore((state) => state.setOwnerId);
-  const { effectiveSeasonId, isSeasonDataReady, persistedSeasonId } =
-    useResolvedSeasonId(query.season);
+  const { effectiveSeasonId, isSeasonDataReady } = useResolvedSeasonId(
+    query.season,
+  );
   const teamsQuery = useTeams({
     seasonId: effectiveSeasonId,
     enabled: Boolean(effectiveSeasonId),
@@ -548,15 +553,11 @@ export function useLockerRoomContextNavigation() {
     authStatus !== "loading";
   const storeMatches =
     persistedView === view &&
-    (effectiveSeasonId === null || persistedSeasonId === effectiveSeasonId) &&
     (ownerId === null || persistedOwnerId === ownerId);
 
   useEffect(() => {
     if (!routeDataReady || !navigation.shouldSyncCurrentUrl) return;
     if (persistedView !== view) setView(view);
-    if (effectiveSeasonId && persistedSeasonId !== effectiveSeasonId) {
-      setSeasonId(effectiveSeasonId);
-    }
     if (ownerId && persistedOwnerId !== ownerId) setOwnerId(ownerId);
     const canonicalHref = buildLockerRoomNavigationHref(navigation.search, {
       view,
@@ -571,11 +572,9 @@ export function useLockerRoomContextNavigation() {
     navigation,
     ownerId,
     persistedOwnerId,
-    persistedSeasonId,
     persistedView,
     routeDataReady,
     setOwnerId,
-    setSeasonId,
     setView,
     view,
   ]);
@@ -624,7 +623,6 @@ export function useLeagueOfficeContextNavigation() {
   );
   const persistedView = useNavStore((state) => state.selectedLeagueOfficeType);
   const setView = useNavStore((state) => state.setLeagueOfficeType);
-  const setSeasonId = useNavStore((state) => state.setSeasonId);
   const isMockDraftPage = navigation.pathname === "/leagueoffice/mock-draft";
   const validViews = getLeagueOfficeNavigationViews(session?.user.role);
   const view = resolveContextualSelection({
@@ -633,21 +631,17 @@ export function useLeagueOfficeContextNavigation() {
     validValues: validViews,
     fallbackValue: "draft",
   }).value;
-  const { effectiveSeasonId, isSeasonDataReady, persistedSeasonId } =
-    useResolvedSeasonId(query.season);
+  const { effectiveSeasonId, isSeasonDataReady } = useResolvedSeasonId(
+    query.season,
+  );
   const routeDataReady =
     hasHydrated && isSeasonDataReady && status !== "loading";
   const storeMatches = isMockDraftPage
-    ? persistedView === "mockDraft" &&
-      (effectiveSeasonId === null || persistedSeasonId === effectiveSeasonId)
-    : persistedView === view &&
-      (effectiveSeasonId === null || persistedSeasonId === effectiveSeasonId);
+    ? persistedView === "mockDraft"
+    : persistedView === view;
 
   useEffect(() => {
     if (!routeDataReady || !navigation.shouldSyncCurrentUrl) return;
-    if (effectiveSeasonId && persistedSeasonId !== effectiveSeasonId) {
-      setSeasonId(effectiveSeasonId);
-    }
     if (isMockDraftPage) {
       if (persistedView !== "mockDraft") setView("mockDraft");
       return;
@@ -664,10 +658,8 @@ export function useLeagueOfficeContextNavigation() {
     effectiveSeasonId,
     isMockDraftPage,
     navigation,
-    persistedSeasonId,
     persistedView,
     routeDataReady,
-    setSeasonId,
     setView,
     view,
   ]);
