@@ -40,44 +40,32 @@ export function RosterPlayerCard({
       : "--";
 
   return (
-    <div className={cn("flex min-h-14 items-center gap-3 py-2", className)}>
-      <span
-        className="w-7 shrink-0 text-center text-[11px] font-medium text-slate-500"
-        title="Lineup position"
-      >
-        {player.lineupPos ?? "--"}
-      </span>
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-1.5">
-          <NHLLogo team={playerNhlTeam} size={16} />
-          <span className="break-words text-sm font-medium text-slate-950">
-            {player.fullName}
-          </span>
-        </div>
-        <p className="mt-0.5 text-xs text-slate-500">
-          {player.nhlPos?.join(" / ") || "Position unavailable"}
-        </p>
+    <div className={cn("grid grid-cols-2 px-2 text-center", className)}>
+      <div className="col-span-3 text-sm">{player.fullName}</div>
+      <div className="text-2xs">{player.nhlPos?.toString() ?? ""}</div>
+      <div>
+        <NHLLogo team={playerNhlTeam} size={16} />
       </div>
-      <div className="shrink-0 text-right">
-        <span
+      <div
+        className={cn(
+          "max-w-fit place-self-center rounded-lg px-2 text-2xs",
+          getRosterRatingClass(player.seasonRk),
+        )}
+      >
+        {ratingValue}
+      </div>
+      {shouldShowSalaryBadge ? (
+        <div
           className={cn(
-            "inline-block rounded px-1.5 py-0.5 text-xs font-medium tabular-nums",
-            getRosterRatingClass(player.seasonRk),
+            "col-span-3 my-1 rounded-xl px-2 py-1 text-2xs font-semibold tracking-wide shadow-sm",
+            contract?.expiryStatus === ContractStatus.RFA
+              ? "bg-orange-100 text-orange-900 ring-1 ring-orange-300"
+              : "bg-slate-100 text-slate-900 ring-1 ring-slate-200",
           )}
         >
-          <span className="sr-only">Season rating: </span>
-          {ratingValue}
-        </span>
-        {shouldShowSalaryBadge && (
-          <p className="mt-1 text-xs tabular-nums text-slate-600">
-            <span className="sr-only">Salary: </span>
-            {formatMoney(getDisplayedRosterSalary(playerSalary, contract))}
-            {contract?.expiryStatus === ContractStatus.RFA && (
-              <span className="ml-1 text-[10px] font-medium">RFA</span>
-            )}
-          </p>
-        )}
-      </div>
+          {formatMoney(getDisplayedRosterSalary(playerSalary, contract))}
+        </div>
+      ) : null}
     </div>
   );
 }

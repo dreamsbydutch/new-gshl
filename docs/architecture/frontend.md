@@ -178,8 +178,9 @@ Home's compact modules use a centered reading measure. When a linked owner has a
 The Locker Room uses a single 36px section-navigation row on mobile. Team
 selection lives in the header's **Change team** disclosure; selecting a franchise
 closes it and returns focus to the trigger. The route owns horizontal spacing,
-and the compact team header stays above all six views. Roster players use
-position-grouped rows with inline NHL identity, rating, and salary. Matchups,
+and the compact team header stays above all six views. The roster retains its
+rink-style positional lineup and two-column bench, including player ratings
+and salary badges. Matchups,
 Records, Draft, and contract history use plain rows and section dividers.
 
 Salary Cap separates Contracts, Planner, and History with local view buttons.

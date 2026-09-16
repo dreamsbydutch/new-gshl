@@ -25,10 +25,7 @@ export function TeamRoster({
   });
 
   return (
-    <section
-      className="mx-auto max-w-4xl"
-      aria-labelledby="team-roster-heading"
-    >
+    <section className="mx-auto max-w-md" aria-labelledby="team-roster-heading">
       <div className="mb-2 flex items-baseline justify-between gap-3">
         <h2 id="team-roster-heading" className="text-base font-semibold">
           Roster

@@ -15,30 +15,37 @@ export function RosterLineup({
   nhlTeamByAbbr: Map<string, NHLTeam>;
 }) {
   return (
-    <div>
-      {teamLineup.map((section, index) => (
-        <section key={index} className="mb-3">
-          <h3 className="border-b border-slate-200 py-2 text-xs font-semibold text-slate-500">
-            {["Forwards", "Defense", "Goalies"][index]}
-          </h3>
-          <div className="divide-y divide-slate-100">
-            {section
-              .flat()
-              .filter((player): player is Player => player !== null)
-              .map((player) => (
-                <RosterPlayerCard
-                  key={player.id}
-                  player={player}
-                  contract={contractByPlayerId.get(player.id)}
-                  showSalaries={showSalaries}
-                  nhlTeamByAbbr={nhlTeamByAbbr}
-                />
-              ))}
-          </div>
-          {!section.flat().some(Boolean) && (
-            <p className="py-3 text-xs text-slate-500">No players assigned.</p>
-          )}
-        </section>
+    <div className="mx-auto flex max-w-md flex-col rounded-xl border bg-gray-50">
+      {teamLineup.map((lineupSection, sectionIndex) => (
+        <div key={sectionIndex}>
+          {lineupSection.map((positionalArray, rowIndex) => (
+            <div
+              key={rowIndex}
+              className="grid grid-cols-6 items-center py-1.5"
+            >
+              {positionalArray.map((player, playerIndex) =>
+                player ? (
+                  <RosterPlayerCard
+                    key={player.id}
+                    player={player}
+                    contract={contractByPlayerId.get(player.id)}
+                    showSalaries={showSalaries}
+                    nhlTeamByAbbr={nhlTeamByAbbr}
+                    className="col-span-2"
+                  />
+                ) : (
+                  <div
+                    key={`empty-${sectionIndex}-${rowIndex}-${playerIndex}`}
+                    className="col-span-1"
+                  ></div>
+                ),
+              )}
+            </div>
+          ))}
+          {sectionIndex < 2 ? (
+            <div className="mx-auto w-4/6 border-b border-gray-400"></div>
+          ) : null}
+        </div>
       ))}
     </div>
   );
