@@ -1,13 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import {
-  ArrowDown,
-  ArrowUp,
-  ArrowUpDown,
-  ChevronDown,
-  Search,
-} from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, Search } from "lucide-react";
 import { NHLLogoList } from "@gshl-components/player/NHLLogoList";
 import {
   AWARD_CATALOG_BY_KEY,
@@ -16,12 +10,7 @@ import {
 import { useTeamRecordBookView } from "@gshl-hooks";
 import type {
   RecordBookPlayerTableProps,
-  RecordBookPlayerRow,
-  RecordBookGroup,
-  RecordBookSortKey,
-  RecordBookSortState,
   RecordBookSortableHeadProps,
-  RecordBookStatColumn,
   RecordBookToolbarProps,
   RecordBookView,
   AwardsList as AwardsListType,
@@ -29,13 +18,7 @@ import type {
   TeamRecordBookProps,
 } from "@gshl-types";
 import { TableViewport } from "@gshl-ui";
-import {
-  AwardsList,
-  cn,
-  formatRecordBookStat,
-  getRecordBookPriorityColumns,
-  SeasonType,
-} from "@gshl-utils";
+import { AwardsList, cn, formatRecordBookStat, SeasonType } from "@gshl-utils";
 
 const RECORD_BOOK_VIEWS: Array<{
   label: string;
@@ -97,19 +80,6 @@ const PLAYER_TROPHY_TABLE_COLUMNS = [
   },
 ] as const;
 
-const RECORD_BOOK_HONOR_COLUMNS = [
-  ...ALL_STAR_TABLE_COLUMNS.map(({ award, label, title }) => ({
-    award,
-    label,
-    title,
-  })),
-  ...PLAYER_TROPHY_TABLE_COLUMNS.map(({ award, label, title }) => ({
-    award,
-    label,
-    title,
-  })),
-];
-
 function getSeasonTypeLabel(seasonType: SeasonTypeValue): string {
   if (seasonType === SeasonType.PLAYOFFS) return "Playoffs";
   if (seasonType === SeasonType.LOSERS_TOURNAMENT) return "Losers";
@@ -137,7 +107,7 @@ function SortableHead({
       scope="col"
       aria-sort={ariaSort}
       className={cn(
-        "h-11 whitespace-nowrap px-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500 sm:px-3 sm:text-[11px]",
+        "whitespace-nowrap px-1 text-xs font-normal text-gray-200",
         align === "left" ? "text-left" : "text-right",
         className,
       )}
@@ -147,9 +117,9 @@ function SortableHead({
         type="button"
         onClick={() => onSort(sortKey)}
         className={cn(
-          "flex w-full items-center gap-1 rounded px-1 py-1 transition-colors hover:bg-slate-100 hover:text-slate-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400",
+          "flex min-h-9 w-full items-center gap-1 rounded px-1 py-1 hover:bg-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white",
           align === "left" ? "justify-start" : "justify-end",
-          isActive && "text-slate-950",
+          isActive && "font-semibold text-white",
         )}
         title={title ? `Sort by ${title}` : `Sort by ${label}`}
         aria-label={`${title ? `Sort by ${title}` : `Sort by ${label}`}${
@@ -221,7 +191,7 @@ function AwardCountMarks({
 
   if (!count) {
     return (
-      <span className="font-mono text-xs text-slate-400" title={countLabel}>
+      <span className="text-xs text-slate-400" title={countLabel}>
         <span aria-hidden="true">-</span>
         <span className="sr-only">{countLabel}</span>
       </span>
@@ -230,7 +200,7 @@ function AwardCountMarks({
 
   if (!imageUrl) {
     return (
-      <span className="font-mono text-xs tabular-nums" title={countLabel}>
+      <span className="text-xs tabular-nums" title={countLabel}>
         <span aria-hidden="true">{count}</span>
         <span className="sr-only">{countLabel}</span>
       </span>
@@ -298,7 +268,7 @@ function RecordBookToolbar({
         </div>
         <span
           aria-live="polite"
-          className="font-mono text-xs tabular-nums text-slate-500"
+          className="text-xs tabular-nums text-slate-500"
         >
           {visibleCount} {visibleCount === 1 ? "row" : "rows"}
         </span>
@@ -369,230 +339,6 @@ function RecordBookToolbar({
   );
 }
 
-function MobileRecordBookSort({
-  columns,
-  onSort,
-  sort,
-  view,
-}: {
-  columns: RecordBookStatColumn[];
-  onSort: (key: RecordBookSortKey) => void;
-  sort: RecordBookSortState;
-  view: RecordBookView;
-}) {
-  const sortOptions: Array<{ key: RecordBookSortKey; label: string }> = [
-    { key: "playerName", label: "Player" },
-    { key: "positions", label: "Position" },
-    view === "season"
-      ? { key: "seasonYear", label: "Season" }
-      : { key: "seasonCount", label: "Seasons with owner" },
-    ...columns.map((column) => ({
-      key: column.key,
-      label: column.title,
-    })),
-  ];
-  const sortDirectionLabel =
-    sort.direction === "asc" ? "Ascending" : "Descending";
-
-  return (
-    <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2 border-b border-slate-200 bg-white pb-2 lg:hidden">
-      <label className="min-w-0">
-        <span className="mb-1 block text-xs font-semibold text-slate-600">
-          Sort records by
-        </span>
-        <select
-          value={sort.key}
-          onChange={(event) => onSort(event.target.value as RecordBookSortKey)}
-          className="h-9 w-full rounded-md border border-slate-300 bg-white px-3 text-sm font-medium text-slate-900 outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
-        >
-          {sortOptions.map((option) => (
-            <option key={option.key} value={option.key}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-      </label>
-      <button
-        type="button"
-        onClick={() => onSort(sort.key)}
-        className="mt-5 inline-flex min-h-9 items-center justify-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
-        aria-label={`Sort ${sortDirectionLabel === "Ascending" ? "descending" : "ascending"}`}
-      >
-        {sort.direction === "asc" ? (
-          <ArrowUp className="h-4 w-4" aria-hidden="true" />
-        ) : (
-          <ArrowDown className="h-4 w-4" aria-hidden="true" />
-        )}
-        {sortDirectionLabel}
-      </button>
-    </div>
-  );
-}
-
-function PlayerHistoryCard({
-  columns,
-  group,
-  row,
-  view,
-}: {
-  columns: RecordBookStatColumn[];
-  group: RecordBookGroup;
-  row: RecordBookPlayerRow;
-  view: RecordBookView;
-}) {
-  const priorityColumns = getRecordBookPriorityColumns(group, columns);
-  const priorityKeys = new Set(priorityColumns.map((column) => column.key));
-  const detailColumns = columns.filter(
-    (column) => !priorityKeys.has(column.key),
-  );
-  const seasonRange =
-    row.firstSeason && row.lastSeason
-      ? row.firstSeason === row.lastSeason
-        ? String(row.firstSeason)
-        : `${row.firstSeason}–${row.lastSeason}`
-      : null;
-  const contextLabel =
-    view === "season"
-      ? `Season ${row.seasonYear ?? "unknown"}`
-      : `${row.seasonCount} ${row.seasonCount === 1 ? "season" : "seasons"}${
-          seasonRange ? ` · ${seasonRange}` : ""
-        }`;
-
-  return (
-    <article className="border-b border-slate-200 bg-white">
-      <header className="flex min-w-0 items-start gap-2 py-2">
-        <NHLLogoList teams={row.nhlTeams} size={16} />
-        <div className="min-w-0 flex-1">
-          <h3 className="break-words text-sm font-semibold leading-5 text-slate-950">
-            {row.playerName}
-          </h3>
-          <p className="mt-0.5 text-xs text-slate-500">
-            {row.positions || "Position unavailable"} · {contextLabel}
-          </p>
-        </div>
-      </header>
-
-      <dl className="grid grid-cols-4">
-        {priorityColumns.map((column) => (
-          <div
-            key={`${row.id}-priority-${column.key}`}
-            className="min-w-0 px-1.5 py-1 text-center"
-          >
-            <dt
-              className="truncate text-[11px] font-semibold text-slate-500"
-              title={column.title}
-            >
-              <span aria-hidden="true">{column.label}</span>
-              <span className="sr-only">{column.title}</span>
-            </dt>
-            <dd className="mt-0.5 font-mono text-sm font-semibold tabular-nums text-slate-900">
-              {formatRecordBookStat(row, column)}
-            </dd>
-          </div>
-        ))}
-      </dl>
-
-      <details className="group">
-        <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-3 text-xs font-semibold text-slate-700 marker:content-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-slate-400 [&::-webkit-details-marker]:hidden">
-          All stats and honors
-          <ChevronDown
-            className="h-4 w-4 shrink-0 transition-transform group-open:rotate-180"
-            aria-hidden="true"
-          />
-        </summary>
-        <div className="border-t border-slate-100 px-3 pb-3 pt-2.5">
-          <h4 className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-            Complete statistics
-          </h4>
-          <dl className="mt-2 grid grid-cols-3 gap-x-3 gap-y-2">
-            {detailColumns.map((column) => (
-              <div key={`${row.id}-detail-${column.key}`} className="min-w-0">
-                <dt
-                  className="truncate text-[11px] text-slate-500"
-                  title={column.title}
-                >
-                  <span aria-hidden="true">{column.label}</span>
-                  <span className="sr-only">{column.title}</span>
-                </dt>
-                <dd className="font-mono text-sm font-semibold tabular-nums text-slate-800">
-                  {formatRecordBookStat(row, column)}
-                </dd>
-              </div>
-            ))}
-          </dl>
-
-          <h4 className="mt-4 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-            Honors
-          </h4>
-          <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-2">
-            {RECORD_BOOK_HONOR_COLUMNS.map((column) => (
-              <div
-                key={`${row.id}-honor-${column.award}`}
-                className="flex min-w-0 items-baseline justify-between gap-2"
-              >
-                <dt
-                  className="truncate text-xs text-slate-600"
-                  title={column.title}
-                >
-                  <span aria-hidden="true">{column.label}</span>
-                  <span className="sr-only">{column.title}</span>
-                </dt>
-                <dd className="font-mono text-xs font-semibold tabular-nums text-slate-900">
-                  {row.awardCounts[column.award] ?? 0}
-                </dd>
-              </div>
-            ))}
-          </dl>
-        </div>
-      </details>
-    </article>
-  );
-}
-
-function PlayerHistoryCards({
-  columns,
-  group,
-  onSort,
-  rows,
-  sort,
-  view,
-}: RecordBookPlayerTableProps & { group: RecordBookGroup }) {
-  return (
-    <div className="lg:hidden">
-      <MobileRecordBookSort
-        columns={columns}
-        onSort={onSort}
-        sort={sort}
-        view={view}
-      />
-      {rows.length === 0 ? (
-        <p
-          role="status"
-          className="px-4 py-12 text-center text-sm text-slate-500"
-        >
-          No player history found.
-        </p>
-      ) : (
-        <ol
-          className="divide-y divide-slate-100"
-          aria-label="Player record results"
-        >
-          {rows.map((row) => (
-            <li key={row.id}>
-              <PlayerHistoryCard
-                columns={columns}
-                group={group}
-                row={row}
-                view={view}
-              />
-            </li>
-          ))}
-        </ol>
-      )}
-    </div>
-  );
-}
-
 function PlayerHistoryTable({
   columns,
   onSort,
@@ -601,7 +347,7 @@ function PlayerHistoryTable({
   view,
 }: RecordBookPlayerTableProps) {
   const hasSeasonColumn = view === "season";
-  const playerLeftClass = hasSeasonColumn ? "left-20" : "left-0";
+  const playerLeftClass = hasSeasonColumn ? "lg:left-20" : "lg:left-0";
   const emptyColSpan =
     columns.length +
     ALL_STAR_TABLE_COLUMNS.length +
@@ -609,25 +355,18 @@ function PlayerHistoryTable({
     3;
 
   return (
-    <table
-      className={cn(
-        "border-collapse text-xs sm:text-sm",
-        hasSeasonColumn
-          ? "min-w-[1400px] sm:min-w-[1720px]"
-          : "min-w-[1380px] sm:min-w-[1680px]",
-      )}
-    >
+    <table className="mx-auto min-w-max border-collapse whitespace-nowrap text-xs">
       <caption className="sr-only">
         {view === "career" ? "Career" : "Season-by-season"} player records,
         including complete statistics and honors
       </caption>
       <thead>
-        <tr className="border-b border-slate-200 bg-slate-50">
+        <tr className="bg-gray-800 text-gray-200">
           {hasSeasonColumn ? (
             <SortableHead
               activeSort={sort}
               align="left"
-              className="sticky left-0 z-30 w-20 bg-slate-50 px-3"
+              className="w-20 bg-gray-800 px-2 lg:sticky lg:left-0 lg:z-30"
               label="Season"
               onSort={onSort}
               sortKey="seasonYear"
@@ -637,7 +376,7 @@ function PlayerHistoryTable({
             activeSort={sort}
             align="left"
             className={cn(
-              "sticky z-30 w-[240px] min-w-[240px] max-w-[240px] bg-slate-50 px-3",
+              "bg-gray-800 px-2 lg:sticky lg:z-30",
               playerLeftClass,
             )}
             label="Player"
@@ -675,7 +414,7 @@ function PlayerHistoryTable({
             <th
               scope="col"
               key={column.award}
-              className="w-14 px-1 text-center text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500"
+              className="w-14 px-1 text-center text-xs font-normal text-gray-200"
               title={column.title}
             >
               <AwardColumnHeading label={column.label} title={column.title} />
@@ -685,7 +424,7 @@ function PlayerHistoryTable({
             <th
               scope="col"
               key={column.award}
-              className="w-16 px-1 text-center text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500"
+              className="w-16 px-1 text-center text-xs font-normal text-gray-200"
               title={column.title}
             >
               <AwardColumnHeading
@@ -711,40 +450,35 @@ function PlayerHistoryTable({
           rows.map((row) => (
             <tr
               key={row.id}
-              className="group border-0 bg-white hover:bg-slate-50"
+              className="group odd:bg-white even:bg-gray-100 hover:bg-slate-200"
             >
               {hasSeasonColumn ? (
-                <td className="sticky left-0 z-20 w-20 bg-white px-3 py-2.5 font-mono text-xs font-semibold tabular-nums text-slate-700 group-hover:bg-slate-50">
+                <td className="w-20 bg-inherit px-2 py-1 tabular-nums lg:sticky lg:left-0 lg:z-20">
                   {row.seasonYear}
                 </td>
               ) : null}
               <th
                 scope="row"
                 className={cn(
-                  "sticky z-20 w-[240px] min-w-[240px] max-w-[240px] bg-white px-3 py-2.5 text-left font-normal group-hover:bg-slate-50",
+                  "bg-inherit px-2 py-1 text-left font-normal lg:sticky lg:z-20",
                   playerLeftClass,
                 )}
               >
-                <div className="flex min-w-0 items-center gap-1.5 sm:gap-2.5">
-                  <NHLLogoList
-                    teams={row.nhlTeams}
-                    size={row.nhlTeams.length > 1 ? 18 : 22}
-                  />
-                  <span className="min-w-0 truncate font-semibold text-slate-900">
-                    {row.playerName}
-                  </span>
+                <div className="flex items-center gap-1.5">
+                  <NHLLogoList teams={row.nhlTeams} size={16} />
+                  <span className="text-slate-900">{row.playerName}</span>
                 </div>
               </th>
-              <td className="w-16 whitespace-nowrap px-3 py-2.5 text-left text-slate-500">
+              <td className="w-16 whitespace-nowrap px-2 py-1 text-left text-slate-500">
                 {row.positions || "—"}
               </td>
               {!hasSeasonColumn ? (
-                <td className="whitespace-nowrap px-3 py-2.5 text-right font-mono tabular-nums text-slate-600">
+                <td className="whitespace-nowrap px-2 py-1 text-right tabular-nums text-slate-600">
                   <span className="font-semibold text-slate-900">
                     {row.seasonCount || "—"}
                   </span>
                   {row.firstSeason && row.lastSeason ? (
-                    <span className="ml-1.5 hidden text-[10px] text-slate-400 sm:inline">
+                    <span className="ml-1.5 text-[10px] text-slate-500">
                       {row.firstSeason === row.lastSeason
                         ? row.firstSeason
                         : `${row.firstSeason}–${row.lastSeason}`}
@@ -755,7 +489,7 @@ function PlayerHistoryTable({
               {columns.map((column) => (
                 <td
                   key={`${row.id}-${column.key}`}
-                  className="whitespace-nowrap px-2 py-2.5 text-right font-mono tabular-nums text-slate-700 sm:px-3"
+                  className="whitespace-nowrap px-2 py-1 text-right tabular-nums text-slate-700"
                 >
                   {formatRecordBookStat(row, column)}
                 </td>
@@ -763,7 +497,7 @@ function PlayerHistoryTable({
               {ALL_STAR_TABLE_COLUMNS.map((column) => (
                 <td
                   key={`${row.id}-${column.award}`}
-                  className="whitespace-nowrap px-1 py-2.5 text-center font-mono tabular-nums text-slate-700"
+                  className="whitespace-nowrap px-1 py-1 text-center tabular-nums text-slate-700"
                 >
                   {(row.awardCounts[column.award] ?? 0) === 0
                     ? "-"
@@ -773,7 +507,7 @@ function PlayerHistoryTable({
               {PLAYER_TROPHY_TABLE_COLUMNS.map((column) => (
                 <td
                   key={`${row.id}-${column.award}`}
-                  className="px-1 py-2.5 text-center"
+                  className="px-1 py-1 text-center"
                 >
                   <AwardCountMarks
                     count={row.awardCounts[column.award]}
@@ -832,17 +566,8 @@ export function TeamRecordBook(props: TeamRecordBookProps) {
             seasonTypes={seasonTypes}
             view={view}
           />
-          <PlayerHistoryCards
-            columns={columns}
-            group={group}
-            onSort={onSort}
-            rows={playerRows}
-            sort={sort}
-            view={view}
-          />
           <TableViewport
             ariaLabel="Complete player record-book statistics"
-            className="hidden lg:block"
             scrollHint="Scroll to review every statistic and honor"
             viewportClassName="rounded-none border-0 focus-visible:ring-inset focus-visible:ring-offset-0"
           >

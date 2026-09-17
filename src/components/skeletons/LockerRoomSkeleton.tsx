@@ -188,49 +188,17 @@ export function TeamRecordBookSkeleton() {
           <div className="space-y-3 border-b border-slate-200 p-3 sm:p-4">
             <div className="flex flex-wrap gap-2">
               {Array.from({ length: 5 }).map((_, index) => (
-                <Skeleton key={index} className="h-11 w-20 rounded-md" />
+                <Skeleton key={index} className="h-9 w-20 rounded-md" />
               ))}
-              <Skeleton className="ml-auto h-11 w-44 rounded-md" />
+              <Skeleton className="ml-auto h-9 w-44 rounded-md" />
             </div>
-          </div>
-          <div className="lg:hidden">
-            <div className="grid grid-cols-[minmax(0,1fr)_7rem] gap-2">
-              <Skeleton className="h-11 w-full rounded-md" />
-              <Skeleton className="h-11 w-full rounded-md" />
-            </div>
-            {Array.from({ length: 5 }).map((_, rowIndex) => (
-              <div
-                key={rowIndex}
-                className="border-b border-slate-200 bg-white"
-              >
-                <div className="flex items-center gap-3 px-3 py-3">
-                  <Skeleton className="h-8 w-8 rounded-lg" />
-                  <div className="space-y-1.5">
-                    <Skeleton className="h-4 w-36" />
-                    <Skeleton className="h-3 w-24" />
-                  </div>
-                </div>
-                <div className="grid grid-cols-4 gap-2 border-y border-slate-100 bg-slate-50 px-2 py-2.5">
-                  {Array.from({ length: 4 }).map((_, cellIndex) => (
-                    <Skeleton
-                      key={cellIndex}
-                      className="h-7 w-8 justify-self-center"
-                    />
-                  ))}
-                </div>
-                <div className="flex min-h-11 items-center px-3">
-                  <Skeleton className="h-3 w-32" />
-                </div>
-              </div>
-            ))}
           </div>
           <TableViewport
             ariaLabel="Loading complete player record-book statistics"
-            className="hidden lg:block"
             viewportClassName="rounded-none border-0"
           >
             <div className="min-w-[105rem]">
-              <div className="grid grid-cols-[15rem_4rem_repeat(14,5rem)] gap-2 bg-slate-50 px-3 py-3">
+              <div className="grid grid-cols-[15rem_4rem_repeat(14,5rem)] gap-2 bg-gray-800 px-2 py-2">
                 {Array.from({ length: 16 }).map((_, index) => (
                   <Skeleton key={index} className="h-3 w-full" />
                 ))}
@@ -238,12 +206,12 @@ export function TeamRecordBookSkeleton() {
               {Array.from({ length: 9 }).map((_, rowIndex) => (
                 <div
                   key={rowIndex}
-                  className="grid grid-cols-[15rem_4rem_repeat(14,5rem)] items-center gap-2 border-t px-3 py-2.5"
+                  className="grid grid-cols-[15rem_4rem_repeat(14,5rem)] items-center gap-2 border-t px-2 py-1"
                 >
                   {Array.from({ length: 16 }).map((_, cellIndex) => (
                     <Skeleton
                       key={cellIndex}
-                      className={cellIndex === 0 ? "h-5 w-44" : "h-3 w-10"}
+                      className={cellIndex === 0 ? "h-4 w-44" : "h-3 w-10"}
                     />
                   ))}
                 </div>
