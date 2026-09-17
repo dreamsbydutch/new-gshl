@@ -6,7 +6,7 @@ function ContractRowSkeleton() {
     <tr>
       <th
         scope="row"
-        className="w-32 border-y border-gray-300 bg-gray-50 p-1 lg:sticky lg:left-0 lg:z-20"
+        className="sticky left-0 z-20 w-28 min-w-28 max-w-28 border-y border-gray-300 bg-gray-50 p-1 lg:w-32 lg:min-w-32 lg:max-w-32"
       >
         <Skeleton className="mx-auto h-3 w-24" />
       </th>
@@ -43,7 +43,7 @@ export function TeamContractTableSkeleton() {
           <thead>
             <tr>
               {[
-                "w-32",
+                "w-28 min-w-28 max-w-28 lg:w-32 lg:min-w-32 lg:max-w-32",
                 "w-12",
                 "w-8",
                 "w-20",
@@ -59,7 +59,7 @@ export function TeamContractTableSkeleton() {
                     index < 3
                       ? `lg:sticky lg:z-30 ${
                           index === 0
-                            ? "lg:left-0"
+                            ? "sticky left-0 z-30"
                             : index === 1
                               ? "lg:left-[8rem]"
                               : "lg:left-[11rem]"
@@ -79,7 +79,7 @@ export function TeamContractTableSkeleton() {
             <tr>
               <th
                 scope="row"
-                className="border-t border-gray-800 bg-gray-200 px-2 py-1 lg:sticky lg:left-0 lg:z-20"
+                className="sticky left-0 z-20 border-t border-gray-800 bg-gray-200 px-2 py-1"
               >
                 <Skeleton className="mx-auto h-3 w-20 bg-gray-300" />
               </th>

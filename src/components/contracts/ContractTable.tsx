@@ -21,6 +21,7 @@
 
 import { useMemo } from "react";
 import { Trash2 } from "lucide-react";
+import { CompactPlayerName } from "@gshl-components/player/CompactPlayerName";
 import { NHLLogo } from "@gshl-components/player/NHLLogo";
 import { TeamContractTableSkeleton } from "@gshl-skeletons";
 import { TableViewport } from "@gshl-ui";
@@ -67,7 +68,7 @@ const TableHeader = ({
       <tr>
         <th
           scope="col"
-          className={`w-32 bg-gray-800 text-center text-2xs font-normal text-gray-200 lg:sticky lg:left-0 lg:z-30 ${headerPadding}`}
+          className={`sticky left-0 z-30 w-28 min-w-28 max-w-28 bg-gray-800 text-center text-2xs font-normal text-gray-200 lg:w-32 lg:min-w-32 lg:max-w-32 ${headerPadding}`}
         >
           Name
         </th>
@@ -150,7 +151,7 @@ const PlayerContractRow = ({
       <tr className="text-gray-400">
         <th
           scope="row"
-          className={`w-32 whitespace-nowrap border-b border-t border-gray-300 bg-gray-50 text-center text-xs font-normal lg:sticky lg:left-0 lg:z-20 ${stickyCellPadding}`}
+          className={`sticky left-0 z-20 w-28 min-w-28 max-w-28 whitespace-nowrap border-b border-t border-gray-300 bg-gray-50 text-center text-xs font-normal lg:w-32 lg:min-w-32 lg:max-w-32 ${stickyCellPadding}`}
         >
           Loading player…
         </th>
@@ -234,9 +235,9 @@ const PlayerContractRow = ({
     <tr className={isGhost || hasBuyout ? "text-gray-400" : "text-gray-800"}>
       <th
         scope="row"
-        className={`w-32 max-w-fit whitespace-nowrap border-b border-t border-gray-300 text-center text-xs font-normal lg:sticky lg:left-0 lg:z-20 ${stickyCellPadding} ${isGhost ? "bg-gray-100" : "bg-gray-50"}`}
+        className={`sticky left-0 z-20 w-28 min-w-28 max-w-28 whitespace-nowrap border-b border-t border-gray-300 text-center text-xs font-normal lg:w-32 lg:min-w-32 lg:max-w-32 ${stickyCellPadding} ${isGhost ? "bg-gray-100" : "bg-gray-50"}`}
       >
-        {player.fullName}
+        <CompactPlayerName name={player.fullName} />
       </th>
       <td
         className={`w-12 whitespace-nowrap border-b border-t border-gray-300 text-center text-xs lg:sticky lg:left-[8rem] lg:z-20 ${stickyCellPadding} ${isGhost ? "bg-gray-100" : "bg-gray-50"}`}
@@ -306,7 +307,7 @@ const CapSpaceRow = ({
     <tr key={`${currentTeam.franchiseId}CapSpace`}>
       <th
         scope="row"
-        className={`w-32 whitespace-nowrap border-t border-gray-800 bg-gray-200 text-center text-xs font-bold lg:sticky lg:left-0 lg:z-20 ${cellPadding}`}
+        className={`sticky left-0 z-20 w-28 min-w-28 max-w-28 whitespace-nowrap border-t border-gray-800 bg-gray-200 text-center text-xs font-bold lg:w-32 lg:min-w-32 lg:max-w-32 ${cellPadding}`}
       >
         Cap Space
       </th>

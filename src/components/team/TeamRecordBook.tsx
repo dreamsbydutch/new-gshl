@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { ArrowDown, ArrowUp, ArrowUpDown, Search } from "lucide-react";
+import { CompactPlayerName } from "@gshl-components/player/CompactPlayerName";
 import { NHLLogoList } from "@gshl-components/player/NHLLogoList";
 import {
   AWARD_CATALOG_BY_KEY,
@@ -347,12 +348,11 @@ function PlayerHistoryTable({
   view,
 }: RecordBookPlayerTableProps) {
   const hasSeasonColumn = view === "season";
-  const playerLeftClass = hasSeasonColumn ? "lg:left-20" : "lg:left-0";
   const emptyColSpan =
     columns.length +
     ALL_STAR_TABLE_COLUMNS.length +
     PLAYER_TROPHY_TABLE_COLUMNS.length +
-    3;
+    4;
 
   return (
     <table className="mx-auto min-w-max border-collapse whitespace-nowrap text-xs">
@@ -362,11 +362,19 @@ function PlayerHistoryTable({
       </caption>
       <thead>
         <tr className="bg-gray-800 text-gray-200">
+          <SortableHead
+            activeSort={sort}
+            align="left"
+            className="sticky left-0 z-30 w-28 min-w-28 max-w-28 bg-gray-800 px-2 lg:w-auto lg:max-w-none"
+            label="Player"
+            onSort={onSort}
+            sortKey="playerName"
+          />
           {hasSeasonColumn ? (
             <SortableHead
               activeSort={sort}
               align="left"
-              className="w-20 bg-gray-800 px-2 lg:sticky lg:left-0 lg:z-30"
+              className="bg-gray-800 px-2"
               label="Season"
               onSort={onSort}
               sortKey="seasonYear"
@@ -375,22 +383,14 @@ function PlayerHistoryTable({
           <SortableHead
             activeSort={sort}
             align="left"
-            className={cn(
-              "bg-gray-800 px-2 lg:sticky lg:z-30",
-              playerLeftClass,
-            )}
-            label="Player"
-            onSort={onSort}
-            sortKey="playerName"
-          />
-          <SortableHead
-            activeSort={sort}
-            align="left"
             className="w-12 sm:w-16"
             label="Pos"
             onSort={onSort}
             sortKey="positions"
           />
+          <th scope="col" className="px-2 font-normal">
+            Team
+          </th>
           {!hasSeasonColumn ? (
             <SortableHead
               activeSort={sort}
@@ -452,25 +452,20 @@ function PlayerHistoryTable({
               key={row.id}
               className="group odd:bg-white even:bg-gray-100 hover:bg-slate-200"
             >
-              {hasSeasonColumn ? (
-                <td className="w-20 bg-inherit px-2 py-1 tabular-nums lg:sticky lg:left-0 lg:z-20">
-                  {row.seasonYear}
-                </td>
-              ) : null}
               <th
                 scope="row"
-                className={cn(
-                  "bg-inherit px-2 py-1 text-left font-normal lg:sticky lg:z-20",
-                  playerLeftClass,
-                )}
+                className="sticky left-0 z-20 w-28 min-w-28 max-w-28 bg-inherit px-2 py-1 text-left font-normal lg:w-auto lg:max-w-none"
               >
-                <div className="flex items-center gap-1.5">
-                  <NHLLogoList teams={row.nhlTeams} size={16} />
-                  <span className="text-slate-900">{row.playerName}</span>
-                </div>
+                <CompactPlayerName name={row.playerName} />
               </th>
+              {hasSeasonColumn ? (
+                <td className="px-2 py-1 tabular-nums">{row.seasonYear}</td>
+              ) : null}
               <td className="w-16 whitespace-nowrap px-2 py-1 text-left text-slate-500">
                 {row.positions || "—"}
+              </td>
+              <td className="px-2 py-1">
+                <NHLLogoList teams={row.nhlTeams} size={16} />
               </td>
               {!hasSeasonColumn ? (
                 <td className="whitespace-nowrap px-2 py-1 text-right tabular-nums text-slate-600">
