@@ -168,6 +168,18 @@ void test("My Team draft picks use their own season control", () => {
   assert.match(draftPicks, /aria-label="Draft season"/);
 });
 
+void test("My Team exposes a labelled native team selector in the header", () => {
+  const navbar = readSource("src/components/nav/MainNavbar.tsx");
+  const selector = readSource("src/components/nav/HeaderTeamSelect.tsx");
+  const layout = readSource("src/components/locker-room/LockerRoomLayout.tsx");
+
+  assert.match(navbar, /showTeamControl = pathname === "\/lockerroom"/);
+  assert.match(selector, /<select\s+aria-label="View team"/);
+  assert.match(selector, /disabled=\{!navigation.isReady \|\| !hasTeams\}/);
+  assert.match(selector, /<option key=\{team.id\}/);
+  assert.doesNotMatch(layout, /<details|TeamsToggle/);
+});
+
 void test("UFA and matchup statistics retain compact scrollable tables on phones", () => {
   const ufa = readSource("src/components/contracts/UfaSigning.tsx");
   const nhlLogo = readSource("src/components/player/NHLLogo.tsx");

@@ -504,7 +504,7 @@ export function useStandingsContextNavigation() {
   };
 }
 
-export function useLockerRoomContextNavigation() {
+export function useLockerRoomContextNavigation(synchronizeRoute = true) {
   const navigation = useContextualRouter();
   const { hasHydrated } = useNavigationHydration();
   const { session, status: authStatus } = useAuthSession();
@@ -556,7 +556,12 @@ export function useLockerRoomContextNavigation() {
     (ownerId === null || persistedOwnerId === ownerId);
 
   useEffect(() => {
-    if (!routeDataReady || !navigation.shouldSyncCurrentUrl) return;
+    if (
+      !synchronizeRoute ||
+      !routeDataReady ||
+      !navigation.shouldSyncCurrentUrl
+    )
+      return;
     if (persistedView !== view) setView(view);
     if (ownerId && persistedOwnerId !== ownerId) setOwnerId(ownerId);
     const canonicalHref = buildLockerRoomNavigationHref(navigation.search, {
@@ -568,6 +573,7 @@ export function useLockerRoomContextNavigation() {
       navigation.replace(canonicalHref);
     }
   }, [
+    synchronizeRoute,
     effectiveSeasonId,
     navigation,
     ownerId,
@@ -598,13 +604,20 @@ export function useLockerRoomContextNavigation() {
         season: effectiveSeasonId,
         owner: nextOwnerId,
       });
-      navigation.push(href, () => setOwnerId(nextOwnerId));
+      // The route layout owns store synchronization for header selections.
+      navigation.push(href, () => {
+        if (synchronizeRoute) setOwnerId(nextOwnerId);
+      });
     },
-    [effectiveSeasonId, navigation, setOwnerId, view],
+    [effectiveSeasonId, navigation, setOwnerId, synchronizeRoute, view],
   );
 
   return {
     isReady: routeDataReady && storeMatches,
+    teamOptions: ((teamsQuery.data ?? []) as GSHLTeam[])
+      .filter((team) => Boolean(team.ownerId))
+      .slice()
+      .sort((a, b) => (a.name ?? "").localeCompare(b.name ?? "")),
     selectedOwnerId: ownerId,
     selectedSeasonId: effectiveSeasonId,
     selectedView: view,

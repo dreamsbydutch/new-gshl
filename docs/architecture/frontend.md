@@ -178,8 +178,10 @@ Home's compact modules use a centered reading measure. When a linked owner has a
 ## My Team layout
 
 The Locker Room uses a single 36px section-navigation row on mobile. Team
-selection lives in the header's **Change team** disclosure; selecting a franchise
-closes it and returns focus to the trigger. The route owns horizontal spacing,
+selection lives in a labelled **Team** dropdown in the global header, showing
+the selected team on mobile and desktop. Switching teams preserves the active
+My Team section and its URL context. The route layout owns URL/store synchronization;
+the header reads the same selection and navigates without a competing synchronization effect. The route owns horizontal spacing,
 and the compact team header stays above all six views. The roster retains its
 rink-style positional lineup and two-column bench, including player ratings
 and salary badges. Matchups,
