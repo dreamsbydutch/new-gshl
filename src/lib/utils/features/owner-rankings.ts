@@ -44,6 +44,13 @@ export const OWNER_LADDER_POWER_WEIGHTS = {
   lastPlace: -1.5,
 } as const;
 
+/**
+ * Power form builds at the original per-week rate, then becomes a placement
+ * rate once the sample is established. This keeps long careers from receiving
+ * an unbounded bonus or penalty merely for having more ranked weeks.
+ */
+export const OWNER_LADDER_POWER_SAMPLE_WEEKS = 10;
+
 const PLAYOFF_TYPES = new Set<MatchupTypeValue>([
   MatchupType.QUARTER_FINAL,
   MatchupType.SEMI_FINAL,
@@ -133,11 +140,21 @@ const performanceAdjustment = (state: OwnerLadderState) =>
   (bayesianPercentage(state.conference, 10) - 0.5) * 80 +
   (bayesianPercentage(state.playoffs, 6) - 0.5) * 120;
 
-const powerRankingAdjustment = (state: OwnerLadderState) =>
-  state.weeksAtNumberOne * OWNER_LADDER_POWER_WEIGHTS.numberOne +
-  state.weeksInTopThree * OWNER_LADDER_POWER_WEIGHTS.topThree +
-  state.weeksInBottomThree * OWNER_LADDER_POWER_WEIGHTS.bottomThree +
-  state.weeksInLastPlace * OWNER_LADDER_POWER_WEIGHTS.lastPlace;
+const powerRankingAdjustment = (state: OwnerLadderState) => {
+  if (!state.powerWeeksRanked) return 0;
+
+  const rawAdjustment =
+    state.weeksAtNumberOne * OWNER_LADDER_POWER_WEIGHTS.numberOne +
+    state.weeksInTopThree * OWNER_LADDER_POWER_WEIGHTS.topThree +
+    state.weeksInBottomThree * OWNER_LADDER_POWER_WEIGHTS.bottomThree +
+    state.weeksInLastPlace * OWNER_LADDER_POWER_WEIGHTS.lastPlace;
+  const exposureWeeks = Math.max(
+    state.powerWeeksRanked,
+    OWNER_LADDER_POWER_SAMPLE_WEEKS,
+  );
+
+  return (rawAdjustment / exposureWeeks) * OWNER_LADDER_POWER_SAMPLE_WEEKS;
+};
 
 const ladderRating = (state: OwnerLadderState) =>
   OWNER_LADDER_BASE_RATING +

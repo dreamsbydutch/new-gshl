@@ -126,6 +126,11 @@ All active users can access:
 - conference-versus-conference records and rating history; and
 - the historical owner ladder.
 
+The owner ladder combines Bayesian-smoothed records, a small Elo form signal,
+career achievements, and power-ranking form. Power form accumulates during its
+first ten ranked weeks, then uses the owner's placement rate so additional
+seasons do not create an unbounded bonus or penalty for equivalent results.
+
 Draft Classes provides four year-selectable projections with search, position
 and certainty filters. Guaranteed UFAs are visually distinct from other
 projected players; summary counts, mobile cards, and a complete desktop table
