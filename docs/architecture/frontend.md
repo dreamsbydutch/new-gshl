@@ -219,3 +219,31 @@ Tests use Node's built-in test runner and are colocated primarily with pure util
 - `src/trpc/` and some configured aliases are inactive.
 - Similar legacy draft and free-agency components remain in the tree. Begin from an active route and follow imports before editing.
 - `npm run format:check` does not include ordinary Markdown files.
+
+### NHL abbreviation aliases
+
+Player team parsing normalizes aliases before deduplicating logo lists. Catalog
+lookup prefers the canonical abbreviation and accepts an alias-only catalog.
+The NHL catalog audit found these 12 duplicate pairs:
+
+| Alias | Canonical |
+| ----- | --------- |
+| ANH   | ANA       |
+| CAL   | CGY       |
+| CLB   | CBJ       |
+| LA    | LAK       |
+| MON   | MTL       |
+| NAS   | NSH       |
+| NJ    | NJD       |
+| SJ    | SJS       |
+| TB    | TBL       |
+| VEG   | VGK       |
+| WAS   | WSH       |
+| WIN   | WPG       |
+
+The remaining catalog abbreviations are ARI, BOS, BUF, CAR, CHI, COL, DAL,
+DET, EDM, FLA, MIN, NYI, NYR, OTT, PHI, PIT, SEA, STL, TOR, UTA, and VAN.
+Supported stat-source variants also map ARZ to ARI, CLS to CBJ, NASH to NSH,
+and UTAH to UTA. Unknown abbreviations are preserved. Historical relocations
+are not merged (for example, ARI and UTA remain distinct). This is a display
+normalization; stored catalog and statistical records are unchanged.

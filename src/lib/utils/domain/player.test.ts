@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { NHLTeam } from "@gshl-types";
-import { findNhlTeamByAbbreviation } from "./player";
+import { findNhlTeamByAbbreviation, getPlayerNhlAbbreviations } from "./player";
 
 const teams: NHLTeam[] = [
   {
@@ -29,4 +29,48 @@ void test("findNhlTeamByAbbreviation resolves the stored abbr field", () => {
 void test("findNhlTeamByAbbreviation normalizes player team values", () => {
   assert.equal(findNhlTeamByAbbreviation(teams, " njd "), teams[1]);
   assert.equal(findNhlTeamByAbbreviation(teams, ["tor"]), teams[0]);
+});
+
+void test("normalizes every duplicate NHL catalog abbreviation pair", () => {
+  const pairs = [
+    ["ANH", "ANA"],
+    ["CAL", "CGY"],
+    ["CLB", "CBJ"],
+    ["LA", "LAK"],
+    ["MON", "MTL"],
+    ["NAS", "NSH"],
+    ["NJ", "NJD"],
+    ["SJ", "SJS"],
+    ["TB", "TBL"],
+    ["VEG", "VGK"],
+    ["WAS", "WSH"],
+    ["WIN", "WPG"],
+    ["ARZ", "ARI"],
+    ["CLS", "CBJ"],
+    ["NASH", "NSH"],
+    ["UTAH", "UTA"],
+  ];
+  for (const [alias, canonical] of pairs) {
+    assert.deepEqual(getPlayerNhlAbbreviations(`${alias}/${canonical}`), [
+      canonical,
+    ]);
+  }
+  assert.deepEqual(
+    getPlayerNhlAbbreviations([" nj / NJD", "VEG", "vgk", "TOR"]),
+    ["NJD", "VGK", "TOR"],
+  );
+  assert.deepEqual(getPlayerNhlAbbreviations(["ARI", "UTA", "WPG", "ATL"]), [
+    "ARI",
+    "UTA",
+    "WPG",
+    "ATL",
+  ]);
+});
+
+void test("prefers canonical catalog entries and falls back to alias-only catalogs", () => {
+  const alias = { abbr: "NJ" };
+  const canonical = { abbr: "NJD" };
+  assert.equal(findNhlTeamByAbbreviation([alias, canonical], "NJ"), canonical);
+  assert.equal(findNhlTeamByAbbreviation([alias], "NJD"), alias);
+  assert.equal(findNhlTeamByAbbreviation([canonical], " nj "), canonical);
 });

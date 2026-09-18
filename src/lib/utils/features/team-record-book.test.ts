@@ -366,3 +366,32 @@ void test("player-history years preserve gaps and abbreviate consecutive runs", 
   assert.equal(careerRows[0]?.seasonCount, 5);
   assert.equal(seasonRows[0]?.yearsLabel, "'24");
 });
+
+void test("player history renders one logo per NHL team despite alias catalog IDs", () => {
+  const catalog = [
+    nhlTeam("nj-alias", "NJ"),
+    nhlTeam("nj-canonical", "NJD"),
+    nhlTeam("vegas-alias", "VEG"),
+    nhlTeam("vegas-canonical", "VGK"),
+    nhlTeam("toronto", "TOR"),
+  ];
+  const { careerRows, seasonRows } = buildRecordBookPlayerRows({
+    awardRows: [],
+    careerSplits: [
+      seasonSplitRow({ nhlTeam: ["NJ", "NJD", "VEG", "VGK", "TOR"] }),
+    ],
+    nhlTeamsByAbbr: new Map(catalog.map((team) => [team.abbr, team])),
+    ownerTeamIds: new Set(["owner-a-team-1"]),
+    playersById: new Map(),
+    seasonSplits: [
+      seasonSplitRow({ nhlTeam: ["NJ", "NJD", "VEG", "VGK", "TOR"] }),
+    ],
+    seasonsById: new Map([["season-1", 2025]]),
+  });
+  for (const row of [careerRows[0], seasonRows[0]]) {
+    assert.deepEqual(
+      row?.nhlTeams.map((team) => team.id),
+      ["nj-canonical", "vegas-canonical", "toronto"],
+    );
+  }
+});
