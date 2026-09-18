@@ -5,6 +5,10 @@ import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { requireCommissioner, requireOwnerOrCommissioner } from "./lib/auth";
+import {
+  deriveContractCreationTerms,
+  getEffectiveSigningStatus,
+} from "../src/lib/utils/domain/contracts";
 import { buildLeagueActivity } from "../src/lib/utils/features/league-activity";
 import {
   buildLockKey,
@@ -1250,10 +1254,14 @@ export const createContract = mutation({
   },
   handler: async (ctx, args) => {
     await requireCommissioner(ctx);
-    const [team, player, seasons] = await Promise.all([
+    const [team, player, seasons, playerContracts] = await Promise.all([
       ctx.db.get(args.teamId),
       ctx.db.get(args.playerId),
       ctx.db.query("seasons").collect(),
+      ctx.db
+        .query("contracts")
+        .withIndex("by_playerId", (q) => q.eq("playerId", args.playerId))
+        .collect(),
     ]);
     if (!team || !player) throw new Error("Team or player not found");
     const ordered = [...seasons].sort(
@@ -1265,20 +1273,49 @@ export const createContract = mutation({
     }
     const franchise = await ctx.db.get(team.franchiseId);
     if (!franchise?.ownerId) throw new Error("Team owner not found");
-    const duplicate = await ctx.db
-      .query("contracts")
-      .withIndex("by_playerId", (q) => q.eq("playerId", args.playerId))
-      .filter((q) => q.eq(q.field("seasonId"), signingSeason._id))
-      .first();
-    if (duplicate) throw new Error("Player already has a contract");
-    const seasonIndex = ordered.findIndex(
-      (season) => season._id === signingSeason._id,
+    const duplicate = playerContracts.find(
+      (contract) => contract.seasonId === signingSeason._id,
     );
-    const expirySeason =
-      ordered[seasonIndex + args.contractLength - 1] ?? signingSeason;
+    if (duplicate) throw new Error("Player already has a contract");
+
+    const contractSeasons = ordered.map((season) => ({
+      ...season,
+      id: String(season._id),
+      year: Number(season.year),
+    }));
+    const contractSigningSeason = contractSeasons.find(
+      (season) => season.id === String(signingSeason._id),
+    );
+    if (!contractSigningSeason) {
+      throw new Error("The active signing season could not be resolved");
+    }
+    const contractRows = playerContracts.map((contract) => ({
+      ...contract,
+      id: String(contract._id),
+      playerId: String(contract.playerId),
+      ownerId: String(contract.ownerId),
+      seasonId: String(contract.seasonId),
+    }));
+    const effectiveSigningStatus = getEffectiveSigningStatus({
+      player: { ...player, id: String(player._id) },
+      signingSeason: contractSigningSeason,
+      contracts: contractRows,
+      seasons: contractSeasons,
+    });
+    const terms = deriveContractCreationTerms({
+      player: {
+        ...player,
+        id: String(player._id),
+        isResignable: effectiveSigningStatus,
+      },
+      signingSeason: contractSigningSeason,
+      contractLength: args.contractLength,
+      contracts: contractRows,
+      seasons: contractSeasons,
+    });
     const now = Date.now();
-    const startDate = toUtcTimestamp(signingSeason.startDate);
-    const expiryDate = toUtcTimestamp(expirySeason.endDate);
+    const startDate = toUtcTimestamp(terms.startDate);
+    const expiryDate = toUtcTimestamp(terms.expiryDate);
     if (startDate === null || expiryDate === null) {
       throw new Error("The selected contract seasons have invalid dates");
     }
@@ -1286,15 +1323,15 @@ export const createContract = mutation({
       playerId: args.playerId,
       ownerId: franchise.ownerId,
       seasonId: signingSeason._id,
-      contractType: "STANDARD",
+      contractType: terms.contractType,
       contractLength: args.contractLength,
-      contractSalary: Number(player.salary ?? 0),
+      contractSalary: terms.contractSalary,
       signingDate: now,
       startDate,
-      signingStatus: "Drafted",
-      expiryStatus: "UFA",
+      signingStatus: terms.signingStatus,
+      expiryStatus: terms.expiryStatus,
       expiryDate,
-      capHit: Number(player.salary ?? 0),
+      capHit: terms.contractSalary,
       capHitEndDate: expiryDate,
       createdAt: now,
       updatedAt: now,

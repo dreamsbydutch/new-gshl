@@ -92,6 +92,20 @@ void test("a season 6 signing starts in 7 and expires by term", () => {
   }
 });
 
+void test("an offseason signing takes effect today and ends after the upcoming season", () => {
+  const terms = deriveContractCreationTerms({
+    player: player(ResignableStatus.DRAFT),
+    signingSeason: seasons[1]!,
+    contractLength: 1,
+    contracts: [],
+    seasons,
+    referenceDate: new Date("2020-08-15T16:00:00.000Z"),
+  });
+
+  assert.equal(terms.startDate, "2020-08-15");
+  assert.equal(terms.expiryDate, seasons[2]!.endDate);
+});
+
 void test("Draft and RFA terms apply their salary and status rules", () => {
   const draft = deriveContractCreationTerms({
     player: player(ResignableStatus.DRAFT),
