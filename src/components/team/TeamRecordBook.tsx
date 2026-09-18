@@ -471,7 +471,7 @@ function PlayerHistoryTable({
                 <CompactPlayerName name={row.playerName} />
               </th>
               {hasSeasonColumn ? (
-                <td className="px-2 py-1 tabular-nums">{row.seasonYear}</td>
+                <td className="px-2 py-1 tabular-nums">{row.yearsLabel}</td>
               ) : null}
               <td className="w-16 whitespace-nowrap px-2 py-1 text-left text-slate-500">
                 {row.positions || "—"}
@@ -484,11 +484,9 @@ function PlayerHistoryTable({
                   <span className="font-semibold text-slate-900">
                     {row.seasonCount || "—"}
                   </span>
-                  {row.firstSeason && row.lastSeason ? (
+                  {row.yearsLabel ? (
                     <span className="ml-1.5 text-[10px] text-slate-500">
-                      {row.firstSeason === row.lastSeason
-                        ? row.firstSeason
-                        : `${row.firstSeason}–${row.lastSeason}`}
+                      {row.yearsLabel}
                     </span>
                   ) : null}
                 </td>

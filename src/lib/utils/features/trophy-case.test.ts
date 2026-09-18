@@ -117,3 +117,10 @@ void test("groups trophy wins by award with count and season range metadata", ()
     [2022, 2021],
   );
 });
+
+void test("abbreviated year ranges join only consecutive years", () => {
+  assert.equal(formatYearRanges([2019, 2021], true), "'19, '21");
+  assert.equal(formatYearRanges([2020, 2019], true), "'19\u2013'20");
+  assert.equal(formatYearRanges([2021], true), "'21");
+  assert.equal(formatYearRanges([], true), "");
+});

@@ -345,3 +345,24 @@ void test("record-book awards follow season type and player group", () => {
     );
   }
 });
+
+void test("player-history years preserve gaps and abbreviate consecutive runs", () => {
+  const years = [2024, 2019, 2021, 2020, 2021, 2026];
+  const { careerRows, seasonRows } = buildRecordBookPlayerRows({
+    awardRows: [],
+    careerSplits: [seasonSplitRow()],
+    nhlTeamsByAbbr: new Map(),
+    ownerTeamIds: new Set(["owner-a-team-1"]),
+    playersById: new Map(),
+    seasonSplits: years.map((year, index) =>
+      seasonSplitRow({
+        id: `split-${index}`,
+        seasonId: `season-${year}`,
+      }),
+    ),
+    seasonsById: new Map(years.map((year) => [`season-${year}`, year])),
+  });
+  assert.equal(careerRows[0]?.yearsLabel, "'19\u2013'21, '24, '26");
+  assert.equal(careerRows[0]?.seasonCount, 5);
+  assert.equal(seasonRows[0]?.yearsLabel, "'24");
+});

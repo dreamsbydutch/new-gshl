@@ -32,6 +32,7 @@ import {
   getPlayerNhlAbbreviations,
 } from "../domain/player";
 import { getAllStarSeasonType } from "./season-awards";
+import { formatYearRanges } from "./trophy-case";
 
 /** Awards applicable to the selected statistical comparison. */
 export function getRecordBookVisibleAwards(
@@ -651,6 +652,7 @@ export function buildRecordBookPlayerRows(
       seasonId: row.seasonId,
       seasonYear: row.seasonYear,
       seasonCount: 1,
+      yearsLabel: formatYearRanges([row.seasonYear], true),
       firstSeason: row.seasonYear,
       lastSeason: row.seasonYear,
       ...getStatLine(row),
@@ -684,6 +686,7 @@ export function buildRecordBookPlayerRows(
         positionGroup: String(player?.posGroup ?? row.posGroup),
         seasonType: row.seasonType,
         seasonCount: years.length,
+        yearsLabel: formatYearRanges(years, true),
         firstSeason: years.at(0),
         lastSeason: years.at(-1),
         ...getStatLine(row),
