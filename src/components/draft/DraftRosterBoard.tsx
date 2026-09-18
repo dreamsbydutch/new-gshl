@@ -55,7 +55,7 @@ function RosterPlayer({
       <p
         aria-label={player.fullName}
         className={cn(
-          "whitespace-normal text-[1em] leading-tight text-slate-900",
+          "whitespace-normal text-[0.9em] leading-tight text-slate-900",
           muted ? "font-medium" : "font-bold",
         )}
       >
@@ -65,14 +65,14 @@ function RosterPlayer({
         <NHLLogo
           team={nhlTeam}
           size={18}
-          className="!h-[1.2em] !w-[1.2em] shrink-0"
+          className="!h-[1.05em] !w-[1.05em] shrink-0"
         />
-        <span className="break-words text-[0.9em] leading-tight text-slate-600">
+        <span className="break-words text-[0.72em] leading-tight text-slate-600">
           {player.nhlPos.join("/")}
         </span>
         <span
           className={cn(
-            "rounded px-1 text-[0.9em] leading-tight text-slate-800",
+            "rounded px-0.5 text-[0.75em] leading-tight text-slate-800",
             muted ? "font-medium" : "font-bold",
             getRosterRatingClass(player.seasonRk),
           )}
@@ -117,7 +117,7 @@ export function TeamRosterCard({
       <div ref={contentRef} className="w-full shrink-0">
         <header
           className={cn(
-            "flex min-h-9 shrink-0 items-center gap-1.5 border-b border-slate-300 px-1.5 py-1",
+            "flex min-h-8 shrink-0 items-center gap-1 border-b border-slate-300 px-1.5 py-0.5",
             muted ? "bg-slate-200/80" : "bg-slate-50",
           )}
         >
@@ -127,23 +127,23 @@ export function TeamRosterCard({
               alt={`${team.name ?? team.abbr ?? "Team"} logo`}
               width={24}
               height={24}
-              className="h-[2em] w-[2em] shrink-0 object-contain"
+              className="h-[1.65em] w-[1.65em] shrink-0 object-contain"
             />
           ) : (
-            <div className="grid h-[2em] w-[2em] shrink-0 place-items-center rounded-full bg-slate-200 text-[0.9em] font-bold">
+            <div className="grid h-[1.65em] w-[1.65em] shrink-0 place-items-center rounded-full bg-slate-200 text-[0.75em] font-bold">
               {team.abbr ?? "?"}
             </div>
           )}
           <div className="min-w-0">
             <h3
               className={cn(
-                "whitespace-normal break-words text-[1.1em] leading-tight text-slate-950",
+                "whitespace-normal break-words text-[0.96em] leading-tight text-slate-950",
                 muted ? "font-semibold" : "font-black",
               )}
             >
               {team.name ?? team.abbr ?? "Team"}
             </h3>
-            <p className="text-[0.9em] leading-tight text-slate-600">
+            <p className="text-[0.76em] leading-tight text-slate-600">
               {roster.length} players
             </p>
           </div>
@@ -151,12 +151,12 @@ export function TeamRosterCard({
             className="ml-auto shrink-0 text-right"
             title="Live talent rating across 15 weighted roster slots. Empty slots count as zero; primary starters count most, followed by secondary starters and goalie, utility, then bench."
           >
-            <p className="text-[0.8em] font-medium uppercase tracking-wide text-slate-600">
+            <p className="text-[0.68em] font-medium uppercase tracking-wide text-slate-600">
               Talent
             </p>
             <p
               className={cn(
-                "text-[1.1em] tabular-nums text-primary",
+                "text-[0.96em] tabular-nums text-primary",
                 muted ? "font-medium" : "font-black",
               )}
             >
@@ -232,7 +232,12 @@ export function TeamRosterCard({
               <p className="mb-1 text-[0.75em] font-medium uppercase tracking-wide text-slate-600">
                 Draft picks &middot; {remainingPicks.length}
               </p>
-              <div className="grid grid-cols-3 gap-x-1 gap-y-0.5 text-center text-[0.85em] tabular-nums text-slate-700">
+              <div
+                className="grid grid-flow-col grid-cols-3 gap-x-1 gap-y-0.5 text-center text-[0.78em] tabular-nums text-slate-700"
+                style={{
+                  gridTemplateRows: `repeat(${Math.ceil(remainingPicks.length / 3)}, minmax(0, auto))`,
+                }}
+              >
                 {remainingPicks.map((pick) => (
                   <span
                     key={pick.id}
@@ -507,7 +512,6 @@ export function DraftRosterBoard() {
                 teams={board.conferences.flatMap(
                   (conference) => conference.teams,
                 )}
-                seasonName={board.season?.name}
               />
             ) : null}
           </div>

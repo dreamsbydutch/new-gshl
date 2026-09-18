@@ -15,7 +15,7 @@ const players=teams.flatMap(team=>Array.from({length:15},(_,i)=>player(i,team.ow
 const available=Array.from({length:50},(_,i)=>({...player(i),posGroup:i<35?"F":"G"}));
 const pick=(i)=>({pick:{id:String(i),round:2,pick:i},team:{...teams[i%14],id:"draft-season-"+teams[i%14].id},player:player(i)});
 export function useDraftRosterBoard(){return {season:{name:"2026-27",year:2027},nhlTeams:[],players,remainingPicksByFranchise:new Map(teams.map(team=>[team.franchiseId,Array.from({length:15-(window.tvStep??0)},(_,i)=>({id:team.id+"-pick-"+i,round:String(i+1),pick:String(i*14+Number(team.id)+1)}))])),availablePlayers:available,isLoading:window.tvState==="loading",conferences:[{id:"a",name:"Hickory Hotel",teams:teams.slice(0,7)},{id:"b",name:"Sunview",teams:teams.slice(7)}]};}
-export function useOwnerRankingsData(){return {isLoading:window.tvState==="loading",data:{rankings:teams.map((team,i)=>({owner:{id:team.ownerId},rank:i+1,displayName:"Alexander Owner "+(i+1),rating:1800-i*23,cups:i%4,primaryTeam:null,seasonsPlayed:12,playoffAppearances:8,finalsAppearances:3,overallRecord:{wins:150,losses:125,ties:3,winPercentage:0.545}}))}};}
+export function useOwnerRankingsData(){return {isLoading:window.tvState==="loading",data:{rankings:Array.from({length:20},(_,i)=>({owner:{id:i<14?teams[i].ownerId:"inactive-"+i},rank:i+1,displayName:i<14?"Alexander Owner "+(i+1):"Retired Owner "+(i-13),rating:1800-i*23,cups:i%4,primaryTeam:null,seasonsPlayed:12,playoffAppearances:8,finalsAppearances:3,overallRecord:{wins:150,losses:125,ties:3,winPercentage:0.545}}))}};}
 export function useDraftLiveTvBoard(){const cursor=30+(window.tvStep??0); return {season:{name:"2026-27",draftStartAt:"2026-09-25T20:00:00Z"},state:{status:window.tvState,completedCount:cursor-1,remainingCount:90-cursor},activePick:pick(cursor),clockRemainingSeconds:125,draftStartRemainingSeconds:90061,isLoading:window.tvState==="loading",recentPicks:Array.from({length:5},(_,i)=>pick(cursor-i-1)),upcomingPicks:Array.from({length:5},(_,i)=>pick(cursor+i+1))};}
 `;
 const compiled = await build({
@@ -140,6 +140,11 @@ try {
       if (view === "overview") {
         assert.equal(result.panels, 15);
         assert.match(result.text, /Owner ladder/);
+        assert.match(result.text, /Inactive/i);
+        assert.doesNotMatch(
+          result.text,
+          /Available TV|Live TV|Draft Hub|2026-27 · 14 rosters/,
+        );
         assert.doesNotMatch(result.text, /TOP 26 SKATERS|League Roster Board/);
       }
       await page.screenshot({
@@ -155,6 +160,35 @@ try {
           210,
         );
         assert.match(result.text, /Win%/);
+        assert.equal(
+          await page.$$eval(
+            '[aria-label="Owner ladder"] [data-owner-status="inactive"]',
+            (nodes) => nodes.length,
+          ),
+          6,
+        );
+        const pickLayout = await page.$$eval(
+          "article:first-of-type [data-remaining-pick-id]",
+          (nodes) =>
+            nodes.slice(0, 6).map((node) => {
+              const bounds = node.getBoundingClientRect();
+              return {
+                left: Math.round(bounds.left),
+                top: Math.round(bounds.top),
+              };
+            }),
+        );
+        assert.equal(
+          new Set(pickLayout.slice(0, 5).map(({ left }) => left)).size,
+          1,
+        );
+        assert.ok(
+          pickLayout
+            .slice(1, 5)
+            .every((item, index) => item.top > pickLayout[index].top),
+        );
+        assert.ok(pickLayout[5].left > pickLayout[0].left);
+        assert.equal(pickLayout[5].top, pickLayout[0].top);
         await page.evaluate(() =>
           [...document.querySelectorAll('[aria-label="Center view"] button')]
             .find((button) => button.textContent === "Live draft")

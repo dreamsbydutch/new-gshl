@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { useDraftLiveTvBoard } from "@gshl-hooks";
 import type { DraftRosterTeamView } from "@gshl-types";
 import { cn } from "@gshl-utils";
@@ -19,7 +18,7 @@ function CenterLiveDraft() {
   return (
     <section
       aria-label="Live draft center"
-      className="flex min-h-0 flex-1 flex-col p-1"
+      className="flex min-h-0 flex-1 flex-col p-1 text-[1.08em]"
     >
       <DraftLiveHeader draft={draft} compact />
       <div className="grid min-h-0 flex-1 grid-cols-2 gap-2">
@@ -36,13 +35,7 @@ function CenterLiveDraft() {
   );
 }
 
-export function DraftRosterCenter({
-  teams,
-  seasonName,
-}: {
-  teams: DraftRosterTeamView[];
-  seasonName?: string;
-}) {
+export function DraftRosterCenter({ teams }: { teams: DraftRosterTeamView[] }) {
   const [view, setView] = useState<"owners" | "live">("owners");
   return (
     <aside
@@ -81,19 +74,6 @@ export function DraftRosterCenter({
       ) : (
         <CenterLiveDraft />
       )}
-      <footer className="shrink-0 border-t border-slate-400 px-2 py-1 text-[0.75em] text-slate-700">
-        <p className="mb-1">
-          {seasonName ?? "GSHL Draft"} &middot; {teams.length} rosters
-        </p>
-        <nav
-          aria-label="Draft screens"
-          className="flex justify-between gap-2 underline underline-offset-4"
-        >
-          <Link href="/draft-roster-board/available">Available TV</Link>
-          <Link href="/draft-roster-board/live">Live TV</Link>
-          <Link href="/draft">Draft Hub</Link>
-        </nav>
-      </footer>
     </aside>
   );
 }

@@ -3,16 +3,14 @@
 import Image from "next/image";
 import { useOwnerRankingsData } from "@gshl-hooks";
 import { useDraftBoardFit } from "@gshl-hooks/features/useDraftBoardFit";
-import { abbreviatePlayerName } from "@gshl-utils";
+import { abbreviatePlayerName, cn } from "@gshl-utils";
 import type { DraftRosterTeamView } from "@gshl-types";
 
 export function DraftOwnerLadder({ teams }: { teams: DraftRosterTeamView[] }) {
   const { data, isLoading } = useOwnerRankingsData();
   const { panelRef, contentRef } = useDraftBoardFit();
-  const ownerIds = new Set(teams.map((team) => team.ownerId));
-  const rankings = data.rankings.filter((entry) =>
-    ownerIds.has(entry.owner.id),
-  );
+  const activeOwnerIds = new Set(teams.map((team) => team.ownerId));
+  const rankings = data.rankings;
   return (
     <section
       ref={panelRef}
@@ -25,7 +23,7 @@ export function DraftOwnerLadder({ teams }: { teams: DraftRosterTeamView[] }) {
             Owner ladder
           </h2>
           <p className="text-[0.75em] text-slate-600">
-            Active owners &middot; All-time ranks
+            Active and inactive owners &middot; All-time ranks
           </p>
         </header>
         {isLoading ? (
@@ -82,57 +80,69 @@ export function DraftOwnerLadder({ teams }: { teams: DraftRosterTeamView[] }) {
               </tr>
             </thead>
             <tbody>
-              {rankings.map((entry) => (
-                <tr
-                  key={entry.owner.id}
-                  className="border-t border-slate-300 even:bg-slate-100/60"
-                >
-                  <td className="px-1 py-0.5 tabular-nums text-slate-600">
-                    {entry.rank}
-                  </td>
-                  <td className="px-1 py-0.5">
-                    <div className="flex items-center gap-1">
-                      {entry.primaryTeam?.logoUrl && (
-                        <Image
-                          src={entry.primaryTeam.logoUrl}
-                          alt=""
-                          width={24}
-                          height={24}
-                          className="h-[1.3em] w-[1.3em] shrink-0 object-contain"
-                        />
-                      )}
-                      <span
-                        className="whitespace-nowrap font-medium"
-                        title={entry.displayName}
-                      >
-                        {abbreviatePlayerName(entry.displayName)}
-                      </span>
-                    </div>
-                  </td>
-                  <td className="px-1 py-0.5 text-right tabular-nums">
-                    {Math.round(entry.rating).toLocaleString("en-CA")}
-                  </td>
-                  <td className="whitespace-nowrap px-1 py-0.5 text-right tabular-nums text-slate-700">
-                    {entry.overallRecord.wins}-{entry.overallRecord.losses}-
-                    {entry.overallRecord.ties}
-                  </td>
-                  <td className="px-1 py-0.5 text-right tabular-nums">
-                    {(entry.overallRecord.winPercentage * 100).toFixed(0)}
-                  </td>
-                  <td className="px-1 py-0.5 text-right tabular-nums">
-                    {entry.seasonsPlayed}
-                  </td>
-                  <td className="px-1 py-0.5 text-right tabular-nums">
-                    {entry.playoffAppearances}
-                  </td>
-                  <td className="px-1 py-0.5 text-right tabular-nums">
-                    {entry.finalsAppearances}
-                  </td>
-                  <td className="px-1 py-0.5 text-right tabular-nums">
-                    {entry.cups}
-                  </td>
-                </tr>
-              ))}
+              {rankings.map((entry) => {
+                const isActive = activeOwnerIds.has(entry.owner.id);
+                return (
+                  <tr
+                    key={entry.owner.id}
+                    data-owner-status={isActive ? "active" : "inactive"}
+                    className={cn(
+                      "border-t border-slate-300 even:bg-slate-100/60",
+                      !isActive && "text-slate-500",
+                    )}
+                  >
+                    <td className="px-1 py-0.5 tabular-nums text-slate-600">
+                      {entry.rank}
+                    </td>
+                    <td className="px-1 py-0.5">
+                      <div className="flex items-center gap-1">
+                        {entry.primaryTeam?.logoUrl && (
+                          <Image
+                            src={entry.primaryTeam.logoUrl}
+                            alt=""
+                            width={24}
+                            height={24}
+                            className="h-[1.3em] w-[1.3em] shrink-0 object-contain"
+                          />
+                        )}
+                        <span
+                          className="whitespace-nowrap font-medium"
+                          title={entry.displayName}
+                        >
+                          {abbreviatePlayerName(entry.displayName)}
+                        </span>
+                        {!isActive ? (
+                          <span className="whitespace-nowrap text-[0.68em] font-medium uppercase tracking-wide text-slate-500">
+                            Inactive
+                          </span>
+                        ) : null}
+                      </div>
+                    </td>
+                    <td className="px-1 py-0.5 text-right tabular-nums">
+                      {Math.round(entry.rating).toLocaleString("en-CA")}
+                    </td>
+                    <td className="whitespace-nowrap px-1 py-0.5 text-right tabular-nums text-slate-700">
+                      {entry.overallRecord.wins}-{entry.overallRecord.losses}-
+                      {entry.overallRecord.ties}
+                    </td>
+                    <td className="px-1 py-0.5 text-right tabular-nums">
+                      {(entry.overallRecord.winPercentage * 100).toFixed(0)}
+                    </td>
+                    <td className="px-1 py-0.5 text-right tabular-nums">
+                      {entry.seasonsPlayed}
+                    </td>
+                    <td className="px-1 py-0.5 text-right tabular-nums">
+                      {entry.playoffAppearances}
+                    </td>
+                    <td className="px-1 py-0.5 text-right tabular-nums">
+                      {entry.finalsAppearances}
+                    </td>
+                    <td className="px-1 py-0.5 text-right tabular-nums">
+                      {entry.cups}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         ) : (
