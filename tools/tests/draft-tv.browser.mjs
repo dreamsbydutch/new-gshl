@@ -146,6 +146,12 @@ try {
               };
             },
           ),
+          downConnectors: document.querySelectorAll(
+            '[aria-label="Recent picks"] [data-pick-connector="down"]',
+          ).length,
+          upConnectors: document.querySelectorAll(
+            '[aria-label="Upcoming picks"] [data-pick-connector="up"]',
+          ).length,
         }));
         assert.ok(rails.left.length >= 5);
         assert.ok(rails.right.length >= 5);
@@ -162,6 +168,8 @@ try {
           ),
         );
         assert.equal(rails.clock, "02:05");
+        assert.equal(rails.downConnectors, rails.left.length - 1);
+        assert.equal(rails.upConnectors, rails.right.length - 1);
         assert.ok(
           rails.fit.every(({ unused, nextRow }) => unused < nextRow + 3),
         );
@@ -261,6 +269,11 @@ try {
             timer: panel.querySelector('[role="timer"]')?.textContent,
             rosters: panel.querySelectorAll("article").length,
             rails: panel.querySelectorAll("[data-tv-fit]").length,
+            downConnectors: panel.querySelectorAll(
+              '[data-pick-connector="down"]',
+            ).length,
+            upConnectors: panel.querySelectorAll('[data-pick-connector="up"]')
+              .length,
             overflow: [...panel.querySelectorAll("[data-tv-fit]"), panel].some(
               (node) =>
                 node.scrollWidth > node.clientWidth + 1 ||
@@ -291,6 +304,8 @@ try {
           timer: "02:05",
           rosters: 0,
           rails: 2,
+          downConnectors: 4,
+          upConnectors: 4,
           overflow: false,
         });
 

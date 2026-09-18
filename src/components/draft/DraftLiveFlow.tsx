@@ -8,6 +8,7 @@ import { useDraftPickFlowMotion } from "@gshl-hooks/features/useDraftPickFlowMot
 import { abbreviatePlayerName, cn } from "@gshl-utils";
 import { formatDraftTvClock } from "@gshl-utils/features/draft-tv-clock";
 import type { DraftHubPickView } from "@gshl-types";
+import { DraftPickConnector } from "./DraftPickConnector";
 
 function PickLogo({
   pick,
@@ -140,7 +141,7 @@ export function DraftPickRail({
               key={pick.pick.id}
               data-pick-id={pick.pick.id}
               className={cn(
-                "border border-slate-300",
+                "relative border border-slate-300",
                 compact ? "px-1 py-0.5" : "px-3 py-2",
                 recent
                   ? "border-l-[3px] border-l-emerald-600 bg-slate-100"
@@ -148,6 +149,9 @@ export function DraftPickRail({
                 index === 0 && "bg-slate-50",
               )}
             >
+              {index > 0 ? (
+                <DraftPickConnector recent={recent} />
+              ) : null}
               <p
                 className={cn(
                   "flex justify-between text-[0.65em] text-slate-600",

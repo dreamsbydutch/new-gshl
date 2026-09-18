@@ -21,6 +21,7 @@ import type {
   DraftHubPickView,
 } from "@gshl-types";
 import { DraftPlayerTable } from "./DraftPlayerTable";
+import { DraftPickConnector } from "./DraftPickConnector";
 
 function formatClock(totalSeconds: number): string {
   const minutes = Math.floor(totalSeconds / 60);
@@ -203,15 +204,21 @@ function DraftPickFlow({
           {recentPicks.length ? (
             <div className="space-y-1 sm:space-y-2">
               {recentPicks.map((pick, index) => (
-                <DraftFlowPick
-                  key={pick.pick.id}
-                  pick={pick}
-                  isRecent={true}
-                  isUndoing={isUndoing}
-                  onUndo={
-                    canUndoLastPick && index === 0 ? onUndoLastPick : undefined
-                  }
-                />
+                <div key={pick.pick.id} className="relative">
+                  {index > 0 ? (
+                    <DraftPickConnector recent />
+                  ) : null}
+                  <DraftFlowPick
+                    pick={pick}
+                    isRecent={true}
+                    isUndoing={isUndoing}
+                    onUndo={
+                      canUndoLastPick && index === 0
+                        ? onUndoLastPick
+                        : undefined
+                    }
+                  />
+                </div>
               ))}
             </div>
           ) : (
@@ -227,13 +234,19 @@ function DraftPickFlow({
           </h2>
           {upcomingPicks.length ? (
             <div className="space-y-1 sm:space-y-2">
-              {upcomingPicks.map((pick) => (
-                <DraftFlowPick
-                  key={pick.pick.id}
-                  pick={pick}
-                  isRecent={false}
-                  mockProjection={mockProjectionByPickId[String(pick.pick.id)]}
-                />
+              {upcomingPicks.map((pick, index) => (
+                <div key={pick.pick.id} className="relative">
+                  {index > 0 ? (
+                    <DraftPickConnector recent={false} />
+                  ) : null}
+                  <DraftFlowPick
+                    pick={pick}
+                    isRecent={false}
+                    mockProjection={
+                      mockProjectionByPickId[String(pick.pick.id)]
+                    }
+                  />
+                </div>
               ))}
             </div>
           ) : (
