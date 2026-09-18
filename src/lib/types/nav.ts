@@ -26,6 +26,7 @@ export type LockerRoomNavigationView =
   | "history"
   | "trophy"
   | "recordbook"
+  | "tradeBlock"
   | "draft";
 
 export type LeagueOfficeNavigationView =

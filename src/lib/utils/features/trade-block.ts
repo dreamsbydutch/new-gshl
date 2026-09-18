@@ -10,3 +10,24 @@ export function normalizeTradeBlockNote(value: string | null | undefined) {
   }
   return note || undefined;
 }
+
+/** Separates the selected owner's listings from the league without granting edit access. */
+export function getTradeBlockPerspective<T extends { ownerId: string }>(
+  listings: readonly T[],
+  selectedOwnerId: string,
+  viewerOwnerId: string | null | undefined,
+  canManage: boolean,
+) {
+  return {
+    teamListings: listings.filter(
+      (listing) => listing.ownerId === selectedOwnerId,
+    ),
+    leagueListings: listings.filter(
+      (listing) => listing.ownerId !== selectedOwnerId,
+    ),
+    canManageTeam:
+      canManage &&
+      Boolean(selectedOwnerId) &&
+      selectedOwnerId === viewerOwnerId,
+  };
+}

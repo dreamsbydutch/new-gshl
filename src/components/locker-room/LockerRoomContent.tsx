@@ -91,6 +91,18 @@ const InteractiveContractTable = dynamic(
   { loading: () => <CapLabSkeleton /> },
 );
 
+const TradeBlock = dynamic(
+  () =>
+    import("@gshl-components/team/TradeBlock").then(
+      (module) => module.TradeBlock,
+    ),
+  {
+    loading: () => (
+      <p className="py-3 text-xs text-slate-500">Loading trade block...</p>
+    ),
+  },
+);
+
 const SHOW_LOCKER_ROOM_ROSTER_SALARIES = true;
 
 export function LockerRoomContent() {
@@ -361,6 +373,9 @@ export function LockerRoomContent() {
             <FranchiseContractHistory {...teamContractHistory} />
           </div>
         </>
+      )}
+      {selectedLockerRoomType === "tradeBlock" && (
+        <TradeBlock key={currentTeam.ownerId} currentTeam={currentTeam} />
       )}
       {selectedLockerRoomType === "roster" && (
         <TeamRoster

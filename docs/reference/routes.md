@@ -6,25 +6,25 @@ This reference follows active App Router files under `src/app`. “Public” mea
 
 ## Page routes
 
-| Route                      | Access                   | Active entry                                  | Purpose                                                                                                                                             |
-| -------------------------- | ------------------------ | --------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `/`                        | Public                   | `HomeContent`                                 | Compact season-aware previews for Press Box, UFA, rankings, activity, and draft/offseason destinations.                                             |
-| `/signin`                  | Public                   | `SignInContent`                               | Google sign-in and safe callback redirect. Active sessions redirect to the requested internal path or `/lockerroom`.                                |
-| `/schedule`                | Public                   | `ScheduleContent` in `ScheduleLayout`         | Weekly or selected-team schedule with URL-addressable global season context plus page-level week/team controls.                                     |
-| `/standings`               | Public                   | `StandingsContent` in `StandingsLayout`       | URL-addressable standings plus responsive power-ranking, playoff, and award views.                                                                  |
-| `/matchup/[matchupId]`     | Public                   | `MatchupPageContent`                          | Matchup summary plus responsive category and player-performance detail; source and selected team live in the URL.                                   |
-| `/headlines`               | Public                   | `HeadlinesArchiveContent`                     | Archive of published Press Box editions.                                                                                                            |
-| `/headlines/[editionId]`   | Public                   | `WeeklyEditionPageContent`                    | One published edition; hidden or unknown IDs render an inline unavailable state.                                                                    |
-| `/rulebook`                | Public                   | `Rulebook`                                    | Searchable, navigable, printable official league rules.                                                                                             |
-| `/rules`                   | Public alias             | Server redirect                               | Redirects to `/rulebook`.                                                                                                                           |
-| `/lockerroom`              | Active user              | `LockerRoomContent` in `LockerRoomLayout`     | URL-selected team's roster, cap, matchups, trophies, records, with independent matchup-year and draft-pick season filters.                          |
-| `/leagueoffice`            | Active user              | `LeagueOfficeContent` in `LeagueOfficeLayout` | URL-addressable draft classes, trade block, league reference views, and role-gated commissioner panels; invalid or fresh state opens Draft Classes. |
-| `/leagueoffice/mock-draft` | Active user              | `LeagueOfficeMockDraft`                       | Mock draft for the upcoming season during a resolvable offseason window.                                                                            |
-| `/draft`                   | Active user              | `DraftHubBoard` in `DraftHubLayout`           | Transactional live draft board with responsive player decision cards and a comprehensive large-screen table.                                        |
-| `/draft/my-team`           | Active user              | `DraftHubTeamPage`                            | Draft-season salary, roster, and picks for the session's linked owner.                                                                              |
-| `/draft/teams`             | Active user              | `DraftHubTeamPage`                            | Equivalent view for another owner selected through the `owner` query parameter.                                                                     |
-| `/draftboard`              | Active user legacy alias | Server redirect                               | Authenticates, then redirects to `/draft`.                                                                                                          |
-| `/draft-roster-board`      | Public, `noindex`        | `DraftRosterBoard`                            | Shell-free large-screen conference roster and best-available display.                                                                               |
+| Route                      | Access                   | Active entry                                  | Purpose                                                                                                                                 |
+| -------------------------- | ------------------------ | --------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `/`                        | Public                   | `HomeContent`                                 | Compact season-aware previews for Press Box, UFA, rankings, activity, and draft/offseason destinations.                                 |
+| `/signin`                  | Public                   | `SignInContent`                               | Google sign-in and safe callback redirect. Active sessions redirect to the requested internal path or `/lockerroom`.                    |
+| `/schedule`                | Public                   | `ScheduleContent` in `ScheduleLayout`         | Weekly or selected-team schedule with URL-addressable global season context plus page-level week/team controls.                         |
+| `/standings`               | Public                   | `StandingsContent` in `StandingsLayout`       | URL-addressable standings plus responsive power-ranking, playoff, and award views.                                                      |
+| `/matchup/[matchupId]`     | Public                   | `MatchupPageContent`                          | Matchup summary plus responsive category and player-performance detail; source and selected team live in the URL.                       |
+| `/headlines`               | Public                   | `HeadlinesArchiveContent`                     | Archive of published Press Box editions.                                                                                                |
+| `/headlines/[editionId]`   | Public                   | `WeeklyEditionPageContent`                    | One published edition; hidden or unknown IDs render an inline unavailable state.                                                        |
+| `/rulebook`                | Public                   | `Rulebook`                                    | Searchable, navigable, printable official league rules.                                                                                 |
+| `/rules`                   | Public alias             | Server redirect                               | Redirects to `/rulebook`.                                                                                                               |
+| `/lockerroom`              | Active user              | `LockerRoomContent` in `LockerRoomLayout`     | URL-selected team's roster, cap, trade block, matchups, trophies, records, with independent matchup-year and draft-pick season filters. |
+| `/leagueoffice`            | Active user              | `LeagueOfficeContent` in `LeagueOfficeLayout` | URL-addressable draft classes, league reference views, and role-gated commissioner panels; invalid or fresh state opens Draft Classes.  |
+| `/leagueoffice/mock-draft` | Active user              | `LeagueOfficeMockDraft`                       | Mock draft for the upcoming season during a resolvable offseason window.                                                                |
+| `/draft`                   | Active user              | `DraftHubBoard` in `DraftHubLayout`           | Transactional live draft board with responsive player decision cards and a comprehensive large-screen table.                            |
+| `/draft/my-team`           | Active user              | `DraftHubTeamPage`                            | Draft-season salary, roster, and picks for the session's linked owner.                                                                  |
+| `/draft/teams`             | Active user              | `DraftHubTeamPage`                            | Equivalent view for another owner selected through the `owner` query parameter.                                                         |
+| `/draftboard`              | Active user legacy alias | Server redirect                               | Authenticates, then redirects to `/draft`.                                                                                              |
+| `/draft-roster-board`      | Public, `noindex`        | `DraftRosterBoard`                            | Shell-free large-screen conference roster and best-available display.                                                                   |
 
 `src/app/not-found.tsx` supplies the global App Router not-found page. Dynamic matchup and edition screens currently render their own missing-data states instead of calling `notFound()`.
 
@@ -79,7 +79,7 @@ When names overlap, follow these traces before editing:
   → useUfaOverview / useSubmitUfaOffer
   → convex/ufa.ts
 
-/leagueoffice?view=tradeBlock
+/lockerroom?view=tradeBlock
   → TradeBlock
   → useTradeBlockMarket
   → convex/tradeBlock.ts
@@ -96,3 +96,7 @@ When names overlap, follow these traces before editing:
 
 - `/draft-roster-board` is public in current route code but carries `noindex` metadata. Confirm the intended audience before adding data.
 - Middleware and server page guards overlap on some routes and differ on `/draft`; this is current implementation, not a recommendation to duplicate every guard.
+
+Legacy `/leagueoffice?view=tradeBlock` links redirect to My Team. The selected
+owner controls which listings appear first; only the signed-in owner's team
+shows listing controls. Other teams and inactive owners remain read-only.

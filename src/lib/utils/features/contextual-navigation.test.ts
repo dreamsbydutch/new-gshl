@@ -12,6 +12,7 @@ import {
   buildStandingsNavigationHref,
   getLeagueOfficeNavigationViews,
   isGlobalSeasonUrlPath,
+  isLockerRoomNavigationView,
   resolveContextualSelection,
   resolveMatchupBackHref,
   resolveMatchupNavigationSide,
@@ -217,4 +218,19 @@ void test("only Schedule and Standings share historical season selection", () =>
       null,
     );
   }
+});
+
+void test("trade block is a My Team view and old League Office links resolve there", () => {
+  assert.equal(isLockerRoomNavigationView("tradeBlock"), true);
+  assert.equal(
+    buildLockerRoomNavigationHref("", { view: "tradeBlock", owner: "owner-a" }),
+    "/lockerroom?view=tradeBlock&owner=owner-a",
+  );
+  assert.equal(
+    buildLeagueOfficeNavigationHref(
+      "?view=tradeBlock&owner=owner-a&season=old",
+      { view: "tradeBlock" },
+    ),
+    "/lockerroom?view=tradeBlock&owner=owner-a",
+  );
 });

@@ -657,6 +657,13 @@ export function useLeagueOfficeContextNavigation() {
       if (persistedView !== "mockDraft") setView("mockDraft");
       return;
     }
+    if (view === "tradeBlock") {
+      setView("draft");
+      navigation.replace(
+        buildLeagueOfficeNavigationHref(navigation.search, { view }),
+      );
+      return;
+    }
     if (persistedView !== view) setView(view);
     const canonicalHref = buildLeagueOfficeNavigationHref(navigation.search, {
       view,

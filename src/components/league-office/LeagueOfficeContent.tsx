@@ -30,10 +30,6 @@ const DraftClasses = dynamic(
   () => import("./DraftClasses").then((module) => module.DraftClasses),
   { loading: () => <DraftClassesSkeleton /> },
 );
-const TradeBlock = dynamic(
-  () => import("./TradeBlock").then((module) => module.TradeBlock),
-  { loading: () => <AdminPanelSkeleton /> },
-);
 const UserManagement = dynamic(
   () =>
     import("@gshl-components/auth/UserManagement").then(
@@ -75,8 +71,7 @@ export function LeagueOfficeContent() {
   const { selectedType } = useLeagueOfficeNavigation();
   const { session } = useAuthSession();
   const activeType = resolveLeagueOfficeView(selectedType, session?.user.role);
-  const usesCompactLayout =
-    activeType === "draft" || activeType === "tradeBlock";
+  const usesCompactLayout = activeType === "draft";
 
   return (
     <div
@@ -87,7 +82,6 @@ export function LeagueOfficeContent() {
     >
       {activeType === "rules" ? <Rulebook /> : null}
       {activeType === "draft" ? <DraftClasses /> : null}
-      {activeType === "tradeBlock" ? <TradeBlock /> : null}
       {activeType === "confBattle" ? <ConferenceContest /> : null}
       {activeType === "ownerRankings" ? <OwnerRankings /> : null}
       {activeType === "freeAgents" ? <UfaLeagueOffice /> : null}

@@ -8,6 +8,7 @@ import { cn } from "@gshl-utils";
 const sections = [
   ["roster", "Roster"],
   ["salary", "Cap"],
+  ["tradeBlock", "Trades"],
   ["history", "Matchups"],
   ["trophy", "Trophies"],
   ["recordbook", "Records"],
@@ -28,7 +29,7 @@ export function LockerRoomLayout({ children }: { children: React.ReactNode }) {
               aria-pressed={navigation.selectedView === key}
               onClick={() => navigation.selectView(key)}
               className={cn(
-                "min-h-9 min-w-0 flex-1 border-t-2 px-1 text-[11px] font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-slate-500 sm:text-xs lg:border-b-2 lg:border-t-0 lg:text-sm",
+                "min-h-9 min-w-0 flex-1 border-t-2 px-0.5 text-[10px] font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-slate-500 sm:text-xs lg:border-b-2 lg:border-t-0 lg:text-sm",
                 navigation.selectedView === key
                   ? "border-slate-950 text-slate-950"
                   : "border-transparent text-slate-500 hover:bg-slate-50 hover:text-slate-950",

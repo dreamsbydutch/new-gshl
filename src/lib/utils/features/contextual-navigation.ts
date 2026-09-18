@@ -32,6 +32,7 @@ export const LOCKER_ROOM_NAVIGATION_VIEWS = [
   "history",
   "trophy",
   "recordbook",
+  "tradeBlock",
   "draft",
 ] as const;
 
@@ -228,6 +229,13 @@ export function buildLeagueOfficeNavigationHref(
   currentSearch: string | URLSearchParams,
   context: LeagueOfficeNavigationContext,
 ): string {
+  // Preserve old bookmarks and persisted League Office selections.
+  if (context.view === "tradeBlock") {
+    return buildLockerRoomNavigationHref(currentSearch, {
+      view: "tradeBlock",
+      owner: readContextualNavigationQuery(currentSearch).owner,
+    });
+  }
   return buildContextualNavigationHref("/leagueoffice", currentSearch, {
     view: context.view,
     season: context.season ?? null,

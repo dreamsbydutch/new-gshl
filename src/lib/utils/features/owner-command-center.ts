@@ -322,7 +322,10 @@ function buildActivity(data: OwnerCommandCenterData) {
       title: `${item.teamName} listed ${item.playerName}`,
       detail: "New trade lead",
       occurredAt: item.occurredAt,
-      href: "/leagueoffice?view=tradeBlock",
+      href: buildLockerRoomNavigationHref("", {
+        view: "tradeBlock",
+        owner: data.ownerId,
+      }),
     }),
   );
   return tradeItems.sort((left, right) =>
@@ -371,8 +374,15 @@ export function buildOwnerCommandCenterView(data: OwnerCommandCenterData) {
     listedPlayers: data.listedPlayers,
     activity: buildActivity(data),
     actions: {
-      exploreTrade: "/leagueoffice?view=tradeBlock",
-      listPlayer: "/leagueoffice?view=tradeBlock#manage-trade-block-heading",
+      exploreTrade: buildLockerRoomNavigationHref("", {
+        view: "tradeBlock",
+        owner: data.ownerId,
+      }),
+      listPlayer:
+        buildLockerRoomNavigationHref("", {
+          view: "tradeBlock",
+          owner: data.ownerId,
+        }) + "#manage-trade-block-heading",
       reviewOffer: "/leagueoffice?view=freeAgents",
       viewRoster: buildLockerRoomNavigationHref("", {
         view: "roster",

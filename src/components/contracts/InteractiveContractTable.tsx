@@ -2,21 +2,13 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { KeyboardEvent } from "react";
+import Link from "next/link";
 import { RotateCcw } from "lucide-react";
 
-import {
-  useInteractiveContractTable,
-  useToast,
-  useTradeBlockMarket,
-} from "@gshl-hooks";
+import { useInteractiveContractTable, useTradeBlockMarket } from "@gshl-hooks";
 import { Button, Input, Select } from "@gshl-ui";
 import type { InteractiveContractTableProps, Player } from "@gshl-types";
-import {
-  cn,
-  formatMoney,
-  groupContractsByPlayer,
-  isPlayingContract,
-} from "@gshl-utils";
+import { cn, formatMoney, buildLockerRoomNavigationHref } from "@gshl-utils";
 import { TeamContractTable } from "./ContractTable";
 
 const CONTRACT_LENGTHS = [1, 2, 3] as const;
@@ -37,7 +29,6 @@ export function InteractiveContractTable({
   const [isPickerOpen, setIsPickerOpen] = useState(false);
   const [highlightedPlayerIndex, setHighlightedPlayerIndex] = useState(0);
   const playerOptionsRef = useRef<HTMLDivElement>(null);
-  const { toast } = useToast();
   const tradeBlock = useTradeBlockMarket(ready);
   const interactive = useInteractiveContractTable({
     currentSeason,
@@ -64,24 +55,6 @@ export function InteractiveContractTable({
       ),
     [tradeBlock.data?.listings],
   );
-  const ownListingByPlayerId = useMemo(
-    () =>
-      new Map(
-        (tradeBlock.data?.listings ?? [])
-          .filter(
-            (listing) =>
-              listing.ownerId === String(tradeBlock.data?.viewerOwnerId ?? ""),
-          )
-          .map((listing) => [listing.playerId, listing] as const),
-      ),
-    [tradeBlock.data?.listings, tradeBlock.data?.viewerOwnerId],
-  );
-  const canManageTradeBlock =
-    Boolean(tradeBlock.data?.canManage) &&
-    Boolean(currentTeam.ownerId) &&
-    String(tradeBlock.data?.viewerOwnerId ?? "") ===
-      String(currentTeam.ownerId);
-
   const filteredPlayers = useMemo(() => {
     const search = playerSearch.trim().toLocaleLowerCase();
     return interactive.availablePlayers
@@ -112,13 +85,6 @@ export function InteractiveContractTable({
   const resolvedHighlightedPlayerIndex = filteredPlayers.length
     ? Math.min(highlightedPlayerIndex, filteredPlayers.length - 1)
     : -1;
-  const baselineRosterGroups = useMemo(
-    () =>
-      groupContractsByPlayer(existingContracts).filter((contracts) =>
-        contracts.some(isPlayingContract),
-      ),
-    [existingContracts],
-  );
   const isOverCap = interactive.capImpact.some((entry) => entry.after < 0);
 
   useEffect(() => {
@@ -162,35 +128,6 @@ export function InteractiveContractTable({
         event.preventDefault();
         choosePlayer(String(selectedPlayer.player.id));
       }
-    }
-  };
-
-  const toggleTradeBlock = async (playerId: string) => {
-    const listing = ownListingByPlayerId.get(playerId);
-    const player = playerById.get(playerId);
-    try {
-      if (listing?.listingId) {
-        await tradeBlock.remove.mutateAsync({ listingId: listing.listingId });
-        toast({
-          title: "Removed from trade block",
-          description: player?.fullName,
-        });
-      } else {
-        await tradeBlock.save.mutateAsync({ playerId });
-        toast({
-          title: "Added to trade block",
-          description:
-            (player?.fullName ?? "Player") +
-            " is now visible in League Office.",
-        });
-      }
-    } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "Trade block was not updated",
-        description:
-          error instanceof Error ? error.message : "Please try again.",
-      });
     }
   };
 
@@ -386,43 +323,15 @@ export function InteractiveContractTable({
           ]),
         )}
       />
-      {canManageTradeBlock ? (
-        <details className="mt-4 border-t border-slate-200 pt-2">
-          <summary className="cursor-pointer py-2 text-xs font-medium text-slate-600">
-            Manage trade block
-          </summary>
-          <p className="mb-2 text-xs text-slate-500">
-            These listings are visible to the league.
-          </p>
-          <ul className="divide-y divide-slate-100">
-            {baselineRosterGroups.map((contracts) => {
-              const playerId = String(contracts[0]?.playerId ?? "");
-              const player = playerById.get(playerId);
-              const listing = ownListingByPlayerId.get(playerId);
-              return (
-                <li
-                  key={playerId}
-                  className="flex items-center justify-between gap-2 py-1 text-xs"
-                >
-                  <span>{player?.fullName ?? "Unknown player"}</span>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => toggleTradeBlock(playerId)}
-                    disabled={
-                      tradeBlock.save.isPending || tradeBlock.remove.isPending
-                    }
-                    aria-label={`${listing ? "Remove" : "List"} ${player?.fullName ?? "player"} ${listing ? "from" : "on"} trade block`}
-                  >
-                    {listing ? "Unlist" : "List"}
-                  </Button>
-                </li>
-              );
-            })}
-          </ul>
-        </details>
-      ) : null}
+      <Link
+        href={buildLockerRoomNavigationHref("", {
+          view: "tradeBlock",
+          owner: currentTeam.ownerId,
+        })}
+        className="mt-3 inline-flex min-h-9 items-center text-xs text-slate-600 underline underline-offset-4"
+      >
+        View and manage trade block
+      </Link>
     </section>
   );
 }

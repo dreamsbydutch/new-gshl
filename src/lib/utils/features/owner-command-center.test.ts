@@ -270,6 +270,16 @@ void test("owner command center combines roster, cap, schedule, picks, and decis
   assert.match(view.matchup.latest?.href ?? "", /matchup\/matchup-last/);
   assert.match(view.matchup.upcoming[0]?.href ?? "", /matchup\/matchup-next/);
   assert.match(view.matchup.upcoming[0]?.href ?? "", /from=lockerroom/);
+  assert.equal(
+    view.actions.exploreTrade,
+    "/lockerroom?view=tradeBlock&owner=" + data.ownerId,
+  );
+  assert.equal(
+    view.actions.listPlayer,
+    "/lockerroom?view=tradeBlock&owner=" +
+      data.ownerId +
+      "#manage-trade-block-heading",
+  );
   assert.match(view.actions.viewRoster, /view=roster/);
   assert.match(view.actions.viewDraftPicks, /view=draft/);
   assert.equal(view.draft.count, 2);
