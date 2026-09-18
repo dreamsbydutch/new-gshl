@@ -25,12 +25,10 @@ export function DraftLiveTvBoard() {
   const nhlTeams = new Map(
     roster.nhlTeams.map((team) => [team.abbr.trim().toUpperCase(), team]),
   );
-  const recentPicks = upcoming ? [] : draft.recentPicks.slice(0, 5);
+  const recentPicks = upcoming ? [] : draft.recentPicks;
   const upcomingPicks = complete
     ? []
-    : draft.upcomingPicks
-        .filter((entry) => entry.pick.id !== pick?.pick.id)
-        .slice(0, 5);
+    : draft.upcomingPicks.filter((entry) => entry.pick.id !== pick?.pick.id);
   return (
     <main className="flex h-dvh min-h-[500px] flex-col overflow-hidden bg-slate-200 p-3 text-[length:clamp(16px,1.25vw,48px)] leading-tight text-slate-950">
       <nav
@@ -52,7 +50,7 @@ export function DraftLiveTvBoard() {
         <>
           <DraftLiveHeader draft={draft} />
           <div className="grid min-h-0 flex-1 grid-cols-[1fr_1.65fr_1fr] gap-3">
-            <DraftPickRail picks={recentPicks} recent />
+            <DraftPickRail picks={recentPicks} recent fillHeight />
             <section
               aria-label="On-clock team roster"
               className="flex min-h-0 min-w-0 flex-col"
@@ -87,7 +85,7 @@ export function DraftLiveTvBoard() {
                 </div>
               )}
             </section>
-            <DraftPickRail picks={upcomingPicks} recent={false} />
+            <DraftPickRail picks={upcomingPicks} recent={false} fillHeight />
           </div>
         </>
       )}

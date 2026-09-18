@@ -63,6 +63,7 @@ export function useDraftLiveTvBoard() {
     picksQuery.data,
     season?.draftStartAt,
     new Date(now),
+    Number.POSITIVE_INFINITY,
   );
   const secondsUntil = (time: number | null) =>
     time === null ? 0 : Math.max(0, Math.ceil((time - now) / 1000));

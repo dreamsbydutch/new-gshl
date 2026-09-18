@@ -9,14 +9,15 @@ import puppeteer from "puppeteer-core";
 const fixture = `
 const names = ["Auston Matthews", "Martin Necas", "Ryan Nugent-Hopkins", "James van Riemsdyk", "Alex DeBrincat"];
 const positions = ["LW","C","RW","LW","C","RW","D","D","D","D","G","UTIL","BN","BN","BN"];
+const nhlPositions = ["LW","C","RW","LW","C","RW","D","D","D","D","G","C","LW","RW","D"];
 const teams = Array.from({length:14},(_,i)=>({id:String(i),ownerId:String(i),franchiseId:String(i),name:"Toronto Maple Reg's " + (i+1),abbr:"TOR",talentRating:89.75,logoUrl:null}));
-const player = (i,ownerId="available")=>({id:ownerId+"-"+i,ownerId,fullName:names[i%names.length],nhlTeam:"TOR",nhlPos:["C","LW","RW"],posGroup:i%15===10?"G":"F",lineupPos:positions[i%15],overallRating:99.99,seasonRating:99.99,overallRk:i+1,seasonRk:i+1,stats:{GP:82,G:65,A:105,P:170,PM:35,PIM:120,PPP:55,SOG:345,HIT:210,BLK:150,W:45,GAA:2.35,SVP:0.925}});
+const player = (i,ownerId="available")=>({id:ownerId+"-"+i,ownerId,fullName:names[i%names.length],nhlTeam:"TOR",nhlPos:[nhlPositions[i%nhlPositions.length]],posGroup:i%15===10?"G":"F",lineupPos:positions[i%15],overallRating:99.99,seasonRating:99.99,overallRk:i+1,seasonRk:i+1,stats:{GP:82,G:65,A:105,P:170,PM:35,PIM:120,PPP:55,SOG:345,HIT:210,BLK:150,W:45,GAA:2.35,SVP:0.925}});
 const players=teams.flatMap(team=>Array.from({length:15},(_,i)=>player(i,team.ownerId)));
 const available=Array.from({length:50},(_,i)=>({...player(i),posGroup:i<35?"F":"G"}));
 const pick=(i)=>({pick:{id:String(i),round:2,pick:i},team:{...teams[i%14],id:"draft-season-"+teams[i%14].id},player:player(i)});
 export function useDraftRosterBoard(){return {season:{name:"2026-27",year:2027},nhlTeams:[],players,remainingPicksByFranchise:new Map(teams.map(team=>[team.franchiseId,Array.from({length:15-(window.tvStep??0)},(_,i)=>({id:team.id+"-pick-"+i,round:String(i+1),pick:String(i*14+Number(team.id)+1)}))])),availablePlayers:available,isLoading:window.tvState==="loading",conferences:[{id:"a",name:"Hickory Hotel",teams:teams.slice(0,7)},{id:"b",name:"Sunview",teams:teams.slice(7)}]};}
 export function useOwnerRankingsData(){return {isLoading:window.tvState==="loading",data:{rankings:Array.from({length:20},(_,i)=>({owner:{id:i<14?teams[i].ownerId:"inactive-"+i},rank:i+1,displayName:i<14?"Alexander Owner "+(i+1):"Retired Owner "+(i-13),rating:1800-i*23,cups:i%4,primaryTeam:null,seasonsPlayed:12,playoffAppearances:8,finalsAppearances:3,overallRecord:{wins:150,losses:125,ties:3,winPercentage:0.545}}))}};}
-export function useDraftLiveTvBoard(){const cursor=30+(window.tvStep??0); return {season:{name:"2026-27",draftStartAt:"2026-09-25T20:00:00Z"},state:{status:window.tvState,completedCount:cursor-1,remainingCount:90-cursor},activePick:pick(cursor),clockRemainingSeconds:125,draftStartRemainingSeconds:90061,isLoading:window.tvState==="loading",recentPicks:Array.from({length:5},(_,i)=>pick(cursor-i-1)),upcomingPicks:Array.from({length:5},(_,i)=>pick(cursor+i+1))};}
+export function useDraftLiveTvBoard(){const cursor=30+(window.tvStep??0); return {season:{name:"2026-27",draftStartAt:"2026-09-25T20:00:00Z"},state:{status:window.tvState,completedCount:cursor-1,remainingCount:90-cursor},activePick:pick(cursor),clockRemainingSeconds:125,draftStartRemainingSeconds:90061,isLoading:window.tvState==="loading",recentPicks:Array.from({length:20},(_,i)=>pick(cursor-i-1)),upcomingPicks:Array.from({length:20},(_,i)=>pick(cursor+i+1))};}
 `;
 const compiled = await build({
   stdin: {
@@ -83,7 +84,7 @@ try {
       const result = await page.evaluate(() => {
         const panels = [
           ...document.querySelectorAll(
-            'article,aside,[data-tv-fit],section[aria-label="Top 26 skaters"],section[aria-label="Top 8 goalies"],section[aria-label="Recent and upcoming picks"]',
+            'article,aside,[data-tv-fit],section[aria-label$="skaters"],section[aria-label$="goalies"],section[aria-label="Recent and upcoming picks"]',
           ),
         ];
         return {
@@ -132,10 +133,69 @@ try {
             ),
           ].map((node) => node.dataset.pickId),
           clock: document.querySelector('[role="timer"]')?.textContent,
+          fit: [...document.querySelectorAll('[aria-label$="picks"]')].map(
+            (panel) => {
+              const rows = [...panel.querySelectorAll("li")];
+              const last = rows.at(-1)?.getBoundingClientRect();
+              const previous = rows.at(-2)?.getBoundingClientRect();
+              const panelBounds = panel.getBoundingClientRect();
+              const gap = last && previous ? last.top - previous.bottom : 0;
+              return {
+                unused: last ? panelBounds.bottom - last.bottom : 0,
+                nextRow: last ? last.height + gap : Number.POSITIVE_INFINITY,
+              };
+            },
+          ),
         }));
-        assert.deepEqual(rails.left, ["29", "28", "27", "26", "25"]);
-        assert.deepEqual(rails.right, ["31", "32", "33", "34", "35"]);
+        assert.ok(rails.left.length >= 5);
+        assert.ok(rails.right.length >= 5);
+        assert.deepEqual(
+          rails.left,
+          Array.from({ length: rails.left.length }, (_, index) =>
+            String(29 - index),
+          ),
+        );
+        assert.deepEqual(
+          rails.right,
+          Array.from({ length: rails.right.length }, (_, index) =>
+            String(31 + index),
+          ),
+        );
         assert.equal(rails.clock, "02:05");
+        assert.ok(
+          rails.fit.every(({ unused, nextRow }) => unused < nextRow + 3),
+        );
+      }
+      if (view === "available") {
+        const available = await page.evaluate(() => {
+          const skaters = document.querySelector(
+            'section[aria-label$="skaters"]',
+          );
+          const skaterRows = skaters?.querySelectorAll("tbody tr") ?? [];
+          const lastSkater = skaterRows[skaterRows.length - 1];
+          const goalieRows = document.querySelectorAll(
+            'section[aria-label$="goalies"] tbody tr',
+          );
+          const positionRows = document.querySelectorAll(
+            '[aria-label="Team position counts"] tbody tr',
+          );
+          const lastBounds = lastSkater?.getBoundingClientRect();
+          const panelBounds = skaters?.getBoundingClientRect();
+          return {
+            skaters: skaterRows.length,
+            goalies: goalieRows.length,
+            teams: positionRows.length,
+            unusedHeight:
+              lastBounds && panelBounds
+                ? Math.round(panelBounds.bottom - lastBounds.bottom)
+                : null,
+            rowHeight: lastBounds ? Math.round(lastBounds.height) : null,
+          };
+        });
+        assert.ok(available.skaters >= 20);
+        assert.equal(available.goalies, 10);
+        assert.equal(available.teams, 14);
+        assert.ok(available.unusedHeight <= available.rowHeight + 3);
       }
       if (view === "overview") {
         assert.equal(result.panels, 15);
@@ -269,8 +329,20 @@ try {
       ),
     ].map((node) => node.dataset.pickId),
   }));
-  assert.deepEqual(shifted.left, ["30", "29", "28", "27", "26"]);
-  assert.deepEqual(shifted.right, ["32", "33", "34", "35", "36"]);
+  assert.ok(shifted.left.length >= 5);
+  assert.ok(shifted.right.length >= 5);
+  assert.deepEqual(
+    shifted.left,
+    Array.from({ length: shifted.left.length }, (_, index) =>
+      String(30 - index),
+    ),
+  );
+  assert.deepEqual(
+    shifted.right,
+    Array.from({ length: shifted.right.length }, (_, index) =>
+      String(32 + index),
+    ),
+  );
   assert.equal(
     await page.evaluate(() =>
       document

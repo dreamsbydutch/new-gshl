@@ -1,4 +1,5 @@
 "use client";
+import { useLayoutEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { ArrowDown, ArrowUp } from "lucide-react";
 import type { useDraftLiveTvBoard } from "@gshl-hooks";
@@ -43,21 +44,72 @@ export function DraftPickRail({
   picks,
   recent,
   compact = false,
+  fillHeight = false,
 }: {
   picks: DraftHubPickView[];
   recent: boolean;
   compact?: boolean;
+  fillHeight?: boolean;
 }) {
   const { panelRef, contentRef } = useDraftBoardFit();
+  const capacityPanelRef = useRef<HTMLElement>(null);
+  const [rowCapacity, setRowCapacity] = useState(5);
   const { listRef } = useDraftPickFlowMotion(recent);
+  const visiblePicks = fillHeight ? picks.slice(0, rowCapacity) : picks;
+
+  useLayoutEffect(() => {
+    if (!fillHeight) return;
+    const panel = capacityPanelRef.current;
+    if (!panel || !picks.length) return;
+
+    const measure = () => {
+      const list = panel.querySelector("ol");
+      const rows = list ? [...list.querySelectorAll("li")] : [];
+      const rowHeight = Math.max(
+        1,
+        ...rows.map((row) => row.getBoundingClientRect().height),
+      );
+      const firstRow = rows[0];
+      const secondRow = rows[1];
+      const gap =
+        firstRow && secondRow
+          ? Math.max(
+              0,
+              secondRow.getBoundingClientRect().top -
+                firstRow.getBoundingClientRect().bottom,
+            )
+          : 0;
+      const availableHeight =
+        panel.clientHeight -
+        (list
+          ? list.getBoundingClientRect().top - panel.getBoundingClientRect().top
+          : 0);
+      const nextCapacity = Math.max(
+        1,
+        Math.min(
+          picks.length,
+          Math.floor((availableHeight + gap - 2) / (rowHeight + gap)),
+        ),
+      );
+      setRowCapacity((current) =>
+        current === nextCapacity ? current : nextCapacity,
+      );
+    };
+
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(panel);
+    return () => observer.disconnect();
+  }, [fillHeight, picks.length, rowCapacity]);
+
   return (
     <section
-      ref={panelRef}
+      ref={fillHeight ? capacityPanelRef : panelRef}
       data-tv-fit
       aria-label={recent ? "Recent picks" : "Upcoming picks"}
       className="min-h-0 min-w-0 overflow-hidden"
     >
-      <div ref={contentRef} className="w-full">
+      <div ref={fillHeight ? undefined : contentRef} className="w-full">
         <h2
           className={cn(
             "flex items-center justify-center gap-2 border-b-2 text-[0.75em] font-semibold uppercase tracking-wider",
@@ -83,7 +135,7 @@ export function DraftPickRail({
           ref={listRef}
           className={cn("relative", compact ? "space-y-1" : "space-y-2")}
         >
-          {picks.map((pick, index) => (
+          {visiblePicks.map((pick, index) => (
             <li
               key={pick.pick.id}
               data-pick-id={pick.pick.id}

@@ -277,6 +277,30 @@ void test("selects the first unfilled pick and skips completed picks", () => {
   );
 });
 
+void test("can return the full live draft pick window for TV displays", () => {
+  const state = resolveDraftClockState(
+    Array.from({ length: 12 }, (_, index) =>
+      pick(
+        String(index + 1),
+        index + 1,
+        index < 6 ? `player-${index + 1}` : null,
+      ),
+    ),
+    start,
+    new Date("2026-09-01T23:02:00.000Z"),
+    Number.POSITIVE_INFINITY,
+  );
+
+  assert.deepEqual(
+    state.recentPicks.map((draftPick) => draftPick.id),
+    ["6", "5", "4", "3", "2", "1"],
+  );
+  assert.deepEqual(
+    state.upcomingPicks.map((draftPick) => draftPick.id),
+    ["8", "9", "10", "11", "12"],
+  );
+});
+
 void test("finds only the latest completed live selection for commissioner undo", () => {
   const latest = findLatestCompletedLiveDraftPick([
     pick("4", 4, "signing-player", { isSigning: true }),

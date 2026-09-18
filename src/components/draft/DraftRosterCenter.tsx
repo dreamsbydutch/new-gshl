@@ -22,11 +22,11 @@ function CenterLiveDraft() {
     >
       <DraftLiveHeader draft={draft} compact />
       <div className="grid min-h-0 flex-1 grid-cols-2 gap-2">
-        <DraftPickRail picks={draft.recentPicks} recent compact />
+        <DraftPickRail picks={draft.recentPicks.slice(0, 5)} recent compact />
         <DraftPickRail
-          picks={draft.upcomingPicks.filter(
-            (pick) => pick.pick.id !== draft.activePick?.pick.id,
-          )}
+          picks={draft.upcomingPicks
+            .filter((pick) => pick.pick.id !== draft.activePick?.pick.id)
+            .slice(0, 5)}
           compact
           recent={false}
         />
