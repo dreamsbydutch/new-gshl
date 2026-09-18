@@ -187,3 +187,19 @@ Do not say “all checks passed” when only `npm run check` or CI completed.
 - [Command reference](../reference/commands.md)
 - [Deployment](deployment.md)
 - [Troubleshooting](troubleshooting.md)
+
+## Draft TV displays
+
+Run the full-roster browser fixture after changing the TV layouts or fit hook:
+
+```bash
+npx tailwindcss -i src/styles/globals.css -o .next/draft-tv-test.css
+node tools/tests/draft-tv.browser.mjs
+```
+
+The test uses the existing Puppeteer dependency and local Edge by default. Set
+`TV_TEST_BROWSER` to a Chromium executable on other systems. It bundles the real
+components with fixture hooks, loads the bundled Geist font, and checks all three
+displays at 720p, 1080p, and 4K for page/panel overflow. It also checks loading
+transitions and live-draft status states. Screenshots stay under gitignored
+`.next/tv-checks/`. This does not test authentication or submit draft picks.

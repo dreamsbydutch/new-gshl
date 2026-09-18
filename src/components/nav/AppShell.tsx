@@ -7,7 +7,9 @@ import { NavDefaults } from "./NavDefaults";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { pathname } = useAppPathname();
-  const isStandaloneDraftRosterBoard = pathname === "/draft-roster-board";
+  const isStandaloneDraftRosterBoard =
+    pathname === "/draft-roster-board" ||
+    pathname.startsWith("/draft-roster-board/");
 
   if (isStandaloneDraftRosterBoard) {
     return <>{children}</>;
