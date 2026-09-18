@@ -17,6 +17,7 @@ import {
   buildRecordBookPlayerRows,
   formatRecordBookStat,
   getOwnerTeamIds,
+  getRecordBookVisibleAwards,
   getRecordBookAwardSeasonType,
   getRecordBookPriorityColumns,
   RECORD_BOOK_GOALIE_COLUMNS,
@@ -311,4 +312,36 @@ void test("builds a unique all-time lineup from the best positional splits", () 
     ],
   );
   assert.equal(new Set(lineup.map((entry) => entry.playerId)).size, 6);
+});
+
+void test("record-book awards follow season type and player group", () => {
+  assert.deepEqual(
+    getRecordBookVisibleAwards("skater", SeasonType.REGULAR_SEASON),
+    [
+      AwardsList.FIRST_AS,
+      AwardsList.SECOND_AS,
+      AwardsList.CROSBY,
+      AwardsList.LIDSTROM,
+      AwardsList.GRETZKY,
+      AwardsList.OVECHKIN,
+    ],
+  );
+  assert.deepEqual(
+    getRecordBookVisibleAwards("goalie", SeasonType.REGULAR_SEASON),
+    [
+      AwardsList.FIRST_AS,
+      AwardsList.SECOND_AS,
+      AwardsList.CROSBY,
+      AwardsList.BRODEUR,
+    ],
+  );
+  for (const group of ["skater", "goalie"] as const) {
+    assert.deepEqual(getRecordBookVisibleAwards(group, SeasonType.PLAYOFFS), [
+      AwardsList.CONN_SMYTHE,
+    ]);
+    assert.deepEqual(
+      getRecordBookVisibleAwards(group, SeasonType.LOSERS_TOURNAMENT),
+      [],
+    );
+  }
 });

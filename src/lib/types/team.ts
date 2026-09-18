@@ -280,6 +280,8 @@ export interface RecordBookSortableHeadProps {
 }
 
 export interface RecordBookPlayerTableProps {
+  group: RecordBookGroup;
+  seasonType: SeasonType;
   columns: RecordBookStatColumn[];
   onSort: (key: RecordBookSortKey) => void;
   rows: RecordBookPlayerRow[];

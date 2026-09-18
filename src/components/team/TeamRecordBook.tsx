@@ -19,7 +19,13 @@ import type {
   TeamRecordBookProps,
 } from "@gshl-types";
 import { TableViewport } from "@gshl-ui";
-import { AwardsList, cn, formatRecordBookStat, SeasonType } from "@gshl-utils";
+import {
+  AwardsList,
+  cn,
+  formatRecordBookStat,
+  getRecordBookVisibleAwards,
+  SeasonType,
+} from "@gshl-utils";
 
 const RECORD_BOOK_VIEWS: Array<{
   label: string;
@@ -342,17 +348,23 @@ function RecordBookToolbar({
 
 function PlayerHistoryTable({
   columns,
+  group,
+  seasonType,
   onSort,
   rows,
   sort,
   view,
 }: RecordBookPlayerTableProps) {
+  const visibleAwards = getRecordBookVisibleAwards(group, seasonType);
+  const allStarColumns = ALL_STAR_TABLE_COLUMNS.filter((column) =>
+    visibleAwards.includes(column.award),
+  );
+  const trophyColumns = PLAYER_TROPHY_TABLE_COLUMNS.filter((column) =>
+    visibleAwards.includes(column.award),
+  );
   const hasSeasonColumn = view === "season";
   const emptyColSpan =
-    columns.length +
-    ALL_STAR_TABLE_COLUMNS.length +
-    PLAYER_TROPHY_TABLE_COLUMNS.length +
-    4;
+    columns.length + allStarColumns.length + trophyColumns.length + 4;
 
   return (
     <table className="mx-auto min-w-max border-collapse whitespace-nowrap text-xs">
@@ -410,7 +422,7 @@ function PlayerHistoryTable({
               title={column.title}
             />
           ))}
-          {ALL_STAR_TABLE_COLUMNS.map((column) => (
+          {allStarColumns.map((column) => (
             <th
               scope="col"
               key={column.award}
@@ -420,7 +432,7 @@ function PlayerHistoryTable({
               <AwardColumnHeading label={column.label} title={column.title} />
             </th>
           ))}
-          {PLAYER_TROPHY_TABLE_COLUMNS.map((column) => (
+          {trophyColumns.map((column) => (
             <th
               scope="col"
               key={column.award}
@@ -489,7 +501,7 @@ function PlayerHistoryTable({
                   {formatRecordBookStat(row, column)}
                 </td>
               ))}
-              {ALL_STAR_TABLE_COLUMNS.map((column) => (
+              {allStarColumns.map((column) => (
                 <td
                   key={`${row.id}-${column.award}`}
                   className="whitespace-nowrap px-1 py-1 text-center tabular-nums text-slate-700"
@@ -499,7 +511,7 @@ function PlayerHistoryTable({
                     : row.awardCounts[column.award]}
                 </td>
               ))}
-              {PLAYER_TROPHY_TABLE_COLUMNS.map((column) => (
+              {trophyColumns.map((column) => (
                 <td
                   key={`${row.id}-${column.award}`}
                   className="px-1 py-1 text-center"
@@ -567,6 +579,8 @@ export function TeamRecordBook(props: TeamRecordBookProps) {
             viewportClassName="rounded-none border-0 focus-visible:ring-inset focus-visible:ring-offset-0"
           >
             <PlayerHistoryTable
+              group={group}
+              seasonType={seasonType}
               columns={columns}
               onSort={onSort}
               rows={playerRows}

@@ -33,6 +33,23 @@ import {
 } from "../domain/player";
 import { getAllStarSeasonType } from "./season-awards";
 
+/** Awards applicable to the selected statistical comparison. */
+export function getRecordBookVisibleAwards(
+  group: RecordBookGroup,
+  seasonType: SeasonTypeValue,
+): AwardsListType[] {
+  if (seasonType === SeasonType.PLAYOFFS) return [AwardsList.CONN_SMYTHE];
+  if (seasonType !== SeasonType.REGULAR_SEASON) return [];
+  return [
+    AwardsList.FIRST_AS,
+    AwardsList.SECOND_AS,
+    AwardsList.CROSBY,
+    ...(group === "goalie"
+      ? [AwardsList.BRODEUR]
+      : [AwardsList.LIDSTROM, AwardsList.GRETZKY, AwardsList.OVECHKIN]),
+  ];
+}
+
 export const ALL_TIME_ROSTER_SLOTS: AllTimeRosterSlot[] = [
   "C",
   "LW",

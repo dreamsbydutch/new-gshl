@@ -168,15 +168,17 @@ void test("My Team draft picks use their own season control", () => {
   assert.match(draftPicks, /aria-label="Draft season"/);
 });
 
-void test("My Team exposes a labelled native team selector in the header", () => {
+void test("My Team exposes a labelled team menu with logos in the header", () => {
   const navbar = readSource("src/components/nav/MainNavbar.tsx");
   const selector = readSource("src/components/nav/HeaderTeamSelect.tsx");
   const layout = readSource("src/components/locker-room/LockerRoomLayout.tsx");
 
   assert.match(navbar, /showTeamControl = pathname === "\/lockerroom"/);
-  assert.match(selector, /<select\s+aria-label="View team"/);
+  assert.match(selector, /<DropdownMenuRadioGroup\s+aria-label="View team"/);
   assert.match(selector, /disabled=\{!navigation.isReady \|\| !hasTeams\}/);
-  assert.match(selector, /<option key=\{team.id\}/);
+  assert.match(selector, /<DropdownMenuRadioItem\s+key=\{team.id\}/);
+  assert.match(selector, /src=\{selectedTeam.logoUrl\}/);
+  assert.match(selector, /src=\{team.logoUrl\}/);
   assert.doesNotMatch(layout, /<details|TeamsToggle/);
 });
 
