@@ -15,6 +15,7 @@ const players=teams.flatMap(team=>Array.from({length:15},(_,i)=>player(i,team.ow
 const available=Array.from({length:50},(_,i)=>({...player(i),posGroup:i<35?"F":"G"}));
 const pick=(i)=>({pick:{id:String(i),round:2,pick:i},team:teams[i%14],player:player(i)});
 export function useDraftRosterBoard(){return {season:{name:"2026-27",year:2027},nhlTeams:[],players,availablePlayers:available,isLoading:window.tvState==="loading",conferences:[{id:"a",name:"Hickory Hotel",teams:teams.slice(0,7)},{id:"b",name:"Sunview",teams:teams.slice(7)}]};}
+export function useOwnerRankingsData(){return {isLoading:window.tvState==="loading",data:{rankings:teams.map((team,i)=>({owner:{id:team.ownerId},rank:i+1,displayName:"Alexander Owner "+(i+1),rating:1800-i*23,cups:i%4,primaryTeam:null,overallRecord:{wins:150,losses:125,ties:3}}))}};}
 export function useDraftHubBoard(){return {season:{draftStartAt:"2026-09-25T20:00:00Z"},state:{status:window.tvState},activePick:pick(3),clockRemainingSeconds:125,isLoading:window.tvState==="loading",recentPicks:Array.from({length:8},(_,i)=>pick(30-i)),upcomingPicks:[pick(3),pick(4),pick(5),pick(6)]};}
 `;
 const compiled = await build({
@@ -118,7 +119,11 @@ try {
       );
       assert.ok(result.panels > 0);
       assert.match(result.text, /A\. Matthews|M\. Necas/);
-      if (view === "overview") assert.equal(result.panels, 15);
+      if (view === "overview") {
+        assert.equal(result.panels, 15);
+        assert.match(result.text, /Owner ladder/);
+        assert.doesNotMatch(result.text, /TOP 26 SKATERS|League Roster Board/);
+      }
       await page.screenshot({
         path: resolve(`.next/tv-checks/${view}-${width}.png`),
       });

@@ -1,10 +1,10 @@
 "use client";
 
 import Image from "next/image";
-import Link from "next/link";
 import { MonitorUp } from "lucide-react";
 import { NHLLogo } from "@gshl-components/player/NHLLogo";
 import { useDraftRosterBoard } from "@gshl-hooks";
+import { DraftOwnerLadder } from "./DraftOwnerLadder";
 import { useDraftBoardFit } from "@gshl-hooks/features/useDraftBoardFit";
 import {
   abbreviatePlayerName,
@@ -14,7 +14,6 @@ import {
   formatNumber,
   formatUfaStat,
   getBenchPlayers,
-  getDraftYear,
   getPlayerNhlAbbreviation,
   getRosterRatingClass,
 } from "@gshl-utils";
@@ -29,9 +28,11 @@ import type {
 function RosterPlayer({
   player,
   nhlTeamByAbbr,
+  muted = false,
 }: {
   player: Player;
   nhlTeamByAbbr: Map<string, NHLTeam>;
+  muted?: boolean;
 }) {
   const nhlAbbr = getPlayerNhlAbbreviation(player);
   const nhlTeam = nhlAbbr ? nhlTeamByAbbr.get(nhlAbbr) : undefined;
@@ -43,12 +44,18 @@ function RosterPlayer({
 
   return (
     <div
-      className="min-w-0 rounded border border-slate-200 bg-white px-1 py-0.5 text-center shadow-sm"
+      className={cn(
+        "min-w-0 rounded border border-slate-300/70 px-1 py-0.5 text-center",
+        muted ? "bg-slate-200/60" : "bg-white shadow-sm",
+      )}
       title={`${abbreviatePlayerName(player.fullName)} · ${player.nhlPos.join("/")} · ${rating}`}
     >
       <p
         aria-label={player.fullName}
-        className="whitespace-normal text-[1em] font-bold leading-tight text-slate-900"
+        className={cn(
+          "whitespace-normal text-[1em] leading-tight text-slate-900",
+          muted ? "font-medium" : "font-bold",
+        )}
       >
         {abbreviatePlayerName(player.fullName)}
       </p>
@@ -63,7 +70,8 @@ function RosterPlayer({
         </span>
         <span
           className={cn(
-            "rounded px-1 text-[0.9em] font-bold leading-tight text-slate-800",
+            "rounded px-1 text-[0.9em] leading-tight text-slate-800",
+            muted ? "font-medium" : "font-bold",
             getRosterRatingClass(player.seasonRk),
           )}
         >
@@ -79,11 +87,13 @@ export function TeamRosterCard({
   players,
   nhlTeamByAbbr,
   className,
+  muted = false,
 }: {
   team: DraftRosterTeamView;
   players: Player[];
   nhlTeamByAbbr: Map<string, NHLTeam>;
   className?: string;
+  muted?: boolean;
 }) {
   const { panelRef, contentRef } = useDraftBoardFit();
   const roster = buildCurrentRoster(players, team);
@@ -95,12 +105,18 @@ export function TeamRosterCard({
       ref={panelRef}
       aria-label={`${team.name ?? team.abbr ?? "Team"} roster`}
       className={cn(
-        "flex min-h-0 flex-col overflow-hidden rounded-lg border border-slate-300 bg-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-slate-700",
+        "flex min-h-0 flex-col overflow-hidden rounded-lg border border-slate-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-slate-700",
+        muted ? "bg-slate-100" : "bg-white",
         className,
       )}
     >
       <div ref={contentRef} className="w-full shrink-0">
-        <header className="flex min-h-9 shrink-0 items-center gap-1.5 border-b border-slate-200 bg-slate-50 px-1.5 py-1">
+        <header
+          className={cn(
+            "flex min-h-9 shrink-0 items-center gap-1.5 border-b border-slate-300 px-1.5 py-1",
+            muted ? "bg-slate-200/80" : "bg-slate-50",
+          )}
+        >
           {team.logoUrl ? (
             <Image
               src={team.logoUrl}
@@ -115,7 +131,12 @@ export function TeamRosterCard({
             </div>
           )}
           <div className="min-w-0">
-            <h3 className="whitespace-normal break-words text-[1.1em] font-black leading-tight text-slate-950">
+            <h3
+              className={cn(
+                "whitespace-normal break-words text-[1.1em] leading-tight text-slate-950",
+                muted ? "font-semibold" : "font-black",
+              )}
+            >
               {team.name ?? team.abbr ?? "Team"}
             </h3>
             <p className="text-[0.9em] leading-tight text-slate-600">
@@ -126,10 +147,15 @@ export function TeamRosterCard({
             className="ml-auto shrink-0 text-right"
             title="Live talent rating across 15 weighted roster slots. Empty slots count as zero; primary starters count most, followed by secondary starters and goalie, utility, then bench."
           >
-            <p className="text-[0.8em] font-bold uppercase tracking-wide text-slate-600">
+            <p className="text-[0.8em] font-medium uppercase tracking-wide text-slate-600">
               Talent
             </p>
-            <p className="text-[1.1em] font-black tabular-nums text-primary">
+            <p
+              className={cn(
+                "text-[1.1em] tabular-nums text-primary",
+                muted ? "font-medium" : "font-black",
+              )}
+            >
               {team.talentRating === null
                 ? "--"
                 : formatNumber(team.talentRating, 2)}
@@ -167,6 +193,7 @@ export function TeamRosterCard({
                       <RosterPlayer
                         key={player.id}
                         player={player}
+                        muted={muted}
                         nhlTeamByAbbr={nhlTeamByAbbr}
                       />
                     ))}
@@ -186,6 +213,7 @@ export function TeamRosterCard({
                   <RosterPlayer
                     key={player.id}
                     player={player}
+                    muted={muted}
                     nhlTeamByAbbr={nhlTeamByAbbr}
                   />
                 ))}
@@ -210,8 +238,8 @@ function ConferenceRosterCard({
   shiftBottomTeams: boolean;
 }) {
   return (
-    <section className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white p-1.5 shadow-sm">
-      <header className="mb-1 flex h-[2.25em] shrink-0 items-center justify-center gap-2 rounded-lg border-b border-slate-200 bg-slate-50 text-slate-900">
+    <section className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-slate-300 bg-slate-200 p-1.5">
+      <header className="mb-1 flex h-[2.25em] shrink-0 items-center justify-center gap-2 rounded-lg border-b border-slate-300 bg-slate-200 text-slate-900">
         {conference.logoUrl ? (
           <Image
             src={conference.logoUrl}
@@ -221,7 +249,7 @@ function ConferenceRosterCard({
             className="h-[1.5em] w-[1.5em] object-contain"
           />
         ) : null}
-        <h2 className="text-[1.25em] font-black uppercase tracking-[0.14em]">
+        <h2 className="text-[1.25em] font-semibold uppercase tracking-[0.14em]">
           {conference.name}
         </h2>
       </header>
@@ -230,6 +258,7 @@ function ConferenceRosterCard({
           <TeamRosterCard
             key={team.id}
             team={team}
+            muted
             players={players}
             nhlTeamByAbbr={nhlTeamByAbbr}
             className={
@@ -396,38 +425,8 @@ export function CompactBestAvailableTable({
   );
 }
 
-function CompactBestAvailable({
-  players,
-}: {
-  players: DraftHubEligiblePlayerView[];
-}) {
-  const { panelRef, contentRef } = useDraftBoardFit();
-  const skaters = players
-    .filter((player) => player.posGroup !== "G")
-    .slice(0, 26);
-  const goalies = players
-    .filter((player) => player.posGroup === "G")
-    .slice(0, 8);
-
-  return (
-    <aside
-      ref={panelRef}
-      className="absolute bottom-1.5 left-1/2 z-10 flex h-[calc((100%_-_2.25em_-_24px)/2)] w-[calc(25%_+_3px)] -translate-x-1/2 flex-col overflow-hidden rounded-lg border border-slate-300 bg-white shadow-md"
-      aria-label="Best available players"
-    >
-      <div ref={contentRef} className="w-full shrink-0">
-        <CompactBestAvailableTable title="Top 26 skaters" players={skaters} />
-        <div className="mt-auto border-t border-slate-300">
-          <CompactBestAvailableTable title="Top 8 goalies" players={goalies} />
-        </div>
-      </div>
-    </aside>
-  );
-}
-
 export function DraftRosterBoard() {
   const board = useDraftRosterBoard();
-  const draftYear = board.season ? getDraftYear(board.season) : null;
   const nhlTeamByAbbr = new Map(
     board.nhlTeams.map((team) => [team.abbr.trim().toUpperCase(), team]),
   );
@@ -446,46 +445,8 @@ export function DraftRosterBoard() {
         </div>
       </div>
 
-      <main className="hidden h-dvh min-h-[700px] flex-col overflow-hidden bg-white p-2 text-[length:clamp(13px,0.833vw,32px)] leading-tight text-slate-950 xl:flex">
-        <header className="mb-2 flex min-h-[3.5em] shrink-0 items-center justify-between gap-4 border-b border-slate-300 bg-white px-2 pb-1">
-          <div>
-            <p className="text-[1em] font-bold uppercase tracking-[0.22em] text-primary">
-              {draftYear ? `${draftYear} GSHL Draft` : "GSHL Draft"}
-            </p>
-            <h1 className="text-[1.5em] font-black leading-tight">
-              League Roster Board
-            </h1>
-          </div>
-          <div className="flex items-center gap-5">
-            <Link
-              href="/draft-roster-board/available"
-              className="text-[0.9em] font-semibold underline underline-offset-4"
-            >
-              Available TV
-            </Link>
-            <Link
-              href="/draft-roster-board/live"
-              className="text-[0.9em] font-semibold underline underline-offset-4"
-            >
-              Live TV
-            </Link>
-            <Link
-              href="/draft"
-              className="text-[0.9em] font-semibold underline underline-offset-4 focus-visible:outline focus-visible:outline-2"
-            >
-              Draft Hub
-            </Link>
-            <p className="text-right text-[0.9em] text-slate-700">
-              {board.season?.name ?? "Current draft season"}
-              <br />
-              {board.conferences.reduce(
-                (total, conference) => total + conference.teams.length,
-                0,
-              )}{" "}
-              current rosters
-            </p>
-          </div>
-        </header>
+      <main className="hidden h-dvh min-h-[700px] flex-col overflow-hidden bg-slate-200 p-2 text-[length:clamp(13px,0.833vw,32px)] leading-tight text-slate-950 xl:flex">
+        <h1 className="sr-only">Draft roster overview</h1>
 
         {board.isLoading ? (
           <div className="grid min-h-0 flex-1 grid-cols-2 gap-2">
@@ -508,7 +469,12 @@ export function DraftRosterBoard() {
               />
             ))}
             {board.conferences.length >= 2 ? (
-              <CompactBestAvailable players={board.availablePlayers} />
+              <DraftOwnerLadder
+                teams={board.conferences.flatMap(
+                  (conference) => conference.teams,
+                )}
+                seasonName={board.season?.name}
+              />
             ) : null}
           </div>
         ) : (
