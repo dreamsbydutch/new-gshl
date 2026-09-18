@@ -5,27 +5,22 @@ import {
   AlertTriangle,
   ArrowDown,
   ArrowUp,
-  ArrowUpDown,
   CheckCircle2,
   Clock3,
   Search,
   ShieldAlert,
   Undo2,
 } from "lucide-react";
-import { Button, TableViewport } from "@gshl-ui";
-import { NHLLogo } from "@gshl-components/player/NHLLogo";
+import { Button } from "@gshl-ui";
 import { DraftHubBoardSkeleton } from "@gshl-skeletons";
-import { useDesktopViewport, useDraftHubBoard } from "@gshl-hooks";
-import { cn, formatNumber, formatUfaStat } from "@gshl-utils";
+import { useDraftHubBoard } from "@gshl-hooks";
+import { cn } from "@gshl-utils";
 import type {
-  DraftHubEligiblePlayerView,
   DraftHubMockProjection,
   DraftHubNextPickNotice,
   DraftHubPickView,
-  DraftPlayerSortDirection,
-  DraftPlayerSortKey,
 } from "@gshl-types";
-import { DraftPlayerDecisionList } from "./DraftPlayerDecisionList";
+import { DraftPlayerTable } from "./DraftPlayerTable";
 
 function formatClock(totalSeconds: number): string {
   const minutes = Math.floor(totalSeconds / 60);
@@ -405,338 +400,8 @@ function DraftStatusHero({
   );
 }
 
-const SKATER_STAT_KEYS = [
-  "GP",
-  "G",
-  "A",
-  "P",
-  "PM",
-  "PIM",
-  "PPP",
-  "SOG",
-  "HIT",
-  "BLK",
-] as const;
-const GOALIE_STAT_KEYS = [
-  "GP",
-  "W",
-  "GA",
-  "GAA",
-  "SV",
-  "SA",
-  "SVP",
-  "SO",
-  "QS",
-  "RBS",
-] as const;
-
-function SortableHeader({
-  label,
-  sortKey,
-  activeSortKey,
-  sortDirection,
-  onSort,
-  className,
-  align = "center",
-}: {
-  label: string;
-  sortKey: DraftPlayerSortKey;
-  activeSortKey: DraftPlayerSortKey;
-  sortDirection: DraftPlayerSortDirection;
-  onSort: (key: DraftPlayerSortKey) => void;
-  className?: string;
-  align?: "left" | "center";
-}) {
-  const isActive = activeSortKey === sortKey;
-  return (
-    <th
-      scope="col"
-      className={className}
-      aria-sort={
-        isActive
-          ? sortDirection === "asc"
-            ? "ascending"
-            : "descending"
-          : "none"
-      }
-    >
-      <button
-        type="button"
-        className={cn(
-          "inline-flex w-full items-center gap-1 whitespace-nowrap uppercase hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-          align === "left" ? "justify-start" : "justify-center",
-        )}
-        onClick={() => onSort(sortKey)}
-        aria-label={`Sort by ${label}`}
-      >
-        {label}
-        {isActive ? (
-          sortDirection === "asc" ? (
-            <ArrowUp
-              className="h-3 w-3 shrink-0 text-primary"
-              aria-hidden="true"
-            />
-          ) : (
-            <ArrowDown
-              className="h-3 w-3 shrink-0 text-primary"
-              aria-hidden="true"
-            />
-          )
-        ) : (
-          <ArrowUpDown
-            className="h-3 w-3 shrink-0 text-muted-foreground/60"
-            aria-hidden="true"
-          />
-        )}
-      </button>
-    </th>
-  );
-}
-
-function getStatHeaderLabel(key: DraftPlayerSortKey): string {
-  if (key === "SVP") return "SV%";
-  if (key === "PM") return "+/−";
-  return key;
-}
-
-function PlayerRow({
-  player,
-  canSubmit,
-  commissionerRequired,
-  isSubmitting,
-  onSubmit,
-}: {
-  player: DraftHubEligiblePlayerView;
-  canSubmit: boolean;
-  commissionerRequired: boolean;
-  isSubmitting: boolean;
-  onSubmit: () => void;
-}) {
-  const statKeys =
-    player.posGroup === "G" ? GOALIE_STAT_KEYS : SKATER_STAT_KEYS;
-  return (
-    <tr className="group border-t border-border/70 align-middle">
-      <td className="sticky left-0 z-20 w-8 min-w-8 border-r !bg-background px-0.5 py-1 group-hover:!bg-muted sm:static sm:z-auto sm:w-auto sm:min-w-0 sm:border-0 sm:!bg-transparent sm:px-2 sm:py-3">
-        <NHLLogo
-          team={
-            player.nhlTeamLogoUrl
-              ? {
-                  name: player.nhlTeam.length > 0 ? player.nhlTeam : "NHL team",
-                  logoUrl: player.nhlTeamLogoUrl,
-                }
-              : undefined
-          }
-          size={24}
-        />
-      </td>
-      <th
-        scope="row"
-        className="sticky left-[31px] z-20 min-w-[7rem] border-r !bg-background px-1.5 py-1 text-left text-[10px] font-semibold group-hover:!bg-muted sm:static sm:z-auto sm:min-w-0 sm:border-0 sm:!bg-transparent sm:px-2 sm:py-3 sm:text-sm"
-      >
-        {player.fullName}
-      </th>
-      <td className="whitespace-nowrap px-1 py-1 text-[9px] sm:px-2 sm:py-3 sm:text-sm">
-        {player.nhlPos.length > 0 ? player.nhlPos.join("/") : player.posGroup}
-      </td>
-      <td className="whitespace-nowrap px-1 py-1 text-[9px] tabular-nums sm:px-2 sm:py-3 sm:text-sm">
-        {player.overallRk ?? "—"}
-      </td>
-      <td className="whitespace-nowrap px-1 py-1 text-[9px] tabular-nums sm:px-2 sm:py-3 sm:text-sm">
-        {player.yahooDraftRk ?? "—"}
-      </td>
-      <td className="whitespace-nowrap px-1 py-1 text-[9px] tabular-nums sm:px-2 sm:py-3 sm:text-sm">
-        {player.otherDraftRk ?? "—"}
-      </td>
-      <td className="whitespace-nowrap bg-muted/25 px-1 py-1 text-[9px] font-bold tabular-nums text-foreground sm:px-2 sm:py-3 sm:text-sm">
-        {formatNumber(player.overallRating ?? 0, 2)}
-      </td>
-      {statKeys.map((key) => (
-        <td
-          key={key}
-          className="whitespace-nowrap px-1 py-1 text-[9px] sm:px-2 sm:py-3 sm:text-xs"
-        >
-          {formatUfaStat(player.stats, key)}
-        </td>
-      ))}
-      <td className="px-1 py-1 sm:px-2 sm:py-3">
-        <Button
-          size="sm"
-          variant={commissionerRequired ? "destructive" : "secondary"}
-          disabled={!canSubmit || isSubmitting}
-          onClick={onSubmit}
-          aria-label={`Draft ${player.fullName}`}
-          className="min-h-11 px-3 text-xs"
-        >
-          {isSubmitting
-            ? "Submitting…"
-            : commissionerRequired
-              ? "Force Pick"
-              : "Draft"}
-        </Button>
-      </td>
-    </tr>
-  );
-}
-
-function DraftPlayerTable({
-  players,
-  canSubmit,
-  commissionerRequired,
-  submittingPlayerId,
-  sortKey,
-  sortDirection,
-  onSort,
-  onSubmit,
-}: {
-  players: DraftHubEligiblePlayerView[];
-  canSubmit: boolean;
-  commissionerRequired: boolean;
-  submittingPlayerId: string | null;
-  sortKey: DraftPlayerSortKey;
-  sortDirection: DraftPlayerSortDirection;
-  onSort: (key: DraftPlayerSortKey) => void;
-  onSubmit: (playerId: string) => void;
-}) {
-  const hasGoalies = players.some((player) => player.posGroup === "G");
-  const hasSkaters = players.some((player) => player.posGroup !== "G");
-
-  if (hasGoalies && hasSkaters) {
-    return (
-      <div className="w-full min-w-0 max-w-full space-y-5 overflow-hidden">
-        <DraftPlayerTable
-          players={players.filter((player) => player.posGroup !== "G")}
-          canSubmit={canSubmit}
-          commissionerRequired={commissionerRequired}
-          submittingPlayerId={submittingPlayerId}
-          sortKey={sortKey}
-          sortDirection={sortDirection}
-          onSort={onSort}
-          onSubmit={onSubmit}
-        />
-        <DraftPlayerTable
-          players={players.filter((player) => player.posGroup === "G")}
-          canSubmit={canSubmit}
-          commissionerRequired={commissionerRequired}
-          submittingPlayerId={submittingPlayerId}
-          sortKey={sortKey}
-          sortDirection={sortDirection}
-          onSort={onSort}
-          onSubmit={onSubmit}
-        />
-      </div>
-    );
-  }
-
-  const statKeys = hasGoalies ? GOALIE_STAT_KEYS : SKATER_STAT_KEYS;
-
-  return (
-    <TableViewport
-      ariaLabel={`Available draft ${hasGoalies ? "goalies" : "skaters"}`}
-      scrollHint="Scroll to compare all rankings and statistics"
-    >
-      <table className="w-max min-w-full text-center text-[10px] sm:text-sm">
-        <caption className="sr-only">
-          Available draft {hasGoalies ? "goalies" : "skaters"}, rankings, season
-          statistics, and selection action
-        </caption>
-        <thead className="bg-muted/70 text-[8px] uppercase tracking-wide sm:text-xs">
-          <tr className="border-b border-border/70">
-            <SortableHeader
-              label="NHL"
-              sortKey="nhlTeam"
-              activeSortKey={sortKey}
-              sortDirection={sortDirection}
-              onSort={onSort}
-              className="sticky left-0 z-30 w-8 min-w-8 border-r !bg-muted px-0.5 py-1 sm:static sm:z-auto sm:w-auto sm:min-w-0 sm:border-0 sm:!bg-transparent sm:px-2 sm:py-3"
-            />
-            <SortableHeader
-              label="Player"
-              sortKey="fullName"
-              activeSortKey={sortKey}
-              sortDirection={sortDirection}
-              onSort={onSort}
-              align="left"
-              className="sticky left-[31px] z-30 min-w-[7rem] border-r !bg-muted px-1.5 py-1 text-left sm:static sm:z-auto sm:min-w-0 sm:border-0 sm:!bg-transparent sm:px-2 sm:py-3"
-            />
-            <SortableHeader
-              label="Pos"
-              sortKey="nhlPosition"
-              activeSortKey={sortKey}
-              sortDirection={sortDirection}
-              onSort={onSort}
-              className="whitespace-nowrap px-1 py-1 sm:px-2 sm:py-3"
-            />
-            <SortableHeader
-              label="Rank"
-              sortKey="overallRk"
-              activeSortKey={sortKey}
-              sortDirection={sortDirection}
-              onSort={onSort}
-              className="whitespace-nowrap px-1 py-1 sm:px-2 sm:py-3"
-            />
-            <SortableHeader
-              label="Yahoo RK"
-              sortKey="yahooDraftRk"
-              activeSortKey={sortKey}
-              sortDirection={sortDirection}
-              onSort={onSort}
-              className="whitespace-nowrap px-1 py-1 sm:px-2 sm:py-3"
-            />
-            <SortableHeader
-              label="Other RK"
-              sortKey="otherDraftRk"
-              activeSortKey={sortKey}
-              sortDirection={sortDirection}
-              onSort={onSort}
-              className="whitespace-nowrap px-1 py-1 sm:px-2 sm:py-3"
-            />
-            <SortableHeader
-              label="OVR"
-              sortKey="overallRating"
-              activeSortKey={sortKey}
-              sortDirection={sortDirection}
-              onSort={onSort}
-              className="whitespace-nowrap bg-muted/40 px-1 py-1 font-bold text-foreground sm:px-2 sm:py-3"
-            />
-            {statKeys.map((statKey) => (
-              <SortableHeader
-                key={statKey}
-                label={getStatHeaderLabel(statKey)}
-                sortKey={statKey}
-                activeSortKey={sortKey}
-                sortDirection={sortDirection}
-                onSort={onSort}
-                className="whitespace-nowrap px-1 py-1 sm:px-2 sm:py-3"
-              />
-            ))}
-            <th
-              scope="col"
-              className="whitespace-nowrap px-1 py-1 sm:px-2 sm:py-3"
-            >
-              Selection
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {players.map((player) => (
-            <PlayerRow
-              key={player.id}
-              player={player}
-              canSubmit={canSubmit}
-              commissionerRequired={commissionerRequired}
-              isSubmitting={submittingPlayerId === player.id}
-              onSubmit={() => onSubmit(player.id)}
-            />
-          ))}
-        </tbody>
-      </table>
-    </TableViewport>
-  );
-}
-
 export function DraftHubBoard() {
   const board = useDraftHubBoard();
-  const isDesktopViewport = useDesktopViewport();
   if (board.isLoading) return <DraftHubBoardSkeleton />;
   if (!board.season || !board.state) {
     return (
@@ -795,14 +460,8 @@ export function DraftHubBoard() {
       />
 
       <section>
-        <div className="mb-4">
-          <p className="text-xs font-bold uppercase tracking-widest text-primary">
-            Player pool
-          </p>
-          <h2 className="text-2xl font-bold">Best Available</h2>
-          <p className="text-sm text-muted-foreground">
-            Search, filter, and sort the available players.
-          </p>
+        <div className="mb-3">
+          <h2 className="text-xl font-semibold">Best Available</h2>
         </div>
         <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <label className="relative block min-w-0 flex-1 sm:max-w-md">
@@ -830,7 +489,7 @@ export function DraftHubBoard() {
                 }
                 onClick={() => board.setPositionFilter(filter)}
                 aria-pressed={board.positionFilter === filter}
-                className="min-h-11 min-w-11"
+                className="min-h-9 min-w-9 px-2"
               >
                 {filter === "all" ? "All" : filter}
               </Button>
@@ -846,36 +505,22 @@ export function DraftHubBoard() {
           </p>
         ) : null}
         {board.eligiblePlayers.length ? (
-          isDesktopViewport ? (
-            <DraftPlayerTable
-              players={board.eligiblePlayers}
-              canSubmit={board.canSubmitActivePick && !board.isSubmitting}
-              commissionerRequired={commissionerRequired}
-              submittingPlayerId={
-                board.isSubmitting ? board.submittingPlayerId : null
-              }
-              sortKey={board.playerSortKey}
-              sortDirection={board.playerSortDirection}
-              onSort={board.setPlayerSort}
-              onSubmit={(playerId) => void board.submitPlayer(playerId)}
-            />
-          ) : (
-            <DraftPlayerDecisionList
-              key={board.activePick?.pick.id ?? "no-active-pick"}
-              players={board.eligiblePlayers}
-              activePick={board.activePick}
-              canSubmit={board.canSubmitActivePick && !board.isSubmitting}
-              commissionerRequired={commissionerRequired}
-              disabledReason={draftDecisionDisabledReason}
-              submittingPlayerId={
-                board.isSubmitting ? board.submittingPlayerId : null
-              }
-              sortKey={board.playerSortKey}
-              sortDirection={board.playerSortDirection}
-              onSort={board.setPlayerSort}
-              onSubmit={(playerId) => void board.submitPlayer(playerId)}
-            />
-          )
+          <DraftPlayerTable
+            key={board.activePick?.pick.id ?? "no-active-pick"}
+            players={board.eligiblePlayers}
+            activePick={board.activePick}
+            canSubmit={board.canSubmitActivePick && !board.isSubmitting}
+            commissionerRequired={commissionerRequired}
+            disabledReason={draftDecisionDisabledReason}
+            error={board.error}
+            submittingPlayerId={
+              board.isSubmitting ? board.submittingPlayerId : null
+            }
+            sortKey={board.playerSortKey}
+            sortDirection={board.playerSortDirection}
+            onSort={board.setPlayerSort}
+            onSubmit={(playerId) => void board.submitPlayer(playerId)}
+          />
         ) : (
           <div className="rounded-lg border border-dashed bg-slate-50 p-6 text-center text-sm text-muted-foreground">
             {hasActivePlayerFilters
