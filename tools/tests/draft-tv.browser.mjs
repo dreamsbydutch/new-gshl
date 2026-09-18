@@ -11,7 +11,7 @@ const names = ["Auston Matthews", "Martin Necas", "Ryan Nugent-Hopkins", "James 
 const positions = ["LW","C","RW","LW","C","RW","D","D","D","D","G","UTIL","BN","BN","BN"];
 const nhlPositions = ["LW","C","RW","LW","C","RW","D","D","D","D","G","C","LW","RW","D"];
 const teams = Array.from({length:14},(_,i)=>({id:String(i),ownerId:String(i),franchiseId:String(i),name:"Toronto Maple Reg's " + (i+1),abbr:"TOR",talentRating:89.75,logoUrl:null}));
-const player = (i,ownerId="available")=>({id:ownerId+"-"+i,ownerId,fullName:names[i%names.length],nhlTeam:"TOR",nhlPos:[nhlPositions[i%nhlPositions.length]],posGroup:i%15===10?"G":"F",lineupPos:positions[i%15],overallRating:99.99,seasonRating:99.99,overallRk:i+1,seasonRk:i+1,stats:{GP:82,G:65,A:105,P:170,PM:35,PIM:120,PPP:55,SOG:345,HIT:210,BLK:150,W:45,GAA:2.35,SVP:0.925}});
+const player = (i,ownerId="available")=>({id:ownerId+"-"+i,ownerId,fullName:names[i%names.length],nhlTeam:"TOR",nhlPos:[nhlPositions[i%nhlPositions.length]],posGroup:nhlPositions[i%nhlPositions.length]==="G"?"G":nhlPositions[i%nhlPositions.length]==="D"?"D":"F",lineupPos:positions[i%15],overallRating:99.99,seasonRating:99.99,overallRk:i+1,seasonRk:i+1,stats:{GP:82,G:65,A:105,P:170,PM:35,PIM:120,PPP:55,SOG:345,HIT:210,BLK:150,W:45,GAA:2.35,SVP:0.925}});
 const players=teams.flatMap(team=>Array.from({length:15},(_,i)=>player(i,team.ownerId)));
 const available=Array.from({length:50},(_,i)=>({...player(i),posGroup:i<35?"F":"G"}));
 const pick=(i)=>({pick:{id:String(i),round:2,pick:i},team:{...teams[i%14],id:"draft-season-"+teams[i%14].id},player:player(i)});
@@ -187,12 +187,34 @@ try {
           const positionRows = document.querySelectorAll(
             '[aria-label="Team position counts"] tbody tr',
           );
+          const positionTable = document.querySelector(
+            '[aria-label="Team position counts"]',
+          );
+          const firstPositionRow = positionRows[0];
           const lastBounds = lastSkater?.getBoundingClientRect();
           const panelBounds = skaters?.getBoundingClientRect();
           return {
             skaters: skaterRows.length,
             goalies: goalieRows.length,
             teams: positionRows.length,
+            headers: [
+              ...(positionTable?.querySelectorAll("thead th") ?? []),
+            ].map((cell) => cell.textContent?.trim()),
+            totalPlayers: firstPositionRow?.querySelector("[data-roster-total]")
+              ?.textContent,
+            rosterGroups: Object.fromEntries(
+              [
+                ...(firstPositionRow?.querySelectorAll("[data-roster-group]") ??
+                  []),
+              ].map((cell) => [cell.dataset.rosterGroup, cell.textContent]),
+            ),
+            positionEligibility: Object.fromEntries(
+              [
+                ...(firstPositionRow?.querySelectorAll(
+                  "[data-position-count]",
+                ) ?? []),
+              ].map((cell) => [cell.dataset.positionCount, cell.textContent]),
+            ),
             unusedHeight:
               lastBounds && panelBounds
                 ? Math.round(panelBounds.bottom - lastBounds.bottom)
@@ -203,6 +225,27 @@ try {
         assert.ok(available.skaters >= 20);
         assert.equal(available.goalies, 10);
         assert.equal(available.teams, 14);
+        assert.deepEqual(available.headers, [
+          "Team",
+          "Total",
+          "F",
+          "D",
+          "G",
+          "C",
+          "LW",
+          "RW",
+          "D",
+          "G",
+        ]);
+        assert.equal(available.totalPlayers, "15");
+        assert.deepEqual(available.rosterGroups, { F: "9", D: "5", G: "1" });
+        assert.deepEqual(available.positionEligibility, {
+          C: "3",
+          LW: "3",
+          RW: "3",
+          D: "5",
+          G: "1",
+        });
         assert.ok(available.unusedHeight <= available.rowHeight + 3);
       }
       if (view === "overview") {

@@ -135,7 +135,8 @@ function AvailablePanel({
   );
 }
 
-const POSITION_COLUMNS = ["C", "LW", "RW", "D", "G"] as const;
+const ROSTER_GROUP_COLUMNS = ["F", "D", "G"] as const;
+const ELIGIBILITY_COLUMNS = ["C", "LW", "RW", "D", "G"] as const;
 
 function TeamPositionTable({
   teams,
@@ -147,8 +148,16 @@ function TeamPositionTable({
   const { panelRef, contentRef } = useDraftBoardFit();
   const rows = teams.map((team) => {
     const roster = buildCurrentRoster(players, team);
-    const counts = Object.fromEntries(
-      POSITION_COLUMNS.map((position) => [
+    const rosterGroupCounts = Object.fromEntries(
+      ROSTER_GROUP_COLUMNS.map((position) => [
+        position,
+        roster.filter(
+          (player) => player.posGroup.trim().toUpperCase() === position,
+        ).length,
+      ]),
+    ) as Record<(typeof ROSTER_GROUP_COLUMNS)[number], number>;
+    const eligibilityCounts = Object.fromEntries(
+      ELIGIBILITY_COLUMNS.map((position) => [
         position,
         roster.filter((player) =>
           position === "G"
@@ -163,8 +172,13 @@ function TeamPositionTable({
               ),
         ).length,
       ]),
-    ) as Record<(typeof POSITION_COLUMNS)[number], number>;
-    return { team, counts };
+    ) as Record<(typeof ELIGIBILITY_COLUMNS)[number], number>;
+    return {
+      team,
+      totalPlayers: roster.length,
+      rosterGroupCounts,
+      eligibilityCounts,
+    };
   });
 
   return (
@@ -180,17 +194,41 @@ function TeamPositionTable({
             Roster makeup
           </h2>
         </header>
-        <table className="w-full text-[0.8em] leading-tight">
+        <table className="w-full text-[0.72em] leading-tight">
           <thead className="border-y border-slate-300 bg-slate-200 text-slate-600">
             <tr>
               <th scope="col" className="px-1 py-0.5 text-left font-medium">
                 Team
               </th>
-              {POSITION_COLUMNS.map((position) => (
+              <th
+                scope="col"
+                className="px-0.5 py-0.5 text-center font-medium"
+                title="Total players"
+              >
+                Total
+              </th>
+              {ROSTER_GROUP_COLUMNS.map((position, index) => (
                 <th
-                  key={position}
+                  key={`group-${position}`}
                   scope="col"
-                  className="px-1 py-0.5 text-center font-medium"
+                  className={cn(
+                    "px-0.5 py-0.5 text-center font-medium",
+                    index === 0 && "border-l border-slate-400",
+                  )}
+                  title={`${position} roster group`}
+                >
+                  {position}
+                </th>
+              ))}
+              {ELIGIBILITY_COLUMNS.map((position, index) => (
+                <th
+                  key={`eligibility-${position}`}
+                  scope="col"
+                  className={cn(
+                    "px-0.5 py-0.5 text-center font-medium",
+                    index === 0 && "border-l border-slate-400",
+                  )}
+                  title={`${position} position eligibility`}
                 >
                   {position}
                 </th>
@@ -198,44 +236,75 @@ function TeamPositionTable({
             </tr>
           </thead>
           <tbody>
-            {rows.map(({ team, counts }) => (
-              <tr
-                key={team.id}
-                className="border-b border-slate-200 last:border-0 odd:bg-slate-100 even:bg-slate-200/60"
-              >
-                <th scope="row" className="px-1 py-1 text-left font-medium">
-                  <span
-                    className="flex items-center gap-1"
-                    title={team.name ?? team.abbr ?? "Team"}
-                  >
-                    {team.logoUrl ? (
-                      <Image
-                        src={team.logoUrl}
-                        alt=""
-                        width={24}
-                        height={24}
-                        className="h-[1.4em] w-[1.4em] object-contain"
-                      />
-                    ) : (
-                      <span className="grid h-[1.4em] w-[1.4em] place-items-center rounded-full bg-slate-300 text-[0.65em]">
-                        {team.abbr ?? "?"}
-                      </span>
-                    )}
-                    {team.logoUrl ? (
-                      <span className="truncate">{team.abbr ?? team.name}</span>
-                    ) : null}
-                  </span>
-                </th>
-                {POSITION_COLUMNS.map((position) => (
+            {rows.map(
+              ({
+                team,
+                totalPlayers,
+                rosterGroupCounts,
+                eligibilityCounts,
+              }) => (
+                <tr
+                  key={team.id}
+                  className="border-b border-slate-200 last:border-0 odd:bg-slate-100 even:bg-slate-200/60"
+                >
+                  <th scope="row" className="px-1 py-1 text-left font-medium">
+                    <span
+                      className="flex items-center gap-1"
+                      title={team.name ?? team.abbr ?? "Team"}
+                    >
+                      {team.logoUrl ? (
+                        <Image
+                          src={team.logoUrl}
+                          alt=""
+                          width={24}
+                          height={24}
+                          className="h-[1.4em] w-[1.4em] object-contain"
+                        />
+                      ) : (
+                        <span className="grid h-[1.4em] w-[1.4em] place-items-center rounded-full bg-slate-300 text-[0.65em]">
+                          {team.abbr ?? "?"}
+                        </span>
+                      )}
+                      {team.logoUrl ? (
+                        <span className="truncate">
+                          {team.abbr ?? team.name}
+                        </span>
+                      ) : null}
+                    </span>
+                  </th>
                   <td
-                    key={position}
-                    className="px-1 py-1 text-center tabular-nums"
+                    data-roster-total
+                    className="px-0.5 py-1 text-center tabular-nums"
                   >
-                    {counts[position]}
+                    {totalPlayers}
                   </td>
-                ))}
-              </tr>
-            ))}
+                  {ROSTER_GROUP_COLUMNS.map((position, index) => (
+                    <td
+                      key={`group-${position}`}
+                      data-roster-group={position}
+                      className={cn(
+                        "px-0.5 py-1 text-center tabular-nums",
+                        index === 0 && "border-l border-slate-400",
+                      )}
+                    >
+                      {rosterGroupCounts[position]}
+                    </td>
+                  ))}
+                  {ELIGIBILITY_COLUMNS.map((position, index) => (
+                    <td
+                      key={`eligibility-${position}`}
+                      data-position-count={position}
+                      className={cn(
+                        "px-0.5 py-1 text-center tabular-nums",
+                        index === 0 && "border-l border-slate-400",
+                      )}
+                    >
+                      {eligibilityCounts[position]}
+                    </td>
+                  ))}
+                </tr>
+              ),
+            )}
           </tbody>
         </table>
       </div>
