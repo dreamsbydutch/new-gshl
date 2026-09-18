@@ -245,9 +245,11 @@ function ConferenceRosterCard({
 export function CompactBestAvailableTable({
   title,
   players,
+  broadcast = false,
 }: {
   title: string;
   players: DraftHubEligiblePlayerView[];
+  broadcast?: boolean;
 }) {
   const isGoalieTable = players.some((player) => player.posGroup === "G");
   const statColumns = isGoalieTable
@@ -272,12 +274,31 @@ export function CompactBestAvailableTable({
 
   return (
     <section className="min-h-0" aria-label={`${title} statistics`}>
-      <div className="flex min-h-[1.8em] items-center justify-between bg-slate-100 px-1.5">
-        <h3 className="text-[0.9em] font-black uppercase tracking-[0.08em] text-slate-800">
+      <div
+        className={cn(
+          "flex min-h-[1.8em] items-center justify-between px-1.5",
+          broadcast
+            ? "border-l-4 border-amber-400 bg-slate-800 text-white"
+            : "bg-slate-100",
+        )}
+      >
+        <h3
+          className={cn(
+            "text-[0.9em] font-black uppercase tracking-[0.08em]",
+            broadcast ? "text-white" : "text-slate-800",
+          )}
+        >
           {title}
         </h3>
-        <span className="text-[0.9em] font-semibold text-slate-600">
-          Best available
+        <span
+          className={cn(
+            "font-semibold",
+            broadcast
+              ? "text-[0.6em] uppercase tracking-widest text-slate-300"
+              : "text-[0.9em] text-slate-600",
+          )}
+        >
+          {broadcast ? "Ranked by OVR" : "Best available"}
         </span>
       </div>
       <table className="w-full table-auto text-[0.9em] leading-snug">
@@ -289,7 +310,14 @@ export function CompactBestAvailableTable({
               Player
             </th>
             <th className="whitespace-nowrap px-0.5 py-0">Pos</th>
-            <th className="px-0.5 py-0 text-right">OVR</th>
+            <th
+              className={cn(
+                "px-0.5 py-0 text-right",
+                broadcast && "bg-amber-100 text-slate-900",
+              )}
+            >
+              OVR
+            </th>
             {statColumns.map(([, label]) => (
               <th key={label} className="px-px py-0 text-right">
                 {label}
@@ -298,12 +326,24 @@ export function CompactBestAvailableTable({
           </tr>
         </thead>
         <tbody>
-          {players.map((player) => (
+          {players.map((player, index) => (
             <tr
               key={player.id}
-              className="border-b border-slate-200 last:border-b-0 odd:bg-white even:bg-slate-50"
+              className={cn(
+                "border-b border-slate-200 last:border-b-0",
+                broadcast && index < 3
+                  ? "bg-amber-50/70"
+                  : "odd:bg-white even:bg-slate-50",
+              )}
             >
-              <td className="px-px py-0 text-right align-top tabular-nums text-slate-600">
+              <td
+                className={cn(
+                  "px-px py-0 text-right align-top tabular-nums",
+                  broadcast && index < 3
+                    ? "border-l-4 border-amber-400 font-bold text-slate-900"
+                    : "text-slate-600",
+                )}
+              >
                 {player.overallRk ?? "--"}
               </td>
               <td className="px-px py-0 align-top">
@@ -322,14 +362,20 @@ export function CompactBestAvailableTable({
               </td>
               <td
                 className="whitespace-nowrap bg-inherit px-0.5 py-0 align-top font-semibold leading-tight text-slate-900"
-                title={abbreviatePlayerName(player.fullName)}
+                title={player.fullName}
+                aria-label={player.fullName}
               >
                 {abbreviatePlayerName(player.fullName)}
               </td>
               <td className="whitespace-nowrap px-px py-0 text-center align-top leading-tight text-slate-600">
                 {player.nhlPos.join("/")}
               </td>
-              <td className="px-px py-0 text-right align-top font-bold tabular-nums text-slate-800">
+              <td
+                className={cn(
+                  "px-px py-0 text-right align-top font-bold tabular-nums text-slate-800",
+                  broadcast && "bg-amber-100/60",
+                )}
+              >
                 {typeof player.overallRating === "number"
                   ? formatNumber(player.overallRating, 2)
                   : "--"}
