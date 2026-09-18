@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { CheckCircle2 } from "lucide-react";
 import { useDraftLiveTvBoard, useDraftRosterBoard } from "@gshl-hooks";
 import { DraftLiveHeader, DraftPickRail } from "./DraftLiveFlow";
@@ -31,19 +30,11 @@ export function DraftLiveTvBoard() {
     : draft.upcomingPicks.filter((entry) => entry.pick.id !== pick?.pick.id);
   return (
     <main className="flex h-dvh min-h-[500px] flex-col overflow-hidden bg-slate-200 p-3 text-[length:clamp(16px,1.25vw,48px)] leading-tight text-slate-950">
-      <nav
-        aria-label="TV boards"
-        className="mb-2 flex shrink-0 items-center justify-between text-[0.6em] text-slate-700"
-      >
+      <header className="mb-2 flex shrink-0 items-center text-[0.6em] text-slate-700">
         <span className="font-semibold uppercase tracking-widest">
           GSHL &middot; {draft.season?.name ?? "Live draft"}
         </span>
-        <div className="flex gap-4 underline underline-offset-4">
-          <Link href="/draft-roster-board">Overview</Link>
-          <Link href="/draft-roster-board/available">Available</Link>
-          <Link href="/draft">Draft Hub</Link>
-        </div>
-      </nav>
+      </header>
       {draft.isLoading || roster.isLoading ? (
         <p role="status">Loading draft...</p>
       ) : (

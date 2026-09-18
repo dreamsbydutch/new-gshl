@@ -106,6 +106,9 @@ try {
               ch: panel.clientHeight,
             })),
           text: document.body.innerText,
+          links: [...document.querySelectorAll("a")].map((link) =>
+            link.getAttribute("href"),
+          ),
         };
       });
       assert.equal(
@@ -119,6 +122,11 @@ try {
         `${view} ${width}: panel overflow`,
       );
       assert.ok(result.panels > 0);
+      assert.deepEqual(
+        result.links,
+        [],
+        `${view} ${width}: TV displays must remain URL-only`,
+      );
       assert.match(result.text, /A\. Matthews|M\. Necas/);
       if (view === "live") {
         const rails = await page.evaluate(() => ({

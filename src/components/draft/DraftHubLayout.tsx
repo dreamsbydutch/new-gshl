@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ClipboardList, MonitorUp, Shield, UsersRound } from "lucide-react";
+import { ClipboardList, Shield, UsersRound } from "lucide-react";
 import {
   PageContextNavigation,
   SecondaryPageToolbar,
@@ -41,12 +41,6 @@ export function DraftHubLayout({ children }: { children: React.ReactNode }) {
     teams,
   });
   const draftLinks = [
-    {
-      href: "/draft-roster-board",
-      label: "TV board",
-      icon: MonitorUp,
-      isActive: false,
-    },
     {
       href: teamNavigation.draftHref,
       label: "Board",

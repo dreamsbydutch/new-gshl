@@ -2,7 +2,6 @@
 
 import { useLayoutEffect, useRef, useState } from "react";
 import Image from "next/image";
-import Link from "next/link";
 import type { ReactNode } from "react";
 import { useDraftRosterBoard } from "@gshl-hooks";
 import { useDraftBoardFit } from "@gshl-hooks/features/useDraftBoardFit";
@@ -25,7 +24,7 @@ function TvFrame({
 }) {
   return (
     <main className="flex h-dvh min-h-[500px] flex-col overflow-hidden bg-slate-200 p-3 text-[length:clamp(16px,1.35vw,52px)] leading-tight text-slate-950">
-      <header className="mb-3 flex shrink-0 items-center justify-between border-y-[3px] border-slate-800 bg-slate-100 px-3 py-2">
+      <header className="mb-3 flex shrink-0 items-center border-y-[3px] border-slate-800 bg-slate-100 px-3 py-2">
         <div className="flex items-center gap-3">
           {season && (
             <span className="border-r border-slate-300 pr-3 text-[0.8em] font-semibold tracking-[0.16em] text-slate-700">
@@ -39,20 +38,6 @@ function TvFrame({
             </span>
           )}
         </div>
-        <nav
-          aria-label="TV boards"
-          className="flex gap-4 text-[0.65em] font-medium text-slate-700 underline underline-offset-4"
-        >
-          <Link href="/draft-roster-board">Overview</Link>
-          <Link
-            href="/draft-roster-board/available"
-            aria-current="page"
-            className="decoration-amber-500 decoration-2"
-          >
-            Available
-          </Link>
-          <Link href="/draft-roster-board/live">Live draft</Link>
-        </nav>
       </header>
       {children}
     </main>
