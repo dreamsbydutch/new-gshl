@@ -75,6 +75,12 @@ compatibility filter before honoring a row limit.
 
 Authorization is a handler responsibility. Do not infer permission from whether a function appears in generated `api`.
 
+The Newsroom treats the AI configuration query as optional. If it fails (including
+when `weeklyEditions:aiStatus` has not been deployed), AI writing is disabled with
+an unavailable notice while the manual editor remains usable. The subscription
+can recover when the backend becomes available; required Newsroom queries still
+propagate their errors.
+
 ## Server-secret operator API
 
 These modules declare public Convex functions because Next.js or standalone scripts must call them, but every handler compares an argument against the Convex deployment’s `CONVEX_SERVER_SECRET`:

@@ -451,9 +451,11 @@ export function Newsroom() {
           <p className="text-xs leading-5 text-slate-500">
             {newsroom.isAiStatusLoading
               ? "Checking OpenAI configuration..."
-              : newsroom.aiStatus?.configured
-                ? `OpenAI ready · ${newsroom.aiStatus.model}`
-                : "Add OPENAI_API_KEY to the Convex deployment to enable AI writing."}
+              : newsroom.isAiStatusUnavailable
+                ? "AI writing is temporarily unavailable. You can still edit and publish manually."
+                : newsroom.aiStatus?.configured
+                  ? `OpenAI ready · ${newsroom.aiStatus.model}`
+                  : "Add OPENAI_API_KEY to the Convex deployment to enable AI writing."}
           </p>
         </div>
       </div>
