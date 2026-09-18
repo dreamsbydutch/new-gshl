@@ -4,7 +4,8 @@ import Image from "next/image";
 import { MonitorUp } from "lucide-react";
 import { NHLLogo } from "@gshl-components/player/NHLLogo";
 import { useDraftRosterBoard } from "@gshl-hooks";
-import { DraftOwnerLadder } from "./DraftOwnerLadder";
+import { DraftRosterCenter } from "./DraftRosterCenter";
+import { formatDraftPickLabel } from "@gshl-utils/features/draft-tv";
 import { useDraftBoardFit } from "@gshl-hooks/features/useDraftBoardFit";
 import {
   abbreviatePlayerName,
@@ -19,6 +20,7 @@ import {
 } from "@gshl-utils";
 import type {
   DraftHubEligiblePlayerView,
+  DraftPick,
   DraftRosterConferenceView,
   DraftRosterTeamView,
   NHLTeam,
@@ -88,12 +90,14 @@ export function TeamRosterCard({
   nhlTeamByAbbr,
   className,
   muted = false,
+  remainingPicks,
 }: {
   team: DraftRosterTeamView;
   players: Player[];
   nhlTeamByAbbr: Map<string, NHLTeam>;
   className?: string;
   muted?: boolean;
+  remainingPicks?: readonly DraftPick[];
 }) {
   const { panelRef, contentRef } = useDraftBoardFit();
   const roster = buildCurrentRoster(players, team);
@@ -220,6 +224,27 @@ export function TeamRosterCard({
               </div>
             </section>
           ) : null}
+          {remainingPicks && remainingPicks.length > 0 && (
+            <section
+              aria-label="Remaining draft picks"
+              className="border-t border-slate-300 pt-1"
+            >
+              <p className="mb-1 text-[0.75em] font-medium uppercase tracking-wide text-slate-600">
+                Draft picks &middot; {remainingPicks.length}
+              </p>
+              <div className="grid grid-cols-3 gap-x-1 gap-y-0.5 text-center text-[0.85em] tabular-nums text-slate-700">
+                {remainingPicks.map((pick) => (
+                  <span
+                    key={pick.id}
+                    data-remaining-pick-id={pick.id}
+                    title={`Round ${pick.round}, overall ${pick.pick}`}
+                  >
+                    {formatDraftPickLabel(pick)}
+                  </span>
+                ))}
+              </div>
+            </section>
+          )}
         </div>
       </div>
     </article>
@@ -231,11 +256,13 @@ function ConferenceRosterCard({
   players,
   nhlTeamByAbbr,
   shiftBottomTeams,
+  remainingPicksByFranchise,
 }: {
   conference: DraftRosterConferenceView;
   players: Player[];
   nhlTeamByAbbr: Map<string, NHLTeam>;
   shiftBottomTeams: boolean;
+  remainingPicksByFranchise: Map<string, DraftPick[]>;
 }) {
   return (
     <section className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-slate-300 bg-slate-200 p-1.5">
@@ -258,6 +285,7 @@ function ConferenceRosterCard({
           <TeamRosterCard
             key={team.id}
             team={team}
+            remainingPicks={remainingPicksByFranchise.get(team.franchiseId)}
             muted
             players={players}
             nhlTeamByAbbr={nhlTeamByAbbr}
@@ -307,14 +335,14 @@ export function CompactBestAvailableTable({
         className={cn(
           "flex min-h-[1.8em] items-center justify-between px-1.5",
           broadcast
-            ? "border-l-4 border-amber-400 bg-slate-800 text-white"
+            ? "border-l-4 border-amber-400 bg-slate-200/80 text-slate-900"
             : "bg-slate-100",
         )}
       >
         <h3
           className={cn(
-            "text-[0.9em] font-black uppercase tracking-[0.08em]",
-            broadcast ? "text-white" : "text-slate-800",
+            "text-[0.9em] uppercase tracking-[0.08em] text-slate-800",
+            broadcast ? "font-semibold" : "font-black",
           )}
         >
           {title}
@@ -323,7 +351,7 @@ export function CompactBestAvailableTable({
           className={cn(
             "font-semibold",
             broadcast
-              ? "text-[0.6em] uppercase tracking-widest text-slate-300"
+              ? "text-[0.6em] uppercase tracking-widest text-slate-600"
               : "text-[0.9em] text-slate-600",
           )}
         >
@@ -331,18 +359,21 @@ export function CompactBestAvailableTable({
         </span>
       </div>
       <table className="w-full table-auto text-[0.9em] leading-snug">
-        <thead className="border-y border-slate-200 bg-slate-100 text-[1em] uppercase leading-tight text-slate-600">
+        <thead
+          className={cn(
+            "border-y border-slate-300 text-[1em] uppercase leading-tight text-slate-600",
+            broadcast ? "bg-slate-200" : "bg-slate-100",
+          )}
+        >
           <tr>
             <th className="px-0.5 py-0 text-right">RK</th>
             <th className="px-0.5 py-0" aria-label="NHL team" />
-            <th className="whitespace-nowrap bg-slate-100 px-0.5 py-0 text-left">
-              Player
-            </th>
+            <th className="whitespace-nowrap px-0.5 py-0 text-left">Player</th>
             <th className="whitespace-nowrap px-0.5 py-0">Pos</th>
             <th
               className={cn(
                 "px-0.5 py-0 text-right",
-                broadcast && "bg-amber-100 text-slate-900",
+                broadcast && "bg-amber-100/60 text-slate-900",
               )}
             >
               OVR
@@ -361,8 +392,10 @@ export function CompactBestAvailableTable({
               className={cn(
                 "border-b border-slate-200 last:border-b-0",
                 broadcast && index < 3
-                  ? "bg-amber-50/70"
-                  : "odd:bg-white even:bg-slate-50",
+                  ? "bg-amber-100/30"
+                  : broadcast
+                    ? "odd:bg-slate-100 even:bg-slate-200/60"
+                    : "odd:bg-white even:bg-slate-50",
               )}
             >
               <td
@@ -402,7 +435,7 @@ export function CompactBestAvailableTable({
               <td
                 className={cn(
                   "px-px py-0 text-right align-top font-bold tabular-nums text-slate-800",
-                  broadcast && "bg-amber-100/60",
+                  broadcast && "bg-amber-100/40",
                 )}
               >
                 {typeof player.overallRating === "number"
@@ -464,12 +497,13 @@ export function DraftRosterBoard() {
                 key={conference.id}
                 conference={conference}
                 players={board.players}
+                remainingPicksByFranchise={board.remainingPicksByFranchise}
                 nhlTeamByAbbr={nhlTeamByAbbr}
                 shiftBottomTeams={conference === board.conferences[1]}
               />
             ))}
             {board.conferences.length >= 2 ? (
-              <DraftOwnerLadder
+              <DraftRosterCenter
                 teams={board.conferences.flatMap(
                   (conference) => conference.teams,
                 )}

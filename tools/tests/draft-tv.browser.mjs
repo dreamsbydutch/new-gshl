@@ -13,10 +13,10 @@ const teams = Array.from({length:14},(_,i)=>({id:String(i),ownerId:String(i),fra
 const player = (i,ownerId="available")=>({id:ownerId+"-"+i,ownerId,fullName:names[i%names.length],nhlTeam:"TOR",nhlPos:["C","LW","RW"],posGroup:i%15===10?"G":"F",lineupPos:positions[i%15],overallRating:99.99,seasonRating:99.99,overallRk:i+1,seasonRk:i+1,stats:{GP:82,G:65,A:105,P:170,PM:35,PIM:120,PPP:55,SOG:345,HIT:210,BLK:150,W:45,GAA:2.35,SVP:0.925}});
 const players=teams.flatMap(team=>Array.from({length:15},(_,i)=>player(i,team.ownerId)));
 const available=Array.from({length:50},(_,i)=>({...player(i),posGroup:i<35?"F":"G"}));
-const pick=(i)=>({pick:{id:String(i),round:2,pick:i},team:teams[i%14],player:player(i)});
-export function useDraftRosterBoard(){return {season:{name:"2026-27",year:2027},nhlTeams:[],players,availablePlayers:available,isLoading:window.tvState==="loading",conferences:[{id:"a",name:"Hickory Hotel",teams:teams.slice(0,7)},{id:"b",name:"Sunview",teams:teams.slice(7)}]};}
-export function useOwnerRankingsData(){return {isLoading:window.tvState==="loading",data:{rankings:teams.map((team,i)=>({owner:{id:team.ownerId},rank:i+1,displayName:"Alexander Owner "+(i+1),rating:1800-i*23,cups:i%4,primaryTeam:null,overallRecord:{wins:150,losses:125,ties:3}}))}};}
-export function useDraftHubBoard(){const cursor=30+(window.tvStep??0); return {season:{name:"2026-27",draftStartAt:"2026-09-25T20:00:00Z"},state:{status:window.tvState,completedCount:cursor-1,remainingCount:90-cursor},activePick:pick(cursor),clockRemainingSeconds:125,draftStartRemainingSeconds:90061,isLoading:window.tvState==="loading",recentPicks:Array.from({length:5},(_,i)=>pick(cursor-i-1)),upcomingPicks:Array.from({length:5},(_,i)=>pick(cursor+i+1))};}
+const pick=(i)=>({pick:{id:String(i),round:2,pick:i},team:{...teams[i%14],id:"draft-season-"+teams[i%14].id},player:player(i)});
+export function useDraftRosterBoard(){return {season:{name:"2026-27",year:2027},nhlTeams:[],players,remainingPicksByFranchise:new Map(teams.map(team=>[team.franchiseId,Array.from({length:15-(window.tvStep??0)},(_,i)=>({id:team.id+"-pick-"+i,round:String(i+1),pick:String(i*14+Number(team.id)+1)}))])),availablePlayers:available,isLoading:window.tvState==="loading",conferences:[{id:"a",name:"Hickory Hotel",teams:teams.slice(0,7)},{id:"b",name:"Sunview",teams:teams.slice(7)}]};}
+export function useOwnerRankingsData(){return {isLoading:window.tvState==="loading",data:{rankings:teams.map((team,i)=>({owner:{id:team.ownerId},rank:i+1,displayName:"Alexander Owner "+(i+1),rating:1800-i*23,cups:i%4,primaryTeam:null,seasonsPlayed:12,playoffAppearances:8,finalsAppearances:3,overallRecord:{wins:150,losses:125,ties:3,winPercentage:0.545}}))}};}
+export function useDraftLiveTvBoard(){const cursor=30+(window.tvStep??0); return {season:{name:"2026-27",draftStartAt:"2026-09-25T20:00:00Z"},state:{status:window.tvState,completedCount:cursor-1,remainingCount:90-cursor},activePick:pick(cursor),clockRemainingSeconds:125,draftStartRemainingSeconds:90061,isLoading:window.tvState==="loading",recentPicks:Array.from({length:5},(_,i)=>pick(cursor-i-1)),upcomingPicks:Array.from({length:5},(_,i)=>pick(cursor+i+1))};}
 `;
 const compiled = await build({
   stdin: {
@@ -146,9 +146,78 @@ try {
         path: resolve(`.next/tv-checks/${view}-${width}.png`),
       });
       console.log(`${view} ${width}x${height}: all panels fit`);
+      if (view === "overview") {
+        assert.equal(
+          await page.$$eval(
+            "[data-remaining-pick-id]",
+            (nodes) => nodes.length,
+          ),
+          210,
+        );
+        assert.match(result.text, /Win%/);
+        await page.evaluate(() =>
+          [...document.querySelectorAll('[aria-label="Center view"] button')]
+            .find((button) => button.textContent === "Live draft")
+            .click(),
+        );
+        await new Promise((resolve) => setTimeout(resolve, 400));
+        const center = await page.evaluate(() => {
+          const panel = document.querySelector('[aria-label="Draft center"]');
+          return {
+            timer: panel.querySelector('[role="timer"]')?.textContent,
+            rosters: panel.querySelectorAll("article").length,
+            rails: panel.querySelectorAll("[data-tv-fit]").length,
+            overflow: [...panel.querySelectorAll("[data-tv-fit]"), panel].some(
+              (node) =>
+                node.scrollWidth > node.clientWidth + 1 ||
+                node.scrollHeight > node.clientHeight + 1,
+            ),
+          };
+        });
+        await page.screenshot({
+          path: resolve(`.next/tv-checks/overview-live-${width}.png`),
+        });
+        if (center.overflow)
+          console.log(
+            await page.evaluate(() =>
+              [
+                ...document.querySelectorAll(
+                  '[aria-label="Draft center"], [aria-label="Draft center"] [data-tv-fit]',
+                ),
+              ].map((node) => ({
+                name: node.getAttribute("aria-label"),
+                w: node.clientWidth,
+                sw: node.scrollWidth,
+                h: node.clientHeight,
+                sh: node.scrollHeight,
+              })),
+            ),
+          );
+        assert.deepEqual(center, {
+          timer: "02:05",
+          rosters: 0,
+          rails: 2,
+          overflow: false,
+        });
+
+        console.log(
+          `overview live center ${width}x${height}: clock and both rails fit`,
+        );
+      }
     }
   }
   await page.setViewport({ width: 1920, height: 1080 });
+  await page.evaluate(() => {
+    window.tvStep = 1;
+    window.renderTV("overview", "on_clock");
+  });
+  await new Promise((resolve) => setTimeout(resolve, 400));
+  assert.equal(
+    await page.$$eval("[data-remaining-pick-id]", (nodes) => nodes.length),
+    196,
+  );
+  console.log("overview remaining picks decrease after selection");
+
   await page.evaluate(() => {
     window.tvStep = 1;
     window.renderTV("live", "on_clock");

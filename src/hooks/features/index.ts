@@ -47,3 +47,5 @@ export * from "./useInteractiveContractTable";
 export * from "./useMatchupContextNavigation";
 
 export * from "./useLockerRoomTeamOptions";
+
+export * from "./useDraftLiveTvBoard";

@@ -216,6 +216,7 @@ export interface DraftRosterConferenceView {
 export interface DraftRosterBoardViewModel {
   season: Season | undefined;
   conferences: DraftRosterConferenceView[];
+  remainingPicksByFranchise: Map<string, DraftPick[]>;
   players: Player[];
   availablePlayers: DraftHubEligiblePlayerView[];
   nhlTeams: NHLTeam[];

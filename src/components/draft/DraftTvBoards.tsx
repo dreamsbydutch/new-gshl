@@ -4,7 +4,6 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { useDraftRosterBoard } from "@gshl-hooks";
 import { useDraftBoardFit } from "@gshl-hooks/features/useDraftBoardFit";
-import { cn } from "@gshl-utils";
 import type { DraftHubEligiblePlayerView } from "@gshl-types";
 import { CompactBestAvailableTable } from "./DraftRosterBoard";
 
@@ -18,37 +17,30 @@ function TvFrame({
   season?: string;
 }) {
   return (
-    <main className="flex h-dvh min-h-[500px] flex-col overflow-hidden bg-white p-3 text-[length:clamp(16px,1.35vw,52px)] leading-tight text-slate-950">
-      <header
-        className={cn(
-          "mb-3 flex shrink-0 items-center justify-between",
-          season
-            ? "border-b-[3px] border-amber-400 bg-slate-950 px-3 py-2 text-white"
-            : "border-b border-slate-300 pb-2",
-        )}
-      >
+    <main className="flex h-dvh min-h-[500px] flex-col overflow-hidden bg-slate-200 p-3 text-[length:clamp(16px,1.35vw,52px)] leading-tight text-slate-950">
+      <header className="mb-3 flex shrink-0 items-center justify-between border-y-[3px] border-slate-800 bg-slate-100 px-3 py-2">
         <div className="flex items-center gap-3">
           {season && (
-            <span className="border-r border-white/25 pr-3 text-[0.8em] font-black tracking-[0.16em] text-amber-300">
+            <span className="border-r border-slate-300 pr-3 text-[0.8em] font-semibold tracking-[0.16em] text-slate-700">
               GSHL
             </span>
           )}
-          <h1 className="text-[1.3em] font-bold">{title}</h1>
+          <h1 className="text-[1.3em] font-semibold">{title}</h1>
           {season && (
-            <span className="ml-2 text-[0.6em] font-semibold uppercase tracking-wider text-slate-300">
+            <span className="ml-2 text-[0.6em] font-semibold uppercase tracking-wider text-slate-600">
               {season}
             </span>
           )}
         </div>
         <nav
           aria-label="TV boards"
-          className="flex gap-4 text-[0.65em] font-semibold underline underline-offset-4"
+          className="flex gap-4 text-[0.65em] font-medium text-slate-700 underline underline-offset-4"
         >
           <Link href="/draft-roster-board">Overview</Link>
           <Link
             href="/draft-roster-board/available"
-            aria-current={season ? "page" : undefined}
-            className={season ? "text-amber-300" : undefined}
+            aria-current="page"
+            className="decoration-amber-500 decoration-2"
           >
             Available
           </Link>
@@ -72,7 +64,7 @@ function AvailablePanel({
     <section
       ref={panelRef}
       aria-label={title}
-      className="min-h-0 min-w-0 overflow-hidden border border-slate-300"
+      className="min-h-0 min-w-0 overflow-hidden border border-slate-300 bg-slate-100"
     >
       <div ref={contentRef} className="w-full">
         <CompactBestAvailableTable title={title} players={players} broadcast />

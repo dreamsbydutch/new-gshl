@@ -1,18 +1,12 @@
 "use client";
 
 import Image from "next/image";
-import Link from "next/link";
 import { useOwnerRankingsData } from "@gshl-hooks";
 import { useDraftBoardFit } from "@gshl-hooks/features/useDraftBoardFit";
+import { abbreviatePlayerName } from "@gshl-utils";
 import type { DraftRosterTeamView } from "@gshl-types";
 
-export function DraftOwnerLadder({
-  teams,
-  seasonName,
-}: {
-  teams: DraftRosterTeamView[];
-  seasonName?: string;
-}) {
+export function DraftOwnerLadder({ teams }: { teams: DraftRosterTeamView[] }) {
   const { data, isLoading } = useOwnerRankingsData();
   const { panelRef, contentRef } = useDraftBoardFit();
   const ownerIds = new Set(teams.map((team) => team.ownerId));
@@ -20,10 +14,10 @@ export function DraftOwnerLadder({
     ownerIds.has(entry.owner.id),
   );
   return (
-    <aside
+    <section
       ref={panelRef}
       aria-label="Owner ladder"
-      className="absolute bottom-1.5 left-1/2 z-10 flex h-[calc((100%_-_2.25em_-_24px)/2)] w-[calc(25%_+_3px)] -translate-x-1/2 flex-col overflow-hidden rounded-lg border border-slate-400 bg-slate-200"
+      className="min-h-0 flex-1 overflow-hidden"
     >
       <div ref={contentRef} className="w-full shrink-0">
         <header className="border-b border-slate-400 px-2 py-1.5">
@@ -54,6 +48,34 @@ export function DraftOwnerLadder({
                 <th scope="col" className="px-1 py-1 text-right font-medium">
                   W-L-T
                 </th>
+                <th
+                  scope="col"
+                  className="px-1 py-1 text-right font-medium"
+                  title="Win percentage"
+                >
+                  Win%
+                </th>
+                <th
+                  scope="col"
+                  className="px-1 py-1 text-right font-medium"
+                  title="Seasons played"
+                >
+                  Yrs
+                </th>
+                <th
+                  scope="col"
+                  className="px-1 py-1 text-right font-medium"
+                  title="Playoff appearances"
+                >
+                  PO
+                </th>
+                <th
+                  scope="col"
+                  className="px-1 py-1 text-right font-medium"
+                  title="Finals appearances"
+                >
+                  Finals
+                </th>
                 <th scope="col" className="px-1 py-1 text-right font-medium">
                   Cups
                 </th>
@@ -79,7 +101,12 @@ export function DraftOwnerLadder({
                           className="h-[1.3em] w-[1.3em] shrink-0 object-contain"
                         />
                       )}
-                      <span className="font-medium">{entry.displayName}</span>
+                      <span
+                        className="whitespace-nowrap font-medium"
+                        title={entry.displayName}
+                      >
+                        {abbreviatePlayerName(entry.displayName)}
+                      </span>
                     </div>
                   </td>
                   <td className="px-1 py-0.5 text-right tabular-nums">
@@ -88,6 +115,18 @@ export function DraftOwnerLadder({
                   <td className="whitespace-nowrap px-1 py-0.5 text-right tabular-nums text-slate-700">
                     {entry.overallRecord.wins}-{entry.overallRecord.losses}-
                     {entry.overallRecord.ties}
+                  </td>
+                  <td className="px-1 py-0.5 text-right tabular-nums">
+                    {(entry.overallRecord.winPercentage * 100).toFixed(0)}
+                  </td>
+                  <td className="px-1 py-0.5 text-right tabular-nums">
+                    {entry.seasonsPlayed}
+                  </td>
+                  <td className="px-1 py-0.5 text-right tabular-nums">
+                    {entry.playoffAppearances}
+                  </td>
+                  <td className="px-1 py-0.5 text-right tabular-nums">
+                    {entry.finalsAppearances}
                   </td>
                   <td className="px-1 py-0.5 text-right tabular-nums">
                     {entry.cups}
@@ -101,20 +140,7 @@ export function DraftOwnerLadder({
             Owner rankings are not available yet.
           </p>
         )}
-        <footer className="mt-2 border-t border-slate-400 px-2 py-1.5 text-[0.75em] text-slate-700">
-          <p className="mb-1">
-            {seasonName ?? "GSHL Draft"} &middot; {teams.length} rosters
-          </p>
-          <nav
-            aria-label="Draft screens"
-            className="flex justify-between gap-2 underline underline-offset-4"
-          >
-            <Link href="/draft-roster-board/available">Available TV</Link>
-            <Link href="/draft-roster-board/live">Live TV</Link>
-            <Link href="/draft">Draft Hub</Link>
-          </nav>
-        </footer>
       </div>
-    </aside>
+    </section>
   );
 }
