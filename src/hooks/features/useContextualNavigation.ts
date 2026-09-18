@@ -30,6 +30,7 @@ import {
   LOCKER_ROOM_NAVIGATION_VIEWS,
   readContextualNavigationQuery,
   resolveContextualSelection,
+  resolveLockerRoomOwnerId,
   SCHEDULE_NAVIGATION_VIEWS,
   STANDINGS_NAVIGATION_VIEWS,
   toPersistedNavigationId,
@@ -528,15 +529,11 @@ export function useLockerRoomContextNavigation(synchronizeRoute = true) {
   const ownOwnerId = session?.user.ownerId
     ? String(session.user.ownerId)
     : null;
-  const fallbackOwnerId =
-    (ownOwnerId && validOwnerIds.includes(ownOwnerId) ? ownOwnerId : null) ??
-    validOwnerIds[0] ??
-    null;
-  const ownerId = resolveId(
+  const ownerId = resolveLockerRoomOwnerId(
     query.owner,
+    ownOwnerId,
     persistedOwnerId,
     validOwnerIds,
-    fallbackOwnerId,
   );
   const view = resolveContextualSelection({
     explicitValue: query.view,

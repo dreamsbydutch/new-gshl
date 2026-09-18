@@ -346,3 +346,24 @@ export function isLockerRoomNavigationView(
 ): value is LockerRoomNavigationView {
   return isOneOf(value, LOCKER_ROOM_NAVIGATION_VIEWS);
 }
+
+/** A fresh My Team visit belongs to the viewer; explicit team links take precedence. */
+export function resolveLockerRoomOwnerId(
+  explicitOwnerId: string | null,
+  signedInOwnerId: string | null,
+  persistedOwnerId: string | null | undefined,
+  validOwnerIds: readonly string[],
+): string | null {
+  const ownOwnerId =
+    signedInOwnerId && validOwnerIds.includes(signedInOwnerId)
+      ? signedInOwnerId
+      : null;
+  const fallback = ownOwnerId ?? validOwnerIds[0] ?? null;
+  if (explicitOwnerId !== null) {
+    return validOwnerIds.includes(explicitOwnerId) ? explicitOwnerId : fallback;
+  }
+  if (ownOwnerId) return ownOwnerId;
+  return persistedOwnerId && validOwnerIds.includes(persistedOwnerId)
+    ? persistedOwnerId
+    : fallback;
+}

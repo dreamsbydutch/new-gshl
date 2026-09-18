@@ -14,6 +14,7 @@ import {
   isGlobalSeasonUrlPath,
   isLockerRoomNavigationView,
   resolveContextualSelection,
+  resolveLockerRoomOwnerId,
   resolveMatchupBackHref,
   resolveMatchupNavigationSide,
   toPersistedNavigationId,
@@ -232,5 +233,37 @@ void test("trade block is a My Team view and old League Office links resolve the
       { view: "tradeBlock" },
     ),
     "/lockerroom?view=tradeBlock&owner=owner-a",
+  );
+});
+
+void test("My Team defaults to the signed-in owner rather than the stored or first team", () => {
+  const owners = ["first-owner", "my-owner", "other-owner"];
+  assert.equal(
+    resolveLockerRoomOwnerId(null, "my-owner", "first-owner", owners),
+    "my-owner",
+  );
+  assert.equal(
+    resolveLockerRoomOwnerId(null, "my-owner", "other-owner", owners),
+    "my-owner",
+  );
+  assert.equal(
+    resolveLockerRoomOwnerId("other-owner", "my-owner", "first-owner", owners),
+    "other-owner",
+  );
+  assert.equal(
+    resolveLockerRoomOwnerId("invalid", "my-owner", "first-owner", owners),
+    "my-owner",
+  );
+  assert.equal(
+    resolveLockerRoomOwnerId(null, null, "other-owner", owners),
+    "other-owner",
+  );
+  assert.equal(
+    resolveLockerRoomOwnerId(null, "unlinked", null, owners),
+    "first-owner",
+  );
+  assert.equal(
+    resolveLockerRoomOwnerId(null, "my-owner", "old-owner", []),
+    null,
   );
 });

@@ -250,7 +250,7 @@ normalization; stored catalog and statistical records are unchanged.
 
 ### My Team trade block
 
-The Trades tab renders compact selected-owner listings above the league market.
+The Trades tab renders compact selected-owner listings above the league market, with a 48rem maximum width on desktop. A My Team visit without an explicit owner opens the signed-in owner's team ahead of any persisted selection. Explicit owner links and dropdown selections still take precedence; viewers without a linked team retain the existing stored/first-team fallback.
 A List player button opens the player/request editor only for the signed-in
 owner's selected team, and each owned listing has an Edit action. Switching
 owners remounts the form so drafts cannot carry between teams. Market search

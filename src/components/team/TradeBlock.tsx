@@ -155,7 +155,10 @@ export function TradeBlock({
   if (market.isLoading) return <TradeBlockLoading />;
 
   return (
-    <section aria-labelledby="trade-block-heading">
+    <section
+      aria-labelledby="trade-block-heading"
+      className="w-full lg:max-w-3xl"
+    >
       <header className="mb-3 flex items-center justify-between gap-2">
         <h2 id="trade-block-heading" className="text-base font-semibold">
           Trade Block
