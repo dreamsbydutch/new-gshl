@@ -38,12 +38,12 @@ const RECORD_BOOK_VIEWS: Array<{
 const ALL_STAR_TABLE_COLUMNS = [
   {
     award: AwardsList.FIRST_AS,
-    label: "1st",
+    label: "1st Team",
     title: "First Team All-Star selections",
   },
   {
     award: AwardsList.SECOND_AS,
-    label: "2nd",
+    label: "2nd Team",
     title: "Second Team All-Star selections",
   },
 ] as const;
