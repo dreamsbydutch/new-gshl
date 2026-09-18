@@ -239,14 +239,24 @@ function finalizeRates<
   };
 }
 
-function getStatLine(row: RecordBookStatLine): RecordBookStatLine {
+function getStatLine(
+  row: RecordBookStatLine & { notCountedStats?: Set<RecordBookStatKey> },
+): RecordBookStatLine & { notCountedStats: Set<RecordBookStatKey> } {
+  const notCountedStats = new Set(row.notCountedStats);
+  // Historical seasons may omit P even when goals and assists were recorded.
+  if (notCountedStats.has("G") && notCountedStats.has("A")) {
+    notCountedStats.add("P");
+  } else {
+    notCountedStats.delete("P");
+  }
   return {
+    notCountedStats,
     days: row.days,
     GP: row.GP,
     GS: row.GS,
     G: row.G,
     A: row.A,
-    P: row.P,
+    P: row.G + row.A,
     PM: row.PM,
     PIM: row.PIM,
     PPP: row.PPP,
@@ -656,7 +666,6 @@ export function buildRecordBookPlayerRows(
       firstSeason: row.seasonYear,
       lastSeason: row.seasonYear,
       ...getStatLine(row),
-      notCountedStats: row.notCountedStats,
       awardCounts:
         seasonCounts.get(`${row.playerId}|${row.seasonId}|${row.seasonType}`) ??
         {},
@@ -690,7 +699,6 @@ export function buildRecordBookPlayerRows(
         firstSeason: years.at(0),
         lastSeason: years.at(-1),
         ...getStatLine(row),
-        notCountedStats: row.notCountedStats,
         awardCounts:
           careerCounts.get(`${row.playerId}|${row.seasonType}`) ?? {},
       };

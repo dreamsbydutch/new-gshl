@@ -16,6 +16,7 @@ import {
   buildAllTimeFranchiseRoster,
   buildRecordBookPlayerRows,
   formatRecordBookStat,
+  sortRecordBookPlayerRows,
   getOwnerTeamIds,
   getRecordBookVisibleAwards,
   getRecordBookAwardSeasonType,
@@ -392,6 +393,106 @@ void test("player history renders one logo per NHL team despite alias catalog ID
     assert.deepEqual(
       row?.nhlTeams.map((team) => team.id),
       ["nj-canonical", "vegas-canonical", "toronto"],
+    );
+  }
+});
+
+void test("history points use goals plus assists across seasons and stages", () => {
+  const splits = [
+    seasonSplitRow({ G: "10", A: "20", P: "", seasonId: "old" }),
+    seasonSplitRow({ G: "5", A: "7", P: "0", seasonId: "new" }),
+    seasonSplitRow({
+      G: "2",
+      A: "3",
+      P: "999",
+      seasonType: SeasonType.PLAYOFFS,
+    }),
+    seasonSplitRow({ playerId: "player-2", G: "15", A: "20", P: "35" }),
+    seasonSplitRow({ gshlTeamId: "other-owner", G: "100", A: "100", P: "200" }),
+  ];
+  const before = structuredClone(splits);
+  const { careerRows, seasonRows } = buildRecordBookPlayerRows({
+    awardRows: [],
+    careerSplits: splits,
+    seasonSplits: splits,
+    nhlTeamsByAbbr: new Map(),
+    playersById: new Map(),
+    ownerTeamIds: new Set(["owner-a-team-1"]),
+    seasonsById: new Map([
+      ["old", 2019],
+      ["new", 2021],
+      ["season-1", 2025],
+    ]),
+  });
+  const regular = careerRows.find(
+    (row) =>
+      row.playerId === "player-1" &&
+      row.seasonType === SeasonType.REGULAR_SEASON,
+  )!;
+  const playoff = careerRows.find(
+    (row) => row.seasonType === SeasonType.PLAYOFFS,
+  )!;
+  assert.equal(regular.P, 42);
+  assert.equal(playoff.P, 5);
+  assert.equal(seasonRows.find((row) => row.seasonId === "old")?.P, 30);
+  assert.equal(seasonRows.find((row) => row.seasonId === "new")?.P, 12);
+  const points = {
+    key: "P",
+    label: "P",
+    title: "Points",
+  } satisfies RecordBookStatColumn;
+  assert.equal(formatRecordBookStat(regular, points), "42");
+  assert.equal(
+    sortRecordBookPlayerRows(
+      careerRows.filter((row) => row.seasonType === SeasonType.REGULAR_SEASON),
+      { key: "P", direction: "desc" },
+    )[0]?.playerId,
+    "player-1",
+  );
+  assert.deepEqual(splits, before);
+});
+
+void test("derived history points distinguish zero from unavailable goals and assists", () => {
+  const splits = [
+    seasonSplitRow({ playerId: "zero", G: "0", A: "0", P: "" }),
+    seasonSplitRow({ playerId: "unavailable", G: "", A: "", P: "" }),
+    seasonSplitRow({ playerId: "goals-only", G: "2", A: "", P: "" }),
+  ];
+  const { careerRows, seasonRows } = buildRecordBookPlayerRows({
+    awardRows: [],
+    careerSplits: splits,
+    seasonSplits: splits,
+    nhlTeamsByAbbr: new Map(),
+    playersById: new Map(),
+    ownerTeamIds: new Set(["owner-a-team-1"]),
+    seasonsById: new Map(),
+  });
+  const points = {
+    key: "P",
+    label: "P",
+    title: "Points",
+  } satisfies RecordBookStatColumn;
+  for (const rows of [careerRows, seasonRows]) {
+    assert.equal(
+      formatRecordBookStat(
+        rows.find((row) => row.playerId === "zero")!,
+        points,
+      ),
+      "0",
+    );
+    assert.equal(
+      formatRecordBookStat(
+        rows.find((row) => row.playerId === "unavailable")!,
+        points,
+      ),
+      "-",
+    );
+    assert.equal(
+      formatRecordBookStat(
+        rows.find((row) => row.playerId === "goals-only")!,
+        points,
+      ),
+      "2",
     );
   }
 });
