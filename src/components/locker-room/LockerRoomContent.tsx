@@ -11,7 +11,7 @@ import {
   usePlayerTotalsByPlayers,
   usePlayerAwards,
   useSeasonState,
-  useTeams,
+  useLockerRoomTeamOptions,
   useNHLTeams,
   useContracts,
   useNav,
@@ -19,7 +19,7 @@ import {
   useTeamAwards,
 } from "@gshl-hooks";
 import { getOwnerTeamIds, resolveSalaryCapSeason } from "@gshl-utils";
-import type { GSHLTeam, NHLTeam } from "@gshl-types";
+import type { NHLTeam } from "@gshl-types";
 import {
   CapLabSkeleton,
   ContractHistorySkeleton,
@@ -111,24 +111,21 @@ export function LockerRoomContent() {
   // Only fetch contract data when on a tab that needs it
   const needsContractData =
     selectedLockerRoomType === "salary" || selectedLockerRoomType === "roster";
-  const lockerRoomSeason = contextSeason ?? contractSeason;
-
-  const { data: teamsRaw = [], isLoading: teamsLoading } = useTeams({
-    seasonId: lockerRoomSeason?.id,
-    enabled: Boolean(lockerRoomSeason?.id),
-  });
-  const teams = teamsRaw as GSHLTeam[];
-
-  const currentTeam = teams?.find((t) => t.ownerId === selectedOwnerId);
+  const teamCatalog = useLockerRoomTeamOptions();
+  const teamsLoading = teamCatalog.isLoading;
+  const allTeams = teamCatalog.allTeams;
+  const currentTeam = teamCatalog.teamOptions.find(
+    (team) => team.ownerId === selectedOwnerId,
+  );
+  const teams = allTeams.filter(
+    (team) => team.seasonId === (currentTeam?.seasonId ?? contextSeason?.id),
+  );
+  const isInactiveOwner = Boolean(currentTeam && !currentTeam.ownerIsActive);
+  const lastTeamSeason = seasons.find(
+    (season) => season.id === currentTeam?.seasonId,
+  );
   const isTrophyTab = selectedLockerRoomType === "trophy";
   const isRecordBookTab = selectedLockerRoomType === "recordbook";
-  const needsHistoricalTeams = isTrophyTab || isRecordBookTab;
-  const { data: historicalTeamsRaw = [] } = useTeams({
-    enabled: needsHistoricalTeams,
-  });
-  const allTeams = needsHistoricalTeams
-    ? (historicalTeamsRaw as GSHLTeam[])
-    : teams;
   const needsPlayers = needsContractData || isRecordBookTab;
   const { data: players = [], isLoading: playersLoading } = usePlayers({
     ownerId: currentTeam?.ownerId,
@@ -303,6 +300,12 @@ export function LockerRoomContent() {
   return (
     <>
       <LockerRoomHeader currentTeam={currentTeam} headingLevel={2} />
+      {isInactiveOwner && (
+        <p className="mb-3 text-xs text-slate-500">
+          <span className="font-semibold">Inactive owner</span>
+          {lastTeamSeason ? ` - Last team: ${lastTeamSeason.name}` : ""}
+        </p>
+      )}
       {selectedLockerRoomType === "salary" && (
         <>
           <div
@@ -378,7 +381,11 @@ export function LockerRoomContent() {
         />
       )}
       {selectedLockerRoomType === "draft" && (
-        <TeamDraftPickHistory currentTeam={currentTeam} seasons={seasons} />
+        <TeamDraftPickHistory
+          key={currentTeam.ownerId}
+          currentTeam={currentTeam}
+          seasons={seasons}
+        />
       )}
       {selectedLockerRoomType === "trophy" && (
         <TrophyCase

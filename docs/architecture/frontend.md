@@ -180,7 +180,11 @@ Home's compact modules use a centered reading measure. When a linked owner has a
 The Locker Room uses a single 36px section-navigation row on mobile. Team
 selection lives in a labelled **Team** dropdown in the global header, showing
 the selected team and its logo on mobile and desktop. The menu lists team logos
-and names with keyboard navigation and a selected-team indicator. Switching teams preserves the active
+and names with keyboard navigation and a selected-team indicator. Active teams
+appear first; inactive owners appear below with their newest recorded team, owner
+name, last season, and an Inactive label. Selection is owner-based, including former
+owners absent from the current season; all My Team views resolve the same representative
+team. Draft Picks defaults former owners to their last recorded season. Switching teams preserves the active
 My Team section and its URL context. The route layout owns URL/store synchronization;
 the header reads the same selection and navigates without a competing synchronization effect. The route owns horizontal spacing,
 and the compact team header stays above all six views. The roster retains its

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef } from "react";
 
+import { useLockerRoomTeamOptions } from "./useLockerRoomTeamOptions";
 import { useNavStore } from "@gshl-cache";
 import type {
   GSHLTeam,
@@ -519,13 +520,10 @@ export function useLockerRoomContextNavigation(synchronizeRoute = true) {
   const { effectiveSeasonId, isSeasonDataReady } = useResolvedSeasonId(
     query.season,
   );
-  const teamsQuery = useTeams({
-    seasonId: effectiveSeasonId,
-    enabled: Boolean(effectiveSeasonId),
-  });
+  const teamCatalog = useLockerRoomTeamOptions();
   const validOwnerIds = useMemo(
-    () => uniqueOwnerIds((teamsQuery.data ?? []) as GSHLTeam[]),
-    [teamsQuery.data],
+    () => uniqueOwnerIds(teamCatalog.teamOptions),
+    [teamCatalog.teamOptions],
   );
   const ownOwnerId = session?.user.ownerId
     ? String(session.user.ownerId)
@@ -549,7 +547,7 @@ export function useLockerRoomContextNavigation(synchronizeRoute = true) {
   const routeDataReady =
     hasHydrated &&
     isSeasonDataReady &&
-    !teamsQuery.isLoading &&
+    !teamCatalog.isLoading &&
     authStatus !== "loading";
   const storeMatches =
     persistedView === view &&
@@ -614,10 +612,10 @@ export function useLockerRoomContextNavigation(synchronizeRoute = true) {
 
   return {
     isReady: routeDataReady && storeMatches,
-    teamOptions: ((teamsQuery.data ?? []) as GSHLTeam[])
-      .filter((team) => Boolean(team.ownerId))
-      .slice()
-      .sort((a, b) => (a.name ?? "").localeCompare(b.name ?? "")),
+    teamOptions: teamCatalog.teamOptions,
+    activeTeams: teamCatalog.activeTeams,
+    inactiveTeams: teamCatalog.inactiveTeams,
+    seasons: teamCatalog.seasons,
     selectedOwnerId: ownerId,
     selectedSeasonId: effectiveSeasonId,
     selectedView: view,

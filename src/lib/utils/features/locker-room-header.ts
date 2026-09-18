@@ -5,7 +5,7 @@
  * Type definitions are sourced from @gshl-types
  */
 
-import type { GSHLTeam } from "@gshl-types";
+import type { GSHLTeam, Season } from "@gshl-types";
 
 // Re-export types for backward compatibility
 export type {
@@ -33,3 +33,45 @@ export const formatOwnerName = (team: GSHLTeam) => {
 
   return `${ownerFirstName} ${ownerLastName}`;
 };
+
+/** One team per owner; current active teams precede former owners' latest teams. */
+export function buildLockerRoomTeamOptions<
+  T extends Pick<
+    GSHLTeam,
+    "id" | "seasonId" | "ownerId" | "ownerIsActive" | "isActive" | "name"
+  >,
+>(
+  teams: readonly T[],
+  seasons: readonly Pick<Season, "id" | "year">[],
+  currentSeasonId: string | null | undefined,
+) {
+  const yearById = new Map(seasons.map((season) => [season.id, season.year]));
+  const newestFirst = [...teams].sort(
+    (a, b) =>
+      (yearById.get(b.seasonId) ?? -1) - (yearById.get(a.seasonId) ?? -1) ||
+      a.id.localeCompare(b.id),
+  );
+  const byOwner = new Map<string, T>();
+  for (const team of newestFirst) {
+    if (!team.ownerId) continue;
+    const previous = byOwner.get(team.ownerId);
+    if (
+      !previous ||
+      (team.ownerIsActive &&
+        team.isActive &&
+        (team.seasonId === currentSeasonId || !previous.isActive))
+    ) {
+      byOwner.set(team.ownerId, team);
+    }
+  }
+  const choices = [...byOwner.values()].sort((a, b) =>
+    (a.name ?? "").localeCompare(b.name ?? ""),
+  );
+  const activeTeams = choices.filter((team) => team.ownerIsActive);
+  const inactiveTeams = choices.filter((team) => !team.ownerIsActive);
+  return {
+    activeTeams,
+    inactiveTeams,
+    teamOptions: [...activeTeams, ...inactiveTeams],
+  };
+}
