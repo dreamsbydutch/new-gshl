@@ -16,7 +16,7 @@ const available=Array.from({length:50},(_,i)=>({...player(i),posGroup:i<35?"F":"
 const pick=(i)=>({pick:{id:String(i),round:2,pick:i},team:teams[i%14],player:player(i)});
 export function useDraftRosterBoard(){return {season:{name:"2026-27",year:2027},nhlTeams:[],players,availablePlayers:available,isLoading:window.tvState==="loading",conferences:[{id:"a",name:"Hickory Hotel",teams:teams.slice(0,7)},{id:"b",name:"Sunview",teams:teams.slice(7)}]};}
 export function useOwnerRankingsData(){return {isLoading:window.tvState==="loading",data:{rankings:teams.map((team,i)=>({owner:{id:team.ownerId},rank:i+1,displayName:"Alexander Owner "+(i+1),rating:1800-i*23,cups:i%4,primaryTeam:null,overallRecord:{wins:150,losses:125,ties:3}}))}};}
-export function useDraftHubBoard(){return {season:{draftStartAt:"2026-09-25T20:00:00Z"},state:{status:window.tvState},activePick:pick(3),clockRemainingSeconds:125,isLoading:window.tvState==="loading",recentPicks:Array.from({length:8},(_,i)=>pick(30-i)),upcomingPicks:[pick(3),pick(4),pick(5),pick(6)]};}
+export function useDraftHubBoard(){const cursor=30+(window.tvStep??0); return {season:{name:"2026-27",draftStartAt:"2026-09-25T20:00:00Z"},state:{status:window.tvState,completedCount:cursor-1,remainingCount:90-cursor},activePick:pick(cursor),clockRemainingSeconds:125,draftStartRemainingSeconds:90061,isLoading:window.tvState==="loading",recentPicks:Array.from({length:5},(_,i)=>pick(cursor-i-1)),upcomingPicks:Array.from({length:5},(_,i)=>pick(cursor+i+1))};}
 `;
 const compiled = await build({
   stdin: {
@@ -83,7 +83,7 @@ try {
       const result = await page.evaluate(() => {
         const panels = [
           ...document.querySelectorAll(
-            'article,aside,section[aria-label="Top 26 skaters"],section[aria-label="Top 8 goalies"],section[aria-label="Recent and upcoming picks"]',
+            'article,aside,[data-tv-fit],section[aria-label="Top 26 skaters"],section[aria-label="Top 8 goalies"],section[aria-label="Recent and upcoming picks"]',
           ),
         ];
         return {
@@ -119,6 +119,24 @@ try {
       );
       assert.ok(result.panels > 0);
       assert.match(result.text, /A\. Matthews|M\. Necas/);
+      if (view === "live") {
+        const rails = await page.evaluate(() => ({
+          left: [
+            ...document.querySelectorAll(
+              '[aria-label="Recent picks"] [data-pick-id]',
+            ),
+          ].map((node) => node.dataset.pickId),
+          right: [
+            ...document.querySelectorAll(
+              '[aria-label="Upcoming picks"] [data-pick-id]',
+            ),
+          ].map((node) => node.dataset.pickId),
+          clock: document.querySelector('[role="timer"]')?.textContent,
+        }));
+        assert.deepEqual(rails.left, ["29", "28", "27", "26", "25"]);
+        assert.deepEqual(rails.right, ["31", "32", "33", "34", "35"]);
+        assert.equal(rails.clock, "02:05");
+      }
       if (view === "overview") {
         assert.equal(result.panels, 15);
         assert.match(result.text, /Owner ladder/);
@@ -130,6 +148,45 @@ try {
       console.log(`${view} ${width}x${height}: all panels fit`);
     }
   }
+  await page.setViewport({ width: 1920, height: 1080 });
+  await page.evaluate(() => {
+    window.tvStep = 1;
+    window.renderTV("live", "on_clock");
+  });
+  await new Promise((resolve) => setTimeout(resolve, 600));
+  const shifted = await page.evaluate(() => ({
+    left: [
+      ...document.querySelectorAll(
+        '[aria-label="Recent picks"] [data-pick-id]',
+      ),
+    ].map((node) => node.dataset.pickId),
+    right: [
+      ...document.querySelectorAll(
+        '[aria-label="Upcoming picks"] [data-pick-id]',
+      ),
+    ].map((node) => node.dataset.pickId),
+  }));
+  assert.deepEqual(shifted.left, ["30", "29", "28", "27", "26"]);
+  assert.deepEqual(shifted.right, ["32", "33", "34", "35", "36"]);
+  assert.equal(
+    await page.evaluate(() =>
+      document
+        .querySelector('[aria-label="On-clock team roster"] article')
+        ?.getAttribute("aria-label"),
+    ),
+    "Toronto Maple Reg's 4 roster",
+  );
+  console.log("live pick advancement: queues and active roster update");
+  await page.emulateMediaFeatures([
+    { name: "prefers-reduced-motion", value: "reduce" },
+  ]);
+  await page.evaluate(() => {
+    window.tvStep = 2;
+    window.renderTV("live", "on_clock");
+  });
+  await new Promise((resolve) => setTimeout(resolve, 100));
+  assert.equal(await page.evaluate(() => document.getAnimations().length), 0);
+  console.log("reduced-motion preference: no pick animations");
   for (const state of [
     "upcoming",
     "commissioner_required",
@@ -145,7 +202,18 @@ try {
       complete: "Draft complete",
       unavailable: "Draft unavailable",
     };
-    assert.ok(text.includes(expected[state]));
+    assert.ok(text.toLowerCase().includes(expected[state].toLowerCase()));
+    if (state === "upcoming") {
+      assert.match(text, /First team roster/i);
+      assert.match(text, /1d 01:01:01/);
+      assert.equal(
+        await page.evaluate(() => document.querySelectorAll("article").length),
+        1,
+      );
+    }
+    await page.screenshot({
+      path: resolve(`.next/tv-checks/live-${state}.png`),
+    });
     console.log(`live ${state}: passed`);
   }
 } finally {
