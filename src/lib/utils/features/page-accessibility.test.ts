@@ -19,6 +19,7 @@ void test("contextual layouts expose a labelled main landmark", () => {
       "src/components/league-office/LeagueOfficeLayout.tsx",
       "league-office-page-heading",
     ],
+    ["src/components/admin/AdminLayout.tsx", "admin-page-heading"],
   ] as const) {
     const source = readSource(path);
 
@@ -74,19 +75,20 @@ void test("the standalone Rulebook owns the landmark while shared content stays 
   assert.match(content, /<h2[^>]*>GSHL Rulebook<\/h2>/);
 });
 
-void test("Locker Room and League Office feature headings stay below the route h1", () => {
+void test("contextual feature headings stay below the route h1", () => {
   for (const path of [
     "src/components/locker-room/LockerRoomContent.tsx",
     "src/components/team/LockerRoomHeader.tsx",
     "src/components/league-office/ConferenceContest.tsx",
-    "src/components/league-office/ImageUpload.tsx",
     "src/components/league-office/LeagueOfficeMockDraft.tsx",
-    "src/components/league-office/Newsroom.tsx",
     "src/components/league-office/OwnerRankings.tsx",
     "src/components/league-office/Rulebook.tsx",
     "src/components/contracts/UfaSigning.tsx",
     "src/components/admin/ContractManagement.tsx",
+    "src/components/admin/ImageUpload.tsx",
     "src/components/admin/JobManagement.tsx",
+    "src/components/admin/Newsroom.tsx",
+    "src/components/admin/TvDisplays.tsx",
     "src/components/auth/UserManagement.tsx",
   ]) {
     assert.doesNotMatch(readSource(path), /<h1(?:\s|>)/);

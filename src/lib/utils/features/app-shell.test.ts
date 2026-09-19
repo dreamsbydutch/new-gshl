@@ -23,6 +23,10 @@ void test("maps primary routes to the correct persistent navigation item", () =>
     "lockerroom",
   );
   assert.equal(getAppShellRouteContext("/leagueoffice").activeNavId, "more");
+  assert.deepEqual(getAppShellRouteContext("/admin"), {
+    title: "Admin",
+    activeNavId: "more",
+  });
 });
 
 void test("keeps detail routes connected to their parent destination", () => {

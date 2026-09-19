@@ -35,12 +35,15 @@ export type LeagueOfficeNavigationView =
   | "freeAgents"
   | "rules"
   | "confBattle"
-  | "ownerRankings"
+  | "ownerRankings";
+
+export type AdminNavigationView =
   | "contracts"
   | "users"
   | "jobs"
   | "newsroom"
-  | "imageUpload";
+  | "images"
+  | "tv";
 
 export type MatchupNavigationSource = "schedule" | "lockerroom" | "headlines";
 
@@ -89,6 +92,10 @@ export interface LockerRoomNavigationContext {
 export interface LeagueOfficeNavigationContext {
   view: LeagueOfficeNavigationView;
   season?: string | null;
+}
+
+export interface AdminNavigationContext {
+  view: AdminNavigationView;
 }
 
 export interface MatchupNavigationContext {

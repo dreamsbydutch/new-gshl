@@ -1,4 +1,6 @@
 import type {
+  AdminNavigationContext,
+  AdminNavigationView,
   ContextualNavigationQuery,
   ContextualSelection,
   ContextualSelectionOptions,
@@ -45,12 +47,13 @@ export const MEMBER_LEAGUE_OFFICE_NAVIGATION_VIEWS = [
   "ownerRankings",
 ] as const;
 
-export const COMMISSIONER_LEAGUE_OFFICE_NAVIGATION_VIEWS = [
+export const ADMIN_NAVIGATION_VIEWS = [
   "contracts",
   "users",
   "jobs",
   "newsroom",
-  "imageUpload",
+  "images",
+  "tv",
 ] as const;
 
 export const MATCHUP_NAVIGATION_SOURCES = [
@@ -242,6 +245,15 @@ export function buildLeagueOfficeNavigationHref(
   });
 }
 
+export function buildAdminNavigationHref(
+  currentSearch: string | URLSearchParams,
+  context: AdminNavigationContext,
+): string {
+  return buildContextualNavigationHref("/admin", currentSearch, {
+    view: context.view,
+  });
+}
+
 export function buildDraftTeamsNavigationHref(
   currentSearch: string | URLSearchParams,
   owner: string | null | undefined,
@@ -252,14 +264,17 @@ export function buildDraftTeamsNavigationHref(
 }
 
 export function getLeagueOfficeNavigationViews(
-  role: string | null | undefined,
+  _role?: string | null,
 ): readonly LeagueOfficeNavigationView[] {
-  return role === "commissioner"
-    ? [
-        ...MEMBER_LEAGUE_OFFICE_NAVIGATION_VIEWS,
-        ...COMMISSIONER_LEAGUE_OFFICE_NAVIGATION_VIEWS,
-      ]
-    : MEMBER_LEAGUE_OFFICE_NAVIGATION_VIEWS;
+  return MEMBER_LEAGUE_OFFICE_NAVIGATION_VIEWS;
+}
+
+export function isAdminNavigationView(
+  view: string | null | undefined,
+): view is AdminNavigationView {
+  return Boolean(
+    view && ADMIN_NAVIGATION_VIEWS.includes(view as AdminNavigationView),
+  );
 }
 
 export function buildMatchupNavigationHref(

@@ -7,7 +7,9 @@ import {
   ClipboardList,
   Ellipsis,
   Newspaper,
+  ShieldCheck,
 } from "lucide-react";
+import { useAuthSession } from "@gshl-hooks";
 import type { MainNavbarMoreMenuProps } from "@gshl-types";
 import {
   DropdownMenu,
@@ -46,6 +48,13 @@ const moreItems = [
   },
 ];
 
+const adminItem = {
+  label: "Admin",
+  description: "Commissioner tools and TV displays",
+  href: "/admin",
+  icon: ShieldCheck,
+};
+
 function isMenuRouteActive(pathname: string, href: string): boolean {
   if (href === "/rulebook" && pathname === "/rules") return true;
   if (
@@ -63,6 +72,8 @@ export function MoreNavigationMenu({
   placement,
 }: MainNavbarMoreMenuProps) {
   const isMobile = placement === "mobile";
+  const { session } = useAuthSession();
+  const AdminIcon = adminItem.icon;
 
   return (
     <DropdownMenu>
@@ -119,6 +130,43 @@ export function MoreNavigationMenu({
             </DropdownMenuItem>
           );
         })}
+        {session?.user.role === "commissioner" ? (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuLabel className="px-3 py-2 text-xs uppercase tracking-[0.14em] text-slate-500">
+              Commissioner
+            </DropdownMenuLabel>
+            <DropdownMenuItem
+              asChild
+              className={cn(
+                "min-h-12 cursor-pointer rounded-lg px-3 py-2",
+                isMenuRouteActive(pathname, adminItem.href) && "bg-slate-100",
+              )}
+            >
+              <Link
+                href={adminItem.href}
+                aria-current={
+                  isMenuRouteActive(pathname, adminItem.href)
+                    ? "page"
+                    : undefined
+                }
+              >
+                <AdminIcon
+                  className="h-5 w-5 text-slate-600"
+                  aria-hidden="true"
+                />
+                <span className="min-w-0">
+                  <span className="block font-semibold text-slate-900">
+                    {adminItem.label}
+                  </span>
+                  <span className="block truncate text-xs text-slate-500">
+                    {adminItem.description}
+                  </span>
+                </span>
+              </Link>
+            </DropdownMenuItem>
+          </>
+        ) : null}
       </DropdownMenuContent>
     </DropdownMenu>
   );

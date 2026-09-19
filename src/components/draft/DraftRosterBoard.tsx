@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { MonitorUp } from "lucide-react";
 import { NHLLogo } from "@gshl-components/player/NHLLogo";
-import { useDraftRosterBoard } from "@gshl-hooks";
+import { lighten, useDraftRosterBoard, useTeamPalette } from "@gshl-hooks";
 import { DraftRosterCenter } from "./DraftRosterCenter";
 import { formatDraftPickLabel } from "@gshl-utils/features/draft-tv";
 import { useDraftBoardFit } from "@gshl-hooks/features/useDraftBoardFit";
@@ -31,10 +31,12 @@ function RosterPlayer({
   player,
   nhlTeamByAbbr,
   muted = false,
+  backgroundColor,
 }: {
   player: Player;
   nhlTeamByAbbr: Map<string, NHLTeam>;
   muted?: boolean;
+  backgroundColor?: string;
 }) {
   const nhlAbbr = getPlayerNhlAbbreviation(player);
   const nhlTeam = nhlAbbr ? nhlTeamByAbbr.get(nhlAbbr) : undefined;
@@ -50,12 +52,13 @@ function RosterPlayer({
         "min-w-0 rounded border border-slate-300/70 px-1 py-0.5 text-center",
         muted ? "bg-slate-200/60" : "bg-white shadow-sm",
       )}
+      style={backgroundColor ? { backgroundColor } : undefined}
       title={`${abbreviatePlayerName(player.fullName)} · ${player.nhlPos.join("/")} · ${rating}`}
     >
       <p
         aria-label={player.fullName}
         className={cn(
-          "whitespace-normal text-[0.9em] leading-tight text-slate-900",
+          "whitespace-normal text-[0.82em] leading-tight text-slate-900",
           muted ? "font-medium" : "font-bold",
         )}
       >
@@ -65,14 +68,14 @@ function RosterPlayer({
         <NHLLogo
           team={nhlTeam}
           size={18}
-          className="!h-[1.05em] !w-[1.05em] shrink-0"
+          className="!h-[0.95em] !w-[0.95em] shrink-0"
         />
-        <span className="break-words text-[0.72em] leading-tight text-slate-600">
+        <span className="break-words text-[0.66em] leading-tight text-slate-600">
           {player.nhlPos.join("/")}
         </span>
         <span
           className={cn(
-            "rounded px-0.5 text-[0.75em] leading-tight text-slate-800",
+            "rounded px-0.5 text-[0.7em] leading-tight text-slate-800",
             muted ? "font-medium" : "font-bold",
             getRosterRatingClass(player.seasonRk),
           )}
@@ -103,16 +106,35 @@ export function TeamRosterCard({
   const roster = buildCurrentRoster(players, team);
   const lineup = buildTeamLineup(roster);
   const bench = getBenchPlayers(roster);
+  const palette = useTeamPalette(team.logoUrl);
+  const primaryColor = palette.primary;
+  const secondaryColor = palette.secondary ?? primaryColor;
+  const cardBackground = primaryColor ? lighten(primaryColor, 0.84) : undefined;
+  const playerBackground = primaryColor
+    ? lighten(primaryColor, 0.94)
+    : undefined;
+  const headerBackground = primaryColor
+    ? `linear-gradient(90deg, ${lighten(primaryColor, 0.72)}, ${lighten(secondaryColor ?? primaryColor, 0.84)})`
+    : undefined;
 
   return (
     <article
       ref={panelRef}
       aria-label={`${team.name ?? team.abbr ?? "Team"} roster`}
+      data-team-primary={primaryColor ?? undefined}
       className={cn(
         "flex min-h-0 flex-col overflow-hidden rounded-lg border border-slate-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-slate-700",
         muted ? "bg-slate-100" : "bg-white",
         className,
       )}
+      style={
+        primaryColor
+          ? {
+              background: cardBackground,
+              borderColor: primaryColor,
+            }
+          : undefined
+      }
     >
       <div ref={contentRef} className="w-full shrink-0">
         <header
@@ -120,6 +142,9 @@ export function TeamRosterCard({
             "flex min-h-8 shrink-0 items-center gap-1 border-b border-slate-300 px-1.5 py-0.5",
             muted ? "bg-slate-200/80" : "bg-slate-50",
           )}
+          style={
+            headerBackground ? { background: headerBackground } : undefined
+          }
         >
           {team.logoUrl ? (
             <Image
@@ -198,6 +223,7 @@ export function TeamRosterCard({
                         key={player.id}
                         player={player}
                         muted={muted}
+                        backgroundColor={playerBackground}
                         nhlTeamByAbbr={nhlTeamByAbbr}
                       />
                     ))}
@@ -218,6 +244,7 @@ export function TeamRosterCard({
                     key={player.id}
                     player={player}
                     muted={muted}
+                    backgroundColor={playerBackground}
                     nhlTeamByAbbr={nhlTeamByAbbr}
                   />
                 ))}
@@ -307,10 +334,12 @@ function ConferenceRosterCard({
 export function CompactBestAvailableTable({
   title,
   players,
+  draftRanks,
   broadcast = false,
 }: {
   title: string;
   players: DraftHubEligiblePlayerView[];
+  draftRanks: ReadonlyMap<string, number>;
   broadcast?: boolean;
 }) {
   const isGoalieTable = players.some((player) => player.posGroup === "G");
@@ -326,8 +355,6 @@ export function CompactBestAvailableTable({
         ["G", "G"],
         ["A", "A"],
         ["P", "P"],
-        ["PM", "+/-"],
-        ["PIM", "PIM"],
         ["PPP", "PPP"],
         ["SOG", "SOG"],
         ["HIT", "HIT"],
@@ -360,7 +387,7 @@ export function CompactBestAvailableTable({
               : "text-[0.9em] text-slate-600",
           )}
         >
-          {broadcast ? "Ranked by OVR" : "Best available"}
+          {broadcast ? "Composite draft rank" : "Best available"}
         </span>
       </div>
       <table className="w-full table-auto text-[0.9em] leading-snug">
@@ -375,14 +402,6 @@ export function CompactBestAvailableTable({
             <th className="px-0.5 py-0" aria-label="NHL team" />
             <th className="whitespace-nowrap px-0.5 py-0 text-left">Player</th>
             <th className="whitespace-nowrap px-0.5 py-0">Pos</th>
-            <th
-              className={cn(
-                "px-0.5 py-0 text-right",
-                broadcast && "bg-amber-100/60 text-slate-900",
-              )}
-            >
-              OVR
-            </th>
             {statColumns.map(([, label]) => (
               <th key={label} className="px-px py-0 text-right">
                 {label}
@@ -391,72 +410,69 @@ export function CompactBestAvailableTable({
           </tr>
         </thead>
         <tbody>
-          {players.map((player, index) => (
-            <tr
-              key={player.id}
-              className={cn(
-                "border-b border-slate-200 last:border-b-0",
-                broadcast && index < 3
-                  ? "bg-amber-100/30"
-                  : broadcast
-                    ? "odd:bg-slate-100 even:bg-slate-200/60"
-                    : "odd:bg-white even:bg-slate-50",
-              )}
-            >
-              <td
+          {players.map((player) => {
+            const draftRank = draftRanks.get(String(player.id));
+            const isFeatured =
+              broadcast && draftRank !== undefined && draftRank <= 6;
+            return (
+              <tr
+                key={player.id}
+                data-featured-rank={isFeatured ? draftRank : undefined}
                 className={cn(
-                  "px-px py-0 text-right align-top tabular-nums",
-                  broadcast && index < 3
-                    ? "border-l-4 border-amber-400 font-bold text-slate-900"
-                    : "text-slate-600",
+                  "border-b border-slate-200 last:border-b-0",
+                  isFeatured
+                    ? "bg-amber-100/30"
+                    : broadcast
+                      ? "odd:bg-slate-100 even:bg-slate-200/60"
+                      : "odd:bg-white even:bg-slate-50",
                 )}
               >
-                {player.overallRk ?? "--"}
-              </td>
-              <td className="px-px py-0 align-top">
-                <NHLLogo
-                  team={
-                    player.nhlTeamLogoUrl
-                      ? {
-                          name: getPlayerNhlAbbreviation(player) ?? "NHL team",
-                          logoUrl: player.nhlTeamLogoUrl,
-                        }
-                      : undefined
-                  }
-                  size={18}
-                  className="!h-[1.2em] !w-[1.2em]"
-                />
-              </td>
-              <td
-                className="whitespace-nowrap bg-inherit px-0.5 py-0 align-top font-semibold leading-tight text-slate-900"
-                title={player.fullName}
-                aria-label={player.fullName}
-              >
-                {abbreviatePlayerName(player.fullName)}
-              </td>
-              <td className="whitespace-nowrap px-px py-0 text-center align-top leading-tight text-slate-600">
-                {player.nhlPos.join("/")}
-              </td>
-              <td
-                className={cn(
-                  "px-px py-0 text-right align-top font-bold tabular-nums text-slate-800",
-                  broadcast && "bg-amber-100/40",
-                )}
-              >
-                {typeof player.overallRating === "number"
-                  ? formatNumber(player.overallRating, 2)
-                  : "--"}
-              </td>
-              {statColumns.map(([key]) => (
                 <td
-                  key={key}
-                  className="px-px py-0 text-right align-top tabular-nums text-slate-600"
+                  className={cn(
+                    "px-px py-0 text-right align-top tabular-nums",
+                    isFeatured
+                      ? "border-l-4 border-amber-400 font-bold text-slate-900"
+                      : "text-slate-600",
+                  )}
                 >
-                  {formatUfaStat(player.stats, key)}
+                  {draftRank ?? "--"}
                 </td>
-              ))}
-            </tr>
-          ))}
+                <td className="px-px py-0 align-top">
+                  <NHLLogo
+                    team={
+                      player.nhlTeamLogoUrl
+                        ? {
+                            name:
+                              getPlayerNhlAbbreviation(player) ?? "NHL team",
+                            logoUrl: player.nhlTeamLogoUrl,
+                          }
+                        : undefined
+                    }
+                    size={18}
+                    className="!h-[1.2em] !w-[1.2em]"
+                  />
+                </td>
+                <td
+                  className="whitespace-nowrap bg-inherit px-0.5 py-0 align-top font-semibold leading-tight text-slate-900"
+                  title={player.fullName}
+                  aria-label={player.fullName}
+                >
+                  {abbreviatePlayerName(player.fullName)}
+                </td>
+                <td className="whitespace-nowrap px-px py-0 text-center align-top leading-tight text-slate-600">
+                  {player.nhlPos.join("/")}
+                </td>
+                {statColumns.map(([key]) => (
+                  <td
+                    key={key}
+                    className="px-px py-0 text-right align-top tabular-nums text-slate-600"
+                  >
+                    {formatUfaStat(player.stats, key)}
+                  </td>
+                ))}
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </section>

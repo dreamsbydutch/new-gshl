@@ -10,18 +10,21 @@ const fixture = `
 const names = ["Auston Matthews", "Martin Necas", "Ryan Nugent-Hopkins", "James van Riemsdyk", "Alex DeBrincat"];
 const positions = ["LW","C","RW","LW","C","RW","D","D","D","D","G","UTIL","BN","BN","BN"];
 const nhlPositions = ["LW","C","RW","LW","C","RW","D","D","D","D","G","C","LW","RW","D"];
-const teams = Array.from({length:14},(_,i)=>({id:String(i),ownerId:String(i),franchiseId:String(i),name:"Toronto Maple Reg's " + (i+1),abbr:"TOR",talentRating:89.75,logoUrl:null}));
-const player = (i,ownerId="available")=>({id:ownerId+"-"+i,ownerId,fullName:names[i%names.length],nhlTeam:"TOR",nhlPos:[nhlPositions[i%nhlPositions.length]],posGroup:nhlPositions[i%nhlPositions.length]==="G"?"G":nhlPositions[i%nhlPositions.length]==="D"?"D":"F",lineupPos:positions[i%15],overallRating:99.99,seasonRating:99.99,overallRk:i+1,seasonRk:i+1,stats:{GP:82,G:65,A:105,P:170,PM:35,PIM:120,PPP:55,SOG:345,HIT:210,BLK:150,W:45,GAA:2.35,SVP:0.925}});
+const teamLogos=["data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24'%3E%3Crect width='24' height='24' fill='%23ef4444'/%3E%3C/svg%3E","data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24'%3E%3Crect width='24' height='24' fill='%231e3a8a'/%3E%3C/svg%3E"];
+const teams = Array.from({length:14},(_,i)=>({id:String(i),ownerId:String(i),franchiseId:String(i),name:"Toronto Maple Reg's " + (i+1),abbr:"TOR",talentRating:89.75,logoUrl:teamLogos[i%teamLogos.length]}));
+const player = (i,ownerId="available")=>({id:ownerId+"-"+i,ownerId,fullName:names[i%names.length],nhlTeam:"TOR",nhlPos:[nhlPositions[i%nhlPositions.length]],posGroup:nhlPositions[i%nhlPositions.length]==="G"?"G":nhlPositions[i%nhlPositions.length]==="D"?"D":"F",lineupPos:positions[i%15],overallRating:99.99,seasonRating:99.99,overallRk:i+1,yahooDraftRk:200-i,dailyFaceoffRk:200-i,nhlRk:200-i,seasonRk:i+1,stats:{GP:82,G:65,A:105,P:170,PM:35,PIM:120,PPP:55,SOG:345,HIT:210,BLK:150,W:45,GAA:2.35,SVP:0.925}});
 const players=teams.flatMap(team=>Array.from({length:15},(_,i)=>player(i,team.ownerId)));
-const available=Array.from({length:50},(_,i)=>({...player(i),posGroup:i<35?"F":"G"}));
+const available=Array.from({length:80},(_,i)=>({...player(79-i),posGroup:i%2===0?"F":"G"}));
 const pick=(i)=>({pick:{id:String(i),round:2,pick:i},team:{...teams[i%14],id:"draft-season-"+teams[i%14].id},player:player(i)});
 export function useDraftRosterBoard(){return {season:{name:"2026-27",year:2027},nhlTeams:[],players,remainingPicksByFranchise:new Map(teams.map(team=>[team.franchiseId,Array.from({length:15-(window.tvStep??0)},(_,i)=>({id:team.id+"-pick-"+i,round:String(i+1),pick:String(i*14+Number(team.id)+1)}))])),availablePlayers:available,isLoading:window.tvState==="loading",conferences:[{id:"a",name:"Hickory Hotel",teams:teams.slice(0,7)},{id:"b",name:"Sunview",teams:teams.slice(7)}]};}
+export function useTeamPalette(logoUrl){const red=logoUrl?.includes("ef4444"); return logoUrl?{primary:red?"#ef4444":"#1e3a8a",secondary:red?"#f59e0b":"#60a5fa",accent:null,palette:[]}:{primary:null,secondary:null,accent:null,palette:[]};}
+export function lighten(hex,amount=.7){const value=parseInt(hex.replace("#",""),16); const channel=(shift)=>{const original=(value>>shift)&255; return Math.round(original+(255-original)*amount).toString(16).padStart(2,"0")}; return "#"+channel(16)+channel(8)+channel(0);}
 export function useOwnerRankingsData(){return {isLoading:window.tvState==="loading",data:{rankings:Array.from({length:20},(_,i)=>({owner:{id:i<14?teams[i].ownerId:"inactive-"+i},rank:i+1,displayName:i<14?"Alexander Owner "+(i+1):"Retired Owner "+(i-13),rating:1800-i*23,cups:i%4,primaryTeam:null,seasonsPlayed:12,playoffAppearances:8,finalsAppearances:3,overallRecord:{wins:150,losses:125,ties:3,winPercentage:0.545}}))}};}
 export function useDraftLiveTvBoard(){const cursor=30+(window.tvStep??0); return {season:{name:"2026-27",draftStartAt:"2026-09-25T20:00:00Z"},state:{status:window.tvState,completedCount:cursor-1,remainingCount:90-cursor},activePick:pick(cursor),clockRemainingSeconds:125,draftStartRemainingSeconds:90061,isLoading:window.tvState==="loading",recentPicks:Array.from({length:20},(_,i)=>pick(cursor-i-1)),upcomingPicks:Array.from({length:20},(_,i)=>pick(cursor+i+1))};}
 `;
 const compiled = await build({
   stdin: {
-    contents: `import React from "react"; import {createRoot} from "react-dom/client"; import {DraftRosterBoard} from "./src/components/draft/DraftRosterBoard"; import {DraftAvailableTvBoard,DraftLiveTvBoard} from "./src/components/draft/DraftTvBoards"; const root=createRoot(document.getElementById("root")); window.renderTV=(view,state)=>{window.tvState=state; root.render(React.createElement(view==="overview"?DraftRosterBoard:view==="available"?DraftAvailableTvBoard:DraftLiveTvBoard));};`,
+    contents: `import React from "react"; import {createRoot} from "react-dom/client"; import {TvDisplays} from "./src/components/admin/TvDisplays"; import {DraftRosterBoard} from "./src/components/draft/DraftRosterBoard"; import {DraftAvailableTvBoard,DraftLiveTvBoard} from "./src/components/draft/DraftTvBoards"; const root=createRoot(document.getElementById("root")); window.renderTV=(view,state)=>{window.tvState=state; root.render(React.createElement(view==="overview"?DraftRosterBoard:view==="available"?DraftAvailableTvBoard:view==="admin"?TvDisplays:DraftLiveTvBoard));};`,
     resolveDir: process.cwd(),
     loader: "tsx",
   },
@@ -38,6 +41,19 @@ const compiled = await build({
           path: "fixture",
           namespace: "fixture",
         }));
+        builder.onResolve({ filter: /^next\/image$/ }, () => ({
+          path: "next-image",
+          namespace: "fixture",
+        }));
+        builder.onLoad(
+          { filter: /^next-image$/, namespace: "fixture" },
+          () => ({
+            contents:
+              'import React from "react"; export default function Image(props){return React.createElement("img",props);}',
+            loader: "js",
+            resolveDir: process.cwd(),
+          }),
+        );
         builder.onLoad({ filter: /.*/, namespace: "fixture" }, () => ({
           contents: fixture,
           loader: "js",
@@ -192,69 +208,87 @@ try {
           const goalieRows = document.querySelectorAll(
             'section[aria-label$="goalies"] tbody tr',
           );
-          const positionRows = document.querySelectorAll(
-            '[aria-label="Team position counts"] tbody tr',
+          const goalies = document.querySelector(
+            'section[aria-label$="goalies"]',
           );
-          const positionTable = document.querySelector(
-            '[aria-label="Team position counts"]',
-          );
-          const firstPositionRow = positionRows[0];
-          const lastBounds = lastSkater?.getBoundingClientRect();
-          const panelBounds = skaters?.getBoundingClientRect();
+          const lastGoalie = goalieRows[goalieRows.length - 1];
+          const skaterLastBounds = lastSkater?.getBoundingClientRect();
+          const skaterPanelBounds = skaters?.getBoundingClientRect();
+          const goalieLastBounds = lastGoalie?.getBoundingClientRect();
+          const goaliePanelBounds = goalies?.getBoundingClientRect();
           return {
             skaters: skaterRows.length,
+            skaterRanks: [...skaterRows].map((row) =>
+              Number(row.querySelector("td")?.textContent),
+            ),
             goalies: goalieRows.length,
-            teams: positionRows.length,
-            headers: [
-              ...(positionTable?.querySelectorAll("thead th") ?? []),
+            goalieRanks: [...goalieRows].map((row) =>
+              Number(row.querySelector("td")?.textContent),
+            ),
+            featuredRanks: [
+              ...document.querySelectorAll("[data-featured-rank]"),
+            ].map((row) => Number(row.dataset.featuredRank)),
+            skaterHeaders: [
+              ...(skaters?.querySelectorAll("thead th") ?? []),
             ].map((cell) => cell.textContent?.trim()),
-            totalPlayers: firstPositionRow?.querySelector("[data-roster-total]")
-              ?.textContent,
-            rosterGroups: Object.fromEntries(
-              [
-                ...(firstPositionRow?.querySelectorAll("[data-roster-group]") ??
-                  []),
-              ].map((cell) => [cell.dataset.rosterGroup, cell.textContent]),
-            ),
-            positionEligibility: Object.fromEntries(
-              [
-                ...(firstPositionRow?.querySelectorAll(
-                  "[data-position-count]",
-                ) ?? []),
-              ].map((cell) => [cell.dataset.positionCount, cell.textContent]),
-            ),
-            unusedHeight:
-              lastBounds && panelBounds
-                ? Math.round(panelBounds.bottom - lastBounds.bottom)
+            rosterMakeup: document.querySelector(
+              '[aria-label="Team position counts"]',
+            )?.textContent,
+            visibleHeader: document.querySelector("main > header")?.textContent,
+            skaterUnusedHeight:
+              skaterLastBounds && skaterPanelBounds
+                ? Math.round(skaterPanelBounds.bottom - skaterLastBounds.bottom)
                 : null,
-            rowHeight: lastBounds ? Math.round(lastBounds.height) : null,
+            skaterRowHeight: skaterLastBounds
+              ? Math.round(skaterLastBounds.height)
+              : null,
+            goalieUnusedHeight:
+              goalieLastBounds && goaliePanelBounds
+                ? Math.round(goaliePanelBounds.bottom - goalieLastBounds.bottom)
+                : null,
+            goalieRowHeight: goalieLastBounds
+              ? Math.round(goalieLastBounds.height)
+              : null,
           };
         });
         assert.ok(available.skaters >= 20);
-        assert.equal(available.goalies, 10);
-        assert.equal(available.teams, 14);
-        assert.deepEqual(available.headers, [
-          "Team",
-          "Total",
-          "F",
-          "D",
+        assert.deepEqual(
+          available.skaterRanks,
+          [...available.skaterRanks].sort((left, right) => left - right),
+        );
+        assert.equal(available.skaterRanks[0], 1);
+        assert.ok(available.goalies > 10);
+        assert.deepEqual(
+          available.goalieRanks,
+          [...available.goalieRanks].sort((left, right) => left - right),
+        );
+        assert.equal(available.goalieRanks[0], 2);
+        assert.deepEqual(
+          [...available.featuredRanks].sort((left, right) => left - right),
+          [1, 2, 3, 4, 5, 6],
+        );
+        assert.deepEqual(available.skaterHeaders, [
+          "RK",
+          "",
+          "Player",
+          "Pos",
+          "GP",
           "G",
-          "C",
-          "LW",
-          "RW",
-          "D",
-          "G",
+          "A",
+          "P",
+          "PPP",
+          "SOG",
+          "HIT",
+          "BLK",
         ]);
-        assert.equal(available.totalPlayers, "15");
-        assert.deepEqual(available.rosterGroups, { F: "9", D: "5", G: "1" });
-        assert.deepEqual(available.positionEligibility, {
-          C: "3",
-          LW: "3",
-          RW: "3",
-          D: "5",
-          G: "1",
-        });
-        assert.ok(available.unusedHeight <= available.rowHeight + 3);
+        assert.equal(available.rosterMakeup, undefined);
+        assert.equal(available.visibleHeader, undefined);
+        assert.ok(
+          available.skaterUnusedHeight <= available.skaterRowHeight + 3,
+        );
+        assert.ok(
+          available.goalieUnusedHeight <= available.goalieRowHeight + 3,
+        );
       }
       if (view === "overview") {
         assert.equal(result.panels, 15);
@@ -265,6 +299,19 @@ try {
           /Available TV|Live TV|Draft Hub|2026-27 · 14 rosters/,
         );
         assert.doesNotMatch(result.text, /TOP 26 SKATERS|League Roster Board/);
+        const teamBackgrounds = await page.$$eval(
+          "article[data-team-primary]",
+          (cards) => ({
+            count: cards.length,
+            colors: [
+              ...new Set(
+                cards.map((card) => getComputedStyle(card).backgroundColor),
+              ),
+            ],
+          }),
+        );
+        assert.equal(teamBackgrounds.count, 14);
+        assert.equal(teamBackgrounds.colors.length, 2);
       }
       await page.screenshot({
         path: resolve(`.next/tv-checks/${view}-${width}.png`),
@@ -366,6 +413,26 @@ try {
       }
     }
   }
+  await page.evaluate(() => window.renderTV("admin", "on_clock"));
+  await new Promise((resolve) => setTimeout(resolve, 100));
+  assert.deepEqual(
+    await page.$$eval("a", (links) =>
+      links.map((link) => ({
+        href: link.getAttribute("href"),
+        target: link.getAttribute("target"),
+      })),
+    ),
+    [
+      { href: "/draft-roster-board", target: "_blank" },
+      { href: "/draft-roster-board/available", target: "_blank" },
+      { href: "/draft-roster-board/live", target: "_blank" },
+    ],
+  );
+  await page.screenshot({
+    path: resolve(".next/tv-checks/admin-tv-links.png"),
+  });
+  console.log("admin TV display links: passed");
+
   await page.setViewport({ width: 1920, height: 1080 });
   await page.evaluate(() => {
     window.tvStep = 1;
