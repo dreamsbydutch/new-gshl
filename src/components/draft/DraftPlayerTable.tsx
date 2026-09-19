@@ -1,14 +1,14 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
 import { NHLLogo } from "@gshl-components/player/NHLLogo";
 import { Button, TableViewport } from "@gshl-ui";
 import {
   abbreviatePlayerName,
   cn,
-  formatNumber,
   formatUfaStat,
+  getDraftCompositeRanks,
 } from "@gshl-utils";
 import type {
   DraftHubEligiblePlayerView,
@@ -42,11 +42,11 @@ const GOALIE_STATS = [
   "RBS",
 ] as const;
 const RANKINGS = [
-  ["overallRating", "OVR"],
-  ["overallRk", "Rank"],
-  ["yahooDraftRk", "Yahoo"],
-  ["dailyFaceoffRk", "DF Rk"],
-  ["nhlRk", "NHL Rk"],
+  { key: "draftRk", label: "Rank" },
+  { key: "overallRk", label: "DU Rk", dividerBefore: true },
+  { key: "yahooDraftRk", label: "Yahoo Rk" },
+  { key: "dailyFaceoffRk", label: "DF Rk" },
+  { key: "nhlRk", label: "NHL Rk" },
 ] as const;
 
 export function DraftPlayerTable({
@@ -78,6 +78,10 @@ export function DraftPlayerTable({
   const dialogRef = useRef<HTMLDialogElement>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const confirmingPlayer = players.find((player) => player.id === confirmingId);
+  const compositeRanks = useMemo(
+    () => getDraftCompositeRanks(players),
+    [players],
+  );
   const isSubmitting = submittingPlayerId !== null;
   const actionLabel = commissionerRequired ? "Force pick" : "Draft";
 
@@ -92,7 +96,12 @@ export function DraftPlayerTable({
     }
   }, [confirmingPlayer]);
 
-  function heading(label: string, key: DraftPlayerSortKey, sticky = false) {
+  function heading(
+    label: string,
+    key: DraftPlayerSortKey,
+    sticky = false,
+    dividerBefore = false,
+  ) {
     const active = sortKey === key;
     return (
       <th
@@ -107,6 +116,7 @@ export function DraftPlayerTable({
         }
         className={cn(
           "whitespace-nowrap px-2 py-1 font-medium",
+          dividerBefore && "border-l border-slate-500/80",
           sticky &&
             "sticky left-0 z-30 w-28 min-w-28 max-w-28 bg-gray-800 text-left lg:w-auto lg:max-w-none",
         )}
@@ -130,6 +140,18 @@ export function DraftPlayerTable({
         </button>
       </th>
     );
+  }
+
+  function rankingValue(
+    player: DraftHubEligiblePlayerView,
+    key: DraftPlayerSortKey,
+  ): number | null | undefined {
+    if (key === "draftRk") return compositeRanks.get(String(player.id));
+    if (key === "overallRk") return player.overallRk;
+    if (key === "yahooDraftRk") return player.yahooDraftRk;
+    if (key === "dailyFaceoffRk") return player.dailyFaceoffRk;
+    if (key === "nhlRk") return player.nhlRk;
+    return null;
   }
 
   return (
@@ -168,11 +190,15 @@ export function DraftPlayerTable({
                     {heading("Player", "fullName", true)}
                     {heading("Team", "nhlTeam")}
                     {heading("Pos", "nhlPosition")}
-                    {RANKINGS.map(([key, label]) => heading(label, key))}
-                    {stats.map((key) =>
+                    {RANKINGS.map(({ key, label, dividerBefore }) =>
+                      heading(label, key, false, dividerBefore),
+                    )}
+                    {stats.map((key, index) =>
                       heading(
                         key === "PM" ? "+/-" : key === "SVP" ? "SV%" : key,
                         key,
+                        false,
+                        index === 0,
                       ),
                     )}
                     <th
@@ -220,23 +246,29 @@ export function DraftPlayerTable({
                       <td className="px-2 py-1 text-slate-600">
                         {player.nhlPos.join("/") || player.posGroup}
                       </td>
-                      {RANKINGS.map(([key]) => (
+                      {RANKINGS.map(({ key, dividerBefore }) => {
+                        const value = rankingValue(player, key);
+                        return (
+                          <td
+                            key={key}
+                            className={cn(
+                              "px-2 py-1 tabular-nums",
+                              key === "draftRk" && "font-semibold",
+                              dividerBefore && "border-l border-slate-300",
+                            )}
+                          >
+                            {value == null ? "-" : value}
+                          </td>
+                        );
+                      })}
+                      {stats.map((key, index) => (
                         <td
                           key={key}
                           className={cn(
                             "px-2 py-1 tabular-nums",
-                            key === "overallRating" && "font-semibold",
+                            index === 0 && "border-l border-slate-300",
                           )}
                         >
-                          {player[key] == null
-                            ? "-"
-                            : key === "overallRating"
-                              ? formatNumber(player[key], 2)
-                              : player[key]}
-                        </td>
-                      ))}
-                      {stats.map((key) => (
-                        <td key={key} className="px-2 py-1 tabular-nums">
                           {formatUfaStat(player.stats, key)}
                         </td>
                       ))}

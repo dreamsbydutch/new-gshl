@@ -112,6 +112,7 @@ export type DraftPlayerSortKey =
   | "nhlTeam"
   | "fullName"
   | "nhlPosition"
+  | "draftRk"
   | "overallRk"
   | "yahooDraftRk"
   | "dailyFaceoffRk"

@@ -16,11 +16,72 @@ export const DRAFT_PICK_CLOCK_MS = 4 * 60 * 1000;
 export const ESTIMATED_DRAFT_PICK_MS = 82 * 1000;
 
 const DRAFT_RANK_SORT_KEYS = new Set<DraftPlayerSortKey>([
+  "draftRk",
   "overallRk",
   "yahooDraftRk",
   "dailyFaceoffRk",
   "nhlRk",
 ]);
+
+const DRAFT_RANKING_SOURCES = [
+  { key: "overallRk", weight: 0.15 },
+  { key: "yahooDraftRk", weight: 0.3 },
+  { key: "dailyFaceoffRk", weight: 0.3 },
+  { key: "nhlRk", weight: 0.25 },
+] as const;
+
+type DraftRankingSourceKey = (typeof DRAFT_RANKING_SOURCES)[number]["key"];
+
+function getRankValue(
+  player: DraftHubEligiblePlayerView,
+  key: DraftRankingSourceKey,
+): number | null {
+  const value = Number(player[key]);
+  return Number.isFinite(value) && value > 0 ? value : null;
+}
+
+/**
+ * Produces a composite draft rank that emphasizes projection sources over the
+ * league's current-performance rank. Source ranks are normalized individually
+ * so rankings with different list depths remain comparable. An absent source
+ * rank is treated as one place below that source's displayed list.
+ */
+export function getDraftCompositeRanks(
+  players: readonly DraftHubEligiblePlayerView[],
+): ReadonlyMap<string, number> {
+  const sourceMaximums = new Map<DraftRankingSourceKey, number>(
+    DRAFT_RANKING_SOURCES.map(({ key }) => [
+      key,
+      Math.max(
+        1,
+        ...players.flatMap((player) => {
+          const rank = getRankValue(player, key);
+          return rank === null ? [] : [rank];
+        }),
+      ),
+    ]),
+  );
+  const scoredPlayers = players
+    .map((player) => {
+      const score = DRAFT_RANKING_SOURCES.reduce((total, { key, weight }) => {
+        const maximum = sourceMaximums.get(key) ?? 1;
+        const rank = getRankValue(player, key) ?? maximum + 1;
+        return total + ((Math.min(rank, maximum + 1) - 1) / maximum) * weight;
+      }, 0);
+      return { player, score };
+    })
+    .sort(
+      (left, right) =>
+        left.score - right.score ||
+        Number(left.player.overallRk ?? Number.MAX_SAFE_INTEGER) -
+          Number(right.player.overallRk ?? Number.MAX_SAFE_INTEGER) ||
+        left.player.fullName.localeCompare(right.player.fullName),
+    );
+
+  return new Map(
+    scoredPlayers.map(({ player }, index) => [String(player.id), index + 1]),
+  );
+}
 
 const DRAFT_TEXT_SORT_KEYS = new Set<DraftPlayerSortKey>([
   "nhlTeam",
@@ -83,10 +144,16 @@ export function sortDraftEligiblePlayers(
   key: DraftPlayerSortKey,
   direction: DraftPlayerSortDirection,
 ): DraftHubEligiblePlayerView[] {
+  const compositeRanks =
+    key === "draftRk" ? getDraftCompositeRanks(players) : null;
   return [...players].sort((left, right) => {
     const primary = compareDraftPlayerSortValues(
-      getDraftPlayerSortValue(left, key),
-      getDraftPlayerSortValue(right, key),
+      key === "draftRk"
+        ? (compositeRanks?.get(String(left.id)) ?? null)
+        : getDraftPlayerSortValue(left, key),
+      key === "draftRk"
+        ? (compositeRanks?.get(String(right.id)) ?? null)
+        : getDraftPlayerSortValue(right, key),
       direction,
     );
     if (primary !== 0) return primary;
