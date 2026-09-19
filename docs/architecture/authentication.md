@@ -51,7 +51,7 @@ The JWT subject is an application user ID, not the Google subject and not an own
 - A matching email can be connected to a new Google subject, but conflicting subject/email records fail closed.
 - Existing sign-in refreshes profile fields and `lastLoginAt` without changing role, owner, or status.
 - Disabled users cannot complete a new sign-in, are denied protected routes, and fail Convex `requireActiveUser` even if an older browser token still exists.
-- The first commissioner is bootstrapped by changing the initial account in the Convex dashboard after schema deployment. Subsequent access changes should use League Office.
+- The first commissioner is bootstrapped by changing the initial account in the Convex dashboard after schema deployment. Subsequent access changes should use Admin.
 
 There is no pending status. “Viewer until approved” means the account has active read access but no owner or commissioner mutation privileges.
 
@@ -87,6 +87,7 @@ An owner account must link to an active `owners` record. The shared-secret acces
 - `/draft/:path*`
 - `/draftboard/:path*`
 - `/leagueoffice/:path*`
+- `/admin/:path*`
 
 Relevant pages also call the server-only `requireActiveUser`. This duplicate protection is intentional defense in depth. Middleware and page guards preserve the complete same-app path and query string as the sign-in callback. The sign-in page accepts relative or same-origin callbacks and rejects cross-origin, protocol-relative, backslash-normalized, and non-HTTP destinations before redirecting.
 

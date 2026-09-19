@@ -21,7 +21,7 @@ export function useDraftLiveTvBoard(){const cursor=30+(window.tvStep??0); return
 `;
 const compiled = await build({
   stdin: {
-    contents: `import React from "react"; import {createRoot} from "react-dom/client"; import {DraftRosterBoard} from "./src/components/draft/DraftRosterBoard"; import {DraftAvailableTvBoard,DraftLiveTvBoard} from "./src/components/draft/DraftTvBoards"; const root=createRoot(document.getElementById("root")); window.renderTV=(view,state)=>{window.tvState=state; root.render(React.createElement(view==="overview"?DraftRosterBoard:view==="available"?DraftAvailableTvBoard:DraftLiveTvBoard));};`,
+    contents: `import React from "react"; import {createRoot} from "react-dom/client"; import {TvDisplays} from "./src/components/admin/TvDisplays"; import {DraftRosterBoard} from "./src/components/draft/DraftRosterBoard"; import {DraftAvailableTvBoard,DraftLiveTvBoard} from "./src/components/draft/DraftTvBoards"; const root=createRoot(document.getElementById("root")); window.renderTV=(view,state)=>{window.tvState=state; root.render(React.createElement(view==="overview"?DraftRosterBoard:view==="available"?DraftAvailableTvBoard:view==="admin"?TvDisplays:DraftLiveTvBoard));};`,
     resolveDir: process.cwd(),
     loader: "tsx",
   },
@@ -366,6 +366,26 @@ try {
       }
     }
   }
+  await page.evaluate(() => window.renderTV("admin", "on_clock"));
+  await new Promise((resolve) => setTimeout(resolve, 100));
+  assert.deepEqual(
+    await page.$$eval("a", (links) =>
+      links.map((link) => ({
+        href: link.getAttribute("href"),
+        target: link.getAttribute("target"),
+      })),
+    ),
+    [
+      { href: "/draft-roster-board", target: "_blank" },
+      { href: "/draft-roster-board/available", target: "_blank" },
+      { href: "/draft-roster-board/live", target: "_blank" },
+    ],
+  );
+  await page.screenshot({
+    path: resolve(".next/tv-checks/admin-tv-links.png"),
+  });
+  console.log("admin TV display links: passed");
+
   await page.setViewport({ width: 1920, height: 1080 });
   await page.evaluate(() => {
     window.tvStep = 1;

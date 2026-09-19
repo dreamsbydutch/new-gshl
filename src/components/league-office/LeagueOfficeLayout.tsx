@@ -1,6 +1,6 @@
 "use client";
 
-import { useAuthSession, useLeagueOfficeContextNavigation } from "@gshl-hooks";
+import { useLeagueOfficeContextNavigation } from "@gshl-hooks";
 import {
   HorizontalToggle,
   PageContextNavigation,
@@ -15,7 +15,6 @@ export function LeagueOfficeLayout({
   children: React.ReactNode;
 }) {
   const navigation = useLeagueOfficeContextNavigation();
-  const { session } = useAuthSession();
   const selectedType = navigation.selectedView;
   const isMockDraftPage = navigation.isMockDraftPage;
 
@@ -27,12 +26,7 @@ export function LeagueOfficeLayout({
       nextType === "freeAgents" ||
       nextType === "rules" ||
       nextType === "confBattle" ||
-      nextType === "ownerRankings" ||
-      nextType === "contracts" ||
-      nextType === "users" ||
-      nextType === "jobs" ||
-      nextType === "newsroom" ||
-      nextType === "imageUpload"
+      nextType === "ownerRankings"
     ) {
       navigation.selectView(nextType);
     }
@@ -74,35 +68,6 @@ export function LeagueOfficeLayout({
         value: "Owners",
         setter: selectView,
       },
-      ...(session?.user.role === "commissioner"
-        ? [
-            {
-              key: "contracts",
-              value: "Contracts",
-              setter: selectView,
-            },
-            {
-              key: "users",
-              value: "Users",
-              setter: selectView,
-            },
-            {
-              key: "jobs",
-              value: "Jobs",
-              setter: selectView,
-            },
-            {
-              key: "newsroom",
-              value: "Newsroom",
-              setter: selectView,
-            },
-            {
-              key: "imageUpload",
-              value: "Images",
-              setter: selectView,
-            },
-          ]
-        : []),
     ],
   };
 

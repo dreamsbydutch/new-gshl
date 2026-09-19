@@ -6,5 +6,6 @@ export const config = {
     "/draft/:path*",
     "/draftboard/:path*",
     "/leagueoffice/:path*",
+    "/admin/:path*",
   ],
 };

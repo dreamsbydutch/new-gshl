@@ -113,6 +113,9 @@ export function getAppShellRouteContext(
   if (isRoute(pathname, "/leagueoffice")) {
     return { title: "League Office", activeNavId: "more" };
   }
+  if (isRoute(pathname, "/admin")) {
+    return { title: "Admin", activeNavId: "more" };
+  }
   if (isRoute(pathname, "/draft") || isRoute(pathname, "/draftboard")) {
     return { title: "Draft Hub", activeNavId: "more" };
   }

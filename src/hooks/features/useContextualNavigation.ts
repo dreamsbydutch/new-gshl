@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useLockerRoomTeamOptions } from "./useLockerRoomTeamOptions";
 import { useNavStore } from "@gshl-cache";
 import type {
+  AdminNavigationView,
   GSHLTeam,
   LeagueOfficeNavigationView,
   LockerRoomNavigationView,
@@ -13,6 +14,8 @@ import type {
   Week,
 } from "@gshl-types";
 import {
+  ADMIN_NAVIGATION_VIEWS,
+  buildAdminNavigationHref,
   buildContextualNavigationHref,
   buildDraftTeamsNavigationHref,
   buildGlobalSeasonNavigationHref,
@@ -29,6 +32,7 @@ import {
   isStandingsNavigationView,
   LOCKER_ROOM_NAVIGATION_VIEWS,
   readContextualNavigationQuery,
+  resolveAdminView,
   resolveContextualSelection,
   resolveLockerRoomOwnerId,
   SCHEDULE_NAVIGATION_VIEWS,
@@ -707,6 +711,44 @@ export function useLeagueOfficeContextNavigation() {
     isReady: routeDataReady && storeMatches,
     selectedSeasonId: effectiveSeasonId,
     selectedView: isMockDraftPage ? ("mockDraft" as const) : view,
+    selectView,
+  };
+}
+
+export function useAdminContextNavigation() {
+  const navigation = useContextualRouter();
+  const { status } = useAuthSession();
+  const query = useMemo(
+    () => readContextualNavigationQuery(navigation.search),
+    [navigation.search],
+  );
+  const view = resolveAdminView(query.view);
+  const isReady = status !== "loading";
+
+  useEffect(() => {
+    if (!isReady || !navigation.shouldSyncCurrentUrl) return;
+    const canonicalHref = buildAdminNavigationHref(navigation.search, {
+      view,
+    });
+    if (navigation.currentHref !== canonicalHref) {
+      navigation.replace(canonicalHref);
+    }
+  }, [isReady, navigation, view]);
+
+  const selectView = useCallback(
+    (nextView: AdminNavigationView) => {
+      if (!ADMIN_NAVIGATION_VIEWS.includes(nextView)) return;
+      navigation.push(
+        buildAdminNavigationHref(navigation.search, { view: nextView }),
+        () => undefined,
+      );
+    },
+    [navigation],
+  );
+
+  return {
+    isReady,
+    selectedView: view,
     selectView,
   };
 }

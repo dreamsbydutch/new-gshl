@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  buildAdminNavigationHref,
   buildContextualNavigationHref,
   buildDraftTeamsNavigationHref,
   buildGlobalSeasonNavigationHref,
@@ -85,6 +86,10 @@ void test("route builders preserve unknown params and remove stale owned params"
 
 void test("each contextual route gets only its relevant state", () => {
   assert.equal(
+    buildAdminNavigationHref("?season=old", { view: "tv" }),
+    "/admin?view=tv",
+  );
+  assert.equal(
     buildStandingsNavigationHref("?week=old", {
       view: "power",
       season: "12",
@@ -146,18 +151,20 @@ void test("generic updates clean duplicate owned params without dropping unknown
   );
 });
 
-void test("commissioner League Office views remain role gated", () => {
+void test("League Office navigation excludes commissioner administration", () => {
   assert.equal(
     getLeagueOfficeNavigationViews("viewer").includes("tradeBlock"),
     true,
   );
   assert.equal(
-    getLeagueOfficeNavigationViews("owner").includes("contracts"),
+    getLeagueOfficeNavigationViews("owner").map(String).includes("contracts"),
     false,
   );
   assert.equal(
-    getLeagueOfficeNavigationViews("commissioner").includes("contracts"),
-    true,
+    getLeagueOfficeNavigationViews("commissioner")
+      .map(String)
+      .includes("contracts"),
+    false,
   );
 });
 

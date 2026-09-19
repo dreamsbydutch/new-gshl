@@ -12,14 +12,18 @@ void test("uses Draft Classes for empty and legacy League Office defaults", () =
   assert.equal(DEFAULT_LEAGUE_OFFICE_VIEW, "draft");
 });
 
-void test("preserves member views and role-valid commissioner views", () => {
+void test("preserves member views", () => {
   assert.equal(resolveLeagueOfficeView("freeAgents", "owner"), "freeAgents");
   assert.equal(resolveLeagueOfficeView("tradeBlock", "owner"), "tradeBlock");
   assert.equal(resolveLeagueOfficeView("rules", "viewer"), "rules");
-  assert.equal(resolveLeagueOfficeView("jobs", "commissioner"), "jobs");
+  assert.equal(
+    resolveLeagueOfficeView("ownerRankings", "commissioner"),
+    "ownerRankings",
+  );
 });
 
 void test("does not reopen commissioner panels for non-commissioners", () => {
   assert.equal(resolveLeagueOfficeView("users", "owner"), "draft");
   assert.equal(resolveLeagueOfficeView("contracts", undefined), "draft");
+  assert.equal(resolveLeagueOfficeView("jobs", "commissioner"), "draft");
 });

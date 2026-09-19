@@ -1,15 +1,13 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useAuthSession, useLeagueOfficeNavigation } from "@gshl-hooks";
+import { useLeagueOfficeNavigation } from "@gshl-hooks";
 import {
-  AdminPanelSkeleton,
   ConferenceContestSkeleton,
   DraftClassesSkeleton,
   FreeAgencySkeleton,
   OwnerRankingsSkeleton,
   RulebookSkeleton,
-  UserManagementSkeleton,
 } from "@gshl-skeletons";
 import { cn, resolveLeagueOfficeView } from "@gshl-utils";
 
@@ -30,27 +28,6 @@ const DraftClasses = dynamic(
   () => import("./DraftClasses").then((module) => module.DraftClasses),
   { loading: () => <DraftClassesSkeleton /> },
 );
-const UserManagement = dynamic(
-  () =>
-    import("@gshl-components/auth/UserManagement").then(
-      (module) => module.UserManagement,
-    ),
-  { loading: () => <UserManagementSkeleton /> },
-);
-const ContractManagement = dynamic(
-  () =>
-    import("@gshl-components/admin/ContractManagement").then(
-      (module) => module.ContractManagement,
-    ),
-  { loading: () => <AdminPanelSkeleton /> },
-);
-const JobManagement = dynamic(
-  () =>
-    import("@gshl-components/admin/JobManagement").then(
-      (module) => module.JobManagement,
-    ),
-  { loading: () => <AdminPanelSkeleton /> },
-);
 const UfaLeagueOffice = dynamic(
   () =>
     import("@gshl-components/contracts/UfaSigning").then(
@@ -58,19 +35,9 @@ const UfaLeagueOffice = dynamic(
     ),
   { loading: () => <FreeAgencySkeleton /> },
 );
-const ImageUpload = dynamic(
-  () => import("./ImageUpload").then((module) => module.ImageUpload),
-  { loading: () => <AdminPanelSkeleton /> },
-);
-const Newsroom = dynamic(
-  () => import("./Newsroom").then((module) => module.Newsroom),
-  { loading: () => <AdminPanelSkeleton /> },
-);
-
 export function LeagueOfficeContent() {
   const { selectedType } = useLeagueOfficeNavigation();
-  const { session } = useAuthSession();
-  const activeType = resolveLeagueOfficeView(selectedType, session?.user.role);
+  const activeType = resolveLeagueOfficeView(selectedType);
   const usesCompactLayout = activeType === "draft";
 
   return (
@@ -85,21 +52,6 @@ export function LeagueOfficeContent() {
       {activeType === "confBattle" ? <ConferenceContest /> : null}
       {activeType === "ownerRankings" ? <OwnerRankings /> : null}
       {activeType === "freeAgents" ? <UfaLeagueOffice /> : null}
-      {activeType === "users" && session?.user.role === "commissioner" ? (
-        <UserManagement />
-      ) : null}
-      {activeType === "jobs" && session?.user.role === "commissioner" ? (
-        <JobManagement />
-      ) : null}
-      {activeType === "contracts" && session?.user.role === "commissioner" ? (
-        <ContractManagement />
-      ) : null}
-      {activeType === "imageUpload" && session?.user.role === "commissioner" ? (
-        <ImageUpload />
-      ) : null}
-      {activeType === "newsroom" && session?.user.role === "commissioner" ? (
-        <Newsroom />
-      ) : null}
     </div>
   );
 }

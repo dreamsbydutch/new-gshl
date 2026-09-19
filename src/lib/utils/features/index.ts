@@ -1,4 +1,5 @@
 export * from "./contract-table";
+export * from "./admin-navigation";
 export * from "./app-shell";
 export * from "./contextual-navigation";
 export * from "./cap-lab";
