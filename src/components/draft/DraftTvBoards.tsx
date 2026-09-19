@@ -4,7 +4,11 @@ import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useDraftRosterBoard } from "@gshl-hooks";
 import { useDraftBoardFit } from "@gshl-hooks/features/useDraftBoardFit";
-import { cn, getDraftCompositeRanks } from "@gshl-utils";
+import {
+  cn,
+  getDraftCompositeRanks,
+  sortDraftEligiblePlayers,
+} from "@gshl-utils";
 import type { DraftHubEligiblePlayerView } from "@gshl-types";
 import { CompactBestAvailableTable } from "./DraftRosterBoard";
 
@@ -126,9 +130,13 @@ function AvailablePanel({
 
 export function DraftAvailableTvBoard() {
   const board = useDraftRosterBoard();
-  const draftRanks = useMemo(
-    () => getDraftCompositeRanks(board.availablePlayers),
+  const rankedPlayers = useMemo(
+    () => sortDraftEligiblePlayers(board.availablePlayers, "draftRk", "asc"),
     [board.availablePlayers],
+  );
+  const draftRanks = useMemo(
+    () => getDraftCompositeRanks(rankedPlayers),
+    [rankedPlayers],
   );
   return (
     <TvFrame
@@ -144,17 +152,13 @@ export function DraftAvailableTvBoard() {
             label="skaters"
             fillHeight
             draftRanks={draftRanks}
-            players={board.availablePlayers.filter(
-              (player) => player.posGroup !== "G",
-            )}
+            players={rankedPlayers.filter((player) => player.posGroup !== "G")}
           />
           <AvailablePanel
             label="goalies"
             fillHeight
             draftRanks={draftRanks}
-            players={board.availablePlayers.filter(
-              (player) => player.posGroup === "G",
-            )}
+            players={rankedPlayers.filter((player) => player.posGroup === "G")}
           />
         </div>
       )}

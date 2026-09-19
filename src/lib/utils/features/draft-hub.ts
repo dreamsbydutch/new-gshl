@@ -41,10 +41,11 @@ function getRankValue(
 }
 
 /**
- * Produces a composite draft rank that emphasizes projection sources over the
- * league's current-performance rank. Source ranks are normalized individually
- * so rankings with different list depths remain comparable. An absent source
- * rank is treated as one place below that source's displayed list.
+ * Produces the draft-table composite rank from Yahoo, Daily Faceoff, and NHL
+ * draft rankings plus the rank derived from the GSHL player rating. Source
+ * ranks are normalized individually so lists with different depths remain
+ * comparable. An absent source rank is treated as one place below that
+ * source's displayed list.
  */
 export function getDraftCompositeRanks(
   players: readonly DraftHubEligiblePlayerView[],

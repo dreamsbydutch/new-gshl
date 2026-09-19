@@ -15,7 +15,6 @@ import {
   prepareDraftBoardPlayers,
   resolveDraftHubSeason,
   selectLatestActiveFranchiseTeams,
-  sortDraftEligiblePlayers,
 } from "@gshl-utils";
 import {
   useContracts,
@@ -101,7 +100,7 @@ export function useDraftRosterBoard(): DraftRosterBoardViewModel {
           findNhlTeamByAbbreviation(nhlTeams, player.nhlTeam)?.logoUrl ?? null,
         stats: latestNhlStatsByPlayer.get(String(player.id)) ?? null,
       }));
-    return sortDraftEligiblePlayers(playerViews, "draftRk", "asc");
+    return playerViews;
   }, [
     contractsQuery.data,
     draftPicksQuery.data,

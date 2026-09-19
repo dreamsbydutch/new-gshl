@@ -272,7 +272,6 @@ try {
           "",
           "Player",
           "Pos",
-          "OVR",
           "GP",
           "G",
           "A",

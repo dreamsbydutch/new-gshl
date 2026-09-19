@@ -387,7 +387,7 @@ export function CompactBestAvailableTable({
               : "text-[0.9em] text-slate-600",
           )}
         >
-          {broadcast ? "Ranked by Rk" : "Best available"}
+          {broadcast ? "Composite draft rank" : "Best available"}
         </span>
       </div>
       <table className="w-full table-auto text-[0.9em] leading-snug">
@@ -402,14 +402,6 @@ export function CompactBestAvailableTable({
             <th className="px-0.5 py-0" aria-label="NHL team" />
             <th className="whitespace-nowrap px-0.5 py-0 text-left">Player</th>
             <th className="whitespace-nowrap px-0.5 py-0">Pos</th>
-            <th
-              className={cn(
-                "px-0.5 py-0 text-right",
-                broadcast && "bg-amber-100/60 text-slate-900",
-              )}
-            >
-              OVR
-            </th>
             {statColumns.map(([, label]) => (
               <th key={label} className="px-px py-0 text-right">
                 {label}
@@ -469,16 +461,6 @@ export function CompactBestAvailableTable({
                 </td>
                 <td className="whitespace-nowrap px-px py-0 text-center align-top leading-tight text-slate-600">
                   {player.nhlPos.join("/")}
-                </td>
-                <td
-                  className={cn(
-                    "px-px py-0 text-right align-top font-bold tabular-nums text-slate-800",
-                    broadcast && "bg-amber-100/40",
-                  )}
-                >
-                  {typeof player.overallRating === "number"
-                    ? formatNumber(player.overallRating, 2)
-                    : "--"}
                 </td>
                 {statColumns.map(([key]) => (
                   <td
