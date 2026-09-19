@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import { groupRemainingDraftPicksByFranchise } from "@gshl-utils/features/draft-tv";
 import type {
   DraftRosterBoardViewModel,
   Franchise,
@@ -110,9 +111,15 @@ export function useDraftRosterBoard(): DraftRosterBoardViewModel {
     season?.startDate,
   ]);
 
+  const remainingPicksByFranchise = useMemo(
+    () => groupRemainingDraftPicksByFranchise(draftPicksQuery.data, teamRows),
+    [draftPicksQuery.data, teamRows],
+  );
+
   return {
     season,
     conferences,
+    remainingPicksByFranchise,
     players: playersQuery.data,
     availablePlayers,
     nhlTeams,

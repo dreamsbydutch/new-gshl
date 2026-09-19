@@ -19,6 +19,7 @@ import {
 import { NavContainer, LinkNavItem } from "./BaseComponents";
 import type { LinkNavItem as LinkNavItemType, NavbarProps } from "@gshl-types";
 import { AuthNavControl } from "@gshl-components/auth";
+import { HeaderTeamSelect } from "./HeaderTeamSelect";
 import { MoreNavigationMenu } from "./MoreNavigationMenu";
 import {
   GlobalSeasonSelect,
@@ -33,6 +34,7 @@ import {
 export function MainNavbar({ className, search = "" }: NavbarProps) {
   const { pathname } = useAppPathname();
   const routeContext = getAppShellRouteContext(pathname, search);
+  const showTeamControl = pathname === "/lockerroom";
   const seasonNavigation = useGlobalSeasonContextNavigation();
   const seasonOptions = useMemo(
     () => [...seasonNavigation.seasonOptions].sort((a, b) => b.year - a.year),
@@ -140,14 +142,28 @@ export function MainNavbar({ className, search = "" }: NavbarProps) {
             <span className="sr-only">GSHL</span>
           </Link>
           <div className="flex min-w-0 items-center justify-center gap-1.5 px-1">
-            <p className="hidden min-w-0 truncate text-center text-xs font-bold min-[360px]:block sm:text-sm">
-              {routeContext.title}
-            </p>
-            {seasonNavigation.isReady && seasonControlProps ? (
-              <GlobalSeasonSelect {...seasonControlProps} placement="mobile" />
+            {showTeamControl ? (
+              <HeaderTeamSelect />
             ) : (
-              <GlobalSeasonSelectFallback placement="mobile" />
+              <p
+                className={cn(
+                  "min-w-0 truncate text-center text-xs font-bold sm:text-sm",
+                  seasonNavigation.showSeasonControl &&
+                    "hidden min-[360px]:block",
+                )}
+              >
+                {routeContext.title}
+              </p>
             )}
+            {seasonNavigation.showSeasonControl &&
+              (seasonNavigation.isReady && seasonControlProps ? (
+                <GlobalSeasonSelect
+                  {...seasonControlProps}
+                  placement="mobile"
+                />
+              ) : (
+                <GlobalSeasonSelectFallback placement="mobile" />
+              ))}
           </div>
           <div className="flex justify-end">
             <AuthNavControl compact />
@@ -218,11 +234,16 @@ export function MainNavbar({ className, search = "" }: NavbarProps) {
             />
           </div>
           <div className="hidden shrink-0 lg:block">
-            {seasonNavigation.isReady && seasonControlProps ? (
-              <GlobalSeasonSelect {...seasonControlProps} placement="desktop" />
-            ) : (
-              <GlobalSeasonSelectFallback placement="desktop" />
-            )}
+            {showTeamControl && <HeaderTeamSelect />}
+            {seasonNavigation.showSeasonControl &&
+              (seasonNavigation.isReady && seasonControlProps ? (
+                <GlobalSeasonSelect
+                  {...seasonControlProps}
+                  placement="desktop"
+                />
+              ) : (
+                <GlobalSeasonSelectFallback placement="desktop" />
+              ))}
           </div>
           <div className="hidden shrink-0 lg:block">
             <AuthNavControl />

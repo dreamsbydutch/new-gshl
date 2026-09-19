@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { LockerRoomHeader } from "@gshl-components/team/LockerRoomHeader";
 import {
   useCareerSplits,
@@ -11,7 +11,7 @@ import {
   usePlayerTotalsByPlayers,
   usePlayerAwards,
   useSeasonState,
-  useTeams,
+  useLockerRoomTeamOptions,
   useNHLTeams,
   useContracts,
   useNav,
@@ -19,7 +19,7 @@ import {
   useTeamAwards,
 } from "@gshl-hooks";
 import { getOwnerTeamIds, resolveSalaryCapSeason } from "@gshl-utils";
-import type { GSHLTeam, NHLTeam } from "@gshl-types";
+import type { NHLTeam } from "@gshl-types";
 import {
   CapLabSkeleton,
   ContractHistorySkeleton,
@@ -91,9 +91,22 @@ const InteractiveContractTable = dynamic(
   { loading: () => <CapLabSkeleton /> },
 );
 
+const TradeBlock = dynamic(
+  () =>
+    import("@gshl-components/team/TradeBlock").then(
+      (module) => module.TradeBlock,
+    ),
+  {
+    loading: () => (
+      <p className="py-3 text-xs text-slate-500">Loading trade block...</p>
+    ),
+  },
+);
+
 const SHOW_LOCKER_ROOM_ROSTER_SALARIES = true;
 
 export function LockerRoomContent() {
+  const [capView, setCapView] = useState("contracts");
   const { selectedSeason, currentSeason, defaultSeason, seasons } =
     useSeasonState();
   const contextSeason = selectedSeason ?? currentSeason ?? defaultSeason;
@@ -110,24 +123,21 @@ export function LockerRoomContent() {
   // Only fetch contract data when on a tab that needs it
   const needsContractData =
     selectedLockerRoomType === "salary" || selectedLockerRoomType === "roster";
-  const lockerRoomSeason = contextSeason ?? contractSeason;
-
-  const { data: teamsRaw = [], isLoading: teamsLoading } = useTeams({
-    seasonId: lockerRoomSeason?.id,
-    enabled: Boolean(lockerRoomSeason?.id),
-  });
-  const teams = teamsRaw as GSHLTeam[];
-
-  const currentTeam = teams?.find((t) => t.ownerId === selectedOwnerId);
+  const teamCatalog = useLockerRoomTeamOptions();
+  const teamsLoading = teamCatalog.isLoading;
+  const allTeams = teamCatalog.allTeams;
+  const currentTeam = teamCatalog.teamOptions.find(
+    (team) => team.ownerId === selectedOwnerId,
+  );
+  const teams = allTeams.filter(
+    (team) => team.seasonId === (currentTeam?.seasonId ?? contextSeason?.id),
+  );
+  const isInactiveOwner = Boolean(currentTeam && !currentTeam.ownerIsActive);
+  const lastTeamSeason = seasons.find(
+    (season) => season.id === currentTeam?.seasonId,
+  );
   const isTrophyTab = selectedLockerRoomType === "trophy";
   const isRecordBookTab = selectedLockerRoomType === "recordbook";
-  const needsHistoricalTeams = isTrophyTab || isRecordBookTab;
-  const { data: historicalTeamsRaw = [] } = useTeams({
-    enabled: needsHistoricalTeams,
-  });
-  const allTeams = needsHistoricalTeams
-    ? (historicalTeamsRaw as GSHLTeam[])
-    : teams;
   const needsPlayers = needsContractData || isRecordBookTab;
   const { data: players = [], isLoading: playersLoading } = usePlayers({
     ownerId: currentTeam?.ownerId,
@@ -302,32 +312,70 @@ export function LockerRoomContent() {
   return (
     <>
       <LockerRoomHeader currentTeam={currentTeam} headingLevel={2} />
+      {isInactiveOwner && (
+        <p className="mb-3 text-xs text-slate-500">
+          <span className="font-semibold">Inactive owner</span>
+          {lastTeamSeason ? ` - Last team: ${lastTeamSeason.name}` : ""}
+        </p>
+      )}
       {selectedLockerRoomType === "salary" && (
         <>
-          <TeamContractTable
-            {...{
-              currentSeason: contractSeason,
-              players: contractPlayers,
-              nhlTeams,
-              contracts: currentContracts,
-              currentTeam,
-              ...teamContractTableData,
-            }}
-          />
-          <InteractiveContractTable
-            currentSeason={contractSeason}
-            currentTeam={currentTeam}
-            signablePlayers={signablePlayers}
-            tradePlayers={tradePlayersQuery.data}
-            tradeContracts={allLeagueContracts}
-            contractPlayers={contractPlayers}
-            nhlTeams={nhlTeams}
-            existingContracts={currentContracts}
-            seasons={seasons ?? []}
-            ready={teamContractTableData.ready}
-          />
-          <FranchiseContractHistory {...teamContractHistory} />
+          <div
+            className="mb-3 flex gap-4 border-b border-slate-200"
+            role="group"
+            aria-label="Salary cap views"
+          >
+            {(
+              [
+                ["contracts", "Contracts"],
+                ["planner", "Planner"],
+                ["history", "History"],
+              ] as const
+            ).map(([key, label]) => (
+              <button
+                key={key}
+                type="button"
+                aria-pressed={capView === key}
+                onClick={() => setCapView(key)}
+                className={`min-h-9 border-b-2 px-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 ${capView === key ? "border-slate-950 font-semibold text-slate-950" : "border-transparent text-slate-500"}`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <div hidden={capView !== "contracts"}>
+            <TeamContractTable
+              {...{
+                currentSeason: contractSeason,
+                players: contractPlayers,
+                nhlTeams,
+                contracts: currentContracts,
+                currentTeam,
+                ...teamContractTableData,
+              }}
+            />
+          </div>
+          <div hidden={capView !== "planner"}>
+            <InteractiveContractTable
+              currentSeason={contractSeason}
+              currentTeam={currentTeam}
+              signablePlayers={signablePlayers}
+              tradePlayers={tradePlayersQuery.data}
+              tradeContracts={allLeagueContracts}
+              contractPlayers={contractPlayers}
+              nhlTeams={nhlTeams}
+              existingContracts={currentContracts}
+              seasons={seasons ?? []}
+              ready={teamContractTableData.ready}
+            />
+          </div>
+          <div hidden={capView !== "history"}>
+            <FranchiseContractHistory {...teamContractHistory} />
+          </div>
         </>
+      )}
+      {selectedLockerRoomType === "tradeBlock" && (
+        <TradeBlock key={currentTeam.ownerId} currentTeam={currentTeam} />
       )}
       {selectedLockerRoomType === "roster" && (
         <TeamRoster
@@ -341,13 +389,18 @@ export function LockerRoomContent() {
       )}
       {selectedLockerRoomType === "history" && (
         <TeamHistoryContainer
+          key={currentTeam.ownerId}
           {...{
             teamInfo: currentTeam,
           }}
         />
       )}
       {selectedLockerRoomType === "draft" && (
-        <TeamDraftPickHistory currentTeam={currentTeam} seasons={seasons} />
+        <TeamDraftPickHistory
+          key={currentTeam.ownerId}
+          currentTeam={currentTeam}
+          seasons={seasons}
+        />
       )}
       {selectedLockerRoomType === "trophy" && (
         <TrophyCase

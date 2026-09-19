@@ -6,7 +6,12 @@ import type {
   TeamHistoryMatchupSummary,
   TeamHistoryTeamSummary,
 } from "@gshl-types";
-import { buildOwnerOptions, parseIdValue } from "./team-history";
+import {
+  buildOwnerOptions,
+  parseIdValue,
+  filterTeamHistorySeasons,
+  calculateWinLossRecord,
+} from "./team-history";
 
 void test("preserves string IDs from history filter values", () => {
   assert.equal(parseIdValue("2025-26,j57abc123"), "j57abc123");
@@ -56,4 +61,86 @@ void test("builds opponent options from historical owner teams", () => {
     ["All", ""],
     ["Rival Owner", "owner-2"],
   ]);
+});
+
+void test("local year selection combines records across selected seasons without mutating history", () => {
+  const teams: TeamHistoryTeamSummary[] = [
+    {
+      id: "home",
+      ownerId: "owner",
+      name: "Home",
+      logoUrl: null,
+      confAbbr: null,
+      ownerFirstName: null,
+      ownerLastName: null,
+    },
+    {
+      id: "away",
+      ownerId: "opponent",
+      name: "Away",
+      logoUrl: null,
+      confAbbr: null,
+      ownerFirstName: null,
+      ownerLastName: null,
+    },
+  ];
+  const games: TeamHistoryMatchupSummary[] = [
+    {
+      id: "one",
+      seasonId: "2024",
+      weekId: "w1",
+      homeTeamId: "home",
+      awayTeamId: "away",
+      gameType: "CC",
+      homeWin: true,
+      awayWin: false,
+    },
+    {
+      id: "two",
+      seasonId: "2025",
+      weekId: "w2",
+      homeTeamId: "home",
+      awayTeamId: "away",
+      gameType: "CC",
+      homeWin: false,
+      awayWin: true,
+    },
+    {
+      id: "three",
+      seasonId: "2026",
+      weekId: "w3",
+      homeTeamId: "home",
+      awayTeamId: "away",
+      gameType: "CC",
+      tie: true,
+    },
+  ];
+  const original = structuredClone(games);
+  assert.deepEqual(
+    calculateWinLossRecord(
+      filterTeamHistorySeasons(games, ["2024"]),
+      "owner",
+      teams,
+    ),
+    [1, 0, 0],
+  );
+  assert.deepEqual(
+    calculateWinLossRecord(
+      filterTeamHistorySeasons(games, ["2024", "2026"]),
+      "owner",
+      teams,
+    ),
+    [1, 0, 1],
+  );
+  assert.deepEqual(
+    calculateWinLossRecord(
+      filterTeamHistorySeasons(games, ["2024", "2025", "2026"]),
+      "owner",
+      teams,
+    ),
+    [1, 1, 1],
+  );
+  assert.deepEqual(filterTeamHistorySeasons(games, []), []);
+  assert.deepEqual(filterTeamHistorySeasons(games, ["unknown"]), []);
+  assert.deepEqual(games, original);
 });

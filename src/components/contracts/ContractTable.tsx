@@ -20,7 +20,7 @@
  */
 
 import { useMemo } from "react";
-import { Trash2 } from "lucide-react";
+import { CompactPlayerName } from "@gshl-components/player/CompactPlayerName";
 import { NHLLogo } from "@gshl-components/player/NHLLogo";
 import { TeamContractTableSkeleton } from "@gshl-skeletons";
 import { TableViewport } from "@gshl-ui";
@@ -33,6 +33,7 @@ import {
   getPlayerNhlAbbreviation,
   getSeasonDisplay,
   groupContractsByPlayer,
+  isPlayingContract,
   showDate,
 } from "@gshl-utils";
 import type {
@@ -67,19 +68,27 @@ const TableHeader = ({
       <tr>
         <th
           scope="col"
-          className={`w-32 bg-gray-800 text-center text-2xs font-normal text-gray-200 lg:sticky lg:left-0 lg:z-30 ${headerPadding}`}
+          className={`sticky left-0 z-30 w-28 min-w-28 max-w-28 bg-gray-800 text-center text-2xs font-normal text-gray-200 lg:w-32 lg:min-w-32 lg:max-w-32 ${headerPadding}`}
         >
           Name
         </th>
+        {showRemoveAction ? (
+          <th
+            scope="col"
+            className={`bg-gray-800 text-center text-2xs font-normal text-gray-200 ${headerPadding}`}
+          >
+            Plan
+          </th>
+        ) : null}
         <th
           scope="col"
-          className={`w-12 bg-gray-800 text-center text-2xs font-normal text-gray-200 lg:sticky lg:left-[8rem] lg:z-30 ${headerPadding}`}
+          className={`w-12 bg-gray-800 text-center text-2xs font-normal text-gray-200 ${showRemoveAction ? "" : "lg:sticky lg:left-[8rem] lg:z-30"} ${headerPadding}`}
         >
           Pos
         </th>
         <th
           scope="col"
-          className={`w-8 bg-gray-800 text-center text-2xs font-normal text-gray-200 lg:sticky lg:left-[11rem] lg:z-30 ${headerPadding}`}
+          className={`w-8 bg-gray-800 text-center text-2xs font-normal text-gray-200 ${showRemoveAction ? "" : "lg:sticky lg:left-[11rem] lg:z-30"} ${headerPadding}`}
         >
           Team
         </th>
@@ -113,14 +122,6 @@ const TableHeader = ({
         >
           {seasonName ? getSeasonDisplay(seasonName, 4) : ""}
         </th>
-        {showRemoveAction ? (
-          <th
-            scope="col"
-            className={`bg-gray-800 text-center text-2xs font-normal text-gray-200 ${headerPadding}`}
-          >
-            Remove
-          </th>
-        ) : null}
       </tr>
     </thead>
   );
@@ -140,6 +141,7 @@ const PlayerContractRow = ({
   compact = false,
   onRemovePlayer,
   isGhost = false,
+  note,
   onRestoreContract,
 }: PlayerContractRowProps) => {
   const firstContract = contracts[0];
@@ -150,15 +152,20 @@ const PlayerContractRow = ({
       <tr className="text-gray-400">
         <th
           scope="row"
-          className={`w-32 whitespace-nowrap border-b border-t border-gray-300 bg-gray-50 text-center text-xs font-normal lg:sticky lg:left-0 lg:z-20 ${stickyCellPadding}`}
+          className={`sticky left-0 z-20 w-28 min-w-28 max-w-28 whitespace-nowrap border-b border-t border-gray-300 bg-gray-50 text-center text-xs font-normal lg:w-32 lg:min-w-32 lg:max-w-32 ${stickyCellPadding}`}
         >
           Loading player…
         </th>
+        {onRemovePlayer || onRestoreContract ? (
+          <td
+            className={`border-b border-t border-gray-300 ${rowCellPadding}`}
+          />
+        ) : null}
         <td
-          className={`w-12 border-b border-t border-gray-300 bg-gray-50 lg:sticky lg:left-[8rem] lg:z-20 ${stickyCellPadding}`}
+          className={`w-12 border-b border-t border-gray-300 bg-gray-50 ${onRemovePlayer || onRestoreContract ? "" : "lg:sticky lg:left-[8rem] lg:z-20"} ${stickyCellPadding}`}
         />
         <td
-          className={`w-8 border-b border-t border-gray-300 bg-gray-50 lg:sticky lg:left-[11rem] lg:z-20 ${stickyCellPadding}`}
+          className={`w-8 border-b border-t border-gray-300 bg-gray-50 ${onRemovePlayer || onRestoreContract ? "" : "lg:sticky lg:left-[11rem] lg:z-20"} ${stickyCellPadding}`}
         />
         {Array.from({ length: 5 }, (_, index) => (
           <td
@@ -166,11 +173,6 @@ const PlayerContractRow = ({
             className={`border-b border-t border-gray-300 ${rowCellPadding}`}
           />
         ))}
-        {onRemovePlayer || onRestoreContract ? (
-          <td
-            className={`border-b border-t border-gray-300 ${rowCellPadding}`}
-          />
-        ) : null}
       </tr>
     ) : null;
   }
@@ -234,57 +236,61 @@ const PlayerContractRow = ({
     <tr className={isGhost || hasBuyout ? "text-gray-400" : "text-gray-800"}>
       <th
         scope="row"
-        className={`w-32 max-w-fit whitespace-nowrap border-b border-t border-gray-300 text-center text-xs font-normal lg:sticky lg:left-0 lg:z-20 ${stickyCellPadding} ${isGhost ? "bg-gray-100" : "bg-gray-50"}`}
+        className={`sticky left-0 z-20 w-28 min-w-28 max-w-28 whitespace-nowrap border-b border-t border-gray-300 text-center text-xs font-normal lg:w-32 lg:min-w-32 lg:max-w-32 ${stickyCellPadding} ${isGhost ? "bg-gray-100" : "bg-gray-50"}`}
       >
-        {player.fullName}
+        <CompactPlayerName name={player.fullName} />
+        {note ? (
+          <span className="block text-[9px] font-normal text-slate-500">
+            {note}
+          </span>
+        ) : null}
       </th>
-      <td
-        className={`w-12 whitespace-nowrap border-b border-t border-gray-300 text-center text-xs lg:sticky lg:left-[8rem] lg:z-20 ${stickyCellPadding} ${isGhost ? "bg-gray-100" : "bg-gray-50"}`}
-      >
-        {player.nhlPos?.toString() ?? ""}
-      </td>
-      <td
-        className={`w-8 whitespace-nowrap border-b border-t border-gray-300 text-center text-xs lg:sticky lg:left-[11rem] lg:z-20 ${stickyCellPadding} ${isGhost ? "bg-gray-100" : "bg-gray-50"}`}
-      >
-        <NHLLogo team={playerNhlTeam} size={16} />
-      </td>
-      {displayYears.map((displayYear) => renderCapHitCell(displayYear))}
       {onRemovePlayer ? (
         <td
           className={`border-b border-t border-gray-300 text-center ${rowCellPadding}`}
         >
           <button
             type="button"
-            className="inline-flex min-h-11 min-w-11 items-center justify-center rounded p-2 text-gray-500 hover:bg-gray-200 hover:text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-500"
+            className="inline-flex min-h-9 min-w-9 items-center justify-center rounded px-1 text-[10px] text-gray-500 hover:bg-gray-200 hover:text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 disabled:opacity-30"
             onClick={() =>
               onRemovePlayer(String(firstContract?.playerId ?? ""))
             }
             aria-label={`Remove ${player.fullName} from this scenario`}
             title="Remove player from scenario"
+            disabled={!contracts.some(isPlayingContract)}
           >
-            <Trash2 className="h-3.5 w-3.5" />
+            Remove
           </button>
         </td>
       ) : onRestoreContract ? (
         <td
           className={`border-b border-t border-gray-300 bg-gray-100 text-center ${rowCellPadding}`}
         >
-          <div className="flex flex-col items-center gap-1">
-            {contracts.map((contract) => (
-              <button
-                key={contract.id}
-                type="button"
-                className={`min-h-11 min-w-11 rounded border border-gray-400 text-[10px] text-gray-500 hover:bg-gray-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 ${compact ? "px-1.5 py-1" : "px-2 py-1"}`}
-                onClick={() => onRestoreContract(String(contract.id))}
-                aria-label={`Add back ${player.fullName}'s contract starting ${showDate(contract.startDate)}`}
-                title={`Add back contract starting ${showDate(contract.startDate)}`}
-              >
-                Add back
-              </button>
-            ))}
-          </div>
+          <button
+            type="button"
+            className="min-h-9 min-w-9 rounded px-1 text-[10px] text-gray-600 hover:bg-gray-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-500"
+            onClick={() =>
+              contracts.forEach((contract) =>
+                onRestoreContract(String(contract.id)),
+              )
+            }
+            aria-label={`Restore ${player.fullName} to this scenario`}
+          >
+            Restore
+          </button>
         </td>
       ) : null}
+      <td
+        className={`w-12 whitespace-nowrap border-b border-t border-gray-300 text-center text-xs ${onRemovePlayer || onRestoreContract ? "" : "lg:sticky lg:left-[8rem] lg:z-20"} ${stickyCellPadding} ${isGhost ? "bg-gray-100" : "bg-gray-50"}`}
+      >
+        {player.nhlPos?.toString() ?? ""}
+      </td>
+      <td
+        className={`w-8 whitespace-nowrap border-b border-t border-gray-300 text-center text-xs ${onRemovePlayer || onRestoreContract ? "" : "lg:sticky lg:left-[11rem] lg:z-20"} ${stickyCellPadding} ${isGhost ? "bg-gray-100" : "bg-gray-50"}`}
+      >
+        <NHLLogo team={playerNhlTeam} size={16} />
+      </td>
+      {displayYears.map((displayYear) => renderCapHitCell(displayYear))}
     </tr>
   );
 };
@@ -297,6 +303,7 @@ const PlayerContractRow = ({
  */
 const CapSpaceRow = ({
   currentTeam,
+  label = "Cap Space",
   capSpaceWindow,
   compact = false,
   showRemoveAction = false,
@@ -306,15 +313,18 @@ const CapSpaceRow = ({
     <tr key={`${currentTeam.franchiseId}CapSpace`}>
       <th
         scope="row"
-        className={`w-32 whitespace-nowrap border-t border-gray-800 bg-gray-200 text-center text-xs font-bold lg:sticky lg:left-0 lg:z-20 ${cellPadding}`}
+        className={`sticky left-0 z-20 w-28 min-w-28 max-w-28 whitespace-nowrap border-t border-gray-800 bg-gray-200 text-center text-xs font-bold lg:w-32 lg:min-w-32 lg:max-w-32 ${cellPadding}`}
       >
-        Cap Space
+        {label}
       </th>
+      {showRemoveAction ? (
+        <td className={`border-t border-gray-800 bg-gray-200 ${cellPadding}`} />
+      ) : null}
       <td
-        className={`w-12 whitespace-nowrap border-t border-gray-800 bg-gray-200 text-center text-xs lg:sticky lg:left-[8rem] lg:z-20 ${cellPadding}`}
+        className={`w-12 whitespace-nowrap border-t border-gray-800 bg-gray-200 text-center text-xs ${showRemoveAction ? "" : "lg:sticky lg:left-[8rem] lg:z-20"} ${cellPadding}`}
       ></td>
       <td
-        className={`w-8 whitespace-nowrap border-t border-gray-800 bg-gray-200 text-center text-xs lg:sticky lg:left-[11rem] lg:z-20 ${cellPadding}`}
+        className={`w-8 whitespace-nowrap border-t border-gray-800 bg-gray-200 text-center text-xs ${showRemoveAction ? "" : "lg:sticky lg:left-[11rem] lg:z-20"} ${cellPadding}`}
       ></td>
       {capSpaceWindow.map((c) => (
         <td
@@ -324,9 +334,6 @@ const CapSpaceRow = ({
           {formatMoney(c.remaining)}
         </td>
       ))}
-      {showRemoveAction ? (
-        <td className={`border-t border-gray-800 bg-gray-200 ${cellPadding}`} />
-      ) : null}
     </tr>
   );
 };
@@ -357,6 +364,9 @@ export function TeamContractTable({
   capSpaceWindow,
   ready,
   title = "Current Contracts",
+  hideTitle = false,
+  baselineCapSpaceWindow,
+  playerNotes,
   compact = false,
   onRemovePlayer,
   ghostContracts = [],
@@ -400,39 +410,15 @@ export function TeamContractTable({
       {compact ? (
         <h3
           id={headingId}
-          className="mt-2 w-full text-center text-lg font-bold"
+          className={hideTitle ? "sr-only" : "mb-2 text-base font-semibold"}
         >
           {title}
         </h3>
       ) : (
-        <h2
-          id={headingId}
-          className="mt-4 w-full text-center text-xl font-bold"
-        >
+        <h2 id={headingId} className="mb-2 text-base font-semibold">
           {title}
         </h2>
       )}
-
-      <div className="mx-auto mt-3 max-w-xl px-3 lg:hidden">
-        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          Remaining cap by season
-        </p>
-        <dl className="grid grid-cols-2 gap-2 min-[420px]:grid-cols-3">
-          {capSpaceWindow.map((entry) => (
-            <div
-              key={`mobile-cap-${entry.year}`}
-              className="rounded-lg border bg-slate-50 px-3 py-2"
-            >
-              <dt className="text-xs text-muted-foreground">{entry.label}</dt>
-              <dd
-                className={`mt-0.5 text-sm font-semibold ${entry.remaining < 0 ? "text-red-600" : "text-slate-900"}`}
-              >
-                {formatMoney(entry.remaining)}
-              </dd>
-            </div>
-          ))}
-        </dl>
-      </div>
 
       {!hasVisibleContracts ? (
         <p className="mt-3 px-3 text-center text-sm text-muted-foreground">
@@ -444,14 +430,14 @@ export function TeamContractTable({
         ariaLabel={viewportLabel}
         scrollHint="Scroll to compare cap seasons"
         className={`w-full ${compact ? "mt-2" : "mt-4"}`}
-        viewportClassName="rounded-md"
+        viewportClassName="rounded-none border-x-0"
       >
         <table className="mx-auto min-w-max whitespace-nowrap font-normal">
           <caption className="sr-only">{viewportLabel}</caption>
           <TableHeader
             currentSeason={currentSeason}
             compact={compact}
-            showRemoveAction={Boolean(onRemovePlayer)}
+            showRemoveAction={Boolean(onRemovePlayer ?? onRestoreContract)}
           />
           <tbody>
             {/* Render one chronological contract timeline per player. */}
@@ -464,20 +450,14 @@ export function TeamContractTable({
                 nhlTeams={nhlTeams}
                 compact={compact}
                 onRemovePlayer={onRemovePlayer}
+                note={playerNotes?.[String(contracts[0]?.playerId)]}
               />
             ))}
-            {/* Summary row for remaining cap space across seasons */}
-            <CapSpaceRow
-              currentTeam={currentTeam}
-              capSpaceWindow={capSpaceWindow}
-              compact={compact}
-              showRemoveAction={Boolean(onRemovePlayer)}
-            />
             {ghostContractGroups.length > 0 ? (
               <>
                 <tr>
                   <td
-                    colSpan={onRemovePlayer ? 9 : 8}
+                    colSpan={onRemovePlayer || onRestoreContract ? 9 : 8}
                     className={`border-t border-gray-300 bg-gray-100 text-left text-xs font-semibold text-gray-400 ${compact ? "px-1.5 py-1" : "px-2 py-2"}`}
                   >
                     Removed from preview
@@ -497,6 +477,22 @@ export function TeamContractTable({
                 ))}
               </>
             ) : null}
+            {baselineCapSpaceWindow ? (
+              <CapSpaceRow
+                currentTeam={currentTeam}
+                capSpaceWindow={baselineCapSpaceWindow}
+                compact={compact}
+                showRemoveAction={Boolean(onRemovePlayer ?? onRestoreContract)}
+                label="Current Space"
+              />
+            ) : null}
+            <CapSpaceRow
+              currentTeam={currentTeam}
+              capSpaceWindow={capSpaceWindow}
+              compact={compact}
+              showRemoveAction={Boolean(onRemovePlayer ?? onRestoreContract)}
+              label={onRemovePlayer ? "Planned Space" : "Cap Space"}
+            />
           </tbody>
         </table>
       </TableViewport>

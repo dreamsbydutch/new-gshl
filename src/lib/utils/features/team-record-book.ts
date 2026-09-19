@@ -32,6 +32,24 @@ import {
   getPlayerNhlAbbreviations,
 } from "../domain/player";
 import { getAllStarSeasonType } from "./season-awards";
+import { formatYearRanges } from "./trophy-case";
+
+/** Awards applicable to the selected statistical comparison. */
+export function getRecordBookVisibleAwards(
+  group: RecordBookGroup,
+  seasonType: SeasonTypeValue,
+): AwardsListType[] {
+  if (seasonType === SeasonType.PLAYOFFS) return [AwardsList.CONN_SMYTHE];
+  if (seasonType !== SeasonType.REGULAR_SEASON) return [];
+  return [
+    AwardsList.FIRST_AS,
+    AwardsList.SECOND_AS,
+    AwardsList.CROSBY,
+    ...(group === "goalie"
+      ? [AwardsList.BRODEUR]
+      : [AwardsList.LIDSTROM, AwardsList.GRETZKY, AwardsList.OVECHKIN]),
+  ];
+}
 
 export const ALL_TIME_ROSTER_SLOTS: AllTimeRosterSlot[] = [
   "C",
@@ -221,14 +239,24 @@ function finalizeRates<
   };
 }
 
-function getStatLine(row: RecordBookStatLine): RecordBookStatLine {
+function getStatLine(
+  row: RecordBookStatLine & { notCountedStats?: Set<RecordBookStatKey> },
+): RecordBookStatLine & { notCountedStats: Set<RecordBookStatKey> } {
+  const notCountedStats = new Set(row.notCountedStats);
+  // Historical seasons may omit P even when goals and assists were recorded.
+  if (notCountedStats.has("G") && notCountedStats.has("A")) {
+    notCountedStats.add("P");
+  } else {
+    notCountedStats.delete("P");
+  }
   return {
+    notCountedStats,
     days: row.days,
     GP: row.GP,
     GS: row.GS,
     G: row.G,
     A: row.A,
-    P: row.P,
+    P: row.G + row.A,
     PM: row.PM,
     PIM: row.PIM,
     PPP: row.PPP,
@@ -634,10 +662,10 @@ export function buildRecordBookPlayerRows(
       seasonId: row.seasonId,
       seasonYear: row.seasonYear,
       seasonCount: 1,
+      yearsLabel: formatYearRanges([row.seasonYear], true),
       firstSeason: row.seasonYear,
       lastSeason: row.seasonYear,
       ...getStatLine(row),
-      notCountedStats: row.notCountedStats,
       awardCounts:
         seasonCounts.get(`${row.playerId}|${row.seasonId}|${row.seasonType}`) ??
         {},
@@ -667,10 +695,10 @@ export function buildRecordBookPlayerRows(
         positionGroup: String(player?.posGroup ?? row.posGroup),
         seasonType: row.seasonType,
         seasonCount: years.length,
+        yearsLabel: formatYearRanges(years, true),
         firstSeason: years.at(0),
         lastSeason: years.at(-1),
         ...getStatLine(row),
-        notCountedStats: row.notCountedStats,
         awardCounts:
           careerCounts.get(`${row.playerId}|${row.seasonType}`) ?? {},
       };

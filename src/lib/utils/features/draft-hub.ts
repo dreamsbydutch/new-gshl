@@ -217,6 +217,7 @@ export function resolveDraftClockState(
   picks: readonly DraftPick[],
   draftStartAt: Date | string | number | null | undefined,
   now: Date = new Date(),
+  pickLimit = 5,
 ): DraftClockState {
   const orderedPicks = orderDraftPicks(picks);
   const liveDraftPicks = orderedPicks.filter(isLiveDraftSelection);
@@ -226,7 +227,7 @@ export function resolveDraftClockState(
   );
   const activePick =
     activeIndex >= 0 ? (liveDraftPicks[activeIndex] ?? null) : null;
-  const recentPicks = [...completedPicks].reverse().slice(0, 5);
+  const recentPicks = [...completedPicks].reverse().slice(0, pickLimit);
 
   if (orderedPicks.length === 0 || !draftStartAt) {
     return {
@@ -300,7 +301,7 @@ export function resolveDraftClockState(
     upcomingPicks: liveDraftPicks
       .slice(activeIndex + 1)
       .filter((pick) => !draftPickHasPlayer(pick))
-      .slice(0, 5),
+      .slice(0, pickLimit),
   };
 }
 

@@ -9,6 +9,9 @@ import { RecordDisplay } from "./history/RecordDisplay";
 
 export function TeamHistoryContainer({ teamInfo }: TeamHistoryProps) {
   const {
+    seasonOptions,
+    selectedSeasonIds,
+    setSelectedSeasonIds,
     gameTypeValue,
     setGameTypeValue,
     ownerValue,
@@ -27,8 +30,12 @@ export function TeamHistoryContainer({ teamInfo }: TeamHistoryProps) {
   }
 
   return (
-    <section className="mx-auto w-full max-w-5xl px-4 sm:px-6">
+    <section className="mx-auto w-full max-w-5xl">
+      <h2 className="mb-3 text-base font-semibold">Matchups</h2>
       <FilterDropdowns
+        seasonOptions={seasonOptions}
+        selectedSeasonIds={selectedSeasonIds}
+        setSelectedSeasonIds={setSelectedSeasonIds}
         gameTypeValue={gameTypeValue}
         setGameTypeValue={setGameTypeValue}
         ownerValue={ownerValue}

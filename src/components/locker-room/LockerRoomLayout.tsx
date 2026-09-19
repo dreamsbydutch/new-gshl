@@ -1,89 +1,57 @@
 "use client";
 
 import { useLockerRoomContextNavigation } from "@gshl-hooks";
-import {
-  HorizontalToggle,
-  PageContextNavigation,
-  SecondaryPageToolbar,
-  TeamsToggle,
-  TertiaryPageToolbar,
-} from "@gshl-nav";
-import type { ToggleItem } from "@gshl-types";
+import { PageContextNavigation } from "@gshl-nav";
 import { LockerRoomSkeleton } from "@gshl-skeletons";
+import { cn } from "@gshl-utils";
+
+const sections = [
+  ["roster", "Roster"],
+  ["salary", "Cap"],
+  ["tradeBlock", "Trades"],
+  ["history", "Matchups"],
+  ["trophy", "Trophies"],
+  ["recordbook", "Records"],
+  ["draft", "Draft"],
+] as const;
 
 export function LockerRoomLayout({ children }: { children: React.ReactNode }) {
   const navigation = useLockerRoomContextNavigation();
-  const selectedType = navigation.selectedView;
 
-  const pageToolbarProps: {
-    toolbarKeys: ToggleItem<string | null>[];
-    activeKey: string | null;
-  } = {
-    activeKey: selectedType,
-    toolbarKeys: [
-      {
-        key: "roster",
-        value: "Roster",
-        setter: () => navigation.selectView("roster"),
-      },
-      {
-        key: "salary",
-        value: "Cap",
-        setter: () => navigation.selectView("salary"),
-      },
-      {
-        key: "history",
-        value: "Matchups",
-        setter: () => navigation.selectView("history"),
-      },
-      {
-        key: "trophy",
-        value: "Trophies",
-        setter: () => navigation.selectView("trophy"),
-      },
-      {
-        key: "recordbook",
-        value: "Records",
-        setter: () => navigation.selectView("recordbook"),
-      },
-      {
-        key: "draft",
-        value: "Draft",
-        setter: () => navigation.selectView("draft"),
-      },
-    ],
-  };
   return (
     <div className="font-varela">
-      <PageContextNavigation ariaLabel="My Team controls" mobileRows={2}>
-        <SecondaryPageToolbar>
-          <TeamsToggle
-            seasonId={navigation.selectedSeasonId}
-            selectedOwnerId={navigation.selectedOwnerId}
-            onSelectOwner={navigation.selectOwner}
-          />
-        </SecondaryPageToolbar>
-        <TertiaryPageToolbar>
-          <HorizontalToggle<ToggleItem<string | null>>
-            items={pageToolbarProps.toolbarKeys}
-            selectedItem={
-              pageToolbarProps.toolbarKeys.find(
-                (item) => item.key === pageToolbarProps.activeKey,
-              ) ?? null
-            }
-            onSelect={(type: ToggleItem<string | null>) =>
-              type.setter(type.key)
-            }
-            getItemKey={(type: ToggleItem<string | null>) => type.key}
-            getItemLabel={(type: ToggleItem<string | null>) => type.value}
-            itemClassName="text-sm"
-          />
-        </TertiaryPageToolbar>
+      <PageContextNavigation ariaLabel="My Team controls" mobileRows={1}>
+        <div className="mx-auto flex max-w-5xl">
+          {sections.map(([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              aria-pressed={navigation.selectedView === key}
+              onClick={() => navigation.selectView(key)}
+              className={cn(
+                "min-h-9 min-w-0 flex-1 border-t-2 px-0.5 text-[10px] font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-slate-500 sm:text-xs lg:border-b-2 lg:border-t-0 lg:text-sm",
+                navigation.selectedView === key
+                  ? "border-slate-950 text-slate-950"
+                  : "border-transparent text-slate-500 hover:bg-slate-50 hover:text-slate-950",
+              )}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
       </PageContextNavigation>
-      <main aria-labelledby="locker-room-page-heading">
-        <h1 id="locker-room-page-heading" className="sr-only">
-          Locker Room
-        </h1>
+      <main
+        aria-labelledby="locker-room-page-heading"
+        className="mx-auto max-w-7xl px-3 pb-4 sm:px-6"
+      >
+        <div className="flex min-h-9 items-center pt-2">
+          <h1
+            id="locker-room-page-heading"
+            className="text-xs font-semibold text-slate-500"
+          >
+            My Team
+          </h1>
+        </div>
         {navigation.isReady ? children : <LockerRoomSkeleton />}
       </main>
     </div>

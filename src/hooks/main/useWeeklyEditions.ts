@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery } from "convex/react";
+import { useQueries, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import type {
@@ -51,10 +51,18 @@ export function useWeeklyEdition(
 }
 
 export function useWeeklyEditionNewsroom(editionId?: string) {
-  const aiStatus: WeeklyEditionAiStatus | undefined = useQuery(
-    api.weeklyEditions.aiStatus,
-    {},
-  );
+  // Optional AI capabilities must not take down the manual editor when the
+  // frontend is ahead of the deployed backend. useQueries returns errors
+  // as values and keeps the subscription alive for backend recovery.
+  const aiQueries = useQueries({
+    aiStatus: { query: api.weeklyEditions.aiStatus, args: {} },
+  });
+  const aiResult = aiQueries.aiStatus as
+    | WeeklyEditionAiStatus
+    | Error
+    | undefined;
+  const isAiStatusUnavailable = aiResult instanceof Error;
+  const aiStatus = aiResult instanceof Error ? undefined : aiResult;
   const editions: WeeklyEditionNewsroomSummary[] | undefined = useQuery(
     api.weeklyEditions.newsroom,
     {},
@@ -73,7 +81,8 @@ export function useWeeklyEditionNewsroom(editionId?: string) {
     revisions,
     aiStatus,
     isLoading: editions === undefined,
-    isAiStatusLoading: aiStatus === undefined,
+    isAiStatusLoading: aiResult === undefined,
+    isAiStatusUnavailable,
     isEditionLoading: Boolean(editionId) && selectedEdition === undefined,
     generateWithAi: useAppAction(api.weeklyEditions.generateWithAi),
     generateHistorical: useAppMutation(api.weeklyEditions.generateHistorical),

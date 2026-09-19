@@ -32,6 +32,7 @@ export const LOCKER_ROOM_NAVIGATION_VIEWS = [
   "history",
   "trophy",
   "recordbook",
+  "tradeBlock",
   "draft",
 ] as const;
 
@@ -173,14 +174,7 @@ export function getCurrentNavigationHref(
 }
 
 export function isGlobalSeasonUrlPath(pathname: string): boolean {
-  return (
-    pathname === "/schedule" ||
-    pathname === "/standings" ||
-    pathname === "/lockerroom" ||
-    pathname === "/leagueoffice" ||
-    pathname === "/leagueoffice/mock-draft" ||
-    pathname.startsWith("/matchup/")
-  );
+  return pathname === "/schedule" || pathname === "/standings";
 }
 
 /** Updates the global season on routes that expose their context in the URL. */
@@ -235,6 +229,13 @@ export function buildLeagueOfficeNavigationHref(
   currentSearch: string | URLSearchParams,
   context: LeagueOfficeNavigationContext,
 ): string {
+  // Preserve old bookmarks and persisted League Office selections.
+  if (context.view === "tradeBlock") {
+    return buildLockerRoomNavigationHref(currentSearch, {
+      view: "tradeBlock",
+      owner: readContextualNavigationQuery(currentSearch).owner,
+    });
+  }
   return buildContextualNavigationHref("/leagueoffice", currentSearch, {
     view: context.view,
     season: context.season ?? null,
@@ -344,4 +345,25 @@ export function isLockerRoomNavigationView(
   value: string | null | undefined,
 ): value is LockerRoomNavigationView {
   return isOneOf(value, LOCKER_ROOM_NAVIGATION_VIEWS);
+}
+
+/** A fresh My Team visit belongs to the viewer; explicit team links take precedence. */
+export function resolveLockerRoomOwnerId(
+  explicitOwnerId: string | null,
+  signedInOwnerId: string | null,
+  persistedOwnerId: string | null | undefined,
+  validOwnerIds: readonly string[],
+): string | null {
+  const ownOwnerId =
+    signedInOwnerId && validOwnerIds.includes(signedInOwnerId)
+      ? signedInOwnerId
+      : null;
+  const fallback = ownOwnerId ?? validOwnerIds[0] ?? null;
+  if (explicitOwnerId !== null) {
+    return validOwnerIds.includes(explicitOwnerId) ? explicitOwnerId : fallback;
+  }
+  if (ownOwnerId) return ownOwnerId;
+  return persistedOwnerId && validOwnerIds.includes(persistedOwnerId)
+    ? persistedOwnerId
+    : fallback;
 }

@@ -166,6 +166,7 @@ export interface RecordBookPlayerRow extends RecordBookStatLine {
   seasonId?: string;
   seasonYear?: number | string;
   seasonCount: number;
+  yearsLabel: string;
   firstSeason?: number | string;
   lastSeason?: number | string;
   notCountedStats?: Set<RecordBookStatKey>;
@@ -280,6 +281,8 @@ export interface RecordBookSortableHeadProps {
 }
 
 export interface RecordBookPlayerTableProps {
+  group: RecordBookGroup;
+  seasonType: SeasonType;
   columns: RecordBookStatColumn[];
   onSort: (key: RecordBookSortKey) => void;
   rows: RecordBookPlayerRow[];

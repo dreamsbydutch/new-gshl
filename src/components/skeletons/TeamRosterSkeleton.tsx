@@ -27,8 +27,8 @@ function LineupRowSkeleton({ players = 3 }: { players?: number }) {
 export function TeamRosterSkeleton() {
   return (
     <>
-      <Skeleton className="mx-auto mt-12 h-6 w-36" />
-      <div className="mx-auto mt-5 flex max-w-md flex-col overflow-hidden rounded-xl border bg-gray-50 px-1 py-2">
+      <Skeleton className="mx-auto mb-2 h-5 w-36" />
+      <div className="mx-auto flex max-w-md flex-col overflow-hidden rounded-xl border bg-gray-50 px-1 py-2">
         <LineupRowSkeleton />
         <LineupRowSkeleton />
         <div className="mx-auto my-1 w-4/6 border-b border-gray-300" />

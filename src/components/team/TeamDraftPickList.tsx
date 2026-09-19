@@ -45,7 +45,7 @@ const DraftPickItem = ({ processedPick, teams }: DraftPickItemProps) => {
   if (isAvailable) {
     return (
       <div className="text-gray-800">
-        <div className="mx-auto w-5/6 border-t border-gray-300 px-2 py-1 text-center text-xs">
+        <div className="border-b border-slate-100 py-1 text-sm leading-5">
           {formatDraftPickDescription(draftPick)}
           {getOriginalTeamName(teams, originalTeam)}
         </div>
@@ -54,8 +54,8 @@ const DraftPickItem = ({ processedPick, teams }: DraftPickItemProps) => {
   }
 
   return (
-    <div className="text-gray-400">
-      <div className="mx-auto w-5/6 border-t border-gray-300 px-2 py-1 text-center text-xs">
+    <div className="text-slate-500">
+      <div className="border-b border-slate-100 py-1 text-sm leading-5">
         {selectedPlayer?.fullName}, {selectedPlayer?.nhlPos?.toString() ?? ""} (
         {formatDraftPickDescription(draftPick)})
       </div>
@@ -163,8 +163,8 @@ export function TeamDraftPickList({
 
   return (
     <>
-      <div className="mx-auto mt-4 flex items-center justify-center gap-2 py-3">
-        <h2 className="text-xl font-bold">Draft Picks</h2>
+      <div className="mb-1 flex items-center justify-between gap-3">
+        <h2 className="text-base font-semibold">Draft Picks</h2>
         {onSelectSeason ? (
           <label>
             <span className="sr-only">Draft season</span>
@@ -172,7 +172,7 @@ export function TeamDraftPickList({
               aria-label="Draft season"
               value={selectedSeasonId}
               onChange={(event) => onSelectSeason(event.target.value)}
-              className="h-8 min-w-24 rounded-md border border-slate-300 bg-white px-2.5 pr-7 text-xs font-semibold text-slate-800 shadow-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-1 motion-reduce:transition-none"
+              className="h-9 min-w-24 rounded-md border border-slate-300 bg-white px-2.5 pr-7 text-xs font-semibold text-slate-800 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-1 motion-reduce:transition-none"
             >
               {displaySeasonOptions.map((season) => (
                 <option key={season.id} value={season.id}>

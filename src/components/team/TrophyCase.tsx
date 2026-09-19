@@ -25,12 +25,12 @@ import {
 
 function TrophySectionDivider({ label }: { label: string }) {
   return (
-    <div className="mb-4 mt-8 flex items-center gap-2.5 px-3 sm:mb-6 sm:mt-12 sm:gap-4 sm:px-4">
-      <div className="h-0 w-full border-t-4 border-dotted border-gray-300" />
+    <div className="mb-3 mt-5 flex items-center gap-3">
+      <div className="h-0 w-full border-t border-slate-200" />
       <span className="shrink-0 text-[10px] uppercase tracking-[0.2em] text-gray-400 sm:text-xs sm:tracking-[0.28em]">
         {label}
       </span>
-      <div className="h-0 w-full border-t-4 border-dotted border-gray-300" />
+      <div className="h-0 w-full border-t border-slate-200" />
     </div>
   );
 }
@@ -178,7 +178,7 @@ function FeaturedCupShowcase({ section }: { section: TrophyCaseAwardSection }) {
 function TrophyWin({ card }: { card: TrophyCaseCard }) {
   return (
     <article
-      className="flex min-w-0 flex-col items-center border-r border-slate-200 px-1 py-2 text-center last:border-r-0"
+      className="flex min-w-0 flex-col items-center px-1 py-2 text-center"
       title={`${card.catalog.fullName}, ${card.seasonYear}${
         card.franchiseName ? ` - ${card.franchiseName}` : ""
       }`}
@@ -220,7 +220,7 @@ function TrophyAwardRow({ section }: { section: TrophyCaseAwardSection }) {
           </p>
         </div>
       </div>
-      <div className="mt-2 grid grid-cols-6 overflow-hidden border-y border-slate-200 bg-slate-50/80 sm:grid-cols-8 md:grid-cols-10 lg:grid-cols-12">
+      <div className="mt-2 grid grid-cols-6 sm:grid-cols-8 md:grid-cols-10 lg:grid-cols-12">
         {section.cards.map((card) => (
           <TrophyWin key={card.id} card={card} />
         ))}
@@ -290,7 +290,7 @@ export function TrophyCase(props: TrophyCaseProps) {
         return (
           <div key={group}>
             <TrophySectionDivider label={group} />
-            <div className="mx-auto max-w-7xl space-y-6 sm:space-y-8">
+            <div className="mx-auto max-w-7xl space-y-4">
               {groupSections.map((section) => (
                 <TrophyAwardRow key={section.awardKey} section={section} />
               ))}

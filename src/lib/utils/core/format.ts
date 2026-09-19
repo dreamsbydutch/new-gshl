@@ -25,6 +25,12 @@ export function formatPlayerName(name: string): string {
     .join(" ");
 }
 
+/** Shorten only the first name, preserving compound surnames and punctuation. */
+export function abbreviatePlayerName(name: string): string {
+  const [first = "", ...rest] = name.trim().split(/\s+/);
+  return rest.length ? `${Array.from(first)[0]}. ${rest.join(" ")}` : first;
+}
+
 /**
  * Formats team name for display.
  *

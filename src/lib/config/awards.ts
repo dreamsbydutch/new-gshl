@@ -64,8 +64,7 @@ export const AWARD_CATALOG: AwardCatalogEntry[] = [
     key: AwardsList.HART,
     group: "TIER 1 AWARDS",
     fullName: "Hart Trophy",
-    imageUrl:
-      "https://qzcw4d2n1l.ufs.sh/f/wTZjIHOpQwiM9O8bqT53sYjkIOmdlLVgBTXw2nAP8azqeZyb",
+    imageUrl: "/awards/hart.png",
     summaryLabel: "Hart",
     sortOrder: 1,
   },
@@ -73,8 +72,7 @@ export const AWARD_CATALOG: AwardCatalogEntry[] = [
     key: AwardsList.NORRIS,
     group: "TIER 1 AWARDS",
     fullName: "Norris Trophy",
-    imageUrl:
-      "https://qzcw4d2n1l.ufs.sh/f/wTZjIHOpQwiMUwcmA8rpJv4dqGs8bj7iKZmCeMNSOFT2ck9V",
+    imageUrl: "/awards/norris.png",
     summaryLabel: "Norris",
     sortOrder: 2,
   },
@@ -82,8 +80,7 @@ export const AWARD_CATALOG: AwardCatalogEntry[] = [
     key: AwardsList.VEZINA,
     group: "TIER 1 AWARDS",
     fullName: "Vezina Trophy",
-    imageUrl:
-      "https://qzcw4d2n1l.ufs.sh/f/wTZjIHOpQwiMy376tZI09z2CeSKuZMtgV46qIXxB7l5A1poD",
+    imageUrl: "/awards/vezina.png",
     summaryLabel: "Vezina",
     sortOrder: 3,
   },
@@ -118,8 +115,7 @@ export const AWARD_CATALOG: AwardCatalogEntry[] = [
     key: AwardsList.ROCKET,
     group: "TIER 2 AWARDS",
     fullName: "Rocket Richard Trophy",
-    imageUrl:
-      "https://qzcw4d2n1l.ufs.sh/f/wTZjIHOpQwiM7qCeydDBWlUhdc6B3jnr5wuiRE7aNTgpL89F",
+    imageUrl: "/awards/rocket.png",
     summaryLabel: "Rocket Richard",
     sortOrder: 1,
   },
@@ -127,8 +123,7 @@ export const AWARD_CATALOG: AwardCatalogEntry[] = [
     key: AwardsList.ART_ROSS,
     group: "TIER 2 AWARDS",
     fullName: "Art Ross Trophy",
-    imageUrl:
-      "https://qzcw4d2n1l.ufs.sh/f/wTZjIHOpQwiMXNBbuH9eUFO1XWmtTViK8j9IM3506pqAgZNJ",
+    imageUrl: "/awards/ross.png",
     summaryLabel: "Art Ross",
     sortOrder: 2,
   },
@@ -188,10 +183,7 @@ export const PLAYER_TROPHY_ICON_AWARDS = new Map<
 ]);
 
 export const PLAYER_TROPHY_ICON_URLS = new Map<AwardsListType, string>([
-  [
-    AwardsList.CONN_SMYTHE,
-    "https://qzcw4d2n1l.ufs.sh/f/wTZjIHOpQwiMdFatOuljvrNGugImeAEicjQUD0qyz2nb1B5Z",
-  ],
+  [AwardsList.CONN_SMYTHE, "/awards/smythe.png"],
 ]);
 
 export function getAwardLabel(award: string): string {

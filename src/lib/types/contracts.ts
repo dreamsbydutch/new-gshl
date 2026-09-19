@@ -219,6 +219,9 @@ export interface ContractTableProps {
   capSpaceWindow: CapSpaceEntry[];
   ready: boolean;
   title?: string;
+  hideTitle?: boolean;
+  baselineCapSpaceWindow?: CapSpaceEntry[];
+  playerNotes?: Readonly<Record<string, string>>;
   compact?: boolean;
   onRemovePlayer?: (playerId: string) => void;
   ghostContracts?: Contract[];
@@ -233,6 +236,7 @@ export interface PlayerContractRowProps {
   compact?: boolean;
   onRemovePlayer?: (playerId: string) => void;
   isGhost?: boolean;
+  note?: string;
   onRestoreContract?: (contractId: string) => void;
 }
 
@@ -244,6 +248,7 @@ export interface TableHeaderProps {
 
 export interface CapSpaceRowProps {
   currentTeam: GSHLTeam;
+  label?: string;
   capSpaceWindow: CapSpaceEntry[];
   compact?: boolean;
   showRemoveAction?: boolean;

@@ -16,7 +16,9 @@ import {
   buildAllTimeFranchiseRoster,
   buildRecordBookPlayerRows,
   formatRecordBookStat,
+  sortRecordBookPlayerRows,
   getOwnerTeamIds,
+  getRecordBookVisibleAwards,
   getRecordBookAwardSeasonType,
   getRecordBookPriorityColumns,
   RECORD_BOOK_GOALIE_COLUMNS,
@@ -311,4 +313,186 @@ void test("builds a unique all-time lineup from the best positional splits", () 
     ],
   );
   assert.equal(new Set(lineup.map((entry) => entry.playerId)).size, 6);
+});
+
+void test("record-book awards follow season type and player group", () => {
+  assert.deepEqual(
+    getRecordBookVisibleAwards("skater", SeasonType.REGULAR_SEASON),
+    [
+      AwardsList.FIRST_AS,
+      AwardsList.SECOND_AS,
+      AwardsList.CROSBY,
+      AwardsList.LIDSTROM,
+      AwardsList.GRETZKY,
+      AwardsList.OVECHKIN,
+    ],
+  );
+  assert.deepEqual(
+    getRecordBookVisibleAwards("goalie", SeasonType.REGULAR_SEASON),
+    [
+      AwardsList.FIRST_AS,
+      AwardsList.SECOND_AS,
+      AwardsList.CROSBY,
+      AwardsList.BRODEUR,
+    ],
+  );
+  for (const group of ["skater", "goalie"] as const) {
+    assert.deepEqual(getRecordBookVisibleAwards(group, SeasonType.PLAYOFFS), [
+      AwardsList.CONN_SMYTHE,
+    ]);
+    assert.deepEqual(
+      getRecordBookVisibleAwards(group, SeasonType.LOSERS_TOURNAMENT),
+      [],
+    );
+  }
+});
+
+void test("player-history years preserve gaps and abbreviate consecutive runs", () => {
+  const years = [2024, 2019, 2021, 2020, 2021, 2026];
+  const { careerRows, seasonRows } = buildRecordBookPlayerRows({
+    awardRows: [],
+    careerSplits: [seasonSplitRow()],
+    nhlTeamsByAbbr: new Map(),
+    ownerTeamIds: new Set(["owner-a-team-1"]),
+    playersById: new Map(),
+    seasonSplits: years.map((year, index) =>
+      seasonSplitRow({
+        id: `split-${index}`,
+        seasonId: `season-${year}`,
+      }),
+    ),
+    seasonsById: new Map(years.map((year) => [`season-${year}`, year])),
+  });
+  assert.equal(careerRows[0]?.yearsLabel, "'19\u2013'21, '24, '26");
+  assert.equal(careerRows[0]?.seasonCount, 5);
+  assert.equal(seasonRows[0]?.yearsLabel, "'24");
+});
+
+void test("player history renders one logo per NHL team despite alias catalog IDs", () => {
+  const catalog = [
+    nhlTeam("nj-alias", "NJ"),
+    nhlTeam("nj-canonical", "NJD"),
+    nhlTeam("vegas-alias", "VEG"),
+    nhlTeam("vegas-canonical", "VGK"),
+    nhlTeam("toronto", "TOR"),
+  ];
+  const { careerRows, seasonRows } = buildRecordBookPlayerRows({
+    awardRows: [],
+    careerSplits: [
+      seasonSplitRow({ nhlTeam: ["NJ", "NJD", "VEG", "VGK", "TOR"] }),
+    ],
+    nhlTeamsByAbbr: new Map(catalog.map((team) => [team.abbr, team])),
+    ownerTeamIds: new Set(["owner-a-team-1"]),
+    playersById: new Map(),
+    seasonSplits: [
+      seasonSplitRow({ nhlTeam: ["NJ", "NJD", "VEG", "VGK", "TOR"] }),
+    ],
+    seasonsById: new Map([["season-1", 2025]]),
+  });
+  for (const row of [careerRows[0], seasonRows[0]]) {
+    assert.deepEqual(
+      row?.nhlTeams.map((team) => team.id),
+      ["nj-canonical", "vegas-canonical", "toronto"],
+    );
+  }
+});
+
+void test("history points use goals plus assists across seasons and stages", () => {
+  const splits = [
+    seasonSplitRow({ G: "10", A: "20", P: "", seasonId: "old" }),
+    seasonSplitRow({ G: "5", A: "7", P: "0", seasonId: "new" }),
+    seasonSplitRow({
+      G: "2",
+      A: "3",
+      P: "999",
+      seasonType: SeasonType.PLAYOFFS,
+    }),
+    seasonSplitRow({ playerId: "player-2", G: "15", A: "20", P: "35" }),
+    seasonSplitRow({ gshlTeamId: "other-owner", G: "100", A: "100", P: "200" }),
+  ];
+  const before = structuredClone(splits);
+  const { careerRows, seasonRows } = buildRecordBookPlayerRows({
+    awardRows: [],
+    careerSplits: splits,
+    seasonSplits: splits,
+    nhlTeamsByAbbr: new Map(),
+    playersById: new Map(),
+    ownerTeamIds: new Set(["owner-a-team-1"]),
+    seasonsById: new Map([
+      ["old", 2019],
+      ["new", 2021],
+      ["season-1", 2025],
+    ]),
+  });
+  const regular = careerRows.find(
+    (row) =>
+      row.playerId === "player-1" &&
+      row.seasonType === SeasonType.REGULAR_SEASON,
+  )!;
+  const playoff = careerRows.find(
+    (row) => row.seasonType === SeasonType.PLAYOFFS,
+  )!;
+  assert.equal(regular.P, 42);
+  assert.equal(playoff.P, 5);
+  assert.equal(seasonRows.find((row) => row.seasonId === "old")?.P, 30);
+  assert.equal(seasonRows.find((row) => row.seasonId === "new")?.P, 12);
+  const points = {
+    key: "P",
+    label: "P",
+    title: "Points",
+  } satisfies RecordBookStatColumn;
+  assert.equal(formatRecordBookStat(regular, points), "42");
+  assert.equal(
+    sortRecordBookPlayerRows(
+      careerRows.filter((row) => row.seasonType === SeasonType.REGULAR_SEASON),
+      { key: "P", direction: "desc" },
+    )[0]?.playerId,
+    "player-1",
+  );
+  assert.deepEqual(splits, before);
+});
+
+void test("derived history points distinguish zero from unavailable goals and assists", () => {
+  const splits = [
+    seasonSplitRow({ playerId: "zero", G: "0", A: "0", P: "" }),
+    seasonSplitRow({ playerId: "unavailable", G: "", A: "", P: "" }),
+    seasonSplitRow({ playerId: "goals-only", G: "2", A: "", P: "" }),
+  ];
+  const { careerRows, seasonRows } = buildRecordBookPlayerRows({
+    awardRows: [],
+    careerSplits: splits,
+    seasonSplits: splits,
+    nhlTeamsByAbbr: new Map(),
+    playersById: new Map(),
+    ownerTeamIds: new Set(["owner-a-team-1"]),
+    seasonsById: new Map(),
+  });
+  const points = {
+    key: "P",
+    label: "P",
+    title: "Points",
+  } satisfies RecordBookStatColumn;
+  for (const rows of [careerRows, seasonRows]) {
+    assert.equal(
+      formatRecordBookStat(
+        rows.find((row) => row.playerId === "zero")!,
+        points,
+      ),
+      "0",
+    );
+    assert.equal(
+      formatRecordBookStat(
+        rows.find((row) => row.playerId === "unavailable")!,
+        points,
+      ),
+      "-",
+    );
+    assert.equal(
+      formatRecordBookStat(
+        rows.find((row) => row.playerId === "goals-only")!,
+        points,
+      ),
+      "2",
+    );
+  }
 });

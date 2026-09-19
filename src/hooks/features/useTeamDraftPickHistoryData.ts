@@ -32,8 +32,19 @@ export function useTeamDraftPickHistoryData({
     ) {
       return localSeasonId;
     }
+    if (!currentTeam.ownerIsActive) {
+      return (
+        seasonOptions.find((season) => season.id === currentTeam.seasonId)
+          ?.id ?? null
+      );
+    }
     return seasonOptions[0]?.id ?? null;
-  }, [localSeasonId, seasonOptions]);
+  }, [
+    currentTeam.ownerIsActive,
+    currentTeam.seasonId,
+    localSeasonId,
+    seasonOptions,
+  ]);
 
   const teamsQuery = useTeams({
     seasonId: selectedSeasonId,

@@ -13,10 +13,12 @@ import {
   findCurrentSeason,
   findSeasonById,
   isSeasonPickable,
+  isGlobalSeasonUrlPath,
   resolveDefaultSeason,
   toSeasonSummary,
 } from "@gshl-utils";
 import { useNavStore } from "@gshl-cache";
+import { useAppPathname } from "./useNextNavigation";
 
 export function useSeasons(options: UseSeasonsOptions = {}) {
   const {
@@ -67,6 +69,8 @@ export function useSeasons(options: UseSeasonsOptions = {}) {
 
 export function useSeasonState(options: UseSeasonStateOptions = {}) {
   const { autoSelect = true, referenceDate = new Date() } = options;
+  const { pathname } = useAppPathname();
+  const usesSharedSeason = isGlobalSeasonUrlPath(pathname);
   const query = useSeasons({ orderBy: { year: "asc" } });
   const seasons = useMemo(() => query.data ?? [], [query.data]);
   const selectedSeasonId = useNavStore((state) => state.selectedSeasonId);
@@ -92,6 +96,7 @@ export function useSeasonState(options: UseSeasonStateOptions = {}) {
     [seasons, referenceDate],
   );
   const selectedSeason =
+    usesSharedSeason &&
     storedSelectedSeason &&
     isSeasonPickable(storedSelectedSeason, referenceDate)
       ? storedSelectedSeason
@@ -99,6 +104,7 @@ export function useSeasonState(options: UseSeasonStateOptions = {}) {
 
   useEffect(() => {
     if (
+      usesSharedSeason &&
       autoSelect &&
       !query.isLoading &&
       selectedSeason?.id &&
@@ -108,6 +114,7 @@ export function useSeasonState(options: UseSeasonStateOptions = {}) {
     }
   }, [
     autoSelect,
+    usesSharedSeason,
     query.isLoading,
     selectedSeason,
     selectedSeasonId,
@@ -126,7 +133,9 @@ export function useSeasonState(options: UseSeasonStateOptions = {}) {
     selectableDefaultSeason,
     selectableDefaultSeasonSummary: toSeasonSummary(selectableDefaultSeason),
     seasonOptions: buildSeasonSummaries(seasons, referenceDate),
-    selectedSeasonId,
+    selectedSeasonId: usesSharedSeason
+      ? selectedSeasonId
+      : (selectedSeason?.id ?? null),
     setSelectedSeasonId,
     isSelectedSeasonLoading: query.isLoading,
     isSelectedSeasonFetching: query.isLoading,

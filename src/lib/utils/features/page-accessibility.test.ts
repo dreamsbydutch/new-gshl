@@ -22,11 +22,11 @@ void test("contextual layouts expose a labelled main landmark", () => {
   ] as const) {
     const source = readSource(path);
 
-    assert.match(source, new RegExp(`<main aria-labelledby="${headingId}">`));
     assert.match(
       source,
-      new RegExp(`<h1 id="${headingId}" className="sr-only">`),
+      new RegExp(`<main\\b[^>]*aria-labelledby="${headingId}"[^>]*>`),
     );
+    assert.match(source, new RegExp(`<h1\\b[^>]*id="${headingId}"[^>]*>`));
   }
 });
 
@@ -43,11 +43,11 @@ void test("protected contextual loading routes retain a labelled primary landmar
   ] as const) {
     const source = readSource(path);
 
-    assert.match(source, new RegExp(`<main aria-labelledby="${headingId}">`));
     assert.match(
       source,
-      new RegExp(`<h1 id="${headingId}" className="sr-only">`),
+      new RegExp(`<main\\b[^>]*aria-labelledby="${headingId}"[^>]*>`),
     );
+    assert.match(source, new RegExp(`<h1\\b[^>]*id="${headingId}"[^>]*>`));
   }
 });
 
@@ -166,6 +166,20 @@ void test("My Team draft picks use their own season control", () => {
   assert.match(content, /<TeamDraftPickHistory/);
   assert.doesNotMatch(content, /useDraftPicks/);
   assert.match(draftPicks, /aria-label="Draft season"/);
+});
+
+void test("My Team exposes a labelled team menu with logos in the header", () => {
+  const navbar = readSource("src/components/nav/MainNavbar.tsx");
+  const selector = readSource("src/components/nav/HeaderTeamSelect.tsx");
+  const layout = readSource("src/components/locker-room/LockerRoomLayout.tsx");
+
+  assert.match(navbar, /showTeamControl = pathname === "\/lockerroom"/);
+  assert.match(selector, /<DropdownMenuRadioGroup\s+aria-label="View team"/);
+  assert.match(selector, /disabled=\{!navigation.isReady \|\| !hasTeams\}/);
+  assert.match(selector, /<DropdownMenuRadioItem\s+key=\{team.id\}/);
+  assert.match(selector, /src=\{selectedTeam.logoUrl\}/);
+  assert.match(selector, /src=\{team.logoUrl\}/);
+  assert.doesNotMatch(layout, /<details|TeamsToggle/);
 });
 
 void test("UFA and matchup statistics retain compact scrollable tables on phones", () => {

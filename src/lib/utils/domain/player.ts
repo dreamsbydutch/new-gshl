@@ -113,9 +113,29 @@ export function getFreeAgents(
   return sortPlayersByRating(result, sortDirection);
 }
 
+// Alternate abbreviations in the NHL catalog and supported stat sources.
+const NHL_TEAM_ABBREVIATION_ALIASES: Readonly<Record<string, string>> = {
+  ANH: "ANA",
+  ARZ: "ARI",
+  CAL: "CGY",
+  CLB: "CBJ",
+  CLS: "CBJ",
+  LA: "LAK",
+  MON: "MTL",
+  NAS: "NSH",
+  NASH: "NSH",
+  NJ: "NJD",
+  SJ: "SJS",
+  TB: "TBL",
+  UTAH: "UTA",
+  VEG: "VGK",
+  WAS: "WSH",
+  WIN: "WPG",
+};
+
 function normalizePlayerTeamToken(value: string): string | null {
   const team = value.trim().toUpperCase();
-  return team.length > 0 ? team : null;
+  return team.length > 0 ? (NHL_TEAM_ABBREVIATION_ALIASES[team] ?? team) : null;
 }
 
 /**
@@ -184,9 +204,13 @@ export function findNhlTeamByAbbreviation<
   const normalizedAbbreviation =
     getPlayerNhlAbbreviation(abbreviation)?.toUpperCase();
   return normalizedAbbreviation
-    ? nhlTeams.find(
+    ? (nhlTeams.find(
         (team) => team.abbr.trim().toUpperCase() === normalizedAbbreviation,
-      )
+      ) ??
+        nhlTeams.find(
+          (team) =>
+            normalizePlayerTeamToken(team.abbr) === normalizedAbbreviation,
+        ))
     : undefined;
 }
 

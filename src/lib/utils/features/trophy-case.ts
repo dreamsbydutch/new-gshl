@@ -30,12 +30,22 @@ export function formatYearRange(startYear: number, endYear: number): string {
     : `${startYear}-${endYear}`;
 }
 
-export function formatYearRanges(years: Array<number | string>): string {
+export function formatYearRanges(
+  years: Array<number | string>,
+  abbreviate = false,
+): string {
   const normalizedYears = Array.from(
     new Set(years.map(Number).filter(Number.isFinite)),
   ).sort((left, right) => left - right);
   if (normalizedYears.length === 0) return years.map(String).join(", ");
 
+  const formatRange = (start: number, end: number) => {
+    if (!abbreviate) return formatYearRange(start, end);
+    const shortYear = (year: number) => `'${String(year).slice(-2)}`;
+    return start === end
+      ? shortYear(start)
+      : `${shortYear(start)}–${shortYear(end)}`;
+  };
   const ranges: string[] = [];
   let rangeStart = normalizedYears[0]!;
   let rangeEnd = rangeStart;
@@ -44,11 +54,11 @@ export function formatYearRanges(years: Array<number | string>): string {
       rangeEnd = currentYear;
       continue;
     }
-    ranges.push(formatYearRange(rangeStart, rangeEnd));
+    ranges.push(formatRange(rangeStart, rangeEnd));
     rangeStart = currentYear;
     rangeEnd = currentYear;
   }
-  ranges.push(formatYearRange(rangeStart, rangeEnd));
+  ranges.push(formatRange(rangeStart, rangeEnd));
   return ranges.join(", ");
 }
 

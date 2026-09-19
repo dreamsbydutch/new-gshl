@@ -270,3 +270,12 @@ export const getScoreColor = (result: string): string => {
     winClass: "text-emerald-700 font-bold",
   });
 };
+
+/** Selects local history seasons without changing the shared league context. */
+export function filterTeamHistorySeasons<T extends { seasonId: string }>(
+  rows: T[],
+  seasonIds: readonly string[],
+): T[] {
+  const selected = new Set(seasonIds);
+  return rows.filter((row) => selected.has(row.seasonId));
+}
