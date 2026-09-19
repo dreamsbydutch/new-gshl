@@ -57,7 +57,7 @@ Do not collapse these concepts:
 
 | Table               | Purpose and important relationships                                                                                                                               |
 | ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `contracts`         | Player-owner contract signed in a season, with type, term, salary/cap hit, start/expiry dates, and statuses.                                                      |
+| `contracts`         | Player-owner contract signed in a season, with type, term, salary/cap hit, start/expiry dates, and statuses. A signing atomically assigns the player to the first covered season's team and reserves that franchise's lowest open draft pick in every covered season. |
 | `tradeBlockEntries` | One active owner/player market signal with an optional public negotiation note. App-native IDs and owner/player indexes keep writes scoped and listings realtime. |
 | `draftPicks`        | Ordered season pick, current/original team, selected player, live clock timestamps, and trade/signing flags. Canonical live order is `(seasonId, round, pick)`.   |
 | `ufaOfferGroups`    | One player/season competition, shared deadline, resolution state, winning offer, final odds/roll, and failure details.                                            |

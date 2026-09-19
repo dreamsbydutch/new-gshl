@@ -9,6 +9,7 @@ import {
   deriveContractCreationTerms,
   getEffectiveSigningStatus,
 } from "../src/lib/utils/domain/contracts";
+import { resolveContractSigningAssignments } from "./lib/contractSigning";
 import { buildLeagueActivity } from "../src/lib/utils/features/league-activity";
 import {
   buildLockKey,
@@ -1313,6 +1314,60 @@ export const createContract = mutation({
       contracts: contractRows,
       seasons: contractSeasons,
     });
+    const contractSeasonIndex = contractSeasons.findIndex(
+      (season) => season.id === contractSigningSeason.id,
+    );
+    const coveredSeasonIds = contractSeasons
+      .slice(
+        contractSeasonIndex + 1,
+        contractSeasonIndex + 1 + args.contractLength,
+      )
+      .map((season) => season.id);
+    const seasonAssignments = await Promise.all(
+      coveredSeasonIds.map(async (seasonId) => {
+        const [teams, picks] = await Promise.all([
+          ctx.db
+            .query("teams")
+            .withIndex("by_seasonId", (range) =>
+              range.eq("seasonId", seasonId as Id<"seasons">),
+            )
+            .collect(),
+          ctx.db
+            .query("draftPicks")
+            .withIndex("by_seasonId", (range) =>
+              range.eq("seasonId", seasonId as Id<"seasons">),
+            )
+            .collect(),
+        ]);
+        return { teams, picks };
+      }),
+    );
+    const signingAssignments = resolveContractSigningAssignments({
+      signingSeasonId: contractSigningSeason.id,
+      contractLength: args.contractLength,
+      franchiseId: String(team.franchiseId),
+      seasons: contractSeasons,
+      teams: seasonAssignments.flatMap(({ teams }) =>
+        teams.map((candidate) => ({
+          id: String(candidate._id),
+          seasonId: String(candidate.seasonId),
+          franchiseId: String(candidate.franchiseId),
+        })),
+      ),
+      picks: seasonAssignments.flatMap(({ picks }) =>
+        picks.map((candidate) => ({
+          id: String(candidate._id),
+          seasonId: String(candidate.seasonId),
+          gshlTeamId: candidate.gshlTeamId
+            ? String(candidate.gshlTeamId)
+            : null,
+          round: candidate.round,
+          pick: candidate.pick,
+          playerId: candidate.playerId ? String(candidate.playerId) : null,
+          isSigning: candidate.isSigning,
+        })),
+      ),
+    });
     const now = Date.now();
     const startDate = toUtcTimestamp(terms.startDate);
     const expiryDate = toUtcTimestamp(terms.expiryDate);
@@ -1338,9 +1393,22 @@ export const createContract = mutation({
     });
     await ctx.db.patch(args.playerId, {
       ownerId: franchise.ownerId,
-      gshlTeamId: undefined,
+      gshlTeamId: signingAssignments[0]?.teamId,
+      isSignable: false,
+      isResignable: null,
+      lineupPos: null,
       updatedAt: now,
     });
+    for (const assignment of signingAssignments) {
+      await ctx.db.patch(assignment.pickId as Id<"draftPicks">, {
+        playerId: args.playerId,
+        isSigning: true,
+        onClockStartedAt: null,
+        onClockExpiresAt: null,
+        onClockEndedAt: null,
+        updatedAt: now,
+      });
+    }
     return publicRow((await ctx.db.get(id)) as unknown as Row);
   },
 });

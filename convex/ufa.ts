@@ -11,6 +11,7 @@ import {
 import { getUfaOfferGroupDeadline } from "../src/lib/utils/features/ufa-deadline";
 import { requireOwnerOrCommissioner } from "./lib/auth";
 import { utcTimestampToDateKey } from "./lib/timestamps";
+import { resolveContractSigningAssignments } from "./lib/contractSigning";
 import { loadDueUfaOfferGroups } from "./lib/ufaReconciliation";
 import { loadUfaOddsData, type UfaOddsData } from "./ufaOdds";
 
@@ -846,6 +847,60 @@ export const finalizeGroup = internalMutation({
         contract.playerId === player._id &&
         coveredSeasonIds(contract, seasons).includes(group.seasonId),
     );
+    const ownerFranchises = await db
+      .query("franchises")
+      .withIndex("by_ownerId", (q: any) =>
+        q.eq("ownerId", winningOffer.ownerId),
+      )
+      .collect();
+    if (ownerFranchises.length !== 1) {
+      throw new Error("The winning owner's franchise could not be resolved.");
+    }
+    const coveredSeasonIds = seasons
+      .slice(signingIndex + 1, signingIndex + 1 + winningOffer.contractLength)
+      .map((season: any) => String(season._id));
+    const seasonAssignments = await Promise.all(
+      coveredSeasonIds.map(async (seasonId: string) => {
+        const [teams, picks] = await Promise.all([
+          db
+            .query("teams")
+            .withIndex("by_seasonId", (q: any) => q.eq("seasonId", seasonId))
+            .collect(),
+          db
+            .query("draftPicks")
+            .withIndex("by_seasonId", (q: any) => q.eq("seasonId", seasonId))
+            .collect(),
+        ]);
+        return { teams, picks };
+      }),
+    );
+    const signingAssignments = resolveContractSigningAssignments({
+      signingSeasonId: String(group.seasonId),
+      contractLength: winningOffer.contractLength,
+      franchiseId: String(ownerFranchises[0]!._id),
+      seasons: seasons.map((season: any) => ({
+        id: String(season._id),
+        year: season.year,
+      })),
+      teams: seasonAssignments.flatMap(({ teams }: any) =>
+        teams.map((team: any) => ({
+          id: String(team._id),
+          seasonId: String(team.seasonId),
+          franchiseId: String(team.franchiseId),
+        })),
+      ),
+      picks: seasonAssignments.flatMap(({ picks }: any) =>
+        picks.map((pick: any) => ({
+          id: String(pick._id),
+          seasonId: String(pick.seasonId),
+          gshlTeamId: pick.gshlTeamId ? String(pick.gshlTeamId) : null,
+          round: pick.round,
+          pick: pick.pick,
+          playerId: pick.playerId ? String(pick.playerId) : null,
+          isSigning: pick.isSigning,
+        })),
+      ),
+    });
     const factorByOfferId = new Map(
       args.factorSnapshots.map((entry) => [entry.offerId, entry.snapshot]),
     );
@@ -869,12 +924,22 @@ export const finalizeGroup = internalMutation({
     });
     await db.patch(player._id, {
       ownerId: winningOffer.ownerId,
-      gshlTeamId: undefined,
+      gshlTeamId: signingAssignments[0]?.teamId,
       isSignable: false,
       isResignable: null,
       lineupPos: null,
       updatedAt: now,
     });
+    for (const assignment of signingAssignments) {
+      await db.patch(assignment.pickId, {
+        playerId: player._id,
+        isSigning: true,
+        onClockStartedAt: null,
+        onClockExpiresAt: null,
+        onClockEndedAt: null,
+        updatedAt: now,
+      });
+    }
     for (const offer of offers) {
       await db.patch(offer._id, {
         status: offer._id === winningOffer._id ? "won" : "lost",
