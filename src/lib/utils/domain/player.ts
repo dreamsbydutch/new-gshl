@@ -11,6 +11,51 @@ type PlayerTeamCarrier = Pick<Player, "nhlTeam">;
 type PlayerTeamInput = string | string[] | PlayerTeamCarrier | null | undefined;
 type PlayerPositionInput = string | string[] | null | undefined;
 
+const NHL_LOGO_IDENTIFIERS_BY_SLUG = {
+  "anaheim-ducks": ["Anaheim Ducks", "ANA", "ANH"],
+  "arizona-coyotes": ["Arizona Coyotes", "ARI"],
+  "boston-bruins": ["Boston Bruins", "BOS"],
+  "buffalo-sabres": ["Buffalo Sabres", "BUF"],
+  "calgary-flames": ["Calgary Flames", "CGY", "CAL"],
+  "carolina-hurricanes": ["Carolina Hurricanes", "CAR"],
+  "chicago-blackhawks": ["Chicago Blackhawks", "CHI"],
+  "colorado-avalanche": ["Colorado Avalanche", "COL"],
+  "columbus-blue-jackets": ["Columbus Blue Jackets", "CBJ", "CLB"],
+  "dallas-stars": ["Dallas Stars", "DAL"],
+  "detroit-red-wings": ["Detroit Red Wings", "DET"],
+  "edmonton-oilers": ["Edmonton Oilers", "EDM"],
+  "florida-panthers": ["Florida Panthers", "FLA"],
+  "los-angeles-kings": ["Los Angeles Kings", "LAK", "LA"],
+  "minnesota-wild": ["Minnesota Wild", "MIN"],
+  "montreal-canadiens": ["Montreal Canadiens", "MON", "MTL"],
+  "nashville-predators": ["Nashville Predators", "NSH", "NAS"],
+  "new-jersey-devils": ["New Jersey Devils", "NJ", "NJD"],
+  "new-york-islanders": ["New York Islanders", "NYI"],
+  "new-york-rangers": ["New York Rangers", "NYR"],
+  "ottawa-senators": ["Ottawa Senators", "OTT"],
+  "philadelphia-flyers": ["Philadelphia Flyers", "PHI"],
+  "pittsburgh-penguins": ["Pittsburgh Penguins", "PIT"],
+  "san-jose-sharks": ["San Jose Sharks", "SJS", "SJ"],
+  "seattle-kraken": ["Seattle Kraken", "SEA"],
+  "st-louis-blues": ["St. Louis Blues", "STL"],
+  "tampa-bay-lightning": ["Tampa Bay Lightning", "TB", "TBL"],
+  "toronto-maple-leafs": ["Toronto Maple Leafs", "TOR"],
+  "utah-mammoth": ["Utah Mammoth", "UTA"],
+  "vancouver-canucks": ["Vancouver Canucks", "VAN"],
+  "vegas-golden-knights": ["Vegas Golden Knights", "VEG", "VGK"],
+  "washington-capitals": ["Washington Capitals", "WSH", "WAS"],
+  "winnipeg-jets": ["Winnipeg Jets", "WPG", "WIN"],
+} as const;
+
+const NHL_LOGO_URL_BY_IDENTIFIER = new Map<string, string>(
+  Object.entries(NHL_LOGO_IDENTIFIERS_BY_SLUG).flatMap(([slug, identifiers]) =>
+    identifiers.map(
+      (identifier) =>
+        [identifier.toUpperCase(), `/nhl-logos/${slug}.png`] as const,
+    ),
+  ),
+);
+
 /**
  * Checks whether active player.
  *
@@ -212,6 +257,27 @@ export function findNhlTeamByAbbreviation<
             normalizePlayerTeamToken(team.abbr) === normalizedAbbreviation,
         ))
     : undefined;
+}
+
+/**
+ * Resolves an NHL team to the permanent local transparent logo asset.
+ *
+ * The first token fallback supports display carriers whose name is a stored
+ * multi-team abbreviation such as "NJD/CGY".
+ */
+export function resolveNhlTeamLogoUrl(
+  team: Pick<NHLTeam, "name" | "logoUrl">,
+): string {
+  const normalizedName = team.name.trim().toUpperCase();
+  const firstIdentifier = normalizedName.split(/[\/,|]/)[0]?.trim();
+
+  return (
+    NHL_LOGO_URL_BY_IDENTIFIER.get(normalizedName) ??
+    (firstIdentifier
+      ? NHL_LOGO_URL_BY_IDENTIFIER.get(firstIdentifier)
+      : undefined) ??
+    team.logoUrl
+  );
 }
 
 /**
