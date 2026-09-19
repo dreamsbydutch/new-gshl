@@ -10,6 +10,7 @@ import {
   getEffectiveSigningStatus,
 } from "../src/lib/utils/domain/contracts";
 import { resolveContractSigningAssignments } from "./lib/contractSigning";
+import { rebuildTeamLineup } from "./lib/teamLineup";
 import { buildLeagueActivity } from "../src/lib/utils/features/league-activity";
 import {
   buildLockKey,
@@ -1408,6 +1409,14 @@ export const createContract = mutation({
         onClockEndedAt: null,
         updatedAt: now,
       });
+    }
+    if (signingAssignments[0]?.teamId) {
+      await rebuildTeamLineup(
+        ctx,
+        franchise.ownerId,
+        signingAssignments[0].teamId as Id<"teams">,
+        now,
+      );
     }
     return publicRow((await ctx.db.get(id)) as unknown as Row);
   },

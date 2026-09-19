@@ -31,6 +31,7 @@ import type * as lib_reporterDirectory from "../lib/reporterDirectory.js";
 import type * as lib_scheduleProjection from "../lib/scheduleProjection.js";
 import type * as lib_standingsProjection from "../lib/standingsProjection.js";
 import type * as lib_teamHistoryProjection from "../lib/teamHistoryProjection.js";
+import type * as lib_teamLineup from "../lib/teamLineup.js";
 import type * as lib_teamScheduleProjection from "../lib/teamScheduleProjection.js";
 import type * as lib_timestamps from "../lib/timestamps.js";
 import type * as lib_ufaCatalog from "../lib/ufaCatalog.js";
@@ -83,6 +84,7 @@ declare const fullApi: ApiFromModules<{
   "lib/scheduleProjection": typeof lib_scheduleProjection;
   "lib/standingsProjection": typeof lib_standingsProjection;
   "lib/teamHistoryProjection": typeof lib_teamHistoryProjection;
+  "lib/teamLineup": typeof lib_teamLineup;
   "lib/teamScheduleProjection": typeof lib_teamScheduleProjection;
   "lib/timestamps": typeof lib_timestamps;
   "lib/ufaCatalog": typeof lib_ufaCatalog;
