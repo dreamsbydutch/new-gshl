@@ -15,7 +15,7 @@ import {
   prepareDraftBoardPlayers,
   resolveDraftHubSeason,
   selectLatestActiveFranchiseTeams,
-  sortByOverallRank,
+  sortDraftEligiblePlayers,
 } from "@gshl-utils";
 import {
   useContracts,
@@ -89,19 +89,19 @@ export function useDraftRosterBoard(): DraftRosterBoardViewModel {
         .filter((playerId): playerId is string => Boolean(playerId)),
     );
 
-    return prepareDraftBoardPlayers(
+    const playerViews = prepareDraftBoardPlayers(
       playersQuery.data,
       contractsQuery.data,
       season?.startDate,
     )
       .filter((player) => !draftedPlayerIds.has(String(player.id)))
-      .sort(sortByOverallRank)
       .map((player) => ({
         ...player,
         nhlTeamLogoUrl:
           findNhlTeamByAbbreviation(nhlTeams, player.nhlTeam)?.logoUrl ?? null,
         stats: latestNhlStatsByPlayer.get(String(player.id)) ?? null,
       }));
+    return sortDraftEligiblePlayers(playerViews, "draftRk", "asc");
   }, [
     contractsQuery.data,
     draftPicksQuery.data,

@@ -11,9 +11,9 @@ const names = ["Auston Matthews", "Martin Necas", "Ryan Nugent-Hopkins", "James 
 const positions = ["LW","C","RW","LW","C","RW","D","D","D","D","G","UTIL","BN","BN","BN"];
 const nhlPositions = ["LW","C","RW","LW","C","RW","D","D","D","D","G","C","LW","RW","D"];
 const teams = Array.from({length:14},(_,i)=>({id:String(i),ownerId:String(i),franchiseId:String(i),name:"Toronto Maple Reg's " + (i+1),abbr:"TOR",talentRating:89.75,logoUrl:null}));
-const player = (i,ownerId="available")=>({id:ownerId+"-"+i,ownerId,fullName:names[i%names.length],nhlTeam:"TOR",nhlPos:[nhlPositions[i%nhlPositions.length]],posGroup:nhlPositions[i%nhlPositions.length]==="G"?"G":nhlPositions[i%nhlPositions.length]==="D"?"D":"F",lineupPos:positions[i%15],overallRating:99.99,seasonRating:99.99,overallRk:i+1,seasonRk:i+1,stats:{GP:82,G:65,A:105,P:170,PM:35,PIM:120,PPP:55,SOG:345,HIT:210,BLK:150,W:45,GAA:2.35,SVP:0.925}});
+const player = (i,ownerId="available")=>({id:ownerId+"-"+i,ownerId,fullName:names[i%names.length],nhlTeam:"TOR",nhlPos:[nhlPositions[i%nhlPositions.length]],posGroup:nhlPositions[i%nhlPositions.length]==="G"?"G":nhlPositions[i%nhlPositions.length]==="D"?"D":"F",lineupPos:positions[i%15],overallRating:99.99,seasonRating:99.99,overallRk:i+1,yahooDraftRk:200-i,dailyFaceoffRk:200-i,nhlRk:200-i,seasonRk:i+1,stats:{GP:82,G:65,A:105,P:170,PM:35,PIM:120,PPP:55,SOG:345,HIT:210,BLK:150,W:45,GAA:2.35,SVP:0.925}});
 const players=teams.flatMap(team=>Array.from({length:15},(_,i)=>player(i,team.ownerId)));
-const available=Array.from({length:80},(_,i)=>({...player(79-i),posGroup:i<40?"F":"G"}));
+const available=Array.from({length:80},(_,i)=>({...player(79-i),posGroup:i%2===0?"F":"G"}));
 const pick=(i)=>({pick:{id:String(i),round:2,pick:i},team:{...teams[i%14],id:"draft-season-"+teams[i%14].id},player:player(i)});
 export function useDraftRosterBoard(){return {season:{name:"2026-27",year:2027},nhlTeams:[],players,remainingPicksByFranchise:new Map(teams.map(team=>[team.franchiseId,Array.from({length:15-(window.tvStep??0)},(_,i)=>({id:team.id+"-pick-"+i,round:String(i+1),pick:String(i*14+Number(team.id)+1)}))])),availablePlayers:available,isLoading:window.tvState==="loading",conferences:[{id:"a",name:"Hickory Hotel",teams:teams.slice(0,7)},{id:"b",name:"Sunview",teams:teams.slice(7)}]};}
 export function useOwnerRankingsData(){return {isLoading:window.tvState==="loading",data:{rankings:Array.from({length:20},(_,i)=>({owner:{id:i<14?teams[i].ownerId:"inactive-"+i},rank:i+1,displayName:i<14?"Alexander Owner "+(i+1):"Retired Owner "+(i-13),rating:1800-i*23,cups:i%4,primaryTeam:null,seasonsPlayed:12,playoffAppearances:8,finalsAppearances:3,overallRecord:{wins:150,losses:125,ties:3,winPercentage:0.545}}))}};}
@@ -209,6 +209,9 @@ try {
             goalieRanks: [...goalieRows].map((row) =>
               Number(row.querySelector("td")?.textContent),
             ),
+            featuredRanks: [
+              ...document.querySelectorAll("[data-featured-rank]"),
+            ].map((row) => Number(row.dataset.featuredRank)),
             skaterHeaders: [
               ...(skaters?.querySelectorAll("thead th") ?? []),
             ].map((cell) => cell.textContent?.trim()),
@@ -237,10 +240,16 @@ try {
           available.skaterRanks,
           [...available.skaterRanks].sort((left, right) => left - right),
         );
+        assert.equal(available.skaterRanks[0], 1);
         assert.ok(available.goalies > 10);
         assert.deepEqual(
           available.goalieRanks,
           [...available.goalieRanks].sort((left, right) => left - right),
+        );
+        assert.equal(available.goalieRanks[0], 2);
+        assert.deepEqual(
+          [...available.featuredRanks].sort((left, right) => left - right),
+          [1, 2, 3, 4, 5, 6],
         );
         assert.deepEqual(available.skaterHeaders, [
           "RK",

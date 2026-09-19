@@ -1,10 +1,10 @@
 "use client";
 
-import { useLayoutEffect, useRef, useState } from "react";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useDraftRosterBoard } from "@gshl-hooks";
 import { useDraftBoardFit } from "@gshl-hooks/features/useDraftBoardFit";
-import { cn, sortByOverallRank } from "@gshl-utils";
+import { cn, getDraftCompositeRanks } from "@gshl-utils";
 import type { DraftHubEligiblePlayerView } from "@gshl-types";
 import { CompactBestAvailableTable } from "./DraftRosterBoard";
 
@@ -48,12 +48,14 @@ function TvFrame({
 function AvailablePanel({
   label,
   players,
+  draftRanks,
   limit,
   fillHeight = false,
   className,
 }: {
   label: string;
   players: DraftHubEligiblePlayerView[];
+  draftRanks: ReadonlyMap<string, number>;
   limit?: number;
   fillHeight?: boolean;
   className?: string;
@@ -61,10 +63,9 @@ function AvailablePanel({
   const { panelRef, contentRef } = useDraftBoardFit();
   const capacityPanelRef = useRef<HTMLElement>(null);
   const [rowCapacity, setRowCapacity] = useState(26);
-  const rankedPlayers = [...players].sort(sortByOverallRank);
-  const visiblePlayers = rankedPlayers.slice(
+  const visiblePlayers = players.slice(
     0,
-    fillHeight ? rowCapacity : (limit ?? rankedPlayers.length),
+    fillHeight ? rowCapacity : (limit ?? players.length),
   );
   const title = `Top ${fillHeight ? visiblePlayers.length : (limit ?? visiblePlayers.length)} ${label}`;
 
@@ -114,6 +115,7 @@ function AvailablePanel({
         <CompactBestAvailableTable
           title={title}
           players={visiblePlayers}
+          draftRanks={draftRanks}
           broadcast
         />
         {!players.length && <p className="p-2">No available players.</p>}
@@ -124,6 +126,10 @@ function AvailablePanel({
 
 export function DraftAvailableTvBoard() {
   const board = useDraftRosterBoard();
+  const draftRanks = useMemo(
+    () => getDraftCompositeRanks(board.availablePlayers),
+    [board.availablePlayers],
+  );
   return (
     <TvFrame
       title="Best available"
@@ -137,6 +143,7 @@ export function DraftAvailableTvBoard() {
           <AvailablePanel
             label="skaters"
             fillHeight
+            draftRanks={draftRanks}
             players={board.availablePlayers.filter(
               (player) => player.posGroup !== "G",
             )}
@@ -144,6 +151,7 @@ export function DraftAvailableTvBoard() {
           <AvailablePanel
             label="goalies"
             fillHeight
+            draftRanks={draftRanks}
             players={board.availablePlayers.filter(
               (player) => player.posGroup === "G",
             )}

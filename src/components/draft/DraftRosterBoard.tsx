@@ -307,10 +307,12 @@ function ConferenceRosterCard({
 export function CompactBestAvailableTable({
   title,
   players,
+  draftRanks,
   broadcast = false,
 }: {
   title: string;
   players: DraftHubEligiblePlayerView[];
+  draftRanks: ReadonlyMap<string, number>;
   broadcast?: boolean;
 }) {
   const isGoalieTable = players.some((player) => player.posGroup === "G");
@@ -389,72 +391,79 @@ export function CompactBestAvailableTable({
           </tr>
         </thead>
         <tbody>
-          {players.map((player, index) => (
-            <tr
-              key={player.id}
-              className={cn(
-                "border-b border-slate-200 last:border-b-0",
-                broadcast && index < 3
-                  ? "bg-amber-100/30"
-                  : broadcast
-                    ? "odd:bg-slate-100 even:bg-slate-200/60"
-                    : "odd:bg-white even:bg-slate-50",
-              )}
-            >
-              <td
+          {players.map((player) => {
+            const draftRank = draftRanks.get(String(player.id));
+            const isFeatured =
+              broadcast && draftRank !== undefined && draftRank <= 6;
+            return (
+              <tr
+                key={player.id}
+                data-featured-rank={isFeatured ? draftRank : undefined}
                 className={cn(
-                  "px-px py-0 text-right align-top tabular-nums",
-                  broadcast && index < 3
-                    ? "border-l-4 border-amber-400 font-bold text-slate-900"
-                    : "text-slate-600",
+                  "border-b border-slate-200 last:border-b-0",
+                  isFeatured
+                    ? "bg-amber-100/30"
+                    : broadcast
+                      ? "odd:bg-slate-100 even:bg-slate-200/60"
+                      : "odd:bg-white even:bg-slate-50",
                 )}
               >
-                {player.overallRk ?? "--"}
-              </td>
-              <td className="px-px py-0 align-top">
-                <NHLLogo
-                  team={
-                    player.nhlTeamLogoUrl
-                      ? {
-                          name: getPlayerNhlAbbreviation(player) ?? "NHL team",
-                          logoUrl: player.nhlTeamLogoUrl,
-                        }
-                      : undefined
-                  }
-                  size={18}
-                  className="!h-[1.2em] !w-[1.2em]"
-                />
-              </td>
-              <td
-                className="whitespace-nowrap bg-inherit px-0.5 py-0 align-top font-semibold leading-tight text-slate-900"
-                title={player.fullName}
-                aria-label={player.fullName}
-              >
-                {abbreviatePlayerName(player.fullName)}
-              </td>
-              <td className="whitespace-nowrap px-px py-0 text-center align-top leading-tight text-slate-600">
-                {player.nhlPos.join("/")}
-              </td>
-              <td
-                className={cn(
-                  "px-px py-0 text-right align-top font-bold tabular-nums text-slate-800",
-                  broadcast && "bg-amber-100/40",
-                )}
-              >
-                {typeof player.overallRating === "number"
-                  ? formatNumber(player.overallRating, 2)
-                  : "--"}
-              </td>
-              {statColumns.map(([key]) => (
                 <td
-                  key={key}
-                  className="px-px py-0 text-right align-top tabular-nums text-slate-600"
+                  className={cn(
+                    "px-px py-0 text-right align-top tabular-nums",
+                    isFeatured
+                      ? "border-l-4 border-amber-400 font-bold text-slate-900"
+                      : "text-slate-600",
+                  )}
                 >
-                  {formatUfaStat(player.stats, key)}
+                  {draftRank ?? "--"}
                 </td>
-              ))}
-            </tr>
-          ))}
+                <td className="px-px py-0 align-top">
+                  <NHLLogo
+                    team={
+                      player.nhlTeamLogoUrl
+                        ? {
+                            name:
+                              getPlayerNhlAbbreviation(player) ?? "NHL team",
+                            logoUrl: player.nhlTeamLogoUrl,
+                          }
+                        : undefined
+                    }
+                    size={18}
+                    className="!h-[1.2em] !w-[1.2em]"
+                  />
+                </td>
+                <td
+                  className="whitespace-nowrap bg-inherit px-0.5 py-0 align-top font-semibold leading-tight text-slate-900"
+                  title={player.fullName}
+                  aria-label={player.fullName}
+                >
+                  {abbreviatePlayerName(player.fullName)}
+                </td>
+                <td className="whitespace-nowrap px-px py-0 text-center align-top leading-tight text-slate-600">
+                  {player.nhlPos.join("/")}
+                </td>
+                <td
+                  className={cn(
+                    "px-px py-0 text-right align-top font-bold tabular-nums text-slate-800",
+                    broadcast && "bg-amber-100/40",
+                  )}
+                >
+                  {typeof player.overallRating === "number"
+                    ? formatNumber(player.overallRating, 2)
+                    : "--"}
+                </td>
+                {statColumns.map(([key]) => (
+                  <td
+                    key={key}
+                    className="px-px py-0 text-right align-top tabular-nums text-slate-600"
+                  >
+                    {formatUfaStat(player.stats, key)}
+                  </td>
+                ))}
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </section>
