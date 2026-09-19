@@ -82,6 +82,14 @@ export function DraftPlayerTable({
     () => getDraftCompositeRanks(players),
     [players],
   );
+  const hasSkaters = players.some((player) => player.posGroup !== "G");
+  const hasGoalies = players.some((player) => player.posGroup === "G");
+  const stats = [
+    ...new Set([
+      ...(hasSkaters ? SKATER_STATS : []),
+      ...(hasGoalies ? GOALIE_STATS : []),
+    ]),
+  ];
   const isSubmitting = submittingPlayerId !== null;
   const actionLabel = commissionerRequired ? "Force pick" : "Draft";
 
@@ -161,150 +169,142 @@ export function DraftPlayerTable({
           {disabledReason}
         </p>
       )}
-      {([false, true] as const).map((goalie) => {
-        const rows = players.filter(
-          (player) => (player.posGroup === "G") === goalie,
-        );
-        if (!rows.length) return null;
-        const stats = goalie ? GOALIE_STATS : SKATER_STATS;
-        const label = goalie ? "Goalies" : "Skaters";
-        return (
-          <section
-            key={label}
-            aria-label={`Available ${label.toLowerCase()}`}
-            className="min-w-0"
+      {players.length > 0 && (
+        <section aria-label="Available players" className="min-w-0">
+          <TableViewport
+            ariaLabel="Available draft players"
+            scrollHint="Scroll to compare rankings and stats"
+            viewportClassName="rounded-none border-0"
           >
-            <h3 className="mb-1 text-sm font-medium">{label}</h3>
-            <TableViewport
-              ariaLabel={`Available draft ${label.toLowerCase()}`}
-              scrollHint="Scroll to compare rankings and stats"
-              viewportClassName="rounded-none border-0"
-            >
-              <table className="w-full min-w-max border-collapse whitespace-nowrap text-center text-xs">
-                <caption className="sr-only">
-                  Available {label.toLowerCase()}, rankings, statistics, and
-                  draft selection
-                </caption>
-                <thead className="bg-gray-800 text-gray-200">
-                  <tr>
-                    {heading("Player", "fullName", true)}
-                    {heading("Team", "nhlTeam")}
-                    {heading("Pos", "nhlPosition")}
-                    {RANKINGS.map(({ key, label, dividerBefore }) =>
-                      heading(label, key, false, dividerBefore),
-                    )}
-                    {stats.map((key, index) =>
-                      heading(
-                        key === "PM" ? "+/-" : key === "SVP" ? "SV%" : key,
-                        key,
-                        false,
-                        index === 0,
-                      ),
-                    )}
+            <table className="w-full min-w-max border-collapse whitespace-nowrap text-center text-xs">
+              <caption className="sr-only">
+                Available skaters and goalies, rankings, statistics, and draft
+                selection
+              </caption>
+              <thead className="bg-gray-800 text-gray-200">
+                <tr>
+                  {heading("Player", "fullName", true)}
+                  {heading("Team", "nhlTeam")}
+                  {heading("Pos", "nhlPosition")}
+                  {RANKINGS.map(({ key, label, dividerBefore }) =>
+                    heading(label, key, false, dividerBefore),
+                  )}
+                  {stats.map((key, index) =>
+                    heading(
+                      key === "PM" ? "+/-" : key === "SVP" ? "SV%" : key,
+                      key,
+                      false,
+                      index === 0,
+                    ),
+                  )}
+                  <th
+                    scope="col"
+                    className="sticky right-0 z-30 bg-gray-800 px-1 py-1 font-medium"
+                  >
+                    Pick
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {players.map((player) => (
+                  <tr
+                    key={player.id}
+                    className="border-b border-slate-200 bg-white even:bg-gray-100"
+                    aria-busy={submittingPlayerId === player.id || undefined}
+                  >
                     <th
-                      scope="col"
-                      className="sticky right-0 z-30 bg-gray-800 px-1 py-1 font-medium"
+                      scope="row"
+                      className="sticky left-0 z-20 w-28 min-w-28 max-w-28 bg-inherit px-2 py-1 text-left font-normal lg:w-auto lg:max-w-none"
+                      title={player.fullName}
+                      aria-label={player.fullName}
                     >
-                      Pick
+                      <span className="block truncate lg:hidden">
+                        {abbreviatePlayerName(player.fullName)}
+                      </span>
+                      <span className="hidden lg:inline">
+                        {player.fullName}
+                      </span>
                     </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.map((player) => (
-                    <tr
-                      key={player.id}
-                      className="border-b border-slate-200 bg-white even:bg-gray-100"
-                      aria-busy={submittingPlayerId === player.id || undefined}
-                    >
-                      <th
-                        scope="row"
-                        className="sticky left-0 z-20 w-28 min-w-28 max-w-28 bg-inherit px-2 py-1 text-left font-normal lg:w-auto lg:max-w-none"
-                        title={player.fullName}
-                        aria-label={player.fullName}
-                      >
-                        <span className="block truncate lg:hidden">
-                          {abbreviatePlayerName(player.fullName)}
-                        </span>
-                        <span className="hidden lg:inline">
-                          {player.fullName}
-                        </span>
-                      </th>
-                      <td className="px-2 py-1">
-                        <NHLLogo
-                          team={
-                            player.nhlTeamLogoUrl
-                              ? {
-                                  name: player.nhlTeam || "NHL team",
-                                  logoUrl: player.nhlTeamLogoUrl,
-                                }
-                              : undefined
-                          }
-                          size={20}
-                        />
-                        <span className="sr-only">{player.nhlTeam}</span>
-                      </td>
-                      <td className="px-2 py-1 text-slate-600">
-                        {player.nhlPos.join("/") || player.posGroup}
-                      </td>
-                      {RANKINGS.map(({ key, dividerBefore }) => {
-                        const value = rankingValue(player, key);
-                        return (
-                          <td
-                            key={key}
-                            className={cn(
-                              "px-2 py-1 tabular-nums",
-                              key === "draftRk" && "font-semibold",
-                              dividerBefore && "border-l border-slate-300",
-                            )}
-                          >
-                            {value ?? "-"}
-                          </td>
-                        );
-                      })}
-                      {stats.map((key, index) => (
+                    <td className="px-2 py-1">
+                      <NHLLogo
+                        team={
+                          player.nhlTeamLogoUrl
+                            ? {
+                                name: player.nhlTeam || "NHL team",
+                                logoUrl: player.nhlTeamLogoUrl,
+                              }
+                            : undefined
+                        }
+                        size={20}
+                      />
+                      <span className="sr-only">{player.nhlTeam}</span>
+                    </td>
+                    <td className="px-2 py-1 text-slate-600">
+                      {player.nhlPos.join("/") || player.posGroup}
+                    </td>
+                    {RANKINGS.map(({ key, dividerBefore }) => {
+                      const value = rankingValue(player, key);
+                      return (
                         <td
                           key={key}
                           className={cn(
                             "px-2 py-1 tabular-nums",
-                            index === 0 && "border-l border-slate-300",
+                            key === "draftRk" && "font-semibold",
+                            dividerBefore && "border-l border-slate-300",
                           )}
                         >
-                          {formatUfaStat(player.stats, key)}
+                          {value ?? "-"}
                         </td>
-                      ))}
-                      <td className="sticky right-0 z-20 bg-inherit px-1 py-1 shadow-[-1px_0_0_0_#cbd5e1]">
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant={
-                            commissionerRequired ? "destructive" : "default"
-                          }
-                          className="h-8 min-w-14 px-2 text-xs"
-                          disabled={!canSubmit || isSubmitting}
-                          aria-label={`${actionLabel} ${player.fullName}`}
-                          title={
-                            !canSubmit
-                              ? disabledReason
-                              : `${actionLabel} ${player.fullName}`
-                          }
-                          onClick={(event) => {
-                            triggerRef.current = event.currentTarget;
-                            setConfirmingId(player.id);
-                          }}
-                        >
-                          {submittingPlayerId === player.id
-                            ? "Drafting..."
-                            : actionLabel}
-                        </Button>
+                      );
+                    })}
+                    {stats.map((key, index) => (
+                      <td
+                        key={key}
+                        className={cn(
+                          "px-2 py-1 tabular-nums",
+                          index === 0 && "border-l border-slate-300",
+                        )}
+                      >
+                        {(player.posGroup === "G"
+                          ? GOALIE_STATS
+                          : SKATER_STATS
+                        ).some((stat) => stat === key)
+                          ? formatUfaStat(player.stats, key)
+                          : "-"}
                       </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </TableViewport>
-          </section>
-        );
-      })}
+                    ))}
+                    <td className="sticky right-0 z-20 bg-inherit px-1 py-1 shadow-[-1px_0_0_0_#cbd5e1]">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={
+                          commissionerRequired ? "destructive" : "default"
+                        }
+                        className="h-8 min-w-14 px-2 text-xs"
+                        disabled={!canSubmit || isSubmitting}
+                        aria-label={`${actionLabel} ${player.fullName}`}
+                        title={
+                          !canSubmit
+                            ? disabledReason
+                            : `${actionLabel} ${player.fullName}`
+                        }
+                        onClick={(event) => {
+                          triggerRef.current = event.currentTarget;
+                          setConfirmingId(player.id);
+                        }}
+                      >
+                        {submittingPlayerId === player.id
+                          ? "Drafting..."
+                          : actionLabel}
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </TableViewport>
+        </section>
+      )}
       <dialog
         ref={dialogRef}
         aria-labelledby="draft-confirm-title"
