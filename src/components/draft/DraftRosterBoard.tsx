@@ -55,7 +55,7 @@ function RosterPlayer({
       <p
         aria-label={player.fullName}
         className={cn(
-          "whitespace-normal text-[0.9em] leading-tight text-slate-900",
+          "whitespace-normal text-[0.82em] leading-tight text-slate-900",
           muted ? "font-medium" : "font-bold",
         )}
       >
@@ -65,14 +65,14 @@ function RosterPlayer({
         <NHLLogo
           team={nhlTeam}
           size={18}
-          className="!h-[1.05em] !w-[1.05em] shrink-0"
+          className="!h-[0.95em] !w-[0.95em] shrink-0"
         />
-        <span className="break-words text-[0.72em] leading-tight text-slate-600">
+        <span className="break-words text-[0.66em] leading-tight text-slate-600">
           {player.nhlPos.join("/")}
         </span>
         <span
           className={cn(
-            "rounded px-0.5 text-[0.75em] leading-tight text-slate-800",
+            "rounded px-0.5 text-[0.7em] leading-tight text-slate-800",
             muted ? "font-medium" : "font-bold",
             getRosterRatingClass(player.seasonRk),
           )}
@@ -326,8 +326,6 @@ export function CompactBestAvailableTable({
         ["G", "G"],
         ["A", "A"],
         ["P", "P"],
-        ["PM", "+/-"],
-        ["PIM", "PIM"],
         ["PPP", "PPP"],
         ["SOG", "SOG"],
         ["HIT", "HIT"],
@@ -360,7 +358,7 @@ export function CompactBestAvailableTable({
               : "text-[0.9em] text-slate-600",
           )}
         >
-          {broadcast ? "Ranked by OVR" : "Best available"}
+          {broadcast ? "Ranked by Rk" : "Best available"}
         </span>
       </div>
       <table className="w-full table-auto text-[0.9em] leading-snug">

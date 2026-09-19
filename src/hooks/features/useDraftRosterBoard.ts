@@ -15,7 +15,7 @@ import {
   prepareDraftBoardPlayers,
   resolveDraftHubSeason,
   selectLatestActiveFranchiseTeams,
-  sortByOverallRating,
+  sortByOverallRank,
 } from "@gshl-utils";
 import {
   useContracts,
@@ -95,7 +95,7 @@ export function useDraftRosterBoard(): DraftRosterBoardViewModel {
       season?.startDate,
     )
       .filter((player) => !draftedPlayerIds.has(String(player.id)))
-      .sort(sortByOverallRating)
+      .sort(sortByOverallRank)
       .map((player) => ({
         ...player,
         nhlTeamLogoUrl:
