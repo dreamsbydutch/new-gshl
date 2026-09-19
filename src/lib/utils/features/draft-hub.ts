@@ -106,6 +106,7 @@ function getDraftPlayerSortValue(
   if (key === "nhlPosition") {
     return player.nhlPos.length > 0 ? player.nhlPos.join("/") : player.posGroup;
   }
+  if (key === "draftRk") return null;
 
   const rawValue =
     key === "overallRk" ||
