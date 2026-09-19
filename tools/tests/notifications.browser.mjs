@@ -8,6 +8,7 @@ const bundle = await build({
   stdin: {
     contents: `import React from "react"; import {createRoot} from "react-dom/client";
       import {DraftNotificationSetup} from "./src/components/notifications/DraftNotificationSetup";
+      import {NotificationCenter} from "./src/components/notifications/NotificationCenter";
       const root=createRoot(document.getElementById("root"));
       window.actions=[];
       window.renderSetup=(overrides={})=>{
@@ -18,6 +19,12 @@ const bundle = await build({
           enableDraftReminders:async()=>window.actions.push(["save"]),
           run:async work=>work(),...overrides};
         root.render(<div className="p-3"><DraftNotificationSetup /></div>);
+      };
+      window.renderCenter=(isCommissioner)=>{
+        window.setup={...window.setup,
+          settings:{publicKey:"fixture-key",options:[],devices:[],isCommissioner},
+          inbox:{status:"Exhausted",results:[]}};
+        root.render(<NotificationCenter />);
       };`,
     loader: "tsx",
     resolveDir: process.cwd(),
@@ -139,9 +146,25 @@ try {
     "test",
     "own-device",
   ]);
+  for (const isCommissioner of [false, true, false]) {
+    await page.evaluate((role) => window.renderCenter(role), isCommissioner);
+    await page.waitForSelector('[aria-label="Notification views"]');
+    await page.evaluate(() =>
+      [...document.querySelectorAll("button")]
+        .find((button) => button.textContent === "preferences")
+        .click(),
+    );
+    await page.waitForSelector('[aria-label="Preferences"]');
+    await page.waitForFunction(
+      (expected) =>
+        !!document.querySelector('form button[type="submit"]') === expected,
+      {},
+      isCommissioner,
+    );
+  }
   assert.deepEqual(errors, []);
   console.log(
-    "Notification setup: permission requires a click; blocked/iOS/unconfigured/ready states pass; no overflow at 320/390/1280px.",
+    "Notification setup and commissioner-only announcement visibility pass; no overflow at 320/390/1280px.",
   );
 } finally {
   await browser.close();

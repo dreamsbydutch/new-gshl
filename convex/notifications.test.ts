@@ -9,6 +9,7 @@ import type { MutationCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import {
   announce,
+  settings,
   enableDraftReminders,
   testPush,
   delivery,
@@ -130,6 +131,32 @@ const userId = "user" as Id<"authUsers">;
 const eventId = "event" as Id<"notificationEvents">;
 const deviceId = "device" as Id<"pushSubscriptions">;
 const notificationId = "notification" as Id<"notifications">;
+
+for (const role of ["viewer", "owner", "commissioner"] as const) {
+  void test(`announcement access for ${role}`, async () => {
+    const f = fixture();
+    await f.ctx.db.patch(userId, { role });
+    const result = await handler(settings)(f.ctx, {});
+    assert.equal(
+      (result as { isCommissioner: boolean }).isCommissioner,
+      role === "commissioner",
+    );
+    const send = () =>
+      handler(announce)(f.ctx, {
+        title: "Draft update",
+        body: "The draft starts soon.",
+      });
+    if (role === "commissioner") {
+      await send();
+      assert.equal(f.rows("notificationEvents").size, 1);
+      assert.equal(f.scheduled.length, 1);
+    } else {
+      await assert.rejects(send, /Forbidden/);
+      assert.equal(f.rows("notificationEvents").size, 0);
+      assert.equal(f.scheduled.length, 0);
+    }
+  });
+}
 
 void test("draft setup enables four reminders without changing other choices", async () => {
   const f = fixture();

@@ -33,8 +33,13 @@ users can remove any of their connected devices. Signing out revokes the current
 browser subscription. On iOS/iPadOS, open the installed Home Screen app before
 enabling push. Unsupported browsers retain the inbox.
 
-Commissioners can send a league announcement from the Preferences view. This
-publishes immediately to eligible users; the server enforces commissioner access.
+Only commissioner accounts see the announcement form in Preferences or can send
+league announcements. The server rejects other roles, including direct API calls.
+Announcements publish immediately to eligible users.
+
+Push alerts use the white-background GSHL logo in
+`public/gshl-notification-icon.png`. The web app manifest and Apple touch icon use
+the same asset for installed apps.
 
 ## Delivery
 

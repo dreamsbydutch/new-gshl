@@ -21,7 +21,7 @@ pushWorker.addEventListener("push", (event) => {
   event.waitUntil(
     pushWorker.registration.showNotification(message.title, {
       body: typeof message.body === "string" ? message.body : "",
-      icon: "/favicon.ico",
+      icon: "/gshl-notification-icon.png",
       tag: message.tag,
       data: { href: message.href },
     }),

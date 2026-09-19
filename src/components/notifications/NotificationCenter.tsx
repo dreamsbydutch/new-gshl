@@ -244,7 +244,9 @@ export function NotificationCenter() {
                 }, "Announcement sent.");
               }}
             >
-              <h2 className="text-sm font-semibold">League announcement</h2>
+              <h2 className="text-sm font-semibold">
+                Commissioner announcement
+              </h2>
               <p className="text-xs text-muted-foreground">
                 Send an update to users who have league announcements enabled.
               </p>
