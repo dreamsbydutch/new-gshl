@@ -42,11 +42,11 @@ const GOALIE_STATS = [
   "RBS",
 ] as const;
 const RANKINGS = [
-  { key: "draftRk", label: "Rank" },
+  { key: "draftRk", label: "Rank", dividerBefore: false },
   { key: "overallRk", label: "DU Rk", dividerBefore: true },
-  { key: "yahooDraftRk", label: "Yahoo Rk" },
-  { key: "dailyFaceoffRk", label: "DF Rk" },
-  { key: "nhlRk", label: "NHL Rk" },
+  { key: "yahooDraftRk", label: "Yahoo Rk", dividerBefore: false },
+  { key: "dailyFaceoffRk", label: "DF Rk", dividerBefore: false },
+  { key: "nhlRk", label: "NHL Rk", dividerBefore: false },
 ] as const;
 
 export function DraftPlayerTable({
