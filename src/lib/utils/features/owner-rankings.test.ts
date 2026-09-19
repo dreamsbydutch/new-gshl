@@ -5,6 +5,7 @@ import {
   buildOwnerRankings,
   compactOwnerRankings,
   OWNER_LADDER_BASE_RATING,
+  OWNER_LADDER_POWER_SAMPLE_WEEKS,
   OWNER_LADDER_REFERENCE_CEILING,
   OWNER_LADDER_REFERENCE_FLOOR,
 } from "./owner-rankings";
@@ -313,6 +314,53 @@ void test("rewards power-ranking dominance and penalizes bottom-three weeks", ()
   assert.equal(lastPlace.weeksInLastPlace, 2);
   assert.equal(lastPlace.powerRankingAdjustment, -4);
   assert.ok(leader.rating > lastPlace.rating);
+});
+
+void test("normalizes established power form so career length does not compound its effect", () => {
+  const powerFormFor = (rankedWeeks: number) => {
+    const owners = Array.from({ length: 6 }, (_, index) =>
+      owner(`owner-${index + 1}`, true),
+    );
+    const teams = owners.map((item) => team(`${item.id}-team`, "s1", item.id));
+    const weekIds = Array.from(
+      { length: rankedWeeks },
+      (_, index) => `w${index + 1}`,
+    );
+    const result = buildOwnerRankings({
+      owners,
+      seasons: [season("s1", 2025)],
+      teams,
+      weeks: weekIds.map((id, index) => week(id, "s1", index + 1)),
+      matchups: [],
+      teamAwards: [],
+      powerRankingStats: weekIds.flatMap((weekId) =>
+        teams.map((item, index) => powerRank("s1", weekId, item.id, index + 1)),
+      ),
+    });
+
+    return {
+      leader: result.rankings.find((entry) => entry.owner.id === "owner-1"),
+      lastPlace: result.rankings.find((entry) => entry.owner.id === "owner-6"),
+    };
+  };
+
+  const established = powerFormFor(OWNER_LADDER_POWER_SAMPLE_WEEKS);
+  const longCareer = powerFormFor(OWNER_LADDER_POWER_SAMPLE_WEEKS * 4);
+
+  assert.ok(established.leader);
+  assert.ok(established.lastPlace);
+  assert.ok(longCareer.leader);
+  assert.ok(longCareer.lastPlace);
+  assert.equal(
+    longCareer.leader.powerRankingAdjustment,
+    established.leader.powerRankingAdjustment,
+  );
+  assert.equal(
+    longCareer.lastPlace.powerRankingAdjustment,
+    established.lastPlace.powerRankingAdjustment,
+  );
+  assert.equal(longCareer.leader.powerRankingAdjustment, 20);
+  assert.equal(longCareer.lastPlace.powerRankingAdjustment, -20);
 });
 
 void test("ranks the stronger career resume above a weaker late Elo run", () => {

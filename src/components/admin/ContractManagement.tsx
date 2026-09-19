@@ -192,9 +192,9 @@ export function ContractManagement() {
       <div>
         <h2 className="text-2xl font-bold">Create Contract</h2>
         <p className="text-sm text-muted-foreground">
-          Contracts signed in {signingSeason?.name ?? "the active season"} begin
-          next season. Salary, dates, type, and expiry status are calculated
-          automatically.
+          Contracts signed in {signingSeason?.name ?? "the active season"} take
+          effect today and run through their selected future seasons. Salary,
+          dates, type, and expiry status are calculated automatically.
         </p>
         {freeAgencyOpen ? (
           <p className="mt-2 text-sm font-medium text-green-700">

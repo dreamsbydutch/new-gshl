@@ -94,9 +94,9 @@ export function useDraftHubBoard(): DraftHubBoardViewModel {
   const [searchTerm, setSearchTerm] = useState("");
   const [positionFilter, setPositionFilter] = useState("all");
   const [playerSortKey, setPlayerSortKey] =
-    useState<DraftPlayerSortKey>("overallRating");
+    useState<DraftPlayerSortKey>("draftRk");
   const [playerSortDirection, setPlayerSortDirection] =
-    useState<DraftPlayerSortDirection>("desc");
+    useState<DraftPlayerSortDirection>("asc");
   const [submittingPlayerId, setSubmittingPlayerId] = useState<string | null>(
     null,
   );

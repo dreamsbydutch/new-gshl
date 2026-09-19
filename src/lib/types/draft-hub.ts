@@ -112,9 +112,11 @@ export type DraftPlayerSortKey =
   | "nhlTeam"
   | "fullName"
   | "nhlPosition"
+  | "draftRk"
   | "overallRk"
   | "yahooDraftRk"
-  | "otherDraftRk"
+  | "dailyFaceoffRk"
+  | "nhlRk"
   | "overallRating"
   | keyof UfaStatView;
 

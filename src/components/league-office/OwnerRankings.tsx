@@ -407,10 +407,7 @@ export function OwnerRankings() {
           <span>Standard range: 0–1000</span>
           <span>Entry rating: 250</span>
           <span>Elo form: 15%</span>
-          <span>#1 week +1.5</span>
-          <span>Top 3 week +0.5</span>
-          <span className="text-red-600">Bottom 3 week -0.5</span>
-          <span className="text-red-600">Last-place week -1.5</span>
+          <span>Power form: placement rate, max ±20</span>
           <span>Playoffs +8</span>
           <span>Finals +18</span>
           <span>Cup +40</span>

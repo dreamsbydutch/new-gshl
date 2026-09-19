@@ -9,6 +9,7 @@ import type {
 import {
   canSubmitDraftPick,
   findLatestCompletedLiveDraftPick,
+  getDraftCompositeRanks,
   getDefaultDraftPlayerSortDirection,
   getDraftYear,
   getNextOwnerDraftPickNotice,
@@ -144,10 +145,38 @@ void test("estimates the logged-in owner's next open draft pick", () => {
 
 void test("uses intuitive initial directions for every draft player column", () => {
   assert.equal(getDefaultDraftPlayerSortDirection("fullName"), "asc");
+  assert.equal(getDefaultDraftPlayerSortDirection("draftRk"), "asc");
   assert.equal(getDefaultDraftPlayerSortDirection("yahooDraftRk"), "asc");
-  assert.equal(getDefaultDraftPlayerSortDirection("otherDraftRk"), "asc");
+  assert.equal(getDefaultDraftPlayerSortDirection("dailyFaceoffRk"), "asc");
   assert.equal(getDefaultDraftPlayerSortDirection("overallRating"), "desc");
   assert.equal(getDefaultDraftPlayerSortDirection("GP"), "desc");
+});
+
+void test("weights projection rankings above the current-performance rank", () => {
+  const players = [
+    eligiblePlayer("current-performance", {
+      overallRk: 1,
+      yahooDraftRk: 100,
+      dailyFaceoffRk: 100,
+      nhlRk: 100,
+    }),
+    eligiblePlayer("projected", {
+      overallRk: 100,
+      yahooDraftRk: 1,
+      dailyFaceoffRk: 1,
+      nhlRk: 1,
+    }),
+  ];
+
+  const ranks = getDraftCompositeRanks(players);
+  assert.equal(ranks.get("projected"), 1);
+  assert.equal(ranks.get("current-performance"), 2);
+  assert.deepEqual(
+    sortDraftEligiblePlayers(players, "draftRk", "asc").map(
+      (player) => player.id,
+    ),
+    ["projected", "current-performance"],
+  );
 });
 
 void test("sorts draft rankings numerically and always leaves empty ranks last", () => {

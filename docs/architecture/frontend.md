@@ -152,6 +152,11 @@ decorative shading. A logo may replace repeated visible league, conference, or
 team text when the context remains clear, but preserve the accessible name with
 alt text, an `sr-only` label, or the surrounding labelled control.
 
+NHL team marks resolve to transparent local assets under `public/nhl-logos/`.
+The stored `nhlTeams.logoUrl` remains a fallback for a future team that has not
+yet been added to the local catalog; legacy abbreviations resolve to the same
+asset as their current equivalent.
+
 GSHL identity is the primary brand layer. Give league, conference, franchise,
 and GSHL team marks the prominent position and size. Treat NHL logos as compact
 player metadata: normally 16-18px and placed immediately before the player's

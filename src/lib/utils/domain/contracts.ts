@@ -362,8 +362,16 @@ export function deriveContractCreationTerms(options: {
   contractLength: 1 | 2 | 3;
   contracts: Contract[];
   seasons: Season[];
+  referenceDate?: Date;
 }): ContractCreationTerms {
-  const { player, signingSeason, contractLength, contracts, seasons } = options;
+  const {
+    player,
+    signingSeason,
+    contractLength,
+    contracts,
+    seasons,
+    referenceDate,
+  } = options;
   const ordered = orderContractSeasons(seasons);
   const signingIndex = ordered.findIndex(
     (season) => String(season.id) === String(signingSeason.id),
@@ -425,7 +433,7 @@ export function deriveContractCreationTerms(options: {
     contractSalary: Math.round(baseSalary * multiplier),
     signingStatus,
     expiryStatus,
-    startDate: startSeason.startDate,
+    startDate: getTorontoDate(referenceDate),
     expiryDate: expirySeason.endDate,
   };
 }

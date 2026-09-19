@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { NHLTeam } from "@gshl-types";
-import { findNhlTeamByAbbreviation, getPlayerNhlAbbreviations } from "./player";
+import {
+  findNhlTeamByAbbreviation,
+  getPlayerNhlAbbreviations,
+  resolveNhlTeamLogoUrl,
+} from "./player";
 
 const teams: NHLTeam[] = [
   {
@@ -29,6 +33,24 @@ void test("findNhlTeamByAbbreviation resolves the stored abbr field", () => {
 void test("findNhlTeamByAbbreviation normalizes player team values", () => {
   assert.equal(findNhlTeamByAbbreviation(teams, " njd "), teams[1]);
   assert.equal(findNhlTeamByAbbreviation(teams, ["tor"]), teams[0]);
+});
+
+void test("resolveNhlTeamLogoUrl uses permanent local assets", () => {
+  assert.equal(
+    resolveNhlTeamLogoUrl(teams[0]!),
+    "/nhl-logos/toronto-maple-leafs.png",
+  );
+  assert.equal(
+    resolveNhlTeamLogoUrl({ name: "NJD/CGY", logoUrl: "remote.png" }),
+    "/nhl-logos/new-jersey-devils.png",
+  );
+});
+
+void test("resolveNhlTeamLogoUrl preserves unknown remote logos", () => {
+  assert.equal(
+    resolveNhlTeamLogoUrl({ name: "Future NHL Team", logoUrl: "remote.png" }),
+    "remote.png",
+  );
 });
 
 void test("normalizes every duplicate NHL catalog abbreviation pair", () => {
