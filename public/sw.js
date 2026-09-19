@@ -22,6 +22,7 @@ pushWorker.addEventListener("push", (event) => {
     pushWorker.registration.showNotification(message.title, {
       body: typeof message.body === "string" ? message.body : "",
       icon: "/gshl-notification-icon.png",
+      badge: "/gshl-notification-badge.png",
       tag: message.tag,
       data: { href: message.href },
     }),

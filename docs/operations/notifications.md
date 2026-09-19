@@ -40,6 +40,11 @@ Announcements publish immediately to eligible users.
 Push alerts use the white-background GSHL logo in
 `public/gshl-notification-icon.png`. The web app manifest and Apple touch icon use
 the same asset for installed apps.
+Android's status bar uses a separate transparent, monochrome 96px badge at
+`public/gshl-notification-badge.png`, supplied through the worker's `badge`
+option. The operating system controls its tint; the white-background popup icon
+is unchanged. Badge support varies by browser. Existing displayed notifications
+keep their old icon; test a new notification after the service worker updates.
 
 ## Delivery
 
