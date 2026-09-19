@@ -17,6 +17,7 @@ export const metadata: Metadata = {
     default: "GSHL",
   },
   description: "Gem Stone Hockey League",
+  manifest: "/manifest.webmanifest",
   icons: [{ rel: "icon", url: "/favicon.ico" }],
 };
 

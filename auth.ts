@@ -76,6 +76,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     authorized({ auth: session, request }) {
       const isProtected = [
         "/lockerroom",
+        "/notifications",
         "/draft",
         "/draftboard",
         "/leagueoffice",

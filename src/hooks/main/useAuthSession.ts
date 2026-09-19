@@ -2,6 +2,8 @@
 
 import { useCallback } from "react";
 import { signOut, useSession } from "next-auth/react";
+import { useMutation } from "convex/react";
+import { api } from "../../../convex/_generated/api";
 
 export function useAuthSession() {
   const { data: session, status, update } = useSession();
@@ -14,7 +16,29 @@ export function useAuthSession() {
 }
 
 export function useAuthActions() {
-  const signOutUser = useCallback(() => signOut({ redirectTo: "/" }), []);
+  const disconnectBrowser = useMutation(api.notifications.disconnectBrowser);
+  const signOutUser = useCallback(async () => {
+    if ("serviceWorker" in navigator) {
+      try {
+        const registration = await navigator.serviceWorker.getRegistration();
+        const subscription = await registration?.pushManager.getSubscription();
+        if (subscription) {
+          try {
+            await Promise.race([
+              disconnectBrowser({ endpoint: subscription.endpoint }),
+              new Promise<void>((resolve) => setTimeout(resolve, 1500)),
+            ]);
+          } catch {
+            /* Still revoke the browser subscription when offline. */
+          }
+        }
+        await subscription?.unsubscribe();
+      } catch {
+        // Signing out must remain available if browser push is unavailable.
+      }
+    }
+    return signOut({ redirectTo: "/" });
+  }, [disconnectBrowser]);
 
   return {
     signOut: signOutUser,

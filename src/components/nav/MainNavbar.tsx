@@ -124,7 +124,7 @@ export function MainNavbar({ className, search = "" }: NavbarProps) {
   return (
     <>
       <header className="fixed inset-x-0 top-0 z-50 border-b border-slate-800 bg-slate-950 pt-[env(safe-area-inset-top)] text-white shadow-sm lg:hidden print:hidden">
-        <div className="grid h-[var(--app-mobile-header-height)] grid-cols-[4rem_minmax(0,1fr)_5rem] items-center px-[max(0.25rem,env(safe-area-inset-left))] pr-[max(0.25rem,env(safe-area-inset-right))]">
+        <div className="grid h-[var(--app-mobile-header-height)] grid-cols-[4rem_minmax(0,1fr)_7.5rem] items-center px-[max(0.25rem,env(safe-area-inset-left))] pr-[max(0.25rem,env(safe-area-inset-right))]">
           <Link
             href="/"
             aria-label="GSHL home"

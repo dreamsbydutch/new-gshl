@@ -1,5 +1,6 @@
 import { defineSchema, defineTable, type TableDefinition } from "convex/server";
 import { v, type GenericValidator } from "convex/values";
+import { notificationCategory } from "./lib/notificationValidators";
 
 type TableShape = Record<string, GenericValidator>;
 type IndexSpec = string | readonly string[];
@@ -160,6 +161,51 @@ function table<
 }
 
 export default defineSchema({
+  notificationPreferences: defineTable({
+    userId: v.id("authUsers"),
+    category: notificationCategory,
+    inbox: v.boolean(),
+    push: v.boolean(),
+    updatedAt: v.number(),
+  }).index("by_user_category", ["userId", "category"]),
+  pushSubscriptions: defineTable({
+    userId: v.id("authUsers"),
+    endpoint: v.string(),
+    p256dh: v.string(),
+    auth: v.string(),
+    label: v.string(),
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_endpoint", ["endpoint"]),
+  notificationEvents: defineTable({
+    key: v.string(),
+    category: notificationCategory,
+    title: v.string(),
+    body: v.string(),
+    href: v.string(),
+    createdAt: v.number(),
+    expiresAt: v.number(),
+    ownerId: v.optional(v.id("owners")),
+    pickId: v.optional(v.id("draftPicks")),
+    clockStartedAt: v.optional(v.number()),
+    seasonId: v.optional(v.id("seasons")),
+    editionId: v.optional(v.id("weeklyEditions")),
+  }).index("by_key", ["key"]),
+  notifications: defineTable({
+    userId: v.id("authUsers"),
+    eventId: v.id("notificationEvents"),
+    category: notificationCategory,
+    title: v.string(),
+    body: v.string(),
+    href: v.string(),
+    inbox: v.boolean(),
+    read: v.boolean(),
+    createdAt: v.number(),
+  })
+    .index("by_user_inbox", ["userId", "inbox"])
+    .index("by_user_inbox_read", ["userId", "inbox", "read"])
+    .index("by_user_event", ["userId", "eventId"]),
   authUsers: defineTable({
     googleSubject: v.string(),
     email: v.string(),
@@ -178,6 +224,7 @@ export default defineSchema({
   })
     .index("by_googleSubject", ["googleSubject"])
     .index("by_email", ["email"])
+    .index("by_status", ["status"])
     .index("by_ownerId", ["ownerId"]),
 
   seasons: table({
@@ -193,7 +240,7 @@ export default defineSchema({
     draftStartAt: timestampValue,
     createdAt: timestampValue,
     updatedAt: timestampValue,
-  }),
+  }).index("by_draftStartAt", ["draftStartAt"]),
 
   conferences: table({
     name: stringValue,

@@ -17,6 +17,7 @@ import {
 import { cn, resolveDraftHubSeason } from "@gshl-utils";
 import type { GSHLTeam } from "@gshl-types";
 import { DraftHubTeamToggle } from "./DraftHubTeamToggle";
+import { DraftNotificationSetup } from "@gshl-components/notifications/DraftNotificationSetup";
 
 export function DraftHubLayout({ children }: { children: React.ReactNode }) {
   const { pathname } = useAppPathname();
@@ -102,6 +103,9 @@ export function DraftHubLayout({ children }: { children: React.ReactNode }) {
           </TertiaryPageToolbar>
         ) : null}
       </PageContextNavigation>
+      <div className="mx-auto max-w-7xl px-3 py-3 sm:px-5">
+        <DraftNotificationSetup compact />
+      </div>
       {!showTeamToggle || teamNavigation.isReady ? children : null}
     </div>
   );

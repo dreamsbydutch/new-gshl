@@ -1,8 +1,15 @@
 import { cronJobs } from "convex/server";
 import { makeFunctionReference } from "convex/server";
 import type { FunctionReference } from "convex/server";
+import { internal } from "./_generated/api";
 
 const crons = cronJobs();
+crons.interval(
+  "deliver due notifications",
+  { minutes: 1 },
+  internal.notificationScanner.scan,
+  {},
+);
 const tickSchedules = makeFunctionReference<"mutation">(
   "jobRunner:tickSchedules",
 ) as unknown as FunctionReference<

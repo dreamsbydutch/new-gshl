@@ -58,6 +58,9 @@ The wiki explains software concepts; it does not duplicate the rulebook.
 
 ## Operations
 
+- [User notifications](operations/notifications.md) - inbox preferences, draft
+  reminders, browser push, and deployment configuration
+
 - [Data pipelines](operations/data-pipelines.md) - source ingestion, pure domain
   reconciliation, aggregates, adapters, and safe applies
 - [Managed jobs and browser worker](operations/managed-jobs.md) - job states,

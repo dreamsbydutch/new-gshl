@@ -196,6 +196,11 @@ write guards; see [Apps Script operations](../operations/apps-script.md).
 
 ## Safe configuration checks
 
+Browser push uses `WEB_PUSH_PUBLIC_KEY`, `WEB_PUSH_PRIVATE_KEY`, and
+`WEB_PUSH_SUBJECT` on the Convex deployment. Only the public key is exposed to
+authenticated browsers. See [user notifications](../operations/notifications.md)
+for setup and key lifecycle.
+
 - Confirm a name exists without printing its value.
 - Verify the intended target before any production or destructive command.
 - Keep the application and Convex deployment copies of shared secrets aligned.

@@ -1,5 +1,13 @@
 import { v } from "convex/values";
-import { mutation, query, type MutationCtx } from "./_generated/server";
+import {
+  internalMutation,
+  mutation,
+  query,
+  type MutationCtx,
+  type QueryCtx,
+} from "./_generated/server";
+import { internal } from "./_generated/api";
+import { emitNotification } from "./lib/notificationEvents";
 import type { Doc, Id } from "./_generated/dataModel";
 import {
   requireActiveUser,
@@ -62,6 +70,22 @@ function compareRows(
   return (
     Number(left.round ?? 0) - Number(right.round ?? 0) ||
     Number(left.pick ?? 0) - Number(right.pick ?? 0)
+  );
+}
+
+export async function notificationClock(
+  ctx: QueryCtx | MutationCtx,
+  seasonId: Id<"seasons">,
+) {
+  const season = await ctx.db.get(seasonId);
+  const rows = await ctx.db
+    .query("draftPicks")
+    .withIndex("by_seasonId_round_pick", (q) => q.eq("seasonId", seasonId))
+    .collect();
+  return resolveDraftClockState(
+    [...rows].sort(compareRows).map(toDraftPick),
+    toUtcTimestamp(season?.draftStartAt),
+    new Date(),
   );
 }
 
@@ -440,6 +464,20 @@ export const submitPick = mutation({
       });
     }
 
+    await emitNotification(ctx, {
+      key: `pick:${activeRow._id}:${nowTimestamp}`,
+      category: "draft_pick",
+      title: "Pick confirmed",
+      body: `Your team selected ${player.fullName}.`,
+      href: "/draft/my-team",
+      ownerId: franchise.ownerId,
+      pickId: activeRow._id,
+      clockStartedAt: nowTimestamp,
+      expiresAt: nowTimestamp + 3600000,
+    });
+    await ctx.scheduler.runAfter(0, internal.draft.notifyState, {
+      seasonId: args.seasonId,
+    });
     return {
       completedPickId: String(activeRow._id),
       nextPickId: nextPick ? String(nextPick._id) : null,
@@ -532,9 +570,124 @@ export const undoPick = mutation({
       updatedAt: nowTimestamp,
     });
 
+    await ctx.scheduler.runAfter(0, internal.draft.notifyState, {
+      seasonId: args.seasonId,
+    });
     return {
       undonePickId: String(latestCompletedPick._id),
       releasedPlayerId: String(player._id),
     };
+  },
+});
+
+export const notifyState = internalMutation({
+  args: { seasonId: v.id("seasons") },
+  handler: async (ctx, { seasonId }) => {
+    const season = await ctx.db.get(seasonId);
+    if (!season) return;
+    const now = Date.now(),
+      start = toUtcTimestamp(season.draftStartAt);
+    if (start === null) return;
+    const rows = await ctx.db
+      .query("draftPicks")
+      .withIndex("by_seasonId_round_pick", (q) => q.eq("seasonId", seasonId))
+      .collect();
+    const picks = [...rows].sort(compareRows).map(toDraftPick);
+    const clock = resolveDraftClockState(picks, start, new Date(now));
+    const base = { href: "/draft", expiresAt: start, seasonId };
+    if (
+      now < start &&
+      now >= start - 15 * 60000 &&
+      picks.some((pick) => !pick.isSigning)
+    ) {
+      await emitNotification(ctx, {
+        ...base,
+        key: `start:${seasonId}:${start}`,
+        category: "draft_start",
+        title: "Draft starting soon",
+        body: `${season.name} starts in ${Math.ceil((start - now) / 60000)} minutes.`,
+      });
+      await ctx.scheduler.runAt(start, internal.draft.notifyState, {
+        seasonId,
+      });
+      return;
+    }
+    if (clock.status === "complete") {
+      const lastEnded = Math.max(
+        0,
+        ...rows.map((row) => toUtcTimestamp(row.onClockEndedAt) ?? 0),
+      );
+      if (lastEnded > now - 5 * 60000)
+        await emitNotification(ctx, {
+          ...base,
+          key: `complete:${seasonId}:${lastEnded}`,
+          category: "draft_complete",
+          title: "Draft complete",
+          body: `${season.name}: all selections are in.`,
+          expiresAt: lastEnded + 3600000,
+        });
+      return;
+    }
+    if (
+      clock.status !== "on_clock" ||
+      !clock.activePick ||
+      !clock.clockExpiresAt ||
+      !clock.clockStartedAt
+    )
+      return;
+    const expiresAt = toUtcTimestamp(clock.clockExpiresAt)!;
+    const clockStartedAt = toUtcTimestamp(clock.clockStartedAt)!;
+    const teamById = await loadTeamSummaries(ctx, seasonId);
+    const ownerFor = (pick: DraftPick) =>
+      teamById.get(pick.gshlTeamId)?.ownerId as Id<"owners"> | undefined;
+    const active = rows.find(
+      (row) => String(row._id) === clock.activePick!.id,
+    )!;
+    const ownerId = ownerFor(clock.activePick);
+    if (ownerId) {
+      const event = {
+        href: "/draft",
+        ownerId,
+        pickId: active._id,
+        clockStartedAt,
+        expiresAt,
+      };
+      await emitNotification(ctx, {
+        ...event,
+        key: `turn:${active._id}:${clockStartedAt}:${ownerId}`,
+        category: "draft_turn",
+        title: "You are on the clock",
+        body: `Round ${active.round}, pick ${active.pick}. Make your selection.`,
+      });
+      if (now >= expiresAt - 60000)
+        await emitNotification(ctx, {
+          ...event,
+          key: `clock:${active._id}:${clockStartedAt}:${ownerId}`,
+          category: "draft_clock",
+          title: "Your draft clock is running low",
+          body: "Less than a minute remains. Make your pick.",
+        });
+      else
+        await ctx.scheduler.runAt(
+          expiresAt - 60000,
+          internal.draft.notifyState,
+          { seasonId },
+        );
+    }
+    for (const [index, pick] of clock.upcomingPicks.slice(0, 2).entries()) {
+      const upcomingOwner = ownerFor(pick);
+      if (!upcomingOwner || upcomingOwner === ownerId) continue;
+      const row = rows.find((row) => String(row._id) === pick.id)!;
+      await emitNotification(ctx, {
+        href: "/draft",
+        ownerId: upcomingOwner,
+        pickId: row._id,
+        key: `upcoming:${pick.id}:${toUtcTimestamp(row.updatedAt) ?? 0}:${upcomingOwner}`,
+        category: "draft_upcoming",
+        title: "Your pick is coming up",
+        body: `Your team picks in ${index + 1} ${index === 0 ? "selection" : "selections"}.`,
+        expiresAt: now + 8 * 60000,
+      });
+    }
   },
 });

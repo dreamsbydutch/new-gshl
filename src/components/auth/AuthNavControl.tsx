@@ -6,6 +6,7 @@ import { useAuthActions, useAuthSession } from "@gshl-hooks";
 import { Skeleton } from "@gshl-ui";
 import type { AuthNavControlProps } from "@gshl-types";
 import { cn } from "@gshl-utils";
+import { NotificationBell } from "@gshl-components/notifications/NotificationBell";
 
 export function AuthNavControl({ compact = false }: AuthNavControlProps) {
   const { session, status } = useAuthSession();
@@ -58,6 +59,7 @@ export function AuthNavControl({ compact = false }: AuthNavControlProps) {
           {session.user.role}
         </div>
       </div>
+      <NotificationBell />
       <button
         type="button"
         aria-label="Sign out"
