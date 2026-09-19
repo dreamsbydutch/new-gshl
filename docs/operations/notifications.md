@@ -4,8 +4,9 @@
 
 ## User experience
 
-Home and the Draft Hub show a draft notification setup panel. It also appears
-above the inbox in Notifications, so users do not need to find Preferences first.
+Home shows a draft notification setup panel. It also appears above the inbox
+in Notifications, so users do not need to find Preferences first. The Draft Hub
+uses its top-right space for the Live/Auto draft mode control.
 **Enable draft alerts** requests browser permission, registers this device, and
 enables the four time-sensitive draft reminders in one action. Other preferences
 stay unchanged. Permission is requested only after a button press.

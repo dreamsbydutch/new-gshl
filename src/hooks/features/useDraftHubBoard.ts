@@ -312,12 +312,14 @@ export function useDraftHubBoard(): DraftHubBoardViewModel {
     season?.startDate,
     state?.picks,
   ]);
-  const canSubmitActivePick = canSubmitDraftPick({
-    role: session?.user.role,
-    userOwnerId: session?.user.ownerId,
-    activeTeamOwnerId: activePick?.team?.ownerId,
-    status: state?.status ?? "unavailable",
-  });
+  const canSubmitActivePick =
+    !activePick?.team?.draftAuto &&
+    canSubmitDraftPick({
+      role: session?.user.role,
+      userOwnerId: session?.user.ownerId,
+      activeTeamOwnerId: activePick?.team?.ownerId,
+      status: state?.status ?? "unavailable",
+    });
   const latestCompletedPick = recentPicks[0] ?? null;
   const canUndoLastPick =
     session?.user.role === "commissioner" && latestCompletedPick !== null;

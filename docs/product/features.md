@@ -173,3 +173,18 @@ The active live-draft route uses `DraftHubBoard` and the transactional functions
 
 - The standalone draft roster board is public in route code; confirm that this is intentional before placing private information there.
 - Public data and member-only pages are not synonymous: many league reads are public by design, while owner email and owing amounts are redacted for unauthenticated readers.
+
+### Draft Live and Auto modes
+
+The Draft Hub has a compact Live/Auto switch at the top right. Live is grayscale;
+Auto is red. Owners control their own season team. Commissioners can select any
+team and change its mode. Viewers cannot change draft modes.
+
+A clock timeout selects the roster-optimized suggested player on the server. Two
+consecutive timeouts for the same team enable Auto for its remaining picks. Auto
+teams pick immediately when their turn arrives, without waiting for the clock.
+A manual pick breaks the timeout streak; switching to Live resets it. Modes are
+stored per season team and persist across page reloads. Auto never picks before
+the scheduled draft start. Selection, roster assignment, lineup rebuilding, and
+advancement happen in one transaction. If no eligible player remains, a
+commissioner must resolve the stalled pick.

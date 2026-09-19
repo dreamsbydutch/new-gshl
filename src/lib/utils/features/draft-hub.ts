@@ -187,7 +187,12 @@ export function getNextOwnerDraftPickNotice(
   return {
     pick,
     picksAway: nextPickIndex,
-    estimatedAt: estimateBaseTime + nextPickIndex * ESTIMATED_DRAFT_PICK_MS,
+    estimatedAt:
+      estimateBaseTime +
+      openPicks
+        .slice(0, nextPickIndex)
+        .filter((entry) => !entry.team?.draftAuto).length *
+        ESTIMATED_DRAFT_PICK_MS,
   };
 }
 

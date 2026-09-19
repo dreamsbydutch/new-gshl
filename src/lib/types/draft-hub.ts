@@ -28,6 +28,7 @@ export interface DraftClockState {
 }
 
 export interface DraftHubTeamSummary {
+  draftAuto?: boolean;
   id: string;
   franchiseId: string;
   ownerId: string | null;

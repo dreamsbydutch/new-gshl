@@ -286,6 +286,8 @@ export default defineSchema({
       seasonId: id("seasons"),
       franchiseId: id("franchises"),
       yahooId: optionalNullableString,
+      draftAuto: v.optional(v.boolean()),
+      draftTimeoutStreak: v.optional(v.number()),
       confId: id("conferences"),
       createdAt: timestampValue,
       updatedAt: timestampValue,

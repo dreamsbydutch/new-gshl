@@ -141,6 +141,12 @@ void test("estimates the logged-in owner's next open draft pick", () => {
   assert.equal(notice?.picksAway, 12);
   assert.equal(notice?.pick.pick.pick, "13");
   assert.equal(notice?.estimatedAt, estimateBaseTime + 12 * 82 * 1000);
+  picks[0]!.team!.draftAuto = true;
+  assert.equal(
+    getNextOwnerDraftPickNotice(picks, "owner-me", estimateBaseTime)
+      ?.estimatedAt,
+    estimateBaseTime + 11 * 82 * 1000,
+  );
 });
 
 void test("uses intuitive initial directions for every draft player column", () => {

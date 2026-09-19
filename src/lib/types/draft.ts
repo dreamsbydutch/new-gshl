@@ -62,3 +62,8 @@ export interface BuildMockDraftProjectionOptions<
   teams: GSHLTeam[];
   take?: number;
 }
+
+export type AutoDraftCandidate = Pick<
+  DraftBoardPlayer,
+  "id" | "nhlPos" | "lineupPos" | "overallRating" | "overallRk" | "preDraftRk"
+>;
