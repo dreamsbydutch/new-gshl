@@ -53,6 +53,16 @@ void test("resolveNhlTeamLogoUrl preserves unknown remote logos", () => {
   );
 });
 
+void test("resolveNhlTeamLogoUrl tolerates malformed team names", () => {
+  assert.equal(
+    resolveNhlTeamLogoUrl({
+      name: ["TOR"],
+      logoUrl: "remote.png",
+    } as unknown as NHLTeam),
+    "remote.png",
+  );
+});
+
 void test("normalizes every duplicate NHL catalog abbreviation pair", () => {
   const pairs = [
     ["ANH", "ANA"],

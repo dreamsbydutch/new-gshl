@@ -268,7 +268,8 @@ export function findNhlTeamByAbbreviation<
 export function resolveNhlTeamLogoUrl(
   team: Pick<NHLTeam, "name" | "logoUrl">,
 ): string {
-  const normalizedName = team.name.trim().toUpperCase();
+  const normalizedName =
+    typeof team.name === "string" ? team.name.trim().toUpperCase() : "";
   const firstIdentifier = normalizedName.split(/[\/,|]/)[0]?.trim();
 
   return (
