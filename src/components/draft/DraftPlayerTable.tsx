@@ -257,7 +257,7 @@ export function DraftPlayerTable({
                               dividerBefore && "border-l border-slate-300",
                             )}
                           >
-                            {value == null ? "-" : value}
+                            {value ?? "-"}
                           </td>
                         );
                       })}
