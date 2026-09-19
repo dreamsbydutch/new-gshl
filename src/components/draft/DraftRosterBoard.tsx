@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { MonitorUp } from "lucide-react";
 import { NHLLogo } from "@gshl-components/player/NHLLogo";
-import { useDraftRosterBoard } from "@gshl-hooks";
+import { lighten, useDraftRosterBoard, useTeamPalette } from "@gshl-hooks";
 import { DraftRosterCenter } from "./DraftRosterCenter";
 import { formatDraftPickLabel } from "@gshl-utils/features/draft-tv";
 import { useDraftBoardFit } from "@gshl-hooks/features/useDraftBoardFit";
@@ -31,10 +31,12 @@ function RosterPlayer({
   player,
   nhlTeamByAbbr,
   muted = false,
+  backgroundColor,
 }: {
   player: Player;
   nhlTeamByAbbr: Map<string, NHLTeam>;
   muted?: boolean;
+  backgroundColor?: string;
 }) {
   const nhlAbbr = getPlayerNhlAbbreviation(player);
   const nhlTeam = nhlAbbr ? nhlTeamByAbbr.get(nhlAbbr) : undefined;
@@ -50,6 +52,7 @@ function RosterPlayer({
         "min-w-0 rounded border border-slate-300/70 px-1 py-0.5 text-center",
         muted ? "bg-slate-200/60" : "bg-white shadow-sm",
       )}
+      style={backgroundColor ? { backgroundColor } : undefined}
       title={`${abbreviatePlayerName(player.fullName)} · ${player.nhlPos.join("/")} · ${rating}`}
     >
       <p
@@ -103,16 +106,35 @@ export function TeamRosterCard({
   const roster = buildCurrentRoster(players, team);
   const lineup = buildTeamLineup(roster);
   const bench = getBenchPlayers(roster);
+  const palette = useTeamPalette(team.logoUrl);
+  const primaryColor = palette.primary;
+  const secondaryColor = palette.secondary ?? primaryColor;
+  const cardBackground = primaryColor ? lighten(primaryColor, 0.84) : undefined;
+  const playerBackground = primaryColor
+    ? lighten(primaryColor, 0.94)
+    : undefined;
+  const headerBackground = primaryColor
+    ? `linear-gradient(90deg, ${lighten(primaryColor, 0.72)}, ${lighten(secondaryColor ?? primaryColor, 0.84)})`
+    : undefined;
 
   return (
     <article
       ref={panelRef}
       aria-label={`${team.name ?? team.abbr ?? "Team"} roster`}
+      data-team-primary={primaryColor ?? undefined}
       className={cn(
         "flex min-h-0 flex-col overflow-hidden rounded-lg border border-slate-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-slate-700",
         muted ? "bg-slate-100" : "bg-white",
         className,
       )}
+      style={
+        primaryColor
+          ? {
+              background: cardBackground,
+              borderColor: primaryColor,
+            }
+          : undefined
+      }
     >
       <div ref={contentRef} className="w-full shrink-0">
         <header
@@ -120,6 +142,9 @@ export function TeamRosterCard({
             "flex min-h-8 shrink-0 items-center gap-1 border-b border-slate-300 px-1.5 py-0.5",
             muted ? "bg-slate-200/80" : "bg-slate-50",
           )}
+          style={
+            headerBackground ? { background: headerBackground } : undefined
+          }
         >
           {team.logoUrl ? (
             <Image
@@ -198,6 +223,7 @@ export function TeamRosterCard({
                         key={player.id}
                         player={player}
                         muted={muted}
+                        backgroundColor={playerBackground}
                         nhlTeamByAbbr={nhlTeamByAbbr}
                       />
                     ))}
@@ -218,6 +244,7 @@ export function TeamRosterCard({
                     key={player.id}
                     player={player}
                     muted={muted}
+                    backgroundColor={playerBackground}
                     nhlTeamByAbbr={nhlTeamByAbbr}
                   />
                 ))}

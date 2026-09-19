@@ -10,12 +10,15 @@ const fixture = `
 const names = ["Auston Matthews", "Martin Necas", "Ryan Nugent-Hopkins", "James van Riemsdyk", "Alex DeBrincat"];
 const positions = ["LW","C","RW","LW","C","RW","D","D","D","D","G","UTIL","BN","BN","BN"];
 const nhlPositions = ["LW","C","RW","LW","C","RW","D","D","D","D","G","C","LW","RW","D"];
-const teams = Array.from({length:14},(_,i)=>({id:String(i),ownerId:String(i),franchiseId:String(i),name:"Toronto Maple Reg's " + (i+1),abbr:"TOR",talentRating:89.75,logoUrl:null}));
+const teamLogos=["data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24'%3E%3Crect width='24' height='24' fill='%23ef4444'/%3E%3C/svg%3E","data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24'%3E%3Crect width='24' height='24' fill='%231e3a8a'/%3E%3C/svg%3E"];
+const teams = Array.from({length:14},(_,i)=>({id:String(i),ownerId:String(i),franchiseId:String(i),name:"Toronto Maple Reg's " + (i+1),abbr:"TOR",talentRating:89.75,logoUrl:teamLogos[i%teamLogos.length]}));
 const player = (i,ownerId="available")=>({id:ownerId+"-"+i,ownerId,fullName:names[i%names.length],nhlTeam:"TOR",nhlPos:[nhlPositions[i%nhlPositions.length]],posGroup:nhlPositions[i%nhlPositions.length]==="G"?"G":nhlPositions[i%nhlPositions.length]==="D"?"D":"F",lineupPos:positions[i%15],overallRating:99.99,seasonRating:99.99,overallRk:i+1,yahooDraftRk:200-i,dailyFaceoffRk:200-i,nhlRk:200-i,seasonRk:i+1,stats:{GP:82,G:65,A:105,P:170,PM:35,PIM:120,PPP:55,SOG:345,HIT:210,BLK:150,W:45,GAA:2.35,SVP:0.925}});
 const players=teams.flatMap(team=>Array.from({length:15},(_,i)=>player(i,team.ownerId)));
 const available=Array.from({length:80},(_,i)=>({...player(79-i),posGroup:i%2===0?"F":"G"}));
 const pick=(i)=>({pick:{id:String(i),round:2,pick:i},team:{...teams[i%14],id:"draft-season-"+teams[i%14].id},player:player(i)});
 export function useDraftRosterBoard(){return {season:{name:"2026-27",year:2027},nhlTeams:[],players,remainingPicksByFranchise:new Map(teams.map(team=>[team.franchiseId,Array.from({length:15-(window.tvStep??0)},(_,i)=>({id:team.id+"-pick-"+i,round:String(i+1),pick:String(i*14+Number(team.id)+1)}))])),availablePlayers:available,isLoading:window.tvState==="loading",conferences:[{id:"a",name:"Hickory Hotel",teams:teams.slice(0,7)},{id:"b",name:"Sunview",teams:teams.slice(7)}]};}
+export function useTeamPalette(logoUrl){const red=logoUrl?.includes("ef4444"); return logoUrl?{primary:red?"#ef4444":"#1e3a8a",secondary:red?"#f59e0b":"#60a5fa",accent:null,palette:[]}:{primary:null,secondary:null,accent:null,palette:[]};}
+export function lighten(hex,amount=.7){const value=parseInt(hex.replace("#",""),16); const channel=(shift)=>{const original=(value>>shift)&255; return Math.round(original+(255-original)*amount).toString(16).padStart(2,"0")}; return "#"+channel(16)+channel(8)+channel(0);}
 export function useOwnerRankingsData(){return {isLoading:window.tvState==="loading",data:{rankings:Array.from({length:20},(_,i)=>({owner:{id:i<14?teams[i].ownerId:"inactive-"+i},rank:i+1,displayName:i<14?"Alexander Owner "+(i+1):"Retired Owner "+(i-13),rating:1800-i*23,cups:i%4,primaryTeam:null,seasonsPlayed:12,playoffAppearances:8,finalsAppearances:3,overallRecord:{wins:150,losses:125,ties:3,winPercentage:0.545}}))}};}
 export function useDraftLiveTvBoard(){const cursor=30+(window.tvStep??0); return {season:{name:"2026-27",draftStartAt:"2026-09-25T20:00:00Z"},state:{status:window.tvState,completedCount:cursor-1,remainingCount:90-cursor},activePick:pick(cursor),clockRemainingSeconds:125,draftStartRemainingSeconds:90061,isLoading:window.tvState==="loading",recentPicks:Array.from({length:20},(_,i)=>pick(cursor-i-1)),upcomingPicks:Array.from({length:20},(_,i)=>pick(cursor+i+1))};}
 `;
@@ -38,6 +41,19 @@ const compiled = await build({
           path: "fixture",
           namespace: "fixture",
         }));
+        builder.onResolve({ filter: /^next\/image$/ }, () => ({
+          path: "next-image",
+          namespace: "fixture",
+        }));
+        builder.onLoad(
+          { filter: /^next-image$/, namespace: "fixture" },
+          () => ({
+            contents:
+              'import React from "react"; export default function Image(props){return React.createElement("img",props);}',
+            loader: "js",
+            resolveDir: process.cwd(),
+          }),
+        );
         builder.onLoad({ filter: /.*/, namespace: "fixture" }, () => ({
           contents: fixture,
           loader: "js",
@@ -284,6 +300,19 @@ try {
           /Available TV|Live TV|Draft Hub|2026-27 · 14 rosters/,
         );
         assert.doesNotMatch(result.text, /TOP 26 SKATERS|League Roster Board/);
+        const teamBackgrounds = await page.$$eval(
+          "article[data-team-primary]",
+          (cards) => ({
+            count: cards.length,
+            colors: [
+              ...new Set(
+                cards.map((card) => getComputedStyle(card).backgroundColor),
+              ),
+            ],
+          }),
+        );
+        assert.equal(teamBackgrounds.count, 14);
+        assert.equal(teamBackgrounds.colors.length, 2);
       }
       await page.screenshot({
         path: resolve(`.next/tv-checks/${view}-${width}.png`),
