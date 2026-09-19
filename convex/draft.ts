@@ -423,6 +423,8 @@ async function completePick(
   await ctx.db.patch(player._id, {
     ownerId: franchise.ownerId,
     gshlTeamId: activeTeam._id,
+    isSignable: false,
+    isResignable: null,
     lineupPos: null,
     updatedAt: nowTimestamp,
   });
@@ -431,6 +433,8 @@ async function completePick(
     ...player,
     ownerId: franchise.ownerId,
     gshlTeamId: activeTeam._id,
+    isSignable: false,
+    isResignable: null,
     lineupPos: null,
     updatedAt: nowTimestamp,
   };
