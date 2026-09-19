@@ -65,14 +65,15 @@ Run these from `scripts/`.
 
 ### Player identity, biography, and salary
 
-| Command                                  | Purpose                                                                                                                                                  |
-| ---------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `npm run player-bios:sync`               | Reconcile PuckPedia player identity, biography, contract and salary data; Yahoo position eligibility; current ownership; and optimized lineup positions. |
-| `npm run nhl-salaries:import`            | Validate and import `salaryHistory.json`; identity ambiguity or missing identity aborts all writes.                                                      |
-| `npm run player-bios:backfill-nhl-ids`   | Backfill NHL API IDs using the Python NHL helper.                                                                                                        |
-| `npm run player-bios:backfill-yahoo-ids` | Backfill historical Yahoo player IDs.                                                                                                                    |
-| `npm run players:import-daily-faceoff-rankings` | Dry-run or import Daily Faceoff ranks into `Player.dailyFaceoffRk`; matched On the Bubble players follow in descending GSHL overall-rating order. Requires an explicit `--target`, and writes only with `--apply`. |
-| `npm run players:import-nhl-rankings` | Dry-run or import NHL.com Top 250 and honorable-mention ranks into `Player.nhlRk`; requires an explicit `--target`, and writes only with `--apply`. |
+| Command                                           | Purpose                                                                                                                                                                                                            |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `npm run player-bios:sync`                        | Reconcile PuckPedia player identity, biography, contract and salary data; Yahoo position eligibility; current ownership; and optimized lineup positions.                                                           |
+| `npm run nhl-salaries:import`                     | Validate and import `salaryHistory.json`; identity ambiguity or missing identity aborts all writes.                                                                                                                |
+| `npm run player-bios:backfill-nhl-ids`            | Backfill NHL API IDs using the Python NHL helper.                                                                                                                                                                  |
+| `npm run player-bios:backfill-yahoo-ids`          | Backfill historical Yahoo player IDs.                                                                                                                                                                              |
+| `npm run players:import-daily-faceoff-rankings`   | Dry-run or import Daily Faceoff ranks into `Player.dailyFaceoffRk`; matched On the Bubble players follow in descending GSHL overall-rating order. Requires an explicit `--target`, and writes only with `--apply`. |
+| `npm run players:import-nhl-rankings`             | Dry-run or import NHL.com Top 250 and honorable-mention ranks into `Player.nhlRk`; requires an explicit `--target`, and writes only with `--apply`.                                                                |
+| `npm run players:import-yahoo-preseason-rankings` | Dry-run or import every public Yahoo preseason rank into `Player.yahooDraftRk`; requires an explicit `--target`, and writes only with `--apply`.                                                                   |
 
 ### League calculations
 

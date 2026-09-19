@@ -39,6 +39,11 @@ known operational gaps.
 - [Feature catalog](product/features.md) - public, owner, commissioner, draft,
   contract, editorial, competition, and analytics surfaces
 
+## Proposals
+
+- [GSHL relaunch owner proposal](proposals/gshl-relaunch-owner-proposal.md) -
+  owner-facing discussion draft for the proposed league redesign
+
 The official league rules are application content in
 [`src/content/rulebook.ts`](../src/content/rulebook.ts), rendered at `/rulebook`.
 The wiki explains software concepts; it does not duplicate the rulebook.
