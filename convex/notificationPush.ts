@@ -34,6 +34,7 @@ export const send = internalAction({
           body: notification.body,
           href: notification.href,
           tag: notification._id,
+          icon: delivery.icon,
         }),
         {
           vapidDetails: { subject, publicKey, privateKey },

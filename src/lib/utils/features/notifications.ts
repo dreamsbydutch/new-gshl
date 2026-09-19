@@ -3,6 +3,22 @@ import type {
   NotificationChoice,
 } from "../../types/notifications";
 
+export const DEFAULT_NOTIFICATION_ICON = "/gshl-notification-icon.png";
+
+export function notificationIconUrl(value?: string | null): string {
+  if (!value) return DEFAULT_NOTIFICATION_ICON;
+  if (value.startsWith("/") && !value.startsWith("//") && !value.includes("\\"))
+    return value;
+  try {
+    const url = new URL(value);
+    if (url.protocol === "https:" && !url.username && !url.password)
+      return url.href;
+  } catch {
+    /* Missing or invalid logos use league branding. */
+  }
+  return DEFAULT_NOTIFICATION_ICON;
+}
+
 export const DRAFT_REMINDER_CATEGORIES: readonly NotificationCategory[] = [
   "draft_start",
   "draft_turn",

@@ -11,6 +11,7 @@ export function NotificationCenter() {
   const [tab, setTab] = useState<"inbox" | "preferences">("inbox");
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
+  const [subjectKey, setSubjectKey] = useState("");
   return (
     <main className="mx-auto w-full max-w-3xl px-4 py-6">
       <h1 className="text-xl font-semibold">Notifications</h1>
@@ -238,9 +239,16 @@ export function NotificationCenter() {
               onSubmit={(event) => {
                 event.preventDefault();
                 void center.run(async () => {
-                  await center.announce({ title, body });
+                  await center.announce({
+                    title,
+                    body,
+                    subject: center.settings?.subjects.find(
+                      (option) => option.key === subjectKey,
+                    )?.subject,
+                  });
                   setTitle("");
                   setBody("");
+                  setSubjectKey("");
                 }, "Announcement sent.");
               }}
             >
@@ -250,6 +258,24 @@ export function NotificationCenter() {
               <p className="text-xs text-muted-foreground">
                 Send an update to users who have league announcements enabled.
               </p>
+              <label className="block text-sm">
+                About
+                <select
+                  value={subjectKey}
+                  onChange={(event) => setSubjectKey(event.target.value)}
+                  className="mt-1 block min-h-11 w-full rounded border bg-white px-3"
+                >
+                  <option value="">League</option>
+                  {center.settings.subjects.map((option) => (
+                    <option key={option.key} value={option.key}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+                <span className="mt-1 block text-xs text-muted-foreground">
+                  Chooses the notification logo. Recipients stay the same.
+                </span>
+              </label>
               <label className="block text-sm">
                 Title
                 <input

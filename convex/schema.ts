@@ -1,6 +1,9 @@
 import { defineSchema, defineTable, type TableDefinition } from "convex/server";
 import { v, type GenericValidator } from "convex/values";
-import { notificationCategory } from "./lib/notificationValidators";
+import {
+  notificationCategory,
+  notificationSubject,
+} from "./lib/notificationValidators";
 
 type TableShape = Record<string, GenericValidator>;
 type IndexSpec = string | readonly string[];
@@ -179,6 +182,7 @@ export default defineSchema({
     .index("by_user", ["userId"])
     .index("by_endpoint", ["endpoint"]),
   notificationEvents: defineTable({
+    subject: v.optional(notificationSubject),
     key: v.string(),
     category: notificationCategory,
     title: v.string(),

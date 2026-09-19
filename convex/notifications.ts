@@ -8,7 +8,11 @@ import {
   query,
 } from "./_generated/server";
 import { requireActiveUser, requireCommissioner } from "./lib/auth";
-import { notificationCategory } from "./lib/notificationValidators";
+import {
+  notificationCategory,
+  notificationSubject,
+} from "./lib/notificationValidators";
+import { resolveNotificationIcon } from "./lib/notificationEvents";
 import {
   isAllowedPushEndpoint,
   notificationChoice,
@@ -30,7 +34,37 @@ export const settings = query({
       .query("pushSubscriptions")
       .withIndex("by_user", (q) => q.eq("userId", user._id))
       .take(20);
+    const franchises =
+      user.role === "commissioner"
+        ? await ctx.db.query("franchises").take(100)
+        : [];
+    const conferences =
+      user.role === "commissioner"
+        ? await ctx.db.query("conferences").take(20)
+        : [];
     return {
+      subjects: [
+        {
+          key: "press_box",
+          label: "Press Box",
+          subject: { kind: "press_box" as const },
+        },
+        ...franchises
+          .filter((franchise) => franchise.isActive)
+          .map((franchise) => ({
+            key: String(franchise._id),
+            label: franchise.name,
+            subject: { kind: "team" as const, franchiseId: franchise._id },
+          })),
+        ...conferences.map((conference) => ({
+          key: String(conference._id),
+          label: conference.name,
+          subject: {
+            kind: "conference" as const,
+            conferenceId: conference._id,
+          },
+        })),
+      ],
       options: NOTIFICATION_OPTIONS.map((option) => ({
         ...option,
         ...notificationChoice(
@@ -292,9 +326,23 @@ export const disconnectBrowser = mutation({
 });
 
 export const announce = mutation({
-  args: { title: v.string(), body: v.string() },
+  args: {
+    title: v.string(),
+    body: v.string(),
+    subject: v.optional(notificationSubject),
+  },
   handler: async (ctx, args) => {
     await requireCommissioner(ctx);
+    if (
+      args.subject?.kind === "team" &&
+      !(await ctx.db.get(args.subject.franchiseId))
+    )
+      throw new Error("Team not found.");
+    if (
+      args.subject?.kind === "conference" &&
+      !(await ctx.db.get(args.subject.conferenceId))
+    )
+      throw new Error("Conference not found.");
     const title = args.title.trim(),
       body = args.body.trim();
     if (!title || title.length > 100 || !body || body.length > 500)
@@ -304,6 +352,7 @@ export const announce = mutation({
     const now = Date.now();
     const eventId = await ctx.db.insert("notificationEvents", {
       key: `announcement:${now}`,
+      subject: args.subject,
       category: "announcement",
       title,
       body,
@@ -463,7 +512,12 @@ export const delivery = internalQuery({
         if (franchise?.ownerId !== event.ownerId) return null;
       }
     }
-    return { notification, device, expiresAt: event.expiresAt };
+    return {
+      notification,
+      device,
+      expiresAt: event.expiresAt,
+      icon: await resolveNotificationIcon(ctx, event),
+    };
   },
 });
 

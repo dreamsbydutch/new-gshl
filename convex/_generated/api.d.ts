@@ -20,6 +20,7 @@ import type * as jobCatalog from "../jobCatalog.js";
 import type * as jobRunner from "../jobRunner.js";
 import type * as jobs from "../jobs.js";
 import type * as lib_auth from "../lib/auth.js";
+import type * as lib_contractSigning from "../lib/contractSigning.js";
 import type * as lib_frontendQuery from "../lib/frontendQuery.js";
 import type * as lib_matchupProjection from "../lib/matchupProjection.js";
 import type * as lib_notificationEvents from "../lib/notificationEvents.js";
@@ -70,6 +71,7 @@ declare const fullApi: ApiFromModules<{
   jobRunner: typeof jobRunner;
   jobs: typeof jobs;
   "lib/auth": typeof lib_auth;
+  "lib/contractSigning": typeof lib_contractSigning;
   "lib/frontendQuery": typeof lib_frontendQuery;
   "lib/matchupProjection": typeof lib_matchupProjection;
   "lib/notificationEvents": typeof lib_notificationEvents;

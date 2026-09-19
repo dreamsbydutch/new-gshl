@@ -24,7 +24,10 @@ import {
   isAllowedPushEndpoint,
   notificationChoice,
   NOTIFICATION_OPTIONS,
+  notificationIconUrl,
+  DEFAULT_NOTIFICATION_ICON,
 } from "../src/lib/utils/features/notifications";
+import { WEEKLY_EDITION_LOGO_URL } from "../src/lib/utils/features/weekly-edition-brand";
 
 function handler<A extends DefaultFunctionArgs>(
   fn:
@@ -131,6 +134,121 @@ const userId = "user" as Id<"authUsers">;
 const eventId = "event" as Id<"notificationEvents">;
 const deviceId = "device" as Id<"pushSubscriptions">;
 const notificationId = "notification" as Id<"notifications">;
+
+void test("push delivery chooses current team, conference and Press Box logos", async () => {
+  const f = fixture();
+  const now = Date.now();
+  f.put("notifications", "notification", { userId, eventId });
+  f.put("pushSubscriptions", "device", { userId });
+  f.put("franchises", "franchise", { logoUrl: "https://example.com/team.png" });
+  f.put("conferences", "conference", {
+    logoUrl: "https://example.com/conference.png",
+  });
+  f.put("teams", "team", { franchiseId: "franchise" });
+  f.put("draftPicks", "pick", {
+    gshlTeamId: "team",
+    playerId: "player",
+    onClockEndedAt: now,
+  });
+  const icon = async (fields: Record<string, unknown>) => {
+    f.put("notificationEvents", "event", {
+      category: "announcement",
+      expiresAt: now + 60000,
+      ...fields,
+    });
+    const result = await handler(delivery)(f.ctx, { notificationId, deviceId });
+    assert.ok(result);
+    return (result as { icon: string }).icon;
+  };
+  assert.equal(await icon({}), DEFAULT_NOTIFICATION_ICON);
+  assert.equal(
+    await icon({ subject: { kind: "team", franchiseId: "franchise" } }),
+    "https://example.com/team.png",
+  );
+  assert.equal(
+    await icon({ subject: { kind: "conference", conferenceId: "conference" } }),
+    "https://example.com/conference.png",
+  );
+  assert.equal(
+    await icon({ subject: { kind: "press_box" } }),
+    WEEKLY_EDITION_LOGO_URL,
+  );
+  await handler(savePreference)(f.ctx, {
+    category: "press_box",
+    push: true,
+    inbox: true,
+  });
+  assert.equal(await icon({ category: "press_box" }), WEEKLY_EDITION_LOGO_URL);
+  await handler(savePreference)(f.ctx, {
+    category: "draft_pick",
+    push: true,
+    inbox: true,
+  });
+  assert.equal(
+    await icon({ category: "draft_pick", pickId: "pick", clockStartedAt: now }),
+    "https://example.com/team.png",
+  );
+  f.put("franchises", "traded-franchise", {
+    logoUrl: "https://example.com/traded.png",
+  });
+  f.get("team")!.franchiseId = "traded-franchise";
+  assert.equal(
+    await icon({ category: "draft_pick", pickId: "pick", clockStartedAt: now }),
+    "https://example.com/traded.png",
+  );
+  f.get("traded-franchise")!.logoUrl = null;
+  assert.equal(
+    await icon({ category: "draft_pick", pickId: "pick", clockStartedAt: now }),
+    DEFAULT_NOTIFICATION_ICON,
+  );
+  assert.equal(
+    await icon({ subject: { kind: "conference", conferenceId: "missing" } }),
+    DEFAULT_NOTIFICATION_ICON,
+  );
+});
+
+void test("notification icons reject unsafe URLs and keep a league fallback", () => {
+  for (const value of [
+    null,
+    "",
+    "javascript:alert(1)",
+    "data:image/png;base64,abc",
+    "http://example.com/logo.png",
+    "https://user:password@example.com/logo.png",
+    "//example.com/logo.png",
+    "/\\example.com/logo.png",
+  ])
+    assert.equal(notificationIconUrl(value), DEFAULT_NOTIFICATION_ICON);
+  assert.equal(notificationIconUrl("/logo.png"), "/logo.png");
+});
+
+void test("commissioner announcement subjects are validated and preserved", async () => {
+  const f = fixture();
+  await f.ctx.db.patch(userId, { role: "commissioner" });
+  const subject = {
+    kind: "conference" as const,
+    conferenceId: "conference" as Id<"conferences">,
+  };
+  await assert.rejects(
+    handler(announce)(f.ctx, {
+      title: "Conference news",
+      body: "Update",
+      subject,
+    }),
+    /Conference not found/,
+  );
+  assert.equal(f.rows("notificationEvents").size, 0);
+  f.put("conferences", "conference", { name: "Conference" });
+  await handler(announce)(f.ctx, {
+    title: "Conference news",
+    body: "Update",
+    subject,
+  });
+  assert.deepEqual(
+    [...f.rows("notificationEvents").values()][0]!.subject,
+    subject,
+  );
+});
 
 for (const role of ["viewer", "owner", "commissioner"] as const) {
   void test(`announcement access for ${role}`, async () => {

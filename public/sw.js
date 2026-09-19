@@ -18,10 +18,25 @@ pushWorker.addEventListener("push", (event) => {
     return;
   }
   if (!message || typeof message.title !== "string") return;
+  let icon = "/gshl-notification-icon.png";
+  if (typeof message.icon === "string") {
+    try {
+      const candidate = new URL(message.icon, pushWorker.location.origin);
+      if (
+        !candidate.username &&
+        !candidate.password &&
+        (candidate.protocol === "https:" ||
+          candidate.origin === pushWorker.location.origin)
+      )
+        icon = candidate.href;
+    } catch {
+      // Older or malformed payloads keep the league icon.
+    }
+  }
   event.waitUntil(
     pushWorker.registration.showNotification(message.title, {
       body: typeof message.body === "string" ? message.body : "",
-      icon: "/gshl-notification-icon.png",
+      icon,
       badge: "/gshl-notification-badge.png",
       tag: message.tag,
       data: { href: message.href },

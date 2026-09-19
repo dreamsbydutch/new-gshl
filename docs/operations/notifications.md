@@ -37,7 +37,12 @@ Only commissioner accounts see the announcement form in Preferences or can send
 league announcements. The server rejects other roles, including direct API calls.
 Announcements publish immediately to eligible users.
 
-Push alerts use the white-background GSHL logo in
+Push popups use the subject's logo: draft pick/turn/upcoming/clock alerts resolve
+the pick's current team and franchise, and Press Box alerts use the existing
+Press Box brand. Commissioners can choose a team, conference, or Press Box as an
+announcement's subject; this changes its logo, not its recipients. Logos are
+resolved at delivery time so updated team branding and traded picks stay current.
+Missing or invalid logos and general league alerts use the white-background GSHL logo in
 `public/gshl-notification-icon.png`. The web app manifest and Apple touch icon use
 the same asset for installed apps.
 Android's status bar uses a separate transparent, monochrome 96px badge at

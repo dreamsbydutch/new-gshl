@@ -22,7 +22,7 @@ const bundle = await build({
       };
       window.renderCenter=(isCommissioner)=>{
         window.setup={...window.setup,
-          settings:{publicKey:"fixture-key",options:[],devices:[],isCommissioner},
+          settings:{publicKey:"fixture-key",options:[],devices:[],subjects:[],isCommissioner},
           inbox:{status:"Exhausted",results:[]}};
         root.render(<NotificationCenter />);
       };`,
