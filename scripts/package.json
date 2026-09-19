@@ -8,6 +8,8 @@
     "nhl-salaries:import": "tsx src/commands/player-bios/import-nhl-salary-history.ts",
     "player-bios:backfill-nhl-ids": "tsx src/commands/player-bios/backfill-nhl-api-ids.ts",
     "player-bios:backfill-yahoo-ids": "tsx src/commands/player-bios/backfill-yahoo-ids.ts",
+    "players:import-daily-faceoff-rankings": "tsx src/commands/players/import-daily-faceoff-rankings.ts",
+    "players:import-nhl-rankings": "tsx src/commands/players/import-nhl-rankings.ts",
     "awards:backfill": "node --use-system-ca --dns-result-order=ipv4first ../node_modules/tsx/dist/cli.mjs src/commands/awards/backfill-season-awards.ts",
     "ranking-engine:check": "node ../tools/ranking-engine-sync.mjs check",
     "ranking-engine:sync": "node ../tools/ranking-engine-sync.mjs sync",

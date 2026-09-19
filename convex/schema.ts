@@ -257,6 +257,8 @@ export default defineSchema({
       preDraftRk: statValue,
       yahooDraftRk: statValue,
       otherDraftRk: statValue,
+      dailyFaceoffRk: statValue,
+      nhlRk: statValue,
       seasonRk: statValue,
       seasonRating: statValue,
       overallRk: statValue,

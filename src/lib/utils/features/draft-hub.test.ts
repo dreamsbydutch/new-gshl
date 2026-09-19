@@ -145,7 +145,7 @@ void test("estimates the logged-in owner's next open draft pick", () => {
 void test("uses intuitive initial directions for every draft player column", () => {
   assert.equal(getDefaultDraftPlayerSortDirection("fullName"), "asc");
   assert.equal(getDefaultDraftPlayerSortDirection("yahooDraftRk"), "asc");
-  assert.equal(getDefaultDraftPlayerSortDirection("otherDraftRk"), "asc");
+  assert.equal(getDefaultDraftPlayerSortDirection("dailyFaceoffRk"), "asc");
   assert.equal(getDefaultDraftPlayerSortDirection("overallRating"), "desc");
   assert.equal(getDefaultDraftPlayerSortDirection("GP"), "desc");
 });

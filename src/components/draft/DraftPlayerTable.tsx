@@ -45,7 +45,8 @@ const RANKINGS = [
   ["overallRating", "OVR"],
   ["overallRk", "Rank"],
   ["yahooDraftRk", "Yahoo"],
-  ["otherDraftRk", "Other"],
+  ["dailyFaceoffRk", "DF Rk"],
+  ["nhlRk", "NHL Rk"],
 ] as const;
 
 export function DraftPlayerTable({

@@ -194,6 +194,8 @@ export interface Player {
   isSignable: boolean;
   isResignable: ResignableStatus | null;
   preDraftRk?: number | null;
+  nhlRk?: number | null;
+  dailyFaceoffRk?: number | null;
   seasonRk?: number | null;
   seasonRating?: number | null;
   overallRk?: number | null;

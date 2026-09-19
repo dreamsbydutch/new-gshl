@@ -198,6 +198,8 @@ export interface Player {
   preDraftRk?: number | null;
   yahooDraftRk?: number | null;
   otherDraftRk?: number | null;
+  dailyFaceoffRk?: number | null;
+  nhlRk?: number | null;
   seasonRk?: number | null;
   seasonRating?: number | null;
   overallRk?: number | null;

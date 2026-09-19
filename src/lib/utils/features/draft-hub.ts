@@ -18,7 +18,8 @@ export const ESTIMATED_DRAFT_PICK_MS = 82 * 1000;
 const DRAFT_RANK_SORT_KEYS = new Set<DraftPlayerSortKey>([
   "overallRk",
   "yahooDraftRk",
-  "otherDraftRk",
+  "dailyFaceoffRk",
+  "nhlRk",
 ]);
 
 const DRAFT_TEXT_SORT_KEYS = new Set<DraftPlayerSortKey>([
@@ -48,7 +49,8 @@ function getDraftPlayerSortValue(
   const rawValue =
     key === "overallRk" ||
     key === "yahooDraftRk" ||
-    key === "otherDraftRk" ||
+    key === "dailyFaceoffRk" ||
+    key === "nhlRk" ||
     key === "overallRating"
       ? player[key]
       : player.stats?.[key];
