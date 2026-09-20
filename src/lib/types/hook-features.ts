@@ -9,12 +9,7 @@ import type {
   TeamSeasonStatLine,
   Week,
 } from "./database";
-import type {
-  BuyoutContractType,
-  CapSpaceEntry,
-  FranchiseContractHistoryRowType,
-  FranchiseDraftPickGroupType,
-} from "./contracts";
+import type { FranchiseContractView } from "./contracts";
 import type { ProcessedDraftPick } from "./draft-ui";
 import type { TeamStatsLevel, UseTeamsOptions } from "./hook-core";
 import type { QueryLike, QueryState } from "./hook-query";
@@ -44,25 +39,8 @@ export interface UseContractDataOptions {
   enabled?: boolean;
 }
 
-export interface UseContractDataResult {
-  table: {
-    contractGroups: Contract[][];
-    capSpaceWindow: CapSpaceEntry[];
-    ready: boolean;
-  };
-  history: {
-    rows: FranchiseContractHistoryRowType[];
-    hasData: boolean;
-  };
-  draft: {
-    groups: FranchiseDraftPickGroupType[];
-    hasData: boolean;
-  };
-  currentContracts: Contract[];
-  contractPlayers: Player[];
-  buyoutContracts: BuyoutContractType[];
-  expiredRows: FranchiseContractHistoryRowType[];
-  draftPickGroups: FranchiseDraftPickGroupType[];
+export interface UseContractDataResult extends FranchiseContractView {
+  table: FranchiseContractView["table"] & { ready: boolean };
   isLoading: boolean;
   error: Error | null;
 }

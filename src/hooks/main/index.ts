@@ -12,7 +12,7 @@
  * All hooks follow the options object pattern for consistent, flexible configuration.
  */
 
-// Contract hooks - sophisticated filtering and aggregation
+// Main data hooks
 export { useAuthUserAdmin, useUpdateAuthUserAccess } from "./useAuthUsers";
 export {
   useAuthActions,
@@ -32,17 +32,15 @@ export {
 } from "./useWeeklyEditions";
 export {
   useContracts,
-  useAllContracts,
-  useContractData,
+  useContractPlayerNhlSalaries,
   useCreateContract,
-  type ContractFilters,
-  type ContractSortOption,
-  type ContractSummary,
 } from "./useContract";
 export type {
   BuyoutContractType,
   CapSpaceEntry,
-  ContractSelectionContext,
+  ContractFilters,
+  ContractSortOption,
+  ContractSummary,
   FranchiseContractHistoryRowType,
   FranchiseDraftPickGroupType,
   FranchiseDraftPickRowType,

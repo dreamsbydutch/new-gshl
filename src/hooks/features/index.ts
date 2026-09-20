@@ -13,6 +13,7 @@
  * Heavy data manipulation and calculations belong in lib/utils, not here.
  */
 
+export * from "./useContractData";
 export * from "./useDraftBoardData";
 export * from "./useDraftAdminList";
 export * from "./useDraftCountdown";
