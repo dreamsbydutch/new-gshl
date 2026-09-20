@@ -277,22 +277,35 @@ export function compareRows(
   }
   return 0;
 }
-// These indexed fields use v.id(...) in every table in the catalog above.
+// These indexed fields use v.id(...) in the specified schema table.
 // Unconstrained strings (legacyId, abbr, seasonType, sourcePlayerDayId, etc.)
 // can contain stored whitespace even when the requested value is trimmed.
-const validatedIdFields = new Set([
-  "seasonId",
-  "franchiseId",
-  "confId",
-  "ownerId",
-  "gshlTeamId",
-  "playerId",
-  "weekId",
-  "homeTeamId",
-  "awayTeamId",
-  "teamId",
-  "winnerId",
-]);
+const validatedIdFieldsByTable: Record<string, readonly string[]> = {
+  weeks: ["seasonId"],
+  teams: ["seasonId", "franchiseId", "confId"],
+  franchises: ["ownerId", "confId"],
+  players: ["ownerId", "gshlTeamId"],
+  playerNhlSalaries: ["playerId"],
+  contracts: ["playerId", "ownerId", "seasonId"],
+  draftPicks: ["seasonId", "gshlTeamId", "playerId"],
+  matchups: ["seasonId", "weekId", "homeTeamId", "awayTeamId"],
+  events: ["seasonId"],
+  awards: ["seasonId", "winnerId"],
+  playerAwards: ["seasonId", "playerId"],
+  teamAwards: ["seasonId", "ownerId", "teamId"],
+  playerDayStatLines: ["seasonId", "gshlTeamId", "playerId", "weekId"],
+  playerDayHighlights: ["seasonId"],
+  playerWeekStatLines: ["seasonId", "gshlTeamId", "playerId", "weekId"],
+  playerSplitStatLines: ["seasonId", "gshlTeamId", "playerId"],
+  playerTotalStatLines: ["seasonId", "playerId"],
+  playerCareerSplitStatLines: ["gshlTeamId", "playerId"],
+  playerCareerTotalStatLines: ["playerId"],
+  // NHL source player IDs are unconstrained strings, not Convex player IDs.
+  playerNhlStatLines: ["seasonId"],
+  teamDayStatLines: ["seasonId", "gshlTeamId", "weekId"],
+  teamWeekStatLines: ["seasonId", "gshlTeamId", "weekId"],
+  teamSeasonStatLines: ["seasonId", "gshlTeamId"],
+};
 
 /** Numeric compatibility and timestamp equality cannot use type-exact indexes.
  * Null also matches absent fields, so it must remain a residual predicate. */
@@ -301,12 +314,13 @@ export function compatibilityIndexPlan(
   where: ReadOptions["where"] = {},
 ): CompatibilityIndexPlan | null {
   const nonExact = new Set<string>(timestampFieldsForTable(table));
+  const validatedIdFields = validatedIdFieldsByTable[table] ?? [];
   for (const [field, value] of Object.entries(where)) {
     if (
       value === null ||
       typeof comparable(value) === "number" ||
       (typeof value === "string" &&
-        (!validatedIdFields.has(field) || value !== value.trim())) ||
+        (!validatedIdFields.includes(field) || value !== value.trim())) ||
       typeof value === "object"
     )
       nonExact.add(field);

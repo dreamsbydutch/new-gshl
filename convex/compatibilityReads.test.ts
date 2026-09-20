@@ -80,7 +80,7 @@ const operator = (table: string, args: Row = {}) => ({
   ...args,
 });
 
-test("public IDs filter and order ordinary reads before limits", async () => {
+void test("public IDs filter and order ordinary reads before limits", async () => {
   const f = fixture();
   f.put("seasons", "z-last", {});
   f.put("seasons", "a-first", {});
@@ -117,7 +117,7 @@ test("public IDs filter and order ordinary reads before limits", async () => {
   assert.equal(f.takes(), 0);
 });
 
-test("stored unconstrained strings are normalized before filtering and bounded takes", async () => {
+void test("stored unconstrained strings are normalized before filtering and bounded takes", async () => {
   for (const [table, fn, field, value] of [
     ["seasons", frontend.seasons, "legacyId", "legacy-one"],
     ["nhlTeams", frontend.nhlTeams, "abbr", "TOR"],
@@ -140,7 +140,7 @@ test("stored unconstrained strings are normalized before filtering and bounded t
   }
 });
 
-test("validated owner IDs still permit exact indexed bounded takes", async () => {
+void test("validated owner IDs still permit exact indexed bounded takes", async () => {
   const f = fixture();
   f.put("players", "other", { ownerId: "other-owner" });
   f.put("players", "owned", { ownerId: "owner" });
@@ -153,7 +153,7 @@ test("validated owner IDs still permit exact indexed bounded takes", async () =>
   assert.ok(f.calls.every((call) => call.index === "by_ownerId"));
 });
 
-test("plain string suffixes retain a safe season prefix and residual matching", async () => {
+void test("plain string suffixes retain a safe season prefix and residual matching", async () => {
   for (const [table, fn, field, value] of [
     [
       "playerDayHighlights",
@@ -166,6 +166,12 @@ test("plain string suffixes retain a safe season prefix and residual matching", 
       frontend.playerTotalStats,
       "seasonType",
       "regular",
+    ],
+    [
+      "playerNhlStatLines",
+      frontend.playerNhlStats,
+      "playerId",
+      "external-player",
     ],
   ] as const) {
     const f = fixture();
@@ -181,7 +187,7 @@ test("plain string suffixes retain a safe season prefix and residual matching", 
   }
 });
 
-test("unrelated split awards do not suppress matching legacy award fallback", async () => {
+void test("unrelated split awards do not suppress matching legacy award fallback", async () => {
   const f = fixture();
   f.put("owners", "unrelated-owner", {});
   f.put("teamAwards", "unrelated-split", {
@@ -241,7 +247,7 @@ test("unrelated split awards do not suppress matching legacy award fallback", as
   );
 });
 
-test("both adapters retain numeric and numeric-string rows, filtering and ordering before limits", async () => {
+void test("both adapters retain numeric and numeric-string rows, filtering and ordering before limits", async () => {
   const f = fixture();
   f.put("draftPicks", "miss", { seasonId: "s", round: 2, pick: 1 });
   f.put("draftPicks", "later", { seasonId: "s", round: 1, pick: "10" });
@@ -270,7 +276,7 @@ test("both adapters retain numeric and numeric-string rows, filtering and orderi
   assert.equal(f.takes(), 0);
 });
 
-test("safe compound prefixes and residual predicates are shared", async () => {
+void test("safe compound prefixes and residual predicates are shared", async () => {
   const f = fixture();
   f.put("playerDayStatLines", "miss", {
     seasonId: "s",
@@ -305,7 +311,7 @@ test("safe compound prefixes and residual predicates are shared", async () => {
   assert.equal(f.takes(), 0);
 });
 
-test("mixed legacy timestamps match and sort before each adapter's serialization", async () => {
+void test("mixed legacy timestamps match and sort before each adapter's serialization", async () => {
   const f = fixture();
   const epoch = Date.UTC(2026, 0, 1);
   f.put("events", "late", { seasonId: "s", date: "2026-01-02" });
@@ -348,7 +354,7 @@ test("mixed legacy timestamps match and sort before each adapter's serialization
   );
 });
 
-test("numeric legacy IDs and operator-only tables remain readable; zero limits return no rows", async () => {
+void test("numeric legacy IDs and operator-only tables remain readable; zero limits return no rows", async () => {
   const f = fixture();
   f.put("seasons", "s", { legacyId: "01" });
   assert.deepEqual(
@@ -375,7 +381,7 @@ test("numeric legacy IDs and operator-only tables remain readable; zero limits r
   );
 });
 
-test("operator authentication and browser owner privacy remain at adapters", async () => {
+void test("operator authentication and browser owner privacy remain at adapters", async () => {
   const f = fixture();
   f.put("owners", "owner", { email: "private@example.invalid", owing: 50 });
   f.signIn(null);
@@ -394,7 +400,7 @@ test("operator authentication and browser owner privacy remain at adapters", asy
   assert.equal((await read(frontend.owners, f.ctx, {}))[0]?.owing, 50);
 });
 
-test("award compatibility projection runs before winner filtering and limits", async () => {
+void test("award compatibility projection runs before winner filtering and limits", async () => {
   const f = fixture();
   f.put("playerAwards", "a", {
     seasonId: "s",
@@ -420,7 +426,7 @@ test("award compatibility projection runs before winner filtering and limits", a
   );
 });
 
-test("cursor adapter keeps bounded native pagination and safe filtering", async () => {
+void test("cursor adapter keeps bounded native pagination and safe filtering", async () => {
   const f = fixture();
   f.put("weeks", "w", { seasonId: "s", weekNum: "1" });
   const result = (await invoke(
@@ -433,7 +439,7 @@ test("cursor adapter keeps bounded native pagination and safe filtering", async 
   assert.deepEqual(f.calls, [{ index: "by_seasonId", fields: ["seasonId"] }]);
 });
 
-test("upsert batches retain existing rows beyond a first row's longer compound prefix", async () => {
+void test("upsert batches retain existing rows beyond a first row's longer compound prefix", async () => {
   const f = fixture();
   f.put("playerDayStatLines", "a", {
     seasonId: "s",
@@ -462,7 +468,7 @@ test("upsert batches retain existing rows beyond a first row's longer compound p
   assert.equal(f.get("b")?.rating, 2);
 });
 
-test("translated team-award owners are filtered after projection in list and count", async () => {
+void test("translated team-award owners are filtered after projection in list and count", async () => {
   const f = fixture();
   f.put("owners", "o", { firstName: "Test", lastName: "Owner", owing: 0 });
   f.put("franchises", "f", { ownerId: "o", abbr: "T", isActive: true });
@@ -484,7 +490,7 @@ test("translated team-award owners are filtered after projection in list and cou
   }
 });
 
-test("null compatibility keeps absent fields and exact predicates permit bounded takes", async () => {
+void test("null compatibility keeps absent fields and exact predicates permit bounded takes", async () => {
   const f = fixture();
   f.put("players", "absent", { isActive: true });
   f.put("players", "null", { isActive: true, ownerId: null });

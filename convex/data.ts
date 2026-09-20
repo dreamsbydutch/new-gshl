@@ -4,7 +4,6 @@ import { v } from "convex/values";
 import {
   normalizeTimestampFields,
   timestampFieldsForTable,
-  toUtcTimestamp,
 } from "./lib/timestamps";
 import {
   compatibilityEquals as equals,
@@ -1320,7 +1319,7 @@ export const rebuildTeamLineup = mutationGeneric({
     const team = await ctx.db.get(args.teamId);
     if (!team) throw new Error("Team not found");
     const franchise = await ctx.db.get(team.franchiseId);
-    if (!franchise || franchise.ownerId !== args.ownerId) {
+    if (franchise?.ownerId !== args.ownerId) {
       throw new Error("Team does not belong to the requested owner");
     }
     const assignments = await rebuildLineup(ctx as never, {

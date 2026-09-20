@@ -605,15 +605,15 @@ void test("draft and undo rebuild the union roster without reassigning conflicti
   });
   await handler(submitPick)(f.ctx, {
     seasonId,
-    pickId: "pick1" as Id<"draftPicks">,
-    playerId: "player1" as Id<"players">,
+    pickId: "pick1",
+    playerId: "player1",
   });
   assert.equal(f.get("player1")!.lineupPos, "C");
   assert.equal(f.get("teamOnly")!.lineupPos, "G");
   assert.equal(f.get("ownedElsewhere")!.lineupPos, "IR");
   await handler(undoPick)(f.ctx, {
     seasonId,
-    pickId: "pick1" as Id<"draftPicks">,
+    pickId: "pick1",
   });
   assert.equal(f.get("player1")!.ownerId, null);
   assert.equal(f.get("player1")!.gshlTeamId, undefined);
