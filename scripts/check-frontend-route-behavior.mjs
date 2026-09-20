@@ -113,6 +113,15 @@ export function checkRouteBehavior(file, source) {
     const declaration = symbol.declarations?.[0];
     if (
       declaration &&
+      ts.isImportSpecifier(declaration) &&
+      (declaration.propertyName ?? declaration.name).text === "default"
+    ) {
+      const clause = declaration.parent.parent;
+      if (!declaration.isTypeOnly && !clause.isTypeOnly)
+        return clause.parent.moduleSpecifier.text;
+    }
+    if (
+      declaration &&
       (ts.isNamespaceImport(declaration) || ts.isImportClause(declaration))
     ) {
       const clause = ts.isImportClause(declaration)

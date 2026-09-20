@@ -95,6 +95,29 @@ test("rejects React default and namespace hook calls", () => {
   );
 });
 
+for (const [specifier, member] of [
+  ["react", "useState"],
+  ["next/navigation", "useRouter"],
+]) {
+  test(`recognizes named default aliases from ${specifier} without treating types as values`, () => {
+    rejected(
+      `import { default as runtime } from "${specifier}"; runtime.${member}();`,
+    );
+    for (const declaration of [
+      `import type { default as runtime } from "${specifier}";`,
+      `import { type default as runtime } from "${specifier}";`,
+    ]) {
+      assert.deepEqual(
+        checkRouteBehavior(
+          page,
+          `${declaration} type Member = typeof runtime.${member};`,
+        ),
+        [],
+      );
+    }
+  });
+}
+
 for (const specifier of [
   "@gshl-hooks",
   "@gshl-hooks/features/useLeague",

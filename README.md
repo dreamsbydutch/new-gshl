@@ -57,7 +57,7 @@ The [architecture checker](scripts/check-frontend-architecture.mjs) keeps route
 composition free of React state/lifecycle hooks, browser query and navigation
 hooks, direct data/cache integrations, and inline fetching. Routes may compose
 UI, metadata, redirects, request adapters, and server auth guards. `route.ts`
-handlers retain integration access; client error entries may use effects for
+handlers retain integration access; client error entries may use `useEffect` for
 logging. The [route fixtures](tools/tests/frontend-architecture.test.mjs) document
 these rules and exceptions. These are targeted static checks, not proof that all
 business logic has left `src/app`; indirect calls and computed module access
