@@ -1,71 +1,53 @@
 ---
 name: gshl-data-operations
 description: >-
-  Plan, change, or run GSHL operator data workflows. Use for scripts/, backfill,
-  migration, repair, data sync/import, reconciliation, aggregation,
-  standings/lineup rebuild or backfill, awards rebuild, player bios, Yahoo,
-  NHL, Hockey Reference, PuckPedia, production Convex, dry run, --apply,
-  archive, restore, archive/data snapshot, source deletion, SQLite, or salary
-  history. Do not use for frontend pages, tabs, or display-only work that
-  consumes existing data.
+  Change or run GSHL operator workflows under scripts/, including imports,
+  backfills, repairs, reconciliation, archives, external hockey sources, or
+  production Convex data. Use whenever a command may read or write live data.
 metadata:
-  short-description: Operate GSHL data commands with target and write safety
+  short-description: Operate GSHL data commands safely
 ---
 
 # GSHL data operations
 
-Read [AGENTS.md](../../../AGENTS.md), the
-[data-pipeline guide](../../../docs/operations/data-pipelines.md),
-[command reference](../../../docs/reference/commands.md), and the relevant
-section of [`scripts/README.md`](../../../scripts/README.md).
+Read the relevant command section in [`scripts/README.md`](../../../scripts/README.md).
+Trace its entry point from `scripts/src/commands` through `domains` to
+`integrations`; complete the trace when inputs, target selection, writes, and
+dry-run behavior are accounted for.
 
-## Trace the command
+## Run protocol
 
-Follow `scripts/src/commands` to its `domains` implementation and then its
-`integrations` boundary. Keep parsing, matching, reconciliation, and planning
-pure where practical. Keep Convex, Sheets, browser, filesystem, and external
-network access in integrations or command orchestration.
+For a write-capable command:
 
-## Mutation protocol
+1. Resolve and state the exact environment, deployment, season/week/date scope,
+   source, and proposed writes.
+2. Verify the command's current `--help`. In Windows PowerShell use
+   `npm.cmd run <command> -- --help`. If the package script includes
+   `--use-system-ca`, confirm the selected Node runtime supports that flag.
+3. Run the narrowest dry run. Review counts, samples, unmatched identities,
+   conflicts, deletions, and replacement plans.
+4. Apply only when the user authorized the write and the target matches step 1.
+5. Repeat the dry run or parity check until the result proves idempotency or the
+   intended remaining delta.
 
-The scripts package defaults its Convex target to production. Before any run:
+Keep parsing and reconciliation pure; keep Convex, Sheets, browser, filesystem,
+and network access at integration boundaries. Preserve throttling, retries,
+allowlists, dry-run defaults, and secret redaction.
 
-1. Resolve and state the exact target, season/week/date scope, source, and
-   intended writes.
-2. Run `--help` if flags are not already verified from code. On Windows
-   PowerShell, use `npm.cmd run <command> -- --help`; the current `npm.ps1`
-   wrapper can consume forwarded flag names. If the package entry contains
-   `--use-system-ca`, first verify that the `node` runtime seen by the package
-   exposes that flag; Node 20 does not.
-3. Run the dry-run form and inspect counts, unmatched/ambiguous identities,
-   samples, and deletion/replacement plans.
-4. Apply only with user authorization, an explicit target, and the narrowest
-   scope.
-5. Rerun dry-run or parity checks to demonstrate idempotency and inspect saved
-   reports/artifacts.
+## Hard stops
 
-Do not treat a code-edit request as permission to write production data.
+- `convex:migrate` ignores normal target selection, uses
+  `NEXT_PUBLIC_CONVEX_URL`, clears mapped tables before its first Sheets read,
+  and has no dry run. Require explicit target confirmation and an independent
+  backup.
+- Archive source deletion, `--replace-existing-archive`, and
+  `--replace-conflicts` require explicit authorization and a verified backup.
+- `stats:aggregate-season --apply` can delete stale derived rows unless
+  `--preserve-stale` is set.
+- `player-bios:sync --apply` can clear managed fields and deactivate eligible
+  stale players.
+- `CONVEX_SERVER_SECRET`, cookies, OAuth material, headers, and authenticated
+  page contents never belong in output or artifacts.
 
-`npm run convex:migrate` is the destructive exception: it has no dry-run or
-`--apply` gate, ignores the package's normal target selector, reads its exact
-target only from `NEXT_PUBLIC_CONVEX_URL`, and clears all mapped tables before
-its first Sheets read. Never run it without explicit URL/target confirmation
-and a verified backup.
-Likewise, do not delete archive sources or use `--replace-existing-archive` or
-`--replace-conflicts` without the confirmations and backups in the
-[archive guide](../../../docs/operations/player-day-archive.md).
-
-Two broad apply behaviors require explicit review: `stats:aggregate-season
---apply` deletes stale derived rows unless `--preserve-stale` is passed, and
-`player-bios:sync --apply` intentionally clears stale managed fields and can
-deactivate players that meet its guarded inactivity rules.
-
-Preserve throttling, retry, host allowlists, dry-run defaults, and secret
-redaction. Never print cookies, headers, credentials, server secrets, or raw
-authenticated pages.
-
-## Verify changes
-
-Run `npm --prefix scripts run typecheck` plus the smallest relevant packaged or
-direct `tsx --test` suite. For ranking or power behavior, also use the
-`gshl-ranking` workflow and runtime parity check.
+Verify with the direct tests that own the changed behavior. Add the scripts
+type-check or a grouped suite only when shared types or behavior changed.
