@@ -88,27 +88,30 @@ Convex deployment value.
 The commissioner-facing League Office uses `convex/frontend.ts`. It can list
 recent run summaries, start a run, cancel it, and retry a failed or cancelled
 run. It does not expose events, artifacts, external tasks, child runs, or
-schedule management. Its start path currently does not reject an already
-active matching lock, and its retry creates a fresh run without preserving the
-old cursor, progress, parent run, or pipeline stage. Treat those as current UI
-limits, not behavior guaranteed by the server-secret API.
+schedule management. Both entry paths delegate to
+[the job lifecycle module](../../convex/lib/jobLifecycle.ts), which owns
+scope admission, run initialization, cancellation, retry checkpoints, terminal
+transitions, events, and scheduling. Authorization remains in each entry path.
 
 ## Scope locks and batching
 
 The lock key combines the canonical job name with `seasonId`, `weekId`,
 `matchupId`, and `date`. Missing dimensions are represented as an all-scope
-selection. The `convex/jobs.ts` start path rejects a second active run with the
-same lock; the League Office start path currently does not, so a commissioner
-must check the visible recent runs before starting overlapping work.
+selection. All creation paths check active runs using both lock key and status:
+manual start and retry reject a busy scope, schedules skip it, and pipeline
+dispatch waits one minute before trying again. Exact keys do not detect overlap
+between broader season work and narrower week work.
 
 Native processing uses batches of 100. Cancellation is immediate for queued or
 waiting-external work; a running batch moves to cancelling and stops at its
 next cooperative check.
 
-Retry through `convex/jobs.ts` preserves the previous arguments, apply mode,
-cursor, progress, parent pipeline relationship, and lock while incrementing the
-attempt. League Office retry preserves the job, arguments, apply mode, lock,
-and attempt count only.
+Both retry paths preserve arguments, apply mode, cursor, progress, parent
+pipeline relationship, and stage while incrementing the attempt and checking
+scope admission again. Retrying creates a new run; it does not transfer child
+runs or external tasks from the old run. Terminal cancellation is a no-op,
+repeated cancellation is idempotent, and late completion cannot replace a
+terminal result.
 
 ## Schedules
 

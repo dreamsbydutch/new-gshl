@@ -8,10 +8,17 @@ import {
 import { v } from "convex/values";
 import {
   ACTIVE_REFRESH_STAGES,
-  buildLockKey,
   canonicalJobName,
   isExternalJob,
 } from "./jobCatalog";
+import {
+  queueJob,
+  isActiveJob,
+  emptyJobProgress,
+  prepareJob,
+  finishJob,
+} from "./lib/jobLifecycle";
+import { internalMutation } from "./_generated/server";
 import { utcTimestampToDateKey } from "./lib/timestamps";
 import {
   calculatePlayerAwards,
@@ -33,7 +40,6 @@ const actionRef = (name: string) =>
     unknown
   >;
 const runner = actionRef("jobRunner:run");
-const ACTIVE = new Set(["queued", "running", "waiting_external", "cancelling"]);
 const BATCH_SIZE = 100;
 
 type Progress = {
@@ -45,14 +51,7 @@ type Progress = {
   skipped: number;
 };
 
-const emptyProgress = (): Progress => ({
-  processed: 0,
-  inserted: 0,
-  updated: 0,
-  deleted: 0,
-  unchanged: 0,
-  skipped: 0,
-});
+const emptyProgress = emptyJobProgress;
 
 function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value)
@@ -64,29 +63,9 @@ function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : String(error);
 }
 
-export const prepare = internalMutationGeneric({
+export const prepare = internalMutation({
   args: { runId: v.id("jobRuns") },
-  handler: async (ctx, args) => {
-    const run = await ctx.db.get(args.runId);
-    if (!run) return null;
-    if (run.status === "cancelling") {
-      await ctx.db.patch(args.runId, {
-        status: "cancelled",
-        finishedAt: Date.now(),
-      });
-      return null;
-    }
-    if (!["queued", "running", "waiting_external"].includes(run.status))
-      return null;
-    const now = Date.now();
-    await ctx.db.patch(args.runId, {
-      status: "running",
-      startedAt: run.startedAt ?? now,
-      heartbeatAt: now,
-      error: undefined,
-    });
-    return { ...run, status: "running" };
-  },
+  handler: (ctx, args) => prepareJob(ctx, args.runId),
 });
 
 export const appendEvent = internalMutationGeneric({
@@ -112,7 +91,7 @@ export const appendEvent = internalMutationGeneric({
   },
 });
 
-export const finish = internalMutationGeneric({
+export const finish = internalMutation({
   args: {
     runId: v.id("jobRuns"),
     status: v.union(
@@ -123,27 +102,7 @@ export const finish = internalMutationGeneric({
     result: v.optional(v.any()),
     error: v.optional(v.string()),
   },
-  handler: async (ctx, args) => {
-    const run = await ctx.db.get(args.runId);
-    if (!run) return;
-    const status = run.status === "cancelling" ? "cancelled" : args.status;
-    await ctx.db.patch(args.runId, {
-      status,
-      result: args.result,
-      error: args.error,
-      finishedAt: Date.now(),
-      heartbeatAt: Date.now(),
-    });
-    await ctx.db.insert("jobEvents", {
-      runId: args.runId,
-      level: status === "failed" ? "error" : "info",
-      message:
-        status === "failed" ? (args.error ?? "Job failed") : `Job ${status}`,
-      createdAt: Date.now(),
-    });
-    if (run.parentRunId)
-      await ctx.scheduler.runAfter(0, runner, { runId: run.parentRunId });
-  },
+  handler: (ctx, args) => finishJob(ctx, args),
 });
 
 function targetTable(jobName: string) {
@@ -579,7 +538,7 @@ export const saveArtifact = internalMutationGeneric({
     await ctx.db.insert("jobArtifacts", { ...args, createdAt: Date.now() }),
 });
 
-export const advancePipeline = internalMutationGeneric({
+export const advancePipeline = internalMutation({
   args: { runId: v.id("jobRuns") },
   handler: async (ctx, args) => {
     const parent = await ctx.db.get(args.runId);
@@ -598,7 +557,7 @@ export const advancePipeline = internalMutationGeneric({
         childId: failed._id,
         error: failed.error,
       };
-    const active = children.find((child) => ACTIVE.has(child.status));
+    const active = children.find((child) => isActiveJob(child.status));
     if (active) return { state: "waiting" as const, childId: active._id };
     const stage = children.length;
     if (stage >= ACTIVE_REFRESH_STAGES.length)
@@ -608,23 +567,21 @@ export const advancePipeline = internalMutationGeneric({
       };
     const jobName = ACTIVE_REFRESH_STAGES[stage]!;
     const jobArgs = asRecord(parent.args);
-    const now = Date.now();
-    const childId = await ctx.db.insert("jobRuns", {
+    const child = await queueJob(ctx, {
       jobName,
       args: jobArgs,
       apply: parent.apply,
       mode: "pipeline",
-      status: "queued",
-      lockKey: buildLockKey(jobName, jobArgs),
       parentRunId: args.runId,
       pipelineStage: stage,
-      attempt: 1,
       requestedBy: parent.requestedBy,
-      createdAt: now,
-      progress: emptyProgress(),
     });
-    await ctx.scheduler.runAfter(0, runner, { runId: childId });
-    return { state: "started" as const, childId };
+    if (!child) {
+      // Retry admission without creating a competing child.
+      await ctx.scheduler.runAfter(60_000, runner, { runId: args.runId });
+      return { state: "waiting" as const };
+    }
+    return { state: "started" as const, childId: child._id };
   },
 });
 
@@ -805,7 +762,7 @@ export const run = internalActionGeneric({
   },
 });
 
-export const tickSchedules = internalMutationGeneric({
+export const tickSchedules = internalMutation({
   args: {},
   handler: async (ctx) => {
     const now = Date.now();
@@ -817,37 +774,18 @@ export const tickSchedules = internalMutationGeneric({
     for (const schedule of due) {
       const jobName = canonicalJobName(schedule.jobName);
       const jobArgs = asRecord(schedule.args);
-      const lockKey = buildLockKey(jobName, jobArgs);
-      const conflicts = await ctx.db
-        .query("jobRuns")
-        .withIndex("by_lockKey_status", (q) => q.eq("lockKey", lockKey))
-        .collect();
-      if (!conflicts.some((row) => ACTIVE.has(row.status))) {
-        const runId = await ctx.db.insert("jobRuns", {
-          jobName,
-          args: jobArgs,
-          apply: schedule.apply,
-          mode: "scheduled",
-          status: "queued",
-          lockKey,
-          attempt: 1,
-          requestedBy: `schedule:${schedule.name}`,
-          createdAt: now,
-          progress: emptyProgress(),
-        });
-        await ctx.scheduler.runAfter(0, runner, { runId });
-        await ctx.db.patch(schedule._id, {
-          lastRunAt: now,
-          lastRunId: runId,
-          nextRunAt: now + schedule.intervalMinutes * 60_000,
-          updatedAt: now,
-        });
-      } else {
-        await ctx.db.patch(schedule._id, {
-          nextRunAt: now + schedule.intervalMinutes * 60_000,
-          updatedAt: now,
-        });
-      }
+      const run = await queueJob(ctx, {
+        jobName,
+        args: jobArgs,
+        apply: schedule.apply,
+        mode: "scheduled",
+        requestedBy: "schedule:" + schedule.name,
+      });
+      await ctx.db.patch(schedule._id, {
+        ...(run ? { lastRunAt: now, lastRunId: run._id } : {}),
+        nextRunAt: now + schedule.intervalMinutes * 60_000,
+        updatedAt: now,
+      });
     }
   },
 });

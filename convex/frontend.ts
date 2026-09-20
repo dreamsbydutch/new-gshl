@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/ban-ts-comment, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/prefer-optional-chain */
 // @ts-nocheck
-import { makeFunctionReference, paginationOptsValidator } from "convex/server";
+import { paginationOptsValidator } from "convex/server";
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
@@ -11,13 +11,13 @@ import {
 } from "../src/lib/utils/domain/contracts";
 import { resolveContractSigningAssignments } from "./lib/contractSigning";
 import { rebuildTeamLineup } from "./lib/teamLineup";
-import { buildLeagueActivity } from "../src/lib/utils/features/league-activity";
 import {
-  buildLockKey,
-  canonicalJobName,
-  JOB_NAMES,
-  JOB_STATUSES,
-} from "./jobCatalog";
+  startJob as startManagedJob,
+  cancelJob as cancelManagedJob,
+  retryJob as retryManagedJob,
+} from "./lib/jobLifecycle";
+import { buildLeagueActivity } from "../src/lib/utils/features/league-activity";
+import { JOB_NAMES, JOB_STATUSES } from "./jobCatalog";
 import {
   normalizeTimestampFields,
   timestampFieldsForTable,
@@ -1422,10 +1422,6 @@ export const createContract = mutation({
   },
 });
 
-const runJob = makeFunctionReference<"action", { runId: string }>(
-  "jobRunner:run",
-);
-
 export const jobCatalog = query({
   args: {},
   handler: async (ctx) => {
@@ -1455,23 +1451,14 @@ export const startJob = mutation({
   },
   handler: async (ctx, args) => {
     const user = await requireCommissioner(ctx);
-    const jobName = canonicalJobName(args.jobName);
-    const jobArgs = args.args ?? {};
-    const now = Date.now();
-    const runId = await ctx.db.insert("jobRuns", {
-      jobName,
-      args: jobArgs,
-      apply: args.apply === true,
-      mode: "manual",
-      status: "queued",
-      lockKey: buildLockKey(jobName, jobArgs),
-      attempt: 1,
-      requestedBy: user.email,
-      createdAt: now,
-      progress: { processed: 0 },
-    });
-    await ctx.scheduler.runAfter(0, runJob, { runId });
-    return publicRow((await ctx.db.get(runId)) as unknown as Row);
+    return publicRow(
+      await startManagedJob(ctx, {
+        jobName: args.jobName,
+        args: args.args ?? {},
+        apply: args.apply === true,
+        requestedBy: user.email,
+      }),
+    );
   },
 });
 
@@ -1479,13 +1466,7 @@ export const cancelJob = mutation({
   args: { runId: v.id("jobRuns") },
   handler: async (ctx, args) => {
     await requireCommissioner(ctx);
-    const run = await ctx.db.get(args.runId);
-    if (!run) throw new Error("Run not found");
-    await ctx.db.patch(args.runId, {
-      status: run.status === "running" ? "cancelling" : "cancelled",
-      finishedAt: run.status === "running" ? undefined : Date.now(),
-    });
-    return publicRow((await ctx.db.get(args.runId)) as unknown as Row);
+    return publicRow(await cancelManagedJob(ctx, args.runId));
   },
 });
 
@@ -1493,22 +1474,6 @@ export const retryJob = mutation({
   args: { runId: v.id("jobRuns") },
   handler: async (ctx, args) => {
     const user = await requireCommissioner(ctx);
-    const previous = await ctx.db.get(args.runId);
-    if (!previous || !["failed", "cancelled"].includes(previous.status)) {
-      throw new Error("Only failed or cancelled runs can be retried");
-    }
-    const runId = await ctx.db.insert("jobRuns", {
-      jobName: previous.jobName,
-      args: previous.args,
-      apply: previous.apply,
-      mode: "retry",
-      status: "queued",
-      lockKey: previous.lockKey,
-      attempt: previous.attempt + 1,
-      requestedBy: user.email,
-      createdAt: Date.now(),
-    });
-    await ctx.scheduler.runAfter(0, runJob, { runId });
-    return publicRow((await ctx.db.get(runId)) as unknown as Row);
+    return publicRow(await retryManagedJob(ctx, args.runId, user.email));
   },
 });
