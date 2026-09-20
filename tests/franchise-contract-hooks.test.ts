@@ -116,7 +116,8 @@ function renderContractData(
 }
 
 void test("missing owner or disabled input skips every contract-dependent query", () => {
-  for (const options of [{}, { ...context, enabled: false }]) {
+  const cases: UseContractDataOptions[] = [{}, { ...context, enabled: false }];
+  for (const options of cases) {
     const { result, queries } = renderContractData(options);
     assert.equal(queries.size, 0);
     assert.equal(result.isLoading, false);
@@ -131,7 +132,18 @@ void test("pending owner contracts do not start unscoped player or salary reads"
   const { result, queries } = renderContractData(context);
   assert.deepEqual(
     [...queries],
-    [["frontend:contracts", { where: { ownerId: "owner-1" } }]],
+    [
+      [
+        "frontend:contracts",
+        {
+          where: {
+            ownerId: "owner-1",
+            playerId: undefined,
+            seasonId: undefined,
+          },
+        },
+      ],
+    ],
   );
   assert.equal(result.isLoading, true);
   assert.equal(result.table.ready, false);
@@ -155,7 +167,7 @@ void test("owner override scopes contracts and excludes other owners from depend
     },
   );
   assert.deepEqual(queries.get("frontend:contracts"), {
-    where: { ownerId: "owner-2" },
+    where: { ownerId: "owner-2", playerId: undefined, seasonId: undefined },
   });
   assert.equal(queries.size, 1);
   assert.deepEqual(result.currentContracts, []);
