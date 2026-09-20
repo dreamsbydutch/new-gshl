@@ -103,8 +103,10 @@ void test("draft correction adapter preserves nested values and leaves its input
   await act(async () => {
     await h.current.mutateAsync(input);
   });
+  const calledReference = h.transport.mock.calls[0]?.arguments[0];
+  assert.ok(calledReference);
   assert.equal(
-    getFunctionName(h.transport.mock.calls[0]!.arguments[0]),
+    getFunctionName(calledReference),
     getFunctionName(api.draft.correctPicks),
   );
   assert.deepEqual(h.transport.mock.calls[0]?.arguments[1], snapshot);
@@ -149,8 +151,10 @@ void test("newsroom optional home edition preserves omission and explicit IDs", 
   await act(async () => {
     await h.current.setHomeActive.mutateAsync({});
   });
+  const calledReference = h.transport.mock.calls[0]?.arguments[0];
+  assert.ok(calledReference);
   assert.equal(
-    getFunctionName(h.transport.mock.calls[0]!.arguments[0]),
+    getFunctionName(calledReference),
     getFunctionName(api.weeklyEditions.setHomeActive),
   );
   assert.deepEqual(h.transport.mock.calls[0]?.arguments[1], {});
