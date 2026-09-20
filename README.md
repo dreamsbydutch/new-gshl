@@ -53,6 +53,16 @@ Convex is the live application database and API. Sheets adapters remain for
 compatibility, migration, and the Apps Script runtime; there is no active tRPC
 layer.
 
+The [architecture checker](scripts/check-frontend-architecture.mjs) keeps route
+composition free of React state/lifecycle hooks, browser query and navigation
+hooks, direct data/cache integrations, and inline fetching. Routes may compose
+UI, metadata, redirects, request adapters, and server auth guards. `route.ts`
+handlers retain integration access; client error entries may use effects for
+logging. The [route fixtures](tools/tests/frontend-architecture.test.mjs) document
+these rules and exceptions. These are targeted static checks, not proof that all
+business logic has left `src/app`; indirect calls and computed module access
+still require review.
+
 | Area             | Responsibility                                                        |
 | ---------------- | --------------------------------------------------------------------- |
 | `src/app`        | Routes, layouts, metadata, loading, and API handlers                  |
