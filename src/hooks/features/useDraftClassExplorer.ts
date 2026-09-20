@@ -8,11 +8,7 @@ import {
   useNHLTeams,
   useSeasonState,
 } from "../main";
-import type {
-  DraftClassCertainty,
-  DraftClassPosition,
-  NHLTeam,
-} from "@gshl-types";
+import type { DraftClassCertainty, DraftClassPosition } from "@gshl-types";
 import {
   buildDraftClassRows,
   filterDraftClassRows,
@@ -39,10 +35,7 @@ export function useDraftClassExplorer() {
   const playersQuery = useActivePlayers();
   const contractsQuery = useContracts();
   const nhlTeamsQuery = useNHLTeams();
-  const nhlTeams = useMemo(
-    () => nhlTeamsQuery.data.filter((team): team is NHLTeam => "abbr" in team),
-    [nhlTeamsQuery.data],
-  );
+  const nhlTeams = nhlTeamsQuery.data;
   const rows = useMemo(
     () =>
       buildDraftClassRows({

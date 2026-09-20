@@ -1,8 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 import type {
   DraftAdminListViewModel,
-  GSHLTeam,
-  NHLTeam,
   Player,
   UseDraftAdminListOptions,
 } from "@gshl-types";
@@ -56,15 +54,9 @@ export function useDraftAdminList(
   const [draftingPlayerId, setDraftingPlayerId] = useState<string | null>(null);
 
   const { data: players, isLoading: playersLoading } = usePlayers();
-  const { data: nhlTeamsRaw = [] } = useNHLTeams();
-  const nhlTeams = nhlTeamsRaw.filter(
-    (team): team is NHLTeam => "abbr" in team,
-  );
+  const { data: nhlTeams } = useNHLTeams();
   const { data: draftPicks = [] } = useDraftPicks();
-  const { data: gshlTeamsRaw = [] } = useTeams({ seasonId });
-  const gshlTeams = gshlTeamsRaw.filter(
-    (team): team is GSHLTeam => "seasonId" in team && "ownerId" in team,
-  );
+  const { data: gshlTeams } = useTeams({ seasonId });
 
   const draftPickQuery = useMemo(
     () => ({
@@ -348,13 +340,8 @@ export function useDraftAdminList(
     isPlayerUpdatePending ||
     draftingPlayerId !== null;
 
-  const playersReady = Boolean(players);
-
   // Aggregate loading state from all queries
   const isLoading = playersLoading;
-
-  // Aggregate error state (mutations handle surfaced failures internally)
-  const error: Error | null = null; // No direct query errors exposed, mutations handle errors internally
 
   return {
     searchTerm,
@@ -364,7 +351,6 @@ export function useDraftAdminList(
     freeAgentsCount: freeAgents.length,
     nhlTeams,
     playersLoading,
-    playersReady,
     activeDraftPick,
     activeDraftTeam,
     lastCompletedPlayer,
@@ -375,6 +361,5 @@ export function useDraftAdminList(
     handleDraftPlayer,
     handleUndoLastPick,
     isLoading,
-    error,
   };
 }

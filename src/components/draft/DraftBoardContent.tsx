@@ -25,11 +25,10 @@ export function DraftBoardContent() {
   const { data: contractsData, isLoading: contractsLoading } = useContracts();
   const contracts: Contract[] = contractsData ?? [];
   const { data: players, isLoading: playersLoading } = usePlayers();
-  const { data: teamsRaw = [], isLoading: teamsLoading } = useTeams({
+  const { data: teams, isLoading: teamsLoading } = useTeams({
     seasonId,
     enabled: Boolean(seasonId),
   });
-  const teams = teamsRaw as GSHLTeam[];
   const { data: draftPicks, isLoading: draftPicksLoading } = useDraftPicks();
 
   const isLoading =

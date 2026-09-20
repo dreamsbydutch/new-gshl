@@ -25,7 +25,6 @@ export function useDraftPickPages(options: {
     isLoading:
       enabled && Boolean(seasonId) && query.status === "LoadingFirstPage",
     isLoadingMore: query.status === "LoadingMore",
-    error: null,
   };
 }
 
@@ -43,7 +42,6 @@ export function useDraftPicks(options: UseDraftPicksOptions = {}) {
   return {
     data: (result ?? []) as unknown as DraftPick[],
     isLoading: enabled && result === undefined,
-    error: null,
   };
 }
 
