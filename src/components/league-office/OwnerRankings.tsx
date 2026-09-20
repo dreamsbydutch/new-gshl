@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { ArrowDown, ArrowUp, Minus, Shield, Users } from "lucide-react";
+import { ArrowDown, ArrowUp, Minus, Users } from "lucide-react";
 
 import { useOwnerRankingsData } from "@gshl-hooks";
 import { OwnerRankingsSkeleton } from "@gshl-skeletons";
@@ -148,23 +148,9 @@ function AwardHeading({
 }
 
 export function OwnerRankings() {
-  const { data, isLoading, error } = useOwnerRankingsData();
+  const { data, isLoading } = useOwnerRankingsData();
 
   if (isLoading) return <OwnerRankingsSkeleton />;
-
-  if (error) {
-    return (
-      <div className="mx-auto max-w-2xl rounded-lg border border-red-200 bg-red-50 p-8 text-center">
-        <Shield className="mx-auto h-6 w-6 text-red-500" />
-        <h2 className="mt-3 font-oswald text-2xl text-red-950">
-          The GM Ladder is unavailable
-        </h2>
-        <p className="mt-1 text-sm text-red-700">
-          The league history could not be assembled right now.
-        </p>
-      </div>
-    );
-  }
 
   if (!data.rankings.length) {
     return (

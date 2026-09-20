@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery } from "convex/react";
+import { HOME_MOCK_DRAFT_PREVIEW_LIMIT } from "@gshl-utils";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import type {
@@ -71,4 +72,21 @@ export function useSetDraftTeamMode() {
       teamId: args.teamId as Id<"teams">,
     }),
   );
+}
+
+export function useMockDraftPreview(seasonId: string) {
+  const result = useQuery(
+    api.frontend.mockDraftPreview,
+    seasonId
+      ? {
+          seasonId: seasonId as Id<"seasons">,
+          take: HOME_MOCK_DRAFT_PREVIEW_LIMIT,
+        }
+      : "skip",
+  );
+  return {
+    isLoading: Boolean(seasonId) && result === undefined,
+    nhlTeams: result?.nhlTeams ?? [],
+    projectedDraftPicks: result?.projectedDraftPicks ?? [],
+  };
 }

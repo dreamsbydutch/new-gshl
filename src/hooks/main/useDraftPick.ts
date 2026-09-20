@@ -15,16 +15,15 @@ export function useDraftPickPages(options: {
   const { seasonId, enabled = true, limit = 50 } = options;
   const query = usePaginatedQuery(
     api.frontend.draftPicksPage,
-    enabled && seasonId
-      ? { seasonId: seasonId as Id<"seasons"> }
-      : "skip",
+    enabled && seasonId ? { seasonId: seasonId as Id<"seasons"> } : "skip",
     { initialNumItems: Math.min(Math.max(limit, 1), 50) },
   );
   return {
     data: query.results as unknown as DraftPick[],
     hasMore: query.status === "CanLoadMore",
     loadMore: () => query.loadMore(Math.min(Math.max(limit, 1), 50)),
-    isLoading: query.status === "LoadingFirstPage",
+    isLoading:
+      enabled && Boolean(seasonId) && query.status === "LoadingFirstPage",
     isLoadingMore: query.status === "LoadingMore",
     error: null,
   };
@@ -39,9 +38,7 @@ export function useDraftPicks(options: UseDraftPicksOptions = {}) {
   if (round !== undefined) where.round = round;
   const result = useQuery(
     api.frontend.draftPicks,
-    enabled
-      ? { ...(Object.keys(where).length ? { where } : {}) }
-      : "skip",
+    enabled ? { ...(Object.keys(where).length ? { where } : {}) } : "skip",
   );
   return {
     data: (result ?? []) as unknown as DraftPick[],

@@ -295,6 +295,19 @@ test("CLI enforces route behavior alongside existing filename policy", async () 
       accepted.stderr || accepted.error?.message,
     );
 
+    const featureFile = path.join(fixture, "src/hooks/features/useExample.ts");
+    await writeFile(featureFile, 'import { useQuery } from "convex/react";');
+    const featureOwnership = run();
+    assert.equal(featureOwnership.status, 1, featureOwnership.stderr);
+    assert.match(
+      featureOwnership.stderr,
+      /Feature hook has forbidden runtime dependency/,
+    );
+    await writeFile(
+      featureFile,
+      'import { useExample } from "../main/useExample";',
+    );
+
     await writeFile(
       path.join(fixture, "src/app/page.tsx"),
       'export default async function Page() { return fetch("/data"); }',
