@@ -164,6 +164,31 @@ function table<
 }
 
 export default defineSchema({
+  ownerLedgerEntries: defineTable({
+    ownerId: v.id("owners"),
+    kind: v.union(
+      v.literal("opening"),
+      v.literal("charge"),
+      v.literal("payment"),
+      v.literal("credit"),
+      v.literal("refund"),
+    ),
+    amountCents: v.number(),
+    effectiveAt: v.number(),
+    description: v.string(),
+    reference: v.optional(v.string()),
+    requestId: v.optional(v.string()),
+    seasonId: v.optional(v.id("seasons")),
+    teamId: v.optional(v.id("teams")),
+    createdAt: v.number(),
+    createdBy: v.id("authUsers"),
+    voidedAt: v.optional(v.number()),
+    voidReason: v.optional(v.string()),
+    voidedBy: v.optional(v.id("authUsers")),
+  })
+    .index("by_ownerId", ["ownerId"])
+    .index("by_requestId", ["requestId"])
+    .index("by_seasonId_teamId", ["seasonId", "teamId"]),
   notificationPreferences: defineTable({
     userId: v.id("authUsers"),
     category: notificationCategory,
