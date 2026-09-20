@@ -48,8 +48,16 @@ This branch builds on the merged franchise-contract-module PR.
   callbacks, and both Convex mutations and actions without live network access.
 - Type tests cover generated mutation and action references, typed success
   callbacks, rejected incorrect arguments, and result types.
-- Focused ESLint, type checking, architecture checks and diff checks pass.
+- Focused ESLint, architecture checks and diff checks pass; type checking adds
+  no failures beyond the recorded baseline.
 - Tests use a React-18-compatible renderer as a development-only dependency.
 
 No corresponding open spec issue or ticket numbers were found. This document
 is the PR's specification and task graph.
+
+## Verification baseline
+
+Before production edits, `npx tsc --noEmit --incremental false` on main commit
+`59cde9df800f39460dba359cdced04cf7f76e5e6` plus this task's setup reported one
+existing error: `convex/draft.test.ts(482,16): TS18046: 'result' is of type
+'unknown'`. This unrelated draft test remains outside this refactor.
