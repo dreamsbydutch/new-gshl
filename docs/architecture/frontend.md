@@ -110,6 +110,12 @@ Components that need App Router behavior use `useAppPathname` or `useAppRouter`,
 
 Auth.js accepts only verified Google identities. A successful first sign-in creates an active viewer. The session carries application user ID, role, optional owner ID, and status.
 
+The sign-in route delegates request headers, OAuth readiness, session lookup,
+and its Google sign-in server action to `src/lib/auth/sign-in.ts`. The route
+owns the active-user redirect and rendering. Request-origin normalization and
+safe callback resolution live together in `src/lib/utils/core/auth-callback.ts`;
+the action captures only the prepared destination, not configuration secrets.
+
 - `viewer`: protected read access, no owner or commissioner mutations.
 - `owner`: viewer access plus authorized actions for the linked owner.
 - `commissioner`: administrative access and recovery actions.
