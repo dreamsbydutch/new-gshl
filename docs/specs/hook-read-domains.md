@@ -22,7 +22,7 @@ contract eligibility rules.
 Replace the team/franchise/NHL/stat union interface with domain-specific results
 so callers do not assert the requested result type. Remove fabricated read
 error/refetch capabilities from the affected read interfaces and their consumers.
-The migration covers team-domain reads, player/stat/season reads and their
+The migration covers team-domain reads, player/stat/season/draft reads and their
 affected feature consumers; unrelated legacy read interfaces are not a blanket
 rewrite. Keep legacy backend shape conversion at main adapters: the permissive
 frontend facade is not an end-to-end type guarantee.
