@@ -234,6 +234,10 @@ export function comparable(value: unknown): string | number | boolean | null {
 export function compatibilityEquals(left: unknown, right: unknown): boolean {
   return comparable(left) === comparable(right);
 }
+// Public adapters expose the canonical document ID as `id`.
+function fieldValue(row: Row, field: string): unknown {
+  return field === "id" && "_id" in row ? row._id : row[field];
+}
 export function matchesWhere(
   table: string,
   row: Row,
@@ -245,7 +249,7 @@ export function matchesWhere(
       expected === undefined ||
       (timestamps.has(field)
         ? toUtcTimestamp(row[field]) === toUtcTimestamp(expected)
-        : compatibilityEquals(row[field], expected)),
+        : compatibilityEquals(fieldValue(row, field), expected)),
   );
 }
 export function compareRows(
@@ -258,10 +262,10 @@ export function compareRows(
   for (const [field, direction] of Object.entries(orderBy ?? {})) {
     const a = timestamps.has(field)
       ? toUtcTimestamp(left[field])
-      : comparable(left[field]);
+      : comparable(fieldValue(left, field));
     const b = timestamps.has(field)
       ? toUtcTimestamp(right[field])
-      : comparable(right[field]);
+      : comparable(fieldValue(right, field));
     if (a === b) continue;
     if (a === null) return 1;
     if (b === null) return -1;
@@ -273,6 +277,23 @@ export function compareRows(
   }
   return 0;
 }
+// These indexed fields use v.id(...) in every table in the catalog above.
+// Unconstrained strings (legacyId, abbr, seasonType, sourcePlayerDayId, etc.)
+// can contain stored whitespace even when the requested value is trimmed.
+const validatedIdFields = new Set([
+  "seasonId",
+  "franchiseId",
+  "confId",
+  "ownerId",
+  "gshlTeamId",
+  "playerId",
+  "weekId",
+  "homeTeamId",
+  "awayTeamId",
+  "teamId",
+  "winnerId",
+]);
+
 /** Numeric compatibility and timestamp equality cannot use type-exact indexes.
  * Null also matches absent fields, so it must remain a residual predicate. */
 export function compatibilityIndexPlan(
@@ -284,7 +305,8 @@ export function compatibilityIndexPlan(
     if (
       value === null ||
       typeof comparable(value) === "number" ||
-      (typeof value === "string" && value !== value.trim()) ||
+      (typeof value === "string" &&
+        (!validatedIdFields.has(field) || value !== value.trim())) ||
       typeof value === "object"
     )
       nonExact.add(field);
@@ -305,8 +327,14 @@ export function compatibilityQuery(
   return plan
     ? query.withIndex(plan.indexName, (range) => {
         let constrained = range;
-        for (const field of plan.constrainedFields)
-          constrained = constrained.eq(field, where[field]) as typeof range;
+        for (const field of plan.constrainedFields) {
+          // The planner permits only exact string IDs and boolean predicates.
+          const value = where[field];
+          if (typeof value !== "string" && typeof value !== "boolean") {
+            throw new Error("Invalid exact-index constraint");
+          }
+          constrained = constrained.eq(field, value) as typeof range;
+        }
         return constrained;
       })
     : query;
@@ -317,14 +345,17 @@ export async function readCandidateRows(
   args: ReadOptions,
 ): Promise<CompatibilityRow[]> {
   const query = compatibilityQuery(ctx.db, table, args.where);
-  return args.take !== undefined &&
-    !args.orderBy &&
-    canTakeRowsBeforeFiltering(
-      args.where ?? {},
-      compatibilityIndexPlan(table, args.where),
-    )
+  const rows = await (args.take !== undefined &&
+  !args.orderBy &&
+  canTakeRowsBeforeFiltering(
+    args.where ?? {},
+    compatibilityIndexPlan(table, args.where),
+  )
     ? query.take((args.skip ?? 0) + args.take)
-    : query.collect();
+    : query.collect());
+  // Convex includes both system fields on every stored document; its generic
+  // (schema-independent) reader type does not express that guarantee.
+  return rows as CompatibilityRow[];
 }
 /** Apply residual predicates and ordering before offset/limit, after adapter projection. */
 export function finishCompatibilityRead<T extends Row>(

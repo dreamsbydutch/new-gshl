@@ -80,6 +80,167 @@ const operator = (table: string, args: Row = {}) => ({
   ...args,
 });
 
+test("public IDs filter and order ordinary reads before limits", async () => {
+  const f = fixture();
+  f.put("seasons", "z-last", {});
+  f.put("seasons", "a-first", {});
+  f.put("seasons", "m-middle", {});
+  for (const [fn, args] of [
+    [frontend.seasons, {}],
+    [list, operator("seasons")],
+  ] as const) {
+    assert.deepEqual(
+      ids(await read(fn, f.ctx, { ...args, orderBy: { id: "asc" }, take: 1 })),
+      ["a-first"],
+    );
+    assert.deepEqual(
+      ids(
+        await read(fn, f.ctx, { ...args, where: { id: "m-middle" }, take: 1 }),
+      ),
+      ["m-middle"],
+    );
+  }
+  assert.deepEqual(
+    ids(
+      await read(
+        list,
+        f.ctx,
+        operator("seasons", {
+          orderBy: { id: "asc" },
+          skip: 1,
+          take: 1,
+        }),
+      ),
+    ),
+    ["m-middle"],
+  );
+  assert.equal(f.takes(), 0);
+});
+
+test("stored unconstrained strings are normalized before filtering and bounded takes", async () => {
+  for (const [table, fn, field, value] of [
+    ["seasons", frontend.seasons, "legacyId", "legacy-one"],
+    ["nhlTeams", frontend.nhlTeams, "abbr", "TOR"],
+  ] as const) {
+    const f = fixture();
+    f.put(table, "miss", { [field]: "unrelated" });
+    f.put(table, "match", { [field]: ` ${value} ` });
+    f.put(table, "second", { [field]: value });
+    const args = { where: { [field]: value }, take: 1 };
+    assert.deepEqual(ids(await read(fn, f.ctx, args)), ["match"]);
+    assert.deepEqual(ids(await read(list, f.ctx, operator(table, args))), [
+      "match",
+    ]);
+    assert.deepEqual(
+      ids(await read(list, f.ctx, operator(table, { ...args, skip: 1 }))),
+      ["second"],
+    );
+    assert.equal(f.calls.length, 0);
+    assert.equal(f.takes(), 0);
+  }
+});
+
+test("validated owner IDs still permit exact indexed bounded takes", async () => {
+  const f = fixture();
+  f.put("players", "other", { ownerId: "other-owner" });
+  f.put("players", "owned", { ownerId: "owner" });
+  const args = { where: { ownerId: "owner" }, take: 1 };
+  assert.deepEqual(ids(await read(frontend.players, f.ctx, args)), ["owned"]);
+  assert.deepEqual(ids(await read(list, f.ctx, operator("players", args))), [
+    "owned",
+  ]);
+  assert.equal(f.takes(), 2);
+  assert.ok(f.calls.every((call) => call.index === "by_ownerId"));
+});
+
+test("plain string suffixes retain a safe season prefix and residual matching", async () => {
+  for (const [table, fn, field, value] of [
+    [
+      "playerDayHighlights",
+      frontend.playerDayHighlights,
+      "sourcePlayerDayId",
+      "source",
+    ],
+    [
+      "playerTotalStatLines",
+      frontend.playerTotalStats,
+      "seasonType",
+      "regular",
+    ],
+  ] as const) {
+    const f = fixture();
+    f.put(table, "miss", { seasonId: "s", [field]: "other" });
+    f.put(table, "match", { seasonId: "s", [field]: ` ${value} ` });
+    const args = { where: { seasonId: "s", [field]: value }, take: 1 };
+    assert.deepEqual(ids(await read(fn, f.ctx, args)), ["match"]);
+    assert.deepEqual(ids(await read(list, f.ctx, operator(table, args))), [
+      "match",
+    ]);
+    assert.ok(f.calls.every((call) => call.index === "by_seasonId"));
+    assert.equal(f.takes(), 0);
+  }
+});
+
+test("unrelated split awards do not suppress matching legacy award fallback", async () => {
+  const f = fixture();
+  f.put("owners", "unrelated-owner", {});
+  f.put("teamAwards", "unrelated-split", {
+    seasonId: "s",
+    ownerId: "unrelated-owner",
+    award: "champion",
+  });
+  f.put("awards", "legacy-a", {
+    seasonId: "s",
+    winnerId: "p",
+    award: "firstAS",
+  });
+  f.put("awards", "legacy-b", {
+    seasonId: "s",
+    winnerId: "p",
+    award: "secondAS",
+  });
+  const where = { seasonId: "s", winnerId: "p" };
+  assert.deepEqual(
+    ids(
+      await read(
+        list,
+        f.ctx,
+        operator("awards", {
+          where,
+          orderBy: { award: "desc" },
+          take: 1,
+        }),
+      ),
+    ),
+    ["legacy-b"],
+  );
+  assert.deepEqual(
+    ids(
+      await read(
+        list,
+        f.ctx,
+        operator("awards", {
+          where,
+          orderBy: { award: "desc" },
+          skip: 1,
+          take: 1,
+        }),
+      ),
+    ),
+    ["legacy-a"],
+  );
+  assert.equal(await invoke(count, f.ctx, operator("awards", { where })), 2);
+  f.put("playerAwards", "matching-split", {
+    seasonId: "s",
+    playerId: "p",
+    award: "firstAS",
+  });
+  assert.deepEqual(
+    ids(await read(list, f.ctx, operator("awards", { where }))),
+    ["matching-split"],
+  );
+});
+
 test("both adapters retain numeric and numeric-string rows, filtering and ordering before limits", async () => {
   const f = fixture();
   f.put("draftPicks", "miss", { seasonId: "s", round: 2, pick: 1 });

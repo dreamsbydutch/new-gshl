@@ -808,7 +808,11 @@ async function readAwardRows(
       })
     ).map((row) => publicTeamAwardRow(ctx, row)),
   );
-  const splitRows = [...playerRows, ...teamRows];
+  const splitRows = finishCompatibilityRead<Row>(
+    AWARDS_TABLE,
+    [...playerRows, ...teamRows],
+    { where: args.where, orderBy: args.orderBy },
+  );
 
   const rows =
     splitRows.length > 0
