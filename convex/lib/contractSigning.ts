@@ -14,7 +14,7 @@ export type ContractSigningPick = {
   seasonId: string;
   gshlTeamId: string | null | undefined;
   round: number | string;
-  pick: number | string;
+  pick?: number | string | null;
   playerId: string | null | undefined;
   isSigning: boolean;
 };

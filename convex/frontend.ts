@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/ban-ts-comment, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/prefer-optional-chain */
 // @ts-nocheck
-import { makeFunctionReference, paginationOptsValidator } from "convex/server";
+import { paginationOptsValidator } from "convex/server";
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
@@ -9,15 +9,14 @@ import {
   deriveContractCreationTerms,
   getEffectiveSigningStatus,
 } from "../src/lib/utils/domain/contracts";
-import { resolveContractSigningAssignments } from "./lib/contractSigning";
-import { rebuildTeamLineup } from "./lib/teamLineup";
-import { buildLeagueActivity } from "../src/lib/utils/features/league-activity";
+import { signContract } from "./lib/contractSigningTransaction";
 import {
-  buildLockKey,
-  canonicalJobName,
-  JOB_NAMES,
-  JOB_STATUSES,
-} from "./jobCatalog";
+  startJob as startManagedJob,
+  cancelJob as cancelManagedJob,
+  retryJob as retryManagedJob,
+} from "./lib/jobLifecycle";
+import { buildLeagueActivity } from "../src/lib/utils/features/league-activity";
+import { JOB_NAMES, JOB_STATUSES } from "./jobCatalog";
 import {
   normalizeTimestampFields,
   timestampFieldsForTable,
@@ -1315,116 +1314,21 @@ export const createContract = mutation({
       contracts: contractRows,
       seasons: contractSeasons,
     });
-    const contractSeasonIndex = contractSeasons.findIndex(
-      (season) => season.id === contractSigningSeason.id,
-    );
-    const coveredSeasonIds = contractSeasons
-      .slice(
-        contractSeasonIndex + 1,
-        contractSeasonIndex + 1 + args.contractLength,
-      )
-      .map((season) => season.id);
-    const seasonAssignments = await Promise.all(
-      coveredSeasonIds.map(async (seasonId) => {
-        const [teams, picks] = await Promise.all([
-          ctx.db
-            .query("teams")
-            .withIndex("by_seasonId", (range) =>
-              range.eq("seasonId", seasonId as Id<"seasons">),
-            )
-            .collect(),
-          ctx.db
-            .query("draftPicks")
-            .withIndex("by_seasonId", (range) =>
-              range.eq("seasonId", seasonId as Id<"seasons">),
-            )
-            .collect(),
-        ]);
-        return { teams, picks };
-      }),
-    );
-    const signingAssignments = resolveContractSigningAssignments({
-      signingSeasonId: contractSigningSeason.id,
-      contractLength: args.contractLength,
-      franchiseId: String(team.franchiseId),
-      seasons: contractSeasons,
-      teams: seasonAssignments.flatMap(({ teams }) =>
-        teams.map((candidate) => ({
-          id: String(candidate._id),
-          seasonId: String(candidate.seasonId),
-          franchiseId: String(candidate.franchiseId),
-        })),
-      ),
-      picks: seasonAssignments.flatMap(({ picks }) =>
-        picks.map((candidate) => ({
-          id: String(candidate._id),
-          seasonId: String(candidate.seasonId),
-          gshlTeamId: candidate.gshlTeamId
-            ? String(candidate.gshlTeamId)
-            : null,
-          round: candidate.round,
-          pick: candidate.pick,
-          playerId: candidate.playerId ? String(candidate.playerId) : null,
-          isSigning: candidate.isSigning,
-        })),
-      ),
-    });
-    const now = Date.now();
-    const startDate = toUtcTimestamp(terms.startDate);
-    const expiryDate = toUtcTimestamp(terms.expiryDate);
-    if (startDate === null || expiryDate === null) {
-      throw new Error("The selected contract seasons have invalid dates");
-    }
-    const id = await ctx.db.insert("contracts", {
+    const id = await signContract(ctx, {
       playerId: args.playerId,
-      ownerId: franchise.ownerId,
+      franchiseId: team.franchiseId,
       seasonId: signingSeason._id,
-      contractType: terms.contractType,
       contractLength: args.contractLength,
+      contractType: terms.contractType,
       contractSalary: terms.contractSalary,
-      signingDate: now,
-      startDate,
       signingStatus: terms.signingStatus,
       expiryStatus: terms.expiryStatus,
-      expiryDate,
-      capHit: terms.contractSalary,
-      capHitEndDate: expiryDate,
-      createdAt: now,
-      updatedAt: now,
+      startDate: terms.startDate,
+      expiryDate: terms.expiryDate,
     });
-    await ctx.db.patch(args.playerId, {
-      ownerId: franchise.ownerId,
-      gshlTeamId: signingAssignments[0]?.teamId,
-      isSignable: false,
-      isResignable: null,
-      lineupPos: null,
-      updatedAt: now,
-    });
-    for (const assignment of signingAssignments) {
-      await ctx.db.patch(assignment.pickId as Id<"draftPicks">, {
-        playerId: args.playerId,
-        isSigning: true,
-        onClockStartedAt: null,
-        onClockExpiresAt: null,
-        onClockEndedAt: null,
-        updatedAt: now,
-      });
-    }
-    if (signingAssignments[0]?.teamId) {
-      await rebuildTeamLineup(
-        ctx,
-        franchise.ownerId,
-        signingAssignments[0].teamId as Id<"teams">,
-        now,
-      );
-    }
     return publicRow((await ctx.db.get(id)) as unknown as Row);
   },
 });
-
-const runJob = makeFunctionReference<"action", { runId: string }>(
-  "jobRunner:run",
-);
 
 export const jobCatalog = query({
   args: {},
@@ -1455,23 +1359,14 @@ export const startJob = mutation({
   },
   handler: async (ctx, args) => {
     const user = await requireCommissioner(ctx);
-    const jobName = canonicalJobName(args.jobName);
-    const jobArgs = args.args ?? {};
-    const now = Date.now();
-    const runId = await ctx.db.insert("jobRuns", {
-      jobName,
-      args: jobArgs,
-      apply: args.apply === true,
-      mode: "manual",
-      status: "queued",
-      lockKey: buildLockKey(jobName, jobArgs),
-      attempt: 1,
-      requestedBy: user.email,
-      createdAt: now,
-      progress: { processed: 0 },
-    });
-    await ctx.scheduler.runAfter(0, runJob, { runId });
-    return publicRow((await ctx.db.get(runId)) as unknown as Row);
+    return publicRow(
+      await startManagedJob(ctx, {
+        jobName: args.jobName,
+        args: args.args ?? {},
+        apply: args.apply === true,
+        requestedBy: user.email,
+      }),
+    );
   },
 });
 
@@ -1479,13 +1374,7 @@ export const cancelJob = mutation({
   args: { runId: v.id("jobRuns") },
   handler: async (ctx, args) => {
     await requireCommissioner(ctx);
-    const run = await ctx.db.get(args.runId);
-    if (!run) throw new Error("Run not found");
-    await ctx.db.patch(args.runId, {
-      status: run.status === "running" ? "cancelling" : "cancelled",
-      finishedAt: run.status === "running" ? undefined : Date.now(),
-    });
-    return publicRow((await ctx.db.get(args.runId)) as unknown as Row);
+    return publicRow(await cancelManagedJob(ctx, args.runId));
   },
 });
 
@@ -1493,22 +1382,6 @@ export const retryJob = mutation({
   args: { runId: v.id("jobRuns") },
   handler: async (ctx, args) => {
     const user = await requireCommissioner(ctx);
-    const previous = await ctx.db.get(args.runId);
-    if (!previous || !["failed", "cancelled"].includes(previous.status)) {
-      throw new Error("Only failed or cancelled runs can be retried");
-    }
-    const runId = await ctx.db.insert("jobRuns", {
-      jobName: previous.jobName,
-      args: previous.args,
-      apply: previous.apply,
-      mode: "retry",
-      status: "queued",
-      lockKey: previous.lockKey,
-      attempt: previous.attempt + 1,
-      requestedBy: user.email,
-      createdAt: Date.now(),
-    });
-    await ctx.scheduler.runAfter(0, runJob, { runId });
-    return publicRow((await ctx.db.get(runId)) as unknown as Row);
+    return publicRow(await retryManagedJob(ctx, args.runId, user.email));
   },
 });

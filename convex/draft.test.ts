@@ -479,7 +479,7 @@ void test("completed pick ownership can be corrected without moving players or c
     reason: "Repair pick ownership only",
     edits: [f.edit("pick1", { gshlTeamId: "other-team" as Id<"teams"> })],
   });
-  assert.equal(result.correctedCount, 1);
+  assert.deepEqual(result, { correctedCount: 1 });
   assert.equal(f.get("pick1")!.gshlTeamId, "other-team");
   assert.equal(f.get("pick1")!.playerId, "player1");
   assert.equal(f.get("pick1")!.onClockEndedAt, 123);
