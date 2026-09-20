@@ -58,6 +58,21 @@ type DateValueOutput = "date" | "iso";
 type DateFormatMode = "iso" | "display" | "timestamp";
 type DateInput = Date | string | number | boolean | object | null | undefined;
 
+/** The interpretation to use when coercing a date-like value. */
+export type DateCoercionMode = "date-only" | "instant";
+
+/**
+ * Input for the date-coercion module interface.
+ *
+ * `date-only` normalizes structured calendar strings at UTC midnight.
+ * `instant` preserves JavaScript's native timestamp parsing, including a
+ * numeric epoch value.
+ */
+export type DateCoercionInput = {
+  value: DateInput;
+  mode?: DateCoercionMode;
+};
+
 type ResolveDateValueOptions = {
   output?: DateValueOutput;
 };
@@ -142,7 +157,9 @@ function resolveDateValue(
   if (input === null || input === undefined || input === "") return null;
 
   if (input instanceof Date) {
-    return isNaN(input.getTime()) ? null : formatResolvedDateOutput(input, output);
+    return isNaN(input.getTime())
+      ? null
+      : formatResolvedDateOutput(input, output);
   }
 
   if (typeof input === "number") {
@@ -159,9 +176,7 @@ function resolveDateValue(
 
   const normalized = normalizeStructuredDateString(raw);
   if (normalized) {
-    return output === "iso"
-      ? normalized
-      : toDateFromNormalizedIso(normalized);
+    return output === "iso" ? normalized : toDateFromNormalizedIso(normalized);
   }
 
   if (/^-?\d+(\.\d+)?$/.test(raw)) {
@@ -178,6 +193,32 @@ function resolveDateValue(
   }
 
   return formatResolvedDateOutput(parsed, output);
+}
+
+/**
+ * Coerces a date-like value through one explicit interpretation.
+ *
+ * Date-only structured strings are normalized at UTC midnight, while instant
+ * values retain native `Date` parsing semantics for timestamps and legacy
+ * date strings.
+ */
+export function coerceDate({
+  value,
+  mode = "instant",
+}: DateCoercionInput): Date | null {
+  if (mode === "date-only") {
+    const parsed = resolveDateValue(value, { output: "date" });
+    return parsed instanceof Date ? parsed : null;
+  }
+
+  if (value === null || value === undefined || value === "") return null;
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? null : value;
+  }
+  if (typeof value !== "string" && typeof value !== "number") return null;
+
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
 /**
@@ -387,6 +428,5 @@ export function convertInputDate(excelSerialDate: number): Date {
  * @returns The resulting safe parse sheet date.
  */
 export function safeParseSheetDate(input: DateInput): Date | null {
-  const parsed = resolveDateValue(input, { output: "date" });
-  return parsed instanceof Date ? parsed : null;
+  return coerceDate({ value: input, mode: "date-only" });
 }

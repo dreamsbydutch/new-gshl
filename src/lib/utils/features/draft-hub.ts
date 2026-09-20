@@ -13,6 +13,7 @@ import type {
   DraftPick,
   Season,
 } from "@gshl-types";
+import { coerceDate } from "../core/date";
 import { findCurrentSeason, findUpcomingSeason } from "../domain/season";
 
 export function getDraftPickClockMs(
@@ -220,10 +221,11 @@ export function getNextOwnerDraftPickNotice(
 export function getDraftYear(
   season: Pick<Season, "draftStartAt" | "startDate" | "year">,
 ): number {
-  const draftDate = season.draftStartAt
-    ? new Date(season.draftStartAt)
-    : new Date(season.startDate);
-  const dateYear = draftDate.getUTCFullYear();
+  const draftDate = coerceDate({
+    value: season.draftStartAt || season.startDate,
+    mode: "instant",
+  });
+  const dateYear = draftDate?.getUTCFullYear() ?? Number.NaN;
   if (Number.isFinite(dateYear)) return dateYear;
 
   const seasonYear = Number(season.year);
@@ -236,9 +238,7 @@ function timestamp(
   value: Date | string | number | null | undefined,
 ): number | null {
   if (!value) return null;
-  const parsed = value instanceof Date ? value : new Date(value);
-  const valueOf = parsed.getTime();
-  return Number.isNaN(valueOf) ? null : valueOf;
+  return coerceDate({ value, mode: "instant" })?.getTime() ?? null;
 }
 
 export function draftPickHasPlayer(pick: Pick<DraftPick, "playerId">): boolean {
