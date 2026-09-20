@@ -37,7 +37,7 @@ export function hashWeeklyEditionSource(value: unknown) {
   return (hash >>> 0).toString(16).padStart(8, "0");
 }
 
-function choose<T>(
+export function choose<T>(
   packet: WeeklyEditionFactPacket,
   values: readonly T[],
   salt: string,
@@ -49,7 +49,7 @@ function choose<T>(
   return values[hash % values.length]!;
 }
 
-function scoreline(matchup: WeeklyEditionMatchupFact) {
+export function scoreline(matchup: WeeklyEditionMatchupFact) {
   return `${matchup.awayTeamName} ${matchup.awayScore}–${matchup.homeScore} ${matchup.homeTeamName}`;
 }
 
@@ -64,7 +64,7 @@ function matchupStageLabelForGameType(gameType?: string) {
   return undefined;
 }
 
-function matchupSummary(matchup: WeeklyEditionMatchupFact) {
+export function matchupSummary(matchup: WeeklyEditionMatchupFact) {
   const stage = matchupStageLabel(matchup);
   const stagePrefix = stage ? `${stage}: ` : "";
   const categoryNote = matchup.categoryMargins.find(
@@ -77,6 +77,19 @@ function matchupSummary(matchup: WeeklyEditionMatchupFact) {
     return `${stagePrefix}${matchup.homeTeamName} and ${matchup.awayTeamName} finished level at ${matchup.homeScore}–${matchup.awayScore}.`;
   }
   return `${stagePrefix}${matchup.winnerTeamName} beat ${matchup.loserTeamName} ${Math.max(matchup.homeScore, matchup.awayScore)}–${Math.min(matchup.homeScore, matchup.awayScore)}.${categorySentence}`;
+}
+
+export function pressBoxEditorialCandidates(
+  packet: WeeklyEditionFactPacket,
+) {
+  const loserTournamentCandidateIds = new Set(
+    packet.matchups
+      .filter((matchup) => matchup.gameType === "LT")
+      .map((matchup) => `matchup:${matchup.matchupId}`),
+  );
+  return (packet.editorialCandidates ?? []).filter(
+    (candidate) => !loserTournamentCandidateIds.has(candidate.id),
+  );
 }
 
 export const WEEKLY_EDITION_STAFF = {

@@ -41,6 +41,13 @@ import {
   parseWeeklyEditionArticleCount,
   weeklyEditionArticleSlot,
 } from "./weekly-edition-articles";
+import {
+  assignWeeklyEditionAuthors,
+  choose,
+  matchupSummary,
+  pressBoxEditorialCandidates,
+  scoreline,
+} from "./weekly-edition-authors";
 
 export const WEEKLY_EDITION_SECTION_KINDS = [
   "primary_article",
@@ -477,17 +484,6 @@ function pressBoxNextMatchups(
         playoffGameTypePriority(right.gameType) -
         playoffGameTypePriority(left.gameType),
     );
-}
-
-function pressBoxEditorialCandidates(packet: WeeklyEditionFactPacket) {
-  const loserTournamentCandidateIds = new Set(
-    packet.matchups
-      .filter((matchup) => matchup.gameType === "LT")
-      .map((matchup) => `matchup:${matchup.matchupId}`),
-  );
-  return (packet.editorialCandidates ?? []).filter(
-    (candidate) => !loserTournamentCandidateIds.has(candidate.id),
-  );
 }
 
 const metricText = (metric: WeeklyEditionEditorialMetric) =>
@@ -1535,7 +1531,6 @@ export {
   selectWeeklyEditionStoryAssignments,
   WEEKLY_EDITION_STAFF,
 } from "./weekly-edition-authors";
-import { assignWeeklyEditionAuthors } from "./weekly-edition-authors";
 
 function section(
   kind: WeeklyEditionSectionKind,
