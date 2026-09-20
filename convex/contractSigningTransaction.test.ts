@@ -127,6 +127,14 @@ for (const [label, fn, args] of [
       );
       assert.equal(contract.expiryDate, Date.parse("2029-06-01"));
       assert.equal(contract.capHit, contract.contractSalary);
+      assert.equal(contract.capHitEndDate, contract.expiryDate);
+      assert.equal(contract.contractType, "STANDARD");
+      assert.equal(contract.expiryStatus, "RFA");
+      assert.equal(contract.signingStatus, "UFA");
+      assert.equal(
+        contract.contractSalary,
+        label === "UFA" ? 2_000_000 : 1_250_000,
+      );
       assert.equal(f.get("player")?.ownerId, "owner");
       assert.equal(f.get("player")?.gshlTeamId, "team1");
       assert.equal(f.get("player")?.isSignable, false);
@@ -217,4 +225,74 @@ void test("commissioner signing rejects anonymous and owner callers", async () =
     /Forbidden/,
   );
   assert.equal(f.rows("contracts").length, 0);
+});
+
+void test("commissioner retains draft and RFA terms before free agency", async () => {
+  for (const status of ["DRAFT", "RFA"] as const) {
+    const f = signingFixture();
+    await f.ctx.db.patch("signing" as never, { signingEndDate: "2999-07-01" });
+    await f.ctx.db.patch("player" as never, { isResignable: status });
+    await invokeMutation(createContract, f.ctx, commissionerArgs);
+    const contract = f.rows("contracts")[0]!;
+    assert.equal(
+      contract.contractSalary,
+      status === "DRAFT" ? 1_000_000 : 1_150_000,
+    );
+    assert.equal(
+      contract.contractType,
+      status === "DRAFT" ? "STANDARD" : "EXTENSION",
+    );
+    assert.equal(
+      contract.signingStatus,
+      status === "DRAFT" ? "Drafted" : "RFA",
+    );
+    assert.equal(contract.expiryStatus, status === "DRAFT" ? "RFA" : "UFA");
+  }
+});
+
+void test("UFA retains extension terms when the prior contract covers the signing season", async () => {
+  const f = signingFixture();
+  f.put("seasons", "priorSeason", { year: 2025 });
+  f.put("contracts", "priorContract", {
+    playerId: "player",
+    ownerId: "owner",
+    seasonId: "priorSeason",
+    contractLength: 1,
+    contractType: "STANDARD",
+    expiryStatus: "UFA",
+    expiryDate: "2020-06-01",
+  });
+  await invokeMutation(finalizeGroup, f.ctx, ufaArgs);
+  const contract = f
+    .rows("contracts")
+    .find((row) => row.seasonId === "signing")!;
+  assert.equal(contract.contractType, "EXTENSION");
+  assert.equal(contract.expiryStatus, "UFA");
+  assert.equal(contract.contractSalary, 2_000_000);
+});
+
+void test("UFA rejects a stale winner or newly contracted player before signing writes", async () => {
+  for (const alreadyContracted of [false, true]) {
+    const f = signingFixture();
+    if (alreadyContracted) {
+      f.put("contracts", "existingContract", {
+        playerId: "player",
+        seasonId: "signing",
+        contractLength: 1,
+        contractType: "STANDARD",
+        expiryStatus: "RFA",
+        expiryDate: "2028-06-01",
+      });
+    } else {
+      await f.ctx.db.patch("winner" as never, { status: "withdrawn" });
+    }
+    await assert.rejects(
+      invokeMutation(finalizeGroup, f.ctx, ufaArgs),
+      /winning contract/,
+    );
+    assert.equal(f.rows("contracts").length, alreadyContracted ? 1 : 0);
+    assert.equal(f.get("pick1:5")?.playerId, null);
+    assert.equal(f.get("player")?.isSignable, true);
+    assert.equal(f.get("group")?.status, "open");
+  }
 });
