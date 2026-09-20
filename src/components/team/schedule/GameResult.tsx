@@ -2,10 +2,10 @@
 
 import type { GameResultProps } from "@gshl-types";
 import {
-  formatTeamScore,
-  getResultStyleClass,
+  formatMatchupScore,
+  getTeamScheduleResultClass,
   getTeamMatchupResult,
-  isGameCompleted,
+  isScheduleItemComplete,
 } from "@gshl-utils";
 
 export function GameResult({
@@ -13,13 +13,19 @@ export function GameResult({
   selectedTeamId,
   week,
 }: GameResultProps) {
-  if (!isGameCompleted(week)) {
+  if (!isScheduleItemComplete({ mode: "weekEnd", week: week ?? undefined })) {
     return null;
   }
 
   const result = getTeamMatchupResult(matchup, selectedTeamId);
-  const styleClass = getResultStyleClass(matchup, selectedTeamId);
-  const scoreText = formatTeamScore(matchup, selectedTeamId);
+  const styleClass = getTeamScheduleResultClass({
+    matchup,
+    selectedTeamId,
+  });
+  const scoreText = formatMatchupScore({
+    matchup,
+    perspectiveTeamId: selectedTeamId,
+  });
 
   return (
     <div className={`col-span-2 my-auto text-center font-varela text-sm ${styleClass}`}>
