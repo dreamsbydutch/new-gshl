@@ -1,7 +1,7 @@
 # Hook read domains and draft projections
 
 Implements architecture-review Candidates 3–6, selected on 2026-09-20.
-Builds on Candidate 2, PR #14. Source: the original architecture review at
+Builds on merged Candidate 2, PR #14. Source: the original architecture review at
 `C:/Users/choug/AppData/Local/Temp/architecture-review-20260920-142940.html`.
 No issue/ticket identifiers were found. This document makes those candidates
 concrete against the current active callers.
@@ -77,5 +77,7 @@ of scope. Existing local generated-file edits must remain untouched.
 - Full type checking adds no failures beyond the baseline on Candidate 2 head
   `eddff7d09ea1a431b6df386db8c8927c7e87cd55`: `convex/draft.test.ts(482,16)`
   TS18046 (`result` is unknown).
+- PR #14 merged during implementation; the integrated main/review base is
+  `541a5620c20d555b16a62b8a3a1f016fb1e7f5b7`.
 - Preserve existing UI and behavior; no visual redesign or additional data reads
   solely to support abstractions.
