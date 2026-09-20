@@ -27,7 +27,7 @@ import {
   isUnsignedForSigningSeason,
   isUfaFreeAgencyOpen,
 } from "@gshl-utils";
-import { type ContractLength, type GSHLTeam, type NHLTeam } from "@gshl-types";
+import { type ContractLength } from "@gshl-types";
 
 const LENGTHS: readonly ContractLength[] = [1, 2, 3];
 
@@ -53,7 +53,7 @@ export function ContractManagement() {
 
   const teams = useMemo(
     () =>
-      (teamsQuery.data as GSHLTeam[])
+      teamsQuery.data
         .filter((team) => team.isActive)
         .sort((left, right) =>
           String(left.name ?? left.abbr ?? "").localeCompare(
@@ -63,9 +63,7 @@ export function ContractManagement() {
     [teamsQuery.data],
   );
   const selectedTeam = teams.find((team) => String(team.id) === teamId);
-  const nhlTeams = nhlTeamsQuery.data.filter(
-    (team): team is NHLTeam => "abbr" in team,
-  );
+  const nhlTeams = nhlTeamsQuery.data;
   const playerHasSigningSeasonContract = useMemo(
     () =>
       new Set(

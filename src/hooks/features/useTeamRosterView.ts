@@ -7,15 +7,11 @@ import { useTeamRosterData } from "./useTeamRosterData";
 
 export function useTeamRosterView(options: UseTeamRosterDataOptions = {}) {
   const rosterData = useTeamRosterData(options);
-  const {
-    data: nhlTeams = [],
-    isLoading: nhlTeamsLoading,
-    error: nhlTeamsError,
-  } = useNHLTeams();
+  const { data: nhlTeams = [], isLoading: nhlTeamsLoading } = useNHLTeams();
 
   const nhlTeamByAbbr = useMemo(
     () =>
-      (nhlTeams as NHLTeam[]).reduce((map, team) => {
+      nhlTeams.reduce((map, team) => {
         if (team.abbr) {
           map.set(team.abbr.trim().toUpperCase(), team);
         }
@@ -33,7 +29,6 @@ export function useTeamRosterView(options: UseTeamRosterDataOptions = {}) {
     [options.contracts],
   );
 
-  const error = rosterData.error ?? nhlTeamsError ?? null;
   const isLoading = rosterData.isLoading || nhlTeamsLoading;
 
   return {
@@ -41,7 +36,6 @@ export function useTeamRosterView(options: UseTeamRosterDataOptions = {}) {
     nhlTeamByAbbr,
     contractByPlayerId,
     isLoading,
-    error,
-    ready: rosterData.ready && !nhlTeamsLoading && !error,
+    ready: rosterData.ready && !nhlTeamsLoading,
   };
 }

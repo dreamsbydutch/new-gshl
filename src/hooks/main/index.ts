@@ -114,12 +114,22 @@ export type { UsePlayerStatsOptions, UsePlayerStatsResult } from "@gshl-types";
 export { useSeasons, useSeasonState } from "./useSeason";
 export type { UseSeasonStateOptions, UseSeasonsOptions } from "@gshl-types";
 
-// Team and franchise hooks - now unified with statsLevel and teamType options
-export { useTeams, useNHLTeams, useFranchises } from "./useTeam";
+// Domain-specific team, franchise, NHL and statistics reads
+export {
+  useTeams,
+  useNHLTeams,
+  useFranchises,
+  useTeamDayStats,
+  useTeamWeekStats,
+  useTeamSeasonStats,
+} from "./useTeam";
 export type {
   EnrichedFranchise,
-  TeamStatsLevel,
-  TeamType,
+  UseNHLTeamsOptions,
+  UseFranchisesOptions,
+  UseTeamDayStatsOptions,
+  UseTeamWeekStatsOptions,
+  UseTeamSeasonStatsOptions,
   UseTeamsOptions,
 } from "@gshl-types";
 

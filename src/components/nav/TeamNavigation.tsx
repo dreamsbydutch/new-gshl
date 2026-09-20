@@ -33,15 +33,11 @@ export function TeamsToggle({
       ? selectedOwnerIdOverride
       : storedOwnerId;
 
-  const {
-    data: teamsRaw = [],
-    isLoading,
-    error,
-  } = useTeams({
+  const { data: teamsRaw = [], isLoading } = useTeams({
     seasonId: selectedSeasonId,
     enabled: Boolean(selectedSeasonId),
   });
-  const teams = teamsRaw as GSHLTeam[];
+  const teams = teamsRaw;
 
   const selectedTeam = teams.find((t) => t.ownerId === selectedOwnerId) ?? null;
 
@@ -89,7 +85,6 @@ export function TeamsToggle({
       getItemKey={getTeamKey}
       getItemLabel={getTeamLabel}
       renderCustomItem={renderTeamItem}
-      error={error?.message ?? null}
       className={className}
     />
   );

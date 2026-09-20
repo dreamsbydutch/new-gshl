@@ -43,11 +43,20 @@ export function useTeamRosterData(
     [players, currentTeam],
   );
 
-  const teamLineup = useMemo(() => buildTeamLineup(currentRoster), [currentRoster]);
+  const teamLineup = useMemo(
+    () => buildTeamLineup(currentRoster),
+    [currentRoster],
+  );
 
-  const benchPlayers = useMemo(() => getBenchPlayers(currentRoster), [currentRoster]);
+  const benchPlayers = useMemo(
+    () => getBenchPlayers(currentRoster),
+    [currentRoster],
+  );
 
-  const totalCapHit = useMemo(() => calculateTotalCapHit(contracts), [contracts]);
+  const totalCapHit = useMemo(
+    () => calculateTotalCapHit(contracts),
+    [contracts],
+  );
 
   const isLoading = players === undefined || contracts === undefined;
 
@@ -57,7 +66,6 @@ export function useTeamRosterData(
     benchPlayers,
     totalCapHit,
     isLoading,
-    error: null,
     ready: !isLoading,
   };
 }

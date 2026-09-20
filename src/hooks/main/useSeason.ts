@@ -20,6 +20,8 @@ import {
 import { useNavStore } from "@gshl-cache";
 import { useAppPathname } from "./useNextNavigation";
 
+const EMPTY_SEASONS: Season[] = [];
+
 export function useSeasons(options: UseSeasonsOptions = {}) {
   const {
     seasonId,
@@ -51,19 +53,18 @@ export function useSeasons(options: UseSeasonsOptions = {}) {
         }
       : "skip",
   );
-  const seasons = (result ?? []) as unknown as Season[];
+  const seasons =
+    result === undefined ? EMPTY_SEASONS : (result as unknown as Season[]);
   const data = current
     ? (() => {
         const season = findCurrentSeason(seasons, referenceDate);
-        return season ? [season] : [];
+        return season ? [season] : EMPTY_SEASONS;
       })()
     : seasons;
 
   return {
     data,
     isLoading: enabled && result === undefined,
-    isFetching: enabled && result === undefined,
-    error: null,
   };
 }
 
@@ -138,7 +139,5 @@ export function useSeasonState(options: UseSeasonStateOptions = {}) {
       : (selectedSeason?.id ?? null),
     setSelectedSeasonId,
     isSelectedSeasonLoading: query.isLoading,
-    isSelectedSeasonFetching: query.isLoading,
-    refetchSelectedSeason: undefined,
   };
 }

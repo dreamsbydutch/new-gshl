@@ -15,6 +15,8 @@ import type {
   UseRosterPlayersOptions,
 } from "@gshl-types";
 
+const EMPTY_PLAYERS: Player[] = [];
+
 export function usePlayerPages(options: UsePlayerPagesOptions = {}) {
   const { active, positionGroup, enabled = true, limit = 50 } = options;
   const query = usePaginatedQuery(
@@ -29,9 +31,8 @@ export function usePlayerPages(options: UsePlayerPagesOptions = {}) {
     data,
     hasMore: query.status === "CanLoadMore",
     loadMore: () => query.loadMore(Math.min(Math.max(limit, 1), 50)),
-    isLoading: query.status === "LoadingFirstPage",
+    isLoading: enabled && query.status === "LoadingFirstPage",
     isLoadingMore: query.status === "LoadingMore",
-    error: null,
   };
 }
 
@@ -44,9 +45,9 @@ export function usePlayersByIds(ids: string[], enabled = true) {
       : "skip",
   );
   return {
-    data: (result ?? []) as unknown as Player[],
+    data:
+      result === undefined ? EMPTY_PLAYERS : (result as unknown as Player[]),
     isLoading: enabled && uniqueIds.length > 0 && result === undefined,
-    error: null,
   };
 }
 
@@ -72,9 +73,9 @@ export function usePlayers(options: UsePlayersOptions = {}) {
     enabled ? { ...(Object.keys(where).length ? { where } : {}) } : "skip",
   );
   return {
-    data: (result ?? []) as unknown as Player[],
+    data:
+      result === undefined ? EMPTY_PLAYERS : (result as unknown as Player[]),
     isLoading: enabled && result === undefined,
-    error: null,
   };
 }
 

@@ -2,57 +2,53 @@
 
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
-import type { TeamResult, UseTeamsResult, UseTeamsOptions } from "@gshl-types";
+import type {
+  CollectionQueryResult,
+  GSHLTeam,
+  NHLTeam,
+  Franchise,
+  TeamDayStatLine,
+  TeamWeekStatLine,
+  TeamSeasonStatLine,
+  UseTeamsOptions,
+  UseNHLTeamsOptions,
+  UseFranchisesOptions,
+  UseTeamDayStatsOptions,
+  UseTeamWeekStatsOptions,
+  UseTeamSeasonStatsOptions,
+} from "@gshl-types";
 
-export function useTeams(options: UseTeamsOptions = {}): UseTeamsResult {
-  const {
-    teamId,
-    seasonId,
-    franchiseId,
-    conferenceId,
-    weekId,
-    date,
-    seasonType,
-    ownerId,
-    isActive,
-    statsLevel = "none",
-    teamType = "gshl",
-    orderBy,
-    enabled = true,
-  } = options;
+const EMPTY_TEAMS: GSHLTeam[] = [];
+const EMPTY_NHL_TEAMS: NHLTeam[] = [];
+const EMPTY_FRANCHISES: Franchise[] = [];
+const EMPTY_DAY_STATS: TeamDayStatLine[] = [];
+const EMPTY_WEEK_STATS: TeamWeekStatLine[] = [];
+const EMPTY_SEASON_STATS: TeamSeasonStatLine[] = [];
+
+/** The legacy facade reshapes stored IDs/dates; keep its row assertion here. */
+function useTeamCollection<T>(
+  reference: typeof api.frontend.teams | typeof api.frontend.nhlTeams,
+  options: UseTeamsOptions & UseTeamDayStatsOptions & UseTeamWeekStatsOptions,
+  fallback: T[],
+  statistics = false,
+): CollectionQueryResult<T> {
+  const { enabled = true, orderBy } = options;
   const where: Record<string, unknown> = {};
-  if (teamId) {
-    if (statsLevel === "none") where.id = String(teamId);
-    else where.gshlTeamId = String(teamId);
-  }
-  if (seasonId) where.seasonId = String(seasonId);
-  if (franchiseId) where.franchiseId = String(franchiseId);
-  if (conferenceId) where.confId = String(conferenceId);
-  if (weekId) where.weekId = String(weekId);
-  if (seasonType) where.seasonType = String(seasonType);
-  if (ownerId) where.ownerId = String(ownerId);
-  if (isActive !== undefined) where.isActive = isActive;
-  if (date) {
+  if (options.teamId) where[statistics ? "gshlTeamId" : "id"] = options.teamId;
+  if (options.seasonId) where.seasonId = options.seasonId;
+  if (options.franchiseId) where.franchiseId = options.franchiseId;
+  if (options.conferenceId) where.confId = options.conferenceId;
+  if (options.weekId) where.weekId = options.weekId;
+  if (options.seasonType) where.seasonType = options.seasonType;
+  if (options.ownerId) where.ownerId = options.ownerId;
+  if (options.isActive !== undefined) where.isActive = options.isActive;
+  if (options.date)
     where.date =
-      typeof date === "string"
-        ? date
-        : (date.toISOString().split("T")[0] ?? "");
-  }
-
-  const functionReference =
-    teamType === "nhl"
-      ? api.frontend.nhlTeams
-      : teamType === "franchise"
-        ? api.frontend.franchises
-        : statsLevel === "daily"
-          ? api.frontend.teamDayStats
-          : statsLevel === "weekly"
-            ? api.frontend.teamWeekStats
-            : statsLevel === "season"
-              ? api.frontend.teamSeasonStats
-              : api.frontend.teams;
+      typeof options.date === "string"
+        ? options.date
+        : (options.date.toISOString().split("T")[0] ?? "");
   const result = useQuery(
-    functionReference,
+    reference,
     enabled
       ? {
           ...(Object.keys(where).length ? { where } : {}),
@@ -60,19 +56,47 @@ export function useTeams(options: UseTeamsOptions = {}): UseTeamsResult {
         }
       : "skip",
   );
-  const error: Error | null = null;
-
   return {
-    data: (result ?? []) as unknown as TeamResult[],
+    data: result === undefined ? fallback : (result as unknown as T[]),
     isLoading: enabled && result === undefined,
-    error,
   };
 }
 
-export function useNHLTeams(options: Omit<UseTeamsOptions, "teamType"> = {}) {
-  return useTeams({ ...options, teamType: "nhl" });
+export function useTeams(options: UseTeamsOptions = {}) {
+  return useTeamCollection(api.frontend.teams, options, EMPTY_TEAMS);
 }
 
-export function useFranchises(options: Omit<UseTeamsOptions, "teamType"> = {}) {
-  return useTeams({ ...options, teamType: "franchise" });
+export function useNHLTeams(options: UseNHLTeamsOptions = {}) {
+  return useTeamCollection(api.frontend.nhlTeams, options, EMPTY_NHL_TEAMS);
+}
+
+export function useFranchises(options: UseFranchisesOptions = {}) {
+  return useTeamCollection(api.frontend.franchises, options, EMPTY_FRANCHISES);
+}
+
+export function useTeamDayStats(options: UseTeamDayStatsOptions = {}) {
+  return useTeamCollection(
+    api.frontend.teamDayStats,
+    options,
+    EMPTY_DAY_STATS,
+    true,
+  );
+}
+
+export function useTeamWeekStats(options: UseTeamWeekStatsOptions = {}) {
+  return useTeamCollection(
+    api.frontend.teamWeekStats,
+    options,
+    EMPTY_WEEK_STATS,
+    true,
+  );
+}
+
+export function useTeamSeasonStats(options: UseTeamSeasonStatsOptions = {}) {
+  return useTeamCollection(
+    api.frontend.teamSeasonStats,
+    options,
+    EMPTY_SEASON_STATS,
+    true,
+  );
 }

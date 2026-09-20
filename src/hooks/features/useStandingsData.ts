@@ -11,7 +11,6 @@ import {
   type StandingsGroup,
 } from "@gshl-utils";
 import type {
-  TeamSeasonStatLine,
   UseStandingsDataOptions,
   UseStandingsDataResult,
 } from "@gshl-types";
@@ -63,14 +62,11 @@ export function useStandingsData(
   );
   const isPowerRankingsView = requirements.includeWeeklyStats;
 
-  const {
-    data: overrideSeasonData,
-    isLoading: overrideSeasonLoading,
-    error: overrideSeasonError,
-  } = useSeasons({
-    seasonId: shouldResolveOverrideSeason ? selectedSeasonId : null,
-    enabled: shouldResolveOverrideSeason,
-  });
+  const { data: overrideSeasonData, isLoading: overrideSeasonLoading } =
+    useSeasons({
+      seasonId: shouldResolveOverrideSeason ? selectedSeasonId : null,
+      enabled: shouldResolveOverrideSeason,
+    });
   const resolvedSelectedSeason = shouldResolveOverrideSeason
     ? (overrideSeasonData?.[0] ?? null)
     : (selectedSeason ?? null);
@@ -82,12 +78,11 @@ export function useStandingsData(
     teamStats: statsResponse,
     status,
     ready: seasonDataReady,
-    error: seasonDataError,
-  } = useSeasonDataBundle<TeamSeasonStatLine>({
+  } = useSeasonDataBundle({
     seasonId: selectedSeasonId,
     includeMatchups: requirements.includeMatchups,
     includeWeeks: requirements.includeWeeks && !isPowerRankingsView,
-    teamStatsLevel: requirements.includeSeasonStats ? "season" : null,
+    includeSeasonStats: requirements.includeSeasonStats,
     useNavigation: false,
     teamQueryOptions: requirements.includeSeasonStats
       ? { seasonType: SeasonType.REGULAR_SEASON }
@@ -141,11 +136,6 @@ export function useStandingsData(
     status.isLoading ||
     overrideSeasonLoading ||
     (isPowerRankingsView && powerHistoryQuery.isLoading);
-  const error =
-    seasonDataError ??
-    overrideSeasonError ??
-    (isPowerRankingsView ? powerHistoryQuery.error : null) ??
-    null;
 
   return {
     selectedSeason: resolvedSelectedSeason,
@@ -158,11 +148,9 @@ export function useStandingsData(
     powerRankings,
     standingsType,
     isLoading,
-    error: error ?? null,
     ready:
       seasonDataReady &&
       !overrideSeasonLoading &&
-      (!isPowerRankingsView || !powerHistoryQuery.isLoading) &&
-      !error,
+      (!isPowerRankingsView || !powerHistoryQuery.isLoading),
   };
 }

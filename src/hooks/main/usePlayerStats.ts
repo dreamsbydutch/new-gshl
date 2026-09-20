@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import { combineQueryStates } from "@gshl-utils/core/query";
 import { useQueries, useQuery } from "convex/react";
 import type { RequestForQueries } from "convex/react";
 import { api } from "../../../convex/_generated/api";
@@ -16,12 +17,17 @@ import type {
   UsePlayerStatsResult,
 } from "@gshl-types";
 
+const EMPTY_DAY_STATS: PlayerDayStatLine[] = [];
+const EMPTY_WEEK_STATS: PlayerWeekStatLine[] = [];
+const EMPTY_SPLITS: PlayerSplitStatLine[] = [];
+const EMPTY_TOTALS: PlayerTotalStatLine[] = [];
+const EMPTY_CAREER_SPLITS: PlayerCareerSplitStatLine[] = [];
+const EMPTY_NHL_STATS: PlayerNHLStatLine[] = [];
+
 function state<T>(data: T[] | undefined, enabled: boolean) {
   return {
     data,
     isLoading: enabled && data === undefined,
-    isFetching: enabled && data === undefined,
-    error: null,
   };
 }
 
@@ -87,15 +93,15 @@ export function usePlayerStats(
     splits: state(splits, splitsEnabled),
     totals: state(totals, totalsEnabled),
   };
-  const isLoading = Object.values(queries).some((query) => query.isLoading);
+  const status = combineQueryStates(...Object.values(queries));
 
   return {
-    daily: daily ?? [],
-    weekly: weekly ?? [],
-    splits: splits ?? [],
-    totals: totals ?? [],
-    ready: !isLoading,
-    status: { isLoading, isFetching: isLoading, error: null },
+    daily: daily ?? EMPTY_DAY_STATS,
+    weekly: weekly ?? EMPTY_WEEK_STATS,
+    splits: splits ?? EMPTY_SPLITS,
+    totals: totals ?? EMPTY_TOTALS,
+    ready: !status.isLoading,
+    status,
     queries,
   };
 }
@@ -113,9 +119,11 @@ export function useCareerSplits(
       : "skip",
   );
   return {
-    data: (result ?? []) as unknown as PlayerCareerSplitStatLine[],
+    data:
+      result === undefined
+        ? EMPTY_CAREER_SPLITS
+        : (result as unknown as PlayerCareerSplitStatLine[]),
     isLoading: enabled && uniqueTeamIds.length > 0 && result === undefined,
-    error: null,
   };
 }
 
@@ -164,9 +172,11 @@ export function usePlayerTotalsByPlayers(playerIds: string[], enabled = true) {
     enabled && ids.length ? { playerIds: ids as Id<"players">[] } : "skip",
   );
   return {
-    data: (result ?? []) as unknown as PlayerTotalStatLine[],
+    data:
+      result === undefined
+        ? EMPTY_TOTALS
+        : (result as unknown as PlayerTotalStatLine[]),
     isLoading: enabled && ids.length > 0 && result === undefined,
-    error: null,
   };
 }
 
@@ -180,9 +190,11 @@ export function usePlayerNhlStatsByPlayers(
     enabled && ids.length ? { playerIds: ids as Id<"players">[] } : "skip",
   );
   return {
-    data: (result ?? []) as unknown as PlayerNHLStatLine[],
+    data:
+      result === undefined
+        ? EMPTY_NHL_STATS
+        : (result as unknown as PlayerNHLStatLine[]),
     isLoading: enabled && ids.length > 0 && result === undefined,
-    error: null,
   };
 }
 
@@ -192,8 +204,10 @@ export function useLatestPlayerNhlStats(seasonId?: string, enabled = true) {
     enabled && seasonId ? { seasonId: seasonId as Id<"seasons"> } : "skip",
   );
   return {
-    data: (result ?? []) as unknown as PlayerNHLStatLine[],
+    data:
+      result === undefined
+        ? EMPTY_NHL_STATS
+        : (result as unknown as PlayerNHLStatLine[]),
     isLoading: enabled && Boolean(seasonId) && result === undefined,
-    error: null,
   };
 }

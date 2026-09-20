@@ -2,7 +2,6 @@
 
 import { useMemo, useState } from "react";
 import { useJobAdmin, useSeasons, useTeams, useWeeks } from "@gshl-hooks";
-import type { GSHLTeam } from "@gshl-types";
 import { Button } from "@gshl-ui";
 
 const activeStatuses = new Set([
@@ -43,7 +42,7 @@ export function JobManagement() {
   );
   const teams = useMemo(
     () =>
-      ([...teamsQuery.data] as GSHLTeam[]).sort((left, right) =>
+      [...teamsQuery.data].sort((left, right) =>
         String(left.name ?? left.abbr ?? "").localeCompare(
           String(right.name ?? right.abbr ?? ""),
         ),

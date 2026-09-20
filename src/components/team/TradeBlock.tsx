@@ -46,10 +46,7 @@ export function TradeBlock({
   const [note, setNote] = useState("");
   const [isEditing, setIsEditing] = useState(false);
 
-  const nhlTeams = useMemo(
-    () => nhlTeamsQuery.data.filter((team): team is NHLTeam => "abbr" in team),
-    [nhlTeamsQuery.data],
-  );
+  const nhlTeams = nhlTeamsQuery.data;
   const candidates = useMemo(
     () => market.data?.candidates ?? [],
     [market.data?.candidates],

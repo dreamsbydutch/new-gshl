@@ -3,7 +3,6 @@
 import { useCallback, useMemo, useState } from "react";
 
 import type {
-  GSHLTeam,
   UseTeamDraftPickHistoryDataOptions,
   UseTeamDraftPickHistoryDataResult,
 } from "@gshl-types";
@@ -50,10 +49,7 @@ export function useTeamDraftPickHistoryData({
     seasonId: selectedSeasonId,
     enabled: enabled && Boolean(selectedSeasonId),
   });
-  const teams = useMemo(
-    () => (teamsQuery.data ?? []) as GSHLTeam[],
-    [teamsQuery.data],
-  );
+  const teams = teamsQuery.data;
   const selectedTeam = useMemo(
     () => resolveDraftPickSeasonTeam(teams, currentTeam),
     [currentTeam, teams],
