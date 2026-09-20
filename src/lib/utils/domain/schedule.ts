@@ -5,6 +5,7 @@
  * Used across team-schedule and weekly-schedule features.
  */
 
+import { isIsoDateInRange, toLocalIsoDateOnly } from "../core/date";
 import type { Matchup, Week } from "@gshl-types";
 
 /**
@@ -105,6 +106,24 @@ type RankDisplayOptions = {
   threshold?: number;
 };
 
+type WeekDateRange = Pick<Week, "endDate" | "id" | "startDate">;
+
+type SelectWeekForReferenceDateOptions<TWeek extends WeekDateRange> = {
+  /**
+   * The weeks to evaluate. They may be in any order and are never mutated.
+   */
+  weeks: readonly TWeek[];
+  /**
+   * The instant whose local calendar day determines the selection. Week dates
+   * are date-only values, so this deliberately uses the caller's local day.
+   */
+  referenceDate: Date;
+  /**
+   * Whether an unmatched reference date resolves to the first supplied week.
+   */
+  fallback?: "first" | "none";
+};
+
 /**
  * Checks whether empty filter value.
  *
@@ -115,6 +134,44 @@ function isEmptyFilterValue(
   value: string | number | null | undefined,
 ): boolean {
   return value === null || value === undefined || value === "";
+}
+
+/**
+ * Selects the week most relevant to a reference date.
+ *
+ * Selection prefers a week containing the reference date, then the nearest
+ * upcoming week, then the most recently completed week. Weeks can arrive in
+ * any order; this function sorts a copy and leaves the caller's array intact.
+ * When no dated week applies, callers can opt into the first supplied week as
+ * a fallback.
+ */
+export function selectWeekForReferenceDate<TWeek extends WeekDateRange>({
+  weeks,
+  referenceDate,
+  fallback = "none",
+}: SelectWeekForReferenceDateOptions<TWeek>): TWeek | null {
+  if (!weeks.length) return null;
+
+  const referenceDay = toLocalIsoDateOnly(referenceDate);
+  const chronologicalWeeks = [...weeks].sort((left, right) =>
+    left.startDate.localeCompare(right.startDate),
+  );
+  const currentWeek = chronologicalWeeks.find((week) =>
+    isIsoDateInRange(referenceDay, week.startDate, week.endDate),
+  );
+  if (currentWeek) return currentWeek;
+
+  const nextWeek = chronologicalWeeks.find(
+    (week) => week.startDate > referenceDay,
+  );
+  if (nextWeek) return nextWeek;
+
+  const previousWeek = chronologicalWeeks
+    .filter((week) => week.endDate < referenceDay)
+    .at(-1);
+  if (previousWeek) return previousWeek;
+
+  return fallback === "first" ? (weeks[0] ?? null) : null;
 }
 
 /**
