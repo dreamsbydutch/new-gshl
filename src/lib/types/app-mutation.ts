@@ -14,15 +14,15 @@ export type ActionReference = FunctionReference<
   unknown
 >;
 
-export interface AppMutationOptions {
-  onSuccess?: (value: unknown) => void;
+export interface AppMutationOptions<TResult = unknown> {
+  onSuccess?: (value: TResult) => void;
   onError?: (error: Error) => void;
   onSettled?: () => void;
 }
 
-export interface AppMutationController<TArgs> {
-  mutate: (args: TArgs, options?: AppMutationOptions) => void;
-  mutateAsync: (args: TArgs) => Promise<unknown>;
+export interface AppMutationController<TArgs, TResult = unknown> {
+  mutate: (args: TArgs, options?: AppMutationOptions<TResult>) => void;
+  mutateAsync: (args: TArgs) => Promise<TResult>;
   isPending: boolean;
   error: Error | null;
 }

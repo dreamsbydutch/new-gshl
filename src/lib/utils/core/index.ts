@@ -3,6 +3,7 @@ export * from "./auth-callback";
 export * from "./constants";
 export * from "./data";
 export * from "./date";
+export * from "./error";
 export * from "./format";
 export * from "./ids";
 export * from "./string";
