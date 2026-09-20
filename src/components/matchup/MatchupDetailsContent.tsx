@@ -26,7 +26,7 @@ import {
   formatMatchupPlayerPositions,
   formatStatValue,
   formatWeekRange,
-  getGameTypeDisplay,
+  getScheduleGameTypeDisplay,
   getStarPlayers,
   resolveMatchupCategories,
   toStatNumber,
@@ -479,13 +479,13 @@ export function MatchupDetailsContent({
 
   const weekRange = formatWeekRange(week?.startDate, week?.endDate);
   const gameDisplay = matchup
-    ? getGameTypeDisplay(
-        String(matchup.gameType),
-        week ?? undefined,
-        "HOME",
-        awayTeam ?? undefined,
-        homeTeam ?? undefined,
-      )
+    ? getScheduleGameTypeDisplay({
+        awayTeam: awayTeam ?? undefined,
+        gameType: String(matchup.gameType),
+        homeTeam: homeTeam ?? undefined,
+        location: "HOME",
+        week: week ?? undefined,
+      })
     : null;
 
   if (matchupQuery.isLoading) {

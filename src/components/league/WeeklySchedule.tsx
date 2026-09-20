@@ -15,10 +15,10 @@ import type {
 import {
   buildMatchupNavigationHref,
   buildScheduleNavigationHref,
-  getScoreClass,
-  isMatchupCompleted,
-  isValidMatchup,
-  shouldDisplayRanking,
+  getMatchupOutcomeClass,
+  isScheduleItemComplete,
+  isValidScheduleMatchup,
+  shouldDisplayRank,
   TEAM_LOGO_DIMENSIONS,
 } from "@gshl-utils";
 import { useAuthSession, useWeeklyScheduleData } from "@gshl-hooks";
@@ -36,7 +36,7 @@ const ScheduleHeader = () => (
 );
 
 const ScoreDisplay = ({ matchup }: ScoreDisplayProps) => {
-  if (!isMatchupCompleted(matchup)) {
+  if (!isScheduleItemComplete({ matchup, mode: "scores" })) {
     return (
       <div className="xs:text-lg col-span-2 text-center font-oswald text-xl">
         @
@@ -46,11 +46,25 @@ const ScoreDisplay = ({ matchup }: ScoreDisplayProps) => {
 
   return (
     <div className="xs:text-lg col-span-2 text-center font-oswald text-xl">
-      <span className={getScoreClass(!!matchup.awayWin, !!matchup.homeWin)}>
+      <span
+        className={getMatchupOutcomeClass({
+          isLoser: !!matchup.homeWin,
+          isWinner: !!matchup.awayWin,
+          lossClass: "text-rose-800",
+          winClass: "font-bold text-emerald-700",
+        })}
+      >
         {matchup.awayScore}
       </span>
       {" - "}
-      <span className={getScoreClass(!!matchup.homeWin, !!matchup.awayWin)}>
+      <span
+        className={getMatchupOutcomeClass({
+          isLoser: !!matchup.awayWin,
+          isWinner: !!matchup.homeWin,
+          lossClass: "text-rose-800",
+          winClass: "font-bold text-emerald-700",
+        })}
+      >
         {matchup.homeScore}
       </span>
     </div>
@@ -62,7 +76,7 @@ const TeamDisplay = ({ team, rank, isAway = false }: TeamDisplayProps) => {
 
   return (
     <div className="col-span-4 flex min-w-0 items-center justify-center gap-1.5 p-1 text-center">
-      {shouldDisplayRanking(rank) ? (
+      {shouldDisplayRank(rank) ? (
         <span className="font-oswald text-xs font-bold text-slate-500">
           #{rank}
         </span>
@@ -93,7 +107,11 @@ const WeekScheduleItem = ({
   const homeTeam = teams.find((team) => team.id === matchup.homeTeamId);
   const awayTeam = teams.find((team) => team.id === matchup.awayTeamId);
 
-  if (!homeTeam || !awayTeam || !isValidMatchup(matchup, homeTeam, awayTeam)) {
+  if (
+    !homeTeam ||
+    !awayTeam ||
+    !isValidScheduleMatchup({ matchup, homeTeam, awayTeam })
+  ) {
     return <WeeklyMatchupRowSkeleton />;
   }
 
@@ -130,7 +148,7 @@ export function WeeklySchedule() {
     const homeTeam = teams.find((team) => team.id === matchup.homeTeamId);
     const awayName = awayTeam?.name ?? "Away team";
     const homeName = homeTeam?.name ?? "Home team";
-    const matchupLabel = isMatchupCompleted(matchup)
+    const matchupLabel = isScheduleItemComplete({ matchup, mode: "scores" })
       ? `${awayName} ${matchup.awayScore} - ${matchup.homeScore} ${homeName}`
       : `${awayName} at ${homeName}`;
     return `${index + 1}. ${matchupLabel}`;

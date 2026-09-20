@@ -4,7 +4,7 @@ import Link from "next/link";
 import type { TeamScheduleItemProps } from "@gshl-types";
 import { useTeamScheduleMatchupDetails } from "@gshl-hooks";
 import { MatchupStatsSkeleton } from "@gshl-skeletons";
-import { formatOpponentDisplay } from "@gshl-utils";
+import { formatScheduleOpponent } from "@gshl-utils";
 import { GameResult } from "./GameResult";
 import { MatchupStatsTable } from "./MatchupStatsTable";
 import { OpponentDisplay } from "./OpponentDisplay";
@@ -45,12 +45,12 @@ export function TeamScheduleItem({
     selectedTeamId,
   });
 
-  const opponentText = formatOpponentDisplay(
-    gameLocation,
-    matchup,
-    homeTeam,
+  const opponentText = formatScheduleOpponent({
     awayTeam,
-  );
+    homeTeam,
+    location: gameLocation,
+    matchup,
+  });
   const disclosureId = `team-schedule-matchup-${matchup.id}-details`;
   const triggerId = `team-schedule-matchup-${matchup.id}-trigger`;
 

@@ -1,5 +1,9 @@
 import { optimizedSheetsClient } from "../client/optimized-client";
 import {
+  columnToLetter,
+  planCompositeKeyUpsert,
+} from "../../../../shared/sheets-core/index";
+import {
   getSpreadsheetIdsForModel,
   serializeCsvMultiValue,
   SHEETS_CONFIG,
@@ -54,19 +58,6 @@ function stringifyPrimitive(value: string | number | boolean): string {
   return typeof value === "string" ? value : String(value);
 }
 
-function normalizeColumnKey(value: unknown): string {
-  if (
-    typeof value === "string" ||
-    typeof value === "number" ||
-    typeof value === "boolean" ||
-    typeof value === "bigint"
-  ) {
-    return value.toString().trim().toLowerCase();
-  }
-
-  return "";
-}
-
 function isDateOnlyColumn(column: string): boolean {
   return column === "date" || column.endsWith("Date") || column === "birthday";
 }
@@ -75,19 +66,6 @@ function isCsvMultiValueColumn(column: string): boolean {
   return (
     column === "nhlPos" || column === "nhlTeam" || column === "gshlTeamIds"
   );
-}
-
-function columnToLetter(columnIndex1: number): string {
-  let columnIndex = columnIndex1;
-  let letter = "";
-
-  while (columnIndex > 0) {
-    const remainder = (columnIndex - 1) % 26;
-    letter = String.fromCharCode(65 + remainder) + letter;
-    columnIndex = Math.floor((columnIndex - 1) / 26);
-  }
-
-  return letter;
 }
 
 function normalizeWriteValue(
@@ -142,47 +120,11 @@ function normalizeCompositeKeyPart(column: string, value: unknown): string {
   return "";
 }
 
-function makeCompositeKey(
-  source: Record<string, unknown>,
-  keyColumns: readonly string[],
-): string {
-  return keyColumns
-    .map((column) => normalizeCompositeKeyPart(column, source[column]))
-    .join("|");
-}
-
-function rowToRecord(
-  header: readonly string[],
-  row: readonly PrimitiveCellValue[],
-): Record<string, PrimitiveCellValue> {
-  const record: Record<string, PrimitiveCellValue> = {};
-  header.forEach((column, index) => {
-    record[column] = row[index] ?? "";
-  });
-  return record;
-}
-
 function normalizeComparableCellValue(value: PrimitiveCellValue): string {
   if (value === null || value === undefined || value === "") {
     return "";
   }
   return String(value).trim();
-}
-
-function rowsMatch(
-  left: readonly PrimitiveCellValue[],
-  right: readonly PrimitiveCellValue[],
-): boolean {
-  const maxLength = Math.max(left.length, right.length);
-  for (let index = 0; index < maxLength; index += 1) {
-    if (
-      normalizeComparableCellValue(left[index] ?? "") !==
-      normalizeComparableCellValue(right[index] ?? "")
-    ) {
-      return false;
-    }
-  }
-  return true;
 }
 
 function getChangedFields(
@@ -209,31 +151,6 @@ function getChangedFields(
   return changedFields;
 }
 
-function buildRowFromObject(
-  header: readonly string[],
-  item: Record<string, unknown>,
-  existingRow: readonly PrimitiveCellValue[] | null,
-  merge: boolean,
-): PrimitiveCellValue[] {
-  const itemKeyMap = new Map<string, string>();
-  Object.keys(item).forEach((key) => {
-    itemKeyMap.set(normalizeColumnKey(key), key);
-  });
-
-  return header.map((column, index) => {
-    const directKey = Object.prototype.hasOwnProperty.call(item, column)
-      ? column
-      : itemKeyMap.get(normalizeColumnKey(column));
-    if (directKey && Object.prototype.hasOwnProperty.call(item, directKey)) {
-      return normalizeWriteValue(column, item[directKey]);
-    }
-    if (merge && existingRow) {
-      return existingRow[index] ?? "";
-    }
-    return "";
-  });
-}
-
 async function findRowNumberById(
   modelName: keyof typeof SHEETS_CONFIG.SHEETS,
   id: string,
@@ -254,7 +171,7 @@ async function findRowNumberById(
     throw new Error(`Model ${String(modelName)} has no 'id' column mapping`);
   }
 
-  const idColLetter = columnToLetter(idColumnIndex + 1);
+  const idColLetter = columnToLetter({ columnIndex: idColumnIndex + 1 });
   const idColumnRange = `${sheetName}!${idColLetter}2:${idColLetter}`;
 
   for (const spreadsheetId of getSpreadsheetIdsForModel(String(modelName))) {
@@ -300,7 +217,7 @@ export class MinimalSheetsWriter {
     for (const [key, value] of updates) {
       const colIndex = columns.indexOf(key as never);
       if (colIndex < 0) continue;
-      const colLetter = columnToLetter(colIndex + 1);
+      const colLetter = columnToLetter({ columnIndex: colIndex + 1 });
       const range = `${location.sheetName}!${colLetter}${location.rowNumber}`;
 
       await optimizedSheetsClient.updateValues(location.spreadsheetId, range, [
@@ -352,10 +269,6 @@ export class MinimalSheetsWriter {
       );
     }
 
-    const merge = options.merge ?? true;
-    const updatedAtColumn = options.updatedAtColumn;
-    const createdAtColumn = options.createdAtColumn;
-    const idColumn = options.idColumn;
     const diagnosticsOptions =
       options.diagnostics && typeof options.diagnostics === "object"
         ? options.diagnostics
@@ -373,166 +286,68 @@ export class MinimalSheetsWriter {
     const header = (rawRows[0] ?? []).map((cell) => String(cell ?? "").trim());
     const headerColumns = header.length ? header : [...columns];
     const dataRows = rawRows.slice(1);
-    const headerIndex = new Map<string, number>();
-
-    headerColumns.forEach((column, index) => {
-      if (column) {
-        headerIndex.set(column, index);
-      }
+    const plan = planCompositeKeyUpsert({
+      headerColumns,
+      existingRows: dataRows,
+      incomingRows: rows,
+      keyColumns,
+      merge: options.merge ?? true,
+      idColumn: options.idColumn,
+      createdAtColumn: options.createdAtColumn,
+      updatedAtColumn: options.updatedAtColumn,
+      nowIso,
+      generateId: options.generateId,
+      normalizeValue: ({ column, value }) => normalizeWriteValue(column, value),
+      normalizeKeyPart: ({ column, value }) =>
+        normalizeCompositeKeyPart(column, value),
+      cellsMatch: ({ left, right }) =>
+        normalizeComparableCellValue(left) === normalizeComparableCellValue(right),
     });
-
-    for (const keyColumn of keyColumns) {
-      if (!headerIndex.has(keyColumn)) {
-        throw new Error(
-          `Sheet ${sheetName} is missing composite key column ${keyColumn}.`,
-        );
-      }
-    }
-
-    const existingByKey = new Map<
-      string,
-      { rowNumber: number; row: PrimitiveCellValue[] }
-    >();
-    let maxNumericId = 0;
-    const idIndex = idColumn ? headerIndex.get(idColumn) : undefined;
-
-    dataRows.forEach((row, rowOffset) => {
-      const paddedRow = headerColumns.map((_column, index) => row[index] ?? "");
-      const key = makeCompositeKey(
-        rowToRecord(headerColumns, paddedRow),
-        keyColumns,
-      );
-      if (!key) {
-        return;
-      }
-      existingByKey.set(key, { rowNumber: rowOffset + 2, row: paddedRow });
-      if (idIndex !== undefined) {
-        const idValue = paddedRow[idIndex];
-        const numericId = Number(String(idValue ?? "").trim());
-        if (Number.isFinite(numericId) && numericId > maxNumericId) {
-          maxNumericId = numericId;
-        }
-      }
-    });
-
-    const updates = new Map<number, PrimitiveCellValue[]>();
-    const inserts: PrimitiveCellValue[][] = [];
-    const incomingSeen = new Set<string>();
     const changedColumnCounts = new Map<string, number>();
     const sampleUpdates: CompositeKeyDiffSample[] = [];
-    let updated = 0;
-    let inserted = 0;
-    let unchanged = 0;
-    let nextNumericId = maxNumericId + 1;
-
-    for (const row of rows) {
-      const mutableRow: Record<string, unknown> = { ...row };
-      const key = makeCompositeKey(mutableRow, keyColumns);
-      if (!key) {
-        throw new Error(
-          `Cannot upsert ${String(modelName)} row without composite key ${keyColumns.join(", ")}.`,
-        );
-      }
-      if (incomingSeen.has(key)) {
-        continue;
-      }
-      incomingSeen.add(key);
-
-      const existing = existingByKey.get(key);
-      if (existing) {
-        const candidateRow = buildRowFromObject(
-          headerColumns,
-          mutableRow,
-          existing.row,
-          merge,
-        );
-        if (rowsMatch(existing.row, candidateRow)) {
-          unchanged += 1;
-          continue;
-        }
-        if (captureDiagnostics) {
-          const changedFields = getChangedFields(
-            headerColumns,
-            existing.row,
-            candidateRow,
+    if (captureDiagnostics)
+      for (const [rowIndex, nextRow] of plan.updates) {
+        const existingRow = dataRows[rowIndex - 1] ?? [];
+        const changedFields = getChangedFields(headerColumns, existingRow, nextRow)
+          .filter((field) => field.column !== options.updatedAtColumn);
+        for (const changedField of changedFields)
+          changedColumnCounts.set(
+            changedField.column,
+            (changedColumnCounts.get(changedField.column) ?? 0) + 1,
           );
-          for (const changedField of changedFields) {
-            changedColumnCounts.set(
-              changedField.column,
-              (changedColumnCounts.get(changedField.column) ?? 0) + 1,
-            );
-          }
-          if (sampleUpdates.length < maxDiffSamples) {
-            sampleUpdates.push({
-              key,
-              rowNumber: existing.rowNumber,
-              changedFields: changedFields.slice(0, maxFieldsPerSample),
-            });
-          }
-        }
-        const nextRow = [...candidateRow];
-        if (updatedAtColumn) {
-          const updatedAtIndex = headerIndex.get(updatedAtColumn);
-          if (updatedAtIndex !== undefined) {
-            nextRow[updatedAtIndex] = normalizeWriteValue(
-              updatedAtColumn,
-              nowIso,
-            );
-          }
-        }
-        if (createdAtColumn) {
-          const createdAtIndex = headerIndex.get(createdAtColumn);
-          if (
-            createdAtIndex !== undefined &&
-            existing.row[createdAtIndex] !== undefined &&
-            existing.row[createdAtIndex] !== ""
-          ) {
-            nextRow[createdAtIndex] = existing.row[createdAtIndex] ?? "";
-          }
-        }
-        updates.set(existing.rowNumber - 1, nextRow);
-        updated += 1;
-        continue;
+        if (sampleUpdates.length < maxDiffSamples)
+          sampleUpdates.push({
+            key: plan.updateKeys.get(rowIndex) ?? String(rowIndex),
+            rowNumber: rowIndex + 1,
+            changedFields: changedFields.slice(0, maxFieldsPerSample),
+          });
       }
 
-      if (idColumn && !mutableRow[idColumn]) {
-        mutableRow[idColumn] = options.generateId
-          ? options.generateId()
-          : String(nextNumericId++);
-      }
-      if (createdAtColumn && !mutableRow[createdAtColumn]) {
-        mutableRow[createdAtColumn] = nowIso;
-      }
-
-      inserts.push(buildRowFromObject(headerColumns, mutableRow, null, false));
-      inserted += 1;
-    }
-
-    if (updates.size > 0) {
+    if (plan.updates.size > 0) {
       await optimizedSheetsClient.updateRowsByIds(
         spreadsheetId,
         sheetName,
-        updates,
+        plan.updates,
       );
     }
 
-    if (inserts.length > 0) {
+    if (plan.inserts.length > 0) {
       await optimizedSheetsClient.appendValuesBatch(
         spreadsheetId,
         sheetName,
-        inserts,
+        plan.inserts,
       );
     }
 
     fastSheetsReader.clearCache(modelName);
 
     return {
-      updated,
-      inserted,
+      updated: plan.updated,
+      inserted: plan.inserted,
       deleted: 0,
       duplicateDeletes: 0,
-      unchanged,
-      total: updated + inserted,
+      unchanged: plan.unchanged,
+      total: plan.updated + plan.inserted,
       diagnostics: captureDiagnostics
         ? {
             changedColumns: Array.from(changedColumnCounts.entries())
