@@ -294,7 +294,8 @@ export function buildMockDraftProjection<
 
 /**
  * Uses the same composite as Best Available, then measures the improvement
- * after fitting each candidate into the team's existing lineup.
+ * after fitting each candidate into the team's existing lineup. Auto selects
+ * the fifth-best improvement, or the best when fewer than five players remain.
  */
 export function selectAutoDraftPlayer<TPlayer extends AutoDraftCandidate>(
   players: readonly TPlayer[],
@@ -314,30 +315,35 @@ export function selectAutoDraftPlayer<TPlayer extends AutoDraftCandidate>(
   const roster = teamRoster.map(toLineupPlayer);
   const currentPoints = calculatePointsAfterFullLineupOptimization(roster);
   const rankOf = (player: TPlayer) => ranks.get(String(player.id)) ?? Infinity;
-  const bestByEligibility = new Map<string, TPlayer>();
-  for (const player of players) {
+  const selectionRank = players.length >= 5 ? 5 : 1;
+  const bestByEligibility = new Map<string, TPlayer[]>();
+  for (const player of [...players].sort((a, b) => rankOf(a) - rankOf(b))) {
     const key = [...new Set(normalizePlayerPositions(player))].sort().join("|");
-    const current = bestByEligibility.get(key);
-    if (!current || rankOf(player) < rankOf(current))
-      bestByEligibility.set(key, player);
-  }
-  let projectedPlayer: TPlayer | undefined;
-  let bestGain = Number.NEGATIVE_INFINITY;
-  for (const candidate of bestByEligibility.values()) {
-    const gain =
-      calculatePointsAfterFullLineupOptimization([
-        ...roster,
-        toLineupPlayer({ ...candidate, lineupPos: null }),
-      ]) - currentPoints;
-    const tied = Math.abs(gain - bestGain) < 1e-9;
-    if (
-      (!tied && gain > bestGain) ||
-      (tied &&
-        (!projectedPlayer || rankOf(candidate) < rankOf(projectedPlayer)))
-    ) {
-      projectedPlayer = candidate;
-      bestGain = gain;
+    const current = bestByEligibility.get(key) ?? [];
+    // A sixth player with identical eligibility cannot outrank all five ahead
+    // of them. Keep five per group, rather than only the former best candidate.
+    if (current.length < selectionRank) {
+      current.push(player);
+      bestByEligibility.set(key, current);
     }
   }
-  return { player: projectedPlayer, score: bestGain };
+  const options = [...bestByEligibility.values()].flat().map((player) => ({
+    player,
+    score:
+      calculatePointsAfterFullLineupOptimization([
+        ...roster,
+        toLineupPlayer({ ...player, lineupPos: null }),
+      ]) - currentPoints,
+  }));
+  options.sort((a, b) =>
+    Math.abs(a.score - b.score) < 1e-9
+      ? rankOf(a.player) - rankOf(b.player)
+      : b.score - a.score,
+  );
+  return (
+    options[selectionRank - 1] ?? {
+      player: undefined,
+      score: Number.NEGATIVE_INFINITY,
+    }
+  );
 }

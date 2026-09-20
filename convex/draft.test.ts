@@ -7,7 +7,7 @@ import type {
 } from "convex/server";
 import type { MutationCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
-import { notifyState, setTeamMode, submitPick, undoPick } from "./draft";
+import { notifyState, setTeamMode, state, submitPick, undoPick } from "./draft";
 import { nextDraftMode } from "./lib/draftMode";
 function handler<A extends DefaultFunctionArgs>(
   fn:
@@ -112,6 +112,22 @@ function fixture() {
 
 const seasonId = "season" as Id<"seasons">;
 const teamId = "team" as Id<"teams">;
+void test("saved draft mode survives fresh hub reads and scheduled processing", async () => {
+  const f = draftFixture(Date.now() + 60000);
+  for (const auto of [true, false, true]) {
+    await handler(setTeamMode)(f.ctx, { teamId, auto });
+    await handler(notifyState)(f.ctx, { seasonId });
+    for (let read = 0; read < 2; read++) {
+      const result = (await handler(state)(f.ctx, { seasonId })) as {
+        teams: { id: string; draftAuto: boolean }[];
+      };
+      assert.equal(
+        result.teams.find((team) => team.id === teamId)?.draftAuto,
+        auto,
+      );
+    }
+  }
+});
 function draftFixture(start = Date.now() - 300000) {
   const f = fixture();
   f.put("seasons", "season", {
@@ -282,6 +298,35 @@ void test("server auto picks follow the combined ranking rather than raw talent"
   assert.equal(f.get("pick1")!.playerId, "player2");
 });
 
+for (const mode of ["timeout", "auto"] as const) {
+  void test(`${mode} selects the fifth-best eligible player after exclusions`, async () => {
+    const f = draftFixture(mode === "auto" ? Date.now() - 1000 : undefined);
+    for (let rank = 1; rank <= 8; rank++) {
+      f.put("players", "player" + rank, {
+        isActive: true,
+        fullName: "Player " + rank,
+        nhlPos: ["C"],
+        overallRk: rank,
+        yahooDraftRk: rank,
+        dailyFaceoffRk: rank,
+        nhlRk: rank,
+      });
+    }
+    f.put("contracts", "contract", {
+      playerId: "player1",
+      ownerId: "other-owner",
+      startDate: 0,
+      expiryDate: Date.now() + 86400000,
+    });
+    f.get("pick4")!.playerId = "player2";
+    f.get("pick4")!.isSigning = true;
+    if (mode === "auto")
+      await handler(setTeamMode)(f.ctx, { teamId, auto: true });
+    await handler(notifyState)(f.ctx, { seasonId });
+    assert.equal(f.get("pick1")!.playerId, "player7");
+  });
+}
+
 void test("server auto picks account for the contracted roster using the same composite", async () => {
   const f = draftFixture();
   for (let i = 1; i <= 4; i++) {
@@ -303,3 +348,38 @@ void test("server auto picks account for the contracted roster using the same co
   await handler(notifyState)(f.ctx, { seasonId });
   assert.equal(f.get("pick1")!.playerId, "player3");
 });
+
+for (const [fromRound, toRound, minutes] of [
+  [4, 5, 3],
+  [6, 7, 2],
+] as const) {
+  void test(`advancing into round ${toRound} and undoing its pick both use ${minutes} minutes`, async () => {
+    const f = draftFixture(Date.now() - 1000);
+    for (let i = 1; i <= 4; i++) f.get("pick" + i)!.round = fromRound + i - 1;
+    await handler(submitPick)(f.ctx, {
+      seasonId,
+      pickId: "pick1",
+      playerId: "player1",
+    });
+    assert.equal(
+      Number(f.get("pick2")!.onClockExpiresAt) -
+        Number(f.get("pick2")!.onClockStartedAt),
+      minutes * 60000,
+    );
+    await handler(submitPick)(f.ctx, {
+      seasonId,
+      pickId: "pick2",
+      playerId: "player2",
+    });
+    f.get("user")!.role = "commissioner";
+    await handler(undoPick)(f.ctx, { seasonId, pickId: "pick2" });
+    assert.equal(
+      Number(f.get("pick2")!.onClockExpiresAt) -
+        Number(f.get("pick2")!.onClockStartedAt),
+      minutes * 60000,
+    );
+    f.get("pick2")!.onClockExpiresAt = Date.now() - 1;
+    await handler(notifyState)(f.ctx, { seasonId });
+    assert.ok(f.get("pick2")!.playerId);
+  });
+}

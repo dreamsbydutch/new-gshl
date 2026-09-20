@@ -25,7 +25,7 @@ import type {
   RosterPosition as RosterPositionType,
 } from "../src/lib/types";
 import {
-  DRAFT_PICK_CLOCK_MS,
+  getDraftPickClockMs,
   findLatestCompletedLiveDraftPick,
   resolveDraftClockState,
   serializeDraftHubPick,
@@ -461,7 +461,7 @@ async function completePick(
     onClockExpiresAt:
       toUtcTimestamp(activeRow.onClockExpiresAt) ??
       toUtcTimestamp(clock.clockExpiresAt) ??
-      nowTimestamp + DRAFT_PICK_CLOCK_MS,
+      nowTimestamp + getDraftPickClockMs(activeRow.round),
     onClockEndedAt: nowTimestamp,
     isSigning: false,
     updatedAt: nowTimestamp,
@@ -474,7 +474,7 @@ async function completePick(
   if (nextPick) {
     await ctx.db.patch(nextPick._id, {
       onClockStartedAt: nowTimestamp,
-      onClockExpiresAt: nowTimestamp + DRAFT_PICK_CLOCK_MS,
+      onClockExpiresAt: nowTimestamp + getDraftPickClockMs(nextPick.round),
       onClockEndedAt: null,
       updatedAt: nowTimestamp,
     });
@@ -610,7 +610,8 @@ export const undoPick = mutation({
     await ctx.db.patch(latestCompletedPick._id, {
       playerId: null,
       onClockStartedAt: restartedAt,
-      onClockExpiresAt: restartedAt + DRAFT_PICK_CLOCK_MS,
+      onClockExpiresAt:
+        restartedAt + getDraftPickClockMs(latestCompletedPick.round),
       onClockEndedAt: null,
       updatedAt: nowTimestamp,
     });

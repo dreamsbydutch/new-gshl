@@ -180,6 +180,10 @@ The Draft Hub has a compact Live/Auto switch at the top right. Live is grayscale
 Auto is red. Owners control their own season team. Commissioners can select any
 team and change its mode. Viewers cannot change draft modes.
 
+The pick clock is four minutes in rounds 1–4, three minutes in rounds 5–6,
+and two minutes from round 7 onward. Each new or restarted turn uses its round's
+duration. A turn already running keeps its recorded expiry.
+
 A clock timeout selects the roster-optimized suggested player on the server. Two
 consecutive timeouts for the same team enable Auto for its remaining picks. Auto
 teams pick immediately when their turn arrives, without waiting for the clock.
@@ -197,13 +201,18 @@ Best Available: Yahoo 30%, Daily Faceoff 30%, NHL 25%, and GSHL overall rank 15%
 The existing normalization and missing-rank handling apply to every source.
 
 The combined score supplies player value for the existing lineup optimizer;
-raw talent ratings do not override it. A recommendation maximizes the gain
+raw talent ratings do not override it. Candidates are ordered by their gain
 in the team's weighted lineup, so an open position can take priority over a
 similarly ranked player at a filled position. For this calculation, a normalized
 composite score of zero is worth 101 points and a score of one is worth one
 point. Roster players use the available pool's normalization so adding them
 does not change the order of the available players. These are temporary
 draft-selection values, not stored player ratings.
+
+Auto-draft selects the fifth-best roster improvement, with the combined draft
+rank breaking ties. This applies to timeouts, persistent Auto mode, potential
+auto-picks, and mock projections. If fewer than five eligible players remain,
+it selects the best remaining option; an empty pool produces no selection.
 
 Each projection begins with the team's signed roster and completed selections.
 Projected picks then update that roster and remove the selected player from

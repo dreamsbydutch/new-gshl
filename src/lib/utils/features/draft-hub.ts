@@ -13,7 +13,13 @@ import type {
 } from "@gshl-types";
 import { findCurrentSeason, findUpcomingSeason } from "../domain/season";
 
-export const DRAFT_PICK_CLOCK_MS = 4 * 60 * 1000;
+export function getDraftPickClockMs(
+  round: string | number | null | undefined,
+): number {
+  const roundNumber = Number(round);
+  const minutes = roundNumber > 6 ? 2 : roundNumber > 4 ? 3 : 4;
+  return minutes * 60 * 1000;
+}
 export const ESTIMATED_DRAFT_PICK_MS = 82 * 1000;
 
 const DRAFT_RANK_SORT_KEYS = new Set<DraftPlayerSortKey>([
@@ -368,7 +374,9 @@ export function resolveDraftClockState(
   const storedExpiry = timestamp(activePick.onClockExpiresAt);
   const expiresAt =
     storedExpiry ??
-    (startedAt === null ? null : startedAt + DRAFT_PICK_CLOCK_MS);
+    (startedAt === null
+      ? null
+      : startedAt + getDraftPickClockMs(activePick.round));
   let status: DraftHubStatus = "unavailable";
 
   if (draftStart !== null && nowTime < draftStart) {

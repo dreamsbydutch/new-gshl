@@ -62,7 +62,8 @@ keep their old icon; test a new notification after the service worker updates.
   the pick's current team and franchise owner, including traded picks.
 - Up-next alerts cover the next two selections, once per upcoming pick version.
   A user's next pick is suppressed while that user is already on the clock.
-- The existing four-minute draft clock schedules its final-minute reminder.
+- The round-based draft clock (four minutes in rounds 1–4, three in rounds
+  5–6, and two from round 7 onward) schedules its final-minute reminder.
   Expired clocks do not produce actionable turn reminders.
 - Pick confirmations are emitted within the pick transaction. Draft completion
   is announced after the final selection, including after undo and re-completion.

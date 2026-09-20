@@ -258,6 +258,61 @@ function rankedPlayer(
   });
 }
 
+void test("auto draft chooses the fifth-best composite option, including identical positions", () => {
+  const candidates = Array.from({ length: 10 }, (_, index) =>
+    rankedPlayer(`candidate-${index + 1}`, index + 1, ["C"], {
+      overallRating: index * 10,
+    }),
+  );
+  assert.equal(selectAutoDraftPlayer(candidates, []).player?.id, "candidate-5");
+  assert.equal(
+    selectAutoDraftPlayer([...candidates].reverse(), []).player?.id,
+    "candidate-5",
+  );
+  const projection = buildMockDraftProjection({
+    seasonDraftPicks: [pick("first", 1), pick("second", 2)],
+    draftPlayers: candidates,
+    rosterPlayers: [],
+    teams: [team()],
+  });
+  assert.deepEqual(
+    projection.map((entry) => entry.projectedPlayer?.id),
+    ["candidate-5", "candidate-6"],
+  );
+});
+
+void test("fifth-best selection still accounts for the signed roster", () => {
+  const candidates = [
+    rankedPlayer("defenseman", 4, ["D"]),
+    ...[5, 6, 7, 8, 9].map((rank) =>
+      rankedPlayer(`wing-${rank}`, rank, ["RW"]),
+    ),
+    rankedPlayer("depth", 200, ["D"]),
+  ];
+  const roster = [1, 2, 3].map((rank) =>
+    rankedPlayer(`signed-${rank}`, rank, ["D"]),
+  );
+  assert.equal(selectAutoDraftPlayer(candidates, roster).player?.id, "wing-9");
+});
+
+void test("fewer than five remaining players fall back to the best option", () => {
+  const candidates = [4, 2, 3, 1].map((rank) =>
+    rankedPlayer(`p-${rank}`, rank, ["C"]),
+  );
+  assert.equal(selectAutoDraftPlayer(candidates, []).player?.id, "p-1");
+});
+
+void test("fifth-best selection breaks tied gains deterministically", () => {
+  const candidates = ["f", "d", "a", "e", "b", "c"].map((id) =>
+    rankedPlayer(id, 1, ["C"]),
+  );
+  assert.equal(selectAutoDraftPlayer(candidates, []).player?.id, "e");
+  assert.equal(
+    selectAutoDraftPlayer([...candidates].reverse(), []).player?.id,
+    "e",
+  );
+});
+
 void test("combined draft rankings beat raw talent for identical roster eligibility", () => {
   const candidates = [
     rankedPlayer("talent-favorite", 100, ["C"], {
