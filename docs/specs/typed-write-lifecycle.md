@@ -31,6 +31,9 @@ This branch builds on the merged franchise-contract-module PR.
   displayed error, promise rejection and callbacks remain consistent.
 - Hooks own React state. Shared types remain type-only. No generated-file edits,
   deployment, or production writes.
+- Stabilize the newsroom AI query descriptor: integration tests exposed a
+  subscription rerender loop when write state changes. Preserve its query,
+  payload, and error recovery behavior.
 
 ## Task graph
 
