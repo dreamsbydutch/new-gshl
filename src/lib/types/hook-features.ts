@@ -148,7 +148,6 @@ export interface DraftAdminListViewModel {
   freeAgentsCount: number;
   nhlTeams: NHLTeam[];
   playersLoading: boolean;
-  playersReady: boolean;
   activeDraftPick: DraftPick | null;
   activeDraftTeam: GSHLTeam | null;
   lastCompletedPlayer: Player | null;
@@ -159,7 +158,6 @@ export interface DraftAdminListViewModel {
   handleDraftPlayer: (player: Player) => Promise<void>;
   handleUndoLastPick: () => Promise<void>;
   isLoading: boolean;
-  error: Error | null;
 }
 
 export interface UseTeamHistoryDataOptions {

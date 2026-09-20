@@ -1,3 +1,9 @@
+import { useDraftPicks } from "../src/hooks/main/useDraftPick";
+import {
+  useDraftHubStatus,
+  useDraftHubState,
+} from "../src/hooks/main/useDraftHub";
+import { useDraftAdminList } from "../src/hooks/features/useDraftAdminList";
 import assert from "node:assert/strict";
 import { test, type TestContext } from "node:test";
 import { Component, createElement, type ReactNode } from "react";
@@ -215,4 +221,27 @@ void test("optional split subscriptions retain real returned errors and recover"
   h.publish("frontend:playerSplitStats", []);
   assert.equal(h.current.error, null);
   assert.equal(h.current.isLoading, false);
+});
+
+void test("draft admin preserves player loading until hydration without fabricated read state", (t) => {
+  const h = mount(t, () => useDraftAdminList());
+  assert.equal(h.current.playersLoading, true);
+  assert.equal("playersReady" in h.current, false);
+  assert.equal("error" in h.current, false);
+  h.publish("frontend:players", []);
+  assert.equal(h.current.playersLoading, false);
+  assert.equal(h.current.freeAgentsCount, 0);
+  assert.equal(h.current.isDraftPending, false);
+  assert.equal(h.current.isUndoPending, false);
+});
+
+void test("draft query adapters expose loading and data without invented errors", (t) => {
+  const picks = mount(t, () => useDraftPicks({ enabled: false }));
+  const status = mount(t, () => useDraftHubStatus());
+  const state = mount(t, () => useDraftHubState());
+  for (const hook of [picks, status, state]) {
+    assert.equal(hook.current.isLoading, false);
+    assert.equal("error" in hook.current, false);
+    assert.equal(hook.subscriptions.size, 0);
+  }
 });

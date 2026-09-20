@@ -14,7 +14,7 @@ import {
   useTradeBlockMarket,
   useWeeks,
 } from "@gshl-hooks/main";
-import type { Franchise, GSHLTeam, Season, Week } from "@gshl-types";
+import type { Season, Week } from "@gshl-types";
 import type {
   OwnerCommandCenterData,
   OwnerCommandCenterMatchup,
@@ -106,18 +106,14 @@ export function useOwnerCommandCenter() {
     ownerId,
     enabled: isLinkedOwner && Boolean(ownerId),
   });
-  const franchises = franchisesQuery.data.filter(
-    (row): row is Franchise => "ownerId" in row && !("seasonId" in row),
-  );
+  const franchises = franchisesQuery.data;
   const franchise =
     franchises.find((candidate) => candidate.isActive) ?? franchises[0] ?? null;
   const teamsQuery = useTeams({
     franchiseId: franchise?.id,
     enabled: isLinkedOwner && Boolean(franchise?.id),
   });
-  const ownerTeams = teamsQuery.data.filter(
-    (row): row is GSHLTeam => "seasonId" in row && "ownerId" in row,
-  );
+  const ownerTeams = teamsQuery.data;
   const currentTeam = operationalSeason
     ? (ownerTeams.find(
         (team) => String(team.seasonId) === String(operationalSeason.id),

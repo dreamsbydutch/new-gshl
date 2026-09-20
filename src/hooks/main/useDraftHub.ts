@@ -14,7 +14,6 @@ import { useDomainMutation } from "./useDomainMutation";
 export function useDraftHubStatus(options: UseDraftHubStatusOptions = {}): {
   data: DraftHubStatusData | undefined;
   isLoading: boolean;
-  error: null;
 } {
   const { seasonId, enabled = true } = options;
   const result = useQuery(
@@ -24,7 +23,6 @@ export function useDraftHubStatus(options: UseDraftHubStatusOptions = {}): {
   return {
     data: result,
     isLoading: enabled && Boolean(seasonId) && result === undefined,
-    error: null,
   };
 }
 
@@ -37,7 +35,6 @@ export function useDraftHubState(options: UseDraftHubStateOptions = {}) {
   return {
     data: result,
     isLoading: enabled && Boolean(seasonId) && result === undefined,
-    error: null,
   };
 }
 
