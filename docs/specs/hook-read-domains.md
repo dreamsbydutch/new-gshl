@@ -1,9 +1,10 @@
 # Hook read domains and draft projections
 
 Implements architecture-review Candidates 3–6, selected on 2026-09-20.
-Builds on Candidate 2, PR #14. No original issue/ticket identifiers or separate
-candidate specifications were found; this document records the implementation
-scope inferred from the selected candidates and active callers.
+Builds on Candidate 2, PR #14. Source: the original architecture review at
+`C:/Users/choug/AppData/Local/Temp/architecture-review-20260920-142940.html`.
+No issue/ticket identifiers were found. This document makes those candidates
+concrete against the current active callers.
 
 ## Requirements
 
@@ -21,6 +22,10 @@ contract eligibility rules.
 Replace the team/franchise/NHL/stat union interface with domain-specific results
 so callers do not assert the requested result type. Remove fabricated read
 error/refetch capabilities from the affected read interfaces and their consumers.
+The migration covers team-domain reads, player/stat/season reads and their
+affected feature consumers; unrelated legacy read interfaces are not a blanket
+rewrite. Keep legacy backend shape conversion at main adapters: the permissive
+frontend facade is not an end-to-end type guarantee.
 Convex query failures continue to reach the existing error boundaries; genuine
 in-band errors (such as optional subscriptions) and write errors retain their
 behavior. Skipped queries must not claim to load; empty arrays do not prove
@@ -43,6 +48,12 @@ rendering components. Preserve route/owner navigation semantics, explicit
 overrides, signed-out/loading behavior and the public TV's non-mutating season
 selection. Keep roster board's latest-active-franchise selection distinct from
 season-specific teams.
+Deepen the existing team-draft-pick-list utility to own season/franchise/pick
+projection. Real season metadata is authoritative: order by year/date, never by
+numeric opaque IDs, and do not fabricate season dates. An explicitly selected
+unknown season retains its exact ID for filtering with undefined metadata;
+an explicitly selected season with no picks stays empty. Preserve the existing
+unselected fallback to franchise picks when the default season has no picks.
 
 ## Task graph
 
