@@ -113,7 +113,7 @@ export type {
   WeekScheduleItemProps,
   TeamDisplayProps,
   ScoreDisplayProps,
-  WeeklyGameType,
+  GameType as WeeklyGameType,
   ConferenceAbbr,
   GameTypeConfig,
 } from "./weekly-schedule";
