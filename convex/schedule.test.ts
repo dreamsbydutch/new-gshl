@@ -7,8 +7,15 @@ import type {
 } from "convex/server";
 import type { MutationCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
-import { builderContext, publishBuilderSchedule } from "./schedule";
-import { generateSchedule } from "../src/lib/utils/features/schedule-builder";
+import {
+  builderContext,
+  builderSeasonHistory,
+  publishBuilderSchedule,
+} from "./schedule";
+import {
+  combineScheduleHistory,
+  generateSchedule,
+} from "../src/lib/utils/features/schedule-builder";
 
 function handler<A extends DefaultFunctionArgs, R>(
   fn: RegisteredMutation<"public", A, R> | RegisteredQuery<"public", A, R>,
@@ -66,6 +73,7 @@ function fixture() {
     });
   put("weeks", "oldweek", { seasonId: "old", weekNum: 1, isPlayoffs: false });
   put("weeks", "playoff", { seasonId: "old", weekNum: 2, isPlayoffs: true });
+  const reads: { table: string; filters: [string, unknown][] }[] = [];
   const ctx = {
     auth: { getUserIdentity: async () => ({ subject: "user" }) },
     db: {
@@ -83,10 +91,12 @@ function fixture() {
             filter(range);
             return query;
           },
-          collect: async () =>
-            rows(table).filter((r) =>
+          collect: async () => {
+            reads.push({ table, filters: [...filters] });
+            return rows(table).filter((r) =>
               filters.every(([key, value]) => r[key] === value),
-            ),
+            );
+          },
         };
         return query;
       },
@@ -97,7 +107,7 @@ function fixture() {
       },
     },
   } as unknown as MutationCtx;
-  return { ctx, teams, put, get, rows };
+  return { ctx, teams, put, get, rows, reads };
 }
 
 void test("history follows owners across franchises and excludes playoffs and target season", async () => {
@@ -141,7 +151,29 @@ void test("history follows owners across franchises and excludes playoffs and ta
   const result = await handler(builderContext)(f.ctx, {
     seasonId: "season" as Id<"seasons">,
   });
-  assert.deepEqual(result.history, [
+  assert.deepEqual(result.historySeasonIds, ["old"]);
+  assert.equal(f.reads.length, 4);
+  assert.ok(
+    f.reads.every(
+      (r) =>
+        r.table === "seasons" ||
+        r.filters.some(
+          ([key, value]) => key === "seasonId" && value === "season",
+        ),
+    ),
+  );
+  f.reads.length = 0;
+  const history = await handler(builderSeasonHistory)(f.ctx, {
+    seasonId: "season" as Id<"seasons">,
+    historySeasonId: "old" as Id<"seasons">,
+  });
+  assert.ok(
+    f.reads.every((r) =>
+      r.filters.some(([key, value]) => key === "seasonId" && value === "old"),
+    ),
+  );
+  assert.equal(f.reads.length, 3);
+  assert.deepEqual(history.history, [
     { a: "owner0", b: "owner1", games: 1, aHome: 1 },
   ]);
   assert.equal(result.teams[0]?.ownerId, "owner0");
@@ -202,4 +234,87 @@ void test("publishing refuses missing weeks and started seasons", async () => {
     /future/,
   );
   assert.equal(f.rows("matchups").length, 0);
+});
+
+void test("history query rejects target/future seasons and enforces commissioner access", async () => {
+  const f = fixture();
+  f.put("seasons", "future", { startDate: Date.now() + 86400000 * 500 });
+  for (const id of ["season", "future", "missing"]) {
+    await assert.rejects(
+      handler(builderSeasonHistory)(f.ctx, {
+        seasonId: "season" as Id<"seasons">,
+        historySeasonId: id as Id<"seasons">,
+      }),
+      /before the selected/,
+    );
+  }
+  assert.equal(f.reads.length, 0);
+  f.get("user")!.role = "owner";
+  await assert.rejects(
+    handler(builderSeasonHistory)(f.ctx, {
+      seasonId: "season" as Id<"seasons">,
+      historySeasonId: "old" as Id<"seasons">,
+    }),
+    /Forbidden/,
+  );
+});
+
+void test("season batches combine owner history across changed franchises and retain exclusions", async () => {
+  const f = fixture();
+  f.put("seasons", "older", { startDate: 50 });
+  f.put("franchises", "olderf0", { ownerId: "owner0" });
+  f.put("franchises", "olderf1", { ownerId: "owner1" });
+  for (const id of [0, 1])
+    f.put("teams", "olderteam" + id, {
+      seasonId: "older",
+      franchiseId: "olderf" + id,
+    });
+  f.put("weeks", "olderweek", { seasonId: "older", isPlayoffs: false });
+  for (const prefix of ["old", "older"])
+    f.put("matchups", prefix + "game", {
+      seasonId: prefix,
+      weekId: prefix + "week",
+      gameType: "RS",
+      homeTeamId: prefix + "team" + (prefix === "old" ? "0" : "1"),
+      awayTeamId: prefix + "team" + (prefix === "old" ? "1" : "0"),
+    });
+  f.put("matchups", "unknownOwners", {
+    seasonId: "old",
+    weekId: "oldweek",
+    gameType: "RS",
+    homeTeamId: "missing",
+    awayTeamId: "oldteam0",
+  });
+  const batches = await Promise.all(
+    ["old", "older"].map((id) =>
+      handler(builderSeasonHistory)(f.ctx, {
+        seasonId: "season" as Id<"seasons">,
+        historySeasonId: id as Id<"seasons">,
+      }),
+    ),
+  );
+  const snapshot = structuredClone(batches);
+  assert.deepEqual(combineScheduleHistory(batches), {
+    history: [{ a: "owner0", b: "owner1", games: 2, aHome: 1 }],
+    excluded: 1,
+  });
+  assert.deepEqual(batches, snapshot);
+  const games = generateSchedule(
+    f.teams,
+    21,
+    combineScheduleHistory(batches).history,
+    1,
+  ).map((g) => ({
+    ...g,
+    home: g.home as Id<"teams">,
+    away: g.away as Id<"teams">,
+  }));
+  assert.deepEqual(
+    await handler(publishBuilderSchedule)(f.ctx, {
+      seasonId: "season" as Id<"seasons">,
+      weeks: 21,
+      games,
+    }),
+    { games: 147 },
+  );
 });

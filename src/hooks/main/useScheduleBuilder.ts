@@ -1,5 +1,7 @@
 "use client";
 
+import { useMemo } from "react";
+import { combineScheduleHistory } from "@gshl-utils/features/schedule-builder";
 import { useMutation, useQueries } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
 import { api } from "../../../convex/_generated/api";
@@ -23,7 +25,49 @@ export function useScheduleBuilder(seasonId: string) {
   const contextResult = results.context as
     FunctionReturnType<typeof api.schedule.builderContext> | Error | undefined;
   const seasons = seasonsResult instanceof Error ? undefined : seasonsResult;
-  const context = contextResult instanceof Error ? undefined : contextResult;
+  const catalog = contextResult instanceof Error ? undefined : contextResult;
+  const historyResults = useQueries(
+    Object.fromEntries(
+      (catalog?.historySeasonIds ?? []).map((historySeasonId) => [
+        historySeasonId,
+        {
+          query: api.schedule.builderSeasonHistory,
+          args: { seasonId: seasonId as Id<"seasons">, historySeasonId },
+        },
+      ]),
+    ),
+  );
+  const batches = (catalog?.historySeasonIds ?? []).map(
+    (id) =>
+      historyResults[id] as
+        | FunctionReturnType<typeof api.schedule.builderSeasonHistory>
+        | Error
+        | undefined,
+  );
+  const historyError = batches.find(
+    (batch): batch is Error => batch instanceof Error,
+  );
+  const context = useMemo(() => {
+    if (!catalog) return undefined;
+    const loaded = catalog.historySeasonIds.map(
+      (id) =>
+        historyResults[id] as
+          | FunctionReturnType<typeof api.schedule.builderSeasonHistory>
+          | Error
+          | undefined,
+    );
+    if (loaded.some((batch) => batch === undefined || batch instanceof Error))
+      return undefined;
+    return {
+      ...catalog,
+      historySeasons: catalog.historySeasonIds.length,
+      ...combineScheduleHistory(
+        loaded as FunctionReturnType<
+          typeof api.schedule.builderSeasonHistory
+        >[],
+      ),
+    };
+  }, [catalog, historyResults]);
   const publish = useMutation(api.schedule.publishBuilderSchedule);
   return {
     seasons,
@@ -33,7 +77,7 @@ export function useScheduleBuilder(seasonId: string) {
         ? seasonsResult.message
         : contextResult instanceof Error
           ? contextResult.message
-          : null,
+          : (historyError?.message ?? null),
     publish: (weeks: number, games: BuilderGame[]) =>
       publish({
         seasonId: seasonId as Id<"seasons">,

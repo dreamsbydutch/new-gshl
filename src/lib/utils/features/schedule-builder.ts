@@ -8,6 +8,26 @@ export function pairKey(a: string, b: string) {
   return JSON.stringify([a, b].sort());
 }
 
+/** Merge season batches without losing repeated owner pairs across franchises. */
+export function combineScheduleHistory(
+  batches: readonly { history: PairHistory[]; excluded: number }[],
+) {
+  const pairs = new Map<string, PairHistory>();
+  let excluded = 0;
+  for (const batch of batches) {
+    excluded += batch.excluded;
+    for (const record of batch.history) {
+      const key = pairKey(record.a, record.b);
+      const existing = pairs.get(key);
+      if (existing) {
+        existing.games += record.games;
+        existing.aHome += record.aHome;
+      } else pairs.set(key, { ...record });
+    }
+  }
+  return { history: [...pairs.values()], excluded };
+}
+
 export function validateBuilderTeams(teams: BuilderTeam[], weeks: number) {
   const conferences = new Set(teams.map((t) => t.conferenceId));
   if (

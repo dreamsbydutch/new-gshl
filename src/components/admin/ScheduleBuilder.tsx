@@ -2,12 +2,12 @@
 
 import { useScheduleBuilderView } from "@gshl-hooks/features/useScheduleBuilderView";
 
+import { Button } from "../ui/ButtonPrimitive";
+import { Input } from "../ui/InputPrimitive";
+import { Select } from "../ui/SelectPrimitive";
+
 export function ScheduleBuilder() {
   const view = useScheduleBuilderView();
-  const inputClass =
-    "mt-1 block w-full rounded border border-slate-300 bg-white p-2 text-slate-950";
-  const buttonClass =
-    "rounded bg-slate-900 px-4 py-2 text-white disabled:opacity-40";
   const names = new Map(view.context?.teams.map((t) => [t.id, t.name]) ?? []);
   const closeRematches = view.balance.filter(
     (p) => p.gap !== null && p.gap < 4,
@@ -29,8 +29,8 @@ export function ScheduleBuilder() {
       <div className="grid gap-4 rounded-lg border border-slate-200 p-4 sm:grid-cols-3">
         <label className="text-sm">
           Season
-          <select
-            className={inputClass}
+          <Select
+            className="mt-1"
             value={view.seasonId}
             disabled={view.busy}
             onChange={(e) => {
@@ -48,12 +48,12 @@ export function ScheduleBuilder() {
                 {season.name}
               </option>
             ))}
-          </select>
+          </Select>
         </label>
         <label className="text-sm">
           Regular-season weeks
-          <input
-            className={inputClass}
+          <Input
+            className="mt-1"
             type="number"
             min={19}
             max={49}
@@ -68,8 +68,8 @@ export function ScheduleBuilder() {
         </label>
         <label className="text-sm">
           Random seed
-          <input
-            className={inputClass}
+          <Input
+            className="mt-1"
             type="number"
             min={0}
             max={4294967295}
@@ -91,13 +91,12 @@ export function ScheduleBuilder() {
           so existing differences in those totals cannot be corrected under
           these rules.
         </p>
-        <button
-          className={buttonClass}
+        <Button
           disabled={!view.context || view.busy}
           onClick={() => void view.generate()}
         >
           {view.busy ? "Working…" : "Generate draft"}
-        </button>
+        </Button>
       </div>
       {view.loadError && (
         <p
@@ -154,9 +153,7 @@ export function ScheduleBuilder() {
               optimized heuristically; review the report before publishing.
               Drafts are temporary until downloaded or published.
             </p>
-            <button className={buttonClass} onClick={view.download}>
-              Download CSV
-            </button>
+            <Button onClick={view.download}>Download CSV</Button>
             <details className="mt-4">
               <summary className="cursor-pointer font-semibold">
                 Publish to season
@@ -182,19 +179,18 @@ export function ScheduleBuilder() {
                 I reviewed this draft and want to publish it to the selected
                 season.
               </label>
-              <button
-                className={`${buttonClass} mt-3`}
+              <Button
+                className="mt-3"
                 disabled={
                   !view.confirmed ||
                   view.busy ||
                   Boolean(view.context?.hasSchedule) ||
-                  view.context?.regularWeeks !== view.weeks ||
-                  Boolean(view.context?.excluded)
+                  view.context?.regularWeeks !== view.weeks
                 }
                 onClick={() => void view.publish()}
               >
                 Publish schedule
-              </button>
+              </Button>
             </details>
           </div>
           <details className="rounded-lg border border-slate-200 p-4">
@@ -263,16 +259,18 @@ export function ScheduleBuilder() {
               >
                 <h3 className="mb-3 font-semibold">Week {i + 1}</h3>
                 <div className="mb-3 flex gap-3 text-sm">
-                  <button
-                    className="rounded border px-2 py-1 disabled:opacity-40"
+                  <Button
+                    variant="outline"
+                    size="sm"
                     aria-label={`Move week ${i + 1} earlier`}
                     disabled={i === 0 || view.busy || view.context?.hasSchedule}
                     onClick={() => view.swapWeeks(i + 1, i)}
                   >
                     Earlier
-                  </button>
-                  <button
-                    className="rounded border px-2 py-1 disabled:opacity-40"
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
                     aria-label={`Move week ${i + 1} later`}
                     disabled={
                       i === view.weeks - 1 ||
@@ -282,7 +280,7 @@ export function ScheduleBuilder() {
                     onClick={() => view.swapWeeks(i + 1, i + 2)}
                   >
                     Later
-                  </button>
+                  </Button>
                 </div>
                 <ul className="space-y-2 text-sm">
                   {view.games
