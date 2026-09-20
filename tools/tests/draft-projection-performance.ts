@@ -26,13 +26,17 @@ const players = Array.from({ length: 1000 }, (_, i) => {
     nhlRk: i + 1,
   };
 }) as DraftBoardPlayer[];
-const picks = Array.from({ length: 210 }, (_, i) => ({
+const picks: DraftPick[] = Array.from({ length: 210 }, (_, i) => ({
   id: `pick-${i}`,
+  seasonId: "season",
   gshlTeamId: teams[i % 14]!.id,
-  round: Math.floor(i / 14) + 1,
-  pick: i + 1,
+  round: String(Math.floor(i / 14) + 1),
+  pick: String(i + 1),
   isSigning: false,
-})) as DraftPick[];
+  isTraded: false,
+  createdAt: new Date(0),
+  updatedAt: new Date(0),
+}));
 for (const take of [undefined, 6]) {
   const start = performance.now();
   const result = buildMockDraftProjection({
