@@ -1,75 +1,70 @@
 ---
 name: gshl-convex
 description: >-
-  Implement or review GSHL Convex backend work. Use when a task mentions
-  convex/, schema, table, field, index, query, mutation, action, transaction,
-  generated API, auth guard, role, privacy, cron, managed job, external task,
-  server secret, migration endpoint, pagination, or browser Convex data access.
-  Do not use for pure frontend styling or an Apps Script-only change.
+  Change or review the GSHL Convex data contract and backend behavior. Use for
+  schema, queries, mutations, actions, authorization, privacy, indexes, jobs,
+  crons, generated APIs, or browser-facing Convex access. Exclude UI-only and
+  Apps Script-only work.
 metadata:
   short-description: Change GSHL Convex schema, APIs, auth, or jobs safely
 ---
 
 # GSHL Convex backend
 
-Read [AGENTS.md](../../../AGENTS.md), then the
-[Convex backend guide](../../../docs/architecture/convex.md),
-[data model](../../../docs/architecture/data-model.md), and
-[authentication guide](../../../docs/architecture/authentication.md) relevant
-to the task.
+The outcome is a bounded server-side contract whose data ownership,
+authorization, and read/write cost are explicit.
 
-## Choose the correct surface
+## Establish the contract
+
+Read the relevant section of the
+[Convex guide](../../../docs/architecture/convex.md). Read the
+[data model](../../../docs/architecture/data-model.md) when tables,
+relationships, identifiers, or timestamps change, and the
+[authentication guide](../../../docs/architecture/authentication.md) when a
+caller can observe or mutate protected data.
+
+Trace every affected caller before choosing a surface:
 
 - Browser-facing projections and ordinary league reads: `convex/frontend.ts`.
-- Atomic domain behavior: a focused module such as `draft.ts`, `ufa.ts`, or
-  `weeklyEditions.ts`.
-- Broad server-secret migration/operator access: `convex/data.ts`; never expose
-  it to browser code.
-- Scoped maintenance: an existing maintenance module rather than a new generic
-  table escape hatch.
-- Scheduled/internal orchestration: `jobRunner.ts`, `crons.ts`, or the owning
-  domain's internal function.
+- Atomic invariants and transactions: the focused owning domain module.
+- Operator imports/migrations under server-secret authorization: `convex/data.ts`.
+- Scheduled work: the owning internal function plus `jobRunner.ts`/`crons.ts`.
 
-For managed-job work, read the
-[managed-jobs guide](../../../docs/operations/managed-jobs.md). Most current
-processors are parity-stage scans or source-capture scaffolds, not replacements
-for the local calculation/reconciliation command. Keep production schedules
-disabled until dry-run parity and repeated idempotent apply checks pass.
+For a managed job or external worker, also read the
+[managed-jobs guide](../../../docs/operations/managed-jobs.md). State whether
+the path is authoritative, parity-stage, or source-capture-only; do not promote
+it to an apply-capable replacement without demonstrated parity and idempotency.
 
-The external browser worker targets `CONVEX_URL` with
-`NEXT_PUBLIC_CONVEX_URL` as a fallback and authenticates with the separate
-`BROWSER_WORKER_SECRET`, not `GSHL_CONVEX_TARGET` or `CONVEX_SERVER_SECRET`.
-It returns bounded captures and does not write league tables.
+Before implementation, write down the input validator, output shape, caller,
+authorization rule, query bound/index, and transaction boundary. A schema/API
+change is not ready to edit until each item is known.
 
-`data:clearTables` and `data:splitLegacyAwards` are immediate destructive
-server-secret mutations with no dry-run or `apply` gate. Any proposed call must
-also use the `gshl-data-operations` authorization, exact-target, and backup
-protocol.
+## Protect the boundaries
 
-## Protect invariants
+Use Convex `_id` as identity and keep imported IDs in `legacyId`. Preserve the
+person/owner, franchise, and season-team distinctions. Use the repository
+timestamp helpers and keep day-stat dates as calendar keys.
 
-- Treat `_id` as canonical and `legacyId` as import compatibility.
-- Preserve owner/person, franchise/identity, and team/season-instance semantics.
-- Add indexes for bounded production reads and scope large stat queries before
-  collecting. Generic adapters may filter in memory.
-- Normalize timestamps through `convex/lib/timestamps.ts`; day-stat dates remain
-  calendar keys.
-- Recheck authorization in every sensitive server function. UI visibility is
-  not authorization. Avoid returning private owner fields anonymously.
-- Keep any `src/lib` dependency imported by Convex pure and runtime-compatible.
-- Never edit `convex/_generated` directly or spread existing `@ts-nocheck` and
-  broad assertions into new code without a demonstrated compatibility need.
+Enforce authorization inside every protected server function and filter private
+fields before returning. Treat client role checks as presentation only. Imports
+from `src/lib` must remain pure and Convex-runtime compatible.
 
-After a schema or exported-function change, regenerate local bindings with
-`npx convex codegen`; it does not modify a deployment. `npx convex dev` pushes
-to the configured development deployment and watches for changes, so use it
-only when that external mutation is intended. Do not deploy or mutate production
-merely because code changes were requested.
+Bound production reads with a suitable index and scope before collection. If
+the requested access pattern cannot be bounded, stop and redesign the query
+instead of normalizing an unbounded scan.
 
-## Verify
+Calling a server-secret function, clearing/splitting data, deploying, or
+enabling a schedule is a data operation. Invoke `gshl-data-operations` and
+obtain its target, authorization, dry-run, and backup gates before execution.
+Code edits alone grant no runtime-write authority.
 
-Run focused pure tests, root type-check/lint, and any affected operator-package
-tests. Root lint excludes `convex/lib/**`; lint a changed nested file directly,
-for example `npx eslint convex/lib/timestamps.ts`. Note that direct Convex
-runtime integration coverage is currently absent; manually inspect auth,
-privacy, index, and transaction paths in the diff.
+## Completion gate
+
+The work is complete when every affected caller matches the new contract,
+authorization and privacy have been reviewed at the server boundary, reads are
+bounded, and focused tests cover the domain behavior. Regenerate bindings with
+`npx convex codegen` after schema or exported-surface changes; never edit
+`convex/_generated` directly. Select all remaining checks from the
+[verification guide](../../../docs/operations/verification.md), including
+direct lint for changed nested `convex/lib` files, and report any runtime path
+that lacks integration coverage.

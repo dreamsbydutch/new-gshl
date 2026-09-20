@@ -1,196 +1,122 @@
 ---
 name: gshl-preview-pr
 description: >-
-  Publish only the current agent's completed-goal changes as a reviewable
-  GitHub and Vercel handoff. Use when the user explicitly asks to turn current
-  changes into a preview/* branch, thoughtful logical commits, a pushed GitHub
-  branch, a Vercel preview, and an informative pull request with the direct
-  preview URL, or asks to publish a completed goal as a preview PR. Do not use
-  for a local commit only, PR review, merge, production promotion, or unrelated
-  dirty-worktree cleanup.
+  Publish the current agent's completed GSHL change as an isolated preview
+  branch, coherent commits, an exact-HEAD Vercel preview, and a GitHub pull
+  request. Use only when the user explicitly asks for this complete handoff.
 metadata:
   short-description: Publish completed agent work as a Vercel preview PR
 ---
 
 # GSHL preview pull request
 
-Read [AGENTS.md](../../../AGENTS.md) before publishing. Treat this skill and its
-[GitHub/Vercel lookup reference](references/github-vercel.md) as the complete
-publication procedure; do not assume a separate documentation or verification
-change is part of the branch.
+The outcome is one `preview/<goal-slug>` branch containing only the completed
+goal, a successful Vercel preview for its exact HEAD, and one reviewable PR that
+links to that preview. This workflow publishes; it never merges or promotes to
+production.
 
-The required outcome is one `preview/<goal-slug>` branch containing only the
-current agent's completed work, a small set of coherent commits, a successful
-Vercel deployment for the exact pushed HEAD, and one GitHub PR whose body links
-directly to that deployment.
+The user's explicit request for this workflow authorizes branch creation, a
+non-force push to the confirmed `origin`, waiting for the connected preview,
+and creating or updating the PR. It does not authorize incorporating unrelated
+work, changing repository/deployment settings, merging, force-pushing, or
+deleting branches.
 
-## Authorization and completion gate
+## 1. Prove the publish set
 
-A completed implementation goal does not authorize a push. Proceed through the
-remote steps only when the user explicitly requests this publish/preview/PR
-flow. That request authorizes creating the preview branch, pushing it to the
-confirmed `origin`, triggering its preview deployment, and creating or updating
-the PR. It does not authorize merging, force-pushing, promoting to production,
-changing GitHub/Vercel settings, or deleting branches.
+Record the current branch, HEAD, upstream, `origin`, default branch, index, and
+working-tree status. Define the completed objective and an ownership manifest
+of paths or hunks changed for that objective.
 
-Identify the implementation objective from the completed goal or same-session
-task history. The publication flow may itself be the active goal, but the work
-being published must already be genuinely complete and verified. If a
-different agent/session cannot reliably identify the work it owns, require an
-explicit base and path/hunk manifest before continuing.
+Classify every dirty path as goal-owned, pre-existing/user-owned, or mixed.
+Use session edit history and focused diffs; dirtiness alone is not ownership.
+The index must be empty or contain only reviewed goal-owned work. If an unknown
+staged change exists, or a mixed hunk cannot be separated safely, stop and ask
+for the missing ownership decision.
 
-## 1. Establish ownership and base
+Check dependency closure against the intended base: imports, generated files,
+fixtures, docs links, and package changes required by the patch must already be
+in the base or in the ownership manifest. When the mixed working tree obscures
+that proof, verify from a temporary worktree containing the base plus only the
+owned patch. Leave unrelated changes untouched.
 
-Before mutating Git state, record:
+Choose and record the PR base. Prefer the goal's starting branch when it is the
+actual integration base; otherwise use the repository default only after
+checking ancestry. Fetch `origin` and stop if the proposed base would include
+unrelated commits or require an unrequested rebase.
 
-- `git status --short`, the current branch, `HEAD`, its upstream, and `origin`;
-- the repository default branch from `gh repo view`;
-- the completed goal statement and the files/hunks changed by this agent; and
-- existing commit conventions from repository policy and recent history.
+## 2. Build the branch and commits
 
-Inspect the index separately with `git diff --cached`. It must be empty or
-fully attributable to this agent and goal. If it contains unknown or
-user-owned work, stop; do not unstage, overwrite, or inherit it.
+Create a short `preview/<goal-slug>` name derived from the outcome. Validate the
+ref and inspect matching local/remote branches and PRs. Resume an existing name
+only when its base, commits, and PR prove it belongs to this same goal without
+unexpected divergence; otherwise use a numeric suffix.
 
-Classify every dirty path as agent-owned, pre-existing/user-owned, or mixed.
-Use the session's edit history and focused diffs; a dirty file is not proof of
-ownership. Never stage an unknown path. Never use `git add .`, `git add -A`,
-`git commit -a`, stash, clean, reset, checkout-discard, or another operation
-that could capture or remove someone else's work. Stage explicit paths, and
-use reviewed patch staging for mixed files. If ownership cannot be separated,
-stop before creating commits and ask for the missing scope.
+Write a commit plan before staging. Group implementation with its focused tests
+and group generated or synchronized files with their source. Separate a docs or
+operations change only when it is independently reviewable.
 
-Exclude credentials, environment files, reports with authenticated content,
-raw browser captures, `.local-data/`, `.vercel/`, archives, and other local
-artifacts even if they are untracked.
+For each commit:
 
-Verify dependency closure against the prospective branch, not the mixed
-working tree. Every documented command, linked file, generated binding, import,
-schema/API dependency, and test fixture needed by the agent-owned patch must
-already exist in the base or be agent-owned. If the patch works only because of
-someone else's uncommitted changes, stop until those dependencies land on the
-base or revise the patch; never absorb them merely to make the PR self-contained.
-Use a temporary worktree from the base plus only the owned patch when the live
-working tree cannot prove this cleanly.
-
-If other agents are still editing the shared worktree, wait for them to finish
-before switching its branch. Use an isolated worktree only when the owned patch
-can be transferred without including another agent's state.
-
-Choose the intended PR base before creating the branch. Default to the branch
-that was checked out when the goal began when it is the actual integration
-base; otherwise use the repository default only when its ancestry is correct.
-Fetch `origin` and verify the recorded base commit is an ancestor of the remote
-base. Do not silently rebase or fold unrelated existing commits into the PR.
-
-## 2. Create the preview branch
-
-Derive a short lowercase kebab-case slug from the completed goal's outcome, not
-from a generic word such as `changes` or `agent-work`. Use
-`preview/<goal-slug>`, validate it with `git check-ref-format --branch`, and
-check both local and remote refs. If it exists, inspect its base, commits, and
-associated PR. Resume it only when it is demonstrably the same goal and has no
-unexpected divergence. Otherwise add a small numeric suffix. Never overwrite
-or force-update an existing preview branch.
-
-Create the branch from the recorded base `HEAD`. Unrelated dirty work may remain
-in the working tree, but it must never enter a commit or the pushed diff.
-
-## 3. Build logical commits
-
-Inspect the full agent-owned diff and write the commit plan before staging.
-Group by reviewable outcome and dependency, not mechanically by file type:
-
-- keep an implementation with its focused tests;
-- keep a manifest with its generated lockfile;
-- keep authoritative runtime changes with synchronized copies;
-- keep schema/API changes in a compatible order; and
-- separate documentation or operational guidance only when it is an
-  independently understandable change.
-
-Follow the repository's dominant recent subject style. When no enforced style
-exists, use an imperative, outcome-first subject of roughly 72 characters or
-less; add a body when the reason, migration, risk, or verification is not
-obvious. Avoid `WIP`, vague subjects, fake issue references, and arbitrary
-commit counts.
-
-For every commit:
-
-1. stage only the planned explicit paths or hunks;
-2. inspect `git diff --cached --name-status` and the complete cached diff;
-3. run `git diff --cached --check` and scan for secrets/artifacts;
+1. stage explicit goal-owned paths, or reviewed hunks for mixed files;
+2. inspect the complete cached diff and name-status;
+3. run `git diff --cached --check` and scan for secrets/local artifacts;
 4. commit without bypassing hooks; and
-5. confirm the remaining staged and unstaged changes still have the expected
-   ownership.
+5. recheck ownership of everything still staged and unstaged.
 
-After the final commit, compare `BASE_SHA...HEAD` and its file list with the
-ownership manifest. It must contain every intended change and no pre-existing
-or user-owned change. Unrelated local modifications may remain uncommitted.
+Use the repository's recent subject style. Prefer an imperative, outcome-first
+subject when no convention is evident. Never stage broadly or alter unrelated
+work to make the branch clean.
 
-## 4. Verify the exact pushed tree
+The branch is ready only when `BASE...HEAD` exactly matches the ownership
+manifest and contains no credentials, environment values, authenticated
+captures, `.local-data`, `.vercel`, archives, or other local artifacts.
 
-Use the repository's verification policy to select the smallest checks that
-exercise the committed change, and retain their exact commands and results for
-the PR. Always inspect `git diff --check` and the focused branch diff. For
-Markdown, run an explicit formatter check over the changed Markdown paths and
-verify their relative links. When unrelated dirty files could influence a
-check, run it from a temporary clean worktree at `HEAD` or state precisely why
-the result still represents the committed tree. Do not claim a check covers
-the preview branch when it ran against materially different local files.
+## 3. Verify the committed tree
 
-Do not push a known-broken branch as ready for review. If the user explicitly
-wants a failing diagnostic PR, make it a draft and disclose every failure.
+Use the [verification guide](../../../docs/operations/verification.md) to run
+checks that exercise the committed change. Always inspect the focused branch
+diff and `git diff --check`; check changed Markdown explicitly. If unrelated
+working-tree files can affect a result, run the check from a clean temporary
+worktree at HEAD.
 
-## 5. Push and resolve the Vercel preview
+Retain the exact commands, working directories, and results for the PR. Stop
+before publishing a known-broken branch unless the user explicitly requested a
+diagnostic PR; in that case use a draft and disclose every failure.
 
-Reconfirm `gh auth status`, the `origin` URL, branch name, commit list, and HEAD.
-Push with upstream tracking and without force:
+## 4. Push and resolve the exact preview
+
+Reconfirm GitHub authentication, repository identity, branch name, commits, and
+HEAD. Push once with upstream tracking and no force:
 
 ```text
 git push --set-upstream origin preview/<goal-slug>
 ```
 
-This repository's GitHub integration triggers Vercel from the branch push. Do
-not run `vercel deploy`, guess a branch URL, or change Vercel configuration.
+The GitHub integration creates the Vercel preview. Do not invoke a second
+deployment path or guess a URL. Follow the exact-SHA polling procedure in
+[GitHub/Vercel preview lookup](references/github-vercel.md). Stop on failure or
+after its time limit and report the returned diagnostic. Before accepting the
+URL, prove the remote branch still points to the SHA used for the deployment.
 
-Resolve the repository name with `gh repo view`, capture the pushed HEAD SHA,
-and poll GitHub's deployments endpoint using the exact `sha` filter. Select the
-newest deployment created by `vercel[bot]`, then poll its statuses. Accept only
-a `success` status in Vercel's `Preview` environment, or another environment
-already confirmed as this repository's preview environment, with a non-empty
-`environment_url` or `target_url`; that is the direct preview link. Reconfirm
-the remote branch still points to the same SHA before using it. Use the exact
-read-only API recipe in
-[GitHub/Vercel preview lookup](references/github-vercel.md).
+## 5. Create and inspect the PR
 
-Poll for at most 15 minutes, with concise progress updates at least once per
-minute. Stop immediately on `error` or `failure` and report the deployment's
-description/log URL. A missing or protected preview is not permission to
-invent a URL, invoke a second deployment path, or use a production deployment.
+Update the existing PR for this head branch or create one with explicit base and
+head arguments. Use a reviewed body file so shell escaping cannot corrupt it.
+The body must contain:
 
-## 6. Create the informative PR
+- outcome-focused summary;
+- `Open the Vercel preview` linking to the successful direct URL, plus short SHA;
+- logical changes and important boundaries;
+- exact verification results and checks not run; and
+- risks, migrations, generated files, limitations, and excluded scope.
 
-Check whether the head branch already has a PR. Update that PR rather than
-creating a duplicate. Otherwise create one with explicit `--base` and `--head`
-arguments and a reviewed `--body-file` to avoid shell-escaping damage.
+Create a normal PR unless an explicitly accepted failure requires a draft.
+Inspect the resulting PR and verify base, head, title, body, preview link, and
+URL.
 
-Use a result-oriented title. The body must contain:
+## Completion gate
 
-1. **Summary** - the completed goal and user-visible/operational outcomes.
-2. **Preview** - a Markdown link labeled `Open the Vercel preview` whose
-   destination is the direct deployment URL, near the top, plus the exact short
-   commit SHA.
-3. **Changes** - the logical commit/change groups and important boundaries.
-4. **Verification** - exact checks and results, plus checks not run and why.
-5. **Risk and review notes** - migrations, generated files, known limitations,
-   rollout concerns, or intentionally excluded scope.
-
-Do not include secrets, local absolute paths, raw authenticated output, or
-claims unsupported by the diff. Create a draft only for an explicitly accepted
-failure or unresolved review condition; otherwise create a normal PR after the
-preview succeeds.
-
-Finally, inspect the PR through `gh pr view` and verify its base/head, title,
-body, direct preview link, and URL. Report the preview branch, commit hashes and
-subjects, PR URL, Vercel URL, verification results, and any unrelated local
-changes that remain uncommitted. Never merge the PR as part of this skill.
+Report the branch, commit hashes and subjects, PR URL, direct Vercel URL,
+verification results, and unrelated local changes left uncommitted. Completion
+requires the remote branch SHA, successful deployment SHA, and PR head SHA to
+match exactly.

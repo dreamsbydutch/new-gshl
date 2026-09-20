@@ -1,54 +1,60 @@
 ---
 name: gshl-ranking
 description: >-
-  Change or investigate GSHL ranking and power logic. Use when a task mentions
-  RankingEngine, PowerRankingsAlgo, rankRows, rankPerformance, player rating,
-  skater rating, goalie rating, team rating, award rating, power rating, Elo,
-  tuning profile, score scale, parity, entering-week power snapshot, runtime
-  drift, ranking-engine:sync, or ranking-engine:check. Do not use for displaying
-  an already-computed rank without algorithm changes.
+  Investigate or change GSHL rating and power calculations. Use for player,
+  goalie, team, award, or power algorithms; tuning profiles; entering-week
+  snapshots; parity; or runtime synchronization. Exclude UI-only display of an
+  already-computed rank.
 metadata:
   short-description: Edit the authoritative rating and power runtimes
 ---
 
 # GSHL ranking and power
 
-Read [AGENTS.md](../../../AGENTS.md) and the full
-[ranking reference](../../../docs/RANKING.md) before changing behavior.
+The outcome is an explained algorithm change or diagnosis whose affected
+cohorts, expected score movement, temporal behavior, and runtime parity are
+demonstrated.
 
-The authoritative runtime lives in `scripts/src/runtime/apps-script/`:
+Read the relevant algorithm and operational sections of the
+[ranking reference](../../../docs/RANKING.md). Trace the caller into the
+authoritative runtime under `scripts/src/runtime/apps-script/`; matching files
+under `apps-script/` are synchronized deployment copies, never independent
+edit targets.
 
-- `features/RankingEngine/config.js`
-- `features/RankingEngine/player-pure.js`
-- `features/RankingEngine/team-pure.js`
-- `features/RankingEngine/index.js`
-- `features/PowerRankingsAlgo.js`
+## Diagnose before tuning
 
-Matching `apps-script/` files are synchronized deployment copies. Never make a
-one-sided behavioral edit.
+Identify the calculation path, comparison pool, position/sheet/season branches,
+small-sample behavior, rounding or score scale, and the first week affected.
+For power, preserve the entering-week invariant: Week N results can influence
+Week N+1 power but cannot rewrite Week N's entering snapshot.
 
-Keep tuning constants in the structured config, pure player/team math in its
-own module, and sheet/context orchestration in the public runtime. Preserve the
-entering-week snapshot invariant: Week N results may affect Week N+1 power, but
-must not rewrite Week N's entering power.
+Before changing a constant or formula, state a falsifiable hypothesis: the
+cohort that is wrong, why the current calculation causes it, and the expected
+direction and approximate scale of movement. Do not retune unrelated profiles
+to make a fixture pass.
 
-For a behavior change:
+Keep tunable constants in structured config, pure rating math in its player or
+team module, and sheet/context orchestration at the runtime boundary.
 
-1. Identify every supported sheet/position/season type affected and the
-   comparison-pool or small-sample behavior involved.
-2. Add or update focused representative tests or parity fixtures before broad
-   backfills. There is no packaged rating-engine unit suite today.
-3. From the repository root, run `npm --prefix scripts run test:power` for
-   power changes, then
-   `npm.cmd --prefix scripts run power:parity -- --season-id SEASON_ID` in
-   Windows PowerShell. For player-rating changes, run
-   `npm.cmd --prefix scripts run ratings:parity -- --season-id SEASON_ID`.
-   Follow the data-operations skill's Node-flag and argument-forwarding
-   preflight before either parity command.
-4. Run `npm run ranking-engine:sync`, review all five destination diffs, then
-   run `npm run ranking-engine:check`.
-5. Treat any backfill or production recomputation as a separate data operation
-   requiring dry-run, scope, and authorization.
+## Prove the behavior
 
-Do not recalibrate unrelated profiles merely to make one fixture pass. Report
-the expected score/rank movement and affected cohorts.
+Add a focused fixture that is red for the reported behavior and representative
+of each affected branch. Run the relevant rating or power tests and parity
+command using the season required by the task. Before a parity command, invoke
+`gshl-data-operations` for target, runtime, and flag preflight.
+
+After an intentional behavior change, run `npm run ranking-engine:sync`, inspect
+every synchronized diff, and then run `npm run ranking-engine:check`. A sync
+check proves byte parity only; the focused fixtures and parity result must prove
+the numerical behavior.
+
+Any backfill or production recomputation is a separate data operation and needs
+fresh authorization. Do not perform it as an implied part of an algorithm edit.
+
+## Completion gate
+
+The work is complete when the hypothesis is supported or rejected with evidence,
+every affected branch has representative coverage, expected score/rank movement
+is reported, entering-week behavior is preserved, and authoritative/deployed
+copies match. Report the exact parity scope and any cohort or historical season
+that was not exercised.

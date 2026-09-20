@@ -259,7 +259,6 @@ Repository skills live in `.agents/skills/` and route specialized work:
   data safety.
 - `gshl-apps-script` for the Apps Script/Sheets runtime and clasp workflows.
 - `gshl-ranking` for player/team ratings, power ratings, parity, and sync.
-- `gshl-verification` for selecting the real quality gates and test scope.
 - `gshl-preview-pr` for publishing a completed goal as isolated logical commits,
   a `preview/*` branch, a verified Vercel preview, and an informative GitHub PR.
 

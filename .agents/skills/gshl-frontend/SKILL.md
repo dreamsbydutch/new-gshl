@@ -1,62 +1,63 @@
 ---
 name: gshl-frontend
 description: >-
-  Implement or review GSHL Next.js frontend work under src/. Use when a task
-  mentions a page, route, layout, component, UI, Tailwind, skeleton, hook, view
-  model, navigation, client component, frontend type, import alias, responsive
-  behavior, accessibility, or an architecture-check violation. Do not use for a
-  Convex-only or operator-script-only change.
+  Change or review the active GSHL Next.js UI path. Use for routes, components,
+  hooks, view models, navigation, accessibility, responsive behavior, or
+  frontend architecture failures. Exclude backend-only and operator work.
 metadata:
   short-description: Change GSHL frontend code within enforced layers
 ---
 
 # GSHL frontend
 
-Read [AGENTS.md](../../../AGENTS.md) before editing. Use the
+The outcome is a change on the active render/data path, placed in the narrowest
+owning layer, with loading and interaction states preserved.
+
+## Establish the path
+
+Read the relevant sections of the
 [frontend architecture](../../../docs/architecture/frontend.md) and
-[route map](../../../docs/reference/routes.md) to identify the active path.
+[route map](../../../docs/reference/routes.md). Start at the route and use
+callers/imports to trace the rendered component, feature hook, main hook,
+Convex function, transforms, and types that actually participate. Similar
+names are not evidence: before editing, account for every file you intend to
+touch as active, compatibility-only, or unreferenced.
 
-## Trace before placing code
+Choose ownership before writing code:
 
-Start at the active `src/app` route and follow its feature component, feature
-hook, main hook, Convex function, pure transforms, and shared types. Search for
-callers before changing similarly named files; legacy unreferenced components
-remain in the tree.
+| Concern | Owner |
+| --- | --- |
+| Route composition, metadata, redirects, server guards | `src/app` |
+| Rendering and interaction | `src/components/<feature>` |
+| Feature orchestration and view models | `src/hooks/features` |
+| Stable remote/domain access | `src/hooks/main` |
+| Deterministic transforms | `src/lib/utils` |
+| Shared frontend contracts | `src/lib/types` |
 
-Place work at the narrowest layer that owns it:
+Reuse the nearest existing primitive, skeleton, hook, transform, and type before
+adding another abstraction. If the required data contract does not exist,
+invoke the `gshl-convex` workflow for that part of the change.
 
-- Route composition, metadata, redirects, and server guards: `src/app`.
-- Rendering and interaction: `src/components/<feature>`.
-- Multi-hook orchestration and view models: `src/hooks/features`.
-- Stable remote/domain access: `src/hooks/main`.
-- Deterministic transforms: `src/lib/utils/{core,domain,features}`.
-- Shared type contracts: `src/lib/types`.
-- Domain-agnostic primitives and loading states: existing `components/ui` and
-  `components/skeletons` files.
+## Implement the change
 
-## Preserve the enforced boundaries
+Keep client state at the lowest boundary that needs it. Components obtain
+navigation, authentication, persisted state, and Convex data through hooks;
+pure transforms remain outside React. Clone query results before sorting.
 
-- Keep route files thin and use Server Components until client behavior is
-  required.
-- Components use hooks for Convex, navigation, auth, and persisted state. Do not
-  import those integration modules directly.
-- Hooks never import components. Utilities stay framework-free. Types stay
-  runtime-free.
-- Use PascalCase named component exports and `use`-prefixed hook filenames.
-- Clone props and query results before sorting or mutation.
-- Preserve loading, empty, error, overflow, keyboard, and mobile states.
-- Use existing Tailwind tokens and primitives; do not introduce a styling or
-  state-management alternative for a local change.
-- Use existing league, conference, GSHL team, and NHL team logos for color and
-  compact identification before adding colored surfaces or repeated names.
-  Preserve an accessible name when a logo replaces visible text.
-- Keep secondary and tertiary navigation low-profile. Use compact 36px rows and
-  controls; reserve the larger mobile target treatment for primary navigation
-  and consequential actions. Keep focus states visible at every size.
+Match the existing feature's spacing and interaction language. For UI changes,
+explicitly inspect loading, empty, error, populated, narrow-screen, overflow,
+keyboard, and focus behavior; record which states are impossible or out of
+scope instead of silently skipping them. Use existing logo-led identification
+and compact secondary controls where the feature already establishes them.
 
-## Verify
+## Completion gate
 
-Run `npm run check:architecture`, the smallest relevant `tsx --test` files,
-and the affected root lint/type-check. Use the
-[verification guide](../../../docs/operations/verification.md) because
-`npm run check` does not run tests or Markdown checks.
+The work is complete when:
+
+- the edited files are proven to be on the active path;
+- each concern sits in the owner above and the architecture checker accepts it;
+- changed deterministic behavior has a focused test;
+- all applicable UI states were inspected; and
+- the targeted checks selected from the
+  [verification guide](../../../docs/operations/verification.md) pass, with
+  skipped checks and pre-existing failures reported.

@@ -1,71 +1,84 @@
 ---
 name: gshl-data-operations
 description: >-
-  Plan, change, or run GSHL operator data workflows. Use for scripts/, backfill,
-  migration, repair, data sync/import, reconciliation, aggregation,
-  standings/lineup rebuild or backfill, awards rebuild, player bios, Yahoo,
-  NHL, Hockey Reference, PuckPedia, production Convex, dry run, --apply,
-  archive, restore, archive/data snapshot, source deletion, SQLite, or salary
-  history. Do not use for frontend pages, tabs, or display-only work that
-  consumes existing data.
+  Change, review, or execute GSHL operator workflows. Use for scripts-package
+  commands, imports, reconciliation, rebuilds, backfills, archives, restores,
+  external hockey sources, or any scoped production-data operation. Exclude
+  display-only work over existing data.
 metadata:
   short-description: Operate GSHL data commands with target and write safety
 ---
 
 # GSHL data operations
 
-Read [AGENTS.md](../../../AGENTS.md), the
-[data-pipeline guide](../../../docs/operations/data-pipelines.md),
-[command reference](../../../docs/reference/commands.md), and the relevant
-section of [`scripts/README.md`](../../../scripts/README.md).
+The outcome is either a reviewed code change or an auditable run. A run is
+auditable only when its target, scope, read/write plan, authorization, and
+postcondition are all explicit.
 
-## Trace the command
+## Build the execution model
 
-Follow `scripts/src/commands` to its `domains` implementation and then its
-`integrations` boundary. Keep parsing, matching, reconciliation, and planning
-pure where practical. Keep Convex, Sheets, browser, filesystem, and external
-network access in integrations or command orchestration.
+Read the relevant portions of the
+[pipeline guide](../../../docs/operations/data-pipelines.md),
+[command reference](../../../docs/reference/commands.md), and
+[`scripts/README.md`](../../../scripts/README.md). Trace the command entry point
+through its domain planner to every integration. Before changing or running it,
+account for:
 
-## Mutation protocol
+- how the target is resolved, including defaults and environment fallbacks;
+- sources read and systems written;
+- scope keys such as season, week, date, team, or player;
+- dry-run/apply defaults, destructive branches, and saved artifacts; and
+- retry, throttle, identity-match, and conflict behavior.
 
-The scripts package defaults its Convex target to production. Before any run:
+Keep parsing and reconciliation pure; keep Convex, Sheets, browser, filesystem,
+and network effects at integration or orchestration boundaries.
 
-1. Resolve and state the exact target, season/week/date scope, source, and
-   intended writes.
-2. Run `--help` if flags are not already verified from code. On Windows
-   PowerShell, use `npm.cmd run <command> -- --help`; the current `npm.ps1`
-   wrapper can consume forwarded flag names. If the package entry contains
-   `--use-system-ca`, first verify that the `node` runtime seen by the package
-   exposes that flag; Node 20 does not.
-3. Run the dry-run form and inspect counts, unmatched/ambiguous identities,
-   samples, and deletion/replacement plans.
-4. Apply only with user authorization, an explicit target, and the narrowest
-   scope.
-5. Rerun dry-run or parity checks to demonstrate idempotency and inspect saved
-   reports/artifacts.
+## Choose the branch
 
-Do not treat a code-edit request as permission to write production data.
+**Code or review only:** edit and test locally. A request to change code does
+not authorize a remote run. Exercise `--help` or a local fixture when useful;
+do not turn verification into a production dry run.
 
-`npm run convex:migrate` is the destructive exception: it has no dry-run or
-`--apply` gate, ignores the package's normal target selector, reads its exact
-target only from `NEXT_PUBLIC_CONVEX_URL`, and clears all mapped tables before
-its first Sheets read. Never run it without explicit URL/target confirmation
-and a verified backup.
-Likewise, do not delete archive sources or use `--replace-existing-archive` or
-`--replace-conflicts` without the confirmations and backups in the
-[archive guide](../../../docs/operations/player-day-archive.md).
+**Read or dry run:** state the exact resolved target and scope before execution.
+Confirm the command's current `--help` and source rather than relying on a
+remembered flag. On PowerShell, use `npm.cmd` for forwarded flags. If the
+package script contains `--use-system-ca`, verify the same shell's Node runtime
+supports it before invoking the command.
 
-Two broad apply behaviors require explicit review: `stats:aggregate-season
---apply` deletes stale derived rows unless `--preserve-stale` is passed, and
-`player-bios:sync --apply` intentionally clears stale managed fields and can
-deactivate players that meet its guarded inactivity rules.
+**Apply or destructive run:** require explicit user authorization for this run,
+the resolved target, and the narrowest scope. First run the exact dry-run form
+and inspect totals, samples, unmatched identities, conflicts, and every planned
+delete/replacement. Require a verified, separately retained backup before a
+delete, source removal, table clear, or replacement. Apply once, then rerun the
+dry run or parity check and inspect artifacts to demonstrate the postcondition
+and idempotency.
 
-Preserve throttling, retry, host allowlists, dry-run defaults, and secret
-redaction. Never print cookies, headers, credentials, server secrets, or raw
-authenticated pages.
+Stop before apply when the target is inferred, help and code disagree, dry-run
+output is unresolved, the backup is unverified, or the authorized scope does
+not cover the proposed writes.
 
-## Verify changes
+## Exceptional commands
 
-Run `npm --prefix scripts run typecheck` plus the smallest relevant packaged or
-direct `tsx --test` suite. For ranking or power behavior, also use the
-`gshl-ranking` workflow and runtime parity check.
+`convex:migrate` has no dry-run gate, ignores the normal target selector, takes
+its target from `NEXT_PUBLIC_CONVEX_URL`, and clears mapped tables before its
+first Sheets read. It requires explicit confirmation of that resolved URL and
+a verified backup; ordinary apply authorization is insufficient.
+
+For archive deletion or replacement, read the
+[archive guide](../../../docs/operations/player-day-archive.md) and satisfy its
+snapshot and conflict gates. For ranking or power computation, also invoke
+`gshl-ranking` before changing algorithms or synchronizing runtimes.
+
+Preserve source throttles, retry limits, host allowlists, dry-run defaults, and
+secret redaction. Keep cookies, credentials, headers, authenticated page
+content, and server secrets out of output and artifacts.
+
+## Completion gate
+
+A code change is complete when its execution model is still accurate, effects
+remain isolated, focused tests cover planning/reconciliation, and the scripts
+package type-check plus checks selected from the
+[verification guide](../../../docs/operations/verification.md) pass. A run is
+complete only when the post-run check demonstrates the requested state and the
+report records target, scope, mode, counts, warnings, and artifact locations
+without secrets.
