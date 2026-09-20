@@ -2,6 +2,7 @@ import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import { checkRouteBehavior } from "./check-frontend-route-behavior.mjs";
+import { checkFeatureHookOwnership } from "./check-feature-hook-ownership.mjs";
 
 const root = process.cwd();
 const srcRoot = path.join(root, "src");
@@ -148,6 +149,7 @@ for (const group of ["main", "features"]) {
       failures.push(`Hook filename must start with use: ${relative(file)}`);
     }
     const source = await readFile(file, "utf8");
+    failures.push(...checkFeatureHookOwnership(relative(file), source));
     if (/^(?:export\s+)?(?:type|interface)\s+\w+/m.test(source)) {
       failures.push(`Hook declares a type or interface: ${relative(file)}`);
     }

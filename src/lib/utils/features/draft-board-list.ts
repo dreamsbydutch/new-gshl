@@ -1,3 +1,10 @@
+import type {
+  DraftPlayerCatalogInput,
+  DraftPlayerCatalog,
+  DraftPlayerCatalogFilter,
+} from "@gshl-lib/types/draft-selection";
+import { findNhlTeamByAbbreviation } from "../domain/player";
+import { sortDraftEligiblePlayers } from "./draft-hub";
 /**
  * Draft Board List Utility Functions
  *
@@ -325,3 +332,50 @@ export function groupProjectedDraftPicksByRound<
 export const draftBoardFilters = { matchesFilter };
 export const draftBoardSorters = { sortByPreDraftRank, sortByOverallRank };
 export const draftBoardHelpers = { excludeGoalies };
+
+/** The catalog shared by live picks and public roster boards. */
+export function buildDraftPlayerCatalog(
+  input: DraftPlayerCatalogInput,
+): DraftPlayerCatalog {
+  const selectedIds = new Set(input.selectedPlayerIds);
+  return prepareDraftBoardPlayers(
+    input.players,
+    input.contracts,
+    input.activeOn,
+  )
+    .filter((player) => !selectedIds.has(String(player.id)))
+    .map((player) => ({
+      ...player,
+      nhlTeamLogoUrl:
+        findNhlTeamByAbbreviation(input.nhlTeams, player.nhlTeam)?.logoUrl ??
+        null,
+      stats: input.latestStats.get(String(player.id)) ?? null,
+    }));
+}
+
+export function filterDraftPlayerCatalog(
+  players: DraftPlayerCatalog,
+  options: DraftPlayerCatalogFilter,
+): DraftPlayerCatalog {
+  const search = options.searchTerm.trim().toLowerCase();
+  const filtered = players.filter((player) => {
+    const position = options.positionFilter;
+    const matchesPosition =
+      position === "all" ||
+      (["F", "D", "G"].includes(position)
+        ? player.posGroup === position
+        : player.nhlPos.some((value) => value === position));
+    return (
+      matchesPosition &&
+      (!search ||
+        player.fullName.toLowerCase().includes(search) ||
+        player.nhlPos.join(" ").toLowerCase().includes(search) ||
+        String(player.nhlTeam).toLowerCase().includes(search))
+    );
+  });
+  return sortDraftEligiblePlayers(
+    filtered,
+    options.sortKey,
+    options.sortDirection,
+  );
+}

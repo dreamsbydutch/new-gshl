@@ -19,7 +19,6 @@ import {
   useTeamAwards,
 } from "@gshl-hooks";
 import { getOwnerTeamIds, resolveSalaryCapSeason } from "@gshl-utils";
-import type { NHLTeam } from "@gshl-types";
 import {
   CapLabSkeleton,
   ContractHistorySkeleton,
@@ -175,7 +174,7 @@ export function LockerRoomContent() {
   const { data: nhlTeamsRaw = [], isLoading: nhlTeamsLoading } = useNHLTeams({
     enabled: needsNhlTeams,
   });
-  const nhlTeams = nhlTeamsRaw as NHLTeam[];
+  const nhlTeams = nhlTeamsRaw;
   const { data: teamAwards = [], isLoading: teamAwardsLoading } = useTeamAwards(
     {
       enabled: isTrophyTab,

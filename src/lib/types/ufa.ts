@@ -115,6 +115,23 @@ export type UfaOverviewMode = "full" | "home";
 export interface UseUfaOverviewResult {
   data: UfaOverviewData | undefined;
   isLoading: boolean;
-  error: Error | null;
 }
-import type { Franchise } from "./database";
+import type {
+  Contract,
+  Franchise,
+  GSHLTeam,
+  NHLTeam,
+  Player,
+  PlayerNHLStatLine,
+  Season,
+} from "./database";
+
+export interface UfaCatalog {
+  players: Player[];
+  nhlStats: PlayerNHLStatLine[];
+  nhlTeams: NHLTeam[];
+  franchises: Franchise[];
+  teams: GSHLTeam[];
+  seasons: Season[];
+  contracts: Contract[];
+}

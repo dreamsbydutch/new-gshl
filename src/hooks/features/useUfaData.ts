@@ -1,18 +1,9 @@
 "use client";
 
 import { useMemo } from "react";
-import { useQuery } from "convex/react";
-import { useSession } from "next-auth/react";
-import { api } from "../../../convex/_generated/api";
-import { useAppMutation } from "../main/useAppMutation";
+import { useAuthSession } from "../main/useAuthSession";
+import { useUfaCatalog, useUfaOfferMutation } from "../main/useUfa";
 import type {
-  Contract,
-  Franchise,
-  GSHLTeam,
-  NHLTeam,
-  Player,
-  PlayerNHLStatLine,
-  Season,
   UfaFreeAgentView,
   UfaOfferGroupView,
   UfaOverviewMode,
@@ -31,29 +22,22 @@ import {
 export function useUfaOverview(
   mode: UfaOverviewMode = "full",
 ): UseUfaOverviewResult {
-  const { data: session } = useSession();
-  const rawState = useQuery(api.ufa.publicState, {});
-  const fullCatalog = useQuery(
-    api.frontend.ufaCatalog,
-    mode === "full" ? {} : "skip",
-  );
-  const homeCatalog = useQuery(
-    api.frontend.ufaHomeCatalog,
-    mode === "home" ? {} : "skip",
-  );
-  const rawCatalog = mode === "home" ? homeCatalog : fullCatalog;
+  const { session } = useAuthSession();
+  const { state: rawState, catalog: rawCatalog } = useUfaCatalog(mode);
   const state = useMemo(() => normalizeUfaPublicState(rawState), [rawState]);
   const data = useMemo(() => {
     if (rawState === undefined || rawCatalog === undefined) {
       return undefined;
     }
-    const players = rawCatalog.players as unknown as Player[];
-    const nhlStats = rawCatalog.nhlStats as unknown as PlayerNHLStatLine[];
-    const nhlTeams = rawCatalog.nhlTeams as unknown as NHLTeam[];
-    const franchises = rawCatalog.franchises as unknown as Franchise[];
-    const teams = rawCatalog.teams as unknown as GSHLTeam[];
-    const seasons = rawCatalog.seasons as unknown as Season[];
-    const contracts = rawCatalog.contracts as unknown as Contract[];
+    const {
+      players,
+      nhlStats,
+      nhlTeams,
+      franchises,
+      teams,
+      seasons,
+      contracts,
+    } = rawCatalog;
     const activeSeason = seasons.find((season) => season.isActive);
     const latestNhlStatsByPlayer = indexLatestUfaNhlStats(
       nhlStats,
@@ -193,11 +177,10 @@ export function useUfaOverview(
       },
     };
   }, [rawCatalog, rawState, session?.user?.ownerId, state]);
-  const error: Error | null = null;
+
   return {
     data,
     isLoading: data === undefined,
-    error,
   };
 }
 
@@ -205,7 +188,7 @@ export function useSubmitUfaOffer(options?: {
   onSuccess?: () => void;
   onError?: (message: string) => void;
 }) {
-  const mutation = useAppMutation(api.ufa.submitOffer);
+  const mutation = useUfaOfferMutation();
   return {
     ...mutation,
     mutate: (args: { playerId: string; contractLength: 1 | 2 | 3 }) =>
