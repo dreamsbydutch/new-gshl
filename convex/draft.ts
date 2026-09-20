@@ -24,9 +24,6 @@ import type {
   DraftHubPlayerSummary,
   DraftHubTeamSummary,
   DraftPick,
-  LineupAssignment,
-  LineupCandidate,
-  RosterPosition as RosterPositionType,
 } from "../src/lib/types";
 import {
   getDraftPickClockMs,
@@ -34,11 +31,8 @@ import {
   resolveDraftClockState,
   serializeDraftHubPick,
 } from "../src/lib/utils/features/draft-hub";
-import { generateLineupAssignments } from "../src/lib/utils/features/draft-admin";
-import {
-  ContractStatus,
-  RosterPosition,
-} from "../src/lib/utils/domain/constants";
+import { rebuildTeamLineup, toLineupCandidate } from "./lib/teamLineup";
+import { ContractStatus } from "../src/lib/utils/domain/constants";
 import { toUtcTimestamp } from "./lib/timestamps";
 
 function toDate(value: unknown, fallback: number): Date {
@@ -135,87 +129,6 @@ function playerSummary(
 
 function parseTime(value: unknown): number | null {
   return toUtcTimestamp(value);
-}
-
-function toRosterPosition(value: unknown): RosterPositionType | null {
-  switch (value) {
-    case RosterPosition.BN:
-      return RosterPosition.BN;
-    case RosterPosition.IR:
-      return RosterPosition.IR;
-    case RosterPosition.IRplus:
-      return RosterPosition.IRplus;
-    case RosterPosition.LW:
-      return RosterPosition.LW;
-    case RosterPosition.C:
-      return RosterPosition.C;
-    case RosterPosition.RW:
-      return RosterPosition.RW;
-    case RosterPosition.D:
-      return RosterPosition.D;
-    case RosterPosition.G:
-      return RosterPosition.G;
-    case RosterPosition.Util:
-      return RosterPosition.Util;
-    default:
-      return null;
-  }
-}
-
-function toLineupCandidate(player: Doc<"players">): LineupCandidate {
-  const parsedRating =
-    player.overallRating === null || player.overallRating === undefined
-      ? null
-      : Number(player.overallRating);
-  return {
-    id: String(player._id),
-    nhlPos: (player.nhlPos ?? [])
-      .map(toRosterPosition)
-      .filter((position): position is RosterPositionType => position !== null),
-    lineupPos: toRosterPosition(player.lineupPos),
-    overallRating: Number.isFinite(parsedRating) ? parsedRating : null,
-  };
-}
-
-async function rebuildTeamLineup(
-  ctx: MutationCtx,
-  ownerId: Id<"owners">,
-  teamId: Id<"teams">,
-  updatedAt: number,
-  explicitlyIncludedPlayers: readonly Doc<"players">[] = [],
-): Promise<LineupAssignment[]> {
-  const [ownerRosterRows, teamRosterRows] = await Promise.all([
-    ctx.db
-      .query("players")
-      .withIndex("by_ownerId", (range) => range.eq("ownerId", ownerId))
-      .collect(),
-    ctx.db
-      .query("players")
-      .withIndex("by_gshlTeamId", (range) => range.eq("gshlTeamId", teamId))
-      .collect(),
-  ]);
-  const rosterById = new Map<string, Doc<"players">>();
-  for (const rosterPlayer of [
-    ...ownerRosterRows,
-    ...teamRosterRows,
-    ...explicitlyIncludedPlayers,
-  ]) {
-    rosterById.set(String(rosterPlayer._id), rosterPlayer);
-  }
-  const lineupAssignments = generateLineupAssignments(
-    [...rosterById.values()]
-      .filter((rosterPlayer) => rosterPlayer.isActive)
-      .map(toLineupCandidate),
-  );
-  for (const assignment of lineupAssignments) {
-    const rosterPlayer = rosterById.get(assignment.playerId);
-    if (!rosterPlayer) continue;
-    await ctx.db.patch(rosterPlayer._id, {
-      lineupPos: assignment.lineupPos,
-      updatedAt,
-    });
-  }
-  return lineupAssignments;
 }
 
 function contractCoversDraft(
@@ -602,13 +515,13 @@ async function completePick(
     lineupPos: null,
     updatedAt: nowTimestamp,
   };
-  const lineupAssignments = await rebuildTeamLineup(
-    ctx,
-    franchise.ownerId,
-    activeTeam._id,
-    nowTimestamp,
-    [draftedPlayerRow],
-  );
+  const lineupAssignments = await rebuildTeamLineup(ctx, {
+    policy: "draft",
+    ownerId: franchise.ownerId,
+    teamId: activeTeam._id,
+    updatedAt: nowTimestamp,
+    explicitlyIncludedPlayers: [draftedPlayerRow],
+  });
   const draftedPlayerAssignment = lineupAssignments.find(
     (assignment) => assignment.playerId === String(player._id),
   );
@@ -754,7 +667,12 @@ export const undoPick = mutation({
       lineupPos: null,
       updatedAt: nowTimestamp,
     });
-    await rebuildTeamLineup(ctx, franchise.ownerId, team._id, nowTimestamp);
+    await rebuildTeamLineup(ctx, {
+      policy: "draft",
+      ownerId: franchise.ownerId,
+      teamId: team._id,
+      updatedAt: nowTimestamp,
+    });
     // Undo removes the timeout from the streak; Auto still needs an explicit toggle.
     await ctx.db.patch(team._id, { draftTimeoutStreak: 0 });
 

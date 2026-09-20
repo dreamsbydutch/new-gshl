@@ -1422,12 +1422,12 @@ export const rebuildTeamLineup = mutationGeneric({
     if (!franchise || franchise.ownerId !== args.ownerId) {
       throw new Error("Team does not belong to the requested owner");
     }
-    const assignments = await rebuildLineup(
-      ctx as never,
-      args.ownerId,
-      args.teamId,
-      Date.now(),
-    );
+    const assignments = await rebuildLineup(ctx as never, {
+      policy: "signing",
+      ownerId: args.ownerId,
+      teamId: args.teamId,
+      updatedAt: Date.now(),
+    });
     return { assignments };
   },
 });
