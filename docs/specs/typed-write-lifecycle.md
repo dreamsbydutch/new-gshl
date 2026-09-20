@@ -25,7 +25,10 @@ This branch builds on the merged franchise-contract-module PR.
 - Reconcile existing caller types exposed by stricter inference at owning main
   hooks/type declarations, rather than weakening the shared write interface or
   scattering Convex ID assertions through UI. Server authorization, transaction
-  behavior, and payload values remain unchanged.
+  behavior, and valid payload values remain unchanged. Draft-correction editor
+  models permit a missing team while the server requires one; reject that
+  invalid input inside the shared write lifecycle before transport, so pending,
+  displayed error, promise rejection and callbacks remain consistent.
 - Hooks own React state. Shared types remain type-only. No generated-file edits,
   deployment, or production writes.
 
