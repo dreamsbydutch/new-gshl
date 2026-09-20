@@ -17,6 +17,7 @@ import {
   PositionGroup,
   RosterPosition,
 } from "../domain/constants";
+import { coerceDate } from "../core/date";
 import type {
   Contract,
   DraftBoardPlayer,
@@ -118,19 +119,6 @@ export function sortByOverallRank(
 }
 
 /**
- * Parses date.
- *
- * @param value - The source value to process.
- * @returns The parsed date.
- */
-function parseDate(value: string | Date | null | undefined): Date | null {
-  if (!value) return null;
-
-  const parsed = value instanceof Date ? value : new Date(value);
-  return Number.isNaN(parsed.getTime()) ? null : parsed;
-}
-
-/**
  * Checks whether upcoming season contract exists.
  *
  * @param playerId - The player id to use.
@@ -153,8 +141,11 @@ function contractCoversDate(
     return true;
   }
 
-  const startDate = parseDate(contract.startDate);
-  const expiryDate = parseDate(contract.capHitEndDate ?? contract.expiryDate);
+  const startDate = coerceDate({ value: contract.startDate, mode: "instant" });
+  const expiryDate = coerceDate({
+    value: contract.capHitEndDate ?? contract.expiryDate,
+    mode: "instant",
+  });
   if (!startDate || !expiryDate) {
     return false;
   }
@@ -188,7 +179,7 @@ function hasUpcomingSeasonContract(
 export function filterAvailableDraftPlayers<
   T extends Pick<DraftBoardPlayer, "id" | "isActive">,
 >(players: T[], contracts: Contract[], activeOn?: string | Date | null): T[] {
-  const activeDate = parseDate(activeOn ?? null);
+  const activeDate = coerceDate({ value: activeOn ?? null, mode: "instant" });
 
   return players.filter(
     (player) =>
@@ -205,7 +196,7 @@ export function buildContractedSeasonRosterPlayers<T extends DraftBoardPlayer>(
   contracts: Contract[],
   activeOn: string | Date,
 ): T[] {
-  const activeDate = parseDate(activeOn);
+  const activeDate = coerceDate({ value: activeOn, mode: "instant" });
   if (!activeDate) return [];
 
   const ownerIdByPlayerId = new Map<string, string>();

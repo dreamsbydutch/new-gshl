@@ -13,7 +13,7 @@ import type {
 } from "@gshl-types";
 import { doesContractAffectSeason } from "../domain/contracts";
 import { resolveContractDefaultSeason } from "../domain/season";
-import { toNumber } from "../core";
+import { coerceDate, toNumber } from "../core";
 
 type DateCandidate = Date | string | number | null | undefined;
 
@@ -181,8 +181,8 @@ export function getDateYear(
 ): number | null {
   if (!value) return null;
 
-  const parsed = value instanceof Date ? value : new Date(String(value));
-  if (!Number.isNaN(parsed.getTime())) {
+  const parsed = coerceDate({ value, mode: "instant" });
+  if (parsed) {
     return parsed.getFullYear();
   }
 
