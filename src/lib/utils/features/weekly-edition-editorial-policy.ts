@@ -79,9 +79,7 @@ export function matchupSummary(matchup: WeeklyEditionMatchupFact) {
   return `${stagePrefix}${matchup.winnerTeamName} beat ${matchup.loserTeamName} ${Math.max(matchup.homeScore, matchup.awayScore)}–${Math.min(matchup.homeScore, matchup.awayScore)}.${categorySentence}`;
 }
 
-export function pressBoxEditorialCandidates(
-  packet: WeeklyEditionFactPacket,
-) {
+export function pressBoxEditorialCandidates(packet: WeeklyEditionFactPacket) {
   const loserTournamentCandidateIds = new Set(
     packet.matchups
       .filter((matchup) => matchup.gameType === "LT")
@@ -853,4 +851,3 @@ export function assignWeeklyEditionAuthors(
     }),
   };
 }
-
