@@ -1,5 +1,9 @@
 import { optimizedSheetsClient } from "../client/optimized-client";
 import {
+  columnToLetter,
+  makeCompositeKey as makeCoreCompositeKey,
+} from "../../../../shared/sheets-core/index";
+import {
   getSpreadsheetIdsForModel,
   serializeCsvMultiValue,
   SHEETS_CONFIG,
@@ -77,19 +81,6 @@ function isCsvMultiValueColumn(column: string): boolean {
   );
 }
 
-function columnToLetter(columnIndex1: number): string {
-  let columnIndex = columnIndex1;
-  let letter = "";
-
-  while (columnIndex > 0) {
-    const remainder = (columnIndex - 1) % 26;
-    letter = String.fromCharCode(65 + remainder) + letter;
-    columnIndex = Math.floor((columnIndex - 1) / 26);
-  }
-
-  return letter;
-}
-
 function normalizeWriteValue(
   column: string,
   value: unknown,
@@ -146,9 +137,12 @@ function makeCompositeKey(
   source: Record<string, unknown>,
   keyColumns: readonly string[],
 ): string {
-  return keyColumns
-    .map((column) => normalizeCompositeKeyPart(column, source[column]))
-    .join("|");
+  return makeCoreCompositeKey({
+    source,
+    keyColumns,
+    normalizePart: ({ column, value }) =>
+      normalizeCompositeKeyPart(column, value),
+  });
 }
 
 function rowToRecord(
@@ -254,7 +248,7 @@ async function findRowNumberById(
     throw new Error(`Model ${String(modelName)} has no 'id' column mapping`);
   }
 
-  const idColLetter = columnToLetter(idColumnIndex + 1);
+  const idColLetter = columnToLetter({ columnIndex: idColumnIndex + 1 });
   const idColumnRange = `${sheetName}!${idColLetter}2:${idColLetter}`;
 
   for (const spreadsheetId of getSpreadsheetIdsForModel(String(modelName))) {
@@ -300,7 +294,7 @@ export class MinimalSheetsWriter {
     for (const [key, value] of updates) {
       const colIndex = columns.indexOf(key as never);
       if (colIndex < 0) continue;
-      const colLetter = columnToLetter(colIndex + 1);
+      const colLetter = columnToLetter({ columnIndex: colIndex + 1 });
       const range = `${location.sheetName}!${colLetter}${location.rowNumber}`;
 
       await optimizedSheetsClient.updateValues(location.spreadsheetId, range, [
