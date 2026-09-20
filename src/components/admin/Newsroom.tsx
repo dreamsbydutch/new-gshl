@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import { useSeasons, useWeeklyEditionNewsroom, useWeeks } from "@gshl-hooks";
 import type {
-  WeeklyEdition,
+  WeeklyEditionIssueType,
   WeeklyEditionArticleCount,
   WeeklyEditionContent,
   WeeklyEditionValidationResult,
@@ -48,7 +48,7 @@ export function Newsroom() {
   const [notice, setNotice] = useState("");
   const [seasonId, setSeasonId] = useState("");
   const [weekId, setWeekId] = useState("");
-  const [issueType, setIssueType] = useState("weekly");
+  const [issueType, setIssueType] = useState<WeeklyEditionIssueType>("weekly");
   const [articleCount, setArticleCount] = useState<WeeklyEditionArticleCount>(
     DEFAULT_WEEKLY_EDITION_ARTICLE_COUNT,
   );
@@ -161,15 +161,11 @@ export function Newsroom() {
   const generateTemplate = async () => {
     if (!seasonId || !weekId) return;
     try {
-      const result = await newsroom.generateHistorical.mutateAsync({
+      const generated = await newsroom.generateHistorical.mutateAsync({
         seasonId,
         weekId,
         issueType,
       });
-      const generated = result as {
-        state?: string;
-        edition?: WeeklyEdition;
-      };
       if (generated.edition?.id) setEditionId(generated.edition.id);
       showNotice(`Grounded template ${generated.state ?? "generated"}.`);
     } catch {
@@ -380,7 +376,18 @@ export function Newsroom() {
           Edition type
           <select
             value={issueType}
-            onChange={(event) => setIssueType(event.target.value)}
+            onChange={(event) => {
+              const value = event.target.value;
+              if (
+                value === "weekly" ||
+                value === "final_recap" ||
+                value === "resigning_outlook" ||
+                value === "offseason_market" ||
+                value === "pre_draft" ||
+                value === "preseason"
+              )
+                setIssueType(value);
+            }}
             className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2"
           >
             <option value="weekly">Weekly recap</option>

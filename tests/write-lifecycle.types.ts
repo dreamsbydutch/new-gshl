@@ -1,3 +1,6 @@
+import { useSubmitDraftPick } from "../src/hooks/main/useDraftHub";
+import { useWeeklyEditionNewsroom } from "../src/hooks/main/useWeeklyEditions";
+import { useJobAdmin } from "../src/hooks/main/useJobs";
 // Compile-only fixtures: exported for type checking, never mounted or invoked.
 import type { FunctionArgs, FunctionReturnType } from "convex/server";
 import { makeFunctionReference } from "convex/server";
@@ -96,4 +99,48 @@ export function useEdgeWriteTypeFixture() {
     },
   );
   return { emptyResult, optionalResult };
+}
+
+export function useDomainWriteTypeFixture() {
+  const pick = useSubmitDraftPick();
+  const args = { seasonId: "season", pickId: "pick", playerId: "player" };
+  const result = pick.mutateAsync(args);
+  expectType<
+    Equal<
+      typeof result,
+      Promise<FunctionReturnType<typeof api.draft.submitPick>>
+    >
+  >(true);
+  pick.mutate(args, {
+    onSuccess(_value) {
+      expectType<
+        Equal<typeof _value, FunctionReturnType<typeof api.draft.submitPick>>
+      >(true);
+    },
+  });
+  // @ts-expect-error The domain adapter preserves required arguments.
+  void pick.mutateAsync({ seasonId: "season" });
+  // @ts-expect-error Domain IDs accept strings, not numbers.
+  void pick.mutateAsync({ ...args, playerId: 42 });
+  const newsroom = useWeeklyEditionNewsroom();
+  void newsroom.setHomeActive.mutateAsync({});
+  void newsroom.setHomeActive.mutateAsync({ editionId: "edition" });
+  void newsroom.generateWithAi.mutateAsync({
+    seasonId: "season",
+    weekId: "week",
+    // @ts-expect-error The mapped action still checks generated issue types.
+    issueType: "invalid",
+  });
+  const jobs = useJobAdmin();
+  jobs.start.mutate(
+    { jobName: "job", apply: false, args: {} },
+    {
+      onSuccess(_value) {
+        expectType<
+          Equal<typeof _value, FunctionReturnType<typeof api.frontend.startJob>>
+        >(true);
+      },
+    },
+  );
+  return result;
 }

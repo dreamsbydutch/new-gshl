@@ -10,7 +10,8 @@ import {
   normalizePlayerNhlSalaryRows,
   sortContracts,
 } from "@gshl-utils";
-import { useAppMutation } from "./useAppMutation";
+import type { FunctionArgs } from "convex/server";
+import { useDomainMutation } from "./useDomainMutation";
 
 const EMPTY_CONTRACTS: Contract[] = [];
 
@@ -27,7 +28,19 @@ function singleFilterValue(value: unknown): string | undefined {
 }
 
 export function useCreateContract() {
-  return useAppMutation(api.frontend.createContract);
+  return useDomainMutation(
+    api.frontend.createContract,
+    (
+      args: Omit<
+        FunctionArgs<typeof api.frontend.createContract>,
+        "teamId" | "playerId"
+      > & { teamId: string; playerId: string },
+    ) => ({
+      ...args,
+      teamId: args.teamId as Id<"teams">,
+      playerId: args.playerId as Id<"players">,
+    }),
+  );
 }
 
 /** Reads contracts with server scope and optional local filtering/sorting. */

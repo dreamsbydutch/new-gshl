@@ -1,3 +1,5 @@
+import type { FunctionReturnType } from "convex/server";
+import type { api } from "@gshl-convex/_generated/api";
 import type { Id } from "@gshl-convex/_generated/dataModel";
 import type { AppMutationController } from "./app-mutation";
 import type { QueryLike } from "./hook-query";
@@ -38,7 +40,16 @@ export interface JobRunMutationArgs extends Record<string, unknown> {
 export interface UseJobAdminResult {
   catalog: QueryLike<JobCatalog>;
   runs: QueryLike<JobRun[]>;
-  start: AppMutationController<StartJobArgs>;
-  cancel: AppMutationController<JobRunMutationArgs>;
-  retry: AppMutationController<JobRunMutationArgs>;
+  start: AppMutationController<
+    StartJobArgs,
+    FunctionReturnType<typeof api.frontend.startJob>
+  >;
+  cancel: AppMutationController<
+    JobRunMutationArgs,
+    FunctionReturnType<typeof api.frontend.cancelJob>
+  >;
+  retry: AppMutationController<
+    JobRunMutationArgs,
+    FunctionReturnType<typeof api.frontend.retryJob>
+  >;
 }

@@ -2,6 +2,8 @@
 
 import { useMemo } from "react";
 import { usePaginatedQuery, useQuery } from "convex/react";
+import type { FunctionArgs } from "convex/server";
+import { useDomainMutation } from "./useDomainMutation";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import type {
@@ -148,4 +150,15 @@ export function useRankedPlayers(options: UseRankedPlayersOptions = {}) {
 
 function getPlayerRankValue(player: Player, field: PlayerRankField) {
   return player[field] ?? null;
+}
+
+export function useUpdatePlayer() {
+  return useDomainMutation(
+    api.frontend.updatePlayer,
+    (
+      args: Omit<FunctionArgs<typeof api.frontend.updatePlayer>, "id"> & {
+        id: string;
+      },
+    ) => ({ ...args, id: args.id as Id<"players"> }),
+  );
 }
