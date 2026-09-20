@@ -188,3 +188,26 @@ stored per season team and persist across page reloads. Auto never picks before
 the scheduled draft start. Selection, roster assignment, lineup rebuilding, and
 advancement happen in one transaction. If no eligible player remains, a
 commissioner must resolve the stalled pick.
+
+### Draft recommendations
+
+Mock drafts, the Draft Hub's potential auto-pick, and server auto-picks share
+one roster-aware selection function. It uses the same combined ranking as
+Best Available: Yahoo 30%, Daily Faceoff 30%, NHL 25%, and GSHL overall rank 15%.
+The existing normalization and missing-rank handling apply to every source.
+
+The combined score supplies player value for the existing lineup optimizer;
+raw talent ratings do not override it. A recommendation maximizes the gain
+in the team's weighted lineup, so an open position can take priority over a
+similarly ranked player at a filled position. For this calculation, a normalized
+composite score of zero is worth 101 points and a score of one is worth one
+point. Roster players use the available pool's normalization so adding them
+does not change the order of the available players. These are temporary
+draft-selection values, not stored player ratings.
+
+Each projection begins with the team's signed roster and completed selections.
+Projected picks then update that roster and remove the selected player from
+the shared available pool. Signing slots and already selected players are
+excluded from future picks. Teams with no roster use the same ranking and
+position weights; players with external rankings remain eligible even when
+their GSHL talent rating is missing.

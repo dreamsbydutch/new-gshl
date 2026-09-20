@@ -699,9 +699,15 @@ export const notifyState = internalMutation({
         ]);
         const candidates = players.map((player) => ({
           ...toLineupCandidate(player),
+          fullName: player.fullName,
+          yahooDraftRk:
+            player.yahooDraftRk == null ? null : Number(player.yahooDraftRk),
+          dailyFaceoffRk:
+            player.dailyFaceoffRk == null
+              ? null
+              : Number(player.dailyFaceoffRk),
+          nhlRk: player.nhlRk == null ? null : Number(player.nhlRk),
           overallRk: player.overallRk == null ? null : Number(player.overallRk),
-          preDraftRk:
-            player.preDraftRk == null ? null : Number(player.preDraftRk),
         }));
         const selected = selectAutoDraftPlayer(
           candidates.filter(

@@ -263,3 +263,43 @@ void test("stale pick timers cannot act on a later or restarted clock", async ()
   });
   assert.equal(f.get("pick2")!.playerId, undefined);
 });
+
+void test("server auto picks follow the combined ranking rather than raw talent", async () => {
+  const f = draftFixture();
+  for (let i = 1; i <= 4; i++)
+    Object.assign(f.get("player" + i)!, {
+      yahooDraftRk: 100,
+      dailyFaceoffRk: 100,
+      nhlRk: 100,
+    });
+  Object.assign(f.get("player2")!, {
+    overallRating: null,
+    yahooDraftRk: 1,
+    dailyFaceoffRk: 1,
+    nhlRk: 1,
+  });
+  await handler(notifyState)(f.ctx, { seasonId });
+  assert.equal(f.get("pick1")!.playerId, "player2");
+});
+
+void test("server auto picks account for the contracted roster using the same composite", async () => {
+  const f = draftFixture();
+  for (let i = 1; i <= 4; i++) {
+    const rank = i === 4 ? 200 : i;
+    Object.assign(f.get("player" + i)!, {
+      overallRk: rank,
+      yahooDraftRk: rank,
+      dailyFaceoffRk: rank,
+      nhlRk: rank,
+    });
+  }
+  f.get("player3")!.nhlPos = ["RW"];
+  f.put("contracts", "contract", {
+    playerId: "player1",
+    ownerId: "owner",
+    startDate: 0,
+    expiryDate: Date.now() + 86400000,
+  });
+  await handler(notifyState)(f.ctx, { seasonId });
+  assert.equal(f.get("pick1")!.playerId, "player3");
+});

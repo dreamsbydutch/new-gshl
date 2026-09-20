@@ -65,5 +65,17 @@ export interface BuildMockDraftProjectionOptions<
 
 export type AutoDraftCandidate = Pick<
   DraftBoardPlayer,
-  "id" | "nhlPos" | "lineupPos" | "overallRating" | "overallRk" | "preDraftRk"
+  | "id"
+  | "fullName"
+  | "nhlPos"
+  | "lineupPos"
+  | "overallRk"
+  | "yahooDraftRk"
+  | "dailyFaceoffRk"
+  | "nhlRk"
+>;
+
+export type DraftRankingPlayer = Pick<
+  DraftBoardPlayer,
+  "id" | "fullName" | "overallRk" | "yahooDraftRk" | "dailyFaceoffRk" | "nhlRk"
 >;

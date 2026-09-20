@@ -3,6 +3,7 @@ import type {
   BuildMockDraftProjectionOptions,
   DraftBoardPlayer,
   GSHLTeam,
+  LineupCandidate,
   MockDraftDisplayPick,
   MockDraftDisplayPlayer,
   ProjectedDraftPick,
@@ -10,6 +11,7 @@ import type {
 } from "@gshl-types";
 import { getPlayerNhlAbbreviation } from "../domain/player";
 import { generateLineupAssignments } from "./draft-admin";
+import { getDraftCompositeRanks, getDraftCompositeScores } from "./draft-hub";
 import { calculateDraftRosterTalentPoints } from "./draft-roster-board";
 
 export type {
@@ -85,70 +87,6 @@ export function getMockDraftReferencedNhlAbbreviations(
 }
 
 /**
- * Creates a comparison result for players.
- *
- * @param left - The left to use.
- * @param right - The right to use.
- * @returns The comparison callback result.
- */
-function comparePlayers(
-  left: Pick<
-    DraftBoardPlayer,
-    "overallRk" | "overallRating" | "preDraftRk" | "id"
-  >,
-  right: Pick<
-    DraftBoardPlayer,
-    "overallRk" | "overallRating" | "preDraftRk" | "id"
-  >,
-): number {
-  const overallRankDelta = (left.overallRk ?? 9999) - (right.overallRk ?? 9999);
-  if (overallRankDelta !== 0) return overallRankDelta;
-
-  const overallDelta = (right.overallRating ?? 0) - (left.overallRating ?? 0);
-  if (overallDelta !== 0) return overallDelta;
-
-  const draftRankDelta = (left.preDraftRk ?? 9999) - (right.preDraftRk ?? 9999);
-  if (draftRankDelta !== 0) return draftRankDelta;
-
-  return String(left.id).localeCompare(String(right.id));
-}
-
-function hasTalentRating(
-  player: Pick<DraftBoardPlayer, "overallRating">,
-): boolean {
-  return (
-    player.overallRating !== null &&
-    player.overallRating !== undefined &&
-    Number.isFinite(Number(player.overallRating))
-  );
-}
-
-function selectHighestRatedCandidateByEligibility<
-  TPlayer extends AutoDraftCandidate,
->(players: readonly TPlayer[]): TPlayer[] {
-  const candidateByEligibility = new Map<string, TPlayer>();
-
-  for (const player of players) {
-    const eligibilityKey = [...new Set(normalizePlayerPositions(player))]
-      .sort()
-      .join("|");
-    const current = candidateByEligibility.get(eligibilityKey);
-    const playerRating = Number(player.overallRating);
-    const currentRating = Number(current?.overallRating);
-
-    if (
-      !current ||
-      playerRating > currentRating ||
-      (playerRating === currentRating && comparePlayers(player, current) < 0)
-    ) {
-      candidateByEligibility.set(eligibilityKey, player);
-    }
-  }
-
-  return [...candidateByEligibility.values()].sort(comparePlayers);
-}
-
-/**
  * Sorts projected picks.
  *
  * @param left - The left to use.
@@ -181,12 +119,12 @@ function normalizePlayerPositions(
  * primary, secondary, utility, and bench weights.
  */
 function calculatePointsAfterFullLineupOptimization(
-  roster: readonly AutoDraftCandidate[],
+  roster: readonly LineupCandidate[],
 ): number {
   const assignments = generateLineupAssignments(
     roster.map((player) => ({
       id: String(player.id),
-      nhlPos: normalizePlayerPositions(player),
+      nhlPos: player.nhlPos,
       lineupPos: player.lineupPos,
       overallRating: player.overallRating,
     })),
@@ -233,17 +171,40 @@ export function buildMockDraftProjection<
     seasonDraftPicks,
     draftPlayers,
     rosterPlayers,
-    completedPicks = [],
+    completedPicks: suppliedCompletedPicks = [],
     teams,
     take,
   } = options;
   const teamById = new Map(teams.map((team) => [String(team.id), team]));
-  const completedPlayerIds = new Set(
-    completedPicks.map(({ player }) => String(player.id)),
+  const playerById = new Map(
+    [
+      ...draftPlayers,
+      ...rosterPlayers,
+      ...suppliedCompletedPicks.map(({ player }) => player),
+    ].map((player) => [String(player.id), player]),
   );
-  const remainingPlayers = draftPlayers
-    .filter((player) => !completedPlayerIds.has(String(player.id)))
-    .sort(comparePlayers);
+  const completedByPickId = new Map(
+    suppliedCompletedPicks.map((entry) => [String(entry.pick.id), entry]),
+  );
+  for (const pick of seasonDraftPicks) {
+    const player = pick.playerId
+      ? playerById.get(String(pick.playerId))
+      : undefined;
+    if (!pick.isSigning && player && !completedByPickId.has(String(pick.id))) {
+      completedByPickId.set(String(pick.id), { pick, player });
+    }
+  }
+  const completedPicks = [...completedByPickId.values()];
+  const unavailablePlayerIds = new Set([
+    ...seasonDraftPicks.flatMap((pick) =>
+      pick.playerId ? [String(pick.playerId)] : [],
+    ),
+    ...rosterPlayers.map((player) => String(player.id)),
+    ...completedPicks.map(({ player }) => String(player.id)),
+  ]);
+  const remainingPlayers = draftPlayers.filter(
+    (player) => !unavailablePlayerIds.has(String(player.id)),
+  );
   const rosterByTeamKey = new Map<string, TPlayer[]>();
   for (const team of teams) {
     const teamRoster = rosterPlayers.filter(
@@ -276,13 +237,16 @@ export function buildMockDraftProjection<
 
     rosterByTeamKey.set(teamKey, [
       ...teamRoster,
-      asDraftedRosterPlayer(completedPick.player, completedPickTeam),
+      {
+        ...asDraftedRosterPlayer(completedPick.player, completedPickTeam),
+        lineupPos: completedPick.player.lineupPos,
+      },
     ]);
   }
   const projectedPicks: ProjectedDraftPick<TPlayer>[] = [];
 
   for (const pick of [...seasonDraftPicks]
-    .filter((x) => !x.playerId)
+    .filter((x) => !x.playerId && !x.isSigning)
     .sort(
       (left, right) =>
         Number(left.round ?? 0) - Number(right.round ?? 0) ||
@@ -328,40 +292,52 @@ export function buildMockDraftProjection<
   return projectedPicks.sort(sortProjectedPicks);
 }
 
+/**
+ * Uses the same composite as Best Available, then measures the improvement
+ * after fitting each candidate into the team's existing lineup.
+ */
 export function selectAutoDraftPlayer<TPlayer extends AutoDraftCandidate>(
   players: readonly TPlayer[],
   teamRoster: readonly AutoDraftCandidate[],
 ) {
-  const currentTalentPoints =
-    calculatePointsAfterFullLineupOptimization(teamRoster);
+  const ranks = getDraftCompositeRanks(players);
+  // Score the roster against the same source depths as the available pool.
+  const scores = getDraftCompositeScores([...players, ...teamRoster], players);
+  const toLineupPlayer = (player: AutoDraftCandidate): LineupCandidate => ({
+    id: String(player.id),
+    nhlPos: normalizePlayerPositions(player),
+    lineupPos: player.lineupPos,
+    // Composite scores run from 0 (best) to 1 (missing all sources).
+    // Keep a small positive value so every eligible player can fill a slot.
+    overallRating: 1 + 100 * (1 - (scores.get(String(player.id)) ?? 1)),
+  });
+  const roster = teamRoster.map(toLineupPlayer);
+  const currentPoints = calculatePointsAfterFullLineupOptimization(roster);
+  const rankOf = (player: TPlayer) => ranks.get(String(player.id)) ?? Infinity;
+  const bestByEligibility = new Map<string, TPlayer>();
+  for (const player of players) {
+    const key = [...new Set(normalizePlayerPositions(player))].sort().join("|");
+    const current = bestByEligibility.get(key);
+    if (!current || rankOf(player) < rankOf(current))
+      bestByEligibility.set(key, player);
+  }
   let projectedPlayer: TPlayer | undefined;
-  let bestTalentGain = Number.NEGATIVE_INFINITY;
-  const ratedCandidates = players.filter(hasTalentRating);
-  // Evaluate the best-rated candidate for every distinct eligibility
-  // profile. A lower-rated player with identical eligibility cannot produce
-  // a better optimized lineup, but every multi-position combination must be
-  // tested independently.
-  const candidatePool = ratedCandidates.length
-    ? selectHighestRatedCandidateByEligibility(ratedCandidates)
-    : players;
-
-  for (const candidate of candidatePool) {
-    const draftedCandidate = { ...candidate, lineupPos: null };
-    const resultingTalentPoints = calculatePointsAfterFullLineupOptimization([
-      ...teamRoster,
-      draftedCandidate,
-    ]);
-    const talentGain = resultingTalentPoints - currentTalentPoints;
-    const isBetterGain = talentGain > bestTalentGain;
-    const winsTie =
-      talentGain === bestTalentGain &&
-      (!projectedPlayer || comparePlayers(candidate, projectedPlayer) < 0);
-
-    if (isBetterGain || winsTie) {
+  let bestGain = Number.NEGATIVE_INFINITY;
+  for (const candidate of bestByEligibility.values()) {
+    const gain =
+      calculatePointsAfterFullLineupOptimization([
+        ...roster,
+        toLineupPlayer({ ...candidate, lineupPos: null }),
+      ]) - currentPoints;
+    const tied = Math.abs(gain - bestGain) < 1e-9;
+    if (
+      (!tied && gain > bestGain) ||
+      (tied &&
+        (!projectedPlayer || rankOf(candidate) < rankOf(projectedPlayer)))
+    ) {
       projectedPlayer = candidate;
-      bestTalentGain = talentGain;
+      bestGain = gain;
     }
   }
-
-  return { player: projectedPlayer, score: bestTalentGain };
+  return { player: projectedPlayer, score: bestGain };
 }
