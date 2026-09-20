@@ -6,6 +6,15 @@ import {
   timestampFieldsForTable,
   toUtcTimestamp,
 } from "./lib/timestamps";
+import {
+  compatibilityEquals as equals,
+  matchesWhere,
+  compatibilityQuery,
+  compatibilityIndexPlan,
+  readCandidateRows,
+  readCompatibilityRows,
+  finishCompatibilityRead,
+} from "./lib/compatibilityRead";
 import { rebuildTeamLineup as rebuildLineup } from "./lib/teamLineup";
 
 type Row = Record<string, unknown>;
@@ -45,58 +54,6 @@ function publicRow(row: Row & { _id: string; _creationTime: number }) {
     ...row,
     id: row._id,
   };
-}
-
-function toComparable(value: unknown): string | number | boolean | null {
-  if (value === null || value === undefined) return null;
-  if (typeof value === "number" || typeof value === "boolean") return value;
-  if (typeof value === "string") {
-    const trimmed = value.trim();
-    const asNumber = Number(trimmed);
-    return trimmed !== "" && Number.isFinite(asNumber) ? asNumber : trimmed;
-  }
-  return JSON.stringify(value);
-}
-
-function equals(left: unknown, right: unknown): boolean {
-  return toComparable(left) === toComparable(right);
-}
-
-function matchesWhere(
-  table: string,
-  row: Row,
-  where?: Record<string, unknown>,
-): boolean {
-  if (!where) return true;
-  const timestampFields = new Set(timestampFieldsForTable(table));
-  return Object.entries(where).every(([field, expected]) => {
-    if (expected === undefined) return true;
-    if (timestampFields.has(field)) {
-      return toUtcTimestamp(row[field]) === toUtcTimestamp(expected);
-    }
-    return equals(row[field], expected);
-  });
-}
-
-function compareRows(
-  left: Row,
-  right: Row,
-  orderBy?: Record<string, "asc" | "desc">,
-): number {
-  if (!orderBy) return 0;
-  for (const [field, direction] of Object.entries(orderBy)) {
-    const a = toComparable(left[field]);
-    const b = toComparable(right[field]);
-    if (a === b) continue;
-    if (a === null) return 1;
-    if (b === null) return -1;
-    const sign = direction === "asc" ? 1 : -1;
-    if (typeof a === "number" && typeof b === "number") {
-      return sign * (a - b);
-    }
-    return sign * String(a).localeCompare(String(b));
-  }
-  return 0;
 }
 
 const defaultIndexes = ["legacyId"] as const;
@@ -180,6 +137,34 @@ const TABLE_INDEX_FIELDS: Record<string, Set<string>> = {
   ]),
 };
 
+// Upsert scope stays independent of longer read prefixes: batches may differ
+// on later compound fields, and every existing incoming key is needed.
+function indexesForTable(table: string) {
+  return TABLE_INDEX_FIELDS[table] ?? new Set(defaultIndexes);
+}
+function upsertCandidateWhere(table: string, where?: Record<string, unknown>) {
+  if (
+    table === "players" &&
+    ["isActive", "isSignable", "isResignable"].every(
+      (field) => where?.[field] !== undefined,
+    )
+  ) {
+    return Object.fromEntries(
+      ["isActive", "isSignable", "isResignable"].map((field) => [
+        field,
+        where?.[field],
+      ]),
+    );
+  }
+  const entry = Object.entries(where ?? {}).find(
+    ([field, value]) =>
+      value !== undefined &&
+      indexesForTable(table).has(field) &&
+      !timestampFieldsForTable(table).includes(field),
+  );
+  return entry ? Object.fromEntries([entry]) : undefined;
+}
+
 const TABLE_PAGE_INDEXES: Record<
   string,
   Array<{ name: string; equalityField: string; orderFields: string[] }>
@@ -200,24 +185,6 @@ const TABLE_PAGE_INDEXES: Record<
   ],
 };
 
-const TABLE_EXACT_INDEXES: Record<
-  string,
-  Array<{ name: string; fields: string[] }>
-> = {
-  players: [
-    {
-      name: "by_isActive_isSignable_isResignable",
-      fields: ["isActive", "isSignable", "isResignable"],
-    },
-  ],
-};
-
-function resolveExactIndex(table: string, where?: Record<string, unknown>) {
-  return TABLE_EXACT_INDEXES[table]?.find((index) =>
-    index.fields.every((field) => where?.[field] !== undefined),
-  );
-}
-
 function resolvePageIndex(
   table: string,
   where?: Record<string, unknown>,
@@ -226,82 +193,14 @@ function resolvePageIndex(
   const orderFields = Object.keys(orderBy ?? {});
   return TABLE_PAGE_INDEXES[table]?.find(
     (index) =>
-      where?.[index.equalityField] !== undefined &&
+      compatibilityIndexPlan(table, where)?.constrainedFields.includes(
+        index.equalityField,
+      ) &&
       orderFields.length === index.orderFields.length &&
       orderFields.every(
         (field, position) => field === index.orderFields[position],
       ),
   );
-}
-
-function indexesForTable(table: string) {
-  return TABLE_INDEX_FIELDS[table] ?? new Set(defaultIndexes);
-}
-
-function firstIndexedWhere(
-  table: string,
-  where?: Record<string, unknown>,
-): [string, unknown] | null {
-  if (!where) return null;
-  const indexedFields = indexesForTable(table);
-  const timestampFields = new Set(timestampFieldsForTable(table));
-  return (
-    Object.entries(where).find(
-      ([field, value]) =>
-        value !== undefined &&
-        indexedFields.has(field) &&
-        !timestampFields.has(field),
-    ) ?? null
-  );
-}
-
-async function readCandidateRows(
-  ctx: { db: any },
-  table: string,
-  args: {
-    where?: Record<string, unknown>;
-    orderBy?: Record<string, "asc" | "desc">;
-    take?: number;
-    skip?: number;
-  },
-): Promise<ConvexRow[]> {
-  const exactIndex = resolveExactIndex(table, args.where);
-  if (exactIndex) {
-    return (await ctx.db
-      .query(table as never)
-      .withIndex(exactIndex.name as never, (q: any) => {
-        let range = q;
-        for (const field of exactIndex.fields) {
-          range = range.eq(field as never, args.where?.[field]);
-        }
-        return range;
-      })
-      .collect()) as ConvexRow[];
-  }
-
-  const indexedWhere = firstIndexedWhere(table, args.where);
-  const needsInMemoryFiltering =
-    Boolean(
-      args.where && Object.keys(args.where).length > (indexedWhere ? 1 : 0),
-    ) || Boolean(args.orderBy);
-
-  if (indexedWhere) {
-    const [field, expected] = indexedWhere;
-    return (await ctx.db
-      .query(table as never)
-      .withIndex(`by_${field}` as never, (q: any) =>
-        q.eq(field as never, expected),
-      )
-      .collect()) as ConvexRow[];
-  }
-
-  if (!needsInMemoryFiltering && args.take !== undefined) {
-    return (await ctx.db
-      .query(table as never)
-      .take((args.skip ?? 0) + args.take)) as ConvexRow[];
-  }
-
-  return (await ctx.db.query(table as never).collect()) as ConvexRow[];
 }
 
 function normalizeDoc(table: string, input: Row): Row {
@@ -875,6 +774,17 @@ function translateAwardDeleteMissing(
   };
 }
 
+// Owner and nominee IDs can be resolved from legacy team/player references.
+// Only stored, unchanged fields may constrain candidates before that projection.
+function teamAwardCandidateWhere(where?: Record<string, unknown>) {
+  return Object.fromEntries(
+    Object.entries(where ?? {}).filter(
+      ([field]) =>
+        field !== "winnerId" && field !== "ownerId" && field !== "nomineeIds",
+    ),
+  );
+}
+
 async function readAwardRows(
   ctx: { db: any },
   args: {
@@ -894,7 +804,7 @@ async function readAwardRows(
     (
       await readCandidateRows(ctx, TEAM_AWARDS_TABLE, {
         ...args,
-        where: translateAwardWhere(args.where, "team"),
+        where: teamAwardCandidateWhere(args.where),
       })
     ).map((row) => publicTeamAwardRow(ctx, row)),
   );
@@ -907,9 +817,10 @@ async function readAwardRows(
           publicRow(row),
         );
 
-  return rows
-    .filter((row) => matchesWhere(AWARDS_TABLE, row, args.where))
-    .sort((left, right) => compareRows(left, right, args.orderBy));
+  return finishCompatibilityRead(AWARDS_TABLE, rows, {
+    where: args.where,
+    orderBy: args.orderBy,
+  });
 }
 
 async function deleteAllRows(ctx: { db: any }, table: string): Promise<number> {
@@ -930,11 +841,15 @@ async function applyUpsertByCompositeKey(ctx: { db: any }, args: UpsertArgs) {
       return value !== undefined && indexesForTable(args.table).has(field);
     }),
   );
-  const existingRows = (await readCandidateRows(ctx, args.table, {
-    where:
+  const existingRows = await readCandidateRows(ctx, args.table, {
+    where: upsertCandidateWhere(
+      args.table,
       deleteMissingFilter ??
-      (Object.keys(rowIndexedFilter).length > 0 ? rowIndexedFilter : undefined),
-  })) as Array<Row & { _id: string; _creationTime: number }>;
+        (Object.keys(rowIndexedFilter).length > 0
+          ? rowIndexedFilter
+          : undefined),
+    ),
+  });
   const existingByKey = new Map<
     string,
     Row & { _id: string; _creationTime: number }
@@ -1076,34 +991,22 @@ export const list = queryGeneric({
     const where = normalizeWhere(args.table, args.where);
     const normalizedArgs = { ...args, where };
     if (isAwardsTable(args.table)) {
-      const rows = await readAwardRows(ctx, normalizedArgs);
-      const start = args.skip ?? 0;
-      const end = args.take === undefined ? undefined : start + args.take;
-      return rows.slice(start, end);
+      const rows = await readAwardRows(ctx, { where, orderBy: args.orderBy });
+      return finishCompatibilityRead(args.table, rows, normalizedArgs);
     }
-
     if (isTeamAwardsTable(args.table)) {
-      const rows = await readCandidateRows(ctx, args.table, normalizedArgs);
+      // Projection derives owner/team fields, so filter and limit afterwards.
+      const rows = await readCandidateRows(ctx, args.table, {
+        where: teamAwardCandidateWhere(where),
+      });
       const normalized = await Promise.all(
         rows.map((row) => publicTeamAwardRow(ctx, row)),
       );
-      const filtered = normalized
-        .filter((row) => matchesWhere(args.table, row, where))
-        .sort((left, right) => compareRows(left, right, args.orderBy));
-      const start = args.skip ?? 0;
-      const end = args.take === undefined ? undefined : start + args.take;
-      return filtered.slice(start, end);
+      return finishCompatibilityRead(args.table, normalized, normalizedArgs);
     }
-
-    const rows = await readCandidateRows(ctx, args.table, normalizedArgs);
-    const filtered = rows
-      .map((row) => publicRow(row as never))
-      .filter((row) => matchesWhere(args.table, row, where))
-      .sort((left, right) => compareRows(left, right, args.orderBy));
-
-    const start = args.skip ?? 0;
-    const end = args.take === undefined ? undefined : start + args.take;
-    return filtered.slice(start, end);
+    return (await readCompatibilityRows(ctx, args.table, normalizedArgs)).map(
+      publicRow,
+    );
   },
 });
 
@@ -1130,13 +1033,7 @@ export const listPage = queryGeneric({
         q.eq(pageIndex.equalityField as never, expected),
       );
     } else {
-      const indexedWhere = firstIndexedWhere(args.table, where);
-      if (indexedWhere) {
-        const [field, expected] = indexedWhere;
-        query = query.withIndex(`by_${field}` as never, (q: any) =>
-          q.eq(field as never, expected),
-        );
-      }
+      query = compatibilityQuery(ctx.db, args.table, where);
     }
 
     const result = await query.order(orderDirection).paginate({
