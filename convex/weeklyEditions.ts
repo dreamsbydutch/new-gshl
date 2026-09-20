@@ -9,7 +9,7 @@ import {
   type MutationCtx,
 } from "./_generated/server";
 import { internal } from "./_generated/api";
-import type { Doc, Id } from "./_generated/dataModel";
+import type { Doc } from "./_generated/dataModel";
 import { requireCommissioner } from "./lib/auth";
 import { buildLeagueActivity } from "../src/lib/utils/features/league-activity";
 import { buildOwnerRankings } from "../src/lib/utils/features/owner-rankings";
@@ -30,7 +30,6 @@ import {
   buildWeeklyEditionCareerRecordFacts,
   buildWeeklyEditionArchiveSummary,
   buildMilestoneEditionFactPacket,
-  buildTemplateWeeklyEdition,
   buildWeeklyEditionHomeSummary,
   buildWeeklyEditionMilestoneFacts,
   buildWeeklyEditionMilestoneSchedule,
@@ -46,9 +45,7 @@ import {
   isWeeklyEditionPlayingContract,
   isWeeklyEditionSummerUfaPoolAvailable,
   selectWeeklyEditionStoryAssignments,
-  validateWeeklyEditionContent,
   validateWeeklyEditionStoryAssignments,
-  validateWeeklyEditionImport,
   weeklyEditionContractAffectsSeason,
 } from "../src/lib/utils/features/weekly-edition";
 import {
@@ -60,12 +57,18 @@ import {
 import { DEFAULT_WEEKLY_EDITION_ARTICLE_COUNT } from "../src/lib/utils/features/weekly-edition-articles";
 import { toUtcTimestamp, utcTimestampToDateKey } from "./lib/timestamps";
 
+import {
+  publishTemplateEdition,
+  publishAiEdition,
+  editEdition,
+  restoreEditionRevision,
+  setEditionVisibility,
+  setEditionHomeActive,
+  setEditionSectionActive,
+  type TemplatePublicationOptions as GenerationOptions,
+} from "./lib/weeklyEditionPublication";
+
 type EditionRow = Doc<"weeklyEditions">;
-type GenerationOptions = {
-  editedBy?: Id<"authUsers">;
-  refreshSource?: boolean;
-  replaceEditorial?: boolean;
-};
 
 const PUBLIC_TIMESTAMP_FIELDS = [
   "startDate",
@@ -213,21 +216,6 @@ const editorialMetrics = (row: Record<string, unknown>) =>
 const contractStatuses = new Set<unknown>(Object.values(ContractStatusValues));
 const isContractStatus = (value: unknown): value is ContractStatus =>
   contractStatuses.has(value);
-
-async function saveRevision(
-  ctx: MutationCtx,
-  edition: EditionRow,
-  editedBy?: Id<"authUsers">,
-) {
-  await ctx.db.insert("weeklyEditionRevisions", {
-    editionId: edition._id,
-    generationMode: edition.generationMode,
-    content: edition.content,
-    sourceHash: edition.sourceHash,
-    createdAt: Date.now(),
-    editedBy,
-  });
-}
 
 async function buildSource(
   ctx: MutationCtx,
@@ -1082,69 +1070,23 @@ async function generateForWeek(
     throw new Error("The selected week has not ended");
 
   const facts = await buildSource(ctx, season, week);
-  const sourceHash = hashWeeklyEditionSource(facts);
-  const editionKey = `week:${String(week._id)}`;
-  const existing = await ctx.db
-    .query("weeklyEditions")
-    .withIndex("by_seasonId_editionKey", (q) =>
-      q.eq("seasonId", season._id).eq("editionKey", editionKey),
-    )
-    .unique();
-  if (existing?.sourceHash === sourceHash)
-    return { state: "unchanged", existing };
-  if (
-    existing &&
-    existing.generationMode !== "template" &&
-    options.replaceEditorial !== true
-  ) {
-    return { state: "protected", existing };
-  }
-
-  const now = Date.now();
-  const content = buildTemplateWeeklyEdition(facts);
-  if (existing) {
-    await saveRevision(ctx, existing, options.editedBy);
-    await ctx.db.patch(existing._id, {
-      editionKey,
+  return publishTemplateEdition(
+    ctx,
+    {
+      seasonId: season._id,
+      weekId: week._id,
+      editionKey: `week:${String(week._id)}`,
       issueType: "weekly",
       issueLabel: `Week ${asNumber(week.weekNum)}`,
       seasonName: season.name,
       weekNum: asNumber(week.weekNum),
       startDate: weekStart,
       endDate: weekEnd,
-      status: "published",
-      generationMode: "template",
-      content,
-      facts,
-      sourceHash,
       scheduledFor: weekEnd,
-      updatedAt: now,
-      editedBy: options.editedBy,
-    });
-    return { state: "updated", existing: await ctx.db.get(existing._id) };
-  }
-  const editionId = await ctx.db.insert("weeklyEditions", {
-    seasonId: season._id,
-    weekId: week._id,
-    editionKey,
-    issueType: "weekly",
-    issueLabel: `Week ${asNumber(week.weekNum)}`,
-    seasonName: season.name,
-    weekNum: asNumber(week.weekNum),
-    startDate: weekStart,
-    endDate: weekEnd,
-    status: "published",
-    generationMode: "template",
-    content,
-    facts,
-    sourceHash,
-    publishedAt: now,
-    scheduledFor: weekEnd,
-    createdAt: now,
-    updatedAt: now,
-    editedBy: options.editedBy,
-  });
-  return { state: "inserted", existing: await ctx.db.get(editionId) };
+      facts,
+    },
+    options,
+  );
 }
 
 function milestoneSchedule(season: Doc<"seasons">, finalWeek: Doc<"weeks">) {
@@ -1886,67 +1828,26 @@ async function generateMilestoneForSeason(
     issueType,
     scheduledFor,
   );
-  const sourceHash = hashWeeklyEditionSource(facts);
-  const editionKey = `milestone:${issueType}`;
-  const existing = await ctx.db
-    .query("weeklyEditions")
-    .withIndex("by_seasonId_editionKey", (q) =>
-      q.eq("seasonId", season._id).eq("editionKey", editionKey),
-    )
-    .unique();
-  if (existing && options.refreshSource !== true)
-    return { state: "unchanged", existing };
-  if (existing?.sourceHash === sourceHash)
-    return { state: "unchanged", existing };
-  if (
-    existing &&
-    existing.generationMode !== "template" &&
-    options.replaceEditorial !== true
-  ) {
-    return { state: "protected", existing };
-  }
-  const now = Date.now();
   const scheduledForTimestamp = toUtcTimestamp(scheduledFor);
   const anchorStart = toUtcTimestamp(anchorWeek.startDate);
   const anchorEnd = toUtcTimestamp(anchorWeek.endDate);
-  if (
-    scheduledForTimestamp === null ||
-    anchorStart === null ||
-    anchorEnd === null
-  ) {
-    throw new Error("The weekly edition schedule contains an invalid date");
-  }
-  const content = buildTemplateWeeklyEdition(facts);
-  const values = {
-    editionKey,
-    issueType,
-    issueLabel: facts.issueLabel,
-    seasonName: season.name,
-    weekNum: asNumber(anchorWeek.weekNum),
-    startDate: anchorStart,
-    endDate: anchorEnd,
-    status: "published" as const,
-    generationMode: "template" as const,
-    content,
-    facts,
-    sourceHash,
-    scheduledFor: scheduledForTimestamp,
-    updatedAt: now,
-    editedBy: options.editedBy,
-  };
-  if (existing) {
-    await saveRevision(ctx, existing, options.editedBy);
-    await ctx.db.patch(existing._id, values);
-    return { state: "updated", existing: await ctx.db.get(existing._id) };
-  }
-  const editionId = await ctx.db.insert("weeklyEditions", {
-    seasonId: season._id,
-    weekId: anchorWeek._id,
-    ...values,
-    publishedAt: now,
-    createdAt: now,
-  });
-  return { state: "inserted", existing: await ctx.db.get(editionId) };
+  return publishTemplateEdition(
+    ctx,
+    {
+      seasonId: season._id,
+      weekId: anchorWeek._id,
+      editionKey: `milestone:${issueType}`,
+      issueType,
+      issueLabel: facts.issueLabel,
+      seasonName: season.name,
+      weekNum: asNumber(anchorWeek.weekNum),
+      startDate: anchorStart,
+      endDate: anchorEnd,
+      scheduledFor: scheduledForTimestamp,
+      facts,
+    },
+    options,
+  );
 }
 
 export const latestPublished = query({
@@ -2190,81 +2091,12 @@ export const finalizeAiGeneration = internalMutation({
     editedBy: v.id("authUsers"),
   },
   handler: async (ctx, args) => {
-    const user = await ctx.db.get(args.editedBy);
-    if (user?.status !== "active" || user.role !== "commissioner") {
-      throw new Error("Forbidden");
-    }
-
-    const facts = args.facts as WeeklyEditionFactPacket;
-    if (hashWeeklyEditionSource(facts) !== args.sourceHash) {
-      throw new Error("The newsletter fact packet failed its integrity check");
-    }
-    const validation = validateWeeklyEditionImport(args.raw, facts);
-    if (!validation.valid || !validation.content) {
-      throw new Error(validation.errors.join("\n"));
-    }
-
-    const existing = args.existingEditionId
-      ? await ctx.db.get(args.existingEditionId)
-      : null;
-    if (args.existingEditionId && !existing) {
-      throw new Error("The newsletter changed while OpenAI was writing it");
-    }
-    if (
-      existing &&
-      (existing.seasonId !== args.seasonId ||
-        existing.weekId !== args.weekId ||
-        existing.editionKey !== args.editionKey ||
-        requiredPublicTimestamp("updatedAt", existing.updatedAt) !==
-          args.expectedUpdatedAt)
-    ) {
-      throw new Error("The newsletter changed while OpenAI was writing it");
-    }
-    if (!existing) {
-      const concurrent = await ctx.db
-        .query("weeklyEditions")
-        .withIndex("by_seasonId_editionKey", (q) =>
-          q.eq("seasonId", args.seasonId).eq("editionKey", args.editionKey),
-        )
-        .unique();
-      if (concurrent) {
-        throw new Error("The newsletter changed while OpenAI was writing it");
-      }
-    }
-
-    const now = Date.now();
-    const values = {
-      editionKey: args.editionKey,
-      issueType: args.issueType,
-      issueLabel: args.issueLabel,
-      seasonName: args.seasonName,
-      weekNum: args.weekNum,
-      startDate: args.startDate,
-      endDate: args.endDate,
-      status: "published" as const,
-      generationMode: "openai" as const,
-      content: validation.content,
-      facts,
-      sourceHash: args.sourceHash,
-      scheduledFor: args.scheduledFor,
-      updatedAt: now,
-      editedBy: args.editedBy,
-    };
-
-    if (existing) {
-      await saveRevision(ctx, existing, args.editedBy);
-      await ctx.db.patch(existing._id, values);
-      return publicRow(await ctx.db.get(existing._id));
-    }
-
-    const editionId = await ctx.db.insert("weeklyEditions", {
-      seasonId: args.seasonId,
-      weekId: args.weekId,
-      ...values,
-      publishedAt: now,
-      createdAt: now,
-    });
-    return publicRow(await ctx.db.get(editionId));
+    return publicRow(
+      await publishAiEdition(ctx, {
+        ...args,
+        facts: args.facts as WeeklyEditionFactPacket,
+      }),
+    );
   },
 });
 
@@ -2474,20 +2306,14 @@ export const publishImport = mutation({
   args: { editionId: v.id("weeklyEditions"), raw: v.string() },
   handler: async (ctx, args) => {
     const user = await requireCommissioner(ctx);
-    const edition = await ctx.db.get(args.editionId);
-    if (!edition) throw new Error("Edition not found");
-    const result = validateWeeklyEditionImport(args.raw, edition.facts);
-    if (!result.valid || !result.content)
-      throw new Error(result.errors.join("\n"));
-    await saveRevision(ctx, edition, user._id);
-    await ctx.db.patch(edition._id, {
-      content: result.content,
-      generationMode: "chatgpt_import",
-      status: "published",
-      editedBy: user._id,
-      updatedAt: Date.now(),
-    });
-    return publicRow(await ctx.db.get(edition._id));
+    return publicRow(
+      await editEdition(
+        ctx,
+        args.editionId,
+        { mode: "chatgpt_import", raw: args.raw },
+        user._id,
+      ),
+    );
   },
 });
 
@@ -2495,19 +2321,14 @@ export const updateManual = mutation({
   args: { editionId: v.id("weeklyEditions"), content: v.any() },
   handler: async (ctx, args) => {
     const user = await requireCommissioner(ctx);
-    const edition = await ctx.db.get(args.editionId);
-    if (!edition) throw new Error("Edition not found");
-    const result = validateWeeklyEditionContent(args.content, edition.facts);
-    if (!result.valid || !result.content)
-      throw new Error(result.errors.join("\n"));
-    await saveRevision(ctx, edition, user._id);
-    await ctx.db.patch(edition._id, {
-      content: result.content,
-      generationMode: "manual",
-      editedBy: user._id,
-      updatedAt: Date.now(),
-    });
-    return publicRow(await ctx.db.get(edition._id));
+    return publicRow(
+      await editEdition(
+        ctx,
+        args.editionId,
+        { mode: "manual", content: args.content as unknown },
+        user._id,
+      ),
+    );
   },
 });
 
@@ -2518,15 +2339,9 @@ export const setVisibility = mutation({
   },
   handler: async (ctx, args) => {
     const user = await requireCommissioner(ctx);
-    const edition = await ctx.db.get(args.editionId);
-    if (!edition) throw new Error("Edition not found");
-    await ctx.db.patch(args.editionId, {
-      status: args.status,
-      isHomeActive: args.status === "hidden" ? false : edition.isHomeActive,
-      editedBy: user._id,
-      updatedAt: Date.now(),
-    });
-    return publicRow(await ctx.db.get(args.editionId));
+    return publicRow(
+      await setEditionVisibility(ctx, args.editionId, args.status, user._id),
+    );
   },
 });
 
@@ -2534,35 +2349,7 @@ export const setHomeActive = mutation({
   args: { editionId: v.optional(v.id("weeklyEditions")) },
   handler: async (ctx, args) => {
     const user = await requireCommissioner(ctx);
-    const target = args.editionId ? await ctx.db.get(args.editionId) : null;
-    if (args.editionId && !target) throw new Error("Edition not found");
-    if (target && target.status !== "published") {
-      throw new Error("Only a published edition can appear on the homepage");
-    }
-
-    const activeEditions = await ctx.db
-      .query("weeklyEditions")
-      .withIndex("by_homeActive_publishedAt", (q) => q.eq("isHomeActive", true))
-      .collect();
-    const now = Date.now();
-    for (const edition of activeEditions) {
-      if (edition._id === args.editionId) continue;
-      await ctx.db.patch(edition._id, {
-        isHomeActive: false,
-        editedBy: user._id,
-        updatedAt: now,
-      });
-    }
-    if (target) {
-      await ctx.db.patch(target._id, {
-        isHomeActive: true,
-        editedBy: user._id,
-        updatedAt: now,
-      });
-    }
-    return {
-      activeEditionId: target ? String(target._id) : null,
-    };
+    return setEditionHomeActive(ctx, args.editionId, user._id);
   },
 });
 
@@ -2574,21 +2361,15 @@ export const setSectionActive = mutation({
   },
   handler: async (ctx, args) => {
     const user = await requireCommissioner(ctx);
-    const edition = await ctx.db.get(args.editionId);
-    if (!edition) throw new Error("Edition not found");
-    const sections = edition.content.sections as Array<{ id: string }>;
-    if (!sections.some((section) => section.id === args.sectionId)) {
-      throw new Error("Article not found in this edition");
-    }
-    const inactive = new Set(edition.inactiveSectionIds ?? []);
-    if (args.active) inactive.delete(args.sectionId);
-    else inactive.add(args.sectionId);
-    await ctx.db.patch(edition._id, {
-      inactiveSectionIds: [...inactive],
-      editedBy: user._id,
-      updatedAt: Date.now(),
-    });
-    return publicRow(await ctx.db.get(edition._id));
+    return publicRow(
+      await setEditionSectionActive(
+        ctx,
+        args.editionId,
+        args.sectionId,
+        args.active,
+        user._id,
+      ),
+    );
   },
 });
 
@@ -2596,19 +2377,9 @@ export const restoreRevision = mutation({
   args: { revisionId: v.id("weeklyEditionRevisions") },
   handler: async (ctx, args) => {
     const user = await requireCommissioner(ctx);
-    const revision = await ctx.db.get(args.revisionId);
-    if (!revision) throw new Error("Revision not found");
-    const edition = await ctx.db.get(revision.editionId);
-    if (!edition) throw new Error("Edition not found");
-    await saveRevision(ctx, edition, user._id);
-    await ctx.db.patch(edition._id, {
-      content: revision.content,
-      generationMode: revision.generationMode,
-      sourceHash: revision.sourceHash,
-      editedBy: user._id,
-      updatedAt: Date.now(),
-    });
-    return publicRow(await ctx.db.get(edition._id));
+    return publicRow(
+      await restoreEditionRevision(ctx, args.revisionId, user._id),
+    );
   },
 });
 
