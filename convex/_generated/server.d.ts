@@ -22,17 +22,6 @@ import {
 import type { DataModel } from "./dataModel.js";
 
 /**
- * Typesafe environment variables.
- *
- * This includes platform-provided env vars and any variables declared in
- * `convex.config.ts`.
- */
-type Env = {
-  readonly CONVEX_CLOUD_URL: string;
-  readonly CONVEX_SITE_URL: string;
-};
-
-/**
  * Define a query in this Convex app's public API.
  *
  * This function will be allowed to read your Convex database and will be accessible from the client.
@@ -106,13 +95,7 @@ export declare const internalAction: ActionBuilder<DataModel, "internal">;
  */
 export declare const httpAction: HttpActionBuilder;
 
-/**
- * Typesafe environment variables.
- *
- * This includes platform-provided env vars and any variables declared in
- * `convex.config.ts`.
- */
-export declare const env: Env;
+export declare const env: Record<string, string | undefined>;
 
 /**
  * A set of services for use within Convex query functions.
