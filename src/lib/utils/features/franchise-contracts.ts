@@ -7,7 +7,7 @@ import type {
   Player,
   Season,
 } from "@gshl-types";
-import { formatDate, toNumber } from "../core";
+import { coerceDate, formatDate, toNumber } from "../core";
 import { ContractStatus } from "../domain/constants";
 import {
   getContractDedupeKey,
@@ -144,7 +144,10 @@ export function buildFranchiseContractView(
     })
     .sort((a, b) => {
       const signingDateDelta =
-        new Date(b.signingDate).getTime() - new Date(a.signingDate).getTime();
+        (coerceDate({ value: b.signingDate, mode: "instant" })?.getTime() ??
+          Number.NaN) -
+        (coerceDate({ value: a.signingDate, mode: "instant" })?.getTime() ??
+          Number.NaN);
       if (!Number.isNaN(signingDateDelta) && signingDateDelta !== 0) {
         return signingDateDelta;
       }
@@ -304,7 +307,10 @@ function shouldShowRecentExpiryStatus(
   } else {
     if (contract.expiryStatus === ContractStatus.BUYOUT) return false;
 
-    const signingDeadline = parseDateValue(currentSeason.signingEndDate);
+    const signingDeadline = coerceDate({
+      value: currentSeason.signingEndDate,
+      mode: "instant",
+    });
     if (!signingDeadline || referenceDate > signingDeadline) return false;
   }
 
@@ -313,20 +319,6 @@ function shouldShowRecentExpiryStatus(
   if (expiryYear === null) return false;
 
   return expiryYear === activeSeasonEndYear - 1;
-}
-
-/**
- * Safely converts a date-like value into a valid Date instance.
- */
-function parseDateValue(value: Date | string | null | undefined): Date | null {
-  if (!value) return null;
-
-  const parsed = value instanceof Date ? value : new Date(String(value));
-  if (Number.isNaN(parsed.getTime())) {
-    return null;
-  }
-
-  return parsed;
 }
 
 /**

@@ -28,7 +28,6 @@ import {
   getCurrentNavigationHref,
   getLeagueOfficeNavigationViews,
   isGlobalSeasonUrlPath,
-  isIsoDateInRange,
   isLockerRoomNavigationView,
   isScheduleNavigationView,
   isStandingsNavigationView,
@@ -40,7 +39,7 @@ import {
   SCHEDULE_NAVIGATION_VIEWS,
   STANDINGS_NAVIGATION_VIEWS,
   toPersistedNavigationId,
-  toLocalIsoDateOnly,
+  selectWeekForReferenceDate,
 } from "@gshl-utils";
 import {
   useAppPathname,
@@ -80,16 +79,13 @@ function uniqueOwnerIds(teams: readonly GSHLTeam[]): string[] {
 }
 
 function defaultWeekId(weeks: readonly Week[]): string | null {
-  if (!weeks.length) return null;
-  const today = toLocalIsoDateOnly(new Date());
-  const current = weeks.find((week) =>
-    isIsoDateInRange(today, week.startDate, week.endDate),
+  return (
+    selectWeekForReferenceDate({
+      weeks,
+      referenceDate: new Date(),
+      fallback: "first",
+    })?.id ?? null
   );
-  if (current?.id) return String(current.id);
-  const next = weeks.find((week) => week.startDate > today);
-  if (next?.id) return String(next.id);
-  const previous = [...weeks].reverse().find((week) => week.endDate < today);
-  return previous?.id ? String(previous.id) : String(weeks[0]!.id);
 }
 
 function useContextualRouter() {

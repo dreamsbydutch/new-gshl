@@ -5,7 +5,7 @@ import type {
   TeamSeasonStatLine,
   Week,
 } from "@gshl-types";
-import { getSeasonString, safeParseSheetDate } from "../core/date";
+import { coerceDate, getSeasonString } from "../core/date";
 import { formatRecord } from "../core/format";
 
 type SeasonDateInput = Date | string | number | null | undefined;
@@ -13,13 +13,13 @@ type SeasonDateInput = Date | string | number | null | undefined;
 export const SEASON_PICKER_ADVANCE_DAYS = 15;
 
 /**
- * Coerces date.
+ * Parses a season's date-only field.
  *
  * @param value - The source value to process.
  * @returns The coerced date.
  */
-function coerceDate(value: SeasonDateInput): Date | null {
-  return safeParseSheetDate(value);
+function parseSeasonDateOnly(value: SeasonDateInput): Date | null {
+  return coerceDate({ value, mode: "date-only" });
 }
 
 type SeasonDateField = "endDate" | "startDate";
@@ -49,7 +49,7 @@ function getSeasonDateValue(
   season: Season,
   dateField: SeasonDateField,
 ): number | null {
-  return coerceDate(season[dateField])?.getTime() ?? null;
+  return parseSeasonDateOnly(season[dateField])?.getTime() ?? null;
 }
 
 /**
@@ -90,8 +90,8 @@ function compareSeasonDates(
  * @returns True when within season; otherwise false.
  */
 function isWithinSeason(season: Season, reference: Date): boolean {
-  const start = coerceDate(season.startDate);
-  const end = coerceDate(season.endDate);
+  const start = parseSeasonDateOnly(season.startDate);
+  const end = parseSeasonDateOnly(season.endDate);
   if (!start || !end) return false;
 
   const refTime = reference.getTime();
@@ -288,8 +288,8 @@ export function isBetweenSeasons(
     return false;
   }
 
-  const endedAt = coerceDate(offseasonWindow.endedSeason.endDate);
-  const startsAt = coerceDate(offseasonWindow.upcomingSeason.startDate);
+  const endedAt = parseSeasonDateOnly(offseasonWindow.endedSeason.endDate);
+  const startsAt = parseSeasonDateOnly(offseasonWindow.upcomingSeason.startDate);
   if (!endedAt || !startsAt) {
     return false;
   }
@@ -318,8 +318,8 @@ function findClosestAdjacentSeason(
   if (!mostRecent) return upcoming;
   if (!upcoming) return mostRecent;
 
-  const recentEnd = coerceDate(mostRecent.endDate);
-  const upcomingStart = coerceDate(upcoming.startDate);
+  const recentEnd = parseSeasonDateOnly(mostRecent.endDate);
+  const upcomingStart = parseSeasonDateOnly(upcoming.startDate);
 
   const distanceToRecent = recentEnd
     ? Math.abs(refTime - recentEnd.getTime())
@@ -366,7 +366,7 @@ function deriveProjectedNextSeason(
    * @param value - The source value to process.
    */
   const shiftYear = (value: string) => {
-    const parsed = coerceDate(value);
+    const parsed = parseSeasonDateOnly(value);
     if (!parsed) return value;
 
     const shifted = new Date(parsed);
@@ -519,7 +519,7 @@ export function isSeasonPickable(
   });
   if (isSeasonZero) return false;
 
-  const startDate = coerceDate(season.startDate);
+  const startDate = parseSeasonDateOnly(season.startDate);
   if (!startDate) return false;
 
   const latestPickableStart = new Date(referenceDate);
@@ -576,8 +576,8 @@ export function findWeekByDate(
   const refTime = normalizedRef.getTime();
 
   const matchedWeek = filteredWeeks.find((week) => {
-    const start = coerceDate(week.startDate);
-    const end = coerceDate(week.endDate);
+    const start = parseSeasonDateOnly(week.startDate);
+    const end = parseSeasonDateOnly(week.endDate);
 
     if (!start || !end) return false;
 
