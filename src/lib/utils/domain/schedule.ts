@@ -5,7 +5,11 @@
  * Used across team-schedule and weekly-schedule features.
  */
 
-import { isIsoDateInRange, toLocalIsoDateOnly } from "../core/date";
+import {
+  isIsoDateInRange,
+  normalizeDateOnlyValue,
+  toLocalIsoDateOnly,
+} from "../core/date";
 import type { Matchup, Week } from "@gshl-types";
 
 /**
@@ -108,6 +112,12 @@ type RankDisplayOptions = {
 
 type WeekDateRange = Pick<Week, "endDate" | "id" | "startDate">;
 
+type NormalizedWeekDateRange<TWeek extends WeekDateRange> = {
+  endDate: string;
+  startDate: string;
+  week: TWeek;
+};
+
 type SelectWeekForReferenceDateOptions<TWeek extends WeekDateRange> = {
   /**
    * The weeks to evaluate. They may be in any order and are never mutated.
@@ -153,23 +163,31 @@ export function selectWeekForReferenceDate<TWeek extends WeekDateRange>({
   if (!weeks.length) return null;
 
   const referenceDay = toLocalIsoDateOnly(referenceDate);
-  const chronologicalWeeks = [...weeks].sort((left, right) =>
-    left.startDate.localeCompare(right.startDate),
+  const chronologicalWeeks = weeks
+    .flatMap((week): NormalizedWeekDateRange<TWeek>[] => {
+      const startDate = normalizeDateOnlyValue(week.startDate);
+      const endDate = normalizeDateOnlyValue(week.endDate);
+      if (!startDate || !endDate || startDate > endDate) return [];
+
+      return [{ endDate, startDate, week }];
+    })
+    .sort((left, right) =>
+      left.startDate.localeCompare(right.startDate),
+    );
+  const currentWeek = chronologicalWeeks.find(({ endDate, startDate }) =>
+    isIsoDateInRange(referenceDay, startDate, endDate),
   );
-  const currentWeek = chronologicalWeeks.find((week) =>
-    isIsoDateInRange(referenceDay, week.startDate, week.endDate),
-  );
-  if (currentWeek) return currentWeek;
+  if (currentWeek) return currentWeek.week;
 
   const nextWeek = chronologicalWeeks.find(
     (week) => week.startDate > referenceDay,
   );
-  if (nextWeek) return nextWeek;
+  if (nextWeek) return nextWeek.week;
 
   const previousWeek = chronologicalWeeks
     .filter((week) => week.endDate < referenceDay)
     .at(-1);
-  if (previousWeek) return previousWeek;
+  if (previousWeek) return previousWeek.week;
 
   return fallback === "first" ? (weeks[0] ?? null) : null;
 }

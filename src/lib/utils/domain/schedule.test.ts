@@ -38,6 +38,22 @@ void test("returns no selection for an empty week list", () => {
   );
 });
 
+void test("only uses the first supplied week when fallback is requested", () => {
+  const undatedWeek = [
+    { id: "undated", startDate: "2026-01-01", endDate: "not-a-date" },
+  ] as const;
+  const input = {
+    weeks: undatedWeek,
+    referenceDate: new Date("2026-10-05T12:00:00"),
+  };
+
+  assert.equal(selectWeekForReferenceDate(input), null);
+  assert.equal(
+    selectWeekForReferenceDate({ ...input, fallback: "first" }),
+    undatedWeek[0],
+  );
+});
+
 void test("does not mutate the caller's week order", () => {
   const originalOrder = weeks.map((week) => week.id);
 

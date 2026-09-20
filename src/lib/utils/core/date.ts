@@ -428,6 +428,5 @@ export function convertInputDate(excelSerialDate: number): Date {
  * @returns The resulting safe parse sheet date.
  */
 export function safeParseSheetDate(input: DateInput): Date | null {
-  const parsed = resolveDateValue(input, { output: "date" });
-  return parsed instanceof Date ? parsed : null;
+  return coerceDate({ value: input, mode: "date-only" });
 }
