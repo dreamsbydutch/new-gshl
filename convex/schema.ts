@@ -578,6 +578,16 @@ export default defineSchema({
     ["seasonId", "gshlTeamId", "playerId", ["seasonId", "round", "pick"]],
   ),
 
+  draftPickCorrections: defineTable({
+    seasonId: v.id("seasons"),
+    pickId: v.id("draftPicks"),
+    userId: v.id("authUsers"),
+    reason: v.string(),
+    before: v.string(),
+    after: v.string(),
+    createdAt: v.number(),
+  }).index("by_pickId", ["pickId"]),
+
   nhlTeams: table(
     {
       name: stringValue,

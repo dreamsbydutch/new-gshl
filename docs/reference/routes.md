@@ -112,3 +112,39 @@ When names overlap, follow these traces before editing:
 Legacy `/leagueoffice?view=tradeBlock` links redirect to My Team. The selected
 owner controls which listings appear first; only the signed-in owner's team
 shows listing controls. Other teams and inactive owners remain read-only.
+
+## Draft pick corrections
+
+Commissioners can open `/admin?view=draftPicks` to inspect every pick in a
+selected season, filter by assigned team or search, and stage corrections to
+assigned/original teams, round, pick number, selected player, and signing/trade
+flags. The comparison shows saved and proposed records before the batch is
+confirmed. A reason is required. Staged edits remain local to the page until
+saved and are lost on navigation or reload.
+
+Corrections save atomically through `draft:correctPicks`. Swapping teams and
+players or swapping pick positions is supported within one batch. The final
+batch must retain exactly the same selected players for each team; it cannot
+add, remove, or transfer a team's selections. Rosters, lineups, contracts, and
+clock timestamps are not rewritten. This is a record-correction workflow, not
+a roster transfer or a way to replay the draft.
+
+The server checks commissioner access, same-season team references, unique
+final pick positions and player selections, and stale records. Corrections
+are allowed before the scheduled draft or after all picks are completed or
+reserved for signings; they cannot reopen a completed draft. Each changed
+pick receives a `draftPickCorrections` audit row with commissioner ID, time,
+reason, and before/after records. Its editor shows the latest 20 corrections.
+
+These controls do not diagnose or rerun the original pick allocation process.
+
+The local browser fixture exercises staging both sides of a swap, review, and a
+single batch submission through the real editor and feature hook:
+
+```bash
+node tools/tests/draft-corrections.browser.mjs
+```
+
+It uses local fixture data and Edge (or `TV_TEST_BROWSER`) without making remote
+writes. Server validation and audit coverage run with
+`npx tsx --test convex/draft.test.ts`.

@@ -13,12 +13,7 @@ import type { SeasonSummary } from "./season";
 export type ScheduleNavigationView = "week" | "team";
 
 export type StandingsNavigationView =
-  | "overall"
-  | "conference"
-  | "wildcard"
-  | "power"
-  | "playoff"
-  | "awards";
+  "overall" | "conference" | "wildcard" | "power" | "playoff" | "awards";
 
 export type LockerRoomNavigationView =
   | "roster"
@@ -38,12 +33,7 @@ export type LeagueOfficeNavigationView =
   | "ownerRankings";
 
 export type AdminNavigationView =
-  | "contracts"
-  | "users"
-  | "jobs"
-  | "newsroom"
-  | "images"
-  | "tv";
+  "draftPicks" | "contracts" | "users" | "jobs" | "newsroom" | "images" | "tv";
 
 export type MatchupNavigationSource = "schedule" | "lockerroom" | "headlines";
 

@@ -7,7 +7,21 @@ import type {
 } from "convex/server";
 import type { MutationCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
-import { notifyState, setTeamMode, state, submitPick, undoPick } from "./draft";
+import {
+  adminPicks,
+  correctPicks,
+  correctionHistory,
+  notifyState,
+  setTeamMode,
+  state,
+  submitPick,
+  undoPick,
+} from "./draft";
+import {
+  draftCorrectionSnapshot,
+  draftCorrectionVersion,
+} from "./lib/draftCorrection";
+import type { Doc } from "./_generated/dataModel";
 import { nextDraftMode } from "./lib/draftMode";
 function handler<A extends DefaultFunctionArgs>(
   fn:
@@ -70,6 +84,7 @@ function fixture() {
             return selected()[0] ?? null;
           },
           collect: async () => selected(),
+          order: () => query,
           take: async (limit: number) => selected().slice(0, limit),
           paginate: async () => ({
             page: selected(),
@@ -383,3 +398,160 @@ for (const [fromRound, toRound, minutes] of [
     assert.ok(f.get("pick2")!.playerId);
   });
 }
+
+function correctionFixture() {
+  const f = draftFixture();
+  f.get("user")!.role = "commissioner";
+  f.put("teams", "other-team", {
+    seasonId: "season",
+    franchiseId: "other-franchise",
+  });
+  f.put("franchises", "other-franchise", {
+    ownerId: "other-owner",
+    name: "Other team",
+  });
+  for (let i = 1; i <= 4; i++) f.get("pick" + i)!.playerId = "player" + i;
+  f.get("pick2")!.gshlTeamId = "other-team";
+  function edit(id: string, changes: Partial<Doc<"draftPicks">> = {}) {
+    const row = f.get(id) as unknown as Doc<"draftPicks">;
+    const snapshot = draftCorrectionSnapshot(row);
+    return {
+      pickId: row._id,
+      expectedVersion: draftCorrectionVersion(row),
+      changes: {
+        ...snapshot,
+        gshlTeamId: row.gshlTeamId!,
+        round: Number(row.round),
+        pick: Number(row.pick),
+        ...changes,
+      },
+    };
+  }
+  return { ...f, edit };
+}
+
+void test("completed pick swaps preserve team selections, rosters, contracts and clocks, with an audit per pick", async () => {
+  const f = correctionFixture();
+  f.put("contracts", "contract", { playerId: "player1", ownerId: "owner" });
+  f.get("player1")!.ownerId = "owner";
+  f.get("pick1")!.onClockEndedAt = 123;
+  const roster = JSON.stringify([...f.rows("players").values()]);
+  const contracts = JSON.stringify([...f.rows("contracts").values()]);
+  await handler(correctPicks)(f.ctx, {
+    seasonId,
+    reason: "Correct allocation",
+    edits: [
+      f.edit("pick1", {
+        gshlTeamId: "other-team" as Id<"teams">,
+        playerId: "player2" as Id<"players">,
+      }),
+      f.edit("pick2", {
+        gshlTeamId: "team" as Id<"teams">,
+        playerId: "player1" as Id<"players">,
+      }),
+    ],
+  });
+  assert.equal(f.get("pick1")!.gshlTeamId, "other-team");
+  assert.equal(f.get("pick1")!.playerId, "player2");
+  assert.equal(f.get("pick2")!.gshlTeamId, "team");
+  assert.equal(f.get("pick2")!.playerId, "player1");
+  assert.equal(f.get("pick1")!.onClockEndedAt, 123);
+  assert.equal(JSON.stringify([...f.rows("players").values()]), roster);
+  assert.equal(JSON.stringify([...f.rows("contracts").values()]), contracts);
+  assert.equal(f.rows("draftPickCorrections").size, 2);
+  const audit = [...f.rows("draftPickCorrections").values()][0]!;
+  assert.equal(audit.userId, "user");
+  assert.equal(audit.reason, "Correct allocation");
+  assert.match(String(audit.before), /player1/);
+  assert.match(String(audit.after), /player2/);
+  assert.equal(f.scheduled.length, 0);
+});
+
+void test("round and pick swaps validate the final batch", async () => {
+  const f = correctionFixture();
+  await handler(correctPicks)(f.ctx, {
+    seasonId,
+    reason: "Correct order",
+    edits: [f.edit("pick1", { round: 2 }), f.edit("pick2", { round: 1 })],
+  });
+  assert.equal(f.get("pick1")!.round, 2);
+  assert.equal(f.get("pick2")!.round, 1);
+});
+
+void test("correction reads and writes reject owners, viewers, inactive and anonymous users", async () => {
+  for (const role of ["owner", "viewer", "inactive", "anonymous"]) {
+    const f = correctionFixture();
+    if (role === "anonymous") f.signIn(null);
+    else if (role === "inactive") f.get("user")!.status = "inactive";
+    else f.get("user")!.role = role;
+    await assert.rejects(
+      handler(adminPicks)(f.ctx, { seasonId }),
+      /Forbidden|Unauthenticated/,
+    );
+    await assert.rejects(
+      handler(correctionHistory)(f.ctx, {
+        pickId: "pick1",
+      }),
+      /Forbidden|Unauthenticated/,
+    );
+    await assert.rejects(
+      handler(correctPicks)(f.ctx, {
+        seasonId,
+        reason: "Fix",
+        edits: [f.edit("pick1", { isTraded: true })],
+      }),
+      /Forbidden|Unauthenticated/,
+    );
+    assert.equal(f.rows("draftPickCorrections").size, 0);
+  }
+});
+
+void test("invalid batches fail before any write, including when a later edit is stale", async () => {
+  for (const scenario of [
+    "team",
+    "slot",
+    "player",
+    "selection",
+    "reopen",
+    "stale",
+    "reason",
+    "number",
+    "live",
+    "duplicate",
+    "season",
+  ] as const) {
+    const f = correctionFixture();
+    let edits = [
+      f.edit("pick1", { isTraded: true }),
+      f.edit("pick2", { isTraded: true }),
+    ];
+    let reason = "Correction";
+    if (scenario === "team") {
+      f.get("other-team")!.seasonId = "other-season";
+    }
+    if (scenario === "slot") edits[1]!.changes.round = 1;
+    if (scenario === "player")
+      edits[1]!.changes.playerId = "player1" as Id<"players">;
+    if (scenario === "selection")
+      edits[1]!.changes.gshlTeamId = "team" as Id<"teams">;
+    if (scenario === "reopen") edits[1]!.changes.playerId = null;
+    if (scenario === "stale") f.get("pick2")!.updatedAt = 999;
+    if (scenario === "reason") reason = " ";
+    if (scenario === "number") edits[1]!.changes.round = 1.5;
+    if (scenario === "live") f.get("pick4")!.playerId = null;
+    if (scenario === "duplicate") edits = [edits[0]!, edits[0]!];
+    if (scenario === "season") f.get("pick2")!.seasonId = "other-season";
+    const before = JSON.stringify([...f.rows("draftPicks").values()]);
+    await assert.rejects(
+      handler(correctPicks)(f.ctx, { seasonId, reason, edits }),
+      /./,
+      scenario,
+    );
+    assert.equal(
+      JSON.stringify([...f.rows("draftPicks").values()]),
+      before,
+      scenario,
+    );
+    assert.equal(f.rows("draftPickCorrections").size, 0, scenario);
+  }
+});
