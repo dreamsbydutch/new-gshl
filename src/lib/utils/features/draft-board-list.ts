@@ -1,3 +1,10 @@
+import type {
+  DraftPlayerCatalogInput,
+  DraftPlayerCatalog,
+  DraftPlayerCatalogFilter,
+} from "@gshl-lib/types/draft-selection";
+import { findNhlTeamByAbbreviation } from "../domain/player";
+import { sortDraftEligiblePlayers } from "./draft-hub";
 /**
  * Draft Board List Utility Functions
  *
@@ -10,6 +17,7 @@ import {
   PositionGroup,
   RosterPosition,
 } from "../domain/constants";
+import { coerceDate } from "../core/date";
 import type {
   Contract,
   DraftBoardPlayer,
@@ -111,19 +119,6 @@ export function sortByOverallRank(
 }
 
 /**
- * Parses date.
- *
- * @param value - The source value to process.
- * @returns The parsed date.
- */
-function parseDate(value: string | Date | null | undefined): Date | null {
-  if (!value) return null;
-
-  const parsed = value instanceof Date ? value : new Date(value);
-  return Number.isNaN(parsed.getTime()) ? null : parsed;
-}
-
-/**
  * Checks whether upcoming season contract exists.
  *
  * @param playerId - The player id to use.
@@ -146,8 +141,11 @@ function contractCoversDate(
     return true;
   }
 
-  const startDate = parseDate(contract.startDate);
-  const expiryDate = parseDate(contract.capHitEndDate ?? contract.expiryDate);
+  const startDate = coerceDate({ value: contract.startDate, mode: "instant" });
+  const expiryDate = coerceDate({
+    value: contract.capHitEndDate ?? contract.expiryDate,
+    mode: "instant",
+  });
   if (!startDate || !expiryDate) {
     return false;
   }
@@ -181,7 +179,7 @@ function hasUpcomingSeasonContract(
 export function filterAvailableDraftPlayers<
   T extends Pick<DraftBoardPlayer, "id" | "isActive">,
 >(players: T[], contracts: Contract[], activeOn?: string | Date | null): T[] {
-  const activeDate = parseDate(activeOn ?? null);
+  const activeDate = coerceDate({ value: activeOn ?? null, mode: "instant" });
 
   return players.filter(
     (player) =>
@@ -198,7 +196,7 @@ export function buildContractedSeasonRosterPlayers<T extends DraftBoardPlayer>(
   contracts: Contract[],
   activeOn: string | Date,
 ): T[] {
-  const activeDate = parseDate(activeOn);
+  const activeDate = coerceDate({ value: activeOn, mode: "instant" });
   if (!activeDate) return [];
 
   const ownerIdByPlayerId = new Map<string, string>();
@@ -325,3 +323,50 @@ export function groupProjectedDraftPicksByRound<
 export const draftBoardFilters = { matchesFilter };
 export const draftBoardSorters = { sortByPreDraftRank, sortByOverallRank };
 export const draftBoardHelpers = { excludeGoalies };
+
+/** The catalog shared by live picks and public roster boards. */
+export function buildDraftPlayerCatalog(
+  input: DraftPlayerCatalogInput,
+): DraftPlayerCatalog {
+  const selectedIds = new Set(input.selectedPlayerIds);
+  return prepareDraftBoardPlayers(
+    input.players,
+    input.contracts,
+    input.activeOn,
+  )
+    .filter((player) => !selectedIds.has(String(player.id)))
+    .map((player) => ({
+      ...player,
+      nhlTeamLogoUrl:
+        findNhlTeamByAbbreviation(input.nhlTeams, player.nhlTeam)?.logoUrl ??
+        null,
+      stats: input.latestStats.get(String(player.id)) ?? null,
+    }));
+}
+
+export function filterDraftPlayerCatalog(
+  players: DraftPlayerCatalog,
+  options: DraftPlayerCatalogFilter,
+): DraftPlayerCatalog {
+  const search = options.searchTerm.trim().toLowerCase();
+  const filtered = players.filter((player) => {
+    const position = options.positionFilter;
+    const matchesPosition =
+      position === "all" ||
+      (["F", "D", "G"].includes(position)
+        ? player.posGroup === position
+        : player.nhlPos.some((value) => value === position));
+    return (
+      matchesPosition &&
+      (!search ||
+        player.fullName.toLowerCase().includes(search) ||
+        player.nhlPos.join(" ").toLowerCase().includes(search) ||
+        String(player.nhlTeam).toLowerCase().includes(search))
+    );
+  });
+  return sortDraftEligiblePlayers(
+    filtered,
+    options.sortKey,
+    options.sortDirection,
+  );
+}

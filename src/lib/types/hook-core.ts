@@ -1,5 +1,4 @@
 import type {
-  Contract,
   Franchise,
   GSHLTeam,
   PlayerDayStatLine,
@@ -8,7 +7,7 @@ import type {
   PlayerWeekStatLine,
 } from "./database";
 import type { ContractFilters, ContractSortOption } from "./contracts";
-import type { QueryLike, QueryState } from "./hook-query";
+import type { ReadQueryResult, QueryState } from "./hook-query";
 
 export interface UseAwardsOptions {
   awardId?: string;
@@ -106,10 +105,10 @@ export interface UsePlayerStatsResult {
   ready: boolean;
   status: QueryState;
   queries: {
-    daily: QueryLike<PlayerDayStatLine[]>;
-    weekly: QueryLike<PlayerWeekStatLine[]>;
-    splits: QueryLike<PlayerSplitStatLine[]>;
-    totals: QueryLike<PlayerTotalStatLine[]>;
+    daily: ReadQueryResult<PlayerDayStatLine[]>;
+    weekly: ReadQueryResult<PlayerWeekStatLine[]>;
+    splits: ReadQueryResult<PlayerSplitStatLine[]>;
+    totals: ReadQueryResult<PlayerTotalStatLine[]>;
   };
 }
 
@@ -140,48 +139,51 @@ export interface UseWeeksOptions {
   enabled?: boolean;
 }
 
-export type TeamStatsLevel = "none" | "daily" | "weekly" | "season";
-export type TeamType = "gshl" | "nhl" | "franchise";
-
 export interface UseTeamsOptions {
   teamId?: string | null;
   seasonId?: string | null;
   franchiseId?: string | null;
   conferenceId?: string | null;
-  weekId?: string | null;
-  date?: Date | string | null;
-  seasonType?: string | null;
   ownerId?: string | null;
   isActive?: boolean;
-  statsLevel?: TeamStatsLevel;
-  teamType?: TeamType;
   orderBy?: Record<string, "asc" | "desc">;
   enabled?: boolean;
+}
+
+export interface UseNHLTeamsOptions {
+  teamId?: string | null;
+  isActive?: boolean;
+  orderBy?: Record<string, "asc" | "desc">;
+  enabled?: boolean;
+}
+
+export interface UseFranchisesOptions extends UseNHLTeamsOptions {
+  ownerId?: string | null;
+}
+
+export interface UseTeamSeasonStatsOptions {
+  teamId?: string | null;
+  seasonId?: string | null;
+  seasonType?: string | null;
+  orderBy?: Record<string, "asc" | "desc">;
+  enabled?: boolean;
+}
+
+export interface UseTeamWeekStatsOptions extends UseTeamSeasonStatsOptions {
+  weekId?: string | null;
+}
+
+export interface UseTeamDayStatsOptions extends UseTeamSeasonStatsOptions {
+  date?: Date | string | null;
 }
 
 export interface EnrichedFranchise extends Franchise {
   teams?: GSHLTeam[];
 }
 
-export interface ContractSelectionContext<T> {
-  allContracts: Contract[];
-  filteredContracts: Contract[];
-  getContracts: <U = T>(options?: {
-    filters?: ContractFilters;
-    sort?: ContractSortOption;
-    take?: number;
-    map?: (contract: Contract) => U;
-  }) => U[];
-  deps: readonly unknown[];
-}
-
-export interface UseContractsOptions<T = Contract, S = undefined> {
+export interface UseContractsOptions {
   filters?: ContractFilters;
   sort?: ContractSortOption;
   take?: number;
-  map?: (contract: Contract) => T;
-  select?: (contracts: T[], context: ContractSelectionContext<T>) => S;
-  selectDeps?: ReadonlyArray<unknown>;
-  withSummary?: boolean;
   enabled?: boolean;
 }

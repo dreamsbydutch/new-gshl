@@ -37,7 +37,6 @@ export function DraftAdminList(): JSX.Element {
     freeAgentsCount,
     nhlTeams,
     playersLoading,
-    playersReady,
     activeDraftPick,
     activeDraftTeam,
     lastCompletedPlayer,
@@ -49,7 +48,7 @@ export function DraftAdminList(): JSX.Element {
     handleUndoLastPick,
   } = useDraftAdminList();
 
-  if (playersLoading && !playersReady) {
+  if (playersLoading) {
     return <DraftAdminListSkeleton />;
   }
 

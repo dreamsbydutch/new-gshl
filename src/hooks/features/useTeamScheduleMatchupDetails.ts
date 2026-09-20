@@ -6,7 +6,10 @@ import type {
   TeamScheduleTeamSummary,
   TeamScheduleWeekSummary,
 } from "@gshl-types";
-import { getGameLocation, getGameTypeDisplay } from "@gshl-utils";
+import {
+  getScheduleGameLocation,
+  getScheduleGameTypeDisplay,
+} from "@gshl-utils";
 import { useTeamScheduleStats } from "../main";
 
 export function useTeamScheduleMatchupDetails({
@@ -31,7 +34,7 @@ export function useTeamScheduleMatchupDetails({
     [matchup.awayTeamId, teams],
   );
   const gameLocation = useMemo(
-    () => getGameLocation(matchup, selectedTeamId),
+    () => getScheduleGameLocation({ matchup, selectedTeamId }),
     [matchup, selectedTeamId],
   );
 
@@ -63,13 +66,13 @@ export function useTeamScheduleMatchupDetails({
 
   const gameDisplay = useMemo(
     () =>
-      getGameTypeDisplay(
-        String(matchup.gameType),
-        week ?? undefined,
-        gameLocation,
+      getScheduleGameTypeDisplay({
         awayTeam,
+        gameType: String(matchup.gameType),
         homeTeam,
-      ),
+        location: gameLocation,
+        week: week ?? undefined,
+      }),
     [awayTeam, gameLocation, homeTeam, matchup.gameType, week],
   );
 

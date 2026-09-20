@@ -86,42 +86,23 @@ export * from "./team-roster";
 export * from "./trade-block";
 export * from "./trophy-case";
 
-export {
-  filterTeamMatchups,
-  sortMatchupsByWeek,
-  findWeekById,
-  getGameLocation,
-  getGameTypeDisplay,
-  formatOpponentDisplay,
-  shouldShowRank,
-  isGameCompleted,
-  getResultStyleClass,
-  formatTeamScore,
-} from "./team-schedule";
 export type {
   TeamScheduleItemProps,
   OpponentDisplayProps,
   GameResultProps,
   WeekDisplayProps,
   GameLocation,
-  GameType as TeamScheduleGameType,
+  TeamScheduleGameType,
   GameTypeDisplay,
   ConferenceConfig,
-} from "./team-schedule";
+} from "@gshl-types";
 
 export {
-  filterMatchupsByWeek,
-  sortMatchupsByRating,
   collectInactivePlayerIds,
   buildPlayerLookup,
   buildPlayerWeekStatsByTeam,
   buildTeamWeekStatsByTeam,
   getUpcomingWeekIds,
-  getGameBackgroundClass,
-  shouldDisplayRanking,
-  isMatchupCompleted,
-  getScoreClass,
-  isValidMatchup,
 } from "./weekly-schedule";
 export * from "./ufa";
 export * from "./ufa-state";
@@ -136,3 +117,5 @@ export type {
   ConferenceAbbr,
   GameTypeConfig,
 } from "./weekly-schedule";
+
+export * from "./franchise-contracts";

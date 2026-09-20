@@ -1,25 +1,17 @@
 "use client";
 
+import { useDraftSeason } from "./useDraftSeason";
+
 import { useEffect, useMemo, useState } from "react";
-import {
-  useDraftPicks,
-  usePlayersByIds,
-  useSeasonState,
-  useTeams,
-} from "@gshl-hooks/main";
-import type { GSHLTeam } from "@gshl-types";
-import {
-  resolveDraftClockState,
-  resolveDraftHubSeason,
-} from "@gshl-utils/features/draft-hub";
+import { useDraftPicks, usePlayersByIds, useTeams } from "@gshl-hooks/main";
+import { resolveDraftClockState } from "@gshl-utils/features/draft-hub";
 import { buildDraftTvPicks } from "@gshl-utils/features/draft-tv";
 
 /** Public, read-only draft display. Selection controls stay in the authenticated hub. */
 export function useDraftLiveTvBoard() {
-  const { seasons, isLoading: seasonsLoading } = useSeasonState({
+  const { season, isLoading: seasonsLoading } = useDraftSeason({
     autoSelect: false,
   });
-  const season = useMemo(() => resolveDraftHubSeason(seasons), [seasons]);
   const picksQuery = useDraftPicks({
     seasonId: season?.id,
     enabled: Boolean(season?.id),
@@ -41,18 +33,7 @@ export function useDraftLiveTvBoard() {
   }, []);
   const picks = useMemo(
     () =>
-      buildDraftTvPicks(
-        picksQuery.data,
-        teamsQuery.data.filter(
-          (team): team is GSHLTeam =>
-            "franchiseId" in team &&
-            "ownerId" in team &&
-            !("seasonType" in team) &&
-            !("weekId" in team) &&
-            !("date" in team),
-        ),
-        playersQuery.data,
-      ),
+      buildDraftTvPicks(picksQuery.data, teamsQuery.data, playersQuery.data),
     [picksQuery.data, teamsQuery.data, playersQuery.data],
   );
   const picksById = useMemo(

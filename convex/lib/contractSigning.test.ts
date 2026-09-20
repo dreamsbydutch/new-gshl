@@ -2,6 +2,39 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { resolveContractSigningAssignments } from "./contractSigning";
+import type { ContractSigningPick } from "./contractSigning";
+
+void test("preserves legacy ordering for null and absent overall pick numbers", () => {
+  const basePick = {
+    seasonId: "future",
+    gshlTeamId: "team",
+    round: 5,
+    playerId: null,
+    isSigning: false,
+  };
+  for (const [unnumberedPick, expectedId] of [
+    [{ ...basePick, id: "z-null", pick: null }, "a-numbered"],
+    [{ ...basePick, id: "z-absent" }, "z-absent"],
+  ] satisfies [ContractSigningPick, string][]) {
+    const assignments = resolveContractSigningAssignments({
+      signingSeasonId: "signing",
+      contractLength: 1,
+      franchiseId: "franchise",
+      seasons: [
+        { id: "signing", year: 2026 },
+        { id: "future", year: 2027 },
+      ],
+      teams: [{ id: "team", seasonId: "future", franchiseId: "franchise" }],
+      picks: [
+        { ...basePick, id: "a-numbered", pick: 50 },
+        unnumberedPick,
+        { ...basePick, id: "earlier-round", round: 4, pick: 100 },
+      ],
+    });
+    // Null coerces to zero; an absent number falls through to the ID tie-break.
+    assert.equal(assignments[0]?.pickId, expectedId);
+  }
+});
 
 void test("reserves the lowest open pick for every season covered by a signing", () => {
   const assignments = resolveContractSigningAssignments({

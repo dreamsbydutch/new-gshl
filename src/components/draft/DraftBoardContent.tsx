@@ -2,7 +2,7 @@
 
 import { DraftBoardList } from "@gshl-components/draft/DraftBoardList";
 import {
-  useAllContracts,
+  useContracts,
   useDraftPicks,
   usePlayers,
   useTeams,
@@ -22,15 +22,13 @@ export function DraftBoardContent() {
   } = useSeasonState();
   const contractSeason = resolveContractDefaultSeason(seasons) ?? defaultSeason;
   const seasonId = contractSeason?.id ? String(contractSeason.id) : undefined;
-  const { data: contractsData, isLoading: contractsLoading } =
-    useAllContracts();
+  const { data: contractsData, isLoading: contractsLoading } = useContracts();
   const contracts: Contract[] = contractsData ?? [];
   const { data: players, isLoading: playersLoading } = usePlayers();
-  const { data: teamsRaw = [], isLoading: teamsLoading } = useTeams({
+  const { data: teams, isLoading: teamsLoading } = useTeams({
     seasonId,
     enabled: Boolean(seasonId),
   });
-  const teams = teamsRaw as GSHLTeam[];
   const { data: draftPicks, isLoading: draftPicksLoading } = useDraftPicks();
 
   const isLoading =

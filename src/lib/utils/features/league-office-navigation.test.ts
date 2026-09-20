@@ -5,25 +5,36 @@ import {
   resolveLeagueOfficeView,
 } from "./league-office-navigation";
 
-void test("uses Draft Classes for empty and legacy League Office defaults", () => {
-  assert.equal(resolveLeagueOfficeView(undefined, "owner"), "draft");
-  assert.equal(resolveLeagueOfficeView("home", "owner"), "draft");
-  assert.equal(resolveLeagueOfficeView("mockDraft", "owner"), "draft");
+void test("uses Draft Classes for empty and obsolete League Office views", () => {
+  for (const view of [
+    undefined,
+    null,
+    "",
+    "home",
+    "mockDraft",
+    "tradeBlock",
+    "draftPicks",
+    "contracts",
+    "users",
+    "jobs",
+    "newsroom",
+    "images",
+    "imageUpload",
+    "tv",
+  ]) {
+    assert.equal(resolveLeagueOfficeView(view), "draft", String(view));
+  }
   assert.equal(DEFAULT_LEAGUE_OFFICE_VIEW, "draft");
 });
 
-void test("preserves member views", () => {
-  assert.equal(resolveLeagueOfficeView("freeAgents", "owner"), "freeAgents");
-  assert.equal(resolveLeagueOfficeView("tradeBlock", "owner"), "tradeBlock");
-  assert.equal(resolveLeagueOfficeView("rules", "viewer"), "rules");
-  assert.equal(
-    resolveLeagueOfficeView("ownerRankings", "commissioner"),
+void test("preserves all active member views", () => {
+  for (const view of [
+    "draft",
+    "freeAgents",
+    "rules",
+    "confBattle",
     "ownerRankings",
-  );
-});
-
-void test("does not reopen commissioner panels for non-commissioners", () => {
-  assert.equal(resolveLeagueOfficeView("users", "owner"), "draft");
-  assert.equal(resolveLeagueOfficeView("contracts", undefined), "draft");
-  assert.equal(resolveLeagueOfficeView("jobs", "commissioner"), "draft");
+  ]) {
+    assert.equal(resolveLeagueOfficeView(view), view);
+  }
 });

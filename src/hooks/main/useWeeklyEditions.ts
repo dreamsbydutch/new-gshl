@@ -1,5 +1,7 @@
 "use client";
 
+import { useCallback, useMemo } from "react";
+import type { FunctionArgs } from "convex/server";
 import { useQueries, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
@@ -14,7 +16,7 @@ import type {
   WeeklyEditionRevisionSummary,
 } from "@gshl-types";
 import { useAppAction } from "./useAppAction";
-import { useAppMutation } from "./useAppMutation";
+import { useDomainMutation } from "./useDomainMutation";
 
 export function useLatestWeeklyEdition(): WeeklyEditionQueryState<WeeklyEditionHomeSummary | null> {
   const data = useQuery(api.weeklyEditions.latestPublished, {});
@@ -54,9 +56,13 @@ export function useWeeklyEditionNewsroom(editionId?: string) {
   // Optional AI capabilities must not take down the manual editor when the
   // frontend is ahead of the deployed backend. useQueries returns errors
   // as values and keeps the subscription alive for backend recovery.
-  const aiQueries = useQueries({
-    aiStatus: { query: api.weeklyEditions.aiStatus, args: {} },
-  });
+  const aiQueryRequest = useMemo(
+    () => ({
+      aiStatus: { query: api.weeklyEditions.aiStatus, args: {} },
+    }),
+    [],
+  );
+  const aiQueries = useQueries(aiQueryRequest);
   const aiResult = aiQueries.aiStatus as
     | WeeklyEditionAiStatus
     | Error
@@ -75,6 +81,22 @@ export function useWeeklyEditionNewsroom(editionId?: string) {
     api.weeklyEditions.revisions,
     editionId ? { editionId: editionId as Id<"weeklyEditions"> } : "skip",
   );
+  const aiGeneration = useAppAction(api.weeklyEditions.generateWithAi);
+  const executeAiGeneration = aiGeneration.mutateAsync;
+  const generateWithAi = useCallback(
+    (
+      args: Omit<
+        FunctionArgs<typeof api.weeklyEditions.generateWithAi>,
+        "seasonId" | "weekId"
+      > & { seasonId: string; weekId: string },
+    ) =>
+      executeAiGeneration({
+        ...args,
+        seasonId: args.seasonId as Id<"seasons">,
+        weekId: args.weekId as Id<"weeks">,
+      }),
+    [executeAiGeneration],
+  );
   return {
     editions,
     selectedEdition: selectedEdition as WeeklyEdition | null | undefined,
@@ -84,13 +106,72 @@ export function useWeeklyEditionNewsroom(editionId?: string) {
     isAiStatusLoading: aiResult === undefined,
     isAiStatusUnavailable,
     isEditionLoading: Boolean(editionId) && selectedEdition === undefined,
-    generateWithAi: useAppAction(api.weeklyEditions.generateWithAi),
-    generateHistorical: useAppMutation(api.weeklyEditions.generateHistorical),
-    publishImport: useAppMutation(api.weeklyEditions.publishImport),
-    updateManual: useAppMutation(api.weeklyEditions.updateManual),
-    setVisibility: useAppMutation(api.weeklyEditions.setVisibility),
-    setHomeActive: useAppMutation(api.weeklyEditions.setHomeActive),
-    setSectionActive: useAppMutation(api.weeklyEditions.setSectionActive),
-    restoreRevision: useAppMutation(api.weeklyEditions.restoreRevision),
+    generateWithAi: { ...aiGeneration, mutateAsync: generateWithAi },
+    generateHistorical: useDomainMutation(
+      api.weeklyEditions.generateHistorical,
+      (
+        args: Omit<
+          FunctionArgs<typeof api.weeklyEditions.generateHistorical>,
+          "seasonId" | "weekId"
+        > & { seasonId: string; weekId: string },
+      ) => ({
+        ...args,
+        seasonId: args.seasonId as Id<"seasons">,
+        weekId: args.weekId as Id<"weeks">,
+      }),
+    ),
+    publishImport: useDomainMutation(
+      api.weeklyEditions.publishImport,
+      (
+        args: Omit<
+          FunctionArgs<typeof api.weeklyEditions.publishImport>,
+          "editionId"
+        > & { editionId: string },
+      ) => ({ ...args, editionId: args.editionId as Id<"weeklyEditions"> }),
+    ),
+    updateManual: useDomainMutation(
+      api.weeklyEditions.updateManual,
+      (
+        args: Omit<
+          FunctionArgs<typeof api.weeklyEditions.updateManual>,
+          "editionId"
+        > & { editionId: string },
+      ) => ({ ...args, editionId: args.editionId as Id<"weeklyEditions"> }),
+    ),
+    setVisibility: useDomainMutation(
+      api.weeklyEditions.setVisibility,
+      (
+        args: Omit<
+          FunctionArgs<typeof api.weeklyEditions.setVisibility>,
+          "editionId"
+        > & { editionId: string },
+      ) => ({ ...args, editionId: args.editionId as Id<"weeklyEditions"> }),
+    ),
+    setHomeActive: useDomainMutation(
+      api.weeklyEditions.setHomeActive,
+      (args: { editionId?: string }) =>
+        args as FunctionArgs<typeof api.weeklyEditions.setHomeActive>,
+    ),
+    setSectionActive: useDomainMutation(
+      api.weeklyEditions.setSectionActive,
+      (
+        args: Omit<
+          FunctionArgs<typeof api.weeklyEditions.setSectionActive>,
+          "editionId"
+        > & { editionId: string },
+      ) => ({ ...args, editionId: args.editionId as Id<"weeklyEditions"> }),
+    ),
+    restoreRevision: useDomainMutation(
+      api.weeklyEditions.restoreRevision,
+      (
+        args: Omit<
+          FunctionArgs<typeof api.weeklyEditions.restoreRevision>,
+          "revisionId"
+        > & { revisionId: string },
+      ) => ({
+        ...args,
+        revisionId: args.revisionId as Id<"weeklyEditionRevisions">,
+      }),
+    ),
   };
 }

@@ -9,15 +9,10 @@ import type {
   TeamSeasonStatLine,
   Week,
 } from "./database";
-import type {
-  BuyoutContractType,
-  CapSpaceEntry,
-  FranchiseContractHistoryRowType,
-  FranchiseDraftPickGroupType,
-} from "./contracts";
+import type { FranchiseContractView } from "./contracts";
 import type { ProcessedDraftPick } from "./draft-ui";
-import type { TeamStatsLevel, UseTeamsOptions } from "./hook-core";
-import type { QueryLike, QueryState } from "./hook-query";
+import type { UseTeamSeasonStatsOptions } from "./hook-core";
+import type { ReadQueryResult, QueryState } from "./hook-query";
 import type { PowerRankingsViewModel, StandingsGroup } from "./standings";
 import type {
   TeamHistoryMatchupSummary,
@@ -44,25 +39,8 @@ export interface UseContractDataOptions {
   enabled?: boolean;
 }
 
-export interface UseContractDataResult {
-  table: {
-    contractGroups: Contract[][];
-    capSpaceWindow: CapSpaceEntry[];
-    ready: boolean;
-  };
-  history: {
-    rows: FranchiseContractHistoryRowType[];
-    hasData: boolean;
-  };
-  draft: {
-    groups: FranchiseDraftPickGroupType[];
-    hasData: boolean;
-  };
-  currentContracts: Contract[];
-  contractPlayers: Player[];
-  buyoutContracts: BuyoutContractType[];
-  expiredRows: FranchiseContractHistoryRowType[];
-  draftPickGroups: FranchiseDraftPickGroupType[];
+export interface UseContractDataResult extends FranchiseContractView {
+  table: FranchiseContractView["table"] & { ready: boolean };
   isLoading: boolean;
   error: Error | null;
 }
@@ -106,8 +84,8 @@ export interface UseSeasonMatchupsAndTeamsResult {
   matchups: Matchup[];
   teams: GSHLTeam[];
   status: QueryState;
-  matchupsQuery: QueryLike<Matchup[]>;
-  teamsQuery: QueryLike<GSHLTeam[]>;
+  matchupsQuery: ReadQueryResult<Matchup[]>;
+  teamsQuery: ReadQueryResult<GSHLTeam[]>;
   isWeekScoped: boolean;
 }
 
@@ -116,26 +94,25 @@ export interface UseSeasonDataBundleOptions {
   weekId?: string | null;
   includeMatchups?: boolean;
   includeWeeks?: boolean;
-  teamStatsLevel?: Exclude<TeamStatsLevel, "none"> | null;
+  includeSeasonStats?: boolean;
   useNavigation?: boolean;
   weeksOrderBy?: Record<string, "asc" | "desc">;
-  teamQueryOptions?: Partial<Pick<UseTeamsOptions, "seasonType">>;
+  teamQueryOptions?: Partial<Pick<UseTeamSeasonStatsOptions, "seasonType">>;
 }
 
-export interface UseSeasonDataBundleResult<TTeamStats = never> {
+export interface UseSeasonDataBundleResult {
   seasonId: string | null;
   weekId: string | null;
   matchups: Matchup[];
   teams: GSHLTeam[];
   weeks: Week[];
-  teamStats: TTeamStats[];
-  status: QueryState;
+  teamStats: TeamSeasonStatLine[];
+  status: { isLoading: boolean };
   ready: boolean;
-  error: Error | null;
-  matchupsQuery: QueryLike<Matchup[]>;
-  teamsQuery: QueryLike<GSHLTeam[]>;
-  weeksQuery?: QueryLike<Week[]>;
-  teamStatsQuery?: QueryLike<TTeamStats[]>;
+  matchupsQuery: ReadQueryResult<Matchup[]>;
+  teamsQuery: ReadQueryResult<GSHLTeam[]>;
+  weeksQuery?: ReadQueryResult<Week[]>;
+  teamStatsQuery?: ReadQueryResult<TeamSeasonStatLine[]>;
 }
 
 export interface UseDraftCountdownProps {
@@ -171,7 +148,6 @@ export interface DraftAdminListViewModel {
   freeAgentsCount: number;
   nhlTeams: NHLTeam[];
   playersLoading: boolean;
-  playersReady: boolean;
   activeDraftPick: DraftPick | null;
   activeDraftTeam: GSHLTeam | null;
   lastCompletedPlayer: Player | null;
@@ -182,7 +158,6 @@ export interface DraftAdminListViewModel {
   handleDraftPlayer: (player: Player) => Promise<void>;
   handleUndoLastPick: () => Promise<void>;
   isLoading: boolean;
-  error: Error | null;
 }
 
 export interface UseTeamHistoryDataOptions {
@@ -201,7 +176,6 @@ export interface UseTeamRosterDataResult {
   benchPlayers: Player[];
   totalCapHit: number;
   isLoading: boolean;
-  error: Error | null;
   ready: boolean;
 }
 
@@ -307,6 +281,5 @@ export interface UseStandingsDataResult {
   powerRankings: PowerRankingsViewModel;
   standingsType: string;
   isLoading: boolean;
-  error: Error | null;
   ready: boolean;
 }

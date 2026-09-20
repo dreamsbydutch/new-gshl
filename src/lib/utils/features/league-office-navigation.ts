@@ -1,21 +1,19 @@
+import type { LeagueOfficeNavigationView } from "@gshl-types";
+import {
+  MEMBER_LEAGUE_OFFICE_NAVIGATION_VIEWS,
+  resolveContextualSelection,
+} from "./contextual-navigation";
+
 export const DEFAULT_LEAGUE_OFFICE_VIEW = "draft";
 
-const MEMBER_LEAGUE_OFFICE_VIEWS = new Set([
-  "draft",
-  "tradeBlock",
-  "freeAgents",
-  "rules",
-  "confBattle",
-  "ownerRankings",
-]);
-
-/** Returns a route-renderable League Office view for the current role. */
+/** Returns a renderable member view, using Draft Classes for invalid selections. */
 export function resolveLeagueOfficeView(
   selectedView: string | null | undefined,
-  _role?: string | null,
-): string {
-  if (selectedView && MEMBER_LEAGUE_OFFICE_VIEWS.has(selectedView)) {
-    return selectedView;
-  }
-  return DEFAULT_LEAGUE_OFFICE_VIEW;
+): LeagueOfficeNavigationView {
+  return resolveContextualSelection({
+    explicitValue: selectedView ?? null,
+    persistedValue: null,
+    validValues: MEMBER_LEAGUE_OFFICE_NAVIGATION_VIEWS,
+    fallbackValue: DEFAULT_LEAGUE_OFFICE_VIEW,
+  }).value;
 }

@@ -7,7 +7,7 @@
 
 import { useNavStore } from "@gshl-cache";
 import { useSeasonState, useWeeks } from "../main";
-import { isIsoDateInRange, toLocalIsoDateOnly } from "@gshl-utils";
+import { selectWeekForReferenceDate } from "@gshl-utils";
 import { useEffect } from "react";
 import type { NavigationSelectionOptions } from "@gshl-types";
 
@@ -108,8 +108,6 @@ export function useSeasonNavigation(options: { autoSelect?: boolean } = {}) {
     selectedSeasonId,
     setSelectedSeasonId,
     isSelectedSeasonLoading,
-    isSelectedSeasonFetching,
-    refetchSelectedSeason,
   } = useSeasonState({ autoSelect: options.autoSelect ?? true });
 
   return {
@@ -122,8 +120,6 @@ export function useSeasonNavigation(options: { autoSelect?: boolean } = {}) {
     selectedSeasonId,
     setSelectedSeasonId,
     isSelectedSeasonLoading,
-    isSelectedSeasonFetching,
-    refetchSelectedSeason,
   };
 }
 
@@ -145,14 +141,10 @@ export function useWeekNavigation(
     orderBy: { startDate: "asc" },
     enabled: Boolean(selectedSeasonId),
   });
-  const today = toLocalIsoDateOnly(new Date());
-  const currentWeek = weeks.find((week) =>
-    isIsoDateInRange(today, week.startDate, week.endDate),
-  );
-  const nextWeek = weeks.find((week) => week.startDate > today);
-  const previousWeek = [...weeks]
-    .reverse()
-    .find((week) => week.endDate < today);
+  const selectedWeek = selectWeekForReferenceDate({
+    weeks,
+    referenceDate: new Date(),
+  });
 
   useEffect(() => {
     if (options.autoSelect === false) return;
@@ -162,26 +154,14 @@ export function useWeekNavigation(
 
     if (weeks.some((week) => week.id === selectedWeekId)) return;
 
-    if (currentWeek?.id) {
-      setWeekId(currentWeek.id);
-      return;
-    }
-
-    if (nextWeek?.id) {
-      setWeekId(nextWeek.id);
-      return;
-    }
-
-    if (previousWeek?.id) {
-      setWeekId(previousWeek.id);
+    if (selectedWeek?.id) {
+      setWeekId(selectedWeek.id);
       return;
     }
   }, [
     selectedWeekId,
     selectedSeasonId,
-    currentWeek,
-    nextWeek,
-    previousWeek,
+    selectedWeek,
     weeks,
     isLoading,
     setWeekId,
@@ -189,7 +169,7 @@ export function useWeekNavigation(
   ]);
 
   return {
-    selectedWeek: currentWeek ?? nextWeek ?? previousWeek,
+    selectedWeek,
     selectedWeekId: selectedWeekId,
     setSelectedWeekId: setWeekId,
   };

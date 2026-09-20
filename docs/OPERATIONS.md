@@ -80,6 +80,14 @@ separately verified copy before deleting or replacing source data.
 
 ## Managed jobs
 
+Browser, operator, schedule, and pipeline entry paths share
+[`convex/lib/jobLifecycle.ts`](../convex/lib/jobLifecycle.ts); authorization
+remains in each entry path. Active runs block identical scope keys only, not
+overlapping season/week scopes. Both retry paths preserve cursor, progress,
+arguments, apply mode, and pipeline provenance in a new run; child runs and
+external tasks stay with the old run. Repeated cancellation is idempotent, and
+late completion or external handoff cannot revive a terminal run.
+
 Managed jobs store runs, events, artifacts, child runs, scope locks, and
 external browser tasks. Several processors are still parity/scaffolding paths,
 not proven replacements for their local commands. Keep production schedules
@@ -99,6 +107,13 @@ league tables itself.
 
 Separate code-defined crons reconcile due UFA groups every 15 minutes and scan
 weekly-edition milestones every six hours.
+
+Commissioner contract creation and UFA finalization share
+[`convex/lib/contractSigningTransaction.ts`](../convex/lib/contractSigningTransaction.ts)
+inside the originating mutation. It validates all covered teams and signing
+picks before writing the contract, player assignment, pick reservations, and
+first covered lineup. Authorization, contract terms, and UFA winner and offer
+finalization remain in their owning handlers; no separate transaction is added.
 
 ## Yahoo OAuth
 

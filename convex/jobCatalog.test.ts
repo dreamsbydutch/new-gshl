@@ -24,6 +24,10 @@ void test("scope locks separate season and week work", () => {
 
 void test("refresh pipeline has ordered native and external stages", () => {
   assert.equal(ACTIVE_REFRESH_STAGES[0], "nhl-daily-stat-sync");
-  assert.equal(ACTIVE_REFRESH_STAGES.at(-1), "standings-backfill");
+  assert.deepEqual(ACTIVE_REFRESH_STAGES.slice(-3), [
+    "standings-backfill",
+    "awards-backfill",
+    "weekly-edition-generation",
+  ]);
   assert.equal(isExternalJob(ACTIVE_REFRESH_STAGES[0]), true);
 });

@@ -17,6 +17,10 @@ const UserManagement = dynamic(
     ),
   { loading: () => <UserManagementSkeleton /> },
 );
+const ScheduleBuilder = dynamic(
+  () => import("./ScheduleBuilder").then((module) => module.ScheduleBuilder),
+  { loading: () => <AdminPanelSkeleton /> },
+);
 const ContractManagement = dynamic(
   () =>
     import("./ContractManagement").then((module) => module.ContractManagement),
@@ -58,6 +62,7 @@ export function AdminContent() {
       {selectedView === "newsroom" ? <Newsroom /> : null}
       {selectedView === "images" ? <ImageUpload /> : null}
       {selectedView === "tv" ? <TvDisplays /> : null}
+      {selectedView === "scheduleBuilder" ? <ScheduleBuilder /> : null}
     </div>
   );
 }

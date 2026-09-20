@@ -16,6 +16,7 @@ const ADMIN_TABS: ReadonlyArray<{
   { key: "accounts", label: "Accounts" },
   { key: "contracts", label: "Contracts" },
   { key: "draftPicks", label: "Draft Picks" },
+  { key: "scheduleBuilder", label: "Schedule Builder" },
   { key: "users", label: "Users" },
   { key: "jobs", label: "Jobs" },
   { key: "newsroom", label: "Newsroom" },

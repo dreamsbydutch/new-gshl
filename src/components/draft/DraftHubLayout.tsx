@@ -7,64 +7,15 @@ import {
   SecondaryPageToolbar,
   TertiaryPageToolbar,
 } from "@gshl-nav";
-import {
-  useAppPathname,
-  useAuthSession,
-  useDraftTeamsContextNavigation,
-  useSeasonState,
-  useTeams,
-} from "@gshl-hooks";
-import { cn, resolveDraftHubSeason } from "@gshl-utils";
-import type { GSHLTeam } from "@gshl-types";
+import { useDraftHubNavigation } from "@gshl-hooks/features/useDraftHubNavigation";
+import { cn } from "@gshl-utils";
 import { DraftHubTeamToggle } from "./DraftHubTeamToggle";
 import { DraftModeControl } from "./DraftModeControl";
 
 export function DraftHubLayout({ children }: { children: React.ReactNode }) {
-  const { pathname } = useAppPathname();
-  const { session, status: authStatus } = useAuthSession();
-  const { seasons } = useSeasonState();
-  const season = resolveDraftHubSeason(seasons);
-  const { data: teamRows = [], isLoading: teamsLoading } = useTeams({
-    seasonId: season?.id,
-    enabled: Boolean(season?.id),
-  });
-  const teams = teamRows as GSHLTeam[];
-  const ownTeam = teams.find(
-    (team) =>
-      session?.user.ownerId &&
-      String(team.ownerId) === String(session.user.ownerId),
-  );
-  const showTeamToggle =
-    pathname === "/draft/teams" || pathname.startsWith("/draft/teams/");
-  const teamNavigation = useDraftTeamsContextNavigation({
-    excludedOwnerId: session?.user.ownerId,
-    isLoading: teamsLoading || authStatus === "loading",
-    teams,
-  });
-  const draftLinks = [
-    {
-      href: teamNavigation.draftHref,
-      label: "Board",
-      icon: ClipboardList,
-      isActive: pathname === "/draft",
-    },
-    ...(ownTeam
-      ? [
-          {
-            href: teamNavigation.myTeamHref,
-            label: "My team",
-            icon: Shield,
-            isActive: pathname === "/draft/my-team",
-          },
-        ]
-      : []),
-    {
-      href: teamNavigation.teamsHref,
-      label: "Teams",
-      icon: UsersRound,
-      isActive: showTeamToggle,
-    },
-  ];
+  const navigation = useDraftHubNavigation();
+  const showTeamToggle = navigation.isTeamsPage;
+  const icons = { board: ClipboardList, mine: Shield, teams: UsersRound };
 
   return (
     <div>
@@ -73,40 +24,41 @@ export function DraftHubLayout({ children }: { children: React.ReactNode }) {
         mobileRows={showTeamToggle ? 2 : 1}
       >
         <SecondaryPageToolbar className="sm:justify-center">
-          {draftLinks.map(({ href, label, icon: Icon, isActive }) => (
-            <Link
-              key={href}
-              href={href}
-              aria-current={isActive ? "page" : undefined}
-              className={cn(
-                "flex min-h-9 shrink-0 items-center gap-1.5 rounded px-2.5 py-1 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 motion-reduce:transition-none",
-                isActive
-                  ? "bg-slate-900 text-white"
-                  : "text-slate-700 hover:bg-slate-100",
-              )}
-            >
-              <Icon className="h-4 w-4" aria-hidden="true" />
-              <span>{label}</span>
-            </Link>
-          ))}
+          {navigation.links.map(({ href, label, kind, isActive }) => {
+            const Icon = icons[kind];
+            return (
+              <Link
+                key={href}
+                href={href}
+                aria-current={isActive ? "page" : undefined}
+                className={cn(
+                  "flex min-h-9 shrink-0 items-center gap-1.5 rounded px-2.5 py-1 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 motion-reduce:transition-none",
+                  isActive
+                    ? "bg-slate-900 text-white"
+                    : "text-slate-700 hover:bg-slate-100",
+                )}
+              >
+                <Icon className="h-4 w-4" aria-hidden="true" />
+                <span>{label}</span>
+              </Link>
+            );
+          })}
         </SecondaryPageToolbar>
         {showTeamToggle ? (
           <TertiaryPageToolbar>
             <DraftHubTeamToggle
-              seasonId={season?.id}
-              excludedOwnerId={session?.user.ownerId}
-              isLoading={teamsLoading || authStatus === "loading"}
-              teams={teamNavigation.selectableTeams}
-              selectedOwnerId={teamNavigation.selectedOwnerId}
-              onSelectOwner={teamNavigation.selectOwner}
+              isLoading={navigation.isLoading}
+              teams={navigation.selectableTeams}
+              selectedTeam={navigation.selectedTeam}
+              onSelectOwner={navigation.selectOwner}
             />
           </TertiaryPageToolbar>
         ) : null}
       </PageContextNavigation>
       <div className="mx-auto max-w-7xl px-3 py-3 sm:px-5">
-        <DraftModeControl seasonId={season?.id} />
+        <DraftModeControl seasonId={navigation.season?.id} />
       </div>
-      {!showTeamToggle || teamNavigation.isReady ? children : null}
+      {!showTeamToggle || navigation.isReady ? children : null}
     </div>
   );
 }

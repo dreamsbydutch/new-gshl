@@ -1,4 +1,5 @@
 import { optimizedSheetsClient } from "../client/optimized-client";
+import { alignRowsToColumns } from "../../../../../shared/sheets-core/index";
 import {
   SHEETS_CONFIG,
   getPlayerDayWorkbookId,
@@ -19,45 +20,6 @@ type SnapshotResult<M extends readonly ModelName[]> = Record<
 interface CacheEntry {
   rows: DatabaseRecord[];
   timestamp: number;
-}
-
-function normalizeHeaderKey(value: unknown): string {
-  return String(value ?? "")
-    .trim()
-    .toLowerCase();
-}
-
-function alignRowsToConfiguredColumns(
-  rawRows: (string | number | boolean | null)[][],
-  columns: readonly string[],
-): (string | number | boolean | null)[][] {
-  const header = rawRows[0] ?? [];
-  const dataRows = rawRows.slice(1);
-
-  if (!header.length) {
-    // Fallback for unexpected sheets without header rows.
-    return dataRows.map((row) => columns.map((_, index) => row[index] ?? null));
-  }
-
-  const headerIndex = new Map<string, number>();
-  header.forEach((cell, index) => {
-    const key = String(cell).trim();
-    if (key) {
-      headerIndex.set(key, index);
-      const normalizedKey = normalizeHeaderKey(key);
-      if (normalizedKey && !headerIndex.has(normalizedKey)) {
-        headerIndex.set(normalizedKey, index);
-      }
-    }
-  });
-
-  return dataRows.map((row) =>
-    columns.map((column) => {
-      const index =
-        headerIndex.get(column) ?? headerIndex.get(normalizeHeaderKey(column));
-      return index === undefined ? null : (row[index] ?? null);
-    }),
-  );
 }
 
 /**
@@ -179,7 +141,11 @@ export class FastSheetsReader {
             spreadsheetId,
             range,
           );
-          return alignRowsToConfiguredColumns(rawRows, columns)
+          return alignRowsToColumns({
+            rawRows,
+            columns,
+            headerCoercion: "legacy",
+          })
             .filter((row) => row && row.length > 0)
             .map((row) => convertRowToModel<T>(row, columns));
         }),
@@ -231,7 +197,11 @@ export class FastSheetsReader {
         spreadsheetId,
         range,
       );
-      const rows = alignRowsToConfiguredColumns(rawRows, columns)
+      const rows = alignRowsToColumns({
+        rawRows,
+        columns,
+        headerCoercion: "legacy",
+      })
         .filter((row) => row && row.length > 0)
         .map((row) => convertRowToModel<T>(row, columns))
         .filter((row) => {
@@ -331,7 +301,11 @@ export class FastSheetsReader {
           const columns = SHEETS_CONFIG.COLUMNS[modelName];
           if (!columns) continue;
 
-          const alignedRows = alignRowsToConfiguredColumns(values, columns);
+          const alignedRows = alignRowsToColumns({
+            rawRows: values,
+            columns,
+            headerCoercion: "legacy",
+          });
 
           const rows = alignedRows
             .filter((row) => row && row.length > 0)

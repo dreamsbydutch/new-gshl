@@ -1,6 +1,8 @@
 import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
+import { checkRouteBehavior } from "./check-frontend-route-behavior.mjs";
+import { checkFeatureHookOwnership } from "./check-feature-hook-ownership.mjs";
 
 const root = process.cwd();
 const srcRoot = path.join(root, "src");
@@ -20,6 +22,7 @@ const allowedSrcDirectories = new Set([
 const routeFileNames = new Set([
   "default.tsx",
   "error.tsx",
+  "global-error.tsx",
   "layout.tsx",
   "loading.tsx",
   "not-found.tsx",
@@ -123,17 +126,17 @@ for (const file of await walk(path.join(srcRoot, "components"))) {
 
 for (const file of await walk(path.join(srcRoot, "app"))) {
   if (!/\.(?:ts|tsx)$/.test(file)) continue;
+  const source = await readFile(file, "utf8");
   if (!routeFileNames.has(path.basename(file))) {
     failures.push(`Non-route module found in src/app: ${relative(file)}`);
   }
   if (
     !relative(file).startsWith("src/app/api/") &&
-    /^(?:export\s+)?(?:type|interface)\s+\w+/m.test(
-      await readFile(file, "utf8"),
-    )
+    /^(?:export\s+)?(?:type|interface)\s+\w+/m.test(source)
   ) {
     failures.push(`Route declares a type or interface: ${relative(file)}`);
   }
+  failures.push(...checkRouteBehavior(relative(file), source));
 }
 
 for (const group of ["main", "features"]) {
@@ -146,6 +149,7 @@ for (const group of ["main", "features"]) {
       failures.push(`Hook filename must start with use: ${relative(file)}`);
     }
     const source = await readFile(file, "utf8");
+    failures.push(...checkFeatureHookOwnership(relative(file), source));
     if (/^(?:export\s+)?(?:type|interface)\s+\w+/m.test(source)) {
       failures.push(`Hook declares a type or interface: ${relative(file)}`);
     }

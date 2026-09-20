@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery } from "convex/react";
+import { HOME_MOCK_DRAFT_PREVIEW_LIMIT } from "@gshl-utils";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import type {
@@ -8,12 +9,11 @@ import type {
   UseDraftHubStateOptions,
   UseDraftHubStatusOptions,
 } from "@gshl-types";
-import { useAppMutation } from "./useAppMutation";
+import { useDomainMutation } from "./useDomainMutation";
 
 export function useDraftHubStatus(options: UseDraftHubStatusOptions = {}): {
   data: DraftHubStatusData | undefined;
   isLoading: boolean;
-  error: null;
 } {
   const { seasonId, enabled = true } = options;
   const result = useQuery(
@@ -23,7 +23,6 @@ export function useDraftHubStatus(options: UseDraftHubStatusOptions = {}): {
   return {
     data: result,
     isLoading: enabled && Boolean(seasonId) && result === undefined,
-    error: null,
   };
 }
 
@@ -36,18 +35,55 @@ export function useDraftHubState(options: UseDraftHubStateOptions = {}) {
   return {
     data: result,
     isLoading: enabled && Boolean(seasonId) && result === undefined,
-    error: null,
   };
 }
 
 export function useSubmitDraftPick() {
-  return useAppMutation(api.draft.submitPick);
+  return useDomainMutation(
+    api.draft.submitPick,
+    (args: { seasonId: string; pickId: string; playerId: string }) => ({
+      ...args,
+      seasonId: args.seasonId as Id<"seasons">,
+      pickId: args.pickId as Id<"draftPicks">,
+      playerId: args.playerId as Id<"players">,
+    }),
+  );
 }
 
 export function useUndoDraftPick() {
-  return useAppMutation(api.draft.undoPick);
+  return useDomainMutation(
+    api.draft.undoPick,
+    (args: { seasonId: string; pickId: string }) => ({
+      ...args,
+      seasonId: args.seasonId as Id<"seasons">,
+      pickId: args.pickId as Id<"draftPicks">,
+    }),
+  );
 }
 
 export function useSetDraftTeamMode() {
-  return useAppMutation(api.draft.setTeamMode);
+  return useDomainMutation(
+    api.draft.setTeamMode,
+    (args: { teamId: string; auto: boolean }) => ({
+      ...args,
+      teamId: args.teamId as Id<"teams">,
+    }),
+  );
+}
+
+export function useMockDraftPreview(seasonId: string) {
+  const result = useQuery(
+    api.frontend.mockDraftPreview,
+    seasonId
+      ? {
+          seasonId: seasonId as Id<"seasons">,
+          take: HOME_MOCK_DRAFT_PREVIEW_LIMIT,
+        }
+      : "skip",
+  );
+  return {
+    isLoading: Boolean(seasonId) && result === undefined,
+    nhlTeams: result?.nhlTeams ?? [],
+    projectedDraftPicks: result?.projectedDraftPicks ?? [],
+  };
 }

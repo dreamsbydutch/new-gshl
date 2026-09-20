@@ -517,10 +517,10 @@ function HomeFreeAgents({ players }: { players: UfaFreeAgentView[] }) {
 export function UfaHomeCard() {
   const query = useUfaOverview("home");
   if (query.isLoading) return <UfaHomeCardSkeleton />;
-  if (query.error || !query.data)
+  if (!query.data)
     return (
       <section className="mx-auto w-full max-w-5xl rounded-xl border border-destructive/40 p-3 text-xs text-destructive sm:p-5 sm:text-sm">
-        UFA information could not be loaded: {query.error?.message}
+        UFA information could not be loaded.
       </section>
     );
   if (!query.data.window.isOpen && query.data.offerGroups.length === 0)
@@ -604,12 +604,8 @@ export function UfaLeagueOffice() {
   );
   const visiblePlayers = players.slice(0, visibleCount);
   if (query.isLoading) return <FreeAgencySkeleton />;
-  if (query.error || !query.data)
-    return (
-      <p className="text-destructive">
-        Unable to load free agents: {query.error?.message}
-      </p>
-    );
+  if (!query.data)
+    return <p className="text-destructive">Unable to load free agents.</p>;
   return (
     <div className="w-full min-w-0 max-w-full space-y-4 overflow-hidden sm:space-y-6">
       <div>

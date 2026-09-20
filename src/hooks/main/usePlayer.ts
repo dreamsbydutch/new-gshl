@@ -2,6 +2,8 @@
 
 import { useMemo } from "react";
 import { usePaginatedQuery, useQuery } from "convex/react";
+import type { FunctionArgs } from "convex/server";
+import { useDomainMutation } from "./useDomainMutation";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import type {
@@ -12,6 +14,8 @@ import type {
   UseRankedPlayersOptions,
   UseRosterPlayersOptions,
 } from "@gshl-types";
+
+const EMPTY_PLAYERS: Player[] = [];
 
 export function usePlayerPages(options: UsePlayerPagesOptions = {}) {
   const { active, positionGroup, enabled = true, limit = 50 } = options;
@@ -27,9 +31,8 @@ export function usePlayerPages(options: UsePlayerPagesOptions = {}) {
     data,
     hasMore: query.status === "CanLoadMore",
     loadMore: () => query.loadMore(Math.min(Math.max(limit, 1), 50)),
-    isLoading: query.status === "LoadingFirstPage",
+    isLoading: enabled && query.status === "LoadingFirstPage",
     isLoadingMore: query.status === "LoadingMore",
-    error: null,
   };
 }
 
@@ -42,9 +45,9 @@ export function usePlayersByIds(ids: string[], enabled = true) {
       : "skip",
   );
   return {
-    data: (result ?? []) as unknown as Player[],
+    data:
+      result === undefined ? EMPTY_PLAYERS : (result as unknown as Player[]),
     isLoading: enabled && uniqueIds.length > 0 && result === undefined,
-    error: null,
   };
 }
 
@@ -70,9 +73,9 @@ export function usePlayers(options: UsePlayersOptions = {}) {
     enabled ? { ...(Object.keys(where).length ? { where } : {}) } : "skip",
   );
   return {
-    data: (result ?? []) as unknown as Player[],
+    data:
+      result === undefined ? EMPTY_PLAYERS : (result as unknown as Player[]),
     isLoading: enabled && result === undefined,
-    error: null,
   };
 }
 
@@ -148,4 +151,15 @@ export function useRankedPlayers(options: UseRankedPlayersOptions = {}) {
 
 function getPlayerRankValue(player: Player, field: PlayerRankField) {
   return player[field] ?? null;
+}
+
+export function useUpdatePlayer() {
+  return useDomainMutation(
+    api.frontend.updatePlayer,
+    (
+      args: Omit<FunctionArgs<typeof api.frontend.updatePlayer>, "id"> & {
+        id: string;
+      },
+    ) => ({ ...args, id: args.id as Id<"players"> }),
+  );
 }

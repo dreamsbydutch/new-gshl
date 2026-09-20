@@ -12,7 +12,7 @@
  * All hooks follow the options object pattern for consistent, flexible configuration.
  */
 
-// Contract hooks - sophisticated filtering and aggregation
+// Main data hooks
 export { useAuthUserAdmin, useUpdateAuthUserAccess } from "./useAuthUsers";
 export {
   useAuthActions,
@@ -22,6 +22,9 @@ export {
 export { useJobAdmin } from "./useJobs";
 export { useImageUpload } from "./useImageUpload";
 export { useLeagueActivity } from "./useLeagueActivity";
+export { useMockDraftPreview } from "./useDraftHub";
+export { useOwnerRankings } from "./useOwnerRankings";
+export { useUfaCatalog, useUfaOfferMutation } from "./useUfa";
 export { useConferenceContestView } from "./useConferenceContest";
 export { usePowerRankingsPreview } from "./usePowerRankings";
 export {
@@ -32,17 +35,15 @@ export {
 } from "./useWeeklyEditions";
 export {
   useContracts,
-  useAllContracts,
-  useContractData,
+  useContractPlayerNhlSalaries,
   useCreateContract,
-  type ContractFilters,
-  type ContractSortOption,
-  type ContractSummary,
 } from "./useContract";
 export type {
   BuyoutContractType,
   CapSpaceEntry,
-  ContractSelectionContext,
+  ContractFilters,
+  ContractSortOption,
+  ContractSummary,
   FranchiseContractHistoryRowType,
   FranchiseDraftPickGroupType,
   FranchiseDraftPickRowType,
@@ -116,12 +117,22 @@ export type { UsePlayerStatsOptions, UsePlayerStatsResult } from "@gshl-types";
 export { useSeasons, useSeasonState } from "./useSeason";
 export type { UseSeasonStateOptions, UseSeasonsOptions } from "@gshl-types";
 
-// Team and franchise hooks - now unified with statsLevel and teamType options
-export { useTeams, useNHLTeams, useFranchises } from "./useTeam";
+// Domain-specific team, franchise, NHL and statistics reads
+export {
+  useTeams,
+  useNHLTeams,
+  useFranchises,
+  useTeamDayStats,
+  useTeamWeekStats,
+  useTeamSeasonStats,
+} from "./useTeam";
 export type {
   EnrichedFranchise,
-  TeamStatsLevel,
-  TeamType,
+  UseNHLTeamsOptions,
+  UseFranchisesOptions,
+  UseTeamDayStatsOptions,
+  UseTeamWeekStatsOptions,
+  UseTeamSeasonStatsOptions,
   UseTeamsOptions,
 } from "@gshl-types";
 

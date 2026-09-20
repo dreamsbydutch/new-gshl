@@ -1,5 +1,7 @@
 "use client";
 
+import { buildDraftTeamOptions } from "@gshl-utils/features/draft-hub";
+
 import { useCallback, useEffect, useMemo, useRef } from "react";
 
 import { useLockerRoomTeamOptions } from "./useLockerRoomTeamOptions";
@@ -26,7 +28,6 @@ import {
   getCurrentNavigationHref,
   getLeagueOfficeNavigationViews,
   isGlobalSeasonUrlPath,
-  isIsoDateInRange,
   isLockerRoomNavigationView,
   isScheduleNavigationView,
   isStandingsNavigationView,
@@ -38,7 +39,7 @@ import {
   SCHEDULE_NAVIGATION_VIEWS,
   STANDINGS_NAVIGATION_VIEWS,
   toPersistedNavigationId,
-  toLocalIsoDateOnly,
+  selectWeekForReferenceDate,
 } from "@gshl-utils";
 import {
   useAppPathname,
@@ -78,16 +79,13 @@ function uniqueOwnerIds(teams: readonly GSHLTeam[]): string[] {
 }
 
 function defaultWeekId(weeks: readonly Week[]): string | null {
-  if (!weeks.length) return null;
-  const today = toLocalIsoDateOnly(new Date());
-  const current = weeks.find((week) =>
-    isIsoDateInRange(today, week.startDate, week.endDate),
+  return (
+    selectWeekForReferenceDate({
+      weeks,
+      referenceDate: new Date(),
+      fallback: "first",
+    })?.id ?? null
   );
-  if (current?.id) return String(current.id);
-  const next = weeks.find((week) => week.startDate > today);
-  if (next?.id) return String(next.id);
-  const previous = [...weeks].reverse().find((week) => week.endDate < today);
-  return previous?.id ? String(previous.id) : String(weeks[0]!.id);
 }
 
 function useContextualRouter() {
@@ -284,7 +282,7 @@ export function useScheduleContextNavigation() {
     [weeksQuery.data],
   );
   const validOwnerIds = useMemo(
-    () => uniqueOwnerIds((teamsQuery.data ?? []) as GSHLTeam[]),
+    () => uniqueOwnerIds(teamsQuery.data ?? []),
     [teamsQuery.data],
   );
   const effectiveWeekId =
@@ -628,7 +626,7 @@ export function useLockerRoomContextNavigation(synchronizeRoute = true) {
 export function useLeagueOfficeContextNavigation() {
   const navigation = useContextualRouter();
   const { hasHydrated } = useNavigationHydration();
-  const { session, status } = useAuthSession();
+  const { status } = useAuthSession();
   const query = useMemo(
     () => readContextualNavigationQuery(navigation.search),
     [navigation.search],
@@ -636,7 +634,7 @@ export function useLeagueOfficeContextNavigation() {
   const persistedView = useNavStore((state) => state.selectedLeagueOfficeType);
   const setView = useNavStore((state) => state.setLeagueOfficeType);
   const isMockDraftPage = navigation.pathname === "/leagueoffice/mock-draft";
-  const validViews = getLeagueOfficeNavigationViews(session?.user.role);
+  const validViews = getLeagueOfficeNavigationViews();
   const view = resolveContextualSelection({
     explicitValue: isMockDraftPage ? null : query.view,
     persistedValue: isMockDraftPage ? "draft" : persistedView,
@@ -656,13 +654,6 @@ export function useLeagueOfficeContextNavigation() {
     if (!routeDataReady || !navigation.shouldSyncCurrentUrl) return;
     if (isMockDraftPage) {
       if (persistedView !== "mockDraft") setView("mockDraft");
-      return;
-    }
-    if (view === "tradeBlock") {
-      setView("draft");
-      navigation.replace(
-        buildLeagueOfficeNavigationHref(navigation.search, { view }),
-      );
       return;
     }
     if (persistedView !== view) setView(view);
@@ -774,16 +765,7 @@ export function useDraftTeamsContextNavigation({
     navigation.pathname === "/draft/teams" ||
     navigation.pathname.startsWith("/draft/teams/");
   const selectableTeams = useMemo(
-    () =>
-      teams
-        .filter(
-          (team) =>
-            !excludedOwnerId ||
-            String(team.ownerId) !== String(excludedOwnerId),
-        )
-        .sort((left, right) =>
-          String(left.name ?? "").localeCompare(String(right.name ?? "")),
-        ),
+    () => buildDraftTeamOptions(teams, excludedOwnerId),
     [excludedOwnerId, teams],
   );
   const validOwnerIds = useMemo(
@@ -837,6 +819,8 @@ export function useDraftTeamsContextNavigation({
     isReady: routeDataReady && storeMatches,
     isTeamsPage,
     selectableTeams,
+    selectedTeam:
+      selectableTeams.find((team) => String(team.ownerId) === ownerId) ?? null,
     selectedOwnerId: ownerId,
     selectOwner,
     myTeamHref: buildContextualNavigationHref(
