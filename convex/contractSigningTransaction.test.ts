@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import type { Id } from "./_generated/dataModel";
 import { createContract } from "./frontend";
 import { finalizeGroup } from "./ufa";
 import {
@@ -284,7 +285,7 @@ void test("UFA rejects a stale winner or newly contracted player before signing 
         expiryDate: "2028-06-01",
       });
     } else {
-      await f.ctx.db.patch("winner" as never, { status: "withdrawn" });
+      await f.ctx.db.patch("winner" as Id<"ufaOffers">, { status: "lost" });
     }
     await assert.rejects(
       invokeMutation(finalizeGroup, f.ctx, ufaArgs),
