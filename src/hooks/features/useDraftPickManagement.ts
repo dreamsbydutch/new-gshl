@@ -110,7 +110,7 @@ export function useDraftPickManagement() {
       });
       discard();
       setMessage(
-        "Corrections saved together. Each team retains its selected players; rosters and contracts are unchanged.",
+        "Corrections saved together. Draft records updated; player ownership, rosters, and contracts are unchanged.",
       );
     } catch (caught) {
       setError(

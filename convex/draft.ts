@@ -366,17 +366,8 @@ export const correctPicks = mutation({
         players.add(row.playerId);
       }
     }
-    const selections = (picks: typeof rows) =>
-      picks
-        .filter((p) => p.playerId)
-        .map((p) => `${p.gshlTeamId ?? ""}:${p.playerId}`)
-        .sort();
-    if (
-      JSON.stringify(selections(rows)) !== JSON.stringify(selections(finalRows))
-    )
-      throw new Error(
-        "Keep each team's selected players: move the team and its player together, or stage the matching pick changes",
-      );
+    // Correct draft history independently of current player ownership.
+    // Only draft picks and their audit records are written below.
     const changedRows = rows.filter(
       (row) =>
         edits.has(row._id) &&
