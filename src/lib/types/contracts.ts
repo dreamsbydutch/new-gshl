@@ -255,3 +255,29 @@ export interface CapSpaceRowProps {
 }
 
 export type TeamContractTableProps = ContractTableProps;
+
+/** Data needed to project one owner's contracts in a franchise context. */
+export interface FranchiseContractViewInput {
+  ownerContracts: Contract[];
+  currentSeason?: Season;
+  currentTeam?: GSHLTeam;
+  teams?: GSHLTeam[];
+  allTeams?: GSHLTeam[];
+  players?: Player[];
+  relatedPlayers?: Player[];
+  seasons?: Season[];
+  draftPicks?: DraftPick[];
+  playerNhlSalaryRows?: PlayerNhlSalaryRow[];
+  referenceDate?: Date;
+}
+
+export interface FranchiseContractView {
+  table: { contractGroups: Contract[][]; capSpaceWindow: CapSpaceEntry[] };
+  history: { rows: FranchiseContractHistoryRowType[]; hasData: boolean };
+  draft: { groups: FranchiseDraftPickGroupType[]; hasData: boolean };
+  currentContracts: Contract[];
+  contractPlayers: Player[];
+  buyoutContracts: BuyoutContractType[];
+  expiredRows: FranchiseContractHistoryRowType[];
+  draftPickGroups: FranchiseDraftPickGroupType[];
+}
