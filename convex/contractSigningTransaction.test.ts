@@ -111,7 +111,25 @@ for (const [label, fn, args] of [
       " signing reserves picks, assigns ownership, and rebuilds the first covered roster",
     async () => {
       const f = signingFixture();
+      f.put("players", "teamOnly", {
+        ownerId: "otherOwner",
+        gshlTeamId: "team1",
+        isActive: true,
+        nhlPos: ["G"],
+        lineupPos: "BN",
+      });
+      f.put("players", "inactive", {
+        ownerId: "owner",
+        gshlTeamId: "currentTeam",
+        isActive: false,
+        nhlPos: ["D"],
+        lineupPos: "IR",
+      });
       await invokeMutation(fn, f.ctx, args);
+      assert.equal(f.get("teamOnly")?.lineupPos, "BN");
+      assert.equal(f.get("teamOnly")?.updatedAt, undefined);
+      assert.equal(f.get("inactive")?.gshlTeamId, "currentTeam");
+      assert.equal(f.get("inactive")?.updatedAt, undefined);
       const contract = f.rows("contracts")[0]!;
       assert.equal(contract.ownerId, "owner");
       assert.equal(contract.seasonId, "signing");

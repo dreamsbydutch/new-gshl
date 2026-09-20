@@ -67,6 +67,11 @@ export function mutationFixture() {
           },
           collect: async () => select(),
           first: async () => select()[0] ?? null,
+          unique: async () => {
+            const matches = select();
+            if (matches.length > 1) throw new Error("Expected a unique row");
+            return matches[0] ?? null;
+          },
           take: async (count: number) => select().slice(0, count),
         };
         return query;

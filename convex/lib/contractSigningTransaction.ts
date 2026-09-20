@@ -126,6 +126,11 @@ export async function signContract(ctx: MutationCtx, request: SigningRequest) {
       updatedAt: now,
     });
   }
-  await rebuildTeamLineup(ctx, franchise.ownerId, firstTeam._id, now);
+  await rebuildTeamLineup(ctx, {
+    policy: "signing",
+    ownerId: franchise.ownerId,
+    teamId: firstTeam._id,
+    updatedAt: now,
+  });
   return contractId;
 }

@@ -14,8 +14,10 @@ function toRosterPosition(value: unknown): RosterPositionType | null {
     : null;
 }
 
-function toCandidate(player: Doc<"players">): LineupCandidate {
-  const rating = Number(player.overallRating);
+export function toLineupCandidate(player: Doc<"players">): LineupCandidate {
+  // Unknown ratings stay null; the assignment algorithm scores them as zero.
+  const rating =
+    player.overallRating == null ? null : Number(player.overallRating);
   return {
     id: String(player._id),
     nhlPos: (player.nhlPos ?? [])
@@ -26,23 +28,52 @@ function toCandidate(player: Doc<"players">): LineupCandidate {
   };
 }
 
-/** Rebuilds one team's best lineup from its owned, active players. */
+type LineupRequest = {
+  ownerId: Id<"owners">;
+  teamId: Id<"teams">;
+  updatedAt: number;
+} & (
+  | { policy: "draft"; explicitlyIncludedPlayers?: readonly Doc<"players">[] }
+  | { policy: "signing" }
+);
+
+/** Rebuild using the workflow's roster membership and write policy. */
 export async function rebuildTeamLineup(
   ctx: MutationCtx,
-  ownerId: Id<"owners">,
-  teamId: Id<"teams">,
-  updatedAt: number,
+  request: LineupRequest,
 ): Promise<LineupAssignment[]> {
-  const roster = await ctx.db
-    .query("players")
-    .withIndex("by_ownerId", (range) => range.eq("ownerId", ownerId))
-    .collect();
+  const { ownerId, teamId, updatedAt, policy } = request;
+  const [ownerRoster, teamRoster] = await Promise.all([
+    ctx.db
+      .query("players")
+      .withIndex("by_ownerId", (range) => range.eq("ownerId", ownerId))
+      .collect(),
+    policy === "draft"
+      ? ctx.db
+          .query("players")
+          .withIndex("by_gshlTeamId", (range) => range.eq("gshlTeamId", teamId))
+          .collect()
+      : Promise.resolve([]),
+  ]);
+  // Explicit rows win over indexed snapshots, including a just-drafted player.
+  const rosterById = new Map<string, Doc<"players">>();
+  for (const player of [
+    ...ownerRoster,
+    ...teamRoster,
+    ...(policy === "draft" ? (request.explicitlyIncludedPlayers ?? []) : []),
+  ]) {
+    rosterById.set(String(player._id), player);
+  }
   const assignments = generateLineupAssignments(
-    roster.filter((player) => player.isActive).map(toCandidate),
+    [...rosterById.values()]
+      .filter((player) => player.isActive)
+      .map((player) => toLineupCandidate(player)),
   );
   for (const assignment of assignments) {
-    await ctx.db.patch(assignment.playerId as Id<"players">, {
-      gshlTeamId: teamId,
+    const player = rosterById.get(assignment.playerId);
+    if (!player) continue;
+    await ctx.db.patch(player._id, {
+      ...(policy === "signing" ? { gshlTeamId: teamId } : {}),
       lineupPos: assignment.lineupPos,
       updatedAt,
     });

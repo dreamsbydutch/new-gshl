@@ -19,15 +19,14 @@ import { buildLeagueActivity } from "../src/lib/utils/features/league-activity";
 import { JOB_NAMES, JOB_STATUSES } from "./jobCatalog";
 import {
   normalizeTimestampFields,
-  timestampFieldsForTable,
   toUtcTimestamp,
   utcTimestampToDateKey,
 } from "./lib/timestamps";
 import { loadLatestNhlStats, loadUfaCatalog } from "./lib/ufaCatalog";
 import {
-  canTakeFrontendRowsBeforeFiltering,
-  selectFrontendIndexPlan,
-} from "./lib/frontendQuery";
+  readCompatibilityRows,
+  finishCompatibilityRead,
+} from "./lib/compatibilityRead";
 import {
   pickDefinedFields,
   PLAYER_NHL_DISPLAY_FIELDS,
@@ -67,195 +66,6 @@ const listArgs = {
   take: v.optional(v.number()),
 };
 
-const indexFieldsByTable: Record<string, readonly (readonly string[])[]> = {
-  seasons: [["legacyId"]],
-  weeks: [
-    ["legacyId"],
-    ["seasonId"],
-    ["seasonId", "weekNum"],
-    ["seasonId", "startDate"],
-  ],
-  teams: [
-    ["legacyId"],
-    ["seasonId"],
-    ["franchiseId"],
-    ["confId"],
-    ["seasonId", "franchiseId"],
-  ],
-  franchises: [["legacyId"], ["ownerId"], ["confId"]],
-  conferences: [["legacyId"]],
-  owners: [["legacyId"]],
-  players: [
-    ["legacyId"],
-    ["ownerId"],
-    ["gshlTeamId"],
-    ["isActive"],
-    ["isActive", "overallRk"],
-    ["isActive", "overallRating"],
-    ["isActive", "isSignable", "isResignable"],
-  ],
-  playerNhlSalaries: [
-    ["legacyId"],
-    ["playerId"],
-    ["nhlApiId"],
-    ["seasonStartYear"],
-    ["playerId", "seasonStartYear"],
-    ["seasonStartYear", "normalizedSalary"],
-  ],
-  contracts: [
-    ["legacyId"],
-    ["playerId"],
-    ["ownerId"],
-    ["seasonId"],
-    ["signingDate"],
-    ["seasonId", "signingDate"],
-  ],
-  draftPicks: [
-    ["legacyId"],
-    ["seasonId"],
-    ["gshlTeamId"],
-    ["playerId"],
-    ["seasonId", "round", "pick"],
-  ],
-  matchups: [
-    ["legacyId"],
-    ["seasonId"],
-    ["weekId"],
-    ["homeTeamId"],
-    ["awayTeamId"],
-    ["seasonId", "weekId"],
-    ["seasonId", "homeTeamId"],
-    ["seasonId", "awayTeamId"],
-  ],
-  events: [["legacyId"], ["seasonId"], ["date"]],
-  awards: [["legacyId"], ["seasonId"], ["winnerId"]],
-  playerAwards: [["legacyId"], ["seasonId"], ["playerId"]],
-  teamAwards: [
-    ["legacyId"],
-    ["seasonId"],
-    ["ownerId"],
-    ["teamId"],
-    ["seasonId", "ownerId"],
-  ],
-  nhlTeams: [["legacyId"], ["abbr"]],
-  playerDayStatLines: [
-    ["legacyId"],
-    ["seasonId"],
-    ["gshlTeamId"],
-    ["playerId"],
-    ["weekId"],
-    ["date"],
-    ["seasonId", "date"],
-    ["seasonId", "weekId", "gshlTeamId"],
-    ["seasonId", "playerId", "date"],
-    ["seasonId", "gshlTeamId", "playerId", "weekId", "date"],
-  ],
-  playerDayHighlights: [
-    ["legacyId"],
-    ["seasonId"],
-    ["seasonId", "date"],
-    ["seasonId", "ratingRank"],
-    ["seasonId", "sourcePlayerDayId"],
-  ],
-  playerWeekStatLines: [
-    ["legacyId"],
-    ["seasonId"],
-    ["gshlTeamId"],
-    ["playerId"],
-    ["weekId"],
-    ["seasonId", "weekId", "gshlTeamId"],
-    ["seasonId", "playerId"],
-    ["seasonId", "gshlTeamId", "playerId", "weekId"],
-  ],
-  playerSplitStatLines: [
-    ["legacyId"],
-    ["seasonId"],
-    ["gshlTeamId"],
-    ["playerId"],
-    ["seasonType"],
-    ["seasonId", "seasonType", "gshlTeamId", "playerId"],
-  ],
-  playerTotalStatLines: [
-    ["legacyId"],
-    ["seasonId"],
-    ["playerId"],
-    ["seasonType"],
-    ["seasonId", "seasonType", "playerId"],
-  ],
-  playerCareerSplitStatLines: [
-    ["legacyId"],
-    ["gshlTeamId"],
-    ["playerId"],
-    ["seasonType"],
-    ["gshlTeamId", "playerId", "seasonType"],
-  ],
-  playerCareerTotalStatLines: [
-    ["legacyId"],
-    ["playerId"],
-    ["seasonType"],
-    ["playerId", "seasonType"],
-  ],
-  playerNhlStatLines: [
-    ["legacyId"],
-    ["seasonId"],
-    ["playerId"],
-    ["seasonId", "playerId"],
-  ],
-  teamDayStatLines: [
-    ["legacyId"],
-    ["seasonId"],
-    ["gshlTeamId"],
-    ["weekId"],
-    ["date"],
-    ["seasonId", "date"],
-    ["seasonId", "weekId", "gshlTeamId"],
-    ["seasonId", "gshlTeamId", "weekId", "date"],
-  ],
-  teamWeekStatLines: [
-    ["legacyId"],
-    ["seasonId"],
-    ["gshlTeamId"],
-    ["weekId"],
-    ["seasonId", "weekId", "gshlTeamId"],
-  ],
-  teamSeasonStatLines: [
-    ["legacyId"],
-    ["seasonId"],
-    ["seasonType"],
-    ["gshlTeamId"],
-    ["seasonId", "seasonType", "gshlTeamId"],
-  ],
-};
-
-// The generic facade preserves compatibility equality between numeric strings
-// and numbers, and between legacy date strings and UTC timestamps. Convex index
-// equality is type-exact, so these fields may only be filtered after the last
-// safe index prefix or valid legacy rows would be omitted.
-const nonExactIndexFieldsByTable: Record<string, readonly string[]> = {
-  weeks: ["weekNum", "startDate"],
-  players: ["overallRk", "overallRating"],
-  playerNhlSalaries: ["seasonStartYear", "normalizedSalary"],
-  contracts: ["signingDate"],
-  draftPicks: ["round", "pick"],
-  events: ["date"],
-  playerDayHighlights: ["ratingRank"],
-};
-
-function comparable(value: unknown): string | number | boolean | null {
-  if (value === null || value === undefined) return null;
-  if (typeof value === "number" || typeof value === "boolean") return value;
-  if (typeof value === "string") {
-    const trimmed = value.trim();
-    const number = Number(trimmed);
-    return trimmed && Number.isFinite(number) ? number : trimmed;
-  }
-  return JSON.stringify(value);
-}
-
-function equal(left: unknown, right: unknown) {
-  return comparable(left) === comparable(right);
-}
-
 function publicRow(row: Row): Record<string, any> {
   const output: Record<string, unknown> = { ...row, id: row._id };
   delete output._id;
@@ -271,41 +81,6 @@ function publicRow(row: Row): Record<string, any> {
     }
   }
   return output;
-}
-
-function matches(
-  table: string,
-  row: Record<string, unknown>,
-  where?: Record<string, unknown>,
-) {
-  const timestampFields = new Set(timestampFieldsForTable(table));
-  return Object.entries(where ?? {}).every(
-    ([field, expected]) =>
-      expected === undefined ||
-      (timestampFields.has(field)
-        ? toUtcTimestamp(row[field]) === toUtcTimestamp(expected)
-        : equal(row[field], expected)),
-  );
-}
-
-function compare(
-  left: Record<string, unknown>,
-  right: Record<string, unknown>,
-  orderBy?: Record<string, Direction>,
-) {
-  for (const [field, direction] of Object.entries(orderBy ?? {})) {
-    const a = comparable(left[field]);
-    const b = comparable(right[field]);
-    if (a === b) continue;
-    if (a === null) return 1;
-    if (b === null) return -1;
-    const result =
-      typeof a === "number" && typeof b === "number"
-        ? a - b
-        : String(a).localeCompare(String(b));
-    return direction === "desc" ? -result : result;
-  }
-  return 0;
 }
 
 async function rows(
@@ -325,7 +100,11 @@ async function rows(
 
       const row = (await ctx.db.get(normalizedId)) as Row | null;
       delete where.id;
-      return row && matches(table, row, where) ? [publicRow(row)] : [];
+      return row
+        ? finishCompatibilityRead(table, [row], { ...args, where }).map(
+            publicRow,
+          )
+        : [];
     } catch {
       return [];
     }
@@ -336,38 +115,9 @@ async function rows(
     delete where.teamId;
   }
 
-  const timestampFields = new Set(timestampFieldsForTable(table));
-  const nonExactIndexFields = new Set(nonExactIndexFieldsByTable[table] ?? []);
-  const indexPlan = selectFrontendIndexPlan(
-    indexFieldsByTable[table] ?? [],
-    where,
-    nonExactIndexFields,
+  return (await readCompatibilityRows(ctx, table, { ...args, where })).map(
+    publicRow,
   );
-  let query: any = ctx.db.query(table as never);
-  if (indexPlan) {
-    query = query.withIndex(indexPlan.indexName, (range: any) => {
-      let constrainedRange = range;
-      for (const field of indexPlan.constrainedFields) {
-        const value = timestampFields.has(field)
-          ? (toUtcTimestamp(where[field]) ?? where[field])
-          : where[field];
-        constrainedRange = constrainedRange.eq(field, value);
-      }
-      return constrainedRange;
-    });
-  }
-
-  const candidates =
-    args.take &&
-    !args.orderBy &&
-    canTakeFrontendRowsBeforeFiltering(where, indexPlan)
-      ? await query.take(args.take)
-      : await query.collect();
-  const result = (candidates as Row[])
-    .filter((row) => matches(table, row, where))
-    .map(publicRow)
-    .sort((a, b) => compare(a, b, args.orderBy));
-  return args.take ? result.slice(0, args.take) : result;
 }
 
 function list(table: string) {

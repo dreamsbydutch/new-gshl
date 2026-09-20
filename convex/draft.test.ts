@@ -577,3 +577,49 @@ void test("invalid batches fail before any write, including when a later edit is
     assert.equal(f.rows("draftPickCorrections").size, 0, scenario);
   }
 });
+
+void test("draft and undo rebuild the union roster without reassigning conflicting memberships", async () => {
+  const f = draftFixture(Date.now() - 1000);
+  f.put("authUsers", "user", { status: "active", role: "commissioner" });
+  f.put("players", "ownedElsewhere", {
+    ownerId: "owner",
+    gshlTeamId: "otherTeam",
+    isActive: true,
+    nhlPos: ["D"],
+    overallRating: null,
+    lineupPos: "IR",
+  });
+  f.put("players", "teamOnly", {
+    ownerId: "otherOwner",
+    gshlTeamId: "team",
+    isActive: true,
+    nhlPos: ["G"],
+    overallRating: 75,
+  });
+  f.put("players", "inactive", {
+    ownerId: "owner",
+    gshlTeamId: "team",
+    isActive: false,
+    nhlPos: ["C"],
+    lineupPos: "IRplus",
+  });
+  await handler(submitPick)(f.ctx, {
+    seasonId,
+    pickId: "pick1",
+    playerId: "player1",
+  });
+  assert.equal(f.get("player1")!.lineupPos, "C");
+  assert.equal(f.get("teamOnly")!.lineupPos, "G");
+  assert.equal(f.get("ownedElsewhere")!.lineupPos, "IR");
+  await handler(undoPick)(f.ctx, {
+    seasonId,
+    pickId: "pick1",
+  });
+  assert.equal(f.get("player1")!.ownerId, null);
+  assert.equal(f.get("player1")!.gshlTeamId, undefined);
+  assert.equal(f.get("player1")!.lineupPos, null);
+  assert.equal(f.get("ownedElsewhere")!.gshlTeamId, "otherTeam");
+  assert.equal(f.get("teamOnly")!.ownerId, "otherOwner");
+  assert.equal(f.get("teamOnly")!.lineupPos, "G");
+  assert.equal(f.get("inactive")!.updatedAt, undefined);
+});
