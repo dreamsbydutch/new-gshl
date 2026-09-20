@@ -10,6 +10,7 @@ void test("admin navigation defaults to contract management", () => {
 
 void test("admin navigation accepts every dedicated admin view", () => {
   for (const view of [
+    "accounts",
     "draftPicks",
     "scheduleBuilder",
     "contracts",

@@ -28,6 +28,7 @@ export type LeagueOfficeNavigationView =
   "draft" | "freeAgents" | "rules" | "confBattle" | "ownerRankings";
 
 export type AdminNavigationView =
+  | "accounts"
   | "draftPicks"
   | "contracts"
   | "users"
