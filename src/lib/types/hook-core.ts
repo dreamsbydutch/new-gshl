@@ -1,5 +1,4 @@
 import type {
-  Contract,
   Franchise,
   GSHLTeam,
   PlayerDayStatLine,
@@ -163,25 +162,9 @@ export interface EnrichedFranchise extends Franchise {
   teams?: GSHLTeam[];
 }
 
-export interface ContractSelectionContext<T> {
-  allContracts: Contract[];
-  filteredContracts: Contract[];
-  getContracts: <U = T>(options?: {
-    filters?: ContractFilters;
-    sort?: ContractSortOption;
-    take?: number;
-    map?: (contract: Contract) => U;
-  }) => U[];
-  deps: readonly unknown[];
-}
-
-export interface UseContractsOptions<T = Contract, S = undefined> {
+export interface UseContractsOptions {
   filters?: ContractFilters;
   sort?: ContractSortOption;
   take?: number;
-  map?: (contract: Contract) => T;
-  select?: (contracts: T[], context: ContractSelectionContext<T>) => S;
-  selectDeps?: ReadonlyArray<unknown>;
-  withSummary?: boolean;
   enabled?: boolean;
 }
