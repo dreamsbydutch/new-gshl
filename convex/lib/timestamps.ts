@@ -13,6 +13,7 @@ export const DATE_KEY_TABLE_FIELDS = {
 } as const;
 
 export const UTC_TIMESTAMP_TABLE_FIELDS = {
+  ownerLedgerEntries: ["effectiveAt", "createdAt", "voidedAt"],
   notificationPreferences: ["updatedAt"],
   pushSubscriptions: ["updatedAt"],
   notificationEvents: ["createdAt", "expiresAt", "clockStartedAt"],
