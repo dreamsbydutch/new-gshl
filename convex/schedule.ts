@@ -1,5 +1,11 @@
 import { v } from "convex/values";
-import { query } from "./_generated/server";
+import { mutation, query } from "./_generated/server";
+import { requireCommissioner } from "./lib/auth";
+import {
+  pairKey,
+  validateSchedule,
+} from "../src/lib/utils/features/schedule-builder";
+import type { PairHistory } from "../src/lib/types/schedule-builder";
 import type { Doc } from "./_generated/dataModel";
 import {
   projectWeeklyScheduleMatchups,
@@ -10,11 +16,209 @@ import {
   projectTeamScheduleTeam,
 } from "./lib/teamScheduleProjection";
 import { projectMatchupTeamWeekStats } from "./lib/matchupProjection";
-import { utcTimestampToDateKey } from "./lib/timestamps";
+import { toUtcTimestamp, utcTimestampToDateKey } from "./lib/timestamps";
 
 function present<T>(value: T | null): value is T {
   return value !== null;
 }
+
+export const builderSeasons = query({
+  args: {},
+  handler: async (ctx) => {
+    await requireCommissioner(ctx);
+    const seasons = await ctx.db.query("seasons").collect();
+    return [...seasons]
+      .sort(
+        (a, b) =>
+          (toUtcTimestamp(b.startDate) ?? 0) -
+          (toUtcTimestamp(a.startDate) ?? 0),
+      )
+      .map((s) => ({ id: s._id, name: s.name }));
+  },
+});
+
+export const builderContext = query({
+  args: { seasonId: v.id("seasons") },
+  handler: async (ctx, { seasonId }) => {
+    await requireCommissioner(ctx);
+    const target = await ctx.db.get(seasonId);
+    if (!target) throw new Error("Season not found.");
+    const seasons = await ctx.db.query("seasons").collect();
+    const targetStart = toUtcTimestamp(target.startDate);
+    if (targetStart === null)
+      throw new Error("Set the season start date before building a schedule.");
+    if (seasons.some((s) => toUtcTimestamp(s.startDate) === null))
+      throw new Error(
+        "Every season needs a start date to establish historical order.",
+      );
+    const previous = seasons.filter(
+      (s) => toUtcTimestamp(s.startDate)! < targetStart,
+    );
+    const franchises = await ctx.db.query("franchises").collect();
+    const byFranchise = new Map(franchises.map((f) => [f._id, f]));
+    const teams = await ctx.db
+      .query("teams")
+      .withIndex("by_seasonId", (q) => q.eq("seasonId", seasonId))
+      .collect();
+    const history = new Map<string, PairHistory>();
+    let excluded = 0;
+    for (const season of previous) {
+      const [oldTeams, matchups, weeks] = await Promise.all([
+        ctx.db
+          .query("teams")
+          .withIndex("by_seasonId", (q) => q.eq("seasonId", season._id))
+          .collect(),
+        ctx.db
+          .query("matchups")
+          .withIndex("by_seasonId", (q) => q.eq("seasonId", season._id))
+          .collect(),
+        ctx.db
+          .query("weeks")
+          .withIndex("by_seasonId", (q) => q.eq("seasonId", season._id))
+          .collect(),
+      ]);
+      const owners = new Map(
+        oldTeams.map((t) => [t._id, byFranchise.get(t.franchiseId)?.ownerId]),
+      );
+      const regularWeeks = new Set(
+        weeks.filter((w) => !w.isPlayoffs).map((w) => w._id),
+      );
+      for (const game of matchups) {
+        if (game.isComplete === false) continue;
+        if (
+          !["CC", "NC", "RS"].includes(game.gameType) ||
+          !regularWeeks.has(game.weekId)
+        )
+          continue;
+        const home = owners.get(game.homeTeamId);
+        const away = owners.get(game.awayTeamId);
+        if (!home || !away || home === away) {
+          excluded++;
+          continue;
+        }
+        const [a, b] = [String(home), String(away)].sort() as [string, string];
+        const key = pairKey(a, b);
+        const record = history.get(key) ?? { a, b, games: 0, aHome: 0 };
+        record.games++;
+        if (home === a) record.aHome++;
+        history.set(key, record);
+      }
+    }
+    const weeks = await ctx.db
+      .query("weeks")
+      .withIndex("by_seasonId", (q) => q.eq("seasonId", seasonId))
+      .collect();
+    const existing = await ctx.db
+      .query("matchups")
+      .withIndex("by_seasonId", (q) => q.eq("seasonId", seasonId))
+      .collect();
+    return {
+      teams: teams.map((t) => {
+        const franchise = byFranchise.get(t.franchiseId);
+        if (!franchise)
+          throw new Error("A team is missing its franchise / owner.");
+        return {
+          id: String(t._id),
+          ownerId: String(franchise.ownerId),
+          conferenceId: String(t.confId),
+          name: franchise.name,
+        };
+      }),
+      history: [...history.values()],
+      historySeasons: previous.length,
+      excluded,
+      regularWeeks: weeks.filter((w) => !w.isPlayoffs).length,
+      hasSchedule: existing.some(
+        (g) =>
+          ["CC", "NC", "RS"].includes(g.gameType) ||
+          weeks.some((w) => w._id === g.weekId && !w.isPlayoffs),
+      ),
+    };
+  },
+});
+
+export const publishBuilderSchedule = mutation({
+  args: {
+    seasonId: v.id("seasons"),
+    weeks: v.number(),
+    games: v.array(
+      v.object({ week: v.number(), home: v.id("teams"), away: v.id("teams") }),
+    ),
+  },
+  handler: async (ctx, args) => {
+    await requireCommissioner(ctx);
+    const [teams, allWeeks, existing] = await Promise.all([
+      ctx.db
+        .query("teams")
+        .withIndex("by_seasonId", (q) => q.eq("seasonId", args.seasonId))
+        .collect(),
+      ctx.db
+        .query("weeks")
+        .withIndex("by_seasonId", (q) => q.eq("seasonId", args.seasonId))
+        .collect(),
+      ctx.db
+        .query("matchups")
+        .withIndex("by_seasonId", (q) => q.eq("seasonId", args.seasonId))
+        .collect(),
+    ]);
+    const weeks = allWeeks
+      .filter((w) => !w.isPlayoffs)
+      .sort((a, b) => Number(a.weekNum) - Number(b.weekNum));
+    if (
+      weeks.length !== args.weeks ||
+      new Set(weeks.map((w) => Number(w.weekNum))).size !== weeks.length ||
+      weeks.some((w) => !Number.isFinite(Number(w.weekNum)))
+    ) {
+      throw new Error(
+        "Create exactly the requested number of distinct regular-season weeks before publishing.",
+      );
+    }
+    if (weeks.some((w) => (toUtcTimestamp(w.startDate) ?? 0) <= Date.now()))
+      throw new Error(
+        "Publishing requires valid future start dates for every regular-season week.",
+      );
+    if (
+      existing.some(
+        (g) =>
+          ["CC", "NC", "RS"].includes(g.gameType) ||
+          weeks.some((w) => w._id === g.weekId),
+      )
+    )
+      throw new Error(
+        "This season already has regular-season matchups. Nothing was overwritten.",
+      );
+    const builderTeams = await Promise.all(
+      teams.map(async (t) => {
+        const franchise = await ctx.db.get(t.franchiseId);
+        if (!franchise) throw new Error("Missing franchise / owner.");
+        return {
+          id: String(t._id),
+          ownerId: String(franchise.ownerId),
+          conferenceId: String(t.confId),
+          name: franchise.name,
+        };
+      }),
+    );
+    validateSchedule(builderTeams, args.weeks, args.games);
+    const byId = new Map(teams.map((t) => [t._id, t]));
+    const now = Date.now();
+    for (const game of args.games)
+      await ctx.db.insert("matchups", {
+        seasonId: args.seasonId,
+        weekId: weeks[game.week - 1]!._id,
+        homeTeamId: game.home,
+        awayTeamId: game.away,
+        gameType:
+          byId.get(game.home)!.confId === byId.get(game.away)!.confId
+            ? "CC"
+            : "NC",
+        isComplete: false,
+        createdAt: now,
+        updatedAt: now,
+      });
+    return { games: args.games.length };
+  },
+});
 
 /**
  * Returns the complete public payload for one weekly schedule view.
