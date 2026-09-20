@@ -116,7 +116,8 @@ function renderContractData(
 }
 
 void test("missing owner or disabled input skips every contract-dependent query", () => {
-  for (const options of [{}, { ...context, enabled: false }]) {
+  const cases: UseContractDataOptions[] = [{}, { ...context, enabled: false }];
+  for (const options of cases) {
     const { result, queries } = renderContractData(options);
     assert.equal(queries.size, 0);
     assert.equal(result.isLoading, false);
