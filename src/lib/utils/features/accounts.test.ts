@@ -8,7 +8,15 @@ test("ledger amounts retain exact cents and reject ambiguous input", () => {
   assert.equal(parseAccountAmount("10.1"), 1010);
   assert.equal(parseAccountAmount("100000000"), 10_000_000_000);
   assert.throws(() => parseAccountAmount("100000000.01"));
-  for (const value of ["0", "-1", "1.005", "1e2", "1,000", "Infinity", "9007199254740992"]) {
+  for (const value of [
+    "0",
+    "-1",
+    "1.005",
+    "1e2",
+    "1,000",
+    "Infinity",
+    "9007199254740992",
+  ]) {
     assert.throws(() => parseAccountAmount(value));
   }
 });
