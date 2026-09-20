@@ -1,30 +1,31 @@
 "use client";
 
-import { useMemo } from "react";
+import { combineQueryStates } from "@gshl-utils/core/query";
 
 import type {
-  QueryLike,
   UseSeasonDataBundleOptions,
   UseSeasonDataBundleResult,
 } from "@gshl-types";
-import { combineQueryStates } from "@gshl-utils/core/query";
 
-import { useMatchups, useNav, useTeams, useWeeks } from "../main";
+import { useMatchups } from "../main/useMatchups";
+import { useNav } from "../main/useNav";
+import { useTeams, useTeamSeasonStats } from "../main/useTeam";
+import { useWeeks } from "../main/useWeek";
 
 /**
  * Loads season-scoped collections behind a single options object so feature
  * hooks can opt into the exact datasets they need without repeating the same
  * fetch orchestration.
  */
-export function useSeasonDataBundle<TTeamStats = never>(
+export function useSeasonDataBundle(
   options: UseSeasonDataBundleOptions = {},
-): UseSeasonDataBundleResult<TTeamStats> {
+): UseSeasonDataBundleResult {
   const {
     seasonId: optionSeasonId,
     weekId: optionWeekId,
     includeMatchups = true,
     includeWeeks = false,
-    teamStatsLevel = null,
+    includeSeasonStats = false,
     useNavigation = true,
     weeksOrderBy,
     teamQueryOptions,
@@ -61,7 +62,7 @@ export function useSeasonDataBundle<TTeamStats = never>(
   const teamsQuery = useTeams({
     seasonId,
     enabled: hasSeasonScope || hasWeekScope,
-  }) as UseSeasonDataBundleResult<TTeamStats>["teamsQuery"];
+  });
 
   const weeksQuery = useWeeks({
     seasonId,
@@ -69,30 +70,17 @@ export function useSeasonDataBundle<TTeamStats = never>(
     enabled: includeWeeks && hasSeasonScope,
   });
 
-  const teamStatsQuery = useTeams({
+  const teamStatsQuery = useTeamSeasonStats({
     seasonId,
-    weekId,
-    statsLevel: teamStatsLevel ?? "none",
-    enabled: Boolean(teamStatsLevel) && hasSeasonScope,
+    enabled: includeSeasonStats && hasSeasonScope,
     ...teamQueryOptions,
-  }) as QueryLike<TTeamStats[]>;
+  });
 
-  const status = useMemo(
-    () =>
-      combineQueryStates(
-        matchupsQuery,
-        teamsQuery,
-        includeWeeks ? weeksQuery : {},
-        teamStatsLevel ? teamStatsQuery : {},
-      ),
-    [
-      includeWeeks,
-      matchupsQuery,
-      teamStatsLevel,
-      teamStatsQuery,
-      teamsQuery,
-      weeksQuery,
-    ],
+  const status = combineQueryStates(
+    matchupsQuery,
+    teamsQuery,
+    includeWeeks ? weeksQuery : {},
+    includeSeasonStats ? teamStatsQuery : {},
   );
 
   return {
@@ -101,13 +89,12 @@ export function useSeasonDataBundle<TTeamStats = never>(
     matchups: matchupsQuery.data ?? [],
     teams: teamsQuery.data ?? [],
     weeks: includeWeeks ? (weeksQuery.data ?? []) : [],
-    teamStats: teamStatsLevel ? (teamStatsQuery.data ?? []) : [],
+    teamStats: includeSeasonStats ? (teamStatsQuery.data ?? []) : [],
     status,
-    ready: !status.isLoading && !status.isFetching,
-    error: (status.error as Error | null) ?? null,
+    ready: !status.isLoading,
     matchupsQuery,
     teamsQuery,
     weeksQuery: includeWeeks ? weeksQuery : undefined,
-    teamStatsQuery: teamStatsLevel ? teamStatsQuery : undefined,
+    teamStatsQuery: includeSeasonStats ? teamStatsQuery : undefined,
   };
 }

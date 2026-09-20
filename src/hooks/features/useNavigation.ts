@@ -108,8 +108,6 @@ export function useSeasonNavigation(options: { autoSelect?: boolean } = {}) {
     selectedSeasonId,
     setSelectedSeasonId,
     isSelectedSeasonLoading,
-    isSelectedSeasonFetching,
-    refetchSelectedSeason,
   } = useSeasonState({ autoSelect: options.autoSelect ?? true });
 
   return {
@@ -122,8 +120,6 @@ export function useSeasonNavigation(options: { autoSelect?: boolean } = {}) {
     selectedSeasonId,
     setSelectedSeasonId,
     isSelectedSeasonLoading,
-    isSelectedSeasonFetching,
-    refetchSelectedSeason,
   };
 }
 

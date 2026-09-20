@@ -12,7 +12,7 @@
 import { useMemo } from "react";
 import { usePlayers, useNHLTeams } from "../main";
 import { getFreeAgents } from "@gshl-utils/domain";
-import type { NHLTeam, UseFreeAgencyDataOptions } from "@gshl-types";
+import type { UseFreeAgencyDataOptions } from "@gshl-types";
 
 /**
  * Hook for free agency data.
@@ -36,7 +36,7 @@ export function useFreeAgencyData(options: UseFreeAgencyDataOptions = {}) {
   const { data: players, isLoading: playersLoading } = usePlayers();
   const { data: nhlTeamsRaw, isLoading: teamsLoading } = useNHLTeams();
 
-  const nhlTeams = (nhlTeamsRaw as NHLTeam[]) ?? [];
+  const nhlTeams = nhlTeamsRaw;
 
   // Apply domain utility for filtering and sorting
   const freeAgents = useMemo(
@@ -50,7 +50,6 @@ export function useFreeAgencyData(options: UseFreeAgencyDataOptions = {}) {
     freeAgents,
     nhlTeams,
     isLoading,
-    error: null,
     ready: !isLoading && !!players,
   };
 }

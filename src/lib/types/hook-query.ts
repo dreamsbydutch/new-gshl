@@ -1,24 +1,12 @@
-import type {
-  Franchise,
-  GSHLTeam,
-  NHLTeam,
-  TeamDayStatLine,
-  TeamSeasonStatLine,
-  TeamWeekStatLine,
-} from "./database";
-
-export type TeamResult =
-  | GSHLTeam
-  | NHLTeam
-  | Franchise
-  | TeamDayStatLine
-  | TeamWeekStatLine
-  | TeamSeasonStatLine;
-
-export interface UseTeamsResult {
-  data: TeamResult[];
+/** Live Convex reads throw to the existing error boundary; no refetch facade. */
+export interface CollectionQueryResult<T> {
+  data: T[];
   isLoading: boolean;
-  error: Error | null;
+}
+
+export interface ReadQueryResult<TData> {
+  data: TData | undefined;
+  isLoading: boolean;
 }
 
 export type QueryLike<TData> = {
@@ -30,8 +18,6 @@ export type QueryLike<TData> = {
 
 export type QueryState = {
   isLoading: boolean;
-  isFetching: boolean;
-  error: unknown;
 };
 
 export interface QueryAdapterOptions<TData, TMapped> {

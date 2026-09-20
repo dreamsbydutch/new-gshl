@@ -284,7 +284,7 @@ export function useScheduleContextNavigation() {
     [weeksQuery.data],
   );
   const validOwnerIds = useMemo(
-    () => uniqueOwnerIds((teamsQuery.data ?? []) as GSHLTeam[]),
+    () => uniqueOwnerIds(teamsQuery.data ?? []),
     [teamsQuery.data],
   );
   const effectiveWeekId =

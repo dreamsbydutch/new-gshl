@@ -1,0 +1,5 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": { "noEmit": true, "incremental": false },
+  "include": ["./read-domains.types.ts", "./read-domains.test.ts"]
+}
