@@ -1,44 +1,28 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback } from "react";
 import { useMutation } from "convex/react";
-import type { MutationReference } from "@gshl-types";
+import type {
+  FunctionArgs,
+  FunctionReturnType,
+  OptionalRestArgs,
+} from "convex/server";
+import type { AppMutationOptions, MutationReference } from "@gshl-types";
+import { useAppWrite } from "./useAppWrite";
 
 export function useAppMutation<Mutation extends MutationReference>(
   reference: Mutation,
 ) {
-  const execute = useMutation(reference);
-  const [isPending, setIsPending] = useState(false);
-  const [error, setError] = useState<Error | null>(null);
-
-  const mutateAsync = useCallback(
-    async (args: Record<string, unknown>) => {
-      setIsPending(true);
-      setError(null);
-      try {
-        return await execute(...([args] as Parameters<typeof execute>));
-      } catch (caught) {
-        const nextError =
-          caught instanceof Error ? caught : new Error(String(caught));
-        setError(nextError);
-        throw nextError;
-      } finally {
-        setIsPending(false);
-      }
-    },
-    [execute],
-  );
+  const { mutateAsync, isPending, error } = useAppWrite(useMutation(reference));
 
   const mutate = useCallback(
     (
-      args: Record<string, unknown>,
-      options?: {
-        onSuccess?: (value: unknown) => void;
-        onError?: (error: Error) => void;
-        onSettled?: () => void;
-      },
+      args: FunctionArgs<Mutation>,
+      options?: AppMutationOptions<FunctionReturnType<Mutation>>,
     ) => {
-      void mutateAsync(args)
+      // Convex allows omission for empty arguments; a supplied argument is valid
+      // in either case, which TS cannot prove for this conditional tuple type.
+      void mutateAsync(...([args] as OptionalRestArgs<Mutation>))
         .then((value) => options?.onSuccess?.(value))
         .catch((caught: Error) => options?.onError?.(caught))
         .finally(() => options?.onSettled?.());
