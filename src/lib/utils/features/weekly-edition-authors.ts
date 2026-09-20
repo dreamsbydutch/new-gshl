@@ -57,7 +57,7 @@ function matchupStageLabel(matchup: WeeklyEditionMatchupFact) {
   return matchupStageLabelForGameType(matchup.gameType);
 }
 
-function matchupStageLabelForGameType(gameType?: string) {
+export function matchupStageLabelForGameType(gameType?: string) {
   if (gameType === "F") return "Final";
   if (gameType === "SF") return "Semifinal";
   if (gameType === "QF") return "Quarterfinal";
@@ -148,7 +148,7 @@ export function getWeeklyEditionFallbackAuthor(
   return { ...WEEKLY_EDITION_STAFF.nationalReporter };
 }
 
-function referencedTeams(
+export function referencedTeams(
   item: WeeklyEditionSection,
   packet: WeeklyEditionFactPacket,
 ) {
@@ -821,6 +821,17 @@ export function normalizeWeeklyEditionArticleGrid(
     );
   }
   return { ...content, sections };
+}
+
+function section(
+  kind: WeeklyEditionSectionKind,
+  eyebrow: string,
+  headline: string,
+  body: string,
+  links: WeeklyEditionSection["links"],
+  id: string = kind,
+): WeeklyEditionSection {
+  return { id, kind, eyebrow, headline, body, links };
 }
 
 export function assignWeeklyEditionAuthors(

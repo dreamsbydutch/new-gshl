@@ -43,9 +43,15 @@ import {
 } from "./weekly-edition-articles";
 import {
   assignWeeklyEditionAuthors,
+  buildWeeklyEditionAuthorRoster,
+  buildWeeklyEditionStoryLedger,
   choose,
   matchupSummary,
+  matchupStageLabelForGameType,
+  normalizeWeeklyEditionArticleGrid,
   pressBoxEditorialCandidates,
+  referencedTeams,
+  sameWeeklyEditionAuthor,
   scoreline,
 } from "./weekly-edition-authors";
 
