@@ -28,7 +28,14 @@ export type LeagueOfficeNavigationView =
   "draft" | "freeAgents" | "rules" | "confBattle" | "ownerRankings";
 
 export type AdminNavigationView =
-  "draftPicks" | "contracts" | "users" | "jobs" | "newsroom" | "images" | "tv";
+  | "draftPicks"
+  | "contracts"
+  | "users"
+  | "jobs"
+  | "newsroom"
+  | "images"
+  | "tv"
+  | "scheduleBuilder";
 
 export type MatchupNavigationSource = "schedule" | "lockerroom" | "headlines";
 
