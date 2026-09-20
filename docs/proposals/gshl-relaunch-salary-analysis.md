@@ -1,6 +1,7 @@
 # GSHL relaunch salary analysis
 
-[Wiki home](../README.md) | [Owner proposal](gshl-relaunch-owner-proposal.md)
+[Project overview](../../README.md) ·
+[Owner proposal](gshl-relaunch-owner-proposal.md)
 
 > Planning calculation, September 17, 2026. This uses hypothetical ranks, not
 > an actual player-rating export. It changes neither live salaries nor contracts.

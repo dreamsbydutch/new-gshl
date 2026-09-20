@@ -2,22 +2,12 @@
 
 GSHL is the web and operations platform for the Gem Stone Hockey League. It
 combines a public league site, authenticated owner and commissioner tools,
-realtime Convex data, repeatable hockey-data workflows, and a separate Google
-Apps Script runtime for active-season Sheets operations.
+Convex data, local hockey-data workflows, and a separate Google Apps Script
+runtime for active-season Sheets operations.
 
-## Start here
+## Start
 
-- [Wiki](docs/README.md) - product, architecture, data, operations, and reference
-- [Agent guide](AGENTS.md) - commands, boundaries, workflow, and local skills
-- [Operator command manual](scripts/README.md) - command flags and examples
-- [Ranking engine](docs/RANKING.md) - scoring runtime and parity model
-- [Official rulebook source](src/content/rulebook.ts) - content rendered at `/rulebook`
-
-## Local development
-
-Use Node 20 and npm for the root application. Some operator-package commands
-have an additional Node runtime constraint; see the
-[local-development guide](docs/getting-started/local-development.md).
+Use Node 20 and npm 10 for the root application:
 
 ```powershell
 npm install
@@ -25,50 +15,76 @@ Copy-Item .env.example .env.local
 npm run dev
 ```
 
-The browser requires a configured Convex URL. Google sign-in and authenticated
-Convex access additionally require the Auth.js and JWT bridge settings described
-in the [local-development guide](docs/getting-started/local-development.md).
-Never commit `.env.local` or credentials.
+`NEXT_PUBLIC_CONVEX_URL` is required for browser data. Google sign-in also
+requires the Auth.js and Convex JWT settings declared in `src/env.js`. Keep real
+values in local or hosted secret stores, never in Git.
 
-Run the root quality gate with:
+The repository itself is the command index:
 
-```powershell
-npm run check
-```
+- root app and checks: `package.json`
+- operator commands and flags: [`scripts/README.md`](scripts/README.md)
+- Apps Script entry points and clasp: [`apps-script/README.md`](apps-script/README.md)
+- production/runtime setup: [docs/OPERATIONS.md](docs/OPERATIONS.md)
+- ranking and power behavior: [docs/RANKING.md](docs/RANKING.md)
+- agent working rules: [AGENTS.md](AGENTS.md)
 
-`npm run check` does not run tests, Markdown formatting, or ranking-runtime
-parity. Choose the additional checks for your change from the
-[verification guide](docs/operations/verification.md).
-
-## Architecture at a glance
+## Architecture
 
 ```text
-Next.js route -> feature UI -> feature hook -> main Convex hook -> Convex API
+Browser
+  -> Next.js route
+  -> feature component
+  -> feature hook
+  -> main Convex hook
+  -> Convex query or mutation
 
-Local command -> domain reconciliation -> Convex/Sheets integration
+Operator machine
+  -> scripts command
+  -> pure domain reconciliation
+  -> Convex, Sheets, browser, or source integration
 
-Google Apps Script -> active-season Yahoo ingest/aggregation -> Google Sheets
+Google Apps Script
+  -> trigger/global entry point
+  -> Yahoo ingest and aggregation
+  -> Google Sheets
 ```
 
-Convex is the live application data path. The Google Sheets adapters remain for
-compatibility, migration, parity, and the Apps Script runtime; there is no
-active tRPC implementation. See the [architecture overview](docs/architecture/overview.md)
-for boundaries and source-of-truth rules.
+Convex is the live application database and API. Sheets adapters remain for
+compatibility, migration, and the Apps Script runtime; there is no active tRPC
+layer.
 
-## Packages
+| Area             | Responsibility                                                        |
+| ---------------- | --------------------------------------------------------------------- |
+| `src/app`        | Routes, layouts, metadata, loading, and API handlers                  |
+| `src/components` | Feature UI and shared primitives                                      |
+| `src/hooks`      | Feature view models and stable Convex/navigation access               |
+| `src/lib`        | Pure utilities, shared types, auth, cache, and compatibility adapters |
+| `convex`         | Schema, browser APIs, transactions, authorization, jobs, and crons    |
+| `scripts`        | Imports, repairs, reconciliation, rebuilds, parity, and archives      |
+| `apps-script`    | Active-season Sheets runtime                                          |
 
-| Area              | Responsibility                                                                       |
-| ----------------- | ------------------------------------------------------------------------------------ |
-| `src/`            | Next.js application, components, hooks, pure utilities, and shared types             |
-| `convex/`         | Schema, realtime APIs, authorization, domain transactions, jobs, and crons           |
-| `scripts/`        | Independent TypeScript operator package for imports, repairs, rebuilds, and archives |
-| `apps-script/`    | Google Apps Script active-season Sheets runtime                                      |
-| `docs/`           | Human- and agent-oriented wiki                                                       |
-| `.agents/skills/` | Repository-local workflow skills                                                     |
+The primary data contract is `convex/schema.ts`. Browser access normally enters
+through `convex/frontend.ts`; atomic workflows such as draft, UFA, and weekly
+editions live in focused Convex modules. The official league rules are
+`src/content/rulebook.ts` and render at `/rulebook`.
 
-Git branch pushes are connected to Vercel outside the checked-in configuration;
-`preview/*` branches receive preview deployments. Convex and Apps Script remain
-separate deployment surfaces. See [deployment](docs/operations/deployment.md).
+## Development expectations
 
-Before contributing, read [AGENTS.md](AGENTS.md). It applies to humans and
-automation alike where it describes repository boundaries and safety rules.
+Read [AGENTS.md](AGENTS.md) before changing the repository. In particular:
+
+- preserve unrelated work in a dirty tree;
+- enforce sensitive authorization inside Convex handlers;
+- edit authoritative ranking files, then synchronize generated copies;
+- treat production writes and deployments as separately authorized operations;
+  and
+- lint changed files and run focused tests instead of routine repository-wide
+  gates.
+
+Decision and investigation artifacts are kept separate from the project guide:
+
+- [GSHL relaunch proposal](docs/proposals/gshl-relaunch-owner-proposal.md)
+- [Relaunch salary analysis](docs/proposals/gshl-relaunch-salary-analysis.md)
+- [Salary-cap upgrade report](docs/product/salary-cap-upgrade-report.md)
+- [Draft reliability investigation](docs/operations/draft-reliability.md)
+
+Proposals are discussion material, not implemented behavior or active rules.

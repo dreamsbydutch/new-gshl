@@ -208,8 +208,9 @@ export function DraftPickManagement() {
             </div>
           </fieldset>
           <p className="text-sm text-muted-foreground">
-            Stage all matching changes before saving. Each team must retain its
-            selected players.
+            Stage all matching changes before saving. Corrections update draft
+            records only; player ownership, rosters, and contracts stay
+            unchanged.
           </p>
           <div className="flex gap-2">
             <Button disabled={!form.gshlTeamId} onClick={vm.stage}>
@@ -299,9 +300,9 @@ export function DraftPickManagement() {
           </label>
           {vm.reviewing && (
             <p className="text-sm">
-              Save all {vm.staged.length} corrections together? Each team&apos;s
-              selected players, current rosters, and contracts will be
-              preserved.
+              Save all {vm.staged.length} corrections together? Draft records
+              will change; player ownership, current rosters, and contracts will
+              be preserved.
             </p>
           )}
           <div className="flex flex-wrap gap-2">

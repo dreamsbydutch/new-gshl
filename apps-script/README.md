@@ -5,8 +5,9 @@ lineup assignment, aggregation, ratings, standings, and power snapshots written
 to Google Sheets. It is a separate operational surface from the Convex-backed
 web application.
 
-Read the [Apps Script wiki page](../docs/operations/apps-script.md) for system
-context and [AGENTS.md](../AGENTS.md) before changing the runtime.
+Read [AGENTS.md](../AGENTS.md) before changing the runtime. The concise
+[operations guide](../docs/OPERATIONS.md) covers cross-runtime deployment and
+production safety.
 
 ## Runtime boundary
 

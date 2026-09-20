@@ -467,6 +467,31 @@ void test("completed pick swaps preserve team selections, rosters, contracts and
   assert.equal(f.scheduled.length, 0);
 });
 
+void test("completed pick ownership can be corrected without moving players or contracts", async () => {
+  const f = correctionFixture();
+  f.put("contracts", "contract", { playerId: "player1", ownerId: "owner" });
+  f.get("player1")!.ownerId = "owner";
+  f.get("pick1")!.onClockEndedAt = 123;
+  const roster = JSON.stringify([...f.rows("players").values()]);
+  const contracts = JSON.stringify([...f.rows("contracts").values()]);
+  const result = await handler(correctPicks)(f.ctx, {
+    seasonId,
+    reason: "Repair pick ownership only",
+    edits: [f.edit("pick1", { gshlTeamId: "other-team" as Id<"teams"> })],
+  });
+  assert.equal(result.correctedCount, 1);
+  assert.equal(f.get("pick1")!.gshlTeamId, "other-team");
+  assert.equal(f.get("pick1")!.playerId, "player1");
+  assert.equal(f.get("pick1")!.onClockEndedAt, 123);
+  assert.equal(JSON.stringify([...f.rows("players").values()]), roster);
+  assert.equal(JSON.stringify([...f.rows("contracts").values()]), contracts);
+  const audits = [...f.rows("draftPickCorrections").values()];
+  assert.equal(audits.length, 1);
+  assert.match(String(audits[0]!.before), /"gshlTeamId":"team"/);
+  assert.match(String(audits[0]!.after), /"gshlTeamId":"other-team"/);
+  assert.equal(f.scheduled.length, 0);
+});
+
 void test("round and pick swaps validate the final batch", async () => {
   const f = correctionFixture();
   await handler(correctPicks)(f.ctx, {
@@ -511,7 +536,6 @@ void test("invalid batches fail before any write, including when a later edit is
     "team",
     "slot",
     "player",
-    "selection",
     "reopen",
     "stale",
     "reason",
@@ -532,8 +556,6 @@ void test("invalid batches fail before any write, including when a later edit is
     if (scenario === "slot") edits[1]!.changes.round = 1;
     if (scenario === "player")
       edits[1]!.changes.playerId = "player1" as Id<"players">;
-    if (scenario === "selection")
-      edits[1]!.changes.gshlTeamId = "team" as Id<"teams">;
     if (scenario === "reopen") edits[1]!.changes.playerId = null;
     if (scenario === "stale") f.get("pick2")!.updatedAt = 999;
     if (scenario === "reason") reason = " ";

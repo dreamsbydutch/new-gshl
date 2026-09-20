@@ -16,6 +16,7 @@ import type * as data from "../data.js";
 import type * as draft from "../draft.js";
 import type * as externalWorker from "../externalWorker.js";
 import type * as frontend from "../frontend.js";
+import type * as http from "../http.js";
 import type * as jobCatalog from "../jobCatalog.js";
 import type * as jobRunner from "../jobRunner.js";
 import type * as jobs from "../jobs.js";
@@ -37,6 +38,7 @@ import type * as lib_teamScheduleProjection from "../lib/teamScheduleProjection.
 import type * as lib_timestamps from "../lib/timestamps.js";
 import type * as lib_ufaCatalog from "../lib/ufaCatalog.js";
 import type * as lib_ufaReconciliation from "../lib/ufaReconciliation.js";
+import type * as lib_yahooOAuth from "../lib/yahooOAuth.js";
 import type * as maintenanceScope from "../maintenanceScope.js";
 import type * as matchup from "../matchup.js";
 import type * as notificationPush from "../notificationPush.js";
@@ -53,7 +55,9 @@ import type * as ufa from "../ufa.js";
 import type * as ufaOdds from "../ufaOdds.js";
 import type * as weeklyEditionBackfill from "../weeklyEditionBackfill.js";
 import type * as weeklyEditions from "../weeklyEditions.js";
+import type * as yahoo from "../yahoo.js";
 import type * as yahooBackfill from "../yahooBackfill.js";
+import type * as yahooConnectionStore from "../yahooConnectionStore.js";
 
 import type {
   ApiFromModules,
@@ -70,6 +74,7 @@ declare const fullApi: ApiFromModules<{
   draft: typeof draft;
   externalWorker: typeof externalWorker;
   frontend: typeof frontend;
+  http: typeof http;
   jobCatalog: typeof jobCatalog;
   jobRunner: typeof jobRunner;
   jobs: typeof jobs;
@@ -91,6 +96,7 @@ declare const fullApi: ApiFromModules<{
   "lib/timestamps": typeof lib_timestamps;
   "lib/ufaCatalog": typeof lib_ufaCatalog;
   "lib/ufaReconciliation": typeof lib_ufaReconciliation;
+  "lib/yahooOAuth": typeof lib_yahooOAuth;
   maintenanceScope: typeof maintenanceScope;
   matchup: typeof matchup;
   notificationPush: typeof notificationPush;
@@ -107,7 +113,9 @@ declare const fullApi: ApiFromModules<{
   ufaOdds: typeof ufaOdds;
   weeklyEditionBackfill: typeof weeklyEditionBackfill;
   weeklyEditions: typeof weeklyEditions;
+  yahoo: typeof yahoo;
   yahooBackfill: typeof yahooBackfill;
+  yahooConnectionStore: typeof yahooConnectionStore;
 }>;
 
 /**

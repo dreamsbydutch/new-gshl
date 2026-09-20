@@ -210,6 +210,21 @@ export default defineSchema({
     .index("by_user_inbox", ["userId", "inbox"])
     .index("by_user_inbox_read", ["userId", "inbox", "read"])
     .index("by_user_event", ["userId", "eventId"]),
+  // OAuth material is encrypted before storage and has no browser API.
+  yahooConnections: defineTable({
+    key: v.literal("league"),
+    encryptedTokens: v.optional(v.string()),
+    connectedAt: v.optional(v.number()),
+    updatedAt: v.number(),
+    ticketHash: v.optional(v.string()),
+    stateHash: v.optional(v.string()),
+    browserHash: v.optional(v.string()),
+    pendingUntil: v.optional(v.number()),
+    generation: v.number(),
+    lease: v.optional(v.string()),
+    leaseUntil: v.optional(v.number()),
+  }).index("by_key", ["key"]),
+
   authUsers: defineTable({
     googleSubject: v.string(),
     email: v.string(),

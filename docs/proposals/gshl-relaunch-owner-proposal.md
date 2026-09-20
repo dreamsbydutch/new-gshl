@@ -1,6 +1,7 @@
 # GSHL Relaunch
 
-[Wiki home](../README.md) · [Current rulebook](../../src/content/rulebook.ts)
+[Project overview](../../README.md) ·
+[Current rulebook](../../src/content/rulebook.ts)
 
 > **Owner discussion draft.** These are proposed changes, not adopted rules.
 > The Commissioner will speak with owners before settling the package. Scoring

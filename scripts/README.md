@@ -3,10 +3,9 @@
 Standalone Node/TypeScript tooling for historical backfills, repair jobs,
 Yahoo validation, ratings rebuilds, and Convex database maintenance.
 
-Use the [wiki command index](../docs/reference/commands.md) for package-wide
-command scope and the [data-pipeline guide](../docs/operations/data-pipelines.md)
-for architecture and safety. This file remains the detailed flag and example
-manual.
+This file is the command and flag manual. Read
+[AGENTS.md](../AGENTS.md) for repository rules and the concise
+[operations guide](../docs/OPERATIONS.md) for runtime and production safety.
 
 ## Convex operational jobs
 
