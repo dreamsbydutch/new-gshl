@@ -151,21 +151,58 @@ void test("generic updates clean duplicate owned params without dropping unknown
   );
 });
 
-void test("League Office navigation excludes commissioner administration", () => {
-  assert.equal(
-    getLeagueOfficeNavigationViews("viewer").includes("tradeBlock"),
-    true,
-  );
-  assert.equal(
-    getLeagueOfficeNavigationViews("owner").map(String).includes("contracts"),
-    false,
-  );
-  assert.equal(
-    getLeagueOfficeNavigationViews("commissioner")
-      .map(String)
-      .includes("contracts"),
-    false,
-  );
+void test("League Office navigation offers only active member destinations", () => {
+  assert.deepEqual(getLeagueOfficeNavigationViews(), [
+    "draft",
+    "freeAgents",
+    "rules",
+    "confBattle",
+    "ownerRankings",
+  ]);
+  for (const view of getLeagueOfficeNavigationViews()) {
+    assert.equal(
+      buildLeagueOfficeNavigationHref("?utm=league&owner=old&week=stale", {
+        view,
+        season: "12",
+      }),
+      "/leagueoffice?utm=league&view=" + view + "&season=12",
+    );
+  }
+});
+
+void test("obsolete URL and persisted League Office views fall back to Draft Classes", () => {
+  for (const legacyView of [
+    "tradeBlock",
+    "imageUpload",
+    "draftPicks",
+    "contracts",
+    "users",
+    "jobs",
+    "newsroom",
+    "images",
+    "tv",
+  ]) {
+    for (const explicitValue of [legacyView, null]) {
+      const selection = resolveContextualSelection({
+        explicitValue,
+        persistedValue: explicitValue === null ? legacyView : "freeAgents",
+        validValues: getLeagueOfficeNavigationViews(),
+        fallbackValue: "draft",
+      });
+      assert.deepEqual(selection, {
+        value: "draft",
+        source: "default",
+        urlWasInvalid: explicitValue !== null,
+      });
+      assert.equal(
+        buildLeagueOfficeNavigationHref(
+          "?view=" + legacyView + "&owner=old&utm=league",
+          { view: selection.value, season: "12" },
+        ),
+        "/leagueoffice?utm=league&view=draft&season=12",
+      );
+    }
+  }
 });
 
 void test("matchup links carry an allowlisted source context and selected side", () => {
@@ -228,17 +265,10 @@ void test("only Schedule and Standings share historical season selection", () =>
   }
 });
 
-void test("trade block is a My Team view and old League Office links resolve there", () => {
+void test("trade block links retain the active My Team destination", () => {
   assert.equal(isLockerRoomNavigationView("tradeBlock"), true);
   assert.equal(
     buildLockerRoomNavigationHref("", { view: "tradeBlock", owner: "owner-a" }),
-    "/lockerroom?view=tradeBlock&owner=owner-a",
-  );
-  assert.equal(
-    buildLeagueOfficeNavigationHref(
-      "?view=tradeBlock&owner=owner-a&season=old",
-      { view: "tradeBlock" },
-    ),
     "/lockerroom?view=tradeBlock&owner=owner-a",
   );
 });

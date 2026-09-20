@@ -11,13 +11,3 @@ export function resolveAdminView(
     ? (selectedView as AdminNavigationView)
     : DEFAULT_ADMIN_VIEW;
 }
-
-export function resolveLegacyLeagueOfficeAdminView(
-  selectedView: string | null | undefined,
-): AdminNavigationView | null {
-  if (selectedView === "imageUpload") return "images";
-  return selectedView &&
-    ADMIN_NAVIGATION_VIEWS.includes(selectedView as AdminNavigationView)
-    ? (selectedView as AdminNavigationView)
-    : null;
-}
