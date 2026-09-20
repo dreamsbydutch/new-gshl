@@ -2,9 +2,10 @@
 
 import { useCallback, useRef, useState } from "react";
 import { normalizeError } from "@gshl-utils/core/error";
+import type { AppMutationOptions } from "@gshl-types";
 
 /** Shared execution lifecycle for the mutation and action adapters. */
-export function useAppWrite<TArgs extends unknown[], TResult>(
+export function useAppWrite<TArgs extends [args?: unknown], TResult>(
   execute: (...args: TArgs) => Promise<TResult>,
 ) {
   const [pendingCount, setPendingCount] = useState(0);
@@ -30,5 +31,17 @@ export function useAppWrite<TArgs extends unknown[], TResult>(
     [execute],
   );
 
-  return { mutateAsync, isPending: pendingCount > 0, error };
+  const mutate = useCallback(
+    (args: TArgs[0], options?: AppMutationOptions<TResult>) => {
+      // Supplying the sole argument is valid for both required and optional
+      // tuples; TS cannot establish this for a generic tuple constraint.
+      void mutateAsync(...([args] as unknown as TArgs))
+        .then((value) => options?.onSuccess?.(value))
+        .catch((caught: Error) => options?.onError?.(caught))
+        .finally(() => options?.onSettled?.());
+    },
+    [mutateAsync],
+  );
+
+  return { mutate, mutateAsync, isPending: pendingCount > 0, error };
 }
