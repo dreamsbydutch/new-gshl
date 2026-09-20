@@ -92,6 +92,8 @@ schedule management. Both entry paths delegate to
 [the job lifecycle module](../../convex/lib/jobLifecycle.ts), which owns
 scope admission, run initialization, cancellation, retry checkpoints, terminal
 transitions, events, and scheduling. Authorization remains in each entry path.
+External-worker handoff also uses the lifecycle module: a late handoff cannot
+revive a cancelled or finished run, and repeated handoffs reuse the existing task.
 
 ## Scope locks and batching
 

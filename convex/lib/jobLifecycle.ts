@@ -57,6 +57,7 @@ async function enqueue(
   const lockKey = buildLockKey(jobName, request.args);
   if (await scopeIsBusy(ctx, lockKey)) return null;
   const now = Date.now();
+  const progress: unknown = previous?.progress ?? emptyJobProgress();
   const runId = await ctx.db.insert("jobRuns", {
     ...request,
     jobName,
@@ -64,7 +65,7 @@ async function enqueue(
     status: "queued",
     attempt: previous ? previous.attempt + 1 : 1,
     cursor: previous?.cursor,
-    progress: previous?.progress ?? emptyJobProgress(),
+    progress,
     createdAt: now,
   });
   await ctx.db.insert("jobEvents", {
@@ -161,6 +162,38 @@ export async function prepareJob(ctx: MutationCtx, runId: Id<"jobRuns">) {
     error: undefined,
   });
   return { ...run, status: "running" as const };
+}
+
+/** Admit the external handoff only while the originating worker is active. */
+export async function waitForExternalJob(
+  ctx: MutationCtx,
+  args: { runId: Id<"jobRuns">; kind: string; payload: unknown },
+) {
+  const run = await ctx.db.get(args.runId);
+  if (!run) throw new Error("Run not found");
+  if (run.status === "cancelling") {
+    await finishJob(ctx, { runId: args.runId, status: "cancelled" });
+    return null;
+  }
+  if (!isActiveJob(run.status)) return null;
+  const existing = await ctx.db
+    .query("externalTasks")
+    .withIndex("by_runId", (q) => q.eq("runId", args.runId))
+    .first();
+  const now = Date.now();
+  const taskId =
+    existing?._id ??
+    (await ctx.db.insert("externalTasks", {
+      ...args,
+      status: "pending",
+      createdAt: now,
+      updatedAt: now,
+    }));
+  await ctx.db.patch(args.runId, {
+    status: "waiting_external",
+    heartbeatAt: now,
+  });
+  return await ctx.db.get(taskId);
 }
 
 export async function finishJob(

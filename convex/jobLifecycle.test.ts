@@ -2,7 +2,13 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { startJob, cancelJob, retryJob } from "./frontend";
 import { start, cancel, retry } from "./jobs";
-import { prepare, finish, advancePipeline, tickSchedules } from "./jobRunner";
+import {
+  prepare,
+  finish,
+  advancePipeline,
+  tickSchedules,
+  createExternalTask,
+} from "./jobRunner";
 import { ACTIVE_REFRESH_STAGES, buildLockKey } from "./jobCatalog";
 import {
   mutationFixture,
@@ -181,4 +187,51 @@ void test("pipeline waits for a busy stage scope then creates one child", async 
   assert.equal(child.mode, "pipeline");
   await invokeMutation(advancePipeline, f.ctx, { runId: "parent" });
   assert.equal(f.rows("jobRuns").length, 3);
+});
+
+void test("external handoff cannot revive cancellation or terminal runs", async () => {
+  for (const status of ["cancelling", "cancelled", "failed", "succeeded"]) {
+    const f = mutationFixture();
+    f.put("jobRuns", "run", { ...request, status });
+    assert.equal(
+      await invokeMutation(createExternalTask, f.ctx, {
+        runId: "run",
+        kind: "nhl-daily-stat-sync",
+        payload: {},
+      }),
+      null,
+    );
+    assert.equal(
+      f.get("run")?.status,
+      status === "cancelling" ? "cancelled" : status,
+    );
+    assert.equal(f.rows("externalTasks").length, 0);
+  }
+});
+
+void test("repeated external handoff reuses the task and restores the waiting state", async () => {
+  const f = mutationFixture();
+  f.put("jobRuns", "run", { ...request, status: "running" });
+  const args = { runId: "run", kind: "nhl-daily-stat-sync", payload: {} };
+  await invokeMutation(createExternalTask, f.ctx, args);
+  assert.equal(f.get("run")?.status, "waiting_external");
+  await invokeMutation(prepare, f.ctx, { runId: "run" });
+  await invokeMutation(createExternalTask, f.ctx, args);
+  assert.equal(f.get("run")?.status, "waiting_external");
+  assert.equal(f.rows("externalTasks").length, 1);
+});
+
+void test("late pipeline advancement cannot enqueue children after termination", async () => {
+  for (const status of ["cancelling", "cancelled", "failed", "succeeded"]) {
+    const f = mutationFixture();
+    f.put("jobRuns", "parent", {
+      jobName: "active-season-refresh",
+      args: request.args,
+      status,
+      apply: false,
+    });
+    await invokeMutation(advancePipeline, f.ctx, { runId: "parent" });
+    assert.equal(f.rows("jobRuns").length, 1);
+    assert.equal(f.scheduled.length, 0);
+  }
 });

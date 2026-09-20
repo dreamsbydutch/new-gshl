@@ -17,6 +17,7 @@ import {
   emptyJobProgress,
   prepareJob,
   finishJob,
+  waitForExternalJob,
 } from "./lib/jobLifecycle";
 import { internalMutation } from "./_generated/server";
 import { utcTimestampToDateKey } from "./lib/timestamps";
@@ -489,27 +490,9 @@ export const processAwardsBackfill = internalMutationGeneric({
   },
 });
 
-export const createExternalTask = internalMutationGeneric({
+export const createExternalTask = internalMutation({
   args: { runId: v.id("jobRuns"), kind: v.string(), payload: v.any() },
-  handler: async (ctx, args) => {
-    const existing = await ctx.db
-      .query("externalTasks")
-      .withIndex("by_runId", (q) => q.eq("runId", args.runId))
-      .first();
-    if (existing) return existing;
-    const now = Date.now();
-    const taskId = await ctx.db.insert("externalTasks", {
-      ...args,
-      status: "pending",
-      createdAt: now,
-      updatedAt: now,
-    });
-    await ctx.db.patch(args.runId, {
-      status: "waiting_external",
-      heartbeatAt: now,
-    });
-    return await ctx.db.get(taskId);
-  },
+  handler: (ctx, args) => waitForExternalJob(ctx, args),
 });
 
 export const getExternalResult = internalMutationGeneric({
@@ -543,7 +526,8 @@ export const advancePipeline = internalMutation({
   handler: async (ctx, args) => {
     const parent = await ctx.db.get(args.runId);
     if (!parent) throw new Error("Pipeline not found");
-    if (parent.status === "cancelling") return { state: "cancelled" as const };
+    if (!isActiveJob(parent.status) || parent.status === "cancelling")
+      return { state: "cancelled" as const };
     const children = await ctx.db
       .query("jobRuns")
       .withIndex("by_parentRunId", (q) => q.eq("parentRunId", args.runId))
