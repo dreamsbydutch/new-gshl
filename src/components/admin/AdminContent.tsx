@@ -6,6 +6,10 @@ import { AdminPanelSkeleton, UserManagementSkeleton } from "@gshl-skeletons";
 import { TvDisplays } from "./TvDisplays";
 import { readContextualNavigationQuery, resolveAdminView } from "@gshl-utils";
 
+const AccountsManagement = dynamic(
+  () => import("./AccountsManagement").then((module) => module.AccountsManagement),
+  { loading: () => <AdminPanelSkeleton /> },
+);
 const UserManagement = dynamic(
   () =>
     import("@gshl-components/auth/UserManagement").then(
@@ -46,6 +50,7 @@ export function AdminContent() {
 
   return (
     <div className="container mx-auto px-4 py-8">
+      {selectedView === "accounts" ? <AccountsManagement /> : null}
       {selectedView === "contracts" ? <ContractManagement /> : null}
       {selectedView === "draftPicks" ? <DraftPickManagement /> : null}
       {selectedView === "users" ? <UserManagement /> : null}

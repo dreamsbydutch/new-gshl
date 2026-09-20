@@ -13,6 +13,7 @@ const ADMIN_TABS: ReadonlyArray<{
   key: AdminNavigationView;
   label: string;
 }> = [
+  { key: "accounts", label: "Accounts" },
   { key: "contracts", label: "Contracts" },
   { key: "draftPicks", label: "Draft Picks" },
   { key: "users", label: "Users" },

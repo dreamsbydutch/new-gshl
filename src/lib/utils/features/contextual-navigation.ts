@@ -48,6 +48,7 @@ export const MEMBER_LEAGUE_OFFICE_NAVIGATION_VIEWS = [
 ] as const;
 
 export const ADMIN_NAVIGATION_VIEWS = [
+  "accounts",
   "draftPicks",
   "contracts",
   "users",
