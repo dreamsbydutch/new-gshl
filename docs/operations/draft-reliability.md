@@ -1,6 +1,6 @@
 # Draft reliability investigation
 
-[Wiki home](../README.md) · [Troubleshooting](troubleshooting.md)
+[Project overview](../../README.md) · [Operations](../OPERATIONS.md)
 
 ## Incident and confidence
 

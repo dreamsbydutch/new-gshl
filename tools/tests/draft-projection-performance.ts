@@ -28,12 +28,12 @@ const players = Array.from({ length: 1000 }, (_, i) => {
 }) as DraftBoardPlayer[];
 const picks: DraftPick[] = Array.from({ length: 210 }, (_, i) => ({
   id: `pick-${i}`,
-  seasonId: "season",
+  seasonId: "synthetic-season",
   gshlTeamId: teams[i % 14]!.id,
   round: String(Math.floor(i / 14) + 1),
   pick: String(i + 1),
-  isSigning: false,
   isTraded: false,
+  isSigning: false,
   createdAt: new Date(0),
   updatedAt: new Date(0),
 }));

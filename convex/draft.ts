@@ -1,5 +1,9 @@
 import { selectAutoDraftPlayer } from "../src/lib/utils/features/mock-draft";
 import { nextDraftMode } from "./lib/draftMode";
+import {
+  draftCorrectionSnapshot,
+  draftCorrectionVersion,
+} from "./lib/draftCorrection";
 import { v } from "convex/values";
 import {
   internalMutation,
@@ -234,6 +238,166 @@ function contractCoversDraft(
   );
 }
 
+export const adminPicks = query({
+  args: { seasonId: v.id("seasons") },
+  handler: async (ctx, { seasonId }) => {
+    await requireCommissioner(ctx);
+    const [rows, teams] = await Promise.all([
+      ctx.db
+        .query("draftPicks")
+        .withIndex("by_seasonId", (q) => q.eq("seasonId", seasonId))
+        .collect(),
+      loadTeamSummaries(ctx, seasonId),
+    ]);
+    return {
+      teams: [...teams.values()],
+      picks: await Promise.all(
+        [...rows].sort(compareRows).map(async (row) => ({
+          id: row._id,
+          ...draftCorrectionSnapshot(row),
+          version: draftCorrectionVersion(row),
+          playerName: row.playerId
+            ? ((await ctx.db.get(row.playerId))?.fullName ?? "Missing player")
+            : null,
+        })),
+      ),
+    };
+  },
+});
+
+export const correctionHistory = query({
+  args: { pickId: v.id("draftPicks") },
+  handler: async (ctx, { pickId }) => {
+    await requireCommissioner(ctx);
+    return ctx.db
+      .query("draftPickCorrections")
+      .withIndex("by_pickId", (q) => q.eq("pickId", pickId))
+      .order("desc")
+      .take(20);
+  },
+});
+
+export const correctPicks = mutation({
+  args: {
+    seasonId: v.id("seasons"),
+    reason: v.string(),
+    edits: v.array(
+      v.object({
+        pickId: v.id("draftPicks"),
+        expectedVersion: v.string(),
+        changes: v.object({
+          gshlTeamId: v.id("teams"),
+          originalTeamId: v.union(v.id("teams"), v.null()),
+          round: v.number(),
+          pick: v.number(),
+          playerId: v.union(v.id("players"), v.null()),
+          isTraded: v.boolean(),
+          isSigning: v.boolean(),
+        }),
+      }),
+    ),
+  },
+  handler: async (ctx, args) => {
+    const user = await requireCommissioner(ctx);
+    if (!args.edits.length || args.edits.length > 500)
+      throw new Error("Stage between 1 and 500 corrections");
+    const reason = args.reason.trim();
+    if (!reason || reason.length > 1000)
+      throw new Error("Enter a correction reason (1-1000 characters)");
+    const season = await ctx.db.get(args.seasonId);
+    if (!season) throw new Error("Draft season not found");
+    const rows = await ctx.db
+      .query("draftPicks")
+      .withIndex("by_seasonId", (q) => q.eq("seasonId", args.seasonId))
+      .collect();
+    const started = (toUtcTimestamp(season.draftStartAt) ?? 0) <= Date.now();
+    if (started && rows.some((p) => !p.isSigning && !p.playerId))
+      throw new Error(
+        "Corrections are available before the draft starts or after every pick is complete",
+      );
+    const edits = new Map(args.edits.map((edit) => [edit.pickId, edit]));
+    if (edits.size !== args.edits.length)
+      throw new Error("Each pick may be edited only once per batch");
+    for (const edit of args.edits) {
+      const row = rows.find((p) => p._id === edit.pickId);
+      if (!row) throw new Error("Draft pick not found in this season");
+      if (draftCorrectionVersion(row) !== edit.expectedVersion)
+        throw new Error(
+          "A staged pick changed. Discard the batch and reopen the picks before saving.",
+        );
+      const changes = edit.changes;
+      if (
+        ![changes.round, changes.pick].every(
+          (n) => Number.isSafeInteger(n) && n > 0,
+        )
+      )
+        throw new Error("Round and pick must be positive whole numbers");
+      for (const teamId of new Set([
+        changes.gshlTeamId,
+        changes.originalTeamId,
+      ])) {
+        if (!teamId) continue;
+        const team = await ctx.db.get(teamId);
+        if (team?.seasonId !== args.seasonId)
+          throw new Error("Choose teams from the pick's season");
+      }
+      if (changes.playerId && !(await ctx.db.get(changes.playerId)))
+        throw new Error("Player not found");
+    }
+    const finalRows = rows.map((row) => ({
+      ...row,
+      ...edits.get(row._id)?.changes,
+    }));
+    if (started && finalRows.some((p) => !p.isSigning && !p.playerId))
+      throw new Error("A correction cannot reopen a completed draft");
+    // Validate the final batch so swaps do not fail on intermediate duplicates.
+    const slots = new Set<string>();
+    const players = new Set<string>();
+    for (const row of finalRows) {
+      const slot = `${Number(row.round)}:${Number(row.pick)}`;
+      if (slots.has(slot))
+        throw new Error("Each round and pick must be unique after corrections");
+      slots.add(slot);
+      if (row.playerId) {
+        if (players.has(row.playerId))
+          throw new Error(
+            "Each player must appear only once after corrections",
+          );
+        players.add(row.playerId);
+      }
+    }
+    // Correct draft history independently of current player ownership.
+    // Only draft picks and their audit records are written below.
+    const changedRows = rows.filter(
+      (row) =>
+        edits.has(row._id) &&
+        JSON.stringify(draftCorrectionSnapshot(row)) !==
+          JSON.stringify(
+            draftCorrectionSnapshot({ ...row, ...edits.get(row._id)!.changes }),
+          ),
+    );
+    if (!changedRows.length) throw new Error("No changes to save");
+    const now = Date.now();
+    for (const row of changedRows) {
+      const changes = edits.get(row._id)!.changes;
+      const before = JSON.stringify(draftCorrectionSnapshot(row));
+      const after = JSON.stringify(
+        draftCorrectionSnapshot({ ...row, ...changes }),
+      );
+      await ctx.db.patch(row._id, { ...changes, updatedAt: now });
+      await ctx.db.insert("draftPickCorrections", {
+        seasonId: row.seasonId,
+        pickId: row._id,
+        userId: user._id,
+        reason,
+        before,
+        after,
+        createdAt: now,
+      });
+    }
+    return { correctedCount: changedRows.length };
+  },
+});
 export const status = query({
   args: { seasonId: v.id("seasons") },
   handler: async (ctx, args) => {

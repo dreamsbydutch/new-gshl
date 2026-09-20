@@ -136,3 +136,5 @@ export type {
   ConferenceAbbr,
   GameTypeConfig,
 } from "./weekly-schedule";
+
+export * from "./franchise-contracts";

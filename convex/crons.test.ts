@@ -16,7 +16,7 @@ const registry = crons as unknown as CronRegistry;
 
 void test("background recovery cron cadences avoid minute-by-minute polling", () => {
   assert.deepEqual(registry.crons["dispatch due job schedules"]?.schedule, {
-    minutes: 5,
+    minutes: 15,
     type: "interval",
   });
   assert.deepEqual(registry.crons["resolve due UFA offer groups"]?.schedule, {

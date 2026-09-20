@@ -30,6 +30,13 @@ const Newsroom = dynamic(
   () => import("./Newsroom").then((module) => module.Newsroom),
   { loading: () => <AdminPanelSkeleton /> },
 );
+const DraftPickManagement = dynamic(
+  () =>
+    import("./DraftPickManagement").then(
+      (module) => module.DraftPickManagement,
+    ),
+  { loading: () => <AdminPanelSkeleton /> },
+);
 
 export function AdminContent() {
   const { search } = useAppSearchParams();
@@ -40,6 +47,7 @@ export function AdminContent() {
   return (
     <div className="container mx-auto px-4 py-8">
       {selectedView === "contracts" ? <ContractManagement /> : null}
+      {selectedView === "draftPicks" ? <DraftPickManagement /> : null}
       {selectedView === "users" ? <UserManagement /> : null}
       {selectedView === "jobs" ? <JobManagement /> : null}
       {selectedView === "newsroom" ? <Newsroom /> : null}
