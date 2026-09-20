@@ -173,11 +173,11 @@ export function useDraftHubBoard(): DraftHubBoardViewModel {
     [teamsQuery.data],
   );
   const mockProjectionByPickId = useMemo(() => {
-    if (!season?.startDate || !state) {
+    if (!season?.startDate || !stateQuery.data) {
       return {};
     }
 
-    const draftPicks: DraftPick[] = state.picks
+    const draftPicks: DraftPick[] = stateQuery.data.picks
       .filter((pickView) => !pickView.pick.isSigning)
       .map(({ pick }) => ({
         id: pick.id,
@@ -198,7 +198,7 @@ export function useDraftHubBoard(): DraftHubBoardViewModel {
     const playerById = new Map(
       allPlayersQuery.data.map((player) => [String(player.id), player]),
     );
-    const completedPicks = state.picks.flatMap((pickView) => {
+    const completedPicks = stateQuery.data.picks.flatMap((pickView) => {
       const completedPlayer = pickView.player
         ? playerById.get(String(pickView.player.id))
         : undefined;
@@ -224,6 +224,9 @@ export function useDraftHubBoard(): DraftHubBoardViewModel {
       rosterPlayers,
       completedPicks,
       teams,
+      // Only the active pick and next five picks are displayed. Simulating the
+      // entire draft blocks the browser while optimizing hundreds of lineups.
+      take: 6,
     });
 
     return Object.fromEntries(
@@ -249,7 +252,7 @@ export function useDraftHubBoard(): DraftHubBoardViewModel {
     allPlayersQuery.data,
     contractsQuery.data,
     season?.startDate,
-    state,
+    stateQuery.data,
     teams,
   ]);
   const setPlayerSort = useCallback(

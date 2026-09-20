@@ -66,6 +66,7 @@ function AvailablePanel({
 }) {
   const { panelRef, contentRef } = useDraftBoardFit();
   const capacityPanelRef = useRef<HTMLElement>(null);
+  const measuredRow = useRef({ width: 0, height: 0, tallest: 1 });
   const [rowCapacity, setRowCapacity] = useState(26);
   const visiblePlayers = players.slice(
     0,
@@ -83,10 +84,25 @@ function AvailablePanel({
       const heading = table?.previousElementSibling;
       const tableHead = table?.querySelector("thead");
       const rows = table ? [...table.querySelectorAll("tbody tr")] : [];
-      const rowHeight = Math.max(
+      const measuredHeight = Math.max(
         1,
         ...rows.map((row) => row.getBoundingClientRect().height),
       );
+      // A wrapped row must not disappear from the height estimate when the
+      // visible slice shrinks, or successive layout effects can oscillate.
+      const previous = measuredRow.current;
+      const rowHeight = Math.max(
+        measuredHeight,
+        previous.width === panel.clientWidth &&
+          previous.height === panel.clientHeight
+          ? previous.tallest
+          : 1,
+      );
+      measuredRow.current = {
+        width: panel.clientWidth,
+        height: panel.clientHeight,
+        tallest: rowHeight,
+      };
       const availableHeight =
         panel.clientHeight -
         (heading?.getBoundingClientRect().height ?? 0) -

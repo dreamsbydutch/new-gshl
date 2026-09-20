@@ -54,6 +54,7 @@ export function DraftPickRail({
 }) {
   const { panelRef, contentRef } = useDraftBoardFit();
   const capacityPanelRef = useRef<HTMLElement>(null);
+  const measuredRow = useRef({ width: 0, height: 0, tallest: 1, gap: 0 });
   const [rowCapacity, setRowCapacity] = useState(5);
   const { listRef } = useDraftPickFlowMotion(recent);
   const visiblePicks = fillHeight ? picks.slice(0, rowCapacity) : picks;
@@ -66,20 +67,37 @@ export function DraftPickRail({
     const measure = () => {
       const list = panel.querySelector("ol");
       const rows = list ? [...list.querySelectorAll("li")] : [];
-      const rowHeight = Math.max(
+      const measuredHeight = Math.max(
         1,
         ...rows.map((row) => row.getBoundingClientRect().height),
       );
+      // Retain tall rows after they leave the visible slice. Otherwise capacity
+      // can alternate forever between including and excluding a wrapped row.
+      const previous = measuredRow.current;
+      const sameSize =
+        previous.width === panel.clientWidth &&
+        previous.height === panel.clientHeight;
+      const rowHeight = Math.max(
+        measuredHeight,
+        sameSize ? previous.tallest : 1,
+      );
       const firstRow = rows[0];
       const secondRow = rows[1];
-      const gap =
+      const measuredGap =
         firstRow && secondRow
           ? Math.max(
               0,
-              secondRow.getBoundingClientRect().top -
-                firstRow.getBoundingClientRect().bottom,
+              secondRow.offsetTop - firstRow.offsetTop - firstRow.offsetHeight,
             )
           : 0;
+      // A single visible row cannot measure the inter-row gap. Keep it too.
+      const gap = Math.max(measuredGap, sameSize ? previous.gap : 0);
+      measuredRow.current = {
+        width: panel.clientWidth,
+        height: panel.clientHeight,
+        tallest: rowHeight,
+        gap,
+      };
       const availableHeight =
         panel.clientHeight -
         (list
@@ -149,9 +167,7 @@ export function DraftPickRail({
                 index === 0 && "bg-slate-50",
               )}
             >
-              {index > 0 ? (
-                <DraftPickConnector recent={recent} />
-              ) : null}
+              {index > 0 ? <DraftPickConnector recent={recent} /> : null}
               <p
                 className={cn(
                   "flex justify-between text-[0.65em] text-slate-600",

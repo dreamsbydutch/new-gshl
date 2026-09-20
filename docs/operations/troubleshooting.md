@@ -52,6 +52,10 @@ from the repository root and do not remove that setting as an unrelated cleanup.
 
 ## Convex and operator-script failures
 
+For draft freezes or client-side exceptions on TV screens, see the
+[draft reliability investigation](draft-reliability.md), including reproducible
+browser tests and the pre-season rehearsal plan.
+
 ### Production scripts refuse the endpoint
 
 Production-backed scripts intentionally require an explicit production URL,
