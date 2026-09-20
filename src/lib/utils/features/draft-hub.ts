@@ -1,4 +1,6 @@
+import type { DraftTeamSelection } from "@gshl-lib/types/draft-selection";
 import type {
+  GSHLTeam,
   DraftRankingPlayer,
   DraftClockState,
   DraftHubDraftPick,
@@ -429,4 +431,33 @@ export function resolveDraftHubSeason(
 
   const upcomingSeason = findUpcomingSeason(realSeasons, referenceDate);
   return upcomingSeason?.draftStartAt ? upcomingSeason : undefined;
+}
+
+export function selectDraftTeams(
+  teams: readonly GSHLTeam[],
+  viewerOwnerId: string | null | undefined,
+  selectedOwnerId: string | null | undefined,
+): DraftTeamSelection {
+  const findOwnerTeam = (ownerId: string | null | undefined) =>
+    ownerId
+      ? teams.find((team) => String(team.ownerId) === String(ownerId))
+      : undefined;
+  return {
+    ownTeam: findOwnerTeam(viewerOwnerId),
+    selectedTeam: findOwnerTeam(selectedOwnerId),
+  };
+}
+
+export function buildDraftTeamOptions(
+  teams: readonly GSHLTeam[],
+  excludedOwnerId?: string | null,
+): GSHLTeam[] {
+  return teams
+    .filter(
+      (team) =>
+        !excludedOwnerId || String(team.ownerId) !== String(excludedOwnerId),
+    )
+    .sort((left, right) =>
+      String(left.name ?? "").localeCompare(String(right.name ?? "")),
+    );
 }

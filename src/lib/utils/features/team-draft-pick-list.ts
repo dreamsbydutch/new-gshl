@@ -1,16 +1,11 @@
-import type {
-  Contract,
-  DraftPick,
-  GSHLTeam,
-  Player,
-  Season,
-} from "@gshl-types";
+import type { DraftPick, GSHLTeam, Season } from "@gshl-types";
 import type {
   TeamDraftPickListProps,
   ProcessedDraftPick,
   DraftPickItemProps,
 } from "@gshl-types";
-import { getSeasonString, toIsoDateOnly } from "../core";
+import type { UseTeamDraftPickListDataOptions } from "@gshl-types";
+import type { DraftPickListProjection } from "@gshl-lib/types/draft-selection";
 
 // Re-export types for backward compatibility
 export type { TeamDraftPickListProps, ProcessedDraftPick, DraftPickItemProps };
@@ -47,80 +42,6 @@ export const getOriginalTeamName = (
   return teamName ? ` (via ${teamName})` : "";
 };
 
-/**
- * Checks whether draft pick available.
- *
- * @param draftPicks - The draft picks to use.
- * @param contracts - The contracts to use.
- * @param index - The index to use.
- * @returns True when draft pick available; otherwise false.
- */
-export const isDraftPickAvailable = (
-  draftPicks: DraftPick[],
-  contracts: Contract[],
-  index: number,
-): boolean => draftPicks.length - index > contracts.length;
-
-/**
- * Resolve the player chosen for an already-used draft pick.
- * Inverse maps pick index to contract index (latest picks correlate to last contracts).
- * @param contracts Ordered contracts corresponding to filled picks.
- * @param players Player entities for id -> player lookup.
- * @param draftPicks All draft picks (for length-based index mapping).
- * @param index Current pick index in ascending pick order.
- */
-export const getSelectedPlayer = (
-  contracts: Contract[],
-  players: Player[],
-  draftPicks: DraftPick[],
-  index: number,
-): Player | undefined => {
-  const contractIndex = draftPicks.length - index - 1;
-  const contract = contracts[contractIndex];
-  if (!contract) return undefined;
-  return players.find((player) => player.id === contract.playerId);
-};
-
-/**
- * Shifts season date.
- *
- * @param dateValue - The date value to use.
- * @param yearOffset - The year offset to use.
- * @returns The shifted season date.
- */
-export function shiftSeasonDate(dateValue: string, yearOffset: number): string {
-  const parsed = new Date(dateValue);
-  if (Number.isNaN(parsed.getTime())) return dateValue;
-
-  parsed.setFullYear(parsed.getFullYear() + yearOffset);
-  return toIsoDateOnly(parsed);
-}
-
-/**
- * Builds synthetic season.
- *
- * @param previousSeason - The previous season to use.
- * @param id - The id to use.
- * @returns The assembled synthetic season.
- */
-export function buildSyntheticSeason(
-  previousSeason: Season,
-  id: string,
-): Season {
-  const nextEndYear = Number(previousSeason.year) + 1;
-
-  return {
-    ...previousSeason,
-    id,
-    year: nextEndYear,
-    name: getSeasonString(nextEndYear - 1),
-    startDate: shiftSeasonDate(previousSeason.startDate, 1),
-    endDate: shiftSeasonDate(previousSeason.endDate, 1),
-    signingEndDate: shiftSeasonDate(previousSeason.signingEndDate, 1),
-    isActive: false,
-  };
-}
-
 export function buildDraftPickSeasonOptions(
   seasons: readonly Season[],
 ): Season[] {
@@ -146,4 +67,103 @@ export function resolveDraftPickSeasonTeam(
   return teams.find(
     (team) => String(team.ownerId) === String(referenceTeam.ownerId),
   );
+}
+
+/** Resolve the complete pick list against real season metadata and franchise identity. */
+export function buildTeamDraftPickList(
+  options: UseTeamDraftPickListDataOptions,
+  now: number = Date.now(),
+): DraftPickListProjection {
+  const {
+    seasons = [],
+    draftPicks,
+    players = [],
+    gshlTeamId,
+    selectedSeasonId,
+  } = options;
+  const teams = options.allTeams ?? options.teams ?? [];
+  const seasonOptions = buildDraftPickSeasonOptions(seasons);
+  const explicitSelection = selectedSeasonId !== undefined;
+  const byStart = [...seasons].sort(
+    (a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime(),
+  );
+  const activeSeason = explicitSelection
+    ? seasons.find((season) => String(season.id) === String(selectedSeasonId))
+    : (byStart.find((season) => new Date(season.startDate).getTime() >= now) ??
+      byStart.at(-1));
+  const activeSeasonId = explicitSelection
+    ? selectedSeasonId
+    : activeSeason?.id;
+  const baseTeam = teams.find((team) => String(team.id) === String(gshlTeamId));
+  const resolvedTeamId =
+    (baseTeam && activeSeasonId
+      ? teams.find(
+          (team) =>
+            String(team.seasonId) === String(activeSeasonId) &&
+            String(team.franchiseId) === String(baseTeam.franchiseId),
+        )?.id
+      : undefined) ?? gshlTeamId;
+  const relatedTeamIds = new Set(
+    baseTeam
+      ? teams
+          .filter((team) =>
+            baseTeam.franchiseId
+              ? String(team.franchiseId) === String(baseTeam.franchiseId)
+              : baseTeam.ownerId != null &&
+                String(team.ownerId) === String(baseTeam.ownerId),
+          )
+          .map((team) => String(team.id))
+      : [],
+  );
+  let picks = !gshlTeamId
+    ? []
+    : (draftPicks ?? []).filter((pick) =>
+        relatedTeamIds.size
+          ? relatedTeamIds.has(String(pick.gshlTeamId))
+          : String(pick.gshlTeamId) === String(resolvedTeamId),
+      );
+  if (activeSeasonId !== undefined) {
+    const scoped = picks.filter(
+      (pick) => String(pick.seasonId) === String(activeSeasonId),
+    );
+    if (explicitSelection || scoped.length) picks = scoped;
+  }
+  const playerById = new Map(players.map((player) => [player.id, player]));
+  const teamById = new Map(teams.map((team) => [team.id, team]));
+  const processedDraftPicks = [...picks]
+    .sort(
+      (a, b) =>
+        Number(a.round) - Number(b.round) || Number(a.pick) - Number(b.pick),
+    )
+    .map((draftPick) => ({
+      draftPick,
+      originalTeam:
+        draftPick.originalTeamId &&
+        draftPick.originalTeamId !== draftPick.gshlTeamId
+          ? teamById.get(draftPick.originalTeamId)
+          : undefined,
+      isAvailable: !draftPick.playerId,
+      selectedPlayer: draftPick.playerId
+        ? playerById.get(draftPick.playerId)
+        : undefined,
+    }));
+  return {
+    processedDraftPicks,
+    seasonOptions,
+    selectionOptions:
+      explicitSelection && !activeSeason
+        ? [
+            ...seasonOptions,
+            {
+              id: selectedSeasonId,
+              name: `Unknown season (${selectedSeasonId})`,
+            },
+          ]
+        : seasonOptions,
+    activeSeason,
+    activeSeasonId,
+    resolvedTeamId,
+    ready: Boolean(draftPicks && resolvedTeamId),
+    isLoading: false,
+  };
 }
