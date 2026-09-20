@@ -1,6 +1,8 @@
 "use client";
 
 import { usePaginatedQuery, useQuery } from "convex/react";
+import type { FunctionArgs } from "convex/server";
+import { useDomainMutation } from "./useDomainMutation";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import type { DraftPick, UseDraftPicksOptions } from "@gshl-types";
@@ -46,4 +48,15 @@ export function useDraftPicks(options: UseDraftPicksOptions = {}) {
     isLoading: enabled && result === undefined,
     error: null,
   };
+}
+
+export function useUpdateDraftPick() {
+  return useDomainMutation(
+    api.frontend.updateDraftPick,
+    (
+      args: Omit<FunctionArgs<typeof api.frontend.updateDraftPick>, "id"> & {
+        id: string;
+      },
+    ) => ({ ...args, id: args.id as Id<"draftPicks"> }),
+  );
 }

@@ -2,8 +2,10 @@
 
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
+import type { Id } from "../../../convex/_generated/dataModel";
 import type { AuthOwnerOption, AuthUser, Owner } from "@gshl-types";
-import { useAppMutation } from "./useAppMutation";
+import type { FunctionArgs } from "convex/server";
+import { useDomainMutation } from "./useDomainMutation";
 
 export function useAuthUserAdmin() {
   const usersResult = useQuery(api.frontend.authUsers, {});
@@ -34,5 +36,17 @@ export function useAuthUserAdmin() {
 }
 
 export function useUpdateAuthUserAccess() {
-  return useAppMutation(api.frontend.updateAuthUserAccess);
+  return useDomainMutation(
+    api.frontend.updateAuthUserAccess,
+    (
+      args: Omit<
+        FunctionArgs<typeof api.frontend.updateAuthUserAccess>,
+        "id" | "ownerId"
+      > & { id: string; ownerId?: string },
+    ) => ({
+      ...args,
+      id: args.id as Id<"authUsers">,
+      ownerId: args.ownerId as Id<"owners"> | undefined,
+    }),
+  );
 }

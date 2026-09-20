@@ -8,7 +8,7 @@ import type {
   UseDraftHubStateOptions,
   UseDraftHubStatusOptions,
 } from "@gshl-types";
-import { useAppMutation } from "./useAppMutation";
+import { useDomainMutation } from "./useDomainMutation";
 
 export function useDraftHubStatus(options: UseDraftHubStatusOptions = {}): {
   data: DraftHubStatusData | undefined;
@@ -41,13 +41,34 @@ export function useDraftHubState(options: UseDraftHubStateOptions = {}) {
 }
 
 export function useSubmitDraftPick() {
-  return useAppMutation(api.draft.submitPick);
+  return useDomainMutation(
+    api.draft.submitPick,
+    (args: { seasonId: string; pickId: string; playerId: string }) => ({
+      ...args,
+      seasonId: args.seasonId as Id<"seasons">,
+      pickId: args.pickId as Id<"draftPicks">,
+      playerId: args.playerId as Id<"players">,
+    }),
+  );
 }
 
 export function useUndoDraftPick() {
-  return useAppMutation(api.draft.undoPick);
+  return useDomainMutation(
+    api.draft.undoPick,
+    (args: { seasonId: string; pickId: string }) => ({
+      ...args,
+      seasonId: args.seasonId as Id<"seasons">,
+      pickId: args.pickId as Id<"draftPicks">,
+    }),
+  );
 }
 
 export function useSetDraftTeamMode() {
-  return useAppMutation(api.draft.setTeamMode);
+  return useDomainMutation(
+    api.draft.setTeamMode,
+    (args: { teamId: string; auto: boolean }) => ({
+      ...args,
+      teamId: args.teamId as Id<"teams">,
+    }),
+  );
 }

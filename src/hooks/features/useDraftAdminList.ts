@@ -17,8 +17,8 @@ import {
 import { getFreeAgents } from "@gshl-utils/domain/player";
 import { generateLineupAssignments, RosterPosition } from "@gshl-utils";
 import { useDraftPicks, usePlayers, useNHLTeams, useTeams } from "@gshl-hooks";
-import { useAppMutation } from "../main/useAppMutation";
-import { api } from "../../../convex/_generated/api";
+import { useUpdateDraftPick } from "../main/useDraftPick";
+import { useUpdatePlayer } from "../main/usePlayer";
 
 /**
  * Normalizes team and franchise identifiers into trimmed string ids.
@@ -79,11 +79,11 @@ export function useDraftAdminList(
     [players],
   );
 
-  const draftMutation = useAppMutation(api.frontend.updateDraftPick);
+  const draftMutation = useUpdateDraftPick();
 
-  const undoMutation = useAppMutation(api.frontend.updateDraftPick);
+  const undoMutation = useUpdateDraftPick();
 
-  const playerUpdateMutation = useAppMutation(api.frontend.updatePlayer);
+  const playerUpdateMutation = useUpdatePlayer();
 
   const updateOwnerLineup = useCallback(
     async (ownerId: string | null | undefined) => {
