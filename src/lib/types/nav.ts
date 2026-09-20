@@ -34,7 +34,13 @@ export type LeagueOfficeNavigationView =
 
 export type AdminNavigationView =
   | "accounts"
-  "draftPicks" | "contracts" | "users" | "jobs" | "newsroom" | "images" | "tv";
+  | "draftPicks"
+  | "contracts"
+  | "users"
+  | "jobs"
+  | "newsroom"
+  | "images"
+  | "tv";
 
 export type MatchupNavigationSource = "schedule" | "lockerroom" | "headlines";
 
