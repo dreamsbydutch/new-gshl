@@ -53,7 +53,7 @@ import {
   referencedTeams,
   sameWeeklyEditionAuthor,
   scoreline,
-} from "./weekly-edition-authors";
+} from "./weekly-edition-editorial-policy";
 
 export const WEEKLY_EDITION_SECTION_KINDS = [
   "primary_article",
@@ -1536,7 +1536,7 @@ export {
   normalizeWeeklyEditionArticleGrid,
   selectWeeklyEditionStoryAssignments,
   WEEKLY_EDITION_STAFF,
-} from "./weekly-edition-authors";
+} from "./weekly-edition-editorial-policy";
 
 function section(
   kind: WeeklyEditionSectionKind,

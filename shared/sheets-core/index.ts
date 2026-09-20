@@ -98,6 +98,7 @@ export function makeCompositeKey({
 
 export type CompositeKeyPlan = {
   updates: Map<number, SheetRow>;
+  updateKeys: Map<number, string>;
   inserts: SheetRow[];
   rowNumbersToDelete: number[];
   duplicateRowNumbers: number[];
@@ -121,6 +122,8 @@ export function planCompositeKeyUpsert({
   generateId,
   normalizeValue,
   normalizeKeyPart,
+  headerCoercion = "strict",
+  cellsMatch,
 }: {
   headerColumns: readonly string[];
   existingRows: SheetRow[];
@@ -136,6 +139,8 @@ export function planCompositeKeyUpsert({
   generateId?: () => string;
   normalizeValue: (input: { column: string; value: unknown }) => SheetCell;
   normalizeKeyPart: (input: { column: string; value: unknown }) => string;
+  headerCoercion?: HeaderCoercion;
+  cellsMatch?: (input: { left: SheetCell; right: SheetCell }) => boolean;
 }): CompositeKeyPlan {
   const index = new Map(
     headerColumns.map((column, position) => [column, position]),
@@ -159,7 +164,7 @@ export function planCompositeKeyUpsert({
   ): SheetRow => {
     const itemKeys = new Map(
       Object.keys(item).map((key) => [
-        normalizeHeaderKey({ value: key, coercion: "strict" }),
+        normalizeHeaderKey({ value: key, coercion: headerCoercion }),
         key,
       ]),
     );
@@ -167,7 +172,7 @@ export function planCompositeKeyUpsert({
       const direct = Object.hasOwn(item, column)
         ? column
         : itemKeys.get(
-            normalizeHeaderKey({ value: column, coercion: "strict" }),
+            normalizeHeaderKey({ value: column, coercion: headerCoercion }),
           );
       if (direct && Object.hasOwn(item, direct))
         return normalizeValue({ column, value: item[direct] });
@@ -192,6 +197,7 @@ export function planCompositeKeyUpsert({
     }
   });
   const updates = new Map<number, SheetRow>();
+  const updateKeys = new Map<number, string>();
   const inserts: SheetRow[] = [];
   const seen = new Set<string>();
   let updated = 0;
@@ -213,7 +219,9 @@ export function planCompositeKeyUpsert({
       if (
         candidate.every(
           (value, position) =>
-            String(value ?? "") === String(existing.row[position] ?? ""),
+            cellsMatch
+              ? cellsMatch({ left: value, right: existing.row[position] ?? "" })
+              : String(value ?? "") === String(existing.row[position] ?? ""),
         )
       ) {
         unchanged++;
@@ -233,6 +241,7 @@ export function planCompositeKeyUpsert({
           candidate[position] = existing.row[position] ?? "";
       }
       updates.set(existing.rowNumber - 1, candidate);
+      updateKeys.set(existing.rowNumber - 1, key);
       updated++;
       continue;
     }
@@ -262,6 +271,7 @@ export function planCompositeKeyUpsert({
     : [];
   return {
     updates,
+    updateKeys,
     inserts,
     rowNumbersToDelete,
     duplicateRowNumbers: [...duplicates],

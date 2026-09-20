@@ -1,7 +1,7 @@
 import { optimizedSheetsClient } from "../client/optimized-client";
 import {
   columnToLetter,
-  makeCompositeKey as makeCoreCompositeKey,
+  planCompositeKeyUpsert,
 } from "../../../../../shared/sheets-core/index";
 import {
   getSpreadsheetIdsForModel,
@@ -57,12 +57,6 @@ type CompositeKeyUpsertResult = {
 
 function stringifyPrimitive(value: string | number | boolean): string {
   return typeof value === "string" ? value : String(value);
-}
-
-function normalizeColumnKey(value: unknown): string {
-  return String(value ?? "")
-    .trim()
-    .toLowerCase();
 }
 
 function isDateOnlyColumn(column: string): boolean {
@@ -127,66 +121,11 @@ function normalizeCompositeKeyPart(column: string, value: unknown): string {
   return "";
 }
 
-function matchesFilter(
-  rowRecord: Record<string, unknown>,
-  filter: Record<string, unknown> | null,
-): boolean {
-  if (!filter) {
-    return true;
-  }
-
-  return Object.entries(filter).every(([column, expected]) => {
-    return (
-      normalizeCompositeKeyPart(column, rowRecord[column]) ===
-      normalizeCompositeKeyPart(column, expected)
-    );
-  });
-}
-
-function makeCompositeKey(
-  source: Record<string, unknown>,
-  keyColumns: readonly string[],
-): string {
-  return makeCoreCompositeKey({
-    source,
-    keyColumns,
-    normalizePart: ({ column, value }) =>
-      normalizeCompositeKeyPart(column, value),
-  });
-}
-
-function rowToRecord(
-  header: readonly string[],
-  row: readonly PrimitiveCellValue[],
-): Record<string, PrimitiveCellValue> {
-  const record: Record<string, PrimitiveCellValue> = {};
-  header.forEach((column, index) => {
-    record[column] = row[index] ?? "";
-  });
-  return record;
-}
-
 function normalizeComparableCellValue(value: PrimitiveCellValue): string {
   if (value === null || value === undefined || value === "") {
     return "";
   }
   return String(value).trim();
-}
-
-function rowsMatch(
-  left: readonly PrimitiveCellValue[],
-  right: readonly PrimitiveCellValue[],
-): boolean {
-  const maxLength = Math.max(left.length, right.length);
-  for (let index = 0; index < maxLength; index += 1) {
-    if (
-      normalizeComparableCellValue(left[index] ?? "") !==
-      normalizeComparableCellValue(right[index] ?? "")
-    ) {
-      return false;
-    }
-  }
-  return true;
 }
 
 function getChangedFields(
@@ -211,31 +150,6 @@ function getChangedFields(
   }
 
   return changedFields;
-}
-
-function buildRowFromObject(
-  header: readonly string[],
-  item: Record<string, unknown>,
-  existingRow: readonly PrimitiveCellValue[] | null,
-  merge: boolean,
-): PrimitiveCellValue[] {
-  const itemKeyMap = new Map<string, string>();
-  Object.keys(item).forEach((key) => {
-    itemKeyMap.set(normalizeColumnKey(key), key);
-  });
-
-  return header.map((column, index) => {
-    const directKey = Object.prototype.hasOwnProperty.call(item, column)
-      ? column
-      : itemKeyMap.get(normalizeColumnKey(column));
-    if (directKey && Object.prototype.hasOwnProperty.call(item, directKey)) {
-      return normalizeWriteValue(column, item[directKey]);
-    }
-    if (merge && existingRow) {
-      return existingRow[index] ?? "";
-    }
-    return "";
-  });
 }
 
 async function findRowNumberById(
@@ -345,10 +259,6 @@ export class MinimalSheetsWriter {
       );
     }
 
-    const merge = options.merge ?? true;
-    const updatedAtColumn = options.updatedAtColumn;
-    const createdAtColumn = options.createdAtColumn;
-    const idColumn = options.idColumn;
     const deleteMissing = options.deleteMissing ?? null;
     const diagnosticsOptions =
       options.diagnostics && typeof options.diagnostics === "object"
@@ -367,210 +277,90 @@ export class MinimalSheetsWriter {
     const header = (rawRows[0] ?? []).map((cell) => String(cell ?? "").trim());
     const headerColumns = header.length ? header : [...columns];
     const dataRows = rawRows.slice(1);
-    const headerIndex = new Map<string, number>();
-
-    headerColumns.forEach((column, index) => {
-      if (column) {
-        headerIndex.set(column, index);
-      }
+    const plan = planCompositeKeyUpsert({
+      headerColumns,
+      existingRows: dataRows,
+      incomingRows: rows,
+      keyColumns,
+      merge: options.merge ?? true,
+      idColumn: options.idColumn,
+      createdAtColumn: options.createdAtColumn,
+      updatedAtColumn: options.updatedAtColumn,
+      nowIso,
+      deleteMissing: Boolean(deleteMissing),
+      deleteFilter:
+        deleteMissing && typeof deleteMissing === "object"
+          ? (deleteMissing.filter ?? null)
+          : null,
+      generateId: options.generateId,
+      headerCoercion: "legacy",
+      normalizeValue: ({ column, value }) => normalizeWriteValue(column, value),
+      normalizeKeyPart: ({ column, value }) =>
+        normalizeCompositeKeyPart(column, value),
+      cellsMatch: ({ left, right }) =>
+        normalizeComparableCellValue(left) === normalizeComparableCellValue(right),
     });
-
-    for (const keyColumn of keyColumns) {
-      if (!headerIndex.has(keyColumn)) {
-        throw new Error(
-          `Sheet ${sheetName} is missing composite key column ${keyColumn}.`,
-        );
-      }
-    }
-
-    const existingByKey = new Map<
-      string,
-      { rowNumber: number; row: PrimitiveCellValue[] }
-    >();
-    const duplicateRowNumbers = new Set<number>();
-    let maxNumericId = 0;
-    const idIndex = idColumn ? headerIndex.get(idColumn) : undefined;
-
-    dataRows.forEach((row, rowOffset) => {
-      const paddedRow = headerColumns.map((_column, index) => row[index] ?? "");
-      const rowNumber = rowOffset + 2;
-      const key = makeCompositeKey(
-        rowToRecord(headerColumns, paddedRow),
-        keyColumns,
-      );
-      if (!key) {
-        return;
-      }
-      const existing = existingByKey.get(key);
-      if (existing) {
-        duplicateRowNumbers.add(existing.rowNumber);
-      }
-      existingByKey.set(key, { rowNumber: rowNumber, row: paddedRow });
-      if (idIndex !== undefined) {
-        const idValue = paddedRow[idIndex];
-        const numericId = Number(String(idValue ?? "").trim());
-        if (Number.isFinite(numericId) && numericId > maxNumericId) {
-          maxNumericId = numericId;
-        }
-      }
-    });
-
-    const updates = new Map<number, PrimitiveCellValue[]>();
-    const inserts: PrimitiveCellValue[][] = [];
-    const incomingSeen = new Set<string>();
     const changedColumnCounts = new Map<string, number>();
     const sampleUpdates: CompositeKeyDiffSample[] = [];
-    let updated = 0;
-    let inserted = 0;
-    let unchanged = 0;
-    let nextNumericId = maxNumericId + 1;
-
-    for (const row of rows) {
-      const mutableRow: Record<string, unknown> = { ...row };
-      const key = makeCompositeKey(mutableRow, keyColumns);
-      if (!key) {
-        throw new Error(
-          `Cannot upsert ${String(modelName)} row without composite key ${keyColumns.join(", ")}.`,
-        );
-      }
-      if (incomingSeen.has(key)) {
-        continue;
-      }
-      incomingSeen.add(key);
-
-      const existing = existingByKey.get(key);
-      if (existing) {
-        const candidateRow = buildRowFromObject(
-          headerColumns,
-          mutableRow,
-          existing.row,
-          merge,
-        );
-        if (rowsMatch(existing.row, candidateRow)) {
-          unchanged += 1;
-          continue;
-        }
-        if (captureDiagnostics) {
-          const changedFields = getChangedFields(
-            headerColumns,
-            existing.row,
-            candidateRow,
+    if (captureDiagnostics)
+      for (const [rowIndex, nextRow] of plan.updates) {
+        const existingRow = dataRows[rowIndex - 1] ?? [];
+        const changedFields = getChangedFields(headerColumns, existingRow, nextRow)
+          .filter((field) => field.column !== options.updatedAtColumn);
+        for (const changedField of changedFields)
+          changedColumnCounts.set(
+            changedField.column,
+            (changedColumnCounts.get(changedField.column) ?? 0) + 1,
           );
-          for (const changedField of changedFields) {
-            changedColumnCounts.set(
-              changedField.column,
-              (changedColumnCounts.get(changedField.column) ?? 0) + 1,
-            );
-          }
-          if (sampleUpdates.length < maxDiffSamples) {
-            sampleUpdates.push({
-              key,
-              rowNumber: existing.rowNumber,
-              changedFields: changedFields.slice(0, maxFieldsPerSample),
-            });
-          }
-        }
-        const nextRow = [...candidateRow];
-        if (updatedAtColumn) {
-          const updatedAtIndex = headerIndex.get(updatedAtColumn);
-          if (updatedAtIndex !== undefined) {
-            nextRow[updatedAtIndex] = normalizeWriteValue(
-              updatedAtColumn,
-              nowIso,
-            );
-          }
-        }
-        if (createdAtColumn) {
-          const createdAtIndex = headerIndex.get(createdAtColumn);
-          if (
-            createdAtIndex !== undefined &&
-            existing.row[createdAtIndex] !== undefined &&
-            existing.row[createdAtIndex] !== ""
-          ) {
-            nextRow[createdAtIndex] = existing.row[createdAtIndex] ?? "";
-          }
-        }
-        updates.set(existing.rowNumber - 1, nextRow);
-        updated += 1;
-        continue;
+        if (sampleUpdates.length < maxDiffSamples)
+          sampleUpdates.push({
+            key: plan.updateKeys.get(rowIndex) ?? String(rowIndex),
+            rowNumber: rowIndex + 1,
+            changedFields: changedFields.slice(0, maxFieldsPerSample),
+          });
       }
 
-      if (idColumn && !mutableRow[idColumn]) {
-        mutableRow[idColumn] = options.generateId
-          ? options.generateId()
-          : String(nextNumericId++);
-      }
-      if (createdAtColumn && !mutableRow[createdAtColumn]) {
-        mutableRow[createdAtColumn] = nowIso;
-      }
-
-      inserts.push(buildRowFromObject(headerColumns, mutableRow, null, false));
-      inserted += 1;
-    }
-
-    const deleteMissingFilter =
-      deleteMissing && typeof deleteMissing === "object"
-        ? (deleteMissing.filter ?? null)
-        : null;
-    const rowNumbersToDelete: number[] = [];
-    if (deleteMissing) {
-      dataRows.forEach((row, rowOffset) => {
-        const paddedRow = headerColumns.map((_, index) => row[index] ?? "");
-        const rowRecord = rowToRecord(headerColumns, paddedRow);
-        const key = makeCompositeKey(rowRecord, keyColumns);
-
-        if (!matchesFilter(rowRecord, deleteMissingFilter)) {
-          return;
-        }
-        if (incomingSeen.has(key)) {
-          return;
-        }
-
-        rowNumbersToDelete.push(rowOffset + 2);
-      });
-    }
-
-    if (updates.size > 0) {
+    if (plan.updates.size > 0) {
       await optimizedSheetsClient.updateRowsByIds(
         spreadsheetId,
         sheetName,
-        updates,
+        plan.updates,
       );
     }
 
-    if (inserts.length > 0) {
+    if (plan.inserts.length > 0) {
       await optimizedSheetsClient.appendValuesBatch(
         spreadsheetId,
         sheetName,
-        inserts,
+        plan.inserts,
       );
     }
 
-    if (rowNumbersToDelete.length > 0) {
+    if (plan.rowNumbersToDelete.length > 0) {
       await optimizedSheetsClient.deleteRows(
         spreadsheetId,
         sheetName,
-        rowNumbersToDelete,
+        plan.rowNumbersToDelete,
       );
     }
 
-    if (duplicateRowNumbers.size > 0) {
+    if (plan.duplicateRowNumbers.length > 0) {
       await optimizedSheetsClient.deleteRows(
         spreadsheetId,
         sheetName,
-        Array.from(duplicateRowNumbers),
+        plan.duplicateRowNumbers,
       );
     }
 
     fastSheetsReader.clearCache(modelName);
 
     return {
-      updated,
-      inserted,
-      deleted: rowNumbersToDelete.length,
-      duplicateDeletes: duplicateRowNumbers.size,
-      unchanged,
-      total: updated + inserted,
+      updated: plan.updated,
+      inserted: plan.inserted,
+      deleted: plan.rowNumbersToDelete.length,
+      duplicateDeletes: plan.duplicateRowNumbers.length,
+      unchanged: plan.unchanged,
+      total: plan.updated + plan.inserted,
       diagnostics: captureDiagnostics
         ? {
             changedColumns: Array.from(changedColumnCounts.entries())
