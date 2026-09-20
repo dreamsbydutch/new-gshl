@@ -630,7 +630,7 @@ export function useLockerRoomContextNavigation(synchronizeRoute = true) {
 export function useLeagueOfficeContextNavigation() {
   const navigation = useContextualRouter();
   const { hasHydrated } = useNavigationHydration();
-  const { session, status } = useAuthSession();
+  const { status } = useAuthSession();
   const query = useMemo(
     () => readContextualNavigationQuery(navigation.search),
     [navigation.search],
@@ -638,7 +638,7 @@ export function useLeagueOfficeContextNavigation() {
   const persistedView = useNavStore((state) => state.selectedLeagueOfficeType);
   const setView = useNavStore((state) => state.setLeagueOfficeType);
   const isMockDraftPage = navigation.pathname === "/leagueoffice/mock-draft";
-  const validViews = getLeagueOfficeNavigationViews(session?.user.role);
+  const validViews = getLeagueOfficeNavigationViews();
   const view = resolveContextualSelection({
     explicitValue: isMockDraftPage ? null : query.view,
     persistedValue: isMockDraftPage ? "draft" : persistedView,
@@ -658,13 +658,6 @@ export function useLeagueOfficeContextNavigation() {
     if (!routeDataReady || !navigation.shouldSyncCurrentUrl) return;
     if (isMockDraftPage) {
       if (persistedView !== "mockDraft") setView("mockDraft");
-      return;
-    }
-    if (view === "tradeBlock") {
-      setView("draft");
-      navigation.replace(
-        buildLeagueOfficeNavigationHref(navigation.search, { view }),
-      );
       return;
     }
     if (persistedView !== view) setView(view);

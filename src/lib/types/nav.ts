@@ -25,12 +25,7 @@ export type LockerRoomNavigationView =
   | "draft";
 
 export type LeagueOfficeNavigationView =
-  | "draft"
-  | "tradeBlock"
-  | "freeAgents"
-  | "rules"
-  | "confBattle"
-  | "ownerRankings";
+  "draft" | "freeAgents" | "rules" | "confBattle" | "ownerRankings";
 
 export type AdminNavigationView =
   "draftPicks" | "contracts" | "users" | "jobs" | "newsroom" | "images" | "tv";

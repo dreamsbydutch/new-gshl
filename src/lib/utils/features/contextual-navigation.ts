@@ -40,7 +40,6 @@ export const LOCKER_ROOM_NAVIGATION_VIEWS = [
 
 export const MEMBER_LEAGUE_OFFICE_NAVIGATION_VIEWS = [
   "draft",
-  "tradeBlock",
   "freeAgents",
   "rules",
   "confBattle",
@@ -233,13 +232,6 @@ export function buildLeagueOfficeNavigationHref(
   currentSearch: string | URLSearchParams,
   context: LeagueOfficeNavigationContext,
 ): string {
-  // Preserve old bookmarks and persisted League Office selections.
-  if (context.view === "tradeBlock") {
-    return buildLockerRoomNavigationHref(currentSearch, {
-      view: "tradeBlock",
-      owner: readContextualNavigationQuery(currentSearch).owner,
-    });
-  }
   return buildContextualNavigationHref("/leagueoffice", currentSearch, {
     view: context.view,
     season: context.season ?? null,
@@ -264,9 +256,7 @@ export function buildDraftTeamsNavigationHref(
   });
 }
 
-export function getLeagueOfficeNavigationViews(
-  _role?: string | null,
-): readonly LeagueOfficeNavigationView[] {
+export function getLeagueOfficeNavigationViews(): readonly LeagueOfficeNavigationView[] {
   return MEMBER_LEAGUE_OFFICE_NAVIGATION_VIEWS;
 }
 
