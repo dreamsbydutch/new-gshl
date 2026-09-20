@@ -1,5 +1,11 @@
 "use client";
 
+import {
+  buildDraftPlayerCatalog,
+  filterDraftPlayerCatalog,
+} from "@gshl-utils/features/draft-board-list";
+import { useDraftSeason } from "./useDraftSeason";
+
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type {
   DraftBoardPlayer,
@@ -9,21 +15,15 @@ import type {
   DraftPlayerSortDirection,
   DraftPlayerSortKey,
   DraftPick,
-  GSHLTeam,
-  NHLTeam,
-  Player,
 } from "@gshl-types";
 import {
   buildContractedSeasonRosterPlayers,
   buildMockDraftProjection,
   canSubmitDraftPick,
-  findNhlTeamByAbbreviation,
   getDefaultDraftPlayerSortDirection,
   getNextOwnerDraftPickNotice,
   indexLatestUfaNhlStats,
   prepareDraftBoardPlayers,
-  resolveDraftHubSeason,
-  sortDraftEligiblePlayers,
 } from "@gshl-utils";
 import {
   useAuthSession,
@@ -32,20 +32,11 @@ import {
   useNHLTeams,
   useLatestPlayerNhlStats,
   usePlayers,
-  useSeasonState,
   useSubmitDraftPick,
   useTeams,
   useToast,
   useUndoDraftPick,
 } from "@gshl-hooks";
-
-function matchesPosition(player: Player, filter: string): boolean {
-  if (filter === "all") return true;
-  if (filter === "F") return player.posGroup === "F";
-  if (filter === "D") return player.posGroup === "D";
-  if (filter === "G") return player.posGroup === "G";
-  return player.nhlPos.some((position) => position === filter);
-}
 
 function withLiveStatus(
   state: DraftHubStateData | undefined,
@@ -83,8 +74,7 @@ function withLiveStatus(
 }
 
 export function useDraftHubBoard(): DraftHubBoardViewModel {
-  const { seasons } = useSeasonState();
-  const season = useMemo(() => resolveDraftHubSeason(seasons), [seasons]);
+  const { seasons, season } = useDraftSeason();
   const stateQuery = useDraftHubState({
     seasonId: season?.id,
     enabled: Boolean(season?.id),
@@ -156,22 +146,8 @@ export function useDraftHubBoard(): DraftHubBoardViewModel {
     () => indexLatestUfaNhlStats(nhlStatsQuery.data, seasons, season?.year),
     [nhlStatsQuery.data, season?.year, seasons],
   );
-  const nhlTeams = useMemo(
-    () => nhlTeamsQuery.data.filter((team): team is NHLTeam => "abbr" in team),
-    [nhlTeamsQuery.data],
-  );
-  const teams = useMemo(
-    () =>
-      teamsQuery.data.filter(
-        (team): team is GSHLTeam =>
-          "franchiseId" in team &&
-          "ownerId" in team &&
-          !("date" in team) &&
-          !("weekId" in team) &&
-          !("seasonType" in team),
-      ),
-    [teamsQuery.data],
-  );
+  const nhlTeams = nhlTeamsQuery.data;
+  const teams = teamsQuery.data;
   const mockProjectionByPickId = useMemo(() => {
     if (!season?.startDate || !stateQuery.data) {
       return {};
@@ -269,52 +245,37 @@ export function useDraftHubBoard(): DraftHubBoardViewModel {
     },
     [playerSortKey],
   );
-  const eligiblePlayers = useMemo(() => {
-    const draftedPlayerIds = new Set(
-      (state?.picks ?? [])
-        .map((pick) => pick.player?.id)
-        .filter((playerId): playerId is string => Boolean(playerId)),
-    );
-    const prepared = prepareDraftBoardPlayers(
+  const catalog = useMemo(
+    () =>
+      buildDraftPlayerCatalog({
+        players: allPlayersQuery.data,
+        contracts: contractsQuery.data,
+        activeOn: season?.startDate,
+        selectedPlayerIds: (state?.picks ?? []).flatMap((pick) =>
+          pick.player ? [pick.player.id] : [],
+        ),
+        nhlTeams,
+        latestStats: latestNhlStatsByPlayer,
+      }),
+    [
       allPlayersQuery.data,
       contractsQuery.data,
       season?.startDate,
-    );
-    const normalizedSearch = searchTerm.trim().toLowerCase();
-    const playerViews = prepared
-      .filter((player) => !draftedPlayerIds.has(player.id))
-      .filter((player) => matchesPosition(player, positionFilter))
-      .filter((player) => {
-        if (!normalizedSearch) return true;
-        return (
-          player.fullName.toLowerCase().includes(normalizedSearch) ||
-          player.nhlPos.join(" ").toLowerCase().includes(normalizedSearch) ||
-          String(player.nhlTeam).toLowerCase().includes(normalizedSearch)
-        );
-      })
-      .map((player) => ({
-        ...player,
-        nhlTeamLogoUrl:
-          findNhlTeamByAbbreviation(nhlTeams, player.nhlTeam)?.logoUrl ?? null,
-        stats: latestNhlStatsByPlayer.get(String(player.id)) ?? null,
-      }));
-    return sortDraftEligiblePlayers(
-      playerViews,
-      playerSortKey,
-      playerSortDirection,
-    );
-  }, [
-    contractsQuery.data,
-    latestNhlStatsByPlayer,
-    nhlTeams,
-    playerSortDirection,
-    playerSortKey,
-    allPlayersQuery.data,
-    positionFilter,
-    searchTerm,
-    season?.startDate,
-    state?.picks,
-  ]);
+      state?.picks,
+      nhlTeams,
+      latestNhlStatsByPlayer,
+    ],
+  );
+  const eligiblePlayers = useMemo(
+    () =>
+      filterDraftPlayerCatalog(catalog, {
+        searchTerm,
+        positionFilter,
+        sortKey: playerSortKey,
+        sortDirection: playerSortDirection,
+      }),
+    [catalog, searchTerm, positionFilter, playerSortKey, playerSortDirection],
+  );
   const canSubmitActivePick =
     !activePick?.team?.draftAuto &&
     canSubmitDraftPick({

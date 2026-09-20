@@ -1,5 +1,7 @@
 "use client";
 
+import { buildDraftTeamOptions } from "@gshl-utils/features/draft-hub";
+
 import { useCallback, useEffect, useMemo, useRef } from "react";
 
 import { useLockerRoomTeamOptions } from "./useLockerRoomTeamOptions";
@@ -774,16 +776,7 @@ export function useDraftTeamsContextNavigation({
     navigation.pathname === "/draft/teams" ||
     navigation.pathname.startsWith("/draft/teams/");
   const selectableTeams = useMemo(
-    () =>
-      teams
-        .filter(
-          (team) =>
-            !excludedOwnerId ||
-            String(team.ownerId) !== String(excludedOwnerId),
-        )
-        .sort((left, right) =>
-          String(left.name ?? "").localeCompare(String(right.name ?? "")),
-        ),
+    () => buildDraftTeamOptions(teams, excludedOwnerId),
     [excludedOwnerId, teams],
   );
   const validOwnerIds = useMemo(
@@ -837,6 +830,8 @@ export function useDraftTeamsContextNavigation({
     isReady: routeDataReady && storeMatches,
     isTeamsPage,
     selectableTeams,
+    selectedTeam:
+      selectableTeams.find((team) => String(team.ownerId) === ownerId) ?? null,
     selectedOwnerId: ownerId,
     selectOwner,
     myTeamHref: buildContextualNavigationHref(

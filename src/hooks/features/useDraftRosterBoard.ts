@@ -1,19 +1,14 @@
 "use client";
 
+import { buildDraftPlayerCatalog } from "@gshl-utils/features/draft-board-list";
+import { useDraftSeason } from "./useDraftSeason";
+
 import { useMemo } from "react";
 import { groupRemainingDraftPicksByFranchise } from "@gshl-utils/features/draft-tv";
-import type {
-  DraftRosterBoardViewModel,
-  Franchise,
-  GSHLTeam,
-  NHLTeam,
-} from "@gshl-types";
+import type { DraftRosterBoardViewModel } from "@gshl-types";
 import {
-  findNhlTeamByAbbreviation,
   groupDraftRosterTeamsByConference,
   indexLatestUfaNhlStats,
-  prepareDraftBoardPlayers,
-  resolveDraftHubSeason,
   selectLatestActiveFranchiseTeams,
 } from "@gshl-utils";
 import {
@@ -23,15 +18,15 @@ import {
   useNHLTeams,
   useLatestPlayerNhlStats,
   usePlayers,
-  useSeasonState,
   useTeams,
 } from "@gshl-hooks";
 
 export function useDraftRosterBoard(): DraftRosterBoardViewModel {
-  const { seasons, isLoading: seasonsLoading } = useSeasonState({
-    autoSelect: false,
-  });
-  const season = useMemo(() => resolveDraftHubSeason(seasons), [seasons]);
+  const {
+    seasons,
+    season,
+    isLoading: seasonsLoading,
+  } = useDraftSeason({ autoSelect: false });
   const teamsQuery = useTeams();
   const franchisesQuery = useFranchises({ isActive: true });
   const playersQuery = usePlayers({ isActive: true });
@@ -45,26 +40,8 @@ export function useDraftRosterBoard(): DraftRosterBoardViewModel {
     seasonId: season?.id,
     enabled: Boolean(season?.id),
   });
-  const teamRows = useMemo(
-    () =>
-      teamsQuery.data.filter(
-        (team): team is GSHLTeam =>
-          "seasonId" in team &&
-          "franchiseId" in team &&
-          !("date" in team) &&
-          !("weekId" in team) &&
-          !("seasonType" in team),
-      ),
-    [teamsQuery.data],
-  );
-  const franchises = useMemo(
-    () =>
-      franchisesQuery.data.filter(
-        (franchise): franchise is Franchise =>
-          "ownerId" in franchise && !("seasonId" in franchise),
-      ),
-    [franchisesQuery.data],
-  );
+  const teamRows = teamsQuery.data;
+  const franchises = franchisesQuery.data;
   const teams = useMemo(
     () => selectLatestActiveFranchiseTeams(teamRows, franchises, seasons),
     [franchises, seasons, teamRows],
@@ -73,42 +50,32 @@ export function useDraftRosterBoard(): DraftRosterBoardViewModel {
     () => groupDraftRosterTeamsByConference(teams, playersQuery.data),
     [playersQuery.data, teams],
   );
-  const nhlTeams = useMemo(
-    () => nhlTeamsQuery.data.filter((team): team is NHLTeam => "abbr" in team),
-    [nhlTeamsQuery.data],
-  );
+  const nhlTeams = nhlTeamsQuery.data;
   const latestNhlStatsByPlayer = useMemo(
     () => indexLatestUfaNhlStats(nhlStatsQuery.data, seasons, season?.year),
     [nhlStatsQuery.data, season?.year, seasons],
   );
-  const availablePlayers = useMemo(() => {
-    const draftedPlayerIds = new Set(
-      draftPicksQuery.data
-        .map((pick) => pick.playerId)
-        .filter((playerId): playerId is string => Boolean(playerId)),
-    );
-
-    const playerViews = prepareDraftBoardPlayers(
+  const availablePlayers = useMemo(
+    () =>
+      buildDraftPlayerCatalog({
+        players: playersQuery.data,
+        contracts: contractsQuery.data,
+        activeOn: season?.startDate,
+        selectedPlayerIds: draftPicksQuery.data.flatMap((pick) =>
+          pick.playerId ? [pick.playerId] : [],
+        ),
+        nhlTeams,
+        latestStats: latestNhlStatsByPlayer,
+      }),
+    [
       playersQuery.data,
       contractsQuery.data,
       season?.startDate,
-    )
-      .filter((player) => !draftedPlayerIds.has(String(player.id)))
-      .map((player) => ({
-        ...player,
-        nhlTeamLogoUrl:
-          findNhlTeamByAbbreviation(nhlTeams, player.nhlTeam)?.logoUrl ?? null,
-        stats: latestNhlStatsByPlayer.get(String(player.id)) ?? null,
-      }));
-    return playerViews;
-  }, [
-    contractsQuery.data,
-    draftPicksQuery.data,
-    latestNhlStatsByPlayer,
-    nhlTeams,
-    playersQuery.data,
-    season?.startDate,
-  ]);
+      draftPicksQuery.data,
+      nhlTeams,
+      latestNhlStatsByPlayer,
+    ],
+  );
 
   const remainingPicksByFranchise = useMemo(
     () => groupRemainingDraftPicksByFranchise(draftPicksQuery.data, teamRows),

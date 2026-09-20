@@ -13,18 +13,13 @@
  * @module components/team/TeamDraftPickList
  */
 
-import { useMemo } from "react";
 import { DraftPickListSkeleton } from "@gshl-skeletons";
 import type {
   DraftPickItemProps,
   Season,
   TeamDraftPickListProps,
 } from "@gshl-types";
-import {
-  buildSyntheticSeason,
-  formatDraftPickDescription,
-  getOriginalTeamName,
-} from "@gshl-utils";
+import { formatDraftPickDescription, getOriginalTeamName } from "@gshl-utils";
 import { useTeamDraftPickListData } from "@gshl-hooks";
 
 // ============================================================================
@@ -114,51 +109,17 @@ export function TeamDraftPickList({
   isLoading = false,
   onSelectSeason,
 }: TeamDraftPickListProps & { seasons?: Season[] }) {
-  const seasonOptions = useMemo<Season[]>(() => {
-    const knownSeasons = [...(seasons ?? [])].sort(
-      (a, b) => Number(a.id) - Number(b.id),
-    );
-    const seasonIdsFromPicks = Array.from(
-      new Set((draftPicks ?? []).map((pick) => String(pick.seasonId ?? ""))),
-    )
-      .filter(Boolean)
-      .sort((a, b) => Number(a) - Number(b));
-
-    if (!knownSeasons.length) return knownSeasons;
-
-    const seasonsById = new Map(
-      knownSeasons.map((season) => [season.id, season]),
-    );
-    const orderedSeasons = [...knownSeasons];
-
-    for (const seasonId of seasonIdsFromPicks) {
-      if (seasonsById.has(seasonId)) continue;
-
-      const previousSeason = orderedSeasons[orderedSeasons.length - 1];
-      if (!previousSeason) continue;
-
-      const syntheticSeason = buildSyntheticSeason(previousSeason, seasonId);
-      orderedSeasons.push(syntheticSeason);
-      seasonsById.set(seasonId, syntheticSeason);
-    }
-
-    return orderedSeasons;
-  }, [draftPicks, seasons]);
-  const displaySeasonOptions = useMemo(
-    () => [...seasonOptions].sort((a, b) => Number(b.year) - Number(a.year)),
-    [seasonOptions],
-  );
-
-  const { processedDraftPicks, ready } = useTeamDraftPickListData({
-    teams,
-    draftPicks,
-    contracts,
-    players,
-    seasons: seasonOptions,
-    gshlTeamId,
-    selectedSeasonId,
-    allTeams,
-  });
+  const { processedDraftPicks, ready, selectionOptions } =
+    useTeamDraftPickListData({
+      teams,
+      draftPicks,
+      contracts,
+      players,
+      seasons,
+      gshlTeamId,
+      selectedSeasonId,
+      allTeams,
+    });
   if (!ready) return <DraftPickListSkeleton />;
 
   return (
@@ -174,7 +135,7 @@ export function TeamDraftPickList({
               onChange={(event) => onSelectSeason(event.target.value)}
               className="h-9 min-w-24 rounded-md border border-slate-300 bg-white px-2.5 pr-7 text-xs font-semibold text-slate-800 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-1 motion-reduce:transition-none"
             >
-              {displaySeasonOptions.map((season) => (
+              {selectionOptions.map((season) => (
                 <option key={season.id} value={season.id}>
                   {season.name}
                 </option>
