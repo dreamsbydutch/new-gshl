@@ -1,9 +1,6 @@
 "use client";
 
 import { useMemo } from "react";
-import { useQuery } from "convex/react";
-import { api } from "../../../convex/_generated/api";
-import type { Id } from "../../../convex/_generated/dataModel";
 import {
   useContracts,
   useDraftPickPages,
@@ -23,39 +20,12 @@ import {
   prepareDraftBoardPlayers,
   getSeasonDraftPicks,
   resolveContractDefaultSeason,
-  HOME_MOCK_DRAFT_PREVIEW_LIMIT,
   type DraftBoardPlayer,
   type ProjectedDraftPick,
 } from "@gshl-utils";
-import type {
-  DraftPick,
-  GSHLTeam,
-  MockDraftDisplayNhlTeam,
-  MockDraftDisplayPick,
-  NHLTeam,
-  UseDraftBoardDataOptions,
-} from "@gshl-types";
+import type { DraftPick, UseDraftBoardDataOptions } from "@gshl-types";
 
-export function useMockDraftPreview(seasonId: string) {
-  const result = useQuery(
-    api.frontend.mockDraftPreview,
-    seasonId
-      ? {
-          seasonId: seasonId as Id<"seasons">,
-          take: HOME_MOCK_DRAFT_PREVIEW_LIMIT,
-        }
-      : "skip",
-  );
-  const nhlTeams: MockDraftDisplayNhlTeam[] = result?.nhlTeams ?? [];
-  const projectedDraftPicks: MockDraftDisplayPick[] =
-    result?.projectedDraftPicks ?? [];
-
-  return {
-    isLoading: result === undefined,
-    nhlTeams,
-    projectedDraftPicks,
-  };
-}
+export { useMockDraftPreview } from "../main/useDraftHub";
 
 /**
  * useDraftBoardData Hook
@@ -134,14 +104,8 @@ export function useDraftBoardData(options: UseDraftBoardDataOptions) {
     ? allDraftPicksQuery.isLoading
     : draftPickPages.isLoading;
 
-  const nhlTeams = useMemo(
-    () => (nhlTeamsRaw as NHLTeam[]) ?? [],
-    [nhlTeamsRaw],
-  );
-  const gshlTeams = useMemo(
-    () => (gshlTeamsData as GSHLTeam[]) ?? [],
-    [gshlTeamsData],
-  );
+  const nhlTeams = nhlTeamsRaw;
+  const gshlTeams = gshlTeamsData;
 
   // Apply utility to filter and sort draft picks for the season
   const seasonDraftPicks: DraftPick[] = useMemo(
@@ -209,22 +173,13 @@ export function useDraftBoardData(options: UseDraftBoardDataOptions) {
     [seasonDraftPicks, draftPlayers, rosterPlayers, gshlTeams],
   );
 
-  const hasHydratedData =
-    players !== undefined &&
-    nhlTeamsRaw !== undefined &&
-    gshlTeamsData !== undefined &&
-    draftPicks !== undefined;
-
-  const hasLoadingQuery =
+  const isLoading =
     playersLoading ||
     contractsLoading ||
     nhlTeamsLoading ||
     seasonsLoading ||
     gshlTeamsLoading ||
     draftPicksLoading;
-  const isLoading = isMockDraft
-    ? hasLoadingQuery
-    : !hasHydratedData && hasLoadingQuery;
 
   return {
     draftPlayers,
@@ -234,7 +189,6 @@ export function useDraftBoardData(options: UseDraftBoardDataOptions) {
     nhlTeams,
     gshlTeams,
     isLoading,
-    error: null,
     ready: !isLoading,
     hasMore: isMockDraft ? false : hasMore,
     loadMore,
