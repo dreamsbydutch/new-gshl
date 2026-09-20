@@ -16,6 +16,7 @@ import {
   buildMockDraftProjection,
   compactMockDraftProjection,
   getMockDraftReferencedNhlAbbreviations,
+  selectAutoDraftPlayer,
 } from "./mock-draft";
 
 const timestamp = new Date("2026-07-27T12:00:00.000Z");
@@ -228,7 +229,7 @@ void test("compacts Home mock-draft cards to their exact display shape", () => {
   );
 });
 
-void test("does not let a missing talent rating beat a rated roster upgrade", () => {
+void test("prefers a player with a source ranking over an entirely unranked player", () => {
   const projection = buildMockDraftProjection({
     seasonDraftPicks: [pick("pick-1", 1)],
     draftPlayers: [
@@ -242,99 +243,206 @@ void test("does not let a missing talent rating beat a rated roster upgrade", ()
   assert.equal(projection[0]?.projectedPlayer?.id, "ranked-player");
 });
 
-void test("reaches for positional help when it improves roster talent more than the top-ranked player", () => {
-  const rosterPlayers = [
-    player("lw-1", 95, ["LW"], { ownerId: "owner-a" }),
-    player("lw-2", 94, ["LW"], { ownerId: "owner-a" }),
-    player("c-1", 93, ["C"], { ownerId: "owner-a" }),
-    player("c-2", 92, ["C"], { ownerId: "owner-a" }),
-    player("rw-1", 91, ["RW"], { ownerId: "owner-a" }),
-    player("rw-2", 90, ["RW"], { ownerId: "owner-a" }),
-    player("d-1", 89, ["D"], { ownerId: "owner-a" }),
-    player("d-2", 88, ["D"], { ownerId: "owner-a" }),
-    player("d-3", 87, ["D"], { ownerId: "owner-a" }),
-    player("utility", 86, ["D"], { ownerId: "owner-a" }),
-    player("goalie", 1, ["G"], { ownerId: "owner-a" }),
-  ];
-  const draftPlayers = [
-    player("elite-center", 99, ["C"], { overallRk: 1 }),
-    player("needed-goalie", 90, ["G"], { overallRk: 2 }),
-    player("second-goalie", 89, ["G"], { overallRk: 3 }),
-  ];
-
-  const projection = buildMockDraftProjection({
-    seasonDraftPicks: [pick("pick-1", 1), pick("pick-2", 2)],
-    draftPlayers,
-    rosterPlayers,
-    teams: [team()],
+function rankedPlayer(
+  id: string,
+  rank: number,
+  nhlPos: RosterPosition[],
+  fields: Partial<DraftBoardPlayer> = {},
+) {
+  return player(id, 50, nhlPos, {
+    overallRk: rank,
+    yahooDraftRk: rank,
+    dailyFaceoffRk: rank,
+    nhlRk: rank,
+    ...fields,
   });
+}
 
-  assert.deepEqual(
-    projection.map((projectedPick) => projectedPick.projectedPlayer?.id),
-    ["needed-goalie", "elite-center"],
+void test("auto draft chooses the fifth-best composite option, including identical positions", () => {
+  const candidates = Array.from({ length: 10 }, (_, index) =>
+    rankedPlayer(`candidate-${index + 1}`, index + 1, ["C"], {
+      overallRating: index * 10,
+    }),
   );
-  assert.ok(Number(projection[0]?.score) > Number(projection[1]?.score));
-});
-
-void test("prefers a primary RW over a slightly higher-rated utility defenseman", () => {
-  const projection = buildMockDraftProjection({
-    seasonDraftPicks: [pick("pick-1", 1)],
-    draftPlayers: [
-      player("utility-defenseman", 89, ["D"], { overallRk: 1 }),
-      player("primary-right-wing", 80, ["RW"], { overallRk: 2 }),
-    ],
-    rosterPlayers: [
-      player("defense-one", 100, ["D"], { ownerId: "owner-a" }),
-      player("defense-two", 99, ["D"], { ownerId: "owner-a" }),
-      player("defense-three", 98, ["D"], { ownerId: "owner-a" }),
-    ],
-    teams: [team()],
-  });
-
-  assert.equal(projection[0]?.projectedPlayer?.id, "primary-right-wing");
-  assert.ok(Math.abs(Number(projection[0]?.score) - 80 * 1.22) < 1e-10);
-});
-
-void test("uses roughly a 5-to-6-point threshold between adjacent lineup tiers", () => {
-  const rosterPlayers = [
-    player("primary-center", 100, ["C"], { ownerId: "owner-a" }),
-  ];
-  const buildProjection = (secondaryCenterRating: number) =>
-    buildMockDraftProjection({
-      seasonDraftPicks: [pick("pick-1", 1)],
-      draftPlayers: [
-        player("secondary-center", secondaryCenterRating, ["C"], {
-          overallRk: 1,
-        }),
-        player("primary-right-wing", 80, ["RW"], { overallRk: 2 }),
-      ],
-      rosterPlayers,
-      teams: [team()],
-    });
-
+  assert.equal(selectAutoDraftPlayer(candidates, []).player?.id, "candidate-5");
   assert.equal(
-    buildProjection(85)[0]?.projectedPlayer?.id,
-    "primary-right-wing",
+    selectAutoDraftPlayer([...candidates].reverse(), []).player?.id,
+    "candidate-5",
   );
-  assert.equal(buildProjection(86)[0]?.projectedPlayer?.id, "secondary-center");
-});
-
-void test("selects the candidate with the greatest marginal weighted points", () => {
   const projection = buildMockDraftProjection({
-    seasonDraftPicks: [pick("pick-1", 1)],
-    draftPlayers: [
-      player("talent-losing-goalie", 40, ["G"], { overallRk: 1 }),
-      player("talent-gaining-center", 50, ["C"], { overallRk: 2 }),
-    ],
-    rosterPlayers: [
-      player("primary-center", 100, ["C"], { ownerId: "owner-a" }),
-      player("secondary-center", 10, ["C"], { ownerId: "owner-a" }),
-    ],
+    seasonDraftPicks: [pick("first", 1), pick("second", 2)],
+    draftPlayers: candidates,
+    rosterPlayers: [],
     teams: [team()],
   });
+  assert.deepEqual(
+    projection.map((entry) => entry.projectedPlayer?.id),
+    ["candidate-5", "candidate-6"],
+  );
+});
 
-  assert.equal(projection[0]?.projectedPlayer?.id, "talent-gaining-center");
-  assert.ok(Number(projection[0]?.score) > 0);
+void test("fifth-best selection still accounts for the signed roster", () => {
+  const candidates = [
+    rankedPlayer("defenseman", 4, ["D"]),
+    ...[5, 6, 7, 8, 9].map((rank) =>
+      rankedPlayer(`wing-${rank}`, rank, ["RW"]),
+    ),
+    rankedPlayer("depth", 200, ["D"]),
+  ];
+  const roster = [1, 2, 3].map((rank) =>
+    rankedPlayer(`signed-${rank}`, rank, ["D"]),
+  );
+  assert.equal(selectAutoDraftPlayer(candidates, roster).player?.id, "wing-9");
+});
+
+void test("fewer than five remaining players fall back to the best option", () => {
+  const candidates = [4, 2, 3, 1].map((rank) =>
+    rankedPlayer(`p-${rank}`, rank, ["C"]),
+  );
+  assert.equal(selectAutoDraftPlayer(candidates, []).player?.id, "p-1");
+});
+
+void test("fifth-best selection breaks tied gains deterministically", () => {
+  const candidates = ["f", "d", "a", "e", "b", "c"].map((id) =>
+    rankedPlayer(id, 1, ["C"]),
+  );
+  assert.equal(selectAutoDraftPlayer(candidates, []).player?.id, "e");
+  assert.equal(
+    selectAutoDraftPlayer([...candidates].reverse(), []).player?.id,
+    "e",
+  );
+});
+
+void test("combined draft rankings beat raw talent for identical roster eligibility", () => {
+  const candidates = [
+    rankedPlayer("talent-favorite", 100, ["C"], {
+      overallRating: 110,
+      overallRk: 1,
+    }),
+    rankedPlayer("draft-favorite", 1, ["C"], {
+      overallRating: 25,
+      overallRk: 100,
+    }),
+  ];
+  const projection = buildMockDraftProjection({
+    seasonDraftPicks: [pick("pick-1", 1)],
+    draftPlayers: candidates,
+    rosterPlayers: [],
+    teams: [team()],
+  });
+  assert.equal(projection[0]?.projectedPlayer?.id, "draft-favorite");
+  assert.equal(
+    selectAutoDraftPlayer(candidates, []).player?.id,
+    "draft-favorite",
+  );
+});
+
+void test("fills an open wing ahead of a similarly ranked extra defenseman", () => {
+  const candidates = [
+    rankedPlayer("extra-defenseman", 4, ["D"]),
+    rankedPlayer("needed-wing", 5, ["RW"]),
+    rankedPlayer("depth", 200, ["D"]),
+  ];
+  const roster = [1, 2, 3].map((rank) =>
+    rankedPlayer("signed-" + rank, rank, ["D"], { ownerId: "owner-a" }),
+  );
+  assert.equal(
+    selectAutoDraftPlayer(candidates, []).player?.id,
+    "extra-defenseman",
+  );
+  const projection = buildMockDraftProjection({
+    seasonDraftPicks: [pick("pick-1", 1)],
+    draftPlayers: candidates,
+    rosterPlayers: roster,
+    teams: [team()],
+  });
+  assert.equal(projection[0]?.projectedPlayer?.id, "needed-wing");
+  assert.equal(
+    selectAutoDraftPlayer(candidates, roster).player?.id,
+    "needed-wing",
+  );
+});
+
+void test("externally ranked players remain eligible without a GSHL talent rating", () => {
+  const candidates = [
+    rankedPlayer("projection-favorite", 1, ["G"], {
+      overallRating: null,
+      overallRk: null,
+    }),
+    rankedPlayer("talent-favorite", 100, ["G"], {
+      overallRating: 100,
+      overallRk: 1,
+    }),
+  ];
+  assert.equal(
+    selectAutoDraftPlayer(candidates, []).player?.id,
+    "projection-favorite",
+  );
+});
+
+void test("infers completed picks into the roster and excludes signing slots", () => {
+  const selected = rankedPlayer("already-picked", 1, ["C"]);
+  const candidates = [
+    selected,
+    rankedPlayer("extra-center", 2, ["C"]),
+    rankedPlayer("needed-wing", 3, ["RW"]),
+    rankedPlayer("depth", 200, ["D"]),
+  ];
+  const projection = buildMockDraftProjection({
+    seasonDraftPicks: [
+      pick("completed", 1, { playerId: selected.id }),
+      pick("signing", 2, { isSigning: true }),
+      pick("next", 3),
+    ],
+    draftPlayers: candidates,
+    rosterPlayers: [],
+    teams: [team()],
+  });
+  assert.deepEqual(
+    projection.map((entry) => [entry.pick.id, entry.projectedPlayer?.id]),
+    [["next", "needed-wing"]],
+  );
+});
+
+void test("each projected pick updates the roster and removes its player from the pool", () => {
+  const roster = [1, 2, 3].map((rank) =>
+    rankedPlayer("signed-" + rank, rank, ["D"], { ownerId: "owner-a" }),
+  );
+  const candidates = [
+    rankedPlayer("extra-defenseman", 4, ["D"]),
+    rankedPlayer("needed-wing", 5, ["RW"]),
+    rankedPlayer("depth", 200, ["D"]),
+  ];
+  const original = structuredClone({ candidates, roster });
+  const projection = buildMockDraftProjection({
+    seasonDraftPicks: [pick("one", 1), pick("two", 2)],
+    draftPlayers: candidates,
+    rosterPlayers: roster,
+    teams: [team()],
+  });
+  const first = selectAutoDraftPlayer(candidates, roster).player!;
+  const second = selectAutoDraftPlayer(
+    candidates.filter((player) => player.id !== first.id),
+    [...roster, first],
+  ).player!;
+  assert.deepEqual(
+    projection.map((entry) => entry.projectedPlayer?.id),
+    [first.id, second.id],
+  );
+  assert.notEqual(first.id, second.id);
+  assert.deepEqual({ candidates, roster }, original);
+});
+
+void test("an empty pool and missing ranking sources have deterministic fallbacks", () => {
+  assert.equal(selectAutoDraftPlayer([], []).player, undefined);
+  const candidates = ["z", "a"].map((id) =>
+    player(id, null, ["C"], { overallRk: null }),
+  );
+  assert.equal(selectAutoDraftPlayer(candidates, []).player?.id, "a");
+  assert.equal(
+    selectAutoDraftPlayer([...candidates].reverse(), []).player?.id,
+    "a",
+  );
 });
 
 void test("reprojects future picks around completed live-draft selections", () => {
@@ -360,4 +468,33 @@ void test("reprojects future picks around completed live-draft selections", () =
   assert.equal(projection.length, 1);
   assert.equal(projection[0]?.pick.id, pendingPick.id);
   assert.equal(projection[0]?.projectedPlayer?.id, neededGoalie.id);
+});
+
+void test("protected injured-reserve players do not fill an active roster need", () => {
+  const candidates = [
+    rankedPlayer("center", 2, ["C"]),
+    rankedPlayer("wing", 3, ["RW"]),
+    rankedPlayer("depth", 200, ["D"]),
+  ];
+  const signed = rankedPlayer("signed-center", 1, ["C"], { lineupPos: "IR" });
+  assert.equal(
+    selectAutoDraftPlayer(candidates, [signed]).player?.id,
+    "center",
+  );
+  assert.equal(
+    selectAutoDraftPlayer(candidates, [{ ...signed, lineupPos: "C" }]).player
+      ?.id,
+    "wing",
+  );
+  const projection = buildMockDraftProjection({
+    seasonDraftPicks: [
+      pick("completed", 1, { playerId: signed.id }),
+      pick("next", 2),
+    ],
+    draftPlayers: [...candidates, signed],
+    rosterPlayers: [],
+    teams: [team()],
+  });
+  assert.equal(projection[0]?.projectedPlayer?.id, "center");
+  assert.equal(signed.lineupPos, "IR");
 });

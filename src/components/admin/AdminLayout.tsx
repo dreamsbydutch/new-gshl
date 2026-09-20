@@ -14,6 +14,7 @@ const ADMIN_TABS: ReadonlyArray<{
   label: string;
 }> = [
   { key: "contracts", label: "Contracts" },
+  { key: "draftPicks", label: "Draft Picks" },
   { key: "users", label: "Users" },
   { key: "jobs", label: "Jobs" },
   { key: "newsroom", label: "Newsroom" },

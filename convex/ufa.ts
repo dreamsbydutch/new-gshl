@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return, @typescript-eslint/prefer-optional-chain */
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
+import type { Id } from "./_generated/dataModel";
 import {
   internalAction,
   internalMutation,
@@ -12,6 +13,7 @@ import { getUfaOfferGroupDeadline } from "../src/lib/utils/features/ufa-deadline
 import { requireOwnerOrCommissioner } from "./lib/auth";
 import { utcTimestampToDateKey } from "./lib/timestamps";
 import { resolveContractSigningAssignments } from "./lib/contractSigning";
+import { rebuildTeamLineup } from "./lib/teamLineup";
 import { loadDueUfaOfferGroups } from "./lib/ufaReconciliation";
 import { loadUfaOddsData, type UfaOddsData } from "./ufaOdds";
 
@@ -939,6 +941,14 @@ export const finalizeGroup = internalMutation({
         onClockEndedAt: null,
         updatedAt: now,
       });
+    }
+    if (signingAssignments[0]?.teamId) {
+      await rebuildTeamLineup(
+        ctx as never,
+        winningOffer.ownerId,
+        signingAssignments[0].teamId as Id<"teams">,
+        now,
+      );
     }
     for (const offer of offers) {
       await db.patch(offer._id, {

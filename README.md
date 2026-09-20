@@ -80,5 +80,11 @@ Read [AGENTS.md](AGENTS.md) before changing the repository. In particular:
 - lint changed files and run focused tests instead of routine repository-wide
   gates.
 
-The optional [salary-cap proposal](docs/product/salary-cap-upgrade-report.md) is
-a discussion artifact, not implemented behavior or an active league rule.
+Decision and investigation artifacts are kept separate from the project guide:
+
+- [GSHL relaunch proposal](docs/proposals/gshl-relaunch-owner-proposal.md)
+- [Relaunch salary analysis](docs/proposals/gshl-relaunch-salary-analysis.md)
+- [Salary-cap upgrade report](docs/product/salary-cap-upgrade-report.md)
+- [Draft reliability investigation](docs/operations/draft-reliability.md)
+
+Proposals are discussion material, not implemented behavior or active rules.

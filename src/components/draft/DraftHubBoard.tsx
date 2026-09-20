@@ -205,9 +205,7 @@ function DraftPickFlow({
             <div className="space-y-1 sm:space-y-2">
               {recentPicks.map((pick, index) => (
                 <div key={pick.pick.id} className="relative">
-                  {index > 0 ? (
-                    <DraftPickConnector recent />
-                  ) : null}
+                  {index > 0 ? <DraftPickConnector recent /> : null}
                   <DraftFlowPick
                     pick={pick}
                     isRecent={true}
@@ -236,9 +234,7 @@ function DraftPickFlow({
             <div className="space-y-1 sm:space-y-2">
               {upcomingPicks.map((pick, index) => (
                 <div key={pick.pick.id} className="relative">
-                  {index > 0 ? (
-                    <DraftPickConnector recent={false} />
-                  ) : null}
+                  {index > 0 ? <DraftPickConnector recent={false} /> : null}
                   <DraftFlowPick
                     pick={pick}
                     isRecent={false}
@@ -328,7 +324,7 @@ function DraftStatusHero({
               )}
             >
               {expired
-                ? "Commissioner pick required"
+                ? "Auto-pick pending"
                 : upcoming
                   ? "First selection"
                   : "On the clock"}
@@ -404,7 +400,7 @@ function DraftStatusHero({
           {expired ? (
             <p className="mt-2 inline-flex items-center gap-1 text-sm font-semibold text-red-700">
               <ShieldAlert className="h-4 w-4" />
-              Only a commissioner can submit
+              An automatic selection is pending. A commissioner can submit
             </p>
           ) : null}
         </div>
@@ -436,11 +432,13 @@ export function DraftHubBoard() {
       ? "Selections unlock when the draft begins."
       : board.state.status === "complete"
         ? "The draft is complete."
-        : board.state.status === "commissioner_required"
-          ? "The clock expired; a commissioner must make this selection."
-          : board.state.status === "on_clock" && board.activePick?.team
-            ? `Only ${board.activePick.team.name}'s owner or a commissioner can make this pick.`
-            : "No draft selection is available right now.";
+        : board.activePick?.team?.draftAuto
+          ? "This team is on Auto. Switch to Live to make a pick."
+          : board.state.status === "commissioner_required"
+            ? "The clock expired; an automatic selection is pending."
+            : board.state.status === "on_clock" && board.activePick?.team
+              ? `Only ${board.activePick.team.name}'s owner or a commissioner can make this pick.`
+              : "No draft selection is available right now.";
 
   return (
     <main className="container mx-auto space-y-8 px-3 py-5 sm:px-4">

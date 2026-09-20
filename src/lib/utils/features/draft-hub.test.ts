@@ -141,6 +141,12 @@ void test("estimates the logged-in owner's next open draft pick", () => {
   assert.equal(notice?.picksAway, 12);
   assert.equal(notice?.pick.pick.pick, "13");
   assert.equal(notice?.estimatedAt, estimateBaseTime + 12 * 82 * 1000);
+  picks[0]!.team!.draftAuto = true;
+  assert.equal(
+    getNextOwnerDraftPickNotice(picks, "owner-me", estimateBaseTime)
+      ?.estimatedAt,
+    estimateBaseTime + 11 * 82 * 1000,
+  );
 });
 
 void test("uses intuitive initial directions for every draft player column", () => {
@@ -414,6 +420,49 @@ void test("hides completed picks until the configured draft has started", () => 
 
   assert.equal(state.status, "upcoming");
   assert.deepEqual(state.recentPicks, []);
+});
+
+for (const [round, minutes] of [
+  [1, 4],
+  [4, 4],
+  [5, 3],
+  [6, 3],
+  [7, 2],
+  [15, 2],
+]) {
+  void test(`round ${round} expires after ${minutes} minutes`, () => {
+    const expiresAt = Date.parse(start) + minutes! * 60000;
+    const picks = [pick("active", 1, null, { round: String(round) })];
+    assert.equal(
+      resolveDraftClockState(picks, start, new Date(expiresAt - 1)).status,
+      "on_clock",
+    );
+    assert.equal(
+      resolveDraftClockState(picks, start, new Date(expiresAt)).status,
+      "commissioner_required",
+    );
+    assert.equal(
+      resolveDraftClockState(picks, start, new Date(expiresAt)).clockExpiresAt,
+      expiresAt,
+    );
+  });
+}
+
+void test("an already running turn preserves its stored expiry", () => {
+  const expiry = Date.parse(start) + 4 * 60000;
+  const result = resolveDraftClockState(
+    [
+      pick("active", 1, null, {
+        round: "7",
+        onClockStartedAt: start,
+        onClockExpiresAt: new Date(expiry).toISOString(),
+      }),
+    ],
+    start,
+    new Date(Date.parse(start) + 3 * 60000),
+  );
+  assert.equal(result.status, "on_clock");
+  assert.equal(result.clockExpiresAt, expiry);
 });
 
 void test("returns only the next five open picks", () => {

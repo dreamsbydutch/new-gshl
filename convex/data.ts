@@ -6,6 +6,7 @@ import {
   timestampFieldsForTable,
   toUtcTimestamp,
 } from "./lib/timestamps";
+import { rebuildTeamLineup as rebuildLineup } from "./lib/teamLineup";
 
 type Row = Record<string, unknown>;
 type ConvexRow = Row & { _id: string; _creationTime: number };
@@ -1403,6 +1404,31 @@ export const updateById = mutationGeneric({
 
     await ctx.db.patch(row._id, normalizeDoc(args.table, args.data) as never);
     return publicRow((await ctx.db.get(row._id)) as never);
+  },
+});
+
+/** Rebuild one season team's best lineup from owned active players. */
+export const rebuildTeamLineup = mutationGeneric({
+  args: {
+    serverSecret: v.string(),
+    ownerId: v.id("owners"),
+    teamId: v.id("teams"),
+  },
+  handler: async (ctx, args) => {
+    requireServerSecret(args.serverSecret);
+    const team = await ctx.db.get(args.teamId);
+    if (!team) throw new Error("Team not found");
+    const franchise = await ctx.db.get(team.franchiseId);
+    if (!franchise || franchise.ownerId !== args.ownerId) {
+      throw new Error("Team does not belong to the requested owner");
+    }
+    const assignments = await rebuildLineup(
+      ctx as never,
+      args.ownerId,
+      args.teamId,
+      Date.now(),
+    );
+    return { assignments };
   },
 });
 

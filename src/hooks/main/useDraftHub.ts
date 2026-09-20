@@ -47,3 +47,7 @@ export function useSubmitDraftPick() {
 export function useUndoDraftPick() {
   return useAppMutation(api.draft.undoPick);
 }
+
+export function useSetDraftTeamMode() {
+  return useAppMutation(api.draft.setTeamMode);
+}

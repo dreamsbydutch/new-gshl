@@ -1,3 +1,9 @@
+import { selectAutoDraftPlayer } from "../src/lib/utils/features/mock-draft";
+import { nextDraftMode } from "./lib/draftMode";
+import {
+  draftCorrectionSnapshot,
+  draftCorrectionVersion,
+} from "./lib/draftCorrection";
 import { v } from "convex/values";
 import {
   internalMutation,
@@ -23,7 +29,7 @@ import type {
   RosterPosition as RosterPositionType,
 } from "../src/lib/types";
 import {
-  DRAFT_PICK_CLOCK_MS,
+  getDraftPickClockMs,
   findLatestCompletedLiveDraftPick,
   resolveDraftClockState,
   serializeDraftHubPick,
@@ -107,6 +113,7 @@ async function loadTeamSummaries(
         name: String(franchise?.name ?? "Unknown team"),
         abbr: String(franchise?.abbr ?? ""),
         logoUrl: franchise?.logoUrl ?? null,
+        draftAuto: team.draftAuto ?? false,
       };
       return [String(team._id), summary] as const;
     }),
@@ -231,6 +238,175 @@ function contractCoversDraft(
   );
 }
 
+export const adminPicks = query({
+  args: { seasonId: v.id("seasons") },
+  handler: async (ctx, { seasonId }) => {
+    await requireCommissioner(ctx);
+    const [rows, teams] = await Promise.all([
+      ctx.db
+        .query("draftPicks")
+        .withIndex("by_seasonId", (q) => q.eq("seasonId", seasonId))
+        .collect(),
+      loadTeamSummaries(ctx, seasonId),
+    ]);
+    return {
+      teams: [...teams.values()],
+      picks: await Promise.all(
+        [...rows].sort(compareRows).map(async (row) => ({
+          id: row._id,
+          ...draftCorrectionSnapshot(row),
+          version: draftCorrectionVersion(row),
+          playerName: row.playerId
+            ? ((await ctx.db.get(row.playerId))?.fullName ?? "Missing player")
+            : null,
+        })),
+      ),
+    };
+  },
+});
+
+export const correctionHistory = query({
+  args: { pickId: v.id("draftPicks") },
+  handler: async (ctx, { pickId }) => {
+    await requireCommissioner(ctx);
+    return ctx.db
+      .query("draftPickCorrections")
+      .withIndex("by_pickId", (q) => q.eq("pickId", pickId))
+      .order("desc")
+      .take(20);
+  },
+});
+
+export const correctPicks = mutation({
+  args: {
+    seasonId: v.id("seasons"),
+    reason: v.string(),
+    edits: v.array(
+      v.object({
+        pickId: v.id("draftPicks"),
+        expectedVersion: v.string(),
+        changes: v.object({
+          gshlTeamId: v.id("teams"),
+          originalTeamId: v.union(v.id("teams"), v.null()),
+          round: v.number(),
+          pick: v.number(),
+          playerId: v.union(v.id("players"), v.null()),
+          isTraded: v.boolean(),
+          isSigning: v.boolean(),
+        }),
+      }),
+    ),
+  },
+  handler: async (ctx, args) => {
+    const user = await requireCommissioner(ctx);
+    if (!args.edits.length || args.edits.length > 500)
+      throw new Error("Stage between 1 and 500 corrections");
+    const reason = args.reason.trim();
+    if (!reason || reason.length > 1000)
+      throw new Error("Enter a correction reason (1-1000 characters)");
+    const season = await ctx.db.get(args.seasonId);
+    if (!season) throw new Error("Draft season not found");
+    const rows = await ctx.db
+      .query("draftPicks")
+      .withIndex("by_seasonId", (q) => q.eq("seasonId", args.seasonId))
+      .collect();
+    const started = (toUtcTimestamp(season.draftStartAt) ?? 0) <= Date.now();
+    if (started && rows.some((p) => !p.isSigning && !p.playerId))
+      throw new Error(
+        "Corrections are available before the draft starts or after every pick is complete",
+      );
+    const edits = new Map(args.edits.map((edit) => [edit.pickId, edit]));
+    if (edits.size !== args.edits.length)
+      throw new Error("Each pick may be edited only once per batch");
+    for (const edit of args.edits) {
+      const row = rows.find((p) => p._id === edit.pickId);
+      if (!row) throw new Error("Draft pick not found in this season");
+      if (draftCorrectionVersion(row) !== edit.expectedVersion)
+        throw new Error(
+          "A staged pick changed. Discard the batch and reopen the picks before saving.",
+        );
+      const changes = edit.changes;
+      if (
+        ![changes.round, changes.pick].every(
+          (n) => Number.isSafeInteger(n) && n > 0,
+        )
+      )
+        throw new Error("Round and pick must be positive whole numbers");
+      for (const teamId of new Set([
+        changes.gshlTeamId,
+        changes.originalTeamId,
+      ])) {
+        if (!teamId) continue;
+        const team = await ctx.db.get(teamId);
+        if (team?.seasonId !== args.seasonId)
+          throw new Error("Choose teams from the pick's season");
+      }
+      if (changes.playerId && !(await ctx.db.get(changes.playerId)))
+        throw new Error("Player not found");
+    }
+    const finalRows = rows.map((row) => ({
+      ...row,
+      ...edits.get(row._id)?.changes,
+    }));
+    if (started && finalRows.some((p) => !p.isSigning && !p.playerId))
+      throw new Error("A correction cannot reopen a completed draft");
+    // Validate the final batch so swaps do not fail on intermediate duplicates.
+    const slots = new Set<string>();
+    const players = new Set<string>();
+    for (const row of finalRows) {
+      const slot = `${Number(row.round)}:${Number(row.pick)}`;
+      if (slots.has(slot))
+        throw new Error("Each round and pick must be unique after corrections");
+      slots.add(slot);
+      if (row.playerId) {
+        if (players.has(row.playerId))
+          throw new Error(
+            "Each player must appear only once after corrections",
+          );
+        players.add(row.playerId);
+      }
+    }
+    const selections = (picks: typeof rows) =>
+      picks
+        .filter((p) => p.playerId)
+        .map((p) => `${p.gshlTeamId ?? ""}:${p.playerId}`)
+        .sort();
+    if (
+      JSON.stringify(selections(rows)) !== JSON.stringify(selections(finalRows))
+    )
+      throw new Error(
+        "Keep each team's selected players: move the team and its player together, or stage the matching pick changes",
+      );
+    const changedRows = rows.filter(
+      (row) =>
+        edits.has(row._id) &&
+        JSON.stringify(draftCorrectionSnapshot(row)) !==
+          JSON.stringify(
+            draftCorrectionSnapshot({ ...row, ...edits.get(row._id)!.changes }),
+          ),
+    );
+    if (!changedRows.length) throw new Error("No changes to save");
+    const now = Date.now();
+    for (const row of changedRows) {
+      const changes = edits.get(row._id)!.changes;
+      const before = JSON.stringify(draftCorrectionSnapshot(row));
+      const after = JSON.stringify(
+        draftCorrectionSnapshot({ ...row, ...changes }),
+      );
+      await ctx.db.patch(row._id, { ...changes, updatedAt: now });
+      await ctx.db.insert("draftPickCorrections", {
+        seasonId: row.seasonId,
+        pickId: row._id,
+        userId: user._id,
+        reason,
+        before,
+        after,
+        createdAt: now,
+      });
+    }
+    return { correctedCount: changedRows.length };
+  },
+});
 export const status = query({
   args: { seasonId: v.id("seasons") },
   handler: async (ctx, args) => {
@@ -291,6 +467,7 @@ export const state = query({
         startDate: toUtcTimestamp(season.startDate) ?? 0,
         draftStartAt: toUtcTimestamp(season.draftStartAt) ?? 0,
       },
+      teams: [...teamById.values()],
       serverNow: now.getTime(),
       status: clock.status,
       activePickId: clock.activePick?.id ?? null,
@@ -312,178 +489,217 @@ export const state = query({
   },
 });
 
+async function completePick(
+  ctx: MutationCtx,
+  args: {
+    seasonId: Id<"seasons">;
+    pickId: Id<"draftPicks">;
+    playerId: Id<"players">;
+  },
+  automatic?: "timeout" | "auto",
+) {
+  const user = automatic ? null : await requireOwnerOrCommissioner(ctx);
+  const [season, pickRows, player] = await Promise.all([
+    ctx.db.get(args.seasonId),
+    ctx.db
+      .query("draftPicks")
+      .withIndex("by_seasonId_round_pick", (range) =>
+        range.eq("seasonId", args.seasonId),
+      )
+      .collect(),
+    ctx.db.get(args.playerId),
+  ]);
+  if (!season) throw new Error("Draft season not found");
+  if (!player) throw new Error("Player not found");
+
+  const orderedRows = [...pickRows].sort(compareRows);
+  const activeRow =
+    orderedRows.find((pick) => !pick.isSigning && !pick.playerId) ?? null;
+  if (!activeRow) throw new Error("The draft is complete");
+  if (activeRow._id !== args.pickId) {
+    throw new Error("That pick is no longer on the clock");
+  }
+
+  const now = new Date();
+  const nowTimestamp = now.getTime();
+  const clock = resolveDraftClockState(
+    orderedRows.map(toDraftPick),
+    toUtcTimestamp(season.draftStartAt),
+    now,
+  );
+  if (clock.status === "upcoming") {
+    throw new Error("The draft has not started");
+  }
+  if (clock.status !== "on_clock" && clock.status !== "commissioner_required") {
+    throw new Error("The active draft clock is unavailable");
+  }
+
+  if (!activeRow.gshlTeamId) {
+    throw new Error("The active pick does not have a team");
+  }
+  const activeTeam = await ctx.db.get(activeRow.gshlTeamId);
+  const franchise = activeTeam
+    ? await ctx.db.get(activeTeam.franchiseId)
+    : null;
+  if (!activeTeam || !franchise) {
+    throw new Error("The active pick team could not be resolved");
+  }
+
+  const isCommissioner = user?.role === "commissioner";
+  if (
+    !automatic &&
+    !isCommissioner &&
+    (!user?.ownerId || user.ownerId !== franchise.ownerId)
+  ) {
+    throw new Error("Only the on-the-clock owner can make this pick");
+  }
+  if (
+    clock.status === "commissioner_required" &&
+    !isCommissioner &&
+    !automatic
+  ) {
+    throw new Error("The clock expired; a commissioner must make this pick");
+  }
+
+  if (!automatic && activeTeam.draftAuto)
+    throw new Error("Switch this team to Live before making a pick");
+  await ctx.db.patch(
+    activeTeam._id,
+    nextDraftMode(activeTeam, automatic === "timeout"),
+  );
+
+  if (!player.isActive) {
+    throw new Error("That player is not draft eligible");
+  }
+  if (
+    orderedRows.some(
+      (pick) => pick.playerId === args.playerId && pick._id !== activeRow._id,
+    )
+  ) {
+    throw new Error("That player has already been drafted");
+  }
+
+  const draftDate = parseTime(season.startDate);
+  if (draftDate === null) {
+    throw new Error("The draft season start date is invalid");
+  }
+  const playerContracts = await ctx.db
+    .query("contracts")
+    .withIndex("by_playerId", (range) => range.eq("playerId", args.playerId))
+    .collect();
+  if (
+    playerContracts.some((contract) => contractCoversDraft(contract, draftDate))
+  ) {
+    throw new Error("That player already has a contract for this season");
+  }
+
+  await ctx.db.patch(player._id, {
+    ownerId: franchise.ownerId,
+    gshlTeamId: activeTeam._id,
+    isSignable: false,
+    isResignable: null,
+    lineupPos: null,
+    updatedAt: nowTimestamp,
+  });
+
+  const draftedPlayerRow: Doc<"players"> = {
+    ...player,
+    ownerId: franchise.ownerId,
+    gshlTeamId: activeTeam._id,
+    isSignable: false,
+    isResignable: null,
+    lineupPos: null,
+    updatedAt: nowTimestamp,
+  };
+  const lineupAssignments = await rebuildTeamLineup(
+    ctx,
+    franchise.ownerId,
+    activeTeam._id,
+    nowTimestamp,
+    [draftedPlayerRow],
+  );
+  const draftedPlayerAssignment = lineupAssignments.find(
+    (assignment) => assignment.playerId === String(player._id),
+  );
+  if (!draftedPlayerAssignment) {
+    throw new Error("The drafted player could not be placed in the lineup");
+  }
+
+  await ctx.db.patch(activeRow._id, {
+    playerId: args.playerId,
+    onClockStartedAt:
+      toUtcTimestamp(activeRow.onClockStartedAt) ??
+      toUtcTimestamp(clock.clockStartedAt) ??
+      nowTimestamp,
+    onClockExpiresAt:
+      toUtcTimestamp(activeRow.onClockExpiresAt) ??
+      toUtcTimestamp(clock.clockExpiresAt) ??
+      nowTimestamp + getDraftPickClockMs(activeRow.round),
+    onClockEndedAt: nowTimestamp,
+    isSigning: false,
+    updatedAt: nowTimestamp,
+  });
+
+  const nextPick =
+    orderedRows.find(
+      (pick) => pick._id !== activeRow._id && !pick.isSigning && !pick.playerId,
+    ) ?? null;
+  if (nextPick) {
+    await ctx.db.patch(nextPick._id, {
+      onClockStartedAt: nowTimestamp,
+      onClockExpiresAt: nowTimestamp + getDraftPickClockMs(nextPick.round),
+      onClockEndedAt: null,
+      updatedAt: nowTimestamp,
+    });
+  }
+
+  await emitNotification(ctx, {
+    key: `pick:${activeRow._id}:${nowTimestamp}`,
+    category: "draft_pick",
+    title: "Pick confirmed",
+    body: `Your team selected ${player.fullName}.`,
+    href: "/draft/my-team",
+    ownerId: franchise.ownerId,
+    pickId: activeRow._id,
+    clockStartedAt: nowTimestamp,
+    expiresAt: nowTimestamp + 3600000,
+  });
+  await ctx.scheduler.runAfter(0, internal.draft.notifyState, {
+    seasonId: args.seasonId,
+  });
+  return {
+    completedPickId: String(activeRow._id),
+    nextPickId: nextPick ? String(nextPick._id) : null,
+    isComplete: nextPick === null,
+    lineupPos: draftedPlayerAssignment.lineupPos,
+  };
+}
 export const submitPick = mutation({
   args: {
     seasonId: v.id("seasons"),
     pickId: v.id("draftPicks"),
     playerId: v.id("players"),
   },
+  handler: (ctx, args) => completePick(ctx, args),
+});
+export const setTeamMode = mutation({
+  args: { teamId: v.id("teams"), auto: v.boolean() },
   handler: async (ctx, args) => {
     const user = await requireOwnerOrCommissioner(ctx);
-    const [season, pickRows, player] = await Promise.all([
-      ctx.db.get(args.seasonId),
-      ctx.db
-        .query("draftPicks")
-        .withIndex("by_seasonId_round_pick", (range) =>
-          range.eq("seasonId", args.seasonId),
-        )
-        .collect(),
-      ctx.db.get(args.playerId),
-    ]);
-    if (!season) throw new Error("Draft season not found");
-    if (!player) throw new Error("Player not found");
-
-    const orderedRows = [...pickRows].sort(compareRows);
-    const activeRow =
-      orderedRows.find((pick) => !pick.isSigning && !pick.playerId) ?? null;
-    if (!activeRow) throw new Error("The draft is complete");
-    if (activeRow._id !== args.pickId) {
-      throw new Error("That pick is no longer on the clock");
-    }
-
-    const now = new Date();
-    const nowTimestamp = now.getTime();
-    const clock = resolveDraftClockState(
-      orderedRows.map(toDraftPick),
-      toUtcTimestamp(season.draftStartAt),
-      now,
-    );
-    if (clock.status === "upcoming") {
-      throw new Error("The draft has not started");
-    }
-    if (
-      clock.status !== "on_clock" &&
-      clock.status !== "commissioner_required"
-    ) {
-      throw new Error("The active draft clock is unavailable");
-    }
-
-    if (!activeRow.gshlTeamId) {
-      throw new Error("The active pick does not have a team");
-    }
-    const activeTeam = await ctx.db.get(activeRow.gshlTeamId);
-    const franchise = activeTeam
-      ? await ctx.db.get(activeTeam.franchiseId)
-      : null;
-    if (!activeTeam || !franchise) {
-      throw new Error("The active pick team could not be resolved");
-    }
-
-    const isCommissioner = user.role === "commissioner";
-    if (
-      !isCommissioner &&
-      (!user.ownerId || user.ownerId !== franchise.ownerId)
-    ) {
-      throw new Error("Only the on-the-clock owner can make this pick");
-    }
-    if (clock.status === "commissioner_required" && !isCommissioner) {
-      throw new Error("The clock expired; a commissioner must make this pick");
-    }
-
-    if (!player.isActive) {
-      throw new Error("That player is not draft eligible");
-    }
-    if (
-      orderedRows.some(
-        (pick) => pick.playerId === args.playerId && pick._id !== activeRow._id,
-      )
-    ) {
-      throw new Error("That player has already been drafted");
-    }
-
-    const draftDate = parseTime(season.startDate);
-    if (draftDate === null) {
-      throw new Error("The draft season start date is invalid");
-    }
-    const playerContracts = await ctx.db
-      .query("contracts")
-      .withIndex("by_playerId", (range) => range.eq("playerId", args.playerId))
-      .collect();
-    if (
-      playerContracts.some((contract) =>
-        contractCoversDraft(contract, draftDate),
-      )
-    ) {
-      throw new Error("That player already has a contract for this season");
-    }
-
-    await ctx.db.patch(player._id, {
-      ownerId: franchise.ownerId,
-      gshlTeamId: activeTeam._id,
-      lineupPos: null,
-      updatedAt: nowTimestamp,
-    });
-
-    const draftedPlayerRow: Doc<"players"> = {
-      ...player,
-      ownerId: franchise.ownerId,
-      gshlTeamId: activeTeam._id,
-      lineupPos: null,
-      updatedAt: nowTimestamp,
-    };
-    const lineupAssignments = await rebuildTeamLineup(
-      ctx,
-      franchise.ownerId,
-      activeTeam._id,
-      nowTimestamp,
-      [draftedPlayerRow],
-    );
-    const draftedPlayerAssignment = lineupAssignments.find(
-      (assignment) => assignment.playerId === String(player._id),
-    );
-    if (!draftedPlayerAssignment) {
-      throw new Error("The drafted player could not be placed in the lineup");
-    }
-
-    await ctx.db.patch(activeRow._id, {
-      playerId: args.playerId,
-      onClockStartedAt:
-        toUtcTimestamp(activeRow.onClockStartedAt) ??
-        toUtcTimestamp(clock.clockStartedAt) ??
-        nowTimestamp,
-      onClockExpiresAt:
-        toUtcTimestamp(activeRow.onClockExpiresAt) ??
-        toUtcTimestamp(clock.clockExpiresAt) ??
-        nowTimestamp + DRAFT_PICK_CLOCK_MS,
-      onClockEndedAt: nowTimestamp,
-      isSigning: false,
-      updatedAt: nowTimestamp,
-    });
-
-    const nextPick =
-      orderedRows.find(
-        (pick) =>
-          pick._id !== activeRow._id && !pick.isSigning && !pick.playerId,
-      ) ?? null;
-    if (nextPick) {
-      await ctx.db.patch(nextPick._id, {
-        onClockStartedAt: nowTimestamp,
-        onClockExpiresAt: nowTimestamp + DRAFT_PICK_CLOCK_MS,
-        onClockEndedAt: null,
-        updatedAt: nowTimestamp,
-      });
-    }
-
-    await emitNotification(ctx, {
-      key: `pick:${activeRow._id}:${nowTimestamp}`,
-      category: "draft_pick",
-      title: "Pick confirmed",
-      body: `Your team selected ${player.fullName}.`,
-      href: "/draft/my-team",
-      ownerId: franchise.ownerId,
-      pickId: activeRow._id,
-      clockStartedAt: nowTimestamp,
-      expiresAt: nowTimestamp + 3600000,
+    const team = await ctx.db.get(args.teamId);
+    const franchise = team ? await ctx.db.get(team.franchiseId) : null;
+    if (!team || !franchise) throw new Error("Team not found");
+    if (user.role !== "commissioner" && user.ownerId !== franchise.ownerId)
+      throw new Error(
+        "Only this team's owner or a commissioner can change draft mode",
+      );
+    await ctx.db.patch(team._id, {
+      draftAuto: args.auto,
+      draftTimeoutStreak: 0,
     });
     await ctx.scheduler.runAfter(0, internal.draft.notifyState, {
-      seasonId: args.seasonId,
+      seasonId: team.seasonId,
     });
-    return {
-      completedPickId: String(activeRow._id),
-      nextPickId: nextPick ? String(nextPick._id) : null,
-      isComplete: nextPick === null,
-      lineupPos: draftedPlayerAssignment.lineupPos,
-    };
   },
 });
 
@@ -548,6 +764,8 @@ export const undoPick = mutation({
       updatedAt: nowTimestamp,
     });
     await rebuildTeamLineup(ctx, franchise.ownerId, team._id, nowTimestamp);
+    // Undo removes the timeout from the streak; Auto still needs an explicit toggle.
+    await ctx.db.patch(team._id, { draftTimeoutStreak: 0 });
 
     for (const openPick of orderedRows.filter(
       (pick) => !pick.isSigning && !pick.playerId,
@@ -565,7 +783,8 @@ export const undoPick = mutation({
     await ctx.db.patch(latestCompletedPick._id, {
       playerId: null,
       onClockStartedAt: restartedAt,
-      onClockExpiresAt: restartedAt + DRAFT_PICK_CLOCK_MS,
+      onClockExpiresAt:
+        restartedAt + getDraftPickClockMs(latestCompletedPick.round),
       onClockEndedAt: null,
       updatedAt: nowTimestamp,
     });
@@ -581,8 +800,15 @@ export const undoPick = mutation({
 });
 
 export const notifyState = internalMutation({
-  args: { seasonId: v.id("seasons") },
-  handler: async (ctx, { seasonId }) => {
+  args: {
+    seasonId: v.id("seasons"),
+    expectedPickId: v.optional(v.id("draftPicks")),
+    expectedClockStartedAt: v.optional(v.number()),
+  },
+  handler: async (
+    ctx,
+    { seasonId, expectedPickId, expectedClockStartedAt },
+  ) => {
     const season = await ctx.db.get(seasonId);
     if (!season) return;
     const now = Date.now(),
@@ -594,6 +820,97 @@ export const notifyState = internalMutation({
       .collect();
     const picks = [...rows].sort(compareRows).map(toDraftPick);
     const clock = resolveDraftClockState(picks, start, new Date(now));
+    // Ignore timers from picks that were completed, undone, or rescheduled.
+    if (
+      expectedPickId &&
+      (clock.activePick?.id !== String(expectedPickId) ||
+        clock.clockStartedAt !== expectedClockStartedAt)
+    )
+      return;
+    if (
+      clock.activePick &&
+      (clock.status === "on_clock" || clock.status === "commissioner_required")
+    ) {
+      const active = rows.find(
+        (row) => String(row._id) === clock.activePick!.id,
+      )!;
+      const team = active.gshlTeamId
+        ? await ctx.db.get(active.gshlTeamId)
+        : null;
+      if (
+        team &&
+        (team.draftAuto || clock.status === "commissioner_required")
+      ) {
+        const franchise = await ctx.db.get(team.franchiseId);
+        const draftDate = toUtcTimestamp(season.startDate);
+        if (!franchise || draftDate === null) return;
+        const [players, contracts] = await Promise.all([
+          ctx.db
+            .query("players")
+            .withIndex("by_isActive", (q) => q.eq("isActive", true))
+            .collect(),
+          ctx.db.query("contracts").collect(),
+        ]);
+        const covered = contracts.filter((contract) =>
+          contractCoversDraft(contract, draftDate),
+        );
+        const drafted = new Set(
+          rows.flatMap((row) => (row.playerId ? [String(row.playerId)] : [])),
+        );
+        const contracted = new Set(
+          covered.map((contract) => String(contract.playerId)),
+        );
+        const rosterIds = new Set([
+          ...covered
+            .filter((contract) => contract.ownerId === franchise.ownerId)
+            .map((contract) => String(contract.playerId)),
+          ...rows
+            .filter(
+              (row) =>
+                row.gshlTeamId === team._id && !row.isSigning && row.playerId,
+            )
+            .map((row) => String(row.playerId)),
+        ]);
+        const candidates = players.map((player) => ({
+          ...toLineupCandidate(player),
+          fullName: player.fullName,
+          yahooDraftRk:
+            player.yahooDraftRk == null ? null : Number(player.yahooDraftRk),
+          dailyFaceoffRk:
+            player.dailyFaceoffRk == null
+              ? null
+              : Number(player.dailyFaceoffRk),
+          nhlRk: player.nhlRk == null ? null : Number(player.nhlRk),
+          overallRk: player.overallRk == null ? null : Number(player.overallRk),
+        }));
+        const selected = selectAutoDraftPlayer(
+          candidates.filter(
+            (player) => !drafted.has(player.id) && !contracted.has(player.id),
+          ),
+          candidates.filter((player) => rosterIds.has(player.id)),
+        ).player;
+        if (!selected) return;
+        const player = players.find(
+          (player) => String(player._id) === selected.id,
+        )!;
+        await completePick(
+          ctx,
+          { seasonId, pickId: active._id, playerId: player._id },
+          team.draftAuto ? "auto" : "timeout",
+        );
+        return;
+      }
+      if (clock.clockExpiresAt)
+        await ctx.scheduler.runAt(
+          clock.clockExpiresAt,
+          internal.draft.notifyState,
+          {
+            seasonId,
+            expectedPickId: active._id,
+            expectedClockStartedAt: clock.clockStartedAt ?? undefined,
+          },
+        );
+    }
     const base = { href: "/draft", expiresAt: start, seasonId };
     if (
       now < start &&
@@ -671,7 +988,11 @@ export const notifyState = internalMutation({
         await ctx.scheduler.runAt(
           expiresAt - 60000,
           internal.draft.notifyState,
-          { seasonId },
+          {
+            seasonId,
+            expectedPickId: active._id,
+            expectedClockStartedAt: clockStartedAt,
+          },
         );
     }
     for (const [index, pick] of clock.upcomingPicks.slice(0, 2).entries()) {

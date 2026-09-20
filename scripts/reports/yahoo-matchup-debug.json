@@ -1,0 +1,895 @@
+{
+  "url": "https://hockey.fantasysports.yahoo.com/hockey/44541/players",
+  "seasonId": "",
+  "hasPM": true,
+  "htmlPath": "C:\\Users\\choug\\Documents\\apps\\new-gshl\\scripts\\reports\\yahoo-matchup-debug.html",
+  "candidateTableCount": 4,
+  "selectedTables": {
+    "skaterTableIndex": null,
+    "goalieTableIndex": null
+  },
+  "debugReport": {
+    "candidateTables": [
+      {
+        "index": 0,
+        "caption": "",
+        "headers": [
+          "",
+          "",
+          "",
+          "",
+          "Rankings",
+          "Rosters",
+          "Offense",
+          ""
+        ],
+        "rowCount": 26,
+        "rows": [
+          [
+            "",
+            "",
+            "Forwards/Defensemen",
+            "Opp: 9/18",
+            "Roster Status",
+            "GP*",
+            "Pre-Season",
+            "Current",
+            "% Ros",
+            "TOI/G*",
+            "G",
+            "A",
+            "P",
+            "PPP",
+            "SOG",
+            "HIT",
+            "BLK",
+            ""
+          ],
+          [
+            "",
+            "",
+            "Connor McDavidPlayer Note EDM - C",
+            "",
+            "FA",
+            "82",
+            "1",
+            "3",
+            "100%",
+            "22:59",
+            "48",
+            "90",
+            "138",
+            "54",
+            "306",
+            "40",
+            "30",
+            ""
+          ],
+          [
+            "",
+            "",
+            "Nathan MacKinnonNo new player Notes COL - C",
+            "",
+            "FA",
+            "80",
+            "2",
+            "4",
+            "100%",
+            "22:15",
+            "53",
+            "74",
+            "127",
+            "30",
+            "350",
+            "64",
+            "35",
+            ""
+          ],
+          [
+            "",
+            "",
+            "Nikita KucherovPlayer Note TB - RW",
+            "",
+            "FA",
+            "76",
+            "3",
+            "5",
+            "100%",
+            "20:20",
+            "44",
+            "86",
+            "130",
+            "37",
+            "231",
+            "36",
+            "29",
+            ""
+          ],
+          [
+            "",
+            "",
+            "Macklin CelebriniNo new player Notes SJ - C",
+            "",
+            "FA",
+            "82",
+            "4",
+            "6",
+            "100%",
+            "21:18",
+            "45",
+            "70",
+            "115",
+            "33",
+            "287",
+            "53",
+            "53",
+            ""
+          ],
+          [
+            "",
+            "",
+            "Leon DraisaitlNo new player Notes EDM - C,LW",
+            "",
+            "FA",
+            "65",
+            "5",
+            "18",
+            "100%",
+            "21:34",
+            "35",
+            "62",
+            "97",
+            "42",
+            "186",
+            "34",
+            "15",
+            ""
+          ],
+          [
+            "",
+            "",
+            "Cale MakarOPlayer Note COL - D",
+            "",
+            "FA",
+            "75",
+            "6",
+            "32",
+            "100%",
+            "24:50",
+            "20",
+            "59",
+            "79",
+            "29",
+            "199",
+            "35",
+            "118",
+            ""
+          ],
+          [
+            "",
+            "",
+            "David PastrnakNo new player Notes BOS - RW",
+            "",
+            "FA",
+            "77",
+            "7",
+            "9",
+            "100%",
+            "20:39",
+            "29",
+            "71",
+            "100",
+            "33",
+            "261",
+            "86",
+            "32",
+            ""
+          ],
+          [
+            "",
+            "",
+            "Kirill KaprizovNo new player Notes MIN - LW",
+            "",
+            "FA",
+            "78",
+            "8",
+            "14",
+            "100%",
+            "22:08",
+            "45",
+            "44",
+            "89",
+            "32",
+            "269",
+            "52",
+            "27",
+            ""
+          ],
+          [
+            "",
+            "",
+            "Jason RobertsonNo new player Notes DAL - LW,RW",
+            "",
+            "FA",
+            "82",
+            "9",
+            "8",
+            "100%",
+            "20:15",
+            "45",
+            "51",
+            "96",
+            "41",
+            "294",
+            "48",
+            "34",
+            ""
+          ],
+          [
+            "",
+            "",
+            "Quinn HughesNo new player Notes MIN - D",
+            "",
+            "FA",
+            "74",
+            "11",
+            "39",
+            "100%",
+            "27:44",
+            "7",
+            "69",
+            "76",
+            "34",
+            "187",
+            "7",
+            "87",
+            ""
+          ],
+          [
+            "",
+            "",
+            "Nick SuzukiNo new player Notes MTL - C",
+            "",
+            "FA",
+            "82",
+            "12",
+            "10",
+            "100%",
+            "20:49",
+            "29",
+            "72",
+            "101",
+            "43",
+            "183",
+            "62",
+            "62",
+            ""
+          ],
+          [
+            "",
+            "",
+            "Zach WerenskiNo new player Notes CBJ - D",
+            "",
+            "FA",
+            "75",
+            "13",
+            "30",
+            "100%",
+            "26:36",
+            "22",
+            "59",
+            "81",
+            "21",
+            "260",
+            "30",
+            "94",
+            ""
+          ],
+          [
+            "",
+            "",
+            "Martin NecasPlayer Note COL - RW",
+            "",
+            "FA",
+            "78",
+            "14",
+            "17",
+            "100%",
+            "21:29",
+            "38",
+            "62",
+            "100",
+            "24",
+            "206",
+            "85",
+            "26",
+            ""
+          ],
+          [
+            "",
+            "",
+            "Auston MatthewsPlayer Note TOR - C",
+            "",
+            "FA",
+            "60",
+            "15",
+            "112",
+            "99%",
+            "20:48",
+            "27",
+            "26",
+            "53",
+            "12",
+            "227",
+            "42",
+            "81",
+            ""
+          ],
+          [
+            "",
+            "",
+            "Jack HughesNo new player Notes NJ - C,LW",
+            "",
+            "FA",
+            "61",
+            "16",
+            "54",
+            "99%",
+            "21:18",
+            "27",
+            "50",
+            "77",
+            "23",
+            "228",
+            "4",
+            "32",
+            ""
+          ],
+          [
+            "",
+            "",
+            "Wyatt JohnstonNo new player Notes DAL - C,RW",
+            "",
+            "FA",
+            "82",
+            "17",
+            "13",
+            "100%",
+            "20:07",
+            "45",
+            "41",
+            "86",
+            "42",
+            "206",
+            "56",
+            "55",
+            ""
+          ],
+          [
+            "",
+            "",
+            "Evan BouchardNo new player Notes EDM - D",
+            "",
+            "FA",
+            "82",
+            "18",
+            "12",
+            "100%",
+            "24:40",
+            "21",
+            "74",
+            "95",
+            "33",
+            "221",
+            "29",
+            "101",
+            ""
+          ],
+          [
+            "",
+            "",
+            "Lane HutsonNo new player Notes MTL - D",
+            "",
+            "FA",
+            "82",
+            "19",
+            "53",
+            "100%",
+            "23:46",
+            "12",
+            "66",
+            "78",
+            "20",
+            "124",
+            "31",
+            "137",
+            ""
+          ],
+          [
+            "",
+            "",
+            "Cole CaufieldNo new player Notes MTL - LW,RW",
+            "",
+            "FA",
+            "81",
+            "20",
+            "19",
+            "100%",
+            "18:11",
+            "51",
+            "37",
+            "88",
+            "29",
+            "258",
+            "50",
+            "21",
+            ""
+          ],
+          [
+            "",
+            "",
+            "Brady TkachukNo new player Notes FLA - C,LW",
+            "",
+            "FA",
+            "60",
+            "21",
+            "69",
+            "99%",
+            "16:57",
+            "22",
+            "37",
+            "59",
+            "20",
+            "221",
+            "162",
+            "19",
+            ""
+          ],
+          [
+            "",
+            "",
+            "Matt BoldyNo new player Notes MIN - LW,RW",
+            "",
+            "FA",
+            "76",
+            "22",
+            "15",
+            "99%",
+            "20:34",
+            "42",
+            "43",
+            "85",
+            "30",
+            "254",
+            "60",
+            "58",
+            ""
+          ],
+          [
+            "",
+            "",
+            "Jack EichelNo new player Notes VGK - C",
+            "",
+            "FA",
+            "74",
+            "23",
+            "21",
+            "99%",
+            "21:12",
+            "27",
+            "63",
+            "90",
+            "28",
+            "260",
+            "35",
+            "40",
+            ""
+          ],
+          [
+            "",
+            "",
+            "Mikko RantanenNo new player Notes DAL - LW,RW",
+            "",
+            "FA",
+            "64",
+            "25",
+            "60",
+            "99%",
+            "20:10",
+            "22",
+            "55",
+            "77",
+            "34",
+            "139",
+            "48",
+            "30",
+            ""
+          ],
+          [
+            "",
+            "",
+            "Kyle ConnorNo new player Notes WPG - LW",
+            "",
+            "FA",
+            "82",
+            "28",
+            "28",
+            "99%",
+            "21:30",
+            "39",
+            "53",
+            "92",
+            "19",
+            "274",
+            "36",
+            "19",
+            ""
+          ],
+          [
+            "",
+            "",
+            "Cutter GauthierPlayer Note ANA - C,LW,RW",
+            "",
+            "FA",
+            "76",
+            "29",
+            "40",
+            "99%",
+            "17:15",
+            "41",
+            "28",
+            "69",
+            "19",
+            "285",
+            "64",
+            "20",
+            ""
+          ]
+        ]
+      },
+      {
+        "index": 1,
+        "caption": "",
+        "headers": [
+          "Notes"
+        ],
+        "rowCount": 28,
+        "rows": [
+          [
+            "Pre-Season",
+            "Player's fantasy ranking based on pre-season projections"
+          ],
+          [
+            "Current",
+            "Player's current fantasy ranking based on stats filter selected"
+          ],
+          [
+            "",
+            "Probable Starter (announced for starting lineup)"
+          ],
+          [
+            "New Player Note",
+            "New player notes in the last 24 hours. Click to view notes and other information."
+          ],
+          [
+            "No new player Notes",
+            "No new player notes available. Click to view other information."
+          ],
+          [
+            "Video Playlist",
+            "New video highlight. Click to view video."
+          ],
+          [
+            "Player Status"
+          ],
+          [
+            "COVID-19",
+            "Covid-19"
+          ],
+          [
+            "DTD",
+            "Day-to-Day"
+          ],
+          [
+            "IR-NR",
+            "Injured Reserve"
+          ],
+          [
+            "IR",
+            "Injured Reserve"
+          ],
+          [
+            "IR-LT",
+            "Injured Reserve"
+          ],
+          [
+            "NA",
+            "Not Active"
+          ],
+          [
+            "O",
+            "Out"
+          ],
+          [
+            "SUSP",
+            "Suspended"
+          ],
+          [
+            "Action"
+          ],
+          [
+            "",
+            "Add Player"
+          ],
+          [
+            "",
+            "Add Player functionality is disabled"
+          ],
+          [
+            "",
+            "No more roster moves available"
+          ],
+          [
+            "",
+            "Drop Player"
+          ],
+          [
+            "",
+            "Player on Can't Cut list"
+          ],
+          [
+            "",
+            "Propose Trade"
+          ],
+          [
+            "",
+            "No more trades available"
+          ],
+          [
+            "",
+            "Trade functionality is disabled"
+          ],
+          [
+            "",
+            "Actions locked by commissioner"
+          ],
+          [
+            "",
+            "Add player to Watch List"
+          ],
+          [
+            "",
+            "Remove player from Watch List"
+          ],
+          [
+            "",
+            "Watch List is not available"
+          ]
+        ]
+      },
+      {
+        "index": 2,
+        "caption": "",
+        "headers": [
+          "Forwards/Defensemen:"
+        ],
+        "rowCount": 34,
+        "rows": [
+          [
+            "Abbreviation",
+            "What it Means"
+          ],
+          [
+            "G",
+            "Goals"
+          ],
+          [
+            "A",
+            "Assists"
+          ],
+          [
+            "P",
+            "Points"
+          ],
+          [
+            "+/-",
+            "Plus/Minus"
+          ],
+          [
+            "PIM",
+            "Penalty Minutes"
+          ],
+          [
+            "PPG",
+            "Powerplay Goals"
+          ],
+          [
+            "PPA",
+            "Powerplay Assists"
+          ],
+          [
+            "PPP",
+            "Powerplay Points"
+          ],
+          [
+            "SHG",
+            "Shorthanded Goals"
+          ],
+          [
+            "SHA",
+            "Shorthanded Assists"
+          ],
+          [
+            "SHP",
+            "Shorthanded Points"
+          ],
+          [
+            "GWG",
+            "Game-Winning Goals"
+          ],
+          [
+            "GTG",
+            "Game-Tying Goals"
+          ],
+          [
+            "SOG",
+            "Shots on Goal"
+          ],
+          [
+            "SH%",
+            "Shooting Percentage"
+          ],
+          [
+            "FW",
+            "Faceoffs Won"
+          ],
+          [
+            "FL",
+            "Faceoffs Lost"
+          ],
+          [
+            "HIT",
+            "Hits"
+          ],
+          [
+            "BLK",
+            "Blocks"
+          ],
+          [
+            "Total",
+            "Total Standard Deviation"
+          ],
+          [
+            "Goalies:"
+          ],
+          [
+            "Abbreviation",
+            "What it Means"
+          ],
+          [
+            "GS",
+            "Games Started"
+          ],
+          [
+            "W",
+            "Wins"
+          ],
+          [
+            "L",
+            "Losses"
+          ],
+          [
+            "GA",
+            "Goals Against"
+          ],
+          [
+            "GAA",
+            "Goals Against Average"
+          ],
+          [
+            "SA",
+            "Shots Against"
+          ],
+          [
+            "SEC",
+            "Seconds Played"
+          ],
+          [
+            "SV",
+            "Saves"
+          ],
+          [
+            "SV%",
+            "Save Percentage"
+          ],
+          [
+            "SHO",
+            "Shutouts"
+          ],
+          [
+            "Total",
+            "Total Standard Deviation"
+          ]
+        ]
+      },
+      {
+        "index": 3,
+        "caption": "",
+        "headers": [
+          "Pos",
+          "What it Means",
+          "Who is Eligible"
+        ],
+        "rowCount": 10,
+        "rows": [
+          [
+            "C",
+            "Center",
+            "Only centers"
+          ],
+          [
+            "LW",
+            "Left Wing",
+            "Only left wings"
+          ],
+          [
+            "RW",
+            "Right Wing",
+            "Only right wings"
+          ],
+          [
+            "W",
+            "Wing",
+            "Any left or right winger"
+          ],
+          [
+            "F",
+            "Forward",
+            "Any centers, left or right wingers"
+          ],
+          [
+            "D",
+            "Defense",
+            "Any defenseman"
+          ],
+          [
+            "G",
+            "Goaltender",
+            "Any goaltender"
+          ],
+          [
+            "Util",
+            "Utility",
+            "Any non-goaltender"
+          ],
+          [
+            "BN",
+            "Bench",
+            "Any player not in a starting roster or IR spot"
+          ],
+          [
+            "IR",
+            "Injured Reserve",
+            "Any player on the real-life IR"
+          ]
+        ]
+      }
+    ],
+    "selectedTables": {
+      "skaterTableIndex": null,
+      "goalieTableIndex": null
+    },
+    "selectedTableCells": {
+      "skaterRows": [],
+      "goalieRows": []
+    },
+    "rowSplits": {
+      "homeSkaterRows": [],
+      "awaySkaterRows": [],
+      "homeGoalieRows": [],
+      "awayGoalieRows": []
+    },
+    "parsed": null,
+    "parseError": "[yahoo:matchup-utils] Could not identify the daily skater/goalie matchup tables. candidateTableCount=4"
+  }
+}

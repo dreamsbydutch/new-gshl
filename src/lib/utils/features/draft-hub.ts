@@ -1,4 +1,5 @@
 import type {
+  DraftRankingPlayer,
   DraftClockState,
   DraftHubDraftPick,
   DraftHubEligiblePlayerView,
@@ -12,7 +13,13 @@ import type {
 } from "@gshl-types";
 import { findCurrentSeason, findUpcomingSeason } from "../domain/season";
 
-export const DRAFT_PICK_CLOCK_MS = 4 * 60 * 1000;
+export function getDraftPickClockMs(
+  round: string | number | null | undefined,
+): number {
+  const roundNumber = Number(round);
+  const minutes = roundNumber > 6 ? 2 : roundNumber > 4 ? 3 : 4;
+  return minutes * 60 * 1000;
+}
 export const ESTIMATED_DRAFT_PICK_MS = 82 * 1000;
 
 const DRAFT_RANK_SORT_KEYS = new Set<DraftPlayerSortKey>([
@@ -33,7 +40,7 @@ const DRAFT_RANKING_SOURCES = [
 type DraftRankingSourceKey = (typeof DRAFT_RANKING_SOURCES)[number]["key"];
 
 function getRankValue(
-  player: DraftHubEligiblePlayerView,
+  player: DraftRankingPlayer,
   key: DraftRankingSourceKey,
 ): number | null {
   const value = Number(player[key]);
@@ -41,42 +48,54 @@ function getRankValue(
 }
 
 /**
- * Produces the draft-table composite rank from Yahoo, Daily Faceoff, and NHL
+ * Produces the draft-table composite score (lower is better) from Yahoo, Daily Faceoff, and NHL
  * draft rankings plus the rank derived from the GSHL player rating. Source
  * ranks are normalized individually so lists with different depths remain
  * comparable. An absent source rank is treated as one place below that
- * source's displayed list.
+ * source's displayed list. A reference pool lets roster players use the same
+ * scale without changing the available players' ranking.
  */
-export function getDraftCompositeRanks(
-  players: readonly DraftHubEligiblePlayerView[],
+export function getDraftCompositeScores(
+  players: readonly DraftRankingPlayer[],
+  referencePlayers: readonly DraftRankingPlayer[] = players,
 ): ReadonlyMap<string, number> {
   const sourceMaximums = new Map<DraftRankingSourceKey, number>(
     DRAFT_RANKING_SOURCES.map(({ key }) => [
       key,
       Math.max(
         1,
-        ...players.flatMap((player) => {
+        ...referencePlayers.flatMap((player) => {
           const rank = getRankValue(player, key);
           return rank === null ? [] : [rank];
         }),
       ),
     ]),
   );
-  const scoredPlayers = players
-    .map((player) => {
+  return new Map(
+    players.map((player) => {
       const score = DRAFT_RANKING_SOURCES.reduce((total, { key, weight }) => {
         const maximum = sourceMaximums.get(key) ?? 1;
         const rank = getRankValue(player, key) ?? maximum + 1;
         return total + ((Math.min(rank, maximum + 1) - 1) / maximum) * weight;
       }, 0);
-      return { player, score };
-    })
+      return [String(player.id), score] as const;
+    }),
+  );
+}
+
+export function getDraftCompositeRanks(
+  players: readonly DraftRankingPlayer[],
+): ReadonlyMap<string, number> {
+  const scores = getDraftCompositeScores(players);
+  const scoredPlayers = players
+    .map((player) => ({ player, score: scores.get(String(player.id)) ?? 1 }))
     .sort(
       (left, right) =>
         left.score - right.score ||
         Number(left.player.overallRk ?? Number.MAX_SAFE_INTEGER) -
           Number(right.player.overallRk ?? Number.MAX_SAFE_INTEGER) ||
-        left.player.fullName.localeCompare(right.player.fullName),
+        left.player.fullName.localeCompare(right.player.fullName) ||
+        String(left.player.id).localeCompare(String(right.player.id)),
     );
 
   return new Map(
@@ -187,7 +206,12 @@ export function getNextOwnerDraftPickNotice(
   return {
     pick,
     picksAway: nextPickIndex,
-    estimatedAt: estimateBaseTime + nextPickIndex * ESTIMATED_DRAFT_PICK_MS,
+    estimatedAt:
+      estimateBaseTime +
+      openPicks
+        .slice(0, nextPickIndex)
+        .filter((entry) => !entry.team?.draftAuto).length *
+        ESTIMATED_DRAFT_PICK_MS,
   };
 }
 
@@ -350,7 +374,9 @@ export function resolveDraftClockState(
   const storedExpiry = timestamp(activePick.onClockExpiresAt);
   const expiresAt =
     storedExpiry ??
-    (startedAt === null ? null : startedAt + DRAFT_PICK_CLOCK_MS);
+    (startedAt === null
+      ? null
+      : startedAt + getDraftPickClockMs(activePick.round));
   let status: DraftHubStatus = "unavailable";
 
   if (draftStart !== null && nowTime < draftStart) {
