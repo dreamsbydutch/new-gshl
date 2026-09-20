@@ -9,8 +9,7 @@ import {
   deriveContractCreationTerms,
   getEffectiveSigningStatus,
 } from "../src/lib/utils/domain/contracts";
-import { resolveContractSigningAssignments } from "./lib/contractSigning";
-import { rebuildTeamLineup } from "./lib/teamLineup";
+import { signContract } from "./lib/contractSigningTransaction";
 import {
   startJob as startManagedJob,
   cancelJob as cancelManagedJob,
@@ -1315,109 +1314,18 @@ export const createContract = mutation({
       contracts: contractRows,
       seasons: contractSeasons,
     });
-    const contractSeasonIndex = contractSeasons.findIndex(
-      (season) => season.id === contractSigningSeason.id,
-    );
-    const coveredSeasonIds = contractSeasons
-      .slice(
-        contractSeasonIndex + 1,
-        contractSeasonIndex + 1 + args.contractLength,
-      )
-      .map((season) => season.id);
-    const seasonAssignments = await Promise.all(
-      coveredSeasonIds.map(async (seasonId) => {
-        const [teams, picks] = await Promise.all([
-          ctx.db
-            .query("teams")
-            .withIndex("by_seasonId", (range) =>
-              range.eq("seasonId", seasonId as Id<"seasons">),
-            )
-            .collect(),
-          ctx.db
-            .query("draftPicks")
-            .withIndex("by_seasonId", (range) =>
-              range.eq("seasonId", seasonId as Id<"seasons">),
-            )
-            .collect(),
-        ]);
-        return { teams, picks };
-      }),
-    );
-    const signingAssignments = resolveContractSigningAssignments({
-      signingSeasonId: contractSigningSeason.id,
-      contractLength: args.contractLength,
-      franchiseId: String(team.franchiseId),
-      seasons: contractSeasons,
-      teams: seasonAssignments.flatMap(({ teams }) =>
-        teams.map((candidate) => ({
-          id: String(candidate._id),
-          seasonId: String(candidate.seasonId),
-          franchiseId: String(candidate.franchiseId),
-        })),
-      ),
-      picks: seasonAssignments.flatMap(({ picks }) =>
-        picks.map((candidate) => ({
-          id: String(candidate._id),
-          seasonId: String(candidate.seasonId),
-          gshlTeamId: candidate.gshlTeamId
-            ? String(candidate.gshlTeamId)
-            : null,
-          round: candidate.round,
-          pick: candidate.pick,
-          playerId: candidate.playerId ? String(candidate.playerId) : null,
-          isSigning: candidate.isSigning,
-        })),
-      ),
-    });
-    const now = Date.now();
-    const startDate = toUtcTimestamp(terms.startDate);
-    const expiryDate = toUtcTimestamp(terms.expiryDate);
-    if (startDate === null || expiryDate === null) {
-      throw new Error("The selected contract seasons have invalid dates");
-    }
-    const id = await ctx.db.insert("contracts", {
+    const id = await signContract(ctx, {
       playerId: args.playerId,
-      ownerId: franchise.ownerId,
+      franchiseId: team.franchiseId,
       seasonId: signingSeason._id,
-      contractType: terms.contractType,
       contractLength: args.contractLength,
+      contractType: terms.contractType,
       contractSalary: terms.contractSalary,
-      signingDate: now,
-      startDate,
       signingStatus: terms.signingStatus,
       expiryStatus: terms.expiryStatus,
-      expiryDate,
-      capHit: terms.contractSalary,
-      capHitEndDate: expiryDate,
-      createdAt: now,
-      updatedAt: now,
+      startDate: terms.startDate,
+      expiryDate: terms.expiryDate,
     });
-    await ctx.db.patch(args.playerId, {
-      ownerId: franchise.ownerId,
-      gshlTeamId: signingAssignments[0]?.teamId,
-      isSignable: false,
-      isResignable: null,
-      lineupPos: null,
-      updatedAt: now,
-    });
-    for (const assignment of signingAssignments) {
-      await ctx.db.patch(assignment.pickId as Id<"draftPicks">, {
-        playerId: args.playerId,
-        isSigning: true,
-        onClockStartedAt: null,
-        onClockExpiresAt: null,
-        onClockEndedAt: null,
-        updatedAt: now,
-      });
-    }
-    if (signingAssignments[0]?.teamId) {
-      await rebuildTeamLineup(
-        ctx,
-        franchise.ownerId,
-        signingAssignments[0].teamId as Id<"teams">,
-        now,
-      );
-    }
     return publicRow((await ctx.db.get(id)) as unknown as Row);
   },
 });

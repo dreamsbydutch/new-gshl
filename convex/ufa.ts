@@ -12,8 +12,7 @@ import {
 import { getUfaOfferGroupDeadline } from "../src/lib/utils/features/ufa-deadline";
 import { requireOwnerOrCommissioner } from "./lib/auth";
 import { utcTimestampToDateKey } from "./lib/timestamps";
-import { resolveContractSigningAssignments } from "./lib/contractSigning";
-import { rebuildTeamLineup } from "./lib/teamLineup";
+import { signContract } from "./lib/contractSigningTransaction";
 import { loadDueUfaOfferGroups } from "./lib/ufaReconciliation";
 import { loadUfaOddsData, type UfaOddsData } from "./ufaOdds";
 
@@ -373,7 +372,7 @@ export async function calculateOddsForGroup(
         contract.ownerId === offer.ownerId &&
         Boolean(
           nextSeasonId &&
-            coveredSeasonIds(contract, orderedSeasons).includes(nextSeasonId),
+          coveredSeasonIds(contract, orderedSeasons).includes(nextSeasonId),
         ),
     );
     const contractedPlayers = ownerContracts
@@ -858,98 +857,22 @@ export const finalizeGroup = internalMutation({
     if (ownerFranchises.length !== 1) {
       throw new Error("The winning owner's franchise could not be resolved.");
     }
-    const coveredSeasonIds = seasons
-      .slice(signingIndex + 1, signingIndex + 1 + winningOffer.contractLength)
-      .map((season: any) => String(season._id));
-    const seasonAssignments = await Promise.all(
-      coveredSeasonIds.map(async (seasonId: string) => {
-        const [teams, picks] = await Promise.all([
-          db
-            .query("teams")
-            .withIndex("by_seasonId", (q: any) => q.eq("seasonId", seasonId))
-            .collect(),
-          db
-            .query("draftPicks")
-            .withIndex("by_seasonId", (q: any) => q.eq("seasonId", seasonId))
-            .collect(),
-        ]);
-        return { teams, picks };
-      }),
-    );
-    const signingAssignments = resolveContractSigningAssignments({
-      signingSeasonId: String(group.seasonId),
+    await signContract(ctx, {
+      playerId: player._id,
+      franchiseId: ownerFranchises[0]!._id,
+      seasonId: group.seasonId,
       contractLength: winningOffer.contractLength,
-      franchiseId: String(ownerFranchises[0]!._id),
-      seasons: seasons.map((season: any) => ({
-        id: String(season._id),
-        year: season.year,
-      })),
-      teams: seasonAssignments.flatMap(({ teams }: any) =>
-        teams.map((team: any) => ({
-          id: String(team._id),
-          seasonId: String(team.seasonId),
-          franchiseId: String(team.franchiseId),
-        })),
-      ),
-      picks: seasonAssignments.flatMap(({ picks }: any) =>
-        picks.map((pick: any) => ({
-          id: String(pick._id),
-          seasonId: String(pick.seasonId),
-          gshlTeamId: pick.gshlTeamId ? String(pick.gshlTeamId) : null,
-          round: pick.round,
-          pick: pick.pick,
-          playerId: pick.playerId ? String(pick.playerId) : null,
-          isSigning: pick.isSigning,
-        })),
-      ),
+      contractType: continuous ? "EXTENSION" : "STANDARD",
+      contractSalary: winningOffer.salary,
+      signingStatus: "UFA",
+      expiryStatus: continuous ? "UFA" : "RFA",
+      startDate: startSeason.startDate,
+      expiryDate: expirySeason.endDate,
     });
     const factorByOfferId = new Map(
       args.factorSnapshots.map((entry) => [entry.offerId, entry.snapshot]),
     );
     const now = Date.now();
-    await db.insert("contracts", {
-      playerId: player._id,
-      ownerId: winningOffer.ownerId,
-      seasonId: group.seasonId,
-      contractType: continuous ? "EXTENSION" : "STANDARD",
-      contractLength: winningOffer.contractLength,
-      contractSalary: winningOffer.salary,
-      signingDate: now,
-      startDate: startSeason.startDate,
-      signingStatus: "UFA",
-      expiryStatus: continuous ? "UFA" : "RFA",
-      expiryDate: expirySeason.endDate,
-      capHit: winningOffer.salary,
-      capHitEndDate: expirySeason.endDate,
-      createdAt: now,
-      updatedAt: now,
-    });
-    await db.patch(player._id, {
-      ownerId: winningOffer.ownerId,
-      gshlTeamId: signingAssignments[0]?.teamId,
-      isSignable: false,
-      isResignable: null,
-      lineupPos: null,
-      updatedAt: now,
-    });
-    for (const assignment of signingAssignments) {
-      await db.patch(assignment.pickId, {
-        playerId: player._id,
-        isSigning: true,
-        onClockStartedAt: null,
-        onClockExpiresAt: null,
-        onClockEndedAt: null,
-        updatedAt: now,
-      });
-    }
-    if (signingAssignments[0]?.teamId) {
-      await rebuildTeamLineup(
-        ctx as never,
-        winningOffer.ownerId,
-        signingAssignments[0].teamId as Id<"teams">,
-        now,
-      );
-    }
     for (const offer of offers) {
       await db.patch(offer._id, {
         status: offer._id === winningOffer._id ? "won" : "lost",

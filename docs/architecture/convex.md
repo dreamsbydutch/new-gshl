@@ -73,6 +73,15 @@ compatibility filter before honoring a row limit.
 - `ufa:publicState` is anonymous but masks owner identity and returns unresolved groups with their offers so pending cap reservations survive resolution retries. Odds are shown for open groups only, with formula-wide inputs shared across groups and selective inputs scoped by bidder-owner and season indexes. `submitOffer` requires an owner/commissioner identity unless the trusted server-secret path is used. Resolution functions are internal.
 - Weekly edition reader endpoints return only published, active content. Archive, Home, Newsroom, and revision lists use compact projections; full edition content is fetched by ID only for an opened reader or a commissioner-selected Newsroom issue. Published archive reads are bounded by status/season publication indexes, and Newsroom and revision lists are capped at 100 rows. Newsroom, prompt, OpenAI generation, editing, visibility, homepage selection, section activation, and revision restoration are commissioner-only. AI generation reads its API key only from the Convex deployment and uses the Responses API without server-side response storage. Its first structured response gathers beat-scoped pitches from every available writer; pure server logic validates authors and evidence, ranks the pitches, removes duplicate leads, enforces subject diversity, and assigns the requested six to ten stories to different writers, defaulting to eight. A second structured response writes those locked assignments. Each stage may be corrected once, and the edition is saved atomically only after the existing fact-packet validator and assignment validator pass. A concurrent Newsroom edit aborts the save rather than being overwritten.
 
+Contract creation and UFA finalization call the shared
+[contract signing transaction module](../../convex/lib/contractSigningTransaction.ts)
+inside their originating mutation. It loads covered teams and picks,
+validates all reservations before writing, normalizes dates, creates the
+contract, assigns the player, reserves signing picks, and rebuilds the first
+covered roster. Commissioner authorization and terms, and UFA eligibility,
+winner selection, and offer finalization remain in their owning handlers.
+The shared call does not introduce a separate transaction or scheduled write.
+
 Authorization is a handler responsibility. Do not infer permission from whether a function appears in generated `api`.
 
 The Newsroom treats the AI configuration query as optional. If it fails (including
