@@ -1,7 +1,7 @@
 # Typed write lifecycle
 
 Source: architecture-review candidate 2, selected on 2026-09-20.
-This branch is stacked on the unmerged franchise-contract-module PR.
+This branch builds on the merged franchise-contract-module PR.
 
 ## Scope and behavior
 
@@ -39,7 +39,7 @@ This branch is stacked on the unmerged franchise-contract-module PR.
 3. **Caller integration** (blocked by 1): preserve caller payloads while fixing
    newly exposed type errors at domain hook seams. Run focused verification.
 4. **Review and handoff** (blocked by 1, 2, 3): standards/spec review, fix issues,
-   verify, publish and mark the stacked PR ready.
+   verify, publish and mark the PR ready.
 
 ## Acceptance checks
 
