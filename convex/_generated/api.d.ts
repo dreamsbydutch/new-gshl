@@ -21,6 +21,7 @@ import type * as crons from "../crons.js";
 import type * as data from "../data.js";
 import type * as draft from "../draft.js";
 import type * as externalWorker from "../externalWorker.js";
+import type * as lib_activeRoster from "../lib/activeRoster.js";
 import type * as frontend from "../frontend.js";
 import type * as http from "../http.js";
 import type * as jobCatalog from "../jobCatalog.js";
@@ -84,6 +85,7 @@ declare const fullApi: ApiFromModules<{
   conferenceContest: typeof conferenceContest;
   crons: typeof crons;
   data: typeof data;
+  "lib/activeRoster": typeof lib_activeRoster;
   draft: typeof draft;
   externalWorker: typeof externalWorker;
   frontend: typeof frontend;

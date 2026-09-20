@@ -1,7 +1,10 @@
 import type { MutationCtx } from "../../convex/_generated/server";
 
 type Row = Record<string, unknown> & { _id: string; _creationTime: number };
-type Range = { eq: (field: string, value: unknown) => Range };
+type Range = {
+  eq: (field: string, value: unknown) => Range;
+  lte: (field: string, value: string | number) => Range;
+};
 
 /** Indexed read/write adapter for handler tests; not a Convex runtime emulator. */
 export function mutationFixture() {
@@ -35,20 +38,45 @@ export function mutationFixture() {
       get: async (id: string) => get(id),
       query: (name: string) => {
         const predicates: ((row: Row) => boolean)[] = [];
+        let indexFields: string[] = [];
+        let direction = 1;
         const select = () =>
-          rows(name).filter((row) => predicates.every((match) => match(row)));
+          rows(name)
+            .filter((row) => predicates.every((match) => match(row)))
+            .sort((a, b) => {
+              for (const field of indexFields) {
+                const left = a[field];
+                const right = b[field];
+                if (left === right) continue;
+                return (String(left) < String(right) ? -1 : 1) * direction;
+              }
+              return 0;
+            });
         const query = {
           withIndex: (
             _name: string,
             selectRange: (range: Range) => unknown,
           ) => {
+            indexFields = _name.replace(/^by_/, "").split("_");
             const range: Range = {
               eq: (field, value) => {
                 predicates.push((row) => row[field] === value);
                 return range;
               },
+              lte: (field, value) => {
+                predicates.push((row) =>
+                  typeof value === "number"
+                    ? Number(row[field]) <= value
+                    : String(row[field]) <= value,
+                );
+                return range;
+              },
             };
             selectRange(range);
+            return query;
+          },
+          order: (value: "asc" | "desc") => {
+            direction = value === "desc" ? -1 : 1;
             return query;
           },
           filter: (

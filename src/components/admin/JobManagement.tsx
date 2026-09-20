@@ -23,6 +23,7 @@ export function JobManagement() {
   const [teamId, setTeamId] = useState("");
   const [matchupId, setMatchupId] = useState("");
   const [apply, setApply] = useState(false);
+  const isActiveRosterRefresh = jobName === "active-roster-refresh";
   const sortedRuns = useMemo(() => runs.data ?? [], [runs.data]);
   const isYahooPlayerDayBackfill =
     jobName === "yahoo-matchup-player-day-backfill";
@@ -62,7 +63,8 @@ export function JobManagement() {
     const normalizedWeekNum = weekNum.trim();
     const normalizedTeamId = teamId.trim();
     const normalizedMatchupId = matchupId.trim();
-    if (normalizedSeasonId) args.seasonId = normalizedSeasonId;
+    if (normalizedSeasonId && !isActiveRosterRefresh)
+      args.seasonId = normalizedSeasonId;
     if (isYahooPlayerDayBackfill && normalizedWeekNum) {
       args.weekNum = normalizedWeekNum;
     }
@@ -94,7 +96,9 @@ export function JobManagement() {
           >
             {(catalog.data?.jobs ?? []).map((name) => (
               <option key={name} value={name}>
-                {name}
+                {name === "active-roster-refresh"
+                  ? "Active roster refresh"
+                  : name}
               </option>
             ))}
           </select>
@@ -115,6 +119,13 @@ export function JobManagement() {
               ))}
             </select>
           </label>
+        ) : isActiveRosterRefresh ? (
+          <p className="text-sm text-muted-foreground">
+            Refresh all player teams, owners, and optimized lineup positions.
+            Uses the latest player days in season, completed draft picks before
+            the season, or active contracts in the offseason. The season is
+            selected automatically.
+          </p>
         ) : (
           <label className="text-sm">
             <span className="mb-1 block font-medium">Season ID (optional)</span>

@@ -21,6 +21,7 @@ import {
 } from "./lib/jobLifecycle";
 import { internalMutation } from "./_generated/server";
 import { utcTimestampToDateKey } from "./lib/timestamps";
+import { refreshActiveRoster } from "./lib/activeRoster";
 import {
   calculatePlayerAwards,
   calculateTeamAwards,
@@ -67,6 +68,33 @@ function errorMessage(error: unknown) {
 export const prepare = internalMutation({
   args: { runId: v.id("jobRuns") },
   handler: (ctx, args) => prepareJob(ctx, args.runId),
+});
+
+export const processActiveRoster = internalMutation({
+  args: { runId: v.id("jobRuns") },
+  handler: async (ctx, args) => {
+    const run = await ctx.db.get(args.runId);
+    if (run?.jobName !== "active-roster-refresh")
+      throw new Error("Invalid roster refresh run");
+    if (run.status !== "running") return { cancelled: true };
+    const jobArgs = asRecord(run.args);
+    const result = await refreshActiveRoster(ctx, {
+      apply: run.apply,
+      seasonId:
+        typeof jobArgs.seasonId === "string" ? jobArgs.seasonId : undefined,
+      now: Date.now(),
+    });
+    await ctx.db.patch(run._id, {
+      progress: {
+        ...emptyProgress(),
+        processed: result.processed,
+        updated: result.updated,
+        unchanged: result.unchanged,
+      },
+      heartbeatAt: Date.now(),
+    });
+    return { cancelled: false, ...result };
+  },
 });
 
 export const appendEvent = internalMutationGeneric({
@@ -673,6 +701,19 @@ export const run = internalActionGeneric({
           ...args,
           kind: jobName,
           payload: asRecord(run.args),
+        });
+        return;
+      }
+
+      if (jobName === "active-roster-refresh") {
+        const result = (await ctx.runMutation(
+          mutationRef("jobRunner:processActiveRoster"),
+          args,
+        )) as { cancelled: boolean };
+        await ctx.runMutation(mutationRef("jobRunner:finish"), {
+          ...args,
+          status: result.cancelled ? "cancelled" : "succeeded",
+          result,
         });
         return;
       }

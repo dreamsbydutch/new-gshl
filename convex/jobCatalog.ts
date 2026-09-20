@@ -30,6 +30,7 @@ export const JOB_NAMES = [
   "standings-backfill",
   "awards-backfill",
   "lineup-recalculation",
+  "active-roster-refresh",
   "nhl-player-id-backfill",
   "nhl-daily-stat-sync",
   "hockey-reference-backfill",
@@ -84,6 +85,8 @@ export function isExternalJob(jobName: JobName): boolean {
 }
 
 export function buildLockKey(jobName: JobName, args: Record<string, unknown>) {
+  // This job replaces global player membership, regardless of supplied scope.
+  if (jobName === "active-roster-refresh") return jobName;
   const scope = ["seasonId", "weekId", "matchupId", "date"]
     .map((key) => {
       const value = args[key];
