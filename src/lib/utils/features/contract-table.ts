@@ -191,7 +191,8 @@ export function getDateYear(
   return Number(matches[matches.length - 1]);
 }
 
-function getSeasonEndYear(season: Season): number | null {
+export function getSeasonEndYear(season?: Season): number | null {
+  if (!season) return null;
   const explicitYear = toNumber(season.year, Number.NaN);
   if (Number.isFinite(explicitYear)) return Math.trunc(explicitYear);
 
