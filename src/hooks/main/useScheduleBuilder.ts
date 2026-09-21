@@ -2,41 +2,54 @@
 
 import { useMemo } from "react";
 import { combineScheduleHistory } from "@gshl-utils/features/schedule-builder";
-import { useMutation, useQueries } from "convex/react";
+import { useMutation, useQueries, type RequestForQueries } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import type { BuilderGame } from "@gshl-lib/types/schedule-builder";
 
 export function useScheduleBuilder(seasonId: string) {
-  const results = useQueries({
-    seasons: { query: api.schedule.builderSeasons, args: {} },
-    ...(seasonId
-      ? {
-          context: {
-            query: api.schedule.builderContext,
-            args: { seasonId },
-          },
-        }
-      : {}),
-  });
+  // Convex resets subscription state during render when request identity changes.
+  const queries = useMemo<RequestForQueries>(
+    () => ({
+      seasons: { query: api.schedule.builderSeasons, args: {} },
+      ...(seasonId
+        ? {
+            context: {
+              query: api.schedule.builderContext,
+              args: { seasonId },
+            },
+          }
+        : {}),
+    }),
+    [seasonId],
+  );
+  const results = useQueries(queries);
   const seasonsResult = results.seasons as
-    FunctionReturnType<typeof api.schedule.builderSeasons> | Error | undefined;
+    | FunctionReturnType<typeof api.schedule.builderSeasons>
+    | Error
+    | undefined;
   const contextResult = results.context as
-    FunctionReturnType<typeof api.schedule.builderContext> | Error | undefined;
+    | FunctionReturnType<typeof api.schedule.builderContext>
+    | Error
+    | undefined;
   const seasons = seasonsResult instanceof Error ? undefined : seasonsResult;
   const catalog = contextResult instanceof Error ? undefined : contextResult;
-  const historyResults = useQueries(
-    Object.fromEntries(
-      (catalog?.historySeasonIds ?? []).map((historySeasonId) => [
-        historySeasonId,
-        {
-          query: api.schedule.builderSeasonHistory,
-          args: { seasonId: seasonId as Id<"seasons">, historySeasonId },
-        },
-      ]),
-    ),
+  const historySeasonIds = catalog?.historySeasonIds;
+  const historyQueries = useMemo<RequestForQueries>(
+    () =>
+      Object.fromEntries(
+        (historySeasonIds ?? []).map((historySeasonId) => [
+          historySeasonId,
+          {
+            query: api.schedule.builderSeasonHistory,
+            args: { seasonId: seasonId as Id<"seasons">, historySeasonId },
+          },
+        ]),
+      ),
+    [seasonId, historySeasonIds],
   );
+  const historyResults = useQueries(historyQueries);
   const batches = (catalog?.historySeasonIds ?? []).map(
     (id) =>
       historyResults[id] as
