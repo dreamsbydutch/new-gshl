@@ -7,6 +7,7 @@ import type { FunctionReturnType } from "convex/server";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import type { BuilderGame } from "@gshl-lib/types/schedule-builder";
+import type { CalendarWeek } from "@gshl-lib/types/season-calendar";
 
 export function useScheduleBuilder(seasonId: string) {
   // Convex resets subscription state during render when request identity changes.
@@ -82,9 +83,12 @@ export function useScheduleBuilder(seasonId: string) {
     };
   }, [catalog, historyResults]);
   const publish = useMutation(api.schedule.publishBuilderSchedule);
+  const createCalendar = useMutation(api.schedule.createBuilderCalendar);
   return {
     seasons,
     context,
+    createCalendar: (weeks: CalendarWeek[]) =>
+      createCalendar({ seasonId: seasonId as Id<"seasons">, weeks }),
     loadError:
       seasonsResult instanceof Error
         ? seasonsResult.message

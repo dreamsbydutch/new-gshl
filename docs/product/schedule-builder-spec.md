@@ -24,8 +24,7 @@ Source: the schedule-hub conversation with the commissioner.
 
 ## Derived constraints and implementation decisions
 
-- With seven teams per conference, the number of weeks must be odd and at least
-  19. Each week needs at least one cross-conference game, so the 49 such games
+- With seven teams per conference, the number of weeks must be odd and at least 19. Each week needs at least one cross-conference game, so the 49 such games
   limit the season to 49 weeks.
 - Historical matchup counts use earlier seasons and exclude playoff weeks,
   playoff game types, and games explicitly marked incomplete. Legacy regular
@@ -38,6 +37,13 @@ Source: the schedule-hub conversation with the commissioner.
   a guarantee of a global optimum. A seed makes generated drafts reproducible.
 - Allow whole weeks to be reordered without breaking weekly participation rules.
 - Drafts are temporary until downloaded or published.
+- Commissioners can preview and save a new season calendar in the hub, with
+  the selected regular-season length and three playoff weeks by default.
+  Seven-day defaults can be edited per week, including game-day counts.
+  Dates are inclusive, ordered, non-overlapping, and must start in the future.
+  Calendar creation is atomic and refuses seasons with any existing weeks or
+  matchups. It creates RS/PO week records, not playoff opponents. Existing
+  calendars are displayed for review; replacement and repair are out of scope.
 - Publishing requires exactly the requested number of existing regular-season
   weeks, with future start dates. Map draft positions to their week-number order.
 - Publish through a commissioner-authorized atomic transaction, revalidating all

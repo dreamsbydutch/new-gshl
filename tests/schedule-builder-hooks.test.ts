@@ -76,6 +76,27 @@ function mountBuilder<T>(t: TestContext, useHook: () => T) {
   };
 }
 
+void test("calendar previews preserve date edits and clear when season or week counts change", (t) => {
+  const h = mountBuilder(t, useScheduleBuilderView);
+  act(() => h.current.setSeasonId("season"));
+  act(() => h.current.setCalendarStart("2090-10-01"));
+  act(() => h.current.previewCalendar());
+  assert.equal(h.current.calendarRows.length, 24);
+  act(() => h.current.editCalendarWeek(0, { gameDays: 5 }));
+  h.rerender();
+  assert.equal(h.current.calendarRows[0]?.gameDays, 5);
+  act(() => h.current.setWeeks(23));
+  assert.equal(h.current.calendarRows.length, 0);
+  act(() => h.current.previewCalendar());
+  assert.equal(h.current.calendarRows.length, 26);
+  act(() => h.current.setSeasonId("another-season"));
+  assert.equal(h.current.calendarRows.length, 0);
+  act(() => h.current.previewCalendar());
+  act(() => h.current.setPlayoffWeeks(4));
+  assert.equal(h.current.calendarRows.length, 0);
+  assert.ok(h.renders < 35);
+});
+
 void test("opening schedule builder and editing inputs settles without a render loop", (t) => {
   const h = mountBuilder(t, useScheduleBuilderView);
   assert.equal(h.current.seasonId, "");

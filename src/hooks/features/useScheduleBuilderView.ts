@@ -7,6 +7,11 @@ import {
   scheduleBalance,
 } from "@gshl-utils/features/schedule-builder";
 import type { BuilderGame } from "@gshl-lib/types/schedule-builder";
+import {
+  previewSeasonCalendar,
+  validateSeasonCalendar,
+} from "@gshl-utils/features/season-calendar";
+import type { CalendarWeek } from "@gshl-lib/types/season-calendar";
 
 export function useScheduleBuilderView() {
   const [seasonId, setSeasonId] = useState("");
@@ -21,6 +26,61 @@ export function useScheduleBuilderView() {
   const [busy, setBusy] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
   const data = useScheduleBuilder(seasonId);
+  const [calendarStart, setCalendarStart] = useState("");
+  const [playoffWeeks, setPlayoffWeeks] = useState(3);
+  const [calendarDraft, setCalendarDraft] = useState<{
+    key: string;
+    rows: CalendarWeek[];
+  } | null>(null);
+  const calendarKey = JSON.stringify([
+    seasonId,
+    weeks,
+    playoffWeeks,
+    calendarStart,
+  ]);
+  const calendarRows =
+    calendarDraft?.key === calendarKey ? calendarDraft.rows : [];
+  const previewCalendar = () => {
+    setError("");
+    setMessage("");
+    try {
+      const rows = previewSeasonCalendar(calendarStart, weeks, playoffWeeks);
+      validateSeasonCalendar(rows, Date.now());
+      setCalendarDraft({ key: calendarKey, rows });
+    } catch (cause) {
+      setError(
+        cause instanceof Error ? cause.message : "Calendar preview failed.",
+      );
+    }
+  };
+  const editCalendarWeek = (index: number, patch: Partial<CalendarWeek>) => {
+    setCalendarDraft({
+      key: calendarKey,
+      rows: calendarRows.map((row, i) =>
+        i === index ? { ...row, ...patch } : row,
+      ),
+    });
+  };
+  const saveCalendar = async () => {
+    if (!calendarRows.length || busy) return;
+    setBusy(true);
+    setError("");
+    setMessage("");
+    try {
+      validateSeasonCalendar(calendarRows, Date.now());
+      const result = await data.createCalendar(calendarRows);
+      setCalendarDraft(null);
+      setMessage(
+        `Created ${result.weeks} calendar weeks, including ${playoffWeeks} playoff weeks. You can now publish a matching regular-season draft.`,
+      );
+    } catch (cause) {
+      setError(
+        cause instanceof Error ? cause.message : "Calendar creation failed.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
   const fingerprint = JSON.stringify([
     seasonId,
     weeks,
@@ -121,6 +181,14 @@ export function useScheduleBuilderView() {
   };
   return {
     ...data,
+    calendarStart,
+    setCalendarStart,
+    playoffWeeks,
+    setPlayoffWeeks,
+    calendarRows,
+    previewCalendar,
+    editCalendarWeek,
+    saveCalendar,
     seasonId,
     setSeasonId,
     weeks,

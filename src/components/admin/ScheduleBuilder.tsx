@@ -5,6 +5,7 @@ import { useScheduleBuilderView } from "@gshl-hooks/features/useScheduleBuilderV
 import { Button } from "../ui/ButtonPrimitive";
 import { Input } from "../ui/InputPrimitive";
 import { Select } from "../ui/SelectPrimitive";
+import { SeasonCalendar } from "./SeasonCalendar";
 
 export function ScheduleBuilder() {
   const view = useScheduleBuilderView();
@@ -139,6 +140,7 @@ export function ScheduleBuilder() {
           {view.message}
         </p>
       )}
+      <SeasonCalendar view={view} />
       {view.games.length > 0 && (
         <>
           <div className="rounded-lg border border-slate-200 p-4">
@@ -169,6 +171,15 @@ export function ScheduleBuilder() {
               {view.context?.hasSchedule && (
                 <p className="my-2 text-sm text-amber-800">
                   This season already has a schedule. Publishing is unavailable.
+                </p>
+              )}
+              {view.context && view.context.regularWeeks !== view.weeks && (
+                <p className="my-2 text-sm text-amber-800" role="status">
+                  Publishing needs {view.weeks} regular-season calendar weeks;
+                  this season has {view.context.regularWeeks}.{" "}
+                  {view.context.calendar.length === 0
+                    ? "Use Season calendar above to create the calendar."
+                    : "Match the draft length to the saved calendar. Existing calendars cannot be replaced here."}
                 </p>
               )}
               <label className="flex items-center gap-2 text-sm">

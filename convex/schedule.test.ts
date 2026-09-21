@@ -10,12 +10,14 @@ import type { Id } from "./_generated/dataModel";
 import {
   builderContext,
   builderSeasonHistory,
+  createBuilderCalendar,
   publishBuilderSchedule,
 } from "./schedule";
 import {
   combineScheduleHistory,
   generateSchedule,
 } from "../src/lib/utils/features/schedule-builder";
+import { previewSeasonCalendar } from "../src/lib/utils/features/season-calendar";
 
 function handler<A extends DefaultFunctionArgs, R>(
   fn: RegisteredMutation<"public", A, R> | RegisteredQuery<"public", A, R>,
@@ -109,6 +111,86 @@ function fixture() {
   } as unknown as MutationCtx;
   return { ctx, teams, put, get, rows, reads };
 }
+
+void test("calendar creation saves regular and playoff weeks and enables regular-season publishing", async () => {
+  const f = fixture();
+  f.rows("weeks").splice(0);
+  const weeks = previewSeasonCalendar("2090-10-01", 23, 3);
+  const args = { seasonId: "season" as Id<"seasons">, weeks };
+  assert.deepEqual(await handler(createBuilderCalendar)(f.ctx, args), {
+    weeks: 26,
+  });
+  const saved = f.rows("weeks");
+  assert.equal(saved.filter((week) => week.weekType === "RS").length, 23);
+  assert.equal(
+    saved.filter((week) => week.weekType === "PO" && week.isPlayoffs).length,
+    3,
+  );
+  assert.equal(saved[0]?.startDate, Date.parse("2090-10-01T00:00:00Z"));
+  assert.equal(saved[25]?.weekNum, 26);
+  assert.equal(saved[0]?.gameDays, 7);
+  const games = generateSchedule(f.teams, 23, [], 1).map((game) => ({
+    ...game,
+    home: game.home as Id<"teams">,
+    away: game.away as Id<"teams">,
+  }));
+  assert.deepEqual(
+    await handler(publishBuilderSchedule)(f.ctx, {
+      seasonId: args.seasonId,
+      weeks: 23,
+      games,
+    }),
+    { games: 161 },
+  );
+  const playoffIds = new Set(
+    saved.filter((week) => week.isPlayoffs).map((week) => week._id),
+  );
+  assert.ok(f.rows("matchups").every((game) => !playoffIds.has(game.weekId)));
+  await assert.rejects(
+    handler(createBuilderCalendar)(f.ctx, args),
+    /already has/,
+  );
+  assert.equal(saved.length, 26);
+});
+
+void test("calendar creation rejects unauthorized, invalid and occupied seasons without inserting", async () => {
+  const f = fixture();
+  const args = {
+    seasonId: "season" as Id<"seasons">,
+    weeks: previewSeasonCalendar("2090-10-01", 21, 3),
+  };
+  f.get("user")!.role = "owner";
+  await assert.rejects(
+    handler(createBuilderCalendar)(f.ctx, args),
+    /Forbidden/,
+  );
+  f.get("user")!.role = "commissioner";
+  await assert.rejects(
+    handler(createBuilderCalendar)(f.ctx, args),
+    /already has/,
+  );
+  f.rows("weeks").splice(0);
+  await assert.rejects(
+    handler(createBuilderCalendar)(f.ctx, {
+      ...args,
+      seasonId: "missing" as Id<"seasons">,
+    }),
+    /not found/,
+  );
+  const invalid = args.weeks.map((week) => ({ ...week }));
+  invalid[23]!.startDate = invalid[22]!.startDate;
+  await assert.rejects(
+    handler(createBuilderCalendar)(f.ctx, { ...args, weeks: invalid }),
+    /overlap/,
+  );
+  assert.equal(f.rows("weeks").length, 0);
+  f.put("matchups", "orphan", { seasonId: "season" });
+  await assert.rejects(
+    handler(createBuilderCalendar)(f.ctx, args),
+    /already has/,
+  );
+  assert.equal(f.rows("weeks").length, 0);
+});
 
 void test("history follows owners across franchises and excludes playoffs and target season", async () => {
   const f = fixture();

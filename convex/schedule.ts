@@ -18,6 +18,7 @@ import {
 } from "./lib/teamScheduleProjection";
 import { projectMatchupTeamWeekStats } from "./lib/matchupProjection";
 import { toUtcTimestamp, utcTimestampToDateKey } from "./lib/timestamps";
+import { validateSeasonCalendar } from "../src/lib/utils/features/season-calendar";
 
 function present<T>(value: T | null): value is T {
   return value !== null;
@@ -158,12 +159,71 @@ export const builderContext = query({
       teams: await projectBuilderTeams(ctx, teams),
       historySeasonIds: previous.map((s) => s._id),
       regularWeeks: weeks.filter((w) => !w.isPlayoffs).length,
+      calendar: [...weeks]
+        .sort((a, b) => Number(a.weekNum) - Number(b.weekNum))
+        .map((week) => ({
+          weekNum: Number(week.weekNum),
+          startDate: utcTimestampToDateKey(week.startDate),
+          endDate: utcTimestampToDateKey(week.endDate),
+          isPlayoffs: Boolean(week.isPlayoffs),
+        })),
       hasSchedule: existing.some(
         (g) =>
           ["CC", "NC", "RS"].includes(g.gameType) ||
           weeks.some((w) => w._id === g.weekId && !w.isPlayoffs),
       ),
     };
+  },
+});
+
+/** Create a new calendar atomically; existing calendars and fixtures are preserved. */
+export const createBuilderCalendar = mutation({
+  args: {
+    seasonId: v.id("seasons"),
+    weeks: v.array(
+      v.object({
+        startDate: v.string(),
+        endDate: v.string(),
+        gameDays: v.number(),
+        isPlayoffs: v.boolean(),
+      }),
+    ),
+  },
+  handler: async (ctx, args) => {
+    await requireCommissioner(ctx);
+    if (!(await ctx.db.get(args.seasonId)))
+      throw new Error("Season not found.");
+    const [weeks, matchups] = await Promise.all([
+      ctx.db
+        .query("weeks")
+        .withIndex("by_seasonId", (q) => q.eq("seasonId", args.seasonId))
+        .collect(),
+      ctx.db
+        .query("matchups")
+        .withIndex("by_seasonId", (q) => q.eq("seasonId", args.seasonId))
+        .collect(),
+    ]);
+    if (weeks.length || matchups.length)
+      throw new Error(
+        "This season already has calendar weeks or matchups. Nothing was overwritten.",
+      );
+    const now = Date.now();
+    validateSeasonCalendar(args.weeks, now);
+    for (const [index, week] of args.weeks.entries()) {
+      await ctx.db.insert("weeks", {
+        seasonId: args.seasonId,
+        weekNum: index + 1,
+        weekType: week.isPlayoffs ? "PO" : "RS",
+        startDate: toUtcTimestamp(week.startDate)!,
+        endDate: toUtcTimestamp(week.endDate)!,
+        gameDays: week.gameDays,
+        isPlayoffs: week.isPlayoffs,
+        isActive: false,
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
+    return { weeks: args.weeks.length };
   },
 });
 
