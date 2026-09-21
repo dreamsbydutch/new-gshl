@@ -11,6 +11,9 @@ Source: the schedule-hub conversation with the commissioner.
 - Each team plays the seven opponents in the other conference exactly once.
 - All remaining games are within its conference, with at least two games against
   each of the six conference opponents.
+- Conference opponent counts in the new season must differ by at most one:
+  everyone gets two before any opponent gets three, everyone gets three before
+  any opponent gets four, and so on. This controls total season allocations.
 - Favor historical equality in opponent meeting totals where the constraints
   allow extra games to be allocated.
 - Make each owner pair's cumulative regular-season home/away counts as equal as

@@ -62,6 +62,8 @@ export function validateSchedule(
   const byId = new Map(teams.map((t) => [t.id, t]));
   const occupied = new Set<string>();
   const counts = new Map<string, number>();
+  const conferenceMinimum = Math.floor((weeks - 7) / 6);
+  const conferenceMaximum = Math.ceil((weeks - 7) / 6);
   for (const game of games) {
     if (
       !Number.isInteger(game.week) ||
@@ -91,6 +93,14 @@ export function validateSchedule(
       ) {
         throw new Error(
           "Every conference opponent needs at least two games; every other conference opponent needs exactly one.",
+        );
+      }
+      if (
+        first.conferenceId === second.conferenceId &&
+        (count < conferenceMinimum || count > conferenceMaximum)
+      ) {
+        throw new Error(
+          `Conference opponent counts must be between ${conferenceMinimum} and ${conferenceMaximum} games. Complete each matchup tier before adding another.`,
         );
       }
     }
@@ -159,38 +169,60 @@ export function generateSchedule(
     return result;
   };
   const past = new Map(history.map((p) => [pairKey(p.a, p.b), p]));
+  const conferenceMinimum = Math.floor((weeks - 7) / 6);
+  const extraCycles = ((weeks - 7) % 6) / 2;
   const counts = Array.from({ length: 14 }, (_, a) =>
     Array.from({ length: 14 }, (_, b) =>
-      a === b ? 0 : teams[a]!.conferenceId === teams[b]!.conferenceId ? 2 : 1,
+      a === b
+        ? 0
+        : teams[a]!.conferenceId === teams[b]!.conferenceId
+          ? conferenceMinimum
+          : 1,
     ),
   );
-  // Each extra Hamiltonian cycle gives every team exactly two more conference games.
-  // Search cycles by marginal squared historical meeting counts to favor underplayed pairs.
+  // Complete the same matchup tier for every opponent first. At most two
+  // edge-disjoint cycles then give each team two or four distinct extra opponents.
+  // History selects those opponents without ever skipping a seasonal tier.
   for (const conference of new Set(teams.map((t) => t.conferenceId))) {
-    const indices = teams
-      .map((_, i) => i)
-      .filter((i) => teams[i]!.conferenceId === conference);
-    for (let extra = 19; extra < weeks; extra += 2) {
+    const indices = shuffle(
+      teams
+        .map((_, i) => i)
+        .filter((i) => teams[i]!.conferenceId === conference),
+    );
+    for (let extra = 0; extra < extraCycles; extra++) {
       let best = indices;
       let bestCost = Infinity;
-      for (let trial = 0; trial < 500; trial++) {
-        const cycle = shuffle(indices);
-        const cost = cycle.reduce((sum, a, i) => {
-          const b = cycle[(i + 1) % 7]!;
-          return (
-            sum +
-            2 *
-              ((past.get(pairKey(teams[a]!.ownerId, teams[b]!.ownerId))
-                ?.games ?? 0) +
-                counts[a]![b]!) +
-            1
-          );
-        }, 0);
-        if (cost < bestCost) {
-          best = cycle;
-          bestCost = cost;
+      // Exhaust all six remaining vertices rather than relying on random sampling
+      // to find a cycle that does not reuse an already-promoted matchup.
+      const visit = (cycle: number[], remaining: number[]) => {
+        const last = cycle[cycle.length - 1]!;
+        if (remaining.length === 0) {
+          if (counts[last]![cycle[0]!] !== conferenceMinimum) return;
+          const cost = cycle.reduce((sum, a, i) => {
+            const b = cycle[(i + 1) % 7]!;
+            return (
+              sum +
+              (past.get(pairKey(teams[a]!.ownerId, teams[b]!.ownerId))?.games ??
+                0)
+            );
+          }, 0);
+          if (cost < bestCost) {
+            best = cycle;
+            bestCost = cost;
+          }
+          return;
         }
-      }
+        for (const next of remaining) {
+          if (counts[last]![next] !== conferenceMinimum) continue;
+          visit(
+            [...cycle, next],
+            remaining.filter((id) => id !== next),
+          );
+        }
+      };
+      visit([indices[0]!], indices.slice(1));
+      if (!Number.isFinite(bestCost))
+        throw new Error("Unable to allocate balanced conference opponents.");
       best.forEach((a, i) => {
         const b = best[(i + 1) % 7]!;
         counts[a]![b]!++;

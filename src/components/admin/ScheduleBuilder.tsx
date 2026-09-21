@@ -85,11 +85,13 @@ export function ScheduleBuilder() {
         <p className="text-sm text-slate-600 sm:col-span-3">
           Two conferences of seven require an odd season length of at least 19
           weeks. Each team plays all seven cross-conference opponents once and
-          each conference opponent at least twice. Extra conference games favor
-          historically underplayed pairs. Change the seed to explore another
-          layout. Cross-conference totals increase by one per pair each season,
-          so existing differences in those totals cannot be corrected under
-          these rules.
+          each conference opponent at least twice. Season totals stay within one
+          game per conference opponent: everyone gets two before anyone gets
+          three, three before four, and so on. Extra games within that limit
+          favor historically underplayed pairs. Change the seed to explore
+          another layout. Cross-conference totals increase by one per pair each
+          season, so existing differences in those totals cannot be corrected
+          under these rules.
         </p>
         <Button
           disabled={!view.context || view.busy}
