@@ -47,6 +47,11 @@ import {
 import { buildPowerRankings } from "../src/lib/utils/features/power-rankings";
 import { projectStandingsPowerHistory } from "./lib/standingsProjection";
 import {
+  buildDraftHistoryPicks,
+  draftNumber,
+} from "../src/lib/utils/features/draft-history";
+import type { DraftHistoryData } from "../src/lib/types/draft-history";
+import {
   buildUfaCatalogCandidates,
   resolveUfaViewerContext,
   selectUfaHomeCatalogPlayerIds,
@@ -152,6 +157,148 @@ export const playerNhlStats = list("playerNhlStatLines");
 export const teamDayStats = list("teamDayStatLines");
 export const teamWeekStats = list("teamWeekStatLines");
 export const teamSeasonStats = list("teamSeasonStatLines");
+
+export const ownerDraftHistory = query({
+  args: { ownerId: v.id("owners"), seasonId: v.optional(v.id("seasons")) },
+  handler: async (ctx, args): Promise<DraftHistoryData> => {
+    const franchises = await ctx.db
+      .query("franchises")
+      .withIndex("by_ownerId", (q) => q.eq("ownerId", args.ownerId))
+      .collect();
+    const teams = (
+      await Promise.all(
+        franchises.map((franchise) =>
+          ctx.db
+            .query("teams")
+            .withIndex("by_franchiseId", (q) =>
+              q.eq("franchiseId", franchise._id),
+            )
+            .collect(),
+        ),
+      )
+    ).flat();
+    const seasonIds = [...new Set(teams.map((team) => team.seasonId))];
+    const seasons = (
+      await Promise.all(
+        seasonIds.map(async (seasonId) => {
+          const [season, stats, awards] = await Promise.all([
+            ctx.db.get(seasonId),
+            ctx.db
+              .query("teamSeasonStatLines")
+              .withIndex("by_seasonId_seasonType_gshlTeamId", (q) =>
+                q.eq("seasonId", seasonId).eq("seasonType", "RS"),
+              )
+              .collect(),
+            ctx.db
+              .query("teamAwards")
+              .withIndex("by_seasonId", (q) => q.eq("seasonId", seasonId))
+              .collect(),
+          ]);
+          if (!season) return null;
+          const teamIds = new Set(
+            teams
+              .filter((team) => team.seasonId === seasonId)
+              .map((team) => team._id),
+          );
+          const stat = stats.find((row) => teamIds.has(row.gshlTeamId));
+          const end = toUtcTimestamp(season.endDate);
+          return {
+            id: seasonId,
+            name: season.name,
+            year: Number(season.year),
+            complete: end != null && end < Date.now(),
+            calderRating: draftNumber(stat?.calderRating),
+            calderRank: draftNumber(stat?.calderRk),
+            winner: awards.some(
+              (award) =>
+                award.award === "calder" &&
+                (award.ownerId
+                  ? award.ownerId === args.ownerId
+                  : teamIds.has(award.teamId)),
+            ),
+          };
+        }),
+      )
+    )
+      .filter((season) => season !== null)
+      .sort((a, b) => b.year - a.year);
+    const selectedSeasonId =
+      args.seasonId && seasonIds.includes(args.seasonId)
+        ? args.seasonId
+        : (seasons.find((season) => season.calderRating !== null)?.id ??
+          seasons[0]?.id ??
+          null);
+    if (!selectedSeasonId) return { seasons, selectedSeasonId, picks: [] };
+    const teamIds = teams
+      .filter((team) => team.seasonId === selectedSeasonId)
+      .map((team) => team._id);
+    const [picks, totals, splits] = await Promise.all([
+      ctx.db
+        .query("draftPicks")
+        .withIndex("by_seasonId", (q) => q.eq("seasonId", selectedSeasonId))
+        .collect(),
+      ctx.db
+        .query("playerTotalStatLines")
+        .withIndex("by_seasonId_seasonType_playerId", (q) =>
+          q.eq("seasonId", selectedSeasonId).eq("seasonType", "RS"),
+        )
+        .collect(),
+      Promise.all(
+        teamIds.map((teamId) =>
+          ctx.db
+            .query("playerSplitStatLines")
+            .withIndex("by_seasonId_seasonType_gshlTeamId_playerId", (q) =>
+              q
+                .eq("seasonId", selectedSeasonId)
+                .eq("seasonType", "RS")
+                .eq("gshlTeamId", teamId),
+            )
+            .collect(),
+        ),
+      ).then((groups) => groups.flat()),
+    ]);
+    const playerIds = [
+      ...new Set(
+        picks
+          .filter((pick) => teamIds.includes(pick.gshlTeamId) && pick.playerId)
+          .map((pick) => pick.playerId),
+      ),
+    ];
+    const players = (
+      await Promise.all(playerIds.map((id) => ctx.db.get(id)))
+    ).filter(Boolean);
+    return {
+      seasons,
+      selectedSeasonId,
+      picks: buildDraftHistoryPicks({
+        picks: picks.map((pick) => ({
+          ...pick,
+          id: pick._id,
+          teamId: pick.gshlTeamId,
+        })),
+        teamIds,
+        totals: totals.map((row) => ({
+          playerId: row.playerId,
+          rating: row.Rating,
+          days: row.days,
+          position: row.posGroup,
+        })),
+        splits: splits.map((row) => ({
+          playerId: row.playerId,
+          teamId: row.gshlTeamId,
+          rating: row.Rating,
+          days: row.days,
+          position: row.posGroup,
+        })),
+        players: players.map((player) => ({
+          id: player._id,
+          name: player.fullName,
+          position: player.posGroup,
+        })),
+      }),
+    };
+  },
+});
 
 export const owners = query({
   args: listArgs,
