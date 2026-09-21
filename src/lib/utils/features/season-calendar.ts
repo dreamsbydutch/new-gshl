@@ -2,6 +2,24 @@ import type { CalendarWeek } from "../../types/season-calendar";
 
 const DAY = 86_400_000;
 
+/** Keep each date range's duration, making inclusive weeks consecutive. */
+export function alignCalendarWeeks(
+  weeks: CalendarWeek[],
+  fromIndex = 1,
+): CalendarWeek[] {
+  const result = weeks.map((week) => ({ ...week }));
+  for (let index = Math.max(1, fromIndex); index < result.length; index++) {
+    const week = result[index]!;
+    const duration = dateValue(week.endDate) - dateValue(week.startDate);
+    if (duration < 0)
+      throw new Error("A week's end date cannot precede its start date.");
+    const start = dateValue(result[index - 1]!.endDate) + DAY;
+    week.startDate = new Date(start).toISOString().slice(0, 10);
+    week.endDate = new Date(start + duration).toISOString().slice(0, 10);
+  }
+  return result;
+}
+
 export function resizeSeasonCalendar(
   weeks: CalendarWeek[],
   regularCount: number,
@@ -50,13 +68,13 @@ export function resizeSeasonCalendar(
       .toISOString()
       .slice(0, 10),
   }));
-  return [
+  return alignCalendarWeeks([
     ...nextRegular,
     ...resizeGroup(shiftedPlayoffs, playoffCount, end + DAY, true),
-  ];
+  ]);
 }
 
-/** Shift later weeks by the end-date change, preserving their lengths and gaps. */
+/** Rebuild subsequent start dates from the previous inclusive end date. */
 export function editSeasonCalendarWeek(
   weeks: CalendarWeek[],
   index: number,
@@ -66,7 +84,6 @@ export function editSeasonCalendarWeek(
   const original = weeks[index];
   if (!original) return weeks;
   const edited = { ...original, ...patch };
-  let shift = 0;
   try {
     const oldLength =
       (dateValue(original.endDate) - dateValue(original.startDate)) / DAY + 1;
@@ -79,28 +96,21 @@ export function editSeasonCalendarWeek(
           ? newLength
           : Math.min(original.gameDays, newLength);
     }
-    if (moveFollowing)
-      shift = dateValue(edited.endDate) - dateValue(original.endDate);
   } catch {
     // Allow partially typed dates; validation reports incomplete dates on save.
   }
-  return weeks.map((week, i) => {
-    if (i === index) return edited;
-    if (i < index || !shift) return { ...week };
+  const result = weeks.map((week, i) => (i === index ? edited : { ...week }));
+  if (
+    moveFollowing &&
+    (patch.startDate !== undefined || patch.endDate !== undefined)
+  ) {
     try {
-      return {
-        ...week,
-        startDate: new Date(dateValue(week.startDate) + shift)
-          .toISOString()
-          .slice(0, 10),
-        endDate: new Date(dateValue(week.endDate) + shift)
-          .toISOString()
-          .slice(0, 10),
-      };
+      return alignCalendarWeeks(result, index + 1);
     } catch {
-      return { ...week };
+      // Keep incomplete input editable; save validation reports invalid dates.
     }
-  });
+  }
+  return result;
 }
 
 function dateValue(value: string): number {

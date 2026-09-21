@@ -13,6 +13,7 @@ import {
   validateCalendarDates,
   editSeasonCalendarWeek,
   resizeSeasonCalendar,
+  alignCalendarWeeks,
 } from "@gshl-utils/features/season-calendar";
 import type { CalendarWeek } from "@gshl-lib/types/season-calendar";
 
@@ -81,6 +82,25 @@ export function useScheduleBuilderView() {
     });
   };
   const cancelCalendarEditor = () => setCalendarDraft(null);
+  const alignCalendarPreview = () => {
+    if (!calendarDraft || !calendarRows.length) return;
+    setError("");
+    try {
+      const firstEditable = calendarRows.findIndex(
+        (_, index) => !lockedCalendarWeeks[index],
+      );
+      if (firstEditable < 0)
+        throw new Error("All calendar weeks have started and are locked.");
+      setCalendarDraft({
+        ...calendarDraft,
+        rows: alignCalendarWeeks(calendarRows, Math.max(1, firstEditable)),
+      });
+    } catch (cause) {
+      setError(
+        cause instanceof Error ? cause.message : "Could not align week dates.",
+      );
+    }
+  };
   const resizeCalendarPreview = () => {
     if (!calendarDraft || !editingSavedCalendar) return;
     setError("");
@@ -286,6 +306,7 @@ export function useScheduleBuilderView() {
     calendarPlayoffCount,
     setCalendarPlayoffCount,
     resizeCalendarPreview,
+    alignCalendarPreview,
     lockedCalendarWeeks,
     openCalendarEditor,
     cancelCalendarEditor,

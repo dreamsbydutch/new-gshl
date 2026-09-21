@@ -5,7 +5,37 @@ import {
   editSeasonCalendarWeek,
   resizeSeasonCalendar,
   validateSeasonCalendar,
+  validateCalendarDates,
 } from "./season-calendar";
+
+void test("editing an imported calendar places every following start one day after the previous end", () => {
+  const weeks = Array.from({ length: 25 }, (_, index) => ({
+    startDate: new Date(Date.UTC(2027, 9, 7 + index * 7))
+      .toISOString()
+      .slice(0, 10),
+    endDate: new Date(Date.UTC(2027, 9, 14 + index * 7))
+      .toISOString()
+      .slice(0, 10),
+    gameDays: 7,
+    isPlayoffs: index >= 22,
+  }));
+  const updated = editSeasonCalendarWeek(
+    weeks,
+    0,
+    { endDate: "2027-10-14" },
+    true,
+  );
+  assert.equal(updated[1]?.startDate, "2027-10-15");
+  for (let index = 1; index < updated.length; index++) {
+    assert.equal(
+      Date.parse(updated[index]!.startDate) -
+        Date.parse(updated[index - 1]!.endDate),
+      86400000,
+    );
+  }
+  validateCalendarDates(updated, 0);
+  assert.equal(weeks[1]?.startDate, "2027-10-14");
+});
 
 void test("count corrections preserve custom durations and move playoff dates", () => {
   const original = previewSeasonCalendar("2090-10-01", 23, 3);
@@ -31,7 +61,7 @@ void test("count corrections preserve custom durations and move playoff dates", 
   validateSeasonCalendar(bigger, 0);
 });
 
-void test("long weeks move subsequent dates while preserving other exceptions, gaps and playoff flags", () => {
+void test("long weeks move subsequent dates while preserving other durations and playoff flags", () => {
   const initial = previewSeasonCalendar("2090-10-01", 21, 3);
   const original = structuredClone(initial);
   const twoWeeks = editSeasonCalendarWeek(
@@ -74,7 +104,7 @@ void test("long weeks move subsequent dates while preserving other exceptions, g
     { endDate: "2090-10-14" },
     true,
   );
-  assert.equal(shiftedGap[1]?.startDate, "2090-10-17");
+  assert.equal(shiftedGap[1]?.startDate, "2090-10-15");
   assert.equal(shiftedGap[1]?.gameDays, 3);
   const finalIndex = shiftedGap.length - 1;
   const finalEnd = new Date(

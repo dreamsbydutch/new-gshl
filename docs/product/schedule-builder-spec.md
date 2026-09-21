@@ -46,8 +46,10 @@ Source: the schedule-hub conversation with the commissioner.
   calendars allow date and game-day edits to future, inactive weeks, including
   after publishing. Week IDs and matchup assignments are preserved. Started
   weeks cannot change. Concurrent edits require reopening the latest calendar.
-  Changing a week's end date moves all following weeks by the same number of
-  days, preserving their lengths and gaps, including playoff weeks. Full-week
+  Changing a week's dates starts each following week one day after the previous
+  inclusive end date, preserving its duration, including playoff weeks. The
+  Align week dates action also repairs overlaps or gaps in an existing preview
+  before saving. Full-week
   game-day counts track the new duration; custom counts remain editable.
 - Saved calendars also support regular-season and playoff count corrections
   before any week starts and before matchups, statistics, or weekly editions

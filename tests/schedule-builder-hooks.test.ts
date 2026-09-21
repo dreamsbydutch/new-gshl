@@ -6,7 +6,10 @@ import { ConvexProvider, ConvexReactClient } from "convex/react";
 import { getFunctionName, type FunctionReference } from "convex/server";
 import { useScheduleBuilderView } from "../src/hooks/features/useScheduleBuilderView";
 import { useScheduleBuilder } from "../src/hooks/main/useScheduleBuilder";
-import { previewSeasonCalendar } from "../src/lib/utils/features/season-calendar";
+import {
+  previewSeasonCalendar,
+  validateCalendarDates,
+} from "../src/lib/utils/features/season-calendar";
 
 // Keep the real Convex hooks and React lifecycle; replace only the network watches.
 function mountBuilder<T>(t: TestContext, useHook: () => T) {
@@ -76,6 +79,45 @@ function mountBuilder<T>(t: TestContext, useHook: () => T) {
     },
   };
 }
+
+void test("aligning an existing 22-week calendar repairs shared boundaries without changing week counts", (t) => {
+  const h = mountBuilder(t, useScheduleBuilderView);
+  act(() => h.current.setSeasonId("season"));
+  const calendar = Array.from({ length: 25 }, (_, index) => ({
+    id: `week${index}`,
+    weekNum: index + 1,
+    isActive: false,
+    isPlayoffs: index >= 22,
+    gameDays: 7,
+    startDate: new Date(Date.UTC(2090, 9, 7 + index * 7))
+      .toISOString()
+      .slice(0, 10),
+    endDate: new Date(Date.UTC(2090, 9, 14 + index * 7))
+      .toISOString()
+      .slice(0, 10),
+  }));
+  h.publish(
+    "schedule:builderContext",
+    { seasonId: "season" },
+    {
+      teams: [],
+      historySeasonIds: [],
+      regularWeeks: 22,
+      hasSchedule: false,
+      calendarRevision: "v1",
+      calendar,
+    },
+  );
+  act(() => h.current.openCalendarEditor());
+  assert.throws(() => validateCalendarDates(h.current.calendarRows), /overlap/);
+  act(() => h.current.alignCalendarPreview());
+  assert.equal(h.current.calendarRows[0]?.endDate, "2090-10-14");
+  assert.equal(h.current.calendarRows[1]?.startDate, "2090-10-15");
+  assert.equal(h.current.calendarRows.length, 25);
+  assert.equal(h.current.calendarRegularCount, 22);
+  assert.equal(h.current.calendarCountPending, false);
+  validateCalendarDates(h.current.calendarRows);
+});
 
 void test("saved calendar editing shifts later weeks and stays scoped to its season", (t) => {
   const h = mountBuilder(t, useScheduleBuilderView);

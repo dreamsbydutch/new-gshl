@@ -106,7 +106,7 @@ export function SeasonCalendar({
               <p className="text-sm">
                 Correct the regular-season or playoff week count before
                 publishing or recording season data. Retained weeks keep their
-                dates and lengths; added weeks start at seven days. Removing
+                lengths; added weeks start at seven days. Removing
                 regular-season weeks moves playoffs earlier.
               </p>
               <div className="grid gap-3 sm:grid-cols-2">
@@ -169,9 +169,20 @@ export function SeasonCalendar({
           )}
           <p className="mt-4 text-sm text-slate-600">
             Adjust any week to span the dates you need. Changing its end date
-            automatically moves all following weeks, keeping their lengths and
-            gaps. Full-week game-day counts follow the new length; custom counts
-            remain editable.
+            automatically starts each following week one day after the previous
+            week ends, keeping its length. Full-week game-day counts follow the
+            new length; custom counts remain editable.
+          </p>
+          <Button
+            className="mt-3"
+            disabled={view.busy}
+            onClick={view.alignCalendarPreview}
+          >
+            Align week dates
+          </Button>
+          <p className="mt-2 text-sm text-slate-600">
+            Use Align week dates to correct existing overlaps or gaps in this
+            preview, then review and save the calendar.
           </p>
           <div className="mt-4 overflow-x-auto">
             <table className="w-full text-left text-sm">
