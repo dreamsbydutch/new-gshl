@@ -8,11 +8,6 @@
  * @module
  */
 
-import type {
-  ApiFromModules,
-  FilterApi,
-  FunctionReference,
-} from "convex/server";
 import type * as accounts from "../accounts.js";
 import type * as authUsers from "../authUsers.js";
 import type * as awardCalculations from "../awardCalculations.js";
@@ -21,12 +16,12 @@ import type * as crons from "../crons.js";
 import type * as data from "../data.js";
 import type * as draft from "../draft.js";
 import type * as externalWorker from "../externalWorker.js";
-import type * as lib_activeRoster from "../lib/activeRoster.js";
 import type * as frontend from "../frontend.js";
 import type * as http from "../http.js";
 import type * as jobCatalog from "../jobCatalog.js";
 import type * as jobRunner from "../jobRunner.js";
 import type * as jobs from "../jobs.js";
+import type * as lib_activeRoster from "../lib/activeRoster.js";
 import type * as lib_auth from "../lib/auth.js";
 import type * as lib_compatibilityRead from "../lib/compatibilityRead.js";
 import type * as lib_contractSigning from "../lib/contractSigning.js";
@@ -70,14 +65,12 @@ import type * as yahoo from "../yahoo.js";
 import type * as yahooBackfill from "../yahooBackfill.js";
 import type * as yahooConnectionStore from "../yahooConnectionStore.js";
 
-/**
- * A utility for referencing Convex functions in your app's API.
- *
- * Usage:
- * ```js
- * const myFunctionReference = api.myModule.myFunction;
- * ```
- */
+import type {
+  ApiFromModules,
+  FilterApi,
+  FunctionReference,
+} from "convex/server";
+
 declare const fullApi: ApiFromModules<{
   accounts: typeof accounts;
   authUsers: typeof authUsers;
@@ -85,7 +78,6 @@ declare const fullApi: ApiFromModules<{
   conferenceContest: typeof conferenceContest;
   crons: typeof crons;
   data: typeof data;
-  "lib/activeRoster": typeof lib_activeRoster;
   draft: typeof draft;
   externalWorker: typeof externalWorker;
   frontend: typeof frontend;
@@ -93,6 +85,7 @@ declare const fullApi: ApiFromModules<{
   jobCatalog: typeof jobCatalog;
   jobRunner: typeof jobRunner;
   jobs: typeof jobs;
+  "lib/activeRoster": typeof lib_activeRoster;
   "lib/auth": typeof lib_auth;
   "lib/compatibilityRead": typeof lib_compatibilityRead;
   "lib/contractSigning": typeof lib_contractSigning;
@@ -136,11 +129,31 @@ declare const fullApi: ApiFromModules<{
   yahooBackfill: typeof yahooBackfill;
   yahooConnectionStore: typeof yahooConnectionStore;
 }>;
+
+/**
+ * A utility for referencing Convex functions in your app's public API.
+ *
+ * Usage:
+ * ```js
+ * const myFunctionReference = api.myModule.myFunction;
+ * ```
+ */
 export declare const api: FilterApi<
   typeof fullApi,
   FunctionReference<any, "public">
 >;
+
+/**
+ * A utility for referencing Convex functions in your app's internal API.
+ *
+ * Usage:
+ * ```js
+ * const myFunctionReference = internal.myModule.myFunction;
+ * ```
+ */
 export declare const internal: FilterApi<
   typeof fullApi,
   FunctionReference<any, "internal">
 >;
+
+export declare const components: {};
