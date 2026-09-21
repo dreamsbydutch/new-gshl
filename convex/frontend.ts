@@ -5,6 +5,7 @@ import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { requireCommissioner, requireOwnerOrCommissioner } from "./lib/auth";
+import { validateAuthUserOwnerLink } from "./lib/authUserOwnerLink";
 import {
   deriveContractCreationTerms,
   getEffectiveSigningStatus,
@@ -1122,22 +1123,24 @@ export const updateAuthUserAccess = mutation({
   },
   handler: async (ctx, args) => {
     const current = await requireCommissioner(ctx);
+    const user = await ctx.db.get(args.id);
+    if (!user) throw new Error("User not found");
     if (
       current._id === args.id &&
       (args.role !== "commissioner" || args.status !== "active")
     ) {
       throw new Error("You cannot remove your own commissioner access");
     }
-    if (args.role === "owner" && !args.ownerId) {
-      throw new Error("Owners must be linked to an owner record");
-    }
+    const ownerId = await validateAuthUserOwnerLink(
+      ctx,
+      args.id,
+      args.role,
+      args.ownerId,
+    );
     await ctx.db.patch(args.id, {
       role: args.role,
       status: args.status,
-      ownerId:
-        args.role === "owner" || args.role === "commissioner"
-          ? args.ownerId
-          : undefined,
+      ownerId,
       updatedAt: Date.now(),
     });
     return publicRow((await ctx.db.get(args.id)) as unknown as Row);

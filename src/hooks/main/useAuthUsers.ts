@@ -10,7 +10,6 @@ import { useDomainMutation } from "./useDomainMutation";
 export function useAuthUserAdmin() {
   const usersResult = useQuery(api.frontend.authUsers, {});
   const ownersResult = useQuery(api.frontend.owners, {
-    where: { isActive: true },
     orderBy: { lastName: "asc", firstName: "asc" },
   });
   return {

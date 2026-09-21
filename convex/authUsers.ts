@@ -1,5 +1,6 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
+import { validateAuthUserOwnerLink } from "./lib/authUserOwnerLink";
 
 const role = v.union(
   v.literal("viewer"),
@@ -127,32 +128,17 @@ export const updateAccess = mutation({
     const user = await ctx.db.get(args.id);
     if (!user) throw new Error("User not found");
 
-    const canHaveOwnerLink =
-      args.role === "owner" || args.role === "commissioner";
-
-    if (args.role === "owner" && !args.ownerId) {
-      throw new Error("Owners must be linked to an owner record");
-    }
-
-    if (canHaveOwnerLink && args.ownerId) {
-      const owner = (await ctx.db.get(args.ownerId)) as {
-        isActive?: boolean;
-      } | null;
-      if (!owner?.isActive)
-        throw new Error("Owner link must reference an active owner");
-      const linked = await ctx.db
-        .query("authUsers")
-        .withIndex("by_ownerId", (q) => q.eq("ownerId", args.ownerId))
-        .first();
-      if (linked && linked._id !== args.id) {
-        throw new Error("That owner is already linked to another account");
-      }
-    }
+    const ownerId = await validateAuthUserOwnerLink(
+      ctx,
+      args.id,
+      args.role,
+      args.ownerId,
+    );
 
     await ctx.db.patch(args.id, {
       role: args.role,
       status: args.status,
-      ownerId: canHaveOwnerLink ? args.ownerId : undefined,
+      ownerId,
       updatedAt: Date.now(),
     });
     return publicUser((await ctx.db.get(args.id))!);

@@ -44,6 +44,7 @@ function UserAccessRow({
       <td className="px-2 py-3">
         <select
           value={ownerId}
+          aria-label={`Owner link for ${user.name ?? user.email}`}
           disabled={!canHaveOwnerLink}
           onChange={(event) => setOwnerId(event.target.value)}
           className="max-w-52 rounded border bg-white px-2 py-1 disabled:opacity-50"
@@ -53,6 +54,7 @@ function UserAccessRow({
             <option key={owner.id} value={owner.id}>
               {owner.firstName} {owner.nickName ? `“${owner.nickName}” ` : ""}
               {owner.lastName}
+              {!owner.isActive ? " (Inactive)" : ""}
             </option>
           ))}
         </select>
@@ -113,7 +115,8 @@ export function UserManagement() {
         <p className="text-sm text-muted-foreground">
           New Google accounts begin as viewers. Owners require one linked league
           owner record; commissioners can optionally link their owner record
-          too.
+          too. Both active and inactive owners can be linked. Linking an
+          inactive owner does not reactivate them in the league.
         </p>
       </div>
       <table className="w-full min-w-[780px] text-sm">
