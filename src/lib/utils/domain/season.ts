@@ -503,7 +503,7 @@ export function toSeasonSummary(
  * Checks whether a season may be selected from season navigation.
  *
  * Season zero is a sentinel and is never selectable. Future seasons become
- * selectable once their start date is no more than 15 days away.
+ * selectable once active, once their draft starts, or within 15 days of opening.
  */
 export function isSeasonPickable(
   season: Season,
@@ -518,6 +518,11 @@ export function isSeasonPickable(
     return Number.isFinite(numericIdentifier) && numericIdentifier === 0;
   });
   if (isSeasonZero) return false;
+
+  if (season.isActive) return true;
+  const draftStart = coerceDate({ value: season.draftStartAt });
+  if (draftStart && draftStart.getTime() <= referenceDate.getTime())
+    return true;
 
   const startDate = parseSeasonDateOnly(season.startDate);
   if (!startDate) return false;

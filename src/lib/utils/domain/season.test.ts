@@ -51,6 +51,48 @@ void test("a season becomes pickable exactly 15 days before its start", () => {
   );
 });
 
+void test("the season picker includes the new season once its draft starts", () => {
+  const upcoming = {
+    ...season("2026-27", "2026-10-07"),
+    draftStartAt: "2026-09-20T00:00:00.000Z",
+  };
+  const before = new Date("2026-09-19T23:59:59.999Z");
+  const after = new Date("2026-09-20T00:00:00.000Z");
+  assert.equal(isSeasonPickable(upcoming, before), false);
+  assert.deepEqual(
+    buildSeasonSummaries([upcoming], after).map((s) => s.id),
+    ["2026-27"],
+  );
+});
+
+void test("an explicitly active season is pickable before opening day", () => {
+  const active = { ...season("active", "2026-10-07"), isActive: true };
+  assert.equal(isSeasonPickable(active, referenceDate), true);
+  assert.equal(
+    isSeasonPickable({ ...active, legacyId: "0" }, referenceDate),
+    false,
+  );
+});
+
+void test("future or invalid draft dates do not unlock a future season", () => {
+  for (const draftStartAt of ["2027-09-20T00:00:00Z", "invalid", null]) {
+    assert.equal(
+      isSeasonPickable(
+        { ...season("later", "2027-10-07"), draftStartAt },
+        referenceDate,
+      ),
+      false,
+    );
+  }
+  assert.equal(
+    isSeasonPickable(
+      { ...season("sentinel", "2026-10-07", "0"), draftStartAt: "2026-01-01" },
+      referenceDate,
+    ),
+    false,
+  );
+});
+
 void test("season picker summaries exclude sentinel and too-early seasons", () => {
   const summaries = buildSeasonSummaries(
     [
