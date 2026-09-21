@@ -4,11 +4,53 @@ import test from "node:test";
 import type { Season } from "@gshl-types";
 import {
   buildSeasonSummaries,
+  findMockDraftSeason,
   isSeasonPickable,
   SEASON_PICKER_ADVANCE_DAYS,
 } from "./season";
 
 const referenceDate = new Date("2026-07-23T00:00:00.000Z");
+
+void test("mock draft is visible only after playoffs and before the immediate next draft", () => {
+  const previous = {
+    ...season("previous", "2025-10-01"),
+    year: 2025,
+    endDate: "2026-04-20",
+  };
+  const upcoming = {
+    ...season("next", "2026-10-01"),
+    year: 2026,
+    draftStartAt: "2026-09-20T23:00:00Z",
+  };
+  const future = {
+    ...season("future", "2027-10-01"),
+    year: 2027,
+    draftStartAt: "2027-09-20T23:00:00Z",
+  };
+  const seasons = [future, upcoming, previous];
+  for (const date of [
+    "2026-01-01T12:00:00Z",
+    "2026-04-21T03:59:59Z",
+    "2026-09-20T23:00:00Z",
+    "2026-11-01T12:00:00Z",
+  ]) {
+    assert.equal(findMockDraftSeason(seasons, new Date(date)), undefined);
+  }
+  for (const date of ["2026-04-21T04:00:00Z", "2026-09-20T22:59:59Z"]) {
+    assert.equal(findMockDraftSeason(seasons, new Date(date))?.id, upcoming.id);
+  }
+  assert.equal(
+    findMockDraftSeason(
+      [previous, { ...upcoming, draftStartAt: null }],
+      referenceDate,
+    ),
+    undefined,
+  );
+  assert.deepEqual(
+    seasons.map((item) => item.id),
+    ["future", "next", "previous"],
+  );
+});
 
 function season(id: string, startDate: string, legacyId?: string): Season {
   return {

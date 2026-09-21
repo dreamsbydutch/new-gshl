@@ -24,6 +24,7 @@ import {
   utcTimestampToDateKey,
 } from "./lib/timestamps";
 import { loadLatestNhlStats, loadUfaCatalog } from "./lib/ufaCatalog";
+import { resolveUfaSigningSeason } from "../src/lib/utils/features/ufa-deadline";
 import {
   readCompatibilityRows,
   finishCompatibilityRead,
@@ -667,6 +668,7 @@ const UFA_SEASON_FIELDS = [
   "endDate",
   "isActive",
   "signingEndDate",
+  "draftStartAt",
 ] as const;
 const UFA_PLAYER_FIELDS = [
   "id",
@@ -803,9 +805,7 @@ export const ufaHomeCatalog = query({
       nhlStats: [],
       contracts: catalog.contracts,
     });
-    const activeSeason = selectionCatalog.seasons.find(
-      (season) => season.isActive,
-    );
+    const activeSeason = resolveUfaSigningSeason(selectionCatalog.seasons);
     const viewer = resolveUfaViewerContext({
       ownerId: viewerOwnerId ? String(viewerOwnerId) : undefined,
       signingSeasonId: activeSeason?.id,

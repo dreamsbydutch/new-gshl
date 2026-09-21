@@ -28,6 +28,7 @@ export interface UfaFreeAgentView {
   positions: string[];
   positionGroup: string;
   salary: number;
+  nextContractExpiryStatus: "RFA" | "UFA";
   seasonRating: number;
   overallRating: number;
   stats: UfaStatView | null;
@@ -98,6 +99,7 @@ export interface UfaOverviewData {
   window: {
     isOpen: boolean;
     signingEndDate: string | null;
+    contractSeasonName: string | null;
     reason: string | null;
   };
   freeAgents: UfaFreeAgentView[];

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { Id } from "./_generated/dataModel";
 import { createContract } from "./frontend";
-import { finalizeGroup } from "./ufa";
+import { finalizeGroup, submitOffer } from "./ufa";
 import {
   mutationFixture,
   invokeMutation,
@@ -20,6 +20,7 @@ function signingFixture() {
       year: 2026 + i,
       startDate: 2026 + i + "-10-01",
       endDate: 2027 + i + "-06-01",
+      draftStartAt: Date.now() + i * 365 * 86400000,
     });
     f.put("teams", "team" + i, {
       seasonId: "season" + i,
@@ -101,6 +102,43 @@ const ufaArgs = {
   odds: [{ offerId: "winner", probability: 1 }],
   factorSnapshots: [{ offerId: "winner", snapshot: "{}" }],
 };
+
+void test("UFA offers and commissioner signings are blocked at the draft cutoff", async () => {
+  const f = signingFixture();
+  f.put("authUsers", "commissioner", {
+    ...f.get("commissioner"),
+    ownerId: "owner",
+  });
+  f.put("seasons", "season1", {
+    ...f.get("season1"),
+    draftStartAt: Date.now() - 1000,
+  });
+  await assert.rejects(
+    invokeMutation(submitOffer, f.ctx, {
+      playerId: "player",
+      contractLength: 1,
+    }),
+    /Summer Free Agency is not open/,
+  );
+  await assert.rejects(
+    invokeMutation(createContract, f.ctx, commissionerArgs),
+    /Summer Free Agency is not open/,
+  );
+  assert.equal(f.rows("contracts").length, 0);
+});
+
+void test("pending UFA offers cannot create a contract after the draft starts", async () => {
+  const f = signingFixture();
+  f.put("seasons", "season1", {
+    ...f.get("season1"),
+    draftStartAt: Date.now() - 1000,
+  });
+  await invokeMutation(finalizeGroup, f.ctx, ufaArgs);
+  assert.equal(f.rows("contracts").length, 0);
+  assert.equal(f.get("group")?.status, "resolved");
+  assert.equal(f.get("winner")?.status, "lost");
+  assert.equal(f.get("loser")?.status, "lost");
+});
 
 for (const [label, fn, args] of [
   ["commissioner", createContract, commissionerArgs],

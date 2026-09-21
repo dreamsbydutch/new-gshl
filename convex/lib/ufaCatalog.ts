@@ -1,5 +1,6 @@
 import type { Doc } from "../_generated/dataModel";
 import type { DatabaseReader } from "../_generated/server";
+import { resolveUfaSigningSeason } from "../../src/lib/utils/features/ufa-deadline";
 
 const seasonYear = (season: Doc<"seasons">): number => {
   const year = Number(season.year);
@@ -38,7 +39,7 @@ export async function loadUfaCatalog(db: DatabaseReader) {
   const orderedSeasons = [...seasons].sort(
     (left, right) => seasonYear(left) - seasonYear(right),
   );
-  const signingSeason = orderedSeasons.find((season) => season.isActive);
+  const signingSeason = resolveUfaSigningSeason(orderedSeasons);
 
   const [players, nhlTeams, franchises, teams, contracts, nhlStats] =
     await Promise.all([

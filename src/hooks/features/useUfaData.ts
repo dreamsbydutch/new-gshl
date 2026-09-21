@@ -15,9 +15,11 @@ import {
   getUfaWindow,
   indexLatestUfaNhlStats,
   normalizeUfaPublicState,
+  orderContractSeasons,
   resolveUfaViewerContext,
   selectAffordableUfas,
 } from "@gshl-utils";
+import { resolveUfaSigningSeason } from "@gshl-utils/features/ufa-deadline";
 
 export function useUfaOverview(
   mode: UfaOverviewMode = "full",
@@ -38,13 +40,21 @@ export function useUfaOverview(
       seasons,
       contracts,
     } = rawCatalog;
-    const activeSeason = seasons.find((season) => season.isActive);
+    const activeSeason = resolveUfaSigningSeason(seasons);
     const latestNhlStatsByPlayer = indexLatestUfaNhlStats(
       nhlStats,
       seasons,
       activeSeason?.year,
     );
-    const window = getUfaWindow(activeSeason ?? null);
+    const orderedSeasons = orderContractSeasons(seasons);
+    const signingIndex = orderedSeasons.findIndex(
+      (season) => season.id === activeSeason?.id,
+    );
+    const window = getUfaWindow(
+      activeSeason ?? null,
+      new Date(),
+      signingIndex >= 0 ? (orderedSeasons[signingIndex + 1] ?? null) : null,
+    );
     const ownerId = session?.user?.ownerId;
     const { ownerFranchise, ownerTeam, isSignedInOwner } =
       resolveUfaViewerContext({
@@ -61,7 +71,7 @@ export function useUfaOverview(
       ownerId,
       groups: state.groups,
       offers: state.offers,
-    }).map(({ player, salary, affordableTerms }) => {
+    }).map(({ player, salary, affordableTerms, nextContractExpiryStatus }) => {
       const nhlTeam = findNhlTeamByAbbreviation(nhlTeams, player.nhlTeam);
       const group = state.groups.find(
         (candidate) =>
@@ -81,6 +91,7 @@ export function useUfaOverview(
           : [],
         positionGroup: String(player.posGroup),
         salary,
+        nextContractExpiryStatus,
         seasonRating: Number(player.seasonRating ?? 0),
         overallRating: Number(player.overallRating ?? 0),
         stats: latestNhlStatsByPlayer.get(String(player.id)) ?? null,
@@ -165,7 +176,10 @@ export function useUfaOverview(
       window: {
         isOpen: window.isOpen,
         signingEndDate: activeSeason?.signingEndDate ?? null,
-        reason: window.isOpen ? null : "Summer Free Agency is closed.",
+        contractSeasonName: orderedSeasons[signingIndex + 1]?.name ?? null,
+        reason: window.isOpen
+          ? null
+          : "UFA offers open after the final signing period and close when the draft starts. You can still browse available players.",
       },
       freeAgents,
       topFreeAgents: freeAgents.slice(0, 15),

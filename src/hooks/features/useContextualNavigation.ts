@@ -26,6 +26,7 @@ import {
   buildScheduleNavigationHref,
   buildStandingsNavigationHref,
   getCurrentNavigationHref,
+  findMockDraftSeason,
   getLeagueOfficeNavigationViews,
   isGlobalSeasonUrlPath,
   isLockerRoomNavigationView,
@@ -625,6 +626,8 @@ export function useLockerRoomContextNavigation(synchronizeRoute = true) {
 
 export function useLeagueOfficeContextNavigation() {
   const navigation = useContextualRouter();
+  const { seasons } = useSeasonState();
+  const showMockDraft = Boolean(findMockDraftSeason(seasons));
   const { hasHydrated } = useNavigationHydration();
   const { status } = useAuthSession();
   const query = useMemo(
@@ -699,6 +702,7 @@ export function useLeagueOfficeContextNavigation() {
 
   return {
     isMockDraftPage,
+    showMockDraft,
     isReady: routeDataReady && storeMatches,
     selectedSeasonId: effectiveSeasonId,
     selectedView: isMockDraftPage ? ("mockDraft" as const) : view,

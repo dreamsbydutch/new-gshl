@@ -95,9 +95,16 @@ function PlayerRows({
                   size={16}
                   className="mx-0 shrink-0"
                 />
-                <span className="truncate" title={player.fullName}>
-                  {player.fullName}
-                </span>
+                <div className="min-w-0">
+                  <p className="truncate" title={player.fullName}>
+                    {player.fullName}
+                  </p>
+                  <p className="text-[9px] font-normal text-muted-foreground sm:text-xs">
+                    {player.nextContractExpiryStatus === "UFA"
+                      ? "2nd contract · expires UFA"
+                      : "1st contract · expires RFA"}
+                  </p>
+                </div>
               </div>
             </th>
             <td
@@ -612,7 +619,19 @@ export function UfaLeagueOffice() {
         <h2 className="text-2xl font-black sm:text-3xl">Free Agents</h2>
         <p className="text-xs text-muted-foreground sm:text-sm">
           Available UFAs with their previous NHL season statistics and fixed
-          125% salary. Linked owners see players their franchise can afford.
+          125% salary. Linked owners see players they can afford for the
+          upcoming offseason, using cap commitments for the seasons the new
+          contract covers.
+        </p>
+        <p className="mt-1 text-xs text-muted-foreground sm:text-sm">
+          {query.data.window.contractSeasonName
+            ? `New contracts cover ${query.data.window.contractSeasonName} onward. `
+            : ""}
+          {query.data.window.signingEndDate
+            ? `Offers open after the late signing deadline on ${query.data.window.signingEndDate}. `
+            : ""}
+          Projected free agents may re-sign before that deadline. Second
+          contracts expire as UFAs; first contracts expire as RFAs.
         </p>
       </div>
       <div

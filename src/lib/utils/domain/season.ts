@@ -272,6 +272,30 @@ export function findOffseasonWindow(
   };
 }
 
+/** Mock drafts run after the latest season's playoffs until the next draft. */
+export function findMockDraftSeason(
+  seasons: Season[] | undefined,
+  referenceDate: Date = new Date(),
+): Season | undefined {
+  const latestSeason = findMostRecentSeason(seasons, referenceDate);
+  if (!latestSeason) return undefined;
+  const endedAt = parseSeasonDateOnly(latestSeason.endDate);
+  const today = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Toronto",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(referenceDate);
+  if (!endedAt || today <= endedAt.toISOString().slice(0, 10)) return undefined;
+  const upcomingSeason = [...(seasons ?? [])]
+    .filter((season) => Number(season.year) > Number(latestSeason.year))
+    .sort((a, b) => Number(a.year) - Number(b.year))[0];
+  const draftStart = coerceDate({ value: upcomingSeason?.draftStartAt });
+  return draftStart && referenceDate.getTime() < draftStart.getTime()
+    ? upcomingSeason
+    : undefined;
+}
+
 /**
  * Checks whether between seasons.
  *
@@ -289,7 +313,9 @@ export function isBetweenSeasons(
   }
 
   const endedAt = parseSeasonDateOnly(offseasonWindow.endedSeason.endDate);
-  const startsAt = parseSeasonDateOnly(offseasonWindow.upcomingSeason.startDate);
+  const startsAt = parseSeasonDateOnly(
+    offseasonWindow.upcomingSeason.startDate,
+  );
   if (!endedAt || !startsAt) {
     return false;
   }

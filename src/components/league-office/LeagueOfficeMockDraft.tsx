@@ -3,11 +3,11 @@
 import { MockDraft } from "@gshl-components/draft";
 import { useSeasonState } from "@gshl-hooks";
 import { MockDraftSkeleton } from "@gshl-skeletons";
-import { findOffseasonWindow } from "@gshl-utils";
+import { findMockDraftSeason } from "@gshl-utils";
 
 export function LeagueOfficeMockDraft() {
   const { seasons, isLoading } = useSeasonState();
-  const upcomingSeason = findOffseasonWindow(seasons)?.upcomingSeason;
+  const upcomingSeason = findMockDraftSeason(seasons);
 
   if (isLoading) {
     return <MockDraftSkeleton />;

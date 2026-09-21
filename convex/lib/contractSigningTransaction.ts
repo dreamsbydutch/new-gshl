@@ -3,6 +3,7 @@ import type { MutationCtx } from "../_generated/server";
 import { resolveContractSigningAssignments } from "./contractSigning";
 import { rebuildTeamLineup } from "./teamLineup";
 import { toUtcTimestamp } from "./timestamps";
+import { isUfaOfferWindowOpen } from "../../src/lib/utils/features/ufa-deadline";
 
 type SigningRequest = {
   playerId: Id<"players">;
@@ -45,6 +46,15 @@ export async function signContract(ctx: MutationCtx, request: SigningRequest) {
   );
   if (signingIndex < 0)
     throw new Error("The contract signing season could not be resolved");
+  if (
+    request.signingStatus === "UFA" &&
+    !isUfaOfferWindowOpen(
+      ordered[signingIndex]?.signingEndDate,
+      ordered[signingIndex + 1]?.draftStartAt,
+    )
+  ) {
+    throw new Error("Summer Free Agency is not open.");
+  }
   const covered = ordered.slice(
     signingIndex + 1,
     signingIndex + 1 + request.contractLength,

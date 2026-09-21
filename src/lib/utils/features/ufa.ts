@@ -11,11 +11,11 @@ import type {
 import {
   checkContractCapSpace,
   getContractCoveredSeasonIds,
-  getTorontoDate,
+  hasContractContinuity,
   isUnsignedForSigningSeason,
   orderContractSeasons,
 } from "../domain/contracts";
-import { UFA_OFFER_MS } from "./ufa-deadline";
+import { isUfaOfferWindowOpen, UFA_OFFER_MS } from "./ufa-deadline";
 import { HOME_UFA_PREVIEW_LIMIT } from "./home-dashboard";
 
 export { UFA_OFFER_MS } from "./ufa-deadline";
@@ -28,15 +28,17 @@ export function calculateUfaSalary(baseSalary: unknown): number {
 export function getUfaWindow(
   season: Pick<Season, "signingEndDate"> | null,
   referenceDate = new Date(),
+  upcomingSeason: Pick<Season, "draftStartAt"> | null = null,
 ) {
-  const afterSigning = Boolean(
-    season?.signingEndDate &&
-      getTorontoDate(referenceDate) > season.signingEndDate,
-  );
   const now = referenceDate.getTime();
+  const isOpen = isUfaOfferWindowOpen(
+    season?.signingEndDate,
+    upcomingSeason?.draftStartAt,
+    now,
+  );
   return {
-    isOpen: afterSigning,
-    deadlineForFirstOffer: afterSigning ? now + UFA_OFFER_MS : null,
+    isOpen,
+    deadlineForFirstOffer: isOpen ? now + UFA_OFFER_MS : null,
   };
 }
 
@@ -168,6 +170,7 @@ export function buildUfaCatalogCandidates<
   player: TPlayer;
   salary: number;
   affordableTerms: Array<1 | 2 | 3>;
+  nextContractExpiryStatus: "RFA" | "UFA";
 }> {
   const {
     players,
@@ -203,6 +206,14 @@ export function buildUfaCatalogCandidates<
           fullName: player.fullName,
           overallRating: player.overallRating,
           salary,
+          nextContractExpiryStatus: hasContractContinuity(
+            String(player.id),
+            String(signingSeason.id),
+            contracts,
+            seasons,
+          )
+            ? ("UFA" as const)
+            : ("RFA" as const),
           affordableTerms: getAffordableUfaTerms({
             ownerId,
             salary,
@@ -215,10 +226,11 @@ export function buildUfaCatalogCandidates<
         },
       ];
     }),
-  ).map(({ player, salary, affordableTerms }) => ({
+  ).map(({ player, salary, affordableTerms, nextContractExpiryStatus }) => ({
     player,
     salary,
     affordableTerms,
+    nextContractExpiryStatus,
   }));
 }
 

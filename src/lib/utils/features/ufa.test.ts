@@ -62,24 +62,75 @@ void test("UFA salary applies and rounds the 125 percent premium", () => {
   assert.equal(calculateUfaSalary(null), 0);
 });
 
-void test("UFA window opens after signing regardless of draft configuration", () => {
+void test("in-season UFA preview releases expiring cap and labels consecutive contracts", () => {
+  const signingSeason = capSeasons[1]!;
+  const expiring: Contract = {
+    ...committedContract,
+    playerId: "expiring",
+    contractLength: 1,
+    expiryDate: signingSeason.endDate,
+    capHitEndDate: signingSeason.endDate,
+  };
+  const candidates = buildUfaCatalogCandidates({
+    players: ["expiring", "new-player"].map((id) => ({
+      id,
+      fullName: id,
+      isActive: true,
+      overallRk: 10,
+      overallRating: 80,
+      salary: 8_000_000,
+    })),
+    signingSeason,
+    seasons: capSeasons,
+    contracts: [expiring],
+    ownerId: "owner-1",
+    groups: [],
+    offers: [],
+  });
+  assert.equal(candidates.length, 2);
+  assert.deepEqual(candidates[0]?.affordableTerms, [1, 2]);
+  assert.equal(
+    candidates.find(({ player }) => player.id === "expiring")
+      ?.nextContractExpiryStatus,
+    "UFA",
+  );
+  assert.equal(
+    candidates.find(({ player }) => player.id === "new-player")
+      ?.nextContractExpiryStatus,
+    "RFA",
+  );
+  const currentWindowTerms = getAffordableUfaTerms({
+    ownerId: "owner-1",
+    salary: 10_000_000,
+    signingSeason: capSeasons[0]!,
+    seasons: capSeasons,
+    contracts: [expiring],
+    groups: [],
+    offers: [],
+  });
+  assert.deepEqual(currentWindowTerms, []);
+});
+
+void test("UFA window opens after signing and closes exactly at the next draft", () => {
   const season = {
     signingEndDate: "2026-06-30",
     draftStartAt: "2026-10-03T23:00:00.000Z",
   };
   assert.equal(
-    getUfaWindow(season, new Date("2026-07-01T12:00:00.000Z")).isOpen,
+    getUfaWindow(season, new Date("2026-07-01T12:00:00.000Z"), season).isOpen,
     true,
   );
   assert.equal(
-    getUfaWindow(season, new Date("2026-10-03T23:00:00.000Z")).isOpen,
-    true,
+    getUfaWindow(season, new Date("2026-10-03T23:00:00.000Z"), season).isOpen,
+    false,
   );
 });
 
 void test("first offers always receive a seven-day window", () => {
   const referenceDate = new Date("2026-10-01T12:00:00.000Z");
-  const window = getUfaWindow({ signingEndDate: "2026-06-30" }, referenceDate);
+  const window = getUfaWindow({ signingEndDate: "2026-06-30" }, referenceDate, {
+    draftStartAt: "2026-10-03T23:00:00.000Z",
+  });
   assert.equal(
     window.deadlineForFirstOffer,
     referenceDate.getTime() + 7 * 24 * 60 * 60 * 1_000,

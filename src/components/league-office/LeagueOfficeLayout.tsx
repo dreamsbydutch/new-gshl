@@ -38,11 +38,9 @@ export function LeagueOfficeLayout({
   } = {
     activeKey: isMockDraftPage ? "mockDraft" : selectedType,
     toolbarKeys: [
-      {
-        key: "mockDraft",
-        value: "Mock",
-        setter: selectView,
-      },
+      ...(navigation.showMockDraft
+        ? [{ key: "mockDraft", value: "Mock", setter: selectView }]
+        : []),
       {
         key: "draft",
         value: "Classes",

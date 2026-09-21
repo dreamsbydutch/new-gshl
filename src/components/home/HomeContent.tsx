@@ -3,12 +3,7 @@
 import { MockDraftPreview } from "@gshl-components/draft/DraftBoardList";
 import { useSeasonState } from "@gshl-hooks";
 import { HomeSkeleton } from "@gshl-skeletons";
-import {
-  cn,
-  findOffseasonWindow,
-  isBetweenSeasons,
-  resolveDraftHubSeason,
-} from "@gshl-utils";
+import { cn, findMockDraftSeason, resolveDraftHubSeason } from "@gshl-utils";
 import { LeagueActivityCard } from "./LeagueActivityCard";
 import { PowerRankingsHomeCard } from "./PowerRankingsHomeCard";
 import { UfaHomeCard } from "@gshl-components/contracts";
@@ -25,8 +20,7 @@ export function HomeContent() {
     return <HomeSkeleton />;
   }
 
-  const offseasonWindow = findOffseasonWindow(seasons);
-  const showOffseasonContent = isBetweenSeasons(seasons);
+  const mockDraftSeason = findMockDraftSeason(seasons);
   const draftSeason = resolveDraftHubSeason(seasons);
   const dashboardSeason = selectedSeason ?? currentSeason ?? defaultSeason;
 
@@ -63,11 +57,9 @@ export function HomeContent() {
             <DraftHubCard season={draftSeason} />
           </div>
         ) : null}
-        {showOffseasonContent && offseasonWindow ? (
+        {mockDraftSeason ? (
           <div className="mx-auto w-full max-w-5xl">
-            <MockDraftPreview
-              seasonId={String(offseasonWindow.upcomingSeason.id)}
-            />
+            <MockDraftPreview seasonId={String(mockDraftSeason.id)} />
           </div>
         ) : null}
       </div>

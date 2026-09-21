@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return, @typescript-eslint/prefer-optional-chain */
 import { v } from "convex/values";
+import type { Doc } from "./_generated/dataModel";
 import { internal } from "./_generated/api";
 import {
   internalAction,
@@ -8,7 +9,11 @@ import {
   mutation,
   query,
 } from "./_generated/server";
-import { getUfaOfferGroupDeadline } from "../src/lib/utils/features/ufa-deadline";
+import {
+  getUfaOfferGroupDeadline,
+  isUfaOfferWindowOpen,
+  resolveUfaSigningSeason,
+} from "../src/lib/utils/features/ufa-deadline";
 import { requireOwnerOrCommissioner } from "./lib/auth";
 import { utcTimestampToDateKey } from "./lib/timestamps";
 import { signContract } from "./lib/contractSigningTransaction";
@@ -38,14 +43,6 @@ const num = (value: unknown, fallback = 0) => {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
 };
-
-const torontoDate = (at = Date.now()) =>
-  new Intl.DateTimeFormat("en-CA", {
-    timeZone: "America/Toronto",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(new Date(at));
 
 function percentile(value: number, population: number[]) {
   const valid = population.filter(Number.isFinite).sort((a, b) => a - b);
@@ -371,7 +368,7 @@ export async function calculateOddsForGroup(
         contract.ownerId === offer.ownerId &&
         Boolean(
           nextSeasonId &&
-          coveredSeasonIds(contract, orderedSeasons).includes(nextSeasonId),
+            coveredSeasonIds(contract, orderedSeasons).includes(nextSeasonId),
         ),
     );
     const contractedPlayers = ownerContracts
@@ -574,10 +571,17 @@ export const submitOffer = mutation({
     const orderedSeasons = [...seasons].sort(
       (a: any, b: any) => num(a.year) - num(b.year),
     );
-    const signingSeason = orderedSeasons.find((season: any) => season.isActive);
+    const signingSeason = resolveUfaSigningSeason(seasons as Doc<"seasons">[]);
     if (!signingSeason) throw new Error("There is no active signing season.");
-    const signingEndDate = normalizeDateOnly(signingSeason.signingEndDate);
-    if (!signingEndDate || torontoDate(now) <= signingEndDate) {
+    const upcomingSeason =
+      orderedSeasons[orderedSeasons.indexOf(signingSeason) + 1];
+    if (
+      !isUfaOfferWindowOpen(
+        signingSeason.signingEndDate,
+        upcomingSeason?.draftStartAt,
+        now,
+      )
+    ) {
       throw new Error("Summer Free Agency is not open.");
     }
     if (
@@ -820,6 +824,27 @@ export const finalizeGroup = internalMutation({
       (season: any) => season._id === group.seasonId,
     );
     const startSeason = seasons[signingIndex + 1];
+    if (
+      !isUfaOfferWindowOpen(
+        seasons[signingIndex]?.signingEndDate,
+        startSeason?.draftStartAt,
+      )
+    ) {
+      const now = Date.now();
+      for (const offer of offers) {
+        if (offer.status === "pending") {
+          await db.patch(offer._id, { status: "lost", updatedAt: now });
+        }
+      }
+      await db.patch(group._id, {
+        status: "resolved",
+        failureReason:
+          "The UFA signing window closed before this offer resolved.",
+        resolvedAt: now,
+        updatedAt: now,
+      });
+      return;
+    }
     const expirySeason =
       seasons[signingIndex + num(winningOffer?.contractLength)];
     const priorContracts = player
