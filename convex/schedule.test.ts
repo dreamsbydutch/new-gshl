@@ -11,13 +11,18 @@ import {
   builderContext,
   builderSeasonHistory,
   createBuilderCalendar,
+  updateBuilderCalendar,
+  resizeBuilderCalendar,
   publishBuilderSchedule,
 } from "./schedule";
 import {
   combineScheduleHistory,
   generateSchedule,
 } from "../src/lib/utils/features/schedule-builder";
-import { previewSeasonCalendar } from "../src/lib/utils/features/season-calendar";
+import {
+  previewSeasonCalendar,
+  resizeSeasonCalendar,
+} from "../src/lib/utils/features/season-calendar";
 
 function handler<A extends DefaultFunctionArgs, R>(
   fn: RegisteredMutation<"public", A, R> | RegisteredQuery<"public", A, R>,
@@ -30,6 +35,7 @@ function handler<A extends DefaultFunctionArgs, R>(
 }
 
 function fixture() {
+  let inserted = 0;
   const tables = new Map<string, Record<string, unknown>[]>();
   const rows = (name: string) => {
     if (!tables.has(name)) tables.set(name, []);
@@ -99,18 +105,182 @@ function fixture() {
               filters.every(([key, value]) => r[key] === value),
             );
           },
+          first: async () =>
+            rows(table).find((r) =>
+              filters.every(([key, value]) => r[key] === value),
+            ) ?? null,
         };
         return query;
       },
       insert: async (table: string, value: Record<string, unknown>) => {
-        const id = `${table}${rows(table).length}`;
+        const id = `${table}-insert-${inserted++}`;
         put(table, id, value);
         return id;
+      },
+      patch: async (id: string, value: Record<string, unknown>) => {
+        Object.assign(get(id)!, value);
+      },
+      delete: async (id: string) => {
+        for (const table of tables.values()) {
+          const index = table.findIndex((row) => row._id === id);
+          if (index !== -1) table.splice(index, 1);
+        }
       },
     },
   } as unknown as MutationCtx;
   return { ctx, teams, put, get, rows, reads };
 }
+
+void test("saved calendar count corrections preserve surviving IDs and reject calendars in use", async () => {
+  const f = fixture();
+  f.rows("weeks").splice(0);
+  const seasonId = "season" as Id<"seasons">;
+  await handler(createBuilderCalendar)(f.ctx, {
+    seasonId,
+    weeks: previewSeasonCalendar("2090-10-01", 23, 3),
+  });
+  const context = await handler(builderContext)(f.ctx, { seasonId });
+  const weeks = resizeSeasonCalendar(
+    previewSeasonCalendar("2090-10-01", 23, 3),
+    21,
+    4,
+  );
+  const args = { seasonId, expectedRevision: context.calendarRevision, weeks };
+  for (const table of [
+    "matchups",
+    "playerDayStatLines",
+    "playerDayHighlights",
+    "playerWeekStatLines",
+    "teamDayStatLines",
+    "teamWeekStatLines",
+    "weeklyEditions",
+  ]) {
+    f.put(table, `ref-${table}`, { seasonId, weekId: context.calendar[0]!.id });
+    await assert.rejects(
+      handler(resizeBuilderCalendar)(f.ctx, args),
+      /cannot change/,
+    );
+    assert.equal(f.rows("weeks").length, 26);
+    f.rows(table).splice(0);
+  }
+  assert.deepEqual(await handler(resizeBuilderCalendar)(f.ctx, args), {
+    weeks: 25,
+  });
+  const updated = await handler(builderContext)(f.ctx, { seasonId });
+  assert.equal(updated.regularWeeks, 21);
+  assert.equal(updated.calendar[21]?.id, context.calendar[23]?.id);
+  assert.equal(updated.calendar[21]?.weekNum, 22);
+  assert.equal(updated.calendar[21]?.startDate, weeks[21]?.startDate);
+  assert.equal(f.get(context.calendar[21]!.id), null);
+  await assert.rejects(
+    handler(resizeBuilderCalendar)(f.ctx, args),
+    /changed since/,
+  );
+  const grow = {
+    seasonId,
+    expectedRevision: updated.calendarRevision,
+    weeks: resizeSeasonCalendar(weeks, 25, 3),
+  };
+  f.get("user")!.role = "owner";
+  await assert.rejects(
+    handler(resizeBuilderCalendar)(f.ctx, grow),
+    /Forbidden/,
+  );
+  f.get("user")!.role = "commissioner";
+  assert.deepEqual(await handler(resizeBuilderCalendar)(f.ctx, grow), {
+    weeks: 28,
+  });
+  const grown = await handler(builderContext)(f.ctx, { seasonId });
+  f.get(grown.calendar[0]!.id)!.startDate = 0;
+  const started = await handler(builderContext)(f.ctx, { seasonId });
+  await assert.rejects(
+    handler(resizeBuilderCalendar)(f.ctx, {
+      ...grow,
+      expectedRevision: started.calendarRevision,
+    }),
+    /before any/,
+  );
+});
+
+void test("calendar date updates preserve matchups, reject stale edits and enforce future-only changes", async () => {
+  const f = fixture();
+  f.rows("weeks").splice(0);
+  const seasonId = "season" as Id<"seasons">;
+  await handler(createBuilderCalendar)(f.ctx, {
+    seasonId,
+    weeks: previewSeasonCalendar("2090-10-01", 21, 3),
+  });
+  const context = await handler(builderContext)(f.ctx, { seasonId });
+  f.put("matchups", "assigned", {
+    seasonId,
+    weekId: context.calendar[0]!.id,
+    gameType: "CC",
+  });
+  const before = structuredClone(f.get("assigned"));
+  const rows = context.calendar.map((week) => ({
+    id: week.id,
+    startDate: week.startDate!,
+    endDate: week.endDate!,
+    gameDays: week.gameDays,
+  }));
+  rows[0]!.startDate = "2090-09-25";
+  rows[0]!.gameDays = 13;
+  const args = {
+    seasonId,
+    expectedRevision: context.calendarRevision,
+    weeks: rows,
+  };
+  f.get("user")!.role = "owner";
+  await assert.rejects(
+    handler(updateBuilderCalendar)(f.ctx, args),
+    /Forbidden/,
+  );
+  f.get("user")!.role = "commissioner";
+  await assert.rejects(
+    handler(updateBuilderCalendar)(f.ctx, { ...args, weeks: rows.slice(1) }),
+    /exactly/,
+  );
+  assert.deepEqual(await handler(updateBuilderCalendar)(f.ctx, args), {
+    weeks: 1,
+  });
+  assert.deepEqual(f.get("assigned"), before);
+  assert.equal(f.rows("weeks").length, 24);
+  await assert.rejects(
+    handler(updateBuilderCalendar)(f.ctx, args),
+    /changed since/,
+  );
+  f.get(rows[0]!.id)!.startDate = Date.parse("2000-01-01");
+  f.get(rows[0]!.id)!.endDate = Date.parse("2000-01-13");
+  const current = await handler(builderContext)(f.ctx, { seasonId });
+  const currentRows = current.calendar.map((week) => ({
+    id: week.id,
+    startDate: week.startDate!,
+    endDate: week.endDate!,
+    gameDays: week.gameDays,
+  }));
+  currentRows[0]!.startDate = "2000-01-02";
+  currentRows[0]!.gameDays = 12;
+  await assert.rejects(
+    handler(updateBuilderCalendar)(f.ctx, {
+      ...args,
+      expectedRevision: current.calendarRevision,
+      weeks: currentRows,
+    }),
+    /Started weeks/,
+  );
+  currentRows[0]!.startDate = "2000-01-01";
+  currentRows[0]!.gameDays = 13;
+  currentRows[1]!.startDate = "2090-10-09";
+  currentRows[1]!.gameDays = 6;
+  assert.deepEqual(
+    await handler(updateBuilderCalendar)(f.ctx, {
+      ...args,
+      expectedRevision: current.calendarRevision,
+      weeks: currentRows,
+    }),
+    { weeks: 1 },
+  );
+});
 
 void test("calendar creation saves regular and playoff weeks and enables regular-season publishing", async () => {
   const f = fixture();

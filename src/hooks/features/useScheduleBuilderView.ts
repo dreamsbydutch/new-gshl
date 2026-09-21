@@ -10,6 +10,9 @@ import type { BuilderGame } from "@gshl-lib/types/schedule-builder";
 import {
   previewSeasonCalendar,
   validateSeasonCalendar,
+  validateCalendarDates,
+  editSeasonCalendarWeek,
+  resizeSeasonCalendar,
 } from "@gshl-utils/features/season-calendar";
 import type { CalendarWeek } from "@gshl-lib/types/season-calendar";
 
@@ -28,9 +31,13 @@ export function useScheduleBuilderView() {
   const data = useScheduleBuilder(seasonId);
   const [calendarStart, setCalendarStart] = useState("");
   const [playoffWeeks, setPlayoffWeeks] = useState(3);
+  const [calendarRegularCount, setCalendarRegularCount] = useState(21);
+  const [calendarPlayoffCount, setCalendarPlayoffCount] = useState(3);
   const [calendarDraft, setCalendarDraft] = useState<{
     key: string;
     rows: CalendarWeek[];
+    resized?: boolean;
+    saved?: { revision: string; ids: string[]; locked: boolean[] };
   } | null>(null);
   const calendarKey = JSON.stringify([
     seasonId,
@@ -38,8 +45,60 @@ export function useScheduleBuilderView() {
     playoffWeeks,
     calendarStart,
   ]);
+  const savedCalendarKey = JSON.stringify([seasonId, "saved"]);
+  const editingSavedCalendar = calendarDraft?.key === savedCalendarKey;
   const calendarRows =
-    calendarDraft?.key === calendarKey ? calendarDraft.rows : [];
+    calendarDraft?.key === calendarKey || editingSavedCalendar
+      ? calendarDraft.rows
+      : [];
+  const lockedCalendarWeeks = editingSavedCalendar
+    ? calendarDraft.saved!.locked
+    : [];
+  const openCalendarEditor = () => {
+    if (!data.context?.calendar.length) return;
+    setError("");
+    setMessage("");
+    setCalendarRegularCount(data.context.regularWeeks);
+    setCalendarPlayoffCount(
+      data.context.calendar.filter((week) => week.isPlayoffs).length,
+    );
+    setCalendarDraft({
+      key: savedCalendarKey,
+      rows: data.context.calendar.map((week) => ({
+        startDate: week.startDate ?? "",
+        endDate: week.endDate ?? "",
+        gameDays: week.gameDays,
+        isPlayoffs: week.isPlayoffs,
+      })),
+      saved: {
+        revision: data.context.calendarRevision,
+        ids: data.context.calendar.map((week) => week.id),
+        locked: data.context.calendar.map(
+          (week) =>
+            week.isActive || Date.parse(week.startDate ?? "") <= Date.now(),
+        ),
+      },
+    });
+  };
+  const cancelCalendarEditor = () => setCalendarDraft(null);
+  const resizeCalendarPreview = () => {
+    if (!calendarDraft || !editingSavedCalendar) return;
+    setError("");
+    try {
+      const rows = resizeSeasonCalendar(
+        calendarRows,
+        calendarRegularCount,
+        calendarPlayoffCount,
+      );
+      setCalendarDraft({ ...calendarDraft, rows, resized: true });
+    } catch (cause) {
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : "Could not adjust week counts.",
+      );
+    }
+  };
   const previewCalendar = () => {
     setError("");
     setMessage("");
@@ -54,11 +113,13 @@ export function useScheduleBuilderView() {
     }
   };
   const editCalendarWeek = (index: number, patch: Partial<CalendarWeek>) => {
+    if (!calendarDraft || lockedCalendarWeeks[index]) return;
+    // Date inputs emit empty values while a date is incomplete. Keep the last
+    // complete date so the eventual edit can move following weeks accurately.
+    if (patch.startDate === "" || patch.endDate === "") return;
     setCalendarDraft({
-      key: calendarKey,
-      rows: calendarRows.map((row, i) =>
-        i === index ? { ...row, ...patch } : row,
-      ),
+      ...calendarDraft,
+      rows: editSeasonCalendarWeek(calendarRows, index, patch, true),
     });
   };
   const saveCalendar = async () => {
@@ -67,12 +128,39 @@ export function useScheduleBuilderView() {
     setError("");
     setMessage("");
     try {
-      validateSeasonCalendar(calendarRows, Date.now());
-      const result = await data.createCalendar(calendarRows);
+      if (editingSavedCalendar) {
+        validateCalendarDates(calendarRows);
+        const original = calendarDraft.saved!;
+        if (calendarDraft.resized) {
+          const result = await data.resizeCalendar(
+            original.revision,
+            calendarRows,
+          );
+          setWeeks(calendarRows.filter((week) => !week.isPlayoffs).length);
+          setConfirmed(false);
+          setMessage(
+            `Saved ${result.weeks} calendar weeks. Generate a draft matching the corrected regular-season length.`,
+          );
+        } else {
+          const result = await data.updateCalendar(
+            original.revision,
+            calendarRows.map((week, index) => ({
+              ...week,
+              id: original.ids[index]!,
+            })),
+          );
+          setMessage(
+            `Updated dates for ${result.weeks} weeks. Existing matchup assignments are preserved.`,
+          );
+        }
+      } else {
+        validateSeasonCalendar(calendarRows, Date.now());
+        const result = await data.createCalendar(calendarRows);
+        setMessage(
+          `Created ${result.weeks} calendar weeks, including ${playoffWeeks} playoff weeks. You can now publish a matching regular-season draft.`,
+        );
+      }
       setCalendarDraft(null);
-      setMessage(
-        `Created ${result.weeks} calendar weeks, including ${playoffWeeks} playoff weeks. You can now publish a matching regular-season draft.`,
-      );
     } catch (cause) {
       setError(
         cause instanceof Error ? cause.message : "Calendar creation failed.",
@@ -186,6 +274,21 @@ export function useScheduleBuilderView() {
     playoffWeeks,
     setPlayoffWeeks,
     calendarRows,
+    editingSavedCalendar,
+    calendarCountPending:
+      editingSavedCalendar &&
+      (calendarRegularCount !==
+        calendarRows.filter((week) => !week.isPlayoffs).length ||
+        calendarPlayoffCount !==
+          calendarRows.filter((week) => week.isPlayoffs).length),
+    calendarRegularCount,
+    setCalendarRegularCount,
+    calendarPlayoffCount,
+    setCalendarPlayoffCount,
+    resizeCalendarPreview,
+    lockedCalendarWeeks,
+    openCalendarEditor,
+    cancelCalendarEditor,
     previewCalendar,
     editCalendarWeek,
     saveCalendar,

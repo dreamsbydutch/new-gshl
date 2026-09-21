@@ -2,8 +2,93 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   previewSeasonCalendar,
+  editSeasonCalendarWeek,
+  resizeSeasonCalendar,
   validateSeasonCalendar,
 } from "./season-calendar";
+
+void test("count corrections preserve custom durations and move playoff dates", () => {
+  const original = previewSeasonCalendar("2090-10-01", 23, 3);
+  const extended = editSeasonCalendarWeek(
+    original,
+    0,
+    { endDate: "2090-10-14" },
+    true,
+  );
+  const smaller = resizeSeasonCalendar(extended, 21, 4);
+  assert.equal(smaller.length, 25);
+  assert.deepEqual(smaller[0], extended[0]);
+  assert.equal(
+    Date.parse(smaller[21]!.startDate),
+    Date.parse(extended[23]!.startDate) - 14 * 86400000,
+  );
+  assert.equal(smaller[24]?.isPlayoffs, true);
+  validateSeasonCalendar(smaller, 0);
+  const bigger = resizeSeasonCalendar(smaller, 25, 3);
+  assert.equal(bigger.length, 28);
+  assert.deepEqual(bigger[0], extended[0]);
+  assert.equal(bigger[24]?.gameDays, 7);
+  validateSeasonCalendar(bigger, 0);
+});
+
+void test("long weeks move subsequent dates while preserving other exceptions, gaps and playoff flags", () => {
+  const initial = previewSeasonCalendar("2090-10-01", 21, 3);
+  const original = structuredClone(initial);
+  const twoWeeks = editSeasonCalendarWeek(
+    initial,
+    0,
+    { endDate: "2090-10-14" },
+    true,
+  );
+  assert.equal(twoWeeks[0]?.gameDays, 14);
+  assert.equal(twoWeeks[1]?.startDate, "2090-10-15");
+  assert.equal(twoWeeks[1]?.endDate, "2090-10-21");
+  const longMiddle = editSeasonCalendarWeek(
+    twoWeeks,
+    1,
+    { endDate: "2090-10-24" },
+    true,
+  );
+  assert.equal(longMiddle[1]?.gameDays, 10);
+  const shortened = editSeasonCalendarWeek(
+    longMiddle,
+    0,
+    { endDate: "2090-10-11" },
+    true,
+  );
+  assert.equal(shortened[1]?.startDate, "2090-10-12");
+  assert.equal(shortened[1]?.endDate, "2090-10-21");
+  assert.equal(shortened[1]?.gameDays, 10);
+  assert.equal(shortened[21]?.isPlayoffs, true);
+  validateSeasonCalendar(shortened, 0);
+  assert.deepEqual(initial, original);
+  const withGap = editSeasonCalendarWeek(
+    initial,
+    1,
+    { startDate: "2090-10-10", gameDays: 3 },
+    true,
+  );
+  const shiftedGap = editSeasonCalendarWeek(
+    withGap,
+    0,
+    { endDate: "2090-10-14" },
+    true,
+  );
+  assert.equal(shiftedGap[1]?.startDate, "2090-10-17");
+  assert.equal(shiftedGap[1]?.gameDays, 3);
+  const finalIndex = shiftedGap.length - 1;
+  const finalEnd = new Date(
+    Date.parse(shiftedGap[finalIndex]!.endDate) + 7 * 86400000,
+  )
+    .toISOString()
+    .slice(0, 10);
+  assert.equal(
+    editSeasonCalendarWeek(shiftedGap, finalIndex, { endDate: finalEnd }, true)[
+      finalIndex
+    ]?.gameDays,
+    14,
+  );
+});
 
 void test("calendar dates cross month, leap day and year boundaries without timezone drift", () => {
   const weeks = previewSeasonCalendar("2088-02-28", 21, 3);

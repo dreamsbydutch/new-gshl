@@ -6,6 +6,7 @@ import { ConvexProvider, ConvexReactClient } from "convex/react";
 import { getFunctionName, type FunctionReference } from "convex/server";
 import { useScheduleBuilderView } from "../src/hooks/features/useScheduleBuilderView";
 import { useScheduleBuilder } from "../src/hooks/main/useScheduleBuilder";
+import { previewSeasonCalendar } from "../src/lib/utils/features/season-calendar";
 
 // Keep the real Convex hooks and React lifecycle; replace only the network watches.
 function mountBuilder<T>(t: TestContext, useHook: () => T) {
@@ -75,6 +76,43 @@ function mountBuilder<T>(t: TestContext, useHook: () => T) {
     },
   };
 }
+
+void test("saved calendar editing shifts later weeks and stays scoped to its season", (t) => {
+  const h = mountBuilder(t, useScheduleBuilderView);
+  act(() => h.current.setSeasonId("season"));
+  h.publish(
+    "schedule:builderContext",
+    { seasonId: "season" },
+    {
+      teams: [],
+      historySeasonIds: [],
+      regularWeeks: 21,
+      hasSchedule: true,
+      calendarRevision: "v1",
+      calendar: previewSeasonCalendar("2090-10-01", 21, 3).map(
+        (week, index) => ({
+          ...week,
+          id: `week${index}`,
+          weekNum: index + 1,
+          isActive: false,
+        }),
+      ),
+    },
+  );
+  act(() => h.current.openCalendarEditor());
+  assert.equal(h.current.editingSavedCalendar, true);
+  act(() => h.current.editCalendarWeek(0, { endDate: "2090-10-14" }));
+  assert.equal(h.current.calendarRows[1]?.startDate, "2090-10-15");
+  assert.equal(h.current.calendarRows[0]?.gameDays, 14);
+  act(() => h.current.setWeeks(23));
+  assert.equal(h.current.calendarRows.length, 24);
+  act(() => h.current.cancelCalendarEditor());
+  assert.equal(h.current.calendarRows.length, 0);
+  act(() => h.current.openCalendarEditor());
+  assert.equal(h.current.calendarRows[0]?.endDate, "2090-10-07");
+  act(() => h.current.setSeasonId("other"));
+  assert.equal(h.current.calendarRows.length, 0);
+});
 
 void test("calendar previews preserve date edits and clear when season or week counts change", (t) => {
   const h = mountBuilder(t, useScheduleBuilderView);

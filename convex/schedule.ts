@@ -18,7 +18,26 @@ import {
 } from "./lib/teamScheduleProjection";
 import { projectMatchupTeamWeekStats } from "./lib/matchupProjection";
 import { toUtcTimestamp, utcTimestampToDateKey } from "./lib/timestamps";
-import { validateSeasonCalendar } from "../src/lib/utils/features/season-calendar";
+import {
+  validateCalendarDates,
+  validateSeasonCalendar,
+} from "../src/lib/utils/features/season-calendar";
+
+function calendarRevision(weeks: Doc<"weeks">[]) {
+  return JSON.stringify(
+    [...weeks]
+      .sort((a, b) => String(a._id).localeCompare(String(b._id)))
+      .map((week) => [
+        week._id,
+        week.weekNum,
+        week.startDate,
+        week.endDate,
+        week.gameDays,
+        week.isPlayoffs,
+        week.updatedAt,
+      ]),
+  );
+}
 
 function present<T>(value: T | null): value is T {
   return value !== null;
@@ -159,13 +178,17 @@ export const builderContext = query({
       teams: await projectBuilderTeams(ctx, teams),
       historySeasonIds: previous.map((s) => s._id),
       regularWeeks: weeks.filter((w) => !w.isPlayoffs).length,
+      calendarRevision: calendarRevision(weeks),
       calendar: [...weeks]
         .sort((a, b) => Number(a.weekNum) - Number(b.weekNum))
         .map((week) => ({
+          id: week._id,
           weekNum: Number(week.weekNum),
           startDate: utcTimestampToDateKey(week.startDate),
           endDate: utcTimestampToDateKey(week.endDate),
           isPlayoffs: Boolean(week.isPlayoffs),
+          gameDays: Number(week.gameDays),
+          isActive: Boolean(week.isActive),
         })),
       hasSchedule: existing.some(
         (g) =>
@@ -223,6 +246,170 @@ export const createBuilderCalendar = mutation({
         updatedAt: now,
       });
     }
+    return { weeks: args.weeks.length };
+  },
+});
+
+/** Date edits preserve week IDs and every existing matchup assignment. */
+export const updateBuilderCalendar = mutation({
+  args: {
+    seasonId: v.id("seasons"),
+    expectedRevision: v.string(),
+    weeks: v.array(
+      v.object({
+        id: v.id("weeks"),
+        startDate: v.string(),
+        endDate: v.string(),
+        gameDays: v.number(),
+      }),
+    ),
+  },
+  handler: async (ctx, args) => {
+    await requireCommissioner(ctx);
+    const saved = await ctx.db
+      .query("weeks")
+      .withIndex("by_seasonId", (q) => q.eq("seasonId", args.seasonId))
+      .collect();
+    if (!saved.length) throw new Error("Create the season calendar first.");
+    if (calendarRevision(saved) !== args.expectedRevision)
+      throw new Error(
+        "The calendar changed since you opened it. Cancel and reopen the editor to load the latest dates.",
+      );
+    const byId = new Map(args.weeks.map((week) => [week.id, week]));
+    if (
+      args.weeks.length !== saved.length ||
+      byId.size !== saved.length ||
+      saved.some((week) => !byId.has(week._id))
+    )
+      throw new Error(
+        "Date edits must include exactly the existing weeks in this season.",
+      );
+    const ordered = [...saved].sort(
+      (a, b) => Number(a.weekNum) - Number(b.weekNum),
+    );
+    const updated = ordered.map((week) => ({
+      ...byId.get(week._id)!,
+      isPlayoffs: Boolean(week.isPlayoffs),
+    }));
+    validateCalendarDates(updated);
+    const now = Date.now();
+    const changes = ordered.flatMap((week, index) => {
+      const next = updated[index]!;
+      const startDate = toUtcTimestamp(next.startDate)!;
+      const endDate = toUtcTimestamp(next.endDate)!;
+      if (
+        next.startDate === utcTimestampToDateKey(week.startDate) &&
+        next.endDate === utcTimestampToDateKey(week.endDate) &&
+        next.gameDays === Number(week.gameDays)
+      )
+        return [];
+      if (
+        (toUtcTimestamp(week.startDate) ?? 0) <= now ||
+        startDate <= now ||
+        week.isActive
+      )
+        throw new Error(
+          "Only future, inactive weeks can be edited. Started weeks are locked.",
+        );
+      return [{ id: week._id, startDate, endDate, gameDays: next.gameDays }];
+    });
+    // Validate every change before writing any of them.
+    for (const { id, ...change } of changes)
+      await ctx.db.patch(id, { ...change, updatedAt: now });
+    return { weeks: changes.length };
+  },
+});
+
+/** Correct counts only before the calendar is in use; retain surviving week IDs. */
+export const resizeBuilderCalendar = mutation({
+  args: {
+    seasonId: v.id("seasons"),
+    expectedRevision: v.string(),
+    weeks: v.array(
+      v.object({
+        startDate: v.string(),
+        endDate: v.string(),
+        gameDays: v.number(),
+        isPlayoffs: v.boolean(),
+      }),
+    ),
+  },
+  handler: async (ctx, args) => {
+    await requireCommissioner(ctx);
+    const saved = await ctx.db
+      .query("weeks")
+      .withIndex("by_seasonId", (q) => q.eq("seasonId", args.seasonId))
+      .collect();
+    if (!saved.length) throw new Error("Create the season calendar first.");
+    if (calendarRevision(saved) !== args.expectedRevision)
+      throw new Error(
+        "The calendar changed since you opened it. Cancel and reopen the editor.",
+      );
+    const now = Date.now();
+    if (
+      saved.some(
+        (week) => week.isActive || (toUtcTimestamp(week.startDate) ?? 0) <= now,
+      )
+    )
+      throw new Error(
+        "Week counts can only change before any calendar week starts.",
+      );
+    validateSeasonCalendar(args.weeks, now);
+    const references = await Promise.all([
+      ...(
+        [
+          "matchups",
+          "playerDayStatLines",
+          "playerDayHighlights",
+          "playerWeekStatLines",
+          "teamDayStatLines",
+          "teamWeekStatLines",
+        ] as const
+      ).map((table) =>
+        ctx.db
+          .query(table)
+          .withIndex("by_seasonId", (q) => q.eq("seasonId", args.seasonId))
+          .first(),
+      ),
+      ctx.db
+        .query("weeklyEditions")
+        .withIndex("by_seasonId_weekId", (q) => q.eq("seasonId", args.seasonId))
+        .first(),
+    ]);
+    if (references.some(Boolean))
+      throw new Error(
+        "Week counts cannot change while this season has matchups, stats, or weekly editions. Date edits remain available for future weeks.",
+      );
+    const ordered = [...saved].sort(
+      (a, b) => Number(a.weekNum) - Number(b.weekNum),
+    );
+    const regular = ordered.filter((week) => !week.isPlayoffs);
+    const playoffs = ordered.filter((week) => week.isPlayoffs);
+    const kept = new Set<string>();
+    let regularIndex = 0;
+    let playoffIndex = 0;
+    for (const [index, week] of args.weeks.entries()) {
+      const existing = week.isPlayoffs
+        ? playoffs[playoffIndex++]
+        : regular[regularIndex++];
+      const value = {
+        seasonId: args.seasonId,
+        weekNum: index + 1,
+        weekType: week.isPlayoffs ? "PO" : "RS",
+        startDate: toUtcTimestamp(week.startDate)!,
+        endDate: toUtcTimestamp(week.endDate)!,
+        gameDays: week.gameDays,
+        isPlayoffs: week.isPlayoffs,
+        isActive: false,
+        updatedAt: now,
+      };
+      if (existing) {
+        kept.add(existing._id);
+        await ctx.db.patch(existing._id, value);
+      } else await ctx.db.insert("weeks", { ...value, createdAt: now });
+    }
+    for (const week of saved)
+      if (!kept.has(week._id)) await ctx.db.delete(week._id);
     return { weeks: args.weeks.length };
   },
 });

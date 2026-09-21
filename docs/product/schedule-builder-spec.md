@@ -43,7 +43,18 @@ Source: the schedule-hub conversation with the commissioner.
   Dates are inclusive, ordered, non-overlapping, and must start in the future.
   Calendar creation is atomic and refuses seasons with any existing weeks or
   matchups. It creates RS/PO week records, not playoff opponents. Existing
-  calendars are displayed for review; replacement and repair are out of scope.
+  calendars allow date and game-day edits to future, inactive weeks, including
+  after publishing. Week IDs and matchup assignments are preserved. Started
+  weeks cannot change. Concurrent edits require reopening the latest calendar.
+  Changing a week's end date moves all following weeks by the same number of
+  days, preserving their lengths and gaps, including playoff weeks. Full-week
+  game-day counts track the new duration; custom counts remain editable.
+- Saved calendars also support regular-season and playoff count corrections
+  before any week starts and before matchups, statistics, or weekly editions
+  exist. Retain existing week IDs by regular/playoff position, add seven-day
+  weeks as needed, and remove unused trailing weeks within each phase. Moving
+  the regular-season boundary shifts playoff dates while preserving durations.
+  Commissioners review the resulting calendar before saving atomically.
 - Publishing requires exactly the requested number of existing regular-season
   weeks, with future start dates. Map draft positions to their week-number order.
 - Publish through a commissioner-authorized atomic transaction, revalidating all

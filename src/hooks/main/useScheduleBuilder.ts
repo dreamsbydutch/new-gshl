@@ -84,9 +84,31 @@ export function useScheduleBuilder(seasonId: string) {
   }, [catalog, historyResults]);
   const publish = useMutation(api.schedule.publishBuilderSchedule);
   const createCalendar = useMutation(api.schedule.createBuilderCalendar);
+  const updateCalendar = useMutation(api.schedule.updateBuilderCalendar);
+  const resizeCalendar = useMutation(api.schedule.resizeBuilderCalendar);
   return {
     seasons,
     context,
+    resizeCalendar: (expectedRevision: string, weeks: CalendarWeek[]) =>
+      resizeCalendar({
+        seasonId: seasonId as Id<"seasons">,
+        expectedRevision,
+        weeks,
+      }),
+    updateCalendar: (
+      expectedRevision: string,
+      weeks: (CalendarWeek & { id: string })[],
+    ) =>
+      updateCalendar({
+        seasonId: seasonId as Id<"seasons">,
+        expectedRevision,
+        weeks: weeks.map(({ id, startDate, endDate, gameDays }) => ({
+          id: id as Id<"weeks">,
+          startDate,
+          endDate,
+          gameDays,
+        })),
+      }),
     createCalendar: (weeks: CalendarWeek[]) =>
       createCalendar({ seasonId: seasonId as Id<"seasons">, weeks }),
     loadError:
