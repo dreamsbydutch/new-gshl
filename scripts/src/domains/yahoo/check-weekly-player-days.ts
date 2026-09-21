@@ -1,17 +1,11 @@
+import * as dataStore from "@gshl-lib/data/convex-store";
 import { randomUUID } from "node:crypto";
-import { fastSheetsReader } from "@gshl-lib/sheets/reader/fast-reader";
-import { optimizedSheetsClient } from "@gshl-lib/sheets/client/optimized-client";
-import { minimalSheetsWriter } from "@gshl-lib/sheets/writer/minimal-writer";
 import {
-  convertRowToModel,
   getCompositeKeyColumnsForModel,
-  getPlayerDayWorkbookId,
-  getWriteSpreadsheetIdForModel,
-  SHEETS_CONFIG,
   type CompositeKeyModelName,
   type DatabaseRecord,
-} from "@gshl-lib/sheets/config/config";
-import { rankRowsWithAppsScriptEngine } from "@gshl-lib/ranking/apps-script-engine";
+} from "@gshl-lib/data/records";
+import { rankRowsWithRankingEngine } from "@gshl-lib/ranking/ranking-engine";
 import { applyPlayerDayDerivedColumns } from "@gshl-lib/stats/player-day-flags";
 import {
   getArgValue,
@@ -50,8 +44,6 @@ import {
   type ParsedYahooWeeklyPlayers,
   type YahooWeeklyMatchupPlayerRow,
 } from "@gshl-lib/yahoo/matchup-utils";
-
-type PrimitiveCellValue = string | number | boolean | null;
 
 type LoadedPlayerDayRow = {
   rowNumber: number;
@@ -99,7 +91,7 @@ type DiscrepancyRecord = {
   playerName?: string;
   field?: string;
   yahooHeader?: string;
-  sheetValue?: string;
+  modelValue?: string;
   yahooValue?: string;
   url?: string;
   details: string;
@@ -123,7 +115,7 @@ type GoalieDifferenceRecord = {
   playerName?: string;
   field?: string;
   yahooHeader?: string;
-  sheetValue?: string;
+  modelValue?: string;
   yahooValue?: string;
   url?: string;
   details: string;
@@ -168,8 +160,6 @@ type ResolvedYahooWeeklySide = {
 type FranchiseNameTeamIndex = ReadonlyMap<string, Team>;
 
 const PLAYER_DAY_MODEL = "PlayerDayStatLine";
-const PLAYER_DAY_SHEET = SHEETS_CONFIG.SHEETS.PlayerDayStatLine;
-const PLAYER_DAY_COLUMNS = SHEETS_CONFIG.COLUMNS.PlayerDayStatLine;
 const STARTING_DAILY_POSITIONS = new Set(["C", "LW", "RW", "D", "G", "UTIL"]);
 const DEFAULT_WEEKLY_CHECK_REQUEST_STAGGER_MIN_MS = 2500;
 const DEFAULT_WEEKLY_CHECK_REQUEST_STAGGER_MS = 5000;
@@ -198,7 +188,15 @@ const TEAM_WEEK_ALLOWED_FIELDS = new Set([
 ]);
 const GOALIE_TEAM_FIELDS = new Set(["W", "GA", "GAA", "SV", "SA", "SVP", "SO"]);
 const CONSOLE_IGNORED_CHANGE_FIELDS = new Set(["PM", "PPP"]);
-const WEEKLY_SKATER_FIELDS = ["G", "A", "P", "PPP", "SOG", "HIT", "BLK"] as const;
+const WEEKLY_SKATER_FIELDS = [
+  "G",
+  "A",
+  "P",
+  "PPP",
+  "SOG",
+  "HIT",
+  "BLK",
+] as const;
 const WEEKLY_GOALIE_FIELDS = ["W"] as const;
 type MutablePlayerDayStatField =
   | "G"
@@ -380,9 +378,10 @@ function formatDiscrepancyChangeLine(discrepancy: DiscrepancyRecord): string {
 
   if (
     discrepancy.field &&
-    (discrepancy.sheetValue !== undefined || discrepancy.yahooValue !== undefined)
+    (discrepancy.modelValue !== undefined ||
+      discrepancy.yahooValue !== undefined)
   ) {
-    const fromValue = toTrimmedString(discrepancy.sheetValue) || "(blank)";
+    const fromValue = toTrimmedString(discrepancy.modelValue) || "(blank)";
     const toValue = toTrimmedString(discrepancy.yahooValue) || "(blank)";
     return `${prefix} | ${discrepancy.field}: ${fromValue} -> ${toValue}`;
   }
@@ -396,15 +395,16 @@ function formatGoalieChangeLine(difference: GoalieDifferenceRecord): string {
     matchupId: difference.matchupId,
     teamId: difference.gshlTeamId,
     side: difference.side,
-    playerName: difference.scope === "team-week" ? "(team total)" : difference.playerName,
+    playerName:
+      difference.scope === "team-week" ? "(team total)" : difference.playerName,
     playerId: difference.scope === "team-week" ? "" : difference.playerId,
   });
 
   if (
     difference.field &&
-    (difference.sheetValue !== undefined || difference.yahooValue !== undefined)
+    (difference.modelValue !== undefined || difference.yahooValue !== undefined)
   ) {
-    const fromValue = toTrimmedString(difference.sheetValue) || "(blank)";
+    const fromValue = toTrimmedString(difference.modelValue) || "(blank)";
     const toValue = toTrimmedString(difference.yahooValue) || "(blank)";
     return `${prefix} | ${difference.field}: ${fromValue} -> ${toValue}`;
   }
@@ -427,7 +427,8 @@ function printRequiredChanges(
     ...goalieDifferences
       .filter(
         (difference) =>
-          !difference.field || !CONSOLE_IGNORED_CHANGE_FIELDS.has(difference.field),
+          !difference.field ||
+          !CONSOLE_IGNORED_CHANGE_FIELDS.has(difference.field),
       )
       .map(formatGoalieChangeLine),
   ];
@@ -443,57 +444,17 @@ function normalizeDateKey(value: unknown): string {
   return normalizeDateOnlyValue(value) ?? toTrimmedString(value);
 }
 
-function alignRowsToConfiguredColumns(
-  rawRows: PrimitiveCellValue[][],
-  columns: readonly string[],
-): PrimitiveCellValue[][] {
-  const header = rawRows[0] ?? [];
-  const dataRows = rawRows.slice(1);
-
-  if (!header.length) {
-    return dataRows.map((row) => columns.map((_, index) => row[index] ?? null));
-  }
-
-  const headerIndex = new Map<string, number>();
-  header.forEach((cell, index) => {
-    const key = String(cell ?? "").trim();
-    if (key) {
-      headerIndex.set(key, index);
-    }
-  });
-
-  return dataRows.map((row) =>
-    columns.map((column) => {
-      const index = headerIndex.get(column);
-      return index === undefined ? null : (row[index] ?? null);
-    }),
-  );
-}
-
 async function loadPlayerDayRowsWithNumbers(
   seasonId: string,
 ): Promise<LoadedPlayerDayRow[]> {
-  const spreadsheetId = getPlayerDayWorkbookId(seasonId);
-  const rawRows = await optimizedSheetsClient.getValues(
-    spreadsheetId,
-    `${PLAYER_DAY_SHEET}!A1:ZZ`,
-  );
-  const alignedRows = alignRowsToConfiguredColumns(rawRows, PLAYER_DAY_COLUMNS);
-  return alignedRows
-    .map((row, index) => ({
-      rowNumber: index + 2,
-      record: (() => {
-        const record = convertRowToModel<DatabaseRecord>(
-          row,
-          PLAYER_DAY_COLUMNS,
-        ) as unknown as PlayerDayStatLine;
-        return {
-          ...record,
-          date: normalizeDateKey(record.date),
-        };
-      })(),
-    }))
-    .filter(({ record }) => toTrimmedString(record.seasonId) === seasonId);
+  const rows = await dataStore.fetchPlayerDaySeason<DatabaseRecord>(seasonId);
+  return rows.map((record, index) => ({
+    rowNumber: index + 1,
+    record: {
+      ...record,
+      date: normalizeDateKey(record.date),
+    } as unknown as PlayerDayStatLine,
+  }));
 }
 
 function parseOptions(args: string[]): YahooWeeklyPlayerDayCheckOptions {
@@ -638,7 +599,9 @@ function resolveTargetWeeks(
   }
   if (options.weekNums.length > 0) {
     const wanted = new Set(options.weekNums);
-    return seasonWeeks.filter((week) => wanted.has(toTrimmedString(week.weekNum)));
+    return seasonWeeks.filter((week) =>
+      wanted.has(toTrimmedString(week.weekNum)),
+    );
   }
   return seasonWeeks;
 }
@@ -667,31 +630,31 @@ function formatNumberForDisplay(value: number, decimals: number): string {
 
 function compareStatValues(
   fieldName: string,
-  sheetValue: unknown,
+  modelValue: unknown,
   yahooValue: string,
 ): {
   matches: boolean;
-  sheetDisplay: string;
+  modelDisplay: string;
   yahooDisplay: string;
 } {
   const yahooDisplay = yahooValue.trim() === "-" ? "" : yahooValue.trim();
   const yahooNumeric = parseYahooNumeric(yahooDisplay);
-  const sheetNumeric = Number(sheetValue);
+  const modelNumeric = Number(modelValue);
 
   if (!yahooDisplay) {
-    const sheetDisplay = toTrimmedString(sheetValue);
+    const modelDisplay = toTrimmedString(modelValue);
     return {
       matches:
-        sheetDisplay === "" ||
-        (Number.isFinite(sheetNumeric) && Math.abs(sheetNumeric) < 1e-9),
-      sheetDisplay,
+        modelDisplay === "" ||
+        (Number.isFinite(modelNumeric) && Math.abs(modelNumeric) < 1e-9),
+      modelDisplay,
       yahooDisplay,
     };
   }
 
-  if (yahooNumeric !== null && Number.isFinite(sheetNumeric)) {
+  if (yahooNumeric !== null && Number.isFinite(modelNumeric)) {
     const decimals = getDecimalPlaces(yahooDisplay);
-    const roundedSheet = Number(sheetNumeric.toFixed(decimals));
+    const roundedModel = Number(modelNumeric.toFixed(decimals));
     const epsilon =
       fieldName === "GAA"
         ? 0.01
@@ -699,15 +662,15 @@ function compareStatValues(
           ? 0.001
           : 1 / 10 ** Math.max(decimals + 2, 6);
     return {
-      matches: Math.abs(roundedSheet - yahooNumeric) <= epsilon,
-      sheetDisplay: formatNumberForDisplay(roundedSheet, decimals),
+      matches: Math.abs(roundedModel - yahooNumeric) <= epsilon,
+      modelDisplay: formatNumberForDisplay(roundedModel, decimals),
       yahooDisplay,
     };
   }
 
   return {
-    matches: toTrimmedString(sheetValue) === yahooDisplay,
-    sheetDisplay: toTrimmedString(sheetValue),
+    matches: toTrimmedString(modelValue) === yahooDisplay,
+    modelDisplay: toTrimmedString(modelValue),
     yahooDisplay,
   };
 }
@@ -842,9 +805,7 @@ function isGoaliePlayer(player: Player | undefined): boolean {
 }
 
 function shouldCountPlayerDayRow(row: PlayerDayStatLine): boolean {
-  return (
-    toTrimmedString(row.GP) === "1" && toTrimmedString(row.GS) === "1"
-  );
+  return toTrimmedString(row.GP) === "1" && toTrimmedString(row.GS) === "1";
 }
 
 function getAdjustmentCandidateRows(
@@ -904,28 +865,26 @@ function distributePositiveDelta(
   rows: PlayerDayStatLine[],
   field: MutablePlayerDayStatField,
   delta: number,
-) : boolean {
+): boolean {
   const candidateRows = getAdjustmentCandidateRows(rows);
   if (!candidateRows.length) {
     return false;
   }
-  const orderedRows = candidateRows
-    .slice()
-    .sort((left, right) => {
-      const leftValue = Number(getMutablePlayerDayStatValue(left, field)) || 0;
-      const rightValue = Number(getMutablePlayerDayStatValue(right, field)) || 0;
-      const leftHasFieldValue = leftValue !== 0 ? 1 : 0;
-      const rightHasFieldValue = rightValue !== 0 ? 1 : 0;
-      if (rightHasFieldValue !== leftHasFieldValue) {
-        return rightHasFieldValue - leftHasFieldValue;
-      }
-      if (rightValue !== leftValue) {
-        return rightValue - leftValue;
-      }
-      return normalizeDateKey(left.date).localeCompare(
-        normalizeDateKey(right.date),
-      );
-    });
+  const orderedRows = candidateRows.slice().sort((left, right) => {
+    const leftValue = Number(getMutablePlayerDayStatValue(left, field)) || 0;
+    const rightValue = Number(getMutablePlayerDayStatValue(right, field)) || 0;
+    const leftHasFieldValue = leftValue !== 0 ? 1 : 0;
+    const rightHasFieldValue = rightValue !== 0 ? 1 : 0;
+    if (rightHasFieldValue !== leftHasFieldValue) {
+      return rightHasFieldValue - leftHasFieldValue;
+    }
+    if (rightValue !== leftValue) {
+      return rightValue - leftValue;
+    }
+    return normalizeDateKey(left.date).localeCompare(
+      normalizeDateKey(right.date),
+    );
+  });
   let remaining = delta;
   let index = 0;
   while (remaining > 0 && orderedRows.length > 0) {
@@ -958,23 +917,33 @@ function distributeNegativeDelta(
       .filter((entry) => allowNegativeValues || entry.value > 0)
       .sort((left, right) => {
         if (right.value !== left.value) return right.value - left.value;
-        return normalizeDateKey(right.row.date).localeCompare(normalizeDateKey(left.row.date));
+        return normalizeDateKey(right.row.date).localeCompare(
+          normalizeDateKey(left.row.date),
+        );
       });
     if (!candidates.length) {
       return false;
     }
     for (const candidate of candidates) {
       if (remaining <= 0) break;
-      setMutablePlayerDayStatValue(candidate.row, field, String(candidate.value - 1));
+      setMutablePlayerDayStatValue(
+        candidate.row,
+        field,
+        String(candidate.value - 1),
+      );
       remaining -= 1;
     }
   }
   return true;
 }
 
-function resolveSyntheticDailyPos(player: Player): PlayerDayStatLine["dailyPos"] {
+function resolveSyntheticDailyPos(
+  player: Player,
+): PlayerDayStatLine["dailyPos"] {
   if (toTrimmedString(player.posGroup) === "G") return RosterPosition.G;
-  const positions = Array.isArray(player.nhlPos) ? player.nhlPos.map(String) : [];
+  const positions = Array.isArray(player.nhlPos)
+    ? player.nhlPos.map(String)
+    : [];
   for (const candidate of [
     RosterPosition.C,
     RosterPosition.LW,
@@ -1000,7 +969,9 @@ function computeSyntheticGpAndGs(
   hasPM: boolean,
 ): Pick<PlayerDayStatLine, "GP" | "GS" | "dailyPos"> {
   const supportedFields = getSupportedPlayerFields(row, hasPM);
-  const hasStats = supportedFields.some((field) => toTrimmedString(row[field as keyof YahooWeeklyMatchupPlayerRow]));
+  const hasStats = supportedFields.some((field) =>
+    toTrimmedString(row[field as keyof YahooWeeklyMatchupPlayerRow]),
+  );
   const dailyPos = resolveSyntheticDailyPos(player);
   const gp = hasStats ? "1" : "";
   return {
@@ -1073,7 +1044,6 @@ async function applyPlayerDayWrites(params: {
   updatesByRowNumber: Map<number, PlayerDayStatLine>;
   creates: PlayerDayStatLine[];
 }): Promise<{ updated: number; created: number }> {
-  const spreadsheetId = getPlayerDayWorkbookId(params.seasonId);
   const rowsToWrite = [
     ...Array.from(params.updatesByRowNumber.values()),
     ...params.creates,
@@ -1086,8 +1056,8 @@ async function applyPlayerDayWrites(params: {
     rowsToWrite,
     params.existingRows.map((row) => row.record as unknown as DatabaseRecord),
   );
-  await rankRowsWithAppsScriptEngine(rowsToWrite, {
-    sheetName: PLAYER_DAY_MODEL,
+  await rankRowsWithRankingEngine(rowsToWrite, {
+    dataModelName: PLAYER_DAY_MODEL,
     outputField: "Rating",
     mutate: true,
   });
@@ -1098,7 +1068,7 @@ async function applyPlayerDayWrites(params: {
         : row.Rating;
   }
 
-  await minimalSheetsWriter.upsertByCompositeKey(
+  await dataStore.upsertByCompositeKey(
     PLAYER_DAY_MODEL,
     getCompositeKeyColumnsForModel(PLAYER_DAY_MODEL as CompositeKeyModelName),
     rowsToWrite,
@@ -1107,10 +1077,9 @@ async function applyPlayerDayWrites(params: {
       idColumn: "id",
       createdAtColumn: "createdAt",
       updatedAtColumn: "updatedAt",
-      spreadsheetId,
     },
   );
-  fastSheetsReader.clearCache(PLAYER_DAY_MODEL);
+
   return {
     updated: params.updatesByRowNumber.size,
     created: params.creates.length,
@@ -1121,7 +1090,7 @@ async function applyTeamWeekWrites(
   updates: TeamWeekStatLine[],
 ): Promise<number> {
   if (!updates.length) return 0;
-  await minimalSheetsWriter.upsertByCompositeKey(
+  await dataStore.upsertByCompositeKey(
     TEAM_WEEK_MODEL,
     getCompositeKeyColumnsForModel(TEAM_WEEK_MODEL as CompositeKeyModelName),
     updates as unknown as DatabaseRecord[],
@@ -1130,10 +1099,9 @@ async function applyTeamWeekWrites(
       idColumn: "id",
       createdAtColumn: "createdAt",
       updatedAtColumn: "updatedAt",
-      spreadsheetId: getWriteSpreadsheetIdForModel(TEAM_WEEK_MODEL),
     },
   );
-  fastSheetsReader.clearCache(TEAM_WEEK_MODEL);
+
   return updates.length;
 }
 
@@ -1145,388 +1113,304 @@ async function main(): Promise<void> {
       return;
     }
 
-    process.env.USE_GOOGLE_SHEETS ??= "true";
-    process.env.GOOGLE_SERVICE_ACCOUNT_KEY_FILE ??= "credentials.json";
-
     applyYahooBrowserArgOverrides(args);
     const optionsInput = parseOptions(args);
     const [seasons, weeks, teams, franchises, matchups, teamWeekRows, players] =
       (await Promise.all([
-        fastSheetsReader.fetchModel("Season"),
-        fastSheetsReader.fetchModel("Week"),
-        fastSheetsReader.fetchModel("Team"),
-        fastSheetsReader.fetchModel("Franchise"),
-        fastSheetsReader.fetchModel("Matchup"),
-        fastSheetsReader.fetchModel("TeamWeekStatLine"),
-        fastSheetsReader.fetchModel("Player"),
+        dataStore.fetchModel("Season"),
+        dataStore.fetchModel("Week"),
+        dataStore.fetchModel("Team"),
+        dataStore.fetchModel("Franchise"),
+        dataStore.fetchModel("Matchup"),
+        dataStore.fetchModel("TeamWeekStatLine"),
+        dataStore.fetchModel("Player"),
       ])) as unknown as [
-      Season[],
-      Week[],
-      Team[],
-      Franchise[],
-      Matchup[],
-      TeamWeekStatLine[],
-      Player[],
+        Season[],
+        Week[],
+        Team[],
+        Franchise[],
+        Matchup[],
+        TeamWeekStatLine[],
+        Player[],
       ];
 
-  const seasonId = optionsInput.seasonId || resolveActiveSeasonId(seasons);
-  const options: YahooWeeklyPlayerDayCheckOptions = {
-    ...optionsInput,
-    seasonId,
-  };
-  const season = seasons.find(
-    (entry) => toTrimmedString(entry.id) === options.seasonId,
-  );
-  if (!season) {
-    throw new Error(
-      `[yahoo:check-weekly-player-days] Season ${options.seasonId} was not found.`,
+    const seasonId = optionsInput.seasonId || resolveActiveSeasonId(seasons);
+    const options: YahooWeeklyPlayerDayCheckOptions = {
+      ...optionsInput,
+      seasonId,
+    };
+    const season = seasons.find(
+      (entry) => toTrimmedString(entry.id) === options.seasonId,
     );
-  }
-
-  const targetWeeks = resolveTargetWeeks(options.seasonId, weeks, options);
-  if (!targetWeeks.length) {
-    throw new Error(
-      `[yahoo:check-weekly-player-days] No weeks matched the requested filters for season ${options.seasonId}.`,
-    );
-  }
-
-  const targetWeekIds = new Set(targetWeeks.map((week) => toTrimmedString(week.id)));
-  const requestedTeamIds = new Set(options.teamIds);
-  const requestedMatchupIds = new Set(options.matchupIds);
-  const targetMatchups = matchups.filter((matchup) => {
-    if (toTrimmedString(matchup.seasonId) !== options.seasonId) return false;
-    if (!targetWeekIds.has(toTrimmedString(matchup.weekId))) return false;
-    if (toTrimmedString(matchup.gameType) === LT_MATCHUP_TYPE) return false;
-    if (
-      requestedMatchupIds.size > 0 &&
-      !requestedMatchupIds.has(toTrimmedString(matchup.id))
-    ) {
-      return false;
-    }
-    if (!requestedTeamIds.size) return true;
-    return (
-      requestedTeamIds.has(toTrimmedString(matchup.homeTeamId)) ||
-      requestedTeamIds.has(toTrimmedString(matchup.awayTeamId))
-    );
-  });
-
-  if (!targetMatchups.length) {
-    throw new Error(
-      `[yahoo:check-weekly-player-days] No matchups matched the requested filters for season ${options.seasonId}.`,
-    );
-  }
-
-  const playerDayRows = await loadPlayerDayRowsWithNumbers(options.seasonId);
-  const weekById = new Map(
-    targetWeeks.map((week) => [toTrimmedString(week.id), week] as const),
-  );
-  const seasonTeams = teams.filter(
-    (team) => toTrimmedString(team.seasonId) === options.seasonId,
-  );
-  const teamById = new Map(
-    seasonTeams.map((team) => [toTrimmedString(team.id), team] as const),
-  );
-  const franchiseNameTeamIndex = buildFranchiseNameTeamIndex({
-    franchises,
-    seasonTeams,
-  });
-  const teamWeekByKey = new Map(
-    teamWeekRows
-      .filter((row) => toTrimmedString(row.seasonId) === options.seasonId)
-      .map(
-        (row) =>
-          [
-            buildTeamWeekKey(
-              toTrimmedString(row.weekId),
-              toTrimmedString(row.gshlTeamId),
-            ),
-            row,
-          ] as const,
-      ),
-  );
-  const playersById = new Map(
-    players.map((player) => [toTrimmedString(player.id), player] as const),
-  );
-  const playersByYahooId = new Map<string, Player>();
-  for (const player of players) {
-    const yahooId = toTrimmedString(player.yahooId);
-    if (yahooId) {
-      playersByYahooId.set(yahooId, player);
-    }
-  }
-  const playersByNormalizedName = buildPlayersByNormalizedName(players);
-  const playerDaysByWeekTeamPlayer = new Map<string, LoadedPlayerDayRow[]>();
-  for (const row of playerDayRows) {
-    const weekId = toTrimmedString(row.record.weekId);
-    if (!targetWeekIds.has(weekId)) continue;
-    const key = buildPlayerWeekKey(
-      weekId,
-      toTrimmedString(row.record.gshlTeamId),
-      toTrimmedString(row.record.playerId),
-    );
-    const list = playerDaysByWeekTeamPlayer.get(key) ?? [];
-    list.push(row);
-    playerDaysByWeekTeamPlayer.set(key, list);
-  }
-  const goalieStartsByTeamWeek = buildGoalieStartsByTeamWeek({
-    playerDayRows,
-    playersById,
-    targetWeekIds,
-  });
-  const goalieStartMinimum = getGoalieStartMinimumForSeasonId(options.seasonId);
-
-  const discrepancies: DiscrepancyRecord[] = [];
-  const goalieDifferences: GoalieDifferenceRecord[] = [];
-  const unsupportedHeaders = new Set<string>();
-  const pendingPlayerDayUpdates = new Map<number, PlayerDayStatLine>();
-  const pendingPlayerDayCreates = new Map<string, PlayerDayStatLine>();
-  const pendingTeamWeekUpdates = new Map<string, TeamWeekStatLine>();
-  let teamRowsChecked = 0;
-  let playerRowsChecked = 0;
-  let statComparisons = 0;
-  let fetchFailures = 0;
-  let parseFailures = 0;
-
-  const recordDiscrepancy = (discrepancy: DiscrepancyRecord): void => {
-    discrepancies.push(discrepancy);
-    log(options, formatDiscrepancyChangeLine(discrepancy));
-  };
-  const recordGoalieDifference = (difference: GoalieDifferenceRecord): void => {
-    goalieDifferences.push(difference);
-    log(options, formatGoalieChangeLine(difference));
-  };
-
-  for (const matchup of targetMatchups) {
-    const matchupId = toTrimmedString(matchup.id);
-    const weekId = toTrimmedString(matchup.weekId);
-    const week = weekById.get(weekId);
-    if (!week) {
-      recordDiscrepancy({
-        type: "missing-week",
-        seasonId: options.seasonId,
-        weekId,
-        matchupId,
-        details: `Week ${weekId} was not found for matchup ${matchupId}.`,
-      });
-      continue;
+    if (!season) {
+      throw new Error(
+        `[yahoo:check-weekly-player-days] Season ${options.seasonId} was not found.`,
+      );
     }
 
-    const homeTeamId = toTrimmedString(matchup.homeTeamId);
-    const awayTeamId = toTrimmedString(matchup.awayTeamId);
-    const homeTeam = teamById.get(homeTeamId);
-    const awayTeam = teamById.get(awayTeamId);
-    if (!homeTeam || !awayTeam) {
-      recordDiscrepancy({
-        type: "missing-team",
-        seasonId: options.seasonId,
-        weekId,
-        weekNum: toTrimmedString(week.weekNum),
-        matchupId,
-        details: `Could not find both teams for matchup ${matchupId}. home=${homeTeamId} away=${awayTeamId}`,
-      });
-      continue;
+    const targetWeeks = resolveTargetWeeks(options.seasonId, weeks, options);
+    if (!targetWeeks.length) {
+      throw new Error(
+        `[yahoo:check-weekly-player-days] No weeks matched the requested filters for season ${options.seasonId}.`,
+      );
     }
 
-    const homeYahooTeamId = toTrimmedString(homeTeam.yahooId);
-    const awayYahooTeamId = toTrimmedString(awayTeam.yahooId);
-    if (!homeYahooTeamId || !awayYahooTeamId) {
-      recordDiscrepancy({
-        type: "missing-yahoo-team-id",
-        seasonId: options.seasonId,
-        weekId,
-        weekNum: toTrimmedString(week.weekNum),
-        matchupId,
-        details: `Could not resolve Yahoo team ids for matchup ${matchupId}. home=${homeYahooTeamId || "(missing)"} away=${awayYahooTeamId || "(missing)"}`,
-      });
-      continue;
-    }
-
-    const url = buildYahooMatchupUrl({
-      season,
-      seasonId: options.seasonId,
-      yahooWeekNum: toTrimmedString(week.weekNum),
-      homeYahooTeamId: homeYahooTeamId,
-      awayYahooTeamId: awayYahooTeamId,
+    const targetWeekIds = new Set(
+      targetWeeks.map((week) => toTrimmedString(week.id)),
+    );
+    const requestedTeamIds = new Set(options.teamIds);
+    const requestedMatchupIds = new Set(options.matchupIds);
+    const targetMatchups = matchups.filter((matchup) => {
+      if (toTrimmedString(matchup.seasonId) !== options.seasonId) return false;
+      if (!targetWeekIds.has(toTrimmedString(matchup.weekId))) return false;
+      if (toTrimmedString(matchup.gameType) === LT_MATCHUP_TYPE) return false;
+      if (
+        requestedMatchupIds.size > 0 &&
+        !requestedMatchupIds.has(toTrimmedString(matchup.id))
+      ) {
+        return false;
+      }
+      if (!requestedTeamIds.size) return true;
+      return (
+        requestedTeamIds.has(toTrimmedString(matchup.homeTeamId)) ||
+        requestedTeamIds.has(toTrimmedString(matchup.awayTeamId))
+      );
     });
-    const hasPM = hasPlusMinusForSeason(options.seasonId);
 
-    let html: string;
-    try {
-      await applyRandomRequestStagger(url, options);
-      html = await fetchYahooMatchupPage(url, options.requestDelayMs, (event) => {
-        log(options, formatYahooFetchProgress(event));
-      });
-    } catch (error) {
-      fetchFailures += 1;
-      recordDiscrepancy({
-        type: "fetch-failure",
-        seasonId: options.seasonId,
-        weekId,
-        weekNum: toTrimmedString(week.weekNum),
-        matchupId,
-        url,
-        details: error instanceof Error ? error.message : String(error),
-      });
-      continue;
+    if (!targetMatchups.length) {
+      throw new Error(
+        `[yahoo:check-weekly-player-days] No matchups matched the requested filters for season ${options.seasonId}.`,
+      );
     }
 
-    let teamTotals;
-    let weeklyPlayers;
-    try {
-      teamTotals = parseYahooMatchupTotals(html);
-      weeklyPlayers = parseYahooWeeklyMatchupPlayers(html, hasPM);
-    } catch (error) {
-      parseFailures += 1;
-      recordDiscrepancy({
-        type: "parse-failure",
-        seasonId: options.seasonId,
-        weekId,
-        weekNum: toTrimmedString(week.weekNum),
-        matchupId,
-        url,
-        details: error instanceof Error ? error.message : String(error),
-      });
-      continue;
-    }
-
-    const resolvedSides = resolveYahooWeeklySides({
-      expectedHomeTeamId: homeTeamId,
-      expectedAwayTeamId: awayTeamId,
-      expectedHomeYahooTeamId: homeYahooTeamId,
-      expectedAwayYahooTeamId: awayYahooTeamId,
-      teamTotals,
-      weeklyPlayers,
-      franchiseNameTeamIndex,
+    const playerDayRows = await loadPlayerDayRowsWithNumbers(options.seasonId);
+    const weekById = new Map(
+      targetWeeks.map((week) => [toTrimmedString(week.id), week] as const),
+    );
+    const seasonTeams = teams.filter(
+      (team) => toTrimmedString(team.seasonId) === options.seasonId,
+    );
+    const teamById = new Map(
+      seasonTeams.map((team) => [toTrimmedString(team.id), team] as const),
+    );
+    const franchiseNameTeamIndex = buildFranchiseNameTeamIndex({
+      franchises,
+      seasonTeams,
     });
-    if (resolvedSides.mode === "franchise-name") {
-      log(
-        options,
-        `Resolved Yahoo matchup ${matchupId} by Yahoo team names. Page home "${teamTotals.home.teamName}" -> team ${resolvedSides.home.gshlTeamId}; page away "${teamTotals.away.teamName}" -> team ${resolvedSides.away.gshlTeamId}.`,
-      );
-    } else if (resolvedSides.mode === "swapped") {
-      log(
-        options,
-        `Resolved Yahoo matchup ${matchupId} with swapped page sides. Expected home=${homeYahooTeamId} away=${awayYahooTeamId}; page home=${toTrimmedString(teamTotals.home.yahooTeamId) || "(missing)"} away=${toTrimmedString(teamTotals.away.yahooTeamId) || "(missing)"}.`,
-      );
-    } else if (resolvedSides.mode === "fallback") {
-      log(
-        options,
-        `Could not confidently map Yahoo page sides by team id for matchup ${matchupId}. Falling back to page home/away order. Expected home=${homeYahooTeamId} away=${awayYahooTeamId}; page home=${toTrimmedString(teamTotals.home.yahooTeamId) || "(missing)"} away=${toTrimmedString(teamTotals.away.yahooTeamId) || "(missing)"}.`,
-      );
+    const teamWeekByKey = new Map(
+      teamWeekRows
+        .filter((row) => toTrimmedString(row.seasonId) === options.seasonId)
+        .map(
+          (row) =>
+            [
+              buildTeamWeekKey(
+                toTrimmedString(row.weekId),
+                toTrimmedString(row.gshlTeamId),
+              ),
+              row,
+            ] as const,
+        ),
+    );
+    const playersById = new Map(
+      players.map((player) => [toTrimmedString(player.id), player] as const),
+    );
+    const playersByYahooId = new Map<string, Player>();
+    for (const player of players) {
+      const yahooId = toTrimmedString(player.yahooId);
+      if (yahooId) {
+        playersByYahooId.set(yahooId, player);
+      }
     }
+    const playersByNormalizedName = buildPlayersByNormalizedName(players);
+    const playerDaysByWeekTeamPlayer = new Map<string, LoadedPlayerDayRow[]>();
+    for (const row of playerDayRows) {
+      const weekId = toTrimmedString(row.record.weekId);
+      if (!targetWeekIds.has(weekId)) continue;
+      const key = buildPlayerWeekKey(
+        weekId,
+        toTrimmedString(row.record.gshlTeamId),
+        toTrimmedString(row.record.playerId),
+      );
+      const list = playerDaysByWeekTeamPlayer.get(key) ?? [];
+      list.push(row);
+      playerDaysByWeekTeamPlayer.set(key, list);
+    }
+    const goalieStartsByTeamWeek = buildGoalieStartsByTeamWeek({
+      playerDayRows,
+      playersById,
+      targetWeekIds,
+    });
+    const goalieStartMinimum = getGoalieStartMinimumForSeasonId(
+      options.seasonId,
+    );
 
-    for (const [side, teamId, yahooTeamId, yahooStats] of [
-      [
-        "home",
-        resolvedSides.home.gshlTeamId,
-        resolvedSides.home.yahooTeamId || homeYahooTeamId,
-        resolvedSides.home.totals,
-      ] as const,
-      [
-        "away",
-        resolvedSides.away.gshlTeamId,
-        resolvedSides.away.yahooTeamId || awayYahooTeamId,
-        resolvedSides.away.totals,
-      ] as const,
-    ]) {
-      const teamWeekKey = buildTeamWeekKey(weekId, teamId);
-      const teamWeek = pendingTeamWeekUpdates.get(teamWeekKey) ??
-        teamWeekByKey.get(teamWeekKey);
-      if (!teamWeek) {
+    const discrepancies: DiscrepancyRecord[] = [];
+    const goalieDifferences: GoalieDifferenceRecord[] = [];
+    const unsupportedHeaders = new Set<string>();
+    const pendingPlayerDayUpdates = new Map<number, PlayerDayStatLine>();
+    const pendingPlayerDayCreates = new Map<string, PlayerDayStatLine>();
+    const pendingTeamWeekUpdates = new Map<string, TeamWeekStatLine>();
+    let teamRowsChecked = 0;
+    let playerRowsChecked = 0;
+    let statComparisons = 0;
+    let fetchFailures = 0;
+    let parseFailures = 0;
+
+    const recordDiscrepancy = (discrepancy: DiscrepancyRecord): void => {
+      discrepancies.push(discrepancy);
+      log(options, formatDiscrepancyChangeLine(discrepancy));
+    };
+    const recordGoalieDifference = (
+      difference: GoalieDifferenceRecord,
+    ): void => {
+      goalieDifferences.push(difference);
+      log(options, formatGoalieChangeLine(difference));
+    };
+
+    for (const matchup of targetMatchups) {
+      const matchupId = toTrimmedString(matchup.id);
+      const weekId = toTrimmedString(matchup.weekId);
+      const week = weekById.get(weekId);
+      if (!week) {
         recordDiscrepancy({
-          type: "missing-team-week-row",
+          type: "missing-week",
           seasonId: options.seasonId,
           weekId,
-          weekNum: toTrimmedString(week.weekNum),
           matchupId,
-          gshlTeamId: teamId,
-          yahooTeamId,
-          side,
-          url,
-          details: `No TeamWeekStatLine row found for team ${teamId} week ${weekId}.`,
+          details: `Week ${weekId} was not found for matchup ${matchupId}.`,
         });
         continue;
       }
 
-      teamRowsChecked += 1;
-      let mutableTeamWeek = teamWeek;
-      const teamWeekGoalieStarts = goalieStartsByTeamWeek.get(teamWeekKey) ?? 0;
-      const shouldSkipGoalieValidation =
-        teamWeekGoalieStarts > 0 && teamWeekGoalieStarts < goalieStartMinimum;
-      for (const [yahooHeader, yahooValue] of Object.entries(yahooStats.stats)) {
-        const sheetField = YAHOO_HEADER_TO_TEAM_WEEK_FIELD[yahooHeader];
-        if (!sheetField || !TEAM_WEEK_ALLOWED_FIELDS.has(sheetField)) {
-          if (!unsupportedHeaders.has(yahooHeader)) {
-            unsupportedHeaders.add(yahooHeader);
-            recordDiscrepancy({
-              type: "unsupported-yahoo-header",
-              seasonId: options.seasonId,
-              weekId,
-              weekNum: toTrimmedString(week.weekNum),
-              matchupId,
-              gshlTeamId: teamId,
-              yahooTeamId,
-              side,
-              yahooHeader,
-              url,
-              details: `Yahoo header ${yahooHeader} is not mapped to a supported TeamWeekStatLine field and was skipped.`,
-            });
-          }
-          continue;
-        }
-        if (!(sheetField in mutableTeamWeek)) {
-          if (!unsupportedHeaders.has(yahooHeader)) {
-            unsupportedHeaders.add(yahooHeader);
-            recordDiscrepancy({
-              type: "unsupported-yahoo-header",
-              seasonId: options.seasonId,
-              weekId,
-              weekNum: toTrimmedString(week.weekNum),
-              matchupId,
-              gshlTeamId: teamId,
-              yahooTeamId,
-              side,
-              yahooHeader,
-              field: sheetField,
-              url,
-              details: `Mapped field ${sheetField} does not exist on TeamWeekStatLine and was skipped.`,
-            });
-          }
-          continue;
-        }
-        if (isGoalieTeamField(sheetField) && shouldSkipGoalieValidation) {
-          continue;
-        }
+      const homeTeamId = toTrimmedString(matchup.homeTeamId);
+      const awayTeamId = toTrimmedString(matchup.awayTeamId);
+      const homeTeam = teamById.get(homeTeamId);
+      const awayTeam = teamById.get(awayTeamId);
+      if (!homeTeam || !awayTeam) {
+        recordDiscrepancy({
+          type: "missing-team",
+          seasonId: options.seasonId,
+          weekId,
+          weekNum: toTrimmedString(week.weekNum),
+          matchupId,
+          details: `Could not find both teams for matchup ${matchupId}. home=${homeTeamId} away=${awayTeamId}`,
+        });
+        continue;
+      }
 
-        statComparisons += 1;
-        const comparison = compareStatValues(
-          sheetField,
-          mutableTeamWeek[sheetField as keyof TeamWeekStatLine],
-          yahooValue,
+      const homeYahooTeamId = toTrimmedString(homeTeam.yahooId);
+      const awayYahooTeamId = toTrimmedString(awayTeam.yahooId);
+      if (!homeYahooTeamId || !awayYahooTeamId) {
+        recordDiscrepancy({
+          type: "missing-yahoo-team-id",
+          seasonId: options.seasonId,
+          weekId,
+          weekNum: toTrimmedString(week.weekNum),
+          matchupId,
+          details: `Could not resolve Yahoo team ids for matchup ${matchupId}. home=${homeYahooTeamId || "(missing)"} away=${awayYahooTeamId || "(missing)"}`,
+        });
+        continue;
+      }
+
+      const url = buildYahooMatchupUrl({
+        season,
+        seasonId: options.seasonId,
+        yahooWeekNum: toTrimmedString(week.weekNum),
+        homeYahooTeamId: homeYahooTeamId,
+        awayYahooTeamId: awayYahooTeamId,
+      });
+      const hasPM = hasPlusMinusForSeason(options.seasonId);
+
+      let html: string;
+      try {
+        await applyRandomRequestStagger(url, options);
+        html = await fetchYahooMatchupPage(
+          url,
+          options.requestDelayMs,
+          (event) => {
+            log(options, formatYahooFetchProgress(event));
+          },
         );
-        if (!comparison.matches) {
-          if (isGoalieTeamField(sheetField)) {
-            recordGoalieDifference({
-              scope: "team-week",
-              seasonId: options.seasonId,
-              weekId,
-              weekNum: toTrimmedString(week.weekNum),
-              matchupId,
-              gshlTeamId: teamId,
-              yahooTeamId,
-              side,
-              field: sheetField,
-              yahooHeader,
-              sheetValue: comparison.sheetDisplay,
-              yahooValue: comparison.yahooDisplay,
-              url,
-              details: `${side} team ${teamId} goalie field ${sheetField} differs. TeamWeekStatLine=${comparison.sheetDisplay} Yahoo=${comparison.yahooDisplay}`,
-            });
-            continue;
-          }
+      } catch (error) {
+        fetchFailures += 1;
+        recordDiscrepancy({
+          type: "fetch-failure",
+          seasonId: options.seasonId,
+          weekId,
+          weekNum: toTrimmedString(week.weekNum),
+          matchupId,
+          url,
+          details: error instanceof Error ? error.message : String(error),
+        });
+        continue;
+      }
 
+      let teamTotals;
+      let weeklyPlayers;
+      try {
+        teamTotals = parseYahooMatchupTotals(html);
+        weeklyPlayers = parseYahooWeeklyMatchupPlayers(html, hasPM);
+      } catch (error) {
+        parseFailures += 1;
+        recordDiscrepancy({
+          type: "parse-failure",
+          seasonId: options.seasonId,
+          weekId,
+          weekNum: toTrimmedString(week.weekNum),
+          matchupId,
+          url,
+          details: error instanceof Error ? error.message : String(error),
+        });
+        continue;
+      }
+
+      const resolvedSides = resolveYahooWeeklySides({
+        expectedHomeTeamId: homeTeamId,
+        expectedAwayTeamId: awayTeamId,
+        expectedHomeYahooTeamId: homeYahooTeamId,
+        expectedAwayYahooTeamId: awayYahooTeamId,
+        teamTotals,
+        weeklyPlayers,
+        franchiseNameTeamIndex,
+      });
+      if (resolvedSides.mode === "franchise-name") {
+        log(
+          options,
+          `Resolved Yahoo matchup ${matchupId} by Yahoo team names. Page home "${teamTotals.home.teamName}" -> team ${resolvedSides.home.gshlTeamId}; page away "${teamTotals.away.teamName}" -> team ${resolvedSides.away.gshlTeamId}.`,
+        );
+      } else if (resolvedSides.mode === "swapped") {
+        log(
+          options,
+          `Resolved Yahoo matchup ${matchupId} with swapped page sides. Expected home=${homeYahooTeamId} away=${awayYahooTeamId}; page home=${toTrimmedString(teamTotals.home.yahooTeamId) || "(missing)"} away=${toTrimmedString(teamTotals.away.yahooTeamId) || "(missing)"}.`,
+        );
+      } else if (resolvedSides.mode === "fallback") {
+        log(
+          options,
+          `Could not confidently map Yahoo page sides by team id for matchup ${matchupId}. Falling back to page home/away order. Expected home=${homeYahooTeamId} away=${awayYahooTeamId}; page home=${toTrimmedString(teamTotals.home.yahooTeamId) || "(missing)"} away=${toTrimmedString(teamTotals.away.yahooTeamId) || "(missing)"}.`,
+        );
+      }
+
+      for (const [side, teamId, yahooTeamId, yahooStats] of [
+        [
+          "home",
+          resolvedSides.home.gshlTeamId,
+          resolvedSides.home.yahooTeamId || homeYahooTeamId,
+          resolvedSides.home.totals,
+        ] as const,
+        [
+          "away",
+          resolvedSides.away.gshlTeamId,
+          resolvedSides.away.yahooTeamId || awayYahooTeamId,
+          resolvedSides.away.totals,
+        ] as const,
+      ]) {
+        const teamWeekKey = buildTeamWeekKey(weekId, teamId);
+        const teamWeek =
+          pendingTeamWeekUpdates.get(teamWeekKey) ??
+          teamWeekByKey.get(teamWeekKey);
+        if (!teamWeek) {
           recordDiscrepancy({
-            type: "stat-mismatch",
+            type: "missing-team-week-row",
             seasonId: options.seasonId,
             weekId,
             weekNum: toTrimmedString(week.weekNum),
@@ -1534,93 +1418,147 @@ async function main(): Promise<void> {
             gshlTeamId: teamId,
             yahooTeamId,
             side,
-            field: sheetField,
-            yahooHeader,
-            sheetValue: comparison.sheetDisplay,
-            yahooValue: comparison.yahooDisplay,
             url,
-            details: `${side} team ${teamId} field ${sheetField} differs. TeamWeekStatLine=${comparison.sheetDisplay} Yahoo=${comparison.yahooDisplay}`,
+            details: `No TeamWeekStatLine row found for team ${teamId} week ${weekId}.`,
           });
+          continue;
+        }
 
-          if (options.apply) {
-            mutableTeamWeek = {
-              ...mutableTeamWeek,
-              [sheetField]: yahooValue,
-              updatedAt: new Date(),
-            };
-            pendingTeamWeekUpdates.set(teamWeekKey, mutableTeamWeek);
+        teamRowsChecked += 1;
+        let mutableTeamWeek = teamWeek;
+        const teamWeekGoalieStarts =
+          goalieStartsByTeamWeek.get(teamWeekKey) ?? 0;
+        const shouldSkipGoalieValidation =
+          teamWeekGoalieStarts > 0 && teamWeekGoalieStarts < goalieStartMinimum;
+        for (const [yahooHeader, yahooValue] of Object.entries(
+          yahooStats.stats,
+        )) {
+          const modelField = YAHOO_HEADER_TO_TEAM_WEEK_FIELD[yahooHeader];
+          if (!modelField || !TEAM_WEEK_ALLOWED_FIELDS.has(modelField)) {
+            if (!unsupportedHeaders.has(yahooHeader)) {
+              unsupportedHeaders.add(yahooHeader);
+              recordDiscrepancy({
+                type: "unsupported-yahoo-header",
+                seasonId: options.seasonId,
+                weekId,
+                weekNum: toTrimmedString(week.weekNum),
+                matchupId,
+                gshlTeamId: teamId,
+                yahooTeamId,
+                side,
+                yahooHeader,
+                url,
+                details: `Yahoo header ${yahooHeader} is not mapped to a supported TeamWeekStatLine field and was skipped.`,
+              });
+            }
+            continue;
+          }
+          if (!(modelField in mutableTeamWeek)) {
+            if (!unsupportedHeaders.has(yahooHeader)) {
+              unsupportedHeaders.add(yahooHeader);
+              recordDiscrepancy({
+                type: "unsupported-yahoo-header",
+                seasonId: options.seasonId,
+                weekId,
+                weekNum: toTrimmedString(week.weekNum),
+                matchupId,
+                gshlTeamId: teamId,
+                yahooTeamId,
+                side,
+                yahooHeader,
+                field: modelField,
+                url,
+                details: `Mapped field ${modelField} does not exist on TeamWeekStatLine and was skipped.`,
+              });
+            }
+            continue;
+          }
+          if (isGoalieTeamField(modelField) && shouldSkipGoalieValidation) {
+            continue;
+          }
+
+          statComparisons += 1;
+          const comparison = compareStatValues(
+            modelField,
+            mutableTeamWeek[modelField as keyof TeamWeekStatLine],
+            yahooValue,
+          );
+          if (!comparison.matches) {
+            if (isGoalieTeamField(modelField)) {
+              recordGoalieDifference({
+                scope: "team-week",
+                seasonId: options.seasonId,
+                weekId,
+                weekNum: toTrimmedString(week.weekNum),
+                matchupId,
+                gshlTeamId: teamId,
+                yahooTeamId,
+                side,
+                field: modelField,
+                yahooHeader,
+                modelValue: comparison.modelDisplay,
+                yahooValue: comparison.yahooDisplay,
+                url,
+                details: `${side} team ${teamId} goalie field ${modelField} differs. TeamWeekStatLine=${comparison.modelDisplay} Yahoo=${comparison.yahooDisplay}`,
+              });
+              continue;
+            }
+
+            recordDiscrepancy({
+              type: "stat-mismatch",
+              seasonId: options.seasonId,
+              weekId,
+              weekNum: toTrimmedString(week.weekNum),
+              matchupId,
+              gshlTeamId: teamId,
+              yahooTeamId,
+              side,
+              field: modelField,
+              yahooHeader,
+              modelValue: comparison.modelDisplay,
+              yahooValue: comparison.yahooDisplay,
+              url,
+              details: `${side} team ${teamId} field ${modelField} differs. TeamWeekStatLine=${comparison.modelDisplay} Yahoo=${comparison.yahooDisplay}`,
+            });
+
+            if (options.apply) {
+              mutableTeamWeek = {
+                ...mutableTeamWeek,
+                [modelField]: yahooValue,
+                updatedAt: new Date(),
+              };
+              pendingTeamWeekUpdates.set(teamWeekKey, mutableTeamWeek);
+            }
           }
         }
       }
-    }
 
-    for (const [side, teamId, yahooTeamId, yahooRows] of [
-      [
-        "home",
-        resolvedSides.home.gshlTeamId,
-        resolvedSides.home.yahooTeamId || homeYahooTeamId,
-        resolvedSides.home.rows,
-      ] as const,
-      [
-        "away",
-        resolvedSides.away.gshlTeamId,
-        resolvedSides.away.yahooTeamId || awayYahooTeamId,
-        resolvedSides.away.rows,
-      ] as const,
-    ]) {
-      const matchedPlayerWeekKeys = new Set<string>();
-      for (const yahooRow of yahooRows) {
-        const player = resolvePlayerFromYahooReference({
-          yahooId: yahooRow.yahooId,
-          playerName: yahooRow.playerName,
-          playersByYahooId,
-          playersByNormalizedName,
-          players,
-        });
-        if (!player) {
-          recordDiscrepancy({
-            type: "unknown-yahoo-player",
-            seasonId: options.seasonId,
-            weekId,
-            weekNum: toTrimmedString(week.weekNum),
-            matchupId,
-            gshlTeamId: teamId,
-            yahooTeamId,
-            side,
-            yahooId: toTrimmedString(yahooRow.yahooId),
+      for (const [side, teamId, yahooTeamId, yahooRows] of [
+        [
+          "home",
+          resolvedSides.home.gshlTeamId,
+          resolvedSides.home.yahooTeamId || homeYahooTeamId,
+          resolvedSides.home.rows,
+        ] as const,
+        [
+          "away",
+          resolvedSides.away.gshlTeamId,
+          resolvedSides.away.yahooTeamId || awayYahooTeamId,
+          resolvedSides.away.rows,
+        ] as const,
+      ]) {
+        const matchedPlayerWeekKeys = new Set<string>();
+        for (const yahooRow of yahooRows) {
+          const player = resolvePlayerFromYahooReference({
+            yahooId: yahooRow.yahooId,
             playerName: yahooRow.playerName,
-            url,
-            details: `Could not resolve Yahoo weekly player ${yahooRow.playerName}.`,
+            playersByYahooId,
+            playersByNormalizedName,
+            players,
           });
-          continue;
-        }
-
-        playerRowsChecked += 1;
-        const playerId = toTrimmedString(player.id);
-        const playerWeekKey = buildPlayerWeekKey(weekId, teamId, playerId);
-        matchedPlayerWeekKeys.add(playerWeekKey);
-        let existingGroup = playerDaysByWeekTeamPlayer.get(playerWeekKey) ?? [];
-
-        if (!existingGroup.length && options.apply && yahooRow.posGroup !== "goalie") {
-          const syntheticKey = playerWeekKey;
-          if (!pendingPlayerDayCreates.has(syntheticKey)) {
-            const synthetic = buildSyntheticPlayerDayRow({
-              seasonId: options.seasonId,
-              week,
-              teamId,
-              player,
-              yahooRow,
-              hasPM,
-            });
-            pendingPlayerDayCreates.set(syntheticKey, synthetic);
-            existingGroup = [{ rowNumber: Number.MAX_SAFE_INTEGER, record: synthetic }];
-          }
-        }
-
-        if (!existingGroup.length) {
-          if (yahooRow.posGroup === "goalie") {
-            recordGoalieDifference({
-              scope: "missing-player-day-rows",
+          if (!player) {
+            recordDiscrepancy({
+              type: "unknown-yahoo-player",
               seasonId: options.seasonId,
               weekId,
               weekNum: toTrimmedString(week.weekNum),
@@ -1628,51 +1566,47 @@ async function main(): Promise<void> {
               gshlTeamId: teamId,
               yahooTeamId,
               side,
-              playerId,
               yahooId: toTrimmedString(yahooRow.yahooId),
               playerName: yahooRow.playerName,
               url,
-              details: `No PlayerDayStatLine rows were found for goalie ${playerId} on team ${teamId} for week ${weekId}.`,
+              details: `Could not resolve Yahoo weekly player ${yahooRow.playerName}.`,
             });
             continue;
           }
 
-          recordDiscrepancy({
-            type: "missing-player-day-rows",
-            seasonId: options.seasonId,
-            weekId,
-            weekNum: toTrimmedString(week.weekNum),
-            matchupId,
-            gshlTeamId: teamId,
-            yahooTeamId,
-            side,
-            playerId,
-            yahooId: toTrimmedString(yahooRow.yahooId),
-            playerName: yahooRow.playerName,
-            url,
-            details: `No PlayerDayStatLine rows were found for team ${teamId}, player ${playerId}, week ${weekId}.`,
-          });
-          continue;
-        }
+          playerRowsChecked += 1;
+          const playerId = toTrimmedString(player.id);
+          const playerWeekKey = buildPlayerWeekKey(weekId, teamId, playerId);
+          matchedPlayerWeekKeys.add(playerWeekKey);
+          let existingGroup =
+            playerDaysByWeekTeamPlayer.get(playerWeekKey) ?? [];
 
-        const currentRows = existingGroup.map((row) =>
-          row.rowNumber === Number.MAX_SAFE_INTEGER
-            ? row.record
-            : getCurrentPlayerDayRow(row, pendingPlayerDayUpdates),
-        );
+          if (
+            !existingGroup.length &&
+            options.apply &&
+            yahooRow.posGroup !== "goalie"
+          ) {
+            const syntheticKey = playerWeekKey;
+            if (!pendingPlayerDayCreates.has(syntheticKey)) {
+              const synthetic = buildSyntheticPlayerDayRow({
+                seasonId: options.seasonId,
+                week,
+                teamId,
+                player,
+                yahooRow,
+                hasPM,
+              });
+              pendingPlayerDayCreates.set(syntheticKey, synthetic);
+              existingGroup = [
+                { rowNumber: Number.MAX_SAFE_INTEGER, record: synthetic },
+              ];
+            }
+          }
 
-        const supportedFields = getSupportedPlayerFields(yahooRow, hasPM);
-        for (const field of supportedFields) {
-          statComparisons += 1;
-          const sheetTotal = sumPlayerDayField(currentRows, field);
-          const yahooValue = toTrimmedString(
-            yahooRow[field as keyof YahooWeeklyMatchupPlayerRow],
-          );
-          const comparison = compareStatValues(field, sheetTotal, yahooValue);
-          if (!comparison.matches) {
+          if (!existingGroup.length) {
             if (yahooRow.posGroup === "goalie") {
               recordGoalieDifference({
-                scope: "player-week",
+                scope: "missing-player-day-rows",
                 seasonId: options.seasonId,
                 weekId,
                 weekNum: toTrimmedString(week.weekNum),
@@ -1683,17 +1617,14 @@ async function main(): Promise<void> {
                 playerId,
                 yahooId: toTrimmedString(yahooRow.yahooId),
                 playerName: yahooRow.playerName,
-                field,
-                sheetValue: comparison.sheetDisplay,
-                yahooValue: comparison.yahooDisplay,
                 url,
-                details: `Goalie ${playerId} weekly ${field} differs. PlayerDayStatLine sum=${comparison.sheetDisplay} Yahoo=${comparison.yahooDisplay}`,
+                details: `No PlayerDayStatLine rows were found for goalie ${playerId} on team ${teamId} for week ${weekId}.`,
               });
               continue;
             }
 
             recordDiscrepancy({
-              type: "player-stat-mismatch",
+              type: "missing-player-day-rows",
               seasonId: options.seasonId,
               weekId,
               weekNum: toTrimmedString(week.weekNum),
@@ -1704,18 +1635,30 @@ async function main(): Promise<void> {
               playerId,
               yahooId: toTrimmedString(yahooRow.yahooId),
               playerName: yahooRow.playerName,
-              field,
-              sheetValue: comparison.sheetDisplay,
-              yahooValue: comparison.yahooDisplay,
               url,
-              details: `Player ${playerId} weekly ${field} differs. PlayerDayStatLine sum=${comparison.sheetDisplay} Yahoo=${comparison.yahooDisplay}`,
+              details: `No PlayerDayStatLine rows were found for team ${teamId}, player ${playerId}, week ${weekId}.`,
             });
+            continue;
+          }
 
-            if (options.apply) {
-              const target = parseYahooNumeric(yahooValue);
-              if (target === null || !Number.isFinite(target)) {
-                recordDiscrepancy({
-                  type: "player-apply-failure",
+          const currentRows = existingGroup.map((row) =>
+            row.rowNumber === Number.MAX_SAFE_INTEGER
+              ? row.record
+              : getCurrentPlayerDayRow(row, pendingPlayerDayUpdates),
+          );
+
+          const supportedFields = getSupportedPlayerFields(yahooRow, hasPM);
+          for (const field of supportedFields) {
+            statComparisons += 1;
+            const modelTotal = sumPlayerDayField(currentRows, field);
+            const yahooValue = toTrimmedString(
+              yahooRow[field as keyof YahooWeeklyMatchupPlayerRow],
+            );
+            const comparison = compareStatValues(field, modelTotal, yahooValue);
+            if (!comparison.matches) {
+              if (yahooRow.posGroup === "goalie") {
+                recordGoalieDifference({
+                  scope: "player-week",
                   seasonId: options.seasonId,
                   weekId,
                   weekNum: toTrimmedString(week.weekNum),
@@ -1727,24 +1670,36 @@ async function main(): Promise<void> {
                   yahooId: toTrimmedString(yahooRow.yahooId),
                   playerName: yahooRow.playerName,
                   field,
+                  modelValue: comparison.modelDisplay,
+                  yahooValue: comparison.yahooDisplay,
                   url,
-                  details: `Could not apply field ${field} because Yahoo value ${yahooValue} is not numeric.`,
+                  details: `Goalie ${playerId} weekly ${field} differs. PlayerDayStatLine sum=${comparison.modelDisplay} Yahoo=${comparison.yahooDisplay}`,
                 });
                 continue;
               }
-              const delta = Math.round(target - sheetTotal);
-              if (delta > 0) {
-                const mutableRows = existingGroup.map((row) =>
-                  row.rowNumber === Number.MAX_SAFE_INTEGER
-                    ? row.record
-                    : getMutablePlayerDayRow(row, pendingPlayerDayUpdates),
-                );
-                const success = distributePositiveDelta(
-                  mutableRows,
-                  field as MutablePlayerDayStatField,
-                  delta,
-                );
-                if (!success) {
+
+              recordDiscrepancy({
+                type: "player-stat-mismatch",
+                seasonId: options.seasonId,
+                weekId,
+                weekNum: toTrimmedString(week.weekNum),
+                matchupId,
+                gshlTeamId: teamId,
+                yahooTeamId,
+                side,
+                playerId,
+                yahooId: toTrimmedString(yahooRow.yahooId),
+                playerName: yahooRow.playerName,
+                field,
+                modelValue: comparison.modelDisplay,
+                yahooValue: comparison.yahooDisplay,
+                url,
+                details: `Player ${playerId} weekly ${field} differs. PlayerDayStatLine sum=${comparison.modelDisplay} Yahoo=${comparison.yahooDisplay}`,
+              });
+
+              if (options.apply) {
+                const target = parseYahooNumeric(yahooValue);
+                if (target === null || !Number.isFinite(target)) {
                   recordDiscrepancy({
                     type: "player-apply-failure",
                     seasonId: options.seasonId,
@@ -1759,122 +1714,121 @@ async function main(): Promise<void> {
                     playerName: yahooRow.playerName,
                     field,
                     url,
-                    details: `Could not increase PlayerDayStatLine ${field} totals for player ${playerId} by ${delta} because no countable player-day row was available.`,
+                    details: `Could not apply field ${field} because Yahoo value ${yahooValue} is not numeric.`,
                   });
+                  continue;
                 }
-              } else if (delta < 0) {
-                const mutableRows = existingGroup.map((row) =>
-                  row.rowNumber === Number.MAX_SAFE_INTEGER
-                    ? row.record
-                    : getMutablePlayerDayRow(row, pendingPlayerDayUpdates),
-                );
-                const success = distributeNegativeDelta(
-                  mutableRows,
-                  field as MutablePlayerDayStatField,
-                  delta,
-                );
-                if (!success) {
-                  recordDiscrepancy({
-                    type: "player-apply-failure",
-                    seasonId: options.seasonId,
-                    weekId,
-                    weekNum: toTrimmedString(week.weekNum),
-                    matchupId,
-                    gshlTeamId: teamId,
-                    yahooTeamId,
-                    side,
-                    playerId,
-                    yahooId: toTrimmedString(yahooRow.yahooId),
-                    playerName: yahooRow.playerName,
-                    field,
-                    url,
-                    details: `Could not reduce PlayerDayStatLine ${field} totals for player ${playerId} by ${Math.abs(delta)} without producing negative day values.`,
-                  });
+                const delta = Math.round(target - modelTotal);
+                if (delta > 0) {
+                  const mutableRows = existingGroup.map((row) =>
+                    row.rowNumber === Number.MAX_SAFE_INTEGER
+                      ? row.record
+                      : getMutablePlayerDayRow(row, pendingPlayerDayUpdates),
+                  );
+                  const success = distributePositiveDelta(
+                    mutableRows,
+                    field as MutablePlayerDayStatField,
+                    delta,
+                  );
+                  if (!success) {
+                    recordDiscrepancy({
+                      type: "player-apply-failure",
+                      seasonId: options.seasonId,
+                      weekId,
+                      weekNum: toTrimmedString(week.weekNum),
+                      matchupId,
+                      gshlTeamId: teamId,
+                      yahooTeamId,
+                      side,
+                      playerId,
+                      yahooId: toTrimmedString(yahooRow.yahooId),
+                      playerName: yahooRow.playerName,
+                      field,
+                      url,
+                      details: `Could not increase PlayerDayStatLine ${field} totals for player ${playerId} by ${delta} because no countable player-day row was available.`,
+                    });
+                  }
+                } else if (delta < 0) {
+                  const mutableRows = existingGroup.map((row) =>
+                    row.rowNumber === Number.MAX_SAFE_INTEGER
+                      ? row.record
+                      : getMutablePlayerDayRow(row, pendingPlayerDayUpdates),
+                  );
+                  const success = distributeNegativeDelta(
+                    mutableRows,
+                    field as MutablePlayerDayStatField,
+                    delta,
+                  );
+                  if (!success) {
+                    recordDiscrepancy({
+                      type: "player-apply-failure",
+                      seasonId: options.seasonId,
+                      weekId,
+                      weekNum: toTrimmedString(week.weekNum),
+                      matchupId,
+                      gshlTeamId: teamId,
+                      yahooTeamId,
+                      side,
+                      playerId,
+                      yahooId: toTrimmedString(yahooRow.yahooId),
+                      playerName: yahooRow.playerName,
+                      field,
+                      url,
+                      details: `Could not reduce PlayerDayStatLine ${field} totals for player ${playerId} by ${Math.abs(delta)} without producing negative day values.`,
+                    });
+                  }
                 }
+              }
+            }
+          }
+
+          if (yahooRow.posGroup === "goalie") {
+            for (const unsupportedField of ["GAA", "SVP"]) {
+              if (
+                toTrimmedString(
+                  yahooRow[
+                    unsupportedField as keyof YahooWeeklyMatchupPlayerRow
+                  ],
+                )
+              ) {
+                continue;
               }
             }
           }
         }
 
-        if (yahooRow.posGroup === "goalie") {
-          for (const unsupportedField of ["GAA", "SVP"]) {
-            if (
-              toTrimmedString(
-                yahooRow[unsupportedField as keyof YahooWeeklyMatchupPlayerRow],
-              )
-            ) {
-              continue;
-            }
-          }
-        }
-      }
+        for (const [
+          playerWeekKey,
+          existingGroup,
+        ] of playerDaysByWeekTeamPlayer.entries()) {
+          const [groupWeekId, groupTeamId, playerId] = playerWeekKey.split("|");
+          if (groupWeekId !== weekId || groupTeamId !== teamId) continue;
+          if (matchedPlayerWeekKeys.has(playerWeekKey)) continue;
 
-      for (const [playerWeekKey, existingGroup] of playerDaysByWeekTeamPlayer.entries()) {
-        const [groupWeekId, groupTeamId, playerId] = playerWeekKey.split("|");
-        if (groupWeekId !== weekId || groupTeamId !== teamId) continue;
-        if (matchedPlayerWeekKeys.has(playerWeekKey)) continue;
-
-        const player = playersById.get(playerId);
-        if (!player) continue;
-        const supportedFields = hasPlusMinusForSeason(options.seasonId)
-          ? [...WEEKLY_SKATER_FIELDS, "PM"]
-          : WEEKLY_SKATER_FIELDS.slice();
-        const goalieFields = WEEKLY_GOALIE_FIELDS.slice();
-        const fields = isGoaliePlayer(player) ? goalieFields : supportedFields;
-        const currentRows = existingGroup.map((row) => row.record);
-        const currentTotals = Object.fromEntries(
-          fields.map((field) => [
-            field,
-            sumPlayerDayField(
-              currentRows,
+          const player = playersById.get(playerId);
+          if (!player) continue;
+          const supportedFields = hasPlusMinusForSeason(options.seasonId)
+            ? [...WEEKLY_SKATER_FIELDS, "PM"]
+            : WEEKLY_SKATER_FIELDS.slice();
+          const goalieFields = WEEKLY_GOALIE_FIELDS.slice();
+          const fields = isGoaliePlayer(player)
+            ? goalieFields
+            : supportedFields;
+          const currentRows = existingGroup.map((row) => row.record);
+          const currentTotals = Object.fromEntries(
+            fields.map((field) => [
               field,
-            ),
-          ]),
-        );
-        const hasAnyTotal = Object.values(currentTotals).some((value) => Number(value) > 0);
-        if (!hasAnyTotal) continue;
-
-        if (isGoaliePlayer(player)) {
-          recordGoalieDifference({
-            scope: "missing-yahoo-weekly-player",
-            seasonId: options.seasonId,
-            weekId,
-            weekNum: toTrimmedString(week.weekNum),
-            matchupId,
-            gshlTeamId: teamId,
-            yahooTeamId,
-            side,
-            playerId,
-            playerName: player.fullName,
-            url,
-            details: `Goalie ${playerId} has PlayerDayStatLine totals for week ${weekId} but was not present in Yahoo's weekly matchup player tables.`,
-          });
-          continue;
-        }
-
-        recordDiscrepancy({
-          type: "missing-yahoo-weekly-player",
-          seasonId: options.seasonId,
-          weekId,
-          weekNum: toTrimmedString(week.weekNum),
-          matchupId,
-          gshlTeamId: teamId,
-          yahooTeamId,
-          side,
-          playerId,
-          playerName: player.fullName,
-          url,
-          details: `Player ${playerId} has PlayerDayStatLine totals for week ${weekId} but was not present in Yahoo's weekly matchup player tables.`,
-        });
-
-        if (options.apply) {
-          const mutableRows = existingGroup.map((row) =>
-            getMutablePlayerDayRow(row, pendingPlayerDayUpdates),
+              sumPlayerDayField(currentRows, field),
+            ]),
           );
-          const candidateRows = getAdjustmentCandidateRows(mutableRows);
-          if (!candidateRows.length) {
-            recordDiscrepancy({
-              type: "player-apply-failure",
+          const hasAnyTotal = Object.values(currentTotals).some(
+            (value) => Number(value) > 0,
+          );
+          if (!hasAnyTotal) continue;
+
+          if (isGoaliePlayer(player)) {
+            recordGoalieDifference({
+              scope: "missing-yahoo-weekly-player",
               seasonId: options.seasonId,
               weekId,
               weekNum: toTrimmedString(week.weekNum),
@@ -1885,88 +1839,128 @@ async function main(): Promise<void> {
               playerId,
               playerName: player.fullName,
               url,
-              details: `Could not clear PlayerDayStatLine stats for player ${playerId} because no row with GP=1 and GS=1 was available.`,
+              details: `Goalie ${playerId} has PlayerDayStatLine totals for week ${weekId} but was not present in Yahoo's weekly matchup player tables.`,
             });
             continue;
           }
 
-          for (const mutable of candidateRows) {
-            for (const field of fields) {
-              setMutablePlayerDayStatValue(
-                mutable,
-                field as MutablePlayerDayStatField,
-                "",
-              );
+          recordDiscrepancy({
+            type: "missing-yahoo-weekly-player",
+            seasonId: options.seasonId,
+            weekId,
+            weekNum: toTrimmedString(week.weekNum),
+            matchupId,
+            gshlTeamId: teamId,
+            yahooTeamId,
+            side,
+            playerId,
+            playerName: player.fullName,
+            url,
+            details: `Player ${playerId} has PlayerDayStatLine totals for week ${weekId} but was not present in Yahoo's weekly matchup player tables.`,
+          });
+
+          if (options.apply) {
+            const mutableRows = existingGroup.map((row) =>
+              getMutablePlayerDayRow(row, pendingPlayerDayUpdates),
+            );
+            const candidateRows = getAdjustmentCandidateRows(mutableRows);
+            if (!candidateRows.length) {
+              recordDiscrepancy({
+                type: "player-apply-failure",
+                seasonId: options.seasonId,
+                weekId,
+                weekNum: toTrimmedString(week.weekNum),
+                matchupId,
+                gshlTeamId: teamId,
+                yahooTeamId,
+                side,
+                playerId,
+                playerName: player.fullName,
+                url,
+                details: `Could not clear PlayerDayStatLine stats for player ${playerId} because no row with GP=1 and GS=1 was available.`,
+              });
+              continue;
             }
-            mutable.updatedAt = new Date();
+
+            for (const mutable of candidateRows) {
+              for (const field of fields) {
+                setMutablePlayerDayStatValue(
+                  mutable,
+                  field as MutablePlayerDayStatField,
+                  "",
+                );
+              }
+              mutable.updatedAt = new Date();
+            }
           }
         }
       }
     }
-  }
 
-  let appliedPlayerDayUpdates = 0;
-  let appliedPlayerDayCreates = 0;
-  let appliedTeamWeekUpdates = 0;
-  if (options.apply) {
-    const playerDayWriteSummary = await applyPlayerDayWrites({
-      seasonId: options.seasonId,
-      existingRows: playerDayRows,
-      updatesByRowNumber: pendingPlayerDayUpdates,
-      creates: Array.from(pendingPlayerDayCreates.values()),
-    });
-    appliedPlayerDayUpdates = playerDayWriteSummary.updated;
-    appliedPlayerDayCreates = playerDayWriteSummary.created;
-    appliedTeamWeekUpdates = await applyTeamWeekWrites(
-      Array.from(pendingTeamWeekUpdates.values()),
+    let appliedPlayerDayUpdates = 0;
+    let appliedPlayerDayCreates = 0;
+    let appliedTeamWeekUpdates = 0;
+    if (options.apply) {
+      const playerDayWriteSummary = await applyPlayerDayWrites({
+        seasonId: options.seasonId,
+        existingRows: playerDayRows,
+        updatesByRowNumber: pendingPlayerDayUpdates,
+        creates: Array.from(pendingPlayerDayCreates.values()),
+      });
+      appliedPlayerDayUpdates = playerDayWriteSummary.updated;
+      appliedPlayerDayCreates = playerDayWriteSummary.created;
+      appliedTeamWeekUpdates = await applyTeamWeekWrites(
+        Array.from(pendingTeamWeekUpdates.values()),
+      );
+    }
+
+    const goalieDifferenceBreakdown = Array.from(
+      goalieDifferences
+        .reduce(
+          (map, difference) => {
+            const field = difference.field || "(none)";
+            const key = `${difference.scope}::${field}`;
+            map.set(key, {
+              scope: difference.scope,
+              field,
+              count: (map.get(key)?.count ?? 0) + 1,
+            });
+            return map;
+          },
+          new Map<
+            string,
+            {
+              scope: GoalieDifferenceRecord["scope"];
+              field: string;
+              count: number;
+            }
+          >(),
+        )
+        .values(),
+    ).sort(
+      (left, right) =>
+        left.scope.localeCompare(right.scope) ||
+        left.field.localeCompare(right.field),
     );
-  }
 
-  const goalieDifferenceBreakdown = Array.from(
-    goalieDifferences.reduce(
-      (map, difference) => {
-        const field = difference.field || "(none)";
-        const key = `${difference.scope}::${field}`;
-        map.set(key, {
-          scope: difference.scope,
-          field,
-          count: (map.get(key)?.count ?? 0) + 1,
-        });
-        return map;
-      },
-      new Map<
-        string,
-        {
-          scope: GoalieDifferenceRecord["scope"];
-          field: string;
-          count: number;
-        }
-      >(),
-    ).values(),
-  ).sort(
-    (left, right) =>
-      left.scope.localeCompare(right.scope) ||
-      left.field.localeCompare(right.field),
-  );
-
-  const summary: CheckSummary = {
-    seasonId: options.seasonId,
-    apply: options.apply,
-    weeksChecked: targetWeeks.length,
-    matchupsChecked: targetMatchups.length,
-    teamRowsChecked,
-    playerRowsChecked,
-    statComparisons,
-    discrepancies: discrepancies.length,
-    fetchFailures,
-    parseFailures,
-    unsupportedHeaders: Array.from(unsupportedHeaders).sort(),
-    appliedPlayerDayUpdates,
-    appliedPlayerDayCreates,
-    appliedTeamWeekUpdates,
-    goaltendingDifferences: goalieDifferences.length,
-    goaltendingDifferenceBreakdown: goalieDifferenceBreakdown,
-  };
+    const summary: CheckSummary = {
+      seasonId: options.seasonId,
+      apply: options.apply,
+      weeksChecked: targetWeeks.length,
+      matchupsChecked: targetMatchups.length,
+      teamRowsChecked,
+      playerRowsChecked,
+      statComparisons,
+      discrepancies: discrepancies.length,
+      fetchFailures,
+      parseFailures,
+      unsupportedHeaders: Array.from(unsupportedHeaders).sort(),
+      appliedPlayerDayUpdates,
+      appliedPlayerDayCreates,
+      appliedTeamWeekUpdates,
+      goaltendingDifferences: goalieDifferences.length,
+      goaltendingDifferenceBreakdown: goalieDifferenceBreakdown,
+    };
 
     printSummary(summary);
     printRequiredChanges(discrepancies, goalieDifferences);
@@ -1982,7 +1976,9 @@ async function main(): Promise<void> {
     ]);
     if (
       (!options.apply && discrepancies.length > 0) ||
-      discrepancies.some((discrepancy) => hardFailureTypes.has(discrepancy.type))
+      discrepancies.some((discrepancy) =>
+        hardFailureTypes.has(discrepancy.type),
+      )
     ) {
       process.exitCode = 1;
     }
@@ -1993,7 +1989,7 @@ async function main(): Promise<void> {
 
 void main().catch((error: unknown) => {
   const message =
-    error instanceof Error ? error.stack ?? error.message : String(error);
+    error instanceof Error ? (error.stack ?? error.message) : String(error);
   console.error(message);
   process.exitCode = 1;
 });

@@ -25,13 +25,8 @@ Configure `CONVEX_URL`, `BROWSER_WORKER_SECRET`, and
 authenticated Yahoo profile. The worker only leases source tasks and returns
 bounded captures. It never writes league tables.
 
-This package is intentionally separate from both the Next.js app and
-`apps-script/`:
-
-- `scripts/` is the main home for retrospective and operator-run workflows.
-- `apps-script/` stays focused on active-season automation inside Google Apps
-  Script.
-- Shared ranking/runtime logic should stay aligned across both runtimes.
+This package owns operator workflows and the local calculation runtimes under
+`src/runtime/`. League records are read from and written to Convex.
 
 ## Working Here
 
@@ -51,7 +46,7 @@ Most commands also support:
 - `--log false` to reduce console noise
 
 On Windows PowerShell, invoke argument-bearing commands with `npm.cmd`, for
-example `npm.cmd run ratings:parity -- --help`. In this workspace the
+example `npm.cmd run ratings:backfill -- --help`. In this workspace the
 `npm.ps1` shim can consume forwarded names such as `--help` or `--season-id`.
 Verify the parsed help/arguments before any `--apply` run. The repository
 declares npm 10.1.0; check the resolved npm version instead of assuming the
@@ -85,9 +80,7 @@ points at a developer deployment.
 
 To intentionally target a non-production deployment, set
 `GSHL_CONVEX_TARGET=development` and configure `NEXT_PUBLIC_CONVEX_URL` or
-`CONVEX_URL`. To use the old Sheets backend temporarily, set
-`GSHL_DATA_BACKEND=sheets` and provide the existing Google service-account
-configuration.
+`CONVEX_URL`.
 
 ### Yahoo-authenticated workflows
 
@@ -392,22 +385,6 @@ Notable flags:
 - `--stop-on-error`
 - `--apply`
 
-#### `ratings:parity`
-
-Compares local TypeScript player-rating output against the Apps Script rating
-engine for a sampled season slice.
-
-Notable flags:
-
-- `--season-id <id>`
-- `--models <list>`
-- `--sample-size <n>`
-- `--seed <value>`
-- `--season-type <value>`
-- `--week-ids <list>`
-- `--week-nums <list>`
-- `--max-delta <value>`
-
 #### `power:rebuild`
 
 Recomputes start-of-week team power snapshots and matchup ranking fields.
@@ -423,27 +400,9 @@ Notable flags:
 - `--season-type <type>`
 - `--apply`
 
-#### `power:parity`
-
-Compares local TypeScript power outputs against the Apps Script power
-implementation for one season.
-
-Notable flags:
-
-- `--season-id <id>`
-- `--sample-size <n>`
-- `--week-types <list>`
-- `--season-type <type>`
-
-#### `ranking-engine:sync`
-
-Copies the shared ranking-engine runtime files from `scripts/` into
-`apps-script/` and verifies the hashes match.
-
 #### `ranking-engine:check`
 
-Verifies that the ranking-engine runtime files in `scripts/` and `apps-script/`
-are still in sync without copying.
+Runs local power and aggregation fixtures against the calculation runtime.
 
 ### Stats Backfills and Syncs
 
@@ -482,9 +441,7 @@ Notable flags:
 
 Pulls Yahoo daily matchup pages, reconciles them against `PlayerDayStatLine`
 in the production Convex database, and reports updates, creations, deletions,
-and investigation flags. It does not read from or write to the legacy Sheets
-database.
-
+and investigation flags.
 Notable flags:
 
 - `--seasonId, --seasonIds <list>`
@@ -660,21 +617,6 @@ the corresponding dry-run output.
 
 The `.local-data/` directory is gitignored. OneDrive synchronization is useful
 transport, but it is not a retention policy or independently verified backup.
-
-#### `convex:migrate`
-
-Destructively replaces every mapped table in the selected Convex deployment
-with data read from Google Sheets. This command is the major exception to the
-package's normal safety model: it has no dry-run and no `--apply` gate. It
-clears target tables before importing them in dependency order and writes
-`reports/convex-migration-latest.json`.
-
-Do not run it without explicit authorization, exact target confirmation, and a
-verified backup.
-
-```bash
-npm run convex:migrate
-```
 
 #### `worker:browser`
 

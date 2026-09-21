@@ -23,8 +23,8 @@ function forbiddenModule(file, specifier) {
     ? path.posix.normalize(path.posix.join(path.posix.dirname(file), specifier))
     : specifier.replace(/^@gshl-lib\//, "src/lib/");
   return [
-    /^@gshl-(?:hooks|cache|server|convex|sheets|yahoo|nhl)(?:\/|$)/,
-    /^(?:src\/hooks|src\/server|src\/lib\/(?:cache|data|sheets|yahoo|nhl)|convex)(?:\/|$)/,
+    /^@gshl-(?:hooks|cache|server|convex|yahoo|nhl)(?:\/|$)/,
+    /^(?:src\/hooks|src\/server|src\/lib\/(?:cache|data|yahoo|nhl)|convex)(?:\/|$)/,
     /^(?:convex|@convex-dev)(?:\/|$)/,
     /^next-auth\/react(?:\/|$)/,
     /^@(?:tanstack\/(?:react-query|query-core)|apollo\/client|uploadthing\/react)(?:\/|$)/,

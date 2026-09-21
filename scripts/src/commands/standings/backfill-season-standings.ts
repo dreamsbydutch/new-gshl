@@ -18,7 +18,7 @@
  *   --help                 Print the built-in help text and exit.
  */
 import { pathToFileURL } from "node:url";
-import type { DatabaseRecord } from "@gshl-lib/sheets/config/config";
+import type { DatabaseRecord } from "@gshl-lib/data/records";
 import {
   fetchModel,
   fetchSeasonModel,
@@ -306,7 +306,7 @@ function parseSeasonCategories(rawValue: unknown): string[] {
             .filter((category): category is string => !!category);
         }
       } catch {
-        // Fall through to CSV parsing for plain sheet values.
+        // Fall through to CSV parsing for plain record values.
       }
     }
 

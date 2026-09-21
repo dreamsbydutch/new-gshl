@@ -54,27 +54,13 @@ export * from "./enums";
 export * from "./ui-components";
 
 // ============================================================================
-// GOOGLE SHEETS INTEGRATION
-// ============================================================================
-
-/**
- * Types specific to Google Sheets data storage and retrieval
- * - WorkbookConfig: Configuration for multiple Google Sheets workbooks
- * - SheetConfig: Individual sheet naming and structure
- * - FieldTransforms: Data transformation rules for different field types
- * - ModelTransforms: Model-specific transformation configurations
- * - Google Sheets API response types and interfaces
- */
-export * from "./sheets";
-
-// ============================================================================
 // DATA TRANSFORMATION TYPES
 // ============================================================================
 
 /**
- * Transformed versions of database models for sheets adapter compatibility
+ * Transformed versions of database models for application use
  * - Aliases and modified versions of core database types
- * - Optimized types for Google Sheets storage format
+ * - Application data representations
  * - Ensures type safety during data transformation processes
  */
 export * from "./transforms";
@@ -135,9 +121,6 @@ export * from "./weekly-schedule";
  *
  * // Import navigation types for UI components
  * import type { BaseNavItem } from "~/lib/types";
- *
- * // Import sheets-specific types for data operations
- * import type { WorkbookConfig, FieldTransforms } from "~/lib/types";
  *
  * // Example usage in component props
  * interface SeasonSelectorProps {

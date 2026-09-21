@@ -1,15 +1,10 @@
+import * as dataStore from "@gshl-lib/data/convex-store";
 import { promisify } from "node:util";
 import { execFile as execFileCallback } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import type { Player } from "@gshl-lib/types/database";
-import { fastSheetsReader } from "@gshl-lib/sheets/reader/fast-reader";
-import {
-  type DatabaseRecord,
-  getSpreadsheetIdForModel,
-  SHEETS_CONFIG,
-} from "@gshl-lib/sheets/config/config";
-import { optimizedSheetsClient } from "@gshl-lib/sheets/client/optimized-client";
+import { type DatabaseRecord } from "@gshl-lib/data/records";
 import { normalizeDateOnlyValue } from "@gshl-lib/utils/core/date";
 import {
   getArgValue,
@@ -26,9 +21,6 @@ const PYTHON_FETCHER_PATH = path.resolve(
   "../../../python/fetch_nhl_player_directory.py",
 );
 
-const PLAYER_SHEET_NAME = SHEETS_CONFIG.SHEETS.Player;
-const PLAYER_HEADER_RANGE = `${PLAYER_SHEET_NAME}!A1:ZZ`;
-const NHL_API_ID_COLUMN = "nhlApiId";
 const DEFAULT_START_SEASON = "20142015";
 
 const HELP_TEXT = `
@@ -133,18 +125,13 @@ type InvestigationFlag = {
     | "ambiguous-api-player"
     | "unmatched-api-player"
     | "existing-id-conflict"
-    | "duplicate-sheet-nhl-api-id"
-    | "missing-player-sheet-row";
+    | "duplicate-stored-nhl-api-id"
+    | "missing-player-record";
   playerId?: string;
   fullName?: string;
   teamAbbrs?: string[];
   nhlApiId?: string;
   details: string;
-};
-
-type PlayerSheetRow = {
-  rowNumber: number;
-  values: (string | number | boolean | null)[];
 };
 
 type PlayerMatch = {
@@ -162,7 +149,7 @@ export type NhlPlayerIdBackfillSummary = {
     skaters: number;
     goalies: number;
   };
-  playerSheetRows: number;
+  playerRows: number;
   apiPlayersFetched: number;
   matchedPlayers: number;
   updatedPlayers: number;
@@ -170,8 +157,7 @@ export type NhlPlayerIdBackfillSummary = {
   existingIdConflicts: number;
   unmatchedApiPlayers: number;
   ambiguousApiPlayers: number;
-  duplicateSheetNhlApiIds: number;
-  headerColumnAdded: boolean;
+  duplicateStoredNhlApiIds: number;
   flags: InvestigationFlag[];
 };
 
@@ -408,28 +394,29 @@ function normalizeBirthday(value: unknown): string {
 
 function uniqueStrings(values: unknown[]): string[] {
   return Array.from(
-    new Set(
-      values
-        .map((value) => cleanWhitespace(value))
-        .filter(Boolean),
-    ),
+    new Set(values.map((value) => cleanWhitespace(value)).filter(Boolean)),
   );
 }
 
-function scorePlayerMatch(player: Player, external: ExternalPlayerProfile): number {
+function scorePlayerMatch(
+  player: Player,
+  external: ExternalPlayerProfile,
+): number {
   let score = 0;
   const playerName = getComparableNameParts(buildPlayerFullName(player));
   const externalName = getComparableNameParts(external.fullName);
   const playerPosGroup = inferPosGroup(player.nhlPos, player.posGroup);
-  const playerTeams = new Set([
-    normalizeTeamAbbr(player.nhlTeam),
-  ].filter(Boolean));
+  const playerTeams = new Set(
+    [normalizeTeamAbbr(player.nhlTeam)].filter(Boolean),
+  );
   const externalTeams = new Set(
     external.teamAbbrs.map((team) => normalizeTeamAbbr(team)).filter(Boolean),
   );
   const playerBirthday = normalizeBirthday(player.birthday);
   const externalBirthday = normalizeBirthday(external.birthDate);
-  const externalPositions = new Set(external.positionCodes.map(normalizePosToken));
+  const externalPositions = new Set(
+    external.positionCodes.map(normalizePosToken),
+  );
   const playerPositions = splitPosTokens(player.nhlPos);
 
   if (areFullNamesCompatible(buildPlayerFullName(player), external.fullName)) {
@@ -441,7 +428,11 @@ function scorePlayerMatch(player: Player, external: ExternalPlayerProfile): numb
   if (playerName.last && playerName.last === externalName.last) {
     score += 3;
   }
-  if (playerBirthday && externalBirthday && playerBirthday === externalBirthday) {
+  if (
+    playerBirthday &&
+    externalBirthday &&
+    playerBirthday === externalBirthday
+  ) {
     score += 6;
   }
   if ([...playerTeams].some((team) => externalTeams.has(team))) {
@@ -529,7 +520,9 @@ function findFallbackPlayers(
     if (!playerName.last || playerName.last !== externalName.last) {
       return false;
     }
-    if (areFullNamesCompatible(buildPlayerFullName(player), external.fullName)) {
+    if (
+      areFullNamesCompatible(buildPlayerFullName(player), external.fullName)
+    ) {
       return true;
     }
     return areFirstNamesCompatible(playerName.first, externalName.first);
@@ -554,7 +547,9 @@ function normalizeExternalPlayerProfile(
     birthCountry: toTrimmedString(row.birthCountry).toUpperCase(),
     shootsCatches: toTrimmedString(row.shootsCatches).toUpperCase(),
     teamAbbrs: uniqueStrings((row.teamAbbrs ?? []).map(normalizeTeamAbbr)),
-    positionCodes: uniqueStrings((row.positionCodes ?? []).map(normalizePosToken)),
+    positionCodes: uniqueStrings(
+      (row.positionCodes ?? []).map(normalizePosToken),
+    ),
     posGroups: uniqueStrings(
       (row.posGroups ?? []).map((value) => {
         const normalized = toTrimmedString(value).toUpperCase();
@@ -566,7 +561,9 @@ function normalizeExternalPlayerProfile(
   };
 }
 
-function parseExternalPlayers(payload: PythonDirectoryPayload): ExternalPlayerProfile[] {
+function parseExternalPlayers(
+  payload: PythonDirectoryPayload,
+): ExternalPlayerProfile[] {
   const deduped = new Map<string, ExternalPlayerProfile>();
 
   for (const rawRow of payload.players ?? []) {
@@ -590,7 +587,9 @@ function resolveDefaultNhlEndSeason(now = new Date()): string {
 function seasonTokenStartYear(value: string): number {
   const token = toTrimmedString(value);
   if (!/^\d{8}$/.test(token)) {
-    throw new Error(`[player-bios:backfill-nhl-ids] Invalid NHL season token: ${value}`);
+    throw new Error(
+      `[player-bios:backfill-nhl-ids] Invalid NHL season token: ${value}`,
+    );
   }
   return Number(token.slice(0, 4));
 }
@@ -619,19 +618,6 @@ function resolveSeasonRange(options: NhlPlayerIdBackfillOptions): {
   };
 }
 
-function columnToLetter(columnIndex1: number): string {
-  let columnIndex = columnIndex1;
-  let letter = "";
-
-  while (columnIndex > 0) {
-    const remainder = (columnIndex - 1) % 26;
-    letter = String.fromCharCode(65 + remainder) + letter;
-    columnIndex = Math.floor((columnIndex - 1) / 26);
-  }
-
-  return letter;
-}
-
 async function fetchExternalDirectory(
   startSeason: string,
   endSeason: string,
@@ -656,73 +642,6 @@ async function fetchExternalDirectory(
     console.error(stderr.trim());
   }
   return JSON.parse(stdout) as PythonDirectoryPayload;
-}
-
-async function loadPlayerSheetRows(): Promise<{
-  spreadsheetId: string;
-  header: string[];
-  rowsByPlayerId: Map<string, PlayerSheetRow>;
-}> {
-  const spreadsheetId = getSpreadsheetIdForModel("Player");
-  const rawRows = await optimizedSheetsClient.getValues(
-    spreadsheetId,
-    PLAYER_HEADER_RANGE,
-  );
-  const header = (rawRows[0] ?? []).map((cell) => String(cell ?? "").trim());
-  const idIndex = header.indexOf("id");
-  if (idIndex < 0) {
-    throw new Error(
-      "[player-bios:backfill-nhl-ids] Player sheet is missing the id column.",
-    );
-  }
-
-  const rowsByPlayerId = new Map<string, PlayerSheetRow>();
-  for (let index = 1; index < rawRows.length; index++) {
-    const values = rawRows[index] ?? [];
-    const playerId = toTrimmedString(values[idIndex]);
-    if (!playerId) continue;
-    rowsByPlayerId.set(playerId, {
-      rowNumber: index + 1,
-      values: [...values],
-    });
-  }
-
-  return {
-    spreadsheetId,
-    header,
-    rowsByPlayerId,
-  };
-}
-
-async function ensurePlayerHeaderColumn(
-  spreadsheetId: string,
-  header: string[],
-  apply: boolean,
-): Promise<{
-  header: string[];
-  headerColumnAdded: boolean;
-}> {
-  if (header.includes(NHL_API_ID_COLUMN)) {
-    return {
-      header,
-      headerColumnAdded: false,
-    };
-  }
-
-  if (!apply) {
-    return {
-      header: [...header, NHL_API_ID_COLUMN],
-      headerColumnAdded: false,
-    };
-  }
-
-  const nextHeader = [...header, NHL_API_ID_COLUMN];
-  const range = `${PLAYER_SHEET_NAME}!A1:${columnToLetter(nextHeader.length)}1`;
-  await optimizedSheetsClient.updateValues(spreadsheetId, range, [nextHeader]);
-  return {
-    header: nextHeader,
-    headerColumnAdded: true,
-  };
 }
 
 export function parseNhlPlayerIdBackfillOptions(
@@ -752,12 +671,11 @@ export async function runNhlPlayerIdBackfill(
   const { startSeason, endSeason } = resolveSeasonRange(options);
   log(
     options,
-    `Loading Player sheet and fetching historical NHL player directory for ${startSeason} through ${endSeason}.`,
+    `Loading Player table and fetching historical NHL player directory for ${startSeason} through ${endSeason}.`,
   );
 
-  const [playerRows, playerSheet, payload] = await Promise.all([
-    fastSheetsReader.fetchModel<DatabaseRecord>("Player"),
-    loadPlayerSheetRows(),
+  const [playerRows, payload] = await Promise.all([
+    dataStore.fetchModel<DatabaseRecord>("Player"),
     fetchExternalDirectory(startSeason, endSeason, options),
   ]);
   const players = playerRows as unknown as Player[];
@@ -775,14 +693,14 @@ export async function runNhlPlayerIdBackfill(
     playersByNhlApiId.set(nhlApiId, existing);
   }
 
-  let duplicateSheetNhlApiIds = 0;
+  let duplicateStoredNhlApiIds = 0;
   for (const [nhlApiId, groupedPlayers] of playersByNhlApiId.entries()) {
     if (groupedPlayers.length <= 1) continue;
-    duplicateSheetNhlApiIds += 1;
+    duplicateStoredNhlApiIds += 1;
     flags.push({
-      kind: "duplicate-sheet-nhl-api-id",
+      kind: "duplicate-stored-nhl-api-id",
       nhlApiId,
-      details: `Multiple Player sheet rows already use nhlApiId=${nhlApiId}.`,
+      details: `Multiple Player table rows already use nhlApiId=${nhlApiId}.`,
     });
   }
 
@@ -800,7 +718,7 @@ export async function runNhlPlayerIdBackfill(
         fullName: external.fullName,
         teamAbbrs: external.teamAbbrs,
         nhlApiId: external.nhlApiId,
-        details: `Multiple Player sheet rows already map to NHL API id ${external.nhlApiId}.`,
+        details: `Multiple Player table rows already map to NHL API id ${external.nhlApiId}.`,
       });
       continue;
     }
@@ -815,9 +733,10 @@ export async function runNhlPlayerIdBackfill(
       continue;
     }
 
-    const directCandidates = getPlayersForExternal(playersByName, external).filter(
-      (player) => isEligibleForExternalId(player, external.nhlApiId),
-    );
+    const directCandidates = getPlayersForExternal(
+      playersByName,
+      external,
+    ).filter((player) => isEligibleForExternalId(player, external.nhlApiId));
     const fallbackCandidates = directCandidates.length
       ? directCandidates
       : findFallbackPlayers(external, players).filter((player) =>
@@ -832,7 +751,7 @@ export async function runNhlPlayerIdBackfill(
         fullName: external.fullName,
         teamAbbrs: external.teamAbbrs,
         nhlApiId: external.nhlApiId,
-        details: `No Player sheet row matched NHL directory player ${external.fullName}.`,
+        details: `No Player table row matched NHL directory player ${external.fullName}.`,
       });
       continue;
     }
@@ -844,7 +763,7 @@ export async function runNhlPlayerIdBackfill(
         fullName: external.fullName,
         teamAbbrs: external.teamAbbrs,
         nhlApiId: external.nhlApiId,
-        details: `Multiple Player sheet rows plausibly matched NHL directory player ${external.fullName}.`,
+        details: `Multiple Player table rows plausibly matched NHL directory player ${external.fullName}.`,
       });
       continue;
     }
@@ -858,7 +777,7 @@ export async function runNhlPlayerIdBackfill(
         fullName: external.fullName,
         teamAbbrs: external.teamAbbrs,
         nhlApiId: external.nhlApiId,
-        details: `Player sheet row ${playerId} would map to more than one NHL directory player in this pass.`,
+        details: `Player table row ${playerId} would map to more than one NHL directory player in this pass.`,
       });
       continue;
     }
@@ -867,33 +786,13 @@ export async function runNhlPlayerIdBackfill(
     matches.push({ player, external });
   }
 
-  const { header, headerColumnAdded } = await ensurePlayerHeaderColumn(
-    playerSheet.spreadsheetId,
-    playerSheet.header,
-    options.apply,
-  );
-  const nhlApiIdIndex = header.indexOf(NHL_API_ID_COLUMN);
-  const updatedAtIndex = header.indexOf("updatedAt");
-
-  const updates = new Map<number, (string | number | boolean | null)[]>();
+  const updates: Array<{ id: string; data: DatabaseRecord }> = [];
   let updatedPlayers = 0;
   let unchangedPlayers = 0;
   let existingIdConflicts = 0;
 
   for (const match of matches) {
     const playerId = toTrimmedString(match.player.id);
-    const sheetRow = playerSheet.rowsByPlayerId.get(playerId);
-    if (!sheetRow) {
-      flags.push({
-        kind: "missing-player-sheet-row",
-        playerId,
-        fullName: match.external.fullName,
-        nhlApiId: match.external.nhlApiId,
-        details: `Matched Player id ${playerId} was not found in the raw Player sheet rows.`,
-      });
-      continue;
-    }
-
     const existingNhlApiId = toTrimmedString(match.player.nhlApiId);
     if (existingNhlApiId === match.external.nhlApiId) {
       unchangedPlayers += 1;
@@ -912,23 +811,19 @@ export async function runNhlPlayerIdBackfill(
       continue;
     }
 
-    const nextValues = header.map((_, index) => sheetRow.values[index] ?? "");
-    nextValues[nhlApiIdIndex] = match.external.nhlApiId;
-    if (updatedAtIndex >= 0) {
-      nextValues[updatedAtIndex] = new Date().toISOString();
-    }
-    updates.set(sheetRow.rowNumber - 1, nextValues);
+    updates.push({
+      id: playerId,
+      data: {
+        nhlApiId: match.external.nhlApiId,
+        updatedAt: new Date().toISOString(),
+      },
+    });
     updatedPlayers += 1;
   }
 
-  if (options.apply && updates.size > 0) {
-    log(options, `Writing ${updates.size} Player sheet update(s).`);
-    await optimizedSheetsClient.updateRowsByIds(
-      playerSheet.spreadsheetId,
-      PLAYER_SHEET_NAME,
-      updates,
-    );
-    fastSheetsReader.clearCache("Player");
+  if (options.apply && updates.length > 0) {
+    log(options, `Writing ${updates.length} Player table update(s).`);
+    await dataStore.updateRowsById("Player", updates);
   }
 
   return {
@@ -938,7 +833,7 @@ export async function runNhlPlayerIdBackfill(
     seasonCount: payload.seasonCount,
     currentRosterTeamCount: payload.currentRosterTeamCount,
     statRowsFetched: payload.statRowsFetched,
-    playerSheetRows: players.length,
+    playerRows: players.length,
     apiPlayersFetched: externalPlayers.length,
     matchedPlayers: matches.length,
     updatedPlayers,
@@ -946,8 +841,8 @@ export async function runNhlPlayerIdBackfill(
     existingIdConflicts,
     unmatchedApiPlayers,
     ambiguousApiPlayers,
-    duplicateSheetNhlApiIds,
-    headerColumnAdded,
+    duplicateStoredNhlApiIds,
+
     flags,
   };
 }

@@ -1,9 +1,9 @@
-import type { DatabaseRecord } from "@gshl-lib/sheets/config/config";
+import type { DatabaseRecord } from "@gshl-lib/data/records";
 import {
   getDefaultRatingOutputField,
-  normalizeRankingEngineSheetName,
-  type RankingEngineSheetName,
-} from "@gshl-lib/ranking/apps-script-engine";
+  normalizeRankingEngineModelName,
+  type RankingEngineModelName,
+} from "@gshl-lib/ranking/ranking-engine";
 
 export type PrimitiveCellValue = string | number | boolean | null;
 
@@ -23,24 +23,15 @@ export type PlayerRatingSelectionOptions = {
   weekNums?: string[];
 };
 
-type SheetsConfigShape = {
-  SHEETS: Record<string, string>;
-  COLUMNS: Record<string, readonly string[]>;
-};
-
 export type LoadedPlayerRatingRow = {
-  rowNumber: number;
-  sheetValues: PrimitiveCellValue[];
   record: DatabaseRecord;
 };
 
 export type PreparedPlayerRatingModel = {
   modelName: SupportedPlayerRatingModelName;
-  spreadsheetId: string;
-  sheetName: string;
+  dataModelName: string;
   outputField: string;
-  rankingSheetName: RankingEngineSheetName;
-  headers: string[];
+  rankingModelName: RankingEngineModelName;
   rows: LoadedPlayerRatingRow[];
   targetRows: LoadedPlayerRatingRow[];
 };
@@ -144,10 +135,7 @@ export function toBoolean(value: unknown, fallback: boolean): boolean {
 function getNpmConfigEnvKey(flagName: string): string | null {
   const normalized = toTrimmedString(flagName);
   if (!normalized.startsWith("--")) return null;
-  const configName = normalized
-    .slice(2)
-    .replace(/-/g, "_")
-    .trim();
+  const configName = normalized.slice(2).replace(/-/g, "_").trim();
   return configName ? `npm_config_${configName}` : null;
 }
 
@@ -215,53 +203,6 @@ export function parseSupportedPlayerRatingModels(
   return Array.from(new Set(resolved));
 }
 
-function padRow(
-  values: PrimitiveCellValue[],
-  length: number,
-): PrimitiveCellValue[] {
-  const next = values.slice(0, length);
-  while (next.length < length) {
-    next.push("");
-  }
-  return next;
-}
-
-function resolveConfiguredSheetName(
-  config: SheetsConfigShape,
-  modelName: SupportedPlayerRatingModelName,
-): string {
-  return config.SHEETS[modelName] ?? modelName;
-}
-
-function getSheetCandidates(
-  config: SheetsConfigShape,
-  modelName: SupportedPlayerRatingModelName,
-): string[] {
-  return [resolveConfiguredSheetName(config, modelName)];
-}
-
-function resolveOutputField(
-  headers: readonly string[],
-  preferredOutputField: string,
-): string {
-  if (headers.includes(preferredOutputField)) {
-    return preferredOutputField;
-  }
-
-  const candidates =
-    preferredOutputField === "seasonRating"
-      ? ["seasonRating", "seasonrating", "season_rating"]
-      : ["Rating", "rating"];
-
-  const resolved = candidates.find((candidate) => headers.includes(candidate));
-  if (!resolved) {
-    throw new Error(
-      `[player-rating] Could not find output column ${preferredOutputField} in sheet headers.`,
-    );
-  }
-  return resolved;
-}
-
 function matchesSeasonTypeFilter(
   record: DatabaseRecord,
   seasonType: string,
@@ -316,10 +257,8 @@ async function buildWeekIdAllowList(
     return null;
   }
 
-  const { fastSheetsReader } = await import(
-    "@gshl-lib/sheets/reader/fast-reader"
-  );
-  const weeks = await fastSheetsReader.fetchModel<DatabaseRecord>("Week");
+  const dataStore = await import("@gshl-lib/data/convex-store");
+  const weeks = await dataStore.fetchModel<DatabaseRecord>("Week");
   const allowList = new Set<string>();
   for (const week of weeks) {
     if (toTrimmedString(week.seasonId) !== options.seasonId) continue;
@@ -333,129 +272,23 @@ async function buildWeekIdAllowList(
   return allowList.size > 0 ? allowList : null;
 }
 
-async function resolveSpreadsheetId(
-  modelName: SupportedPlayerRatingModelName,
-  seasonId: string,
-): Promise<string> {
-  const configModule = await import("@gshl-lib/sheets/config/config");
-  return configModule.getWriteSpreadsheetIdForModel(modelName, { seasonId });
-}
-
-export function isSkippableMissingSheetError(
-  error: unknown,
-  modelName: SupportedPlayerRatingModelName,
-): boolean {
-  const message =
-    error instanceof Error ? error.message : toTrimmedString(error);
-  if (!message) return false;
-
-  if (
-    modelName === "PlayerDayStatLine" &&
-    /Missing PlayerDay workbook id|PlayerDay workbook lookup requires a valid seasonId/i.test(
-      message,
-    )
-  ) {
-    return true;
-  }
-
-  return /Unable to parse range|Requested entity was not found/i.test(message);
-}
-
-async function loadWritableRows(
-  spreadsheetId: string,
-  sheetNameCandidates: string[],
-  modelName: SupportedPlayerRatingModelName,
-): Promise<{
-  sheetName: string;
-  headers: string[];
-  rows: LoadedPlayerRatingRow[];
-}> {
-  const [clientModule, configModule] = await Promise.all([
-    import("@gshl-lib/sheets/client/optimized-client"),
-    import("@gshl-lib/sheets/config/config"),
-  ]);
-
-  const columns = configModule.SHEETS_CONFIG.COLUMNS[modelName];
-  if (!columns) {
-    throw new Error(`[player-rating] No configured columns for ${modelName}.`);
-  }
-
-  let lastError: unknown = null;
-  for (const sheetName of sheetNameCandidates) {
-    try {
-      const rawRows = await clientModule.optimizedSheetsClient.getValues(
-        spreadsheetId,
-        `${sheetName}!A1:ZZ`,
-      );
-
-      const headers = (rawRows[0] ?? []).map((value) =>
-        String(value ?? "").trim(),
-      );
-      if (!headers.length) {
-        return { sheetName, headers: [], rows: [] };
-      }
-
-      const headerIndex = new Map<string, number>();
-      headers.forEach((header, index) => {
-        if (header) {
-          headerIndex.set(header, index);
-        }
-      });
-
-      const rows: LoadedPlayerRatingRow[] = [];
-      for (let index = 1; index < rawRows.length; index += 1) {
-        const values = rawRows[index] ?? [];
-        const paddedSheetValues = padRow(
-          values.map((value) => (value ?? "") as PrimitiveCellValue),
-          headers.length,
-        );
-        const alignedValues = columns.map((column) => {
-          const headerPosition = headerIndex.get(column);
-          return headerPosition === undefined
-            ? null
-            : (paddedSheetValues[headerPosition] ?? null);
-        });
-
-        const record = configModule.convertRowToModel<DatabaseRecord>(
-          alignedValues,
-          columns,
-        );
-
-        rows.push({
-          rowNumber: index + 1,
-          sheetValues: paddedSheetValues,
-          record,
-        });
-      }
-
-      return { sheetName, headers, rows };
-    } catch (error) {
-      lastError = error;
-    }
-  }
-
-  throw lastError instanceof Error
-    ? lastError
-    : new Error(`[player-rating] Could not load ${modelName} from Sheets.`);
-}
-
 export async function preparePlayerRatingModelRows(
   selection: PlayerRatingSelectionOptions,
   modelName: SupportedPlayerRatingModelName,
 ): Promise<PreparedPlayerRatingModel> {
-  const configModule = await import("@gshl-lib/sheets/config/config");
-  const spreadsheetId = await resolveSpreadsheetId(
-    modelName,
-    selection.seasonId,
-  );
-  const loaded = await loadWritableRows(
-    spreadsheetId,
-    getSheetCandidates(configModule.SHEETS_CONFIG, modelName),
-    modelName,
-  );
-  const rankingSheetName = normalizeRankingEngineSheetName(modelName);
-  const preferredOutputField = getDefaultRatingOutputField(rankingSheetName);
-  const outputField = resolveOutputField(loaded.headers, preferredOutputField);
+  const dataStore = await import("@gshl-lib/data/convex-store");
+  const records =
+    modelName === "PlayerDayStatLine"
+      ? await dataStore.fetchPlayerDaySeason<DatabaseRecord>(selection.seasonId)
+      : await dataStore.fetchAggregateRows<DatabaseRecord>(
+          modelName,
+          isCareerAggregateModel(modelName) || modelName === "PlayerNHLStatLine"
+            ? undefined
+            : selection.seasonId,
+        );
+  const loaded = { rows: records.map((record) => ({ record })) };
+  const rankingModelName = normalizeRankingEngineModelName(modelName);
+  const outputField = getDefaultRatingOutputField(rankingModelName);
   const weekIdAllowList = isWeekScopedModel(modelName)
     ? await buildWeekIdAllowList(selection)
     : null;
@@ -484,11 +317,9 @@ export async function preparePlayerRatingModelRows(
 
   return {
     modelName,
-    spreadsheetId,
-    sheetName: loaded.sheetName,
+    dataModelName: modelName,
     outputField,
-    rankingSheetName,
-    headers: loaded.headers,
+    rankingModelName,
     rows: loaded.rows,
     targetRows,
   };

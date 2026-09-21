@@ -12,12 +12,6 @@ export const env = createEnv({
     NODE_ENV: z
       .enum(["development", "test", "production"])
       .default("development"),
-    GSHL_DATA_BACKEND: z.enum(["sheets", "convex"]).default("convex"),
-    USE_GOOGLE_SHEETS: z.enum(["true", "false"]).default("true"),
-    GOOGLE_SERVICE_ACCOUNT_KEY_FILE: z.string().optional(),
-    GOOGLE_SERVICE_ACCOUNT_KEY: z.string().optional(),
-    GOOGLE_APPS_SCRIPT_ID: z.string().optional(),
-    GOOGLE_APPS_SCRIPT_ACCESS_TOKEN: z.string().optional(),
     CONVEX_URL: z.string().url().optional(),
     CONVEX_DEPLOYMENT: z.string().optional(),
     CONVEX_DEPLOY_KEY: z.string().optional(),
@@ -49,21 +43,12 @@ export const env = createEnv({
     // DATABASE_URL: process.env.DATABASE_URL,
     // DIRECT_URL: process.env.DIRECT_URL,
     NODE_ENV: process.env.NODE_ENV,
-    GSHL_DATA_BACKEND: process.env.GSHL_DATA_BACKEND ?? "convex",
-    USE_GOOGLE_SHEETS: process.env.USE_GOOGLE_SHEETS ?? "true",
-    GOOGLE_SERVICE_ACCOUNT_KEY_FILE:
-      process.env.GOOGLE_SERVICE_ACCOUNT_KEY_FILE,
-    GOOGLE_SERVICE_ACCOUNT_KEY: process.env.GOOGLE_SERVICE_ACCOUNT_KEY,
-    GOOGLE_APPS_SCRIPT_ID: process.env.GOOGLE_APPS_SCRIPT_ID,
-    GOOGLE_APPS_SCRIPT_ACCESS_TOKEN:
-      process.env.GOOGLE_APPS_SCRIPT_ACCESS_TOKEN,
     CONVEX_URL: process.env.CONVEX_URL,
     CONVEX_DEPLOYMENT: process.env.CONVEX_DEPLOYMENT,
     CONVEX_DEPLOY_KEY: process.env.CONVEX_DEPLOY_KEY,
     CONVEX_SERVER_SECRET: process.env.CONVEX_SERVER_SECRET,
     CONVEX_AUTH_PRIVATE_KEY: process.env.CONVEX_AUTH_PRIVATE_KEY,
-    CONVEX_AUTH_KEY_ID:
-      process.env.CONVEX_AUTH_KEY_ID ?? "gshl-convex-auth",
+    CONVEX_AUTH_KEY_ID: process.env.CONVEX_AUTH_KEY_ID ?? "gshl-convex-auth",
     CONVEX_AUTH_ISSUER: process.env.CONVEX_AUTH_ISSUER,
     AUTH_SECRET: process.env.AUTH_SECRET,
     AUTH_GOOGLE_ID: process.env.AUTH_GOOGLE_ID,

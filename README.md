@@ -2,8 +2,7 @@
 
 GSHL is the web and operations platform for the Gem Stone Hockey League. It
 combines a public league site, authenticated owner and commissioner tools,
-Convex data, local hockey-data workflows, and a separate Google Apps Script
-runtime for active-season Sheets operations.
+Convex data, and local hockey-data workflows.
 
 ## Start
 
@@ -23,7 +22,6 @@ The repository itself is the command index:
 
 - root app and checks: `package.json`
 - operator commands and flags: [`scripts/README.md`](scripts/README.md)
-- Apps Script entry points and clasp: [`apps-script/README.md`](apps-script/README.md)
 - production/runtime setup: [docs/OPERATIONS.md](docs/OPERATIONS.md)
 - ranking and power behavior: [docs/RANKING.md](docs/RANKING.md)
 - agent working rules: [AGENTS.md](AGENTS.md)
@@ -41,17 +39,11 @@ Browser
 Operator machine
   -> scripts command
   -> pure domain reconciliation
-  -> Convex, Sheets, browser, or source integration
-
-Google Apps Script
-  -> trigger/global entry point
-  -> Yahoo ingest and aggregation
-  -> Google Sheets
+  -> Convex, browser, or source integration
 ```
 
-Convex is the live application database and API. Sheets adapters remain for
-compatibility, migration, and the Apps Script runtime; there is no active tRPC
-layer.
+Convex is the application database and API. Operator commands use Convex for
+league records and SQLite for completed-season archives.
 
 The [architecture checker](scripts/check-frontend-architecture.mjs) keeps route
 composition free of React state/lifecycle hooks, browser query and navigation
@@ -71,7 +63,6 @@ still require review.
 | `src/lib`        | Pure utilities, shared types, auth, cache, and compatibility adapters |
 | `convex`         | Schema, browser APIs, transactions, authorization, jobs, and crons    |
 | `scripts`        | Imports, repairs, reconciliation, rebuilds, parity, and archives      |
-| `apps-script`    | Active-season Sheets runtime                                          |
 
 The primary data contract is `convex/schema.ts`. Browser access normally enters
 through `convex/frontend.ts`; atomic workflows such as draft, UFA, and weekly
@@ -79,6 +70,14 @@ editions live in focused Convex modules. The official league rules are
 `src/content/rulebook.ts` and render at `/rulebook`.
 
 ## Development expectations
+
+Production builds run cached runtime-source lint before compilation, keeping
+typed ESLint and Next's TypeScript checker out of memory at the same time. Both
+use `tsconfig.build.json` for app and backend types; test files are covered by the
+broader repository lint/check scripts and root TypeScript config. The build
+profiler uses the same pipeline, with elapsed times printed for each stage.
+Build stages get a 3 GiB Node heap allowance to give typed validation room beyond
+the smaller automatic heap limits on low-memory hosts.
 
 Read [AGENTS.md](AGENTS.md) before changing the repository. In particular:
 

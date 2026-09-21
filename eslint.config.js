@@ -13,7 +13,6 @@ export default tseslint.config(
     ignores: [
       ".next/**",
       "node_modules/**",
-      "apps-script/**",
       "scripts/**",
       "tools/**",
       "next-env.d.ts",

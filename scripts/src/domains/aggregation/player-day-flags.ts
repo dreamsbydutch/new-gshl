@@ -1,4 +1,4 @@
-import type { DatabaseRecord } from "@gshl-lib/sheets/config/config";
+import type { DatabaseRecord } from "@gshl-lib/data/records";
 import { normalizeDateOnlyValue } from "@gshl-lib/utils/core/date";
 
 type PlayerDayDerivedRecord = DatabaseRecord & {
@@ -25,7 +25,11 @@ function toUpperToken(value: unknown): string {
   return toTrimmedString(value).toUpperCase();
 }
 
-function buildPresenceKey(playerId: string, teamId: string, date: string): string {
+function buildPresenceKey(
+  playerId: string,
+  teamId: string,
+  date: string,
+): string {
   return `${playerId}|${teamId}|${date}`;
 }
 

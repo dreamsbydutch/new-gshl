@@ -1,7 +1,7 @@
 # GSHL agent guide
 
 GSHL is a Next.js application backed by Convex, with a separate TypeScript
-operator package and a Google Apps Script runtime. Preserve user changes and
+operator package. Preserve user changes and
 keep work inside the existing architecture unless the user approves a redesign.
 
 ## Find the source of truth
@@ -9,7 +9,6 @@ keep work inside the existing architecture unless the user approves a redesign.
 ```text
 Browser: src/app -> components -> feature hooks -> main hooks -> Convex
 Operator: scripts/src/commands -> domains -> integrations
-Sheets: apps-script entry point -> features -> Core -> Google Sheets
 ```
 
 - `convex/schema.ts` defines stored data. Convex `_id` is canonical;
@@ -19,7 +18,6 @@ Sheets: apps-script entry point -> features -> Core -> Google Sheets
 - `src/lib/types` is type-only. Deterministic logic belongs in
   `src/lib/utils`; code imported by Convex must be runtime-pure.
 - `scripts/README.md` owns operator command flags and examples.
-- `apps-script/README.md` owns the Apps Script entry points and clasp commands.
 - `src/content/rulebook.ts` is the official league rulebook.
 
 Search from an active entry point before adding a file or trusting a similarly
@@ -50,8 +48,8 @@ the command reference; do not reproduce them in documentation.
 Generated and synchronized files:
 
 - Regenerate `convex/_generated/` with `npx convex codegen`; never edit it.
-- Edit ranking/power sources in `scripts/src/runtime/apps-script/`, then run
-  `npm run ranking-engine:sync`. Matching `apps-script/` files are output.
+- Ranking, power, and lineup sources live in `scripts/src/runtime/`. Run
+  `npm run ranking-engine:check` after changing their contracts.
 - Let npm update lockfiles when a manifest changes.
 
 ## Work safely
@@ -65,11 +63,11 @@ credentials, cookies, tokens, service-account material, and environment values
 out of artifacts.
 
 A code-edit request authorizes code edits, not remote writes. Convex deployment,
-clasp push, production data changes, trigger/property changes, and GitHub/Vercel
+production data changes, and GitHub/Vercel
 publication require the corresponding user intent. Use the relevant skill for
-operator, Apps Script, ranking, or preview-PR work.
+operator, ranking, or preview-PR work.
 
-Never run `convex:migrate`, table clearing, archive source deletion, destructive
+Never run table clearing, archive source deletion, destructive
 replacement, or conflict replacement without explicit authorization, the exact
 target, and a verified independent backup. Local `.local-data/` and OneDrive
 sync are not backups by themselves.
@@ -93,8 +91,7 @@ exactly what ran, what did not run, and pre-existing failures.
 
 - `gshl-data-operations`: operator scripts, data repair/import, archives, and
   any production-backed data command.
-- `gshl-apps-script`: Apps Script code, triggers, properties, logs, and clasp.
-- `gshl-ranking`: rating/power algorithms, synchronized runtimes, and parity.
+- `gshl-ranking`: rating/power algorithms, local runtimes, and numerical fixtures.
 - `gshl-preview-pr`: explicitly requested preview branch, Vercel deployment,
   and pull-request publication.
 

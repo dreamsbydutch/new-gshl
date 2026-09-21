@@ -49,7 +49,6 @@ type UpsertOptions = {
   createdAtColumn?: string;
   idColumn?: string;
   generateId?: () => string;
-  spreadsheetId?: string;
   deleteMissing?: boolean | { filter?: Record<string, unknown> };
   diagnostics?: boolean | { maxSamples?: number; maxFieldsPerSample?: number };
 };
@@ -156,7 +155,7 @@ function getConvexUrl(): string {
   const url = convexUrl();
   if (!url) {
     throw new Error(
-      "GSHL_DATA_BACKEND=convex requires CONVEX_URL or NEXT_PUBLIC_CONVEX_URL to be set.",
+      "Convex requires CONVEX_URL or NEXT_PUBLIC_CONVEX_URL to be set.",
     );
   }
 

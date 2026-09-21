@@ -1,12 +1,3 @@
-import type { SHEETS_CONFIG } from "../sheets/config/config";
-
-export type SheetModelName = keyof typeof SHEETS_CONFIG.SHEETS;
-export type ModelName =
-  | SheetModelName
-  | "PlayerAward"
-  | "TeamAward"
-  | "PlayerNHLSalary";
-
 export const MODEL_TO_CONVEX_TABLE = {
   Season: "seasons",
   Conference: "conferences",
@@ -35,7 +26,9 @@ export const MODEL_TO_CONVEX_TABLE = {
   TeamDayStatLine: "teamDayStatLines",
   TeamWeekStatLine: "teamWeekStatLines",
   TeamSeasonStatLine: "teamSeasonStatLines",
-} as const satisfies Record<ModelName, string>;
+} as const;
+
+export type ModelName = keyof typeof MODEL_TO_CONVEX_TABLE;
 
 export const CONVEX_TABLE_TO_MODEL = Object.fromEntries(
   Object.entries(MODEL_TO_CONVEX_TABLE).map(([model, table]) => [table, model]),

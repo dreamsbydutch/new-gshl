@@ -1,3 +1,4 @@
+import * as dataStore from "@gshl-lib/data/convex-store";
 import { promisify } from "node:util";
 import { execFile as execFileCallback } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -14,10 +15,9 @@ import { PositionGroup, type RosterPosition } from "@gshl-lib/types/enums";
 import {
   serializeCsvMultiValue,
   type DatabaseRecord,
-} from "@gshl-lib/sheets/config/config";
-import { fastSheetsReader } from "@gshl-lib/sheets/reader/fast-reader";
+} from "@gshl-lib/data/records";
 import { fetchPlayerDayWeeks, updateById } from "@gshl-lib/data/convex-store";
-import { rankRowsWithAppsScriptEngine } from "@gshl-lib/ranking/apps-script-engine";
+import { rankRowsWithRankingEngine } from "@gshl-lib/ranking/ranking-engine";
 import { applyPlayerDayDerivedColumns } from "@gshl-lib/stats/player-day-flags";
 import { normalizeDateOnlyValue } from "@gshl-lib/utils/core/date";
 import {
@@ -1587,10 +1587,10 @@ export async function runDailyNhlPlayerStatSync(
   options: DailyNhlPlayerStatSyncOptions,
 ): Promise<DailyNhlPlayerStatSyncSummary> {
   const [seasonRows, weekRows, teamRows, playerRows] = (await Promise.all([
-    fastSheetsReader.fetchModel<DatabaseRecord>("Season"),
-    fastSheetsReader.fetchModel<DatabaseRecord>("Week"),
-    fastSheetsReader.fetchModel<DatabaseRecord>("Team"),
-    fastSheetsReader.fetchModel<DatabaseRecord>("Player"),
+    dataStore.fetchModel<DatabaseRecord>("Season"),
+    dataStore.fetchModel<DatabaseRecord>("Week"),
+    dataStore.fetchModel<DatabaseRecord>("Team"),
+    dataStore.fetchModel<DatabaseRecord>("Player"),
   ])) as unknown as [Season[], Week[], Team[], Player[]];
 
   const targetDateHint =
@@ -1725,7 +1725,7 @@ export async function runDailyNhlPlayerStatSync(
         {
           kind: "missing-player-day-row",
           date: skippedDates[0] ?? "",
-          details: `No PlayerDayStatLine rows exist for the requested date window in season ${resolvedSeasonId}. Available dates in this workbook run from ${Array.from(availableDateSet).sort()[0] ?? "n/a"} to ${Array.from(availableDateSet).sort().at(-1) ?? "n/a"}.`,
+          details: `No PlayerDayStatLine rows exist for the requested date window in season ${resolvedSeasonId}. Available dates in this season run from ${Array.from(availableDateSet).sort()[0] ?? "n/a"} to ${Array.from(availableDateSet).sort().at(-1) ?? "n/a"}.`,
         },
       ],
     };
@@ -1818,7 +1818,7 @@ export async function runDailyNhlPlayerStatSync(
         fullName: externalRow.fullName,
         nhlTeam: externalRow.nhlTeam,
         nhlPlayerId: externalRow.nhlPlayerId,
-        details: `No Player sheet row matched NHL API player ${externalRow.fullName} (${externalRow.nhlTeam}).`,
+        details: `No Player table row matched NHL API player ${externalRow.fullName} (${externalRow.nhlTeam}).`,
       });
       continue;
     }
@@ -1903,10 +1903,10 @@ export async function runDailyNhlPlayerStatSync(
       "Preserving existing Rating values for scoped week/team sync; global rating rebuild was not requested.",
     );
   } else {
-    await rankRowsWithAppsScriptEngine(
+    await rankRowsWithRankingEngine(
       preparedRows as unknown as DatabaseRecord[],
       {
-        sheetName: PLAYER_DAY_MODEL,
+        dataModelName: PLAYER_DAY_MODEL,
         outputField: "Rating",
         mutate: true,
       },
@@ -1951,7 +1951,6 @@ export async function runDailyNhlPlayerStatSync(
         );
       }
     }
-    fastSheetsReader.clearCache(PLAYER_DAY_MODEL);
   }
 
   let aggregateSummary: DailyNhlPlayerStatSyncSummary["aggregateSummary"];

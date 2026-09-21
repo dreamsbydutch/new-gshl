@@ -1282,9 +1282,6 @@ export async function refreshPlayerNhlSeason(
 }
 
 export async function runHockeyReferenceBackfillCli(): Promise<void> {
-  process.env.USE_GOOGLE_SHEETS ??= "true";
-  process.env.GOOGLE_SERVICE_ACCOUNT_KEY_FILE ??= "credentials.json";
-
   const options = await parseOptions(process.argv.slice(2));
   const seasons = (await fetchModel("Season")) as unknown as Season[];
   const players = (await fetchModel("Player")) as unknown as Player[];

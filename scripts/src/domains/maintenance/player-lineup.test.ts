@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { getAppsScriptLineupBuilder } from "../lineup/apps-script-lineup-builder";
+import { getLineupBuilder } from "../lineup/lineup-builder";
 import { reconcileRosterLineups } from "./player-lineup";
 
 test("optimizes each roster with seasonRating and clears unrostered positions", async () => {
-  const lineupBuilder = await getAppsScriptLineupBuilder();
+  const lineupBuilder = await getLineupBuilder();
   const slots = lineupBuilder.buildLineupStructureFromRosterSpots?.([
     "LW",
     "G",

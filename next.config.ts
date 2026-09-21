@@ -6,6 +6,9 @@ import "./src/env.js";
 import type { NextConfig } from "next";
 
 const config: NextConfig = {
+  // Production validates app/backend code; repository tests and tooling remain
+  // covered by the broader root tsconfig used by `npm run typecheck`.
+  typescript: { tsconfigPath: "tsconfig.build.json" },
   // Keep tracing and cache discovery inside this app. A lockfile in the parent
   // apps directory previously made Next treat that directory as the workspace.
   outputFileTracingRoot: process.cwd(),

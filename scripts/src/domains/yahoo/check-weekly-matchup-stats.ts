@@ -1,3 +1,4 @@
+import * as dataStore from "@gshl-lib/data/convex-store";
 /**
  * Usage:
  *   npm run yahoo:check-weekly-matchups
@@ -27,7 +28,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { config as loadEnv } from "dotenv";
 import { load as loadHtml } from "cheerio";
-import { fastSheetsReader } from "@gshl-lib/sheets/reader/fast-reader";
 import {
   getArgValue,
   hasFlag,
@@ -88,7 +88,7 @@ type DiscrepancyRecord = {
   side?: "home" | "away";
   field?: string;
   yahooHeader?: string;
-  sheetValue?: string;
+  modelValue?: string;
   yahooValue?: string;
   url?: string;
   details: string;
@@ -135,8 +135,8 @@ const YAHOO_HEADER_TO_TEAM_WEEK_FIELD: Record<string, string> = {
   A: "A",
   P: "P",
   PPP: "PPP",
-  "PPG": "PPG",
-  "PPA": "PPA",
+  PPG: "PPG",
+  PPA: "PPA",
   SOG: "SOG",
   HIT: "HIT",
   BLK: "BLK",
@@ -149,7 +149,7 @@ const YAHOO_HEADER_TO_TEAM_WEEK_FIELD: Record<string, string> = {
   "SA*": "SA",
   SA: "SA",
   "SV%": "SVP",
-  "SVP": "SVP",
+  SVP: "SVP",
   SHO: "SO",
   SO: "SO",
   "+/-": "PM",
@@ -223,7 +223,8 @@ function resolveActiveSeasonId(seasons: Season[]): string {
     .slice()
     .sort(
       (left, right) =>
-        Number(toTrimmedString(right.year)) - Number(toTrimmedString(left.year)),
+        Number(toTrimmedString(right.year)) -
+        Number(toTrimmedString(left.year)),
     );
   return toTrimmedString(sorted[0]?.id);
 }
@@ -551,20 +552,20 @@ function formatNumberForDisplay(value: number, decimals: number): string {
 
 function compareStatValues(
   fieldName: string,
-  sheetValue: unknown,
+  modelValue: unknown,
   yahooValue: string,
 ): {
   matches: boolean;
-  sheetDisplay: string;
+  modelDisplay: string;
   yahooDisplay: string;
 } {
   const yahooDisplay = yahooValue.trim();
   const yahooNumeric = parseYahooNumeric(yahooDisplay);
-  const sheetNumeric = Number(sheetValue);
+  const modelNumeric = Number(modelValue);
 
-  if (yahooNumeric !== null && Number.isFinite(sheetNumeric)) {
+  if (yahooNumeric !== null && Number.isFinite(modelNumeric)) {
     const decimals = getDecimalPlaces(yahooDisplay);
-    const roundedSheet = Number(sheetNumeric.toFixed(decimals));
+    const roundedModel = Number(modelNumeric.toFixed(decimals));
     const epsilon =
       fieldName === "GAA"
         ? 0.01
@@ -572,15 +573,15 @@ function compareStatValues(
           ? 0.001
           : 1 / 10 ** Math.max(decimals + 2, 6);
     return {
-      matches: Math.abs(roundedSheet - yahooNumeric) <= epsilon,
-      sheetDisplay: formatNumberForDisplay(roundedSheet, decimals),
+      matches: Math.abs(roundedModel - yahooNumeric) <= epsilon,
+      modelDisplay: formatNumberForDisplay(roundedModel, decimals),
       yahooDisplay,
     };
   }
 
   return {
-    matches: toTrimmedString(sheetValue) === yahooDisplay,
-    sheetDisplay: toTrimmedString(sheetValue),
+    matches: toTrimmedString(modelValue) === yahooDisplay,
+    modelDisplay: toTrimmedString(modelValue),
     yahooDisplay,
   };
 }
@@ -611,24 +612,15 @@ function resolveTargetWeeks(
 }
 
 async function main(): Promise<void> {
-  process.env.USE_GOOGLE_SHEETS ??= "true";
-  process.env.GOOGLE_SERVICE_ACCOUNT_KEY_FILE ??= "credentials.json";
-
   const optionsInput = parseOptions(process.argv.slice(2));
 
   const [seasons, weeks, teams, matchups, teamWeekRows] = (await Promise.all([
-    fastSheetsReader.fetchModel("Season"),
-    fastSheetsReader.fetchModel("Week"),
-    fastSheetsReader.fetchModel("Team"),
-    fastSheetsReader.fetchModel("Matchup"),
-    fastSheetsReader.fetchModel("TeamWeekStatLine"),
-  ])) as unknown as [
-    Season[],
-    Week[],
-    Team[],
-    Matchup[],
-    TeamWeekStatLine[],
-  ];
+    dataStore.fetchModel("Season"),
+    dataStore.fetchModel("Week"),
+    dataStore.fetchModel("Team"),
+    dataStore.fetchModel("Matchup"),
+    dataStore.fetchModel("TeamWeekStatLine"),
+  ])) as unknown as [Season[], Week[], Team[], Matchup[], TeamWeekStatLine[]];
 
   const seasonId = optionsInput.seasonId || resolveActiveSeasonId(seasons);
   const options: YahooWeeklyMatchupCheckOptions = {
@@ -651,7 +643,9 @@ async function main(): Promise<void> {
     );
   }
 
-  const targetWeekIds = new Set(targetWeeks.map((week) => toTrimmedString(week.id)));
+  const targetWeekIds = new Set(
+    targetWeeks.map((week) => toTrimmedString(week.id)),
+  );
   const requestedTeamIds = new Set(options.teamIds);
   const requestedMatchupIds = new Set(options.matchupIds);
 
@@ -783,9 +777,9 @@ async function main(): Promise<void> {
       const html = await fetchYahooMatchupPage(url, options.requestDelayMs);
       parsed = parseYahooMatchupTotals(html);
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : String(error);
-      const isParseFailure = message.includes("totals table shape") ||
+      const message = error instanceof Error ? error.message : String(error);
+      const isParseFailure =
+        message.includes("totals table shape") ||
         message.includes("totals table");
       if (isParseFailure) {
         parseFailures += 1;
@@ -836,9 +830,11 @@ async function main(): Promise<void> {
 
       teamRowsChecked += 1;
 
-      for (const [yahooHeader, yahooValue] of Object.entries(yahooStats.stats)) {
-        const sheetField = YAHOO_HEADER_TO_TEAM_WEEK_FIELD[yahooHeader];
-        if (!sheetField) {
+      for (const [yahooHeader, yahooValue] of Object.entries(
+        yahooStats.stats,
+      )) {
+        const modelField = YAHOO_HEADER_TO_TEAM_WEEK_FIELD[yahooHeader];
+        if (!modelField) {
           if (!unsupportedHeaders.has(yahooHeader)) {
             unsupportedHeaders.add(yahooHeader);
             recordDiscrepancy({
@@ -858,7 +854,7 @@ async function main(): Promise<void> {
           continue;
         }
 
-        if (!(sheetField in teamWeek)) {
+        if (!(modelField in teamWeek)) {
           if (!unsupportedHeaders.has(yahooHeader)) {
             unsupportedHeaders.add(yahooHeader);
             recordDiscrepancy({
@@ -871,9 +867,9 @@ async function main(): Promise<void> {
               yahooTeamId,
               side,
               yahooHeader,
-              field: sheetField,
+              field: modelField,
               url,
-              details: `Mapped field ${sheetField} does not exist on TeamWeekStatLine and was skipped.`,
+              details: `Mapped field ${modelField} does not exist on TeamWeekStatLine and was skipped.`,
             });
           }
           continue;
@@ -881,8 +877,8 @@ async function main(): Promise<void> {
 
         statComparisons += 1;
         const comparison = compareStatValues(
-          sheetField,
-          teamWeek[sheetField as keyof TeamWeekStatLine],
+          modelField,
+          teamWeek[modelField as keyof TeamWeekStatLine],
           yahooValue,
         );
         if (!comparison.matches) {
@@ -895,12 +891,12 @@ async function main(): Promise<void> {
             gshlTeamId: teamId,
             yahooTeamId,
             side,
-            field: sheetField,
+            field: modelField,
             yahooHeader,
-            sheetValue: comparison.sheetDisplay,
+            modelValue: comparison.modelDisplay,
             yahooValue: comparison.yahooDisplay,
             url,
-            details: `${side} team ${teamId} field ${sheetField} differs. TeamWeekStatLine=${comparison.sheetDisplay} Yahoo=${comparison.yahooDisplay}`,
+            details: `${side} team ${teamId} field ${modelField} differs. TeamWeekStatLine=${comparison.modelDisplay} Yahoo=${comparison.yahooDisplay}`,
           });
         }
       }
@@ -927,7 +923,8 @@ async function main(): Promise<void> {
 }
 
 void main().catch((error: unknown) => {
-  const message = error instanceof Error ? error.stack ?? error.message : String(error);
+  const message =
+    error instanceof Error ? (error.stack ?? error.message) : String(error);
   console.error(message);
   process.exitCode = 1;
 });

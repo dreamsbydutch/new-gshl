@@ -327,22 +327,22 @@ export function showDate(date: Date | string | null): string {
 }
 
 /**
- * Parses sheet date.
+ * Parses record date.
  *
  * @param dateStr - The date str to use.
- * @returns The parsed sheet date.
+ * @returns The parsed record date.
  */
-export function parseSheetDate(dateStr: string | null): Date | null {
-  return safeParseSheetDate(dateStr);
+export function parseStoredDate(dateStr: string | null): Date | null {
+  return safeParseDate(dateStr);
 }
 
 /**
- * Formats sheet date for display.
+ * Formats record date for display.
  *
  * @param date - The date value to process.
- * @returns The formatted sheet date.
+ * @returns The formatted record date.
  */
-export function formatSheetDate(date: Date | null): string {
+export function formatStoredDate(date: Date | null): string {
   return date ? toIsoDateOnly(date) : "";
 }
 
@@ -409,7 +409,7 @@ export function formatTimestamp(date: Date | string | null): string {
  * @returns The resulting convert input date.
  */
 export function convertInputDate(excelSerialDate: number): Date {
-  // Google Sheets and Excel serial dates are day counts relative to 1899-12-30.
+  // Legacy serial dates are day counts relative to 1899-12-30.
   // Using the standard 25569 offset preserves the expected date-only value.
   const millisecondsPerDay = 24 * 60 * 60 * 1000;
   const excelEpochToJSEpochOffsetMs = 25569 * millisecondsPerDay;
@@ -422,11 +422,11 @@ export function convertInputDate(excelSerialDate: number): Date {
 }
 
 /**
- * Safe parse sheet date.
+ * Safe parse record date.
  *
  * @param input - The input value to process.
- * @returns The resulting safe parse sheet date.
+ * @returns The resulting safe parse record date.
  */
-export function safeParseSheetDate(input: DateInput): Date | null {
+export function safeParseDate(input: DateInput): Date | null {
   return coerceDate({ value: input, mode: "date-only" });
 }

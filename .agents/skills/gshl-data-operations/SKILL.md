@@ -30,16 +30,12 @@ For a write-capable command:
 5. Repeat the dry run or parity check until the result proves idempotency or the
    intended remaining delta.
 
-Keep parsing and reconciliation pure; keep Convex, Sheets, browser, filesystem,
+Keep parsing and reconciliation pure; keep Convex, browser, filesystem,
 and network access at integration boundaries. Preserve throttling, retries,
 allowlists, dry-run defaults, and secret redaction.
 
 ## Hard stops
 
-- `convex:migrate` ignores normal target selection, uses
-  `NEXT_PUBLIC_CONVEX_URL`, clears mapped tables before its first Sheets read,
-  and has no dry run. Require explicit target confirmation and an independent
-  backup.
 - Archive source deletion, `--replace-existing-archive`, and
   `--replace-conflicts` require explicit authorization and a verified backup.
 - `stats:aggregate-season --apply` can delete stale derived rows unless

@@ -5,8 +5,8 @@ details that can be discovered directly from code are intentionally omitted.
 
 ## Source and runtime
 
-The authoritative Apps-Script-compatible files live under
-`scripts/src/runtime/apps-script/features/`:
+The local calculation files live under
+`scripts/src/runtime/`:
 
 - `RankingEngine/config.js`
 - `RankingEngine/player-pure.js`
@@ -14,20 +14,13 @@ The authoritative Apps-Script-compatible files live under
 - `RankingEngine/index.js`
 - `PowerRankingsAlgo.js`
 
-Matching files under `apps-script/features/` are synchronized deployment
-copies. Local TypeScript commands load the ranking runtime into a Node `vm`;
-there is no second TypeScript implementation.
+Local TypeScript commands load these runtimes into a Node `vm` with supplied
+record data. Calculations do not perform storage writes. Convex persistence
+belongs to the calling operator workflow.
 
-After editing an authoritative file:
-
-```powershell
-npm run ranking-engine:sync
-npm run ranking-engine:check
-```
-
-Inspect every destination diff. Add focused representative tests; use numerical
-parity commands when scoring changes. A production rebuild is a separate data
-operation.
+Run `npm run ranking-engine:check` after runtime changes, and add representative
+numerical fixtures when scoring changes. A production rebuild is a separate
+authorized data operation.
 
 ## Ranking behavior
 

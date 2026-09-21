@@ -1,21 +1,19 @@
-import path from "node:path";
-import type { DatabaseRecord } from "@gshl-lib/sheets/config/config";
+import * as dataStore from "@gshl-lib/data/convex-store";
+import type { DatabaseRecord } from "@gshl-lib/data/records";
 import {
   getCompositeKeyColumnsForModel,
   type CompositeKeyModelName,
-} from "@gshl-lib/sheets/config/config";
-import { minimalSheetsWriter } from "@gshl-lib/sheets/writer/minimal-writer";
+} from "@gshl-lib/data/records";
 import {
   fetchModel,
   fetchWeekScopedModel,
   updateById,
 } from "@gshl-lib/data/convex-store";
-import { rankRowsWithAppsScriptEngine } from "@gshl-lib/ranking/apps-script-engine";
+import { rankRowsWithRankingEngine } from "@gshl-lib/ranking/ranking-engine";
 import { applyPlayerDayDerivedColumns } from "@gshl-lib/stats/player-day-flags";
 import {
   getArgValue,
   hasFlag,
-  isSkippableMissingSheetError,
   parseSupportedPlayerRatingModels,
   preparePlayerRatingModelRows,
   toBoolean,
@@ -38,8 +36,8 @@ export type PlayerRatingBackfillOptions = {
 
 export type PlayerRatingModelExecutionSummary = {
   modelName: SupportedPlayerRatingModelName;
-  spreadsheetId: string;
-  sheetName: string;
+
+  dataModelName: string;
   outputField: string;
   matchedRows: number;
   updatedRows: number;
@@ -63,25 +61,6 @@ Options:
   --log <true|false>      Enable or disable console logging. Default: true.
   --help                  Show this message and exit.
 `.trim();
-
-function formatUnknownMessage(value: unknown): string {
-  if (value == null) return "";
-  if (
-    typeof value === "string" ||
-    typeof value === "number" ||
-    typeof value === "boolean" ||
-    typeof value === "bigint" ||
-    typeof value === "symbol"
-  ) {
-    return String(value);
-  }
-
-  try {
-    return JSON.stringify(value);
-  } catch {
-    return Object.prototype.toString.call(value);
-  }
-}
 
 export function parsePlayerRatingBackfillOptions(
   args: string[],
@@ -633,14 +612,6 @@ function applyPlayerNhlDerivedFields(
 ): void {
   if (prepared.modelName !== "PlayerNHLStatLine") return;
 
-  const overallRatingColumnIndex = prepared.headers.indexOf("overallRating");
-  const salaryColumnIndex = prepared.headers.indexOf("salary");
-  if (overallRatingColumnIndex < 0 || salaryColumnIndex < 0) {
-    throw new Error(
-      "[ratings:backfill] Could not resolve PlayerNHLStatLine overallRating/salary columns.",
-    );
-  }
-
   const seasonRows = prepared.targetRows.map((entry) => entry.record);
   const seasonLeagueAnchors = buildSeasonLeagueAnchors(seasonRows);
   const seasonIndexMap = buildSeasonIndexMap(
@@ -714,8 +685,6 @@ function applyPlayerNhlDerivedFields(
       : "";
     entry.entry.record.overallRating = overallValue;
     entry.entry.record.salary = salaryValue;
-    entry.entry.sheetValues[overallRatingColumnIndex] = overallValue;
-    entry.entry.sheetValues[salaryColumnIndex] = salaryValue;
   }
 }
 
@@ -742,19 +711,11 @@ function wrapWritePermissionError(
   error: unknown,
   options: PlayerRatingBackfillOptions,
   modelName: SupportedPlayerRatingModelName,
-  prepared: Awaited<ReturnType<typeof preparePlayerRatingModelRows>>,
-  serviceAccountEmail?: string,
+  _prepared: unknown,
 ): Error {
-  const baseMessage =
-    error instanceof Error
-      ? error.message
-      : formatUnknownMessage(error) || "Unknown error";
-  const accountLabel = serviceAccountEmail
-    ? `Service account ${serviceAccountEmail}`
-    : "Configured Convex credentials";
-
   return new Error(
-    `[ratings:backfill] ${accountLabel} cannot update ${modelName} for season ${options.seasonId} in workbook ${prepared.spreadsheetId} sheet ${prepared.sheetName}. Convex returned: ${baseMessage}. Share that spreadsheet with Editor access for the service account or rerun with --models excluding ${modelName}.`,
+    `[ratings:backfill] Convex cannot update ${modelName} for season ${options.seasonId}: ${error instanceof Error ? error.message : String(error)}`,
+    { cause: error },
   );
 }
 
@@ -797,8 +758,8 @@ async function executeScopedPlayerRatingBackfill(
     ),
     fetchModel<DatabaseRecord>("Season"),
   ]);
-  await rankRowsWithAppsScriptEngine(rows, {
-    sheetName: modelName,
+  await rankRowsWithRankingEngine(rows, {
+    dataModelName: modelName,
     outputField: "Rating",
     mutate: true,
     dataContext: { seasonRows },
@@ -823,8 +784,8 @@ async function executeScopedPlayerRatingBackfill(
   }
   return {
     modelName,
-    spreadsheetId: "production-convex",
-    sheetName: modelName,
+
+    dataModelName: modelName,
     outputField: "Rating",
     matchedRows: targetRows.length,
     updatedRows,
@@ -847,45 +808,15 @@ export async function executePlayerRatingModelBackfill(
     }
     return executeScopedPlayerRatingBackfill(options, modelName);
   }
-  const clientModule = await import("@gshl-lib/sheets/client/optimized-client");
-  let prepared: Awaited<ReturnType<typeof preparePlayerRatingModelRows>>;
-  try {
-    prepared = await preparePlayerRatingModelRows(
-      {
-        seasonId: options.seasonId,
-        seasonType: options.seasonType,
-        weekIds: options.weekIds,
-        weekNums: options.weekNums,
-      },
-      modelName,
-    );
-  } catch (error) {
-    if (!isSkippableMissingSheetError(error, modelName)) {
-      throw error;
-    }
-
-    const configModule = await import("@gshl-lib/sheets/config/config");
-    const sheetName = configModule.SHEETS_CONFIG.SHEETS[modelName] ?? modelName;
-    const outputField =
-      modelName === "PlayerNHLStatLine" ? "seasonRating" : "Rating";
-    const reason =
-      error instanceof Error ? error.message : formatUnknownMessage(error);
-
-    logPlayerRatingBackfill(
-      options,
-      `${modelName}: skipped for season ${options.seasonId} because no active sheet/workbook is configured yet (${reason}).`,
-    );
-
-    return {
-      modelName,
-      spreadsheetId: "",
-      sheetName,
-      outputField,
-      matchedRows: 0,
-      updatedRows: 0,
-      dryRun: !options.apply,
-    };
-  }
+  const prepared = await preparePlayerRatingModelRows(
+    {
+      seasonId: options.seasonId,
+      seasonType: options.seasonType,
+      weekIds: options.weekIds,
+      weekNums: options.weekNums,
+    },
+    modelName,
+  );
 
   const targetRecords = prepared.targetRows.map((entry) => entry.record);
   if (modelName === "PlayerDayStatLine") {
@@ -899,8 +830,8 @@ export async function executePlayerRatingModelBackfill(
     );
   }
 
-  await rankRowsWithAppsScriptEngine(targetRecords, {
-    sheetName: prepared.rankingSheetName,
+  await rankRowsWithRankingEngine(targetRecords, {
+    dataModelName: prepared.rankingModelName,
     outputField: prepared.outputField,
     includeBreakdown: options.includeBreakdown,
     mutate: true,
@@ -923,7 +854,7 @@ export async function executePlayerRatingModelBackfill(
 
   if (options.apply && prepared.targetRows.length > 0) {
     try {
-      const result = await minimalSheetsWriter.upsertByCompositeKey(
+      const result = await dataStore.upsertByCompositeKey(
         modelName as CompositeKeyModelName,
         getCompositeKeyColumnsForModel(modelName as CompositeKeyModelName),
         targetRecords,
@@ -932,13 +863,12 @@ export async function executePlayerRatingModelBackfill(
           idColumn: "id",
           createdAtColumn: "createdAt",
           updatedAtColumn: "updatedAt",
-          spreadsheetId: prepared.spreadsheetId,
         },
       );
       return {
         modelName,
-        spreadsheetId: prepared.spreadsheetId,
-        sheetName: prepared.sheetName,
+
+        dataModelName: prepared.dataModelName,
         outputField: prepared.outputField,
         matchedRows: prepared.targetRows.length,
         updatedRows: result.total,
@@ -946,13 +876,7 @@ export async function executePlayerRatingModelBackfill(
       };
     } catch (error) {
       if (isWritePermissionError(error)) {
-        throw wrapWritePermissionError(
-          error,
-          options,
-          modelName,
-          prepared,
-          clientModule.optimizedSheetsClient.getConfiguredServiceAccountEmail(),
-        );
+        throw wrapWritePermissionError(error, options, modelName, prepared);
       }
       throw error;
     }
@@ -960,8 +884,8 @@ export async function executePlayerRatingModelBackfill(
 
   return {
     modelName,
-    spreadsheetId: prepared.spreadsheetId,
-    sheetName: prepared.sheetName,
+
+    dataModelName: prepared.dataModelName,
     outputField: prepared.outputField,
     matchedRows: prepared.targetRows.length,
     updatedRows: options.apply ? prepared.targetRows.length : 0,
@@ -972,10 +896,6 @@ export async function executePlayerRatingModelBackfill(
 export async function runPlayerRatingBackfill(
   options: PlayerRatingBackfillOptions,
 ): Promise<PlayerRatingModelExecutionSummary[]> {
-  process.env.USE_GOOGLE_SHEETS ??= "true";
-  process.env.GOOGLE_SERVICE_ACCOUNT_KEY_FILE ??=
-    path.resolve("credentials.json");
-
   const [seasons, weeks, teams] = await Promise.all([
     fetchModel<DatabaseRecord>("Season"),
     fetchModel<DatabaseRecord>("Week"),
@@ -1065,7 +985,7 @@ export async function runPlayerRatingBackfill(
     summaries.push(summary);
     logPlayerRatingBackfill(
       options,
-      `${summary.modelName}: matched=${summary.matchedRows} output=${summary.outputField} sheet=${summary.sheetName} workbook=${summary.spreadsheetId}`,
+      `${summary.modelName}: matched=${summary.matchedRows} output=${summary.outputField} model=${summary.dataModelName}`,
     );
   }
 
@@ -1073,14 +993,8 @@ export async function runPlayerRatingBackfill(
 }
 
 export async function getAllSeasonIds(): Promise<string[]> {
-  process.env.USE_GOOGLE_SHEETS ??= "true";
-  process.env.GOOGLE_SERVICE_ACCOUNT_KEY_FILE ??=
-    path.resolve("credentials.json");
-
-  const { fastSheetsReader } = await import(
-    "@gshl-lib/sheets/reader/fast-reader"
-  );
-  const seasons = await fastSheetsReader.fetchModel<DatabaseRecord>("Season");
+  const dataStore = await import("@gshl-lib/data/convex-store");
+  const seasons = await dataStore.fetchModel<DatabaseRecord>("Season");
   return seasons
     .map((row) => toTrimmedString(row.id))
     .filter(Boolean)

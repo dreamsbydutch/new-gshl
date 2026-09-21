@@ -476,7 +476,10 @@ function normalizeName(name: string): string {
     .trim();
 }
 
-function parseOptions(argv: string[]) {
+function parseOptions(argv: string[]): {
+  target: "development" | "production";
+  apply: boolean;
+} {
   const targetIndex = argv.indexOf("--target");
   const target = targetIndex === -1 ? undefined : argv[targetIndex + 1];
   if (target !== "development" && target !== "production") {

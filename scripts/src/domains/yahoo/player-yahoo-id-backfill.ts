@@ -1,12 +1,7 @@
+import * as dataStore from "@gshl-lib/data/convex-store";
 import { load as loadHtml } from "cheerio";
 import type { Player, Season } from "@gshl-lib/types/database";
-import { fastSheetsReader } from "@gshl-lib/sheets/reader/fast-reader";
-import {
-  type DatabaseRecord,
-  getSpreadsheetIdForModel,
-  SHEETS_CONFIG,
-} from "@gshl-lib/sheets/config/config";
-import { optimizedSheetsClient } from "@gshl-lib/sheets/client/optimized-client";
+import { type DatabaseRecord } from "@gshl-lib/data/records";
 import {
   fetchYahooMatchupPage,
   resolveLeagueId,
@@ -24,12 +19,7 @@ type PrimitiveCellValue = string | number | boolean | null;
 
 export type YahooHistoricalPlayerGroup = "skater" | "goalie";
 export type YahooEligiblePosition = "C" | "LW" | "RW" | "D" | "G";
-type SheetPositionGroup = "F" | "D" | "G";
-
-type PlayerSheetRow = {
-  rowNumber: number;
-  values: PrimitiveCellValue[];
-};
+type PlayerPositionGroup = "F" | "D" | "G";
 
 type YahooPlayerSource = {
   group: YahooHistoricalPlayerGroup;
@@ -42,7 +32,7 @@ export type ScrapedYahooPlayer = {
   playerName: string;
   normalizedName: string;
   nameKeys: string[];
-  posGroup: SheetPositionGroup;
+  posGroup: PlayerPositionGroup;
   positions: string[];
   nhlTeam: string;
   sourceGroup: YahooHistoricalPlayerGroup;
@@ -57,18 +47,18 @@ type PlayerMatch = {
 
 type PendingPlayerInsert = {
   playerId: string;
-  row: PrimitiveCellValue[];
+  row: DatabaseRecord;
   scraped: ScrapedYahooPlayer;
 };
 
 type InvestigationFlag = {
   kind:
-    | "duplicate-sheet-yahoo-id"
+    | "duplicate-stored-yahoo-id"
     | "duplicate-scraped-yahoo-id"
     | "created-player"
     | "ambiguous-yahoo-player"
     | "existing-id-conflict"
-    | "missing-player-sheet-row"
+    | "missing-player-record"
     | "pagination-truncated";
   playerId?: string;
   yahooId?: string;
@@ -113,7 +103,7 @@ export type YahooPlayerIdBackfillSummary = {
   seasonId?: string;
   seasonYear?: string;
   leagueId?: string;
-  playerSheetRows: number;
+  playerRows: number;
   pagesFetched: Record<YahooHistoricalPlayerGroup, number>;
   scrapedPlayers: Record<YahooHistoricalPlayerGroup, number>;
   matchedPlayers: number;
@@ -123,17 +113,14 @@ export type YahooPlayerIdBackfillSummary = {
   existingIdConflicts: number;
   unmatchedYahooPlayers: number;
   ambiguousYahooPlayers: number;
-  duplicateSheetYahooIds: number;
+  duplicateStoredYahooIds: number;
   duplicateScrapedYahooIds: number;
   flags: InvestigationFlag[];
 };
 
-const PLAYER_SHEET_NAME = SHEETS_CONFIG.SHEETS.Player;
-const PLAYER_HEADER_RANGE = `${PLAYER_SHEET_NAME}!A1:ZZ`;
 const DEFAULT_PAGE_SIZE = 25;
 const DEFAULT_MAX_PAGES = 80;
 const DEFAULT_REQUEST_DELAY_MS = 3500;
-const YAHOO_ID_COLUMN = "yahooId";
 const MAX_SKATERS_TO_CHECK = 600;
 const MAX_GOALIES_TO_CHECK = 125;
 
@@ -154,7 +141,7 @@ Options:
   --max-pages <n>            Pagination safety cap per group. Default: 80
   --request-delay-ms <ms>    Minimum delay between Yahoo requests. Default: 3500
   --overwrite-existing       Allow replacing a different existing Player.yahooId.
-  --apply                    Write yahooId updates to the Player sheet.
+  --apply                    Write yahooId updates to the Player table.
   --log <true|false>         Enable or disable console logging. Default: true
   --help                     Show this message and exit.
 
@@ -374,10 +361,10 @@ function normalizePositionList(value: unknown): string[] {
     .filter(Boolean);
 }
 
-function deriveSheetPositionGroup(
+function derivePlayerPositionGroup(
   positions: readonly string[],
   fallbackGroup: YahooHistoricalPlayerGroup,
-): SheetPositionGroup {
+): PlayerPositionGroup {
   if (positions.includes("G") || fallbackGroup === "goalie") {
     return "G";
   }
@@ -508,7 +495,7 @@ function parseScrapedYahooPlayerRow(
       : fallbackPosition
         ? [fallbackPosition]
         : [];
-  const posGroup = deriveSheetPositionGroup(positions, fallbackGroup);
+  const posGroup = derivePlayerPositionGroup(positions, fallbackGroup);
   const nameKeys = buildNameKeys(playerName);
   if (!nameKeys.length) return null;
 
@@ -594,58 +581,6 @@ function withCountOffset(urlValue: string, countOffset: number): string {
   return url.toString();
 }
 
-function normalizeWriteValue(
-  value: PrimitiveCellValue | undefined,
-): PrimitiveCellValue {
-  if (value === undefined || value === null) return "";
-  return value;
-}
-
-function buildRowArray(
-  headers: string[],
-  source: Record<string, PrimitiveCellValue | undefined>,
-  existing?: PrimitiveCellValue[],
-): PrimitiveCellValue[] {
-  return headers.map((header, index) => {
-    if (Object.prototype.hasOwnProperty.call(source, header)) {
-      return normalizeWriteValue(source[header]);
-    }
-    return existing?.[index] ?? "";
-  });
-}
-
-async function loadPlayerSheetRows(): Promise<{
-  spreadsheetId: string;
-  header: string[];
-  rowsByPlayerId: Map<string, PlayerSheetRow>;
-}> {
-  const spreadsheetId = getSpreadsheetIdForModel("Player");
-  const rawRows = await optimizedSheetsClient.getValues(
-    spreadsheetId,
-    PLAYER_HEADER_RANGE,
-  );
-  const header = (rawRows[0] ?? []).map((cell) => String(cell ?? "").trim());
-  const idIndex = header.indexOf("id");
-  if (idIndex < 0) {
-    throw new Error(
-      "[player-bios:backfill-yahoo-ids] Player sheet is missing the id column.",
-    );
-  }
-
-  const rowsByPlayerId = new Map<string, PlayerSheetRow>();
-  for (let index = 1; index < rawRows.length; index += 1) {
-    const values = rawRows[index] ?? [];
-    const playerId = toTrimmedString(values[idIndex]);
-    if (!playerId) continue;
-    rowsByPlayerId.set(playerId, {
-      rowNumber: index + 1,
-      values: [...values],
-    });
-  }
-
-  return { spreadsheetId, header, rowsByPlayerId };
-}
-
 function parsePlayerGroups(
   rawValue: string | undefined,
 ): YahooHistoricalPlayerGroup[] {
@@ -720,7 +655,7 @@ async function resolveSeasonContext(
     return { seasonId, seasonYear, leagueId };
   }
 
-  const seasons = (await fastSheetsReader.fetchModel<DatabaseRecord>(
+  const seasons = (await dataStore.fetchModel<DatabaseRecord>(
     "Season",
   )) as unknown as Season[];
   const season = seasons.find((row) => toTrimmedString(row.id) === seasonId);
@@ -868,7 +803,7 @@ export function mergeYahooPlayerPositionRows(
     playersByYahooId.set(player.yahooId, {
       ...existing,
       positions,
-      posGroup: deriveSheetPositionGroup(positions, existing.sourceGroup),
+      posGroup: derivePlayerPositionGroup(positions, existing.sourceGroup),
     });
   }
   return [...playersByYahooId.values()];
@@ -926,9 +861,7 @@ export async function fetchYahooPlayerDirectory(
   };
 }
 
-function getNextPlayerId(
-  rowsByPlayerId: ReadonlyMap<string, PlayerSheetRow>,
-): number {
+function getNextPlayerId(rowsByPlayerId: ReadonlyMap<string, unknown>): number {
   let maxPlayerId = 0;
   for (const playerId of rowsByPlayerId.keys()) {
     const numericId = Number(playerId);
@@ -1184,14 +1117,13 @@ export async function runYahooPlayerIdBackfill(
   const sources = resolveYahooSources(context, options);
   log(
     options,
-    `Loading Player sheet and scraping Yahoo historical player pages for ${sources
+    `Loading Player table and scraping Yahoo historical player pages for ${sources
       .map((source) => source.group)
       .join(", ")}.`,
   );
 
-  const [playerRows, playerSheet, ...scrapeResults] = await Promise.all([
-    fastSheetsReader.fetchModel<DatabaseRecord>("Player"),
-    loadPlayerSheetRows(),
+  const [playerRows, ...scrapeResults] = await Promise.all([
+    dataStore.fetchModel<DatabaseRecord>("Player"),
     ...sources.map((source) =>
       fetchAllHistoricalYahooPlayers(source, options, flags),
     ),
@@ -1199,14 +1131,14 @@ export async function runYahooPlayerIdBackfill(
 
   const players = playerRows as unknown as Player[];
   const indexes = buildPlayerIndexes(players);
-  let duplicateSheetYahooIds = 0;
+  let duplicateStoredYahooIds = 0;
   for (const [yahooId, groupedPlayers] of indexes.playersByYahooId.entries()) {
     if (groupedPlayers.length <= 1) continue;
-    duplicateSheetYahooIds += 1;
+    duplicateStoredYahooIds += 1;
     flags.push({
-      kind: "duplicate-sheet-yahoo-id",
+      kind: "duplicate-stored-yahoo-id",
       yahooId,
-      details: `Multiple Player sheet rows already use yahooId=${yahooId}.`,
+      details: `Multiple Player table rows already use yahooId=${yahooId}.`,
     });
   }
 
@@ -1245,7 +1177,9 @@ export async function runYahooPlayerIdBackfill(
   const matches: PlayerMatch[] = [];
   const pendingPlayerInserts: PendingPlayerInsert[] = [];
   const assignedPlayerIds = new Set<string>();
-  let nextPlayerId = getNextPlayerId(playerSheet.rowsByPlayerId);
+  let nextPlayerId = getNextPlayerId(
+    new Map(players.map((player) => [String(player.id), player])),
+  );
   let unmatchedYahooPlayers = 0;
   let ambiguousYahooPlayers = 0;
 
@@ -1257,7 +1191,7 @@ export async function runYahooPlayerIdBackfill(
         kind: "ambiguous-yahoo-player",
         yahooId: scraped.yahooId,
         fullName: scraped.playerName,
-        details: `Multiple Player sheet rows already map to yahooId=${scraped.yahooId}.`,
+        details: `Multiple Player table rows already map to yahooId=${scraped.yahooId}.`,
       });
       continue;
     }
@@ -1290,10 +1224,7 @@ export async function runYahooPlayerIdBackfill(
       const timestamp = new Date().toISOString();
       pendingPlayerInserts.push({
         playerId,
-        row: buildRowArray(
-          playerSheet.header,
-          buildPlayerInsertSource(playerId, scraped, timestamp),
-        ),
+        row: buildPlayerInsertSource(playerId, scraped, timestamp),
         scraped,
       });
       flags.push({
@@ -1318,7 +1249,7 @@ export async function runYahooPlayerIdBackfill(
         kind: "ambiguous-yahoo-player",
         yahooId: scraped.yahooId,
         fullName: scraped.playerName,
-        details: `Multiple Player sheet rows plausibly matched Yahoo player ${scraped.playerName}.`,
+        details: `Multiple Player table rows plausibly matched Yahoo player ${scraped.playerName}.`,
       });
       continue;
     }
@@ -1328,15 +1259,7 @@ export async function runYahooPlayerIdBackfill(
     matches.push({ player: chosen, scraped });
   }
 
-  const yahooIdIndex = playerSheet.header.indexOf(YAHOO_ID_COLUMN);
-  const updatedAtIndex = playerSheet.header.indexOf("updatedAt");
-  if (yahooIdIndex < 0) {
-    throw new Error(
-      "[player-bios:backfill-yahoo-ids] Player sheet is missing the yahooId column.",
-    );
-  }
-
-  const updates = new Map<number, PrimitiveCellValue[]>();
+  const updates: Array<{ id: string; data: DatabaseRecord }> = [];
   let updatedPlayers = 0;
   let createdPlayers = pendingPlayerInserts.length;
   let unchangedPlayers = 0;
@@ -1344,18 +1267,6 @@ export async function runYahooPlayerIdBackfill(
 
   for (const match of matches) {
     const playerId = cleanWhitespace(match.player.id);
-    const sheetRow = playerSheet.rowsByPlayerId.get(playerId);
-    if (!sheetRow) {
-      flags.push({
-        kind: "missing-player-sheet-row",
-        playerId,
-        yahooId: match.scraped.yahooId,
-        fullName: match.scraped.playerName,
-        details: `Matched Player id ${playerId} was not found in the raw Player sheet rows.`,
-      });
-      continue;
-    }
-
     const existingYahooId = cleanWhitespace(match.player.yahooId);
     if (existingYahooId === match.scraped.yahooId) {
       unchangedPlayers += 1;
@@ -1378,25 +1289,20 @@ export async function runYahooPlayerIdBackfill(
       continue;
     }
 
-    const nextValues = playerSheet.header.map(
-      (_, index) => sheetRow.values[index] ?? "",
-    );
-    nextValues[yahooIdIndex] = match.scraped.yahooId;
-    if (updatedAtIndex >= 0) {
-      nextValues[updatedAtIndex] = new Date().toISOString();
-    }
-    updates.set(sheetRow.rowNumber - 1, nextValues);
+    updates.push({
+      id: playerId,
+      data: {
+        yahooId: match.scraped.yahooId,
+        updatedAt: new Date().toISOString(),
+      },
+    });
     updatedPlayers += 1;
   }
 
   if (options.apply) {
-    if (updates.size > 0) {
-      log(options, `Writing ${updates.size} Player sheet update(s).`);
-      await optimizedSheetsClient.updateRowsByIds(
-        playerSheet.spreadsheetId,
-        PLAYER_SHEET_NAME,
-        updates,
-      );
+    if (updates.length > 0) {
+      log(options, `Writing ${updates.length} Player table update(s).`);
+      await dataStore.updateRowsById("Player", updates);
     }
 
     if (pendingPlayerInserts.length > 0) {
@@ -1404,15 +1310,12 @@ export async function runYahooPlayerIdBackfill(
         options,
         `Appending ${pendingPlayerInserts.length} new Player row(s).`,
       );
-      await optimizedSheetsClient.appendValuesBatch(
-        playerSheet.spreadsheetId,
-        PLAYER_SHEET_NAME,
-        pendingPlayerInserts.map((pendingInsert) => pendingInsert.row),
+      await dataStore.upsertByCompositeKey(
+        "Player",
+        ["id"],
+        pendingPlayerInserts.map((entry) => entry.row),
+        { merge: true },
       );
-    }
-
-    if (updates.size > 0 || pendingPlayerInserts.length > 0) {
-      fastSheetsReader.clearCache("Player");
     }
   }
 
@@ -1422,7 +1325,7 @@ export async function runYahooPlayerIdBackfill(
     seasonId: context.seasonId,
     seasonYear: context.seasonYear,
     leagueId: context.leagueId,
-    playerSheetRows: players.length,
+    playerRows: players.length,
     pagesFetched,
     scrapedPlayers,
     matchedPlayers: matches.length,
@@ -1432,7 +1335,7 @@ export async function runYahooPlayerIdBackfill(
     existingIdConflicts,
     unmatchedYahooPlayers,
     ambiguousYahooPlayers,
-    duplicateSheetYahooIds,
+    duplicateStoredYahooIds,
     duplicateScrapedYahooIds,
     flags,
   };

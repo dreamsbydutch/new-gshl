@@ -372,7 +372,7 @@ export interface PlayerWeekStatLine {
   GP: string;
   MG: string;
   IR: string;
-  IRplus: string; // matches sheets config casing
+  IRplus: string; // matches database schema casing
   GS: string;
   G: string;
   A: string;
@@ -440,7 +440,7 @@ export interface PlayerSplitStatLine {
 export interface PlayerTotalStatLine {
   id: string;
   seasonId: string;
-  gshlTeamIds: string[]; // Note: plural in sheets config
+  gshlTeamIds: string[]; // Note: plural in database schema
   playerId: string;
   nhlPos: RosterPosition[];
   posGroup: PositionGroup;
@@ -580,9 +580,9 @@ export interface PlayerNHLStatLine {
   QS: string;
   RBS: string;
   TOI: string;
-  seasonRating: string; // lowercase from sheets config
-  overallRating: string; // lowercase from sheets config
-  salary: string; // lowercase from sheets config
+  seasonRating: string; // lowercase from database schema
+  overallRating: string; // lowercase from database schema
+  salary: string; // lowercase from database schema
   createdAt: Date;
   updatedAt: Date;
 }

@@ -1,3 +1,4 @@
+import * as dataStore from "@gshl-lib/data/convex-store";
 import { randomUUID } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { load as loadHtml } from "cheerio";
@@ -11,17 +12,11 @@ import type {
   Week,
 } from "@gshl-lib/types/database";
 import {
-  convertRowToModel,
   getCompositeKeyColumnsForModel,
-  getPlayerDayWorkbookId,
-  SHEETS_CONFIG,
   type DatabaseRecord,
   type CompositeKeyModelName,
-} from "@gshl-lib/sheets/config/config";
-import { optimizedSheetsClient } from "@gshl-lib/sheets/client/optimized-client";
-import { fastSheetsReader } from "@gshl-lib/sheets/reader/fast-reader";
-import { minimalSheetsWriter } from "@gshl-lib/sheets/writer/minimal-writer";
-import { rankRowsWithAppsScriptEngine } from "@gshl-lib/ranking/apps-script-engine";
+} from "@gshl-lib/data/records";
+import { rankRowsWithRankingEngine } from "@gshl-lib/ranking/ranking-engine";
 import { applyPlayerDayDerivedColumns } from "@gshl-lib/stats/player-day-flags";
 import { normalizeDateOnlyValue } from "@gshl-lib/utils/core/date";
 import {
@@ -31,8 +26,6 @@ import {
   parsePositiveInteger,
   toTrimmedString,
 } from "@gshl-lib/ranking/player-rating-support";
-
-type PrimitiveCellValue = string | number | boolean | null;
 
 type LoadedPlayerDayRow = {
   rowNumber: number;
@@ -75,7 +68,7 @@ type InvestigationFlag = {
   kind:
     | "unknown-yahoo-player"
     | "created-player-day-row"
-    | "sheet-row-missing-from-yahoo"
+    | "model-row-missing-from-yahoo"
     | "date-missing-week";
   seasonId: string;
   date: string;
@@ -110,8 +103,6 @@ export type YahooRosterBackfillSeasonSummary = {
 };
 
 const PLAYER_DAY_MODEL = "PlayerDayStatLine";
-const PLAYER_DAY_SHEET = SHEETS_CONFIG.SHEETS.PlayerDayStatLine;
-const PLAYER_DAY_COLUMNS = SHEETS_CONFIG.COLUMNS.PlayerDayStatLine;
 const STARTING_POSITIONS = new Set(["C", "LW", "RW", "D", "G", "Util"]);
 const USER_AGENT =
   process.env.YAHOO_USER_AGENT?.trim() ??
@@ -139,33 +130,6 @@ const SEASON_LEAGUE_ID_MAP: Record<string, string> = {
   "11": "47379",
   "12": "6989",
 };
-
-function alignRowsToConfiguredColumns(
-  rawRows: PrimitiveCellValue[][],
-  columns: readonly string[],
-): PrimitiveCellValue[][] {
-  const header = rawRows[0] ?? [];
-  const dataRows = rawRows.slice(1);
-
-  if (!header.length) {
-    return dataRows.map((row) => columns.map((_, index) => row[index] ?? null));
-  }
-
-  const headerIndex = new Map<string, number>();
-  header.forEach((cell, index) => {
-    const key = String(cell ?? "").trim();
-    if (key) {
-      headerIndex.set(key, index);
-    }
-  });
-
-  return dataRows.map((row) =>
-    columns.map((column) => {
-      const index = headerIndex.get(column);
-      return index === undefined ? null : (row[index] ?? null);
-    }),
-  );
-}
 
 function normalizeYahooLineupPosition(value: string): string {
   let normalized = String(value).trim();
@@ -677,27 +641,14 @@ async function fetchYahooRosterPage(
 async function loadPlayerDayRowsWithNumbers(
   seasonId: string,
 ): Promise<LoadedPlayerDayRow[]> {
-  const spreadsheetId = getPlayerDayWorkbookId(seasonId);
-  const rawRows = await optimizedSheetsClient.getValues(
-    spreadsheetId,
-    `${PLAYER_DAY_SHEET}!A1:ZZ`,
-  );
-  const alignedRows = alignRowsToConfiguredColumns(rawRows, PLAYER_DAY_COLUMNS);
-  return alignedRows
-    .map((row, index) => ({
-      rowNumber: index + 2,
-      record: (() => {
-        const record = convertRowToModel<DatabaseRecord>(
-          row,
-          PLAYER_DAY_COLUMNS,
-        ) as unknown as PlayerDayStatLine;
-        return {
-          ...record,
-          date: normalizeDateKey(record.date),
-        };
-      })(),
-    }))
-    .filter(({ record }) => toTrimmedString(record.seasonId) === seasonId);
+  const rows = await dataStore.fetchPlayerDaySeason<DatabaseRecord>(seasonId);
+  return rows.map((record, index) => ({
+    rowNumber: index + 1,
+    record: {
+      ...record,
+      date: normalizeDateKey(record.date),
+    } as unknown as PlayerDayStatLine,
+  }));
 }
 
 function buildExistingIndexes(rows: LoadedPlayerDayRow[]): {
@@ -1040,7 +991,7 @@ async function reconcileTeamDate(params: {
     const playerId = toTrimmedString(existing.record.playerId);
     if (playerId && !matchedPlayerIds.has(playerId)) {
       flags.push({
-        kind: "sheet-row-missing-from-yahoo",
+        kind: "model-row-missing-from-yahoo",
         seasonId,
         date: normalizedDate,
         gshlTeamId: teamId,
@@ -1069,8 +1020,7 @@ async function applySeasonWrites(params: {
   updates: LoadedPlayerDayRow[];
   creates: PlayerDayStatLine[];
 }): Promise<void> {
-  const { seasonId, existingRows, deletes, updates, creates } = params;
-  const spreadsheetId = getPlayerDayWorkbookId(seasonId);
+  const { existingRows, deletes, updates, creates } = params;
   const deletedRowNumbersDescending = Array.from(
     new Set(deletes.map((deleteRow) => deleteRow.rowNumber)),
   ).sort((left, right) => right - left);
@@ -1085,8 +1035,8 @@ async function applySeasonWrites(params: {
   applyPlayerDayDerivedColumns(rowsToWrite, existingContextRows);
 
   if (rowsToWrite.length > 0) {
-    await rankRowsWithAppsScriptEngine(rowsToWrite, {
-      sheetName: PLAYER_DAY_MODEL,
+    await rankRowsWithRankingEngine(rowsToWrite, {
+      dataModelName: PLAYER_DAY_MODEL,
       outputField: "Rating",
       mutate: true,
     });
@@ -1100,32 +1050,24 @@ async function applySeasonWrites(params: {
   }
 
   if (deletedRowNumbersDescending.length > 0) {
-    await optimizedSheetsClient.deleteRows(
-      spreadsheetId,
-      PLAYER_DAY_SHEET,
-      deletedRowNumbersDescending,
+    await dataStore.deleteAggregateRows(
+      "PlayerDayStatLine",
+      deletes.map((row) => String(row.record.id)),
     );
   }
 
   if (rowsToWrite.length > 0) {
-    await minimalSheetsWriter.upsertByCompositeKey(
+    await dataStore.upsertByCompositeKey(
       PLAYER_DAY_MODEL,
-      getCompositeKeyColumnsForModel(
-        PLAYER_DAY_MODEL as CompositeKeyModelName,
-      ),
+      getCompositeKeyColumnsForModel(PLAYER_DAY_MODEL as CompositeKeyModelName),
       rowsToWrite,
       {
         merge: true,
         idColumn: "id",
         createdAtColumn: "createdAt",
         updatedAtColumn: "updatedAt",
-        spreadsheetId,
       },
     );
-  }
-
-  if (deletedRowNumbersDescending.length > 0 || rowsToWrite.length > 0) {
-    fastSheetsReader.clearCache(PLAYER_DAY_MODEL);
   }
 }
 
@@ -1185,10 +1127,10 @@ export async function runYahooRosterPlayerDayBackfill(
   options: YahooRosterBackfillOptions,
 ): Promise<YahooRosterBackfillSeasonSummary[]> {
   const [seasons, weeks, teams, players] = (await Promise.all([
-    fastSheetsReader.fetchModel<DatabaseRecord>("Season"),
-    fastSheetsReader.fetchModel<DatabaseRecord>("Week"),
-    fastSheetsReader.fetchModel<DatabaseRecord>("Team"),
-    fastSheetsReader.fetchModel<DatabaseRecord>("Player"),
+    dataStore.fetchModel<DatabaseRecord>("Season"),
+    dataStore.fetchModel<DatabaseRecord>("Week"),
+    dataStore.fetchModel<DatabaseRecord>("Team"),
+    dataStore.fetchModel<DatabaseRecord>("Player"),
   ])) as unknown as [Season[], Week[], Team[], Player[]];
 
   const playersByYahooId = new Map<string, Player>();
@@ -1203,7 +1145,10 @@ export async function runYahooRosterPlayerDayBackfill(
   const selectedWeeks = options.weekIds.length
     ? weeks.filter((week) => options.weekIds.includes(toTrimmedString(week.id)))
     : [];
-  if (options.weekIds.length > 0 && selectedWeeks.length !== options.weekIds.length) {
+  if (
+    options.weekIds.length > 0 &&
+    selectedWeeks.length !== options.weekIds.length
+  ) {
     const selectedWeekIdSet = new Set(
       selectedWeeks.map((week) => toTrimmedString(week.id)),
     );

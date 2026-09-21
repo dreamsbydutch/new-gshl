@@ -222,7 +222,7 @@ export function getDraftYear(
   season: Pick<Season, "draftStartAt" | "startDate" | "year">,
 ): number {
   const draftDate = coerceDate({
-    value: season.draftStartAt || season.startDate,
+    value: season.draftStartAt ?? season.startDate,
     mode: "instant",
   });
   const dateYear = draftDate?.getUTCFullYear() ?? Number.NaN;

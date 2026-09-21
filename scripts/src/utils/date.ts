@@ -72,7 +72,7 @@ export function normalizeDateOnlyValue(input: unknown): string | null {
     return null;
   }
 
-  const parsed = safeParseSheetDate(raw);
+  const parsed = safeParseDate(raw);
   return parsed ? toIsoDateOnly(parsed) : null;
 }
 
@@ -92,7 +92,7 @@ function formatLocalDateOnlyForDisplay(date: Date | string): string {
     });
   }
 
-  const parsed = safeParseSheetDate(date);
+  const parsed = safeParseDate(date);
   if (!parsed) return "";
   return parsed.toLocaleDateString("en-US", {
     year: "numeric",
@@ -106,11 +106,11 @@ export function showDate(date: Date | string | null): string {
   return formatLocalDateOnlyForDisplay(date) || "N/A";
 }
 
-export function parseSheetDate(dateStr: string | null): Date | null {
-  return safeParseSheetDate(dateStr);
+export function parseStoredDate(dateStr: string | null): Date | null {
+  return safeParseDate(dateStr);
 }
 
-export function formatSheetDate(date: Date | null): string {
+export function formatStoredDate(date: Date | null): string {
   return date ? toIsoDateOnly(date) : "";
 }
 
@@ -138,7 +138,7 @@ export function formatDisplayDate(date: Date | string | null): string {
 
 export function formatTimestamp(date: Date | string | null): string {
   if (!date) return "";
-  const d = safeParseSheetDate(date);
+  const d = safeParseDate(date);
   if (!d) return "";
   return d.toLocaleString("en-US", {
     year: "numeric",
@@ -151,7 +151,7 @@ export function formatTimestamp(date: Date | string | null): string {
 }
 
 export function convertInputDate(excelSerialDate: number): Date {
-  // Google Sheets and Excel serial dates are day counts relative to 1899-12-30.
+  // Legacy serial dates are day counts relative to 1899-12-30.
   // Using the standard 25569 offset preserves the expected date-only value.
   const millisecondsPerDay = 24 * 60 * 60 * 1000;
   const excelEpochToJSEpochOffsetMs = 25569 * millisecondsPerDay;
@@ -164,12 +164,12 @@ export function convertInputDate(excelSerialDate: number): Date {
 }
 
 /**
- * Safely converts date input from Google Sheets to a Date object
- * Handles both string and number inputs from Google Sheets
+ * Safely converts date input from stored records to a Date object
+ * Handles both string and number inputs from stored records
  * @param input - Date input that could be a string, number, or Date
  * @returns Date object or null if invalid
  */
-export function safeParseSheetDate(input: unknown): Date | null {
+export function safeParseDate(input: unknown): Date | null {
   if (!input) return null;
 
   // If it's already a Date object, return it

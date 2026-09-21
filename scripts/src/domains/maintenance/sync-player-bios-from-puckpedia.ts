@@ -5,7 +5,7 @@ import readline from "node:readline/promises";
 import { stdin as input, stdout as output } from "node:process";
 import puppeteer from "puppeteer-core";
 import type { Browser, Page } from "puppeteer-core";
-import { getAppsScriptLineupBuilder } from "../lineup/apps-script-lineup-builder";
+import { getLineupBuilder } from "../lineup/lineup-builder";
 import {
   fetchLatestPlayerDayDate,
   fetchLatestPlayerDayPositions,
@@ -1308,7 +1308,7 @@ export async function runPlayerBioSync(
         `[player-bio-sync] Could not load lineup configuration for season ${rosterCalendar.targetTeamSeasonId}.`,
       );
     }
-    const lineupBuilder = await getAppsScriptLineupBuilder();
+    const lineupBuilder = await getLineupBuilder();
     const rosterSpots = Array.isArray(targetRosterSeason.rosterSpots)
       ? targetRosterSeason.rosterSpots
       : [];

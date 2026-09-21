@@ -27,7 +27,7 @@ import {
   upsertPlayerDayHighlights,
   type AggregateModelName,
 } from "@gshl-lib/data/convex-store";
-import type { DatabaseRecord } from "@gshl-lib/sheets/config/config";
+import type { DatabaseRecord } from "@gshl-lib/data/records";
 import type { Season } from "@gshl-types";
 import {
   PlayerDayArchiveDatabase,

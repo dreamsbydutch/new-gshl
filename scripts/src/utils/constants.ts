@@ -2,7 +2,7 @@
 
 export const APP_CONFIG = {
   NAME: "GSHL",
-  FULL_NAME: "Google Sheets Hockey League",
+  FULL_NAME: "Gem Stone Hockey League",
   VERSION: "1.0.0",
   DESCRIPTION: "Fantasy Hockey League Management System",
 } as const;

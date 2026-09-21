@@ -1,17 +1,15 @@
-import path from "node:path";
+import * as dataStore from "@gshl-lib/data/convex-store";
 import {
   getCompositeKeyColumnsForModel,
-  getWriteSpreadsheetIdForModel,
   type DatabaseRecord,
-} from "@gshl-lib/sheets/config/config";
-import { minimalSheetsWriter } from "@gshl-lib/sheets/writer/minimal-writer";
+} from "@gshl-lib/data/records";
 import { fetchModel } from "@gshl-lib/data/convex-store";
 import {
   getArgValue,
   hasFlag,
   toBoolean,
 } from "@gshl-lib/ranking/player-rating-support";
-import { runLocalPowerRankingsSeason } from "../../domains/power/apps-script-power-engine";
+import { runLocalPowerRankingsSeason } from "../../domains/power/power-engine";
 
 type RebuildPowerOptions = {
   seasonIds: string[];
@@ -85,7 +83,7 @@ function parseOptions(args: string[]): RebuildPowerOptions {
 async function writeRows(
   modelName: "TeamWeekStatLine" | "TeamSeasonStatLine" | "Matchup",
   rows: Record<string, unknown>[],
-  seasonId: string,
+  _seasonId: string,
 ): Promise<number> {
   if (!rows.length) return 0;
 
@@ -94,22 +92,17 @@ async function writeRows(
       ? ["id"]
       : getCompositeKeyColumnsForModel(modelName);
 
-  await minimalSheetsWriter.upsertByCompositeKey(modelName, keyColumns, rows, {
+  await dataStore.upsertByCompositeKey(modelName, keyColumns, rows, {
     merge: true,
     idColumn: "id",
     createdAtColumn: "createdAt",
     updatedAtColumn: "updatedAt",
-    spreadsheetId: getWriteSpreadsheetIdForModel(modelName, { seasonId }),
   });
 
   return rows.length;
 }
 
 async function main(): Promise<void> {
-  process.env.USE_GOOGLE_SHEETS ??= "true";
-  process.env.GOOGLE_SERVICE_ACCOUNT_KEY_FILE ??=
-    path.resolve("credentials.json");
-
   const options = parseOptions(process.argv.slice(2));
   if (!options.apply) {
     log(

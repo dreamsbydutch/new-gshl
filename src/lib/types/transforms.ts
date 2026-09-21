@@ -1,4 +1,4 @@
-// Transformed types for the sheets adapter
+// Transformed types for the data adapter
 import type * as DB from "./database";
 
 export type TransformedSeason = DB.Season;
@@ -30,11 +30,9 @@ export type TransformedPlayerSplitStatLine = DB.PlayerSplitStatLine;
 
 export type TransformedPlayerTotalStatLine = DB.PlayerTotalStatLine;
 
-export type TransformedPlayerCareerSplitStatLine =
-  DB.PlayerCareerSplitStatLine;
+export type TransformedPlayerCareerSplitStatLine = DB.PlayerCareerSplitStatLine;
 
-export type TransformedPlayerCareerTotalStatLine =
-  DB.PlayerCareerTotalStatLine;
+export type TransformedPlayerCareerTotalStatLine = DB.PlayerCareerTotalStatLine;
 
 export type TransformedPlayerNHLStatLine = DB.PlayerNHLStatLine;
 

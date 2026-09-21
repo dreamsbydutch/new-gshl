@@ -1,0 +1,32 @@
+name: Ranking Engine Tests
+
+on:
+  pull_request:
+    paths:
+      - "scripts/src/runtime/**"
+      - "scripts/src/domains/**"
+      - "package*.json"
+      - "scripts/package*.json"
+      - ".github/workflows/ranking-engine-check.yml"
+  push:
+    branches: [main]
+    paths:
+      - "scripts/src/runtime/**"
+      - "scripts/src/domains/**"
+      - "package*.json"
+      - "scripts/package*.json"
+      - ".github/workflows/ranking-engine-check.yml"
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm ci --prefix scripts
+      - run: npm run ranking-engine:check

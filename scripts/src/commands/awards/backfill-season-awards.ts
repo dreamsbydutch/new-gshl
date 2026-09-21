@@ -16,8 +16,8 @@
  *   --stop-on-error        Stop immediately after the first failed season.
  *   --help                 Print the built-in help text and exit.
  */
-import type { DatabaseRecord } from "@gshl-lib/sheets/config/config";
-import { getAppsScriptLineupBuilder } from "@gshl-lib/lineup/apps-script-lineup-builder";
+import type { DatabaseRecord } from "@gshl-lib/data/records";
+import { getLineupBuilder } from "@gshl-lib/lineup/lineup-builder";
 import * as convexStore from "@gshl-lib/data/convex-store";
 import { MatchupType, SeasonType } from "@gshl-lib/types/enums";
 import {
@@ -913,7 +913,7 @@ async function selectAllStarTeam(
 ): Promise<string[]> {
   if (!playerPool.length) return [];
 
-  const lineupBuilder = await getAppsScriptLineupBuilder();
+  const lineupBuilder = await getLineupBuilder();
   const assignments = lineupBuilder.findBestLineup(
     playerPool.map((player) => ({
       playerId: player.playerId,

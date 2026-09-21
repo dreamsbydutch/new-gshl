@@ -28,7 +28,10 @@ function nameKey(name: string): string {
     .trim();
 }
 
-function parseOptions(argv: string[]) {
+function parseOptions(argv: string[]): {
+  target: "development" | "production";
+  apply: boolean;
+} {
   const target = argv[argv.indexOf("--target") + 1];
   if (target !== "production" && target !== "development") {
     throw new Error("Pass --target development or --target production.");

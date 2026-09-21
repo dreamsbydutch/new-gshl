@@ -8,8 +8,8 @@ const root = process.cwd();
 const startedAt = new Date().toISOString();
 const started = performance.now();
 
-const nextCli = path.join(root, "node_modules", "next", "dist", "bin", "next");
-const child = spawn(process.execPath, [nextCli, "build"], {
+const buildCli = path.join(root, "tools", "build.mjs");
+const child = spawn(process.execPath, [buildCli], {
   cwd: root,
   stdio: "inherit",
   env: process.env,

@@ -39,7 +39,6 @@
       "@gshl-skeletons": ["./src/components/skeletons/index.ts"],
       "@gshl-hooks": ["./src/hooks/index.ts"],
       "@gshl-hooks/*": ["./src/hooks/*"],
-      "@gshl-sheets": ["./src/lib/sheets/index.ts"],
       "@gshl-cache": ["./src/lib/cache/index.ts"],
       "@gshl-types": ["./src/lib/types/index.ts"],
       "@gshl-utils": ["./src/lib/utils/index.ts"],

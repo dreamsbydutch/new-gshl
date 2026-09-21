@@ -2,15 +2,13 @@
 
 This page contains the non-obvious setup and production boundaries that are not
 better expressed by code or package scripts. Command names and flags live in
-[`scripts/README.md`](../scripts/README.md) and
-[`apps-script/README.md`](../apps-script/README.md).
+[`scripts/README.md`](../scripts/README.md).
 
 ## Runtime configuration
 
 Common local names are listed in `.env.example`; the complete Next.js contract
 is `src/env.js`. Scripts also read command-specific settings directly from
-`process.env`. Apps Script uses `apps-script/Config/Config.js` and Script
-Properties.
+`process.env`.
 
 Configuration belongs to its runtime:
 
@@ -18,16 +16,12 @@ Configuration belongs to its runtime:
   server-side Convex secret.
 - Convex: server secret, auth issuer, browser-worker secret, web-push keys,
   Newsroom OpenAI key/model, and Yahoo OAuth credentials.
-- Operator machine: exact Convex target, service-account input, browser path,
+- Operator machine: exact Convex target, browser path,
   Yahoo browser/cookie inputs, and optional archive path.
-- Apps Script: spreadsheet/league constants plus `VERBOSE_LOGGING` and
-  `DRY_RUN_MODE` Script Properties.
 
 Production operator scripts require an explicit production identity such as
 `CONVEX_PROD_URL`, production deployment metadata, or a deploy key. They do not
-silently treat `NEXT_PUBLIC_CONVEX_URL` as production. The destructive
-`convex:migrate` command is the exception: it uses only
-`NEXT_PUBLIC_CONVEX_URL`, so verify that exact value independently.
+silently treat `NEXT_PUBLIC_CONVEX_URL` as production.
 
 Secret values never belong in source, Markdown, reports, command transcripts,
 or screenshots. Rotation requires updating every runtime that shares the
@@ -35,15 +29,13 @@ credential; rotating Yahoo's client secret also requires reconnecting Yahoo.
 
 ## Deployment surfaces
 
-The web app, Convex, and Apps Script deploy independently.
+The web app and Convex deploy independently.
 
 - `npx convex codegen` regenerates local bindings without deploying.
 - `npx convex dev` pushes and watches the configured development deployment.
 - `npx convex deploy` deploys functions and schema to the selected target.
 - A pushed `preview/*` branch triggers Vercel through the GitHub integration;
   use `gshl-preview-pr` for the complete handoff.
-- `npm run deploy` in `apps-script/` is only `clasp push`. It creates no
-  versioned deployment and installs no triggers.
 
 The repository does not encode production Vercel project settings, domains,
 promotion, or rollback. Confirm targets and hosted environment values in their
@@ -64,8 +56,6 @@ Node runtime that supports that option; Node 20 does not.
 
 High-risk exceptions:
 
-- `convex:migrate` clears mapped target tables before its first Sheets read and
-  has no dry run.
 - `data:clearTables` and `data:splitLegacyAwards` mutate immediately.
 - archive source deletion and replacement/conflict flags require independent
   backups and explicit confirmation.
@@ -137,18 +127,6 @@ production have independent connections. Run internal mutation
 `yahooConnectionStore:disconnect` to remove stored state; revoke the grant in
 Yahoo separately when required.
 
-## Apps Script
-
-Apps Script remains the active-season Sheets runtime. `DRY_RUN_MODE` defaults to
-false and does not suppress every side effect: combined aggregation still
-manages its follow-up trigger, and power setup may add columns before its
-dry-run branch. Confirm the clasp project, configuration, Script Properties,
-and complete entry-point flow before execution.
-
-Ranking and power files under `apps-script/` are synchronized output from
-`scripts/src/runtime/apps-script/`. Sync and check locally before an authorized
-push, then inspect execution logs and the intended trigger behavior.
-
 ## Verification and diagnosis
 
 Use the change-sized policy in `AGENTS.md`: changed-file lint, nearest tests,
@@ -156,7 +134,7 @@ and broader gates only for affected contracts. Package-wide command existence
 does not make the command necessary.
 
 When diagnosing runtime failures, identify the boundary first: browser,
-Next.js, Convex, operator command, external source, worker, or Apps Script. Then
+Next.js, Convex, operator command, external source, or worker. Then
 confirm the exact target and configuration names without printing values.
 Inspect the smallest relevant run/event/artifact or direct test. Distinguish
 source capture from league-table mutation and upload completion from deployed

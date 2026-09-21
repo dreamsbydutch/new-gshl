@@ -6,7 +6,7 @@
  *
  * What it does:
  *   Pulls current NHL team rosters through the Python nhl-api-py client,
- *   matches those players to the local Player sheet, and optionally writes the
+ *   matches those players to the local Player table, and optionally writes the
  *   stable NHL API ids into the Player.nhlApiId column for future stat syncs.
  */
 import path from "node:path";

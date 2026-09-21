@@ -394,9 +394,9 @@ function scoreTeamWeekAgainstYahooTotals(
     const field = YAHOO_HEADER_TO_TEAM_WEEK_FIELD[yahooHeader];
     if (!field) continue;
     const yahooNumeric = toComparableNumeric(yahooValue);
-    const sheetNumeric = toComparableNumeric(row[field]);
-    if (yahooNumeric === null || sheetNumeric === null) continue;
-    score += Math.abs(sheetNumeric - yahooNumeric);
+    const modelNumeric = toComparableNumeric(row[field]);
+    if (yahooNumeric === null || modelNumeric === null) continue;
+    score += Math.abs(modelNumeric - yahooNumeric);
     comparedFields += 1;
   }
 

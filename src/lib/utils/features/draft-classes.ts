@@ -6,7 +6,7 @@ import type {
   DraftClassSummary,
   Player,
 } from "@gshl-types";
-import { safeParseSheetDate } from "../core";
+import { safeParseDate } from "../core";
 import { ContractStatus } from "../domain/constants";
 import { filterAvailableDraftPlayers } from "./draft-board-list";
 
@@ -52,7 +52,7 @@ export function findExpiringDraftClassContract(
   return activeContracts
     .filter((contract) => String(contract.playerId) === playerId)
     .filter((contract) => {
-      const expiryDate = safeParseSheetDate(contract.expiryDate);
+      const expiryDate = safeParseDate(contract.expiryDate);
 
       if (!expiryDate) {
         return false;
@@ -64,8 +64,8 @@ export function findExpiringDraftClassContract(
       );
     })
     .sort((left, right) => {
-      const leftExpiry = safeParseSheetDate(left.expiryDate)?.getTime() ?? 0;
-      const rightExpiry = safeParseSheetDate(right.expiryDate)?.getTime() ?? 0;
+      const leftExpiry = safeParseDate(left.expiryDate)?.getTime() ?? 0;
+      const rightExpiry = safeParseDate(right.expiryDate)?.getTime() ?? 0;
       return rightExpiry - leftExpiry;
     })[0];
 }

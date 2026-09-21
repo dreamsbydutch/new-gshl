@@ -19,7 +19,6 @@
  */
 export * from "./database";
 
-
 // ============================================================================
 // ENUMS & CONSTANTS
 // ============================================================================
@@ -35,20 +34,6 @@ export * from "./database";
  * - AwardsList: Available awards and recognitions
  */
 export * from "./enums";
-
-// ============================================================================
-// GOOGLE SHEETS INTEGRATION
-// ============================================================================
-
-/**
- * Types specific to Google Sheets data storage and retrieval
- * - WorkbookConfig: Configuration for multiple Google Sheets workbooks
- * - SheetConfig: Individual sheet naming and structure
- * - FieldTransforms: Data transformation rules for different field types
- * - ModelTransforms: Model-specific transformation configurations
- * - Google Sheets API response types and interfaces
- */
-export * from "./sheets";
 
 // ============================================================================
 // USAGE EXAMPLES
@@ -68,9 +53,6 @@ export * from "./sheets";
  *
  * // Import navigation types for UI components
  * import type { BaseNavItem } from "~/lib/types";
- *
- * // Import sheets-specific types for data operations
- * import type { WorkbookConfig, FieldTransforms } from "~/lib/types";
  *
  * // Example usage in component props
  * interface SeasonSelectorProps {

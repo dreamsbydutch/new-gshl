@@ -1,3 +1,4 @@
+import * as dataStore from "@gshl-lib/data/convex-store";
 import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { config as loadEnv } from "dotenv";
@@ -15,7 +16,6 @@ import {
   parsePositiveInteger,
   toTrimmedString,
 } from "@gshl-lib/ranking/player-rating-support";
-import { fastSheetsReader } from "@gshl-lib/sheets/reader/fast-reader";
 import type { Season, Team, Week } from "@gshl-lib/types/database";
 
 loadEnv({ path: ".env.local" });
@@ -29,7 +29,7 @@ Usage:
 Options:
   --url <url>                      Full Yahoo matchup URL to fetch directly.
   --seasonId <id>                  GSHL season id. Required unless URL mode includes enough context for your own review.
-  --weekId <id>                    GSHL week id when building the URL from sheet context.
+  --weekId <id>                    GSHL week id when building the URL from record context.
   --date <yyyy-mm-dd>              Daily matchup date.
   --homeYahooTeamId <id>           Yahoo home team id (mid1).
   --awayYahooTeamId <id>           Yahoo away team id (mid2).
@@ -45,11 +45,7 @@ function resolveReportBase(args: string[]): string {
     return path.resolve(process.cwd(), explicit);
   }
 
-  return path.resolve(
-    process.cwd(),
-    "reports",
-    "yahoo-matchup-debug",
-  );
+  return path.resolve(process.cwd(), "reports", "yahoo-matchup-debug");
 }
 
 async function resolveUrl(args: string[]): Promise<{
@@ -66,13 +62,19 @@ async function resolveUrl(args: string[]): Promise<{
   }
 
   if (!seasonId) {
-    throw new Error("[debug-yahoo-matchup-table] --seasonId is required when --url is not provided.");
+    throw new Error(
+      "[debug-yahoo-matchup-table] --seasonId is required when --url is not provided.",
+    );
   }
 
   const weekId = toTrimmedString(getArgValue(args, "--weekId"));
   const date = toTrimmedString(getArgValue(args, "--date"));
-  const homeYahooTeamId = toTrimmedString(getArgValue(args, "--homeYahooTeamId"));
-  const awayYahooTeamId = toTrimmedString(getArgValue(args, "--awayYahooTeamId"));
+  const homeYahooTeamId = toTrimmedString(
+    getArgValue(args, "--homeYahooTeamId"),
+  );
+  const awayYahooTeamId = toTrimmedString(
+    getArgValue(args, "--awayYahooTeamId"),
+  );
   if (!weekId || !date || !homeYahooTeamId || !awayYahooTeamId) {
     throw new Error(
       "[debug-yahoo-matchup-table] URL build mode requires --weekId, --date, --homeYahooTeamId, and --awayYahooTeamId.",
@@ -80,16 +82,20 @@ async function resolveUrl(args: string[]): Promise<{
   }
 
   const [seasons, weeks] = (await Promise.all([
-    fastSheetsReader.fetchModel("Season"),
-    fastSheetsReader.fetchModel("Week"),
+    dataStore.fetchModel("Season"),
+    dataStore.fetchModel("Week"),
   ])) as unknown as [Season[], Week[]];
   const season = seasons.find((row) => toTrimmedString(row.id) === seasonId);
   if (!season) {
-    throw new Error(`[debug-yahoo-matchup-table] Season ${seasonId} was not found.`);
+    throw new Error(
+      `[debug-yahoo-matchup-table] Season ${seasonId} was not found.`,
+    );
   }
   const week = weeks.find((row) => toTrimmedString(row.id) === weekId);
   if (!week) {
-    throw new Error(`[debug-yahoo-matchup-table] Week ${weekId} was not found.`);
+    throw new Error(
+      `[debug-yahoo-matchup-table] Week ${weekId} was not found.`,
+    );
   }
 
   return {

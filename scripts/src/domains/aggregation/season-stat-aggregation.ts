@@ -1,14 +1,9 @@
-import path from "node:path";
+import * as dataStore from "@gshl-lib/data/convex-store";
 import {
   getCompositeKeyColumnsForModel,
-  getWriteSpreadsheetIdForModel,
-  SHEETS_CONFIG,
   type DatabaseRecord,
   type CompositeKeyModelName,
-} from "@gshl-lib/sheets/config/config";
-import { optimizedSheetsClient } from "@gshl-lib/sheets/client/optimized-client";
-import { minimalSheetsWriter } from "@gshl-lib/sheets/writer/minimal-writer";
-import { fastSheetsReader } from "@gshl-lib/sheets/reader/fast-reader";
+} from "@gshl-lib/data/records";
 import {
   deleteAggregateRows,
   fetchAggregateRows,
@@ -17,7 +12,7 @@ import {
   upsertAggregateRows,
   verifyAggregateMaintenanceFunctions,
 } from "@gshl-lib/data/convex-store";
-import { rankRowsWithAppsScriptEngine } from "@gshl-lib/ranking/apps-script-engine";
+import { rankRowsWithRankingEngine } from "@gshl-lib/ranking/ranking-engine";
 import { SeasonType } from "@gshl-lib/types/enums";
 import { toNumber } from "@gshl-lib/utils/core/data";
 import { applyPlayerDayDerivedColumns } from "@gshl-lib/stats/player-day-flags";
@@ -32,7 +27,7 @@ import {
 import {
   runLocalPowerRankingsSeason,
   type PowerRankingEngineResult,
-} from "../power/apps-script-power-engine";
+} from "../power/power-engine";
 
 const TEAM_STAT_FIELDS = [
   "GP",
@@ -193,8 +188,8 @@ type SeasonAggregationSummary = {
   };
   writes: Array<{
     modelName: WritableSeasonStatModelName;
-    spreadsheetId: string;
-    sheetName: string;
+
+    dataModelName: string;
     seasonRows: number;
     totalRows: number;
     updatedRows: number;
@@ -503,7 +498,7 @@ export function parseSeasonCategories(rawValue: unknown): string[] {
             .filter((category): category is string => !!category);
         }
       } catch {
-        // Fall through to CSV parsing for plain sheet values.
+        // Fall through to CSV parsing for plain model values.
       }
     }
 
@@ -1967,14 +1962,14 @@ function hasAggregateRowChanges(
 
 async function rankBaseStatRows(
   rows: DatabaseRecord[],
-  sheetName: WritableSeasonStatModelName,
+  dataModelName: WritableSeasonStatModelName,
   outputField = "Rating",
   seasonRows: DatabaseRecord[] = [],
 ): Promise<void> {
   if (rows.length === 0) return;
 
-  await rankRowsWithAppsScriptEngine(rows, {
-    sheetName,
+  await rankRowsWithRankingEngine(rows, {
+    dataModelName,
     outputField,
     mutate: true,
     dataContext: { seasonRows },
@@ -1995,13 +1990,6 @@ async function rankBaseStatRows(
   }
 }
 
-function getSpreadsheetIdForSeasonWrite(
-  _modelName: WritableSeasonStatModelName,
-  _seasonId: string,
-): string {
-  return "production-convex";
-}
-
 function isCareerPlayerStatModel(
   modelName: WritableSeasonStatModelName,
 ): boolean {
@@ -2018,8 +2006,8 @@ async function replaceModelRowsForSeason(
   deleteStale: boolean,
 ): Promise<{
   modelName: WritableSeasonStatModelName;
-  spreadsheetId: string;
-  sheetName: string;
+
+  dataModelName: string;
   seasonRows: number;
   totalRows: number;
   updatedRows: number;
@@ -2041,8 +2029,7 @@ async function replaceModelRowsForSeason(
     }>;
   };
 }> {
-  const spreadsheetId = "production-convex";
-  const sheetName = SHEETS_CONFIG.SHEETS[modelName];
+  const dataModelName = modelName;
   const preparedRows = dedupeRowsByCompositeKey(
     modelName,
     sortRows(modelName, generatedRows),
@@ -2055,7 +2042,7 @@ async function replaceModelRowsForSeason(
         )
       : { ...row };
     if (isCareerPlayerStatModel(modelName)) {
-      // Career rows span every season. The legacy Sheets shape retained a
+      // Career rows span every season. The legacy record shape retained a
       // blank seasonId column, but Convex correctly omits that field.
       delete next.seasonId;
     }
@@ -2127,8 +2114,8 @@ async function replaceModelRowsForSeason(
 
   return {
     modelName,
-    spreadsheetId,
-    sheetName,
+
+    dataModelName,
     seasonRows: preparedRows.length,
     totalRows: updatedRows + insertedRows,
     updatedRows,
@@ -2357,20 +2344,9 @@ function wrapWritePermissionError(
   modelName: WritableSeasonStatModelName,
   seasonId: string,
 ): Error {
-  const baseMessage =
-    error instanceof Error
-      ? error.message
-      : formatUnknownMessage(error) || "Unknown error";
-  const serviceAccountEmail =
-    optimizedSheetsClient.getConfiguredServiceAccountEmail();
-  const accountLabel = serviceAccountEmail
-    ? `Service account ${serviceAccountEmail}`
-    : "Configured Convex credentials";
-  const spreadsheetId = getSpreadsheetIdForSeasonWrite(modelName, seasonId);
-  const sheetName = SHEETS_CONFIG.SHEETS[modelName];
-
   return new Error(
-    `[stats:aggregate-season] ${accountLabel} cannot update ${modelName} for season ${seasonId} in workbook ${spreadsheetId} sheet ${sheetName}. Convex returned: ${baseMessage}. Share that spreadsheet with Editor access for the service account or rerun without --apply.`,
+    `[stats:aggregate-season] Convex cannot update ${modelName} for season ${seasonId}: ${error instanceof Error ? error.message : String(error)}`,
+    { cause: error },
   );
 }
 
@@ -2444,26 +2420,21 @@ function mergePowerResultIntoAggregates(
 }
 
 async function writePowerMatchupUpdates(
-  seasonId: string,
+  _seasonId: string,
   rows: DatabaseRecord[],
 ): Promise<void> {
   if (!rows.length) return;
-  await minimalSheetsWriter.upsertByCompositeKey("Matchup", ["id"], rows, {
+  await dataStore.upsertByCompositeKey("Matchup", ["id"], rows, {
     merge: true,
     idColumn: "id",
     createdAtColumn: "createdAt",
     updatedAtColumn: "updatedAt",
-    spreadsheetId: getWriteSpreadsheetIdForModel("Matchup", { seasonId }),
   });
 }
 
 export async function runSeasonStatsAggregation(
   options: SeasonAggregationOptions,
 ): Promise<SeasonAggregationSummary> {
-  process.env.USE_GOOGLE_SHEETS ??= "true";
-  process.env.GOOGLE_SERVICE_ACCOUNT_KEY_FILE ??=
-    path.resolve("credentials.json");
-
   const seasons = await fetchModel<DatabaseRecord>("Season");
   const requestedSeason = seasons.find((season) =>
     [season.id, season.legacyId].some(
@@ -2558,7 +2529,7 @@ export async function runSeasonStatsAggregation(
         writes.push({ ...result, applied: true });
         log(
           options,
-          `${input.modelName}: wrote seasonRows=${result.seasonRows} updated=${result.updatedRows} inserted=${result.insertedRows} unchanged=${result.unchangedRows} deleted=${result.deletedRows} duplicateDeletes=${result.duplicateDeletes} stalePreserved=${result.staleRowsPreserved} totalRows=${result.totalRows} sheet=${result.sheetName}`,
+          `${input.modelName}: wrote seasonRows=${result.seasonRows} updated=${result.updatedRows} inserted=${result.insertedRows} unchanged=${result.unchangedRows} deleted=${result.deletedRows} duplicateDeletes=${result.duplicateDeletes} stalePreserved=${result.staleRowsPreserved} totalRows=${result.totalRows} model=${result.dataModelName}`,
         );
         if (result.diagnostics) {
           for (const diagnosticLine of formatWriteDiagnostics(
@@ -2591,11 +2562,8 @@ export async function runSeasonStatsAggregation(
     for (const input of writeInputs) {
       writes.push({
         modelName: input.modelName,
-        spreadsheetId: getSpreadsheetIdForSeasonWrite(
-          input.modelName,
-          options.seasonId,
-        ),
-        sheetName: SHEETS_CONFIG.SHEETS[input.modelName],
+
+        dataModelName: input.modelName,
         seasonRows: input.rows.length,
         totalRows: -1,
         updatedRows: -1,

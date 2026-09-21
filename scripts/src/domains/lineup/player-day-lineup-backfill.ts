@@ -1,9 +1,9 @@
-import type { DatabaseRecord } from "@gshl-lib/sheets/config/config";
-import { fastSheetsReader } from "@gshl-lib/sheets/reader/fast-reader";
+import * as dataStore from "@gshl-lib/data/convex-store";
+import type { DatabaseRecord } from "@gshl-lib/data/records";
 import { fetchWeekScopedModel, updateById } from "@gshl-lib/data/convex-store";
 import { applyPlayerDayDerivedColumns } from "@gshl-lib/stats/player-day-flags";
 import { normalizeDateOnlyValue } from "@gshl-lib/utils/core/date";
-import { getAppsScriptLineupBuilder } from "@gshl-lib/lineup/apps-script-lineup-builder";
+import { getLineupBuilder } from "@gshl-lib/lineup/lineup-builder";
 
 export type PlayerDayLineupBackfillOptions = {
   seasonId: string;
@@ -417,11 +417,11 @@ export async function runPlayerDayLineupBackfill(
   options: PlayerDayLineupBackfillOptions,
 ): Promise<PlayerDayLineupBackfillSummary> {
   const [weeks, matchups, seasons, teams, lineupBuilder] = await Promise.all([
-    fastSheetsReader.fetchModel<WeekRecord>("Week"),
-    fastSheetsReader.fetchModel<MatchupRecord>("Matchup"),
-    fastSheetsReader.fetchModel<DatabaseRecord>("Season"),
-    fastSheetsReader.fetchModel<DatabaseRecord>("Team"),
-    getAppsScriptLineupBuilder(),
+    dataStore.fetchModel<WeekRecord>("Week"),
+    dataStore.fetchModel<MatchupRecord>("Matchup"),
+    dataStore.fetchModel<DatabaseRecord>("Season"),
+    dataStore.fetchModel<DatabaseRecord>("Team"),
+    getLineupBuilder(),
   ]);
   const resolvedSeasonId = resolveIds(
     seasons,
@@ -515,9 +515,7 @@ export async function runPlayerDayLineupBackfill(
         contextWeekIds,
         resolvedTeamIds,
       )
-    : await fastSheetsReader.fetchPlayerDaySeason<DatabaseRecord>(
-        resolvedSeasonId,
-      );
+    : await dataStore.fetchPlayerDaySeason<DatabaseRecord>(resolvedSeasonId);
 
   const seasonRowsForSeason = seasonRows
     .filter((row) => toTrimmedString(row.seasonId) === resolvedSeasonId)

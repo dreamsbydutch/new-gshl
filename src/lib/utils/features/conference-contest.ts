@@ -19,7 +19,7 @@ import type {
 } from "@gshl-types";
 import { AwardsList, MatchupType } from "../domain/constants";
 import { findCurrentSeason, findMostRecentSeason } from "../domain/season";
-import { safeParseSheetDate } from "../core/date";
+import { safeParseDate } from "../core/date";
 import { getTeamAwardTeam } from "@gshl-lib/config/awards";
 import { isPlayoffMatchupType } from "@gshl-utils/domain/matchup";
 
@@ -82,7 +82,7 @@ export const getConferenceContestVisibleSeasons = (
 
   return [...seasons]
     .filter((season) => {
-      const startTime = safeParseSheetDate(season.startDate)?.getTime();
+      const startTime = safeParseDate(season.startDate)?.getTime();
       return startTime == null || startTime <= referenceTime;
     })
     .sort((left, right) => {

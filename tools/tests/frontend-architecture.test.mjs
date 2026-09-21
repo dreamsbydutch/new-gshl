@@ -135,8 +135,6 @@ for (const specifier of [
   "../../server/uploadthing",
   "@gshl-lib/data/convex",
   "../../lib/data/convex",
-  "@gshl-sheets",
-  "../../lib/sheets/index",
 ]) {
   test(`rejects route runtime access to ${specifier}`, () => {
     rejected(`import { value } from "${specifier}";`);

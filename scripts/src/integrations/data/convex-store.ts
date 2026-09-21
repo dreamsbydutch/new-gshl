@@ -26,7 +26,6 @@ export type UpsertOptions = {
   createdAtColumn?: string;
   idColumn?: string;
   generateId?: () => string;
-  spreadsheetId?: string;
   deleteMissing?: boolean | { filter?: Record<string, unknown> };
   diagnostics?: boolean | { maxSamples?: number; maxFieldsPerSample?: number };
 };

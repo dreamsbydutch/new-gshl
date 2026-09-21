@@ -5,7 +5,7 @@
  *   npm run ratings:rebuild-team -- --season-ids 11,12 --include-team-seasons
  *
  * What it does:
- *   Calls the Apps Script team-rating updater across one or more seasons and
+ *   Calls the local team-rating updater across one or more seasons and
  *   prints a combined summary. Team-week rebuilds also refresh power/team-week
  *   rankings and matchup ranks/ratings. Runs as a dry-run unless --apply is passed.
  *
@@ -18,8 +18,8 @@
  *   --stop-on-error         Abort immediately on the first failed season.
  *   --help                  Show this message and exit.
  */
-import type { DatabaseRecord } from "@gshl-lib/sheets/config/config";
-import { type CompositeKeyModelName } from "@gshl-lib/sheets/config/config";
+import type { DatabaseRecord } from "@gshl-lib/data/records";
+import { type CompositeKeyModelName } from "@gshl-lib/data/records";
 import {
   fetchModel,
   fetchSeasonModel,
@@ -27,11 +27,11 @@ import {
   updateRowsById,
 } from "@gshl-lib/data/convex-store";
 import {
-  rankRowsWithAppsScriptEngine,
-  type RankingEngineSheetName,
-} from "@gshl-lib/ranking/apps-script-engine";
+  rankRowsWithRankingEngine,
+  type RankingEngineModelName,
+} from "@gshl-lib/ranking/ranking-engine";
 import { getAllSeasonIds } from "@gshl-lib/ranking/player-rating-backfill";
-import { runLocalPowerRankingsSeason } from "../../domains/power/apps-script-power-engine";
+import { runLocalPowerRankingsSeason } from "../../domains/power/power-engine";
 import {
   getArgValue,
   hasFlag,
@@ -56,10 +56,10 @@ type TeamRatingModelName = Extract<
   "TeamDayStatLine" | "TeamWeekStatLine" | "TeamSeasonStatLine"
 >;
 
-type TeamRatingSheetSummary = {
+type TeamRatingModelSummary = {
   modelName: TeamRatingModelName;
-  spreadsheetId: string;
-  sheetName: string;
+
+  dataModelName: string;
   outputField: string;
   matchedRows: number;
   updatedRows: number;
@@ -68,7 +68,7 @@ type TeamRatingSheetSummary = {
 
 type TeamRatingSeasonSummary = {
   seasonId: string;
-  models: TeamRatingSheetSummary[];
+  models: TeamRatingModelSummary[];
   powerRefresh: {
     weekRows: number;
     seasonRows: number;
@@ -261,7 +261,7 @@ async function executeTeamRatingModel(
   options: TeamRatingRebuildOptions,
   seasonId: string,
   modelName: TeamRatingModelName,
-): Promise<TeamRatingSheetSummary> {
+): Promise<TeamRatingModelSummary> {
   if (
     options.weekIds.length > 0 &&
     (modelName === "TeamDayStatLine" || modelName === "TeamWeekStatLine")
@@ -274,8 +274,8 @@ async function executeTeamRatingModel(
       ),
       fetchModel<DatabaseRecord>("Season"),
     ]);
-    await rankRowsWithAppsScriptEngine(rows, {
-      sheetName: modelName,
+    await rankRowsWithRankingEngine(rows, {
+      dataModelName: modelName,
       outputField: "Rating",
       mutate: true,
       dataContext: { seasonRows },
@@ -306,24 +306,24 @@ async function executeTeamRatingModel(
     }
     return {
       modelName,
-      spreadsheetId: "production-convex",
-      sheetName: modelName,
+
+      dataModelName: modelName,
       outputField: "Rating",
       matchedRows: targetRows.length,
       updatedRows,
       dryRun: !options.apply,
     };
   }
-  const spreadsheetId = "production-convex";
-  const sheetName = modelName;
+
+  const dataModelName = modelName;
   const outputField = "Rating";
   const [rows, seasonRows] = await Promise.all([
     fetchSeasonModel<DatabaseRecord>(modelName, seasonId),
     fetchModel<DatabaseRecord>("Season"),
   ]);
 
-  await rankRowsWithAppsScriptEngine(rows, {
-    sheetName: modelName satisfies RankingEngineSheetName,
+  await rankRowsWithRankingEngine(rows, {
+    dataModelName: modelName satisfies RankingEngineModelName,
     outputField,
     mutate: true,
     dataContext: { seasonRows },
@@ -353,8 +353,8 @@ async function executeTeamRatingModel(
 
   return {
     modelName,
-    spreadsheetId,
-    sheetName,
+
+    dataModelName,
     outputField,
     matchedRows: rows.length,
     updatedRows: options.apply ? rows.length : 0,
@@ -367,14 +367,14 @@ async function executeSeason(
   seasonId: string,
 ): Promise<TeamRatingSeasonSummary> {
   const models = getSelectedModels(options);
-  const summaries: TeamRatingSheetSummary[] = [];
+  const summaries: TeamRatingModelSummary[] = [];
 
   for (const modelName of models) {
     const summary = await executeTeamRatingModel(options, seasonId, modelName);
     summaries.push(summary);
     log(
       options,
-      `Season ${seasonId} ${summary.modelName}: matched=${summary.matchedRows} updated=${summary.updatedRows} sheet=${summary.sheetName} workbook=${summary.spreadsheetId}.`,
+      `Season ${seasonId} ${summary.modelName}: matched=${summary.matchedRows} updated=${summary.updatedRows} record=${summary.dataModelName}.`,
     );
   }
 
