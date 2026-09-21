@@ -867,6 +867,9 @@ export const rulebookSections: RulebookSection[] = [
             "A player may play under no more than two consecutive contracts.",
           ),
           paragraph(
+            "Consecutive contracts are counted across all teams. A break in contract coverage resets the count, so the next contract is the first consecutive contract. Signing status does not determine expiry status: the first consecutive contract expires as RFA, and only the second consecutive contract expires as UFA, even when the player signed as a UFA.",
+          ),
+          paragraph(
             "After a player’s second consecutive contract expires, the player must return to the GSHL Draft pool and cannot receive a third consecutive contract.",
           ),
         ],

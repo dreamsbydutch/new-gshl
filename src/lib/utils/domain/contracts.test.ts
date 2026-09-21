@@ -154,6 +154,61 @@ void test("UFA continuity controls contract type and expiry status", () => {
   assert.equal(continuous.expiryStatus, ContractStatus.UFA);
 });
 
+void test("Chychrun's 2026-27 UFA signing after a 2024 expiry ends as RFA", () => {
+  const recentSeasons = Array.from(
+    { length: 5 },
+    (_, index): Season => ({
+      ...seasons[0]!,
+      id: `season-${2023 + index}`,
+      year: 2023 + index,
+      startDate: `${2022 + index}-10-01`,
+      endDate: `${2023 + index}-04-20`,
+      signingEndDate: `${2023 + index}-06-20`,
+    }),
+  );
+  const chychrun = { ...player(ResignableStatus.UFA), id: "chychrun" };
+
+  for (const ownerId of ["sauce-puck-owner", "previous-owner"]) {
+    const terms = deriveContractCreationTerms({
+      player: chychrun,
+      signingSeason: recentSeasons[3]!,
+      contractLength: 1,
+      contracts: [
+        contract({
+          playerId: chychrun.id,
+          ownerId,
+          seasonId: "season-2023",
+          startDate: "2023-10-01",
+          expiryDate: "2024-04-20",
+          capHitEndDate: "2024-04-20",
+          expiryStatus: ContractStatus.UFA,
+        }),
+      ],
+      seasons: recentSeasons,
+      referenceDate: new Date("2026-08-01T12:00:00Z"),
+    });
+    assert.equal(terms.startSeason.id, "season-2027");
+    assert.equal(terms.signingStatus, ContractStatus.UFA);
+    assert.equal(terms.expiryStatus, ContractStatus.RFA);
+    assert.equal(terms.contractType, ContractType.STANDARD);
+  }
+});
+
+void test("a second consecutive UFA contract expires as UFA regardless of prior owner", () => {
+  for (const ownerId of ["owner-1", "another-owner"]) {
+    const terms = deriveContractCreationTerms({
+      player: player(ResignableStatus.UFA),
+      signingSeason: seasons[1]!,
+      contractLength: 1,
+      contracts: [contract({ ownerId })],
+      seasons,
+    });
+    assert.equal(terms.signingStatus, ContractStatus.UFA);
+    assert.equal(terms.expiryStatus, ContractStatus.UFA);
+    assert.equal(terms.contractType, ContractType.EXTENSION);
+  }
+});
+
 void test("coverage includes trades but excludes non-playing outcomes", () => {
   assert.deepEqual(getContractCoveredSeasonIds(contract(), seasons), ["6"]);
   assert.equal(
