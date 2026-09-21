@@ -22,6 +22,7 @@ export function useOwnerDraftReport(ownerId: string | null | undefined) {
     filter,
     setFilter,
     selections,
+    signings: picks.filter((pick) => pick.signing && pick.playerId),
     graded,
     hits,
     positions,
@@ -33,7 +34,7 @@ export function useOwnerDraftReport(ownerId: string | null | undefined) {
       : null,
     best: ranked.find((pick) => pick.surplus! > 0),
     worst: [...ranked].reverse().find((pick) => pick.surplus! < 0),
-    visiblePicks: picks.filter(
+    visiblePicks: selections.filter(
       (pick) =>
         filter === "all" ||
         (filter === "hits" ? (pick.surplus ?? 0) > 0 : (pick.surplus ?? 0) < 0),

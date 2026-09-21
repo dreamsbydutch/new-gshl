@@ -28,6 +28,7 @@ export interface DraftHistoryPick {
   days: number | null;
   expectedRating: number | null;
   surplus: number | null;
+  outcome: { label: string; date: string | null };
 }
 
 export interface DraftHistorySeason {
@@ -35,6 +36,7 @@ export interface DraftHistorySeason {
   name: string;
   year: number;
   complete: boolean;
+  teamRating: number | null;
   calderRating: number | null;
   calderRank: number | null;
   winner: boolean;

@@ -4,6 +4,7 @@ import type { TeamDraftPickHistoryProps } from "@gshl-types";
 import { useOwnerDraftReport } from "../../hooks/features/useOwnerDraftReport";
 import { DraftPickListSkeleton } from "@gshl-skeletons";
 import { TableViewport } from "@gshl-ui";
+import { Trophy } from "lucide-react";
 
 const number = (value: number | null | undefined) =>
   value == null ? "-" : value.toFixed(1);
@@ -29,24 +30,52 @@ export function TeamDraftPickHistory({
   return (
     <section className="mx-auto w-full max-w-5xl space-y-6">
       <div>
-        <div className="mb-1 flex items-center justify-between gap-3">
+        <div className="mb-3 flex items-center justify-between gap-3">
           <h2 className="text-base font-semibold">Draft History</h2>
-          <label>
-            <span className="sr-only">Draft season</span>
-            <select
-              className={selectClassName}
-              value={data.selectedSeasonId ?? ""}
-              onChange={(event) => report.selectSeason(event.target.value)}
-            >
-              {data.seasons.map((entry) => (
-                <option key={entry.id} value={entry.id}>
+          <span className="text-xs text-slate-500">
+            {trophies} Calder {trophies === 1 ? "trophy" : "trophies"}
+          </span>
+        </div>
+        <div
+          role="group"
+          aria-label="Choose draft season"
+          className="mb-4 grid grid-cols-2 gap-x-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5"
+        >
+          {data.seasons.map((entry) => {
+            const selected = entry.id === data.selectedSeasonId;
+            return (
+              <button
+                key={entry.id}
+                type="button"
+                aria-pressed={selected}
+                onClick={() => report.selectSeason(entry.id)}
+                className={`border-b-2 px-2 py-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-2 ${selected ? "border-slate-900 bg-slate-100 text-slate-950" : "border-slate-200 text-slate-600 hover:border-slate-400 hover:bg-slate-50"}`}
+              >
+                <span className="flex items-center justify-between gap-2 text-sm font-semibold">
                   {entry.name}
-                </option>
-              ))}
-            </select>
-          </label>
+                  {entry.winner && (
+                    <Trophy
+                      className="h-3.5 w-3.5 text-amber-600"
+                      aria-label="Calder winner"
+                    />
+                  )}
+                </span>
+                <span className="mt-1 block text-[11px] tabular-nums">
+                  Team {number(entry.teamRating)}
+                </span>
+                <span className="flex items-baseline justify-between gap-1 text-[11px] tabular-nums">
+                  <span>Calder {number(entry.calderRating)}</span>
+                  <span className="font-semibold">
+                    {entry.calderRank ? `#${entry.calderRank}` : "Unrated"}
+                  </span>
+                </span>
+              </button>
+            );
+          })}
         </div>
         <p className="text-xs text-slate-500">
+          <span className="font-semibold text-slate-800">{season?.name}</span>
+          {" · "}
           {season?.complete
             ? "Final regular-season results"
             : "Provisional - season not complete"}
@@ -173,10 +202,12 @@ export function TeamDraftPickHistory({
                     >
                       <span className="block">{pick.name}</span>
                       <span className="text-[11px] text-slate-500">
-                        {pick.signing
-                          ? "Signing - ungraded"
-                          : `R${pick.round} / #${pick.pick ?? "-"}`}{" "}
-                        / {pick.position}
+                        {`R${pick.round} / #${pick.pick ?? "-"}`} /{" "}
+                        {pick.position}
+                      </span>
+                      <span className="block max-w-56 whitespace-normal text-[11px] text-slate-500">
+                        {pick.outcome.label}
+                        {pick.outcome.date ? ` · ${pick.outcome.date}` : ""}
                       </span>
                     </th>
                     <td className="px-2 py-1 tabular-nums">
@@ -209,68 +240,70 @@ export function TeamDraftPickHistory({
         )}
       </div>
 
-      <div>
-        <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
-          <h3 className="text-sm font-semibold">Calder History</h3>
-          <p className="text-xs text-slate-500">
-            {trophies} {trophies === 1 ? "trophy" : "trophies"} /{" "}
-            {data.seasons.length} seasons
-          </p>
-        </div>
-        <table className="w-full text-right text-xs">
-          <caption className="sr-only">
-            Calder ratings and awards by season. Select a season to view its
-            draft.
-          </caption>
-          <thead>
-            <tr className="bg-gray-800 text-gray-200">
-              <th scope="col" className="px-2 py-1 text-left font-normal">
-                Season
-              </th>
-              <th scope="col" className="px-2 py-1 font-normal">
-                Rating
-              </th>
-              <th scope="col" className="px-2 py-1 font-normal">
-                Rank
-              </th>
-              <th scope="col" className="px-2 py-1 font-normal">
-                Result
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {data.seasons.map((entry, index) => (
-              <tr
-                key={entry.id}
-                className={index % 2 === 0 ? "bg-white" : "bg-gray-100"}
-              >
-                <th scope="row" className="px-2 py-1 text-left font-normal">
-                  <button
-                    type="button"
-                    aria-pressed={entry.id === data.selectedSeasonId}
-                    onClick={() => report.selectSeason(entry.id)}
-                    className={`min-h-8 text-left underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 ${entry.id === data.selectedSeasonId ? "font-semibold underline" : ""}`}
+      <div className="max-w-2xl">
+        <h3 className="mb-2 text-sm font-semibold">Signings</h3>
+        {report.signings.length ? (
+          <TableViewport
+            ariaLabel="Signing results"
+            viewportClassName="rounded-none border-0"
+          >
+            <table className="w-full whitespace-nowrap text-right text-xs">
+              <caption className="sr-only">
+                Signed players for {season?.name}, excluded from draft grading.
+              </caption>
+              <thead>
+                <tr className="bg-gray-800 text-gray-200">
+                  <th scope="col" className="px-2 py-1 text-left font-normal">
+                    Player
+                  </th>
+                  {["Overall", "Team", "Days"].map((label) => (
+                    <th
+                      key={label}
+                      scope="col"
+                      className="px-2 py-1 font-normal"
+                    >
+                      {label}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {report.signings.map((pick, index) => (
+                  <tr
+                    key={pick.id}
+                    className={index % 2 === 0 ? "bg-white" : "bg-gray-100"}
                   >
-                    {entry.name}
-                  </button>
-                </th>
-                <td className="px-2 py-1 tabular-nums">
-                  {number(entry.calderRating)}
-                </td>
-                <td className="px-2 py-1 tabular-nums">
-                  {entry.calderRank ? `#${entry.calderRank}` : "-"}
-                </td>
-                <td className="px-2 py-1 text-slate-500">
-                  {entry.winner
-                    ? "Winner"
-                    : !entry.complete
-                      ? "Provisional"
-                      : "-"}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                    <th scope="row" className="px-2 py-1 text-left font-normal">
+                      <span className="block">
+                        {pick.name}{" "}
+                        <span className="text-slate-500">
+                          / {pick.position}
+                        </span>
+                      </span>
+                      <span className="block max-w-56 whitespace-normal text-[11px] text-slate-500">
+                        {pick.outcome.label}
+                        {pick.outcome.date ? ` · ${pick.outcome.date}` : ""}
+                      </span>
+                    </th>
+                    <td className="px-2 py-1 tabular-nums">
+                      {number(pick.overallRating)}
+                    </td>
+                    <td className="px-2 py-1 tabular-nums">
+                      {number(pick.teamRating)}
+                    </td>
+                    <td className="px-2 py-1 tabular-nums">
+                      {pick.days ?? "-"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </TableViewport>
+        ) : (
+          <p className="py-2 text-xs text-slate-500">
+            No signings recorded for this season.
+          </p>
+        )}
       </div>
 
       <details className="border-t border-slate-200 pt-3 text-xs text-slate-500">
@@ -294,6 +327,13 @@ export function TeamDraftPickHistory({
             Team rating shows what the drafting team received. Days are recorded
             roster days with that team. Compare the position mix across seasons
             to see drafting preferences.
+          </p>
+          <p>
+            A drop is the first absent day after consecutive roster days from
+            season opening, even if the player later returns. Dated contract
+            endings identify buyouts and trades. Outcomes cover the full season;
+            ratings and days cover the regular season, including later returns.
+            Incomplete daily history is labeled rather than assuming a drop.
           </p>
           <p>
             Signings are excluded from grading. Missing ratings or roster

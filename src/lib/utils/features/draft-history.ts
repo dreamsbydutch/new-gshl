@@ -22,6 +22,7 @@ export function buildDraftHistoryPicks(input: {
   totals: DraftPerformance[];
   splits: DraftPerformance[];
   players: { id: string; name: string; position: string }[];
+  outcomes?: Map<string, DraftHistoryPick["outcome"]>;
 }): DraftHistoryPick[] {
   const totals = new Map(input.totals.map((row) => [row.playerId, row]));
   const splits = new Map(
@@ -68,6 +69,10 @@ export function buildDraftHistoryPicks(input: {
         teamRating: draftNumber(split?.rating),
         overallRating,
         days: draftNumber(split?.days),
+        outcome: input.outcomes?.get(pick.id) ?? {
+          label: "Roster history unavailable",
+          date: null,
+        },
         expectedRating,
         surplus:
           overallRating !== null && expectedRating !== null
