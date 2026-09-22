@@ -16,6 +16,10 @@ const number = (value: number | null | undefined) =>
   value == null ? "-" : value.toFixed(1);
 const signed = (value: number | null) =>
   value === null ? "-" : `${value > 0 ? "+" : ""}${value.toFixed(1)}`;
+const rosterStatus = (label: string, date: string | null) =>
+  label === "Roster history incomplete"
+    ? "-"
+    : `${label}${date ? ` · ${date}` : ""}`;
 
 function RosterDays({
   days,
@@ -330,8 +334,7 @@ export function TeamDraftPickHistory({
                       {signed(pick.surplus)}
                     </td>
                     <td className="whitespace-nowrap px-2 py-1 text-left text-[11px] text-slate-500">
-                      {pick.outcome.label}
-                      {pick.outcome.date ? ` · ${pick.outcome.date}` : ""}
+                      {rosterStatus(pick.outcome.label, pick.outcome.date)}
                     </td>
                   </tr>
                 );
@@ -406,8 +409,7 @@ export function TeamDraftPickHistory({
                       />
                     </td>
                     <td className="whitespace-nowrap px-2 py-1 text-left text-[11px] text-slate-500">
-                      {pick.outcome.label}
-                      {pick.outcome.date ? ` · ${pick.outcome.date}` : ""}
+                      {rosterStatus(pick.outcome.label, pick.outcome.date)}
                     </td>
                   </tr>
                 ))}
@@ -450,7 +452,7 @@ export function TeamDraftPickHistory({
             season opening, even if the player later returns. Dated contract
             endings identify buyouts and trades. Outcomes, ratings and days
             cover the regular season; roster days include later returns.
-            Incomplete daily history is labeled rather than assuming a drop.
+            Incomplete daily history displays a dash rather than assuming a drop.
           </p>
           <p>
             Signings are excluded from grading. Missing ratings or roster
