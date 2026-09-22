@@ -25,7 +25,12 @@ export type LockerRoomNavigationView =
   | "draft";
 
 export type LeagueOfficeNavigationView =
-  "draft" | "freeAgents" | "rules" | "confBattle" | "ownerRankings";
+  | "draft"
+  | "freeAgents"
+  | "rules"
+  | "confBattle"
+  | "ownerRankings"
+  | "performances";
 
 export type AdminNavigationView =
   | "accounts"

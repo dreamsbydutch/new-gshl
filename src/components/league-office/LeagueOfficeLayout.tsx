@@ -26,7 +26,8 @@ export function LeagueOfficeLayout({
       nextType === "freeAgents" ||
       nextType === "rules" ||
       nextType === "confBattle" ||
-      nextType === "ownerRankings"
+      nextType === "ownerRankings" ||
+      nextType === "performances"
     ) {
       navigation.selectView(nextType);
     }
@@ -38,6 +39,7 @@ export function LeagueOfficeLayout({
   } = {
     activeKey: isMockDraftPage ? "mockDraft" : selectedType,
     toolbarKeys: [
+      { key: "performances", value: "Performances", setter: selectView },
       ...(navigation.showMockDraft
         ? [{ key: "mockDraft", value: "Mock", setter: selectView }]
         : []),

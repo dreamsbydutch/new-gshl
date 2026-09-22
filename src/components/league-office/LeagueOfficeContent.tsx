@@ -28,6 +28,12 @@ const DraftClasses = dynamic(
   () => import("./DraftClasses").then((module) => module.DraftClasses),
   { loading: () => <DraftClassesSkeleton /> },
 );
+const Performances = dynamic(
+  () => import("./Performances").then((module) => module.Performances),
+  {
+    loading: () => <p role="status">Loading performances…</p>,
+  },
+);
 const UfaLeagueOffice = dynamic(
   () =>
     import("@gshl-components/contracts/UfaSigning").then(
@@ -52,6 +58,7 @@ export function LeagueOfficeContent() {
       {activeType === "confBattle" ? <ConferenceContest /> : null}
       {activeType === "ownerRankings" ? <OwnerRankings /> : null}
       {activeType === "freeAgents" ? <UfaLeagueOffice /> : null}
+      {activeType === "performances" ? <Performances /> : null}
     </div>
   );
 }

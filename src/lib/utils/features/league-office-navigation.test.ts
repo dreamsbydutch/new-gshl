@@ -34,6 +34,7 @@ void test("preserves all active member views", () => {
     "rules",
     "confBattle",
     "ownerRankings",
+    "performances",
   ]) {
     assert.equal(resolveLeagueOfficeView(view), view);
   }

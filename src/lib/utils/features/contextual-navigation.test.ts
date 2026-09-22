@@ -158,6 +158,7 @@ void test("League Office navigation offers only active member destinations", () 
     "rules",
     "confBattle",
     "ownerRankings",
+    "performances",
   ]);
   for (const view of getLeagueOfficeNavigationViews()) {
     assert.equal(

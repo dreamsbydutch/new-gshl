@@ -51,6 +51,7 @@ import type * as matchup from "../matchup.js";
 import type * as notificationPush from "../notificationPush.js";
 import type * as notificationScanner from "../notificationScanner.js";
 import type * as notifications from "../notifications.js";
+import type * as performances from "../performances.js";
 import type * as playerDayArchive from "../playerDayArchive.js";
 import type * as reporterBackfill from "../reporterBackfill.js";
 import type * as schedule from "../schedule.js";
@@ -116,6 +117,7 @@ declare const fullApi: ApiFromModules<{
   notificationPush: typeof notificationPush;
   notificationScanner: typeof notificationScanner;
   notifications: typeof notifications;
+  performances: typeof performances;
   playerDayArchive: typeof playerDayArchive;
   reporterBackfill: typeof reporterBackfill;
   schedule: typeof schedule;

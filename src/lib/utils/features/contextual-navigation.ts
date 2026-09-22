@@ -44,6 +44,7 @@ export const MEMBER_LEAGUE_OFFICE_NAVIGATION_VIEWS = [
   "rules",
   "confBattle",
   "ownerRankings",
+  "performances",
 ] as const;
 
 export const ADMIN_NAVIGATION_VIEWS = [
