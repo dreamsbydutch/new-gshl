@@ -12,6 +12,7 @@ import type {
   PlayerSplitStatLine,
   PlayerTotalStatLine,
   Season,
+  TeamAward,
   TeamWeekStatLine,
 } from "./database";
 import type { MatchupTeamWeekStats } from "./matchup";
