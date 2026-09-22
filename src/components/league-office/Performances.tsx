@@ -5,12 +5,14 @@ import { PERFORMANCE_KINDS } from "@gshl-utils/features/performances";
 import type {
   PerformanceFilters,
   PerformanceKind,
+  PerformanceColumnGroup,
 } from "@gshl-lib/types/performances";
 
 const controlClass =
   "w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900";
 const labels: Record<string, string> = {
   Rating: "Rating",
+  ADD: "Adds",
   seasonRating: "Season rating",
   overallRating: "Overall rating",
   PM: "+/−",
@@ -30,8 +32,8 @@ export function Performances() {
           Top performances
         </h2>
         <p className="mt-1 text-sm text-gray-600">
-          Compare up to 100 performances per season. Choose a statistic or click
-          a column to rank the full selection.
+          Compare the top 100 performances across selected seasons. Choose a
+          statistic or click a column to rank the full selection.
         </p>
       </div>
       <div className="grid grid-cols-2 gap-3 rounded-lg border bg-white p-4 md:grid-cols-4">
@@ -51,22 +53,45 @@ export function Performances() {
             ))}
           </select>
         </label>
-        <label className="space-y-1 text-sm">
-          Season
-          <select
-            className={controlClass}
-            value={filters.seasonId}
-            onChange={(event) => view.setSeason(event.target.value)}
-            disabled={view.seasonsLoading}
-          >
-            {!filters.seasonId && <option value="">Select a season</option>}
-            {[...view.seasons].reverse().map((season) => (
-              <option key={season.id} value={season.id}>
-                {season.name}
-              </option>
-            ))}
-          </select>
-        </label>
+        <fieldset
+          className="min-w-0 space-y-1 text-sm"
+          disabled={view.seasonsLoading}
+        >
+          <legend>Seasons</legend>
+          <details className="rounded-md border border-gray-300 p-2">
+            <summary className="cursor-pointer">
+              {filters.seasonIds.length} selected
+            </summary>
+            <div className="my-2 flex gap-3">
+              <button
+                type="button"
+                className="underline"
+                onClick={view.selectAllSeasons}
+              >
+                All years
+              </button>
+              <button
+                type="button"
+                className="underline"
+                onClick={view.clearSeasons}
+              >
+                Clear
+              </button>
+            </div>
+            <div className="max-h-48 space-y-2 overflow-y-auto">
+              {[...view.seasons].reverse().map((season) => (
+                <label key={season.id} className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={filters.seasonIds.includes(season.id)}
+                    onChange={() => view.toggleSeason(season.id)}
+                  />
+                  {season.name}
+                </label>
+              ))}
+            </div>
+          </details>
+        </fieldset>
         <label className="space-y-1 text-sm">
           Rank by
           <select
@@ -156,6 +181,27 @@ export function Performances() {
         goalies only in player tables. No minimum beyond one game; ties use a
         stable order.
       </p>
+      <label className="flex flex-wrap items-center gap-2 text-sm">
+        Show columns
+        <select
+          className="rounded-md border border-gray-300 bg-white px-3 py-2"
+          value={view.columnGroup}
+          onChange={(event) =>
+            view.setColumnGroup(event.target.value as PerformanceColumnGroup)
+          }
+        >
+          <option value="all">All statistics</option>
+          <option value="activity">
+            Activity — Adds, MS, BS, and availability
+          </option>
+          <option value="hockey">Hockey statistics</option>
+          <option value="ratings">Ratings and ranks</option>
+        </select>
+        <span className="text-xs text-gray-600">
+          The ranking statistic stays first. Scroll horizontally for more
+          columns.
+        </span>
+      </label>
       {view.validationError && (
         <p role="alert" className="text-sm text-red-700">
           {view.validationError}
@@ -174,15 +220,15 @@ export function Performances() {
           ? "Finding top performances…"
           : view.data
             ? `${view.data.rows.length} performances · ${label(filters.stat)} · ${filters.direction === "desc" ? "highest" : "lowest"} first`
-            : !filters.seasonId
-              ? "Select a season to compare performances."
+            : filters.seasonIds.length === 0
+              ? "Select one or more seasons to compare performances."
               : ""}
       </div>
       {view.data?.highlightsOnly && (
         <p className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
-          This season&apos;s daily records are archived. Results rank retained
-          highlights only; date filters and other categories may omit
-          performances from the full archive.
+          Some selected seasons have archived daily records. For those seasons,
+          results rank retained highlights only; date filters and other
+          categories may omit performances from the full archive.
         </p>
       )}
       {view.data && (
@@ -215,9 +261,12 @@ export function Performances() {
                   </th>
                 )}
                 <th scope="col" className="px-3 py-3">
+                  Season
+                </th>
+                <th scope="col" className="px-3 py-3">
                   Period
                 </th>
-                {view.stats.map((stat) => (
+                {view.visibleStats.map((stat) => (
                   <th
                     key={stat}
                     scope="col"
@@ -259,8 +308,9 @@ export function Performances() {
                       {[row.team, row.position].filter(Boolean).join(" · ")}
                     </td>
                   )}
+                  <td className="px-3 py-2">{row.season}</td>
                   <td className="px-3 py-2">{row.period}</td>
-                  {view.stats.map((stat) => (
+                  {view.visibleStats.map((stat) => (
                     <td
                       key={stat}
                       className={`px-3 py-2 text-right tabular-nums ${stat === filters.stat ? "bg-blue-50 font-semibold" : ""}`}

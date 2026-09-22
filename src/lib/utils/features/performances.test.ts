@@ -7,6 +7,7 @@ import type {
 import {
   PERFORMANCE_KINDS,
   performanceDirection,
+  performanceColumns,
   performanceNumber,
   performanceStats,
   qualifiesForPerformance,
@@ -15,7 +16,7 @@ import {
 
 const filters: PerformanceFilters = {
   kind: "playerDay",
-  seasonId: "season",
+  seasonIds: ["season"],
   stat: "Rating",
   direction: "desc",
   position: "all",
@@ -25,6 +26,7 @@ const filters: PerformanceFilters = {
 };
 const row = (id: string, value: number | null): PerformanceRow => ({
   id,
+  season: "Season",
   stats: { Rating: value },
   playerId: null,
   teamIds: [],
@@ -33,6 +35,21 @@ const row = (id: string, value: number | null): PerformanceRow => ({
   position: "",
   name: "",
   team: "",
+});
+
+void test("team columns prioritize activity stats and keep the ranking stat visible in every group", () => {
+  const all = performanceColumns("teamSeason", "all", "Rating");
+  assert.deepEqual(all.slice(0, 4), ["Rating", "ADD", "MS", "BS"]);
+  assert.deepEqual([...all].sort(), [...performanceStats("teamSeason")].sort());
+  const activity = performanceColumns("teamSeason", "activity", "G");
+  assert.deepEqual(activity.slice(0, 4), ["G", "ADD", "MS", "BS"]);
+  assert.ok(activity.includes("playersUsed"));
+  assert.ok(!activity.includes("GAA"));
+  assert.ok(
+    !performanceColumns("playerNhl", "activity", "seasonRating").includes(
+      "ADD",
+    ),
+  );
 });
 
 void test("every requested table exposes its stored rating and stats", () => {

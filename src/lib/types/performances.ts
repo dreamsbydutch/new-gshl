@@ -8,9 +8,11 @@ export type PerformanceKind =
   | "teamWeek"
   | "teamSeason";
 
+export type PerformanceColumnGroup = "all" | "activity" | "hockey" | "ratings";
+
 export interface PerformanceFilters {
   kind: PerformanceKind;
-  seasonId: string;
+  seasonIds: string[];
   stat: string;
   direction: "asc" | "desc";
   position: "all" | "skater" | "goalie";
@@ -21,6 +23,7 @@ export interface PerformanceFilters {
 
 export interface PerformanceRow {
   id: string;
+  season: string;
   playerId: string | null;
   teamIds: string[];
   weekId: string | null;

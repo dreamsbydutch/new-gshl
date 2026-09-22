@@ -23,7 +23,10 @@ export function usePerformances(filters: PerformanceFilters, enabled: boolean) {
     let active = true;
     const timer = setTimeout(() => {
       void load({
-        filters: { ...filters, seasonId: filters.seasonId as Id<"seasons"> },
+        filters: {
+          ...filters,
+          seasonIds: filters.seasonIds as Id<"seasons">[],
+        },
       }).then(
         (data) => {
           if (active) setState({ key, data });

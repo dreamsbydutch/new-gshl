@@ -15,7 +15,7 @@ import {
   topPerformances,
 } from "../src/lib/utils/features/performances";
 
-const filtersValidator = v.object({
+const filterFields = {
   kind: v.union(
     v.literal("playerDay"),
     v.literal("playerWeek"),
@@ -26,13 +26,20 @@ const filtersValidator = v.object({
     v.literal("teamWeek"),
     v.literal("teamSeason"),
   ),
-  seasonId: v.id("seasons"),
   stat: v.string(),
   direction: v.union(v.literal("asc"), v.literal("desc")),
   position: v.union(v.literal("all"), v.literal("skater"), v.literal("goalie")),
   seasonType: v.string(),
   startDate: v.string(),
   endDate: v.string(),
+};
+const filtersValidator = v.object({
+  ...filterFields,
+  seasonIds: v.array(v.id("seasons")),
+});
+const seasonFiltersValidator = v.object({
+  ...filterFields,
+  seasonId: v.id("seasons"),
 });
 const tables = {
   playerDay: "playerDayStatLines",
@@ -45,7 +52,7 @@ const tables = {
   teamSeason: "teamSeasonStatLines",
 } as const;
 
-function validateFilters(filters: PerformanceFilters) {
+function validateFilters(filters: Omit<PerformanceFilters, "seasonIds">) {
   if (!performanceStats(filters.kind).includes(filters.stat))
     throw new Error("Invalid statistic");
   for (const date of [filters.startDate, filters.endDate]) {
@@ -70,7 +77,10 @@ function validateFilters(filters: PerformanceFilters) {
 // Each transaction reads a bounded page; the action retains only the best 100.
 // Numeric strings in historical stats prevent correct numeric index ordering.
 export const page = internalQuery({
-  args: { filters: filtersValidator, cursor: v.union(v.string(), v.null()) },
+  args: {
+    filters: seasonFiltersValidator,
+    cursor: v.union(v.string(), v.null()),
+  },
   handler: async (
     ctx,
     { filters, cursor },
@@ -82,6 +92,7 @@ export const page = internalQuery({
   }> => {
     await requireActiveUser(ctx);
     validateFilters(filters);
+    const season = await ctx.db.get(filters.seasonId);
     const archive =
       filters.kind === "playerDay"
         ? await ctx.db
@@ -121,6 +132,7 @@ export const page = internalQuery({
       if (!qualifiesForPerformance(row, filters)) continue;
       rows.push({
         id: document._id,
+        season: season?.name ?? "Unknown season",
         playerId: typeof row.playerId === "string" ? row.playerId : null,
         teamIds:
           typeof row.gshlTeamId === "string"
@@ -159,6 +171,7 @@ export const page = internalQuery({
 
 const rowValidator = v.object({
   id: v.string(),
+  season: v.string(),
   playerId: v.union(v.string(), v.null()),
   teamIds: v.array(v.string()),
   weekId: v.union(v.string(), v.null()),
@@ -218,26 +231,39 @@ export const leaderboard = action({
   args: { filters: filtersValidator },
   handler: async (ctx, { filters }): Promise<PerformanceResult> => {
     validateFilters(filters);
-    let cursor: string | null = null;
+    const { seasonIds, ...commonFilters } = filters;
+    if (seasonIds.length === 0 || seasonIds.length > 100)
+      throw new Error("Select between 1 and 100 seasons");
     let rows: PerformanceRow[] = [];
     let highlightsOnly = false;
-    for (;;) {
-      const result: {
-        rows: PerformanceRow[];
-        cursor: string;
-        done: boolean;
-        highlightsOnly: boolean;
-      } = await ctx.runQuery(internal.performances.page, { filters, cursor });
-      if (cursor !== null && highlightsOnly !== result.highlightsOnly)
-        throw new Error("Season archive changed. Please refresh results.");
-      highlightsOnly = result.highlightsOnly;
-      rows = topPerformances(
-        [...rows, ...result.rows],
-        filters.stat,
-        filters.direction,
-      );
-      if (result.done) break;
-      cursor = result.cursor;
+    for (const seasonId of new Set(seasonIds)) {
+      let cursor: string | null = null;
+      let seasonHighlightsOnly: boolean | undefined;
+      for (;;) {
+        const result: {
+          rows: PerformanceRow[];
+          cursor: string;
+          done: boolean;
+          highlightsOnly: boolean;
+        } = await ctx.runQuery(internal.performances.page, {
+          filters: { ...commonFilters, seasonId },
+          cursor,
+        });
+        if (
+          seasonHighlightsOnly !== undefined &&
+          seasonHighlightsOnly !== result.highlightsOnly
+        )
+          throw new Error("Season archive changed. Please refresh results.");
+        seasonHighlightsOnly = result.highlightsOnly;
+        highlightsOnly ||= result.highlightsOnly;
+        rows = topPerformances(
+          [...rows, ...result.rows],
+          filters.stat,
+          filters.direction,
+        );
+        if (result.done) break;
+        cursor = result.cursor;
+      }
     }
     return {
       rows: await ctx.runQuery(internal.performances.hydrate, { rows }),

@@ -7,7 +7,7 @@ import type {
   PerformanceRow,
 } from "../src/lib/types/performances";
 
-const filters: PerformanceFilters = {
+const filters: Omit<PerformanceFilters, "seasonIds"> & { seasonId: string } = {
   kind: "playerDay",
   seasonId: "season",
   stat: "G",
@@ -56,7 +56,7 @@ function fixture(status?: string, signedIn = true) {
         Promise.resolve(signedIn ? { subject: "user" } : null),
     },
     db: {
-      get: () => Promise.resolve({ status: "active" }),
+      get: () => Promise.resolve({ status: "active", name: "2026" }),
       query: (table: string) => {
         calls.push(table);
         return {
@@ -128,6 +128,7 @@ void test("daily query applies season and inclusive date bounds to an index and 
     ),
   );
   assert.equal(result.rows[0]?.stats.G, 10);
+  assert.equal(result.rows[0]?.season, "2026");
   assert.equal(result.highlightsOnly, false);
 });
 
@@ -179,6 +180,7 @@ void test("leaderboard consumes every page before returning only 100 hydrated le
             { length: 100 },
             (_, i): PerformanceRow => ({
               id: String(offset + i),
+              season: "2026",
               playerId: "player",
               teamIds: [],
               weekId: null,
@@ -195,11 +197,83 @@ void test("leaderboard consumes every page before returning only 100 hydrated le
         });
       },
     },
-    { filters },
+    { filters: { ...filters, seasonIds: [filters.seasonId] } },
   );
   assert.equal(pages, 2);
   assert.equal(result.rows.length, 100);
   assert.equal(result.rows[0]?.stats.G, 199);
   assert.equal(result.rows[99]?.stats.G, 100);
   assert.equal(result.rows[0]?.name, "Hydrated player");
+});
+
+void test("multiple seasons share one top 100, reset pagination, deduplicate selection, and retain archive warnings", async () => {
+  const calls: string[] = [];
+  for (const direction of ["asc", "desc"] as const) {
+    calls.length = 0;
+    const result = await readLeaderboard(
+      {
+        runQuery: (
+          _ref: unknown,
+          args: {
+            filters?: { seasonId: string };
+            cursor?: string | null;
+            rows?: PerformanceRow[];
+          },
+        ) => {
+          if (args.rows) return Promise.resolve(args.rows);
+          const season = args.filters!.seasonId;
+          calls.push(`${season}:${args.cursor ?? "start"}`);
+          const offset = season === "older" ? 0 : 200;
+          return Promise.resolve({
+            rows: Array.from(
+              { length: 100 },
+              (_, index): PerformanceRow => ({
+                id: `${season}-${args.cursor ?? "start"}-${index}`,
+                season,
+                playerId: "player",
+                teamIds: [],
+                weekId: null,
+                name: "",
+                team: "",
+                period: "",
+                position: "F",
+                stats: { G: offset + index + (args.cursor ? 100 : 0) },
+              }),
+            ),
+            cursor: "next",
+            done: args.cursor === "next",
+            highlightsOnly: season === "older",
+          });
+        },
+      },
+      {
+        filters: {
+          ...filters,
+          direction,
+          seasonIds: ["older", "newer", "older"],
+        },
+      },
+    );
+    assert.deepEqual(calls, [
+      "older:start",
+      "older:next",
+      "newer:start",
+      "newer:next",
+    ]);
+    assert.equal(result.rows.length, 100);
+    assert.equal(result.rows[0]?.stats.G, direction === "desc" ? 399 : 0);
+    assert.equal(result.rows[99]?.stats.G, direction === "desc" ? 300 : 99);
+    assert.equal(
+      result.rows[0]?.season,
+      direction === "desc" ? "newer" : "older",
+    );
+    assert.equal(result.highlightsOnly, true);
+  }
+});
+
+void test("empty season selection is rejected before reading data", async () => {
+  await assert.rejects(
+    readLeaderboard({}, { filters: { ...filters, seasonIds: [] } }),
+    /Select between 1 and 100 seasons/,
+  );
 });

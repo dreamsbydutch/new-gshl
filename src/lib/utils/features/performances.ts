@@ -1,5 +1,6 @@
 import type {
   PerformanceFilters,
+  PerformanceColumnGroup,
   PerformanceKind,
   PerformanceRow,
 } from "../../types/performances";
@@ -128,6 +129,42 @@ export function performanceDirection(stat: string): "asc" | "desc" {
     ? "asc"
     : "desc";
 }
+
+export function performanceColumns(
+  kind: PerformanceKind,
+  group: PerformanceColumnGroup,
+  sortStat: string,
+): string[] {
+  const stats = performanceStats(kind);
+  const activity = [
+    "ADD",
+    "MS",
+    "BS",
+    "GP",
+    "GS",
+    "MG",
+    "IR",
+    "IRplus",
+    "days",
+    "playersUsed",
+  ];
+  const visible =
+    group === "activity"
+      ? activity.filter((stat) => stats.includes(stat))
+      : group === "hockey"
+        ? stats.filter(
+            (stat) =>
+              hockeyStats.includes(stat) || stat === "QS" || stat === "RBS",
+          )
+        : group === "ratings"
+          ? stats.filter((stat) => /rating|power|Rk|gmLadder|GMOY/i.test(stat))
+          : kind.startsWith("team")
+            ? [...activity.filter((stat) => stats.includes(stat)), ...stats]
+            : stats;
+  return [
+    ...new Set([...(stats.includes(sortStat) ? [sortStat] : []), ...visible]),
+  ];
+}
 export function performanceNumber(value: unknown): number | null {
   if (typeof value !== "number" && typeof value !== "string") return null;
   if (typeof value === "string" && !value.trim()) return null;
@@ -141,7 +178,7 @@ export function performanceNumber(value: unknown): number | null {
 }
 export function qualifiesForPerformance(
   row: Record<string, unknown>,
-  filters: PerformanceFilters,
+  filters: Omit<PerformanceFilters, "seasonIds">,
 ): boolean {
   if (filters.seasonType && row.seasonType !== filters.seasonType) return false;
   if (filters.kind.startsWith("player")) {
