@@ -23,6 +23,7 @@ import type * as jobRunner from "../jobRunner.js";
 import type * as jobs from "../jobs.js";
 import type * as lib_activeRoster from "../lib/activeRoster.js";
 import type * as lib_auth from "../lib/auth.js";
+import type * as lib_authUserOwnerLink from "../lib/authUserOwnerLink.js";
 import type * as lib_compatibilityRead from "../lib/compatibilityRead.js";
 import type * as lib_contractSigning from "../lib/contractSigning.js";
 import type * as lib_contractSigningTransaction from "../lib/contractSigningTransaction.js";
@@ -87,6 +88,7 @@ declare const fullApi: ApiFromModules<{
   jobs: typeof jobs;
   "lib/activeRoster": typeof lib_activeRoster;
   "lib/auth": typeof lib_auth;
+  "lib/authUserOwnerLink": typeof lib_authUserOwnerLink;
   "lib/compatibilityRead": typeof lib_compatibilityRead;
   "lib/contractSigning": typeof lib_contractSigning;
   "lib/contractSigningTransaction": typeof lib_contractSigningTransaction;

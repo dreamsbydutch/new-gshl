@@ -2126,14 +2126,22 @@ var RankingEngine = RankingEngine || {};
         return (
           row &&
           !isTruthyModelValue(row.isSigning) &&
-          isFinite(Number(row.pick)) &&
+          Number.isInteger(Number(row.pick)) &&
           Number(row.pick) > 0
         );
       },
     );
     var draftRows = nonSigningDraftRows
       .filter(function (row) {
-        return getTeamKey(row) && getPlayerKey(row);
+        var total =
+          componentContext.talentContext.totalByPlayer[getPlayerKey(row)];
+        return (
+          getTeamKey(row) &&
+          getPlayerKey(row) &&
+          total &&
+          isRegularSeasonType(total.seasonType) &&
+          getFirstFiniteNumber(total, ["Rating"]) !== null
+        );
       })
       .sort(function (left, right) {
         return toNumber(left && left.pick) - toNumber(right && right.pick);
@@ -2165,12 +2173,9 @@ var RankingEngine = RankingEngine || {};
       var splitRow =
         componentContext.playerSplitByTeamPlayer[teamKey + "|" + playerKey];
       var totalRow = talentContext.totalByPlayer[playerKey];
-      var slotShare = maxPick > 0 ? (maxPick - pickNumber + 1) / maxPick : 0;
-      var slotValue = Math.pow(Math.max(slotShare, 0), 1.35);
       return {
         teamKey: teamKey,
         pickNumber: pickNumber,
-        initialTalent: talent.previousOverall,
         currentNhlValue: talent.currentOverall,
         gshlTotalValue:
           getFirstFiniteNumber(totalRow, ["Rating"]) !== null
@@ -2180,29 +2185,11 @@ var RankingEngine = RankingEngine || {};
           getFirstFiniteNumber(splitRow, ["Rating"]) !== null
             ? getFirstFiniteNumber(splitRow, ["Rating"])
             : 0,
-        slotValue: slotValue,
+        expectedRating: ns.TeamPure.expectedDraftRating(pickNumber, maxPick),
       };
     });
-    var initialTalentValues = pickEntries.map(function (entry) {
-      return entry.initialTalent;
-    });
-    var topInitialTalent = Math.max.apply(
-      null,
-      numericValues(initialTalentValues),
-    );
-    var bottomInitialTalent = Math.min.apply(
-      null,
-      numericValues(initialTalentValues),
-    );
-    if (!isFinite(topInitialTalent)) topInitialTalent = talentContext.fallback;
-    if (!isFinite(bottomInitialTalent))
-      bottomInitialTalent = talentContext.fallback;
-
     pickEntries.forEach(function (entry) {
-      var expectedTalent =
-        bottomInitialTalent +
-        (topInitialTalent - bottomInitialTalent) * entry.slotValue;
-      entry.valueOverSlot = entry.initialTalent - expectedTalent;
+      entry.valueOverSlot = entry.gshlTotalValue - entry.expectedRating;
     });
 
     var valueOverSlotValues = pickEntries.map(function (entry) {

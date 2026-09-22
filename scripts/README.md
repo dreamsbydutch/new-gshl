@@ -61,6 +61,24 @@ launch those commands. Verify that the `node` runtime resolved by the package
 lists that flag in `node --help` before running dry-run, apply, archive, or
 parity commands that use it.
 
+## Draft signing-pick repair
+
+`src/commands/draft/repair-signing-picks.ts` audits contracts at each season's
+opening date against its draft. Run its `--help` from this directory with
+`node --use-system-ca ../node_modules/tsx/dist/cli.mjs` for the current options.
+It defaults to a production dry run and writes a local JSON review. Applying
+requires the exact hash from that review; changed inputs require another review.
+
+The planner fills a team's latest empty owned picks first, including unassigned
+signing placeholders whose original team is known. It only appends picks when
+the existing final rounds prove the snake direction. Repaired picks are signing
+picks with matching owning/original teams and `isTraded: false`. Filled picks are
+preserved. Opening-day rosters resolve duplicate contract ownership, departed
+owners' inherited contracts, and stale buyout coverage; unresolved cases are
+reported. Missing future team/draft configurations are reported without creating
+an entire draft. A local before-image, applied-write journal, and idempotency
+report accompany an apply. These artifacts are not independent archival backups.
+
 ## Prerequisites
 
 ### Convex access
@@ -268,6 +286,12 @@ npm run player-bios:backfill-yahoo-ids -- --season-id 1 --apply
 
 ### Awards, Standings, and Lineups
 
+For an explicitly requested Calder trophy reassignment, use
+`src/commands/awards/reconcile-calder-winners.ts` and consult its `--help`.
+It reads completed-season Calder ranks, updates existing Calder winners and
+nominees in place after a reviewed dry-run hash, and verifies all team award
+records. Seasons without rated Calder rankings are reported and preserved.
+
 #### `awards:backfill`
 
 Rebuilds split award data directly from production Convex season standings,
@@ -367,6 +391,15 @@ Scoped team ratings update TeamDay and TeamWeek ratings and intentionally skip
 season-wide team ratings and power refreshes.
 
 #### `ratings:rebuild-team`
+
+For draft-only historical recalculation, use
+`src/commands/draft/recalculate-draft-ratings.ts` and consult its `--help`.
+It exports every draft benchmark and applies only regular-season Calder score
+and rank patches after matching a reviewed dry-run hash. Recorded trophy
+recipients and other rating fields are preserved. The before-values and
+recalculated picks are saved in its local JSON audit before any apply.
+Run `src/commands/draft/research-slot-curve.ts` for the read-only historical
+analysis; its cached mode reproduces the fit without further production reads.
 
 Rebuilds `TeamDayStatLine`, `TeamWeekStatLine`, and `TeamSeasonStatLine`
 ratings directly in production Convex. Full-season runs also refresh power and

@@ -16,6 +16,25 @@ const number = (value: number | null | undefined) =>
   value == null ? "-" : value.toFixed(1);
 const signed = (value: number | null) =>
   value === null ? "-" : `${value > 0 ? "+" : ""}${value.toFixed(1)}`;
+
+function RosterDays({
+  days,
+  percent,
+}: {
+  days: number | null;
+  percent: number | null;
+}) {
+  return (
+    <>
+      {days ?? "-"}
+      {percent != null && (
+        <span className="ml-1 text-[10px] text-slate-500">
+          ({Math.round(percent)}%)
+        </span>
+      )}
+    </>
+  );
+}
 const selectClassName =
   "h-9 rounded-md border border-slate-300 bg-white px-2.5 pr-7 text-xs font-semibold text-slate-800 outline-none focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-1";
 
@@ -256,17 +275,20 @@ export function TeamDraftPickHistory({
                 >
                   Player / pick
                 </th>
-                {["Slot value", "Overall", "Team", "Days", "Over slot"].map(
-                  (label) => (
-                    <th
-                      key={label}
-                      scope="col"
-                      className="px-2 py-1 font-normal"
-                    >
-                      {label}
-                    </th>
-                  ),
-                )}
+                {[
+                  "Slot value",
+                  "Overall",
+                  "Team days",
+                  "Usage",
+                  "Over slot",
+                ].map((label) => (
+                  <th key={label} scope="col" className="px-2 py-1 font-normal">
+                    {label}
+                  </th>
+                ))}
+                <th scope="col" className="px-2 py-1 text-left font-normal">
+                  Roster status
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -283,10 +305,6 @@ export function TeamDraftPickHistory({
                         {`R${pick.round} / #${pick.pick ?? "-"}`} /{" "}
                         {pick.position}
                       </span>
-                      <span className="block max-w-56 whitespace-normal text-[11px] text-slate-500">
-                        {pick.outcome.label}
-                        {pick.outcome.date ? ` · ${pick.outcome.date}` : ""}
-                      </span>
                     </th>
                     <td className="px-2 py-1 tabular-nums">
                       {number(pick.expectedRating)}
@@ -295,15 +313,25 @@ export function TeamDraftPickHistory({
                       {number(pick.overallRating)}
                     </td>
                     <td className="px-2 py-1 tabular-nums">
-                      {number(pick.teamRating)}
+                      <RosterDays
+                        days={pick.days}
+                        percent={pick.teamDaysPercent}
+                      />
                     </td>
                     <td className="px-2 py-1 tabular-nums">
-                      {pick.days ?? "-"}
+                      <RosterDays
+                        days={pick.usageDays}
+                        percent={pick.usagePercent}
+                      />
                     </td>
                     <td
                       className={`px-2 py-1 tabular-nums ${(pick.surplus ?? 0) > 0 ? "text-emerald-700" : (pick.surplus ?? 0) < 0 ? "text-rose-700" : "text-slate-500"}`}
                     >
                       {signed(pick.surplus)}
+                    </td>
+                    <td className="whitespace-nowrap px-2 py-1 text-left text-[11px] text-slate-500">
+                      {pick.outcome.label}
+                      {pick.outcome.date ? ` · ${pick.outcome.date}` : ""}
                     </td>
                   </tr>
                 );
@@ -334,7 +362,7 @@ export function TeamDraftPickHistory({
                   <th scope="col" className="px-2 py-1 text-left font-normal">
                     Player
                   </th>
-                  {["Overall", "Team", "Days"].map((label) => (
+                  {["Overall", "Team days", "Usage"].map((label) => (
                     <th
                       key={label}
                       scope="col"
@@ -343,6 +371,9 @@ export function TeamDraftPickHistory({
                       {label}
                     </th>
                   ))}
+                  <th scope="col" className="px-2 py-1 text-left font-normal">
+                    Roster status
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -358,19 +389,25 @@ export function TeamDraftPickHistory({
                           / {pick.position}
                         </span>
                       </span>
-                      <span className="block max-w-56 whitespace-normal text-[11px] text-slate-500">
-                        {pick.outcome.label}
-                        {pick.outcome.date ? ` · ${pick.outcome.date}` : ""}
-                      </span>
                     </th>
                     <td className="px-2 py-1 tabular-nums">
                       {number(pick.overallRating)}
                     </td>
                     <td className="px-2 py-1 tabular-nums">
-                      {number(pick.teamRating)}
+                      <RosterDays
+                        days={pick.days}
+                        percent={pick.teamDaysPercent}
+                      />
                     </td>
                     <td className="px-2 py-1 tabular-nums">
-                      {pick.days ?? "-"}
+                      <RosterDays
+                        days={pick.usageDays}
+                        percent={pick.usagePercent}
+                      />
+                    </td>
+                    <td className="whitespace-nowrap px-2 py-1 text-left text-[11px] text-slate-500">
+                      {pick.outcome.label}
+                      {pick.outcome.date ? ` · ${pick.outcome.date}` : ""}
                     </td>
                   </tr>
                 ))}
@@ -390,27 +427,29 @@ export function TeamDraftPickHistory({
         </summary>
         <div className="mt-2 space-y-2 leading-relaxed">
           <p>
-            Calder is the official best-draft measure. It combines scouting
-            value, NHL performance, overall GSHL performance, and production for
-            the drafting team. Winners reflect recorded awards.
+            Calder is the official best-draft measure. It combines value above
+            slot expectation, NHL performance, overall GSHL performance, and
+            production for the drafting team. Winners reflect recorded awards.
           </p>
           <p>
             Over slot is a separate retrospective benchmark: overall
             regular-season rating minus the expectation for the pick. The
-            expectation spans the lowest to highest rated drafted player in that
-            season, using Calder&apos;s draft-slot curve (remaining slot share
-            raised to 1.35). It is not an individual Calder score.
+            expectation comes from 1,590 rated selections across eight
+            historical drafts, adjusted for draft length: about 87 at the first
+            slot, declining to about 42 at the last. Calder uses the same
+            over-slot measure as one component of its team score.
           </p>
           <p>
-            Team rating shows what the drafting team received. Days are recorded
-            roster days with that team. Compare the position mix across seasons
-            to see drafting preferences.
+            Team days counts roster days with this team. Usage counts roster
+            days across all teams. The smaller percentages show each count as a
+            share of the full regular season, including for seasons still in
+            progress.
           </p>
           <p>
             A drop is the first absent day after consecutive roster days from
             season opening, even if the player later returns. Dated contract
-            endings identify buyouts and trades. Outcomes cover the full season;
-            ratings and days cover the regular season, including later returns.
+            endings identify buyouts and trades. Outcomes, ratings and days
+            cover the regular season; roster days include later returns.
             Incomplete daily history is labeled rather than assuming a drop.
           </p>
           <p>

@@ -26,6 +26,9 @@ export interface DraftHistoryPick {
   teamRating: number | null;
   overallRating: number | null;
   days: number | null;
+  usageDays: number | null;
+  teamDaysPercent: number | null;
+  usagePercent: number | null;
   expectedRating: number | null;
   surplus: number | null;
   outcome: { label: string; date: string | null };

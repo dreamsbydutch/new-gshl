@@ -426,6 +426,18 @@ var RankingEngine = RankingEngine || {};
       });
   }
 
+  api.expectedDraftRating = function (pick, maxPick) {
+    if (
+      !Number.isInteger(pick) ||
+      !Number.isInteger(maxPick) ||
+      pick < 1 ||
+      maxPick < pick
+    )
+      return null;
+    var curve = ns.TuningConfig.draftSlot;
+    return curve.floor + curve.span * ((maxPick - pick + 1) / maxPick);
+  };
+
   api.rankTeamRows = rankTeamRows;
   api.rankTeamWeekRows = rankTeamWeekRows;
   api.rankTeamDayRows = rankTeamDayRows;

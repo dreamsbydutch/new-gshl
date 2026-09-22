@@ -51,6 +51,29 @@ Starter, Borderline Starter, Rosterable, Waiver Wire, and No Impact.
 The engine computes ratings, not every downstream field. For example,
 `PlayerNHL` salary and overall-rating derivation remain outside the engine.
 
+## Draft expectations and Calder
+
+Draft slot expectations use the historical regular-season quality curve in
+`RankingEngine/config.js` (`draftSlot`). The browser calibration JSON is generated
+by `node tools/sync-draft-slot.mjs`; `--check` verifies it without writing.
+Browser/runtime parity is exercised by the draft-slot-curve tests.
+
+Expected rating is `41.73092969231692 + 45.19453675621042 × remaining slot share`,
+where remaining slot share is `(last non-signing slot - slot + 1) / last non-signing slot`.
+It is a fixed retrospective benchmark fitted to eight recorded drafts, rather
+than a scale stretched between each season's strongest and weakest selections.
+See [the research](product/draft-slot-quality-curve.md) for coverage and validation.
+
+Calder's over-slot component uses the same actual regular-season total rating
+minus slot expectation as the draft page. The existing percentile combination
+and weights remain: over-slot value 31.5%, NHL value 24.5%, GSHL total 14%, and
+team production 30%, followed by the existing first-eight/later-picks weighting.
+Signings and selections missing regular-season ratings do not receive draft grades.
+Recalculating Calder scores/ranks does not rewrite recorded award recipients.
+When award reassignment is requested, the focused
+`scripts/src/commands/awards/reconcile-calder-winners.ts` operator reconciles
+Calder winners and nominees to those rankings and verifies all award records.
+
 ## Entering-week power
 
 `TeamWeekStatLine.powerRating` and `powerRk` describe a team entering the week.

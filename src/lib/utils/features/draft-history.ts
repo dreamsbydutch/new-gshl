@@ -3,6 +3,7 @@ import type {
   DraftPerformance,
   DraftResultInput,
 } from "../../types/draft-history";
+import { expectedDraftRating } from "./draft-slot-curve";
 
 export function draftNumber(value: unknown): number | null {
   if (
@@ -23,23 +24,24 @@ export function buildDraftHistoryPicks(input: {
   splits: DraftPerformance[];
   players: { id: string; name: string; position: string }[];
   outcomes?: Map<string, DraftHistoryPick["outcome"]>;
+  seasonDays?: number | null;
 }): DraftHistoryPick[] {
+  const percentage = (days: number | null) =>
+    days !== null && input.seasonDays && input.seasonDays > 0
+      ? (days / input.seasonDays) * 100
+      : null;
   const totals = new Map(input.totals.map((row) => [row.playerId, row]));
   const splits = new Map(
     input.splits.map((row) => [`${row.teamId}:${row.playerId}`, row]),
   );
   const players = new Map(input.players.map((row) => [row.id, row]));
   const pool = input.picks.filter(
-    (pick) => !pick.isSigning && (draftNumber(pick.pick) ?? 0) > 0,
+    (pick) =>
+      !pick.isSigning &&
+      Number.isInteger(draftNumber(pick.pick)) &&
+      (draftNumber(pick.pick) ?? 0) > 0,
   );
   const maxPick = Math.max(0, ...pool.map((pick) => Number(pick.pick)));
-  const ratings = pool.flatMap((pick) => {
-    const value = draftNumber(totals.get(pick.playerId ?? "")?.rating);
-    return value === null ? [] : [value];
-  });
-  // Do not infer outcomes from missing archives or a single rated selection.
-  const low = ratings.length >= 2 ? Math.min(...ratings) : null;
-  const high = ratings.length >= 2 ? Math.max(...ratings) : null;
   return input.picks
     .filter((pick) => input.teamIds.includes(pick.teamId ?? ""))
     .map((pick) => {
@@ -49,12 +51,8 @@ export function buildDraftHistoryPicks(input: {
       const slot = draftNumber(pick.pick);
       const overallRating = draftNumber(total?.rating);
       const expectedRating =
-        !pick.isSigning &&
-        slot !== null &&
-        slot > 0 &&
-        low !== null &&
-        high !== null
-          ? low + (high - low) * Math.pow((maxPick - slot + 1) / maxPick, 1.35)
+        !pick.isSigning && slot !== null && slot > 0
+          ? expectedDraftRating(slot, maxPick)
           : null;
       return {
         id: pick.id,
@@ -69,6 +67,9 @@ export function buildDraftHistoryPicks(input: {
         teamRating: draftNumber(split?.rating),
         overallRating,
         days: draftNumber(split?.days),
+        usageDays: draftNumber(total?.days),
+        teamDaysPercent: percentage(draftNumber(split?.days)),
+        usagePercent: percentage(draftNumber(total?.days)),
         outcome: input.outcomes?.get(pick.id) ?? {
           label: "Roster history unavailable",
           date: null,

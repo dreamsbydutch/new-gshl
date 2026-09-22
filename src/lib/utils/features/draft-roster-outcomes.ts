@@ -20,10 +20,12 @@ export function buildDraftRosterOutcomes(input: {
   picks: DraftResultInput[];
   start: string | null;
   end: string | null;
+  regularSeasonEnd?: string | null;
   today: string;
   days: { teamId: string; playerId: string; date: string }[];
   contracts: ContractEnd[];
 }): Map<string, DraftHistoryPick["outcome"]> {
+  const end = input.regularSeasonEnd ?? input.end;
   const rosters = new Map<string, Set<string>>();
   for (const row of input.days) {
     const key = `${row.teamId}:${row.date}`;
@@ -38,8 +40,7 @@ export function buildDraftRosterOutcomes(input: {
         date: string | null = null,
       ): [string, DraftHistoryPick["outcome"]] => [pick.id, { label, date }];
       if (!pick.playerId) return result("Awaiting selection");
-      if (!input.start || !input.end)
-        return result("Roster history unavailable");
+      if (!input.start || !end) return result("Roster history unavailable");
       if (input.start > input.today) return result("Season not started");
       const recordedEnd = input.contracts.find(
         (entry) =>
@@ -48,7 +49,7 @@ export function buildDraftRosterOutcomes(input: {
           entry.start <= input.start! &&
           entry.end &&
           entry.end >= input.start! &&
-          entry.end <= input.end! &&
+          entry.end <= end &&
           entry.end <= input.today &&
           ["buyout", "trade", "retired", "injured"].includes(
             entry.status?.toLowerCase() ?? "",
@@ -84,7 +85,7 @@ export function buildDraftRosterOutcomes(input: {
       if (!opening) return missingHistory("Roster history unavailable");
       if (!opening.has(pick.playerId))
         return result("Not on opening roster", input.start);
-      const limit = input.end < input.today ? input.end : input.today;
+      const limit = end < input.today ? end : input.today;
       for (
         let date = nextDay(input.start);
         date <= limit;
@@ -113,8 +114,8 @@ export function buildDraftRosterOutcomes(input: {
         );
         return result(endLabel(contract?.status), date);
       }
-      return input.end < input.today
-        ? result("Finished season with team", input.end)
+      return end < input.today
+        ? result("Full season", end)
         : result("Still rostered", limit);
     }),
   );

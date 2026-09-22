@@ -31,6 +31,35 @@ const base = {
 const outcome = (input: Parameters<typeof buildDraftRosterOutcomes>[0]) =>
   buildDraftRosterOutcomes(input).get("pick");
 
+void test("full regular-season retention does not require postseason snapshots", () => {
+  const input = {
+    ...base,
+    end: "2024-10-10",
+    regularSeasonEnd: "2024-10-04",
+    days: [1, 2, 3, 4].map((day) => row(`2024-10-0${day}`)),
+  };
+  assert.deepEqual(outcome(input), {
+    label: "Full season",
+    date: "2024-10-04",
+  });
+  assert.deepEqual(
+    outcome({ ...input, days: [...input.days, row("2024-10-05", "other")] }),
+    outcome(input),
+  );
+  assert.deepEqual(outcome({ ...input, today: "2024-10-03" }), {
+    label: "Still rostered",
+    date: "2024-10-03",
+  });
+  assert.equal(
+    outcome({ ...input, days: [row("2024-10-01"), row("2024-10-04")] })?.label,
+    "Roster history incomplete",
+  );
+  assert.deepEqual(outcome({ ...input, days: base.days }), {
+    label: "Dropped",
+    date: "2024-10-03",
+  });
+});
+
 void test("drop is first absence after opening stint, even after a later return", () => {
   assert.deepEqual(outcome(base), { label: "Dropped", date: "2024-10-03" });
   assert.deepEqual(
@@ -114,7 +143,7 @@ void test("contract evidence remains visible when daily archives are missing", (
 
 void test("completed, in-progress and future seasons have distinct outcomes", () => {
   const days = [1, 2, 3, 4].map((day) => row(`2024-10-0${day}`));
-  assert.equal(outcome({ ...base, days })?.label, "Finished season with team");
+  assert.equal(outcome({ ...base, days })?.label, "Full season");
   assert.deepEqual(outcome({ ...base, days, today: "2024-10-03" }), {
     label: "Still rostered",
     date: "2024-10-03",

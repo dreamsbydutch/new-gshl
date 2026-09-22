@@ -32,6 +32,12 @@ var RankingEngine = RankingEngine || {};
   };
 
   const TuningConfig = {
+    // Empirical RS rating expectation; see docs/product/draft-slot-quality-curve.md.
+    draftSlot: {
+      version: "2026-09-history-v1",
+      floor: 41.73092969231692,
+      span: 45.19453675621042,
+    },
     defaults: {
       skaterCategories: [
         StatCategory.G,
