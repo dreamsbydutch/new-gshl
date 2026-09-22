@@ -135,3 +135,32 @@ void test("inputs are not sorted or mutated and unselected slots remain visible"
   assert.equal(result.find((pick) => pick.id === "6")?.surplus, null);
   assert.deepEqual(input, copy);
 });
+
+void test("usage combines regular season and playoffs without changing rating benchmarks", () => {
+  const result = buildDraftHistoryPicks({
+    ...input,
+    seasonDays: 125,
+    splits: [
+      { playerId: "c", teamId: "ours", rating: 20, days: 20, position: "D" },
+    ],
+    postseasonTotals: [
+      { playerId: "c", rating: 99, days: 25, position: "D" },
+      { playerId: "d", days: 10, rating: null, position: "F" },
+    ],
+    postseasonSplits: [
+      { playerId: "c", teamId: "ours", days: 15, rating: null, position: "D" },
+      { playerId: "c", teamId: "other", days: 10, rating: null, position: "D" },
+      { playerId: "d", teamId: "ours", days: 10, rating: null, position: "F" },
+    ],
+  });
+  assert.equal(result[1]?.days, 35);
+  assert.equal(result[1]?.usageDays, 125);
+  assert.ok(Math.abs((result[1]?.teamDaysPercent ?? NaN) - 28) < 1e-10);
+  assert.equal(result[1]?.usagePercent, 100);
+  assert.equal(result[1]?.overallRating, 90);
+  assert.equal(result[1]?.teamRating, 20);
+  assert.equal(result[1]?.surplus, buildDraftHistoryPicks(input)[1]?.surplus);
+  assert.equal(result[2]?.days, 10);
+  assert.equal(result[2]?.usageDays, 10);
+  assert.equal(result[2]?.overallRating, null);
+});

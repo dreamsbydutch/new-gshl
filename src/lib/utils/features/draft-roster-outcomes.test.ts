@@ -31,33 +31,67 @@ const base = {
 const outcome = (input: Parameters<typeof buildDraftRosterOutcomes>[0]) =>
   buildDraftRosterOutcomes(input).get("pick");
 
-void test("full regular-season retention does not require postseason snapshots", () => {
-  const input = {
-    ...base,
-    end: "2024-10-10",
-    regularSeasonEnd: "2024-10-04",
-    days: [1, 2, 3, 4].map((day) => row(`2024-10-0${day}`)),
-  };
+void test("full season requires playoff retention too", () => {
+  const days = [1, 2, 3, 4, 5, 6].map((day) => row(`2024-10-0${day}`));
+  const input = { ...base, end: "2024-10-06", days };
   assert.deepEqual(outcome(input), {
     label: "Full season",
-    date: "2024-10-04",
-  });
-  assert.deepEqual(
-    outcome({ ...input, days: [...input.days, row("2024-10-05", "other")] }),
-    outcome(input),
-  );
-  assert.deepEqual(outcome({ ...input, today: "2024-10-03" }), {
-    label: "Still rostered",
-    date: "2024-10-03",
+    date: "2024-10-06",
   });
   assert.equal(
-    outcome({ ...input, days: [row("2024-10-01"), row("2024-10-04")] })?.label,
+    outcome({ ...input, days: days.slice(0, 4) })?.label,
     "Roster history incomplete",
   );
-  assert.deepEqual(outcome({ ...input, days: base.days }), {
-    label: "Dropped",
-    date: "2024-10-03",
-  });
+  assert.deepEqual(
+    outcome({
+      ...input,
+      days: [...days.slice(0, 4), row("2024-10-05", "other"), days[5]!],
+    }),
+    { label: "Dropped", date: "2024-10-05" },
+  );
+});
+
+void test("only buyouts between season opening and playoff end affect status", () => {
+  const days = [1, 2, 3, 4].map((day) => row(`2024-10-0${day}`));
+  for (const end of ["2024-09-30", "2024-10-05", "2024-10-20"]) {
+    const input = {
+      ...base,
+      days,
+      contracts: [
+        { playerId: "p", start: "2024-09-01", end, status: "Buyout" },
+      ],
+    };
+    assert.deepEqual(outcome(input), {
+      label: "Full season",
+      date: "2024-10-04",
+    });
+  }
+  for (const end of ["2024-10-01", "2024-10-03", "2024-10-04"]) {
+    assert.deepEqual(
+      outcome({
+        ...base,
+        days,
+        contracts: [
+          { playerId: "p", start: "2024-09-01", end, status: "Buyout" },
+        ],
+      }),
+      { label: "Bought out", date: end },
+    );
+  }
+  assert.deepEqual(
+    outcome({
+      ...base,
+      contracts: [
+        {
+          playerId: "p",
+          start: "2024-09-01",
+          end: "2024-10-20",
+          status: "Buyout",
+        },
+      ],
+    }),
+    { label: "Dropped", date: "2024-10-03" },
+  );
 });
 
 void test("drop is first absence after opening stint, even after a later return", () => {
@@ -105,7 +139,7 @@ void test("dated contract exit identifies buyout, trade, retirement and expiry",
           },
         ],
       }),
-      { label, date: "2024-10-03" },
+      { label, date: "2024-10-02" },
     );
   }
 });
@@ -137,7 +171,7 @@ void test("contract evidence remains visible when daily archives are missing", (
         },
       ],
     }),
-    { label: "Bought out (contract record)", date: "2024-10-02" },
+    { label: "Bought out", date: "2024-10-02" },
   );
 });
 

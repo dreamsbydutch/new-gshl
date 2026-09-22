@@ -22,6 +22,8 @@ export function buildDraftHistoryPicks(input: {
   teamIds: string[];
   totals: DraftPerformance[];
   splits: DraftPerformance[];
+  postseasonTotals?: DraftPerformance[];
+  postseasonSplits?: DraftPerformance[];
   players: { id: string; name: string; position: string }[];
   outcomes?: Map<string, DraftHistoryPick["outcome"]>;
   seasonDays?: number | null;
@@ -35,6 +37,21 @@ export function buildDraftHistoryPicks(input: {
     input.splits.map((row) => [`${row.teamId}:${row.playerId}`, row]),
   );
   const players = new Map(input.players.map((row) => [row.id, row]));
+  const postseasonTotals = new Map(
+    (input.postseasonTotals ?? []).map((row) => [row.playerId, row]),
+  );
+  const postseasonSplits = new Map(
+    (input.postseasonSplits ?? []).map((row) => [
+      `${row.teamId}:${row.playerId}`,
+      row,
+    ]),
+  );
+  const rosterDays = (...rows: (DraftPerformance | undefined)[]) => {
+    const counts = rows
+      .map((row) => draftNumber(row?.days))
+      .filter((days): days is number => days !== null);
+    return counts.length ? counts.reduce((sum, days) => sum + days, 0) : null;
+  };
   const pool = input.picks.filter(
     (pick) =>
       !pick.isSigning &&
@@ -50,6 +67,14 @@ export function buildDraftHistoryPicks(input: {
       const player = players.get(pick.playerId ?? "");
       const slot = draftNumber(pick.pick);
       const overallRating = draftNumber(total?.rating);
+      const days = rosterDays(
+        split,
+        postseasonSplits.get(`${pick.teamId}:${pick.playerId}`),
+      );
+      const usageDays = rosterDays(
+        total,
+        postseasonTotals.get(pick.playerId ?? ""),
+      );
       const expectedRating =
         !pick.isSigning && slot !== null && slot > 0
           ? expectedDraftRating(slot, maxPick)
@@ -66,10 +91,10 @@ export function buildDraftHistoryPicks(input: {
         signing: pick.isSigning,
         teamRating: draftNumber(split?.rating),
         overallRating,
-        days: draftNumber(split?.days),
-        usageDays: draftNumber(total?.days),
-        teamDaysPercent: percentage(draftNumber(split?.days)),
-        usagePercent: percentage(draftNumber(total?.days)),
+        days,
+        usageDays,
+        teamDaysPercent: percentage(days),
+        usagePercent: percentage(usageDays),
         outcome: input.outcomes?.get(pick.id) ?? {
           label: "Roster history unavailable",
           date: null,

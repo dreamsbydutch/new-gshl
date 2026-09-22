@@ -243,62 +243,79 @@ export const ownerDraftHistory = query({
     const teamIds = teams
       .filter((team) => team.seasonId === selectedSeasonId)
       .map((team) => team._id);
-    const [picks, totals, splits, season, days, contracts, weeks] =
-      await Promise.all([
-        ctx.db
-          .query("draftPicks")
-          .withIndex("by_seasonId", (q) => q.eq("seasonId", selectedSeasonId))
-          .collect(),
-        ctx.db
-          .query("playerTotalStatLines")
-          .withIndex("by_seasonId_seasonType_playerId", (q) =>
-            q.eq("seasonId", selectedSeasonId).eq("seasonType", "RS"),
-          )
-          .collect(),
-        Promise.all(
-          teamIds.map((teamId) =>
-            ctx.db
-              .query("playerSplitStatLines")
-              .withIndex("by_seasonId_seasonType_gshlTeamId_playerId", (q) =>
-                q
-                  .eq("seasonId", selectedSeasonId)
-                  .eq("seasonType", "RS")
-                  .eq("gshlTeamId", teamId),
-              )
-              .collect(),
-          ),
-        ).then((groups) => groups.flat()),
-        ctx.db.get(selectedSeasonId),
-        Promise.all(
-          teamIds.map((teamId) =>
-            ctx.db
-              .query("playerDayStatLines")
-              .withIndex("by_seasonId_gshlTeamId_playerId_weekId_date", (q) =>
-                q.eq("seasonId", selectedSeasonId).eq("gshlTeamId", teamId),
-              )
-              .collect(),
-          ),
-        ).then((groups) => groups.flat()),
-        ctx.db
-          .query("contracts")
-          .withIndex("by_ownerId", (q) => q.eq("ownerId", args.ownerId))
-          .collect(),
-        ctx.db
-          .query("weeks")
-          .withIndex("by_seasonId", (q) => q.eq("seasonId", selectedSeasonId))
-          .collect(),
-      ]);
+    const [
+      picks,
+      totals,
+      splits,
+      season,
+      days,
+      contracts,
+      postseasonTotals,
+      postseasonSplits,
+    ] = await Promise.all([
+      ctx.db
+        .query("draftPicks")
+        .withIndex("by_seasonId", (q) => q.eq("seasonId", selectedSeasonId))
+        .collect(),
+      ctx.db
+        .query("playerTotalStatLines")
+        .withIndex("by_seasonId_seasonType_playerId", (q) =>
+          q.eq("seasonId", selectedSeasonId).eq("seasonType", "RS"),
+        )
+        .collect(),
+      Promise.all(
+        teamIds.map((teamId) =>
+          ctx.db
+            .query("playerSplitStatLines")
+            .withIndex("by_seasonId_seasonType_gshlTeamId_playerId", (q) =>
+              q
+                .eq("seasonId", selectedSeasonId)
+                .eq("seasonType", "RS")
+                .eq("gshlTeamId", teamId),
+            )
+            .collect(),
+        ),
+      ).then((groups) => groups.flat()),
+      ctx.db.get(selectedSeasonId),
+      Promise.all(
+        teamIds.map((teamId) =>
+          ctx.db
+            .query("playerDayStatLines")
+            .withIndex("by_seasonId_gshlTeamId_playerId_weekId_date", (q) =>
+              q.eq("seasonId", selectedSeasonId).eq("gshlTeamId", teamId),
+            )
+            .collect(),
+        ),
+      ).then((groups) => groups.flat()),
+      ctx.db
+        .query("contracts")
+        .withIndex("by_ownerId", (q) => q.eq("ownerId", args.ownerId))
+        .collect(),
+      ctx.db
+        .query("playerTotalStatLines")
+        .withIndex("by_seasonId_seasonType_playerId", (q) =>
+          q.eq("seasonId", selectedSeasonId).eq("seasonType", "PO"),
+        )
+        .collect(),
+      Promise.all(
+        teamIds.map((teamId) =>
+          ctx.db
+            .query("playerSplitStatLines")
+            .withIndex("by_seasonId_seasonType_gshlTeamId_playerId", (q) =>
+              q
+                .eq("seasonId", selectedSeasonId)
+                .eq("seasonType", "PO")
+                .eq("gshlTeamId", teamId),
+            )
+            .collect(),
+        ),
+      ).then((groups) => groups.flat()),
+    ]);
     const ownedPicks = picks.filter((pick) =>
       teamIds.includes(pick.gshlTeamId),
     );
-    const regularSeasonEnd = weeks
-      .filter((week) => week.weekType === "RS")
-      .map((week) => utcTimestampToDateKey(week.endDate))
-      .filter((date): date is string => date !== null)
-      .sort()
-      .at(-1);
     const seasonStart = toUtcTimestamp(season?.startDate);
-    const regularEnd = toUtcTimestamp(regularSeasonEnd);
+    const seasonEnd = toUtcTimestamp(season?.endDate);
     const outcomes = buildDraftRosterOutcomes({
       picks: ownedPicks.map((pick) => ({
         ...pick,
@@ -307,7 +324,6 @@ export const ownerDraftHistory = query({
       })),
       start: utcTimestampToDateKey(season?.startDate),
       end: utcTimestampToDateKey(season?.endDate),
-      regularSeasonEnd,
       today: utcTimestampToDateKey(Date.now())!,
       days: days.map((row) => ({
         teamId: row.gshlTeamId,
@@ -337,10 +353,8 @@ export const ownerDraftHistory = query({
       picks: buildDraftHistoryPicks({
         outcomes,
         seasonDays:
-          seasonStart !== null &&
-          regularEnd !== null &&
-          regularEnd >= seasonStart
-            ? Math.floor((regularEnd - seasonStart) / 86_400_000) + 1
+          seasonStart !== null && seasonEnd !== null && seasonEnd >= seasonStart
+            ? Math.floor((seasonEnd - seasonStart) / 86_400_000) + 1
             : null,
         picks: picks.map((pick) => ({
           ...pick,
@@ -359,6 +373,19 @@ export const ownerDraftHistory = query({
           teamId: row.gshlTeamId,
           rating: row.Rating,
           days: row.days,
+          position: row.posGroup,
+        })),
+        postseasonTotals: postseasonTotals.map((row) => ({
+          playerId: row.playerId,
+          days: row.days,
+          rating: row.Rating,
+          position: row.posGroup,
+        })),
+        postseasonSplits: postseasonSplits.map((row) => ({
+          playerId: row.playerId,
+          teamId: row.gshlTeamId,
+          days: row.days,
+          rating: row.Rating,
           position: row.posGroup,
         })),
         players: players.map((player) => ({

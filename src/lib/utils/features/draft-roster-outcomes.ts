@@ -20,12 +20,11 @@ export function buildDraftRosterOutcomes(input: {
   picks: DraftResultInput[];
   start: string | null;
   end: string | null;
-  regularSeasonEnd?: string | null;
   today: string;
   days: { teamId: string; playerId: string; date: string }[];
   contracts: ContractEnd[];
 }): Map<string, DraftHistoryPick["outcome"]> {
-  const end = input.regularSeasonEnd ?? input.end;
+  const end = input.end;
   const rosters = new Map<string, Set<string>>();
   for (const row of input.days) {
     const key = `${row.teamId}:${row.date}`;
@@ -81,6 +80,10 @@ export function buildDraftRosterOutcomes(input: {
               recordedEnd.end,
             )
           : result(label);
+      // The contract records the transaction date; roster snapshots can end
+      // earlier than an in-season buyout.
+      if (recordedEnd?.status?.toLowerCase() === "buyout")
+        return result("Bought out", recordedEnd.end);
       const opening = rosters.get(`${pick.teamId}:${input.start}`);
       if (!opening) return missingHistory("Roster history unavailable");
       if (!opening.has(pick.playerId))
@@ -112,7 +115,7 @@ export function buildDraftRosterOutcomes(input: {
             entry.end &&
             (entry.end === date || nextDay(entry.end) === date),
         );
-        return result(endLabel(contract?.status), date);
+        return result(endLabel(contract?.status), contract?.end ?? date);
       }
       return end < input.today
         ? result("Full season", end)

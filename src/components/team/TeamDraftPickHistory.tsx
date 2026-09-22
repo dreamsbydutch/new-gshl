@@ -19,7 +19,19 @@ const signed = (value: number | null) =>
 const rosterStatus = (label: string, date: string | null) =>
   label === "Roster history incomplete"
     ? "-"
-    : `${label}${date ? ` · ${date}` : ""}`;
+    : `${label}${date && label !== "Full season" ? ` · ${date}` : ""}`;
+
+function ColumnLabel({ label }: { label: string }) {
+  return label === "Team usage" || label === "League usage" ? (
+    <>
+      {label.split(" ")[0]}
+      <br />
+      usage
+    </>
+  ) : (
+    label
+  );
+}
 
 function RosterDays({
   days,
@@ -268,10 +280,10 @@ export function TeamDraftPickHistory({
         >
           <table className="w-full whitespace-nowrap text-right text-xs">
             <caption className="sr-only">
-              Draft outcomes for {season?.name}; ratings and roster days cover
-              the regular season.
+              Draft outcomes for {season?.name}; ratings cover the regular
+              season. Usage and roster status include the playoffs.
             </caption>
-            <thead>
+            <thead className="[&_th]:align-bottom">
               <tr className="bg-gray-800 text-gray-200">
                 <th
                   scope="col"
@@ -282,12 +294,12 @@ export function TeamDraftPickHistory({
                 {[
                   "Slot value",
                   "Overall",
-                  "Team days",
-                  "Usage",
+                  "Team usage",
+                  "League usage",
                   "Over slot",
                 ].map((label) => (
                   <th key={label} scope="col" className="px-2 py-1 font-normal">
-                    {label}
+                    <ColumnLabel label={label} />
                   </th>
                 ))}
                 <th scope="col" className="px-2 py-1 text-left font-normal">
@@ -360,20 +372,14 @@ export function TeamDraftPickHistory({
               <caption className="sr-only">
                 Signed players for {season?.name}, excluded from draft grading.
               </caption>
-              <thead>
+              <thead className="[&_th]:align-bottom">
                 <tr className="bg-gray-800 text-gray-200">
                   <th scope="col" className="px-2 py-1 text-left font-normal">
                     Player
                   </th>
-                  {["Overall", "Team days", "Usage"].map((label) => (
-                    <th
-                      key={label}
-                      scope="col"
-                      className="px-2 py-1 font-normal"
-                    >
-                      {label}
-                    </th>
-                  ))}
+                  <th scope="col" className="px-2 py-1 font-normal">
+                    Overall
+                  </th>
                   <th scope="col" className="px-2 py-1 text-left font-normal">
                     Roster status
                   </th>
@@ -395,18 +401,6 @@ export function TeamDraftPickHistory({
                     </th>
                     <td className="px-2 py-1 tabular-nums">
                       {number(pick.overallRating)}
-                    </td>
-                    <td className="px-2 py-1 tabular-nums">
-                      <RosterDays
-                        days={pick.days}
-                        percent={pick.teamDaysPercent}
-                      />
-                    </td>
-                    <td className="px-2 py-1 tabular-nums">
-                      <RosterDays
-                        days={pick.usageDays}
-                        percent={pick.usagePercent}
-                      />
                     </td>
                     <td className="whitespace-nowrap px-2 py-1 text-left text-[11px] text-slate-500">
                       {rosterStatus(pick.outcome.label, pick.outcome.date)}
@@ -442,17 +436,20 @@ export function TeamDraftPickHistory({
             over-slot measure as one component of its team score.
           </p>
           <p>
-            Team days counts roster days with this team. Usage counts roster
-            days across all teams. The smaller percentages show each count as a
-            share of the full regular season, including for seasons still in
-            progress.
+            Team usage counts roster days with this team. League usage counts
+            roster days across all teams. The smaller percentages show each
+            count as a share of the full season, including the regular season
+            and playoffs, even for seasons still in progress.
           </p>
           <p>
             A drop is the first absent day after consecutive roster days from
             season opening, even if the player later returns. Dated contract
-            endings identify buyouts and trades. Outcomes, ratings and days
-            cover the regular season; roster days include later returns.
-            Incomplete daily history displays a dash rather than assuming a drop.
+            endings identify buyouts and trades. Usage and roster status cover
+            the regular season and playoffs; roster days include later returns.
+            Buyouts show the recorded transaction date only when they occur
+            between season opening and playoff end. Later buyouts do not change
+            full-season status. Ratings cover the regular season. Incomplete
+            daily history displays a dash rather than assuming a drop.
           </p>
           <p>
             Signings are excluded from grading. Missing ratings or roster
