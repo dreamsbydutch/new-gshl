@@ -2,6 +2,7 @@ import type {
   DraftHistoryPick,
   DraftPerformance,
   DraftResultInput,
+  SigningValue,
 } from "../../types/draft-history";
 import { expectedDraftRating } from "./draft-slot-curve";
 
@@ -27,6 +28,7 @@ export function buildDraftHistoryPicks(input: {
   players: { id: string; name: string; position: string }[];
   outcomes?: Map<string, DraftHistoryPick["outcome"]>;
   seasonDays?: number | null;
+  signingValues?: Map<string, SigningValue>;
 }): DraftHistoryPick[] {
   const percentage = (days: number | null) =>
     days !== null && input.seasonDays && input.seasonDays > 0
@@ -67,6 +69,9 @@ export function buildDraftHistoryPicks(input: {
       const player = players.get(pick.playerId ?? "");
       const slot = draftNumber(pick.pick);
       const overallRating = draftNumber(total?.rating);
+      const signingValue = pick.isSigning
+        ? input.signingValues?.get(pick.id)
+        : undefined;
       const days = rosterDays(
         split,
         postseasonSplits.get(`${pick.teamId}:${pick.playerId}`),
@@ -89,6 +94,9 @@ export function buildDraftHistoryPicks(input: {
         pick: slot,
         round: pick.round,
         signing: pick.isSigning,
+        salary: signingValue?.salary ?? null,
+        salaryExpectedRating: signingValue?.expectedRating ?? null,
+        signingValue: signingValue?.value ?? null,
         teamRating: draftNumber(split?.rating),
         overallRating,
         days,

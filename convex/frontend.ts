@@ -17,6 +17,7 @@ import {
   retryJob as retryManagedJob,
 } from "./lib/jobLifecycle";
 import { buildLeagueActivity } from "../src/lib/utils/features/league-activity";
+import { buildSigningValues } from "../src/lib/utils/features/signing-value";
 import { JOB_NAMES, JOB_STATUSES } from "./jobCatalog";
 import {
   normalizeTimestampFields,
@@ -239,7 +240,8 @@ export const ownerDraftHistory = query({
         : (seasons.find((season) => season.calderRating !== null)?.id ??
           seasons[0]?.id ??
           null);
-    if (!selectedSeasonId) return { seasons, selectedSeasonId, picks: [] };
+    if (!selectedSeasonId)
+      return { seasons, selectedSeasonId, picks: [], signingSummary: null };
     const teamIds = teams
       .filter((team) => team.seasonId === selectedSeasonId)
       .map((team) => team._id);
@@ -252,6 +254,7 @@ export const ownerDraftHistory = query({
       contracts,
       postseasonTotals,
       postseasonSplits,
+      seasonTeams,
     ] = await Promise.all([
       ctx.db
         .query("draftPicks")
@@ -310,12 +313,69 @@ export const ownerDraftHistory = query({
             .collect(),
         ),
       ).then((groups) => groups.flat()),
+      ctx.db
+        .query("teams")
+        .withIndex("by_seasonId", (q) => q.eq("seasonId", selectedSeasonId))
+        .collect(),
     ]);
     const ownedPicks = picks.filter((pick) =>
       teamIds.includes(pick.gshlTeamId),
     );
     const seasonStart = toUtcTimestamp(season?.startDate);
     const seasonEnd = toUtcTimestamp(season?.endDate);
+    const signingTeamIds = new Set(
+      picks
+        .filter((pick) => pick.isSigning && pick.playerId)
+        .map((pick) => pick.gshlTeamId),
+    );
+    const signingTeams = seasonTeams.filter((team) =>
+      signingTeamIds.has(team._id),
+    );
+    const signingFranchises = await Promise.all(
+      [...new Set(signingTeams.map((team) => team.franchiseId))].map((id) =>
+        ctx.db.get(id),
+      ),
+    );
+    const signingOwners = new Map(
+      signingFranchises
+        .filter(Boolean)
+        .map((franchise) => [franchise._id, franchise.ownerId]),
+    );
+    const otherContracts = await Promise.all(
+      [...new Set(signingOwners.values())]
+        .filter((ownerId) => ownerId && ownerId !== args.ownerId)
+        .map((ownerId) =>
+          ctx.db
+            .query("contracts")
+            .withIndex("by_ownerId", (q) => q.eq("ownerId", ownerId))
+            .collect(),
+        ),
+    );
+    const signingReport = buildSigningValues({
+      picks: picks.map((pick) => ({
+        ...pick,
+        id: pick._id,
+        teamId: pick.gshlTeamId,
+      })),
+      teams: signingTeams.map((team) => ({
+        id: team._id,
+        ownerId: signingOwners.get(team.franchiseId) ?? null,
+      })),
+      contracts: [...contracts, ...otherContracts.flat()].map((row) => ({
+        id: row._id,
+        playerId: row.playerId,
+        ownerId: row.ownerId,
+        salary: draftNumber(row.contractSalary),
+        start: utcTimestampToDateKey(row.startDate),
+        end: utcTimestampToDateKey(row.expiryDate),
+        signed: utcTimestampToDateKey(row.signingDate),
+      })),
+      seasonStart: utcTimestampToDateKey(season?.startDate),
+      ratings: totals.map((row) => ({
+        playerId: row.playerId,
+        rating: draftNumber(row.Rating),
+      })),
+    });
     const outcomes = buildDraftRosterOutcomes({
       picks: ownedPicks.map((pick) => ({
         ...pick,
@@ -350,7 +410,11 @@ export const ownerDraftHistory = query({
     return {
       seasons,
       selectedSeasonId,
+      signingSummary:
+        signingReport.teams.find((team) => teamIds.includes(team.teamId)) ??
+        null,
       picks: buildDraftHistoryPicks({
+        signingValues: signingReport.values,
         outcomes,
         seasonDays:
           seasonStart !== null && seasonEnd !== null && seasonEnd >= seasonStart

@@ -23,6 +23,9 @@ export interface DraftHistoryPick {
   pick: number | null;
   round: number | string;
   signing: boolean;
+  salary: number | null;
+  salaryExpectedRating: number | null;
+  signingValue: number | null;
   teamRating: number | null;
   overallRating: number | null;
   days: number | null;
@@ -32,6 +35,31 @@ export interface DraftHistoryPick {
   expectedRating: number | null;
   surplus: number | null;
   outcome: { label: string; date: string | null };
+}
+
+export interface DraftSigningContract {
+  id: string;
+  playerId: string;
+  ownerId: string;
+  start: string | null;
+  end: string | null;
+  signed: string | null;
+  salary: number | null;
+}
+
+export interface SigningValue {
+  salary: number | null;
+  expectedRating: number | null;
+  value: number | null;
+}
+
+export interface TeamSigningValue {
+  teamId: string;
+  score: number | null;
+  rank: number | null;
+  rankedTeams: number;
+  graded: number;
+  total: number;
 }
 
 export interface DraftHistorySeason {
@@ -49,4 +77,5 @@ export interface DraftHistoryData {
   seasons: DraftHistorySeason[];
   selectedSeasonId: string | null;
   picks: DraftHistoryPick[];
+  signingSummary: TeamSigningValue | null;
 }

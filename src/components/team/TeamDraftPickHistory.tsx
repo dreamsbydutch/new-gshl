@@ -11,6 +11,7 @@ import {
   TableViewport,
 } from "@gshl-ui";
 import { Check, ChevronDown, Trophy } from "lucide-react";
+import { formatMoney } from "../../lib/utils/core/format";
 
 const number = (value: number | null | undefined) =>
   value == null ? "-" : value.toFixed(1);
@@ -361,12 +362,40 @@ export function TeamDraftPickHistory({
         )}
       </div>
 
-      <div className="max-w-2xl">
+      <div>
         <h3 className="mb-2 text-sm font-semibold">Signings</h3>
+        <p className="mb-2 text-[11px] text-slate-500">
+          Salary value is for display only and does not affect Calder.
+        </p>
+        {data.signingSummary && (
+          <dl className="mb-3 flex flex-wrap gap-x-5 gap-y-1 text-xs">
+            <div className="flex gap-2">
+              <dt className="text-slate-500">Avg. above expected</dt>
+              <dd className="font-semibold tabular-nums">
+                {signed(data.signingSummary.score)}
+              </dd>
+            </div>
+            <div className="flex gap-2">
+              <dt className="text-slate-500">Signing rank</dt>
+              <dd className="font-semibold tabular-nums">
+                {data.signingSummary.rank === null
+                  ? "Not rated"
+                  : `#${data.signingSummary.rank} / ${data.signingSummary.rankedTeams}`}
+              </dd>
+            </div>
+            <div className="flex gap-2">
+              <dt className="text-slate-500">Graded</dt>
+              <dd className="tabular-nums">
+                {data.signingSummary.graded} / {data.signingSummary.total}
+              </dd>
+            </div>
+          </dl>
+        )}
         {report.signings.length ? (
           <TableViewport
             ariaLabel="Signing results"
             viewportClassName="rounded-none border-0"
+            scrollHint="Scroll for complete signing results"
           >
             <table className="w-full whitespace-nowrap text-right text-xs">
               <caption className="sr-only">
@@ -374,11 +403,25 @@ export function TeamDraftPickHistory({
               </caption>
               <thead className="[&_th]:align-bottom">
                 <tr className="bg-gray-800 text-gray-200">
-                  <th scope="col" className="px-2 py-1 text-left font-normal">
+                  <th
+                    scope="col"
+                    className="sticky left-0 z-30 bg-gray-800 px-2 py-1 text-left font-normal"
+                  >
                     Player
                   </th>
                   <th scope="col" className="px-2 py-1 font-normal">
+                    Salary
+                  </th>
+                  <th scope="col" className="px-2 py-1 font-normal">
+                    Expected
+                  </th>
+                  <th scope="col" className="px-2 py-1 font-normal">
                     Overall
+                  </th>
+                  <th scope="col" className="px-2 py-1 font-normal">
+                    Above
+                    <br />
+                    expected
                   </th>
                   <th scope="col" className="px-2 py-1 text-left font-normal">
                     Roster status
@@ -391,7 +434,10 @@ export function TeamDraftPickHistory({
                     key={pick.id}
                     className={index % 2 === 0 ? "bg-white" : "bg-gray-100"}
                   >
-                    <th scope="row" className="px-2 py-1 text-left font-normal">
+                    <th
+                      scope="row"
+                      className={`sticky left-0 z-20 px-2 py-1 text-left font-normal ${index % 2 === 0 ? "bg-white" : "bg-gray-100"}`}
+                    >
                       <span className="block">
                         {pick.name}{" "}
                         <span className="text-slate-500">
@@ -400,7 +446,18 @@ export function TeamDraftPickHistory({
                       </span>
                     </th>
                     <td className="px-2 py-1 tabular-nums">
+                      {formatMoney(pick.salary)}
+                    </td>
+                    <td className="px-2 py-1 tabular-nums">
+                      {number(pick.salaryExpectedRating)}
+                    </td>
+                    <td className="px-2 py-1 tabular-nums">
                       {number(pick.overallRating)}
+                    </td>
+                    <td
+                      className={`px-2 py-1 tabular-nums ${(pick.signingValue ?? 0) > 0 ? "text-emerald-700" : (pick.signingValue ?? 0) < 0 ? "text-rose-700" : "text-slate-500"}`}
+                    >
+                      {signed(pick.signingValue)}
                     </td>
                     <td className="whitespace-nowrap px-2 py-1 text-left text-[11px] text-slate-500">
                       {rosterStatus(pick.outcome.label, pick.outcome.date)}
@@ -452,10 +509,22 @@ export function TeamDraftPickHistory({
             daily history displays a dash rather than assuming a drop.
           </p>
           <p>
-            Signings are excluded from grading. Missing ratings or roster
-            records display a dash, never an assumed zero. Historical position
-            groups are used when available. Owner history follows the
-            franchise-to-owner links stored by the league.
+            Signings are excluded from Calder and draft-slot grading. Their
+            separate salary expectation uses 258 historical signing results:
+            34.48 + 17.76 × the square root of salary in millions. Salary is the
+            contract price at season opening. Above expected is the overall
+            regular-season rating minus that expectation. The team signing score
+            averages its graded players, and ranks teams in the selected season;
+            equal scores at one decimal share a rank. Results remain provisional
+            while the season is in progress.
+          </p>
+          <p>
+            Salary expectations cover the observed $1M–$12.5M range. Missing or
+            ambiguous salaries and missing ratings are ungraded and excluded
+            from the team average; coverage is shown beside the rank. Missing
+            ratings or roster records display a dash, never an assumed zero.
+            Historical position groups are used when available. Owner history
+            follows the franchise-to-owner links stored by the league.
           </p>
         </div>
       </details>
