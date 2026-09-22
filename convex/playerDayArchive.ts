@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return, @typescript-eslint/prefer-optional-chain */
 import { mutationGeneric, queryGeneric } from "convex/server";
 import { v } from "convex/values";
+import { syncPlayerDayPerformanceIndex } from "./lib/playerDayPerformanceIndex";
 
 const ARCHIVE_VERSION = 1;
 const MAX_DELETE_BATCH = 20;
@@ -163,13 +164,25 @@ export const upsertHighlightsBatch = mutationGeneric({
       const now = Date.now();
       if (existing) {
         await ctx.db.patch(existing._id, { ...doc, updatedAt: now });
+        await syncPlayerDayPerformanceIndex(
+          ctx.db,
+          "playerDayHighlights",
+          existing._id,
+          { ...existing, ...doc },
+        );
         updated += 1;
       } else {
-        await ctx.db.insert("playerDayHighlights", {
+        const id = await ctx.db.insert("playerDayHighlights", {
           ...doc,
           createdAt: now,
           updatedAt: now,
         });
+        await syncPlayerDayPerformanceIndex(
+          ctx.db,
+          "playerDayHighlights",
+          id,
+          doc,
+        );
         inserted += 1;
       }
     }
@@ -194,6 +207,12 @@ export const removeStaleHighlightsBatch = mutationGeneric({
       .slice(0, MAX_HIGHLIGHT_BATCH);
     let deleted = 0;
     for (const row of stale) {
+      await syncPlayerDayPerformanceIndex(
+        ctx.db,
+        "playerDayHighlights",
+        row._id,
+        null,
+      );
       await ctx.db.delete(row._id);
       deleted += 1;
     }
@@ -312,6 +331,12 @@ export const deleteVerifiedSourceBatch = mutationGeneric({
         missing += 1;
         continue;
       }
+      await syncPlayerDayPerformanceIndex(
+        ctx.db,
+        "playerDayStatLines",
+        item.expected.id,
+        null,
+      );
       await ctx.db.delete(item.expected.id);
       deleted += 1;
     }

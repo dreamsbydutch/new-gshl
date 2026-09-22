@@ -15,6 +15,7 @@ import {
   finishCompatibilityRead,
 } from "./lib/compatibilityRead";
 import { rebuildTeamLineup as rebuildLineup } from "./lib/teamLineup";
+import { syncPlayerDayPerformanceIndex } from "./lib/playerDayPerformanceIndex";
 
 type Row = Record<string, unknown>;
 type ConvexRow = Row & { _id: string; _creationTime: number };
@@ -829,6 +830,7 @@ async function readAwardRows(
 async function deleteAllRows(ctx: { db: any }, table: string): Promise<number> {
   const rows = await ctx.db.query(table as never).collect();
   for (const row of rows) {
+    await syncPlayerDayPerformanceIndex(ctx.db, table, row._id, null);
     await ctx.db.delete(row._id);
   }
   return rows.length;
@@ -893,11 +895,15 @@ async function applyUpsertByCompositeKey(ctx: { db: any }, args: UpsertArgs) {
         continue;
       }
       await ctx.db.patch(existing._id as never, patch as never);
+      await syncPlayerDayPerformanceIndex(ctx.db, args.table, existing._id, {
+        ...existing,
+        ...patch,
+      });
       updated += 1;
       continue;
     }
 
-    await ctx.db.insert(
+    const insertedId = await ctx.db.insert(
       args.table as never,
       {
         ...row,
@@ -905,6 +911,7 @@ async function applyUpsertByCompositeKey(ctx: { db: any }, args: UpsertArgs) {
         updatedAt: row.updatedAt ?? now,
       } as never,
     );
+    await syncPlayerDayPerformanceIndex(ctx.db, args.table, insertedId, row);
     inserted += 1;
   }
 
@@ -915,6 +922,7 @@ async function applyUpsertByCompositeKey(ctx: { db: any }, args: UpsertArgs) {
       if (filter && !matchesWhere(args.table, row, filter)) continue;
       if (incomingKeys.has(compositeKey(row, args.keyColumns))) continue;
       await ctx.db.delete(row._id as never);
+      await syncPlayerDayPerformanceIndex(ctx.db, args.table, row._id, null);
       deleted += 1;
     }
   }
@@ -1234,6 +1242,7 @@ export const insertMany = mutationGeneric({
 
       const doc = normalizeDoc(args.table, row);
       const id = await ctx.db.insert(args.table as never, doc as never);
+      await syncPlayerDayPerformanceIndex(ctx.db, args.table, id, doc);
       inserted.push({
         legacyId: typeof doc.legacyId === "string" ? doc.legacyId : null,
         id,
@@ -1303,6 +1312,10 @@ export const updateById = mutationGeneric({
     }
 
     await ctx.db.patch(row._id, normalizeDoc(args.table, args.data) as never);
+    await syncPlayerDayPerformanceIndex(ctx.db, args.table, row._id, {
+      ...row,
+      ...normalizeDoc(args.table, args.data),
+    });
     return publicRow((await ctx.db.get(row._id)) as never);
   },
 });

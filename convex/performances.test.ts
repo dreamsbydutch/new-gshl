@@ -34,7 +34,7 @@ const readLeaderboard = (
   }
 )._handler;
 
-function fixture(status?: string, signedIn = true) {
+function fixture(status?: string, signedIn = true, ready = true, count = 1) {
   const calls: unknown[] = [];
   const range = {
     eq: (field: string, value: unknown) => {
@@ -66,8 +66,30 @@ function fixture(status?: string, signedIn = true) {
           ) => {
             calls.push(index);
             build(range);
-            return {
-              unique: () => Promise.resolve(status ? { status } : null),
+            const query = {
+              unique: () =>
+                Promise.resolve(
+                  table === "playerDayPerformanceCoverage"
+                    ? { ready }
+                    : status
+                      ? { status }
+                      : null,
+                ),
+              order: (direction: string) => {
+                calls.push(["order", direction]);
+                return query;
+              },
+              take: (limit: number) => {
+                calls.push(["take", limit]);
+                return Promise.resolve(
+                  Array.from({ length: Math.min(limit, count) }, (_, i) => ({
+                    sourceId: `line-${i}`,
+                    position: "skater",
+                    date: "2026-01-15",
+                    scores: { G: 10 },
+                  })),
+                );
+              },
               paginate: (options: unknown) => {
                 calls.push(options);
                 return Promise.resolve({
@@ -87,6 +109,7 @@ function fixture(status?: string, signedIn = true) {
                 });
               },
             };
+            return query;
           },
         };
       },
@@ -95,11 +118,21 @@ function fixture(status?: string, signedIn = true) {
   return { ctx, calls };
 }
 
+void test("player days never fall back to paginating the source table", async () => {
+  const { ctx, calls } = fixture();
+  await readPage(ctx, { filters, cursor: null });
+  assert.equal(
+    calls.includes("playerDayStatLines"),
+    false,
+    "Leaderboard requests must use numeric score indexes, not scan player days",
+  );
+});
+
 void test("daily query applies season and inclusive date bounds to an index and limits each read", async () => {
   const { ctx, calls } = fixture();
   const result = await readPage(ctx, { filters, cursor: null });
-  assert.ok(calls.includes("playerDayStatLines"));
-  assert.ok(calls.includes("by_seasonId_date"));
+  assert.ok(calls.includes("playerDayPerformanceIndex"));
+  assert.ok(calls.includes("by_source_seasonId_date"));
   assert.ok(
     calls.some(
       (call) =>
@@ -122,9 +155,7 @@ void test("daily query applies season and inclusive date bounds to an index and 
   );
   assert.ok(
     calls.some(
-      (call) =>
-        JSON.stringify(call) ===
-        JSON.stringify({ cursor: null, numItems: 500 }),
+      (call) => JSON.stringify(call) === JSON.stringify(["take", 1001]),
     ),
   );
   assert.equal(result.rows[0]?.stats.G, 10);
@@ -135,8 +166,47 @@ void test("daily query applies season and inclusive date bounds to an index and 
 void test("archived days use retained highlights and signal partial historical coverage", async () => {
   const { ctx, calls } = fixture("archived");
   const result = await readPage(ctx, { filters, cursor: null });
-  assert.ok(calls.includes("playerDayHighlights"));
+  assert.ok(
+    calls.some(
+      (call) =>
+        JSON.stringify(call) ===
+        JSON.stringify(["eq", "source", "playerDayHighlights"]),
+    ),
+  );
   assert.equal(result.highlightsOnly, true);
+});
+
+void test("whole-season player days read only 100 indexed candidates per position even for a large source", async () => {
+  const { ctx, calls } = fixture(undefined, true, true, 100000);
+  const result = await readPage(ctx, {
+    filters: { ...filters, startDate: "", endDate: "" },
+    cursor: null,
+  });
+  const takes = calls.filter(
+    (call) => Array.isArray(call) && call[0] === "take",
+  );
+  assert.deepEqual(takes, [
+    ["take", 100],
+    ["take", 100],
+  ]);
+  assert.ok(calls.includes("by_source_seasonId_position_scores_G_sourceId"));
+  assert.equal(result.done, true);
+  assert.equal(result.rows.length, 100);
+});
+
+void test("unprepared indexes and over-budget date ranges fail without a source scan or partial leaderboard", async () => {
+  const missing = fixture(undefined, true, false);
+  await assert.rejects(
+    readPage(missing.ctx, { filters, cursor: null }),
+    /not ready/,
+  );
+  assert.ok(!missing.calls.includes("playerDayStatLines"));
+  const overBudget = fixture(undefined, true, true, 100000);
+  await assert.rejects(
+    readPage(overBudget.ctx, { filters, cursor: null }),
+    /Shorten the date range/,
+  );
+  assert.ok(!overBudget.calls.includes("playerDayStatLines"));
 });
 
 void test("unauthenticated and invalid date requests cannot scan stats", async () => {

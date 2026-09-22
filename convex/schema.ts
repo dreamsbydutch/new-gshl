@@ -1,12 +1,20 @@
 import { defineSchema, defineTable, type TableDefinition } from "convex/server";
 import { v, type GenericValidator } from "convex/values";
 import {
+  PLAYER_DAY_SCORES,
+  type PlayerDayScore,
+} from "./lib/playerDayPerformanceIndex";
+import {
   notificationCategory,
   notificationSubject,
 } from "./lib/notificationValidators";
 
 type TableShape = Record<string, GenericValidator>;
 type IndexSpec = string | readonly string[];
+type IndexIdentifier<Name extends string> =
+  Name extends `${infer Left}.${infer Right}`
+    ? `${Left}_${IndexIdentifier<Right>}`
+    : Name;
 type JoinIndexFields<Fields extends readonly string[]> =
   Fields extends readonly []
     ? ""
@@ -21,7 +29,7 @@ type JoinIndexFields<Fields extends readonly string[]> =
 type IndexName<Spec extends IndexSpec> = Spec extends string
   ? `by_${Spec}`
   : Spec extends readonly string[]
-    ? `by_${JoinIndexFields<Spec>}`
+    ? `by_${IndexIdentifier<JoinIndexFields<Spec>>}`
     : never;
 type IndexFields<Spec extends IndexSpec> = Spec extends string
   ? [Spec, "_creationTime"]
@@ -36,7 +44,7 @@ type MatchingIndexSpec<
   Spec extends IndexSpec,
   Name extends string,
 > = Spec extends IndexSpec
-  ? IndexName<Spec> extends Name
+  ? Name extends IndexName<Spec>
     ? Spec
     : never
   : never;
@@ -152,7 +160,7 @@ function table<
   for (const index of indexes) {
     const fields = typeof index === "string" ? [index] : [...index];
     definition = definition.index(
-      `by_${fields.join("_")}` as never,
+      `by_${fields.join("_").replaceAll(".", "_")}` as never,
       fields as never,
     );
   }
@@ -163,7 +171,49 @@ function table<
   >;
 }
 
+const optionalPerformanceScore = v.optional(v.number());
+const performanceScoreFields = Object.fromEntries(
+  PLAYER_DAY_SCORES.map((stat) => [stat, optionalPerformanceScore]),
+) as Record<PlayerDayScore, typeof optionalPerformanceScore>;
+
 export default defineSchema({
+  playerDayPerformanceIndex: table(
+    {
+      sourceId: v.string(),
+      source: v.union(
+        v.literal("playerDayStatLines"),
+        v.literal("playerDayHighlights"),
+      ),
+      seasonId: v.id("seasons"),
+      position: v.union(v.literal("skater"), v.literal("goalie")),
+      date: v.union(v.string(), v.null()),
+      scores: v.object(performanceScoreFields),
+    },
+    [
+      "sourceId",
+      ["source", "seasonId", "date"],
+      ...PLAYER_DAY_SCORES.map(
+        (stat) =>
+          [
+            "source",
+            "seasonId",
+            "position",
+            `scores.${stat}`,
+            "sourceId",
+          ] as const,
+      ),
+    ],
+  ),
+  playerDayPerformanceCoverage: defineTable({
+    source: v.union(
+      v.literal("playerDayStatLines"),
+      v.literal("playerDayHighlights"),
+    ),
+    seasonId: v.id("seasons"),
+    cursor: v.union(v.string(), v.null()),
+    ready: v.boolean(),
+    indexedRows: v.number(),
+  }).index("by_source_season", ["source", "seasonId"]),
   ownerLedgerEntries: defineTable({
     ownerId: v.id("owners"),
     kind: v.union(

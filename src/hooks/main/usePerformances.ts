@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useAction } from "convex/react";
+import { ConvexError } from "convex/values";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import type {
@@ -31,11 +32,14 @@ export function usePerformances(filters: PerformanceFilters, enabled: boolean) {
         (data) => {
           if (active) setState({ key, data });
         },
-        () => {
+        (error: unknown) => {
           if (active)
             setState({
               key,
-              error: "Unable to load performances. Please try again.",
+              error:
+                error instanceof ConvexError && typeof error.data === "string"
+                  ? error.data
+                  : "Unable to load performances. Please try again.",
             });
         },
       );

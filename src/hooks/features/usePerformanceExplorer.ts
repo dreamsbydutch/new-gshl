@@ -26,6 +26,8 @@ export function usePerformanceExplorer() {
   const [seasonType, setSeasonType] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const [submittedFilters, setSubmittedFilters] =
+    useState<PerformanceFilters | null>(null);
   const isDaily = kind.endsWith("Day");
   const hasSeasonType = ["playerSplit", "playerTotal", "teamSeason"].includes(
     kind,
@@ -66,9 +68,11 @@ export function usePerformanceExplorer() {
       ? "Start date must be on or before end date."
       : null;
   const query = usePerformances(
-    filters,
-    seasonIds.length > 0 && !validationError,
+    submittedFilters ?? filters,
+    submittedFilters !== null,
   );
+  const needsComparison =
+    JSON.stringify(filters) !== JSON.stringify(submittedFilters);
   function selectStat(next: string) {
     setStat(next);
     setDirection(
@@ -88,6 +92,15 @@ export function usePerformanceExplorer() {
   }
   return {
     ...query,
+    data: needsComparison ? undefined : query.data,
+    error: needsComparison ? undefined : query.error,
+    needsComparison,
+    runComparison: () => {
+      if (seasonIds.length > 0 && !validationError) {
+        setSubmittedFilters(filters);
+        if (!needsComparison) query.refresh();
+      }
+    },
     seasons: seasons.seasons,
     seasonsLoading: seasons.isLoading,
     filters,

@@ -27,6 +27,29 @@ Secret values never belong in source, Markdown, reports, command transcripts,
 or screenshots. Rotation requires updating every runtime that shares the
 credential; rotating Yahoo's client secret also requires reconnecting Yahoo.
 
+## Player-day performance index
+
+Player-day leaderboards require `playerDayPerformanceIndex` and a completed
+`playerDayPerformanceCoverage` record for each season/source. Browsing never
+builds the index or falls back to scanning source records. Normal operator
+writes and archive mutations maintain the derived rows transactionally.
+
+After the schema and functions are deployed, the authenticated operator mutation
+`playerDayPerformanceIndex:prepare` accepts `seasonId`, `source`
+(`playerDayStatLines` or `playerDayHighlights`), and the server secret supplied
+from the operator environment. Omit `apply` for a read-only readiness check;
+`apply: true` explicitly starts/resumes the additive, scheduled 100-row batches.
+Check readiness again after completion. Repeating an already completed build is
+a no-op. Prepare only the relevant source: live rows for live seasons, highlights
+for archived seasons. This one-time backfill reads existing rows and writes one
+compact numeric projection per source row; it does not change source statistics.
+
+Unfiltered leaderboards read at most 100 candidates per position group per
+season and hydrate only the final 100 combined winners. Date-filtered searches
+read at most 1,001 compact rows per season and refuse ranges exceeding 1,000;
+shorten the range or remove the date filter. Other performance tables continue
+to use their existing season-scoped queries.
+
 ## Deployment surfaces
 
 The web app and Convex deploy independently.

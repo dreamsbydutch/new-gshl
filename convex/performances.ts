@@ -1,8 +1,12 @@
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import { action, internalQuery } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { requireActiveUser } from "./lib/auth";
 import type { Id } from "./_generated/dataModel";
+import {
+  PLAYER_DAY_SCORES,
+  type PlayerDayScore,
+} from "./lib/playerDayPerformanceIndex";
 import type {
   PerformanceFilters,
   PerformanceResult,
@@ -74,8 +78,7 @@ function validateFilters(filters: Omit<PerformanceFilters, "seasonIds">) {
     throw new Error("Date ranges apply to daily performances");
 }
 
-// Each transaction reads a bounded page; the action retains only the best 100.
-// Numeric strings in historical stats prevent correct numeric index ordering.
+// Player days use normalized score indexes; no request-time source scan.
 export const page = internalQuery({
   args: {
     filters: seasonFiltersValidator,
@@ -106,6 +109,99 @@ export const page = internalQuery({
       );
     const highlightsOnly = archive?.status === "archived";
     const table = highlightsOnly ? "playerDayHighlights" : tables[filters.kind];
+    if (filters.kind === "playerDay") {
+      const source = highlightsOnly
+        ? "playerDayHighlights"
+        : "playerDayStatLines";
+      const coverage = await ctx.db
+        .query("playerDayPerformanceCoverage")
+        .withIndex("by_source_season", (q) =>
+          q.eq("source", source).eq("seasonId", filters.seasonId),
+        )
+        .unique();
+      if (!coverage?.ready)
+        throw new ConvexError(
+          "Player-day comparisons are not ready for this season yet. The league administrator needs to prepare its performance index.",
+        );
+      if (!PLAYER_DAY_SCORES.includes(filters.stat as PlayerDayScore))
+        throw new Error("Invalid player-day statistic");
+      const stat = filters.stat as PlayerDayScore;
+      const positions =
+        filters.position === "all"
+          ? (["skater", "goalie"] as const)
+          : [filters.position];
+      let candidates;
+      if (filters.startDate || filters.endDate) {
+        // Date-first index prevents examining unrelated days. Refuse oversized
+        // ranges instead of silently scanning a season or returning partial tops.
+        candidates = await ctx.db
+          .query("playerDayPerformanceIndex")
+          .withIndex("by_source_seasonId_date", (q) => {
+            const range = q
+              .eq("source", source)
+              .eq("seasonId", filters.seasonId);
+            if (filters.startDate && filters.endDate)
+              return range
+                .gte("date", filters.startDate)
+                .lte("date", filters.endDate);
+            if (filters.startDate) return range.gte("date", filters.startDate);
+            return range.lte("date", filters.endDate);
+          })
+          .take(1001);
+        if (candidates.length > 1000)
+          throw new ConvexError(
+            "This date range includes too many player days. Shorten the date range, or remove the date filter to compare indexed season leaders.",
+          );
+      } else {
+        const index =
+          `by_source_seasonId_position_scores_${stat}_sourceId` as const;
+        const field = `scores.${stat}` as const;
+        candidates = (
+          await Promise.all(
+            positions.map((position) =>
+              ctx.db
+                .query("playerDayPerformanceIndex")
+                .withIndex(index, (q) =>
+                  q
+                    .eq("source", source)
+                    .eq("seasonId", filters.seasonId)
+                    .eq("position", position)
+                    .gte(field, -Number.MAX_VALUE),
+                )
+                .order(filters.direction)
+                .take(100),
+            ),
+          )
+        ).flat();
+      }
+      const rows: PerformanceRow[] = candidates
+        .filter(
+          (row) =>
+            positions.includes(row.position) && row.scores[stat] !== undefined,
+        )
+        .map((row) => ({
+          id: row.sourceId,
+          season: season?.name ?? "Unknown season",
+          playerId: null,
+          teamIds: [],
+          weekId: null,
+          period: row.date ?? "Season",
+          position: row.position,
+          stats: Object.fromEntries(
+            Object.entries(row.scores).filter(
+              (entry): entry is [string, number] => entry[1] !== undefined,
+            ),
+          ),
+          name: "",
+          team: "",
+        }));
+      return {
+        rows: topPerformances(rows, stat, filters.direction),
+        cursor: "",
+        done: true,
+        highlightsOnly,
+      };
+    }
     const query =
       table === "playerDayStatLines" ||
       table === "playerDayHighlights" ||
@@ -188,6 +284,30 @@ export const hydrate = internalQuery({
     if (rows.length > 100) throw new Error("Too many performances");
     return Promise.all(
       rows.map(async (row) => {
+        // Only the final combined winners need their full source documents.
+        const dayId =
+          ctx.db.normalizeId("playerDayStatLines", row.id) ??
+          ctx.db.normalizeId("playerDayHighlights", row.id);
+        if (dayId) {
+          const day = await ctx.db.get(dayId);
+          if (!day)
+            throw new ConvexError(
+              "Performance records changed. Please run the comparison again.",
+            );
+          row = {
+            ...row,
+            playerId: day.playerId,
+            teamIds: [day.gshlTeamId],
+            weekId: day.weekId,
+            position: day.posGroup,
+            stats: Object.fromEntries(
+              performanceStats("playerDay").map((stat) => [
+                stat,
+                performanceNumber((day as Record<string, unknown>)[stat]),
+              ]),
+            ),
+          };
+        }
         const playerId = row.playerId
           ? ctx.db.normalizeId("players", row.playerId)
           : null;

@@ -213,7 +213,9 @@ export function topPerformances(
     .sort((a, b) => {
       const difference =
         (a.stats[stat]! - b.stats[stat]!) * (direction === "asc" ? 1 : -1);
-      return difference || a.id.localeCompare(b.id);
+      return (
+        difference || a.id.localeCompare(b.id) * (direction === "asc" ? 1 : -1)
+      );
     })
     .slice(0, 100);
 }

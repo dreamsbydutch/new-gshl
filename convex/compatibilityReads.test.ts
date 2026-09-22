@@ -47,6 +47,11 @@ function fixture() {
           },
           collect: async () => selected(),
           first: async () => selected()[0] ?? null,
+          unique: async () => {
+            const matches = selected();
+            if (matches.length > 1) throw new Error("Expected unique row");
+            return matches[0] ?? null;
+          },
           take: async (n: number) => {
             takes++;
             return selected().slice(0, n);

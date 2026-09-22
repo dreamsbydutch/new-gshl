@@ -33,7 +33,7 @@ export function Performances() {
         </h2>
         <p className="mt-1 text-sm text-gray-600">
           Compare the top 100 performances across selected seasons. Choose a
-          statistic or click a column to rank the full selection.
+          statistic or click a column, then run the comparison.
         </p>
       </div>
       <div className="grid grid-cols-2 gap-3 rounded-lg border bg-white p-4 md:grid-cols-4">
@@ -175,6 +175,23 @@ export function Performances() {
           </>
         )}
       </div>
+      <button
+        type="button"
+        onClick={view.runComparison}
+        disabled={
+          view.isLoading ||
+          filters.seasonIds.length === 0 ||
+          Boolean(view.validationError)
+        }
+        className="rounded-md bg-gray-900 px-4 py-2 text-sm text-white disabled:opacity-50"
+      >
+        {view.isLoading ? "Finding performances…" : "Run comparison"}
+      </button>
+      {view.needsComparison && !view.isLoading && (
+        <p className="text-sm text-gray-600">
+          Choose your filters, then run the comparison.
+        </p>
+      )}
       <p className="text-xs text-gray-600">
         Game statistics require games played and a recorded value; availability
         statistics can include non-playing days. Goalie categories include
