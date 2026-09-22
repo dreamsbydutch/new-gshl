@@ -171,6 +171,7 @@ export interface RecordBookPlayerRow extends RecordBookStatLine {
   lastSeason?: number | string;
   notCountedStats?: Set<RecordBookStatKey>;
   awardCounts: Partial<Record<AwardsList, number>>;
+  cupCount: number;
 }
 
 export interface RecordBookAwardRow {
@@ -222,6 +223,7 @@ export interface AllTimeRosterEntry {
 
 export interface TeamRecordBookProps {
   playerAwards: PlayerAward[];
+  teamAwards: TeamAward[];
   allTeams: GSHLTeam[];
   careerSplits: PlayerCareerSplitStatLine[];
   currentTeam: GSHLTeam;
@@ -235,6 +237,7 @@ export interface TeamRecordBookProps {
 export interface BuildRecordBookPlayerRowsOptions {
   awardRows: RecordBookAwardRow[];
   careerSplits: PlayerCareerSplitStatLine[];
+  cupSeasonIds?: ReadonlySet<string>;
   ownerTeamIds: Set<string>;
   nhlTeamsByAbbr: Map<string, NHLTeam>;
   playersById: Map<string, Player>;

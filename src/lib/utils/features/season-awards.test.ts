@@ -100,7 +100,7 @@ void test("groups every non-all-star player award for the standings awards page"
     "Casey Finalist",
   ]);
   assert.equal(sections[0]?.iconUrl !== null, true);
-  assert.equal(sections[2]?.title, "Conn Smythe Trophy");
+  assert.equal(sections[2]?.title, "Playoff MVP");
 });
 
 void test("sorts all-star winners by lineup position", () => {

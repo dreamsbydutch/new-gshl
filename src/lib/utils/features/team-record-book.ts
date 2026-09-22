@@ -622,6 +622,7 @@ export function buildRecordBookPlayerRows(
   const {
     awardRows,
     careerSplits,
+    cupSeasonIds = new Set<string>(),
     ownerTeamIds,
     nhlTeamsByAbbr,
     playersById,
@@ -669,6 +670,7 @@ export function buildRecordBookPlayerRows(
       awardCounts:
         seasonCounts.get(`${row.playerId}|${row.seasonId}|${row.seasonType}`) ??
         {},
+      cupCount: cupSeasonIds.has(row.seasonId) ? 1 : 0,
     };
   });
 
@@ -701,6 +703,11 @@ export function buildRecordBookPlayerRows(
         ...getStatLine(row),
         awardCounts:
           careerCounts.get(`${row.playerId}|${row.seasonType}`) ?? {},
+        cupCount: new Set(
+          playerSeasons
+            .map((season) => season.seasonId)
+            .filter((seasonId) => cupSeasonIds.has(seasonId)),
+        ).size,
       };
     },
   );

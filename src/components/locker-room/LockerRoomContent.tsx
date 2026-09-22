@@ -177,7 +177,7 @@ export function LockerRoomContent() {
   const nhlTeams = nhlTeamsRaw;
   const { data: teamAwards = [], isLoading: teamAwardsLoading } = useTeamAwards(
     {
-      enabled: isTrophyTab,
+      enabled: isTrophyTab || isRecordBookTab,
       orderBy: { seasonId: "desc" },
     },
   );
@@ -256,7 +256,8 @@ export function LockerRoomContent() {
     (needsNhlTeams && nhlTeamsLoading) ||
     (isTrophyTab && teamAwardsLoading) ||
     (isRecordBookTab &&
-      (playerAwardsLoading ||
+      (teamAwardsLoading ||
+        playerAwardsLoading ||
         playerTotalsQuery.isLoading ||
         recordBookPlayersQuery.isLoading ||
         careerSplitsQuery.isLoading ||
@@ -412,6 +413,7 @@ export function LockerRoomContent() {
       {selectedLockerRoomType === "recordbook" && (
         <TeamRecordBook
           playerAwards={playerAwards}
+          teamAwards={teamAwards}
           allTeams={allTeams}
           careerSplits={careerSplits}
           currentTeam={currentTeam}

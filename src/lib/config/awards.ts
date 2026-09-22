@@ -163,12 +163,12 @@ export const ALL_STAR_MEDAL_EMOJIS = new Map<AwardsListType, string>([
 ]);
 
 export const PLAYER_TROPHY_LABELS = new Map<AwardsListType, string>([
-  [AwardsList.CROSBY, "Crosby Trophy"],
-  [AwardsList.LIDSTROM, "Lidstrom Trophy"],
-  [AwardsList.BRODEUR, "Brodeur Trophy"],
-  [AwardsList.GRETZKY, "Gretzky Trophy"],
-  [AwardsList.OVECHKIN, "Ovechkin Trophy"],
-  [AwardsList.CONN_SMYTHE, "Conn Smythe Trophy"],
+  [AwardsList.CROSBY, "Player MVP"],
+  [AwardsList.LIDSTROM, "Best Dman"],
+  [AwardsList.BRODEUR, "Best G"],
+  [AwardsList.GRETZKY, "Most Pts"],
+  [AwardsList.OVECHKIN, "Most G"],
+  [AwardsList.CONN_SMYTHE, "Playoff MVP"],
 ]);
 
 export const PLAYER_TROPHY_ICON_AWARDS = new Map<

@@ -52,38 +52,38 @@ const PLAYER_TROPHY_TABLE_COLUMNS = [
   {
     award: AwardsList.CROSBY,
     iconAward: AwardsList.HART,
-    label: "Crosby",
-    title: "Crosby Trophy",
+    label: "Player MVP",
+    title: "Player MVP",
   },
   {
     award: AwardsList.LIDSTROM,
     iconAward: AwardsList.NORRIS,
-    label: "Lidstrom",
-    title: "Lidstrom Trophy",
+    label: "Best Dman",
+    title: "Best Dman",
   },
   {
     award: AwardsList.BRODEUR,
     iconAward: AwardsList.VEZINA,
-    label: "Brodeur",
-    title: "Brodeur Trophy",
+    label: "Best G",
+    title: "Best G",
   },
   {
     award: AwardsList.GRETZKY,
     iconAward: AwardsList.ART_ROSS,
-    label: "Gretzky",
-    title: "Gretzky Trophy",
+    label: "Most Pts",
+    title: "Most Pts",
   },
   {
     award: AwardsList.OVECHKIN,
     iconAward: AwardsList.ROCKET,
-    label: "Ovechkin",
-    title: "Ovechkin Trophy",
+    label: "Most G",
+    title: "Most G",
   },
   {
     award: AwardsList.CONN_SMYTHE,
     iconAward: AwardsList.CONN_SMYTHE,
-    label: "Conn Smythe",
-    title: "Conn Smythe Trophy",
+    label: "Playoff MVP",
+    title: "Playoff MVP",
   },
 ] as const;
 
@@ -364,7 +364,7 @@ function PlayerHistoryTable({
   );
   const hasSeasonColumn = view === "season";
   const emptyColSpan =
-    columns.length + allStarColumns.length + trophyColumns.length + 4;
+    columns.length + allStarColumns.length + trophyColumns.length + 5;
 
   return (
     <table className="mx-auto min-w-max border-collapse whitespace-nowrap text-xs">
@@ -422,6 +422,17 @@ function PlayerHistoryTable({
               title={column.title}
             />
           ))}
+          <th
+            scope="col"
+            className="w-14 px-1 text-center text-xs font-normal text-gray-200"
+            title="GSHL Cups won with this team"
+          >
+            <AwardColumnHeading
+              iconAward={AwardsList.GSHL_CUP}
+              label="Cups"
+              title="GSHL Cups won with this team"
+            />
+          </th>
           {allStarColumns.map((column) => (
             <th
               scope="col"
@@ -499,6 +510,13 @@ function PlayerHistoryTable({
                   {formatRecordBookStat(row, column)}
                 </td>
               ))}
+              <td className="px-1 py-1 text-center">
+                <AwardCountMarks
+                  count={row.cupCount}
+                  iconAward={AwardsList.GSHL_CUP}
+                  label="GSHL Cup won with this team"
+                />
+              </td>
               {allStarColumns.map((column) => (
                 <td
                   key={`${row.id}-${column.award}`}

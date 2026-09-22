@@ -218,6 +218,21 @@ void test("counts all-star and player trophies in the matching table season", ()
   assert.equal(playoffRow.awardCounts[AwardsList.CONN_SMYTHE], 1);
 });
 
+void test("counts Cups won while a player was with the team", () => {
+  const { seasonRows } = buildRecordBookPlayerRows({
+    awardRows: [],
+    careerSplits: [],
+    cupSeasonIds: new Set(["season-1"]),
+    nhlTeamsByAbbr: new Map(),
+    ownerTeamIds: new Set(["owner-a-team-1"]),
+    playersById: new Map(),
+    seasonSplits: [seasonSplitRow()],
+    seasonsById: new Map([["season-1", 2025]]),
+  });
+
+  assert.equal(seasonRows[0]?.cupCount, 1);
+});
+
 void test("assigns the Conn Smythe to playoff record-book rows", () => {
   assert.equal(
     getRecordBookAwardSeasonType(AwardsList.CONN_SMYTHE),

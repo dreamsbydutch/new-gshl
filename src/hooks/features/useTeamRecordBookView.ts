@@ -11,6 +11,7 @@ import type {
   UseTeamRecordBookViewResult,
 } from "@gshl-types";
 import {
+  AwardsList,
   buildRecordBookAwardRows,
   buildRecordBookPlayerRows,
   getOwnerTeamIds,
@@ -56,6 +57,7 @@ export function useTeamRecordBookView(
     currentTeam,
     nhlTeams,
     playerAwards,
+    teamAwards,
     playerTotals,
     players,
     seasonSplits,
@@ -87,6 +89,19 @@ export function useTeamRecordBookView(
     () => getOwnerTeamIds(allTeams, currentTeam),
     [allTeams, currentTeam],
   );
+  const cupSeasonIds = useMemo(
+    () =>
+      new Set(
+        teamAwards
+          .filter(
+            (award) =>
+              award.award === AwardsList.GSHL_CUP &&
+              String(award.ownerId) === String(currentTeam.ownerId),
+          )
+          .map((award) => String(award.seasonId)),
+      ),
+    [currentTeam.ownerId, teamAwards],
+  );
   const allAwardRows = useMemo(
     () =>
       buildRecordBookAwardRows({
@@ -113,6 +128,7 @@ export function useTeamRecordBookView(
       buildRecordBookPlayerRows({
         awardRows: allAwardRows,
         careerSplits,
+        cupSeasonIds,
         ownerTeamIds,
         nhlTeamsByAbbr,
         playersById,
@@ -122,6 +138,7 @@ export function useTeamRecordBookView(
     [
       careerSplits,
       allAwardRows,
+      cupSeasonIds,
       ownerTeamIds,
       nhlTeamsByAbbr,
       playersById,
