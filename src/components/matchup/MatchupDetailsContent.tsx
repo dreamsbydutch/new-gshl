@@ -5,7 +5,6 @@ import Image from "next/image";
 import Link from "next/link";
 import { WhatsAppShareButton } from "@gshl-components/ui/WhatsAppShareButton";
 import { MatchupSkeleton } from "@gshl-skeletons";
-import { TableViewport } from "@gshl-ui";
 import {
   lighten,
   readableText,
@@ -146,93 +145,95 @@ function CategoryResultsCard({
           No category data available yet.
         </div>
       ) : (
-        <TableViewport
-          ariaLabel={`${awayLabel} and ${homeLabel} matchup category comparison`}
-          scrollHint="Scroll to compare every matchup category"
-        >
-          <table className="w-max min-w-full border-collapse text-xs sm:text-sm">
+        <div className="overflow-hidden rounded-lg border border-slate-200">
+          <table className="w-full table-fixed border-collapse text-xs sm:text-sm">
             <caption className="sr-only">
-              {awayLabel} and {homeLabel} matchup category comparison
+              {awayLabel} (away) and {homeLabel} (home) matchup category
+              comparison
             </caption>
+            <colgroup>
+              <col className="w-2/5" />
+              <col className="w-1/5" />
+              <col className="w-2/5" />
+            </colgroup>
             <thead className="bg-slate-50">
               <tr className="border-b border-slate-200">
-                <th
-                  scope="col"
-                  className="sticky left-0 z-30 w-20 min-w-20 max-w-20 border-r border-slate-200 bg-slate-50 px-2 py-2 text-left text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500 sm:w-28 sm:min-w-28 sm:max-w-28 sm:px-3 sm:text-xs sm:tracking-[0.14em]"
-                >
-                  Team
-                </th>
-                {categories.map((category) => (
-                  <th
-                    key={category.key}
-                    scope="col"
-                    className="min-w-14 whitespace-nowrap px-2 py-2 text-center text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500 sm:text-xs sm:tracking-[0.14em]"
-                  >
-                    {category.label}
-                  </th>
-                ))}
+                {(["away", "category", "home"] as const).map((side) => {
+                  if (side === "category") {
+                    return (
+                      <th key={side} scope="col">
+                        <span className="sr-only">Category</span>
+                      </th>
+                    );
+                  }
+                  const team = side === "away" ? awayTeam : homeTeam;
+                  const label = side === "away" ? awayLabel : homeLabel;
+                  return (
+                    <th
+                      key={side}
+                      scope="col"
+                      className="px-2 py-2 text-center"
+                    >
+                      <div className="flex min-w-0 items-center justify-center gap-1.5">
+                        {team?.logoUrl ? (
+                          <Image
+                            src={team.logoUrl}
+                            alt=""
+                            width={28}
+                            height={28}
+                            className="h-6 w-6 shrink-0 object-contain sm:h-7 sm:w-7"
+                          />
+                        ) : null}
+                        <span
+                          className="truncate font-semibold text-slate-700"
+                          title={team?.name ?? label}
+                        >
+                          {label}
+                        </span>
+                      </div>
+                      <div className="mt-0.5 text-[10px] font-normal uppercase tracking-wider text-slate-500">
+                        {side}
+                      </div>
+                    </th>
+                  );
+                })}
               </tr>
             </thead>
             <tbody>
-              {(
-                [
-                  {
-                    side: "away" as const,
-                    label: awayLabel,
-                    team: awayTeam,
-                    value: (category: CategoryResult) => category.awayValue,
-                  },
-                  {
-                    side: "home" as const,
-                    label: homeLabel,
-                    team: homeTeam,
-                    value: (category: CategoryResult) => category.homeValue,
-                  },
-                ] as const
-              ).map((row) => (
+              {categories.map((category) => (
                 <tr
-                  key={row.side}
-                  className="group border-b border-slate-200 last:border-0 odd:bg-white even:bg-slate-50/70 hover:bg-slate-100"
+                  key={category.key}
+                  className="border-b border-slate-100 last:border-0 odd:bg-white even:bg-slate-50/50"
                 >
+                  <td
+                    className={`px-2 py-1.5 text-center tabular-nums ${valueClassFor(category, "away")}`}
+                  >
+                    {category.awayValue}
+                    <span className="sr-only">
+                      , {outcomeFor(category, "away")}
+                    </span>
+                  </td>
                   <th
                     scope="row"
-                    className="sticky left-0 z-20 w-20 min-w-20 max-w-20 overflow-hidden border-r border-slate-200 bg-inherit px-2 py-3 text-left text-xs font-semibold uppercase tracking-[0.12em] text-slate-600 group-hover:bg-slate-100 sm:w-28 sm:min-w-28 sm:max-w-28 sm:px-3 sm:tracking-[0.14em]"
+                    className="px-1 py-1.5 text-center text-[10px] font-semibold text-slate-600 sm:text-xs"
                   >
-                    <span className="flex min-w-0 items-center gap-1.5">
-                      {row.team?.logoUrl ? (
-                        <Image
-                          src={row.team.logoUrl}
-                          alt=""
-                          width={28}
-                          height={28}
-                          className="h-6 w-6 shrink-0 object-contain sm:h-7 sm:w-7"
-                        />
-                      ) : null}
-                      <span
-                        className="truncate"
-                        title={row.team?.name ?? row.label}
-                      >
-                        {row.label}
-                      </span>
+                    <span className="inline-block rounded bg-slate-100 px-2 py-1">
+                      {category.label}
                     </span>
                   </th>
-                  {categories.map((category) => {
-                    const outcome = outcomeFor(category, row.side);
-                    return (
-                      <td
-                        key={category.key}
-                        className={`whitespace-nowrap px-2 py-3 text-center ${valueClassFor(category, row.side)}`}
-                      >
-                        {row.value(category)}
-                        <span className="sr-only">, {outcome}</span>
-                      </td>
-                    );
-                  })}
+                  <td
+                    className={`px-2 py-1.5 text-center tabular-nums ${valueClassFor(category, "home")}`}
+                  >
+                    {category.homeValue}
+                    <span className="sr-only">
+                      , {outcomeFor(category, "home")}
+                    </span>
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
-        </TableViewport>
+        </div>
       )}
     </section>
   );
