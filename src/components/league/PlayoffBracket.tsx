@@ -24,7 +24,7 @@ function TeamSlot({
   return (
     <div
       className={cn(
-        "flex min-w-0 flex-1 items-center gap-1 px-2 py-1.5 lg:gap-2 lg:px-2.5",
+        "flex min-w-0 flex-1 items-center justify-center gap-1 px-2 py-1.5 lg:justify-start lg:gap-2 lg:px-2.5",
         winner && "bg-emerald-50/80",
       )}
       title={team?.name ?? "TBD"}
@@ -37,15 +37,15 @@ function TeamSlot({
       >
         {label}
       </span>
-      <div className="flex min-w-0 flex-1 items-center gap-2">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-slate-100">
+      <div className="flex min-w-0 items-center lg:flex-1 lg:gap-2">
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-slate-100">
           {team?.logoUrl ? (
             <Image
               src={team.logoUrl}
               alt=""
-              width={40}
-              height={40}
-              className="h-10 w-10 object-contain"
+              width={32}
+              height={32}
+              className="h-8 w-8 object-contain"
             />
           ) : (
             <span className="text-[9px] font-bold text-slate-400">?</span>
@@ -72,7 +72,7 @@ function TeamSlot({
       <span
         aria-label={score === null ? "Score unavailable" : `${score} points`}
         className={cn(
-          "w-7 shrink-0 text-right font-mono text-sm font-bold tabular-nums text-slate-900",
+          "shrink-0 text-right font-mono text-sm font-bold tabular-nums text-slate-900 lg:w-7",
           winner && "text-emerald-700",
         )}
       >

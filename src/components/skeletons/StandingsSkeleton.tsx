@@ -123,10 +123,10 @@ function BracketMatchupSkeleton() {
       {Array.from({ length: 2 }).map((_, index) => (
         <div
           key={index}
-          className="flex items-center gap-2 border-t border-slate-100 px-2.5 py-1.5 first:border-0"
+          className="flex items-center justify-center gap-1 border-t border-slate-100 px-2.5 py-1.5 first:border-0 lg:justify-start lg:gap-2"
         >
           <Skeleton className="h-2.5 w-8" />
-          <Skeleton className="h-10 w-10 rounded-md" />
+          <Skeleton className="h-8 w-8 rounded-md" />
           <Skeleton className="hidden h-3 flex-1 lg:block" />
           <Skeleton className="h-4 w-5" />
         </div>
