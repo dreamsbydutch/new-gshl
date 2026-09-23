@@ -55,6 +55,10 @@ export function PlayerStatsTable({
       );
     }
 
+    if (["MG", "IR", "IRplus"].includes(columnKey)) {
+      classes.push("border-l border-slate-300");
+    }
+
     if (
       columnKey !== "player" &&
       columnKey !== "date" &&

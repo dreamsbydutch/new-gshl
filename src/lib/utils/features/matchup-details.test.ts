@@ -48,14 +48,14 @@ void test("weekly status columns include zeroes and retain values for skaters an
         "pos",
         "nhlTeam",
         "GP",
-        "MG",
-        "IR",
-        "IRplus",
         "ADD",
         "MS",
         "BS",
         "G",
         "W",
+        "MG",
+        "IR",
+        "IRplus",
       ],
     );
     assert.equal(
