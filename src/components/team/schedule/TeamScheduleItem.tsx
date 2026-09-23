@@ -56,16 +56,9 @@ export function TeamScheduleItem({
 
   return (
     <div className="border-b">
-      <button
-        id={triggerId}
-        type="button"
-        aria-controls={canExpand ? disclosureId : undefined}
-        aria-expanded={canExpand ? isExpanded : undefined}
-        disabled={!canExpand}
-        onClick={canExpand ? onToggle : undefined}
-        className={`grid w-full grid-cols-9 py-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-slate-500 disabled:cursor-default ${gameDisplay.className} ${
-          canExpand ? "cursor-pointer hover:bg-gray-50" : ""
-        }`}
+      <Link
+        href={matchupHref ?? `/matchup/${matchup.id}`}
+        className={`grid min-h-11 w-full grid-cols-9 py-2 text-left hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-slate-500 ${gameDisplay.className}`}
       >
         <WeekDisplay label={gameDisplay.label} />
         <OpponentDisplay opponentText={opponentText} />
@@ -74,7 +67,22 @@ export function TeamScheduleItem({
           selectedTeamId={selectedTeamId}
           week={week}
         />
-      </button>
+      </Link>
+      {canExpand ? (
+        <div className="flex justify-end px-2">
+          <button
+            id={triggerId}
+            type="button"
+            aria-controls={isExpanded ? disclosureId : undefined}
+            aria-expanded={isExpanded}
+            aria-label={`${isExpanded ? "Hide" : "Show"} stats: ${opponentText}, ${gameDisplay.label}`}
+            onClick={onToggle}
+            className="min-h-11 rounded px-3 text-xs font-semibold text-slate-600 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500"
+          >
+            {isExpanded ? "Hide stats" : "Show stats"}
+          </button>
+        </div>
+      ) : null}
 
       {canExpand && isExpanded ? (
         <div id={disclosureId} role="region" aria-labelledby={triggerId}>
@@ -88,14 +96,6 @@ export function TeamScheduleItem({
             )
           ) : (
             <div className="pb-2">
-              <div className="mx-auto flex w-5/6 justify-end pt-2">
-                <Link
-                  href={matchupHref ?? `/matchup/${matchup.id}`}
-                  className="inline-flex min-h-11 items-center rounded-full border border-slate-300 px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-slate-600 transition hover:border-slate-800 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500"
-                >
-                  Open matchup page
-                </Link>
-              </div>
               <MatchupStatsTable
                 selectedTeam={selectedTeam ?? null}
                 selectedTeamStats={selectedTeamStats!}
