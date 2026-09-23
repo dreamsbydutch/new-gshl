@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildDraftHistoryPicks, draftNumber } from "./draft-history";
+import {
+  buildDraftHistoryPicks,
+  draftNumber,
+  draftSeasonWindow,
+} from "./draft-history";
 import { expectedDraftRating } from "./draft-slot-curve";
+import { buildDraftRosterOutcomes } from "./draft-roster-outcomes";
 import type {
   DraftPerformance,
   DraftResultInput,
@@ -56,6 +61,86 @@ const totals: DraftPerformance[] = [
   { playerId: "e", rating: 125, days: 100, position: "F" },
 ];
 const input = { picks, totals, splits: [], players: [], teamIds: ["ours"] };
+
+void test("192 full-season roster days are 100% when playoff calendar ends before season metadata", () => {
+  const window = draftSeasonWindow({
+    start: "2025-10-07",
+    end: "2026-04-19",
+    weeks: [
+      { start: "2025-10-07", end: "2026-03-22", type: "RS" },
+      { start: "2026-03-23", end: "2026-04-16", type: "PO" },
+    ],
+  });
+  const full = {
+    playerId: "a",
+    teamId: "ours",
+    rating: 80,
+    days: 192,
+    position: "F",
+  };
+  const result = buildDraftHistoryPicks({
+    ...input,
+    totals: [full],
+    splits: [full],
+    seasonDays: window.days,
+  });
+  assert.equal(result[0]?.teamDaysPercent, 100);
+  assert.equal(result[0]?.usagePercent, 100);
+  assert.equal(window.end, "2026-04-16");
+  const partial = buildDraftHistoryPicks({
+    ...input,
+    totals: [{ ...full, days: 96 }],
+    splits: [{ ...full, days: 96 }],
+    seasonDays: window.days,
+  });
+  assert.equal(partial[0]?.teamDaysPercent, 50);
+  const days = Array.from({ length: 192 }, (_, index) => ({
+    date: new Date(Date.parse("2025-10-07T00:00:00Z") + index * 86_400_000)
+      .toISOString()
+      .slice(0, 10),
+    playerId: "a",
+    teamId: "ours",
+  }));
+  const outcomes = buildDraftRosterOutcomes({
+    picks: [picks[0]!],
+    start: window.start,
+    end: window.end,
+    today: "2026-09-22",
+    days,
+    contracts: [
+      {
+        playerId: "a",
+        start: "2025-09-01",
+        end: "2026-04-18",
+        status: "Buyout",
+      },
+    ],
+  });
+  assert.equal(outcomes.get("1")?.label, "Full season");
+});
+
+void test("season window includes postseason and falls back to configured dates without weeks", () => {
+  assert.deepEqual(
+    draftSeasonWindow({ start: "2025-10-07", end: "2026-04-19", weeks: [] }),
+    { start: "2025-10-07", end: "2026-04-19", days: 195 },
+  );
+  assert.equal(
+    draftSeasonWindow({ start: null, end: null, weeks: [] }).days,
+    null,
+  );
+  assert.deepEqual(
+    draftSeasonWindow({
+      start: "2025-10-07",
+      end: "2026-04-19",
+      weeks: [
+        { start: "2025-10-07", end: "2026-03-22", type: "RS" },
+        { start: "2026-03-23", end: "2026-04-16", type: "LT" },
+        { start: "2026-05-01", end: "2026-05-20", type: "EX" },
+      ],
+    }),
+    { start: "2025-10-07", end: "2026-04-16", days: 192 },
+  );
+});
 
 void test("slot value uses the league draft pool and excludes signings", () => {
   const result = buildDraftHistoryPicks(input);
@@ -163,4 +248,15 @@ void test("usage combines regular season and playoffs without changing rating be
   assert.equal(result[2]?.days, 10);
   assert.equal(result[2]?.usageDays, 10);
   assert.equal(result[2]?.overallRating, null);
+});
+
+void test("historical week calendar also corrects shifted season opening dates", () => {
+  assert.deepEqual(
+    draftSeasonWindow({
+      start: "2023-10-13",
+      end: "2024-04-21",
+      weeks: [{ start: "2023-10-10", end: "2024-04-18", type: "RS" }],
+    }),
+    { start: "2023-10-10", end: "2024-04-18", days: 192 },
+  );
 });

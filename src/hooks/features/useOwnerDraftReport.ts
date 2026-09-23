@@ -25,6 +25,13 @@ export function useOwnerDraftReport(ownerId: string | null | undefined) {
     signings: picks.filter((pick) => pick.signing && pick.playerId),
     graded,
     hits,
+    misses: graded.filter((pick) => pick.surplus! < 0),
+    fullSeasonPicks: selections.filter(
+      (pick) => pick.outcome.label === "Full season",
+    ),
+    averageSurplus: graded.length
+      ? graded.reduce((sum, pick) => sum + pick.surplus!, 0) / graded.length
+      : null,
     positions,
     season: query.data?.seasons.find(
       (season) => season.id === query.data?.selectedSeasonId,

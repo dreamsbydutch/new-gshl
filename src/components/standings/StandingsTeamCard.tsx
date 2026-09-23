@@ -28,48 +28,61 @@ function StandingsGameList({
       </p>
       {games.length ? (
         <ul className="flex flex-wrap gap-x-4 gap-y-1">
-          {games.map((game) => (
-            <li
-              key={game.id}
-              title={`${game.weekLabel}: ${game.venueLabel === "@" ? "Away at" : "Home vs"} ${game.opponentName}`}
-              className="flex min-h-7 items-center gap-1.5"
-            >
-              <span className="sr-only">
-                {game.weekLabel}:{" "}
-                {game.venueLabel === "@" ? "Away at" : "Home vs"}
-              </span>
-              <span aria-hidden="true" className="text-xs text-slate-500">
-                {game.venueLabel}
-              </span>
-              {game.opponentLogoUrl ? (
-                <Image
-                  src={game.opponentLogoUrl}
-                  alt={game.opponentName}
-                  width={24}
-                  height={24}
-                  className="h-6 w-6 shrink-0 object-contain"
-                />
-              ) : (
-                <span
-                  role="img"
-                  aria-label={game.opponentName}
-                  className="flex h-6 w-6 shrink-0 items-center justify-center rounded bg-slate-100 text-[9px] font-semibold text-slate-600"
-                >
-                  {game.opponentName.slice(0, 2).toUpperCase()}
-                </span>
-              )}
-              {game.isComplete ? (
-                <span
-                  className={cn(
-                    "whitespace-nowrap font-mono text-xs font-semibold tabular-nums",
-                    RESULT_TONE_CLASS[game.resultTone],
+          {games.map((game) => {
+            // Older query responses carry venue only in upcoming result labels.
+            const venue =
+              game.venueLabel ??
+              (game.resultLabel === "@"
+                ? "@"
+                : game.resultLabel === "vs"
+                  ? "v"
+                  : null);
+            const venueDescription =
+              venue === "@" ? "Away at" : venue === "v" ? "Home vs" : "Against";
+            const weekLabel = game.weekLabel.replace(/^W(?=\d)/, "Week ");
+            return (
+              <li
+                key={game.id}
+                title={`${weekLabel}: ${venueDescription} ${game.opponentName}`}
+                className="flex flex-col gap-0.5"
+              >
+                <div className="flex min-h-7 items-center gap-1.5">
+                  <span className="sr-only">{venueDescription}</span>
+                  <span aria-hidden="true" className="text-xs text-slate-500">
+                    {venue}
+                  </span>
+                  {game.opponentLogoUrl ? (
+                    <Image
+                      src={game.opponentLogoUrl}
+                      alt={game.opponentName}
+                      width={24}
+                      height={24}
+                      className="h-6 w-6 shrink-0 object-contain"
+                    />
+                  ) : (
+                    <span
+                      role="img"
+                      aria-label={game.opponentName}
+                      className="flex h-6 w-6 shrink-0 items-center justify-center rounded bg-slate-100 text-[9px] font-semibold text-slate-600"
+                    >
+                      {game.opponentName.slice(0, 2).toUpperCase()}
+                    </span>
                   )}
-                >
-                  {game.resultLabel}
-                </span>
-              ) : null}
-            </li>
-          ))}
+                  {game.isComplete ? (
+                    <span
+                      className={cn(
+                        "whitespace-nowrap font-mono text-xs font-semibold tabular-nums",
+                        RESULT_TONE_CLASS[game.resultTone],
+                      )}
+                    >
+                      {game.resultLabel}
+                    </span>
+                  ) : null}
+                </div>
+                <span className="text-[10px] text-slate-400">{weekLabel}</span>
+              </li>
+            );
+          })}
         </ul>
       ) : (
         <p className="py-1 text-xs text-slate-400">{emptyLabel}</p>
@@ -94,7 +107,8 @@ function StandingsCategoryRanks({ categories }: StandingsCategoryRanksProps) {
             >
               <dt className="text-slate-500">{category.label}</dt>
               <dd className="font-mono font-semibold tabular-nums text-slate-800">
-                #{category.rank}
+                {category.isTied ? "T" : "#"}
+                {category.rank}
               </dd>
             </div>
           ))}

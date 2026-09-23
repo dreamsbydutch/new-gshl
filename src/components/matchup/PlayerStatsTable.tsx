@@ -49,7 +49,7 @@ export function PlayerStatsTable({
 
     if (columnKey === "player") {
       classes.push(
-        `sticky left-0 w-28 min-w-28 max-w-28 overflow-hidden border-r border-slate-200 text-left sm:w-40 sm:min-w-40 sm:max-w-40 lg:w-auto lg:min-w-[180px] lg:max-w-none ${
+        `sticky left-0 w-36 min-w-36 max-w-36 overflow-hidden border-r border-slate-200 text-left sm:w-40 sm:min-w-40 sm:max-w-40 lg:w-auto lg:min-w-[180px] lg:max-w-none ${
           isHeader ? "z-30 bg-slate-50" : "z-20 bg-inherit"
         }`,
       );

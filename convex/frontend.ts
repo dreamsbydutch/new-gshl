@@ -51,6 +51,7 @@ import { buildPowerRankings } from "../src/lib/utils/features/power-rankings";
 import { projectStandingsPowerHistory } from "./lib/standingsProjection";
 import {
   buildDraftHistoryPicks,
+  draftSeasonWindow,
   draftNumber,
 } from "../src/lib/utils/features/draft-history";
 import type { DraftHistoryData } from "../src/lib/types/draft-history";
@@ -255,6 +256,7 @@ export const ownerDraftHistory = query({
       postseasonTotals,
       postseasonSplits,
       seasonTeams,
+      seasonWeeks,
     ] = await Promise.all([
       ctx.db
         .query("draftPicks")
@@ -317,12 +319,23 @@ export const ownerDraftHistory = query({
         .query("teams")
         .withIndex("by_seasonId", (q) => q.eq("seasonId", selectedSeasonId))
         .collect(),
+      ctx.db
+        .query("weeks")
+        .withIndex("by_seasonId", (q) => q.eq("seasonId", selectedSeasonId))
+        .collect(),
     ]);
     const ownedPicks = picks.filter((pick) =>
       teamIds.includes(pick.gshlTeamId),
     );
-    const seasonStart = toUtcTimestamp(season?.startDate);
-    const seasonEnd = toUtcTimestamp(season?.endDate);
+    const rosterWindow = draftSeasonWindow({
+      start: utcTimestampToDateKey(season?.startDate),
+      end: utcTimestampToDateKey(season?.endDate),
+      weeks: seasonWeeks.map((week) => ({
+        start: utcTimestampToDateKey(week.startDate),
+        end: utcTimestampToDateKey(week.endDate),
+        type: week.weekType,
+      })),
+    });
     const signingTeamIds = new Set(
       picks
         .filter((pick) => pick.isSigning && pick.playerId)
@@ -382,8 +395,8 @@ export const ownerDraftHistory = query({
         id: pick._id,
         teamId: pick.gshlTeamId,
       })),
-      start: utcTimestampToDateKey(season?.startDate),
-      end: utcTimestampToDateKey(season?.endDate),
+      start: rosterWindow.start,
+      end: rosterWindow.end,
       today: utcTimestampToDateKey(Date.now())!,
       days: days.map((row) => ({
         teamId: row.gshlTeamId,
@@ -416,10 +429,7 @@ export const ownerDraftHistory = query({
       picks: buildDraftHistoryPicks({
         signingValues: signingReport.values,
         outcomes,
-        seasonDays:
-          seasonStart !== null && seasonEnd !== null && seasonEnd >= seasonStart
-            ? Math.floor((seasonEnd - seasonStart) / 86_400_000) + 1
-            : null,
+        seasonDays: rosterWindow.days,
         picks: picks.map((pick) => ({
           ...pick,
           id: pick._id,

@@ -6,6 +6,34 @@ import type {
 } from "../../types/draft-history";
 import { expectedDraftRating } from "./draft-slot-curve";
 
+export function draftSeasonWindow(input: {
+  start: string | null;
+  end: string | null;
+  weeks: { start: string | null; end: string | null; type: string }[];
+}) {
+  const weeks = input.weeks.filter(
+    (week) =>
+      ["RS", "PO", "LT"].includes(week.type) &&
+      week.start &&
+      week.end &&
+      week.end >= week.start,
+  );
+  const starts = weeks.map((week) => week.start!).sort();
+  const ends = weeks.map((week) => week.end!).sort();
+  // Season metadata can extend to Sunday after the last NHL playing day.
+  // Use the scheduled competition window, never the longest individual tenure.
+  const start = starts[0] ?? input.start;
+  const end = ends.at(-1) ?? input.end;
+  const days =
+    start && end && end >= start
+      ? Math.round(
+          (Date.parse(`${end}T00:00:00Z`) - Date.parse(`${start}T00:00:00Z`)) /
+            86_400_000,
+        ) + 1
+      : null;
+  return { start, end, days };
+}
+
 export function draftNumber(value: unknown): number | null {
   if (
     value === null ||

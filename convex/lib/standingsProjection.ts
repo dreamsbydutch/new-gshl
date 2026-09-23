@@ -106,7 +106,11 @@ const CATEGORY_FIELDS = [
 ] as const;
 
 function numeric(value: NumericStat): number | null {
-  return typeof value === "number" && Number.isFinite(value) ? value : null;
+  if (value == null || (typeof value === "string" && !value.trim())) {
+    return null;
+  }
+  const result = Number(value);
+  return Number.isFinite(result) ? result : null;
 }
 
 function normalizedNumeric(value: NumericStat): number | null {
@@ -143,13 +147,6 @@ export function projectStandingsPowerHistory(options: {
       ];
     }),
   };
-}
-
-function categoryValue(value: NumericStat): number | string | null {
-  if (typeof value === "number") {
-    return Number.isFinite(value) ? value : null;
-  }
-  return typeof value === "string" && value !== "" ? value : null;
 }
 
 function statLabelValue(value: NumericStat): number | string {
@@ -245,20 +242,28 @@ function buildCategoryRanks(
   if (!selectedStats) return [];
 
   return CATEGORY_FIELDS.flatMap(({ direction, key, label }) => {
-    const value = categoryValue(selectedStats[key]);
-    if (value === null) return [];
+    const value = selectedStats[key];
+    const selectedValue = numeric(value);
+    if (selectedValue === null) return [];
 
-    const rankedRows = [...teamStats].sort((left, right) => {
-      const leftValue = numeric(left[key]);
-      const rightValue = numeric(right[key]);
-      if (direction === "asc") {
-        return (leftValue ?? Infinity) - (rightValue ?? Infinity);
-      }
-      return (rightValue ?? -Infinity) - (leftValue ?? -Infinity);
-    });
+    // Equal totals share a rank; missing values never outrank valid stats.
     const rank =
-      rankedRows.findIndex((row) => String(row.gshlTeamId) === teamId) + 1;
-    return rank > 0 ? [{ label, value, rank }] : [];
+      1 +
+      teamStats.filter((row) => {
+        const candidate = numeric(row[key]);
+        return (
+          candidate !== null &&
+          (direction === "asc"
+            ? candidate < selectedValue
+            : candidate > selectedValue)
+        );
+      }).length;
+    const isTied = teamStats.some(
+      (row) =>
+        String(row.gshlTeamId) !== teamId &&
+        numeric(row[key]) === selectedValue,
+    );
+    return [{ label, value, rank, isTied }];
   })
     .sort((left, right) => left.rank - right.rank)
     .slice(0, 6);

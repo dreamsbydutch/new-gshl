@@ -9,6 +9,69 @@ import {
   selectStandingsTopPlayerTotals,
 } from "./standingsProjection";
 
+test("category ranks compare numeric strings by category, not input order", () => {
+  const teamStats = [
+    { gshlTeamId: "team-1", G: "9", A: "30", GAA: "2.1" },
+    { gshlTeamId: "team-2", G: "100", A: "10", GAA: "3.2" },
+    { gshlTeamId: "team-3", G: "20", A: "20", GAA: "2.5" },
+  ];
+  const ranks = teamStats.map(({ gshlTeamId }) => {
+    const result = projectStandingsTeamDetail({
+      teamId: gshlTeamId,
+      owner: null,
+      conference: null,
+      teamStats,
+      matchups: [],
+      weeks: [],
+      opponents: [],
+      playerTotals: [],
+      players: [],
+    });
+    return Object.fromEntries(
+      result.categoryRanks.map(({ label, rank }) => [label, rank]),
+    );
+  });
+  assert.deepEqual(ranks, [
+    { G: 3, A: 1, GAA: 1 },
+    { G: 1, A: 3, GAA: 3 },
+    { G: 2, A: 2, GAA: 2 },
+  ]);
+});
+
+test("category ranks share ties and exclude missing or invalid totals", () => {
+  const teamStats = [
+    { gshlTeamId: "missing", G: null, A: " ", GAA: "invalid" },
+    { gshlTeamId: "selected", G: "0", A: "20", GAA: "2.5" },
+    { gshlTeamId: "tied", G: 0, A: 20, GAA: 2.5 },
+    { gshlTeamId: "leader", G: 10, A: 30, GAA: 2 },
+  ];
+  const project = (teamId: string) =>
+    projectStandingsTeamDetail({
+      teamId,
+      owner: null,
+      conference: null,
+      teamStats,
+      matchups: [],
+      weeks: [],
+      opponents: [],
+      playerTotals: [],
+      players: [],
+    }).categoryRanks;
+  for (const teamId of ["selected", "tied"]) {
+    assert.ok(project(teamId).every((category) => category.isTied === true));
+    assert.deepEqual(
+      project(teamId).map(({ label, rank }) => [label, rank]),
+      [
+        ["G", 2],
+        ["A", 2],
+        ["GAA", 2],
+      ],
+    );
+  }
+  assert.deepEqual(project("missing"), []);
+  assert.ok(project("leader").every((category) => category.isTied === false));
+});
+
 test("standings power history strips wide rows and unranked statistics", () => {
   const result = projectStandingsPowerHistory({
     weeks: [

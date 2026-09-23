@@ -11,6 +11,7 @@ import {
   TableViewport,
 } from "@gshl-ui";
 import { Check, ChevronDown, Trophy } from "lucide-react";
+import { LockerRoomHeader } from "./LockerRoomHeader";
 import { formatMoney } from "../../lib/utils/core/format";
 
 const number = (value: number | null | undefined) =>
@@ -60,203 +61,291 @@ export function TeamDraftPickHistory({
 }: TeamDraftPickHistoryProps) {
   const report = useOwnerDraftReport(currentTeam.ownerId);
   const [seasonPickerOpen, setSeasonPickerOpen] = useState(false);
-  if (report.isLoading) return <DraftPickListSkeleton />;
+  if (report.isLoading)
+    return (
+      <>
+        <LockerRoomHeader currentTeam={currentTeam} headingLevel={2} />
+        <DraftPickListSkeleton />
+      </>
+    );
   const { data, season } = report;
   if (!data?.seasons.length)
     return (
-      <p className="py-8 text-center text-sm text-muted-foreground">
-        No draft history is available for this owner.
-      </p>
+      <>
+        <LockerRoomHeader currentTeam={currentTeam} headingLevel={2} />
+        <p className="py-8 text-center text-sm text-muted-foreground">
+          No draft history is available for this owner.
+        </p>
+      </>
     );
   const trophies = data.seasons.filter((entry) => entry.winner).length;
 
   return (
     <section className="mx-auto w-full max-w-5xl space-y-6">
-      <div>
-        <div className="mb-3 flex items-center justify-between gap-3">
-          <div>
-            <h2 className="text-base font-semibold">Draft History</h2>
-            <p className="text-xs text-slate-500">
-              {trophies} Calder {trophies === 1 ? "trophy" : "trophies"}
-            </p>
-          </div>
-          <Popover open={seasonPickerOpen} onOpenChange={setSeasonPickerOpen}>
-            <PopoverTrigger asChild>
-              <button
-                type="button"
-                aria-label={`Choose draft season, currently ${season?.name ?? "unselected"}`}
-                className="flex min-h-10 items-center gap-3 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-800 shadow-sm hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-2"
-              >
-                {season?.name ?? "Choose season"}
-                <ChevronDown
-                  aria-hidden="true"
-                  className={`h-4 w-4 text-slate-500 transition-transform ${seasonPickerOpen ? "rotate-180" : ""}`}
-                />
-              </button>
-            </PopoverTrigger>
-            <PopoverContent
-              align="end"
-              sideOffset={8}
-              aria-label="Choose draft season"
-              className="w-[min(26rem,calc(100vw-2rem))] overflow-hidden p-0"
-            >
-              <div className="border-b border-slate-200 px-3 py-2.5">
-                <p className="text-sm font-semibold">Seasons</p>
-                <p className="text-[11px] text-slate-500">
-                  Compare results and select a draft.
+      <LockerRoomHeader currentTeam={currentTeam} headingLevel={2} />
+      <header className="space-y-4">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+            <div className="flex items-center gap-3">
+              <Trophy
+                aria-hidden="true"
+                className="h-9 w-9 shrink-0 text-amber-600"
+              />
+              <div>
+                <p className="text-2xl font-bold tracking-tight text-slate-950">
+                  {trophies} Calder {trophies === 1 ? "trophy" : "trophies"}
+                </p>
+                <p className="text-xs text-amber-900">
+                  Across this owner&apos;s draft history
                 </p>
               </div>
-              <div className="max-h-[min(24rem,calc(var(--radix-popover-content-available-height)-5rem))] overflow-y-auto overscroll-contain">
-                <table className="w-full text-right text-xs tabular-nums">
-                  <caption className="sr-only">
-                    Draft seasons, team ratings, Calder ratings and Calder ranks
-                  </caption>
-                  <thead className="sticky top-0 z-10 bg-gray-800 text-gray-200">
-                    <tr>
-                      <th
-                        scope="col"
-                        className="px-3 py-2 text-left font-normal"
-                      >
-                        Season
-                      </th>
-                      <th scope="col" className="px-2 py-2 font-normal">
-                        Team
-                      </th>
-                      <th scope="col" className="px-2 py-2 font-normal">
-                        Calder
-                      </th>
-                      <th scope="col" className="px-3 py-2 font-normal">
-                        Rank
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {data.seasons.map((entry) => {
-                      const selected = entry.id === data.selectedSeasonId;
-                      return (
-                        <tr
-                          key={entry.id}
-                          className={`relative focus-within:bg-slate-100 hover:bg-slate-100 ${selected ? "bg-slate-100 font-semibold text-slate-950" : "text-slate-600 odd:bg-white even:bg-gray-50"}`}
-                        >
-                          <th
-                            scope="row"
-                            className="px-3 text-left font-normal"
-                          >
-                            <button
-                              type="button"
-                              aria-pressed={selected}
-                              onClick={() => {
-                                setSeasonPickerOpen(false);
-                                report.selectSeason(entry.id);
-                              }}
-                              className="flex min-h-11 items-center gap-2 whitespace-nowrap text-left after:absolute after:inset-0 focus-visible:outline-none focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-slate-500"
-                            >
-                              <Check
-                                aria-hidden="true"
-                                className={`h-3.5 w-3.5 shrink-0 ${selected ? "text-slate-900" : "invisible"}`}
-                              />
-                              <span className={selected ? "font-semibold" : ""}>
-                                {entry.name}
-                              </span>
-                              {entry.winner && (
-                                <>
-                                  <Trophy
-                                    aria-hidden="true"
-                                    className="h-3.5 w-3.5 shrink-0 text-amber-600"
-                                  />
-                                  <span className="sr-only">Calder winner</span>
-                                </>
-                              )}
-                            </button>
-                          </th>
-                          <td className="px-2 py-2">
-                            {number(entry.teamRating)}
-                          </td>
-                          <td className="px-2 py-2">
-                            {number(entry.calderRating)}
-                          </td>
-                          <td className="px-3 py-2">
-                            {entry.calderRank ? `#${entry.calderRank}` : "-"}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </PopoverContent>
-          </Popover>
-        </div>
-        <p className="text-xs text-slate-500">
-          <span className="font-semibold text-slate-800">{season?.name}</span>
-          {" · "}
-          {season?.complete
-            ? "Final regular-season results"
-            : "Provisional - season not complete"}
-        </p>
-        <dl className="mt-3 flex flex-wrap gap-x-6 gap-y-2 border-y border-slate-200 py-2 text-xs">
-          {[
-            ["Selections", String(report.selections.length)],
-            [
-              "Above slot",
-              report.graded.length
-                ? `${report.hits.length} / ${report.graded.length}`
-                : "Not rated",
-            ],
-            ["Avg. roster days", number(report.averageDays)],
-            ["Calder rating", number(season?.calderRating)],
-            [
-              "Calder rank",
-              season?.calderRank ? `#${season.calderRank}` : "Not rated",
-            ],
-          ].map(([label, value]) => (
-            <div key={label} className="flex items-baseline gap-2">
-              <dt className="text-slate-500">{label}</dt>
-              <dd className="font-semibold tabular-nums">{value}</dd>
             </div>
-          ))}
-        </dl>
-        <dl className="mt-2 divide-y divide-slate-100 text-xs">
-          <div className="flex flex-wrap gap-x-3 gap-y-1 py-2">
-            <dt className="w-28 shrink-0 text-slate-500">Position mix</dt>
-            <dd>
-              {report.positions
-                .map(({ position, count }) => `${count} ${position}`)
-                .join(" / ")}
-            </dd>
+            {trophies > 0 && (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {data.seasons
+                  .filter((entry) => entry.winner)
+                  .map((entry) => (
+                    <button
+                      key={entry.id}
+                      type="button"
+                      onClick={() => report.selectSeason(entry.id)}
+                      aria-label={`View Calder-winning ${entry.name} draft`}
+                      aria-pressed={entry.id === data.selectedSeasonId}
+                      className={`min-h-9 rounded-md border px-2.5 py-1 text-xs font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-700 ${entry.id === data.selectedSeasonId ? "border-amber-700 bg-amber-100 text-amber-950" : "border-amber-200 bg-white text-amber-900 hover:bg-amber-100"}`}
+                    >
+                      {entry.name}
+                    </button>
+                  ))}
+              </div>
+            )}
           </div>
-          <div className="flex flex-wrap gap-x-3 gap-y-1 py-2">
-            <dt className="w-28 shrink-0 text-slate-500">Best value</dt>
-            <dd>
-              {report.best ? (
-                <>
-                  {report.best.name}{" "}
-                  <span className="text-emerald-700">
-                    (#{report.best.pick}, {signed(report.best.surplus)})
-                  </span>
-                </>
-              ) : (
-                "No above-slot result yet"
+          <div className="flex flex-col justify-center gap-2">
+            <p className="text-sm font-semibold text-slate-700">
+              Choose a draft class
+            </p>
+            <Popover open={seasonPickerOpen} onOpenChange={setSeasonPickerOpen}>
+              <PopoverTrigger asChild>
+                <button
+                  type="button"
+                  aria-label={`Choose draft season, currently ${season?.name ?? "unselected"}`}
+                  className="flex min-h-14 w-full items-center justify-between gap-4 rounded-lg border border-slate-300 bg-white px-4 py-3 text-xl font-bold text-slate-950 shadow-sm hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-2"
+                >
+                  {season?.name ?? "Choose season"}
+                  <ChevronDown
+                    aria-hidden="true"
+                    className={`h-4 w-4 text-slate-500 transition-transform ${seasonPickerOpen ? "rotate-180" : ""}`}
+                  />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent
+                align="end"
+                sideOffset={8}
+                aria-label="Choose draft season"
+                className="w-[min(26rem,calc(100vw-2rem))] overflow-hidden p-0"
+              >
+                <div className="border-b border-slate-200 px-3 py-2.5">
+                  <p className="text-sm font-semibold">Seasons</p>
+                  <p className="text-[11px] text-slate-500">
+                    Compare results and select a draft.
+                  </p>
+                </div>
+                <div className="max-h-[min(24rem,calc(var(--radix-popover-content-available-height)-5rem))] overflow-y-auto overscroll-contain">
+                  <table className="w-full text-right text-xs tabular-nums">
+                    <caption className="sr-only">
+                      Draft seasons, team ratings, Calder ratings and Calder
+                      ranks
+                    </caption>
+                    <thead className="sticky top-0 z-10 bg-gray-800 text-gray-200">
+                      <tr>
+                        <th
+                          scope="col"
+                          className="px-3 py-2 text-left font-normal"
+                        >
+                          Season
+                        </th>
+                        <th scope="col" className="px-2 py-2 font-normal">
+                          Team
+                        </th>
+                        <th scope="col" className="px-2 py-2 font-normal">
+                          Calder
+                        </th>
+                        <th scope="col" className="px-3 py-2 font-normal">
+                          Rank
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {data.seasons.map((entry) => {
+                        const selected = entry.id === data.selectedSeasonId;
+                        return (
+                          <tr
+                            key={entry.id}
+                            className={`relative focus-within:bg-slate-100 hover:bg-slate-100 ${selected ? "bg-slate-100 font-semibold text-slate-950" : "text-slate-600 odd:bg-white even:bg-gray-50"}`}
+                          >
+                            <th
+                              scope="row"
+                              className="px-3 text-left font-normal"
+                            >
+                              <button
+                                type="button"
+                                aria-pressed={selected}
+                                onClick={() => {
+                                  setSeasonPickerOpen(false);
+                                  report.selectSeason(entry.id);
+                                }}
+                                className="flex min-h-11 items-center gap-2 whitespace-nowrap text-left after:absolute after:inset-0 focus-visible:outline-none focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-slate-500"
+                              >
+                                <Check
+                                  aria-hidden="true"
+                                  className={`h-3.5 w-3.5 shrink-0 ${selected ? "text-slate-900" : "invisible"}`}
+                                />
+                                <span
+                                  className={selected ? "font-semibold" : ""}
+                                >
+                                  {entry.name}
+                                </span>
+                                {entry.winner && (
+                                  <>
+                                    <Trophy
+                                      aria-hidden="true"
+                                      className="h-3.5 w-3.5 shrink-0 text-amber-600"
+                                    />
+                                    <span className="sr-only">
+                                      Calder winner
+                                    </span>
+                                  </>
+                                )}
+                              </button>
+                            </th>
+                            <td className="px-2 py-2">
+                              {number(entry.teamRating)}
+                            </td>
+                            <td className="px-2 py-2">
+                              {number(entry.calderRating)}
+                            </td>
+                            <td className="px-3 py-2">
+                              {entry.calderRank ? `#${entry.calderRank}` : "-"}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </PopoverContent>
+            </Popover>
+            <p className="text-xs text-slate-500">
+              Explore each season&apos;s picks, results and signing value.
+            </p>
+          </div>
+        </div>
+        <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h3 className="text-lg font-bold text-slate-950">
+                {season?.name} draft review
+              </h3>
+              <p className="mt-1 text-xs text-slate-500">
+                {season?.complete ? "Final results" : "Provisional results"} ?{" "}
+                {report.selections.length} draft picks ? {report.graded.length}{" "}
+                graded
+              </p>
+            </div>
+            <div
+              className={`rounded-lg px-3 py-2 text-right ${season?.winner ? "bg-amber-100 text-amber-950" : "bg-white text-slate-800"}`}
+            >
+              <p className="text-sm font-bold">
+                {season?.winner
+                  ? "Calder winner"
+                  : season?.calderRank
+                    ? `#${season.calderRank} in Calder`
+                    : "Calder not rated"}
+              </p>
+              <p className="text-xs">
+                Calder rating {number(season?.calderRating)}
+              </p>
+            </div>
+          </div>
+          <div className="mt-4 grid gap-4 sm:grid-cols-2">
+            <div className="border-l-2 border-emerald-500 pl-3">
+              <h4 className="text-sm font-semibold text-emerald-800">
+                What went well
+              </h4>
+              <p className="mt-1 text-sm text-slate-700">
+                {report.graded.length
+                  ? `${report.hits.length} of ${report.graded.length} graded picks beat their slot expectation.`
+                  : "Player ratings are not available for this draft yet."}
+              </p>
+              {report.best && (
+                <p className="mt-2 text-xs text-slate-600">
+                  <span className="font-semibold text-slate-900">
+                    {report.best.name}
+                  </span>{" "}
+                  was the best value:{" "}
+                  <span className="font-semibold text-emerald-700">
+                    {signed(report.best.surplus)}
+                  </span>{" "}
+                  rating points above the expectation for pick #
+                  {report.best.pick}.
+                </p>
               )}
-            </dd>
-          </div>
-          <div className="flex flex-wrap gap-x-3 gap-y-1 py-2">
-            <dt className="w-28 shrink-0 text-slate-500">Largest shortfall</dt>
-            <dd>
-              {report.worst ? (
-                <>
-                  {report.worst.name}{" "}
-                  <span className="text-rose-700">
-                    (#{report.worst.pick}, {signed(report.worst.surplus)})
-                  </span>
-                </>
-              ) : (
-                "No below-slot result yet"
+            </div>
+            <div className="border-l-2 border-rose-400 pl-3">
+              <h4 className="text-sm font-semibold text-rose-800">
+                What went poorly
+              </h4>
+              <p className="mt-1 text-sm text-slate-700">
+                {!report.graded.length
+                  ? "Not enough rated results to identify shortfalls."
+                  : report.misses.length
+                    ? `${report.misses.length} of ${report.graded.length} graded picks fell below their slot expectation.`
+                    : "No graded picks fell below their slot expectation."}
+              </p>
+              {report.worst && (
+                <p className="mt-2 text-xs text-slate-600">
+                  <span className="font-semibold text-slate-900">
+                    {report.worst.name}
+                  </span>{" "}
+                  had the largest shortfall:{" "}
+                  <span className="font-semibold text-rose-700">
+                    {signed(report.worst.surplus)}
+                  </span>{" "}
+                  rating points versus the expectation for pick #
+                  {report.worst.pick}.
+                </p>
               )}
-            </dd>
+            </div>
           </div>
-        </dl>
-      </div>
+          <dl className="mt-4 flex flex-wrap gap-x-6 gap-y-2 border-t border-slate-200 pt-3 text-xs">
+            <div>
+              <dt className="text-slate-500">Average vs. slot</dt>
+              <dd className="mt-1 font-semibold tabular-nums">
+                {signed(report.averageSurplus)} rating points
+              </dd>
+            </div>
+            <div>
+              <dt className="text-slate-500">Stayed the full season</dt>
+              <dd className="mt-1 font-semibold tabular-nums">
+                {report.fullSeasonPicks.length} / {report.selections.length}{" "}
+                picks
+              </dd>
+            </div>
+            <div>
+              <dt className="text-slate-500">Position mix</dt>
+              <dd className="mt-1 font-semibold">
+                {report.positions
+                  .map(({ position, count }) => `${count} ${position}`)
+                  .join(" / ")}
+              </dd>
+            </div>
+          </dl>
+          <p className="mt-3 text-[11px] text-slate-500">
+            Value compares regular-season player ratings with historical
+            expectations for each pick. Retention includes the playoffs;
+            incomplete history is not counted as a full season.
+          </p>
+        </div>
+      </header>
 
       <div>
         <div className="mb-2 flex items-center justify-between gap-3">

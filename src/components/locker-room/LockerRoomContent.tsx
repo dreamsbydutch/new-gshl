@@ -311,7 +311,9 @@ export function LockerRoomContent() {
   }
   return (
     <>
-      <LockerRoomHeader currentTeam={currentTeam} headingLevel={2} />
+      {selectedLockerRoomType !== "draft" && (
+        <LockerRoomHeader currentTeam={currentTeam} headingLevel={2} />
+      )}
       {isInactiveOwner && (
         <p className="mb-3 text-xs text-slate-500">
           <span className="font-semibold">Inactive owner</span>
