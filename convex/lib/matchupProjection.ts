@@ -67,6 +67,12 @@ type PlayerWeekSource = TeamWeekSource & {
   days?: StatValue;
   GP?: StatValue;
   GS?: StatValue;
+  MG?: StatValue;
+  IR?: StatValue;
+  IRplus?: StatValue;
+  ADD?: StatValue;
+  MS?: StatValue;
+  BS?: StatValue;
   Rating?: StatValue;
 };
 
@@ -200,6 +206,12 @@ export function projectMatchupPlayerWeekRow(
     days: stats.days ?? null,
     GP: stats.GP ?? null,
     GS: stats.GS ?? null,
+    MG: stats.MG ?? null,
+    IR: stats.IR ?? null,
+    IRplus: stats.IRplus ?? null,
+    ADD: stats.ADD ?? null,
+    MS: stats.MS ?? null,
+    BS: stats.BS ?? null,
     G: stats.G ?? null,
     A: stats.A ?? null,
     P: stats.P ?? null,

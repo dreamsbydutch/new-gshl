@@ -14,6 +14,12 @@ type StandingsTeamStatSource = {
   G?: NumericStat;
   A?: NumericStat;
   P?: NumericStat;
+  PM?: NumericStat;
+  PIM?: NumericStat;
+  GA?: NumericStat;
+  SV?: NumericStat;
+  SA?: NumericStat;
+  SO?: NumericStat;
   PPP?: NumericStat;
   SOG?: NumericStat;
   HIT?: NumericStat;
@@ -96,13 +102,19 @@ const CATEGORY_FIELDS = [
   { key: "G", label: "G", direction: "desc" },
   { key: "A", label: "A", direction: "desc" },
   { key: "P", label: "P", direction: "desc" },
+  { key: "PM", label: "+/-", direction: "desc" },
+  { key: "PIM", label: "PIM", direction: "desc" },
   { key: "PPP", label: "PPP", direction: "desc" },
   { key: "SOG", label: "SOG", direction: "desc" },
   { key: "HIT", label: "HIT", direction: "desc" },
   { key: "BLK", label: "BLK", direction: "desc" },
   { key: "W", label: "W", direction: "desc" },
+  { key: "GA", label: "GA", direction: "asc" },
   { key: "GAA", label: "GAA", direction: "asc" },
+  { key: "SV", label: "SV", direction: "desc" },
+  { key: "SA", label: "SA", direction: "desc" },
   { key: "SVP", label: "SV%", direction: "desc" },
+  { key: "SO", label: "SO", direction: "desc" },
 ] as const;
 
 function numeric(value: NumericStat): number | null {
@@ -264,9 +276,7 @@ function buildCategoryRanks(
         numeric(row[key]) === selectedValue,
     );
     return [{ label, value, rank, isTied }];
-  })
-    .sort((left, right) => left.rank - right.rank)
-    .slice(0, 6);
+  });
 }
 
 function projectGame(

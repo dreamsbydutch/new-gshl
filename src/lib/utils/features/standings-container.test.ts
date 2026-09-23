@@ -3,6 +3,7 @@ import test from "node:test";
 import type { GSHLTeam, Matchup, Week } from "@gshl-types";
 import {
   buildStandingsTeamGames,
+  restoreStandingsGameVenues,
   getStandingsViewDataRequirements,
 } from "./standings-container";
 
@@ -90,6 +91,16 @@ void test("buildStandingsTeamGames returns the two latest finals and two next ga
   ];
 
   const result = buildStandingsTeamGames("team-a", matchups, weeks, teams);
+
+  const olderResults = result.previousGames.map(
+    ({ venueLabel: _venue, ...game }) => game,
+  );
+  assert.deepEqual(
+    restoreStandingsGameVenues(olderResults, matchups, "team-a").map(
+      (game) => game.venueLabel,
+    ),
+    ["v", "@"],
+  );
 
   assert.deepEqual(
     result.previousGames.map((game) => game.venueLabel),

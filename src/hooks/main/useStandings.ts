@@ -3,6 +3,8 @@
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
+import { useMatchups } from "./useMatchups";
+import { restoreStandingsGameVenues } from "@gshl-utils/features/standings-container";
 import type {
   StandingsTeamCardViewModel,
   UseStandingsTeamDetailOptions,
@@ -44,9 +46,35 @@ export function useStandingsTeamDetail(
       : "skip",
   );
 
+  const needsVenueLookup = Boolean(
+    result &&
+      [...result.previousGames, ...result.upcomingGames].some(
+        (game) => !game.venueLabel,
+      ),
+  );
+  const { data: matchups, isLoading: venuesLoading } = useMatchups({
+    seasonId: seasonId ?? undefined,
+    enabled: shouldQuery && needsVenueLookup,
+  });
+
   return {
-    data: result,
-    isLoading: shouldQuery && result === undefined,
+    data:
+      result && needsVenueLookup
+        ? {
+            ...result,
+            previousGames: restoreStandingsGameVenues(
+              result.previousGames,
+              matchups,
+              teamId!,
+            ),
+            upcomingGames: restoreStandingsGameVenues(
+              result.upcomingGames,
+              matchups,
+              teamId!,
+            ),
+          }
+        : result,
+    isLoading: (shouldQuery && result === undefined) || venuesLoading,
     error: null,
   };
 }

@@ -65,7 +65,7 @@ const PLAYER_STAT_IDENTITY_COLUMNS: ReadonlyArray<
 
 const PLAYER_STAT_CONTEXT_COLUMNS: ReadonlyArray<
   PlayerStatColumn & {
-    key: "date" | "opp" | "score" | "days" | "GP" | "GS" | "Rating";
+    key: Exclude<PlayerStatContextKey, "nhlTeam">;
   }
 > = [
   { key: "date", label: "Date", className: "whitespace-nowrap" },
@@ -74,6 +74,12 @@ const PLAYER_STAT_CONTEXT_COLUMNS: ReadonlyArray<
   { key: "days", label: "Days" },
   { key: "GP", label: "GP" },
   { key: "GS", label: "GS" },
+  { key: "MG", label: "MG" },
+  { key: "IR", label: "IR" },
+  { key: "IRplus", label: "IR+" },
+  { key: "ADD", label: "ADD" },
+  { key: "MS", label: "MS" },
+  { key: "BS", label: "BS" },
   { key: "Rating", label: "Rating" },
 ];
 
@@ -529,6 +535,11 @@ export function renderPlayerStatCell(
       String(player.posGroup ?? player.dailyPos ?? "-"),
     );
   }
+
+  const category = normalizeSeasonCategory(key);
+  const ineligibleCategories =
+    player.posGroup === "G" ? SKATER_CARD_STAT_KEYS : GOALIE_CARD_STAT_KEYS;
+  if (category && ineligibleCategories.has(category)) return "-";
 
   if (key === "GAA") {
     return formatStatValue(player[key], 2);

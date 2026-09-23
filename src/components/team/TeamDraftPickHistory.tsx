@@ -1,6 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
+import { AWARD_CATALOG } from "../../lib/config/awards";
+import { buildTrophyCupShowcaseLayout } from "../../lib/utils/features/trophy-case";
 import type { TeamDraftPickHistoryProps } from "@gshl-types";
 import { useOwnerDraftReport } from "../../hooks/features/useOwnerDraftReport";
 import { DraftPickListSkeleton } from "@gshl-skeletons";
@@ -78,57 +81,74 @@ export function TeamDraftPickHistory({
         </p>
       </>
     );
-  const trophies = data.seasons.filter((entry) => entry.winner).length;
+  const calderWins = data.seasons.filter((entry) => entry.winner);
+  const calderLayout = buildTrophyCupShowcaseLayout(calderWins.length);
+  const calderImage = AWARD_CATALOG.find(
+    (award) => award.key === "calder",
+  )!.imageUrl;
 
   return (
     <section className="mx-auto w-full max-w-5xl space-y-6">
       <LockerRoomHeader currentTeam={currentTeam} headingLevel={2} />
       <header className="space-y-4">
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
-            <div className="flex items-center gap-3">
-              <Trophy
-                aria-hidden="true"
-                className="h-9 w-9 shrink-0 text-amber-600"
-              />
-              <div>
-                <p className="text-2xl font-bold tracking-tight text-slate-950">
-                  {trophies} Calder {trophies === 1 ? "trophy" : "trophies"}
-                </p>
-                <p className="text-xs text-amber-900">
-                  Across this owner&apos;s draft history
-                </p>
-              </div>
-            </div>
-            {trophies > 0 && (
-              <div className="mt-3 flex flex-wrap gap-2">
-                {data.seasons
-                  .filter((entry) => entry.winner)
-                  .map((entry) => (
+        <div className="flex items-center justify-between gap-4">
+          <div className="min-w-0 flex-1" aria-label="Calder trophies">
+            {calderWins.length ? (
+              <div
+                className="relative grid h-28 w-full grid-cols-1 items-start justify-items-center"
+                style={{ maxWidth: calderLayout.maxWidth }}
+              >
+                {calderLayout.positions.map((position) => {
+                  const entry = calderWins[position.itemIndex];
+                  if (!entry) return null;
+                  const offset = position.offsetRatio - 0.5;
+                  return (
                     <button
                       key={entry.id}
                       type="button"
                       onClick={() => report.selectSeason(entry.id)}
                       aria-label={`View Calder-winning ${entry.name} draft`}
                       aria-pressed={entry.id === data.selectedSeasonId}
-                      className={`min-h-9 rounded-md border px-2.5 py-1 text-xs font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-700 ${entry.id === data.selectedSeasonId ? "border-amber-700 bg-amber-100 text-amber-950" : "border-amber-200 bg-white text-amber-900 hover:bg-amber-100"}`}
+                      title={`Calder Trophy, ${entry.name}`}
+                      className="relative col-start-1 row-start-1 h-24 w-16 origin-center rounded focus-visible:!z-[200] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500"
+                      style={{
+                        left:
+                          calderWins.length === 1
+                            ? 0
+                            : `calc(${offset * 100}% - ${offset * 64}px)`,
+                        zIndex: position.zIndex,
+                        transform: `translateY(${position.translateY}px) scale(${position.scale})`,
+                      }}
                     >
-                      {entry.name}
+                      <Image
+                        src={calderImage}
+                        alt="Calder Trophy"
+                        width={64}
+                        height={96}
+                        unoptimized
+                        className="h-24 w-16 object-contain drop-shadow-md"
+                      />
+                      <span className="absolute bottom-1 left-1/2 -translate-x-1/2 rounded bg-slate-950/85 px-1.5 py-0.5 font-varela text-[11px] font-bold leading-none text-white shadow-sm">
+                        {entry.year}
+                      </span>
                     </button>
-                  ))}
+                  );
+                })}
               </div>
+            ) : (
+              <p className="text-xs text-slate-400">No Calder trophies yet</p>
             )}
           </div>
-          <div className="flex flex-col justify-center gap-2">
-            <p className="text-sm font-semibold text-slate-700">
-              Choose a draft class
+          <div className="flex shrink-0 flex-col gap-1.5">
+            <p className="text-right text-[11px] font-medium text-slate-500">
+              Draft season
             </p>
             <Popover open={seasonPickerOpen} onOpenChange={setSeasonPickerOpen}>
               <PopoverTrigger asChild>
                 <button
                   type="button"
                   aria-label={`Choose draft season, currently ${season?.name ?? "unselected"}`}
-                  className="flex min-h-14 w-full items-center justify-between gap-4 rounded-lg border border-slate-300 bg-white px-4 py-3 text-xl font-bold text-slate-950 shadow-sm hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-2"
+                  className="flex min-h-11 items-center justify-between gap-3 rounded-md border border-slate-300 bg-white px-3 py-2 text-base font-semibold text-slate-950 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-2"
                 >
                   {season?.name ?? "Choose season"}
                   <ChevronDown
@@ -234,9 +254,6 @@ export function TeamDraftPickHistory({
                 </div>
               </PopoverContent>
             </Popover>
-            <p className="text-xs text-slate-500">
-              Explore each season&apos;s picks, results and signing value.
-            </p>
           </div>
         </div>
         <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
@@ -246,9 +263,10 @@ export function TeamDraftPickHistory({
                 {season?.name} draft review
               </h3>
               <p className="mt-1 text-xs text-slate-500">
-                {season?.complete ? "Final results" : "Provisional results"} ?{" "}
-                {report.selections.length} draft picks ? {report.graded.length}{" "}
-                graded
+                {season?.complete ? "Final results" : "Provisional results"}
+                {" \u00b7 "}
+                {report.selections.length} draft picks{" \u00b7 "}
+                {report.graded.length} graded
               </p>
             </div>
             <div

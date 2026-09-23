@@ -8,6 +8,7 @@ import type {
 } from "@gshl-types";
 import { useStandingsTeamDetail } from "@gshl-hooks";
 import { cn } from "@gshl-utils";
+import { resolveMatchupCategories } from "@gshl-utils/features/matchup-details";
 
 const RESULT_TONE_CLASS = {
   win: "text-emerald-700",
@@ -91,27 +92,44 @@ function StandingsGameList({
   );
 }
 
-function StandingsCategoryRanks({ categories }: StandingsCategoryRanksProps) {
+function StandingsCategoryRanks({
+  categories,
+  seasonCategories,
+}: StandingsCategoryRanksProps) {
+  const columns = seasonCategories.length
+    ? resolveMatchupCategories(seasonCategories)
+    : [];
   return (
     <div className="border-t border-slate-200/70 pt-2">
       <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
-        Best category ranks
+        Category ranks
       </p>
-      {categories.length ? (
-        <dl className="grid grid-cols-3 gap-x-4 gap-y-1 sm:grid-cols-6">
-          {categories.map((category) => (
-            <div
-              key={category.label}
-              title={`${category.label}: ${category.value ?? "—"} total`}
-              className="flex items-baseline justify-between gap-1 text-xs"
-            >
-              <dt className="text-slate-500">{category.label}</dt>
-              <dd className="font-mono font-semibold tabular-nums text-slate-800">
-                {category.isTied ? "T" : "#"}
-                {category.rank}
-              </dd>
-            </div>
-          ))}
+      {columns.length ? (
+        <dl
+          className="grid gap-0.5"
+          style={{
+            gridTemplateColumns: `repeat(${columns.length}, minmax(0, 1fr))`,
+          }}
+        >
+          {columns.map(({ label }) => {
+            const category = categories.find((item) => item.label === label);
+            return (
+              <div
+                key={label}
+                title={`${label}: ${category?.value ?? "—"}`}
+                className="flex min-w-0 flex-col items-center gap-0.5"
+              >
+                <dt className="order-2 text-[9px] text-slate-500 sm:text-[10px]">
+                  {label}
+                </dt>
+                <dd className="font-mono text-[10px] font-semibold tabular-nums text-slate-800 sm:text-xs">
+                  {category?.rank == null
+                    ? "—"
+                    : `${category.isTied ? "T" : "#"}${category.rank}`}
+                </dd>
+              </div>
+            );
+          })}
         </dl>
       ) : (
         <p className="text-xs text-slate-400">No category ranks yet.</p>
@@ -122,6 +140,7 @@ function StandingsCategoryRanks({ categories }: StandingsCategoryRanksProps) {
 
 export function StandingsTeamCard({
   seasonId,
+  seasonCategories,
   teamId,
 }: StandingsTeamCardProps) {
   const { data: context, isLoading } = useStandingsTeamDetail({
@@ -159,7 +178,10 @@ export function StandingsTeamCard({
           emptyLabel="None scheduled"
         />
       </div>
-      <StandingsCategoryRanks categories={context.categoryRanks} />
+      <StandingsCategoryRanks
+        categories={context.categoryRanks}
+        seasonCategories={seasonCategories}
+      />
     </div>
   );
 }

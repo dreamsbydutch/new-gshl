@@ -37,7 +37,7 @@ export interface StandingsCategoryRank {
 export interface StandingsTeamGameContext {
   id: string;
   isComplete: boolean;
-  venueLabel: "v" | "@";
+  venueLabel?: "v" | "@";
   opponentLogoUrl: string | null;
   opponentName: string;
   resultLabel: string;
@@ -65,6 +65,7 @@ export interface StandingsTeamCardViewModel {
 
 export interface StandingsTeamCardProps {
   seasonId: string;
+  seasonCategories: string[];
   teamId: string;
 }
 
@@ -82,6 +83,7 @@ export interface StandingsGameListProps {
 
 export interface StandingsCategoryRanksProps {
   categories: StandingsCategoryRank[];
+  seasonCategories: string[];
 }
 
 export interface StandingsTopPlayersProps {

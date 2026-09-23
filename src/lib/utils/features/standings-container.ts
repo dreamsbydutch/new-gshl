@@ -666,6 +666,25 @@ function formatMatchupContext(
   };
 }
 
+export function restoreStandingsGameVenues(
+  games: StandingsTeamGameContext[],
+  matchups: Matchup[],
+  teamId: string,
+): StandingsTeamGameContext[] {
+  const matchupById = keyBy(matchups, (matchup) => matchup.id);
+  return games.map((game) => {
+    if (game.venueLabel) return game;
+    const matchup = matchupById.get(game.id);
+    const venueLabel =
+      matchup?.homeTeamId === teamId
+        ? "v"
+        : matchup?.awayTeamId === teamId
+          ? "@"
+          : undefined;
+    return { ...game, venueLabel };
+  });
+}
+
 export function buildStandingsTeamGames(
   teamId: string,
   matchups: Matchup[],

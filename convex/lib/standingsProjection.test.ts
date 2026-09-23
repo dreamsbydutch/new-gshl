@@ -72,6 +72,50 @@ test("category ranks share ties and exclude missing or invalid totals", () => {
   assert.ok(project("leader").every((category) => category.isTied === false));
 });
 
+test("standings ranks include historical scoring categories", () => {
+  const result = projectStandingsTeamDetail({
+    teamId: "team-1",
+    owner: null,
+    conference: null,
+    teamStats: [
+      {
+        gshlTeamId: "team-1",
+        PM: "-3",
+        PIM: "20",
+        SO: "3",
+        SV: "500",
+        GA: "30",
+        SA: "530",
+      },
+      {
+        gshlTeamId: "team-2",
+        PM: "-5",
+        PIM: "30",
+        SO: "1",
+        SV: "600",
+        GA: "40",
+        SA: "640",
+      },
+    ],
+    matchups: [],
+    weeks: [],
+    opponents: [],
+    playerTotals: [],
+    players: [],
+  });
+  assert.deepEqual(
+    result.categoryRanks.map(({ label, rank }) => [label, rank]),
+    [
+      ["+/-", 1],
+      ["PIM", 2],
+      ["GA", 1],
+      ["SV", 2],
+      ["SA", 2],
+      ["SO", 1],
+    ],
+  );
+});
+
 test("standings power history strips wide rows and unranked statistics", () => {
   const result = projectStandingsPowerHistory({
     weeks: [
@@ -324,6 +368,10 @@ test("standings detail projects the complete expanded-card DTO", () => {
       ["PPP", 2],
       ["SOG", 2],
       ["HIT", 2],
+      ["BLK", 2],
+      ["W", 2],
+      ["GAA", 2],
+      ["SV%", 2],
     ],
   );
   assert.deepEqual(result.previousGames, [

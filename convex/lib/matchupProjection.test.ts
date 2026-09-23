@@ -79,6 +79,12 @@ test("player-week projection joins only display identity and scoring fields", ()
       posGroup: "F",
       nhlTeam: ["TOR"],
       GP: 3,
+      MG: 0,
+      IR: 1,
+      IRplus: "2",
+      ADD: 1,
+      MS: "3",
+      BS: 4,
       G: 2,
       Rating: 8.5,
       powerMetric: 999,
@@ -100,6 +106,10 @@ test("player-week projection joins only display identity and scoring fields", ()
   assert.deepEqual(result.nhlPos, ["LW"]);
   assert.deepEqual(result.nhlTeam, ["TOR"]);
   assert.equal(result.G, 2);
+  assert.deepEqual(
+    [result.MG, result.IR, result.IRplus, result.ADD, result.MS, result.BS],
+    [0, 1, "2", 1, "3", 4],
+  );
   assert.equal("salary" in result, false);
   assert.equal("powerMetric" in result, false);
   assert.deepEqual(collectMatchupNhlAbbreviations([result, result]), ["TOR"]);
@@ -124,6 +134,10 @@ test("player-week projection falls back to the current NHL team without a snapsh
   );
 
   assert.deepEqual(result.nhlTeam, ["NJD"]);
+  assert.deepEqual(
+    [result.MG, result.IR, result.IRplus, result.ADD, result.MS, result.BS],
+    [null, null, null, null, null, null],
+  );
 });
 
 test("team-week projection excludes power and operational fields", () => {

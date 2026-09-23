@@ -64,6 +64,12 @@ export interface MatchupPlayerWeekRow {
   days: MatchupStatValue;
   GP: MatchupStatValue;
   GS: MatchupStatValue;
+  MG?: MatchupStatValue;
+  IR?: MatchupStatValue;
+  IRplus?: MatchupStatValue;
+  ADD?: MatchupStatValue;
+  MS?: MatchupStatValue;
+  BS?: MatchupStatValue;
   G: MatchupStatValue;
   A: MatchupStatValue;
   P: MatchupStatValue;
@@ -155,6 +161,12 @@ export type PlayerStatContextKey =
   | "days"
   | "GP"
   | "GS"
+  | "MG"
+  | "IR"
+  | "IRplus"
+  | "ADD"
+  | "MS"
+  | "BS"
   | "Rating";
 
 export type PlayerStatColumnKey =
