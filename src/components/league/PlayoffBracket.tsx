@@ -280,8 +280,8 @@ function BracketColumn({
             conferenceLogoPlacement={
               column.id === "conference-championships"
                 ? matchupIndex === 0
-                  ? "above"
-                  : "below"
+                  ? "below"
+                  : "above"
                 : undefined
             }
           />

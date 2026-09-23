@@ -34,7 +34,7 @@ import {
 import { canShareOwnerContent } from "@gshl-utils/features/whatsapp-share";
 import { buildMatchupWhatsAppShareMessage } from "@gshl-utils/features/whatsapp-messages";
 import { PlayerStatsTable } from "./PlayerStatsTable";
-import { ArrowLeftIcon } from "lucide-react";
+import { ArrowLeftIcon, StarIcon } from "lucide-react";
 
 function MatchupSummaryTeam({
   team,
@@ -282,30 +282,50 @@ function StarPodiumCard({ star }: { star: StarPlayer }) {
 
   return (
     <div
-      className={`flex min-w-0 flex-col items-center gap-0.5 rounded-lg border p-1.5 text-center backdrop-blur-sm sm:gap-1 sm:rounded-2xl sm:p-3 ${config.cardClass}`}
+      className={`grid min-w-0 grid-cols-[4.5rem_minmax(0,1fr)] gap-x-3 rounded-lg border p-2.5 text-left backdrop-blur-sm sm:flex sm:flex-col sm:items-center sm:gap-1 sm:rounded-2xl sm:p-3 sm:text-center ${config.cardClass}`}
     >
-      <div className={`leading-none ${config.starClass}`}>{config.stars}</div>
-      <div className="text-[9px] font-medium uppercase tracking-[0.18em] text-slate-400 sm:text-[10px]">
+      <div
+        aria-hidden="true"
+        className={`relative row-span-5 self-stretch sm:hidden ${config.starClass}`}
+      >
+        <StarIcon
+          className="h-full min-h-20 w-full fill-current"
+          strokeWidth={1}
+        />
+        <span className="absolute inset-0 flex items-center justify-center text-xl font-semibold text-slate-800">
+          {star.starRank}
+        </span>
+      </div>
+      <div
+        aria-hidden="true"
+        className={`hidden leading-none sm:block ${config.starClass}`}
+      >
+        {config.stars}
+      </div>
+      <div className="text-[10px] font-medium uppercase tracking-[0.18em] text-slate-500 sm:text-slate-400">
         {config.label}
       </div>
-      <div className="mt-1 line-clamp-2 text-[10px] font-semibold leading-tight text-slate-800 sm:text-sm">
+      <div className="mt-1 text-sm font-semibold leading-tight text-slate-800 sm:line-clamp-2">
         {formatMatchupPlayerName(star)}
       </div>
-      <div className="max-w-full truncate text-[9px] text-slate-400 sm:text-xs">
+      <div className="mt-0.5 text-xs text-slate-500 sm:mt-0 sm:max-w-full sm:truncate sm:text-slate-400">
         {star.team?.abbr ?? star.team?.name ?? "—"} ·{" "}
         {formatMatchupPlayerPositions(star)}
       </div>
-      <div className="mt-1 text-[10px] font-semibold text-slate-600 sm:text-xs">
+      <div className="mt-1 text-xs text-slate-500 sm:font-semibold sm:text-slate-600">
         {formatStatValue(star.numericRating, 2)}
-        <span className="ml-1 text-[8px] font-normal uppercase text-slate-400 sm:text-[10px]">
+        <span className="ml-1 text-[10px] font-normal uppercase text-slate-400">
           Rating
         </span>
       </div>
-      <div className="mt-0.5 hidden flex-wrap justify-center gap-x-1.5 gap-y-0.5 sm:flex sm:gap-x-2">
+      <div className="mt-0.5 flex flex-wrap gap-x-2 gap-y-0.5 sm:justify-center">
         {statItems.map(({ v, l }) => (
-          <span key={l} className="text-[9px] text-slate-400 sm:text-[10px]">
+          <span
+            key={l}
+            className="text-[10px] text-slate-500 sm:text-slate-400"
+          >
             {v}
-            <span className="ml-0.5 text-slate-300">{l}</span>
+            <span className="ml-0.5 text-slate-400 sm:text-slate-300">{l}</span>
           </span>
         ))}
       </div>
@@ -314,9 +334,7 @@ function StarPodiumCard({ star }: { star: StarPlayer }) {
 }
 
 function StarsCard({ stars }: { stars: StarPlayer[] }) {
-  const firstStar = stars.find((s) => s.starRank === 1) ?? null;
-  const secondStar = stars.find((s) => s.starRank === 2) ?? null;
-  const thirdStar = stars.find((s) => s.starRank === 3) ?? null;
+  const rankedStars = [...stars].sort((a, b) => a.starRank - b.starRank);
 
   return (
     <section className="rounded-lg border border-slate-200 bg-white p-2.5 shadow-sm sm:rounded-2xl sm:p-4">
@@ -330,29 +348,22 @@ function StarsCard({ stars }: { stars: StarPlayer[] }) {
           No player performances available for this matchup yet.
         </div>
       ) : (
-        <div className="grid grid-cols-3 items-start gap-1.5 sm:gap-2">
-          <div className="min-w-0 pt-2 sm:pt-4">
-            {secondStar ? (
-              <StarPodiumCard star={secondStar} />
-            ) : (
-              <div className="h-full rounded-2xl border border-slate-100" />
-            )}
-          </div>
-          <div className="min-w-0 pt-0">
-            {firstStar ? (
-              <StarPodiumCard star={firstStar} />
-            ) : (
-              <div className="h-full rounded-2xl border border-slate-100" />
-            )}
-          </div>
-          <div className="min-w-0 pt-4 sm:pt-8">
-            {thirdStar ? (
-              <StarPodiumCard star={thirdStar} />
-            ) : (
-              <div className="h-full rounded-2xl border border-slate-100" />
-            )}
-          </div>
-        </div>
+        <ol className="grid grid-cols-1 items-start gap-2 sm:grid-cols-3">
+          {rankedStars.map((star) => (
+            <li
+              key={star.starRank}
+              className={`min-w-0 ${
+                star.starRank === 1
+                  ? "sm:col-start-2 sm:row-start-1"
+                  : star.starRank === 2
+                    ? "sm:col-start-1 sm:row-start-1 sm:pt-4"
+                    : "sm:col-start-3 sm:row-start-1 sm:pt-8"
+              }`}
+            >
+              <StarPodiumCard star={star} />
+            </li>
+          ))}
+        </ol>
       )}
     </section>
   );
