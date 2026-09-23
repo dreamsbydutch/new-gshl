@@ -100,28 +100,32 @@ function CategoryResultsCard({
                 const label = side === "away" ? awayLabel : homeLabel;
                 return (
                   <th key={side} scope="col" className="px-2 py-2 text-center">
-                    <div className="flex min-w-0 items-center justify-center gap-1.5">
+                    <div
+                      className={`flex min-h-[69px] min-w-0 items-center justify-center gap-1.5 sm:min-h-[79px] sm:gap-2 ${side === "home" ? "flex-row-reverse" : ""}`}
+                    >
                       {team?.logoUrl ? (
                         <Image
                           src={team.logoUrl}
                           alt=""
-                          width={28}
-                          height={28}
-                          className="h-6 w-6 shrink-0 object-contain sm:h-7 sm:w-7"
+                          width={64}
+                          height={64}
+                          className="h-12 w-12 shrink-0 object-contain sm:h-16 sm:w-16"
                         />
                       ) : null}
-                      <span
-                        className="truncate font-semibold text-slate-700"
-                        title={team?.name ?? label}
-                      >
-                        {label}
-                      </span>
-                    </div>
-                    <div className="mt-1 font-oswald text-2xl font-normal leading-none text-slate-900 sm:text-3xl">
-                      {scores[side]}
-                    </div>
-                    <div className="mt-0.5 text-[10px] font-normal uppercase tracking-wider text-slate-500">
-                      {side}
+                      <div className="min-w-0">
+                        <div
+                          className="truncate font-semibold text-slate-700"
+                          title={team?.name ?? label}
+                        >
+                          {label}
+                        </div>
+                        <div className="mt-1 font-oswald text-2xl font-normal leading-none text-slate-900 sm:text-3xl">
+                          {scores[side]}
+                        </div>
+                        <div className="mt-0.5 text-[10px] font-normal uppercase tracking-wider text-slate-500">
+                          {side}
+                        </div>
+                      </div>
                     </div>
                   </th>
                 );

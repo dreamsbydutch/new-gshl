@@ -155,6 +155,41 @@ void test("builds identity, available context, and deduplicated season columns",
 
   assert.deepEqual(
     result.map((column) => column.key),
-    ["player", "pos", "nhlTeam", "GP", "Rating", "G", "SVP"],
+    [
+      "player",
+      "pos",
+      "nhlTeam",
+      "GP",
+      "Rating",
+      "G",
+      "SVP",
+      "MS",
+      "BS",
+      "ADD",
+      "MG",
+      "IR",
+      "IRplus",
+    ],
   );
+});
+
+void test("weekly status columns remain visible when the payload has no status values", () => {
+  const keys = ["MS", "BS", "ADD", "MG", "IR", "IRplus"] as const;
+  for (const players of [
+    [],
+    [player("F")],
+    [player("G", { MS: null, BS: "", ADD: " " })],
+  ]) {
+    const result = buildPlayerStatColumns({ players, categories: ["G", "W"] });
+    assert.deepEqual(
+      result.slice(-6).map((column) => column.key),
+      [...keys],
+    );
+  }
+  for (const key of keys) {
+    assert.equal(renderPlayerStatCell(player("F"), key), "-");
+    assert.equal(renderPlayerStatCell(player("G", { [key]: null }), key), "-");
+    assert.equal(renderPlayerStatCell(player("F", { [key]: " " }), key), "-");
+    assert.equal(renderPlayerStatCell(player("G", { [key]: 0 }), key), "0");
+  }
 });

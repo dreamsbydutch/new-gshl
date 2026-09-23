@@ -244,11 +244,7 @@ export function buildPlayerStatColumns({
     resolvedColumns.push(PLAYER_STAT_CATEGORY_COLUMNS[category.field]);
   }
 
-  for (const column of PLAYER_STAT_TRAILING_COLUMNS) {
-    if (hasPlayerStatField(players, column.key)) {
-      resolvedColumns.push(column);
-    }
-  }
+  resolvedColumns.push(...PLAYER_STAT_TRAILING_COLUMNS);
 
   return resolvedColumns.filter((column, index, columns) => {
     return columns.findIndex((entry) => entry.key === column.key) === index;
@@ -551,6 +547,12 @@ export function renderPlayerStatCell(
   }
 
   const value: PlayerStatCellValue = player[key];
+  if (
+    PLAYER_STAT_TRAILING_COLUMNS.some((column) => column.key === key) &&
+    (value == null || (typeof value === "string" && value.trim() === ""))
+  ) {
+    return "-";
+  }
   if (value == null || value === "") {
     return NON_NUMERIC_PLAYER_STAT_KEYS.has(key) ? "-" : "0";
   }
