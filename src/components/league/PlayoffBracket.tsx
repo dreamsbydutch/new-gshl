@@ -201,19 +201,6 @@ function MatchupCard({
   );
 }
 
-function getBracketColumnTheme(title: string) {
-  if (title === "Sunview") {
-    return "border-sunview-200 bg-sunview-50/80";
-  }
-  if (title === "Hickory Hotel") {
-    return "border-hotel-200 bg-hotel-50/80";
-  }
-  if (title === "GSHL Cup Final") {
-    return "border-champ-300 bg-champ-50/90";
-  }
-  return "border-slate-200 bg-slate-50/90";
-}
-
 function BracketColumn({
   column,
   index,
@@ -235,29 +222,8 @@ function BracketColumn({
 
   return (
     <section className="min-w-0">
-      <header
-        className={cn(
-          "flex h-24 flex-col items-center justify-center gap-1 rounded-xl border px-2 py-2 shadow-sm lg:h-14 lg:flex-row lg:justify-start lg:gap-2 lg:px-3",
-          getBracketColumnTheme(column.title),
-        )}
-      >
-        {column.logoUrl ? (
-          <Image
-            src={column.logoUrl}
-            alt=""
-            width={42}
-            height={42}
-            className="h-10 w-10 shrink-0 object-contain"
-          />
-        ) : null}
-        <div className="min-w-0 max-w-full text-center lg:text-left">
-          <h2 className="truncate text-sm font-bold text-slate-950">
-            {column.title}
-          </h2>
-          <p className="truncate text-xs text-slate-600">{column.subtitle}</p>
-        </div>
-      </header>
-      <div className="relative mt-3 grid h-[42rem] grid-rows-4 gap-4">
+      <h2 className="sr-only">{column.title}</h2>
+      <div className="relative grid h-[42rem] grid-rows-4 gap-4">
         {Array.from({ length: Math.floor(matchupCount / 2) }).map(
           (_, pairIndex) => {
             const lineClass = getConnectorLineClasses(
@@ -308,25 +274,13 @@ export function PlayoffBracket({
   }
 
   return (
-    <section className="pb-12 pt-4" aria-labelledby="playoff-picture-title">
+    <section className="pb-12 pt-2" aria-label={`${season.name} playoffs`}>
       <div className="mx-auto max-w-[96rem] px-3 sm:px-6">
-        <div className="flex flex-col gap-3 border-b border-slate-200 pb-4 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <h2
-              id="playoff-picture-title"
-              className="font-oswald text-2xl text-slate-950 sm:text-3xl"
-            >
-              {season.name} playoff picture
-            </h2>
-            <p className="mt-1 text-sm text-slate-500">{bracket.formatLabel}</p>
-          </div>
-        </div>
-
         <div
           role="region"
           aria-label="Playoff bracket, scroll horizontally to see all rounds"
           tabIndex={0}
-          className="mt-5 overflow-x-auto rounded-2xl border border-slate-200 bg-gradient-to-b from-slate-50 to-white p-2.5 shadow-sm sm:p-5"
+          className="overflow-x-auto rounded-2xl border border-slate-200 bg-gradient-to-b from-slate-50 to-white p-2.5 shadow-sm sm:p-5"
         >
           <div className="grid auto-cols-[minmax(148px,1fr)] grid-flow-col gap-5 lg:auto-cols-[minmax(280px,1fr)] lg:gap-10">
             {bracket.columns.map((column, index) => (
