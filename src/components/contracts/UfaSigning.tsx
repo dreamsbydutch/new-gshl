@@ -63,9 +63,11 @@ function Countdown({ deadlineAt }: { deadlineAt: number }) {
 function PlayerRows({
   players,
   showStats,
+  showOffers,
 }: {
   players: UfaFreeAgentView[];
   showStats: boolean;
+  showOffers: boolean;
 }) {
   const mobileCellPadding = showStats ? "px-1 py-1" : "px-0.5 py-0.5";
   return (
@@ -158,9 +160,11 @@ function PlayerRows({
                     </td>
                   ))
               : null}
-            <td className={`sm:px-2 sm:py-3 ${mobileCellPadding}`}>
-              <UfaOfferForm player={player} />
-            </td>
+            {showOffers ? (
+              <td className={`sm:px-2 sm:py-3 ${mobileCellPadding}`}>
+                <UfaOfferForm player={player} />
+              </td>
+            ) : null}
           </tr>
         );
       })}
@@ -171,9 +175,11 @@ function PlayerRows({
 function PlayerTable({
   players,
   showStats = false,
+  showOffers = true,
 }: {
   players: UfaFreeAgentView[];
   showStats?: boolean;
+  showOffers?: boolean;
 }) {
   const hasGoalies = players.some((player) => player.positionGroup === "G");
   const hasSkaters = players.some((player) => player.positionGroup !== "G");
@@ -185,10 +191,12 @@ function PlayerTable({
           <PlayerTable
             players={players.filter((player) => player.positionGroup !== "G")}
             showStats
+            showOffers={showOffers}
           />
           <PlayerTable
             players={players.filter((player) => player.positionGroup === "G")}
             showStats
+            showOffers={showOffers}
           />
         </div>
       </div>
@@ -200,13 +208,15 @@ function PlayerTable({
   const mobileCellPadding = showStats ? "px-1 py-1" : "px-0.5 py-0.5";
   return (
     <TableViewport
-      ariaLabel={`Available unrestricted free-agent ${hasGoalies ? "goalies" : "skaters"}`}
+      ariaLabel={`${showOffers ? "Available" : "Potential upcoming"} unrestricted free-agent ${hasGoalies ? "goalies" : "skaters"}`}
       scrollHint="Scroll to compare all salaries and statistics"
     >
       <table className="w-max min-w-full text-center text-[10px] sm:text-sm">
         <caption className="sr-only">
-          Available unrestricted free-agent {hasGoalies ? "goalies" : "skaters"}
-          , salaries, previous-season statistics, and binding-offer action
+          {showOffers ? "Available" : "Potential upcoming"} unrestricted
+          free-agent {hasGoalies ? "goalies" : "skaters"}, salaries,
+          previous-season statistics
+          {showOffers ? ", and binding-offer action" : ""}
         </caption>
         <thead className="bg-muted/70 text-[8px] uppercase tracking-wide sm:text-xs">
           <tr className="border-b border-border/70">
@@ -239,15 +249,17 @@ function PlayerTable({
                   </th>
                 ))
               : null}
-            <th
-              scope="col"
-              className={`whitespace-nowrap sm:px-2 sm:py-3 ${mobileCellPadding}`}
-            >
-              Offer
-            </th>
+            {showOffers ? (
+              <th
+                scope="col"
+                className={`whitespace-nowrap sm:px-2 sm:py-3 ${mobileCellPadding}`}
+              >
+                Offer
+              </th>
+            ) : null}
           </tr>
         </thead>
-        <PlayerRows players={players} showStats={showStats} />
+        <PlayerRows players={players} showStats={showStats} showOffers={showOffers} />
       </table>
     </TableViewport>
   );
@@ -623,49 +635,43 @@ export function UfaLeagueOffice() {
     <div className="w-full min-w-0 max-w-full space-y-4 overflow-hidden sm:space-y-6">
       <div>
         <h2 className="text-2xl font-black sm:text-3xl">Free Agents</h2>
-        {query.data.window.isOpen ? (
-          <>
-            <p className="text-xs text-muted-foreground sm:text-sm">
-              Available UFAs with their previous NHL season statistics and fixed
-              125% salary. Linked owners see players they can afford for the
-              upcoming offseason, using cap commitments for the seasons the new
-              contract covers.
-            </p>
-            <p className="mt-1 text-xs text-muted-foreground sm:text-sm">
-              {query.data.window.contractSeasonName
-                ? `New contracts cover ${query.data.window.contractSeasonName} onward. `
-                : ""}
-              {query.data.window.signingEndDate
-                ? `Offers open after the late signing deadline on ${query.data.window.signingEndDate}. `
-                : ""}
-              Projected free agents may re-sign before that deadline. Second
-              contracts expire as UFAs; first contracts expire as RFAs.
-            </p>
-          </>
-        ) : null}
+        <p className="text-xs text-muted-foreground sm:text-sm">
+          Potential upcoming UFAs with previous NHL season statistics and
+          projected salaries at the 125% UFA rate. All candidates remain visible
+          for cap planning, including players who do not fit your current cap
+          space.
+        </p>
+        <p className="mt-1 text-xs text-muted-foreground sm:text-sm">
+          {query.data.window.contractSeasonName
+            ? `New contracts cover ${query.data.window.contractSeasonName} onward. `
+            : ""}
+          {query.data.window.signingEndDate
+            ? `Offers open after the late signing deadline on ${query.data.window.signingEndDate}. `
+            : ""}
+          Projected free agents may re-sign before that deadline. Second
+          contracts expire as UFAs; first contracts expire as RFAs.
+        </p>
       </div>
-      {query.data.window.isOpen ? (
-        <div
-          className="flex flex-wrap gap-1.5 sm:gap-2"
-          aria-label="Filter free agents by position"
-          role="group"
-        >
-          {["ALL", "F", "LW", "RW", "C", "D", "G"].map((value) => (
-            <button
-              key={value}
-              type="button"
-              onClick={() => {
-                setFilter(value);
-                setVisibleCount(50);
-              }}
-              aria-pressed={filter === value}
-              className={`min-h-11 min-w-11 rounded-full border px-3 py-2 text-xs font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${filter === value ? "bg-primary text-primary-foreground" : "hover:bg-muted"} sm:px-4 sm:text-sm`}
-            >
-              {value === "ALL" ? "All" : value}
-            </button>
-          ))}
-        </div>
-      ) : null}
+      <div
+        className="flex flex-wrap gap-1.5 sm:gap-2"
+        aria-label="Filter free agents by position"
+        role="group"
+      >
+        {["ALL", "F", "LW", "RW", "C", "D", "G"].map((value) => (
+          <button
+            key={value}
+            type="button"
+            onClick={() => {
+              setFilter(value);
+              setVisibleCount(50);
+            }}
+            aria-pressed={filter === value}
+            className={`min-h-11 min-w-11 rounded-full border px-3 py-2 text-xs font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${filter === value ? "bg-primary text-primary-foreground" : "hover:bg-muted"} sm:px-4 sm:text-sm`}
+          >
+            {value === "ALL" ? "All" : value}
+          </button>
+        ))}
+      </div>
       {!query.data.window.isOpen ? (
         <p className="rounded-md bg-muted p-2 text-xs sm:p-3 sm:text-sm">
           {query.data.window.reason}
@@ -675,17 +681,19 @@ export function UfaLeagueOffice() {
         groups={query.data.offerGroups}
         canShare={canShareOwnerContent(session?.user.role)}
       />
-      {query.data.window.isOpen ? (
-        visiblePlayers.length > 0 ? (
-          <PlayerTable players={visiblePlayers} showStats />
-        ) : (
-          <p className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
-            No available free agents match the{" "}
-            {filter === "ALL" ? "current" : filter} filter.
-          </p>
-        )
-      ) : null}
-      {query.data.window.isOpen && visibleCount < players.length ? (
+      {visiblePlayers.length > 0 ? (
+        <PlayerTable
+          players={visiblePlayers}
+          showStats
+          showOffers={query.data.window.isOpen}
+        />
+      ) : (
+        <p className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
+          No potential free agents match the{" "}
+          {filter === "ALL" ? "current" : filter} filter.
+        </p>
+      )}
+      {visibleCount < players.length ? (
         <div className="flex justify-center">
           <button
             type="button"

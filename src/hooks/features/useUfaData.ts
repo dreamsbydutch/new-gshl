@@ -118,7 +118,7 @@ export function useUfaOverview(
                   : null,
       };
     });
-    const freeAgents: UfaFreeAgentView[] = isSignedInOwner
+    const freeAgents: UfaFreeAgentView[] = mode === "home" && isSignedInOwner
       ? selectAffordableUfas(rankedFreeAgents)
       : rankedFreeAgents;
     const playerById = new Map(
@@ -190,7 +190,7 @@ export function useUfaOverview(
         isSignedInOwner,
       },
     };
-  }, [rawCatalog, rawState, session?.user?.ownerId, state]);
+  }, [mode, rawCatalog, rawState, session?.user?.ownerId, state]);
 
   return {
     data,
