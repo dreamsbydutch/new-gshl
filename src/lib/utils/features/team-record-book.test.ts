@@ -218,19 +218,119 @@ void test("counts all-star and player trophies in the matching table season", ()
   assert.equal(playoffRow.awardCounts[AwardsList.CONN_SMYTHE], 1);
 });
 
-void test("counts Cups won while a player was with the team", () => {
-  const { seasonRows } = buildRecordBookPlayerRows({
+void test("credits Cups for playoff participation or strictly over two-thirds of roster days", () => {
+  const seasonSplits = [
+    seasonSplitRow({ playerId: "short-stay", days: "10" }),
+    seasonSplitRow({ playerId: "exact-threshold", days: "60" }),
+    seasonSplitRow({ playerId: "long-stay", days: "61", GP: "0" }),
+    seasonSplitRow({ playerId: "combined-days", days: "55" }),
+    seasonSplitRow({
+      playerId: "combined-days",
+      seasonType: SeasonType.PLAYOFFS,
+      days: "6",
+      GP: "0",
+    }),
+    seasonSplitRow({ playerId: "playoff-game", days: "1" }),
+    seasonSplitRow({
+      playerId: "playoff-game",
+      seasonType: SeasonType.PLAYOFFS,
+      days: "1",
+      GP: "1",
+    }),
+    seasonSplitRow({ playerId: "other-team", days: "1" }),
+    seasonSplitRow({
+      playerId: "other-team",
+      gshlTeamId: "other-team",
+      seasonType: SeasonType.PLAYOFFS,
+      days: "90",
+      GP: "1",
+    }),
+    seasonSplitRow({
+      playerId: "losers-tournament",
+      seasonType: SeasonType.LOSERS_TOURNAMENT,
+      days: "1",
+      GP: "1",
+    }),
+    seasonSplitRow({
+      playerId: "not-a-champion",
+      seasonId: "season-2",
+      days: "90",
+    }),
+  ];
+  const { seasonRows, careerRows } = buildRecordBookPlayerRows({
     awardRows: [],
-    careerSplits: [],
+    careerSplits: seasonSplits,
     cupSeasonIds: new Set(["season-1"]),
+    seasons: [
+      { id: "season-1", startDate: "2025-01-01", endDate: "2025-03-31" },
+    ],
     nhlTeamsByAbbr: new Map(),
     ownerTeamIds: new Set(["owner-a-team-1"]),
     playersById: new Map(),
-    seasonSplits: [seasonSplitRow()],
-    seasonsById: new Map([["season-1", 2025]]),
+    seasonSplits,
+    seasonsById: new Map([
+      ["season-1", 2025],
+      ["season-2", 2026],
+    ]),
   });
 
-  assert.equal(seasonRows[0]?.cupCount, 1);
+  const eligible = new Set(["long-stay", "combined-days", "playoff-game"]);
+  for (const row of [...seasonRows, ...careerRows]) {
+    assert.equal(row.cupCount, eligible.has(row.playerId) ? 1 : 0, row.id);
+  }
+});
+
+void test("counts each qualifying Cup once across career stages", () => {
+  const seasonSplits = [
+    seasonSplitRow({ days: "61" }),
+    seasonSplitRow({ seasonId: "season-2", days: "1" }),
+    seasonSplitRow({
+      seasonId: "season-2",
+      seasonType: SeasonType.PLAYOFFS,
+      days: "2",
+      GP: "2",
+    }),
+  ];
+  const { careerRows, seasonRows } = buildRecordBookPlayerRows({
+    awardRows: [],
+    careerSplits: seasonSplits,
+    cupSeasonIds: new Set(["season-1", "season-2"]),
+    seasons: [
+      { id: "season-1", startDate: "2025-01-01", endDate: "2025-03-31" },
+    ],
+    nhlTeamsByAbbr: new Map(),
+    ownerTeamIds: new Set(["owner-a-team-1"]),
+    playersById: new Map(),
+    seasonSplits,
+    seasonsById: new Map([
+      ["season-1", 2025],
+      ["season-2", 2026],
+    ]),
+  });
+
+  assert.equal(careerRows.length, 2);
+  for (const row of careerRows) assert.equal(row.cupCount, 2, row.id);
+  for (const row of seasonRows) assert.equal(row.cupCount, 1, row.id);
+});
+
+void test("does not guess roster-day eligibility when season dates are unavailable", () => {
+  for (const seasons of [
+    [],
+    [{ id: "season-1", startDate: "", endDate: "" }],
+  ]) {
+    const { seasonRows } = buildRecordBookPlayerRows({
+      awardRows: [],
+      careerSplits: [],
+      cupSeasonIds: new Set(["season-1"]),
+      seasons,
+      nhlTeamsByAbbr: new Map(),
+      ownerTeamIds: new Set(["owner-a-team-1"]),
+      playersById: new Map(),
+      seasonSplits: [seasonSplitRow({ days: "200" })],
+      seasonsById: new Map([["season-1", 2025]]),
+    });
+    assert.equal(seasonRows[0]?.cupCount, 0);
+  }
 });
 
 void test("assigns the Conn Smythe to playoff record-book rows", () => {

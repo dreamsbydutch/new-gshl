@@ -623,6 +623,7 @@ export function buildRecordBookPlayerRows(
     awardRows,
     careerSplits,
     cupSeasonIds = new Set<string>(),
+    seasons = [],
     ownerTeamIds,
     nhlTeamsByAbbr,
     playersById,
@@ -636,6 +637,51 @@ export function buildRecordBookPlayerRows(
   );
   const { careerCounts, seasonCounts } =
     buildRecordBookAwardCountMaps(awardRows);
+  const seasonDayCounts = new Map(
+    seasons.map((season) => [
+      String(season.id),
+      (Date.parse(season.endDate) - Date.parse(season.startDate)) / 86_400_000 +
+        1,
+    ]),
+  );
+  // Roster days span all stages; Cup eligibility does not depend on the
+  // currently selected stats. Use the existing splits, never daily-row reads.
+  const cupParticipation = new Map<
+    string,
+    { playerId: string; seasonId: string; days: number; playoffGames: number }
+  >();
+  for (const row of ownerSeasonRows) {
+    if (!cupSeasonIds.has(row.seasonId)) continue;
+    const key = `${row.playerId}|${row.seasonId}`;
+    const participation = cupParticipation.get(key) ?? {
+      playerId: row.playerId,
+      seasonId: row.seasonId,
+      days: 0,
+      playoffGames: 0,
+    };
+    participation.days += row.days;
+    if (row.seasonType === SeasonType.PLAYOFFS) {
+      participation.playoffGames += row.GP;
+    }
+    cupParticipation.set(key, participation);
+  }
+  const cupSeasonsByPlayer = new Map<string, Set<string>>();
+  for (const participation of cupParticipation.values()) {
+    const seasonDays = seasonDayCounts.get(participation.seasonId) ?? 0;
+    if (
+      participation.playoffGames < 1 &&
+      !(
+        Number.isFinite(seasonDays) &&
+        seasonDays > 0 &&
+        participation.days * 3 > seasonDays * 2
+      )
+    )
+      continue;
+    const cupSeasons =
+      cupSeasonsByPlayer.get(participation.playerId) ?? new Set<string>();
+    cupSeasons.add(participation.seasonId);
+    cupSeasonsByPlayer.set(participation.playerId, cupSeasons);
+  }
   const seasonsByPlayerStage = new Map<string, FranchiseSeasonRow[]>();
 
   for (const row of ownerSeasonRows) {
@@ -670,7 +716,7 @@ export function buildRecordBookPlayerRows(
       awardCounts:
         seasonCounts.get(`${row.playerId}|${row.seasonId}|${row.seasonType}`) ??
         {},
-      cupCount: cupSeasonIds.has(row.seasonId) ? 1 : 0,
+      cupCount: cupSeasonsByPlayer.get(row.playerId)?.has(row.seasonId) ? 1 : 0,
     };
   });
 
@@ -703,11 +749,7 @@ export function buildRecordBookPlayerRows(
         ...getStatLine(row),
         awardCounts:
           careerCounts.get(`${row.playerId}|${row.seasonType}`) ?? {},
-        cupCount: new Set(
-          playerSeasons
-            .map((season) => season.seasonId)
-            .filter((seasonId) => cupSeasonIds.has(seasonId)),
-        ).size,
+        cupCount: cupSeasonsByPlayer.get(row.playerId)?.size ?? 0,
       };
     },
   );

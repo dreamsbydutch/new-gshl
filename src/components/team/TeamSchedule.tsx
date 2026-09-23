@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import { useTeamScheduleView } from "@gshl-hooks";
 import { TeamScheduleSkeleton } from "@gshl-skeletons";
 import { TeamScheduleHeader } from "./schedule/TeamScheduleHeader";
@@ -12,15 +11,11 @@ export function TeamSchedule() {
     error,
     isLoading,
     matchups,
-    matchupCategories,
     selectedOwnerId,
     selectedSeasonId,
     selectedTeam,
     teams,
   } = useTeamScheduleView();
-  const [expandedMatchupId, setExpandedMatchupId] = useState<string | null>(
-    null,
-  );
 
   if (isLoading) {
     return <TeamScheduleSkeleton />;
@@ -53,7 +48,6 @@ export function TeamSchedule() {
             week={week}
             teams={teams}
             selectedTeamId={selectedTeam.id}
-            categories={matchupCategories}
             matchupHref={buildMatchupNavigationHref(String(matchup.id), {
               from: "schedule",
               view: "team",
@@ -64,12 +58,6 @@ export function TeamSchedule() {
                   ? "home"
                   : "away",
             })}
-            isExpanded={expandedMatchupId === matchup.id}
-            onToggle={() =>
-              setExpandedMatchupId((current) =>
-                current === matchup.id ? null : matchup.id,
-              )
-            }
           />
         ))}
       </div>

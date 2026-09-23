@@ -1,15 +1,11 @@
 "use client";
 
-import { useState } from "react";
 import type {
   GSHLTeam,
   TeamHistoryTeamSummary,
   UseScheduleDataEnhancedMatchup,
 } from "@gshl-types";
-import {
-  buildMatchupNavigationHref,
-  resolveMatchupCategories,
-} from "@gshl-utils";
+import { buildMatchupNavigationHref } from "@gshl-utils";
 import { TeamScheduleHeader } from "../schedule/TeamScheduleHeader";
 import { TeamScheduleItem } from "../schedule/TeamScheduleItem";
 
@@ -25,10 +21,6 @@ export function HistoryMatchupList({
   teams: TeamHistoryTeamSummary[];
   teamInfo: GSHLTeam;
 }) {
-  const [expandedMatchupId, setExpandedMatchupId] = useState<string | null>(
-    null,
-  );
-
   return (
     <div className="mx-auto mb-4 w-full max-w-5xl">
       {rows.length === 0 && (
@@ -69,15 +61,6 @@ export function HistoryMatchupList({
                       ? "home"
                       : "away",
                 })}
-                categories={resolveMatchupCategories(
-                  matchup.season?.categories,
-                )}
-                isExpanded={expandedMatchupId === matchup.id}
-                onToggle={() =>
-                  setExpandedMatchupId((current) =>
-                    current === matchup.id ? null : matchup.id,
-                  )
-                }
               />
             </div>
           );

@@ -239,6 +239,7 @@ export interface BuildRecordBookPlayerRowsOptions {
   awardRows: RecordBookAwardRow[];
   careerSplits: PlayerCareerSplitStatLine[];
   cupSeasonIds?: ReadonlySet<string>;
+  seasons?: readonly Pick<Season, "id" | "startDate" | "endDate">[];
   ownerTeamIds: Set<string>;
   nhlTeamsByAbbr: Map<string, NHLTeam>;
   playersById: Map<string, Player>;

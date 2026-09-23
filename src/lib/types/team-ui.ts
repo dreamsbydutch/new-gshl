@@ -7,7 +7,6 @@ import type {
   Week,
 } from "./database";
 import type { AwardsList, MatchupType } from "./enums";
-import type { MatchupCategoryConfig } from "./team";
 import type {
   WeeklyScheduleMatchupSummary,
   WeeklyScheduleTeamSummary,
@@ -147,7 +146,6 @@ export interface TeamScheduleItemProps {
   week: TeamScheduleWeekSummary | null | undefined;
   teams: TeamScheduleTeamSummary[];
   selectedTeamId: string;
-  categories: MatchupCategoryConfig[];
   matchupHref?: string;
 }
 
