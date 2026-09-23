@@ -149,9 +149,15 @@ export function PowerRankings({ season, rankings }: PowerRankingsProps) {
                 <tr>
                   <th
                     scope="col"
-                    className="sticky left-0 z-20 min-w-44 border-b border-r border-slate-200 bg-slate-50 px-2.5 py-2 text-left sm:min-w-60 sm:px-3"
+                    className="sticky left-0 z-20 w-[72px] min-w-[72px] border-b border-r border-slate-200 bg-slate-50 px-2 py-2 text-center"
                   >
-                    Rank / team
+                    Rank
+                  </th>
+                  <th
+                    scope="col"
+                    className="min-w-48 border-b border-slate-200 px-2 py-2 text-left sm:min-w-52"
+                  >
+                    Team
                   </th>
                   <th
                     scope="col"
@@ -181,18 +187,19 @@ export function PowerRankings({ season, rankings }: PowerRankingsProps) {
                   <tr key={entry.team.id} className="hover:bg-slate-50">
                     <th
                       scope="row"
-                      className="sticky left-0 z-10 border-b border-r border-slate-200 bg-white px-2.5 py-2 text-left font-normal sm:px-3"
+                      aria-label={`${entry.team.name ?? entry.team.abbr ?? "Team"}, rank ${entry.rank}`}
+                      className="sticky left-0 z-10 w-[72px] min-w-[72px] border-b border-r border-slate-200 bg-white px-2 py-2 text-left font-normal"
                     >
                       <span className="flex items-center gap-2">
                         <span className="w-5 shrink-0 text-center font-oswald text-base font-semibold tabular-nums text-slate-950">
                           {entry.rank}
                         </span>
                         <TeamLogo entry={entry} />
-                        <span className="min-w-0 font-semibold leading-tight text-slate-900">
-                          {entry.team.name ?? entry.team.abbr ?? "Team"}
-                        </span>
                       </span>
                     </th>
+                    <td className="min-w-48 border-b border-slate-100 px-2 py-2 font-semibold leading-tight text-slate-900 sm:min-w-52">
+                      {entry.team.name ?? entry.team.abbr ?? "Team"}
+                    </td>
                     <td className="border-b border-slate-100 px-2.5 py-2 text-center">
                       <RankMovement entry={entry} />
                     </td>
