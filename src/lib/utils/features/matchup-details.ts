@@ -549,7 +549,7 @@ export function renderPlayerStatCell(
   const value: PlayerStatCellValue = player[key];
   if (
     PLAYER_STAT_TRAILING_COLUMNS.some((column) => column.key === key) &&
-    (value == null || (typeof value === "string" && value.trim() === ""))
+    (value == null || Number(value) === 0)
   ) {
     return "-";
   }

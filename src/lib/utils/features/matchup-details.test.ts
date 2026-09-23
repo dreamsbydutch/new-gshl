@@ -66,7 +66,7 @@ void test("weekly status columns include zeroes and retain values for skaters an
       (["MG", "IR", "IRplus", "ADD", "MS", "BS"] as const).map((key) =>
         renderPlayerStatCell(row, key),
       ),
-      ["0", "1", "2", "1", "3", "4"],
+      ["-", "1", "2", "1", "3", "4"],
     );
   }
 });
@@ -190,6 +190,16 @@ void test("weekly status columns remain visible when the payload has no status v
     assert.equal(renderPlayerStatCell(player("F"), key), "-");
     assert.equal(renderPlayerStatCell(player("G", { [key]: null }), key), "-");
     assert.equal(renderPlayerStatCell(player("F", { [key]: " " }), key), "-");
-    assert.equal(renderPlayerStatCell(player("G", { [key]: 0 }), key), "0");
+    for (const value of [0, "0", "0.0", " 0 "] as const) {
+      assert.equal(
+        renderPlayerStatCell(player("G", { [key]: value }), key),
+        "-",
+      );
+      assert.equal(
+        renderPlayerStatCell(player("F", { [key]: value }), key),
+        "-",
+      );
+    }
+    assert.equal(renderPlayerStatCell(player("G", { [key]: 2 }), key), "2");
   }
 });
