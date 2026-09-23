@@ -204,7 +204,7 @@ function StandingsGroupTable({
                             </span>
                           )}
                         </div>
-                        <span className="min-w-0 flex-1 truncate font-semibold text-slate-900">
+                        <span className="min-w-0 flex-1 whitespace-normal break-words text-pretty font-semibold leading-snug text-slate-900">
                           {team.name}
                         </span>
                         <ChevronDown

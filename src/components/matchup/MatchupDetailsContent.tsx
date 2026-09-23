@@ -282,17 +282,14 @@ function StarPodiumCard({ star }: { star: StarPlayer }) {
 
   return (
     <div
-      className={`grid min-w-0 grid-cols-[4.5rem_minmax(0,1fr)] gap-x-3 rounded-lg border p-2.5 text-left backdrop-blur-sm sm:flex sm:flex-col sm:items-center sm:gap-1 sm:rounded-2xl sm:p-3 sm:text-center ${config.cardClass}`}
+      className={`grid min-w-0 grid-cols-[2.5rem_minmax(0,1fr)] gap-x-2 rounded-lg border px-2 py-2 text-left backdrop-blur-sm sm:flex sm:flex-col sm:items-center sm:gap-1 sm:rounded-2xl sm:p-3 sm:text-center ${config.cardClass}`}
     >
       <div
         aria-hidden="true"
-        className={`relative row-span-5 self-stretch sm:hidden ${config.starClass}`}
+        className={`relative row-span-3 self-center sm:hidden ${config.starClass}`}
       >
-        <StarIcon
-          className="h-full min-h-20 w-full fill-current"
-          strokeWidth={1}
-        />
-        <span className="absolute inset-0 flex items-center justify-center text-xl font-semibold text-slate-800">
+        <StarIcon className="h-10 w-10 fill-current" strokeWidth={1} />
+        <span className="absolute inset-0 flex items-center justify-center text-sm font-semibold text-slate-800">
           {star.starRank}
         </span>
       </div>
@@ -302,32 +299,37 @@ function StarPodiumCard({ star }: { star: StarPlayer }) {
       >
         {config.stars}
       </div>
-      <div className="text-[10px] font-medium uppercase tracking-[0.18em] text-slate-500 sm:text-slate-400">
+      <div className="hidden text-[10px] font-medium uppercase tracking-[0.18em] text-slate-400 sm:block">
         {config.label}
       </div>
-      <div className="mt-1 text-sm font-semibold leading-tight text-slate-800 sm:line-clamp-2">
+      <div className="text-sm font-semibold leading-tight text-slate-800 sm:mt-1 sm:line-clamp-2">
         {formatMatchupPlayerName(star)}
       </div>
       <div className="mt-0.5 text-xs text-slate-500 sm:mt-0 sm:max-w-full sm:truncate sm:text-slate-400">
+        <span className="sm:hidden">{config.label} · </span>
         {star.team?.abbr ?? star.team?.name ?? "—"} ·{" "}
         {formatMatchupPlayerPositions(star)}
       </div>
-      <div className="mt-1 text-xs text-slate-500 sm:font-semibold sm:text-slate-600">
-        {formatStatValue(star.numericRating, 2)}
-        <span className="ml-1 text-[10px] font-normal uppercase text-slate-400">
-          Rating
-        </span>
-      </div>
-      <div className="mt-0.5 flex flex-wrap gap-x-2 gap-y-0.5 sm:justify-center">
-        {statItems.map(({ v, l }) => (
-          <span
-            key={l}
-            className="text-[10px] text-slate-500 sm:text-slate-400"
-          >
-            {v}
-            <span className="ml-0.5 text-slate-400 sm:text-slate-300">{l}</span>
+      <div className="mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-0.5 sm:mt-0 sm:contents">
+        <div className="text-[10px] text-slate-500 sm:mt-1 sm:text-xs sm:font-semibold sm:text-slate-600">
+          {formatStatValue(star.numericRating, 2)}
+          <span className="ml-1 text-[10px] font-normal uppercase text-slate-400">
+            Rating
           </span>
-        ))}
+        </div>
+        <div className="contents sm:mt-0.5 sm:flex sm:flex-wrap sm:justify-center sm:gap-x-2 sm:gap-y-0.5">
+          {statItems.map(({ v, l }) => (
+            <span
+              key={l}
+              className="text-[10px] text-slate-500 sm:text-slate-400"
+            >
+              {v}
+              <span className="ml-0.5 text-slate-400 sm:text-slate-300">
+                {l}
+              </span>
+            </span>
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -348,7 +350,7 @@ function StarsCard({ stars }: { stars: StarPlayer[] }) {
           No player performances available for this matchup yet.
         </div>
       ) : (
-        <ol className="grid grid-cols-1 items-start gap-2 sm:grid-cols-3">
+        <ol className="grid grid-cols-1 items-start gap-1.5 sm:grid-cols-3 sm:gap-2">
           {rankedStars.map((star) => (
             <li
               key={star.starRank}
