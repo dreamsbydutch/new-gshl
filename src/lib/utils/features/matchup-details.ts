@@ -74,17 +74,17 @@ const PLAYER_STAT_CONTEXT_COLUMNS: ReadonlyArray<
   { key: "days", label: "Days" },
   { key: "GP", label: "GP" },
   { key: "GS", label: "GS" },
-  { key: "ADD", label: "ADD" },
-  { key: "MS", label: "MS" },
-  { key: "BS", label: "BS" },
   { key: "Rating", label: "Rating" },
 ];
 
 const PLAYER_STAT_TRAILING_COLUMNS: ReadonlyArray<
   PlayerStatColumn & {
-    key: "MG" | "IR" | "IRplus";
+    key: "MS" | "BS" | "ADD" | "MG" | "IR" | "IRplus";
   }
 > = [
+  { key: "MS", label: "MS" },
+  { key: "BS", label: "BS" },
+  { key: "ADD", label: "ADD" },
   { key: "MG", label: "MG" },
   { key: "IR", label: "IR" },
   { key: "IRplus", label: "IR+" },

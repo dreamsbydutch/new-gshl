@@ -256,113 +256,61 @@ export function TeamDraftPickHistory({
             </Popover>
           </div>
         </div>
-        <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <h3 className="text-lg font-bold text-slate-950">
-                {season?.name} draft review
-              </h3>
-              <p className="mt-1 text-xs text-slate-500">
-                {season?.complete ? "Final results" : "Provisional results"}
-                {" \u00b7 "}
-                {report.selections.length} draft picks{" \u00b7 "}
-                {report.graded.length} graded
-              </p>
-            </div>
-            <div
-              className={`rounded-lg px-3 py-2 text-right ${season?.winner ? "bg-amber-100 text-amber-950" : "bg-white text-slate-800"}`}
-            >
-              <p className="text-sm font-bold">
-                {season?.winner
-                  ? "Calder winner"
-                  : season?.calderRank
-                    ? `#${season.calderRank} in Calder`
-                    : "Calder not rated"}
-              </p>
-              <p className="text-xs">
-                Calder rating {number(season?.calderRating)}
-              </p>
-            </div>
-          </div>
-          <div className="mt-4 grid gap-4 sm:grid-cols-2">
-            <div className="border-l-2 border-emerald-500 pl-3">
-              <h4 className="text-sm font-semibold text-emerald-800">
-                What went well
-              </h4>
-              <p className="mt-1 text-sm text-slate-700">
-                {report.graded.length
-                  ? `${report.hits.length} of ${report.graded.length} graded picks beat their slot expectation.`
-                  : "Player ratings are not available for this draft yet."}
-              </p>
-              {report.best && (
-                <p className="mt-2 text-xs text-slate-600">
-                  <span className="font-semibold text-slate-900">
-                    {report.best.name}
-                  </span>{" "}
-                  was the best value:{" "}
-                  <span className="font-semibold text-emerald-700">
-                    {signed(report.best.surplus)}
-                  </span>{" "}
-                  rating points above the expectation for pick #
-                  {report.best.pick}.
-                </p>
-              )}
-            </div>
-            <div className="border-l-2 border-rose-400 pl-3">
-              <h4 className="text-sm font-semibold text-rose-800">
-                What went poorly
-              </h4>
-              <p className="mt-1 text-sm text-slate-700">
-                {!report.graded.length
-                  ? "Not enough rated results to identify shortfalls."
-                  : report.misses.length
-                    ? `${report.misses.length} of ${report.graded.length} graded picks fell below their slot expectation.`
-                    : "No graded picks fell below their slot expectation."}
-              </p>
-              {report.worst && (
-                <p className="mt-2 text-xs text-slate-600">
-                  <span className="font-semibold text-slate-900">
-                    {report.worst.name}
-                  </span>{" "}
-                  had the largest shortfall:{" "}
-                  <span className="font-semibold text-rose-700">
-                    {signed(report.worst.surplus)}
-                  </span>{" "}
-                  rating points versus the expectation for pick #
-                  {report.worst.pick}.
-                </p>
-              )}
-            </div>
-          </div>
-          <dl className="mt-4 flex flex-wrap gap-x-6 gap-y-2 border-t border-slate-200 pt-3 text-xs">
-            <div>
-              <dt className="text-slate-500">Average vs. slot</dt>
-              <dd className="mt-1 font-semibold tabular-nums">
-                {signed(report.averageSurplus)} rating points
-              </dd>
-            </div>
-            <div>
-              <dt className="text-slate-500">Stayed the full season</dt>
-              <dd className="mt-1 font-semibold tabular-nums">
-                {report.fullSeasonPicks.length} / {report.selections.length}{" "}
-                picks
-              </dd>
-            </div>
-            <div>
-              <dt className="text-slate-500">Position mix</dt>
-              <dd className="mt-1 font-semibold">
-                {report.positions
-                  .map(({ position, count }) => `${count} ${position}`)
-                  .join(" / ")}
-              </dd>
-            </div>
-          </dl>
-          <p className="mt-3 text-[11px] text-slate-500">
-            Value compares regular-season player ratings with historical
-            expectations for each pick. Retention includes the playoffs;
-            incomplete history is not counted as a full season.
-          </p>
-        </div>
+        <dl
+          className="grid grid-cols-[5.5rem_minmax(0,1fr)] gap-x-3 gap-y-1.5 border-y border-slate-200 py-2 text-xs"
+          aria-label="Draft summary"
+        >
+          <dt className="text-slate-500">Best pick</dt>
+          <dd className="min-w-0">
+            {report.best ? (
+              <>
+                {report.best.name}{" "}
+                <span className="whitespace-nowrap text-emerald-700">
+                  (#{report.best.pick}, {signed(report.best.surplus)})
+                </span>
+              </>
+            ) : (
+              "-"
+            )}
+          </dd>
+          <dt className="text-slate-500">Worst pick</dt>
+          <dd className="min-w-0">
+            {report.worst ? (
+              <>
+                {report.worst.name}{" "}
+                <span className="whitespace-nowrap text-rose-700">
+                  (#{report.worst.pick}, {signed(report.worst.surplus)})
+                </span>
+              </>
+            ) : (
+              "-"
+            )}
+          </dd>
+          <dt className="text-slate-500">Above slot</dt>
+          <dd className="tabular-nums">
+            {report.graded.length
+              ? `${report.hits.length} / ${report.graded.length} picks`
+              : "-"}
+          </dd>
+          <dt className="text-slate-500">Calder</dt>
+          <dd className="tabular-nums">
+            {season?.calderRating != null ? (
+              <>
+                {season.winner
+                  ? "Winner"
+                  : season.calderRank
+                    ? `#${season.calderRank}`
+                    : "Unranked"}{" "}
+                ({number(season.calderRating)})
+              </>
+            ) : (
+              "-"
+            )}
+            {!season?.complete && (
+              <span className="ml-2 text-slate-400">Provisional</span>
+            )}
+          </dd>
+        </dl>
       </header>
 
       <div>

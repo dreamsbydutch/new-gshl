@@ -55,7 +55,7 @@ export function PlayerStatsTable({
       );
     }
 
-    if (["MG", "IR", "IRplus"].includes(columnKey)) {
+    if (columnKey === "MS" || columnKey === "MG") {
       classes.push("border-l border-slate-300");
     }
 
