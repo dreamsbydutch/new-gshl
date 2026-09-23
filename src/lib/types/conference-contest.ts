@@ -101,6 +101,8 @@ export interface ConferenceContestBrowserSeason
   leftConference: ConferenceContestConferenceInfo;
   rightConference: ConferenceContestConferenceInfo;
   ratingByConferenceId: Record<string, number>;
+  gamesPlayedByConferenceId: Record<string, number>;
+  headToHeadRecordByConferenceId: Record<string, ConferenceContestRecord>;
 }
 
 /** Exact all-time payload rendered above the season explorer. */

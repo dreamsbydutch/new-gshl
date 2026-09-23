@@ -24,10 +24,14 @@ import type {
   ConferenceContestConferenceInfo,
   ConferenceContestBrowserSeason,
   ConferenceContestRawStatRow,
+  ConferenceContestRecord,
 } from "@gshl-types";
 import { buildStandingsNavigationHref, cn } from "@gshl-utils";
 
 const cleanConferenceName = (name: string) => name.replace(" Hotel", "");
+
+const formatRecord = (record?: ConferenceContestRecord) =>
+  `${record?.wins ?? 0}-${record?.losses ?? 0}${record?.ties ? `-${record.ties}` : ""}`;
 
 const conferenceTone = (conference: ConferenceContestConferenceInfo) => {
   const value = `${conference.name} ${conference.abbr ?? ""}`.toLowerCase();
@@ -286,6 +290,16 @@ function SeasonExplorer({
   const leftId = left.id;
   const rightId = right.id;
   const rows: ConferenceContestRawStatRow[] = [
+    {
+      label: "Head-to-head games",
+      left: selectedSeason.gamesPlayedByConferenceId[leftId] ?? 0,
+      right: selectedSeason.gamesPlayedByConferenceId[rightId] ?? 0,
+    },
+    {
+      label: "Head-to-head record",
+      left: formatRecord(selectedSeason.headToHeadRecordByConferenceId[leftId]),
+      right: formatRecord(selectedSeason.headToHeadRecordByConferenceId[rightId]),
+    },
     {
       label: "Head-to-head wins",
       left: selectedSeason.headToHeadWinsByConferenceId[leftId] ?? 0,

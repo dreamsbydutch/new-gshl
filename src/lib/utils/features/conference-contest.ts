@@ -18,8 +18,11 @@ import type {
   TeamAward,
 } from "@gshl-types";
 import { AwardsList, MatchupType } from "../domain/constants";
-import { findCurrentSeason, findMostRecentSeason } from "../domain/season";
-import { safeParseDate } from "../core/date";
+import {
+  findCurrentSeason,
+  findMostRecentSeason,
+  isSeasonPickable,
+} from "../domain/season";
 import { getTeamAwardTeam } from "@gshl-lib/config/awards";
 import { isPlayoffMatchupType } from "@gshl-utils/domain/matchup";
 
@@ -62,9 +65,10 @@ const EXCLUDED_AWARDS = new Set<AwardsListType>([
 
 /**
  * Returns the seasons that can be shown by the conference comparison page.
- * The current season is preferred as the newest season; when there is no
- * current season, the most recently started season is preferred instead.
- * Future seasons are excluded from the comparison.
+ * The current season is preferred as the newest season; otherwise an active
+ * upcoming season or the most recently started season is preferred.
+ * Seasons available in the shared season selector are included, even before
+ * their first game.
  *
  * @param seasons - The seasons to filter and order.
  * @param referenceDate - The date used to determine season visibility.
@@ -76,15 +80,15 @@ export const getConferenceContestVisibleSeasons = (
 ): Season[] => {
   const currentSeason = findCurrentSeason(seasons, referenceDate);
   const defaultSeason =
-    currentSeason ?? findMostRecentSeason(seasons, referenceDate);
+    currentSeason ??
+    [...seasons]
+      .filter((season) => season.isActive && isSeasonPickable(season, referenceDate))
+      .sort((left, right) => right.year - left.year)[0] ??
+    findMostRecentSeason(seasons, referenceDate);
   const defaultSeasonId = normalizeId(defaultSeason?.id);
-  const referenceTime = referenceDate.getTime();
 
   return [...seasons]
-    .filter((season) => {
-      const startTime = safeParseDate(season.startDate)?.getTime();
-      return startTime == null || startTime <= referenceTime;
-    })
+    .filter((season) => isSeasonPickable(season, referenceDate))
     .sort((left, right) => {
       const leftIsDefault = normalizeId(left.id) === defaultSeasonId;
       const rightIsDefault = normalizeId(right.id) === defaultSeasonId;
@@ -742,6 +746,18 @@ export function projectConferenceContestBrowserView(params: {
         leftConference: season.leftConference,
         rightConference: season.rightConference,
         ratingByConferenceId: season.ratingByConferenceId,
+        headToHeadRecordByConferenceId: season.headToHeadRecordByConferenceId,
+        gamesPlayedByConferenceId: Object.fromEntries(
+          conferenceIds.map((id) => {
+            const record = season.headToHeadRecordByConferenceId[id];
+            return [
+              id,
+              (record?.wins ?? 0) +
+                (record?.losses ?? 0) +
+                (record?.ties ?? 0),
+            ];
+          }),
+        ),
         ...projectConferenceCounts(season, conferenceIds),
       };
     },

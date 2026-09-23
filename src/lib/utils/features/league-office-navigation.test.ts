@@ -21,6 +21,7 @@ void test("uses Draft Classes for empty and obsolete League Office views", () =>
     "images",
     "imageUpload",
     "tv",
+    "rules",
   ]) {
     assert.equal(resolveLeagueOfficeView(view), "draft", String(view));
   }
@@ -31,7 +32,6 @@ void test("preserves all active member views", () => {
   for (const view of [
     "draft",
     "freeAgents",
-    "rules",
     "confBattle",
     "ownerRankings",
     "performances",

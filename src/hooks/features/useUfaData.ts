@@ -179,7 +179,7 @@ export function useUfaOverview(
         contractSeasonName: orderedSeasons[signingIndex + 1]?.name ?? null,
         reason: window.isOpen
           ? null
-          : "UFA offers open after the final signing period and close when the draft starts. You can still browse available players.",
+          : "UFA offers open after the final signing period and close when the draft starts.",
       },
       freeAgents,
       topFreeAgents: freeAgents.slice(0, 15),

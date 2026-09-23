@@ -93,7 +93,7 @@ export function UfaOfferForm({
     <div
       className={cn(
         "text-left",
-        isCard ? "w-full" : "min-w-[13rem] max-w-[16rem]",
+        isCard ? "w-full" : "w-max min-w-[12rem] max-w-[16rem]",
       )}
       aria-busy={mutation.isPending || undefined}
     >
@@ -140,7 +140,12 @@ export function UfaOfferForm({
           </div>
         </div>
       ) : (
-        <div className={cn("grid gap-2", isCard && "sm:grid-cols-2")}>
+        <div
+          className={cn(
+            "gap-2",
+            isCard ? "grid sm:grid-cols-2" : "flex items-center",
+          )}
+        >
           <label htmlFor={fieldId} className="min-w-0">
             <span
               className={cn(
@@ -160,7 +165,10 @@ export function UfaOfferForm({
                 setIsReviewing(false);
                 setMessage(null);
               }}
-              className="min-h-11 w-full rounded-md border bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+              className={cn(
+                "min-h-10 rounded-md border bg-background px-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50",
+                isCard ? "w-full" : "w-24",
+              )}
             >
               {[1, 2, 3].map((term) => (
                 <option
@@ -188,8 +196,8 @@ export function UfaOfferForm({
               setIsReviewing(true);
             }}
             className={cn(
-              "min-h-11 whitespace-normal px-3 text-sm font-bold leading-tight",
-              !isCard && "mt-0",
+              "min-h-10 px-3 text-sm font-bold leading-tight",
+              isCard ? "whitespace-normal" : "whitespace-nowrap",
             )}
             aria-describedby={helperId}
             aria-label={`Review binding offer for ${player.fullName}`}

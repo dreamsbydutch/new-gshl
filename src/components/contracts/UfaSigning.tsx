@@ -534,7 +534,9 @@ export function UfaHomeCard() {
     return null;
   const previewFreeAgents = selectHomeUfaPreview(query.data.topFreeAgents);
   const showOwnerFreeAgentTable =
-    query.data.viewer.isSignedInOwner && previewFreeAgents.length > 0;
+    query.data.window.isOpen &&
+    query.data.viewer.isSignedInOwner &&
+    previewFreeAgents.length > 0;
   return (
     <section
       aria-labelledby="home-ufa-heading"
@@ -550,11 +552,15 @@ export function UfaHomeCard() {
               id="home-ufa-heading"
               className="text-lg font-black leading-tight sm:text-2xl"
             >
-              Top {HOME_UFA_PREVIEW_LIMIT} UFAs
+              {query.data.window.isOpen
+                ? `Top ${HOME_UFA_PREVIEW_LIMIT} UFAs`
+                : "UFA offers"}
             </h2>
-            <p className="mt-0.5 text-xs leading-4 text-muted-foreground sm:mt-1 sm:text-sm">
-              Salaries include the 125% premium.
-            </p>
+            {query.data.window.isOpen ? (
+              <p className="mt-0.5 text-xs leading-4 text-muted-foreground sm:mt-1 sm:text-sm">
+                Salaries include the 125% premium.
+              </p>
+            ) : null}
           </div>
           <Link
             href="/leagueoffice?view=freeAgents"
@@ -617,43 +623,49 @@ export function UfaLeagueOffice() {
     <div className="w-full min-w-0 max-w-full space-y-4 overflow-hidden sm:space-y-6">
       <div>
         <h2 className="text-2xl font-black sm:text-3xl">Free Agents</h2>
-        <p className="text-xs text-muted-foreground sm:text-sm">
-          Available UFAs with their previous NHL season statistics and fixed
-          125% salary. Linked owners see players they can afford for the
-          upcoming offseason, using cap commitments for the seasons the new
-          contract covers.
-        </p>
-        <p className="mt-1 text-xs text-muted-foreground sm:text-sm">
-          {query.data.window.contractSeasonName
-            ? `New contracts cover ${query.data.window.contractSeasonName} onward. `
-            : ""}
-          {query.data.window.signingEndDate
-            ? `Offers open after the late signing deadline on ${query.data.window.signingEndDate}. `
-            : ""}
-          Projected free agents may re-sign before that deadline. Second
-          contracts expire as UFAs; first contracts expire as RFAs.
-        </p>
+        {query.data.window.isOpen ? (
+          <>
+            <p className="text-xs text-muted-foreground sm:text-sm">
+              Available UFAs with their previous NHL season statistics and fixed
+              125% salary. Linked owners see players they can afford for the
+              upcoming offseason, using cap commitments for the seasons the new
+              contract covers.
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground sm:text-sm">
+              {query.data.window.contractSeasonName
+                ? `New contracts cover ${query.data.window.contractSeasonName} onward. `
+                : ""}
+              {query.data.window.signingEndDate
+                ? `Offers open after the late signing deadline on ${query.data.window.signingEndDate}. `
+                : ""}
+              Projected free agents may re-sign before that deadline. Second
+              contracts expire as UFAs; first contracts expire as RFAs.
+            </p>
+          </>
+        ) : null}
       </div>
-      <div
-        className="flex flex-wrap gap-1.5 sm:gap-2"
-        aria-label="Filter free agents by position"
-        role="group"
-      >
-        {["ALL", "F", "LW", "RW", "C", "D", "G"].map((value) => (
-          <button
-            key={value}
-            type="button"
-            onClick={() => {
-              setFilter(value);
-              setVisibleCount(50);
-            }}
-            aria-pressed={filter === value}
-            className={`min-h-11 min-w-11 rounded-full border px-3 py-2 text-xs font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${filter === value ? "bg-primary text-primary-foreground" : "hover:bg-muted"} sm:px-4 sm:text-sm`}
-          >
-            {value === "ALL" ? "All" : value}
-          </button>
-        ))}
-      </div>
+      {query.data.window.isOpen ? (
+        <div
+          className="flex flex-wrap gap-1.5 sm:gap-2"
+          aria-label="Filter free agents by position"
+          role="group"
+        >
+          {["ALL", "F", "LW", "RW", "C", "D", "G"].map((value) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => {
+                setFilter(value);
+                setVisibleCount(50);
+              }}
+              aria-pressed={filter === value}
+              className={`min-h-11 min-w-11 rounded-full border px-3 py-2 text-xs font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${filter === value ? "bg-primary text-primary-foreground" : "hover:bg-muted"} sm:px-4 sm:text-sm`}
+            >
+              {value === "ALL" ? "All" : value}
+            </button>
+          ))}
+        </div>
+      ) : null}
       {!query.data.window.isOpen ? (
         <p className="rounded-md bg-muted p-2 text-xs sm:p-3 sm:text-sm">
           {query.data.window.reason}
@@ -663,15 +675,17 @@ export function UfaLeagueOffice() {
         groups={query.data.offerGroups}
         canShare={canShareOwnerContent(session?.user.role)}
       />
-      {visiblePlayers.length > 0 ? (
-        <PlayerTable players={visiblePlayers} showStats />
-      ) : (
-        <p className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
-          No available free agents match the{" "}
-          {filter === "ALL" ? "current" : filter} filter.
-        </p>
-      )}
-      {visibleCount < players.length ? (
+      {query.data.window.isOpen ? (
+        visiblePlayers.length > 0 ? (
+          <PlayerTable players={visiblePlayers} showStats />
+        ) : (
+          <p className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
+            No available free agents match the{" "}
+            {filter === "ALL" ? "current" : filter} filter.
+          </p>
+        )
+      ) : null}
+      {query.data.window.isOpen && visibleCount < players.length ? (
         <div className="flex justify-center">
           <button
             type="button"

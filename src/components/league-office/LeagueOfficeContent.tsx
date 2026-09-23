@@ -7,7 +7,6 @@ import {
   DraftClassesSkeleton,
   FreeAgencySkeleton,
   OwnerRankingsSkeleton,
-  RulebookSkeleton,
 } from "@gshl-skeletons";
 import { cn, resolveLeagueOfficeView } from "@gshl-utils";
 
@@ -19,10 +18,6 @@ const ConferenceContest = dynamic(
 const OwnerRankings = dynamic(
   () => import("./OwnerRankings").then((module) => module.OwnerRankings),
   { loading: () => <OwnerRankingsSkeleton /> },
-);
-const Rulebook = dynamic(
-  () => import("./Rulebook").then((module) => module.Rulebook),
-  { loading: () => <RulebookSkeleton /> },
 );
 const DraftClasses = dynamic(
   () => import("./DraftClasses").then((module) => module.DraftClasses),
@@ -53,7 +48,6 @@ export function LeagueOfficeContent() {
         usesCompactLayout ? "py-4" : "py-8",
       )}
     >
-      {activeType === "rules" ? <Rulebook /> : null}
       {activeType === "draft" ? <DraftClasses /> : null}
       {activeType === "confBattle" ? <ConferenceContest /> : null}
       {activeType === "ownerRankings" ? <OwnerRankings /> : null}

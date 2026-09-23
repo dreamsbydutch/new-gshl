@@ -24,7 +24,6 @@ export function LeagueOfficeLayout({
       nextType === "mockDraft" ||
       nextType === "draft" ||
       nextType === "freeAgents" ||
-      nextType === "rules" ||
       nextType === "confBattle" ||
       nextType === "ownerRankings" ||
       nextType === "performances"
@@ -51,11 +50,6 @@ export function LeagueOfficeLayout({
       {
         key: "freeAgents",
         value: "UFA",
-        setter: selectView,
-      },
-      {
-        key: "rules",
-        value: "Rulebook",
         setter: selectView,
       },
       {

@@ -5,6 +5,7 @@ import {
   aggregateConferenceRatings,
   buildConferenceContestOverallFromSeasonModels,
   buildConferenceContestSeasonViewModel,
+  buildConferenceContestSeasonViewModels,
   CONFERENCE_RECENCY_RETENTION,
   getConferenceContestVisibleSeasons,
   projectConferenceContestBrowserView,
@@ -135,6 +136,36 @@ void test("excludes future seasons and puts the current season first", () => {
     visibleSeasons.map(({ id }) => id),
     ["current", "recent"],
   );
+});
+
+void test("shows an active upcoming season with zero games and a 0-0 record", () => {
+  const upcoming = season("upcoming", 2099, true);
+  const teams = [
+    team("left", "upcoming", "A", "Alpha"),
+    team("right", "upcoming", "B", "Beta"),
+  ];
+  assert.deepEqual(
+    getConferenceContestVisibleSeasons([upcoming], new Date("2098-09-22"))
+      .map(({ id }) => id),
+    ["upcoming"],
+  );
+  const models = buildConferenceContestSeasonViewModels({
+    seasons: [upcoming],
+    gshlTeams: teams,
+    matchups: [],
+  });
+  assert.equal(models.length, 1);
+  const view = projectConferenceContestBrowserView({
+    overall: buildConferenceContestOverallFromSeasonModels(models),
+    seasons: models,
+  });
+  assert.equal(view.seasons[0]?.gamesPlayedByConferenceId.A, 0);
+  assert.deepEqual(view.seasons[0]?.headToHeadRecordByConferenceId.A, {
+    wins: 0,
+    losses: 0,
+    ties: 0,
+  });
+  assert.ok(view.overall);
 });
 
 void test("uses the most recent season first when there is no current season", () => {
