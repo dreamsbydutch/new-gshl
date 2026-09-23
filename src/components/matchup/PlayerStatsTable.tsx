@@ -6,6 +6,7 @@ import type {
   PlayerStatRow,
 } from "@gshl-types";
 import {
+  abbreviatePlayerName,
   buildPlayerStatColumns,
   findNhlTeamByAbbreviation,
   formatMatchupPlayerName,
@@ -170,6 +171,7 @@ export function PlayerStatsTable({
                         key={`${player.id}-${column.key}`}
                         scope="row"
                         className={cellClassName}
+                        aria-label={formatMatchupPlayerName(player)}
                       >
                         <div className="flex min-w-0 items-center gap-1.5">
                           {renderNhlTeamCell(player)}
@@ -177,7 +179,7 @@ export function PlayerStatsTable({
                             className="truncate"
                             title={formatMatchupPlayerName(player)}
                           >
-                            {content}
+                            {abbreviatePlayerName(content)}
                           </span>
                         </div>
                       </th>

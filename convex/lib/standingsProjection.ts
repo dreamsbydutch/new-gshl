@@ -296,6 +296,7 @@ function projectGame(
   return {
     id: String(matchup._id),
     isComplete: Boolean(matchup.isComplete),
+    venueLabel: isHome ? "v" : "@",
     opponentLogoUrl: opponent?.logoUrl ?? null,
     opponentName: opponent?.name ?? "Opponent",
     resultLabel,

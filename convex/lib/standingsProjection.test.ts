@@ -267,6 +267,7 @@ test("standings detail projects the complete expanded-card DTO", () => {
     {
       id: "previous",
       isComplete: true,
+      venueLabel: "v",
       opponentLogoUrl: "bears.png",
       opponentName: "Bears",
       resultLabel: "W 6-4",
@@ -278,6 +279,7 @@ test("standings detail projects the complete expanded-card DTO", () => {
     {
       id: "upcoming",
       isComplete: false,
+      venueLabel: "@",
       opponentLogoUrl: null,
       opponentName: "Comets",
       resultLabel: "@",

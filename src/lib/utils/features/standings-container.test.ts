@@ -92,6 +92,15 @@ void test("buildStandingsTeamGames returns the two latest finals and two next ga
   const result = buildStandingsTeamGames("team-a", matchups, weeks, teams);
 
   assert.deepEqual(
+    result.previousGames.map((game) => game.venueLabel),
+    ["v", "@"],
+  );
+  assert.deepEqual(
+    result.upcomingGames.map((game) => game.venueLabel),
+    ["@", "v"],
+  );
+
+  assert.deepEqual(
     result.previousGames.map((game) => [
       game.weekLabel,
       game.opponentName,

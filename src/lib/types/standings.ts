@@ -36,6 +36,7 @@ export interface StandingsCategoryRank {
 export interface StandingsTeamGameContext {
   id: string;
   isComplete: boolean;
+  venueLabel: "v" | "@";
   opponentLogoUrl: string | null;
   opponentName: string;
   resultLabel: string;

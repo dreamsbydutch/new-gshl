@@ -657,6 +657,7 @@ function formatMatchupContext(
   return {
     id: matchup.id,
     isComplete: matchup.isComplete,
+    venueLabel: isHome ? "v" : "@",
     opponentLogoUrl: opponent?.logoUrl ?? null,
     opponentName: opponent?.name ?? opponent?.abbr ?? "Opponent",
     resultLabel,
