@@ -116,8 +116,7 @@ export function PowerRankingsSkeleton() {
 function BracketMatchupSkeleton() {
   return (
     <div className="min-h-[92px] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-      <div className="flex items-center justify-between border-b bg-slate-50 px-2.5 py-1.5">
-        <Skeleton className="h-2.5 w-20" />
+      <div className="flex items-center justify-end border-b bg-slate-50 px-2.5 py-1">
         <Skeleton className="h-2.5 w-12" />
       </div>
       {Array.from({ length: 2 }).map((_, index) => (

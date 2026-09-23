@@ -116,11 +116,13 @@ function MatchupCard({
   connectsLeft,
   connectsRight,
   rowSpanClass,
+  conferenceLogoPlacement,
 }: {
   matchup: BracketMatchup;
   connectsLeft: boolean;
   connectsRight: boolean;
   rowSpanClass: string;
+  conferenceLogoPlacement?: "above" | "below";
 }) {
   const statusLabel =
     matchup.source === "played"
@@ -143,6 +145,20 @@ function MatchupCard({
           "after:absolute after:-right-2.5 after:top-1/2 after:h-px after:w-2.5 after:bg-slate-300 after:content-[''] lg:after:-right-5 lg:after:w-5",
       )}
     >
+      {conferenceLogoPlacement && matchup.logoUrl ? (
+        <Image
+          src={matchup.logoUrl}
+          alt={matchup.title}
+          width={72}
+          height={72}
+          className={cn(
+            "absolute left-1/2 h-[72px] w-[72px] -translate-x-1/2 object-contain",
+            conferenceLogoPlacement === "above"
+              ? "bottom-full mb-3"
+              : "top-full mt-3",
+          )}
+        />
+      ) : null}
       {matchup.source !== "projected" ? (
         <Link
           href={`/matchup/${encodeURIComponent(matchup.id)}`}
@@ -151,19 +167,8 @@ function MatchupCard({
         />
       ) : null}
       <div className="overflow-hidden rounded-xl">
-        <div className="flex min-h-10 flex-wrap items-center justify-between gap-1 border-b border-slate-200 bg-slate-50 px-2.5 py-1.5">
-          <h3 className="flex min-w-0 items-center gap-1.5 text-[9px] font-bold uppercase tracking-wide text-slate-600 lg:text-[11px]">
-            {matchup.logoUrl ? (
-              <Image
-                src={matchup.logoUrl}
-                alt=""
-                width={14}
-                height={14}
-                className="h-3.5 w-3.5 shrink-0 object-contain"
-              />
-            ) : null}
-            <span className="break-words lg:truncate">{matchup.title}</span>
-          </h3>
+        <div className="flex items-center justify-end border-b border-slate-200 bg-slate-50 px-2.5 py-1">
+          <h3 className="sr-only">{matchup.title}</h3>
           <span
             className={cn(
               "shrink-0 text-[9px] font-semibold uppercase tracking-wide lg:text-[11px]",
@@ -265,13 +270,20 @@ function BracketColumn({
             ) : null;
           },
         )}
-        {column.matchups.map((matchup) => (
+        {column.matchups.map((matchup, matchupIndex) => (
           <MatchupCard
             key={matchup.id}
             matchup={matchup}
             connectsLeft={index > 0}
             connectsRight={index < columnCount - 1}
             rowSpanClass={rowSpanClass}
+            conferenceLogoPlacement={
+              column.id === "conference-championships"
+                ? matchupIndex === 0
+                  ? "above"
+                  : "below"
+                : undefined
+            }
           />
         ))}
       </div>
