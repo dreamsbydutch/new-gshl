@@ -692,7 +692,7 @@ export const rulebookSections: RulebookSection[] = [
             "All player awards are based on GSHL season statistics, GSHL rankings, and league-specific performance—not NHL season awards or NHL standings.",
           ),
           bullets([
-            "Player MVP — Best Overall Player",
+            "MVP — Best Overall Player",
             "Best Dman — Best Defenseman",
             "Best G — Best Goaltender",
             "Most Pts — Most Points",

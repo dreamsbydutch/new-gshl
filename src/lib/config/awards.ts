@@ -19,8 +19,7 @@ export const AWARD_CATALOG: AwardCatalogEntry[] = [
     key: AwardsList.GSHL_CUP,
     group: "TEAM TROPHIES",
     fullName: "GSHL Cup",
-    imageUrl:
-      "https://qzcw4d2n1l.ufs.sh/f/wTZjIHOpQwiMqmHsLqnu8zTgQJHtWPjswfb4x51ZVaUmCycA",
+    imageUrl: "/awards/gshl-cup-transparent.png",
     summaryLabel: "GSHL Cup",
     sortOrder: 1,
   },
@@ -163,7 +162,7 @@ export const ALL_STAR_MEDAL_EMOJIS = new Map<AwardsListType, string>([
 ]);
 
 export const PLAYER_TROPHY_LABELS = new Map<AwardsListType, string>([
-  [AwardsList.CROSBY, "Player MVP"],
+  [AwardsList.CROSBY, "MVP"],
   [AwardsList.LIDSTROM, "Best Dman"],
   [AwardsList.BRODEUR, "Best G"],
   [AwardsList.GRETZKY, "Most Pts"],

@@ -52,8 +52,8 @@ const PLAYER_TROPHY_TABLE_COLUMNS = [
   {
     award: AwardsList.CROSBY,
     iconAward: AwardsList.HART,
-    label: "Player MVP",
-    title: "Player MVP",
+    label: "MVP",
+    title: "MVP",
   },
   {
     award: AwardsList.LIDSTROM,

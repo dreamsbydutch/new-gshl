@@ -295,7 +295,7 @@ records. Seasons without rated Calder rankings are reported and preserved.
 #### `awards:backfill`
 
 Rebuilds split award data directly from production Convex season standings,
-player and team rating outputs, and playoff final results. Player MVP, Best
+player and team rating outputs, and playoff final results. MVP, Best
 Dman, Best G, Most Pts, Most G, Playoff MVP, and regular-season All-Star selections
 are upserted into `playerAwards` using `playerId`; league, playoff, and
 management awards are upserted into `teamAwards` using the season-specific
