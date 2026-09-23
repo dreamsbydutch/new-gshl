@@ -17,7 +17,7 @@ export function useMatchupContextNavigation(
   fallbackWeekId: string,
 ) {
   const { pathname } = useAppPathname();
-  const { router } = useAppRouter();
+  const { replaceInPlace } = useAppRouter();
   const { search } = useAppSearchParams();
   const selectedSide = resolveMatchupNavigationSide(search);
   const backHref = resolveMatchupBackHref(search, {
@@ -41,9 +41,9 @@ export function useMatchupContextNavigation(
         from: query.from,
         side,
       });
-      router.replace(href, { scroll: false });
+      replaceInPlace(href);
     },
-    [pathname, router, search],
+    [pathname, replaceInPlace, search],
   );
 
   return {

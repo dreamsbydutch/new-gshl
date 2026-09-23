@@ -1,6 +1,7 @@
 "use client";
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useCallback } from "react";
 
 /**
  * Returns the current Next.js pathname for app-router aware hooks/components.
@@ -13,7 +14,13 @@ export function useAppPathname() {
  * Returns the Next.js app router instance for imperative navigation.
  */
 export function useAppRouter() {
-  return { router: useRouter() };
+  const router = useRouter();
+  // Next synchronizes native history updates with useSearchParams without a
+  // route transition. Use this for query-only, in-page selections.
+  const replaceInPlace = useCallback((href: string) => {
+    window.history.replaceState(null, "", href);
+  }, []);
+  return { router, replaceInPlace };
 }
 
 /**

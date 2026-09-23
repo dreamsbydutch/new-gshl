@@ -35,84 +35,17 @@ import { buildMatchupWhatsAppShareMessage } from "@gshl-utils/features/whatsapp-
 import { PlayerStatsTable } from "./PlayerStatsTable";
 import { ArrowLeftIcon, StarIcon } from "lucide-react";
 
-function MatchupSummaryTeam({
-  team,
-  score,
-  alignment,
-}: {
-  team: MatchupDetailsTeam | null;
-  score: number;
-  alignment: "left" | "right";
-}) {
-  const fallbackLabel = alignment === "right" ? "Away" : "Home";
-  const logo = team?.logoUrl ? (
-    <Image
-      src={team.logoUrl}
-      alt={team.name ?? "Team Logo"}
-      width={44}
-      height={44}
-      className="h-7 w-7 shrink-0 object-contain sm:h-11 sm:w-11"
-    />
-  ) : (
-    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-200 text-[10px] font-semibold text-slate-600 sm:h-11 sm:w-11 sm:text-sm">
-      {team?.abbr?.slice(0, 3) ?? "?"}
-    </div>
-  );
-  const teamName = (
-    <div className="min-w-0">
-      <div className="truncate text-xs font-semibold leading-tight text-slate-900 sm:text-lg">
-        <span className="sm:hidden">
-          {team?.abbr ?? team?.name ?? fallbackLabel}
-        </span>
-        <span className="hidden sm:inline">{team?.name ?? "Unknown Team"}</span>
-      </div>
-      <div className="hidden text-xs uppercase tracking-[0.18em] text-slate-500 sm:block">
-        {team?.ownerNickname ?? team?.confAbbr ?? "Team"}
-      </div>
-    </div>
-  );
-  const teamScore = (
-    <div className="min-w-7 font-oswald text-2xl leading-none text-slate-900 sm:min-w-12 sm:text-4xl">
-      {score}
-    </div>
-  );
-
-  return (
-    <div
-      className={`grid min-w-0 items-center gap-1.5 sm:flex sm:gap-3 ${
-        alignment === "right"
-          ? "grid-cols-[minmax(0,1fr)_auto] text-right sm:justify-end"
-          : "grid-cols-[auto_minmax(0,1fr)] text-left"
-      }`}
-    >
-      {alignment === "right" ? (
-        <>
-          {teamName}
-          <div className="flex items-center gap-1.5 sm:contents">
-            {logo}
-            {teamScore}
-          </div>
-        </>
-      ) : (
-        <>
-          <div className="flex items-center gap-1.5 sm:contents">
-            {teamScore}
-            {logo}
-          </div>
-          {teamName}
-        </>
-      )}
-    </div>
-  );
-}
-
 function CategoryResultsCard({
   title,
+  scores,
+  status,
   categories,
   homeTeam,
   awayTeam,
 }: {
   title: string;
+  scores: { away: number; home: number };
+  status: string;
   categories: CategoryResult[];
   homeTeam: MatchupDetailsTeam | null;
   awayTeam: MatchupDetailsTeam | null;
@@ -135,106 +68,119 @@ function CategoryResultsCard({
 
   return (
     <section className="rounded-lg border border-slate-200 bg-white p-2.5 shadow-sm sm:rounded-2xl sm:p-4">
-      <div className="mb-2 sm:mb-4">
-        <h2 className="font-oswald text-xl text-slate-900 sm:text-2xl">
-          {title}
-        </h2>
-      </div>
-      {categories.length === 0 ? (
-        <div className="rounded-xl bg-slate-50 px-4 py-6 text-sm text-slate-500">
-          No category data available yet.
-        </div>
-      ) : (
-        <div className="overflow-hidden rounded-lg border border-slate-200">
-          <table className="w-full table-fixed border-collapse text-xs sm:text-sm">
-            <caption className="sr-only">
-              {awayLabel} (away) and {homeLabel} (home) matchup category
-              comparison
-            </caption>
-            <colgroup>
-              <col className="w-2/5" />
-              <col className="w-1/5" />
-              <col className="w-2/5" />
-            </colgroup>
-            <thead className="bg-slate-50">
-              <tr className="border-b border-slate-200">
-                {(["away", "category", "home"] as const).map((side) => {
-                  if (side === "category") {
-                    return (
-                      <th key={side} scope="col">
-                        <span className="sr-only">Category</span>
-                      </th>
-                    );
-                  }
-                  const team = side === "away" ? awayTeam : homeTeam;
-                  const label = side === "away" ? awayLabel : homeLabel;
+      <h2 className="sr-only">{title}</h2>
+      <div className="overflow-hidden rounded-lg border border-slate-200">
+        <table className="w-full table-fixed border-collapse text-xs sm:text-sm">
+          <caption className="sr-only">
+            {awayLabel} (away) and {homeLabel} (home) matchup category
+            comparison
+          </caption>
+          <colgroup>
+            <col className="w-2/5" />
+            <col className="w-1/5" />
+            <col className="w-2/5" />
+          </colgroup>
+          <thead className="bg-slate-50">
+            <tr>
+              {(["away", "category", "home"] as const).map((side) => {
+                if (side === "category") {
                   return (
-                    <th
-                      key={side}
-                      scope="col"
-                      className="px-2 py-2 text-center"
-                    >
-                      <div className="flex min-w-0 items-center justify-center gap-1.5">
-                        {team?.logoUrl ? (
-                          <Image
-                            src={team.logoUrl}
-                            alt=""
-                            width={28}
-                            height={28}
-                            className="h-6 w-6 shrink-0 object-contain sm:h-7 sm:w-7"
-                          />
-                        ) : null}
-                        <span
-                          className="truncate font-semibold text-slate-700"
-                          title={team?.name ?? label}
-                        >
-                          {label}
-                        </span>
-                      </div>
-                      <div className="mt-0.5 text-[10px] font-normal uppercase tracking-wider text-slate-500">
-                        {side}
-                      </div>
+                    <th key={side} scope="col">
+                      <span
+                        aria-hidden="true"
+                        className="font-oswald text-lg font-normal text-slate-800 sm:text-2xl"
+                      >
+                        vs
+                      </span>
+                      <span className="sr-only">Category</span>
                     </th>
                   );
-                })}
-              </tr>
-            </thead>
-            <tbody>
-              {categories.map((category) => (
-                <tr
-                  key={category.key}
-                  className="border-b border-slate-100 last:border-0 odd:bg-white even:bg-slate-50/50"
-                >
-                  <td
-                    className={`px-2 py-1.5 text-center tabular-nums ${valueClassFor(category, "away")}`}
-                  >
-                    {category.awayValue}
-                    <span className="sr-only">
-                      , {outcomeFor(category, "away")}
-                    </span>
-                  </td>
-                  <th
-                    scope="row"
-                    className="px-1 py-1.5 text-center text-[10px] font-semibold text-slate-600 sm:text-xs"
-                  >
-                    <span className="inline-block rounded bg-slate-100 px-2 py-1">
-                      {category.label}
-                    </span>
+                }
+                const team = side === "away" ? awayTeam : homeTeam;
+                const label = side === "away" ? awayLabel : homeLabel;
+                return (
+                  <th key={side} scope="col" className="px-2 py-2 text-center">
+                    <div className="flex min-w-0 items-center justify-center gap-1.5">
+                      {team?.logoUrl ? (
+                        <Image
+                          src={team.logoUrl}
+                          alt=""
+                          width={28}
+                          height={28}
+                          className="h-6 w-6 shrink-0 object-contain sm:h-7 sm:w-7"
+                        />
+                      ) : null}
+                      <span
+                        className="truncate font-semibold text-slate-700"
+                        title={team?.name ?? label}
+                      >
+                        {label}
+                      </span>
+                    </div>
+                    <div className="mt-1 font-oswald text-2xl font-normal leading-none text-slate-900 sm:text-3xl">
+                      {scores[side]}
+                    </div>
+                    <div className="mt-0.5 text-[10px] font-normal uppercase tracking-wider text-slate-500">
+                      {side}
+                    </div>
                   </th>
-                  <td
-                    className={`px-2 py-1.5 text-center tabular-nums ${valueClassFor(category, "home")}`}
-                  >
-                    {category.homeValue}
-                    <span className="sr-only">
-                      , {outcomeFor(category, "home")}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+                );
+              })}
+            </tr>
+            <tr className="border-b border-slate-200">
+              <td
+                colSpan={3}
+                className="px-2 pb-2 text-center text-xs font-normal text-slate-600"
+              >
+                {status}
+              </td>
+            </tr>
+          </thead>
+          <tbody>
+            {categories.length === 0 ? (
+              <tr>
+                <td
+                  colSpan={3}
+                  className="px-4 py-6 text-center text-sm text-slate-500"
+                >
+                  No category data available yet.
+                </td>
+              </tr>
+            ) : null}
+            {categories.map((category) => (
+              <tr
+                key={category.key}
+                className="border-b border-slate-100 last:border-0 odd:bg-white even:bg-slate-50/50"
+              >
+                <td
+                  className={`px-2 py-1.5 text-center tabular-nums ${valueClassFor(category, "away")}`}
+                >
+                  {category.awayValue}
+                  <span className="sr-only">
+                    , {outcomeFor(category, "away")}
+                  </span>
+                </td>
+                <th
+                  scope="row"
+                  className="px-1 py-1.5 text-center text-[10px] font-semibold text-slate-600 sm:text-xs"
+                >
+                  <span className="inline-block rounded bg-slate-100 px-2 py-1">
+                    {category.label}
+                  </span>
+                </th>
+                <td
+                  className={`px-2 py-1.5 text-center tabular-nums ${valueClassFor(category, "home")}`}
+                >
+                  {category.homeValue}
+                  <span className="sr-only">
+                    , {outcomeFor(category, "home")}
+                  </span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </section>
   );
 }
@@ -575,35 +521,11 @@ export function MatchupDetailsContent({
       </div>
 
       <section className="rounded-lg border border-slate-200 p-2 sm:p-4">
-        <div className="mb-2 border-b border-slate-200 pb-2 sm:mb-5 sm:pb-5">
-          <div className="grid grid-cols-[minmax(0,1fr)_2.5rem_minmax(0,1fr)] items-center gap-1.5 sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] sm:gap-4">
-            <MatchupSummaryTeam
-              team={awayTeam}
-              score={matchupScore.away}
-              alignment="right"
-            />
-            <div className="text-center">
-              <div className="font-oswald text-lg text-slate-800 sm:text-3xl">
-                vs
-              </div>
-              <div className="mt-1 hidden max-w-24 text-[11px] leading-tight text-slate-500 sm:block sm:max-w-none sm:text-sm">
-                {matchupStatus}
-              </div>
-            </div>
-            <MatchupSummaryTeam
-              team={homeTeam}
-              score={matchupScore.home}
-              alignment="left"
-            />
-          </div>
-          <p className="mt-2 text-center text-xs leading-tight text-slate-600 sm:hidden">
-            {matchupStatus}
-          </p>
-        </div>
-
         <div className="space-y-2 sm:space-y-4">
           <CategoryResultsCard
             title="Matchup Breakdown"
+            scores={matchupScore}
+            status={matchupStatus}
             categories={categoryResults}
             homeTeam={homeTeam}
             awayTeam={awayTeam}
@@ -651,7 +573,7 @@ export function MatchupDetailsContent({
                     matchupNavigation.selectSide(nextSide);
                     document
                       .getElementById(`matchup-${nextSide}-players-tab`)
-                      ?.focus();
+                      ?.focus({ preventScroll: true });
                   }}
                   className={[
                     "relative flex min-h-12 min-w-0 items-center justify-center gap-1.5 px-2 py-2 text-left transition-all sm:min-h-24 sm:gap-4 sm:px-4 sm:py-5",
