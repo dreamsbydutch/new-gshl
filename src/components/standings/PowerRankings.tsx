@@ -113,27 +113,16 @@ export function PowerRankings({ season, rankings }: PowerRankingsProps) {
 
   return (
     <div className="mx-auto w-full max-w-6xl space-y-3 px-2.5 py-3 sm:px-6 sm:py-4">
-      <header className="border-b border-slate-300 pb-2">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h2 className="font-oswald text-2xl text-slate-950 sm:text-3xl">
-              {season.name} power rankings
-            </h2>
-            <p className="mt-1 text-xs text-slate-500">
-              {snapshotLabel} order {latestWeekLabel}. Movement compares the two
-              most recent ranked weeks.
-            </p>
-          </div>
-          {canShareCommissionerContent(session?.user.role) ? (
-            <WhatsAppShareButton
-              message={shareMessage}
-              path={sharePath}
-              label="Share rankings"
-              disabled={rankings.entries.length === 0}
-            />
-          ) : null}
+      {canShareCommissionerContent(session?.user.role) ? (
+        <div className="flex justify-end">
+          <WhatsAppShareButton
+            message={shareMessage}
+            path={sharePath}
+            label="Share rankings"
+            disabled={rankings.entries.length === 0}
+          />
         </div>
-      </header>
+      ) : null}
 
       {!rankings.entries.length ? (
         <section className="border-y border-dashed border-slate-300 py-6 text-center">

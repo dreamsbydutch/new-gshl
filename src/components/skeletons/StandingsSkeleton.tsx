@@ -58,10 +58,6 @@ export function PowerRankingsSkeleton() {
       aria-label="Loading power rankings"
       aria-busy="true"
     >
-      <div className="border-b border-slate-300 pb-2">
-        <Skeleton className="h-7 w-64 max-w-[80%]" />
-        <Skeleton className="mt-2 h-3 w-72 max-w-full" />
-      </div>
       <section className="overflow-hidden rounded-lg border border-slate-200 bg-white">
         <div className="grid grid-cols-[minmax(11rem,1fr)_4rem_4rem] items-center gap-2 bg-slate-50 px-2.5 py-2">
           <Skeleton className="h-3 w-10" />
