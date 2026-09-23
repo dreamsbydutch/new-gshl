@@ -126,8 +126,8 @@ function BracketMatchupSkeleton() {
           className="flex items-center gap-2 border-t border-slate-100 px-2.5 py-1.5 first:border-0"
         >
           <Skeleton className="h-2.5 w-8" />
-          <Skeleton className="h-6 w-6 rounded-md" />
-          <Skeleton className="h-3 flex-1" />
+          <Skeleton className="h-10 w-10 rounded-md" />
+          <Skeleton className="hidden h-3 flex-1 lg:block" />
           <Skeleton className="h-4 w-5" />
         </div>
       ))}
@@ -137,21 +137,21 @@ function BracketMatchupSkeleton() {
 
 function BracketColumnSkeleton({ cards }: { cards: number }) {
   return (
-    <section className="min-w-0 lg:min-w-[280px]">
-      <div className="flex min-h-14 items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
+    <section className="min-w-0">
+      <div className="flex h-24 flex-col items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 lg:h-14 lg:flex-row lg:justify-start">
         <Skeleton className="h-10 w-10 rounded-lg" />
-        <div className="flex-1 space-y-1.5">
-          <Skeleton className="h-4 w-28" />
+        <div className="min-w-0 max-w-full space-y-1.5 lg:flex-1">
+          <Skeleton className="h-4 w-28 max-w-full" />
           <Skeleton className="h-3 w-36 max-w-full" />
         </div>
       </div>
       <div
-        className={`mt-3 grid gap-3 lg:h-[28rem] lg:gap-4 ${
+        className={`mt-3 grid h-[42rem] gap-4 ${
           cards === 1
-            ? "lg:content-center"
+            ? "content-center"
             : cards === 2
-              ? "lg:content-around"
-              : "lg:grid-rows-4"
+              ? "content-around"
+              : "grid-rows-4"
         }`}
       >
         {Array.from({ length: cards }).map((_, index) => (
@@ -169,8 +169,8 @@ export function PlayoffBracketSkeleton() {
         <div className="border-b border-slate-200 pb-4">
           <Skeleton className="h-4 w-48" />
         </div>
-        <div className="mt-5 rounded-2xl border border-slate-200 bg-gradient-to-b from-slate-50 to-white p-2.5 shadow-sm sm:p-5">
-          <div className="grid gap-5 lg:grid-cols-3">
+        <div className="mt-5 overflow-x-auto rounded-2xl border border-slate-200 bg-gradient-to-b from-slate-50 to-white p-2.5 shadow-sm sm:p-5">
+          <div className="grid auto-cols-[minmax(148px,1fr)] grid-flow-col gap-5 lg:auto-cols-[minmax(280px,1fr)] lg:gap-10">
             <BracketColumnSkeleton cards={4} />
             <BracketColumnSkeleton cards={2} />
             <BracketColumnSkeleton cards={1} />
