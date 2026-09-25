@@ -277,6 +277,48 @@ export function hasContractContinuity(
   );
 }
 
+/** A second contract expiring in this season sends the player to the draft. */
+export function isDraftBoundAfterSecondContract<
+  TContract extends {
+    playerId: string;
+    expiryStatus: string;
+    expiryDate?: Date | string | number | null;
+    capHitEndDate?: Date | string | number | null;
+  },
+  TSeason extends {
+    startDate?: Date | string | number | null;
+    endDate?: Date | string | number | null;
+  },
+>(playerId: string, signingSeason: TSeason, contracts: readonly TContract[]): boolean {
+  const dateKey = (value: Date | string | number | null | undefined) => {
+    if (typeof value === "number") {
+      const date = new Date(value);
+      return Number.isNaN(date.getTime()) ? null : date.toISOString().slice(0, 10);
+    }
+    return normalizeDateOnlyValue(value);
+  };
+  const seasonStart = dateKey(signingSeason.startDate);
+  const seasonEnd = dateKey(signingSeason.endDate);
+  if (!seasonEnd) return false;
+
+  return contracts.some((contract) => {
+    if (
+      String(contract.playerId) !== playerId ||
+      contract.expiryStatus !== ContractStatus.UFA
+    ) {
+      return false;
+    }
+    const expiryDate = dateKey(
+      contract.expiryDate ?? contract.capHitEndDate,
+    );
+    return Boolean(
+      expiryDate &&
+        expiryDate <= seasonEnd &&
+        (!seasonStart || expiryDate >= seasonStart),
+    );
+  });
+}
+
 /**
  * Returns whether a player is genuinely unsigned for the season being signed.
  *

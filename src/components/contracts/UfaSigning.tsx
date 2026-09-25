@@ -10,6 +10,7 @@ import { FreeAgencySkeleton, UfaHomeCardSkeleton } from "@gshl-skeletons";
 import { TableViewport } from "@gshl-ui";
 import {
   formatMoney,
+  formatUfaSigningDate,
   formatUfaStat,
   HOME_UFA_PREVIEW_LIMIT,
   selectHomeUfaPreview,
@@ -82,7 +83,7 @@ function PlayerRows({
           >
             <th
               scope="row"
-              className={`sticky left-0 z-20 border-r bg-inherit text-left text-[10px] font-semibold group-hover:bg-muted sm:static sm:z-auto sm:w-auto sm:min-w-[10rem] sm:max-w-none sm:border-0 sm:px-2 sm:py-3 sm:text-sm ${showStats ? "w-28 min-w-28 max-w-28 px-1.5 py-1" : "w-24 min-w-24 max-w-24 px-1 py-0.5"}`}
+              className={`sticky left-0 z-20 border-r bg-background text-left text-[10px] font-semibold group-hover:bg-muted sm:static sm:z-auto sm:w-auto sm:min-w-[10rem] sm:max-w-none sm:border-0 sm:px-2 sm:py-3 sm:text-sm ${showStats ? "w-28 min-w-28 max-w-28 px-1.5 py-1" : "w-24 min-w-24 max-w-24 px-1 py-0.5"}`}
             >
               <div className="flex min-w-0 items-center gap-1.5">
                 <NHLLogo
@@ -100,11 +101,6 @@ function PlayerRows({
                 <div className="min-w-0">
                   <p className="truncate" title={player.fullName}>
                     {player.fullName}
-                  </p>
-                  <p className="text-[9px] font-normal text-muted-foreground sm:text-xs">
-                    {player.nextContractExpiryStatus === "UFA"
-                      ? "2nd contract · expires UFA"
-                      : "1st contract · expires RFA"}
                   </p>
                 </div>
               </div>
@@ -165,6 +161,9 @@ function PlayerRows({
                 <UfaOfferForm player={player} />
               </td>
             ) : null}
+            <td className={`whitespace-nowrap font-semibold sm:px-2 sm:py-3 ${mobileCellPadding}`}>
+              {player.nextContractExpiryStatus}
+            </td>
           </tr>
         );
       })}
@@ -216,7 +215,7 @@ function PlayerTable({
           {showOffers ? "Available" : "Potential upcoming"} unrestricted
           free-agent {hasGoalies ? "goalies" : "skaters"}, salaries,
           previous-season statistics
-          {showOffers ? ", and binding-offer action" : ""}
+          {showOffers ? ", binding-offer action" : ""}, and signing expiry
         </caption>
         <thead className="bg-muted/70 text-[8px] uppercase tracking-wide sm:text-xs">
           <tr className="border-b border-border/70">
@@ -257,6 +256,12 @@ function PlayerTable({
                 Offer
               </th>
             ) : null}
+            <th
+              scope="col"
+              className={`whitespace-nowrap sm:px-2 sm:py-3 ${mobileCellPadding}`}
+            >
+              Signing Expiry
+            </th>
           </tr>
         </thead>
         <PlayerRows players={players} showStats={showStats} showOffers={showOffers} />
@@ -635,22 +640,12 @@ export function UfaLeagueOffice() {
     <div className="w-full min-w-0 max-w-full space-y-4 overflow-hidden sm:space-y-6">
       <div>
         <h2 className="text-2xl font-black sm:text-3xl">Free Agents</h2>
-        <p className="text-xs text-muted-foreground sm:text-sm">
-          Potential upcoming UFAs with previous NHL season statistics and
-          projected salaries at the 125% UFA rate. All candidates remain visible
-          for cap planning, including players who do not fit your current cap
-          space.
-        </p>
-        <p className="mt-1 text-xs text-muted-foreground sm:text-sm">
-          {query.data.window.contractSeasonName
-            ? `New contracts cover ${query.data.window.contractSeasonName} onward. `
-            : ""}
-          {query.data.window.signingEndDate
-            ? `Offers open after the late signing deadline on ${query.data.window.signingEndDate}. `
-            : ""}
-          Projected free agents may re-sign before that deadline. Second
-          contracts expire as UFAs; first contracts expire as RFAs.
-        </p>
+        {query.data.window.signingEndDate ? (
+          <p className="text-xs text-muted-foreground sm:text-sm">
+            UFA offers open after the late signing deadline on{" "}
+            {formatUfaSigningDate(query.data.window.signingEndDate)}.
+          </p>
+        ) : null}
       </div>
       <div
         className="flex flex-wrap gap-1.5 sm:gap-2"
@@ -672,11 +667,6 @@ export function UfaLeagueOffice() {
           </button>
         ))}
       </div>
-      {!query.data.window.isOpen ? (
-        <p className="rounded-md bg-muted p-2 text-xs sm:p-3 sm:text-sm">
-          {query.data.window.reason}
-        </p>
-      ) : null}
       <ActiveOffers
         groups={query.data.offerGroups}
         canShare={canShareOwnerContent(session?.user.role)}

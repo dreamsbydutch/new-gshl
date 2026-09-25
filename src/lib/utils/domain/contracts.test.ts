@@ -14,6 +14,7 @@ import {
   getEffectiveSigningStatus,
   getContractCoveredSeasonIds,
   hasContractContinuity,
+  isDraftBoundAfterSecondContract,
   isUnsignedForSigningSeason,
   isUfaFreeAgencyOpen,
   shouldShowExpiredFreeAgentContract,
@@ -240,6 +241,32 @@ void test("coverage includes trades but excludes non-playing outcomes", () => {
       false,
     );
   }
+});
+
+void test("draft-bound UFA expiry is recognized from stored timestamps", () => {
+  const season = {
+    startDate: Date.parse("2026-10-01T00:00:00.000Z"),
+    endDate: Date.parse("2027-04-20T00:00:00.000Z"),
+  };
+  const draftBound = {
+    playerId: "draft-bound",
+    expiryStatus: "UFA",
+    expiryDate: season.endDate,
+  };
+  assert.equal(
+    isDraftBoundAfterSecondContract("draft-bound", season, [draftBound]),
+    true,
+  );
+  assert.equal(
+    isDraftBoundAfterSecondContract("other", season, [draftBound]),
+    false,
+  );
+  assert.equal(
+    isDraftBoundAfterSecondContract("draft-bound", season, [
+      { ...draftBound, expiryDate: Date.parse("2025-04-20T00:00:00.000Z") },
+    ]),
+    false,
+  );
 });
 
 void test("UFA free agency opens after the signing deadline", () => {

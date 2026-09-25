@@ -7,6 +7,7 @@ import {
   calculateUfaFitScore,
   calculateUfaProbabilities,
   calculateUfaSalary,
+  formatUfaSigningDate,
   formatUfaStat,
   getAffordableUfaTerms,
   getUfaWindow,
@@ -60,6 +61,7 @@ const committedContract: Contract = {
 void test("UFA salary applies and rounds the 125 percent premium", () => {
   assert.equal(calculateUfaSalary(1_000_001), 1_250_001);
   assert.equal(calculateUfaSalary(null), 0);
+  assert.equal(formatUfaSigningDate("2027-06-26"), "June 26, 2027");
 });
 
 void test("in-season UFA preview releases expiring cap and labels consecutive contracts", () => {
@@ -109,6 +111,60 @@ void test("in-season UFA preview releases expiring cap and labels consecutive co
     offers: [],
   });
   assert.deepEqual(currentWindowTerms, []);
+});
+
+void test("excludes players whose second contract sends them to the draft", () => {
+  const signingSeason = capSeasons[1]!;
+  const players = ["draft-bound", "first-contract", "historical-ufa"].map(
+    (id) => ({
+      id,
+      fullName: id,
+      isActive: true,
+      overallRk: 10,
+      overallRating: 80,
+      salary: 5_000_000,
+    }),
+  );
+  const contracts = [
+    {
+      ...committedContract,
+      playerId: "draft-bound",
+      contractLength: 1,
+      expiryStatus: ContractStatus.UFA,
+      expiryDate: signingSeason.endDate,
+      capHitEndDate: signingSeason.endDate,
+    },
+    {
+      ...committedContract,
+      playerId: "first-contract",
+      contractLength: 1,
+      expiryStatus: ContractStatus.RFA,
+      expiryDate: signingSeason.endDate,
+      capHitEndDate: signingSeason.endDate,
+    },
+    {
+      ...committedContract,
+      playerId: "historical-ufa",
+      seasonId: "season-2026",
+      contractLength: 1,
+      expiryStatus: ContractStatus.UFA,
+      expiryDate: capSeasons[0]!.endDate,
+      capHitEndDate: capSeasons[0]!.endDate,
+    },
+  ];
+  const candidates = buildUfaCatalogCandidates({
+    players,
+    signingSeason,
+    seasons: capSeasons,
+    contracts,
+    ownerId: undefined,
+    groups: [],
+    offers: [],
+  });
+  assert.deepEqual(
+    candidates.map(({ player }) => player.id),
+    ["first-contract", "historical-ufa"],
+  );
 });
 
 void test("UFA window opens after signing and closes exactly at the next draft", () => {

@@ -12,6 +12,7 @@ import {
   checkContractCapSpace,
   getContractCoveredSeasonIds,
   hasContractContinuity,
+  isDraftBoundAfterSecondContract,
   isUnsignedForSigningSeason,
   orderContractSeasons,
 } from "../domain/contracts";
@@ -23,6 +24,18 @@ export { UFA_OFFER_MS } from "./ufa-deadline";
 export function calculateUfaSalary(baseSalary: unknown): number {
   const parsed = Number(baseSalary);
   return Number.isFinite(parsed) && parsed > 0 ? Math.round(parsed * 1.25) : 0;
+}
+
+export function formatUfaSigningDate(date: string): string {
+  const parsed = new Date(`${date}T12:00:00.000Z`);
+  return Number.isNaN(parsed.getTime())
+    ? date
+    : new Intl.DateTimeFormat("en-US", {
+        month: "long",
+        day: "numeric",
+        year: "numeric",
+        timeZone: "UTC",
+      }).format(parsed);
 }
 
 export function getUfaWindow(
@@ -194,6 +207,11 @@ export function buildUfaCatalogCandidates<
           String(signingSeason.id),
           contracts,
           seasons,
+        ) ||
+        isDraftBoundAfterSecondContract(
+          String(player.id),
+          signingSeason,
+          contracts,
         ) ||
         salary <= 0
       ) {

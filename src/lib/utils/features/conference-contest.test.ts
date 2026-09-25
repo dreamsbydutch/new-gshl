@@ -168,6 +168,38 @@ void test("shows an active upcoming season with zero games and a 0-0 record", ()
   assert.ok(view.overall);
 });
 
+void test("shows a draft-open preseason before season teams exist", () => {
+  const preseason = {
+    ...season("preseason", 2026),
+    startDate: "2026-10-15",
+    draftStartAt: "2026-09-20T23:00:00.000Z",
+  };
+  const referenceDate = new Date("2026-09-24T12:00:00.000Z");
+  const models = buildConferenceContestSeasonViewModels({
+    seasons: [preseason],
+    gshlTeams: [],
+    matchups: [],
+    fallbackConferences: [
+      { id: "A", name: "Alpha", abbr: "A", logoUrl: null },
+      { id: "B", name: "Beta", abbr: "B", logoUrl: null },
+    ],
+    referenceDate,
+  });
+  assert.equal(models.length, 1);
+  const view = projectConferenceContestBrowserView({
+    overall: buildConferenceContestOverallFromSeasonModels(models),
+    seasons: models,
+  });
+  assert.equal(view.seasons[0]?.seasonId, "preseason");
+  assert.equal(view.seasons[0]?.gamesPlayedByConferenceId.A, 0);
+  assert.deepEqual(view.seasons[0]?.headToHeadRecordByConferenceId.B, {
+    wins: 0,
+    losses: 0,
+    ties: 0,
+  });
+  assert.ok(view.overall);
+});
+
 void test("uses the most recent season first when there is no current season", () => {
   const referenceDate = new Date("2026-07-23T00:00:00.000Z");
   const visibleSeasons = getConferenceContestVisibleSeasons(

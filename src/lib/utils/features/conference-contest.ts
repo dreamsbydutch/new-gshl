@@ -349,11 +349,28 @@ export const buildConferenceContestSeasonViewModel = (params: {
   matchups: Matchup[];
   gshlTeams: GSHLTeam[];
   teamAwards?: TeamAward[];
+  fallbackConferences?: ConferenceContestConferenceInfo[];
 }): ConferenceContestSeasonViewModel | null => {
-  const { season, matchups, gshlTeams, teamAwards = [] } = params;
+  const {
+    season,
+    matchups,
+    gshlTeams,
+    teamAwards = [],
+    fallbackConferences = [],
+  } = params;
   const seasonId = normalizeId(season.id);
   if (!seasonId) return null;
-  const conferences = getSeasonConferences(seasonId, gshlTeams);
+  const seasonConferences = getSeasonConferences(seasonId, gshlTeams);
+  const conferences =
+    seasonConferences.length >= 2
+      ? seasonConferences
+      : [
+          ...seasonConferences,
+          ...fallbackConferences.filter(
+            (conference) =>
+              !seasonConferences.some((existing) => existing.id === conference.id),
+          ),
+        ].sort((left, right) => left.name.localeCompare(right.name));
   const leftConference = conferences[0];
   const rightConference = conferences[1];
   if (!leftConference || !rightConference) return null;
@@ -507,8 +524,10 @@ export const buildConferenceContestSeasonViewModels = (params: {
   matchups: Matchup[];
   gshlTeams: GSHLTeam[];
   teamAwards?: TeamAward[];
+  fallbackConferences?: ConferenceContestConferenceInfo[];
+  referenceDate?: Date;
 }): ConferenceContestSeasonViewModel[] =>
-  getConferenceContestVisibleSeasons(params.seasons)
+  getConferenceContestVisibleSeasons(params.seasons, params.referenceDate)
     .map((season) =>
       buildConferenceContestSeasonViewModel({ ...params, season }),
     )
@@ -601,6 +620,8 @@ export const buildConferenceContestOverallViewModel = (params: {
   matchups: Matchup[];
   gshlTeams: GSHLTeam[];
   teamAwards?: TeamAward[];
+  fallbackConferences?: ConferenceContestConferenceInfo[];
+  referenceDate?: Date;
 }): ConferenceContestOverallViewModel | null =>
   buildConferenceContestOverallFromSeasonModels(
     buildConferenceContestSeasonViewModels(params),

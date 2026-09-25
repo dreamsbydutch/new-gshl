@@ -29,6 +29,10 @@ export const view = query({
           name: season.name,
           startDate: utcTimestampToDateKey(season.startDate),
           endDate: utcTimestampToDateKey(season.endDate),
+          draftStartAt:
+            season.draftStartAt == null
+              ? null
+              : new Date(season.draftStartAt).toISOString(),
           isActive: season.isActive,
         }) as Season,
     );
@@ -59,9 +63,10 @@ export const view = query({
     const teamDocs = sourcePages.flatMap((page) => page.teams);
     const franchiseIds = [...new Set(teamDocs.map((team) => team.franchiseId))];
     const conferenceIds = [...new Set(teamDocs.map((team) => team.confId))];
-    const [franchiseDocs, conferenceDocs] = await Promise.all([
+    const [franchiseDocs, conferenceDocs, fallbackConferenceDocs] = await Promise.all([
       Promise.all(franchiseIds.map((id) => ctx.db.get(id))),
       Promise.all(conferenceIds.map((id) => ctx.db.get(id))),
+      ctx.db.query("conferences").take(2),
     ]);
     const franchisesById = new Map(
       franchiseDocs
@@ -122,6 +127,12 @@ export const view = query({
       matchups,
       gshlTeams: teams,
       teamAwards,
+      fallbackConferences: fallbackConferenceDocs.map((conference) => ({
+        id: String(conference._id),
+        name: conference.name,
+        abbr: conference.abbr,
+        logoUrl: conference.logoUrl ?? null,
+      })),
     });
     const overall =
       buildConferenceContestOverallFromSeasonModels(seasonViewModels);

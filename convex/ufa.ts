@@ -19,6 +19,7 @@ import { utcTimestampToDateKey } from "./lib/timestamps";
 import { signContract } from "./lib/contractSigningTransaction";
 import { loadDueUfaOfferGroups } from "./lib/ufaReconciliation";
 import { loadUfaOddsData, type UfaOddsData } from "./ufaOdds";
+import { isDraftBoundAfterSecondContract } from "../src/lib/utils/domain/contracts";
 
 const CAP = 25_000_000;
 const resolutionOddsValidator = v.array(
@@ -594,6 +595,15 @@ export const submitOffer = mutation({
     ) {
       throw new Error("This player is already under contract.");
     }
+    if (
+      isDraftBoundAfterSecondContract(
+        String(player._id),
+        signingSeason,
+        contracts,
+      )
+    ) {
+      throw new Error("This player must return to the draft.");
+    }
     const franchise = franchises.find(
       (candidate: any) => candidate.ownerId === ownerId && candidate.isActive,
     );
@@ -861,6 +871,12 @@ export const finalizeGroup = internalMutation({
         group.seasonId,
         priorContracts,
         seasons,
+      ) ||
+      !seasons[signingIndex] ||
+      isDraftBoundAfterSecondContract(
+        String(player._id),
+        seasons[signingIndex],
+        priorContracts,
       ) ||
       !startSeason?.startDate ||
       !expirySeason?.endDate
