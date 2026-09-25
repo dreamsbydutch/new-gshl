@@ -73,6 +73,7 @@ var PowerRankingsAlgo = (function buildPowerRankingsAlgo() {
     wTalent: 0.15,
     wGm: 0.1,
     wHistory: 0,
+    preseasonTransitionWeeks: 4,
     matchupPregameBlend: 0.6,
     matchupRealizedBlend: 0.4,
     matchupPregameStrengthWeight: 0.55,
@@ -1384,6 +1385,20 @@ var PowerRankingsAlgo = (function buildPowerRankingsAlgo() {
         toNumber(opts.wTalent) * talentZ +
         toNumber(opts.wGm || 0) * gmZ +
         toNumber(opts.wHistory) * historyZ;
+      var preseason = (LeagueRuntime.preseasonProjections || []).find(
+        function (row) {
+          return row.teamId === teamKey;
+        },
+      );
+      if (preseason) {
+        // Transfer weight to observed performance over the first four completed weeks.
+        var priorWeight = Math.max(
+          0,
+          1 - (weekNumber - 1) / opts.preseasonTransitionWeeks,
+        );
+        composite =
+          priorWeight * preseason.score + (1 - priorWeight) * composite;
+      }
       compositeByTeam.set(teamKey, composite);
       ratingByTeam.set(teamKey, scaleCompositeToPowerRating(composite));
     });

@@ -101,9 +101,11 @@ export function PowerRankingsHomeCard({
 
   const latestLabel = data?.latestWeek
     ? `Week ${data.latestWeek.weekNum}`
-    : selectedSeason?.isActive
-      ? "Current"
-      : "Final";
+    : data?.isPreseason
+      ? "Preseason"
+      : selectedSeason?.isActive
+        ? "Current"
+        : "Final";
   const previewEntries = selectHomePowerRankingPreview(entries);
 
   return (

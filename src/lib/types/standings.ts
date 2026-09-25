@@ -176,6 +176,7 @@ export type PowerRankingPaletteMap = Record<string, string[]>;
 export type PowerRankingColorMap = Record<string, string>;
 
 export interface PowerRankingsViewModel {
+  isPreseason?: boolean;
   entries: PowerRankingEntry[];
   chartData: PowerRankingChartPoint[];
   series: PowerRankingSeries[];
@@ -200,6 +201,7 @@ export interface PowerRankingPreviewEntry {
 }
 
 export interface PowerRankingsPreview {
+  isPreseason?: boolean;
   season: Pick<Season, "id" | "name" | "isActive">;
   latestWeek: Pick<Week, "weekNum"> | null;
   entries: PowerRankingPreviewEntry[];
@@ -218,15 +220,23 @@ export type PowerRankingSeasonStat = Pick<
 >;
 
 export interface StandingsPowerHistory {
+  preseason?: PreseasonPowerRanking[];
   weeks: PowerRankingWeek[];
   weeklyStats: PowerRankingWeeklyStat[];
 }
 
 export interface BuildPowerRankingsOptions {
+  preseason?: PreseasonPowerRanking[];
   teams: PowerRankingTeam[];
   weeks: PowerRankingWeek[];
   weeklyStats: PowerRankingWeeklyStat[];
   seasonStats: PowerRankingSeasonStat[];
+}
+
+export interface PreseasonPowerRanking {
+  teamId: string;
+  rank: number;
+  rating: number;
 }
 
 export interface PlayoffProbType {

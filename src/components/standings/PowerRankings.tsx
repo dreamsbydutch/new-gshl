@@ -85,10 +85,16 @@ export function PowerRankings({ season, rankings }: PowerRankingsProps) {
     );
   }
 
-  const snapshotLabel = season.isActive ? "Current" : "Final";
+  const snapshotLabel = rankings.isPreseason
+    ? "Preseason"
+    : season.isActive
+      ? "Current"
+      : "Final";
   const latestWeekLabel = rankings.latestWeek
     ? `through Week ${rankings.latestWeek.weekNum}`
-    : "from the season summary";
+    : rankings.isPreseason
+      ? "projected from opening rosters"
+      : "from the season summary";
   const shareMessage = buildWhatsAppShareMessage({
     title: `GSHL ${snapshotLabel} Power Rankings`,
     summary: `${season.name} · ${latestWeekLabel}`,

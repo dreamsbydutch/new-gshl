@@ -123,6 +123,7 @@ export function buildPowerRankings({
   weeks,
   weeklyStats,
   seasonStats,
+  preseason = [],
 }: BuildPowerRankingsOptions): PowerRankingsViewModel {
   const teamById = new Map(teams.map((team) => [team.id, team]));
   const statsByWeek = new Map<string, PowerRankingWeeklyStat[]>();
@@ -153,6 +154,11 @@ export function buildPowerRankings({
     const rank = validRank(stat.powerRk);
     if (rank !== null) fallbackRankByTeam.set(stat.gshlTeamId, rank);
   }
+  const preseasonByTeam = new Map(
+    !latestWeek ? preseason.map((row) => [row.teamId, row]) : [],
+  );
+  for (const row of preseasonByTeam.values())
+    fallbackRankByTeam.set(row.teamId, row.rank);
 
   const rankedTeams = teams
     .flatMap((team) => {
@@ -180,7 +186,9 @@ export function buildPowerRankings({
       return {
         team,
         rank,
-        rating: validRating(latestStat?.powerRating),
+        rating: validRating(
+          latestStat?.powerRating ?? preseasonByTeam.get(team.id)?.rating,
+        ),
         previousRank,
         rankChange: previousRank === null ? null : previousRank - rank,
         color: colorByTeam.get(team.id) ?? "#475569",
@@ -202,6 +210,7 @@ export function buildPowerRankings({
   });
 
   return {
+    ...(preseasonByTeam.size ? { isPreseason: true } : {}),
     entries,
     chartData,
     latestWeek,

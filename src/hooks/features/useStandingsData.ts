@@ -128,8 +128,16 @@ export function useStandingsData(
         weeks: isPowerRankingsView ? powerWeeks : [],
         weeklyStats,
         seasonStats: teamStats,
+        preseason: powerHistoryQuery.data?.preseason,
       }),
-    [isPowerRankingsView, powerWeeks, teamStats, teams, weeklyStats],
+    [
+      isPowerRankingsView,
+      powerWeeks,
+      teamStats,
+      teams,
+      weeklyStats,
+      powerHistoryQuery.data?.preseason,
+    ],
   );
 
   const isLoading =

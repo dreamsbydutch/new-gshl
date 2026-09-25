@@ -3,28 +3,22 @@ import path from "node:path";
 import vm from "node:vm";
 import { fileURLToPath } from "node:url";
 import type { DatabaseRecord } from "@gshl-lib/data/records";
-import { fetchModel, fetchSeasonModel } from "@gshl-lib/data/convex-store";
+import {
+  fetchModel,
+  fetchSeasonModel,
+  fetchSeasonDraftPicks,
+} from "@gshl-lib/data/convex-store";
 import { SeasonType } from "@gshl-lib/types/enums";
+import {
+  buildPreseasonProjections,
+  seasonCategories,
+} from "../../runtime/preseason-projection";
 
 const CURRENT_FILE_DIR = path.dirname(fileURLToPath(import.meta.url));
 const POWER_ENGINE_FILE = path.resolve(
   CURRENT_FILE_DIR,
   "../../runtime/PowerRankingsAlgo.js",
 );
-
-const MATCHUP_CATEGORY_RULES = [
-  { field: "G", higherBetter: true },
-  { field: "A", higherBetter: true },
-  { field: "P", higherBetter: true },
-  { field: "PM", higherBetter: true },
-  { field: "PPP", higherBetter: true },
-  { field: "SOG", higherBetter: true },
-  { field: "HIT", higherBetter: true },
-  { field: "BLK", higherBetter: true },
-  { field: "W", higherBetter: true },
-  { field: "GAA", higherBetter: false },
-  { field: "SVP", higherBetter: true },
-] as const;
 
 type PowerRankingsAlgoApi = {
   updatePowerRankingsForSeason: (
@@ -62,6 +56,7 @@ export type PowerRankingFixtureData = {
   playerDays?: DatabaseRecord[];
   playerWeeks?: DatabaseRecord[];
   playerNhlRows?: DatabaseRecord[];
+  draftPicks?: DatabaseRecord[];
   matchups?: DatabaseRecord[];
   teamWeeks?: DatabaseRecord[];
   teamSeasons?: DatabaseRecord[];
@@ -203,6 +198,7 @@ async function loadModelCache(
     playerNhlRows,
     matchups,
     teamWeeks,
+    draftPicks,
   ] = await Promise.all([
     fetchSeasonHistory("Week", replaySeasonIds),
     fetchSeasonHistory("Team", replaySeasonIds),
@@ -213,6 +209,7 @@ async function loadModelCache(
     fetchSeasonHistory("PlayerNHLStatLine", priorSeasonIds),
     fetchSeasonHistory("Matchup", replaySeasonIds),
     fetchSeasonHistory("TeamWeekStatLine", replaySeasonIds),
+    fetchSeasonDraftPicks<DatabaseRecord>(seasonId),
   ]);
   const effectivePlayerWeeks = inputOverrides.playerWeeks ?? playerWeeks;
   const effectiveTeamWeeks = mergeTeamWeekRows(
@@ -231,6 +228,7 @@ async function loadModelCache(
     ["PlayerNHL", playerNhlRows],
     ["PlayerWeekStatLine", effectivePlayerWeeks],
     ["TeamWeekStatLine", effectiveTeamWeeks],
+    ["DraftPick", draftPicks],
   ];
 
   modelCacheEntries.push(["PlayerDayStatLine", playerDays]);
@@ -240,11 +238,55 @@ async function loadModelCache(
 
 function createPowerEngineContext(
   modelCache: ModelCache,
+  seasonId: string,
 ): PowerRankingsContext {
+  const seasons = modelCache.get("Season") ?? [];
+  const season = seasons.find((row) => String(row.id) === seasonId) ?? {};
+  const categories = seasonCategories(season);
+  const openingWeek = (modelCache.get("Week") ?? [])
+    .filter((row) => String(row.seasonId) === seasonId)
+    .sort((a, b) =>
+      formatDateOnly(a.startDate).localeCompare(formatDateOnly(b.startDate)),
+    )[0];
+  const teams = (modelCache.get("Team") ?? []).filter(
+    (row) => String(row.seasonId) === seasonId,
+  );
+  const days = modelCache.get("PlayerDayStatLine") ?? [];
+  const picks = modelCache.get("DraftPick") ?? [];
+  const openingDate = formatDateOnly(openingWeek?.startDate);
+  const rosters = teams.flatMap((team) => {
+    const snapshot = days.filter(
+      (row) =>
+        String(row.seasonId) === seasonId &&
+        row.gshlTeamId === team.id &&
+        formatDateOnly(row.date) === openingDate,
+    );
+    if (snapshot.length) return snapshot;
+    return picks.filter(
+      (row) =>
+        String(row.seasonId) === seasonId &&
+        row.gshlTeamId === team.id &&
+        row.playerId &&
+        (!row.onClockEndedAt ||
+          formatDateOnly(row.onClockEndedAt) <= openingDate),
+    );
+  });
+  const playerNhlRows = modelCache.get("PlayerNHLStatLine") ?? [];
+  const preseason =
+    rosters.length && playerNhlRows.some((row) => Number(row.GP) > 0)
+      ? buildPreseasonProjections({
+          season,
+          seasons,
+          teams,
+          rosters,
+          playerNhlRows,
+        })
+      : [];
   return vm.createContext({
     console,
     PowerRankingsAlgo: {},
     LeagueRuntime: {
+      preseasonProjections: preseason,
       readModel(modelName: string): DatabaseRecord[] {
         return cloneRows(modelCache.get(modelName) ?? []);
       },
@@ -261,7 +303,10 @@ function createPowerEngineContext(
           normalizeSeasonId,
         },
         constants: {
-          MATCHUP_CATEGORY_RULES,
+          MATCHUP_CATEGORY_RULES: categories.map((field) => ({
+            field,
+            higherBetter: field !== "GAA",
+          })),
           SeasonType,
         },
       },
@@ -278,7 +323,7 @@ async function loadPowerRankingsAlgo(
     readPowerEngineSource(),
   ]);
 
-  const context = createPowerEngineContext(modelCache);
+  const context = createPowerEngineContext(modelCache, seasonId);
   vm.runInContext(source, context, { filename: POWER_ENGINE_FILE });
 
   const api = context.PowerRankingsAlgo;
@@ -307,6 +352,7 @@ function buildFixtureModelCache(
     ["TeamWeekStatLine", cloneRows(data.teamWeeks ?? [])],
     ["TeamSeasonStatLine", cloneRows(data.teamSeasons ?? [])],
     ["PlayerDayStatLine", cloneRows(data.playerDays ?? [])],
+    ["DraftPick", cloneRows(data.draftPicks ?? [])],
   ]);
 }
 
@@ -322,6 +368,7 @@ export async function runPowerRankingsFixture(
   const source = await readPowerEngineSource();
   const context = createPowerEngineContext(
     buildFixtureModelCache(normalizedSeasonId, data),
+    normalizedSeasonId,
   );
   vm.runInContext(source, context, { filename: POWER_ENGINE_FILE });
   const api = context.PowerRankingsAlgo;

@@ -433,6 +433,14 @@ Notable flags:
 - `--season-type <type>`
 - `--apply`
 
+#### Preseason projection review
+
+For preseason projection review, `src/commands/power/preview-preseason.ts` reads
+production rosters and prior NHL history without changing league data.
+`src/commands/power/evaluate-preseason.ts` compares projections against the
+cached historical draft dataset locally. Consult each command's `--help` for
+its inputs and local report destinations.
+
 #### `ranking-engine:check`
 
 Runs local power and aggregation fixtures against the calculation runtime.

@@ -80,7 +80,32 @@ Calder winners and nominees to those rankings and verifies all award records.
 Week N results may affect Week N+1 but must never rewrite Week N's snapshot.
 Only active and completed weeks receive power rows.
 
-The standardized composite is:
+Before opening week, the power views compute a separate preseason projection
+from current season team assignments. This preview does not create a fictional
+week or write derived rows. Historical replay uses opening-day roster snapshots,
+falling back to completed draft selections; it never uses today's player team
+assignments to reconstruct an old season.
+
+The pure preseason model lives in `scripts/src/runtime/preseason-projection.ts`.
+It projects category rates from the preceding three NHL seasons, regresses small
+samples toward position-group rates, and models availability and eligible daily
+lineups using the target season's roster slots. Goalie ratios use total shots
+and minutes; goalie category strength includes the risk of missing the weekly
+appearance minimum. Unproven players receive conservative position priors rather
+than disappearing from the roster average. Only the selected season's configured
+categories count, including plus/minus when configured.
+
+Entering Weeks 1–4, the composite blends the fixed opening projection with the
+standard in-season composite at 100%, 75%, 50%, and 25% preseason weight. Entering
+Week 5, this explicit preseason weight is zero. The existing rolling player talent
+and seeded Elo still carry historical information. The four-week transition is a
+transparent policy choice, not a fitted optimal decay. The projection's score uses
+the same `50 + 25 × standardized composite` display scale as weekly power.
+
+See [the preseason evaluation](product/preseason-power-projections.md) for
+historical comparison, current coverage, assumptions, and limitations.
+
+The standard in-season composite is:
 
 | Signal                                         | Weight |
 | ---------------------------------------------- | -----: |

@@ -271,6 +271,16 @@ export async function fetchModel<T extends AnyRow>(
   return rows.map(hydrateRow<T>);
 }
 
+export async function fetchSeasonDraftPicks<T extends AnyRow>(
+  seasonId: string,
+): Promise<T[]> {
+  const rows = await getClient().query(
+    refs.list,
+    serverArgs({ table: "draftPicks", where: { seasonId } }),
+  );
+  return rows.map(hydrateRow<T>);
+}
+
 export async function fetchRawPlayerDaySeason(
   seasonId: string,
 ): Promise<AnyRow[]> {

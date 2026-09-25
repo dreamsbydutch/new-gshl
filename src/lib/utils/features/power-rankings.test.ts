@@ -61,6 +61,42 @@ const weekly = (
   powerRating,
 });
 
+void test("shows preseason projections before games without inventing weekly history", () => {
+  const preseason = [
+    { teamId: "a", rank: 2, rating: 40 },
+    { teamId: "b", rank: 1, rating: 60 },
+  ];
+  const input = {
+    teams: [makeTeam("a", "Alpha"), makeTeam("b", "Bravo")],
+    weeks: [],
+    weeklyStats: [],
+    seasonStats: [],
+    preseason,
+  };
+  const result = buildPowerRankings(input);
+  assert.equal(result.isPreseason, true);
+  assert.equal(result.latestWeek, null);
+  assert.deepEqual(result.chartData, []);
+  assert.deepEqual(
+    result.entries.map((entry) => [
+      entry.team.id,
+      entry.rating,
+      entry.rankChange,
+    ]),
+    [
+      ["b", 60, null],
+      ["a", 40, null],
+    ],
+  );
+  const started = buildPowerRankings({
+    ...input,
+    weeks: [makeWeek(1)],
+    weeklyStats: [weekly("a", 1, 1, 70), weekly("b", 1, 2, 30)],
+  });
+  assert.equal(started.isPreseason, undefined);
+  assert.equal(started.entries[0]?.team.id, "a");
+});
+
 void test("builds the latest power order, movement, and weekly chart", () => {
   const result = buildPowerRankings({
     teams: [makeTeam("a", "Alpha"), makeTeam("b", "Bravo")],

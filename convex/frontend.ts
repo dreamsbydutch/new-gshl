@@ -49,6 +49,7 @@ import {
 } from "../src/lib/utils/features/owner-rankings";
 import { buildPowerRankings } from "../src/lib/utils/features/power-rankings";
 import { projectStandingsPowerHistory } from "./lib/standingsProjection";
+import { preseasonPower } from "./lib/preseasonPower";
 import {
   buildDraftHistoryPicks,
   draftSeasonWindow,
@@ -643,6 +644,9 @@ export const powerRankingsPreview = query({
       weeks: rankedWeeks,
       weeklyStats: rankedWeeklyStats,
       seasonStats,
+      preseason: rankedWeeks.length
+        ? []
+        : await preseasonPower(ctx, args.seasonId),
     });
     const requestedTake = Number.isFinite(args.take) ? args.take : 8;
     const limit = Math.min(Math.max(Math.trunc(requestedTake), 1), 16);
@@ -658,6 +662,7 @@ export const powerRankingsPreview = query({
             weekNum: rankings.latestWeek.weekNum,
           }
         : null,
+      isPreseason: rankings.isPreseason ?? false,
       entries: rankings.entries.slice(0, limit).map((entry) => ({
         team: {
           id: entry.team.id,

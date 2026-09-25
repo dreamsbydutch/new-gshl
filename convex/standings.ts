@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { query } from "./_generated/server";
+import { preseasonPower } from "./lib/preseasonPower";
 import {
   projectStandingsPowerHistory,
   projectStandingsTeamDetail,
@@ -31,7 +32,13 @@ export const powerHistory = query({
         .collect(),
     ]);
 
-    return projectStandingsPowerHistory({ weeks, weeklyStats });
+    const history = projectStandingsPowerHistory({ weeks, weeklyStats });
+    return {
+      ...history,
+      preseason: history.weeklyStats.length
+        ? []
+        : await preseasonPower(ctx, args.seasonId),
+    };
   },
 });
 
