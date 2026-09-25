@@ -6,12 +6,7 @@ import { Search, SlidersHorizontal } from "lucide-react";
 import { NHLLogo } from "@gshl-components/player/NHLLogo";
 import { useDraftClassExplorer } from "@gshl-hooks";
 import { DraftClassesSkeleton } from "@gshl-skeletons";
-import type {
-  DraftClassCertainty,
-  DraftClassPosition,
-  DraftClassRow,
-  NHLTeam,
-} from "@gshl-types";
+import type { DraftClassCertainty, DraftClassPosition } from "@gshl-types";
 import { Button, Input, Select, TableViewport } from "@gshl-ui";
 import { cn, findNhlTeamByAbbreviation, formatMoney } from "@gshl-utils";
 
@@ -107,7 +102,7 @@ export function DraftClasses() {
             }
           >
             <option value="all">All projections</option>
-            <option value="guaranteed">Guaranteed UFAs</option>
+            <option value="guaranteed">Draft required</option>
             <option value="projected">Other projected</option>
           </Select>
         </div>
@@ -119,7 +114,7 @@ export function DraftClasses() {
           value={String(explorer.summary.available)}
         />
         <SummaryStat
-          label="Guaranteed UFAs"
+          label="Draft required"
           value={String(explorer.summary.guaranteedUfas)}
         />
         <SummaryStat
@@ -139,7 +134,8 @@ export function DraftClasses() {
               {explorer.selectedYear} player pool
             </h3>
             <p className="text-xs text-slate-500">
-              Guaranteed: UFA contract expires before this draft.
+              Draft required: a second consecutive contract expires as UFA
+              before this draft.
             </p>
           </div>
           <span className="shrink-0 pt-1 text-xs text-slate-500">
@@ -148,113 +144,130 @@ export function DraftClasses() {
         </div>
 
         {explorer.visibleRows.length ? (
-          <>
-            <div className="mt-3 divide-y divide-slate-100 rounded-lg border border-slate-200 lg:hidden">
-              {explorer.visibleRows.slice(0, 300).map((row, index) => (
-                <DraftClassListItem
-                  key={row.player.id}
-                  row={row}
-                  rank={index + 1}
-                  nhlTeam={findNhlTeamByAbbreviation(
+          <TableViewport
+            ariaLabel={explorer.selectedYear + " projected GSHL draft class"}
+            scrollHint="Scroll to see ratings and salary"
+            className="mt-3"
+            viewportClassName="rounded-lg border-slate-200"
+          >
+            <table className="w-max min-w-full border-separate border-spacing-0 text-xs sm:text-sm">
+              <caption className="sr-only">
+                {explorer.selectedYear} projected draft class
+              </caption>
+              <thead className="bg-slate-100 text-left text-[11px] font-medium uppercase tracking-wide text-slate-600">
+                <tr>
+                  <th
+                    scope="col"
+                    className="sticky left-0 z-20 w-44 min-w-44 max-w-44 border-b border-r border-slate-200 bg-slate-100 px-2 py-2 sm:w-60 sm:min-w-60 sm:max-w-60 sm:px-3"
+                  >
+                    # / Player
+                  </th>
+                  <th
+                    scope="col"
+                    className="min-w-28 border-b border-slate-200 px-2 py-2 sm:px-3"
+                  >
+                    Status
+                  </th>
+                  <th
+                    scope="col"
+                    className="min-w-20 border-b border-slate-200 px-2 py-2 text-right sm:px-3"
+                  >
+                    Overall
+                  </th>
+                  <th
+                    scope="col"
+                    className="min-w-20 border-b border-slate-200 px-2 py-2 text-right sm:px-3"
+                  >
+                    Season
+                  </th>
+                  <th
+                    scope="col"
+                    className="min-w-28 border-b border-slate-200 px-2 py-2 text-right sm:px-3"
+                  >
+                    Salary
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {explorer.visibleRows.slice(0, 300).map((row, index) => {
+                  const nhlTeam = findNhlTeamByAbbreviation(
                     explorer.nhlTeams,
                     row.player.nhlTeam,
-                  )}
-                />
-              ))}
-            </div>
-            <TableViewport
-              ariaLabel={explorer.selectedYear + " projected GSHL draft class"}
-              scrollHint="Scroll for all projections"
-              className="mt-3 hidden lg:block"
-              viewportClassName="rounded-lg border-slate-200"
-            >
-              <table className="w-full min-w-[56rem] text-sm">
-                <caption className="sr-only">
-                  {explorer.selectedYear} projected draft class
-                </caption>
-                <thead className="border-b border-slate-200 bg-slate-100 text-left text-xs font-medium text-slate-600">
-                  <tr>
-                    <th scope="col" className="px-3 py-2 text-center">
-                      #
-                    </th>
-                    <th scope="col" className="px-3 py-2">
-                      Player
-                    </th>
-                    <th scope="col" className="px-3 py-2">
-                      Status
-                    </th>
-                    <th scope="col" className="px-3 py-2 text-center">
-                      Pos
-                    </th>
-                    <th scope="col" className="px-3 py-2 text-center">
-                      NHL
-                    </th>
-                    <th scope="col" className="px-3 py-2 text-right">
-                      Overall
-                    </th>
-                    <th scope="col" className="px-3 py-2 text-right">
-                      Season
-                    </th>
-                    <th scope="col" className="px-3 py-2 text-right">
-                      Salary
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {explorer.visibleRows.slice(0, 300).map((row, index) => {
-                    const nhlTeam = findNhlTeamByAbbreviation(
-                      explorer.nhlTeams,
-                      row.player.nhlTeam,
-                    );
-                    return (
-                      <tr key={row.player.id} className="hover:bg-slate-50">
-                        <td className="px-3 py-2 text-center font-mono text-xs text-slate-400">
-                          {index + 1}
-                        </td>
-                        <th scope="row" className="px-3 py-2 text-left">
-                          <span
-                            className={cn(
-                              "font-medium text-slate-950",
-                              row.isGuaranteedUfa && "font-semibold",
-                            )}
-                          >
-                            {row.player.fullName}
+                  );
+                  return (
+                    <tr
+                      key={row.player.id}
+                      className={cn(
+                        "group",
+                        row.isGuaranteedUfa
+                          ? "bg-amber-50 hover:bg-amber-100"
+                          : "bg-white hover:bg-slate-50",
+                      )}
+                    >
+                      <th
+                        scope="row"
+                        className={cn(
+                          "sticky left-0 z-10 w-44 min-w-44 max-w-44 border-b border-r border-slate-200 px-2 py-1.5 text-left font-normal sm:w-60 sm:min-w-60 sm:max-w-60 sm:px-3",
+                          row.isGuaranteedUfa
+                            ? "bg-amber-50 group-hover:bg-amber-100"
+                            : "bg-white group-hover:bg-slate-50",
+                        )}
+                      >
+                        <span className="flex items-center gap-1.5 sm:gap-2">
+                          <span className="w-4 shrink-0 text-center font-mono text-[11px] text-slate-500">
+                            {index + 1}
                           </span>
-                          <span className="ml-2 text-xs font-normal text-slate-400">
-                            Rk {row.player.overallRk ?? "—"}
-                          </span>
-                        </th>
-                        <td className="px-3 py-2">
-                          <StatusBadge guaranteed={row.isGuaranteedUfa} />
-                        </td>
-                        <td className="px-3 py-2 text-center">
-                          {row.player.nhlPos?.join("/") || row.player.posGroup}
-                        </td>
-                        <td className="px-3 py-2 text-center">
                           {nhlTeam ? (
-                            <NHLLogo team={nhlTeam} size={24} />
+                            <NHLLogo
+                              team={nhlTeam}
+                              size={22}
+                              className="mx-0 shrink-0"
+                            />
                           ) : (
-                            row.player.nhlTeam || "FA"
+                            <span className="flex h-[22px] w-[22px] shrink-0 items-center justify-center text-[9px] text-slate-500">
+                              {row.player.nhlTeam || "FA"}
+                            </span>
                           )}
-                        </td>
-                        <td className="px-3 py-2 text-right font-mono font-semibold">
-                          {formatRating(row.player.overallRating)}
-                        </td>
-                        <td className="px-3 py-2 text-right font-mono">
-                          {formatRating(row.player.seasonRating)}
-                        </td>
-                        <td className="px-3 py-2 text-right font-mono">
-                          {row.player.salary
-                            ? formatMoney(Number(row.player.salary))
-                            : "—"}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </TableViewport>
-          </>
+                          <span className="min-w-0">
+                            <span
+                              className="block truncate font-semibold text-slate-950"
+                              title={row.player.fullName}
+                            >
+                              {row.player.fullName}
+                            </span>
+                            <span className="block text-[10px] text-slate-500 sm:text-xs">
+                              {row.player.nhlPos?.join("/") ||
+                                row.player.posGroup}
+                              {" / "}Rk {row.player.overallRk ?? "—"}
+                            </span>
+                          </span>
+                        </span>
+                      </th>
+                      <td className="border-b border-slate-200 px-2 py-1.5 sm:px-3">
+                        <StatusBadge guaranteed={row.isGuaranteedUfa} />
+                        {row.isGuaranteedUfa ? (
+                          <span className="block whitespace-nowrap text-[10px] text-amber-900">
+                            2nd contract · UFA
+                          </span>
+                        ) : null}
+                      </td>
+                      <td className="border-b border-slate-200 px-2 py-1.5 text-right font-mono font-semibold tabular-nums sm:px-3">
+                        {formatRating(row.player.overallRating)}
+                      </td>
+                      <td className="border-b border-slate-200 px-2 py-1.5 text-right font-mono tabular-nums sm:px-3">
+                        {formatRating(row.player.seasonRating)}
+                      </td>
+                      <td className="whitespace-nowrap border-b border-slate-200 px-2 py-1.5 text-right font-mono tabular-nums sm:px-3">
+                        {row.player.salary
+                          ? formatMoney(Number(row.player.salary))
+                          : "—"}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </TableViewport>
         ) : (
           <div className="mt-3 border-y border-dashed border-slate-300 py-6 text-center">
             <Search
@@ -281,84 +294,17 @@ function SummaryStat({ label, value }: { label: string; value: string }) {
   );
 }
 
-function DraftClassListItem({
-  row,
-  rank,
-  nhlTeam,
-}: {
-  row: DraftClassRow;
-  rank: number;
-  nhlTeam: NHLTeam | undefined;
-}) {
-  const position = row.player.nhlPos?.join("/") || row.player.posGroup;
-  return (
-    <article className="px-3 py-2.5">
-      <div className="flex items-center gap-2.5">
-        <span className="w-5 shrink-0 text-center font-mono text-xs text-slate-400">
-          {rank}
-        </span>
-        {nhlTeam ? (
-          <NHLLogo team={nhlTeam} size={26} className="mx-0 shrink-0" />
-        ) : (
-          <span className="flex h-[26px] w-[26px] shrink-0 items-center justify-center text-[10px] text-slate-400">
-            {row.player.nhlTeam || "FA"}
-          </span>
-        )}
-        <div className="min-w-0 flex-1">
-          <h4
-            className={cn(
-              "truncate text-sm font-medium text-slate-950",
-              row.isGuaranteedUfa && "font-semibold",
-            )}
-          >
-            {row.player.fullName}
-          </h4>
-          <p className="text-xs text-slate-500">
-            {position} · Rk {row.player.overallRk ?? "—"}
-          </p>
-        </div>
-        <StatusBadge guaranteed={row.isGuaranteedUfa} />
-      </div>
-      <dl className="mt-2 grid grid-cols-3 gap-2 pl-[4.125rem] text-xs">
-        <CompactStat
-          label="Overall"
-          value={formatRating(row.player.overallRating)}
-        />
-        <CompactStat
-          label="Season"
-          value={formatRating(row.player.seasonRating)}
-        />
-        <CompactStat
-          label="Salary"
-          value={
-            row.player.salary ? formatMoney(Number(row.player.salary)) : "—"
-          }
-        />
-      </dl>
-    </article>
-  );
-}
-
-function CompactStat({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <dt className="text-[10px] text-slate-400">{label}</dt>
-      <dd className="font-mono font-medium text-slate-700">{value}</dd>
-    </div>
-  );
-}
-
 function StatusBadge({ guaranteed }: { guaranteed: boolean }) {
   return (
     <span
       className={cn(
-        "inline-flex shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-medium",
+        "inline-flex shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold sm:text-xs",
         guaranteed
-          ? "border-slate-400 bg-slate-100 text-slate-800"
+          ? "border-amber-400 bg-amber-100 text-amber-950"
           : "border-slate-200 text-slate-500",
       )}
     >
-      {guaranteed ? "UFA" : "Projected"}
+      {guaranteed ? "Draft required" : "Projected"}
     </span>
   );
 }
