@@ -35,6 +35,7 @@ import type * as lib_matchupProjection from "../lib/matchupProjection.js";
 import type * as lib_notificationEvents from "../lib/notificationEvents.js";
 import type * as lib_notificationValidators from "../lib/notificationValidators.js";
 import type * as lib_playerDayPerformanceIndex from "../lib/playerDayPerformanceIndex.js";
+import type * as lib_preseasonPower from "../lib/preseasonPower.js";
 import type * as lib_publicProjection from "../lib/publicProjection.js";
 import type * as lib_reporterDirectory from "../lib/reporterDirectory.js";
 import type * as lib_scheduleProjection from "../lib/scheduleProjection.js";
@@ -103,6 +104,7 @@ declare const fullApi: ApiFromModules<{
   "lib/notificationEvents": typeof lib_notificationEvents;
   "lib/notificationValidators": typeof lib_notificationValidators;
   "lib/playerDayPerformanceIndex": typeof lib_playerDayPerformanceIndex;
+  "lib/preseasonPower": typeof lib_preseasonPower;
   "lib/publicProjection": typeof lib_publicProjection;
   "lib/reporterDirectory": typeof lib_reporterDirectory;
   "lib/scheduleProjection": typeof lib_scheduleProjection;
