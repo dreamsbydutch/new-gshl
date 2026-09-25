@@ -985,6 +985,30 @@ export default defineSchema({
     ],
   ),
 
+  weeklyEditionGenerationJobs: defineTable({
+    seasonId: v.id("seasons"),
+    weekId: v.id("weeks"),
+    editionKey: v.string(),
+    issueType: v.union(
+      v.literal("weekly"),
+      v.literal("final_recap"),
+      v.literal("resigning_outlook"),
+      v.literal("offseason_market"),
+      v.literal("pre_draft"),
+      v.literal("preseason"),
+    ),
+    status: v.union(
+      v.literal("queued"),
+      v.literal("running"),
+      v.literal("succeeded"),
+      v.literal("failed"),
+    ),
+    attempts: v.number(),
+    leaseUntil: v.number(),
+    updatedAt: v.number(),
+    error: v.optional(v.string()),
+  }).index("by_seasonId_editionKey", ["seasonId", "editionKey"]),
+
   weeklyEditions: defineTable({
     seasonId: v.id("seasons"),
     weekId: v.id("weeks"),

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { selectResearchEvidence } from "./weekly-edition-research";
 import type {
   BuildWeeklyEditionFactPacketInput,
   BuildWeeklyEditionCategoryMarginsInput,
@@ -830,8 +831,7 @@ export function buildWeeklyEditionEditorialCandidates(
         value: performance.rating,
       },
       ...Object.entries(performance.stats)
-        .filter(([, value]) => value !== 0)
-        .slice(0, 6)
+        .filter(([, value]) => Number.isFinite(value))
         .map(([key, value]) => ({ key, label: key, value })),
     ];
     const entityName =
@@ -1008,12 +1008,7 @@ export function buildWeeklyEditionEditorialCandidates(
     });
   }
 
-  return candidates
-    .sort(
-      (left, right) =>
-        right.importance - left.importance || left.id.localeCompare(right.id),
-    )
-    .slice(0, 40);
+  return selectResearchEvidence([...candidates, ...(input.comparisons ?? [])]);
 }
 
 export function buildWeeklyEditionFactPacket(
@@ -2740,6 +2735,9 @@ export function buildWeeklyEditionStoryScoutPrompt(
   return [
     "PROMPT_FORMAT=newsroom_pitch_desk_v1",
     "You are running the GSHL Press Box pitch meeting. The goal is to discover the strongest supported stories before any newsletter copy is written.",
+    "Work as an autonomous newspaper: inspect the whole research dossier before choosing subjects. Evidence cards are raw reporting material, not article assignments. Connect independent facts across owners, schedules, performances, categories, roster decisions and historical baselines when the connection matters now. You may propose an original angle even when no headlineHint suggests it. No owner or storyline deserves automatic coverage.",
+    "Consider both recent events and upcoming stakes. Pair a scheduled opponent with supported owner history or current form when relevant. Keep people, franchises and season teams distinct. Never turn scheduled games into results, missing data into zero, or first recorded participation into a confirmed debut. Respect every research limitation.",
+    "Read recentCoverage as editorial memory, not factual evidence. Avoid repeating a previous headline's central claim unless fresh evidence changes the story; explain that change in the angle. Supporting evidence should establish a real connection rather than pad the pitch. Do not file several versions of one event with swapped lead IDs.",
     "Every entry in NEWSROOM_AUTHORS is a working writer. Return exactly one submission for every writer, in the supplied order, and copy each author object exactly. A writer may file zero, one, or two pitches. Zero is the correct answer when the ledger has no story inside that writer's beat.",
     "Each pitch needs one exact leadCandidateId and no more than two exact supportingCandidateIds from STORY_LEDGER. The lead evidence must fit the writer's scoutsFor scope. Do not pitch a subject merely because a name or number exists; look for consequence, surprise, tension, a decision, a changed hierarchy, or a trend supported by a useful comparison.",
     "Team beat writers may lead only with evidence centered on their team. Conference reporters may lead only with evidence centered on a team in their conference. League specialists must obey scoutsFor and passesOn. Do not stretch a beat to fill space.",
@@ -2761,6 +2759,8 @@ export function buildWeeklyEditionStoryScoutPrompt(
     `NEWSROOM_AUTHORS=${JSON.stringify(newsroomAuthors, null, 2)}`,
     "",
     `STORY_LEDGER=${JSON.stringify(storyLedger, null, 2)}`,
+    `RESEARCH_DOSSIER=${JSON.stringify(packet.research ?? null)}`,
+    `RULEBOOK_CONTEXT=${JSON.stringify(buildWeeklyEditionRuleContext(packet))}`,
   ].join("\n");
 }
 
@@ -2831,7 +2831,11 @@ export function validateWeeklyEditionStoryAssignments(
         ? packet.matchups.find(
             (row) => `matchup:${row.matchupId}` === candidate.id,
           )
-        : undefined;
+        : candidate?.kind === "upcoming_matchup"
+          ? packet.nextMatchups.find(
+              (row) => `upcoming:${row.matchupId}` === candidate.id,
+            )
+          : undefined;
     const requiredSubjectNames = matchup
       ? [matchup.homeTeamName, matchup.awayTeamName]
       : candidate?.playerName
@@ -2909,6 +2913,8 @@ export function buildWeeklyEditionChatGptPrompt(
       }
     : undefined;
   const leagueSnapshot = {
+    research: packet.research,
+    upcomingSchedule: previewMatchups,
     snapshotAt:
       milestone?.triggerDate ??
       packet.week.endDate ??

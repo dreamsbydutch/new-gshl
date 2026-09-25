@@ -318,6 +318,9 @@ const ANALYTICS_CANDIDATE_KINDS = new Set<
   "gm_ranking",
   "performance",
   "matchup",
+  "trend",
+  "owner_history",
+  "upcoming_matchup",
 ]);
 
 const INSIDER_CANDIDATE_KINDS = new Set<
@@ -329,6 +332,7 @@ function weeklyEditionCandidateTeamIds(
   packet: WeeklyEditionFactPacket,
 ) {
   const teamIds = new Set<string>();
+  for (const teamId of candidate.relatedTeamIds ?? []) teamIds.add(teamId);
   if (candidate.teamId) teamIds.add(candidate.teamId);
   if (candidate.kind === "matchup" && candidate.id.startsWith("matchup:")) {
     const matchup = packet.matchups.find(
@@ -460,6 +464,11 @@ export function selectWeeklyEditionStoryAssignments(
     candidates.map((candidate) => [candidate.id, candidate]),
   );
   const seenPitchIds = new Set<string>();
+  const previouslyUsedEvidence = new Set(
+    packet.research?.recentCoverage.flatMap(
+      (edition) => edition.evidenceHashes ?? [],
+    ) ?? [],
+  );
   const eligible = submissions.flatMap((submission) => {
     const author = rosterByKey.get(weeklyEditionAuthorKey(submission.author))!;
     return submission.pitches.flatMap((pitch) => {
@@ -488,7 +497,11 @@ export function selectWeeklyEditionStoryAssignments(
           supportingCandidateIds: supportIds,
           author,
           lead,
-          editorialScore: weeklyEditionPitchScore(lead, pitch),
+          editorialScore:
+            weeklyEditionPitchScore(lead, pitch) -
+            (previouslyUsedEvidence.has(hashWeeklyEditionSource(lead))
+              ? 40
+              : 0),
         },
       ];
     });
@@ -503,6 +516,7 @@ export function selectWeeklyEditionStoryAssignments(
   const selected: typeof eligible = [];
   const usedAuthors = new Set<string>();
   const usedLeadCandidates = new Set<string>();
+  const usedEvidence = new Set<string>();
   const teamCounts = new Map<string, number>();
   const kindCounts = new Map<WeeklyEditionEditorialCandidate["kind"], number>();
   const takePitches = (enforceMix: boolean) => {
@@ -514,6 +528,10 @@ export function selectWeeklyEditionStoryAssignments(
       if (
         usedAuthors.has(authorKey) ||
         usedLeadCandidates.has(pitch.leadCandidateId) ||
+        (usedEvidence.has(pitch.leadCandidateId) &&
+          pitch.supportingCandidateIds.some((id) =>
+            usedLeadCandidates.has(id),
+          )) ||
         (enforceMix && teamId && (teamCounts.get(teamId) ?? 0) >= 2) ||
         (enforceMix && (kindCounts.get(kind) ?? 0) >= 2)
       ) {
@@ -522,6 +540,8 @@ export function selectWeeklyEditionStoryAssignments(
       selected.push(pitch);
       usedAuthors.add(authorKey);
       usedLeadCandidates.add(pitch.leadCandidateId);
+      usedEvidence.add(pitch.leadCandidateId);
+      pitch.supportingCandidateIds.forEach((id) => usedEvidence.add(id));
       if (teamId) teamCounts.set(teamId, (teamCounts.get(teamId) ?? 0) + 1);
       kindCounts.set(kind, (kindCounts.get(kind) ?? 0) + 1);
     }

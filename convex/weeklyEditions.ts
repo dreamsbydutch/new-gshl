@@ -3,13 +3,15 @@ import { v } from "convex/values";
 import {
   action,
   internalMutation,
+  internalAction,
   internalQuery,
   mutation,
   query,
   type MutationCtx,
+  type ActionCtx,
 } from "./_generated/server";
 import { internal } from "./_generated/api";
-import type { Doc } from "./_generated/dataModel";
+import type { Doc, Id } from "./_generated/dataModel";
 import { requireCommissioner } from "./lib/auth";
 import { buildLeagueActivity } from "../src/lib/utils/features/league-activity";
 import { buildOwnerRankings } from "../src/lib/utils/features/owner-rankings";
@@ -54,8 +56,17 @@ import {
   buildWeeklyEditionPitchOpenAiRequest,
   extractWeeklyEditionOpenAiText,
   parseWeeklyEditionStorySubmissions,
+  buildWeeklyEditionReviewRequest,
+  parseWeeklyEditionReview,
 } from "../src/lib/utils/features/weekly-edition-openai";
 import { DEFAULT_WEEKLY_EDITION_ARTICLE_COUNT } from "../src/lib/utils/features/weekly-edition-articles";
+import {
+  ownerParticipation,
+  researchCandidates,
+  selectResearchEvidence,
+  weeklyStatComparisons,
+  teamResultEvidence,
+} from "../src/lib/utils/features/weekly-edition-research";
 import { toUtcTimestamp, utcTimestampToDateKey } from "./lib/timestamps";
 
 import {
@@ -125,6 +136,7 @@ async function requestNewsroomJson({
       "Content-Type": "application/json",
     },
     body: JSON.stringify(request),
+    signal: AbortSignal.timeout(90_000),
   });
   const payload: unknown = await response.json().catch(() => null);
   if (!response.ok) {
@@ -486,26 +498,54 @@ async function buildSource(
   const missedStarts = [...missedStartGroups.values()];
   const performanceStats = (row: Record<string, unknown>) =>
     Object.fromEntries(
-      EDITORIAL_STAT_KEYS.filter((key) => key !== "Rating").map((key) => [
-        key,
-        asNumber(row[key]),
-      ]),
+      [
+        ...new Set<string>([
+          ...EDITORIAL_STAT_KEYS,
+          ...(season.categories ?? []),
+          "GP",
+          "MS",
+        ]),
+      ]
+        .filter(
+          (key) =>
+            key !== "Rating" &&
+            row[key] !== null &&
+            row[key] !== undefined &&
+            row[key] !== "" &&
+            Number.isFinite(Number(row[key])),
+        )
+        .map((key) => [key, asNumber(row[key])]),
     );
   const selectStandouts = <
     Row extends {
       id: string;
       rating: number;
+      stats: Record<string, number>;
     },
   >(
     rows: Row[],
-  ) =>
-    rows
-      .filter((row) => row.rating > 0)
-      .sort(
-        (left, right) =>
-          right.rating - left.rating || left.id.localeCompare(right.id),
-      )
-      .filter((row, index) => row.rating >= 85 || index < 3);
+  ) => {
+    const ordered = [...rows].sort(
+      (a, b) => b.rating - a.rating || a.id.localeCompare(b.id),
+    );
+    const selected = new Map(
+      ordered
+        .filter((row, index) => row.rating >= 85 || index < 3)
+        .map((row) => [row.id, row]),
+    );
+    // Category specialists can be newsworthy without an elite overall rating.
+    for (const key of new Set(rows.flatMap((row) => Object.keys(row.stats)))) {
+      const leaders = rows
+        .filter((row) => (row.stats[key] ?? 0) > 0)
+        .sort(
+          (a, b) =>
+            (b.stats[key] ?? 0) - (a.stats[key] ?? 0) ||
+            a.id.localeCompare(b.id),
+        );
+      for (const row of leaders.slice(0, 2)) selected.set(row.id, row);
+    }
+    return [...selected.values()];
+  };
   const playerWeekPerformances = selectStandouts(
     playerWeekRows.map((row) => ({
       id: `player-week:${String(row._id)}`,
@@ -934,6 +974,18 @@ async function buildSource(
   ];
 
   return buildWeeklyEditionFactPacket({
+    comparisons: weeklyStatComparisons(
+      [...teamById.values()],
+      currentPower.map((row) => ({
+        gshlTeamId: String(row.gshlTeamId),
+        stats: row,
+      })),
+      previousPower.map((row) => ({
+        gshlTeamId: String(row.gshlTeamId),
+        stats: row,
+      })),
+      season.categories ?? [],
+    ),
     season: {
       id: String(season._id),
       name: season.name,
@@ -1034,6 +1086,9 @@ async function buildSource(
     milestones,
     awards: awardFacts,
     nextMatchups: nextMatchups.map((matchup) => ({
+      homeTeamId: String(matchup.homeTeamId),
+      awayTeamId: String(matchup.awayTeamId),
+      startDate: nextWeek ? dateKey(nextWeek.startDate) : undefined,
       matchupId: String(matchup._id),
       gameType: String(matchup.gameType),
       homeTeamName:
@@ -1126,11 +1181,46 @@ async function buildPreseasonGmRankingFacts(
     allPowerRankingStats,
   ] = await Promise.all([
     ctx.db.query("owners").collect(),
-    ctx.db.query("teams").collect(),
-    ctx.db.query("weeks").collect(),
-    ctx.db.query("matchups").collect(),
-    ctx.db.query("teamAwards").collect(),
-    ctx.db.query("teamWeekStatLines").collect(),
+    Promise.all(
+      seasons.map((season) =>
+        ctx.db
+          .query("teams")
+          .withIndex("by_seasonId", (q) => q.eq("seasonId", season._id))
+          .collect(),
+      ),
+    ).then((rows) => rows.flat()),
+    Promise.all(
+      seasons.map((season) =>
+        ctx.db
+          .query("weeks")
+          .withIndex("by_seasonId", (q) => q.eq("seasonId", season._id))
+          .collect(),
+      ),
+    ).then((rows) => rows.flat()),
+    Promise.all(
+      seasons.map((season) =>
+        ctx.db
+          .query("matchups")
+          .withIndex("by_seasonId", (q) => q.eq("seasonId", season._id))
+          .collect(),
+      ),
+    ).then((rows) => rows.flat()),
+    Promise.all(
+      seasons.map((season) =>
+        ctx.db
+          .query("teamAwards")
+          .withIndex("by_seasonId", (q) => q.eq("seasonId", season._id))
+          .collect(),
+      ),
+    ).then((rows) => rows.flat()),
+    Promise.all(
+      seasons.map((season) =>
+        ctx.db
+          .query("teamWeekStatLines")
+          .withIndex("by_seasonId", (q) => q.eq("seasonId", season._id))
+          .collect(),
+      ),
+    ).then((rows) => rows.flat()),
   ]);
   const franchiseById = new Map(
     franchises.map((franchise) => [String(franchise._id), franchise]),
@@ -1265,6 +1355,7 @@ async function buildPreseasonGmRankingFacts(
   return rankings.rankings
     .filter((entry) => entry.isActive)
     .map((entry) => ({
+      ownerId: entry.owner.id,
       rank: entry.rank,
       gmName: entry.displayName,
       teamName: entry.primaryTeam?.name ?? undefined,
@@ -1976,6 +2067,17 @@ export const aiStatus = query({
     return {
       configured: Boolean(process.env.OPENAI_API_KEY?.trim()),
       model: newsroomModel(),
+      automaticPublication: Boolean(process.env.OPENAI_API_KEY?.trim()),
+      recentRuns: (
+        await ctx.db.query("weeklyEditionGenerationJobs").order("desc").take(12)
+      ).map((job) => ({
+        id: String(job._id),
+        issueType: job.issueType,
+        status: job.status,
+        attempts: job.attempts,
+        updatedAt: job.updatedAt,
+        error: job.error,
+      })),
     };
   },
 });
@@ -1987,6 +2089,226 @@ export const currentAiCommissioner = internalQuery({
     return { userId: user._id };
   },
 });
+
+async function enrichNewsroomResearch(
+  ctx: MutationCtx,
+  packet: WeeklyEditionFactPacket,
+  seasons: Doc<"seasons">[],
+): Promise<WeeklyEditionFactPacket> {
+  const analysisSeasonId =
+    packet.milestone?.analysisSeasonId ?? packet.season.id;
+  const analysisSeason = seasons.find(
+    (season) => String(season._id) === analysisSeasonId,
+  );
+  if (!analysisSeason) throw new Error("Research season not found");
+  const asOf = packet.milestone?.triggerDate ?? packet.week.endDate;
+  const [teams, franchises, owners, weeks, editions, seasonResults] =
+    await Promise.all([
+      ctx.db
+        .query("teams")
+        .withIndex("by_seasonId", (q) => q.eq("seasonId", analysisSeason._id))
+        .collect(),
+      ctx.db.query("franchises").collect(),
+      ctx.db.query("owners").collect(),
+      ctx.db
+        .query("weeks")
+        .withIndex("by_seasonId", (q) => q.eq("seasonId", analysisSeason._id))
+        .collect(),
+      ctx.db
+        .query("weeklyEditions")
+        .withIndex("by_status_publishedAt", (q) => q.eq("status", "published"))
+        .order("desc")
+        .take(20),
+      ctx.db
+        .query("matchups")
+        .withIndex("by_seasonId", (q) => q.eq("seasonId", analysisSeason._id))
+        .collect(),
+    ]);
+  const franchiseById = new Map(
+    franchises.map((row) => [String(row._id), row]),
+  );
+  const ownerById = new Map(owners.map((row) => [String(row._id), row]));
+  const currentOwnerIds = new Set(
+    teams.map((team) =>
+      String(franchiseById.get(String(team.franchiseId))?.ownerId ?? ""),
+    ),
+  );
+  const ownerTeams = (
+    await Promise.all(
+      franchises
+        .filter((franchise) => currentOwnerIds.has(String(franchise.ownerId)))
+        .map((franchise) =>
+          ctx.db
+            .query("teams")
+            .withIndex("by_franchiseId", (q) =>
+              q.eq("franchiseId", franchise._id),
+            )
+            .collect(),
+        ),
+    )
+  ).flat();
+  const seasonFacts = seasons
+    .filter((season) => asNumber(season.year) <= asNumber(analysisSeason.year))
+    .map((season) => ({
+      id: String(season._id),
+      name: season.name,
+      year: asNumber(season.year),
+    }));
+  const ownerFacts = teams.flatMap((team) => {
+    const franchise = franchiseById.get(String(team.franchiseId));
+    const owner = ownerById.get(String(franchise?.ownerId ?? ""));
+    if (!owner || !franchise) return [];
+    const participation = new Set(
+      ownerTeams
+        .filter(
+          (entry) =>
+            franchiseById.get(String(entry.franchiseId))?.ownerId === owner._id,
+        )
+        .map((entry) => String(entry.seasonId)),
+    );
+    return [
+      {
+        ownerId: String(owner._id),
+        name: owner.nickName?.trim().length
+          ? owner.nickName.trim()
+          : `${owner.firstName} ${owner.lastName}`.trim(),
+        teamId: String(team._id),
+        teamName: franchise.name,
+        ...ownerParticipation(seasonFacts, participation, analysisSeasonId),
+        ranking: packet.milestone?.gmRankings?.find(
+          (ranking) => ranking.ownerId === String(owner._id),
+        ),
+      },
+    ];
+  });
+  const upcomingWeeks = [...weeks]
+    .filter((week) => dateKey(week.startDate) > asOf)
+    .sort((a, b) => asNumber(a.weekNum) - asNumber(b.weekNum))
+    .slice(0, 2);
+  const upcoming = (
+    await Promise.all(
+      upcomingWeeks.map(async (week) => {
+        const matchups = await ctx.db
+          .query("matchups")
+          .withIndex("by_weekId", (q) => q.eq("weekId", week._id))
+          .collect();
+        return matchups
+          .filter((row) => row.gameType !== "LT")
+          .flatMap((row) => {
+            const home = ownerFacts.find(
+              (owner) => owner.teamId === String(row.homeTeamId),
+            );
+            const away = ownerFacts.find(
+              (owner) => owner.teamId === String(row.awayTeamId),
+            );
+            if (!home || !away) return [];
+            return [
+              {
+                matchupId: String(row._id),
+                homeTeamId: home.teamId,
+                awayTeamId: away.teamId,
+                homeTeamName: home.teamName,
+                awayTeamName: away.teamName,
+                gameType: String(row.gameType),
+                startDate: dateKey(week.startDate),
+              },
+            ];
+          });
+      }),
+    )
+  ).flat();
+  const research: NonNullable<WeeklyEditionFactPacket["research"]> = {
+    asOf,
+    analysisSeasonId,
+    coverage: [
+      "Owner participation across stored franchises and seasons",
+      "Next two scheduled weeks",
+      "Daily and weekly performance candidates",
+      "Contracts, cap and draft evidence where included by issue type",
+      "Recent published headlines",
+    ],
+    limitations: [
+      "Participation describes stored teams; missing records do not prove a debut or explain an absence.",
+      "Owner associations use the stored franchise owner; ownership transfers without historical attribution cannot be reconstructed.",
+      "Historical editions can contain current roster ratings or later-updated season aggregates. Do not describe those as contemporaneous or infer historical records from them.",
+      "All-time records require an explicitly complete historical baseline; a maximum within the supplied sample is not an all-time record.",
+      ...(ownerFacts.some((owner) => !owner.ranking)
+        ? ["GM Ladder rankings are unavailable for some owners in this issue."]
+        : []),
+    ],
+    owners: ownerFacts,
+    recentCoverage: editions
+      .filter(
+        (edition) =>
+          dateKey(edition.scheduledFor) < asOf &&
+          dateKey(edition.publishedAt) <= asOf,
+      )
+      .slice(0, 6)
+      .map((edition) => {
+        const content = edition.content as WeeklyEditionContent;
+        const priorFacts = edition.facts as WeeklyEditionFactPacket;
+        const usedCandidateIds = new Set(
+          priorFacts.research?.assignments?.flatMap((assignment) => [
+            assignment.leadCandidateId,
+            ...assignment.supportingCandidateIds,
+          ]) ?? [],
+        );
+        return {
+          editionId: String(edition._id),
+          evidenceHashes: (priorFacts.editorialCandidates ?? [])
+            .filter((candidate) => usedCandidateIds.has(candidate.id))
+            .map(hashWeeklyEditionSource),
+          headline: content.headline,
+          headlines: content.sections
+            .filter(
+              (section) => !edition.inactiveSectionIds?.includes(section.id),
+            )
+            .map((section) => section.headline),
+        };
+      }),
+  };
+  const enriched = {
+    ...packet,
+    research,
+    nextMatchups: upcoming.length ? upcoming : packet.nextMatchups,
+  };
+  const resultEvidence = teamResultEvidence(
+    ownerFacts.map((owner) => ({ teamId: owner.teamId, name: owner.teamName })),
+    seasonResults.flatMap((row) => {
+      const week = weeks.find((week) => week._id === row.weekId);
+      if (
+        !week ||
+        !dateKey(week.endDate) ||
+        dateKey(week.endDate) > asOf ||
+        !row.isComplete ||
+        ["QF", "SF", "F", "LT"].includes(String(row.gameType)) ||
+        row.homeScore == null ||
+        row.awayScore == null ||
+        !Number.isFinite(row.homeScore) ||
+        !Number.isFinite(row.awayScore)
+      )
+        return [];
+      return [
+        {
+          id: String(row._id),
+          weekNumber: asNumber(week.weekNum),
+          homeTeamId: String(row.homeTeamId),
+          awayTeamId: String(row.awayTeamId),
+          homeScore: Number(row.homeScore),
+          awayScore: Number(row.awayScore),
+        },
+      ];
+    }),
+  );
+  return {
+    ...enriched,
+    editorialCandidates: selectResearchEvidence([
+      ...packet.editorialCandidates,
+      ...researchCandidates(enriched, research),
+      ...resultEvidence,
+    ]),
+  };
+}
 
 export const prepareAiGeneration = internalMutation({
   args: {
@@ -2045,6 +2367,7 @@ export const prepareAiGeneration = internalMutation({
       scheduledForTimestamp = timestamp;
     }
 
+    facts = await enrichNewsroomResearch(ctx, facts, allSeasons);
     const existing = await ctx.db
       .query("weeklyEditions")
       .withIndex("by_seasonId_editionKey", (q) =>
@@ -2089,7 +2412,8 @@ export const finalizeAiGeneration = internalMutation({
     facts: v.any(),
     sourceHash: v.string(),
     raw: v.string(),
-    editedBy: v.id("authUsers"),
+    editedBy: v.optional(v.id("authUsers")),
+    automatic: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     return publicRow(
@@ -2121,80 +2445,140 @@ export const generateWithAi = action({
       internal.weeklyEditions.currentAiCommissioner,
       {},
     );
-    const apiKey = process.env.OPENAI_API_KEY?.trim();
-    if (!apiKey) {
-      throw new Error(
-        "OpenAI is not configured. Add OPENAI_API_KEY to this Convex deployment.",
-      );
-    }
+    return writeNewsroomEdition(ctx, args, commissioner.userId);
+  },
+});
 
-    const articleCount =
-      args.articleCount ?? DEFAULT_WEEKLY_EDITION_ARTICLE_COUNT;
-    const prepared = await ctx.runMutation(
-      internal.weeklyEditions.prepareAiGeneration,
-      {
-        seasonId: args.seasonId,
-        weekId: args.weekId,
-        issueType: args.issueType,
-      },
+async function writeNewsroomEdition(
+  ctx: ActionCtx,
+  args: {
+    seasonId: Id<"seasons">;
+    weekId: Id<"weeks">;
+    issueType: WeeklyEditionIssueType;
+    articleCount?: WeeklyEditionArticleCount;
+  },
+  editedBy?: Id<"authUsers">,
+): Promise<{
+  state: "inserted" | "updated";
+  model: string;
+  articleCount: WeeklyEditionArticleCount;
+  edition: WeeklyEdition;
+}> {
+  const apiKey = process.env.OPENAI_API_KEY?.trim();
+  if (!apiKey) {
+    throw new Error(
+      "OpenAI is not configured. Add OPENAI_API_KEY to this Convex deployment.",
     );
-    const facts = prepared.facts;
-    const model = newsroomModel();
-    const scoutPrompt = buildWeeklyEditionStoryScoutPrompt(facts, articleCount);
-    let pitchRaw = await requestNewsroomJson({
-      apiKey,
-      failureLabel: "run the newsroom pitch meeting",
-      request: buildWeeklyEditionPitchOpenAiRequest({
-        model,
-        prompt: scoutPrompt,
-      }),
-    });
-    let assignments: ReturnType<typeof selectWeeklyEditionStoryAssignments>;
-    try {
-      assignments = selectWeeklyEditionStoryAssignments(
-        facts,
-        parseWeeklyEditionStorySubmissions(pitchRaw),
-        articleCount,
-      );
-    } catch (error) {
-      const correctionPrompt = [
-        scoutPrompt,
-        "",
-        "PITCH_REVISION_REQUIRED: The pitch desk response failed validation.",
-        `Return every supplied writer exactly once, keep each pitch inside that writer's beat, use only exact STORY_LEDGER candidate IDs, and provide enough distinct eligible leads for ${articleCount} different writers.`,
-        `VALIDATION_ERROR=${error instanceof Error ? error.message : "Invalid pitch response"}`,
-        `REJECTED_PITCHES=${pitchRaw}`,
-      ].join("\n");
-      pitchRaw = await requestNewsroomJson({
-        apiKey,
-        failureLabel: "correct the newsroom pitches",
-        request: buildWeeklyEditionPitchOpenAiRequest({
-          model,
-          prompt: correctionPrompt,
-        }),
-      });
-      assignments = selectWeeklyEditionStoryAssignments(
-        facts,
-        parseWeeklyEditionStorySubmissions(pitchRaw),
-        articleCount,
-      );
-    }
-    const prompt = buildWeeklyEditionChatGptPrompt(
+  }
+
+  const articleCount =
+    args.articleCount ?? DEFAULT_WEEKLY_EDITION_ARTICLE_COUNT;
+  const prepared = await ctx.runMutation(
+    internal.weeklyEditions.prepareAiGeneration,
+    {
+      seasonId: args.seasonId,
+      weekId: args.weekId,
+      issueType: args.issueType,
+    },
+  );
+  const facts = prepared.facts;
+  const model = newsroomModel();
+  const scoutPrompt = buildWeeklyEditionStoryScoutPrompt(facts, articleCount);
+  let pitchRaw = await requestNewsroomJson({
+    apiKey,
+    failureLabel: "run the newsroom pitch meeting",
+    request: buildWeeklyEditionPitchOpenAiRequest({
+      model,
+      prompt: scoutPrompt,
+    }),
+  });
+  let assignments: ReturnType<typeof selectWeeklyEditionStoryAssignments>;
+  try {
+    assignments = selectWeeklyEditionStoryAssignments(
       facts,
-      assignments,
+      parseWeeklyEditionStorySubmissions(pitchRaw),
       articleCount,
     );
-    let raw = await requestNewsroomJson({
+  } catch (error) {
+    const correctionPrompt = [
+      scoutPrompt,
+      "",
+      "PITCH_REVISION_REQUIRED: The pitch desk response failed validation.",
+      `Return every supplied writer exactly once, keep each pitch inside that writer's beat, use only exact STORY_LEDGER candidate IDs, and provide enough distinct eligible leads for ${articleCount} different writers.`,
+      `VALIDATION_ERROR=${error instanceof Error ? error.message : "Invalid pitch response"}`,
+      `REJECTED_PITCHES=${pitchRaw}`,
+    ].join("\n");
+    pitchRaw = await requestNewsroomJson({
       apiKey,
-      failureLabel: "write the newsletter",
+      failureLabel: "correct the newsroom pitches",
+      request: buildWeeklyEditionPitchOpenAiRequest({
+        model,
+        prompt: correctionPrompt,
+      }),
+    });
+    assignments = selectWeeklyEditionStoryAssignments(
+      facts,
+      parseWeeklyEditionStorySubmissions(pitchRaw),
+      articleCount,
+    );
+  }
+  const prompt = buildWeeklyEditionChatGptPrompt(
+    facts,
+    assignments,
+    articleCount,
+  );
+  let raw = await requestNewsroomJson({
+    apiKey,
+    failureLabel: "write the newsletter",
+    request: buildWeeklyEditionOpenAiRequest({
+      model,
+      prompt,
+      articleCount,
+    }),
+  });
+  let validation = validateWeeklyEditionImport(raw, facts);
+  let validationErrors =
+    validation.valid && validation.content
+      ? validateWeeklyEditionStoryAssignments(
+          validation.content,
+          assignments,
+          facts,
+        )
+      : validation.errors;
+
+  const reviewContent = async (content: WeeklyEditionContent) =>
+    parseWeeklyEditionReview(
+      await requestNewsroomJson({
+        apiKey,
+        failureLabel: "review the newsletter",
+        request: buildWeeklyEditionReviewRequest({ model, facts, content }),
+      }),
+      content,
+    );
+  if (validation.valid && validation.content && validationErrors.length === 0) {
+    validationErrors = await reviewContent(validation.content);
+  }
+
+  if (!validation.valid || validationErrors.length > 0) {
+    const correctionPrompt = [
+      prompt,
+      "",
+      "REVISION_REQUIRED: The draft below failed the newsroom validator.",
+      `Correct every listed error without changing supported facts, adding claims, or changing the required ${articleCount}-article structure. Return only the corrected JSON object.`,
+      `VALIDATION_ERRORS=${JSON.stringify(validationErrors)}`,
+      `REJECTED_DRAFT=${raw}`,
+    ].join("\n");
+    raw = await requestNewsroomJson({
+      apiKey,
+      failureLabel: "correct the newsletter",
       request: buildWeeklyEditionOpenAiRequest({
         model,
-        prompt,
+        prompt: correctionPrompt,
         articleCount,
       }),
     });
-    let validation = validateWeeklyEditionImport(raw, facts);
-    let validationErrors =
+    validation = validateWeeklyEditionImport(raw, facts);
+    validationErrors =
       validation.valid && validation.content
         ? validateWeeklyEditionStoryAssignments(
             validation.content,
@@ -2202,62 +2586,45 @@ export const generateWithAi = action({
             facts,
           )
         : validation.errors;
-
-    if (!validation.valid || validationErrors.length > 0) {
-      const correctionPrompt = [
-        prompt,
-        "",
-        "REVISION_REQUIRED: The draft below failed the newsroom validator.",
-        `Correct every listed error without changing supported facts, adding claims, or changing the required ${articleCount}-article structure. Return only the corrected JSON object.`,
-        `VALIDATION_ERRORS=${JSON.stringify(validationErrors)}`,
-        `REJECTED_DRAFT=${raw}`,
-      ].join("\n");
-      raw = await requestNewsroomJson({
-        apiKey,
-        failureLabel: "correct the newsletter",
-        request: buildWeeklyEditionOpenAiRequest({
-          model,
-          prompt: correctionPrompt,
-          articleCount,
-        }),
-      });
-      validation = validateWeeklyEditionImport(raw, facts);
-      validationErrors =
-        validation.valid && validation.content
-          ? validateWeeklyEditionStoryAssignments(
-              validation.content,
-              assignments,
-              facts,
-            )
-          : validation.errors;
+    if (
+      validation.valid &&
+      validation.content &&
+      validationErrors.length === 0
+    ) {
+      validationErrors = await reviewContent(validation.content);
     }
+  }
 
-    if (!validation.valid || validationErrors.length > 0) {
-      throw new Error(
-        `OpenAI returned a newsletter that failed validation:\n${validationErrors.join(
-          "\n",
-        )}`,
-      );
-    }
-
-    const edition = await ctx.runMutation(
-      internal.weeklyEditions.finalizeAiGeneration,
-      {
-        ...prepared,
-        raw,
-        editedBy: commissioner.userId,
-      },
+  if (!validation.valid || validationErrors.length > 0) {
+    throw new Error(
+      `OpenAI returned a newsletter that failed validation:\n${validationErrors.join(
+        "\n",
+      )}`,
     );
-    if (!edition)
-      throw new Error("The generated newsletter could not be saved");
-    return {
-      state: prepared.existingEditionId ? "updated" : "inserted",
-      model,
-      articleCount,
-      edition: edition as unknown as WeeklyEdition,
-    };
-  },
-});
+  }
+
+  const publicationFacts = facts.research
+    ? { ...facts, research: { ...facts.research, assignments } }
+    : facts;
+  const edition = await ctx.runMutation(
+    internal.weeklyEditions.finalizeAiGeneration,
+    {
+      ...prepared,
+      facts: publicationFacts,
+      sourceHash: hashWeeklyEditionSource(publicationFacts),
+      raw,
+      editedBy,
+      automatic: !editedBy,
+    },
+  );
+  if (!edition) throw new Error("The generated newsletter could not be saved");
+  return {
+    state: prepared.existingEditionId ? "updated" : "inserted",
+    model,
+    articleCount,
+    edition: edition as unknown as WeeklyEdition,
+  };
+}
 
 export const generateHistorical = mutation({
   args: {
@@ -2485,6 +2852,53 @@ export const scanDueMilestones = internalMutation({
   handler: async (ctx) => {
     const today = dateKey(Date.now());
     const seasons = await ctx.db.query("seasons").collect();
+    if (process.env.OPENAI_API_KEY?.trim()) {
+      let queued = 0;
+      for (const season of seasons.filter(
+        (row) => row.isActive || nextChronologicalSeason(seasons, row).isActive,
+      )) {
+        const weeks = await ctx.db
+          .query("weeks")
+          .withIndex("by_seasonId", (q) => q.eq("seasonId", season._id))
+          .collect();
+        const completed = [...weeks]
+          .filter((week) => dateKey(week.endDate) < today)
+          .sort((a, b) => asNumber(b.weekNum) - asNumber(a.weekNum));
+        const finalWeek = [...weeks].sort(
+          (a, b) => asNumber(b.weekNum) - asNumber(a.weekNum),
+        )[0];
+        if (
+          season.isActive &&
+          completed[0] &&
+          completed[0]._id !== finalWeek?._id
+        )
+          queued += Number(
+            await queueAutomaticEdition(ctx, season, completed[0], "weekly"),
+          );
+        if (!finalWeek || dateKey(finalWeek.endDate) >= today) continue;
+        const milestone = milestoneSchedule(
+          nextChronologicalSeason(seasons, season),
+          finalWeek,
+        )
+          .filter(
+            (entry) =>
+              entry.scheduledFor <= today &&
+              (toUtcTimestamp(entry.scheduledFor) ?? 0) >=
+                Date.now() - 21 * 86_400_000,
+          )
+          .sort((a, b) => b.scheduledFor.localeCompare(a.scheduledFor))[0];
+        if (milestone)
+          queued += Number(
+            await queueAutomaticEdition(
+              ctx,
+              season,
+              finalWeek,
+              milestone.issueType,
+            ),
+          );
+      }
+      return { queued };
+    }
     const result = {
       processed: 0,
       inserted: 0,
@@ -2525,5 +2939,128 @@ export const scanDueMilestones = internalMutation({
       }
     }
     return result;
+  },
+});
+
+async function queueAutomaticEdition(
+  ctx: MutationCtx,
+  season: Doc<"seasons">,
+  week: Doc<"weeks">,
+  issueType: WeeklyEditionIssueType,
+) {
+  const editionKey =
+    issueType === "weekly"
+      ? `week:${String(week._id)}`
+      : `milestone:${issueType}`;
+  const existing = await ctx.db
+    .query("weeklyEditions")
+    .withIndex("by_seasonId_editionKey", (q) =>
+      q.eq("seasonId", season._id).eq("editionKey", editionKey),
+    )
+    .unique();
+  if (
+    existing &&
+    (existing.generationMode !== "template" ||
+      existing.status !== "published" ||
+      existing.editedBy ||
+      existing.inactiveSectionIds?.length)
+  )
+    return false;
+  const job = await ctx.db
+    .query("weeklyEditionGenerationJobs")
+    .withIndex("by_seasonId_editionKey", (q) =>
+      q.eq("seasonId", season._id).eq("editionKey", editionKey),
+    )
+    .unique();
+  const now = Date.now();
+  if (
+    job &&
+    (job.status === "succeeded" || job.attempts >= 3 || job.leaseUntil > now)
+  )
+    return false;
+  const values = {
+    seasonId: season._id,
+    weekId: week._id,
+    editionKey,
+    issueType,
+    status: "queued" as const,
+    attempts: (job?.attempts ?? 0) + 1,
+    leaseUntil: now + 30 * 60_000,
+    updatedAt: now,
+    error: undefined,
+  };
+  const jobId = job
+    ? job._id
+    : await ctx.db.insert("weeklyEditionGenerationJobs", values);
+  if (job) await ctx.db.patch(jobId, values);
+  await ctx.scheduler.runAfter(
+    0,
+    internal.weeklyEditions.generateAutomaticEdition,
+    { jobId, attempt: values.attempts },
+  );
+  return true;
+}
+
+export const transitionAutomaticEdition = internalMutation({
+  args: {
+    jobId: v.id("weeklyEditionGenerationJobs"),
+    attempt: v.number(),
+    status: v.union(
+      v.literal("running"),
+      v.literal("succeeded"),
+      v.literal("failed"),
+    ),
+    error: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const job = await ctx.db.get(args.jobId);
+    if (
+      !job ||
+      job.attempts !== args.attempt ||
+      (args.status === "running"
+        ? job.status !== "queued" || job.leaseUntil < Date.now()
+        : job.status !== "running")
+    )
+      return null;
+    await ctx.db.patch(job._id, {
+      status: args.status,
+      error: args.error,
+      updatedAt: Date.now(),
+      leaseUntil: args.status === "running" ? Date.now() + 30 * 60_000 : 0,
+    });
+    return job;
+  },
+});
+
+export const generateAutomaticEdition = internalAction({
+  args: { jobId: v.id("weeklyEditionGenerationJobs"), attempt: v.number() },
+  handler: async (ctx, args): Promise<void> => {
+    const job = await ctx.runMutation(
+      internal.weeklyEditions.transitionAutomaticEdition,
+      { ...args, status: "running" },
+    );
+    if (!job) return;
+    try {
+      await writeNewsroomEdition(ctx, {
+        seasonId: job.seasonId,
+        weekId: job.weekId,
+        issueType: job.issueType,
+      });
+      await ctx.runMutation(
+        internal.weeklyEditions.transitionAutomaticEdition,
+        { ...args, status: "succeeded" },
+      );
+    } catch {
+      // Do not persist provider payloads, drafts, or credentials in the run log.
+      await ctx.runMutation(
+        internal.weeklyEditions.transitionAutomaticEdition,
+        {
+          ...args,
+          status: "failed",
+          error:
+            "Automatic reporting failed. Generate this edition in the Newsroom to inspect validation or source availability. Retries stop after three attempts.",
+        },
+      );
+    }
   },
 });

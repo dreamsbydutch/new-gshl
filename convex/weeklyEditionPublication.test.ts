@@ -8,6 +8,7 @@ import {
 } from "../tools/testing/convexMutationFixture";
 import {
   publishTemplateEdition,
+  publishAiEdition,
   type EditionPublicationSource,
 } from "./lib/weeklyEditionPublication";
 import {
@@ -25,6 +26,31 @@ import {
   setHomeActive,
   setSectionActive,
 } from "./weeklyEditions";
+
+void test("automatic finalization protects edited and hidden editions at publication time", async () => {
+  for (const overrides of [
+    { editedBy: "commissioner" },
+    { status: "hidden" },
+    { generationMode: "openai" },
+    { inactiveSectionIds: ["article_1"] },
+  ]) {
+    const f = fixture();
+    const { request, edition, raw } = await published(f);
+    f.put("weeklyEditions", edition._id, { ...edition, ...overrides });
+    await assert.rejects(
+      publishAiEdition(f.ctx, {
+        ...request,
+        existingEditionId: edition._id,
+        expectedUpdatedAt: edition.updatedAt,
+        sourceHash: hashWeeklyEditionSource(request.facts),
+        raw,
+        automatic: true,
+      }),
+      /protected from automatic replacement/,
+    );
+    assert.equal(f.rows("weeklyEditionRevisions").length, 0);
+  }
+});
 
 function fixture() {
   const f = mutationFixture();

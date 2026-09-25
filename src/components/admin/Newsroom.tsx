@@ -259,11 +259,42 @@ export function Newsroom() {
           GSHL Press Box Newsroom
         </h2>
         <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-          Choose a completed week, issue type, and story count. The newsroom
-          builds a grounded draft from the league record, then checks every
-          article against the stored facts before it can go live.
+          The Press Box researches league evidence, finds story angles, writes
+          articles, and runs an editorial review before publishing. Generate an
+          edition below to run the reporting desk yourself.
         </p>
       </header>
+
+      {newsroom.aiStatus?.automaticPublication ? (
+        <details className="rounded-xl border border-slate-200 bg-white p-4 text-sm">
+          <summary className="cursor-pointer font-semibold text-slate-900">
+            Automatic publication is on · Checks for due editions every six
+            hours
+          </summary>
+          <p className="mt-3 text-slate-600">
+            Due editions go through research, pitches, writing, and editorial
+            review. Edited and hidden editions are protected. Failed runs retry
+            up to three times; AI review reduces errors but still benefits from
+            your editorial oversight.
+          </p>
+          <ul className="mt-3 space-y-2">
+            {newsroom.aiStatus.recentRuns?.map((run) => (
+              <li key={run.id} className="rounded-lg bg-slate-50 p-3">
+                <span className="font-medium">
+                  {run.issueType.replaceAll("_", " ")} · {run.status} · Attempt{" "}
+                  {run.attempts}
+                </span>
+                {run.error ? (
+                  <p className="mt-1 text-red-700">{run.error}</p>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+          {!newsroom.aiStatus.recentRuns?.length ? (
+            <p className="mt-3 text-slate-500">No automatic runs yet.</p>
+          ) : null}
+        </details>
+      ) : null}
 
       {notice ? (
         <p
@@ -705,6 +736,29 @@ export function Newsroom() {
                 }}
                 preview
               />
+            ) : null}
+
+            {selectedEdition.facts.research ? (
+              <details className="rounded-xl border border-slate-200 bg-white p-5 text-sm">
+                <summary className="cursor-pointer font-semibold text-slate-900">
+                  Reporting evidence ·{" "}
+                  {selectedEdition.facts.editorialCandidates.length} evidence
+                  cards
+                </summary>
+                <p className="mt-3 text-slate-600">
+                  As of {selectedEdition.facts.research.asOf} ·{" "}
+                  {selectedEdition.facts.research.owners.length} owner histories
+                  · {selectedEdition.facts.nextMatchups.length} upcoming
+                  matchups
+                </p>
+                <ul className="mt-3 list-disc space-y-1 pl-5 text-slate-600">
+                  {selectedEdition.facts.research.limitations.map(
+                    (limitation) => (
+                      <li key={limitation}>{limitation}</li>
+                    ),
+                  )}
+                </ul>
+              </details>
             ) : null}
 
             <details className="rounded-xl border border-slate-200 bg-white shadow-sm">

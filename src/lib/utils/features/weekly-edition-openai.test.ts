@@ -5,11 +5,89 @@ import {
   buildWeeklyEditionPitchOpenAiRequest,
   extractWeeklyEditionOpenAiText,
   parseWeeklyEditionStorySubmissions,
+  parseWeeklyEditionReview,
 } from "./weekly-edition-openai";
 import {
   buildWeeklyEditionArticleSlots,
   parseWeeklyEditionArticleCount,
 } from "./weekly-edition-articles";
+
+void test("incomplete model output is rejected even when it contains parseable JSON", () => {
+  assert.throws(
+    () =>
+      extractWeeklyEditionOpenAiText({
+        status: "incomplete",
+        output_text: '{"headline":"Partial"}',
+      }),
+    /did not complete/,
+  );
+  assert.throws(
+    () =>
+      extractWeeklyEditionOpenAiText({ status: "failed", output_text: "{}" }),
+    /did not complete/,
+  );
+});
+
+void test("editorial review must cover the front page and every article", () => {
+  const content = {
+    headline: "Test",
+    deck: "Test",
+    sections: [
+      {
+        id: "article_1",
+        kind: "primary_article" as const,
+        eyebrow: "Test",
+        headline: "Test",
+        body: "Test",
+        links: [],
+      },
+    ],
+  };
+  assert.throws(
+    () =>
+      parseWeeklyEditionReview(
+        JSON.stringify({ reviewedArticleIds: ["article_1"], issues: [] }),
+        content,
+      ),
+    /every article/,
+  );
+  assert.throws(
+    () =>
+      parseWeeklyEditionReview(
+        JSON.stringify({
+          reviewedArticleIds: ["front_page", "front_page"],
+          issues: [],
+        }),
+        content,
+      ),
+    /every article/,
+  );
+  assert.deepEqual(
+    parseWeeklyEditionReview(
+      JSON.stringify({
+        reviewedArticleIds: ["front_page", "article_1"],
+        issues: [
+          {
+            articleId: "article_1",
+            detail: "The quoted score has no supporting matchup.",
+          },
+        ],
+      }),
+      content,
+    ),
+    ["article_1: The quoted score has no supporting matchup."],
+  );
+  assert.deepEqual(
+    parseWeeklyEditionReview(
+      JSON.stringify({
+        reviewedArticleIds: ["front_page", "article_1"],
+        issues: [],
+      }),
+      content,
+    ),
+    [],
+  );
+});
 
 void test("newsletter article counts accept six through ten", () => {
   assert.equal(parseWeeklyEditionArticleCount("8"), 8);

@@ -153,13 +153,16 @@ export async function publishAiEdition(
     expectedUpdatedAt?: number;
     sourceHash: string;
     raw: string;
-    editedBy: Id<"authUsers">;
+    editedBy?: Id<"authUsers">;
+    automatic?: boolean;
   },
 ) {
   // Generation crosses an action boundary: revalidate the initiating commissioner's access.
-  const user = await ctx.db.get(request.editedBy);
-  if (user?.status !== "active" || user.role !== "commissioner")
-    throw new Error("Forbidden");
+  if (!request.automatic) {
+    const user = request.editedBy ? await ctx.db.get(request.editedBy) : null;
+    if (user?.status !== "active" || user.role !== "commissioner")
+      throw new Error("Forbidden");
+  }
   if (hashWeeklyEditionSource(request.facts) !== request.sourceHash) {
     throw new Error("The newsletter fact packet failed its integrity check");
   }
@@ -180,6 +183,16 @@ export async function publishAiEdition(
   )
     throw new Error(changed);
   if (!existing && (await findEdition(ctx, request))) throw new Error(changed);
+  if (
+    request.automatic &&
+    existing &&
+    (existing.generationMode !== "template" ||
+      existing.status !== "published" ||
+      existing.editedBy ||
+      existing.inactiveSectionIds?.length)
+  ) {
+    throw new Error("This edition is protected from automatic replacement");
+  }
   // Select only stored source fields: concurrency tokens and raw model output stay transient.
   const source: EditionPublicationSource = {
     seasonId: request.seasonId,

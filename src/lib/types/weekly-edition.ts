@@ -190,6 +190,9 @@ export interface WeeklyEditionMissedStartFact {
 
 export interface WeeklyEditionNextMatchupFact {
   matchupId: string;
+  homeTeamId?: string;
+  awayTeamId?: string;
+  startDate?: string;
   gameType?: string;
   homeTeamName: string;
   awayTeamName: string;
@@ -211,6 +214,9 @@ export type WeeklyEditionEditorialCandidateKind =
   | "ufa"
   | "draft"
   | "gm_ranking"
+  | "owner_history"
+  | "upcoming_matchup"
+  | "trend"
   | "activity"
   | "performance"
   | "missed_start";
@@ -233,6 +239,7 @@ export interface WeeklyEditionEditorialMetric {
 
 export interface WeeklyEditionEditorialCandidate {
   id: string;
+  relatedTeamIds?: string[];
   kind: WeeklyEditionEditorialCandidateKind;
   scope: WeeklyEditionEditorialCandidateScope;
   importance: number;
@@ -340,6 +347,7 @@ export interface WeeklyEditionAchievementSnapshot {
 
 export interface WeeklyEditionFactPacket {
   version: 1;
+  research?: WeeklyEditionResearch;
   season: {
     id: string;
     name: string;
@@ -402,6 +410,7 @@ export interface WeeklyEditionBuyoutFact {
 }
 
 export interface WeeklyEditionGmRankingFact {
+  ownerId?: string;
   rank: number;
   gmName: string;
   teamName?: string;
@@ -411,6 +420,30 @@ export interface WeeklyEditionGmRankingFact {
   overallLosses: number;
   playoffAppearances: number;
   cups: number;
+}
+
+export interface WeeklyEditionResearch {
+  assignments?: WeeklyEditionStoryAssignment[];
+  asOf: string;
+  analysisSeasonId: string;
+  coverage: string[];
+  limitations: string[];
+  owners: {
+    ownerId: string;
+    name: string;
+    teamId: string;
+    teamName: string;
+    seasons: { id: string; name: string; year: number }[];
+    absentSeasons: number;
+    status: "returning" | "continuing" | "first_recorded_season";
+    ranking?: WeeklyEditionGmRankingFact;
+  }[];
+  recentCoverage: {
+    editionId: string;
+    headline: string;
+    headlines: string[];
+    evidenceHashes?: string[];
+  }[];
 }
 
 export interface WeeklyEditionTeamOutlookFact {
@@ -589,6 +622,7 @@ export interface WeeklyEditionContractCoverageSource {
 }
 
 export interface BuildWeeklyEditionFactPacketInput {
+  comparisons?: WeeklyEditionEditorialCandidate[];
   season: WeeklyEditionFactPacket["season"];
   week: WeeklyEditionFactPacket["week"];
   teams: WeeklyEditionTeamFact[];
@@ -674,6 +708,15 @@ export interface WeeklyEditionQueryState<T> {
 export interface WeeklyEditionAiStatus {
   configured: boolean;
   model: string;
+  automaticPublication?: boolean;
+  recentRuns?: {
+    id: string;
+    issueType: WeeklyEditionIssueType;
+    status: "queued" | "running" | "succeeded" | "failed";
+    attempts: number;
+    updatedAt: number;
+    error?: string;
+  }[];
 }
 
 export interface WeeklyEditionAiGenerationResult {
