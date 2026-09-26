@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { ConvexError } from "convex/values";
 import {
   mutationFixture,
   invokeMutation,
@@ -10,6 +11,82 @@ import {
   prepareAiGeneration,
 } from "./weeklyEditions";
 import type { WeeklyEditionFactPacket } from "../src/lib/types";
+
+void test("manual preseason selection covers that season, not the following draft", async () => {
+  const f = mutationFixture();
+  for (const [id, year] of [
+    ["previous", 2026],
+    ["selected", 2027],
+    ["next", 2028],
+  ] as const) {
+    f.put("seasons", id, {
+      name: `${year - 1}-${year}`,
+      year,
+      startDate: `${year - 1}-10-01`,
+      endDate: `${year}-04-15`,
+      draftStartAt: `${year - 1}-09-20`,
+      categories: [],
+    });
+    f.put("weeks", `${id}:week`, {
+      seasonId: id,
+      weekNum: id === "previous" ? 25 : 1,
+      startDate: id === "previous" ? "2026-04-08" : `${year - 1}-10-01`,
+      endDate: id === "previous" ? "2026-04-15" : `${year - 1}-10-07`,
+    });
+    f.put("teams", `${id}:team`, {
+      seasonId: id,
+      franchiseId: "club",
+      confId: "conference",
+    });
+    f.put("draftPicks", `${id}:pick`, {
+      seasonId: id,
+      gshlTeamId: `${id}:team`,
+      round: 1,
+      pick: 1,
+      isSigning: false,
+      ...(id === "selected" ? { playerId: "player" } : {}),
+    });
+  }
+  f.put("franchises", "club", {
+    ownerId: "owner",
+    name: "Selected club",
+    abbr: "SC",
+  });
+  f.put("players", "player", { fullName: "Drafted player", nhlPos: ["C"] });
+  const args = {
+    seasonId: "selected",
+    weekId: "selected:week",
+    issueType: "preseason",
+    seasonSelection: "edition",
+  };
+  const prepared = (await invokeMutation(prepareAiGeneration, f.ctx, args)) as {
+    seasonId: string;
+    weekId: string;
+    facts: WeeklyEditionFactPacket;
+  };
+  assert.equal(prepared.seasonId, "previous");
+  assert.equal(prepared.weekId, "previous:week");
+  assert.equal(prepared.facts.research?.analysisSeasonId, "selected");
+  assert.equal(f.rows("weeklyEditions").length, 0);
+  const automatic = (await invokeMutation(prepareAiGeneration, f.ctx, {
+    seasonId: "previous",
+    weekId: "previous:week",
+    issueType: "preseason",
+  })) as { facts: WeeklyEditionFactPacket };
+  assert.deepEqual(prepared.facts, automatic.facts);
+  f.put("draftPicks", "selected:pick", {
+    seasonId: "selected",
+    isSigning: false,
+  });
+  await assert.rejects(
+    invokeMutation(prepareAiGeneration, f.ctx, args),
+    (error: unknown) => {
+      assert.ok(error instanceof ConvexError);
+      assert.match(String(error.data), /2026-2027 draft is not complete/);
+      return true;
+    },
+  );
+});
 
 function fixture() {
   const f = mutationFixture();

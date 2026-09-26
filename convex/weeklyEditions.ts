@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/prefer-optional-chain */
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import {
   action,
   internalMutation,
@@ -1165,6 +1165,41 @@ function nextChronologicalSeason(
   return index >= 0 ? (ordered[index + 1] ?? season) : season;
 }
 
+// Scheduled milestones are anchored to the season that just ended. Manual
+// offseason issues select the season being covered, then reuse that same anchor.
+async function manualEditionAnchor(
+  ctx: MutationCtx,
+  seasons: Doc<"seasons">[],
+  selectedSeason: Doc<"seasons">,
+  selectedWeek: Doc<"weeks">,
+  issueType: WeeklyEditionIssueType,
+) {
+  if (issueType === "weekly" || issueType === "final_recap") {
+    return { season: selectedSeason, week: selectedWeek };
+  }
+  const previousSeason = [...seasons]
+    .filter((season) => asNumber(season.year) < asNumber(selectedSeason.year))
+    .sort((left, right) => asNumber(right.year) - asNumber(left.year))[0];
+  if (!previousSeason) {
+    throw new ConvexError(
+      "The selected season has no previous season available for offseason reporting.",
+    );
+  }
+  const weeks = await ctx.db
+    .query("weeks")
+    .withIndex("by_seasonId", (q) => q.eq("seasonId", previousSeason._id))
+    .collect();
+  const finalWeek = [...weeks].sort(
+    (left, right) => asNumber(right.weekNum) - asNumber(left.weekNum),
+  )[0];
+  if (!finalWeek) {
+    throw new ConvexError(
+      "The previous season has no final week available for offseason reporting.",
+    );
+  }
+  return { season: previousSeason, week: finalWeek };
+}
+
 async function buildPreseasonGmRankingFacts(
   ctx: MutationCtx,
   seasons: Doc<"seasons">[],
@@ -1439,7 +1474,9 @@ async function buildMilestoneSource(
     issueType === "preseason" &&
     (draftPicks.length === 0 || draftPicks.some((pick) => !pick.playerId))
   ) {
-    throw new Error("The draft is not complete");
+    throw new ConvexError(
+      `The ${analysisSeason.name} draft is not complete. Choose a pre-draft issue until all picks are recorded.`,
+    );
   }
 
   const franchiseById = new Map(
@@ -2315,16 +2352,31 @@ export const prepareAiGeneration = internalMutation({
     seasonId: v.id("seasons"),
     weekId: v.id("weeks"),
     issueType: weeklyEditionIssueTypeValidator,
+    seasonSelection: v.optional(v.literal("edition")),
   },
   handler: async (ctx, args) => {
-    const [season, week, allSeasons] = await Promise.all([
+    const [selectedSeason, selectedWeek, allSeasons] = await Promise.all([
       ctx.db.get(args.seasonId),
       ctx.db.get(args.weekId),
       ctx.db.query("seasons").collect(),
     ]);
-    if (!season || !week || week.seasonId !== season._id) {
-      throw new Error("Season or week not found");
+    if (
+      !selectedSeason ||
+      !selectedWeek ||
+      selectedWeek.seasonId !== selectedSeason._id
+    ) {
+      throw new ConvexError("Season or week not found");
     }
+    const { season, week } =
+      args.seasonSelection === "edition"
+        ? await manualEditionAnchor(
+            ctx,
+            allSeasons,
+            selectedSeason,
+            selectedWeek,
+            args.issueType,
+          )
+        : { season: selectedSeason, week: selectedWeek };
 
     const analysisSeason = nextChronologicalSeason(allSeasons, season);
     const scheduledFor =
@@ -2482,6 +2534,7 @@ async function writeNewsroomEdition(
       seasonId: args.seasonId,
       weekId: args.weekId,
       issueType: args.issueType,
+      ...(editedBy ? { seasonSelection: "edition" as const } : {}),
     },
   );
   const facts = prepared.facts;
@@ -2637,14 +2690,25 @@ export const generateHistorical = mutation({
   },
   handler: async (ctx, args) => {
     const user = await requireCommissioner(ctx);
-    const [season, week, allSeasons] = await Promise.all([
+    const [selectedSeason, selectedWeek, allSeasons] = await Promise.all([
       ctx.db.get(args.seasonId),
       ctx.db.get(args.weekId),
       ctx.db.query("seasons").collect(),
     ]);
-    if (!season || !week || week.seasonId !== season._id)
-      throw new Error("Season or week not found");
+    if (
+      !selectedSeason ||
+      !selectedWeek ||
+      selectedWeek.seasonId !== selectedSeason._id
+    )
+      throw new ConvexError("Season or week not found");
     const issueType = args.issueType ?? "weekly";
+    const { season, week } = await manualEditionAnchor(
+      ctx,
+      allSeasons,
+      selectedSeason,
+      selectedWeek,
+      issueType,
+    );
     const analysisSeason = nextChronologicalSeason(allSeasons, season);
     const scheduledFor =
       milestoneSchedule(analysisSeason, week).find(

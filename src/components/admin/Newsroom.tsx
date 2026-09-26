@@ -372,7 +372,7 @@ export function Newsroom() {
 
       <div className="grid gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm md:grid-cols-2 xl:grid-cols-3">
         <label className="text-sm font-medium text-slate-700">
-          Generate a completed week
+          Season to cover
           <select
             value={seasonId}
             onChange={(event) => {
@@ -430,6 +430,10 @@ export function Newsroom() {
             <option value="pre_draft">Pre-draft issue</option>
             <option value="preseason">Preseason preview</option>
           </select>
+          <span className="mt-1 block text-xs font-normal leading-5 text-slate-500">
+            Offseason and preseason issues cover the selected season and use the
+            previous season’s final week for historical context.
+          </span>
         </label>
         <label className="text-sm font-medium text-slate-700">
           AI story count

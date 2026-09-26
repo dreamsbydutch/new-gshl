@@ -182,9 +182,16 @@ void test("AI pipeline reviews corrected copy and never publishes unresolved edi
         )._handler(
           {
             runQuery: async () => ({ userId: "commissioner" }),
-            runMutation: async (fn: Parameters<typeof getFunctionName>[0]) => {
-              if (getFunctionName(fn) === "weeklyEditions:prepareAiGeneration")
+            runMutation: async (
+              fn: Parameters<typeof getFunctionName>[0],
+              args: { seasonSelection?: string },
+            ) => {
+              if (
+                getFunctionName(fn) === "weeklyEditions:prepareAiGeneration"
+              ) {
+                assert.equal(args.seasonSelection, "edition");
                 return { facts, seasonId: "s", weekId: "w" };
+              }
               publications++;
               return { id: "edition" };
             },
