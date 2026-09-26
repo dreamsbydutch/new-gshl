@@ -45,7 +45,6 @@ function useNHLResource<T>(
       try {
         const response = await fetch(url!, {
           signal: controller.signal,
-          cache: "no-store",
         });
         if (!response.ok)
           throw new Error(
