@@ -128,7 +128,7 @@ async function requestNewsroomJson({
   deadlineAt,
 }: {
   apiKey: string;
-  request: object;
+  request: { model: string; text: { format: { name: string } } };
   failureLabel: string;
   deadlineAt: number;
 }) {
@@ -138,6 +138,11 @@ async function requestNewsroomJson({
       "The Newsroom reached its generation time limit before validation finished. No edition was published. Please retry.",
     );
   }
+  const modelReceipt = {
+    stage: request.text.format.name,
+    requestedModel: request.model,
+  };
+  console.info("Newsroom OpenAI request", modelReceipt);
   const response = await fetch("https://api.openai.com/v1/responses", {
     method: "POST",
     headers: {
@@ -148,6 +153,15 @@ async function requestNewsroomJson({
     signal: AbortSignal.timeout(Math.min(90_000, remainingMs)),
   });
   const payload: unknown = await response.json().catch(() => null);
+  const returnedModel =
+    payload && typeof payload === "object" && "model" in payload
+      ? payload.model
+      : undefined;
+  console.info("Newsroom OpenAI response", {
+    ...modelReceipt,
+    returnedModel: typeof returnedModel === "string" ? returnedModel : null,
+    status: response.status,
+  });
   if (!response.ok) {
     const detail = openAiErrorMessage(payload);
     throw new Error(
@@ -2538,6 +2552,11 @@ async function writeNewsroomEdition(
   const articleCount =
     args.articleCount ?? DEFAULT_WEEKLY_EDITION_ARTICLE_COUNT;
   const model = newsroomModel(args.model);
+  console.info("Newsroom edition model", {
+    trigger: editedBy ? "manual" : "automatic",
+    requestedModel: args.model ?? null,
+    resolvedModel: model,
+  });
   const deadlineAt = Date.now() + 8 * 60_000;
   const prepared = await ctx.runMutation(
     internal.weeklyEditions.prepareAiGeneration,

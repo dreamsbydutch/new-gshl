@@ -429,12 +429,18 @@ void test("AI pipeline reviews corrected copy and never publishes unresolved edi
   delete process.env.OPENAI_NEWSROOM_MODEL;
   process.env.OPENAI_API_KEY = "test-only";
   try {
-    for (const resolves of [true, false]) {
-      const expectedModel = resolves ? "gpt-5.6-terra" : "gpt-5.6-sol";
+    for (const scenario of [
+      { resolves: true, selection: undefined },
+      { resolves: true, selection: "gpt-5.4-mini" },
+      { resolves: false, selection: "gpt-5.6-sol" },
+    ]) {
+      const { resolves, selection } = scenario;
+      const expectedModel = selection ?? "gpt-5.6-terra";
       const { facts, submissions, content } = writingFixture();
       let reviews = 0;
       let publications = 0;
       const requests: string[] = [];
+      const modelLog = mock.method(console, "info", () => undefined);
       const fetchMock = mock.method(
         globalThis,
         "fetch",
@@ -481,6 +487,7 @@ void test("AI pipeline reviews corrected copy and never publishes unresolved edi
           }
           return new Response(
             JSON.stringify({
+              model: `${expectedModel}-2026-03-17`,
               status: "completed",
               output_text: JSON.stringify(result),
             }),
@@ -514,12 +521,32 @@ void test("AI pipeline reviews corrected copy and never publishes unresolved edi
             seasonId: "s",
             weekId: "w",
             issueType: "weekly",
-            ...(resolves ? {} : { model: expectedModel }),
+            ...(selection ? { model: selection } : {}),
           },
         );
         if (resolves) await run;
         else await assert.rejects(run, /unsupported claim/);
         assert.equal(publications, resolves ? 1 : 0);
+        assert.deepEqual(modelLog.mock.calls[0]?.arguments, [
+          "Newsroom edition model",
+          {
+            trigger: "manual",
+            requestedModel: selection ?? null,
+            resolvedModel: expectedModel,
+          },
+        ]);
+        const receipts = modelLog.mock.calls.filter(
+          (call) => call.arguments[0] === "Newsroom OpenAI response",
+        );
+        assert.equal(receipts.length, requests.length);
+        for (const [index, receipt] of receipts.entries()) {
+          assert.deepEqual(receipt.arguments[1], {
+            stage: requests[index],
+            requestedModel: expectedModel,
+            returnedModel: `${expectedModel}-2026-03-17`,
+            status: 200,
+          });
+        }
         assert.deepEqual(requests, [
           "gshl_newsroom_pitches",
           "gshl_weekly_edition",
@@ -538,6 +565,7 @@ void test("AI pipeline reviews corrected copy and never publishes unresolved edi
         ]);
       } finally {
         fetchMock.mock.restore();
+        modelLog.mock.restore();
       }
     }
   } finally {
