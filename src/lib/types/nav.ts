@@ -10,10 +10,16 @@
 import type { ReactNode } from "react";
 import type { SeasonSummary } from "./season";
 
-export type ScheduleNavigationView = "week" | "team";
+export type ScheduleNavigationView = "week" | "team" | "nhl";
 
 export type StandingsNavigationView =
-  "overall" | "conference" | "wildcard" | "power" | "playoff" | "awards";
+  | "overall"
+  | "conference"
+  | "wildcard"
+  | "power"
+  | "playoff"
+  | "awards"
+  | "nhl";
 
 export type LockerRoomNavigationView =
   | "roster"

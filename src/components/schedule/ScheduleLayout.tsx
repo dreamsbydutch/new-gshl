@@ -20,6 +20,7 @@ export function ScheduleLayout({ children }: { children: React.ReactNode }) {
   const scheduleTypes: LabeledToggleOption[] = [
     { key: "team", label: "Team" },
     { key: "week", label: "Week" },
+    { key: "nhl", label: "NHL" },
   ];
 
   const selectedScheduleType =
@@ -32,7 +33,13 @@ export function ScheduleLayout({ children }: { children: React.ReactNode }) {
             items={scheduleTypes}
             selectedItem={selectedScheduleType}
             onSelect={(type: LabeledToggleOption) =>
-              navigation.selectView(type.key === "team" ? "team" : "week")
+              navigation.selectView(
+                type.key === "team"
+                  ? "team"
+                  : type.key === "nhl"
+                    ? "nhl"
+                    : "week",
+              )
             }
             getItemKey={(type: LabeledToggleOption) => type.key}
             getItemLabel={(type: LabeledToggleOption) => type.label}
@@ -47,7 +54,7 @@ export function ScheduleLayout({ children }: { children: React.ReactNode }) {
               onSelectOwner={navigation.selectOwner}
             />
           )}
-          {scheduleType === "week" && (
+          {scheduleType !== "team" && (
             <WeeksToggle
               seasonId={navigation.selectedSeasonId}
               selectedWeekId={navigation.selectedWeekId}

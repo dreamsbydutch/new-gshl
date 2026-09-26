@@ -4,6 +4,11 @@ import dynamic from "next/dynamic";
 import { useNav } from "@gshl-hooks";
 import { TeamScheduleSkeleton, WeeklyScheduleSkeleton } from "@gshl-skeletons";
 
+const NHLSchedule = dynamic(
+  () => import("./NHLSchedule").then((module) => module.NHLSchedule),
+  { loading: () => <WeeklyScheduleSkeleton /> },
+);
+
 const WeeklySchedule = dynamic(
   () =>
     import("@gshl-components/league/WeeklySchedule").then(
@@ -28,6 +33,7 @@ export function ScheduleContent() {
       className={`mx-auto w-full ${isTeamSchedule ? "max-w-5xl" : "max-w-2xl"}`}
     >
       {scheduleType === "week" && <WeeklySchedule />}
+      {scheduleType === "nhl" && <NHLSchedule />}
       {isTeamSchedule && <TeamSchedule />}
     </div>
   );
