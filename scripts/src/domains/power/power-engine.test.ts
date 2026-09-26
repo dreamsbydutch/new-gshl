@@ -137,6 +137,55 @@ function rowByTeamWeek(
   return row;
 }
 
+void test("forfeited goalie categories lower next-week form instead of disappearing", async () => {
+  const input = fixture(4, 4);
+  for (const row of input.teamWeeks ?? []) {
+    row.W = 2;
+    row.GAA = 3;
+    row.SVP = 0.9;
+  }
+  const qualified = await runPowerRankingsFixture(seasonId, input, {
+    todayDate: "2026-07-25",
+  });
+  const forfeited = structuredClone(input);
+  const row = forfeited.teamWeeks!.find(
+    (row) => row.weekId === "week-1" && row.gshlTeamId === "team-a",
+  )!;
+  row.W = "";
+  row.GAA = "";
+  row.SVP = "";
+  const result = await runPowerRankingsFixture(seasonId, forfeited, {
+    todayDate: "2026-07-25",
+  });
+  const before = rowByTeamWeek(qualified.weekUpdates!, "week-2", "team-a");
+  const after = rowByTeamWeek(result.weekUpdates!, "week-2", "team-a");
+  assert.ok(
+    Math.abs(
+      Number(before.powerStatScore) - Number(after.powerStatScore) - 0.375,
+    ) < 1e-10,
+  );
+  assert.ok(Number(after.powerRating) < Number(before.powerRating));
+  assert.equal(
+    rowByTeamWeek(result.weekUpdates!, "week-1", "team-a").powerRating,
+    rowByTeamWeek(qualified.weekUpdates!, "week-1", "team-a").powerRating,
+  );
+});
+
+void test("one poor week does not erase an established run of strong play", async () => {
+  const input = fixture(0, 1);
+  input.weeks[2]!.isActive = false;
+  input.weeks[3]!.isActive = true;
+  const loss = input.matchups!.find((row) => row.weekId === "week-3")!;
+  loss.isComplete = true;
+  const result = await runPowerRankingsFixture(seasonId, input, {
+    todayDate: "2026-08-02",
+  });
+  const a = rowByTeamWeek(result.weekUpdates!, "week-4", "team-a");
+  const b = rowByTeamWeek(result.weekUpdates!, "week-4", "team-b");
+  assert.ok(Number(a.powerStatScore) < 0);
+  assert.ok(Number(a.powerRating) > Number(b.powerRating));
+});
+
 void test("publishes only completed and active start-of-week snapshots", async () => {
   const result = await runPowerRankingsFixture(seasonId, fixture(4, 4), {
     todayDate: "2026-07-25",

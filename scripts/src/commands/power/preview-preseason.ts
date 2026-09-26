@@ -8,7 +8,8 @@ import {
   fetchSeasonModel,
   fetchSeasonDraftPicks,
 } from "../../integrations/data/convex-store";
-import { buildPreseasonProjections } from "../../runtime/preseason-projection";
+import { buildPreseasonStandingsProjections } from "../../runtime/preseason-projection";
+import { OWNER_PROJECTION_CONFIG } from "../../runtime/owner-projection";
 
 const { values } = parseArgs({
   options: {
@@ -19,7 +20,7 @@ const { values } = parseArgs({
 });
 if (values.help) {
   console.log(
-    "Read-only production preseason preview. --year <season year> required; --output <directory> optional. Reads teams, draft, current player directory, and previous three NHL seasons. Writes local review files only.",
+    "Read-only production preseason preview. --year <season year> required; --output <directory> optional. Reads teams, franchises, draft, current players, previous three NHL seasons and four seasons of owner records. Writes local review files only.",
   );
 } else {
   if (!values.year) throw new Error("--year is required");
@@ -73,8 +74,32 @@ if (values.help) {
   const rosters = players
     .filter((player) => teamIds.has(String(player.gshlTeamId)))
     .map((player) => ({ ...player, playerId: player.id }));
-  const source = { season, seasons, teams, rosters, playerNhlRows };
-  const rankings = buildPreseasonProjections(source);
+  const ownerSeasons = seasons.filter(
+    (row) =>
+      Number(row.year) < Number(season.year) &&
+      Number(row.year) >= Number(season.year) - OWNER_PROJECTION_CONFIG.seasons,
+  );
+  const [historicalTeams, teamSeasons] = await Promise.all([
+    Promise.all(
+      ownerSeasons.map((row) => fetchSeasonModel("Team", String(row.id))),
+    ),
+    Promise.all(
+      ownerSeasons.map((row) =>
+        fetchSeasonModel("TeamSeasonStatLine", String(row.id)),
+      ),
+    ),
+  ]);
+  const source = {
+    season,
+    seasons,
+    teams,
+    rosters,
+    playerNhlRows,
+    historicalTeams: historicalTeams.flat(),
+    teamSeasons: teamSeasons.flat(),
+    franchises,
+  };
+  const rankings = buildPreseasonStandingsProjections(source);
   const directory = resolve(values.output ?? "../.local-data/preseason");
   await mkdir(directory, { recursive: true });
   await writeFile(resolve(directory, "source.json"), JSON.stringify(source));
@@ -96,6 +121,9 @@ if (values.help) {
           rank: row.rank,
           team: teams.find((team) => team.id === row.teamId)?.name,
           rating: Number(row.rating.toFixed(2)),
+          rosterScore: row.rosterScore,
+          ownerScore: row.ownerScore,
+          ownerWeightedGames: row.ownerWeightedGames,
           unprovenPlayers: row.unprovenPlayers,
           goalieQualification: Number(row.goalieQualification.toFixed(3)),
         })),

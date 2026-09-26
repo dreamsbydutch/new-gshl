@@ -1,6 +1,7 @@
 import type { QueryCtx } from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
-import { buildPreseasonProjections } from "../../scripts/src/runtime/preseason-projection";
+import { buildPreseasonStandingsProjections } from "../../scripts/src/runtime/preseason-projection";
+import { OWNER_PROJECTION_CONFIG } from "../../scripts/src/runtime/owner-projection";
 
 /** Live preseason preview; never substitutes today's roster into historical weeks. */
 export async function preseasonPower(ctx: QueryCtx, seasonId: Id<"seasons">) {
@@ -44,7 +45,31 @@ export async function preseasonPower(ctx: QueryCtx, seasonId: Id<"seasons">) {
     ),
   ]);
   if (!rosters.some((roster) => roster.length)) return [];
-  return buildPreseasonProjections({
+  const ownerSeasons = seasons.filter(
+    (row) =>
+      Number(row.year) < Number(season.year) &&
+      Number(row.year) >= Number(season.year) - OWNER_PROJECTION_CONFIG.seasons,
+  );
+  const [historicalTeams, teamSeasons, franchises] = await Promise.all([
+    Promise.all(
+      ownerSeasons.map((row) =>
+        ctx.db
+          .query("teams")
+          .withIndex("by_seasonId", (q) => q.eq("seasonId", row._id))
+          .collect(),
+      ),
+    ),
+    Promise.all(
+      ownerSeasons.map((row) =>
+        ctx.db
+          .query("teamSeasonStatLines")
+          .withIndex("by_seasonId", (q) => q.eq("seasonId", row._id))
+          .collect(),
+      ),
+    ),
+    ctx.db.query("franchises").collect(),
+  ]);
+  return buildPreseasonStandingsProjections({
     season,
     seasons,
     teams,
@@ -52,5 +77,8 @@ export async function preseasonPower(ctx: QueryCtx, seasonId: Id<"seasons">) {
       .flat()
       .map((player) => ({ ...player, playerId: player._id })),
     playerNhlRows: nhl.flat(),
+    historicalTeams: historicalTeams.flat(),
+    teamSeasons: teamSeasons.flat(),
+    franchises,
   });
 }

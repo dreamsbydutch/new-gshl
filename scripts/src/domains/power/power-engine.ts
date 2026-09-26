@@ -9,8 +9,9 @@ import {
   fetchSeasonDraftPicks,
 } from "@gshl-lib/data/convex-store";
 import { SeasonType } from "@gshl-lib/types/enums";
+import { weeklyCategoryStrength } from "../../runtime/power-category-strength";
 import {
-  buildPreseasonProjections,
+  buildPreseasonStandingsProjections,
   seasonCategories,
 } from "../../runtime/preseason-projection";
 
@@ -199,6 +200,7 @@ async function loadModelCache(
     matchups,
     teamWeeks,
     draftPicks,
+    teamSeasons,
   ] = await Promise.all([
     fetchSeasonHistory("Week", replaySeasonIds),
     fetchSeasonHistory("Team", replaySeasonIds),
@@ -210,6 +212,7 @@ async function loadModelCache(
     fetchSeasonHistory("Matchup", replaySeasonIds),
     fetchSeasonHistory("TeamWeekStatLine", replaySeasonIds),
     fetchSeasonDraftPicks<DatabaseRecord>(seasonId),
+    fetchSeasonHistory("TeamSeasonStatLine", priorSeasonIds.slice(-4)),
   ]);
   const effectivePlayerWeeks = inputOverrides.playerWeeks ?? playerWeeks;
   const effectiveTeamWeeks = mergeTeamWeekRows(
@@ -229,6 +232,7 @@ async function loadModelCache(
     ["PlayerWeekStatLine", effectivePlayerWeeks],
     ["TeamWeekStatLine", effectiveTeamWeeks],
     ["DraftPick", draftPicks],
+    ["PreseasonOwnerTeamSeasons", teamSeasons],
   ];
 
   modelCacheEntries.push(["PlayerDayStatLine", playerDays]);
@@ -274,18 +278,25 @@ function createPowerEngineContext(
   const playerNhlRows = modelCache.get("PlayerNHLStatLine") ?? [];
   const preseason =
     rosters.length && playerNhlRows.some((row) => Number(row.GP) > 0)
-      ? buildPreseasonProjections({
+      ? buildPreseasonStandingsProjections({
           season,
           seasons,
           teams,
           rosters,
           playerNhlRows,
+          historicalTeams: modelCache.get("Team") ?? [],
+          franchises: modelCache.get("Franchise") ?? [],
+          teamSeasons:
+            modelCache.get("PreseasonOwnerTeamSeasons") ??
+            modelCache.get("TeamSeasonStatLine") ??
+            [],
         })
       : [];
   return vm.createContext({
     console,
     PowerRankingsAlgo: {},
     LeagueRuntime: {
+      weeklyCategoryStrength,
       preseasonProjections: preseason,
       readModel(modelName: string): DatabaseRecord[] {
         return cloneRows(modelCache.get(modelName) ?? []);

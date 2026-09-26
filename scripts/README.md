@@ -712,6 +712,20 @@ npm run stats:backfill-yahoo-matchup-days -- --seasonId 12
 npm run yahoo:check-weekly-player-days -- --season-id 12 --week-nums 1,2
 ```
 
+### Evaluate preseason and matchup objectives
+
+Preseason objective evaluation and read-only current-roster previews live under
+`src/commands/power/`. See `evaluate-power-objectives.ts --help` and
+`preview-preseason.ts --help` for options. The evaluation uses cached draft
+research, owner directories and weekly history under `.local-data/`; its
+`--fetch` option refreshes weekly history from production without writes.
+Find methodology and limitations in
+[the power objectives report](../docs/product/power-ranking-objectives.md).
+Local refinement commands `refine-preseason.ts`, `evaluate-form.ts` and
+`evaluate-transition.ts` compare player projection, form and transition policies
+without network or league writes. See their `--help` and
+[refinement evidence](../docs/product/power-ranking-refinement.md).
+
 ### Keep ranking-engine runtimes aligned
 
 ```bash

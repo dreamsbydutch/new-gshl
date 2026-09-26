@@ -1,5 +1,9 @@
 # Preseason power projections
 
+This records the initial roster-model iteration. The subsequent
+[standings and matchup evaluation](power-ranking-objectives.md) adds owner
+history to preseason and documents the current formula and validation.
+
 ## Decision and evidence
 
 There are concrete improvements over the old preseason roster average: the

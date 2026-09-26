@@ -2,12 +2,92 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   buildPreseasonProjections,
+  buildPreseasonStandingsProjections,
   projectPreseasonPlayers,
   seasonCategories,
   type PreseasonInput,
 } from "../../runtime/preseason-projection";
 import { runPowerRankingsFixture } from "./power-engine";
 import type { DatabaseRecord } from "../../integrations/data/records";
+
+void test("owner-aware standings seed replay consistently and never use current-season owner results", async () => {
+  const input = fixture();
+  input.playerNhlRows.forEach((row) => {
+    row.G = 30;
+  });
+  input.teams.forEach((team) => {
+    team.ownerId = team.id;
+  });
+  const ownerInput = {
+    historicalTeams: [{ id: "old-b", ownerId: "b" }],
+    franchises: [],
+    teamSeasons: [
+      {
+        seasonId: "prior",
+        gshlTeamId: "old-b",
+        seasonType: "RS",
+        teamW: 24,
+        teamL: 0,
+      },
+    ],
+  };
+  const before = buildPreseasonStandingsProjections({
+    ...input,
+    ...ownerInput,
+  });
+  const b = before.find((row) => row.teamId === "b")!;
+  assert.equal(b.rank, 1);
+  assert.equal(before.find((row) => row.teamId === "a")!.rank, 2);
+  assert.ok(b.ownerScore > 0);
+  assert.equal(b.ownerWeightedGames, 24);
+  assert.equal(
+    b.rosterScore,
+    buildPreseasonProjections(input).find((row) => row.teamId === "b")!.score,
+  );
+  ownerInput.teamSeasons.push({
+    seasonId: "next",
+    gshlTeamId: "old-b",
+    seasonType: "RS",
+    teamW: 0,
+    teamL: 99,
+  });
+  assert.deepEqual(
+    buildPreseasonStandingsProjections({ ...input, ...ownerInput }),
+    before,
+  );
+  const result = await runPowerRankingsFixture(
+    "next",
+    {
+      seasons: input.seasons,
+      teams: [
+        ...input.teams,
+        { ...ownerInput.historicalTeams[0], seasonId: "prior" },
+      ],
+      franchises: [],
+      teamSeasons: ownerInput.teamSeasons,
+      playerNhlRows: input.playerNhlRows,
+      draftPicks: input.rosters.map((row) => ({ ...row, seasonId: "next" })),
+      weeks: [
+        {
+          id: "w1",
+          seasonId: "next",
+          startDate: "2026-10-01",
+          endDate: "2026-10-07",
+          weekNum: 1,
+          weekType: "RS",
+          isActive: true,
+        },
+      ],
+    },
+    { todayDate: "2026-10-02" },
+  );
+  assert.equal(result.weekUpdates?.length, 2);
+  for (const row of result.weekUpdates ?? [])
+    assert.equal(
+      row.powerRating,
+      before.find((team) => team.teamId === row.gshlTeamId)!.rating,
+    );
+});
 
 function fixture(): {
   [Key in keyof PreseasonInput]: Key extends "season"
@@ -263,13 +343,63 @@ void test("preseason weight falls to zero after four completed weeks", async () 
       (team) => team.teamId === row.gshlTeamId,
     )!.score;
     const regular =
-      0.25 * Number(row.powerStatScore) +
-      0.3 * Number(row.powerStatEwma) +
-      0.1 * Number(row.powerGmScore);
+      0.55 * Number(row.powerStatEwma) + 0.1 * Number(row.powerGmScore);
     assert.ok(
       Math.abs(
         Number(row.powerComposite) - (weight * prior + (1 - weight) * regular),
       ) < 1e-10,
     );
   }
+});
+
+void test("a week without results does not consume preseason confidence", async () => {
+  const input = fixture();
+  const result = await runPowerRankingsFixture(
+    "next",
+    {
+      seasons: input.seasons,
+      teams: input.teams,
+      franchises: [],
+      playerNhlRows: input.playerNhlRows,
+      matchups: [
+        {
+          id: "unplayed",
+          seasonId: "next",
+          weekId: "w1",
+          homeTeamId: "a",
+          awayTeamId: "b",
+          homeScore: 0,
+          awayScore: 0,
+          isComplete: false,
+        },
+      ],
+      draftPicks: input.rosters.map((row) => ({ ...row, seasonId: "next" })),
+      weeks: [
+        {
+          id: "w1",
+          seasonId: "next",
+          weekNum: 1,
+          weekType: "RS",
+          startDate: "2026-10-01",
+          endDate: "2026-10-07",
+        },
+        {
+          id: "w2",
+          seasonId: "next",
+          weekNum: 2,
+          weekType: "RS",
+          startDate: "2026-10-08",
+          endDate: "2026-10-14",
+          isActive: true,
+        },
+      ],
+    },
+    { todayDate: "2026-10-09" },
+  );
+  const projections = buildPreseasonProjections(input);
+  for (const row of result.weekUpdates ?? [])
+    assert.equal(
+      row.powerRating,
+      projections.find((team) => team.teamId === row.gshlTeamId)!.rating,
+    );
 });

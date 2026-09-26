@@ -96,8 +96,9 @@ than disappearing from the roster average. Only the selected season's configured
 categories count, including plus/minus when configured.
 
 Entering Weeks 1–4, the composite blends the fixed opening projection with the
-standard in-season composite at 100%, 75%, 50%, and 25% preseason weight. Entering
-Week 5, this explicit preseason weight is zero. The existing rolling player talent
+standard in-season composite at 100%, 75%, 50%, and 25% preseason weight. After
+four completed weeks with team evidence, this explicit preseason weight is zero.
+Empty weeks do not consume confidence. The existing rolling player talent
 and seeded Elo still carry historical information. The four-week transition is a
 transparent policy choice, not a fitted optimal decay. The projection's score uses
 the same `50 + 25 × standardized composite` display scale as weekly power.
@@ -105,18 +106,29 @@ the same `50 + 25 × standardized composite` display scale as weekly power.
 See [the preseason evaluation](product/preseason-power-projections.md) for
 historical comparison, current coverage, assumptions, and limitations.
 
+The preseason standings prior now blends roster strength and a shrunk owner
+regular-season record. Owner history covers the prior four seasons and follows
+the person across franchises. See [objectives and evaluation](product/power-ranking-objectives.md)
+for the formula, retrospective evidence, ownership-data limits, and the decision
+to retain the existing midseason weights.
+
 The standard in-season composite is:
 
 | Signal                                         | Weight |
 | ---------------------------------------------- | -----: |
-| Previous completed week                        |    25% |
-| Recent-form EWMA through the previous week     |    30% |
+| Recent-form EWMA through the previous week     |    55% |
 | Matchup Elo through the previous week          |    20% |
 | Rolling roster talent at the start of the week |    15% |
 | GM career ladder at the start of the week      |    10% |
 
 `gmLadderRating` stores the absolute ladder snapshot;
 `powerGmScore` stores its league-standardized contribution.
+
+Recent form uses alpha 0.5; the latest completed week is not counted a second
+time. Explicitly forfeited goalie categories remain losses in category strength
+rather than disappearing from its average. Missing fields alone do not imply
+forfeiture. See [refinement evidence](product/power-ranking-refinement.md) for
+chronological validation, rejected alternatives and limitations.
 
 ## Change checklist
 

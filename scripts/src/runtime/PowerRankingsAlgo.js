@@ -54,7 +54,7 @@ var PowerRankingsAlgo = (function buildPowerRankingsAlgo() {
       return out;
     })(),
     eloPlayoffRoundStep: 1,
-    ewmaAlpha: 0.72,
+    ewmaAlpha: 0.5,
     perfCategoryWeight: 0.5,
     perfMatchupPointsWeight: 0.25,
     perfMatchupMarginWeight: 0.25,
@@ -68,8 +68,9 @@ var PowerRankingsAlgo = (function buildPowerRankingsAlgo() {
     seedEloHistoryPointsPerZ: 110,
     // Published TeamWeek power is always the state entering that week.
     wElo: 0.2,
-    wStat: 0.3,
-    wCurrent: 0.25,
+    // The latest completed week already contributes through EWMA.
+    wStat: 0.55,
+    wCurrent: 0,
     wTalent: 0.15,
     wGm: 0.1,
     wHistory: 0,
@@ -262,82 +263,15 @@ var PowerRankingsAlgo = (function buildPowerRankingsAlgo() {
       .filter(Boolean);
   }
 
-  function computeZScores(valuesByTeam, higherBetter) {
-    var vals = [];
-    valuesByTeam.forEach(function (v) {
-      if (v === null || v === undefined || v === "") return;
-      var n = toNumber(v);
-      if (!isFinite(n)) return;
-      vals.push(n);
-    });
-
-    if (!vals.length) {
-      return { mean: 0, std: 1 };
-    }
-
-    var mean = vals.reduce(function (a, b) {
-      return a + b;
-    }, 0);
-    mean = mean / vals.length;
-
-    var variance = 0;
-    for (var i = 0; i < vals.length; i++) {
-      variance += Math.pow(vals[i] - mean, 2);
-    }
-    variance = variance / Math.max(1, vals.length);
-    var std = Math.sqrt(variance);
-    if (!std || !isFinite(std)) std = 1;
-
-    return {
-      mean: mean,
-      std: std,
-      direction: higherBetter ? 1 : -1,
-    };
-  }
-
   function computeWeeklyStatScores(teamWeeksInWeekId, teamIds) {
-    var rules = MATCHUP_CATEGORY_RULES || [];
-
-    // Build per-category maps of team->value for this week.
-    var categoryStats = rules.map(function (r) {
-      var map = new Map();
-      (teamIds || []).forEach(function (tid) {
-        var row = teamWeeksInWeekId.get(String(tid));
-        map.set(String(tid), row ? row[r.field] : null);
-      });
-      return {
-        rule: r,
-        valuesByTeam: map,
-      };
-    });
-
-    // Precompute mean/std per category.
-    var zMeta = categoryStats.map(function (c) {
-      var m = computeZScores(c.valuesByTeam, !!c.rule.higherBetter);
-      return { rule: c.rule, valuesByTeam: c.valuesByTeam, meta: m };
-    });
-
-    // Score per team: average directional z across categories.
-    var scores = new Map();
-    (teamIds || []).forEach(function (tid) {
-      var sum = 0;
-      var count = 0;
-      zMeta.forEach(function (cat) {
-        var raw = cat.valuesByTeam.get(String(tid));
-        if (raw === null || raw === undefined || raw === "") return;
-        var n = toNumber(raw);
-        if (!isFinite(n)) return;
-        var z = (n - cat.meta.mean) / cat.meta.std;
-        z = (cat.meta.direction || 1) * z;
-        sum += z;
-        count += 1;
-      });
-      scores.set(String(tid), count ? sum / count : 0);
-    });
-
-    return scores;
+    return LeagueRuntime.weeklyCategoryStrength(
+      teamWeeksInWeekId,
+      teamIds,
+      (MATCHUP_CATEGORY_RULES || []).map(function (rule) {
+        return rule.field;
+      }),
+    );
   }
-
   function computeZFromArray(vals) {
     var clean = (vals || []).filter(function (n) {
       return n !== null && n !== undefined && n !== "" && isFinite(toNumber(n));
@@ -530,6 +464,7 @@ var PowerRankingsAlgo = (function buildPowerRankingsAlgo() {
   function isMatchupEffectivelyComplete(matchup) {
     if (!matchup) return false;
     if (matchup.isComplete === true) return true;
+    if (matchup.isComplete === false) return false;
     if (
       matchup.homeScore !== undefined &&
       matchup.homeScore !== null &&
@@ -1353,6 +1288,7 @@ var PowerRankingsAlgo = (function buildPowerRankingsAlgo() {
     currentScoreByTeam,
     weekNumber,
     opts,
+    completedWeeksByTeam,
   ) {
     var eloVals = teamIds.map(function (teamId) {
       return toNumber(eloByTeam.get(String(teamId)));
@@ -1394,7 +1330,9 @@ var PowerRankingsAlgo = (function buildPowerRankingsAlgo() {
         // Transfer weight to observed performance over the first four completed weeks.
         var priorWeight = Math.max(
           0,
-          1 - (weekNumber - 1) / opts.preseasonTransitionWeeks,
+          1 -
+            (completedWeeksByTeam.get(teamKey) || 0) /
+              opts.preseasonTransitionWeeks,
         );
         composite =
           priorWeight * preseason.score + (1 - priorWeight) * composite;
@@ -1584,7 +1522,7 @@ var PowerRankingsAlgo = (function buildPowerRankingsAlgo() {
     var maxCats = (MATCHUP_CATEGORY_RULES || []).length || 10;
 
     (matchups || []).forEach(function (m) {
-      if (!m) return;
+      if (!isMatchupEffectivelyComplete(m)) return;
       var homeId =
         m.homeTeamId !== undefined && m.homeTeamId !== null
           ? String(m.homeTeamId)
@@ -1992,6 +1930,7 @@ var PowerRankingsAlgo = (function buildPowerRankingsAlgo() {
 
     var weekUpdates = [];
     var matchupUpdates = [];
+    var completedWeeksByTeam = new Map();
 
     // For season snapshots: track the last weekId per weekType encountered.
     var lastWeekIdByType = new Map();
@@ -2046,6 +1985,7 @@ var PowerRankingsAlgo = (function buildPowerRankingsAlgo() {
         previousWeekScoreByTeam,
         weekNumber,
         opts,
+        completedWeeksByTeam,
       );
       var preCompositeByTeam = prePowerMaps.compositeByTeam;
       var preRatingByTeam = prePowerMaps.ratingByTeam;
@@ -2181,6 +2121,10 @@ var PowerRankingsAlgo = (function buildPowerRankingsAlgo() {
         var curr = weeklyPerfScore.get(teamKey) || 0;
         previousWeekScoreByTeam.set(teamKey, curr);
         if (!teamHasSignal.get(teamKey)) return;
+        completedWeeksByTeam.set(
+          teamKey,
+          (completedWeeksByTeam.get(teamKey) || 0) + 1,
+        );
         var prev = statEwmaByTeam.get(teamKey) || 0;
         var next = opts.ewmaAlpha * curr + (1 - opts.ewmaAlpha) * prev;
         statEwmaByTeam.set(teamKey, next);

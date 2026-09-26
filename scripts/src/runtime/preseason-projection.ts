@@ -1,4 +1,6 @@
 /** Pure, season-scoped projections shared by the browser facade and power replay. */
+import { projectOwners, type OwnerProjectionInput } from "./owner-projection";
+
 type Row = Record<string, unknown>;
 
 const SKATER = ["G", "A", "P", "PM", "PIM", "PPP", "SOG", "HIT", "BLK"];
@@ -30,12 +32,55 @@ const DEFAULT_SLOTS = [
 ];
 
 export const PRESEASON_CONFIG = {
+  ownerWeight: 0.5,
   recency: [1, 0.6, 0.3],
   skaterPriorGames: 30,
   goaliePriorGames: 50,
   lineupSamples: 512,
   gamesPerWeek: 3.2,
 } as const;
+
+export type PreseasonProjectionOptions = {
+  recency?: readonly number[];
+  skaterPriorGames?: number;
+  goaliePriorGames?: number;
+};
+
+/** Final-standings prior; roster projection remains independently inspectable. */
+export function buildPreseasonStandingsProjections(
+  input: PreseasonInput &
+    Pick<
+      OwnerProjectionInput,
+      "historicalTeams" | "franchises" | "teamSeasons"
+    >,
+) {
+  const roster = buildPreseasonProjections(input);
+  const owners = projectOwners(input);
+  const scores = standardized(
+    roster.map(
+      (team) =>
+        (1 - PRESEASON_CONFIG.ownerWeight) * team.score +
+        PRESEASON_CONFIG.ownerWeight * (owners.get(team.teamId)?.score ?? 0),
+    ),
+  );
+  const result = roster
+    .map((team, index) => ({
+      ...team,
+      rosterScore: team.score,
+      ownerScore: owners.get(team.teamId)?.score ?? 0,
+      ownerWeightedGames: owners.get(team.teamId)?.weightedGames ?? 0,
+      score: scores[index]!,
+      rating: 50 + 25 * scores[index]!,
+    }))
+    .sort((a, b) => b.score - a.score || a.teamId.localeCompare(b.teamId));
+  result.forEach((team, index) => {
+    team.rank =
+      index && Math.abs(team.score - result[index - 1]!.score) < 1e-9
+        ? result[index - 1]!.rank
+        : index + 1;
+  });
+  return result;
+}
 
 function number(value: unknown, fallback = 0): number {
   if (value === null || value === undefined || value === "") return fallback;
@@ -130,7 +175,9 @@ export type PreseasonInput = {
 
 export function projectPreseasonPlayers(
   input: PreseasonInput,
+  options: PreseasonProjectionOptions = {},
 ): Map<string, ProjectedPlayer> {
+  const config = { ...PRESEASON_CONFIG, ...options };
   const yearBySeason = new Map(
     input.seasons.map((season) => [
       String(season.id ?? season._id),
@@ -141,9 +188,7 @@ export function projectPreseasonPlayers(
   const history = input.playerNhlRows.filter((row) => {
     const distance = targetYear - (yearBySeason.get(String(row.seasonId)) ?? 0);
     return (
-      distance >= 1 &&
-      distance <= PRESEASON_CONFIG.recency.length &&
-      number(row.GP) > 0
+      distance >= 1 && distance <= config.recency.length && number(row.GP) > 0
     );
   });
   const byPlayer = new Map<string, Row[]>();
@@ -186,9 +231,7 @@ export function projectPreseasonPlayers(
     const position = group(identity);
     const goalie = position === "G";
     const prior = priors.get(position) ?? {};
-    const priorGp = goalie
-      ? PRESEASON_CONFIG.goaliePriorGames
-      : PRESEASON_CONFIG.skaterPriorGames;
+    const priorGp = goalie ? config.goaliePriorGames : config.skaterPriorGames;
     let effectiveGp = 0;
     const totals: Record<string, number> = {};
     let availability = 0;
@@ -196,7 +239,7 @@ export function projectPreseasonPlayers(
     for (const row of rows) {
       const distance =
         targetYear - (yearBySeason.get(String(row.seasonId)) ?? 0);
-      const weight = PRESEASON_CONFIG.recency[distance - 1] ?? 0;
+      const weight = config.recency[distance - 1] ?? 0;
       const gp = number(row.GP);
       effectiveGp += gp * weight;
       for (const field of Object.keys(prior))
@@ -268,6 +311,7 @@ function lineup(
 
 export function buildPreseasonProjections(
   input: PreseasonInput,
+  options: PreseasonProjectionOptions = {},
 ): PreseasonTeamProjection[] {
   const categories = seasonCategories(input.season);
   const configuredSlots = list(input.season.rosterSpots).map((slot) =>
@@ -278,7 +322,7 @@ export function buildPreseasonProjections(
         ["C", "LW", "RW", "D", "F", "UTIL", "G"].includes(slot),
       )
     : DEFAULT_SLOTS;
-  const projections = projectPreseasonPlayers(input);
+  const projections = projectPreseasonPlayers(input, options);
   const players = [...projections.values()];
   const value = new Map(players.map((player) => [player.playerId, 0]));
   for (const field of categories) {
