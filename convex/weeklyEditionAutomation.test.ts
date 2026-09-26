@@ -190,6 +190,36 @@ void test("automatic scanner protects human edits, hidden issues, and AI edition
   }
 });
 
+void test("automatic scanner skips an already-succeeded job without reading its edition", async () => {
+  const prior = process.env.OPENAI_API_KEY;
+  process.env.OPENAI_API_KEY = "test-only";
+  try {
+    const f = fixture();
+    f.put("weeklyEditionGenerationJobs", "job", {
+      seasonId: "s",
+      weekId: "w",
+      editionKey: "week:w",
+      issueType: "weekly",
+      status: "succeeded",
+      attempts: 1,
+      leaseUntil: 0,
+      updatedAt: Date.now(),
+    });
+    const originalQuery = f.ctx.db.query;
+    f.ctx.db.query = ((table: string) => {
+      if (table === "weeklyEditions")
+        throw new Error("scanner should not read an already-generated edition");
+      return originalQuery(table);
+    }) as typeof f.ctx.db.query;
+
+    await invokeMutation(scanDueMilestones, f.ctx, {});
+    assert.equal(f.scheduled.length, 0);
+  } finally {
+    if (prior === undefined) delete process.env.OPENAI_API_KEY;
+    else process.env.OPENAI_API_KEY = prior;
+  }
+});
+
 void test("AI preparation connects owner history, opponents and dated results without private owner data", async () => {
   const f = fixture();
   f.put("seasons", "old", { name: "Earlier season", year: 2023 });

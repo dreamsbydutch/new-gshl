@@ -3018,6 +3018,18 @@ async function queueAutomaticEdition(
     issueType === "weekly"
       ? `week:${String(week._id)}`
       : `milestone:${issueType}`;
+  const job = await ctx.db
+    .query("weeklyEditionGenerationJobs")
+    .withIndex("by_seasonId_editionKey", (q) =>
+      q.eq("seasonId", season._id).eq("editionKey", editionKey),
+    )
+    .unique();
+  const now = Date.now();
+  if (
+    job &&
+    (job.status === "succeeded" || job.attempts >= 3 || job.leaseUntil > now)
+  )
+    return false;
   const existing = await ctx.db
     .query("weeklyEditions")
     .withIndex("by_seasonId_editionKey", (q) =>
@@ -3030,18 +3042,6 @@ async function queueAutomaticEdition(
       existing.status !== "published" ||
       existing.editedBy ||
       existing.inactiveSectionIds?.length)
-  )
-    return false;
-  const job = await ctx.db
-    .query("weeklyEditionGenerationJobs")
-    .withIndex("by_seasonId_editionKey", (q) =>
-      q.eq("seasonId", season._id).eq("editionKey", editionKey),
-    )
-    .unique();
-  const now = Date.now();
-  if (
-    job &&
-    (job.status === "succeeded" || job.attempts >= 3 || job.leaseUntil > now)
   )
     return false;
   const values = {
