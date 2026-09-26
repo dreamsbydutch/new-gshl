@@ -90,6 +90,23 @@ export function pressBoxEditorialCandidates(packet: WeeklyEditionFactPacket) {
   );
 }
 
+export function buildWeeklyEditionEditorialFocus(
+  packet: WeeklyEditionFactPacket,
+) {
+  const rosterCoverage =
+    packet.issueType === "preseason" || packet.issueType === "weekly";
+  return [
+    "Roster membership and GSHL contract status are different. Drafted and otherwise rostered players matter equally to playing strength whether or not they have a contract. Do not call a rostered player a free agent, assume every player needs a contract, or assume an unsigned player will eventually sign one.",
+    rosterCoverage
+      ? "For preseason and weekly editions, prioritize the actual players, roster strengths and weaknesses, player and team ratings, category matchups, results, form, and upcoming opponents. Discover stories within that coverage rather than assigning every team the same angle. Grounded forecasts are welcome."
+      : "Match the reporting to this edition's stage: re-signing and offseason editions may examine cap space, renewal choices, and keeper planning; draft coverage should explain the player pool and meaningful selections; final recaps should explain results.",
+    rosterCoverage
+      ? "Cap space is not a measure of playing strength, depth, contention, or ability to field a roster. Do not build a preseason or weekly story around cap balances, routine expiries, or hypothetical keeper spending. Discuss cap only when explaining a concrete, evidence-supported trade-market situation, and keep the focus on its player and roster consequences. A scheduled matchup alone does not make cap space relevant."
+      : "Cap space is relevant to re-signing, offseason keeper planning, and supported trade-market decisions. It does not measure the quality of a completed playing roster.",
+    "The presence of a financial field in the facts is not a reason to cover it. A brief, relevant trade explanation is allowed; a repeated cap-space angle across roster previews is outside the edition's scope.",
+  ].join("\n");
+}
+
 export const WEEKLY_EDITION_STAFF = {
   editorInChief: {
     name: "Graham MacIntyre",

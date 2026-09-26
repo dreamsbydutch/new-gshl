@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import type {
   BuildWeeklyEditionFactPacketInput,
+  BuildMilestoneEditionFactPacketInput,
   WeeklyEdition,
   WeeklyEditionArticleId,
   WeeklyEditionContent,
@@ -1704,6 +1705,28 @@ void test("builds each season milestone from contract, cap, draft, and roster fa
       assert.match(prompt, /"gmLadder"/);
       assert.match(prompt, /Pat Brennan/);
       assert.match(prompt, /Jordan Frost/);
+      assert.match(prompt, /contractedPlayers/);
+      assert.match(prompt, /draftedPlayers/);
+      assert.doesNotMatch(
+        prompt,
+        /"salary":|"expiryStatus":|"capSpace":|"committedSalary":/,
+      );
+      const outlooks = packet.editorialCandidates.filter((candidate) =>
+        candidate.id.startsWith("outlook:"),
+      );
+      assert.ok(outlooks.length > 0);
+      assert.ok(
+        outlooks.every((candidate) =>
+          candidate.metrics.every(
+            (metric) =>
+              metric.key !== "capSpace" && metric.key !== "expiringCount",
+          ),
+        ),
+      );
+      assert.doesNotMatch(
+        content.sections.map((section) => section.body).join(" "),
+        /cap space/i,
+      );
     }
     const validation = validateWeeklyEditionImport(
       JSON.stringify(content),
@@ -1711,6 +1734,74 @@ void test("builds each season milestone from contract, cap, draft, and roster fa
     );
     assert.deepEqual(validation.errors, [], issueType);
   }
+});
+
+void test("preseason evidence ranks rosters independently of cap balances and renewal counts", () => {
+  const base: BuildMilestoneEditionFactPacketInput = {
+    issueType: "preseason",
+    issueLabel: "Preseason",
+    triggerDate: "2026-10-01",
+    analysisSeason: { id: "next", name: "2026-27" },
+    season: source().season,
+    week: source().week,
+    teams: source().teams,
+    teamOutlooks: [
+      {
+        teamId: "team-a",
+        teamName: "Aurora",
+        capSpace: 0,
+        committedSalary: 25_000_000,
+        expiringCount: 0,
+        rosterSize: 15,
+        rosterTalent: 80,
+        draftPickCount: 15,
+        firstRoundPickCount: 1,
+      },
+    ],
+    expiringContracts: [],
+    recentSignings: [],
+    signedPlayers: [
+      {
+        contractId: "c",
+        playerName: "Contracted Star",
+        teamName: "Aurora",
+        salary: 5_000_000,
+        expiryStatus: "RFA",
+        expiryDate: "2027-04-01",
+        playerRating: 85,
+      },
+    ],
+    draftPicks: [
+      {
+        pickId: "p",
+        teamName: "Aurora",
+        round: 1,
+        selectedPlayerName: "Drafted Star",
+        selectedPlayerRating: 95,
+      },
+    ],
+  };
+  const changed = structuredClone(base);
+  changed.teamOutlooks[0]!.capSpace = 20_000_000;
+  changed.teamOutlooks[0]!.committedSalary = 5_000_000;
+  changed.teamOutlooks[0]!.expiringCount = 8;
+  const initial = buildMilestoneEditionFactPacket(base);
+  assert.deepEqual(
+    initial.editorialCandidates,
+    buildMilestoneEditionFactPacket(changed).editorialCandidates,
+  );
+  const summary = initial.editorialCandidates.find((candidate) =>
+    candidate.id.startsWith("outlook:"),
+  )!.summary;
+  assert.match(
+    summary,
+    /Drafted Star \(rated 95\).*Contracted Star \(rated 85\)/,
+  );
+  base.issueType = changed.issueType = "resigning_outlook";
+  assert.notDeepEqual(
+    buildMilestoneEditionFactPacket(base).editorialCandidates,
+    buildMilestoneEditionFactPacket(changed).editorialCandidates,
+  );
 });
 
 void test("uses upcoming-season contract coverage for offseason roster and cap facts", () => {

@@ -43,6 +43,7 @@ import {
 import {
   assignWeeklyEditionAuthors,
   buildWeeklyEditionAuthorRoster,
+  buildWeeklyEditionEditorialFocus,
   buildWeeklyEditionStoryLedger,
   choose,
   matchupSummary,
@@ -1156,14 +1157,44 @@ function buildMilestoneEditorialCandidates(
         ? "team_performance"
         : "cap";
   for (const team of input.teamOutlooks) {
+    const financeCoverage =
+      input.issueType === "resigning_outlook" ||
+      input.issueType === "offseason_market";
     const draftDetail = `${team.draftPickCount} draft pick${team.draftPickCount === 1 ? "" : "s"}, including ${team.firstRoundPickCount} in the first round`;
     const rosterDetail = `${team.rosterSize} players and a ${team.rosterTalent.toFixed(1)} roster-talent rating`;
     const capDetail = `${weeklyEditionMoney(team.capSpace)} in cap space with ${team.expiringCount} expiring contract${team.expiringCount === 1 ? "" : "s"}`;
+    const rosterHighlights =
+      input.issueType === "preseason"
+        ? [
+            ...(input.signedPlayers ?? [])
+              .filter((player) => player.teamName === team.teamName)
+              .map((player) => ({
+                name: player.playerName,
+                rating: player.playerRating,
+              })),
+            ...input.draftPicks
+              .filter(
+                (pick) =>
+                  pick.teamName === team.teamName && pick.selectedPlayerName,
+              )
+              .map((pick) => ({
+                name: pick.selectedPlayerName!,
+                rating: pick.selectedPlayerRating,
+              })),
+          ]
+            .sort((left, right) => (right.rating ?? 0) - (left.rating ?? 0))
+            .slice(0, 6)
+            .map(
+              (player) =>
+                `${player.name}${player.rating === undefined ? "" : ` (rated ${player.rating})`}`,
+            )
+            .join(", ")
+        : "";
     const summary =
       input.issueType === "pre_draft"
         ? `${team.teamName} enters the draft with ${rosterDetail} plus ${draftDetail}.`
         : input.issueType === "preseason"
-          ? `${team.teamName} enters the season with ${rosterDetail}; its draft consumed ${team.draftSelectionsConsumed ?? 0} selections.`
+          ? `${team.teamName} enters the season with ${rosterDetail}.${rosterHighlights ? ` Roster highlights include ${rosterHighlights}.` : ""}`
           : `${team.teamName} has ${capDetail}, ${rosterDetail}, and ${draftDetail}.`;
     candidates.push({
       id: `outlook:${input.issueType}:${team.teamId}`,
@@ -1171,7 +1202,7 @@ function buildMilestoneEditorialCandidates(
       scope: "season",
       importance: candidateImportance(
         58 +
-          Math.min(team.expiringCount * 3, 18) +
+          (financeCoverage ? Math.min(team.expiringCount * 3, 18) : 0) +
           Math.min(team.firstRoundPickCount * 5, 15) +
           Math.min(Math.abs(team.rosterTalent - 75) / 2, 12),
       ),
@@ -1180,18 +1211,22 @@ function buildMilestoneEditorialCandidates(
       teamId: team.teamId,
       teamName: team.teamName,
       metrics: [
-        { key: "capSpace", label: "Cap space", value: team.capSpace },
+        ...(financeCoverage
+          ? [
+              { key: "capSpace", label: "Cap space", value: team.capSpace },
+              {
+                key: "expiringCount",
+                label: "Expiring contracts",
+                value: team.expiringCount,
+              },
+            ]
+          : []),
         {
           key: "rosterTalent",
           label: "Roster talent",
           value: team.rosterTalent,
         },
         { key: "rosterSize", label: "Roster size", value: team.rosterSize },
-        {
-          key: "expiringCount",
-          label: "Expiring contracts",
-          value: team.expiringCount,
-        },
         {
           key: "firstRoundPickCount",
           label: "First-round picks",
@@ -1773,7 +1808,7 @@ function teamOutlookSummary(packet: WeeklyEditionFactPacket) {
       .slice(0, 6)
       .map(
         (team) =>
-          `${team.teamName}: ${money(team.capSpace)} in cap space, ${team.rosterSize} rostered players and a ${team.rosterTalent.toFixed(1)} talent rating.`,
+          `${team.teamName}: ${packet.issueType === "resigning_outlook" || packet.issueType === "offseason_market" ? `${money(team.capSpace)} in cap space, ` : ""}${team.rosterSize} rostered players and a ${team.rosterTalent.toFixed(1)} talent rating.`,
       )
       .join(" ") ?? "Team outlook data is still being assembled."
   );
@@ -2120,7 +2155,7 @@ function buildMilestoneTemplateEditionCopy(
     headline: topTeam
       ? `${topTeam.teamName} opens as the team to catch`
       : "The new GSHL season takes shape",
-    deck: `The ${facts.analysisSeasonName} draft is complete and the rosters are formed. Talent ratings, cap construction and team depth point to the contenders—and the teams ready to surprise.`,
+    deck: `The ${facts.analysisSeasonName} draft is complete and the rosters are formed. Player quality, team depth and opening matchups shape the preseason outlook.`,
     sections: [
       section(
         "season_predictions",
@@ -2158,13 +2193,19 @@ function buildMilestoneTemplateEditionCopy(
         [],
       ),
       section(
-        "cap_space",
-        "Flexibility",
-        capLeader
-          ? `${capLeader.teamName} keeps the largest cushion`
-          : "Who kept room for the unexpected?",
-        teamOutlookSummary(packet),
-        [],
+        "matchup_roundup",
+        "Opening Matchups",
+        "Roster strengths meet the opening schedule",
+        packet.nextMatchups.length
+          ? packet.nextMatchups
+              .slice(0, 4)
+              .map(
+                (matchup) =>
+                  `${matchup.awayTeamName} is scheduled to visit ${matchup.homeTeamName}.`,
+              )
+              .join(" ")
+          : "The completed rosters set the baseline for the season ahead. Opening matchups were not available in this snapshot, so the first tests remain an open question.",
+        [{ label: "View schedule", href: "/schedule" }],
       ),
       section(
         "next_week",
@@ -2693,6 +2734,7 @@ export function buildWeeklyEditionRuleContext(packet: WeeklyEditionFactPacket) {
   };
 
   const common = {
+    editorialFocus: buildWeeklyEditionEditorialFocus(packet),
     authority:
       "This RULEBOOK_CONTEXT is authoritative. EDITION_FACTS is authoritative for people, teams, amounts, dates and events. If either source does not establish a claim, write it conditionally or say it is unknown.",
     seasonFrame,
@@ -2736,6 +2778,7 @@ export function buildWeeklyEditionStoryScoutPrompt(
   return [
     "PROMPT_FORMAT=newsroom_pitch_desk_v1",
     "You are running the GSHL Press Box pitch meeting. The goal is to discover the strongest supported stories before any newsletter copy is written.",
+    buildWeeklyEditionEditorialFocus(packet),
     "Work as an autonomous newspaper: inspect the whole research dossier before choosing subjects. Evidence cards are raw reporting material, not article assignments. Connect independent facts across owners, schedules, performances, categories, roster decisions and historical baselines when the connection matters now. You may propose an original angle even when no headlineHint suggests it. No owner or storyline deserves automatic coverage.",
     "Across writers, each proposed story needs a distinct central development and factual spine. Different candidate IDs, headlines, or bylines do not make two accounts of the same development different stories. Pitch alternatives rather than repeating another writer's main subject and statistics.",
     "Consider both recent events and upcoming stakes. Pair a scheduled opponent with supported owner history or current form when relevant. Keep people, franchises and season teams distinct. Never turn scheduled games into results, missing data into zero, or first recorded participation into a confirmed debut. Respect every research limitation.",
@@ -2911,7 +2954,9 @@ export function buildWeeklyEditionChatGptPrompt(
         issueLabel: packet.issueLabel,
         analysisSeason,
         triggerDate: milestone.triggerDate,
-        salaryCap: milestone.salaryCap,
+        ...(packet.issueType === "preseason"
+          ? {}
+          : { salaryCap: milestone.salaryCap }),
       }
     : undefined;
   const leagueSnapshot = {
@@ -2994,9 +3039,12 @@ export function buildWeeklyEditionChatGptPrompt(
     teamName: team.teamName,
     rosterTalent: team.rosterTalent,
     rosterSize: team.rosterSize,
-    signedPlayers: signedPlayers.filter(
-      (contract) => contract.teamName === team.teamName,
-    ),
+    contractedPlayers: signedPlayers
+      .filter((contract) => contract.teamName === team.teamName)
+      .map((contract) => ({
+        playerName: contract.playerName,
+        playerRating: contract.playerRating,
+      })),
     draftedPlayers: (milestone?.draftPicks ?? [])
       .filter(
         (pick) =>
@@ -3127,6 +3175,7 @@ export function buildWeeklyEditionChatGptPrompt(
       ? "PROMPT_FORMAT=assigned_newsroom_edition_v7"
       : "PROMPT_FORMAT=league_snapshot_v7",
     "You are the editor of the GSHL Press Box, a fantasy-hockey league newspaper covering the Gem Stone Hockey League.",
+    buildWeeklyEditionEditorialFocus(packet),
     assignments
       ? `The pitch meeting is complete. EDITOR_ASSIGNMENTS contains the ${articleCount} selected stories in publication order. Write those assignments; do not substitute a subject, change a byline, or merge two assignments.`
       : "EDITION_FACTS is a timestamped snapshot of the league at publication time. It is context, not an article assignment or outline. Use your own editorial judgment and creativity to decide every story, angle, headline, connection and emphasis.",
