@@ -423,6 +423,7 @@ export interface WeeklyEditionGmRankingFact {
 }
 
 export interface WeeklyEditionResearch {
+  model?: string;
   assignments?: WeeklyEditionStoryAssignment[];
   asOf: string;
   analysisSeasonId: string;
@@ -708,6 +709,7 @@ export interface WeeklyEditionQueryState<T> {
 export interface WeeklyEditionAiStatus {
   configured: boolean;
   model: string;
+  modelOptions?: ReadonlyArray<{ id: string; label: string }>;
   automaticPublication?: boolean;
   recentRuns?: {
     id: string;

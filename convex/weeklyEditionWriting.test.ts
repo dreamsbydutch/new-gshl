@@ -121,9 +121,12 @@ void test("previous coverage moves unchanged evidence behind fresh front-page st
 
 void test("AI pipeline reviews corrected copy and never publishes unresolved editorial issues", async () => {
   const prior = process.env.OPENAI_API_KEY;
+  const priorModel = process.env.OPENAI_NEWSROOM_MODEL;
+  delete process.env.OPENAI_NEWSROOM_MODEL;
   process.env.OPENAI_API_KEY = "test-only";
   try {
     for (const resolves of [true, false]) {
+      const expectedModel = resolves ? "gpt-5.6-terra" : "gpt-5.6-sol";
       const { facts, submissions, content } = writingFixture();
       let reviews = 0;
       let publications = 0;
@@ -135,8 +138,10 @@ void test("AI pipeline reviews corrected copy and never publishes unresolved edi
           if (typeof init.body !== "string")
             throw new Error("Expected a JSON request body");
           const request = JSON.parse(init.body) as {
+            model: string;
             text: { format: { name: string } };
           };
+          assert.equal(request.model, expectedModel);
           const name = request.text.format.name;
           requests.push(name);
           let result: unknown;
@@ -184,7 +189,12 @@ void test("AI pipeline reviews corrected copy and never publishes unresolved edi
               return { id: "edition" };
             },
           },
-          { seasonId: "s", weekId: "w", issueType: "weekly" },
+          {
+            seasonId: "s",
+            weekId: "w",
+            issueType: "weekly",
+            ...(resolves ? {} : { model: expectedModel }),
+          },
         );
         if (resolves) await run;
         else await assert.rejects(run, /unsupported claim/);
@@ -203,5 +213,7 @@ void test("AI pipeline reviews corrected copy and never publishes unresolved edi
   } finally {
     if (prior === undefined) delete process.env.OPENAI_API_KEY;
     else process.env.OPENAI_API_KEY = prior;
+    if (priorModel === undefined) delete process.env.OPENAI_NEWSROOM_MODEL;
+    else process.env.OPENAI_NEWSROOM_MODEL = priorModel;
   }
 });

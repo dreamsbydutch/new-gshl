@@ -13,6 +13,24 @@ import {
   DEFAULT_WEEKLY_EDITION_ARTICLE_COUNT,
 } from "./weekly-edition-articles";
 
+export const DEFAULT_NEWSROOM_MODEL = "gpt-5.6-terra";
+export const NEWSROOM_MODEL_OPTIONS = [
+  { id: "gpt-5.6-terra", label: "GPT-5.6 Terra · Balanced" },
+  { id: "gpt-5.6-sol", label: "GPT-5.6 Sol · Higher capability" },
+] as const;
+
+export function resolveNewsroomModel(requested?: string, configured?: string) {
+  const selection = requested?.trim();
+  if (selection) {
+    if (!NEWSROOM_MODEL_OPTIONS.some((option) => option.id === selection)) {
+      throw new Error("Choose a supported Newsroom model");
+    }
+    return selection;
+  }
+  const deploymentModel = configured?.trim();
+  return deploymentModel?.length ? deploymentModel : DEFAULT_NEWSROOM_MODEL;
+}
+
 const articleAuthorSchema = {
   anyOf: [
     {

@@ -6,11 +6,30 @@ import {
   extractWeeklyEditionOpenAiText,
   parseWeeklyEditionStorySubmissions,
   parseWeeklyEditionReview,
+  resolveNewsroomModel,
 } from "./weekly-edition-openai";
 import {
   buildWeeklyEditionArticleSlots,
   parseWeeklyEditionArticleCount,
 } from "./weekly-edition-articles";
+
+void test("Newsroom uses Terra by default and an explicit selection overrides deployment configuration", () => {
+  assert.equal(resolveNewsroomModel(), "gpt-5.6-terra");
+  assert.equal(resolveNewsroomModel("", "  "), "gpt-5.6-terra");
+  assert.equal(
+    resolveNewsroomModel(undefined, "custom-deployment-model"),
+    "custom-deployment-model",
+  );
+  assert.equal(
+    resolveNewsroomModel("gpt-5.6-terra", "gpt-5-mini"),
+    "gpt-5.6-terra",
+  );
+  assert.equal(resolveNewsroomModel("gpt-5.6-sol"), "gpt-5.6-sol");
+  assert.throws(
+    () => resolveNewsroomModel("arbitrary-client-model"),
+    /supported Newsroom model/,
+  );
+});
 
 void test("incomplete model output is rejected even when it contains parseable JSON", () => {
   assert.throws(

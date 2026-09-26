@@ -58,6 +58,8 @@ import {
   parseWeeklyEditionStorySubmissions,
   buildWeeklyEditionReviewRequest,
   parseWeeklyEditionReview,
+  NEWSROOM_MODEL_OPTIONS,
+  resolveNewsroomModel,
 } from "../src/lib/utils/features/weekly-edition-openai";
 import { DEFAULT_WEEKLY_EDITION_ARTICLE_COUNT } from "../src/lib/utils/features/weekly-edition-articles";
 import {
@@ -105,11 +107,8 @@ const weeklyEditionArticleCountValidator = v.union(
   v.literal(9),
   v.literal(10),
 );
-const DEFAULT_NEWSROOM_MODEL = "gpt-5-mini";
-
-function newsroomModel() {
-  const configured = process.env.OPENAI_NEWSROOM_MODEL?.trim();
-  return configured?.length ? configured : DEFAULT_NEWSROOM_MODEL;
+function newsroomModel(requested?: string) {
+  return resolveNewsroomModel(requested, process.env.OPENAI_NEWSROOM_MODEL);
 }
 
 function openAiErrorMessage(value: unknown) {
@@ -2067,6 +2066,7 @@ export const aiStatus = query({
     return {
       configured: Boolean(process.env.OPENAI_API_KEY?.trim()),
       model: newsroomModel(),
+      modelOptions: NEWSROOM_MODEL_OPTIONS,
       automaticPublication: Boolean(process.env.OPENAI_API_KEY?.trim()),
       recentRuns: (
         await ctx.db.query("weeklyEditionGenerationJobs").order("desc").take(12)
@@ -2431,6 +2431,7 @@ export const generateWithAi = action({
     weekId: v.id("weeks"),
     issueType: weeklyEditionIssueTypeValidator,
     articleCount: v.optional(weeklyEditionArticleCountValidator),
+    model: v.optional(v.string()),
   },
   handler: async (
     ctx,
@@ -2456,6 +2457,7 @@ async function writeNewsroomEdition(
     weekId: Id<"weeks">;
     issueType: WeeklyEditionIssueType;
     articleCount?: WeeklyEditionArticleCount;
+    model?: string;
   },
   editedBy?: Id<"authUsers">,
 ): Promise<{
@@ -2473,6 +2475,7 @@ async function writeNewsroomEdition(
 
   const articleCount =
     args.articleCount ?? DEFAULT_WEEKLY_EDITION_ARTICLE_COUNT;
+  const model = newsroomModel(args.model);
   const prepared = await ctx.runMutation(
     internal.weeklyEditions.prepareAiGeneration,
     {
@@ -2482,7 +2485,6 @@ async function writeNewsroomEdition(
     },
   );
   const facts = prepared.facts;
-  const model = newsroomModel();
   const scoutPrompt = buildWeeklyEditionStoryScoutPrompt(facts, articleCount);
   let pitchRaw = await requestNewsroomJson({
     apiKey,
@@ -2604,7 +2606,7 @@ async function writeNewsroomEdition(
   }
 
   const publicationFacts = facts.research
-    ? { ...facts, research: { ...facts.research, assignments } }
+    ? { ...facts, research: { ...facts.research, assignments, model } }
     : facts;
   const edition = await ctx.runMutation(
     internal.weeklyEditions.finalizeAiGeneration,

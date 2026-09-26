@@ -48,6 +48,7 @@ export function Newsroom() {
   const [notice, setNotice] = useState("");
   const [seasonId, setSeasonId] = useState("");
   const [weekId, setWeekId] = useState("");
+  const [model, setModel] = useState("");
   const [issueType, setIssueType] = useState<WeeklyEditionIssueType>("weekly");
   const [articleCount, setArticleCount] = useState<WeeklyEditionArticleCount>(
     DEFAULT_WEEKLY_EDITION_ARTICLE_COUNT,
@@ -181,6 +182,7 @@ export function Newsroom() {
         weekId,
         issueType,
         articleCount,
+        ...(model ? { model } : {}),
       });
       setEditionId(generated.edition.id);
       showNotice(
@@ -368,7 +370,7 @@ export function Newsroom() {
         </p>
       </details>
 
-      <div className="grid gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm md:grid-cols-2 xl:grid-cols-5">
+      <div className="grid gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm md:grid-cols-2 xl:grid-cols-3">
         <label className="text-sm font-medium text-slate-700">
           Generate a completed week
           <select
@@ -447,6 +449,32 @@ export function Newsroom() {
             ))}
           </select>
         </label>
+        <label className="text-sm font-medium text-slate-700">
+          AI model
+          <select
+            value={model}
+            onChange={(event) => setModel(event.target.value)}
+            disabled={
+              !newsroom.aiStatus?.modelOptions?.length ||
+              newsroom.generateWithAi.isPending
+            }
+            className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 disabled:bg-slate-100"
+          >
+            <option value="">
+              Default
+              {newsroom.aiStatus?.model ? ` · ${newsroom.aiStatus.model}` : ""}
+            </option>
+            {newsroom.aiStatus?.modelOptions?.map((option) => (
+              <option key={option.id} value={option.id}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+          <span className="mt-1 block text-xs font-normal leading-5 text-slate-500">
+            Applies to research pitches, writing, and review for this edition.
+            Automatic editions use the default.
+          </span>
+        </label>
         <div className="space-y-2 self-end">
           <Button
             type="button"
@@ -492,7 +520,7 @@ export function Newsroom() {
               : newsroom.isAiStatusUnavailable
                 ? "AI writing is temporarily unavailable. You can still edit and publish manually."
                 : newsroom.aiStatus?.configured
-                  ? `OpenAI ready · ${newsroom.aiStatus.model}`
+                  ? `OpenAI ready · ${model || newsroom.aiStatus.model}`
                   : "Add OPENAI_API_KEY to the Convex deployment to enable AI writing."}
           </p>
         </div>
@@ -751,6 +779,12 @@ export function Newsroom() {
                   · {selectedEdition.facts.nextMatchups.length} upcoming
                   matchups
                 </p>
+                {selectedEdition.facts.research.model ? (
+                  <p className="mt-1 text-slate-600">
+                    Written and reviewed with{" "}
+                    {selectedEdition.facts.research.model}
+                  </p>
+                ) : null}
                 <ul className="mt-3 list-disc space-y-1 pl-5 text-slate-600">
                   {selectedEdition.facts.research.limitations.map(
                     (limitation) => (
