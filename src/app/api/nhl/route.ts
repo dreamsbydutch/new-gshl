@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
 import {
+  NHL_STANDINGS_REFRESH_SECONDS,
+  NHL_SCHEDULE_REFRESH_SECONDS,
+} from "@gshl-utils/features/nhl";
+import {
   getNHLSchedule,
   getNHLStandings,
   nhlDateRange,
@@ -27,7 +31,17 @@ export async function GET(request: Request) {
       view === "standings"
         ? await getNHLStandings()
         : await getNHLSchedule(dates);
-    return NextResponse.json(data);
+    const interval =
+      view === "standings"
+        ? NHL_STANDINGS_REFRESH_SECONDS
+        : NHL_SCHEDULE_REFRESH_SECONDS;
+    // CDN hits avoid invoking a server function for each visitor.
+    const remaining = interval - (Math.floor(Date.now() / 1000) % interval);
+    return NextResponse.json(data, {
+      headers: {
+        "Cache-Control": `public, max-age=0, s-maxage=${remaining}`,
+      },
+    });
   } catch {
     return NextResponse.json(
       { error: "NHL data is temporarily unavailable. Please try again." },

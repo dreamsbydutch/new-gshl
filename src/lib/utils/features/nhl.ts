@@ -1,5 +1,8 @@
 import { z } from "zod";
 
+export const NHL_STANDINGS_REFRESH_SECONDS = 24 * 60 * 60;
+export const NHL_SCHEDULE_REFRESH_SECONDS = 15 * 60;
+
 const localized = z.object({ default: z.string() });
 export const nhlStandingsSchema = z.object({
   standings: z.array(
@@ -44,6 +47,26 @@ export const nhlScheduleSchema = z.object({
     z.object({ date: z.string(), games: z.array(nhlGameSchema) }),
   ),
 });
+
+// The timestamp is cached with the data, not regenerated for each visitor.
+export const nhlStandingsResponseSchema = nhlStandingsSchema.extend({
+  updatedAt: z.number(),
+});
+export const nhlScheduleResponseSchema = nhlScheduleSchema.extend({
+  updatedAt: z.number(),
+});
+
+export function formatNHLUpdatedAt(updatedAt: number): string {
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone: "America/Toronto",
+    timeZoneName: "short",
+  }).format(new Date(updatedAt));
+}
 
 /** Date keys are NHL calendar dates; never convert them through the browser timezone. */
 export function nhlDateRange(start: string, end: string): string[] {

@@ -3,11 +3,19 @@
 import { useCallback, useEffect, useState } from "react";
 import type { z } from "zod";
 import {
-  nhlScheduleSchema,
-  nhlStandingsSchema,
+  nhlScheduleResponseSchema,
+  nhlStandingsResponseSchema,
+  NHL_STANDINGS_REFRESH_SECONDS,
+  NHL_SCHEDULE_REFRESH_SECONDS,
 } from "@gshl-utils/features/nhl";
 
-function useNHLResource<T>(url: string | null, schema: z.ZodType<T>) {
+const cache = new Map<string, { data: unknown; checkedAt: number }>();
+
+function useNHLResource<T>(
+  url: string | null,
+  schema: z.ZodType<T>,
+  refreshSeconds: number,
+) {
   const [result, setResult] = useState<{
     url: string;
     data?: T;
@@ -19,8 +27,20 @@ function useNHLResource<T>(url: string | null, schema: z.ZodType<T>) {
     if (!url) return;
     const controller = new AbortController();
     let pending = false;
-    async function refresh() {
+    let lastAttempt = 0;
+    async function refresh(force = false) {
       if (pending) return;
+      const cached = cache.get(url!);
+      if (
+        !force &&
+        cached &&
+        Date.now() - cached.checkedAt < refreshSeconds * 1000
+      ) {
+        setResult({ url: url!, data: schema.parse(cached.data) });
+        return;
+      }
+      if (!force && Date.now() - lastAttempt < refreshSeconds * 1000) return;
+      lastAttempt = Date.now();
       pending = true;
       try {
         const response = await fetch(url!, {
@@ -32,7 +52,11 @@ function useNHLResource<T>(url: string | null, schema: z.ZodType<T>) {
             "NHL data is temporarily unavailable. Please try again.",
           );
         const data = schema.parse(await response.json());
-        if (!controller.signal.aborted) setResult({ url: url!, data });
+        if (!controller.signal.aborted) {
+          if (cache.size >= 32) cache.delete(cache.keys().next().value!);
+          cache.set(url!, { data, checkedAt: Date.now() });
+          setResult({ url: url!, data });
+        }
       } catch {
         if (!controller.signal.aborted)
           setResult((previous) => ({
@@ -45,10 +69,10 @@ function useNHLResource<T>(url: string | null, schema: z.ZodType<T>) {
         pending = false;
       }
     }
-    void refresh();
+    void refresh(attempt > 0);
     const timer = setInterval(() => {
       if (document.visibilityState === "visible") void refresh();
-    }, 60000);
+    }, refreshSeconds * 1000);
     const onFocus = () => void refresh();
     window.addEventListener("focus", onFocus);
     return () => {
@@ -56,7 +80,7 @@ function useNHLResource<T>(url: string | null, schema: z.ZodType<T>) {
       clearInterval(timer);
       window.removeEventListener("focus", onFocus);
     };
-  }, [url, schema, attempt]);
+  }, [url, schema, attempt, refreshSeconds]);
   const current = result?.url === url ? result : undefined;
   return {
     data: current?.data,
@@ -67,7 +91,11 @@ function useNHLResource<T>(url: string | null, schema: z.ZodType<T>) {
 }
 
 export function useNHLStandings() {
-  return useNHLResource("/api/nhl?view=standings", nhlStandingsSchema);
+  return useNHLResource(
+    "/api/nhl?view=standings",
+    nhlStandingsResponseSchema,
+    NHL_STANDINGS_REFRESH_SECONDS,
+  );
 }
 
 export function useNHLSchedule(start?: string, end?: string) {
@@ -75,6 +103,7 @@ export function useNHLSchedule(start?: string, end?: string) {
     start && end
       ? `/api/nhl?view=schedule&start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`
       : null,
-    nhlScheduleSchema,
+    nhlScheduleResponseSchema,
+    NHL_SCHEDULE_REFRESH_SECONDS,
   );
 }

@@ -2,6 +2,7 @@
 
 import { useNHLStandings } from "@gshl-hooks/main/useNHL";
 import { StandingsSkeleton } from "@gshl-skeletons";
+import { formatNHLUpdatedAt } from "@gshl-utils/features/nhl";
 
 export function NHLStandings() {
   const { data, isLoading, error, retry } = useNHLStandings();
@@ -20,8 +21,16 @@ export function NHLStandings() {
         </p>
         <p className="text-xs text-gray-500">
           {data?.standings[0]?.date ? `As of ${data.standings[0].date} · ` : ""}
-          Refreshes every minute
+          Refreshes daily
         </p>
+        {data && (
+          <p className="text-xs text-gray-500">
+            Last updated:{" "}
+            <time dateTime={new Date(data.updatedAt).toISOString()}>
+              {formatNHLUpdatedAt(data.updatedAt)}
+            </time>
+          </p>
+        )}
       </header>
       {error && (
         <p role="alert" className="text-center text-sm">

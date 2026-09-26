@@ -2,7 +2,7 @@
 
 import { useNHLScheduleData } from "@gshl-hooks/features/useNHLScheduleData";
 import { WeeklyScheduleSkeleton } from "@gshl-skeletons";
-import { nhlGameStatus } from "@gshl-utils/features/nhl";
+import { nhlGameStatus, formatNHLUpdatedAt } from "@gshl-utils/features/nhl";
 
 export function NHLSchedule() {
   const { data, week, isLoading, error, retry } = useNHLScheduleData();
@@ -14,8 +14,16 @@ export function NHLSchedule() {
           NHL Schedule{week ? ` · Week ${week.weekNum}` : ""}
         </h2>
         <p className="text-xs text-gray-500">
-          All times Eastern · Refreshes every minute
+          All times Eastern · Scores and schedule refresh every 15 minutes
         </p>
+        {data && (
+          <p className="text-xs text-gray-500">
+            Last updated:{" "}
+            <time dateTime={new Date(data.updatedAt).toISOString()}>
+              {formatNHLUpdatedAt(data.updatedAt)}
+            </time>
+          </p>
+        )}
       </header>
       {error && (
         <p role="alert" className="text-center text-sm">
