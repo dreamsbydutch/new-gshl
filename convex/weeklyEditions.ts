@@ -57,6 +57,8 @@ import {
   extractWeeklyEditionOpenAiText,
   parseWeeklyEditionStorySubmissions,
   buildWeeklyEditionReviewRequest,
+  buildWeeklyEditionReviewVerdictRequest,
+  applyWeeklyEditionReviewVerdicts,
   parseWeeklyEditionEditorialReview,
   NEWSROOM_MODEL_OPTIONS,
   resolveNewsroomModel,
@@ -2636,6 +2638,22 @@ async function writeNewsroomEdition(
         }),
         validation.content,
       );
+      if (review.errors.length) {
+        review = applyWeeklyEditionReviewVerdicts(
+          await requestNewsroomJson({
+            apiKey,
+            deadlineAt,
+            failureLabel: "verify the editorial objections",
+            request: buildWeeklyEditionReviewVerdictRequest({
+              model,
+              facts,
+              content: validation.content,
+              review,
+            }),
+          }),
+          review,
+        );
+      }
       validationErrors = review.errors;
     }
     if (validation.valid && validationErrors.length === 0) break;

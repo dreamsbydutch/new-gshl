@@ -89,6 +89,97 @@ function writingFixture() {
   return { facts, submissions, content, assignments };
 }
 
+void test("unsubstantiated copy-editor objections do not rewrite or block a grounded preview", async () => {
+  const priorKey = process.env.OPENAI_API_KEY;
+  process.env.OPENAI_API_KEY = "test-only";
+  const { facts, submissions, content } = writingFixture();
+  let writes = 0;
+  let confirmations = 0;
+  let publications = 0;
+  const fetchMock = mock.method(
+    globalThis,
+    "fetch",
+    async (_url: unknown, init: RequestInit) => {
+      if (typeof init.body !== "string") throw new Error("Expected JSON");
+      const request = JSON.parse(init.body) as {
+        text: { format: { name: string } };
+      };
+      let result: unknown;
+      switch (request.text.format.name) {
+        case "gshl_newsroom_pitches":
+          result = { submissions };
+          break;
+        case "gshl_weekly_edition":
+          writes++;
+          result = content;
+          break;
+        case "gshl_editorial_verdicts":
+          confirmations++;
+          result = {
+            verdicts: [
+              {
+                issueIndex: 0,
+                decision: "dismiss",
+                reason: "3.7 million and 3,700,000 are equivalent amounts.",
+              },
+            ],
+          };
+          break;
+        default:
+          result = {
+            reviewedArticleIds: [
+              "front_page",
+              ...content.sections.map((s) => s.id),
+            ],
+            replacementArticleIds: [],
+            issues: [
+              {
+                articleId: "article_1",
+                detail: '"3.7 million in cap space" should be 3,700,000.',
+              },
+            ],
+          };
+      }
+      return new Response(
+        JSON.stringify({
+          status: "completed",
+          output_text: JSON.stringify(result),
+        }),
+        { status: 200 },
+      );
+    },
+  );
+  try {
+    await (
+      generateWithAi as unknown as {
+        _handler: (ctx: unknown, args: unknown) => Promise<unknown>;
+      }
+    )._handler(
+      {
+        runQuery: async () => ({ userId: "commissioner" }),
+        runMutation: async (
+          fn: Parameters<typeof getFunctionName>[0],
+          args: { raw: string },
+        ) => {
+          if (getFunctionName(fn) === "weeklyEditions:prepareAiGeneration")
+            return { facts, seasonId: "s", weekId: "w" };
+          publications++;
+          assert.deepEqual(JSON.parse(args.raw), content);
+          return { id: "edition" };
+        },
+      },
+      { seasonId: "s", weekId: "w", issueType: "weekly" },
+    );
+    assert.equal(writes, 1);
+    assert.equal(confirmations, 1);
+    assert.equal(publications, 1);
+  } finally {
+    fetchMock.mock.restore();
+    if (priorKey === undefined) delete process.env.OPENAI_API_KEY;
+    else process.env.OPENAI_API_KEY = priorKey;
+  }
+});
+
 void test("duplicate stories reopen the affected assignment before a reviewed replacement is published", async () => {
   for (const initialCopyError of [false, true]) {
     const priorKey = process.env.OPENAI_API_KEY;
@@ -169,6 +260,17 @@ void test("duplicate stories reopen the affected assignment before a reviewed re
             ),
           };
           if (initialCopyError && writes === 1) result = {};
+        } else if (request.text.format.name === "gshl_editorial_verdicts") {
+          result = {
+            verdicts: [
+              {
+                issueIndex: 0,
+                decision: "replace_story",
+                reason:
+                  "The two articles repeat the same development and evidence.",
+              },
+            ],
+          };
         } else {
           reviews++;
           const duplicate = pitches === 1;
@@ -349,6 +451,16 @@ void test("AI pipeline reviews corrected copy and never publishes unresolved edi
           let result: unknown;
           if (name === "gshl_newsroom_pitches") result = { submissions };
           else if (name === "gshl_weekly_edition") result = content;
+          else if (name === "gshl_editorial_verdicts")
+            result = {
+              verdicts: [
+                {
+                  issueIndex: 0,
+                  decision: "correct_copy",
+                  reason: "The factual assertion has no supporting evidence.",
+                },
+              ],
+            };
           else {
             reviews++;
             result = {
@@ -412,10 +524,16 @@ void test("AI pipeline reviews corrected copy and never publishes unresolved edi
           "gshl_newsroom_pitches",
           "gshl_weekly_edition",
           "gshl_editorial_review",
+          "gshl_editorial_verdicts",
           "gshl_weekly_edition",
           "gshl_editorial_review",
           ...(!resolves
-            ? ["gshl_weekly_edition", "gshl_editorial_review"]
+            ? [
+                "gshl_editorial_verdicts",
+                "gshl_weekly_edition",
+                "gshl_editorial_review",
+                "gshl_editorial_verdicts",
+              ]
             : []),
         ]);
       } finally {

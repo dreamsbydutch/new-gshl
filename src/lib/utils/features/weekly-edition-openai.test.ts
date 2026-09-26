@@ -7,6 +7,7 @@ import {
   parseWeeklyEditionStorySubmissions,
   parseWeeklyEditionReview,
   parseWeeklyEditionEditorialReview,
+  applyWeeklyEditionReviewVerdicts,
   resolveNewsroomModel,
 } from "./weekly-edition-openai";
 import {
@@ -152,6 +153,92 @@ void test("newsletter article counts accept six through ten", () => {
   assert.equal(buildWeeklyEditionArticleSlots(10).at(-1)?.id, "article_10");
   assert.throws(() => parseWeeklyEditionArticleCount(5), /between 6 and 10/i);
   assert.throws(() => parseWeeklyEditionArticleCount(11), /between 6 and 10/i);
+});
+
+void test("verification dismisses false alarms without losing factual corrections or retaining dismissed replacements", () => {
+  const issues = [
+    { articleId: "article_1", detail: "This repeats another article." },
+    {
+      articleId: "article_1",
+      detail: "The cap amount contradicts the source.",
+    },
+    {
+      articleId: "article_2",
+      detail:
+        "The opener will reveal whether the core is enough is a forecast.",
+    },
+  ];
+  const review = {
+    issues,
+    errors: issues.map((issue) => `${issue.articleId}: ${issue.detail}`),
+    affectedArticleIds: ["article_1", "article_2"],
+    replacementArticleIds: ["article_1"],
+  };
+  const verdicts = [
+    {
+      issueIndex: 2,
+      decision: "dismiss",
+      reason: "Grounded preview analysis is permitted.",
+    },
+    {
+      issueIndex: 0,
+      decision: "dismiss",
+      reason: "Shared context supports distinct developments.",
+    },
+    {
+      issueIndex: 1,
+      decision: "correct_copy",
+      reason: "The article's amount differs from the source.",
+    },
+  ];
+  const result = applyWeeklyEditionReviewVerdicts(
+    JSON.stringify({ verdicts }),
+    review,
+  );
+  assert.deepEqual(result.issues, [issues[1]]);
+  assert.deepEqual(result.errors, [
+    "article_1: The cap amount contradicts the source.",
+  ]);
+  assert.deepEqual(result.affectedArticleIds, ["article_1"]);
+  assert.deepEqual(result.replacementArticleIds, []);
+  assert.deepEqual(
+    applyWeeklyEditionReviewVerdicts(
+      JSON.stringify({
+        verdicts: verdicts.map((v) =>
+          v.issueIndex === 0 ? { ...v, decision: "replace_story" } : v,
+        ),
+      }),
+      review,
+    ).replacementArticleIds,
+    ["article_1"],
+  );
+  for (const invalid of [
+    [],
+    verdicts.slice(1),
+    [verdicts[0], verdicts[0], verdicts[2]],
+    verdicts.map((v) => (v.issueIndex === 2 ? { ...v, issueIndex: 3 } : v)),
+  ]) {
+    assert.throws(
+      () =>
+        applyWeeklyEditionReviewVerdicts(
+          JSON.stringify({ verdicts: invalid }),
+          review,
+        ),
+      /every issue exactly once/,
+    );
+  }
+  assert.throws(
+    () =>
+      applyWeeklyEditionReviewVerdicts(
+        JSON.stringify({
+          verdicts: verdicts.map((v) =>
+            v.issueIndex === 2 ? { ...v, decision: "replace_story" } : v,
+          ),
+        }),
+        review,
+      ),
+    /unproposed story replacement/,
+  );
 });
 
 void test("buildWeeklyEditionOpenAiRequest defaults to eight exact articles", () => {
