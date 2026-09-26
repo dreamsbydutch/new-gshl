@@ -1,6 +1,7 @@
 "use client";
 
 import { useNHLScheduleData } from "@gshl-hooks/features/useNHLScheduleData";
+import { NHLLogo } from "@gshl-components/player/NHLLogo";
 import { WeeklyScheduleSkeleton } from "@gshl-skeletons";
 import { nhlGameStatus, formatNHLUpdatedAt } from "@gshl-utils/features/nhl";
 
@@ -59,49 +60,64 @@ export function NHLSchedule() {
           )}
           {[...day.games]
             .sort((a, b) => a.startTimeUTC.localeCompare(b.startTimeUTC))
-            .map((game) => (
-              <article key={game.id} className="border-t px-4 py-3">
-                <div className="mb-2 flex items-center justify-between gap-2 text-xs text-gray-500">
+            .map((game) => {
+              const hasScore = ["LIVE", "CRIT", "FINAL", "OFF"].includes(
+                game.gameState,
+              );
+              const awayScore = hasScore ? (game.awayTeam.score ?? "–") : "–";
+              const homeScore = hasScore ? (game.homeTeam.score ?? "–") : "–";
+              const status = nhlGameStatus(game);
+              const awayName = `${game.awayTeam.placeName.default} ${game.awayTeam.commonName?.default ?? game.awayTeam.abbrev}`;
+              const homeName = `${game.homeTeam.placeName.default} ${game.homeTeam.commonName?.default ?? game.homeTeam.abbrev}`;
+              return (
+                <a
+                  key={game.id}
+                  className="grid min-h-11 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_5.5rem] items-center gap-2 border-t px-3 py-2 transition-colors hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-gray-700 sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_7rem] sm:px-4"
+                  href={`https://www.nhl.com/gamecenter/${game.id}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  aria-label={`${awayName} at ${homeName}${hasScore ? `, ${awayScore} to ${homeScore}` : ""}. ${status}. Game details (opens in a new tab).`}
+                >
                   <span
-                    className={
-                      game.gameState === "LIVE" || game.gameState === "CRIT"
-                        ? "font-bold text-green-700"
-                        : ""
-                    }
+                    className="flex items-center justify-end gap-1.5"
+                    title={awayName}
                   >
-                    {nhlGameStatus(game)}
+                    <NHLLogo
+                      team={{ name: game.awayTeam.abbrev, logoUrl: "" }}
+                      size={28}
+                      className="!mx-0 shrink-0"
+                    />
+                    <span className="hidden text-xs font-medium sm:inline">
+                      {game.awayTeam.abbrev}
+                    </span>
+                    <span className="w-5 text-center text-sm font-bold tabular-nums">
+                      {awayScore}
+                    </span>
                   </span>
-                  <a
-                    className="underline"
-                    href={`https://www.nhl.com/gamecenter/${game.id}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    aria-label={`${game.awayTeam.abbrev} at ${game.homeTeam.abbrev} game details`}
-                  >
-                    Game details
-                  </a>
-                </div>
-                {[game.awayTeam, game.homeTeam].map((team, index) => (
-                  <div
-                    key={index}
-                    className="flex items-center justify-between gap-3 py-1 text-sm"
-                  >
-                    <span>
-                      <span className="mr-2 text-xs text-gray-400">
-                        {index === 0 ? "AWAY" : "HOME"}
-                      </span>
-                      {team.placeName.default}{" "}
-                      {team.commonName?.default ?? team.abbrev}
+                  <span className="text-xs text-gray-400" aria-hidden="true">
+                    @
+                  </span>
+                  <span className="flex items-center gap-1.5" title={homeName}>
+                    <span className="w-5 text-center text-sm font-bold tabular-nums">
+                      {homeScore}
                     </span>
-                    <span className="text-lg font-bold tabular-nums">
-                      {["LIVE", "CRIT", "FINAL", "OFF"].includes(game.gameState)
-                        ? (team.score ?? "–")
-                        : "–"}
+                    <NHLLogo
+                      team={{ name: game.homeTeam.abbrev, logoUrl: "" }}
+                      size={28}
+                      className="!mx-0 shrink-0"
+                    />
+                    <span className="hidden text-xs font-medium sm:inline">
+                      {game.homeTeam.abbrev}
                     </span>
-                  </div>
-                ))}
-              </article>
-            ))}
+                  </span>
+                  <span
+                    className={`whitespace-nowrap text-right text-[10px] sm:text-xs ${game.gameState === "LIVE" || game.gameState === "CRIT" ? "font-bold text-green-700" : "text-gray-500"}`}
+                  >
+                    {status}
+                  </span>
+                </a>
+              );
+            })}
         </section>
       ))}
       <p className="text-center text-xs text-gray-500">
