@@ -17,6 +17,10 @@ export const DEFAULT_NEWSROOM_MODEL = "gpt-5.6-terra";
 export const NEWSROOM_MODEL_OPTIONS = [
   { id: "gpt-5.6-terra", label: "GPT-5.6 Terra · Balanced" },
   { id: "gpt-5.6-sol", label: "GPT-5.6 Sol · Higher capability" },
+  { id: "gpt-5.4", label: "GPT-5.4" },
+  { id: "gpt-5.4-mini", label: "GPT-5.4 Mini" },
+  { id: "gpt-5.4-nano", label: "GPT-5.4 Nano" },
+  { id: "gpt-5-mini", label: "GPT-5 Mini" },
 ] as const;
 
 export function resolveNewsroomModel(requested?: string, configured?: string) {

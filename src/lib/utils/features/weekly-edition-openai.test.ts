@@ -25,6 +25,9 @@ void test("Newsroom uses Terra by default and an explicit selection overrides de
     "gpt-5.6-terra",
   );
   assert.equal(resolveNewsroomModel("gpt-5.6-sol"), "gpt-5.6-sol");
+  for (const model of ["gpt-5-mini", "gpt-5.4-mini", "gpt-5.4-nano", "gpt-5.4"]) {
+    assert.equal(resolveNewsroomModel(model, "gpt-5.6-terra"), model);
+  }
   assert.throws(
     () => resolveNewsroomModel("arbitrary-client-model"),
     /supported Newsroom model/,
