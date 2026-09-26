@@ -22,8 +22,8 @@ void test("manual preseason selection covers that season, not the following draf
     f.put("seasons", id, {
       name: `${year - 1}-${year}`,
       year,
-      startDate: `${year - 1}-10-01`,
-      endDate: `${year}-04-15`,
+      startDate: Date.parse(`${year - 1}-10-01`),
+      endDate: Date.parse(`${year}-04-15`),
       draftStartAt: `${year - 1}-09-20`,
       categories: [],
     });
@@ -53,6 +53,14 @@ void test("manual preseason selection covers that season, not the following draf
     abbr: "SC",
   });
   f.put("players", "player", { fullName: "Drafted player", nhlPos: ["C"] });
+  f.put("contracts", "contract", {
+    ownerId: "owner",
+    playerId: "player",
+    seasonId: "previous",
+    contractLength: 1,
+    startDate: Date.parse("2026-10-01"),
+    expiryDate: Date.parse("2027-04-15"),
+  });
   const args = {
     seasonId: "selected",
     weekId: "selected:week",

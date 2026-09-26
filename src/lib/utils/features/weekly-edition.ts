@@ -340,10 +340,13 @@ export function weeklyEditionContractAffectsSeason(
   season: WeeklyEditionContractSeasonSource,
   seasons: WeeklyEditionContractSeasonSource[],
 ) {
-  const seasonStart = normalizeDateOnlyValue(season.startDate);
-  const seasonEnd = normalizeDateOnlyValue(season.endDate);
-  const contractStart = normalizeDateOnlyValue(contract.startDate);
-  const contractEnd = normalizeDateOnlyValue(
+  // Stored numeric dates are UTC epoch milliseconds, not spreadsheet serials.
+  const storedDate = (value: WeeklyEditionContractSeasonSource["startDate"]) =>
+    normalizeDateOnlyValue(typeof value === "number" ? new Date(value) : value);
+  const seasonStart = storedDate(season.startDate);
+  const seasonEnd = storedDate(season.endDate);
+  const contractStart = storedDate(contract.startDate);
+  const contractEnd = storedDate(
     contract.capHitEndDate ?? contract.expiryDate,
   );
   if (seasonStart && seasonEnd && contractStart && contractEnd) {
