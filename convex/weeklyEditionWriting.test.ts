@@ -86,8 +86,162 @@ function writingFixture() {
       links: [],
     })),
   };
-  return { facts, submissions, content };
+  return { facts, submissions, content, assignments };
 }
+
+void test("duplicate stories reopen the affected assignment before a reviewed replacement is published", async () => {
+  for (const initialCopyError of [false, true]) {
+    const priorKey = process.env.OPENAI_API_KEY;
+    process.env.OPENAI_API_KEY = "test-only";
+    const { facts, submissions, content, assignments } = writingFixture();
+    facts.research = {
+      asOf: "2025-10-07",
+      analysisSeasonId: "s",
+      coverage: [],
+      limitations: [],
+      owners: [],
+      recentCoverage: [],
+    };
+    const replaced = assignments[7]!;
+    const oldLead = facts.editorialCandidates.find(
+      (c) => c.id === replaced.leadCandidateId,
+    )!;
+    facts.editorialCandidates.push({
+      ...oldLead,
+      id: "different-evidence",
+      summary: "A distinct upcoming matchup",
+      headlineHint: "A distinct upcoming matchup",
+    });
+    const revisedSubmissions = submissions.map((s) => ({
+      ...s,
+      pitches: s.pitches.map((p) =>
+        p.leadCandidateId === replaced.leadCandidateId
+          ? {
+              ...p,
+              pitchId: "replacement",
+              leadCandidateId: "different-evidence",
+              proposedHeadline: "A distinct upcoming matchup",
+              angle:
+                "Cover the upcoming matchup instead of repeating the return story.",
+            }
+          : p,
+      ),
+    }));
+    let pitches = 0;
+    let writes = 0;
+    let reviews = 0;
+    let publications = 0;
+    const fetchMock = mock.method(
+      globalThis,
+      "fetch",
+      async (_url: unknown, init: RequestInit) => {
+        assert.equal(typeof init.body, "string");
+        const request = JSON.parse(init.body as string) as {
+          input: string;
+          text: { format: { name: string } };
+        };
+        let result: unknown;
+        if (request.text.format.name === "gshl_newsroom_pitches") {
+          pitches++;
+          if (pitches > 1)
+            assert.match(request.input, /STORY_REASSIGNMENT_REQUIRED/);
+          result = {
+            submissions: pitches === 1 ? submissions : revisedSubmissions,
+          };
+        } else if (request.text.format.name === "gshl_weekly_edition") {
+          writes++;
+          if (writes > 1) assert.match(request.input, /different-evidence/);
+          result = {
+            ...content,
+            sections: content.sections.map((s) =>
+              s.id === replaced.id && pitches > 1
+                ? {
+                    ...s,
+                    headline: "A distinct upcoming matchup",
+                    body: `${s.author?.teamName} has an upcoming matchup. This article covers that matchup using the new evidence.`,
+                  }
+                : pitches > 1
+                  ? {
+                      ...s,
+                      body: "Unrequested rewrite that the server must discard.",
+                    }
+                  : s,
+            ),
+          };
+          if (initialCopyError && writes === 1) result = {};
+        } else {
+          reviews++;
+          const duplicate = pitches === 1;
+          result = {
+            reviewedArticleIds: [
+              "front_page",
+              ...content.sections.map((s) => s.id),
+            ],
+            issues: duplicate
+              ? [
+                  {
+                    articleId: replaced.id,
+                    detail:
+                      "Substantially duplicates article_3 under a different headline.",
+                  },
+                ]
+              : [],
+            replacementArticleIds: duplicate ? [replaced.id] : [],
+          };
+        }
+        return new Response(
+          JSON.stringify({
+            status: "completed",
+            output_text: JSON.stringify(result),
+          }),
+          { status: 200 },
+        );
+      },
+    );
+    try {
+      await (
+        generateWithAi as unknown as {
+          _handler: (ctx: unknown, args: unknown) => Promise<unknown>;
+        }
+      )._handler(
+        {
+          runQuery: async () => ({ userId: "commissioner" }),
+          runMutation: async (
+            fn: Parameters<typeof getFunctionName>[0],
+            args: { raw: string; facts: WeeklyEditionFactPacket },
+          ) => {
+            if (getFunctionName(fn) === "weeklyEditions:prepareAiGeneration")
+              return { facts, seasonId: "s", weekId: "w" };
+            publications++;
+            const published = JSON.parse(args.raw) as WeeklyEditionContent;
+            assert.equal(
+              published.sections[7]?.headline,
+              "A distinct upcoming matchup",
+            );
+            assert.deepEqual(
+              published.sections.slice(0, 7),
+              content.sections.slice(0, 7),
+            );
+            assert.equal(
+              args.facts.research?.assignments?.[7]?.leadCandidateId,
+              "different-evidence",
+            );
+            return { id: "edition" };
+          },
+        },
+        { seasonId: "s", weekId: "w", issueType: "weekly" },
+      );
+      assert.equal(pitches, 2);
+      assert.equal(reviews, 2);
+      assert.equal(writes, initialCopyError ? 3 : 2);
+      assert.equal(publications, 1);
+    } finally {
+      fetchMock.mock.restore();
+      if (priorKey === undefined) delete process.env.OPENAI_API_KEY;
+      else process.env.OPENAI_API_KEY = priorKey;
+    }
+  }
+});
 
 void test("previous coverage moves unchanged evidence behind fresh front-page stories", () => {
   const { facts, submissions } = writingFixture();
@@ -117,6 +271,54 @@ void test("previous coverage moves unchanged evidence behind fresh front-page st
     selectWeeklyEditionStoryAssignments(facts, submissions)[0]!.leadCandidateId,
     previousLead,
   );
+});
+
+void test("generation stops before another model request when its total time budget expires", async () => {
+  const priorKey = process.env.OPENAI_API_KEY;
+  process.env.OPENAI_API_KEY = "test-only";
+  const { facts, submissions } = writingFixture();
+  let now = 0;
+  let calls = 0;
+  const clockMock = mock.method(Date, "now", () => now);
+  const fetchMock = mock.method(globalThis, "fetch", async () => {
+    calls++;
+    now = 8 * 60_000 + 1;
+    return new Response(
+      JSON.stringify({
+        status: "completed",
+        output_text: JSON.stringify({ submissions }),
+      }),
+      { status: 200 },
+    );
+  });
+  try {
+    await assert.rejects(
+      (
+        generateWithAi as unknown as {
+          _handler: (ctx: unknown, args: unknown) => Promise<unknown>;
+        }
+      )._handler(
+        {
+          runQuery: async () => ({ userId: "commissioner" }),
+          runMutation: async (fn: Parameters<typeof getFunctionName>[0]) => {
+            assert.equal(
+              getFunctionName(fn),
+              "weeklyEditions:prepareAiGeneration",
+            );
+            return { facts, seasonId: "s", weekId: "w" };
+          },
+        },
+        { seasonId: "s", weekId: "w", issueType: "weekly" },
+      ),
+      /generation time limit/,
+    );
+    assert.equal(calls, 1);
+  } finally {
+    clockMock.mock.restore();
+    fetchMock.mock.restore();
+    if (priorKey === undefined) delete process.env.OPENAI_API_KEY;
+    else process.env.OPENAI_API_KEY = priorKey;
+  }
 });
 
 void test("AI pipeline reviews corrected copy and never publishes unresolved editorial issues", async () => {
@@ -212,6 +414,9 @@ void test("AI pipeline reviews corrected copy and never publishes unresolved edi
           "gshl_editorial_review",
           "gshl_weekly_edition",
           "gshl_editorial_review",
+          ...(!resolves
+            ? ["gshl_weekly_edition", "gshl_editorial_review"]
+            : []),
         ]);
       } finally {
         fetchMock.mock.restore();

@@ -346,9 +346,7 @@ export function weeklyEditionContractAffectsSeason(
   const seasonStart = storedDate(season.startDate);
   const seasonEnd = storedDate(season.endDate);
   const contractStart = storedDate(contract.startDate);
-  const contractEnd = storedDate(
-    contract.capHitEndDate ?? contract.expiryDate,
-  );
+  const contractEnd = storedDate(contract.capHitEndDate ?? contract.expiryDate);
   if (seasonStart && seasonEnd && contractStart && contractEnd) {
     return contractStart <= seasonEnd && contractEnd >= seasonStart;
   }
@@ -2739,6 +2737,7 @@ export function buildWeeklyEditionStoryScoutPrompt(
     "PROMPT_FORMAT=newsroom_pitch_desk_v1",
     "You are running the GSHL Press Box pitch meeting. The goal is to discover the strongest supported stories before any newsletter copy is written.",
     "Work as an autonomous newspaper: inspect the whole research dossier before choosing subjects. Evidence cards are raw reporting material, not article assignments. Connect independent facts across owners, schedules, performances, categories, roster decisions and historical baselines when the connection matters now. You may propose an original angle even when no headlineHint suggests it. No owner or storyline deserves automatic coverage.",
+    "Across writers, each proposed story needs a distinct central development and factual spine. Different candidate IDs, headlines, or bylines do not make two accounts of the same development different stories. Pitch alternatives rather than repeating another writer's main subject and statistics.",
     "Consider both recent events and upcoming stakes. Pair a scheduled opponent with supported owner history or current form when relevant. Keep people, franchises and season teams distinct. Never turn scheduled games into results, missing data into zero, or first recorded participation into a confirmed debut. Respect every research limitation.",
     "Read recentCoverage as editorial memory, not factual evidence. Avoid repeating a previous headline's central claim unless fresh evidence changes the story; explain that change in the angle. Supporting evidence should establish a real connection rather than pad the pitch. Do not file several versions of one event with swapped lead IDs.",
     "Every entry in NEWSROOM_AUTHORS is a working writer. Return exactly one submission for every writer, in the supplied order, and copy each author object exactly. A writer may file zero, one, or two pitches. Zero is the correct answer when the ledger has no story inside that writer's beat.",
@@ -3138,6 +3137,7 @@ export function buildWeeklyEditionChatGptPrompt(
     "VOICE: Write like an informed hockey reporter, not an assistant. Follow each assigned writer's voice without turning the byline into a caricature. Lead with the concrete news. Use specific names, scores, amounts and ratings as evidence, then explain what they change. Vary sentence length and keep paragraphs to two through five sentences.",
     "VOICE: Cut throat-clearing, generic transitions, inflated claims and moralizing recap endings. Do not use canned frames such as 'here is the thing', 'in today's landscape', 'more than just', 'it is important to note', 'game-changer', 'pivotal moment' or 'a testament to'. Do not replace them with choppy fragments.",
     "VOICE: Preserve the packet's scope and uncertainty. Never add a quote, anecdote, motive, conclusion or degree of certainty that the facts do not support.",
+    "EDITION VARIETY: Each article must report a materially distinct development. Shared context may appear briefly, but do not repeat another article's central claim and main statistics under a different angle or headline.",
     "Factual claims must be supported by EDITION_FACTS or RULEBOOK_CONTEXT. Do not invent events, quotes, relationships, motives, injuries, rules, names, scores, statistics, transactions or historical claims. Clearly rhetorical color is allowed when it does not imply a new fact.",
     "Use the supplied ratings as the baseline for league hierarchy and broad judgments, then use the surrounding events and details to explain or challenge that baseline. Ratings may support playful hockey-style chirps about strong and weak players, rosters, and GM track records, but keep the chirps proportionate to the evidence and distinguish player quality, roster talent, and GM performance.",
     "Use RULEBOOK_CONTEXT as the source of truth for league process. Apply only the rule blocks included for this edition. Do not substitute NHL rules or ordinary fantasy-hockey assumptions.",

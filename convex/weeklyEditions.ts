@@ -57,7 +57,7 @@ import {
   extractWeeklyEditionOpenAiText,
   parseWeeklyEditionStorySubmissions,
   buildWeeklyEditionReviewRequest,
-  parseWeeklyEditionReview,
+  parseWeeklyEditionEditorialReview,
   NEWSROOM_MODEL_OPTIONS,
   resolveNewsroomModel,
 } from "../src/lib/utils/features/weekly-edition-openai";
@@ -123,11 +123,19 @@ async function requestNewsroomJson({
   apiKey,
   request,
   failureLabel,
+  deadlineAt,
 }: {
   apiKey: string;
   request: object;
   failureLabel: string;
+  deadlineAt: number;
 }) {
+  const remainingMs = deadlineAt - Date.now();
+  if (remainingMs <= 0) {
+    throw new ConvexError(
+      "The Newsroom reached its generation time limit before validation finished. No edition was published. Please retry.",
+    );
+  }
   const response = await fetch("https://api.openai.com/v1/responses", {
     method: "POST",
     headers: {
@@ -135,7 +143,7 @@ async function requestNewsroomJson({
       "Content-Type": "application/json",
     },
     body: JSON.stringify(request),
-    signal: AbortSignal.timeout(90_000),
+    signal: AbortSignal.timeout(Math.min(90_000, remainingMs)),
   });
   const payload: unknown = await response.json().catch(() => null);
   if (!response.ok) {
@@ -2528,6 +2536,7 @@ async function writeNewsroomEdition(
   const articleCount =
     args.articleCount ?? DEFAULT_WEEKLY_EDITION_ARTICLE_COUNT;
   const model = newsroomModel(args.model);
+  const deadlineAt = Date.now() + 8 * 60_000;
   const prepared = await ctx.runMutation(
     internal.weeklyEditions.prepareAiGeneration,
     {
@@ -2541,6 +2550,7 @@ async function writeNewsroomEdition(
   const scoutPrompt = buildWeeklyEditionStoryScoutPrompt(facts, articleCount);
   let pitchRaw = await requestNewsroomJson({
     apiKey,
+    deadlineAt,
     failureLabel: "run the newsroom pitch meeting",
     request: buildWeeklyEditionPitchOpenAiRequest({
       model,
@@ -2565,6 +2575,7 @@ async function writeNewsroomEdition(
     ].join("\n");
     pitchRaw = await requestNewsroomJson({
       apiKey,
+      deadlineAt,
       failureLabel: "correct the newsroom pitches",
       request: buildWeeklyEditionPitchOpenAiRequest({
         model,
@@ -2584,6 +2595,7 @@ async function writeNewsroomEdition(
   );
   let raw = await requestNewsroomJson({
     apiKey,
+    deadlineAt,
     failureLabel: "write the newsletter",
     request: buildWeeklyEditionOpenAiRequest({
       model,
@@ -2592,46 +2604,8 @@ async function writeNewsroomEdition(
     }),
   });
   let validation = validateWeeklyEditionImport(raw, facts);
-  let validationErrors =
-    validation.valid && validation.content
-      ? validateWeeklyEditionStoryAssignments(
-          validation.content,
-          assignments,
-          facts,
-        )
-      : validation.errors;
-
-  const reviewContent = async (content: WeeklyEditionContent) =>
-    parseWeeklyEditionReview(
-      await requestNewsroomJson({
-        apiKey,
-        failureLabel: "review the newsletter",
-        request: buildWeeklyEditionReviewRequest({ model, facts, content }),
-      }),
-      content,
-    );
-  if (validation.valid && validation.content && validationErrors.length === 0) {
-    validationErrors = await reviewContent(validation.content);
-  }
-
-  if (!validation.valid || validationErrors.length > 0) {
-    const correctionPrompt = [
-      prompt,
-      "",
-      "REVISION_REQUIRED: The draft below failed the newsroom validator.",
-      `Correct every listed error without changing supported facts, adding claims, or changing the required ${articleCount}-article structure. Return only the corrected JSON object.`,
-      `VALIDATION_ERRORS=${JSON.stringify(validationErrors)}`,
-      `REJECTED_DRAFT=${raw}`,
-    ].join("\n");
-    raw = await requestNewsroomJson({
-      apiKey,
-      failureLabel: "correct the newsletter",
-      request: buildWeeklyEditionOpenAiRequest({
-        model,
-        prompt: correctionPrompt,
-        articleCount,
-      }),
-    });
+  let validationErrors: string[] = [];
+  for (let revision = 0; revision <= 2; revision++) {
     validation = validateWeeklyEditionImport(raw, facts);
     validationErrors =
       validation.valid && validation.content
@@ -2641,17 +2615,114 @@ async function writeNewsroomEdition(
             facts,
           )
         : validation.errors;
+    let review:
+      | ReturnType<typeof parseWeeklyEditionEditorialReview>
+      | undefined;
     if (
       validation.valid &&
       validation.content &&
       validationErrors.length === 0
     ) {
-      validationErrors = await reviewContent(validation.content);
+      review = parseWeeklyEditionEditorialReview(
+        await requestNewsroomJson({
+          apiKey,
+          deadlineAt,
+          failureLabel: "review the newsletter",
+          request: buildWeeklyEditionReviewRequest({
+            model,
+            facts,
+            content: validation.content,
+          }),
+        }),
+        validation.content,
+      );
+      validationErrors = review.errors;
+    }
+    if (validation.valid && validationErrors.length === 0) break;
+    if (revision === 2) break;
+
+    const priorContent = validation.content;
+    if (review?.replacementArticleIds.length) {
+      const replacements = new Set(review.replacementArticleIds);
+      const retainedAssignments = assignments.filter(
+        (assignment) => !replacements.has(assignment.id),
+      );
+      const excludedLeadCandidateIds = [
+        ...new Set(
+          assignments.flatMap((assignment) =>
+            replacements.has(assignment.id)
+              ? [assignment.leadCandidateId]
+              : [
+                  assignment.leadCandidateId,
+                  ...assignment.supportingCandidateIds,
+                ],
+          ),
+        ),
+      ];
+      const replacementPitches = await requestNewsroomJson({
+        apiKey,
+        deadlineAt,
+        failureLabel: "find distinct replacement stories",
+        request: buildWeeklyEditionPitchOpenAiRequest({
+          model,
+          prompt: [
+            scoutPrompt,
+            "STORY_REASSIGNMENT_REQUIRED: The copy editor found stories that need different subjects, not cosmetic rewrites.",
+            "Keep the retained assignments. Find materially distinct developments in the remaining evidence for the replacement slots. Never merely rephrase a rejected angle or repeat a retained story's central facts. Return every supplied writer exactly once; retained writers can submit zero pitches. Replacement writers must stay within their beats and cannot use any excluded candidate as a lead.",
+            `REPLACEMENT_ARTICLE_IDS=${JSON.stringify(review.replacementArticleIds)}`,
+            `RETAINED_ASSIGNMENTS=${JSON.stringify(retainedAssignments)}`,
+            `EXCLUDED_LEAD_CANDIDATE_IDS=${JSON.stringify(excludedLeadCandidateIds)}`,
+            `EDITORIAL_ERRORS=${JSON.stringify(validationErrors)}`,
+            `REJECTED_DRAFT=${raw}`,
+          ].join("\n"),
+        }),
+      });
+      assignments = selectWeeklyEditionStoryAssignments(
+        facts,
+        parseWeeklyEditionStorySubmissions(replacementPitches),
+        articleCount,
+        { retainedAssignments, excludedLeadCandidateIds },
+      );
+    }
+    const correctionPrompt = [
+      buildWeeklyEditionChatGptPrompt(facts, assignments, articleCount),
+      "",
+      "REVISION_REQUIRED: The draft below failed the newsroom validator.",
+      `Correct every listed error without changing supported facts, adding claims, or changing the required ${articleCount}-article structure. Return only the corrected JSON object.`,
+      "The current EDITOR_ASSIGNMENTS supersede the rejected draft. Write genuinely new stories for replaced assignments. Keep articles without listed errors verbatim; correct the front-page headline/deck if the revised stories require it.",
+      `VALIDATION_ERRORS=${JSON.stringify(validationErrors)}`,
+      `REJECTED_DRAFT=${raw}`,
+    ].join("\n");
+    raw = await requestNewsroomJson({
+      apiKey,
+      deadlineAt,
+      failureLabel: "correct the newsletter",
+      request: buildWeeklyEditionOpenAiRequest({
+        model,
+        prompt: correctionPrompt,
+        articleCount,
+      }),
+    });
+    // Preserve already accepted copy even if the model rewrites it unnecessarily.
+    const revised = validateWeeklyEditionImport(raw, facts);
+    if (review && priorContent && revised.valid && revised.content) {
+      const affected = new Set(review.affectedArticleIds);
+      const priorSections = new Map(
+        priorContent.sections.map((section) => [section.id, section]),
+      );
+      raw = JSON.stringify({
+        ...revised.content,
+        sections: revised.content.sections.map((section) =>
+          affected.has(section.id)
+            ? section
+            : (priorSections.get(section.id) ?? section),
+        ),
+      });
     }
   }
 
   if (!validation.valid || validationErrors.length > 0) {
-    throw new Error(
+    throw new ConvexError(
       `OpenAI returned a newsletter that failed validation:\n${validationErrors.join(
         "\n",
       )}`,

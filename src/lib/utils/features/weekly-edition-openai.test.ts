@@ -6,6 +6,7 @@ import {
   extractWeeklyEditionOpenAiText,
   parseWeeklyEditionStorySubmissions,
   parseWeeklyEditionReview,
+  parseWeeklyEditionEditorialReview,
   resolveNewsroomModel,
 } from "./weekly-edition-openai";
 import {
@@ -25,7 +26,12 @@ void test("Newsroom uses Terra by default and an explicit selection overrides de
     "gpt-5.6-terra",
   );
   assert.equal(resolveNewsroomModel("gpt-5.6-sol"), "gpt-5.6-sol");
-  for (const model of ["gpt-5-mini", "gpt-5.4-mini", "gpt-5.4-nano", "gpt-5.4"]) {
+  for (const model of [
+    "gpt-5-mini",
+    "gpt-5.4-mini",
+    "gpt-5.4-nano",
+    "gpt-5.4",
+  ]) {
     assert.equal(resolveNewsroomModel(model, "gpt-5.6-terra"), model);
   }
   assert.throws(
@@ -99,6 +105,36 @@ void test("editorial review must cover the front page and every article", () => 
     ),
     ["article_1: The quoted score has no supporting matchup."],
   );
+  assert.deepEqual(
+    parseWeeklyEditionEditorialReview(
+      JSON.stringify({
+        reviewedArticleIds: ["front_page", "article_1"],
+        replacementArticleIds: ["article_1"],
+        issues: [{ articleId: "article_1", detail: "Repeats another story." }],
+      }),
+      content,
+    ).replacementArticleIds,
+    ["article_1"],
+  );
+  for (const replacementArticleIds of [
+    ["front_page"],
+    ["missing"],
+    ["article_1", "article_1"],
+    ["article_1"],
+  ]) {
+    assert.throws(
+      () =>
+        parseWeeklyEditionEditorialReview(
+          JSON.stringify({
+            reviewedArticleIds: ["front_page", "article_1"],
+            replacementArticleIds,
+            issues: [],
+          }),
+          content,
+        ),
+      /invalid story replacement/,
+    );
+  }
   assert.deepEqual(
     parseWeeklyEditionReview(
       JSON.stringify({

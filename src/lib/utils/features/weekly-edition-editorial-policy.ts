@@ -426,8 +426,27 @@ export function selectWeeklyEditionStoryAssignments(
   packet: WeeklyEditionFactPacket,
   submissions: WeeklyEditionStorySubmission[],
   articleCount: WeeklyEditionArticleCount = DEFAULT_WEEKLY_EDITION_ARTICLE_COUNT,
+  revision: {
+    retainedAssignments: WeeklyEditionStoryAssignment[];
+    excludedLeadCandidateIds: string[];
+  } = { retainedAssignments: [], excludedLeadCandidateIds: [] },
 ): WeeklyEditionStoryAssignment[] {
   const articleSlots = buildWeeklyEditionArticleSlots(articleCount);
+  const retained = new Map(
+    revision.retainedAssignments.map((assignment) => [
+      assignment.id,
+      assignment,
+    ]),
+  );
+  if (
+    retained.size !== revision.retainedAssignments.length ||
+    [...retained.keys()].some(
+      (id) => !articleSlots.some((slot) => slot.id === id),
+    )
+  ) {
+    throw new Error("The revision contains invalid retained article slots");
+  }
+  const excludedLeads = new Set(revision.excludedLeadCandidateIds);
   const roster = buildWeeklyEditionAuthorRoster(packet).map(
     ({ author }) => author,
   );
@@ -483,6 +502,7 @@ export function selectWeeklyEditionStoryAssignments(
       if (
         seenPitchIds.has(pitchKey) ||
         !lead ||
+        excludedLeads.has(pitch.leadCandidateId) ||
         support.some((candidate) => !candidate) ||
         !writerCanLeadCandidate(author, lead, packet) ||
         pitch.proposedHeadline.length > 120 ||
@@ -514,14 +534,34 @@ export function selectWeeklyEditionStoryAssignments(
   );
 
   const selected: typeof eligible = [];
-  const usedAuthors = new Set<string>();
-  const usedLeadCandidates = new Set<string>();
-  const usedEvidence = new Set<string>();
+  const usedAuthors = new Set(
+    revision.retainedAssignments.map((assignment) =>
+      weeklyEditionAuthorKey(assignment.author),
+    ),
+  );
+  const usedLeadCandidates = new Set(
+    revision.retainedAssignments.map(
+      (assignment) => assignment.leadCandidateId,
+    ),
+  );
+  const usedEvidence = new Set(
+    revision.retainedAssignments.flatMap((assignment) => [
+      assignment.leadCandidateId,
+      ...assignment.supportingCandidateIds,
+    ]),
+  );
   const teamCounts = new Map<string, number>();
   const kindCounts = new Map<WeeklyEditionEditorialCandidate["kind"], number>();
+  for (const assignment of revision.retainedAssignments) {
+    const lead = candidatesById.get(assignment.leadCandidateId);
+    if (lead?.teamId)
+      teamCounts.set(lead.teamId, (teamCounts.get(lead.teamId) ?? 0) + 1);
+    if (lead) kindCounts.set(lead.kind, (kindCounts.get(lead.kind) ?? 0) + 1);
+  }
+  const requiredPitches = articleSlots.length - retained.size;
   const takePitches = (enforceMix: boolean) => {
     for (const pitch of eligible) {
-      if (selected.length === articleSlots.length) break;
+      if (selected.length === requiredPitches) break;
       const authorKey = weeklyEditionAuthorKey(pitch.author);
       const teamId = pitch.lead.teamId;
       const kind = pitch.lead.kind;
@@ -548,14 +588,17 @@ export function selectWeeklyEditionStoryAssignments(
   };
   takePitches(true);
   takePitches(false);
-  if (selected.length < articleSlots.length) {
+  if (selected.length < requiredPitches) {
     throw new Error(
-      `The pitch desk found only ${selected.length} distinct, eligible stories; ${articleCount} are required`,
+      `The pitch desk found only ${selected.length + retained.size} distinct, eligible stories; ${articleCount} are required`,
     );
   }
 
-  return articleSlots.map((slot, index) => {
-    const pitch = selected[index]!;
+  let replacementIndex = 0;
+  return articleSlots.map((slot) => {
+    const kept = retained.get(slot.id);
+    if (kept) return kept;
+    const pitch = selected[replacementIndex++]!;
     return {
       ...slot,
       author: pitch.author,
