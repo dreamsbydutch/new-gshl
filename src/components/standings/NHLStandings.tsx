@@ -3,15 +3,11 @@
 import { useNHLStandingsData } from "@gshl-hooks/features/useNHLStandingsData";
 import { NHLLogo } from "@gshl-components/player/NHLLogo";
 import { StandingsSkeleton } from "@gshl-skeletons";
-import {
-  formatNHLUpdatedAt,
-  NHL_DIVISION_ORDER,
-} from "@gshl-utils/features/nhl";
+import { NHL_DIVISION_ORDER } from "@gshl-utils/features/nhl";
 
 export function NHLStandings() {
-  const { data, seasonId, isLoading, error, retry } = useNHLStandingsData();
+  const { data, isLoading, error, retry } = useNHLStandingsData();
   if (isLoading) return <StandingsSkeleton />;
-  const season = seasonId?.toString();
   const divisions = [
     ...new Set(data?.standings.map((team) => team.divisionName) ?? []),
   ].sort((a, b) => {
@@ -25,25 +21,6 @@ export function NHLStandings() {
   });
   return (
     <div className="mx-auto max-w-4xl space-y-6 px-3 py-6">
-      <header className="text-center">
-        <h2 className="text-xl font-bold">NHL Standings</h2>
-        <p className="text-sm text-gray-500">
-          NHL season
-          {season ? ` · ${season.slice(0, 4)}–${season.slice(4)}` : ""}
-        </p>
-        <p className="text-xs text-gray-500">
-          {data?.standings[0]?.date ? `As of ${data.standings[0].date} · ` : ""}
-          Refreshes daily
-        </p>
-        {data && (
-          <p className="text-xs text-gray-500">
-            Last updated:{" "}
-            <time dateTime={new Date(data.updatedAt).toISOString()}>
-              {formatNHLUpdatedAt(data.updatedAt)}
-            </time>
-          </p>
-        )}
-      </header>
       {data?.isPreseason && (
         <p className="text-center text-xs text-gray-500">
           Preseason · Regular-season totals start at zero.
