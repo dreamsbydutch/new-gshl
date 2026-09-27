@@ -47,7 +47,6 @@ export function TeamRoster({
           {injuryStatus}
         </p>
       )}
-      <h3 className="mb-1 text-xs font-semibold text-slate-600">Lineup</h3>
       <RosterLineup
         teamLineup={teamLineup}
         contractByPlayerId={contractByPlayerId}
