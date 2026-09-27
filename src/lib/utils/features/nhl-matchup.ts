@@ -1,6 +1,37 @@
 import type { GSHLTeam, Player, PlayerDayStatLine } from "@gshl-types";
 import type { NHLGame, NHLMatchupPlayerRow } from "@gshl-lib/types/nhl";
 import { getPlayerNhlAbbreviations } from "../domain/player";
+import { z } from "zod";
+import { nhlBoxscorePlayerSchema } from "./nhl";
+
+export const nhlMatchupRosterSchema = z.object({
+  season: z.object({ id: z.string() }).nullable(),
+  updatedAt: z.number(),
+  players: z.array(
+    z.object({
+      id: z.string(),
+      fullName: z.string(),
+      position: z.string(),
+      goalie: z.boolean(),
+      side: z.enum(["away", "home"]),
+      gshlTeam: z.object({
+        id: z.string(),
+        name: z.string().nullable(),
+        abbr: z.string().nullable(),
+        logoUrl: z.string().nullable(),
+      }),
+      lineupPosition: z.string().nullable(),
+      lineupStatus: z.enum([
+        "Started",
+        "Bench",
+        "Out",
+        "Planned",
+        "Not recorded",
+      ]),
+      stats: nhlBoxscorePlayerSchema.nullable(),
+    }),
+  ),
+});
 
 export function buildNHLMatchupPlayers({
   game,

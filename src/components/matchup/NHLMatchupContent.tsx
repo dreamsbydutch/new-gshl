@@ -19,6 +19,7 @@ export function NHLMatchupContent({ gameId }: { gameId: string }) {
     backHref,
     rosterLoading,
     rosterError,
+    retryRoster,
     hasSeason,
   } = useNHLMatchupData(gameId);
   if (isLoading) return <MatchupSkeleton />;
@@ -132,7 +133,12 @@ export function NHLMatchupContent({ gameId }: { gameId: string }) {
           Loading GSHL players…
         </p>
       ) : rosterError ? (
-        <p role="alert">{rosterError}</p>
+        <p role="alert">
+          {rosterError}{" "}
+          <button className="underline" onClick={retryRoster}>
+            Retry players
+          </button>
+        </p>
       ) : !hasSeason ? (
         <p className="text-center text-sm text-slate-500">
           No matching GSHL season is available for this game.

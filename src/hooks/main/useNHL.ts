@@ -15,7 +15,7 @@ import { useSeasons } from "./useSeason";
 
 const cache = new Map<string, { data: unknown; checkedAt: number }>();
 
-function useNHLResource<T>(
+export function useNHLResource<T>(
   url: string | null,
   schema: z.ZodType<T, z.ZodTypeDef, unknown>,
   refreshSeconds: number,

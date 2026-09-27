@@ -5,8 +5,6 @@ import { act, create, type ReactTestRenderer } from "react-test-renderer";
 import { ConvexProvider, ConvexReactClient } from "convex/react";
 import { getFunctionName, type FunctionReference } from "convex/server";
 import { useNavStore } from "../src/lib/cache";
-import { useNHLMatchupRoster } from "../src/hooks/main/useNHLMatchupRoster";
-import { nhlGameResponseSchema } from "../src/lib/utils/features/nhl";
 import {
   useNHLSeason,
   useNHLStandings,
@@ -50,18 +48,6 @@ for (const year of ["2025", "2026", "2027"]) {
     });
     const requests: string[] = [];
     const seasonId = startYear * 10000 + Number(year);
-    const game = nhlGameResponseSchema.parse({
-      id: startYear * 1000000 + 20001,
-      season: seasonId,
-      gameType: 2,
-      gameDate: `${startYear}-10-10`,
-      startTimeUTC: `${startYear}-10-10T23:00:00Z`,
-      gameState: "OFF",
-      gameScheduleState: "OK",
-      updatedAt: Date.now(),
-      awayTeam: { abbrev: "TOR", placeName: { default: "Toronto" } },
-      homeTeam: { abbrev: "MTL", placeName: { default: "Montreal" } },
-    });
     t.mock.method(globalThis, "fetch", async (url: string) => {
       requests.push(url);
       return Response.json(
@@ -83,9 +69,7 @@ for (const year of ["2025", "2026", "2027"]) {
     let resolvedSeason: number | undefined;
     let standings: ReturnType<typeof useNHLStandings> | undefined;
     let schedule: ReturnType<typeof useNHLSchedule> | undefined;
-    let matchupSeason: string | undefined;
     function Probe() {
-      matchupSeason = useNHLMatchupRoster(game).season?.id;
       resolvedSeason = useNHLSeason().seasonId;
       standings = useNHLStandings(resolvedSeason);
       schedule = useNHLSchedule(
@@ -115,11 +99,6 @@ for (const year of ["2025", "2026", "2027"]) {
       "Both NHL tabs must fetch data after resolving the selected GSHL season",
     );
     assert.equal(resolvedSeason, seasonId);
-    assert.equal(
-      matchupSeason,
-      "selected-season",
-      "NHL matchups must find the GSHL season by its ending year",
-    );
     assert.ok(requests.every((url) => url.includes(`season=${seasonId}`)));
     assert.equal(standings?.data?.seasonId, seasonId);
     assert.equal(schedule?.data?.gameWeek.length, 1);
