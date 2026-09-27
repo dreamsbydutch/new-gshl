@@ -17,6 +17,7 @@ export function getTradeBlockPerspective<T extends { ownerId: string }>(
   selectedOwnerId: string,
   viewerOwnerId: string | null | undefined,
   canManage: boolean,
+  isCommissioner = false,
 ) {
   return {
     teamListings: listings.filter(
@@ -29,5 +30,9 @@ export function getTradeBlockPerspective<T extends { ownerId: string }>(
       canManage &&
       Boolean(selectedOwnerId) &&
       selectedOwnerId === viewerOwnerId,
+    canRemoveTeamListings:
+      canManage &&
+      Boolean(selectedOwnerId) &&
+      (selectedOwnerId === viewerOwnerId || isCommissioner),
   };
 }

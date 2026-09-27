@@ -31,9 +31,11 @@ void test("trade block follows the selected owner without exposing another team'
   assert.deepEqual(own.teamListings, [listings[0]]);
   assert.deepEqual(own.leagueListings, [listings[1]]);
   assert.equal(own.canManageTeam, true);
+  assert.equal(own.canRemoveTeamListings, true);
   const other = getTradeBlockPerspective(listings, "b", "a", true);
   assert.deepEqual(other.teamListings, [listings[1]]);
   assert.equal(other.canManageTeam, false);
+  assert.equal(other.canRemoveTeamListings, false);
   assert.equal(
     getTradeBlockPerspective(listings, "a", "a", false).canManageTeam,
     false,
@@ -41,6 +43,11 @@ void test("trade block follows the selected owner without exposing another team'
   assert.equal(
     getTradeBlockPerspective(listings, "", null, true).canManageTeam,
     false,
+  );
+  assert.equal(
+    getTradeBlockPerspective(listings, "b", null, true, true)
+      .canRemoveTeamListings,
+    true,
   );
   assert.deepEqual(
     getTradeBlockPerspective(listings, "inactive", "a", true).teamListings,

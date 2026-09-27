@@ -116,6 +116,9 @@ export function mutationFixture() {
         for (const key of Object.keys(value))
           if (value[key] === undefined) delete row[key];
       },
+      delete: async (id: string) => {
+        for (const rows of tables.values()) rows.delete(id);
+      },
     },
     scheduler: {
       runAfter: async (

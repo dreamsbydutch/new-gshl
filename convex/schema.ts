@@ -266,6 +266,7 @@ export default defineSchema({
     createdAt: v.number(),
     expiresAt: v.number(),
     ownerId: v.optional(v.id("owners")),
+    excludeOwnerId: v.optional(v.id("owners")),
     pickId: v.optional(v.id("draftPicks")),
     clockStartedAt: v.optional(v.number()),
     seasonId: v.optional(v.id("seasons")),

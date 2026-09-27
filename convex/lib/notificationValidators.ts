@@ -18,4 +18,5 @@ export const notificationCategory = v.union(
   v.literal("draft_complete"),
   v.literal("announcement"),
   v.literal("press_box"),
+  v.literal("trade_block"),
 );

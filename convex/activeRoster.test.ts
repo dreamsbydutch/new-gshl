@@ -50,6 +50,10 @@ function fixture() {
     lineupPos: "D",
     isActive: false,
   });
+  f.put("tradeBlockEntries", "released-listing", {
+    ownerId: "owner1",
+    playerId: "released",
+  });
   f.put("players", "unsigned", {
     ownerId: null,
     gshlTeamId: null,
@@ -75,6 +79,7 @@ void test("post-draft dry run, team/owner repair, lineup optimization, cleanup a
   assert.equal(f.get("released")?.ownerId, null);
   assert.equal(f.get("released")?.gshlTeamId, null);
   assert.equal(f.get("released")?.lineupPos, null);
+  assert.equal(f.get("released-listing"), null);
   assert.equal(f.get("unsigned")?.updatedAt, undefined);
   assert.equal((await refreshActiveRoster(f.ctx, request)).updated, 0);
 });

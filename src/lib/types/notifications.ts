@@ -6,6 +6,7 @@ export type NotificationCategory =
   | "draft_pick"
   | "draft_complete"
   | "announcement"
-  | "press_box";
+  | "press_box"
+  | "trade_block";
 
 export type NotificationChoice = { inbox: boolean; push: boolean };

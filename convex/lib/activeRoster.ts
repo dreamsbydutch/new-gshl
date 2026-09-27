@@ -224,8 +224,15 @@ export async function refreshActiveRoster(
   }
   const changes = planActiveRoster(players, rosterTeams, memberships);
   if (request.apply) {
-    for (const { playerId, ...patch } of changes)
-      await ctx.db.patch(playerId, { ...patch, updatedAt: request.now });
+    for (const { playerId, ownerId, ...patch } of changes) {
+      const listings = await ctx.db
+        .query("tradeBlockEntries")
+        .withIndex("by_playerId", (q) => q.eq("playerId", playerId))
+        .collect();
+      for (const listing of listings)
+        if (listing.ownerId !== ownerId) await ctx.db.delete(listing._id);
+      await ctx.db.patch(playerId, { ownerId, ...patch, updatedAt: request.now });
+    }
   }
   return {
     seasonId: season._id,

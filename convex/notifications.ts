@@ -390,6 +390,11 @@ export const fanOut = internalMutation({
         toUtcTimestamp(user.createdAt)! > event.createdAt
       )
         continue;
+      if (
+        event.category === "trade_block" &&
+        (user.role !== "owner" || !user.ownerId || user.ownerId === event.excludeOwnerId)
+      )
+        continue;
       if (event.ownerId && user.role === "viewer") continue;
       const existing = await ctx.db
         .query("notifications")

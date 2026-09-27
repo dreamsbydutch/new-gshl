@@ -80,6 +80,12 @@ export const NOTIFICATION_OPTIONS: readonly {
     description: "When a new edition is published.",
     defaultPush: false,
   },
+  {
+    key: "trade_block",
+    label: "Trade block listings",
+    description: "When another owner lists a player on the trade block.",
+    defaultPush: false,
+  },
 ];
 
 export function notificationChoice(

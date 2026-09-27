@@ -3,6 +3,7 @@ import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import { mutation, query, type QueryCtx } from "./_generated/server";
 import { requireActiveUser, requireOwnerAccess } from "./lib/auth";
+import { emitNotification } from "./lib/notificationEvents";
 import { toUtcTimestamp, utcTimestampToDateKey } from "./lib/timestamps";
 import { normalizeTradeBlockNote } from "../src/lib/utils/features/trade-block";
 
@@ -90,14 +91,15 @@ async function loadOwnerResources(
 
 function projectCandidate(options: {
   player: Doc<"players">;
-  contract: Doc<"contracts">;
+  ownerId: Id<"owners">;
+  contract?: Doc<"contracts">;
   franchise: Doc<"franchises"> | null;
   listing?: Doc<"tradeBlockEntries">;
 }) {
-  const { player, contract, franchise, listing } = options;
+  const { player, ownerId, contract, franchise, listing } = options;
   return {
     listingId: listing ? String(listing._id) : null,
-    ownerId: String(contract.ownerId),
+    ownerId: String(ownerId),
     playerId: String(player._id),
     fullName: player.fullName,
     posGroup: player.posGroup,
@@ -111,11 +113,14 @@ function projectCandidate(options: {
       player.overallRk === null || player.overallRk === undefined
         ? null
         : Number(player.overallRk),
-    capHit: Number(contract.capHit ?? contract.contractSalary ?? 0),
-    contractLength: Number(contract.contractLength ?? 0),
-    expiryDate: utcTimestampToDateKey(
-      contract.capHitEndDate ?? contract.expiryDate,
-    ),
+    isUnderContract: Boolean(contract),
+    capHit: contract
+      ? Number(contract.capHit ?? contract.contractSalary ?? 0)
+      : null,
+    contractLength: contract ? Number(contract.contractLength ?? 0) : null,
+    expiryDate: contract
+      ? utcTimestampToDateKey(contract.capHitEndDate ?? contract.expiryDate)
+      : null,
     team: {
       name: franchise?.name ?? "Unknown team",
       abbr: franchise?.abbr ?? "",
@@ -171,8 +176,7 @@ export const market = query({
         if (
           !player ||
           !resources ||
-          player.ownerId !== listing.ownerId ||
-          !player.isActive
+          player.ownerId !== listing.ownerId
         ) {
           return null;
         }
@@ -182,14 +186,13 @@ export const market = query({
           listing.playerId,
           now,
         );
-        return contract
-          ? projectCandidate({
-              player,
-              contract,
-              franchise: resources.franchise,
-              listing,
-            })
-          : null;
+        return projectCandidate({
+          player,
+          ownerId: listing.ownerId,
+          contract,
+          franchise: resources.franchise,
+          listing,
+        });
       })
       .filter(
         (listing): listing is NonNullable<typeof listing> => listing !== null,
@@ -214,7 +217,6 @@ export const market = query({
       );
       if (resources) {
         candidates = players
-          .filter((player) => player.isActive)
           .map((player) => {
             const contract = selectDisplayContract(
               resources.contracts,
@@ -222,14 +224,13 @@ export const market = query({
               player._id,
               now,
             );
-            return contract
-              ? projectCandidate({
-                  player,
-                  contract,
-                  franchise: resources.franchise,
-                  listing: listingByPlayerId.get(String(player._id)),
-                })
-              : null;
+            return projectCandidate({
+              player,
+              ownerId: viewerOwnerId,
+              contract,
+              franchise: resources.franchise,
+              listing: listingByPlayerId.get(String(player._id)),
+            });
           })
           .filter(
             (candidate): candidate is NonNullable<typeof candidate> =>
@@ -242,8 +243,9 @@ export const market = query({
     return {
       viewerOwnerId: viewerOwnerId ? String(viewerOwnerId) : null,
       canManage:
-        Boolean(viewerOwnerId) &&
-        (user.role === "owner" || user.role === "commissioner"),
+        user.role === "commissioner" ||
+        (user.role === "owner" && Boolean(viewerOwnerId)),
+      isCommissioner: user.role === "commissioner",
       listings: projectedListings,
       candidates,
     };
@@ -262,24 +264,9 @@ export const save = mutation({
     await requireOwnerAccess(ctx, user.ownerId);
 
     const player = await ctx.db.get(args.playerId);
-    if (!player?.isActive || player.ownerId !== user.ownerId) {
-      throw new Error("Only active players on your roster can be listed.");
+    if (!player || player.ownerId !== user.ownerId) {
+      throw new Error("Only players on your roster can be listed.");
     }
-    const ownerContracts = await ctx.db
-      .query("contracts")
-      .withIndex("by_ownerId", (range) => range.eq("ownerId", user.ownerId!))
-      .collect();
-    if (
-      !selectDisplayContract(
-        ownerContracts,
-        user.ownerId,
-        player._id,
-        Date.now(),
-      )
-    ) {
-      throw new Error("This player does not have an active tradable contract.");
-    }
-
     const note = normalizeTradeBlockNote(args.note);
     const existing = await ctx.db
       .query("tradeBlockEntries")
@@ -292,13 +279,23 @@ export const save = mutation({
       await ctx.db.patch(existing._id, { note, updatedAt: now });
       return existing._id;
     }
-    return ctx.db.insert("tradeBlockEntries", {
+    const listingId = await ctx.db.insert("tradeBlockEntries", {
       ownerId: user.ownerId,
       playerId: player._id,
       note,
       createdAt: now,
       updatedAt: now,
     });
+    await emitNotification(ctx, {
+      key: `trade-block:${listingId}`,
+      category: "trade_block",
+      title: "New trade block listing",
+      body: `${player.fullName} is available from the trade block.`,
+      href: "/lockerroom?view=tradeBlock",
+      excludeOwnerId: user.ownerId,
+      expiresAt: now + 7 * 24 * 60 * 60 * 1000,
+    });
+    return listingId;
   },
 });
 

@@ -81,6 +81,7 @@ export function TradeBlock({
     String(currentTeam.ownerId ?? ""),
     market.data?.viewerOwnerId,
     Boolean(market.data?.canManage),
+    Boolean(market.data?.isCommissioner),
   );
   const listings = useMemo(() => {
     const normalizedSearch = search.trim().toLocaleLowerCase();
@@ -138,6 +139,26 @@ export function TradeBlock({
       toast({
         title: "Player removed",
         description: `${selectedCandidate.fullName} is no longer on the trade block.`,
+      });
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Listing was not removed",
+        description:
+          error instanceof Error ? error.message : "Please try again.",
+      });
+    }
+  };
+
+  const removeTeamListing = async (
+    listing: (typeof perspective.teamListings)[number],
+  ) => {
+    if (!listing.listingId || !perspective.canRemoveTeamListings) return;
+    try {
+      await market.remove.mutateAsync({ listingId: listing.listingId });
+      toast({
+        title: "Player removed",
+        description: `${listing.fullName} is no longer on the trade block.`,
       });
     } catch (error) {
       toast({
@@ -279,13 +300,18 @@ export function TradeBlock({
                 }
               : undefined
           }
+          onRemove={
+            perspective.canRemoveTeamListings
+              ? (listing) => void removeTeamListing(listing)
+              : undefined
+          }
         />
         {perspective.teamListings.length === 0 ? (
           <p className="py-2 text-xs text-slate-500">
             {perspective.canManageTeam
               ? candidates.length
                 ? "List a player and tell other owners what you want in return."
-                : "No eligible contracted players to list."
+                : "No players on your roster to list."
               : `${currentTeam.name} has no players listed.`}
           </p>
         ) : null}
@@ -343,12 +369,18 @@ function TradeListingRows({
   listings,
   nhlTeams,
   onEdit,
+  onRemove,
 }: {
   listings: NonNullable<
     ReturnType<typeof useTradeBlockMarket>["data"]
   >["listings"];
   nhlTeams: NHLTeam[];
   onEdit?: (playerId: string) => void;
+  onRemove?: (
+    listing: NonNullable<
+      ReturnType<typeof useTradeBlockMarket>["data"]
+    >["listings"][number],
+  ) => void;
 }) {
   return (
     <div className="divide-y divide-slate-100">
@@ -387,10 +419,16 @@ function TradeListingRows({
                 </div>
               </div>
               <div className="shrink-0 text-right text-xs tabular-nums">
-                <p>{formatMoney(listing.capHit)}</p>
-                <p className="text-[10px] text-slate-500">
-                  Through {listing.expiryDate?.slice(0, 4) ?? "-"}
-                </p>
+                {listing.isUnderContract ? (
+                  <>
+                    <p>{formatMoney(listing.capHit ?? 0)}</p>
+                    <p className="text-[10px] text-slate-500">
+                      Under contract through {listing.expiryDate?.slice(0, 4) ?? "-"}
+                    </p>
+                  </>
+                ) : (
+                  <p className="text-[10px] text-slate-500">No active contract</p>
+                )}
               </div>
               {onEdit ? (
                 <Button
@@ -402,6 +440,18 @@ function TradeListingRows({
                   aria-label={`Edit ${listing.fullName} listing`}
                 >
                   Edit
+                </Button>
+              ) : null}
+              {onRemove ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  className="h-9"
+                  onClick={() => onRemove(listing)}
+                  aria-label={`Remove ${listing.fullName} from the trade block`}
+                >
+                  Unlist
                 </Button>
               ) : null}
             </div>
