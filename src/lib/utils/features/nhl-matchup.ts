@@ -49,8 +49,11 @@ export function buildNHLMatchupPlayers({
   return [...uniquePlayers.values()]
     .flatMap((player) => {
       const day = gameDays.get(player.id);
-      const teamId =
-        day?.gshlTeamId ?? (allowCurrentRoster ? player.gshlTeamId : null);
+      const teamId = day
+        ? day.gshlTeamId
+        : allowCurrentRoster
+          ? player.gshlTeamId
+          : null;
       const gshlTeam = teamId ? teamsById.get(teamId) : undefined;
       if (!gshlTeam) return [];
       const recorded = gamePlayers.find(
@@ -68,7 +71,8 @@ export function buildNHLMatchupPlayers({
             : null);
       if (!side) return [];
       const lineupPosition =
-        day?.dailyPos ?? (allowCurrentRoster ? player.lineupPos : null) ?? null;
+        (day ? day.dailyPos : allowCurrentRoster ? player.lineupPos : null) ??
+        null;
       const bench = lineupPosition === "BN";
       const out = ["IR", "IR+", "IRplus", "NA"].includes(lineupPosition ?? "");
       const active = [

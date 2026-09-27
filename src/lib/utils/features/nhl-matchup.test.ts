@@ -134,3 +134,28 @@ void test("current lineup is only a plan, never proof of a start", () => {
   assert.equal(rows[0]?.lineupPosition, "C");
   assert.equal(rows[0]?.lineupStatus, "Planned");
 });
+
+void test("an existing day record never borrows missing ownership or position from today's roster", () => {
+  const input = {
+    game,
+    teams,
+    players: [{ ...player, lineupPos: "C" }],
+    days: [
+      {
+        playerId: "p1",
+        date: game.gameDate,
+        gshlTeamId: null,
+        dailyPos: null,
+        nhlTeam: ["TOR"],
+      },
+    ],
+    allowCurrentRoster: true,
+  };
+  assert.deepEqual(buildNHLMatchupPlayers(input), []);
+  const rows = buildNHLMatchupPlayers({
+    ...input,
+    days: [{ ...input.days[0]!, gshlTeamId: "old-team" }],
+  });
+  assert.equal(rows[0]?.lineupPosition, null);
+  assert.equal(rows[0]?.lineupStatus, "Not recorded");
+});
