@@ -72,6 +72,10 @@ import {
   teamResultEvidence,
 } from "../src/lib/utils/features/weekly-edition-research";
 import { toUtcTimestamp, utcTimestampToDateKey } from "./lib/timestamps";
+import {
+  prepareEditionInjuryContext,
+  addEditionInjuryReporting,
+} from "./lib/weeklyEditionInjuries";
 
 import {
   publishTemplateEdition,
@@ -2467,6 +2471,11 @@ export const prepareAiGeneration = internalMutation({
       scheduledFor: scheduledForTimestamp,
       facts,
       sourceHash: hashWeeklyEditionSource(facts),
+      injuryContext: await prepareEditionInjuryContext(
+        ctx,
+        facts,
+        existing?._id,
+      ),
     };
   },
 });
@@ -2558,7 +2567,7 @@ async function writeNewsroomEdition(
     resolvedModel: model,
   });
   const deadlineAt = Date.now() + 8 * 60_000;
-  const prepared = await ctx.runMutation(
+  const { injuryContext, ...prepared } = await ctx.runMutation(
     internal.weeklyEditions.prepareAiGeneration,
     {
       seasonId: args.seasonId,
@@ -2567,7 +2576,10 @@ async function writeNewsroomEdition(
       ...(editedBy ? { seasonSelection: "edition" as const } : {}),
     },
   );
-  const facts = prepared.facts;
+  const facts = await addEditionInjuryReporting(
+    prepared.facts,
+    injuryContext ?? null,
+  );
   const scoutPrompt = buildWeeklyEditionStoryScoutPrompt(facts, articleCount);
   let pitchRaw = await requestNewsroomJson({
     apiKey,

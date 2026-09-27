@@ -249,7 +249,7 @@ function weeklyEditionAuthorProfile(author: WeeklyEditionAuthor) {
   if (author.name === WEEKLY_EDITION_STAFF.headInsider.name) {
     return {
       scoutsFor:
-        "The edition's biggest signing, trade, contract, cap, or roster-management decision and its league-wide chain reaction.",
+        "The edition's biggest signing, trade, contract, cap, major injury, confirmed return, or roster-management decision and its league-wide chain reaction.",
       passesOn:
         "Routine adds and drops, speculative motives, and any supposed negotiation detail absent from the source packet.",
       voice:
@@ -259,7 +259,7 @@ function weeklyEditionAuthorProfile(author: WeeklyEditionAuthor) {
   if (author.name === WEEKLY_EDITION_STAFF.insider.name) {
     return {
       scoutsFor:
-        "Signings, trades, adds, drops, expiring contracts, cap developments, and the next roster decision created by them.",
+        "Signings, trades, adds, drops, expiring contracts, cap developments, major injuries, confirmed returns, and the next roster decision created by them.",
       passesOn:
         "Transaction lists with no consequence, unsupported market rumours, and performance stories with no roster angle.",
       voice:
@@ -342,7 +342,7 @@ const ANALYTICS_CANDIDATE_KINDS = new Set<
 
 const INSIDER_CANDIDATE_KINDS = new Set<
   WeeklyEditionEditorialCandidate["kind"]
->(["transaction", "contract", "cap", "ufa", "activity"]);
+>(["transaction", "contract", "cap", "ufa", "activity", "injury"]);
 
 function weeklyEditionCandidateTeamIds(
   candidate: WeeklyEditionEditorialCandidate,

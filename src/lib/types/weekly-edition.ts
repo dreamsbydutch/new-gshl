@@ -1,3 +1,5 @@
+import type { EditionInjurySnapshot } from "./weekly-edition-injuries";
+
 export type WeeklyEditionGenerationMode =
   | "template"
   | "openai"
@@ -201,6 +203,7 @@ export interface WeeklyEditionNextMatchupFact {
 }
 
 export type WeeklyEditionEditorialCandidateKind =
+  | "injury"
   | "matchup"
   | "player_performance"
   | "team_performance"
@@ -346,6 +349,7 @@ export interface WeeklyEditionAchievementSnapshot {
 }
 
 export interface WeeklyEditionFactPacket {
+  injurySnapshot?: EditionInjurySnapshot;
   version: 1;
   research?: WeeklyEditionResearch;
   season: {
