@@ -10,7 +10,52 @@ import {
   selectHomeMockDraftPreview,
   selectHomePowerRankingPreview,
   selectHomeUfaPreview,
+  isHomeDraftHubVisible,
 } from "./home-dashboard";
+
+void test("home draft hub appears one week before the draft and hides three days after", () => {
+  const startsAt = "2026-10-04T23:00:00Z";
+  for (const [now, expected] of [
+    ["2026-09-27T22:59:59.999Z", false],
+    ["2026-09-27T23:00:00Z", true],
+    [startsAt, true],
+    ["2026-10-07T22:59:59.999Z", true],
+    ["2026-10-07T23:00:00Z", false],
+    ["2027-01-01T00:00:00Z", false],
+  ] as const) {
+    assert.equal(isHomeDraftHubVisible(startsAt, new Date(now)), expected, now);
+  }
+});
+
+void test("home draft hub preserves an active draft but hides completed results outside the window", () => {
+  const startsAt = "2026-10-04T23:00:00Z";
+  const later = new Date("2026-10-08T23:00:00Z");
+  assert.equal(isHomeDraftHubVisible(startsAt, later, "on_clock"), true);
+  assert.equal(
+    isHomeDraftHubVisible(startsAt, later, "commissioner_required"),
+    true,
+  );
+  assert.equal(isHomeDraftHubVisible(startsAt, later, "complete"), false);
+  assert.equal(isHomeDraftHubVisible(startsAt, later, "upcoming"), false);
+  assert.equal(
+    isHomeDraftHubVisible(
+      startsAt,
+      new Date("2026-10-05T23:00:00Z"),
+      "complete",
+    ),
+    true,
+  );
+});
+
+void test("home draft hub rejects missing or invalid dates", () => {
+  for (const start of [undefined, null, "", "not-a-date"]) {
+    assert.equal(isHomeDraftHubVisible(start, new Date()), false);
+  }
+  assert.equal(
+    isHomeDraftHubVisible("2026-10-04T23:00:00Z", new Date(NaN)),
+    false,
+  );
+});
 
 void test("home activity starts compact and can expose the complete query inventory", () => {
   const entries = Array.from({ length: 12 }, (_, index) => ({

@@ -10,7 +10,7 @@ import {
   useDraftHubStatus,
 } from "@gshl-hooks";
 import type { DraftHubCardProps } from "@gshl-types";
-import { getDraftYear } from "@gshl-utils";
+import { getDraftYear, isHomeDraftHubVisible } from "@gshl-utils";
 
 export function DraftHubCard({ season }: DraftHubCardProps) {
   const { session, status: sessionStatus } = useAuthSession();
@@ -22,7 +22,14 @@ export function DraftHubCard({ season }: DraftHubCardProps) {
   });
   const draftDate = new Date(season.draftStartAt ?? Number.NaN);
   const countdown = useDraftCountdown({ draftDate });
-  if (Number.isNaN(draftDate.getTime())) return null;
+  if (
+    !isHomeDraftHubVisible(
+      season.draftStartAt,
+      countdown.now,
+      draftStatus.data?.status,
+    )
+  )
+    return null;
   const draftYear = getDraftYear(season);
 
   const isComplete = draftStatus.data?.status === "complete";
@@ -39,7 +46,7 @@ export function DraftHubCard({ season }: DraftHubCardProps) {
   return (
     <section
       aria-labelledby="draft-hub-home-heading"
-      className="border-y border-slate-300 py-3 sm:py-4"
+      className="mx-auto w-full max-w-5xl border-y border-slate-300 py-3 sm:py-4"
     >
       <div className="grid items-center gap-3 md:grid-cols-[1fr_auto] md:gap-5">
         <div className="flex min-w-0 items-start gap-3">

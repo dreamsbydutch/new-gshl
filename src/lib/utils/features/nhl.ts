@@ -2,6 +2,32 @@ import { z } from "zod";
 
 export const NHL_STANDINGS_REFRESH_SECONDS = 24 * 60 * 60;
 export const NHL_SCHEDULE_REFRESH_SECONDS = 15 * 60;
+
+/** Home follows today's Eastern calendar date, independent of the season picker. */
+export function getNHLHomeScheduleDays(now: Date) {
+  const today = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Toronto",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(now);
+  return (["Yesterday", "Today", "Tomorrow"] as const).map((label, index) => {
+    const day = new Date(Date.parse(today) + (index - 1) * 86400000);
+    const year = day.getUTCFullYear();
+    const endingYear = year + (day.getUTCMonth() >= 6 ? 1 : 0);
+    return {
+      label,
+      date: day.toISOString().slice(0, 10),
+      seasonId: (endingYear - 1) * 10000 + endingYear,
+      dateLabel: new Intl.DateTimeFormat("en-US", {
+        weekday: "short",
+        month: "short",
+        day: "numeric",
+        timeZone: "UTC",
+      }).format(day),
+    };
+  });
+}
 export const NHL_DIVISION_ORDER = [
   "Atlantic",
   "Metropolitan",

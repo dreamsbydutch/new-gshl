@@ -3,6 +3,52 @@ import { test, type TestContext } from "node:test";
 import { createElement } from "react";
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
 import { useNHLSchedule, useNHLStandings } from "../src/hooks/main/useNHL";
+import { useNHLHomeSchedule } from "../src/hooks/features/useNHLHomeSchedule";
+
+void test("home schedule switches days and rolls forward when the app regains focus", async (t) => {
+  const { events, restore } = browser(t);
+  const requestedDates: string[] = [];
+  t.mock.method(globalThis, "fetch", async (url: string) => {
+    const params = new URL(url, "https://gshl.test").searchParams;
+    const date = params.get("start")!;
+    assert.equal(params.get("end"), date);
+    requestedDates.push(date);
+    return Response.json({
+      updatedAt: Date.now(),
+      seasonId: Number(params.get("season")),
+      published: true,
+      gameWeek: [{ date, games: [] }],
+    });
+  });
+  let latest: ReturnType<typeof useNHLHomeSchedule> | undefined;
+  function Probe() {
+    latest = useNHLHomeSchedule();
+    return null;
+  }
+  let renderer: ReactTestRenderer | undefined;
+  t.after(() => {
+    act(() => renderer?.unmount());
+    restore();
+  });
+  await act(async () => {
+    renderer = create(createElement(Probe));
+  });
+  assert.equal(latest?.selectedDay?.date, "2026-09-26");
+  assert.equal(requestedDates.at(-1), "2026-09-26");
+  assert.equal(latest?.isLoading, false);
+  await act(async () => latest?.setSelectedIndex(0));
+  assert.equal(latest?.selectedDay?.label, "Yesterday");
+  assert.equal(requestedDates.at(-1), "2026-09-25");
+  await act(async () => latest?.setSelectedIndex(2));
+  assert.equal(latest?.selectedDay?.label, "Tomorrow");
+  assert.equal(requestedDates.at(-1), "2026-09-27");
+  t.mock.timers.setTime(new Date("2026-09-27T12:00:00Z").getTime());
+  await act(async () => {
+    events.dispatchEvent(new Event("focus"));
+  });
+  assert.equal(latest?.selectedDay?.date, "2026-09-28");
+  assert.equal(requestedDates.at(-1), "2026-09-28");
+});
 
 function browser(t: TestContext) {
   const windowDescriptor = Object.getOwnPropertyDescriptor(

@@ -7,12 +7,46 @@ import {
   nhlScheduleSchema,
   toNHLSeasonId,
   isNHLSeasonId,
+  getNHLHomeScheduleDays,
 } from "./nhl";
 import {
   buildScheduleNavigationHref,
   isScheduleNavigationView,
   isStandingsNavigationView,
 } from "./contextual-navigation";
+
+void test("home NHL dates follow Eastern time across the year boundary", () => {
+  const days = getNHLHomeScheduleDays(new Date("2027-01-01T02:00:00Z"));
+  assert.deepEqual(
+    days.map(({ date, label, seasonId }) => ({ date, label, seasonId })),
+    [
+      { date: "2026-12-30", label: "Yesterday", seasonId: 20262027 },
+      { date: "2026-12-31", label: "Today", seasonId: 20262027 },
+      { date: "2027-01-01", label: "Tomorrow", seasonId: 20262027 },
+    ],
+  );
+});
+
+void test("home NHL dates stay consecutive through daylight saving changes", () => {
+  for (const [instant, expected] of [
+    ["2026-03-08T16:00:00Z", ["2026-03-07", "2026-03-08", "2026-03-09"]],
+    ["2026-11-01T17:00:00Z", ["2026-10-31", "2026-11-01", "2026-11-02"]],
+  ] as const) {
+    assert.deepEqual(
+      getNHLHomeScheduleDays(new Date(instant)).map((day) => day.date),
+      expected,
+    );
+  }
+});
+
+void test("home NHL requests use the season for each day at the summer rollover", () => {
+  assert.deepEqual(
+    getNHLHomeScheduleDays(new Date("2026-07-01T16:00:00Z")).map(
+      (day) => day.seasonId,
+    ),
+    [20252026, 20262027, 20262027],
+  );
+});
 
 void test("GSHL ending years map to NHL season IDs and invalid IDs stay rejected", () => {
   assert.equal(toNHLSeasonId("2027"), 20262027);

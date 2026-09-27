@@ -150,12 +150,12 @@ export function PowerRankingsHomeCard({
       ) : (
         <ol
           aria-label={`Top ${previewEntries.length} power rankings`}
-          className="grid grid-cols-1 divide-y divide-slate-100 px-3 sm:grid-cols-2 sm:gap-x-4 sm:divide-y-0 sm:px-5"
+          className="divide-y divide-slate-100 px-3 sm:px-5"
         >
           {previewEntries.map((entry) => (
             <li
               key={entry.team.id}
-              className="grid min-w-0 grid-cols-[1.75rem_minmax(0,1fr)_2.25rem_3rem] items-center gap-1.5 border-b border-slate-100 py-2 last:border-b-0 sm:gap-2 sm:last:border-b"
+              className="grid min-w-0 grid-cols-[1.75rem_minmax(0,1fr)_2.25rem_3rem] items-center gap-1.5 py-2 sm:gap-2"
             >
               <span className="text-center font-oswald text-base font-semibold tabular-nums text-slate-950">
                 {entry.rank}

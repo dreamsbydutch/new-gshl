@@ -42,7 +42,7 @@ export function PowerRankingsHomeCardSkeleton() {
         </div>
         <Skeleton className="h-11 w-20 rounded-lg" />
       </header>
-      <div className="grid grid-cols-1 px-3 sm:grid-cols-2 sm:gap-x-4 sm:px-5">
+      <div className="px-3 sm:px-5">
         {Array.from({ length: 8 }).map((_, index) => (
           <div
             key={index}
@@ -93,6 +93,27 @@ export function UfaHomeCardSkeleton() {
   );
 }
 
+export function NHLScheduleHomeCardSkeleton() {
+  return (
+    <section
+      aria-label="Loading NHL schedule"
+      aria-busy="true"
+      className="min-w-0 overflow-hidden rounded-lg border border-slate-200 bg-white"
+    >
+      <div className="space-y-3 border-b border-slate-100 p-4">
+        <Skeleton className="h-6 w-36" />
+        <Skeleton className="h-3 w-48" />
+        <Skeleton className="h-11 w-full" />
+      </div>
+      <div className="space-y-3 p-4">
+        {Array.from({ length: 5 }, (_, index) => (
+          <Skeleton key={index} className="h-9 w-full" />
+        ))}
+      </div>
+    </section>
+  );
+}
+
 export function HomeSkeleton() {
   return (
     <main
@@ -110,8 +131,11 @@ export function HomeSkeleton() {
           <Skeleton className="h-11 w-20 shrink-0 rounded-full" />
         </section>
         <UfaHomeCardSkeleton />
-        <div className="mx-auto grid w-full min-w-0 max-w-5xl items-start gap-3 sm:gap-4 xl:grid-cols-2">
+        <div className="mx-auto grid w-full min-w-0 max-w-5xl items-start gap-3 sm:gap-4 lg:grid-cols-2">
           <PowerRankingsHomeCardSkeleton />
+          <NHLScheduleHomeCardSkeleton />
+        </div>
+        <div className="mx-auto w-full max-w-5xl">
           <LeagueActivityCardSkeleton />
         </div>
       </div>

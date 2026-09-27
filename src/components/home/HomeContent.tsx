@@ -6,6 +6,7 @@ import { HomeSkeleton } from "@gshl-skeletons";
 import { cn, findMockDraftSeason, resolveDraftHubSeason } from "@gshl-utils";
 import { LeagueActivityCard } from "./LeagueActivityCard";
 import { PowerRankingsHomeCard } from "./PowerRankingsHomeCard";
+import { NHLScheduleHomeCard } from "./NHLScheduleHomeCard";
 import { UfaHomeCard } from "@gshl-components/contracts";
 import { WeeklyEditionHomeCard } from "@gshl-components/headlines/WeeklyEditionHomeCard";
 import { DraftHubCard } from "./DraftHubCard";
@@ -40,12 +41,15 @@ export function HomeContent() {
         <div
           className={cn(
             "mx-auto grid w-full min-w-0 max-w-5xl items-start gap-3 sm:gap-4",
-            dashboardSeason && "xl:grid-cols-2",
+            dashboardSeason && "lg:grid-cols-2",
           )}
         >
           {dashboardSeason ? (
             <PowerRankingsHomeCard seasonId={String(dashboardSeason.id)} />
           ) : null}
+          <NHLScheduleHomeCard />
+        </div>
+        <div className="mx-auto w-full max-w-5xl">
           <LeagueActivityCard
             seasonId={
               dashboardSeason?.id ? String(dashboardSeason.id) : undefined
@@ -53,9 +57,7 @@ export function HomeContent() {
           />
         </div>
         {draftSeason?.draftStartAt ? (
-          <div className="mx-auto w-full max-w-5xl">
-            <DraftHubCard season={draftSeason} />
-          </div>
+          <DraftHubCard season={draftSeason} />
         ) : null}
         {mockDraftSeason ? (
           <div className="mx-auto w-full max-w-5xl">
