@@ -10,13 +10,15 @@ export const NHL_DIVISION_ORDER = [
 ] as const;
 
 export function toNHLSeasonId(
-  startYear: number | undefined,
+  startYear: string | number | undefined,
 ): number | undefined {
-  return startYear !== undefined &&
-    Number.isInteger(startYear) &&
-    startYear >= 1917 &&
-    startYear < 2100
-    ? startYear * 10000 + startYear + 1
+  // The Convex season facade preserves stored string years.
+  const year = typeof startYear === "string" ? Number(startYear) : startYear;
+  return year !== undefined &&
+    Number.isInteger(year) &&
+    year >= 1917 &&
+    year < 2100
+    ? year * 10000 + year + 1
     : undefined;
 }
 
