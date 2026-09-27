@@ -4,6 +4,49 @@ import { getPlayerNhlAbbreviations } from "../domain/player";
 import { z } from "zod";
 import { nhlBoxscorePlayerSchema } from "./nhl";
 
+const startingPositions = new Set([
+  "C",
+  "LW",
+  "RW",
+  "W",
+  "F",
+  "D",
+  "G",
+  "UTIL",
+  "Util",
+]);
+const nonStartingPositions = new Set(["BN", "IR", "IR+", "IRplus", "NA"]);
+
+export function groupNHLMatchupPlayers(players: NHLMatchupPlayerRow[]) {
+  const starters = players.filter((player) =>
+    startingPositions.has(player.lineupPosition ?? ""),
+  );
+  return [
+    {
+      label:
+        starters.length &&
+        starters.every((player) => player.lineupStatus === "Planned")
+          ? "Projected starters"
+          : "Starters",
+      players: starters,
+    },
+    {
+      label: "Non-starters",
+      players: players.filter((player) =>
+        nonStartingPositions.has(player.lineupPosition ?? ""),
+      ),
+    },
+    {
+      label: "Position not recorded",
+      players: players.filter(
+        (player) =>
+          !startingPositions.has(player.lineupPosition ?? "") &&
+          !nonStartingPositions.has(player.lineupPosition ?? ""),
+      ),
+    },
+  ].filter((group) => group.players.length);
+}
+
 export const nhlMatchupRosterSchema = z.object({
   season: z.object({ id: z.string() }).nullable(),
   updatedAt: z.number(),
@@ -106,17 +149,7 @@ export function buildNHLMatchupPlayers({
         null;
       const bench = lineupPosition === "BN";
       const out = ["IR", "IR+", "IRplus", "NA"].includes(lineupPosition ?? "");
-      const active = [
-        "C",
-        "LW",
-        "RW",
-        "W",
-        "F",
-        "D",
-        "G",
-        "UTIL",
-        "Util",
-      ].includes(lineupPosition ?? "");
+      const active = startingPositions.has(lineupPosition ?? "");
       const lineupStatus =
         !day && lineupPosition
           ? "Planned"

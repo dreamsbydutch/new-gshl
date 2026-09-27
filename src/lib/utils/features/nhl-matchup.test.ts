@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildNHLMatchupPlayers } from "./nhl-matchup";
+import { buildNHLMatchupPlayers, groupNHLMatchupPlayers } from "./nhl-matchup";
 import { nhlGameResponseSchema } from "./nhl";
 
 const game = nhlGameResponseSchema.parse({
@@ -34,6 +34,64 @@ const player = {
   nhlTeam: ["MTL"],
   gshlTeamId: "new-team",
 };
+
+void test("upcoming table groups use lineup positions even when bench and injured players are Planned", () => {
+  const rows = buildNHLMatchupPlayers({
+    game: { ...game, gameState: "FUT" },
+    teams,
+    days: [],
+    allowCurrentRoster: true,
+    players: ["BN", "C", "IR", "IR+", "IRplus", "NA", "G", null].map(
+      (position, index) => ({
+        ...player,
+        id: String(index),
+        lineupPos: position,
+      }),
+    ),
+  });
+  const originalIds = rows.map((row) => row.id);
+  const groups = groupNHLMatchupPlayers(rows);
+  assert.deepEqual(
+    groups.map((group) => group.label),
+    ["Projected starters", "Non-starters", "Position not recorded"],
+  );
+  assert.deepEqual(
+    groups[0]?.players.map((row) => row.lineupPosition),
+    ["C", "G"],
+  );
+  assert.deepEqual(
+    groups[1]?.players.map((row) => row.lineupPosition),
+    ["BN", "IR", "IR+", "IRplus", "NA"],
+  );
+  assert.equal(groups[2]?.players[0]?.lineupPosition, null);
+  assert.deepEqual(
+    rows.map((row) => row.id),
+    originalIds,
+  );
+});
+
+void test("recorded starters keep a historical label and empty table groups are omitted", () => {
+  const rows = buildNHLMatchupPlayers({
+    game,
+    teams,
+    players: [player],
+    allowCurrentRoster: false,
+    days: [
+      {
+        playerId: player.id,
+        gshlTeamId: "old-team",
+        date: game.gameDate,
+        dailyPos: "C",
+        nhlTeam: ["TOR"],
+      },
+    ],
+  });
+  assert.deepEqual(
+    groupNHLMatchupPlayers(rows).map((group) => group.label),
+    ["Starters"],
+  );
+  assert.deepEqual(groupNHLMatchupPlayers([]), []);
+});
 
 void test("NHL matchup uses game-day GSHL team and position instead of current ownership", () => {
   const rows = buildNHLMatchupPlayers({

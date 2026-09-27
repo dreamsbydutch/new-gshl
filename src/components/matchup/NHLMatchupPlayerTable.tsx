@@ -1,5 +1,6 @@
 import Image from "next/image";
 import { TableViewport } from "@gshl-ui";
+import { groupNHLMatchupPlayers } from "@gshl-utils/features/nhl-matchup";
 import type {
   NHLBoxscorePlayer,
   NHLMatchupPlayerRow,
@@ -62,8 +63,8 @@ export function NHLMatchupPlayerTable({
               ))}
             </tr>
           </thead>
-          <tbody>
-            {!players.length ? (
+          {!players.length ? (
+            <tbody>
               <tr>
                 <td
                   colSpan={columns.length + 2}
@@ -73,67 +74,80 @@ export function NHLMatchupPlayerTable({
                   this team and date.
                 </td>
               </tr>
-            ) : (
-              players.map((player) => (
-                <tr
-                  key={player.id}
-                  className={`border-b border-slate-200 last:border-0 ${["BN", "IR", "IR+", "IRplus"].includes(player.lineupPosition ?? "") ? "bg-slate-100 text-slate-500 [&_img]:opacity-60" : "odd:bg-white even:bg-slate-50/70"}`}
-                >
+            </tbody>
+          ) : (
+            groupNHLMatchupPlayers(players).map((group) => (
+              <tbody key={group.label}>
+                <tr>
                   <th
-                    scope="row"
-                    className="sticky left-0 z-10 bg-inherit px-3 py-2 text-left font-normal"
+                    scope="rowgroup"
+                    colSpan={columns.length + 2}
+                    className="border-y border-slate-200 bg-slate-50 px-3 py-2 text-left text-xs font-medium text-slate-600"
                   >
-                    <span className="flex items-center gap-2">
-                      {player.gshlTeam.logoUrl ? (
-                        <Image
-                          src={player.gshlTeam.logoUrl}
-                          alt={player.gshlTeam.name ?? "GSHL team"}
-                          title={player.gshlTeam.name ?? undefined}
-                          width={24}
-                          height={24}
-                          className="h-6 w-6 shrink-0 object-contain"
-                        />
-                      ) : (
-                        <span
-                          className="text-[10px]"
-                          title={player.gshlTeam.name ?? undefined}
-                        >
-                          {player.gshlTeam.abbr ?? "GSHL"}
-                        </span>
-                      )}
-                      <span
-                        className="max-w-36 truncate sm:max-w-none"
-                        title={player.fullName}
-                      >
-                        {player.fullName}
-                      </span>
-                    </span>
+                    {group.label}
                   </th>
-                  <td className="whitespace-nowrap px-3 py-2 text-center">
-                    <span className="font-medium" title={player.lineupStatus}>
-                      {player.lineupPosition ?? "–"}
-                    </span>
-                  </td>
-                  {columns.map((column) => {
-                    const value = player.stats?.[column.key];
-                    return (
-                      <td
-                        key={column.key}
-                        className="px-3 py-2 text-center tabular-nums"
-                      >
-                        {value == null
-                          ? "–"
-                          : column.key === "savePctg" &&
-                              typeof value === "number"
-                            ? value.toFixed(3)
-                            : value}
-                      </td>
-                    );
-                  })}
                 </tr>
-              ))
-            )}
-          </tbody>
+                {group.players.map((player) => (
+                  <tr
+                    key={player.id}
+                    className="border-b border-slate-200 text-slate-800 last:border-0 odd:bg-white even:bg-slate-50/40"
+                  >
+                    <th
+                      scope="row"
+                      className="sticky left-0 z-10 bg-inherit px-3 py-2 text-left font-normal"
+                    >
+                      <span className="flex items-center gap-2">
+                        {player.gshlTeam.logoUrl ? (
+                          <Image
+                            src={player.gshlTeam.logoUrl}
+                            alt={player.gshlTeam.name ?? "GSHL team"}
+                            title={player.gshlTeam.name ?? undefined}
+                            width={24}
+                            height={24}
+                            className="h-6 w-6 shrink-0 object-contain"
+                          />
+                        ) : (
+                          <span
+                            className="text-[10px]"
+                            title={player.gshlTeam.name ?? undefined}
+                          >
+                            {player.gshlTeam.abbr ?? "GSHL"}
+                          </span>
+                        )}
+                        <span
+                          className="max-w-36 truncate sm:max-w-none"
+                          title={player.fullName}
+                        >
+                          {player.fullName}
+                        </span>
+                      </span>
+                    </th>
+                    <td className="whitespace-nowrap px-3 py-2 text-center">
+                      <span className="font-medium" title={player.lineupStatus}>
+                        {player.lineupPosition ?? "–"}
+                      </span>
+                    </td>
+                    {columns.map((column) => {
+                      const value = player.stats?.[column.key];
+                      return (
+                        <td
+                          key={column.key}
+                          className="px-3 py-2 text-center tabular-nums"
+                        >
+                          {value == null
+                            ? "–"
+                            : column.key === "savePctg" &&
+                                typeof value === "number"
+                              ? value.toFixed(3)
+                              : value}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            ))
+          )}
         </table>
       </TableViewport>
     </section>
