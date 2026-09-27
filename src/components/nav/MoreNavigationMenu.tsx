@@ -23,6 +23,12 @@ import { cn } from "@gshl-utils";
 
 const moreItems = [
   {
+    label: "Injury Report",
+    description: "NHL player availability and injury updates",
+    href: "/injuries",
+    icon: ClipboardList,
+  },
+  {
     label: "Press Box",
     description: "League news and weekly editions",
     href: "/headlines",

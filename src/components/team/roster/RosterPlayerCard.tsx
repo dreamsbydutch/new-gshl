@@ -1,6 +1,7 @@
 "use client";
 
 import { NHLLogo } from "@gshl-components/player/NHLLogo";
+import { PlayerInjuryBadge } from "@gshl-components/player/PlayerInjuryBadge";
 import type { Contract, NHLTeam, Player } from "@gshl-types";
 import {
   cn,
@@ -41,7 +42,10 @@ export function RosterPlayerCard({
 
   return (
     <div className={cn("grid grid-cols-2 px-2 text-center", className)}>
-      <div className="col-span-3 text-sm">{player.fullName}</div>
+      <div className="col-span-3 text-sm">
+        {player.fullName}
+        <PlayerInjuryBadge name={player.fullName} teams={player.nhlTeam} />
+      </div>
       <div className="text-2xs">{player.nhlPos?.toString() ?? ""}</div>
       <div>
         <NHLLogo team={playerNhlTeam} size={16} />
