@@ -153,6 +153,8 @@ export function useNotificationCenter(includeInbox = true) {
     ...data,
     supported,
     browserChecked,
+    deviceChecked: browserChecked && (!endpoint || data.deviceId !== undefined),
+    pushReady: permission === "granted" && Boolean(data.deviceId),
     needsHomeScreen,
     draftReady:
       permission === "granted" &&

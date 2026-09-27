@@ -15,7 +15,10 @@ export function DraftNotificationSetup({
   if (status === "loading") return null;
   if (!session?.user)
     return compact ? (
-      <section aria-label="Draft notifications" className="border-y py-3">
+      <section
+        aria-label="Draft notifications"
+        className="mx-auto w-full max-w-5xl rounded-lg border bg-muted/30 p-4"
+      >
         <p className="text-sm font-medium">Get ready for the draft</p>
         <Link
           href="/signin?callbackUrl=%2Fnotifications"
@@ -25,23 +28,17 @@ export function DraftNotificationSetup({
         </Link>
       </section>
     ) : null;
-  if (!setup.settings || !setup.browserChecked) return null;
-  if (compact && setup.draftReady)
-    return (
-      <div className="flex flex-wrap items-center justify-between gap-2 border-y py-2 text-sm">
-        <span>Draft alerts enabled on this device</span>
-        <Link
-          href="/notifications"
-          className="inline-flex min-h-9 items-center underline"
-        >
-          Check notification setup
-        </Link>
-      </div>
-    );
+  if (!setup.settings || !setup.deviceChecked) return null;
+  // Reminder preferences are optional once the device is connected.
+  if (compact && setup.pushReady && !setup.busy && !setup.error) return null;
   return (
     <section
       aria-label="Draft notification setup"
-      className="space-y-3 border-y py-4"
+      className={
+        compact
+          ? "mx-auto w-full max-w-5xl space-y-3 rounded-lg border bg-muted/30 p-4"
+          : "space-y-3 border-y py-4"
+      }
     >
       <div>
         <h2 className="text-sm font-semibold">
@@ -50,8 +47,9 @@ export function DraftNotificationSetup({
             : "Get ready for the draft"}
         </h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Allow notifications for the draft start, your turn, upcoming picks,
-          and the final minute on your clock.
+          {compact
+            ? "Get draft reminders on this device so you don’t miss your pick."
+            : "Allow notifications for the draft start, your turn, upcoming picks, and the final minute on your clock."}
         </p>
       </div>
       {setup.needsHomeScreen ? (
@@ -138,8 +136,7 @@ export function DraftNotificationSetup({
         setup.permission !== "denied" &&
         setup.settings.publicKey && (
           <p className="text-xs text-muted-foreground">
-            Choose Allow when your browser asks. You can change each reminder
-            later.
+            Choose Allow when prompted. Manage reminders in Notifications.
           </p>
         )}
       {setup.error && (
@@ -157,7 +154,7 @@ export function DraftNotificationSetup({
           href="/notifications"
           className="inline-flex min-h-9 items-center text-sm underline"
         >
-          Notification settings and device help
+          Setup help and preferences
         </Link>
       )}
     </section>
