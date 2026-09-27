@@ -25,14 +25,6 @@ export function RosterReserveSection({
         title === "IR" ? "border-red-200 bg-red-50" : "bg-brown-50",
       )}
     >
-      <h3
-        className={cn(
-          "px-3 pt-2 text-xs font-semibold",
-          title === "IR" ? "text-red-900" : "text-slate-600",
-        )}
-      >
-        {title} <span className="font-normal">({players.length})</span>
-      </h3>
       {players.length === 0 && (
         <p className="px-3 py-2 text-xs text-slate-500">
           {title === "IR" ? "No players on IR." : "No bench players."}
