@@ -1,12 +1,14 @@
 "use client";
 
+import Link from "next/link";
 import { useNHLScheduleData } from "@gshl-hooks/features/useNHLScheduleData";
 import { NHLLogo } from "@gshl-components/player/NHLLogo";
 import { WeeklyScheduleSkeleton } from "@gshl-skeletons";
 import { nhlGameStatus, formatNHLUpdatedAt } from "@gshl-utils/features/nhl";
 
 export function NHLSchedule() {
-  const { data, week, isLoading, error, retry } = useNHLScheduleData();
+  const { data, week, isLoading, error, retry, getMatchupHref } =
+    useNHLScheduleData();
   if (isLoading) return <WeeklyScheduleSkeleton />;
   return (
     <div className="space-y-5 px-3 py-6">
@@ -37,6 +39,11 @@ export function NHLSchedule() {
       {!week && !error && (
         <p className="text-center text-sm text-gray-500">
           Select a week to see NHL games.
+        </p>
+      )}
+      {data && !data.published && (
+        <p className="text-center text-sm text-gray-500">
+          The NHL schedule has not been published for this season.
         </p>
       )}
       {data?.gameWeek.map((day) => (
@@ -70,13 +77,12 @@ export function NHLSchedule() {
               const awayName = `${game.awayTeam.placeName.default} ${game.awayTeam.commonName?.default ?? game.awayTeam.abbrev}`;
               const homeName = `${game.homeTeam.placeName.default} ${game.homeTeam.commonName?.default ?? game.homeTeam.abbrev}`;
               return (
-                <a
+                <Link
                   key={game.id}
                   className="grid min-h-11 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_5.5rem] items-center gap-2 border-t px-3 py-2 transition-colors hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-gray-700 sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_7rem] sm:px-4"
-                  href={`https://www.nhl.com/gamecenter/${game.id}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  aria-label={`${awayName} at ${homeName}${hasScore ? `, ${awayScore} to ${homeScore}` : ""}. ${status}. Game details (opens in a new tab).`}
+                  href={getMatchupHref(game.id)}
+                  prefetch={false}
+                  aria-label={`${awayName} at ${homeName}${hasScore ? `, ${awayScore} to ${homeScore}` : ""}. ${status}. GSHL player matchup details.`}
                 >
                   <span
                     className="flex items-center justify-end gap-1.5"
@@ -115,7 +121,7 @@ export function NHLSchedule() {
                   >
                     {status}
                   </span>
-                </a>
+                </Link>
               );
             })}
         </section>

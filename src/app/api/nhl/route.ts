@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import {
   NHL_STANDINGS_REFRESH_SECONDS,
   NHL_SCHEDULE_REFRESH_SECONDS,
+  isNHLSeasonId,
 } from "@gshl-utils/features/nhl";
 import {
   getNHLSchedule,
@@ -12,6 +13,10 @@ import {
 export async function GET(request: Request) {
   const params = new URL(request.url).searchParams;
   const view = params.get("view");
+  const seasonId = Number(params.get("season"));
+  if (!isNHLSeasonId(seasonId)) {
+    return NextResponse.json({ error: "Invalid NHL season" }, { status: 400 });
+  }
   if (view !== "standings" && view !== "schedule") {
     return NextResponse.json({ error: "Invalid NHL view" }, { status: 400 });
   }
@@ -29,8 +34,8 @@ export async function GET(request: Request) {
   try {
     const data =
       view === "standings"
-        ? await getNHLStandings()
-        : await getNHLSchedule(dates);
+        ? await getNHLStandings(seasonId)
+        : await getNHLSchedule(seasonId, dates);
     const interval =
       view === "standings"
         ? NHL_STANDINGS_REFRESH_SECONDS

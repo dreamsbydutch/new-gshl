@@ -7,13 +7,17 @@ import {
   nhlStandingsResponseSchema,
   NHL_STANDINGS_REFRESH_SECONDS,
   NHL_SCHEDULE_REFRESH_SECONDS,
+  toNHLSeasonId,
+  nhlGameResponseSchema,
 } from "@gshl-utils/features/nhl";
+import { useNav } from "./useNav";
+import { useSeasons } from "./useSeason";
 
 const cache = new Map<string, { data: unknown; checkedAt: number }>();
 
 function useNHLResource<T>(
   url: string | null,
-  schema: z.ZodType<T>,
+  schema: z.ZodType<T, z.ZodTypeDef, unknown>,
   refreshSeconds: number,
 ) {
   const [result, setResult] = useState<{
@@ -89,20 +93,48 @@ function useNHLResource<T>(
   };
 }
 
-export function useNHLStandings() {
+export function useNHLSeason() {
+  const { selectedSeasonId } = useNav();
+  const seasons = useSeasons({
+    seasonId: selectedSeasonId ?? undefined,
+    enabled: Boolean(selectedSeasonId),
+  });
+  const selectedSeason = seasons.data.find(
+    (season) => season.id === selectedSeasonId,
+  );
+  return {
+    seasonId: toNHLSeasonId(selectedSeason?.year),
+    selectedSeason,
+    isLoading: seasons.isLoading,
+  };
+}
+
+export function useNHLStandings(seasonId?: number) {
   return useNHLResource(
-    "/api/nhl?view=standings",
+    seasonId ? `/api/nhl?view=standings&season=${seasonId}` : null,
     nhlStandingsResponseSchema,
     NHL_STANDINGS_REFRESH_SECONDS,
   );
 }
 
-export function useNHLSchedule(start?: string, end?: string) {
+export function useNHLSchedule(
+  start?: string,
+  end?: string,
+  seasonId?: number,
+) {
   return useNHLResource(
-    start && end
-      ? `/api/nhl?view=schedule&start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`
+    start && end && seasonId
+      ? `/api/nhl?view=schedule&season=${seasonId}&start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`
       : null,
     nhlScheduleResponseSchema,
+    NHL_SCHEDULE_REFRESH_SECONDS,
+  );
+}
+
+export function useNHLGame(gameId: string) {
+  return useNHLResource(
+    /^\d{10}$/.test(gameId) ? `/api/nhl/game/${gameId}` : null,
+    nhlGameResponseSchema,
     NHL_SCHEDULE_REFRESH_SECONDS,
   );
 }

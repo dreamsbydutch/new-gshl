@@ -37,14 +37,67 @@ function browser(t: TestContext) {
   return { events, restore };
 }
 
-void test("standings reuse cached results on focus and remount, refreshing after one day", async (t) => {
-  const { events, restore } = browser(t);
-  const request = t.mock.method(globalThis, "fetch", async () =>
-    Response.json({ standings: [], updatedAt: Date.now() }),
+void test("selecting 2026-27 never renders the unscoped API's 2025-26 standings", async (t) => {
+  const { restore } = browser(t);
+  t.mock.method(globalThis, "fetch", async (url: string) =>
+    Response.json({
+      updatedAt: Date.now(),
+      seasonId: 20262027,
+      isPreseason: true,
+      standings: url.includes("season=20262027")
+        ? []
+        : [
+            {
+              teamName: { default: "Toronto Maple Leafs" },
+              teamAbbrev: { default: "TOR" },
+              conferenceName: "Eastern",
+              divisionName: "Atlantic",
+              divisionSequence: 1,
+              gamesPlayed: 82,
+              wins: 50,
+              losses: 25,
+              otLosses: 7,
+              points: 107,
+              goalDifferential: 20,
+              date: "2026-04-17",
+              seasonId: 20252026,
+            },
+          ],
+    }),
   );
   let latest: ReturnType<typeof useNHLStandings> | undefined;
   function Probe() {
-    latest = useNHLStandings();
+    latest = useNHLStandings(20262027);
+    return null;
+  }
+  let renderer: ReactTestRenderer | undefined;
+  t.after(() => {
+    act(() => renderer?.unmount());
+    restore();
+  });
+  await act(async () => {
+    renderer = create(createElement(Probe));
+  });
+  assert.equal(
+    latest?.data?.standings.length,
+    0,
+    "The selected upcoming season must not show previous-season results",
+  );
+});
+
+void test("standings reuse cached results on focus and remount, refreshing after one day", async (t) => {
+  const { events, restore } = browser(t);
+  const request = t.mock.method(globalThis, "fetch", async () =>
+    Response.json({
+      standings: [],
+      updatedAt: Date.now(),
+      seasonId: 20252026,
+      isPreseason: false,
+    }),
+  );
+  let latest: ReturnType<typeof useNHLStandings> | undefined;
+  function Probe() {
+    latest = useNHLStandings(20252026);
     return null;
   }
   let renderer: ReactTestRenderer | undefined;
@@ -81,11 +134,16 @@ void test("schedule waits 15 minutes between refreshes and keeps the last timest
   const request = t.mock.method(globalThis, "fetch", async () =>
     fail
       ? new Response(null, { status: 502 })
-      : Response.json({ gameWeek: [], updatedAt: Date.now() }),
+      : Response.json({
+          gameWeek: [],
+          updatedAt: Date.now(),
+          seasonId: 20252026,
+          published: true,
+        }),
   );
   let latest: ReturnType<typeof useNHLSchedule> | undefined;
   function Probe() {
-    latest = useNHLSchedule("2026-01-05", "2026-01-11");
+    latest = useNHLSchedule("2026-01-05", "2026-01-11", 20252026);
     return null;
   }
   let renderer: ReactTestRenderer | undefined;

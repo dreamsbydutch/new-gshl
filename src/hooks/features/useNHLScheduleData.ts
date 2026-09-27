@@ -1,11 +1,12 @@
 "use client";
 
 import { useNav, useWeeks } from "../main";
-import { useNHLSchedule } from "../main/useNHL";
+import { useNHLSchedule, useNHLSeason } from "../main/useNHL";
 import { normalizeDateOnlyValue } from "@gshl-utils/core/date";
 
 export function useNHLScheduleData() {
   const { selectedWeekId, selectedSeasonId } = useNav();
+  const season = useNHLSeason();
   const weeks = useWeeks({
     seasonId: selectedSeasonId,
     enabled: Boolean(selectedSeasonId),
@@ -14,11 +15,15 @@ export function useNHLScheduleData() {
   const schedule = useNHLSchedule(
     week ? (normalizeDateOnlyValue(week.startDate) ?? undefined) : undefined,
     week ? (normalizeDateOnlyValue(week.endDate) ?? undefined) : undefined,
+    season.seasonId,
   );
   return {
     ...schedule,
     week,
-    isLoading: weeks.isLoading || schedule.isLoading,
+    seasonId: season.seasonId,
+    getMatchupHref: (gameId: number) =>
+      `/nhl/matchup/${gameId}?${new URLSearchParams({ season: selectedSeasonId ?? "", week: selectedWeekId ?? "" }).toString()}`,
+    isLoading: season.isLoading || weeks.isLoading || schedule.isLoading,
     error:
       schedule.error ??
       (weeks.error ? "Unable to load the selected week." : undefined),

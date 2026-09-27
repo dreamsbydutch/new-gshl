@@ -1,22 +1,34 @@
 "use client";
 
-import { useNHLStandings } from "@gshl-hooks/main/useNHL";
+import { useNHLStandingsData } from "@gshl-hooks/features/useNHLStandingsData";
+import { NHLLogo } from "@gshl-components/player/NHLLogo";
 import { StandingsSkeleton } from "@gshl-skeletons";
-import { formatNHLUpdatedAt } from "@gshl-utils/features/nhl";
+import {
+  formatNHLUpdatedAt,
+  NHL_DIVISION_ORDER,
+} from "@gshl-utils/features/nhl";
 
 export function NHLStandings() {
-  const { data, isLoading, error, retry } = useNHLStandings();
+  const { data, seasonId, isLoading, error, retry } = useNHLStandingsData();
   if (isLoading) return <StandingsSkeleton />;
-  const season = data?.standings[0]?.seasonId.toString();
+  const season = seasonId?.toString();
   const divisions = [
     ...new Set(data?.standings.map((team) => team.divisionName) ?? []),
-  ];
+  ].sort((a, b) => {
+    const order = (name: string) => {
+      const index = NHL_DIVISION_ORDER.findIndex(
+        (division) => division === name,
+      );
+      return index === -1 ? 4 : index;
+    };
+    return order(a) - order(b);
+  });
   return (
     <div className="mx-auto max-w-4xl space-y-6 px-3 py-6">
       <header className="text-center">
         <h2 className="text-xl font-bold">NHL Standings</h2>
         <p className="text-sm text-gray-500">
-          Current NHL season
+          NHL season
           {season ? ` · ${season.slice(0, 4)}–${season.slice(4)}` : ""}
         </p>
         <p className="text-xs text-gray-500">
@@ -32,6 +44,11 @@ export function NHLStandings() {
           </p>
         )}
       </header>
+      {data?.isPreseason && (
+        <p className="text-center text-xs text-gray-500">
+          Preseason · Regular-season totals start at zero.
+        </p>
+      )}
       {error && (
         <p role="alert" className="text-center text-sm">
           {error}{" "}
@@ -85,17 +102,27 @@ export function NHLStandings() {
                         scope="row"
                         className="whitespace-nowrap px-3 py-3 text-left font-normal"
                       >
-                        <span className="mr-2 text-gray-400">
-                          {team.divisionSequence}
-                        </span>
-                        <span
-                          className="sm:hidden"
-                          title={team.teamName.default}
-                        >
-                          {team.teamAbbrev.default}
-                        </span>
-                        <span className="hidden sm:inline">
-                          {team.teamName.default}
+                        <span className="inline-flex items-center gap-2">
+                          <span className="w-3 text-gray-400">
+                            {data?.isPreseason ? "–" : team.divisionSequence}
+                          </span>
+                          <NHLLogo
+                            team={{
+                              name: team.teamAbbrev.default,
+                              logoUrl: "",
+                            }}
+                            size={24}
+                            className="!mx-0 shrink-0"
+                          />
+                          <span
+                            className="sm:hidden"
+                            title={team.teamName.default}
+                          >
+                            {team.teamAbbrev.default}
+                          </span>
+                          <span className="hidden sm:inline">
+                            {team.teamName.default}
+                          </span>
                         </span>
                       </th>
                       <td className="px-2">{team.gamesPlayed}</td>

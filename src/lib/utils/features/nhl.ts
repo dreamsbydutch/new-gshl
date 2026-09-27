@@ -2,6 +2,27 @@ import { z } from "zod";
 
 export const NHL_STANDINGS_REFRESH_SECONDS = 24 * 60 * 60;
 export const NHL_SCHEDULE_REFRESH_SECONDS = 15 * 60;
+export const NHL_DIVISION_ORDER = [
+  "Atlantic",
+  "Metropolitan",
+  "Central",
+  "Pacific",
+] as const;
+
+export function toNHLSeasonId(
+  startYear: number | undefined,
+): number | undefined {
+  return startYear !== undefined &&
+    Number.isInteger(startYear) &&
+    startYear >= 1917 &&
+    startYear < 2100
+    ? startYear * 10000 + startYear + 1
+    : undefined;
+}
+
+export function isNHLSeasonId(value: number): boolean {
+  return toNHLSeasonId(Math.floor(value / 10000)) === value;
+}
 
 const localized = z.object({ default: z.string() });
 export const nhlStandingsSchema = z.object({
@@ -32,6 +53,8 @@ const gameTeam = z.object({
 });
 export const nhlGameSchema = z.object({
   id: z.number(),
+  season: z.number(),
+  gameType: z.number(),
   startTimeUTC: z.string().datetime(),
   gameState: z.string(),
   gameScheduleState: z.string(),
@@ -51,10 +74,106 @@ export const nhlScheduleSchema = z.object({
 // The timestamp is cached with the data, not regenerated for each visitor.
 export const nhlStandingsResponseSchema = nhlStandingsSchema.extend({
   updatedAt: z.number(),
+  seasonId: z.number(),
+  isPreseason: z.boolean(),
 });
 export const nhlScheduleResponseSchema = nhlScheduleSchema.extend({
   updatedAt: z.number(),
+  seasonId: z.number(),
+  published: z.boolean(),
 });
+
+export const nhlSeasonsSchema = z.object({
+  seasons: z.array(
+    z.object({
+      id: z.number(),
+      standingsStart: z.string(),
+      standingsEnd: z.string(),
+    }),
+  ),
+});
+export const nhlClubScheduleSchema = z.object({
+  games: z.array(nhlGameSchema),
+});
+
+export const nhlBoxscorePlayerSchema = z.object({
+  playerId: z.number(),
+  position: z.string(),
+  goals: z.number().optional(),
+  assists: z.number().optional(),
+  points: z.number().optional(),
+  plusMinus: z.number().optional(),
+  pim: z.number().optional(),
+  hits: z.number().optional(),
+  powerPlayGoals: z.number().optional(),
+  sog: z.number().optional(),
+  blockedShots: z.number().optional(),
+  saves: z.number().optional(),
+  shotsAgainst: z.number().optional(),
+  goalsAgainst: z.number().optional(),
+  savePctg: z.number().optional(),
+  toi: z.string().optional(),
+});
+const boxscoreTeam = z.object({
+  forwards: z.array(nhlBoxscorePlayerSchema).default([]),
+  defense: z.array(nhlBoxscorePlayerSchema).default([]),
+  goalies: z.array(nhlBoxscorePlayerSchema).default([]),
+});
+export const nhlBoxscoreSchema = nhlGameSchema.extend({
+  gameDate: z.string(),
+  playerByGameStats: z
+    .object({ awayTeam: boxscoreTeam, homeTeam: boxscoreTeam })
+    .optional(),
+});
+export const nhlGameResponseSchema = nhlBoxscoreSchema.extend({
+  updatedAt: z.number(),
+});
+
+export function buildNHLPreseasonStandings(
+  seasonId: number,
+  date: string,
+  games: z.infer<typeof nhlGameSchema>[],
+  previous: z.infer<typeof nhlStandingsSchema>["standings"],
+): z.infer<typeof nhlStandingsSchema>["standings"] {
+  const regularGames = games.filter(
+    (game) => game.season === seasonId && game.gameType === 2,
+  );
+  if (
+    !regularGames.length ||
+    regularGames.some((game) => ["OFF", "FINAL"].includes(game.gameState))
+  )
+    return [];
+  const teams = new Map(
+    regularGames
+      .flatMap((game) => [game.awayTeam, game.homeTeam])
+      .map((team) => [team.abbrev, team]),
+  );
+  return [...teams.values()]
+    .map((team) => {
+      // Reuse only division metadata; never carry results into another season.
+      const metadata = previous.find(
+        (row) => row.teamAbbrev.default === team.abbrev,
+      );
+      return {
+        seasonId,
+        date,
+        teamAbbrev: { default: team.abbrev },
+        teamName: {
+          default: `${team.placeName.default} ${team.commonName?.default ?? team.abbrev}`,
+        },
+        conferenceName: metadata?.conferenceName ?? "",
+        divisionName: metadata?.divisionName ?? "Unassigned",
+        divisionSequence: 0,
+        gamesPlayed: 0,
+        wins: 0,
+        losses: 0,
+        otLosses: 0,
+        points: 0,
+        goalDifferential: 0,
+      };
+    })
+    .sort((a, b) => a.teamName.default.localeCompare(b.teamName.default));
+}
 
 export function formatNHLUpdatedAt(updatedAt: number): string {
   return new Intl.DateTimeFormat("en-US", {

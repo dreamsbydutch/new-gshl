@@ -14,6 +14,8 @@ import {
 
 const game = nhlGameSchema.parse({
   id: 1,
+  season: 20252026,
+  gameType: 2,
   startTimeUTC: "2026-01-06T00:00:00Z",
   gameState: "FUT",
   gameScheduleState: "OK",
