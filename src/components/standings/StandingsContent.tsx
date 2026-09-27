@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic";
 import {
+  useNav,
   usePlayerAwards,
   usePlayers,
   usePlayerStats,
@@ -14,6 +15,11 @@ import {
   SeasonAwardsSkeleton,
   StandingsSkeleton,
 } from "@gshl-skeletons";
+
+const NHLStandings = dynamic(
+  () => import("./NHLStandings").then((module) => module.NHLStandings),
+  { loading: () => <StandingsSkeleton /> },
+);
 
 const PlayoffBracket = dynamic(
   () =>
@@ -45,6 +51,15 @@ const PowerRankings = dynamic(
 );
 
 export function StandingsContent() {
+  const { selectedStandingsType } = useNav();
+  return selectedStandingsType === "nhl" ? (
+    <NHLStandings />
+  ) : (
+    <GSHLStandingsContent />
+  );
+}
+
+function GSHLStandingsContent() {
   const {
     selectedSeason,
     selectedSeasonId,

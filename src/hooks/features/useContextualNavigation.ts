@@ -272,7 +272,7 @@ export function useScheduleContextNavigation() {
   const weeksQuery = useWeeks({
     seasonId: effectiveSeasonId,
     orderBy: { startDate: "asc" },
-    enabled: view === "week" && Boolean(effectiveSeasonId),
+    enabled: view !== "team" && Boolean(effectiveSeasonId),
   });
   const teamsQuery = useTeams({
     seasonId: effectiveSeasonId,
@@ -287,7 +287,7 @@ export function useScheduleContextNavigation() {
     [teamsQuery.data],
   );
   const effectiveWeekId =
-    view === "week"
+    view !== "team"
       ? resolveId(
           query.week,
           persistedWeekId,
@@ -312,13 +312,13 @@ export function useScheduleContextNavigation() {
   const routeDataReady =
     hasHydrated &&
     isSeasonDataReady &&
-    (view === "week"
+    (view !== "team"
       ? !weeksQuery.isLoading
       : !teamsQuery.isLoading && authStatus !== "loading");
   const storeMatches =
     persistedView === view &&
     persistedSeasonId === storedSeasonId &&
-    (view !== "week" || persistedWeekId === storedWeekId) &&
+    (view === "team" || persistedWeekId === storedWeekId) &&
     (view !== "team" || persistedOwnerId === storedOwnerId);
 
   useEffect(() => {
@@ -328,7 +328,7 @@ export function useScheduleContextNavigation() {
     if (persistedSeasonId !== storedSeasonId) {
       setSeasonId(storedSeasonId);
     }
-    if (view === "week" && persistedWeekId !== storedWeekId) {
+    if (view !== "team" && persistedWeekId !== storedWeekId) {
       setWeekId(storedWeekId);
     }
     if (view === "team" && persistedOwnerId !== storedOwnerId) {
@@ -371,7 +371,7 @@ export function useScheduleContextNavigation() {
         view: nextView,
         season: effectiveSeasonId,
         week:
-          nextView === "week" && persistedWeekId !== "0"
+          nextView !== "team" && persistedWeekId !== "0"
             ? persistedWeekId
             : null,
         owner: nextView === "team" ? persistedOwnerId : null,
@@ -397,13 +397,13 @@ export function useScheduleContextNavigation() {
   const selectWeek = useCallback(
     (weekId: string) => {
       const href = buildScheduleNavigationHref(navigation.search, {
-        view: "week",
+        view: view === "nhl" ? "nhl" : "week",
         season: effectiveSeasonId,
         week: weekId,
       });
       navigation.push(href, () => setWeekId(weekId));
     },
-    [effectiveSeasonId, navigation, setWeekId],
+    [effectiveSeasonId, navigation, setWeekId, view],
   );
 
   const selectOwner = useCallback(

@@ -155,7 +155,6 @@ void test("League Office navigation offers only active member destinations", () 
   assert.deepEqual(getLeagueOfficeNavigationViews(), [
     "draft",
     "freeAgents",
-    "rules",
     "confBattle",
     "ownerRankings",
     "performances",

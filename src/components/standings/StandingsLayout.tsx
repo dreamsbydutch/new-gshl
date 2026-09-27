@@ -21,6 +21,7 @@ export function StandingsLayout({ children }: { children: React.ReactNode }) {
     { key: "power", label: "Power" },
     { key: "playoff", label: "Playoff" },
     { key: "awards", label: "Awards" },
+    { key: "nhl", label: "NHL" },
   ];
 
   const selectedStandingsType =
@@ -40,7 +41,8 @@ export function StandingsLayout({ children }: { children: React.ReactNode }) {
                 type.key === "wildcard" ||
                 type.key === "power" ||
                 type.key === "playoff" ||
-                type.key === "awards"
+                type.key === "awards" ||
+                type.key === "nhl"
               ) {
                 navigation.selectView(type.key);
               }

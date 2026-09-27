@@ -17,7 +17,7 @@ import type {
   StandingsNavigationView,
 } from "@gshl-types";
 
-export const SCHEDULE_NAVIGATION_VIEWS = ["week", "team"] as const;
+export const SCHEDULE_NAVIGATION_VIEWS = ["week", "team", "nhl"] as const;
 
 export const STANDINGS_NAVIGATION_VIEWS = [
   "overall",
@@ -26,6 +26,7 @@ export const STANDINGS_NAVIGATION_VIEWS = [
   "power",
   "playoff",
   "awards",
+  "nhl",
 ] as const;
 
 export const LOCKER_ROOM_NAVIGATION_VIEWS = [
@@ -204,7 +205,7 @@ export function buildScheduleNavigationHref(
   return buildContextualNavigationHref("/schedule", currentSearch, {
     view: context.view,
     season: context.season ?? null,
-    week: context.view === "week" ? (context.week ?? null) : null,
+    week: context.view !== "team" ? (context.week ?? null) : null,
     owner: context.view === "team" ? (context.owner ?? null) : null,
   });
 }
