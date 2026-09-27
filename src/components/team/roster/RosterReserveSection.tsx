@@ -17,6 +17,8 @@ export function RosterReserveSection({
   showSalaries: boolean;
   nhlTeamByAbbr: Map<string, NHLTeam>;
 }) {
+  if (players.length === 0) return null;
+
   return (
     <section
       aria-label={title}
@@ -25,11 +27,6 @@ export function RosterReserveSection({
         title === "IR" ? "border-red-200 bg-red-50" : "bg-brown-50",
       )}
     >
-      {players.length === 0 && (
-        <p className="px-3 py-2 text-xs text-slate-500">
-          {title === "IR" ? "No players on IR." : "No bench players."}
-        </p>
-      )}
       <div className="mx-2 my-1 grid grid-cols-2 items-center">
         {players.map((player) => (
           <RosterPlayerCard
