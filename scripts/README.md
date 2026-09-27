@@ -79,6 +79,20 @@ reported. Missing future team/draft configurations are reported without creating
 an entire draft. A local before-image, applied-write journal, and idempotency
 report accompany an apply. These artifacts are not independent archival backups.
 
+## Upcoming season calendar repair
+
+`src/commands/maintenance/repair-season-calendar.ts` plans an upcoming season's
+weeks from the NHL regular-season opening and closing dates. Run its `--help`
+from this directory with `node ../node_modules/tsx/dist/cli.mjs` for options.
+Partial first and last calendar weeks are combined with their neighbors; the
+final three matchup weeks remain playoffs. Existing week IDs and playoff rounds
+are preserved, and missing regular weeks may be added. It refuses seasons with
+existing matchups or day/week statistics, already-started seasons, and week removal.
+Apply requires the exact reviewed dry-run hash, saves a local before-image, and
+verifies no changes remain. It updates only season boundaries and week calendar
+fields; it does not generate matchups or change rosters. Both the environment
+target and expected database hostname must be supplied explicitly.
+
 ## Prerequisites
 
 ### Convex access
