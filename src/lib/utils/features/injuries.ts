@@ -4,6 +4,10 @@ import { getPlayerNhlAbbreviations } from "../domain/player";
 
 export const INJURY_REFRESH_MS = 30 * 60 * 1000;
 
+export function isInjuredReserveDesignation(designation: string): boolean {
+  return designation === "IR" || designation === "LTIR";
+}
+
 const espnReport = z.object({
   status: z.literal("success"),
   timestamp: z.string().refine((value) => Number.isFinite(Date.parse(value))),

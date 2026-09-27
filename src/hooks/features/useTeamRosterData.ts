@@ -5,16 +5,13 @@ import {
   type UseTeamRosterDataOptions,
   type UseTeamRosterDataResult,
 } from "@gshl-types";
-import {
-  buildCurrentRoster,
-  buildTeamLineup,
-  calculateTotalCapHit,
-  getBenchPlayers,
-} from "@gshl-utils";
+import { buildCurrentRoster, calculateTotalCapHit } from "@gshl-utils";
+import { useInjuryReport } from "../main/useInjuryReport";
+import { buildAvailableTeamRoster } from "@gshl-utils/features/available-team-roster";
 
 /**
  * Hook for processing team roster data.
- * Filters players by team, builds lineup, identifies bench players, and calculates cap hit.
+ * Separates IR players, optimizes the available lineup, and retains the full cap hit.
  *
  * @param options - Configuration options
  * @returns Processed roster data with lineup and cap information
@@ -37,20 +34,16 @@ export function useTeamRosterData(
   options: UseTeamRosterDataOptions = {},
 ): UseTeamRosterDataResult {
   const { players, contracts, currentTeam } = options;
+  const injuryReport = useInjuryReport();
 
   const currentRoster = useMemo(
     () => buildCurrentRoster(players, currentTeam),
     [players, currentTeam],
   );
 
-  const teamLineup = useMemo(
-    () => buildTeamLineup(currentRoster),
-    [currentRoster],
-  );
-
-  const benchPlayers = useMemo(
-    () => getBenchPlayers(currentRoster),
-    [currentRoster],
+  const { teamLineup, benchPlayers, irPlayers } = useMemo(
+    () => buildAvailableTeamRoster(currentRoster, injuryReport.data),
+    [currentRoster, injuryReport.data],
   );
 
   const totalCapHit = useMemo(
@@ -59,11 +52,23 @@ export function useTeamRosterData(
   );
 
   const isLoading = players === undefined || contracts === undefined;
+  const injuryUpdatesDelayed =
+    Boolean(injuryReport.error) ||
+    (injuryReport.data !== null &&
+      Date.now() - injuryReport.data.fetchedAt > 60 * 60 * 1000);
 
   return {
     currentRoster,
     teamLineup,
     benchPlayers,
+    irPlayers,
+    injuryStatus: injuryReport.loading
+      ? "Checking injury designations…"
+      : injuryUpdatesDelayed
+        ? injuryReport.data
+          ? "Injury updates delayed; using the last available report."
+          : "Injury updates unavailable; using saved IR assignments."
+        : null,
     totalCapHit,
     isLoading,
     ready: !isLoading,

@@ -2,7 +2,7 @@
 
 import type { TeamRosterProps } from "@gshl-types";
 import { useTeamRosterView } from "@gshl-hooks";
-import { BenchPlayers } from "./roster/BenchPlayers";
+import { RosterReserveSection } from "./roster/RosterReserveSection";
 import { RatingLegend } from "./roster/RatingLegend";
 import { RosterLineup } from "./roster/RosterLineup";
 
@@ -14,6 +14,8 @@ export function TeamRoster({
 }: TeamRosterProps) {
   const {
     benchPlayers,
+    irPlayers,
+    injuryStatus,
     contractByPlayerId,
     currentRoster,
     nhlTeamByAbbr,
@@ -40,6 +42,12 @@ export function TeamRoster({
         </p>
       )}
 
+      {injuryStatus && (
+        <p role="status" className="mb-2 text-xs text-slate-500">
+          {injuryStatus}
+        </p>
+      )}
+      <h3 className="mb-1 text-xs font-semibold text-slate-600">Lineup</h3>
       <RosterLineup
         teamLineup={teamLineup}
         contractByPlayerId={contractByPlayerId}
@@ -47,8 +55,17 @@ export function TeamRoster({
         nhlTeamByAbbr={nhlTeamByAbbr}
       />
 
-      <BenchPlayers
-        benchPlayers={benchPlayers}
+      <RosterReserveSection
+        title="Bench"
+        players={benchPlayers}
+        contractByPlayerId={contractByPlayerId}
+        showSalaries={showSalaries}
+        nhlTeamByAbbr={nhlTeamByAbbr}
+      />
+
+      <RosterReserveSection
+        title="IR"
+        players={irPlayers}
         contractByPlayerId={contractByPlayerId}
         showSalaries={showSalaries}
         nhlTeamByAbbr={nhlTeamByAbbr}

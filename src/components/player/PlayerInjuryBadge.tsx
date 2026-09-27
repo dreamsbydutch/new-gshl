@@ -3,7 +3,10 @@
 import { useId } from "react";
 import { Popover, PopoverContent, PopoverTrigger } from "@gshl-ui";
 import { useInjuryReport } from "@gshl-hooks/main/useInjuryReport";
-import { findPlayerInjury } from "@gshl-utils/features/injuries";
+import {
+  findPlayerInjury,
+  isInjuredReserveDesignation,
+} from "@gshl-utils/features/injuries";
 import { cn } from "@gshl-utils";
 
 export function PlayerInjuryBadge({
@@ -18,7 +21,7 @@ export function PlayerInjuryBadge({
   const injury = data ? findPlayerInjury(data.injuries, name, teams) : null;
   if (!injury) return null;
   const stale = Boolean(error) || Date.now() - data!.fetchedAt > 60 * 60 * 1000;
-  const onInjuredReserve = ["IR", "LTIR"].includes(injury.designation);
+  const onInjuredReserve = isInjuredReserveDesignation(injury.designation);
   return (
     <Popover>
       <PopoverTrigger asChild>

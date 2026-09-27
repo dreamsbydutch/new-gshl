@@ -174,6 +174,8 @@ export interface UseTeamRosterDataResult {
   currentRoster: Player[];
   teamLineup: Array<Array<Array<Player | null>>>;
   benchPlayers: Player[];
+  irPlayers: Player[];
+  injuryStatus: string | null;
   totalCapHit: number;
   isLoading: boolean;
   ready: boolean;
