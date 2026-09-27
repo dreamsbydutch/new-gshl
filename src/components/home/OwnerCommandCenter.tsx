@@ -16,6 +16,7 @@ import {
 
 import { lighten, useTeamPalette } from "@gshl-hooks";
 import { useOwnerCommandCenter } from "@gshl-hooks/features/useOwnerCommandCenter";
+import { PlayerInjuryBadge } from "@gshl-components/player/PlayerInjuryBadge";
 import { Button, Skeleton } from "@gshl-ui";
 import { cn, formatMoney } from "@gshl-utils";
 
@@ -192,6 +193,10 @@ function RosterPanel({
               >
                 {player.fullName}
               </span>
+              <PlayerInjuryBadge
+                name={player.fullName}
+                teams={player.nhlTeam}
+              />
               <span className="shrink-0 font-mono text-[9px] text-slate-400">
                 {player.lineupPos ??
                   (player.nhlPos.length

@@ -15,6 +15,7 @@ const espnReport = z.object({
           status: z.string().min(1),
           date: z.string().nullish(),
           shortComment: z.string().nullish(),
+          longComment: z.string().nullish(),
           athlete: z.object({
             displayName: z.string().min(1),
             team: z.object({ abbreviation: z.string().min(1) }),
@@ -56,7 +57,10 @@ export function parseEspnInjuries(
       status: injury.status,
       designation: injuryDesignation(injury.status),
       description: injury.details?.type ?? null,
-      comment: injury.shortComment ?? null,
+      comment:
+        [injury.longComment, injury.shortComment]
+          .map((comment) => comment?.trim())
+          .find((comment) => Boolean(comment)) ?? null,
       updatedAt: injury.date ?? null,
       returnDate: injury.details?.returnDate ?? null,
     })),

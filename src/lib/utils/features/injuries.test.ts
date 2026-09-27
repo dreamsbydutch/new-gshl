@@ -68,3 +68,18 @@ void test("accepts missing optional injury details", () => {
   assert.equal(report.injuries[0]?.returnDate, null);
   assert.equal(report.injuries[0]?.description, null);
 });
+
+void test("prefers full injury news and falls back to a short update", () => {
+  const parseComment = (longComment: string | null) =>
+    parseEspnInjuries({
+      ...snapshot,
+      injuries: [
+        {
+          injuries: [{ ...injury, longComment, shortComment: "Short update" }],
+        },
+      ],
+    }).injuries[0]?.comment;
+  assert.equal(parseComment("Full injury news"), "Full injury news");
+  assert.equal(parseComment("  "), "Short update");
+  assert.equal(parseComment(null), "Short update");
+});

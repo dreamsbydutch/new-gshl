@@ -16,6 +16,6 @@ export const getInjuryReport = unstable_cache(
     const payload: unknown = await response.json();
     return parseEspnInjuries(payload);
   },
-  ["espn-nhl-injuries-v1"],
+  ["espn-nhl-injuries-v2"],
   { revalidate: INJURY_REFRESH_MS / 1000 },
 );
