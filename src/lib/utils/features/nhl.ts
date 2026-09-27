@@ -10,20 +10,23 @@ export const NHL_DIVISION_ORDER = [
 ] as const;
 
 export function toNHLSeasonId(
-  startYear: string | number | undefined,
+  gshlEndingYear: string | number | undefined,
 ): number | undefined {
-  // The Convex season facade preserves stored string years.
-  const year = typeof startYear === "string" ? Number(startYear) : startYear;
+  // GSHL stores the ending year: "2027" means the 2026-27 season.
+  const year =
+    typeof gshlEndingYear === "string"
+      ? Number(gshlEndingYear)
+      : gshlEndingYear;
   return year !== undefined &&
     Number.isInteger(year) &&
-    year >= 1917 &&
-    year < 2100
-    ? year * 10000 + year + 1
+    year >= 1918 &&
+    year <= 2100
+    ? (year - 1) * 10000 + year
     : undefined;
 }
 
 export function isNHLSeasonId(value: number): boolean {
-  return toNHLSeasonId(Math.floor(value / 10000)) === value;
+  return toNHLSeasonId(value % 10000) === value;
 }
 
 const localized = z.object({ default: z.string() });

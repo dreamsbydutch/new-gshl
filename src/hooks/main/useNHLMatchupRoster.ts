@@ -12,7 +12,7 @@ import { usePlayersByIds } from "./usePlayer";
 
 export function useNHLMatchupRoster(game?: NHLGame) {
   const seasons = useSeasons({
-    year: game ? Math.floor(game.season / 10000) : undefined,
+    year: game ? game.season % 10000 : undefined,
     enabled: Boolean(game),
   });
   const season = seasons.data[0];

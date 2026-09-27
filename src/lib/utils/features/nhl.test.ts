@@ -5,12 +5,25 @@ import {
   nhlGameSchema,
   nhlGameStatus,
   nhlScheduleSchema,
+  toNHLSeasonId,
+  isNHLSeasonId,
 } from "./nhl";
 import {
   buildScheduleNavigationHref,
   isScheduleNavigationView,
   isStandingsNavigationView,
 } from "./contextual-navigation";
+
+void test("GSHL ending years map to NHL season IDs and invalid IDs stay rejected", () => {
+  assert.equal(toNHLSeasonId("2027"), 20262027);
+  assert.equal(toNHLSeasonId(2026), 20252026);
+  assert.equal(toNHLSeasonId("2021"), 20202021);
+  for (const year of [undefined, "", "2026-27", "invalid", 1917, 2101])
+    assert.equal(toNHLSeasonId(year), undefined);
+  assert.equal(isNHLSeasonId(20262027), true);
+  assert.equal(isNHLSeasonId(20262028), false);
+  assert.equal(isNHLSeasonId(20262027.5), false);
+});
 
 const game = nhlGameSchema.parse({
   id: 1,
