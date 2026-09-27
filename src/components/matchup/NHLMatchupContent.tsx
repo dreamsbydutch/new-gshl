@@ -123,11 +123,6 @@ export function NHLMatchupContent({ gameId }: { gameId: string }) {
           </button>
         ))}
       </div>
-      <p className="text-center text-xs text-slate-500">
-        Recorded GSHL positions show who started or was benched on this date.
-        Current roster positions are labeled “Planned” until game-day records
-        arrive. “Not recorded” does not mean the player was benched.
-      </p>
       {rosterLoading ? (
         <p role="status" className="py-6 text-center text-sm text-slate-500">
           Loading GSHL players…

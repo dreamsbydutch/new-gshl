@@ -35,12 +35,6 @@ export function NHLMatchupPlayerTable({
   const label = goalies ? "Goaltenders" : "Skaters";
   return (
     <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm sm:rounded-2xl">
-      <h2 className="border-b border-slate-200 px-3 py-3 font-oswald text-xl text-slate-900 sm:px-4">
-        {label}{" "}
-        <span className="font-sans text-xs text-slate-500">
-          · {players.length} GSHL players
-        </span>
-      </h2>
       <TableViewport
         ariaLabel={`${label} NHL game statistics`}
         scrollHint="Scroll to review every player statistic"
@@ -59,9 +53,6 @@ export function NHLMatchupPlayerTable({
                 Player
               </th>
               <th scope="col" className="px-3 py-3">
-                NHL Pos
-              </th>
-              <th scope="col" className="px-3 py-3">
                 GSHL lineup
               </th>
               {columns.map((column) => (
@@ -75,7 +66,7 @@ export function NHLMatchupPlayerTable({
             {!players.length ? (
               <tr>
                 <td
-                  colSpan={columns.length + 3}
+                  colSpan={columns.length + 2}
                   className="px-3 py-6 text-center text-slate-500"
                 >
                   No GSHL {goalies ? "goaltenders" : "skaters"} recorded for
@@ -86,7 +77,7 @@ export function NHLMatchupPlayerTable({
               players.map((player) => (
                 <tr
                   key={player.id}
-                  className="border-b border-slate-200 last:border-0 odd:bg-white even:bg-slate-50/70"
+                  className={`border-b border-slate-200 last:border-0 ${["BN", "IR", "IR+", "IRplus"].includes(player.lineupPosition ?? "") ? "bg-slate-100 text-slate-500 [&_img]:opacity-60" : "odd:bg-white even:bg-slate-50/70"}`}
                 >
                   <th
                     scope="row"
@@ -118,19 +109,9 @@ export function NHLMatchupPlayerTable({
                       </span>
                     </span>
                   </th>
-                  <td className="px-3 py-2 text-center">{player.position}</td>
                   <td className="whitespace-nowrap px-3 py-2 text-center">
-                    <span
-                      className={
-                        player.lineupStatus === "Started"
-                          ? "font-semibold text-emerald-700"
-                          : "text-slate-500"
-                      }
-                    >
-                      {player.lineupPosition
-                        ? `${player.lineupPosition} · `
-                        : ""}
-                      {player.lineupStatus}
+                    <span className="font-medium" title={player.lineupStatus}>
+                      {player.lineupPosition ?? "–"}
                     </span>
                   </td>
                   {columns.map((column) => {
