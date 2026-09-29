@@ -2,6 +2,10 @@ import { ConvexHttpClient } from "convex/browser";
 import { makeFunctionReference } from "convex/server";
 import { env } from "@gshl-env";
 import {
+  groupNhlContracts,
+  type NhlContractObservation,
+} from "../../domains/maintenance/nhl-contracts";
+import {
   CONVEX_TABLE_TO_MODEL,
   getConvexTableName,
   type ModelName,
@@ -219,6 +223,59 @@ function serverArgs(args: Record<string, unknown>): Record<string, unknown> {
     throw new Error("CONVEX_SERVER_SECRET is required for Convex scripts.");
   }
   return { ...args, serverSecret: env.CONVEX_SERVER_SECRET };
+}
+
+export type NhlContractWriteSummary = {
+  contractsInserted: number;
+  contractsUpdated: number;
+  seasonsInserted: number;
+  seasonsUpdated: number;
+  seasonsUnchanged: number;
+};
+
+export async function syncNhlContractHistory(
+  rows: readonly NhlContractObservation[],
+  apply = false,
+  onProgress?: (completed: number, total: number) => void,
+): Promise<NhlContractWriteSummary> {
+  const summary: NhlContractWriteSummary = {
+    contractsInserted: 0,
+    contractsUpdated: 0,
+    seasonsInserted: 0,
+    seasonsUpdated: 0,
+    seasonsUnchanged: 0,
+  };
+  const previewRef = makeFunctionReference<
+    "query",
+    Record<string, unknown>,
+    NhlContractWriteSummary
+  >("nhlContracts:preview");
+  const upsertRef = makeFunctionReference<
+    "mutation",
+    Record<string, unknown>,
+    NhlContractWriteSummary
+  >("nhlContracts:upsert");
+  const groups = groupNhlContracts(rows);
+  // Groups have distinct contract identities and never modify player records.
+  // Bound concurrency so large historical imports do not flood the deployment.
+  for (let offset = 0; offset < groups.length; offset += 4) {
+    const results = await Promise.all(
+      groups.slice(offset, offset + 4).map(async (group) => {
+        const args = serverArgs({ rows: group });
+        return apply
+          ? await getClient().mutation(upsertRef, args)
+          : await getClient().query(previewRef, args);
+      }),
+    );
+    for (const result of results) {
+      for (const key of Object.keys(summary) as Array<
+        keyof NhlContractWriteSummary
+      >)
+        summary[key] += result[key];
+    }
+    onProgress?.(Math.min(offset + 4, groups.length), groups.length);
+  }
+  return summary;
 }
 
 function hydrateRow<T>(row: AnyRow): T {

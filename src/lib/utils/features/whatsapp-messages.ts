@@ -26,7 +26,7 @@ interface TradeBlockWhatsAppListing {
   posGroup: string;
   nhlPos: readonly string[];
   nhlTeam: readonly string[];
-  capHit: number;
+  capHit: number | null;
   expiryDate: string | null;
   note: string | null;
   team: {

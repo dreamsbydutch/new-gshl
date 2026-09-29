@@ -32,6 +32,13 @@ export const UTC_TIMESTAMP_TABLE_FIELDS = {
   franchises: ["createdAt", "updatedAt"],
   teams: ["createdAt", "updatedAt"],
   players: ["birthday", "nhlSigningDate", "createdAt", "updatedAt"],
+  nhlContracts: [
+    "signingDate",
+    "firstObservedAt",
+    "lastObservedAt",
+    "updatedAt",
+  ],
+  nhlContractSeasons: ["firstObservedAt", "lastObservedAt", "updatedAt"],
   contracts: [
     "signingDate",
     "startDate",

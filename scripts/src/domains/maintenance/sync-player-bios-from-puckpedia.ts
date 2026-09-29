@@ -14,7 +14,13 @@ import {
   fetchPlayerNhlSeason,
   updateRowsById,
   upsertByCompositeKey,
+  syncNhlContractHistory,
+  type NhlContractWriteSummary,
 } from "../../integrations/data/convex-store";
+import {
+  puckPediaContractCandidates,
+  reconcileNhlContracts,
+} from "./nhl-contracts";
 import {
   canonicalName,
   mapPuckPediaPlayer,
@@ -91,6 +97,7 @@ type PlayerBioSyncOptions = {
   yahooMaxPages: number;
   yahooBrowserFallback: boolean;
   salarySeasonSpecs?: string[];
+  contractSeasonSpecs?: string[];
   focusSeasonStartYear?: number | null;
   salaryCapOverrides?: Record<number, number>;
 };
@@ -129,6 +136,16 @@ type SalarySeasonSource = {
 };
 
 export type PlayerBioSyncSummary = {
+  nhlContracts: {
+    sourceRows: number;
+    seasons: string[];
+    readyRows: number;
+    unresolvedRows: number;
+    warnings: string[];
+    unresolved: Array<{ name: string; birthDate: string; reason: string }>;
+    preview?: NhlContractWriteSummary;
+    applied?: NhlContractWriteSummary;
+  };
   dryRun: boolean;
   focusSeason: string;
   statSeason: string;
@@ -284,6 +301,8 @@ What it does:
 
 Options:
   --apply                 Persist changes to the Convex Player table.
+  --contract-seasons <years> NHL contract seasons (start years or YEAR=TOKEN).
+                            Default: focus season plus the following season.
   --headless              Run Chrome or Edge without a visible window.
   --focus-season <value>  Override PuckPedia's current focus-season token.
   --stat-season <value>   Override PuckPedia's current stat-season token.
@@ -444,6 +463,10 @@ export function parsePlayerBioSyncOptions(
       parseBoolean(process.env.YAHOO_BROWSER_FALLBACK, false),
     salarySeasonSpecs: (getArgValue(argv, "--salary-seasons") ?? "")
       .split(",")
+      .map((value) => value.trim())
+      .filter(Boolean),
+    contractSeasonSpecs: getArgValue(argv, "--contract-seasons")
+      ?.split(",")
       .map((value) => value.trim())
       .filter(Boolean),
     focusSeasonStartYear:
@@ -876,6 +899,16 @@ export function resolveSalarySeasonRequests(
   );
 }
 
+export function resolveContractSeasonRequests(options: PlayerBioSyncOptions) {
+  const focusYear =
+    options.focusSeasonStartYear ??
+    inferredNhlSeasonStartYear(options.currentDate);
+  return resolveSalarySeasonRequests({
+    ...options,
+    salarySeasonSpecs: options.contractSeasonSpecs ?? [String(focusYear + 1)],
+  });
+}
+
 async function upsertPuckPediaSalaryRows(
   rows: readonly PlayerNhlSalaryWrite[],
 ): Promise<{ inserted: number; updated: number; unchanged: number }> {
@@ -1191,6 +1224,32 @@ export async function runPlayerBioSync(
       salarySources,
       options.salaryCapOverrides ?? {},
     );
+    const contractSources = [...salarySources];
+    for (const request of resolveContractSeasonRequests(options)) {
+      if (
+        contractSources.some(
+          (source) => source.seasonToken === request.seasonToken,
+        )
+      )
+        continue;
+      log(
+        options,
+        `fetching PuckPedia contracts for season ${request.seasonToken}`,
+      );
+      const contractSource = await fetchCompleteDirectory(page, {
+        ...options,
+        focusSeason: request.seasonToken,
+      });
+      contractSources.push({ ...request, players: contractSource.players });
+    }
+    const contractAudits = contractSources.map((source) =>
+      puckPediaContractCandidates(
+        source.players,
+        source.seasonStartYear,
+        source.seasonToken,
+      ),
+    );
+    const contractCandidates = contractAudits.flatMap((audit) => audit.rows);
     const [existingPlayers, seasonRows] = await Promise.all([
       fetchModel<StoredPlayer>("Player"),
       fetchModel<ActivitySeason & RosterSeason>("Season"),
@@ -1508,6 +1567,22 @@ export async function runPlayerBioSync(
           (review) => review.changed,
         ),
       },
+      nhlContracts: (() => {
+        const result = reconcileNhlContracts(
+          contractCandidates,
+          existingPlayers,
+        );
+        return {
+          sourceRows: contractCandidates.length,
+          seasons: contractSources.map((source) =>
+            seasonLabel(source.seasonStartYear),
+          ),
+          readyRows: result.rows.length,
+          unresolvedRows: result.unresolved.length,
+          unresolved: result.unresolved,
+          warnings: contractAudits.flatMap((audit) => audit.warnings),
+        };
+      })(),
       nhlSalaries: (() => {
         const salaryReconciliation = reconcileSalaryCandidates(
           salaryCandidates,
@@ -1530,6 +1605,13 @@ export async function runPlayerBioSync(
       })(),
     };
 
+    const existingContractMatches = reconcileNhlContracts(
+      contractCandidates,
+      existingPlayers,
+    );
+    summary.nhlContracts.preview = await syncNhlContractHistory(
+      existingContractMatches.rows,
+    );
     if (!options.apply) return summary;
 
     summary.appliedUpdates = await updateRowsById("Player", updates);
@@ -1542,6 +1624,17 @@ export async function runPlayerBioSync(
     const persistedPlayers = await fetchModel<
       StoredPlayer & StoredSalaryPlayer
     >("Player");
+    const contractMatches = reconcileNhlContracts(
+      contractCandidates,
+      persistedPlayers,
+    );
+    summary.nhlContracts.readyRows = contractMatches.rows.length;
+    summary.nhlContracts.unresolvedRows = contractMatches.unresolved.length;
+    summary.nhlContracts.unresolved = contractMatches.unresolved;
+    summary.nhlContracts.applied = await syncNhlContractHistory(
+      contractMatches.rows,
+      true,
+    );
     const salaryReconciliation = reconcileSalaryCandidates(
       salaryCandidates,
       persistedPlayers,

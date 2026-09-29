@@ -32,6 +32,8 @@ import type * as lib_draftMode from "../lib/draftMode.js";
 import type * as lib_frontendQuery from "../lib/frontendQuery.js";
 import type * as lib_jobLifecycle from "../lib/jobLifecycle.js";
 import type * as lib_matchupProjection from "../lib/matchupProjection.js";
+import type * as lib_nhlContractFields from "../lib/nhlContractFields.js";
+import type * as lib_nhlContractMerge from "../lib/nhlContractMerge.js";
 import type * as lib_notificationEvents from "../lib/notificationEvents.js";
 import type * as lib_notificationValidators from "../lib/notificationValidators.js";
 import type * as lib_playerDayPerformanceIndex from "../lib/playerDayPerformanceIndex.js";
@@ -51,6 +53,7 @@ import type * as lib_weeklyEditionPublication from "../lib/weeklyEditionPublicat
 import type * as lib_yahooOAuth from "../lib/yahooOAuth.js";
 import type * as maintenanceScope from "../maintenanceScope.js";
 import type * as matchup from "../matchup.js";
+import type * as nhlContracts from "../nhlContracts.js";
 import type * as notificationPush from "../notificationPush.js";
 import type * as notificationScanner from "../notificationScanner.js";
 import type * as notifications from "../notifications.js";
@@ -102,6 +105,8 @@ declare const fullApi: ApiFromModules<{
   "lib/frontendQuery": typeof lib_frontendQuery;
   "lib/jobLifecycle": typeof lib_jobLifecycle;
   "lib/matchupProjection": typeof lib_matchupProjection;
+  "lib/nhlContractFields": typeof lib_nhlContractFields;
+  "lib/nhlContractMerge": typeof lib_nhlContractMerge;
   "lib/notificationEvents": typeof lib_notificationEvents;
   "lib/notificationValidators": typeof lib_notificationValidators;
   "lib/playerDayPerformanceIndex": typeof lib_playerDayPerformanceIndex;
@@ -121,6 +126,7 @@ declare const fullApi: ApiFromModules<{
   "lib/yahooOAuth": typeof lib_yahooOAuth;
   maintenanceScope: typeof maintenanceScope;
   matchup: typeof matchup;
+  nhlContracts: typeof nhlContracts;
   notificationPush: typeof notificationPush;
   notificationScanner: typeof notificationScanner;
   notifications: typeof notifications;

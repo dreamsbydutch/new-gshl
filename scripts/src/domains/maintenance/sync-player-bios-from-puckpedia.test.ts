@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   buildPuckPediaQuery,
   resolveSalarySeasonRequests,
+  resolveContractSeasonRequests,
 } from "./sync-player-bios-from-puckpedia";
 
 const options = {
@@ -24,6 +25,27 @@ const options = {
   yahooMaxPages: 80,
   yahooBrowserFallback: false,
 };
+
+test("contract tracking checks the focus and next season, with explicit token overrides", () => {
+  assert.deepEqual(
+    resolveContractSeasonRequests({ ...options, focusSeasonStartYear: 2026 }),
+    [
+      { seasonToken: "163", seasonStartYear: 2026 },
+      { seasonToken: "164", seasonStartYear: 2027 },
+    ],
+  );
+  assert.deepEqual(
+    resolveContractSeasonRequests({
+      ...options,
+      focusSeasonStartYear: 2026,
+      contractSeasonSpecs: ["2027=190"],
+    }),
+    [
+      { seasonToken: "163", seasonStartYear: 2026 },
+      { seasonToken: "190", seasonStartYear: 2027 },
+    ],
+  );
+});
 
 test("builds the skater state used by PuckPedia's own page loader", () => {
   const query = buildPuckPediaQuery("1", 2, options);

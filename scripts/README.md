@@ -171,12 +171,39 @@ current PuckPedia row has no value, and players absent from both directories
 have their old NHL team, jersey number, and contract fields cleared. Writes
 remain field-diffed, so unchanged values are not patched.
 
-Each applied run also upserts the focus season's total salary and cap hit into
-`playerNhlSalaries`. Rows store the NHL salary cap for their season and the
+Each applied run also upserts the focus season into `playerNhlSalaries`. Its
+`salary` field uses cap hit, falling back to total salary when cap hit is
+unavailable; `capHit` retains the source cap hit. Rows store the NHL salary cap for their season and the
 salary normalized to a $100 million cap. Use `--salary-seasons 2027,2028` to
 load future PuckPedia focus seasons in the same run. If PuckPedia's season
 tokens are not sequential, use `YEAR=TOKEN`. Unknown future caps are stored as
 null and can be supplied with repeated `--salary-cap YEAR=VALUE` flags.
+
+The same sync preserves NHL contract history in `nhlContracts` and
+`nhlContractSeasons`, separate from GSHL contracts. By default it checks the
+focus season and the following season so future extensions can be observed;
+`--contract-seasons` overrides the extra contract seasons, using start years or
+`YEAR=TOKEN` for nonsequential PuckPedia tokens. Seasons fetched through
+`--salary-seasons` also contribute contract observations. The current player
+snapshot still comes only from the focus season. This adds a directory fetch
+for the following season unless that season was already requested.
+
+Contract identity is player ID, signing date, and start season. Each contract
+season preserves its own cap hit and clauses; actual total salary is stored
+separately as `cashSalary` when PuckPedia supplies it. Missing contract identity,
+term, or cap hit and contracts outside the requested season are skipped with
+warnings. Unresolved player matches are reported and skipped by the live sync;
+the historical importer blocks all writes until every identity is resolved. Directory
+absence never deletes historical contracts. Live observations take precedence
+over later historical imports, and missing optional metadata does not clear
+known values. First/last observation times describe our collection, not signing
+events; live reruns advance last-observed times even when terms are unchanged.
+
+This is polling of directory snapshots, not a complete signing-event feed.
+Coverage depends on running the sync and on the contracts exposed by the
+requested seasons. A correction to a signing date or start season changes the
+identity and needs review rather than automatically replacing old history.
+Deploy the new Convex schema/functions before running the updated sync.
 
 Positional eligibility is resolved separately from PuckPedia's single primary
 position. The sync checks Yahoo's C, LW, RW, D, and G player-table filters and
@@ -215,6 +242,7 @@ Notable flags:
 - `--focus-season-year <yyyy>`
 - `--stat-season <value>`
 - `--salary-seasons <yyyy,yyyy,...>`
+- `--contract-seasons <yyyy,yyyy,...>`
 - `--salary-cap <yyyy=value>`
 - `--page-size <value>`
 - `--max-pages <value>`
@@ -234,6 +262,47 @@ Example:
 ```bash
 npm run player-bios:sync -- --apply
 ```
+
+#### `nhl-contracts:import`
+
+Imports the contract-season JSON export into `nhlContracts` and
+`nhlContractSeasons`. The export's `Season` is an ending year: `2009` becomes
+start year `2008`. Placeholder rows are discarded, equivalent duplicate
+contract seasons are collapsed, and conflicting duplicates or malformed
+required values block the import. Source term/status discrepancies are warnings
+and remain available in each season's `historicalValues`, along with original
+normalization/ranking fields. Those source-derived metrics are not treated as
+verified future NHL salary caps or cash salaries.
+
+Player matching uses a stable NHL ID when available, otherwise normalized name
+plus birthdate. Missing/ambiguous identities block all import writes; the
+importer does not create players. Historical source contract IDs are retained,
+but Convex IDs are canonical. Each contract and its seasons are written in one
+bounded transaction. A run spanning many contracts may be partially applied
+if interrupted; rerunning is safe and does not delete records.
+
+For independently verified aliases, missing bios, or duplicate player records,
+`--player-map <path>` accepts a reviewed JSON array with `sourceName`,
+`sourceBirthDate`, canonical `playerId`, `reason`, and evidence URL `sourceRef`.
+A contradictory stored birthdate still blocks matching unless that particular
+mapping explicitly sets `allowBirthdateConflict: true`. Evidence and reasons
+are retained on the imported season records and in the full audit. Mappings
+do not modify player records or the original historical values.
+
+```bash
+npm run nhl-contracts:import -- --file /path/to/history.json --validate-only
+npm run nhl-contracts:import -- --file /path/to/history.json --target production --match-only
+npm run nhl-contracts:import -- --file /path/to/history.json --target production --report /path/to/audit.json
+npm run nhl-contracts:import -- --file /path/to/history.json --target production --apply
+```
+
+File validation is local. Match-only reads existing players and can run before
+deployment; full previews require the new Convex schema/functions. Apply
+requires an explicit target, previews every contract first, and repeats the
+preview afterward to verify an unchanged result. The full local report includes
+all validation warnings and unresolved identities; console samples are bounded.
+This workflow does not update GSHL contracts or the separate salary-history
+table. Use `nhl-salaries:import` when that projection also needs populating.
 
 #### `nhl-salaries:import`
 

@@ -34,7 +34,9 @@
     "yahoo:check-weekly-player-days": "tsx src/commands/yahoo/check-yahoo-weekly-player-days.ts",
     "yahoo:check-weekly-matchups": "tsx src/commands/yahoo/check-yahoo-weekly-matchup-stats.ts",
     "worker:browser": "tsx src/workers/convex-browser-worker.ts",
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "nhl-contracts:import": "tsx src/commands/player-bios/import-nhl-contract-history.ts",
+    "test:nhl-contracts": "node ../node_modules/tsx/dist/cli.mjs --test src/domains/maintenance/nhl-contracts.test.ts src/domains/maintenance/nhl-contract-storage.test.ts src/domains/maintenance/sync-player-bios-from-puckpedia.test.ts"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",

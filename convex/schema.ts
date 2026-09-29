@@ -1,6 +1,11 @@
 import { defineSchema, defineTable, type TableDefinition } from "convex/server";
 import { v, type GenericValidator } from "convex/values";
 import {
+  nhlContractFields,
+  nhlContractSeasonFields,
+  nhlContractSource,
+} from "./lib/nhlContractFields";
+import {
   PLAYER_DAY_SCORES,
   type PlayerDayScore,
 } from "./lib/playerDayPerformanceIndex";
@@ -468,6 +473,35 @@ export default defineSchema({
       ["playerId", "seasonStartYear"],
       ["seasonStartYear", "normalizedSalary"],
     ],
+  ),
+
+  nhlContracts: table(
+    {
+      ...nhlContractFields,
+      source: nhlContractSource,
+      sourceRef: v.string(),
+      historicalContractId: v.optional(v.string()),
+      observationSeasonStartYear: v.number(),
+      firstObservedAt: v.number(),
+      lastObservedAt: v.number(),
+      updatedAt: v.number(),
+    },
+    ["playerId", ["playerId", "startSeasonStartYear", "signingDate"]],
+  ),
+
+  nhlContractSeasons: table(
+    {
+      contractId: id("nhlContracts"),
+      playerId: id("players"),
+      ...nhlContractSeasonFields,
+      source: nhlContractSource,
+      sourceRef: v.string(),
+      historicalValues: v.optional(v.record(v.string(), v.string())),
+      firstObservedAt: v.number(),
+      lastObservedAt: v.number(),
+      updatedAt: v.number(),
+    },
+    ["playerId", "seasonStartYear", ["contractId", "seasonStartYear"]],
   ),
 
   contracts: table(
