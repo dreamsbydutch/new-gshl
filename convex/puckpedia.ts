@@ -188,6 +188,9 @@ export const batch = internalMutation({
             await ctx.db.patch(player._id, { ...patch, updatedAt: Date.now() });
           progress.updated++;
         }
+        // Contract matching must see the identity just refreshed above, also
+        // during a dry run where the proposed profile has not been persisted.
+        player = { ...player, ...patch };
       } else if (!player) {
         if (run.apply || item.firstPlayer !== false) progress.inserted++;
         if (run.apply) {
@@ -223,8 +226,25 @@ export const batch = internalMutation({
       }
       if (player && audit.rows.length) {
         const observations = reconcileNhlContracts(audit.rows, [
-          { ...player, id: player._id },
+          {
+            ...player,
+            id: player._id,
+            // The guarded directory match above has already resolved this
+            // identity, including profiles missing their NHL ID or birthday.
+            nhlApiId: source.nhlApiId,
+            birthday: source.birthDate || player.birthday,
+          },
         ]).rows;
+        if (!observations.length) {
+          progress.skipped++;
+          await ctx.db.insert("jobEvents", {
+            runId: run._id,
+            level: "warning",
+            message: `${source.fullName}: contract identity could not be resolved; skipped`,
+            createdAt: Date.now(),
+          });
+          continue;
+        }
         const counts = await writeNhlContracts(
           ctx,
           observations.map((row) => ({ ...row, playerId: player._id })),

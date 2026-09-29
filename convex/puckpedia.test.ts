@@ -23,9 +23,47 @@ const player = mapPuckPediaPlayer({
   sal_t: 1500000,
 })!;
 const rows = [
-  { player, year: 2026, token: "10", current: true },
-  { player, year: 2027, token: "11", current: false },
+  {
+    player,
+    year: 2026,
+    token: "10",
+    current: true,
+    firstPlayer: true,
+    firstContract: true,
+  },
+  {
+    player,
+    year: 2027,
+    token: "11",
+    current: false,
+    firstPlayer: false,
+    firstContract: false,
+  },
 ];
+
+void test("an existing player with missing NHL identity uses the refreshed profile for contract matching", async () => {
+  for (const apply of [false, true]) {
+    const f = fixture(apply);
+    f.put("players", "legacy", {
+      fullName: "Test Player",
+      firstName: "Test",
+      lastName: "Player",
+      nhlApiId: null,
+      birthday: null,
+      nhlPos: ["C"],
+      isActive: false,
+    });
+    await run(f);
+    assert.equal(f.rows("players").length, 1);
+    assert.equal(
+      (f.get("run")?.progress as { contractsInserted: number })
+        .contractsInserted,
+      1,
+    );
+    assert.equal(f.rows("nhlContracts").length, apply ? 1 : 0);
+    assert.equal((f.get("run")?.progress as { skipped: number }).skipped, 0);
+  }
+});
 function fixture(apply = true) {
   const f = mutationFixture();
   f.put("jobRuns", "run", {
