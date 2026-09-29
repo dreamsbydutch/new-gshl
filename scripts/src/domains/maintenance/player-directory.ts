@@ -682,7 +682,7 @@ function calculateAge(birthDate: string, currentDate: Date): number | null {
   return age >= 0 ? age : null;
 }
 
-function sourcePatch(
+export function sourcePatch(
   source: DirectoryPlayer,
   currentDate: Date,
 ): Record<string, unknown> {

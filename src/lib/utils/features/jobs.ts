@@ -28,6 +28,11 @@ function normalizeProgress(value: unknown): JobRunProgress {
   return {
     processed: optionalNumber(value.processed),
     updated: optionalNumber(value.updated),
+    inserted: optionalNumber(value.inserted),
+    contractsInserted: optionalNumber(value.contractsInserted),
+    contractsUpdated: optionalNumber(value.contractsUpdated),
+    seasonsInserted: optionalNumber(value.seasonsInserted),
+    skipped: optionalNumber(value.skipped),
   };
 }
 

@@ -86,7 +86,11 @@ export function isExternalJob(jobName: JobName): boolean {
 
 export function buildLockKey(jobName: JobName, args: Record<string, unknown>) {
   // This job replaces global player membership, regardless of supplied scope.
-  if (jobName === "active-roster-refresh") return jobName;
+  if (
+    jobName === "active-roster-refresh" ||
+    jobName === "puckpedia-player-bio-sync"
+  )
+    return jobName;
   const scope = ["seasonId", "weekId", "matchupId", "date"]
     .map((key) => {
       const value = args[key];

@@ -1,5 +1,10 @@
 import { v, type Infer } from "convex/values";
-import { mutation, query, type QueryCtx } from "./_generated/server";
+import {
+  mutation,
+  query,
+  type MutationCtx,
+  type QueryCtx,
+} from "./_generated/server";
 import { nhlContractObservation } from "./lib/nhlContractFields";
 import {
   changedNhlContractFields,
@@ -147,51 +152,58 @@ export const preview = query({
   },
 });
 
+export async function writeNhlContracts(
+  ctx: MutationCtx,
+  rows: Observation[],
+  apply = true,
+) {
+  const result = await plan(ctx, rows);
+  if (!apply) return result.summary;
+  const now = Date.now();
+  const contractId =
+    result.existing?._id ??
+    (await ctx.db.insert("nhlContracts", {
+      ...result.contract,
+      firstObservedAt: now,
+      lastObservedAt: now,
+      updatedAt: now,
+    }));
+  if (result.existing) {
+    // Observation timestamps may advance on an otherwise idempotent live sync.
+    await ctx.db.patch(contractId, {
+      ...result.contract,
+      lastObservedAt:
+        rows[0]!.source === "puckpedia" ? now : result.existing.lastObservedAt,
+      updatedAt: result.contractChanged ? now : result.existing.updatedAt,
+    });
+  }
+  for (const season of result.seasons) {
+    if (season.existing) {
+      await ctx.db.patch(season.existing._id, {
+        ...season.data,
+        lastObservedAt:
+          rows[0]!.source === "puckpedia"
+            ? now
+            : season.existing.lastObservedAt,
+        updatedAt: season.changed ? now : season.existing.updatedAt,
+      });
+    } else {
+      await ctx.db.insert("nhlContractSeasons", {
+        ...season.data,
+        contractId,
+        firstObservedAt: now,
+        lastObservedAt: now,
+        updatedAt: now,
+      });
+    }
+  }
+  return result.summary;
+}
+
 export const upsert = mutation({
   args,
   handler: async (ctx, input) => {
     authorize(input.serverSecret);
-    const result = await plan(ctx, input.rows);
-    const now = Date.now();
-    const contractId =
-      result.existing?._id ??
-      (await ctx.db.insert("nhlContracts", {
-        ...result.contract,
-        firstObservedAt: now,
-        lastObservedAt: now,
-        updatedAt: now,
-      }));
-    if (result.existing) {
-      // Observation timestamps may advance on an otherwise idempotent live sync.
-      await ctx.db.patch(contractId, {
-        ...result.contract,
-        lastObservedAt:
-          input.rows[0]!.source === "puckpedia"
-            ? now
-            : result.existing.lastObservedAt,
-        updatedAt: result.contractChanged ? now : result.existing.updatedAt,
-      });
-    }
-    for (const season of result.seasons) {
-      if (season.existing) {
-        await ctx.db.patch(season.existing._id, {
-          ...season.data,
-          lastObservedAt:
-            input.rows[0]!.source === "puckpedia"
-              ? now
-              : season.existing.lastObservedAt,
-          updatedAt: season.changed ? now : season.existing.updatedAt,
-        });
-      } else {
-        await ctx.db.insert("nhlContractSeasons", {
-          ...season.data,
-          contractId,
-          firstObservedAt: now,
-          lastObservedAt: now,
-          updatedAt: now,
-        });
-      }
-    }
-    return result.summary;
+    return writeNhlContracts(ctx, input.rows);
   },
 });

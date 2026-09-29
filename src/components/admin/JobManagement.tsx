@@ -86,6 +86,41 @@ export function JobManagement() {
         </p>
       </div>
 
+      <div className="space-y-3 rounded-lg border p-4">
+        <h3 className="font-semibold">PuckPedia player and contract refresh</h3>
+        <p className="text-sm text-muted-foreground">
+          Refresh player bios and NHL contract details, and save new contracts
+          found for the current and upcoming seasons. The browser worker must be
+          online. Progress and results appear below.
+        </p>
+        <Button
+          disabled={
+            runs.isLoading === true ||
+            start.isPending ||
+            sortedRuns.some(
+              (run) =>
+                run.jobName === "puckpedia-player-bio-sync" &&
+                activeStatuses.has(run.status),
+            )
+          }
+          onClick={() =>
+            start.mutate({
+              jobName: "puckpedia-player-bio-sync",
+              apply: true,
+              args: {},
+            })
+          }
+        >
+          {sortedRuns.some(
+            (run) =>
+              run.jobName === "puckpedia-player-bio-sync" &&
+              activeStatuses.has(run.status),
+          )
+            ? "PuckPedia refresh in progress"
+            : "Update players from PuckPedia"}
+        </Button>
+      </div>
+
       <div className="grid gap-3 rounded-lg border p-4 md:grid-cols-2 xl:grid-cols-4">
         <label className="text-sm">
           <span className="mb-1 block font-medium">Job</span>
@@ -257,6 +292,23 @@ export function JobManagement() {
                     {Number(progress.processed ?? 0)} processed
                     <br />
                     {Number(progress.updated ?? 0)} changed
+                    {run.jobName === "puckpedia-player-bio-sync" ? (
+                      <>
+                        <br />
+                        {progress.inserted ?? 0} new players
+                        <br />
+                        {progress.contractsInserted ?? 0} new contracts
+                        <br />
+                        {progress.contractsUpdated ?? 0} contracts updated
+                        <br />
+                        {progress.seasonsInserted ?? 0} new contract seasons
+                        <br />
+                        {progress.skipped ?? 0} skipped / need review
+                        {run.status === "waiting_external" ? (
+                          <p>Waiting for browser worker</p>
+                        ) : null}
+                      </>
+                    ) : null}
                   </td>
                   <td className="px-3 py-3 text-xs">
                     {formatTime(run.startedAt ?? run.createdAt)}

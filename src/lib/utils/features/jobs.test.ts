@@ -19,6 +19,7 @@ void test("normalizes job rows before they reach admin components", () => {
   ]);
 
   assert.equal(runs.length, 1);
-  assert.deepEqual(runs[0]?.progress, { processed: 12, updated: 4 });
+  assert.equal(runs[0]?.progress.processed, 12);
+  assert.equal(runs[0]?.progress.updated, 4);
   assert.equal(runs[0]?.apply, true);
 });

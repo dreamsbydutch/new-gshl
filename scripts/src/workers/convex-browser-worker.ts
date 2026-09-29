@@ -1,6 +1,7 @@
 import "dotenv/config";
 import { convexToJson, jsonToConvex } from "convex/values";
 import puppeteer, { type Browser } from "puppeteer-core";
+import { capturePuckPediaDirectories } from "../domains/maintenance/sync-player-bios-from-puckpedia";
 
 type Task = { _id: string; kind: string; payload: Record<string, unknown> };
 
@@ -10,7 +11,8 @@ const convexUrl = String(
 const workerSecret = String(process.env.BROWSER_WORKER_SECRET ?? "");
 const workerId = String(process.env.BROWSER_WORKER_ID ?? `gshl-${process.pid}`);
 const executablePath = String(process.env.BROWSER_EXECUTABLE_PATH ?? "");
-const profilePath = process.env.YAHOO_BROWSER_PROFILE_PATH;
+const profilePath =
+  process.env.BROWSER_USER_DATA_DIR ?? process.env.YAHOO_BROWSER_PROFILE_PATH;
 
 if (!convexUrl || !workerSecret || !executablePath) {
   throw new Error(
@@ -61,6 +63,21 @@ function taskUrl(task: Task) {
 }
 
 async function execute(browser: Browser, task: Task) {
+  if (task.kind === "puckpedia-player-bio-sync") {
+    const snapshot = await capturePuckPediaDirectories(browser);
+    const uploadUrl = await callConvex<string>("externalWorker:uploadUrl", {
+      taskId: task._id,
+      workerId,
+    });
+    const response = await fetch(uploadUrl, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(snapshot),
+    });
+    if (!response.ok) throw new Error("PuckPedia snapshot upload failed");
+    const result = (await response.json()) as { storageId: string };
+    return [{ storageId: result.storageId }];
+  }
   const page = await browser.newPage();
   try {
     await page.goto(taskUrl(task), {
@@ -93,12 +110,7 @@ async function execute(browser: Browser, task: Task) {
   }
 }
 
-const browser = await puppeteer.launch({
-  executablePath,
-  headless: true,
-  userDataDir: profilePath,
-  args: ["--no-first-run", "--disable-background-networking"],
-});
+let browser: Browser | undefined;
 
 async function poll() {
   const task = await callConvex<Task | null>("externalWorker:lease", {
@@ -114,6 +126,12 @@ async function poll() {
     }).catch(() => undefined);
   }, 45_000);
   try {
+    browser = await puppeteer.launch({
+      executablePath,
+      headless: process.env.BROWSER_HEADLESS !== "false",
+      userDataDir: profilePath,
+      args: ["--no-first-run", "--disable-background-networking"],
+    });
     const chunks = await execute(browser, task);
     await callConvex("externalWorker:complete", {
       taskId: task._id,
@@ -128,14 +146,15 @@ async function poll() {
     });
   } finally {
     clearInterval(heartbeat);
+    await browser?.close();
+    browser = undefined;
   }
 }
 
-process.on("SIGINT", () => void browser.close().finally(() => process.exit(0)));
-process.on(
-  "SIGTERM",
-  () => void browser.close().finally(() => process.exit(0)),
-);
+const shutdown = () =>
+  void Promise.resolve(browser?.close()).finally(() => process.exit(0));
+process.on("SIGINT", shutdown);
+process.on("SIGTERM", shutdown);
 
 while (true) {
   await poll().catch((error: unknown) => console.error(error));

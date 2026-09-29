@@ -1169,6 +1169,45 @@ async function fetchRecentPlayerDayPositions(
   return { error: "", rows };
 }
 
+/** Capture both complete directories before a managed job writes anything. */
+export async function capturePuckPediaDirectories(browser: Browser) {
+  const initial = parsePlayerBioSyncOptions(["--headless", "--log", "false"]);
+  const page = await browser.newPage();
+  try {
+    await page.goto("https://puckpedia.com/players/search", {
+      waitUntil: "domcontentloaded",
+      timeout: 90_000,
+    });
+    try {
+      await waitForPuckPediaStore(page);
+    } catch {
+      throw new Error(
+        "PuckPedia search did not become available. Complete any verification in the worker browser, then retry the refresh.",
+      );
+    }
+    const html = await page.content();
+    const tokens = resolveSeasonTokens(html, initial);
+    const focus = await readPuckPediaFocusSeason(page);
+    const year = focus ? seasonStartYear(focus.label) : null;
+    if (year === null)
+      throw new Error("PuckPedia did not identify its focus season");
+    const options = { ...initial, ...tokens, focusSeasonStartYear: year };
+    const sources = [];
+    for (const request of resolveContractSeasonRequests(options)) {
+      const directory = await fetchCompleteDirectory(page, {
+        ...options,
+        focusSeason: request.seasonToken,
+      });
+      sources.push({ ...request, players: directory.players });
+    }
+    if (sources.length !== 2 || !sources[0]?.players.length)
+      throw new Error("Incomplete PuckPedia seasons");
+    return { capturedAt: Date.now(), sources };
+  } finally {
+    await page.close();
+  }
+}
+
 export async function runPlayerBioSync(
   initialOptions: PlayerBioSyncOptions,
 ): Promise<PlayerBioSyncSummary> {

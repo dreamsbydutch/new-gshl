@@ -7,6 +7,11 @@ import type { QueryLike } from "./hook-query";
 export interface JobRunProgress {
   processed?: number;
   updated?: number;
+  inserted?: number;
+  contractsInserted?: number;
+  contractsUpdated?: number;
+  seasonsInserted?: number;
+  skipped?: number;
 }
 
 export interface JobRun {

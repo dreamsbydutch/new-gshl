@@ -625,6 +625,30 @@ export const run = internalActionGeneric({
     if (!run) return;
     try {
       const jobName = canonicalJobName(String(run.jobName));
+      if (jobName === "puckpedia-player-bio-sync") {
+        const task = (await ctx.runMutation(
+          mutationRef("jobRunner:getExternalResult"),
+          args,
+        )) as { resultChunks?: Array<{ storageId?: string }> } | null;
+        if (task) {
+          const storageId = task.resultChunks?.[0]?.storageId;
+          if (!storageId)
+            throw new Error(
+              "PuckPedia worker returned no structured snapshot; update the browser worker",
+            );
+          await ctx.runAction(actionRef("puckpedia:process"), {
+            ...args,
+            storageId,
+          });
+        } else {
+          await ctx.runMutation(mutationRef("jobRunner:createExternalTask"), {
+            ...args,
+            kind: jobName,
+            payload: {},
+          });
+        }
+        return;
+      }
       if (jobName === "active-season-refresh") {
         const state = (await ctx.runMutation(
           mutationRef("jobRunner:advancePipeline"),

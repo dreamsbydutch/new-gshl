@@ -12,6 +12,26 @@ const runner = makeFunctionReference<"action", { runId: string }>(
   "jobRunner:run",
 );
 
+export const uploadUrl = mutationGeneric({
+  args: {
+    workerSecret: v.string(),
+    taskId: v.id("externalTasks"),
+    workerId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    requireWorkerSecret(args.workerSecret);
+    const task = await ctx.db.get(args.taskId);
+    if (
+      !task ||
+      task.status !== "leased" ||
+      task.leaseOwner !== args.workerId ||
+      task.leaseExpiresAt <= Date.now()
+    )
+      throw new Error("Task lease is not owned by this worker");
+    return ctx.storage.generateUploadUrl();
+  },
+});
+
 export const lease = mutationGeneric({
   args: {
     workerSecret: v.string(),

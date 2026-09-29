@@ -60,6 +60,7 @@ import type * as notifications from "../notifications.js";
 import type * as performances from "../performances.js";
 import type * as playerDayArchive from "../playerDayArchive.js";
 import type * as playerDayPerformanceIndex from "../playerDayPerformanceIndex.js";
+import type * as puckpedia from "../puckpedia.js";
 import type * as reporterBackfill from "../reporterBackfill.js";
 import type * as schedule from "../schedule.js";
 import type * as standings from "../standings.js";
@@ -133,6 +134,7 @@ declare const fullApi: ApiFromModules<{
   performances: typeof performances;
   playerDayArchive: typeof playerDayArchive;
   playerDayPerformanceIndex: typeof playerDayPerformanceIndex;
+  puckpedia: typeof puckpedia;
   reporterBackfill: typeof reporterBackfill;
   schedule: typeof schedule;
   standings: typeof standings;

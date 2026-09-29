@@ -118,6 +118,20 @@ allowlisted tasks using `CONVEX_URL`, `BROWSER_WORKER_SECRET`, and
 `BROWSER_EXECUTABLE_PATH`; it captures bounded source data but does not write
 league tables itself.
 
+The admin **Update players from PuckPedia** button starts an applied
+`puckpedia-player-bio-sync` job. The browser worker captures complete current
+and next-season directories before Convex processes bounded batches. Convex
+updates source-backed player bios and current NHL terms, upserts NHL salary
+projections, and reconciles `nhlContracts` / `nhlContractSeasons`. It preserves
+GSHL ownership, multi-position eligibility, and historical contracts. Identity
+conflicts and incomplete contract data are skipped with warning events and
+counts in the job list. Retry safely resumes through idempotent writes.
+
+The worker must be online for this button. `BROWSER_USER_DATA_DIR` selects its
+persistent browser profile. This workflow needs PuckPedia's search interface;
+a verification challenge or incomplete directory fails the job rather than
+reporting a successful refresh. It does not enable recurring schedules.
+
 Separate code-defined crons reconcile due UFA groups every 15 minutes and scan
 weekly-edition milestones every six hours.
 
