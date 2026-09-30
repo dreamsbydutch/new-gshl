@@ -53,6 +53,7 @@ import type * as lib_weeklyEditionPublication from "../lib/weeklyEditionPublicat
 import type * as lib_yahooOAuth from "../lib/yahooOAuth.js";
 import type * as maintenanceScope from "../maintenanceScope.js";
 import type * as matchup from "../matchup.js";
+import type * as nhlContractAnalytics from "../nhlContractAnalytics.js";
 import type * as nhlContracts from "../nhlContracts.js";
 import type * as notificationPush from "../notificationPush.js";
 import type * as notificationScanner from "../notificationScanner.js";
@@ -127,6 +128,7 @@ declare const fullApi: ApiFromModules<{
   "lib/yahooOAuth": typeof lib_yahooOAuth;
   maintenanceScope: typeof maintenanceScope;
   matchup: typeof matchup;
+  nhlContractAnalytics: typeof nhlContractAnalytics;
   nhlContracts: typeof nhlContracts;
   notificationPush: typeof notificationPush;
   notificationScanner: typeof notificationScanner;

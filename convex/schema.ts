@@ -492,6 +492,12 @@ export default defineSchema({
     ["playerId", ["playerId", "startSeasonStartYear", "signingDate"]],
   ),
 
+  nhlSalaryCaps: defineTable({
+    seasonStartYear: v.number(),
+    salaryCap: v.number(),
+    updatedAt: v.number(),
+  }).index("by_seasonStartYear", ["seasonStartYear"]),
+
   nhlContractSeasons: table(
     {
       contractId: id("nhlContracts"),

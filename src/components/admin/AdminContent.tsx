@@ -7,7 +7,8 @@ import { TvDisplays } from "./TvDisplays";
 import { readContextualNavigationQuery, resolveAdminView } from "@gshl-utils";
 
 const AccountsManagement = dynamic(
-  () => import("./AccountsManagement").then((module) => module.AccountsManagement),
+  () =>
+    import("./AccountsManagement").then((module) => module.AccountsManagement),
   { loading: () => <AdminPanelSkeleton /> },
 );
 const UserManagement = dynamic(
@@ -28,6 +29,13 @@ const ContractManagement = dynamic(
 );
 const JobManagement = dynamic(
   () => import("./JobManagement").then((module) => module.JobManagement),
+  { loading: () => <AdminPanelSkeleton /> },
+);
+const NormalizedNhlContracts = dynamic(
+  () =>
+    import("./NormalizedNhlContracts").then(
+      (module) => module.NormalizedNhlContracts,
+    ),
   { loading: () => <AdminPanelSkeleton /> },
 );
 const ImageUpload = dynamic(
@@ -56,6 +64,7 @@ export function AdminContent() {
     <div className="container mx-auto px-4 py-8">
       {selectedView === "accounts" ? <AccountsManagement /> : null}
       {selectedView === "contracts" ? <ContractManagement /> : null}
+      {selectedView === "nhlContracts" ? <NormalizedNhlContracts /> : null}
       {selectedView === "draftPicks" ? <DraftPickManagement /> : null}
       {selectedView === "users" ? <UserManagement /> : null}
       {selectedView === "jobs" ? <JobManagement /> : null}
