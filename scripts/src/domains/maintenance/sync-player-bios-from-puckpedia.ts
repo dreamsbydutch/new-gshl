@@ -4,7 +4,7 @@ import path from "node:path";
 import readline from "node:readline/promises";
 import { stdin as input, stdout as output } from "node:process";
 import puppeteer from "puppeteer-core";
-import type { Browser, Page } from "puppeteer-core";
+import type { Browser, Page, HTTPResponse } from "puppeteer-core";
 import { withPuckPediaCaptureRecovery } from "../../integrations/puckpedia-capture-retry";
 import { getLineupBuilder } from "../lineup/lineup-builder";
 import {
@@ -641,78 +641,87 @@ async function fetchPuckPediaPage(
   options: PlayerBioSyncOptions,
 ): Promise<PuckPediaPage> {
   const query = buildPuckPediaQuery(role.value, pageNumber, options);
-  const result = await page.evaluate(async (request) => {
-    type PuckStore = {
-      loading: boolean;
-      fetchError: boolean;
-      players: unknown;
-      count: number;
-      hasSearched: boolean;
-      sortBy: string;
-      sortDirection: string;
-      curPage: number;
-      pageSize: number;
-      focus_season: { label: string; value: string };
-      player_role: { label: string; value: string };
-      stat_season: { label: string; value: string };
-      filters_g1: Record<string, unknown>;
-      filters_g2: Record<string, unknown>;
-      filters_g3: Record<string, unknown>;
-      filters_g4: Record<string, unknown>;
-      filters_g5: Record<string, unknown>;
-      filters_g6: Record<string, unknown>;
-      getData: () => Promise<void>;
-    };
-    const alpine = (
-      globalThis as unknown as {
-        Alpine?: {
-          store?: (name: string) => PuckStore | undefined;
-        };
+  let apiStatus: number | undefined;
+  const onResponse = (response: HTTPResponse) => {
+    const url = new URL(response.url());
+    if (url.hostname === "puckpedia.com" && url.pathname === "/players/api")
+      apiStatus = response.status();
+  };
+  page.on("response", onResponse);
+  const result = await page
+    .evaluate(async (request) => {
+      type PuckStore = {
+        loading: boolean;
+        fetchError: boolean;
+        players: unknown;
+        count: number;
+        hasSearched: boolean;
+        sortBy: string;
+        sortDirection: string;
+        curPage: number;
+        pageSize: number;
+        focus_season: { label: string; value: string };
+        player_role: { label: string; value: string };
+        stat_season: { label: string; value: string };
+        filters_g1: Record<string, unknown>;
+        filters_g2: Record<string, unknown>;
+        filters_g3: Record<string, unknown>;
+        filters_g4: Record<string, unknown>;
+        filters_g5: Record<string, unknown>;
+        filters_g6: Record<string, unknown>;
+        getData: () => Promise<void>;
+      };
+      const alpine = (
+        globalThis as unknown as {
+          Alpine?: {
+            store?: (name: string) => PuckStore | undefined;
+          };
+        }
+      ).Alpine;
+      const store = alpine?.store?.("puck");
+      if (!store) {
+        throw new Error("PuckPedia player search state is unavailable.");
       }
-    ).Alpine;
-    const store = alpine?.store?.("puck");
-    if (!store) {
-      throw new Error("PuckPedia player search state is unavailable.");
-    }
 
-    store.filters_g1 = {};
-    store.filters_g2 = {
-      bio_pos: { value: request.bio_pos },
-      bio_shot: { value: request.bio_shot },
-    };
-    store.filters_g3 = {};
-    store.filters_g4 = {};
-    store.filters_g5 = {};
-    store.filters_g6 = {};
-    store.sortBy = request.sortBy;
-    store.sortDirection = request.sortDirection;
-    store.curPage = request.curPage;
-    store.pageSize = request.pageSize;
-    store.focus_season = {
-      label: request.focus_season,
-      value: request.focus_season,
-    };
-    store.player_role = {
-      label: request.player_role === "0" ? "Goalies" : "Skaters",
-      value: request.player_role,
-    };
-    store.stat_season = {
-      label: request.stat_season,
-      value: request.stat_season,
-    };
-    store.hasSearched = true;
-    await store.getData();
+      store.filters_g1 = {};
+      store.filters_g2 = {
+        bio_pos: { value: request.bio_pos },
+        bio_shot: { value: request.bio_shot },
+      };
+      store.filters_g3 = {};
+      store.filters_g4 = {};
+      store.filters_g5 = {};
+      store.filters_g6 = {};
+      store.sortBy = request.sortBy;
+      store.sortDirection = request.sortDirection;
+      store.curPage = request.curPage;
+      store.pageSize = request.pageSize;
+      store.focus_season = {
+        label: request.focus_season,
+        value: request.focus_season,
+      };
+      store.player_role = {
+        label: request.player_role === "0" ? "Goalies" : "Skaters",
+        value: request.player_role,
+      };
+      store.stat_season = {
+        label: request.stat_season,
+        value: request.stat_season,
+      };
+      store.hasSearched = true;
+      await store.getData();
 
-    return {
-      fetchError: store.fetchError,
-      rows: JSON.parse(JSON.stringify(store.players)) as unknown,
-      totalRows: Number(store.count),
-    };
-  }, query);
+      return {
+        fetchError: store.fetchError,
+        rows: JSON.parse(JSON.stringify(store.players)) as unknown,
+        totalRows: Number(store.count),
+      };
+    }, query)
+    .finally(() => page.off("response", onResponse));
 
   if (result.fetchError) {
     throw new Error(
-      `[player-bio-sync] PuckPedia's own page loader failed for ${role.label} page ${pageNumber}.`,
+      `[player-bio-sync] PuckPedia's own page loader failed for ${role.label} page ${pageNumber}. API status: ${apiStatus ?? "no response"}.`,
     );
   }
   const rowsCandidate = Array.isArray(result.rows)
