@@ -5,6 +5,7 @@ import readline from "node:readline/promises";
 import { stdin as input, stdout as output } from "node:process";
 import puppeteer from "puppeteer-core";
 import type { Browser, Page } from "puppeteer-core";
+import { withPuckPediaCaptureRecovery } from "../../integrations/puckpedia-capture-retry";
 import { getLineupBuilder } from "../lineup/lineup-builder";
 import {
   fetchLatestPlayerDayDate,
@@ -1171,6 +1172,12 @@ async function fetchRecentPlayerDayPositions(
 
 /** Capture both complete directories before a managed job writes anything. */
 export async function capturePuckPediaDirectories(browser: Browser) {
+  return withPuckPediaCaptureRecovery(() =>
+    capturePuckPediaDirectoriesOnce(browser),
+  );
+}
+
+async function capturePuckPediaDirectoriesOnce(browser: Browser) {
   const initial = parsePlayerBioSyncOptions(["--headless", "--log", "false"]);
   const page = await browser.newPage();
   try {
