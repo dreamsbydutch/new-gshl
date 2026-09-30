@@ -9,6 +9,21 @@ export interface NhlContractAnalyticsInput {
   seasons: Array<{ seasonStartYear: number; capHit: number }>;
 }
 
+export interface NhlRosterAnalyticsPlayer {
+  id: string;
+  playerName: string;
+  position: string;
+  nhlTeam: string[];
+  contracts: NhlContractAnalyticsInput[];
+  historyTruncated: boolean;
+}
+
+export interface NhlRosterAnalyticsTeam {
+  id: string;
+  name: string;
+  abbr: string;
+}
+
 export interface NormalizedContractSeason {
   seasonStartYear: number;
   capHit: number | null;

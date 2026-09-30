@@ -38,6 +38,7 @@ export type LeagueOfficeNavigationView =
   | "performances";
 
 export type AdminNavigationView =
+  | "nhlRosters"
   | "nhlContracts"
   | "accounts"
   | "draftPicks"

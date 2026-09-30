@@ -38,6 +38,13 @@ const NormalizedNhlContracts = dynamic(
     ),
   { loading: () => <AdminPanelSkeleton /> },
 );
+const NormalizedNhlRosters = dynamic(
+  () =>
+    import("./NormalizedNhlRosters").then(
+      (module) => module.NormalizedNhlRosters,
+    ),
+  { loading: () => <AdminPanelSkeleton /> },
+);
 const ImageUpload = dynamic(
   () => import("./ImageUpload").then((module) => module.ImageUpload),
   { loading: () => <AdminPanelSkeleton /> },
@@ -65,6 +72,7 @@ export function AdminContent() {
       {selectedView === "accounts" ? <AccountsManagement /> : null}
       {selectedView === "contracts" ? <ContractManagement /> : null}
       {selectedView === "nhlContracts" ? <NormalizedNhlContracts /> : null}
+      {selectedView === "nhlRosters" ? <NormalizedNhlRosters /> : null}
       {selectedView === "draftPicks" ? <DraftPickManagement /> : null}
       {selectedView === "users" ? <UserManagement /> : null}
       {selectedView === "jobs" ? <JobManagement /> : null}

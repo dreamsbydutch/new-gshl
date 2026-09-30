@@ -15,6 +15,7 @@ void test("admin navigation accepts every dedicated admin view", () => {
     "scheduleBuilder",
     "contracts",
     "nhlContracts",
+    "nhlRosters",
     "users",
     "jobs",
     "newsroom",

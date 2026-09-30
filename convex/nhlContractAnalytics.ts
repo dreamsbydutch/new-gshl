@@ -4,6 +4,93 @@ import { query, mutation, internalMutation } from "./_generated/server";
 import { requireCommissioner } from "./lib/auth";
 import { NHL_SALARY_CAP_BY_START_YEAR } from "../src/lib/utils/domain/nhl-salary-caps";
 
+export const rosterTeams = query({
+  args: {},
+  handler: async (ctx) => {
+    await requireCommissioner(ctx);
+    return (await ctx.db.query("nhlTeams").take(100)).map((team) => ({
+      id: team._id,
+      name: team.name,
+      abbr: team.abbr,
+    }));
+  },
+});
+
+export const rosterPage = query({
+  args: {
+    paginationOpts: paginationOptsValidator,
+    seasonStartYear: v.number(),
+  },
+  handler: async (ctx, args) => {
+    await requireCommissioner(ctx);
+    if (
+      !Number.isInteger(args.seasonStartYear) ||
+      args.seasonStartYear < 1900 ||
+      args.seasonStartYear > 2200
+    )
+      throw new Error("Invalid NHL season");
+    const result = await ctx.db
+      .query("players")
+      .withIndex("by_isActive", (q) => q.eq("isActive", true))
+      .paginate({
+        ...args.paginationOpts,
+        numItems: Math.min(Math.max(args.paginationOpts.numItems, 1), 50),
+      });
+    const page = await Promise.all(
+      result.page
+        .filter((player) => player.nhlTeam?.some((team) => team.trim()))
+        .map(async (player) => {
+          const history = await ctx.db
+            .query("nhlContracts")
+            .withIndex("by_playerId_startSeasonStartYear_signingDate", (q) =>
+              q
+                .eq("playerId", player._id)
+                .lte("startSeasonStartYear", args.seasonStartYear),
+            )
+            .order("desc")
+            .take(31);
+          const contracts = await Promise.all(
+            history
+              .filter(
+                (contract) =>
+                  contract.expirySeasonStartYear >= args.seasonStartYear,
+              )
+              .map(async (contract) => {
+                const seasons = await ctx.db
+                  .query("nhlContractSeasons")
+                  .withIndex("by_contractId_seasonStartYear", (q) =>
+                    q.eq("contractId", contract._id),
+                  )
+                  .take(31);
+                return {
+                  id: contract._id,
+                  playerName: player.fullName,
+                  position: player.posGroup,
+                  signingDate: contract.signingDate,
+                  startSeasonStartYear: contract.startSeasonStartYear,
+                  expirySeasonStartYear: contract.expirySeasonStartYear,
+                  length: contract.length,
+                  seasons: seasons.map((row) => ({
+                    seasonStartYear: row.seasonStartYear,
+                    capHit: row.capHit,
+                  })),
+                };
+              }),
+          );
+          return {
+            id: player._id,
+            playerName: player.fullName,
+            position: player.posGroup,
+            nhlTeam: player.nhlTeam ?? [],
+            contracts,
+            historyTruncated: history.length === 31,
+          };
+        }),
+    );
+    return { ...result, page };
+  },
+});
+
 export const page = query({
   args: { paginationOpts: paginationOptsValidator },
   handler: async (ctx, args) => {

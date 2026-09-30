@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   page,
+  rosterPage,
+  rosterTeams,
   salaryCaps,
   saveSalaryCaps,
   seedSuppliedCaps,
@@ -18,6 +20,14 @@ void test("all contract analytics endpoints enforce commissioner authorization",
     f.signIn(identity);
     for (const [fn, args] of [
       [page, { paginationOpts: { numItems: 100, cursor: null } }],
+      [
+        rosterPage,
+        {
+          paginationOpts: { numItems: 50, cursor: null },
+          seasonStartYear: 2026,
+        },
+      ],
+      [rosterTeams, {}],
       [salaryCaps, {}],
       [
         saveSalaryCaps,
