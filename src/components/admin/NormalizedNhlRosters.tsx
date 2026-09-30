@@ -145,6 +145,11 @@ function RosterContent() {
                           </td>
                           <td className="p-2 text-right tabular-nums">
                             {dollars(player.normalizedAav)}
+                            {player.usesProfileContract ? (
+                              <div className="text-xs text-muted-foreground">
+                                Stored player profile
+                              </div>
+                            ) : null}
                             {player.reason ? (
                               <div className="text-xs text-amber-700">
                                 {player.reason}

@@ -7,6 +7,7 @@ import {
   salaryCaps,
   saveSalaryCaps,
   seedSuppliedCaps,
+  repairProfileContracts,
 } from "./nhlContractAnalytics";
 import {
   mutationFixture,
@@ -39,6 +40,52 @@ void test("all contract analytics endpoints enforce commissioner authorization",
         /auth|commissioner|sign|forbidden/i,
       );
   }
+});
+
+void test("profile repair previews missing history and repeats without modifying existing contracts", async () => {
+  const f = mutationFixture();
+  f.put("players", "holl", {
+    fullName: "Justin Holl",
+    nhlStartYear: "2026",
+    nhlExpiryYear: "2026",
+    nhlContractLength: "1",
+    nhlSigningDate: "2026-07-01",
+    nhlCapHit: 900_000,
+  });
+  const args = { playerIds: ["holl"], seasonStartYear: 2026 };
+  const preview = await invokeMutation(repairProfileContracts, f.ctx, args);
+  assert.deepEqual(preview, {
+    apply: false,
+    results: [
+      {
+        playerId: "holl",
+        name: "Justin Holl",
+        status: "would-insert",
+        capHit: 900_000,
+        length: 1,
+        contractsInserted: 1,
+        contractsUpdated: 0,
+        seasonsInserted: 1,
+        seasonsUpdated: 0,
+        seasonsUnchanged: 0,
+      },
+    ],
+  });
+  assert.equal(f.rows("nhlContracts").length, 0);
+  await invokeMutation(repairProfileContracts, f.ctx, { ...args, apply: true });
+  assert.equal(f.rows("nhlContracts").length, 1);
+  assert.equal(f.rows("nhlContractSeasons")[0]?.capHit, 900_000);
+  assert.equal(f.rows("nhlContracts")[0]?.source, "player-profile");
+  const before = JSON.stringify(f.rows("nhlContracts"));
+  const repeat = await invokeMutation(repairProfileContracts, f.ctx, {
+    ...args,
+    apply: true,
+  });
+  assert.deepEqual(repeat, {
+    apply: true,
+    results: [{ playerId: "holl", status: "unchanged" }],
+  });
+  assert.equal(JSON.stringify(f.rows("nhlContracts")), before);
 });
 
 void test("caps seed with a preview, preserve edits and repeat without writes", async () => {

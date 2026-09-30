@@ -16,6 +16,7 @@ export interface NhlRosterAnalyticsPlayer {
   nhlTeam: string[];
   contracts: NhlContractAnalyticsInput[];
   historyTruncated: boolean;
+  currentProfileContract?: NhlContractAnalyticsInput | null;
 }
 
 export interface NhlRosterAnalyticsTeam {

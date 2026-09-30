@@ -3,6 +3,7 @@ import { v, type Infer } from "convex/values";
 export const nhlContractSource = v.union(
   v.literal("historical-json"),
   v.literal("puckpedia"),
+  v.literal("player-profile"),
 );
 
 export const nhlContractFields = {

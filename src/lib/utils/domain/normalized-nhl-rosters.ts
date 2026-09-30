@@ -37,13 +37,37 @@ export function buildNormalizedNhlRosters(
           contract.startSeasonStartYear <= seasonStartYear &&
           contract.expirySeasonStartYear >= seasonStartYear,
       );
+      const profile = player.currentProfileContract;
+      const currentProfile =
+        profile &&
+        profile.startSeasonStartYear <= seasonStartYear &&
+        profile.expirySeasonStartYear >= seasonStartYear
+          ? profile
+          : null;
+      const matching = currentProfile
+        ? contracts.filter(
+            (contract) =>
+              contract.signingDate === currentProfile.signingDate &&
+              contract.startSeasonStartYear ===
+                currentProfile.startSeasonStartYear,
+          )
+        : [];
+      const selected = currentProfile
+        ? matching.length === 1
+          ? matching[0]
+          : matching.length === 0
+            ? currentProfile
+            : undefined
+        : contracts.length === 1
+          ? contracts[0]
+          : undefined;
       const contract =
-        !player.historyTruncated && contracts.length === 1
-          ? normalizeNhlContract(contracts[0]!, caps)
+        !player.historyTruncated && selected
+          ? normalizeNhlContract(selected, caps)
           : null;
       const reason = player.historyTruncated
         ? "Contract history needs review"
-        : contracts.length > 1
+        : !selected && contracts.length > 1
           ? "Overlapping contracts"
           : !contract
             ? "No current contract"
@@ -60,6 +84,8 @@ export function buildNormalizedNhlRosters(
         position: player.position,
         teamId: team?.id ?? "unassigned",
         contract,
+        usesProfileContract:
+          selected === currentProfile && currentProfile !== null,
         reason: !team ? "Team assignment needs review" : reason,
         normalizedAav: contract?.normalizedAav ?? null,
         capHit:

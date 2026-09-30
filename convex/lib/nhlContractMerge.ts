@@ -6,11 +6,18 @@ export function mergeNhlContractFields<T extends Record<string, unknown>>(
   preserveExisting = false,
 ): T {
   const merged = {} as T;
-  const historicalAfterLive =
-    existing?.source === "puckpedia" && incoming.source === "historical-json";
+  const priority: Record<string, number> = {
+    "historical-json": 0,
+    "player-profile": 1,
+    puckpedia: 2,
+  };
+  const lowerPrioritySource =
+    typeof incoming.source === "string" &&
+    typeof existing?.source === "string" &&
+    (priority[existing.source] ?? -1) > (priority[incoming.source] ?? -1);
   for (const key of Object.keys(incoming)) {
     const preferExisting =
-      (historicalAfterLive || preserveExisting) &&
+      (lowerPrioritySource || preserveExisting) &&
       key !== "historicalValues" &&
       key !== "historicalContractId";
     const value = preferExisting

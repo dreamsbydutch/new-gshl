@@ -125,3 +125,51 @@ void test("cap edits recalculate team totals and missing caps make totals incomp
   assert.equal(result.missing, 1);
   assert.equal(result.normalizedTotal, 0);
 });
+
+void test("a complete current profile supplies a missing signing, including Holl's one-year deal", () => {
+  const profile = {
+    ...player.contracts[0]!,
+    id: "profile:p",
+    startSeasonStartYear: 2026,
+    expirySeasonStartYear: 2026,
+    length: 1,
+    signingDate: Date.UTC(2026, 6, 1),
+    seasons: [{ seasonStartYear: 2026, capHit: 900_000 }],
+  };
+  const result = buildNormalizedNhlRosters(
+    teams,
+    [{ ...player, contracts: [], currentProfileContract: profile }],
+    2026,
+    { 2026: 104_000_000 },
+  )[0]!;
+  assert.equal(result.complete, true);
+  assert.equal(result.normalizedTotal, (900_000 / 104_000_000) * 100_000_000);
+  assert.equal(result.roster[0]?.usesProfileContract, true);
+});
+
+void test("the profile's signing identity selects the current deal without deleting overlapping history", () => {
+  const current = {
+    ...player.contracts[0]!,
+    id: "new",
+    signingDate: Date.UTC(2026, 8, 12),
+    startSeasonStartYear: 2026,
+    expirySeasonStartYear: 2026,
+    length: 1,
+    seasons: [{ seasonStartYear: 2026, capHit: 2_150_000 }],
+  };
+  const result = buildNormalizedNhlRosters(
+    teams,
+    [
+      {
+        ...player,
+        contracts: [...player.contracts, current],
+        currentProfileContract: { ...current, id: "profile:p" },
+      },
+    ],
+    2026,
+    { 2026: 104_000_000 },
+  )[0]!;
+  assert.equal(result.roster[0]?.contract?.id, "new");
+  assert.equal(result.roster[0]?.reason, null);
+  assert.equal(result.roster[0]?.usesProfileContract, false);
+});

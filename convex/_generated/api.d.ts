@@ -34,6 +34,7 @@ import type * as lib_jobLifecycle from "../lib/jobLifecycle.js";
 import type * as lib_matchupProjection from "../lib/matchupProjection.js";
 import type * as lib_nhlContractFields from "../lib/nhlContractFields.js";
 import type * as lib_nhlContractMerge from "../lib/nhlContractMerge.js";
+import type * as lib_nhlProfileContract from "../lib/nhlProfileContract.js";
 import type * as lib_notificationEvents from "../lib/notificationEvents.js";
 import type * as lib_notificationValidators from "../lib/notificationValidators.js";
 import type * as lib_playerDayPerformanceIndex from "../lib/playerDayPerformanceIndex.js";
@@ -109,6 +110,7 @@ declare const fullApi: ApiFromModules<{
   "lib/matchupProjection": typeof lib_matchupProjection;
   "lib/nhlContractFields": typeof lib_nhlContractFields;
   "lib/nhlContractMerge": typeof lib_nhlContractMerge;
+  "lib/nhlProfileContract": typeof lib_nhlProfileContract;
   "lib/notificationEvents": typeof lib_notificationEvents;
   "lib/notificationValidators": typeof lib_notificationValidators;
   "lib/playerDayPerformanceIndex": typeof lib_playerDayPerformanceIndex;

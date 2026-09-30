@@ -3,6 +3,8 @@ import { v } from "convex/values";
 import { query, mutation, internalMutation } from "./_generated/server";
 import { requireCommissioner } from "./lib/auth";
 import { NHL_SALARY_CAP_BY_START_YEAR } from "../src/lib/utils/domain/nhl-salary-caps";
+import { nhlProfileContract } from "./lib/nhlProfileContract";
+import { writeNhlContracts } from "./nhlContracts";
 
 export const rosterTeams = query({
   args: {},
@@ -40,6 +42,7 @@ export const rosterPage = query({
       result.page
         .filter((player) => player.nhlTeam?.some((team) => team.trim()))
         .map(async (player) => {
+          const profile = nhlProfileContract(player, args.seasonStartYear);
           const history = await ctx.db
             .query("nhlContracts")
             .withIndex("by_playerId_startSeasonStartYear_signingDate", (q) =>
@@ -83,11 +86,73 @@ export const rosterPage = query({
             position: player.posGroup,
             nhlTeam: player.nhlTeam ?? [],
             contracts,
+            currentProfileContract: profile
+              ? {
+                  id: `profile:${player._id}`,
+                  playerName: player.fullName,
+                  position: player.posGroup,
+                  signingDate: profile.signingDate,
+                  startSeasonStartYear: profile.startSeasonStartYear,
+                  expirySeasonStartYear: profile.expirySeasonStartYear,
+                  length: profile.length,
+                  seasons: [
+                    {
+                      seasonStartYear: profile.seasonStartYear,
+                      capHit: profile.capHit,
+                    },
+                  ],
+                }
+              : null,
             historyTruncated: history.length === 31,
           };
         }),
     );
     return { ...result, page };
+  },
+});
+
+/** Add missing history from explicit stored profile terms; never replace history. */
+export const repairProfileContracts = internalMutation({
+  args: {
+    playerIds: v.array(v.id("players")),
+    seasonStartYear: v.number(),
+    apply: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args) => {
+    if (!args.playerIds.length || args.playerIds.length > 50)
+      throw new Error("Provide 1–50 players");
+    const results = [];
+    for (const playerId of new Set(args.playerIds)) {
+      const player = await ctx.db.get(playerId);
+      const row = player && nhlProfileContract(player, args.seasonStartYear);
+      if (!row) {
+        results.push({ playerId, status: "invalid-profile" });
+        continue;
+      }
+      const existing = await ctx.db
+        .query("nhlContracts")
+        .withIndex("by_playerId_startSeasonStartYear_signingDate", (q) =>
+          q
+            .eq("playerId", playerId)
+            .eq("startSeasonStartYear", row.startSeasonStartYear)
+            .eq("signingDate", row.signingDate),
+        )
+        .unique();
+      if (existing) {
+        results.push({ playerId, status: "unchanged" });
+        continue;
+      }
+      const counts = await writeNhlContracts(ctx, [row], args.apply === true);
+      results.push({
+        playerId,
+        name: player.fullName,
+        status: args.apply ? "inserted" : "would-insert",
+        capHit: row.capHit,
+        length: row.length,
+        ...counts,
+      });
+    }
+    return { apply: args.apply === true, results };
   },
 });
 
