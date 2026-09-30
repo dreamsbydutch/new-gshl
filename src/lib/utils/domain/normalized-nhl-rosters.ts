@@ -10,14 +10,28 @@ export function buildNormalizedNhlRosters(
   players: readonly NhlRosterAnalyticsPlayer[],
   seasonStartYear: number,
   caps: Readonly<Record<number, number>>,
+  mode: "current" | "historical" | "future" = "current",
 ) {
+  const abbreviationsForSeason = (value: string | string[]) =>
+    getPlayerNhlAbbreviations(value).map((abbr) =>
+      abbr === "PHX" ? "ARI" : abbr,
+    );
   // The catalog includes alternate abbreviations and historical teams. Group
   // aliases under the canonical entry and show teams represented on rosters.
   const teamByAbbr = new Map<string, NhlRosterAnalyticsTeam>();
   for (const team of teams) {
-    const abbr = getPlayerNhlAbbreviations(team.abbr)[0];
+    const abbr = abbreviationsForSeason(team.abbr)[0];
     if (abbr && (!teamByAbbr.has(abbr) || team.abbr === abbr))
-      teamByAbbr.set(abbr, { ...team, abbr });
+      teamByAbbr.set(abbr, {
+        ...team,
+        abbr,
+        name:
+          abbr === "ARI" && seasonStartYear < 2014
+            ? "Phoenix Coyotes"
+            : abbr === "UTA" && seasonStartYear === 2024
+              ? "Utah Hockey Club"
+              : team.name,
+      });
   }
   const seen = new Set<string>();
   const rows = players
@@ -27,7 +41,7 @@ export function buildNormalizedNhlRosters(
       return true;
     })
     .map((player) => {
-      const abbreviations = getPlayerNhlAbbreviations(player.nhlTeam);
+      const abbreviations = abbreviationsForSeason(player.nhlTeam);
       const team =
         abbreviations.length === 1
           ? teamByAbbr.get(abbreviations[0]!)
@@ -37,7 +51,8 @@ export function buildNormalizedNhlRosters(
           contract.startSeasonStartYear <= seasonStartYear &&
           contract.expirySeasonStartYear >= seasonStartYear,
       );
-      const profile = player.currentProfileContract;
+      const profile =
+        mode === "historical" ? null : player.currentProfileContract;
       const currentProfile =
         profile &&
         profile.startSeasonStartYear <= seasonStartYear &&
@@ -80,6 +95,10 @@ export function buildNormalizedNhlRosters(
                   : null;
       return {
         id: player.id,
+        hasCommitment:
+          contracts.length > 0 ||
+          currentProfile !== null ||
+          player.historyTruncated,
         playerName: player.playerName,
         position: player.position,
         teamId: team?.id ?? "unassigned",
@@ -93,7 +112,11 @@ export function buildNormalizedNhlRosters(
             (row) => row.seasonStartYear === seasonStartYear,
           )?.capHit ?? null,
       };
-    });
+    })
+    .filter((row) => mode !== "future" || row.hasCommitment);
+  const representedTeams = new Set(
+    players.flatMap((player) => getPlayerNhlAbbreviations(player.nhlTeam)),
+  );
   const allTeams = [
     ...teamByAbbr.values(),
     ...(rows.some((row) => row.teamId === "unassigned")
@@ -114,6 +137,8 @@ export function buildNormalizedNhlRosters(
         ...team,
         roster,
         missing,
+        calculatedPlayers: roster.filter((row) => row.normalizedAav !== null)
+          .length,
         complete: roster.length > 0 && missing === 0,
         normalizedTotal: roster.reduce(
           (sum, row) => sum + (row.normalizedAav ?? 0),
@@ -123,7 +148,11 @@ export function buildNormalizedNhlRosters(
         missingCapHits: roster.filter((row) => row.capHit === null).length,
       };
     })
-    .filter((team) => team.roster.length > 0)
+    .filter(
+      (team) =>
+        team.roster.length > 0 ||
+        (mode === "future" && representedTeams.has(team.abbr)),
+    )
     .sort(
       (a, b) =>
         Number(b.complete) - Number(a.complete) ||

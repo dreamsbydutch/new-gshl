@@ -4,6 +4,8 @@ import {
   page,
   rosterPage,
   rosterTeams,
+  rosterSeasons,
+  historicalRosterPage,
   salaryCaps,
   saveSalaryCaps,
   seedSuppliedCaps,
@@ -29,6 +31,11 @@ void test("all contract analytics endpoints enforce commissioner authorization",
         },
       ],
       [rosterTeams, {}],
+      [rosterSeasons, {}],
+      [
+        historicalRosterPage,
+        { seasonId: "past", paginationOpts: { numItems: 50, cursor: null } },
+      ],
       [salaryCaps, {}],
       [
         saveSalaryCaps,
@@ -40,6 +47,76 @@ void test("all contract analytics endpoints enforce commissioner authorization",
         /auth|commissioner|sign|forbidden/i,
       );
   }
+});
+
+void test("historical rosters include retired players on their season team and never use current profile terms", async () => {
+  const f = mutationFixture();
+  f.put("seasons", "past", { year: "2021", startDate: "2021-01-16" });
+  f.put("seasons", "empty", { year: "2030" });
+  f.put("players", "retired", {
+    fullName: "Retired Player",
+    isActive: false,
+    posGroup: "D",
+    nhlTeam: ["WSH"],
+    nhlStartYear: "2020",
+    nhlExpiryYear: "2020",
+    nhlContractLength: "1",
+    nhlSigningDate: "2020-07-01",
+    nhlCapHit: 999,
+  });
+  f.put("playerNhlStatLines", "stats", {
+    seasonId: "past",
+    playerId: "retired",
+    nhlTeam: ["TOR"],
+    posGroup: "D",
+  });
+  f.put("nhlContracts", "contract", {
+    playerId: "retired",
+    signingDate: 1,
+    startSeasonStartYear: 2020,
+    expirySeasonStartYear: 2020,
+    length: 1,
+  });
+  f.put("nhlContractSeasons", "salary", {
+    contractId: "contract",
+    seasonStartYear: 2020,
+    capHit: 1_000_000,
+  });
+  assert.deepEqual(await invokeMutation(rosterSeasons, f.ctx, {}), [
+    { id: "past", seasonStartYear: 2020 },
+  ]);
+  assert.deepEqual(
+    await invokeMutation(historicalRosterPage, f.ctx, {
+      seasonId: "past",
+      paginationOpts: { numItems: 1, cursor: null },
+    }),
+    {
+      isDone: true,
+      continueCursor: "1",
+      page: [
+        {
+          id: "retired",
+          playerName: "Retired Player",
+          position: "D",
+          nhlTeam: ["TOR"],
+          historyTruncated: false,
+          currentProfileContract: null,
+          contracts: [
+            {
+              id: "contract",
+              playerName: "Retired Player",
+              position: "D",
+              signingDate: 1,
+              startSeasonStartYear: 2020,
+              expirySeasonStartYear: 2020,
+              length: 1,
+              seasons: [{ seasonStartYear: 2020, capHit: 1_000_000 }],
+            },
+          ],
+        },
+      ],
+    },
+  );
 });
 
 void test("profile repair previews missing history and repeats without modifying existing contracts", async () => {

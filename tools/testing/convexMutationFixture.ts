@@ -35,6 +35,8 @@ export function mutationFixture() {
   const ctx = {
     auth: { getUserIdentity: async () => (subject ? { subject } : null) },
     db: {
+      normalizeId: (name: string, id: string) =>
+        table(name).has(id) ? id : null,
       get: async (id: string) => get(id),
       query: (name: string) => {
         const predicates: ((row: Row) => boolean)[] = [];
@@ -101,6 +103,21 @@ export function mutationFixture() {
             return matches[0] ?? null;
           },
           take: async (count: number) => select().slice(0, count),
+          paginate: async ({
+            numItems,
+            cursor,
+          }: {
+            numItems: number;
+            cursor: string | null;
+          }) => {
+            const offset = Number(cursor ?? 0);
+            const all = select();
+            return {
+              page: all.slice(offset, offset + numItems),
+              isDone: offset + numItems >= all.length,
+              continueCursor: String(offset + numItems),
+            };
+          },
         };
         return query;
       },

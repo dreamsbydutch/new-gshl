@@ -52,22 +52,48 @@ function RosterContent() {
       <div>
         <h2 className="text-2xl font-bold">NHL team normalized cap hits</h2>
         <p className="mt-2 text-sm text-muted-foreground">
-          Current roster assignments · {view.seasonStartYear}–
-          {String(view.seasonStartYear + 1).slice(-2)} contracts. Each player’s
-          normalized AAV averages their full contract at a $100 million cap,
-          using your saved season ceilings. Team totals add those values.
+          {view.mode === "historical"
+            ? "Historical season teams"
+            : view.mode === "future"
+              ? "Future signed commitments"
+              : "Current roster assignments"}{" "}
+          · {view.seasonStartYear}–{String(view.seasonStartYear + 1).slice(-2)}{" "}
+          contracts. Each player’s normalized AAV averages their full contract
+          at a $100 million cap, using your saved season ceilings. Team totals
+          add those values.
         </p>
         <p className="mt-2 text-sm text-muted-foreground">
-          Shows active players with stored NHL team assignments, including
-          contracted prospects. These roster totals do not include retained
-          salary, buyouts, or other team cap adjustments. Update players from
-          PuckPedia to refresh assignments.
+          {view.mode === "historical"
+            ? "Uses each player's stored NHL season team, including retired players. This is a season roster comparison, not an opening-day snapshot. Missing or multiple team assignments appear under review and are not allocated to a team."
+            : view.mode === "future"
+              ? "Shows only contracts covering the selected season, assigned to the player's current team. These are partial commitments, not a forecast of a full roster; future trades and unsigned deals are not included."
+              : "Shows active players with stored NHL team assignments, including contracted prospects."}{" "}
+          These roster totals do not include retained salary, buyouts, or other
+          team cap adjustments.
+          {view.mode !== "historical"
+            ? " Update players from PuckPedia to refresh current assignments."
+            : ""}
         </p>
       </div>
+      <label className="block text-sm">
+        <span className="mb-1 block font-medium">NHL season</span>
+        <select
+          className="rounded border bg-background px-3 py-2"
+          value={view.seasonStartYear}
+          onChange={(event) =>
+            view.setSeasonStartYear(Number(event.target.value))
+          }
+        >
+          {view.seasons.map((year) => (
+            <option key={year} value={year}>
+              {year}–{String(year + 1).slice(-2)}
+            </option>
+          ))}
+        </select>
+      </label>
       {view.isLoading ? (
         <p role="status" className="rounded-lg border p-6">
-          Loading complete rosters… {view.loaded.toLocaleString()} players
-          loaded.
+          Loading season data… {view.loaded.toLocaleString()} players loaded.
         </p>
       ) : (
         <>
@@ -88,8 +114,18 @@ function RosterContent() {
             </p>
           </div>
           <p className="text-sm text-muted-foreground">
-            Complete totals appear first, highest to lowest. Search keeps each
-            matching team’s full roster and total.
+            {view.calculatedPlayers} of {view.playerCount} players have
+            calculated normalized values.
+            {view.unassignedPlayers
+              ? ` ${view.unassignedPlayers} players need a team assignment review.`
+              : ""}
+            {view.calculatedPlayers < view.playerCount
+              ? " Missing contracts are excluded from subtotals; a dash means no value is available."
+              : ""}
+          </p>
+          <p className="text-sm text-muted-foreground">
+            Teams with complete contract data appear first, highest to lowest.
+            Search keeps each matching team’s full roster and total.
           </p>
           {!view.teams.length ? (
             <p>No teams or players match your search.</p>
@@ -104,8 +140,17 @@ function RosterContent() {
                 <span className="font-semibold">{team.name}</span>
                 <span className="ml-3 text-sm">
                   {team.roster.length} players ·{" "}
-                  {team.roster.length ? dollars(team.normalizedTotal) : "—"}{" "}
-                  normalized {team.complete ? "total" : "subtotal"}
+                  {dollars(
+                    team.roster.length && !team.calculatedPlayers
+                      ? null
+                      : team.normalizedTotal,
+                  )}{" "}
+                  normalized{" "}
+                  {view.mode === "future"
+                    ? "signed commitments"
+                    : team.complete && view.mode === "current"
+                      ? "total"
+                      : "subtotal"}
                 </span>
                 {!team.complete && team.roster.length ? (
                   <span className="ml-3 text-sm text-amber-700">
@@ -162,14 +207,24 @@ function RosterContent() {
                     <tfoot>
                       <tr className="font-semibold">
                         <th colSpan={3} className="p-2 text-left">
-                          Roster {team.complete ? "total" : "subtotal"}
+                          {view.mode === "future"
+                            ? "Signed commitments"
+                            : `Roster ${team.complete && view.mode === "current" ? "total" : "subtotal"}`}
                         </th>
                         <td className="p-2 text-right tabular-nums">
-                          {dollars(team.capHitTotal)}
+                          {dollars(
+                            team.roster.length === team.missingCapHits
+                              ? null
+                              : team.capHitTotal,
+                          )}
                           {team.missingCapHits ? " (partial)" : ""}
                         </td>
                         <td className="p-2 text-right tabular-nums">
-                          {dollars(team.normalizedTotal)}
+                          {dollars(
+                            team.calculatedPlayers
+                              ? team.normalizedTotal
+                              : null,
+                          )}
                           {!team.complete ? " (partial)" : ""}
                         </td>
                       </tr>
@@ -178,7 +233,8 @@ function RosterContent() {
                 </div>
               ) : (
                 <p className="px-4 pb-4 text-sm text-muted-foreground">
-                  No active players with this team assignment are stored.
+                  No signed commitments for this season are stored for this
+                  team.
                 </p>
               )}
             </details>

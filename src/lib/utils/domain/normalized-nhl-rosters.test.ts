@@ -30,6 +30,78 @@ const player: NhlRosterAnalyticsPlayer = {
     },
   ],
 };
+void test("future commitments drop expired deals, select extensions and retain teams with zero commitments", () => {
+  const extension = {
+    ...player.contracts[0]!,
+    id: "extension",
+    startSeasonStartYear: 2027,
+    expirySeasonStartYear: 2027,
+    length: 1,
+    seasons: [{ seasonStartYear: 2027, capHit: 20_000_000 }],
+  };
+  const result = buildNormalizedNhlRosters(
+    teams,
+    [
+      { ...player, contracts: [...player.contracts, extension] },
+      { ...player, id: "expired", nhlTeam: ["NJD"] },
+    ],
+    2027,
+    caps,
+    "future",
+  );
+  const tor = result.find((team) => team.id === "tor")!;
+  assert.equal(tor.normalizedTotal, 10_000_000);
+  assert.equal(tor.roster[0]?.contract?.id, "extension");
+  const nj = result.find((team) => team.id === "nj")!;
+  assert.equal(nj.roster.length, 0);
+  assert.equal(nj.normalizedTotal, 0);
+});
+void test("historical mode uses recorded contract history rather than a later profile observation", () => {
+  const result = buildNormalizedNhlRosters(
+    teams,
+    [
+      {
+        ...player,
+        currentProfileContract: {
+          ...player.contracts[0]!,
+          signingDate: 2,
+          seasons: [{ seasonStartYear: 2026, capHit: 900_000 }],
+        },
+      },
+    ],
+    2026,
+    caps,
+    "historical",
+  );
+  assert.equal(result[0]?.normalizedTotal, 15_000_000);
+  assert.equal(result[0]?.roster[0]?.usesProfileContract, false);
+});
+
+void test("Phoenix historical assignments resolve to the Coyotes without changing other franchises", () => {
+  const result = buildNormalizedNhlRosters(
+    [{ id: "ari", name: "Arizona Coyotes", abbr: "ARI" }],
+    [
+      {
+        ...player,
+        nhlTeam: ["PHX"],
+        contracts: [
+          {
+            ...player.contracts[0]!,
+            startSeasonStartYear: 2013,
+            expirySeasonStartYear: 2013,
+            length: 1,
+            seasons: [{ seasonStartYear: 2013, capHit: 1_000_000 }],
+          },
+        ],
+      },
+    ],
+    2013,
+    { 2013: 64_300_000 },
+    "historical",
+  );
+  assert.equal(result[0]?.name, "Phoenix Coyotes");
+  assert.equal(result[0]?.roster[0]?.reason, null);
+});
 void test("sums full-contract normalization once per current player and ignores future extensions", () => {
   const extension = {
     ...player.contracts[0]!,
@@ -73,6 +145,7 @@ void test("missing and overlapping contracts remain visible with partial totals"
   assert.equal(result.missing, 2);
   assert.equal(result.complete, false);
   assert.equal(result.roster.length, 3);
+  assert.equal(result.calculatedPlayers, 1);
 });
 void test("team aliases resolve while ambiguous assignments are never counted twice", () => {
   const result = buildNormalizedNhlRosters(
