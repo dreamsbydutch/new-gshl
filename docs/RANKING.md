@@ -341,8 +341,11 @@ duration and both remaining-clock fields agree exactly. It also recovers an
 omitted full-period goalie interval when the official period TOI and strength
 totals each account for every second. An omitted final skater shift requires
 one explicit open API shift, no overlap with the reported shifts, and an exact
-reconciliation to the official period and strength totals. Ambiguous gaps stay
-excluded. Derived report caches are versioned and keyed by the API shift input
+reconciliation to the official period and strength totals. A corrupt interval
+elsewhere in the report does not discard an independently verified full-period
+goalie total: that fallback retains the API shifts and adds only entirely
+absent goalie periods. Ambiguous gaps stay excluded. Derived report caches are
+versioned and keyed by the API shift input
 hash so these repairs cannot silently reuse an older projection.
 
 The subsequent inclusive revision replaces the whole-game exclusions described

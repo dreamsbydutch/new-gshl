@@ -28,6 +28,7 @@ export function parseOfficialShiftReport(
   rawGame: unknown,
   home: boolean,
   apiShifts: unknown[] = [],
+  goaliePeriodsOnly = false,
 ) {
   const game = rawGame as ReportGame;
   if (!Number.isInteger(game.id) || !Array.isArray(game.rosterSpots))
@@ -166,7 +167,7 @@ export function parseOfficialShiftReport(
           ["0:00", "00:00"].includes(String(s.duration))
         );
       }) as Array<Record<string, unknown>>;
-      if (existing.length && open.length === 1) {
+      if (!goaliePeriodsOnly && existing.length && open.length === 1) {
         const startTime = String(open[0]!.startTime),
           start = clockSeconds(startTime);
         const ordered = [...existing].sort(
@@ -205,6 +206,7 @@ export function parseOfficialShiftReport(
       }
       return;
     }
+    if (goaliePeriodsOnly) return;
     if (
       fields.length !== 6 ||
       !/^\d+$/.test(fields[0]!) ||

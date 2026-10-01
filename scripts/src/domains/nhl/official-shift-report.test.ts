@@ -132,6 +132,20 @@ test("a goalie full-period summary recovers an omitted interval without locating
   };
   const rows = parseOfficialShiftReport(report, goalieGame, true);
   assert.equal(rows.length, 3);
+  const corrupt = report.replace("00:45</td>", "55:00</td>");
+  assert.throws(
+    () => parseOfficialShiftReport(corrupt, goalieGame, true),
+    /interval/,
+  );
+  const isolated = parseOfficialShiftReport(
+    corrupt,
+    goalieGame,
+    true,
+    [],
+    true,
+  );
+  assert.equal(isolated.length, 1);
+  assert.equal(isolated[0]!.period, 3);
   assert.deepEqual(
     [rows[2]!.period, rows[2]!.startTime, rows[2]!.endTime],
     [3, "0:00", "20:00"],

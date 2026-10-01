@@ -88,7 +88,7 @@ test("alternate reports must fully verify or increase usable exposure without lo
       [url],
     );
     await cache.saveDerived(
-      `html-shifts-reconciled-v2-${id}-${hash(JSON.stringify(originalGood ? f.sources.shifts : bad))}`,
+      `html-shifts-reconciled-v3-${id}-${hash(JSON.stringify(originalGood ? f.sources.shifts : bad))}`,
       alternateGood ? f.sources.shifts : bad,
       [url],
     );

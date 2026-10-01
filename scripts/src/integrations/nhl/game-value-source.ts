@@ -504,7 +504,7 @@ export async function fetchGameSources(
   ]);
   const fromReports = async () => {
     // The reconciliation also depends on hash-verified API shift starts.
-    const reportKey = `html-shifts-reconciled-v2-${gameId}-${digest(Buffer.from(JSON.stringify(derivedShifts ?? [])))}`;
+    const reportKey = `html-shifts-reconciled-v3-${gameId}-${digest(Buffer.from(JSON.stringify(derivedShifts ?? [])))}`;
     const cached = await cache.derived<unknown[]>(reportKey);
     if (cached)
       return {
@@ -521,20 +521,49 @@ export async function fetchGameSources(
         `https://www.nhl.com/scores/htmlreports/${season}/T${side}${suffix}.HTM`,
     );
     const pages = await Promise.all(urls.map((url) => cache.bytes(url)));
-    const shifts = [
-      ...parseOfficialShiftReport(
-        pages[0]!.toString("utf8"),
-        pbp,
-        true,
-        derivedShifts,
-      ),
-      ...parseOfficialShiftReport(
-        pages[1]!.toString("utf8"),
-        pbp,
-        false,
-        derivedShifts,
-      ),
-    ];
+    const shifts = pages.flatMap((page, index) => {
+      const home = index === 0,
+        html = page.toString("utf8");
+      try {
+        return parseOfficialShiftReport(html, pbp, home, derivedShifts);
+      } catch (error) {
+        if (
+          !(error instanceof Error) ||
+          error.message !== "Invalid official report shift interval" ||
+          !derivedShifts?.length
+        )
+          throw error;
+        // A corrupt skater interval cannot invalidate an independently verified
+        // full-period goalie summary. Keep the original API side and add only
+        // entirely absent goalie periods; all downstream reconciliation remains.
+        const goaliePeriods = parseOfficialShiftReport(
+          html,
+          pbp,
+          home,
+          [],
+          true,
+        );
+        const additions = goaliePeriods.filter(
+          (s) =>
+            !derivedShifts.some((raw) => {
+              const r = raw as Record<string, unknown>;
+              return (
+                r.typeCode === 517 &&
+                r.playerId === s.playerId &&
+                r.period === s.period
+              );
+            }),
+        );
+        if (!additions.length) throw error;
+        const teamId = additions[0]!.teamId;
+        return [
+          ...derivedShifts.filter(
+            (raw) => (raw as Record<string, unknown>).teamId === teamId,
+          ),
+          ...additions,
+        ] as ReturnType<typeof parseOfficialShiftReport>;
+      }
+    });
     await cache.saveDerived(reportKey, shifts, [
       ...urls,
       `https://api-web.nhle.com/v1/gamecenter/${gameId}/play-by-play`,
