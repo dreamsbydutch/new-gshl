@@ -54,7 +54,12 @@ if (values.help) {
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
   }
-  async function run(command: string, args: string[], log: string) {
+  async function run(
+    command: string,
+    args: string[],
+    log: string,
+    optionalRepair = false,
+  ) {
     let transcript = "";
     const code = await new Promise<number | null>((accept, reject) => {
       const child = spawn(
@@ -81,7 +86,12 @@ if (values.help) {
       child.on("close", accept);
     });
     await writeFile(log, transcript, { flag: "wx" });
-    if (code !== 0) throw new Error(`${command} failed (${code}); see ${log}`);
+    if (code !== 0 && !optionalRepair)
+      throw new Error(`${command} failed (${code}); see ${log}`);
+    if (code !== 0 && optionalRepair)
+      console.log(
+        "Some alternate reports are unavailable; retained original sources and repair audit. Final publication gates still apply.",
+      );
   }
   for (const season of seasons) {
     const directory = resolve(output, String(season.nhlSeason));
@@ -116,6 +126,7 @@ if (values.help) {
             attempt + "-repair.json",
           ],
           attempt + "-repair.log",
+          true,
         );
         // A failed fit may leave an audit behind; use a new attempt directory and
         // retain it for review rather than overwriting earlier evidence.
