@@ -207,6 +207,18 @@ coverage/qualification rules remain unchanged. Frozen reports using the earlier
 95%-of-games gate retain their original evidence and values. The publisher
 recomputes component coverage from each new report's game audit.
 
+An explicitly reviewed single-season publication can retain calculated values
+as provisional when process coverage is at least 95% and individual shot
+coverage is at least 98%, but process coverage or held-out impact improvement
+fails the normal admission policy. Complete downloads, official exposure and
+identity reconciliation, provenance, convergence, shot-model validation and
+held-out sample requirements still apply. The publisher records the review
+reason, failed checks and coverage in every player's warnings and includes the
+review in the source hash. Every result is provisional; official season ranks,
+ability ranks, percentiles and sampling rank intervals are withheld. Original
+calculation artifacts and failed gate results remain unchanged. This path does
+not represent a passed season validation or change normal publication defaults.
+
 The public game cache is hash-verified, and reports record canonical input,
 prior, shot-file and per-game source hashes for deterministic offline replay.
 Reconciliation separately identifies missing/extra appearances and per-game TOI

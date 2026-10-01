@@ -82,7 +82,18 @@ export function prepareGameValuePublication(input: {
   priorText: string;
   reportText: string;
   auditText: string;
+  provisionalReason?: string;
 }) {
+  const provisional = input.provisionalReason !== undefined;
+  if (provisional && input.provisionalReason!.trim().length < 20)
+    throw new Error(
+      "Provisional publication requires a substantive review reason",
+    );
+  const provisionalGates = new Set([
+    "improvesHeldOutXg",
+    "improvesHeldOutGoals",
+    "atLeast98PercentProcessExposureVerified",
+  ]);
   const source = JSON.parse(input.sourceText) as { nhl: NhlRatingSource };
   const report = JSON.parse(input.reportText) as {
     version: string;
@@ -127,10 +138,10 @@ export function prepareGameValuePublication(input: {
   if (report.qualityGate.policy === "verified-components-v1") {
     const coverage = gameSourceCoverage(audit.games);
     if (
-      coverage.processFraction < 0.98 ||
+      coverage.processFraction < (provisional ? 0.95 : 0.98) ||
       coverage.individualShotFraction < 0.98 ||
       report.qualityGate.gates.atLeast98PercentProcessExposureVerified !==
-        true ||
+        coverage.processFraction >= 0.98 ||
       report.qualityGate.gates.atLeast98PercentIndividualShotsVerified !==
         true ||
       !report.qualityGate.sourceCoverage ||
@@ -142,6 +153,7 @@ export function prepareGameValuePublication(input: {
     )
       throw new Error("Unverified component coverage evidence");
   } else if (
+    provisional ||
     report.qualityGate.policy !== undefined ||
     report.qualityGate.gates.atLeast95PercentGamesVerified !== true ||
     audit.games.filter((g) => g.eligible).length / audit.officialGames < 0.95
@@ -159,9 +171,24 @@ export function prepareGameValuePublication(input: {
     report.gameType !== 2 ||
     report.probabilitySource !== "nhl" ||
     !report.completeSourceScope ||
-    !report.qualityGate.passes ||
+    (!provisional && !report.qualityGate.passes) ||
+    report.qualityGate.passes !==
+      Object.values(report.qualityGate.gates).every((g) => g === true) ||
     !report.referenceReconciliation.matches ||
-    requiredGates.some((g) => report.qualityGate.gates[g] !== true) ||
+    requiredGates.some(
+      (g) =>
+        report.qualityGate.gates[g] !== true &&
+        !(
+          provisional &&
+          provisionalGates.has(g) &&
+          report.qualityGate.gates[g] === false
+        ),
+    ) ||
+    Object.entries(report.qualityGate.gates).some(
+      ([g, pass]) =>
+        pass !== true &&
+        !(provisional && provisionalGates.has(g) && pass === false),
+    ) ||
     report.sourceHash !== hash(input.sourceText) ||
     report.priorHash !== hash(input.priorText) ||
     report.gameSourcesHash !== hash(JSON.stringify(audit.gameSourceHashes)) ||
@@ -224,13 +251,33 @@ export function prepareGameValuePublication(input: {
       position,
       games,
       minutes,
-      status,
+      status: provisional ? ("provisional" as const) : status,
       seasonValue,
-      seasonRating,
-      rank: seasonRank,
+      seasonRating: provisional ? null : seasonRating,
+      rank: provisional ? null : seasonRank,
       impactPer60: null,
       missing: [] as string[],
-      gameValue: { revision: NHL_ADJUSTED_IMPACT_CONFIG.revision, ...details },
+      gameValue: {
+        revision: NHL_ADJUSTED_IMPACT_CONFIG.revision,
+        ...details,
+        ...(provisional
+          ? {
+              abilityRank: null,
+              samplingInterval: null,
+              warnings: [
+                ...details.warnings,
+                `Provisional season publication: ${input.provisionalReason!.trim()}`,
+                `Season review checks not passed: ${
+                  Object.entries(report.qualityGate.gates)
+                    .filter(([, pass]) => !pass)
+                    .map(([gate]) => gate)
+                    .join(", ") || "none"
+                }`,
+                `Verified season process coverage: ${report.qualityGate.sourceCoverage!.processFraction}; individual shot coverage: ${report.qualityGate.sourceCoverage!.individualShotFraction}`,
+              ],
+            }
+          : {}),
+      },
     };
   });
   return {
@@ -246,6 +293,14 @@ export function prepareGameValuePublication(input: {
           input.priorText,
           input.reportText,
           input.auditText,
+          ...(provisional
+            ? [
+                {
+                  policy: "provisional-season-review-v1",
+                  reason: input.provisionalReason!.trim(),
+                },
+              ]
+            : []),
         ]),
       ),
     },

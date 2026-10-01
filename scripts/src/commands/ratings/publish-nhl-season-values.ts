@@ -31,6 +31,7 @@ const { values } = parseArgs({
     season: { type: "string" },
     model: { type: "string", default: "v1" },
     baseline: { type: "string" },
+    "provisional-reason": { type: "string" },
     apply: { type: "boolean", default: false },
     help: { type: "boolean" },
   },
@@ -78,6 +79,10 @@ if (values.help) {
   --season 20242025       Optional single NHL season scope
   --model v1|v3          Defaults to v1; v3 requires complete verified game reports
   --baseline <directory> Required v2 source/calibration root for v3
+  --provisional-reason <review> Explicit single-season v3 publication as provisional;
+                         retains failed review checks, withholds ranks/percentiles.
+                         Requires complete reconciled inputs, >=95% process and
+                         >=98% shot coverage; only process/impact accuracy may fail.
   --apply                 Persist the reviewed records; never deletes data
 Writes only nhlSeasonValues. Existing GSHL ratings, stats and salaries are untouched.
 Requires the nhlSeasonValues schema and internal importBatch mutation deployed.`);
@@ -89,6 +94,13 @@ Requires the nhlSeasonValues schema and internal importBatch mutation deployed.`
     (values.model === "v3" && !values.baseline)
   )
     throw new Error("Invalid model or missing v3 baseline");
+  if (
+    values["provisional-reason"] !== undefined &&
+    (values.model !== "v3" || !values.season)
+  )
+    throw new Error(
+      "Provisional publication requires an explicit single v3 season",
+    );
   const inputDirectory = resolve(values.input),
     outputDirectory = resolve(values.output);
   await mkdir(outputDirectory, { recursive: true });
@@ -122,6 +134,7 @@ Requires the nhlSeasonValues schema and internal importBatch mutation deployed.`
         priorText,
         reportText,
         auditText,
+        provisionalReason: values["provisional-reason"],
       });
       plans.push({
         season,
@@ -187,6 +200,7 @@ Requires the nhlSeasonValues schema and internal importBatch mutation deployed.`
         target: "production",
         table: "nhlSeasonValues",
         apply: values.apply,
+        provisionalReason: values["provisional-reason"],
         plans,
       },
       null,

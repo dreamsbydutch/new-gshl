@@ -7,6 +7,7 @@ import {
 } from "./game-value-publication";
 import { NHL_ADJUSTED_IMPACT_CONFIG } from "../../runtime/nhl-adjusted-impact";
 import { applySourceCoveragePolicy } from "./game-value-coverage";
+import { validateSeasonValue } from "../../../../convex/nhlSeasonValues";
 
 const hash = (x: string) => createHash("sha256").update(x).digest("hex");
 test("penalty-shot publication check includes misses and rejects omissions, wrong attribution and duplicates", () => {
@@ -219,4 +220,110 @@ test("component admission recomputes source evidence instead of trusting report 
     () => prepareGameValuePublication(f.input()),
     /component coverage/,
   );
+});
+
+function provisionalFixture() {
+  const f = fixture();
+  const games = f.audit.games.map((g) => ({
+    ...g,
+    gameSeconds: 3600,
+    usableProcessSeconds: 3492,
+    officialShots: 80,
+    verifiedShotCount: 80,
+  }));
+  f.audit.games = games;
+  f.report.qualityGate.gates.improvesHeldOutXg = false;
+  f.report.qualityGate.gates.improvesHeldOutGoals = false;
+  f.report.qualityGate = applySourceCoveragePolicy(f.report.qualityGate, games);
+  return {
+    ...f,
+    games,
+    provisionalReason:
+      "Reviewed historical season: publish values with explicit unresolved validation limitations.",
+  };
+}
+
+test("explicit provisional review preserves values, records limitations, and withholds all ranks", () => {
+  const f = provisionalFixture();
+  const input = {
+    ...f.input(),
+    provisionalReason: f.provisionalReason,
+    reportText: JSON.stringify({
+      ...f.report,
+      ratings: f.report.ratings.map((p) => ({
+        ...p,
+        status: "rated",
+        seasonRank: 1,
+        abilityRank: 1,
+        seasonRating: 100,
+      })),
+    }),
+  };
+  assert.throws(() =>
+    prepareGameValuePublication({ ...input, provisionalReason: undefined }),
+  );
+  const result = prepareGameValuePublication(input);
+  const player = result.results[0]!;
+  assert.equal(player.status, "provisional");
+  assert.equal(player.seasonValue, -0.1);
+  assert.deepEqual(
+    [
+      player.rank,
+      player.seasonRating,
+      player.gameValue.abilityRank,
+      player.gameValue.samplingInterval,
+    ],
+    [null, null, null, null],
+  );
+  assert.match(player.gameValue.warnings.join(" "), /improvesHeldOutXg/);
+  assert.match(player.gameValue.warnings.join(" "), /0.97/);
+  validateSeasonValue(player, result.metadata.modelVersion);
+  assert.deepEqual(prepareGameValuePublication(input), result);
+  assert.notEqual(
+    prepareGameValuePublication({
+      ...input,
+      provisionalReason: f.provisionalReason + " Second review.",
+    }).metadata.sourceHash,
+    result.metadata.sourceHash,
+  );
+});
+
+test("provisional review cannot bypass integrity, convergence, shot coverage, or minimum process evidence", () => {
+  for (const change of [
+    (f: ReturnType<typeof provisionalFixture>) => {
+      f.report.sourceHash = "bad";
+    },
+    (f: ReturnType<typeof provisionalFixture>) => {
+      f.report.qualityGate.gates.impactModelsConverged = false;
+    },
+    (f: ReturnType<typeof provisionalFixture>) => {
+      f.report.ratings[0]!.includedGames = 0;
+    },
+    (f: ReturnType<typeof provisionalFixture>) => {
+      f.games[0]!.usableProcessSeconds = 3300;
+      f.report.qualityGate = applySourceCoveragePolicy(
+        f.report.qualityGate,
+        f.games,
+      );
+    },
+    (f: ReturnType<typeof provisionalFixture>) => {
+      f.games[0]!.verifiedShotCount = 70;
+      f.report.qualityGate = applySourceCoveragePolicy(
+        f.report.qualityGate,
+        f.games,
+      );
+    },
+    (f: ReturnType<typeof provisionalFixture>) => {
+      f.provisionalReason = "force";
+    },
+  ]) {
+    const f = provisionalFixture();
+    change(f);
+    assert.throws(() =>
+      prepareGameValuePublication({
+        ...f.input(),
+        provisionalReason: f.provisionalReason,
+      }),
+    );
+  }
 });
