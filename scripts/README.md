@@ -88,6 +88,13 @@ New public JSON/HTML bodies and derived envelopes use lossless gzip storage;
 hashes still refer to original decoded source bytes. Legacy cache files remain
 readable and are not rewritten. NHL-based previews do not download unused
 MoneyPuck shot ZIPs; select MoneyPuck explicitly when collecting that shot source.
+The collector checks per-game penalty-shot totals and can recover missing API
+labels through a unique event match to the official play-by-play HTML report.
+Original API bytes remain unchanged; supplemental classifications carry both
+source hashes. Official GP=1 zero-time appearances are retained separately from
+unused backup goalies. New previews require this per-game reconciliation before
+fitting. Publication requires 98% verified coverage of both process ice time and
+individual attempts, alongside the unchanged exposure and predictive checks.
 For nonempty shift histories that fail verification, use the collector's
 `--repair-audit <game-audit.json>` option to fetch alternate official reports
 for quarantined games in that exact season/game-type scope. This only collects

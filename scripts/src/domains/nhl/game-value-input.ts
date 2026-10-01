@@ -48,6 +48,7 @@ export type VerifiedShot = Shot & {
   homePlayers: number[];
   awayPlayers: number[];
   probabilitySource: "moneypuck" | "nhl-event-xg-v1" | "nhl-penalty-shot-v1";
+  classificationSource?: "nhl-api" | "nhl-play-report";
 };
 export type PenaltyEvent = {
   eventId: number;
@@ -210,7 +211,11 @@ function penaltyShotAwards(plays: Play[]) {
             faceoff.order < p.order,
         ),
     );
-    if (["1010", "0101"].includes(p.situation) || award) {
+    if (
+      ["1010", "0101"].includes(p.situation) ||
+      award ||
+      p.details.nhlReportPenaltyShot === true
+    ) {
       result.set(p.id, award);
       if (award) used.add(award.id);
     }
@@ -237,6 +242,10 @@ function officialPlays(pbp: RecordValue): Play[] {
       ];
     })
     .sort((a, b) => a.order - b.order);
+}
+
+export function penaltyShotEventIds(raw: unknown) {
+  return new Set(penaltyShotAwards(officialPlays(object(raw))).keys());
 }
 
 export function extractShotTrainingRows(raw: unknown): ShotTrainingRow[] {
@@ -422,7 +431,7 @@ export function buildGameValueData(
       for (const raw of array(rows[group])) {
         const p = object(raw),
           seconds = clockSeconds(p.toi);
-        if (!seconds) continue;
+        if (!seconds && p.officialAppearance !== true) continue;
         const id = num(p.playerId);
         if (!Number.isInteger(id) || players.some((x) => x.id === id))
           throw new Error("Duplicate/invalid boxscore identity");
@@ -662,6 +671,10 @@ export function buildGameValueData(
         awayPlayers: [],
         attribution: "penalty-shot",
         probabilitySource: "nhl-penalty-shot-v1",
+        classificationSource:
+          p.details.nhlReportPenaltyShot === true
+            ? "nhl-play-report"
+            : "nhl-api",
         penaltyCommitted:
           roster.get(committed)?.team === (home ? awayTeam : homeTeam)
             ? committed

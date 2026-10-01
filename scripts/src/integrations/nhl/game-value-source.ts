@@ -5,6 +5,11 @@ import { setTimeout as delay } from "node:timers/promises";
 import { inflateRawSync, gzipSync, gunzipSync } from "node:zlib";
 import { parseOfficialShiftReport } from "../../domains/nhl/official-shift-report";
 import type { PenaltyShotHistory } from "../../runtime/nhl-shot-quality";
+import {
+  parseOfficialPenaltyShots,
+  penaltyShotGameMatches,
+  type PenaltyShotGameTotal,
+} from "../../domains/nhl/official-penalty-shot-report";
 
 export async function fetchPenaltyShotHistory(
   cache: HockeyDataCache,
@@ -36,29 +41,70 @@ export async function fetchSeasonPenaltyShots(
   );
 }
 
-async function fetchPenaltyShotRows(
+export async function fetchSeasonPenaltyShotGames(
+  cache: HockeyDataCache,
+  season: number,
+  gameType: number,
+) {
+  if (
+    !Number.isInteger(season) ||
+    Math.floor(season / 10000) + 1 !== season % 10000 ||
+    ![2, 3].includes(gameType)
+  )
+    throw new Error("Invalid penalty-shot game scope");
+  const urls: string[] = [];
+  const rows = await fetchPenaltyShotRows<PenaltyShotGameTotal>(
+    cache,
+    `seasonId=${season} and gameTypeId=${gameType}`,
+    true,
+    urls,
+  );
+  if (
+    rows.some(
+      (p) =>
+        Math.floor(p.gameId / 1e6) !== Math.floor(season / 10000) ||
+        Math.floor(p.gameId / 10000) % 100 !== gameType ||
+        !Number.isInteger(p.playerId) ||
+        p.playerId <= 0 ||
+        !Number.isInteger(p.penaltyShotAttempts) ||
+        p.penaltyShotAttempts < 0 ||
+        !Number.isInteger(p.penaltyShotsGoals) ||
+        p.penaltyShotsGoals < 0 ||
+        p.penaltyShotsGoals > p.penaltyShotAttempts,
+    ) ||
+    new Set(rows.map((p) => `${p.gameId}:${p.playerId}`)).size !== rows.length
+  )
+    throw new Error("Invalid official penalty-shot game report");
+  return { rows, urls };
+}
+
+async function fetchPenaltyShotRows<T = PenaltyShotHistory["rows"][number]>(
   cache: HockeyDataCache,
   expression: string,
+  isGame = false,
+  urls?: string[],
 ) {
   const params = new URLSearchParams({
     isAggregate: "false",
-    isGame: "false",
+    isGame: String(isGame),
     start: "0",
     limit: "100",
     sort: JSON.stringify([
-      { property: "seasonId", direction: "ASC" },
+      { property: isGame ? "gameId" : "seasonId", direction: "ASC" },
       { property: "playerId", direction: "ASC" },
     ]),
     cayenneExp: expression,
   });
-  const rows: PenaltyShotHistory["rows"] = [];
+  const rows: T[] = [];
   let expected: number | undefined;
   while (true) {
     params.set("start", String(rows.length));
+    const url = `https://api.nhle.com/stats/rest/en/skater/penaltyShots?${params}`;
+    urls?.push(url);
     const page = await cache.json<{
       total: number;
-      data: PenaltyShotHistory["rows"];
-    }>(`https://api.nhle.com/stats/rest/en/skater/penaltyShots?${params}`);
+      data: T[];
+    }>(url);
     if (
       !Array.isArray(page.data) ||
       !Number.isInteger(page.total) ||
@@ -356,10 +402,59 @@ export async function fetchSeasonGames(
     .sort((a, b) => a.gameDate.localeCompare(b.gameDate) || a.id - b.id);
 }
 
-export function fetchGamePlayByPlay(cache: HockeyDataCache, gameId: number) {
-  return cache.json<unknown>(
-    `https://api-web.nhle.com/v1/gamecenter/${gameId}/play-by-play`,
+export async function fetchGamePlayByPlay(
+  cache: HockeyDataCache,
+  gameId: number,
+) {
+  const raw = await cache.json<{
+    id: number;
+    plays: Array<{ eventId: number; details?: Record<string, unknown> }>;
+  }>(`https://api-web.nhle.com/v1/gamecenter/${gameId}/play-by-play`);
+  const supplement = await cache.derived<{
+    gameId: number;
+    eventIds: number[];
+  }>(`penalty-shots-${gameId}`);
+  if (!supplement) return raw;
+  if (
+    supplement.gameId !== raw.id ||
+    raw.id !== gameId ||
+    new Set(supplement.eventIds).size !== supplement.eventIds.length ||
+    supplement.eventIds.some(
+      (id) => raw.plays.filter((p) => p.eventId === id).length !== 1,
+    )
+  )
+    throw new Error("Invalid penalty-shot supplement identity");
+  return {
+    ...raw,
+    plays: raw.plays.map((p) =>
+      supplement.eventIds.includes(p.eventId)
+        ? { ...p, details: { ...p.details, nhlReportPenaltyShot: true } }
+        : p,
+    ),
+  };
+}
+
+export async function repairGamePenaltyShots(
+  cache: HockeyDataCache,
+  gameId: number,
+  totals: PenaltyShotGameTotal[],
+  reportUrls: string[],
+) {
+  const pbp = await fetchGamePlayByPlay(cache, gameId);
+  if (penaltyShotGameMatches(pbp, totals)) return;
+  const year = Math.floor(gameId / 1e6),
+    season = year * 10000 + year + 1;
+  const url = `https://www.nhl.com/scores/htmlreports/${season}/PL${String(gameId % 1e6).padStart(6, "0")}.HTM`;
+  const eventIds = parseOfficialPenaltyShots(
+    (await cache.bytes(url)).toString("utf8"),
+    pbp,
+    totals,
   );
+  await cache.saveDerived(`penalty-shots-${gameId}`, { gameId, eventIds }, [
+    url,
+    `https://api-web.nhle.com/v1/gamecenter/${gameId}/play-by-play`,
+    ...reportUrls,
+  ]);
 }
 
 export async function fetchGameSources(
@@ -369,9 +464,40 @@ export async function fetchGameSources(
 ) {
   const derivedBox = await cache.derived<unknown>(`box-${gameId}`),
     derivedShifts = await cache.derived<unknown[]>(`shifts-${gameId}`);
+  // Batch summary projections contain only rows explicitly reporting GP=1.
+  // Preserve official zero-time appearances (for example a resumed game), while
+  // direct boxscore backup goalies with zero TOI remain unconfirmed appearances.
+  const officialBox = derivedBox as
+    | {
+        playerByGameStats: Record<
+          string,
+          Record<string, Array<Record<string, unknown>>>
+        >;
+      }
+    | undefined;
+  const appearanceBox = officialBox
+    ? {
+        ...officialBox,
+        playerByGameStats: Object.fromEntries(
+          Object.entries(officialBox.playerByGameStats).map(
+            ([side, groups]) => [
+              side,
+              Object.fromEntries(
+                Object.entries(groups).map(([group, players]) => [
+                  group,
+                  players.map((p) =>
+                    p.toi === "0:00" ? { ...p, officialAppearance: true } : p,
+                  ),
+                ]),
+              ),
+            ],
+          ),
+        ),
+      }
+    : undefined;
   const [pbp, box] = await Promise.all([
     fetchGamePlayByPlay(cache, gameId),
-    derivedBox ??
+    appearanceBox ??
       cache.json<unknown>(
         `https://api-web.nhle.com/v1/gamecenter/${gameId}/boxscore`,
       ),

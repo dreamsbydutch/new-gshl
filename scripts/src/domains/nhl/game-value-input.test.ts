@@ -14,6 +14,26 @@ import { unzipCsv } from "../../integrations/nhl/game-value-source";
 
 import { gameFixture, penaltyShotFixture } from "./game-value-fixtures";
 
+test("confirmed zero-time appearances count without turning dressed backup goalies into appearances", () => {
+  const f = gameFixture();
+  const home = f.sources.box.playerByGameStats.homeTeam;
+  const credited = {
+    ...home.forwards[0]!,
+    playerId: 99,
+    toi: "0:00",
+    officialAppearance: true,
+  };
+  home.forwards.push(credited);
+  home.goalies.push({ ...home.goalies[0]!, playerId: 98, toi: "0:00" });
+  const game = buildGameValueData(f.sources, f.shots);
+  assert.equal(game.players.find((p) => p.id === 99)?.seconds, 0);
+  assert.equal(
+    game.players.some((p) => p.id === 98),
+    false,
+  );
+  assert.equal(game.eligible, true);
+});
+
 test("historical zone evidence recovers period direction including neutral and defensive-zone shots", () => {
   const locations = [
     { period: 1, team: 1, x: -75, zone: "O" },

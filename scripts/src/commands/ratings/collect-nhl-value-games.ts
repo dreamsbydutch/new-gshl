@@ -6,6 +6,8 @@ import {
   fetchSeasonGames,
   fetchGameSources,
   fetchPenaltyShotHistory,
+  fetchSeasonPenaltyShotGames,
+  repairGamePenaltyShots,
   prefetchSeasonSupport,
 } from "../../integrations/nhl/game-value-source";
 import { runGameReconciliation } from "./reconcile-nhl-value-games";
@@ -51,6 +53,11 @@ else {
     : Promise.resolve();
   const schedule = await fetchSeasonGames(cache, season, gameType);
   await fetchPenaltyShotHistory(cache, season, gameType);
+  const penaltyShotGames = await fetchSeasonPenaltyShotGames(
+    cache,
+    season,
+    gameType,
+  );
   const limit = values.limit ? Number(values.limit) : schedule.length;
   if (!Number.isInteger(limit) || limit <= 0)
     throw new Error("Invalid game limit");
@@ -96,6 +103,12 @@ else {
             cache,
             game.id,
             values["repair-audit"] ? "nhl-toi-report" : undefined,
+          );
+          await repairGamePenaltyShots(
+            cache,
+            game.id,
+            penaltyShotGames.rows.filter((p) => p.gameId === game.id),
+            penaltyShotGames.urls,
           );
         } catch (error) {
           failed.push({

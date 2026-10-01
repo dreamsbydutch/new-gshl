@@ -4,6 +4,10 @@ import type { GameSeasonRating } from "../../runtime/nhl-game-season-value";
 import type { PenaltyShotHistory } from "../../runtime/nhl-shot-quality";
 import type { VerifiedShot } from "./game-value-input";
 import {
+  gameSourceCoverage,
+  type GameCoverageEvidence,
+} from "./game-value-coverage";
+import {
   buildNhlRatingInput,
   type NhlRatingSource,
 } from "./season-rating-input";
@@ -90,7 +94,12 @@ export function prepareGameValuePublication(input: {
     gameSourcesHash: string;
     completeSourceScope: boolean;
     probabilitySource: string;
-    qualityGate: { passes: boolean; gates: Record<string, boolean> };
+    qualityGate: {
+      passes: boolean;
+      gates: Record<string, boolean>;
+      policy?: string;
+      sourceCoverage?: ReturnType<typeof gameSourceCoverage>;
+    };
     referenceReconciliation: { matches: boolean };
     inclusion: { includedGames: number; fullyVerifiedGames: number };
     ratings: GameSeasonRating[];
@@ -101,12 +110,11 @@ export function prepareGameValuePublication(input: {
     loadedGames: number;
     failed: unknown[];
     gameSourceHashes: Array<{ gameId: number; sha256: string }>;
-    games: Array<{ gameId: number; eligible: boolean }>;
+    games: Array<{ gameId: number; eligible: boolean } & GameCoverageEvidence>;
   };
   const requiredGates = [
     "officialSeasonExposureMatches",
     "completeDownload",
-    "atLeast95PercentGamesVerified",
     "impactModelsConverged",
     "shotModelsConverged",
     "atLeast100HeldOutGames",
@@ -116,6 +124,30 @@ export function prepareGameValuePublication(input: {
     "shotModelBeatsConstant",
     "shotGoalTotalWithin10Percent",
   ];
+  if (report.qualityGate.policy === "verified-components-v1") {
+    const coverage = gameSourceCoverage(audit.games);
+    if (
+      coverage.processFraction < 0.98 ||
+      coverage.individualShotFraction < 0.98 ||
+      report.qualityGate.gates.atLeast98PercentProcessExposureVerified !==
+        true ||
+      report.qualityGate.gates.atLeast98PercentIndividualShotsVerified !==
+        true ||
+      !report.qualityGate.sourceCoverage ||
+      Object.entries(coverage).some(
+        ([key, value]) =>
+          report.qualityGate.sourceCoverage![key as keyof typeof coverage] !==
+          value,
+      )
+    )
+      throw new Error("Unverified component coverage evidence");
+  } else if (
+    report.qualityGate.policy !== undefined ||
+    report.qualityGate.gates.atLeast95PercentGamesVerified !== true ||
+    audit.games.filter((g) => g.eligible).length / audit.officialGames < 0.95
+  ) {
+    throw new Error("Unverified legacy game coverage gate");
+  }
   if (
     report.version !== NHL_ADJUSTED_IMPACT_CONFIG.version ||
     JSON.stringify(report.config) !==

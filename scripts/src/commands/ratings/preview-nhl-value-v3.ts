@@ -9,8 +9,11 @@ import {
   fetchSeasonGames,
   fetchGamePlayByPlay,
   fetchPenaltyShotHistory,
+  fetchSeasonPenaltyShotGames,
   unzipCsv,
 } from "../../integrations/nhl/game-value-source";
+import { penaltyShotGameMatches } from "../../domains/nhl/official-penalty-shot-report";
+import { applySourceCoveragePolicy } from "../../domains/nhl/game-value-coverage";
 import {
   parseShotFile,
   extractShotTrainingRows,
@@ -86,6 +89,11 @@ else {
     source.nhl.gameType,
   );
   const penaltyShotModel = fitPenaltyShotBaseline(penaltyShotHistory);
+  const penaltyShotGames = await fetchSeasonPenaltyShotGames(
+    cache,
+    season,
+    source.nhl.gameType,
+  );
   if (!["nhl", "moneypuck"].includes(values["shot-source"]!))
     throw new Error("Invalid shot source");
   const zip =
@@ -111,9 +119,17 @@ else {
   if (values["shot-source"] === "nhl") {
     for (const g of schedule) {
       try {
-        const rows = extractShotTrainingRows(
-          await fetchGamePlayByPlay(cache, g.id),
-        );
+        const pbp = await fetchGamePlayByPlay(cache, g.id);
+        if (
+          !penaltyShotGameMatches(
+            pbp,
+            penaltyShotGames.rows.filter((p) => p.gameId === g.id),
+          )
+        )
+          throw new Error(
+            `Penalty-shot classification needs official report reconciliation for ${g.id}; rerun the collector`,
+          );
+        const rows = extractShotTrainingRows(pbp);
         if (rows.some((r) => r.gameId !== g.id || r.date !== g.gameDate))
           throw new Error("Shot-training schedule identity mismatch");
         training.push(...rows);
@@ -297,6 +313,9 @@ else {
       .update(JSON.stringify(penaltyShotHistory))
       .digest("hex"),
     penaltyShotModel,
+    penaltyShotGameReportHash: createHash("sha256")
+      .update(JSON.stringify(penaltyShotGames))
+      .digest("hex"),
     inclusion: {
       policy:
         "All loaded games contribute verified components; full verification remains required for model fitting/evaluation",
@@ -318,13 +337,16 @@ else {
       .digest("hex"),
     shotsHash: zip ? createHash("sha256").update(zip).digest("hex") : null,
     attribution,
-    qualityGate: {
-      gates,
-      passes: Object.values(gates).every(Boolean),
-      verifiedFraction,
-      interpretation:
-        "Minimum local review criteria, not proof of causal value or authorization to publish",
-    },
+    qualityGate: applySourceCoveragePolicy(
+      {
+        gates,
+        passes: Object.values(gates).every(Boolean),
+        verifiedFraction,
+        interpretation:
+          "Minimum local review criteria, not proof of causal value or authorization to publish",
+      },
+      games.map((g) => ({ ...g, verifiedShotCount: g.shots.length })),
+    ),
     referenceReconciliation,
     shotQuality,
     shotOrientationCounts: Object.fromEntries(

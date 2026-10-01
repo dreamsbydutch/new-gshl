@@ -6,6 +6,7 @@ import {
   verifySeasonPenaltyShots,
 } from "./game-value-publication";
 import { NHL_ADJUSTED_IMPACT_CONFIG } from "../../runtime/nhl-adjusted-impact";
+import { applySourceCoveragePolicy } from "./game-value-coverage";
 
 const hash = (x: string) => createHash("sha256").update(x).digest("hex");
 test("penalty-shot publication check includes misses and rejects omissions, wrong attribution and duplicates", () => {
@@ -197,4 +198,25 @@ test("publication rejects failed gates, changed provenance and missing player or
     change(f);
     assert.throws(() => prepareGameValuePublication(f.input()));
   }
+});
+
+test("component admission recomputes source evidence instead of trusting report coverage claims", () => {
+  const f = fixture();
+  const games = f.audit.games.map((g) => ({
+    ...g,
+    eligible: false,
+    gameSeconds: 3600,
+    usableProcessSeconds: 3570,
+    officialShots: 80,
+    verifiedShotCount: 80,
+  }));
+  f.audit.games = games;
+  f.report.inclusion.fullyVerifiedGames = 0;
+  f.report.qualityGate = applySourceCoveragePolicy(f.report.qualityGate, games);
+  assert.equal(prepareGameValuePublication(f.input()).results.length, 1);
+  games[0]!.usableProcessSeconds = 3000;
+  assert.throws(
+    () => prepareGameValuePublication(f.input()),
+    /component coverage/,
+  );
 });

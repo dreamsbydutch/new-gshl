@@ -181,14 +181,21 @@ with a situation-only baseline. Score/zone predictors are neutralized during
 that evaluation; actual lineups and manpower remain known, so this is not a
 pregame forecasting test. Shot Brier error and calibration bins are also saved.
 
-The local review gate requires a complete download, matching official season
-appearances/minutes and player identities, at least 95% verified games,
+The review gate requires a complete download, matching official season
+appearances/minutes and player identities, at least 98% verified process ice time
+and 98% verified individual shot attempts,
 converged fits, at least 100 supported test games covering 95% of the eligible
 test block, improvements in both held-out goal and xG errors, and a shot model
 better than a constant-rate baseline with total test expected goals within 10%
 of actual goals. These are explicit minimum review policies, not statistical
 significance or production
 approval. Short playoff seasons may fail the sample threshold by design.
+The `verified-components-v1` admission policy measures retained evidence rather
+than counting every partially verified game as entirely missing. Full-game
+verification remains required for fitting and held-out evaluation, and player
+coverage/qualification rules remain unchanged. Frozen reports using the earlier
+95%-of-games gate retain their original evidence and values. The publisher
+recomputes component coverage from each new report's game audit.
 
 The public game cache is hash-verified, and reports record canonical input,
 prior, shot-file and per-game source hashes for deterministic offline replay.
@@ -297,6 +304,12 @@ direction is not guessed. Explicit NHL defending-side fields take precedence.
 Reports record the number of shot inputs using each orientation source. A full
 2024-25 comparison found all 112,207 shot-model inputs unchanged across all 1,312
 games, so this historical compatibility repair preserves the published inputs.
+The collector also compares penalty-shot classifications against official
+per-game totals. When API flags are missing, an explicit NHL play-by-play report
+label must match a unique existing event by period, clock, shot result and
+verified roster identity. Supplements retain both source hashes and never add
+a second shot. Confirmed GP=1 rows with zero ice time remain appearances;
+unplayed backup goalies in ordinary boxscores do not become appearances.
 
 The subsequent inclusive revision replaces the whole-game exclusions described
 in the historical snapshots above. In 2024-25 all 1,312 games contribute usable
