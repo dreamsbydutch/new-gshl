@@ -63,6 +63,16 @@ stores it separately from v1, with component coverage, signed ability values,
 sampling ranges and warnings. Publication requires verified complete-season
 artifacts and passing review gates; production coverage is tracked per season.
 
+Supporting API data is fetched for calculation. Rebuild and rollout commands use
+a temporary shared source workspace by default, removed on completion or reported
+failure. A reusable source cache requires an explicit `--cache` path. Existing
+snapshots are preserved. Production retains the rating and calculated breakdown,
+with version/provenance and coverage diagnostics, rather than raw API responses.
+New local game audits retain compact publication evidence: game identity, coverage,
+issues and minimal penalty-shot identities/results. They omit source player-stat
+arrays, reconstructed lineups and full event payloads. This retention policy does
+not change score calculations or qualification rules.
+
 The data adapter joins by official game and player IDs. NHL game reports establish
 played rosters and exposure; official shifts reconstruct changing lineups.
 Official time-on-ice reports provide a fallback when the shift API is empty or

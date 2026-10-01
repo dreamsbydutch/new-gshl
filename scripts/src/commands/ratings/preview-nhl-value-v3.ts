@@ -14,6 +14,7 @@ import {
 } from "../../integrations/nhl/game-value-source";
 import { penaltyShotGameMatches } from "../../domains/nhl/official-penalty-shot-report";
 import { applySourceCoveragePolicy } from "../../domains/nhl/game-value-coverage";
+import { summarizeGameAudit } from "../../domains/nhl/game-value-audit";
 import {
   parseShotFile,
   extractShotTrainingRows,
@@ -209,6 +210,7 @@ else {
       ? "Official NHL events, game reports and shifts; locally fitted nhl-event-xg-v1; MoneyPuck.com historical shrinkage calibration via v2"
       : "Official NHL events, game reports and shifts; MoneyPuck.com shot probabilities";
   await write(resolve(values.output, "game-audit.json"), {
+    retention: "verification-summary-v1",
     season,
     attribution,
     officialGames: schedule.length,
@@ -216,15 +218,7 @@ else {
     failed,
     gameSourceHashes,
     shiftReviews,
-    games: games.map(({ stints, shots, ...game }) => ({
-      ...game,
-      stints: stints.length,
-      verifiedShotCount: shots.length,
-      individualOnlyShots: shots.filter(
-        (s) => s.attribution === "individual-only",
-      ),
-      penaltyShots: shots.filter((s) => s.attribution === "penalty-shot"),
-    })),
+    games: games.map(summarizeGameAudit),
   });
   if (values["prepare-only"]) {
     console.log(

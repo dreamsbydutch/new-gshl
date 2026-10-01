@@ -69,6 +69,18 @@ season and ability rankings, chronological validation, and game sampling ranges.
 These commands read public hockey sources and write new local artifacts only.
 Run each command's `--help` for current options. From `scripts/`:
 
+For normal calculations, use `rebuild-nhl-value-seasons.ts` (local) or
+`rollout-nhl-value-seasons.ts` (production publisher) without `--cache`.
+They fetch supporting API data as needed into a shared temporary workspace and
+remove that workspace on normal completion or a reported failure. Rating results,
+breakdowns, model metadata and compact verification reports remain in `--output`.
+Raw API responses are never imported into `nhlSeasonValues`.
+Explicit `--cache <directory>` opts into reusable source storage for offline
+investigation or a resumable backfill. Supplied directories and existing source
+snapshots are never removed. A forcibly terminated process can leave its temporary
+workspace behind. The manual collection/preview commands below are the explicit
+reusable-cache workflow:
+
 ```powershell
 node ../node_modules/tsx/dist/cli.mjs src/commands/ratings/collect-nhl-value-games.ts --season 20242025 --cache ../.local-data/nhl-rating/game-cache --output ../.local-data/nhl-rating/games-2024.json
 node ../node_modules/tsx/dist/cli.mjs src/commands/ratings/preview-nhl-value-v3.ts --season 20242025 --baseline ../.local-data/nhl-rating/value-v2-final-20260930 --cache ../.local-data/nhl-rating/game-cache --output ../.local-data/nhl-rating/my-v3-review
@@ -109,8 +121,10 @@ Output includes the game audit, source hashes, JSON/CSV ratings, convergence,
 held-out comparisons and a minimum review gate. All loaded games contribute their
 verified components, including penalty shots; only fully verified games fit and
 evaluate the lineup model. Player outputs distinguish included and verified games
-and report component coverage. Game audits retain individual-only and penalty-shot
-events, including failed attempts. Partial-download previews are development
+and report component coverage. New game audits retain coverage totals and minimal
+penalty-shot event IDs, shooter IDs and results for duplicate/totals verification;
+they omit player source-stat arrays, lineups and full shot/penalty events.
+Partial-download previews are development
 diagnostics and cannot pass that gate. Neither passing the gate nor resolving an
 appearance ledger means a model is approved for production.
 

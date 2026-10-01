@@ -3,6 +3,7 @@ import { mkdir, readFile, writeFile, access } from "node:fs/promises";
 import { resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { prepareGameValuePublication } from "../../domains/nhl/game-value-publication";
+import { withNhlSourceCache } from "../../integrations/nhl/source-workspace";
 
 const { values } = parseArgs({
   options: {
@@ -15,13 +16,15 @@ const { values } = parseArgs({
 });
 if (values.help) {
   console.log(
-    "Rebuild all tracked NHL regular seasons locally. --baseline <v2 root> --cache <public cache> --output <resumable directory> [--season 20242025]. Collects throttled public data, audits and repairs official shifts, fits each season, and validates publication artifacts. Resumes completed verified seasons. No database writes. Failures remain explicit in summary.json.",
+    "Rebuild all tracked NHL regular seasons locally. --baseline <v2 root> --output <resumable directory> [--season 20242025] [--cache <retained public cache>]. Fetches API inputs as needed into temporary storage removed after the run; --cache explicitly retains inputs for offline replay/resume. Collects throttled public data, audits and repairs official shifts, fits each season, and validates publication artifacts. Resumes completed verified seasons. No database writes. Failures remain explicit in summary.json.",
   );
 } else {
-  if (!values.baseline || !values.cache || !values.output)
-    throw new Error("Missing paths");
+  await withNhlSourceCache(values.cache, rebuild);
+}
+
+async function rebuild(cache: string) {
+  if (!values.baseline || !values.output) throw new Error("Missing paths");
   const baseline = resolve(values.baseline),
-    cache = resolve(values.cache),
     output = resolve(values.output);
   await mkdir(output, { recursive: true });
   const sourceSummary = JSON.parse(

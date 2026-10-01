@@ -7,6 +7,7 @@ import {
   fetchSeasonPenaltyShots,
 } from "../../integrations/nhl/game-value-source";
 import { verifySeasonPenaltyShots } from "../../domains/nhl/game-value-publication";
+import { withNhlSourceCache } from "../../integrations/nhl/source-workspace";
 
 const { values } = parseArgs({
   options: {
@@ -21,18 +22,16 @@ const { values } = parseArgs({
 });
 if (values.help) {
   console.log(
-    "Resumable NHL v3 production rollout. --target production --baseline <v2 root> --cache <public cache> --output <rollout root> [--season 20242025] [--apply]. Rebuilds and verifies each season, dry-runs imports, applies only additive/idempotent plans when requested, then requires an all-unchanged verification. Failed seasons remain in rollout.json and do not prevent independent seasons. No deletions, no replacement of source snapshots, no recurring schedule. Uses authenticated Convex production CLI; deploy v3 support first.",
+    "Resumable NHL v3 production rollout. --target production --baseline <v2 root> --output <rollout root> [--season 20242025] [--cache <retained public cache>] [--apply]. API inputs use temporary storage removed after the run by default; --cache explicitly retains inputs for offline replay/resume. Rebuilds and verifies each season, dry-runs imports, applies only additive/idempotent plans when requested, then requires an all-unchanged verification. Failed seasons remain in rollout.json and do not prevent independent seasons. No database deletions, no replacement of source snapshots, no recurring schedule. Uses authenticated Convex production CLI; deploy v3 support first.",
   );
 } else {
-  if (
-    values.target !== "production" ||
-    !values.baseline ||
-    !values.cache ||
-    !values.output
-  )
+  await withNhlSourceCache(values.cache, rollout);
+}
+
+async function rollout(cache: string) {
+  if (values.target !== "production" || !values.baseline || !values.output)
     throw new Error("Explicit production target and all paths required");
   const baseline = resolve(values.baseline),
-    cache = resolve(values.cache),
     output = resolve(values.output);
   await mkdir(output, { recursive: true });
   const summary = JSON.parse(
