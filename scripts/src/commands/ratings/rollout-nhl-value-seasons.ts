@@ -41,6 +41,7 @@ if (values.help) {
     }>;
   };
   const seasons = summary.seasons
+    .map(({ id, name, nhlSeason, status }) => ({ id, name, nhlSeason, status }))
     .filter((s) => !values.season || String(s.nhlSeason) === values.season)
     .sort(
       (a, b) =>

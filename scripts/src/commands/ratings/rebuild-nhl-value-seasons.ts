@@ -34,6 +34,9 @@ if (values.help) {
       status: string;
     }>;
   };
+  sourceSummary.seasons = sourceSummary.seasons.map(
+    ({ id, name, nhlSeason, status }) => ({ id, name, nhlSeason, status }),
+  );
   const seasons = sourceSummary.seasons.filter(
     (s) => !values.season || String(s.nhlSeason) === values.season,
   );
