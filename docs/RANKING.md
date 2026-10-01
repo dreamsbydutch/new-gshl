@@ -288,6 +288,16 @@ stops at this boundary rather than asserting that no future improvement is possi
 
 #### Inclusive games and penalty shots
 
+Historical NHL event feeds can omit `homeTeamDefendingSide`. The source adapter
+recovers rink direction from official team-relative offensive/defensive zones
+and coordinates separately for each period, requiring at least three observations
+and 90% agreement for period-wide orientation. Without that consensus, only
+unambiguous offensive/defensive-zone coordinates are usable; neutral-zone
+direction is not guessed. Explicit NHL defending-side fields take precedence.
+Reports record the number of shot inputs using each orientation source. A full
+2024-25 comparison found all 112,207 shot-model inputs unchanged across all 1,312
+games, so this historical compatibility repair preserves the published inputs.
+
 The subsequent inclusive revision replaces the whole-game exclusions described
 in the historical snapshots above. In 2024-25 all 1,312 games contribute usable
 components; 1,302 meet full-game model-fitting checks. The remaining games retain

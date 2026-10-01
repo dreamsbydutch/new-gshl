@@ -14,6 +14,68 @@ import { unzipCsv } from "../../integrations/nhl/game-value-source";
 
 import { gameFixture, penaltyShotFixture } from "./game-value-fixtures";
 
+test("historical zone evidence recovers period direction including neutral and defensive-zone shots", () => {
+  const locations = [
+    { period: 1, team: 1, x: -75, zone: "O" },
+    { period: 1, team: 2, x: 60, zone: "O" },
+    { period: 1, team: 1, x: 55, zone: "D" },
+    { period: 1, team: 1, x: -10, zone: "N" },
+    { period: 2, team: 1, x: 75, zone: "O" },
+    { period: 2, team: 2, x: -60, zone: "O" },
+    { period: 2, team: 1, x: -55, zone: "D" },
+    { period: 2, team: 1, x: -10, zone: "N" },
+  ];
+  const pbp = {
+    id: 2013020001,
+    gameDate: "2013-10-01",
+    homeTeam: { id: 1 },
+    awayTeam: { id: 2 },
+    plays: locations.map((p, i) => ({
+      eventId: i + 1,
+      sortOrder: i + 1,
+      periodDescriptor: { number: p.period, periodType: "REG" },
+      timeInPeriod: "01:00",
+      situationCode: "1551",
+      typeDescKey: "shot-on-goal",
+      homeTeamDefendingSide: p.period === 1 ? "right" : "left",
+      details: {
+        eventOwnerTeamId: p.team,
+        xCoord: p.x,
+        yCoord: 5,
+        zoneCode: p.zone,
+        shotType: "wrist",
+      },
+    })),
+  };
+  const official = extractShotTrainingRows(pbp);
+  const historical = extractShotTrainingRows({
+    ...pbp,
+    plays: pbp.plays.map((p) => ({ ...p, homeTeamDefendingSide: undefined })),
+  });
+  assert.equal(historical.length, 8);
+  assert.deepEqual(
+    historical.map((p) => p.features),
+    official.map((p) => p.features),
+  );
+  assert.ok(
+    historical.every((p) => p.orientationSource === "period-zone-consensus"),
+  );
+  assert.ok(historical[2]!.features[1]! > 1); // Retains the long defensive-zone distance.
+  const ambiguous = extractShotTrainingRows({
+    ...pbp,
+    plays: pbp.plays
+      .slice(0, 4)
+      .filter((_, i) => i !== 2)
+      .map((p) => ({
+        ...p,
+        homeTeamDefendingSide: undefined,
+        details: { ...p.details, xCoord: Math.abs(p.details.xCoord) },
+      })),
+  });
+  assert.equal(ambiguous.length, 2); // Conflicting directions cannot price the neutral-zone shot.
+  assert.ok(ambiguous.every((p) => p.orientationSource === "event-zone"));
+});
+
 test("penalty shots use a distinct prior probability without assigning lineup time or contaminating ordinary xG training", () => {
   const f = penaltyShotFixture();
   assert.deepEqual(extractShotTrainingRows(f.sources.pbp), []);

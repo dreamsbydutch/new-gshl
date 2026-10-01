@@ -242,10 +242,38 @@ function officialPlays(pbp: RecordValue): Play[] {
 export function extractShotTrainingRows(raw: unknown): ShotTrainingRow[] {
   const pbp = object(raw),
     gameId = num(pbp.id),
-    homeId = num(object(pbp.homeTeam).id);
+    homeId = num(object(pbp.homeTeam).id),
+    awayId = num(object(pbp.awayTeam).id);
   const rows: ShotTrainingRow[] = [];
   const eventIds = new Set<number>();
   const penaltyShots = penaltyShotAwards(officialPlays(pbp));
+  // Historical feeds omit the defending-side field. Recover the fixed rink
+  // orientation within each period from official team-relative zones, without
+  // using conversion outcomes, player identities or shot-model predictions.
+  const directionVotes = new Map<number, number[]>();
+  for (const event of array(pbp.plays).map(object)) {
+    const descriptor = object(event.periodDescriptor);
+    const details = event.details ? object(event.details) : {};
+    const team = Number(details.eventOwnerTeamId),
+      x = details.xCoord;
+    if (
+      descriptor.periodType === "SO" ||
+      penaltyShots.has(num(event.eventId)) ||
+      !["goal", "shot-on-goal", "missed-shot"].includes(
+        String(event.typeDescKey),
+      ) ||
+      ![homeId, awayId].includes(team) ||
+      typeof x !== "number" ||
+      !Number.isFinite(x) ||
+      Math.abs(x) < 25 ||
+      !["O", "D"].includes(String(details.zoneCode))
+    )
+      continue;
+    const teamSign = Math.sign(x) * (details.zoneCode === "O" ? 1 : -1);
+    const votes = directionVotes.get(num(descriptor.number)) ?? [];
+    votes.push(team === homeId ? teamSign : -teamSign);
+    directionVotes.set(num(descriptor.number), votes);
+  }
   let previous:
     | { time: number; team: number; kind: string; zone: string }
     | undefined;
@@ -275,14 +303,36 @@ export function extractShotTrainingRows(raw: unknown): ShotTrainingRow[] {
         code = String(event.situationCode);
       const x = details.xCoord,
         y = details.yCoord;
-      const homeAttacksRight = event.homeTeamDefendingSide === "left";
       if (
-        !["left", "right"].includes(String(event.homeTeamDefendingSide)) ||
         !Number.isFinite(x) ||
-        !Number.isFinite(y)
+        !Number.isFinite(y) ||
+        ![homeId, awayId].includes(team)
       )
         continue;
-      const oriented = (home === homeAttacksRight ? 1 : -1) * x;
+      let oriented: number;
+      let orientationSource: NonNullable<ShotTrainingRow["orientationSource"]>;
+      if (["left", "right"].includes(String(event.homeTeamDefendingSide))) {
+        const homeAttacksRight = event.homeTeamDefendingSide === "left";
+        oriented = (home === homeAttacksRight ? 1 : -1) * x;
+        orientationSource = "official-side";
+      } else {
+        const votes = directionVotes.get(num(descriptor.number)) ?? [];
+        const right = votes.filter((v) => v > 0).length;
+        if (
+          votes.length >= 3 &&
+          Math.max(right, votes.length - right) / votes.length >= 0.9
+        ) {
+          const homeSign = right > votes.length / 2 ? 1 : -1;
+          oriented = (home ? homeSign : -homeSign) * x;
+          orientationSource = "period-zone-consensus";
+        } else if (
+          Math.abs(x) >= 25 &&
+          ["O", "D"].includes(String(details.zoneCode))
+        ) {
+          oriented = Math.abs(x) * (details.zoneCode === "O" ? 1 : -1);
+          orientationSource = "event-zone";
+        } else continue; // Do not guess neutral-zone direction without evidence.
+      }
       const distance = Math.hypot(89 - oriented, y),
         angle = (Math.atan2(Math.abs(y), 89 - oriented) * 180) / Math.PI;
       const elapsed = previous ? time - previous.time : Infinity,
@@ -334,6 +384,7 @@ export function extractShotTrainingRows(raw: unknown): ShotTrainingRow[] {
         eventId: num(event.eventId),
         goal: kind === "goal" ? 1 : 0,
         features,
+        orientationSource,
       });
     }
     previous = { time, team, kind, zone: String(details.zoneCode ?? "") };

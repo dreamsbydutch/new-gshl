@@ -63,6 +63,7 @@ export type ShotTrainingRow = {
   eventId: number;
   goal: number;
   features: number[];
+  orientationSource?: "official-side" | "period-zone-consensus" | "event-zone";
 };
 export type ShotQualityModel = {
   version: "nhl-event-xg-v1";

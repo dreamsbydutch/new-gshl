@@ -327,6 +327,12 @@ else {
     },
     referenceReconciliation,
     shotQuality,
+    shotOrientationCounts: Object.fromEntries(
+      ["official-side", "period-zone-consensus", "event-zone"].map((source) => [
+        source,
+        training.filter((r) => r.orientationSource === source).length,
+      ]),
+    ),
     probabilitySource: values["shot-source"],
     uncertaintyInterpretation:
       "95% game-cluster resampling range conditional on fixed fitted coefficients; not a calibrated total model confidence interval",
