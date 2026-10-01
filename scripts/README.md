@@ -84,6 +84,10 @@ cache directory to refresh sources; existing snapshots are reused. Empty shift
 API responses fall back to official NHL time-on-ice reports, with team/jersey
 joins verified against the official roster and report date/game. It can also run
 the reconciliation in the same process, sharing the request throttle.
+New public JSON/HTML bodies and derived envelopes use lossless gzip storage;
+hashes still refer to original decoded source bytes. Legacy cache files remain
+readable and are not rewritten. NHL-based previews do not download unused
+MoneyPuck shot ZIPs; select MoneyPuck explicitly when collecting that shot source.
 For nonempty shift histories that fail verification, use the collector's
 `--repair-audit <game-audit.json>` option to fetch alternate official reports
 for quarantined games in that exact season/game-type scope. This only collects

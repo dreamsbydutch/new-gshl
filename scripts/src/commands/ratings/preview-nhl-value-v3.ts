@@ -88,19 +88,21 @@ else {
   const penaltyShotModel = fitPenaltyShotBaseline(penaltyShotHistory);
   if (!["nhl", "moneypuck"].includes(values["shot-source"]!))
     throw new Error("Invalid shot source");
-  const zip = await cache.bytes(
-    `https://peter-tanner.com/moneypuck/downloads/shots_${Math.floor(season / 10000)}.zip`,
-  );
-  console.log(
-    "Parsing public shot probabilities; then reconciling official game identities and shifts.",
-  );
-  const shots =
+  const zip =
     values["shot-source"] === "moneypuck"
-      ? parseShotFile(
-          unzipCsv(zip, `shots_${Math.floor(season / 10000)}.csv`),
-          season,
+      ? await cache.bytes(
+          `https://peter-tanner.com/moneypuck/downloads/shots_${Math.floor(season / 10000)}.zip`,
         )
-      : new Map<number, Shot[]>();
+      : null;
+  console.log(
+    "Preparing selected shot sources; then reconciling official game identities and shifts.",
+  );
+  const shots = zip
+    ? parseShotFile(
+        unzipCsv(zip, `shots_${Math.floor(season / 10000)}.csv`),
+        season,
+      )
+    : new Map<number, Shot[]>();
   const games: GameValueData[] = [],
     failed: Array<{ gameId: number; error: string }> = [];
   let shotQuality: ReturnType<typeof chronologicalShotQuality> | null = null;
@@ -314,7 +316,7 @@ else {
     gameSourcesHash: createHash("sha256")
       .update(JSON.stringify(gameSourceHashes))
       .digest("hex"),
-    shotsHash: createHash("sha256").update(zip).digest("hex"),
+    shotsHash: zip ? createHash("sha256").update(zip).digest("hex") : null,
     attribution,
     qualityGate: {
       gates,

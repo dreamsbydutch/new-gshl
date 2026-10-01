@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createHash } from "node:crypto";
+import { gzipSync, gunzipSync } from "node:zlib";
 import { mkdtemp, writeFile, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -130,10 +131,12 @@ test("offline public cache rejects changed bytes and conflicting derived provena
     JSON.stringify({ url, sha256: hash("changed") }),
   );
   await assert.rejects(cache.derived("game-1"), /provenance mismatch/);
-  const derivedPath = join(directory, "derived-game-1.json");
-  const envelope = JSON.parse(await readFile(derivedPath, "utf8"));
+  const derivedPath = join(directory, "derived-game-1.json.gz");
+  const envelope = JSON.parse(
+    gunzipSync(await readFile(derivedPath)).toString("utf8"),
+  );
   envelope.data.roster = [2];
-  await writeFile(derivedPath, JSON.stringify(envelope));
+  await writeFile(derivedPath, gzipSync(JSON.stringify(envelope)));
   await assert.rejects(cache.derived("game-1"), /hash mismatch/);
   await assert.rejects(
     cache.bytes("https://example.com/unknown"),
@@ -143,4 +146,42 @@ test("offline public cache rejects changed bytes and conflicting derived provena
     cache.bytes("https://api.nhle.com/missing"),
     /Offline cache missing/,
   );
+});
+
+test("compressed public cache preserves original hashes and reads legacy derived snapshots", async (t) => {
+  const directory = await mkdtemp(join(tmpdir(), "nhl-compressed-cache-test-"));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const url = "https://api.nhle.com/stats/rest/en/game?test=compressed";
+  const body = JSON.stringify({
+    data: Array.from({ length: 100 }, () => ({
+      gameId: 1,
+      name: "repeated public hockey data",
+    })),
+  });
+  const hash = (value: string) =>
+    createHash("sha256").update(value).digest("hex");
+  t.mock.method(globalThis, "fetch", async () => new Response(body));
+  const cache = new HockeyDataCache(directory);
+  assert.equal((await cache.bytes(url)).toString("utf8"), body);
+  const stem = join(directory, hash(url));
+  const meta = JSON.parse(await readFile(stem + ".json", "utf8"));
+  assert.equal(meta.encoding, "gzip");
+  assert.equal(meta.sha256, hash(body));
+  assert.ok(meta.storedBytes < meta.bytes / 2);
+  const offline = new HockeyDataCache(directory, true);
+  assert.equal((await offline.bytes(url)).toString("utf8"), body);
+  await offline.saveDerived("compressed", { playerId: 1 }, [url]);
+  assert.deepEqual(await offline.derived("compressed"), { playerId: 1 });
+  const data = { playerId: 2 };
+  await writeFile(
+    join(directory, "derived-legacy.json"),
+    JSON.stringify({
+      data,
+      sha256: hash(JSON.stringify(data)),
+      sources: [{ url, sha256: hash(body) }],
+    }),
+  );
+  assert.deepEqual(await offline.derived("legacy"), data);
+  await writeFile(stem + ".bin", gzipSync("changed"));
+  await assert.rejects(offline.bytes(url), /hash mismatch/);
 });

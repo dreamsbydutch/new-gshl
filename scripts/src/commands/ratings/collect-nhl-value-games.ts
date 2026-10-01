@@ -16,6 +16,7 @@ const { values } = parseArgs({
     cache: { type: "string" },
     output: { type: "string" },
     "game-type": { type: "string", default: "2" },
+    "shot-source": { type: "string", default: "nhl" },
     limit: { type: "string" },
     "repair-audit": { type: "string" },
     offline: { type: "boolean" },
@@ -26,7 +27,7 @@ const { values } = parseArgs({
 });
 if (values.help)
   console.log(
-    "Collect public NHL game/shift/roster data and MoneyPuck shots. --season 20242025 --cache <directory> --output <new manifest.json> [--game-type 2|3] [--limit <games>] [--offline] [--repair-audit <v3 game-audit.json>] [--reconcile-input <v2 root> --reconcile-output <new ledger.json>]. Repair mode collects alternate official TOI reports for quarantined games; it does not approve replacements. Batch roster/shift reads, globally throttled requests, bounded retries and persistent hash-verified cache. No database access.",
+    "Collect public NHL game/shift/roster data. --season 20242025 --cache <directory> --output <new manifest.json> [--game-type 2|3] [--shot-source nhl|moneypuck] [--limit <games>] [--offline] [--repair-audit <v3 game-audit.json>] [--reconcile-input <v2 root> --reconcile-output <new ledger.json>]. MoneyPuck shot ZIPs are only collected when explicitly selected. Repair mode collects alternate official TOI reports for quarantined games; it does not approve replacements. Batch roster/shift reads, globally throttled requests, bounded retries and persistent hash-verified cache. No database access.",
   );
 else {
   if (!values.cache || !values.output)
@@ -34,6 +35,8 @@ else {
   const season = Number(values.season),
     gameType = Number(values["game-type"]);
   if (gameType !== 2 && gameType !== 3) throw new Error("Invalid game type");
+  if (!["nhl", "moneypuck"].includes(values["shot-source"]!))
+    throw new Error("Invalid shot source");
   const cache = new HockeyDataCache(resolve(values.cache), values.offline);
   if (
     Boolean(values["reconcile-input"]) !== Boolean(values["reconcile-output"])
@@ -76,9 +79,10 @@ else {
     );
     games = schedule.filter((g) => targets.has(g.id));
   }
-  await cache.bytes(
-    `https://peter-tanner.com/moneypuck/downloads/shots_${Math.floor(season / 10000)}.zip`,
-  );
+  if (values["shot-source"] === "moneypuck")
+    await cache.bytes(
+      `https://peter-tanner.com/moneypuck/downloads/shots_${Math.floor(season / 10000)}.zip`,
+    );
   await prefetchSeasonSupport(cache, games);
   let next = 0,
     completed = 0;
@@ -118,6 +122,7 @@ else {
       {
         season,
         gameType,
+        shotSource: values["shot-source"],
         completedAt: new Date().toISOString(),
         cache: resolve(values.cache),
         completeSeasonScope: games.length === schedule.length,

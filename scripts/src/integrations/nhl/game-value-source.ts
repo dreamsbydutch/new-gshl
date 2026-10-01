@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { mkdir, readFile, writeFile, rename } from "node:fs/promises";
 import { resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
-import { inflateRawSync } from "node:zlib";
+import { inflateRawSync, gzipSync, gunzipSync } from "node:zlib";
 import { parseOfficialShiftReport } from "../../domains/nhl/official-shift-report";
 import type { PenaltyShotHistory } from "../../runtime/nhl-shot-quality";
 
@@ -112,8 +112,15 @@ export class HockeyDataCache {
       const meta = JSON.parse(await readFile(path + ".json", "utf8")) as {
         url: string;
         sha256: string;
+        encoding?: "gzip";
       };
-      const body = await readFile(path + ".bin");
+      if (meta.encoding !== undefined && meta.encoding !== "gzip")
+        throw new Error("Unknown public source cache encoding");
+      const stored = await readFile(path + ".bin");
+      const body =
+        meta.encoding === "gzip"
+          ? gunzipSync(stored, { maxOutputLength: 512 * 1024 * 1024 })
+          : stored;
       if (meta.url !== url || digest(body) !== meta.sha256)
         throw new Error("Cached public source hash mismatch");
       return body;
@@ -129,7 +136,11 @@ export class HockeyDataCache {
             `Public source HTTP ${response.status} at ${new URL(url).pathname}`,
           );
         const body = Buffer.from(await response.arrayBuffer());
-        await writeFile(path + ".tmp", body);
+        const encoding = new URL(url).pathname.endsWith(".zip")
+          ? undefined
+          : "gzip";
+        const stored = encoding ? gzipSync(body) : body;
+        await writeFile(path + ".tmp", stored);
         await rename(path + ".tmp", path + ".bin");
         await writeFile(
           path + ".json",
@@ -138,6 +149,8 @@ export class HockeyDataCache {
             fetchedAt: new Date().toISOString(),
             sha256: digest(body),
             bytes: body.length,
+            encoding,
+            storedBytes: stored.length,
           }) + "\n",
         );
         await delay(150);
@@ -157,9 +170,20 @@ export class HockeyDataCache {
   async derived<T>(key: string): Promise<T | undefined> {
     if (!/^[a-z0-9-]+$/.test(key)) throw new Error("Invalid derived cache key");
     try {
-      const envelope = JSON.parse(
-        await readFile(resolve(this.directory, `derived-${key}.json`), "utf8"),
-      ) as {
+      let text: string;
+      try {
+        text = gunzipSync(
+          await readFile(resolve(this.directory, `derived-${key}.json.gz`)),
+          { maxOutputLength: 512 * 1024 * 1024 },
+        ).toString("utf8");
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+        text = await readFile(
+          resolve(this.directory, `derived-${key}.json`),
+          "utf8",
+        );
+      }
+      const envelope = JSON.parse(text) as {
         data: T;
         sha256: string;
         sources: Array<{ url: string; sha256: string }>;
@@ -204,12 +228,14 @@ export class HockeyDataCache {
       }),
     );
     await writeFile(
-      resolve(this.directory, `derived-${key}.json`),
-      JSON.stringify({
-        data,
-        sha256: digest(Buffer.from(JSON.stringify(data))),
-        sources,
-      }) + "\n",
+      resolve(this.directory, `derived-${key}.json.gz`),
+      gzipSync(
+        JSON.stringify({
+          data,
+          sha256: digest(Buffer.from(JSON.stringify(data))),
+          sources,
+        }) + "\n",
+      ),
       { flag: "wx" },
     );
   }
