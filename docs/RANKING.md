@@ -335,6 +335,16 @@ shift disagree with official minutes and discard sound intervals elsewhere.
 Impossible lineups and genuine individual clock conflicts remain excluded;
 coverage and predictive admission thresholds are unchanged.
 
+Historical official TOI reports can reset or misprint the elapsed end clock at
+the period horn. The adapter repairs that endpoint only when the start clock,
+duration and both remaining-clock fields agree exactly. It also recovers an
+omitted full-period goalie interval when the official period TOI and strength
+totals each account for every second. An omitted final skater shift requires
+one explicit open API shift, no overlap with the reported shifts, and an exact
+reconciliation to the official period and strength totals. Ambiguous gaps stay
+excluded. Derived report caches are versioned and keyed by the API shift input
+hash so these repairs cannot silently reuse an older projection.
+
 The subsequent inclusive revision replaces the whole-game exclusions described
 in the historical snapshots above. In 2024-25 all 1,312 games contribute usable
 components; 1,302 meet full-game model-fitting checks. The remaining games retain

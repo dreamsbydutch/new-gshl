@@ -503,7 +503,9 @@ export async function fetchGameSources(
       ),
   ]);
   const fromReports = async () => {
-    const cached = await cache.derived<unknown[]>(`html-shifts-${gameId}`);
+    // The reconciliation also depends on hash-verified API shift starts.
+    const reportKey = `html-shifts-reconciled-v2-${gameId}-${digest(Buffer.from(JSON.stringify(derivedShifts ?? [])))}`;
+    const cached = await cache.derived<unknown[]>(reportKey);
     if (cached)
       return {
         pbp,
@@ -520,10 +522,20 @@ export async function fetchGameSources(
     );
     const pages = await Promise.all(urls.map((url) => cache.bytes(url)));
     const shifts = [
-      ...parseOfficialShiftReport(pages[0]!.toString("utf8"), pbp, true),
-      ...parseOfficialShiftReport(pages[1]!.toString("utf8"), pbp, false),
+      ...parseOfficialShiftReport(
+        pages[0]!.toString("utf8"),
+        pbp,
+        true,
+        derivedShifts,
+      ),
+      ...parseOfficialShiftReport(
+        pages[1]!.toString("utf8"),
+        pbp,
+        false,
+        derivedShifts,
+      ),
     ];
-    await cache.saveDerived(`html-shifts-${gameId}`, shifts, [
+    await cache.saveDerived(reportKey, shifts, [
       ...urls,
       `https://api-web.nhle.com/v1/gamecenter/${gameId}/play-by-play`,
     ]);
