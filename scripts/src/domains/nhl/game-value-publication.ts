@@ -1,12 +1,75 @@
 import { createHash } from "node:crypto";
 import { NHL_ADJUSTED_IMPACT_CONFIG } from "../../runtime/nhl-adjusted-impact";
 import type { GameSeasonRating } from "../../runtime/nhl-game-season-value";
+import type { PenaltyShotHistory } from "../../runtime/nhl-shot-quality";
+import type { VerifiedShot } from "./game-value-input";
 import {
   buildNhlRatingInput,
   type NhlRatingSource,
 } from "./season-rating-input";
 
 const hash = (text: string) => createHash("sha256").update(text).digest("hex");
+
+export function verifySeasonPenaltyShots(
+  season: number,
+  rows: PenaltyShotHistory["rows"],
+  games: Array<{
+    gameId: number;
+    penaltyShots: Array<Pick<VerifiedShot, "eventId" | "shooter" | "kind">>;
+  }>,
+) {
+  const expected = new Map<number, { attempts: number; goals: number }>();
+  for (const row of rows) {
+    if (
+      row.seasonId !== season ||
+      expected.has(row.playerId) ||
+      !Number.isInteger(row.playerId) ||
+      row.playerId <= 0 ||
+      !Number.isInteger(row.penaltyShotAttempts) ||
+      row.penaltyShotAttempts < 0 ||
+      !Number.isInteger(row.penaltyShotsGoals) ||
+      row.penaltyShotsGoals < 0 ||
+      row.penaltyShotsGoals > row.penaltyShotAttempts
+    )
+      throw new Error("Invalid official season penalty-shot totals");
+    expected.set(row.playerId, {
+      attempts: row.penaltyShotAttempts,
+      goals: row.penaltyShotsGoals,
+    });
+  }
+  const actual = new Map<number, { attempts: number; goals: number }>();
+  const seen = new Set<string>();
+  for (const game of games)
+    for (const shot of game.penaltyShots) {
+      const key = `${game.gameId}:${shot.eventId}`;
+      if (seen.has(key) || !["GOAL", "SHOT", "MISS"].includes(shot.kind))
+        throw new Error("Invalid penalty-shot audit event");
+      seen.add(key);
+      const total = actual.get(shot.shooter) ?? { attempts: 0, goals: 0 };
+      total.attempts++;
+      total.goals += shot.kind === "GOAL" ? 1 : 0;
+      actual.set(shot.shooter, total);
+    }
+  const mismatches = [
+    ...new Set([...expected.keys(), ...actual.keys()]),
+  ].filter(
+    (id) =>
+      (expected.get(id)?.attempts ?? 0) !== (actual.get(id)?.attempts ?? 0) ||
+      (expected.get(id)?.goals ?? 0) !== (actual.get(id)?.goals ?? 0),
+  );
+  if (mismatches.length)
+    throw new Error(
+      `Penalty-shot totals differ for NHL players: ${mismatches.join(", ")}`,
+    );
+  return {
+    season,
+    players: actual.size,
+    attempts: seen.size,
+    goals: [...actual.values()].reduce((n, p) => n + p.goals, 0),
+    matches: true,
+    officialSourceHash: hash(JSON.stringify(rows)),
+  };
+}
 
 /** Validate the immutable calculation artifacts before constructing a production batch. */
 export function prepareGameValuePublication(input: {

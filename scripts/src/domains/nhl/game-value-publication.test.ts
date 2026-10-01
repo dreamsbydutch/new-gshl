@@ -1,10 +1,56 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import test from "node:test";
-import { prepareGameValuePublication } from "./game-value-publication";
+import {
+  prepareGameValuePublication,
+  verifySeasonPenaltyShots,
+} from "./game-value-publication";
 import { NHL_ADJUSTED_IMPACT_CONFIG } from "../../runtime/nhl-adjusted-impact";
 
 const hash = (x: string) => createHash("sha256").update(x).digest("hex");
+test("penalty-shot publication check includes misses and rejects omissions, wrong attribution and duplicates", () => {
+  const rows = [
+    {
+      seasonId: 20242025,
+      playerId: 1,
+      penaltyShotAttempts: 2,
+      penaltyShotsGoals: 1,
+    },
+  ];
+  const shots = [
+    { eventId: 1, shooter: 1, kind: "GOAL" },
+    { eventId: 2, shooter: 1, kind: "MISS" },
+  ];
+  const games = [{ gameId: 2024020001, penaltyShots: shots }];
+  const result = verifySeasonPenaltyShots(20242025, rows, games);
+  assert.equal(result.attempts, 2);
+  assert.equal(result.goals, 1);
+  assert.throws(
+    () =>
+      verifySeasonPenaltyShots(20242025, rows, [
+        { ...games[0]!, penaltyShots: shots.slice(0, 1) },
+      ]),
+    /totals differ/,
+  );
+  assert.throws(
+    () =>
+      verifySeasonPenaltyShots(20242025, rows, [
+        {
+          ...games[0]!,
+          penaltyShots: shots.map((s) => ({ ...s, shooter: 2 })),
+        },
+      ]),
+    /totals differ/,
+  );
+  assert.throws(
+    () => verifySeasonPenaltyShots(20242025, rows, [...games, ...games]),
+    /audit event/,
+  );
+  assert.throws(
+    () => verifySeasonPenaltyShots(20242025, [...rows, ...rows], games),
+    /official/,
+  );
+});
 function fixture() {
   const sourceText = JSON.stringify({
     nhl: {

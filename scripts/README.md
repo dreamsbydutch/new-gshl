@@ -127,7 +127,9 @@ even the independent NHL shot model retains historical v2 shrinkage calibration.
 in a saved baseline, retaining successful artifacts for resumption. It has no
 database writes. `rollout-nhl-value-seasons.ts` additionally performs an explicit
 production dry run for each verified season, accepts only additive/idempotent
-plans, applies when requested, and requires an all-unchanged verification. Consult
+plans, applies when requested, and requires an all-unchanged verification.
+The rollout independently compares every shooter's penalty-shot attempts and
+goals with the NHL season report before importing a season. Consult
 each command's `--help`. The rollout journal lists published, failed and pending
 seasons; a failed season is never silently substituted with v1 or v2. This is a
 bounded operator backfill, not a recurring production schedule. Future seasons

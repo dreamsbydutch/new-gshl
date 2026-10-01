@@ -2,6 +2,11 @@ import { spawn } from "node:child_process";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { parseArgs } from "node:util";
+import {
+  HockeyDataCache,
+  fetchSeasonPenaltyShots,
+} from "../../integrations/nhl/game-value-source";
+import { verifySeasonPenaltyShots } from "../../domains/nhl/game-value-publication";
 
 const { values } = parseArgs({
   options: {
@@ -133,6 +138,31 @@ if (values.help) {
         "--season",
         String(season.nhlSeason),
       ];
+      const audit = JSON.parse(
+        await readFile(
+          resolve(input, String(season.nhlSeason), "game-audit.json"),
+          "utf8",
+        ),
+      ) as {
+        games: Parameters<typeof verifySeasonPenaltyShots>[2];
+      };
+      const penaltyShotCheck = verifySeasonPenaltyShots(
+        season.nhlSeason,
+        await fetchSeasonPenaltyShots(
+          new HockeyDataCache(cache),
+          season.nhlSeason,
+          2,
+        ),
+        audit.games,
+      );
+      await writeFile(
+        attempt + "-penalty-shots.json",
+        JSON.stringify(penaltyShotCheck, null, 2),
+        { flag: "wx" },
+      );
+      console.log(
+        `Verified ${penaltyShotCheck.attempts} penalty-shot attempts against NHL season totals`,
+      );
       async function publish(stage: string, apply: boolean) {
         const directory = attempt + "-" + stage;
         await run(

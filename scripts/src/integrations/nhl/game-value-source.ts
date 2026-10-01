@@ -12,6 +12,34 @@ export async function fetchPenaltyShotHistory(
   gameType: number,
 ): Promise<PenaltyShotHistory> {
   const fromSeason = Math.max(20052006, season - 5 * 10001);
+  const rows = await fetchPenaltyShotRows(
+    cache,
+    `seasonId>=${fromSeason} and seasonId<${season} and gameTypeId=${gameType}`,
+  );
+  return { fromSeason, beforeSeason: season, gameType, rows };
+}
+
+export async function fetchSeasonPenaltyShots(
+  cache: HockeyDataCache,
+  season: number,
+  gameType: number,
+) {
+  if (
+    !Number.isInteger(season) ||
+    Math.floor(season / 10000) + 1 !== season % 10000 ||
+    ![2, 3].includes(gameType)
+  )
+    throw new Error("Invalid penalty-shot season scope");
+  return fetchPenaltyShotRows(
+    cache,
+    `seasonId=${season} and gameTypeId=${gameType}`,
+  );
+}
+
+async function fetchPenaltyShotRows(
+  cache: HockeyDataCache,
+  expression: string,
+) {
   const params = new URLSearchParams({
     isAggregate: "false",
     isGame: "false",
@@ -21,7 +49,7 @@ export async function fetchPenaltyShotHistory(
       { property: "seasonId", direction: "ASC" },
       { property: "playerId", direction: "ASC" },
     ]),
-    cayenneExp: `seasonId>=${fromSeason} and seasonId<${season} and gameTypeId=${gameType}`,
+    cayenneExp: expression,
   });
   const rows: PenaltyShotHistory["rows"] = [];
   let expected: number | undefined;
@@ -45,7 +73,7 @@ export async function fetchPenaltyShotHistory(
     if (!page.data.length || rows.length > expected)
       throw new Error("Incomplete penalty-shot history");
   }
-  return { fromSeason, beforeSeason: season, gameType, rows };
+  return rows;
 }
 
 const digest = (b: Uint8Array) => createHash("sha256").update(b).digest("hex");
