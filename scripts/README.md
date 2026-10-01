@@ -61,6 +61,146 @@ launch those commands. Verify that the `node` runtime resolved by the package
 lists that flag in `node --help` before running dry-run, apply, archive, or
 parity commands that use it.
 
+## Independent NHL season ratings
+
+The v3 candidate adds official game-level reconciliation, adjusted on-ice impact,
+an independently labeled NHL shot-quality model, event penalty values, separate
+season and ability rankings, chronological validation, and game sampling ranges.
+These commands read public hockey sources and write new local artifacts only.
+Run each command's `--help` for current options. From `scripts/`:
+
+```powershell
+node ../node_modules/tsx/dist/cli.mjs src/commands/ratings/collect-nhl-value-games.ts --season 20242025 --cache ../.local-data/nhl-rating/game-cache --output ../.local-data/nhl-rating/games-2024.json
+node ../node_modules/tsx/dist/cli.mjs src/commands/ratings/preview-nhl-value-v3.ts --season 20242025 --baseline ../.local-data/nhl-rating/value-v2-final-20260930 --cache ../.local-data/nhl-rating/game-cache --output ../.local-data/nhl-rating/my-v3-review
+node ../node_modules/tsx/dist/cli.mjs src/commands/ratings/reconcile-nhl-value-games.ts --input ../.local-data/nhl-rating/value-v2-final-20260930 --cache ../.local-data/nhl-rating/game-cache --output ../.local-data/nhl-rating/my-reconciliation.json
+```
+
+The collector also caches the preceding five seasons' NHL penalty-shot report,
+using bounded pagination because the endpoint caps returned pages. This supplies
+an independent penalty-shot probability without current-season training leakage.
+The collector batches official roster and shift reports, throttles public reads,
+respects rate-limit cooldowns, and resumes from a hash-verified cache. Use a new
+cache directory to refresh sources; existing snapshots are reused. Empty shift
+API responses fall back to official NHL time-on-ice reports, with team/jersey
+joins verified against the official roster and report date/game. It can also run
+the reconciliation in the same process, sharing the request throttle.
+For nonempty shift histories that fail verification, use the collector's
+`--repair-audit <game-audit.json>` option to fetch alternate official reports
+for quarantined games in that exact season/game-type scope. This only collects
+evidence. The next preview accepts an alternate source if it fully verifies or
+increases verified process exposure without losing individual shots, and records
+both accepted and rejected attempts in `shiftReviews`. Original API snapshots
+remain intact; partially verified games keep that designation.
+The preview is offline by default. Repeat it into a new output directory to
+verify deterministic replay. Its saved v2 baseline supplies canonical season
+exposure and past-season shrinkage priors; it does not blend v2 player scores.
+Output includes the game audit, source hashes, JSON/CSV ratings, convergence,
+held-out comparisons and a minimum review gate. All loaded games contribute their
+verified components, including penalty shots; only fully verified games fit and
+evaluate the lineup model. Player outputs distinguish included and verified games
+and report component coverage. Game audits retain individual-only and penalty-shot
+events, including failed attempts. Partial-download previews are development
+diagnostics and cannot pass that gate. Neither passing the gate nor resolving an
+appearance ledger means a model is approved for production.
+
+The reconciliation confirms extra provider appearances against NHL boxscores
+before removing them from derived totals. If an NHL game log omits ice time, a
+second official per-game statistics report must confirm the exposure, including
+genuine zero-time appearances. Missing games and conflicting exposure
+produce explicit reconstruction queues; their advanced values are not filled
+with zero. Original sources remain intact. A full v3 season rebuild uses official
+events and shifts rather than pretending missing MoneyPuck probabilities were
+recovered. See [the v3 behavior contract](../docs/RANKING.md#game-level-v3-candidate)
+for model definitions and limitations. The version-aware publisher accepts v3
+artifacts with the matching v2 source/calibration baseline. It verifies source
+hashes, game and player populations, all required quality gates and complete
+official exposure before constructing production batches. Signed v3 ability is
+stored separately from the legacy 0-100 display field.
+Credit NHL public reports and **MoneyPuck.com** when displaying v3 outputs:
+even the independent NHL shot model retains historical v2 shrinkage calibration.
+
+`rebuild-nhl-value-seasons.ts` collects, audits, repairs and calculates all seasons
+in a saved baseline, retaining successful artifacts for resumption. It has no
+database writes. `rollout-nhl-value-seasons.ts` additionally performs an explicit
+production dry run for each verified season, accepts only additive/idempotent
+plans, applies when requested, and requires an all-unchanged verification. Consult
+each command's `--help`. The rollout journal lists published, failed and pending
+seasons; a failed season is never silently substituted with v1 or v2. This is a
+bounded operator backfill, not a recurring production schedule. Future seasons
+require fresh canonical baseline snapshots and the same verification workflow.
+
+`src/commands/ratings/preview-nhl-value-v2.ts` retains the season-level NHL
+model. It combines saved official NHL season snapshots with explicit NHL penalty
+counts and MoneyPuck's documented public skater/goalie CSV endpoints. Run `--help`
+for current flags. From `scripts/`:
+
+```powershell
+node ../node_modules/tsx/dist/cli.mjs src/commands/ratings/preview-nhl-value-v2.ts --input ../.local-data/nhl-rating/db-seasons-20260929 --output ../.local-data/nhl-rating/my-v2-review
+node ../node_modules/tsx/dist/cli.mjs src/commands/ratings/preview-nhl-value-v2.ts --input ../.local-data/nhl-rating/my-v2-review --output ../.local-data/nhl-rating/my-v2-replay --replay
+```
+
+The output directory must be new, under an existing parent. Saved source hashes
+allow offline replay. Process all seasons together for expanding-window
+calibration; selecting a single season uses initial priors. Outputs include
+component explanations, observed and conservative season contributions,
+per-60 effectiveness, positional percentiles, provider coverage, context-policy
+sensitivity and historical validation diagnostics. Incomplete data does not
+fall back to v1. Credit **MoneyPuck.com** wherever derived results are displayed;
+its downloads are offered for noncommercial use (see the provider's terms).
+This command never connects to Convex and its new value/report contract cannot
+be passed to the v1 publisher. See the
+[v2 model reference](../docs/product/nhl-season-value-v2.md).
+
+The commands below retain the original v1 baseline and audit workflow.
+
+`src/commands/ratings/audit-nhl-season-values.ts` evaluates saved core reports
+without network or database access. Run `--help` for its current flags. Supply
+`--input <multi-season report directory>` and `--output <audit directory>`;
+optionally supply `--moneypuck <directory>` containing the official 2024-25
+`moneypuck-2024-skaters.csv` and `moneypuck-2024-goalies.csv` downloads. The audit
+records file hashes, position/season correlations, component removal and reference
+sensitivity, adjacent-season stability, and shot-quality diagnostics. It does
+not fit new weights or change ratings. See the
+[quality audit](../docs/product/nhl-season-value-quality-audit.md) for findings
+and interpretation limits.
+
+`src/commands/ratings/preview-nhl-season.ts` reads public NHL season reports and
+calculates a separate NHL Season Value model. It does not connect to Convex or
+change GSHL ratings, salary, draft grades, or power rankings. Run from `scripts/`:
+
+```powershell
+node ../node_modules/tsx/dist/cli.mjs src/commands/ratings/preview-nhl-season.ts --help
+node ../node_modules/tsx/dist/cli.mjs src/commands/ratings/preview-nhl-season.ts --season 20242025 --output ../.local-data/nhl-rating/20242025-core
+```
+
+`--game-type 2` selects the regular season (default); `3` selects playoffs.
+`--profile core` uses traditional NHL reports (default). `--profile edge` also
+fetches player shot-location summaries and requires 2021-22 or later. EDGE takes
+longer because it makes one bounded request per player. Missing EDGE data marks
+a player incomplete; it does not silently mix model profiles.
+
+`--output <directory>` saves the public source snapshot, detailed JSON ratings,
+and a CSV leaderboard. Use a new directory: existing artifacts are never
+overwritten. Omit it to print results only. `--input <source.json>` replays a saved
+snapshot without network access; supply the matching season, game type and profile.
+
+The formula, provisional weights, qualification thresholds, and limitations are
+documented in [the ranking reference](../docs/RANKING.md#independent-nhl-season-value).
+
+`src/commands/ratings/publish-nhl-season-values.ts` imports a verified multi-season
+report directory into the separate `nhlSeasonValues` table. Run `--help` for the
+current flags. It requires `--target production`, `--input <directory>` and a new
+`--output <directory>` for the plan/journal. Omit `--apply` for a dry run; review
+every season's insert/update/unlinked counts before rerunning with `--apply` and
+a different output directory. `--season <NHL season>` narrows the operation.
+
+The authenticated Convex CLI invokes an internal-only mutation in batches of 250. Local snapshots are replayed before any writes. NHL IDs link existing
+players where unambiguous; unmatched players retain their NHL identity without
+creating a player profile. Scores, status, missing fields and source provenance
+are stored independently of GSHL stats and salary. A different source snapshot
+for an existing identity blocks the import. Repeating the dry run after apply
+must report all records unchanged. There are no deletions.
+
 ## Draft signing-pick repair
 
 `src/commands/draft/repair-signing-picks.ts` audits contracts at each season's

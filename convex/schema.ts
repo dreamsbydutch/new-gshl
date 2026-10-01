@@ -1,6 +1,10 @@
 import { defineSchema, defineTable, type TableDefinition } from "convex/server";
 import { v, type GenericValidator } from "convex/values";
 import {
+  nhlSeasonValueMetadata,
+  nhlSeasonValueResult,
+} from "./lib/nhlSeasonValueFields";
+import {
   nhlContractFields,
   nhlContractSeasonFields,
   nhlContractSource,
@@ -923,6 +927,24 @@ export default defineSchema({
     },
     ["playerId", "seasonType", ["playerId", "seasonType"]],
   ),
+
+  nhlSeasonValues: defineTable({
+    seasonId: id("seasons"),
+    playerId: v.optional(id("players")),
+    ...nhlSeasonValueMetadata,
+    ...nhlSeasonValueResult.fields,
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_seasonId", ["seasonId"])
+    .index("by_playerId", ["playerId"])
+    .index("by_identity", [
+      "seasonId",
+      "gameType",
+      "profile",
+      "modelVersion",
+      "nhlPlayerId",
+    ]),
 
   playerNhlStatLines: table(
     {
