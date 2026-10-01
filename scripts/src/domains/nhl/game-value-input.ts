@@ -189,7 +189,7 @@ const shotKind: Record<string, string> = {
   goal: "GOAL",
 };
 
-/** Explicit NHL penalty-shot awards/codes; shootouts never enter these observations. */
+/** Explicit awards or verified report labels; manpower codes alone are ambiguous. */
 function penaltyShotAwards(plays: Play[]) {
   const result = new Map<number, Play | undefined>();
   const awards = plays
@@ -211,11 +211,7 @@ function penaltyShotAwards(plays: Play[]) {
             faceoff.order < p.order,
         ),
     );
-    if (
-      ["1010", "0101"].includes(p.situation) ||
-      award ||
-      p.details.nhlReportPenaltyShot === true
-    ) {
+    if (award || p.details.nhlReportPenaltyShot === true) {
       result.set(p.id, award);
       if (award) used.add(award.id);
     }
@@ -489,6 +485,13 @@ export function buildGameValueData(
     const s = object(raw);
     if (num(s.gameId) !== gameId) throw new Error("Mixed shift games");
     if (s.typeCode !== 517) continue;
+    if (s.endTime === "" && ["00:00", "0:00"].includes(String(s.duration))) {
+      clockSeconds(s.startTime);
+      result.corrections.push(
+        "Ignored explicitly zero-duration shift with blank end clock",
+      );
+      continue;
+    }
     const player = num(s.playerId),
       team = num(s.teamId),
       start = clockSeconds(s.startTime),
@@ -507,6 +510,7 @@ export function buildGameValueData(
     (a, b) => a - b,
   );
   let score = 0;
+  const reconstructed = new Map<number, number>();
   const intervals: Array<{
     period: number;
     start: number;
@@ -541,6 +545,14 @@ export function buildGameValueData(
             .map((s) => s.player),
         ),
       ].map((id) => roster.get(id)!);
+      // Validate individual clocks against all observed shifts, independently of
+      // whether the combined lineup is usable. Removing one bad lineup interval
+      // must not create fictitious clock conflicts throughout the game.
+      for (const player of active)
+        reconstructed.set(
+          player.id,
+          (reconstructed.get(player.id) ?? 0) + stop - start,
+        );
       const home = active
         .filter((p) => p.team === homeTeam && p.position !== "G")
         .map((p) => p.id)
@@ -885,15 +897,6 @@ export function buildGameValueData(
     );
   if (!result.gameSeconds || result.modeledSeconds / result.gameSeconds < 0.98)
     result.issues.push("shift coverage below 98%");
-  const reconstructed = new Map<number, number>();
-  for (const s of result.stints)
-    for (const id of [
-      ...s.home,
-      ...s.away,
-      ...(s.homeGoalie ? [s.homeGoalie] : []),
-      ...(s.awayGoalie ? [s.awayGoalie] : []),
-    ])
-      reconstructed.set(id, (reconstructed.get(id) ?? 0) + s.seconds);
   const conflictedPlayers = new Set(
     players
       .filter(

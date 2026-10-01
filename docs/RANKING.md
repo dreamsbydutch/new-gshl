@@ -320,6 +320,20 @@ label must match a unique existing event by period, clock, shot result and
 verified roster identity. Supplements retain both source hashes and never add
 a second shot. Confirmed GP=1 rows with zero ice time remain appearances;
 unplayed backup goalies in ordinary boxscores do not become appearances.
+Penalty-shot classification requires an explicit award or a verified official
+report label. A manpower code alone is insufficient: some ordinary shots at the
+end of overtime carry `1010`. Those events remain ordinary shots, with the same
+lineup/individual verification rules as other events. Per-game and season-level
+penalty-shot totals still must reconcile before publication.
+An explicitly zero-duration shift row with a blank end clock contributes no ice
+time. Missing clocks on positive or unknown durations still fail parsing;
+official player exposure and game coverage checks remain mandatory.
+Individual time-on-ice reconciliation uses the union of each player's observed
+shift clocks, before excluding impossible combined lineups. Otherwise, removing
+one bad lineup interval can falsely make a goalie's otherwise correct game-long
+shift disagree with official minutes and discard sound intervals elsewhere.
+Impossible lineups and genuine individual clock conflicts remain excluded;
+coverage and predictive admission thresholds are unchanged.
 
 The subsequent inclusive revision replaces the whole-game exclusions described
 in the historical snapshots above. In 2024-25 all 1,312 games contribute usable

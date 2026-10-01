@@ -4,7 +4,10 @@ import {
   parseOfficialPenaltyShots,
   penaltyShotGameMatches,
 } from "./official-penalty-shot-report";
-import { extractShotTrainingRows } from "./game-value-input";
+import {
+  extractShotTrainingRows,
+  penaltyShotEventIds,
+} from "./game-value-input";
 
 const game = {
   id: 2013020678,
@@ -94,4 +97,32 @@ test("wrong report scopes, ambiguous event matches and conflicting official tota
       ]),
     /totals differ/,
   );
+});
+
+test("an end-of-overtime manpower code is not evidence of a penalty shot", () => {
+  for (const situationCode of ["1010", "0101"]) {
+    const overtime = {
+      ...game,
+      plays: game.plays.map((p) => ({
+        ...p,
+        periodDescriptor: { number: 4, periodType: "OT" },
+        timeInPeriod: "05:00",
+        situationCode,
+      })),
+    };
+    assert.equal(penaltyShotEventIds(overtime).size, 0);
+    assert.equal(penaltyShotGameMatches(overtime, []), true);
+    assert.equal(extractShotTrainingRows(overtime).length, 1);
+    // Actual attempts still require the official report when the award is absent.
+    assert.equal(penaltyShotGameMatches(overtime, totals), false);
+    const verified = {
+      ...overtime,
+      plays: overtime.plays.map((p) => ({
+        ...p,
+        details: { ...p.details, nhlReportPenaltyShot: true },
+      })),
+    };
+    assert.equal(penaltyShotGameMatches(verified, totals), true);
+    assert.equal(extractShotTrainingRows(verified).length, 0);
+  }
 });

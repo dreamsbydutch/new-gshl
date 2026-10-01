@@ -14,6 +14,75 @@ import { unzipCsv } from "../../integrations/nhl/game-value-source";
 
 import { gameFixture, penaltyShotFixture } from "./game-value-fixtures";
 
+test("an invalid lineup interval does not manufacture clock conflicts in the rest of the game", () => {
+  const f = gameFixture();
+  f.sources.box.playerByGameStats.homeTeam.forwards.push({
+    ...f.sources.box.playerByGameStats.homeTeam.forwards[0]!,
+    playerId: 99,
+    toi: "1:00",
+  });
+  f.sources.shifts.push({
+    ...f.sources.shifts[0]!,
+    playerId: 99,
+    startTime: "01:00",
+    endTime: "02:00",
+  });
+  const parsed = buildGameValueData(f.sources, f.shots);
+  assert.equal(parsed.eligible, false); // The impossible six-skater-plus-goalie interval stays excluded.
+  assert.equal(parsed.modeledSeconds, 1140);
+  assert.equal(parsed.usableProcessSeconds, 1140);
+  assert.equal(
+    parsed.issues.some((s) => s.startsWith("reconstructed")),
+    false,
+  );
+  assert.equal(parsed.shots.length, 2);
+  f.sources.shifts[0]!.endTime = "19:00";
+  const missing = buildGameValueData(f.sources, f.shots);
+  assert.ok(missing.issues.some((s) => s.startsWith("reconstructed")));
+  assert.ok(missing.usableProcessSeconds < 1140);
+});
+
+test("explicit zero-duration open shift rows add no ice time and do not hide missing positive-duration clocks", () => {
+  const fixture = gameFixture();
+  const original = buildGameValueData(fixture.sources, fixture.shots);
+  const zero = {
+    ...fixture.sources.shifts[0]!,
+    endTime: "",
+    duration: "00:00",
+  };
+  const sources = {
+    ...fixture.sources,
+    shifts: [...fixture.sources.shifts, zero],
+  };
+  const parsed = buildGameValueData(sources, fixture.shots);
+  assert.deepEqual(parsed.stints, original.stints);
+  assert.deepEqual(parsed.players, original.players);
+  assert.equal(parsed.eligible, original.eligible);
+  assert.ok(parsed.corrections.some((s) => s.includes("zero-duration")));
+  assert.throws(
+    () =>
+      buildGameValueData(
+        {
+          ...sources,
+          shifts: [...fixture.sources.shifts, { ...zero, duration: "01:00" }],
+        },
+        fixture.shots,
+      ),
+    /Invalid hockey clock/,
+  );
+  assert.throws(
+    () =>
+      buildGameValueData(
+        {
+          ...sources,
+          shifts: [...fixture.sources.shifts, { ...zero, duration: undefined }],
+        },
+        fixture.shots,
+      ),
+    /Invalid hockey clock/,
+  );
+});
+
 test("confirmed zero-time appearances count without turning dressed backup goalies into appearances", () => {
   const f = gameFixture();
   const home = f.sources.box.playerByGameStats.homeTeam;
