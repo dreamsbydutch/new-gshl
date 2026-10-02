@@ -174,9 +174,32 @@ export const nhlBoxscoreSchema = nhlGameSchema.extend({
     .object({ awayTeam: boxscoreTeam, homeTeam: boxscoreTeam })
     .optional(),
 });
+export const nhlThreeStarSchema = z.object({
+  star: z.number().int().min(1).max(3),
+  playerId: z.number(),
+  teamAbbrev: z.string(),
+  name: localized,
+  position: z.string(),
+  goals: z.number().optional(),
+  assists: z.number().optional(),
+  points: z.number().optional(),
+  savePctg: z.number().optional(),
+});
+export const nhlLandingStarsSchema = z.object({
+  id: z.number(),
+  summary: z
+    .object({ threeStars: z.array(nhlThreeStarSchema).optional() })
+    .optional(),
+});
+
+export function isNHLGameFinal(gameState: string): boolean {
+  return gameState === "FINAL" || gameState === "OFF";
+}
+
 export const nhlGameResponseSchema = nhlBoxscoreSchema.extend({
   updatedAt: z.number(),
   eventFeed: nhlEventFeedSchema.nullable().optional(),
+  threeStars: z.array(nhlThreeStarSchema).nullable().optional(),
 });
 
 export function buildNHLPreseasonStandings(

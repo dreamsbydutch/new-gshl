@@ -57,6 +57,8 @@ export function runCategoryBacktest(
     historicalSaveRate?: boolean;
     skaterImpact?: boolean;
     development?: "none" | "trend" | "age-usage";
+    /** Retain all origin-time predictions, including excluded/unmatured evaluation targets. */
+    retainHistoricalProjections?: boolean;
   } = {},
 ) {
   validateCategorySeasons(rows);
@@ -151,7 +153,7 @@ export function runCategoryBacktest(
               prediction.SVP = prior.SVP;
             }
           }
-          if (origin === last)
+          if (origin === last || options.retainHistoricalProjections)
             projections.push({
               origin,
               horizon,

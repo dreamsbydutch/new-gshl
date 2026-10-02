@@ -81,8 +81,62 @@ void test("game boxscores remain available when the event feed fails or belongs 
   assert.equal((await loadNHLGame(String(game.id)))?.eventFeed, null);
 });
 
-void test("game response includes a validated event feed", async (t) => {
+void test("completed NHL games include official Three Stars from the landing feed", async (t) => {
+  const stars = [
+    {
+      star: 1,
+      playerId: 8478851,
+      teamAbbrev: "MTL",
+      name: { default: "A. Carrier" },
+      position: "D",
+      goals: 1,
+      assists: 1,
+      points: 2,
+    },
+    {
+      star: 2,
+      playerId: 8477939,
+      teamAbbrev: "TOR",
+      name: { default: "W. Nylander" },
+      position: "R",
+      goals: 2,
+      assists: 0,
+      points: 2,
+    },
+    {
+      star: 3,
+      playerId: 8476981,
+      teamAbbrev: "MTL",
+      name: { default: "J. Anderson" },
+      position: "R",
+      goals: 1,
+      assists: 1,
+      points: 2,
+    },
+  ];
   mockAPI(t, {
+    [`gamecenter/${game.id}/boxscore`]: {
+      ...game,
+      gameState: "OFF",
+      gameDate: "2026-09-29",
+    },
+    [`gamecenter/${game.id}/play-by-play`]: {
+      id: game.id,
+      awayTeam: { id: 1, abbrev: "MTL" },
+      homeTeam: { id: 2, abbrev: "TOR" },
+      plays: [],
+    },
+    [`gamecenter/${game.id}/landing`]: {
+      id: game.id,
+      summary: { threeStars: stars },
+    },
+  });
+  const result = await loadNHLGame(String(game.id));
+  assert.deepEqual(result?.threeStars, stars);
+});
+
+void test("game response includes a validated event feed", async (t) => {
+  const requests = mockAPI(t, {
     [`gamecenter/${game.id}/boxscore`]: { ...game, gameDate: "2026-09-29" },
     [`gamecenter/${game.id}/play-by-play`]: {
       id: game.id,
@@ -91,7 +145,14 @@ void test("game response includes a validated event feed", async (t) => {
       plays: [],
     },
   });
-  assert.equal((await loadNHLGame(String(game.id)))?.eventFeed?.id, game.id);
+  const result = await loadNHLGame(String(game.id));
+  assert.equal(result?.eventFeed?.id, game.id);
+  assert.equal(result?.threeStars, null);
+  assert.equal(
+    requests.mock.callCount(),
+    2,
+    "active games do not request final stars",
+  );
 });
 
 void test("published upcoming season initializes zero standings without carrying previous results", async (t) => {

@@ -7,6 +7,7 @@ import { useNHLMatchupData } from "@gshl-hooks/features/useNHLMatchupData";
 import { formatNHLUpdatedAt, nhlGameStatus } from "@gshl-utils/features/nhl";
 import { NHLMatchupPlayerTable } from "./NHLMatchupPlayerTable";
 import { NHLGameEvents } from "./NHLGameEvents";
+import { NHLThreeStars } from "./NHLThreeStars";
 
 export function NHLMatchupContent({ gameId }: { gameId: string }) {
   const {
@@ -101,6 +102,7 @@ export function NHLMatchupContent({ gameId }: { gameId: string }) {
           · Refreshes every 15 minutes
         </p>
       </section>
+      <NHLThreeStars game={game} />
       {error && (
         <p role="alert" className="text-sm text-slate-600">
           {error}{" "}

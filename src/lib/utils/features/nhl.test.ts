@@ -9,12 +9,20 @@ import {
   isNHLSeasonId,
   getNHLHomeScheduleDays,
   countGshlPlayersByNhlTeam,
+  isNHLGameFinal,
 } from "./nhl";
 import {
   buildScheduleNavigationHref,
   isScheduleNavigationView,
   isStandingsNavigationView,
 } from "./contextual-navigation";
+
+void test("Three Stars are available only for final NHL game states", () => {
+  for (const state of ["FINAL", "OFF"])
+    assert.equal(isNHLGameFinal(state), true);
+  for (const state of ["FUT", "PRE", "LIVE", "CRIT"])
+    assert.equal(isNHLGameFinal(state), false);
+});
 
 void test("GSHL roster counts deduplicate players and NHL aliases, including all supplied roster slots", () => {
   assert.deepEqual(

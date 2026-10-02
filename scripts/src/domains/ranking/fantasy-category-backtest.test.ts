@@ -128,7 +128,11 @@ void test("backtest keeps departures, freezes past fits and requires complete te
       r.totals.G = id / 2;
       rows.push(r);
     }
-  const options = { skaterImpact: true, development: "age-usage" as const };
+  const options = {
+    skaterImpact: true,
+    development: "age-usage" as const,
+    retainHistoricalProjections: true,
+  };
   const result = runCategoryBacktest(rows, undefined, options);
   const departed = result.records.find(
     (r) =>
@@ -139,6 +143,10 @@ void test("backtest keeps departures, freezes past fits and requires complete te
   )!;
   assert.equal(departed.actual.GP, 0);
   assert.equal(departed.actual.P, 0);
+  assert.ok(
+    result.projections.some((r) => r.origin === 2018 && r.horizon === 1),
+  );
+  assert.ok(!result.records.some((r) => r.origin === 2018 && r.horizon === 1));
   assert.ok(
     result.trainingAudit.every((a) =>
       a.trainingTargetYears.every((y) => y <= a.origin),
@@ -162,6 +170,10 @@ void test("backtest keeps departures, freezes past fits and requires complete te
       .filter((r) => r.origin <= 2021 && r.method === "category-model")
       .map((r) => r.prediction);
   assert.deepEqual(past(result), past(replay));
+  assert.deepEqual(
+    result.projections.filter((r) => r.origin <= 2021),
+    replay.projections.filter((r) => r.origin <= 2021),
+  );
 });
 
 void test("rate errors use identical method cohorts and report missing comparisons", () => {

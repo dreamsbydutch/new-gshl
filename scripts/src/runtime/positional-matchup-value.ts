@@ -69,11 +69,12 @@ function appearanceDistribution(mean: number, max: number) {
   return values;
 }
 /** Integrates uncertain appearances; does not treat fractional expected GP as qualifying. */
-export function expectedMatchupWin(
+function expectedValue(
   player: PlayerProjection,
   contexts: readonly MatchupContext[],
   utilization: number,
   weeks = 26,
+  objective: "matchup" | "categories" = "matchup",
 ) {
   if (!contexts.length) throw new Error("Historical matchup contexts required");
   if (
@@ -122,11 +123,33 @@ export function expectedMatchupWin(
     let win = 0;
     for (let n = 0; n < count.length; n++) {
       if (count[n]! < 1e-8) continue;
-      win += count[n]! * matchupWin(addLine(base, perGame, n), c.opponent);
+      const line = addLine(base, perGame, n);
+      win +=
+        count[n]! *
+        (objective === "matchup"
+          ? matchupWin(line, c.opponent)
+          : (10 + categoryMargin(line, c.opponent)) / 2);
     }
     score += win;
   }
   return score / contexts.length;
+}
+export function expectedMatchupWin(
+  player: PlayerProjection,
+  contexts: readonly MatchupContext[],
+  utilization: number,
+  weeks = 26,
+) {
+  return expectedValue(player, contexts, utilization, weeks, "matchup");
+}
+/** Category victories plus half credit for ties, in a common unit for F/D/G. */
+export function expectedCategoryWins(
+  player: PlayerProjection,
+  contexts: readonly MatchupContext[],
+  utilization: number,
+  weeks = 26,
+) {
+  return expectedValue(player, contexts, utilization, weeks, "categories");
 }
 export function positionalMatchupValue(
   player: PlayerProjection,

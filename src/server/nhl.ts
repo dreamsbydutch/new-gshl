@@ -47,7 +47,7 @@ const cachedGame = unstable_cache(
     void refreshWindow;
     return loadNHLGame(gameId);
   },
-  ["nhl-game"],
+  ["nhl-game-with-three-stars"],
   { revalidate: NHL_SCHEDULE_REFRESH_SECONDS },
 );
 

@@ -8,6 +8,8 @@ import {
   nhlSeasonsSchema,
   nhlStandingsSchema,
   nhlBoxscoreSchema,
+  nhlLandingStarsSchema,
+  isNHLGameFinal,
 } from "@gshl-utils/features/nhl";
 
 async function fetchNHL<T>(
@@ -36,13 +38,20 @@ export async function loadNHLGame(gameId: string) {
       () => null,
     ),
   ]);
-  return game && String(game.id) === gameId
-    ? {
-        ...game,
-        eventFeed: eventFeed?.id === game.id ? eventFeed : null,
-        updatedAt: Date.now(),
-      }
+  if (!game || String(game.id) !== gameId) return null;
+  const landing = isNHLGameFinal(game.gameState)
+    ? await fetchNHL(
+        `gamecenter/${gameId}/landing`,
+        nhlLandingStarsSchema,
+      ).catch(() => null)
     : null;
+  return {
+    ...game,
+    eventFeed: eventFeed?.id === game.id ? eventFeed : null,
+    threeStars:
+      landing?.id === game.id ? (landing.summary?.threeStars ?? []) : null,
+    updatedAt: Date.now(),
+  };
 }
 
 export async function loadNHLStandings(

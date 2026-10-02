@@ -36,12 +36,11 @@ export function NHLGameEvents({
         className="inline-flex items-center gap-1 whitespace-nowrap"
       >
         {index > 0 ? <span className="mr-1">,</span> : null}
-        {player.name}
         {player.isGshl ? (
-          <span className="rounded border border-blue-200 bg-blue-50 px-1 py-0.5 text-[9px] font-semibold leading-none text-blue-900">
-            GSHL
-          </span>
-        ) : null}
+          <strong className="font-bold">{player.name}</strong>
+        ) : (
+          player.name
+        )}
       </span>
     ));
   };
@@ -79,15 +78,15 @@ export function NHLGameEvents({
           </div>
         </div>
         <p className="text-xs text-slate-800">
-          Times elapsed in each period. GSHL badges identify rostered players.
+          Times elapsed in each period. Bold names are GSHL players.
         </p>
         {rosterLoading ? (
           <p role="status" className="text-xs text-slate-800">
-            Loading GSHL player badges…
+            Loading GSHL players…
           </p>
         ) : rosterError ? (
           <p className="text-xs text-slate-800">
-            GSHL player badges are temporarily unavailable.
+            GSHL player highlighting is temporarily unavailable.
           </p>
         ) : null}
       </header>
