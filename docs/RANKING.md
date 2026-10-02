@@ -869,6 +869,41 @@ worsens rating error. Blending current talent slightly reduces error but weakens
 forward/goalie rank correlation, so it is not selected as a general replacement.
 These experiments do not change the recommended production formula or prices.
 
+### Development and usage feature experiment
+
+The next experiment tests two fixed feature additions against the position-specific
+best: reliability-weighted changes from the preceding season, then interactions
+between category rates, origin workload and age. Trend reliability uses
+GP/(GP+20) from both observed seasons and is zero without a preceding season.
+Age interactions distinguish under-25 and over-30 target-season ages, known from
+birthdate, rather than presuming any future roster or deployment. All forecasts
+retain chronological fitting and the regular-season-end information boundary.
+
+Simple trend features do not reliably improve the final rating. Age/usage
+interactions help lower-workload forwards substantially after applying the same
+workload calibration to both alternatives:
+
+| Contract | Lower-workload F observations | Previous best RMSE | Age/usage RMSE | Reduction |
+| --- | ---: | ---: | ---: | ---: |
+| 2 years | 870 | 11.57 | 10.90 | 5.8% |
+| 3 years | 667 | 12.08 | 11.08 | 8.3% |
+
+The lower-workload group is fewer than 40 schedule-adjusted origin-season games.
+The improvement holds in all four two-year and all three three-year starting
+seasons. Mean bias moves from +0.21 to -0.30 over two years and +0.53 to -0.16
+over three. However, established-forward RMSE worsens about 0.7%; adding these
+features universally is not recommended. The targeted recommendation is a
+post-evaluation subgroup finding, not an independently validated model-selection
+rule. It still mixes injured veterans, newcomers and marginal NHL players.
+
+Defenseman improvements are small/mixed: established three-year RMSE improves
+0.4%, but the complete two-year defenseman pool worsens 0.3%. Goalie rating RMSE
+worsens about 2–3%. Preserve the preceding goalie model. The reports retain all
+alternatives, with and without forward workload calibration; the unchanged raw
+baseline reproduces the earlier experiment exactly. Historical reconstruction,
+repeated players and previously examined seasons limit prospective claims.
+No production formula or salary publication changes are made.
+
 ## NHL rating and real contract salary comparison
 
 The salary audit joins production v3 regular-season ratings to historical NHL

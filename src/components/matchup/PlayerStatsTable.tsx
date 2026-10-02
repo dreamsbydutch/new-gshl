@@ -1,6 +1,7 @@
 "use client";
 
 import { NHLLogoList } from "@gshl-components/player/NHLLogoList";
+import { NHLLogo } from "@gshl-components/player/NHLLogo";
 import { useNHLHomeSchedule } from "@gshl-hooks/features/useNHLHomeSchedule";
 import { getPlayerTodayGames } from "@gshl-utils/features/matchup-details";
 import { nhlGameStatus } from "@gshl-utils/features/nhl";
@@ -9,6 +10,7 @@ import type {
   MatchupDetailsNhlTeam,
   MatchupDetailsTeam,
   PlayerStatRow,
+  PlayerStatColumn,
 } from "@gshl-types";
 import {
   abbreviatePlayerName,
@@ -39,7 +41,15 @@ export function PlayerStatsTable({
     players,
     categories: seasonCategories,
   });
-  const tableColumns = columns.filter((column) => column.key !== "nhlTeam");
+  const tableColumns: (
+    | PlayerStatColumn
+    | { key: "today"; label: string; className?: string }
+  )[] = columns.filter((column) => column.key !== "nhlTeam");
+  tableColumns.splice(
+    tableColumns.findIndex((column) => column.key === "player") + 1,
+    0,
+    { key: "today", label: "Today's game" },
+  );
 
   const getColumnClassName = (
     columnKey: string,
@@ -151,12 +161,6 @@ export function PlayerStatsTable({
           </caption>
           <thead className="bg-slate-50">
             <tr className="border-b border-slate-200">
-              <th
-                scope="col"
-                className={getColumnClassName("today", undefined, true)}
-              >
-                Today&apos;s game
-              </th>
               {tableColumns.map((column) => (
                 <th
                   key={column.key}
@@ -176,7 +180,7 @@ export function PlayerStatsTable({
             {players.length === 0 ? (
               <tr>
                 <td
-                  colSpan={tableColumns.length + 1}
+                  colSpan={tableColumns.length}
                   className="py-8 text-center text-sm text-slate-500"
                 >
                   No player stats available yet.
@@ -188,43 +192,68 @@ export function PlayerStatsTable({
                   key={player.id}
                   className="group border-b border-slate-200 transition-colors last:border-0 odd:bg-white even:bg-slate-50/70 hover:bg-slate-100"
                 >
-                  <td className={getColumnClassName("today")}>
-                    {schedule.isLoading ? (
-                      <span className="text-slate-400">Loading…</span>
-                    ) : !schedule.data ? (
-                      <span className="text-slate-400">Unavailable</span>
-                    ) : !schedule.data.published ? (
-                      <span className="text-slate-400">Not scheduled</span>
-                    ) : getPlayerTodayGames(player, schedule.games).length ===
-                      0 ? (
-                      <span
-                        aria-label="No game today"
-                        className="text-slate-400"
-                      >
-                        —
-                      </span>
-                    ) : (
-                      getPlayerTodayGames(player, schedule.games).map(
-                        (game) => (
-                          <Link
-                            key={game.id}
-                            href={`/nhl/matchup/${game.id}`}
-                            prefetch={false}
-                            aria-label={`${formatMatchupPlayerName(player)}: ${game.awayTeam.abbrev} at ${game.homeTeam.abbrev}. ${nhlGameStatus(game)}. View NHL matchup.`}
-                            className="flex min-h-11 flex-col justify-center rounded text-blue-700 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
-                          >
-                            <span className="font-medium">
-                              {game.awayTeam.abbrev} @ {game.homeTeam.abbrev}
-                            </span>
-                            <span className="text-[10px] text-slate-500">
-                              {nhlGameStatus(game)}
-                            </span>
-                          </Link>
-                        ),
-                      )
-                    )}
-                  </td>
                   {tableColumns.map((column) => {
+                    if (column.key === "today")
+                      return (
+                        <td key="today" className={getColumnClassName("today")}>
+                          {schedule.isLoading ? (
+                            <span className="text-slate-400">Loading…</span>
+                          ) : !schedule.data ? (
+                            <span className="text-slate-400">Unavailable</span>
+                          ) : !schedule.data.published ? (
+                            <span className="text-slate-400">
+                              Not scheduled
+                            </span>
+                          ) : getPlayerTodayGames(player, schedule.games)
+                              .length === 0 ? (
+                            <span
+                              aria-label="No game today"
+                              className="text-slate-400"
+                            >
+                              —
+                            </span>
+                          ) : (
+                            getPlayerTodayGames(player, schedule.games).map(
+                              (game) => (
+                                <Link
+                                  key={game.id}
+                                  href={`/nhl/matchup/${game.id}`}
+                                  prefetch={false}
+                                  aria-label={`${formatMatchupPlayerName(player)}: ${game.awayTeam.abbrev} at ${game.homeTeam.abbrev}. ${nhlGameStatus(game)}. View NHL matchup.`}
+                                  title={`${game.awayTeam.abbrev} at ${game.homeTeam.abbrev} · ${nhlGameStatus(game)}`}
+                                  className="inline-flex min-h-6 items-center justify-center gap-1 rounded px-1 text-blue-700 hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                                >
+                                  <NHLLogo
+                                    team={{
+                                      name: game.awayTeam.abbrev,
+                                      logoUrl: "",
+                                    }}
+                                    size={18}
+                                    className="!mx-0 shrink-0"
+                                  />
+                                  <span
+                                    aria-hidden="true"
+                                    className="text-[10px] text-slate-400"
+                                  >
+                                    @
+                                  </span>
+                                  <NHLLogo
+                                    team={{
+                                      name: game.homeTeam.abbrev,
+                                      logoUrl: "",
+                                    }}
+                                    size={18}
+                                    className="!mx-0 shrink-0"
+                                  />
+                                  <span className="ml-1 text-[10px] text-slate-500">
+                                    {nhlGameStatus(game)}
+                                  </span>
+                                </Link>
+                              ),
+                            )
+                          )}
+                        </td>
+                      );
                     const cellClassName = [
                       getColumnClassName(column.key, column.className),
                       column.key === "player" ? "group-hover:bg-slate-100" : "",
