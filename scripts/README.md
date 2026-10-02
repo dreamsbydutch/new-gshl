@@ -525,6 +525,29 @@ paths. Each command's `--help` describes its required files; output targets must
 be new. Opening-roster and prior-week validation runs must use separate targets,
 and the scarcity-weight comparison requires a baseline with the same roster mode.
 
+The follow-up unified-rating workflow reconstructs the newer category forecaster
+at each origin, compares real-player replacement values, and exports one combined
+F/D/G ranking for two- and three-year contracts. Source API responses use a
+temporary cache; persisted outputs contain derived predictions and diagnostics.
+All three commands below are read-only with respect to production:
+
+```bash
+node ../node_modules/tsx/dist/cli.mjs --tsconfig tsconfig.json src/commands/ratings/build-unified-salary-forecasts.ts --baseline ../.local-data/nhl-rating/value-v2-final-20260930 --team-audit ../.local-data/nhl-rating/team-success-20261001/team-success-input-corrected.json --output ../.local-data/unified-forecasts
+node ../node_modules/tsx/dist/cli.mjs --tsconfig tsconfig.json src/commands/ratings/evaluate-unified-salaries.ts --forecasts ../.local-data/unified-forecasts/forecasts.json --history ../.local-data/position-history --source ../.local-data/draft-slot-research/source.json --output ../.local-data/unified-values
+node ../node_modules/tsx/dist/cli.mjs --tsconfig tsconfig.json src/commands/ratings/report-unified-salaries.ts --input ../.local-data/unified-values/validation.json --output ../.local-data/unified-values/report.html
+```
+
+The history directory must include linked player identities (`directory-linked.json`
+from the October audit, or a fresh `directory.json` with `nhlApiId`). The evaluator
+exports selected rankings, all alternatives, chronological matchup tests and
+complete-contract correlations. The selected model is a research candidate, not
+an automatic salary publication. Its shared percentile is distinct from the
+existing talent rating. See each command's `--help` for its inputs.
+
+The report optionally accepts `--forecast-baseline` pointing to the preceding
+calibrated `salary-validation.json`. This adds an identity/term-matched comparison
+against the prior category forecaster, alongside the original talent baseline.
+
 `src/commands/ratings/test-salary-rating-curves.ts` tests further score calibration
 changes using the isolated experiment's local derived forecasts. Pass `--input`
 with the calibrated isolated directory and `--output` with a new directory.

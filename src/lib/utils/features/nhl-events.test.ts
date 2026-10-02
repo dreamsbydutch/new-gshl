@@ -42,6 +42,57 @@ const raw = {
   plays: [goal, penalty, { ...goal, eventId: 3, typeDescKey: "faceoff" }],
 };
 
+void test("goal tags distinguish power plays, shorthanded goals and empty nets for either team", () => {
+  for (const [code, teamId, expected] of [
+    ["1551", 16, []],
+    ["1541", 16, ["PP"]],
+    ["1541", 13, ["SH"]],
+    ["1451", 13, ["PP"]],
+    ["1451", 16, ["SH"]],
+    ["1560", 16, ["EN"]],
+    ["0651", 13, ["EN"]],
+    ["0651", 16, []],
+    ["1560", 13, []],
+    ["1460", 16, ["SH", "EN"]],
+    ["1540", 16, ["PP", "EN"]],
+    ["invalid", 16, []],
+    [undefined, 16, []],
+    ["1541", 999, []],
+  ] as const) {
+    const feed = nhlEventFeedSchema.parse({
+      ...raw,
+      plays: [
+        {
+          ...goal,
+          situationCode: code,
+          details: { ...goal.details, eventOwnerTeamId: teamId },
+        },
+      ],
+    });
+    assert.deepEqual(
+      buildNHLGameEvents(feed, [])[0]?.tags,
+      [...expected],
+      `${code} scoring team ${teamId}`,
+    );
+  }
+  for (const play of [
+    { ...penalty, situationCode: "1541" },
+    {
+      ...goal,
+      situationCode: "1541",
+      periodDescriptor: { number: 5, periodType: "SO" },
+    },
+  ]) {
+    assert.deepEqual(
+      buildNHLGameEvents(
+        nhlEventFeedSchema.parse({ ...raw, plays: [play] }),
+        [],
+      )[0]?.tags,
+      [],
+    );
+  }
+});
+
 void test("goals and penalties sort chronologically and highlight all GSHL participants by ID", () => {
   const feed = nhlEventFeedSchema.parse(raw);
   const events = buildNHLGameEvents(feed, [

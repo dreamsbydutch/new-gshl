@@ -983,6 +983,81 @@ between them remains unproven. Two-/three-year contract-level matchup value,
 schedule/lineup effects and uncertainty must be validated before publication.
 Research outputs retain all scenarios, exclusions and failed alternatives.
 
+### Unified cross-position salary candidate
+
+`unified-salary-value.ts` compares F, D and G in a single contribution unit:
+expected category victories (ties count one half), or expected matchup wins,
+above real same-position replacements. Unlike the first positional experiment,
+replacement players are ranked by the same contribution objective and the
+benchmark averages their individual values. Averaging their raw stat lines
+first would distort nonlinear goalie qualification and ratio effects.
+
+Each future season is valued separately. Two-/three-year ratings average those
+yearly values, then rank the complete F/D/G pool together. The displayed 0–100
+number is a pooled percentile, not the previous talent scale, an independent
+within-position percentile, a probability or an absolute talent grade. Negative
+replacement values remain visible. No F/D/G salary quota is imposed, and this
+candidate does not change the existing dollar curve or production publisher.
+
+The updated chronological replay uses the newer appearance/rate forecasts with
+skater NHL impact, historical goalie save rate and age/usage for forwards below
+40 origin-season games. It reconstructs these features from regular-season data;
+later rosters, playoffs and realized future ice time remain unavailable to the
+individual forecast. Retaining historical projections in the category backtest
+does not change training or its excluded-target policy. It makes predictions
+available for weekly evaluation even when the annual category backtest excludes
+a shortened pandemic target.
+
+Three predefined variants compare category value with observed ownership depth,
+category value with a two-goalie roster benchmark, and matchup value with
+observed depth. The research selector minimizes mean opening/prior-week Brier
+error in evaluation seasons ending through 2023. Later seasons ending 2024–26
+are reported separately. Each probability fit uses only earlier completed years,
+a fixed ridge penalty and a nonnegative slope. A failed talent relationship
+therefore cannot silently reverse the meaning of a higher player rating.
+
+Complete-contract validation applies actual future NHL production to the
+origin-frozen contexts and replacement benchmark. It is a measure of future
+fantasy opportunity, not actual owner deployment or a causal player effect on
+team wins. Known departures receive zero production. Unlinked identities and
+contracts spanning NHL start years 2019/2020 are excluded. The report includes
+all-player and established cohorts, individual origins and each position, with
+the raw origin-season talent rating as a common baseline. Overlapping contracts,
+repeated players, retrospective corrections and previously examined seasons
+limit prospective claims. Candidate selection and deployment are separate.
+
+The completed October 2 follow-up selects `matchup-empirical` from the earlier
+evaluation block. Across the 485 later matchups, it improves Brier error from
+0.24893 to 0.24159 with opening rosters and from 0.24980 to 0.23763 with prior-week
+rosters (3.0% and 4.9% reductions). Winner accuracy changes from 55.1% to 57.1%
+and 56.7% to 60.2%, respectively. It also beats the 0.24771 home-only benchmark
+in aggregate. The 2024–25 season remains worse in probability error; improvement
+is not uniform across seasons. Category-win candidates are close competitors,
+so the evidence does not establish a uniquely optimal objective.
+
+Complete-contract correlations with modeled future fantasy opportunity improve
+over both raw talent and the preceding calibrated category forecast. On paired
+established-player cohorts, the preceding forecast versus unified candidate is:
+
+| Term | Player contracts | Previous category forecast | Unified candidate |
+| --- | ---: | ---: | ---: |
+| 2 years | 2,702 | 0.7042 | 0.7446 |
+| 3 years | 2,021 | 0.7049 | 0.7412 |
+
+All F/D/G cohorts improve against that preceding forecast in both terms. The
+full cohorts contain 4,214 two-year and 3,192 three-year windows. These target
+values are computed from actual future production using the valuation model;
+they are not observed causal matchup wins. The independent weekly matchup test
+therefore remains an important separate check. The optional preceding-forecast
+comparison in the report matches origin, player and term and applies the same
+origin-known low-workload forward model selection.
+
+The latest combined rankings contain 1,038 players for each term. The two-year
+top 100 has 61F/26D/13G; the three-year top 100 has 63F/26D/11G. This is an outcome
+of the candidate, not a mandated balance or salary-pool split. The candidate is
+implemented in the offline calculation/report workflow; production rating and
+salary publication remain unchanged.
+
 ## NHL rating and real contract salary comparison
 
 The salary audit joins production v3 regular-season ratings to historical NHL

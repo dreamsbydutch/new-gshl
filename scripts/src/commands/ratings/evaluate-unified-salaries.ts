@@ -44,13 +44,20 @@ else {
     read(values.forecasts),
     read(resolve(values.history, "contexts.json")),
     read(values.source),
-    read(resolve(values.history, "directory-linked.json")),
+    read(resolve(values.history, "directory-linked.json")).catch(
+      (error: NodeJS.ErrnoException) => {
+        if (error.code !== "ENOENT") throw error;
+        return read(resolve(values.history!, "directory.json"));
+      },
+    ),
   ]);
   const ids = new Map<number, string>(
     directory.players
       .filter((r: Row) => r.nhlApiId)
       .map((r: Row) => [Number(r.nhlApiId), r.id]),
   );
+  if (ids.size < 1000)
+    throw new Error("History directory lacks linked NHL identities");
   const years = new Map<string, number>(
     source.seasonRows.map((r: Row) => [r.id, Number(r.year)]),
   );

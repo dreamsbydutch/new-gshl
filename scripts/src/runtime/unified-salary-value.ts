@@ -20,7 +20,7 @@ export function unifiedSalaryValues(
   contexts: readonly MatchupContext[],
   utilization: Record<Position, number>,
   depth: Record<Position, number>,
-  objective: SalaryObjective = "categories",
+  objective: SalaryObjective = "matchup",
 ): SalaryValue[] {
   if (new Set(players.map((p) => p.id)).size !== players.length)
     throw new Error("Duplicate projection identity");

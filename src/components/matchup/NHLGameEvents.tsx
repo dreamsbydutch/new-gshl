@@ -24,8 +24,8 @@ export function NHLGameEvents({
     goals ? event.title !== "Penalty" : event.title === "Penalty",
   );
   const headings = goals
-    ? ["Period", "Time", "Team", "Scorer", "Assists", "Goalie", "Score"]
-    : ["Period", "Time", "Team", "Player", "Penalty", "Drawn by", "Served by"];
+    ? ["Period", "Time", "Team", "Scorer", "Assists", "Score"]
+    : ["Period", "Time", "Team", "Player", "Penalty"];
 
   const renderPlayers = (event: (typeof events)[number], role: string) => {
     const players = event.participants.filter((player) => player.role === role);
@@ -137,6 +137,22 @@ export function NHLGameEvents({
                 </td>
                 <td className="px-3 py-2">
                   {renderPlayers(event, goals ? "Scorer" : "By")}
+                  {goals &&
+                    event.tags.map((tag) => (
+                      <abbr
+                        key={tag}
+                        title={
+                          {
+                            PP: "Power-play goal",
+                            SH: "Shorthanded goal",
+                            EN: "Empty-net goal",
+                          }[tag]
+                        }
+                        className="ml-1.5 rounded border border-slate-300 bg-slate-100 px-1 py-0.5 text-[10px] font-semibold no-underline"
+                      >
+                        {tag}
+                      </abbr>
+                    ))}
                 </td>
                 <td className="px-3 py-2">
                   {goals
@@ -145,14 +161,11 @@ export function NHLGameEvents({
                       : renderPlayers(event, "Assist")
                     : event.description || "—"}
                 </td>
-                <td className="px-3 py-2">
-                  {renderPlayers(event, goals ? "Against" : "Drawn by")}
-                </td>
-                <td className="px-3 py-2 tabular-nums">
-                  {goals
-                    ? (event.score ?? "—")
-                    : renderPlayers(event, "Served by")}
-                </td>
+                {goals ? (
+                  <td className="px-3 py-2 tabular-nums">
+                    {event.score ?? "—"}
+                  </td>
+                ) : null}
               </tr>
             ))}
             {!visibleEvents.length ? (

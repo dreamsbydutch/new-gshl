@@ -26,6 +26,7 @@ export const nhlEventFeedSchema = z.object({
           periodType: z.string(),
         }),
         timeInPeriod: z.string(),
+        situationCode: z.string().optional(),
         sortOrder: z.number().optional(),
         details: z
           .object({
@@ -100,8 +101,30 @@ export function buildNHLGameEvents(
         add("Served by", details.servedByPlayerId);
       }
       const period = play.periodDescriptor;
+      const tags: ("PP" | "SH" | "EN")[] = [];
+      const awayGoal = details.eventOwnerTeamId === feed.awayTeam.id;
+      const homeGoal = details.eventOwnerTeamId === feed.homeTeam.id;
+      if (
+        goal &&
+        period.periodType !== "SO" &&
+        (awayGoal || homeGoal) &&
+        /^[01][3-6][3-6][01]$/.test(play.situationCode ?? "")
+      ) {
+        // NHL order: away goalie, away skaters, home skaters, home goalie.
+        const code = play.situationCode!;
+        const awayGoalie = Number(code[0]);
+        const homeGoalie = Number(code[3]);
+        // Include goalies so an extra attacker alone is not mistaken for a power play.
+        const advantage =
+          (Number(code[1]) + awayGoalie - Number(code[2]) - homeGoalie) *
+          (awayGoal ? 1 : -1);
+        if (advantage > 0) tags.push("PP");
+        if (advantage < 0) tags.push("SH");
+        if ((awayGoal ? homeGoalie : awayGoalie) === 0) tags.push("EN");
+      }
       return {
         id: play.eventId,
+        tags,
         period:
           period.periodType === "REG"
             ? `P${period.number}`

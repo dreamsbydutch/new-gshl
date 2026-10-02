@@ -14,6 +14,51 @@ import {
   fitMatchupProbability,
   matchupProbability,
 } from "../../runtime/matchup-probability";
+import { compareUnifiedForecastContracts } from "./unified-contract-comparison";
+
+void test("forecast comparison pairs identities and chooses the origin-known workload model", () => {
+  const contracts = [1, 2, 3].map((id) => ({
+    origin: 2020,
+    term: 2,
+    id: String(id),
+    method: "selected",
+    position: "F",
+    originGames: 20,
+    value: id,
+    actual: id,
+  }));
+  const previous = [
+    {
+      origin: 2020,
+      horizon: 2,
+      playerId: 1,
+      method: "age-usage+calibrated",
+      prediction: 2,
+    },
+    {
+      origin: 2020,
+      horizon: 2,
+      playerId: 2,
+      method: "age-usage+calibrated",
+      prediction: 1,
+    },
+    {
+      origin: 2020,
+      horizon: 2,
+      playerId: 1,
+      method: "position-best+calibrated",
+      prediction: -100,
+    },
+  ];
+  const r = compareUnifiedForecastContracts(
+    contracts,
+    previous,
+    "selected",
+  ).find((r) => r.term === 2 && r.cohort === "all" && r.position === "ALL")!;
+  assert.equal(r.n, 2);
+  assert.equal(r.unified, 1);
+  assert.equal(r.previous, -1);
+});
 
 const context = (): MatchupContext => ({
   year: 2024,
