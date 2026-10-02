@@ -5,6 +5,7 @@ import {
   unifiedSalaryValues,
   rankUnifiedValues,
   type SalaryObjective,
+  salaryEnvironment,
 } from "../../runtime/unified-salary-value";
 import {
   fitMatchupProbability,
@@ -30,15 +31,22 @@ const { values } = parseArgs({
     output: { type: "string" },
     help: { type: "boolean" },
     "veteran-method": { type: "string" },
+    "skater-pool": { type: "string", default: "shared" },
   },
 });
 if (values.help)
   console.log(
-    "Offline unified F/D/G valuation. --forecasts <derived forecasts.json> --history <audited history directory> --source <draft source.json> --output <NEW directory> [--veteran-method <variant>]. Uses a forecast file's preferredVeteranMethod when supplied, applying it to year one only. Evaluates both opening and prior-week rosters, chronological calibration and real-player replacement bands. Never writes production.",
+    "Offline unified F/D/G valuation. --forecasts <derived forecasts.json> --history <audited history directory> --source <draft source.json> --output <NEW directory> [--veteran-method <variant>] [--skater-pool shared|positional]. Defaults to shared skater opportunities for the relaunch candidate; positional reproduces the older model. Uses preferredVeteranMethod for year one only. Historical contexts are not a full best-ball replay. Never writes production.",
   );
 else {
   if (!values.forecasts || !values.history || !values.source || !values.output)
     throw new Error("All paths required");
+  if (
+    values["skater-pool"] !== "shared" &&
+    values["skater-pool"] !== "positional"
+  )
+    throw new Error("Skater pool must be shared or positional");
+  const skaterPool = values["skater-pool"];
   await mkdir(values.output);
   const read = async (path: string) => JSON.parse(await readFile(path, "utf8"));
   const [forecast, history, source, directory] = await Promise.all([
@@ -217,6 +225,13 @@ else {
           utilization,
           depth,
           variant.objective,
+          skaterPool,
+        );
+        const environment = salaryEnvironment(
+          contexts,
+          utilization,
+          depth,
+          skaterPool,
         );
         const mapped = new Map<string, number>();
         for (const r of scored) {
@@ -228,7 +243,7 @@ else {
             canonical &&
             ![2019, 2020].includes(origin + horizon)
           ) {
-            const key = variant.objective + ":" + r.id;
+            const key = variant.name + ":" + r.id;
             if (!realized.has(key)) {
               const a = actualById.get(canonical),
                 p = { id: r.id, position: r.position } as PlayerProjection;
@@ -251,7 +266,14 @@ else {
                 variant.objective === "categories"
                   ? expectedCategoryWins
                   : expectedMatchupWin;
-              realized.set(key, score(p, contexts, utilization[r.position]));
+              realized.set(
+                key,
+                score(
+                  p,
+                  environment.contexts,
+                  environment.utilization[r.position],
+                ),
+              );
             }
             actualValue = realized.get(key)! - r.replacement;
           }
@@ -498,6 +520,7 @@ else {
   );
   const report = {
     veteranMethod: veteranMethod ?? null,
+    skaterPool,
     generatedAt: new Date().toISOString(),
     version: "unified-salary-research-v1",
     latestOrigin,

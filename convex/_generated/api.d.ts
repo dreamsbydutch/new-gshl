@@ -31,6 +31,7 @@ import type * as lib_draftCorrection from "../lib/draftCorrection.js";
 import type * as lib_draftMode from "../lib/draftMode.js";
 import type * as lib_frontendQuery from "../lib/frontendQuery.js";
 import type * as lib_jobLifecycle from "../lib/jobLifecycle.js";
+import type * as lib_matchupPreviewEvidence from "../lib/matchupPreviewEvidence.js";
 import type * as lib_matchupProjection from "../lib/matchupProjection.js";
 import type * as lib_nhlContractFields from "../lib/nhlContractFields.js";
 import type * as lib_nhlContractMerge from "../lib/nhlContractMerge.js";
@@ -55,6 +56,7 @@ import type * as lib_weeklyEditionPublication from "../lib/weeklyEditionPublicat
 import type * as lib_yahooOAuth from "../lib/yahooOAuth.js";
 import type * as maintenanceScope from "../maintenanceScope.js";
 import type * as matchup from "../matchup.js";
+import type * as matchupPreviews from "../matchupPreviews.js";
 import type * as nhlContractAnalytics from "../nhlContractAnalytics.js";
 import type * as nhlContracts from "../nhlContracts.js";
 import type * as nhlSeasonValueFinalization from "../nhlSeasonValueFinalization.js";
@@ -110,6 +112,7 @@ declare const fullApi: ApiFromModules<{
   "lib/draftMode": typeof lib_draftMode;
   "lib/frontendQuery": typeof lib_frontendQuery;
   "lib/jobLifecycle": typeof lib_jobLifecycle;
+  "lib/matchupPreviewEvidence": typeof lib_matchupPreviewEvidence;
   "lib/matchupProjection": typeof lib_matchupProjection;
   "lib/nhlContractFields": typeof lib_nhlContractFields;
   "lib/nhlContractMerge": typeof lib_nhlContractMerge;
@@ -134,6 +137,7 @@ declare const fullApi: ApiFromModules<{
   "lib/yahooOAuth": typeof lib_yahooOAuth;
   maintenanceScope: typeof maintenanceScope;
   matchup: typeof matchup;
+  matchupPreviews: typeof matchupPreviews;
   nhlContractAnalytics: typeof nhlContractAnalytics;
   nhlContracts: typeof nhlContracts;
   nhlSeasonValueFinalization: typeof nhlSeasonValueFinalization;

@@ -4,6 +4,7 @@ type Row = Record<string, unknown> & { _id: string; _creationTime: number };
 type Range = {
   eq: (field: string, value: unknown) => Range;
   lte: (field: string, value: string | number) => Range;
+  gte: (field: string, value: string | number) => Range;
 };
 
 /** Indexed read/write adapter for handler tests; not a Convex runtime emulator. */
@@ -70,6 +71,14 @@ export function mutationFixture() {
                   typeof value === "number"
                     ? Number(row[field]) <= value
                     : String(row[field]) <= value,
+                );
+                return range;
+              },
+              gte: (field, value) => {
+                predicates.push((row) =>
+                  typeof value === "number"
+                    ? Number(row[field]) >= value
+                    : String(row[field]) >= value,
                 );
                 return range;
               },

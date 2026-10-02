@@ -17,6 +17,7 @@ import {
   matchupProbability,
 } from "../../runtime/matchup-probability";
 import { compareUnifiedForecastContracts } from "./unified-contract-comparison";
+import { relaunchAnnualSalary } from "../../runtime/relaunch-salary-curve";
 
 void test("one salary emphasizes next year and requires all three forecast horizons", () => {
   const years = [
@@ -127,6 +128,69 @@ const player = (
   SA: 1400,
   SV: 1280,
   MIN: 3000,
+});
+void test("shared skater opportunities remove positional scarcity and usage bonuses", () => {
+  const pool = (["F", "D", "G"] as const).flatMap((pos) =>
+    Array.from({ length: 12 }, (_, i) => player(pos + i, pos, (i + 1) / 12)),
+  );
+  const c = context();
+  c.own = [4, 8, 3, 45, 15, 20, 2, 7, 90, 83, 180, 3];
+  c.opponent = [5, 9, 4, 50, 18, 24, 2, 8, 90, 82, 180, 3];
+  c.donors.F = [2, 3, 1, 10, 2, 1, 0, 0, 0, 0, 0, 0];
+  c.donors.D = [0, 1, 0, 3, 3, 6, 0, 0, 0, 0, 0, 0];
+  const before = structuredClone(c);
+  const usage = { F: 0.8, D: 0.95, G: 0.7 },
+    depth = { F: 5, D: 2, G: 2 };
+  const shared = unifiedSalaryValues(
+    pool,
+    [c],
+    usage,
+    depth,
+    "matchup",
+    "shared",
+  );
+  const positional = unifiedSalaryValues(
+    pool,
+    [c],
+    usage,
+    depth,
+    "matchup",
+    "positional",
+  );
+  for (let i = 0; i < 12; i++) {
+    assert.equal(
+      shared.find((p) => p.id === `F${i}`)!.value,
+      shared.find((p) => p.id === `D${i}`)!.value,
+    );
+    assert.equal(
+      shared.find((p) => p.id === `G${i}`)!.value,
+      positional.find((p) => p.id === `G${i}`)!.value,
+    );
+  }
+  assert.ok(
+    shared.find((p) => p.id === "F11")!.value >
+      shared.find((p) => p.id === "D0")!.value,
+  );
+  assert.deepEqual(c, before);
+});
+void test("relaunch curve matches proposal anchors, payroll and a declining deeper pool", () => {
+  for (const [rank, salary] of [
+    [1, 10e6],
+    [20, 9.25e6],
+    [160, 5.75e6],
+    [325, 2.5e6],
+    [400, 1e6],
+  ])
+    assert.equal(relaunchAnnualSalary(rank!), salary);
+  let total = 0;
+  for (let rank = 1; rank <= 450; rank++) {
+    if (rank <= 210) total += relaunchAnnualSalary(rank);
+    if (rank > 1)
+      assert.ok(relaunchAnnualSalary(rank) <= relaunchAnnualSalary(rank - 1));
+  }
+  assert.equal(total, 1483950000);
+  assert.equal(relaunchAnnualSalary(231), 4.3e6);
+  assert.throws(() => relaunchAnnualSalary(NaN), /Invalid/);
 });
 void test("category ties give five credits and exposure keeps goalie qualification uncertain", () => {
   const c = context(),

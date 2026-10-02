@@ -4,6 +4,18 @@ import type { FunctionReference } from "convex/server";
 import { internal } from "./_generated/api";
 
 const crons = cronJobs();
+crons.daily(
+  "write matchup previews (Eastern daylight time)",
+  { hourUTC: 8, minuteUTC: 0 },
+  internal.matchupPreviews.scan,
+  {},
+);
+crons.daily(
+  "write matchup previews (Eastern standard time)",
+  { hourUTC: 9, minuteUTC: 0 },
+  internal.matchupPreviews.scan,
+  {},
+);
 crons.interval(
   "deliver due notifications",
   { minutes: 1 },

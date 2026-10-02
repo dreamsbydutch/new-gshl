@@ -67,6 +67,22 @@ own services. Deploying Convex activates code-defined crons, so review
 
 ## Data operations
 
+Matchup previews use the existing Convex Newsroom `OPENAI_API_KEY` and
+`OPENAI_NEWSROOM_MODEL`. Two UTC cron slots dispatch once daily at 4 a.m.
+Eastern, accounting for daylight saving time. Each missing team preview is
+written when its matchup starts in less than 96 hours. Published copy is
+preserved; failed or abandoned attempts can retry the following night.
+The byline comes from the franchise's beat writer (or the legacy reporter
+directory). No preview is published without an assigned writer or valid copy.
+
+Preview evidence includes current rosters, recorded player form over the last
+14 days, recent completed results and a bounded franchise head-to-head sample.
+Injury-reserve designations are not treated as medical diagnoses. Articles are
+deleted by scheduled mutations at 3 a.m. Eastern on the matchup's start date,
+with nightly cleanup as a fallback; the public query also hides started or
+completed matchups. Deploying the Convex schema and functions activates this
+workflow. Generating local bindings alone does not activate it.
+
 Use `gshl-data-operations` for any live or potentially destructive command. The
 standard sequence is exact target and scope, current `--help`, narrow dry run,
 reviewed counts/samples/conflicts, authorized apply, then an idempotency or

@@ -4,13 +4,17 @@ import Image from "next/image";
 import { NHLLogo } from "@gshl-components/player/NHLLogo";
 import type { MatchupDetailsPayload, MatchupDetailsTeam } from "@gshl-types";
 import { useMatchupPlayersToWatch } from "@gshl-hooks/features/useMatchupPlayersToWatch";
+import { useMatchupPreviewArticles } from "@gshl-hooks/main/useMatchupPreviewArticles";
+import type { MatchupPreviewArticle } from "@gshl-lib/types/matchup-preview-article";
 
 function TeamPreview({
   team,
   teamId,
+  article,
 }: {
   team: MatchupDetailsTeam | null;
   teamId: string;
+  article?: MatchupPreviewArticle;
 }) {
   const preview = useMatchupPlayersToWatch(teamId);
   return (
@@ -33,49 +37,59 @@ function TeamPreview({
         </p>
       ) : (
         <ul className="divide-y divide-slate-100">
-          {preview.players.map(({ position, label, player }) => (
+          {preview.players.length === 0 ? (
+            <li className="py-2 text-xs text-slate-600">
+              No ranked players available.
+            </li>
+          ) : null}
+          {preview.players.map((player, index) => (
             <li
-              key={position}
+              key={player.id}
               className="flex min-h-12 items-center gap-2 py-1.5 text-xs"
             >
-              <span className="w-14 shrink-0 text-slate-600">{label}</span>
-              {player ? (
-                <>
-                  <NHLLogo
-                    team={{ name: player.nhlTeam, logoUrl: "" }}
-                    size={22}
-                    className="!mx-0 shrink-0"
-                  />
-                  <div className="min-w-0 flex-1">
-                    <div
-                      className="truncate font-semibold text-slate-900"
-                      title={player.fullName}
-                    >
-                      {player.fullName}
-                    </div>
-                    <div className="truncate text-slate-600">
-                      {player.nhlPos.join(" / ")}
-                      {player.lineupPos === "IR" || player.lineupPos === "IRplus"
-                        ? " · Injured reserve"
-                        : ""}
-                    </div>
-                  </div>
-                  <span className="shrink-0 text-right tabular-nums text-slate-700">
-                    <span className="block font-semibold">
-                      #{player.overallRk}
-                    </span>
-                    <span className="block text-[10px]">Overall</span>
-                  </span>
-                </>
-              ) : (
-                <span className="text-slate-600">
-                  No ranked player available
-                </span>
-              )}
+              <span className="w-4 shrink-0 text-slate-600">{index + 1}</span>
+              <NHLLogo
+                team={{ name: player.nhlTeam, logoUrl: "" }}
+                size={22}
+                className="!mx-0 shrink-0"
+              />
+              <div className="min-w-0 flex-1">
+                <div
+                  className="truncate font-semibold text-slate-900"
+                  title={player.fullName}
+                >
+                  {player.fullName}
+                </div>
+                <div className="truncate text-slate-600">
+                  {player.nhlPos.join(" / ")}
+                  {player.lineupPos === "IR" || player.lineupPos === "IRplus"
+                    ? " · Injured reserve"
+                    : ""}
+                </div>
+              </div>
+              <span className="shrink-0 text-right tabular-nums text-slate-700">
+                <span className="block font-semibold">#{player.overallRk}</span>
+                <span className="block text-[10px]">Overall</span>
+              </span>
             </li>
           ))}
         </ul>
       )}
+      {article ? (
+        <article className="mt-3 border-t border-slate-200 pt-3">
+          <h4 className="font-oswald text-lg leading-tight text-slate-900">
+            {article.headline}
+          </h4>
+          <p className="mt-1 text-xs text-slate-600">
+            By {article.writer} · Team beat writer
+          </p>
+          <div className="mt-2 space-y-2 text-sm leading-relaxed text-slate-800">
+            {article.paragraphs.map((paragraph, index) => (
+              <p key={index}>{paragraph}</p>
+            ))}
+          </div>
+        </article>
+      ) : null}
     </div>
   );
 }
@@ -85,6 +99,7 @@ export function MatchupPlayersToWatch({
 }: {
   details: MatchupDetailsPayload;
 }) {
+  const articles = useMatchupPreviewArticles(details.matchup.id);
   return (
     <section
       aria-labelledby="players-to-watch-heading"
@@ -98,17 +113,23 @@ export function MatchupPlayersToWatch({
           Players to Watch
         </h2>
         <p className="text-xs text-slate-600">
-          Top-ranked players at each position on the current rosters.
+          Top three players on each current roster, by overall rank.
         </p>
       </div>
       <div className="grid divide-y divide-slate-200 sm:grid-cols-2 sm:divide-x sm:divide-y-0">
         <TeamPreview
           team={details.teams.away}
           teamId={details.matchup.awayTeamId}
+          article={articles.find(
+            (article) => article.teamId === details.matchup.awayTeamId,
+          )}
         />
         <TeamPreview
           team={details.teams.home}
           teamId={details.matchup.homeTeamId}
+          article={articles.find(
+            (article) => article.teamId === details.matchup.homeTeamId,
+          )}
         />
       </div>
     </section>

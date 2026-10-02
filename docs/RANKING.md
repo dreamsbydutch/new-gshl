@@ -1045,7 +1045,62 @@ from 39.2 to 42.1 points and rank 252 to 238, but remains $1m because his blende
 replacement-relative value remains negative. These are research previews,
 not published production salaries.
 
+The subsequent `retention-supported` candidate reduces the shrinkage prior
+from 12 to 3 player-equivalents while preserving the original production gate,
+minimum sample requirements and per-player influence cap. The exported forecast
+metadata now prefers this stronger year-one correction. It interpolates toward
+the empirical retention estimate, never beyond it. An alternative that also
+increased eligibility strength (`retention-strong`) worsened every reported
+error measure in the broader eligible cohort relative to conservative retention
+and was not selected.
+
+Supported retention reduces points RMSE to 15.37 in the 34-observation cohort
+(10.9% below the unadjusted model, versus 8.7% for conservative retention), and
+from 17.61 to 17.49 across all 72 eligible observations. Goals, assists, shots
+and blocks also improve in the stronger-production cohort versus conservative
+retention; games, power-play points and hits slightly worsen. Later-origin
+points error improves only marginally and other categories are mixed. These
+are exploratory comparisons on previously examined seasons, not an untouched
+validation set. Years two and three and the dollar pricing floor remain fixed.
+The next-season points estimates become 61.2 for Crosby and 43.4 for Ovechkin.
+The full valuation replay moves Crosby to rank 161 and $4.75m (from 179 and
+$4.15m after conservative retention), and Ovechkin to rank 231 (from 238), still
+at the $1m pricing floor. Selected-model later-matchup Brier improves relative
+to conservative retention to 0.241963 opening and 0.237511 prior-week. Relative
+to the original unadjusted candidate, opening Brier remains worse and prior-week
+Brier improves. Classification accuracy is 56.9% and 59.6%, respectively.
+
 ### Unified cross-position salary candidate
+
+The relaunch evaluator now defaults to a shared skater opportunity model.
+The proposal specifies one overall skater allowance with positional ceilings,
+not guaranteed defensive slots. The earlier positional replacement model
+implicitly reserved those slots and also gave defensemen their higher historical
+utilization rate. For the new candidate, F/D use the same weighted donor context,
+the same utilization and one real-player replacement band at combined skater
+ownership depth. Goalie valuation is unchanged. There is no defensive discount
+or forced position quota; identical F/D projections receive identical value.
+`--skater-pool positional` retains the older comparison. The forecast itself,
+including the veteran correction and 70/20/10 horizon weights, is unchanged.
+
+This is an approximation of shared skater opportunity, not a complete relaunch
+simulation: contexts remain historical, and the model does not select whole
+best-ball games under C/LW/RW/D ceilings. Full relaunch lineup effects remain
+unvalidated. The salary preview command now defaults to the owner proposal's
+PCHIP base-salary curve with anchors at ranks 1, 20, 160, 325 and 400. The former
+nonpositive-value dollar floor is not part of that curve. `--curve legacy`
+retains the previous pricing for explicit comparisons.
+
+In the October 2 shared-skater replay, defensemen fall from six of the top nine
+to three; Seider moves 3 to 8, Werenski 4 to 6, Schaefer 5 to 9 and Makar 7 to
+17. The top 20 contains 14 forwards and six defensemen. The retained
+`matchup-empirical` objective was selected on the same earlier evaluation years.
+On 485 later historical matchups, opening Brier worsens from 0.241963 to
+0.244250 and prior-week Brier from 0.237511 to 0.240767; accuracy falls from
+56.9% to 56.1% and 59.6% to 58.1%, respectively. Therefore this is a proposed-rule
+structural correction and preview, not evidence of improved prediction under
+the historical rules. It must not be described as a validated overall upgrade
+or published to production on the strength of a more familiar rank distribution.
 
 `unified-salary-value.ts` compares F, D and G in a single contribution unit:
 expected category victories (ties count one half), or expected matchup wins,

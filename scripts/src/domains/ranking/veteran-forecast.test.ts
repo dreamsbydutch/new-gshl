@@ -104,3 +104,44 @@ void test("young, non-forward and unproven players keep the baseline; invalid in
     /horizon/,
   );
 });
+
+void test("supported retention strengthens evidence without exceeding comparables or hiding departures", () => {
+  const p = profile(),
+    base = prediction(),
+    rows = examples();
+  const original = adjustVeteranForecast(p, 1, base, rows, "retention");
+  const supported = adjustVeteranForecast(
+    p,
+    1,
+    base,
+    rows,
+    "retention-supported",
+  );
+  assert.ok(supported.prediction.P > original.prediction.P);
+  assert.ok(supported.prediction.P < 70);
+  assert.equal(supported.audit.strength, original.audit.strength);
+  const departed = rows.map((r) => ({
+    ...r,
+    actual: { GP: 0, G: 0, A: 0, PPP: 0, SOG: 0, HIT: 0, BLK: 0 },
+  }));
+  assert.ok(
+    adjustVeteranForecast(p, 1, base, departed, "retention-supported")
+      .prediction.P <
+      adjustVeteranForecast(p, 1, base, departed, "retention").prediction.P,
+  );
+  assert.deepEqual(
+    adjustVeteranForecast(p, 1, base, rows.slice(0, 3), "retention-supported")
+      .prediction,
+    base,
+  );
+  const future = {
+    ...rows[0]!,
+    origin: 2023,
+    targetYear: 2024,
+    actual: { ...rows[0]!.actual, G: 1000 },
+  };
+  assert.deepEqual(
+    adjustVeteranForecast(p, 1, base, [...rows, future], "retention-supported"),
+    supported,
+  );
+});

@@ -8,21 +8,25 @@ import {
   SALARY_HORIZON_WEIGHTS,
 } from "../../runtime/unified-salary-value";
 import { spearman } from "../../domains/ranking/nhl-rating-diagnostics";
+import { relaunchAnnualSalary } from "../../runtime/relaunch-salary-curve";
 type Row = Record<string, any>;
 const { values } = parseArgs({
   options: {
     input: { type: "string" },
     output: { type: "string" },
     help: { type: "boolean" },
+    curve: { type: "string", default: "relaunch" },
   },
 });
 if (values.help)
   console.log(
-    "Offline single-price salary preview. --input <unified validation.json> --output <NEW directory>. One annual price for any 1–3 year term, weighted 70/20/10 across forecast years. Exports local CSV/JSON and historical weighting sensitivity; no production writes.",
+    "Offline single-price salary preview. --input <unified validation.json> --output <NEW directory> [--curve relaunch|legacy]. Defaults to the owner proposal's PCHIP base salaries. One annual price for any 1–3 year term, weighted 70/20/10. Exports local CSV/JSON; no production writes.",
   );
 else {
   if (!values.input || !values.output)
     throw new Error("Input and new output required");
+  if (!["relaunch", "legacy"].includes(values.curve!))
+    throw new Error("Unknown salary curve");
   const input = JSON.parse(await readFile(values.input, "utf8")),
     groups = new Map<string, Row[]>();
   for (const r of input.annualValues.filter(
@@ -53,7 +57,10 @@ else {
         (p) => Math.abs(p.value - r.value) <= 1e-10,
       ).length,
       pricingRank = r.rank + (equal - 1) / 2;
-    const annualSalary = unifiedAnnualSalary(pricingRank, r.value);
+    const annualSalary =
+      values.curve === "relaunch"
+        ? relaunchAnnualSalary(pricingRank)
+        : unifiedAnnualSalary(pricingRank, r.value);
     return {
       ...r,
       pricingRank,
@@ -100,11 +107,16 @@ else {
     origin: input.latestOrigin,
     method: input.selected,
     horizonWeights: SALARY_HORIZON_WEIGHTS,
+    curve: values.curve,
+    skaterPool: input.skaterPool ?? "positional",
     pricing:
-      "One annual salary for terms of one, two or three years. Existing rank-to-dollar curve, $50k rounding and $1m floor for nonpositive replacement value. No extra age adjustment.",
+      values.curve === "relaunch"
+        ? "Owner proposal PCHIP: ranks 1/20/160/325/400 at $10m/$9.25m/$5.75m/$2.5m/$1m. $50k rounding; annual base salary before renewal/UFA premiums. No replacement-value floor."
+        : "Legacy rank-to-dollar curve, $50k rounding and $1m floor for nonpositive replacement value.",
     players,
     sensitivity,
     limitations: [
+      "Shared skater valuation removes reserved positional slots; historical contexts do not simulate best-ball game selection or C/LW/RW/D appearance ceilings. This is a relaunch approximation, not a complete rules replay.",
       "70/20/10 is an explicit policy choice matching next-season priority, not a statistically proven optimal allocation.",
       "Sensitivity uses identical complete three-year cohorts and compares fixed next-season and three-year targets; target weighting does not change between candidates.",
       "Older-player forecasting concerns remain; changing horizon weights does not correct an overly pessimistic year-one forecast.",

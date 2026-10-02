@@ -560,6 +560,16 @@ must not be presented as current annual price options. Local CSV/JSON exports
 include annual salary, total commitments and historical weighting sensitivity.
 There are no database writes; all three horizons must be present.
 
+The evaluator now defaults to `--skater-pool shared`: forwards and defensemen
+share skater donor contexts, utilization and a combined replacement pool.
+Use `--skater-pool positional` to reproduce the earlier scarcity model. This
+removes reserved defensive-slot assumptions; historical contexts still do not
+replay the proposal's best-ball selections or C/LW/RW/D appearance ceilings.
+The pricing command defaults to `--curve relaunch`, using the proposal's PCHIP
+benchmarks and $50k rounding, with a $1m floor at rank 400. These are base salaries
+before renewal/UFA premiums. `--curve legacy` retains the former curve and its
+experimental nonpositive-value floor for comparison. No existing contracts change.
+
 To test sustained-production veteran corrections before valuation:
 
 ```bash
@@ -567,7 +577,7 @@ node ../node_modules/tsx/dist/cli.mjs --tsconfig tsconfig.json src/commands/rati
 ```
 
 Use the resulting `forecasts.json` as the evaluator input. Its preferred-method
-metadata selects the retention correction for year one; later years retain the
+metadata selects the supported-retention correction for year one; later years retain the
 baseline. The evaluator's `--veteran-method` can select another exported variant
 for comparison. The test exports historical category errors and forecasts using
 only completed outcomes at each origin. It reads local snapshots and writes a

@@ -37,10 +37,7 @@ export function selectPlayersToWatch<T extends WatchPlayer>(
         Number(a.overallRk) - Number(b.overallRk) ||
         a.fullName.localeCompare(b.fullName),
     );
-  return (["F", "D", "G"] as const).map((position) => ({
-    position,
-    label:
-      position === "F" ? "Forward" : position === "D" ? "Defense" : "Goalie",
-    player: ranked.find((player) => player.posGroup === position),
-  }));
+  return [
+    ...new Map(ranked.map((player) => [player.id, player])).values(),
+  ].slice(0, 3);
 }

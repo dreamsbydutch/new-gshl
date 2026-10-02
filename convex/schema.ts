@@ -607,7 +607,12 @@ export default defineSchema({
       createdAt: timestampValue,
       updatedAt: timestampValue,
     },
-    ["seasonId", ["seasonId", "weekNum"], ["seasonId", "startDate"]],
+    [
+      "seasonId",
+      "startDate",
+      ["seasonId", "weekNum"],
+      ["seasonId", "startDate"],
+    ],
   ),
 
   matchups: table(
@@ -644,6 +649,28 @@ export default defineSchema({
       ["seasonId", "awayTeamId"],
     ],
   ),
+
+  matchupPreviews: defineTable({
+    matchupId: v.id("matchups"),
+    teamId: v.id("teams"),
+    startsAt: v.number(),
+    status: v.union(
+      v.literal("generating"),
+      v.literal("published"),
+      v.literal("failed"),
+    ),
+    attemptAt: v.number(),
+    writer: v.optional(v.string()),
+    headline: v.optional(v.string()),
+    paragraphs: v.optional(v.array(v.string())),
+    evidence: v.optional(
+      v.array(v.object({ id: v.string(), text: v.string() })),
+    ),
+    publishedAt: v.optional(v.number()),
+    failure: v.optional(v.string()),
+  })
+    .index("by_matchupId_teamId", ["matchupId", "teamId"])
+    .index("by_startsAt", ["startsAt"]),
 
   events: table(
     {

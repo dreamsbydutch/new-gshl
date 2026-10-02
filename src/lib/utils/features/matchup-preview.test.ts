@@ -19,7 +19,7 @@ void test("preview is only shown before the matchup starts and never for final r
   assert.equal(isMatchupUpcoming({}, week, undefined), false);
 });
 
-void test("watch list uses the best published rank in each position without changing the roster", () => {
+void test("watch list takes the top three overall regardless of position without changing the roster", () => {
   const players = [
     {
       id: "f2",
@@ -39,17 +39,15 @@ void test("watch list uses the best published rank in each position without chan
   ];
   const before = structuredClone(players);
   assert.deepEqual(
-    selectPlayersToWatch(players).map(({ player }) => player?.id),
-    ["f1", "d", "g"],
+    selectPlayersToWatch(players).map((player) => player.id),
+    ["f1", "f2", "d"],
   );
   assert.deepEqual(players, before);
-  assert.ok(
-    selectPlayersToWatch([]).every(({ player }) => player === undefined),
-  );
+  assert.deepEqual(selectPlayersToWatch([]), []);
   for (const overallRk of [null, undefined, NaN, Infinity, -1])
     assert.ok(
       selectPlayersToWatch([
         { id: "missing", fullName: "Missing", posGroup: "G", overallRk },
-      ]).every(({ player }) => player === undefined),
+      ]).length === 0,
     );
 });

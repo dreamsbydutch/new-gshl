@@ -53,11 +53,17 @@ export function adjustVeteranForecast(
   mode:
     | "availability"
     | "availability-and-rates"
-    | "retention" = "availability-and-rates",
+    | "retention"
+    | "retention-supported"
+    | "retention-strong" = "availability-and-rates",
 ) {
   if (!Number.isInteger(horizon) || horizon < 1 || horizon > 3)
     throw new Error("Invalid forecast horizon");
-  const strength = veteranEvidence(profile);
+  const evidence = veteranEvidence(profile);
+  // The stronger candidate gives sustained producers more weight without
+  // extrapolating beyond the empirical retention estimate.
+  const strength = mode === "retention-strong" ? Math.sqrt(evidence) : evidence;
+  const retention = mode.startsWith("retention");
   const unchanged = {
     prediction: { ...prediction },
     audit: {
@@ -111,7 +117,12 @@ export function adjustVeteranForecast(
     total = mass.reduce((s, w) => s + w, 0),
     effective = (total * total) / (mass.reduce((s, w) => s + w * w, 0) || 1);
   if (byPlayer.size < 6 || effective < 4) return unchanged;
-  const shrink = total / (total + 12),
+  const shrink =
+      total /
+      (total +
+        (mode === "retention-strong" || mode === "retention-supported"
+          ? 3
+          : 12)),
     gpResidual =
       weighted.reduce(
         (s, { e, w }) => s + w * (e.actual.GP - e.predicted.GP),
@@ -125,7 +136,7 @@ export function adjustVeteranForecast(
       prediction.GP +
         strength *
           shrink *
-          (mode === "retention" ? retainedGP - prediction.GP : gpResidual),
+          (retention ? retainedGP - prediction.GP : gpResidual),
       0,
       82,
     ),
@@ -167,7 +178,7 @@ export function adjustVeteranForecast(
           ) * gp;
       }
   }
-  if (mode === "retention")
+  if (retention)
     for (const k of RATE_KEYS) {
       // Direct counting-stat retention includes departures and the covariance of workload and scoring.
       const retained =

@@ -110,6 +110,8 @@ else {
     "availability",
     "availability-and-rates",
     "retention",
+    "retention-strong",
+    "retention-supported",
   ] as const) {
     const predictions: Row[] = raw.map((r) => {
       const profile = profiles.get(`${r.origin}:${r.playerId}`),
@@ -149,6 +151,8 @@ else {
     "availability",
     "availability-and-rates",
     "retention",
+    "retention-strong",
+    "retention-supported",
   ].flatMap((mode) =>
     [1, 2, 3].map((horizon) => {
       const rows = evaluated.filter(
@@ -196,7 +200,7 @@ else {
     resolve(values.output, "forecasts.json"),
     JSON.stringify({
       ...forecast,
-      preferredVeteranMethod: "veteran-retention",
+      preferredVeteranMethod: "veteran-retention-supported",
       variants: [...forecast.variants, ...variants],
     }),
     { flag: "wx" },
@@ -222,8 +226,9 @@ else {
           ...r,
           metrics: r.metrics.filter((m) => ["GP", "P"].includes(m.category)),
         })),
-        sample: variants[2]!.predictions
-          .filter(
+        sample: variants
+          .find((v) => v.method === "veteran-retention-supported")!
+          .predictions.filter(
             (r) => r.origin === 2025 && [8471675, 8471214].includes(r.playerId),
           )
           .map((r) => ({
