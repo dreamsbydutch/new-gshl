@@ -560,6 +560,20 @@ must not be presented as current annual price options. Local CSV/JSON exports
 include annual salary, total commitments and historical weighting sensitivity.
 There are no database writes; all three horizons must be present.
 
+To test sustained-production veteran corrections before valuation:
+
+```bash
+node ../node_modules/tsx/dist/cli.mjs --tsconfig tsconfig.json src/commands/ratings/test-veteran-forecasts.ts --forecasts ../.local-data/unified-forecasts/forecasts.json --source ../.local-data/draft-slot-research/source.json --directory ../.local-data/position-history/directory-linked.json --output ../.local-data/veteran-forecasts
+```
+
+Use the resulting `forecasts.json` as the evaluator input. Its preferred-method
+metadata selects the retention correction for year one; later years retain the
+baseline. The evaluator's `--veteran-method` can select another exported variant
+for comparison. The test exports historical category errors and forecasts using
+only completed outcomes at each origin. It reads local snapshots and writes a
+new local directory; it does not access production or external APIs. See
+`docs/RANKING.md` for the limited cohort evidence and broader matchup tradeoff.
+
 `src/commands/ratings/test-salary-rating-curves.ts` tests further score calibration
 changes using the isolated experiment's local derived forecasts. Pass `--input`
 with the calibrated isolated directory and `--output` with a new directory.

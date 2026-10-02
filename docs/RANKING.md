@@ -1008,8 +1008,42 @@ optimal percentages. The output retains every tested blend by position.
 
 Changing weights does not fix the identified older-forward forecast weakness:
 the revised local snapshot prices Crosby at $4m and Ovechkin at $1m using the
-unchanged category forecasts. Those veteran prices remain under review. This
+unchanged category forecasts. The veteran correction below addresses part of
+that weakness. This
 workflow writes local previews only; production publication is unchanged.
+
+### Sustained-production veteran forecast candidate
+
+`veteran-forecast.ts` learns counting-stat retention from comparable older
+forwards, using only outcomes completed by each forecast origin. Eligibility
+requires at least 40 games in each of the last two seasons. Correction strength
+ramps from age 32 to 35 and from sustained 0.6 to 1.0 points per game, using the
+lower of the two seasons' scoring rates. There are no named-player exceptions.
+Comparables are weighted by age, workload and sustained production; each
+historical player's combined influence is capped at one observation. Sparse
+samples retain the baseline. Shrinkage limits the correction, and departures
+remain zero-production outcomes rather than disappearing from training.
+
+The local evaluator applies the preferred retention variant to year one only.
+Years two and three retain the original forecast because longer-horizon
+category results were mixed. Defensemen and goalies are unchanged. Salary
+weights remain 70/20/10, including the existing experimental pricing floor.
+
+Across 34 stronger-eligibility next-season observations from 11 players in five
+origin seasons, points RMSE falls from 17.24 to 15.75 (8.7%) and games-played
+RMSE improves 1.8%. All seven skater-category errors improve in this cohort.
+Points error also improves when Crosby and Ovechkin are excluded from evaluation
+rows; this is not a leave-player-out training test. Repeated players, a small
+cohort and candidate selection on these years limit the strength of the result.
+On 485 later GSHL matchups, selected-model Brier slightly worsens: opening
+0.241595 to 0.242053 and prior-week 0.237626 to 0.237691. This supports a targeted
+veteran production correction, not a claim of improved overall matchup accuracy.
+
+In the local 2025–26 season-end snapshot, Crosby's next-season points forecast
+rises from 54.2 to 59.2 and his annual salary from $4m to $4.15m. Ovechkin rises
+from 39.2 to 42.1 points and rank 252 to 238, but remains $1m because his blended
+replacement-relative value remains negative. These are research previews,
+not published production salaries.
 
 ### Unified cross-position salary candidate
 

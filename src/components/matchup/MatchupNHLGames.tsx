@@ -7,6 +7,7 @@ import { useMatchupNHLGames } from "@gshl-hooks/features/useMatchupNHLGames";
 import type { MatchupDetailsPayload } from "@gshl-types";
 import { formatMatchupPlayerName } from "@gshl-utils/features/matchup-details";
 import { nhlGameStatus } from "@gshl-utils/features/nhl";
+import { MatchupPlayersToWatch } from "./MatchupPlayersToWatch";
 
 export function MatchupNHLGames({
   details,
@@ -14,6 +15,7 @@ export function MatchupNHLGames({
   details: MatchupDetailsPayload;
 }) {
   const schedule = useMatchupNHLGames(details);
+  if (schedule.isUpcoming) return <MatchupPlayersToWatch details={details} />;
   if (!schedule.isActive) return null;
 
   return (

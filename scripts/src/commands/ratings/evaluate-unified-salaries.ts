@@ -29,11 +29,12 @@ const { values } = parseArgs({
     source: { type: "string" },
     output: { type: "string" },
     help: { type: "boolean" },
+    "veteran-method": { type: "string" },
   },
 });
 if (values.help)
   console.log(
-    "Offline unified F/D/G valuation. --forecasts <derived forecasts.json> --history <audited history directory> --source <draft source.json> --output <NEW directory>. Evaluates both opening and prior-week rosters, chronological calibration and real-player replacement bands. Produces one latest combined ranking and all candidates; never writes production.",
+    "Offline unified F/D/G valuation. --forecasts <derived forecasts.json> --history <audited history directory> --source <draft source.json> --output <NEW directory> [--veteran-method <variant>]. Uses a forecast file's preferredVeteranMethod when supplied, applying it to year one only. Evaluates both opening and prior-week rosters, chronological calibration and real-player replacement bands. Never writes production.",
   );
 else {
   if (!values.forecasts || !values.history || !values.source || !values.output)
@@ -76,6 +77,31 @@ else {
       ? (development.get(`${r.origin}:${r.horizon}:${r.playerId}`) ?? r)
       : r,
   );
+  const veteranMethod =
+    values["veteran-method"] ?? forecast.preferredVeteranMethod;
+  if (veteranMethod) {
+    const variant = forecast.variants.find(
+      (r: Row) => r.method === veteranMethod,
+    );
+    if (!variant) throw new Error("Missing veteran forecast variant");
+    const adjusted = new Map<string, Row>(
+      variant.predictions.map((r: Row) => [
+        `${r.origin}:${r.horizon}:${r.playerId}`,
+        r,
+      ]),
+    );
+    for (let i = 0; i < predictions.length; i++) {
+      const r = predictions[i]!;
+      // The tested upgrade is next-season only; longer-horizon retention is not selected.
+      if (r.horizon === 1 && r.position === "F" && r.originGames >= 40) {
+        const candidate = adjusted.get(
+          `${r.origin}:${r.horizon}:${r.playerId}`,
+        );
+        if (!candidate) throw new Error("Incomplete veteran forecast join");
+        predictions[i] = candidate;
+      }
+    }
+  }
   const latestOrigin = Math.max(...predictions.map((r) => r.origin)),
     positions: Position[] = ["F", "D", "G"];
   const variants: {
@@ -471,6 +497,7 @@ else {
     ),
   );
   const report = {
+    veteranMethod: veteranMethod ?? null,
     generatedAt: new Date().toISOString(),
     version: "unified-salary-research-v1",
     latestOrigin,
