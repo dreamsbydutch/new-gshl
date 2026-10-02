@@ -34,6 +34,7 @@ import {
 import { canShareOwnerContent } from "@gshl-utils/features/whatsapp-share";
 import { buildMatchupWhatsAppShareMessage } from "@gshl-utils/features/whatsapp-messages";
 import { PlayerStatsTable } from "./PlayerStatsTable";
+import { MatchupNHLGames } from "./MatchupNHLGames";
 import { ArrowLeftIcon, StarIcon } from "lucide-react";
 
 function CategoryResultsCard({
@@ -541,6 +542,7 @@ export function MatchupDetailsContent({
       </section>
 
       <section className="mt-3 space-y-2 sm:mt-6 sm:space-y-4">
+        {details ? <MatchupNHLGames details={details} /> : null}
         <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
           <div
             role="tablist"

@@ -40,6 +40,52 @@ export function isMatchupDetailsComplete(
   return endDate < today;
 }
 
+/** The schedule day uses the matchup's 3 a.m. Eastern rollover. */
+export function isMatchupInPlay(
+  matchup: Partial<MatchupDetailsMatchup> | null,
+  week: Pick<MatchupDetailsWeek, "startDate" | "endDate"> | null,
+  scheduleDate: string | undefined,
+): boolean {
+  const start = normalizeDateOnlyValue(week?.startDate);
+  const end = normalizeDateOnlyValue(week?.endDate);
+  return Boolean(
+    matchup &&
+      !isMatchupDetailsComplete(matchup, null) &&
+      scheduleDate &&
+      start &&
+      end &&
+      start <= scheduleDate &&
+      scheduleDate <= end,
+  );
+}
+
+export function getMatchupTodayGames(
+  games: NHLSchedule["gameWeek"][number]["games"],
+  awayPlayers: readonly PlayerStatRow[],
+  homePlayers: readonly PlayerStatRow[],
+) {
+  const involvedPlayers = (
+    players: readonly PlayerStatRow[],
+    game: (typeof games)[number],
+  ) =>
+    [
+      ...new Map(
+        players
+          .filter((player) => getPlayerTodayGames(player, [game]).length > 0)
+          .map((player) => [player.id, player]),
+      ).values(),
+    ].sort((a, b) =>
+      formatMatchupPlayerName(a).localeCompare(formatMatchupPlayerName(b)),
+    );
+  return games
+    .map((game) => ({
+      game,
+      awayPlayers: involvedPlayers(awayPlayers, game),
+      homePlayers: involvedPlayers(homePlayers, game),
+    }))
+    .filter((row) => row.awayPlayers.length > 0 || row.homePlayers.length > 0);
+}
+
 /** Match today's schedule against current affiliations, not a historical week. */
 export function getPlayerTodayGames(
   player: PlayerStatRow,

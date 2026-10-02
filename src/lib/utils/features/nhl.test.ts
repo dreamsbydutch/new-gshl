@@ -51,6 +51,29 @@ void test("home NHL dates follow Eastern time across the year boundary", () => {
   );
 });
 
+void test("matchup schedule rolls over at 3 a.m. Eastern, including DST and year boundaries", () => {
+  for (const [instant, expected] of [
+    ["2027-01-01T05:00:00Z", "2026-12-31"],
+    ["2027-01-01T07:59:59Z", "2026-12-31"],
+    ["2027-01-01T08:00:00Z", "2027-01-01"],
+    ["2026-10-02T04:00:00Z", "2026-10-01"],
+    ["2026-10-02T06:59:59Z", "2026-10-01"],
+    ["2026-10-02T07:00:00Z", "2026-10-02"],
+    ["2026-03-08T06:59:59Z", "2026-03-07"],
+    ["2026-03-08T07:00:00Z", "2026-03-08"],
+    ["2026-11-01T05:30:00Z", "2026-10-31"],
+    ["2026-11-01T06:30:00Z", "2026-10-31"],
+    ["2026-11-01T07:59:59Z", "2026-10-31"],
+    ["2026-11-01T08:00:00Z", "2026-11-01"],
+  ] as const) {
+    assert.equal(
+      getNHLHomeScheduleDays(new Date(instant), 3)[1]?.date,
+      expected,
+      instant,
+    );
+  }
+});
+
 void test("home NHL dates stay consecutive through daylight saving changes", () => {
   for (const [instant, expected] of [
     ["2026-03-08T16:00:00Z", ["2026-03-07", "2026-03-08", "2026-03-09"]],

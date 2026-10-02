@@ -50,6 +50,48 @@ void test("home schedule switches days and rolls forward when the app regains fo
   assert.equal(requestedDates.at(-1), "2026-09-28");
 });
 
+void test("matchup schedule keeps yesterday after midnight and refreshes at 3 a.m. Eastern", async (t) => {
+  const { events, restore } = browser(t);
+  t.mock.timers.setTime(new Date("2026-10-02T04:00:00Z").getTime());
+  const requestedDates: string[] = [];
+  t.mock.method(globalThis, "fetch", async (url: string) => {
+    const params = new URL(url, "https://gshl.test").searchParams;
+    const date = params.get("start")!;
+    requestedDates.push(date);
+    return Response.json({
+      updatedAt: Date.now(),
+      seasonId: Number(params.get("season")),
+      published: true,
+      gameWeek: [{ date, games: [] }],
+    });
+  });
+  let latest: ReturnType<typeof useNHLHomeSchedule> | undefined;
+  function Probe() {
+    latest = useNHLHomeSchedule(3);
+    return null;
+  }
+  let renderer: ReactTestRenderer | undefined;
+  t.after(() => {
+    act(() => renderer?.unmount());
+    restore();
+  });
+  await act(async () => {
+    renderer = create(createElement(Probe));
+  });
+  assert.equal(latest?.selectedDay?.date, "2026-10-01");
+  assert.equal(requestedDates.at(-1), "2026-10-01");
+  t.mock.timers.setTime(new Date("2026-10-02T06:59:00Z").getTime());
+  await act(async () => {
+    events.dispatchEvent(new Event("focus"));
+  });
+  assert.equal(latest?.selectedDay?.date, "2026-10-01");
+  await act(async () => {
+    t.mock.timers.tick(60_000);
+  });
+  assert.equal(latest?.selectedDay?.date, "2026-10-02");
+  assert.equal(requestedDates.at(-1), "2026-10-02");
+});
+
 function browser(t: TestContext) {
   const windowDescriptor = Object.getOwnPropertyDescriptor(
     globalThis,

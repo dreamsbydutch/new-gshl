@@ -548,6 +548,18 @@ The report optionally accepts `--forecast-baseline` pointing to the preceding
 calibrated `salary-validation.json`. This adds an identity/term-matched comparison
 against the prior category forecaster, alongside the original talent baseline.
 
+For the current signing policy, follow evaluation with the single-price command:
+
+```bash
+node ../node_modules/tsx/dist/cli.mjs --tsconfig tsconfig.json src/commands/ratings/price-unified-salaries.ts --input ../.local-data/unified-values/validation.json --output ../.local-data/unified-salaries
+```
+
+This produces one annual salary for any one- to three-year term, weighting future
+value 70/20/10. The old report's separate term averages remain diagnostics and
+must not be presented as current annual price options. Local CSV/JSON exports
+include annual salary, total commitments and historical weighting sensitivity.
+There are no database writes; all three horizons must be present.
+
 `src/commands/ratings/test-salary-rating-curves.ts` tests further score calibration
 changes using the isolated experiment's local derived forecasts. Pass `--input`
 with the calibrated isolated directory and `--output` with a new directory.

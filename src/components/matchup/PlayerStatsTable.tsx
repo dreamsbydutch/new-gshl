@@ -36,7 +36,7 @@ export function PlayerStatsTable({
   headline?: string;
   seasonCategories?: readonly string[];
 }) {
-  const schedule = useNHLHomeSchedule();
+  const schedule = useNHLHomeSchedule(3);
   const columns = buildPlayerStatColumns({
     players,
     categories: seasonCategories,

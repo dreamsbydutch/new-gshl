@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useNHLSchedule } from "../main/useNHL";
 import { getNHLHomeScheduleDays } from "@gshl-utils/features/nhl";
 
-export function useNHLHomeSchedule() {
+export function useNHLHomeSchedule(rolloverHour = 0) {
   const [days, setDays] = useState<ReturnType<typeof getNHLHomeScheduleDays>>(
     [],
   );
@@ -12,7 +12,7 @@ export function useNHLHomeSchedule() {
 
   useEffect(() => {
     const refresh = () => {
-      const next = getNHLHomeScheduleDays(new Date());
+      const next = getNHLHomeScheduleDays(new Date(), rolloverHour);
       setDays((previous) =>
         previous[1]?.date === next[1]?.date ? previous : next,
       );
@@ -24,7 +24,7 @@ export function useNHLHomeSchedule() {
       clearInterval(timer);
       window.removeEventListener("focus", refresh);
     };
-  }, []);
+  }, [rolloverHour]);
 
   const selectedDay = days[selectedIndex];
   const schedule = useNHLSchedule(

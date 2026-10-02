@@ -9,12 +9,53 @@ import {
 import {
   unifiedSalaryValues,
   rankUnifiedValues,
+  singleSalaryValue,
+  unifiedAnnualSalary,
 } from "../../runtime/unified-salary-value";
 import {
   fitMatchupProbability,
   matchupProbability,
 } from "../../runtime/matchup-probability";
 import { compareUnifiedForecastContracts } from "./unified-contract-comparison";
+
+void test("one salary emphasizes next year and requires all three forecast horizons", () => {
+  const years = [
+    { horizon: 3, value: 0 },
+    { horizon: 1, value: 10 },
+    { horizon: 2, value: 5 },
+  ];
+  assert.equal(singleSalaryValue(years), 8);
+  assert.equal(
+    singleSalaryValue([
+      { horizon: 1, value: 10 },
+      { horizon: 2, value: 0 },
+      { horizon: 3, value: 0 },
+    ]),
+    7,
+  );
+  assert.equal(
+    singleSalaryValue([
+      { horizon: 1, value: 0 },
+      { horizon: 2, value: 10 },
+      { horizon: 3, value: 10 },
+    ]),
+    3,
+  );
+  assert.throws(() => singleSalaryValue(years.slice(1)), /Three complete/);
+  assert.throws(
+    () =>
+      singleSalaryValue([
+        { horizon: 1, value: 1 },
+        { horizon: 1, value: 2 },
+        { horizon: 3, value: 3 },
+      ]),
+    /Three complete/,
+  );
+  assert.throws(() => singleSalaryValue(years, [0.7, 0.2, 0.2]), /weights/);
+  assert.equal(unifiedAnnualSalary(21, 1), 9e6);
+  assert.equal(unifiedAnnualSalary(1, -0.1), 1e6);
+  assert.throws(() => unifiedAnnualSalary(NaN, 1), /Invalid/);
+});
 
 void test("forecast comparison pairs identities and chooses the origin-known workload model", () => {
   const contracts = [1, 2, 3].map((id) => ({

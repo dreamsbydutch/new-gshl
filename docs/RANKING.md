@@ -983,6 +983,34 @@ between them remains unproven. Two-/three-year contract-level matchup value,
 schedule/lineup effects and uncertainty must be validated before publication.
 Research outputs retain all scenarios, exclusions and failed alternatives.
 
+### Single annual salary: next-season priority
+
+Signing policy clarification: calculate one annual salary immediately after the
+regular season; owners may use that price for any one-, two- or three-year term.
+Separate two-/three-year prices from the earlier research are superseded.
+Contract-length averages remain diagnostic measures, not alternative quotes.
+
+The current research pricing step weights projected replacement-relative value
+70% next season, 20% year two and 10% year three, then ranks all positions together
+and applies the existing salary anchors and $50k rounding. Nonpositive blended
+value retains the experimental $1m floor. Term length changes total commitment,
+not annual salary. All three forecast years are required; a missing horizon is
+an error, not permission to redistribute its weight. No extra age multiplier is
+applied after forecasting.
+
+70/20/10 is a transparent policy choice reflecting the league's stated emphasis,
+not an empirically unique optimum. On the same 3,192 complete three-year player
+windows, next-season rank correlation improves from 0.7837 with equal weights
+to 0.7965, while three-year correlation remains 0.8004 versus 0.8001. An 80/15/5
+blend yields 0.7982 and 0.7989; next-season-only yields 0.7996 and 0.7952. These
+small tradeoffs and repeated historical observations do not establish precise
+optimal percentages. The output retains every tested blend by position.
+
+Changing weights does not fix the identified older-forward forecast weakness:
+the revised local snapshot prices Crosby at $4m and Ovechkin at $1m using the
+unchanged category forecasts. Those veteran prices remain under review. This
+workflow writes local previews only; production publication is unchanged.
+
 ### Unified cross-position salary candidate
 
 `unified-salary-value.ts` compares F, D and G in a single contribution unit:

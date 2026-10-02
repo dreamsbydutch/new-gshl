@@ -11,6 +11,8 @@ import {
   buildPlayerStatColumns,
   getPlayerStatCardColumns,
   getPlayerTodayGames,
+  getMatchupTodayGames,
+  isMatchupInPlay,
   isMatchupDetailsComplete,
   renderPlayerStatCell,
 } from "./matchup-details";
@@ -120,6 +122,59 @@ void test("today's games match current NHL teams, aliases, and either side witho
     getPlayerTodayGames({ id: "no-games", nhlTeam: ["TOR"] }, []),
     [],
   );
+});
+
+void test("relevant games include both GSHL sides, deduplicate players, and exclude unrelated games", () => {
+  const game: NHLSchedule["gameWeek"][number]["games"][number] = {
+    id: 2026020001,
+    season: 20262027,
+    gameType: 2,
+    startTimeUTC: "2026-10-02T00:00:00Z",
+    gameState: "LIVE",
+    gameScheduleState: "OK",
+    awayTeam: { abbrev: "NJD", placeName: { default: "New Jersey" }, score: 2 },
+    homeTeam: { abbrev: "TOR", placeName: { default: "Toronto" }, score: 1 },
+  };
+  const away = { id: "away", fullName: "Away Player", nhlTeam: ["NJ"] };
+  const home = {
+    id: "home",
+    fullName: "Home Player",
+    nhlTeam: ["BOS"],
+    currentNhlTeam: ["TOR"],
+  };
+  const unrelated = {
+    ...game,
+    id: 2026020002,
+    awayTeam: { ...game.awayTeam, abbrev: "BOS" },
+    homeTeam: { ...game.homeTeam, abbrev: "MTL" },
+  };
+  const games = [game, unrelated];
+  assert.deepEqual(getMatchupTodayGames(games, [away, away], [home]), [
+    { game, awayPlayers: [away], homePlayers: [home] },
+  ]);
+  assert.deepEqual(getMatchupTodayGames(games, [], [home]), [
+    { game, awayPlayers: [], homePlayers: [home] },
+  ]);
+  assert.deepEqual(getMatchupTodayGames(games, [], []), []);
+  assert.deepEqual(getMatchupTodayGames([], [away], [home]), []);
+  assert.equal(games.length, 2);
+});
+
+void test("the NHL games panel appears only within the active matchup's schedule days", () => {
+  const week = { startDate: "2026-10-01", endDate: "2026-10-07" };
+  for (const date of ["2026-10-01", "2026-10-04", "2026-10-07"])
+    assert.equal(isMatchupInPlay({}, week, date), true);
+  for (const date of [undefined, "2026-09-30", "2026-10-08"])
+    assert.equal(isMatchupInPlay({}, week, date), false);
+  for (const result of [
+    { isComplete: true },
+    { homeWin: true },
+    { awayWin: true },
+    { tie: true },
+  ])
+    assert.equal(isMatchupInPlay(result, week, "2026-10-04"), false);
+  assert.equal(isMatchupInPlay(null, week, "2026-10-04"), false);
+  assert.equal(isMatchupInPlay({}, null, "2026-10-04"), false);
 });
 
 function player(

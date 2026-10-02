@@ -7,6 +7,50 @@ import {
 } from "./positional-matchup-value";
 
 export type SalaryObjective = "categories" | "matchup";
+/** League policy: one salary, predominantly next season, regardless of chosen term. */
+export const SALARY_HORIZON_WEIGHTS = [0.7, 0.2, 0.1] as const;
+export function singleSalaryValue(
+  years: readonly { horizon: number; value: number }[],
+  weights: readonly number[] = SALARY_HORIZON_WEIGHTS,
+) {
+  if (
+    years.length !== 3 ||
+    new Set(years.map((r) => r.horizon)).size !== 3 ||
+    years.some(
+      (r) => ![1, 2, 3].includes(r.horizon) || !Number.isFinite(r.value),
+    )
+  )
+    throw new Error("Three complete finite forecast years required");
+  if (
+    weights.length !== 3 ||
+    weights.some((w) => !Number.isFinite(w) || w < 0) ||
+    Math.abs(weights.reduce((s, w) => s + w, 0) - 1) > 1e-9
+  )
+    throw new Error("Invalid horizon weights");
+  return years.reduce((s, r) => s + r.value * weights[r.horizon - 1]!, 0);
+}
+/** Existing rank-to-dollar anchors; the experimental replacement floor is retained. */
+export function unifiedAnnualSalary(rank: number, value: number) {
+  if (!Number.isFinite(rank) || rank < 1 || !Number.isFinite(value))
+    throw new Error("Invalid salary inputs");
+  const anchors = [
+    [3.5, 10e6],
+    [21, 9e6],
+    [35, 8e6],
+    [154, 5e6],
+    [240, 2e6],
+    [285, 1e6],
+  ] as const;
+  if (value <= 0 || rank >= 285) return 1e6;
+  if (rank <= 3.5) return 10e6;
+  for (let i = 1; i < anchors.length; i++) {
+    const [a, x] = anchors[i - 1]!,
+      [b, y] = anchors[i]!;
+    if (rank <= b)
+      return Math.round((x + ((y - x) * (rank - a)) / (b - a)) / 50000) * 50000;
+  }
+  throw new Error("Unpriced rank");
+}
 export type SalaryValue = {
   id: string;
   position: Position;
