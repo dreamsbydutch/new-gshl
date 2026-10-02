@@ -39,6 +39,71 @@ const article = {
   evidence: [{ id: "roster", text: "Known roster" }],
 };
 
+void test("preview history reaches all 13 seasons and prefers actual matchup dates over import order", async (t) => {
+  t.mock.timers.enable({ apis: ["Date"], now: NOW });
+  const f = fixture();
+  for (const side of ["home", "away"]) {
+    f.put("franchises", `${side}-franchise`, {
+      name: side,
+      ownerId: `${side}-owner`,
+      beatWriter: `${side} reporter`,
+    });
+    // Imported rows can arrive in any order, unrelated to season chronology.
+    for (const year of [
+      2023, 2022, 2021, 2014, 2015, 2016, 2017, 2018, 2019, 2020, 2024, 2025,
+      2026,
+    ]) {
+      f.put("teams", `${side}-${year}`, {
+        seasonId: `season-${year}`,
+        franchiseId: `${side}-franchise`,
+      });
+    }
+    f.put("teams", side, {
+      seasonId: "season",
+      franchiseId: `${side}-franchise`,
+    });
+  }
+  for (let year = 2014; year <= 2026; year++) {
+    f.put("weeks", `week-${year}`, { startDate: Date.parse(`${year}-03-01`) });
+    f.put("matchups", `meeting-${year}`, {
+      seasonId: `season-${year}`,
+      weekId: `week-${year}`,
+      homeTeamId: `home-${year}`,
+      awayTeamId: `away-${year}`,
+      homeWin: true,
+      homeScore: 7,
+      awayScore: 3,
+    });
+  }
+  await invokeMutation(scan, f.ctx, {});
+  const row = f.rows("matchupPreviews").find((item) => item.teamId === "home")!;
+  const result = await invokeMutation(evidence, f.ctx, {
+    id: row._id,
+    attemptAt: NOW,
+  });
+  assert.ok(result && typeof result === "object" && "facts" in result);
+  const facts = result.facts as { id: string; text: string }[];
+  const history = JSON.parse(
+    facts.find((fact) => fact.id === "head-to-head")!.text,
+  ) as {
+    meetings: { date: string }[];
+    totalRecordedMeetings: number;
+    earliestRecordedMeeting: string;
+  };
+  assert.equal(history.meetings[0]?.date, "2026-03-01");
+  assert.equal(history.meetings.length, 10);
+  assert.equal(history.totalRecordedMeetings, 13);
+  assert.equal(history.earliestRecordedMeeting, "2014-03-01");
+  const form = JSON.parse(
+    facts.find((fact) => fact.id === "team-form")!.text,
+  ) as {
+    recentCompletedMatchups: { date: string }[];
+    latestHistoricalMatchups: { date: string }[];
+  };
+  assert.equal(form.latestHistoricalMatchups[0]?.date, "2026-03-01");
+  assert.deepEqual(form.recentCompletedMatchups, []);
+});
+
 void test("overnight scan claims exactly one preview per team and preserves published articles", async (t) => {
   t.mock.timers.enable({ apis: ["Date"], now: NOW });
   const f = fixture();
@@ -225,6 +290,13 @@ void test("evidence uses the assigned writer, both current rosters, recent stats
   assert.match(text, /recentSevenDays/);
   assert.match(text, /IR/);
   assert.doesNotMatch(text, /email/);
+  const facts = result.facts as { id: string; text: string }[];
+  const form = JSON.parse(
+    facts.find((fact) => fact.id === "team-form")!.text,
+  ) as {
+    recentCompletedMatchups: { date: string }[];
+  };
+  assert.equal(form.recentCompletedMatchups[0]?.date, "2026-09-20");
 });
 
 void test("generation publishes validated copy under the assigned writer and rejects unsupported evidence", async (t) => {

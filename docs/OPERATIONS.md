@@ -76,7 +76,13 @@ The byline comes from the franchise's beat writer (or the legacy reporter
 directory). No preview is published without an assigned writer or valid copy.
 
 Preview evidence includes current rosters, recorded player form over the last
-14 days, recent completed results and a bounded franchise head-to-head sample.
+14 days, completed results from the last 60 days and the latest ten recorded
+franchise head-to-head meetings. History reads all stored franchise team
+instances and sorts by matchup date, never database creation/import order.
+Older results are explicitly historical context, not current momentum. Evidence
+includes the recorded meeting count and earliest meeting date; these describe
+stored coverage, not independently verified archive completeness. Exceeding the
+history read bounds fails generation instead of silently truncating its source.
 Injury-reserve designations are not treated as medical diagnoses. Articles are
 deleted by scheduled mutations at 3 a.m. Eastern on the matchup's start date,
 with nightly cleanup as a fallback; the public query also hides started or

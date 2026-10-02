@@ -8,6 +8,7 @@ import { utcTimestampToDateKey } from "./timestamps";
 import { FRANCHISE_BEAT_WRITERS_BY_LEGACY_ID } from "./reporterDirectory";
 
 const DAY = 86400000;
+const RECENT_FORM_DAYS = 60;
 const final = (matchup: Doc<"matchups">) =>
   Boolean(
     matchup.isComplete === true ||
@@ -31,13 +32,16 @@ async function teamEvidence(ctx: QueryCtx, team: Doc<"teams">, now: number) {
     ctx.db
       .query("teams")
       .withIndex("by_franchiseId", (q) => q.eq("franchiseId", franchise._id))
-      .order("desc")
-      .take(3),
+      .take(101),
     ctx.db
       .query("teamSeasonStatLines")
       .withIndex("by_seasonId", (q) => q.eq("seasonId", team.seasonId))
       .collect(),
   ]);
+  // Creation order reflects imports, not season chronology. Never silently
+  // truncate the franchise directory and describe that subset as latest form.
+  if (instances.length > 100)
+    throw new Error("Preview franchise history exceeds bound");
   const currentInstances = [
     ...new Map([team, ...instances].map((row) => [row._id, row])).values(),
   ];
@@ -48,12 +52,14 @@ async function teamEvidence(ctx: QueryCtx, team: Doc<"teams">, now: number) {
           ctx.db
             .query("matchups")
             .withIndex("by_homeTeamId", (q) => q.eq("homeTeamId", instance._id))
-            .take(60),
+            .take(61),
           ctx.db
             .query("matchups")
             .withIndex("by_awayTeamId", (q) => q.eq("awayTeamId", instance._id))
-            .take(60),
+            .take(61),
         ]);
+        if (home.length > 60 || away.length > 60)
+          throw new Error("Preview season matchup history exceeds bound");
         return [...home, ...away].filter(final);
       }),
     )
@@ -180,6 +186,10 @@ export async function loadMatchupPreviewEvidence(
     teamEvidence(ctx, opponent, now),
   ]);
   if (!own || !other || !own.writer) return null;
+  const meetings = own.results.filter((row) =>
+    other.teamIds.has(row.opponentTeamId),
+  );
+  const recentFrom = utcTimestampToDateKey(now - RECENT_FORM_DAYS * DAY)!;
   const facts: MatchupPreviewFact[] = [
     {
       id: "matchup",
@@ -195,10 +205,10 @@ export async function loadMatchupPreviewEvidence(
       id: "head-to-head",
       text: JSON.stringify({
         scope:
-          "Completed meetings found across the latest three franchise team instances plus the selected season; not an all-time record",
-        meetings: own.results
-          .filter((row) => other.teamIds.has(row.opponentTeamId))
-          .slice(0, 10),
+          "Latest ten recorded completed meetings across all stored franchise team instances, sorted by matchup date. Database coverage is not independently verified all-time history.",
+        totalRecordedMeetings: meetings.length,
+        earliestRecordedMeeting: meetings.at(-1)?.date ?? null,
+        meetings: meetings.slice(0, 10),
       }),
     },
   ];
@@ -210,7 +220,13 @@ export async function loadMatchupPreviewEvidence(
       id: `${label}-form`,
       text: JSON.stringify({
         name: data.name,
-        recentCompletedMatchups: data.results.slice(0, 5),
+        asOf: utcTimestampToDateKey(now),
+        recentFormDays: RECENT_FORM_DAYS,
+        recentCompletedMatchups: data.results
+          .filter((row) => row.date! >= recentFrom)
+          .slice(0, 5),
+        latestHistoricalMatchups: data.results.slice(0, 5),
+        note: "Recent form includes only the last 60 days. Older completed results are historical context, not current momentum. Empty results do not establish a losing streak or complete archive coverage.",
         season: data.season,
       }),
     });

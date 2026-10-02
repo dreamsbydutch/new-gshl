@@ -67,6 +67,7 @@ export function buildMatchupPreviewRequest(
       "Pick the most interesting supported storyline for YOUR team against this opponent: head-to-head history, recent form, roster availability, strengths or weaknesses. Do not just list the top three players.",
       "GSHL scores count fantasy categories, not NHL goals. Recent player statistics describe recorded GSHL performances; distinguish them from NHL season totals. IR is a roster designation, not a diagnosis.",
       "If there is no meaningful recent sample, say so briefly and use roster strength. Never call missing data a cold streak. Date every form sample and avoid claiming unplayed matchups are final.",
+      "Lead with current-season evidence or recent form when available. Only recentCompletedMatchups supports claims about current team momentum; latestHistoricalMatchups is dated historical context. Never call older results recent or imply a streak continued across missing seasons. Head-to-head meetings are a dated sample, not a verified all-time record; prioritize the newest meetings and state their dates.",
       "Write 120–200 words in 2 or 3 short plain-text paragraphs and a specific headline. Focus on the assigned team's perspective. Be lively, concise and analytical. Predictions must be conditional, not facts.",
       "Return JSON matching the schema, with evidenceIds for the supplied facts used. Do not add a byline; the application supplies the assigned writer.",
     ].join("\n"),
