@@ -1,4 +1,4 @@
-/** Common salary unit: expected matchup wins gained above a positional replacement. */
+/** Experimental valuation unit: modeled matchup wins above a positional replacement. */
 export type Position = "F" | "D" | "G";
 // G,A,PPP,SOG,HIT,BLK,W,GA,SA,SV,goalie minutes,active goalie appearances.
 export type Line = number[];
@@ -79,8 +79,10 @@ export function expectedMatchupWin(
   if (
     !Number.isFinite(player.GP) ||
     player.GP < 0 ||
+    !Number.isFinite(utilization) ||
     utilization < 0 ||
     utilization > 1 ||
+    !Number.isFinite(weeks) ||
     weeks <= 0
   )
     throw new Error("Invalid projection exposure");
@@ -110,6 +112,8 @@ export function expectedMatchupWin(
     throw new Error("Invalid projected rates");
   let score = 0;
   for (const c of contexts) {
+    if (!Number.isFinite(c.days) || c.days < 1 || c.days > 31)
+      throw new Error("Invalid matchup duration");
     const base = addLine(c.own, c.donors[player.position], -1);
     const count = appearanceDistribution(
       ((player.GP / weeks) * utilization * c.days) / 7,

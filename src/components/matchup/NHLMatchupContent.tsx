@@ -109,13 +109,6 @@ export function NHLMatchupContent({ gameId }: { gameId: string }) {
           </button>
         </p>
       )}
-      <NHLGameEvents
-        events={events}
-        available={Boolean(game.eventFeed)}
-        upcoming={["FUT", "PRE"].includes(game.gameState)}
-        rosterLoading={rosterLoading}
-        rosterError={rosterError}
-      />
       <div
         className="flex justify-center gap-2"
         role="group"
@@ -158,6 +151,13 @@ export function NHLMatchupContent({ gameId }: { gameId: string }) {
           />
         </>
       )}
+      <NHLGameEvents
+        events={events}
+        available={Boolean(game.eventFeed)}
+        upcoming={["FUT", "PRE"].includes(game.gameState)}
+        rosterLoading={rosterLoading}
+        rosterError={rosterError}
+      />
     </main>
   );
 }

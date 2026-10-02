@@ -11,8 +11,63 @@ import {
   buildPlayerStatColumns,
   getPlayerStatCardColumns,
   getPlayerTodayGames,
+  isMatchupDetailsComplete,
   renderPlayerStatCell,
 } from "./matchup-details";
+
+void test("completed matchups show Three Stars despite a missing or stale completion flag", () => {
+  const now = new Date("2026-10-01T16:00:00Z");
+  for (const result of [
+    { homeWin: true },
+    { awayWin: true },
+    { tie: true },
+    { isComplete: true },
+  ]) {
+    assert.equal(
+      isMatchupDetailsComplete({ isComplete: false, ...result }, null, now),
+      true,
+    );
+  }
+  assert.equal(
+    isMatchupDetailsComplete(
+      { isComplete: false },
+      { endDate: "2026-09-30" },
+      now,
+    ),
+    true,
+  );
+  assert.equal(
+    isMatchupDetailsComplete({}, { endDate: "2026-09-30" }, now),
+    true,
+  );
+});
+
+void test("live scores and the final evening of a matchup do not reveal Three Stars", () => {
+  const live = { isComplete: false, homeScore: 7, awayScore: 5 };
+  const week = { endDate: "2026-10-01" };
+  assert.equal(
+    isMatchupDetailsComplete(live, week, new Date("2026-10-02T03:59:59Z")),
+    false,
+  );
+  assert.equal(
+    isMatchupDetailsComplete(live, week, new Date("2026-10-02T04:00:00Z")),
+    true,
+  );
+  assert.equal(
+    isMatchupDetailsComplete(
+      live,
+      { endDate: "2026-10-10" },
+      new Date("2026-10-01T16:00:00Z"),
+    ),
+    false,
+  );
+  assert.equal(isMatchupDetailsComplete(live, null), false);
+  assert.equal(isMatchupDetailsComplete(live, { endDate: "invalid" }), false);
+  assert.equal(
+    isMatchupDetailsComplete(null, { endDate: "2020-01-01" }),
+    false,
+  );
+});
 
 void test("today's games match current NHL teams, aliases, and either side without duplicates", () => {
   const games: NHLSchedule["gameWeek"][number]["games"] = [

@@ -9,6 +9,7 @@ import {
   auditPositionalHistory,
   type HistorySeason,
 } from "../../domains/ranking/positional-salary-history";
+import { positionalOutcomeAttribution } from "../../domains/ranking/positional-outcome-attribution";
 
 const { values } = parseArgs({
   options: {
@@ -80,6 +81,11 @@ else {
   await writeFile(
     resolve(output, "contexts.json"),
     JSON.stringify(auditPositionalHistory(snapshots)),
+    { flag: "wx" },
+  );
+  await writeFile(
+    resolve(output, "outcome-attribution.json"),
+    JSON.stringify(positionalOutcomeAttribution(snapshots)),
     { flag: "wx" },
   );
 }

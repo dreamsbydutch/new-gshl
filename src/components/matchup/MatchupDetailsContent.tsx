@@ -27,6 +27,7 @@ import {
   formatWeekRange,
   getScheduleGameTypeDisplay,
   getStarPlayers,
+  isMatchupDetailsComplete,
   resolveMatchupCategories,
   toStatNumber,
 } from "@gshl-utils";
@@ -331,6 +332,7 @@ export function MatchupDetailsContent({
   const matchup = details?.matchup ?? null;
   const season = details?.season ?? null;
   const week = details?.week ?? null;
+  const isComplete = isMatchupDetailsComplete(matchup, week);
   const homeTeam = details?.teams.home ?? null;
   const awayTeam = details?.teams.away ?? null;
   const homeTeamStats = details?.teamStats.home ?? null;
@@ -389,9 +391,9 @@ export function MatchupDetailsContent({
     if (matchup.awayWin)
       return `${awayTeam?.name ?? "Away team"} won the matchup`;
     if (matchup.tie) return "Matchup ended in a tie";
-    if (matchup.isComplete) return "Matchup complete";
+    if (isComplete) return "Matchup complete";
     return "Matchup in progress";
-  }, [awayTeam?.name, homeTeam?.name, matchup]);
+  }, [awayTeam?.name, homeTeam?.name, matchup, isComplete]);
   const homePlayers = useMemo(() => {
     const players = details?.players.home ?? [];
 
@@ -433,7 +435,7 @@ export function MatchupDetailsContent({
       score: matchupScore.home,
       isWinner: matchup?.homeWin === true,
     },
-    isComplete: matchup?.isComplete === true,
+    isComplete,
     isTie: matchup?.tie === true,
     stars,
   });
@@ -534,7 +536,7 @@ export function MatchupDetailsContent({
             homeTeam={homeTeam}
             awayTeam={awayTeam}
           />
-          {matchup.isComplete === true ? <StarsCard stars={stars} /> : null}
+          {isComplete ? <StarsCard stars={stars} /> : null}
         </div>
       </section>
 

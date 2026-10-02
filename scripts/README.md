@@ -505,6 +505,26 @@ Calibration and report commands discover the completed experiment's variants.
 The preview command accepts `--method <variant>` to inspect a particular candidate;
 it requires historical evaluation evidence for that method.
 
+Positional salary research uses historical GSHL weekly outcomes and replacement
+depth. The production audit is read-only; the analysis, validation and HTML
+report commands operate entirely on local snapshots. None publish salaries.
+The current experiments have not established a reliable positional replacement
+for the salary formula; see `docs/RANKING.md` for results and limitations.
+
+```bash
+node ../node_modules/tsx/dist/cli.mjs --tsconfig tsconfig.json src/commands/ratings/audit-positional-salary-history.ts --target production --output ../.local-data/position-history
+node ../node_modules/tsx/dist/cli.mjs --tsconfig tsconfig.json src/commands/ratings/test-positional-matchup-predictions.ts --history ../.local-data/position-history --source ../.local-data/draft-slot-research/source.json --roster-mode prior-week --output ../.local-data/position-validation
+node ../node_modules/tsx/dist/cli.mjs --tsconfig tsconfig.json src/commands/ratings/test-positional-salary-weights.ts --history ../.local-data/position-history --source ../.local-data/draft-slot-research/source.json --baseline ../.local-data/position-validation/validation.json --roster-mode prior-week --output ../.local-data/position-weights
+```
+
+`analyze-positional-salaries.ts` accepts audited `contexts.json`, the development
+forecast directory and the prior experimental salary sample. It exports
+replacement-depth scenarios and candidate player salaries. Use
+`report-positional-salaries.ts --help` for the local interactive report's input
+paths. Each command's `--help` describes its required files; output targets must
+be new. Opening-roster and prior-week validation runs must use separate targets,
+and the scarcity-weight comparison requires a baseline with the same roster mode.
+
 `src/commands/ratings/test-salary-rating-curves.ts` tests further score calibration
 changes using the isolated experiment's local derived forecasts. Pass `--input`
 with the calibrated isolated directory and `--output` with a new directory.

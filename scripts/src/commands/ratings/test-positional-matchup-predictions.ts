@@ -1,7 +1,8 @@
-import { readFile, readdir, writeFile, mkdir } from "node:fs/promises";
+import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { parseArgs } from "node:util";
 import { resolve } from "node:path";
 import { projectPreseasonPlayers } from "../../runtime/preseason-projection";
+import { priorWeekRoster } from "../../domains/ranking/positional-evaluation-roster";
 import {
   expectedMatchupWin,
   type PlayerProjection,
@@ -15,15 +16,18 @@ const { values } = parseArgs({
     source: { type: "string" },
     output: { type: "string" },
     help: { type: "boolean" },
+    "roster-mode": { type: "string", default: "opening" },
   },
 });
 if (values.help)
   console.log(
-    "Offline chronological validation of positional matchup values. --history <audited history directory> --source <draft research source.json> --output <NEW directory>. Freezes player inputs to prior NHL seasons, evaluates known opening-draft rosters, fits probability calibration on earlier seasons only.",
+    "Offline chronological validation of positional matchup values. --history <audited history directory> --source <draft research source.json> --output <NEW directory> [--roster-mode opening|prior-week]. Freezes player inputs to prior NHL seasons, fits probability calibration on earlier seasons only. Rosters are for evaluation, not individual salary features.",
   );
 else {
   if (!values.history || !values.source || !values.output)
     throw new Error("All paths required");
+  if (!["opening", "prior-week"].includes(values["roster-mode"]!))
+    throw new Error("Invalid roster mode");
   const source = JSON.parse(await readFile(values.source, "utf8"));
   const audited = JSON.parse(
     await readFile(resolve(values.history, "contexts.json"), "utf8"),
@@ -138,7 +142,10 @@ else {
       ]),
     ) as Record<Position, number>;
     const teams = [...new Set<string>(picks.map((r: Row) => r.gshlTeamId))],
-      scores = new Map<string, Map<string, number>>([["raw-rating", raw]]);
+      scores = new Map<string, Map<string, number>>([
+        ["raw-rating", raw],
+        ["home-only", new Map()],
+      ]);
     for (const variant of variants) {
       const vals = new Map<string, number>();
       for (const pos of positions) {
@@ -199,8 +206,27 @@ else {
     let n = 0;
     for (const m of history.matchups) {
       if (!m.isComplete || weeks.get(m.weekId)?.weekType !== "RS") continue;
-      const a = teamScores.get(m.homeTeamId),
-        b = teamScores.get(m.awayTeamId);
+      const evaluateTeam = (team: string) => {
+        if (values["roster-mode"] === "opening") return teamScores.get(team);
+        const opening = picks
+          .filter((r: Row) => r.gshlTeamId === team)
+          .map((r: Row) => String(r.playerId));
+        const ids = priorWeekRoster(
+          weeks.get(m.weekId)! as { id: string },
+          history.weeks,
+          history.playerWeeks,
+          team,
+          opening,
+        );
+        return Object.fromEntries(
+          [...scores].map(([method, ratings]) => [
+            method,
+            ids.reduce((sum, id) => sum + (ratings.get(id) ?? 0), 0),
+          ]),
+        );
+      };
+      const a = evaluateTeam(m.homeTeamId),
+        b = evaluateTeam(m.awayTeamId);
       if (!a || !b) continue;
       if (!m.homeWin && !m.awayWin && !m.tie) continue;
       const actual = m.homeWin ? 1 : m.awayWin ? 0 : 0.5;
@@ -225,7 +251,13 @@ else {
     });
     console.log(JSON.stringify(coverage.at(-1)));
   }
-  const methods = ["raw-rating", "empirical", "two-goalies", "three-goalies"],
+  const methods = [
+      "home-only",
+      "raw-rating",
+      "empirical",
+      "two-goalies",
+      "three-goalies",
+    ],
     predictions: Row[] = [];
   function fit(train: Row[], method: string) {
     const scale =
@@ -297,6 +329,7 @@ else {
     });
   }
   const report = {
+    rosterMode: values["roster-mode"],
     coverage,
     training: summarize(predictions.filter((r) => r.year <= 2023)),
     heldOut: summarize(predictions.filter((r) => r.year >= 2024)),
@@ -308,6 +341,7 @@ else {
     limitations: [
       "Historical test uses the existing three-year category forecast, not a reconstruction of the newer development model. It tests the positional valuation layer on a common frozen input.",
       "Opening draft rosters are supplied only for evaluation; no future roster enters individual season-end projections. In-season trades, streaming and lineup decisions are not forecast. Unknown prospects receive zero excess value; raw baseline also uses zero.",
+      "In prior-week mode, evaluation uses the fifteen players with greatest non-IR ownership exposure in the immediately preceding week, with opening draft fallback. This is a roster proxy, not exact closing ownership. Individual predictions remain frozen at season end.",
       "Prior contexts can include different category eras re-scored under current ten-category rules; held-out results are 2023-24 through 2025-26. Player and roster observations are dependent; this is not a randomized intervention.",
     ],
   };

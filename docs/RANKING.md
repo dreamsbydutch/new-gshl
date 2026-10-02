@@ -904,6 +904,85 @@ baseline reproduces the earlier experiment exactly. Historical reconstruction,
 repeated players and previously examined seasons limit prospective claims.
 No production formula or salary publication changes are made.
 
+### Positional salary value and historical matchup validation
+
+The positional research layer uses modeled **matchup wins above a replacement
+at the same position**, instead of comparing independently calibrated F/D/G
+rating scales directly. It is experimental and does not feed salary publication.
+No fixed positional salary allocation has passed the validation in this study.
+
+The October 1, 2026 audit read 73,951 retained player-week rows across twelve
+seasons (2014–15 through 2025–26), reconciling 1,914 regular-season matchups.
+2013–14 has NHL history but no retained GSHL weekly history. Seven completed
+2025–26 matchups lack matching weekly data and are excluded from simulation
+contexts; their recorded outcomes remain usable for prediction evaluation.
+Team/player totals reconcile on the remaining data. Goalie totals blanked by
+the appearance minimum are intentional forfeits, not missing NHL production:
+the audit reconstructs their underlying saves, shots, goals and minutes from
+player rows. The audit reports exclusions rather than silently filling them.
+
+Current-format contexts use all ten scoring categories, pooled goalie ratios,
+the two-active-appearance minimum and neutral half-credit for tied category
+totals. Goals and assists also affect points. A deterministic rotating player
+donor is removed from each historical lineup; candidate and replacement
+projections are substituted into the same contexts. A Poisson appearance model
+integrates qualification risk instead of treating two expected appearances as
+guaranteed qualification. Historical opponent category combinations remain
+intact. Within-game scoring/save variance and future lineup optimization are
+not modeled, so estimated win gains are not causal estimates.
+
+Replacement depth uses non-IR ownership exposure normalized to fifteen roster
+spots (7F/3D/1G plus four bench spots; UTIL treated as F), with 9F/4D/2G and
+8F/4D/3G alternatives. Baseline replacement is a band just beyond the owned
+depth in each positional ranking. Salary premium shares are measured **above
+the $1m floor**, not as shares of the keeper cap or total salary pool. The
+prototype applies the existing rank-to-dollar curve and floors nonpositive
+replacement value at $1m; that is an experimental pricing assumption.
+
+| Latest forecast scenario      | F premium share | D premium share | G premium share |
+| ----------------------------- | --------------: | --------------: | --------------: |
+| Observed ownership depth      |           67.8% |           21.5% |           10.8% |
+| Two-goalie roster benchmark   |           55.0% |           25.1% |           19.9% |
+| Three-goalie roster benchmark |           51.5% |           29.5% |           19.0% |
+
+These are sensitivity results, not recommended weights. Changing replacement
+depth has a large effect on goalie prices. A separate exact three-position
+Shapley decomposition equalizes each excluded position group between opponents
+and averages marginal outcome changes across all six position orderings.
+Across 769 decisive current-rule matchups in 2021–22 through 2025–26, that
+descriptive decomposition attributes 44.6% to F, 26.5% to D and 28.8% to G.
+It measures realized results under a specified counterfactual, not predictable
+contract value. Older seasons are re-scored under today's rules for sensitivity;
+their original category and roster formats must not be treated as equivalent.
+
+Historical prediction tests freeze individual inputs to preceding NHL seasons
+and fit probability calibration only on earlier GSHL seasons. Evaluation uses
+either opening draft rosters or the preceding week's largest non-IR ownership
+exposures, capped at fifteen players. The latter is a proxy for known roster
+membership, not exact end-of-week ownership. Neither enters the individual
+season-end forecast as a future feature. Unknown prospects have zero excess
+value in both candidate and raw-rating baseline. Historical NHL totals and
+ratings are retrospective reconstructions, not archived signing-day quotes.
+
+Later evaluation covers 485 matchups from 2023–24 through 2025–26. With opening
+rosters, the existing rating's Brier error is 0.24913 versus 0.25539 for the
+observed-depth simulation. With prior-week rosters, these are 0.25004 and
+0.24889 respectively; winner accuracy falls from 56.9% to 56.3%. The modest
+probability improvement reverses in 2024–25. Positive, regularized positional
+scarcity weights also fail to improve the later evaluation (0.25258 Brier with
+prior-week rosters). The home-only probability benchmark scores 0.24771, better
+than both rating approaches on this later block. That further argues against
+promoting the positional candidate from these results.
+
+No candidate is promoted on this evidence. Three repeatedly examined later
+seasons with dependent teams and weeks are not an untouched test set. Historical
+validation uses the existing three-year category projection as a common input,
+not a full replay of the latest development/usage forecasting candidate.
+Latest salary scenarios use that newer candidate, so transferring validation
+between them remains unproven. Two-/three-year contract-level matchup value,
+schedule/lineup effects and uncertainty must be validated before publication.
+Research outputs retain all scenarios, exclusions and failed alternatives.
+
 ## NHL rating and real contract salary comparison
 
 The salary audit joins production v3 regular-season ratings to historical NHL

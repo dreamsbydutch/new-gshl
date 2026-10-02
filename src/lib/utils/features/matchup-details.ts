@@ -1,6 +1,8 @@
 import type {
   CategoryResult,
   MatchupDetailsTeam,
+  MatchupDetailsMatchup,
+  MatchupDetailsWeek,
   MatchupTeamWeekStats,
   PlayerStatColumn,
   PlayerStatCategoryKey,
@@ -11,10 +13,32 @@ import type {
 } from "@gshl-types";
 import type { NHLSchedule } from "@gshl-lib/types/nhl";
 import type { MatchupCategoryConfig, TeamWeekStatLine } from "@gshl-types";
+import { normalizeDateOnlyValue } from "../core/date";
 import {
   formatPlayerPositionList,
   getPlayerNhlAbbreviations,
 } from "../domain/player";
+
+/** Legacy matchups may have final results without an explicit completion flag. */
+export function isMatchupDetailsComplete(
+  matchup: Partial<MatchupDetailsMatchup> | null,
+  week: Pick<MatchupDetailsWeek, "endDate"> | null,
+  now = new Date(),
+): boolean {
+  if (!matchup) return false;
+  if (matchup.isComplete || matchup.homeWin || matchup.awayWin || matchup.tie)
+    return true;
+  const endDate = normalizeDateOnlyValue(week?.endDate);
+  if (!endDate) return false;
+  const today = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Toronto",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(now);
+  // The end date is inclusive: games can still be active that evening.
+  return endDate < today;
+}
 
 /** Match today's schedule against current affiliations, not a historical week. */
 export function getPlayerTodayGames(
