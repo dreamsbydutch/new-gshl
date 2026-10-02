@@ -57,6 +57,7 @@ import type * as maintenanceScope from "../maintenanceScope.js";
 import type * as matchup from "../matchup.js";
 import type * as nhlContractAnalytics from "../nhlContractAnalytics.js";
 import type * as nhlContracts from "../nhlContracts.js";
+import type * as nhlSeasonValueFinalization from "../nhlSeasonValueFinalization.js";
 import type * as nhlSeasonValues from "../nhlSeasonValues.js";
 import type * as notificationPush from "../notificationPush.js";
 import type * as notificationScanner from "../notificationScanner.js";
@@ -135,6 +136,7 @@ declare const fullApi: ApiFromModules<{
   matchup: typeof matchup;
   nhlContractAnalytics: typeof nhlContractAnalytics;
   nhlContracts: typeof nhlContracts;
+  nhlSeasonValueFinalization: typeof nhlSeasonValueFinalization;
   nhlSeasonValues: typeof nhlSeasonValues;
   notificationPush: typeof notificationPush;
   notificationScanner: typeof notificationScanner;

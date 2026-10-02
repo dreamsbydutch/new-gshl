@@ -21,6 +21,18 @@ export function validateSeasonValue(
         Object.values(value).forEach(checkFinite);
     };
     checkFinite(detail);
+    const { offensiveProcess, defensiveProcess, adjustedProcess } =
+      detail.components;
+    if (
+      (offensiveProcess === undefined) !== (defensiveProcess === undefined) ||
+      (offensiveProcess !== undefined &&
+        defensiveProcess !== undefined &&
+        Math.abs(offensiveProcess + defensiveProcess - adjustedProcess) >
+          0.000151)
+    )
+      throw new Error(
+        "Offensive and defensive process must reconcile with adjusted process",
+      );
     if (
       detail.revision !== "2026-09-30-partial-games-and-penalty-shots" ||
       result.impactPer60 !== null ||
@@ -196,6 +208,10 @@ export const importBatch = internalMutation({
         unchanged++;
         continue;
       }
+      if (existing?.gameValue?.finalization)
+        throw new Error(
+          "Finalized NHL season values are locked against routine imports",
+        );
       // Updating another snapshot/version requires a separately reviewed workflow.
       if (existing && existing.sourceHash !== args.sourceHash)
         throw new Error(

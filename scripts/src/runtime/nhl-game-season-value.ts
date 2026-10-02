@@ -10,6 +10,7 @@ import {
   type ImpactModel,
 } from "./nhl-adjusted-impact";
 import type { NhlPosition } from "./nhl-season-rating";
+import { impactBreakdown } from "./nhl-impact-breakdown";
 
 export type PenaltyValuation = {
   playerId: number;
@@ -204,6 +205,8 @@ export type GameSeasonRating = {
   seasonRating: number | null;
   components: {
     adjustedProcess: number;
+    offensiveProcess?: number;
+    defensiveProcess?: number;
     observedProcess: number;
     finishing: number;
     penalties: number;
@@ -428,6 +431,11 @@ export function rankGameSeason(
           finishingAbility +
           penaltyAbility
         : total.process + finishingAbility + penaltyAbility;
+    const breakdown = impactBreakdown(
+      model,
+      p.playerId,
+      situations.get(p.playerId) ?? {},
+    );
     return {
       playerId: p.playerId,
       name: p.name,
@@ -460,6 +468,8 @@ export function rankGameSeason(
       seasonRating: null,
       components: {
         adjustedProcess: round(total.process),
+        offensiveProcess: round(breakdown.offense),
+        defensiveProcess: round(breakdown.defense),
         observedProcess: round(total.observedProcess),
         finishing: round(total.finishing),
         penalties: round(total.penalties),

@@ -1133,7 +1133,7 @@ function createEmptyDailyStatRow(
   };
 }
 
-function buildUpdatedPlayerDayRow(
+export function buildUpdatedPlayerDayRow(
   existing: PlayerDayStatLine,
   stat: MatchedExternalStat,
   activeSeasonCategories: ReadonlySet<string>,
@@ -1152,13 +1152,12 @@ function buildUpdatedPlayerDayRow(
   const row: PlayerDayStatLine = {
     ...existing,
     date: normalizeDateKey(existing.date),
-    nhlPos: splitPosTokens(stat.positionCode).length
-      ? toRosterPositions(stat.positionCode)
-      : Array.isArray(existing.nhlPos)
-        ? (existing.nhlPos as RosterPosition[])
-        : [],
-    posGroup: (stat.posGroup ||
-      cleanWhitespace(existing.posGroup) ||
+    // Yahoo owns fantasy eligibility; NHL supplies a single game position.
+    nhlPos: splitPosTokens(existing.nhlPos).length
+      ? toRosterPositions(existing.nhlPos)
+      : toRosterPositions(stat.positionCode),
+    posGroup: (cleanWhitespace(existing.posGroup) ||
+      stat.posGroup ||
       PositionGroup.F) as PlayerDayStatLine["posGroup"],
     nhlTeam: (normalizeTeamAbbr(resolvedNhlTeam)
       ? [normalizeTeamAbbr(resolvedNhlTeam)]
@@ -1689,7 +1688,15 @@ export async function runDailyNhlPlayerStatSync(
     await fetchPlayerDayWeeks<DatabaseRecord>(
       resolvedSeasonId,
       readWeeks.map((week) => toTrimmedString(week.id)),
-      resolvedTeamIds,
+      // The deployed schema has a season/week/team index, not a season/week
+      // index. Enumerate this season's teams for league-wide runs as well.
+      resolvedTeamIds.length
+        ? resolvedTeamIds
+        : teamRows
+            .filter(
+              (team) => toTrimmedString(team.seasonId) === resolvedSeasonId,
+            )
+            .map((team) => toTrimmedString(team.id)),
     ),
   );
   const availableDateSet = new Set(

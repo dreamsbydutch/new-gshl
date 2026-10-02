@@ -199,6 +199,7 @@ export function projectMatchupPlayerWeekRow(
     fullName: player?.fullName ?? "",
     nhlPos: player?.nhlPos ?? stats.nhlPos ?? [],
     posGroup: player?.posGroup ?? stats.posGroup,
+    currentNhlTeam: player?.nhlTeam ?? [],
     nhlTeam:
       stats.nhlTeam && stats.nhlTeam.length > 0
         ? stats.nhlTeam

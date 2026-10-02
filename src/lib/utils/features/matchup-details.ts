@@ -9,8 +9,27 @@ import type {
   PlayerStatRow,
   StarPlayer,
 } from "@gshl-types";
+import type { NHLSchedule } from "@gshl-lib/types/nhl";
 import type { MatchupCategoryConfig, TeamWeekStatLine } from "@gshl-types";
-import { formatPlayerPositionList } from "../domain/player";
+import {
+  formatPlayerPositionList,
+  getPlayerNhlAbbreviations,
+} from "../domain/player";
+
+/** Match today's schedule against current affiliations, not a historical week. */
+export function getPlayerTodayGames(
+  player: PlayerStatRow,
+  games: NHLSchedule["gameWeek"][number]["games"],
+) {
+  const teams = new Set(
+    getPlayerNhlAbbreviations(player.currentNhlTeam ?? player.nhlTeam),
+  );
+  return games.filter((game) =>
+    [game.awayTeam, game.homeTeam].some((team) =>
+      getPlayerNhlAbbreviations(team.abbrev).some((abbr) => teams.has(abbr)),
+    ),
+  );
+}
 
 type MatchupStatCategoryConfig = MatchupCategoryConfig & {
   field: PlayerStatCategoryKey;

@@ -27,6 +27,8 @@
     "stats:debug-yahoo-matchup-table": "tsx src/commands/stats/debug-yahoo-matchup-table.ts",
     "stats:backfill-yahoo-rosters": "npm run stats:backfill-yahoo-matchup-days --",
     "stats:sync-nhl-daily": "node --use-system-ca --dns-result-order=ipv4first ../node_modules/tsx/dist/cli.mjs src/commands/stats/sync-nhl-daily-stats.ts",
+    "stats:sync-yahoo-daily-rosters": "node --use-system-ca ../node_modules/tsx/dist/cli.mjs src/commands/stats/sync-yahoo-daily-rosters.ts",
+    "stats:yahoo-cycle": "node --use-system-ca ../node_modules/tsx/dist/cli.mjs src/commands/stats/run-yahoo-roster-cycle.ts",
     "stats:archive-player-days": "node --use-system-ca --dns-result-order=ipv4first ../node_modules/tsx/dist/cli.mjs src/commands/stats/archive-player-days.ts",
     "stats:verify-player-day-archive": "node --use-system-ca --dns-result-order=ipv4first ../node_modules/tsx/dist/cli.mjs src/commands/stats/verify-player-day-archive.ts",
     "stats:restore-player-days": "node --use-system-ca --dns-result-order=ipv4first ../node_modules/tsx/dist/cli.mjs src/commands/stats/restore-player-days.ts",

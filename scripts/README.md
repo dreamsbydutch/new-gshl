@@ -191,6 +191,32 @@ not fit new weights or change ratings. See the
 [quality audit](../docs/product/nhl-season-value-quality-audit.md) for findings
 and interpretation limits.
 
+`src/commands/ratings/audit-nhl-team-success.ts` joins the fitted reports listed
+in a defense-audit manifest to official historical team records, team-filtered
+player ice time and playoff brackets. It retains derived team/player contribution
+tables and source hashes, and removes temporary API responses automatically.
+It reconciles traded-player exposure and keeps zero-shot emergency goalies'
+unknown ability explicit. It does not access Convex or modify player ratings.
+
+`src/commands/ratings/analyze-nhl-team-success.ts` analyzes that derived snapshot
+offline. It exports team/player CSVs, an interactive HTML report, within-season
+associations, season-cluster intervals, component comparisons and chronological
+playoff-series tests against points-percentage and goal-difference baselines.
+Use each command's `--help` for current input/output options. Failed-gate seasons
+remain labeled sensitivities; unfinished postseasons are excluded from playoff
+comparisons. See the team-validation section in `docs/RANKING.md` for interpretation.
+
+`src/commands/ratings/finalize-nhl-season-2019.ts` closes the reviewed 2019-20
+production snapshot without recalculating scores. Preparation verifies the live
+970-player population against the immutable calculation and source review,
+creates hash-verified backups in the workspace and an independent directory,
+and emits a plan. The plan runs as a dry run by default; explicit apply restores
+qualified ranks and records `final-with-limitations` on every row. Replaying the
+plan is unchanged. Finalized records reject routine imports. Individual
+small-sample/coverage flags remain, independently of the completed season review.
+Run `--help` for exact flags. The operation is pinned to `polished-tern-709`,
+2019-20, regular-season v3/core records; v1 and GSHL statistics are untouched.
+
 `src/commands/ratings/preview-nhl-season.ts` reads public NHL season reports and
 calculates a separate NHL Season Value model. It does not connect to Convex or
 change GSHL ratings, salary, draft grades, or power rankings. Run from `scripts/`:
@@ -429,6 +455,93 @@ Example:
 ```bash
 npm run player-bios:sync -- --apply
 ```
+
+#### Category-based fantasy forecast experiment
+
+`src/commands/ratings/backtest-fantasy-categories.ts` evaluates local category
+forecasts against subsequent NHL seasons. It reads the existing 13-season NHL
+source snapshots and verified team-exposure audit, fetches official hits/blocks
+and immutable birthdates into an automatically removed temporary workspace,
+and saves predictions, evaluation, source hashes and an interactive HTML report.
+It does not access Convex or change GSHL ratings/salaries.
+
+```bash
+node ../node_modules/tsx/dist/cli.mjs src/commands/ratings/backtest-fantasy-categories.ts --baseline ../.local-data/nhl-rating/value-v2-final-20260930 --team-audit ../.local-data/nhl-rating/team-success-20261001/team-success-input-corrected.json --output ../.local-data/fantasy-forecast-experiment
+```
+
+Use a new output directory. `--help` describes the inputs. Read `report.html`,
+`evaluation.csv`, `projections.csv` and `analysis.json`; `backtest-errors.csv`
+contains per-player prediction errors. Horizons 1/2/3 are individual future
+seasons; contract evaluations average all years of fully observed two/three-year
+terms. Totals use 82-game equivalents. See `docs/RANKING.md` for validation
+boundaries and exclusions. This is research, not a production salary command.
+
+#### Compare salary-rating upgrades with the current talent formula
+
+`src/commands/ratings/test-salary-rating-upgrades.ts` reuses the category experiment's
+source preparation and tests three variants against a replay of the current
+talent formula. Run with the operator tsconfig so existing aliases resolve:
+
+```bash
+node ../node_modules/tsx/dist/cli.mjs --tsconfig tsconfig.json src/commands/ratings/test-salary-rating-upgrades.ts --baseline ../.local-data/nhl-rating/value-v2-final-20260930 --team-audit ../.local-data/nhl-rating/team-success-20261001/team-success-input-corrected.json --output ../.local-data/salary-upgrades
+node ../node_modules/tsx/dist/cli.mjs src/commands/ratings/calibrate-salary-rating-forecasts.ts --input ../.local-data/salary-upgrades --output ../.local-data/salary-upgrades-calibrated
+node ../node_modules/tsx/dist/cli.mjs src/commands/ratings/report-salary-rating-upgrades.ts --input ../.local-data/salary-upgrades-calibrated
+node ../node_modules/tsx/dist/cli.mjs --tsconfig tsconfig.json src/commands/ratings/preview-contract-talent.ts --input ../.local-data/salary-upgrades-calibrated --source ../.local-data/nhl-rating/value-v2-final-20260930/20252026/source.json --output ../.local-data/contract-talent-preview
+```
+
+Only the first command fetches public source data, using temporary scratch
+storage. Subsequent commands operate on local derived results. Output directories
+must be new; the report command refuses to overwrite an existing `report.html`.
+All commands support `--help`; none writes Convex, salaries, or production ratings.
+`salary-validation.json` retains scalar forecasts/outcomes, fold comparisons,
+source provenance and calibration maturity checks. `contract-ratings.csv` provides
+annual and two/three-year candidate ratings, with separate position ranks.
+No new salary curve or cross-position replacement-value policy is implied.
+
+Use `--experiment isolated` on the test command to compare the original rate
+model with NHL impact inputs, historical goalie save percentage, and both together.
+This separates feature value from the previously tested change to direct totals.
+Calibration and report commands discover the completed experiment's variants.
+The preview command accepts `--method <variant>` to inspect a particular candidate;
+it requires historical evaluation evidence for that method.
+
+`src/commands/ratings/test-salary-rating-curves.ts` tests further score calibration
+changes using the isolated experiment's local derived forecasts. Pass `--input`
+with the calibrated isolated directory and `--output` with a new directory.
+It compares the strongest position-specific candidate with a monotone curve,
+a historically learned blend with current talent, and origin-workload group
+calibration. `validation.json` retains predictions, complete-contract comparisons,
+per-origin results and fit maturity audits. No external API or database access
+is required. Workload groups describe the completed regular season, not known
+future roster roles. These are research alternatives, not production defaults.
+
+The upgrade test command also accepts `--experiment development`. It compares
+the position-specific best model against annual category-rate trends and
+age/usage interactions; it requires no knowledge of future rosters or minutes.
+The calibration command accepts `--forward-workload` to apply the experimental
+origin-workload correction equally to every forward candidate and baseline.
+That mode is recorded in the output. The player preview command currently
+rejects grouped calibration rather than silently displaying ungrouped scores.
+
+#### NHL rating versus real contract salary
+
+`src/commands/ratings/audit-nhl-salaries.ts` reads production v3 regular-season
+ratings and historical `nhlContracts`/`nhlContractSeasons` through bounded,
+season-indexed queries. It requires an explicit production target and writes
+only a new local snapshot directory. It never substitutes current-profile or
+GSHL salaries. Start years identify seasons (2024 = 2024-25).
+
+```bash
+node ../node_modules/tsx/dist/cli.mjs src/commands/ratings/audit-nhl-salaries.ts --target production --seasons 2023,2024,2025 --output ../.local-data/nhl-salary-snapshot
+node ../node_modules/tsx/dist/cli.mjs src/commands/ratings/analyze-nhl-salaries.ts --input ../.local-data/nhl-salary-snapshot/snapshot.json --output ../.local-data/nhl-salary-comparison
+```
+
+The second command runs offline and writes `report.html`, `players.csv` and
+`analysis.json`. It shows cap-share/rating correlations, matched-cohort pay and
+rating percentiles, and observed peer ranges in both directions. Sparse seasons,
+ambiguous contracts, provisional ratings and insufficient peer samples stay
+explicit; no salary forecast or fair-market dollar surplus is claimed. See
+`docs/RANKING.md` for the comparison rules. Both commands support `--help`.
 
 #### `nhl-contracts:import`
 
@@ -803,11 +916,118 @@ Default output base:
 
 - `reports/yahoo-matchup-debug`
 
+#### `stats:sync-yahoo-daily-rosters`
+
+Temporary current-season Yahoo website source while Fantasy API access is
+unavailable. Reads every season team's roster for one date using its stored
+Yahoo team ID. Only team membership, Yahoo eligibility (`nhlPos`), position
+group, and daily lineup slot are created/patched on player-day rows. Yahoo
+statistics are ignored. Roster-only mode preserves existing stats and global
+Player ownership. Add `--daily-pipeline` for the complete current-day workflow.
+The date defaults to today in `America/Toronto`; it must resolve to one season
+and week. An explicit `--season-id` uses that season's existing week calendar,
+even if the season-level start date is later. This command uses current-season
+Yahoo URLs, not historical archives.
+
+```powershell
+npm.cmd run stats:sync-yahoo-daily-rosters -- --target production --season-id 13 --league-id 44541
+npm.cmd run stats:sync-yahoo-daily-rosters -- --target production --season-id 13 --league-id 44541 --apply --sync-nhl
+npm.cmd run stats:sync-yahoo-daily-rosters -- --target production --season-id 13 --league-id 44541 --daily-pipeline
+npm.cmd run stats:sync-yahoo-daily-rosters -- --target production --season-id 13 --league-id 44541 --daily-pipeline --apply
+```
+
+Review the first command's plan before applying. All teams must load and every
+Yahoo player ID must match exactly one existing player. A missing stored Yahoo
+ID may be filled from a unique exact full-name match; existing IDs are never
+overwritten and names are never matched approximately. Unresolved/duplicate IDs,
+duplicate roster assignments, malformed pages, and stored days absent from Yahoo
+block writes. Missing days need separate reviewed removal; there are no inferred
+deletions. Use the Yahoo ID backfill workflow for unresolved identities.
+The existing Yahoo cookie/browser configuration, throttling, and retries apply;
+use `--help` for browser options. HTML and session material are never saved.
+
+`--sync-nhl` runs the existing NHL daily sync for those teams after a successful
+roster apply and metadata verification, preserving existing ratings. In dry-run
+mode it is deferred because new day rows are only planned. This phase requires
+the Python prerequisites above; a failure can
+leave roster metadata applied, and both phases can be rerun. Use `--python-bin`
+if Python is not on PATH. No managed schedule is enabled by this command.
+Capture lineups during the day and rerun for the same date after games finish to
+collect final NHL stats.
+
+For a historical date in this Yahoo season, use `--date YYYY-MM-DD --sync-nhl
+--aggregate`. This imports that date's lineup and NHL stats and rebuilds the six
+season rollups without changing today's ownership or processing historical
+buyouts. A two-day grace period after the last scoring date allows final stats
+to settle. `--current-rosters` runs today's roster/optimizer/buyout step without
+the NHL fetch; combine it with `--aggregate` for frequent lineup refreshes.
+`--summary` keeps logs to counts, changes and conflicts.
+
+`--daily-pipeline` includes NHL sync and only accepts today's Toronto date. It
+then updates `Player.ownerId` and the current team through Team → Franchise →
+Owner, refreshes Yahoo eligibility, and runs the existing lineup optimizer using
+season roster slots and player season ratings. The resulting `Player.lineupPos`
+is separate from the Yahoo `dailyPos` used for scoring. Unrostered players have
+their current ownership, team, and lineup position cleared.
+
+The dry run lists roster changes and proposed buyouts before any writes. Playing
+contracts belonging to current season owners whose players are absent from the
+entire Yahoo league become buyouts: 50% of the original salary remains as the
+cap charge, through the original contract end, or through the following season
+for a final-year buyout. Original salary and signing information are retained.
+Ended contracts and contracts of former owners are excluded. A contracted
+player appearing under another current owner blocks the run for transaction
+review; a roster capture alone cannot distinguish a trade from a drop/pickup.
+Missing future-season dates and overlapping playing contracts also block the
+run. Yahoo league membership is checked again before buyouts. Ownership and
+contract plans are reread after the NHL stage to detect concurrent changes.
+
+Finally, the six season rollups are rebuilt from all persisted player days in
+that season: player weeks, splits and totals; team days, weeks and seasons.
+This shares the existing aggregation math, preserves rating/award/power fields,
+and never deletes stale derived rows. Career totals, power, awards and standings
+are separate workflows. Aggregate dry-run counts use planned roster metadata
+with currently stored NHL statistics; live NHL updates can change the result.
+The stages are resumable, not one database transaction. If a later stage fails,
+rerun the dry run and apply; existing buyouts are not charged again.
+
+#### `stats:yahoo-cycle`
+
+Runs one resumable cycle for a Windows Task Scheduler task or another operator
+scheduler. Consult `--help` for the required deployment, league, season, scoring
+date range and Python executable. Dry runs exercise the child import previews
+without advancing the checkpoint; `--apply` enables the validated stages.
+
+The intended cadence is every 15 minutes. Current Yahoo rosters, eligibility,
+optimized lineups and season aggregates refresh every cycle; NHL stats refresh
+hourly. After 06:00 Toronto, the previous two dates are rechecked for completed
+lineups and final stats. After downtime, older missing dates are processed first,
+at most two per cycle. Historical failures do not advance past the failed date.
+Current-roster failures are recorded while independent historical work can
+finish. Contract/source conflicts require review and are never silently accepted.
+
+The runner gets the server credential from its environment or the signed-in
+Convex CLI for the explicitly named deployment, retains it only in memory, and
+redacts it from child output. No Convex deployment or managed schedule is needed.
+The operator PC must remain awake, connected, and logged into the scheduled
+Windows user. Configure the task to skip overlapping runs and start when a
+missed trigger becomes available; a process lock also prevents overlapping cycles.
+Long NHL/catch-up runs can delay the next roster refresh.
+
+Checkpoints, daily logs and the latest status are under `.local-data/yahoo-sync/`,
+with deployment/league/season in each filename. A failed run records its stage
+and retries on the next trigger. Invalid checkpoints/locks fail visibly instead
+of guessing; inspect the prior process before manually repairing a lock. Local
+state is operational progress, not a database backup. Keep the task's scoring
+range aligned with the existing weeks and allow two days after the final week
+for final-stat catch-up.
+
 #### `stats:sync-nhl-daily`
 
 Uses the Python `nhl-api-py` client to fetch real NHL boxscore data for one or
 more dates, matches those rows to existing `PlayerDayStatLine` records, and can
-write refreshed day-level stats back to Convex.
+write refreshed day-level stats back to Convex. Existing Yahoo eligibility and
+daily slots are preserved; NHL position is only a fallback for missing eligibility.
 
 Notable flags:
 

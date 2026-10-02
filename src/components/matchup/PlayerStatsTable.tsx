@@ -1,4 +1,9 @@
+"use client";
+
 import { NHLLogoList } from "@gshl-components/player/NHLLogoList";
+import { useNHLHomeSchedule } from "@gshl-hooks/features/useNHLHomeSchedule";
+import { getPlayerTodayGames } from "@gshl-utils/features/matchup-details";
+import { nhlGameStatus } from "@gshl-utils/features/nhl";
 import { TableViewport } from "@gshl-ui";
 import type {
   MatchupDetailsNhlTeam,
@@ -14,6 +19,7 @@ import {
   renderPlayerStatCell,
 } from "@gshl-utils";
 import Image from "next/image";
+import Link from "next/link";
 
 export function PlayerStatsTable({
   team,
@@ -28,6 +34,7 @@ export function PlayerStatsTable({
   headline?: string;
   seasonCategories?: readonly string[];
 }) {
+  const schedule = useNHLHomeSchedule();
   const columns = buildPlayerStatColumns({
     players,
     categories: seasonCategories,
@@ -121,6 +128,18 @@ export function PlayerStatsTable({
         </div>
       </div>
 
+      {schedule.error ? (
+        <p role="alert" className="px-3 py-2 text-xs text-slate-600 sm:px-4">
+          {schedule.error}{" "}
+          <button
+            type="button"
+            onClick={schedule.retry}
+            className="inline-flex min-h-11 items-center rounded underline focus-visible:ring-2 focus-visible:ring-blue-500"
+          >
+            Retry today&apos;s games
+          </button>
+        </p>
+      ) : null}
       <TableViewport
         ariaLabel={`${teamName} comprehensive player statistics`}
         scrollHint="Scroll to review every player statistic"
@@ -132,6 +151,12 @@ export function PlayerStatsTable({
           </caption>
           <thead className="bg-slate-50">
             <tr className="border-b border-slate-200">
+              <th
+                scope="col"
+                className={getColumnClassName("today", undefined, true)}
+              >
+                Today&apos;s game
+              </th>
               {tableColumns.map((column) => (
                 <th
                   key={column.key}
@@ -151,7 +176,7 @@ export function PlayerStatsTable({
             {players.length === 0 ? (
               <tr>
                 <td
-                  colSpan={tableColumns.length}
+                  colSpan={tableColumns.length + 1}
                   className="py-8 text-center text-sm text-slate-500"
                 >
                   No player stats available yet.
@@ -163,6 +188,42 @@ export function PlayerStatsTable({
                   key={player.id}
                   className="group border-b border-slate-200 transition-colors last:border-0 odd:bg-white even:bg-slate-50/70 hover:bg-slate-100"
                 >
+                  <td className={getColumnClassName("today")}>
+                    {schedule.isLoading ? (
+                      <span className="text-slate-400">Loading…</span>
+                    ) : !schedule.data ? (
+                      <span className="text-slate-400">Unavailable</span>
+                    ) : !schedule.data.published ? (
+                      <span className="text-slate-400">Not scheduled</span>
+                    ) : getPlayerTodayGames(player, schedule.games).length ===
+                      0 ? (
+                      <span
+                        aria-label="No game today"
+                        className="text-slate-400"
+                      >
+                        —
+                      </span>
+                    ) : (
+                      getPlayerTodayGames(player, schedule.games).map(
+                        (game) => (
+                          <Link
+                            key={game.id}
+                            href={`/nhl/matchup/${game.id}`}
+                            prefetch={false}
+                            aria-label={`${formatMatchupPlayerName(player)}: ${game.awayTeam.abbrev} at ${game.homeTeam.abbrev}. ${nhlGameStatus(game)}. View NHL matchup.`}
+                            className="flex min-h-11 flex-col justify-center rounded text-blue-700 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                          >
+                            <span className="font-medium">
+                              {game.awayTeam.abbrev} @ {game.homeTeam.abbrev}
+                            </span>
+                            <span className="text-[10px] text-slate-500">
+                              {nhlGameStatus(game)}
+                            </span>
+                          </Link>
+                        ),
+                      )
+                    )}
+                  </td>
                   {tableColumns.map((column) => {
                     const cellClassName = [
                       getColumnClassName(column.key, column.className),

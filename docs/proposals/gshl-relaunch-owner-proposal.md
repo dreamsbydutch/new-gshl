@@ -1,470 +1,691 @@
 # GSHL Relaunch
 
 [Project overview](../../README.md) ·
-[Current rulebook](../../src/content/rulebook.ts)
+[Current rulebook](../../src/content/rulebook.ts) ·
+[Salary analysis](gshl-relaunch-salary-analysis.md)
 
-> **Owner discussion draft.** These are proposed changes, not adopted rules.
-> The Commissioner will speak with owners before settling the package. Scoring
-> limits, the salary cap, and launch timing still need testing. Items marked
-> **To settle** are open decisions, not rules owners are being asked to assume.
+> **Owner discussion proposal.** This records the agreed direction for the
+> relaunch, not the currently adopted rules or a claim that every feature is
+> built. The target is the **2027 draft**, subject to readiness. Financial
+> calibration and the remaining launch work are identified below.
 
 ## 23 players, no daily bench decisions
 
-The main change is simple: build your roster, then let your players play.
 Each franchise would have **15 main-roster players and eight reserves**.
-Everyone on the main roster is active. There is no daily bench to set.
+Everyone on the main roster is eligible to score. Owners choose the players;
+the app handles legal positional arrangement and selects the strongest complete
+game performances through **best-ball scoring**.
 
 | Roster      | Players | Role                                             |
 | ----------- | ------: | ------------------------------------------------ |
 | Main roster |      15 | 3 C, 3 LW, 3 RW, 4 D, and 2 G; eligible to score |
 | Reserves    |       8 | Owned depth; must be promoted to score           |
-| **Total**   |  **23** | The full franchise roster                        |
+| **Total**   |  **23** | Full franchise roster                            |
 
-The app would use **best-ball scoring** to select your main roster's strongest
-complete game performances within matchup appearance limits. You still decide
-who belongs on your team, who to promote, and who to acquire. You no longer lose
-production because you forgot to move someone off the bench.
+There would be no daily bench to set and no IR or IR+ slots. An injured player
+could remain on the main roster or move to reserve using a normal roster move.
+Reserves remain fully owned: they can be traded, carry contracts and salaries,
+and accumulate signing eligibility.
 
-IR and IR+ would disappear. An injured player could stay on the main roster or
-move to reserve using a normal swap. Reserves remain fully owned: they can be
-traded, carry contracts and salaries, and build signing eligibility.
+The app would arrange multi-position players automatically. Owners would not
+need to move a C/LW between positions every day. Each selected performance can
+occupy only one eligible position, with all appearance limits enforced together.
+
+Positional eligibility would be published before the draft and locked at the
+start of the season. There are no midseason additions, removals, or corrections
+to a player's eligible positions. Changes wait until the next offseason.
+
+Vacancies would be legal. Teams must respect roster maximums, positional
+capacity, and the cap, but need not acquire someone merely to fill an empty
+spot. Vacancies provide no extra scoring capacity or moves.
+
+## More time talking hockey, less time maintaining lineups
+
+Owners still want a deep league, but have less time for fantasy hockey. The
+relaunch should move that time toward **trade conversations, roster
+construction, and week-to-week strategy**.
+
+Daily maintenance would no longer be required. An owner could leave a sound
+roster in place and compete, while someone with an idea for improving their team
+would have reasons to approach another owner. Trading should be the most
+reliable route to a specific upgrade; waivers should help fill holes without
+replacing the trade market.
+
+GSHL would keep its 14 franchises, two seven-team conferences, head-to-head
+categories, home-ice tiebreaker, Cup and playoff structure, Owner Ladder, and
+long-term team identities. The draft could remain a live, informal event or
+move to a slow online format that owners participate in over multiple days.
+
+## The entire league in the GSHL App
+
+The entire league would run in the **GSHL App**, with no Yahoo league. Rosters,
+reserve moves, claims, trades, contracts, UFA, the draft, schedules, standings,
+and official results would all live in one place.
+
+The scoreboard would show the category score, which performances count, which
+are below the cut, remaining capacity, and when a stronger game replaces an
+earlier one. Owners should be able to understand a result without reconstructing
+it themselves.
+
+ESPN and NHL API endpoints are the league's information sources. Complete owner
+workflows, dependable ingestion, and GSHL's own published eligibility,
+transaction, scoring, and recovery rules are requirements for launch. The data
+integration uses the NHL API as the authority whenever it disagrees with ESPN.
+This precedence does not reopen completed matchups or change locked positions.
 
 ## How a matchup would work
 
-GSHL would remain a head-to-head category league. The seven skater categories
-would stay goals, assists, points, power-play points, shots, hits, and blocks.
-The three goalie categories would stay wins, goals against average, and save
-percentage. Home ice would still decide a matchup tied in total categories.
+The seven skater categories remain goals, assists, points, power-play points,
+shots, hits, and blocks. Goalies compete in wins, goals against average, and
+save percentage. Home ice decides a matchup tied in total categories.
 
-### The app chooses performances; you choose the players
+### Best-ball selects whole performances
 
-Each game played by someone on your main roster supplies a candidate performance
-for that matchup. After each NHL day, the app recalculates which performances
-count, using the GSHL player-rating system and the appearance limits.
+Each eligible main-roster player-game supplies a candidate performance. After
+each NHL day, the app recalculates the selection using GSHL player ratings.
+Every eligible performance counts until an appearance limit requires a cut.
 
-A performance counts as a whole. The app cannot take a goal from one game and
-hits from another to create a better single appearance. Selection is based on
-player ratings; it is not a promise to find the combination that wins the most
-categories against that week's opponent.
+A performance counts as a whole: the app cannot take a goal from one game and
+hits from another to create one appearance. Automatic selection uses the same
+rating rule for everyone. Ratings determine the primary selection; equally
+rated performances are compared in the matchup's closest category first: the
+performance with the better value in that category wins. If still tied, compare
+the second-closest category, then the third, and continue as needed. Higher
+values are better except for GAA, where lower is better. This comparison cannot
+displace a higher-rated performance.
 
-For example, if your centers produce 16 eligible games in a seven-day matchup,
-only 14 can fit under the center limit. Some could also miss the cut because of
-the overall skater limit. A stronger game later in the matchup can replace an
-earlier one, so the category totals can change as the selection changes.
+For example, 16 center performances cannot all fit under a 14-appearance center
+limit. Some could also miss the cut because of the overall skater limit. A
+stronger performance later can replace one currently counting. Reaching a limit
+does not lock in the earlier games.
 
-The goal is to keep schedule planning useful while limiting how much a team can
-win through sheer volume. Extra games still give you more chances at a strong
-performance. Reaching an appearance limit does not lock in the games already
-counting.
+Schedules still matter: extra games create more chances at strong performances.
+The limits keep a favorable schedule from creating unlimited counting-stat volume.
 
-### Moves still matter
+### Optional owner overrides
 
-Each team would receive **two external acquisitions and four reserve swaps per
-matchup**. One swap exchanges one main-roster player with one reserve and takes
-effect the next day. Unused swaps expire. Moving an injured player down and
-bringing them back later uses two swaps.
+Owners can optionally override the app's selections directly in the games
+table, toggling which eligible **skater and goalie performances** count toward
+the week's totals. In a standard seven-game-day matchup, that means choosing
+the games included in the **45 skater appearances** and up to **four goalie
+appearances**. Other matchup lengths use their normal scaled allowances.
 
-A free agent could be added directly to either roster tier by dropping someone
-from that same tier. That keeps streaming available within the acquisition
-limit. Dropping a contracted player still has buyout consequences.
+Automatic best-ball remains the default for owners who make no changes. An
+owner could choose a lower-rated game because its production better suits the
+category matchup. The table would show which selections are manual and let the
+owner return to automatic selection.
 
-### One official scoreboard
+Overrides change only which whole performances count. They cannot include
+reserve-only or otherwise ineligible games, count a performance twice, or
+exceed overall or positional limits. They do not move players between roster
+tiers or consume acquisition or reserve moves. Manual selections stay editable
+until the matchup is finalized, independently of the daily roster transaction
+deadline. Finalized matchup results remain locked; there is no additional
+editing window after the final statistics are processed.
 
-The GSHL App would become the official matchup scoreboard. It would show the
-category score, which performances count, which are below the cut, remaining
-capacity, and when a new game replaces an earlier one.
+Goalie selection must still count available
+appearances up to the maximum rather than discard poor games to protect ratios.
+For example, with five eligible goalie games and a four-game maximum, an owner
+can choose which four count; with only three eligible games, all three count.
+Implementation must make clear how newly completed games interact with manual
+selections so owners know which choices the app will preserve.
 
-Yahoo would remain the familiar home for roster, waiver, trade, and positional
-eligibility tools. Its matchup score would no longer decide the GSHL result.
-Making those two systems easy to use together is a requirement for launch.
+### Longer means more NHL game days
 
-## What this keeps about GSHL
+Only calendar dates on which NHL games are actually played count toward matchup length. A matchup
+spanning two calendar weeks but containing six NHL game days is a six-day
+matchup. Breaks do not add capacity. Postponed games receive no special
+make-up treatment: they count in the matchup week in which they are actually
+played, not their originally scheduled week.
 
-The league would still have 14 franchises, two seven-team conferences, the GSHL
-Cup, the existing playoff structure, the Owner Ladder, contracts, trades, and
-long-term team identities. The draft would remain informal and peer-paced.
+Appearance limits are recalculated when postponements change that count. If
+every game on a date is postponed, that date adds no capacity; if any game is
+played, it still counts as one NHL game day. Move allowances remain unchanged.
 
-The reason to change is that careers, children, and distance have made daily
-fantasy maintenance harder. The aim is to preserve serious competition while
-putting more of the effort into decisions worth talking about: building a team,
-making a trade, and deciding which players to keep.
+The starting allowances for testing are:
 
-The priorities are more owner interaction, credible results when life gets
-busy, easier participation, and meaningful GM decisions.
+| NHL game days | All skaters | C max | LW max | RW max | D max | G range |
+| ------------: | ----------: | ----: | -----: | -----: | ----: | ------: |
+|             6 |          39 |    12 |     10 |     10 |    15 |     2–4 |
+|             7 |          45 |    14 |     12 |     12 |    18 |     2–4 |
+|            10 |          65 |    20 |     17 |     17 |    26 |     2–6 |
+|            14 |          91 |    28 |     24 |     24 |    36 |     2–8 |
 
-## Keep more of your team from year to year
+For `N` NHL game days, the overall skater limit is `floor(6.5 × N)`, centers
+`2 × N`, each wing `round(12 × N ÷ 7)`, and defense `round(18 × N ÷ 7)`.
+Positional ceilings are not guaranteed allocations and do not add up to the
+overall ceiling.
 
-The proposal is a **salary cap of roughly $80 million**, with the aim of letting
-a typical team afford **roughly 10–14 contracted players** out of its 23-player
-roster. The revised salary curve and actual contract costs still need testing
-to confirm how closely that cap supports the target.
+The goalie minimum is **always two**. The maximum is
+`max(4, round(4 × N ÷ 7))`: it grows for longer matchups but never falls below
+four. Relief appearances count. The app counts available appearances up to the
+maximum; it cannot keep only two excellent games to protect ratios. Above the
+maximum, automatic selection uses the highest-rated complete performances;
+owners may override that selection under the rules above. GAA and save
+percentage use combined underlying totals, not averages of game percentages.
 
-There would be no numeric keeper maximum. A team paying for several stars would
-have less room for depth; a team with affordable contracts could keep more
-players. The 10–14 range is a design target, not a guaranteed allowance or limit.
+A team below two appearances concedes all three goalie categories. If both
+teams miss the minimum, those categories tie.
 
-Drafted players would remain cap-free for their initial season. To return for a
-later season, a player would need a contract. A single announced offseason
-contract window would replace the current multiple signing periods, with the
-app showing each decision, its cap effect, and the deadline.
+### Completed results stay final
 
-Keeping 10–14 players would leave 9–13 roster openings before UFA and the draft.
-A team keeping 12 and making no UFA signings would need 11 draft selections.
-The draft would support up to 23 rounds and skip teams once they are full.
-Rookies, emerging players, released veterans, and future value would remain
-central to it.
+A matchup becomes final when every included NHL game has ended and its required
+statistics have been received and processed. The app displays **awaiting final
+stats** during a data delay. Once complete, later corrections do not change the
+matchup result.
+
+Counted performances determine GSHL category totals and production-based awards.
+Every eligible performance is also retained to explain selections and support
+analysis. The underlying NHL talent model continues to use NHL performance
+independently of which games GSHL selected.
+
+## Weekly management and the daily deadline
+
+Each team receives **two external acquisitions and four reserve moves per
+matchup**. These allowances do not increase for longer matchups. Unused moves
+expire.
+
+A normal reserve swap exchanges one player in each direction and uses one move.
+Demoting an injured player and later bringing them back uses two. The app handles
+movement between eligible main-roster positions automatically.
+
+Transactions process at **3 p.m. Eastern or 30 minutes before the day's first
+NHL game, whichever is earlier**. A 1 p.m. first game means a 12:30 p.m.
+deadline; a 7 p.m. first game means 3 p.m. On days without games, use 3 p.m.
+
+If the NHL schedule changes on the day of a game, the deadline becomes immediate
+when that change is detected. Transactions already processed remain in effect.
+
+The app shows the next deadline. Reserve moves, acquisition awards, and accepted
+trades take effect at that processing time. Submissions after the deadline wait
+for the next day's processing. Already-earned performances stay with the team
+that owned the player when the game locked.
+
+Due decisions enter one queue and execute one at a time. There is no preferred
+order among claims, signings, trades, and roster moves. The app records the
+actual execution order and preserves existing reservations and transaction
+requirements as each decision completes.
+
+## Trading should be the main way to improve a team
+
+Trades **do not consume the two-acquisition allowance**. Owners can negotiate
+through WhatsApp or direct messages, then send a formal app offer showing
+players, picks, contracts, retained salary, cap effects, and required roster moves.
+
+Acceptance makes the agreement binding and immediately reserves the players,
+picks, cap room, roster capacity, and required reserve moves needed to complete
+the trade. Acceptance must satisfy roster, position, and cap rules, including
+existing reservations. Later actions cannot spend or commit those reserved
+resources or invalidate the accepted trade. The complete exchange executes
+together at the next daily processing time.
+There is no routine league vote or Commissioner approval.
+
+Owners choose whether an incoming player joins the main roster or reserves. If
+a player must move down to make room, that demotion uses one of the four reserve
+moves. Directly replacing a departing main-roster player does not use a move.
+Trades cannot provide free main/reserve reshuffling.
+
+Only picks in the upcoming draft can be traded. Trade-block listings identify
+at least one desired type of return. The app may suggest partners based on
+needs, positions, categories, and cap room, but will not declare a trade “fair.”
+Owners should acknowledge direct inquiries within 72 hours, even if the answer
+is no.
+
+## Waivers and free agents without a daily race
+
+Dropped players spend **at least 48 hours on waivers**, then resolve at the first
+daily processing time after that period. Other unowned free agents are available
+through daily claims rather than immediate first-click acquisitions.
+
+Competing claims use a weighted draw, similar to UFA but **without a new
+contract**. The claim score has two factors, each normalized from zero to one:
+
+| Claim factor                              | Weight |
+| ----------------------------------------- | -----: |
+| Improvement to the best legal main roster |    75% |
+| Relative roster weakness                  |    25% |
+
+The model considers all 23 owned players and the proposed drop when assessing
+the best possible main roster. No special safeguards against vacancy or demotion
+strategies are required. Salary, contract term, Owner Ladder standing,
+and draft capital do not affect claim scores. Better fit improves a chance;
+it does not guarantee the award. Claims use the shared probability calculation
+described below for UFA.
+
+### Every claim is a commitment
+
+There are no ranked backup claims. Each pending claim reserves an acquisition
+and identifies a distinct player to drop or an available roster spot. An owner
+must be able to accept **every outstanding claim**. A team with two acquisitions
+available cannot make three binding claims hoping to lose one.
+
+Reservations count against the matchup in which the award is scheduled to
+process. Losing releases the reservation; winning executes the acquisition
+automatically. A free agent can enter either tier by replacing a player in that
+tier or filling a legal vacancy. Dropping a contracted player triggers a buyout.
+
+Displayed odds are provisional until closing. Final odds use the roster at
+closing, and the app retains the inputs and draw result so the award can be
+explained.
+
+## Keep a core; refresh depth through the draft
+
+The retention goal is to move toward **roughly 15 players per team**, with the
+main core staying together and much of the depth turning over through the
+draft. This is an intended outcome, not a requirement to keep starters or
+release reserves. There is no numeric keeper maximum.
+
+The proposed salary cap is **$100 million per team**. The updated salary curve
+and this cap will be tested together before rollout against the retention goal.
+Expensive stars still force choices; affordable contracts allow more depth.
+
+A team keeping 15 of 23 players has eight openings before UFA and the draft.
+Established-player movement would primarily come through trades and mandatory
+UFA. The draft replenishes depth, prospects, and future value. Drafted players
+receive their initial season cap-free and need a contract to return for a later
+season.
+
+### Picks and roster openings
+
+Keepers consume a team's latest available original picks first. Acquired picks
+are preserved where roster capacity permits, and the app shows usable selections
+before the draft. Full teams stop selecting. Teams short of selections receive
+end-of-draft fill picks so they can complete their rosters. The draft supports
+up to 23 regular rounds.
+
+### Option: a slow online draft
+
+Instead of requiring everyone to attend one event, the draft could run in the
+GSHL App over multiple days. Each owner would have **roughly six hours of active
+draft time per pick**, with the draft and its clock paused overnight. An owner
+can pick sooner, immediately passing the turn to the next team during active
+hours. Unused time on the current pick carries into the next active day.
+
+The app would show whose turn it is, the remaining time, and the overnight
+pause, and notify owners when they are on the clock. This format would replace
+the need to attend a single live draft while preserving pick trading and the
+existing draft order and roster rules.
+
+Before choosing this format, publish the daily active hours in Eastern time,
+the rule for an expired pick clock, and a calendar with enough time to finish
+before the season. Six hours is a maximum, not an expected pace: 14 teams making
+eight picks each would allow **672 active hours** if every pick used the full
+clock, so the draft could take weeks rather than days. Its start date and
+preceding contract and UFA deadlines must account for that possibility.
+
+The live format remains an option, with remote/proxy participation, early
+scheduling, food, predictions, and an informal pace.
 
 ### Protect the 2027 Seven-Year Super Draft
 
-The 2027 draft marks seven seasons since the keeper system began. The
-Commissioner's projection is that roughly eight top NHL players will finish
-their initial season and two contracts together. Under the rules those
-contracts were signed under, they are due to return to the draft. The exact
-class still needs to be checked against the contract ledger.
+The target is to begin the new era at the **2027 draft**. The Commissioner's
+projection is that roughly eight top NHL players will complete their initial
+season and two contracts together, seven seasons after the keeper system began.
+The exact class must still be verified against the contract ledger.
 
-The proposal preserves that expectation:
+Players already promised a return to that draft remain in it. Existing 2027
+pick ownership and placement results stand. The verified class will be published
+before offseason decisions. The new mandatory-UFA route applies to
+second-contract expirations after the 2027 draft.
 
-- Players already due in the 2027 draft after their second contract stay in it.
-- Existing 2027 pick ownership and Draft Placement Tournament results stand.
-- The exact returning class is checked and published before offseason decisions.
-- The new mandatory-UFA route applies to second-contract expirations after the
-  2027 draft.
+The event should receive class profiles, mock drafts, pick-trade coverage, and a
+countdown. Its protected player class does not depend on the new app being ready.
 
-The Super Draft would be the intended launch event for the new era, with class
-profiles, mock drafts, pick-trade coverage, and a countdown. That ambition is
-still subject to launch readiness; preserving the promised draft class should
-not depend on the new scoring system being ready.
+### Move into the new salary system in 2028
 
-## More reasons to stay involved
+The transition happens in two stages. The **2027 draft redistributes the top
+talent** returning to the pool. The **2028 re-signing window introduces the new
+salary curve**, followed by an offseason market intended to help teams build
+toward roughly 15 contracts under the **$100 million cap**.
 
-### Trading
+At the **end of the 2028 re-signing period**, teams must stay within a **firm
+$40 million cap**, with **no contract-count limit** beyond roster capacity.
+Existing contracts and new re-signings both count toward the cap, with normal cap accounting for
+buyouts and outgoing retained salary. This is the checkpoint before UFA opens,
+not a limit measured before re-signing begins.
 
-Salary retention would give teams another way to make a trade work. A seller
-could keep part of a player's cap charge for the remaining contract term; the
-limits are explained later in this proposal.
+When the offseason moves into UFA, the cap rises to **$100 million**. Owners fill
+out the rest of their contracted core through UFA. The $40 million checkpoint applies only to the 2028
+transition.
 
-Trade-block listings would identify at least one desired return. The app could
-suggest possible partners based on cap room, categories, positions, and stated
-needs. Owners would still negotiate through WhatsApp or direct messages, and
-the app would not declare a trade “fair.” Completed trades would have a clear
-salary and contract summary to share.
+For the **2028 offseason only**, UFA offers start at **100% of base salary** and
+can reach **150% of base salary**, in steps of five percentage points of base.
+A player with a $4 million base salary can receive offers from $4 million to
+$6 million. The seven-day market, one-to-three-year terms, binding offers, and
+cap reservations still apply. Existing signed salaries are not repriced.
 
-Owners would be expected to acknowledge a direct inquiry within 72 hours, even
-if the answer is no. Only picks in the upcoming draft could be traded.
+The lower UFA entry price gives owners a way to build out their contracted core.
+Roughly 15 contracts is the intended outcome, not a quota or guarantee that every
+team can afford its preferred 15 players.
 
-### A second trophy race during the NHL playoffs
+## The postseason and a second trophy race
 
-After the GSHL season, each team's 15-player main roster would freeze for a
-separate competition covering the entire Stanley Cup Playoffs. Reserves would
-not participate, and there would be no further acquisitions or swaps.
+### External moves stop when Cup contention ends
 
-Every playoff statistic from those players would count, with no appearance
-maximums. Having players whose NHL teams advance would be an intentional
-advantage. Teams would compete in a 14-team rotisserie table using the same ten
-categories: category finishes earn points, and the highest total wins.
+A team loses external add/drop access immediately when it misses the playoffs
+at the end of the regular season or loses a Cup playoff matchup. This applies
+even if the team still has placement games to play.
 
-The winner would receive $50, a permanent trophy, five Owner Ladder points, and
-recognition at the Cup Parade. Results would not affect GSHL standings,
-playoffs, power ratings, or draft order.
+Eliminated teams can continue main/reserve moves, with the same four-move
+allowance per league matchup period. When the GSHL championship matchup
+completes, **all teams' main rosters freeze together** for the NHL playoff
+tournament.
 
-The existing postseason placement competition would become the **Draft
-Placement Tournament**. The Adam Brophy Award and its negative Ladder value
-would move to the last-place regular-season team.
+Offseason trading reopens when the NHL playoff tournament ends. This does not
+reopen external add/drop access or change the completed tournament's rosters
+or results.
 
-### A manageable league calendar
+The existing placement competition becomes the **Draft Placement Tournament**.
+The Adam Brophy Award and its negative Ladder value move to the last-place
+regular-season team.
 
-The year would have a few clear moments: Cup Parade, contract decisions, UFA,
-the draft, the trade deadline, the GSHL playoffs, and the NHL playoff tournament.
+### NHL playoff tournament
 
-During the season, the app would prepare two short WhatsApp posts for a human
-to review and share:
+The frozen main rosters compete through the entire Stanley Cup Playoffs.
+Reserves do not participate, and there are no tournament acquisitions or roster
+moves. Every playoff statistic from the frozen players counts, with no
+appearance maximum. Having players whose NHL teams advance is an intentional
+advantage.
 
-- **Monday Aftermath:** results, upsets, close finishes, standings movement, and
-  one funny superlative.
-- **Thursday Stakes:** rivalries, playoff stakes, performances near the best-ball
-  cut, trade activity, and one prediction prompt.
+All 14 teams compete in the same ten categories using rotisserie scoring:
 
-Longer Press Box editions would be saved for preseason, the trade deadline,
-and the two playoff competitions. Push notifications would focus on actions
-such as contract deadlines, UFA offers, trades, reserve locks, draft turns, and
-invalid rosters. Owners would receive public contract-window notices and
-private reminders about unfinished decisions.
+- First in a category earns 14 points, second 13, down to one point for last.
+  Tied places split the points for those positions.
+- Higher totals win counting categories and save percentage; lower GAA wins.
+- Teams need four goalie appearances to qualify for GAA and save percentage.
+  Teams below that minimum receive zero points in those two categories;
+  qualified teams receive the usual points for their finishing positions.
+  Goalie wins still count normally.
+- Highest combined score wins. Overall ties are broken by most outright
+  category wins, then most second-place finishes, then thirds, and so on.
+  If still tied, teams share the title and split the $50 prize; each receives
+  five Owner Ladder points.
 
-The Cup Parade would remain an excuse to gather, with about 20 minutes at most
-for structured awards and comedy.
+The winner receives $50, a permanent trophy, five Owner Ladder points, and Cup
+Parade recognition. The tournament does not affect GSHL standings, playoffs,
+power ratings, or draft order.
 
-### What owners would be expected to do
+## Contracts and the offseason market
 
-Maintain a valid roster, acknowledge trade inquiries within 72 hours, complete
-offseason decisions on time, and attend the draft or arrange a remote/proxy
-plan. Social participation would be encouraged. Chat volume would never earn
-a competitive advantage.
+### One clear contract window
 
-The draft would keep its existing approach to remote participation, early
-scheduling, food, predictions, and peer pressure to keep picks moving. There
-would be no new draft clock or attendance penalty.
+Final cap rules, the salary curve, individual salaries, and signing eligibility
+will be published **at least 30 days before the contract deadline** and frozen
+for that offseason. One announced offseason contract window replaces the
+current multiple signing periods. The app shows each decision, its cap effect,
+and the deadline, with public notices and private reminders.
 
-## The scoring details
+Existing signed contracts keep their agreed salaries. At the deadline, those
+contracts continue, while unsigned players are released: contract-eligible
+players enter UFA, and ineligible players enter the draft pool. There are no
+automatic new contracts. Owners receive a final preview of releases.
 
-These are the starting limits for historical testing. They are not final.
-Only dates with at least one NHL game would count when sizing a matchup;
-empty dates during an All-Star break would add no capacity.
+The existing roster-day signing-eligibility rule is fixed: a player must have
+spent **more than two-thirds of the GSHL regular season** on the signing team's
+roster or on GSHL rosters across the league, measured by player-days. Reserve
+days count. Eligibility history is tracked separately from the contract-cycle
+counter, and a buyout does not erase it.
 
-| Active NHL game days | All skaters | C max | LW max | RW max | D max | G range |
-| -------------------: | ----------: | ----: | -----: | -----: | ----: | ------: |
-|                    7 |          45 |    14 |     12 |     12 |    18 |     2–4 |
-|                   10 |          65 |    20 |     17 |     17 |    26 |     2–4 |
+### A player's contract cycle
 
-Both the overall and positional limits apply. The positional limits are ceilings,
-not guaranteed allocations, and do not add up to the overall limit.
+| Stage                                   | Treatment                                                                              |
+| --------------------------------------- | -------------------------------------------------------------------------------------- |
+| Drafted season                          | Cap-free                                                                               |
+| First contract                          | 100% of published base salary; one to three years                                      |
+| Incumbent second contract               | 110% of updated base salary; one to three years                                        |
+| Second contract expires                 | Mandatory UFA, except for the protected 2027 class                                     |
+| Signed through UFA                      | Contract one of a new two-contract cycle                                               |
+| Mandatory UFA unsigned before the draft | Returns to the draft pool; normal cap-free drafted season, then a fresh contract cycle |
 
-For a matchup with `N` active NHL game days, the formulas would be:
+Trades carry the existing term and contract history with the player. They do
+not reset the cycle. Signed salaries remain fixed for the contract term.
 
-- All skaters: `floor(6.5 × N)`
-- Centers: `2 × N`
-- Each wing: `round(12 × N ÷ 7)`
-- Defense: `round(18 × N ÷ 7)`
-- Goalies: minimum two and maximum four appearances per matchup
+The former owner may bid in mandatory UFA but has no matching right or incumbent
+preference. The protection against indefinite ownership is the genuine
+offseason market opportunity; an unsigned player is allowed to return through
+the draft without a contract.
 
-The goalie range currently stays fixed even in a longer matchup. That needs to
-be tested alongside the skater limits.
+### Seven days of public UFA offers
 
-**To settle before launch:**
+The special 2028 transition uses the 100%–150% range described above. After 2028,
+the normal **110%–148.5% of base salary** range applies as described below.
 
-- **Selection rules.** How are multi-position players assigned? Does their
-  roster slot lock the position for that day's game? How are equal ratings
-  broken, and how does selection satisfy the overall and positional limits
-  together? The proposed default is that all eligible skater games count until
-  a limit requires a cut; the final rule should make that explicit.
-- **Goalies.** Which appearances count when more than four are available? Must
-  the system use four if available, or can it choose fewer? Confirm whether
-  relief appearances count and whether the current penalty remains: concede all
-  three goalie categories below two appearances, or tie them if both teams
-  miss the minimum. GAA and save percentage need to be calculated from combined
-  underlying totals, rather than averages of game percentages.
-- **Timing and corrections.** Publish the daily lock time and time zone, how
-  postponed games affect capacity, and when a result becomes final after stat
-  corrections. An eligible game should remain with the team that owned it at
-  the game lock, even if the player later moves; confirm that rule explicitly.
-- **Transactions.** Define whether trades count as external acquisitions, how
-  uneven trades and empty slots work, and whether moving players between main
-  positions uses a swap. Trades and add/drops must not provide an unintended
-  way around reserve limits. Decide whether longer matchups receive more moves.
-- **Records.** Decide whether awards, player statistics, and power ratings use
-  selected performances or all eligible games. Freeze the scoring-rating
-  version for the season and explain its selection criteria to owners.
+The first offer opens **one seven-day clock for that player**. Later offers do
+not extend it. Salary and term are public. The app shows the deadline and
+notifies interested owners before closing.
 
-For the NHL playoff tournament, first in each category would earn 14 points,
-second 13, down to one point for last. Ties would split the points for the tied
-places. Higher totals win counting categories; lower GAA wins its category.
-Teams would need four goalie appearances to qualify for GAA and save percentage.
+The UFA minimum is **110% of base salary**. Offers increase in steps of **5% of
+that minimum**, up to **135% of the minimum**, equivalent to **148.5% of base
+salary**. A player valued at $4 million receives offers from **$4.4 million to
+$5.94 million per season**. Terms remain one to three years.
 
-**To settle:** publish one roster-freeze time for all teams, including teams
-eliminated early from GSHL play. Define points for teams missing the goalie
-minimum and a tiebreaker for the overall tournament prize.
+Offers are binding and reserve cap room and roster capacity immediately. Neither
+salary nor term can decrease, and offers cannot be withdrawn. A team must be
+able to honor every live offer, including commitments in each covered season.
 
-## Contracts, UFA bidding, and cap accounting
+Salary and term dominate the UFA score:
 
-### A player's path through the league
+| UFA factor                | Weight |
+| ------------------------- | -----: |
+| Offered salary            |    45% |
+| Contract term             |    25% |
+| Roster fit                |    20% |
+| Previous team performance |     5% |
+| Owner Ladder              |     3% |
+| Draft capital             |     2% |
 
-| Stage                               | Proposed treatment                                                                  |
-| ----------------------------------- | ----------------------------------------------------------------------------------- |
-| Initial drafted season              | Cap-free                                                                            |
-| First contract                      | Owner may sign the eligible player for one to three years                           |
-| First contract expires              | Restricted free agent (RFA); incumbent may renew at 110% of the updated GSHL salary |
-| Second consecutive contract expires | Mandatory unrestricted free agency (UFA), except for the protected 2027 draft class |
-| Mandatory UFA                       | Any team may bid; former owner has no matching right or incumbent preference        |
+Each factor is normalized from zero to one. Salary scores zero at the minimum
+and one at the maximum: `(offer / UFA minimum - 1) / 0.35`. Terms of one, two,
+and three years score zero, 0.5, and one respectively. Multiply each factor by
+its weight and add the results to obtain the offer's score.
 
-Contract term and consecutive-contract history would follow the player through
-a trade. Trading a player would not reset the route to mandatory UFA.
+For the special 2028 market, the salary score is instead
+`(offer / base salary - 1) / 0.50`: zero at 100% and one at 150% of base.
+All factor weights and the shared probability calculation remain the same.
 
-Salaries would still come from the NHL-performance-based talent model, but the
-conversion from rank to dollars would change as described below. Signed
-salaries would remain fixed for the contract term. The proposed RFA premium
-falls from the current 115% to **110%**.
+Roster fit keeps the current player-specific blend of teammate quality and
+opportunity. If `p` is the player's rating percentile among positional peers,
+the blend is `(0.35 + 0.30 × p) × quality + (0.65 - 0.30 × p) × opportunity`.
+Elite players therefore put more emphasis on strong teammates; lower-rated
+players put more on opportunity. Opportunity must measure improvement to the
+best legal main roster, replacing the current model's simple count of
+contracted players at the same position.
 
-**To settle:** confirm first-contract pricing and the existing signing-eligibility
-threshold of more than two-thirds of regular-season player-days, including
-reserve days. State where declined renewals, unsigned eligible players, bought-out
-players, and UFAs receiving no offers go next. Define when a new contract cycle
-begins after UFA or redrafting. Mandatory-UFA players need an explicit route
-that cannot be bypassed by simply waiting to draft them cap-free.
+Salary and term account for 70% of the score. Previous performance, Ladder, and
+draft capital together account for only 10%, keeping their advantage modest.
+The app shows understandable probability bands. The highest offer is not
+guaranteed to win.
 
-### A seven-day public UFA market
+A sole valid bidder signs the player automatically. Multiple bidders enter one
+weighted draw at closing. The winning contract begins automatically and losing
+teams immediately recover reserved capacity. Offers and the result remain
+auditable.
 
-UFA would become a public competition on both salary and term. The minimum
-offer would be **110% of the player's updated algorithmic salary**. Owners could
-bid up to **125% of that minimum**, or **137.5% of the underlying salary**.
+UFA closes **at least 48 hours before the draft**. Opening offers stop seven days
+before that closing time, allowing every market to finish. The final draft pool
+is published after offers resolve and reservations are released. Unsigned
+mandatory UFAs join that pool.
 
-For a player valued at $4 million, that means offers from **$4.4 million to
-$5.5 million per season**. Contract terms would remain one to three years.
+### One probability calculation for UFA and claims
 
-Offers would be public for seven days, binding, and immediately reserve cap
-room. Owners could increase an offer but could not reduce or withdraw it.
+Both systems use the same draw method with their respective scores. **10% of
+the probability pool is shared equally** among valid bidders; the other 90%
+follows their weighted scores. This replaces the current five-percentage-point
+minimum for every bidder, which would allocate 70% of a 14-team draw equally.
 
-Higher salary and longer term would improve the chance of signing. Owner Ladder
-standing, prior performance, roster context, and a controlled random element
-would also matter. The highest offer would not be guaranteed to win. The app
-would show understandable probability bands without revealing every internal
-weight.
+For `n` valid bidders and scores between zero and one:
 
-**To settle:**
+```text
+weight = exp(3 × score)
+probability = 0.10 / n + 0.90 × weight / sum(all bidder weights)
+```
 
-- Does the first offer start one seven-day clock for the player? Do late bids
-  extend it? Publish deadlines, bid increments, and which term changes are allowed.
-- Reserve enough cap room and roster space for every live offer to succeed.
-  Define when losing bids release those reservations and how simultaneous
-  signings resolve. This can tie up a team's budget for a week; test whether
-  that makes the market too restrictive.
-- Define the result for a sole bidder, and whether odds use franchise context
-  at opening or closing. Retain an auditable record of the offers and draw.
-- Test whether Ladder and past-performance advantages make rebuilding too hard,
-  and whether the narrow salary range sends most bids straight to the maximum.
+A sole valid bidder wins automatically. Equal scores produce equal chances.
+For example, with two UFA bidders whose other factors are identical, maximum
+salary and three years versus minimum salary and one year produces odds of
+about **85.2% to 14.8%**. Stronger offers matter without eliminating uncertainty.
 
-### A longer salary curve, then a cap that fits
+The weights and draw method are settled. The precise normalization of
+main-roster improvement and roster weakness will be specified and tested during
+implementation, accounting for positional constraints and proposed drops.
 
-The proposed base-salary curve would reach further into the player pool:
+## Salary curve, cap, retention, and buyouts
 
-| Rank in the salary model | Target annual base salary |
-| -----------------------: | ------------------------: |
-|                        1 |               $10 million |
-|                       20 |                $9 million |
-|                      160 |                $5 million |
-|                      325 |                $2 million |
-|                      350 |                $1 million |
+### Price a deeper player pool
 
-The calculation uses a smooth, declining cubic curve through all five points,
-then rounds each salary to the existing $50,000 increment. The curve keeps
-elite players expensive and gradually reaches a $1 million floor at rank 350.
-Later ranks stay at that floor. These are base salaries, before contract premiums.
+The proposed base-salary curve uses a smooth, declining cubic curve through
+these starting targets, with salaries rounded to $50,000:
 
-Splitting the top **168 players across 14 teams** gives each team 12 players.
-An alternating snake allocation produces team payrolls of **$84.00–$84.35
-million**, averaging **$84.14 million**. Every team has the same total rank.
-That is a close salary balance, but actual talent balance still needs checking
-against the underlying ratings rather than assuming equal gaps between ranks.
+| Rank in the salary model | Annual base salary |
+| -----------------------: | -----------------: |
+|                        1 |        $10 million |
+|                       20 |      $9.25 million |
+|                      160 |      $5.75 million |
+|                      325 |       $2.5 million |
+|            400 and later |         $1 million |
 
-| Contracted players per team | Player pool split across 14 teams | Average base payroll | If all salaries receive the 110% RFA premium |
-| --------------------------: | --------------------------------: | -------------------: | -------------------------------------------: |
-|                          10 |                           Top 140 |       $73.89 million |                               $81.27 million |
-|                          12 |                           Top 168 |       $84.14 million |                               $92.55 million |
-|                          14 |                           Top 196 |       $93.24 million |                              $102.56 million |
+The [salary analysis](gshl-relaunch-salary-analysis.md) compares this lifted curve
+with the current schedule and previous proposal. Splitting the top 210 players
+across 14 teams of 15 produces base payrolls of **$105.80–$106.25 million**,
+averaging **$106.00 million**, within the target of **$104–$108 million**.
+That is up from $97.43 million under the previous proposal. The teams are
+approximately balanced by rank; equal underlying talent still needs testing.
 
-The proposed cap is **roughly $80 million**. That is below the modeled
-12-player average even before contract premiums, so owners would need to make
-choices about expensive players and affordable depth. UFA spending, existing
-contracts, and buyout charges still need to be modeled against the 10–14-player
-target. Cheap depth could allow more than 14 contracts.
+The $100 million cap is about $6 million below that 15-player base average,
+so owners will need to make choices about which players to retain. This does
+not establish a fixed keeper count. The cap and curve must be tested against actual
+ratings, realistic keeper choices, existing contracts, UFA premiums, and cap
+obligations. The goal is a retained core approaching 15 players, rather than
+preserving a particular cap number at the expense of that experience.
 
-The [salary analysis](gshl-relaunch-salary-analysis.md) records the calculation,
-all 14 team totals, and the remaining validation. Before choosing the final cap,
-balance actual players using the same talent score that orders their salaries,
-then test how many contracts representative teams can afford.
-
-### What counts against the cap
-
-Contracted players would count whether on the main roster or in reserve.
-Buyout charges and outgoing retained salary would also count. Live UFA offers
-would reserve available room. Initial-season drafted players would remain
-cap-free.
-
-The cap needs to be tested against actual team contracts, including expensive
-and rebuilding rosters. The 10–14-player target must account for contracted
-reserves, buyouts, retention, and commitments through UFA. Existing contracts
-would not be silently repriced to the new curve.
+Contracted main-roster and reserve players, buyouts, and outgoing retained
+salary count against the cap. Live UFA offers reserve room. Newly drafted
+players remain cap-free during their initial season.
 
 ### Salary retention in trades
 
-A seller could retain **10% to 50%** of a contract in 10% increments for its
-remaining term. Each contract could be retained only once, and each team could
-carry at most two outgoing retention obligations. Both teams' cap sheets and
-the trade summary would show the split.
+A seller may retain **10% to 50%** of a contract in 10% increments for its
+remaining term. Each contract can be retained only once; each team can carry
+at most two outgoing retention obligations. Both cap sheets and the trade
+offer show the split.
 
-For example, on a $5 million contract with 40% retained, the seller would carry
-$2 million and the buyer $3 million per season for the remaining term.
+The retaining franchise cannot reacquire the player through any route until its
+retention obligation expires. If the player moves again, the original seller's
+obligation remains. Its retention slot becomes available at the original expiry.
 
-**To settle:** specify what happens to that split if the player is traded again
-or bought out, when a retention slot becomes available, and whether a player
-can return to the retaining team during the obligation.
+### Buyouts and a fresh contract cycle
 
-### Buyouts
+Dropping a contracted player creates a buyout charge of **50% of salary**,
+effective immediately through the later of the original contract expiry or the
+end of the following GSHL season. The app shows the charge schedule before
+confirmation.
 
-Dropping a contracted player would create a charge equal to **50% of salary**,
-starting immediately and lasting until the later of the original contract end
-or the end of the following GSHL season. A final-year drop would therefore still
-leave a charge next season. The app would show the full schedule before an
-owner confirms.
+A buyout breaks the contract streak. The player becomes available without a
+contract and can begin a fresh two-contract cycle, but accumulated roster-day
+eligibility history remains. The new owner can offer a first contract in the
+offseason window if the player is eligible.
 
-**To settle:** clarify that “from the drop date” describes when the cap charge
-starts, rather than implying daily salary proration, and define the treatment
-of contracts with retained salary.
+The dropping franchise cannot reacquire the player through claims, free agency,
+or trades until the original contract would have expired. Deliberate
+arrangements to return a player and circumvent that restriction are prohibited.
+Buyout charges remain with the dropping team.
 
-### Offseason order and existing commitments
+For a retained contract, the seller keeps its original obligation and the buyer
+buys out its own share. On a $5 million contract with 40% retained, the seller
+continues paying **$2 million through the original expiry**. If the buyer drops
+the player, its buyout is **$1.5 million**, half its $3 million share, for the
+normal buyout duration.
 
-The intended sequence is to publish salaries and eligibility, hold the contract
-window, resolve UFA, then draft into remaining roster spaces.
+## League rhythm and owner expectations
 
-**To settle:** publish exact dates and default outcomes for missed decisions.
-Confirm how existing contracts and buyouts carry forward and how keeper slots
-interact with traded picks. A team cannot assume nine usable selections merely
-because it has nine vacancies if it has traded picks away; the final draft
-rules must explain how every team fills its roster and how acquired picks work
-when their new owner is already full.
+The year has clear moments: Cup Parade, contract decisions, UFA, the draft,
+the trade deadline, the GSHL playoffs, and the NHL playoff tournament.
+
+The app would prepare two short weekly WhatsApp posts for a human to review
+and share:
+
+- **Monday Aftermath:** results, upsets, close finishes, standings movement,
+  and one funny superlative.
+- **Thursday Stakes:** rivalries, playoff stakes, performances near the
+  best-ball cut, trade activity, and one prediction prompt.
+
+Long Press Box editions would be reserved for preseason, the trade deadline,
+and the two playoff competitions. Push notifications would focus on actions:
+claims, contracts, UFA, trades, roster deadlines, draft turns, and invalid
+rosters. The Cup Parade remains an excuse to gather, with about 20 minutes at
+most for structured awards and comedy.
+
+Owners are expected to maintain legal rosters, acknowledge trade inquiries
+within 72 hours and complete offseason decisions on time. For a live draft,
+owners attend or arrange remote/proxy participation; for a slow online draft,
+they make selections within the published pick clock. They must respond to Commissioner contact
+and resolve illegal roster or cap states by a published deadline. Legal
+vacancies, injuries, and quiet participation are not violations. Prolonged
+disengagement calls for a private ownership conversation.
+
+GM of the Year and Coach of the Year remain. Award criteria will be handled
+during implementation.
 
 ## Dues and prizes
 
-The entry fee would remain **$60 per owner**, for $840 across 14 teams.
+The buy-in is **$50 per owner**, for **$700 across 14 teams**.
 
 | Use                             |   Amount |
 | ------------------------------- | -------: |
 | GSHL Cup champion               |     $500 |
-| GSHL Cup runner-up              |     $150 |
+| GSHL Cup runner-up              |     $100 |
 | NHL playoff tournament champion |      $50 |
-| Presidents' Trophy              |      $20 |
-| League administration           |     $120 |
-| **Total**                       | **$840** |
+| League fees                     |      $50 |
+| **Total**                       | **$700** |
 
-**To settle:** confirm that the administration allocation covers the new trophy
-and expected running costs.
+League fees would not be tracked against owners individually. The Commissioner
+absorbs costs beyond the allocation; advertised prizes remain fixed.
 
-## What needs to happen before this becomes official
+## Launch when the full league can run reliably
 
-The largest practical risk is making the app the official scorer while owners
-continue to manage rosters in Yahoo. Before launch, the league needs to prove
-that roster tiers, locks, swaps, and scoring stay in sync without routine
-Commissioner intervention. Owners also need a clear process for outages,
-incorrect results, and roster mistakes.
+The desired launch is the **2027 draft**, but readiness takes priority over a
+fixed date. Optional editorial features can wait. Roster, acquisition, trade,
+contract, draft, and scoring workflows must work together first.
 
-The proposed path is:
+Before launch, the league would:
 
-1. Replay completed seasons under the scoring limits and the new salary curve
-   at several cap levels, targeting roughly 10–14 contracted players per team.
-   Show effects on matchups, schedule advantages, positional value, goalie
-   strategies, and keeper counts using representative teams.
-2. Validate the 2027 expiring-contract class and pick ownership. Publish the
-   protected class before owners make offseason commitments.
-3. Discuss the package privately with owners, including whether eight reserves,
-   four swaps, and two acquisitions fit the amount of effort they want to spend.
-4. Resolve the open rules above and publish worked examples of a matchup, an
-   offseason, a contested UFA signing, and a retained-salary buyout.
-5. Run scoring in shadow mode alongside official results and trial the owner
-   workflows. Agree on readiness criteria, a correction process, and an outage
-   fallback before relying on the app for standings.
-6. Publish the final package, calendar, and updated rulebook with time to prepare.
-   Introduce changes only at an offseason boundary. If the system is not ready,
-   defer its launch while preserving the 2027 draft commitments.
+1. Replay historical matchups and validate appearance limits, positional
+   effects, goalie treatment, and selection transparency.
+2. Validate the selected $100 million cap and salary curve against the goal of
+   roughly 15 keepers using expensive and rebuilding rosters.
+3. Verify the protected 2027 player class, contracts, eligibility, and pick
+   ownership before owners make commitments.
+4. Rehearse complete owner transactions, a full matchup, data delays,
+   pre-finalization corrections, and outage recovery before collecting the
+   launch-season buy-in.
+5. Publish the rules, calendar, salary list, eligibility, and worked examples
+   with time for owners to prepare. Introduce changes at an offseason boundary.
 
-Historical replays may change past winners. That is evidence to examine, not
-by itself a reason to accept or reject the proposal. Final judgment remains
-with the Commissioner after owner discussion, considering the package together.
+If the app is unavailable at a deadline, owners can submit requests through a
+designated, timestamped WhatsApp fallback **before the normal deadline**. The
+Commissioner enters valid requests using their original submission times.
+Existing rosters carry forward automatically; retrospective requests are not
+accepted. This recovery process must be rehearsed without Yahoo as a backup.
 
-## Questions for owners
+Implementation must verify NHL-first data ingestion, season-long positional
+locks, the agreed best-ball comparison, and immediate deadlines following
+same-day schedule changes. It must also define and test normalization for claim
+and UFA scores and a consistent fallback for otherwise identical selections.
+Queue execution and reservations must be tested together. These details must
+follow the agreed rules and cannot reopen completed-matchup results or introduce
+daily lineup work.
 
-- Would this be a league you would enjoy managing more than the current version?
-- Which change creates the most excitement, and which creates the most concern?
-- Do the roster size and weekly move limits feel manageable?
-- Does preserving the 2027 Super Draft match your understanding of the current
-  contract promise?
-- Would UFA, trading, or the NHL playoff tournament make you more involved?
-- What part of today's GSHL would you miss, or what change could make you
-  reconsider owning a team?
+The Commissioner will discuss the package with owners and make the final
+adoption decision. If readiness delays the full relaunch, the protected 2027
+draft commitments still stand.
+
+## How we will know whether it worked
+
+After the first season, review completed trades and how broadly trade activity
+was spread across owners. Ask whether owners spent less time maintaining
+lineups and more time discussing players, teams, and potential deals.
+
+More transactions alone would not establish success. The league should feel
+easier to maintain and more worthwhile to participate in. Owner feedback and
+trade participation will guide adjustments; chat volume will never earn a
+competitive advantage or become a participation requirement.

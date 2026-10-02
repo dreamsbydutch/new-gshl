@@ -1,7 +1,19 @@
 import { v } from "convex/values";
 
 const nullableNumber = v.union(v.number(), v.null());
+export const nhlSeasonFinalization = v.object({
+  state: v.literal("final-with-limitations"),
+  reviewHash: v.string(),
+  reviewedAt: v.number(),
+  reason: v.string(),
+  backupSha256: v.string(),
+  reportSha256: v.string(),
+  failedGates: v.array(v.string()),
+  processCoverage: v.number(),
+  shotCoverage: v.number(),
+});
 export const nhlGameValueDetails = v.object({
+  finalization: v.optional(nhlSeasonFinalization),
   revision: v.string(),
   verifiedGames: v.number(),
   includedGames: v.number(),
@@ -18,6 +30,8 @@ export const nhlGameValueDetails = v.object({
   abilityRank: nullableNumber,
   components: v.object({
     adjustedProcess: v.number(),
+    offensiveProcess: v.optional(v.number()),
+    defensiveProcess: v.optional(v.number()),
     observedProcess: v.number(),
     finishing: v.number(),
     penalties: v.number(),

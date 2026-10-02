@@ -534,7 +534,7 @@ export function MatchupDetailsContent({
             homeTeam={homeTeam}
             awayTeam={awayTeam}
           />
-          <StarsCard stars={stars} />
+          {matchup.isComplete === true ? <StarsCard stars={stars} /> : null}
         </div>
       </section>
 

@@ -173,6 +173,18 @@ void test("v3 rejects mismatched versions, non-finite components and invented ex
     { ...gameValue, includedGames: 68 },
     { ...gameValue, revision: "unreviewed" },
     { ...gameValue, components: { ...gameValue.components, saving: NaN } },
+    {
+      ...gameValue,
+      components: { ...gameValue.components, offensiveProcess: 1 },
+    },
+    {
+      ...gameValue,
+      components: {
+        ...gameValue.components,
+        offensiveProcess: 1,
+        defensiveProcess: 1,
+      },
+    },
   ]) {
     const f = fixture();
     await assert.rejects(
@@ -193,4 +205,22 @@ void test("v3 rejects mismatched versions, non-finite components and invented ex
     }),
     /version/,
   );
+});
+void test("v3 accepts signed offensive and defensive breakdowns that reconcile", async () => {
+  const f = fixture();
+  const details = {
+    ...gameValue,
+    components: {
+      ...gameValue.components,
+      offensiveProcess: -2,
+      defensiveProcess: 3,
+    },
+  };
+  await invokeMutation(importBatch, f.ctx, {
+    ...args,
+    modelVersion: "nhl-season-value-v3",
+    apply: true,
+    results: [{ ...result, impactPer60: null, gameValue: details }],
+  });
+  assert.deepEqual(f.rows("nhlSeasonValues")[0]?.gameValue, details);
 });

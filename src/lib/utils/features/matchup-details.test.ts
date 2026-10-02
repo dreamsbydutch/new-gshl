@@ -6,11 +6,66 @@ import type {
   PlayerStatColumnKey,
   PlayerStatRow,
 } from "@gshl-types";
+import type { NHLSchedule } from "@gshl-lib/types/nhl";
 import {
   buildPlayerStatColumns,
   getPlayerStatCardColumns,
+  getPlayerTodayGames,
   renderPlayerStatCell,
 } from "./matchup-details";
+
+void test("today's games match current NHL teams, aliases, and either side without duplicates", () => {
+  const games: NHLSchedule["gameWeek"][number]["games"] = [
+    {
+      id: 2026020001,
+      season: 20262027,
+      gameType: 2,
+      startTimeUTC: "2026-10-02T00:00:00Z",
+      gameState: "FUT",
+      gameScheduleState: "OK",
+      awayTeam: { abbrev: "NJD", placeName: { default: "New Jersey" } },
+      homeTeam: { abbrev: "TOR", placeName: { default: "Toronto" } },
+    },
+  ];
+  assert.deepEqual(
+    getPlayerTodayGames({ id: "away", nhlTeam: [" nj "] }, games),
+    games,
+  );
+  assert.deepEqual(
+    getPlayerTodayGames({ id: "home", nhlTeam: ["TOR"] }, games),
+    games,
+  );
+  assert.deepEqual(
+    getPlayerTodayGames({ id: "both", nhlTeam: ["TOR", "NJD"] }, games),
+    games,
+  );
+  assert.deepEqual(
+    getPlayerTodayGames(
+      { id: "traded", nhlTeam: ["BOS"], currentNhlTeam: ["NJD"] },
+      games,
+    ),
+    games,
+  );
+  assert.deepEqual(
+    getPlayerTodayGames(
+      { id: "off", nhlTeam: ["TOR"], currentNhlTeam: ["BOS"] },
+      games,
+    ),
+    [],
+  );
+  assert.deepEqual(
+    getPlayerTodayGames(
+      { id: "unsigned", nhlTeam: ["TOR"], currentNhlTeam: [] },
+      games,
+    ),
+    [],
+  );
+  assert.deepEqual(getPlayerTodayGames({ id: "unknown" }, games), []);
+  assert.deepEqual(
+    getPlayerTodayGames({ id: "no-games", nhlTeam: ["TOR"] }, []),
+    [],
+  );
+});
 
 function player(
   posGroup: "F" | "D" | "G",

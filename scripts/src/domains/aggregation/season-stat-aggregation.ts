@@ -1999,7 +1999,7 @@ function isCareerPlayerStatModel(
   );
 }
 
-async function replaceModelRowsForSeason(
+export async function replaceModelRowsForSeason(
   modelName: WritableSeasonStatModelName,
   seasonId: string,
   generatedRows: DatabaseRecord[],
@@ -2127,6 +2127,75 @@ async function replaceModelRowsForSeason(
   };
 }
 
+/** Shared season rollups. Inputs and Yahoo daily positions are never mutated. */
+export function buildSeasonStatLines(
+  seasonId: string,
+  sourceDays: DatabaseRecord[],
+  seasonRow: DatabaseRecord,
+  weekRows: DatabaseRecord[],
+  teamRows: DatabaseRecord[],
+) {
+  const weekTypeMap = buildWeekTypeMap(weekRows, seasonId);
+  const fieldConfig = buildSeasonAggregationFieldConfig(seasonRow);
+  const playerDays = canonicalizePlayerDayRows(
+    sourceDays.map((row) => ({ ...row })),
+  );
+  applyPlayerDayDerivedColumns(playerDays, playerDays);
+
+  const playerWeekMap = new Map<string, PlayerWeekBucket>();
+  for (const playerDay of playerDays) {
+    const weekId = toTrimmedString(playerDay.weekId);
+    const seasonType = weekTypeMap.get(weekId);
+    const playerId = toTrimmedString(playerDay.playerId);
+    const gshlTeamId = toTrimmedString(playerDay.gshlTeamId);
+    if (!weekId || !seasonType || !playerId || !gshlTeamId) continue;
+
+    const key = `${weekId}|${gshlTeamId}|${playerId}`;
+    let bucket = playerWeekMap.get(key);
+    if (!bucket) {
+      bucket = createPlayerWeekBucket(
+        seasonId,
+        weekId,
+        gshlTeamId,
+        playerId,
+        seasonType,
+        toTrimmedString(playerDay.posGroup),
+      );
+      playerWeekMap.set(key, bucket);
+    }
+    addPlayerDayToWeekBucket(bucket, playerDay, fieldConfig);
+  }
+
+  const playerWeeks = Array.from(playerWeekMap.values()).map((bucket) =>
+    buildPlayerWeekRow(bucket, fieldConfig),
+  );
+  const { splits, totals } = buildPlayerSplitsAndTotals(
+    playerWeeks,
+    weekTypeMap,
+    seasonId,
+    fieldConfig,
+  );
+  const { teamDays, teamWeeks, teamSeasons } = aggregateTeamStats(
+    playerDays,
+    playerWeeks,
+    splits,
+    teamRows,
+    weekRows.filter((week) => toTrimmedString(week.seasonId) === seasonId),
+    weekTypeMap,
+    seasonId,
+    fieldConfig,
+  );
+  return {
+    playerDays,
+    playerWeeks,
+    playerSplits: splits,
+    playerTotals: totals,
+    teamDays,
+    teamWeeks,
+    teamSeasons,
+  };
+}
+
 /**
  * Aggregates all player and team stats for a season from `PlayerDayStatLine`.
  *
@@ -2193,41 +2262,20 @@ export async function aggregateSeasonStats(
   );
   const fieldConfig = buildSeasonAggregationFieldConfig(seasonRow);
 
-  const playerDays = canonicalizePlayerDayRows(loadedPlayerDays);
-  applyPlayerDayDerivedColumns(playerDays, playerDays);
-
-  const playerWeekMap = new Map<string, PlayerWeekBucket>();
-  for (const playerDay of playerDays) {
-    const weekId = toTrimmedString(playerDay.weekId);
-    const seasonType = weekTypeMap.get(weekId);
-    const playerId = toTrimmedString(playerDay.playerId);
-    const gshlTeamId = toTrimmedString(playerDay.gshlTeamId);
-    if (!weekId || !seasonType || !playerId || !gshlTeamId) continue;
-
-    const key = `${weekId}|${gshlTeamId}|${playerId}`;
-    let bucket = playerWeekMap.get(key);
-    if (!bucket) {
-      bucket = createPlayerWeekBucket(
-        seasonId,
-        weekId,
-        gshlTeamId,
-        playerId,
-        seasonType,
-        toTrimmedString(playerDay.posGroup),
-      );
-      playerWeekMap.set(key, bucket);
-    }
-    addPlayerDayToWeekBucket(bucket, playerDay, fieldConfig);
-  }
-
-  const playerWeeks = Array.from(playerWeekMap.values()).map((bucket) =>
-    buildPlayerWeekRow(bucket, fieldConfig),
-  );
-  const { splits, totals } = buildPlayerSplitsAndTotals(
+  const {
+    playerDays,
     playerWeeks,
-    weekTypeMap,
+    playerSplits: splits,
+    playerTotals: totals,
+    teamDays,
+    teamWeeks,
+    teamSeasons,
+  } = buildSeasonStatLines(
     seasonId,
-    fieldConfig,
+    loadedPlayerDays,
+    seasonRow!,
+    weekRows,
+    teamRows,
   );
   const mergedCareerPlayerWeeks = dedupeRowsByCompositeKey(
     "PlayerWeekStatLine",
@@ -2242,16 +2290,6 @@ export async function aggregateSeasonStats(
     mergedCareerPlayerWeeks,
     fieldConfig,
     careerWeekTypeMap,
-  );
-  const { teamDays, teamWeeks, teamSeasons } = aggregateTeamStats(
-    playerDays,
-    playerWeeks,
-    splits,
-    teamRows,
-    weekRows.filter((week) => toTrimmedString(week.seasonId) === seasonId),
-    weekTypeMap,
-    seasonId,
-    fieldConfig,
   );
 
   await rankBaseStatRows(playerDays, "PlayerDayStatLine", "Rating", seasonRows);

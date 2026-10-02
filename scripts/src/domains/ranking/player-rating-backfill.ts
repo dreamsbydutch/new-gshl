@@ -265,7 +265,7 @@ function getLeagueAnchor(
   return scores.reduce((sum, score) => sum + score, 0) / scores.length;
 }
 
-function buildSeasonLeagueAnchors(
+export function buildSeasonLeagueAnchors(
   rowsForSeason: DatabaseRecord[],
 ): Record<string, number> {
   return {
@@ -368,7 +368,7 @@ function getRecentSeasonInfluence(
   );
 }
 
-function computeOverallRatingForHistory(
+export function computeOverallRatingForHistory(
   historyRows: DatabaseRecord[],
   leagueAnchor: number,
 ): number | null {
@@ -537,7 +537,7 @@ function getAgeValue(value: unknown): number | null {
   return numeric === null ? null : clip(numeric, 18, 45);
 }
 
-function getAgeMarketAdjustment(age: number | null): number {
+export function getAgeMarketAdjustment(age: number | null): number {
   if (age === null) return 0;
   if (age <= 22) return 1.1;
   if (age <= 24) return 0.8;

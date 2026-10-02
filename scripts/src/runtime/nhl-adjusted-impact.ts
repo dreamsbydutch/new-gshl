@@ -214,6 +214,8 @@ export function predictStint(
 }
 export function evaluateImpact(model: ImpactModel, games: GameValueData[]) {
   let xgError = 0,
+    teamXgError = 0,
+    teamGoalError = 0,
     goalError = 0,
     correct = 0,
     decisions = 0,
@@ -238,15 +240,25 @@ export function evaluateImpact(model: ImpactModel, games: GameValueData[]) {
       unsupported++;
       continue;
     }
-    const observedXg = g.stints.reduce(
-      (sum, s) => sum + s.homeXg - s.awayXg,
-      0,
-    );
+    const observedHome = g.stints.reduce((sum, s) => sum + s.homeXg, 0);
+    const observedAway = g.stints.reduce((sum, s) => sum + s.awayXg, 0);
+    const observedXg = observedHome - observedAway;
     const goalDiff = g.homeGoals - g.awayGoals,
       predicted = home - away;
     const penaltyShotDiff = g.shots
       .filter((s) => s.attribution === "penalty-shot")
       .reduce((n, s) => n + (s.home ? s.xg : -s.xg), 0);
+    const homePenaltyShots = g.shots
+      .filter((s) => s.attribution === "penalty-shot" && s.home)
+      .reduce((sum, s) => sum + s.xg, 0);
+    const awayPenaltyShots = g.shots
+      .filter((s) => s.attribution === "penalty-shot" && !s.home)
+      .reduce((sum, s) => sum + s.xg, 0);
+    // Differential errors can cancel when both teams' scoring is misestimated.
+    teamXgError += (home - observedHome) ** 2 + (away - observedAway) ** 2;
+    teamGoalError +=
+      (home + homePenaltyShots - g.homeGoals) ** 2 +
+      (away + awayPenaltyShots - g.awayGoals) ** 2;
     xgError += (predicted - observedXg) ** 2;
     goalError += (predicted + penaltyShotDiff - goalDiff) ** 2;
     if (goalDiff !== 0) {
@@ -260,9 +272,37 @@ export function evaluateImpact(model: ImpactModel, games: GameValueData[]) {
     games: n,
     unsupportedGames: unsupported,
     xgDifferentialMse: n ? xgError / n : null,
+    teamXgMse: n ? teamXgError / (2 * n) : null,
+    teamGoalMse: n ? teamGoalError / (2 * n) : null,
     goalDifferentialMse: n ? goalError / n : null,
     nonShootoutDecisions: decisions,
     nonShootoutDecisionAccuracy: decisions ? correct / decisions : null,
+  };
+}
+
+/** Fixed-model ablations diagnose whether each side helps on held-out games.
+ * They are not causal player estimates and never select parameters on test data.
+ */
+export function evaluateImpactComponents(
+  model: ImpactModel,
+  games: GameValueData[],
+) {
+  const without = (prefix: string) =>
+    evaluateImpact(
+      {
+        ...model,
+        coefficients: Object.fromEntries(
+          Object.entries(model.coefficients).filter(
+            ([key]) => !key.startsWith(prefix),
+          ),
+        ),
+      },
+      games,
+    );
+  return {
+    full: evaluateImpact(model, games),
+    withoutOffense: without("O:"),
+    withoutDefense: without("D:"),
   };
 }
 
@@ -310,6 +350,7 @@ export function chronologicalImpact(
     trials,
     selectedLambda: lambda,
     model: evaluateImpact(testModel, test),
+    components: evaluateImpactComponents(testModel, test),
     situationOnlyBaseline: evaluateImpact(baseline, test),
     conditionalOnObservedDeployment: true,
     testModelConverged: testModel.converged,

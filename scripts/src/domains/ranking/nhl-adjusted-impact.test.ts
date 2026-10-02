@@ -13,7 +13,9 @@ import {
   fitAdjustedImpact,
   chronologicalImpact,
   evaluateImpact,
+  evaluateImpactComponents,
 } from "../../runtime/nhl-adjusted-impact";
+import { impactBreakdown } from "../../runtime/nhl-impact-breakdown";
 import {
   chronologicalShotQuality,
   predictShotQuality,
@@ -242,6 +244,94 @@ function population(): GameValueData[] {
     return g;
   });
 }
+test("equal offensive creation and defensive prevention receive equal season and ability credit", () => {
+  const f = gameFixture(),
+    g = buildGameValueData(f.sources, f.shots);
+  g.shots = [];
+  g.penalties = [];
+  const model = fitAdjustedImpact([g], 4);
+  model.coefficients = { "O:EV:1": 0.6, "D:EV:4": -0.6 };
+  const result = rankGameSeason([g], model, [
+    { playerId: 1, name: "Offense", position: "F", minutes: 20, games: 1 },
+    { playerId: 4, name: "Defense", position: "D", minutes: 20, games: 1 },
+  ]);
+  const [offense, defense] = [1, 4].map(
+    (id) => result.ratings.find((p) => p.playerId === id)!,
+  );
+  assert.equal(offense!.seasonValue, 0.2);
+  assert.equal(defense!.seasonValue, offense!.seasonValue);
+  assert.equal(defense!.abilityPer60, offense!.abilityPer60);
+  assert.equal(offense!.components.offensiveProcess, 0.2);
+  assert.equal(defense!.components.defensiveProcess, 0.2);
+});
+
+test("breakdown uses each side's actual strength exposure and reconciles without inflating defense", () => {
+  const result = impactBreakdown(
+    {
+      coefficients: {
+        "O:EV:1": 1,
+        "D:EV:1": -2,
+        "O:PP:1": 3,
+        "D:SH:1": -4,
+        "D:EN:1": 2,
+      },
+    },
+    1,
+    { "5v5:GG": 60, "5v4:GG": 30, "4v5:GG": 15, "6v5:EG": 6 },
+  );
+  assert.equal(result.offense, 2.5);
+  assert.equal(result.defense, 2.8);
+  assert.equal(result.total, 5.3);
+  assert.equal(result.byStrength.SH!.defense, 1);
+  assert.throws(() => impactBreakdown({ coefficients: {} }, 1, { bogus: 10 }));
+  assert.throws(() =>
+    impactBreakdown({ coefficients: {} }, 1, { "5v5:GG": -1 }),
+  );
+});
+
+test("validation exposes scoring errors that cancel in the goal differential", () => {
+  const games = population().slice(0, 1);
+  const g = games[0]!,
+    s = g.stints[0]!;
+  s.situation = "3v3:GG";
+  s.homeXg = s.awayXg = 2;
+  g.homeGoals = g.awayGoals = 2;
+  g.shots = [];
+  const model = fitAdjustedImpact(games, 4);
+  model.coefficients = { "B:3v3:GG": 5 };
+  const result = evaluateImpact(model, games);
+  assert.equal(result.xgDifferentialMse, 0);
+  assert.equal(result.teamXgMse, 9);
+  assert.equal(result.teamGoalMse, 9);
+  model.coefficients = { "B:3v3:GG": 5, "D:EV:2": -3, "D:EV:12": -3 };
+  const audit = evaluateImpactComponents(model, games);
+  assert.equal(audit.full.teamXgMse, 0);
+  assert.equal(audit.withoutDefense.teamXgMse, 9);
+  assert.equal(audit.withoutOffense.teamXgMse, 0);
+});
+
+test("ridge gives matched offensive and defensive signals the same magnitude of credit", () => {
+  const offensive = population(),
+    defensive = structuredClone(offensive);
+  for (let i = 0; i < offensive.length; i++) {
+    const o = offensive[i]!.stints[0]!,
+      d = defensive[i]!.stints[0]!;
+    // Same design and sample: a one-goal increase for becomes a one-goal reduction against.
+    o.situation = d.situation = "3v3:GG";
+    o.homeXg = i % 2 ? 4 : 2;
+    o.awayXg = 3;
+    d.homeXg = 3;
+    d.awayXg = i % 2 ? 2 : 4;
+  }
+  const a = fitAdjustedImpact(offensive, 4),
+    b = fitAdjustedImpact(defensive, 4);
+  const offenseContrast = a.coefficients["O:EV:1"]! - a.coefficients["O:EV:2"]!;
+  const defenseContrast = -(
+    b.coefficients["D:EV:1"]! - b.coefficients["D:EV:2"]!
+  );
+  assert.ok(offenseContrast > 0);
+  assert.ok(Math.abs(offenseContrast - defenseContrast) < 1e-6);
+});
 test("ridge separates changing lineups, stays finite and is deterministic", () => {
   const games = population();
   const model = fitAdjustedImpact(games, 4);

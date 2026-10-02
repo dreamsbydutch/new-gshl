@@ -61,6 +61,7 @@ export interface MatchupPlayerWeekRow {
   nhlPos: string[];
   posGroup: string;
   nhlTeam: string[];
+  currentNhlTeam?: string[];
   days: MatchupStatValue;
   GP: MatchupStatValue;
   GS: MatchupStatValue;

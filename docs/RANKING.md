@@ -134,7 +134,42 @@ when players share most of their ice time; it does not eliminate confounding.
 Identical design rows are pooled by exposure and expected goals before fitting;
 this preserves the ridge solution while reducing repeated numerical work.
 
-The outputs have distinct interpretations:
+The separate `nhl-performance-v3-preview` calculation in
+`scripts/src/runtime/nhl-performance-rating.ts` explores a performance-led
+ordering without replacing published v3 values or ranks. Its operator entry
+point is `preview-nhl-performance.ts`. It consumes saved calculated ratings,
+not underlying API metrics. Performance per game is `abilityPer60 * minutes /
+(60 * games)`, preserving actual workload and existing component shrinkage.
+Within each F/D/G pool, the median and median absolute deviation establish a
+robust rate scale; an arctangent maps that scale to a bounded score around 50.
+This preserves rate differences that a rank-only percentile would compress.
+
+Sample weight follows `3x² - 2x³`, where x is the smaller of games-based and
+minutes-based exposure relative to the full-sample target, capped at one.
+Targets are 65 equivalent games for skaters and 45 for goalies, with reference
+minutes per game of 15 F / 18 D / 50 G. Exposure scales to actual team season
+length relative to 82 games; unequal team schedules require individual lengths.
+Both the bounded performance score and actual accumulated `seasonValue`
+(independently normalized with its position median/MAD and bounded transform)
+receive this sample moderation. A separate smooth curve controls their blend:
+for skaters, performance receives 20% through 55 equivalent games, rising to 90%
+at 68 games; accumulated contribution receives the remainder. Between those
+endpoints use `t = clamp((effectiveGames - 55) / 13, 0, 1)` and
+`performanceWeight = 0.20 + 0.70 * (3t² - 2t³)`. Effective games are limited by
+the same workload evidence as sample weight. Goalies use a separate 35-to-45
+equivalent-game transition. There is no additional attendance bonus: the
+accumulated contribution component rewards positive volume and penalizes
+negative contribution. Availability remains a diagnostic column only.
+These are explicit preview policy choices, not fitted reliability probabilities.
+At sufficient ice time, skater sample weight is 93.63% at 55 games, 98.32% at 60,
+and 100% from 65 onward. This reliability adjustment is separate from the
+overall-to-performance blend, which finishes transitioning at 68. A ten-game
+skater cannot exceed 55 even with extreme
+rate and volume scores. Provisional and
+incomplete inputs receive no official performance rating/rank. Production
+adoption requires separate review; this preview is not a new validated model.
+
+The published v3 outputs have distinct interpretations:
 
 - `seasonValue`: adjusted chance impact over verified TOI, plus actual goals
   above expected and event penalty value. Goalies receive expected goals minus
@@ -567,6 +602,409 @@ time. Explicitly forfeited goalie categories remain losses in category strength
 rather than disappearing from its average. Missing fields alone do not imply
 forfeiture. See [refinement evidence](product/power-ranking-refinement.md) for
 chronological validation, rejected alternatives and limitations.
+
+## Offensive and defensive NHL value
+
+The game-level NHL model credits an estimated goal prevented equally to an
+estimated goal created. Each player's process contribution is
+`(offensive xG/60 - defensive xGA/60) * verified minutes / 60`, calculated
+separately for even strength, power plays, penalty killing, and empty-net play.
+Both player coefficient families use the same ridge penalty. Positive defensive
+value means fewer expected goals conceded. This applies to forwards as well as
+defensemen; position is not a proxy for playing style.
+
+New calculations retain `offensiveProcess` and `defensiveProcess` alongside
+`adjustedProcess`. The two signed components must reconcile with the aggregate
+within four-decimal rounding. Historical records may omit both. Finishing,
+penalties and goalie saving remain separate; defensive skaters do not receive
+credit for their goalie's saves. There is no extra multiplier for hits, blocks,
+defensive reputation, or a low offensive score. Position-relative display ranks
+are not interchangeable with absolute goal contributions.
+
+The local `audit-nhl-defense.ts` command reconstructs these components from saved
+fitted coefficients and each player's strength-state exposure. It exports CSV
+and JSON without API or database access. The October 2026 review reconciled
+11,885 skater-seasons across all 13 saved seasons. This is a mathematical audit,
+not proof that the model has captured every defensive skill.
+
+Held-out impact evaluation now also reports mean squared error for each team's
+xG and goals, averaged over both teams. Differential errors alone can hide equal
+errors on both sides. Fixed-model ablations remove offensive or defensive player
+coefficients independently, showing whether each family helps prediction. These
+diagnostics do not change parameter selection or publication gates. They are
+conditional on observed deployment, not causal experiments or prospective game
+forecasts. Check them before adopting a recalibration.
+
+The 2024-25 review reconstructed cached official games with the saved, frozen
+shot model, retained the previously selected ridge penalty of 4, fit 1,029
+verified games before March 13, and evaluated 273 later games. Mean team xG
+squared error was 0.66730 with the full model, 0.69447 without defensive player
+effects, and 0.76681 without offensive effects. Removing defense increased
+error; retaining it reduced error by 3.9% against that ablation. Mean team goal
+squared error improved from 3.34265 to 3.31387 (0.9%). These are descriptive
+results for one season, without a significance claim. They support retaining
+defensive impact, not inflating it until its distribution matches offense.
+The full model's winner accuracy was 68%, versus 70% for the situation-only
+baseline; improvements in squared error did not improve every diagnostic.
+The refreshed reconstruction is not a byte-for-byte replay of the older report.
+
+Unit fixtures verify matched offensive and defensive signals receive equal
+fitted credit and equal season/ability value. Remaining measurement limitations
+include correlated teammates, incomplete off-puck tracking, and deployment
+context such as penalty-expiry carryover. Equal goal units do not imply equal
+estimation uncertainty or equal score distributions. The existing 55-to-68-game
+performance blend is unchanged. Breakdown/schema changes require deployment
+before publishing new reports; this review does not modify production scores.
+
+## Category-based fantasy forecast experiment
+
+`scripts/src/runtime/fantasy-category-forecast.ts` is an isolated, pure prototype;
+it does not feed the production ranking engine or salary curve. Separate F/D/G
+models forecast each of the next three seasons. Ridge models estimate games
+played and exposure-weighted production per appearance, then combine them into
+category totals. Features use up to four calendar years of category rates,
+workload, power-play minutes, history coverage and target-year age. Standardized
+features and coefficients use training rows only; ridge regularization is fixed
+at 0.02 on mean weighted loss. No tuning selects weights from test outcomes.
+
+Points are derived from goals plus assists. Goalie GAA uses goals against/minutes;
+save percentage uses independently recorded saves/shots. Official GA need not
+equal shots minus saves. Term rates pool denominators. Forecasts
+enforce nonnegative totals, games no greater than 82, goals no greater than shots,
+PPP no greater than points, wins no greater than appearances and saves no greater
+than shots faced. The appearance/rate decomposition is an approximation, not a
+joint distribution over health, role and production.
+
+At each historical origin, train only on targets already complete, requiring
+three distinct target seasons and at least 100 training examples. Compare with
+last-season categories and a four-year recency-weighted category baseline
+(1, 0.78, 0.59, 0.43); these are not the exact production overall-rating formula.
+Every player who appeared at origin is retained. Absence from a verified complete
+future NHL population becomes zero production, including retirement; it is not
+silently dropped. Incoming prospects without NHL history are outside this model.
+
+Normalize counting totals to 82-game team schedules using the independently
+verified historical team-exposure audit, weighting traded players' schedules by
+appearances. Exclude 2019-20 and 2020-21 target seasons from primary fitting and
+evaluation, while permitting their normalized historical inputs once completed.
+Evaluate individual horizons and average annual production over complete two/
+three-year terms. No-appearance goalie outcomes count for wins/GP; GAA/SVP are
+undefined and excluded from rate errors. Each metric uses an identical paired
+cohort across methods; undefined predictions/outcomes are excluded jointly and
+counted explicitly. Workload errors still include these players. Publish all-player and established-player
+results (40 skater or 15 goalie equivalent appearances at origin), by category,
+position, horizon and origin fold, with RMSE, MAE, bias and correlations.
+
+Sources are retrospective corrected snapshots, not archives captured at signing.
+Birthdate is the only feature taken from the newly fetched aggregate bios report;
+future aggregate statistics/current teams never enter features. NHL API result
+ceilings require split season ranges, with exact identity/GP/population checks.
+Temporary fresh API inputs are removed after preparation; existing snapshots are
+preserved and production receives no source metrics or predictions.
+
+This experiment does not yet add NHL impact-model components, explicit injury or
+future roster information, calibrated uncertainty, weekly matchup simulation,
+replacement value or a scalar salary rating. Overlapping contracts and repeated
+players make observations dependent. Chronological testing measures incremental
+category accuracy, not independent significance or validated salary improvements.
+
+The October 2026 run verified 13,159 player-seasons, evaluated 17,550 player/
+origin/horizon forecasts and 7,406 complete player/origin/term windows (each with
+three methods), and generated 3,114 projections for 1,038 players over 2026-27,
+2027-28 and 2028-29. Complete-term tests cover four signing origins (2020 through
+2023) for two-year terms and three origins (2020 through 2022) for three-year
+terms; the longer history supplies training, not thirteen independent test years.
+
+For established players, reductions in RMSE versus weighted category history are:
+
+| Category | Two-year annual average | Three-year annual average |
+| --- | ---: | ---: |
+| Forward points | 16.1% | 17.6% |
+| Defense points | 14.6% | 17.3% |
+| Forward shots | 17.8% | 19.9% |
+| Defense shots | 20.8% | 25.6% |
+| Goalie wins | 18.8% | 23.9% |
+| Goalie GAA | 4.2% | 5.8% |
+| Goalie save percentage | **-2.6%** | **-2.7%** |
+
+All seven skater categories improve in aggregate for both terms, with improvements
+in every origin/category combination except one two-year defense hits fold.
+Goalie save percentage worsens in all four two-year folds and two of three
+three-year folds. Do not promote the whole goalie model on wins improvement.
+That initial experiment did not compare the production talent formula or NHL
+impact features; the subsequent comparison below addresses those questions.
+
+### Contract-rating comparison and chronological calibration
+
+The second experiment replays the current `PlayerNHL` RankingEngine on original
+official season totals, then calls the unchanged production talent-history and
+age-adjustment functions. Those three pure functions are now exported from
+`player-rating-backfill.ts`; their bodies and production behavior are unchanged.
+These are formula replays, not historical database salary quotes. Compare the
+result with the average of future NHL fantasy season ratings over the contract;
+NHL departures receive zero future value. This target measures available fantasy
+production, not actual owner lineups or matchup category wins.
+
+Three predefined variants were evaluated: the original category forecast, direct
+future skater totals/direct goalie rate fitting, and that direct model with NHL
+offense, defense, finishing, saving, penalty and shrunk ability inputs. The direct
+skater model generally worsened category accuracy and ranking; the tested NHL
+enrichment recovered some accuracy but did not beat the original category model.
+They remain experimental options, not production changes. This does not rule out
+other ways of incorporating NHL information. Goalie starts in projected engine
+scores hold the origin's starts/appearance ratio constant.
+
+`contract-rating-calibration.ts` corrects score levels using only forecasts whose
+target season is complete by the prediction origin. It fits position/horizon/
+method-specific positive linear corrections, requiring 100 observations and two
+prior origin years. A fixed 50-observation identity prior limits early changes;
+without enough history the original score is used. All baselines receive the
+same calibration opportunity. No future outcome can change an earlier correction.
+Two- and three-year candidate ratings equally average all calibrated annual
+forecasts, requiring all three years to produce both term options.
+
+Established-player contract-average rating RMSE:
+
+| Position / term | Current talent formula | Calibrated current formula | Calibrated category forecast |
+| --- | ---: | ---: | ---: |
+| F / 2 years | 18.48 | 18.00 | 16.10 |
+| F / 3 years | 19.47 | 18.85 | 16.83 |
+| D / 2 years | 17.54 | 16.88 | 15.22 |
+| D / 3 years | 18.47 | 17.71 | 15.46 |
+| G / 2 years | 22.06 | 20.75 | 20.31 |
+| G / 3 years | 21.77 | 20.50 | 19.34 |
+
+Against the equally calibrated current formula, the candidate improves RMSE by
+10.5–10.7% F, 9.8–12.7% D and 2.1–5.7% G. It improves every tested skater
+contract-origin fold, two of four two-year goalie folds and all three three-year
+goalie folds. Three-year rank correlations versus the uncalibrated current talent
+formula are 0.712→0.775 F, 0.754→0.809 D and 0.420→0.570 G. Calibration itself
+slightly reduces pooled rank correlations versus the uncalibrated category model
+while improving score errors; do not describe it as improving every metric.
+
+The local preview covers 1,038 current players, with annual estimates for 2026-27
+through 2028-29, two/three-year scores and separate position ranks. It does not
+set a new salary curve or establish cross-position replacement value. Retrospective
+corrected sources, forecast/actual cohort differences, prior examination of the
+test seasons, overlapping contracts and modest goalie samples limit the claims.
+These are research candidates, not production salary replacements or untouched
+prospective validation. No database source metrics, salaries or ratings are written.
+
+### Isolated NHL inputs and goalie save-rate follow-up
+
+A follow-up held the stronger appearance-times-rate model fixed and tested NHL
+impact inputs and historical goalie save percentage separately and together.
+It reused the same 13,159 player-seasons, chronological cutoffs, zero-value
+departures and equally calibrated baselines. The original candidate reproduced
+exactly. These seasons have already informed research; this is additional
+development evidence, not an untouched test or proof of a globally optimal model.
+
+Established-player contract-average rating RMSE versus the preceding calibrated
+category candidate (lower is better):
+
+| Position / term | Previous candidate | Follow-up candidate | Error reduction | Better origin folds |
+| --- | ---: | ---: | ---: | ---: |
+| F / 2 years | 16.10 | 15.93 | 1.1% | 4/4 |
+| F / 3 years | 16.83 | 16.55 | 1.7% | 3/3 |
+| D / 2 years | 15.22 | 14.93 | 1.9% | 3/4 |
+| D / 3 years | 15.46 | 15.06 | 2.6% | 2/3 |
+| G / 2 years | 20.31 | 19.61 | 3.5% | 4/4 |
+| G / 3 years | 19.34 | 18.53 | 4.2% | 3/3 |
+
+Skater rows use `rate-impact+calibrated`; goalie rows use
+`historical-save-rate+calibrated`. These are position-specific recommendations
+from separate tested variants, not a new deployed combined salary formula.
+Three-year rank correlations also improve: F 0.775 to 0.782, D 0.809 to 0.823,
+G 0.570 to 0.587. Defenseman point forecasts improve 1.0–1.6%, blocks about 2.7%,
+and hits about 1.5%. Thus NHL impact is useful as an input to fantasy-category
+forecasts; this does not award salary points directly for non-fantasy defense.
+
+The goalie variant replaces predicted SV/SA with four-calendar-season recency-
+and shot-weighted history, retaining learned GP, wins, minutes, shots and goals
+against. It improves save-percentage RMSE by 2.6–2.7% on the identical comparison
+cohort. Goalie NHL impact inputs worsen both overall calibrated error and rank
+correlation; combining them with historical save percentage is weaker than the
+save-rate change alone. Keep their workload model free of those added inputs.
+
+The isolated experiment exports all alternatives, chronological training and
+calibration audits, per-origin results, an interactive report and optional
+method-specific player previews. Four two-year and three three-year origin
+folds, especially the modest goalie sample, do not establish prospective
+reliability. Replacement value, cross-position salary allocation, actual weekly
+category wins and players without NHL history remain separate validation needs.
+No production salary or rating changes are made by these research commands.
+
+### Regular-season-end cutoff and workload calibration research
+
+Signing salaries forecast the upcoming two or three seasons immediately after
+the final NHL regular-season game. Inputs stop at that completed regular season:
+no playoff results, later transactions, or realized future teammates/ice time.
+Future age is known from birthdate; future usage is a forecast. Historical
+calculation cutoffs include only target seasons completed by the origin. Existing
+retrospectively corrected inputs are not archived signing-day API snapshots, so
+these tests do not establish exact publication-time data availability. A live
+publication workflow still needs final-game completeness and a frozen version.
+
+Further offline experiments compare the strongest position-specific candidate
+with a monotone calibration curve, a chronological blend with current talent,
+and separate calibration for origin-season workload groups. The existing groups
+are 40 schedule-adjusted appearances for skaters and 15 for goalies; the lower
+group includes injured veterans and late call-ups, not only rookies. Group fits
+require 100 matured examples from two origin years; otherwise the whole-position
+calibration is retained. Group choice never uses future appearances.
+
+The useful signal is in lower-workload forwards: two-year rating RMSE falls
+12.04 to 11.57 (870 observations), and three-year RMSE 12.55 to 12.08 (667).
+Mean overprediction falls from 1.72 to 0.21 rating points over two years and from
+1.62 to 0.53 over three years. Across all forwards, rating error improves about
+1%, with rank correlation improving from 0.773 to 0.781 over two years and
+0.761 to 0.768 over three. Established-forward score changes are small.
+
+This is a candidate for improving limited-workload forward pricing, not a
+universal workload penalty. Defensemen show no consistent error improvement;
+goalie results are mixed and the split increases underprediction in the smaller
+workload group. Hard group boundaries and injured-veteran versus newcomer
+differences need validation before adoption. The curved correction generally
+worsens rating error. Blending current talent slightly reduces error but weakens
+forward/goalie rank correlation, so it is not selected as a general replacement.
+These experiments do not change the recommended production formula or prices.
+
+## NHL rating and real contract salary comparison
+
+The salary audit joins production v3 regular-season ratings to historical NHL
+contract seasons by canonical player ID and season start year. It does not use
+GSHL contracts or current player-profile salary as a historical fallback. Missing,
+ambiguous, invalid and unlinked contracts remain explicit. Cap hit and cash salary
+are separate; the comparison uses cap hit divided by the historical ceiling in
+`nhl-salary-caps.ts`, not cash pay or retained team cap charges.
+
+Compare accumulated season value and shrunk ability per 60 separately. The latter
+is not the proposed performance/volume blend, which remains a separate preview.
+Pay and rating percentiles use identical matched, rated player pools within each
+season and position (F/D/G). A positive percentile difference indicates stronger
+rating standing than salary standing; it is not a dollar surplus calculation.
+Correlations/percentiles require 30 matches, at least 80% contract coverage among
+qualified players and no recorded season-level limitations. That reporting guard
+does not establish that the remaining missing contracts are unbiased.
+
+Observed peer cap-hit ranges use the same season, position and exact recorded
+signing status, within 10 rating-percentile points, excluding the target player.
+At least 15 peers are required. Reverse comparisons use a 10-point pay-percentile
+window to summarize peers' season values. Medians and interquartile ranges are
+descriptive, not confidence intervals or fair-market salary estimates. Unknown
+signing status gets no dollar benchmark. Entry-level status is not reliably
+identified; all-player percentile gaps must not be interpreted as unrestricted
+market bargains. Signing age and term are exposed but not adjusted. Existing
+contracts reflect different signing dates and expectations; this is not an
+out-of-sample prediction of a new contract.
+
+The October 2026 snapshot matched 6,472 of 13,159 tracked player-seasons. Only ten
+season/position cohorts passed the reporting guard: 2022-23 forwards and all
+three positions in 2023-24 through 2025-26. In 2025-26, qualified-player contract
+coverage was 96.9% F, 96.4% D and 95.9% G. Cap-hit versus accumulated-value rank
+correlations were 0.261, 0.166 and -0.064 respectively. These descriptive results
+do not justify changing the hockey rating to reproduce salary rankings.
+
+## NHL team-success validation
+
+The October 2026 audit covered all 404 team-seasons from 2013-14 through 2025-26,
+with 14,240 player/team allocations covering 13,159 saved player-seasons. It fetched official NHL team summaries,
+team-filtered skater time-on-ice and goalie summaries, and postseason brackets.
+Team membership comes from the historical `teamId` query, not the player's
+current team or the report's multi-team abbreviation string. All player-minute
+allocations reconciled to the saved season totals. Two emergency goalies with
+8 seconds and 70 seconds of exposure retain their recorded zero contribution;
+their unknown ability is not replaced with a made-up rate. The two affected
+team-seasons are omitted only from ability-rate comparisons.
+
+Team contribution is the sum of each player's season goal value multiplied by
+their fraction of ice time for that team, divided by the team's games played.
+Goalies are included. This conserves each traded player's season value, but is
+an allocation of a season estimate, not an independently measured contribution
+for each trade stint. The ability comparison sums shrunk ability rates times
+actual team ice time. The performance-display comparison takes a TOI-weighted
+mean of the existing 0-100 player scores, using neutral 50 for unrated players;
+it is a diagnostic display average, not additive goal value. Unequal schedules
+and failed-gate seasons do not receive this display comparison.
+
+Primary analysis excludes provisional 2019-20: 373 team-seasons across 12 years.
+Pearson correlations remove each season's mean; rank comparisons use ranks
+within season. Whole-season bootstrap intervals use 1,000 deterministic
+resamples, accounting for teams within a season moving together.
+
+| Comparison | Within-season Pearson correlation |
+| --- | ---: |
+| Accumulated team value vs points percentage | 0.945 |
+| Accumulated team value vs win percentage | 0.932 |
+| Accumulated team value vs goal difference/game | 0.981 |
+| Performance-display team score vs points percentage | 0.875 |
+| Skater-only value vs points percentage | 0.858 |
+| Offensive process plus finishing vs goals scored | 0.974 |
+| Defensive process plus goalie saving vs fewer goals conceded | 0.970 |
+| Accumulated value vs playoff wins, among postseason entrants | 0.179 |
+
+The points correlation's season-bootstrap interval is 0.930-0.957. Each individual
+qualified season's points correlation is between 0.905 and 0.967. Including
+2019-20 produces 0.944; excluding both pandemic seasons produces 0.950. These
+are retrospective associations, not forecasting accuracy: the player scores
+already contain the same regular-season goal and shot outcomes.
+
+Regular-season ratings were frozen for postseason comparison. Higher accumulated
+team value won 101/180 series (56.1%); higher points percentage scored 55.6%,
+with tied values receiving half credit. The performance-display team score
+also scored 55.6%. Playoff wins correlate weakly with team value: the
+season-bootstrap interval is 0.057-0.304. Conditioning on playoff participation
+avoids inflating this relationship with nonqualifiers' zero playoff wins.
+
+For probability evaluation, symmetric ridge-logistic calibrations train on
+earlier seasons only, requiring three training seasons. On 135 subsequent
+series, accumulated-value Brier error was 0.2480, compared with 0.2437 for points
+percentage and 0.2500 for a constant 50% forecast. Adding accumulated value to
+points percentage yielded 0.2471. Neither comparison establishes an improvement
+over points percentage: paired season-bootstrap differences include zero.
+Ability and display-score alternatives are also exported, with points baselines
+re-evaluated on matching series when ability is missing.
+
+Interpretation: the model distributes regular-season team success coherently,
+and including goalies matters. This does not prove that credit is allocated
+correctly among correlated teammates, or that the annual total is a strong
+playoff predictor. Full-season roster exposure differs from a healthy playoff
+lineup; trade timing, injuries, opponent matchups and later deployment remain
+unmodeled. Prior historical model development also means these are not untouched
+prospective trials. Persistent franchise dependence across years is not modeled
+by the bootstrap. The test does not change weights, production ratings, or the
+55-to-68-game performance curve.
+
+## Finalized 2019-20 review
+
+The 2019-20 regular-season calculation is finalized with documented limitations,
+not reclassified as having passed its original validation gates. All 970 player
+scores and played-game inclusions are retained. The 679 players meeting the
+existing individual evidence thresholds receive their original position ranks,
+percentiles and ability ranks; 291 retain individual provisional flags for
+sample size or coverage. Those flags do not mean the season remains unfinished.
+
+The final review rechecked the 20 largest lineup-exposure gaps against official
+alternate reports without recovering additional trustworthy process time.
+Verified process coverage remains 97.1531%, and individual shot coverage 99.9732%.
+Held-out xG/goal differential MSE was respectively about 0.23%/0.35% worse than
+the situation-only baseline. These failed checks remain recorded. Team-success
+correlation is supporting retrospective evidence, not grounds to mark those
+predictive checks passed.
+
+Each production row's `gameValue.finalization` records the reviewed state,
+timestamp, reason, failed checks, coverage and report/backup/review hashes.
+The original calculation provenance and numerical components are preserved.
+The targeted finalization mutation checks the exact 970-player source snapshot,
+preserves scores, validates individual qualification, recomputes tied ranks,
+and applies atomically. A second application is unchanged. Routine imports
+cannot change finalized records. A future scientific revision requires a
+separate explicitly reviewed version/migration; it cannot silently overwrite
+the accepted historical season.
+
+Team-audit artifacts produced before this final review retain their historical
+"provisional 2019-20" labels and strict-gate exclusion. They are immutable
+evaluation snapshots, not the current publication state.
 
 ## Change checklist
 

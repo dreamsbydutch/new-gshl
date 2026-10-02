@@ -105,6 +105,7 @@ test("player-week projection joins only display identity and scoring fields", ()
   assert.equal(result.fullName, "Gem Stone");
   assert.deepEqual(result.nhlPos, ["LW"]);
   assert.deepEqual(result.nhlTeam, ["TOR"]);
+  assert.deepEqual(result.currentNhlTeam, ["NJD", "TOR"]);
   assert.equal(result.G, 2);
   assert.deepEqual(
     [result.MG, result.IR, result.IRplus, result.ADD, result.MS, result.BS],
@@ -134,6 +135,7 @@ test("player-week projection falls back to the current NHL team without a snapsh
   );
 
   assert.deepEqual(result.nhlTeam, ["NJD"]);
+  assert.deepEqual(result.currentNhlTeam, ["NJD"]);
   assert.deepEqual(
     [result.MG, result.IR, result.IRplus, result.ADD, result.MS, result.BS],
     [null, null, null, null, null, null],
