@@ -226,7 +226,7 @@ export async function loadMatchupPreviewEvidence(
           .filter((row) => row.date! >= recentFrom)
           .slice(0, 5),
         latestHistoricalMatchups: data.results.slice(0, 5),
-        note: "Recent form includes only the last 60 days. Older completed results are historical context, not current momentum. Empty results do not establish a losing streak or complete archive coverage.",
+        note: "Internal editorial context, not article copy: recent form includes only the last 60 days. Use older completed results as dated past-season context alongside this year's roster. An empty recent sample is normal around the offseason; focus on the available roster and history without commenting on absent results or unproven momentum.",
         season: data.season,
       }),
     });
