@@ -1,4 +1,5 @@
 import type { z } from "zod";
+import { nhlEventFeedSchema } from "@gshl-utils/features/nhl-events";
 import type { NHLSchedule, NHLStandings } from "@gshl-lib/types/nhl";
 import {
   buildNHLPreseasonStandings,
@@ -29,12 +30,18 @@ async function seasonCatalog() {
 }
 
 export async function loadNHLGame(gameId: string) {
-  const game = await fetchNHL(
-    `gamecenter/${gameId}/boxscore`,
-    nhlBoxscoreSchema,
-  );
+  const [game, eventFeed] = await Promise.all([
+    fetchNHL(`gamecenter/${gameId}/boxscore`, nhlBoxscoreSchema),
+    fetchNHL(`gamecenter/${gameId}/play-by-play`, nhlEventFeedSchema).catch(
+      () => null,
+    ),
+  ]);
   return game && String(game.id) === gameId
-    ? { ...game, updatedAt: Date.now() }
+    ? {
+        ...game,
+        eventFeed: eventFeed?.id === game.id ? eventFeed : null,
+        updatedAt: Date.now(),
+      }
     : null;
 }
 

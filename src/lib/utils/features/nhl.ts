@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { nhlEventFeedSchema } from "./nhl-events";
 import { getPlayerNhlAbbreviations } from "../domain/player";
 
 /** The caller supplies rostered players; bench and injury status do not matter. */
@@ -175,6 +176,7 @@ export const nhlBoxscoreSchema = nhlGameSchema.extend({
 });
 export const nhlGameResponseSchema = nhlBoxscoreSchema.extend({
   updatedAt: z.number(),
+  eventFeed: nhlEventFeedSchema.nullable().optional(),
 });
 
 export function buildNHLPreseasonStandings(

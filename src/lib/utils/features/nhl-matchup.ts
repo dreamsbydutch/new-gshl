@@ -53,6 +53,7 @@ export const nhlMatchupRosterSchema = z.object({
   players: z.array(
     z.object({
       id: z.string(),
+      nhlPlayerId: z.number().nullable().optional(),
       fullName: z.string(),
       position: z.string(),
       goalie: z.boolean(),
@@ -165,6 +166,10 @@ export function buildNHLMatchupPlayers({
       return [
         {
           id: player.id,
+          nhlPlayerId:
+            player.nhlApiId && /^\d+$/.test(player.nhlApiId)
+              ? Number(player.nhlApiId)
+              : null,
           fullName: player.fullName || `${player.firstName} ${player.lastName}`,
           position:
             recorded?.stats.position ??

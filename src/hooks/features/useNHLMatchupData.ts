@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { buildNHLGameEvents } from "@gshl-utils/features/nhl-events";
 import { useNHLGame } from "../main/useNHL";
 import { useNHLMatchupRoster } from "../main/useNHLMatchupRoster";
 import { useAppSearchParams } from "../main/useNextNavigation";
@@ -15,6 +16,7 @@ export function useNHLMatchupData(gameId: string) {
   return {
     ...query,
     game: query.data,
+    events: buildNHLGameEvents(query.data?.eventFeed, players),
     players: players.filter((player) => player.side === side),
     side,
     setSide,

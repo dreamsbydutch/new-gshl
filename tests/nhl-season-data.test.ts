@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import { test, type TestContext } from "node:test";
-import { loadNHLSchedule, loadNHLStandings } from "../src/server/nhl-data";
+import {
+  loadNHLGame,
+  loadNHLSchedule,
+  loadNHLStandings,
+} from "../src/server/nhl-data";
 
 const catalog = {
   seasons: [
@@ -52,6 +56,43 @@ function mockAPI(t: TestContext, responses: Record<string, unknown>) {
     return Response.json(responses[path]);
   });
 }
+
+void test("game boxscores remain available when the event feed fails or belongs to another game", async (t) => {
+  const boxscore = { ...game, gameDate: "2026-09-29" };
+  const fetchMock = t.mock.method(globalThis, "fetch", async (url: string) =>
+    url.endsWith("/boxscore")
+      ? Response.json(boxscore)
+      : new Response(null, { status: 503 }),
+  );
+  assert.equal((await loadNHLGame(String(game.id)))?.id, game.id);
+  assert.equal((await loadNHLGame(String(game.id)))?.eventFeed, null);
+  fetchMock.mock.mockImplementation(async (url: string) =>
+    Response.json(
+      url.endsWith("/boxscore")
+        ? boxscore
+        : {
+            id: game.id + 1,
+            awayTeam: { id: 1, abbrev: "TOR" },
+            homeTeam: { id: 2, abbrev: "MTL" },
+            plays: [],
+          },
+    ),
+  );
+  assert.equal((await loadNHLGame(String(game.id)))?.eventFeed, null);
+});
+
+void test("game response includes a validated event feed", async (t) => {
+  mockAPI(t, {
+    [`gamecenter/${game.id}/boxscore`]: { ...game, gameDate: "2026-09-29" },
+    [`gamecenter/${game.id}/play-by-play`]: {
+      id: game.id,
+      awayTeam: { id: 1, abbrev: "TOR" },
+      homeTeam: { id: 2, abbrev: "MTL" },
+      plays: [],
+    },
+  });
+  assert.equal((await loadNHLGame(String(game.id)))?.eventFeed?.id, game.id);
+});
 
 void test("published upcoming season initializes zero standings without carrying previous results", async (t) => {
   mockAPI(t, {

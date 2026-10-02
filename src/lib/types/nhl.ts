@@ -13,6 +13,7 @@ export type NHLBoxscorePlayer = z.infer<typeof nhlBoxscorePlayerSchema>;
 
 export interface NHLMatchupPlayerRow {
   id: string;
+  nhlPlayerId?: number | null;
   fullName: string;
   position: string;
   goalie: boolean;

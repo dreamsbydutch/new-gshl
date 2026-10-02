@@ -6,10 +6,12 @@ import { MatchupSkeleton } from "@gshl-skeletons";
 import { useNHLMatchupData } from "@gshl-hooks/features/useNHLMatchupData";
 import { formatNHLUpdatedAt, nhlGameStatus } from "@gshl-utils/features/nhl";
 import { NHLMatchupPlayerTable } from "./NHLMatchupPlayerTable";
+import { NHLGameEvents } from "./NHLGameEvents";
 
 export function NHLMatchupContent({ gameId }: { gameId: string }) {
   const {
     game,
+    events,
     isLoading,
     error,
     retry,
@@ -107,6 +109,13 @@ export function NHLMatchupContent({ gameId }: { gameId: string }) {
           </button>
         </p>
       )}
+      <NHLGameEvents
+        events={events}
+        available={Boolean(game.eventFeed)}
+        upcoming={["FUT", "PRE"].includes(game.gameState)}
+        rosterLoading={rosterLoading}
+        rosterError={rosterError}
+      />
       <div
         className="flex justify-center gap-2"
         role="group"
