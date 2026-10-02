@@ -6,7 +6,7 @@ import { StandingsSkeleton } from "@gshl-skeletons";
 import { NHL_DIVISION_ORDER } from "@gshl-utils/features/nhl";
 
 export function NHLStandings() {
-  const { data, isLoading, error, retry } = useNHLStandingsData();
+  const { data, isLoading, error, retry, rosterCounts } = useNHLStandingsData();
   if (isLoading) return <StandingsSkeleton />;
   const divisions = [
     ...new Set(data?.standings.map((team) => team.divisionName) ?? []),
@@ -58,7 +58,8 @@ export function NHLStandings() {
               <table className="w-full text-right text-sm tabular-nums">
                 <caption className="sr-only">
                   {division} NHL standings. OT means overtime and shootout
-                  losses.
+                  losses. RP counts all currently rostered GSHL players,
+                  including bench and injured players.
                 </caption>
                 <thead className="text-xs text-gray-500">
                   <tr>
@@ -70,6 +71,9 @@ export function NHLStandings() {
                         {label}
                       </th>
                     ))}
+                    <th scope="col" className="px-2 py-2">
+                      RP
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -111,6 +115,13 @@ export function NHLStandings() {
                         {team.goalDifferential > 0 ? "+" : ""}
                         {team.goalDifferential}
                       </td>
+                      <td className="px-2">
+                        {rosterCounts === undefined ? (
+                          <span aria-label="Loading GSHL player count">—</span>
+                        ) : (
+                          (rosterCounts[team.teamAbbrev.default] ?? 0)
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -129,7 +140,8 @@ export function NHLStandings() {
         >
           NHL
         </a>{" "}
-        · GP: games played · OT: overtime/shootout losses
+        · GP: games played · OT: overtime/shootout losses · RP = GSHL Roster
+        Players
       </p>
     </div>
   );

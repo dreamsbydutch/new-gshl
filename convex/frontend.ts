@@ -17,6 +17,7 @@ import {
   retryJob as retryManagedJob,
 } from "./lib/jobLifecycle";
 import { buildLeagueActivity } from "../src/lib/utils/features/league-activity";
+import { countGshlPlayersByNhlTeam } from "../src/lib/utils/features/nhl";
 import { buildSigningValues } from "../src/lib/utils/features/signing-value";
 import { JOB_NAMES, JOB_STATUSES } from "./jobCatalog";
 import {
@@ -564,6 +565,47 @@ export const teams = query({
       : null;
     const includePrivate = user?.status === "active";
     return enrichTeamRows(ctx, teamRows, includePrivate);
+  },
+});
+
+export const nhlStandingsRosterCounts = query({
+  args: { seasonId: v.id("seasons") },
+  handler: async (ctx, { seasonId }) => {
+    const teams = await ctx.db
+      .query("teams")
+      .withIndex("by_seasonId", (q) => q.eq("seasonId", seasonId))
+      .collect();
+    const franchises = await Promise.all(
+      [...new Set(teams.map((team) => team.franchiseId))].map((id) =>
+        ctx.db.get(id),
+      ),
+    );
+    const ownerIds = [
+      ...new Set(
+        franchises.flatMap((franchise) =>
+          franchise ? [franchise.ownerId] : [],
+        ),
+      ),
+    ];
+    const rosters = await Promise.all([
+      ...ownerIds.map((ownerId) =>
+        ctx.db
+          .query("players")
+          .withIndex("by_ownerId", (q) => q.eq("ownerId", ownerId))
+          .collect(),
+      ),
+      ...teams.map((team) =>
+        ctx.db
+          .query("players")
+          .withIndex("by_gshlTeamId", (q) => q.eq("gshlTeamId", team._id))
+          .collect(),
+      ),
+    ]);
+    return countGshlPlayersByNhlTeam(
+      rosters
+        .flat()
+        .map((player) => ({ id: player._id, nhlTeam: player.nhlTeam })),
+    );
   },
 });
 

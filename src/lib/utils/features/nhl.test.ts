@@ -8,12 +8,28 @@ import {
   toNHLSeasonId,
   isNHLSeasonId,
   getNHLHomeScheduleDays,
+  countGshlPlayersByNhlTeam,
 } from "./nhl";
 import {
   buildScheduleNavigationHref,
   isScheduleNavigationView,
   isStandingsNavigationView,
 } from "./contextual-navigation";
+
+void test("GSHL roster counts deduplicate players and NHL aliases, including all supplied roster slots", () => {
+  assert.deepEqual(
+    countGshlPlayersByNhlTeam([
+      { id: "starter", nhlTeam: ["NJ", "NJD"] },
+      { id: "starter", nhlTeam: ["NJD"] },
+      { id: "bench", nhlTeam: [" njd "] },
+      { id: "injured", nhlTeam: ["TOR"] },
+      { id: "unknown", nhlTeam: [] },
+      { id: "missing", nhlTeam: null },
+    ]),
+    { NJD: 2, TOR: 1 },
+  );
+  assert.deepEqual(countGshlPlayersByNhlTeam([]), {});
+});
 
 void test("home NHL dates follow Eastern time across the year boundary", () => {
   const days = getNHLHomeScheduleDays(new Date("2027-01-01T02:00:00Z"));

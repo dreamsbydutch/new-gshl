@@ -1,4 +1,21 @@
 import { z } from "zod";
+import { getPlayerNhlAbbreviations } from "../domain/player";
+
+/** The caller supplies rostered players; bench and injury status do not matter. */
+export function countGshlPlayersByNhlTeam(
+  players: ReadonlyArray<{ id: string; nhlTeam?: string[] | null }>,
+): Record<string, number> {
+  const counts: Record<string, number> = {};
+  const seen = new Set<string>();
+  for (const player of players) {
+    if (seen.has(player.id)) continue;
+    seen.add(player.id);
+    for (const team of getPlayerNhlAbbreviations(player.nhlTeam)) {
+      counts[team] = (counts[team] ?? 0) + 1;
+    }
+  }
+  return counts;
+}
 
 export const NHL_STANDINGS_REFRESH_SECONDS = 24 * 60 * 60;
 export const NHL_SCHEDULE_REFRESH_SECONDS = 15 * 60;
