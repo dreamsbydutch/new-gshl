@@ -244,6 +244,7 @@ export async function loadMatchupPreviewEvidence(
     writer: own.writer,
     teamName: own.name,
     opponentName: other.name,
+    homeTeamName: matchup.homeTeamId === teamId ? own.name : other.name,
     startsAt,
     facts,
   };

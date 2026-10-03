@@ -7,6 +7,7 @@ export interface MatchupPreviewEvidence {
   writer: string;
   teamName: string;
   opponentName: string;
+  homeTeamName?: string;
   startsAt: number;
   facts: MatchupPreviewFact[];
 }

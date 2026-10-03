@@ -337,6 +337,7 @@ void test("generation publishes validated copy under the assigned writer and rej
         headline: article.headline,
         paragraphs: article.paragraphs,
         evidenceIds: [evidenceId],
+        prediction: { winner: "opponent", teamScore: 4, opponentScore: 6 },
       }),
     }),
   );
@@ -344,6 +345,10 @@ void test("generation publishes validated copy under the assigned writer and rej
   await run(actionCtx, { id: first!._id, attemptAt: NOW });
   assert.equal(f.get(first!._id)?.status, "published");
   assert.equal(f.get(first!._id)?.writer, "Assigned Reporter");
+  assert.deepEqual(f.get(first!._id)?.paragraphs, [
+    ...article.paragraphs,
+    "Prediction: Away defeats Home, 6–4.",
+  ]);
   evidenceId = "invented";
   await run(actionCtx, { id: second!._id, attemptAt: NOW });
   assert.equal(f.get(second!._id)?.status, "failed");

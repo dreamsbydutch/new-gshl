@@ -44,10 +44,17 @@ void test("articles must be concise, structured and reference supplied evidence"
     headline: "A balanced roster",
     paragraphs: ["First paragraph.", "Second paragraph."],
     evidenceIds: ["roster"],
+    prediction: { winner: "team", teamScore: 6, opponentScore: 4 },
   };
   assert.deepEqual(
     parseMatchupPreviewArticle(JSON.stringify(article), evidence),
-    article,
+    {
+      ...article,
+      paragraphs: [
+        ...article.paragraphs,
+        "Prediction: Home defeats Away, 6–4.",
+      ],
+    },
   );
   assert.throws(() =>
     parseMatchupPreviewArticle(
@@ -71,4 +78,35 @@ void test("articles must be concise, structured and reference supplied evidence"
     ),
   );
   assert.throws(() => parseMatchupPreviewArticle("not json", evidence));
+  const parsePrediction = (prediction: unknown) =>
+    parseMatchupPreviewArticle(JSON.stringify({ ...article, prediction }), {
+      ...evidence,
+      homeTeamName: "Home",
+    });
+  assert.equal(
+    parsePrediction({
+      winner: "opponent",
+      teamScore: 3,
+      opponentScore: 6,
+    }).paragraphs.at(-1),
+    "Prediction: Away defeats Home, 6–3.",
+  );
+  assert.equal(
+    parsePrediction({
+      winner: "team",
+      teamScore: 5,
+      opponentScore: 5,
+    }).paragraphs.at(-1),
+    "Prediction: Home defeats Away, 5–5 (home-ice tiebreaker).",
+  );
+  for (const prediction of [
+    undefined,
+    { winner: "other", teamScore: 6, opponentScore: 4 },
+    { winner: "team", teamScore: 3, opponentScore: 6 },
+    { winner: "team", teamScore: 7, opponentScore: 4 },
+    { winner: "team", teamScore: 6.5, opponentScore: 3 },
+    { winner: "team", teamScore: 6, opponentScore: -1 },
+    { winner: "opponent", teamScore: 5, opponentScore: 5 },
+  ])
+    assert.throws(() => parsePrediction(prediction));
 });
