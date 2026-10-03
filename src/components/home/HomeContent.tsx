@@ -12,6 +12,7 @@ import { WeeklyEditionHomeCard } from "@gshl-components/headlines/WeeklyEditionH
 import { DraftHubCard } from "./DraftHubCard";
 import { OwnerCommandCenter } from "./OwnerCommandCenter";
 import { DraftNotificationSetup } from "@gshl-components/notifications/DraftNotificationSetup";
+import { HomeScoreboard } from "./HomeScoreboard";
 
 export function HomeContent() {
   const { seasons, selectedSeason, currentSeason, defaultSeason, isLoading } =
@@ -34,6 +35,12 @@ export function HomeContent() {
         GSHL league dashboard
       </h1>
       <div className="space-y-3 sm:space-y-4 lg:space-y-5">
+        {dashboardSeason ? (
+          <HomeScoreboard
+            seasonId={String(dashboardSeason.id)}
+            seasonName={dashboardSeason.name}
+          />
+        ) : null}
         <DraftNotificationSetup compact />
         <OwnerCommandCenter />
         <WeeklyEditionHomeCard />
