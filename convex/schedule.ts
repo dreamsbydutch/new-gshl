@@ -498,6 +498,16 @@ export const weeklySchedule = query({
     weekId: v.id("weeks"),
   },
   handler: async (ctx, args) => {
+    const [season, week] = await Promise.all([
+      ctx.db.get(args.seasonId),
+      ctx.db.get(args.weekId),
+    ]);
+    const today = utcTimestampToDateKey(Date.now());
+    const start = utcTimestampToDateKey(week?.startDate);
+    const end = utcTimestampToDateKey(week?.endDate);
+    const isInProgress = Boolean(
+      today && start && end && start <= today && today <= end,
+    );
     const matchupRows = await ctx.db
       .query("matchups")
       .withIndex("by_seasonId_weekId", (q) =>
@@ -540,8 +550,32 @@ export const weeklySchedule = query({
         .map((conference) => [conference._id, conference] as const),
     );
 
+    const liveStats = isInProgress
+      ? await Promise.all(
+          referencedTeamIds.map((teamId) =>
+            ctx.db
+              .query("teamWeekStatLines")
+              .withIndex("by_seasonId_weekId_gshlTeamId", (q) =>
+                q
+                  .eq("seasonId", args.seasonId)
+                  .eq("weekId", args.weekId)
+                  .eq("gshlTeamId", teamId),
+              )
+              .first(),
+          ),
+        )
+      : [];
+
     return {
-      matchups: projectWeeklyScheduleMatchups(matchupRows),
+      matchups: projectWeeklyScheduleMatchups(matchupRows, {
+        isInProgress,
+        categories: season?.categories ?? [],
+        teamStats: new Map(
+          liveStats
+            .filter(present)
+            .map((stats) => [String(stats.gshlTeamId), stats]),
+        ),
+      }),
       teams: teamRows.map((team: Doc<"teams">) =>
         projectWeeklyScheduleTeam(
           team,

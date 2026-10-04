@@ -6,6 +6,30 @@ import {
   projectWeeklyScheduleTeam,
 } from "./scheduleProjection";
 
+test("in-progress matchups show current category scores before final scores exist", () => {
+  const [matchup] = projectWeeklyScheduleMatchups(
+    [
+      {
+        _id: "live",
+        homeTeamId: "home",
+        awayTeamId: "away",
+        gameType: "RS",
+        isComplete: false,
+      },
+    ],
+    {
+      isInProgress: true,
+      categories: ["G", "A", "GAA"],
+      teamStats: new Map([
+        ["home", { G: 3, A: 1, GAA: 2 }],
+        ["away", { G: 1, A: 4, GAA: 3 }],
+      ]),
+    },
+  );
+  assert.equal(matchup?.homeScore, 2);
+  assert.equal(matchup?.awayScore, 1);
+});
+
 test("weekly schedule projection sorts by rating without exposing sort metadata", () => {
   const rows = [
     {
@@ -60,6 +84,31 @@ test("weekly schedule projection sorts by rating without exposing sort metadata"
     },
   ]);
   assert.equal(rows[0]?._id, "matchup-low");
+});
+
+test("live score fallback preserves final scores and leaves future matchups unscored", () => {
+  const row = {
+    _id: "game",
+    homeTeamId: "home",
+    awayTeamId: "away",
+    gameType: "RS",
+  };
+  const live = { isInProgress: true, categories: ["G"], teamStats: new Map() };
+  const [starting] = projectWeeklyScheduleMatchups([row], live);
+  assert.equal(starting?.homeScore, 0);
+  assert.equal(starting?.awayScore, 0);
+  const [future] = projectWeeklyScheduleMatchups([row], {
+    ...live,
+    isInProgress: false,
+  });
+  assert.equal(future?.homeScore, null);
+  assert.equal(future?.awayScore, null);
+  const [final] = projectWeeklyScheduleMatchups(
+    [{ ...row, isComplete: true, homeScore: 0, awayScore: 7 }],
+    live,
+  );
+  assert.equal(final?.homeScore, 0);
+  assert.equal(final?.awayScore, 7);
 });
 
 test("weekly schedule team projection excludes owner and unrelated team data", () => {

@@ -1,3 +1,9 @@
+import {
+  buildCategoryResults,
+  resolveMatchupCategories,
+} from "../../src/lib/utils/features/matchup-details";
+import { projectMatchupTeamWeekStats } from "./matchupProjection";
+
 type WeeklyScheduleMatchupSource = {
   _id: string;
   homeTeamId: string;
@@ -60,11 +66,43 @@ function projectMatchupOutcome(row: WeeklyScheduleMatchupSource) {
 /** Sorts weekly matchups by display priority and removes non-rendered fields. */
 export function projectWeeklyScheduleMatchups(
   rows: readonly WeeklyScheduleMatchupSource[],
+  live?: {
+    isInProgress: boolean;
+    categories: string[];
+    teamStats: ReadonlyMap<
+      string,
+      Parameters<typeof projectMatchupTeamWeekStats>[0]
+    >;
+  },
 ) {
   return [...rows]
     .sort((left, right) => (right.rating ?? 0) - (left.rating ?? 0))
     .map((row) => {
       const outcome = projectMatchupOutcome(row);
+      let homeScore = row.homeScore ?? null;
+      let awayScore = row.awayScore ?? null;
+      if (
+        live?.isInProgress &&
+        !row.isComplete &&
+        (homeScore === null || awayScore === null)
+      ) {
+        const home = live.teamStats.get(row.homeTeamId);
+        const away = live.teamStats.get(row.awayTeamId);
+        const categories =
+          home && away
+            ? buildCategoryResults(
+                projectMatchupTeamWeekStats(home),
+                projectMatchupTeamWeekStats(away),
+                resolveMatchupCategories(live.categories),
+              )
+            : [];
+        homeScore ??= categories.filter(
+          (category) => category.winner === "home",
+        ).length;
+        awayScore ??= categories.filter(
+          (category) => category.winner === "away",
+        ).length;
+      }
       return {
         id: row._id,
         homeTeamId: row.homeTeamId,
@@ -72,8 +110,8 @@ export function projectWeeklyScheduleMatchups(
         gameType: row.gameType,
         homeRank: row.homeRank ?? null,
         awayRank: row.awayRank ?? null,
-        homeScore: row.homeScore ?? null,
-        awayScore: row.awayScore ?? null,
+        homeScore,
+        awayScore,
         homeWin: outcome.homeWin,
         awayWin: outcome.awayWin,
       };
