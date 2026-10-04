@@ -36,10 +36,7 @@ export function HomeContent() {
       </h1>
       <div className="space-y-3 sm:space-y-4 lg:space-y-5">
         {dashboardSeason ? (
-          <HomeScoreboard
-            seasonId={String(dashboardSeason.id)}
-            seasonName={dashboardSeason.name}
-          />
+          <HomeScoreboard seasonId={String(dashboardSeason.id)} />
         ) : null}
         <DraftNotificationSetup compact />
         <OwnerCommandCenter />

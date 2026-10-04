@@ -3,13 +3,8 @@
 import { useEffect, useRef } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowRight, ChevronLeft, ChevronRight } from "lucide-react";
 import { useHomeScoreboard } from "@gshl-hooks/features/useHomeScoreboard";
-import {
-  buildMatchupNavigationHref,
-  buildScheduleNavigationHref,
-  cn,
-} from "@gshl-utils";
+import { buildMatchupNavigationHref } from "@gshl-utils";
 import { Skeleton } from "../ui/SkeletonPrimitive";
 
 export function HomeScoreboardSkeleton() {
@@ -17,37 +12,20 @@ export function HomeScoreboardSkeleton() {
     <section
       aria-label="Loading GSHL scoreboard"
       aria-busy="true"
-      className="mx-auto w-full max-w-5xl space-y-3 rounded-xl bg-slate-950 p-4"
+      className="mx-auto w-full max-w-5xl overflow-hidden"
     >
-      <Skeleton className="h-6 w-48 bg-slate-700" />
       <div className="flex gap-3 overflow-hidden">
         {[0, 1, 2, 3].map((item) => (
-          <Skeleton
-            key={item}
-            className="h-28 w-56 shrink-0 rounded-lg bg-slate-800"
-          />
+          <Skeleton key={item} className="h-28 w-60 shrink-0 rounded-lg" />
         ))}
       </div>
     </section>
   );
 }
 
-export function HomeScoreboard({
-  seasonId,
-  seasonName,
-}: {
-  seasonId: string;
-  seasonName: string;
-}) {
-  const {
-    week,
-    phase,
-    dateLabel,
-    matchups,
-    isLoading,
-    isScheduleLoading,
-    error,
-  } = useHomeScoreboard(seasonId);
+export function HomeScoreboard({ seasonId }: { seasonId: string }) {
+  const { week, matchups, isLoading, isScheduleLoading, error } =
+    useHomeScoreboard(seasonId);
   const track = useRef<HTMLUListElement>(null);
   const currentWeekStart = useRef<HTMLLIElement>(null);
   useEffect(() => {
@@ -55,73 +33,25 @@ export function HomeScoreboard({
     const item = currentWeekStart.current;
     if (isLoading || isScheduleLoading || !list || !item) return;
     list.scrollLeft +=
-      item.getBoundingClientRect().left -
-      list.getBoundingClientRect().left -
-      16;
+      item.getBoundingClientRect().left - list.getBoundingClientRect().left - 2;
   }, [week?.id, isLoading, isScheduleLoading]);
-  const scroll = (direction: number) =>
-    track.current?.scrollBy({ left: direction * 256, behavior: "auto" });
   if (isLoading) return <HomeScoreboardSkeleton />;
 
-  const scheduleHref = buildScheduleNavigationHref("", {
-    view: "week",
-    season: seasonId,
-    week: week?.id ?? null,
-  });
   return (
     <section
-      aria-labelledby="home-scoreboard-heading"
-      className="mx-auto w-full min-w-0 max-w-5xl overflow-hidden rounded-xl bg-slate-950 text-white"
+      aria-label="GSHL matchups"
+      className="mx-auto w-full min-w-0 max-w-5xl"
     >
-      <header className="flex items-center justify-between gap-3 px-4 pb-3 pt-4">
-        <div className="min-w-0">
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">
-            GSHL · {seasonName}
-          </p>
-          <div className="mt-1 flex flex-wrap items-center gap-2">
-            <h2 id="home-scoreboard-heading" className="text-xl font-semibold">
-              {week
-                ? `${week.isPlayoffs ? "Playoffs · " : ""}Week ${week.weekNum}`
-                : "League scoreboard"}
-            </h2>
-            {week && (
-              <span
-                className={cn(
-                  "rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide",
-                  phase === "current"
-                    ? "bg-rose-600 text-white"
-                    : "bg-slate-800 text-slate-300",
-                )}
-              >
-                {phase === "current"
-                  ? "In progress"
-                  : phase === "upcoming"
-                    ? "Up next"
-                    : "Completed"}
-              </span>
-            )}
-          </div>
-          <p className="mt-1 text-xs text-slate-400">
-            {dateLabel || "Season schedule"}
-          </p>
-        </div>
-        <Link
-          href={scheduleHref}
-          className="flex min-h-11 shrink-0 items-center gap-1 rounded-md px-2 text-xs font-semibold text-slate-200 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
-        >
-          Schedule <ArrowRight className="h-4 w-4" aria-hidden="true" />
-        </Link>
-      </header>
       {isScheduleLoading ? (
-        <p role="status" className="px-4 pb-4 text-sm text-slate-300">
+        <p role="status" className="py-3 text-sm text-slate-500">
           Loading matchups…
         </p>
       ) : error ? (
-        <p role="alert" className="px-4 pb-4 text-sm text-slate-300">
+        <p role="alert" className="py-3 text-sm text-slate-500">
           The scoreboard could not be loaded.
         </p>
       ) : !matchups.length ? (
-        <p className="px-4 pb-4 text-sm text-slate-300">
+        <p className="py-3 text-sm text-slate-500">
           {week
             ? "No matchups scheduled for these weeks."
             : "The season schedule is not available yet."}
@@ -133,7 +63,7 @@ export function HomeScoreboard({
             ref={track}
             aria-label="Weekly matchups"
             tabIndex={0}
-            className="flex snap-x snap-mandatory scroll-px-4 gap-2 overflow-x-auto overscroll-x-contain px-4 pb-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white"
+            className="flex snap-x snap-mandatory scroll-px-0.5 gap-2 overflow-x-auto overscroll-x-contain p-0.5 pb-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500"
           >
             {matchups.map(
               ({
@@ -155,9 +85,9 @@ export function HomeScoreboard({
                       season: seasonId,
                       week: matchupWeek.id,
                     })}
-                    className="block rounded-lg border border-slate-700/60 bg-slate-900 p-3 transition-colors hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+                    className="block rounded-lg border border-slate-200 bg-white p-3 text-slate-900 shadow-sm transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
                   >
-                    <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                    <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
                       Week {matchupWeek.weekNum} ·{" "}
                       {matchupPhase === "current"
                         ? "In progress"
@@ -184,7 +114,7 @@ export function HomeScoreboard({
                             ) : (
                               <span
                                 aria-hidden="true"
-                                className="flex h-8 w-8 shrink-0 items-center justify-center rounded bg-slate-700 text-xs"
+                                className="flex h-8 w-8 shrink-0 items-center justify-center rounded bg-slate-100 text-xs text-slate-500"
                               >
                                 {team?.name?.slice(0, 1) ?? "?"}
                               </span>
@@ -209,27 +139,6 @@ export function HomeScoreboard({
               ),
             )}
           </ul>
-          <div className="flex items-center justify-between px-4 pb-2 text-[11px] text-slate-400">
-            <span>Last week · This week · Next week</span>
-            <div className="flex">
-              <button
-                type="button"
-                aria-label="Scroll to previous matchups"
-                onClick={() => scroll(-1)}
-                className="flex h-11 w-11 items-center justify-center rounded-md hover:bg-slate-800 focus-visible:ring-2 focus-visible:ring-white"
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </button>
-              <button
-                type="button"
-                aria-label="Scroll to next matchups"
-                onClick={() => scroll(1)}
-                className="flex h-11 w-11 items-center justify-center rounded-md hover:bg-slate-800 focus-visible:ring-2 focus-visible:ring-white"
-              >
-                <ChevronRight className="h-4 w-4" />
-              </button>
-            </div>
-          </div>
         </>
       )}
     </section>
