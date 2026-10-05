@@ -1,5 +1,7 @@
 "use client";
 
+import type { MatchupRecords } from "@gshl-lib/types/performance-records";
+import { PerformanceRecordBadge } from "./PerformanceRecordBadge";
 import { NHLLogoList } from "@gshl-components/player/NHLLogoList";
 import { NHLLogo } from "@gshl-components/player/NHLLogo";
 import { useNHLHomeSchedule } from "@gshl-hooks/features/useNHLHomeSchedule";
@@ -27,12 +29,14 @@ export function PlayerStatsTable({
   team,
   nhlTeams,
   players,
+  records = null,
   headline,
   seasonCategories,
 }: {
   team: MatchupDetailsTeam | null;
   nhlTeams: MatchupDetailsNhlTeam[];
   players: PlayerStatRow[];
+  records?: MatchupRecords | null;
   headline?: string;
   seasonCategories?: readonly string[];
 }) {
@@ -283,6 +287,12 @@ export function PlayerStatsTable({
                         className={cellClassName}
                       >
                         {content}
+                        <PerformanceRecordBadge
+                          records={records}
+                          entityId={(team?.id ?? "") + ":" + player.id}
+                          stat={column.key}
+                          value={content}
+                        />
                       </td>
                     );
                   })}
