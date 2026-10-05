@@ -77,7 +77,7 @@ export default function RecordBadgePreview() {
             ["Monday, no games played", "monday", 0],
             ["Final team low", "low", 1],
             ["Final tied low", "tie", 1],
-            ["Saturday, provisional tie", "live", 1],
+            ["Saturday, tied low", "live", 1],
             ["Final player high", "player", 9],
           ].map(([label, id, value]) => (
             <tr key={id} className="border-t">
@@ -94,10 +94,7 @@ export default function RecordBadgePreview() {
           ))}
         </tbody>
       </table>
-      <p className="text-xs text-slate-500">
-        ~ means provisional; = means tied. Blank stats and zero games played do
-        not receive badges.
-      </p>
+      <p className="text-xs text-slate-500">= means tied.</p>
     </main>
   );
 }
