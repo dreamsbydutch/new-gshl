@@ -1,5 +1,8 @@
 "use client";
 
+import { useMatchupRecords } from "@gshl-hooks/main/useMatchupRecords";
+import type { MatchupRecords } from "@gshl-lib/types/performance-records";
+import { PerformanceRecordBadge } from "./PerformanceRecordBadge";
 import { useMemo } from "react";
 import Image from "next/image";
 import Link from "next/link";
@@ -38,6 +41,7 @@ import { MatchupNHLGames } from "./MatchupNHLGames";
 import { ArrowLeftIcon, StarIcon } from "lucide-react";
 
 function CategoryResultsCard({
+  records,
   title,
   scores,
   status,
@@ -45,6 +49,7 @@ function CategoryResultsCard({
   homeTeam,
   awayTeam,
 }: {
+  records: MatchupRecords | null;
   title: string;
   scores: { away: number; home: number };
   status: string;
@@ -162,6 +167,12 @@ function CategoryResultsCard({
                   className={`px-2 py-1.5 text-center tabular-nums ${valueClassFor(category, "away")}`}
                 >
                   {category.awayValue}
+                  <PerformanceRecordBadge
+                    records={records}
+                    entityId={awayTeam?.id ?? ""}
+                    value={category.awayValue}
+                    stat={category.key}
+                  />
                   <span className="sr-only">
                     , {outcomeFor(category, "away")}
                   </span>
@@ -178,6 +189,12 @@ function CategoryResultsCard({
                   className={`px-2 py-1.5 text-center tabular-nums ${valueClassFor(category, "home")}`}
                 >
                   {category.homeValue}
+                  <PerformanceRecordBadge
+                    records={records}
+                    entityId={homeTeam?.id ?? ""}
+                    value={category.homeValue}
+                    stat={category.key}
+                  />
                   <span className="sr-only">
                     , {outcomeFor(category, "home")}
                   </span>
@@ -333,6 +350,7 @@ export function MatchupDetailsContent({
   const matchup = details?.matchup ?? null;
   const season = details?.season ?? null;
   const week = details?.week ?? null;
+  const records = useMatchupRecords(matchupId, week?.startDate, week?.endDate);
   const isComplete = isMatchupDetailsComplete(matchup, week);
   const homeTeam = details?.teams.home ?? null;
   const awayTeam = details?.teams.away ?? null;
@@ -530,6 +548,7 @@ export function MatchupDetailsContent({
       <section className="rounded-lg border border-slate-200 p-2 sm:p-4">
         <div className="space-y-2 sm:space-y-4">
           <CategoryResultsCard
+            records={records}
             title="Matchup Breakdown"
             scores={matchupScore}
             status={matchupStatus}
@@ -632,6 +651,7 @@ export function MatchupDetailsContent({
           aria-labelledby={`matchup-${selectedSide}-players-tab`}
         >
           <PlayerStatsTable
+            records={records}
             team={selectedTeam}
             nhlTeams={details?.nhlTeams ?? []}
             players={selectedPlayers}
