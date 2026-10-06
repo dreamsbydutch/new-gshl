@@ -51,6 +51,7 @@ import type * as lib_teamScheduleProjection from "../lib/teamScheduleProjection.
 import type * as lib_timestamps from "../lib/timestamps.js";
 import type * as lib_ufaCatalog from "../lib/ufaCatalog.js";
 import type * as lib_ufaReconciliation from "../lib/ufaReconciliation.js";
+import type * as lib_verifiedPlayerDayRemoval from "../lib/verifiedPlayerDayRemoval.js";
 import type * as lib_weeklyEditionInjuries from "../lib/weeklyEditionInjuries.js";
 import type * as lib_weeklyEditionPublication from "../lib/weeklyEditionPublication.js";
 import type * as lib_yahooOAuth from "../lib/yahooOAuth.js";
@@ -81,6 +82,7 @@ import type * as weeklyEditions from "../weeklyEditions.js";
 import type * as yahoo from "../yahoo.js";
 import type * as yahooBackfill from "../yahooBackfill.js";
 import type * as yahooConnectionStore from "../yahooConnectionStore.js";
+import type * as yahooRosterReconciliation from "../yahooRosterReconciliation.js";
 
 import type {
   ApiFromModules,
@@ -132,6 +134,7 @@ declare const fullApi: ApiFromModules<{
   "lib/timestamps": typeof lib_timestamps;
   "lib/ufaCatalog": typeof lib_ufaCatalog;
   "lib/ufaReconciliation": typeof lib_ufaReconciliation;
+  "lib/verifiedPlayerDayRemoval": typeof lib_verifiedPlayerDayRemoval;
   "lib/weeklyEditionInjuries": typeof lib_weeklyEditionInjuries;
   "lib/weeklyEditionPublication": typeof lib_weeklyEditionPublication;
   "lib/yahooOAuth": typeof lib_yahooOAuth;
@@ -162,6 +165,7 @@ declare const fullApi: ApiFromModules<{
   yahoo: typeof yahoo;
   yahooBackfill: typeof yahooBackfill;
   yahooConnectionStore: typeof yahooConnectionStore;
+  yahooRosterReconciliation: typeof yahooRosterReconciliation;
 }>;
 
 /**

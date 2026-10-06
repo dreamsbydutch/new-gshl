@@ -8,6 +8,15 @@
 
 ## What the revised rules imply
 
+**October 2 curve revision:** ranks 1–3 now receive $10M. The declining PCHIP
+segment starts at rank 3 and retains the rank 20/160/325/400 benchmarks.
+Rank 4 receives $9.95M. With $50k rounding, the top 210 total $1,481.55M,
+averaging $105.825M across 14 teams; snake-distributed payrolls range from
+$105.65M to $106.05M. The executable source is
+`scripts/src/runtime/relaunch-salary-curve.ts`. The calculations, comparisons,
+and coefficients below document the preceding rank-1 curve and are historical;
+they have not been recalculated for this top-three revision.
+
 The goal is a retained core approaching **15 players per team**, leaving roughly
 eight roster openings before UFA and the draft. There is no numeric keeper
 maximum. **The proposed salary cap is $100 million per team**. The cap and

@@ -52,7 +52,9 @@ export function parseDailyYahooRoster(
       .find('a[data-ys-playerid], a[href*="/players/"]')
       .first();
     if (!anchor.length) {
-      if (row.find(".ysf-player-name").text().trim()) {
+      const name = row.find(".ysf-player-name").text().trim();
+      // Yahoo also wraps vacant slots in its player-name element.
+      if (name && name !== "(Empty)") {
         throw new Error("A Yahoo roster player is missing a stable player ID.");
       }
       return; // Empty roster slot or table summary.
@@ -127,6 +129,7 @@ export function planDailyYahooRosters(input: {
   rosters: { teamId: string; players: YahooRosterPlayer[] }[];
   players: RosterIdentity[];
   existing: RosterDay[];
+  removeMissing?: boolean;
 }) {
   const rosterDays: RosterMetadata[] = [];
   const conflicts: string[] = [];
@@ -216,13 +219,14 @@ export function planDailyYahooRosters(input: {
       else unchanged++;
     }
   }
-  // A disappeared row needs a reviewed removal, not an inferred deletion from HTML.
+  // Missing rows require explicit backed-up removal mode; identity conflicts still block.
   const missing = input.existing.filter((row) => !seen.has(row.playerId));
-  for (const row of missing)
+  for (const row of input.removeMissing ? [] : missing)
     conflicts.push(
       `Existing day ${row.id} is absent from Yahoo; review its removal.`,
     );
   return {
+    removals: input.removeMissing ? missing : [],
     creates,
     updates,
     identityUpdates,

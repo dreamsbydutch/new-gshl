@@ -253,6 +253,7 @@ type TeamWeekBucket = {
   days: number;
   goalieStarts: number;
   goalieStatDays: number;
+  isComplete?: boolean;
 } & Record<(typeof TEAM_STAT_FIELDS)[number], number>;
 
 type TeamSeasonBucket = {
@@ -269,6 +270,8 @@ const TEAM_WEEK_MANAGED_FIELDS = new Set<string>([
   "weekId",
   "days",
   ...TEAM_STAT_FIELDS,
+  "GAA",
+  "SVP",
   "Rating",
   "powerRating",
   "powerElo",
@@ -293,6 +296,8 @@ const TEAM_SEASON_STAT_FIELDS = new Set<string>([
   "gshlTeamId",
   "days",
   ...TEAM_STAT_FIELDS,
+  "GAA",
+  "SVP",
   "Rating",
   "playersUsed",
   "powerRk",
@@ -1277,22 +1282,24 @@ function hasQualifiedWeekGoalieStats(
   > & {
     goalieStarts?: number | string | null;
     goalieStatDays?: number | string | null;
+    isComplete?: boolean;
   },
   goalieStartMinimum = DEFAULT_GOALIE_START_MINIMUM,
 ): boolean {
+  const minimum = source.isComplete === false ? 1 : goalieStartMinimum;
   if (
     source.goalieStarts !== undefined &&
     source.goalieStarts !== null &&
     source.goalieStarts !== ""
   ) {
-    return Number(source.goalieStarts) >= goalieStartMinimum;
+    return Number(source.goalieStarts) >= minimum;
   }
   if (
     source.goalieStatDays !== undefined &&
     source.goalieStatDays !== null &&
     source.goalieStatDays !== ""
   ) {
-    return Number(source.goalieStatDays) >= goalieStartMinimum;
+    return Number(source.goalieStatDays) >= minimum;
   }
   return false;
 }
@@ -1591,23 +1598,26 @@ function aggregateTeamStats(
   weekTypeMap: Map<string, string>,
   seasonId: string,
   fieldConfig: SeasonAggregationFieldConfig,
+  now: Date,
 ): {
   teamDays: DatabaseRecord[];
   teamWeeks: DatabaseRecord[];
   teamSeasons: DatabaseRecord[];
 } {
   const teamDayMap = new Map<string, TeamDayBucket>();
-  const now = new Date();
-  const today = [
-    now.getFullYear(),
-    String(now.getMonth() + 1).padStart(2, "0"),
-    String(now.getDate()).padStart(2, "0"),
-  ].join("-");
+  const today = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Toronto",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(now);
+  const completedWeekIds = new Set<string>();
   const eligibleWeekRows = weekRows.filter((week) => {
     const startDate = normalizeDateKey(week.startDate);
     const endDate = normalizeDateKey(week.endDate);
     const complete =
       week.isComplete === true || Boolean(endDate && endDate < today);
+    if (complete) completedWeekIds.add(toTrimmedString(week.id));
     const active =
       !complete &&
       (week.isActive === true ||
@@ -1749,6 +1759,9 @@ function aggregateTeamStats(
   }
 
   const teamWeekBuckets = Array.from(teamWeekMap.values());
+  for (const week of teamWeekBuckets) {
+    week.isComplete = completedWeekIds.has(week.weekId);
+  }
   const teamWeekRows = teamWeekBuckets.map((week) =>
     buildTeamWeekRow(week, fieldConfig),
   );
@@ -1999,6 +2012,32 @@ function isCareerPlayerStatModel(
   );
 }
 
+export function prepareSeasonAggregateWriteRow(
+  modelName: WritableSeasonStatModelName,
+  row: DatabaseRecord,
+): DatabaseRecord {
+  const managedFields = getManagedFieldsForModel(modelName);
+  const next = managedFields
+    ? Object.fromEntries(
+        Object.entries(row).filter(([field]) => managedFields.has(field)),
+      )
+    : { ...row };
+  if (isCareerPlayerStatModel(modelName)) {
+    // Career rows span every season. The legacy record shape retained a
+    // blank seasonId column, but Convex correctly omits that field.
+    delete next.seasonId;
+  }
+  for (const field of ["nhlPos", "nhlTeam", "gshlTeamIds"] as const) {
+    if (typeof next[field] === "string") {
+      next[field] = next[field]
+        .split(",")
+        .map((value) => value.trim())
+        .filter(Boolean);
+    }
+  }
+  return next;
+}
+
 export async function replaceModelRowsForSeason(
   modelName: WritableSeasonStatModelName,
   seasonId: string,
@@ -2034,28 +2073,9 @@ export async function replaceModelRowsForSeason(
     modelName,
     sortRows(modelName, generatedRows),
   );
-  const managedFields = getManagedFieldsForModel(modelName);
-  const normalizedRows = preparedRows.map((row) => {
-    const next = managedFields
-      ? Object.fromEntries(
-          Object.entries(row).filter(([field]) => managedFields.has(field)),
-        )
-      : { ...row };
-    if (isCareerPlayerStatModel(modelName)) {
-      // Career rows span every season. The legacy record shape retained a
-      // blank seasonId column, but Convex correctly omits that field.
-      delete next.seasonId;
-    }
-    for (const field of ["nhlPos", "nhlTeam", "gshlTeamIds"] as const) {
-      if (typeof next[field] === "string") {
-        next[field] = next[field]
-          .split(",")
-          .map((value) => value.trim())
-          .filter(Boolean);
-      }
-    }
-    return next;
-  });
+  const normalizedRows = preparedRows.map((row) =>
+    prepareSeasonAggregateWriteRow(modelName, row),
+  );
   const existingRows = await fetchAggregateRows<DatabaseRecord>(
     modelName,
     isCareerPlayerStatModel(modelName) ? undefined : seasonId,
@@ -2134,6 +2154,7 @@ export function buildSeasonStatLines(
   seasonRow: DatabaseRecord,
   weekRows: DatabaseRecord[],
   teamRows: DatabaseRecord[],
+  now = new Date(),
 ) {
   const weekTypeMap = buildWeekTypeMap(weekRows, seasonId);
   const fieldConfig = buildSeasonAggregationFieldConfig(seasonRow);
@@ -2184,6 +2205,7 @@ export function buildSeasonStatLines(
     weekTypeMap,
     seasonId,
     fieldConfig,
+    now,
   );
   return {
     playerDays,

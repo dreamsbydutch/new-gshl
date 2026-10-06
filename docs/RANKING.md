@@ -1102,6 +1102,15 @@ structural correction and preview, not evidence of improved prediction under
 the historical rules. It must not be described as a validated overall upgrade
 or published to production on the strength of a more familiar rank distribution.
 
+The subsequent owner-directed curve revision pays ranks 1–3 exactly $10m,
+then interpolates from rank 3 through the remaining proposal anchors. Rank 4
+receives $9.95m. Top-210 rank-pool payroll is $1,481.55m; this price change does
+not modify player values. Brady Tkachuk's fourth-place rank remains provisional:
+replacing only his projected hit rate in all three horizons with Kucherov's,
+holding other projections and replacement benchmarks fixed, moves him to 38th.
+That is a sensitivity diagnostic, not evidence for reducing hits or penalizing
+an individual player. A full proposed-rule replay remains outstanding.
+
 `unified-salary-value.ts` compares F, D and G in a single contribution unit:
 expected category victories (ties count one half), or expected matchup wins,
 above real same-position replacements. Unlike the first positional experiment,

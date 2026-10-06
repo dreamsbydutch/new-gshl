@@ -1,5 +1,7 @@
 export type YahooSyncCheckpoint = {
   lastNhlSyncAt?: number;
+  lastYahooSyncAt?: number;
+  lockedRosterDates?: string[];
   reconciledThrough?: string;
   morningRecheckOn?: string;
 };
@@ -16,6 +18,7 @@ export function planYahooSyncCycle(input: {
   startDate: string;
   endDate: string;
   checkpoint: YahooSyncCheckpoint;
+  games?: { gameState: string; gameScheduleState: string }[];
 }) {
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: "America/Toronto",
@@ -30,13 +33,28 @@ export function planYahooSyncCycle(input: {
   const today = `${part("year")}-${part("month")}-${part("day")}`;
   const hour = Number(part("hour"));
   const active = input.startDate <= today && today <= input.endDate;
-  const refreshNhl =
+  const windowOpen = hour >= 8 && hour <= 22;
+  const hourDue = (last?: number) =>
+    !last ||
+    Math.floor(input.now.getTime() / 3600000) > Math.floor(last / 3600000);
+  const rosterLocked =
+    input.checkpoint.lockedRosterDates?.includes(today) ?? false;
+  const games = input.games?.filter(
+    (g) => !["PPD", "CNCL"].includes(g.gameScheduleState),
+  );
+  const allGamesStarted =
+    !!games?.length &&
+    games.every((g) => ["LIVE", "CRIT", "FINAL", "OFF"].includes(g.gameState));
+  const scrapeYahoo =
     active &&
-    (!input.checkpoint.lastNhlSyncAt ||
-      input.now.getTime() - input.checkpoint.lastNhlSyncAt >= 60 * 60 * 1000);
+    windowOpen &&
+    !rosterLocked &&
+    hourDue(input.checkpoint.lastYahooSyncAt);
+  const refreshNhl =
+    active && windowOpen && hourDue(input.checkpoint.lastNhlSyncAt);
   const closedThrough = [
     input.endDate,
-    shiftYahooDate(today, hour >= 6 ? -1 : -2),
+    shiftYahooDate(today, hour >= 8 ? -1 : -2),
   ].sort()[0]!;
   const firstMissing = input.checkpoint.reconciledThrough
     ? shiftYahooDate(input.checkpoint.reconciledThrough, 1)
@@ -52,7 +70,7 @@ export function planYahooSyncCycle(input: {
     (date) => date >= input.startDate && date <= input.endDate,
   );
   if (
-    hour >= 6 &&
+    windowOpen &&
     input.checkpoint.morningRecheckOn !== today &&
     today <= shiftYahooDate(input.endDate, 2)
   ) {
@@ -61,9 +79,12 @@ export function planYahooSyncCycle(input: {
   return {
     today,
     active,
+    windowOpen,
+    scrapeYahoo,
+    allGamesStarted,
     refreshNhl,
-    historyDates: [...dates].sort(),
+    historyDates: windowOpen ? [...dates].sort() : [],
     recent,
-    morning: hour >= 6,
+    morning: windowOpen,
   };
 }

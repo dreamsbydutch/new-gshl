@@ -1019,9 +1019,20 @@ Review the first command's plan before applying. All teams must load and every
 Yahoo player ID must match exactly one existing player. A missing stored Yahoo
 ID may be filled from a unique exact full-name match; existing IDs are never
 overwritten and names are never matched approximately. Unresolved/duplicate IDs,
-duplicate roster assignments, malformed pages, and stored days absent from Yahoo
-block writes. Missing days need separate reviewed removal; there are no inferred
-deletions. Use the Yahoo ID backfill workflow for unresolved identities.
+duplicate roster assignments and malformed pages block writes. Stored days absent
+from Yahoo also block writes unless `--superseded-backup-dir` explicitly enables
+backed-up removal. Use the Yahoo ID backfill workflow for unresolved identities.
+
+With backed-up removal, the dry run lists the exact superseded row IDs.
+Apply confirms every team's dated roster a second time and checks that the old
+records have not changed. It saves a recovery backup of the complete superseded
+rows and replacement roster in the supplied independent directory outside the
+workspace and OneDrive. The backup is hash-verified by reading it back before
+deleting the exact superseded records. The authenticated exact-ID mutation
+compares each complete backed-up row before deleting it and its performance-index entries. Superseded
+rows are not kept in an application review archive.
+Failures stop the run and are safe to retry. This option does not override unknown
+identities, duplicate assignments, or contract conflicts.
 The existing Yahoo cookie/browser configuration, throttling, and retries apply;
 use `--help` for browser options. HTML and session material are never saved.
 
@@ -1077,21 +1088,53 @@ scheduler. Consult `--help` for the required deployment, league, season, scoring
 date range and Python executable. Dry runs exercise the child import previews
 without advancing the checkpoint; `--apply` enables the validated stages.
 
-The intended cadence is every 15 minutes. Current Yahoo rosters, eligibility,
-optimized lineups and season aggregates refresh every cycle; NHL stats refresh
-hourly. After 06:00 Toronto, the previous two dates are rechecked for completed
-lineups and final stats. After downtime, older missing dates are processed first,
+The intended cadence is hourly from 08:00 through 22:00 in `America/Toronto`,
+including daylight-saving changes. The runner refuses work outside that window.
+Yahoo membership, eligibility and daily slots are reconciled on each scrape,
+including backed-up deletion of superseded days when enabled. The first hourly
+capture after the NHL reports every non-postponed game started locks that day's
+roster; subsequent updates use stored rosters and NHL stats without scraping
+Yahoo. Unknown start status and no-game dates keep hourly Yahoo checks enabled.
+Morning runs recheck the previous two dates for final stats, using NHL-only mode
+for already locked dates. After downtime, older missing dates are processed first,
 at most two per cycle. Historical failures do not advance past the failed date.
 Current-roster failures are recorded while independent historical work can
 finish. Contract/source conflicts require review and are never silently accepted.
 
+After the morning recheck succeeds, the cycle closes ended scoring weeks using
+the existing standings and power commands. It checks NHL game completion before
+advancing historical checkpoints, finalizes matchup scores, rebuilds entering-week
+power, refreshes standings/rank tiebreaks, then hands each completed week to the
+Press Box. Failed stages retry on the next daytime cycle; a persisted completion
+marker prevents repeating successful weekly work. Catch-up waits until every
+ended week is reconciled because these calculations operate on the whole season.
+Sunday-ending weeks therefore roll over on the first successful Monday run after
+08:00 Toronto. The operator PC must be available; this is not a hosted calculation job.
+
+The backend `weeklyEditions:completeWeeklyRefresh` and the week completion field
+must be deployed before applied rollovers can run. A read-only preflight blocks
+weekly writes from an operator checkout whose backend is not deployed yet. The
+Press Box queues only after the handoff, preserving existing editorial protections
+and writing retries. Season dates also identify current seasons when `isActive`
+is stale. Without a Newsroom key, the handoff uses the existing template generator.
+For a standalone preview, consult
+`src/commands/stats/run-weekly-rollover.ts --help`; it requires explicit production
+configuration and completed morning checkpoint dates. Dry runs preview each
+calculation against persisted data, so later stages do not include earlier
+unapplied changes; they neither publish nor advance completion markers.
+
 The runner gets the server credential from its environment or the signed-in
 Convex CLI for the explicitly named deployment, retains it only in memory, and
-redacts it from child output. No Convex deployment or managed schedule is needed.
+redacts it from child output. Backed-up removals require the deployed
+`yahooRosterReconciliation:removeSupersededDays` mutation.
 The operator PC must remain awake, connected, and logged into the scheduled
 Windows user. Configure the task to skip overlapping runs and start when a
 missed trigger becomes available; a process lock also prevents overlapping cycles.
 Long NHL/catch-up runs can delay the next roster refresh.
+Pass `--superseded-backup-dir` to the runner to enable the same backed-up
+reconciliation for current and historical stages. `--nhl-only` on the daily
+command refreshes NHL stats and the six safe rollups from stored player-days;
+it does not scrape Yahoo or change current ownership/contracts.
 
 Checkpoints, daily logs and the latest status are under `.local-data/yahoo-sync/`,
 with deployment/league/season in each filename. A failed run records its stage

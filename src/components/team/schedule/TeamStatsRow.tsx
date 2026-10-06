@@ -7,11 +7,9 @@ import type {
   TeamScheduleTeamSummary,
 } from "@gshl-types";
 import {
-  didWinCategory,
-  formatCategoryValue,
+  buildCategoryResults,
   getScoreCellClass,
   getStatCellClass,
-  toCategoryNumber,
 } from "@gshl-utils";
 
 function TeamLogoCell({ team }: { team?: TeamScheduleTeamSummary | null }) {
@@ -48,16 +46,11 @@ export function TeamStatsRow({
   categories: MatchupCategoryConfig[];
 }) {
   const scoreWon = Number(teamScore) > Number(opponentScore);
-  const categoryStates = categories.map((category) => {
-    const teamValue = toCategoryNumber(teamStats, category);
-    const opponentValue = toCategoryNumber(opponentStats, category);
-
-    return {
-      key: String(category.field),
-      won: didWinCategory(teamValue, opponentValue, category.isInverse),
-      display: formatCategoryValue(teamStats, category),
-    };
-  });
+  const categoryStates = buildCategoryResults(
+    teamStats,
+    opponentStats,
+    categories,
+  );
 
   return (
     <tr>
@@ -66,9 +59,9 @@ export function TeamStatsRow({
       {categoryStates.map((categoryState) => (
         <td
           key={categoryState.key}
-          className={getStatCellClass(categoryState.won)}
+          className={getStatCellClass(categoryState.winner === "home")}
         >
-          {categoryState.display}
+          {categoryState.homeValue}
         </td>
       ))}
     </tr>

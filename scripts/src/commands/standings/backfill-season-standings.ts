@@ -441,7 +441,10 @@ function seasonUsesLegacyTies(season: SeasonRecord | undefined): boolean {
   return toBooleanFlag(season?.usesLegacyTies);
 }
 
-function matchupHasOutcome(matchup: DatabaseRecord): boolean {
+export function matchupHasOutcome(matchup: DatabaseRecord): boolean {
+  // Live category scores are not results, even when a stale winner flag exists.
+  if (matchup.isComplete === false || matchup.isComplete === "false")
+    return false;
   if (toBooleanFlag(matchup.homeWin)) return true;
   if (toBooleanFlag(matchup.awayWin)) return true;
   if (toBooleanFlag(matchup.tie)) return true;

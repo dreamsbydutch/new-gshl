@@ -9,6 +9,7 @@ import {
   scanDueMilestones,
   transitionAutomaticEdition,
   prepareAiGeneration,
+  completeWeeklyRefresh,
 } from "./weeklyEditions";
 import type { WeeklyEditionFactPacket } from "../src/lib/types";
 
@@ -111,6 +112,7 @@ function fixture() {
     weekNum: 1,
     startDate: "2025-10-01",
     endDate: "2025-10-07",
+    weeklyRefreshCompletedAt: 1,
   });
   f.put("weeks", "future", {
     seasonId: "s",
@@ -118,8 +120,141 @@ function fixture() {
     startDate: "2099-10-08",
     endDate: "2099-10-14",
   });
+  f.put("matchups", "unfinished", {
+    seasonId: "s",
+    weekId: "w",
+    isComplete: true,
+  });
   return f;
 }
+
+void test("weekly scanner waits for power/standings handoff even after matchup finalization", async () => {
+  const prior = process.env.OPENAI_API_KEY;
+  process.env.OPENAI_API_KEY = "test-only";
+  try {
+    const f = fixture();
+    await f.ctx.db.patch("w" as never, { weeklyRefreshCompletedAt: undefined });
+    await invokeMutation(scanDueMilestones, f.ctx, {});
+    assert.equal(f.scheduled.length, 0);
+  } finally {
+    if (prior === undefined) delete process.env.OPENAI_API_KEY;
+    else process.env.OPENAI_API_KEY = prior;
+  }
+});
+
+void test("calendar-current season publishes despite a stale inactive flag", async () => {
+  const prior = process.env.OPENAI_API_KEY;
+  process.env.OPENAI_API_KEY = "test-only";
+  try {
+    const f = fixture();
+    await f.ctx.db.patch("s" as never, { isActive: false });
+    await invokeMutation(scanDueMilestones, f.ctx, {});
+    assert.equal(f.scheduled.length, 1);
+  } finally {
+    if (prior === undefined) delete process.env.OPENAI_API_KEY;
+    else process.env.OPENAI_API_KEY = prior;
+  }
+});
+
+void test("operator handoff enforces authorization, readiness, preview and idempotent publication", async () => {
+  const previousSecret = process.env.CONVEX_SERVER_SECRET;
+  const previousKey = process.env.OPENAI_API_KEY;
+  process.env.CONVEX_SERVER_SECRET = "test-only";
+  process.env.OPENAI_API_KEY = "test-only";
+  try {
+    const f = fixture();
+    await f.ctx.db.patch("w" as never, { weeklyRefreshCompletedAt: undefined });
+    const args = {
+      serverSecret: "test-only",
+      seasonId: "s",
+      weekId: "w",
+      apply: true,
+    };
+    await invokeMutation(completeWeeklyRefresh, f.ctx, {
+      ...args,
+      apply: false,
+      preflight: true,
+    });
+    assert.equal(f.scheduled.length, 0);
+    await assert.rejects(
+      invokeMutation(completeWeeklyRefresh, f.ctx, {
+        ...args,
+        serverSecret: "wrong",
+      }),
+      /Unauthorized/,
+    );
+    await assert.rejects(
+      invokeMutation(completeWeeklyRefresh, f.ctx, args),
+      /not ready/,
+    );
+    assert.equal(
+      f.rows("weeks").find((row) => row._id === "w")!.weeklyRefreshCompletedAt,
+      undefined,
+    );
+    f.put("teams", "t", { seasonId: "s" });
+    f.put("teamWeekStatLines", "power", {
+      seasonId: "s",
+      weekId: "future",
+      gshlTeamId: "t",
+      powerRk: 1,
+    });
+    f.put("teamSeasonStatLines", "standings", {
+      seasonId: "s",
+      gshlTeamId: "t",
+      overallRk: 1,
+    });
+    await invokeMutation(completeWeeklyRefresh, f.ctx, {
+      ...args,
+      apply: false,
+    });
+    f.put("teamWeekStatLines", "duplicate-power", {
+      seasonId: "s",
+      weekId: "future",
+      gshlTeamId: "t",
+      powerRk: 1,
+    });
+    await assert.rejects(
+      invokeMutation(completeWeeklyRefresh, f.ctx, args),
+      /not ready/,
+    );
+    await f.ctx.db.delete("duplicate-power" as never);
+    assert.equal(f.scheduled.length, 0);
+    assert.equal(
+      f.rows("weeks").find((row) => row._id === "w")!.weeklyRefreshCompletedAt,
+      undefined,
+    );
+    await invokeMutation(completeWeeklyRefresh, f.ctx, args);
+    await invokeMutation(completeWeeklyRefresh, f.ctx, args);
+    assert.equal(f.scheduled.length, 1);
+    assert.ok(
+      f.rows("weeks").find((row) => row._id === "w")!.weeklyRefreshCompletedAt,
+    );
+  } finally {
+    if (previousSecret === undefined) delete process.env.CONVEX_SERVER_SECRET;
+    else process.env.CONVEX_SERVER_SECRET = previousSecret;
+    if (previousKey === undefined) delete process.env.OPENAI_API_KEY;
+    else process.env.OPENAI_API_KEY = previousKey;
+  }
+});
+
+void test("weekly scanner waits for finalized matchups without spending writing retries", async () => {
+  const prior = process.env.OPENAI_API_KEY;
+  process.env.OPENAI_API_KEY = "test-only";
+  try {
+    const f = fixture();
+    f.put("matchups", "unfinished", {
+      seasonId: "s",
+      weekId: "w",
+      isComplete: false,
+    });
+    await invokeMutation(scanDueMilestones, f.ctx, {});
+    assert.equal(f.rows("weeklyEditionGenerationJobs").length, 0);
+    assert.equal(f.scheduled.length, 0);
+  } finally {
+    if (prior === undefined) delete process.env.OPENAI_API_KEY;
+    else process.env.OPENAI_API_KEY = prior;
+  }
+});
 
 void test("automatic scanner queues once, leases work, and stops after three failures", async () => {
   const prior = process.env.OPENAI_API_KEY;
@@ -213,7 +348,7 @@ void test("automatic scanner skips an already-succeeded job without reading its 
       leaseUntil: 0,
       updatedAt: Date.now(),
     });
-    const originalQuery = f.ctx.db.query;
+    const originalQuery = f.ctx.db.query.bind(f.ctx.db);
     f.ctx.db.query = ((table: string) => {
       if (table === "weeklyEditions")
         throw new Error("scanner should not read an already-generated edition");

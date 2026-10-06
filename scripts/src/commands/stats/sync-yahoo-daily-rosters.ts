@@ -1,4 +1,6 @@
-import { parseArgs } from "node:util";
+import { isDeepStrictEqual, parseArgs } from "node:util";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import {
   configureConvexTarget,
   fetchModel,
@@ -6,6 +8,7 @@ import {
   fetchPlayerDayDate,
   updateById,
   upsertAggregateRows,
+  removeSupersededYahooDays,
 } from "../../integrations/data/convex-store";
 import {
   fetchDailyYahooRoster,
@@ -23,6 +26,7 @@ import { getLineupBuilder } from "../../domains/lineup/lineup-builder";
 import type { DatabaseRecord } from "../../integrations/data/records";
 import { refreshDailySeasonAggregates } from "../../domains/aggregation/daily-season-aggregation";
 import { shiftYahooDate } from "../../domains/yahoo/sync-cycle";
+import { backupSupersededYahooDays } from "../../integrations/yahoo/superseded-roster-backup";
 
 const HELP = `Usage: npm.cmd run stats:sync-yahoo-daily-rosters -- --target production --league-id 44541
 
@@ -35,7 +39,9 @@ Yahoo supplies team membership, eligibility and daily slot; NHL supplies stats.
   --season-id ID                   Canonical or legacy GSHL season ID. Uses its week calendar.
   --date YYYY-MM-DD                Optional date in the current Yahoo season.
   --apply                         Apply only after reviewing a dry run.
+  --superseded-backup-dir PATH        Back up superseded days outside workspace/OneDrive, then delete exact rows.
   --sync-nhl                      After roster apply, refresh NHL stats for this date.
+  --nhl-only                      Refresh NHL stats/rollups from stored rosters; never scrape Yahoo.
   --current-rosters               Refresh today's ownership, eligibility, optimizer and buyouts.
   --aggregate                     Rebuild season rollups after this date's import (also for backfills).
   --summary                       Print counts and conflicts instead of all roster-day payloads.
@@ -53,7 +59,7 @@ Yahoo supplies team membership, eligibility and daily slot; NHL supplies stats.
 No stats or Player ownership fields are written by the roster phase. Missing Yahoo
 IDs may be filled from a unique exact full-name match; existing IDs are never replaced. Unmatched
 Yahoo IDs, duplicate identities and missing existing days block all roster writes.
-Missing rows require review; this command never deletes them. Whole-league reads
+Missing rows block writes unless --superseded-backup-dir enables backed-up deletion. Whole-league reads
 finish before writes start. Interrupted applies may be rerun safely.
 `;
 
@@ -62,7 +68,9 @@ async function main() {
     options: {
       help: { type: "boolean" },
       apply: { type: "boolean" },
+      "superseded-backup-dir": { type: "string" },
       "sync-nhl": { type: "boolean" },
+      "nhl-only": { type: "boolean" },
       "daily-pipeline": { type: "boolean" },
       "current-rosters": { type: "boolean" },
       aggregate: { type: "boolean" },
@@ -160,6 +168,59 @@ async function main() {
       `Expected one GSHL week covering ${date}; found ${selectedWeeks.length}.`,
     );
   const week = selectedWeeks[0]!;
+  const syncNhl = async () => {
+    const { parseDailyNhlPlayerStatSyncOptions, runDailyNhlPlayerStatSync } =
+      await import("../../domains/nhl/daily-player-stats-sync");
+    const result = await runDailyNhlPlayerStatSync(
+      parseDailyNhlPlayerStatSyncOptions([
+        "--season-id",
+        season.id,
+        "--date",
+        date,
+        "--team-ids",
+        teams.map((team) => team.id).join(","),
+        ...(values.apply ? ["--apply"] : []),
+        "--ssl-verify",
+        "true",
+        "--python-bin",
+        values["python-bin"] ?? "python",
+      ]),
+    );
+    console.log(JSON.stringify(result, null, 2));
+    if (result.skippedDates.length || !result.datesSynced.includes(date))
+      throw new Error(
+        "NHL sync did not complete the requested date; later stages were not run.",
+      );
+  };
+  if (values["nhl-only"]) {
+    if (
+      !teams.length ||
+      teams.some((team) => !existing.some((row) => row.gshlTeamId === team.id))
+    )
+      throw new Error(
+        "NHL-only sync requires stored player days for every season team.",
+      );
+    console.log(
+      JSON.stringify({
+        stage: "nhl-only",
+        date,
+        seasonId: season.id,
+        apply: !!values.apply,
+      }),
+    );
+    await syncNhl();
+    console.log(
+      JSON.stringify(
+        await refreshDailySeasonAggregates(
+          season as DatabaseRecord & { id: string },
+          !!values.apply,
+        ),
+        null,
+        2,
+      ),
+    );
+    return;
+  }
   if (
     !teams.length ||
     teams.some((team) => !/^\d+$/.test(String(team.yahooId ?? ""))) ||
@@ -191,6 +252,7 @@ async function main() {
     rosters.push({ teamId: team.id, players: roster });
   }
   const plan = planDailyYahooRosters({
+    removeMissing: !!values["superseded-backup-dir"],
     seasonId: season.id,
     weekId: week.id,
     date,
@@ -206,6 +268,11 @@ async function main() {
       values.summary
         ? {
             creates: plan.creates.length,
+            removals: plan.removals.map((row) => ({
+              id: row.id,
+              playerId: row.playerId,
+              teamId: row.gshlTeamId,
+            })),
             updates: plan.updates.length,
             unchanged: plan.unchanged,
             identityUpdates: plan.identityUpdates,
@@ -298,6 +365,82 @@ async function main() {
     }
     return;
   }
+  if (plan.removals.length) {
+    // Confirm the full source again before backing up/removing any scored rows.
+    const confirmedRosters = [];
+    for (const team of teams)
+      confirmedRosters.push({
+        teamId: team.id,
+        players: await fetchDailyYahooRoster(
+          leagueId,
+          String(team.yahooId),
+          date,
+        ),
+      });
+    const confirmed = planDailyYahooRosters({
+      seasonId: season.id,
+      weekId: week.id,
+      date,
+      rosters: confirmedRosters,
+      players,
+      existing: [],
+    });
+    const byPlayer = (rows: typeof plan.rosterDays) =>
+      [...rows].sort((a, b) => a.playerId.localeCompare(b.playerId));
+    if (
+      confirmed.conflicts.length ||
+      !isDeepStrictEqual(
+        byPlayer(confirmed.rosterDays),
+        byPlayer(plan.rosterDays),
+      )
+    )
+      throw new Error(
+        "Yahoo lineup changed during capture; retry before backup.",
+      );
+    const fresh = await fetchPlayerDayDate<Record<string, unknown> & RosterDay>(
+      season.id,
+      date,
+    );
+    const rows = plan.removals.map(
+      (row) => existing.find((stored) => stored.id === row.id)!,
+    );
+    if (
+      rows.some(
+        (row) =>
+          !isDeepStrictEqual(
+            row,
+            fresh.find((current) => current.id === row.id),
+          ),
+      )
+    )
+      throw new Error(
+        "Superseded player days changed during capture; retry before backup.",
+      );
+    const backup = await backupSupersededYahooDays({
+      workspaceRoot: resolve(
+        dirname(fileURLToPath(import.meta.url)),
+        "../../../..",
+      ),
+      backupDirectory: values["superseded-backup-dir"]!,
+      scope: { target: values.target, leagueId, seasonId: season.id, date },
+      rows,
+      replacementRoster: plan.rosterDays,
+    });
+    console.log(JSON.stringify({ stage: "superseded-day-backup", ...backup }));
+    for (let offset = 0; offset < rows.length; offset += 25) {
+      const batch = rows.slice(offset, offset + 25);
+      const removed = await removeSupersededYahooDays({
+        seasonId: season.id,
+        date,
+        backupSha256: backup.sha256,
+        expected: batch,
+      });
+      if (removed.deleted !== batch.length)
+        throw new Error(
+          "Superseded-day deletion count differs from the verified backup.",
+        );
+    }
+  }
   for (const update of plan.identityUpdates)
     await updateById("Player", update.id, { yahooId: update.yahooId });
   for (const update of plan.updates)
@@ -337,28 +480,7 @@ async function main() {
     `Verified ${remaining.unchanged} roster days; no remaining metadata differences.`,
   );
   if (values["sync-nhl"] || values["daily-pipeline"]) {
-    const { parseDailyNhlPlayerStatSyncOptions, runDailyNhlPlayerStatSync } =
-      await import("../../domains/nhl/daily-player-stats-sync");
-    const nhlResult = await runDailyNhlPlayerStatSync(
-      parseDailyNhlPlayerStatSyncOptions([
-        "--season-id",
-        season.id,
-        "--date",
-        date,
-        "--team-ids",
-        teams.map((team) => team.id).join(","),
-        "--apply",
-        "--ssl-verify",
-        "true",
-        "--python-bin",
-        values["python-bin"] ?? "python",
-      ]),
-    );
-    console.log(JSON.stringify(nhlResult, null, 2));
-    if (nhlResult.skippedDates.length || !nhlResult.datesSynced.includes(date))
-      throw new Error(
-        "NHL sync did not complete the requested date; later stages were not run.",
-      );
+    await syncNhl();
   }
   if (maintenance) {
     // Confirm the full league membership again before any irreversible contract change.

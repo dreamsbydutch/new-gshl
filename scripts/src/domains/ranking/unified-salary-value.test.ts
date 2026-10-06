@@ -188,7 +188,11 @@ void test("relaunch curve matches proposal anchors, payroll and a declining deep
     if (rank > 1)
       assert.ok(relaunchAnnualSalary(rank) <= relaunchAnnualSalary(rank - 1));
   }
-  assert.equal(total, 1483950000);
+  assert.equal(total, 1481550000);
+  assert.deepEqual(
+    [1, 2, 3, 4].map(relaunchAnnualSalary),
+    [10e6, 10e6, 10e6, 9.95e6],
+  );
   assert.equal(relaunchAnnualSalary(231), 4.3e6);
   assert.throws(() => relaunchAnnualSalary(NaN), /Invalid/);
 });

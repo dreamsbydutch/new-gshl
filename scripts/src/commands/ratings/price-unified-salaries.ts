@@ -111,7 +111,7 @@ else {
     skaterPool: input.skaterPool ?? "positional",
     pricing:
       values.curve === "relaunch"
-        ? "Owner proposal PCHIP: ranks 1/20/160/325/400 at $10m/$9.25m/$5.75m/$2.5m/$1m. $50k rounding; annual base salary before renewal/UFA premiums. No replacement-value floor."
+        ? "Owner proposal PCHIP: ranks 1–3 at $10m, then ranks 20/160/325/400 at $9.25m/$5.75m/$2.5m/$1m. $50k rounding; annual base salary before renewal/UFA premiums. No replacement-value floor."
         : "Legacy rank-to-dollar curve, $50k rounding and $1m floor for nonpositive replacement value.",
     players,
     sensitivity,

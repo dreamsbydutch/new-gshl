@@ -62,6 +62,28 @@ test("reads selected lineup dropdown rather than all offered positions", () => {
   );
 });
 
+test("Yahoo's named (Empty) goalie slot is not a player; real players still require IDs", () => {
+  const emptyGoalie =
+    '<tr class="First"><td>G</td><td><div class="ysf-player-name Nowrap Relative Lh-xs">(Empty)</div></td></tr>';
+  const result = parseDailyYahooRoster(html(row("101", "C", "C"), emptyGoalie));
+  assert.equal(result.length, 1);
+  assert.equal(result[0]?.yahooId, "101");
+  assert.throws(
+    () =>
+      parseDailyYahooRoster(
+        html(
+          row("101", "C", "C"),
+          emptyGoalie.replace("(Empty)", "Real Goalie"),
+        ),
+      ),
+    /missing a stable player ID/,
+  );
+  assert.throws(
+    () => parseDailyYahooRoster(html(emptyGoalie, emptyGoalie)),
+    /empty roster/,
+  );
+});
+
 test("verifies the returned league, team and selected date before accepting a capture", () => {
   const expected = { leagueId: "44541", teamId: "1", date: scope.date };
   const capture = (date: string, team = "1") =>
@@ -103,6 +125,7 @@ test("creates metadata only and is idempotent after applying the plan", () => {
     existing: [{ id: "day", ...plan.creates[0]! }],
   });
   assert.deepEqual(next, {
+    removals: [],
     creates: [],
     updates: [],
     identityUpdates: [],
@@ -110,6 +133,30 @@ test("creates metadata only and is idempotent after applying the plan", () => {
     unchanged: 1,
     rosterDays: plan.rosterDays,
   });
+});
+
+test("backed-up removal mode plans exact superseded IDs and converges without keeping extra days", () => {
+  const desired = planDailyYahooRosters(input()).creates[0]!;
+  const extra = { ...desired, id: "superseded", playerId: "dropped" };
+  const source = { ...input(), existing: [extra] };
+  assert.equal(planDailyYahooRosters(source).conflicts.length, 1);
+  assert.deepEqual(planDailyYahooRosters(source).removals, []);
+  const plan = planDailyYahooRosters({ ...source, removeMissing: true });
+  assert.deepEqual(plan.removals, [extra]);
+  assert.equal(plan.creates.length, 1);
+  assert.deepEqual(plan.conflicts, []);
+  const after = planDailyYahooRosters({
+    ...source,
+    removeMissing: true,
+    existing: [{ ...plan.creates[0]!, id: "new-day" }],
+  });
+  assert.equal(after.unchanged, 1);
+  assert.deepEqual(after.removals, []);
+  assert.deepEqual(after.creates, []);
+  assert.ok(
+    planDailyYahooRosters({ ...source, players: [], removeMissing: true })
+      .conflicts.length,
+  );
 });
 
 test("updates transfer and lineup by document ID without touching stored statistics", () => {

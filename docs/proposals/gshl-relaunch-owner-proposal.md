@@ -533,12 +533,12 @@ implementation, accounting for positional constraints and proposed drops.
 
 ### Price a deeper player pool
 
-The proposed base-salary curve uses a smooth, declining cubic curve through
+The proposed base-salary curve pays ranks 1–3 $10 million, then uses a declining cubic curve through
 these starting targets, with salaries rounded to $50,000:
 
 | Rank in the salary model | Annual base salary |
 | -----------------------: | -----------------: |
-|                        1 |        $10 million |
+|                      1–3 |        $10 million |
 |                       20 |      $9.25 million |
 |                      160 |      $5.75 million |
 |                      325 |       $2.5 million |
@@ -546,8 +546,8 @@ these starting targets, with salaries rounded to $50,000:
 
 The [salary analysis](gshl-relaunch-salary-analysis.md) compares this lifted curve
 with the current schedule and previous proposal. Splitting the top 210 players
-across 14 teams of 15 produces base payrolls of **$105.80–$106.25 million**,
-averaging **$106.00 million**, within the target of **$104–$108 million**.
+across 14 teams of 15 produces base payrolls of **$105.65–$106.05 million**,
+averaging **$105.83 million**, within the target of **$104–$108 million**.
 That is up from $97.43 million under the previous proposal. The teams are
 approximately balanced by rank; equal underlying talent still needs testing.
 

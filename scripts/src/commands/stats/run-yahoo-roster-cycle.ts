@@ -7,6 +7,8 @@ import {
   planYahooSyncCycle,
   type YahooSyncCheckpoint,
 } from "../../domains/yahoo/sync-cycle";
+import { fetchDailyGameStatus } from "../../integrations/nhl/daily-game-status";
+import { allScoringGamesFinished } from "../../domains/yahoo/weekly-rollover";
 
 const root = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -19,17 +21,20 @@ const HELP = `Run one scheduled Yahoo cycle (dry run by default).
   --start-date DATE      First scoring day (YYYY-MM-DD).
   --end-date DATE        Last scoring day (YYYY-MM-DD).
   --python-bin PATH      Python with scripts/python/requirements.txt installed.
+  --superseded-backup-dir PATH  Recovery backup outside workspace/OneDrive for superseded-day deletion.
   --state-dir PATH       Local checkpoint/log directory (default .local-data/yahoo-sync).
   --apply               Run imports, current rosters and safe aggregate updates.
   --help                Show this help without authentication or live reads.
 
-Schedule this command every 15 minutes. Current rosters refresh every cycle;
-NHL stats refresh hourly. After 06:00 Toronto, recheck the previous two days.
+Schedule hourly between 08:00 and 22:00 Toronto. One final Yahoo capture after
+all games start locks that date; later NHL updates use stored rosters.
+No work runs outside the daytime window. Morning runs recheck the previous two days.
+After final stats, ended weeks refresh standings/power and release the Press Box.
 Offline gaps catch up two historical dates per cycle. Failed stages retry.
 Credentials stay in memory: CONVEX_SERVER_SECRET or the signed-in Convex CLI.
 `;
 
-function main() {
+async function main() {
   const { values } = parseArgs({
     options: {
       help: { type: "boolean" },
@@ -40,6 +45,7 @@ function main() {
       "start-date": { type: "string" },
       "end-date": { type: "string" },
       "python-bin": { type: "string" },
+      "superseded-backup-dir": { type: "string" },
       "state-dir": { type: "string" },
     },
   });
@@ -119,7 +125,7 @@ function main() {
   }
   fs.writeFileSync(lock, String(process.pid));
   const now = new Date();
-  const plan = planYahooSyncCycle({ now, startDate, endDate, checkpoint });
+  let plan = planYahooSyncCycle({ now, startDate, endDate, checkpoint });
   const logPath = path.join(directory, `${scope}-${plan.today}.log`);
   const statusPath = path.join(
     directory,
@@ -140,6 +146,22 @@ function main() {
     fs.renameSync(temporary, statePath);
   };
   try {
+    if (plan.scrapeYahoo) {
+      try {
+        const games = await fetchDailyGameStatus(plan.today);
+        plan = planYahooSyncCycle({
+          now,
+          startDate,
+          endDate,
+          checkpoint,
+          games,
+        });
+      } catch {
+        log(
+          "NHL start status unavailable; keeping the hourly Yahoo check enabled within daytime hours.",
+        );
+      }
+    }
     log(
       JSON.stringify({
         deployment,
@@ -149,8 +171,27 @@ function main() {
         ...plan,
       }),
     );
-    if (!plan.active && !plan.historyDates.length) {
-      log("Outside scoring/catch-up dates; no work due.");
+    if (
+      !plan.windowOpen ||
+      (!plan.scrapeYahoo &&
+        !plan.refreshNhl &&
+        !plan.historyDates.length &&
+        checkpoint.morningRecheckOn !== plan.today)
+    ) {
+      log("Outside daytime hours or no work due; no Yahoo/NHL requests.");
+      fs.writeFileSync(
+        statusPath,
+        JSON.stringify(
+          {
+            scopeKey,
+            status: values.apply ? "idle" : "dry-run",
+            finishedAt: new Date().toISOString(),
+            plan,
+          },
+          null,
+          2,
+        ),
+      );
       return;
     }
     secret = process.env.CONVEX_SERVER_SECRET?.trim() ?? "";
@@ -182,6 +223,15 @@ function main() {
     if (!secret || /[\r\n]/.test(secret))
       throw new Error("Production server credential is unavailable.");
     const run = (date: string, flags: string[]) => {
+      if (
+        !planYahooSyncCycle({ now: new Date(), startDate, endDate, checkpoint })
+          .windowOpen
+      ) {
+        log(
+          `Daytime window ended; deferring ${date} until the next daytime run.`,
+        );
+        return false;
+      }
       log(`Starting ${date}: ${flags.join(" ")}`);
       const child = spawnSync(
         process.execPath,
@@ -204,6 +254,9 @@ function main() {
           "--python-bin",
           values["python-bin"] ?? "python",
           ...flags,
+          ...(values["superseded-backup-dir"]
+            ? ["--superseded-backup-dir", values["superseded-backup-dir"]]
+            : []),
           ...(values.apply ? ["--apply"] : []),
         ],
         {
@@ -226,18 +279,26 @@ function main() {
         throw new Error(
           `Yahoo stage ${date} failed (${child.error?.message ?? child.status ?? "unknown"}); checkpoint was not advanced for this stage.`,
         );
+      return true;
     };
     const failures: string[] = [];
-    if (plan.active) {
+    if (plan.scrapeYahoo || plan.refreshNhl) {
       try {
-        run(
+        const finished = run(
           plan.today,
-          plan.refreshNhl
-            ? ["--daily-pipeline"]
-            : ["--current-rosters", "--aggregate"],
+          !plan.scrapeYahoo
+            ? ["--nhl-only"]
+            : plan.refreshNhl
+              ? ["--daily-pipeline"]
+              : ["--current-rosters", "--aggregate"],
         );
-        if (values.apply && plan.refreshNhl) {
-          checkpoint.lastNhlSyncAt = Date.now();
+        if (values.apply && finished) {
+          if (plan.refreshNhl) checkpoint.lastNhlSyncAt = now.getTime();
+          if (plan.scrapeYahoo) checkpoint.lastYahooSyncAt = now.getTime();
+          if (plan.scrapeYahoo && plan.allGamesStarted)
+            checkpoint.lockedRosterDates = [
+              ...new Set([...(checkpoint.lockedRosterDates ?? []), plan.today]),
+            ];
           save();
         }
       } catch (error) {
@@ -251,9 +312,22 @@ function main() {
     const completed = new Set<string>();
     for (const date of plan.historyDates) {
       try {
-        run(date, ["--sync-nhl", "--aggregate"]);
+        if (!allScoringGamesFinished(await fetchDailyGameStatus(date)))
+          throw new Error(
+            `NHL games for ${date} are not final; morning reconciliation will retry.`,
+          );
+        const finished = run(
+          date,
+          checkpoint.lockedRosterDates?.includes(date)
+            ? ["--nhl-only"]
+            : ["--sync-nhl", "--aggregate"],
+        );
+        if (!finished) break;
         completed.add(date);
         if (values.apply) {
+          checkpoint.lockedRosterDates = [
+            ...new Set([...(checkpoint.lockedRosterDates ?? []), date]),
+          ];
           checkpoint.reconciledThrough = [
             checkpoint.reconciledThrough ?? startDate,
             date,
@@ -279,6 +353,43 @@ function main() {
       save();
     }
     if (failures.length) throw new Error(failures.join("\n"));
+    if (
+      checkpoint.morningRecheckOn === plan.today &&
+      checkpoint.reconciledThrough
+    ) {
+      const weekly = spawnSync(
+        process.execPath,
+        [
+          "--use-system-ca",
+          path.join(root, "node_modules/tsx/dist/cli.mjs"),
+          path.join(root, "scripts/src/commands/stats/run-weekly-rollover.ts"),
+          "--season-id",
+          seasonId,
+          "--reconciled-through",
+          checkpoint.reconciledThrough,
+          "--morning-recheck-on",
+          checkpoint.morningRecheckOn,
+          ...(values.apply ? ["--apply"] : []),
+        ],
+        {
+          cwd: path.join(root, "scripts"),
+          encoding: "utf8",
+          windowsHide: true,
+          timeout: 60 * 60_000,
+          maxBuffer: 8 * 1024 * 1024,
+          env: {
+            ...process.env,
+            GSHL_CONVEX_TARGET: "production",
+            CONVEX_PROD_URL: `https://${deployment}.convex.cloud`,
+            CONVEX_SERVER_SECRET: secret,
+          },
+        },
+      );
+      if (weekly.stdout) log(weekly.stdout);
+      if (weekly.stderr) log(weekly.stderr);
+      if (weekly.status !== 0)
+        throw new Error("Weekly rollover failed; it will retry next cycle.");
+    }
     fs.writeFileSync(
       statusPath,
       JSON.stringify(
@@ -317,9 +428,7 @@ function main() {
   }
 }
 
-try {
-  main();
-} catch (error) {
+void main().catch((error) => {
   console.error(error instanceof Error ? error.message : "Yahoo cycle failed.");
   process.exitCode = 1;
-}
+});

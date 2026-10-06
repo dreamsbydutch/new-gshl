@@ -737,6 +737,22 @@ export async function deleteAggregateRows(
   );
 }
 
+export async function removeSupersededYahooDays(args: {
+  seasonId: string;
+  date: string;
+  backupSha256: string;
+  expected: AnyRow[];
+}): Promise<{ deleted: number }> {
+  return getClient().mutation(
+    makeFunctionReference<
+      "mutation",
+      Record<string, unknown>,
+      { deleted: number }
+    >("yahooRosterReconciliation:removeSupersededDays"),
+    serverArgs(toConvexValue(args) as Record<string, unknown>),
+  );
+}
+
 export type MaintenancePatchModelName = Extract<
   ModelName,
   | "Player"

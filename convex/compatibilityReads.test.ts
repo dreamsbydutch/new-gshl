@@ -473,6 +473,34 @@ void test("upsert batches retain existing rows beyond a first row's longer compo
   assert.equal(f.get("b")?.rating, 2);
 });
 
+void test("power batches update every team without creating duplicate summaries", async () => {
+  const f = fixture();
+  for (const table of ["teamWeekStatLines", "teamSeasonStatLines"]) {
+    const rows = ["t1", "t2"].map((gshlTeamId) => ({
+      gshlTeamId,
+      seasonId: "s",
+      ...(table === "teamWeekStatLines"
+        ? { weekId: "w" }
+        : { seasonType: "RS" }),
+      powerRk: 1,
+    }));
+    rows.forEach((row, index) =>
+      f.put(table, `${table}:${index}`, { ...row, G: 7 }),
+    );
+    const args = operator(table, {
+      keyColumns:
+        table === "teamWeekStatLines"
+          ? ["seasonId", "weekId", "gshlTeamId"]
+          : ["seasonId", "seasonType", "gshlTeamId"],
+      rows,
+    });
+    await invoke(upsertByCompositeKey, f.ctx, args);
+    await invoke(upsertByCompositeKey, f.ctx, args);
+    assert.equal(f.rows(table).length, 2);
+    assert.ok(f.rows(table).every((row) => row.G === 7));
+  }
+});
+
 void test("translated team-award owners are filtered after projection in list and count", async () => {
   const f = fixture();
   f.put("owners", "o", { firstName: "Test", lastName: "Owner", owing: 0 });

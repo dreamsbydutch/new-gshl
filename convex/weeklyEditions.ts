@@ -3033,15 +3033,124 @@ export const processGenerationJob = internalMutation({
   },
 });
 
+/** Operator handoff: called only after final-stat, power and standings writes. */
+export const completeWeeklyRefresh = mutation({
+  args: {
+    serverSecret: v.string(),
+    seasonId: v.id("seasons"),
+    weekId: v.id("weeks"),
+    apply: v.optional(v.boolean()),
+    preflight: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args) => {
+    if (
+      !process.env.CONVEX_SERVER_SECRET ||
+      args.serverSecret !== process.env.CONVEX_SERVER_SECRET
+    )
+      throw new Error("Unauthorized server request");
+    const [season, week] = await Promise.all([
+      ctx.db.get(args.seasonId),
+      ctx.db.get(args.weekId),
+    ]);
+    if (!season || !week || week.seasonId !== season._id)
+      throw new Error("Season or week not found");
+    const today = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "America/Toronto",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(Date.now());
+    if (!dateKey(week.endDate) || dateKey(week.endDate) >= today)
+      throw new Error("The selected week has not ended");
+    if (args.preflight) {
+      if (args.apply) throw new Error("Preflight cannot apply changes");
+      return { ready: false, applied: false };
+    }
+    const [matchups, teams, weeks, standings] = await Promise.all([
+      ctx.db
+        .query("matchups")
+        .withIndex("by_weekId", (q) => q.eq("weekId", week._id))
+        .collect(),
+      ctx.db
+        .query("teams")
+        .withIndex("by_seasonId", (q) => q.eq("seasonId", season._id))
+        .collect(),
+      ctx.db
+        .query("weeks")
+        .withIndex("by_seasonId", (q) => q.eq("seasonId", season._id))
+        .collect(),
+      ctx.db
+        .query("teamSeasonStatLines")
+        .withIndex("by_seasonId", (q) => q.eq("seasonId", season._id))
+        .collect(),
+    ]);
+    if (!matchups.length || matchups.some((row) => !row.isComplete))
+      throw new Error("The week still has incomplete matchups");
+    const nextWeek = [...weeks]
+      .sort((a, b) => asNumber(a.weekNum) - asNumber(b.weekNum))
+      .find((row) => asNumber(row.weekNum) > asNumber(week.weekNum));
+    const power = await ctx.db
+      .query("teamWeekStatLines")
+      .withIndex("by_weekId", (q) => q.eq("weekId", nextWeek?._id ?? week._id))
+      .collect();
+    if (
+      !teams.length ||
+      teams.some(
+        (team) =>
+          power.filter(
+            (row) => row.gshlTeamId === team._id && asNumber(row.powerRk) > 0,
+          ).length !== 1 ||
+          power.filter((row) => row.gshlTeamId === team._id).length !== 1 ||
+          standings.filter(
+            (row) =>
+              row.gshlTeamId === team._id &&
+              asNumber(row.overallRk) > 0 &&
+              asNumber(row.overallRk) <= teams.length,
+          ).length !== 1,
+      )
+    )
+      throw new Error("Power rankings and standings are not ready");
+    if (!args.apply) return { ready: true, applied: false };
+    if (!week.weeklyRefreshCompletedAt) {
+      await ctx.db.patch(week._id, { weeklyRefreshCompletedAt: Date.now() });
+    }
+    const completedWeek = (await ctx.db.get(week._id))!;
+    if (process.env.OPENAI_API_KEY?.trim()) {
+      await queueAutomaticEdition(
+        ctx,
+        season,
+        completedWeek,
+        nextWeek ? "weekly" : "final_recap",
+      );
+    } else if (nextWeek) {
+      await generateForWeek(ctx, season, completedWeek);
+    } else {
+      await generateMilestoneForSeason(
+        ctx,
+        season,
+        completedWeek,
+        "final_recap",
+        dateKey(week.endDate),
+      );
+    }
+    return { ready: true, applied: true };
+  },
+});
+
 export const scanDueMilestones = internalMutation({
   args: {},
   handler: async (ctx) => {
     const today = dateKey(Date.now());
     const seasons = await ctx.db.query("seasons").collect();
+    const currentSeason = (season: Doc<"seasons">) =>
+      season.isActive ||
+      (dateKey(season.startDate) <= today && dateKey(season.endDate) >= today);
     if (process.env.OPENAI_API_KEY?.trim()) {
       let queued = 0;
       for (const season of seasons.filter(
-        (row) => row.isActive || nextChronologicalSeason(seasons, row).isActive,
+        (row) =>
+          currentSeason(row) ||
+          currentSeason(nextChronologicalSeason(seasons, row)),
       )) {
         const weeks = await ctx.db
           .query("weeks")
@@ -3054,7 +3163,7 @@ export const scanDueMilestones = internalMutation({
           (a, b) => asNumber(b.weekNum) - asNumber(a.weekNum),
         )[0];
         if (
-          season.isActive &&
+          currentSeason(season) &&
           completed[0] &&
           completed[0]._id !== finalWeek?._id
         )
@@ -3134,6 +3243,17 @@ async function queueAutomaticEdition(
   week: Doc<"weeks">,
   issueType: WeeklyEditionIssueType,
 ) {
+  if (issueType === "weekly") {
+    // The operator writes this only after final stats, power and standings.
+    // Waiting for data must not consume any of the three writing attempts.
+    if (!week.weeklyRefreshCompletedAt) return false;
+    const matchups = await ctx.db
+      .query("matchups")
+      .withIndex("by_weekId", (q) => q.eq("weekId", week._id))
+      .collect();
+    if (!matchups.length || matchups.some((row) => !row.isComplete))
+      return false;
+  }
   const editionKey =
     issueType === "weekly"
       ? `week:${String(week._id)}`

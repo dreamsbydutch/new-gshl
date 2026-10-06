@@ -604,6 +604,7 @@ export default defineSchema({
       endDate: dateOnlyValue,
       isActive: boolValue,
       isPlayoffs: boolValue,
+      weeklyRefreshCompletedAt: v.optional(v.number()),
       createdAt: timestampValue,
       updatedAt: timestampValue,
     },

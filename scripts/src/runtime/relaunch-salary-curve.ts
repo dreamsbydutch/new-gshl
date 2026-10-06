@@ -1,5 +1,5 @@
 /** Owner proposal: shape-preserving cubic through rank benchmarks, $50k rounding. */
-const ranks = [1, 20, 160, 325, 400];
+const ranks = [3, 20, 160, 325, 400];
 const millions = [10, 9.25, 5.75, 2.5, 1];
 const widths = ranks.slice(1).map((v, i) => v - ranks[i]!);
 const slopes = widths.map((v, i) => (millions[i + 1]! - millions[i]!) / v);
@@ -25,6 +25,7 @@ derivatives.push(endpoint(widths[3]!, widths[2]!, slopes[3]!, slopes[2]!));
 export function relaunchAnnualSalary(rank: number) {
   if (!Number.isFinite(rank) || rank < 1)
     throw new Error("Invalid salary rank");
+  if (rank <= 3) return 10e6;
   if (rank >= 400) return 1e6;
   const i = ranks.findIndex((v) => v > rank) - 1;
   const t = (rank - ranks[i]!) / widths[i]!;

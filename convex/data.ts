@@ -843,7 +843,11 @@ async function applyUpsertByCompositeKey(ctx: { db: any }, args: UpsertArgs) {
       : undefined;
   const rowIndexedFilter = Object.fromEntries(
     Object.entries(args.rows[0] ?? {}).filter(([field, value]) => {
-      return value !== undefined && indexesForTable(args.table).has(field);
+      return (
+        value !== undefined &&
+        indexesForTable(args.table).has(field) &&
+        args.rows.every((row) => equals(row[field], value))
+      );
     }),
   );
   const existingRows = await readCandidateRows(ctx, args.table, {

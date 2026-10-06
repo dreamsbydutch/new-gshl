@@ -15,7 +15,48 @@ import {
   isMatchupInPlay,
   isMatchupDetailsComplete,
   renderPlayerStatCell,
+  buildCategoryResults,
 } from "./matchup-details";
+
+void test("blank goalie rates are unavailable, while genuine zeroes remain valid", () => {
+  const stats = {
+    G: 0,
+    A: 0,
+    P: 0,
+    PM: 0,
+    PIM: 0,
+    PPP: 0,
+    SOG: 0,
+    HIT: 0,
+    BLK: 0,
+    W: 0,
+    GA: 0,
+    GAA: null,
+    SV: 0,
+    SA: 0,
+    SVP: null,
+    SO: 0,
+  };
+  const categories = [
+    { field: "GAA", label: "GAA", precision: 2, isInverse: true },
+    { field: "SVP", label: "SV%", precision: 3 },
+  ] as const;
+  const results = buildCategoryResults(stats, { ...stats, GAA: 0, SVP: 1 }, [
+    ...categories,
+  ]);
+  assert.equal(results[0]?.homeValue, "-");
+  assert.equal(results[0]?.awayValue, "0.00");
+  assert.equal(results[0]?.winner, "away");
+  assert.equal(results[1]?.homeValue, "-");
+  assert.equal(results[1]?.awayValue, "1.000");
+  assert.equal(results[1]?.winner, "away");
+  assert.equal(
+    buildCategoryResults(stats, stats, [...categories])[0]?.winner,
+    "tie",
+  );
+  assert.equal(renderPlayerStatCell(player("G"), "GAA"), "-");
+  assert.equal(renderPlayerStatCell(player("G"), "SVP"), "-");
+});
 
 void test("completed matchups show Three Stars despite a missing or stale completion flag", () => {
   const now = new Date("2026-10-01T16:00:00Z");

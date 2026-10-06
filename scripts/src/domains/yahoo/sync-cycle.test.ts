@@ -33,7 +33,7 @@ test("frequent rosters do not repeat hourly NHL or completed morning work", () =
     true,
   );
 });
-test("nightly UTC rollover is not Toronto rollover; yesterday is finalized after 6am", () => {
+test("nightly UTC rollover is not Toronto rollover; yesterday is finalized after 8am", () => {
   const midnightUtc = planYahooSyncCycle({
     ...scope,
     now: new Date("2026-10-02T01:00:00Z"),
@@ -48,10 +48,93 @@ test("nightly UTC rollover is not Toronto rollover; yesterday is finalized after
   assert.deepEqual(early.historyDates, []);
   const morning = planYahooSyncCycle({
     ...scope,
-    now: new Date("2026-10-02T10:00:00Z"),
+    now: new Date("2026-10-02T12:00:00Z"),
     checkpoint: { reconciledThrough: "2026-09-30" },
   });
   assert.deepEqual(morning.historyDates, ["2026-09-30", "2026-10-01"]);
+});
+
+test("Yahoo runs hourly only in the Eastern daytime window, including winter time", () => {
+  for (const now of [
+    "2026-10-04T11:59:00Z",
+    "2026-10-05T03:00:00Z",
+    "2027-01-04T12:59:00Z",
+  ]) {
+    const plan = planYahooSyncCycle({
+      ...scope,
+      now: new Date(now),
+      checkpoint: {},
+    });
+    assert.equal(plan.scrapeYahoo, false);
+    assert.equal(plan.refreshNhl, false);
+    assert.deepEqual(plan.historyDates, []);
+  }
+  for (const now of [
+    "2026-10-04T12:00:00Z",
+    "2026-10-05T02:00:00Z",
+    "2027-01-04T13:00:00Z",
+  ]) {
+    assert.equal(
+      planYahooSyncCycle({ ...scope, now: new Date(now), checkpoint: {} })
+        .scrapeYahoo,
+      true,
+    );
+  }
+  const now = new Date("2026-10-04T18:30:00Z");
+  assert.equal(
+    planYahooSyncCycle({
+      ...scope,
+      now,
+      checkpoint: {
+        lastYahooSyncAt: new Date("2026-10-04T18:00:00Z").getTime(),
+      },
+    }).scrapeYahoo,
+    false,
+  );
+});
+
+test("captures the final locked lineup once, then updates NHL without scraping Yahoo", () => {
+  const input = {
+    ...scope,
+    now: new Date("2026-10-05T02:00:00Z"),
+    checkpoint: {},
+  };
+  const live = { gameState: "LIVE", gameScheduleState: "OK" };
+  const upcoming = { gameState: "PRE", gameScheduleState: "OK" };
+  assert.equal(
+    planYahooSyncCycle({ ...input, games: [live, upcoming] }).allGamesStarted,
+    false,
+  );
+  const final = planYahooSyncCycle({
+    ...input,
+    games: [live, { ...live, gameState: "OFF" }],
+  });
+  assert.equal(final.allGamesStarted, true);
+  assert.equal(final.scrapeYahoo, true);
+  const locked = planYahooSyncCycle({
+    ...input,
+    checkpoint: { lockedRosterDates: ["2026-10-04"] },
+  });
+  assert.equal(locked.scrapeYahoo, false);
+  assert.equal(locked.refreshNhl, true);
+  assert.equal(
+    planYahooSyncCycle({ ...input, games: [] }).allGamesStarted,
+    false,
+  );
+  assert.equal(
+    planYahooSyncCycle({
+      ...input,
+      games: [{ ...upcoming, gameScheduleState: "PPD" }],
+    }).allGamesStarted,
+    false,
+  );
+  assert.equal(
+    planYahooSyncCycle({
+      ...input,
+      games: [live, { ...upcoming, gameScheduleState: "PPD" }],
+    }).allGamesStarted,
+    true,
+  );
 });
 test("offline gaps recover oldest missing days in bounded batches", () => {
   const plan = planYahooSyncCycle({

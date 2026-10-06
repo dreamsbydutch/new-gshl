@@ -496,7 +496,19 @@ export function formatCategoryValue(
   category: MatchupCategoryConfig,
 ): string {
   if (!isPlayerStatCategoryKey(category.field)) return "0";
+  if (isMissingGoalieCategory(stats, category)) return "-";
   return formatStatValue(stats[category.field], category.precision);
+}
+
+function isMissingGoalieCategory(
+  stats: MatchupCategoryStats,
+  category: MatchupCategoryConfig,
+): boolean {
+  if (!isPlayerStatCategoryKey(category.field)) return false;
+  if (!["W", "GA", "GAA", "SV", "SA", "SVP", "SO"].includes(category.field))
+    return false;
+  const value = stats[category.field];
+  return value === null || value === undefined || value === "";
 }
 
 /**
@@ -628,10 +640,17 @@ export function renderPlayerStatCell(
   if (category && ineligibleCategories.has(category)) return "-";
 
   if (key === "GAA") {
+    if (player[key] === null || player[key] === undefined || player[key] === "")
+      return "-";
     return formatStatValue(player[key], 2);
   }
 
   if (key === "SVP" || key === "Rating") {
+    if (
+      key === "SVP" &&
+      (player[key] === null || player[key] === undefined || player[key] === "")
+    )
+      return "-";
     return formatStatValue(player[key], 3);
   }
 
@@ -683,18 +702,21 @@ export function buildCategoryResults(
 
     const homeValue = toStatNumber(homeTeamStats[category.field]);
     const awayValue = toStatNumber(awayTeamStats[category.field]);
+    const homeMissing = isMissingGoalieCategory(homeTeamStats, category);
+    const awayMissing = isMissingGoalieCategory(awayTeamStats, category);
     return {
       key: String(category.field),
       label: category.label,
-      homeValue: formatStatValue(
-        homeTeamStats[category.field],
-        category.precision,
-      ),
-      awayValue: formatStatValue(
-        awayTeamStats[category.field],
-        category.precision,
-      ),
-      winner: resolveCategoryWinner(homeValue, awayValue, category.isInverse),
+      homeValue: formatCategoryValue(homeTeamStats, category),
+      awayValue: formatCategoryValue(awayTeamStats, category),
+      winner:
+        homeMissing || awayMissing
+          ? homeMissing === awayMissing
+            ? "tie"
+            : homeMissing
+              ? "away"
+              : "home"
+          : resolveCategoryWinner(homeValue, awayValue, category.isInverse),
     };
   });
 }
