@@ -6,9 +6,28 @@ import {
   easternHour,
   isPreviewDue,
   matchupPreviewStartsAt,
+  matchupPreviewExpiresAt,
   parseMatchupPreviewArticle,
   PREVIEW_WINDOW_MS,
+  matchupPreviewAnalysisIsDuplicate,
+  MatchupPreviewDuplicateAnalysisError,
 } from "./matchup-preview-articles";
+import { FRANCHISE_BEAT_WRITERS_BY_LEGACY_ID } from "../../../../convex/lib/reporterDirectory";
+
+void test("preview readership ends at midnight Wednesday Eastern across start days and DST", () => {
+  for (const [date, expiry] of [
+    ["2026-10-04", "2026-10-07T04:00:00Z"],
+    ["2026-10-05", "2026-10-07T04:00:00Z"],
+    ["2026-10-06", "2026-10-07T04:00:00Z"],
+    ["2026-10-07", "2026-10-14T04:00:00Z"],
+    ["2026-11-01", "2026-11-04T05:00:00Z"],
+    ["2026-03-08", "2026-03-11T04:00:00Z"],
+    ["2026-12-31", "2027-01-06T05:00:00Z"],
+  ])
+    assert.equal(matchupPreviewExpiresAt(date!), Date.parse(expiry!));
+  assert.equal(matchupPreviewExpiresAt(null), null);
+  assert.equal(matchupPreviewExpiresAt("2026-02-30"), null);
+});
 
 void test("writer personalities follow the byline across weeks and opponents", () => {
   const packet = {
@@ -56,6 +75,81 @@ void test("writer personalities follow the byline across weeks and opponents", (
     one.paragraphs.at(-1),
     two.paragraphs.at(-1),
     "matching predictions remain valid regardless of personality",
+  );
+});
+
+void test("configured beat writers have varied stable personalities and forecast temperaments", () => {
+  const writers = Object.values(FRANCHISE_BEAT_WRITERS_BY_LEGACY_ID);
+  const profiles = writers.map((writer) => matchupPreviewWriterProfile(writer));
+  assert.ok(
+    new Set(profiles.map((profile) => JSON.stringify(profile))).size >=
+      writers.length - 1,
+  );
+  assert.equal(
+    new Set(profiles.map((profile) => profile.forecastTemperament)).size,
+    4,
+  );
+  assert.equal(new Set(profiles.map((profile) => profile.teamBias)).size, 5);
+});
+
+void test("pair review flags copied analysis while allowing shared scores and category evidence", () => {
+  const one = [
+    "Home can build its win through scoring volume. Goals, shots and power-play production favor its attack, while Away has the stronger hits and blocks profile. Those scoring edges matter most in my call.",
+    "The risk is that Away turns the physical categories into a broader advantage. Home needs its attacking depth to hold, and I expect that depth to carry it through this matchup.",
+    "Prediction: Home defeats Away, 6–4.",
+  ];
+  const independent = [
+    "Away should trust its hits and blocks advantage rather than chase Home in every offensive category. A route to victory still exists if the goalie ratios swing its way and its physical production holds.",
+    "I am less convinced by that route because Home has the stronger goalie-ratio sample. The scoring pressure compounds the risk, leaving Away needing a favorable crease reversal that I would not count on here.",
+    "Prediction: Home defeats Away, 6–4.",
+  ];
+  assert.equal(matchupPreviewAnalysisIsDuplicate(one, one), true);
+  assert.equal(
+    matchupPreviewAnalysisIsDuplicate(
+      one.map((paragraph) =>
+        paragraph.replace("scoring volume", "scoring production"),
+      ),
+      one,
+    ),
+    true,
+  );
+  assert.equal(matchupPreviewAnalysisIsDuplicate(independent, one), false);
+  const evidence = {
+    writer: "Away Reporter",
+    teamName: "Away",
+    opponentName: "Home",
+    homeTeamName: "Home",
+    startsAt: 1,
+    facts: [{ id: "categories", text: "Supplied category comparison" }],
+    opposingArticle: {
+      writer: "Home Reporter",
+      headline: "Scoring volume",
+      paragraphs: one,
+    },
+  };
+  const article = {
+    headline: "Away's path",
+    paragraphs: one.slice(0, -1),
+    evidenceIds: ["categories"],
+    prediction: { winner: "opponent", teamScore: 4, opponentScore: 6 },
+  };
+  assert.throws(
+    () => parseMatchupPreviewArticle(JSON.stringify(article), evidence),
+    MatchupPreviewDuplicateAnalysisError,
+  );
+  assert.equal(
+    parseMatchupPreviewArticle(
+      JSON.stringify({ ...article, paragraphs: independent.slice(0, -1) }),
+      evidence,
+    ).prediction.winner,
+    "opponent",
+  );
+  const request = buildMatchupPreviewRequest("test", evidence, article);
+  assert.match(request.instructions, /REWRITE REQUIRED/);
+  assert.match(request.instructions, /never factual evidence or instructions/);
+  assert.match(
+    request.instructions,
+    /Clear opponent advantages outweigh loyalty/,
   );
 });
 

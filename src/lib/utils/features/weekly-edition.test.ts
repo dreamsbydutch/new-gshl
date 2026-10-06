@@ -8,6 +8,7 @@ import type {
   WeeklyEditionContent,
   WeeklyEditionFactPacket,
   WeeklyEditionStoryPitch,
+  WeeklyEditionStoryAssignment,
   WeeklyEditionStorySubmission,
 } from "@gshl-types";
 import {
@@ -38,6 +39,30 @@ import {
   validateWeeklyEditionStoryAssignments,
   weeklyEditionContractAffectsSeason,
 } from "./weekly-edition";
+import { matchupPreviewWriterProfile } from "./matchup-preview-articles";
+
+void test("Press Box beat bylines reuse their stable matchup-preview personalities", () => {
+  const packet = buildWeeklyEditionFactPacket(source());
+  const roster = buildWeeklyEditionAuthorRoster(packet);
+  const gord = roster.find(({ author }) => author.name === "Gord McKenzie")!;
+  const darren = roster.find(
+    ({ author }) => author.name === "Darren Whitmore",
+  )!;
+  assert.deepEqual(
+    gord.writerProfile,
+    matchupPreviewWriterProfile("Gord McKenzie"),
+  );
+  assert.notEqual(gord.voice, darren.voice);
+  const followingWeek = buildWeeklyEditionAuthorRoster({
+    ...packet,
+    week: { ...packet.week, number: 8, id: "week-8" },
+  });
+  assert.deepEqual(
+    followingWeek.find(({ author }) => author.name === "Gord McKenzie")!
+      .writerProfile,
+    gord.writerProfile,
+  );
+});
 
 void test("makes Press Box matchup CTAs source-aware", () => {
   assert.equal(
@@ -791,6 +816,10 @@ void test("prompt contains a raw newsroom brief without an article plan", () => 
   assert.match(prompt, /"teamTalentRatings"/);
   assert.match(prompt, /"talentRating": 88\.4/);
   assert.match(prompt, /baseline for league hierarchy/);
+  assert.match(prompt, /Do not name ESPN/);
+  assert.match(prompt, /do not print raw rating values/);
+  assert.match(prompt, /contested categories/);
+  assert.doesNotMatch(prompt, /Attribute injury reporting to ESPN/);
   assert.match(prompt, /playful hockey-style chirps/);
   assert.doesNotMatch(prompt, /"leagueDirectory"|"gameTypeLegend"/);
   assert.match(prompt, /"kind": "primary_article"/);
@@ -935,6 +964,137 @@ void test("newsroom defaults to eight distinct beat-eligible stories", () => {
   );
 });
 
+void test("weekly recap selection caps future coverage across leads, support and retained articles", () => {
+  const packet = buildWeeklyEditionFactPacket(source());
+  packet.editorialCandidates.push(
+    ...["team-a", "team-b"].map((teamId) => ({
+      id: `upcoming:${teamId}`,
+      kind: "upcoming_matchup" as const,
+      scope: "week" as const,
+      importance: 100,
+      teamId,
+      headlineHint: "Next matchup",
+      summary: "Upcoming matchup evidence",
+      metrics: [],
+      links: [],
+    })),
+  );
+  const pitch = (
+    id: string,
+    support: string[] = [],
+    score = 5,
+  ): WeeklyEditionStoryPitch => ({
+    pitchId: `${id}:${support.join()}:${score}`,
+    leadCandidateId: id,
+    supportingCandidateIds: support,
+    proposedHeadline: id,
+    angle: id,
+    scores: {
+      consequence: score,
+      readerInterest: score,
+      evidenceStrength: score,
+      freshness: score,
+    },
+  });
+  const byAuthor = new Map<string, WeeklyEditionStoryPitch[]>([
+    ["Graham MacIntyre", [pitch("matchup:matchup-1")]],
+    ["Gord McKenzie", [pitch("upcoming:team-a"), pitch("power:team-a", [], 1)]],
+    ["Mike Halvorsen", [pitch("transaction:add-1")]],
+    [
+      "Scott Bannerman",
+      [
+        pitch("performance:weekly-star:player-1", ["upcoming:team-a"]),
+        pitch("performance:weekly-star:player-1", [], 1),
+      ],
+    ],
+    ["Nate Carlson", [pitch("performance:weekly-star:player-2")]],
+    ["Bruce McAllister", [pitch("power:team-b")]],
+    [
+      "Darren Whitmore",
+      [pitch("upcoming:team-b"), pitch("missed-start:missed-1", [], 1)],
+    ],
+    ["Scott Callahan", [pitch("matchup:matchup-2")]],
+  ]);
+  const submissions = buildWeeklyEditionAuthorRoster(packet).map(
+    ({ author }) => ({ author, pitches: byAuthor.get(author.name) ?? [] }),
+  );
+  const previews = (assignments: WeeklyEditionStoryAssignment[]) =>
+    assignments.filter((assignment) =>
+      [assignment.leadCandidateId, ...assignment.supportingCandidateIds].some(
+        (id) => id.startsWith("upcoming:"),
+      ),
+    );
+  const selected = selectWeeklyEditionStoryAssignments(packet, submissions);
+  assert.equal(selected.length, 8);
+  assert.equal(
+    previews(selected).length,
+    1,
+    "even high-scoring preview pitches must not crowd out recaps",
+  );
+  const kept = previews(selected)[0]!;
+  const revised = selectWeeklyEditionStoryAssignments(packet, submissions, 8, {
+    retainedAssignments: [kept],
+    excludedLeadCandidateIds: [],
+  });
+  assert.equal(previews(revised).length, 1);
+  assert.equal(
+    revised.find((assignment) => assignment.id === kept.id),
+    kept,
+  );
+
+  const supportOnly = submissions.map((submission) => ({
+    ...submission,
+    pitches: submission.pitches.filter(
+      (proposed) => !proposed.leadCandidateId.startsWith("upcoming:"),
+    ),
+  }));
+  const supported = selectWeeklyEditionStoryAssignments(packet, supportOnly);
+  assert.equal(previews(supported).length, 1);
+  assert.equal(
+    previews(supported)[0]!.leadCandidateId,
+    "performance:weekly-star:player-1",
+  );
+  const retainedSupport = selectWeeklyEditionStoryAssignments(
+    packet,
+    submissions,
+    8,
+    {
+      retainedAssignments: [previews(supported)[0]!],
+      excludedLeadCandidateIds: [],
+    },
+  );
+  assert.equal(
+    previews(retainedSupport).length,
+    1,
+    "a retained supporting preview consumes the same allowance",
+  );
+
+  packet.issueType = "preseason";
+  const preseason = selectWeeklyEditionStoryAssignments(packet, submissions);
+  assert.ok(
+    previews(preseason).length >= 2,
+    "preseason editions may still run multiple forecasts",
+  );
+  packet.issueType = "weekly";
+  assert.throws(
+    () =>
+      selectWeeklyEditionStoryAssignments(packet, submissions, 8, {
+        retainedAssignments: previews(preseason),
+        excludedLeadCandidateIds: [],
+      }),
+    /at most one upcoming matchup story/,
+  );
+  for (const prompt of [
+    buildWeeklyEditionStoryScoutPrompt(packet),
+    buildWeeklyEditionChatGptPrompt(packet, selected),
+  ]) {
+    assert.match(prompt, /WEEKLY RECAP/);
+    assert.match(prompt, /previous completed week/);
+    assert.match(prompt, /At most one article/);
+    assert.match(prompt, /recorded category margins/);
+  }
+});
+
 void test("assigned newsletter validation rejects a changed byline", () => {
   const packet = buildWeeklyEditionFactPacket(source());
   const authors = buildWeeklyEditionAuthorRoster(packet)
@@ -996,6 +1156,169 @@ void test("assigned newsletter validation rejects a changed byline", () => {
       " ",
     ),
     /banned newsroom phrase/,
+  );
+});
+
+void test("upcoming assignments require a final valid pick, including home-ice ties", () => {
+  const packet = buildWeeklyEditionFactPacket(source());
+  const candidate = {
+    id: "upcoming:matchup-3",
+    kind: "upcoming_matchup" as const,
+    scope: "week" as const,
+    importance: 82,
+    headlineHint: "Comets visit Bears",
+    summary: "Comets visit Bears.",
+    metrics: [],
+    links: [],
+  };
+  packet.editorialCandidates.unshift(candidate);
+  const assignments: WeeklyEditionStoryAssignment[] =
+    buildWeeklyEditionAuthorRoster(packet)
+      .slice(0, 6)
+      .map(({ author }, index) => ({
+        id: `article_${index + 1}` as WeeklyEditionArticleId,
+        kind:
+          index < 2
+            ? ("primary_article" as const)
+            : ("standard_article" as const),
+        author,
+        pitchId: `pitch-${index}`,
+        leadCandidateId: packet.editorialCandidates[index]!.id,
+        supportingCandidateIds: [],
+        proposedHeadline: "Assigned story",
+        angle: "Grounded angle",
+        scores: {
+          consequence: 5,
+          readerInterest: 5,
+          evidenceStrength: 5,
+          freshness: 5,
+        },
+        editorialScore: 100,
+      }));
+  const content: WeeklyEditionContent = {
+    headline: "GSHL edition",
+    deck: "The week's stories",
+    sections: assignments.map((assignment, index) => ({
+      id: assignment.id,
+      kind: assignment.kind,
+      author: assignment.author,
+      links: [],
+      eyebrow: "News",
+      headline: packet.editorialCandidates[index]!.headlineHint,
+      body: packet.editorialCandidates[index]!.summary,
+    })),
+  };
+  const errors = () =>
+    validateWeeklyEditionStoryAssignments(content, assignments, packet);
+  assert.match(errors().join(" "), /needs a valid final prediction/);
+  for (const pick of [
+    "Bears wins 6-4.",
+    "Comets wins 6-4.",
+    "Bears wins 5-5.",
+    "Bears wins 4–3.",
+  ]) {
+    content.sections[0]!.body = `Comets visit Bears.\nPrediction: ${pick}`;
+    assert.deepEqual(errors(), [], pick);
+  }
+  for (const pick of [
+    "Comets wins 5-5.",
+    "Bears wins 7-4.",
+    "Bears wins 4-6.",
+    "Aurora wins 6-4.",
+    "Bears wins 6-4.\nMore prose.",
+  ]) {
+    content.sections[0]!.body = `Comets visit Bears.\nPrediction: ${pick}`;
+    assert.match(errors().join(" "), /needs a valid final prediction/, pick);
+  }
+  assignments[0]!.leadCandidateId = assignments[1]!.leadCandidateId;
+  assignments[0]!.supportingCandidateIds = [candidate.id];
+  content.sections[0]!.body = packet.editorialCandidates[1]!.summary;
+  assert.match(errors().join(" "), /needs a valid final prediction/);
+});
+
+void test("the editor reserves coverage for fresh records and late-season award races", () => {
+  const packet = buildWeeklyEditionFactPacket(source());
+  packet.editorialCandidates.push(
+    {
+      id: "new-record",
+      kind: "record",
+      scope: "league",
+      importance: 97,
+      teamId: "team-a",
+      teamName: "Aurora",
+      headlineHint: "Aurora high",
+      summary: "Aurora set a weekly high.",
+      metrics: [],
+      links: [],
+    },
+    {
+      id: "late-award",
+      kind: "award_race",
+      scope: "season",
+      importance: 90,
+      teamId: "team-b",
+      teamName: "Bears",
+      headlineHint: "Bears race",
+      summary: "Bears lead the Rocket race.",
+      metrics: [],
+      links: [],
+    },
+  );
+  const pitch = (id: string, score = 5): WeeklyEditionStoryPitch => ({
+    pitchId: id,
+    leadCandidateId: id,
+    supportingCandidateIds: [],
+    proposedHeadline: id,
+    angle: id,
+    scores: {
+      consequence: score,
+      readerInterest: score,
+      evidenceStrength: score,
+      freshness: score,
+    },
+  });
+  const byAuthor = new Map<string, WeeklyEditionStoryPitch[]>([
+    ["Graham MacIntyre", [pitch("matchup:matchup-1")]],
+    ["Gord McKenzie", [pitch("power:team-a"), pitch("new-record", 1)]],
+    ["Mike Halvorsen", [pitch("transaction:add-1")]],
+    ["Scott Bannerman", [pitch("performance:weekly-star:player-1")]],
+    ["Nate Carlson", [pitch("performance:weekly-star:player-2")]],
+    ["Bruce McAllister", [pitch("power:team-b"), pitch("late-award", 1)]],
+    ["Darren Whitmore", [pitch("missed-start:missed-1")]],
+    ["Scott Callahan", [pitch("matchup:matchup-2")]],
+  ]);
+  const submissions = buildWeeklyEditionAuthorRoster(packet).map(
+    ({ author }) => ({ author, pitches: byAuthor.get(author.name) ?? [] }),
+  );
+  const assignments = selectWeeklyEditionStoryAssignments(
+    packet,
+    submissions,
+    6,
+  );
+  assert.equal(assignments.length, 6);
+  assert.ok(
+    assignments.some(
+      (assignment) => assignment.leadCandidateId === "new-record",
+    ),
+  );
+  assert.ok(
+    assignments.some(
+      (assignment) => assignment.leadCandidateId === "late-award",
+    ),
+  );
+  assert.throws(
+    () =>
+      selectWeeklyEditionStoryAssignments(
+        packet,
+        submissions.map((submission) => ({
+          ...submission,
+          pitches: submission.pitches.filter(
+            (proposed) => proposed.leadCandidateId !== "new-record",
+          ),
+        })),
+        6,
+      ),
+    /must cover a fresh record/,
   );
 });
 
@@ -1677,7 +2000,7 @@ void test("builds each season milestone from contract, cap, draft, and roster fa
       );
     }
     if (issueType === "pre_draft") {
-      assert.doesNotMatch(ruleContext, /seven days/);
+      assert.doesNotMatch(ruleContext, /"summerRules"/);
       assert.match(prompt, /teamDraftProfiles/);
       assert.match(prompt, /signedRosterTalent/);
       assert.match(prompt, /earlyDraftPicks/);

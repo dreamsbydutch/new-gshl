@@ -84,9 +84,13 @@ includes the recorded meeting count and earliest meeting date; these describe
 stored coverage, not independently verified archive completeness. Exceeding the
 history read bounds fails generation instead of silently truncating its source.
 Injury-reserve designations are not treated as medical diagnoses. Articles are
-deleted by scheduled mutations at 3 a.m. Eastern on the matchup's start date,
-with nightly cleanup as a fallback; the public query also hides started or
-completed matchups. Deploying the Convex schema and functions activates this
+kept on the matchup page alongside live games through the first Tuesday night
+on or after the matchup's start date, then deleted at midnight Wednesday
+Eastern, with nightly cleanup as a fallback. Generation and publication still
+stop when the matchup starts; retained predictions are the original pregame
+copy. The public query hides expired articles even if cleanup is delayed.
+Legacy start-time expiry jobs reschedule retained copy to the new cutoff.
+Deploying the Convex schema and functions activates this
 workflow. Generating local bindings alone does not activate it.
 
 Use `gshl-data-operations` for any live or potentially destructive command. The

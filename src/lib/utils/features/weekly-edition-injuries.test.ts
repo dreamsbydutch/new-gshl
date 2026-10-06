@@ -53,15 +53,24 @@ const report: InjuryReport = {
   ],
 };
 
-void test("major absence becomes team evidence with rating context, not a rating deduction", () => {
-  const result = enrichEditionWithInjuries(packet, context, report);
+void test("a recent newly observed major absence carries internal rating context at supporting priority", () => {
+  const result = enrichEditionWithInjuries(
+    packet,
+    {
+      ...context,
+      previous: {
+        fetchedAt: report.fetchedAt - 2 * 86400000,
+        sourceUpdatedAt: "2026-09-25T12:00Z",
+        observations: [],
+      },
+    },
+    report,
+  );
   assert.equal(result.editorialCandidates[0]?.teamId, "t");
   assert.equal(result.editorialCandidates[0]?.kind, "injury");
   assert.equal(result.editorialCandidates[0]?.metrics[0]?.value, 90);
-  assert.match(
-    result.editorialCandidates[0].summary,
-    /first available observation/,
-  );
+  assert.match(result.editorialCandidates[0].summary, /newly observed/);
+  assert.equal(result.editorialCandidates[0]?.importance, 65);
   assert.equal(packet.editorialCandidates.length, 0);
 });
 
@@ -76,7 +85,7 @@ void test("unchanged injuries are tracked but not pitched again", () => {
   assert.equal(next.injurySnapshot?.observations.length, 1);
 });
 
-void test("a changed return estimate produces fresh evidence without claiming recovery", () => {
+void test("a changed distant return estimate does not become a story", () => {
   const first = enrichEditionWithInjuries(packet, context, report);
   const result = enrichEditionWithInjuries(
     packet,
@@ -87,15 +96,93 @@ void test("a changed return estimate produces fresh evidence without claiming re
       injuries: [{ ...report.injuries[0]!, returnDate: "2026-11-01" }],
     },
   );
-  assert.equal(result.editorialCandidates.length, 1);
+  assert.equal(result.editorialCandidates.length, 0);
+  assert.equal(
+    result.injurySnapshot?.observations[0]?.returnDate,
+    "2026-11-01",
+  );
+});
+
+void test("first observations and feed refreshes do not prove a recent injury", () => {
+  assert.equal(
+    enrichEditionWithInjuries(packet, context, report).editorialCandidates
+      .length,
+    0,
+  );
+  const first = enrichEditionWithInjuries(packet, context, report);
+  const refreshed = enrichEditionWithInjuries(
+    packet,
+    { ...context, previous: first.injurySnapshot! },
+    {
+      ...report,
+      fetchedAt: report.fetchedAt + 86400000,
+      sourceUpdatedAt: "2026-09-28T12:00Z",
+      injuries: [
+        {
+          ...report.injuries[0]!,
+          updatedAt: "2026-09-28T12:00Z",
+          description: "Updated description",
+        },
+      ],
+    },
+  );
+  assert.equal(refreshed.editorialCandidates.length, 0);
+  for (const updatedAt of [null, "invalid", "2026-06-01", "2026-10-15"]) {
+    assert.equal(
+      enrichEditionWithInjuries(
+        packet,
+        {
+          ...context,
+          previous: { ...first.injurySnapshot!, observations: [] },
+        },
+        {
+          ...report,
+          fetchedAt: report.fetchedAt + 86400000,
+          injuries: [{ ...report.injuries[0]!, updatedAt }],
+        },
+      ).editorialCandidates.length,
+      0,
+    );
+  }
+});
+
+void test("an old absence can become relevant for a near-term return, without repeating it", () => {
+  const near = {
+    ...report,
+    injuries: [
+      {
+        ...report.injuries[0]!,
+        updatedAt: "2026-06-01",
+        returnDate: "2026-09-30",
+      },
+    ],
+  };
+  const first = enrichEditionWithInjuries(packet, context, near);
+  assert.equal(first.editorialCandidates.length, 1);
   assert.match(
-    result.editorialCandidates[0]!.summary,
-    /Estimated return: 2026-11-01/,
+    first.editorialCandidates[0]!.summary,
+    /outlook, not a confirmed return/,
   );
-  assert.doesNotMatch(
-    result.editorialCandidates[0]!.summary,
-    /recorded an NHL appearance/,
+  assert.equal(
+    enrichEditionWithInjuries(
+      packet,
+      { ...context, previous: first.injurySnapshot! },
+      { ...near, fetchedAt: report.fetchedAt + 86400000 },
+    ).editorialCandidates.length,
+    0,
   );
+  const later = {
+    ...report,
+    injuries: [{ ...report.injuries[0]!, returnDate: "2026-10-05" }],
+  };
+  const before = enrichEditionWithInjuries(packet, context, later);
+  assert.equal(before.editorialCandidates.length, 0);
+  const enteredWindow = enrichEditionWithInjuries(
+    packet,
+    { ...context, previous: before.injurySnapshot! },
+    { ...later, fetchedAt: report.fetchedAt + 86400000 },
+  );
+  assert.equal(enteredWindow.editorialCandidates.length, 1);
 });
 
 void test("missing from ESPN alone is not a return; later recorded appearance is", () => {

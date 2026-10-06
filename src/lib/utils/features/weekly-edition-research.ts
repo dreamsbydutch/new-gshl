@@ -3,6 +3,96 @@ import type {
   WeeklyEditionFactPacket,
   WeeklyEditionResearch,
 } from "@gshl-types";
+import type { MatchupCategoryComparison } from "../../types/matchup-preview-article";
+
+/** Compare a shared completed week or explicitly labeled preseason estimates. */
+export function buildMatchupCategoryComparison(options: {
+  basis?: MatchupCategoryComparison["basis"];
+  homeTeamId: string;
+  awayTeamId: string;
+  homeTeamName: string;
+  awayTeamName: string;
+  startDate: string;
+  endDate: string;
+  rows: {
+    gshlTeamId: string;
+    stats: Record<string, unknown>;
+    rosterSize?: number;
+    goalieQualification?: number;
+  }[];
+}): MatchupCategoryComparison | undefined {
+  const numeric = (value: unknown) =>
+    typeof value === "number" || (typeof value === "string" && value.trim())
+      ? Number.isFinite(Number(value))
+        ? Number(value)
+        : null
+      : null;
+  const basis = options.basis ?? "completed_week";
+  const played = options.rows.filter((row) =>
+    basis === "preseason_projection"
+      ? (row.rosterSize ?? 0) > 0
+      : (numeric(row.stats.GP) ?? 0) > 0,
+  );
+  const home = played.find((row) => row.gshlTeamId === options.homeTeamId);
+  const away = played.find((row) => row.gshlTeamId === options.awayTeamId);
+  if (!home || !away) return undefined;
+  const categories = [
+    "G",
+    "A",
+    "P",
+    "PPP",
+    "SOG",
+    "HIT",
+    "BLK",
+    "W",
+    "GAA",
+    "SVP",
+  ].flatMap((category) => {
+    const homeValue = numeric(home.stats[category]);
+    const awayValue = numeric(away.stats[category]);
+    if (homeValue === null || awayValue === null) return [];
+    const lowerIsBetter = category === "GAA";
+    const values = played.flatMap((row) => {
+      const value = numeric(row.stats[category]);
+      return value === null ? [] : [value];
+    });
+    const rank = (value: number) =>
+      1 +
+      values.filter((other) => (lowerIsBetter ? other < value : other > value))
+        .length;
+    return [
+      {
+        category,
+        homeValue,
+        awayValue,
+        homeRank: rank(homeValue),
+        awayRank: rank(awayValue),
+        rankedTeams: values.length,
+        lowerIsBetter,
+      },
+    ];
+  });
+  if (!categories.length) return undefined;
+  return {
+    basis,
+    startDate: options.startDate,
+    endDate: options.endDate,
+    homeTeamName: options.homeTeamName,
+    awayTeamName: options.awayTeamName,
+    ...(basis === "preseason_projection"
+      ? {
+          homeGoalieQualification: home.goalieQualification,
+          awayGoalieQualification: away.goalieQualification,
+        }
+      : {}),
+    categories,
+    note:
+      (basis === "preseason_projection"
+        ? "Current-roster preseason projections from the existing league model, not recorded results or a schedule-specific forecast. Category values and ranks are estimated weekly production; goalieQualification is the modeled probability of meeting the appearance minimum, not a guarantee. "
+        : "Recorded GSHL team production in one completed week, not a forecast or season-long identity. ") +
+      "Compare relative league strength and the two opponents separately. Ranks cover only the supplied teams with valid category values, which may be fewer than the full league. Similar totals identify possible battlegrounds, not guaranteed ties. Both teams can be weak in a category that still decides their matchup. Playing volume and roster changes can affect totals; do not infer a sustained trend or project an exact score from ranks. Goalie ratios do not establish that the upcoming two-appearance minimum will be met.",
+  };
+}
 
 export function teamResultEvidence(
   teams: { teamId: string; name: string }[],
@@ -186,13 +276,20 @@ export function researchCandidates(
       id: `upcoming:${matchup.matchupId}`,
       kind: "upcoming_matchup",
       scope: "week",
-      importance: 66,
+      importance:
+        packet.issueType === "weekly"
+          ? matchup.categoryComparison
+            ? 54
+            : 45
+          : matchup.categoryComparison
+            ? 82
+            : 66,
       occurredAt: matchup.startDate,
       relatedTeamIds: [matchup.homeTeamId, matchup.awayTeamId].filter(
         (id): id is string => Boolean(id),
       ),
       headlineHint: `${matchup.awayTeamName} at ${matchup.homeTeamName}`,
-      summary: `Scheduled, not a completed result: ${matchup.awayTeamName} at ${matchup.homeTeamName}${matchup.startDate ? `, week beginning ${matchup.startDate}` : ""}. ${owners.map((owner) => `${owner.name} manages ${owner.teamName}`).join("; ")}.`,
+      summary: `Scheduled, not a completed result: ${matchup.awayTeamName} at ${matchup.homeTeamName}${matchup.startDate ? `, week beginning ${matchup.startDate}` : ""}. ${owners.map((owner) => `${owner.name} manages ${owner.teamName}`).join("; ")}.${matchup.categoryComparison ? ` Category scouting context: ${JSON.stringify(matchup.categoryComparison)}` : ""}`,
       metrics: [],
       links: [],
     });

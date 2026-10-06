@@ -6,6 +6,8 @@ import type {
 } from "../../src/lib/types/matchup-preview-article";
 import { utcTimestampToDateKey } from "./timestamps";
 import { FRANCHISE_BEAT_WRITERS_BY_LEGACY_ID } from "./reporterDirectory";
+import { buildMatchupCategoryComparison } from "../../src/lib/utils/features/weekly-edition-research";
+import { preseasonPower } from "./preseasonPower";
 
 const DAY = 86400000;
 const RECENT_FORM_DAYS = 60;
@@ -186,6 +188,76 @@ export async function loadMatchupPreviewEvidence(
     teamEvidence(ctx, opponent, now),
   ]);
   if (!own || !other || !own.writer) return null;
+  const weeks = await ctx.db
+    .query("weeks")
+    .withIndex("by_seasonId", (q) => q.eq("seasonId", team.seasonId))
+    .collect();
+  const completedWeek = [...weeks]
+    .filter((week) => {
+      const end = utcTimestampToDateKey(week.endDate);
+      const start = utcTimestampToDateKey(week.startDate);
+      return (
+        end &&
+        end < utcTimestampToDateKey(now)! &&
+        start &&
+        own.results.some((result) => result.date === start) &&
+        other.results.some((result) => result.date === start)
+      );
+    })
+    .sort((a, b) =>
+      utcTimestampToDateKey(b.endDate)!.localeCompare(
+        utcTimestampToDateKey(a.endDate)!,
+      ),
+    )[0];
+  const [weekStats, weekMatchups] = completedWeek
+    ? await Promise.all([
+        ctx.db
+          .query("teamWeekStatLines")
+          .withIndex("by_weekId", (q) => q.eq("weekId", completedWeek._id))
+          .collect(),
+        ctx.db
+          .query("matchups")
+          .withIndex("by_weekId", (q) => q.eq("weekId", completedWeek._id))
+          .collect(),
+      ])
+    : [[], []];
+  const completedTeams = new Set(
+    weekMatchups
+      .filter(final)
+      .flatMap((row) => [row.homeTeamId, row.awayTeamId]),
+  );
+  const preseasonRows = completedWeek
+    ? []
+    : await preseasonPower(ctx, team.seasonId);
+  const categoryComparison =
+    completedWeek || preseasonRows.length
+      ? buildMatchupCategoryComparison({
+          homeTeamId: String(matchup.homeTeamId),
+          awayTeamId: String(matchup.awayTeamId),
+          homeTeamName: matchup.homeTeamId === teamId ? own.name : other.name,
+          awayTeamName: matchup.homeTeamId === teamId ? other.name : own.name,
+          basis: completedWeek ? "completed_week" : "preseason_projection",
+          startDate: utcTimestampToDateKey(
+            completedWeek ? completedWeek.startDate : now,
+          )!,
+          endDate: utcTimestampToDateKey(
+            completedWeek ? completedWeek.endDate : now,
+          )!,
+          rows: completedWeek
+            ? weekStats
+                .filter((row) => completedTeams.has(row.gshlTeamId))
+                .map((row) => ({
+                  gshlTeamId: String(row.gshlTeamId),
+                  stats: row,
+                }))
+            : preseasonRows.map((row) => ({
+                gshlTeamId: row.teamId,
+                stats: row.projectedWeeklyStats,
+                rosterSize: row.rosterSize,
+                goalieQualification: row.goalieQualification,
+              })),
+        })
+      : undefined;
   const meetings = own.results.filter((row) =>
     other.teamIds.has(row.opponentTeamId),
   );
@@ -212,6 +284,11 @@ export async function loadMatchupPreviewEvidence(
       }),
     },
   ];
+  if (categoryComparison)
+    facts.push({
+      id: "category-comparison",
+      text: JSON.stringify(categoryComparison),
+    });
   for (const [label, data] of [
     ["team", own],
     ["opponent", other],

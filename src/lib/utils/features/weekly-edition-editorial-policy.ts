@@ -14,6 +14,7 @@ import {
   buildWeeklyEditionArticleSlots,
   DEFAULT_WEEKLY_EDITION_ARTICLE_COUNT,
 } from "./weekly-edition-articles";
+import { matchupPreviewWriterProfile } from "./matchup-preview-articles";
 
 function stableValue(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(stableValue);
@@ -97,13 +98,19 @@ export function buildWeeklyEditionEditorialFocus(
     packet.issueType === "preseason" || packet.issueType === "weekly";
   return [
     "Roster membership and GSHL contract status are different. Drafted and otherwise rostered players matter equally to playing strength whether or not they have a contract. Do not call a rostered player a free agent, assume every player needs a contract, or assume an unsigned player will eventually sign one.",
-    rosterCoverage
-      ? "For preseason and weekly editions, prioritize the actual players, roster strengths and weaknesses, player and team ratings, category matchups, results, form, and upcoming opponents. Discover stories within that coverage rather than assigning every team the same angle. Grounded forecasts are welcome."
-      : "Match the reporting to this edition's stage: re-signing and offseason editions may examine cap space, renewal choices, and keeper planning; draft coverage should explain the player pool and meaningful selections; final recaps should explain results.",
+    packet.issueType === "weekly"
+      ? "WEEKLY RECAP: This Press Box edition primarily explains the previous completed week: results, decisive category battles, upsets, standout performances, and their supported standings or team-form consequences. Lead with what happened and why, using recorded category margins rather than projecting them. Full upcoming matchup previews belong on the matchup page. At most one article in this edition may use upcoming_matchup evidence, whether as its lead or support. Other articles must stay centered on completed-week developments; do not turn their closing paragraphs into unassigned previews. Predictions remain required for that one forward-looking assignment, and late-season award picks remain welcome. When there are no completed results, report that limitation and cover available developments without inventing games or filling the edition with previews."
+      : packet.issueType === "preseason"
+        ? "For preseason editions, prioritize the actual players, roster strengths and weaknesses, player and team ratings, category matchups, and upcoming opponents. Discover stories within that coverage rather than assigning every team the same angle. Grounded forecasts are welcome."
+        : "Match the reporting to this edition's stage: re-signing and offseason editions may examine cap space, renewal choices, and keeper planning; draft coverage should explain the player pool and meaningful selections; final recaps should explain results.",
     rosterCoverage
       ? "Cap space is not a measure of playing strength, depth, contention, or ability to field a roster. Do not build a preseason or weekly story around cap balances, routine expiries, or hypothetical keeper spending. Discuss cap only when explaining a concrete, evidence-supported trade-market situation, and keep the focus on its player and roster consequences. A scheduled matchup alone does not make cap space relevant."
       : "Cap space is relevant to re-signing, offseason keeper planning, and supported trade-market decisions. It does not measure the quality of a completed playing roster.",
     "The presence of a financial field in the facts is not a reason to cover it. A brief, relevant trade explanation is allowed; a repeated cap-space angle across roster previews is outside the edition's scope.",
+    "BIG PICTURE: For team and matchup coverage, establish the overall roster or category comparison first. In recaps, explain how the recorded strengths, weaknesses and decisive category margins produced the result; a close category can explain the turning point, but do not invent a play-by-play from aggregate totals. In previews, explain each team's supported strengths, shared strengths or weaknesses, the contested categories, and plausible routes to winning. Distinguish strength relative to the league from an advantage against this opponent. Use players as evidence for the team argument; do not build the article around a backup goalie, bench option or isolated player comparison unless it materially changes that argument. Keep story angles varied rather than reciting every category.",
+    "INJURY RELEVANCE: An injury may lead only for a supported recently observed major absence, a documented return in the last seven days, or an estimated return within the next seven days, with a meaningful team or upcoming-matchup consequence. An old absence, revised description, fresh feed timestamp or first observation does not establish a new injury. Otherwise keep availability as brief supporting context, and avoid repeating the same injury across articles.",
+    "READER LANGUAGE: Sources, feed timestamps, evidence IDs and exact numerical player, roster and GM ratings are internal reporting context. Do not name ESPN or explain where injury data came from in article prose. Translate ratings into supported plain-language comparisons such as stronger scoring, deeper roster or a leading contributor; do not print raw rating values or repeated rating decimals. Concrete category statistics, scores and useful league ranks may appear when they explain the story.",
+    "RECORDS AND AWARDS: Give fresh, supported record-setting performances space, including the statistic, previous benchmark and exact comparison scope. A weekly high within stored comparable weeks is not a verified all-time record. Distinguish a tied benchmark from a new high. When late-season award_race evidence is supplied, cover the leaders, challengers and what could decide the race; make a reasoned award pick. Rocket, Hart, Norris and Vezina here are GSHL team awards, not NHL player trophies. Use the supplied league criteria, statistics and useful award ranks, keeping numerical rating scores internal. Do not manufacture a close race, a gap, or a clinch, or treat a current leader as a winner.",
   ].join("\n");
 }
 
@@ -277,12 +284,13 @@ function weeklyEditionAuthorProfile(author: WeeklyEditionAuthor) {
     };
   }
   if (author.scope === "team") {
+    const writerProfile = matchupPreviewWriterProfile(author.name);
     return {
       scoutsFor: `Results, roster moves, contracts, player performances, matchup trends, and decisions specifically centered on ${author.teamName ?? "the assigned team"}.`,
       passesOn:
         "League-wide stories where the assigned team is incidental, plus claims that require another club's private perspective.",
-      voice:
-        "Close to the beat, not promotional. Use the team-specific detail another desk might miss, acknowledge the opposing evidence, and explain the next local consequence.",
+      voice: `${writerProfile.voice} ${writerProfile.primaryLens} ${writerProfile.teamBias} ${writerProfile.forecastTemperament} Close to the beat, not promotional. Acknowledge opposing evidence and explain the next local consequence.`,
+      writerProfile,
     };
   }
   return {
@@ -499,6 +507,19 @@ export function selectWeeklyEditionStoryAssignments(
   const candidatesById = new Map(
     candidates.map((candidate) => [candidate.id, candidate]),
   );
+  const usesUpcomingMatchup = (story: {
+    leadCandidateId: string;
+    supportingCandidateIds: string[];
+  }) =>
+    [story.leadCandidateId, ...story.supportingCandidateIds].some(
+      (id) => candidatesById.get(id)?.kind === "upcoming_matchup",
+    );
+  let previewCount =
+    revision.retainedAssignments.filter(usesUpcomingMatchup).length;
+  if (packet.issueType === "weekly" && previewCount > 1)
+    throw new Error(
+      "A weekly recap may retain at most one upcoming matchup story",
+    );
   const seenPitchIds = new Set<string>();
   const previouslyUsedEvidence = new Set(
     packet.research?.recentCoverage.flatMap(
@@ -576,13 +597,59 @@ export function selectWeeklyEditionStoryAssignments(
     if (lead) kindCounts.set(lead.kind, (kindCounts.get(lead.kind) ?? 0) + 1);
   }
   const requiredPitches = articleSlots.length - retained.size;
-  const takePitches = (enforceMix: boolean) => {
+  const priorityKinds = ["record", "award_race"] as const;
+  const priorityGroups = priorityKinds.map((kind) =>
+    candidates.filter(
+      (candidate) =>
+        candidate.kind === kind &&
+        !excludedLeads.has(candidate.id) &&
+        !previouslyUsedEvidence.has(hashWeeklyEditionSource(candidate)),
+    ),
+  );
+  for (const group of priorityGroups) {
+    if (
+      !group.length ||
+      group.some((candidate) => usedEvidence.has(candidate.id))
+    )
+      continue;
+    if (
+      !eligible.some((pitch) =>
+        group.some(
+          (candidate) =>
+            candidate.id === pitch.leadCandidateId ||
+            pitch.supportingCandidateIds.includes(candidate.id),
+        ),
+      )
+    ) {
+      throw new Error(
+        `The pitch desk must cover a fresh ${group[0]!.kind} from the supplied evidence`,
+      );
+    }
+  }
+  const takePitches = (
+    enforceMix: boolean,
+    priorityGroup?: typeof candidates,
+  ) => {
     for (const pitch of eligible) {
       if (selected.length === requiredPitches) break;
+      if (priorityGroup) {
+        if (priorityGroup.some((candidate) => usedEvidence.has(candidate.id)))
+          break;
+        if (
+          !priorityGroup.some(
+            (candidate) =>
+              candidate.id === pitch.leadCandidateId ||
+              pitch.supportingCandidateIds.includes(candidate.id),
+          )
+        )
+          continue;
+      }
       const authorKey = weeklyEditionAuthorKey(pitch.author);
       const teamId = pitch.lead.teamId;
       const kind = pitch.lead.kind;
+      const isPreview = usesUpcomingMatchup(pitch);
       if (
+        (packet.issueType === "weekly" && isPreview && previewCount >= 1) ||
         usedAuthors.has(authorKey) ||
         usedLeadCandidates.has(pitch.leadCandidateId) ||
         (usedEvidence.has(pitch.leadCandidateId) &&
@@ -595,6 +662,7 @@ export function selectWeeklyEditionStoryAssignments(
         continue;
       }
       selected.push(pitch);
+      if (isPreview) previewCount++;
       usedAuthors.add(authorKey);
       usedLeadCandidates.add(pitch.leadCandidateId);
       usedEvidence.add(pitch.leadCandidateId);
@@ -603,13 +671,26 @@ export function selectWeeklyEditionStoryAssignments(
       kindCounts.set(kind, (kindCounts.get(kind) ?? 0) + 1);
     }
   };
+  for (const group of priorityGroups)
+    if (group.length) takePitches(true, group);
   takePitches(true);
   takePitches(false);
   if (selected.length < requiredPitches) {
     throw new Error(
-      `The pitch desk found only ${selected.length + retained.size} distinct, eligible stories; ${articleCount} are required`,
+      `The pitch desk found only ${selected.length + retained.size} distinct, eligible stories; ${articleCount} are required${packet.issueType === "weekly" ? "; weekly recaps allow at most one upcoming matchup story, including supporting evidence" : ""}`,
     );
   }
+
+  for (const group of priorityGroups) {
+    if (
+      group.length &&
+      !group.some((candidate) => usedEvidence.has(candidate.id))
+    )
+      throw new Error(
+        `The pitch desk needs distinct eligible writers to cover a fresh ${group[0]!.kind}`,
+      );
+  }
+  selected.sort((left, right) => right.editorialScore - left.editorialScore);
 
   let replacementIndex = 0;
   return articleSlots.map((slot) => {

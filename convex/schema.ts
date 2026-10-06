@@ -655,6 +655,7 @@ export default defineSchema({
     matchupId: v.id("matchups"),
     teamId: v.id("teams"),
     startsAt: v.number(),
+    expiresAt: v.optional(v.number()),
     status: v.union(
       v.literal("generating"),
       v.literal("published"),
@@ -671,7 +672,8 @@ export default defineSchema({
     failure: v.optional(v.string()),
   })
     .index("by_matchupId_teamId", ["matchupId", "teamId"])
-    .index("by_startsAt", ["startsAt"]),
+    .index("by_startsAt", ["startsAt"])
+    .index("by_expiresAt", ["expiresAt"]),
 
   events: table(
     {

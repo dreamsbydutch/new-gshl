@@ -78,6 +78,7 @@ import type * as tradeBlock from "../tradeBlock.js";
 import type * as ufa from "../ufa.js";
 import type * as ufaOdds from "../ufaOdds.js";
 import type * as weeklyEditionBackfill from "../weeklyEditionBackfill.js";
+import type * as weeklyEditionRecords from "../weeklyEditionRecords.js";
 import type * as weeklyEditions from "../weeklyEditions.js";
 import type * as yahoo from "../yahoo.js";
 import type * as yahooBackfill from "../yahooBackfill.js";
@@ -161,6 +162,7 @@ declare const fullApi: ApiFromModules<{
   ufa: typeof ufa;
   ufaOdds: typeof ufaOdds;
   weeklyEditionBackfill: typeof weeklyEditionBackfill;
+  weeklyEditionRecords: typeof weeklyEditionRecords;
   weeklyEditions: typeof weeklyEditions;
   yahoo: typeof yahoo;
   yahooBackfill: typeof yahooBackfill;

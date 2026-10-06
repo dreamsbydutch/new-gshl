@@ -18,8 +18,11 @@ import {
   easternHour,
   isPreviewDue,
   matchupPreviewStartsAt,
+  matchupPreviewExpiresAt,
   parseMatchupPreviewArticle,
   PREVIEW_WINDOW_MS,
+  matchupPreviewAnalysisIsDuplicate,
+  MatchupPreviewDuplicateAnalysisError,
 } from "../src/lib/utils/features/matchup-preview-articles";
 import {
   extractWeeklyEditionOpenAiText,
@@ -33,19 +36,14 @@ async function windowFor(
   matchupId: Id<"matchups">,
 ) {
   const matchup = await ctx.db.get(matchupId);
-  if (
-    !matchup ||
-    matchup.isComplete ||
-    matchup.homeWin ||
-    matchup.awayWin ||
-    matchup.tie
-  )
-    return null;
+  if (!matchup) return null;
   const week = await ctx.db.get(matchup.weekId);
-  const startsAt = matchupPreviewStartsAt(
-    utcTimestampToDateKey(week?.startDate),
-  );
-  return startsAt === null ? null : { matchup, startsAt };
+  const date = utcTimestampToDateKey(week?.startDate);
+  const startsAt = matchupPreviewStartsAt(date);
+  const expiresAt = matchupPreviewExpiresAt(date);
+  return startsAt === null || expiresAt === null
+    ? null
+    : { matchup, startsAt, expiresAt };
 }
 
 /** Public copy only. Expired articles stay hidden even if cleanup is delayed. */
@@ -55,7 +53,7 @@ export const forMatchup = query({
     const id = ctx.db.normalizeId("matchups", args.matchupId);
     if (!id) return [];
     const window = await windowFor(ctx, id);
-    if (!window || window.startsAt <= Date.now()) return [];
+    if (!window || window.expiresAt <= Date.now()) return [];
     const rows = await ctx.db
       .query("matchupPreviews")
       .withIndex("by_matchupId_teamId", (q) => q.eq("matchupId", id))
@@ -89,16 +87,19 @@ async function removeIfExpired(ctx: MutationCtx, id: Id<"matchupPreviews">) {
   const window = await windowFor(ctx, row.matchupId);
   if (
     !window ||
-    window.startsAt <= Date.now() ||
+    window.expiresAt <= Date.now() ||
     ![window.matchup.homeTeamId, window.matchup.awayTeamId].includes(row.teamId)
   ) {
     await ctx.db.delete(id);
     return;
   }
-  // A rescheduled matchup keeps its article until the new start.
-  await ctx.db.patch(id, { startsAt: window.startsAt });
+  // Also upgrades legacy rows when their old start-time expiry job runs.
+  await ctx.db.patch(id, {
+    startsAt: window.startsAt,
+    expiresAt: window.expiresAt,
+  });
   await ctx.scheduler.runAfter(
-    window.startsAt - Date.now(),
+    window.expiresAt - Date.now(),
     internal.matchupPreviews.expire,
     { id },
   );
@@ -114,10 +115,17 @@ export const cleanup = internalMutation({
   handler: async (ctx): Promise<void> => {
     const rows = await ctx.db
       .query("matchupPreviews")
-      .withIndex("by_startsAt", (q) => q.lte("startsAt", Date.now()))
+      .withIndex("by_expiresAt", (q) =>
+        q.gte("expiresAt", 0).lte("expiresAt", Date.now()),
+      )
+      .take(100);
+    const legacy = await ctx.db
+      .query("matchupPreviews")
+      .withIndex("by_expiresAt", (q) => q.eq("expiresAt", undefined))
       .take(100);
     for (const row of rows) await removeIfExpired(ctx, row._id);
-    if (rows.length === 100)
+    for (const row of legacy) await removeIfExpired(ctx, row._id);
+    if (rows.length === 100 || legacy.length === 100)
       await ctx.scheduler.runAfter(0, internal.matchupPreviews.cleanup, {});
   },
 });
@@ -142,7 +150,15 @@ export const scan = internalMutation({
       const startsAt = matchupPreviewStartsAt(
         utcTimestampToDateKey(week.startDate),
       );
-      if (!isPreviewDue(startsAt, now) || startsAt === null) continue;
+      const expiresAt = matchupPreviewExpiresAt(
+        utcTimestampToDateKey(week.startDate),
+      );
+      if (
+        !isPreviewDue(startsAt, now) ||
+        startsAt === null ||
+        expiresAt === null
+      )
+        continue;
       const matchups = await ctx.db
         .query("matchups")
         .withIndex("by_weekId", (q) => q.eq("weekId", week._id))
@@ -155,10 +171,11 @@ export const scan = internalMutation({
           matchup.tie
         )
           continue;
-        for (const teamId of new Set([
-          matchup.homeTeamId,
-          matchup.awayTeamId,
-        ])) {
+        const teamIds = [matchup.homeTeamId, matchup.awayTeamId];
+        // Rotate who writes first; the other writer keeps an independent club perspective.
+        if (Number(week.weekNum) % 2 === 0) teamIds.reverse();
+        const claimed: Id<"matchupPreviews">[] = [];
+        for (const teamId of new Set(teamIds)) {
           const existing = await ctx.db
             .query("matchupPreviews")
             .withIndex("by_matchupId_teamId", (q) =>
@@ -175,6 +192,7 @@ export const scan = internalMutation({
             matchupId: matchup._id,
             teamId,
             startsAt,
+            expiresAt,
             status: "generating" as const,
             attemptAt: now,
           };
@@ -182,17 +200,20 @@ export const scan = internalMutation({
             existing?._id ?? (await ctx.db.insert("matchupPreviews", values));
           if (existing)
             await ctx.db.patch(id, { ...values, failure: undefined });
+          claimed.push(id);
           await ctx.scheduler.runAfter(
-            queued++ * 5000,
-            internal.matchupPreviews.generate,
-            { id, attemptAt: now },
-          );
-          await ctx.scheduler.runAfter(
-            startsAt - now,
+            expiresAt - now,
             internal.matchupPreviews.expire,
             { id },
           );
         }
+        // finish chains the second writer after the first settles, so the pair can be reviewed.
+        if (claimed[0])
+          await ctx.scheduler.runAfter(
+            queued++ * 10000,
+            internal.matchupPreviews.generate,
+            { id: claimed[0], attemptAt: now },
+          );
       }
     }
   },
@@ -207,19 +228,49 @@ export const evidence = internalQuery({
     const window = await windowFor(ctx, row.matchupId);
     if (
       !window ||
+      window.matchup.isComplete ||
+      window.matchup.homeWin ||
+      window.matchup.awayWin ||
+      window.matchup.tie ||
       !isPreviewDue(window.startsAt, Date.now()) ||
       ![window.matchup.homeTeamId, window.matchup.awayTeamId].includes(
         row.teamId,
       )
     )
       return null;
-    return loadMatchupPreviewEvidence(
+    const packet = await loadMatchupPreviewEvidence(
       ctx,
       window.matchup,
       row.teamId,
       window.startsAt,
       Date.now(),
     );
+    if (!packet) return null;
+    const opponentId =
+      row.teamId === window.matchup.homeTeamId
+        ? window.matchup.awayTeamId
+        : window.matchup.homeTeamId;
+    const opposing = await ctx.db
+      .query("matchupPreviews")
+      .withIndex("by_matchupId_teamId", (q) =>
+        q.eq("matchupId", row.matchupId).eq("teamId", opponentId),
+      )
+      .unique();
+    return {
+      ...packet,
+      ...(opposing?.status === "published" &&
+      opposing.writer &&
+      opposing.headline &&
+      opposing.paragraphs
+        ? {
+            opposingArticle: {
+              writer: opposing.writer,
+              headline: opposing.headline,
+              paragraphs: opposing.paragraphs,
+            },
+          }
+        : {}),
+    };
   },
 });
 
@@ -243,7 +294,7 @@ export const finish = internalMutation({
     const window = await windowFor(ctx, row.matchupId);
     if (
       !window ||
-      window.startsAt <= Date.now() ||
+      window.expiresAt <= Date.now() ||
       ![window.matchup.homeTeamId, window.matchup.awayTeamId].includes(
         row.teamId,
       )
@@ -251,10 +302,41 @@ export const finish = internalMutation({
       await ctx.db.delete(row._id);
       return;
     }
-    if (!isPreviewDue(window.startsAt, Date.now())) {
+    if (
+      window.matchup.isComplete ||
+      window.matchup.homeWin ||
+      window.matchup.awayWin ||
+      window.matchup.tie ||
+      !isPreviewDue(window.startsAt, Date.now())
+    ) {
       await ctx.db.patch(row._id, {
         status: "failed",
-        failure: "Matchup moved outside the preview window",
+        failure: "Pregame writing window has closed or the matchup moved",
+      });
+      return;
+    }
+    const opponentId =
+      row.teamId === window.matchup.homeTeamId
+        ? window.matchup.awayTeamId
+        : window.matchup.homeTeamId;
+    const opposing = await ctx.db
+      .query("matchupPreviews")
+      .withIndex("by_matchupId_teamId", (q) =>
+        q.eq("matchupId", row.matchupId).eq("teamId", opponentId),
+      )
+      .unique();
+    if (
+      args.article &&
+      opposing?.status === "published" &&
+      opposing.paragraphs &&
+      matchupPreviewAnalysisIsDuplicate(
+        args.article.paragraphs,
+        opposing.paragraphs,
+      )
+    ) {
+      await ctx.db.patch(row._id, {
+        status: "failed",
+        failure: "Preview repeats opposing analysis; will retry overnight",
       });
       return;
     }
@@ -272,6 +354,14 @@ export const finish = internalMutation({
             failure: "Preview could not be written; will retry overnight",
           },
     );
+    if (
+      opposing?.status === "generating" &&
+      opposing.attemptAt === args.attemptAt
+    )
+      await ctx.scheduler.runAfter(0, internal.matchupPreviews.generate, {
+        id: opposing._id,
+        attemptAt: opposing.attemptAt,
+      });
   },
 });
 
@@ -288,26 +378,53 @@ export const generate = internalAction({
         await ctx.runMutation(internal.matchupPreviews.finish, args);
         return;
       }
-      const response = await fetch("https://api.openai.com/v1/responses", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(
-          buildMatchupPreviewRequest(
-            resolveNewsroomModel(undefined, process.env.OPENAI_NEWSROOM_MODEL),
-            packet,
+      let rejectedArticle:
+        | { headline: string; paragraphs: string[] }
+        | undefined;
+      let article: ReturnType<typeof parseMatchupPreviewArticle> | undefined;
+      for (let attempt = 0; attempt < 2; attempt++) {
+        const response = await fetch("https://api.openai.com/v1/responses", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(
+            buildMatchupPreviewRequest(
+              resolveNewsroomModel(
+                undefined,
+                process.env.OPENAI_NEWSROOM_MODEL,
+              ),
+              packet,
+              rejectedArticle,
+            ),
           ),
-        ),
-        signal: AbortSignal.timeout(90000),
-      });
-      if (!response.ok) throw new Error("Preview generation failed");
-      const payload: unknown = await response.json();
-      const article = parseMatchupPreviewArticle(
-        extractWeeklyEditionOpenAiText(payload),
-        packet,
-      );
+          signal: AbortSignal.timeout(90000),
+        });
+        if (!response.ok) throw new Error("Preview generation failed");
+        const payload: unknown = await response.json();
+        const text = extractWeeklyEditionOpenAiText(payload);
+        try {
+          article = parseMatchupPreviewArticle(text, packet);
+          break;
+        } catch (error) {
+          if (
+            !(error instanceof MatchupPreviewDuplicateAnalysisError) ||
+            attempt > 0
+          )
+            throw error;
+          const draft = parseMatchupPreviewArticle(text, {
+            ...packet,
+            opposingArticle: undefined,
+          });
+          rejectedArticle = {
+            headline: draft.headline,
+            paragraphs: draft.paragraphs.slice(0, -1),
+          };
+        }
+      }
+      if (!article)
+        throw new Error("Preview could not be written independently");
       const used = new Set(article.evidenceIds);
       await ctx.runMutation(internal.matchupPreviews.finish, {
         ...args,

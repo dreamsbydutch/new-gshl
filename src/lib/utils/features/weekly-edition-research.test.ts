@@ -5,6 +5,7 @@ import {
   researchCandidates,
   selectResearchEvidence,
   weeklyStatComparisons,
+  buildMatchupCategoryComparison,
 } from "./weekly-edition-research";
 import type {
   WeeklyEditionFactPacket,
@@ -16,6 +17,98 @@ const seasons = [2020, 2021, 2022, 2023].map((year) => ({
   name: `Season ${year}`,
   year,
 }));
+
+void test("matchup scouting compares shared production, ranks ties equally and respects inverse goalie ratios", () => {
+  const options = {
+    homeTeamId: "a",
+    awayTeamId: "b",
+    homeTeamName: "Alpha",
+    awayTeamName: "Beta",
+    startDate: "2026-10-01",
+    endDate: "2026-10-07",
+    rows: [
+      { gshlTeamId: "a", stats: { GP: 20, G: 0, HIT: 40, GAA: 2, SVP: 0.92 } },
+      {
+        gshlTeamId: "b",
+        stats: { GP: "20", G: "0", HIT: 20, GAA: 3, SVP: 0.93 },
+      },
+      {
+        gshlTeamId: "c",
+        stats: { GP: 30, G: 10, HIT: 40, GAA: null, SVP: "" },
+      },
+      {
+        gshlTeamId: "unplayed",
+        stats: { GP: 0, G: 100, HIT: 100, GAA: 0, SVP: 1 },
+      },
+    ],
+  };
+  const original = structuredClone(options);
+  const result = buildMatchupCategoryComparison(options)!;
+  const goals = result.categories.find((row) => row.category === "G")!;
+  assert.equal(goals.homeValue, 0);
+  assert.equal(goals.homeRank, 2);
+  assert.equal(goals.awayRank, 2);
+  assert.equal(goals.rankedTeams, 3);
+  assert.equal(
+    result.categories.find((row) => row.category === "HIT")!.homeRank,
+    1,
+  );
+  const gaa = result.categories.find((row) => row.category === "GAA")!;
+  assert.equal(gaa.homeRank, 1);
+  assert.equal(gaa.awayRank, 2);
+  assert.equal(gaa.rankedTeams, 2);
+  assert.equal(gaa.lowerIsBetter, true);
+  assert.equal(
+    result.categories.find((row) => row.category === "SVP")!.awayRank,
+    1,
+  );
+  assert.match(result.note, /one completed week, not a forecast/);
+  assert.deepEqual(options, original);
+  assert.equal(
+    buildMatchupCategoryComparison({ ...options, awayTeamId: "unplayed" }),
+    undefined,
+  );
+  assert.equal(
+    buildMatchupCategoryComparison({
+      ...options,
+      rows: options.rows.map((row) => ({ ...row, stats: { GP: 2 } })),
+    }),
+    undefined,
+  );
+});
+
+void test("preseason scouting labels model estimates and omits empty rosters", () => {
+  const comparison = buildMatchupCategoryComparison({
+    basis: "preseason_projection",
+    homeTeamId: "a",
+    awayTeamId: "b",
+    homeTeamName: "Alpha",
+    awayTeamName: "Beta",
+    startDate: "2026-09-27",
+    endDate: "2026-09-27",
+    rows: [
+      {
+        gshlTeamId: "a",
+        rosterSize: 15,
+        goalieQualification: 0.9,
+        stats: { G: 12, GAA: 2 },
+      },
+      {
+        gshlTeamId: "b",
+        rosterSize: 15,
+        goalieQualification: 0.8,
+        stats: { G: 10, GAA: 3 },
+      },
+      { gshlTeamId: "empty", rosterSize: 0, stats: { G: 0, GAA: 0 } },
+    ],
+  })!;
+  assert.equal(comparison.basis, "preseason_projection");
+  assert.equal(comparison.homeGoalieQualification, 0.9);
+  assert.equal(comparison.categories[0]!.homeRank, 1);
+  assert.equal(comparison.categories[0]!.rankedTeams, 2);
+  assert.match(comparison.note, /not recorded results/);
+  assert.match(comparison.note, /modeled probability/);
+});
 
 void test("participation identifies gaps by league seasons and ignores future teams", () => {
   assert.deepEqual(
@@ -105,6 +198,16 @@ void test("research exposes a return and scheduled opponent without scripting th
   assert.match(candidates[1]!.summary, /rank 1/);
   assert.deepEqual(candidates[2]!.relatedTeamIds, ["a", "b"]);
   assert.match(candidates[2]!.summary, /Scheduled, not a completed result/);
+  assert.equal(candidates[2]!.importance, 66);
+  const weekly = researchCandidates(
+    { ...packet, issueType: "weekly" },
+    research,
+  );
+  assert.equal(
+    weekly[2]!.importance,
+    45,
+    "weekly recap evidence takes precedence over upcoming fixtures",
+  );
   assert.equal(
     candidates.some((candidate) =>
       /greeted|rivalry|revenge/.test(candidate.summary),

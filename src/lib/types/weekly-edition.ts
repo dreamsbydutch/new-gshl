@@ -1,4 +1,5 @@
 import type { EditionInjurySnapshot } from "./weekly-edition-injuries";
+import type { MatchupCategoryComparison } from "./matchup-preview-article";
 
 export type WeeklyEditionGenerationMode =
   | "template"
@@ -191,6 +192,7 @@ export interface WeeklyEditionMissedStartFact {
 }
 
 export interface WeeklyEditionNextMatchupFact {
+  categoryComparison?: MatchupCategoryComparison;
   matchupId: string;
   homeTeamId?: string;
   awayTeamId?: string;
@@ -309,6 +311,8 @@ export interface WeeklyEditionAwardFact {
   leaderName: string;
   leaderType: "player" | "team";
   nomineeNames: string[];
+  criteria?: string;
+  contenders?: { name: string; metrics: WeeklyEditionEditorialMetric[] }[];
 }
 
 export interface WeeklyEditionRecordObservation {

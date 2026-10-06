@@ -70,8 +70,17 @@ import {
   selectResearchEvidence,
   weeklyStatComparisons,
   teamResultEvidence,
+  buildMatchupCategoryComparison,
 } from "../src/lib/utils/features/weekly-edition-research";
 import { toUtcTimestamp, utcTimestampToDateKey } from "./lib/timestamps";
+import { preseasonPower } from "./lib/preseasonPower";
+import {
+  calculateTeamAwards,
+  calculatePlayerTrophyAwards,
+} from "./awardCalculations";
+import { isLateSeasonAwardWindow } from "../src/lib/utils/features/weekly-edition-highlights";
+import { recordNumber } from "../src/lib/utils/features/performance-records";
+import { enrichWeeklyEditionRecords } from "./weeklyEditionRecords";
 import {
   prepareEditionInjuryContext,
   addEditionInjuryReporting,
@@ -419,9 +428,9 @@ async function buildSource(
       ];
     }),
   );
-  // Historical records are materialized separately. Interactive generation
-  // must stay on indexed current-week/current-season reads to remain below
-  // Convex's one-second mutation limit.
+  // The AI action adds historical weekly record comparisons separately.
+  // Interactive generation stays on indexed current-week/current-season reads
+  // to remain below Convex's one-second mutation limit.
   const allTeamById = currentTeamContextById;
   const allTeamWeeks = currentPower;
   const teamSeasonRows = teamSeasonRowsForSeason;
@@ -956,13 +965,81 @@ async function buildSource(
   });
 
   const awardsAreFinal = dateKey(week.endDate) >= dateKey(season.endDate);
+  const coverAwardRaces =
+    !nextMatchups.some((matchup) => matchup.isComplete) &&
+    isLateSeasonAwardWindow(
+      dateKey(week.endDate),
+      weeks.map((row) => ({
+        startDate: dateKey(row.startDate),
+        endDate: dateKey(row.endDate),
+        isPlayoffs: row.isPlayoffs,
+      })),
+    );
+  const raceTeamAwards =
+    coverAwardRaces && !awardsAreFinal
+      ? calculateTeamAwards({
+          seasonId: String(season._id),
+          seasonLegacyId: season.legacyId,
+          teamSeasonRows: currentTeamSeasonRows,
+          teams,
+          franchises,
+          conferences,
+          matchups,
+          weeks,
+        })
+      : [];
+  const racePlayerAwards =
+    coverAwardRaces && !awardsAreFinal
+      ? calculatePlayerTrophyAwards({
+          seasonId: String(season._id),
+          seasonLegacyId: season.legacyId,
+          playerTotalRows: currentPlayerTotals,
+        })
+      : [];
+  const awardCriteria: Record<
+    string,
+    { label: string; field: string; criteria: string }
+  > = {
+    rocket: {
+      label: "Goals",
+      field: "G",
+      criteria: "GSHL team regular-season goals",
+    },
+    artRoss: {
+      label: "Points",
+      field: "P",
+      criteria: "GSHL team regular-season points",
+    },
+    hart: {
+      label: "Hart rank",
+      field: "hartRk",
+      criteria: "GSHL best-team award, ordered by the existing Hart ranking",
+    },
+    norris: {
+      label: "Norris rank",
+      field: "norrisRk",
+      criteria:
+        "GSHL team defense award, ordered by the existing Norris ranking",
+    },
+    vezina: {
+      label: "Vezina rank",
+      field: "vezinaRk",
+      criteria:
+        "GSHL team goaltending award, ordered by the existing Vezina ranking",
+    },
+    calder: {
+      label: "Calder rank",
+      field: "calderRk",
+      criteria: "GSHL best-draft award, ordered by the existing Calder ranking",
+    },
+  };
   const awardName = (key: string) =>
     key
       .replace(/([a-z])([A-Z])/g, "$1 $2")
       .replace(/^./, (value) => value.toUpperCase());
   const awardFacts = [
-    ...playerAwards.map((award) => ({
-      id: String(award._id),
+    ...(awardsAreFinal ? playerAwards : racePlayerAwards).map((award) => ({
+      id: `player:${String(award.award)}`,
       awardKey: String(award.award),
       awardName: awardName(String(award.award)),
       status: awardsAreFinal ? ("won" as const) : ("race" as const),
@@ -974,22 +1051,56 @@ async function buildSource(
         (id) => playerById.get(String(id))?.fullName ?? "Unknown player",
       ),
     })),
-    ...teamAwards.flatMap((award) => {
+    ...(awardsAreFinal ? teamAwards : raceTeamAwards).flatMap((award) => {
       const leader =
         (award.ownerId
           ? currentTeamByOwnerId.get(String(award.ownerId))
           : undefined) ??
-        (award.teamId ? teamById.get(String(award.teamId)) : undefined);
+        ("teamId" in award && award.teamId
+          ? teamById.get(String(award.teamId))
+          : undefined);
       if (!leader) return [];
       return [
         {
-          id: String(award._id),
+          id: `team:${String(award.award)}`,
           awardKey: String(award.award),
           awardName: awardName(String(award.award)),
           status: awardsAreFinal ? ("won" as const) : ("race" as const),
           leaderId: leader.teamId,
           leaderName: leader.name,
           leaderType: "team" as const,
+          criteria: awardCriteria[String(award.award)]?.criteria,
+          contenders: [award.ownerId, ...(award.nomineeIds ?? [])].flatMap(
+            (id) => {
+              const team =
+                currentTeamByOwnerId.get(String(id)) ??
+                teamById.get(String(id));
+              const stats =
+                team &&
+                currentTeamSeasonRows.find(
+                  (row) => String(row.gshlTeamId) === team.teamId,
+                );
+              const definition = awardCriteria[String(award.award)];
+              const value =
+                stats && definition
+                  ? recordNumber(stats[definition.field as keyof typeof stats])
+                  : null;
+              return team && value !== null && definition
+                ? [
+                    {
+                      name: team.name,
+                      metrics: [
+                        {
+                          key: definition.field,
+                          label: definition.label,
+                          value,
+                        },
+                      ],
+                    },
+                  ]
+                : [];
+            },
+          ),
           nomineeNames: (award.nomineeIds ?? []).flatMap((id) => {
             const nominee =
               currentTeamByOwnerId.get(String(id)) ?? teamById.get(String(id));
@@ -2332,10 +2443,74 @@ async function enrichNewsroomResearch(
         };
       }),
   };
+  const completedWeek = [...weeks]
+    .filter(
+      (week) =>
+        dateKey(week.endDate) &&
+        dateKey(week.endDate) <= asOf &&
+        seasonResults.some(
+          (result) =>
+            result.weekId === week._id &&
+            result.isComplete &&
+            result.gameType !== "LT",
+        ),
+    )
+    .sort((a, b) => dateKey(b.endDate).localeCompare(dateKey(a.endDate)))[0];
+  const comparisonRows = completedWeek
+    ? await ctx.db
+        .query("teamWeekStatLines")
+        .withIndex("by_weekId", (q) => q.eq("weekId", completedWeek._id))
+        .collect()
+    : [];
+  // Today's roster projections cannot establish a historical preseason outlook.
+  const preseasonRows =
+    !completedWeek &&
+    packet.issueType === "preseason" &&
+    Math.abs(Date.now() - Date.parse(asOf)) <= 7 * 86400000
+      ? await preseasonPower(ctx, analysisSeason._id)
+      : [];
+  const scoutingRows = completedWeek
+    ? comparisonRows
+        .filter((row) =>
+          seasonResults.some(
+            (result) =>
+              result.weekId === completedWeek._id &&
+              result.isComplete &&
+              (result.homeTeamId === row.gshlTeamId ||
+                result.awayTeamId === row.gshlTeamId),
+          ),
+        )
+        .map((row) => ({ gshlTeamId: String(row.gshlTeamId), stats: row }))
+    : preseasonRows.map((row) => ({
+        gshlTeamId: row.teamId,
+        stats: row.projectedWeeklyStats,
+        rosterSize: row.rosterSize,
+        goalieQualification: row.goalieQualification,
+      }));
   const enriched = {
     ...packet,
     research,
-    nextMatchups: upcoming.length ? upcoming : packet.nextMatchups,
+    nextMatchups: (upcoming.length ? upcoming : packet.nextMatchups).map(
+      (matchup) => ({
+        ...matchup,
+        categoryComparison:
+          scoutingRows.length && matchup.homeTeamId && matchup.awayTeamId
+            ? buildMatchupCategoryComparison({
+                ...matchup,
+                homeTeamId: matchup.homeTeamId,
+                awayTeamId: matchup.awayTeamId,
+                basis: completedWeek
+                  ? "completed_week"
+                  : "preseason_projection",
+                startDate: completedWeek
+                  ? dateKey(completedWeek.startDate)
+                  : asOf,
+                endDate: completedWeek ? dateKey(completedWeek.endDate) : asOf,
+                rows: scoutingRows,
+              })
+            : undefined,
+      }),
+    ),
   };
   const resultEvidence = teamResultEvidence(
     ownerFacts.map((owner) => ({ teamId: owner.teamId, name: owner.teamName })),
@@ -2577,7 +2752,7 @@ async function writeNewsroomEdition(
     },
   );
   const facts = await addEditionInjuryReporting(
-    prepared.facts,
+    await enrichWeeklyEditionRecords(ctx, prepared.facts),
     injuryContext ?? null,
   );
   const scoutPrompt = buildWeeklyEditionStoryScoutPrompt(facts, articleCount);
