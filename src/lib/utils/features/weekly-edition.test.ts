@@ -1159,6 +1159,87 @@ void test("assigned newsletter validation rejects a changed byline", () => {
   );
 });
 
+void test("smart apostrophes preserve beat and assigned-subject identity without accepting another team", () => {
+  const packet = buildWeeklyEditionFactPacket(source());
+  const team = packet.teams.find((row) => row.teamId === "team-a")!;
+  team.name = "Hubie's Beauties";
+  team.beatWriter = "Daniel Forsberg";
+  const lead = packet.editorialCandidates.find(
+    (row) => row.id === "power:team-a",
+  )!;
+  lead.teamName = team.name;
+  const roster = buildWeeklyEditionAuthorRoster(packet);
+  const authors = [
+    roster.find(({ author }) => author.name === "Daniel Forsberg")!.author,
+    ...roster
+      .filter(({ author }) => author.scope === "league")
+      .slice(0, 5)
+      .map(({ author }) => author),
+  ];
+  const leads = [
+    lead,
+    ...packet.editorialCandidates
+      .filter((row) => row.id !== lead.id && row.kind !== "matchup")
+      .slice(0, 5),
+  ];
+  const assignments: WeeklyEditionStoryAssignment[] = authors.map(
+    (author, index) => ({
+      id: `article_${index + 1}` as WeeklyEditionArticleId,
+      kind: index < 2 ? "primary_article" : "standard_article",
+      author,
+      pitchId: `pitch-${index}`,
+      leadCandidateId: leads[index]!.id,
+      supportingCandidateIds: [],
+      proposedHeadline: "Weekly story",
+      angle: "Weekly development",
+      scores: {
+        consequence: 5,
+        readerInterest: 5,
+        evidenceStrength: 5,
+        freshness: 5,
+      },
+      editorialScore: 100,
+    }),
+  );
+  const content: WeeklyEditionContent = {
+    headline: "The completed week's stories",
+    deck: "Results around the GSHL",
+    sections: assignments.map((assignment, index) => ({
+      id: assignment.id,
+      kind: assignment.kind,
+      author: assignment.author,
+      eyebrow: "News",
+      links: [],
+      headline:
+        index === 0 ? "Hubie’s Beauties rise" : leads[index]!.headlineHint,
+      body:
+        index === 0
+          ? "Hubie’s\u00a0Beauties moved up the weekly power rankings."
+          : `${leads[index]!.summary} ${leads[index]!.playerName ?? leads[index]!.franchiseName ?? leads[index]!.teamName ?? ""}`,
+    })),
+  };
+  const imported = validateWeeklyEditionImport(JSON.stringify(content), packet);
+  assert.equal(imported.valid, true, imported.errors.join("\n"));
+  assert.deepEqual(
+    validateWeeklyEditionStoryAssignments(content, assignments, packet),
+    [],
+  );
+  content.sections[0]!.headline = "Bears rise";
+  content.sections[0]!.body = "Bears moved up the weekly power rankings.";
+  assert.match(
+    validateWeeklyEditionImport(JSON.stringify(content), packet).errors.join(
+      " ",
+    ),
+    /may write only/,
+  );
+  assert.match(
+    validateWeeklyEditionStoryAssignments(content, assignments, packet).join(
+      " ",
+    ),
+    /changed its assigned subject/,
+  );
+});
+
 void test("upcoming assignments require a final valid pick, including home-ice ties", () => {
   const packet = buildWeeklyEditionFactPacket(source());
   const candidate = {
@@ -1220,6 +1301,21 @@ void test("upcoming assignments require a final valid pick, including home-ice t
     content.sections[0]!.body = `Comets visit Bears.\nPrediction: ${pick}`;
     assert.deepEqual(errors(), [], pick);
   }
+  const scheduled = packet.nextMatchups.find(
+    (row) => row.matchupId === "matchup-3",
+  )!;
+  scheduled.homeTeamName = "Hubie's Beauties";
+  content.sections[0]!.body =
+    "Comets visit Hubie’s Beauties.\nPrediction: Hubie’s Beauties wins 5-5.";
+  assert.deepEqual(
+    errors(),
+    [],
+    "smart apostrophes preserve the scheduled home team's prediction",
+  );
+  content.sections[0]!.body =
+    "Comets visit Hubie’s Beauties.\nPrediction: Comets wins 5-5.";
+  assert.match(errors().join(" "), /needs a valid final prediction/);
+  scheduled.homeTeamName = "Bears";
   for (const pick of [
     "Comets wins 5-5.",
     "Bears wins 7-4.",

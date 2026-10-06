@@ -44,6 +44,7 @@ import {
   assignWeeklyEditionAuthors,
   buildWeeklyEditionAuthorRoster,
   buildWeeklyEditionEditorialFocus,
+  weeklyEditionNameKey,
   buildWeeklyEditionStoryLedger,
   choose,
   matchupSummary,
@@ -2892,7 +2893,9 @@ export function validateWeeklyEditionStoryAssignments(
           : candidate?.teamName
             ? [candidate.teamName]
             : [];
-    const articleCopy = `${section.headline}\n${section.body}`.toLowerCase();
+    const articleCopy = weeklyEditionNameKey(
+      `${section.headline}\n${section.body}`,
+    );
     const previewCandidate = [
       candidate,
       ...assignment.supportingCandidateIds.map((id) => candidatesById.get(id)),
@@ -2911,11 +2914,15 @@ export function validateWeeklyEditionStoryAssignments(
       const losingScore = Number(prediction?.[3]);
       if (
         !prediction ||
-        ![preview.homeTeamName, preview.awayTeamName].includes(winner ?? "") ||
+        ![preview.homeTeamName, preview.awayTeamName]
+          .map(weeklyEditionNameKey)
+          .includes(weeklyEditionNameKey(winner ?? "")) ||
         winningScore > 10 ||
         losingScore > winningScore ||
         winningScore + losingScore > 10 ||
-        (winningScore === losingScore && winner !== preview.homeTeamName)
+        (winningScore === losingScore &&
+          weeklyEditionNameKey(winner ?? "") !==
+            weeklyEditionNameKey(preview.homeTeamName))
       ) {
         errors.push(
           `Article ${index + 1} needs a valid final prediction line: Prediction: TEAM wins X-Y. Use an exact scheduled team name, winner's category score first, at most ten awarded categories, and the home team for an equal score.`,
@@ -2924,7 +2931,7 @@ export function validateWeeklyEditionStoryAssignments(
     }
     if (
       requiredSubjectNames.some(
-        (name) => !articleCopy.includes(name.toLowerCase()),
+        (name) => !articleCopy.includes(weeklyEditionNameKey(name)),
       )
     ) {
       errors.push(`Article ${index + 1} changed its assigned subject`);

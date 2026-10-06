@@ -170,15 +170,25 @@ export function getWeeklyEditionFallbackAuthor(
   return { ...WEEKLY_EDITION_STAFF.nationalReporter };
 }
 
+/** Typography variants do not change a team or player's identity. */
+export function weeklyEditionNameKey(text: string) {
+  return text
+    .normalize("NFKC")
+    .replace(/[‘’ʼ]/g, "'")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+}
+
 export function referencedTeams(
   item: WeeklyEditionSection,
   packet: WeeklyEditionFactPacket,
 ) {
-  const headline = item.headline.toLowerCase();
-  const body = item.body.toLowerCase();
+  const headline = weeklyEditionNameKey(item.headline);
+  const body = weeklyEditionNameKey(item.body);
   return packet.teams
     .map((team) => {
-      const name = team.name.toLowerCase();
+      const name = weeklyEditionNameKey(team.name);
       const headlineIndex = headline.indexOf(name);
       const bodyIndex = body.indexOf(name);
       return {
