@@ -1,12 +1,63 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  buildMatchupPreviewRequest,
+  matchupPreviewWriterProfile,
   easternHour,
   isPreviewDue,
   matchupPreviewStartsAt,
   parseMatchupPreviewArticle,
   PREVIEW_WINDOW_MS,
 } from "./matchup-preview-articles";
+
+void test("writer personalities follow the byline across weeks and opponents", () => {
+  const packet = {
+    writer: "Tyler Beaulieu",
+    teamName: "Butabi Brothers",
+    opponentName: "Robert Thomas",
+    startsAt: 1,
+    facts: [],
+  };
+  const first = JSON.parse(
+    buildMatchupPreviewRequest("test", packet).input,
+  ) as { writerProfile: unknown };
+  const next = JSON.parse(
+    buildMatchupPreviewRequest("test", {
+      ...packet,
+      opponentName: "Peps",
+      startsAt: 2,
+    }).input,
+  ) as { writerProfile: unknown };
+  assert.deepEqual(first.writerProfile, next.writerProfile);
+  assert.deepEqual(
+    first.writerProfile,
+    matchupPreviewWriterProfile("  TYLER BEAULIEU  "),
+  );
+  assert.notDeepEqual(
+    first.writerProfile,
+    matchupPreviewWriterProfile("Gord McKenzie"),
+  );
+  const pick = {
+    headline: "A close matchup",
+    paragraphs: ["First.", "Second."],
+    evidenceIds: ["roster"],
+    prediction: { winner: "opponent", teamScore: 4, opponentScore: 6 },
+  };
+  const evidence = {
+    ...packet,
+    facts: [{ id: "roster", text: "Known roster" }],
+  };
+  const one = parseMatchupPreviewArticle(JSON.stringify(pick), evidence);
+  const two = parseMatchupPreviewArticle(JSON.stringify(pick), {
+    ...evidence,
+    writer: "Gord McKenzie",
+  });
+  assert.equal(
+    one.paragraphs.at(-1),
+    two.paragraphs.at(-1),
+    "matching predictions remain valid regardless of personality",
+  );
+});
 
 void test("preview start uses 3 a.m. Eastern through both DST transitions", () => {
   for (const [date, instant] of [
