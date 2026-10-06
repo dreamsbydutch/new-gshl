@@ -29,6 +29,8 @@ const HELP = `Run one scheduled Yahoo cycle (dry run by default).
 Schedule hourly between 08:00 and 22:00 Toronto. One final Yahoo capture after
 all games start locks that date; later NHL updates use stored rosters.
 No work runs outside the daytime window. Morning runs recheck the previous two days.
+Hourly NHL runs recheck all prior days of unfinalized matchups for corrections.
+Finalized weeks are frozen; their roster and NHL records are not refreshed.
 After final stats, ended weeks refresh standings/power and release the Press Box.
 Offline gaps catch up two historical dates per cycle. Failed stages retry.
 Credentials stay in memory: CONVEX_SERVER_SECRET or the signed-in Convex CLI.
@@ -353,6 +355,14 @@ async function main() {
       save();
     }
     if (failures.length) throw new Error(failures.join("\n"));
+    // Correct every prior day of an open matchup, not only a two-day lookback.
+    // Finalized weeks are excluded by the persisted weekly handoff marker.
+    if (plan.refreshNhl || plan.historyDates.length) {
+      if (!run(plan.active ? plan.today : endDate, ["--refresh-open-weeks"]))
+        throw new Error(
+          "Full-matchup correction refresh deferred; rollover must wait.",
+        );
+    }
     if (
       checkpoint.morningRecheckOn === plan.today &&
       checkpoint.reconciledThrough
@@ -369,6 +379,8 @@ async function main() {
           checkpoint.reconciledThrough,
           "--morning-recheck-on",
           checkpoint.morningRecheckOn,
+          "--python-bin",
+          values["python-bin"] ?? "python",
           ...(values.apply ? ["--apply"] : []),
         ],
         {

@@ -1680,6 +1680,15 @@ export async function runDailyNhlPlayerStatSync(
     );
   }
 
+  if (
+    options.apply &&
+    readWeeks.some((week) =>
+      Boolean((week as unknown as DatabaseRecord).weeklyRefreshCompletedAt),
+    )
+  ) {
+    throw new Error("NHL updates cannot change a finalized scoring week.");
+  }
+
   log(
     options,
     `Loading PlayerDay rows for season ${resolvedSeasonId} across ${targetDates.length} target date(s).`,
@@ -1937,6 +1946,20 @@ export async function runDailyNhlPlayerStatSync(
   });
 
   if (options.apply && rowsToWrite.length > 0) {
+    const freshWeeks = await dataStore.fetchSeasonModel<DatabaseRecord>(
+      "Week",
+      resolvedSeasonId,
+    );
+    if (
+      freshWeeks.some(
+        (week) =>
+          week.weeklyRefreshCompletedAt &&
+          readWeeks.some((selected) => selected.id === week.id),
+      )
+    )
+      throw new Error(
+        "Scoring week finalized during NHL fetch; no updates applied.",
+      );
     for (const row of rowsToWrite) {
       const id = toTrimmedString(row.id);
       if (!id) {

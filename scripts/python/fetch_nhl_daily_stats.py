@@ -170,6 +170,12 @@ def is_power_play_goal(
     if not skater_counts or owner_team_id not in {away_team_id, home_team_id}:
         return False
     away_skaters, home_skaters = skater_counts
+    # An extra attacker replaces a goalie; it does not create a power play.
+    # Compare total players, including goalie-presence flags, so 6-on-5 with
+    # a pulled goalie is even strength but 6-on-4 still counts as a power play.
+    situation = "".join(ch for ch in str(play.get("situationCode")) if ch.isdigit())
+    away_skaters += int(situation[0])
+    home_skaters += int(situation[3])
     if owner_team_id == away_team_id:
         return away_skaters > home_skaters
     return home_skaters > away_skaters
@@ -558,14 +564,7 @@ def fetch_daily_stats(
         try:
             game_id = int(game.get("id"))
             boxscore = client.game_center.boxscore(str(game_id))
-            try:
-                play_by_play = client.game_center.play_by_play(str(game_id))
-            except Exception as error:
-                print(
-                    f"[fetch_nhl_daily_stats] Warning: play-by-play unavailable for game {game_id} on {date}: {error}",
-                    file=sys.stderr,
-                )
-                play_by_play = {}
+            play_by_play = client.game_center.play_by_play(str(game_id))
             away_team = boxscore.get("awayTeam") or {}
             home_team = boxscore.get("homeTeam") or {}
             away_team_id = int(away_team.get("id") or 0)
@@ -656,11 +655,9 @@ def fetch_daily_stats(
                 ),
             )
         except Exception as error:
-            print(
-                f"[fetch_nhl_daily_stats] Warning: skipping game {game.get('id')} on {date}: {error}",
-                file=sys.stderr,
-            )
-            continue
+            raise RuntimeError(
+                f"Incomplete NHL source for game {game.get('id')} on {date}; refusing partial stats"
+            ) from error
 
     return output, team_games, roster_players, len(games)
 
@@ -681,12 +678,9 @@ def main() -> int:
         try:
             date_players, date_team_games, date_roster_players, game_count = fetch_daily_stats(client, date)
         except Exception as error:
-            print(
-                f"[fetch_nhl_daily_stats] Warning: skipping date {date}: {error}",
-                file=sys.stderr,
-            )
-            games_by_date[date] = 0
-            continue
+            raise RuntimeError(
+                f"Incomplete NHL source for {date}; refusing partial stats"
+            ) from error
         games_by_date[date] = game_count
         players.extend(date_players)
         team_games.extend(date_team_games)

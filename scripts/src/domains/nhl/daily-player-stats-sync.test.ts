@@ -112,3 +112,13 @@ test("NHL position is a fallback when no Yahoo eligibility was stored", () => {
     ["RW"],
   );
 });
+
+test("a corrected zero replaces previously credited power-play points", () => {
+  const result = buildUpdatedPlayerDayRow(
+    { ...day, PPP: "2" },
+    { ...boxscore, PPP: "0" },
+    new Set(["PPP"]),
+    "TOR",
+  );
+  assert.equal(result.PPP, "0");
+});

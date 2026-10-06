@@ -11,6 +11,8 @@ import {
 } from "../../integrations/data/convex-store";
 import { fetchDailyGameStatus } from "../../integrations/nhl/daily-game-status";
 import { shiftYahooDate } from "../../domains/yahoo/sync-cycle";
+import { refreshOpenWeekStats } from "../../domains/nhl/refresh-open-week-stats";
+import type { DatabaseRecord } from "../../integrations/data/records";
 import {
   allScoringGamesFinished,
   dueWeeklyRollovers,
@@ -37,11 +39,12 @@ async function main() {
       "season-id": { type: "string" },
       "reconciled-through": { type: "string" },
       "morning-recheck-on": { type: "string" },
+      "python-bin": { type: "string" },
     },
   });
   if (values.help) {
     console.log(
-      "Weekly rollover after final NHL imports. Dry run by default.\n--season-id ID --reconciled-through YYYY-MM-DD --morning-recheck-on YYYY-MM-DD [--apply] [--allow-outside-window]\nUses the explicit CONVEX_PROD_URL and CONVEX_SERVER_SECRET supplied by the Yahoo cycle.\nRebuilds matchup results, power and standings; then hands the completed week to the Press Box.\n--allow-outside-window permits an explicit operator catch-up after daytime hours; scheduled cycles never pass it.",
+      "Weekly rollover after final NHL imports. Dry run by default.\n--season-id ID --reconciled-through YYYY-MM-DD --morning-recheck-on YYYY-MM-DD [--apply] [--allow-outside-window] [--python-bin PATH]\nUses the explicit CONVEX_PROD_URL and CONVEX_SERVER_SECRET supplied by the Yahoo cycle.\nRechecks the full ended matchup for NHL corrections, rebuilds results, power and standings, then freezes stats and hands the week to the Press Box.\n--allow-outside-window permits an explicit operator catch-up after daytime hours; scheduled cycles never pass it.",
     );
     return;
   }
@@ -172,6 +175,19 @@ async function main() {
       weeks: due.map((w) => w.id),
       apply: !!values.apply,
     }),
+  );
+  console.log(
+    JSON.stringify(
+      await refreshOpenWeekStats({
+        season: season as DatabaseRecord & { id: string },
+        today,
+        apply: !!values.apply,
+        pythonBin: values["python-bin"] ?? "python",
+        weekIds: due.map((week) => week.id),
+      }),
+      null,
+      2,
+    ),
   );
   await runWeeklyRollover(
     {

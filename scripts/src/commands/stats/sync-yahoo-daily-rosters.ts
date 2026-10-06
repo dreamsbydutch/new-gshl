@@ -26,6 +26,7 @@ import { getLineupBuilder } from "../../domains/lineup/lineup-builder";
 import type { DatabaseRecord } from "../../integrations/data/records";
 import { refreshDailySeasonAggregates } from "../../domains/aggregation/daily-season-aggregation";
 import { shiftYahooDate } from "../../domains/yahoo/sync-cycle";
+import { refreshOpenWeekStats } from "../../domains/nhl/refresh-open-week-stats";
 import { backupSupersededYahooDays } from "../../integrations/yahoo/superseded-roster-backup";
 
 const HELP = `Usage: npm.cmd run stats:sync-yahoo-daily-rosters -- --target production --league-id 44541
@@ -42,6 +43,7 @@ Yahoo supplies team membership, eligibility and daily slot; NHL supplies stats.
   --superseded-backup-dir PATH        Back up superseded days outside workspace/OneDrive, then delete exact rows.
   --sync-nhl                      After roster apply, refresh NHL stats for this date.
   --nhl-only                      Refresh NHL stats/rollups from stored rosters; never scrape Yahoo.
+  --refresh-open-weeks            Recheck prior days of all unfinalized matchups for NHL corrections.
   --current-rosters               Refresh today's ownership, eligibility, optimizer and buyouts.
   --aggregate                     Rebuild season rollups after this date's import (also for backfills).
   --summary                       Print counts and conflicts instead of all roster-day payloads.
@@ -71,6 +73,7 @@ async function main() {
       "superseded-backup-dir": { type: "string" },
       "sync-nhl": { type: "boolean" },
       "nhl-only": { type: "boolean" },
+      "refresh-open-weeks": { type: "boolean" },
       "daily-pipeline": { type: "boolean" },
       "current-rosters": { type: "boolean" },
       aggregate: { type: "boolean" },
@@ -168,6 +171,27 @@ async function main() {
       `Expected one GSHL week covering ${date}; found ${selectedWeeks.length}.`,
     );
   const week = selectedWeeks[0]!;
+  if (values["refresh-open-weeks"]) {
+    console.log(
+      JSON.stringify(
+        await refreshOpenWeekStats({
+          season: season as DatabaseRecord & { id: string },
+          today,
+          apply: !!values.apply,
+          pythonBin: values["python-bin"] ?? "python",
+        }),
+        null,
+        2,
+      ),
+    );
+    return;
+  }
+  if (week.weeklyRefreshCompletedAt) {
+    console.log(
+      JSON.stringify({ date, weekId: week.id, skipped: "finalized-week" }),
+    );
+    return;
+  }
   const syncNhl = async () => {
     const { parseDailyNhlPlayerStatSyncOptions, runDailyNhlPlayerStatSync } =
       await import("../../domains/nhl/daily-player-stats-sync");

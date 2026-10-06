@@ -1098,6 +1098,10 @@ Yahoo. Unknown start status and no-game dates keep hourly Yahoo checks enabled.
 Morning runs recheck the previous two dates for final stats, using NHL-only mode
 for already locked dates. After downtime, older missing dates are processed first,
 at most two per cycle. Historical failures do not advance past the failed date.
+Each hourly NHL cycle also re-fetches every prior day of unfinalized matchups,
+including double weeks, and rebuilds the six rollups. Corrected zeroes replace
+previously credited stats. NHL source failures abort instead of clearing stats
+from an incomplete response. Yahoo lineups remain locked independently of stats.
 Current-roster failures are recorded while independent historical work can
 finish. Contract/source conflicts require review and are never silently accepted.
 
@@ -1108,6 +1112,11 @@ power, refreshes standings/rank tiebreaks, then hands each completed week to the
 Press Box. Failed stages retry on the next daytime cycle; a persisted completion
 marker prevents repeating successful weekly work. Catch-up waits until every
 ended week is reconciled because these calculations operate on the whole season.
+Immediately before finalization, the rollover rechecks the entire ended matchup
+once more. Its persisted `weeklyRefreshCompletedAt` marker then freezes player-day
+stats and Yahoo roster imports; subsequent NHL corrections are ignored for that
+week. Merely passing Sunday midnight does not freeze a week before the morning
+handoff succeeds. Standalone rollover accepts `--python-bin` for this final pass.
 Sunday-ending weeks therefore roll over on the first successful Monday run after
 08:00 Toronto. The operator PC must be available; this is not a hosted calculation job.
 
