@@ -568,13 +568,13 @@ appearance minimum. Unproven players receive conservative position priors rather
 than disappearing from the roster average. Only the selected season's configured
 categories count, including plus/minus when configured.
 
-Entering Weeks 1–4, the composite blends the fixed opening projection with the
-standard in-season composite at 100%, 75%, 50%, and 25% preseason weight. After
-four completed weeks with team evidence, this explicit preseason weight is zero.
-Empty weeks do not consume confidence. The existing rolling player talent
-and seeded Elo still carry historical information. The four-week transition is a
-transparent policy choice, not a fitted optimal decay. The projection's score uses
-the same `50 + 25 × standardized composite` display scale as weekly power.
+The fixed opening projection counts as one-quarter of a completed week of prior
+evidence. After N completed weeks with team evidence, its weight is
+`0.25 / (N + 0.25)`: 100% before any results, 20% after one week, 11.1% after
+two, and 2.4% after ten. Empty weeks do not consume confidence. Rolling player
+talent and seeded Elo retain smaller supporting contributions. These weights
+are a responsiveness policy, not a fitted reliability estimate. The projection's
+score uses the same `50 + 25 × standardized composite` display scale as weekly power.
 
 See [the preseason evaluation](product/preseason-power-projections.md) for
 historical comparison, current coverage, assumptions, and limitations.
@@ -582,26 +582,31 @@ historical comparison, current coverage, assumptions, and limitations.
 The preseason standings prior now blends roster strength and a shrunk owner
 regular-season record. Owner history covers the prior four seasons and follows
 the person across franchises. See [objectives and evaluation](product/power-ranking-objectives.md)
-for the formula, retrospective evidence, ownership-data limits, and the decision
-to retain the existing midseason weights.
+for the opening forecast's formula, retrospective evidence and ownership-data
+limits. That report describes the earlier in-season policy.
 
 The standard in-season composite is:
 
 | Signal                                         | Weight |
 | ---------------------------------------------- | -----: |
-| Recent-form EWMA through the previous week     |    55% |
-| Matchup Elo through the previous week          |    20% |
-| Rolling roster talent at the start of the week |    15% |
-| GM career ladder at the start of the week      |    10% |
+| Mean completed-week performance                |    85% |
+| Matchup Elo through the previous week          |    10% |
+| Rolling roster talent at the start of the week |     5% |
 
-`gmLadderRating` stores the absolute ladder snapshot;
-`powerGmScore` stores its league-standardized contribution.
+`gmLadderRating` and `powerGmScore` retain the absolute and league-standardized
+career ladder snapshots for diagnostics. The ladder no longer contributes
+directly to weekly power; owner history already informs the opening forecast.
 
-Recent form uses alpha 0.5; the latest completed week is not counted a second
-time. Explicitly forfeited goalie categories remain losses in category strength
-rather than disappearing from its average. Missing fields alone do not imply
-forfeiture. See [refinement evidence](product/power-ranking-refinement.md) for
-chronological validation, rejected alternatives and limitations.
+The legacy `powerStatEwma` field now holds the mean of completed-week performance.
+The first observed week receives full weight; the Nth receives `1 / N`. Each
+new week therefore has less influence as the season sample grows. A week's
+performance blends league-relative category strength (50%), matchup points
+(25%) and category margin (25%); the latest week is counted once. Active and
+empty weeks do not enter the mean. Explicitly forfeited goalie categories
+remain losses in category strength rather than disappearing from its average.
+Missing fields alone do not imply forfeiture. The earlier fixed-alpha model's
+[refinement evidence](product/power-ranking-refinement.md) remains a historical
+evaluation, not validation of this responsiveness policy.
 
 ## Offensive and defensive NHL value
 

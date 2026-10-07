@@ -11,7 +11,7 @@
  *
  * Design notes:
  * - Deterministic computations from input records (Week/Matchup/TeamWeekStatLine)
- * - Uses Elo (matchup results) + exponentially weighted team-stat strength
+ * - Uses Elo (matchup results) + sample-size-weighted season performance
  * - Hooks exist for franchise-history priors (v2)
  */
 
@@ -54,7 +54,6 @@ var PowerRankingsAlgo = (function buildPowerRankingsAlgo() {
       return out;
     })(),
     eloPlayoffRoundStep: 1,
-    ewmaAlpha: 0.5,
     perfCategoryWeight: 0.5,
     perfMatchupPointsWeight: 0.25,
     perfMatchupMarginWeight: 0.25,
@@ -67,14 +66,15 @@ var PowerRankingsAlgo = (function buildPowerRankingsAlgo() {
     seedEloTalentPointsPerZ: 120,
     seedEloHistoryPointsPerZ: 110,
     // Published TeamWeek power is always the state entering that week.
-    wElo: 0.2,
-    // The latest completed week already contributes through EWMA.
-    wStat: 0.55,
+    wElo: 0.1,
+    // Completed-week performance supplies the season's observed evidence.
+    wStat: 0.85,
     wCurrent: 0,
-    wTalent: 0.15,
-    wGm: 0.1,
+    wTalent: 0.05,
+    // Owner history already contributes to the opening projection.
+    wGm: 0,
     wHistory: 0,
-    preseasonTransitionWeeks: 4,
+    preseasonPriorWeeks: 0.25,
     matchupPregameBlend: 0.6,
     matchupRealizedBlend: 0.4,
     matchupPregameStrengthWeight: 0.55,
@@ -1327,13 +1327,12 @@ var PowerRankingsAlgo = (function buildPowerRankingsAlgo() {
         },
       );
       if (preseason) {
-        // Transfer weight to observed performance over the first four completed weeks.
-        var priorWeight = Math.max(
-          0,
-          1 -
-            (completedWeeksByTeam.get(teamKey) || 0) /
-              opts.preseasonTransitionWeeks,
-        );
+        // A small fixed prior loses influence as completed-week evidence accumulates.
+        var completedWeeks = completedWeeksByTeam.get(teamKey) || 0;
+        var priorWeeks = Math.max(0, toNumber(opts.preseasonPriorWeeks));
+        var priorWeight = completedWeeks
+          ? priorWeeks / (priorWeeks + completedWeeks)
+          : 1;
         composite =
           priorWeight * preseason.score + (1 - priorWeight) * composite;
       }
@@ -1908,7 +1907,7 @@ var PowerRankingsAlgo = (function buildPowerRankingsAlgo() {
       allTeamWeekRows,
     );
 
-    // Initialize Elo / EWMA state.
+    // Initialize Elo / season-performance state.
     var eloByTeam = new Map();
     var statEwmaByTeam = new Map();
     var previousWeekScoreByTeam = new Map();
@@ -2056,7 +2055,7 @@ var PowerRankingsAlgo = (function buildPowerRankingsAlgo() {
       // Matchup-derived weekly metrics.
       var matchupMetrics = buildMatchupMetricsForWeek(weekMatchups);
 
-      // Weekly performance score (z-based) + EWMA update.
+      // Weekly performance score (z-based) + accumulated season evidence.
       var categoryZ = computeWeeklyStatScores(weekTeamMap, teamIds);
 
       // Matchup points z-score.
@@ -2126,7 +2125,10 @@ var PowerRankingsAlgo = (function buildPowerRankingsAlgo() {
           (completedWeeksByTeam.get(teamKey) || 0) + 1,
         );
         var prev = statEwmaByTeam.get(teamKey) || 0;
-        var next = opts.ewmaAlpha * curr + (1 - opts.ewmaAlpha) * prev;
+        // The legacy powerStatEwma field now stores the completed-week mean.
+        // First evidence receives full weight; later observations receive 1 / N.
+        var alpha = 1 / completedWeeksByTeam.get(teamKey);
+        var next = prev + alpha * (curr - prev);
         statEwmaByTeam.set(teamKey, next);
       });
 

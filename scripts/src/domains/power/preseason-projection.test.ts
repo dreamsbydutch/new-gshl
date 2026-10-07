@@ -291,7 +291,7 @@ void test("draft rosters seed Week 1 before stat rows exist and rated-week play 
   );
 });
 
-void test("preseason weight falls to zero after four completed weeks", async () => {
+void test("opening evidence shrinks smoothly as completed-week evidence accumulates", async () => {
   const input = fixture();
   const weeks = Array.from({ length: 5 }, (_, index) => ({
     id: `w${index + 1}`,
@@ -338,18 +338,93 @@ void test("preseason weight falls to zero after four completed weeks", async () 
   const preseason = buildPreseasonProjections(input);
   for (const row of result.weekUpdates ?? []) {
     const completed = Number(String(row.weekId).slice(1)) - 1;
-    const weight = Math.max(0, 1 - completed / 4);
+    const weight = 0.25 / (0.25 + completed);
     const prior = preseason.find(
       (team) => team.teamId === row.gshlTeamId,
     )!.score;
-    const regular =
-      0.55 * Number(row.powerStatEwma) + 0.1 * Number(row.powerGmScore);
+    const regular = 0.85 * Number(row.powerStatEwma);
     assert.ok(
       Math.abs(
         Number(row.powerComposite) - (weight * prior + (1 - weight) * regular),
       ) < 1e-10,
     );
   }
+});
+
+void test("an opening upset can overturn a stronger preseason forecast", async () => {
+  const input = fixture();
+  const weeks = [
+    {
+      id: "w1",
+      seasonId: "next",
+      weekNum: 1,
+      weekType: "RS",
+      startDate: "2026-10-01",
+      endDate: "2026-10-07",
+    },
+    {
+      id: "w2",
+      seasonId: "next",
+      weekNum: 2,
+      weekType: "RS",
+      startDate: "2026-10-08",
+      endDate: "2026-10-14",
+      isActive: true,
+    },
+  ];
+  const result = await runPowerRankingsFixture(
+    "next",
+    {
+      seasons: input.seasons,
+      teams: input.teams,
+      franchises: [],
+      weeks,
+      playerNhlRows: input.playerNhlRows,
+      draftPicks: input.rosters.map((row) => ({ ...row, seasonId: "next" })),
+      teamWeeks: input.teams.map((team) => ({
+        seasonId: "next",
+        weekId: "w1",
+        gshlTeamId: team.id,
+        GP: 30,
+        G: team.id === "b" ? 5 : 3,
+        A: 10,
+        P: 20,
+        PPP: 5,
+        SOG: 80,
+        HIT: 25,
+        BLK: 20,
+        W: 2,
+        GAA: 3,
+        SVP: 0.9,
+      })),
+      matchups: [
+        {
+          id: "upset",
+          seasonId: "next",
+          weekId: "w1",
+          homeTeamId: "b",
+          awayTeamId: "a",
+          homeScore: 6,
+          awayScore: 4,
+          homeWin: true,
+          awayWin: false,
+          isComplete: true,
+        },
+      ],
+    },
+    { todayDate: "2026-10-09" },
+  );
+  const rows = result.weekUpdates!;
+  const entering = (teamId: string, weekId: string) =>
+    rows.find((row) => row.gshlTeamId === teamId && row.weekId === weekId)!;
+  assert.equal(entering("a", "w1").powerRk, 1);
+  assert.equal(entering("b", "w1").powerRk, 2);
+  assert.equal(entering("b", "w2").powerRk, 1);
+  assert.equal(entering("a", "w2").powerRk, 2);
+  assert.ok(
+    Number(entering("b", "w2").powerRating) >
+      Number(entering("b", "w1").powerRating),
+  );
 });
 
 void test("a week without results does not consume preseason confidence", async () => {

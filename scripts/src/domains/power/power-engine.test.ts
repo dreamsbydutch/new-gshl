@@ -137,6 +137,101 @@ function rowByTeamWeek(
   return row;
 }
 
+void test("the first completed week supplies the full observed form signal", async () => {
+  const result = await runPowerRankingsFixture(seasonId, fixture(4, 4), {
+    todayDate: "2026-07-25",
+  });
+  const row = rowByTeamWeek(result.weekUpdates!, "week-2", "team-a");
+  assert.ok(Number(row.powerStatScore) > 0);
+  assert.equal(row.powerStatEwma, row.powerStatScore);
+});
+
+void test("each new completed week has less influence as season evidence grows", async () => {
+  const input = fixture(0, 1);
+  input.weeks[2]!.isActive = false;
+  input.weeks[3]!.isActive = true;
+  input.matchups!.find((row) => row.weekId === "week-3")!.isComplete = true;
+  const result = await runPowerRankingsFixture(seasonId, input, {
+    todayDate: "2026-08-02",
+  });
+  const rows = result.weekUpdates!;
+  const first = rowByTeamWeek(rows, "week-2", "team-a");
+  const second = rowByTeamWeek(rows, "week-3", "team-a");
+  const third = rowByTeamWeek(rows, "week-4", "team-a");
+  const firstScore = Number(first.powerStatScore);
+  const secondScore = Number(second.powerStatScore);
+  const thirdScore = Number(third.powerStatScore);
+  assert.ok(
+    Math.abs(Number(second.powerStatEwma) - (firstScore + secondScore) / 2) <
+      1e-10,
+  );
+  assert.ok(
+    Math.abs(
+      Number(third.powerStatEwma) - (firstScore + secondScore + thirdScore) / 3,
+    ) < 1e-10,
+  );
+  assert.ok(thirdScore < 0);
+});
+
+void test("empty completed weeks do not dilute observed season performance", async () => {
+  const input = fixture(4, 4);
+  input.teamWeeks = input.teamWeeks!.filter((row) => row.weekId !== "week-2");
+  input.matchups = input.matchups!.filter((row) => row.weekId !== "week-2");
+  const result = await runPowerRankingsFixture(seasonId, input, {
+    todayDate: "2026-07-25",
+  });
+  for (const teamId of ["team-a", "team-b"]) {
+    const first = rowByTeamWeek(result.weekUpdates!, "week-2", teamId);
+    const following = rowByTeamWeek(result.weekUpdates!, "week-3", teamId);
+    assert.equal(following.powerStatEwma, first.powerStatScore);
+  }
+});
+
+void test("the same performance change moves ratings ten times less after ten observations", async () => {
+  async function ratingAfter(
+    completed: number,
+    upset: boolean,
+  ): Promise<number> {
+    const input = fixture(4, 4);
+    input.seasons[0]!.categories = ["G"];
+    input.weeks = Array.from({ length: completed + 1 }, (_, index) => {
+      const start = new Date(Date.UTC(2026, 6, 1 + index * 7));
+      const end = new Date(Date.UTC(2026, 6, 7 + index * 7));
+      return week(
+        `sample-${index}`,
+        index + 1,
+        start.toISOString().slice(0, 10),
+        end.toISOString().slice(0, 10),
+        index === completed,
+      );
+    });
+    input.matchups = [];
+    input.teamWeeks = input.weeks
+      .slice(0, completed)
+      .flatMap((entry, index) => [
+        teamWeek(
+          String(entry.id),
+          "team-a",
+          upset && index === completed - 1 ? 0 : 10,
+        ),
+        teamWeek(String(entry.id), "team-b", 1),
+      ]);
+    const result = await runPowerRankingsFixture(seasonId, input, {
+      todayDate: String(input.weeks[completed]!.startDate),
+    });
+    return Number(
+      rowByTeamWeek(result.weekUpdates!, `sample-${completed}`, "team-a")
+        .powerRating,
+    );
+  }
+  const earlyMovement =
+    (await ratingAfter(1, false)) - (await ratingAfter(1, true));
+  const lateMovement =
+    (await ratingAfter(10, false)) - (await ratingAfter(10, true));
+  assert.ok(earlyMovement > 0);
+  assert.ok(Math.abs(earlyMovement / lateMovement - 10) < 1e-10);
+});
+
 void test("forfeited goalie categories lower next-week form instead of disappearing", async () => {
   const input = fixture(4, 4);
   for (const row of input.teamWeeks ?? []) {
