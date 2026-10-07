@@ -243,7 +243,7 @@ export function researchCandidates(
         teamId: owner.teamId,
         teamName: owner.teamName,
         headlineHint: `${owner.name}: participation and track record`,
-        summary: `${owner.name} manages ${owner.teamName}. ${owner.status === "returning" ? `Last recorded participation was ${last!.name}; absent for ${owner.absentSeasons} intervening league season(s).` : owner.status === "first_recorded_season" ? "No earlier participation is present in the available team records; this does not establish a first-ever season." : `Also participated in ${last!.name}.`} ${owner.ranking ? `As of the completed seasons in this snapshot, GM Ladder rank ${owner.ranking.rank}, rating ${owner.ranking.rating}, record ${owner.ranking.overallWins}-${owner.ranking.overallLosses}, ${owner.ranking.cups} cups.` : "GM Ladder rank unavailable in this snapshot."}`,
+        summary: `${owner.name} manages ${owner.teamName}. ${owner.status === "returning" ? `Last recorded participation was ${last!.name}; absent for ${owner.absentSeasons} intervening league season(s).` : owner.status === "first_recorded_season" ? "No earlier participation is present in the available team records; this does not establish a first-ever season." : `Also participated in ${last!.name}.`} ${owner.ranking ? `Through ${research.ownerRankingsAsOf ?? research.asOf}, career GM Ladder rank ${owner.ranking.rank} among historical owners, regular-season record ${owner.ranking.overallWins}-${owner.ranking.overallLosses}, ${owner.ranking.cups} cups. Career context is not current team strength.` : "GM Ladder rank unavailable in this snapshot."}`,
         metrics: [
           {
             key: "absentSeasons",
@@ -289,7 +289,7 @@ export function researchCandidates(
         (id): id is string => Boolean(id),
       ),
       headlineHint: `${matchup.awayTeamName} at ${matchup.homeTeamName}`,
-      summary: `Scheduled, not a completed result: ${matchup.awayTeamName} at ${matchup.homeTeamName}${matchup.startDate ? `, week beginning ${matchup.startDate}` : ""}. ${owners.map((owner) => `${owner.name} manages ${owner.teamName}`).join("; ")}.${matchup.categoryComparison ? ` Category scouting context: ${JSON.stringify(matchup.categoryComparison)}` : ""}`,
+      summary: `Scheduled, not a completed result: ${matchup.awayTeamName} at ${matchup.homeTeamName}${matchup.startDate ? `, week beginning ${matchup.startDate}` : ""}. ${owners.map((owner) => `${owner.name} manages ${owner.teamName}`).join("; ")}.${matchup.categoryComparison ? ` Category scouting context: ${JSON.stringify(matchup.categoryComparison)}` : ""}${matchup.ownerRankingComparison ? ` Optional owner-ranking storyline context: ${JSON.stringify(matchup.ownerRankingComparison)}` : ""}`,
       metrics: [],
       links: [],
     });

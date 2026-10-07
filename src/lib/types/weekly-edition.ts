@@ -1,5 +1,6 @@
 import type { EditionInjurySnapshot } from "./weekly-edition-injuries";
 import type { MatchupCategoryComparison } from "./matchup-preview-article";
+import type { OwnerRankingMatchupComparison } from "./owner-ranking-research";
 
 export type WeeklyEditionGenerationMode =
   | "template"
@@ -125,6 +126,7 @@ export interface WeeklyEditionTeamFact {
 }
 
 export interface WeeklyEditionMatchupFact {
+  ownerRankingComparison?: OwnerRankingMatchupComparison;
   matchupId: string;
   gameType?: string;
   homeTeamId: string;
@@ -192,6 +194,7 @@ export interface WeeklyEditionMissedStartFact {
 }
 
 export interface WeeklyEditionNextMatchupFact {
+  ownerRankingComparison?: OwnerRankingMatchupComparison;
   categoryComparison?: MatchupCategoryComparison;
   matchupId: string;
   homeTeamId?: string;
@@ -418,6 +421,7 @@ export interface WeeklyEditionBuyoutFact {
 }
 
 export interface WeeklyEditionGmRankingFact {
+  gamesPlayed?: number;
   ownerId?: string;
   rank: number;
   gmName: string;
@@ -431,6 +435,7 @@ export interface WeeklyEditionGmRankingFact {
 }
 
 export interface WeeklyEditionResearch {
+  ownerRankingsAsOf?: string;
   model?: string;
   assignments?: WeeklyEditionStoryAssignment[];
   asOf: string;

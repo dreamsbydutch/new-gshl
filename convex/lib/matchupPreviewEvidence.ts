@@ -8,6 +8,8 @@ import { utcTimestampToDateKey } from "./timestamps";
 import { FRANCHISE_BEAT_WRITERS_BY_LEGACY_ID } from "./reporterDirectory";
 import { buildMatchupCategoryComparison } from "../../src/lib/utils/features/weekly-edition-research";
 import { preseasonPower } from "./preseasonPower";
+import { loadOwnerRankingResearch } from "./ownerRankingResearch";
+import { buildOwnerRankingMatchupComparison } from "../../src/lib/utils/features/owner-ranking-research";
 
 const DAY = 86400000;
 const RECENT_FORM_DAYS = 60;
@@ -288,6 +290,43 @@ export async function loadMatchupPreviewEvidence(
     facts.push({
       id: "category-comparison",
       text: JSON.stringify(categoryComparison),
+    });
+  const rankingCutoff = utcTimestampToDateKey(Math.min(now, startsAt - 1))!;
+  const rankings = await loadOwnerRankingResearch(
+    ctx,
+    team.seasonId,
+    rankingCutoff,
+  );
+  const seasonTeams = await ctx.db
+    .query("teams")
+    .withIndex("by_seasonId", (q) => q.eq("seasonId", team.seasonId))
+    .collect();
+  const seasonOwners = await Promise.all(
+    seasonTeams.map(async (row) => {
+      const franchise = await ctx.db.get(row.franchiseId);
+      if (!franchise) return null;
+      const ranking = rankings.find(
+        (entry) => entry.ownerId === String(franchise.ownerId),
+      );
+      return {
+        teamId: String(row._id),
+        teamName: franchise.name,
+        ownerId: String(franchise.ownerId),
+        name: ranking?.gmName ?? "",
+        ranking,
+      };
+    }),
+  );
+  const ownerComparison = buildOwnerRankingMatchupComparison({
+    owners: seasonOwners.filter((owner) => owner !== null),
+    homeTeamId: String(matchup.homeTeamId),
+    awayTeamId: String(matchup.awayTeamId),
+    asOf: rankingCutoff,
+  });
+  if (ownerComparison)
+    facts.push({
+      id: "owner-ranking-comparison",
+      text: JSON.stringify(ownerComparison),
     });
   for (const [label, data] of [
     ["team", own],

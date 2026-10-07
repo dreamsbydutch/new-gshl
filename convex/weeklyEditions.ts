@@ -14,13 +14,10 @@ import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import { requireCommissioner } from "./lib/auth";
 import { buildLeagueActivity } from "../src/lib/utils/features/league-activity";
-import { buildOwnerRankings } from "../src/lib/utils/features/owner-rankings";
+import { buildOwnerRankingFacts } from "./lib/ownerRankingResearch";
 import { calculateDraftRosterTalentRating } from "../src/lib/utils/features/draft-roster-board";
 import type {
-  AwardsList,
   ContractStatus,
-  MatchupType,
-  SeasonType,
   WeeklyEditionArticleCount,
   WeeklyEdition,
   WeeklyEditionContent,
@@ -74,6 +71,7 @@ import {
 } from "../src/lib/utils/features/weekly-edition-research";
 import { toUtcTimestamp, utcTimestampToDateKey } from "./lib/timestamps";
 import { preseasonPower } from "./lib/preseasonPower";
+import { buildOwnerRankingMatchupComparison } from "../src/lib/utils/features/owner-ranking-research";
 import {
   calculateTeamAwards,
   calculatePlayerTrophyAwards,
@@ -1339,208 +1337,6 @@ async function manualEditionAnchor(
   return { season: previousSeason, week: finalWeek };
 }
 
-async function buildPreseasonGmRankingFacts(
-  ctx: MutationCtx,
-  seasons: Doc<"seasons">[],
-  franchises: Doc<"franchises">[],
-  conferences: Doc<"conferences">[],
-) {
-  const [
-    owners,
-    allTeams,
-    allWeeks,
-    allMatchups,
-    allTeamAwards,
-    allPowerRankingStats,
-  ] = await Promise.all([
-    ctx.db.query("owners").collect(),
-    Promise.all(
-      seasons.map((season) =>
-        ctx.db
-          .query("teams")
-          .withIndex("by_seasonId", (q) => q.eq("seasonId", season._id))
-          .collect(),
-      ),
-    ).then((rows) => rows.flat()),
-    Promise.all(
-      seasons.map((season) =>
-        ctx.db
-          .query("weeks")
-          .withIndex("by_seasonId", (q) => q.eq("seasonId", season._id))
-          .collect(),
-      ),
-    ).then((rows) => rows.flat()),
-    Promise.all(
-      seasons.map((season) =>
-        ctx.db
-          .query("matchups")
-          .withIndex("by_seasonId", (q) => q.eq("seasonId", season._id))
-          .collect(),
-      ),
-    ).then((rows) => rows.flat()),
-    Promise.all(
-      seasons.map((season) =>
-        ctx.db
-          .query("teamAwards")
-          .withIndex("by_seasonId", (q) => q.eq("seasonId", season._id))
-          .collect(),
-      ),
-    ).then((rows) => rows.flat()),
-    Promise.all(
-      seasons.map((season) =>
-        ctx.db
-          .query("teamWeekStatLines")
-          .withIndex("by_seasonId", (q) => q.eq("seasonId", season._id))
-          .collect(),
-      ),
-    ).then((rows) => rows.flat()),
-  ]);
-  const franchiseById = new Map(
-    franchises.map((franchise) => [String(franchise._id), franchise]),
-  );
-  const conferenceById = new Map(
-    conferences.map((conference) => [String(conference._id), conference]),
-  );
-  const ownerById = new Map(owners.map((owner) => [String(owner._id), owner]));
-  const allowedSeasonIds = new Set(
-    seasons.map((candidate) => String(candidate._id)),
-  );
-  const rankings = buildOwnerRankings({
-    owners: owners.map((owner) => ({
-      ...owner,
-      id: String(owner._id),
-      nickName: String(owner.nickName ?? ""),
-      email: owner.email ?? undefined,
-      owing: asNumber(owner.owing),
-      createdAt: new Date(toUtcTimestamp(owner.createdAt) ?? 0),
-      updatedAt: new Date(toUtcTimestamp(owner.updatedAt) ?? 0),
-    })),
-    seasons: seasons.map((season) => ({
-      ...season,
-      id: String(season._id),
-      year: asNumber(season.year),
-      categories: season.categories ?? [],
-      rosterSpots: season.rosterSpots ?? [],
-      startDate: dateKey(season.startDate),
-      endDate: dateKey(season.endDate),
-      signingEndDate: dateKey(season.signingEndDate),
-      draftStartAt: isoTimestamp(season.draftStartAt),
-      createdAt: new Date(toUtcTimestamp(season.createdAt) ?? 0),
-      updatedAt: new Date(toUtcTimestamp(season.updatedAt) ?? 0),
-    })),
-    teams: allTeams
-      .filter((team) => allowedSeasonIds.has(String(team.seasonId)))
-      .map((team) => {
-        const franchise = franchiseById.get(String(team.franchiseId));
-        const conference = conferenceById.get(String(team.confId));
-        const owner = franchise
-          ? ownerById.get(String(franchise.ownerId))
-          : undefined;
-        return {
-          id: String(team._id),
-          seasonId: String(team.seasonId),
-          franchiseId: String(team.franchiseId),
-          name: franchise?.name ?? null,
-          abbr: franchise?.abbr ?? null,
-          logoUrl: franchise?.logoUrl ?? null,
-          isActive: franchise?.isActive ?? false,
-          yahooId: team.yahooId ?? null,
-          confId: String(team.confId),
-          confName: conference?.name ?? null,
-          confAbbr: conference?.abbr ?? null,
-          confLogoUrl: conference?.logoUrl ?? null,
-          ownerId: owner ? String(owner._id) : null,
-          ownerFirstName: owner?.firstName ?? null,
-          ownerLastName: owner?.lastName ?? null,
-          ownerNickname: owner?.nickName ?? null,
-          ownerEmail: owner?.email ?? null,
-          ownerOwing: owner ? asNumber(owner.owing) : null,
-          ownerIsActive: owner?.isActive ?? false,
-        };
-      }),
-    weeks: allWeeks
-      .filter((week) => allowedSeasonIds.has(String(week.seasonId)))
-      .map((week) => ({
-        id: String(week._id),
-        seasonId: String(week.seasonId),
-        weekNum: asNumber(week.weekNum),
-        weekType: week.weekType as SeasonType,
-        gameDays: asNumber(week.gameDays),
-        startDate: dateKey(week.startDate),
-        endDate: dateKey(week.endDate),
-        isActive: week.isActive,
-        isPlayoffs: week.isPlayoffs,
-        createdAt: new Date(toUtcTimestamp(week.createdAt) ?? 0),
-        updatedAt: new Date(toUtcTimestamp(week.updatedAt) ?? 0),
-      })),
-    matchups: allMatchups
-      .filter((matchup) => allowedSeasonIds.has(String(matchup.seasonId)))
-      .map((matchup) => ({
-        id: String(matchup._id),
-        seasonId: String(matchup.seasonId),
-        weekId: String(matchup.weekId),
-        homeTeamId: String(matchup.homeTeamId),
-        awayTeamId: String(matchup.awayTeamId),
-        gameType: matchup.gameType as MatchupType,
-        homeRank: asNumber(matchup.homeRank),
-        awayRank: asNumber(matchup.awayRank),
-        homeScore: asNumber(matchup.homeScore),
-        awayScore: asNumber(matchup.awayScore),
-        homeWin: Boolean(matchup.homeWin),
-        awayWin: Boolean(matchup.awayWin),
-        tie: Boolean(matchup.tie),
-        isComplete: Boolean(matchup.isComplete),
-        rating: asNumber(matchup.rating),
-        ratingPre: asNumber(matchup.ratingPre),
-        ratingRealized: asNumber(matchup.ratingRealized),
-        ratingCompetitive: asNumber(matchup.ratingCompetitive),
-        ratingImportance: asNumber(matchup.ratingImportance),
-        ratingRosterStrength: asNumber(matchup.ratingRosterStrength),
-        createdAt: new Date(toUtcTimestamp(matchup.createdAt) ?? 0),
-        updatedAt: new Date(toUtcTimestamp(matchup.updatedAt) ?? 0),
-      })),
-    teamAwards: allTeamAwards.flatMap((award) =>
-      award.ownerId && allowedSeasonIds.has(String(award.seasonId))
-        ? [
-            {
-              ...award,
-              id: String(award._id),
-              seasonId: String(award.seasonId),
-              ownerId: String(award.ownerId),
-              teamId: award.teamId ? String(award.teamId) : undefined,
-              nomineeIds: (award.nomineeIds ?? []).map(String),
-              award: award.award as AwardsList,
-              createdAt: new Date(toUtcTimestamp(award.createdAt) ?? 0),
-              updatedAt: new Date(toUtcTimestamp(award.updatedAt) ?? 0),
-            },
-          ]
-        : [],
-    ),
-    powerRankingStats: allPowerRankingStats
-      .filter((row) => allowedSeasonIds.has(String(row.seasonId)))
-      .map((row) => ({
-        seasonId: String(row.seasonId),
-        weekId: String(row.weekId),
-        gshlTeamId: String(row.gshlTeamId),
-        powerRk: asNumber(row.powerRk),
-      })),
-  });
-  return rankings.rankings
-    .filter((entry) => entry.isActive)
-    .map((entry) => ({
-      ownerId: entry.owner.id,
-      rank: entry.rank,
-      gmName: entry.displayName,
-      teamName: entry.primaryTeam?.name ?? undefined,
-      rating: entry.rating,
-      rankChange: entry.rankChange,
-      overallWins: entry.overallRecord.wins,
-      overallLosses: entry.overallRecord.losses,
-      playoffAppearances: entry.playoffAppearances,
-      cups: entry.cups,
-    }));
-}
-
 async function buildMilestoneSource(
   ctx: MutationCtx,
   season: Doc<"seasons">,
@@ -1962,7 +1758,7 @@ async function buildMilestoneSource(
       : [];
   const gmRankings =
     issueType === "preseason"
-      ? await buildPreseasonGmRankingFacts(
+      ? await buildOwnerRankingFacts(
           ctx,
           allSeasons.filter(
             (candidate) => asNumber(candidate.year) <= asNumber(season.year),
@@ -2278,6 +2074,11 @@ async function enrichNewsroomResearch(
   );
   if (!analysisSeason) throw new Error("Research season not found");
   const asOf = packet.milestone?.triggerDate ?? packet.week.endDate;
+  // Recap context must not use the very result it is explaining to rank owners.
+  const ownerRankingsAsOf =
+    packet.issueType === "weekly" || packet.issueType === "final_recap"
+      ? dateKey(Date.parse(packet.week.startDate) - 86400000)
+      : asOf;
   const [teams, franchises, owners, weeks, editions, seasonResults] =
     await Promise.all([
       ctx.db
@@ -2304,6 +2105,18 @@ async function enrichNewsroomResearch(
     franchises.map((row) => [String(row._id), row]),
   );
   const ownerById = new Map(owners.map((row) => [String(row._id), row]));
+  const ownerRankings =
+    packet.issueType === "preseason" && packet.milestone?.gmRankings?.length
+      ? packet.milestone.gmRankings
+      : await buildOwnerRankingFacts(
+          ctx,
+          seasons.filter(
+            (season) => asNumber(season.year) <= asNumber(analysisSeason.year),
+          ),
+          franchises,
+          await ctx.db.query("conferences").collect(),
+          ownerRankingsAsOf,
+        );
   const currentOwnerIds = new Set(
     teams.map((team) =>
       String(franchiseById.get(String(team.franchiseId))?.ownerId ?? ""),
@@ -2351,7 +2164,7 @@ async function enrichNewsroomResearch(
         teamId: String(team._id),
         teamName: franchise.name,
         ...ownerParticipation(seasonFacts, participation, analysisSeasonId),
-        ranking: packet.milestone?.gmRankings?.find(
+        ranking: ownerRankings.find(
           (ranking) => ranking.ownerId === String(owner._id),
         ),
       },
@@ -2395,9 +2208,11 @@ async function enrichNewsroomResearch(
   ).flat();
   const research: NonNullable<WeeklyEditionFactPacket["research"]> = {
     asOf,
+    ownerRankingsAsOf,
     analysisSeasonId,
     coverage: [
       "Owner participation across stored franchises and seasons",
+      `Owner Ladder career rankings through ${ownerRankingsAsOf}, with notable matchup comparisons among this season's owners`,
       "Next two scheduled weeks",
       "Daily and weekly performance candidates",
       "Contracts, cap and draft evidence where included by issue type",
@@ -2490,9 +2305,27 @@ async function enrichNewsroomResearch(
   const enriched = {
     ...packet,
     research,
+    matchups: packet.matchups.map((matchup) => ({
+      ...matchup,
+      ownerRankingComparison: buildOwnerRankingMatchupComparison({
+        owners: ownerFacts,
+        homeTeamId: matchup.homeTeamId,
+        awayTeamId: matchup.awayTeamId,
+        asOf: ownerRankingsAsOf,
+      }),
+    })),
     nextMatchups: (upcoming.length ? upcoming : packet.nextMatchups).map(
       (matchup) => ({
         ...matchup,
+        ownerRankingComparison:
+          matchup.homeTeamId && matchup.awayTeamId
+            ? buildOwnerRankingMatchupComparison({
+                owners: ownerFacts,
+                homeTeamId: matchup.homeTeamId,
+                awayTeamId: matchup.awayTeamId,
+                asOf: ownerRankingsAsOf,
+              })
+            : undefined,
         categoryComparison:
           scoutingRows.length && matchup.homeTeamId && matchup.awayTeamId
             ? buildMatchupCategoryComparison({
@@ -2543,7 +2376,17 @@ async function enrichNewsroomResearch(
   return {
     ...enriched,
     editorialCandidates: selectResearchEvidence([
-      ...packet.editorialCandidates,
+      ...packet.editorialCandidates.map((candidate) => {
+        const comparison = enriched.matchups.find(
+          (matchup) => candidate.id === `matchup:${matchup.matchupId}`,
+        )?.ownerRankingComparison;
+        return comparison
+          ? {
+              ...candidate,
+              summary: `${candidate.summary} Optional owner-ranking storyline context: ${JSON.stringify(comparison)}`,
+            }
+          : candidate;
+      }),
       ...researchCandidates(enriched, research),
       ...resultEvidence,
     ]),
