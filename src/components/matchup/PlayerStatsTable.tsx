@@ -5,11 +5,16 @@ import { PerformanceRecordBadge } from "./PerformanceRecordBadge";
 import { NHLLogoList } from "@gshl-components/player/NHLLogoList";
 import { NHLLogo } from "@gshl-components/player/NHLLogo";
 import { useNHLHomeSchedule } from "@gshl-hooks/features/useNHLHomeSchedule";
-import { getPlayerTodayGames } from "@gshl-utils/features/matchup-details";
+import {
+  getPlayerTodayGames,
+  isMatchupInPlay,
+} from "@gshl-utils/features/matchup-details";
 import { nhlGameStatus } from "@gshl-utils/features/nhl";
 import { TableViewport } from "@gshl-ui";
 import type {
   MatchupDetailsNhlTeam,
+  MatchupDetailsMatchup,
+  MatchupDetailsWeek,
   MatchupDetailsTeam,
   PlayerStatRow,
   PlayerStatColumn,
@@ -26,6 +31,8 @@ import Image from "next/image";
 import Link from "next/link";
 
 export function PlayerStatsTable({
+  matchup,
+  week,
   team,
   nhlTeams,
   players,
@@ -33,6 +40,8 @@ export function PlayerStatsTable({
   headline,
   seasonCategories,
 }: {
+  matchup: MatchupDetailsMatchup;
+  week: MatchupDetailsWeek | null;
   team: MatchupDetailsTeam | null;
   nhlTeams: MatchupDetailsNhlTeam[];
   players: PlayerStatRow[];
@@ -41,6 +50,7 @@ export function PlayerStatsTable({
   seasonCategories?: readonly string[];
 }) {
   const schedule = useNHLHomeSchedule(3);
+  const isActive = isMatchupInPlay(matchup, week, schedule.selectedDay?.date);
   const columns = buildPlayerStatColumns({
     players,
     categories: seasonCategories,
@@ -49,11 +59,13 @@ export function PlayerStatsTable({
     | PlayerStatColumn
     | { key: "today"; label: string; className?: string }
   )[] = columns.filter((column) => column.key !== "nhlTeam");
-  tableColumns.splice(
-    tableColumns.findIndex((column) => column.key === "player") + 1,
-    0,
-    { key: "today", label: "Today's game" },
-  );
+  if (isActive) {
+    tableColumns.splice(
+      tableColumns.findIndex((column) => column.key === "player") + 1,
+      0,
+      { key: "today", label: "Today's game" },
+    );
+  }
 
   const getColumnClassName = (
     columnKey: string,
@@ -142,7 +154,7 @@ export function PlayerStatsTable({
         </div>
       </div>
 
-      {schedule.error ? (
+      {isActive && schedule.error ? (
         <p role="alert" className="px-3 py-2 text-xs text-slate-600 sm:px-4">
           {schedule.error}{" "}
           <button

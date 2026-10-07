@@ -651,6 +651,8 @@ export function MatchupDetailsContent({
           aria-labelledby={`matchup-${selectedSide}-players-tab`}
         >
           <PlayerStatsTable
+            matchup={matchup}
+            week={week}
             records={records}
             team={selectedTeam}
             nhlTeams={details?.nhlTeams ?? []}
