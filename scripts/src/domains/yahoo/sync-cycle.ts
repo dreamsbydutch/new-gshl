@@ -33,7 +33,12 @@ export function planYahooSyncCycle(input: {
   const today = `${part("year")}-${part("month")}-${part("day")}`;
   const hour = Number(part("hour"));
   const active = input.startDate <= today && today <= input.endDate;
-  const windowOpen = hour >= 8 && hour <= 22;
+  const daytime = hour >= 8 && hour <= 22;
+  const overnight = hour >= 23 || hour < 4;
+  const windowOpen = daytime || overnight;
+  // Midnight does not end the previous evening's NHL slate.
+  const nhlDate = hour < 4 ? shiftYahooDate(today, -1) : today;
+  const nhlActive = input.startDate <= nhlDate && nhlDate <= input.endDate;
   const hourDue = (last?: number) =>
     !last ||
     Math.floor(input.now.getTime() / 3600000) > Math.floor(last / 3600000);
@@ -47,11 +52,11 @@ export function planYahooSyncCycle(input: {
     games.every((g) => ["LIVE", "CRIT", "FINAL", "OFF"].includes(g.gameState));
   const scrapeYahoo =
     active &&
-    windowOpen &&
+    daytime &&
     !rosterLocked &&
     hourDue(input.checkpoint.lastYahooSyncAt);
   const refreshNhl =
-    active && windowOpen && hourDue(input.checkpoint.lastNhlSyncAt);
+    nhlActive && windowOpen && hourDue(input.checkpoint.lastNhlSyncAt);
   const closedThrough = [
     input.endDate,
     shiftYahooDate(today, hour >= 8 ? -1 : -2),
@@ -70,7 +75,7 @@ export function planYahooSyncCycle(input: {
     (date) => date >= input.startDate && date <= input.endDate,
   );
   if (
-    windowOpen &&
+    daytime &&
     input.checkpoint.morningRecheckOn !== today &&
     today <= shiftYahooDate(input.endDate, 2)
   ) {
@@ -78,13 +83,15 @@ export function planYahooSyncCycle(input: {
   }
   return {
     today,
+    nhlDate,
+    overnight,
     active,
     windowOpen,
     scrapeYahoo,
     allGamesStarted,
     refreshNhl,
-    historyDates: windowOpen ? [...dates].sort() : [],
+    historyDates: daytime ? [...dates].sort() : [],
     recent,
-    morning: windowOpen,
+    morning: daytime,
   };
 }

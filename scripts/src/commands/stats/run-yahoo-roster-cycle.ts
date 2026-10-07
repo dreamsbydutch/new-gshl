@@ -26,9 +26,10 @@ const HELP = `Run one scheduled Yahoo cycle (dry run by default).
   --apply               Run imports, current rosters and safe aggregate updates.
   --help                Show this help without authentication or live reads.
 
-Schedule hourly between 08:00 and 22:00 Toronto. One final Yahoo capture after
+Schedule hourly. Yahoo runs between 08:00 and 22:00 Toronto. One final capture after
 all games start locks that date; later NHL updates use stored rosters.
-No work runs outside the daytime window. Morning runs recheck the previous two days.
+NHL-only updates continue through 03:00, using the previous date after midnight.
+No work runs from 04:00 through 07:59. Morning runs recheck the previous two days.
 Hourly NHL runs recheck all prior days of unfinalized matchups for corrections.
 Finalized weeks are frozen; their roster and NHL records are not refreshed.
 After final stats, ended weeks refresh standings/power and release the Press Box.
@@ -180,7 +181,7 @@ async function main() {
         !plan.historyDates.length &&
         checkpoint.morningRecheckOn !== plan.today)
     ) {
-      log("Outside daytime hours or no work due; no Yahoo/NHL requests.");
+      log("Outside sync hours or no work due; no Yahoo/NHL requests.");
       fs.writeFileSync(
         statusPath,
         JSON.stringify(
@@ -230,7 +231,7 @@ async function main() {
           .windowOpen
       ) {
         log(
-          `Daytime window ended; deferring ${date} until the next daytime run.`,
+          `Sync window ended; deferring ${date} until the next scheduled run.`,
         );
         return false;
       }
@@ -287,7 +288,7 @@ async function main() {
     if (plan.scrapeYahoo || plan.refreshNhl) {
       try {
         const finished = run(
-          plan.today,
+          plan.scrapeYahoo ? plan.today : plan.nhlDate,
           !plan.scrapeYahoo
             ? ["--nhl-only"]
             : plan.refreshNhl
@@ -357,13 +358,14 @@ async function main() {
     if (failures.length) throw new Error(failures.join("\n"));
     // Correct every prior day of an open matchup, not only a two-day lookback.
     // Finalized weeks are excluded by the persisted weekly handoff marker.
-    if (plan.refreshNhl || plan.historyDates.length) {
+    if (!plan.overnight && (plan.refreshNhl || plan.historyDates.length)) {
       if (!run(plan.active ? plan.today : endDate, ["--refresh-open-weeks"]))
         throw new Error(
           "Full-matchup correction refresh deferred; rollover must wait.",
         );
     }
     if (
+      plan.morning &&
       checkpoint.morningRecheckOn === plan.today &&
       checkpoint.reconciledThrough
     ) {

@@ -1088,8 +1088,12 @@ scheduler. Consult `--help` for the required deployment, league, season, scoring
 date range and Python executable. Dry runs exercise the child import previews
 without advancing the checkpoint; `--apply` enables the validated stages.
 
-The intended cadence is hourly from 08:00 through 22:00 in `America/Toronto`,
-including daylight-saving changes. The runner refuses work outside that window.
+The intended cadence is hourly in `America/Toronto`, including daylight-saving
+changes. Yahoo capture runs from 08:00 through 22:00. NHL-only updates continue
+from 23:00 through 03:00 using stored lineups; after midnight they refresh the
+previous evening's scoring date. Schedule the operator task hourly across midnight.
+The runner skips 04:00 through 07:59. Overnight runs do not perform ownership,
+buyout, historical catch-up, or weekly rollover work.
 Yahoo membership, eligibility and daily slots are reconciled on each scrape,
 including backed-up deletion of superseded days when enabled. The first hourly
 capture after the NHL reports every non-postponed game started locks that day's

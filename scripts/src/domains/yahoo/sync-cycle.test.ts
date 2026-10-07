@@ -3,6 +3,24 @@ import test from "node:test";
 import { planYahooSyncCycle } from "./sync-cycle";
 
 const scope = { startDate: "2026-09-29", endDate: "2027-04-10" };
+test("late games keep updating from stored lineups through the overnight final pass", () => {
+  for (const now of [
+    "2026-10-07T03:00:00Z",
+    "2026-10-07T04:00:00Z",
+    "2026-10-07T07:00:00Z",
+  ]) {
+    const plan = planYahooSyncCycle({
+      ...scope,
+      now: new Date(now),
+      checkpoint: {},
+    });
+    assert.equal(plan.refreshNhl, true);
+    assert.equal(plan.nhlDate, "2026-10-06");
+    assert.equal(plan.scrapeYahoo, false);
+    assert.equal(plan.morning, false);
+    assert.deepEqual(plan.historyDates, []);
+  }
+});
 test("first run catches September 29 and 30 and refreshes today's NHL stats", () => {
   const plan = planYahooSyncCycle({
     ...scope,
@@ -12,6 +30,46 @@ test("first run catches September 29 and 30 and refreshes today's NHL stats", ()
   assert.deepEqual(plan.historyDates, ["2026-09-29", "2026-09-30"]);
   assert.equal(plan.today, "2026-10-01");
   assert.equal(plan.refreshNhl, true);
+});
+
+test("overnight refresh respects winter time, hourly checkpoints and season boundaries", () => {
+  const now = new Date("2027-01-05T08:00:00Z"); // 03:00 Toronto
+  const plan = planYahooSyncCycle({ ...scope, now, checkpoint: {} });
+  assert.equal(plan.nhlDate, "2027-01-04");
+  assert.equal(plan.refreshNhl, true);
+  assert.equal(
+    planYahooSyncCycle({
+      ...scope,
+      now,
+      checkpoint: { lastNhlSyncAt: now.getTime() },
+    }).refreshNhl,
+    false,
+  );
+  const finalNight = planYahooSyncCycle({
+    ...scope,
+    now: new Date("2027-04-11T06:00:00Z"),
+    checkpoint: {},
+  });
+  assert.equal(finalNight.active, false);
+  assert.equal(finalNight.nhlDate, scope.endDate);
+  assert.equal(finalNight.refreshNhl, true);
+  assert.equal(finalNight.scrapeYahoo, false);
+  assert.equal(
+    planYahooSyncCycle({
+      ...scope,
+      now: new Date("2026-09-29T06:00:00Z"),
+      checkpoint: {},
+    }).refreshNhl,
+    false,
+  );
+  assert.equal(
+    planYahooSyncCycle({
+      ...scope,
+      now: new Date("2027-04-12T06:00:00Z"),
+      checkpoint: {},
+    }).refreshNhl,
+    false,
+  );
 });
 test("frequent rosters do not repeat hourly NHL or completed morning work", () => {
   const now = new Date("2026-10-01T14:15:00Z");
@@ -57,7 +115,7 @@ test("nightly UTC rollover is not Toronto rollover; yesterday is finalized after
 test("Yahoo runs hourly only in the Eastern daytime window, including winter time", () => {
   for (const now of [
     "2026-10-04T11:59:00Z",
-    "2026-10-05T03:00:00Z",
+    "2026-10-05T08:00:00Z",
     "2027-01-04T12:59:00Z",
   ]) {
     const plan = planYahooSyncCycle({
