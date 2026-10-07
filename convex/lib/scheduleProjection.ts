@@ -1,6 +1,7 @@
 import {
   buildCategoryResults,
   resolveMatchupCategories,
+  resolveMatchupScore,
 } from "../../src/lib/utils/features/matchup-details";
 import { projectMatchupTeamWeekStats } from "./matchupProjection";
 
@@ -81,11 +82,7 @@ export function projectWeeklyScheduleMatchups(
       const outcome = projectMatchupOutcome(row);
       let homeScore = row.homeScore ?? null;
       let awayScore = row.awayScore ?? null;
-      if (
-        live?.isInProgress &&
-        !row.isComplete &&
-        (homeScore === null || awayScore === null)
-      ) {
+      if (live?.isInProgress && !row.isComplete) {
         const home = live.teamStats.get(row.homeTeamId);
         const away = live.teamStats.get(row.awayTeamId);
         const categories =
@@ -96,12 +93,12 @@ export function projectWeeklyScheduleMatchups(
                 resolveMatchupCategories(live.categories),
               )
             : [];
-        homeScore ??= categories.filter(
-          (category) => category.winner === "home",
-        ).length;
-        awayScore ??= categories.filter(
-          (category) => category.winner === "away",
-        ).length;
+        const score = resolveMatchupScore(
+          { ...row, isComplete: row.isComplete ?? false },
+          categories,
+        );
+        homeScore = score.home;
+        awayScore = score.away;
       }
       return {
         id: row._id,

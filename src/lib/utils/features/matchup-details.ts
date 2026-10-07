@@ -107,6 +107,23 @@ type MatchupStatCategoryConfig = MatchupCategoryConfig & {
 
 type MatchupCategoryStats = MatchupTeamWeekStats | TeamWeekStatLine;
 
+/** Unfinished matchups follow their category totals, not a saved score snapshot. */
+export function resolveMatchupScore(
+  matchup: Partial<MatchupDetailsMatchup> | null,
+  categories: readonly CategoryResult[],
+): { home: number; away: number } {
+  const computed = {
+    home: categories.filter((category) => category.winner === "home").length,
+    away: categories.filter((category) => category.winner === "away").length,
+  };
+  if (categories.length && !isMatchupDetailsComplete(matchup, null))
+    return computed;
+  return {
+    home: matchup?.homeScore ?? computed.home,
+    away: matchup?.awayScore ?? computed.away,
+  };
+}
+
 export const MATCHUP_CATEGORY_MAP: Record<
   PlayerStatCategoryKey,
   MatchupStatCategoryConfig

@@ -6,7 +6,7 @@ import {
   projectWeeklyScheduleTeam,
 } from "./scheduleProjection";
 
-test("in-progress matchups show current category scores before final scores exist", () => {
+test("in-progress matchups replace stored score snapshots with current category scores", () => {
   const [matchup] = projectWeeklyScheduleMatchups(
     [
       {
@@ -15,6 +15,8 @@ test("in-progress matchups show current category scores before final scores exis
         awayTeamId: "away",
         gameType: "RS",
         isComplete: false,
+        homeScore: 0,
+        awayScore: 4,
       },
     ],
     {

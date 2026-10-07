@@ -16,7 +16,38 @@ import {
   isMatchupDetailsComplete,
   renderPlayerStatCell,
   buildCategoryResults,
+  resolveMatchupScore,
 } from "./matchup-details";
+
+void test("live scores follow category changes and corrections while final results stay fixed", () => {
+  const matchup = { homeScore: 0, awayScore: 4, isComplete: false };
+  const category = { key: "G", label: "G", homeValue: "2", awayValue: "1" };
+  assert.deepEqual(
+    resolveMatchupScore(matchup, [{ ...category, winner: "home" }]),
+    { home: 1, away: 0 },
+  );
+  assert.deepEqual(
+    resolveMatchupScore(matchup, [{ ...category, winner: "away" }]),
+    { home: 0, away: 1 },
+  );
+  assert.deepEqual(
+    resolveMatchupScore(matchup, [{ ...category, winner: "tie" }]),
+    { home: 0, away: 0 },
+  );
+  assert.deepEqual(
+    resolveMatchupScore({ ...matchup, isComplete: true }, [
+      { ...category, winner: "home" },
+    ]),
+    { home: 0, away: 4 },
+  );
+  assert.deepEqual(
+    resolveMatchupScore({ ...matchup, awayWin: true }, [
+      { ...category, winner: "home" },
+    ]),
+    { home: 0, away: 4 },
+  );
+  assert.deepEqual(resolveMatchupScore(matchup, []), { home: 0, away: 4 });
+});
 
 void test("blank goalie rates are unavailable, while genuine zeroes remain valid", () => {
   const stats = {

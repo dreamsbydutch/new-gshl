@@ -32,6 +32,7 @@ import {
   getStarPlayers,
   isMatchupDetailsComplete,
   resolveMatchupCategories,
+  resolveMatchupScore,
   toStatNumber,
 } from "@gshl-utils";
 import { canShareOwnerContent } from "@gshl-utils/features/whatsapp-share";
@@ -387,21 +388,7 @@ export function MatchupDetailsContent({
     );
   }, [awayTeamStats, homeTeamStats, matchupCategories]);
 
-  const computedScore = useMemo(() => {
-    return categoryResults.reduce(
-      (scores, category) => {
-        if (category.winner === "home") scores.home += 1;
-        if (category.winner === "away") scores.away += 1;
-        return scores;
-      },
-      { home: 0, away: 0 },
-    );
-  }, [categoryResults]);
-
-  const matchupScore = {
-    home: matchup?.homeScore ?? computedScore.home,
-    away: matchup?.awayScore ?? computedScore.away,
-  };
+  const matchupScore = resolveMatchupScore(matchup, categoryResults);
 
   const matchupStatus = useMemo(() => {
     if (!matchup) return "Matchup unavailable";
