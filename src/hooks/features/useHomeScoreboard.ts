@@ -58,12 +58,12 @@ export function useHomeScoreboard(seasonId: string) {
     });
 
   return {
-    matchups: [
+    matchupGroups: [
       { week: previousWeek, data: previousSchedule.data },
       { week, data: schedule.data },
       { week: nextWeek, data: nextSchedule.data },
     ].flatMap(({ week: matchupWeek, data }) => {
-      if (!matchupWeek) return [];
+      if (!matchupWeek || !data.matchups.length) return [];
       const startsAt = normalizeDateOnlyValue(matchupWeek.startDate);
       const endsAt = normalizeDateOnlyValue(matchupWeek.endDate);
       const matchupPhase =
@@ -72,13 +72,15 @@ export function useHomeScoreboard(seasonId: string) {
           : endsAt && today > endsAt
             ? "completed"
             : "current";
-      return data.matchups.map((matchup, index) => ({
-        matchup,
-        week: matchupWeek,
-        teams: data.teams,
-        phase: matchupPhase,
-        isCurrentWeekStart: matchupWeek.id === week?.id && index === 0,
-      }));
+      return [
+        {
+          matchups: data.matchups,
+          week: matchupWeek,
+          teams: data.teams,
+          phase: matchupPhase,
+          isCurrentWeek: matchupWeek.id === week?.id,
+        },
+      ];
     }),
     week,
     phase,
