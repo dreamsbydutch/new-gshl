@@ -107,7 +107,7 @@ function StandingsGroupTable({
   const showTies = season.usesLegacyTies;
 
   return (
-    <section className="overflow-hidden rounded-lg border border-slate-200">
+    <section className="overflow-hidden border-b border-slate-200">
       <div className="flex items-center gap-2.5 border-b border-slate-200 px-3 py-2 sm:px-4">
         {logoUrl ? (
           <Image
@@ -297,7 +297,7 @@ export function StandingsTable({
   });
 
   return (
-    <div className="mx-auto w-full max-w-6xl space-y-3 px-2.5 py-3 sm:px-6 sm:py-4">
+    <div className="gshl-page space-y-2">
       <div className="border-b border-slate-300 pb-2">
         <div className="flex items-center justify-between gap-3">
           <p className="text-[13px] font-semibold uppercase text-slate-500">
@@ -317,7 +317,7 @@ export function StandingsTable({
         </div>
       </div>
 
-      <div className="space-y-3">
+      <div className="space-y-2">
         {groups.map((group) => (
           <StandingsGroupTable
             key={group.title}

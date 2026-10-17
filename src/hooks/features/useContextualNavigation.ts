@@ -542,7 +542,7 @@ export function useLockerRoomContextNavigation(synchronizeRoute = true) {
     explicitValue: query.view,
     persistedValue: persistedView,
     validValues: LOCKER_ROOM_NAVIGATION_VIEWS,
-    fallbackValue: "roster",
+    fallbackValue: "overview",
   }).value;
   const routeDataReady =
     hasHydrated &&

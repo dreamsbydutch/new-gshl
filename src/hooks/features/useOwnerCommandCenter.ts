@@ -21,6 +21,7 @@ import type {
 } from "@gshl-lib/types/owner-command-center";
 import {
   buildOwnerCommandCenterView,
+  getOwnerMatchupPhase,
   countUnreadOwnerActivity,
   newestOwnerActivityAt,
   ownerCommandCenterActivityStorageKey,
@@ -91,6 +92,31 @@ function projectMatchup(options: {
 }
 
 export function useOwnerCommandCenter() {
+  const [today, setToday] = useState(() =>
+    new Intl.DateTimeFormat("en-CA", {
+      timeZone: "America/Toronto",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(new Date()),
+  );
+  useEffect(() => {
+    const refresh = () =>
+      setToday(
+        new Intl.DateTimeFormat("en-CA", {
+          timeZone: "America/Toronto",
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+        }).format(new Date()),
+      );
+    const timer = window.setInterval(refresh, 60_000);
+    window.addEventListener("focus", refresh);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("focus", refresh);
+    };
+  }, []);
   const { session, status } = useAuthSession();
   const ownerId = session?.user.ownerId ? String(session.user.ownerId) : null;
   const isLinkedOwner = Boolean(
@@ -215,15 +241,30 @@ export function useOwnerCommandCenter() {
         Number(left.week?.weekNum ?? 0) - Number(right.week?.weekNum ?? 0) ||
         left.matchup.id.localeCompare(right.matchup.id),
     );
-    const isComplete = (row: (typeof orderedSchedule)[number]) =>
-      row.matchup.homeScore !== null &&
-      row.matchup.homeScore !== undefined &&
-      row.matchup.awayScore !== null &&
-      row.matchup.awayScore !== undefined;
+    const phase = (row: (typeof orderedSchedule)[number]) => {
+      const week = weeksQuery.data.find(
+        (candidate) => candidate.id === row.matchup.weekId,
+      );
+      return getOwnerMatchupPhase(
+        week?.startDate,
+        week?.endDate ?? row.week?.endDate,
+        today,
+        row.matchup.homeScore != null && row.matchup.awayScore != null,
+      );
+    };
+    const currentRow = orderedSchedule.find((row) => phase(row) === "current");
     const upcomingRows = orderedSchedule
-      .filter((row) => !isComplete(row))
+      .filter((row) => phase(row) === "upcoming")
       .slice(0, 2);
-    const recentRows = orderedSchedule.filter(isComplete).reverse().slice(0, 5);
+    const recentRows = orderedSchedule
+      .filter(
+        (row) =>
+          phase(row) === "completed" &&
+          row.matchup.homeScore != null &&
+          row.matchup.awayScore != null,
+      )
+      .reverse()
+      .slice(0, 5);
     const matchupOptions = {
       teams: scheduleQuery.data.teams,
       weeks: weeksQuery.data,
@@ -246,6 +287,13 @@ export function useOwnerCommandCenter() {
       draftPicks,
       pendingOffers,
       listedPlayers,
+      currentMatchup: currentRow
+        ? projectMatchup({
+            ...matchupOptions,
+            matchup: currentRow.matchup,
+            fallbackWeek: currentRow.week,
+          })
+        : null,
       upcomingMatchups: upcomingRows.map((row) =>
         projectMatchup({
           ...matchupOptions,
@@ -278,6 +326,7 @@ export function useOwnerCommandCenter() {
     tradeQuery.data?.listings,
     ufaQuery.data?.pendingOffers,
     weeksQuery.data,
+    today,
   ]);
   const view = useMemo(
     () => (rawData ? buildOwnerCommandCenterView(rawData) : null),

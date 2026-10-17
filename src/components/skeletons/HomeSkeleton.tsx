@@ -2,7 +2,7 @@ import { Skeleton } from "../ui/SkeletonPrimitive";
 
 export function LeagueActivityRowsSkeleton() {
   return (
-    <div className="divide-y divide-slate-100 px-3 sm:px-5">
+    <div className="divide-y divide-slate-100">
       {Array.from({ length: 5 }).map((_, index) => (
         <div key={index} className="flex items-start gap-2.5 py-2.5">
           <Skeleton className="h-6 w-24 shrink-0 rounded-full" />
@@ -21,8 +21,8 @@ export function LeagueActivityRowsSkeleton() {
 
 export function LeagueActivityCardSkeleton() {
   return (
-    <section className="h-full min-w-0 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm sm:rounded-2xl">
-      <header className="space-y-2 border-b border-slate-100 px-3 py-3 sm:px-5">
+    <section className="gshl-section">
+      <header className="space-y-2 border-b border-slate-200 py-2">
         <Skeleton className="h-6 w-48" />
         <Skeleton className="h-3 w-56 max-w-full" />
       </header>
@@ -33,8 +33,8 @@ export function LeagueActivityCardSkeleton() {
 
 export function PowerRankingsHomeCardSkeleton() {
   return (
-    <section className="h-full min-w-0 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm sm:rounded-2xl">
-      <header className="flex items-center justify-between gap-3 border-b border-slate-100 px-3 py-3 sm:px-5">
+    <section className="gshl-section">
+      <header className="flex items-center justify-between gap-3 border-b border-slate-200 py-2">
         <div className="space-y-2">
           <Skeleton className="h-2.5 w-24" />
           <Skeleton className="h-6 w-36" />
@@ -42,7 +42,7 @@ export function PowerRankingsHomeCardSkeleton() {
         </div>
         <Skeleton className="h-11 w-20 rounded-lg" />
       </header>
-      <div className="px-3 sm:px-5">
+      <div className="py-1">
         {Array.from({ length: 8 }).map((_, index) => (
           <div
             key={index}
@@ -117,27 +117,25 @@ export function NHLScheduleHomeCardSkeleton() {
 export function HomeSkeleton() {
   return (
     <main
-      aria-label="Loading GSHL league dashboard"
+      aria-label="Loading GSHL league overview"
       aria-busy="true"
-      className="mx-auto w-full max-w-7xl px-3 py-3 sm:px-5 sm:py-5"
+      className="gshl-page"
     >
-      <div className="space-y-3 sm:space-y-4 lg:space-y-5">
-        <section className="mx-auto flex h-14 w-full max-w-5xl items-center gap-3 border-y border-slate-200 px-3">
-          <Skeleton className="h-9 w-9 shrink-0 rounded-xl" />
-          <div className="min-w-0 flex-1 space-y-2">
-            <Skeleton className="h-2.5 w-36 max-w-full" />
-            <Skeleton className="h-4 w-72 max-w-[90%]" />
-          </div>
-          <Skeleton className="h-11 w-20 shrink-0 rounded-full" />
-        </section>
-        <UfaHomeCardSkeleton />
-        <div className="mx-auto grid w-full min-w-0 max-w-5xl items-start gap-3 sm:gap-4 lg:grid-cols-2">
-          <PowerRankingsHomeCardSkeleton />
-          <NHLScheduleHomeCardSkeleton />
+      <div className="border-b border-slate-200 py-2">
+        <Skeleton className="my-2 h-4 w-28" />
+        <div className="flex gap-2 overflow-hidden">
+          {[0, 1, 2, 3, 4].map((item) => (
+            <Skeleton key={item} className="h-20 w-40 shrink-0" />
+          ))}
         </div>
-        <div className="mx-auto w-full max-w-5xl">
-          <LeagueActivityCardSkeleton />
-        </div>
+      </div>
+      <div className="border-b border-slate-200 py-2">
+        <Skeleton className="my-2 h-4 w-36" />
+        <Skeleton className="h-14 w-full" />
+      </div>
+      <div className="grid gap-x-6 lg:grid-cols-2">
+        <LeagueActivityCardSkeleton />
+        <PowerRankingsHomeCardSkeleton />
       </div>
     </main>
   );

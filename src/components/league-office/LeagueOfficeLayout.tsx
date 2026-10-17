@@ -1,96 +1,82 @@
 "use client";
-
+import Link from "next/link";
 import { useLeagueOfficeContextNavigation } from "@gshl-hooks";
-import {
-  HorizontalToggle,
-  PageContextNavigation,
-  SecondaryPageToolbar,
-} from "@gshl-nav";
-import type { ToggleItem } from "@gshl-types";
+import { SectionNavigation } from "@gshl-components/nav/SectionNavigation";
 import { LeagueOfficeSkeleton } from "@gshl-skeletons";
-
 export function LeagueOfficeLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
   const navigation = useLeagueOfficeContextNavigation();
-  const selectedType = navigation.selectedView;
-  const isMockDraftPage = navigation.isMockDraftPage;
-
-  const selectView = (type: string | null) => {
-    const nextType = type ?? "draft";
-    if (
-      nextType === "mockDraft" ||
-      nextType === "draft" ||
-      nextType === "freeAgents" ||
-      nextType === "confBattle" ||
-      nextType === "ownerRankings" ||
-      nextType === "performances"
-    ) {
-      navigation.selectView(nextType);
-    }
-  };
-
-  const pageToolbarProps: {
-    toolbarKeys: ToggleItem<string | null>[];
-    activeKey: string | null;
-  } = {
-    activeKey: isMockDraftPage ? "mockDraft" : selectedType,
-    toolbarKeys: [
-      { key: "performances", value: "Performances", setter: selectView },
-      ...(navigation.showMockDraft
-        ? [{ key: "mockDraft", value: "Mock", setter: selectView }]
-        : []),
-      {
-        key: "draft",
-        value: "Classes",
-        setter: selectView,
-      },
-      {
-        key: "freeAgents",
-        value: "UFA",
-        setter: selectView,
-      },
-      {
-        key: "confBattle",
-        value: "Conf v Conf",
-        setter: selectView,
-      },
-      {
-        key: "ownerRankings",
-        value: "Owners",
-        setter: selectView,
-      },
-    ],
-  };
-
+  const leagueView =
+    navigation.selectedView === "ownerRankings" ||
+    navigation.selectedView === "confBattle";
   return (
-    <div className="font-varela">
-      <PageContextNavigation ariaLabel="League Office views">
-        <SecondaryPageToolbar>
-          <HorizontalToggle<ToggleItem<string | null>>
-            items={pageToolbarProps.toolbarKeys}
-            selectedItem={
-              pageToolbarProps.toolbarKeys.find(
-                (item) => item.key === pageToolbarProps.activeKey,
-              ) ?? null
-            }
-            onSelect={(type: ToggleItem<string | null>) =>
-              type.setter(type.key)
-            }
-            getItemKey={(type: ToggleItem<string | null>) => type.key}
-            getItemLabel={(type: ToggleItem<string | null>) => type.value}
-            itemClassName="text-nowrap text-sm"
-          />
-        </SecondaryPageToolbar>
-      </PageContextNavigation>
-      <main aria-labelledby="league-office-page-heading">
-        <h1 id="league-office-page-heading" className="sr-only">
-          League Office
-        </h1>
+    <>
+      <SectionNavigation section={leagueView ? "league" : "players"} />
+      {leagueView ||
+      navigation.selectedView === "draft" ||
+      navigation.isMockDraftPage ? (
+        <div className="gshl-local-controls">
+          <nav
+            aria-label={leagueView ? "League comparisons" : "Draft tools"}
+            className="mx-auto flex max-w-6xl gap-4 px-3 sm:px-5"
+          >
+            {leagueView ? (
+              <>
+                <Link
+                  className="gshl-text-action"
+                  href="/leagueoffice?view=ownerRankings"
+                  aria-current={
+                    navigation.selectedView === "ownerRankings"
+                      ? "page"
+                      : undefined
+                  }
+                >
+                  Owner rankings
+                </Link>
+                <Link
+                  className="gshl-text-action"
+                  href="/leagueoffice?view=confBattle"
+                  aria-current={
+                    navigation.selectedView === "confBattle"
+                      ? "page"
+                      : undefined
+                  }
+                >
+                  Conference contest
+                </Link>
+              </>
+            ) : (
+              <>
+                <Link
+                  className="gshl-text-action"
+                  href="/leagueoffice?view=draft"
+                >
+                  Draft classes
+                </Link>
+                {navigation.showMockDraft ? (
+                  <Link
+                    className="gshl-text-action"
+                    href="/leagueoffice/mock-draft"
+                    aria-current={
+                      navigation.isMockDraftPage ? "page" : undefined
+                    }
+                  >
+                    Mock draft
+                  </Link>
+                ) : null}
+              </>
+            )}
+          </nav>
+        </div>
+      ) : null}
+      <main
+        aria-label={leagueView ? "League comparisons" : "Player acquisition"}
+      >
         {navigation.isReady ? children : <LeagueOfficeSkeleton />}
       </main>
-    </div>
+    </>
   );
 }

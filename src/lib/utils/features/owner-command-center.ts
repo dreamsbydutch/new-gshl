@@ -102,7 +102,7 @@ function matchupHref(
 ) {
   return buildMatchupNavigationHref(matchup.id, {
     from: "lockerroom",
-    view: "history",
+    view: "overview",
     season: data.season?.id ?? null,
     week: matchup.weekId,
     owner: data.ownerId,
@@ -335,6 +335,13 @@ function buildActivity(data: OwnerCommandCenterData) {
 
 export function buildOwnerCommandCenterView(data: OwnerCommandCenterData) {
   const teamId = data.team?.id ?? "";
+  const currentMatchup = data.currentMatchup
+    ? {
+        ...data.currentMatchup,
+        href: matchupHref(data.currentMatchup, data, teamId),
+        score: matchupScore(data.currentMatchup, teamId),
+      }
+    : null;
   const upcomingMatchups = data.upcomingMatchups.map((matchup) => ({
     ...matchup,
     href: matchupHref(matchup, data, teamId),
@@ -363,6 +370,7 @@ export function buildOwnerCommandCenterView(data: OwnerCommandCenterData) {
     cap: buildCapView(data),
     contractDecisions: buildContractDecisions(data),
     matchup: {
+      current: currentMatchup,
       next: upcomingMatchups[0] ?? null,
       upcoming: upcomingMatchups,
       latest: recentMatchups[0] ?? null,
@@ -396,6 +404,21 @@ export function buildOwnerCommandCenterView(data: OwnerCommandCenterData) {
       }),
     },
   };
+}
+
+/** A live score does not make a week complete. Dates take precedence. */
+export function getOwnerMatchupPhase(
+  startDate: string | null | undefined,
+  endDate: string | null | undefined,
+  today: string,
+  hasScores: boolean,
+): "current" | "upcoming" | "completed" {
+  const start = normalizeDateOnlyValue(startDate);
+  const end = normalizeDateOnlyValue(endDate);
+  if (start && today < start) return "upcoming";
+  if (end && today > end) return "completed";
+  if (start && end) return "current";
+  return hasScores ? "completed" : "upcoming";
 }
 
 export function countUnreadOwnerActivity(

@@ -25,23 +25,23 @@ const activityStyle: Record<
 > = {
   signing: {
     label: "Signed",
-    badge: "bg-violet-50 text-violet-700 ring-violet-200",
+    badge: "bg-slate-50 text-slate-600 ring-slate-200",
   },
   trade: {
     label: "Traded",
-    badge: "bg-blue-50 text-blue-700 ring-blue-200",
+    badge: "bg-slate-50 text-slate-600 ring-slate-200",
   },
   add: {
     label: "Added",
-    badge: "bg-emerald-50 text-emerald-700 ring-emerald-200",
+    badge: "bg-slate-50 text-slate-600 ring-slate-200",
   },
   drop: {
     label: "Dropped",
-    badge: "bg-rose-50 text-rose-700 ring-rose-200",
+    badge: "bg-slate-50 text-slate-600 ring-slate-200",
   },
   missed_start: {
     label: "Missed start",
-    badge: "bg-amber-50 text-amber-700 ring-amber-200",
+    badge: "bg-slate-50 text-slate-600 ring-slate-200",
   },
 };
 
@@ -76,37 +76,28 @@ export function LeagueActivityCard({ seasonId }: { seasonId?: string }) {
   );
 
   return (
-    <section
-      aria-labelledby="league-activity-heading"
-      className="h-full min-w-0 overflow-hidden rounded-lg border border-slate-200 bg-white"
-    >
-      <header className="border-b border-slate-100 px-3 py-3 sm:px-5">
-        <h2
-          id="league-activity-heading"
-          className="font-oswald text-lg text-slate-950 sm:text-xl"
-        >
+    <section aria-labelledby="league-activity-heading" className="gshl-section">
+      <header className="flex min-h-9 items-center border-b border-slate-200">
+        <h2 id="league-activity-heading" className="gshl-section-title">
           Recent league activity
         </h2>
-        <p className="mt-0.5 text-xs text-slate-500">
-          Signings, roster moves and missed starts
-        </p>
       </header>
 
       {isLoading ? (
         <LeagueActivityRowsSkeleton />
       ) : error ? (
-        <p className="px-4 py-6 text-center text-sm text-slate-500 sm:px-5">
+        <p className="py-3 text-sm text-slate-500">
           League activity is unavailable right now.
         </p>
       ) : activity.length === 0 ? (
-        <p className="px-4 py-6 text-center text-sm text-slate-500 sm:px-5">
+        <p className="py-3 text-sm text-slate-500">
           No recent league activity has been recorded.
         </p>
       ) : (
         <ul
           id="home-league-activity-list"
           aria-label="Latest league transactions and roster events"
-          className="divide-y divide-slate-100 px-3 sm:px-5"
+          className="divide-y divide-slate-100"
         >
           {visibleActivity.map((event) => {
             const style = activityStyle[event.type];
@@ -117,7 +108,7 @@ export function LeagueActivityCard({ seasonId }: { seasonId?: string }) {
               >
                 <span
                   className={cn(
-                    "mt-0.5 w-24 shrink-0 rounded-full px-2 py-1 text-center font-barlow text-xs font-semibold uppercase tracking-wide ring-1 ring-inset",
+                    "mt-0.5 w-16 shrink-0 rounded px-1 py-1 text-center font-barlow text-[11px] font-medium ring-1 ring-inset",
                     style.badge,
                   )}
                 >

@@ -75,7 +75,7 @@ export function WeeklyEditionArticle({
           </span>
         </div>
 
-        <div className="flex items-center justify-between gap-4 px-4 py-3 sm:px-6">
+        <div className="flex items-center justify-between gap-3 px-3 py-2 sm:px-4">
           <div className="flex min-w-0 items-center gap-2.5">
             <span className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-white p-0.5 shadow-sm">
               <Image
@@ -91,7 +91,7 @@ export function WeeklyEditionArticle({
               <p className="font-oswald text-lg font-bold uppercase leading-none tracking-tight text-slate-950">
                 GSHL Press Box
               </p>
-              <p className="mt-1 truncate text-[11px] font-bold uppercase tracking-[0.12em] text-blue-700 sm:text-xs">
+              <p className="mt-1 truncate text-[11px] font-bold uppercase tracking-[0.12em] text-slate-600 sm:text-xs">
                 {preview ? "Newsroom preview" : edition.seasonName} ·{" "}
                 {edition.issueLabel}
               </p>
@@ -119,8 +119,8 @@ export function WeeklyEditionArticle({
         </div>
       </header>
 
-      <div className="px-4 py-5 sm:px-6 sm:py-7">
-        <p className="text-xs font-bold uppercase tracking-[0.14em] text-blue-700">
+      <div className="px-3 py-3 sm:px-4">
+        <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-600">
           The lead
         </p>
         <h1 className="mt-2 max-w-2xl font-oswald text-2xl font-bold leading-[1.05] tracking-tight text-slate-950 sm:text-3xl">
@@ -131,7 +131,7 @@ export function WeeklyEditionArticle({
         </p>
 
         {primaryArticles.length > 0 ? (
-          <div className="mt-5 grid gap-3 sm:grid-cols-2">
+          <div className="mt-2 grid gap-x-5 sm:grid-cols-2">
             {primaryArticles.map((section) => (
               <WeeklyEditionSectionCard
                 key={section.id}
@@ -144,7 +144,7 @@ export function WeeklyEditionArticle({
         ) : null}
 
         {standardArticles.length > 0 ? (
-          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          <div className="mt-2 grid gap-x-5 sm:grid-cols-2">
             {standardArticles.map((section) => (
               <WeeklyEditionSectionCard
                 key={section.id}

@@ -31,7 +31,7 @@
     --radius: 0.5rem;
     --app-mobile-header-height: 3.5rem;
     --app-primary-nav-height: 4rem;
-    --app-page-context-row-height: 2.25rem;
+    --app-page-context-row-height: 2.75rem;
   }
   .dark {
     --background: 0 0% 3.9%;
@@ -134,5 +134,24 @@
   .rulebook-page aside,
   .rulebook-page table {
     break-inside: avoid;
+  }
+}
+
+/* Compact sections own spacing; nested surfaces do not add another gutter. */
+@layer components {
+  .gshl-page {
+    @apply mx-auto w-full max-w-6xl px-3 py-2 sm:px-5 sm:py-3;
+  }
+  .gshl-section {
+    @apply min-w-0 break-inside-avoid border-b border-slate-200 bg-white py-2;
+  }
+  .gshl-section-title {
+    @apply text-sm font-bold leading-5 text-slate-950;
+  }
+  .gshl-text-action {
+    @apply inline-flex min-h-11 shrink-0 items-center gap-1 text-xs font-semibold text-slate-700 underline-offset-4 hover:text-slate-950 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500;
+  }
+  .gshl-local-controls {
+    @apply border-b border-slate-200 bg-slate-50;
   }
 }

@@ -42,14 +42,14 @@ export function WeeklyEditionSectionCard({
       id={section.id}
       className={
         featured
-          ? "flex h-full flex-col rounded-2xl bg-gradient-to-br from-slate-950 via-slate-900 to-blue-950 p-4 text-white shadow-lg shadow-slate-950/10 sm:p-5"
-          : "flex h-full flex-col rounded-xl border border-slate-200 bg-slate-50/80 p-3.5"
+          ? "flex h-full flex-col border-b border-slate-300 bg-white py-3 text-slate-950"
+          : "flex h-full flex-col border-b border-slate-200 bg-white py-3"
       }
     >
       <div className="flex items-center justify-between gap-3">
         <p
           className={`text-[11px] font-bold uppercase tracking-[0.12em] sm:text-xs ${
-            featured ? "text-cyan-300" : "text-blue-700"
+            featured ? "text-slate-600" : "text-slate-600"
           }`}
         >
           {section.eyebrow}
@@ -94,7 +94,7 @@ export function WeeklyEditionSectionCard({
       <h2
         className={`mt-1.5 font-oswald font-semibold leading-tight ${
           featured
-            ? "text-xl text-white sm:text-2xl"
+            ? "text-lg text-slate-950 sm:text-xl"
             : "text-base text-slate-950"
         }`}
       >
@@ -102,7 +102,7 @@ export function WeeklyEditionSectionCard({
       </h2>
       <p
         className={`mt-1.5 text-[11px] font-medium uppercase leading-5 tracking-[0.06em] sm:text-xs ${
-          featured ? "text-slate-300" : "text-slate-600"
+          featured ? "text-slate-600" : "text-slate-600"
         }`}
       >
         By <span className="font-bold">{author.name}</span>
@@ -111,7 +111,7 @@ export function WeeklyEditionSectionCard({
       </p>
       <p
         className={`mt-2 whitespace-pre-line text-sm leading-6 ${
-          featured ? "text-slate-200" : "text-slate-600"
+          featured ? "text-slate-600" : "text-slate-600"
         }`}
       >
         {section.body}
@@ -124,7 +124,7 @@ export function WeeklyEditionSectionCard({
               href={buildWeeklyEditionCtaHref(link.href)}
               className={`inline-flex min-h-11 items-center gap-1 rounded-full px-3 py-2 text-xs font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 motion-reduce:transition-none ${
                 featured
-                  ? "bg-white/10 text-white hover:bg-white/20"
+                  ? "bg-slate-950 text-white hover:bg-slate-800"
                   : "border border-slate-200 bg-white text-slate-600 hover:border-slate-400 hover:text-slate-950"
               }`}
             >

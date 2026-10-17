@@ -4,6 +4,7 @@ import test from "node:test";
 import type { OwnerCommandCenterData } from "@gshl-lib/types/owner-command-center";
 import {
   buildOwnerCommandCenterView,
+  getOwnerMatchupPhase,
   countUnreadOwnerActivity,
   newestOwnerActivityAt,
   ownerCommandCenterActivityStorageKey,
@@ -313,5 +314,38 @@ void test("owner activity uses a stable per-owner unread marker", () => {
   assert.equal(
     ownerCommandCenterActivityStorageKey("owner-1"),
     "gshl-owner-command-center-activity:owner-1",
+  );
+});
+
+void test("live matchup scores remain current until the week ends", () => {
+  assert.equal(
+    getOwnerMatchupPhase("2026-10-12", "2026-10-18", "2026-10-17", true),
+    "current",
+  );
+  assert.equal(
+    getOwnerMatchupPhase("2026-10-12", "2026-10-18", "2026-10-18", true),
+    "current",
+  );
+  assert.equal(
+    getOwnerMatchupPhase("2026-10-12", "2026-10-18", "2026-10-19", true),
+    "completed",
+  );
+  assert.equal(
+    getOwnerMatchupPhase("2026-10-19", "2026-10-25", "2026-10-17", true),
+    "upcoming",
+  );
+  const current = { ...data.upcomingMatchups[0]!, homeScore: 8, awayScore: 4 };
+  const view = buildOwnerCommandCenterView({
+    ...data,
+    currentMatchup: current,
+    upcomingMatchups: data.upcomingMatchups.slice(1),
+  });
+  assert.equal(view.matchup.current?.id, current.id);
+  assert.equal(view.matchup.current?.score, "8-4");
+  assert.equal(
+    new URL(view.matchup.current.href, "https://gshl.test").searchParams.get(
+      "view",
+    ),
+    "overview",
   );
 });

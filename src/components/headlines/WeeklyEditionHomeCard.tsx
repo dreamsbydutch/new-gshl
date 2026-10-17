@@ -91,25 +91,30 @@ export function WeeklyEditionHomeCard() {
 
   if (isLoading) {
     return (
-      <section className="mx-auto flex h-14 w-full max-w-5xl items-center gap-3 border-y border-slate-200 px-3">
+      <section className="mx-auto flex h-14 w-full max-w-none items-center gap-3 border-b border-slate-200 px-3">
         <Skeleton className="h-9 w-9 rounded-xl" />
         <Skeleton className="h-4 flex-1" />
         <Skeleton className="h-8 w-20 rounded-full" />
       </section>
     );
   }
-  if (!edition) return null;
+  if (!edition)
+    return (
+      <p className="py-3 text-sm text-slate-500">
+        The next league edition will appear here when published.
+      </p>
+    );
 
   return (
     <>
-      <section className="mx-auto flex w-full max-w-5xl items-stretch overflow-hidden border-y border-slate-300 bg-white text-slate-950">
+      <section className="mx-auto flex w-full max-w-none items-stretch overflow-hidden border-b border-slate-200 bg-white text-slate-950">
         <button
           ref={triggerRef}
           type="button"
           onClick={() => setIsOpen(true)}
-          className="group flex min-w-0 flex-1 items-center gap-3 px-2 py-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-slate-500 sm:px-3"
+          className="group flex min-w-0 flex-1 items-center gap-3 py-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-slate-500"
         >
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white p-0.5 shadow-inner">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded bg-white p-0.5">
             <Image
               src={WEEKLY_EDITION_LOGO_URL}
               alt=""
@@ -120,7 +125,7 @@ export function WeeklyEditionHomeCard() {
           </span>
           <span className="min-w-0 flex-1">
             <span className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500 sm:text-xs">
-              Press Box
+              Latest edition
               <span className="text-slate-400">·</span>
               <span className="truncate text-slate-500">
                 {edition.issueLabel}

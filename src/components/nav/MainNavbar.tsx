@@ -9,7 +9,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, CalendarDays, House, Shirt, Trophy } from "lucide-react";
+import { ArrowLeft, House, Shirt, Trophy, Users } from "lucide-react";
 import { useAppPathname, useGlobalSeasonContextNavigation } from "@gshl-hooks";
 import {
   calculatePageScrollProgress,
@@ -82,35 +82,24 @@ export function MainNavbar({ className, search = "" }: NavbarProps) {
       icon: <House className="h-5 w-5" aria-hidden="true" />,
     },
     {
-      id: "schedule",
-      label: "Schedule",
-      href: "/schedule",
-      icon: <CalendarDays className="h-5 w-5" aria-hidden="true" />,
+      id: "lockerroom",
+      label: "My Team",
+      href: "/lockerroom?view=overview",
+      icon: <Shirt className="h-5 w-5" aria-hidden="true" />,
     },
     {
-      id: "standings",
-      label: "Standings",
-      href: "/standings",
+      id: "league",
+      label: "League",
+      href: "/league",
       icon: <Trophy className="h-5 w-5" aria-hidden="true" />,
     },
     {
-      id: "lockerroom",
-      label: "My Team",
-      href: "/lockerroom",
-      icon: <Shirt className="h-5 w-5" aria-hidden="true" />,
+      id: "players",
+      label: "Players",
+      href: "/players",
+      icon: <Users className="h-5 w-5" aria-hidden="true" />,
     },
   ];
-  const mobileNavItems: LinkNavItemType[] = routeContext.backHref
-    ? [
-        {
-          id: "back",
-          label: "Back",
-          href: routeContext.backHref,
-          icon: <ArrowLeft className="h-5 w-5" aria-hidden="true" />,
-        },
-        ...navItems.slice(1),
-      ]
-    : navItems;
   const seasonControlProps = seasonNavigation.selectedSeasonSummary
     ? {
         currentSeason: seasonNavigation.currentSeasonSummary,
@@ -142,6 +131,15 @@ export function MainNavbar({ className, search = "" }: NavbarProps) {
             <span className="sr-only">GSHL</span>
           </Link>
           <div className="flex min-w-0 items-center justify-center gap-1.5 px-1">
+            {routeContext.backHref ? (
+              <Link
+                href={routeContext.backHref}
+                aria-label={routeContext.backLabel}
+                className="flex h-11 w-9 shrink-0 items-center justify-center rounded focus-visible:ring-2 focus-visible:ring-white"
+              >
+                <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+              </Link>
+            ) : null}
             {showTeamControl ? (
               <HeaderTeamSelect />
             ) : (
@@ -204,7 +202,7 @@ export function MainNavbar({ className, search = "" }: NavbarProps) {
             <span>GSHL</span>
           </Link>
           <div className="flex min-w-0 flex-1 items-stretch justify-around lg:hidden">
-            {mobileNavItems.map((item) => (
+            {navItems.map((item) => (
               <LinkNavItem
                 key={item.id}
                 {...item}
@@ -234,6 +232,12 @@ export function MainNavbar({ className, search = "" }: NavbarProps) {
             />
           </div>
           <div className="hidden shrink-0 lg:block">
+            {routeContext.backHref ? (
+              <Link href={routeContext.backHref} className="gshl-text-action">
+                <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+                {routeContext.backLabel}
+              </Link>
+            ) : null}
             {showTeamControl && <HeaderTeamSelect />}
             {seasonNavigation.showSeasonControl &&
               (seasonNavigation.isReady && seasonControlProps ? (

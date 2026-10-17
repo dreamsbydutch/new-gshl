@@ -12,12 +12,12 @@ export function HomeScoreboardSkeleton() {
     <section
       aria-label="Loading GSHL scoreboard"
       aria-busy="true"
-      className="mx-auto w-full max-w-5xl overflow-hidden"
+      className="mx-auto w-full max-w-none overflow-hidden"
     >
       <Skeleton className="mb-2 h-4 w-36" />
       <div className="flex gap-2 overflow-hidden">
         {[0, 1, 2, 3, 4, 5].map((item) => (
-          <Skeleton key={item} className="h-24 w-24 shrink-0 rounded-lg" />
+          <Skeleton key={item} className="h-20 w-40 shrink-0 rounded-lg" />
         ))}
       </div>
     </section>
@@ -41,7 +41,7 @@ export function HomeScoreboard({ seasonId }: { seasonId: string }) {
   return (
     <section
       aria-label="GSHL matchups"
-      className="mx-auto w-full min-w-0 max-w-5xl"
+      className="mx-auto w-full min-w-0 max-w-none"
     >
       {isScheduleLoading ? (
         <p role="status" className="py-3 text-sm text-slate-500">
@@ -64,7 +64,7 @@ export function HomeScoreboard({ seasonId }: { seasonId: string }) {
             ref={track}
             aria-label="Weekly matchups"
             tabIndex={0}
-            className="flex snap-x snap-mandatory scroll-px-0.5 gap-4 overflow-x-auto overscroll-x-contain p-0.5 pb-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500"
+            className="flex snap-x snap-mandatory scroll-px-0.5 gap-3 overflow-x-auto overscroll-x-contain p-0.5 pb-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500"
           >
             {matchupGroups.map(
               ({
@@ -79,20 +79,20 @@ export function HomeScoreboard({ seasonId }: { seasonId: string }) {
                   ref={isCurrentWeek ? currentWeekStart : undefined}
                   className="w-max shrink-0"
                 >
-                  <h2 className="sticky left-0 mb-2 w-max max-w-full bg-white text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                  <h3 className="sticky left-0 mb-1 w-max max-w-full bg-white text-xs font-semibold uppercase tracking-wide text-slate-500">
                     Week {matchupWeek.weekNum} ·{" "}
                     {matchupPhase === "current"
                       ? "In progress"
                       : matchupPhase === "upcoming"
                         ? "Matchup preview →"
                         : "Week complete"}
-                  </h2>
+                  </h3>
                   <ul
                     aria-label={`Week ${matchupWeek.weekNum} matchups`}
                     className="flex gap-2"
                   >
                     {matchups.map((matchup) => (
-                      <li key={matchup.id} className="w-24 shrink-0 snap-start">
+                      <li key={matchup.id} className="w-40 shrink-0 snap-start">
                         <Link
                           href={buildMatchupNavigationHref(matchup.id, {
                             from: "schedule",
@@ -100,7 +100,7 @@ export function HomeScoreboard({ seasonId }: { seasonId: string }) {
                             season: seasonId,
                             week: matchupWeek.id,
                           })}
-                          className="block rounded-lg border border-slate-200 bg-white p-3 text-slate-900 shadow-sm transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                          className="block rounded-lg border border-slate-200 bg-white px-2 py-2 text-slate-900 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
                         >
                           <div className="space-y-2">
                             {(["away", "home"] as const).map((side) => {
@@ -121,7 +121,7 @@ export function HomeScoreboard({ seasonId }: { seasonId: string }) {
                                       alt=""
                                       width={32}
                                       height={32}
-                                      className="h-8 w-8 shrink-0 rounded bg-white object-contain"
+                                      className="h-6 w-6 shrink-0 rounded bg-white object-contain"
                                     />
                                   ) : (
                                     <span
@@ -131,7 +131,7 @@ export function HomeScoreboard({ seasonId }: { seasonId: string }) {
                                       {team?.name?.slice(0, 1) ?? "?"}
                                     </span>
                                   )}
-                                  <span className="sr-only">
+                                  <span className="min-w-0 flex-1 truncate text-xs font-semibold">
                                     {team?.name ?? "Team TBD"}
                                   </span>
                                   <span className="font-oswald text-xl tabular-nums">

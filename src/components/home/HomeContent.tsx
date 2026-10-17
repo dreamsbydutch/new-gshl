@@ -1,73 +1,62 @@
 "use client";
-
-import { MockDraftPreview } from "@gshl-components/draft/DraftBoardList";
 import { useSeasonState } from "@gshl-hooks";
 import { HomeSkeleton } from "@gshl-skeletons";
-import { cn, findMockDraftSeason, resolveDraftHubSeason } from "@gshl-utils";
+import { resolveDraftHubSeason } from "@gshl-utils";
+import { SectionHeading } from "@gshl-components/ui/SectionHeading";
+import { WeeklyEditionHomeCard } from "@gshl-components/headlines/WeeklyEditionHomeCard";
 import { LeagueActivityCard } from "./LeagueActivityCard";
 import { PowerRankingsHomeCard } from "./PowerRankingsHomeCard";
 import { NHLScheduleHomeCard } from "./NHLScheduleHomeCard";
-import { UfaHomeCard } from "@gshl-components/contracts";
-import { WeeklyEditionHomeCard } from "@gshl-components/headlines/WeeklyEditionHomeCard";
-import { DraftHubCard } from "./DraftHubCard";
-import { OwnerCommandCenter } from "./OwnerCommandCenter";
-import { DraftNotificationSetup } from "@gshl-components/notifications/DraftNotificationSetup";
 import { HomeScoreboard } from "./HomeScoreboard";
-
+import { DraftHubCard } from "./DraftHubCard";
+import { StandingsPreview } from "./StandingsPreview";
+import { FreeAgencyNotice } from "./FreeAgencyNotice";
 export function HomeContent() {
-  const { seasons, selectedSeason, currentSeason, defaultSeason, isLoading } =
-    useSeasonState();
-
-  if (isLoading) {
-    return <HomeSkeleton />;
-  }
-
-  const mockDraftSeason = findMockDraftSeason(seasons);
+  const { seasons, currentSeason, defaultSeason, isLoading } = useSeasonState();
+  if (isLoading) return <HomeSkeleton />;
+  // Home follows the live league; historical selections belong in League.
+  const season = currentSeason ?? defaultSeason;
   const draftSeason = resolveDraftHubSeason(seasons);
-  const dashboardSeason = selectedSeason ?? currentSeason ?? defaultSeason;
-
   return (
-    <main
-      aria-labelledby="home-dashboard-heading"
-      className="mx-auto w-full max-w-7xl px-3 py-3 sm:px-5 sm:py-5"
-    >
+    <main aria-labelledby="home-dashboard-heading" className="gshl-page">
       <h1 id="home-dashboard-heading" className="sr-only">
-        GSHL league dashboard
+        Around the GSHL
       </h1>
-      <div className="space-y-3 sm:space-y-4 lg:space-y-5">
-        {dashboardSeason ? (
-          <HomeScoreboard seasonId={String(dashboardSeason.id)} />
-        ) : null}
-        <DraftNotificationSetup compact />
-        <OwnerCommandCenter />
+      {draftSeason?.draftStartAt ? <DraftHubCard season={draftSeason} /> : null}
+      <FreeAgencyNotice />
+      <section aria-labelledby="home-week-heading">
+        <SectionHeading
+          id="home-week-heading"
+          title="This week"
+          href={
+            season
+              ? `/schedule?view=week&season=${encodeURIComponent(String(season.id))}`
+              : "/schedule?view=week"
+          }
+          action="Full schedule"
+        />
+        {season ? (
+          <HomeScoreboard seasonId={String(season.id)} />
+        ) : (
+          <p className="py-3 text-sm text-slate-500">
+            The league schedule will appear when a season is available.
+          </p>
+        )}
+      </section>
+      <section aria-labelledby="home-news-heading">
+        <SectionHeading
+          id="home-news-heading"
+          title="League headlines"
+          href="/headlines"
+          action="All news"
+        />
         <WeeklyEditionHomeCard />
-        <UfaHomeCard />
-        <div
-          className={cn(
-            "mx-auto grid w-full min-w-0 max-w-5xl items-start gap-3 sm:gap-4",
-            dashboardSeason && "lg:grid-cols-2",
-          )}
-        >
-          {dashboardSeason ? (
-            <PowerRankingsHomeCard seasonId={String(dashboardSeason.id)} />
-          ) : null}
-          <NHLScheduleHomeCard />
-        </div>
-        <div className="mx-auto w-full max-w-5xl">
-          <LeagueActivityCard
-            seasonId={
-              dashboardSeason?.id ? String(dashboardSeason.id) : undefined
-            }
-          />
-        </div>
-        {draftSeason?.draftStartAt ? (
-          <DraftHubCard season={draftSeason} />
-        ) : null}
-        {mockDraftSeason ? (
-          <div className="mx-auto w-full max-w-5xl">
-            <MockDraftPreview seasonId={String(mockDraftSeason.id)} />
-          </div>
-        ) : null}
+      </section>
+      <div className="gap-6 lg:columns-2">
+        <LeagueActivityCard seasonId={season?.id} />
+        {season ? <StandingsPreview seasonId={String(season.id)} /> : null}
+        {season ? <PowerRankingsHomeCard seasonId={String(season.id)} /> : null}
+        <NHLScheduleHomeCard />
       </div>
     </main>
   );

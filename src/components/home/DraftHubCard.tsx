@@ -46,9 +46,9 @@ export function DraftHubCard({ season }: DraftHubCardProps) {
   return (
     <section
       aria-labelledby="draft-hub-home-heading"
-      className="mx-auto w-full max-w-5xl border-y border-slate-300 py-3 sm:py-4"
+      className="mx-auto w-full max-w-none border-b border-slate-300 py-2"
     >
-      <div className="grid items-center gap-3 md:grid-cols-[1fr_auto] md:gap-5">
+      <div className="grid items-center gap-2 md:grid-cols-[1fr_auto]">
         <div className="flex min-w-0 items-start gap-3">
           <Image
             src="/favicon.ico"
@@ -68,13 +68,10 @@ export function DraftHubCard({ season }: DraftHubCardProps) {
             </div>
             <h2
               id="draft-hub-home-heading"
-              className="text-xl font-black text-slate-950 sm:text-2xl"
+              className="text-base font-bold text-slate-950"
             >
-              {draftYear} GSHL Draft Hub
+              {draftYear} GSHL draft
             </h2>
-            <p className="mt-0.5 max-w-2xl text-sm text-slate-600">
-              Live board, team rosters, and picks.
-            </p>
             <p className="mt-1 text-xs font-semibold text-slate-600">
               {new Intl.DateTimeFormat("en-CA", {
                 timeZone: "America/Toronto",
@@ -84,7 +81,7 @@ export function DraftHubCard({ season }: DraftHubCardProps) {
             </p>
           </div>
         </div>
-        <div className="flex flex-col items-start gap-3 md:items-end">
+        <div className="flex flex-wrap items-center gap-2 md:items-end">
           {!isLive && !isComplete && countdown.countdown ? (
             <div>
               <p className="mb-0.5 text-[10px] font-bold uppercase tracking-widest text-slate-500 md:text-right">
@@ -95,7 +92,7 @@ export function DraftHubCard({ season }: DraftHubCardProps) {
               </p>
             </div>
           ) : null}
-          <Button asChild variant="secondary" className="min-h-11 gap-2">
+          <Button asChild variant="default" className="min-h-11 gap-2">
             <Link href="/draft">
               {actionLabel}
               <ArrowRight className="h-4 w-4" />
