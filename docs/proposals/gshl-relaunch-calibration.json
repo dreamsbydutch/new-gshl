@@ -1,0 +1,45 @@
+{
+  "historicalCalibration": {
+    "season": "2024-25",
+    "sourceSha256": "6efe2230f7b9b37a51a5d9bc882cb3433248fdfbd9e21d8fe00fff84c5400489",
+    "skaters": 920,
+    "appearances": 47224,
+    "nhlGames": 1312,
+    "goalieAppearances": 2764,
+    "cachedPagesSha256": "137b196f7a16a1b6e4b4b120ea828d39a67a6578f198c4761bdb8df33e28b7e8",
+    "summarySha256": "243aa1b0df2892d90f139157ae18e627e177b04f76047294e72ef23b49baa2ea",
+    "realtimeSha256": "cc1374fdf50f94a52540d1c0f716208e7f871d5caed72025bb1255c50e400d8e",
+    "rejectedLegacyAppearances": 47301,
+    "typicalImpact": {
+      "G": 0.1672454684058953,
+      "A": 0.28144587497882434,
+      "P": 0.4486913433847196,
+      "PPP": 0.09503642215822464,
+      "SOG": 1.570790276130781,
+      "HIT": 1.1920421819413858,
+      "BLK": 0.847048111129934,
+      "W": 0.47467438494934877,
+      "GAA": 0.33498855310592035,
+      "SVP": 0.011942906314979188
+    },
+    "goalieReference": {
+      "W": 1.4240231548480464,
+      "GA": 8.006874095513748,
+      "SA": 79.96237337192474,
+      "SV": 71.9772069464544,
+      "seconds": 10246.56946454414,
+      "GAA": 2.813111924297278,
+      "SVP": 0.9001384515148224
+    }
+  },
+  "examples": {
+    "claimWeakVsStrong": [0.7858170285742793, 0.21418297142572068],
+    "ufaEqualMoneyStrongVsWeak": [0.5161930052260685, 0.4838069947739316],
+    "ufaWeakMaxVsStrongMin": [0.8453351261605827, 0.15466487383941724],
+    "maximumVsMinimumOtherwiseEqual": [0.8518128609239485, 0.1481871390760517],
+    "seededObserved": 0.85227,
+    "fourteenBiddersOneMax": 0.5535140184402227,
+    "draftFullClockDays112": 38,
+    "draftFullClockDays322": 108
+  }
+}
