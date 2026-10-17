@@ -2,8 +2,11 @@
 
 import dynamic from "next/dynamic";
 import { useMemo, useState } from "react";
+import { OwnerCommandCenter } from "@gshl-components/home/OwnerCommandCenter";
+import { DraftNotificationSetup } from "@gshl-components/notifications/DraftNotificationSetup";
 import { LockerRoomHeader } from "@gshl-components/team/LockerRoomHeader";
 import {
+  useAuthSession,
   useCareerSplits,
   usePlayers,
   usePlayersByIds,
@@ -105,6 +108,29 @@ const TradeBlock = dynamic(
 );
 
 export function LockerRoomContent() {
+  const { selectedLockerRoomType, selectedOwnerId } = useNav();
+  const { session } = useAuthSession();
+  const isOwnCurrentTeam =
+    String(session?.user.ownerId ?? "") === String(selectedOwnerId);
+  if (selectedLockerRoomType === "overview" && isOwnCurrentTeam)
+    return (
+      <>
+        <OwnerCommandCenter />
+        <DraftNotificationSetup compact />
+      </>
+    );
+  return (
+    <LockerRoomDetails
+      overviewAsRoster={selectedLockerRoomType === "overview"}
+    />
+  );
+}
+
+function LockerRoomDetails({
+  overviewAsRoster,
+}: {
+  overviewAsRoster: boolean;
+}) {
   const [capView, setCapView] = useState("contracts");
   const { selectedSeason, currentSeason, defaultSeason, seasons } =
     useSeasonState();
@@ -112,7 +138,8 @@ export function LockerRoomContent() {
   const showRosterSalaries = isRosterSigningWindowOpen(
     resolveUfaSigningSeason(seasons),
   );
-  const { selectedLockerRoomType, selectedOwnerId } = useNav();
+  const { selectedLockerRoomType: storedView, selectedOwnerId } = useNav();
+  const selectedLockerRoomType = overviewAsRoster ? "roster" : storedView;
   const salaryCapSeason = useMemo(
     () => resolveSalaryCapSeason(seasons, contextSeason, defaultSeason),
     [contextSeason, defaultSeason, seasons],

@@ -246,8 +246,8 @@ void test("invalid matchup sources cannot become redirect targets", () => {
   assert.equal(resolveMatchupNavigationSide("?side=away", "home"), "away");
 });
 
-void test("only Schedule and Standings share historical season selection", () => {
-  for (const route of ["/schedule", "/standings"])
+void test("League, Schedule and Standings share historical season selection", () => {
+  for (const route of ["/league", "/schedule", "/standings"])
     assert.equal(isGlobalSeasonUrlPath(route), true);
   for (const route of [
     "/",

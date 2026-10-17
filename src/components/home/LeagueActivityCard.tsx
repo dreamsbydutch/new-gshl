@@ -180,22 +180,16 @@ export function LeagueActivityCard({ seasonId }: { seasonId?: string }) {
       : HOME_LEAGUE_ACTIVITY_PREVIEW_LIMIT + 1,
   );
   return (
-    <section
-      aria-labelledby="league-activity-heading"
-      className="h-full min-w-0 overflow-hidden rounded-lg border border-slate-200 bg-white"
-    >
-      <header className="border-b border-slate-100 px-3 py-3 sm:px-5">
-        <h2
-          id="league-activity-heading"
-          className="font-oswald text-lg text-slate-950 sm:text-xl"
-        >
+    <section aria-labelledby="league-activity-heading" className="gshl-section">
+      <header className="flex min-h-9 items-center border-b border-slate-200">
+        <h2 id="league-activity-heading" className="gshl-section-title">
           Recent league activity
         </h2>
       </header>
       {isLoading ? (
         <LeagueActivityRowsSkeleton />
       ) : error ? (
-        <p className="px-4 py-6 text-center text-sm text-slate-500 sm:px-5">
+        <p className="py-3 text-sm text-slate-500">
           League activity is unavailable right now.
         </p>
       ) : (

@@ -108,13 +108,12 @@ export function TeamRosterCard({
   const bench = getBenchPlayers(roster);
   const palette = useTeamPalette(team.logoUrl);
   const primaryColor = palette.primary;
-  const secondaryColor = palette.secondary ?? primaryColor;
   const cardBackground = primaryColor ? lighten(primaryColor, 0.84) : undefined;
   const playerBackground = primaryColor
     ? lighten(primaryColor, 0.94)
     : undefined;
   const headerBackground = primaryColor
-    ? `linear-gradient(90deg, ${lighten(primaryColor, 0.72)}, ${lighten(secondaryColor ?? primaryColor, 0.84)})`
+    ? lighten(primaryColor, 0.94)
     : undefined;
 
   return (

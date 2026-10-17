@@ -2,12 +2,9 @@
 
 import Link from "next/link";
 import { ClipboardList, Shield, UsersRound } from "lucide-react";
-import {
-  PageContextNavigation,
-  SecondaryPageToolbar,
-  TertiaryPageToolbar,
-} from "@gshl-nav";
+import { SecondaryPageToolbar, TertiaryPageToolbar } from "@gshl-nav";
 import { useDraftHubNavigation } from "@gshl-hooks/features/useDraftHubNavigation";
+import { SectionNavigation } from "@gshl-components/nav/SectionNavigation";
 import { cn } from "@gshl-utils";
 import { DraftHubTeamToggle } from "./DraftHubTeamToggle";
 import { DraftModeControl } from "./DraftModeControl";
@@ -19,9 +16,11 @@ export function DraftHubLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div>
-      <PageContextNavigation
-        ariaLabel="Draft navigation"
-        mobileRows={showTeamToggle ? 2 : 1}
+      <SectionNavigation section="players" />
+      <div
+        className="gshl-local-controls"
+        role="group"
+        aria-label="Draft navigation"
       >
         <SecondaryPageToolbar className="sm:justify-center">
           {navigation.links.map(({ href, label, kind, isActive }) => {
@@ -54,7 +53,7 @@ export function DraftHubLayout({ children }: { children: React.ReactNode }) {
             />
           </TertiaryPageToolbar>
         ) : null}
-      </PageContextNavigation>
+      </div>
       <div className="mx-auto max-w-7xl px-3 py-3 sm:px-5">
         <DraftModeControl seasonId={navigation.season?.id} />
       </div>

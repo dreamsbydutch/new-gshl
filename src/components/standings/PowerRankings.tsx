@@ -129,7 +129,7 @@ export function PowerRankings({ season, rankings }: PowerRankingsProps) {
   });
 
   return (
-    <div className="mx-auto w-full max-w-6xl space-y-3 px-2.5 py-3 sm:px-6 sm:py-4">
+    <div className="gshl-page space-y-2">
       {canShareCommissionerContent(session?.user.role) ? (
         <div className="flex justify-end">
           <WhatsAppShareButton

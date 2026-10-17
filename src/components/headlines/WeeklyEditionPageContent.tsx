@@ -32,7 +32,7 @@ export function WeeklyEditionPageContent({
   }
 
   return (
-    <main className="container mx-auto px-3 py-5 sm:px-5 sm:py-8">
+    <main className="gshl-page">
       <WeeklyEditionArticle edition={edition} />
     </main>
   );

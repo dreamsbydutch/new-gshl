@@ -22,6 +22,7 @@ export type StandingsNavigationView =
   | "nhl";
 
 export type LockerRoomNavigationView =
+  | "overview"
   | "roster"
   | "salary"
   | "history"

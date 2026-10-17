@@ -3,10 +3,10 @@
 import Link from "next/link";
 import {
   BookOpenText,
-  Building2,
+  Newspaper,
+  Bell,
   ClipboardList,
   Ellipsis,
-  Newspaper,
   ShieldCheck,
   ChartNoAxesCombined,
 } from "lucide-react";
@@ -42,16 +42,16 @@ const moreItems = [
     icon: BookOpenText,
   },
   {
-    label: "League Office",
-    description: "League tools and reference views",
-    href: "/leagueoffice",
-    icon: Building2,
+    label: "Team history",
+    description: "Past results, records and trophies",
+    href: "/lockerroom?view=history",
+    icon: ClipboardList,
   },
   {
-    label: "Draft Hub",
-    description: "Live draft board and team rooms",
-    href: "/draft",
-    icon: ClipboardList,
+    label: "Notifications",
+    description: "Draft alerts and delivery settings",
+    href: "/notifications",
+    icon: Bell,
   },
 ];
 

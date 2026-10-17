@@ -13,12 +13,12 @@ export function HomeScoreboardSkeleton() {
     <section
       aria-label="Loading GSHL scoreboard"
       aria-busy="true"
-      className="mx-auto w-full max-w-5xl overflow-hidden"
+      className="mx-auto w-full max-w-none overflow-hidden"
     >
       <Skeleton className="mb-2 h-4 w-36" />
       <div className="flex gap-2 overflow-hidden">
         {[0, 1, 2, 3, 4, 5].map((item) => (
-          <Skeleton key={item} className="h-24 w-24 shrink-0 rounded-lg" />
+          <Skeleton key={item} className="h-20 w-40 shrink-0 rounded-lg" />
         ))}
       </div>
     </section>
@@ -42,7 +42,7 @@ export function HomeScoreboard({ seasonId }: { seasonId: string }) {
   return (
     <section
       aria-label="GSHL matchups"
-      className="mx-auto w-full min-w-0 max-w-5xl"
+      className="mx-auto w-full min-w-0 max-w-none"
     >
       {isScheduleLoading ? (
         <p role="status" className="py-3 text-sm text-slate-500">
@@ -88,7 +88,7 @@ export function HomeScoreboard({ seasonId }: { seasonId: string }) {
                       : matchupPhase === "upcoming"
                         ? "Matchup preview →"
                         : "Week complete"}
-                  </h2>
+                  </h3>
                   <ul
                     aria-label={`Week ${matchupWeek.weekNum} matchups`}
                     className="flex gap-2"
@@ -102,7 +102,7 @@ export function HomeScoreboard({ seasonId }: { seasonId: string }) {
                             season: seasonId,
                             week: matchupWeek.id,
                           })}
-                          className="block rounded-lg border border-slate-200 bg-white p-3 text-slate-900 shadow-sm transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                          className="block rounded-lg border border-slate-200 bg-white px-2 py-2 text-slate-900 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
                         >
                           <div className="space-y-2">
                             {(["away", "home"] as const).map((side) => {

@@ -161,7 +161,9 @@ function PlayerRows({
                 <UfaOfferForm player={player} />
               </td>
             ) : null}
-            <td className={`whitespace-nowrap font-semibold sm:px-2 sm:py-3 ${mobileCellPadding}`}>
+            <td
+              className={`whitespace-nowrap font-semibold sm:px-2 sm:py-3 ${mobileCellPadding}`}
+            >
               {player.nextContractExpiryStatus}
             </td>
           </tr>
@@ -264,7 +266,11 @@ function PlayerTable({
             </th>
           </tr>
         </thead>
-        <PlayerRows players={players} showStats={showStats} showOffers={showOffers} />
+        <PlayerRows
+          players={players}
+          showStats={showStats}
+          showOffers={showOffers}
+        />
       </table>
     </TableViewport>
   );
@@ -637,9 +643,9 @@ export function UfaLeagueOffice() {
   if (!query.data)
     return <p className="text-destructive">Unable to load free agents.</p>;
   return (
-    <div className="w-full min-w-0 max-w-full space-y-4 overflow-hidden sm:space-y-6">
+    <div className="w-full min-w-0 max-w-full space-y-2 overflow-hidden">
       <div>
-        <h2 className="text-2xl font-black sm:text-3xl">Free Agents</h2>
+        <h2 className="gshl-section-title">Free Agents</h2>
         {query.data.window.signingEndDate ? (
           <p className="text-xs text-muted-foreground sm:text-sm">
             UFA offers open after the late signing deadline on{" "}
