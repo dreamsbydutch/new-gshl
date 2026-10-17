@@ -2,9 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
-import Link from "next/link";
 import { createPortal } from "react-dom";
-import { ArrowRight, BookOpen, X } from "lucide-react";
+import { BookOpen, X } from "lucide-react";
 import { useLatestWeeklyEdition, useWeeklyEdition } from "@gshl-hooks";
 import { Skeleton } from "@gshl-ui";
 import { WEEKLY_EDITION_LOGO_URL } from "@gshl-utils";
@@ -124,14 +123,10 @@ export function WeeklyEditionHomeCard() {
             />
           </span>
           <span className="min-w-0 flex-1">
-            <span className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500 sm:text-xs">
-              Latest edition
-              <span className="text-slate-400">·</span>
-              <span className="truncate text-slate-500">
-                {edition.issueLabel}
-              </span>
+            <span className="block truncate text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500 sm:text-xs">
+              {edition.issueLabel}
             </span>
-            <span className="mt-0.5 block truncate text-[13px] font-semibold leading-5 text-slate-950 sm:text-sm">
+            <span className="mt-0.5 line-clamp-2 text-sm font-semibold leading-5 text-slate-950 sm:text-base sm:leading-6">
               {edition.headline}
             </span>
           </span>
@@ -158,13 +153,6 @@ export function WeeklyEditionHomeCard() {
             <BookOpen className="h-3 w-3" aria-hidden="true" />
           </span>
         </button>
-        <Link
-          href="/headlines"
-          className="hidden min-h-11 shrink-0 items-center gap-1 border-l border-slate-200 px-3 text-xs font-semibold text-slate-600 transition hover:bg-slate-100 hover:text-slate-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-slate-500 motion-reduce:transition-none sm:flex"
-        >
-          Archive
-          <ArrowRight className="h-3 w-3" aria-hidden="true" />
-        </Link>
       </section>
 
       {isOpen
