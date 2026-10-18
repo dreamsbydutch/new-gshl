@@ -56,6 +56,7 @@ export function getNHLMatchupStatColumns(
     const column = skaterColumns[category.trim().toUpperCase()];
     return column ? [column] : [];
   });
+  columns.push({ key: "toi", label: "TOI" });
   return columns.filter(
     (column, index) =>
       columns.findIndex((entry) => entry.key === column.key) === index,

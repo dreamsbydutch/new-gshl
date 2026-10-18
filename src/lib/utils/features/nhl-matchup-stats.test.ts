@@ -22,11 +22,11 @@ void test("skaters use the game's season categories, including historical +/- an
   ];
   assert.deepEqual(
     getNHLMatchupStatColumns(current).map((c) => c.label),
-    ["G", "A", "P", "PPP", "SOG", "HIT", "BLK"],
+    ["G", "A", "P", "PPP", "SOG", "HIT", "BLK", "TOI"],
   );
   assert.deepEqual(
     getNHLMatchupStatColumns(["G", "PM", "PIM"]).map((c) => c.label),
-    ["G", "+/−", "PIM"],
+    ["G", "+/−", "PIM", "TOI"],
   );
 });
 
