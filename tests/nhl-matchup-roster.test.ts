@@ -50,7 +50,7 @@ function reader(overrides: Partial<NHLMatchupReader> = {}): NHLMatchupReader {
   return {
     seasons: async (year) => {
       assert.equal(year, 2026);
-      return [{ id: "season" }];
+      return [{ id: "season", categories: ["G", "PPP", "GAA"] }];
     },
     teams: async (id) => {
       assert.equal(id, "season");
@@ -109,6 +109,7 @@ void test("past matchup paginates only its indexed date and hydrates only matchi
     }),
     now,
   );
+  assert.deepEqual(result.season?.categories, ["G", "PPP", "GAA"]);
   assert.deepEqual(cursors, [null, "next"]);
   assert.equal(result.players.length, 1);
   assert.equal(result.players[0]?.side, "home");

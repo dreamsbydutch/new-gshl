@@ -40,7 +40,7 @@ const cachedRoster = unstable_cache(
     };
     return loadNHLMatchupRoster(game, reader);
   },
-  ["nhl-matchup-roster"],
+  ["nhl-matchup-roster-season-categories"],
   { revalidate: NHL_SCHEDULE_REFRESH_SECONDS },
 );
 

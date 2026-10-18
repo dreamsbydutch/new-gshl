@@ -16,7 +16,7 @@ type RosterTeam = Parameters<
   Pick<GSHLTeam, "ownerId">;
 
 export interface NHLMatchupReader {
-  seasons(endingYear: number): Promise<{ id: string }[]>;
+  seasons(endingYear: number): Promise<{ id: string; categories?: string[] }[]>;
   teams(seasonId: string): Promise<RosterTeam[]>;
   datePage(
     seasonId: string,
@@ -99,7 +99,7 @@ export async function loadNHLMatchupRoster(
       ])),
     );
   return nhlMatchupRosterSchema.parse({
-    season: { id: season.id },
+    season: { id: season.id, categories: season.categories ?? [] },
     updatedAt: now,
     players: buildNHLMatchupPlayers({
       game,

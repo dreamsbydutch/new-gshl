@@ -24,6 +24,7 @@ export function NHLMatchupContent({ gameId }: { gameId: string }) {
     rosterError,
     retryRoster,
     hasSeason,
+    seasonCategories,
   } = useNHLMatchupData(gameId);
   if (isLoading) return <MatchupSkeleton />;
   if (!game)
@@ -146,6 +147,7 @@ export function NHLMatchupContent({ gameId }: { gameId: string }) {
         <>
           <NHLMatchupPlayerTable
             players={players.filter((player) => !player.goalie)}
+            seasonCategories={seasonCategories}
           />
           <NHLMatchupPlayerTable
             players={players.filter((player) => player.goalie)}

@@ -1,38 +1,22 @@
 import Image from "next/image";
 import { TableViewport } from "@gshl-ui";
-import { groupNHLMatchupPlayers } from "@gshl-utils/features/nhl-matchup";
-import type {
-  NHLBoxscorePlayer,
-  NHLMatchupPlayerRow,
-} from "@gshl-lib/types/nhl";
+import {
+  groupNHLMatchupPlayers,
+  getNHLMatchupStatColumns,
+  formatNHLMatchupStat,
+} from "@gshl-utils/features/nhl-matchup";
+import type { NHLMatchupPlayerRow } from "@gshl-lib/types/nhl";
 
 export function NHLMatchupPlayerTable({
   players,
   goalies = false,
+  seasonCategories = [],
 }: {
   players: NHLMatchupPlayerRow[];
   goalies?: boolean;
+  seasonCategories?: readonly string[];
 }) {
-  const columns: { key: keyof NHLBoxscorePlayer; label: string }[] = goalies
-    ? [
-        { key: "saves", label: "SV" },
-        { key: "shotsAgainst", label: "SA" },
-        { key: "goalsAgainst", label: "GA" },
-        { key: "savePctg", label: "SV%" },
-        { key: "toi", label: "TOI" },
-      ]
-    : [
-        { key: "goals", label: "G" },
-        { key: "assists", label: "A" },
-        { key: "points", label: "P" },
-        { key: "powerPlayGoals", label: "PPG" },
-        { key: "sog", label: "SOG" },
-        { key: "hits", label: "HIT" },
-        { key: "blockedShots", label: "BLK" },
-        { key: "plusMinus", label: "+/−" },
-        { key: "pim", label: "PIM" },
-        { key: "toi", label: "TOI" },
-      ];
+  const columns = getNHLMatchupStatColumns(seasonCategories, goalies);
   const label = goalies ? "Goaltenders" : "Skaters";
   return (
     <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm sm:rounded-2xl">
@@ -128,18 +112,12 @@ export function NHLMatchupPlayerTable({
                       </span>
                     </td>
                     {columns.map((column) => {
-                      const value = player.stats?.[column.key];
                       return (
                         <td
                           key={column.key}
                           className="px-3 py-2 text-center tabular-nums"
                         >
-                          {value == null
-                            ? "–"
-                            : column.key === "savePctg" &&
-                                typeof value === "number"
-                              ? value.toFixed(3)
-                              : value}
+                          {formatNHLMatchupStat(player.stats, column.key)}
                         </td>
                       );
                     })}
