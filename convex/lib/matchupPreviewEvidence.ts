@@ -28,15 +28,28 @@ const number = (value: unknown) =>
 async function teamEvidence(ctx: QueryCtx, team: Doc<"teams">, now: number) {
   const franchise = await ctx.db.get(team.franchiseId);
   if (!franchise) return null;
+  const [owner, ownerFranchises] = await Promise.all([
+    ctx.db.get(franchise.ownerId),
+    ctx.db
+      .query("franchises")
+      .withIndex("by_ownerId", (q) => q.eq("ownerId", franchise.ownerId))
+      .take(41),
+  ]);
+  if (ownerFranchises.length > 40)
+    throw new Error("Preview owner franchise history exceeds bound");
   const [roster, instances, seasonStats] = await Promise.all([
     ctx.db
       .query("players")
       .withIndex("by_ownerId", (q) => q.eq("ownerId", franchise.ownerId))
       .take(60),
-    ctx.db
-      .query("teams")
-      .withIndex("by_franchiseId", (q) => q.eq("franchiseId", franchise._id))
-      .take(101),
+    Promise.all(
+      ownerFranchises.map((club) =>
+        ctx.db
+          .query("teams")
+          .withIndex("by_franchiseId", (q) => q.eq("franchiseId", club._id))
+          .take(101),
+      ),
+    ).then((rows) => rows.flat()),
     ctx.db
       .query("teamSeasonStatLines")
       .withIndex("by_seasonId", (q) => q.eq("seasonId", team.seasonId))
@@ -49,25 +62,35 @@ async function teamEvidence(ctx: QueryCtx, team: Doc<"teams">, now: number) {
   const currentInstances = [
     ...new Map([team, ...instances].map((row) => [row._id, row])).values(),
   ];
-  const matchups = (
-    await Promise.all(
-      currentInstances.map(async (instance) => {
-        const [home, away] = await Promise.all([
-          ctx.db
-            .query("matchups")
-            .withIndex("by_homeTeamId", (q) => q.eq("homeTeamId", instance._id))
-            .take(61),
-          ctx.db
-            .query("matchups")
-            .withIndex("by_awayTeamId", (q) => q.eq("awayTeamId", instance._id))
-            .take(61),
-        ]);
-        if (home.length > 60 || away.length > 60)
-          throw new Error("Preview season matchup history exceeds bound");
-        return [...home, ...away].filter(final);
-      }),
-    )
-  ).flat();
+  const matchups = [
+    ...new Map(
+      (
+        await Promise.all(
+          currentInstances.map(async (instance) => {
+            const [home, away] = await Promise.all([
+              ctx.db
+                .query("matchups")
+                .withIndex("by_homeTeamId", (q) =>
+                  q.eq("homeTeamId", instance._id),
+                )
+                .take(61),
+              ctx.db
+                .query("matchups")
+                .withIndex("by_awayTeamId", (q) =>
+                  q.eq("awayTeamId", instance._id),
+                )
+                .take(61),
+            ]);
+            if (home.length > 60 || away.length > 60)
+              throw new Error("Preview season matchup history exceeds bound");
+            return [...home, ...away].filter(final);
+          }),
+        )
+      )
+        .flat()
+        .map((row) => [row._id, row]),
+    ).values(),
+  ];
   const ownIds = new Set(currentInstances.map((row) => row._id));
   const results = await Promise.all(
     matchups.map(async (matchup) => {
@@ -148,6 +171,12 @@ async function teamEvidence(ctx: QueryCtx, team: Doc<"teams">, now: number) {
   );
   const assignedWriter = franchise.beatWriter?.trim();
   return {
+    ownerId: String(franchise.ownerId),
+    ownerName: owner
+      ? owner.nickName?.trim()
+        ? owner.nickName.trim()
+        : [owner.firstName, owner.lastName].filter(Boolean).join(" ")
+      : null,
     teamIds: ownIds,
     name: franchise.name,
     writer: assignedWriter?.length
@@ -285,6 +314,29 @@ export async function loadMatchupPreviewEvidence(
         meetings: meetings.slice(0, 10),
       }),
     },
+    {
+      id: "owner-head-to-head",
+      text: JSON.stringify({
+        asOf: utcTimestampToDateKey(now),
+        teamOwner: { id: own.ownerId, name: own.ownerName, teamName: own.name },
+        opponentOwner: {
+          id: other.ownerId,
+          name: other.ownerName,
+          teamName: other.name,
+        },
+        scope:
+          "Recorded completed meetings across franchises currently associated with these owners. Undocumented ownership transfers and missing history cannot be reconstructed; this is not a verified all-time record.",
+        wins: meetings.filter((row) => row.result === "W").length,
+        losses: meetings.filter((row) => row.result === "L").length,
+        ties: meetings.filter((row) => row.result === "T").length,
+        resultsNotRecorded: meetings.filter(
+          (row) => row.result === "Final; winner not recorded",
+        ).length,
+        totalRecordedMeetings: meetings.length,
+        earliestRecordedMeeting: meetings.at(-1)?.date ?? null,
+        latestMeetings: meetings.slice(0, 10),
+      }),
+    },
   ];
   if (categoryComparison)
     facts.push({
@@ -297,6 +349,34 @@ export async function loadMatchupPreviewEvidence(
     team.seasonId,
     rankingCutoff,
   );
+  facts.push({
+    id: "owners",
+    text: JSON.stringify(
+      [own, other].map((club) => {
+        const ranking = rankings.find(
+          (entry) => entry.ownerId === club.ownerId,
+        );
+        return {
+          ownerId: club.ownerId,
+          name: club.ownerName,
+          teamName: club.name,
+          ...(ranking
+            ? {
+                ladder: {
+                  asOf: rankingCutoff,
+                  rank: ranking.rank,
+                  gamesPlayed: ranking.gamesPlayed,
+                  wins: ranking.overallWins,
+                  losses: ranking.overallLosses,
+                  cups: ranking.cups,
+                  note: "Career Owner Ladder rank among historical owners, not current team strength. Minimal or missing history does not establish a weak owner.",
+                },
+              }
+            : {}),
+        };
+      }),
+    ),
+  });
   const seasonTeams = await ctx.db
     .query("teams")
     .withIndex("by_seasonId", (q) => q.eq("seasonId", team.seasonId))

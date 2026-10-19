@@ -59,8 +59,8 @@ crons.interval(
   {},
 );
 crons.interval(
-  "publish due GSHL Weekly milestone editions",
-  { hours: 6 },
+  "publish due GSHL Weekly editions",
+  { minutes: 15 },
   scanDueWeeklyEditionMilestones,
   {},
 );

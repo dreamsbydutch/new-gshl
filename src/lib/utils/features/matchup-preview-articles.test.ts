@@ -14,6 +14,25 @@ import {
 } from "./matchup-preview-articles";
 import { FRANCHISE_BEAT_WRITERS_BY_LEGACY_ID } from "../../../../convex/lib/reporterDirectory";
 
+void test("preview brief centers owners and playful rivalry while retaining an evidence-based forecast", () => {
+  const request = buildMatchupPreviewRequest("test", {
+    writer: "Reporter",
+    teamName: "Home",
+    opponentName: "Away",
+    startsAt: 1,
+    facts: [],
+  });
+  assert.match(request.instructions, /OWNER-FIRST PREVIEW/);
+  assert.match(request.instructions, /owner-head-to-head/);
+  assert.match(request.instructions, /Lightly chirp the opposing owner/);
+  assert.match(
+    request.instructions,
+    /do not open with a statistical comparison/,
+  );
+  assert.match(request.instructions, /Career rank is not current team quality/);
+  assert.match(request.instructions, /Every writer must pick a winner/);
+});
+
 void test("preview readership ends at midnight Wednesday Eastern across start days and DST", () => {
   for (const [date, expiry] of [
     ["2026-10-04", "2026-10-07T04:00:00Z"],

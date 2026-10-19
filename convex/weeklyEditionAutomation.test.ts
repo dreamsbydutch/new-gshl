@@ -128,6 +128,63 @@ function fixture() {
   return f;
 }
 
+void test("weekly scanner catches a missed refreshed week when a newer week has ended", async (t) => {
+  t.mock.timers.enable({
+    apis: ["Date"],
+    now: Date.parse("2025-10-16T12:00:00Z"),
+  });
+  const prior = process.env.OPENAI_API_KEY;
+  process.env.OPENAI_API_KEY = "test-only";
+  try {
+    const f = fixture();
+    f.put("weeks", "newer", {
+      seasonId: "s",
+      weekNum: 2,
+      startDate: "2025-10-08",
+      endDate: "2025-10-14",
+    });
+    await invokeMutation(scanDueMilestones, f.ctx, {});
+    assert.deepEqual(
+      f.rows("weeklyEditionGenerationJobs").map((job) => job.weekId),
+      ["w"],
+    );
+    await invokeMutation(scanDueMilestones, f.ctx, {});
+    assert.equal(f.scheduled.length, 1);
+  } finally {
+    if (prior === undefined) delete process.env.OPENAI_API_KEY;
+    else process.env.OPENAI_API_KEY = prior;
+  }
+});
+
+void test("final recap waits for the final week's refresh and finalized matchups", async (t) => {
+  t.mock.timers.enable({
+    apis: ["Date"],
+    now: Date.parse("2025-10-09T12:00:00Z"),
+  });
+  const prior = process.env.OPENAI_API_KEY;
+  process.env.OPENAI_API_KEY = "test-only";
+  try {
+    const f = fixture();
+    await f.ctx.db.delete("future" as never);
+    await f.ctx.db.patch("w" as never, { weeklyRefreshCompletedAt: undefined });
+    await invokeMutation(scanDueMilestones, f.ctx, {});
+    assert.equal(f.scheduled.length, 0);
+    await f.ctx.db.patch("w" as never, { weeklyRefreshCompletedAt: 1 });
+    await f.ctx.db.patch("unfinished" as never, { isComplete: false });
+    await invokeMutation(scanDueMilestones, f.ctx, {});
+    assert.equal(f.scheduled.length, 0);
+    await f.ctx.db.patch("unfinished" as never, { isComplete: true });
+    await invokeMutation(scanDueMilestones, f.ctx, {});
+    assert.equal(
+      f.rows("weeklyEditionGenerationJobs")[0]?.issueType,
+      "final_recap",
+    );
+  } finally {
+    if (prior === undefined) delete process.env.OPENAI_API_KEY;
+    else process.env.OPENAI_API_KEY = prior;
+  }
+});
+
 void test("weekly scanner waits for power/standings handoff even after matchup finalization", async () => {
   const prior = process.env.OPENAI_API_KEY;
   process.env.OPENAI_API_KEY = "test-only";

@@ -3180,14 +3180,15 @@ export const scanDueMilestones = internalMutation({
         const finalWeek = [...weeks].sort(
           (a, b) => asNumber(b.weekNum) - asNumber(a.weekNum),
         )[0];
-        if (
-          currentSeason(season) &&
-          completed[0] &&
-          completed[0]._id !== finalWeek?._id
-        )
-          queued += Number(
-            await queueAutomaticEdition(ctx, season, completed[0], "weekly"),
-          );
+        // A delayed refresh or failed writing attempt must remain eligible
+        // after the next week ends. Edition keys and leases prevent duplicates.
+        if (currentSeason(season))
+          for (const week of completed.filter(
+            (row) => row._id !== finalWeek?._id,
+          ))
+            queued += Number(
+              await queueAutomaticEdition(ctx, season, week, "weekly"),
+            );
         if (!finalWeek || dateKey(finalWeek.endDate) >= today) continue;
         const milestone = milestoneSchedule(
           nextChronologicalSeason(seasons, season),
@@ -3261,7 +3262,7 @@ async function queueAutomaticEdition(
   week: Doc<"weeks">,
   issueType: WeeklyEditionIssueType,
 ) {
-  if (issueType === "weekly") {
+  if (issueType === "weekly" || issueType === "final_recap") {
     // The operator writes this only after final stats, power and standings.
     // Waiting for data must not consume any of the three writing attempts.
     if (!week.weeklyRefreshCompletedAt) return false;
