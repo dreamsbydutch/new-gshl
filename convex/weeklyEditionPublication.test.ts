@@ -25,6 +25,7 @@ import {
   setVisibility,
   setHomeActive,
   setSectionActive,
+  latestPublished,
 } from "./weeklyEditions";
 
 void test("automatic finalization protects edited and hidden editions at publication time", async () => {
@@ -153,6 +154,119 @@ async function published(f: ReturnType<typeof fixture>) {
     raw: JSON.stringify(buildTemplateWeeklyEdition(request.facts)),
   };
 }
+
+function nextSource(): EditionPublicationSource {
+  const previous = source();
+  return {
+    ...previous,
+    weekId: "next-week" as Id<"weeks">,
+    editionKey: "week:next-week",
+    issueLabel: "Week 2",
+    weekNum: 2,
+    startDate: Date.UTC(2020, 0, 8),
+    endDate: Date.UTC(2020, 0, 14),
+    scheduledFor: Date.UTC(2020, 0, 14),
+    facts: {
+      ...previous.facts,
+      issueLabel: "Week 2",
+      week: {
+        id: "next-week",
+        number: 2,
+        startDate: "2020-01-08",
+        endDate: "2020-01-14",
+      },
+    },
+  };
+}
+
+void test("new AI and template editions replace the previous week's homepage selection", async () => {
+  for (const mode of ["openai", "template"] as const) {
+    const f = fixture();
+    const { edition: previous } = await published(f);
+    await f.ctx.db.patch(previous._id, {
+      isHomeActive: true,
+      editedBy: "commissioner" as Id<"authUsers">,
+    });
+    const request = nextSource();
+    const edition =
+      mode === "openai"
+        ? await invokeMutation(finalizeAiGeneration, f.ctx, {
+            ...request,
+            automatic: true,
+            sourceHash: hashWeeklyEditionSource(request.facts),
+            raw: JSON.stringify(buildTemplateWeeklyEdition(request.facts)),
+          })
+        : (await publishTemplateEdition(f.ctx, request)).existing;
+    assert.ok(edition);
+    const active = f.rows("weeklyEditions").filter((row) => row.isHomeActive);
+    assert.equal(active.length, 1);
+    assert.equal(active[0]?.editionKey, request.editionKey);
+    assert.equal(f.get(previous._id)?.isHomeActive, false);
+    assert.equal(f.get(previous._id)?.status, "published");
+    assert.equal(f.get(previous._id)?.editedBy, "commissioner");
+    const home = (await invokeMutation(latestPublished, f.ctx, {})) as {
+      id: string;
+    } | null;
+    assert.equal(home?.id, active[0]?._id);
+    assert.equal(f.rows("weeklyEditionRevisions").length, 0);
+  }
+});
+
+void test("the first publication appears on the homepage without manual activation", async () => {
+  const f = fixture();
+  const { edition } = await published(f);
+  const home = (await invokeMutation(latestPublished, f.ctx, {})) as {
+    id: string;
+  } | null;
+  assert.equal(home?.id, String(edition._id));
+});
+
+void test("older catch-up publications cannot displace a newer homepage edition", async () => {
+  const f = fixture();
+  const newer = (await publishTemplateEdition(f.ctx, nextSource())).existing!;
+  await f.ctx.db.patch(newer._id, { isHomeActive: true });
+  const { request, edition: older, raw } = await published(f);
+  await invokeMutation(finalizeAiGeneration, f.ctx, {
+    ...request,
+    existingEditionId: older._id,
+    expectedUpdatedAt: older.updatedAt,
+    automatic: true,
+    sourceHash: hashWeeklyEditionSource(request.facts),
+    raw,
+  });
+  assert.deepEqual(
+    f
+      .rows("weeklyEditions")
+      .filter((row) => row.isHomeActive)
+      .map((row) => row._id),
+    [newer._id],
+  );
+});
+
+void test("automatic AI upgrade activates an already-created newer template edition", async () => {
+  const f = fixture();
+  const { edition: previous } = await published(f);
+  const request = nextSource();
+  const newer = (await publishTemplateEdition(f.ctx, request)).existing!;
+  // Reproduce an existing template saved before publication activated Home.
+  await f.ctx.db.patch(previous._id, { isHomeActive: true });
+  await f.ctx.db.patch(newer._id, { isHomeActive: false });
+  await invokeMutation(finalizeAiGeneration, f.ctx, {
+    ...request,
+    existingEditionId: newer._id,
+    expectedUpdatedAt: newer.updatedAt,
+    automatic: true,
+    sourceHash: hashWeeklyEditionSource(request.facts),
+    raw: JSON.stringify(buildTemplateWeeklyEdition(request.facts)),
+  });
+  assert.deepEqual(
+    f
+      .rows("weeklyEditions")
+      .filter((row) => row.isHomeActive)
+      .map((row) => row._id),
+    [newer._id],
+  );
+});
 
 void test("publication interface shares unchanged/protection rules and snapshots replacements", async () => {
   const f = fixture();
