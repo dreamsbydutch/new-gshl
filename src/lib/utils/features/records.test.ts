@@ -20,11 +20,13 @@ const row = (
   stats: PerformanceRow["stats"],
   playerId = id,
   franchiseId?: string,
+  ownerId?: string,
 ): PerformanceRow => ({
   id,
   stats,
   playerId,
   franchiseId,
+  ownerId,
   teamIds: [id],
   season: "Season",
   period: "RS",
@@ -56,11 +58,12 @@ void test("career leaders retain contributors below each page's top 100 and do n
   assert.deepEqual(first, before);
 });
 
-void test("team careers follow franchise identity rather than season team IDs or people", () => {
+void test("owner careers combine different franchises while keeping different people separate", () => {
   const rows = [
-    row("team-old", { GP: 10, P: 30 }, "", "franchise"),
-    row("team-new", { GP: 20, P: 40 }, "", "franchise"),
-    row("another", { GP: 20, P: 65 }, "", "other-franchise"),
+    row("team-old", { GP: 10, P: 30 }, "", "first-franchise", "owner"),
+    row("team-new", { GP: 20, P: 40 }, "", "second-franchise", "owner"),
+    row("another", { GP: 20, P: 65 }, "", "first-franchise", "other-owner"),
+    row("unassigned", { GP: 20, P: 999 }, "", "missing-owner"),
   ];
   const leaders = careerLeaders(
     addCareerPerformances(new Map(), rows, "teamCareer"),
@@ -69,7 +72,8 @@ void test("team careers follow franchise identity rather than season team IDs or
     "desc",
   );
   assert.equal(leaders.length, 2);
-  assert.equal(leaders[0]?.franchiseId, "franchise");
+  assert.equal(leaders[0]?.ownerId, "owner");
+  assert.equal(leaders[1]?.ownerId, "other-owner");
   assert.equal(leaders[0]?.stats.P, 70);
   assert.deepEqual(leaders[0]?.teamIds, ["team-old", "team-new"]);
 });

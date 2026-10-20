@@ -46,7 +46,7 @@ export function RecordsContent() {
                   : "border-transparent text-slate-500",
               )}
             >
-              {subject === "player" ? "Players" : "Teams"}
+              {subject === "player" ? "Players" : "Owners"}
             </button>
           ))}
         </div>
@@ -187,7 +187,7 @@ export function RecordsContent() {
             className={control}
             type="search"
             value={records.search}
-            placeholder={isPlayer ? "Player or team" : "Team name"}
+            placeholder={isPlayer ? "Player or team" : "Owner or team"}
             onChange={(event) => records.setSearch(event.target.value)}
           />
         </label>
@@ -203,7 +203,7 @@ export function RecordsContent() {
         <p className="pb-2 text-xs text-slate-500">
           {isPlayer
             ? "GSHL totals across all teams; excludes NHL-only statistics."
-            : "Franchise totals across seasons, including seasons played under earlier team names."}
+            : "Owner totals across all their recorded GSHL teams and seasons."}
         </p>
       )}
       {records.isLoading ? (
@@ -245,15 +245,15 @@ export function RecordsContent() {
               <div className="min-w-0">
                 <p
                   className="truncate text-sm font-semibold text-slate-950"
-                  title={row.name}
+                  title={isPlayer ? row.name : row.ownerName}
                 >
-                  {row.name}
+                  {isPlayer ? row.name : (row.ownerName ?? "Owner unavailable")}
                 </p>
                 <p className="truncate text-xs text-slate-500" title={row.team}>
                   {[
                     records.period !== "career" ? row.season : "",
                     records.period === "week" ? row.period : "",
-                    isPlayer ? row.team : "",
+                    row.team,
                     isPlayer ? row.position : "",
                   ]
                     .filter(Boolean)
@@ -275,7 +275,7 @@ export function RecordsContent() {
           ? "Each row is a separate performance."
           : isPlayer
             ? "Career goalie rates use combined saves, shots, goals against, and ice time."
-            : "Career totals follow the franchise across seasons."}
+            : "Career totals combine teams linked to the same owner."}
       </p>
     </main>
   );

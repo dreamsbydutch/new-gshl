@@ -69,7 +69,9 @@ export function useRecords() {
     .filter(
       (row) =>
         !needle ||
-        `${row.name} ${row.team}`.toLocaleLowerCase().includes(needle),
+        `${row.ownerName ?? ""} ${row.name} ${row.team}`
+          .toLocaleLowerCase()
+          .includes(needle),
     );
   return {
     ...query,
