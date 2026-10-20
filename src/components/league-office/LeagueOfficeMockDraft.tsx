@@ -15,12 +15,14 @@ export function LeagueOfficeMockDraft() {
 
   if (!upcomingSeason) {
     return (
-      <div className="mx-auto max-w-3xl rounded-2xl border border-slate-200 bg-white px-5 py-12 text-center shadow-sm">
-        <h2 className="font-oswald text-2xl text-slate-950">GSHL Mock Draft</h2>
-        <p className="mt-2 text-sm text-slate-500">
+      <section className="gshl-page" aria-labelledby="mock-draft-heading">
+        <h2 id="mock-draft-heading" className="gshl-section-title">
+          Mock draft
+        </h2>
+        <p className="py-2 text-sm text-slate-500">
           The next mock draft is not available yet.
         </p>
-      </div>
+      </section>
     );
   }
 

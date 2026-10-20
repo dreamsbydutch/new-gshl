@@ -335,9 +335,7 @@ function AwardSection({
         <p className="font-barlow text-[10px] uppercase tracking-[0.24em] text-slate-400">
           {eyebrow}
         </p>
-        <h2 className="mt-1 font-oswald text-2xl leading-none text-slate-950 sm:text-3xl">
-          {title}
-        </h2>
+        <h2 className="gshl-section-title">{title}</h2>
       </div>
       <AwardList valueLabel={valueLabel}>{children}</AwardList>
     </section>
@@ -430,8 +428,8 @@ export function SeasonAwards({
 
   if (isInProgress && !hasContenders) {
     return (
-      <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6">
-        <div className="rounded-2xl border border-dashed border-slate-300 px-4 py-12 text-center text-sm text-muted-foreground">
+      <div className="gshl-page">
+        <div className="border-b border-slate-200 py-3 text-sm text-muted-foreground">
           Award contenders will appear as the season progresses.
         </div>
       </div>
@@ -440,8 +438,8 @@ export function SeasonAwards({
 
   if (!isInProgress && !hasAwards) {
     return (
-      <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6">
-        <div className="rounded-2xl border border-dashed border-slate-300 px-4 py-12 text-center text-sm text-muted-foreground">
+      <div className="gshl-page">
+        <div className="border-b border-slate-200 py-3 text-sm text-muted-foreground">
           No awards are on record for this season yet.
         </div>
       </div>
@@ -477,8 +475,8 @@ export function SeasonAwards({
   }
 
   return (
-    <section className="mx-auto max-w-6xl px-4 pb-12 pt-4 sm:px-6 lg:pt-6">
-      <header className="border-b border-slate-200 pb-6">
+    <section className="gshl-page">
+      <header className="border-b border-slate-200 pb-2">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="font-barlow text-sm uppercase text-slate-400">
             {season?.year ? `${season.year} Awards` : "Awards"}
@@ -493,7 +491,7 @@ export function SeasonAwards({
         </div>
       </header>
 
-      <div className="mt-8 space-y-10">
+      <div className="mt-3 space-y-3">
         {visibleGroups.map((group) => {
           const groupCards = awardCards.filter(
             (card) => card.catalog.group === group,

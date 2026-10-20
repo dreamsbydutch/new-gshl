@@ -267,7 +267,7 @@ export function PlayoffBracket({
 
   if (!season) {
     return (
-      <div className="rounded-xl border border-dashed p-10 text-center text-sm text-slate-500">
+      <div className="border-b py-3 text-sm text-slate-500">
         Select a season to view the playoff bracket.
       </div>
     );
@@ -280,7 +280,7 @@ export function PlayoffBracket({
           role="region"
           aria-label="Playoff bracket, scroll horizontally to see all rounds"
           tabIndex={0}
-          className="overflow-x-auto rounded-2xl border border-slate-200 bg-gradient-to-b from-slate-50 to-white p-2.5 shadow-sm sm:p-5"
+          className="overflow-x-auto border-b border-slate-200 bg-white py-2"
         >
           <div className="grid auto-cols-[minmax(148px,1fr)] grid-flow-col gap-5 lg:auto-cols-[minmax(280px,1fr)] lg:gap-10">
             {bracket.columns.map((column, index) => (

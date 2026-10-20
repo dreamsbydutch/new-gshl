@@ -414,8 +414,8 @@ export function DraftHubBoard() {
   if (board.isLoading) return <DraftHubBoardSkeleton />;
   if (!board.season || !board.state) {
     return (
-      <main className="container mx-auto px-3 py-8">
-        <div className="rounded-xl border border-dashed p-8 text-center text-muted-foreground">
+      <main className="gshl-page">
+        <div className="border-b py-3 text-sm text-muted-foreground">
           No configured draft season is available.
         </div>
       </main>
@@ -441,7 +441,7 @@ export function DraftHubBoard() {
               : "No draft selection is available right now.";
 
   return (
-    <main className="container mx-auto space-y-8 px-3 py-5 sm:px-4">
+    <main className="gshl-page space-y-3">
       {board.nextUserPick ? (
         <NextUserPickNotice notice={board.nextUserPick} />
       ) : null}
@@ -471,8 +471,8 @@ export function DraftHubBoard() {
       />
 
       <section>
-        <div className="mb-3">
-          <h2 className="text-xl font-semibold">Best Available</h2>
+        <div className="mb-2">
+          <h2 className="gshl-section-title">Best available</h2>
         </div>
         <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <label className="relative block min-w-0 flex-1 sm:max-w-md">
@@ -500,7 +500,7 @@ export function DraftHubBoard() {
                 }
                 onClick={() => board.setPositionFilter(filter)}
                 aria-pressed={board.positionFilter === filter}
-                className="min-h-9 min-w-9 px-2"
+                className="min-h-11 min-w-11 px-2"
               >
                 {filter === "all" ? "All" : filter}
               </Button>
@@ -533,7 +533,7 @@ export function DraftHubBoard() {
             onSubmit={(playerId) => void board.submitPlayer(playerId)}
           />
         ) : (
-          <div className="rounded-lg border border-dashed bg-slate-50 p-6 text-center text-sm text-muted-foreground">
+          <div className="border-b py-3 text-sm text-muted-foreground">
             {hasActivePlayerFilters
               ? "No eligible players match these filters."
               : "No eligible players remain."}
