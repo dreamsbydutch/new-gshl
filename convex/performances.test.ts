@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { page, leaderboard } from "./performances";
+import { page, leaderboard, hydrate } from "./performances";
 import type {
   PerformanceFilters,
   PerformanceResult,
@@ -33,6 +33,211 @@ const readLeaderboard = (
     _handler: (ctx: unknown, args: unknown) => Promise<PerformanceResult>;
   }
 )._handler;
+const hydrateLeaders = (
+  hydrate as unknown as {
+    _handler: (
+      ctx: unknown,
+      args: { rows: PerformanceRow[] },
+    ) => Promise<PerformanceRow[]>;
+  }
+)._handler;
+
+void test("owner hydration reuses owner/team lookups and retains team names as context", async () => {
+  const reads: string[] = [];
+  const rows: PerformanceRow[] = Array.from({ length: 100 }, (_, index) => ({
+    id: `career:${index}`,
+    season: "Career",
+    period: "Career",
+    playerId: null,
+    teamIds: ["old-team", "new-team"],
+    weekId: null,
+    position: "",
+    name: "",
+    team: "",
+    stats: { P: 100 },
+  }));
+  const result = await hydrateLeaders(
+    {
+      auth: { getUserIdentity: () => Promise.resolve({ subject: "user" }) },
+      db: {
+        normalizeId: () => null,
+        get: (id: string) => {
+          reads.push(id);
+          return Promise.resolve(
+            id === "user"
+              ? { status: "active" }
+              : id === "franchise"
+                ? { name: "Current franchise name", ownerId: "owner" }
+                : id === "owner"
+                  ? { firstName: "Alex", lastName: "Smith", nickName: "Ace" }
+                  : { franchiseId: "franchise" },
+          );
+        },
+      },
+    },
+    { rows },
+  );
+  assert.deepEqual(reads.sort(), [
+    "franchise",
+    "new-team",
+    "old-team",
+    "owner",
+    "user",
+  ]);
+  assert.ok(result.every((row) => row.name === "Current franchise name"));
+  assert.ok(
+    result.every((row) => row.ownerName === "Ace" && row.ownerId === "owner"),
+  );
+});
+
+void test("season and weekly team performances carry owner names with full-name fallback", async () => {
+  const documents: Record<string, unknown> = {
+    user: { status: "active" },
+    team: { franchiseId: "franchise" },
+    franchise: { name: "Team name", ownerId: "owner" },
+    owner: { firstName: "Alex", lastName: "Smith", nickName: " " },
+    week: { weekNum: 7 },
+  };
+  const rows: PerformanceRow[] = [null, "week"].map((weekId) => ({
+    id: weekId ?? "season",
+    season: "2026",
+    period: "Season",
+    playerId: null,
+    teamIds: ["team"],
+    weekId,
+    position: "",
+    name: "",
+    team: "",
+    stats: { P: 100 },
+  }));
+  const result = await hydrateLeaders(
+    {
+      auth: { getUserIdentity: () => Promise.resolve({ subject: "user" }) },
+      db: {
+        normalizeId: () => null,
+        get: (id: string) => Promise.resolve(documents[id]),
+      },
+    },
+    { rows },
+  );
+  assert.ok(result.every((row) => row.ownerName === "Alex Smith"));
+  assert.ok(result.every((row) => row.team === "Team name"));
+  assert.equal(result[1]?.period, "Week 7");
+  assert.equal(rows[0]?.ownerName, undefined);
+});
+
+void test("career action combines full pages before selecting its top 100", async () => {
+  const result = await readLeaderboard(
+    {
+      runQuery: (
+        _ref: unknown,
+        args: { filters?: { seasonId: string }; rows?: PerformanceRow[] },
+      ) => {
+        if (args.rows) return Promise.resolve(args.rows);
+        const older = args.filters?.seasonId === "old";
+        const rows: PerformanceRow[] = older
+          ? Array.from({ length: 101 }, (_, index) => ({
+              id: `old-${index}`,
+              playerId: `p${index}`,
+              teamIds: [],
+              season: "Old",
+              weekId: null,
+              period: "RS",
+              position: "F",
+              name: "",
+              team: "",
+              stats: { GP: 1, G: index === 100 ? 9 : 10 },
+            }))
+          : [
+              {
+                id: "new-100",
+                playerId: "p100",
+                teamIds: [],
+                season: "New",
+                weekId: null,
+                period: "RS",
+                position: "F",
+                name: "",
+                team: "",
+                stats: { GP: 1, G: 9 },
+              },
+            ];
+        return Promise.resolve({
+          rows,
+          done: true,
+          cursor: "",
+          highlightsOnly: false,
+        });
+      },
+    },
+    {
+      filters: {
+        ...filters,
+        kind: "playerCareer",
+        seasonIds: ["old", "new"],
+        startDate: "",
+        endDate: "",
+      },
+    },
+  );
+  assert.equal(result.rows.length, 100);
+  assert.equal(result.rows[0]?.playerId, "p100");
+  assert.equal(result.rows[0]?.stats.G, 18);
+});
+
+void test("career pages return all contributors and owner keys while preserving authorization", async () => {
+  const options = {
+    ...filters,
+    kind: "teamCareer",
+    stat: "P",
+    seasonType: "",
+    minimumGames: 20,
+    startDate: "",
+    endDate: "",
+  };
+  const data = fixture();
+  const result = await readPage(data.ctx, { filters: options, cursor: null });
+  // GP qualification is applied to combined careers; GP=1 source seasons survive.
+  assert.equal(result.rows.length, 1);
+  assert.equal(result.rows[0]?.ownerId, "owner");
+  await assert.rejects(
+    readPage(fixture(undefined, false).ctx, { filters: options, cursor: null }),
+  );
+});
+
+void test("weekly records use their week's season type instead of silently returning no rows", async () => {
+  const options = {
+    ...filters,
+    kind: "playerWeek",
+    seasonType: "RS",
+    startDate: "",
+    endDate: "",
+  };
+  assert.equal(
+    (await readPage(fixture().ctx, { filters: options, cursor: null })).rows
+      .length,
+    1,
+  );
+  assert.equal(
+    (
+      await readPage(fixture().ctx, {
+        filters: { ...options, seasonType: "PO" },
+        cursor: null,
+      })
+    ).rows.length,
+    0,
+  );
+});
+
+void test("unsupported daily game thresholds fail instead of silently changing indexed winners", async () => {
+  await assert.rejects(
+    readPage(fixture().ctx, {
+      filters: { ...filters, minimumGames: 2 },
+      cursor: null,
+    }),
+    /Minimum games applies/,
+  );
+});
 
 function fixture(status?: string, signedIn = true, ready = true, count = 1) {
   const calls: unknown[] = [];
@@ -56,7 +261,14 @@ function fixture(status?: string, signedIn = true, ready = true, count = 1) {
         Promise.resolve(signedIn ? { subject: "user" } : null),
     },
     db: {
-      get: () => Promise.resolve({ status: "active", name: "2026" }),
+      get: () =>
+        Promise.resolve({
+          status: "active",
+          name: "2026",
+          franchiseId: "franchise",
+          ownerId: "owner",
+        }),
+      normalizeId: (_table: string, id: string) => id,
       query: (table: string) => {
         calls.push(table);
         return {
@@ -67,6 +279,7 @@ function fixture(status?: string, signedIn = true, ready = true, count = 1) {
             calls.push(index);
             build(range);
             const query = {
+              collect: () => Promise.resolve([{ _id: "week", weekType: "RS" }]),
               unique: () =>
                 Promise.resolve(
                   table === "playerDayPerformanceCoverage"
@@ -98,6 +311,7 @@ function fixture(status?: string, signedIn = true, ready = true, count = 1) {
                       _id: "line",
                       playerId: "player",
                       gshlTeamId: "team",
+                      weekId: "week",
                       date: "2026-01-15",
                       GP: "1",
                       G: "10",

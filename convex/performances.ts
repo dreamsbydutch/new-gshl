@@ -12,6 +12,12 @@ import type {
   PerformanceResult,
   PerformanceRow,
 } from "../src/lib/types/performances";
+import type { CareerAggregate } from "../src/lib/types/records";
+import {
+  addCareerPerformances,
+  careerLeaders,
+  isCareerPerformance,
+} from "../src/lib/utils/features/records";
 import {
   performanceDisplayStats,
   performanceStats,
@@ -29,6 +35,8 @@ const filterFields = {
     v.literal("teamDay"),
     v.literal("teamWeek"),
     v.literal("teamSeason"),
+    v.literal("playerCareer"),
+    v.literal("teamCareer"),
   ),
   stat: v.string(),
   direction: v.union(v.literal("asc"), v.literal("desc")),
@@ -36,6 +44,7 @@ const filterFields = {
   seasonType: v.string(),
   startDate: v.string(),
   endDate: v.string(),
+  minimumGames: v.optional(v.number()),
 };
 const filtersValidator = v.object({
   ...filterFields,
@@ -54,9 +63,26 @@ const tables = {
   teamDay: "teamDayStatLines",
   teamWeek: "teamWeekStatLines",
   teamSeason: "teamSeasonStatLines",
+  playerCareer: "playerTotalStatLines",
+  teamCareer: "teamSeasonStatLines",
 } as const;
 
 function validateFilters(filters: Omit<PerformanceFilters, "seasonIds">) {
+  if (filters.minimumGames !== undefined && filters.kind.endsWith("Day"))
+    throw new Error(
+      "Minimum games applies to weekly, season, and career records",
+    );
+  if (
+    filters.minimumGames !== undefined &&
+    (!Number.isInteger(filters.minimumGames) ||
+      filters.minimumGames < 1 ||
+      filters.minimumGames > 100000)
+  )
+    throw new Error(
+      "Minimum games must be a whole number between 1 and 100000",
+    );
+  if (!["", "RS", "PO", "LT"].includes(filters.seasonType))
+    throw new Error("Invalid season type");
   if (!performanceStats(filters.kind).includes(filters.stat))
     throw new Error("Invalid statistic");
   for (const date of [filters.startDate, filters.endDate]) {
@@ -222,12 +248,71 @@ export const page = internalQuery({
               q.eq("seasonId", filters.seasonId),
             );
     const result = await query.paginate({ cursor, numItems: 500 });
+    const career = isCareerPerformance(filters.kind);
+    const weeks =
+      filters.kind.endsWith("Week") && filters.seasonType
+        ? await ctx.db
+            .query("weeks")
+            .withIndex("by_seasonId", (q) => q.eq("seasonId", filters.seasonId))
+            .collect()
+        : [];
+    const weekTypes = new Map(
+      weeks.map((week) => [String(week._id), week.weekType]),
+    );
+    const teamOwners = new Map<string, string>();
+    const franchiseOwners = new Map<string, string>();
     const rows: PerformanceRow[] = [];
     for (const document of result.page) {
       const row: Record<string, unknown> = document;
-      if (!qualifiesForPerformance(row, filters)) continue;
+      if (
+        filters.kind === "playerCareer" &&
+        filters.position === "skater" &&
+        ["W", "GA", "GAA", "SV", "SA", "SVP", "SO"].includes(filters.stat)
+      )
+        continue;
+      const qualification = career
+        ? {
+            ...filters,
+            minimumGames: 1,
+            stat: "GP",
+            position:
+              ["W", "GA", "GAA", "SV", "SA", "SVP", "SO"].includes(
+                filters.stat,
+              ) && filters.kind === "playerCareer"
+                ? ("goalie" as const)
+                : filters.position,
+          }
+        : filters;
+      const source = weekTypes.size
+        ? { ...row, seasonType: weekTypes.get(String(row.weekId)) }
+        : row;
+      if (!qualifiesForPerformance(source, qualification)) continue;
+      let ownerId: string | undefined;
+      if (filters.kind === "teamCareer" && typeof row.gshlTeamId === "string") {
+        ownerId = teamOwners.get(row.gshlTeamId);
+        if (!ownerId) {
+          const teamId = ctx.db.normalizeId("teams", row.gshlTeamId);
+          const team = teamId ? await ctx.db.get(teamId) : null;
+          if (!team)
+            throw new ConvexError(
+              "A historical team is missing. Please ask the commissioner to review this record.",
+            );
+          ownerId = franchiseOwners.get(team.franchiseId);
+          if (!ownerId) {
+            const franchise = await ctx.db.get(team.franchiseId);
+            if (!franchise)
+              throw new ConvexError(
+                "Historical ownership is missing. Please ask the commissioner to review this record.",
+              );
+            ownerId = String(franchise.ownerId);
+            franchiseOwners.set(team.franchiseId, ownerId);
+          }
+          teamOwners.set(row.gshlTeamId, ownerId);
+        }
+      }
       rows.push({
         id: document._id,
+        ...(ownerId ? { ownerId } : {}),
         season: season?.name ?? "Unknown season",
         playerId: typeof row.playerId === "string" ? row.playerId : null,
         teamIds:
@@ -252,7 +337,9 @@ export const page = internalQuery({
       });
     }
     return {
-      rows: topPerformances(rows, filters.stat, filters.direction),
+      rows: career
+        ? rows
+        : topPerformances(rows, filters.stat, filters.direction),
       cursor: result.continueCursor,
       done: result.isDone,
       highlightsOnly,
@@ -271,12 +358,53 @@ const rowValidator = v.object({
   stats: v.record(v.string(), v.union(v.number(), v.null())),
   name: v.string(),
   team: v.string(),
+  franchiseId: v.optional(v.string()),
+  ownerId: v.optional(v.string()),
+  ownerName: v.optional(v.string()),
 });
 export const hydrate = internalQuery({
   args: { rows: v.array(rowValidator) },
   handler: async (ctx, { rows }): Promise<PerformanceRow[]> => {
     await requireActiveUser(ctx);
     if (rows.length > 100) throw new Error("Too many performances");
+    type TeamIdentity = { name: string; ownerId?: Id<"owners"> };
+    const teamsById = new Map<string, Promise<TeamIdentity>>();
+    const franchisesById = new Map<string, Promise<TeamIdentity>>();
+    const ownerNamesById = new Map<string, Promise<string>>();
+    const teamIdentity = (id: string): Promise<TeamIdentity> => {
+      const cached = teamsById.get(id);
+      if (cached) return cached;
+      const pending = ctx.db.get(id as Id<"teams">).then((team) => {
+        if (!team) return { name: "Unknown team" };
+        let identity = franchisesById.get(team.franchiseId);
+        if (!identity) {
+          identity = ctx.db.get(team.franchiseId).then((franchise) => ({
+            name: franchise?.name ?? "Unknown team",
+            ownerId: franchise?.ownerId,
+          }));
+          franchisesById.set(team.franchiseId, identity);
+        }
+        return identity;
+      });
+      teamsById.set(id, pending);
+      return pending;
+    };
+    const ownerName = (id: Id<"owners">): Promise<string> => {
+      let name = ownerNamesById.get(id);
+      if (!name) {
+        name = ctx.db
+          .get(id)
+          .then(
+            (owner) =>
+              [
+                owner?.nickName?.trim(),
+                [owner?.firstName, owner?.lastName].filter(Boolean).join(" "),
+              ].find((value) => value?.trim()) ?? "Owner unavailable",
+          );
+        ownerNamesById.set(id, name);
+      }
+      return name;
+    };
     return Promise.all(
       rows.map(async (row) => {
         // Only the final combined winners need their full source documents.
@@ -311,18 +439,19 @@ export const hydrate = internalQuery({
                 )
                 .first()
             : null;
-        const teamNames = await Promise.all(
-          row.teamIds.map(async (id) => {
-            const team = await ctx.db.get(id as Id<"teams">);
-            const franchise = team ? await ctx.db.get(team.franchiseId) : null;
-            return franchise?.name ?? "Unknown team";
-          }),
-        );
+        const identities = await Promise.all(row.teamIds.map(teamIdentity));
+        const teamNames = [...new Set(identities.map((team) => team.name))];
+        const ownerId = !row.playerId
+          ? row.ownerId
+            ? ctx.db.normalizeId("owners", row.ownerId)
+            : identities[0]?.ownerId
+          : undefined;
         const week = row.weekId
           ? await ctx.db.get(row.weekId as Id<"weeks">)
           : null;
         return {
           ...row,
+          ...(ownerId ? { ownerId, ownerName: await ownerName(ownerId) } : {}),
           name: row.playerId
             ? (player?.fullName ?? "Unknown player")
             : teamNames.join(" / "),
@@ -345,6 +474,7 @@ export const leaderboard = action({
     if (seasonIds.length === 0 || seasonIds.length > 100)
       throw new Error("Select between 1 and 100 seasons");
     let rows: PerformanceRow[] = [];
+    let careers = new Map<string, CareerAggregate>();
     let highlightsOnly = false;
     for (const seasonId of new Set(seasonIds)) {
       let cursor: string | null = null;
@@ -366,15 +496,27 @@ export const leaderboard = action({
           throw new Error("Season archive changed. Please refresh results.");
         seasonHighlightsOnly = result.highlightsOnly;
         highlightsOnly ||= result.highlightsOnly;
-        rows = topPerformances(
-          [...rows, ...result.rows],
-          filters.stat,
-          filters.direction,
-        );
+        if (isCareerPerformance(filters.kind)) {
+          careers = addCareerPerformances(careers, result.rows, filters.kind);
+        } else {
+          rows = topPerformances(
+            [...rows, ...result.rows],
+            filters.stat,
+            filters.direction,
+          );
+        }
         if (result.done) break;
         cursor = result.cursor;
       }
     }
+    if (isCareerPerformance(filters.kind))
+      rows = careerLeaders(
+        careers,
+        filters.kind,
+        filters.stat,
+        filters.direction,
+        filters.minimumGames,
+      );
     return {
       rows: await ctx.runQuery(internal.performances.hydrate, { rows }),
       highlightsOnly,

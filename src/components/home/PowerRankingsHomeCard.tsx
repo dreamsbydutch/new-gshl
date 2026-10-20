@@ -111,46 +111,37 @@ export function PowerRankingsHomeCard({
   return (
     <section
       aria-labelledby="power-rankings-home-heading"
-      className="h-full min-w-0 overflow-hidden rounded-lg border border-slate-200 bg-white"
+      className="gshl-section"
     >
-      <header className="flex items-center justify-between gap-2 border-b border-slate-100 px-3 py-3 sm:gap-3 sm:px-5">
-        <div className="min-w-0">
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-blue-600 sm:tracking-[0.18em]">
-            {selectedSeason?.name ?? "GSHL"}
-          </p>
-          <h2
-            id="power-rankings-home-heading"
-            className="mt-0.5 font-oswald text-lg text-slate-950 sm:text-xl"
-          >
-            Power rankings
-          </h2>
-          <p className="mt-0.5 text-xs text-slate-500">
-            Latest available order · {latestLabel}
-          </p>
-        </div>
+      <header className="flex min-h-11 items-center justify-between gap-2 border-b border-slate-200">
+        <h2 id="power-rankings-home-heading" className="gshl-section-title">
+          Power rankings{" "}
+          <span className="text-xs font-normal text-slate-500">
+            {latestLabel}
+          </span>
+        </h2>
         <button
           type="button"
           onClick={openFullRankings}
-          aria-label={`View complete ${selectedSeason?.name ?? "GSHL"} power rankings`}
-          className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+          className="gshl-text-action"
         >
-          View all
+          Full rankings
           <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
         </button>
       </header>
 
       {error ? (
-        <p className="px-4 py-6 text-center text-sm text-slate-500 sm:px-5">
+        <p className="py-3 text-sm text-slate-500">
           Power rankings are unavailable right now.
         </p>
       ) : !entries.length ? (
-        <p className="px-4 py-6 text-center text-sm text-slate-500 sm:px-5">
+        <p className="py-3 text-sm text-slate-500">
           No power rankings have been published for this season.
         </p>
       ) : (
         <ol
           aria-label={`Top ${previewEntries.length} power rankings`}
-          className="divide-y divide-slate-100 px-3 sm:px-5"
+          className="divide-y divide-slate-100"
         >
           {previewEntries.map((entry) => (
             <li

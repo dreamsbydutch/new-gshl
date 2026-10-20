@@ -8,7 +8,10 @@ import type {
   TeamSeasonStatLine,
 } from "@gshl-types";
 import { MatchupType } from "../domain/constants";
-import { buildPlayoffBracket } from "./playoff-bracket";
+import {
+  buildPlayoffBracket,
+  buildPlayoffBracketPreview,
+} from "./playoff-bracket";
 
 function season(legacyId: string): Season {
   return {
@@ -165,6 +168,29 @@ function seasonSevenTeamsAndStats() {
   );
   return { teams, stats };
 }
+
+void test("preview connectors pair the legacy quarterfinals feeding each semifinal", () => {
+  const { teams, stats } = seasonSevenTeamsAndStats();
+  const before = structuredClone({ teams, stats });
+  const bracket = buildPlayoffBracketPreview(teams, stats, [], season("6"));
+  assert.deepEqual(
+    bracket.columns[0]?.matchups.map((game) => [
+      game.homeLabel,
+      game.awayLabel,
+    ]),
+    [
+      ["#1", "#8"],
+      ["#4", "#5"],
+      ["#2", "#7"],
+      ["#3", "#6"],
+    ],
+  );
+  assert.deepEqual({ teams, stats }, before);
+  assert.deepEqual(
+    buildPlayoffBracketPreview(teams, stats, [], season("7")),
+    buildPlayoffBracket(teams, stats, [], season("7")),
+  );
+});
 
 void test("uses the league-wide 1–8 bracket through season six", () => {
   const { teams, stats } = seasonSevenTeamsAndStats();

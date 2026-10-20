@@ -3,12 +3,12 @@
 import { useScheduleContextNavigation } from "@gshl-hooks";
 import {
   HorizontalToggle,
-  PageContextNavigation,
   SecondaryPageToolbar,
   TeamsToggle,
   WeeksToggle,
   TertiaryPageToolbar,
 } from "@gshl-nav";
+import { SectionNavigation } from "@gshl-components/nav/SectionNavigation";
 import type { LabeledToggleOption } from "@gshl-types";
 import { ScheduleSkeleton } from "@gshl-skeletons";
 
@@ -18,8 +18,8 @@ export function ScheduleLayout({ children }: { children: React.ReactNode }) {
 
   // Schedule type navigation items
   const scheduleTypes: LabeledToggleOption[] = [
-    { key: "team", label: "Team" },
-    { key: "week", label: "Week" },
+    { key: "team", label: "By team" },
+    { key: "week", label: "By week" },
     { key: "nhl", label: "NHL" },
   ];
 
@@ -27,7 +27,12 @@ export function ScheduleLayout({ children }: { children: React.ReactNode }) {
     scheduleTypes.find((type) => type.key === scheduleType) ?? null;
   return (
     <div className="font-varela">
-      <PageContextNavigation ariaLabel="Schedule controls" mobileRows={2}>
+      <SectionNavigation section="league" />
+      <div
+        className="gshl-local-controls"
+        role="group"
+        aria-label="Schedule views"
+      >
         <SecondaryPageToolbar className="text-center sm:justify-center">
           <HorizontalToggle<LabeledToggleOption>
             items={scheduleTypes}
@@ -62,7 +67,7 @@ export function ScheduleLayout({ children }: { children: React.ReactNode }) {
             />
           )}
         </TertiaryPageToolbar>
-      </PageContextNavigation>
+      </div>
       <main aria-labelledby="schedule-page-heading">
         <h1 id="schedule-page-heading" className="sr-only">
           Schedule

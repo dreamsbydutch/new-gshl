@@ -3,10 +3,9 @@
 import Link from "next/link";
 import {
   BookOpenText,
-  Building2,
+  Bell,
   ClipboardList,
   Ellipsis,
-  Newspaper,
   ShieldCheck,
 } from "lucide-react";
 import { useAuthSession } from "@gshl-hooks";
@@ -23,28 +22,22 @@ import { cn } from "@gshl-utils";
 
 const moreItems = [
   {
-    label: "Press Box",
-    description: "League news and weekly editions",
-    href: "/headlines",
-    icon: Newspaper,
-  },
-  {
     label: "Rulebook",
     description: "League rules and policies",
     href: "/rulebook",
     icon: BookOpenText,
   },
   {
-    label: "League Office",
-    description: "League tools and reference views",
-    href: "/leagueoffice",
-    icon: Building2,
+    label: "Team history",
+    description: "Past results, records and trophies",
+    href: "/lockerroom?view=history",
+    icon: ClipboardList,
   },
   {
-    label: "Draft Hub",
-    description: "Live draft board and team rooms",
-    href: "/draft",
-    icon: ClipboardList,
+    label: "Notifications",
+    description: "Draft alerts and delivery settings",
+    href: "/notifications",
+    icon: Bell,
   },
 ];
 

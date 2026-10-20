@@ -2,8 +2,11 @@
 
 import dynamic from "next/dynamic";
 import { useMemo, useState } from "react";
+import { OwnerCommandCenter } from "@gshl-components/home/OwnerCommandCenter";
+import { DraftNotificationSetup } from "@gshl-components/notifications/DraftNotificationSetup";
 import { LockerRoomHeader } from "@gshl-components/team/LockerRoomHeader";
 import {
+  useAuthSession,
   useCareerSplits,
   usePlayers,
   usePlayersByIds,
@@ -105,11 +108,35 @@ const TradeBlock = dynamic(
 const SHOW_LOCKER_ROOM_ROSTER_SALARIES = true;
 
 export function LockerRoomContent() {
+  const { selectedLockerRoomType, selectedOwnerId } = useNav();
+  const { session } = useAuthSession();
+  const isOwnCurrentTeam =
+    String(session?.user.ownerId ?? "") === String(selectedOwnerId);
+  if (selectedLockerRoomType === "overview" && isOwnCurrentTeam)
+    return (
+      <>
+        <OwnerCommandCenter />
+        <DraftNotificationSetup compact />
+      </>
+    );
+  return (
+    <LockerRoomDetails
+      overviewAsRoster={selectedLockerRoomType === "overview"}
+    />
+  );
+}
+
+function LockerRoomDetails({
+  overviewAsRoster,
+}: {
+  overviewAsRoster: boolean;
+}) {
   const [capView, setCapView] = useState("contracts");
   const { selectedSeason, currentSeason, defaultSeason, seasons } =
     useSeasonState();
   const contextSeason = selectedSeason ?? currentSeason ?? defaultSeason;
-  const { selectedLockerRoomType, selectedOwnerId } = useNav();
+  const { selectedLockerRoomType: storedView, selectedOwnerId } = useNav();
+  const selectedLockerRoomType = overviewAsRoster ? "roster" : storedView;
   const salaryCapSeason = useMemo(
     () => resolveSalaryCapSeason(seasons, contextSeason, defaultSeason),
     [contextSeason, defaultSeason, seasons],
@@ -339,7 +366,7 @@ export function LockerRoomContent() {
                 type="button"
                 aria-pressed={capView === key}
                 onClick={() => setCapView(key)}
-                className={`min-h-9 border-b-2 px-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 ${capView === key ? "border-slate-950 font-semibold text-slate-950" : "border-transparent text-slate-500"}`}
+                className={`min-h-11 border-b-2 px-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 ${capView === key ? "border-slate-950 font-semibold text-slate-950" : "border-transparent text-slate-500"}`}
               >
                 {label}
               </button>

@@ -34,7 +34,7 @@ export function ClickableNavItem({
       className={cn(
         "flex min-h-11 cursor-pointer items-center gap-2 rounded px-3 py-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-2 motion-reduce:transition-none",
         isActive
-          ? "bg-blue-100 text-blue-700"
+          ? "bg-slate-900 text-white"
           : "text-gray-700 hover:bg-gray-100",
         isDisabled && "cursor-not-allowed opacity-50",
         className,
@@ -117,7 +117,7 @@ export function NavContainer({
     <nav
       aria-label={ariaLabel}
       className={cn(
-        "fixed inset-x-0 bottom-0 z-50 flex items-center justify-center border-t border-slate-200 bg-white/95 pb-[env(safe-area-inset-bottom)] shadow-[0_-8px_24px_rgba(15,23,42,0.08)] backdrop-blur lg:bottom-auto lg:top-0 lg:border-b lg:border-t-0 lg:pb-0 lg:pt-[env(safe-area-inset-top)] lg:shadow-sm print:hidden",
+        "fixed inset-x-0 bottom-0 z-50 flex items-center justify-center border-t border-slate-200 bg-white/95 pb-[env(safe-area-inset-bottom)] shadow-[0_-2px_6px_rgba(15,23,42,0.04)] backdrop-blur lg:bottom-auto lg:top-0 lg:border-b lg:border-t-0 lg:pb-0 lg:pt-[env(safe-area-inset-top)] lg:shadow-sm print:hidden",
         className,
       )}
     >

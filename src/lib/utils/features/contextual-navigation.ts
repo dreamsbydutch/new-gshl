@@ -30,6 +30,7 @@ export const STANDINGS_NAVIGATION_VIEWS = [
 ] as const;
 
 export const LOCKER_ROOM_NAVIGATION_VIEWS = [
+  "overview",
   "roster",
   "salary",
   "history",
@@ -182,7 +183,11 @@ export function getCurrentNavigationHref(
 }
 
 export function isGlobalSeasonUrlPath(pathname: string): boolean {
-  return pathname === "/schedule" || pathname === "/standings";
+  return (
+    pathname === "/schedule" ||
+    pathname === "/standings" ||
+    pathname === "/league"
+  );
 }
 
 /** Updates the global season on routes that expose their context in the URL. */

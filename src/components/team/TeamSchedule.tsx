@@ -23,7 +23,7 @@ export function TeamSchedule() {
 
   if (error) {
     return (
-      <div className="mx-2 mt-4 rounded-xl border border-rose-200 bg-rose-50 p-6 text-center text-sm text-rose-700">
+      <div className="my-2 border-b border-rose-200 py-3 text-center text-sm text-rose-700">
         The team schedule could not be loaded.
       </div>
     );
@@ -31,14 +31,14 @@ export function TeamSchedule() {
 
   if (!selectedTeam) {
     return (
-      <div className="mx-2 mb-8 mt-4">
+      <div className="my-2">
         <div className="text-center text-gray-500">No team selected</div>
       </div>
     );
   }
 
   return (
-    <div className="mx-2 mb-8 mt-4">
+    <div className="my-2">
       <TeamScheduleHeader />
       <div>
         {matchups.map(({ matchup, week }) => (

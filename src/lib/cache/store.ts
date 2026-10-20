@@ -14,7 +14,7 @@ const DEFAULT_STORE_STATE = {
   selectedSeasonId: "11",
   selectedWeekId: "0",
   selectedOwnerId: "1",
-  selectedLockerRoomType: "roster",
+  selectedLockerRoomType: "overview",
   selectedLeagueOfficeType: "draft",
   selectedStandingsType: "overall",
 } as const;

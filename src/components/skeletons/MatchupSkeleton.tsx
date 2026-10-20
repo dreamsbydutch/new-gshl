@@ -88,7 +88,7 @@ export function MatchupSkeleton() {
         <Skeleton className="hidden h-11 w-40 rounded-full lg:block" />
         <Skeleton className="ml-auto h-3 w-44" />
       </div>
-      <section className="rounded-xl border border-slate-200 bg-gradient-to-br from-white via-slate-50 to-slate-100 p-2 shadow-sm sm:rounded-3xl sm:p-5">
+      <section className="border-b border-slate-200 bg-white py-2">
         <div className="mb-2 border-b border-slate-200 pb-2 sm:mb-5 sm:pb-5">
           <div className="grid grid-cols-[minmax(0,1fr)_2.5rem_minmax(0,1fr)] items-center gap-1.5 sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] sm:gap-4">
             <MatchupTeamSkeleton />

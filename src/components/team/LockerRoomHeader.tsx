@@ -16,13 +16,13 @@ const TeamLogo = ({ currentTeam }: TeamLogoProps) => {
     <Image
       src={currentTeam.logoUrl}
       alt={`${currentTeam.name} logo`}
-      className="h-12 w-12 shrink-0 object-contain sm:h-16 sm:w-16"
+      className="h-9 w-9 shrink-0 object-contain sm:h-11 sm:w-11"
       width={TEAM_LOGO_SIZE.width}
       height={TEAM_LOGO_SIZE.height}
       onError={() => setErrored(true)}
     />
   ) : (
-    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded bg-slate-100 sm:h-16 sm:w-16">
+    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded bg-slate-100 sm:h-11 sm:w-11">
       <span className="text-xs font-medium text-gray-400">No Logo</span>
     </div>
   );
@@ -37,7 +37,7 @@ const TeamInfo = ({
 
   return (
     <div className="flex min-w-0 flex-col">
-      <Heading className="break-words text-lg font-bold leading-tight text-slate-950 sm:text-2xl">
+      <Heading className="break-words text-base font-bold leading-tight text-slate-950 sm:text-lg">
         {currentTeam.name}
       </Heading>
       <span className="mt-1 text-xs text-slate-500 sm:text-sm">
@@ -57,7 +57,7 @@ export function LockerRoomHeader({
   headingLevel,
 }: LockerRoomHeaderProps) {
   return (
-    <header className="mb-3 flex items-center gap-3 border-b border-slate-200 pb-3 pt-1">
+    <header className="mb-2 flex items-center gap-2 border-b border-slate-200 py-2">
       <TeamLogo currentTeam={currentTeam} />
       <TeamInfo
         currentTeam={currentTeam}

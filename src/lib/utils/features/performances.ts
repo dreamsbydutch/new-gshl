@@ -15,6 +15,8 @@ export const PERFORMANCE_KINDS: { value: PerformanceKind; label: string }[] = [
   { value: "teamDay", label: "Team days" },
   { value: "teamWeek", label: "Team weeks" },
   { value: "teamSeason", label: "Team seasons" },
+  { value: "playerCareer", label: "Player careers" },
+  { value: "teamCareer", label: "Franchise careers" },
 ];
 const hockeyStats = [
   "GP",
@@ -60,6 +62,14 @@ const goalieStats = new Set([
   "RBS",
 ]);
 export function performanceStats(kind: PerformanceKind): string[] {
+  if (kind === "playerCareer") return hockeyStats;
+  if (kind === "teamCareer")
+    return [
+      ...hockeyStats.filter((stat) => stat !== "GAA" && stat !== "SVP"),
+      "teamW",
+      "teamL",
+      "teamT",
+    ];
   if (kind === "playerNhl")
     return [
       "seasonRating",
@@ -215,7 +225,8 @@ export function qualifiesForPerformance(
   ].includes(filters.stat);
   // Empty/non-playing rows must not win rate-stat or shutout leaderboards.
   return (
-    (availabilityStat || (performanceNumber(row.GP) ?? 0) > 0) &&
+    (availabilityStat ||
+      (performanceNumber(row.GP) ?? 0) >= (filters.minimumGames ?? 1)) &&
     performanceNumber(row[filters.stat]) !== null
   );
 }

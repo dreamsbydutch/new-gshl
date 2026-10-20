@@ -2,11 +2,9 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { useState } from "react";
 import { WhatsAppShareButton } from "@gshl-components/ui/WhatsAppShareButton";
-import {
-  WeeklyMatchupRowSkeleton,
-  WeeklyScheduleSkeleton,
-} from "@gshl-skeletons";
+import { WeeklyScheduleSkeleton } from "@gshl-skeletons";
 import type {
   ScoreDisplayProps,
   TeamDisplayProps,
@@ -19,7 +17,6 @@ import {
   isScheduleItemComplete,
   isValidScheduleMatchup,
   shouldDisplayRank,
-  TEAM_LOGO_DIMENSIONS,
 } from "@gshl-utils";
 import { useAuthSession, useWeeklyScheduleData } from "@gshl-hooks";
 import {
@@ -72,28 +69,50 @@ const ScoreDisplay = ({ matchup }: ScoreDisplayProps) => {
 };
 
 const TeamDisplay = ({ team, rank, isAway = false }: TeamDisplayProps) => {
-  const logoAlt = `${team.name ?? (isAway ? "Away team" : "Home team")} logo`;
+  const [failedLogo, setFailedLogo] = useState<string | null>(null);
+  const teamName = team.name?.trim();
+  const name =
+    teamName !== undefined && teamName.length > 0
+      ? teamName
+      : isAway
+        ? "Away team"
+        : "Home team";
+  const initials = name
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((word) => word.charAt(0))
+    .join("")
+    .toUpperCase();
 
   return (
-    <div className="col-span-4 flex min-w-0 items-center justify-center gap-1.5 p-1 text-center">
+    <div className="col-span-4 flex min-w-0 items-center gap-1 px-1">
       {shouldDisplayRank(rank) ? (
-        <span className="font-oswald text-xs font-bold text-slate-500">
+        <span className="shrink-0 text-[10px] font-semibold text-slate-500">
           #{rank}
         </span>
       ) : null}
-      {team.logoUrl ? (
+      {team.logoUrl && failedLogo !== team.logoUrl ? (
         <Image
-          className="h-9 w-9 object-contain"
+          className="h-6 w-6 shrink-0 object-contain"
           src={team.logoUrl}
-          alt={logoAlt}
-          width={TEAM_LOGO_DIMENSIONS.width}
-          height={TEAM_LOGO_DIMENSIONS.height}
+          alt=""
+          width={24}
+          height={24}
+          onError={() => setFailedLogo(team.logoUrl ?? null)}
         />
       ) : (
-        <div className="flex h-9 w-9 items-center justify-center rounded bg-gray-100" />
+        <span
+          aria-hidden="true"
+          className="flex h-6 w-6 shrink-0 items-center justify-center rounded bg-slate-100 text-[10px] font-semibold text-slate-500"
+        >
+          {initials}
+        </span>
       )}
-      <span className="sr-only font-oswald text-sm sm:not-sr-only sm:max-w-28 sm:truncate">
-        {team.name}
+      <span
+        title={name}
+        className="line-clamp-2 min-w-0 flex-1 text-left text-xs font-medium leading-4 sm:text-sm"
+      >
+        {name}
       </span>
     </div>
   );
@@ -112,13 +131,17 @@ const WeekScheduleItem = ({
     !awayTeam ||
     !isValidScheduleMatchup({ matchup, homeTeam, awayTeam })
   ) {
-    return <WeeklyMatchupRowSkeleton />;
+    return (
+      <p className="px-2 py-3 text-xs text-slate-500">
+        Matchup information is unavailable.
+      </p>
+    );
   }
 
   return (
     <Link
       href={matchupHref}
-      className="flex flex-col items-center py-1 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-slate-500"
+      className="flex min-h-11 flex-col justify-center py-1 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-slate-500"
     >
       <div className="grid w-full grid-cols-10 items-center">
         <TeamDisplay

@@ -11,20 +11,18 @@ export function HeadlinesArchiveContent() {
   const { data: editions, isLoading } = useWeeklyEditionArchive();
 
   return (
-    <main className="container mx-auto px-3 py-4 sm:px-5 sm:py-6">
-      <div className="mx-auto max-w-3xl">
-        <header className="flex items-center gap-3 border-b border-slate-300 pb-3">
+    <main className="gshl-page">
+      <div className="mx-auto max-w-6xl">
+        <header className="flex items-center gap-2 border-b border-slate-200 py-2">
           <Image
             src={WEEKLY_EDITION_LOGO_URL}
             alt="GSHL Press Box"
             width={48}
             height={48}
-            className="h-12 w-12 shrink-0 object-contain"
+            className="h-8 w-8 shrink-0 object-contain"
           />
           <div>
-            <h1 className="font-oswald text-2xl font-bold uppercase tracking-tight sm:text-3xl">
-              Press Box
-            </h1>
+            <h1 className="text-sm font-bold">Press Box</h1>
             <p className="text-xs text-slate-500">News and league updates</p>
           </div>
         </header>
@@ -36,7 +34,7 @@ export function HeadlinesArchiveContent() {
             ))}
           </div>
         ) : editions?.length ? (
-          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <div className="grid divide-y divide-slate-200 sm:grid-cols-2 sm:gap-x-6">
             {editions.map((edition, index) => (
               <Link
                 key={edition.id}
@@ -48,7 +46,7 @@ export function HeadlinesArchiveContent() {
                 </p>
                 <h2
                   className={`mt-2 font-oswald font-bold leading-tight text-slate-950 group-hover:text-blue-800 ${
-                    index === 0 ? "text-2xl sm:text-3xl" : "text-xl"
+                    index === 0 ? "text-lg sm:text-xl" : "text-base"
                   }`}
                 >
                   {edition.headline}

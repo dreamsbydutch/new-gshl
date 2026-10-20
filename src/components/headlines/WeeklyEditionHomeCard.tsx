@@ -2,9 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
-import Link from "next/link";
 import { createPortal } from "react-dom";
-import { ArrowRight, BookOpen, X } from "lucide-react";
+import { BookOpen, X } from "lucide-react";
 import { useLatestWeeklyEdition, useWeeklyEdition } from "@gshl-hooks";
 import { Skeleton } from "@gshl-ui";
 import { WEEKLY_EDITION_LOGO_URL } from "@gshl-utils";
@@ -91,25 +90,30 @@ export function WeeklyEditionHomeCard() {
 
   if (isLoading) {
     return (
-      <section className="mx-auto flex h-14 w-full max-w-5xl items-center gap-3 border-y border-slate-200 px-3">
+      <section className="mx-auto flex h-14 w-full max-w-none items-center gap-3 border-b border-slate-200 px-3">
         <Skeleton className="h-9 w-9 rounded-xl" />
         <Skeleton className="h-4 flex-1" />
         <Skeleton className="h-8 w-20 rounded-full" />
       </section>
     );
   }
-  if (!edition) return null;
+  if (!edition)
+    return (
+      <p className="py-3 text-sm text-slate-500">
+        The next league edition will appear here when published.
+      </p>
+    );
 
   return (
     <>
-      <section className="mx-auto flex w-full max-w-5xl items-stretch overflow-hidden border-y border-slate-300 bg-white text-slate-950">
+      <section className="mx-auto flex w-full max-w-none items-stretch overflow-hidden border-b border-slate-200 bg-white text-slate-950">
         <button
           ref={triggerRef}
           type="button"
           onClick={() => setIsOpen(true)}
-          className="group flex min-w-0 flex-1 items-center gap-3 px-2 py-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-slate-500 sm:px-3"
+          className="group flex min-w-0 flex-1 items-center gap-3 py-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-slate-500"
         >
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white p-0.5 shadow-inner">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded bg-white p-0.5">
             <Image
               src={WEEKLY_EDITION_LOGO_URL}
               alt=""
@@ -119,14 +123,10 @@ export function WeeklyEditionHomeCard() {
             />
           </span>
           <span className="min-w-0 flex-1">
-            <span className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500 sm:text-xs">
-              Press Box
-              <span className="text-slate-400">·</span>
-              <span className="truncate text-slate-500">
-                {edition.issueLabel}
-              </span>
+            <span className="block truncate text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500 sm:text-xs">
+              {edition.issueLabel}
             </span>
-            <span className="mt-0.5 block truncate text-[13px] font-semibold leading-5 text-slate-950 sm:text-sm">
+            <span className="mt-0.5 line-clamp-2 text-sm font-semibold leading-5 text-slate-950 sm:text-base sm:leading-6">
               {edition.headline}
             </span>
           </span>
@@ -153,13 +153,6 @@ export function WeeklyEditionHomeCard() {
             <BookOpen className="h-3 w-3" aria-hidden="true" />
           </span>
         </button>
-        <Link
-          href="/headlines"
-          className="hidden min-h-11 shrink-0 items-center gap-1 border-l border-slate-200 px-3 text-xs font-semibold text-slate-600 transition hover:bg-slate-100 hover:text-slate-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-slate-500 motion-reduce:transition-none sm:flex"
-        >
-          Archive
-          <ArrowRight className="h-3 w-3" aria-hidden="true" />
-        </Link>
       </section>
 
       {isOpen

@@ -38,6 +38,22 @@ const row = (id: string, value: number | null): PerformanceRow => ({
   team: "",
 });
 
+void test("minimum games excludes undersized season and weekly performances", () => {
+  assert.equal(
+    qualifiesForPerformance(
+      { GP: 9, P: 40, posGroup: "F" },
+      { ...filters, kind: "playerTotal", stat: "P", minimumGames: 10 },
+    ),
+    false,
+  );
+  assert.equal(
+    qualifiesForPerformance(
+      { GP: 10, P: 40, posGroup: "F" },
+      { ...filters, kind: "playerTotal", stat: "P", minimumGames: 10 },
+    ),
+    true,
+  );
+});
 void test("v3 GSHL averages are display metadata across periods, leaving NHL metrics and sorting unchanged", () => {
   const source = {
     Rating: 100,
@@ -99,14 +115,21 @@ void test("team columns prioritize activity stats and keep the ranking stat visi
 });
 
 void test("every requested table exposes its stored rating and stats", () => {
-  assert.equal(PERFORMANCE_KINDS.length, 8);
+  assert.equal(PERFORMANCE_KINDS.length, 10);
   for (const kind of PERFORMANCE_KINDS) {
     assert.ok(
       performanceStats(kind.value).includes(
-        kind.value === "playerNhl" ? "seasonRating" : "Rating",
+        kind.value.endsWith("Career")
+          ? "P"
+          : kind.value === "playerNhl"
+            ? "seasonRating"
+            : "Rating",
       ),
     );
-    assert.ok(performanceStats(kind.value).includes("GAA"));
+    assert.equal(
+      performanceStats(kind.value).includes("GAA"),
+      kind.value !== "teamCareer",
+    );
   }
   assert.ok(performanceStats("teamSeason").includes("teamW"));
   assert.ok(performanceStats("teamWeek").includes("powerRating"));

@@ -5,8 +5,8 @@ import {
 
 export type AppShellNavId =
   | "home"
-  | "schedule"
-  | "standings"
+  | "league"
+  | "players"
   | "lockerroom"
   | "more";
 
@@ -52,7 +52,7 @@ export function getAppShellRouteContext(
           : "Back to Schedule";
     return {
       title: "Matchup",
-      activeNavId: "schedule",
+      activeNavId: query.from === "lockerroom" ? "lockerroom" : "league",
       backHref,
       backLabel,
     };
@@ -60,8 +60,8 @@ export function getAppShellRouteContext(
 
   if (pathname.startsWith("/headlines/")) {
     return {
-      title: "Press Box",
-      activeNavId: "more",
+      title: "League news",
+      activeNavId: "league",
       backHref: "/headlines",
       backLabel: "Back to Press Box",
     };
@@ -69,17 +69,17 @@ export function getAppShellRouteContext(
 
   if (pathname === "/leagueoffice/mock-draft") {
     return {
-      title: "Mock Draft",
-      activeNavId: "more",
-      backHref: "/leagueoffice",
-      backLabel: "Back to League Office",
+      title: "Mock draft",
+      activeNavId: "players",
+      backHref: "/players",
+      backLabel: "Back to Players",
     };
   }
 
   if (pathname === "/draft/my-team") {
     return {
       title: "Draft: My Team",
-      activeNavId: "more",
+      activeNavId: "players",
       backHref: "/draft",
       backLabel: "Back to Draft Board",
     };
@@ -88,7 +88,7 @@ export function getAppShellRouteContext(
   if (pathname === "/draft/teams" || pathname.startsWith("/draft/teams/")) {
     return {
       title: "Draft: Teams",
-      activeNavId: "more",
+      activeNavId: "players",
       backHref: "/draft",
       backLabel: "Back to Draft Board",
     };
@@ -96,28 +96,49 @@ export function getAppShellRouteContext(
 
   if (pathname === "/") return { title: "Home", activeNavId: "home" };
   if (isRoute(pathname, "/schedule")) {
-    return { title: "Schedule", activeNavId: "schedule" };
+    return { title: "Schedule", activeNavId: "league" };
   }
   if (isRoute(pathname, "/standings")) {
-    return { title: "Standings", activeNavId: "standings" };
+    return { title: "Standings", activeNavId: "league" };
+  }
+  if (isRoute(pathname, "/records")) {
+    return { title: "Records", activeNavId: "league" };
   }
   if (isRoute(pathname, "/lockerroom")) {
     return { title: "My Team", activeNavId: "lockerroom" };
   }
   if (isRoute(pathname, "/headlines")) {
-    return { title: "Press Box", activeNavId: "more" };
+    return { title: "League news", activeNavId: "league" };
   }
   if (isRoute(pathname, "/rulebook") || isRoute(pathname, "/rules")) {
     return { title: "Rulebook", activeNavId: "more" };
   }
+  if (isRoute(pathname, "/league"))
+    return { title: "League", activeNavId: "league" };
+  if (isRoute(pathname, "/players"))
+    return { title: "Players", activeNavId: "players" };
   if (isRoute(pathname, "/leagueoffice")) {
-    return { title: "League Office", activeNavId: "more" };
+    const view = readContextualNavigationQuery(search).view;
+    const isLeagueView = view === "ownerRankings" || view === "confBattle";
+    return {
+      title: isLeagueView ? "League" : "Players",
+      activeNavId: isLeagueView ? "league" : "players",
+    };
   }
+  if (pathname.startsWith("/nhl/matchup/"))
+    return {
+      title: "NHL matchup",
+      activeNavId: "league",
+      backHref: "/schedule?view=nhl",
+      backLabel: "Back to NHL schedule",
+    };
+  if (isRoute(pathname, "/notifications"))
+    return { title: "Notifications", activeNavId: "more" };
   if (isRoute(pathname, "/admin")) {
     return { title: "Admin", activeNavId: "more" };
   }
   if (isRoute(pathname, "/draft") || isRoute(pathname, "/draftboard")) {
-    return { title: "Draft Hub", activeNavId: "more" };
+    return { title: "Draft hub", activeNavId: "players" };
   }
   if (isRoute(pathname, "/signin")) {
     return { title: "Sign in", activeNavId: null };

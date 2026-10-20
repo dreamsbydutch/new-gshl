@@ -9,7 +9,7 @@ import type {
 } from "@gshl-lib/types/performances";
 
 const controlClass =
-  "w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900";
+  "w-full rounded-md border border-gray-300 min-h-11 bg-white px-2 py-2 text-sm text-gray-900";
 const labels: Record<string, string> = {
   Rating: "Rating",
   ADD: "Adds",
@@ -26,17 +26,17 @@ export function Performances() {
   const view = usePerformanceExplorer();
   const { filters } = view;
   return (
-    <section aria-labelledby="performances-heading" className="space-y-5">
+    <section aria-labelledby="performances-heading" className="space-y-2">
       <div>
-        <h2 id="performances-heading" className="text-2xl font-bold">
+        <h2 id="performances-heading" className="gshl-section-title">
           Top performances
         </h2>
-        <p className="mt-1 text-sm text-gray-600">
+        <p className="mt-0.5 text-xs text-slate-500">
           Compare the top 100 performances across selected seasons. Choose a
           statistic or click a column, then run the comparison.
         </p>
       </div>
-      <div className="grid grid-cols-2 gap-3 rounded-lg border bg-white p-4 md:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2 border-b border-slate-200 bg-white py-2 md:grid-cols-4">
         <label className="space-y-1 text-sm">
           Performance type
           <select
