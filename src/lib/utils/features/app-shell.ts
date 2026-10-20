@@ -101,6 +101,9 @@ export function getAppShellRouteContext(
   if (isRoute(pathname, "/standings")) {
     return { title: "Standings", activeNavId: "league" };
   }
+  if (isRoute(pathname, "/records")) {
+    return { title: "Records", activeNavId: "league" };
+  }
   if (isRoute(pathname, "/lockerroom")) {
     return { title: "My Team", activeNavId: "lockerroom" };
   }

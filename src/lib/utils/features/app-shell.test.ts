@@ -5,6 +5,13 @@ import {
   getAppShellRouteContext,
 } from "./app-shell";
 
+void test("Records belongs to League navigation", () => {
+  assert.deepEqual(getAppShellRouteContext("/records"), {
+    title: "Records",
+    activeNavId: "league",
+  });
+});
+
 void test("calculates bounded page scroll progress", () => {
   assert.equal(calculatePageScrollProgress(0, 2000, 1000), 0);
   assert.equal(calculatePageScrollProgress(500, 2000, 1000), 50);

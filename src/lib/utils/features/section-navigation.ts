@@ -35,6 +35,11 @@ export function getSectionNavigation(
         active: pathname === "/standings",
       },
       {
+        label: "Records",
+        href: "/records",
+        active: pathname === "/records",
+      },
+      {
         label: "News",
         href: "/headlines",
         active: pathname === "/headlines" || pathname.startsWith("/headlines/"),

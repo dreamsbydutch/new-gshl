@@ -34,6 +34,11 @@ export function LeagueOverview() {
               "/standings?view=overall",
             ],
             [
+              "Records & career leaders",
+              "Player and franchise careers, season and weekly records",
+              "/records",
+            ],
+            [
               "Owner rankings",
               "Compare owners across league history",
               "/leagueoffice?view=ownerRankings",

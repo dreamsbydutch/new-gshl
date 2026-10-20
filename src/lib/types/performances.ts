@@ -6,7 +6,9 @@ export type PerformanceKind =
   | "playerNhl"
   | "teamDay"
   | "teamWeek"
-  | "teamSeason";
+  | "teamSeason"
+  | "playerCareer"
+  | "teamCareer";
 
 export type PerformanceColumnGroup = "all" | "activity" | "hockey" | "ratings";
 
@@ -19,6 +21,7 @@ export interface PerformanceFilters {
   seasonType: string;
   startDate: string;
   endDate: string;
+  minimumGames?: number;
 }
 
 export interface PerformanceRow {
@@ -32,6 +35,7 @@ export interface PerformanceRow {
   stats: Record<string, number | null>;
   name: string;
   team: string;
+  franchiseId?: string;
 }
 
 export interface PerformanceResult {

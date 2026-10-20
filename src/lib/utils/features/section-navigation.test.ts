@@ -23,6 +23,14 @@ void test("league links carry the selected season without carrying unrelated own
   );
 });
 
+void test("Records has its own League destination", () => {
+  assert.equal(
+    getSectionNavigation("league", "/records", "").find((item) => item.active)
+      ?.label,
+    "Records",
+  );
+});
+
 void test("news details and NHL matchups keep their league section selected", () => {
   assert.equal(
     getSectionNavigation("league", "/headlines/issue-1", "").find(
