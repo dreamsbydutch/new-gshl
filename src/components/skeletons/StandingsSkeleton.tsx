@@ -126,9 +126,9 @@ function BracketColumnSkeleton({ cards }: { cards: number }) {
 
 export function PlayoffBracketSkeleton() {
   return (
-    <section className="pb-12 pt-2">
+    <section className="py-2">
       <div className="mx-auto max-w-[96rem] px-3 sm:px-6">
-        <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-gradient-to-b from-slate-50 to-white p-2.5 shadow-sm sm:p-5">
+        <div className="overflow-x-auto border-b border-slate-200 bg-white py-2">
           <div className="grid auto-cols-[minmax(148px,1fr)] grid-flow-col gap-5 lg:auto-cols-[minmax(280px,1fr)] lg:gap-10">
             <BracketColumnSkeleton cards={4} />
             <BracketColumnSkeleton cards={2} />

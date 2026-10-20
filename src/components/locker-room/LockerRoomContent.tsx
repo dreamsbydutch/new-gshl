@@ -366,7 +366,7 @@ function LockerRoomDetails({
                 type="button"
                 aria-pressed={capView === key}
                 onClick={() => setCapView(key)}
-                className={`min-h-9 border-b-2 px-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 ${capView === key ? "border-slate-950 font-semibold text-slate-950" : "border-transparent text-slate-500"}`}
+                className={`min-h-11 border-b-2 px-1 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 ${capView === key ? "border-slate-950 font-semibold text-slate-950" : "border-transparent text-slate-500"}`}
               >
                 {label}
               </button>

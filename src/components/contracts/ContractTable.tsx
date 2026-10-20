@@ -522,12 +522,9 @@ export function TeamBuyoutTable({
   return (
     <section
       aria-labelledby="buyout-contracts-heading"
-      className="mx-auto mb-8 w-full max-w-4xl"
+      className="mx-auto w-full max-w-4xl border-b border-slate-200 py-2"
     >
-      <h2
-        id="buyout-contracts-heading"
-        className="mt-4 w-full text-center text-lg font-bold"
-      >
+      <h2 id="buyout-contracts-heading" className="gshl-section-title">
         Buyouts
       </h2>
       {buyoutContracts.length === 0 ? (

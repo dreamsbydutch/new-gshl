@@ -56,8 +56,6 @@ import {
   useDraftBoardData,
   useMockDraftPreview,
   useTeamColor,
-  lighten,
-  readableText,
 } from "@gshl-hooks";
 
 // ============================================================================
@@ -231,23 +229,17 @@ function MockDraftPickCard({
 }) {
   const { pick, projectedPlayer, gshlTeam } = projectedPick;
   const { teamColor } = useTeamColor(gshlTeam?.logoUrl);
-  const base = teamColor ? lighten(teamColor, 0.82) : "#f1f5f9"; // lightened background
   const accent = teamColor ?? "#cbd5e1"; // border uses original or neutral
-  // Determine readable text against the actual background (base), not the original team color
-  const textColor = readableText(base);
   const projectedPlayerNhlTeam = projectedPlayer
     ? findNhlTeamByAbbreviation(nhlTeams, projectedPlayer.nhlTeam)
     : undefined;
 
   return (
     <div
-      className="mx-auto w-full min-w-0 overflow-hidden rounded-md border p-0.5 shadow-sm transition-colors sm:min-w-[18rem] sm:max-w-[24rem]"
-      style={{ backgroundColor: base, borderColor: accent }}
+      className="w-full min-w-0 overflow-hidden border-b border-l-2 bg-white py-2 text-slate-950"
+      style={{ borderLeftColor: accent }}
     >
-      <div
-        className="ml-2 flex flex-row items-center gap-2 font-varela font-semibold sm:ml-4"
-        style={{ color: textColor }}
-      >
+      <div className="ml-2 flex flex-row items-center gap-2 font-semibold">
         {gshlTeam?.logoUrl ? (
           <Image
             className="shrink-0 rounded-sm ring-1 ring-white/40"
@@ -268,10 +260,7 @@ function MockDraftPickCard({
           Rd {pick.round}, Pk {pick.pick}
         </span>
       </div>
-      <div
-        className="rounded p-0.5 text-[11px] leading-tight"
-        style={{ color: textColor }}
-      >
+      <div className="rounded p-0.5 text-[11px] leading-tight">
         {projectedPlayer ? (
           <div className="mx-auto flex w-full min-w-0 flex-row items-center gap-2 px-3 py-1">
             <NHLLogo size={24} team={projectedPlayerNhlTeam} />
@@ -333,39 +322,25 @@ function MockDraftList({
   const rounds = groupProjectedDraftPicksByRound(projectedDraftPicks);
 
   return (
-    <div className={compact ? "mt-0" : "mt-8"}>
-      <h2
-        className={cn(
-          "text-center font-bold",
-          compact ? "text-xl sm:text-2xl" : "text-2xl",
-        )}
-      >
-        {title}
-      </h2>
-      <div
-        className={cn("flex flex-col", compact ? "mt-4 gap-4" : "mt-6 gap-6")}
-      >
+    <div>
+      <h2 className="gshl-section-title">{title}</h2>
+      <div className="mt-2 flex flex-col gap-3">
         {rounds.map(({ round, picks }) => (
           <section
             key={round}
-            className={cn(
-              "flex h-full flex-col rounded-2xl border border-slate-200 bg-white/70 text-left shadow-sm",
-              compact ? "p-3" : "p-4",
-            )}
+            className="flex min-w-0 flex-col border-b border-slate-200 bg-white text-left"
           >
             <div className="flex items-center gap-3">
               <div className="h-px flex-1 bg-slate-300" />
-              <span className="text-sm font-semibold uppercase tracking-[0.24em] text-slate-600">
+              <span className="text-xs font-semibold text-slate-600">
                 Round {round}
               </span>
               <div className="h-px flex-1 bg-slate-300" />
             </div>
             <div
               className={cn(
-                "grid grid-cols-1 gap-3",
-                compact
-                  ? "mt-3 sm:grid-cols-2"
-                  : "mt-4 sm:grid-cols-[repeat(auto-fit,minmax(18rem,1fr))] xl:grid-cols-[repeat(auto-fit,minmax(22rem,1fr))]",
+                "mt-2 grid grid-cols-1 gap-x-4",
+                compact ? "sm:grid-cols-2" : "sm:grid-cols-2 xl:grid-cols-3",
               )}
             >
               {picks.map((projectedPick) => (
@@ -571,10 +546,12 @@ export function MockDraft({ seasonId }: MockDraftProps) {
   }
 
   return (
-    <MockDraftList
-      projectedDraftPicks={projectedDraftPicks}
-      toolbarProps={undefined}
-      nhlTeams={nhlTeams}
-    />
+    <div className="gshl-page">
+      <MockDraftList
+        projectedDraftPicks={projectedDraftPicks}
+        toolbarProps={undefined}
+        nhlTeams={nhlTeams}
+      />
+    </div>
   );
 }

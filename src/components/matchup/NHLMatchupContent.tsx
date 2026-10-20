@@ -28,7 +28,7 @@ export function NHLMatchupContent({ gameId }: { gameId: string }) {
   if (isLoading) return <MatchupSkeleton />;
   if (!game)
     return (
-      <main className="mx-auto max-w-5xl space-y-4 px-3 py-6">
+      <main className="gshl-page space-y-3">
         <Link href={backHref} className="text-sm underline">
           Back to NHL schedule
         </Link>
@@ -42,7 +42,7 @@ export function NHLMatchupContent({ gameId }: { gameId: string }) {
     );
   const hasScore = ["LIVE", "CRIT", "FINAL", "OFF"].includes(game.gameState);
   return (
-    <main className="mx-auto max-w-5xl space-y-4 px-3 py-6 sm:space-y-6">
+    <main className="gshl-page space-y-3">
       <div className="flex items-center justify-between gap-3 text-sm">
         <Link href={backHref} className="text-slate-600 underline">
           Back to NHL schedule
@@ -56,7 +56,7 @@ export function NHLMatchupContent({ gameId }: { gameId: string }) {
           Full game on NHL.com
         </a>
       </div>
-      <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:rounded-2xl sm:p-6">
+      <section className="border-b border-slate-200 bg-white py-2">
         <h1 className="sr-only">
           {game.awayTeam.placeName.default} {game.awayTeam.commonName?.default}{" "}
           at {game.homeTeam.placeName.default}{" "}
