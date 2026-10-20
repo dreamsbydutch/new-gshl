@@ -70,6 +70,7 @@ export function weeklyPerformanceRecordCandidates(input: {
   teamNames: Map<string, string>;
   playerNames: Map<string, string>;
 }): WeeklyEditionEditorialCandidate[] {
+  const currentHighs = weeklyRecordBenchmarks(input.current);
   return input.current.flatMap((row) => {
     const subject =
       row.kind === "player"
@@ -83,6 +84,11 @@ export function weeklyPerformanceRecordCandidates(input: {
       if (!peers.length || current.value <= 0) return [];
       const previousValue = Math.max(...peers.map((peer) => peer.value));
       if (current.value < previousValue) return [];
+      const currentWeekHigh = currentHighs.find(
+        (high) => high.kind === current.kind && high.stat === current.stat,
+      )?.value;
+      if (currentWeekHigh !== undefined && current.value < currentWeekHigh)
+        return [];
       return [
         {
           key: current.stat,
@@ -94,7 +100,7 @@ export function weeklyPerformanceRecordCandidates(input: {
       ];
     });
     if (!highs.length) return [];
-    const scope = `completed stored ${input.isPlayoffs ? "playoff" : "regular-season"} weeks with ${input.gameDays} game days before ${input.endDate}`;
+    const scope = `${input.isPlayoffs ? "playoff" : "regular-season"} weeks with ${input.gameDays} game days`;
     return [
       {
         id: `record:weekly:${input.weekId}:${row.id}`,
@@ -104,8 +110,8 @@ export function weeklyPerformanceRecordCandidates(input: {
           ? 97
           : 92,
         occurredAt: input.endDate,
-        headlineHint: `${subject} reaches a recorded weekly benchmark`,
-        summary: `${subject}: ${highs.map((high) => `${high.key} ${high.value} ${high.value === high.previousValue ? "ties" : "passes"} the previous high of ${high.previousValue}, compared with ${high.compared} recorded performances`).join("; ")}. Comparison scope: ${scope}. Historical coverage is not independently verified; this is a recorded-comparison high, not a verified all-time record. Other performances in the current week may also reach or exceed this benchmark.`,
+        headlineHint: `${subject} ${highs.some((high) => high.value > high.previousValue) ? "sets" : "ties"} a GSHL weekly record`,
+        summary: `${subject}: ${highs.map((high) => `${high.key} ${high.value} ${high.value === high.previousValue ? "ties" : "passes"} the previous high of ${high.previousValue}, compared with ${high.compared} eligible historical performances`).join("; ")}. GSHL weekly record scope: ${scope}. The comparison includes earlier completed weeks across league history and checks the current week's eligible performances. Other performances in the current week may share this record.`,
         teamId: row.teamId,
         teamName: input.teamNames.get(row.teamId),
         playerId: row.playerId,
