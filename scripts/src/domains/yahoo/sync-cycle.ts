@@ -4,6 +4,7 @@ export type YahooSyncCheckpoint = {
   lockedRosterDates?: string[];
   reconciledThrough?: string;
   morningRecheckOn?: string;
+  nightlyCompletedThrough?: string;
 };
 
 export function shiftYahooDate(date: string, offset: number): string {
@@ -17,8 +18,11 @@ export function planYahooSyncCycle(input: {
   now: Date;
   startDate: string;
   endDate: string;
+  nhlEndDate?: string;
   checkpoint: YahooSyncCheckpoint;
   games?: { gameState: string; gameScheduleState: string }[];
+  previousGames?: { gameState: string; gameScheduleState: string }[];
+  nightlyGames?: { gameState: string; gameScheduleState: string }[];
 }) {
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: "America/Toronto",
@@ -35,13 +39,49 @@ export function planYahooSyncCycle(input: {
   const active = input.startDate <= today && today <= input.endDate;
   const daytime = hour >= 8 && hour <= 22;
   const overnight = hour >= 23 || hour < 4;
-  const windowOpen = daytime || overnight;
+  const yesterday = shiftYahooDate(today, -1);
+  const isLive = (games: typeof input.games) =>
+    !!games?.some(
+      (g) =>
+        !["PPD", "CNCL"].includes(g.gameScheduleState) &&
+        ["LIVE", "CRIT"].includes(g.gameState),
+    );
+  const liveDates = [
+    ...(isLive(input.previousGames) ? [yesterday] : []),
+    ...(isLive(input.games) ? [today] : []),
+  ].filter((date) => input.startDate <= date && date <= input.endDate);
+  const liveGames = liveDates.length > 0;
+  // A late game keeps the worker running beyond the old 03:00 cutoff.
+  const nhlEndDate = input.nhlEndDate ?? input.endDate;
+  const nightlyTarget = yesterday < nhlEndDate ? yesterday : nhlEndDate;
+  const nightlyGames =
+    nightlyTarget === yesterday ? input.previousGames : input.nightlyGames;
+  const finalNightCatchup =
+    today > nhlEndDate && today <= shiftYahooDate(nhlEndDate, 2);
+  const nightlyDate =
+    (hour < 8 || finalNightCatchup) &&
+    input.startDate <= nightlyTarget &&
+    (!input.checkpoint.nightlyCompletedThrough ||
+      input.checkpoint.nightlyCompletedThrough < nightlyTarget) &&
+    nightlyGames !== undefined &&
+    nightlyGames.every(
+      (g) =>
+        ["PPD", "CNCL"].includes(g.gameScheduleState) ||
+        ["FINAL", "OFF"].includes(g.gameState),
+    )
+      ? nightlyTarget
+      : null;
+  const windowOpen = daytime || overnight || liveGames || !!nightlyDate;
   // Midnight does not end the previous evening's NHL slate.
   const nhlDate = hour < 4 ? shiftYahooDate(today, -1) : today;
   const nhlActive = input.startDate <= nhlDate && nhlDate <= input.endDate;
   const hourDue = (last?: number) =>
     !last ||
     Math.floor(input.now.getTime() / 3600000) > Math.floor(last / 3600000);
+  const nhlDue = (last?: number) =>
+    !last ||
+    Math.floor(input.now.getTime() / (liveGames ? 300000 : 3600000)) >
+      Math.floor(last / (liveGames ? 300000 : 3600000));
   const rosterLocked =
     input.checkpoint.lockedRosterDates?.includes(today) ?? false;
   const games = input.games?.filter(
@@ -56,7 +96,8 @@ export function planYahooSyncCycle(input: {
     !rosterLocked &&
     hourDue(input.checkpoint.lastYahooSyncAt);
   const refreshNhl =
-    nhlActive && windowOpen && hourDue(input.checkpoint.lastNhlSyncAt);
+    (liveGames || (nhlActive && (daytime || overnight))) &&
+    nhlDue(input.checkpoint.lastNhlSyncAt);
   const closedThrough = [
     input.endDate,
     shiftYahooDate(today, hour >= 8 ? -1 : -2),
@@ -85,12 +126,16 @@ export function planYahooSyncCycle(input: {
     today,
     nhlDate,
     overnight,
+    liveGames,
+    refreshIntervalMinutes: liveGames ? 5 : 60,
+    refreshDates: liveGames ? liveDates : [nhlDate],
+    nightlyDate,
     active,
     windowOpen,
     scrapeYahoo,
     allGamesStarted,
     refreshNhl,
-    historyDates: daytime ? [...dates].sort() : [],
+    historyDates: daytime && !liveGames ? [...dates].sort() : [],
     recent,
     morning: daytime,
   };

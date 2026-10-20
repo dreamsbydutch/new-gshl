@@ -13,6 +13,8 @@ export interface DraftPerformance {
   rating: number | string | null | undefined;
   days: number | string | null | undefined;
   position: string;
+  ratingVersion?: string;
+  averageRating?: number | null;
 }
 
 export interface DraftHistoryPick {
@@ -28,6 +30,7 @@ export interface DraftHistoryPick {
   signingValue: number | null;
   teamRating: number | null;
   overallRating: number | null;
+  ratingVersion?: string;
   days: number | null;
   usageDays: number | null;
   teamDaysPercent: number | null;

@@ -36,6 +36,31 @@ const input = {
   ratings: [{ playerId: "player", rating: 80 }],
 };
 
+void test("category contribution is never subtracted from the legacy salary expectation", () => {
+  const result = buildSigningValues({
+    ...input,
+    ratings: [
+      {
+        playerId: "player",
+        rating: 800,
+        ratingVersion: "gshl-category-impact-v3",
+      },
+    ],
+  });
+  assert.deepEqual(result.values.get("pick"), {
+    salary: 4_000_000,
+    expectedRating: null,
+    value: null,
+  });
+  assert.equal(result.teams[0]?.score, null);
+  assert.equal(result.teams[0]?.graded, 0);
+  assert.equal(result.teams[0]?.total, 1);
+  assert.equal(
+    buildSigningValues(input).values.get("pick")?.expectedRating,
+    expectedSigningRating(4_000_000),
+  );
+});
+
 void test("salary curve matches the historical fit and refuses unsupported prices", () => {
   assert.ok(
     Math.abs(expectedSigningRating(4_000_000)! - 70.00697140590668) < 1e-9,
@@ -151,7 +176,10 @@ void test("team value averages rated unique signings, with competition ties and 
   const multiple = buildSigningValues({
     ...input,
     picks: [pick, { ...pick, id: "second-player", playerId: "second-player" }],
-    contracts: [contract, { ...contract, id: "second-contract", playerId: "second-player" }],
+    contracts: [
+      contract,
+      { ...contract, id: "second-contract", playerId: "second-player" },
+    ],
     ratings: [
       { playerId: "player", rating: expected + 10 },
       { playerId: "second-player", rating: expected + 30 },

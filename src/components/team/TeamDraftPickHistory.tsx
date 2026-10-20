@@ -16,6 +16,7 @@ import {
 import { Check, ChevronDown, Trophy } from "lucide-react";
 import { LockerRoomHeader } from "./LockerRoomHeader";
 import { formatMoney } from "../../lib/utils/core/format";
+import { isCategoryImpactRating } from "../../lib/utils/features/stat-rating";
 
 const number = (value: number | null | undefined) =>
   value == null ? "-" : value.toFixed(1);
@@ -82,6 +83,9 @@ export function TeamDraftPickHistory({
       </>
     );
   const calderWins = data.seasons.filter((entry) => entry.winner);
+  const contributionRatings = data.picks.some((pick) =>
+    isCategoryImpactRating(pick.ratingVersion),
+  );
   const calderLayout = buildTrophyCupShowcaseLayout(calderWins.length);
   const calderImage = AWARD_CATALOG.find(
     (award) => award.key === "calder",
@@ -89,6 +93,13 @@ export function TeamDraftPickHistory({
 
   return (
     <section className="mx-auto w-full max-w-5xl space-y-6">
+      {contributionRatings && (
+        <p className="text-xs text-muted-foreground">
+          Ratings show total category contribution (100 units per expected
+          category point). Draft-slot and salary grades are unavailable because
+          their historical curves use different units.
+        </p>
+      )}
       <LockerRoomHeader currentTeam={currentTeam} headingLevel={2} />
       <header className="space-y-4">
         <div className="flex items-center justify-between gap-4">
@@ -349,7 +360,7 @@ export function TeamDraftPickHistory({
                 </th>
                 {[
                   "Slot value",
-                  "Overall",
+                  contributionRatings ? "Contribution" : "Overall",
                   "Team usage",
                   "League usage",
                   "Over slot",
@@ -471,7 +482,7 @@ export function TeamDraftPickHistory({
                     Expected
                   </th>
                   <th scope="col" className="px-2 py-1 font-normal">
-                    Overall
+                    {contributionRatings ? "Contribution" : "Overall"}
                   </th>
                   <th scope="col" className="px-2 py-1 font-normal">
                     Above

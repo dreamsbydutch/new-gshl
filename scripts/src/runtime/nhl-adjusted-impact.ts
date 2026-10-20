@@ -2,10 +2,14 @@ import type {
   GameValueData,
   ValueStint,
 } from "../domains/nhl/game-value-input";
+import {
+  evaluateGoalOutcomes,
+  fitGoalOutcomeAdjustments,
+} from "./nhl-goal-outcome-validation";
 
 export const NHL_ADJUSTED_IMPACT_CONFIG = {
   version: "nhl-season-value-v3",
-  revision: "2026-09-30-partial-games-and-penalty-shots",
+  revision: "2026-10-18-reviewed-process-and-penalties",
   ridgeCandidates: [1, 4, 16, 64],
   solver: "preconditioned-conjugate-gradient",
   maximumIterations: 500,
@@ -24,6 +28,14 @@ export type ImpactModel = {
   trainingRows: number;
   sourceRows: number;
   relativeResidual: number;
+  experimentalCohortRegularization?: {
+    kind: "shared-cohort-mean-v1";
+    groups: Record<string, string[]>;
+  };
+};
+export type ImpactFitExperiment = {
+  /** Experimental only: coefficient key -> shared prior cohort. No default behavior changes. */
+  cohortGroups: Readonly<Record<string, string>>;
 };
 export function situationFor(s: ValueStint, home: boolean) {
   return home
@@ -66,6 +78,7 @@ export function fitAdjustedImpact(
   games: GameValueData[],
   lambda: number,
   includePlayers = true,
+  experiment?: ImpactFitExperiment,
 ): ImpactModel {
   if (!Number.isFinite(lambda) || lambda <= 0)
     throw new Error("Positive ridge penalty required");
@@ -106,6 +119,36 @@ export function fitAdjustedImpact(
   if (!weights.length) throw new Error("No verified stints for adjusted model");
   const ordered = [...columns].sort(([a], [b]) => a.localeCompare(b));
   const size = ordered.length;
+  const indexByKey = new Map(ordered.map(([key], index) => [key, index]));
+  const cohortMembers = new Map<string, number[]>();
+  for (const [key, group] of Object.entries(experiment?.cohortGroups ?? {})) {
+    const index = indexByKey.get(key);
+    if (
+      !/^[OD]:/.test(key) ||
+      index === undefined ||
+      typeof group !== "string" ||
+      !group.trim()
+    )
+      throw new Error(
+        "Experimental cohort requires a fitted player coefficient and a nonempty group",
+      );
+    const members = cohortMembers.get(group) ?? [];
+    members.push(index);
+    cohortMembers.set(group, members);
+  }
+  const cohorts = [...cohortMembers].sort(([a], [b]) => a.localeCompare(b));
+  const cohortCorrection = new Float64Array(size);
+  // λ Σ(β_i - mean_g)² + λ mean_g². Within-cohort differences retain λ;
+  // the shared mean has less shrinkage than n independent zero-centered priors.
+  const updateCohortCorrection = (vector: Float64Array) => {
+    for (const [, members] of cohorts) {
+      const mean =
+        members.reduce((sum, index) => sum + vector[index]!, 0) /
+        members.length;
+      const correction = lambda * (1 - 1 / members.length) * mean;
+      for (const index of members) cohortCorrection[index] = correction;
+    }
+  };
   const beta = new Float64Array(size),
     residual = new Float64Array(size),
     direction = new Float64Array(size);
@@ -123,6 +166,11 @@ export function fitAdjustedImpact(
         : lambda;
     diagonal[j] = col.sumWeight + penalty[j]!;
     for (const i of col.rows) residual[j] += targets[i]!;
+  }
+  for (const [, members] of cohorts)
+    for (const index of members)
+      diagonal[index] -= (lambda * (1 - 1 / members.length)) / members.length;
+  for (let j = 0; j < size; j++) {
     direction[j] = residual[j]! / diagonal[j]!;
     initialNorm += residual[j]! * direction[j]!;
   }
@@ -136,12 +184,13 @@ export function fitAdjustedImpact(
     !converged && iterations < NHL_ADJUSTED_IMPACT_CONFIG.maximumIterations;
 
   ) {
+    updateCohortCorrection(direction);
     rowPrediction.fill(0);
     for (let j = 0; j < size; j++)
       for (const i of ordered[j]![1].rows) rowPrediction[i] += direction[j]!;
     let denominator = 0;
     for (let j = 0; j < size; j++) {
-      let value = penalty[j]! * direction[j]!;
+      let value = penalty[j]! * direction[j]! - cohortCorrection[j]!;
       for (const i of ordered[j]![1].rows)
         value += weights[i]! * rowPrediction[i]!;
       product[j] = value;
@@ -169,8 +218,9 @@ export function fitAdjustedImpact(
   for (let j = 0; j < size; j++)
     for (const i of ordered[j]![1].rows) rowPrediction[i] += beta[j]!;
   let verifiedNorm = 0;
+  updateCohortCorrection(beta);
   for (let j = 0; j < size; j++) {
-    let gradient = -penalty[j]! * beta[j]!;
+    let gradient = -penalty[j]! * beta[j]! + cohortCorrection[j]!;
     for (const i of ordered[j]![1].rows)
       gradient += targets[i]! - weights[i]! * rowPrediction[i]!;
     verifiedNorm += (gradient * gradient) / diagonal[j]!;
@@ -189,6 +239,19 @@ export function fitAdjustedImpact(
     trainingRows: weights.length,
     sourceRows,
     relativeResidual,
+    ...(cohorts.length
+      ? {
+          experimentalCohortRegularization: {
+            kind: "shared-cohort-mean-v1" as const,
+            groups: Object.fromEntries(
+              cohorts.map(([name, members]) => [
+                name,
+                members.map((index) => ordered[index]![0]).sort(),
+              ]),
+            ),
+          },
+        }
+      : {}),
   };
 }
 export function predictStint(
@@ -311,6 +374,13 @@ export function chronologicalImpact(
   games: GameValueData[],
   boundaries?: { trainedBefore: string; testFrom: string },
 ) {
+  // A duplicated identity can place the same game's outcomes in different folds.
+  const identities = new Set<number>();
+  for (const game of games) {
+    if (identities.has(game.gameId))
+      throw new Error("Duplicate game in chronological impact input");
+    identities.add(game.gameId);
+  }
   const eligible = games
     .filter((g) => g.eligible)
     .sort((a, b) => a.date.localeCompare(b.date) || a.gameId - b.gameId);
@@ -322,9 +392,17 @@ export function chronologicalImpact(
   const first =
       boundaries?.trainedBefore ?? dates[Math.floor(dates.length * 0.6)]!,
     second = boundaries?.testFrom ?? dates[Math.floor(dates.length * 0.8)]!;
+  if (!(first < second))
+    throw new Error(
+      "Impact validation boundaries must be strictly chronological",
+    );
   const train = eligible.filter((g) => g.date < first),
     validation = eligible.filter((g) => g.date >= first && g.date < second),
     test = eligible.filter((g) => g.date >= second);
+  if (!train.length || !validation.length || !test.length)
+    throw new Error(
+      "Impact validation requires nonempty training, validation and test folds",
+    );
   const trials = NHL_ADJUSTED_IMPACT_CONFIG.ridgeCandidates.map((lambda) => {
     const model = fitAdjustedImpact(train, lambda);
     return {
@@ -352,6 +430,11 @@ export function chronologicalImpact(
     model: evaluateImpact(testModel, test),
     components: evaluateImpactComponents(testModel, test),
     situationOnlyBaseline: evaluateImpact(baseline, test),
+    goalOutcomes: evaluateGoalOutcomes(
+      test,
+      fitGoalOutcomeAdjustments(beforeTest),
+      (stint, home) => predictStint(testModel, stint, home, false),
+    ),
     conditionalOnObservedDeployment: true,
     testModelConverged: testModel.converged,
     baselineConverged: baseline.converged,

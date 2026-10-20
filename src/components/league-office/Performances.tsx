@@ -337,6 +337,18 @@ export function Performances() {
                         : row.stats[stat].toLocaleString("en-CA", {
                             maximumFractionDigits: stat === "SVP" ? 4 : 2,
                           })}
+                      {stat === "Rating" && row.stats.averageRating != null ? (
+                        <div
+                          className="mt-0.5 text-xs font-normal text-gray-500"
+                          title="Average rating per appearance"
+                          aria-label={`Average rating per appearance: ${row.stats.averageRating}`}
+                        >
+                          Avg{" "}
+                          {row.stats.averageRating.toLocaleString("en-CA", {
+                            maximumFractionDigits: 2,
+                          })}
+                        </div>
+                      ) : null}
                     </td>
                   ))}
                 </tr>

@@ -306,7 +306,7 @@ function parseSeasonCategories(rawValue: unknown): string[] {
             .filter((category): category is string => !!category);
         }
       } catch {
-        // Fall through to CSV parsing for plain record values.
+        // Fall through to CSV parsing for plain stored values.
       }
     }
 
@@ -623,16 +623,13 @@ function getGoalieStartMinimumForSeasonId(seasonId: string): number {
     : GOALIE_START_MINIMUM;
 }
 
-function hasQualifiedGoalieStats(teamWeek: TeamWeekRecord): boolean {
+export function hasQualifiedGoalieStats(teamWeek: TeamWeekRecord): boolean {
+  // Raw workload is retained even when a week forfeits goalie categories.
   return (
     hasNonBlankValue(teamWeek.W) ||
-    hasNonBlankValue(teamWeek.GA) ||
     hasNonBlankValue(teamWeek.GAA) ||
-    hasNonBlankValue(teamWeek.SV) ||
-    hasNonBlankValue(teamWeek.SA) ||
     hasNonBlankValue(teamWeek.SVP) ||
-    hasNonBlankValue(teamWeek.SO) ||
-    hasNonBlankValue(teamWeek.TOI)
+    hasNonBlankValue(teamWeek.SO)
   );
 }
 

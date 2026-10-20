@@ -134,18 +134,14 @@ test("coincidental penalties cancel, majors do not end on goals, and bench penal
   game.penalties = [{ ...p, kind: "minor", minutes: 2, committed: null }];
   assert.equal(valuePenaltyEvents(game, rates).entries.length, 1);
   game.penalties = [p, { ...p, eventId: 10, committed: 3 }];
-  assert.deepEqual(valuePenaltyEvents(game, rates).unpriced, [10]);
+  assert.deepEqual(valuePenaltyEvents(game, rates).unpriced, [9, 10]);
   const supported = valuePenaltyEvents(game, {
     ...rates,
     "3v5:GG": 0.2,
     "5v3:GG": 12,
   });
-  assert.deepEqual(supported.unpriced, []);
-  assert.ok(
-    Math.abs(
-      supported.entries.find((e) => e.playerId === 3)!.value + 5.8 / 12,
-    ) < 1e-9,
-  );
+  assert.deepEqual(supported.unpriced, [9, 10]);
+  assert.deepEqual(supported.entries, []);
 });
 
 test("overtime penalties add an opponent, respect the remaining clock and end on either goal", () => {
@@ -177,7 +173,7 @@ test("overtime penalties add an opponent, respect the remaining clock and end on
   game.penalties = [{ ...p, remainingSeconds: 0 }];
   assert.equal(valuePenaltyEvents(game, rates).entries.length, 0);
   game.penalties = [p, { ...p, eventId: 99, committed: 3 }];
-  assert.deepEqual(valuePenaltyEvents(game, rates).unpriced, []);
+  assert.deepEqual(valuePenaltyEvents(game, rates).unpriced, [p.eventId, 99]);
   game.penalties = [{ ...p, regularSeasonOvertime: false }];
   assert.deepEqual(valuePenaltyEvents(game, rates).unpriced, [p.eventId]);
 });
@@ -194,7 +190,7 @@ test("same-whistle updated manpower is not assessed twice and missing context st
     "5v3:GG": 12,
   };
   game.penalties = [p, { ...p, eventId: 99, committed: 3, homeBefore: 4 }];
-  assert.deepEqual(valuePenaltyEvents(game, rates).unpriced, []);
+  assert.deepEqual(valuePenaltyEvents(game, rates).unpriced, [p.eventId, 99]);
   game.penalties = [{ ...p, homeBefore: null }];
   assert.deepEqual(valuePenaltyEvents(game, rates).unpriced, [p.eventId]);
   assert.deepEqual(valuePenaltyEvents(game, rates).entries, []);
@@ -250,7 +246,13 @@ test("equal offensive creation and defensive prevention receive equal season and
   g.shots = [];
   g.penalties = [];
   const model = fitAdjustedImpact([g], 4);
-  model.coefficients = { "O:EV:1": 0.6, "D:EV:4": -0.6 };
+  model.coefficients = {
+    ...model.coefficients,
+    "O:EV:1": 0.6,
+    "D:EV:1": 0,
+    "O:EV:4": 0,
+    "D:EV:4": -0.6,
+  };
   const result = rankGameSeason([g], model, [
     { playerId: 1, name: "Offense", position: "F", minutes: 20, games: 1 },
     { playerId: 4, name: "Defense", position: "D", minutes: 20, games: 1 },
@@ -429,6 +431,89 @@ test("season contribution retains observed finishing while ability is independen
   assert.equal(p.status, "provisional");
   assert.equal(p.components.finishing, 0.6);
   assert.notEqual((p.seasonValue! * 60) / p.minutes, p.abilityPer60);
+});
+
+test("unfitted player effects remain missing process exposure, not measured average impact", () => {
+  const f = gameFixture(),
+    g = buildGameValueData(f.sources, f.shots);
+  for (const player of g.players) player.seconds = 12000;
+  g.penalties = [];
+  g.stints = [{ ...g.stints[0]!, seconds: 12000, homeXg: 0, awayXg: 0 }];
+  const model = fitAdjustedImpact([g], 4);
+  const reference = [
+    {
+      playerId: 1,
+      name: "Shooter",
+      position: "F" as const,
+      minutes: 200,
+      games: 1,
+    },
+  ];
+  const supported = rankGameSeason([g], model, reference).ratings[0]!;
+  assert.equal(supported.status, "rated");
+  assert.equal(supported.componentCoverage.processMinutes, 1);
+
+  for (const missing of ["O:EV:1", "D:EV:1"]) {
+    const partialModel = { ...model, coefficients: { ...model.coefficients } };
+    delete partialModel.coefficients[missing];
+    const p = rankGameSeason([g], partialModel, reference).ratings[0]!;
+    assert.equal(p.status, "provisional");
+    assert.equal(p.componentCoverage.processMinutes, 0);
+    assert.equal(p.components.adjustedProcess, 0);
+    assert.equal(p.components.finishing, supported.components.finishing);
+    assert.equal(p.seasonRank, null);
+    assert.ok(p.warnings.some((w) => w.includes("Unfitted player effects")));
+  }
+
+  // A coefficient explicitly fitted to zero is valid evidence.
+  model.coefficients["O:EV:1"] = model.coefficients["D:EV:1"] = 0;
+  const neutral = rankGameSeason([g], model, reference).ratings[0]!;
+  assert.equal(neutral.status, "rated");
+  assert.equal(neutral.componentCoverage.processMinutes, 1);
+
+  // An unsupported special-team role does not erase the player's fitted EV role.
+  const evenStrength = g.stints[0]!;
+  g.stints = [
+    { ...evenStrength, seconds: 10800 },
+    {
+      ...evenStrength,
+      seconds: 1200,
+      away: evenStrength.away.slice(0, 4),
+      situation: "5v4:GG",
+    },
+  ];
+  model.coefficients["O:EV:1"] = 0.6;
+  const partial = rankGameSeason([g], model, reference).ratings[0]!;
+  assert.equal(partial.status, "provisional");
+  assert.equal(partial.componentCoverage.processMinutes, 0.9);
+  assert.equal(partial.modeledMinutes, 180);
+  assert.equal(partial.components.adjustedProcess, 1.8);
+  assert.equal(partial.components.offensiveProcess, 1.8);
+  assert.equal(partial.abilityPer60, 0.585);
+});
+
+test("duplicate game inputs and invalid shrinkage priors cannot silently corrupt season ratings", () => {
+  const f = gameFixture(),
+    g = buildGameValueData(f.sources, f.shots),
+    model = fitAdjustedImpact([g], 4);
+  const reference = [
+    {
+      playerId: 1,
+      name: "Shooter",
+      position: "F" as const,
+      minutes: 20,
+      games: 1,
+    },
+  ];
+  assert.throws(
+    () => rankGameSeason([g, g], model, reference),
+    /Duplicate game/,
+  );
+  for (const prior of [-1, NaN, Infinity])
+    assert.throws(
+      () => rankGameSeason([g], model, reference, { "F:finishing": { prior } }),
+      /Invalid shrinkage prior/,
+    );
 });
 
 test("bootstrap rank ranges give tied players the same competition rank", () => {

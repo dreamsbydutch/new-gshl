@@ -564,6 +564,13 @@ var PowerRankingsAlgo = (function buildPowerRankingsAlgo() {
       });
 
       (rowsByWeekId.get(weekId) || []).forEach(function (row) {
+        // Category contribution totals are not legacy per-player talent units.
+        // Keep the independently derived NHL base until an ability bridge is validated.
+        if (
+          String(row.ratingVersion || "").indexOf("gshl-category-impact-v3") ===
+          0
+        )
+          return;
         var playerId =
           row.playerId !== undefined && row.playerId !== null
             ? String(row.playerId)

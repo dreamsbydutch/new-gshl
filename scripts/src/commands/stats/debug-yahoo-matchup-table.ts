@@ -1,4 +1,3 @@
-import * as dataStore from "@gshl-lib/data/convex-store";
 import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { config as loadEnv } from "dotenv";
@@ -16,6 +15,7 @@ import {
   parsePositiveInteger,
   toTrimmedString,
 } from "@gshl-lib/ranking/player-rating-support";
+import { convexReader } from "@gshl-lib/data/reader";
 import type { Season, Team, Week } from "@gshl-lib/types/database";
 
 loadEnv({ path: ".env.local" });
@@ -29,7 +29,7 @@ Usage:
 Options:
   --url <url>                      Full Yahoo matchup URL to fetch directly.
   --seasonId <id>                  GSHL season id. Required unless URL mode includes enough context for your own review.
-  --weekId <id>                    GSHL week id when building the URL from record context.
+  --weekId <id>                    GSHL week id when building the URL from Convex context.
   --date <yyyy-mm-dd>              Daily matchup date.
   --homeYahooTeamId <id>           Yahoo home team id (mid1).
   --awayYahooTeamId <id>           Yahoo away team id (mid2).
@@ -82,8 +82,8 @@ async function resolveUrl(args: string[]): Promise<{
   }
 
   const [seasons, weeks] = (await Promise.all([
-    dataStore.fetchModel("Season"),
-    dataStore.fetchModel("Week"),
+    convexReader.fetchModel("Season"),
+    convexReader.fetchModel("Week"),
   ])) as unknown as [Season[], Week[]];
   const season = seasons.find((row) => toTrimmedString(row.id) === seasonId);
   if (!season) {

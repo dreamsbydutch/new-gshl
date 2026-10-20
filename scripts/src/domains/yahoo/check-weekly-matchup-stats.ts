@@ -1,4 +1,3 @@
-import * as dataStore from "@gshl-lib/data/convex-store";
 /**
  * Usage:
  *   npm run yahoo:check-weekly-matchups
@@ -28,6 +27,7 @@ import * as dataStore from "@gshl-lib/data/convex-store";
 import { existsSync, readFileSync } from "node:fs";
 import { config as loadEnv } from "dotenv";
 import { load as loadHtml } from "cheerio";
+import { convexReader } from "@gshl-lib/data/reader";
 import {
   getArgValue,
   hasFlag,
@@ -88,7 +88,7 @@ type DiscrepancyRecord = {
   side?: "home" | "away";
   field?: string;
   yahooHeader?: string;
-  modelValue?: string;
+  storedValue?: string;
   yahooValue?: string;
   url?: string;
   details: string;
@@ -552,20 +552,20 @@ function formatNumberForDisplay(value: number, decimals: number): string {
 
 function compareStatValues(
   fieldName: string,
-  modelValue: unknown,
+  storedValue: unknown,
   yahooValue: string,
 ): {
   matches: boolean;
-  modelDisplay: string;
+  storedDisplay: string;
   yahooDisplay: string;
 } {
   const yahooDisplay = yahooValue.trim();
   const yahooNumeric = parseYahooNumeric(yahooDisplay);
-  const modelNumeric = Number(modelValue);
+  const storedNumeric = Number(storedValue);
 
-  if (yahooNumeric !== null && Number.isFinite(modelNumeric)) {
+  if (yahooNumeric !== null && Number.isFinite(storedNumeric)) {
     const decimals = getDecimalPlaces(yahooDisplay);
-    const roundedModel = Number(modelNumeric.toFixed(decimals));
+    const roundedStored = Number(storedNumeric.toFixed(decimals));
     const epsilon =
       fieldName === "GAA"
         ? 0.01
@@ -573,15 +573,15 @@ function compareStatValues(
           ? 0.001
           : 1 / 10 ** Math.max(decimals + 2, 6);
     return {
-      matches: Math.abs(roundedModel - yahooNumeric) <= epsilon,
-      modelDisplay: formatNumberForDisplay(roundedModel, decimals),
+      matches: Math.abs(roundedStored - yahooNumeric) <= epsilon,
+      storedDisplay: formatNumberForDisplay(roundedStored, decimals),
       yahooDisplay,
     };
   }
 
   return {
-    matches: toTrimmedString(modelValue) === yahooDisplay,
-    modelDisplay: toTrimmedString(modelValue),
+    matches: toTrimmedString(storedValue) === yahooDisplay,
+    storedDisplay: toTrimmedString(storedValue),
     yahooDisplay,
   };
 }
@@ -615,11 +615,11 @@ async function main(): Promise<void> {
   const optionsInput = parseOptions(process.argv.slice(2));
 
   const [seasons, weeks, teams, matchups, teamWeekRows] = (await Promise.all([
-    dataStore.fetchModel("Season"),
-    dataStore.fetchModel("Week"),
-    dataStore.fetchModel("Team"),
-    dataStore.fetchModel("Matchup"),
-    dataStore.fetchModel("TeamWeekStatLine"),
+    convexReader.fetchModel("Season"),
+    convexReader.fetchModel("Week"),
+    convexReader.fetchModel("Team"),
+    convexReader.fetchModel("Matchup"),
+    convexReader.fetchModel("TeamWeekStatLine"),
   ])) as unknown as [Season[], Week[], Team[], Matchup[], TeamWeekStatLine[]];
 
   const seasonId = optionsInput.seasonId || resolveActiveSeasonId(seasons);
@@ -893,10 +893,10 @@ async function main(): Promise<void> {
             side,
             field: modelField,
             yahooHeader,
-            modelValue: comparison.modelDisplay,
+            storedValue: comparison.storedDisplay,
             yahooValue: comparison.yahooDisplay,
             url,
-            details: `${side} team ${teamId} field ${modelField} differs. TeamWeekStatLine=${comparison.modelDisplay} Yahoo=${comparison.yahooDisplay}`,
+            details: `${side} team ${teamId} field ${modelField} differs. TeamWeekStatLine=${comparison.storedDisplay} Yahoo=${comparison.yahooDisplay}`,
           });
         }
       }

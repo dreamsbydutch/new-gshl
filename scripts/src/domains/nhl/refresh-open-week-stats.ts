@@ -18,6 +18,8 @@ export async function refreshOpenWeekStats(input: {
   apply: boolean;
   pythonBin: string;
   weekIds?: string[];
+  aggregateMode?: "frequent" | "overnight";
+  maxWeeks?: number;
 }) {
   const [weeks, teams] = await Promise.all([
     fetchSeasonModel<ScoringWeek>("Week", input.season.id),
@@ -26,6 +28,7 @@ export async function refreshOpenWeekStats(input: {
   const plan = planScoringWeekRefresh(
     weeks.filter((w) => !input.weekIds || input.weekIds.includes(w.id)),
     shiftYahooDate(input.today, -1),
+    input.maxWeeks,
   );
   if (!teams.length)
     throw new Error("Correction refresh requires season teams.");
@@ -58,7 +61,17 @@ export async function refreshOpenWeekStats(input: {
     plan,
     results,
     aggregates: plan.length
-      ? await refreshDailySeasonAggregates(input.season, input.apply)
+      ? await refreshDailySeasonAggregates(
+          input.season,
+          input.apply,
+          undefined,
+          {
+            mode: input.aggregateMode ?? "frequent",
+            ...(input.aggregateMode !== "overnight"
+              ? { weekIds: plan.map((range) => range.weekId) }
+              : {}),
+          },
+        )
       : null,
   };
 }

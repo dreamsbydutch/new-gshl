@@ -41,6 +41,45 @@ import {
 } from "./weekly-edition";
 import { matchupPreviewWriterProfile } from "./matchup-preview-articles";
 
+void test("contribution ratings use explicit units without legacy 85/90/95 editorial grades", () => {
+  const base = source();
+  const performance = {
+    id: "versioned-contribution",
+    entityType: "player" as const,
+    scope: "week" as const,
+    playerId: "new-player",
+    playerName: "Contribution Player",
+    rating: 2000,
+    ratingVersion: "gshl-category-impact-v3",
+    stats: {},
+  };
+  const packet = buildWeeklyEditionFactPacket({
+    ...base,
+    performances: [performance],
+  });
+  const candidate = packet.editorialCandidates?.find(
+    (row) => row.id === "performance:versioned-contribution",
+  );
+  assert.equal(candidate?.importance, 70);
+  assert.match(
+    candidate?.summary ?? "",
+    /contribution rating \(100 units per expected category point\)/,
+  );
+  assert.equal(
+    candidate?.metrics[0]?.label,
+    "Contribution (100/category point)",
+  );
+  const legacy = buildWeeklyEditionFactPacket({
+    ...base,
+    performances: [{ ...performance, ratingVersion: undefined, rating: 95 }],
+  });
+  assert.equal(
+    legacy.editorialCandidates?.find((row) => row.id === candidate?.id)
+      ?.importance,
+    98,
+  );
+});
+
 void test("Press Box beat bylines reuse their stable matchup-preview personalities", () => {
   const packet = buildWeeklyEditionFactPacket(source());
   const roster = buildWeeklyEditionAuthorRoster(packet);

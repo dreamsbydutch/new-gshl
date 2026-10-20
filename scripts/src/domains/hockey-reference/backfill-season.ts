@@ -37,6 +37,12 @@ import type {
   Season,
 } from "@gshl-lib/types/database";
 
+import {
+  assertUniqueIncomingHockeyReferencePlayer,
+  chooseHockeyReferencePerson,
+  collapseHockeyReferencePeople,
+} from "./season-identity";
+
 type SourceType = "skater" | "goalie";
 
 type BackfillOptions = {
@@ -50,6 +56,7 @@ type BackfillOptions = {
 type ScrapedCandidate = {
   sourceType: SourceType;
   sourceIndex: number;
+  sourcePlayerId?: string;
   fullName: string;
   normalizedName: string;
   nhlTeam: string;
@@ -595,6 +602,13 @@ function parseTableRows(
           const dataStat = $(cell).attr("data-stat");
           if (!dataStat) return;
           row[dataStat] = cleanWhitespace($(cell).text());
+          if (dataStat === "name_display") {
+            const href = $(cell).find("a[href]").attr("href") ?? "";
+            const playerId = /^\/players\/[a-z]\/([a-z0-9]+)\.html$/.exec(
+              href,
+            )?.[1];
+            if (playerId) row.__sourcePlayerId = playerId;
+          }
         });
 
       if (row.name_display && !isIgnoredSourceName(row.name_display)) {
@@ -614,6 +628,7 @@ function buildSkaterCandidate(row: Record<string, string>): ScrapedCandidate {
   return {
     sourceType: "skater",
     sourceIndex: toNumber(row.__sourceIndex),
+    sourcePlayerId: row.__sourcePlayerId,
     fullName: cleanWhitespace(row.name_display),
     normalizedName: normalizeName(row.name_display),
     nhlTeam: cleanWhitespace(row.team_name_abbr),
@@ -652,6 +667,7 @@ function buildGoalieCandidate(row: Record<string, string>): ScrapedCandidate {
   return {
     sourceType: "goalie",
     sourceIndex: toNumber(row.__sourceIndex),
+    sourcePlayerId: row.__sourcePlayerId,
     fullName: cleanWhitespace(row.name_display),
     normalizedName: normalizeName(row.name_display),
     nhlTeam: cleanWhitespace(row.team_name_abbr),
@@ -683,52 +699,14 @@ function buildGoalieCandidate(row: Record<string, string>): ScrapedCandidate {
   };
 }
 
-function collapseToTotalRows(candidates: ScrapedCandidate[]): {
-  rows: ScrapedCandidate[];
-  duplicateIncomingKeysCollapsed: number;
-} {
-  const grouped = new Map<string, ScrapedCandidate[]>();
-  for (const candidate of candidates) {
-    const key = [
-      candidate.sourceType,
-      candidate.normalizedName,
-      candidate.posGroup,
-    ].join("|");
-    const bucket = grouped.get(key) ?? [];
-    bucket.push(candidate);
-    grouped.set(key, bucket);
-  }
-
-  const rows: ScrapedCandidate[] = [];
-  let duplicateIncomingKeysCollapsed = 0;
-
-  for (const bucket of grouped.values()) {
-    if (bucket.length > 1) {
-      duplicateIncomingKeysCollapsed += bucket.length - 1;
-    }
-    const aggregateRow = bucket.find((candidate) =>
-      isAggregateTeamAbbr(candidate.nhlTeam),
-    );
-    rows.push(
-      (aggregateRow ??
-        [...bucket].sort(
-          (left, right) => left.sourceIndex - right.sourceIndex,
-        )[0])!,
-    );
-  }
-
-  rows.sort((left, right) => left.sourceIndex - right.sourceIndex);
-  return { rows, duplicateIncomingKeysCollapsed };
+function collapseToTotalRows(candidates: ScrapedCandidate[]) {
+  return collapseHockeyReferencePeople(candidates, isAggregateTeamAbbr);
 }
 
 function buildPlayerFullName(player: Player): string {
   const fullName = cleanWhitespace(player.fullName);
   if (fullName) return fullName;
   return cleanWhitespace(`${player.firstName} ${player.lastName}`);
-}
-
-function getPlayerPosTokens(player: Player): string[] {
-  return splitPosTokens(player.nhlPos);
 }
 
 function buildPlayersByName(players: Player[]): Map<string, Player[]> {
@@ -800,80 +778,6 @@ function findFallbackPlayers(
 
     return areFirstNamesCompatible(playerName.first, candidateName.first);
   });
-}
-
-function scorePlayerForCandidate(
-  player: Player,
-  candidate: ScrapedCandidate,
-): number {
-  let score = 0;
-  const playerName = getComparableNameParts(buildPlayerFullName(player));
-  const candidateName = getComparableNameParts(candidate.fullName);
-  const playerPosGroup = inferPosGroup(player.nhlPos, player.posGroup);
-  const playerTeam = normalizeTeamAbbr(player.nhlTeam);
-  const candidateTeam = normalizeTeamAbbr(candidate.nhlTeam);
-
-  if (playerPosGroup === candidate.posGroup) {
-    score += 4;
-  } else if (allowPosGroupMismatch(player, candidate)) {
-    score += 4;
-  }
-  if (areFullNamesCompatible(buildPlayerFullName(player), candidate.fullName)) {
-    score += 4;
-  }
-  if (areFirstNamesCompatible(playerName.first, candidateName.first)) {
-    score += 2;
-  }
-  if (playerName.last && playerName.last === candidateName.last) {
-    score += 2;
-  }
-  if (
-    candidate.primaryPos &&
-    getPlayerPosTokens(player).includes(candidate.primaryPos)
-  ) {
-    score += 2;
-  }
-  if (playerTeam && candidateTeam && playerTeam === candidateTeam) {
-    score += 3;
-  } else if (isAggregateTeamAbbr(candidateTeam)) {
-    score += 1;
-  }
-  if (player.isActive) {
-    score += 1;
-  }
-
-  return score;
-}
-
-function choosePlayerForCandidate(
-  candidate: ScrapedCandidate,
-  players: Player[],
-): Player | null {
-  if (!players.length) return null;
-  if (players.length === 1) return players[0] ?? null;
-
-  const ranked = players
-    .map((player) => ({
-      player,
-      score: scorePlayerForCandidate(player, candidate),
-    }))
-    .sort((left, right) => {
-      if (right.score !== left.score) {
-        return right.score - left.score;
-      }
-      return String(left.player.id).localeCompare(String(right.player.id));
-    });
-
-  const best = ranked[0];
-  const next = ranked[1];
-  if (!best || best.score <= 0) {
-    return null;
-  }
-  if (next?.score === best.score) {
-    return null;
-  }
-
-  return best.player;
 }
 
 function resolveSeasonYear(
@@ -1132,7 +1036,11 @@ async function executeSeason(
     const candidatePlayers = directMatches.length
       ? directMatches
       : findFallbackPlayers(candidate, players);
-    const player = choosePlayerForCandidate(candidate, candidatePlayers);
+    const player = chooseHockeyReferencePerson(
+      candidate.age,
+      seasonYear,
+      candidatePlayers,
+    );
 
     if (!candidatePlayers.length) {
       unmatched.push(
@@ -1179,8 +1087,10 @@ async function executeSeason(
       ),
   );
   const incomingRows = new Map<string, Partial<PlayerNHLStatLine>>();
+  const incomingPlayerKeys = new Set<string>();
   for (const row of matchedRows) {
     const key = makeSeasonPlayerKey(row.seasonId, row.playerId);
+    assertUniqueIncomingHockeyReferencePlayer(incomingPlayerKeys, key);
     incomingRows.set(key, row);
   }
 

@@ -1,1 +1,1 @@
-import "./check-yahoo-weekly-player-days";
+import "@gshl-lib/yahoo/check-weekly-matchup-stats";

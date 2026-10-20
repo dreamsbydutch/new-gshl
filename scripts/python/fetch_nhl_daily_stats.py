@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import ssl
 import sys
 from collections import defaultdict
 from typing import Any
@@ -30,12 +31,11 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--ssl-verify",
-        default="false",
+        default="true",
         choices=("true", "false"),
         help=(
             "Whether the nhl-api-py client should verify TLS certificates. "
-            "Defaults to false because some local Windows Python installs do "
-            "not ship a working CA bundle."
+            "Defaults to true using the operating system's trusted roots."
         ),
     )
     parser.add_argument(
@@ -48,6 +48,12 @@ def parse_args() -> argparse.Namespace:
 
 def to_bool(value: str) -> bool:
     return str(value).strip().lower() == "true"
+
+
+def ssl_verification(verify: bool) -> ssl.SSLContext | bool:
+    # nhl-api-py 3.3 passes this through to HTTPX, which accepts SSLContext.
+    # Python's default context loads Windows/macOS/Linux system trust correctly.
+    return ssl.create_default_context() if verify else False
 
 
 def parse_time_to_minutes(value: Any) -> float:
@@ -555,7 +561,11 @@ def fetch_daily_stats(
     date: str,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]], int]:
     schedule = client.schedule.daily_schedule(date=date)
-    games = schedule.get("games") or []
+    # Fantasy NHL stats exclude preseason, All-Star and other exhibitions.
+    games = [
+        game for game in (schedule.get("games") or [])
+        if game.get("gameType") in (2, 3)
+    ]
     output: list[dict[str, Any]] = []
     team_games: list[dict[str, Any]] = []
     roster_players: list[dict[str, Any]] = []
@@ -564,6 +574,8 @@ def fetch_daily_stats(
         try:
             game_id = int(game.get("id"))
             boxscore = client.game_center.boxscore(str(game_id))
+            if int(boxscore.get("gameType") or 0) != int(game["gameType"]):
+                raise ValueError("Schedule and boxscore game eligibility disagree")
             play_by_play = client.game_center.play_by_play(str(game_id))
             away_team = boxscore.get("awayTeam") or {}
             home_team = boxscore.get("homeTeam") or {}
@@ -668,7 +680,7 @@ def main() -> int:
     if not dates:
         raise SystemExit("At least one date is required.")
 
-    client = NHLClient(ssl_verify=to_bool(args.ssl_verify))
+    client = NHLClient(ssl_verify=ssl_verification(to_bool(args.ssl_verify)))
     players: list[dict[str, Any]] = []
     team_games: list[dict[str, Any]] = []
     roster_players: list[dict[str, Any]] = []

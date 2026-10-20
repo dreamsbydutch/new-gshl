@@ -491,6 +491,65 @@ void test("rolling roster talent excludes the rated week's player results", asyn
   );
 });
 
+void test("category contribution totals cannot enter the legacy NHL talent blend", async () => {
+  const data = fixture(4, 4);
+  data.seasons.unshift({
+    id: "season-0",
+    year: 2025,
+    startDate: "2025-01-01",
+    endDate: "2025-12-31",
+    isActive: false,
+  });
+  data.playerNhlRows = ["a", "b"].map((p) => ({
+    seasonId: "season-0",
+    playerId: `player-${p}`,
+    overallRating: p === "a" ? 65 : 45,
+  }));
+  data.playerDays = data.weeks.flatMap((w) =>
+    ["a", "b"].map((p) => ({
+      seasonId,
+      weekId: w.id,
+      date: w.startDate,
+      gshlTeamId: `team-${p}`,
+      playerId: `player-${p}`,
+    })),
+  );
+  data.playerWeeks = data.weeks.flatMap((w) =>
+    ["a", "b"].map((p) => ({
+      seasonId,
+      weekId: w.id,
+      playerId: `player-${p}`,
+      GP: 10,
+      Rating: p === "a" ? -5000 : 50000,
+      ratingVersion: "gshl-category-impact-v3-retrospective",
+    })),
+  );
+  const versioned = await runPowerRankingsFixture(seasonId, data, {
+    todayDate: "2026-07-25",
+  });
+  const withoutWeeklyTalent = await runPowerRankingsFixture(
+    seasonId,
+    { ...data, playerWeeks: [] },
+    { todayDate: "2026-07-25" },
+  );
+  assert.equal(
+    JSON.stringify(
+      versioned.weekUpdates?.map((r) => [
+        r.weekId,
+        r.gshlTeamId,
+        r.powerTalent,
+      ]),
+    ),
+    JSON.stringify(
+      withoutWeeklyTalent.weekUpdates?.map((r) => [
+        r.weekId,
+        r.gshlTeamId,
+        r.powerTalent,
+      ]),
+    ),
+  );
+});
+
 void test("no-activity and inactive franchises still receive neutral snapshots", async () => {
   const data = fixture(4, 4);
   data.teamWeeks = [];

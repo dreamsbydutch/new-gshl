@@ -88,6 +88,8 @@ export interface MatchupPlayerWeekRow {
   SVP: MatchupStatValue;
   SO: MatchupStatValue;
   Rating: MatchupStatValue;
+  averageRating?: number | null;
+  ratingVersion?: string | null;
 }
 
 export type PlayerStatRow = Pick<MatchupPlayerWeekRow, "id"> &

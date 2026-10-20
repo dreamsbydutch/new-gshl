@@ -1,8 +1,8 @@
-import * as dataStore from "@gshl-lib/data/convex-store";
 import {
   getCompositeKeyColumnsForModel,
   type DatabaseRecord,
 } from "@gshl-lib/data/records";
+import { convexWriter } from "@gshl-lib/data/writer";
 import { fetchModel } from "@gshl-lib/data/convex-store";
 import {
   getArgValue,
@@ -92,7 +92,7 @@ async function writeRows(
       ? ["id"]
       : getCompositeKeyColumnsForModel(modelName);
 
-  await dataStore.upsertByCompositeKey(modelName, keyColumns, rows, {
+  await convexWriter.upsertByCompositeKey(modelName, keyColumns, rows, {
     merge: true,
     idColumn: "id",
     createdAtColumn: "createdAt",

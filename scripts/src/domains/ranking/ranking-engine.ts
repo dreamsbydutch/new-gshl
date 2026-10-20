@@ -2,7 +2,12 @@ import fs from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import vm from "node:vm";
+import { tryRankUniformImpactRows } from "../../integrations/ranking/uniform-impact";
 import type { DatabaseRecord } from "@gshl-lib/data/records";
+import {
+  rankPlayerDayImpactRows,
+  type PlayerDayImpactRatingOptions,
+} from "./player-day-impact";
 
 export type RankingEngineModelName =
   | "PlayerDayStatLine"
@@ -248,8 +253,29 @@ export async function rankRowsWithRankingEngine(
     includeBreakdown?: boolean;
     mutate?: boolean;
     dataContext?: RankingEngineDataContext;
+    playerDayImpact?: PlayerDayImpactRatingOptions;
   },
 ): Promise<RankingEngineRow[]> {
+  const requestedModel = normalizeRankingEngineModelName(options.dataModelName);
+  if (options.playerDayImpact) {
+    if (requestedModel !== "PlayerDayStatLine")
+      throw Error("Matchup impact is a player-day-only profile");
+    return rankPlayerDayImpactRows(rows, {
+      ...options.playerDayImpact,
+      mutate: options.mutate !== false,
+      outputField: options.outputField ?? "Rating",
+      includeBreakdown: options.includeBreakdown,
+    });
+  }
+  if (
+    (!options.outputField || options.outputField === "Rating") &&
+    (!options.dataContext ||
+      rows.some((row) => row.ratingVersion === "gshl-category-impact-v3"))
+  ) {
+    const target =
+      options.mutate === false ? rows.map((row) => ({ ...row })) : rows;
+    if (await tryRankUniformImpactRows(target, requestedModel)) return target;
+  }
   const engine = options.dataContext
     ? await loadRankingEngineWithContext(options.dataContext)
     : await getRankingEngine();

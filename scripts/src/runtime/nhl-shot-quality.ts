@@ -63,6 +63,10 @@ export type ShotTrainingRow = {
   eventId: number;
   goal: number;
   features: number[];
+  /** Official four-digit manpower/goalie code, retained for diagnostics only. */
+  situation?: string;
+  /** Recorded shooting team relative to the official home team; diagnostic/experimental metadata. */
+  shootingHome?: boolean;
   orientationSource?: "official-side" | "period-zone-consensus" | "event-zone";
 };
 export type ShotQualityModel = {
@@ -97,8 +101,13 @@ export function predictShotQuality(
   features: number[],
 ) {
   if (
+    model.coefficients.length !== SHOT_FEATURES.length ||
+    SHOT_FEATURES.some((_, i) => !Number.isFinite(model.coefficients[i]))
+  )
+    throw new Error("Invalid shot-quality coefficients");
+  if (
     features.length !== SHOT_FEATURES.length ||
-    features.some((x) => !Number.isFinite(x))
+    SHOT_FEATURES.some((_, i) => !Number.isFinite(features[i]))
   )
     throw new Error("Invalid shot-quality features");
   return logistic(
@@ -111,7 +120,7 @@ export function fitShotQuality(
   rows: ShotTrainingRow[],
   ridge: number,
 ): ShotQualityModel {
-  if (rows.length < 100 || ridge <= 0)
+  if (rows.length < 100 || !Number.isFinite(ridge) || ridge <= 0)
     throw new Error("Insufficient shots or invalid xG ridge");
   const p = SHOT_FEATURES.length,
     beta = new Array<number>(p).fill(0);
@@ -125,7 +134,7 @@ export function fitShotQuality(
     for (const r of rows) {
       if (
         r.features.length !== p ||
-        r.features.some((x) => !Number.isFinite(x)) ||
+        SHOT_FEATURES.some((_, i) => !Number.isFinite(r.features[i])) ||
         ![0, 1].includes(r.goal)
       )
         throw new Error("Invalid xG training observation");
@@ -192,6 +201,8 @@ export function evaluateShotQuality(
   rows: ShotTrainingRow[],
   baselineRate: number,
 ) {
+  if (!Number.isFinite(baselineRate) || baselineRate < 0 || baselineRate > 1)
+    throw new Error("Invalid shot-quality baseline rate");
   let brier = 0,
     baselineBrier = 0,
     expected = 0,
@@ -201,6 +212,16 @@ export function evaluateShotQuality(
     expected: 0,
     goals: 0,
   }));
+  const situations = new Map<
+    string,
+    {
+      shots: number;
+      expected: number;
+      goals: number;
+      brier: number;
+      baselineBrier: number;
+    }
+  >();
   for (const r of rows) {
     const probability = predictShotQuality(model, r.features);
     brier += (probability - r.goal) ** 2;
@@ -211,6 +232,20 @@ export function evaluateShotQuality(
     bin.shots++;
     bin.expected += probability;
     bin.goals += r.goal;
+    const situation = r.situation ?? "unknown";
+    const group = situations.get(situation) ?? {
+      shots: 0,
+      expected: 0,
+      goals: 0,
+      brier: 0,
+      baselineBrier: 0,
+    };
+    group.shots++;
+    group.expected += probability;
+    group.goals += r.goal;
+    group.brier += (probability - r.goal) ** 2;
+    group.baselineBrier += (baselineRate - r.goal) ** 2;
+    situations.set(situation, group);
   }
   return {
     shots: rows.length,
@@ -219,11 +254,34 @@ export function evaluateShotQuality(
     expectedGoals: expected,
     actualGoals: goals,
     calibrationBins: bins,
+    calibrationBySituation: [...situations]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([situation, group]) => ({
+        situation,
+        shots: group.shots,
+        expectedGoals: group.expected,
+        actualGoals: group.goals,
+        brier: group.brier / group.shots,
+        baselineBrier: group.baselineBrier / group.shots,
+        // Positive means overprediction; this is descriptive, not significance.
+        meanCalibrationResidual: (group.expected - group.goals) / group.shots,
+      })),
   };
 }
 
 /** Expanding folds ensure the chance labels used by later RAPM validation never train on its test outcomes. */
 export function chronologicalShotQuality(rows: ShotTrainingRow[]) {
+  const gameDates = new Map<number, string>();
+  const events = new Set<string>();
+  for (const row of rows) {
+    if (gameDates.has(row.gameId) && gameDates.get(row.gameId) !== row.date)
+      throw new Error("Conflicting dates for shot-quality game");
+    gameDates.set(row.gameId, row.date);
+    const identity = `${row.gameId}:${row.eventId}`;
+    if (events.has(identity))
+      throw new Error("Duplicate shot-quality game/event identity");
+    events.add(identity);
+  }
   const dates = [...new Set(rows.map((r) => r.date))].sort();
   if (dates.length < 10)
     throw new Error(

@@ -217,3 +217,171 @@ test("season opening and final-night catch-up do not change current ownership ou
   assert.equal(final.active, false);
   assert.deepEqual(final.historyDates, ["2027-04-09", "2027-04-10"]);
 });
+
+test("live NHL games refresh on five-minute buckets while Yahoo stays hourly", () => {
+  const now = new Date("2026-10-20T23:16:00Z");
+  const checkpoint = {
+    lastNhlSyncAt: new Date("2026-10-20T23:10:00Z").getTime(),
+    lastYahooSyncAt: new Date("2026-10-20T23:00:00Z").getTime(),
+  };
+  for (const gameState of ["LIVE", "CRIT"]) {
+    const plan = planYahooSyncCycle({
+      ...scope,
+      now,
+      checkpoint,
+      games: [{ gameState, gameScheduleState: "OK" }],
+    });
+    assert.equal(plan.refreshNhl, true);
+    assert.equal(plan.refreshIntervalMinutes, 5);
+    assert.equal(plan.scrapeYahoo, false);
+    assert.deepEqual(plan.refreshDates, ["2026-10-20"]);
+    assert.deepEqual(plan.historyDates, []);
+    assert.equal(
+      planYahooSyncCycle({
+        ...scope,
+        now,
+        checkpoint: { ...checkpoint, lastNhlSyncAt: now.getTime() - 60000 },
+        games: [{ gameState, gameScheduleState: "OK" }],
+      }).refreshNhl,
+      false,
+    );
+  }
+  assert.equal(
+    planYahooSyncCycle({
+      ...scope,
+      now,
+      checkpoint,
+      games: [{ gameState: "FUT", gameScheduleState: "OK" }],
+    }).refreshNhl,
+    false,
+  );
+});
+
+test("late live games continue after 04:00 and track yesterday's scoring date", () => {
+  const plan = planYahooSyncCycle({
+    ...scope,
+    now: new Date("2026-10-21T09:05:00Z"),
+    checkpoint: {},
+    games: [],
+    previousGames: [{ gameState: "LIVE", gameScheduleState: "OK" }],
+  });
+  assert.equal(plan.windowOpen, true);
+  assert.equal(plan.refreshNhl, true);
+  assert.deepEqual(plan.refreshDates, ["2026-10-20"]);
+  assert.equal(plan.scrapeYahoo, false);
+  assert.equal(plan.nightlyDate, null);
+});
+
+test("nightly work requires a known completed previous slate and runs once", () => {
+  const input = {
+    ...scope,
+    now: new Date("2026-10-21T05:00:00Z"),
+    checkpoint: {},
+  };
+  assert.equal(planYahooSyncCycle(input).nightlyDate, null);
+  assert.equal(
+    planYahooSyncCycle({
+      ...input,
+      previousGames: [{ gameState: "PRE", gameScheduleState: "OK" }],
+    }).nightlyDate,
+    null,
+  );
+  assert.equal(
+    planYahooSyncCycle({
+      ...input,
+      previousGames: [{ gameState: "CRIT", gameScheduleState: "OK" }],
+    }).nightlyDate,
+    null,
+  );
+  const previousGames = [
+    { gameState: "OFF", gameScheduleState: "OK" },
+    { gameState: "FUT", gameScheduleState: "PPD" },
+  ];
+  assert.equal(
+    planYahooSyncCycle({ ...input, previousGames }).nightlyDate,
+    "2026-10-20",
+  );
+  assert.equal(
+    planYahooSyncCycle({ ...input, previousGames: [] }).nightlyDate,
+    "2026-10-20",
+  );
+  assert.equal(
+    planYahooSyncCycle({
+      ...input,
+      previousGames,
+      checkpoint: { nightlyCompletedThrough: "2026-10-20" },
+    }).nightlyDate,
+    null,
+  );
+  assert.equal(
+    planYahooSyncCycle({
+      ...input,
+      now: new Date("2026-10-21T12:00:00Z"),
+      previousGames,
+    }).nightlyDate,
+    null,
+  );
+});
+
+test("all live scoring dates refresh and season boundaries still apply", () => {
+  const games = [{ gameState: "LIVE", gameScheduleState: "OK" }];
+  const plan = planYahooSyncCycle({
+    ...scope,
+    now: new Date("2026-10-21T04:05:00Z"),
+    checkpoint: {},
+    games,
+    previousGames: games,
+  });
+  assert.deepEqual(plan.refreshDates, ["2026-10-20", "2026-10-21"]);
+  const final = planYahooSyncCycle({
+    ...scope,
+    now: new Date("2027-04-11T09:05:00Z"),
+    checkpoint: {},
+    games,
+    previousGames: games,
+  });
+  assert.deepEqual(final.refreshDates, ["2027-04-10"]);
+});
+
+test("missed final-night refresh recovers after 08:00 and on the second grace day", () => {
+  const finished = [{ gameState: "OFF", gameScheduleState: "OK" }];
+  const first = planYahooSyncCycle({
+    ...scope,
+    now: new Date("2027-04-11T16:00:00Z"),
+    checkpoint: {},
+    previousGames: finished,
+  });
+  assert.equal(first.nightlyDate, "2027-04-10");
+  const second = planYahooSyncCycle({
+    ...scope,
+    now: new Date("2027-04-12T16:00:00Z"),
+    checkpoint: {},
+    previousGames: [],
+    nightlyGames: finished,
+  });
+  assert.equal(second.nightlyDate, "2027-04-10");
+  assert.equal(
+    planYahooSyncCycle({
+      ...scope,
+      now: new Date("2027-04-12T16:00:00Z"),
+      checkpoint: { nightlyCompletedThrough: "2027-04-10" },
+      nightlyGames: finished,
+    }).nightlyDate,
+    null,
+  );
+});
+
+test("NHL overnight totals continue after the fantasy scoring season ends", () => {
+  const plan = planYahooSyncCycle({
+    ...scope,
+    nhlEndDate: "2027-04-19",
+    now: new Date("2027-04-16T05:00:00Z"),
+    checkpoint: { nightlyCompletedThrough: "2027-04-14" },
+    previousGames: [{ gameState: "OFF", gameScheduleState: "OK" }],
+  });
+  assert.equal(plan.active, false);
+  assert.equal(plan.scrapeYahoo, false);
+  assert.equal(plan.refreshNhl, false);
+  assert.equal(plan.nightlyDate, "2027-04-15");
+  assert.equal(plan.windowOpen, true);
+});

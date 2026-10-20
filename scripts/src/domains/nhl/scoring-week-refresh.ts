@@ -12,8 +12,17 @@ export function isScoringWeekFinalized(week: ScoringWeek): boolean {
   return Boolean(week.weeklyRefreshCompletedAt);
 }
 
-export function planScoringWeekRefresh(weeks: ScoringWeek[], today: string) {
-  return weeks
+export function planScoringWeekRefresh(
+  weeks: ScoringWeek[],
+  today: string,
+  maxWeeks?: number,
+) {
+  if (
+    maxWeeks !== undefined &&
+    (!Number.isSafeInteger(maxWeeks) || maxWeeks < 1 || maxWeeks > 4)
+  )
+    throw Error("Correction refresh requires one to four weeks");
+  const plan = weeks
     .filter((week) => !isScoringWeekFinalized(week))
     .flatMap((week) => {
       const startDate = normalizeDateOnlyValue(week.startDate);
@@ -27,4 +36,10 @@ export function planScoringWeekRefresh(weeks: ScoringWeek[], today: string) {
         },
       ];
     });
+  return maxWeeks === undefined
+    ? plan
+    : plan
+        .sort((a, b) => b.startDate.localeCompare(a.startDate))
+        .slice(0, maxWeeks)
+        .reverse();
 }

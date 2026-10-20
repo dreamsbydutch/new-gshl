@@ -1849,6 +1849,7 @@ var RankingEngine = RankingEngine || {};
     });
     (totalRows || []).forEach(function (row) {
       if (!isRegularSeasonType(row && row.seasonType)) return;
+      if (hasCategoryImpactUnits(row)) return;
       var value = getFirstFiniteNumber(row, ["Rating"]);
       if (value !== null) values.push(value);
     });
@@ -1870,7 +1871,9 @@ var RankingEngine = RankingEngine || {};
       "seasonRating",
     ]);
     var previousOverall = getFirstFiniteNumber(previousRow, ["overallRating"]);
-    var totalRating = getFirstFiniteNumber(totalRow, ["Rating"]);
+    var totalRating = hasCategoryImpactUnits(totalRow)
+      ? null
+      : getFirstFiniteNumber(totalRow, ["Rating"]);
 
     if (previousOverall === null) {
       previousOverall =
@@ -2021,7 +2024,12 @@ var RankingEngine = RankingEngine || {};
     var componentsByTeam = {};
     (regularRows || []).forEach(function (row) {
       var teamKey = getTeamKey(row);
-      var categoryScore = toNumber(row && row.Rating);
+      var categoryScore =
+        String((row && row.ratingVersion) || "").indexOf(
+          "gshl-category-impact-v3",
+        ) === 0
+          ? percentileScore(toNumber(row && row.Rating), categoryValues, false)
+          : toNumber(row && row.Rating);
       var winsScore = percentileScore(
         toNumber(row && row.teamW),
         winsValues,
@@ -2120,7 +2128,57 @@ var RankingEngine = RankingEngine || {};
     };
   }
 
+  function hasCategoryImpactUnits(row) {
+    return (
+      String((row && row.ratingVersion) || "").indexOf(
+        "gshl-category-impact-v3",
+      ) === 0
+    );
+  }
+
+  function legacyAwardRatingClones(rows, dataModelName) {
+    var copies = (rows || []).map(function (row) {
+      var copy = cloneObject(row);
+      delete copy.ratingVersion;
+      delete copy.averageRating;
+      delete copy.ratingAppearances;
+      return copy;
+    });
+    // Call the pure legacy scorer directly; the Node profile adapter is never used.
+    return rankRows(copies, {
+      dataModelName: dataModelName,
+      outputField: "Rating",
+      mutate: true,
+    });
+  }
+
   function buildCalderTeamScores(regularRows, seasonId, componentContext) {
+    var calderTotalByPlayer = componentContext.talentContext.totalByPlayer;
+    var calderSplitByTeamPlayer = componentContext.playerSplitByTeamPlayer;
+    var calderFallback = componentContext.talentContext.fallback;
+    var totalRows = fetchSeasonPlayerTotalRows(seasonId);
+    var splitRows = componentContext.playerSplitRows || [];
+    if (
+      totalRows.some(hasCategoryImpactUnits) ||
+      splitRows.some(hasCategoryImpactUnits)
+    ) {
+      // The historical draft benchmark is in legacy units. Reconstruct those
+      // units only on temporary native-stat clones, never on published ratings.
+      var legacyTotalRows = legacyAwardRatingClones(
+        totalRows,
+        "PlayerTotalStatLine",
+      );
+      calderTotalByPlayer = mapRowsByPlayerId(legacyTotalRows);
+      calderSplitByTeamPlayer = mapPlayerSplitsByTeamPlayer(
+        legacyAwardRatingClones(splitRows, "PlayerSplitStatLine"),
+      );
+      var previousSeasonId = resolvePreviousSeasonId(seasonId);
+      calderFallback = buildLeagueTalentFallback(
+        previousSeasonId ? fetchSeasonPlayerNhlRows(previousSeasonId) : [],
+        fetchSeasonPlayerNhlRows(seasonId),
+        legacyTotalRows,
+      );
+    }
     var nonSigningDraftRows = (componentContext.draftPickRows || []).filter(
       function (row) {
         return (
@@ -2133,8 +2191,7 @@ var RankingEngine = RankingEngine || {};
     );
     var draftRows = nonSigningDraftRows
       .filter(function (row) {
-        var total =
-          componentContext.talentContext.totalByPlayer[getPlayerKey(row)];
+        var total = calderTotalByPlayer[getPlayerKey(row)];
         return (
           getTeamKey(row) &&
           getPlayerKey(row) &&
@@ -2167,12 +2224,11 @@ var RankingEngine = RankingEngine || {};
         playerKey,
         talentContext.previousNhlByPlayer,
         talentContext.currentNhlByPlayer,
-        talentContext.totalByPlayer,
-        talentContext.fallback,
+        calderTotalByPlayer,
+        calderFallback,
       );
-      var splitRow =
-        componentContext.playerSplitByTeamPlayer[teamKey + "|" + playerKey];
-      var totalRow = talentContext.totalByPlayer[playerKey];
+      var splitRow = calderSplitByTeamPlayer[teamKey + "|" + playerKey];
+      var totalRow = calderTotalByPlayer[playerKey];
       return {
         teamKey: teamKey,
         pickNumber: pickNumber,

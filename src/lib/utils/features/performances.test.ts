@@ -7,6 +7,7 @@ import type {
 import {
   PERFORMANCE_KINDS,
   performanceDirection,
+  performanceDisplayStats,
   performanceColumns,
   performanceNumber,
   performanceStats,
@@ -35,6 +36,51 @@ const row = (id: string, value: number | null): PerformanceRow => ({
   position: "",
   name: "",
   team: "",
+});
+
+void test("v3 GSHL averages are display metadata across periods, leaving NHL metrics and sorting unchanged", () => {
+  const source = {
+    Rating: 100,
+    averageRating: 25,
+    ratingVersion: "gshl-category-impact-v3",
+    seasonRating: 80,
+  };
+  const before = structuredClone(source);
+  for (const { value: kind } of PERFORMANCE_KINDS) {
+    const stats = performanceDisplayStats(kind, source);
+    assert.equal(stats.averageRating, kind === "playerNhl" ? undefined : 25);
+    assert.ok(!performanceStats(kind).includes("averageRating"));
+  }
+  assert.equal(
+    performanceDisplayStats("playerWeek", {
+      ...source,
+      ratingVersion: "legacy",
+    }).averageRating,
+    undefined,
+  );
+  assert.equal(
+    performanceDisplayStats("teamWeek", { ...source, averageRating: null })
+      .averageRating,
+    undefined,
+  );
+  assert.equal(
+    performanceDisplayStats("teamDay", { ...source, averageRating: 0 })
+      .averageRating,
+    0,
+  );
+  assert.equal(performanceDisplayStats("playerNhl", source).seasonRating, 80);
+  assert.deepEqual(
+    topPerformances(
+      [
+        { ...row("total", 100), stats: { Rating: 100, averageRating: 1 } },
+        { ...row("average", 50), stats: { Rating: 50, averageRating: 999 } },
+      ],
+      "Rating",
+      "desc",
+    ).map((r) => r.id),
+    ["total", "average"],
+  );
+  assert.deepEqual(source, before);
 });
 
 void test("team columns prioritize activity stats and keep the ranking stat visible in every group", () => {

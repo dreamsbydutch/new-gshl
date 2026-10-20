@@ -12,6 +12,7 @@ The local calculation files live under
 - `RankingEngine/player-pure.js`
 - `RankingEngine/team-pure.js`
 - `RankingEngine/index.js`
+- `RankingEngine/player-day-impact.js` (explicit player-day impact profile)
 - `PowerRankingsAlgo.js`
 
 Local TypeScript commands load these runtimes into a Node `vm` with supplied
@@ -51,7 +52,117 @@ Starter, Borderline Starter, Rosterable, Waiver Wire, and No Impact.
 The engine computes ratings, not every downstream field. For example,
 `PlayerNHL` salary and overall-rating derivation remain outside the engine.
 
+## Player-day category impact profile
+
+An explicit `playerDayImpact` option on the operator ranking adapter selects
+the separate `RankingEngine/player-day-impact.js` profile for player days.
+The default profile and stored ratings do not change automatically.
+
+The main value measures the expected category points a completed appearance
+adds over an unfilled roster appearance. Historical paired team weeks supply
+the background: remove one skater or goalie appearance, insert the performance
+being rated, and compare category outcomes before and after. Each active league
+category awards one point for a win and half for a tie. Counting categories use
+their historical margin distributions. Goalie categories use joint weekly
+workloads, pooled ratios, historical comparison precision and the target
+season's goalie minimum. Negative contributions remain negative.
+
+The reference is frozen before the target week starts. Equal stat lines have
+equal main values across owners and across forward/defense positions within
+the same scoring rules and reference. Season categories, week length and goalie
+minimum can change the value. Missing historical support produces an unavailable
+result rather than an invented score. An empty roster day is zero; a populated
+performance with missing GP is rejected.
+
+The revised optional `schedule-kernel` context uses league-wide NHL games per
+team to weight all earlier backgrounds by opportunity similarity. It borrows
+support for unusual calendar durations without scaling stats or integer goalie
+appearances. The `week-days` context remains available for comparison. Schedule
+exposure is global and cannot depend on a player's owner or NHL team. Historical
+schedule caches are retrospective metadata; prospective runs should freeze
+schedule context before the week starts.
+
+The displayed scale is 100 units per expected category point. Per-category
+contributions, historical support and qualification effects accompany the raw
+value. `ifStarted` describes the performance; `counted` is zero for bench and
+injured-reserve rows. `actualImpact` separately compares the completed owner's
+matchup with and without the appearance. These marginal values are not additive
+across teammates and are not forecasts of player ability. Existing grade labels
+are not calibrated to this scale.
+
+Local experiments compare earlier-season references against later completed
+matchups, with season-blocked validation and a separately frozen final season.
+They compare the legacy same-date profile and a simple category-margin baseline
+on identical supported appearances. Production adoption requires a separate
+reviewed recomputation.
+
+The original calendar-length model failed its final confirmation. Subsequent
+schedule-exposure revisions use that season diagnostically and do not claim a
+fresh untouched confirmation. See the [evaluation record](product/gshl-player-day-category-impact.md)
+for results, coverage and limitations.
+
 ## Independent NHL Season Value
+
+NHL season stat lines expose two separate lenses. `playerNhlStatLines.seasonRating`
+is the existing GSHL category-based season score. `hockeyRating.seasonValue` is
+the reviewed replacement-relative hockey contribution in goal units, with its
+own global rank, qualification and dated authoritative `nhlSeasonValues` source.
+The units are goals above replacement, not wins. The multi-season fantasy
+`overallRating` and salary retain their existing meanings.
+
+The dual-rating reconciliation command verifies the category engine and binds
+every existing stat line to a hockey source or an explicit unavailable status.
+Small samples, zero-game placeholders and unresolved source conflicts retain
+null hockey values. Reviewed identity associations require unique official
+statistical evidence; they do not repair player or stat identities. See the
+[dual-rating rollout](product/nhl-dual-season-ratings.md) for coverage and limits.
+
+The separate [complete season-stat repair](product/nhl-season-stat-cleanup.md)
+rebuilds the official positive-GP population, corrects reviewed identities and
+statistics, then replays category scores and associates the unchanged hockey
+model. Its operator owns explicit backed-up repairs and duplicate deletion;
+ordinary dual-rating reconciliation only associates ratings with existing rows.
+
+The [reviewed overall method](product/nhl-overall-rating.md) defines the current
+local season-contribution profile and its selected/rejected changes. It provides
+one replacement-relative NHL rating across F/D/G while keeping ability separate.
+
+The production model namespace is `nhl-hockey-overall-reviewed-v1`, governed by
+the [fixed production policy](product/nhl-hockey-overall-production-policy.md).
+Its signed `seasonValue` measures goals above the same-position reference;
+`rank` is global across positions. `seasonRating` and `impactPer60` remain null,
+so no percentile becomes a second overall metric. `hockeyOverall` retains
+replacement-relative components, separate ability, source coverage, qualification
+and depth sensitivities. Publication is additive alongside frozen v1/v3 rows.
+The builder and publisher in `scripts/README.md` own calculation and rollout;
+source or numerical failures prevent that season's publication. Future seasons
+have no fabricated ratings, and ongoing seasons are dated snapshots.
+
+The [October 2026 implementation audit](product/nhl-season-value-v3-implementation-audit.md)
+assesses the v3 implementation against the goal of comparing hockey contributions
+across playing styles and positions. It distinguishes verified code corrections
+from statistical changes that still require independent season validation.
+The [iterative review](product/nhl-rating-iterative-review.md) records the
+replacement-player target, reconstructed sources and subsequent experiments.
+The offline overall preview measures season contribution above a same-position
+replacement cohort in common goal units. Its playing-time-depth reference is
+explicit and includes sensitivity checks; sustainable ability remains separate.
+For the user's single overall NHL rating, accumulated season contribution is
+the primary target. Positive values estimate goals contributed above the
+same-position replacement reference over the player's actual workload; zero
+means reference-level contribution. F, D and G share this goal scale and one
+ordering. Position percentiles, fantasy categories and sustainable-ability
+scores do not enter that ordering. Low coverage or unsupported reference cohorts
+remain explicitly unranked.
+The [shot-context](product/nhl-shot-context-experiment.md) and
+[shared-cohort impact](product/nhl-impact-cohort-experiment.md) experiments define
+candidate changes and evaluation criteria before second-season results are
+inspected. They do not alter the default rating or authorize publication.
+The [retrospective cross-fit protocol](product/nhl-retrospective-crossfit-proposal.md)
+separately estimates same-season chance quality without fitting a game's own
+outcomes. Its labels must never enter claimed chronological validation. The
+[goalie credit review](product/nhl-goalie-holistic-credit-review.md) documents
+remaining limits on measuring rebound control and puck handling.
 
 ### Game-level v3 candidate
 
@@ -205,6 +316,13 @@ Missing official season exposure still makes a season incomplete. With official
 exposure present, partial component values remain visible rather than null.
 Qualification requires 95% to 103% exposure coverage, at least 95% individual
 shot coverage, no missing individual goals, and 200 skater or 300 goalie minutes.
+Revision `2026-10-18-reviewed-process-and-penalties` also requires fitted offensive and
+defensive coefficients for each credited skater/situation family. An absent
+coefficient is unknown rather than a measured zero: those minutes receive no
+process value or coverage, while verified finishing and penalty events remain.
+An explicitly fitted zero is supported. Duplicate game inputs and non-finite or
+negative shrinkage priors are rejected. Older stored revisions remain readable;
+new calculations carry the new revision and require fresh publication evidence.
 Skaters also need at least 95% usable process minutes; goalies' saving values do
 not require unrelated skater lineups. Estimates below these thresholds are
 provisional. Official played minutes supply ability-rate denominators so omitted
@@ -274,11 +392,11 @@ events remain unpriced rather than receiving guessed values.
 
 The untouched test block contains 265 games beginning March 13, 2025:
 
-| Test measure | Adjusted model | Situation-only baseline |
-| --- | ---: | ---: |
-| Expected-goal differential MSE | 1.3727 | 1.6274 |
-| Actual-goal differential MSE | 7.0529 | 7.3125 |
-| Non-shootout decision accuracy, 243 games | 67.9% | 69.5% |
+| Test measure                              | Adjusted model | Situation-only baseline |
+| ----------------------------------------- | -------------: | ----------------------: |
+| Expected-goal differential MSE            |         1.3727 |                  1.6274 |
+| Actual-goal differential MSE              |         7.0529 |                  7.3125 |
+| Non-shootout decision accuracy, 243 games |          67.9% |                   69.5% |
 
 Differential errors improve by 15.6% and 3.5%; winner classification does not
 improve. These comparisons condition on observed deployment. The NHL shot model
@@ -716,21 +834,20 @@ category accuracy, not independent significance or validated salary improvements
 The October 2026 run verified 13,159 player-seasons, evaluated 17,550 player/
 origin/horizon forecasts and 7,406 complete player/origin/term windows (each with
 three methods), and generated 3,114 projections for 1,038 players over 2026-27,
-2027-28 and 2028-29. Complete-term tests cover four signing origins (2020 through
-2023) for two-year terms and three origins (2020 through 2022) for three-year
+2027-28 and 2028-29. Complete-term tests cover four signing origins (2020 through 2023) for two-year terms and three origins (2020 through 2022) for three-year
 terms; the longer history supplies training, not thirteen independent test years.
 
 For established players, reductions in RMSE versus weighted category history are:
 
-| Category | Two-year annual average | Three-year annual average |
-| --- | ---: | ---: |
-| Forward points | 16.1% | 17.6% |
-| Defense points | 14.6% | 17.3% |
-| Forward shots | 17.8% | 19.9% |
-| Defense shots | 20.8% | 25.6% |
-| Goalie wins | 18.8% | 23.9% |
-| Goalie GAA | 4.2% | 5.8% |
-| Goalie save percentage | **-2.6%** | **-2.7%** |
+| Category               | Two-year annual average | Three-year annual average |
+| ---------------------- | ----------------------: | ------------------------: |
+| Forward points         |                   16.1% |                     17.6% |
+| Defense points         |                   14.6% |                     17.3% |
+| Forward shots          |                   17.8% |                     19.9% |
+| Defense shots          |                   20.8% |                     25.6% |
+| Goalie wins            |                   18.8% |                     23.9% |
+| Goalie GAA             |                    4.2% |                      5.8% |
+| Goalie save percentage |               **-2.6%** |                 **-2.7%** |
 
 All seven skater categories improve in aggregate for both terms, with improvements
 in every origin/category combination except one two-year defense hits fold.
@@ -771,13 +888,13 @@ forecasts, requiring all three years to produce both term options.
 Established-player contract-average rating RMSE:
 
 | Position / term | Current talent formula | Calibrated current formula | Calibrated category forecast |
-| --- | ---: | ---: | ---: |
-| F / 2 years | 18.48 | 18.00 | 16.10 |
-| F / 3 years | 19.47 | 18.85 | 16.83 |
-| D / 2 years | 17.54 | 16.88 | 15.22 |
-| D / 3 years | 18.47 | 17.71 | 15.46 |
-| G / 2 years | 22.06 | 20.75 | 20.31 |
-| G / 3 years | 21.77 | 20.50 | 19.34 |
+| --------------- | ---------------------: | -------------------------: | ---------------------------: |
+| F / 2 years     |                  18.48 |                      18.00 |                        16.10 |
+| F / 3 years     |                  19.47 |                      18.85 |                        16.83 |
+| D / 2 years     |                  17.54 |                      16.88 |                        15.22 |
+| D / 3 years     |                  18.47 |                      17.71 |                        15.46 |
+| G / 2 years     |                  22.06 |                      20.75 |                        20.31 |
+| G / 3 years     |                  21.77 |                      20.50 |                        19.34 |
 
 Against the equally calibrated current formula, the candidate improves RMSE by
 10.5–10.7% F, 9.8–12.7% D and 2.1–5.7% G. It improves every tested skater
@@ -808,13 +925,13 @@ Established-player contract-average rating RMSE versus the preceding calibrated
 category candidate (lower is better):
 
 | Position / term | Previous candidate | Follow-up candidate | Error reduction | Better origin folds |
-| --- | ---: | ---: | ---: | ---: |
-| F / 2 years | 16.10 | 15.93 | 1.1% | 4/4 |
-| F / 3 years | 16.83 | 16.55 | 1.7% | 3/3 |
-| D / 2 years | 15.22 | 14.93 | 1.9% | 3/4 |
-| D / 3 years | 15.46 | 15.06 | 2.6% | 2/3 |
-| G / 2 years | 20.31 | 19.61 | 3.5% | 4/4 |
-| G / 3 years | 19.34 | 18.53 | 4.2% | 3/3 |
+| --------------- | -----------------: | ------------------: | --------------: | ------------------: |
+| F / 2 years     |              16.10 |               15.93 |            1.1% |                 4/4 |
+| F / 3 years     |              16.83 |               16.55 |            1.7% |                 3/3 |
+| D / 2 years     |              15.22 |               14.93 |            1.9% |                 3/4 |
+| D / 3 years     |              15.46 |               15.06 |            2.6% |                 2/3 |
+| G / 2 years     |              20.31 |               19.61 |            3.5% |                 4/4 |
+| G / 3 years     |              19.34 |               18.53 |            4.2% |                 3/3 |
 
 Skater rows use `rate-impact+calibrated`; goalie rows use
 `historical-save-rate+calibrated`. These are position-specific recommendations
@@ -889,9 +1006,9 @@ interactions help lower-workload forwards substantially after applying the same
 workload calibration to both alternatives:
 
 | Contract | Lower-workload F observations | Previous best RMSE | Age/usage RMSE | Reduction |
-| --- | ---: | ---: | ---: | ---: |
-| 2 years | 870 | 11.57 | 10.90 | 5.8% |
-| 3 years | 667 | 12.08 | 11.08 | 8.3% |
+| -------- | ----------------------------: | -----------------: | -------------: | --------: |
+| 2 years  |                           870 |              11.57 |          10.90 |      5.8% |
+| 3 years  |                           667 |              12.08 |          11.08 |      8.3% |
 
 The lower-workload group is fewer than 40 schedule-adjusted origin-season games.
 The improvement holds in all four two-year and all three three-year starting
@@ -1097,8 +1214,7 @@ nonpositive-value dollar floor is not part of that curve. `--curve legacy`
 retains the previous pricing for explicit comparisons.
 
 In the October 2 shared-skater replay, defensemen fall from six of the top nine
-to three; Seider moves 3 to 8, Werenski 4 to 6, Schaefer 5 to 9 and Makar 7 to
-17. The top 20 contains 14 forwards and six defensemen. The retained
+to three; Seider moves 3 to 8, Werenski 4 to 6, Schaefer 5 to 9 and Makar 7 to 17. The top 20 contains 14 forwards and six defensemen. The retained
 `matchup-empirical` objective was selected on the same earlier evaluation years.
 On 485 later historical matchups, opening Brier worsens from 0.241963 to
 0.244250 and prior-week Brier from 0.237511 to 0.240767; accuracy falls from
@@ -1170,10 +1286,10 @@ Complete-contract correlations with modeled future fantasy opportunity improve
 over both raw talent and the preceding calibrated category forecast. On paired
 established-player cohorts, the preceding forecast versus unified candidate is:
 
-| Term | Player contracts | Previous category forecast | Unified candidate |
-| --- | ---: | ---: | ---: |
-| 2 years | 2,702 | 0.7042 | 0.7446 |
-| 3 years | 2,021 | 0.7049 | 0.7412 |
+| Term    | Player contracts | Previous category forecast | Unified candidate |
+| ------- | ---------------: | -------------------------: | ----------------: |
+| 2 years |            2,702 |                     0.7042 |            0.7446 |
+| 3 years |            2,021 |                     0.7049 |            0.7412 |
 
 All F/D/G cohorts improve against that preceding forecast in both terms. The
 full cohorts contain 4,214 two-year and 3,192 three-year windows. These target
@@ -1252,16 +1368,16 @@ Pearson correlations remove each season's mean; rank comparisons use ranks
 within season. Whole-season bootstrap intervals use 1,000 deterministic
 resamples, accounting for teams within a season moving together.
 
-| Comparison | Within-season Pearson correlation |
-| --- | ---: |
-| Accumulated team value vs points percentage | 0.945 |
-| Accumulated team value vs win percentage | 0.932 |
-| Accumulated team value vs goal difference/game | 0.981 |
-| Performance-display team score vs points percentage | 0.875 |
-| Skater-only value vs points percentage | 0.858 |
-| Offensive process plus finishing vs goals scored | 0.974 |
-| Defensive process plus goalie saving vs fewer goals conceded | 0.970 |
-| Accumulated value vs playoff wins, among postseason entrants | 0.179 |
+| Comparison                                                   | Within-season Pearson correlation |
+| ------------------------------------------------------------ | --------------------------------: |
+| Accumulated team value vs points percentage                  |                             0.945 |
+| Accumulated team value vs win percentage                     |                             0.932 |
+| Accumulated team value vs goal difference/game               |                             0.981 |
+| Performance-display team score vs points percentage          |                             0.875 |
+| Skater-only value vs points percentage                       |                             0.858 |
+| Offensive process plus finishing vs goals scored             |                             0.974 |
+| Defensive process plus goalie saving vs fewer goals conceded |                             0.970 |
+| Accumulated value vs playoff wins, among postseason entrants |                             0.179 |
 
 The points correlation's season-bootstrap interval is 0.930-0.957. Each individual
 qualified season's points correlation is between 0.905 and 0.967. Including
@@ -1325,6 +1441,53 @@ the accepted historical season.
 Team-audit artifacts produced before this final review retain their historical
 "provisional 2019-20" labels and strict-gate exclusion. They are immutable
 evaluation snapshots, not the current publication state.
+
+## Uniform GSHL category contribution
+
+The `gshl-category-impact-v3` profile stores signed expected category points,
+multiplied by 100, in `Rating`. `averageRating` divides contribution by
+`ratingAppearances`, with five-decimal publication precision; empty periods
+have zero total, average and appearances.
+These units apply to GSHL stat lines, preserving NHL value, talent, salaries,
+awards and team power scores.
+
+Daily ratings retain owner-independent if-started performance, including bench
+potential. Player weekly ratings measure actually counted contribution, using
+starter player-days and unrounded counts. Bench-only weeks contribute zero.
+Aggregate GP includes bench appearances and never determines block size.
+Skater ice time is excluded from goalie denominators; goalie offense is excluded
+from team skater categories.
+
+Weekly player blocks replace up to their appearance count in neutral historical
+side-weeks. Exact subset distributions preserve category margins and joint
+goalie workload and qualification. A whole team week is compared with neutral
+opponent weeks relative to an empty team. Team days replace their counted
+appearances in a neutral weekly background. Actual opponents and matchup scores
+never enter these main ratings; actual-matchup diagnostics remain separate.
+
+Splits, seasons and careers sum contributions across independent fantasy weeks,
+not daily marginal scores or pooled season goalie ratios. Losers tournament
+weeks follow the existing playoff aggregation contract. Within-week trades are
+recombined across owners for player totals, while ownership splits score their
+own blocks. Nonlinear category utility means those splits may not sum exactly
+to the player's total. Careers sum the published five-decimal season values,
+using integer units at that precision. This preserves exact rebuild idempotency
+and lets routine career updates read season contributions instead of replaying
+every historical player-day.
+
+Historical publication excludes the target season from the reviewed comparison
+corpus, except unique historical categories with no other-season observations
+(SV and SO in 2014-15), which use their recorded within-season margins.
+This retrospective reference can use later seasons and is not a
+historical forecast. Owner-independent NHL schedule exposure retains the 0.15
+bandwidth. Provide the local reference configuration through
+`GSHL_IMPACT_REFERENCE_CONFIG` on another operator computer. Migrated rows cannot
+fall back to legacy scores when their reference configuration is missing.
+
+The uniform operator writes only Rating and three metadata fields with full-row
+compare-and-swap and transactional player-day index maintenance. Application
+requires an independently verified source and plan backup. Rollback restores
+exact prior field values and presence. Raw stats and matchup results are unchanged.
 
 ## Change checklist
 

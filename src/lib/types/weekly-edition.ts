@@ -156,6 +156,8 @@ export interface WeeklyEditionCategoryMarginFact {
 }
 
 export interface WeeklyEditionStarFact {
+  ratingVersion?: string;
+  averageRating?: number;
   playerId: string;
   playerName: string;
   teamId: string;
@@ -265,6 +267,8 @@ export interface WeeklyEditionEditorialCandidate {
 }
 
 export interface WeeklyEditionPerformanceFact {
+  ratingVersion?: string;
+  averageRating?: number;
   id: string;
   entityType: "player" | "team";
   scope: "day" | "week" | "season";
@@ -599,6 +603,8 @@ export interface WeeklyEditionValidationResult {
 }
 
 export interface WeeklyEditionSourcePlayer {
+  ratingVersion?: string;
+  averageRating?: number;
   playerId: string;
   playerName: string;
   teamId: string;
