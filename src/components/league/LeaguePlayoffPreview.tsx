@@ -31,6 +31,7 @@ function PreviewMatchup({ matchup }: { matchup: BracketMatchup }) {
       {(["home", "away"] as const).map((side) => {
         const team = matchup[`${side}Team`];
         const score = matchup[`${side}Score`];
+        const seed = matchup[`${side}Label`];
         const winner = team != null && matchup.winnerTeam?.id === team.id;
         return (
           <div
@@ -42,6 +43,14 @@ function PreviewMatchup({ matchup }: { matchup: BracketMatchup }) {
               winner && "bg-emerald-50",
             )}
           >
+            {matchup.round === "QF" && seed.startsWith("#") && (
+              <span
+                aria-label={`Seed ${seed.slice(1)}`}
+                className="w-4 shrink-0 text-right text-[10px] font-semibold tabular-nums text-slate-500"
+              >
+                {seed}
+              </span>
+            )}
             {team?.logoUrl ? (
               <Image
                 src={team.logoUrl}
@@ -126,7 +135,7 @@ export function LeaguePlayoffPreview({ season }: { season: Season }) {
                         />
                       ),
                     )}
-                  {column.matchups.map((matchup) => (
+                  {column.matchups.map((matchup, matchupIndex) => (
                     <div
                       key={matchup.id}
                       className={cn(
@@ -142,6 +151,21 @@ export function LeaguePlayoffPreview({ season }: { season: Season }) {
                           "before:absolute before:-left-1 before:top-1/2 before:h-px before:w-1 before:bg-slate-300",
                       )}
                     >
+                      {column.id === "conference-championships" &&
+                        matchup.logoUrl && (
+                          <Image
+                            src={matchup.logoUrl}
+                            alt={`${matchup.title} logo`}
+                            width={28}
+                            height={28}
+                            className={cn(
+                              "absolute left-1/2 h-7 w-7 -translate-x-1/2 object-contain",
+                              matchupIndex === 0
+                                ? "bottom-full mb-1"
+                                : "top-full mt-1",
+                            )}
+                          />
+                        )}
                       <PreviewMatchup matchup={matchup} />
                     </div>
                   ))}
