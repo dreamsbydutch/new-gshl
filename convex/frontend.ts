@@ -389,6 +389,7 @@ export const ownerDraftHistory = query({
       ratings: totals.map((row) => ({
         playerId: row.playerId,
         rating: draftNumber(row.Rating),
+        ratingVersion: row.ratingVersion ?? undefined,
       })),
     });
     const outcomes = buildDraftRosterOutcomes({
@@ -441,6 +442,8 @@ export const ownerDraftHistory = query({
         totals: totals.map((row) => ({
           playerId: row.playerId,
           rating: row.Rating,
+          ratingVersion: row.ratingVersion ?? undefined,
+          averageRating: row.averageRating ?? undefined,
           days: row.days,
           position: row.posGroup,
         })),
@@ -448,6 +451,8 @@ export const ownerDraftHistory = query({
           playerId: row.playerId,
           teamId: row.gshlTeamId,
           rating: row.Rating,
+          ratingVersion: row.ratingVersion ?? undefined,
+          averageRating: row.averageRating ?? undefined,
           days: row.days,
           position: row.posGroup,
         })),
@@ -455,6 +460,8 @@ export const ownerDraftHistory = query({
           playerId: row.playerId,
           days: row.days,
           rating: row.Rating,
+          ratingVersion: row.ratingVersion ?? undefined,
+          averageRating: row.averageRating ?? undefined,
           position: row.posGroup,
         })),
         postseasonSplits: postseasonSplits.map((row) => ({
@@ -462,6 +469,8 @@ export const ownerDraftHistory = query({
           teamId: row.gshlTeamId,
           days: row.days,
           rating: row.Rating,
+          ratingVersion: row.ratingVersion ?? undefined,
+          averageRating: row.averageRating ?? undefined,
           position: row.posGroup,
         })),
         players: players.map((player) => ({

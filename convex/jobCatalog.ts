@@ -59,7 +59,6 @@ const aliases: Record<string, JobName> = {
   "player-bios:backfill-yahoo-ids": "yahoo-player-id-backfill",
   "stats:backfill-yahoo-matchup-days": "yahoo-matchup-player-day-backfill",
   "stats:backfill-yahoo-rosters": "yahoo-matchup-player-day-backfill",
-  "yahoo:check-weekly-player-days": "yahoo-weekly-validation",
   "yahoo:check-weekly-matchups": "yahoo-weekly-validation",
   "player-bios:sync": "puckpedia-player-bio-sync",
 };

@@ -21,6 +21,7 @@ import {
   upsertByCompositeKey,
 } from "@gshl-lib/data/convex-store";
 import { env } from "@gshl-env";
+import { rankRowsWithRankingEngine } from "@gshl-lib/ranking/ranking-engine";
 import { normalizeDateOnlyValue } from "@gshl-lib/utils/core/date";
 import {
   getArgValue,
@@ -394,9 +395,9 @@ function scoreTeamWeekAgainstYahooTotals(
     const field = YAHOO_HEADER_TO_TEAM_WEEK_FIELD[yahooHeader];
     if (!field) continue;
     const yahooNumeric = toComparableNumeric(yahooValue);
-    const modelNumeric = toComparableNumeric(row[field]);
-    if (yahooNumeric === null || modelNumeric === null) continue;
-    score += Math.abs(modelNumeric - yahooNumeric);
+    const storedNumeric = toComparableNumeric(row[field]);
+    if (yahooNumeric === null || storedNumeric === null) continue;
+    score += Math.abs(storedNumeric - yahooNumeric);
     comparedFields += 1;
   }
 
@@ -852,6 +853,9 @@ function buildCreatedPlayerDayRow(params: {
     SO: existing?.SO ?? "",
     TOI: existing?.TOI ?? "",
     Rating: existing?.Rating ?? "",
+    averageRating: existing?.averageRating,
+    ratingVersion: existing?.ratingVersion,
+    ratingAppearances: existing?.ratingAppearances,
     ADD: existing?.ADD ?? "",
     MS: existing?.MS ?? "",
     BS: existing?.BS ?? "",
@@ -1475,6 +1479,36 @@ async function applySeasonWrites(params: {
   );
 }
 
+/** New and moved source records must not carry a stale rating into a write. */
+export async function refreshYahooPlayerDayRatings(
+  rows: PlayerDayStatLine[],
+  rank = rankRowsWithRankingEngine,
+): Promise<void> {
+  if (!rows.length) return;
+  await rank(
+    rows as unknown as Parameters<typeof rankRowsWithRankingEngine>[0],
+    {
+      dataModelName: PLAYER_DAY_MODEL,
+      outputField: "Rating",
+      mutate: true,
+    },
+  );
+  for (const row of rows)
+    if (
+      row.ratingVersion !== "gshl-category-impact-v3" ||
+      typeof row.Rating !== "number" ||
+      !Number.isFinite(row.Rating) ||
+      typeof row.averageRating !== "number" ||
+      !Number.isFinite(row.averageRating) ||
+      typeof row.ratingAppearances !== "number" ||
+      !Number.isSafeInteger(row.ratingAppearances) ||
+      row.ratingAppearances < 0
+    )
+      throw Error(
+        "Yahoo player-day imports require the installed uniform impact reference",
+      );
+}
+
 export function parseYahooMatchupBackfillOptions(
   args: string[],
 ): YahooMatchupBackfillOptions {
@@ -1889,6 +1923,11 @@ export async function runYahooMatchupPlayerDayBackfill(
     const createdRows = creates.length;
     const unchangedRows = matchedYahooRows - updatedRows - createdRows;
 
+    // Dry runs validate the same rating dependency as production writes.
+    await refreshYahooPlayerDayRatings([
+      ...updates.map((entry) => entry.record),
+      ...creates,
+    ]);
     if (options.apply) {
       await applySeasonWrites({
         seasonId,

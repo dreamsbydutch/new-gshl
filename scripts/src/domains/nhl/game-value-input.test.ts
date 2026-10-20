@@ -11,6 +11,7 @@ import {
   reconcileSeasonExposure,
 } from "./game-reconciliation";
 import { unzipCsv } from "../../integrations/nhl/game-value-source";
+import { valuePenaltyEvents } from "../../runtime/nhl-game-season-value";
 
 import { gameFixture, penaltyShotFixture } from "./game-value-fixtures";
 
@@ -265,6 +266,114 @@ test("penalty context preserves missing manpower and removes an extra attacker",
   assert.equal(g.penalties[0]!.homeBefore, null);
   assert.equal(g.penalties[1]!.awayBefore, 4);
   assert.equal(g.penalties[1]!.homeBefore, 5);
+});
+
+test("ordinary penalties with unknown teams or contradictory actor teams stay unpriced", () => {
+  const rates = { "5v5:GG": 3, "4v5:GG": 1, "5v4:GG": 7 };
+  for (const change of [
+    { eventOwnerTeamId: 999 },
+    { committedByPlayerId: 11 },
+    { drawnByPlayerId: 1 },
+  ]) {
+    const f = gameFixture();
+    f.sources.pbp.plays = f.sources.pbp.plays.filter(
+      (p) => p.typeDescKey !== "penalty" || p.eventId === 4,
+    );
+    const penalty = f.sources.pbp.plays.find((p) => p.eventId === 4)!;
+    Object.assign(penalty.details, change);
+    const g = buildGameValueData(f.sources, f.shots);
+    assert.equal(g.penalties.length, 1);
+    assert.equal(g.penalties[0]!.homeBefore, null);
+    assert.equal(g.penalties[0]!.awayBefore, null);
+    assert.ok(
+      g.issues.some((issue) => issue.startsWith("penalty identity 4:")),
+    );
+    assert.deepEqual(valuePenaltyEvents(g, rates).entries, []);
+    assert.deepEqual(valuePenaltyEvents(g, rates).unpriced, [4]);
+    // Penalty identity does not invalidate independently verified lineup/shot components.
+    assert.equal(g.eligible, true);
+    assert.equal(g.shots.length, 2);
+  }
+});
+
+test("bench penalties never blame a server repeated in the committed-player field", () => {
+  const f = gameFixture();
+  f.sources.pbp.plays = f.sources.pbp.plays.filter(
+    (p) => p.typeDescKey !== "penalty" || p.eventId === 4,
+  );
+  const penalty = f.sources.pbp.plays.find((p) => p.eventId === 4)!;
+  penalty.details.typeCode = "BEN";
+  penalty.details.committedByPlayerId = 2;
+  penalty.details.servedByPlayerId = 2;
+  const g = buildGameValueData(f.sources, f.shots);
+  assert.equal(g.penalties[0]!.committed, null);
+  assert.equal(g.penalties[0]!.drawn, 11);
+  const value = valuePenaltyEvents(g, {
+    "5v5:GG": 3,
+    "4v5:GG": 1,
+    "5v4:GG": 7,
+  });
+  assert.deepEqual(value.unpriced, []);
+  assert.equal(value.entries.length, 1);
+  assert.equal(value.entries[0]!.playerId, 11);
+  assert.ok(value.entries[0]!.value > 0);
+  assert.equal(g.issues.length, 0);
+});
+
+test("an invalid later assessment cannot inherit valid same-whistle context after partial offsets", () => {
+  const f = gameFixture();
+  const invalid = f.sources.pbp.plays.find((p) => p.eventId === 5)!;
+  invalid.details.duration = 4;
+  invalid.details.typeCode = "DBL";
+  invalid.details.committedByPlayerId = 2; // Home player contradicts away-team assessment.
+  const g = buildGameValueData(f.sources, f.shots);
+  assert.equal(g.penalties[0]!.homeBefore, null);
+  assert.equal(g.penalties[1]!.homeBefore, null);
+  const valued = valuePenaltyEvents(g, {
+    "5v5:GG": 3,
+    "4v5:GG": 1,
+    "5v4:GG": 7,
+  });
+  assert.deepEqual(valued.entries, []);
+  assert.deepEqual(valued.unpriced, [5]);
+});
+
+test("an invalid postgame penalty does not poison an earlier live penalty at the same overtime clock", () => {
+  const f = gameFixture();
+  const live = f.sources.pbp.plays.find((p) => p.eventId === 4)!;
+  const winner = f.sources.pbp.plays.find((p) => p.eventId === 6)!;
+  const postgame = f.sources.pbp.plays.find((p) => p.eventId === 5)!;
+  for (const p of [live, winner, postgame]) {
+    p.periodDescriptor = { number: 4, periodType: "OT" };
+    p.timeInPeriod = "00:30";
+  }
+  postgame.sortOrder = 7;
+  postgame.details.eventOwnerTeamId = 999;
+  const baseline = structuredClone(f);
+  baseline.sources.pbp.plays = baseline.sources.pbp.plays.filter(
+    (p) => p.eventId !== 5,
+  );
+  const rates = { "5v5:GG": 3, "4v5:GG": 1, "5v4:GG": 7 };
+  const expected = valuePenaltyEvents(
+    buildGameValueData(baseline.sources, baseline.shots),
+    rates,
+  );
+  assert.equal(expected.entries.length, 2);
+  assert.deepEqual(expected.unpriced, []);
+  const actual = buildGameValueData(f.sources, f.shots);
+  assert.equal(
+    actual.penalties.find((p) => p.eventId === 4)!.remainingSeconds,
+    270,
+  );
+  assert.equal(actual.penalties.find((p) => p.eventId === 4)!.homeBefore, 5);
+  assert.equal(
+    actual.penalties.find((p) => p.eventId === 5)!.remainingSeconds,
+    0,
+  );
+  assert.ok(
+    actual.issues.some((issue) => issue.startsWith("penalty identity 5:")),
+  );
+  assert.deepEqual(valuePenaltyEvents(actual, rates), expected);
 });
 
 test("penalties after the final horn have no future exposure, while a tied game can continue", () => {

@@ -20,16 +20,22 @@ const HELP = `Run one scheduled Yahoo cycle (dry run by default).
   --season-id ID         GSHL season, canonical or legacy.
   --start-date DATE      First scoring day (YYYY-MM-DD).
   --end-date DATE        Last scoring day (YYYY-MM-DD).
+  --nhl-end-date DATE    Last NHL season day; nightly NHL refresh can outlast GSHL playoffs.
   --python-bin PATH      Python with scripts/python/requirements.txt installed.
   --superseded-backup-dir PATH  Recovery backup outside workspace/OneDrive for superseded-day deletion.
   --state-dir PATH       Local checkpoint/log directory (default .local-data/yahoo-sync).
+  --skip-weekly-rollover  Refresh stats without publishing weekly editions/standings/power.
   --apply               Run imports, current rosters and safe aggregate updates.
   --help                Show this help without authentication or live reads.
 
-Schedule hourly. Yahoo runs between 08:00 and 22:00 Toronto. One final capture after
+Schedule every five minutes. NHL stats run hourly, or every five minutes while an
+official regular-season/playoff game is LIVE/CRIT (including after midnight).
+Yahoo runs hourly between 08:00 and 22:00 Toronto. One final capture after
 all games start locks that date; later NHL updates use stored rosters.
 NHL-only updates continue through 03:00, using the previous date after midnight.
-No work runs from 04:00 through 07:59. Morning runs recheck the previous two days.
+Between midnight and 08:00, yesterday's full season/career/NHL refresh runs once
+all its games are final. Unknown or unfinished schedules defer this stage.
+Morning runs recheck the previous two days.
 Hourly NHL runs recheck all prior days of unfinalized matchups for corrections.
 Finalized weeks are frozen; their roster and NHL records are not refreshed.
 After final stats, ended weeks refresh standings/power and release the Press Box.
@@ -47,9 +53,11 @@ async function main() {
       "season-id": { type: "string" },
       "start-date": { type: "string" },
       "end-date": { type: "string" },
+      "nhl-end-date": { type: "string" },
       "python-bin": { type: "string" },
       "superseded-backup-dir": { type: "string" },
       "state-dir": { type: "string" },
+      "skip-weekly-rollover": { type: "boolean" },
     },
   });
   if (values.help) {
@@ -61,6 +69,7 @@ async function main() {
   const seasonId = values["season-id"] ?? "";
   const startDate = values["start-date"] ?? "";
   const endDate = values["end-date"] ?? "";
+  const nhlEndDate = values["nhl-end-date"] ?? endDate;
   if (
     !/^[a-z0-9]+(?:-[a-z0-9]+)+$/.test(deployment) ||
     !/^\d+$/.test(leagueId) ||
@@ -69,7 +78,7 @@ async function main() {
     throw new Error(
       "Explicit deployment, numeric league ID and season ID are required.",
     );
-  for (const date of [startDate, endDate])
+  for (const date of [startDate, endDate, nhlEndDate])
     if (
       !/^\d{4}-\d{2}-\d{2}$/.test(date) ||
       !Number.isFinite(Date.parse(date)) ||
@@ -77,6 +86,8 @@ async function main() {
     )
       throw new Error("Valid season start/end dates are required.");
   if (startDate > endDate) throw new Error("Season date range is reversed.");
+  if (nhlEndDate < endDate)
+    throw new Error("NHL season cannot end before the GSHL scoring range.");
   const directory = path.resolve(
     root,
     values["state-dir"] ?? ".local-data/yahoo-sync",
@@ -85,7 +96,7 @@ async function main() {
   const scope = `${deployment}-${leagueId}-${seasonId}`;
   const statePath = path.join(directory, `${scope}.json`);
   const lockPath = path.join(directory, `${scope}.lock`);
-  const scopeKey = `${scope}:${startDate}:${endDate}`;
+  const scopeKey = `${scope}:${startDate}:${endDate}${nhlEndDate === endDate ? "" : `:${nhlEndDate}`}`;
   let checkpoint: YahooSyncCheckpoint = {};
   if (fs.existsSync(statePath)) {
     const stored = JSON.parse(
@@ -128,7 +139,13 @@ async function main() {
   }
   fs.writeFileSync(lock, String(process.pid));
   const now = new Date();
-  let plan = planYahooSyncCycle({ now, startDate, endDate, checkpoint });
+  let plan = planYahooSyncCycle({
+    now,
+    startDate,
+    endDate,
+    nhlEndDate,
+    checkpoint,
+  });
   const logPath = path.join(directory, `${scope}-${plan.today}.log`);
   const statusPath = path.join(
     directory,
@@ -149,19 +166,41 @@ async function main() {
     fs.renameSync(temporary, statePath);
   };
   try {
-    if (plan.scrapeYahoo) {
+    if (
+      plan.active ||
+      (startDate <= plan.nhlDate && plan.nhlDate <= endDate) ||
+      (startDate <= plan.today &&
+        plan.today <=
+          new Date(Date.parse(nhlEndDate) + 2 * 86400000)
+            .toISOString()
+            .slice(0, 10))
+    ) {
       try {
-        const games = await fetchDailyGameStatus(plan.today);
+        const previousDate = new Date(Date.parse(plan.today) - 86400000)
+          .toISOString()
+          .slice(0, 10);
+        const nightlyTarget =
+          previousDate < nhlEndDate ? previousDate : nhlEndDate;
+        const [games, previousGames, nightlyGames] = await Promise.all([
+          fetchDailyGameStatus(plan.today),
+          fetchDailyGameStatus(previousDate),
+          nightlyTarget !== previousDate
+            ? fetchDailyGameStatus(nightlyTarget)
+            : Promise.resolve(undefined),
+        ]);
         plan = planYahooSyncCycle({
           now,
           startDate,
           endDate,
+          nhlEndDate,
           checkpoint,
           games,
+          previousGames,
+          nightlyGames,
         });
       } catch {
         log(
-          "NHL start status unavailable; keeping the hourly Yahoo check enabled within daytime hours.",
+          "NHL schedule status unavailable; using hourly fallback and deferring the overnight finalization.",
         );
       }
     }
@@ -178,8 +217,12 @@ async function main() {
       !plan.windowOpen ||
       (!plan.scrapeYahoo &&
         !plan.refreshNhl &&
+        !plan.nightlyDate &&
         !plan.historyDates.length &&
-        checkpoint.morningRecheckOn !== plan.today)
+        (values["skip-weekly-rollover"] ||
+          !plan.morning ||
+          checkpoint.morningRecheckOn !== plan.today ||
+          !checkpoint.reconciledThrough))
     ) {
       log("Outside sync hours or no work due; no Yahoo/NHL requests.");
       fs.writeFileSync(
@@ -226,21 +269,14 @@ async function main() {
     if (!secret || /[\r\n]/.test(secret))
       throw new Error("Production server credential is unavailable.");
     const run = (date: string, flags: string[]) => {
-      if (
-        !planYahooSyncCycle({ now: new Date(), startDate, endDate, checkpoint })
-          .windowOpen
-      ) {
-        log(
-          `Sync window ended; deferring ${date} until the next scheduled run.`,
-        );
-        return false;
-      }
       log(`Starting ${date}: ${flags.join(" ")}`);
       const child = spawnSync(
         process.execPath,
         [
           "--use-system-ca",
-          path.join(root, "node_modules/tsx/dist/cli.mjs"),
+          "--dns-result-order=ipv4first",
+          "--import",
+          "tsx",
           path.join(
             root,
             "scripts/src/commands/stats/sync-yahoo-daily-rosters.ts",
@@ -285,20 +321,17 @@ async function main() {
       return true;
     };
     const failures: string[] = [];
-    if (plan.scrapeYahoo || plan.refreshNhl) {
+    if (plan.scrapeYahoo) {
       try {
-        const finished = run(
-          plan.scrapeYahoo ? plan.today : plan.nhlDate,
-          !plan.scrapeYahoo
-            ? ["--nhl-only"]
-            : plan.refreshNhl
-              ? ["--daily-pipeline"]
-              : ["--current-rosters", "--aggregate"],
-        );
-        if (values.apply && finished) {
-          if (plan.refreshNhl) checkpoint.lastNhlSyncAt = now.getTime();
-          if (plan.scrapeYahoo) checkpoint.lastYahooSyncAt = now.getTime();
-          if (plan.scrapeYahoo && plan.allGamesStarted)
+        run(plan.today, [
+          "--current-rosters",
+          "--aggregate",
+          "--aggregate-mode",
+          "frequent",
+        ]);
+        if (values.apply) {
+          checkpoint.lastYahooSyncAt = now.getTime();
+          if (plan.allGamesStarted)
             checkpoint.lockedRosterDates = [
               ...new Set([...(checkpoint.lockedRosterDates ?? []), plan.today]),
             ];
@@ -309,6 +342,84 @@ async function main() {
           error instanceof Error
             ? error.message
             : "Current roster stage failed.",
+        );
+      }
+    }
+    // A Yahoo login/roster failure does not block NHL updates from stored lineups.
+    if (plan.refreshNhl) {
+      try {
+        for (const date of plan.refreshDates)
+          run(date, ["--nhl-only", "--aggregate-mode", "frequent"]);
+        if (values.apply) {
+          checkpoint.lastNhlSyncAt = now.getTime();
+          save();
+        }
+      } catch (error) {
+        failures.push(
+          error instanceof Error ? error.message : "NHL refresh failed.",
+        );
+      }
+    }
+    if (plan.nightlyDate) {
+      try {
+        // Recheck immediately before starting; a stale plan never authorizes finalization.
+        if (
+          !allScoringGamesFinished(await fetchDailyGameStatus(plan.nightlyDate))
+        )
+          throw new Error(
+            "Nightly refresh deferred: the scoring slate is not final.",
+          );
+        run(plan.nightlyDate < endDate ? plan.nightlyDate : endDate, [
+          "--nhl-only",
+          "--aggregate-mode",
+          "overnight",
+        ]);
+        const nightly = spawnSync(
+          process.execPath,
+          [
+            "--use-system-ca",
+            "--dns-result-order=ipv4first",
+            "--import",
+            "tsx",
+            path.join(
+              root,
+              "scripts/src/commands/stats/refresh-nightly-nhl-stats.ts",
+            ),
+            "--target",
+            "production",
+            "--season-id",
+            seasonId,
+            "--date",
+            plan.nightlyDate,
+            ...(values.apply ? ["--apply"] : []),
+          ],
+          {
+            cwd: path.join(root, "scripts"),
+            encoding: "utf8",
+            windowsHide: true,
+            timeout: 60 * 60_000,
+            maxBuffer: 8 * 1024 * 1024,
+            env: {
+              ...process.env,
+              GSHL_CONVEX_TARGET: "production",
+              CONVEX_PROD_URL: `https://${deployment}.convex.cloud`,
+              CONVEX_SERVER_SECRET: secret,
+            },
+          },
+        );
+        if (nightly.stdout) log(nightly.stdout);
+        if (nightly.stderr) log(nightly.stderr);
+        if (nightly.status !== 0)
+          throw new Error(
+            "Nightly NHL season refresh did not finish; completion was not advanced.",
+          );
+        if (values.apply) {
+          checkpoint.nightlyCompletedThrough = plan.nightlyDate;
+          save();
+        }
+      } catch (error) {
+        failures.push(
+          error instanceof Error ? error.message : "Nightly refresh failed.",
         );
       }
     }
@@ -358,14 +469,26 @@ async function main() {
     if (failures.length) throw new Error(failures.join("\n"));
     // Correct every prior day of an open matchup, not only a two-day lookback.
     // Finalized weeks are excluded by the persisted weekly handoff marker.
-    if (!plan.overnight && (plan.refreshNhl || plan.historyDates.length)) {
-      if (!run(plan.active ? plan.today : endDate, ["--refresh-open-weeks"]))
+    if (
+      !plan.overnight &&
+      !plan.liveGames &&
+      (plan.refreshNhl || plan.historyDates.length)
+    ) {
+      if (
+        !run(plan.active ? plan.today : endDate, [
+          "--refresh-open-weeks",
+          "--correction-week-limit",
+          "2",
+        ])
+      )
         throw new Error(
           "Full-matchup correction refresh deferred; rollover must wait.",
         );
     }
     if (
       plan.morning &&
+      !plan.liveGames &&
+      !values["skip-weekly-rollover"] &&
       checkpoint.morningRecheckOn === plan.today &&
       checkpoint.reconciledThrough
     ) {
@@ -373,7 +496,9 @@ async function main() {
         process.execPath,
         [
           "--use-system-ca",
-          path.join(root, "node_modules/tsx/dist/cli.mjs"),
+          "--dns-result-order=ipv4first",
+          "--import",
+          "tsx",
           path.join(root, "scripts/src/commands/stats/run-weekly-rollover.ts"),
           "--season-id",
           seasonId,

@@ -2,6 +2,85 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { rankRowsWithRankingEngine } from "./ranking-engine";
 
+test("legacy award category components percentile versioned totals without altering their primary contribution", async () => {
+  const rows = [1000, 2500, 9000].map((Rating, i) => ({
+    id: `t${i}`,
+    gshlTeamId: `t${i}`,
+    seasonId: "s",
+    seasonType: "RS",
+    Rating,
+    ratingVersion: "gshl-category-impact-v3",
+    GP: 30,
+    GS: 20,
+    MS: 1,
+    BS: 1,
+    teamW: i + 1,
+    teamL: 3 - i,
+    teamT: 0,
+    G: i + 1,
+  }));
+  async function awards(values: typeof rows) {
+    return rankRowsWithRankingEngine(values, {
+      dataModelName: "TeamSeasonStatLine",
+      outputField: "awardCompatibilityPreview",
+      mutate: false,
+      dataContext: {
+        seasonRows: [{ id: "s", year: 2025, categories: ["G"] }],
+        teamSeasonRows: values,
+      },
+    });
+  }
+  const result = await awards(rows),
+    scaled = await awards(rows.map((r) => ({ ...r, Rating: 10 * r.Rating })));
+  assert.deepEqual(
+    result.map((r) => r.Rating),
+    rows.map((r) => r.Rating),
+  );
+  for (const [i, r] of result.entries()) {
+    assert.equal(r.hartRating, scaled[i]?.hartRating);
+    assert.ok(Number(r.hartRating) >= 0 && Number(r.hartRating) <= 100);
+  }
+});
+
+test("retained raw goalie workload does not qualify a forfeited team week", async () => {
+  const unqualified = {
+    seasonId: "1",
+    weekId: "w1",
+    seasonType: "RS",
+    GP: 1,
+    W: null,
+    GAA: null,
+    SVP: null,
+    SO: null,
+  };
+  const rows = [
+    { ...unqualified, id: "without-workload", gshlTeamId: "t1" },
+    {
+      ...unqualified,
+      id: "with-workload",
+      gshlTeamId: "t2",
+      GA: 0,
+      SV: 20,
+      SA: 20,
+      TOI: 60,
+    },
+  ];
+  const original = structuredClone(rows);
+  const result = await rankRowsWithRankingEngine(rows, {
+    dataModelName: "TeamWeekStatLine",
+    outputField: "Rating",
+    mutate: false,
+    dataContext: {
+      seasonRows: [
+        { id: "1", seasonYear: 2025, categories: ["W", "GAA", "SVP"] },
+      ],
+    },
+  });
+  assert.equal(result[0]?.Rating, result[1]?.Rating);
+  assert.equal(result[0]?.Rating, 18.75);
+  assert.deepEqual(rows, original);
+});
+
 // Captured from the original engine before removing its storage adapter.
 const expectedRatings = {
   PlayerDayStatLine: [172.5, 33.88],

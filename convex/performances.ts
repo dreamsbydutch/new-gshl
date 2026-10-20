@@ -19,7 +19,7 @@ import {
   isCareerPerformance,
 } from "../src/lib/utils/features/records";
 import {
-  performanceNumber,
+  performanceDisplayStats,
   performanceStats,
   qualifiesForPerformance,
   topPerformances,
@@ -321,12 +321,7 @@ export const page = internalQuery({
               ? row.seasonType
               : "Season",
         position: typeof row.posGroup === "string" ? row.posGroup : "",
-        stats: Object.fromEntries(
-          performanceStats(filters.kind).map((stat) => [
-            stat,
-            performanceNumber(row[stat]),
-          ]),
-        ),
+        stats: performanceDisplayStats(filters.kind, row),
         name: "",
         team: Array.isArray(row.nhlTeam) ? row.nhlTeam.join(" / ") : "",
       });
@@ -397,12 +392,7 @@ export const hydrate = internalQuery({
             teamIds: [day.gshlTeamId],
             weekId: day.weekId,
             position: day.posGroup,
-            stats: Object.fromEntries(
-              performanceStats("playerDay").map((stat) => [
-                stat,
-                performanceNumber((day as Record<string, unknown>)[stat]),
-              ]),
-            ),
+            stats: performanceDisplayStats("playerDay", day),
           };
         }
         const playerId = row.playerId

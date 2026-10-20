@@ -116,6 +116,8 @@ async function main() {
       playerId: String(row.playerId),
       teamId: String(row.gshlTeamId),
       rating: row.Rating as number | string | null,
+      ratingVersion:
+        typeof row.ratingVersion === "string" ? row.ratingVersion : undefined,
       days: row.days as number | string | null,
       position: String(row.posGroup),
     });
@@ -139,6 +141,7 @@ async function main() {
         pick,
         signing,
         overallRating,
+        ratingVersion,
         expectedRating,
         surplus,
       }) => ({
@@ -147,6 +150,7 @@ async function main() {
         pick,
         signing,
         overallRating,
+        ratingVersion,
         expectedRating,
         surplus,
       }),

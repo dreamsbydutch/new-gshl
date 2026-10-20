@@ -6,8 +6,8 @@
  *
  * What it does:
  *   Scrapes one historical Yahoo skater table plus one goalie table across
- *   consecutive `count=` offsets, matches those rows back to the local Player
- *   record, inserts missing Player rows when needed, and optionally writes the
+ *   consecutive `count=` offsets, matches those rows back to Convex
+ *   Player records, inserts missing players when needed, and optionally writes the
  *   resulting Player.yahooId changes. The scrape is capped to the top 600
  *   skaters and top 125 goalies for the selected Yahoo season.
  */

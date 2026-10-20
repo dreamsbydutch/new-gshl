@@ -13,9 +13,12 @@ import {
   verifyAggregateMaintenanceFunctions,
 } from "@gshl-lib/data/convex-store";
 import { rankRowsWithRankingEngine } from "@gshl-lib/ranking/ranking-engine";
+import { rankUniformImpactSets } from "../../integrations/ranking/uniform-impact";
 import { SeasonType } from "@gshl-lib/types/enums";
 import { toNumber } from "@gshl-lib/utils/core/data";
 import { applyPlayerDayDerivedColumns } from "@gshl-lib/stats/player-day-flags";
+import { assertLeagueGameSourceDays } from "./player-day-source-validation";
+import { buildCareerStatLines } from "./career-stat-aggregation";
 import {
   rebuildSeasonStandingsForSeasonId,
   type StandingsBackfillSeasonSummary,
@@ -265,6 +268,9 @@ type TeamSeasonBucket = {
 } & Record<(typeof TEAM_STAT_FIELDS)[number], number>;
 
 const TEAM_WEEK_MANAGED_FIELDS = new Set<string>([
+  "averageRating",
+  "ratingVersion",
+  "ratingAppearances",
   "seasonId",
   "gshlTeamId",
   "weekId",
@@ -291,6 +297,9 @@ const TEAM_WEEK_MANAGED_FIELDS = new Set<string>([
 ]);
 
 const TEAM_SEASON_STAT_FIELDS = new Set<string>([
+  "averageRating",
+  "ratingVersion",
+  "ratingAppearances",
   "seasonId",
   "seasonType",
   "gshlTeamId",
@@ -519,7 +528,9 @@ export function parseSeasonCategories(rawValue: unknown): string[] {
 function getGoalieStartMinimumForSeason(
   seasonRow: DatabaseRecord | undefined,
 ): number {
-  const seasonId = toTrimmedString(seasonRow?.id || seasonRow?.seasonId);
+  const seasonId = toTrimmedString(
+    seasonRow?.legacyId || seasonRow?.id || seasonRow?.seasonId,
+  );
   return SINGLE_GOALIE_START_SEASON_IDS.has(seasonId)
     ? 1
     : DEFAULT_GOALIE_START_MINIMUM;
@@ -694,13 +705,15 @@ function normalizeMultiValueTokens(value: unknown): string[] {
   if (typeof value === "string") {
     const trimmed = value.trim();
     if (!trimmed) return [];
-    try {
-      const parsed = JSON.parse(trimmed) as unknown;
-      if (Array.isArray(parsed)) {
-        return parsed.flatMap((entry) => normalizeMultiValueTokens(entry));
+    if (trimmed.startsWith("[")) {
+      try {
+        const parsed = JSON.parse(trimmed) as unknown;
+        if (Array.isArray(parsed)) {
+          return parsed.flatMap((entry) => normalizeMultiValueTokens(entry));
+        }
+      } catch {
+        // Malformed arrays retain the same CSV fallback as other text.
       }
-    } catch {
-      // fall through to CSV parsing
     }
     return trimmed
       .split(",")
@@ -866,7 +879,7 @@ function canonicalizePlayerDayRows(
     row.GAA = isGoalie ? computeGAA(row.GA, row.TOI) : "";
     row.SVP = isGoalie ? computeSVP(row.SV, row.SA) : "";
     row.Rating = "";
-    normalizeAggregateRowPrecision(row);
+    // Keep source minutes precise until all dependent rollups are calculated.
   }
 
   return sortRows("PlayerDayStatLine", canonicalRows);
@@ -1038,7 +1051,7 @@ function buildPlayerWeekRow(
     blankFields(row, [...TEAM_GOALIE_STARTER_FIELDS, "GAA", "SVP"]);
   }
 
-  return normalizeAggregateRowPrecision(row);
+  return row;
 }
 
 function sumField(rows: DatabaseRecord[], field: string): number {
@@ -1169,71 +1182,6 @@ function buildPlayerSplitsAndTotals(
   });
 
   return { splits, totals };
-}
-
-function buildPlayerCareerSplitsAndTotals(
-  playerWeeks: DatabaseRecord[],
-  fieldConfig: SeasonAggregationFieldConfig,
-  weekTypeMap: ReadonlyMap<string, string>,
-): { careerSplits: DatabaseRecord[]; careerTotals: DatabaseRecord[] } {
-  const careerSplitMap = new Map<string, DatabaseRecord[]>();
-  const careerTotalMap = new Map<string, DatabaseRecord[]>();
-
-  for (const playerWeek of playerWeeks) {
-    const playerId = toTrimmedString(playerWeek.playerId);
-    const gshlTeamId = toTrimmedString(playerWeek.gshlTeamId);
-    const seasonType = resolveCareerPlayerWeekSeasonType(
-      playerWeek.weekId,
-      playerWeek.seasonType,
-      weekTypeMap,
-    );
-    if (!playerId || !gshlTeamId || !seasonType) continue;
-
-    const splitKey = [playerId, gshlTeamId, seasonType].join("|");
-    const totalKey = [playerId, seasonType].join("|");
-
-    const splitRows = careerSplitMap.get(splitKey) ?? [];
-    splitRows.push(playerWeek);
-    careerSplitMap.set(splitKey, splitRows);
-
-    const totalRows = careerTotalMap.get(totalKey) ?? [];
-    totalRows.push(playerWeek);
-    careerTotalMap.set(totalKey, totalRows);
-  }
-
-  const careerSplits = Array.from(careerSplitMap.entries()).map(
-    ([key, rows]) => {
-      const [playerId, gshlTeamId, seasonType] = key.split("|");
-      return buildPlayerAggregate(
-        rows,
-        {
-          playerId: playerId ?? "",
-          seasonId: "",
-          seasonType: seasonType ?? SeasonType.REGULAR_SEASON,
-          gshlTeamId: gshlTeamId ?? "",
-        },
-        fieldConfig,
-      );
-    },
-  );
-
-  const careerTotals = Array.from(careerTotalMap.entries()).map(
-    ([key, rows]) => {
-      const [playerId, seasonType] = key.split("|");
-      return buildPlayerAggregate(
-        rows,
-        {
-          playerId: playerId ?? "",
-          seasonId: "",
-          seasonType: seasonType ?? SeasonType.REGULAR_SEASON,
-          gshlTeamIds: rows.map((row) => toTrimmedString(row.gshlTeamId)),
-        },
-        fieldConfig,
-      );
-    },
-  );
-
-  return { careerSplits, careerTotals };
 }
 
 function createTeamDayBucket(
@@ -1399,22 +1347,14 @@ function buildTeamWeekRow(
       hasQualifiedGoalieStats && fieldConfig.activeStarterFields.has("W")
         ? formatNumber(week.W)
         : "",
-    GA:
-      hasQualifiedGoalieStats && fieldConfig.activeStarterFields.has("GA")
-        ? formatNumber(week.GA)
-        : "",
+    // Keep actual workload separate from forfeited weekly scoring categories.
+    GA: fieldConfig.activeStarterFields.has("GA") ? formatNumber(week.GA) : "",
     GAA:
       hasQualifiedGoalieStats && fieldConfig.activeCategories.has("GAA")
         ? computeGAA(week.GA, week.TOI)
         : "",
-    SV:
-      hasQualifiedGoalieStats && fieldConfig.activeStarterFields.has("SV")
-        ? formatNumber(week.SV)
-        : "",
-    SA:
-      hasQualifiedGoalieStats && fieldConfig.activeStarterFields.has("SA")
-        ? formatNumber(week.SA)
-        : "",
+    SV: fieldConfig.activeStarterFields.has("SV") ? formatNumber(week.SV) : "",
+    SA: fieldConfig.activeStarterFields.has("SA") ? formatNumber(week.SA) : "",
     SVP:
       hasQualifiedGoalieStats && fieldConfig.activeCategories.has("SVP")
         ? computeSVP(week.SV, week.SA)
@@ -1423,10 +1363,9 @@ function buildTeamWeekRow(
       hasQualifiedGoalieStats && fieldConfig.activeStarterFields.has("SO")
         ? formatNumber(week.SO)
         : "",
-    TOI:
-      hasQualifiedGoalieStats && fieldConfig.activeStarterFields.has("TOI")
-        ? formatNumber(week.TOI)
-        : "",
+    TOI: fieldConfig.activeStarterFields.has("TOI")
+      ? formatNumber(week.TOI)
+      : "",
     Rating: "",
     ADD: formatNumber(week.ADD),
     MS: formatNumber(week.MS),
@@ -1565,12 +1504,8 @@ function buildTeamSeasonRowsFromWeeks(
 
     bucket.days += week.days;
     for (const field of TEAM_STAT_FIELDS) {
-      if (
-        TEAM_GOALIE_STARTER_FIELDS.includes(field as never) &&
-        !hasQualifiedWeekGoalieStats(week, fieldConfig.goalieStartMinimum)
-      ) {
-        continue;
-      }
+      // Season statistics include every credited starter appearance. A weekly
+      // minimum changes the matchup result, not the player's actual workload.
       bucket[field] += week[field];
     }
   }
@@ -1637,6 +1572,11 @@ function aggregateTeamStats(
         .filter(Boolean),
     ),
   );
+  // Confirmed roster participation distinguishes playoff teams from eliminated
+  // teams. Empty playoff weeks must not manufacture team appearances.
+  const participatingTeamWeeks = new Set(
+    playerDays.map((day) => `${day.weekId}|${day.gshlTeamId}`),
+  );
 
   for (const week of eligibleWeekRows) {
     const weekId = toTrimmedString(week.id);
@@ -1644,7 +1584,12 @@ function aggregateTeamStats(
 
     const dates = getDatesInRangeInclusive(week.startDate, week.endDate);
     for (const gshlTeamId of activeTeamIds) {
-      for (const date of dates) {
+      if (
+        weekTypeMap.get(weekId) === SeasonType.PLAYOFFS &&
+        !participatingTeamWeeks.has(`${weekId}|${gshlTeamId}`)
+      )
+        continue;
+      for (const date of dates.filter((date) => date <= today)) {
         const key = `${weekId}|${gshlTeamId}|${date}`;
         if (!teamDayMap.has(key)) {
           teamDayMap.set(
@@ -1781,11 +1726,12 @@ function aggregateTeamStats(
   };
 }
 
+const aggregateCollator = new Intl.Collator(undefined, {
+  numeric: true,
+  sensitivity: "base",
+});
 function compareValues(left: string, right: string): number {
-  return left.localeCompare(right, undefined, {
-    numeric: true,
-    sensitivity: "base",
-  });
+  return aggregateCollator.compare(left, right);
 }
 
 function sortRows(
@@ -2155,13 +2101,23 @@ export function buildSeasonStatLines(
   weekRows: DatabaseRecord[],
   teamRows: DatabaseRecord[],
   now = new Date(),
+  dayContext?: readonly DatabaseRecord[],
 ) {
+  assertLeagueGameSourceDays(sourceDays);
   const weekTypeMap = buildWeekTypeMap(weekRows, seasonId);
   const fieldConfig = buildSeasonAggregationFieldConfig(seasonRow);
+  const today = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Toronto",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(now);
   const playerDays = canonicalizePlayerDayRows(
-    sourceDays.map((row) => ({ ...row })),
+    sourceDays
+      .filter((row) => normalizeDateKey(row.date) <= today)
+      .map((row) => ({ ...row })),
   );
-  applyPlayerDayDerivedColumns(playerDays, playerDays);
+  applyPlayerDayDerivedColumns(playerDays, dayContext ?? playerDays);
 
   const playerWeekMap = new Map<string, PlayerWeekBucket>();
   for (const playerDay of playerDays) {
@@ -2207,6 +2163,9 @@ export function buildSeasonStatLines(
     fieldConfig,
     now,
   );
+  for (const rows of [playerDays, playerWeeks]) {
+    for (const row of rows) normalizeAggregateRowPrecision(row);
+  }
   return {
     playerDays,
     playerWeeks,
@@ -2243,7 +2202,6 @@ export async function aggregateSeasonStats(
   }
 
   const weekTypeMap = buildWeekTypeMap(weekRows, seasonId);
-  const careerWeekTypeMap = buildWeekTypeMap(weekRows);
   if (weekTypeMap.size === 0) {
     throw new Error(
       `[stats:aggregate-season] No Week rows were found for season ${seasonId}.`,
@@ -2253,36 +2211,42 @@ export async function aggregateSeasonStats(
     .filter((week) => toTrimmedString(week.seasonId) === seasonId)
     .map((week) => toTrimmedString(week.id))
     .filter(Boolean);
-  const [loadedPlayerDays, loadedPlayerWeeks] = await Promise.all([
+  const [loadedPlayerDays, publishedCareerPeriods] = await Promise.all([
     fetchWeekScopedModel<DatabaseRecord>(
       "PlayerDayStatLine",
       seasonId,
       seasonWeekIds,
     ),
     (async () => {
-      const historyRows: DatabaseRecord[] = [];
+      const seasonSplits: DatabaseRecord[] = [];
+      const seasonTotals: DatabaseRecord[] = [];
       for (const season of seasonRows) {
-        const historySeasonId = toTrimmedString(season.id);
-        const historyWeekIds = weekRows
-          .filter((week) => toTrimmedString(week.seasonId) === historySeasonId)
-          .map((week) => toTrimmedString(week.id))
-          .filter(Boolean);
-        historyRows.push(
-          ...(await fetchWeekScopedModel<DatabaseRecord>(
-            "PlayerWeekStatLine",
+        const historySeasonId = toTrimmedString(season._id ?? season.id);
+        if (historySeasonId === seasonId) continue;
+        const [splits, totals] = await Promise.all([
+          fetchAggregateRows<DatabaseRecord>(
+            "PlayerSplitStatLine",
             historySeasonId,
-            historyWeekIds,
-          )),
-        );
+          ),
+          fetchAggregateRows<DatabaseRecord>(
+            "PlayerTotalStatLine",
+            historySeasonId,
+          ),
+        ]);
+        if (
+          [...splits, ...totals].some((row) => row.seasonId !== historySeasonId)
+        )
+          throw new Error("Published career parent season scope mismatch");
+        seasonSplits.push(...splits);
+        seasonTotals.push(...totals);
       }
-      return historyRows;
+      return { seasonSplits, seasonTotals };
     })(),
   ]);
 
   const seasonRow = seasonRows.find(
     (row) => toTrimmedString(row.id) === seasonId,
   );
-  const fieldConfig = buildSeasonAggregationFieldConfig(seasonRow);
 
   const {
     playerDays,
@@ -2299,50 +2263,58 @@ export async function aggregateSeasonStats(
     weekRows,
     teamRows,
   );
-  const mergedCareerPlayerWeeks = dedupeRowsByCompositeKey(
-    "PlayerWeekStatLine",
-    [
-      ...loadedPlayerWeeks.filter(
-        (row) => toTrimmedString(row.seasonId) !== seasonId,
-      ),
-      ...playerWeeks,
-    ],
-  );
-  const { careerSplits, careerTotals } = buildPlayerCareerSplitsAndTotals(
-    mergedCareerPlayerWeeks,
-    fieldConfig,
-    careerWeekTypeMap,
-  );
+  const { careerSplits, careerTotals } = buildCareerStatLines({
+    ...publishedCareerPeriods,
+    currentSeason: { seasonId, splits, totals },
+  });
 
-  await rankBaseStatRows(playerDays, "PlayerDayStatLine", "Rating", seasonRows);
-  await rankBaseStatRows(
-    playerWeeks,
-    "PlayerWeekStatLine",
-    "Rating",
-    seasonRows,
-  );
-  await rankBaseStatRows(splits, "PlayerSplitStatLine", "Rating", seasonRows);
-  await rankBaseStatRows(totals, "PlayerTotalStatLine", "Rating", seasonRows);
-  await rankBaseStatRows(
-    careerSplits,
-    "PlayerCareerSplitStatLine",
-    "Rating",
-    seasonRows,
-  );
-  await rankBaseStatRows(
-    careerTotals,
-    "PlayerCareerTotalStatLine",
-    "Rating",
-    seasonRows,
-  );
-  await rankBaseStatRows(teamDays, "TeamDayStatLine", "Rating", seasonRows);
-  await rankBaseStatRows(teamWeeks, "TeamWeekStatLine", "Rating", seasonRows);
-  await rankBaseStatRows(
-    teamSeasons,
-    "TeamSeasonStatLine",
-    "Rating",
-    seasonRows,
-  );
+  const impactRated = await rankUniformImpactSets({
+    playerDayStatLines: playerDays,
+    playerWeekStatLines: playerWeeks,
+    playerSplitStatLines: splits,
+    playerTotalStatLines: totals,
+    playerCareerSplitStatLines: careerSplits,
+    playerCareerTotalStatLines: careerTotals,
+    teamDayStatLines: teamDays,
+    teamWeekStatLines: teamWeeks,
+    teamSeasonStatLines: teamSeasons,
+  });
+  if (!impactRated) {
+    await rankBaseStatRows(
+      playerDays,
+      "PlayerDayStatLine",
+      "Rating",
+      seasonRows,
+    );
+    await rankBaseStatRows(
+      playerWeeks,
+      "PlayerWeekStatLine",
+      "Rating",
+      seasonRows,
+    );
+    await rankBaseStatRows(splits, "PlayerSplitStatLine", "Rating", seasonRows);
+    await rankBaseStatRows(totals, "PlayerTotalStatLine", "Rating", seasonRows);
+    await rankBaseStatRows(
+      careerSplits,
+      "PlayerCareerSplitStatLine",
+      "Rating",
+      seasonRows,
+    );
+    await rankBaseStatRows(
+      careerTotals,
+      "PlayerCareerTotalStatLine",
+      "Rating",
+      seasonRows,
+    );
+    await rankBaseStatRows(teamDays, "TeamDayStatLine", "Rating", seasonRows);
+    await rankBaseStatRows(teamWeeks, "TeamWeekStatLine", "Rating", seasonRows);
+    await rankBaseStatRows(
+      teamSeasons,
+      "TeamSeasonStatLine",
+      "Rating",
+      seasonRows,
+    );
+  }
 
   return {
     playerDays,

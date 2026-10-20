@@ -28,10 +28,14 @@ import { refreshDailySeasonAggregates } from "../../domains/aggregation/daily-se
 import { shiftYahooDate } from "../../domains/yahoo/sync-cycle";
 import { refreshOpenWeekStats } from "../../domains/nhl/refresh-open-week-stats";
 import { backupSupersededYahooDays } from "../../integrations/yahoo/superseded-roster-backup";
+import {
+  expectedRosterTeamIds,
+  selectRosterScoringCohort,
+} from "../../domains/yahoo/active-roster-teams";
 
 const HELP = `Usage: npm.cmd run stats:sync-yahoo-daily-rosters -- --target production --league-id 44541
 
-Creates/patches one day's roster metadata from every Yahoo team, then optionally
+Creates/patches one day's roster metadata from active scoring Yahoo teams, then optionally
 runs the NHL daily stats sync. Defaults to a dry run and today in America/Toronto.
 Yahoo supplies team membership, eligibility and daily slot; NHL supplies stats.
 
@@ -44,8 +48,10 @@ Yahoo supplies team membership, eligibility and daily slot; NHL supplies stats.
   --sync-nhl                      After roster apply, refresh NHL stats for this date.
   --nhl-only                      Refresh NHL stats/rollups from stored rosters; never scrape Yahoo.
   --refresh-open-weeks            Recheck prior days of all unfinalized matchups for NHL corrections.
+  --correction-week-limit N       Optionally bound correction work to the latest 1..4 open matchups.
   --current-rosters               Refresh today's ownership, eligibility, optimizer and buyouts.
   --aggregate                     Rebuild season rollups after this date's import (also for backfills).
+  --aggregate-mode frequent|overnight  Frequent: day/week stats and ratings. Overnight: season and career totals too.
   --summary                       Print counts and conflicts instead of all roster-day payloads.
   --daily-pipeline                Run NHL sync, current rosters, optimizer, buyouts and six season rollups.
                                   Current Toronto date only; includes --sync-nhl.
@@ -74,9 +80,11 @@ async function main() {
       "sync-nhl": { type: "boolean" },
       "nhl-only": { type: "boolean" },
       "refresh-open-weeks": { type: "boolean" },
+      "correction-week-limit": { type: "string" },
       "daily-pipeline": { type: "boolean" },
       "current-rosters": { type: "boolean" },
       aggregate: { type: "boolean" },
+      "aggregate-mode": { type: "string", default: "frequent" },
       summary: { type: "boolean" },
       target: { type: "string" },
       "league-id": { type: "string" },
@@ -95,6 +103,20 @@ async function main() {
     console.log(HELP);
     return;
   }
+  const aggregateMode = values["aggregate-mode"];
+  if (aggregateMode !== "frequent" && aggregateMode !== "overnight")
+    throw new Error("--aggregate-mode must be frequent or overnight.");
+  const correctionWeekLimit =
+    values["correction-week-limit"] === undefined
+      ? undefined
+      : Number(values["correction-week-limit"]);
+  if (
+    correctionWeekLimit !== undefined &&
+    (!Number.isSafeInteger(correctionWeekLimit) ||
+      correctionWeekLimit < 1 ||
+      correctionWeekLimit > 4)
+  )
+    throw Error("--correction-week-limit must be 1..4.");
   if (values.target !== "production" && values.target !== "development")
     throw new Error("Specify --target production|development.");
   const leagueId = values["league-id"] ?? "";
@@ -161,7 +183,12 @@ async function main() {
     date <= lastScoringDate &&
     today > lastScoringDate &&
     today <= shiftYahooDate(lastScoringDate, 2);
-  if (!weeks.some((week) => coversDate(week, today)) && !finalStatsGrace) {
+  if (
+    !values["nhl-only"] &&
+    !values["refresh-open-weeks"] &&
+    !weeks.some((week) => coversDate(week, today)) &&
+    !finalStatsGrace
+  ) {
     throw new Error(
       "This source uses the current Yahoo league. Historical seasons require the historical backfill command.",
     );
@@ -179,6 +206,8 @@ async function main() {
           today,
           apply: !!values.apply,
           pythonBin: values["python-bin"] ?? "python",
+          aggregateMode,
+          maxWeeks: correctionWeekLimit,
         }),
         null,
         2,
@@ -187,6 +216,22 @@ async function main() {
     return;
   }
   if (week.weeklyRefreshCompletedAt) {
+    // Frozen player days remain immutable, but season/career refreshes still run.
+    if (values["nhl-only"] && aggregateMode === "overnight") {
+      console.log(
+        JSON.stringify(
+          await refreshDailySeasonAggregates(
+            season as DatabaseRecord & { id: string },
+            !!values.apply,
+            undefined,
+            { mode: "overnight" },
+          ),
+          null,
+          2,
+        ),
+      );
+      return;
+    }
     console.log(
       JSON.stringify({ date, weekId: week.id, skipped: "finalized-week" }),
     );
@@ -216,10 +261,18 @@ async function main() {
         "NHL sync did not complete the requested date; later stages were not run.",
       );
   };
+  const expectedTeams = expectedRosterTeamIds(
+    week,
+    teams,
+    await fetchSeasonModel<DatabaseRecord>("Matchup", season.id),
+  );
+  const scoringTeams = teams.filter((team) => expectedTeams.includes(team.id));
   if (values["nhl-only"]) {
     if (
       !teams.length ||
-      teams.some((team) => !existing.some((row) => row.gshlTeamId === team.id))
+      expectedTeams.some(
+        (teamId) => !existing.some((row) => row.gshlTeamId === teamId),
+      )
     )
       throw new Error(
         "NHL-only sync requires stored player days for every season team.",
@@ -238,6 +291,11 @@ async function main() {
         await refreshDailySeasonAggregates(
           season as DatabaseRecord & { id: string },
           !!values.apply,
+          undefined,
+          {
+            mode: aggregateMode,
+            ...(aggregateMode === "frequent" ? { weekIds: [week.id] } : {}),
+          },
         ),
         null,
         2,
@@ -265,16 +323,24 @@ async function main() {
       apply: !!values.apply,
     }),
   );
-  const rosters = [];
-  for (const team of teams) {
+  // Partial postseason captures cannot authorize league-wide ownership changes.
+  const rawRosters = [];
+  for (const team of scoringTeams) {
     const roster = await fetchDailyYahooRoster(
       leagueId,
       String(team.yahooId),
       date,
     );
     console.log(`Yahoo team ${team.yahooId}: ${roster.length} roster players`);
-    rosters.push({ teamId: team.id, players: roster });
+    rawRosters.push({ teamId: team.id, players: roster });
   }
+  const cohort = selectRosterScoringCohort(
+    expectedTeams,
+    teams.map((team) => team.id),
+    rawRosters,
+    existing,
+  );
+  const rosters = cohort.rosters;
   const plan = planDailyYahooRosters({
     removeMissing: !!values["superseded-backup-dir"],
     seasonId: season.id,
@@ -282,11 +348,23 @@ async function main() {
     date,
     rosters,
     players,
-    existing: existing.map((row) => ({
+    existing: cohort.existing.map((row) => ({
       ...row,
       date: normalizeDateOnlyValue(row.date) ?? "",
     })),
   });
+  if (
+    plan.creates.some((created) =>
+      existing.some(
+        (stored) =>
+          stored.playerId === created.playerId &&
+          !expectedTeams.includes(stored.gshlTeamId),
+      ),
+    )
+  )
+    throw new Error(
+      "An active player already has an inactive-team day; review the exact row before importing.",
+    );
   console.log(
     JSON.stringify(
       values.summary
@@ -340,10 +418,21 @@ async function main() {
         builder.findBestLineup(rows as DatabaseRecord[], false, slots),
     });
   };
+  const maintenanceRequested =
+    values["daily-pipeline"] || values["current-rosters"];
   const maintenance =
-    values["daily-pipeline"] || values["current-rosters"]
+    maintenanceRequested && cohort.ownershipMaintenanceAllowed
       ? await loadMaintenancePlan()
       : null;
+  if (maintenanceRequested && !cohort.ownershipMaintenanceAllowed)
+    console.log(
+      JSON.stringify({
+        stage: "current-rosters",
+        skipped: "partial-postseason-scoring-cohort",
+        reason:
+          "Inactive Yahoo teams cannot authorize ownership removals or buyouts",
+      }),
+    );
   if (maintenance) {
     console.log(
       JSON.stringify(
@@ -373,7 +462,7 @@ async function main() {
       );
     if (values.aggregate || values["daily-pipeline"]) {
       console.log(
-        "Aggregate preview uses planned Yahoo metadata and currently stored NHL stats; apply refreshes NHL first. Ratings and power snapshots are preserved.",
+        "Aggregate preview uses planned Yahoo metadata and currently stored NHL stats; apply refreshes NHL first. Contribution ratings refresh with the selected periods; awards and power are preserved.",
       );
       console.log(
         JSON.stringify(
@@ -381,6 +470,10 @@ async function main() {
             season as DatabaseRecord & { id: string },
             false,
             { date, days: plan.rosterDays },
+            {
+              mode: aggregateMode,
+              ...(aggregateMode === "frequent" ? { weekIds: [week.id] } : {}),
+            },
           ),
           null,
           2,
@@ -392,7 +485,7 @@ async function main() {
   if (plan.removals.length) {
     // Confirm the full source again before backing up/removing any scored rows.
     const confirmedRosters = [];
-    for (const team of teams)
+    for (const team of scoringTeams)
       confirmedRosters.push({
         teamId: team.id,
         players: await fetchDailyYahooRoster(
@@ -405,7 +498,12 @@ async function main() {
       seasonId: season.id,
       weekId: week.id,
       date,
-      rosters: confirmedRosters,
+      rosters: selectRosterScoringCohort(
+        expectedTeams,
+        teams.map((team) => team.id),
+        confirmedRosters,
+        [],
+      ).rosters,
       players,
       existing: [],
     });
@@ -485,7 +583,12 @@ async function main() {
     date,
     rosters,
     players: updatedPlayers,
-    existing: after.map((row) => ({
+    existing: selectRosterScoringCohort(
+      expectedTeams,
+      teams.map((team) => team.id),
+      rawRosters,
+      after,
+    ).existing.map((row) => ({
       ...row,
       date: normalizeDateOnlyValue(row.date) ?? "",
     })),
@@ -510,7 +613,7 @@ async function main() {
     // Confirm the full league membership again before any irreversible contract change.
     // This also catches a player picked up by another Yahoo team during the NHL fetch.
     if (maintenance.buyouts.length) {
-      for (const captured of rosters) {
+      for (const captured of rawRosters) {
         const team = teams.find((row) => row.id === captured.teamId)!;
         const latest = await fetchDailyYahooRoster(
           leagueId,
@@ -563,6 +666,11 @@ async function main() {
         await refreshDailySeasonAggregates(
           season as DatabaseRecord & { id: string },
           true,
+          undefined,
+          {
+            mode: aggregateMode,
+            ...(aggregateMode === "frequent" ? { weekIds: [week.id] } : {}),
+          },
         ),
         null,
         2,

@@ -1,3 +1,4 @@
+import { ratingOutputFields } from "./rating-output-fields";
 import * as dataStore from "@gshl-lib/data/convex-store";
 import type { DatabaseRecord } from "@gshl-lib/data/records";
 import {
@@ -750,19 +751,15 @@ async function executeScopedPlayerRatingBackfill(
   options: PlayerRatingBackfillOptions,
   modelName: "PlayerDayStatLine" | "PlayerWeekStatLine",
 ): Promise<PlayerRatingModelExecutionSummary> {
-  const [rows, seasonRows] = await Promise.all([
-    fetchWeekScopedModel<DatabaseRecord>(
-      modelName,
-      options.seasonId,
-      options.weekIds,
-    ),
-    fetchModel<DatabaseRecord>("Season"),
-  ]);
+  const rows = await fetchWeekScopedModel<DatabaseRecord>(
+    modelName,
+    options.seasonId,
+    options.weekIds,
+  );
   await rankRowsWithRankingEngine(rows, {
     dataModelName: modelName,
     outputField: "Rating",
     mutate: true,
-    dataContext: { seasonRows },
   });
   const teamIdSet = new Set(options.teamIds);
   const targetRows = rows.filter(
@@ -774,9 +771,8 @@ async function executeScopedPlayerRatingBackfill(
     for (const row of targetRows) {
       const id = toTrimmedString(row.id);
       if (!id) throw new Error("[ratings:backfill] Missing Convex row id.");
-      const rating = row.Rating ?? 0;
       await updateById<DatabaseRecord>(modelName, id, {
-        Rating: rating === "" || rating === null ? 0 : rating,
+        ...ratingOutputFields(row),
         updatedAt: new Date(),
       });
       updatedRows += 1;

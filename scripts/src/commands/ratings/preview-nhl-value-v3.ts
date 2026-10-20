@@ -207,7 +207,11 @@ else {
   // Write the data ledger before fitting so source problems remain reviewable even if fitting fails.
   const attribution =
     values["shot-source"] === "nhl"
-      ? "Official NHL events, game reports and shifts; locally fitted nhl-event-xg-v1; MoneyPuck.com historical shrinkage calibration via v2"
+      ? `Official NHL events, game reports and shifts; locally fitted nhl-event-xg-v1; ${
+          Object.keys(oldReport.calibration).length
+            ? "MoneyPuck.com historical shrinkage calibration via v2 with default fallbacks"
+            : "default ability shrinkage priors; v2 source baseline credits MoneyPuck.com"
+        }`
       : "Official NHL events, game reports and shifts; MoneyPuck.com shot probabilities";
   await write(resolve(values.output, "game-audit.json"), {
     retention: "verification-summary-v1",
@@ -299,10 +303,19 @@ else {
     version: NHL_ADJUSTED_IMPACT_CONFIG.version,
     season,
     gameType: source.nhl.gameType,
+    officialTeamCount: new Set(
+      schedule.flatMap((game) => [game.homeTeamId, game.visitingTeamId]),
+    ).size,
     config: NHL_ADJUSTED_IMPACT_CONFIG,
     completeSourceScope: !failed.length,
     sourceHash: createHash("sha256").update(sourceText).digest("hex"),
     priorHash: createHash("sha256").update(priorText).digest("hex"),
+    abilityPriorProvenance: {
+      source: Object.keys(oldReport.calibration).length
+        ? "historical-v2-with-default-fallbacks"
+        : "defaults-only",
+      calibratedComponents: Object.keys(oldReport.calibration).sort(),
+    },
     penaltyShotHistoryHash: createHash("sha256")
       .update(JSON.stringify(penaltyShotHistory))
       .digest("hex"),

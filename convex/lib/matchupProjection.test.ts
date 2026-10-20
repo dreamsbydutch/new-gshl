@@ -9,7 +9,7 @@ import {
   projectMatchupTeamWeekStats,
 } from "./matchupProjection";
 
-test("matchup projection keeps exact display fields and playoff outcomes", () => {
+void test("matchup projection keeps exact display fields and playoff outcomes", () => {
   const result = projectMatchupDetailsMatchup({
     _id: "matchup-1",
     seasonId: "season-1",
@@ -43,7 +43,7 @@ test("matchup projection keeps exact display fields and playoff outcomes", () =>
   });
 });
 
-test("matchup team projection excludes private owner fields", () => {
+void test("matchup team projection excludes private owner fields", () => {
   const result = projectMatchupDetailsTeam(
     { _id: "team-1", yahooId: "unused" },
     {
@@ -70,7 +70,7 @@ test("matchup team projection excludes private owner fields", () => {
   });
 });
 
-test("player-week projection joins only display identity and scoring fields", () => {
+void test("player-week projection joins only display identity and scoring fields", () => {
   const result = projectMatchupPlayerWeekRow(
     {
       _id: "stat-1",
@@ -87,6 +87,8 @@ test("player-week projection joins only display identity and scoring fields", ()
       BS: 4,
       G: 2,
       Rating: 8.5,
+      averageRating: 2.125,
+      ratingVersion: "gshl-category-impact-v3",
       powerMetric: 999,
     },
     {
@@ -107,6 +109,9 @@ test("player-week projection joins only display identity and scoring fields", ()
   assert.deepEqual(result.nhlTeam, ["TOR"]);
   assert.deepEqual(result.currentNhlTeam, ["NJD", "TOR"]);
   assert.equal(result.G, 2);
+  assert.equal(result.Rating, 8.5);
+  assert.equal(result.averageRating, 2.125);
+  assert.equal(result.ratingVersion, "gshl-category-impact-v3");
   assert.deepEqual(
     [result.MG, result.IR, result.IRplus, result.ADD, result.MS, result.BS],
     [0, 1, "2", 1, "3", 4],
@@ -116,7 +121,7 @@ test("player-week projection joins only display identity and scoring fields", ()
   assert.deepEqual(collectMatchupNhlAbbreviations([result, result]), ["TOR"]);
 });
 
-test("player-week projection falls back to the current NHL team without a snapshot", () => {
+void test("player-week projection falls back to the current NHL team without a snapshot", () => {
   const result = projectMatchupPlayerWeekRow(
     {
       _id: "stat-1",
@@ -142,7 +147,7 @@ test("player-week projection falls back to the current NHL team without a snapsh
   );
 });
 
-test("team-week projection excludes power and operational fields", () => {
+void test("team-week projection excludes power and operational fields", () => {
   const result = projectMatchupTeamWeekStats({
     G: 7,
     SVP: 0.925,

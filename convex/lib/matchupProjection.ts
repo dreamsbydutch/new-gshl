@@ -74,6 +74,8 @@ type PlayerWeekSource = TeamWeekSource & {
   MS?: StatValue;
   BS?: StatValue;
   Rating?: StatValue;
+  averageRating?: number | null;
+  ratingVersion?: string | null;
 };
 
 type PlayerSource = {
@@ -230,6 +232,8 @@ export function projectMatchupPlayerWeekRow(
     SVP: stats.SVP ?? null,
     SO: stats.SO ?? null,
     Rating: stats.Rating ?? null,
+    averageRating: stats.averageRating ?? null,
+    ratingVersion: stats.ratingVersion ?? null,
   };
 }
 

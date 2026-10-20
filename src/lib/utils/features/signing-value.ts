@@ -4,6 +4,7 @@ import type {
   SigningValue,
   TeamSigningValue,
 } from "../../types/draft-history";
+import { isCategoryImpactRating } from "./stat-rating";
 
 /** Display-only historical benchmark; never used by the ranking engine or Calder. */
 export function expectedSigningRating(salary: number | null): number | null {
@@ -59,12 +60,14 @@ export function buildSigningValues(input: {
   teams: { id: string; ownerId: string | null }[];
   contracts: DraftSigningContract[];
   seasonStart: string | null;
-  ratings: { playerId: string; rating: number | null }[];
+  ratings: {
+    playerId: string;
+    rating: number | null;
+    ratingVersion?: string;
+  }[];
 }): { values: Map<string, SigningValue>; teams: TeamSigningValue[] } {
   const owners = new Map(input.teams.map((team) => [team.id, team.ownerId]));
-  const ratings = new Map(
-    input.ratings.map((row) => [row.playerId, row.rating]),
-  );
+  const ratings = new Map(input.ratings.map((row) => [row.playerId, row]));
   const values = new Map<string, SigningValue>();
   const groups = new Map<
     string,
@@ -81,8 +84,11 @@ export function buildSigningValues(input: {
           input.seasonStart,
         )
       : null;
-    const expectedRating = expectedSigningRating(salary);
-    const rating = ratings.get(pick.playerId);
+    const performance = ratings.get(pick.playerId);
+    const expectedRating = isCategoryImpactRating(performance?.ratingVersion)
+      ? null
+      : expectedSigningRating(salary);
+    const rating = performance?.rating;
     const value =
       expectedRating !== null && rating != null && Number.isFinite(rating)
         ? rating - expectedRating

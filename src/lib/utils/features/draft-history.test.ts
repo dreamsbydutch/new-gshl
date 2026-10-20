@@ -62,6 +62,32 @@ const totals: DraftPerformance[] = [
 ];
 const input = { picks, totals, splits: [], players: [], teamIds: ["ours"] };
 
+void test("category contribution keeps signed totals and suppresses incompatible draft and salary curves", () => {
+  const result = buildDraftHistoryPicks({
+    ...input,
+    totals: totals.map((row) => ({
+      ...row,
+      rating: -250,
+      ratingVersion: "gshl-category-impact-v3-retrospective",
+    })),
+    signingValues: new Map([
+      ["5", { salary: 4_000_000, expectedRating: 70, value: 55 }],
+    ]),
+  });
+  for (const row of result.filter((row) => row.ratingVersion)) {
+    assert.equal(row.expectedRating, null);
+    assert.equal(row.surplus, null);
+    assert.equal(row.salaryExpectedRating, null);
+    assert.equal(row.signingValue, null);
+  }
+  assert.equal(result[0]?.overallRating, -250);
+  assert.equal(result.at(-1)?.salary, 4_000_000);
+  assert.equal(
+    buildDraftHistoryPicks(input)[0]?.expectedRating,
+    expectedDraftRating(1, 4),
+  );
+});
+
 void test("192 full-season roster days are 100% when playoff calendar ends before season metadata", () => {
   const window = draftSeasonWindow({
     start: "2025-10-07",

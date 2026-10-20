@@ -1,3 +1,4 @@
+import { ratingOutputFields } from "../../domains/ranking/rating-output-fields";
 /**
  * Usage:
  *   npm run ratings:rebuild-team
@@ -266,19 +267,15 @@ async function executeTeamRatingModel(
     options.weekIds.length > 0 &&
     (modelName === "TeamDayStatLine" || modelName === "TeamWeekStatLine")
   ) {
-    const [rows, seasonRows] = await Promise.all([
-      fetchWeekScopedModel<DatabaseRecord>(
-        modelName,
-        seasonId,
-        options.weekIds,
-      ),
-      fetchModel<DatabaseRecord>("Season"),
-    ]);
+    const rows = await fetchWeekScopedModel<DatabaseRecord>(
+      modelName,
+      seasonId,
+      options.weekIds,
+    );
     await rankRowsWithRankingEngine(rows, {
       dataModelName: modelName,
       outputField: "Rating",
       mutate: true,
-      dataContext: { seasonRows },
     });
     const teamIdSet = new Set(options.teamIds);
     const targetRows = rows.filter(
@@ -293,11 +290,10 @@ async function executeTeamRatingModel(
         if (!id) {
           throw new Error("[ratings:rebuild-team] Missing Convex row id.");
         }
-        const rating = row.Rating ?? 0;
         return {
           id,
           data: {
-            Rating: rating === "" || rating === null ? 0 : rating,
+            ...ratingOutputFields(row),
             updatedAt: new Date(),
           },
         };
@@ -317,16 +313,12 @@ async function executeTeamRatingModel(
 
   const dataModelName = modelName;
   const outputField = "Rating";
-  const [rows, seasonRows] = await Promise.all([
-    fetchSeasonModel<DatabaseRecord>(modelName, seasonId),
-    fetchModel<DatabaseRecord>("Season"),
-  ]);
+  const rows = await fetchSeasonModel<DatabaseRecord>(modelName, seasonId);
 
   await rankRowsWithRankingEngine(rows, {
     dataModelName: modelName satisfies RankingEngineModelName,
     outputField,
     mutate: true,
-    dataContext: { seasonRows },
   });
 
   for (const row of rows) {
@@ -345,7 +337,7 @@ async function executeTeamRatingModel(
         throw new Error(`[ratings:rebuild-team] Missing ${modelName} id.`);
       return {
         id,
-        data: { Rating: row.Rating ?? 0, updatedAt: new Date() },
+        data: { ...ratingOutputFields(row), updatedAt: new Date() },
       };
     });
     await updateRowsById(modelName, patches);

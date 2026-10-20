@@ -1,0 +1,109 @@
+# Stat refresh cadence
+
+The operator runner uses Toronto time with daylight-saving transitions.
+
+| Data                                                                            | Frequency                                                               |
+| ------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| Player days, player weeks, team days, team weeks and their contribution ratings | Hourly during the day; every five minutes during LIVE/CRIT NHL games    |
+| Yahoo rosters and lineup metadata                                               | Hourly, 08:00–22:00, until the scoring date is locked                   |
+| Player splits/totals, team seasons and native/rated careers                     | Overnight, after all active games from the previous scoring date finish |
+| NHL player/team season stats and NHL category season ratings                    | Same completed-slate overnight stage                                    |
+
+The five-minute trigger polls public NHL states, then skips work that is not due.
+It excludes All-Star and preseason games. After midnight it checks both calendar
+dates so late games keep the frequent refresh active. Postponed/cancelled games
+and known empty slates permit overnight work; unknown or unfinished states do
+not. The overnight completion marker advances only after both GSHL and NHL
+stages succeed. Failed stages retry, including a final-season two-day grace
+window. The NHL season end can extend past the fantasy week calendar.
+
+Frequent calculation reads only affected weeks, retaining prior-date context
+for acquisition flags. It updates the four rating fields together and preserves
+native player-day source cells. Non-live hourly correction passes revisit the
+two most recent open matchups. Overnight GSHL calculation reads the entire season
+and composes careers from historical season periods plus the fresh current one.
+Eliminated playoff teams do not require fabricated roster days.
+
+The Windows runner has process and task overlap protection and uses the signed-in
+operator's existing Yahoo profile and Convex CLI authentication. It stores no
+credentials in task arguments. The PC must be awake, connected and signed in.
+The installed stat task skips weekly publication, standings and power workflows.
+Its season calendar is explicit; configure the next season when its weeks exist.
+
+Use the installer script's preview and the commands' help for invocation details.
+Checkpoint, log and status files live under `.local-data/yahoo-sync/`. Initial
+setup proofs and readbacks are under `.local-data/stat-refresh-20261020/`.
+
+## NHL model boundary
+
+Official NHL native stats and category ratings refresh nightly. The immutable
+reviewed hockey-model publication workflow requires a separate model rebuild
+and reviewed publication when source statistics change. The nightly stat job
+clears stale hockey contributions to null with an explicit status rather than
+pretending an old model covers new games. It does not overwrite authoritative
+model records, salaries or fantasy rights. See [NHL nightly details](nhl-nightly-refresh.md).
+
+## Transport and validation
+
+The direct Node TSX loader retains `--use-system-ca`; the TSX CLI subprocess
+dropped that flag in the tested Windows runtime. Python uses a verified SSL
+context with OS roots. Neither path disables certificate checks for the task.
+Focused tests cover timing, midnight/DST, final-slate gates, partial scope,
+acquisition boundaries, roster participation, official-stat reconciliation,
+identity intake, protected fields and deployment allowlists.
+
+## Activation on October 20, 2026
+
+The Windows task `GSHL-Stats-polished-tern-709-m9774darbpss4t79nxdbe871318and9f`
+is enabled with a five-minute repeating trigger. It targets production
+`polished-tern-709`, Yahoo league 44541 and the 2026–27 GSHL season. The fantasy
+calendar runs September 29 through April 10; NHL season refresh continues
+through April 19. Its first unattended cycle completed successfully, and the
+following trigger exited successfully without source requests because no work
+was due. The schedule uses Toronto time for its work policy.
+
+The initial NHL refresh verified 763 player season rows and 32 NHL team season
+rows after writing. Seven player season rows were new. Official identity intake
+created Cole Knuble's canonical player record from his verified NHL identity.
+An independent comparison confirmed that protected fields on all 756 existing
+current-season NHL rows were preserved. The 40,233 authoritative hockey-model
+records were outside the write target.
+
+The initial full GSHL reconciliation completed successfully from 4,916 stored
+current-season player days. It initialized ratings on 225 new roster days and
+updated affected period/career rows without deleting rows. The source pass also
+accepted four official NHL daily-stat corrections. Subsequent frequent runs
+reconcile those native statistics and their ratings together. Career contribution
+totals include the refreshed current season.
+
+A fresh read-only replay of the current matchup found no remaining daily-rating
+changes across 450 player days and exact stored values for 225 player weeks,
+28 team days and 14 team weeks. An independent career check rebuilt all 13,045
+careers from the 16 seasons' published player splits/totals: 380,170 native and
+metadata fields matched, including every GP/GS value. Another 52,180 rating-field
+checks matched exact published season contributions and appearance counts.
+These checks performed no production writes.
+
+Of the 1,201 career-total updates in the initial reconciliation, 1,197 only
+reordered metadata arrays without changing their members. The remaining four
+included official HIT/BLK/SOG corrections and their contribution ratings. No
+career GP/GS values changed. The independent before/after explanation is retained
+with the career audit.
+
+Partial postseason imports use only active matchup teams for fetching and all
+three roster plans. They preserve eliminated-team rows and skip global ownership,
+buyout and optimizer maintenance, preventing an empty eliminated roster from
+becoming a set of player drops.
+
+Verification included the 39-test ranking-engine contract suite, the 44-test
+timing/NHL/deployment group, 20 calendar/roster tests, three Python eligibility/TLS
+tests, focused backend tests and scoped strict operator TypeScript. The full
+application build was not required for this operator/backend change. The broad
+scripts typecheck has an existing computed-key error in
+`retrospective-audit-compatibility.test.ts`; the scoped check passes. Operator
+files are excluded by the repository ESLint configuration.
+
+Retained evidence includes the first-run log/status, GSHL apply summary, NHL
+before/after snapshots, independent protected-field comparison and deployment
+plans under `.local-data/stat-refresh-20261020/`. Independent copies are under
+`C:/Users/choug/gshl-backups/stat-refresh-20261020/`.

@@ -20,6 +20,9 @@ export async function planCalderBackfill(
   const regular = rows.filter((row) => row.seasonType === "RS");
   const ranked = await rankRowsWithRankingEngine(regular, {
     dataModelName: "TeamSeasonStatLine",
+    // Award-only replay must bypass the main contribution profile. The legacy
+    // scorer builds private PT/PS benchmark clones and leaves Rating untouched.
+    outputField: "__legacyCalderPreviewRating",
     mutate: false,
     dataContext: context,
   });

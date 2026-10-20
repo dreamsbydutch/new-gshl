@@ -7,6 +7,17 @@ This file is the command and flag manual. Read
 [AGENTS.md](../AGENTS.md) for repository rules and the concise
 [operations guide](../docs/OPERATIONS.md) for runtime and production safety.
 
+## Uniform GSHL contribution ratings
+
+`src/commands/ratings/rebuild-gshl-impact.ts` previews and applies the reviewed
+category-contribution profile to all nine GSHL stat-line tables. Run its `--help`
+for current modes and arguments. Preview is local; preflight validates live
+full-row preimages; apply changes rating fields only; verify requires every
+planned row to match; rollback restores prior field presence and values.
+Application and rollback require an independently verified source/plan backup.
+The versioned reference configuration binds the reviewed corpus and NHL schedule
+sidecar. See [ranking behavior](../docs/RANKING.md#uniform-gshl-category-contribution).
+
 ## Convex operational jobs
 
 Commissioners now start and monitor managed runs from **League Office → Jobs**.
@@ -46,7 +57,7 @@ Most commands also support:
 - `--log false` to reduce console noise
 
 On Windows PowerShell, invoke argument-bearing commands with `npm.cmd`, for
-example `npm.cmd run ratings:backfill -- --help`. In this workspace the
+example `npm.cmd run stats:aggregate-season -- --help`. In this workspace the
 `npm.ps1` shim can consume forwarded names such as `--help` or `--season-id`.
 Verify the parsed help/arguments before any `--apply` run. The repository
 declares npm 10.1.0; check the resolved npm version instead of assuming the
@@ -61,7 +72,137 @@ launch those commands. Verify that the `node` runtime resolved by the package
 lists that flag in `node --help` before running dry-run, apply, archive, or
 parity commands that use it.
 
+## Local player-day category-impact experiments
+
+The local player-day category-impact research command is
+`src/commands/ratings/evaluate-player-day-impact.ts`. It accepts saved paired
+matchups, position and same-date legacy-rating sidecars, and writes new local
+evaluation artifacts. Run its `--help` for required paths and validation/final
+phases. It never reads or writes the database. The model behavior and units are
+documented in [the ranking contract](../docs/RANKING.md#player-day-category-impact-profile).
+
+`src/commands/ratings/preview-player-day-impact.ts` fits a saved reference and
+previews local player-day rows with explicit week contexts. Its `--help`
+describes the JSON inputs and model options. Outputs include the fitted model,
+preview rows, source hashes and a serialized-model parity check, in a new local
+directory. It has no production apply mode.
+With a completed matchup corpus, its optional actual-impact diagnostic validates
+the source appearance, scoring rules and team-week identity before showing that
+counterfactual separately from the main rating. Bench contribution stays zero.
+
+`src/commands/ratings/evaluate-player-day-exposure.ts` evaluates the revised
+schedule-exposure profile using a saved official NHL calendar sidecar and
+hash-bound predictions from the original experiment. Its validation phase
+selects a smoothing setting; its later-season phase is explicitly diagnostic.
+Run `--help` for source and output paths. The original failed confirmation is
+retained. These commands perform no production writes.
+
 ## Independent NHL season ratings
+
+`src/commands/ratings/reconcile-nhl-season-ratings.ts` reconciles both ratings on
+existing NHL season stat lines. It replays the current GSHL `PlayerNHL` category
+engine and associates the separately stored reviewed hockey contribution,
+including qualification and source provenance. It preserves source statistics,
+fantasy career ratings, salaries and the authoritative hockey model rows.
+Production apply requires a reviewed dry run and an independently stored exact
+before snapshot. Identity exceptions additionally require a hash-bound source
+review and verified official statistical fingerprints; missing fields remain
+unknown. Consult command `--help` for current flags and the
+[rollout report](../docs/product/nhl-dual-season-ratings.md) for coverage limits.
+
+`src/commands/ratings/repair-nhl-season-stats.ts` owns explicit, independently
+backed-up identity and complete season-stat repairs. It verifies the reviewed
+source and operation plan, preflights all batches, and requires exact before rows
+and explicit authorization for duplicate/zero-GP deletions. This is separate from
+the association-only reconciliation above. Read its current `--help` and the
+[season-stat cleanup report](../docs/product/nhl-season-stat-cleanup.md) before
+operating; neither command schedules automatic source refreshes.
+
+The optional offline nonlinear research workflow is retained under
+`python/nhl_rating/`: `nonlinear-shot-experiment.py` trains the chronological
+candidate, and `export-nonlinear-shot-model.py` reproduces its saved predictions
+before exporting numeric trees. Run these Python commands from the repository
+root and use `--help` for their arguments. Their separate `requirements.txt`
+pins the Python 3.12 research environment without changing the NHL API tooling.
+Install it into a dedicated virtual environment when needed. Saved trees are
+scored by the pure TypeScript runtime; Python is not a production dependency.
+`src/commands/ratings/evaluate-nhl-nonlinear-impact.ts` tests a hash-verified
+export and full TypeScript prediction-parity report through player impact.
+`src/commands/ratings/verify-nhl-nonlinear-parity.ts` creates that ledger from
+every retained Python test prediction, optionally including the missing-context
+cases produced by `python/nhl_rating/verify-nonlinear-unknown.py`.
+Research outputs must use new paths and do not publish or promote a model.
+
+`python/nhl_rating/retrospective-crossfit.py` estimates descriptive shot quality
+with nested whole-game cross-fitting; its source-only confirmation mode requires
+a sealed protocol and uses a synthetic native-GLM parity fixture instead of a
+chronological season fit. `src/commands/ratings/verify-nhl-retrospective-shots.ts`
+independently replays every saved GLM/GB probability and checks source hashes
+and excluded-game membership. Run from the repository root and consult each
+entry point's `--help`. Retrospective probabilities may use other later-season
+games and must never enter claimed forward validation. The separate
+`src/commands/ratings/preview-nhl-retrospective-values.ts` recomputes local
+season-contribution previews; these research artifacts do not promote a model.
+
+`src/commands/ratings/preview-nhl-hockey-overall.ts` composes one local primary
+rating from completed GB crossfit values and fixed annual same-position
+references. It writes JSON/CSV, separate ability estimates and reference-depth
+sensitivities, retaining the experimental goalie-reference review without
+selecting a reference from its results. Its help owns required input bindings;
+the command fits no model and does not publish ratings.
+
+`src/commands/ratings/rebuild-nhl-hockey-overall.ts` builds the reviewed method
+from an explicit database-season inventory. It collects public sources, repairs
+eligible source gaps, verifies all cross-fitted probabilities, fits season
+contribution, and retains hash-bound checkpoints for resuming. Completed seasons,
+season-to-date snapshots, failed calculations and future seasons remain distinct.
+Existing reviewed artifacts can be reused only after their sources, inference
+and annual-reference calculation reproduce. The builder never writes Convex.
+
+`src/commands/ratings/publish-nhl-hockey-overall.ts` independently verifies a
+build summary before preparing the additive production model
+`nhl-hockey-overall-reviewed-v1`. It requires an explicit production target and
+deployment, defaults to a dry run, and retains per-season publication journals.
+The signed `seasonValue` is the primary overall score and `rank` orders all
+positions together; legacy percentile fields remain null. `hockeyOverall`
+retains separate ability, component, coverage and depth-sensitivity details.
+Old v1/v3 records, finalized seasons and GSHL category ratings are preserved.
+Consult both commands' `--help` and the
+[fixed production policy](../docs/product/nhl-hockey-overall-production-policy.md).
+
+`src/commands/ratings/rollout-nhl-hockey-overall.ts` watches an explicitly pinned
+season inventory and existing ready checkpoints for a finite, resumable rollout.
+It replays each season through the frozen builder and publisher, defaults to a
+dry run, and applies only additive inserts followed by a fully unchanged check.
+Missing, failed and future seasons stay visible in its journal. It never fits,
+collects sources or deploys backend code; local review modes make no production
+requests. Its `--help` owns the bounded wait and resume options.
+
+`src/commands/ratings/evaluate-nhl-shot-context.ts` compares the existing shot
+model with a separately versioned context-calibration experiment using a complete
+offline public-source cache. It retains source hashes, chronological selection,
+identical test shots, situation diagnostics and paired game resampling results.
+`src/commands/ratings/evaluate-nhl-impact-cohort.ts` compares the existing impact
+fit with an experimental shared replacement-cohort prior on hash-verified saved
+inputs. It preserves the baseline date boundaries and checks exact baseline
+reproduction. These commands create research artifacts; they do not promote
+candidates, change defaults or publish ratings. Their `--help` output owns flags.
+
+`src/commands/ratings/evaluate-nhl-ability.ts` evaluates a saved multi-season v3
+component snapshot without API or database access. It compares stored ability,
+observed rates, three-year history, fixed-grid chronological component priors and
+a zero baseline on identical returning-player cohorts. It reports per-position
+errors, missing outcomes and paired player-cluster ranges; it does not adopt a
+candidate or change ratings. Run `--help` for input/output flags.
+
+`src/commands/ratings/preview-nhl-overall.ts` creates an offline replacement-value
+preview from a complete fitted v3 report that passed its source/model gates.
+Supply the official NHL team count for that season. Replacement cohorts use
+ice-time depth and coverage evidence, independently of player scores. The output
+keeps the reference cohorts, common goal-unit contributions, cross-position ranks
+and fixed narrower/wider depth sensitivities. This is a depth-proxy estimate,
+not an independently validated replacement-talent or WAR model. Sustainable
+ability is separate. Run `--help` for current flags; output directories must be new.
 
 The v3 candidate adds official game-level reconciliation, adjusted on-ice impact,
 an independently labeled NHL shot-quality model, event penalty values, separate
@@ -701,7 +842,7 @@ npm run player-bios:backfill-nhl-ids -- --nhl-season 20252026 --apply
 #### `player-bios:backfill-yahoo-ids`
 
 Scrapes historical Yahoo skater and goalie player tables across consecutive
-`count=` offsets, matches those rows back to the local `Player` sheet, and
+`count=` offsets, matches those rows back to Convex `Player` records, and
 backfills missing `Player.yahooId` values.
 
 Notable flags:
@@ -899,6 +1040,12 @@ matchup ranks. It also calculates power snapshots from the newly generated
 player/team rows before writing, so dry runs do not depend on stale stored
 aggregates. All writes go to production Convex.
 
+Career splits and totals combine historical season splits and totals with the
+freshly calculated current season. They retain each historical category's
+availability, sum recorded workload, and pool goalie rates from summed inputs.
+The current season's category settings do not suppress historical statistics.
+See [career reconciliation](../docs/operations/career-stat-reconciliation.md).
+
 Notable flags:
 
 - `--season-id <id>`
@@ -906,6 +1053,69 @@ Notable flags:
 - stale derived aggregate rows are removed by default with `--apply`
 - `--preserve-stale` to keep and report derived rows that are not regenerated
 - `--skip-player-nhl` to omit the external NHL season-total refresh
+
+#### `stats:rebuild-rollups`
+
+Rebuilds only player weeks, player splits, player totals, team days, team weeks,
+and team seasons from a complete, hash-verified production snapshot. Requires an
+explicit deployment and output directory; defaults to a dry run. Apply requires
+the exact reviewed plan and an independently verified backup. Preserves source
+player days, ratings, awards, standings, careers and stale derived rows; reports
+stale rows separately for review. Retained inactive placeholders have numeric
+source-derived counts reset to zero and goalie averages cleared; their existing
+ranking and identity metadata stays intact. Current calculation includes only elapsed
+Toronto dates and postseason teams with roster participation. Losers-tournament
+contributions remain in postseason totals. See command `--help` for arguments.
+
+Team season goalie totals include all actual starter workload, including weeks
+below the matchup appearance minimum. Those weeks retain raw GA/SV/SA/TOI while
+weekly scored goalie categories remain subject to the minimum. Season GAA and
+SV% are recomputed from pooled underlying counts and unrounded source minutes.
+
+Source validation rejects identified exhibition opponents, multiple-game daily
+appearances and inconsistent goalie save/shot/goal counts before calculation.
+Seven exact, independently corroborated official NHL accounting discrepancies
+are permitted through source-bound fixtures; changed tuples still fail validation.
+The October 19 rebuild was rolled back after Yahoo evidence exposed All-Star
+source contamination; see [the rollback diagnosis](../docs/operations/season-rollup-rollback.md).
+The subsequent cleaned-source rebuild passed independent sums, full production
+readback and a zero-change repeat; see the
+[post-cleanup reconciliation](../docs/operations/season-rollup-post-allstar-reconciliation.md).
+
+#### `stats:revert-rollups`
+
+Restores only fields changed by the verified October 19 six-table rebuild,
+using exact original and applied snapshots. Reads current canonical records,
+rejects conflicting later edits, and defaults to a dry run. Apply requires the
+reviewed current-preimage plan and independently verified backups. Inserts,
+deletions, source player-day changes, ratings and standings are excluded. The
+post-write proof checks every restored field and every unrelated preserved
+field. See command `--help` for arguments.
+
+#### `stats:clear-allstar-days`
+
+Clears game statistics, participation, missed-game counters, opponent, score and
+nonzero daily ratings from officially verified All-Star-only dates. Retains roster
+ownership, date, lineup position, eligibility and acquisition history. Corrects
+division team labels using agreeing, freshly verified adjacent roster-day club
+records. Defaults to a dry run; apply requires the exact reviewed plan and a
+checksum-verified independent backup of source, code and current preimages.
+Verifies every affected date and performance-index scores after writing. Never
+deletes roster rows or recalculates aggregate tables. See command `--help`.
+
+The NHL daily importer accepts only regular-season and playoff game types (2/3),
+excluding All-Star games and other exhibitions before boxscore processing.
+
+#### `stats:apply-reviewed-day-patches`
+
+Applies bounded, source-proven player-day stat patches by exact canonical ID.
+Defaults to a dry run. Requires a hash-bound evidence manifest and complete
+current preimages; apply additionally requires the exact reviewed dry-run plan
+and independently verified source/code/preimage backup. Only game statistics,
+game counters, daily rating, opponent and score are allowed fields. Roster
+identity, acquisition and eligibility stay intact. Readback verifies every field;
+repeat dry runs identify already-applied patches without rewriting timestamps.
+Never inserts/deletes or rebuilds aggregates. See command `--help` for arguments.
 
 #### `stats:backfill-hockey-reference`
 
@@ -920,11 +1130,42 @@ Notable flags:
 - `--apply`
 - `--stop-on-error`
 
+#### `stats:audit-player-days`
+
+Read-only audit of a hash-verified complete player-day operator snapshot. It
+checks regular-season team/dates and actual postseason participation, including
+losers-tournament games and byes. Unscheduled postseason dates after a team's
+last appearance are excluded. A missing entire playoff schedule remains uncertain.
+It generates JSON diagnostics plus a roster-count review CSV. Counts at least two below the
+season's regular roster capacity and nearby drops of five or more players are review signals;
+missing team-dates, duplicate player-dates and invalid references are separate
+faults. Inactive-category nulls and no-game days are not inferred stat holes.
+Use command `--help` for snapshot and output options. See
+[the completeness review](../docs/operations/player-day-completeness.md) for the
+latest production findings and limitations.
+
+`stats:repair-player-day-gaps` applies a separately reviewed source-backed plan
+to existing exact player-day IDs. It defaults to dry-run, requires independent
+backups and SHA-bound source evidence, and verifies full preimages and post-read
+preservation. Existing native values require the explicit reviewed-correction
+option and corroborating official sources. This command does not reconstruct
+rosters, insert/delete days, or rebuild season rollups. Use its `--help` as the
+flag reference.
+
+`scripts/src/commands/stats/restore-player-day-roster.ts` restores missing rows
+from a separately reviewed dated-roster plan, with adjacent-day corroboration,
+official daily-stat evidence and independent backups. Run its `--help` from the
+repository root. It inserts only missing players, preserves all existing date
+rows, maintains performance indexes and verifies that repeating proposes no
+additional inserts. It does not infer post-elimination rosters or lineup
+optimization fields.
+
 #### `stats:backfill-yahoo-matchup-days`
 
 Pulls Yahoo daily matchup pages, reconciles them against `PlayerDayStatLine`
 in the production Convex database, and reports updates, creations, deletions,
-and investigation flags.
+and investigation flags. It reads from and writes to Convex.
+
 Notable flags:
 
 - `--seasonId, --seasonIds <list>`
@@ -1072,11 +1313,12 @@ Missing future-season dates and overlapping playing contracts also block the
 run. Yahoo league membership is checked again before buyouts. Ownership and
 contract plans are reread after the NHL stage to detect concurrent changes.
 
-Finally, the six season rollups are rebuilt from all persisted player days in
-that season: player weeks, splits and totals; team days, weeks and seasons.
-This shares the existing aggregation math, preserves rating/award/power fields,
-and never deletes stale derived rows. Career totals, power, awards and standings
-are separate workflows. Aggregate dry-run counts use planned roster metadata
+Finally, frequent aggregation refreshes player-day contribution ratings, player
+weeks, team days and team weeks for the affected matchup. Overnight aggregation
+also refreshes player splits/totals, team seasons and native/rated careers using
+the complete season. Contribution totals, averages and appearance counts are
+published together. Power, awards and ranks are preserved; no stale rows are
+deleted. The aggregate mode is explicit in command help. Preview counts use planned roster metadata
 with currently stored NHL statistics; live NHL updates can change the result.
 The stages are resumable, not one database transaction. If a later stage fails,
 rerun the dry run and apply; existing buyouts are not charged again.
@@ -1088,12 +1330,15 @@ scheduler. Consult `--help` for the required deployment, league, season, scoring
 date range and Python executable. Dry runs exercise the child import previews
 without advancing the checkpoint; `--apply` enables the validated stages.
 
-The intended cadence is hourly in `America/Toronto`, including daylight-saving
-changes. Yahoo capture runs from 08:00 through 22:00. NHL-only updates continue
-from 23:00 through 03:00 using stored lineups; after midnight they refresh the
-previous evening's scoring date. Schedule the operator task hourly across midnight.
-The runner skips 04:00 through 07:59. Overnight runs do not perform ownership,
-buyout, historical catch-up, or weekly rollover work.
+Trigger the runner every five minutes. In `America/Toronto`, including DST,
+day/week updates run hourly; when a regular-season/playoff game is LIVE/CRIT,
+they run every five minutes using stored lineups. Late live games continue past
+03:00. Yahoo capture stays hourly from 08:00 through 22:00. After midnight the
+runner checks yesterday's slate and runs the complete season/career/NHL refresh
+only after all active games are final. Empty slates and explicitly postponed or
+cancelled games do not prevent the nightly update. Unknown schedules defer it.
+The NHL end date can extend past the fantasy scoring calendar. Overnight work
+does not perform ownership, buyout, historical Yahoo capture or weekly publication.
 Yahoo membership, eligibility and daily slots are reconciled on each scrape,
 including backed-up deletion of superseded days when enabled. The first hourly
 capture after the NHL reports every non-postponed game started locks that day's
@@ -1102,12 +1347,14 @@ Yahoo. Unknown start status and no-game dates keep hourly Yahoo checks enabled.
 Morning runs recheck the previous two dates for final stats, using NHL-only mode
 for already locked dates. After downtime, older missing dates are processed first,
 at most two per cycle. Historical failures do not advance past the failed date.
-Each hourly NHL cycle also re-fetches every prior day of unfinalized matchups,
-including double weeks, and rebuilds the six rollups. Corrected zeroes replace
+Non-live hourly cycles also re-fetch prior dates in the two latest open matchups,
+including double weeks, and rebuild their day/week rows and ratings. The manual
+correction command can still request all open matchups. Corrected zeroes replace
 previously credited stats. NHL source failures abort instead of clearing stats
 from an incomplete response. Yahoo lineups remain locked independently of stats.
-Current-roster failures are recorded while independent historical work can
-finish. Contract/source conflicts require review and are never silently accepted.
+Current-roster failures are recorded while independent NHL and historical work
+can finish using stored lineups. Contract/source conflicts require review and
+are never silently accepted.
 
 After the morning recheck succeeds, the cycle closes ended scoring weeks using
 the existing standings and power commands. It checks NHL game completion before
@@ -1157,6 +1404,21 @@ state is operational progress, not a database backup. Keep the task's scoring
 range aligned with the existing weeks and allow two days after the final week
 for final-stat catch-up.
 
+#### `stats:refresh-nightly-nhl`
+
+Refreshes official NHL player/team season statistics
+and pooled category ratings after the final-game gate. It provisions new NHL
+debutants only from agreeing official ID/name/role and landing-page birth data;
+ambiguous existing people stop for review. Changed native statistics withhold
+stale holistic hockey scores until a new reviewed model is published. See
+[nightly NHL behavior](../docs/operations/nhl-nightly-refresh.md) and command help.
+
+The Windows installer under `scripts/windows/` defaults to a preview and installs
+an interactive-user five-minute trigger only when explicitly applied. It never
+replaces an existing task. The wrapper skips weekly publication and uses
+Node's direct `--import tsx` loader to retain system certificate verification.
+See [refresh cadence](../docs/operations/stat-refresh-cadence.md).
+
 #### `stats:sync-nhl-daily`
 
 Uses the Python `nhl-api-py` client to fetch real NHL boxscore data for one or
@@ -1195,39 +1457,10 @@ with Convex document-ID updates, so this command never creates missing
 
 ### Yahoo Validation
 
-#### `yahoo:check-weekly-player-days`
-
-Compares Yahoo weekly matchup totals and weekly player rows against sheet data,
-then optionally writes supported `PlayerDayStatLine` and `TeamWeekStatLine`
-fixes.
-
-Notable flags:
-
-- `--season-id <id>`
-- `--week-ids <list>`
-- `--week-nums <list>`
-- `--team-ids <list>`
-- `--matchup-ids <list>`
-- `--request-delay-ms <ms>`
-- `--request-stagger-ms <ms>`
-- `--browser-fallback <true|false>`
-- `--browser-headless <true|false>`
-- `--browser-path <path>`
-- `--browser-user-data-dir <path>`
-- `--browser-wait-ms <ms>`
-- `--browser-import-cookie <true|false>`
-- `--apply`
-
-Example:
-
-```bash
-npm run yahoo:check-weekly-player-days -- --season-id 12 --week-nums 1,2
-npm run yahoo:check-weekly-player-days -- --season-id 12 --matchup-ids 1871 --apply
-```
-
 #### `yahoo:check-weekly-matchups`
 
-Legacy alias for `yahoo:check-weekly-player-days`.
+Compares Yahoo weekly matchup totals against Convex `TeamWeekStatLine` data.
+This command is read-only.
 
 ### Maintenance
 
@@ -1314,7 +1547,7 @@ npm run power:rebuild -- --season-id 12 --apply
 
 ```bash
 npm run stats:backfill-yahoo-matchup-days -- --seasonId 12
-npm run yahoo:check-weekly-player-days -- --season-id 12 --week-nums 1,2
+npm run yahoo:check-weekly-matchups -- --season-id 12 --week-nums 1,2
 ```
 
 ### Evaluate preseason and matchup objectives
@@ -1330,13 +1563,6 @@ Local refinement commands `refine-preseason.ts`, `evaluate-form.ts` and
 `evaluate-transition.ts` compare player projection, form and transition policies
 without network or league writes. See their `--help` and
 [refinement evidence](../docs/product/power-ranking-refinement.md).
-
-### Keep ranking-engine runtimes aligned
-
-```bash
-npm run ranking-engine:check
-npm run ranking-engine:sync
-```
 
 ## Notes
 

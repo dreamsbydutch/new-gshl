@@ -323,6 +323,9 @@ export interface PlayerDayStatLine {
   SO: string;
   TOI: string;
   Rating: string;
+  averageRating?: number | null;
+  ratingVersion?: string | null;
+  ratingAppearances?: number | null;
   ADD: string;
   MS: string;
   BS: string;
@@ -358,7 +361,7 @@ export interface PlayerWeekStatLine {
   GP: string;
   MG: string;
   IR: string;
-  IRplus: string; // matches database schema casing
+  IRplus: string; // matches stored schema casing
   GS: string;
   G: string;
   A: string;
@@ -426,7 +429,7 @@ export interface PlayerSplitStatLine {
 export interface PlayerTotalStatLine {
   id: string;
   seasonId: string;
-  gshlTeamIds: string[]; // Note: plural in database schema
+  gshlTeamIds: string[]; // Note: plural in the stored schema
   playerId: string;
   nhlPos: RosterPosition[];
   posGroup: PositionGroup;
@@ -538,7 +541,32 @@ export interface PlayerCareerTotalStatLine {
   createdAt: Date;
   updatedAt: Date;
 }
+export interface PlayerNHLHockeyRating {
+  sourceId?: string;
+  modelVersion: "nhl-hockey-overall-reviewed-v1";
+  units: "goals-above-same-position-reference";
+  seasonValue: number | null;
+  rank: number | null;
+  qualification:
+    | "ranked"
+    | "provisional"
+    | "incomplete"
+    | "insufficient-reference"
+    | "no-nhl-games"
+    | "missing-source"
+    | "unresolved-player"
+    | "source-stat-mismatch";
+  sourceFetchedAt?: number;
+  nhlPlayerId?: number;
+  sourceGames?: number;
+  sourcePosition?: "F" | "D" | "G";
+  identityResolution?: "canonical" | "reviewed-source";
+  identityReviewHash?: string;
+  reasons: string[];
+}
+
 export interface PlayerNHLStatLine {
+  GS?: number | string | null;
   id: string;
   seasonId: string;
   playerId: string;
@@ -566,9 +594,10 @@ export interface PlayerNHLStatLine {
   QS: string;
   RBS: string;
   TOI: string;
-  seasonRating: string; // lowercase from database schema
-  overallRating: string; // lowercase from database schema
-  salary: string; // lowercase from database schema
+  seasonRating: string; // lowercase in the stored schema
+  hockeyRating?: PlayerNHLHockeyRating;
+  overallRating: string; // lowercase in the stored schema
+  salary: string; // lowercase in the stored schema
   createdAt: Date;
   updatedAt: Date;
 }

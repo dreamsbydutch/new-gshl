@@ -1,5 +1,5 @@
-import * as dataStore from "@gshl-lib/data/convex-store";
 import type { DatabaseRecord } from "@gshl-lib/data/records";
+import { convexReader } from "@gshl-lib/data/reader";
 import { fetchWeekScopedModel, updateById } from "@gshl-lib/data/convex-store";
 import { applyPlayerDayDerivedColumns } from "@gshl-lib/stats/player-day-flags";
 import { normalizeDateOnlyValue } from "@gshl-lib/utils/core/date";
@@ -417,10 +417,10 @@ export async function runPlayerDayLineupBackfill(
   options: PlayerDayLineupBackfillOptions,
 ): Promise<PlayerDayLineupBackfillSummary> {
   const [weeks, matchups, seasons, teams, lineupBuilder] = await Promise.all([
-    dataStore.fetchModel<WeekRecord>("Week"),
-    dataStore.fetchModel<MatchupRecord>("Matchup"),
-    dataStore.fetchModel<DatabaseRecord>("Season"),
-    dataStore.fetchModel<DatabaseRecord>("Team"),
+    convexReader.fetchModel<WeekRecord>("Week"),
+    convexReader.fetchModel<MatchupRecord>("Matchup"),
+    convexReader.fetchModel<DatabaseRecord>("Season"),
+    convexReader.fetchModel<DatabaseRecord>("Team"),
     getLineupBuilder(),
   ]);
   const resolvedSeasonId = resolveIds(
@@ -515,7 +515,7 @@ export async function runPlayerDayLineupBackfill(
         contextWeekIds,
         resolvedTeamIds,
       )
-    : await dataStore.fetchPlayerDaySeason<DatabaseRecord>(resolvedSeasonId);
+    : await convexReader.fetchPlayerDaySeason<DatabaseRecord>(resolvedSeasonId);
 
   const seasonRowsForSeason = seasonRows
     .filter((row) => toTrimmedString(row.seasonId) === resolvedSeasonId)

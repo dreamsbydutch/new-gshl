@@ -5,6 +5,7 @@ import type {
   SigningValue,
 } from "../../types/draft-history";
 import { expectedDraftRating } from "./draft-slot-curve";
+import { isCategoryImpactRating } from "./stat-rating";
 
 export function draftSeasonWindow(input: {
   start: string | null;
@@ -97,6 +98,10 @@ export function buildDraftHistoryPicks(input: {
       const player = players.get(pick.playerId ?? "");
       const slot = draftNumber(pick.pick);
       const overallRating = draftNumber(total?.rating);
+      const ratingVersion = total?.ratingVersion ?? split?.ratingVersion;
+      const categoryImpact =
+        isCategoryImpactRating(total?.ratingVersion) ||
+        isCategoryImpactRating(split?.ratingVersion);
       const signingValue = pick.isSigning
         ? input.signingValues?.get(pick.id)
         : undefined;
@@ -109,7 +114,7 @@ export function buildDraftHistoryPicks(input: {
         postseasonTotals.get(pick.playerId ?? ""),
       );
       const expectedRating =
-        !pick.isSigning && slot !== null && slot > 0
+        !categoryImpact && !pick.isSigning && slot !== null && slot > 0
           ? expectedDraftRating(slot, maxPick)
           : null;
       return {
@@ -123,10 +128,13 @@ export function buildDraftHistoryPicks(input: {
         round: pick.round,
         signing: pick.isSigning,
         salary: signingValue?.salary ?? null,
-        salaryExpectedRating: signingValue?.expectedRating ?? null,
-        signingValue: signingValue?.value ?? null,
+        salaryExpectedRating: categoryImpact
+          ? null
+          : (signingValue?.expectedRating ?? null),
+        signingValue: categoryImpact ? null : (signingValue?.value ?? null),
         teamRating: draftNumber(split?.rating),
         overallRating,
+        ...(ratingVersion ? { ratingVersion } : {}),
         days,
         usageDays,
         teamDaysPercent: percentage(days),

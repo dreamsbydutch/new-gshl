@@ -1,3 +1,9 @@
+export interface CategoryImpactRatingFields {
+  averageRating?: number | null;
+  ratingVersion?: string | null;
+  ratingAppearances?: number | null;
+}
+
 // Core database model types
 import type {
   RosterPosition,
@@ -299,7 +305,7 @@ export interface DraftPick {
 }
 
 // Player stat line types
-export interface PlayerDayStatLine {
+export interface PlayerDayStatLine extends CategoryImpactRatingFields {
   id: string;
   seasonId: string;
   gshlTeamId: string;
@@ -359,7 +365,7 @@ export type SeasonDataArchiveStatus =
   | "archived"
   | "restored"
   | "failed";
-export interface PlayerWeekStatLine {
+export interface PlayerWeekStatLine extends CategoryImpactRatingFields {
   id: string;
   seasonId: string;
   gshlTeamId: string;
@@ -372,7 +378,7 @@ export interface PlayerWeekStatLine {
   GP: string;
   MG: string;
   IR: string;
-  IRplus: string; // matches database schema casing
+  IRplus: string; // matches stored schema casing
   GS: string;
   G: string;
   A: string;
@@ -398,7 +404,7 @@ export interface PlayerWeekStatLine {
   createdAt: Date;
   updatedAt: Date;
 }
-export interface PlayerSplitStatLine {
+export interface PlayerSplitStatLine extends CategoryImpactRatingFields {
   id: string;
   seasonId: string;
   gshlTeamId: string;
@@ -437,10 +443,10 @@ export interface PlayerSplitStatLine {
   createdAt: Date;
   updatedAt: Date;
 }
-export interface PlayerTotalStatLine {
+export interface PlayerTotalStatLine extends CategoryImpactRatingFields {
   id: string;
   seasonId: string;
-  gshlTeamIds: string[]; // Note: plural in database schema
+  gshlTeamIds: string[]; // Note: plural in the stored schema
   playerId: string;
   nhlPos: RosterPosition[];
   posGroup: PositionGroup;
@@ -476,7 +482,7 @@ export interface PlayerTotalStatLine {
   createdAt: Date;
   updatedAt: Date;
 }
-export interface PlayerCareerSplitStatLine {
+export interface PlayerCareerSplitStatLine extends CategoryImpactRatingFields {
   id: string;
   gshlTeamId: string;
   playerId: string;
@@ -514,7 +520,7 @@ export interface PlayerCareerSplitStatLine {
   createdAt: Date;
   updatedAt: Date;
 }
-export interface PlayerCareerTotalStatLine {
+export interface PlayerCareerTotalStatLine extends CategoryImpactRatingFields {
   id: string;
   gshlTeamIds: string[];
   playerId: string;
@@ -552,7 +558,32 @@ export interface PlayerCareerTotalStatLine {
   createdAt: Date;
   updatedAt: Date;
 }
+export interface PlayerNHLHockeyRating {
+  sourceId?: string;
+  modelVersion: "nhl-hockey-overall-reviewed-v1";
+  units: "goals-above-same-position-reference";
+  seasonValue: number | null;
+  rank: number | null;
+  qualification:
+    | "ranked"
+    | "provisional"
+    | "incomplete"
+    | "insufficient-reference"
+    | "no-nhl-games"
+    | "missing-source"
+    | "unresolved-player"
+    | "source-stat-mismatch";
+  sourceFetchedAt?: number;
+  nhlPlayerId?: number;
+  sourceGames?: number;
+  sourcePosition?: "F" | "D" | "G";
+  identityResolution?: "canonical" | "reviewed-source";
+  identityReviewHash?: string;
+  reasons: string[];
+}
+
 export interface PlayerNHLStatLine {
+  GS?: number | string | null;
   id: string;
   seasonId: string;
   playerId: string;
@@ -580,9 +611,10 @@ export interface PlayerNHLStatLine {
   QS: string;
   RBS: string;
   TOI: string;
-  seasonRating: string; // lowercase from database schema
-  overallRating: string; // lowercase from database schema
-  salary: string; // lowercase from database schema
+  seasonRating: string; // lowercase in the stored schema
+  hockeyRating?: PlayerNHLHockeyRating;
+  overallRating: string; // lowercase in the stored schema
+  salary: string; // lowercase in the stored schema
   createdAt: Date;
   updatedAt: Date;
 }
@@ -664,7 +696,7 @@ export interface ArchivedGoalieDayStatLine {
 }
 
 // Team stat line types
-export interface TeamDayStatLine {
+export interface TeamDayStatLine extends CategoryImpactRatingFields {
   id: string;
   seasonId: string;
   gshlTeamId: string;
@@ -700,7 +732,7 @@ export interface TeamDayStatLine {
   updatedAt: Date;
 }
 
-export interface TeamWeekStatLine {
+export interface TeamWeekStatLine extends CategoryImpactRatingFields {
   id: string;
   seasonId: string;
   gshlTeamId: string;
@@ -752,7 +784,7 @@ export interface TeamWeekStatLine {
   updatedAt: Date;
 }
 
-export interface TeamSeasonStatLine {
+export interface TeamSeasonStatLine extends CategoryImpactRatingFields {
   id: string;
   seasonId: string;
   seasonType: SeasonType;

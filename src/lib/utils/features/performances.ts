@@ -4,6 +4,7 @@ import type {
   PerformanceKind,
   PerformanceRow,
 } from "../../types/performances";
+import { isCategoryImpactRating } from "./stat-rating";
 
 export const PERFORMANCE_KINDS: { value: PerformanceKind; label: string }[] = [
   { value: "playerDay", label: "Player days" },
@@ -185,6 +186,21 @@ export function performanceNumber(value: unknown): number | null {
   }
   const number = Number(value);
   return Number.isFinite(number) ? number : null;
+}
+
+/** Display metadata stays separate from selectable/indexed ranking metrics. */
+export function performanceDisplayStats(
+  kind: PerformanceKind,
+  row: Record<string, unknown>,
+): Record<string, number | null> {
+  const stats = Object.fromEntries(
+    performanceStats(kind).map((stat) => [stat, performanceNumber(row[stat])]),
+  );
+  if (kind !== "playerNhl" && isCategoryImpactRating(row.ratingVersion)) {
+    const average = performanceNumber(row.averageRating);
+    if (average !== null) stats.averageRating = average;
+  }
+  return stats;
 }
 export function qualifiesForPerformance(
   row: Record<string, unknown>,

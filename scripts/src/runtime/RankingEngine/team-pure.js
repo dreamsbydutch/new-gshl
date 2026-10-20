@@ -121,13 +121,9 @@ var RankingEngine = RankingEngine || {};
     if (!row) return false;
     return (
       hasNonBlankCellValue(row.W) ||
-      hasNonBlankCellValue(row.GA) ||
       hasNonBlankCellValue(row.GAA) ||
-      hasNonBlankCellValue(row.SV) ||
-      hasNonBlankCellValue(row.SA) ||
       hasNonBlankCellValue(row.SVP) ||
-      hasNonBlankCellValue(row.SO) ||
-      hasNonBlankCellValue(row.TOI)
+      hasNonBlankCellValue(row.SO)
     );
   }
 

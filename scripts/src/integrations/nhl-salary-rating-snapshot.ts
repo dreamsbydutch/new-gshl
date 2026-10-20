@@ -11,12 +11,12 @@ export async function readSalaryRatingSeason(startYear: number) {
     if(seasons.length===101)throw new Error("Season read bound reached");
     const matches=seasons.filter(s=>Number(s.year)===${startYear + 1});
     if(matches.length!==1)throw new Error("Missing or ambiguous season");
-    const ratings=await ctx.db.query("nhlSeasonValues").withIndex("by_seasonId",q=>q.eq("seasonId",matches[0]._id)).take(3001);
+    const ratings=await ctx.db.query("nhlSeasonValues").withIndex("by_identity",q=>q.eq("seasonId",matches[0]._id).eq("gameType",2).eq("profile","core").eq("modelVersion","nhl-season-value-v3")).take(3001);
     const contracts=await ctx.db.query("nhlContractSeasons").withIndex("by_seasonStartYear",q=>q.eq("seasonStartYear",${startYear})).take(3001);
     if(ratings.length===3001||contracts.length===3001)throw new Error("Season read bound reached");
     const ids=[...new Set(contracts.map(c=>c.contractId))];
     const headers=await Promise.all(ids.map(id=>ctx.db.get(id)));
-    return {startYear:${startYear},ratings:ratings.filter(r=>r.modelVersion==="nhl-season-value-v3"&&r.profile==="core"&&r.gameType===2).map(r=>({
+    return {startYear:${startYear},ratings:ratings.filter(r=>r.modelVersion==="nhl-season-value-v3"&&r.profile==="core"&&r.gameType===2).sort((a,b)=>a._creationTime-b._creationTime).map(r=>({
       nhlPlayerId:r.nhlPlayerId,playerId:r.playerId??null,name:r.name,position:r.position,games:r.games,
       status:r.status,seasonValue:r.seasonValue,abilityPer60:r.gameValue?.abilityPer60??null,
       seasonRating:r.seasonRating,limitedSeason:!!r.gameValue?.finalization?.failedGates?.length
@@ -30,11 +30,15 @@ export async function readSalaryRatingSeason(startYear: number) {
   const root = resolve(import.meta.dirname, "../../..");
   const cli = resolve(root, "node_modules/convex/bin/main.js");
   return new Promise<unknown>((accept, reject) => {
-    const child = spawn(process.execPath, ["--input-type=module", "-"], {
-      cwd: root,
-      windowsHide: true,
-      stdio: ["pipe", "pipe", "pipe"],
-    });
+    const child = spawn(
+      process.execPath,
+      ["--use-system-ca", "--input-type=module", "-"],
+      {
+        cwd: root,
+        windowsHide: true,
+        stdio: ["pipe", "pipe", "pipe"],
+      },
+    );
     let stdout = "";
     child.stdout.on("data", (data) => {
       stdout += String(data);

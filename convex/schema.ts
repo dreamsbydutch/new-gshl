@@ -1,8 +1,10 @@
 import { defineSchema, defineTable, type TableDefinition } from "convex/server";
 import { v, type GenericValidator } from "convex/values";
+import { nightlyTeamFields } from "./lib/nightlyNhlStatFields";
 import {
   nhlSeasonValueMetadata,
   nhlSeasonValueResult,
+  nhlStatLineHockeyRating,
 } from "./lib/nhlSeasonValueFields";
 import {
   nhlContractFields,
@@ -121,6 +123,9 @@ const statFields = {
   SO: statValue,
   TOI: statValue,
   Rating: ratingValue,
+  averageRating: optionalNullableNumber,
+  ratingVersion: optionalNullableString,
+  ratingAppearances: optionalNullableNumber,
   ADD: statValue,
   MS: statValue,
   BS: statValue,
@@ -767,6 +772,17 @@ export default defineSchema({
     ["abbr"],
   ),
 
+  nhlTeamSeasonStatLines: table(
+    {
+      seasonId: id("seasons"),
+      nhlTeamId: id("nhlTeams"),
+      ...nightlyTeamFields,
+      sourceFetchedAt: v.number(),
+      sourceSha256: v.string(),
+    },
+    ["seasonId", ["seasonId", "nhlTeamId"]],
+  ),
+
   playerDayStatLines: table(
     {
       seasonId: id("seasons"),
@@ -985,7 +1001,11 @@ export default defineSchema({
       nhlTeam: optionalNullableStringArray,
       age: optional(v.union(v.number(), v.string(), v.null())),
       ...skaterGoalieStatFields,
+      GS: statValue,
       seasonRating: optionalNullableNumber,
+      hockeyRating: v.optional(nhlStatLineHockeyRating),
+      nhlStatsSourceFetchedAt: optionalNullableNumber,
+      nhlStatsSourceSha256: optionalNullableString,
       overallRating: optionalNullableNumber,
       salary: optionalNullableNumber,
       createdAt: timestampValue,

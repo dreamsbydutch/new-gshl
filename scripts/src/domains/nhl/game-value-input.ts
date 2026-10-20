@@ -47,7 +47,13 @@ export type VerifiedShot = Shot & {
   situation: string;
   homePlayers: number[];
   awayPlayers: number[];
-  probabilitySource: "moneypuck" | "nhl-event-xg-v1" | "nhl-penalty-shot-v1";
+  probabilitySource:
+    | "moneypuck"
+    | "nhl-event-xg-v1"
+    | "nhl-penalty-shot-v1"
+    | "nhl-shot-nonlinear-research-v1"
+    | "nhl-event-xg-crossfit-glm-v1"
+    | "nhl-event-xg-crossfit-gb-v1";
   classificationSource?: "nhl-api" | "nhl-play-report";
 };
 export type PenaltyEvent = {
@@ -61,6 +67,9 @@ export type PenaltyEvent = {
   homeBefore: number | null;
   awayBefore: number | null;
   regularSeasonOvertime: boolean;
+  suddenDeathOvertime?: boolean;
+  /** Known regulation clock; overtime carryover is not priced without its own model. */
+  regulationSecondsRemaining?: number;
   remainingSeconds: number | null;
 };
 export type GameValueData = {
@@ -389,6 +398,8 @@ export function extractShotTrainingRows(raw: unknown): ShotTrainingRow[] {
         eventId: num(event.eventId),
         goal: kind === "goal" ? 1 : 0,
         features,
+        situation: code,
+        shootingHome: home,
         orientationSource,
       });
     }
@@ -813,6 +824,7 @@ export function buildGameValueData(
     result.issues.push(
       `${unused.size} provider shots unmatched to official events`,
     );
+  const invalidPenaltySeconds = new Set<number>();
   for (const p of plays.filter((p) => p.kind === "penalty")) {
     const duration = Number(p.details.duration),
       type = String(p.details.typeCode);
@@ -824,7 +836,30 @@ export function buildGameValueData(
       )
     )
       continue;
-    const code = /^[01][3-6][3-6][01]$/.test(p.situation) ? p.situation : null;
+    const team = num(p.details.eventOwnerTeamId);
+    const knownTeam = team === homeTeam || team === awayTeam;
+    // BEN sanctions belong to the team, even if a source repeats the server's ID
+    // in the committed-player field. Serving a penalty is not committing it.
+    const committedPlayer =
+      type === "BEN"
+        ? undefined
+        : roster.get(Number(p.details.committedByPlayerId));
+    const drawnPlayer = roster.get(Number(p.details.drawnByPlayerId));
+    const validActors =
+      knownTeam &&
+      (!committedPlayer || committedPlayer.team === team) &&
+      (!drawnPlayer || drawnPlayer.team !== team);
+    if (!validActors) {
+      result.issues.push(
+        `penalty identity ${p.id}: unknown team or contradictory actor team; penalty value unavailable`,
+      );
+    }
+    // Preserve the assessment in the diagnostic ledger. Missing context forces
+    // the valuator to report it unpriced while retaining verified game components.
+    const code =
+      validActors && /^[01][3-6][3-6][01]$/.test(p.situation)
+        ? p.situation
+        : null;
     const regularSeasonOvertime =
       Math.floor(gameId / 10000) % 100 === 2 && p.period === 4;
     const precedingGoals = plays.filter(
@@ -837,16 +872,23 @@ export function buildGameValueData(
     const gameAlreadyEnded =
       (p.period === 3 && p.second === 1200 && scoreBefore !== 0) ||
       precedingGoals.some((q) => q.period >= 4);
+    const remainingSeconds = gameAlreadyEnded
+      ? 0
+      : regularSeasonOvertime
+        ? Math.max(0, 300 - p.second)
+        : null;
+    if (!validActors && remainingSeconds !== 0)
+      invalidPenaltySeconds.add((p.period - 1) * 1200 + p.second);
     result.penalties.push({
       eventId: p.id,
       second: (p.period - 1) * 1200 + p.second,
-      team: num(p.details.eventOwnerTeamId),
-      committed: roster.has(Number(p.details.committedByPlayerId))
-        ? Number(p.details.committedByPlayerId)
-        : null,
-      drawn: roster.has(Number(p.details.drawnByPlayerId))
-        ? Number(p.details.drawnByPlayerId)
-        : null,
+      team,
+      committed:
+        knownTeam && committedPlayer?.team === team ? committedPlayer.id : null,
+      drawn:
+        knownTeam && drawnPlayer && drawnPlayer.team !== team
+          ? drawnPlayer.id
+          : null,
       minutes: duration,
       kind:
         duration === 5 ? "major" : duration === 4 ? "double-minor" : "minor",
@@ -854,13 +896,20 @@ export function buildGameValueData(
       homeBefore: code ? Number(code[2]) - Number(code[3] === "0") : null,
       awayBefore: code ? Number(code[1]) - Number(code[0] === "0") : null,
       regularSeasonOvertime,
-      remainingSeconds: gameAlreadyEnded
-        ? 0
-        : regularSeasonOvertime
-          ? Math.max(0, 300 - p.second)
-          : null,
+      suddenDeathOvertime: p.period >= 4,
+      ...(p.period === 3
+        ? { regulationSecondsRemaining: Math.max(0, 1200 - p.second) }
+        : {}),
+      remainingSeconds,
     });
   }
+  // Assessments at one whistle share the first record's manpower context in
+  // valuation. An unverified assessment must not inherit another record's context.
+  for (const penalty of result.penalties)
+    if (invalidPenaltySeconds.has(penalty.second)) {
+      penalty.homeBefore = null;
+      penalty.awayBefore = null;
+    }
   for (const goalie of players.filter((p) => p.position === "G")) {
     const events = result.shots.filter((s) => s.goalie === goalie.id);
     const verifiedShots = events.filter((s) =>

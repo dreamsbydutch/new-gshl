@@ -1,3 +1,4 @@
+import { isCategoryImpactRating } from "./stat-rating";
 import { z } from "zod";
 import { selectResearchEvidence } from "./weekly-edition-research";
 import type {
@@ -804,6 +805,8 @@ export function buildWeeklyEditionEditorialCandidates(
         teamId: player.teamId,
         teamName: player.teamName,
         rating: numberValue(player.rating),
+        ratingVersion: player.ratingVersion,
+        averageRating: player.averageRating,
         stats: {
           P: numberValue(player.points),
           W: numberValue(player.wins),
@@ -814,11 +817,19 @@ export function buildWeeklyEditionEditorialCandidates(
           right.rating - left.rating ||
           left.playerName.localeCompare(right.playerName),
       )
-      .filter((performance, index) => performance.rating >= 85 || index < 3),
+      .filter((performance, index) =>
+        isCategoryImpactRating(performance.ratingVersion)
+          ? index < 3
+          : performance.rating >= 85 || index < 3,
+      ),
   );
   for (const performance of performances) {
-    const ratingBonus =
-      performance.rating >= 95
+    const categoryImpact = isCategoryImpactRating(performance.ratingVersion);
+    const ratingBonus = categoryImpact
+      ? performance.scope === "season"
+        ? 76
+        : 70
+      : performance.rating >= 95
         ? 98
         : performance.rating >= 90
           ? 93
@@ -830,7 +841,7 @@ export function buildWeeklyEditionEditorialCandidates(
     const metrics = [
       {
         key: "Rating",
-        label: "Rating",
+        label: categoryImpact ? "Contribution (100/category point)" : "Rating",
         value: performance.rating,
       },
       ...Object.entries(performance.stats)
@@ -851,8 +862,8 @@ export function buildWeeklyEditionEditorialCandidates(
       scope: performance.scope,
       importance: ratingBonus,
       occurredAt: performance.occurredAt,
-      headlineHint: `${entityName ?? "GSHL standout"} posts a ${performance.rating.toFixed(1)} rating`,
-      summary: `${entityName ?? "GSHL standout"} produced a ${performance.rating.toFixed(1)} ${performance.scope} rating.${statSummary ? ` ${statSummary}.` : ""}`,
+      headlineHint: `${entityName ?? "GSHL standout"} posts a ${performance.rating.toFixed(1)} ${categoryImpact ? "contribution rating" : "rating"}`,
+      summary: `${entityName ?? "GSHL standout"} produced a ${performance.rating.toFixed(1)} ${performance.scope} ${categoryImpact ? "contribution rating (100 units per expected category point)" : "rating"}.${statSummary ? ` ${statSummary}.` : ""}`,
       playerId: performance.playerId,
       playerName: performance.playerName,
       teamId: performance.teamId,
@@ -1028,6 +1039,8 @@ export function buildWeeklyEditionFactPacket(
       teamId: player.teamId,
       teamName: player.teamName,
       rating: numberValue(player.rating),
+      ratingVersion: player.ratingVersion,
+      averageRating: player.averageRating,
       points: numberValue(player.points),
       wins: numberValue(player.wins),
     }))
@@ -1458,6 +1471,8 @@ export function buildMilestoneEditionFactPacket(
       teamId: player.teamId,
       teamName: player.teamName,
       rating: numberValue(player.rating),
+      ratingVersion: player.ratingVersion,
+      averageRating: player.averageRating,
       points: numberValue(player.points),
       wins: numberValue(player.wins),
     }))
@@ -1665,7 +1680,7 @@ export function buildTemplateWeeklyEdition(
         ? packet.stars
             .map(
               (star, index) =>
-                `${index + 1}. ${star.playerName} (${star.teamName}) — ${star.rating.toFixed(2)} rating, ${star.points} points and ${star.wins} wins.`,
+                `${index + 1}. ${star.playerName} (${star.teamName}) — ${star.rating.toFixed(2)} ${isCategoryImpactRating(star.ratingVersion) ? "contribution rating" : "rating"}, ${star.points} points and ${star.wins} wins.`,
             )
             .join(" ")
         : "No eligible weekly player ratings were available.",
@@ -1915,7 +1930,7 @@ function buildMilestoneTemplateEditionCopy(
           packet.stars
             .map(
               (star, index) =>
-                `${index + 1}. ${star.playerName} (${star.teamName}) — ${star.rating.toFixed(2)} rating.`,
+                `${index + 1}. ${star.playerName} (${star.teamName}) — ${star.rating.toFixed(2)} ${isCategoryImpactRating(star.ratingVersion) ? "contribution rating" : "rating"}.`,
             )
             .join(" ") || "Final player ratings were unavailable.",
           [],

@@ -25,6 +25,7 @@ export function valuePenaltyEvents(
     unpriced: number[] = [];
   const groups = new Map<number, PenaltyEvent[]>();
   for (const p of game.penalties) {
+    if (p.remainingSeconds === 0) continue;
     const group = groups.get(p.second) ?? [];
     group.push({ ...p });
     groups.set(p.second, group);
@@ -35,6 +36,7 @@ export function valuePenaltyEvents(
     const initial = group[0]!;
     let homeStrength = initial.homeBefore,
       awayStrength = initial.awayBefore;
+    let ambiguousMatching = false;
     // Matching majors offset majors; two-minute portions of double minors offset ordinary minors.
     for (const major of [true, false]) {
       const home = group.filter(
@@ -43,49 +45,82 @@ export function valuePenaltyEvents(
       const away = group.filter(
         (p) => p.team === game.awayTeam && (p.kind === "major") === major,
       );
-      // Match reciprocal participants before unrelated same-whistle penalties.
+      // Attribute reciprocal offsets only when each participant has one possible
+      // partner. Repeated assessments can otherwise make this pairing arbitrary.
       for (const h of home)
         for (const a of away.filter(
           (a) =>
+            h.minutes > 0 &&
+            a.minutes > 0 &&
             h.committed !== null &&
             a.committed !== null &&
             h.committed === a.drawn &&
-            a.committed === h.drawn,
+            a.committed === h.drawn &&
+            away.filter(
+              (q) =>
+                q.minutes > 0 &&
+                q.committed === h.drawn &&
+                q.drawn === h.committed,
+            ).length === 1 &&
+            home.filter(
+              (q) =>
+                q.minutes > 0 &&
+                q.committed === a.drawn &&
+                q.drawn === a.committed,
+            ).length === 1,
         )) {
           const offset = Math.min(h.minutes, a.minutes);
           h.minutes -= offset;
           a.minutes -= offset;
           coincidentalMinutes += offset * 2;
         }
-      for (const h of home)
-        for (const a of away) {
-          const offset = Math.min(h.minutes, a.minutes);
-          h.minutes -= offset;
-          a.minutes -= offset;
-          coincidentalMinutes += offset * 2;
+      const homeRemaining = home.filter((p) => p.minutes > 0),
+        awayRemaining = away.filter((p) => p.minutes > 0);
+      const homeMinutes = homeRemaining.reduce((sum, p) => sum + p.minutes, 0),
+        awayMinutes = awayRemaining.reduce((sum, p) => sum + p.minutes, 0);
+      if (!homeMinutes || !awayMinutes) continue;
+      coincidentalMinutes += Math.min(homeMinutes, awayMinutes) * 2;
+      if (homeMinutes === awayMinutes) {
+        for (const p of [...homeRemaining, ...awayRemaining]) p.minutes = 0;
+        continue;
+      }
+      const larger = homeMinutes > awayMinutes ? homeRemaining : awayRemaining,
+        smaller = homeMinutes > awayMinutes ? awayRemaining : homeRemaining;
+      if (larger.length === 1) {
+        larger[0]!.minutes = Math.abs(homeMinutes - awayMinutes);
+      } else {
+        // The aggregate residual is known, but which player's penalty survives
+        // cannot be recovered from event order or unrelated participant IDs.
+        ambiguousMatching = true;
+        for (const p of larger) {
+          unpriced.push(p.eventId);
+          p.minutes = 0;
         }
+      }
+      for (const p of smaller) p.minutes = 0;
     }
-    const serial = new Set(
-      group
-        .filter(
-          (p) =>
-            p.minutes > 0 &&
-            p.committed !== null &&
-            group.some(
-              (q) => q !== p && q.minutes > 0 && q.committed === p.committed,
-            ),
-        )
-        .map((p) => p.committed),
-    );
-    // Multiple residual assessments to one player are served sequentially, not
-    // as two missing skaters. A full clock is needed to assign their marginal costs.
-    for (const p of group.filter((p) => p.minutes > 0)) {
-      if (p.remainingSeconds === 0) continue; // No future ice time after the game has ended.
-      if (serial.size) {
+    const residual = group.filter((p) => p.minutes > 0);
+    // Multiple residual assessments have interacting clocks, including opposite
+    // sides or serial assessments to one player. Source order cannot identify
+    // their counterfactual costs. Ambiguous offsets also prevent pricing any
+    // remaining sanction in isolation from the unknown manpower change.
+    if (ambiguousMatching || residual.length > 1) {
+      unpriced.push(...residual.map((p) => p.eventId));
+      continue;
+    }
+    for (const p of residual) {
+      if (
+        p.regulationSecondsRemaining !== undefined &&
+        p.minutes * 60 > p.regulationSecondsRemaining
+      ) {
+        // A tied game may continue into overtime, with different manpower and
+        // a sudden-death clock. Do not invent that unmodeled continuation or
+        // use the eventual final score to decide whether the penalty mattered.
         unpriced.push(p.eventId);
         continue;
       }
       const home = p.team === game.homeTeam;
+      const suddenDeath = p.regularSeasonOvertime || p.suddenDeathOvertime;
       const own = home ? homeStrength : awayStrength,
         other = home ? awayStrength : homeStrength;
       if (
@@ -127,7 +162,7 @@ export function valuePenaltyEvents(
       // Either side scoring ends sudden-death overtime. Use the scheduled clock,
       // never the eventual goal time, to avoid outcome-dependent penalty costs.
       const hazardPerMinute =
-        (afterAgainst! + (p.regularSeasonOvertime ? afterFor! : 0)) / 60;
+        (afterAgainst! + (suddenDeath ? afterFor! : 0)) / 60;
       const available =
         p.remainingSeconds === null
           ? Infinity
@@ -139,13 +174,30 @@ export function valuePenaltyEvents(
           : duration;
       // In sudden death a goal ends the game, even during a major/double minor.
       const overtimeDuration = Math.min(p.minutes, available);
-      const exposure = p.regularSeasonOvertime
+      // A double minor is two serial two-minute clocks. A power-play goal
+      // advances to the second portion; a finite horizon can cut either short.
+      const doubleDuration = Math.min(4, available);
+      const doubleMinorMinutes =
+        hazardPerMinute === 0
+          ? doubleDuration
+          : doubleDuration <= 2
+            ? (2 * -Math.expm1(-hazardPerMinute * doubleDuration) -
+                hazardPerMinute *
+                  doubleDuration *
+                  Math.exp(-hazardPerMinute * doubleDuration)) /
+              hazardPerMinute
+            : (2 * -Math.expm1(-2 * hazardPerMinute)) / hazardPerMinute -
+              (4 - doubleDuration) *
+                Math.exp(-hazardPerMinute * doubleDuration);
+      const exposure = suddenDeath
         ? hazardPerMinute > 0
           ? -Math.expm1(-overtimeDuration * hazardPerMinute) / hazardPerMinute
           : overtimeDuration
         : p.kind === "major"
           ? Math.min(p.minutes, available)
-          : (p.minutes / 2) * minorMinutes;
+          : p.kind === "double-minor" && p.minutes === 4
+            ? doubleMinorMinutes
+            : (p.minutes / 2) * minorMinutes;
       const cost = (change * exposure) / 60;
       if (p.committed !== null)
         entries.push({
@@ -233,6 +285,15 @@ export function rankGameSeason(
   reference: SeasonPlayerReference[],
   priors: Record<string, { prior: number }> = {},
 ) {
+  const gameIds = new Set<number>();
+  for (const game of games) {
+    if (gameIds.has(game.gameId))
+      throw new Error("Duplicate game in season rating input");
+    gameIds.add(game.gameId);
+  }
+  for (const { prior } of Object.values(priors))
+    if (!Number.isFinite(prior) || prior < 0)
+      throw new Error("Invalid shrinkage prior");
   const values = new Map<number, Map<number, PlayerGameValue>>();
   const situations = new Map<number, Record<string, number>>();
   const rates = Object.fromEntries(
@@ -248,6 +309,7 @@ export function rankGameSeason(
   const penaltyWarnings = new Map<number, number>();
   const goalieWarnings = new Map<number, number>();
   const partialGames = new Map<number, number>();
+  const unfittedPlayers = new Set<number>();
   const row = (id: number, game: number) => {
     const player = values.get(id) ?? new Map<number, PlayerGameValue>();
     const value = player.get(game) ?? {
@@ -310,6 +372,15 @@ export function rankGameSeason(
           ) * h;
         const actualDiff = home ? s.homeXg - s.awayXg : s.awayXg - s.homeXg;
         for (const id of own) {
+          // Absent coefficients are unknown, unlike a fitted coefficient of zero.
+          // Retain verified individual events but do not claim process coverage.
+          if (
+            model.coefficients[`O:${family}:${id}`] === undefined ||
+            model.coefficients[`D:${family}:${id}`] === undefined
+          ) {
+            unfittedPlayers.add(id);
+            continue;
+          }
           const p = row(id, g.gameId);
           p.seconds += s.seconds;
           p.process +=
@@ -478,6 +549,11 @@ export function rankGameSeason(
       situations: situations.get(p.playerId) ?? {},
       samplingInterval: null,
       warnings: [
+        ...(unfittedPlayers.has(p.playerId)
+          ? [
+              "Unfitted player effects excluded from process value and coverage; verified individual events retained",
+            ]
+          : []),
         ...(partialGames.has(p.playerId)
           ? [
               `${partialGames.get(p.playerId)} games included with component-level source warnings; uncertain lineup intervals are excluded, verified individual events retained`,
@@ -503,7 +579,7 @@ export function rankGameSeason(
           : []),
         ...(penaltyWarnings.has(p.playerId)
           ? [
-              `${penaltyWarnings.get(p.playerId)} penalty events have missing context, queued clocks or unsupported strength`,
+              `${penaltyWarnings.get(p.playerId)} penalty events have missing context, ambiguous offsets, interacting clocks, unmodeled overtime carryover or unsupported strength`,
             ]
           : []),
         ...(p.position === "G" && !total.shots

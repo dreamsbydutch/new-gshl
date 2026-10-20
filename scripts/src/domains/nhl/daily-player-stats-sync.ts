@@ -16,6 +16,7 @@ import {
   serializeCsvMultiValue,
   type DatabaseRecord,
 } from "@gshl-lib/data/records";
+import { convexReader } from "@gshl-lib/data/reader";
 import { fetchPlayerDayWeeks, updateById } from "@gshl-lib/data/convex-store";
 import { rankRowsWithRankingEngine } from "@gshl-lib/ranking/ranking-engine";
 import { applyPlayerDayDerivedColumns } from "@gshl-lib/stats/player-day-flags";
@@ -53,7 +54,7 @@ Options:
   --start-date <date>     Inclusive lower date bound.
   --end-date <date>       Inclusive upper date bound.
   --python-bin <path>     Python executable to run. Default: python
-  --ssl-verify <bool>     Pass through to nhl-api-py. Default: false
+  --ssl-verify <bool>     Use OS-trusted TLS verification. Default: true
   --aggregate             Rebuild season aggregates after applying PlayerDay updates.
   --apply                 Write PlayerDayStatLine changes to Convex.
   --log <true|false>      Enable or disable console logging. Default: true.
@@ -91,6 +92,9 @@ const PLAYER_DAY_WRITE_FIELDS = [
   "SO",
   "TOI",
   "Rating",
+  "averageRating",
+  "ratingVersion",
+  "ratingAppearances",
   "ADD",
   "MS",
   "BS",
@@ -1578,7 +1582,7 @@ export function parseDailyNhlPlayerStatSyncOptions(
     aggregateAfterApply: hasFlag(args, "--aggregate"),
     logToConsole: toBoolean(getArgValue(args, "--log"), true),
     pythonBin: toTrimmedString(getArgValue(args, "--python-bin")) || "python",
-    sslVerify: toBoolean(getArgValue(args, "--ssl-verify"), false),
+    sslVerify: toBoolean(getArgValue(args, "--ssl-verify"), true),
   };
 }
 
@@ -1586,10 +1590,10 @@ export async function runDailyNhlPlayerStatSync(
   options: DailyNhlPlayerStatSyncOptions,
 ): Promise<DailyNhlPlayerStatSyncSummary> {
   const [seasonRows, weekRows, teamRows, playerRows] = (await Promise.all([
-    dataStore.fetchModel<DatabaseRecord>("Season"),
-    dataStore.fetchModel<DatabaseRecord>("Week"),
-    dataStore.fetchModel<DatabaseRecord>("Team"),
-    dataStore.fetchModel<DatabaseRecord>("Player"),
+    convexReader.fetchModel<DatabaseRecord>("Season"),
+    convexReader.fetchModel<DatabaseRecord>("Week"),
+    convexReader.fetchModel<DatabaseRecord>("Team"),
+    convexReader.fetchModel<DatabaseRecord>("Player"),
   ])) as unknown as [Season[], Week[], Team[], Player[]];
 
   const targetDateHint =
@@ -1834,7 +1838,7 @@ export async function runDailyNhlPlayerStatSync(
         fullName: externalRow.fullName,
         nhlTeam: externalRow.nhlTeam,
         nhlPlayerId: externalRow.nhlPlayerId,
-        details: `No Player table row matched NHL API player ${externalRow.fullName} (${externalRow.nhlTeam}).`,
+        details: `No Player record matched NHL API player ${externalRow.fullName} (${externalRow.nhlTeam}).`,
       });
       continue;
     }
@@ -1911,29 +1915,20 @@ export async function runDailyNhlPlayerStatSync(
     preparedRows as unknown as DatabaseRecord[],
     untouchedSeasonRows,
   );
-  const isScopedExistingRowRun =
-    selectedWeeks.length > 0 || resolvedTeamIds.length > 0;
-  if (isScopedExistingRowRun) {
-    log(
-      options,
-      "Preserving existing Rating values for scoped week/team sync; global rating rebuild was not requested.",
-    );
-  } else {
-    await rankRowsWithRankingEngine(
-      preparedRows as unknown as DatabaseRecord[],
-      {
-        dataModelName: PLAYER_DAY_MODEL,
-        outputField: "Rating",
-        mutate: true,
-      },
-    );
+  // Owner-independent scoring needs no global player pool. Scoped repairs must
+  // refresh their changed stat lines as well as whole-season imports.
+  await rankRowsWithRankingEngine(preparedRows as unknown as DatabaseRecord[], {
+    dataModelName: PLAYER_DAY_MODEL,
+    outputField: "Rating",
+    mutate: true,
+  });
 
-    for (const row of preparedRows) {
-      row.Rating =
-        row.Rating === "" || row.Rating === null || row.Rating === undefined
-          ? ("0" as PlayerDayStatLine["Rating"])
-          : (String(row.Rating) as PlayerDayStatLine["Rating"]);
-    }
+  for (const row of preparedRows) {
+    if (row.ratingVersion === "gshl-category-impact-v3") continue;
+    row.Rating =
+      row.Rating === "" || row.Rating === null || row.Rating === undefined
+        ? ("0" as PlayerDayStatLine["Rating"])
+        : (String(row.Rating) as PlayerDayStatLine["Rating"]);
   }
 
   const now = new Date();

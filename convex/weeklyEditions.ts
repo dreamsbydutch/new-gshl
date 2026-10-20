@@ -1,3 +1,4 @@
+import { isCategoryImpactRating } from "../src/lib/utils/features/stat-rating";
 /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/prefer-optional-chain */
 import { ConvexError, v } from "convex/values";
 import {
@@ -554,6 +555,7 @@ async function buildSource(
     Row extends {
       id: string;
       rating: number;
+      ratingVersion?: string;
       stats: Record<string, number>;
     },
   >(
@@ -564,7 +566,11 @@ async function buildSource(
     );
     const selected = new Map(
       ordered
-        .filter((row, index) => row.rating >= 85 || index < 3)
+        .filter((row, index) =>
+          isCategoryImpactRating(row.ratingVersion)
+            ? index < 3
+            : row.rating >= 85 || index < 3,
+        )
         .map((row) => [row.id, row]),
     );
     // Category specialists can be newsworthy without an elite overall rating.
@@ -591,6 +597,8 @@ async function buildSource(
       teamId: String(row.gshlTeamId),
       teamName: teamById.get(String(row.gshlTeamId))?.name ?? "Unknown team",
       rating: asNumber(row.Rating),
+      ratingVersion: row.ratingVersion ?? undefined,
+      averageRating: row.averageRating ?? undefined,
       stats: performanceStats(row),
     })),
   );
@@ -606,6 +614,8 @@ async function buildSource(
       teamId: String(row.gshlTeamId),
       teamName: teamById.get(String(row.gshlTeamId))?.name ?? "Unknown team",
       rating: asNumber(row.Rating),
+      ratingVersion: row.ratingVersion ?? undefined,
+      averageRating: row.averageRating ?? undefined,
       stats: performanceStats(row),
     })),
   );
@@ -617,6 +627,8 @@ async function buildSource(
       teamId: String(row.gshlTeamId),
       teamName: teamById.get(String(row.gshlTeamId))?.name ?? "Unknown team",
       rating: asNumber(row.Rating),
+      ratingVersion: row.ratingVersion ?? undefined,
+      averageRating: row.averageRating ?? undefined,
       stats: performanceStats(row),
     })),
   );
@@ -629,6 +641,8 @@ async function buildSource(
       teamId: String(row.gshlTeamId),
       teamName: teamById.get(String(row.gshlTeamId))?.name ?? "Unknown team",
       rating: asNumber(row.Rating),
+      ratingVersion: row.ratingVersion ?? undefined,
+      averageRating: row.averageRating ?? undefined,
       stats: performanceStats(row),
     })),
   );
@@ -657,6 +671,8 @@ async function buildSource(
               teamId,
               teamName: teamById.get(teamId)?.name ?? "Unknown team",
               rating: asNumber(row.Rating),
+              ratingVersion: row.ratingVersion ?? undefined,
+              averageRating: row.averageRating ?? undefined,
               stats: performanceStats(row),
             };
           }),
@@ -670,6 +686,8 @@ async function buildSource(
             teamName:
               teamById.get(String(row.gshlTeamId))?.name ?? "Unknown team",
             rating: asNumber(row.Rating),
+            ratingVersion: row.ratingVersion ?? undefined,
+            averageRating: row.averageRating ?? undefined,
             stats: performanceStats(row),
           })),
         ),
@@ -1187,6 +1205,8 @@ async function buildSource(
         teamId: String(row.gshlTeamId),
         teamName: team?.name ?? "Unknown team",
         rating: row.Rating,
+        ratingVersion: row.ratingVersion ?? undefined,
+        averageRating: row.averageRating ?? undefined,
         points: row.P,
         wins: row.W,
       };
@@ -1849,6 +1869,8 @@ async function buildMilestoneSource(
               sourceTeamById.get(String(row.gshlTeamId))?.name ??
               "Unknown team",
             rating: row.Rating,
+            ratingVersion: row.ratingVersion ?? undefined,
+            averageRating: row.averageRating ?? undefined,
             points: row.P,
             wins: row.W,
           }))

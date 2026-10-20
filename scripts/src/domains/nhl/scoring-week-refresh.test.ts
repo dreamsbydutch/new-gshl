@@ -28,3 +28,22 @@ test("Monday final pass includes the whole ended week until its persisted handof
     [],
   );
 });
+
+test("scheduled correction work is bounded to the latest open matchups without mutating the calendar", () => {
+  const weeks = [
+    { id: "old", startDate: "2026-09-29", endDate: "2026-10-04" },
+    { id: "current", startDate: "2026-10-12", endDate: "2026-10-25" },
+    { id: "previous", startDate: "2026-10-05", endDate: "2026-10-11" },
+    { id: "future", startDate: "2026-10-26", endDate: "2026-11-01" },
+  ];
+  const original = structuredClone(weeks);
+  assert.deepEqual(
+    planScoringWeekRefresh(weeks, "2026-10-20", 2).map((r) => r.weekId),
+    ["previous", "current"],
+  );
+  assert.deepEqual(weeks, original);
+  assert.throws(
+    () => planScoringWeekRefresh(weeks, "2026-10-20", 0),
+    /one to four/,
+  );
+});
