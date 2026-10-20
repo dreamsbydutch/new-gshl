@@ -73,6 +73,35 @@ async function patchEdition(
   return ctx.db.get(edition._id);
 }
 
+/** Publication and homepage selection commit together; delayed issues cannot move Home backwards. */
+async function activateNewPublication(ctx: MutationCtx, edition: Edition) {
+  const active = await ctx.db
+    .query("weeklyEditions")
+    .withIndex("by_homeActive_publishedAt", (q) => q.eq("isHomeActive", true))
+    .collect();
+  if (
+    active.some(
+      (row) =>
+        row._id !== edition._id &&
+        (toUtcTimestamp(row.scheduledFor) ?? 0) >=
+          (toUtcTimestamp(edition.scheduledFor) ?? 0),
+    )
+  )
+    return edition;
+
+  const updatedAt = Date.now();
+  for (const row of active) {
+    if (row._id !== edition._id)
+      await ctx.db.patch(row._id, { isHomeActive: false, updatedAt });
+  }
+  // Presentation changes preserve the content editor and create no revisions.
+  if (!edition.isHomeActive) {
+    await ctx.db.patch(edition._id, { isHomeActive: true, updatedAt });
+    return (await ctx.db.get(edition._id))!;
+  }
+  return edition;
+}
+
 async function persistPublication(
   ctx: MutationCtx,
   existing: Edition | null,
@@ -112,7 +141,10 @@ async function persistPublication(
     updatedAt: now,
     editedBy,
   });
-  return { state: "inserted" as const, existing: await ctx.db.get(id) };
+  return {
+    state: "inserted" as const,
+    existing: await activateNewPublication(ctx, (await ctx.db.get(id))!),
+  };
 }
 
 /** Scheduled milestones are snapshots; weekly templates track changed facts automatically. */
@@ -207,16 +239,19 @@ export async function publishAiEdition(
     scheduledFor: request.scheduledFor,
     facts: request.facts,
   };
-  return (
-    await persistPublication(
-      ctx,
-      existing,
-      source,
-      validation.content,
-      "openai",
-      request.editedBy,
-    )
-  ).existing;
+  const result = await persistPublication(
+    ctx,
+    existing,
+    source,
+    validation.content,
+    "openai",
+    request.editedBy,
+  );
+  // Upgrade an existing template too, including templates created before
+  // automatic homepage activation was introduced.
+  return request.automatic && existing && result.existing
+    ? activateNewPublication(ctx, result.existing)
+    : result.existing;
 }
 
 export async function editEdition(

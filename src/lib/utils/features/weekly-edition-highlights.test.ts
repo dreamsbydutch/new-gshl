@@ -80,7 +80,12 @@ void test("weekly records distinguish new and tied highs, qualify goalie/player 
   assert.match(records[0]!.summary, /W 2 ties the previous high of 2/);
   assert.match(records[1]!.summary, /G 3 ties the previous high of 3/);
   assert.match(records[0]!.summary, /regular-season weeks with 7 game days/);
-  assert.match(records[0]!.summary, /not a verified all-time record/);
+  assert.match(records[0]!.summary, /GSHL weekly record/);
+  assert.doesNotMatch(
+    records[0]!.summary,
+    /not independently verified|not a verified|recorded-comparison/,
+  );
+  assert.match(records[1]!.headlineHint, /ties/);
   assert.equal(
     weeklyPerformanceRecordCandidates({ ...input, historical: [] }).length,
     0,
@@ -94,4 +99,38 @@ void test("weekly records distinguish new and tied highs, qualify goalie/player 
     }).length,
     0,
   );
+});
+
+void test("a historical tie is not a record when another player exceeds it in the same week", () => {
+  const records = weeklyPerformanceRecordCandidates({
+    weekId: "week",
+    endDate: "2026-03-01",
+    gameDays: 7,
+    isPlayoffs: false,
+    historical: [{ kind: "player", stat: "A", value: 10, compared: 100 }],
+    teamNames: new Map([["team", "Aurora"]]),
+    playerNames: new Map([
+      ["tied", "Historical Tie"],
+      ["new", "New Leader"],
+    ]),
+    current: [
+      {
+        id: "tie",
+        kind: "player",
+        teamId: "team",
+        playerId: "tied",
+        stats: { GP: 4, A: 10 },
+      },
+      {
+        id: "new",
+        kind: "player",
+        teamId: "team",
+        playerId: "new",
+        stats: { GP: 4, A: 11 },
+      },
+    ],
+  });
+  assert.equal(records.length, 1);
+  assert.equal(records[0]?.playerName, "New Leader");
+  assert.match(records[0].summary, /A 11 passes the previous high of 10/);
 });

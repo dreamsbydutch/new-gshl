@@ -24,6 +24,7 @@ export function useNHLMatchupData(gameId: string) {
     rosterError: roster.error,
     retryRoster: roster.retry,
     hasSeason: Boolean(roster.season),
+    seasonCategories: roster.season?.categories ?? [],
     backHref: buildScheduleNavigationHref("", {
       view: "nhl",
       season: roster.season?.id ?? searchParams.get("season"),

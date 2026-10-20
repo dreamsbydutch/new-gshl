@@ -1,8 +1,13 @@
 import type { GSHLTeam, Player, PlayerDayStatLine } from "@gshl-types";
-import type { NHLGame, NHLMatchupPlayerRow } from "@gshl-lib/types/nhl";
+import type {
+  NHLBoxscorePlayer,
+  NHLGame,
+  NHLMatchupPlayerRow,
+} from "@gshl-lib/types/nhl";
 import { getPlayerNhlAbbreviations } from "../domain/player";
 import { z } from "zod";
 import { nhlBoxscorePlayerSchema } from "./nhl";
+import { buildNHLGameEvents } from "./nhl-events";
 
 const startingPositions = new Set([
   "C",
@@ -16,6 +21,66 @@ const startingPositions = new Set([
   "Util",
 ]);
 const nonStartingPositions = new Set(["BN", "IR", "IR+", "IRplus", "NA"]);
+
+type NHLMatchupStatKey = keyof NHLBoxscorePlayer | "wins" | "gaa";
+type NHLMatchupStatColumn = { key: NHLMatchupStatKey; label: string };
+
+export function getNHLMatchupStatColumns(
+  categories: readonly string[],
+  goalies = false,
+): NHLMatchupStatColumn[] {
+  if (goalies)
+    return [
+      { key: "wins", label: "W" },
+      { key: "goalsAgainst", label: "GA" },
+      { key: "gaa", label: "GAA" },
+      { key: "saves", label: "SV" },
+      { key: "shotsAgainst", label: "SA" },
+      { key: "savePctg", label: "SVP" },
+      { key: "toi", label: "TOI" },
+    ];
+  const skaterColumns: Record<string, NHLMatchupStatColumn> = {
+    G: { key: "goals", label: "G" },
+    A: { key: "assists", label: "A" },
+    P: { key: "points", label: "P" },
+    PPP: { key: "powerPlayPoints", label: "PPP" },
+    PPG: { key: "powerPlayGoals", label: "PPG" },
+    SOG: { key: "sog", label: "SOG" },
+    HIT: { key: "hits", label: "HIT" },
+    BLK: { key: "blockedShots", label: "BLK" },
+    PM: { key: "plusMinus", label: "+/−" },
+    "+/-": { key: "plusMinus", label: "+/−" },
+    PIM: { key: "pim", label: "PIM" },
+  };
+  const columns = categories.flatMap((category) => {
+    const column = skaterColumns[category.trim().toUpperCase()];
+    return column ? [column] : [];
+  });
+  columns.push({ key: "toi", label: "TOI" });
+  return columns.filter(
+    (column, index) =>
+      columns.findIndex((entry) => entry.key === column.key) === index,
+  );
+}
+
+export function formatNHLMatchupStat(
+  stats: NHLBoxscorePlayer | null,
+  key: NHLMatchupStatKey,
+): string | number {
+  if (!stats) return "–";
+  if (key === "wins") return stats.decision === "W" ? 1 : 0;
+  if (key === "gaa") {
+    const match = /^(\d+):([0-5]\d)$/.exec(stats.toi ?? "");
+    const seconds = match ? Number(match[1]) * 60 + Number(match[2]) : 0;
+    return seconds > 0 && stats.goalsAgainst !== undefined
+      ? ((stats.goalsAgainst * 3600) / seconds).toFixed(2)
+      : "–";
+  }
+  const value = stats[key];
+  return key === "savePctg" && typeof value === "number"
+    ? value.toFixed(3)
+    : (value ?? "–");
+}
 
 export function groupNHLMatchupPlayers(players: NHLMatchupPlayerRow[]) {
   const starters = players.filter((player) =>
@@ -48,7 +113,9 @@ export function groupNHLMatchupPlayers(players: NHLMatchupPlayerRow[]) {
 }
 
 export const nhlMatchupRosterSchema = z.object({
-  season: z.object({ id: z.string() }).nullable(),
+  season: z
+    .object({ id: z.string(), categories: z.array(z.string()).default([]) })
+    .nullable(),
   updatedAt: z.number(),
   players: z.array(
     z.object({
@@ -112,6 +179,23 @@ export function buildNHLMatchupPlayers({
   );
   const teamsById = new Map(teams.map((team) => [team.id, team]));
   const uniquePlayers = new Map(players.map((player) => [player.id, player]));
+  const powerPlayPoints = new Map<number, number>();
+  const powerPlayGoals = new Set(
+    buildNHLGameEvents(game.eventFeed, [])
+      .filter((event) => event.tags.includes("PP"))
+      .map((event) => event.id),
+  );
+  for (const play of game.eventFeed?.plays ?? []) {
+    if (!powerPlayGoals.has(play.eventId)) continue;
+    for (const id of [
+      play.details?.scoringPlayerId,
+      play.details?.assist1PlayerId,
+      play.details?.assist2PlayerId,
+    ]) {
+      if (id !== undefined)
+        powerPlayPoints.set(id, (powerPlayPoints.get(id) ?? 0) + 1);
+    }
+  }
   const gamePlayers = (["away", "home"] as const).flatMap((side) => {
     const group =
       game.playerByGameStats?.[side === "away" ? "awayTeam" : "homeTeam"];
@@ -182,7 +266,14 @@ export function buildNHLMatchupPlayers({
           gshlTeam,
           lineupPosition,
           lineupStatus,
-          stats: recorded?.stats ?? null,
+          stats: recorded
+            ? {
+                ...recorded.stats,
+                powerPlayPoints: game.eventFeed
+                  ? (powerPlayPoints.get(recorded.stats.playerId) ?? 0)
+                  : recorded.stats.powerPlayPoints,
+              }
+            : null,
         } satisfies NHLMatchupPlayerRow,
       ];
     })

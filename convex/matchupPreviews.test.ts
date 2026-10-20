@@ -47,6 +47,13 @@ void test("preview history reaches all 13 seasons and prefers actual matchup dat
   t.mock.timers.enable({ apis: ["Date"], now: NOW });
   const f = fixture();
   for (const side of ["home", "away"]) {
+    f.put("owners", `${side}-owner`, {
+      firstName: side,
+      lastName: "Owner",
+      nickName: `${side} boss`,
+      email: "private@example.invalid",
+      owing: 999,
+    });
     f.put("franchises", `${side}-franchise`, {
       name: side,
       ownerId: `${side}-owner`,
@@ -79,6 +86,25 @@ void test("preview history reaches all 13 seasons and prefers actual matchup dat
       awayScore: 3,
     });
   }
+  for (const side of ["home", "away"]) {
+    f.put("franchises", `${side}-old-franchise`, {
+      name: `${side} former club`,
+      ownerId: `${side}-owner`,
+    });
+    f.put("teams", `${side}-old-team`, {
+      seasonId: "old-season",
+      franchiseId: `${side}-old-franchise`,
+    });
+  }
+  f.put("weeks", "old-week", { startDate: Date.parse("2013-03-01") });
+  f.put("matchups", "old-owner-meeting", {
+    weekId: "old-week",
+    homeTeamId: "home-old-team",
+    awayTeamId: "away-old-team",
+    awayWin: true,
+    homeScore: 4,
+    awayScore: 6,
+  });
   await invokeMutation(scan, f.ctx, {});
   const row = f.rows("matchupPreviews").find((item) => item.teamId === "home")!;
   const result = await invokeMutation(evidence, f.ctx, {
@@ -88,16 +114,42 @@ void test("preview history reaches all 13 seasons and prefers actual matchup dat
   assert.ok(result && typeof result === "object" && "facts" in result);
   const facts = result.facts as { id: string; text: string }[];
   const history = JSON.parse(
-    facts.find((fact) => fact.id === "head-to-head")!.text,
+    facts.find((fact) => fact.id === "owner-head-to-head")!.text,
   ) as {
-    meetings: { date: string }[];
+    latestMeetings: { date: string }[];
     totalRecordedMeetings: number;
     earliestRecordedMeeting: string;
   };
-  assert.equal(history.meetings[0]?.date, "2026-03-01");
-  assert.equal(history.meetings.length, 10);
-  assert.equal(history.totalRecordedMeetings, 13);
-  assert.equal(history.earliestRecordedMeeting, "2014-03-01");
+  assert.equal(history.latestMeetings[0]?.date, "2026-03-01");
+  assert.equal(history.latestMeetings.length, 10);
+  assert.equal(history.totalRecordedMeetings, 14);
+  assert.equal(history.earliestRecordedMeeting, "2013-03-01");
+  const rivalry = JSON.parse(
+    facts.find((fact) => fact.id === "owner-head-to-head")!.text,
+  ) as {
+    teamOwner: { name: string };
+    opponentOwner: { name: string };
+    wins: number;
+    losses: number;
+    ties: number;
+    totalRecordedMeetings: number;
+    currentStreak: { ownerId: string; wins: number };
+  };
+  assert.equal(rivalry.teamOwner.name, "home boss");
+  assert.equal(rivalry.opponentOwner.name, "away boss");
+  assert.equal(rivalry.wins, 13);
+  assert.equal(rivalry.losses, 1);
+  assert.equal(rivalry.ties, 0);
+  assert.equal(rivalry.totalRecordedMeetings, 14);
+  assert.deepEqual(
+    {
+      ownerId: rivalry.currentStreak.ownerId,
+      wins: rivalry.currentStreak.wins,
+    },
+    { ownerId: "home-owner", wins: 13 },
+  );
+  assert.ok(!facts.some((fact) => fact.id === "head-to-head"));
+  assert.doesNotMatch(JSON.stringify(facts), /private@example|owing/);
   const form = JSON.parse(
     facts.find((fact) => fact.id === "team-form")!.text,
   ) as {
@@ -106,6 +158,79 @@ void test("preview history reaches all 13 seasons and prefers actual matchup dat
   };
   assert.equal(form.latestHistoricalMatchups[0]?.date, "2026-03-01");
   assert.deepEqual(form.recentCompletedMatchups, []);
+});
+
+void test("owner rivalry streaks count consecutive meetings and stop at losses, ties or unknown winners", async (t) => {
+  t.mock.timers.enable({ apis: ["Date"], now: NOW });
+  for (const [results, expectedOwner, wins] of [
+    [["W", "W", "W", "W", "L", "W"], "home-owner", 4],
+    [["L", "L", "T", "L"], "away-owner", 2],
+    [["W", "unknown", "W"], "home-owner", 1],
+    [["T", "W"], null, 0],
+    [["unknown", "W"], null, 0],
+    [[], null, 0],
+  ] as const) {
+    const f = fixture();
+    for (const side of ["home", "away"]) {
+      f.put("owners", `${side}-owner`, { firstName: side, lastName: "Owner" });
+      f.put("franchises", `${side}-franchise`, {
+        ownerId: `${side}-owner`,
+        name: side,
+        beatWriter: `${side} reporter`,
+      });
+      f.put("teams", side, {
+        seasonId: "season",
+        franchiseId: `${side}-franchise`,
+      });
+    }
+    // Insert oldest first to ensure history is sorted before counting the streak.
+    for (let i = results.length - 1; i >= 0; i--) {
+      f.put("weeks", `past-week-${i}`, {
+        seasonId: "season",
+        weekNum: 9 - i,
+        startDate: Date.UTC(2026, 8, 20 - i),
+        endDate: Date.UTC(2026, 8, 20 - i),
+      });
+      f.put("matchups", `past-meeting-${i}`, {
+        weekId: `past-week-${i}`,
+        homeTeamId: "home",
+        awayTeamId: "away",
+        isComplete: true,
+        homeWin: results[i] === "W",
+        awayWin: results[i] === "L",
+        tie: results[i] === "T",
+      });
+    }
+    await invokeMutation(scan, f.ctx, {});
+    const row = f
+      .rows("matchupPreviews")
+      .find((item) => item.teamId === "home")!;
+    const packet = (await invokeMutation(evidence, f.ctx, {
+      id: row._id,
+      attemptAt: NOW,
+    })) as {
+      facts: { id: string; text: string }[];
+    };
+    const rivalry = JSON.parse(
+      packet.facts.find((fact) => fact.id === "owner-head-to-head")!.text,
+    ) as {
+      latestMeetings: { weekNumber: number }[];
+      currentStreak: {
+        ownerId: string;
+        ownerName: string;
+        wins: number;
+      } | null;
+    };
+    assert.equal(
+      rivalry.latestMeetings[0]?.weekNumber,
+      results.length ? 9 : undefined,
+    );
+    if (expectedOwner) {
+      assert.equal(rivalry.currentStreak?.ownerId, expectedOwner);
+      assert.equal(rivalry.currentStreak?.wins, wins);
+      assert.ok(rivalry.currentStreak?.ownerName);
+    } else assert.equal(rivalry.currentStreak, null);
+  }
 });
 
 void test("overnight scan claims exactly one preview per team and preserves published articles", async (t) => {

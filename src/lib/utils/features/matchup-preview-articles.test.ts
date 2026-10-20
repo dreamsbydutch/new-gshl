@@ -14,6 +14,143 @@ import {
 } from "./matchup-preview-articles";
 import { FRANCHISE_BEAT_WRITERS_BY_LEGACY_ID } from "../../../../convex/lib/reporterDirectory";
 
+void test("story composition varies by assignment and contrasts adjacent articles without changing the writer's voice", () => {
+  const plans = [];
+  for (let week = 0; week < 32; week++) {
+    const evidence = {
+      writer: "Home Reporter",
+      teamName: "Home",
+      opponentName: "Away",
+      startsAt: Date.UTC(2026, 9, 4) + week * 7 * 86400000,
+      facts: [],
+    };
+    const request = buildMatchupPreviewRequest("test", evidence);
+    const first = JSON.parse(request.input) as {
+      writerProfile: unknown;
+      composition: {
+        narrativeApproach: string;
+        cadence: string;
+        suggestedParagraphCount: number;
+      };
+    };
+    assert.deepEqual(
+      JSON.parse(buildMatchupPreviewRequest("test", evidence).input),
+      first,
+    );
+    assert.deepEqual(
+      first.writerProfile,
+      matchupPreviewWriterProfile(evidence.writer),
+    );
+    plans.push(first.composition);
+    const opposing = {
+      ...evidence,
+      writer: "Away Reporter",
+      teamName: "Away",
+      opponentName: "Home",
+      opposingArticle: {
+        writer: evidence.writer,
+        headline: "Home's view",
+        paragraphs: [
+          ...Array.from(
+            { length: first.composition.suggestedParagraphCount },
+            () => "A supported point.",
+          ),
+          "Prediction: Home defeats Away, 6–4.",
+        ],
+      },
+    };
+    const second = JSON.parse(
+      buildMatchupPreviewRequest("test", opposing).input,
+    ) as typeof first;
+    assert.notEqual(
+      first.composition.narrativeApproach,
+      second.composition.narrativeApproach,
+    );
+    assert.notEqual(first.composition.cadence, second.composition.cadence);
+    assert.notEqual(
+      first.composition.suggestedParagraphCount,
+      second.composition.suggestedParagraphCount,
+    );
+    const rewrite = JSON.parse(
+      buildMatchupPreviewRequest("test", opposing, {
+        headline: "Rejected",
+        paragraphs: ["A repeated argument.", "A repeated conclusion."],
+      }).input,
+    ) as typeof first;
+    assert.notEqual(
+      rewrite.composition.narrativeApproach,
+      second.composition.narrativeApproach,
+    );
+    assert.match(request.instructions, /no mandatory order/);
+    assert.doesNotMatch(
+      request.instructions,
+      /2 or 3 short plain-text paragraphs/,
+    );
+  }
+  assert.ok(new Set(plans.map((plan) => plan.narrativeApproach)).size >= 6);
+  assert.equal(new Set(plans.map((plan) => plan.cadence)).size, 4);
+  assert.equal(
+    new Set(plans.map((plan) => plan.suggestedParagraphCount)).size,
+    4,
+  );
+});
+
+void test("previews allow varied paragraph shapes while retaining length and prediction validation", () => {
+  const evidence = {
+    writer: "Reporter",
+    teamName: "Home",
+    opponentName: "Away",
+    startsAt: 1,
+    facts: [{ id: "roster", text: "Known roster" }],
+  };
+  for (const count of [1, 2, 3, 4, 5, 6]) {
+    const text = JSON.stringify({
+      headline: "One player's challenge",
+      paragraphs: Array.from(
+        { length: count },
+        (_value, index) => `Supported point ${index}.`,
+      ),
+      evidenceIds: ["roster"],
+      prediction: { winner: "team", teamScore: 6, opponentScore: 4 },
+    });
+    if (count >= 2 && count <= 5) {
+      const article = parseMatchupPreviewArticle(text, evidence);
+      assert.equal(article.paragraphs.length, count + 1);
+      assert.match(article.paragraphs.at(-1)!, /^Prediction:/);
+    } else assert.throws(() => parseMatchupPreviewArticle(text, evidence));
+  }
+});
+
+void test("preview brief centers owners and playful rivalry while retaining an evidence-based forecast", () => {
+  const request = buildMatchupPreviewRequest("test", {
+    writer: "Reporter",
+    teamName: "Home",
+    opponentName: "Away",
+    startsAt: 1,
+    facts: [],
+  });
+  assert.match(request.instructions, /OWNER-FIRST PREVIEW/);
+  assert.match(request.instructions, /owner-head-to-head/);
+  assert.match(request.instructions, /Lightly chirp the opposing owner/);
+  assert.match(
+    request.instructions,
+    /do not open with a statistical comparison/,
+  );
+  assert.match(request.instructions, /Career rank is not current team quality/);
+  assert.match(request.instructions, /Every writer must pick a winner/);
+  assert.match(request.instructions, /do not print calendar sample ranges/);
+  assert.match(request.instructions, /Use a supplied weekNumber/);
+  assert.doesNotMatch(request.instructions, /Date performance samples/);
+  assert.match(
+    request.instructions,
+    /Attribute the head-to-head record and winning streak to the named owners/,
+  );
+  assert.match(
+    request.instructions,
+    /Never infer a streak from a winning record alone/,
+  );
+});
+
 void test("preview readership ends at midnight Wednesday Eastern across start days and DST", () => {
   for (const [date, expiry] of [
     ["2026-10-04", "2026-10-07T04:00:00Z"],

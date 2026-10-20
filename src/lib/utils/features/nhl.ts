@@ -164,12 +164,14 @@ export const nhlBoxscorePlayerSchema = z.object({
   pim: z.number().optional(),
   hits: z.number().optional(),
   powerPlayGoals: z.number().optional(),
+  powerPlayPoints: z.number().optional(),
   sog: z.number().optional(),
   blockedShots: z.number().optional(),
   saves: z.number().optional(),
   shotsAgainst: z.number().optional(),
   goalsAgainst: z.number().optional(),
   savePctg: z.number().optional(),
+  decision: z.string().optional(),
   toi: z.string().optional(),
 });
 const boxscoreTeam = z.object({
