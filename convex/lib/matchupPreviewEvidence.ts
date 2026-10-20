@@ -99,6 +99,7 @@ async function teamEvidence(ctx: QueryCtx, team: Doc<"teams">, now: number) {
       return {
         id: String(matchup._id),
         date: utcTimestampToDateKey(week?.startDate),
+        weekNumber: number(week?.weekNum),
         opponentTeamId: ownHome ? matchup.awayTeamId : matchup.homeTeamId,
         score: ownHome ? matchup.homeScore : matchup.awayScore,
         opponentScore: ownHome ? matchup.awayScore : matchup.homeScore,
@@ -292,6 +293,15 @@ export async function loadMatchupPreviewEvidence(
   const meetings = own.results.filter((row) =>
     other.teamIds.has(row.opponentTeamId),
   );
+  const latestResult = meetings[0]?.result;
+  let consecutiveWins = 0;
+  if (latestResult === "W" || latestResult === "L") {
+    for (const meeting of meetings) {
+      if (meeting.result !== latestResult) break;
+      consecutiveWins += 1;
+    }
+  }
+  const streakOwner = latestResult === "W" ? own : other;
   const recentFrom = utcTimestampToDateKey(now - RECENT_FORM_DAYS * DAY)!;
   const facts: MatchupPreviewFact[] = [
     {
@@ -300,18 +310,11 @@ export async function loadMatchupPreviewEvidence(
         team: own.name,
         opponent: other.name,
         startsAt,
+        weekNumber: number(
+          weeks.find((week) => week._id === matchup.weekId)?.weekNum,
+        ),
         gameType: matchup.gameType,
         scoreMeaning: "GSHL fantasy categories",
-      }),
-    },
-    {
-      id: "head-to-head",
-      text: JSON.stringify({
-        scope:
-          "Latest ten recorded completed meetings across all stored franchise team instances, sorted by matchup date. Database coverage is not independently verified all-time history.",
-        totalRecordedMeetings: meetings.length,
-        earliestRecordedMeeting: meetings.at(-1)?.date ?? null,
-        meetings: meetings.slice(0, 10),
       }),
     },
     {
@@ -333,6 +336,16 @@ export async function loadMatchupPreviewEvidence(
           (row) => row.result === "Final; winner not recorded",
         ).length,
         totalRecordedMeetings: meetings.length,
+        currentStreak:
+          consecutiveWins > 0
+            ? {
+                ownerId: streakOwner.ownerId,
+                ownerName: streakOwner.ownerName,
+                wins: consecutiveWins,
+                scope:
+                  "Consecutive wins in these owners' latest recorded meetings, not current team form or a verified all-time streak. Ties and unrecorded winners end the streak.",
+              }
+            : null,
         earliestRecordedMeeting: meetings.at(-1)?.date ?? null,
         latestMeetings: meetings.slice(0, 10),
       }),
@@ -341,7 +354,10 @@ export async function loadMatchupPreviewEvidence(
   if (categoryComparison)
     facts.push({
       id: "category-comparison",
-      text: JSON.stringify(categoryComparison),
+      text: JSON.stringify({
+        ...categoryComparison,
+        weekNumber: number(completedWeek?.weekNum),
+      }),
     });
   const rankingCutoff = utcTimestampToDateKey(Math.min(now, startsAt - 1))!;
   const rankings = await loadOwnerRankingResearch(
