@@ -35,7 +35,7 @@ export function LeagueOverview() {
             ],
             [
               "Records & career leaders",
-              "Player and franchise careers, season and weekly records",
+              "Player and owner careers, season and weekly records",
               "/records",
             ],
             [

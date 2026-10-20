@@ -63,7 +63,7 @@ export function addCareerPerformances(
 ): Map<string, CareerAggregate> {
   const next = new Map(current);
   for (const source of rows) {
-    const key = kind === "playerCareer" ? source.playerId : source.franchiseId;
+    const key = kind === "playerCareer" ? source.playerId : source.ownerId;
     if (!key) continue;
     const previous = next.get(key);
     const stats = { ...previous?.row.stats };

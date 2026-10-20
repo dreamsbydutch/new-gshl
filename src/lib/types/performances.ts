@@ -36,6 +36,8 @@ export interface PerformanceRow {
   name: string;
   team: string;
   franchiseId?: string;
+  ownerId?: string;
+  ownerName?: string;
 }
 
 export interface PerformanceResult {
