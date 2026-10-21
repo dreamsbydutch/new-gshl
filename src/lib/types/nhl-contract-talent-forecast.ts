@@ -1,3 +1,4 @@
+import type { NhlTalentAgingModel } from "./nhl-contract-talent-aging";
 /** Regular-season contribution only. No salary, cap or fantasy-category inputs. */
 export type NhlTalentPosition = "F" | "D" | "G";
 export interface NhlTalentAnnualPlayer {
@@ -44,6 +45,7 @@ export interface NhlTalentForecastValidationRow {
   targetKind: "played-known" | "verified-no-nhl-games";
 }
 export interface NhlTalentForecastValidation {
+  unavailablePredictions: number;
   eligibleRows: number;
   knownTargets: number;
   unknownPositiveGameTargets: number;
@@ -69,6 +71,7 @@ export interface NhlTalentForecastValidation {
   }>;
 }
 export interface NhlTalentForecastModel {
+  aging: NhlTalentAgingModel;
   position: NhlTalentPosition;
   horizon: number;
   trainingRows: number;
@@ -97,7 +100,7 @@ export interface NhlTalentForecastProfile {
   latestAppearanceYear: number;
 }
 export interface NhlTalentForecastArtifact {
-  version: "nhl-contract-talent-direct-horizon-v1";
+  version: "nhl-contract-talent-age-trajectory-v2";
   units: "goals-above-same-position-reference-per-82-team-games";
   cutoffYear: number;
   featureNames: readonly string[];
@@ -124,6 +127,7 @@ export interface NhlTalentForecastFitResult {
   validationRows: NhlTalentForecastValidationRow[];
 }
 export interface NhlContractTalentPrediction {
+  targetAge: number | null;
   status: "qualified" | "research" | "unavailable";
   nhlPlayerId: number;
   position: NhlTalentPosition | null;

@@ -109,21 +109,26 @@ export function buildNhlContractTalentViews(
             }),
           });
         }
-        const qualified =
+        const available =
           result.forecast.years.length > 0 &&
           result.forecast.years.every(
             (row) =>
-              row.prediction.status === "qualified" &&
+              row.prediction.status !== "unavailable" &&
               row.prediction.valuePer82 !== null,
           );
-        if (qualified) {
-          result.forecast.status = "qualified";
+        if (available) {
+          result.forecast.status = result.forecast.years.every(
+            (row) => row.prediction.status === "qualified",
+          )
+            ? "qualified"
+            : "estimated";
           result.forecast.averageGar82 =
             result.forecast.years.reduce(
               (sum, row) => sum + row.prediction.valuePer82!,
               0,
             ) / result.forecast.years.length;
-        } else
+        }
+        if (result.forecast.status !== "qualified")
           result.forecast.reasons = [
             ...new Set(
               result.forecast.years

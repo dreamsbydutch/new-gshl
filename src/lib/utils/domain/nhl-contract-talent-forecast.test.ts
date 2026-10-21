@@ -10,6 +10,7 @@ import type {
   NhlTalentForecastDataset,
   NhlTalentPosition,
 } from "../../types/nhl-contract-talent-forecast";
+import forecastJson from "../../data/nhl-contract-talent-forecast.json";
 
 function dataset(from = 2014, to = 2026): NhlTalentForecastDataset {
   return {
@@ -111,7 +112,7 @@ void test("future outcomes and incomplete current seasons cannot alter a cutoff 
   );
 });
 
-void test("direct-horizon outer training AND ridge selection respect the forecast origin, not just target year", () => {
+void test("one-year training, aging and ridge selection respect each forecast origin", () => {
   const source = dataset(),
     first = fitNhlContractTalentForecast(source, {
       cutoffYear: 2026,
@@ -138,6 +139,33 @@ void test("direct-horizon outer training AND ridge selection respect the forecas
     first.validationRows.every(
       (r) => r.trainingThroughYear <= r.originYear && r.targetYear <= 2026,
     ),
+  );
+});
+
+void test("unavailable age-based forecasts remain in the historical coverage denominator", () => {
+  const input = mutable(dataset());
+  for (const season of input.seasons)
+    season.players.find((p) => p.nhlPlayerId === 1)!.age = null;
+  const { artifact } = fitNhlContractTalentForecast(input, {
+    cutoffYear: 2026,
+    horizons: [2],
+  });
+  const validation = artifact.models.find(
+    (m) => m.position === "F",
+  )!.validation;
+  assert.ok(validation.unavailablePredictions > 0);
+  assert.equal(
+    validation.eligibleRows,
+    validation.knownTargets +
+      validation.unknownPositiveGameTargets +
+      validation.censoredTargets +
+      validation.unavailablePredictions,
+  );
+  assert.ok(validation.coverage < 1);
+  assert.equal(
+    predictNhlContractTalent(artifact, { nhlPlayerId: 1, targetYear: 2028 })
+      .valuePer82,
+    null,
   );
 });
 
@@ -214,7 +242,7 @@ void test("signed common goal units survive shortened seasons without treating p
   }
 });
 
-void test("long or missing-history forecasts are withheld/research; repeated contracts never duplicate training observations", () => {
+void test("long forecasts are extrapolated; missing histories stay unavailable; repeated contracts never duplicate training observations", () => {
   const input = dataset(),
     result = fitNhlContractTalentForecast(input, {
       cutoffYear: 2026,
@@ -332,4 +360,30 @@ void test("saved artifact parser rejects invalid coefficients, duplicates, futur
       /Invalid NHL talent forecast artifact/,
     );
   }
+});
+
+void test("published forecast develops Leo Carlsson before declining and covers distant contract years", () => {
+  const artifact = parseNhlTalentForecastArtifact(forecastJson);
+  const projections = Array.from({ length: 12 }, (_, i) =>
+    predictNhlContractTalent(artifact, {
+      nhlPlayerId: 8484153,
+      targetYear: 2027 + i,
+    }),
+  );
+  assert.equal(projections[0]!.targetAge, 22);
+  assert.ok(
+    projections.every(
+      (p) => p.valuePer82 !== null && Number.isFinite(p.valuePer82),
+    ),
+  );
+  assert.ok(projections[1]!.valuePer82! > projections[0]!.valuePer82!);
+  assert.ok(projections[3]!.valuePer82! > projections[0]!.valuePer82!);
+  assert.ok(projections[10]!.valuePer82! < projections[3]!.valuePer82!);
+  assert.equal(projections[10]!.status, "research");
+  assert.equal(projections[10]!.interval, null);
+  // A player-specific expected path, not a manual name/ID override.
+  assert.equal(
+    artifact.models.find((m) => m.position === "F")!.aging.curve!.peakAge,
+    25,
+  );
 });

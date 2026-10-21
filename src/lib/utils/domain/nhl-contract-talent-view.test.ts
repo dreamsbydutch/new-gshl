@@ -82,7 +82,7 @@ void test("an unverified missing cohort is unknown, while a closed official no-g
   assert.equal(identityMissing.actual?.coveredYearCount, 0);
   assert.equal(identityMissing.forecast.averageGar82, null);
 });
-void test("expired and stale contracts never reuse the current forecast, and unsupported long terms have no main score", () => {
+void test("expired and stale contracts never reuse the current forecast, and long terms include explicit extrapolated estimates", () => {
   const expired = buildNhlContractTalentViews(
     [
       contract({
@@ -115,7 +115,8 @@ void test("expired and stale contracts never reuse the current forecast, and uns
     artifact,
     2026,
   ).get("contract")!;
-  assert.equal(remaining.forecast.averageGar82, null);
+  assert.ok(Number.isFinite(remaining.forecast.averageGar82));
+  assert.equal(remaining.forecast.status, "estimated");
   assert.equal(remaining.forecast.years.length, 8);
   assert.ok(
     remaining.forecast.years.some(
@@ -167,4 +168,30 @@ void test("current raw contribution stays separate and identity conflicts fail c
   assert.equal(wrong.actual, null);
   assert.match(wrong.error ?? "", /identity/);
   assert.equal(wrong.forecast.averageGar82, null);
+});
+
+void test("an extension beyond the old eight-year horizon has a full-term projected average", () => {
+  const result = buildNhlContractTalentViews(
+    [
+      contract({
+        nhlPlayerId: 8484153,
+        startSeasonStartYear: 2027,
+        expirySeasonStartYear: 2034,
+        length: 8,
+      }),
+    ],
+    [],
+    artifact,
+    2026,
+  ).get("contract")!;
+  assert.equal(result.forecast.status, "estimated");
+  assert.equal(result.forecast.years.length, 8);
+  assert.equal(result.forecast.years.at(-1)!.seasonStartYear, 2034);
+  assert.ok(
+    result.forecast.years.every((y) => y.prediction.valuePer82 !== null),
+  );
+  assert.equal(
+    result.forecast.averageGar82,
+    result.forecast.years.reduce((s, y) => s + y.prediction.valuePer82!, 0) / 8,
+  );
 });

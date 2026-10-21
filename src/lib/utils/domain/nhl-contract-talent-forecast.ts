@@ -11,9 +11,14 @@ import type {
   NhlTalentForecastValidation,
   NhlTalentForecastValidationRow,
 } from "../../types/nhl-contract-talent-forecast";
+import {
+  fitNhlTalentAging,
+  projectNhlTalentAging,
+  validateNhlTalentAging,
+} from "./nhl-contract-talent-aging";
 
 export const NHL_TALENT_FORECAST_POLICY = {
-  version: "nhl-contract-talent-direct-horizon-v1",
+  version: "nhl-contract-talent-age-trajectory-v2",
   units: "goals-above-same-position-reference-per-82-team-games",
   ridgeCandidates: [1, 10, 100],
   defaultRidge: 10,
@@ -22,7 +27,7 @@ export const NHL_TALENT_FORECAST_POLICY = {
   minimumValidationRows: 100,
   minimumValidationOrigins: 3,
   minimumValidationCoverage: 0.8,
-  maximumHorizon: 8,
+  maximumHorizon: 30,
 } as const;
 const features = [
   "currentGarPer82",
@@ -305,7 +310,8 @@ function quantile(sorted: number[], q: number) {
   ]!;
 }
 
-/** Fit offline. Every outer forecast trains and tunes only with outcomes known at its origin. */
+/** Fit one-year skill/workload forecasts, then a shared age trajectory. Every
+ * fold fits both components using only outcomes completed at its origin. */
 export function fitNhlContractTalentForecast(
   input: NhlTalentForecastDataset,
   options: { cutoffYear: number; horizons?: readonly number[] },
@@ -317,9 +323,9 @@ export function fitNhlContractTalentForecast(
     throw Error(
       "Forecast cutoff requires a completed, complete official cohort",
     );
-  const horizons = [...(options.horizons ?? [1, 2, 3, 4, 5, 6, 7, 8])].sort(
-    (a, b) => a - b,
-  );
+  const horizons = [
+    ...(options.horizons ?? Array.from({ length: 30 }, (_, i) => i + 1)),
+  ].sort((a, b) => a - b);
   if (
     !horizons.length ||
     new Set(horizons).size !== horizons.length ||
@@ -330,7 +336,7 @@ export function fitNhlContractTalentForecast(
         h > NHL_TALENT_FORECAST_POLICY.maximumHorizon,
     )
   )
-    throw Error("Unsupported direct forecast horizons");
+    throw Error("Unsupported forecast horizons");
   const years = [...seasons.values()]
     .filter((s) => complete(s) && s.year <= cutoff)
     .map((s) => s.year)
@@ -340,55 +346,125 @@ export function fitNhlContractTalentForecast(
   );
   const models: NhlTalentForecastModel[] = [],
     validationRows: NhlTalentForecastValidationRow[] = [];
-  for (const position of positions)
-    for (const horizon of horizons) {
-      const examples: Example[] = [];
-      for (const origin of years) {
-        if (origin + horizon > cutoff) continue;
-        for (const profile of profiles.get(origin)!) {
-          if (profile.position !== position) continue;
-          const target = label(seasons, profile.nhlPlayerId, origin + horizon);
-          if (typeof target !== "string")
-            examples.push({
-              profile,
-              originYear: origin,
-              targetYear: origin + horizon,
-              target: target.value,
-              kind: target.kind,
-            });
-        }
+  for (const position of positions) {
+    const examples: Example[] = [];
+    for (const origin of years) {
+      if (origin + 1 > cutoff) continue;
+      for (const profile of profiles.get(origin)!) {
+        if (profile.position !== position) continue;
+        const target = label(seasons, profile.nhlPlayerId, origin + 1);
+        if (typeof target !== "string")
+          examples.push({
+            profile,
+            originYear: origin,
+            targetYear: origin + 1,
+            target: target.value,
+            kind: target.kind,
+          });
       }
-      if (examples.length < NHL_TALENT_FORECAST_POLICY.minimumTrainingRows)
+    }
+    if (examples.length < NHL_TALENT_FORECAST_POLICY.minimumTrainingRows)
+      continue;
+    const candidateErrors = new Map<
+      number,
+      { targetYear: number; error: number }[]
+    >(NHL_TALENT_FORECAST_POLICY.ridgeCandidates.map((r) => [r, []]));
+    const folds = new Map<
+      number,
+      {
+        linear: Linear;
+        aging: NhlTalentForecastModel["aging"];
+        rows: number;
+        through: number;
+        ridge: number;
+        mean: number;
+      }
+    >();
+    for (const origin of years) {
+      const train = examples.filter((r) => r.targetYear <= origin);
+      if (train.length < NHL_TALENT_FORECAST_POLICY.minimumTrainingRows)
         continue;
-      const candidateErrors = new Map<
-        number,
-        { targetYear: number; error: number }[]
-      >(NHL_TALENT_FORECAST_POLICY.ridgeCandidates.map((r) => [r, []]));
+      const system = ridgeSystem(train);
+      const candidates: Candidate[] =
+        NHL_TALENT_FORECAST_POLICY.ridgeCandidates.map((ridge) => ({
+          ridge,
+          model: system.fit(ridge),
+          errors: candidateErrors.get(ridge)!,
+        }));
+      const lambda = selectRidge(candidateErrors, origin),
+        chosen = candidates.find((c) => c.ridge === lambda)!;
+      const aging = fitNhlTalentAging(
+        years.filter((y) => y <= origin).map((y) => seasons.get(y)!),
+        position,
+      );
+      folds.set(origin, {
+        linear: chosen.model,
+        aging,
+        rows: train.length,
+        through: Math.max(...train.map((r) => r.targetYear)),
+        ridge: lambda,
+        mean: system.intercept,
+      });
+      // Tuning sees a target only after that target has completed.
+      for (const profile of profiles
+        .get(origin)!
+        .filter((p) => p.position === position)) {
+        const target =
+          origin + 1 <= cutoff
+            ? label(seasons, profile.nhlPlayerId, origin + 1)
+            : "censored";
+        if (typeof target === "string") continue;
+        for (const candidate of candidates)
+          candidate.errors.push({
+            targetYear: origin + 1,
+            error:
+              (predict(candidate.model, profile.features) - target.value) ** 2,
+          });
+      }
+    }
+    const final = folds.get(cutoff)!;
+    for (const horizon of horizons) {
       const outer: NhlTalentForecastValidationRow[] = [];
-      let eligibleRows = 0,
+      let unavailablePredictions = 0,
+        eligibleRows = 0,
         knownTargets = 0,
         unknownPositiveGameTargets = 0,
         censoredTargets = 0,
         verifiedNoNhlGameTargets = 0;
-      for (const origin of years) {
+      for (const [origin, fold] of folds) {
         if (origin + horizon > cutoff) continue;
-        const train = examples.filter((r) => r.targetYear <= origin);
-        if (train.length < NHL_TALENT_FORECAST_POLICY.minimumTrainingRows)
+        const historicalTargets: number[] = [];
+        for (const prior of years) {
+          if (prior + horizon > origin) continue;
+          for (const history of profiles
+            .get(prior)!
+            .filter((p) => p.position === position)) {
+            const known = label(seasons, history.nhlPlayerId, prior + horizon);
+            if (typeof known !== "string") historicalTargets.push(known.value);
+          }
+        }
+        if (
+          historicalTargets.length <
+          NHL_TALENT_FORECAST_POLICY.minimumTrainingRows
+        )
           continue;
-        const system = ridgeSystem(train),
-          candidates: Candidate[] =
-            NHL_TALENT_FORECAST_POLICY.ridgeCandidates.map((ridge) => ({
-              ridge,
-              model: system.fit(ridge),
-              errors: candidateErrors.get(ridge)!,
-            }));
-        // Selection deliberately happens before adding this outer origin's outcomes.
-        const lambda = selectRidge(candidateErrors, origin),
-          chosen = candidates.find((c) => c.ridge === lambda)!;
+        const horizonMean =
+          historicalTargets.reduce((sum, value) => sum + value, 0) /
+          historicalTargets.length;
         for (const profile of profiles
           .get(origin)!
           .filter((p) => p.position === position)) {
           eligibleRows++;
+          const prediction = trajectory(
+            fold.linear,
+            fold.aging,
+            profile,
+            horizon,
+          );
+          if (prediction === null) {
+            unavailablePredictions++;
+            continue;
+          }
           const target = label(seasons, profile.nhlPlayerId, origin + horizon);
           if (target === "censored") {
             censoredTargets++;
@@ -407,22 +483,15 @@ export function fitNhlContractTalentForecast(
             originYear: origin,
             targetYear: origin + horizon,
             horizon,
-            trainingRows: train.length,
-            trainingThroughYear: Math.max(...train.map((r) => r.targetYear)),
-            ridge: lambda,
+            trainingRows: fold.rows,
+            trainingThroughYear: fold.through,
+            ridge: fold.ridge,
             target: target.value,
-            prediction: predict(chosen.model, profile.features),
+            prediction,
             latestObserved: profile.latestObserved,
-            positionMean: system.intercept,
+            positionMean: horizonMean,
             targetKind: target.kind,
           });
-          for (const candidate of candidates)
-            candidate.errors.push({
-              targetYear: origin + horizon,
-              error:
-                (predict(candidate.model, profile.features) - target.value) **
-                2,
-            });
         }
       }
       const a = metrics(outer, "prediction"),
@@ -438,6 +507,7 @@ export function fitNhlContractTalentForecast(
         origins.length >= NHL_TALENT_FORECAST_POLICY.minimumValidationOrigins &&
         coverage >= NHL_TALENT_FORECAST_POLICY.minimumValidationCoverage;
       const validation: NhlTalentForecastValidation = {
+        unavailablePredictions,
         eligibleRows,
         knownTargets,
         unknownPositiveGameTargets,
@@ -469,21 +539,19 @@ export function fitNhlContractTalentForecast(
           };
         }),
       };
-      const lambda = selectRidge(candidateErrors, cutoff),
-        linear = ridgeSystem(examples).fit(lambda),
-        residuals = outer
-          .map((r) => r.target - r.prediction)
-          .sort((x, y) => x - y);
+      const residuals = outer
+        .map((r) => r.target - r.prediction)
+        .sort((a, b) => a - b);
       models.push({
         position,
         horizon,
-        trainingRows: examples.length,
-        ridge: lambda,
-        ...linear,
+        trainingRows: final.rows,
+        ridge: final.ridge,
+        ...final.linear,
+        aging: final.aging,
         validation,
         residualInterval:
-          outer.length >= NHL_TALENT_FORECAST_POLICY.minimumValidationRows &&
-          origins.length >= NHL_TALENT_FORECAST_POLICY.minimumValidationOrigins
+          outer.length >= 100 && origins.length >= 3
             ? {
                 nominalCoverage: 0.8,
                 low: quantile(residuals, 0.1),
@@ -496,6 +564,7 @@ export function fitNhlContractTalentForecast(
       });
       validationRows.push(...outer);
     }
+  }
   const artifact: NhlTalentForecastArtifact = {
     version: NHL_TALENT_FORECAST_POLICY.version,
     units: NHL_TALENT_FORECAST_POLICY.units,
@@ -515,7 +584,7 @@ export function fitNhlContractTalentForecast(
       originPopulation:
         "Any official NHL appearance in the preceding three completed seasons; one row per player/origin, never per contract",
       qualification:
-        "Sufficient nested historical support and point-MSE improvement over both prespecified baselines; not independent prospective confirmation",
+        "Full-term estimates include explicit long-range extrapolation; historical support is assessed separately at each horizon",
     },
     sourceSeasons: years.map((y) => ({
       year: y,
@@ -525,15 +594,30 @@ export function fitNhlContractTalentForecast(
     profiles: profiles.get(cutoff)!,
     models,
     warnings: [
-      "Expected delivered goal contribution includes NHL participation and workload; it is not isolated causal ability.",
-      "Positive-GP players with unsupported GAR are unknown targets, not zero; nonrandom exclusion can bias validation.",
-      "Historical model/reference reconstructions and already-inspected seasons do not establish untouched prospective validation.",
-      "Residual ranges are conditional empirical prediction intervals; shared player/team/season dependence and model/reference uncertainty remain.",
-      "Only completed source seasons are used. Ongoing-season results and salaries never enter these features.",
-      "Direct long horizons without adequate historical validation remain research estimates; no extrapolation beyond fitted horizons.",
+      "Expected delivered contribution includes participation and workload; not isolated intrinsic ability.",
+      "Age curves use returning-player changes; a separate NHL-return model includes exits but cannot eliminate all selection bias.",
+      "Long-range estimates extrapolate a shared age curve, not independently validated distant-season models.",
+      "Unknown positive-GP outcomes are excluded, never zero. Current incomplete seasons and salaries never enter fitting.",
+      "Retrospective, previously inspected source reconstructions are not untouched prospective confirmation.",
+      "Residual ranges are horizon-specific historical errors, not guaranteed future coverage or contract confidence intervals.",
     ],
   };
   return { artifact, validationRows };
+}
+function trajectory(
+  model: Linear,
+  aging: NhlTalentForecastModel["aging"],
+  profile: NhlTalentForecastProfile,
+  horizon: number,
+): number | null {
+  return projectNhlTalentAging(aging, {
+    baseline: predict(model, profile.features),
+    currentGar: profile.features[0]!,
+    originAge: profile.features[8] === 1 ? profile.features[6]! : null,
+    horizon,
+    gamesShare: profile.features[4]!,
+    garKnown: profile.features[9] === 1,
+  });
 }
 
 /** Validate public artifact boundaries without trusting supplied qualification flags. */
@@ -579,7 +663,9 @@ export function validateNhlTalentForecastArtifact(
     JSON.stringify(value.featureNames) !== JSON.stringify(features) ||
     !array(value.horizons) ||
     !value.horizons.length ||
-    value.horizons.some((h) => !integer(h, 1) || h > 8) ||
+    value.horizons.some(
+      (h) => !integer(h, 1) || h > NHL_TALENT_FORECAST_POLICY.maximumHorizon,
+    ) ||
     new Set(value.horizons).size !== value.horizons.length ||
     !array(value.warnings) ||
     value.warnings.some((w) => typeof w !== "string")
@@ -685,6 +771,7 @@ export function validateNhlTalentForecastArtifact(
   for (const model of value.models) {
     if (!object(model)) fail();
     keys(model, [
+      "aging",
       "position",
       "horizon",
       "trainingRows",
@@ -696,6 +783,16 @@ export function validateNhlTalentForecastArtifact(
       "validation",
       "residualInterval",
     ]);
+    try {
+      validateNhlTalentAging(model.aging);
+    } catch {
+      fail();
+    }
+    if (
+      model.aging.position !== model.position ||
+      model.aging.throughYear !== cutoff
+    )
+      fail();
     const key = `${String(model.position)}:${String(model.horizon)}`;
     if (
       !positions.some((p) => p === model.position) ||
@@ -717,6 +814,7 @@ export function validateNhlTalentForecastArtifact(
     const v = model.validation;
     if (!object(v)) fail();
     keys(v, [
+      "unavailablePredictions",
       "eligibleRows",
       "knownTargets",
       "unknownPositiveGameTargets",
@@ -732,6 +830,7 @@ export function validateNhlTalentForecastArtifact(
       "folds",
     ]);
     for (const field of [
+      "unavailablePredictions",
       "eligibleRows",
       "knownTargets",
       "unknownPositiveGameTargets",
@@ -744,7 +843,8 @@ export function validateNhlTalentForecastArtifact(
       v.eligibleRows !==
         Number(v.knownTargets) +
           Number(v.unknownPositiveGameTargets) +
-          Number(v.censoredTargets) ||
+          Number(v.censoredTargets) +
+          Number(v.unavailablePredictions) ||
       Number(v.verifiedNoNhlGameTargets) > Number(v.knownTargets) ||
       v.coverage !==
         (Number(v.eligibleRows) - Number(v.censoredTargets)
@@ -905,6 +1005,8 @@ export function predictNhlContractTalent(
     targetYear: request.targetYear,
     horizon,
     units: artifact.units,
+    targetAge:
+      profile?.features[8] === 1 ? profile.features[6]! + horizon : null,
   };
   if (!profile || !model)
     return {
@@ -916,7 +1018,7 @@ export function predictNhlContractTalent(
       reasons: [
         !profile
           ? "No eligible completed NHL history at this origin"
-          : "No fitted direct model for this position/horizon",
+          : "No fitted age-trajectory model for this position/horizon",
       ],
     };
   if (
@@ -933,11 +1035,22 @@ export function predictNhlContractTalent(
     )
   )
     throw Error("Invalid or leaking NHL talent forecast artifact");
-  const value = predict(model, profile.features),
+  const value = trajectory(model, model.aging, profile, horizon),
     qualified =
       model.validation.supported &&
       model.validation.beatsBothBaselines &&
       profile.knownGarSeasons > 0;
+  if (value === null)
+    return {
+      ...base,
+      status: "unavailable",
+      valuePer82: null,
+      interval: null,
+      validation: model.validation,
+      reasons: [
+        "A supported age and participation history is required for a multi-year trajectory",
+      ],
+    };
   const interval = model.residualInterval;
   if (
     interval &&

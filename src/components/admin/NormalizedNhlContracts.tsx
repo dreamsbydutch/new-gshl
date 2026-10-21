@@ -74,7 +74,7 @@ function ContractRankings() {
           are never filled with zero.
         </p>
         <p className="mt-1 text-sm text-muted-foreground">
-          Remaining talent averages validated annual forecasts across every
+          Remaining talent averages age-adjusted annual estimates across every
           remaining contract season. These use completed{" "}
           {season(view.forecastOriginYear - 1)} data; the current-year forecast
           is a full-season estimate, not additional value still to be earned.
@@ -326,13 +326,15 @@ function ContractRankings() {
                         <div className="text-xs text-muted-foreground">
                           {row.talent?.forecast.status === "qualified"
                             ? `${row.talent.forecast.years.length} remaining seasons`
-                            : row.talent?.forecast.status === "expired"
-                              ? "Contract ended"
-                              : row.talent?.forecast.status === "stale"
-                                ? "Forecast needs refresh"
-                                : view.talentLoading
-                                  ? "Loading…"
-                                  : "Insufficient validation or history"}
+                            : row.talent?.forecast.status === "estimated"
+                              ? `${row.talent.forecast.years.length} seasons; includes extrapolation`
+                              : row.talent?.forecast.status === "expired"
+                                ? "Contract ended"
+                                : row.talent?.forecast.status === "stale"
+                                  ? "Forecast needs refresh"
+                                  : view.talentLoading
+                                    ? "Loading…"
+                                    : "Insufficient validation or history"}
                         </div>
                       </td>
                       <td className="p-3 text-right tabular-nums">
@@ -458,6 +460,7 @@ function ContractRankings() {
                                   <thead>
                                     <tr className="text-left">
                                       <th className="p-2">Season</th>
+                                      <th className="p-2">Age</th>
                                       <th className="p-2">Expected GAR/82</th>
                                       <th className="p-2">
                                         Historical 80% residual range
@@ -475,6 +478,10 @@ function ContractRankings() {
                                           {season(year.seasonStartYear)}
                                         </td>
                                         <td className="p-2">
+                                          {year.prediction.targetAge ??
+                                            "Unknown"}
+                                        </td>
+                                        <td className="p-2">
                                           {talentScore(
                                             year.prediction.valuePer82,
                                           )}
@@ -490,7 +497,7 @@ function ContractRankings() {
                                             ? "Historical support passed"
                                             : year.prediction.status ===
                                                 "research"
-                                              ? "Research only; excluded from main score"
+                                              ? "Extrapolated / limited historical support"
                                               : "Unavailable"}
                                         </td>
                                       </tr>
@@ -508,9 +515,11 @@ function ContractRankings() {
                                 outcomes; unsupported played seasons remain
                                 unknown. Residual ranges describe those observed
                                 historical errors, not guaranteed future
-                                coverage. Current partial seasons and
-                                research-only horizons do not enter the
-                                delivered or validated remaining-term averages.
+                                coverage. Current partial seasons do not enter
+                                delivered averages. Projected averages include
+                                every remaining year; distant years extrapolate
+                                the shared age curve and NHL participation
+                                model.
                               </p>
                             </div>
                           ) : null}

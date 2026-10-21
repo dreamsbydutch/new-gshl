@@ -18,7 +18,7 @@ export interface NhlContractTalentView {
   actual: NhlContractTalentSummary | null;
   error: string | null;
   forecast: {
-    status: "qualified" | "unavailable" | "expired" | "stale";
+    status: "qualified" | "estimated" | "unavailable" | "expired" | "stale";
     averageGar82: number | null;
     originYear: number;
     years: Array<{

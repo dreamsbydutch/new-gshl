@@ -41,36 +41,67 @@ positive-GP player with no supported hockey value always remains unknown.
 
 ## Remaining-term estimate
 
-The independent forecast uses completed seasons through 2025–26 and predicts
-annual GAR/82 at direct horizons one through eight. It fits forwards, defenders
-and goalies separately while preserving common output units. Features describe
-recent reviewed contribution, workload, age and support/absence indicators.
-Recently absent players remain eligible, and confirmed nonreturners enter
-training with zero delivered contribution. Unsupported played seasons are
-excluded as unknown outcomes and their frequency is reported.
+The v2 forecast uses completed seasons through 2025-26. A chronological,
+regularized one-year regression estimates the initial contribution from recent
+reviewed contribution, workload, age and support indicators. Its age and age-squared
+features alone were insufficient to define a coherent multiyear career path:
+the previous independent horizon models could slope downward during development.
 
-Ridge strength is selected from a fixed grid using earlier rolling origins.
-For every outer forecast, fitting and tuning use only outcomes already completed
-at its origin, including for multi-year horizons. No contract is a training
-observation: each player/origin/horizon occurs once, so multiple contracts cannot
-increase that player's training weight. Incomplete current-season data never
-enters the completed-season reference.
+Subsequent years now follow a shared, position-specific development/decline
+curve. Consecutive returning-player GAR/82 changes, weighted by the smaller
+of the two season game shares, fit a continuous two-sided quadratic curve.
+A grid from peak ages 20-32 chooses the lowest weighted error; development and
+decline rates are constrained nonnegative. The final fitted population peaks
+are age 25 for forwards, 24 for defenders and 26 for goalies. These are pooled
+curve estimates, not promises about any individual's peak. Changes in usage,
+selection and regression to the mean are not fully isolated causal aging.
 
-The main remaining-term rating averages annual predictions equally, only when
-**every** remaining season passes the fixed support and comparative-error rules.
+A separate regularized logistic model estimates NHL return probability from age,
+older-age curvature, contribution, game share and missingness indicators.
+Every official positive-GP player contributes an annual return/absence label,
+including unsupported GAR players. Only absence from a verified complete
+next-season official cohort supplies a nonreturn label. Future conditional
+return probabilities compound after the first forecast year; the one-year
+baseline already incorporates first-year participation risk and is unchanged.
+Return calculations use projected mean contribution and fixed origin game share
+as approximate future states. Reentry and joint usage/talent uncertainty remain
+limitations. A weak intercept prior keeps all-return samples finite.
+
+For later years, divide the initial expected contribution by its modeled
+first-year return probability to obtain a conditional performance estimate.
+Apply the age-curve change relative to the first projected year, bound that
+conditional contribution by historical position-specific observed extremes,
+then apply all participation probabilities, including the first year's. Signed
+negative values remain possible; eventual absence tends toward zero NHL
+contribution. Missing age or unsupported curve/return history stays unavailable.
+No player-specific ID overrides, salary, cap or fantasy inputs affect this path.
+
+All fitting, including the age curves, bounds and participation models, uses
+only data completed at each historical forecast origin. Ridge strength uses
+earlier chronological errors. Each player/origin appears once, regardless of
+how many contracts that player has. Validation retains same-horizon,
+training-only position-mean and latest-observed comparators. Incomplete current
+seasons never enter fitting.
+
+The main remaining-term rating now averages **every remaining contract year**,
+including explicitly labeled long-range extrapolations. Horizons through 30 years
+cover future-starting contracts as well as current terms. Each horizon retains
+its own historical support checks; a full-term average containing any unsupported
+horizon is labeled estimated, rather than being blank or presented as fully
+validated. A missing required annual estimate still prevents an average.
+
 An expired contract has no remaining rating. A future contract starts at its
-actual first year, not horizon one. Current-year predictions are full-season
-preseason estimates, not additional GAR still to be earned; observed current
-contribution is never added to them. A reference for a different preseason is
-marked stale rather than silently reused as a current estimate.
+actual first year. Current-year predictions are preseason full-season estimates,
+not additional value still to be earned; observed current contribution is never
+added to them. A reference for another preseason is marked stale.
 
-The fixed historical qualification requires at least 30 fitted examples, 100
+The historical qualification still requires at least 30 fitted examples, 100
 outer validation observations, three validation origins, 80% known-target
-coverage, and lower outer MSE than both latest-observed and position-mean
-baselines. The current reference passes these rules at horizons one through
-five for every position. Horizons six through eight remain research-only and
-cannot supply the main contract rating. Rookies or unsupported histories may
-also lack a main forecast.
+coverage, and lower outer MSE than both baselines. Horizons one through five
+pass for all positions. Horizon six has only one outer origin, and seven onward
+have none: they remain numeric structural extrapolations, without invented
+historical residual intervals. The annual table shows projected age and support
+status. No claim of equally accurate distant forecasts is made.
 
 The fitted reference reproduces 43,886 chronological validation rows. At horizon
 one, mean squared error was:
@@ -93,7 +124,8 @@ into a contract uncertainty range because errors across years can be correlated.
 ## Integration and refresh boundary
 
 The commissioner contract view can sort globally by normalized salary,
-delivered talent or validated remaining talent. It shows signed values,
+delivered talent or remaining talent, including explicitly labeled extrapolated
+term estimates. It shows signed values,
 completed-year coverage and annual breakdowns. All contracts for the same
 canonical player share bounded indexed season reads; source data is not loaded
 once per contract. Identity conflicts, source mismatches, population changes and
@@ -115,3 +147,21 @@ Full local evidence is under
 `.local-data/nhl-rating/contract-talent-20261020/`. Backend replay matched all
 13 complete population hashes and all 10,029 ranked source associations in the
 saved snapshot. This implementation does not itself publish production changes.
+
+## Aging revision checks
+
+The first-year forecast is unchanged. Against the preceding independent-horizon
+model on the same chronological rows, v2 improves MSE in all forward and defender
+years two through five. Goalie years two and three improve; years four and five
+have higher error than v1, while still beating both prespecified baselines.
+A smoother, interpretable aging path does not guarantee universal error reduction.
+Leo Carlsson (canonical NHL ID 8484153) is a regression fixture: his projected
+age-22 contribution rises through the pooled forward peak before declining, and
+his full extension can include years beyond the old eight-year ceiling.
+Evidence is in `.local-data/nhl-rating/contract-talent-aging-20261021/`.
+
+For methodological context, [Schuckers, Lopez and Macdonald](https://arxiv.org/abs/2110.14017)
+show why player effects and missing observations matter to age-curve estimation;
+[the original Hockey Graphs aging analysis](https://hockey-graphs.com/2017/03/23/a-new-look-at-aging-curves-for-nhl-skaters-part-1/)
+discusses returning-player delta methods and selection at the edges. The curves
+here are fitted from this project's verified data, not copied coefficients.
