@@ -301,48 +301,19 @@ function ContractRankings() {
                       </td>
                       <td className="p-3 text-right font-semibold tabular-nums">
                         {dollars(row.normalizedAav)}
-                        {row.normalizedAav === null ? (
-                          <div className="mt-1 text-xs font-normal text-amber-700">
-                            {row.termNeedsReview
-                              ? "Term needs review"
-                              : row.missingCapYears.length
-                                ? `Missing caps: ${row.missingCapYears.map(season).join(", ")}`
-                                : "Missing season cap hits"}
-                          </div>
-                        ) : null}
                       </td>
                       <td className="p-3 text-right font-semibold tabular-nums">
                         {talentScore(row.actualTalent)}
-                        <div className="text-xs text-muted-foreground">
-                          {row.talent?.actual
-                            ? `${row.talent.actual.coveredYearCount}/${row.talent.actual.expectedYearCount} completed years covered`
-                            : view.talentLoading
-                              ? "Loading…"
-                              : "Unavailable"}
-                        </div>
                       </td>
                       <td className="p-3 text-right font-semibold tabular-nums">
                         {talentScore(row.forecastTalent)}
-                        <div className="text-xs text-muted-foreground">
-                          {row.talent?.forecast.status === "qualified"
-                            ? `${row.talent.forecast.years.length} remaining seasons`
-                            : row.talent?.forecast.status === "estimated"
-                              ? `${row.talent.forecast.years.length} seasons; includes extrapolation`
-                              : row.talent?.forecast.status === "expired"
-                                ? "Contract ended"
-                                : row.talent?.forecast.status === "stale"
-                                  ? "Forecast needs refresh"
-                                  : view.talentLoading
-                                    ? "Loading…"
-                                    : "Insufficient validation or history"}
-                        </div>
                       </td>
                       <td className="p-3 text-right tabular-nums">
                         {percent(row.averageCapShare)}
                       </td>
                       <td className="p-3">
                         <button
-                          className="text-blue-700 underline"
+                          className="whitespace-nowrap text-blue-700 underline"
                           aria-expanded={view.expandedId === row.id}
                           aria-controls={`contract-${row.id}`}
                           onClick={() =>
@@ -374,6 +345,20 @@ function ContractRankings() {
                               <h3 className="font-semibold">
                                 Holistic hockey contribution
                               </h3>
+                              <p className="text-sm text-muted-foreground">
+                                {row.talent.actual
+                                  ? `${row.talent.actual.coveredYearCount}/${row.talent.actual.expectedYearCount} completed years covered. `
+                                  : ""}
+                                {row.talent.forecast.status === "qualified"
+                                  ? `${row.talent.forecast.years.length} remaining seasons`
+                                  : row.talent.forecast.status === "estimated"
+                                    ? `${row.talent.forecast.years.length} seasons; includes extrapolation`
+                                    : row.talent.forecast.status === "expired"
+                                      ? "Contract ended"
+                                      : row.talent.forecast.status === "stale"
+                                        ? "Forecast needs refresh"
+                                        : "Insufficient validation or history"}
+                              </p>
                               {row.talent.error ? (
                                 <p
                                   role="alert"
@@ -584,6 +569,15 @@ function ContractRankings() {
                               ? "A full-contract average is unavailable until every required season has a cap and salary, and the contract term is consistent."
                               : `Sum of normalized seasons ÷ ${row.length} years = ${dollars(row.normalizedAav)} normalized AAV. Rounding is for display only.`}
                           </p>
+                          {row.normalizedAav === null ? (
+                            <p className="mt-1 text-sm text-amber-700">
+                              {row.termNeedsReview
+                                ? "Term needs review"
+                                : row.missingCapYears.length
+                                  ? `Missing caps: ${row.missingCapYears.map(season).join(", ")}`
+                                  : "Missing season cap hits"}
+                            </p>
+                          ) : null}
                         </td>
                       </tr>
                     ) : null}
@@ -621,6 +615,17 @@ function ContractRankings() {
           </div>
         </>
       )}
+      <p className="text-xs text-muted-foreground">
+        Historical hockey data:{" "}
+        <a href="https://www.nhl.com/stats/" className="underline">
+          NHL public reports
+        </a>{" "}
+        and{" "}
+        <a href="https://moneypuck.com/data.htm" className="underline">
+          MoneyPuck.com
+        </a>
+        .
+      </p>
     </section>
   );
 }
