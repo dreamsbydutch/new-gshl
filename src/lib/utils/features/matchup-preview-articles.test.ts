@@ -30,7 +30,6 @@ void test("story composition varies by assignment and contrasts adjacent article
       composition: {
         narrativeApproach: string;
         cadence: string;
-        suggestedParagraphCount: number;
       };
     };
     assert.deepEqual(
@@ -51,10 +50,8 @@ void test("story composition varies by assignment and contrasts adjacent article
         writer: evidence.writer,
         headline: "Home's view",
         paragraphs: [
-          ...Array.from(
-            { length: first.composition.suggestedParagraphCount },
-            () => "A supported point.",
-          ),
+          "A supported opening.",
+          "A supported conclusion.",
           "Prediction: Home defeats Away, 6–4.",
         ],
       },
@@ -67,10 +64,6 @@ void test("story composition varies by assignment and contrasts adjacent article
       second.composition.narrativeApproach,
     );
     assert.notEqual(first.composition.cadence, second.composition.cadence);
-    assert.notEqual(
-      first.composition.suggestedParagraphCount,
-      second.composition.suggestedParagraphCount,
-    );
     const rewrite = JSON.parse(
       buildMatchupPreviewRequest("test", opposing, {
         headline: "Rejected",
@@ -82,6 +75,10 @@ void test("story composition varies by assignment and contrasts adjacent article
       second.composition.narrativeApproach,
     );
     assert.match(request.instructions, /no mandatory order/);
+    assert.match(
+      request.instructions,
+      /90–170 words total in exactly two short/,
+    );
     assert.doesNotMatch(
       request.instructions,
       /2 or 3 short plain-text paragraphs/,
@@ -89,13 +86,9 @@ void test("story composition varies by assignment and contrasts adjacent article
   }
   assert.ok(new Set(plans.map((plan) => plan.narrativeApproach)).size >= 6);
   assert.equal(new Set(plans.map((plan) => plan.cadence)).size, 4);
-  assert.equal(
-    new Set(plans.map((plan) => plan.suggestedParagraphCount)).size,
-    4,
-  );
 });
 
-void test("previews allow varied paragraph shapes while retaining length and prediction validation", () => {
+void test("previews require two short paragraphs while retaining prediction validation", () => {
   const evidence = {
     writer: "Reporter",
     teamName: "Home",
@@ -113,12 +106,34 @@ void test("previews allow varied paragraph shapes while retaining length and pre
       evidenceIds: ["roster"],
       prediction: { winner: "team", teamScore: 6, opponentScore: 4 },
     });
-    if (count >= 2 && count <= 5) {
+    if (count === 2) {
       const article = parseMatchupPreviewArticle(text, evidence);
       assert.equal(article.paragraphs.length, count + 1);
       assert.match(article.paragraphs.at(-1)!, /^Prediction:/);
     } else assert.throws(() => parseMatchupPreviewArticle(text, evidence));
   }
+  const draft = {
+    headline: "One player's challenge",
+    evidenceIds: ["roster"],
+    prediction: { winner: "team", teamScore: 6, opponentScore: 4 },
+    paragraphs: ["word ".repeat(100).trim(), "word ".repeat(100).trim()],
+  };
+  assert.equal(
+    parseMatchupPreviewArticle(JSON.stringify(draft), evidence).paragraphs
+      .length,
+    3,
+  );
+  assert.throws(
+    () =>
+      parseMatchupPreviewArticle(
+        JSON.stringify({
+          ...draft,
+          paragraphs: [draft.paragraphs[0], `${draft.paragraphs[1]} extra`],
+        }),
+        evidence,
+      ),
+    /Preview is too long/,
+  );
 });
 
 void test("preview brief centers owners and playful rivalry while retaining an evidence-based forecast", () => {

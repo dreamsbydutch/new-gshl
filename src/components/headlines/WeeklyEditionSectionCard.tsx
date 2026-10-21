@@ -42,16 +42,12 @@ export function WeeklyEditionSectionCard({
       id={section.id}
       className={
         featured
-          ? "flex h-full flex-col rounded-2xl bg-gradient-to-br from-slate-950 via-slate-900 to-blue-950 p-4 text-white shadow-lg shadow-slate-950/10 sm:p-5"
+          ? "flex h-full flex-col rounded-2xl border-2 border-slate-300 bg-white p-4 text-black sm:p-5"
           : "flex h-full flex-col rounded-xl border border-slate-200 bg-slate-50/80 p-3.5"
       }
     >
       <div className="flex items-center justify-between gap-3">
-        <p
-          className={`text-[11px] font-bold uppercase tracking-[0.12em] sm:text-xs ${
-            featured ? "text-cyan-300" : "text-blue-700"
-          }`}
-        >
+        <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-blue-700 sm:text-xs">
           {section.eyebrow}
         </p>
         {teamMarks.length > 0 ? (
@@ -59,9 +55,7 @@ export function WeeklyEditionSectionCard({
             {conferenceMarks.map((team) => (
               <span
                 key={`conference-${team.conferenceId}`}
-                className={`flex h-5 w-5 items-center justify-center rounded-md p-0.5 ${
-                  featured ? "bg-white/10" : "bg-slate-200/70"
-                }`}
+                className="flex h-5 w-5 items-center justify-center rounded-md bg-slate-200/70 p-0.5"
                 title={team.conferenceName}
               >
                 <Image
@@ -94,24 +88,20 @@ export function WeeklyEditionSectionCard({
       <h2
         className={`mt-1.5 font-oswald font-semibold leading-tight ${
           featured
-            ? "text-xl text-white sm:text-2xl"
+            ? "text-xl text-black sm:text-2xl"
             : "text-base text-slate-950"
         }`}
       >
         {section.headline}
       </h2>
-      <p
-        className={`mt-1.5 text-[11px] font-medium uppercase leading-5 tracking-[0.06em] sm:text-xs ${
-          featured ? "text-slate-300" : "text-slate-600"
-        }`}
-      >
+      <p className="mt-1.5 text-[11px] font-medium uppercase leading-5 tracking-[0.06em] text-slate-600 sm:text-xs">
         By <span className="font-bold">{author.name}</span>
         <span aria-hidden="true"> · </span>
         {author.position}
       </p>
       <p
         className={`mt-2 whitespace-pre-line text-sm leading-6 ${
-          featured ? "text-slate-200" : "text-slate-600"
+          featured ? "text-black" : "text-slate-600"
         }`}
       >
         {section.body}
@@ -124,7 +114,7 @@ export function WeeklyEditionSectionCard({
               href={buildWeeklyEditionCtaHref(link.href)}
               className={`inline-flex min-h-11 items-center gap-1 rounded-full px-3 py-2 text-xs font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 motion-reduce:transition-none ${
                 featured
-                  ? "bg-white/10 text-white hover:bg-white/20"
+                  ? "border border-slate-300 bg-white text-black hover:bg-slate-50"
                   : "border border-slate-200 bg-white text-slate-600 hover:border-slate-400 hover:text-slate-950"
               }`}
             >
