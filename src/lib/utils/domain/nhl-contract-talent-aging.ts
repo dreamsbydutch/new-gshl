@@ -7,6 +7,7 @@ import type {
   NhlTalentAgingModel,
   NhlTalentAgingProjectionInput,
 } from "../../types/nhl-contract-talent-aging";
+import { validateNhlTalentPeerAging } from "./nhl-contract-talent-peers";
 
 const MODEL = "nhl-hockey-overall-reviewed-v1";
 const VERSION = "nhl-talent-aging-v1";
@@ -454,6 +455,15 @@ export function projectNhlTalentAging(
   input: NhlTalentAgingProjectionInput,
 ): number | null {
   validateNhlTalentAging(model);
+  const peer = input.peerAging;
+  if (peer) {
+    validateNhlTalentPeerAging(peer);
+    if (
+      peer.position !== model.position ||
+      peer.throughYear !== model.throughYear
+    )
+      throw Error("Mismatched NHL peer aging reference");
+  }
   if (
     !finite(input.baseline) ||
     !finite(input.currentGar) ||
@@ -483,11 +493,24 @@ export function projectNhlTalentAging(
   );
   if (firstReturn === 0) return 0;
   const conditionalFirst = input.baseline / firstReturn;
+  const peerShape = (at: number) =>
+    peer
+      ? -0.5 *
+          peer.curve.developmentRate *
+          Math.max(0, peer.curve.peakAge - at) ** 2 -
+        0.5 * peer.curve.declineRate * Math.max(0, at - peer.curve.peakAge) ** 2
+      : 0;
   const first = shape(age + 1),
+    firstPeer = peerShape(age + 1),
     at = (h: number) =>
       Math.max(
         bounds.low,
-        Math.min(bounds.high, conditionalFirst + shape(age + h) - first),
+        Math.min(
+          bounds.high,
+          conditionalFirst +
+            (1 - (peer?.blendWeight ?? 0)) * (shape(age + h) - first) +
+            (peer?.blendWeight ?? 0) * (peerShape(age + h) - firstPeer),
+        ),
       );
   let survival = firstReturn;
   for (let step = 1; step < input.horizon; step++)

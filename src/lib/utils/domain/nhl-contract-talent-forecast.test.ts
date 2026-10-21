@@ -381,9 +381,26 @@ void test("published forecast develops Leo Carlsson before declining and covers 
   assert.ok(projections[10]!.valuePer82! < projections[3]!.valuePer82!);
   assert.equal(projections[10]!.status, "research");
   assert.equal(projections[10]!.interval, null);
+  assert.ok(projections[0]!.peerAging);
+  assert.ok(projections[0]!.peerAgingWeight > 0);
+  assert.ok(
+    projections[0]!.peerAging.nearest.every((p) => p.nhlPlayerId !== 8484153),
+  );
   // A player-specific expected path, not a manual name/ID override.
   assert.equal(
     artifact.models.find((m) => m.position === "F")!.aging.curve!.peakAge,
     25,
+  );
+});
+
+void test("saved peer references must match the canonical player and forecast origin", () => {
+  const artifact = structuredClone(
+    parseNhlTalentForecastArtifact(forecastJson),
+  );
+  const profile = artifact.profiles.find((p) => p.peerAging)!;
+  profile.peerAging!.playerId = 99999999;
+  assert.throws(
+    () => parseNhlTalentForecastArtifact(artifact),
+    /Invalid NHL talent forecast artifact/,
   );
 });

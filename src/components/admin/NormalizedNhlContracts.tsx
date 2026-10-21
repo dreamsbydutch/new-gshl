@@ -453,6 +453,16 @@ function ContractRankings() {
                                 </>
                               ) : null}
                               {row.talent.forecast.years.length ? (
+                                <p className="text-sm text-muted-foreground">
+                                  {row.talent.forecast.years[0]?.prediction
+                                    .peerAging &&
+                                  row.talent.forecast.years[0].prediction
+                                    .peerAgingWeight > 0
+                                    ? `Development draws on ${row.talent.forecast.years[0].prediction.peerAging.contributingPeers} comparable NHL careers, matched by age, recent performance and workload.`
+                                    : "Development uses broader position trends where comparable careers provide limited forecasting evidence."}
+                                </p>
+                              ) : null}
+                              {row.talent.forecast.years.length ? (
                                 <table className="w-full text-sm">
                                   <caption className="mb-2 text-left font-medium">
                                     Remaining-season annual talent estimates
@@ -518,8 +528,8 @@ function ContractRankings() {
                                 coverage. Current partial seasons do not enter
                                 delivered averages. Projected averages include
                                 every remaining year; distant years extrapolate
-                                the shared age curve and NHL participation
-                                model.
+                                the individual development curve and NHL
+                                participation model.
                               </p>
                             </div>
                           ) : null}

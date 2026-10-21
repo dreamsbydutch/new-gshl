@@ -16,9 +16,20 @@ import {
   projectNhlTalentAging,
   validateNhlTalentAging,
 } from "./nhl-contract-talent-aging";
+import {
+  createNhlTalentPeerFitter,
+  validateNhlTalentPeerAging,
+} from "./nhl-contract-talent-peers";
+import {
+  classifyNhlTalentPeerGroup,
+  fitNhlTalentPeerCalibration,
+  peerCalibrationWeight,
+  validateNhlTalentPeerCalibration,
+} from "./nhl-contract-talent-peer-calibration";
+import type { NhlTalentPeerCalibrationRow } from "../../types/nhl-contract-talent-peer-calibration";
 
 export const NHL_TALENT_FORECAST_POLICY = {
-  version: "nhl-contract-talent-age-trajectory-v2",
+  version: "nhl-contract-talent-peer-trajectory-v3",
   units: "goals-above-same-position-reference-per-82-team-games",
   ridgeCandidates: [1, 10, 100],
   defaultRidge: 10,
@@ -151,6 +162,8 @@ function profilesAt(
     const newestKnown =
       recent.map((s) => observed(s, id)).find((v) => v !== null) ?? 0;
     return {
+      peerGroup: null,
+      peerAging: null,
       nhlPlayerId: id,
       position: last.position,
       originYear: origin,
@@ -310,8 +323,8 @@ function quantile(sorted: number[], q: number) {
   ]!;
 }
 
-/** Fit one-year skill/workload forecasts, then a shared age trajectory. Every
- * fold fits both components using only outcomes completed at its origin. */
+/** Fit one-year forecasts and peer-specific development with calibrated pooling.
+ * Every component is refitted using only outcomes completed at its origin. */
 export function fitNhlContractTalentForecast(
   input: NhlTalentForecastDataset,
   options: { cutoffYear: number; horizons?: readonly number[] },
@@ -397,6 +410,20 @@ export function fitNhlContractTalentForecast(
         years.filter((y) => y <= origin).map((y) => seasons.get(y)!),
         position,
       );
+      const peerFitter = createNhlTalentPeerFitter(
+        years.filter((y) => y <= origin).map((y) => seasons.get(y)!),
+        years.filter((y) => y <= origin).flatMap((y) => profiles.get(y)!),
+        position,
+      );
+      for (const profile of profiles
+        .get(origin)!
+        .filter((p) => p.position === position)) {
+        profile.peerAging = peerFitter(profile);
+        profile.peerGroup = classifyNhlTalentPeerGroup(
+          profile,
+          profiles.get(origin)!,
+        );
+      }
       folds.set(origin, {
         linear: chosen.model,
         aging,
@@ -423,6 +450,49 @@ export function fitNhlContractTalentForecast(
       }
     }
     const final = folds.get(cutoff)!;
+    // Historical base/peer predictions are frozen at their own origin. The
+    // blend can use an outcome only after its target season has completed.
+    const calibrationRows: NhlTalentPeerCalibrationRow[] = [];
+    for (const [origin, fold] of folds)
+      for (const profile of profiles
+        .get(origin)!
+        .filter((p) => p.position === position))
+        for (const horizon of [2, 3, 4, 5]) {
+          if (origin + horizon > cutoff) continue;
+          const target = label(seasons, profile.nhlPlayerId, origin + horizon);
+          if (typeof target === "string") continue;
+          const positionPrediction = trajectory(
+            fold.linear,
+            fold.aging,
+            profile,
+            horizon,
+            0,
+          );
+          const peerPrediction = trajectory(
+            fold.linear,
+            fold.aging,
+            profile,
+            horizon,
+            1,
+          );
+          if (positionPrediction === null || peerPrediction === null) continue;
+          calibrationRows.push({
+            nhlPlayerId: profile.nhlPlayerId,
+            originYear: origin,
+            targetYear: origin + horizon,
+            horizon,
+            group: profile.peerGroup,
+            target: target.value,
+            positionPrediction,
+            peerPrediction,
+          });
+        }
+    const calibrations = new Map(
+      [...folds.keys()].map((origin) => [
+        origin,
+        fitNhlTalentPeerCalibration(calibrationRows, origin),
+      ]),
+    );
     for (const horizon of horizons) {
       const outer: NhlTalentForecastValidationRow[] = [];
       let unavailablePredictions = 0,
@@ -460,6 +530,7 @@ export function fitNhlContractTalentForecast(
             fold.aging,
             profile,
             horizon,
+            peerCalibrationWeight(calibrations.get(origin)!, profile.peerGroup),
           );
           if (prediction === null) {
             unavailablePredictions++;
@@ -478,6 +549,24 @@ export function fitNhlContractTalentForecast(
           if (target.kind === "verified-no-nhl-games")
             verifiedNoNhlGameTargets++;
           outer.push({
+            positionAgingPrediction: trajectory(
+              fold.linear,
+              fold.aging,
+              profile,
+              horizon,
+              0,
+            )!,
+            peerTrajectoryPrediction: trajectory(
+              fold.linear,
+              fold.aging,
+              profile,
+              horizon,
+              1,
+            )!,
+            peerCalibrationWeight: peerCalibrationWeight(
+              calibrations.get(origin)!,
+              profile.peerGroup,
+            ),
             nhlPlayerId: profile.nhlPlayerId,
             position,
             originYear: origin,
@@ -543,6 +632,7 @@ export function fitNhlContractTalentForecast(
         .map((r) => r.target - r.prediction)
         .sort((a, b) => a - b);
       models.push({
+        peerCalibration: calibrations.get(cutoff)!,
         position,
         horizon,
         trainingRows: final.rows,
@@ -596,7 +686,9 @@ export function fitNhlContractTalentForecast(
     warnings: [
       "Expected delivered contribution includes participation and workload; not isolated intrinsic ability.",
       "Age curves use returning-player changes; a separate NHL-return model includes exits but cannot eliminate all selection bias.",
-      "Long-range estimates extrapolate a shared age curve, not independently validated distant-season models.",
+      "Peer selection uses origin histories; unknown follow-up never supplies a zero or replacement peer. Development and calibration remain subject to selection and historical-data limitations.",
+      "Peer influence is learned from earlier completed forecast targets. Insufficient or unhelpful comparable evidence falls back to the broader position path.",
+      "Long-range estimates extrapolate individual and broad development curves, not independently validated distant-season models.",
       "Unknown positive-GP outcomes are excluded, never zero. Current incomplete seasons and salaries never enter fitting.",
       "Retrospective, previously inspected source reconstructions are not untouched prospective confirmation.",
       "Residual ranges are horizon-specific historical errors, not guaranteed future coverage or contract confidence intervals.",
@@ -609,15 +701,24 @@ function trajectory(
   aging: NhlTalentForecastModel["aging"],
   profile: NhlTalentForecastProfile,
   horizon: number,
+  peerWeight = 1,
 ): number | null {
-  return projectNhlTalentAging(aging, {
+  const input = {
     baseline: predict(model, profile.features),
     currentGar: profile.features[0]!,
     originAge: profile.features[8] === 1 ? profile.features[6]! : null,
     horizon,
     gamesShare: profile.features[4]!,
     garKnown: profile.features[9] === 1,
+  };
+  const position = projectNhlTalentAging(aging, input);
+  if (position === null || !profile.peerAging || peerWeight === 0)
+    return position;
+  const peer = projectNhlTalentAging(aging, {
+    ...input,
+    peerAging: profile.peerAging,
   });
+  return peer === null ? position : position + peerWeight * (peer - position);
 }
 
 /** Validate public artifact boundaries without trusting supplied qualification flags. */
@@ -728,6 +829,8 @@ export function validateNhlTalentForecastArtifact(
   for (const profile of value.profiles) {
     if (!object(profile)) fail();
     keys(profile, [
+      "peerGroup",
+      "peerAging",
       "nhlPlayerId",
       "position",
       "originYear",
@@ -752,6 +855,33 @@ export function validateNhlTalentForecastArtifact(
       fail();
     const x = profile.features;
     if (
+      profile.peerGroup !== null &&
+      (typeof profile.peerGroup !== "string" ||
+        ![
+          "young:high",
+          "young:low",
+          "prime:high",
+          "prime:low",
+          "older:high",
+          "older:low",
+        ].includes(profile.peerGroup))
+    )
+      fail();
+    if (profile.peerAging !== null) {
+      try {
+        validateNhlTalentPeerAging(profile.peerAging);
+      } catch {
+        fail();
+      }
+      if (
+        profile.peerAging.playerId !== profile.nhlPlayerId ||
+        profile.peerAging.position !== profile.position ||
+        profile.peerAging.originYear !== cutoff ||
+        profile.peerAging.throughYear !== cutoff
+      )
+        fail();
+    }
+    if (
       x[14] !== profile.knownGarSeasons ||
       x[13] !== cutoff - profile.latestAppearanceYear ||
       [8, 9, 10, 11, 12].some((i) => x[i] !== 0 && x[i] !== 1) ||
@@ -771,6 +901,7 @@ export function validateNhlTalentForecastArtifact(
   for (const model of value.models) {
     if (!object(model)) fail();
     keys(model, [
+      "peerCalibration",
       "aging",
       "position",
       "horizon",
@@ -784,10 +915,12 @@ export function validateNhlTalentForecastArtifact(
       "residualInterval",
     ]);
     try {
+      validateNhlTalentPeerCalibration(model.peerCalibration);
       validateNhlTalentAging(model.aging);
     } catch {
       fail();
     }
+    if (model.peerCalibration.throughYear !== cutoff) fail();
     if (
       model.aging.position !== model.position ||
       model.aging.throughYear !== cutoff
@@ -999,6 +1132,12 @@ export function predictNhlContractTalent(
         )
       : undefined;
   const base = {
+    peerAgingWeight:
+      profile && model && profile.peerAging
+        ? peerCalibrationWeight(model.peerCalibration, profile.peerGroup) *
+          profile.peerAging.blendWeight
+        : 0,
+    peerAging: profile?.peerAging ?? null,
     nhlPlayerId: request.nhlPlayerId,
     position: profile?.position ?? null,
     originYear: origin,
@@ -1035,7 +1174,13 @@ export function predictNhlContractTalent(
     )
   )
     throw Error("Invalid or leaking NHL talent forecast artifact");
-  const value = trajectory(model, model.aging, profile, horizon),
+  const value = trajectory(
+      model,
+      model.aging,
+      profile,
+      horizon,
+      peerCalibrationWeight(model.peerCalibration, profile.peerGroup),
+    ),
     qualified =
       model.validation.supported &&
       model.validation.beatsBothBaselines &&

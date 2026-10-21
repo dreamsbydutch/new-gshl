@@ -1,4 +1,5 @@
 import type { NhlTalentPosition } from "./nhl-contract-talent-forecast";
+import type { NhlTalentPeerAging } from "./nhl-contract-talent-peers";
 
 export interface NhlTalentAgingModel {
   version: "nhl-talent-aging-v1";
@@ -33,6 +34,7 @@ export interface NhlTalentAgingModel {
 }
 
 export interface NhlTalentAgingProjectionInput {
+  peerAging?: NhlTalentPeerAging | null;
   /** One-step expected delivered GAR/82, including first-year participation risk. */
   baseline: number;
   /** Observed origin GAR/82, or an explicitly unknown placeholder with garKnown=false. */

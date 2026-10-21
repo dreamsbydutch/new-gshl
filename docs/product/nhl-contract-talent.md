@@ -41,13 +41,13 @@ positive-GP player with no supported hockey value always remains unknown.
 
 ## Remaining-term estimate
 
-The v2 forecast uses completed seasons through 2025-26. A chronological,
+The v3 forecast uses completed seasons through 2025-26. A chronological,
 regularized one-year regression estimates the initial contribution from recent
 reviewed contribution, workload, age and support indicators. Its age and age-squared
 features alone were insufficient to define a coherent multiyear career path:
 the previous independent horizon models could slope downward during development.
 
-Subsequent years now follow a shared, position-specific development/decline
+The broad reference follows a shared, position-specific development/decline
 curve. Consecutive returning-player GAR/82 changes, weighted by the smaller
 of the two season game shares, fit a continuous two-sided quadratic curve.
 A grid from peak ages 20-32 chooses the lowest weighted error; development and
@@ -55,6 +55,63 @@ decline rates are constrained nonnegative. The final fitted population peaks
 are age 25 for forwards, 24 for defenders and 26 for goalies. These are pooled
 curve estimates, not promises about any individual's peak. Changes in usage,
 selection and regression to the mean are not fully isolated causal aging.
+
+### Individual development from comparable careers
+
+Starting contribution was already individual, but v2 added the same broad
+position development increments to every player's path. V3 also estimates an
+individual development shape from comparable histories. Peers must share the
+F/D/G role and be within two years of the player's age at the comparison origin.
+Distance uses current and previous GAR/82, their change, minutes, game shares,
+and known-history indicators. It does not use salary, names, eventual peak
+performance or future career success. Only one closest origin per other NHL
+player is retained, with at most 60 selected players; the player being projected
+cannot be their own peer.
+
+Selection happens before inspecting follow-up outcomes. Missing or unsupported
+later performance reduces evidence and never causes another player to be
+substituted. The first selected-origin transition is omitted: the one-year
+baseline already handles initial regression to the mean. Later measured
+returning-player changes fit the development/decline shape. Calendar-step
+normalization limits the influence of long observed careers. Exits remain in
+the separate official-cohort NHL participation model.
+
+At least five contributing players and ten changes are required. Curve changes
+are blended with the broad reference using effective peer count with 20 prior
+peers, reduced further by the absolute similarity of the nearest match. A large
+effective count alone does not establish good comparability. The fitted
+artifact retains nearest IDs, comparison origins, distances and support.
+
+An additional historical calibration estimates how much the peer adjustment
+actually improves prediction. Groups distinguish development ages (through 23),
+prime ages (24-29) and older players (30+), crossed with contribution above or
+below the current same-age peer median. Classification uses only information
+known at that origin; small groups fall back to role-wide evidence.
+
+Calibration minimizes squared error plus `100 * weight^2`, constraining weight
+to 0-1. It requires 100 rows, two origins and 20 unique players. For each outer
+forecast, only original earlier-origin predictions whose target seasons have
+already completed can train this weight. The final annual estimate blends the
+broad and peer-based paths with one weight across horizons, retaining a coherent
+curve. Qualification and residual ranges use these nested blended forecasts.
+Unsupported peer cases remain in calibration with zero incremental adjustment.
+Rows from overlapping horizons and repeated careers are dependent observations.
+
+This avoids asserting that being ahead at 21 guarantees unusually fast future
+growth. Leo Carlsson's raw comparable-career path peaks around 14.28 GAR/82 at
+26, but historical calibration supplies only a small peer adjustment for strong
+young forwards; his main expected peak is about 12.38 at 25. Neither value is
+a prescribed ceiling or a manual player override. The difference reflects
+uncertainty in how much these peers add beyond his already individual starting
+estimate. Group definitions and diagnostic seasons were inspected during this
+revision; this is not untouched prospective confirmation.
+
+Against v2 on the same pooled historical years-two-through-five rows, calibrated
+personalization improves defender MSE slightly and worsens forward and goalie
+MSE slightly. This adds conservative individual development patterns; it is
+not evidence of an overall predictive accuracy improvement.
+
+### Participation, full terms and validation
 
 A separate regularized logistic model estimates NHL return probability from age,
 older-age curvature, contribution, game share and missingness indicators.
