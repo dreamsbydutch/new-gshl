@@ -9,7 +9,10 @@ import {
   type WeeklyRecordRow,
   type WeeklyRecordBenchmark,
 } from "../src/lib/utils/features/weekly-edition-highlights";
-import { RECORD_STATS } from "../src/lib/utils/features/performance-records";
+import {
+  RECORD_STATS,
+  recordWeekCategory,
+} from "../src/lib/utils/features/performance-records";
 import { toUtcTimestamp, utcTimestampToDateKey } from "./lib/timestamps";
 import { selectResearchEvidence } from "../src/lib/utils/features/weekly-edition-research";
 
@@ -22,12 +25,8 @@ export const calendar = internalQuery({
   args: { weekId: v.id("weeks") },
   handler: async (ctx, { weekId }) => {
     const current = await ctx.db.get(weekId);
-    if (
-      !current ||
-      !Number.isFinite(Number(current.gameDays)) ||
-      Number(current.gameDays) <= 0
-    )
-      return null;
+    const category = recordWeekCategory(current?.gameDays);
+    if (!current || !category) return null;
     const seasons = await ctx.db.query("seasons").take(101);
     if (seasons.length === 101)
       throw new Error("Record calendar exceeds its bounded season scope");
@@ -45,7 +44,7 @@ export const calendar = internalQuery({
             (week) =>
               week._id !== current._id &&
               week.isPlayoffs === current.isPlayoffs &&
-              Number(week.gameDays) === Number(current.gameDays) &&
+              recordWeekCategory(week.gameDays) === category &&
               Boolean(dateKey(week.endDate)) &&
               dateKey(week.endDate) < dateKey(current.startDate),
           )

@@ -13,7 +13,7 @@ import { getFunctionName } from "convex/server";
 import type { ActionCtx } from "./_generated/server";
 import type { WeeklyEditionFactPacket } from "../src/lib/types/weekly-edition";
 
-void test("record calendar excludes future, overlapping, shorter and playoff weeks", async () => {
+void test("record calendar pools short and standard NHL weeks and separates long weeks", async () => {
   const f = mutationFixture();
   f.put("seasons", "season", {});
   for (const [id, startDate, endDate, gameDays, isPlayoffs] of [
@@ -23,6 +23,10 @@ void test("record calendar excludes future, overlapping, shorter and playoff wee
     ["overlap", "2026-02-28", "2026-03-02", 7, false],
     ["short", "2026-01-01", "2026-01-04", 4, false],
     ["playoff", "2025-04-01", "2025-04-07", 7, true],
+    ["long", "2026-01-10", "2026-01-23", 10, false],
+    ["longer", "2025-11-01", "2025-11-14", 14, false],
+    ["calendar-break", "2025-12-20", "2026-01-05", 7, false],
+    ["empty", "2025-10-01", "2025-10-07", 0, false],
   ] as const)
     f.put("weeks", id, {
       seasonId: "season",
@@ -34,8 +38,27 @@ void test("record calendar excludes future, overlapping, shorter and playoff wee
   assert.deepEqual(
     await invokeMutation(calendar, f.ctx, { weekId: "current" }),
     {
-      weekIds: ["old"],
+      weekIds: ["old", "short", "calendar-break"],
       gameDays: 7,
+      isPlayoffs: false,
+    },
+  );
+  await f.ctx.db.patch("current" as never, { gameDays: 4 });
+  const short = await invokeMutation(calendar, f.ctx, { weekId: "current" });
+  assert.deepEqual(short, {
+    weekIds: ["old", "short", "calendar-break"],
+    gameDays: 4,
+    isPlayoffs: false,
+  });
+  await f.ctx.db.patch("current" as never, {
+    gameDays: 10,
+    endDate: "2026-03-14",
+  });
+  assert.deepEqual(
+    await invokeMutation(calendar, f.ctx, { weekId: "current" }),
+    {
+      weekIds: ["long", "longer"],
+      gameDays: 10,
       isPlayoffs: false,
     },
   );

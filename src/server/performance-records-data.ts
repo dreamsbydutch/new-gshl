@@ -5,6 +5,7 @@ import type {
 import {
   buildPerformanceRecords,
   recordWindow,
+  recordWeekCategory,
 } from "../lib/utils/features/performance-records";
 export type RecordRow = Record<string, unknown> & { id: string };
 export interface RecordReader {
@@ -38,13 +39,13 @@ export async function loadMatchupRecords(
   const week = weeks.find((row) => row.id === matchup.weekId);
   if (!week || !recordWindow(String(week.startDate), String(week.endDate), now))
     return { badges: [], scope: "" };
-  if (!Number.isFinite(Number(week.gameDays)) || Number(week.gameDays) <= 0)
-    return { badges: [], scope: "" };
+  const category = recordWeekCategory(week.gameDays);
+  if (!category) return { badges: [], scope: "" };
   const complete = isFinal(matchup);
   const comparable = weeks.filter(
     (row) =>
       row.isPlayoffs === week.isPlayoffs &&
-      Number(row.gameDays) === Number(week.gameDays) &&
+      recordWeekCategory(row.gameDays) === category &&
       String(row.endDate) <= String(week.endDate),
   );
   const observations: RecordObservation[] = [];
@@ -99,8 +100,9 @@ export async function loadMatchupRecords(
     badges: buildPerformanceRecords(current, history, !complete),
     scope:
       (week.isPlayoffs ? "Playoff" : "Regular-season") +
-      " weeks with " +
-      String(week.gameDays) +
-      " game days. Compared with completed recorded weeks through this matchup; historical coverage is not independently verified. Refreshes every five minutes.",
+      (category === "weekly"
+        ? " weekly records (up to 7 NHL game days)."
+        : " long-week records (more than 7 NHL game days).") +
+      " Compared with completed league weeks through this matchup. Refreshes every five minutes.",
   };
 }

@@ -4,6 +4,7 @@ import {
   buildPerformanceRecords,
   recordNumber,
   recordWindow,
+  recordWeekCategory,
 } from "./performance-records";
 import type { RecordObservation } from "../../types/performance-records";
 const row = (
@@ -18,6 +19,14 @@ const row = (
   stats: { G, GP: 20, ...extra },
   label: id,
   matchupId: id,
+});
+void test("weekly records pool up to seven NHL game days and keep longer weeks separate", () => {
+  for (const days of [1, 3, 7, "7"])
+    assert.equal(recordWeekCategory(days), "weekly");
+  for (const days of [8, 10, 14, "14"])
+    assert.equal(recordWeekCategory(days), "long_week");
+  for (const days of [0, -1, 7.5, null, undefined, "", "bad", false, Infinity])
+    assert.equal(recordWeekCategory(days), null);
 });
 void test("badges start on Saturday in Toronto for a Sunday-ending week", () => {
   const check = (date: string) =>

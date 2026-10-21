@@ -38,6 +38,15 @@ export function recordNumber(value: unknown): number | null {
   const number = Number(value);
   return Number.isFinite(number) ? number : null;
 }
+
+/** Count NHL game days, rather than elapsed calendar days, for weekly records. */
+export function recordWeekCategory(
+  gameDays: unknown,
+): "weekly" | "long_week" | null {
+  const days = recordNumber(gameDays);
+  if (days === null || !Number.isInteger(days) || days <= 0) return null;
+  return days <= 7 ? "weekly" : "long_week";
+}
 // Counting stats only: rate records need separate goalie qualification rules.
 export const RECORD_STATS = [
   "G",

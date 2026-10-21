@@ -32,10 +32,11 @@ function reader(final = false): RecordReader {
         { ...week, id: "future", endDate: "2026-10-11" },
         { ...week, id: "playoff", isPlayoffs: true },
         { ...week, id: "short", gameDays: 3 },
+        { ...week, id: "long", gameDays: 10 },
       ],
     }),
     week: async (_season, id) => {
-      assert.ok(["current", "old"].includes(id));
+      assert.ok(["current", "old", "short"].includes(id));
       const matchups: RecordRow[] =
         id === "current"
           ? [{ ...game, isComplete: final }]
@@ -57,8 +58,8 @@ function reader(final = false): RecordReader {
                 { id: "b-row", gshlTeamId: "b", GP: 20, G: 10 },
               ]
             : [
-                { id: "c-row", gshlTeamId: "c", GP: 20, G: 2 },
-                { id: "d-row", gshlTeamId: "d", GP: 20, G: 8 },
+                { id: `${id}:c-row`, gshlTeamId: "c", GP: 20, G: 2 },
+                { id: `${id}:d-row`, gshlTeamId: "d", GP: 20, G: 8 },
               ],
       };
     },
@@ -83,7 +84,8 @@ void test("late-week records use comparable completed history and stay provision
   );
   assert.equal(result.badges.length, 2);
   assert.equal(result.badges[0]?.provisional, true);
-  assert.equal(result.badges[0]?.compared, 2);
+  assert.equal(result.badges[0]?.compared, 4);
+  assert.match(result.scope, /weekly records \(up to 7 NHL game days\)/);
 });
 void test("final records include the opponent and exclude self", async () => {
   const result = await loadMatchupRecords(
@@ -92,5 +94,44 @@ void test("final records include the opponent and exclude self", async () => {
     Date.parse("2026-10-05T16:00Z"),
   );
   assert.equal(result.badges[0]?.provisional, false);
+  assert.equal(result.badges[0]?.compared, 5);
+});
+
+void test("matchup long-week records pool different extended lengths and exclude normal weeks", async () => {
+  const source = reader(true);
+  const calls: string[] = [];
+  source.calendar = async () => ({
+    seasons: [{ id: "s", name: "2026" }],
+    weeks: [
+      { ...week, gameDays: 10, endDate: "2026-10-11" },
+      {
+        ...week,
+        id: "long-old",
+        gameDays: 14,
+        startDate: "2026-09-01",
+        endDate: "2026-09-14",
+      },
+      {
+        ...week,
+        id: "normal-old",
+        gameDays: 7,
+        startDate: "2026-09-15",
+        endDate: "2026-09-21",
+      },
+    ],
+  });
+  const read = source.week.bind(source);
+  source.week = async (season, id) => {
+    calls.push(id);
+    assert.notEqual(id, "normal-old");
+    return read(season, id === "long-old" ? "old" : id);
+  };
+  const result = await loadMatchupRecords(
+    "m",
+    source,
+    Date.parse("2026-10-12T16:00Z"),
+  );
+  assert.deepEqual(calls, ["current", "long-old"]);
   assert.equal(result.badges[0]?.compared, 3);
+  assert.match(result.scope, /long-week records \(more than 7 NHL game days\)/);
 });

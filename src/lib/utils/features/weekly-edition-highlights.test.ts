@@ -79,13 +79,30 @@ void test("weekly records distinguish new and tied highs, qualify goalie/player 
   assert.match(records[0]!.summary, /G 13 passes the previous high of 12/);
   assert.match(records[0]!.summary, /W 2 ties the previous high of 2/);
   assert.match(records[1]!.summary, /G 3 ties the previous high of 3/);
-  assert.match(records[0]!.summary, /regular-season weeks with 7 game days/);
+  assert.match(
+    records[0]!.summary,
+    /regular-season weeks with 7 or fewer NHL game days/,
+  );
   assert.match(records[0]!.summary, /GSHL weekly record/);
   assert.doesNotMatch(
     records[0]!.summary,
     /not independently verified|not a verified|recorded-comparison/,
   );
   assert.match(records[1]!.headlineHint, /ties/);
+  for (const gameDays of [4, 7, 10, 14]) {
+    const categorized = weeklyPerformanceRecordCandidates({
+      ...input,
+      gameDays,
+    });
+    assert.match(
+      categorized[0]!.headlineHint,
+      gameDays <= 7 ? /GSHL weekly record/ : /GSHL long-week record/,
+    );
+    assert.match(
+      categorized[0]!.summary,
+      gameDays <= 7 ? /7 or fewer NHL game days/ : /more than 7 NHL game days/,
+    );
+  }
   assert.equal(
     weeklyPerformanceRecordCandidates({ ...input, historical: [] }).length,
     0,

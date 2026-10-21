@@ -1,5 +1,9 @@
 import type { WeeklyEditionEditorialCandidate } from "../../types/weekly-edition";
-import { RECORD_STATS, recordNumber } from "./performance-records";
+import {
+  RECORD_STATS,
+  recordNumber,
+  recordWeekCategory,
+} from "./performance-records";
 
 export function isLateSeasonAwardWindow(
   asOf: string,
@@ -70,6 +74,10 @@ export function weeklyPerformanceRecordCandidates(input: {
   teamNames: Map<string, string>;
   playerNames: Map<string, string>;
 }): WeeklyEditionEditorialCandidate[] {
+  const category = recordWeekCategory(input.gameDays);
+  if (!category) return [];
+  const recordLabel =
+    category === "long_week" ? "long-week record" : "weekly record";
   const currentHighs = weeklyRecordBenchmarks(input.current);
   return input.current.flatMap((row) => {
     const subject =
@@ -100,7 +108,7 @@ export function weeklyPerformanceRecordCandidates(input: {
       ];
     });
     if (!highs.length) return [];
-    const scope = `${input.isPlayoffs ? "playoff" : "regular-season"} weeks with ${input.gameDays} game days`;
+    const scope = `${input.isPlayoffs ? "playoff" : "regular-season"} weeks with ${category === "weekly" ? "7 or fewer" : "more than 7"} NHL game days`;
     return [
       {
         id: `record:weekly:${input.weekId}:${row.id}`,
@@ -110,8 +118,8 @@ export function weeklyPerformanceRecordCandidates(input: {
           ? 97
           : 92,
         occurredAt: input.endDate,
-        headlineHint: `${subject} ${highs.some((high) => high.value > high.previousValue) ? "sets" : "ties"} a GSHL weekly record`,
-        summary: `${subject}: ${highs.map((high) => `${high.key} ${high.value} ${high.value === high.previousValue ? "ties" : "passes"} the previous high of ${high.previousValue}, compared with ${high.compared} eligible historical performances`).join("; ")}. GSHL weekly record scope: ${scope}. The comparison includes earlier completed weeks across league history and checks the current week's eligible performances. Other performances in the current week may share this record.`,
+        headlineHint: `${subject} ${highs.some((high) => high.value > high.previousValue) ? "sets" : "ties"} a GSHL ${recordLabel}`,
+        summary: `${subject}: ${highs.map((high) => `${high.key} ${high.value} ${high.value === high.previousValue ? "ties" : "passes"} the previous high of ${high.previousValue}, compared with ${high.compared} eligible historical performances`).join("; ")}. GSHL ${recordLabel} scope: ${scope}. The comparison includes earlier completed weeks across league history and checks the current week's eligible performances. Other performances in the current week may share this record.`,
         teamId: row.teamId,
         teamName: input.teamNames.get(row.teamId),
         playerId: row.playerId,
