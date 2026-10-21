@@ -384,57 +384,6 @@ function ContractRankings() {
                                     . Future years do not enter the delivered
                                     average.
                                   </p>
-                                  <table className="w-full text-sm">
-                                    <caption className="sr-only">
-                                      Actual annual holistic contribution for{" "}
-                                      {row.playerName}
-                                    </caption>
-                                    <thead>
-                                      <tr className="text-left">
-                                        <th className="p-2">Season</th>
-                                        <th className="p-2">Observed GAR</th>
-                                        <th className="p-2">GAR/82</th>
-                                        <th className="p-2">Coverage</th>
-                                        <th className="p-2">Source date</th>
-                                      </tr>
-                                    </thead>
-                                    <tbody>
-                                      {row.talent.actual.years.map((year) => (
-                                        <tr
-                                          key={year.seasonStartYear}
-                                          className="border-t"
-                                        >
-                                          <td className="p-2">
-                                            {season(year.seasonStartYear)}
-                                          </td>
-                                          <td className="p-2">
-                                            {talentScore(
-                                              year.goalsAboveReplacement,
-                                            )}
-                                          </td>
-                                          <td className="p-2">
-                                            {talentScore(year.gar82)}
-                                          </td>
-                                          <td className="p-2">
-                                            {year.state === "partial"
-                                              ? "Season to date; no annual pace"
-                                              : year.state === "covered" &&
-                                                  year.qualification ===
-                                                    "no-nhl-games"
-                                                ? "Verified no NHL games"
-                                                : year.state}
-                                          </td>
-                                          <td className="p-2">
-                                            {year.sourceFetchedAt
-                                              ? new Date(year.sourceFetchedAt)
-                                                  .toISOString()
-                                                  .slice(0, 10)
-                                              : "—"}
-                                          </td>
-                                        </tr>
-                                      ))}
-                                    </tbody>
-                                  </table>
                                 </>
                               ) : null}
                               {row.talent.forecast.years.length ? (
@@ -446,59 +395,6 @@ function ContractRankings() {
                                     ? `Development draws on ${row.talent.forecast.years[0].prediction.peerAging.contributingPeers} comparable NHL careers, matched by age, recent performance and workload.`
                                     : "Development uses broader position trends where comparable careers provide limited forecasting evidence."}
                                 </p>
-                              ) : null}
-                              {row.talent.forecast.years.length ? (
-                                <table className="w-full text-sm">
-                                  <caption className="mb-2 text-left font-medium">
-                                    Remaining-season annual talent estimates
-                                  </caption>
-                                  <thead>
-                                    <tr className="text-left">
-                                      <th className="p-2">Season</th>
-                                      <th className="p-2">Age</th>
-                                      <th className="p-2">Expected GAR/82</th>
-                                      <th className="p-2">
-                                        Historical 80% residual range
-                                      </th>
-                                      <th className="p-2">Validation</th>
-                                    </tr>
-                                  </thead>
-                                  <tbody>
-                                    {row.talent.forecast.years.map((year) => (
-                                      <tr
-                                        key={year.seasonStartYear}
-                                        className="border-t"
-                                      >
-                                        <td className="p-2">
-                                          {season(year.seasonStartYear)}
-                                        </td>
-                                        <td className="p-2">
-                                          {year.prediction.targetAge ??
-                                            "Unknown"}
-                                        </td>
-                                        <td className="p-2">
-                                          {talentScore(
-                                            year.prediction.valuePer82,
-                                          )}
-                                        </td>
-                                        <td className="p-2">
-                                          {year.prediction.interval
-                                            ? `${talentScore(year.prediction.interval.low)} to ${talentScore(year.prediction.interval.high)}`
-                                            : "—"}
-                                        </td>
-                                        <td className="p-2">
-                                          {year.prediction.status ===
-                                          "qualified"
-                                            ? "Historical support passed"
-                                            : year.prediction.status ===
-                                                "research"
-                                              ? "Extrapolated / limited historical support"
-                                              : "Unavailable"}
-                                        </td>
-                                      </tr>
-                                    ))}
-                                  </tbody>
-                                </table>
                               ) : null}
                               {row.talent.forecast.reasons.length ? (
                                 <p className="text-sm text-muted-foreground">
@@ -518,52 +414,7 @@ function ContractRankings() {
                               </p>
                             </div>
                           ) : null}
-                          <table className="w-full text-sm">
-                            <caption className="sr-only">
-                              Season calculation for {row.playerName}
-                            </caption>
-                            <thead>
-                              <tr className="text-left">
-                                <th className="p-2">Season</th>
-                                <th className="p-2">Cap hit / AAV</th>
-                                <th className="p-2">Team cap</th>
-                                <th className="p-2">Cap share</th>
-                                <th className="p-2">At $100M cap</th>
-                                <th className="p-2">Salary basis</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {row.breakdown.map((year) => (
-                                <tr
-                                  key={year.seasonStartYear}
-                                  className="border-t"
-                                >
-                                  <td className="p-2">
-                                    {season(year.seasonStartYear)}
-                                  </td>
-                                  <td className="p-2">
-                                    {dollars(year.capHit)}
-                                  </td>
-                                  <td className="p-2">
-                                    {dollars(year.salaryCap)}
-                                  </td>
-                                  <td className="p-2">
-                                    {percent(year.capShare)}
-                                  </td>
-                                  <td className="p-2">
-                                    {dollars(year.normalizedSalary)}
-                                  </td>
-                                  <td className="p-2">
-                                    {year.usesContractAav
-                                      ? "Contract AAV"
-                                      : year.capHit === null
-                                        ? "Missing"
-                                        : "Season record"}
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
+                          <ContractSeasonTable row={row} />
                           <p className="mt-3 text-sm">
                             {row.normalizedAav === null
                               ? "A full-contract average is unavailable until every required season has a cap and salary, and the contract term is consistent."
@@ -627,5 +478,131 @@ function ContractRankings() {
         .
       </p>
     </section>
+  );
+}
+
+function ContractSeasonTable({
+  row,
+}: {
+  row: ReturnType<typeof useNormalizedNhlContracts>["rows"][number];
+}) {
+  const actualYears = new Map(
+    row.talent?.actual?.years.map((year) => [year.seasonStartYear, year]),
+  );
+  const forecastYears = new Map(
+    row.talent?.forecast.years.map((year) => [
+      year.seasonStartYear,
+      year.prediction,
+    ]),
+  );
+  const hasActual = [...actualYears.values()].some(
+    (year) =>
+      year.seasonStartYear < (row.talent?.forecast.originYear ?? 0) ||
+      year.goalsAboveReplacement !== null,
+  );
+  const hasForecast = forecastYears.size > 0;
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm tabular-nums">
+        <caption className="sr-only">
+          Season salary and holistic contribution for {row.playerName}
+        </caption>
+        <thead>
+          <tr className="text-left">
+            <th scope="col" className="whitespace-nowrap p-2">
+              Season
+            </th>
+            {hasForecast ? (
+              <th scope="col" className="p-2">
+                Age
+              </th>
+            ) : null}
+            {hasActual ? (
+              <>
+                <th scope="col" className="whitespace-nowrap p-2">
+                  Observed GAR
+                </th>
+                <th scope="col" className="whitespace-nowrap p-2">
+                  Observed GAR/82
+                </th>
+              </>
+            ) : null}
+            {hasForecast ? (
+              <>
+                <th scope="col" className="whitespace-nowrap p-2">
+                  Expected GAR/82
+                </th>
+                <th scope="col" className="p-2">
+                  Historical 80% residual range
+                </th>
+              </>
+            ) : null}
+            <th scope="col" className="whitespace-nowrap p-2">
+              Cap hit / AAV
+            </th>
+            <th scope="col" className="whitespace-nowrap p-2">
+              Team cap
+            </th>
+            <th scope="col" className="whitespace-nowrap p-2">
+              Cap share
+            </th>
+            <th scope="col" className="whitespace-nowrap p-2">
+              At $100M cap
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {row.breakdown.map((year) => {
+            const actual = actualYears.get(year.seasonStartYear);
+            const prediction = forecastYears.get(year.seasonStartYear);
+            return (
+              <tr key={year.seasonStartYear} className="border-t">
+                <th
+                  scope="row"
+                  className="whitespace-nowrap p-2 text-left font-normal"
+                >
+                  {season(year.seasonStartYear)}
+                </th>
+                {hasForecast ? (
+                  <td className="p-2">
+                    {prediction?.targetAge ?? talentScore(null)}
+                  </td>
+                ) : null}
+                {hasActual ? (
+                  <>
+                    <td className="p-2">
+                      {talentScore(actual?.goalsAboveReplacement)}
+                    </td>
+                    <td className="p-2">{talentScore(actual?.gar82)}</td>
+                  </>
+                ) : null}
+                {hasForecast ? (
+                  <>
+                    <td className="p-2">
+                      {talentScore(prediction?.valuePer82)}
+                    </td>
+                    <td className="whitespace-nowrap p-2">
+                      {prediction?.interval
+                        ? `${talentScore(prediction.interval.low)} to ${talentScore(prediction.interval.high)}`
+                        : talentScore(null)}
+                    </td>
+                  </>
+                ) : null}
+                <td className="whitespace-nowrap p-2">
+                  {dollars(year.capHit)}
+                </td>
+                <td className="whitespace-nowrap p-2">
+                  {dollars(year.salaryCap)}
+                </td>
+                <td className="p-2">{percent(year.capShare)}</td>
+                <td className="whitespace-nowrap p-2">
+                  {dollars(year.normalizedSalary)}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
   );
 }
