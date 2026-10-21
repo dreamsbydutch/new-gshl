@@ -617,6 +617,15 @@ seasons; contract evaluations average all years of fully observed two/three-year
 terms. Totals use 82-game equivalents. See `docs/RANKING.md` for validation
 boundaries and exclusions. This is research, not a production salary command.
 
+#### `ratings:fit-contract-talent`
+
+Fits the separate cap-independent holistic NHL contract forecast from a verified
+offline official-cohort snapshot. The cutoff is an NHL season **ending** year.
+It writes a new fitted artifact, chronological validation rows and a receipt;
+it has no network access or production writes and never replaces the shipped
+reference automatically. Use command help for its required input/output options.
+See [contract talent method and coverage](../docs/product/nhl-contract-talent.md).
+
 #### Compare salary-rating upgrades with the current talent formula
 
 `src/commands/ratings/test-salary-rating-upgrades.ts` reuses the category experiment's

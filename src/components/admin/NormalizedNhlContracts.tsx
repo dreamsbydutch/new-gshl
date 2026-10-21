@@ -15,6 +15,10 @@ const dollars = (value: number | null) =>
 const percent = (value: number | null) =>
   value === null ? "—" : `${(value * 100).toFixed(2)}%`;
 const season = (year: number) => `${year}–${String(year + 1).slice(-2)}`;
+const talentScore = (value: number | null | undefined) =>
+  value === null || value === undefined
+    ? "—"
+    : `${value > 0 ? "+" : ""}${value.toFixed(2)}`;
 
 class ContractRankingBoundary extends Component<
   { children: ReactNode },
@@ -57,11 +61,36 @@ function ContractRankings() {
   return (
     <section className="mx-auto max-w-7xl space-y-5">
       <div>
-        <h2 className="text-2xl font-bold">NHL contract normalized AAV</h2>
+        <h2 className="text-2xl font-bold">NHL contract value and talent</h2>
         <p className="mt-2 text-sm text-muted-foreground">
           Each season: cap hit ÷ that season’s team salary cap × $100 million.
           Add those values and divide by the contract’s full number of years.
         </p>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Holistic talent uses goals above replacement per 82 NHL team-game
+          opportunities. Zero is replacement level; negative scores remain
+          negative. Delivered talent averages completed contract years equally.
+          Current-season contribution is shown separately, and unsupported years
+          are never filled with zero.
+        </p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Remaining talent averages validated annual forecasts across every
+          remaining contract season. These use completed{" "}
+          {season(view.forecastOriginYear - 1)} data; the current-year forecast
+          is a full-season estimate, not additional value still to be earned.
+          Salary and cap figures do not affect either talent score.
+        </p>
+        {view.talentError ? (
+          <p role="alert" className="mt-2 text-sm text-red-600">
+            Holistic talent could not load: {view.talentError}
+          </p>
+        ) : null}
+        {view.talentLoading ? (
+          <p role="status" className="mt-2 text-sm">
+            Loading holistic season histories… {view.talentLoadedSeasons}/
+            {view.talentTotalSeasons}
+          </p>
+        ) : null}
         <p className="mt-1 text-sm text-muted-foreground">
           Calculated live from contract history and your season caps. When
           season records are missing, a consistent contract AAV is carried
@@ -143,6 +172,26 @@ function ContractRankings() {
         <>
           <div className="flex flex-wrap items-end justify-between gap-3">
             <label className="text-sm">
+              <span className="mb-1 block font-medium">Rank contracts by</span>
+              <select
+                className="rounded border bg-white px-3 py-2 text-gray-900"
+                value={view.sortBy}
+                onChange={(event) => {
+                  const value = event.target.value;
+                  if (
+                    value === "salary" ||
+                    value === "actual" ||
+                    value === "forecast"
+                  )
+                    view.setSortBy(value);
+                }}
+              >
+                <option value="salary">Normalized NHL salary</option>
+                <option value="actual">Delivered holistic talent</option>
+                <option value="forecast">Remaining holistic talent</option>
+              </select>
+            </label>
+            <label className="text-sm">
               <span className="mb-1 block font-medium">
                 Search player or contract year
               </span>
@@ -163,7 +212,13 @@ function ContractRankings() {
           <div className="overflow-x-auto rounded-lg border">
             <table className="w-full min-w-[900px] text-sm">
               <caption className="sr-only">
-                All NHL contracts sorted by normalized AAV, highest first
+                NHL contracts ranked by{" "}
+                {view.sortBy === "salary"
+                  ? "normalized salary"
+                  : view.sortBy === "actual"
+                    ? "delivered holistic talent"
+                    : "remaining holistic talent"}
+                , highest first
               </caption>
               <thead className="bg-gray-100 text-left">
                 <tr>
@@ -184,10 +239,38 @@ function ContractRankings() {
                   </th>
                   <th
                     scope="col"
-                    aria-sort="descending"
+                    aria-sort={
+                      view.sortBy === "salary" ? "descending" : undefined
+                    }
                     className="p-3 text-right"
                   >
-                    Normalized AAV ↓
+                    Normalized AAV {view.sortBy === "salary" ? "↓" : ""}
+                    <br />
+                    <span className="font-normal">At a $100M cap</span>
+                  </th>
+                  <th
+                    scope="col"
+                    aria-sort={
+                      view.sortBy === "actual" ? "descending" : undefined
+                    }
+                    className="p-3 text-right"
+                  >
+                    Delivered talent {view.sortBy === "actual" ? "↓" : ""}
+                    <br />
+                    <span className="font-normal">GAR/82 per year</span>
+                  </th>
+                  <th
+                    scope="col"
+                    aria-sort={
+                      view.sortBy === "forecast" ? "descending" : undefined
+                    }
+                    className="p-3 text-right"
+                  >
+                    Projected talent {view.sortBy === "forecast" ? "↓" : ""}
+                    <br />
+                    <span className="font-normal">
+                      Remaining years · GAR/82
+                    </span>
                   </th>
                   <th scope="col" className="p-3 text-right">
                     Avg. cap share
@@ -228,6 +311,30 @@ function ContractRankings() {
                           </div>
                         ) : null}
                       </td>
+                      <td className="p-3 text-right font-semibold tabular-nums">
+                        {talentScore(row.actualTalent)}
+                        <div className="text-xs text-muted-foreground">
+                          {row.talent?.actual
+                            ? `${row.talent.actual.coveredYearCount}/${row.talent.actual.expectedYearCount} completed years covered`
+                            : view.talentLoading
+                              ? "Loading…"
+                              : "Unavailable"}
+                        </div>
+                      </td>
+                      <td className="p-3 text-right font-semibold tabular-nums">
+                        {talentScore(row.forecastTalent)}
+                        <div className="text-xs text-muted-foreground">
+                          {row.talent?.forecast.status === "qualified"
+                            ? `${row.talent.forecast.years.length} remaining seasons`
+                            : row.talent?.forecast.status === "expired"
+                              ? "Contract ended"
+                              : row.talent?.forecast.status === "stale"
+                                ? "Forecast needs refresh"
+                                : view.talentLoading
+                                  ? "Loading…"
+                                  : "Insufficient validation or history"}
+                        </div>
+                      </td>
                       <td className="p-3 text-right tabular-nums">
                         {percent(row.averageCapShare)}
                       </td>
@@ -253,13 +360,160 @@ function ContractRankings() {
                         id={`contract-${row.id}`}
                         className="border-t bg-gray-50"
                       >
-                        <td colSpan={8} className="p-4">
+                        <td colSpan={10} className="p-4">
                           <p className="mb-2 font-medium">
                             {row.playerName} · signed{" "}
                             {new Date(row.signingDate)
                               .toISOString()
                               .slice(0, 10)}
                           </p>
+                          {row.talent ? (
+                            <div className="mb-5 space-y-3">
+                              <h3 className="font-semibold">
+                                Holistic hockey contribution
+                              </h3>
+                              {row.talent.error ? (
+                                <p
+                                  role="alert"
+                                  className="text-sm text-red-600"
+                                >
+                                  {row.talent.error}
+                                </p>
+                              ) : null}
+                              {row.talent.actual ? (
+                                <>
+                                  <p className="text-sm">
+                                    Completed-year delivered goals above
+                                    replacement:{" "}
+                                    {talentScore(
+                                      row.talent.actual
+                                        .completedDeliveredGoalsAboveReplacement,
+                                    )}
+                                    . Current-season observed contribution:{" "}
+                                    {talentScore(
+                                      row.talent.actual.currentSeason
+                                        ?.goalsAboveReplacement,
+                                    )}
+                                    . Future years do not enter the delivered
+                                    average.
+                                  </p>
+                                  <table className="w-full text-sm">
+                                    <caption className="sr-only">
+                                      Actual annual holistic contribution for{" "}
+                                      {row.playerName}
+                                    </caption>
+                                    <thead>
+                                      <tr className="text-left">
+                                        <th className="p-2">Season</th>
+                                        <th className="p-2">Observed GAR</th>
+                                        <th className="p-2">GAR/82</th>
+                                        <th className="p-2">Coverage</th>
+                                        <th className="p-2">Source date</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {row.talent.actual.years.map((year) => (
+                                        <tr
+                                          key={year.seasonStartYear}
+                                          className="border-t"
+                                        >
+                                          <td className="p-2">
+                                            {season(year.seasonStartYear)}
+                                          </td>
+                                          <td className="p-2">
+                                            {talentScore(
+                                              year.goalsAboveReplacement,
+                                            )}
+                                          </td>
+                                          <td className="p-2">
+                                            {talentScore(year.gar82)}
+                                          </td>
+                                          <td className="p-2">
+                                            {year.state === "partial"
+                                              ? "Season to date; no annual pace"
+                                              : year.state === "covered" &&
+                                                  year.qualification ===
+                                                    "no-nhl-games"
+                                                ? "Verified no NHL games"
+                                                : year.state}
+                                          </td>
+                                          <td className="p-2">
+                                            {year.sourceFetchedAt
+                                              ? new Date(year.sourceFetchedAt)
+                                                  .toISOString()
+                                                  .slice(0, 10)
+                                              : "—"}
+                                          </td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </>
+                              ) : null}
+                              {row.talent.forecast.years.length ? (
+                                <table className="w-full text-sm">
+                                  <caption className="mb-2 text-left font-medium">
+                                    Remaining-season annual talent estimates
+                                  </caption>
+                                  <thead>
+                                    <tr className="text-left">
+                                      <th className="p-2">Season</th>
+                                      <th className="p-2">Expected GAR/82</th>
+                                      <th className="p-2">
+                                        Historical 80% residual range
+                                      </th>
+                                      <th className="p-2">Validation</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {row.talent.forecast.years.map((year) => (
+                                      <tr
+                                        key={year.seasonStartYear}
+                                        className="border-t"
+                                      >
+                                        <td className="p-2">
+                                          {season(year.seasonStartYear)}
+                                        </td>
+                                        <td className="p-2">
+                                          {talentScore(
+                                            year.prediction.valuePer82,
+                                          )}
+                                        </td>
+                                        <td className="p-2">
+                                          {year.prediction.interval
+                                            ? `${talentScore(year.prediction.interval.low)} to ${talentScore(year.prediction.interval.high)}`
+                                            : "—"}
+                                        </td>
+                                        <td className="p-2">
+                                          {year.prediction.status ===
+                                          "qualified"
+                                            ? "Historical support passed"
+                                            : year.prediction.status ===
+                                                "research"
+                                              ? "Research only; excluded from main score"
+                                              : "Unavailable"}
+                                        </td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              ) : null}
+                              {row.talent.forecast.reasons.length ? (
+                                <p className="text-sm text-muted-foreground">
+                                  {row.talent.forecast.reasons.join(". ")}
+                                </p>
+                              ) : null}
+                              <p className="text-sm text-muted-foreground">
+                                Forecast checks use historical seasons and known
+                                outcomes; unsupported played seasons remain
+                                unknown. Residual ranges describe those observed
+                                historical errors, not guaranteed future
+                                coverage. Current partial seasons and
+                                research-only horizons do not enter the
+                                delivered or validated remaining-term averages.
+                              </p>
+                            </div>
+                          ) : null}
                           <table className="w-full text-sm">
                             <caption className="sr-only">
                               Season calculation for {row.playerName}

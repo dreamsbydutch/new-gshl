@@ -1,5 +1,7 @@
 export interface NhlContractAnalyticsInput {
   id: string;
+  playerId?: string;
+  nhlPlayerId?: number | null;
   playerName: string;
   position: string;
   signingDate: number;

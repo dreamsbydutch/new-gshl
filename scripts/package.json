@@ -44,7 +44,8 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "nhl-contracts:import": "tsx src/commands/player-bios/import-nhl-contract-history.ts",
     "test:nhl-contracts": "node ../node_modules/tsx/dist/cli.mjs --test src/domains/maintenance/nhl-contracts.test.ts src/domains/maintenance/nhl-contract-storage.test.ts src/domains/maintenance/sync-player-bios-from-puckpedia.test.ts",
-    "stats:refresh-nightly-nhl": "node --use-system-ca --dns-result-order=ipv4first --import tsx src/commands/stats/refresh-nightly-nhl-stats.ts"
+    "stats:refresh-nightly-nhl": "node --use-system-ca --dns-result-order=ipv4first --import tsx src/commands/stats/refresh-nightly-nhl-stats.ts",
+    "ratings:fit-contract-talent": "node --import tsx src/commands/ratings/fit-nhl-contract-talent.ts"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",

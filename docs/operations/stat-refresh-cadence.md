@@ -55,7 +55,7 @@ identity intake, protected fields and deployment allowlists.
 ## Activation on October 20, 2026
 
 The Windows task `GSHL-Stats-polished-tern-709-m9774darbpss4t79nxdbe871318and9f`
-is enabled with a five-minute repeating trigger. It targets production
+was enabled with a five-minute repeating trigger. It targets production
 `polished-tern-709`, Yahoo league 44541 and the 2026–27 GSHL season. The fantasy
 calendar runs September 29 through April 10; NHL season refresh continues
 through April 19. Its first unattended cycle completed successfully, and the
@@ -107,3 +107,25 @@ Retained evidence includes the first-run log/status, GSHL apply summary, NHL
 before/after snapshots, independent protected-field comparison and deployment
 plans under `.local-data/stat-refresh-20261020/`. Independent copies are under
 `C:/Users/choug/gshl-backups/stat-refresh-20261020/`.
+
+## Windows host transfer
+
+The original PC's task was disabled on October 20 at the user's request because
+that computer is not reliably online. It was idle at cutover; no run needed to be
+stopped. The five-minute production schedule is not active on that PC. Production
+code and previously reconciled statistics remain deployed.
+
+The prepared transfer bundle is
+`.local-data/stat-refresh-transfer-20261020.zip`. It contains verified copies of
+the frozen category corpus/calendar, a resume checkpoint, installation/preview
+scripts and setup instructions for the other Windows computer. It excludes all
+credentials and browser profiles. The bundle is needed in addition to a Git
+checkout because the frozen reference files are not stored in Git. Its installer
+rewrites reference paths for the destination checkout and defaults to local file
+preparation plus a task preview. Only its explicit `-Apply` installs a task.
+
+The destination needs its own Convex login and Yahoo importer browser session,
+plus Node/Python dependencies. Run a read-only daytime preview before installing
+and inspect the first scheduled status afterward. Keep the original task disabled
+and use only one production scheduler. The destination has not been configured
+or activated from this workspace.

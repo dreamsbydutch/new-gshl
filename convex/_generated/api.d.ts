@@ -36,6 +36,7 @@ import type * as lib_matchupPreviewEvidence from "../lib/matchupPreviewEvidence.
 import type * as lib_matchupProjection from "../lib/matchupProjection.js";
 import type * as lib_nhlContractFields from "../lib/nhlContractFields.js";
 import type * as lib_nhlContractMerge from "../lib/nhlContractMerge.js";
+import type * as lib_nhlContractTalent from "../lib/nhlContractTalent.js";
 import type * as lib_nhlProfileContract from "../lib/nhlProfileContract.js";
 import type * as lib_nhlSeasonValueFields from "../lib/nhlSeasonValueFields.js";
 import type * as lib_nightlyNhlStatFields from "../lib/nightlyNhlStatFields.js";
@@ -124,6 +125,7 @@ declare const fullApi: ApiFromModules<{
   "lib/matchupProjection": typeof lib_matchupProjection;
   "lib/nhlContractFields": typeof lib_nhlContractFields;
   "lib/nhlContractMerge": typeof lib_nhlContractMerge;
+  "lib/nhlContractTalent": typeof lib_nhlContractTalent;
   "lib/nhlProfileContract": typeof lib_nhlProfileContract;
   "lib/nhlSeasonValueFields": typeof lib_nhlSeasonValueFields;
   "lib/nightlyNhlStatFields": typeof lib_nightlyNhlStatFields;

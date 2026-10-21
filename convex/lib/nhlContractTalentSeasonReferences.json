@@ -1,0 +1,85 @@
+{
+  "modelVersion": "nhl-hockey-overall-reviewed-v1",
+  "asOf": "2026-10-19",
+  "inputSha256": "1c1840b9dc4fce04939e9177de91dea789843eba08bfc81ff0edf5608673cd46",
+  "seasons": {
+    "2013": {
+      "teamGames": 82,
+      "expectedPlayers": 983,
+      "populationSha256": "bc28e54141d32bc23548e203cae3abeb9f69130bd68753a384c5b27d5aeb2edc",
+      "sourceSha256": "6d66834b6e8b928d49fe00a4e66e09752f30aaecc28b5f3b1faa6d56e469eef8"
+    },
+    "2014": {
+      "teamGames": 82,
+      "expectedPlayers": 974,
+      "populationSha256": "d21eb24bb4fd9d8dad609be81dcfde621c808a08d347709911e7713d442eff77",
+      "sourceSha256": "2ed9f0e5f0f138f5ced8eecf77d5dfa3c3791960a6f05ec01f733a5243ab159d"
+    },
+    "2015": {
+      "teamGames": 82,
+      "expectedPlayers": 990,
+      "populationSha256": "52fb24cd525329ea6a84e17525cf50c287f62106ab4fc2ca2719e172214f20c5",
+      "sourceSha256": "4836ee1b6e2cfda2bd7103878a56d72457eb4ceefada20505655a5b1bdd3302d"
+    },
+    "2016": {
+      "teamGames": 82,
+      "expectedPlayers": 983,
+      "populationSha256": "ad90099c0117a43ae14eac73ed11562fe31a6c776ef7f44db315637bf9b265bf",
+      "sourceSha256": "da493c4bb9af371949fe34d742f8465709d50cca184542b292eb25bb40f76637"
+    },
+    "2017": {
+      "teamGames": 82,
+      "expectedPlayers": 985,
+      "populationSha256": "3e5ddbf3877f984ae7469a0267d306b9c6731ba995b005667ed82bf494943a05",
+      "sourceSha256": "b9c447fab0d10c50de82388692a3563a7cc7cbcb87e2d47231af79b21a563636"
+    },
+    "2018": {
+      "teamGames": 82,
+      "expectedPlayers": 999,
+      "populationSha256": "c2a3434f1cfee424ef55ae41a026320452d25c6baced62d45e765ce11a4639e2",
+      "sourceSha256": "ff36cb85154ff28d4a1e5dfa826cbcaaa4beeff6b9dac3237885bf182fe7df0f"
+    },
+    "2019": {
+      "teamGames": 69.80645161290323,
+      "expectedPlayers": 970,
+      "populationSha256": "4a4a26a7139a8b9d433fc6064e23dc7b9ab3fe8c1fd7316e90bbf3c67ec94ee3",
+      "sourceSha256": "449b1f0e9bb3a4a29e911c66579d0d977d32436e5d6d03c226d9d4bc42fc0c20"
+    },
+    "2020": {
+      "teamGames": 56,
+      "expectedPlayers": 1011,
+      "populationSha256": "45e0cb3a4893838363a50f4f39626286e2cc2ab615e55648521d2d52f1b86eeb",
+      "sourceSha256": "ed4bbb50f8280447e249297e62187bbe359c1745fcad7796d010c46cc042273e"
+    },
+    "2021": {
+      "teamGames": 82,
+      "expectedPlayers": 1123,
+      "populationSha256": "80d6539c0ed9dc306b39c36c1e7f42ed7c3085f20d72e3d42a540c1e4c8297de",
+      "sourceSha256": "fd67737d7f45d103378d714b5a859637aae62f0129062e2a2f81b6fbf88ad4b3"
+    },
+    "2022": {
+      "teamGames": 82,
+      "expectedPlayers": 1058,
+      "populationSha256": "81bdc12d3d41a2e3ee1908baf4f92984408ebb45b99bfbbd85511e592a4a0de0",
+      "sourceSha256": "a181ed1291161867e2476944b3e1ab1e598ecfed5cf96132282f58ee5f46a53d"
+    },
+    "2023": {
+      "teamGames": 82,
+      "expectedPlayers": 1022,
+      "populationSha256": "3ea704c6d2bd70d374c3cd72e5a2c0bc53cf06453abcf6748daa86625d7c6d30",
+      "sourceSha256": "4f48507111538c68db742053c3a9033436c17fb504008cd041315c5acabec734"
+    },
+    "2024": {
+      "teamGames": 82,
+      "expectedPlayers": 1023,
+      "populationSha256": "8bc16b1c03d0e0d29efa71aee9702f65e2865842ada49076a7b90bfb03f4f74e",
+      "sourceSha256": "6eab5e7671433d8a1cb34725cfd1339a02f2227101d0bddf9c101b1c6026e85f"
+    },
+    "2025": {
+      "teamGames": 82,
+      "expectedPlayers": 1038,
+      "populationSha256": "b1ba89f187823ae9d95063edce58fb3cb2588f7ace93be8ab834bf02ecc573b0",
+      "sourceSha256": "84ab806fbc198d03273b54ace2aab9bb7bce3845bdfb8406873d4c3558fe909d"
+    }
+  }
+}

@@ -7,6 +7,11 @@ import { nhlProfileContract } from "./lib/nhlProfileContract";
 import { writeNhlContracts } from "./nhlContracts";
 import type { Doc } from "./_generated/dataModel";
 import type { QueryCtx } from "./_generated/server";
+import talentReferences from "./lib/nhlContractTalentSeasonReferences.json";
+import {
+  nhlContractPlayerId,
+  projectNhlContractTalentSeason,
+} from "./lib/nhlContractTalent";
 
 async function rosterPlayer(
   ctx: QueryCtx,
@@ -257,6 +262,8 @@ export const page = query({
         ]);
         return {
           id: contract._id,
+          playerId: contract.playerId,
+          nhlPlayerId: nhlContractPlayerId(player?.nhlApiId),
           playerName: player?.fullName ?? "Unknown player",
           position: player?.posGroup ?? "",
           signingDate: contract.signingDate,
@@ -271,6 +278,66 @@ export const page = query({
       }),
     );
     return { ...result, page };
+  },
+});
+
+export const talentSeason = query({
+  args: { seasonId: v.id("seasons") },
+  handler: async (ctx, args) => {
+    await requireCommissioner(ctx);
+    const season = await ctx.db.get(args.seasonId);
+    const seasonStartYear = Number(season?.year) - 1;
+    if (
+      !season ||
+      !Number.isInteger(seasonStartYear) ||
+      seasonStartYear < 1900 ||
+      seasonStartYear > 2200
+    )
+      throw Error("Invalid NHL talent season");
+    const rows = await ctx.db
+      .query("playerNhlStatLines")
+      .withIndex("by_seasonId", (q) => q.eq("seasonId", args.seasonId))
+      .take(1201);
+    if (rows.length > 1200)
+      throw Error(
+        "NHL talent cohort exceeds its bounded read; review before increasing it",
+      );
+    const sourceIds = [
+      ...new Set(
+        rows.flatMap((row) =>
+          row.hockeyRating?.qualification === "ranked" &&
+          row.hockeyRating.sourceId
+            ? [row.hockeyRating.sourceId]
+            : [],
+        ),
+      ),
+    ];
+    const sources = new Map<string, Doc<"nhlSeasonValues">>();
+    await Promise.all(
+      sourceIds.map(async (id) => {
+        const row = await ctx.db.get(id);
+        if (row) sources.set(id, row);
+      }),
+    );
+    const now = new Date();
+    const currentSeasonStartYear = Math.max(
+      now.getUTCFullYear() - (now.getUTCMonth() < 6 ? 1 : 0),
+      ...Object.keys(talentReferences.seasons).map((year) => Number(year) + 1),
+    );
+    const reference =
+      talentReferences.seasons[
+        String(seasonStartYear) as keyof typeof talentReferences.seasons
+      ];
+    return {
+      currentSeasonStartYear,
+      ...(await projectNhlContractTalentSeason({
+        rows,
+        sources,
+        seasonStartYear,
+        currentSeasonStartYear,
+        reference,
+      })),
+    };
   },
 });
 

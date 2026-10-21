@@ -103,6 +103,11 @@ for results, coverage and limitations.
 
 ## Independent NHL Season Value
 
+Cap-independent contract averages and the separately validated remaining-term
+forecast are described in [holistic NHL contract talent](product/nhl-contract-talent.md).
+They retain signed replacement-based goal units and never reuse fantasy salary
+curves or normalize by a player's own games played.
+
 NHL season stat lines expose two separate lenses. `playerNhlStatLines.seasonRating`
 is the existing GSHL category-based season score. `hockeyRating.seasonValue` is
 the reviewed replacement-relative hockey contribution in goal units, with its
