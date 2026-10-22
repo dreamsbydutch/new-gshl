@@ -1,8 +1,32 @@
 {
   "modelVersion": "nhl-hockey-overall-reviewed-v1",
-  "asOf": "2026-10-19",
-  "inputSha256": "1c1840b9dc4fce04939e9177de91dea789843eba08bfc81ff0edf5608673cd46",
+  "asOf": "2026-10-22",
+  "inputSha256": "d0e1911407d6f8bf91ae32fb7e09890accb4559214ada8a108bc4662f6ab0e41",
   "seasons": {
+    "2009": {
+      "teamGames": 82,
+      "expectedPlayers": 962,
+      "populationSha256": "eccf3cc77981687ab62abd93ccdee9ff7be2cb7d85998b5b1e50767029f76555",
+      "sourceSha256": "afc6182872e942ced9e33e8eb739a0a6ce853751728b09ba67ef419500313af1"
+    },
+    "2010": {
+      "teamGames": 82,
+      "expectedPlayers": 978,
+      "populationSha256": "4e3fa37fe720e11213d1345b7eccb4a4429f6f3a26fce59473eebb436984070c",
+      "sourceSha256": "6c983ec583de6e65c8c76218ff8ab7754621ccdfd001cfc7f0a91ba5c14d1ab4"
+    },
+    "2011": {
+      "teamGames": 82,
+      "expectedPlayers": 983,
+      "populationSha256": "ebec920043f1e94fb1ea0758173dc750e1ca5c376446a176302eea18ea4b9650",
+      "sourceSha256": "46c852d66de61b471280989c762d6596909de954abe91f065ebe5f9b7cf1c0a3"
+    },
+    "2012": {
+      "teamGames": 48,
+      "expectedPlayers": 921,
+      "populationSha256": "f88448974aae69b1a10ae63e4e2233b9ed1ae84449cb0fd60c3e66cd94ad082e",
+      "sourceSha256": "e58f011cea9ef52b1edbddde3ed0056fba77df744f75fb12186a9e1f29546f49"
+    },
     "2013": {
       "teamGames": 82,
       "expectedPlayers": 983,
