@@ -1,6 +1,7 @@
 import { ConvexHttpClient } from "convex/browser";
 import { makeFunctionReference } from "convex/server";
 import { env } from "@gshl-env";
+import { selectSeasonScope } from "../../../../src/lib/utils/domain/season-scope";
 import {
   groupNhlContracts,
   type NhlContractObservation,
@@ -318,6 +319,7 @@ function compactRecord(
 
 export async function fetchModel<T extends AnyRow>(
   model: ModelName,
+  options: { includeNhlOnly?: boolean } = {},
 ): Promise<T[]> {
   const rows = await getClient().query(
     refs.list,
@@ -325,7 +327,8 @@ export async function fetchModel<T extends AnyRow>(
       table: getConvexTableName(model),
     }),
   );
-  return rows.map(hydrateRow<T>);
+  const hydrated = rows.map(hydrateRow<T>);
+  return model === "Season" ? selectSeasonScope(hydrated, options) : hydrated;
 }
 
 export async function fetchSeasonDraftPicks<T extends AnyRow>(

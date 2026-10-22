@@ -127,5 +127,54 @@ preparation plus a task preview. Only its explicit `-Apply` installs a task.
 The destination needs its own Convex login and Yahoo importer browser session,
 plus Node/Python dependencies. Run a read-only daytime preview before installing
 and inspect the first scheduled status afterward. Keep the original task disabled
-and use only one production scheduler. The destination has not been configured
-or activated from this workspace.
+and use only one production scheduler. The user confirms that jobs already run
+on the destination computer; its current scheduler health has not been verified
+from this workspace.
+
+## Roster recovery on October 21, 2026
+
+The agent incorrectly interpreted the repair request as authorization to resume
+recurring updates on the original PC. After the user clarified that another
+computer already runs the jobs, the task on `DUTCHGRAM` was disabled again and
+verified idle. Keep this computer's task disabled. Reliability must be checked
+on the destination computer; a successful local run does not establish the
+destination scheduler's health.
+
+The app had missed Dutch Rudders' drops of Owen Tippett and Mikael
+Backlund and additions of Josh Anderson and Michael Brandsegg-Nygård. An
+all-team preview also exposed a missing Yahoo identity: the roster displayed
+"M. Brandsegg-Nygård" while its player link's title contained his full name.
+The importer now reads that full-name title, falling back to visible text,
+so the existing unique exact-name reconciliation can resolve missing IDs
+without matching initials approximately. His missing Yahoo ID was filled after
+verifying the unique canonical player and source identity.
+
+The applied current-day reconciliation created 226 roster days and updated
+13 players across 14 teams, with no contract buyouts. An independent readback
+verified every roster-day ownership assignment and confirmed Tippett's owner,
+team and lineup position were cleared. A fresh Yahoo preview reported 226
+unchanged days and zero remaining player changes or conflicts.
+
+The Windows wrapper now supplies an independent recovery directory under
+`~/gshl-backups/yahoo-sync` to the existing backed-up reconciliation workflow.
+Previously, its missing recovery configuration would block subsequent same-day
+drops when superseded player-day rows already existed. Source confirmation,
+hash-verified backup and exact-document checks remain required before removal.
+The backend removal function was verified present in production; no backend
+deployment was needed for this recovery.
+
+Player/contract/day snapshots and task/checkpoint backups are retained outside
+OneDrive in `C:/Users/choug/gshl-backups/roster-recovery-20261021/`. The name
+regression failed before the parser change and passed afterward. The focused
+35-test roster, maintenance, schedule, backup and verified-removal group passed.
+PowerShell parsing and changed TypeScript formatting were checked. Operator
+files are excluded by repository ESLint configuration; no application build,
+architecture check or ranking contract check was needed for these changes.
+
+The complete applied Windows scheduled cycle finished successfully at
+11:49 a.m. Toronto on October 21, with Task Scheduler result 0. Its checkpoint
+advanced through October 20 with the October 21 morning recheck complete.
+The October 20 source reconciliation added four missing rows, updated eight
+and removed the two superseded Dutch Rudders rows after source reconfirmation
+and a verified independent backup. Final readbacks verified 227 October 20 rows,
+226 October 21 rows, initialized current-day ratings and no stale ownership.

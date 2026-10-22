@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 
 import {
   useAuthSession,
@@ -19,29 +19,8 @@ import type {
   OwnerCommandCenterData,
   OwnerCommandCenterMatchup,
 } from "@gshl-lib/types/owner-command-center";
-import {
-  buildOwnerCommandCenterView,
-  countUnreadOwnerActivity,
-  newestOwnerActivityAt,
-  ownerCommandCenterActivityStorageKey,
-} from "@gshl-utils/features/owner-command-center";
+import { buildOwnerCommandCenterView } from "@gshl-utils/features/owner-command-center";
 import { useUfaOverview } from "./useUfaData";
-
-function readActivityMarker(key: string) {
-  try {
-    return window.localStorage.getItem(key);
-  } catch {
-    return null;
-  }
-}
-
-function writeActivityMarker(key: string, value: string) {
-  try {
-    window.localStorage.setItem(key, value);
-  } catch {
-    // The command center remains usable when browser storage is unavailable.
-  }
-}
 
 function seasonYear(season: Pick<Season, "year">) {
   const year = Number(season.year);
@@ -245,6 +224,7 @@ export function useOwnerCommandCenter() {
       contracts: contractsQuery.data,
       draftPicks,
       pendingOffers,
+      ufaWindowOpen: ufaQuery.data?.window.isOpen === true,
       listedPlayers,
       upcomingMatchups: upcomingRows.map((row) =>
         projectMatchup({
@@ -277,54 +257,13 @@ export function useOwnerCommandCenter() {
     tradeQuery.data?.candidates,
     tradeQuery.data?.listings,
     ufaQuery.data?.pendingOffers,
+    ufaQuery.data?.window.isOpen,
     weeksQuery.data,
   ]);
   const view = useMemo(
     () => (rawData ? buildOwnerCommandCenterView(rawData) : null),
     [rawData],
   );
-  const [lastViewedAt, setLastViewedAt] = useState<string | null>(null);
-  const [activityReady, setActivityReady] = useState(false);
-
-  useEffect(() => {
-    if (!view) {
-      setLastViewedAt(null);
-      setActivityReady(false);
-      return;
-    }
-
-    const key = ownerCommandCenterActivityStorageKey(view.ownerId);
-    const stored = readActivityMarker(key);
-    if (stored) {
-      setLastViewedAt(stored);
-    } else {
-      const baseline =
-        newestOwnerActivityAt(view.activity) ?? new Date().toISOString();
-      writeActivityMarker(key, baseline);
-      setLastViewedAt(baseline);
-    }
-    setActivityReady(true);
-  }, [view]);
-
-  const unreadCount = useMemo(
-    () =>
-      activityReady && view
-        ? countUnreadOwnerActivity(view.activity, lastViewedAt)
-        : 0,
-    [activityReady, lastViewedAt, view],
-  );
-
-  const markActivityRead = useCallback(() => {
-    if (!view) return;
-    const newest = newestOwnerActivityAt(view.activity);
-    if (!newest) return;
-    writeActivityMarker(
-      ownerCommandCenterActivityStorageKey(view.ownerId),
-      newest,
-    );
-    setLastViewedAt(newest);
-  }, [view]);
-
   const isLoading =
     status === "loading" ||
     (isLinkedOwner &&
@@ -343,8 +282,5 @@ export function useOwnerCommandCenter() {
     data: view,
     isEligible: isLinkedOwner,
     isLoading,
-    unreadCount,
-    lastViewedAt,
-    markActivityRead,
   };
 }

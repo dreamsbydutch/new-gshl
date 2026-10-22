@@ -1,3 +1,4 @@
+import { selectSeasonScope } from "../../src/lib/utils/domain/season-scope";
 import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
 import { resolveContractSigningAssignments } from "./contractSigning";
@@ -38,7 +39,7 @@ export async function signContract(ctx: MutationCtx, request: SigningRequest) {
     ctx.db.query("seasons").collect(),
   ]);
   if (!player || !franchise) throw new Error("Player or franchise not found");
-  const ordered = [...seasons].sort(
+  const ordered = selectSeasonScope(seasons).sort(
     (a, b) => Number(a.year) - Number(b.year) || a._id.localeCompare(b._id),
   );
   const signingIndex = ordered.findIndex(

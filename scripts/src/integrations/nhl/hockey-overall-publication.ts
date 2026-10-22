@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { loadAuditedRetrospectiveShots } from "./retrospective-shot-source";
+import { verifyOfficialGoalCoverageFromCache } from "./official-goal-physical-audit";
 import {
   prepareHockeyOverallPublication,
   type HockeyValueReport,
@@ -148,6 +149,24 @@ export async function loadHockeyOverallPublication(
       entry.oofDirectory,
       entry.shotRowsPath,
     );
+    insist(
+      raw.provenance.sourceCacheDirectory &&
+        raw.provenance.gameSourceHashes &&
+        raw.provenance.gameSourcesHash &&
+        raw.provenance.penaltyShotModel &&
+        raw.officialOnGoalCoverage,
+      "Fresh source-bound official goal/on-goal audits required; regenerate an audited value report for this archived calculation",
+    );
+    const officialGoalProof = await verifyOfficialGoalCoverageFromCache({
+      cacheDirectory: raw.provenance.sourceCacheDirectory,
+      sourceText,
+      season: entry.nhlSeason,
+      gameType: 2,
+      expectedCanonicalSourceSha256: entry.sourceSha256,
+      gameSourceHashes: raw.provenance.gameSourceHashes,
+      expectedGameSourcesHash: raw.provenance.gameSourcesHash,
+      penaltyShotProbability: raw.provenance.penaltyShotModel.probability,
+    });
     const prepared = prepareHockeyOverallPublication({
       season: entry.nhlSeason,
       sourceText,
@@ -157,11 +176,13 @@ export async function loadHockeyOverallPublication(
       policyText,
       policyHash: summary.policy.sha256,
       nativeInference: replay.audit,
+      officialGoalProof,
     });
     plans.push({
       season: entry,
       metadata: { seasonId: entry.seasonId, ...prepared.metadata },
       results: prepared.results,
+      officialGoalProof,
     });
   }
   const pending = summary.pending.filter(

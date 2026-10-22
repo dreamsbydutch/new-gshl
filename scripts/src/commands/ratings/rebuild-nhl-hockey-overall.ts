@@ -25,6 +25,8 @@ type Season = {
   nhlSeason: number;
   state: "completed" | "current" | "future";
   asOf: string;
+  historicalShotBridge?: boolean;
+  repairPenaltyShotContext?: boolean;
   reuse?: Reuse;
 };
 type Inventory = {
@@ -217,6 +219,26 @@ async function main(inventoryPath: string, outputPath: string) {
   );
   const all = inventory.value.seasons;
   insist(
+    all.every(
+      (season) =>
+        season.historicalShotBridge === undefined ||
+        (typeof season.historicalShotBridge === "boolean" &&
+          season.nhlSeason >= 20082009 &&
+          season.nhlSeason <= 20122013),
+    ),
+    "Historical raw-shot recovery requires an explicit supported historical season",
+  );
+  insist(
+    all.every(
+      (season) =>
+        season.repairPenaltyShotContext === undefined ||
+        (typeof season.repairPenaltyShotContext === "boolean" &&
+          season.nhlSeason >= 20082009 &&
+          season.nhlSeason <= 20122013),
+    ),
+    "Penalty-shot context recovery requires an explicit supported historical season",
+  );
+  insist(
     new Set(all.map((s) => s.seasonId)).size === all.length &&
       new Set(all.map((s) => s.nhlSeason)).size === all.length &&
       all.every(
@@ -257,11 +279,52 @@ async function main(inventoryPath: string, outputPath: string) {
     "scripts/src/commands/ratings/preview-nhl-retrospective-values.ts",
     "scripts/src/integrations/nhl/retrospective-value-context.ts",
     "scripts/src/integrations/nhl/retrospective-shot-source.ts",
+    "scripts/src/integrations/nhl/game-value-source.ts",
+    "scripts/src/domains/nhl/game-value-input.ts",
+    "scripts/src/domains/nhl/verified-game-source.ts",
+    "scripts/src/domains/nhl/official-shift-report.ts",
+    "scripts/src/domains/nhl/unavailable-shift-proof.ts",
+    "scripts/src/integrations/nhl/unavailable-shift-source.ts",
+    "scripts/src/domains/nhl/official-game-clock.ts",
+    "scripts/src/domains/nhl/boundary-shift-reconciliation.ts",
+    "scripts/src/domains/nhl/boundary-shift-2008-cases.ts",
+    "scripts/src/integrations/nhl/boundary-shift-source.ts",
+    "scripts/src/domains/nhl/official-goal-coverage.ts",
+    "scripts/src/domains/nhl/official-on-goal-coverage.ts",
+    "scripts/src/domains/nhl/official-on-goal-classification.ts",
+    "scripts/src/integrations/nhl/official-on-goal-classification-source.ts",
+    "scripts/src/domains/nhl/official-shot-credit-reconciliation.ts",
+    "scripts/src/integrations/nhl/official-shot-credit-source.ts",
+    "scripts/src/domains/nhl/official-primary-event-recovery.ts",
+    "scripts/src/integrations/nhl/official-primary-event-source.ts",
+    "scripts/src/domains/nhl/reviewed-event-source-availability.ts",
+    "scripts/src/integrations/nhl/reviewed-event-source-availability-source.ts",
+    "scripts/src/domains/nhl/reviewed-2008-shot-credit.ts",
+    "scripts/src/integrations/nhl/reviewed-2008-shot-credit-source.ts",
+    "scripts/src/integrations/nhl/official-goal-physical-audit.ts",
+    "scripts/src/domains/nhl/official-penalty-shot-report.ts",
+    "scripts/src/domains/nhl/official-penalty-shot-context.ts",
+    "scripts/src/domains/nhl/official-missing-penalty-shot.ts",
+    "scripts/src/integrations/nhl/official-penalty-shot-context-source.ts",
+    "scripts/src/domains/nhl/official-empty-net-report.ts",
+    "scripts/src/domains/nhl/historical-shot-source-bridge.ts",
+    "scripts/src/domains/nhl/historical-shot-type-alignment.ts",
+    "scripts/src/domains/nhl/reviewed-paired-penalty-shot-source.ts",
+    "scripts/src/domains/nhl/reviewed-gs-penalty-source.ts",
+    "scripts/src/domains/nhl/reviewed-report-only-penalty-shot-award.ts",
+    "scripts/src/domains/nhl/historical-penalty-alignment.ts",
+    "scripts/src/domains/nhl/missing-native-shot-source.ts",
+    "scripts/src/integrations/nhl/historical-shot-source.ts",
+    "scripts/src/domains/nhl/game-reconciliation.ts",
+    "scripts/src/domains/nhl/game-value-audit.ts",
+    "scripts/src/runtime/nhl-shot-quality.ts",
+    "scripts/src/runtime/nhl-adjusted-impact.ts",
     "scripts/src/runtime/nhl-overall-rating.ts",
     "scripts/src/runtime/nhl-game-season-value.ts",
     "scripts/src/domains/nhl/retrospective-audit-compatibility.ts",
     "scripts/python/nhl_rating/retrospective-crossfit.py",
     "scripts/python/nhl_rating/nonlinear-shot-experiment.py",
+    "docs/product/nhl-historical-source-recovery.md",
   ];
   const codeHashes = await Promise.all(
     codePaths.map(async (path) => ({
@@ -481,9 +544,22 @@ async function main(inventoryPath: string, outputPath: string) {
             "--cache",
             cache,
           ];
+          const recovery = [
+            ...(season.historicalShotBridge
+              ? ["--historical-shot-bridge"]
+              : []),
+            ...(season.repairPenaltyShotContext
+              ? ["--repair-penalty-shot-context"]
+              : []),
+          ];
           await nodeCommand(
             "collect-nhl-value-games.ts",
-            [...common, "--output", resolve(directory, "collection.json")],
+            [
+              ...common,
+              ...recovery,
+              "--output",
+              resolve(directory, "collection.json"),
+            ],
             resolve(directory, "collection.log"),
           );
           const first = resolve(directory, "source-initial");
@@ -502,6 +578,7 @@ async function main(inventoryPath: string, outputPath: string) {
               "collect-nhl-value-games.ts",
               [
                 ...common,
+                ...recovery,
                 "--repair-audit",
                 resolve(first, "game-audit.json"),
                 "--output",

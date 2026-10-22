@@ -27,6 +27,7 @@ import {
 } from "./lib/timestamps";
 import { loadLatestNhlStats, loadUfaCatalog } from "./lib/ufaCatalog";
 import { resolveUfaSigningSeason } from "../src/lib/utils/features/ufa-deadline";
+import { selectSeasonScope } from "../src/lib/utils/domain/season-scope";
 import {
   readCompatibilityRows,
   finishCompatibilityRead,
@@ -113,9 +114,11 @@ async function rows(
       const row = (await ctx.db.get(normalizedId)) as Row | null;
       delete where.id;
       return row
-        ? finishCompatibilityRead(table, [row], { ...args, where }).map(
-            publicRow,
-          )
+        ? finishCompatibilityRead(
+            table,
+            table === "seasons" ? selectSeasonScope([row]) : [row],
+            { ...args, where },
+          ).map(publicRow)
         : [];
     } catch {
       return [];
@@ -127,6 +130,18 @@ async function rows(
     delete where.teamId;
   }
 
+  if (table === "seasons") {
+    // Exclude reference years before applying a requested display limit.
+    const all = await readCompatibilityRows(ctx, table, {
+      ...args,
+      where,
+      take: undefined,
+    });
+    return finishCompatibilityRead(table, selectSeasonScope(all), {
+      ...args,
+      where,
+    }).map(publicRow);
+  }
   return (await readCompatibilityRows(ctx, table, { ...args, where })).map(
     publicRow,
   );
@@ -1391,7 +1406,7 @@ export const createContract = mutation({
         .collect(),
     ]);
     if (!team || !player) throw new Error("Team or player not found");
-    const ordered = [...seasons].sort(
+    const ordered = selectSeasonScope(seasons).sort(
       (a, b) => Number(a.year) - Number(b.year),
     );
     const signingSeason = ordered.find((season) => season.isActive);

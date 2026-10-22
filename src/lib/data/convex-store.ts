@@ -155,7 +155,7 @@ function getConvexUrl(): string {
   const url = convexUrl();
   if (!url) {
     throw new Error(
-      "Convex requires CONVEX_URL or NEXT_PUBLIC_CONVEX_URL to be set.",
+      "Convex access requires CONVEX_URL or NEXT_PUBLIC_CONVEX_URL to be set.",
     );
   }
 

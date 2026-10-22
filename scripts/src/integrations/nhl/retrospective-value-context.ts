@@ -3,6 +3,8 @@ import { readFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import type { ImpactModel } from "../../runtime/nhl-adjusted-impact";
 import type { GameSeasonRating } from "../../runtime/nhl-game-season-value";
+import type { ShiftAvailability } from "../../domains/nhl/unavailable-shift-proof";
+import type { GameSourceBundle } from "./game-value-source";
 import type {
   ShotQualityModel,
   fitPenaltyShotBaseline,
@@ -16,6 +18,17 @@ type Original = {
   shotQuality: { model: ShotQualityModel };
 };
 type Frozen = { model: ImpactModel; ratings: GameSeasonRating[] };
+export type ShotTrainingSupport = {
+  version: "nhl-shot-training-support-v1";
+  games: Array<{
+    gameId: number;
+    date: string;
+    sourceSha256: string;
+    effectivePbpSha256: string;
+    trainingRows: number;
+    disposition: "included" | "zero-verified-ordinary-events";
+  }>;
+};
 export type RetrospectiveSourceManifest = {
   version: "nhl-retrospective-source-manifest-v1";
   publishable: false;
@@ -31,6 +44,7 @@ export type RetrospectiveSourceManifest = {
   rowsSha256: string;
   rowsFileSha256: string;
   scheduleSha256: string;
+  trainingSupport?: ShotTrainingSupport;
   penaltyShotModel: ReturnType<typeof fitPenaltyShotBaseline>;
   penaltyShotHistorySha256: string;
   penaltyShotReportSha256: string;
@@ -38,6 +52,10 @@ export type RetrospectiveSourceManifest = {
   passesSourceGates: boolean;
   sourceAuditSha256: string;
   sourcePreparationCodeHashes: Array<{ path: string; sha256: string }>;
+  unavailableShiftSources?: ShiftAvailability[];
+  reviewedShiftRecoveries?: Array<
+    NonNullable<GameSourceBundle["shiftRecovery"]>
+  >;
 };
 export type RetrospectiveValueContext = {
   mode: "reviewed-four-way" | "source-manifest-two-way";

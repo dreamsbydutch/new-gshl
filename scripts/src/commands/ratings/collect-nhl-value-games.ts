@@ -11,6 +11,8 @@ import {
   prefetchSeasonSupport,
 } from "../../integrations/nhl/game-value-source";
 import { runGameReconciliation } from "./reconcile-nhl-value-games";
+import { collectHistoricalShotBridge } from "../../integrations/nhl/historical-shot-source";
+import { collectOfficialPenaltyShotContext } from "../../integrations/nhl/official-penalty-shot-context-source";
 
 const { values } = parseArgs({
   options: {
@@ -19,6 +21,8 @@ const { values } = parseArgs({
     output: { type: "string" },
     "game-type": { type: "string", default: "2" },
     "shot-source": { type: "string", default: "nhl" },
+    "historical-shot-bridge": { type: "boolean" },
+    "repair-penalty-shot-context": { type: "boolean" },
     limit: { type: "string" },
     "repair-audit": { type: "string" },
     offline: { type: "boolean" },
@@ -29,7 +33,7 @@ const { values } = parseArgs({
 });
 if (values.help)
   console.log(
-    "Collect public NHL game/shift/roster data. --season 20242025 --cache <directory> --output <new manifest.json> [--game-type 2|3] [--shot-source nhl|moneypuck] [--limit <games>] [--offline] [--repair-audit <v3 game-audit.json>] [--reconcile-input <v2 root> --reconcile-output <new ledger.json>]. MoneyPuck shot ZIPs are only collected when explicitly selected. Repair mode collects alternate official TOI reports for quarantined games; it does not approve replacements. Batch roster/shift reads, globally throttled requests, bounded retries and persistent hash-verified cache. No database access.",
+    "Collect public NHL game/shift/roster data. --season 20242025 --cache <directory> --output <new manifest.json> [--game-type 2|3] [--shot-source nhl|moneypuck] [--historical-shot-bridge] [--repair-penalty-shot-context] [--limit <games>] [--offline] [--repair-audit <v3 game-audit.json>] [--reconcile-input <v2 root> --reconcile-output <new ledger.json>]. Raw historical bridge is explicit regular-season opt-in (also installs source-bound unavailable-event metadata for the four reviewed 2008 cases, without replacing native events): archive raw geometry plus independent official HTML identities/manpower, never provider probabilities; immutable proof replayed by all source consumers. Penalty-shot context repair retains independently verified but unclassified official SOG records with unavailable model value and reconciles the single explicitly labeled attempt. MoneyPuck ZIPs are otherwise only collected when explicitly selected. Repair mode collects alternate official TOI reports for quarantined games; it does not approve replacements. Batch roster/shift reads, globally throttled requests, bounded retries and persistent hash-verified cache. No database access.",
   );
 else {
   if (!values.cache || !values.output)
@@ -37,6 +41,12 @@ else {
   const season = Number(values.season),
     gameType = Number(values["game-type"]);
   if (gameType !== 2 && gameType !== 3) throw new Error("Invalid game type");
+  if (values["historical-shot-bridge"] && gameType !== 2)
+    throw Error("Historical raw shot bridge currently requires regular season");
+  if (values["repair-penalty-shot-context"] && gameType !== 2)
+    throw Error(
+      "Penalty-shot context repair currently requires regular season",
+    );
   if (!["nhl", "moneypuck"].includes(values["shot-source"]!))
     throw new Error("Invalid shot source");
   const cache = new HockeyDataCache(resolve(values.cache), values.offline);
@@ -99,6 +109,15 @@ else {
       while (next < games.length) {
         const game = games[next++]!;
         try {
+          if (values["historical-shot-bridge"])
+            await collectHistoricalShotBridge(cache, game.id);
+          if (values["repair-penalty-shot-context"])
+            await collectOfficialPenaltyShotContext(
+              cache,
+              game.id,
+              penaltyShotGames.rows.filter((p) => p.gameId === game.id),
+              penaltyShotGames.urls,
+            );
           await fetchGameSources(
             cache,
             game.id,
@@ -136,6 +155,9 @@ else {
         season,
         gameType,
         shotSource: values["shot-source"],
+        historicalShotBridge: values["historical-shot-bridge"] ?? false,
+        repairPenaltyShotContext:
+          values["repair-penalty-shot-context"] ?? false,
         completedAt: new Date().toISOString(),
         cache: resolve(values.cache),
         completeSeasonScope: games.length === schedule.length,

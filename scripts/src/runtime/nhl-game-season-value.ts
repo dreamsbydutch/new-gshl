@@ -11,6 +11,8 @@ import {
 } from "./nhl-adjusted-impact";
 import type { NhlPosition } from "./nhl-season-rating";
 import { impactBreakdown } from "./nhl-impact-breakdown";
+import { summarizeOfficialOnGoalCoverage } from "../domains/nhl/official-on-goal-coverage";
+import type { ReviewedOnGoalClassificationGroup } from "../domains/nhl/official-on-goal-classification";
 
 export type PenaltyValuation = {
   playerId: number;
@@ -218,6 +220,12 @@ export type SeasonPlayerReference = {
   position: NhlPosition;
   minutes: number;
   games: number;
+  /** Independent official full-snapshot goals; absent only for legacy inputs. */
+  officialGoals?: number;
+  /** Independent official SOG for skaters or SA for goalies. */
+  officialOnGoalAttempts?: number;
+  /** Exact source-replayed physical groups with unresolved official SOG labels. */
+  reviewedOnGoalClassifications?: readonly ReviewedOnGoalClassificationGroup[];
 };
 type PlayerGameValue = {
   seconds: number;
@@ -286,11 +294,48 @@ export function rankGameSeason(
   priors: Record<string, { prior: number }> = {},
 ) {
   const gameIds = new Set<number>();
+  const verifiedGoalCredits = new Map<number, number>();
   for (const game of games) {
     if (gameIds.has(game.gameId))
       throw new Error("Duplicate game in season rating input");
     gameIds.add(game.gameId);
+    for (const shot of game.shots)
+      if (shot.kind === "GOAL")
+        verifiedGoalCredits.set(
+          shot.shooter,
+          (verifiedGoalCredits.get(shot.shooter) ?? 0) + 1,
+        );
   }
+  const officialGoalCoverage = reference.flatMap((p) => {
+    if (p.officialGoals === undefined) return [];
+    const credited = verifiedGoalCredits.get(p.playerId) ?? 0;
+    if (
+      !Number.isInteger(p.officialGoals) ||
+      p.officialGoals < 0 ||
+      credited > p.officialGoals
+    )
+      throw new Error(
+        `Invalid or overcredited official goals for ${p.playerId}`,
+      );
+    return [
+      {
+        playerId: p.playerId,
+        officialGoals: p.officialGoals,
+        verifiedGoalCredits: credited,
+        missingGoals: p.officialGoals - credited,
+      },
+    ];
+  });
+  const officialGoalDeficits = new Map(
+    officialGoalCoverage.map((p) => [p.playerId, p.missingGoals]),
+  );
+  const officialOnGoalCoverage = summarizeOfficialOnGoalCoverage(
+    games,
+    reference,
+  ).players;
+  const officialOnGoalByPlayer = new Map(
+    officialOnGoalCoverage.map((p) => [p.playerId, p]),
+  );
   for (const { prior } of Object.values(priors))
     if (!Number.isFinite(prior) || prior < 0)
       throw new Error("Invalid shrinkage prior");
@@ -458,12 +503,21 @@ export function rankGameSeason(
     );
     const officialMinutes = total.officialSeconds / 60,
       officialCoverage = p.minutes ? officialMinutes / p.minutes : 0,
-      individualCoverage = total.expectedShots
-        ? total.matchedShots / total.expectedShots
+      effectiveExpectedShots =
+        officialOnGoalByPlayer.get(p.playerId)?.effectiveExpectedAttempts ??
+        total.expectedShots,
+      individualCoverage = effectiveExpectedShots
+        ? total.matchedShots / effectiveExpectedShots
         : 1,
       modeledMinutes =
         p.position === "G" ? officialMinutes : total.seconds / 60,
       coverage = p.minutes ? modeledMinutes / p.minutes : 0;
+    // An entirely absent native GOAL has no PBP event to flag. Independently
+    // observed season totals supply that missing-credit evidence, never value.
+    total.missingGoals = Math.max(
+      total.missingGoals,
+      officialGoalDeficits.get(p.playerId) ?? 0,
+    );
     const threshold = p.position === "G" ? 300 : 200;
     const status =
       officialCoverage < NHL_ADJUSTED_IMPACT_CONFIG.minimumPlayerCoverage ||
@@ -682,5 +736,7 @@ export function rankGameSeason(
         a.playerId - b.playerId,
     ),
     penaltyDiagnostics,
+    ...(officialGoalCoverage.length ? { officialGoalCoverage } : {}),
+    ...(officialOnGoalCoverage.length ? { officialOnGoalCoverage } : {}),
   };
 }

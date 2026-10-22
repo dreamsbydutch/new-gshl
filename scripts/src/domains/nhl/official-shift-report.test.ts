@@ -23,6 +23,79 @@ const html = `<html><head><title>Time On Ice Report Home Team</title></head><bod
 <tr><td>2</td><td>OT</td><td>1:00 / 4:00</td><td>1:30 / 3:30</td><td>00:30</td><td></td></tr>
 <tr><td>1</td><td>2</td><td>00:37</td><td>01:15</td><td>01:15</td><td>00:00</td></tr>
 </table></body></html>`;
+
+test("documented historical surnames require exact NHL ID, first names and unique team/jersey", () => {
+  for (const alias of [
+    {
+      id: 8471269,
+      first: "Nicklas",
+      current: "Grossmann",
+      historical: "GROSSMAN",
+    },
+    {
+      id: 8470074,
+      first: "Jeff",
+      current: "Deslauriers",
+      historical: "DROUIN-DESLAURIERS",
+    },
+    {
+      id: 8474708,
+      first: "Alexander",
+      current: "Pechurskiy",
+      historical: "PECHURSKI",
+    },
+  ]) {
+    const player = {
+      ...game.rosterSpots[0]!,
+      playerId: alias.id,
+      firstName: { default: alias.first },
+      lastName: { default: alias.current },
+    };
+    const source = { ...game, rosterSpots: [player] };
+    const report = html.replace(
+      "PASTRNAK, DAVID",
+      `${alias.historical}, ${alias.first.toUpperCase()}`,
+    );
+    const before = structuredClone(source);
+    assert.equal(
+      parseOfficialShiftReport(report, source, true)[0]!.playerId,
+      alias.id,
+    );
+    assert.deepEqual(source, before);
+    for (const candidate of [
+      { ...source, rosterSpots: [{ ...player, playerId: 1 }] },
+      {
+        ...source,
+        rosterSpots: [{ ...player, firstName: { default: "Other" } }],
+      },
+      { ...source, rosterSpots: [{ ...player, firstName: undefined }] },
+      { ...source, rosterSpots: [player, { ...player, playerId: 2 }] },
+      { ...source, rosterSpots: [{ ...player, teamId: 16 }] },
+    ])
+      assert.throws(
+        () => parseOfficialShiftReport(report, candidate, true),
+        /jersey/,
+      );
+    assert.throws(
+      () =>
+        parseOfficialShiftReport(
+          report.replace(alias.first.toUpperCase(), "OTHER"),
+          source,
+          true,
+        ),
+      /jersey/,
+    );
+    assert.throws(
+      () =>
+        parseOfficialShiftReport(
+          report.replace(alias.historical, alias.historical + "X"),
+          source,
+          true,
+        ),
+      /jersey/,
+    );
+  }
+});
 test("official TOI reports recover exact shifts through team/jersey identity and validate the source scope", () => {
   const shifts = parseOfficialShiftReport(html, game, true);
   assert.equal(shifts.length, 2);
@@ -94,6 +167,28 @@ test("successive players in one report table do not inherit each other's shifts"
   assert.deepEqual(
     rows.map((r) => r.playerId),
     [1, 1, 2],
+  );
+});
+
+test("bilingual official game headers retain exact game identity checks", () => {
+  const bilingual = html.replace("Game 1250", "Match/Game 1250");
+  assert.deepEqual(
+    parseOfficialShiftReport(bilingual, game, true),
+    parseOfficialShiftReport(html, game, true),
+  );
+  assert.throws(
+    () =>
+      parseOfficialShiftReport(bilingual.replace("1250", "1251"), game, true),
+    /game/,
+  );
+  assert.throws(
+    () =>
+      parseOfficialShiftReport(
+        bilingual.replace("Match/Game 1250", "Other Match/Game 1250"),
+        game,
+        true,
+      ),
+    /game/,
   );
 });
 

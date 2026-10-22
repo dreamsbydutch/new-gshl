@@ -315,3 +315,32 @@ void test("owner activity uses a stable per-owner unread marker", () => {
     "gshl-owner-command-center-activity:owner-1",
   );
 });
+
+void test("in-season and unresolved UFA windows expose only the trade market action", () => {
+  for (const ufaWindowOpen of [false, undefined]) {
+    const view = buildOwnerCommandCenterView({ ...data, ufaWindowOpen });
+    // A stale pending offer must not surface a closed-season offers shortcut.
+    assert.ok(data.pendingOffers.length > 0);
+    assert.deepEqual(view.primaryActions, [
+      {
+        kind: "trade",
+        label: "Trade market",
+        href: view.actions.exploreTrade,
+        count: data.listedPlayers.length,
+      },
+    ]);
+    assert.match(view.actions.viewContracts, /view=salary/);
+    assert.match(view.actions.viewContracts, /season=season-2026/);
+    assert.match(view.actions.viewContracts, /owner=owner-1/);
+  }
+});
+
+void test("the open Summer Free Agency window adds one offers action without a duplicate listing action", () => {
+  const view = buildOwnerCommandCenterView({ ...data, ufaWindowOpen: true });
+  assert.deepEqual(
+    view.primaryActions.map((action) => action.kind),
+    ["trade", "ufa"],
+  );
+  assert.equal(view.primaryActions[1]?.href, "/leagueoffice?view=freeAgents");
+  assert.equal(view.primaryActions[1]?.count, data.pendingOffers.length);
+});

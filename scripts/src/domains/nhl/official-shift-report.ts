@@ -6,6 +6,7 @@ type RosterSpot = {
   playerId: number;
   sweaterNumber: number;
   positionCode?: string;
+  firstName?: { default: string };
   lastName: { default: string };
 };
 type ReportGame = {
@@ -21,6 +22,44 @@ const normalized = (name: string) =>
     .replace(/[\u0300-\u036f]/g, "")
     .toUpperCase()
     .replace(/[^A-Z]/g, "");
+
+/** Explicit historical spellings, independently corroborated by official same-
+ * game playing rosters and the NHL-ID player landing records. This is never a
+ * general name similarity join: team/jersey must already select one person and
+ * BOTH source first names and the current/old surname pair must match exactly.
+ * Primary examples: 20092010/RO020019 (Grossman), RO020070
+ * (Drouin-Deslauriers), RO020718 (Pechurski). */
+function documentedHistoricalName(
+  player: RosterSpot,
+  reportLast: string,
+  reportFirst: string,
+) {
+  const aliases: Record<
+    number,
+    { first: string; current: string; report: string }
+  > = {
+    8471269: { first: "NICKLAS", current: "GROSSMANN", report: "GROSSMAN" },
+    8470074: {
+      first: "JEFF",
+      current: "DESLAURIERS",
+      report: "DROUINDESLAURIERS",
+    },
+    8474708: {
+      first: "ALEXANDER",
+      current: "PECHURSKIY",
+      report: "PECHURSKI",
+    },
+  };
+  const alias = aliases[player.playerId];
+  return (
+    !!alias &&
+    typeof player.firstName?.default === "string" &&
+    normalized(player.firstName.default) === alias.first &&
+    normalized(reportFirst) === alias.first &&
+    normalized(player.lastName.default) === alias.current &&
+    normalized(reportLast) === alias.report
+  );
+}
 
 /** Official HTML backup for gaps in shiftcharts. Team/jersey identifies players; names only verify the join. */
 export function parseOfficialShiftReport(
@@ -42,7 +81,9 @@ export function parseOfficialShiftReport(
     .map((td) => page(td).text().replace(/\s+/g, " ").trim());
   if (
     !cells.some((s) => {
-      const match = s.match(/^Game\s+(\d+)$/);
+      // Official bilingual reports (for example Stockholm 2008) label this
+      // same game-number field "Match/Game". Keep the complete-cell identity check.
+      const match = s.match(/^(?:Match\/)?Game\s+(\d+)$/);
       return match && Number(match[1]) === game.id % 10000;
     })
   )
@@ -98,14 +139,16 @@ export function parseOfficialShiftReport(
       const label = heading
         .text()
         .trim()
-        .match(/^(\d+)\s+(.+?),\s+.+$/);
+        .match(/^(\d+)\s+(.+?),\s+(.+)$/);
       if (!label) throw new Error("Malformed shift report player heading");
       const candidates = roster.filter(
         (p) => p.sweaterNumber === Number(label[1]),
       );
       if (
         candidates.length !== 1 ||
-        normalized(candidates[0]!.lastName.default) !== normalized(label[2]!)
+        (normalized(candidates[0]!.lastName.default) !==
+          normalized(label[2]!) &&
+          !documentedHistoricalName(candidates[0]!, label[2]!, label[3]!))
       )
         throw new Error(`Unverified shift-report jersey ${label[1]}`);
       playerId = candidates[0]!.playerId;

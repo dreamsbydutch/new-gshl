@@ -1,4 +1,5 @@
 import { parseCsv } from "../ranking/nhl-rating-diagnostics";
+import { reviewedEventSourcePeriods } from "./reviewed-event-source-availability";
 import type { ShotTrainingRow } from "../../runtime/nhl-shot-quality";
 
 export type Shot = {
@@ -93,7 +94,12 @@ export type GameValueData = {
   usableProcessSeconds: number;
   shotCoverageByPlayer: Record<
     number,
-    { expected: number; matched: number; missingGoals: number }
+    {
+      expected: number;
+      matched: number;
+      missingGoals: number;
+      expectedOnGoal?: number;
+    }
   >;
   eligible: boolean;
   shotRejections: Array<{ eventId: number; reason: string }>;
@@ -205,7 +211,11 @@ function penaltyShotAwards(plays: Play[]) {
     .filter((q) => q.kind === "penalty" && q.details.typeCode === "PS")
     .reverse();
   const used = new Set<number>();
-  for (const p of plays.filter((p) => shotKind[p.kind])) {
+  for (const p of plays.filter(
+    (p) =>
+      shotKind[p.kind] &&
+      p.details.nhlReportUnclassifiedPenaltyShotContext !== true,
+  )) {
     const award = awards.find(
       (q) =>
         !used.has(q.id) &&
@@ -258,6 +268,7 @@ export function extractShotTrainingRows(raw: unknown): ShotTrainingRow[] {
     gameId = num(pbp.id),
     homeId = num(object(pbp.homeTeam).id),
     awayId = num(object(pbp.awayTeam).id);
+  const unavailablePeriods = reviewedEventSourcePeriods(pbp);
   const rows: ShotTrainingRow[] = [];
   const eventIds = new Set<number>();
   const penaltyShots = penaltyShotAwards(officialPlays(pbp));
@@ -272,6 +283,7 @@ export function extractShotTrainingRows(raw: unknown): ShotTrainingRow[] {
       x = details.xCoord;
     if (
       descriptor.periodType === "SO" ||
+      unavailablePeriods.has(num(descriptor.number)) ||
       penaltyShots.has(num(event.eventId)) ||
       !["goal", "shot-on-goal", "missed-shot"].includes(
         String(event.typeDescKey),
@@ -296,6 +308,10 @@ export function extractShotTrainingRows(raw: unknown): ShotTrainingRow[] {
     .sort((a, b) => num(a.sortOrder) - num(b.sortOrder))) {
     const descriptor = object(event.periodDescriptor);
     if (descriptor.periodType === "SO") continue;
+    if (unavailablePeriods.has(num(descriptor.number))) {
+      previous = undefined;
+      continue;
+    }
     const eventId = num(event.eventId);
     if (eventIds.has(eventId))
       throw new Error("Duplicate official event identities");
@@ -308,6 +324,7 @@ export function extractShotTrainingRows(raw: unknown): ShotTrainingRow[] {
     if (
       shotKind[kind] &&
       kind !== "failed-shot-attempt" &&
+      details.nhlReportUnclassifiedPenaltyShotContext !== true &&
       !penaltyShots.has(eventId) &&
       typeof details.xCoord === "number" &&
       typeof details.yCoord === "number" &&
@@ -415,6 +432,7 @@ export function buildGameValueData(
     box: unknown;
     shifts: unknown[];
     shiftSource?: "nhl-api" | "nhl-toi-report";
+    officialPeriodEnds?: Array<{ period: number; seconds: number }>;
   },
   providerShots: Shot[],
   localProbabilities?: Map<number, number>,
@@ -422,6 +440,7 @@ export function buildGameValueData(
 ): GameValueData {
   const pbp = object(sources.pbp),
     box = object(sources.box);
+  const unavailablePeriods = reviewedEventSourcePeriods(pbp);
   const gameId = num(pbp.id);
   if (num(box.id) !== gameId || providerShots.some((s) => s.gameId !== gameId))
     throw new Error("Mixed game sources");
@@ -455,6 +474,21 @@ export function buildGameValueData(
   }
   const roster = new Map(players.map((p) => [p.id, p]));
   const plays = officialPlays(pbp);
+  const officialPeriodEnds = new Map<number, number>();
+  for (const clock of sources.officialPeriodEnds ?? []) {
+    if (
+      !Number.isInteger(clock.period) ||
+      clock.period !== 4 ||
+      !Number.isInteger(clock.seconds) ||
+      clock.seconds <= 0 ||
+      clock.seconds > 300 ||
+      officialPeriodEnds.has(clock.period) ||
+      !plays.some((p) => p.period === clock.period) ||
+      plays.some((p) => p.period === clock.period && p.second > clock.seconds)
+    )
+      throw new Error("Invalid verified official period end");
+    officialPeriodEnds.set(clock.period, clock.seconds);
+  }
   const penaltyShots = penaltyShotAwards(plays);
   const isModeledShot = (p: Play) =>
     Boolean(shotKind[p.kind]) &&
@@ -531,7 +565,10 @@ export function buildGameValueData(
   for (const period of periods) {
     const events = plays.filter((p) => p.period === period);
     const end =
-      period <= 3 ? 1200 : Math.max(0, ...events.map((p) => p.second));
+      period <= 3
+        ? 1200
+        : (officialPeriodEnds.get(period) ??
+          Math.max(0, ...events.map((p) => p.second)));
     result.gameSeconds += end;
     const periodShifts = shifts.filter((s) => s.period === period);
     const boundaries = [
@@ -636,7 +673,27 @@ export function buildGameValueData(
       );
   }
   const unused = new Set(providerShots.map((_, i) => i));
+  if (unavailablePeriods.size)
+    result.issues.push(
+      "Reviewed event-source periods lack verified clocks or primary context",
+    );
   for (const p of plays.filter(isModeledShot)) {
+    if (unavailablePeriods.has(p.period)) {
+      result.shotRejections.push({
+        eventId: p.id,
+        reason:
+          "Reviewed event-source period cannot supply individual shot value",
+      });
+      continue;
+    }
+    if (p.details.nhlReportUnclassifiedPenaltyShotContext === true) {
+      result.shotRejections.push({
+        eventId: p.id,
+        reason:
+          "Official penalty-shot-context shot remains unclassified; individual value unavailable",
+      });
+      continue;
+    }
     const home = p.details.eventOwnerTeamId === homeTeam;
     const shooter = Number(
       p.details.shootingPlayerId ?? p.details.scoringPlayerId,
@@ -973,6 +1030,7 @@ export function buildGameValueData(
   for (const interval of intervals) {
     const s = interval.stint;
     s.usableForProcess =
+      !unavailablePeriods.has(interval.period) &&
       ![...s.home, ...s.away, s.homeGoalie, s.awayGoalie].some(
         (id) => id !== null && conflictedPlayers.has(id),
       ) &&
@@ -998,8 +1056,14 @@ export function buildGameValueData(
         expected: 0,
         matched: 0,
         missingGoals: 0,
+        expectedOnGoal: 0,
       };
       count.expected++;
+      if (
+        (p.kind === "shot-on-goal" || p.kind === "goal") &&
+        (roster.get(id)?.position === "G" ? id === goalie : id === shooter)
+      )
+        count.expectedOnGoal = (count.expectedOnGoal ?? 0) + 1;
       const shot = matchedById.get(p.id);
       if (shot && (shot.shooter === id || shot.goalie === id)) count.matched++;
       else if (p.kind === "goal") count.missingGoals++;

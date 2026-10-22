@@ -13,6 +13,7 @@ export interface NhlContractAnalyticsInput {
 
 export interface NhlRosterAnalyticsPlayer {
   id: string;
+  nhlPlayerId?: number | null;
   playerName: string;
   position: string;
   nhlTeam: string[];

@@ -1,3 +1,4 @@
+import { selectSeasonScope } from "../src/lib/utils/domain/season-scope";
 /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-base-to-string */
 import {
   internalActionGeneric,
@@ -249,7 +250,9 @@ export const processAwardsBackfill = internalMutationGeneric({
     const jobArgs = asRecord(run.args);
     const requestedSeasonId =
       typeof jobArgs.seasonId === "string" ? jobArgs.seasonId : undefined;
-    const allSeasons = await ctx.db.query("seasons" as never).collect();
+    const allSeasons = selectSeasonScope(
+      await ctx.db.query("seasons" as never).collect(),
+    );
     const today = utcTimestampToDateKey(Date.now())!;
     const isActiveSeasonPipeline = run.mode === "pipeline";
     const seasons = requestedSeasonId

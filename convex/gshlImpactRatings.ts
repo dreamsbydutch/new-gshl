@@ -1,5 +1,6 @@
 import { mutationGeneric, queryGeneric } from "convex/server";
 import { v } from "convex/values";
+import { selectSeasonScope } from "../src/lib/utils/domain/season-scope";
 import { syncPlayerDayPerformanceIndex } from "./lib/playerDayPerformanceIndex";
 
 const VERSION = "gshl-category-impact-v3";
@@ -142,12 +143,18 @@ export const readInventory = queryGeneric({
   args: { serverSecret: v.string() },
   handler: async (ctx, args) => {
     authorize(args.serverSecret, "playerDayStatLines", []);
-    const [seasons, weeks, teams] = await Promise.all([
-      ctx.db.query("seasons").take(17),
+    const [seasonRows, weeks, teams] = await Promise.all([
+      ctx.db.query("seasons").take(101),
       ctx.db.query("weeks").take(336),
       ctx.db.query("teams").take(213),
     ]);
-    if (seasons.length > 16 || weeks.length > 335 || teams.length > 212)
+    const seasons = selectSeasonScope(seasonRows);
+    if (
+      seasonRows.length > 100 ||
+      seasons.length > 16 ||
+      weeks.length > 335 ||
+      teams.length > 212
+    )
       throw Error("Rating metadata inventory exceeds reviewed bounds");
     return { seasons, weeks, teams };
   },

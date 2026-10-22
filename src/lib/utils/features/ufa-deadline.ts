@@ -1,4 +1,5 @@
 import { coerceDate, normalizeDateOnlyValue } from "../core/date";
+import { selectSeasonScope } from "../domain/season-scope";
 
 export const UFA_OFFER_MS = 7 * 24 * 60 * 60 * 1_000;
 
@@ -11,6 +12,7 @@ export function resolveUfaSigningSeason<
     isActive?: boolean;
   },
 >(seasons: readonly T[], now = Date.now()): T | undefined {
+  seasons = selectSeasonScope(seasons);
   const started = seasons.filter((season) => {
     const start = coerceDate({
       value: season.draftStartAt ?? season.startDate,

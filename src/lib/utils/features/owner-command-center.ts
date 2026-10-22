@@ -354,6 +354,34 @@ export function buildOwnerCommandCenterView(data: OwnerCommandCenterData) {
     { wins: 0, losses: 0, ties: 0 },
   );
 
+  const actions = {
+    exploreTrade: buildLockerRoomNavigationHref("", {
+      view: "tradeBlock",
+      owner: data.ownerId,
+    }),
+    listPlayer:
+      buildLockerRoomNavigationHref("", {
+        view: "tradeBlock",
+        owner: data.ownerId,
+      }) + "#manage-trade-block-heading",
+    reviewOffer: "/leagueoffice?view=freeAgents",
+    viewRoster: buildLockerRoomNavigationHref("", {
+      view: "roster",
+      season: data.season?.id ?? null,
+      owner: data.ownerId,
+    }),
+    viewContracts: buildLockerRoomNavigationHref("", {
+      view: "salary",
+      season: data.season?.id ?? null,
+      owner: data.ownerId,
+    }),
+    viewDraftPicks: buildLockerRoomNavigationHref("", {
+      view: "draft",
+      season: data.season?.id ?? null,
+      owner: data.ownerId,
+    }),
+  };
+
   return {
     ownerId: data.ownerId,
     ownerName: data.ownerName,
@@ -373,28 +401,25 @@ export function buildOwnerCommandCenterView(data: OwnerCommandCenterData) {
     offers: data.pendingOffers,
     listedPlayers: data.listedPlayers,
     activity: buildActivity(data),
-    actions: {
-      exploreTrade: buildLockerRoomNavigationHref("", {
-        view: "tradeBlock",
-        owner: data.ownerId,
-      }),
-      listPlayer:
-        buildLockerRoomNavigationHref("", {
-          view: "tradeBlock",
-          owner: data.ownerId,
-        }) + "#manage-trade-block-heading",
-      reviewOffer: "/leagueoffice?view=freeAgents",
-      viewRoster: buildLockerRoomNavigationHref("", {
-        view: "roster",
-        season: data.season?.id ?? null,
-        owner: data.ownerId,
-      }),
-      viewDraftPicks: buildLockerRoomNavigationHref("", {
-        view: "draft",
-        season: data.season?.id ?? null,
-        owner: data.ownerId,
-      }),
-    },
+    actions,
+    primaryActions: [
+      {
+        kind: "trade" as const,
+        label: "Trade market",
+        href: actions.exploreTrade,
+        count: data.listedPlayers.length,
+      },
+      ...(data.ufaWindowOpen === true
+        ? [
+            {
+              kind: "ufa" as const,
+              label: "UFA offers",
+              href: actions.reviewOffer,
+              count: data.pendingOffers.length,
+            },
+          ]
+        : []),
+    ],
   };
 }
 

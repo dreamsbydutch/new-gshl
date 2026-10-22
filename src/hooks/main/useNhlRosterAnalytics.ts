@@ -23,6 +23,10 @@ export function useNhlRosterAnalytics(seasonStartYear: number) {
   );
   const teams = useQuery(api.nhlContractAnalytics.rosterTeams, {});
   const caps = useQuery(api.nhlContractAnalytics.salaryCaps, {});
+  const talentPopulation = useQuery(
+    api.nhlContractAnalytics.talentSeason,
+    historical && season ? { seasonId: season.id } : "skip",
+  );
   const selected = historical ? history : players;
   const { status, loadMore } = selected;
   useEffect(() => {
@@ -34,10 +38,12 @@ export function useNhlRosterAnalytics(seasonStartYear: number) {
     caps,
     seasons,
     currentYear,
+    talentPopulation,
     isLoading:
       !seasons ||
       (historical && !season ? false : status !== "Exhausted") ||
       !teams ||
+      (historical && Boolean(season) && talentPopulation === undefined) ||
       !caps,
   };
 }

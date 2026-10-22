@@ -4,6 +4,14 @@ import { resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { inflateRawSync, gzipSync, gunzipSync } from "node:zlib";
 import { parseOfficialShiftReport } from "../../domains/nhl/official-shift-report";
+import type { ShiftAvailability } from "../../domains/nhl/unavailable-shift-proof";
+import type { OfficialPeriodEnd } from "../../domains/nhl/official-game-clock";
+import type { reconcileBoundaryShiftReports } from "../../domains/nhl/boundary-shift-reconciliation";
+import {
+  applyOfficialEmptyNetSupplement,
+  parseOfficialEmptyNetCorrections,
+  type OfficialEmptyNetSupplement,
+} from "../../domains/nhl/official-empty-net-report";
 import type { PenaltyShotHistory } from "../../runtime/nhl-shot-quality";
 import {
   parseOfficialPenaltyShots,
@@ -164,10 +172,19 @@ async function publicFetch(url: string) {
 
 /** Immutable, hash-verified public-data cache. No credentials or database access. */
 export class HockeyDataCache {
+  private retainedCache?: HockeyDataCache;
   constructor(
     private directory: string,
     private offline = false,
   ) {}
+  retainedView(): HockeyDataCache {
+    return this.offline
+      ? this
+      : (this.retainedCache ??= new HockeyDataCache(this.directory, true));
+  }
+  async retainedBytes(url: string): Promise<Buffer> {
+    return new HockeyDataCache(this.directory, true).bytes(url);
+  }
   async bytes(url: string): Promise<Buffer> {
     if (
       ![
@@ -406,32 +423,84 @@ export async function fetchGamePlayByPlay(
   cache: HockeyDataCache,
   gameId: number,
 ) {
-  const raw = await cache.json<{
+  const pbpUrl = `https://api-web.nhle.com/v1/gamecenter/${gameId}/play-by-play`;
+  const rawBytes = await cache.bytes(pbpUrl);
+  let raw = JSON.parse(rawBytes.toString("utf8")) as {
     id: number;
     plays: Array<{ eventId: number; details?: Record<string, unknown> }>;
-  }>(`https://api-web.nhle.com/v1/gamecenter/${gameId}/play-by-play`);
+  };
+  raw = await (
+    await import("./reviewed-event-source-availability-source")
+  ).applyCachedReviewedEventSourceAvailability(
+    cache,
+    gameId,
+    raw,
+    digest(rawBytes),
+  );
+  const emptyNet = await cache.derived<OfficialEmptyNetSupplement>(
+    `official-empty-net-${gameId}`,
+  );
+  if (emptyNet) {
+    const year = Math.floor(gameId / 1e6),
+      season = year * 10000 + year + 1;
+    const reportUrl = `https://www.nhl.com/scores/htmlreports/${season}/PL${String(gameId % 1e6).padStart(6, "0")}.HTM`;
+    const html = await cache.bytes(reportUrl);
+    const box = await cache.bytes(
+      `https://api-web.nhle.com/v1/gamecenter/${gameId}/boxscore`,
+    );
+    const verified = parseOfficialEmptyNetCorrections(
+      html.toString("utf8"),
+      raw,
+      JSON.parse(box.toString("utf8")),
+      emptyNet.corrections.map((c) => c.eventId),
+      {
+        pbpSha256: digest(rawBytes),
+        htmlSha256: digest(html),
+        boxSha256: digest(box),
+      },
+    );
+    if (JSON.stringify(verified) !== JSON.stringify(emptyNet))
+      throw new Error("Official empty-net supplement proof changed");
+    raw = applyOfficialEmptyNetSupplement(raw, digest(rawBytes), verified);
+  }
+  raw = await (
+    await import("./reviewed-2008-shot-credit-source")
+  ).applyCachedReviewed2008ShotCredits(cache, gameId, raw, digest(rawBytes));
+  raw = await (
+    await import("./historical-shot-source")
+  ).applyCachedHistoricalShotBridge(cache, gameId, raw, digest(rawBytes));
+  raw = await (
+    await import("./official-penalty-shot-context-source")
+  ).applyCachedPenaltyShotContext(cache, gameId, raw, digest(rawBytes));
   const supplement = await cache.derived<{
     gameId: number;
     eventIds: number[];
   }>(`penalty-shots-${gameId}`);
-  if (!supplement) return raw;
   if (
-    supplement.gameId !== raw.id ||
-    raw.id !== gameId ||
-    new Set(supplement.eventIds).size !== supplement.eventIds.length ||
-    supplement.eventIds.some(
-      (id) => raw.plays.filter((p) => p.eventId === id).length !== 1,
-    )
+    supplement &&
+    (supplement.gameId !== raw.id ||
+      raw.id !== gameId ||
+      new Set(supplement.eventIds).size !== supplement.eventIds.length ||
+      supplement.eventIds.some(
+        (id) => raw.plays.filter((p) => p.eventId === id).length !== 1,
+      ))
   )
     throw new Error("Invalid penalty-shot supplement identity");
-  return {
-    ...raw,
-    plays: raw.plays.map((p) =>
-      supplement.eventIds.includes(p.eventId)
-        ? { ...p, details: { ...p.details, nhlReportPenaltyShot: true } }
-        : p,
-    ),
-  };
+  if (supplement)
+    raw = {
+      ...raw,
+      plays: raw.plays.map((p) =>
+        supplement.eventIds.includes(p.eventId)
+          ? { ...p, details: { ...p.details, nhlReportPenaltyShot: true } }
+          : p,
+      ),
+    };
+  raw = await (
+    await import("./official-shot-credit-source")
+  ).applyCachedOfficialShotCredits(cache, gameId, raw, digest(rawBytes));
+  return (
+    await import("./official-primary-event-source")
+  ).applyCachedOfficialPrimaryEvents(cache, gameId, raw, digest(rawBytes));
 }
 
 export async function repairGamePenaltyShots(
@@ -457,11 +526,23 @@ export async function repairGamePenaltyShots(
   ]);
 }
 
+export type GameSourceBundle = {
+  pbp: unknown;
+  box: unknown;
+  shifts: unknown[];
+  shiftSource: "nhl-api" | "nhl-toi-report";
+  shiftAvailability?: ShiftAvailability;
+  officialPeriodEnds?: OfficialPeriodEnd[];
+  shiftRecovery?: ReturnType<
+    typeof reconcileBoundaryShiftReports
+  >["shiftRecovery"];
+};
+
 export async function fetchGameSources(
   cache: HockeyDataCache,
   gameId: number,
   shiftSource?: "nhl-toi-report",
-) {
+): Promise<GameSourceBundle> {
   const derivedBox = await cache.derived<unknown>(`box-${gameId}`),
     derivedShifts = await cache.derived<unknown[]>(`shifts-${gameId}`);
   // Batch summary projections contain only rows explicitly reporting GP=1.
@@ -502,6 +583,14 @@ export async function fetchGameSources(
         `https://api-web.nhle.com/v1/gamecenter/${gameId}/boxscore`,
       ),
   ]);
+  const recovered = await (
+    await import("./boundary-shift-source")
+  ).applyCachedBoundaryShiftProof(cache, gameId, pbp);
+  if (recovered) return { ...recovered, pbp, box };
+  const unavailable = await (
+    await import("./unavailable-shift-source")
+  ).applyCachedUnavailableShiftProof(cache, gameId, pbp);
+  if (unavailable) return { ...unavailable, pbp, box };
   const fromReports = async () => {
     // The reconciliation also depends on hash-verified API shift starts.
     const reportKey = `html-shifts-reconciled-v3-${gameId}-${digest(Buffer.from(JSON.stringify(derivedShifts ?? [])))}`;

@@ -98,3 +98,20 @@ test("unknown counts never become zero and partial evidence must be explicit and
     /disclosure/,
   );
 });
+
+test("exact native minutes and legacy rounded minutes bind the same official workload", () => {
+  assert.equal(
+    verifyDualRatingSourceFingerprint(
+      { ...stat, TOI: official.timeOnIce / 60 },
+      8476899,
+      source,
+    ).playerId,
+    8476899,
+  );
+  for (const TOI of [null, "", undefined, stat.TOI + 0.01])
+    assert.throws(
+      () =>
+        verifyDualRatingSourceFingerprint({ ...stat, TOI }, 8476899, source),
+      /fingerprint/,
+    );
+});

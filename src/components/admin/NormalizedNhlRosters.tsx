@@ -2,6 +2,7 @@
 import { Component, type ReactNode } from "react";
 import { Button } from "@gshl-ui";
 import { useNormalizedNhlRosters } from "../../hooks/features/useNormalizedNhlRosters";
+import { NhlRosterTalentRankings } from "./NhlRosterTalentRankings";
 
 const dollars = (value: number | null) =>
   value === null
@@ -50,7 +51,7 @@ function RosterContent() {
   return (
     <section className="mx-auto max-w-7xl space-y-5">
       <div>
-        <h2 className="text-2xl font-bold">NHL team normalized cap hits</h2>
+        <h2 className="text-2xl font-bold">NHL team talent and cap hits</h2>
         <p className="mt-2 text-sm text-muted-foreground">
           {view.mode === "historical"
             ? "Historical season teams"
@@ -74,6 +75,33 @@ function RosterContent() {
             ? " Update players from PuckPedia to refresh current assignments."
             : ""}
         </p>
+      </div>
+      <div
+        role="group"
+        aria-label="NHL team talent view"
+        className="flex flex-wrap gap-2"
+      >
+        <Button
+          variant={view.mode === "current" ? "default" : "outline"}
+          aria-pressed={view.mode === "current"}
+          onClick={() => view.setSeasonStartYear(view.currentYear)}
+        >
+          Current projections
+        </Button>
+        <Button
+          variant={view.mode === "historical" ? "default" : "outline"}
+          aria-pressed={view.mode === "historical"}
+          disabled={view.latestHistoricalYear === undefined}
+          onClick={() => {
+            if (
+              view.latestHistoricalYear !== undefined &&
+              view.mode !== "historical"
+            )
+              view.setSeasonStartYear(view.latestHistoricalYear);
+          }}
+        >
+          Historical contribution
+        </Button>
       </div>
       <label className="block text-sm">
         <span className="mb-1 block font-medium">NHL season</span>
@@ -129,6 +157,16 @@ function RosterContent() {
           </p>
           {!view.teams.length ? (
             <p>No teams or players match your search.</p>
+          ) : null}
+          {view.mode === "current" && view.talentNeedsRefresh ? (
+            <p role="status" className="text-sm text-muted-foreground">
+              Projected team strength needs a forecast for the current season.
+            </p>
+          ) : view.mode !== "future" && view.talentTeams.length ? (
+            <NhlRosterTalentRankings
+              teams={view.talentTeams}
+              basis={view.talentBasis}
+            />
           ) : null}
           {view.teams.map((team) => (
             <details

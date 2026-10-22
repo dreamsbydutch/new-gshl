@@ -13,6 +13,7 @@ import type {
 
 // Core model types
 export interface Season {
+  nhlOnly?: boolean;
   id: string;
   year: number;
   name: string;

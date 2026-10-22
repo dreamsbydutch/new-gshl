@@ -55,14 +55,14 @@ these rules and exceptions. These are targeted static checks, not proof that all
 business logic has left `src/app`; indirect calls and computed module access
 still require review.
 
-| Area             | Responsibility                                                        |
-| ---------------- | --------------------------------------------------------------------- |
-| `src/app`        | Routes, layouts, metadata, loading, and API handlers                  |
-| `src/components` | Feature UI and shared primitives                                      |
-| `src/hooks`      | Feature view models and stable Convex/navigation access               |
-| `src/lib`        | Pure utilities, shared types, auth, cache, and compatibility adapters |
-| `convex`         | Schema, browser APIs, transactions, authorization, jobs, and crons    |
-| `scripts`        | Imports, repairs, reconciliation, rebuilds, parity, and archives      |
+| Area             | Responsibility                                                     |
+| ---------------- | ------------------------------------------------------------------ |
+| `src/app`        | Routes, layouts, metadata, loading, and API handlers               |
+| `src/components` | Feature UI and shared primitives                                   |
+| `src/hooks`      | Feature view models and stable Convex/navigation access            |
+| `src/lib`        | Pure utilities, shared types, auth, cache, and Convex access       |
+| `convex`         | Schema, browser APIs, transactions, authorization, jobs, and crons |
+| `scripts`        | Imports, repairs, reconciliation, rebuilds, parity, and archives   |
 
 The primary data contract is `convex/schema.ts`. Browser access normally enters
 through `convex/frontend.ts`; atomic workflows such as draft, UFA, and weekly
@@ -83,7 +83,7 @@ Read [AGENTS.md](AGENTS.md) before changing the repository. In particular:
 
 - preserve unrelated work in a dirty tree;
 - enforce sensitive authorization inside Convex handlers;
-- edit authoritative ranking files, then synchronize generated copies;
+- edit authoritative ranking files in the operator runtime;
 - treat production writes and deployments as separately authorized operations;
   and
 - lint changed files and run focused tests instead of routine repository-wide

@@ -337,6 +337,7 @@ export default defineSchema({
     .index("by_ownerId", ["ownerId"]),
 
   seasons: table({
+    nhlOnly: v.optional(v.boolean()),
     year: stringValue,
     name: stringValue,
     categories: stringArray,

@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   buildGameValueData,
   extractShotTrainingRows,
+  penaltyShotEventIds,
 } from "./game-value-input";
 import {
   reconcileGameLedger,
@@ -190,6 +191,41 @@ test("penalty shots use a distinct prior probability without assigning lineup ti
   assert.equal(
     buildGameValueData(f.sources, [], undefined, 0.3).shots.length,
     0,
+  );
+});
+
+test("source-verified unclassified penalty-shot-context SOG stays in coverage but receives no invented model value", () => {
+  const f = penaltyShotFixture(),
+    goal = f.sources.pbp.plays.find((p) => p.eventId === 6)!;
+  const context = {
+    ...goal,
+    eventId: 5,
+    sortOrder: 5,
+    typeDescKey: "shot-on-goal",
+    details: {
+      ...goal.details,
+      shootingPlayerId: 1,
+      nhlReportUnclassifiedPenaltyShotContext: true,
+    },
+  };
+  Reflect.deleteProperty(context.details, "scoringPlayerId");
+  f.sources.pbp.plays.push(context);
+  f.sources.box.playerByGameStats.awayTeam.goalies[0]!.shotsAgainst = 2;
+  assert.deepEqual([...penaltyShotEventIds(f.sources.pbp)], [6]);
+  assert.deepEqual(extractShotTrainingRows(f.sources.pbp), []);
+  const g = buildGameValueData(f.sources, [], new Map([[5, 0.9]]), 0.3);
+  assert.equal(g.officialShots, 2);
+  assert.equal(g.matchedShots, 1);
+  assert.equal(g.shots.length, 1);
+  assert.equal(g.shots[0]!.eventId, 6);
+  assert.equal(g.shots[0]!.xg, 0.3);
+  assert.equal(g.shotCoverageByPlayer[1]!.expected, 2);
+  assert.equal(g.shotCoverageByPlayer[1]!.matched, 1);
+  assert.equal(g.shotCoverageByPlayer[1]!.missingGoals, 0);
+  assert.ok(
+    g.shotRejections.some(
+      (r) => r.eventId === 5 && r.reason.includes("unclassified"),
+    ),
   );
 });
 
@@ -565,4 +601,73 @@ test("season reconciliation catches stale totals and unexpected NHL identities",
     false,
   );
   assert.deepEqual(reconcileSeasonExposure(games, []).extraPlayerIds, [1]);
+});
+
+test("reviewed unavailable event periods keep exposure and penalties but supply no shot or process value", async () => {
+  const {
+    proveReviewedEventSourceAvailability,
+    applyReviewedEventSourceAvailability,
+  } = await import("./reviewed-event-source-availability");
+  const f = gameFixture(),
+    id = 2008020259;
+  const mapTeam = (team: number) => (team === 1 ? 10 : 6);
+  const raw = {
+    ...f.sources.pbp,
+    id,
+    gameDate: "2008-11-17",
+    gameType: 2,
+    gameState: "OFF",
+    homeTeam: { id: 10 },
+    awayTeam: { id: 6 },
+    rosterSpots: f.sources.shifts.map((p) => ({ playerId: p.playerId })),
+    plays: f.sources.pbp.plays.map((p) => ({
+      ...p,
+      details: {
+        ...p.details,
+        ...(typeof p.details.eventOwnerTeamId === "number"
+          ? { eventOwnerTeamId: mapTeam(p.details.eventOwnerTeamId) }
+          : {}),
+      },
+    })),
+  };
+  const proof = proveReviewedEventSourceAvailability({
+    rawPbpText: JSON.stringify(raw),
+    playReportHtml: "<title>Play By Play</title>",
+    gameSummaryHtml: "<title>Game Summary</title>",
+    providerArchive: {
+      url: "https://peter-tanner.com/moneypuck/downloads/shots_2008.zip",
+      sha256: "a".repeat(64),
+    },
+  });
+  const sources = {
+    ...f.sources,
+    pbp: raw,
+    box: { ...f.sources.box, id },
+    shifts: f.sources.shifts.map((p) => ({
+      ...p,
+      gameId: id,
+      teamId: mapTeam(p.teamId),
+    })),
+  };
+  const shots = f.shots.map((p) => ({ ...p, gameId: id }));
+  const before = buildGameValueData(sources, shots);
+  const reviewed = applyReviewedEventSourceAvailability(raw, proof);
+  const after = buildGameValueData({ ...sources, pbp: reviewed }, shots);
+  assert.equal(extractShotTrainingRows(raw).length, 2);
+  assert.deepEqual(extractShotTrainingRows(reviewed), []);
+  assert.equal(after.officialShots, before.officialShots);
+  assert.deepEqual(after.players, before.players);
+  assert.deepEqual(after.penalties, before.penalties);
+  assert.equal(
+    after.shotCoverageByPlayer[1]?.expected,
+    before.shotCoverageByPlayer[1]?.expected,
+  );
+  assert.equal(
+    after.shotCoverageByPlayer[1]?.expectedOnGoal,
+    before.shotCoverageByPlayer[1]?.expectedOnGoal,
+  );
+  assert.equal(after.shotCoverageByPlayer[1]?.missingGoals, 1);
+  assert.equal(after.shots.length, 0);
+  assert.equal(after.usableProcessSeconds, 0);
+  assert.equal(after.eligible, false);
 });

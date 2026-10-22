@@ -2,6 +2,10 @@ import type { QueryCtx } from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
 import { buildPreseasonStandingsProjections } from "../../scripts/src/runtime/preseason-projection";
 import { OWNER_PROJECTION_CONFIG } from "../../scripts/src/runtime/owner-projection";
+import {
+  isFantasySeason,
+  selectSeasonScope,
+} from "../../src/lib/utils/domain/season-scope";
 
 /** Live preseason preview; never substitutes today's roster into historical weeks. */
 export async function preseasonPower(ctx: QueryCtx, seasonId: Id<"seasons">) {
@@ -47,6 +51,7 @@ export async function preseasonPower(ctx: QueryCtx, seasonId: Id<"seasons">) {
   if (!rosters.some((roster) => roster.length)) return [];
   const ownerSeasons = seasons.filter(
     (row) =>
+      isFantasySeason(row) &&
       Number(row.year) < Number(season.year) &&
       Number(row.year) >= Number(season.year) - OWNER_PROJECTION_CONFIG.seasons,
   );
@@ -71,7 +76,7 @@ export async function preseasonPower(ctx: QueryCtx, seasonId: Id<"seasons">) {
   ]);
   return buildPreseasonStandingsProjections({
     season,
-    seasons,
+    seasons: selectSeasonScope(seasons),
     teams,
     rosters: rosters
       .flat()

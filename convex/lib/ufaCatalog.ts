@@ -1,6 +1,7 @@
 import type { Doc } from "../_generated/dataModel";
 import type { DatabaseReader } from "../_generated/server";
 import { resolveUfaSigningSeason } from "../../src/lib/utils/features/ufa-deadline";
+import { selectSeasonScope } from "../../src/lib/utils/domain/season-scope";
 
 const seasonYear = (season: Doc<"seasons">): number => {
   const year = Number(season.year);
@@ -36,9 +37,10 @@ export async function loadLatestNhlStats(
  */
 export async function loadUfaCatalog(db: DatabaseReader) {
   const seasons = await db.query("seasons").collect();
-  const orderedSeasons = [...seasons].sort(
+  const allOrderedSeasons = [...seasons].sort(
     (left, right) => seasonYear(left) - seasonYear(right),
   );
+  const orderedSeasons = selectSeasonScope(allOrderedSeasons);
   const signingSeason = resolveUfaSigningSeason(orderedSeasons);
 
   const [players, nhlTeams, franchises, teams, contracts, nhlStats] =
@@ -60,7 +62,7 @@ export async function loadUfaCatalog(db: DatabaseReader) {
             .collect()
         : Promise.resolve([]),
       db.query("contracts").collect(),
-      loadLatestNhlStats(db, orderedSeasons, signingSeason),
+      loadLatestNhlStats(db, allOrderedSeasons, signingSeason),
     ]);
 
   return {

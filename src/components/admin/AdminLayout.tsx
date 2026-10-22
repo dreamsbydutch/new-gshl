@@ -16,7 +16,7 @@ const ADMIN_TABS: ReadonlyArray<{
   { key: "accounts", label: "Accounts" },
   { key: "contracts", label: "Contracts" },
   { key: "nhlContracts", label: "NHL Salaries & Talent" },
-  { key: "nhlRosters", label: "NHL Team Cap Hits" },
+  { key: "nhlRosters", label: "NHL Teams" },
   { key: "draftPicks", label: "Draft Picks" },
   { key: "scheduleBuilder", label: "Schedule Builder" },
   { key: "users", label: "Users" },

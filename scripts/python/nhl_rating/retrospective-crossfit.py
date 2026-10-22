@@ -143,6 +143,108 @@ process.stdout.write(JSON.stringify({featureNames:NHL_NONLINEAR_SHOT_FEATURES,fi
                 nonlinearFeatureContractSha256=research.digest("scripts/src/runtime/nhl-shot-nonlinear.ts"),
                 comparisons=comparisons), native["featureNames"]
 
+def validate_training_support(source, metadata=None, audit=None):
+    """Separate the official calendar from estimator support; never create empty labels.
+
+    Legacy all-nonempty sources retain the original split identity exactly. Explicit
+    zero-row games require a complete calendar and independently hash-bound audit.
+    This validates provenance/disposition, not the truth of missing event records.
+    """
+    rows = source["rows"]
+    counts, dates = {}, {}
+    for row in rows:
+        gid = row["gameId"]
+        counts[gid] = counts.get(gid, 0) + 1
+        if dates.setdefault(gid, row["date"]) != row["date"]:
+            raise ValueError("Conflicting training support dates")
+    effective = source["effectiveGameSourceHashes"]
+    support = source.get("trainingSupport")
+    if support is None:
+        if (isinstance(metadata, dict) and metadata.get("trainingSupport") is not None) or (isinstance(audit, dict) and audit.get("trainingSupport") is not None):
+            raise ValueError("Training support authority differs")
+        if len(effective) != len(counts) or set(counts) != {g["gameId"] for g in effective}:
+            raise ValueError("Source schedule/event support differs; explicit trainingSupport required")
+        return None
+    if not isinstance(metadata, dict) or not isinstance(audit, dict):
+        raise ValueError("Explicit training support requires source metadata and physical audit")
+    if support.get("version") != "nhl-shot-training-support-v1" or metadata.get("trainingSupport") != support or audit.get("trainingSupport") != support:
+        raise ValueError("Training support authority differs")
+    for obj in (metadata, audit):
+        if obj.get("season") != source["season"]:
+            raise ValueError("Training support season differs")
+    if metadata.get("gameType") != source["gameType"]:
+        raise ValueError("Training support game type differs")
+    schedule = source.get("completedSchedule")
+    if not isinstance(schedule, list) or not schedule:
+        raise ValueError("Training support requires complete official calendar")
+    schedule_hash = hashlib.sha256(json.dumps(schedule, separators=(",", ":"), ensure_ascii=False, allow_nan=False).encode()).hexdigest()
+    if source.get("scheduleSha256") != schedule_hash or metadata.get("scheduleSha256") != schedule_hash:
+        raise ValueError("Training support official schedule hash differs")
+
+    def index(values, identity):
+        if not isinstance(values, list) or not values:
+            raise ValueError("Missing training support population")
+        result = {}
+        for row in values:
+            gid = row.get(identity)
+            if type(gid) is not int or gid <= 0 or gid in result:
+                raise ValueError("Invalid or duplicate training support identity")
+            result[gid] = row
+        return result
+
+    calendar = index(schedule, "id")
+    ledgers = index(support.get("games"), "gameId")
+    sources = index(metadata.get("gameSourceHashes"), "gameId")
+    physical = index(audit.get("games"), "gameId")
+    physical_hashes = index(audit.get("gameSourceHashes"), "gameId")
+    effective = index(effective, "gameId")
+    all_ids = set(calendar)
+    if any(set(population) != all_ids for population in (ledgers, sources, physical, physical_hashes, effective)) or not set(counts) <= all_ids:
+        raise ValueError("Training support calendar population differs")
+    expected_count = len(all_ids)
+    for actual in (source.get("completedScheduleGames"), metadata.get("officialGames"), metadata.get("loadedGames"), audit.get("officialGames"), audit.get("loadedGames")):
+        if type(actual) is not int or actual != expected_count:
+            raise ValueError("Training support official game count differs")
+    if audit.get("failed") != []:
+        raise ValueError("Training support has failed source games")
+
+    def sha(value):
+        return isinstance(value, str) and len(value) == 64 and all(c in "0123456789abcdef" for c in value)
+
+    zero = []
+    for gid, entry in calendar.items():
+        day = entry.get("gameDate")
+        if type(day) is not str or date.fromisoformat(day).isoformat() != day or entry.get("season") != source["season"] or entry.get("gameType") != source["gameType"] or entry.get("gameStateId") != 7:
+            raise ValueError("Training support official game/date scope differs")
+        ledger, game, src, eff = ledgers[gid], physical[gid], sources[gid], effective[gid]
+        n = counts.get(gid, 0)
+        if ledger.get("date") != day or game.get("date") != day or (gid in dates and dates[gid] != day):
+            raise ValueError("Training support date differs")
+        if not sha(src.get("sha256")) or ledger.get("sourceSha256") != src["sha256"] or physical_hashes[gid].get("sha256") != src["sha256"]:
+            raise ValueError("Training support game source hash differs")
+        if not sha(eff.get("sha256")) or ledger.get("effectivePbpSha256") != eff["sha256"]:
+            raise ValueError("Training support effective PBP hash differs")
+        if type(ledger.get("trainingRows")) is not int or ledger["trainingRows"] != n or type(eff.get("shots")) is not int or eff["shots"] != n:
+            raise ValueError("Training support row count differs")
+        for key in ("officialShots", "verifiedShotCount", "gameSeconds", "usableProcessSeconds"):
+            value = game.get(key)
+            valid_type = type(value) is int if key in ("officialShots", "verifiedShotCount") else type(value) in (int, float)
+            if not valid_type or not np.isfinite(value) or value < 0:
+                raise ValueError("Invalid physical training support counts")
+        if type(game.get("eligible")) is not bool or game["verifiedShotCount"] > game["officialShots"] or game["usableProcessSeconds"] > game["gameSeconds"]:
+            raise ValueError("Invalid physical training support state")
+        expected_disposition = "included" if n else "zero-verified-ordinary-events"
+        if ledger.get("disposition") != expected_disposition:
+            raise ValueError("Training support disposition differs")
+        if not n:
+            if game["eligible"] or game["verifiedShotCount"] != 0:
+                raise ValueError("Zero-row game lacks explicit unsupported physical disposition")
+            zero.append(gid)
+    return dict(version=support["version"], officialGames=expected_count,
+                estimationGames=len(counts), zeroTrainingGameIds=sorted(zero),
+                interpretation="Zero-row games remain in the official source calendar and exposure audit, never as synthetic examples or estimator fold dates.")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     for name in ("rows", "baseline", "frozen-model", "output", "policy", "source-metadata"):
@@ -192,8 +294,18 @@ def main():
         previous = game_dates.setdefault(row["gameId"], row["date"])
         if previous != row["date"]:
             raise ValueError("Conflicting game dates")
-    if len(source["effectiveGameSourceHashes"]) != len(game_dates) or set(game_dates) != {g["gameId"] for g in source["effectiveGameSourceHashes"]}:
-        raise ValueError("Source schedule/event support differs")
+    physical_audit = None
+    if source.get("trainingSupport") is not None:
+        if not args.source_metadata:
+            raise ValueError("Explicit training support requires --source-metadata")
+        audit_path = Path(args.source_metadata).with_name("game-audit.json")
+        audit_bytes = audit_path.read_bytes()
+        audit_sha = hashlib.sha256(audit_bytes).hexdigest()
+        if source_metadata.get("sourceAuditSha256") != audit_sha or source_metadata.get("rowsFileSha256") != startup_input_hashes[args.rows]:
+            raise ValueError("Training support audit/rows file hash differs")
+        physical_audit = json.loads(audit_bytes)
+        startup_input_hashes[str(audit_path)] = audit_sha
+    training_support = validate_training_support(source, source_metadata, physical_audit)
     geometry = np.array([r["features"] for r in rows], dtype=float)
     context = [research.context(r) for r in rows]
     X = np.column_stack([geometry,np.array([c[0] for c in context])])
@@ -300,6 +412,8 @@ def main():
                     libraryVersions=dict(sklearn=sklearn.__version__,numpy=np.__version__,scipy=scipy.__version__),glmNativeParity=glm_parity,
                     baselineMethod="nested-whole-game-OOF-GLM16",candidateMethod="nested-whole-game-OOF-GB21",baseline=glm_metrics,candidate=gb_metrics,calibrationByShootingContext=groups,pairedTestGames=games,singleSeasonScreen=screen,
                     interpretation="Nested whole-game retrospective estimate, never chronological forecasting labels. Every event's fold excludes its entire game from model and parameter fitting. All-season OOF metrics compare models on identical shots; fixed-model bootstrap omits overlapping-training-set dependence. No default adoption.")
+    if training_support is not None:
+        analysis["sourceTrainingSupport"] = training_support
     if frozen_comparison is not None:
         analysis["sourceBaselineSha256"] = research.digest(args.baseline)
         analysis["frozenGbModelSha256"] = research.digest(args.frozen_model)

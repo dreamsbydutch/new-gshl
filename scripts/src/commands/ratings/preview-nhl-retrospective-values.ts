@@ -12,6 +12,7 @@ import {
 import { loadVerifiedGame } from "../../domains/nhl/verified-game-source";
 import { loadAuditedRetrospectiveShots } from "../../integrations/nhl/retrospective-shot-source";
 import { loadRetrospectiveValueContext } from "../../integrations/nhl/retrospective-value-context";
+import { withReviewedOnGoalClassifications } from "../../integrations/nhl/official-on-goal-classification-source";
 import {
   buildGameValueData,
   extractShotTrainingRows,
@@ -20,6 +21,16 @@ import {
 import { summarizeGameAudit } from "../../domains/nhl/game-value-audit";
 import { reconcileSeasonExposure } from "../../domains/nhl/game-reconciliation";
 import { buildNhlRatingInput } from "../../domains/nhl/season-rating-input";
+import {
+  withOfficialSkaterGoals,
+  summarizeOfficialGoalCoverage,
+} from "../../domains/nhl/official-goal-coverage";
+import {
+  withOfficialOnGoalAttempts,
+  countObservedSkaterOnGoalAttempts,
+  summarizeOfficialSourceCoverage,
+  summarizeOfficialOnGoalCoverage,
+} from "../../domains/nhl/official-on-goal-coverage";
 import { fitAdjustedImpact } from "../../runtime/nhl-adjusted-impact";
 import {
   predictShotQuality,
@@ -182,12 +193,43 @@ else {
       "scripts/src/integrations/nhl/game-value-source.ts",
       "scripts/src/domains/nhl/game-value-input.ts",
       "scripts/src/domains/nhl/verified-game-source.ts",
+      "scripts/src/domains/nhl/official-shift-report.ts",
+      "scripts/src/domains/nhl/unavailable-shift-proof.ts",
+      "scripts/src/integrations/nhl/unavailable-shift-source.ts",
+      "scripts/src/domains/nhl/official-game-clock.ts",
+      "scripts/src/domains/nhl/boundary-shift-reconciliation.ts",
+      "scripts/src/domains/nhl/boundary-shift-2008-cases.ts",
+      "scripts/src/integrations/nhl/boundary-shift-source.ts",
+      "scripts/src/domains/nhl/official-penalty-shot-report.ts",
+      "scripts/src/domains/nhl/official-penalty-shot-context.ts",
+      "scripts/src/domains/nhl/official-missing-penalty-shot.ts",
+      "scripts/src/integrations/nhl/official-penalty-shot-context-source.ts",
+      "scripts/src/domains/nhl/historical-shot-source-bridge.ts",
+      "scripts/src/domains/nhl/historical-shot-type-alignment.ts",
+      "scripts/src/domains/nhl/reviewed-paired-penalty-shot-source.ts",
+      "scripts/src/domains/nhl/reviewed-gs-penalty-source.ts",
+      "scripts/src/domains/nhl/reviewed-report-only-penalty-shot-award.ts",
+      "scripts/src/domains/nhl/historical-penalty-alignment.ts",
+      "scripts/src/domains/nhl/missing-native-shot-source.ts",
+      "scripts/src/integrations/nhl/historical-shot-source.ts",
       "scripts/src/runtime/nhl-adjusted-impact.ts",
       "scripts/src/runtime/nhl-shot-quality.ts",
       "scripts/src/runtime/nhl-shot-nonlinear.ts",
       "scripts/src/runtime/nhl-impact-breakdown.ts",
       "scripts/src/runtime/nhl-game-season-value.ts",
       "scripts/src/runtime/nhl-overall-rating.ts",
+      "scripts/src/domains/nhl/official-goal-coverage.ts",
+      "scripts/src/domains/nhl/official-on-goal-coverage.ts",
+      "scripts/src/domains/nhl/official-on-goal-classification.ts",
+      "scripts/src/integrations/nhl/official-on-goal-classification-source.ts",
+      "scripts/src/domains/nhl/official-shot-credit-reconciliation.ts",
+      "scripts/src/integrations/nhl/official-shot-credit-source.ts",
+      "scripts/src/domains/nhl/official-primary-event-recovery.ts",
+      "scripts/src/integrations/nhl/official-primary-event-source.ts",
+      "scripts/src/domains/nhl/reviewed-event-source-availability.ts",
+      "scripts/src/integrations/nhl/reviewed-event-source-availability-source.ts",
+      "scripts/src/domains/nhl/reviewed-2008-shot-credit.ts",
+      "scripts/src/integrations/nhl/reviewed-2008-shot-credit-source.ts",
     ].map(async (path) => ({
       path,
       sha256: hash(await readFile(path, "utf8")),
@@ -246,10 +288,22 @@ else {
     calibration: Record<string, { prior: number }>;
   };
   const frozenRatings = context.frozen;
-  const reference = buildNhlRatingInput(source.nhl).players.filter(
-    (p) => p.games > 0 && p.minutes > 0,
+  const baseReference = withOfficialOnGoalAttempts(
+    withOfficialSkaterGoals(
+      buildNhlRatingInput(source.nhl).players.filter(
+        (p) => p.games > 0 && p.minutes > 0,
+      ),
+      source.nhl,
+    ),
+    source.nhl,
   );
   const cache = new HockeyDataCache(resolve(values.cache), true);
+  const reference = await withReviewedOnGoalClassifications(
+    cache,
+    context.season,
+    baseReference,
+  );
+  let observedSkaterOnGoalAttempts = 0;
   const schedule = await fetchSeasonGames(
     cache,
     context.season,
@@ -299,6 +353,7 @@ else {
     allRows: ShotTrainingRow[] = [];
   for (const scheduled of schedule) {
     const pbp = await fetchGamePlayByPlay(cache, scheduled.id);
+    observedSkaterOnGoalAttempts += countObservedSkaterOnGoalAttempts(pbp);
     const rows = extractShotTrainingRows(pbp);
     allRows.push(...rows);
     const old = new Map<number, number>(),
@@ -366,21 +421,27 @@ else {
       "Reconstructed event rows differ from audited crossfit rows",
     );
   const reconciliation = reconcileSeasonExposure(glmGames, reference);
-  const officialSeconds = glmGames.reduce((sum, g) => sum + g.gameSeconds, 0);
-  const usableSeconds = glmGames.reduce(
-    (sum, g) => sum + g.usableProcessSeconds,
-    0,
-  );
-  const officialShots = glmGames.reduce((sum, g) => sum + g.officialShots, 0);
-  const verifiedShots = glmGames.reduce((sum, g) => sum + g.shots.length, 0);
-  const sourceGates = {
-    officialSeasonExposureMatches: reconciliation.matches,
-    completeDownload: glmGames.length === schedule.length,
-    atLeast98PercentProcessExposureVerified:
-      usableSeconds / officialSeconds >= 0.98,
-    atLeast98PercentIndividualShotsVerified:
-      verifiedShots / officialShots >= 0.98,
+  const officialGoalCoverage = {
+    glm: summarizeOfficialGoalCoverage(glmGames, reference),
+    gb: summarizeOfficialGoalCoverage(gbGames, reference),
   };
+  const officialOnGoalCoverage = {
+    glm: summarizeOfficialOnGoalCoverage(glmGames, reference),
+    gb: summarizeOfficialOnGoalCoverage(gbGames, reference),
+  };
+  const globalSourceCoverage = summarizeOfficialSourceCoverage(
+    glmGames,
+    reference,
+    source.nhl,
+    observedSkaterOnGoalAttempts,
+    {
+      officialGames: schedule.length,
+      officialSeasonExposureMatches: reconciliation.matches,
+    },
+  );
+  const { officialSeconds, usableSeconds, officialShots, verifiedShots } =
+    globalSourceCoverage.coverage;
+  const sourceGates = globalSourceCoverage.sourceGates;
   if (!Object.values(sourceGates).every(Boolean))
     throw new Error("Retrospective source gates failed");
   const output = resolve(values.output);
@@ -391,6 +452,7 @@ else {
     });
   const provenance = {
     season: context.season,
+    sourceCacheDirectory: resolve(values.cache),
     ...context.provenance,
     canonicalSourceSha256: hash(sourceText),
     abilityPriorsSha256: hash(priorText),
@@ -398,6 +460,7 @@ else {
       ? "saved-priors-with-default-fallbacks"
       : "defaults-only",
     gameSourcesHash: context.gameSourcesHash,
+    gameSourceHashes: context.gameSourceHashes,
     rowsSha256: hash(JSON.stringify(allRows)),
     comparisonMode: context.mode,
     lambdas,
@@ -418,6 +481,8 @@ else {
       glm: residualAccounting(glmGames),
       gb: residualAccounting(gbGames),
     },
+    officialGoalCoverage,
+    officialOnGoalCoverage,
     interpretation:
       "Source/inference/attribution checks only. These are not forward prediction gates.",
   });
@@ -577,6 +642,8 @@ else {
       sourceGates,
       interpretation,
       residualCreditAudit,
+      officialGoalCoverage,
+      officialOnGoalCoverage,
       qualificationInvariant: {
         passed: true,
         players: glm.ratings.length,

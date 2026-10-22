@@ -30,8 +30,8 @@ For a write-capable command:
 5. Repeat the dry run or parity check until the result proves idempotency or the
    intended remaining delta.
 
-Keep parsing and reconciliation pure; keep Convex, browser, filesystem,
-and network access at integration boundaries. Preserve throttling, retries,
+Keep parsing and reconciliation pure; keep Convex, browser, filesystem, and
+network access at integration boundaries. Preserve throttling, retries,
 allowlists, dry-run defaults, and secret redaction.
 
 ## Hard stops

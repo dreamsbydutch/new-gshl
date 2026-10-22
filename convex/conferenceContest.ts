@@ -1,3 +1,4 @@
+import { selectSeasonScope } from "../src/lib/utils/domain/season-scope";
 import { query } from "./_generated/server";
 import { utcTimestampToDateKey } from "./lib/timestamps";
 import {
@@ -21,7 +22,7 @@ export const view = query({
   args: {},
   handler: async (ctx) => {
     const seasonDocs = await ctx.db.query("seasons").collect();
-    const seasons = seasonDocs.map(
+    const seasons = selectSeasonScope(seasonDocs).map(
       (season) =>
         ({
           id: String(season._id),
@@ -63,11 +64,12 @@ export const view = query({
     const teamDocs = sourcePages.flatMap((page) => page.teams);
     const franchiseIds = [...new Set(teamDocs.map((team) => team.franchiseId))];
     const conferenceIds = [...new Set(teamDocs.map((team) => team.confId))];
-    const [franchiseDocs, conferenceDocs, fallbackConferenceDocs] = await Promise.all([
-      Promise.all(franchiseIds.map((id) => ctx.db.get(id))),
-      Promise.all(conferenceIds.map((id) => ctx.db.get(id))),
-      ctx.db.query("conferences").take(2),
-    ]);
+    const [franchiseDocs, conferenceDocs, fallbackConferenceDocs] =
+      await Promise.all([
+        Promise.all(franchiseIds.map((id) => ctx.db.get(id))),
+        Promise.all(conferenceIds.map((id) => ctx.db.get(id))),
+        ctx.db.query("conferences").take(2),
+      ]);
     const franchisesById = new Map(
       franchiseDocs
         .filter(present)

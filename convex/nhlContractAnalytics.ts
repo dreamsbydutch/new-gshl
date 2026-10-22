@@ -19,6 +19,7 @@ async function rosterPlayer(
   seasonStartYear: number,
   nhlTeam: string[],
   useProfile: boolean,
+  position = player.posGroup,
 ) {
   const profile = useProfile
     ? nhlProfileContract(player, seasonStartYear)
@@ -43,7 +44,7 @@ async function rosterPlayer(
         return {
           id: contract._id,
           playerName: player.fullName,
-          position: player.posGroup,
+          position,
           signingDate: contract.signingDate,
           startSeasonStartYear: contract.startSeasonStartYear,
           expirySeasonStartYear: contract.expirySeasonStartYear,
@@ -57,15 +58,16 @@ async function rosterPlayer(
   );
   return {
     id: player._id,
+    nhlPlayerId: nhlContractPlayerId(player.nhlApiId),
     playerName: player.fullName,
-    position: player.posGroup,
+    position,
     nhlTeam,
     contracts,
     currentProfileContract: profile
       ? {
           id: `profile:${player._id}`,
           playerName: player.fullName,
-          position: player.posGroup,
+          position,
           signingDate: profile.signingDate,
           startSeasonStartYear: profile.startSeasonStartYear,
           expirySeasonStartYear: profile.expirySeasonStartYear,
@@ -128,9 +130,17 @@ export const historicalRosterPage = query({
         const playerId = ctx.db.normalizeId("players", row.playerId);
         const player = playerId ? await ctx.db.get(playerId) : null;
         return player
-          ? rosterPlayer(ctx, player, year, row.nhlTeam ?? [], false)
+          ? await rosterPlayer(
+              ctx,
+              player,
+              year,
+              row.nhlTeam ?? [],
+              false,
+              row.posGroup,
+            )
           : {
               id: row.playerId,
+              nhlPlayerId: null,
               playerName: "Unlinked historical player",
               position: row.posGroup,
               nhlTeam: row.nhlTeam ?? [],

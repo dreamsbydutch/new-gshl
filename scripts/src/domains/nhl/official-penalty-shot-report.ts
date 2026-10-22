@@ -30,6 +30,17 @@ const normalized = (name: string) =>
     .toUpperCase()
     .replace(/[^A-Z]/g, "");
 
+/** Only these valid-source resolution failures may enter stronger context review. */
+export class OfficialPenaltyShotResolutionError extends Error {
+  constructor(
+    readonly reason: "native-match-ambiguity" | "ledger-mismatch",
+    message: string,
+  ) {
+    super(message);
+    this.name = "OfficialPenaltyShotResolutionError";
+  }
+}
+
 export function penaltyShotGameMatches(
   raw: unknown,
   totals: PenaltyShotGameTotal[],
@@ -65,6 +76,23 @@ export function parseOfficialPenaltyShots(
   totals: PenaltyShotGameTotal[],
 ) {
   const game = raw as ReportGame;
+  if (
+    !Number.isSafeInteger(game.id) ||
+    !Array.isArray(game.plays) ||
+    !Array.isArray(game.rosterSpots) ||
+    new Set(totals.map((row) => row.playerId)).size !== totals.length ||
+    totals.some(
+      (row) =>
+        !Number.isSafeInteger(row.playerId) ||
+        row.playerId <= 0 ||
+        !Number.isSafeInteger(row.penaltyShotAttempts) ||
+        row.penaltyShotAttempts < 0 ||
+        !Number.isSafeInteger(row.penaltyShotsGoals) ||
+        row.penaltyShotsGoals < 0 ||
+        row.penaltyShotsGoals > row.penaltyShotAttempts,
+    )
+  )
+    throw Error("Invalid official penalty-shot input");
   const page = load(html);
   const cells = page("td")
     .toArray()
@@ -81,7 +109,7 @@ export function parseOfficialPenaltyShots(
     !/Play By Play/i.test(page("title").text()) ||
     !cells.some(
       (s) =>
-        /^Game\s+\d+$/.test(s) &&
+        /^(?:Game|Match\/Game)\s+\d+$/.test(s) &&
         Number(s.match(/\d+/)![0]) === game.id % 10000,
     ) ||
     !cells.includes(expectedDate) ||
@@ -141,7 +169,10 @@ export function parseOfficialPenaltyShots(
         ),
     );
     if (matches.length !== 1 || ids.has(matches[0]!.eventId))
-      throw new Error("Ambiguous official penalty-shot event match");
+      throw new OfficialPenaltyShotResolutionError(
+        "native-match-ambiguity",
+        "Ambiguous official penalty-shot event match",
+      );
     ids.add(matches[0]!.eventId);
   });
   const plays = game.plays.map((p) =>
@@ -150,6 +181,9 @@ export function parseOfficialPenaltyShots(
       : p,
   );
   if (!penaltyShotGameMatches({ ...game, plays }, totals))
-    throw new Error("Official HTML and NHL penalty-shot totals differ");
+    throw new OfficialPenaltyShotResolutionError(
+      "ledger-mismatch",
+      "Official HTML and NHL penalty-shot totals differ",
+    );
   return [...ids].sort((a, b) => a - b);
 }

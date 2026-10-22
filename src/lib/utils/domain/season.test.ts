@@ -7,9 +7,36 @@ import {
   findMockDraftSeason,
   isSeasonPickable,
   SEASON_PICKER_ADVANCE_DAYS,
+  findCurrentSeason,
+  findSeasonById,
+  resolveDefaultSeason,
+  resolveContractDefaultSeason,
 } from "./season";
 
 const referenceDate = new Date("2026-07-23T00:00:00.000Z");
+
+void test("NHL-only history never becomes a fantasy option, explicit selection or fallback", () => {
+  const nhl = {
+    ...season("nhl", "2008-10-01"),
+    endDate: "2027-06-30",
+    isActive: true,
+    nhlOnly: true,
+  };
+  const fantasy = season("fantasy", "2025-10-01");
+  assert.equal(isSeasonPickable(nhl, referenceDate), false);
+  assert.equal(findCurrentSeason([nhl], referenceDate), undefined);
+  assert.equal(findSeasonById([nhl], "nhl"), undefined);
+  assert.equal(resolveDefaultSeason([nhl], referenceDate), undefined);
+  assert.equal(resolveContractDefaultSeason([nhl], referenceDate), undefined);
+  assert.deepEqual(
+    buildSeasonSummaries([nhl, fantasy], referenceDate).map((s) => s.id),
+    ["fantasy"],
+  );
+  assert.equal(
+    resolveDefaultSeason([nhl, fantasy], referenceDate)?.id,
+    "fantasy",
+  );
+});
 
 void test("mock draft is visible only after playoffs and before the immediate next draft", () => {
   const previous = {

@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   parseOfficialPenaltyShots,
   penaltyShotGameMatches,
+  OfficialPenaltyShotResolutionError,
 } from "./official-penalty-shot-report";
 import {
   extractShotTrainingRows,
@@ -125,4 +126,51 @@ test("an end-of-overtime manpower code is not evidence of a penalty shot", () =>
     assert.equal(penaltyShotGameMatches(verified, totals), true);
     assert.equal(extractShotTrainingRows(verified).length, 0);
   }
+});
+
+test("bilingual report headers retain exact game, date, actor and ledger guards", () => {
+  const bilingual = html.replace("Game 0678", "Match/Game 0678");
+  assert.deepEqual(parseOfficialPenaltyShots(bilingual, game, totals), [45]);
+  for (const invalid of [
+    bilingual.replace("Match/Game 0678", "Match/Game 0679"),
+    bilingual.replace("Match/Game 0678", "Match 0678"),
+    bilingual.replace("January 11", "January 12"),
+    bilingual.replace("STALBERG", "WRONG"),
+  ])
+    assert.throws(() => parseOfficialPenaltyShots(invalid, game, totals));
+  assert.throws(() =>
+    parseOfficialPenaltyShots(bilingual, game, [
+      { ...totals[0]!, penaltyShotsGoals: 1 },
+    ]),
+  );
+});
+
+test("only valid-source ambiguity and ledger mismatch are typed for stronger review", () => {
+  for (const [raw, ledger, reason] of [
+    [
+      { ...game, plays: [...game.plays, { ...game.plays[0]!, eventId: 46 }] },
+      totals,
+      "native-match-ambiguity",
+    ],
+    [game, [{ ...totals[0]!, penaltyShotsGoals: 1 }], "ledger-mismatch"],
+  ] as const) {
+    assert.throws(
+      () => parseOfficialPenaltyShots(html, raw, [...ledger]),
+      (error) =>
+        error instanceof OfficialPenaltyShotResolutionError &&
+        error.reason === reason,
+    );
+  }
+  for (const ledger of [
+    [{ ...totals[0]!, penaltyShotAttempts: NaN }],
+    [{ ...totals[0]!, penaltyShotsGoals: -1 }],
+    [{ ...totals[0]!, penaltyShotsGoals: 2 }],
+    [totals[0]!, totals[0]!],
+  ])
+    assert.throws(
+      () => parseOfficialPenaltyShots(html, game, ledger),
+      (error) =>
+        error instanceof Error &&
+        !(error instanceof OfficialPenaltyShotResolutionError),
+    );
 });

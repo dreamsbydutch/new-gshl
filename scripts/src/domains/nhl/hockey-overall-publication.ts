@@ -9,6 +9,15 @@ import {
   buildNhlRatingInput,
   type NhlRatingSource,
 } from "./season-rating-input";
+import {
+  assertOfficialGoalQualification,
+  type summarizeOfficialGoalCoverage,
+} from "./official-goal-coverage";
+import {
+  assertOfficialOnGoalQualification,
+  type summarizeOfficialOnGoalCoverage,
+  type summarizeOfficialSourceCoverage,
+} from "./official-on-goal-coverage";
 
 export const NHL_HOCKEY_OVERALL_PUBLICATION = {
   modelVersion: "nhl-hockey-overall-reviewed-v1",
@@ -39,6 +48,10 @@ export type HockeyValueReport = {
     rowsSha256: string;
     allRowInferenceAudit: HockeyInferenceProof;
     codeHashes: Array<{ path: string; sha256: string }>;
+    sourceCacheDirectory?: string;
+    gameSourceHashes?: Array<{ gameId: number; sha256: string }>;
+    gameSourcesHash?: string;
+    penaltyShotModel?: { probability: number };
   };
   sourceGates: Record<string, boolean>;
   residualCreditAudit: {
@@ -52,6 +65,14 @@ export type HockeyValueReport = {
   qualificationInvariant: { passed: boolean; players: number };
   gb: { model: ImpactModel; ratings: GameSeasonRating[] };
   glm: { ratings: GameSeasonRating[] };
+  officialGoalCoverage?: {
+    glm: ReturnType<typeof summarizeOfficialGoalCoverage>;
+    gb: ReturnType<typeof summarizeOfficialGoalCoverage>;
+  };
+  officialOnGoalCoverage?: {
+    glm: ReturnType<typeof summarizeOfficialOnGoalCoverage>;
+    gb: ReturnType<typeof summarizeOfficialOnGoalCoverage>;
+  };
 };
 export type HockeyOverallResult = {
   nhlPlayerId: number;
@@ -121,6 +142,16 @@ export function prepareHockeyOverallPublication(input: {
   policyText: string;
   policyHash: string;
   nativeInference: HockeyInferenceProof;
+  officialGoalProof?: {
+    passed: boolean;
+    season: number;
+    gameType: number;
+    canonicalSourceSha256: string;
+    gameSourcesHash: string;
+    goalCoverage: ReturnType<typeof summarizeOfficialGoalCoverage>;
+    onGoalCoverage?: ReturnType<typeof summarizeOfficialOnGoalCoverage>;
+    sourceCoverage?: ReturnType<typeof summarizeOfficialSourceCoverage>;
+  };
 }) {
   const source = JSON.parse(input.sourceText) as { nhl: NhlRatingSource };
   const report = JSON.parse(input.valueText) as HockeyValueReport;
@@ -133,6 +164,8 @@ export function prepareHockeyOverallPublication(input: {
     version: string;
     provenance: HockeyValueReport["provenance"];
     sourceGates: Record<string, boolean>;
+    officialGoalCoverage?: HockeyValueReport["officialGoalCoverage"];
+    officialOnGoalCoverage?: HockeyValueReport["officialOnGoalCoverage"];
     coverage: {
       officialSeconds: number;
       usableSeconds: number;
@@ -175,6 +208,88 @@ export function prepareHockeyOverallPublication(input: {
     "All four physical publication gates must pass",
   );
   const coverage = audit.coverage;
+  if (input.officialGoalProof || report.officialGoalCoverage) {
+    const proof = input.officialGoalProof;
+    insist(
+      proof?.passed === true &&
+        proof.season === input.season &&
+        proof.gameType === 2 &&
+        proof.canonicalSourceSha256 === hash(input.sourceText) &&
+        proof.gameSourcesHash === report.provenance.gameSourcesHash,
+      "Fresh independent official goal coverage proof required",
+    );
+    assertOfficialGoalQualification(
+      source.nhl,
+      proof.goalCoverage,
+      report.gb.ratings,
+    );
+    assertOfficialGoalQualification(
+      source.nhl,
+      proof.goalCoverage,
+      report.glm.ratings,
+    );
+    insist(
+      report.officialGoalCoverage &&
+        JSON.stringify(report.officialGoalCoverage.gb) ===
+          JSON.stringify(proof.goalCoverage) &&
+        JSON.stringify(report.officialGoalCoverage.glm) ===
+          JSON.stringify(proof.goalCoverage),
+      "Retained official goal ledger differs from independent source replay",
+    );
+    insist(
+      JSON.stringify(audit.officialGoalCoverage) ===
+        JSON.stringify(report.officialGoalCoverage),
+      "Official goal audit and value report differ",
+    );
+  }
+  if (
+    input.officialGoalProof?.onGoalCoverage ||
+    report.officialOnGoalCoverage
+  ) {
+    const proof = input.officialGoalProof;
+    insist(
+      proof?.passed === true &&
+        proof.onGoalCoverage &&
+        proof.season === input.season &&
+        proof.gameType === 2 &&
+        proof.canonicalSourceSha256 === hash(input.sourceText) &&
+        proof.gameSourcesHash === report.provenance.gameSourcesHash,
+      "Fresh independent official on-goal coverage proof required",
+    );
+    assertOfficialOnGoalQualification(
+      source.nhl,
+      proof.onGoalCoverage,
+      report.gb.ratings,
+    );
+    assertOfficialOnGoalQualification(
+      source.nhl,
+      proof.onGoalCoverage,
+      report.glm.ratings,
+    );
+    insist(
+      report.officialOnGoalCoverage &&
+        JSON.stringify(report.officialOnGoalCoverage.gb) ===
+          JSON.stringify(proof.onGoalCoverage) &&
+        JSON.stringify(report.officialOnGoalCoverage.glm) ===
+          JSON.stringify(proof.onGoalCoverage),
+      "Retained official on-goal ledger differs from independent source replay",
+    );
+    insist(
+      JSON.stringify(audit.officialOnGoalCoverage) ===
+        JSON.stringify(report.officialOnGoalCoverage),
+      "Official on-goal audit and value report differ",
+    );
+    insist(
+      proof.sourceCoverage &&
+        JSON.stringify(proof.sourceCoverage.coverage) ===
+          JSON.stringify(coverage) &&
+        JSON.stringify(proof.sourceCoverage.sourceGates) ===
+          JSON.stringify(report.sourceGates) &&
+        JSON.stringify(proof.sourceCoverage.sourceGates) ===
+          JSON.stringify(audit.sourceGates),
+      "Fresh aggregate source coverage/gates differ from retained evidence",
+    );
+  }
   insist(
     [
       coverage.officialSeconds,

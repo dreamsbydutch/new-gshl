@@ -245,6 +245,25 @@ test("fills a missing Yahoo ID only from one exact full-name match", () => {
   }
 });
 
+test("uses Yahoo's full-name title to reconcile an abbreviated roster name", () => {
+  const roster = parseDailyYahooRoster(
+    html(
+      '<tr><td>Util</td><td><div class="ysf-player-name"><a data-ys-playerid="32791" href="/nhl/players/32791" title="Michael Brandsegg-Nygård">M. Brandsegg-Nygård</a></div><span>DET - RW</span></td></tr>',
+    ),
+  ).filter((row) => row.yahooId === "32791");
+  const plan = planDailyYahooRosters({
+    ...scope,
+    players: [{ id: "player", fullName: "Michael Brandsegg-Nygård" }],
+    rosters: [{ teamId: "team", players: roster }],
+    existing: [],
+  });
+  assert.deepEqual(plan.conflicts, []);
+  assert.deepEqual(plan.identityUpdates, [
+    { id: "player", yahooId: "32791", fullName: "Michael Brandsegg-Nygård" },
+  ]);
+  assert.equal(plan.creates[0]?.playerId, "player");
+});
+
 test("reports missing existing days without deleting or silently retaining a stale roster", () => {
   const data = planDailyYahooRosters(input()).creates[0]!;
   const plan = planDailyYahooRosters({

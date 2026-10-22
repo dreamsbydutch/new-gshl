@@ -19,10 +19,26 @@ import { summarizeGameAudit } from "../../domains/nhl/game-value-audit";
 import { reconcileSeasonExposure } from "../../domains/nhl/game-reconciliation";
 import { buildNhlRatingInput } from "../../domains/nhl/season-rating-input";
 import {
+  withOfficialOnGoalAttempts,
+  countObservedSkaterOnGoalAttempts,
+  summarizeOfficialSourceCoverage,
+  summarizeOfficialOnGoalCoverage,
+} from "../../domains/nhl/official-on-goal-coverage";
+import {
+  withOfficialSkaterGoals,
+  summarizeOfficialGoalCoverage,
+} from "../../domains/nhl/official-goal-coverage";
+import { withReviewedOnGoalClassifications } from "../../integrations/nhl/official-on-goal-classification-source";
+import {
   fitPenaltyShotBaseline,
   type ShotTrainingRow,
 } from "../../runtime/nhl-shot-quality";
-import type { RetrospectiveSourceManifest } from "../../integrations/nhl/retrospective-value-context";
+import type {
+  RetrospectiveSourceManifest,
+  ShotTrainingSupport,
+} from "../../integrations/nhl/retrospective-value-context";
+import type { ShiftAvailability } from "../../domains/nhl/unavailable-shift-proof";
+import type { GameSourceBundle } from "../../integrations/nhl/game-value-source";
 
 const { values } = parseArgs({
   options: {
@@ -55,7 +71,40 @@ else {
       "scripts/src/commands/ratings/prepare-nhl-retrospective-source.ts",
       "scripts/src/integrations/nhl/game-value-source.ts",
       "scripts/src/domains/nhl/game-value-input.ts",
+      "scripts/src/domains/nhl/official-on-goal-coverage.ts",
+      "scripts/src/domains/nhl/official-goal-coverage.ts",
+      "scripts/src/domains/nhl/official-on-goal-classification.ts",
+      "scripts/src/integrations/nhl/official-on-goal-classification-source.ts",
+      "scripts/src/domains/nhl/official-shot-credit-reconciliation.ts",
+      "scripts/src/integrations/nhl/official-shot-credit-source.ts",
+      "scripts/src/domains/nhl/official-primary-event-recovery.ts",
+      "scripts/src/integrations/nhl/official-primary-event-source.ts",
+      "scripts/src/domains/nhl/reviewed-event-source-availability.ts",
+      "scripts/src/integrations/nhl/reviewed-event-source-availability-source.ts",
+      "scripts/src/domains/nhl/reviewed-2008-shot-credit.ts",
+      "scripts/src/integrations/nhl/reviewed-2008-shot-credit-source.ts",
       "scripts/src/domains/nhl/verified-game-source.ts",
+      "scripts/src/domains/nhl/official-shift-report.ts",
+      "scripts/src/domains/nhl/unavailable-shift-proof.ts",
+      "scripts/src/integrations/nhl/unavailable-shift-source.ts",
+      "scripts/src/domains/nhl/official-game-clock.ts",
+      "scripts/src/domains/nhl/boundary-shift-reconciliation.ts",
+      "scripts/src/domains/nhl/boundary-shift-2008-cases.ts",
+      "scripts/src/integrations/nhl/boundary-shift-source.ts",
+      "scripts/src/domains/nhl/official-penalty-shot-report.ts",
+      "scripts/src/domains/nhl/official-penalty-shot-context.ts",
+      "scripts/src/domains/nhl/official-missing-penalty-shot.ts",
+      "scripts/src/integrations/nhl/official-penalty-shot-context-source.ts",
+      "scripts/src/domains/nhl/official-empty-net-report.ts",
+      "scripts/src/domains/nhl/historical-shot-source-bridge.ts",
+      "scripts/src/domains/nhl/historical-shot-type-alignment.ts",
+      "scripts/src/domains/nhl/reviewed-paired-penalty-shot-source.ts",
+      "scripts/src/domains/nhl/reviewed-gs-penalty-source.ts",
+      "scripts/src/domains/nhl/reviewed-report-only-penalty-shot-award.ts",
+      "scripts/src/domains/nhl/historical-penalty-alignment.ts",
+      "scripts/src/domains/nhl/missing-native-shot-source.ts",
+      "scripts/src/integrations/nhl/historical-shot-source.ts",
+      "scripts/src/domains/nhl/game-value-audit.ts",
       "scripts/src/domains/nhl/game-reconciliation.ts",
       "scripts/src/runtime/nhl-shot-quality.ts",
     ].map(async (path) => ({
@@ -79,9 +128,19 @@ else {
   };
   if (canonical.nhl.season !== season || canonical.nhl.gameType !== gameType)
     throw new Error("Canonical source scope differs");
-  const reference = buildNhlRatingInput(canonical.nhl).players.filter(
-    (p) => p.games > 0 && p.minutes > 0,
+  const allReference = await withReviewedOnGoalClassifications(
+    cache,
+    season,
+    withOfficialOnGoalAttempts(
+      withOfficialSkaterGoals(
+        buildNhlRatingInput(canonical.nhl).players,
+        canonical.nhl,
+      ),
+      canonical.nhl,
+    ),
   );
+  const reference = allReference.filter((p) => p.games > 0 && p.minutes > 0);
+  let observedOnGoalAttempts = 0;
   const history = await fetchPenaltyShotHistory(cache, season, gameType);
   const penaltyShotModel = fitPenaltyShotBaseline(history);
   const penaltyShotGames = await fetchSeasonPenaltyShotGames(
@@ -98,6 +157,10 @@ else {
     shots: number;
   }> = [];
   const shiftReviews = [];
+  const unavailableShiftSources: ShiftAvailability[] = [];
+  const reviewedShiftRecoveries: Array<
+    NonNullable<GameSourceBundle["shiftRecovery"]>
+  > = [];
   const seen = new Set<string>();
   for (const entry of schedule) {
     const pbp = await fetchGamePlayByPlay(cache, entry.id);
@@ -109,6 +172,7 @@ else {
     )
       throw new Error(`Penalty-shot reconciliation missing for ${entry.id}`);
     const extracted = extractShotTrainingRows(pbp);
+    observedOnGoalAttempts += countObservedSkaterOnGoalAttempts(pbp);
     for (const row of extracted) {
       const key = `${row.gameId}:${row.eventId}`;
       if (
@@ -142,6 +206,13 @@ else {
     )
       throw new Error("Game schedule identity differs");
     games.push(loaded.game);
+    if (
+      "shiftAvailability" in loaded.sources &&
+      loaded.sources.shiftAvailability
+    )
+      unavailableShiftSources.push(loaded.sources.shiftAvailability);
+    if (loaded.sources.shiftRecovery)
+      reviewedShiftRecoveries.push(loaded.sources.shiftRecovery);
     gameSourceHashes.push({
       gameId: entry.id,
       sha256: hash(JSON.stringify(loaded.sources)),
@@ -155,30 +226,71 @@ else {
         }),
       );
   }
+  // Invoke the exact preview canonical ledgers before authorizing any fitting.
+  // Global exposure can hide one player's surplus behind another's deficit.
+  const officialGoalCoverage = summarizeOfficialGoalCoverage(games, reference);
+  const officialOnGoalCoverage = summarizeOfficialOnGoalCoverage(
+    games,
+    reference,
+  );
   const reconciliation = reconcileSeasonExposure(games, reference);
-  const sum = (key: "gameSeconds" | "usableProcessSeconds" | "officialShots") =>
-    games.reduce((n, g) => n + g[key], 0);
-  const officialSeconds = sum("gameSeconds"),
-    usableSeconds = sum("usableProcessSeconds"),
-    officialShots = sum("officialShots"),
-    verifiedShots = games.reduce((n, g) => n + g.shots.length, 0);
-  const sourceGates = {
-    officialSeasonExposureMatches: reconciliation.matches,
-    completeDownload: games.length === schedule.length,
-    atLeast98PercentProcessExposureVerified:
-      officialSeconds > 0 && usableSeconds / officialSeconds >= 0.98,
-    atLeast98PercentIndividualShotsVerified:
-      officialShots > 0 && verifiedShots / officialShots >= 0.98,
+  const globalSourceCoverage = summarizeOfficialSourceCoverage(
+    games,
+    allReference,
+    canonical.nhl,
+    observedOnGoalAttempts,
+    {
+      officialGames: schedule.length,
+      officialSeasonExposureMatches: reconciliation.matches,
+    },
+  );
+  const { officialSeconds, usableSeconds, officialShots, verifiedShots } =
+    globalSourceCoverage.coverage;
+  const {
+    rawObservedAttempts,
+    officialSkaterOnGoalAttempts,
+    reviewedPrimaryLabelExcess,
+    absentOnGoalAttemptsLowerBound,
+  } = globalSourceCoverage.onGoalAccounting;
+  const sourceGates = globalSourceCoverage.sourceGates;
+  const trainingSupport: ShotTrainingSupport = {
+    version: "nhl-shot-training-support-v1",
+    games: games.map((game, index) => {
+      const official = schedule[index]!,
+        source = gameSourceHashes[index]!,
+        effective = effectiveGameSourceHashes[index]!;
+      if (
+        game.gameId !== official.id ||
+        source.gameId !== official.id ||
+        effective.gameId !== official.id ||
+        game.date !== official.gameDate ||
+        (effective.shots === 0 && (game.eligible || game.shots.length !== 0))
+      )
+        throw new Error(
+          "Training support does not match the official physical source audit",
+        );
+      return {
+        gameId: official.id,
+        date: official.gameDate,
+        sourceSha256: source.sha256,
+        effectivePbpSha256: effective.sha256,
+        trainingRows: effective.shots,
+        disposition:
+          effective.shots > 0 ? "included" : "zero-verified-ordinary-events",
+      };
+    }),
   };
   const rowsObject = {
     season,
     gameType,
     offlineOnly: true,
     completedScheduleGames: schedule.length,
+    completedSchedule: schedule,
     scheduleSha256: hash(JSON.stringify(schedule)),
     penaltyShotReportSha256: hash(JSON.stringify(penaltyShotGames)),
     rowsSha256: hash(JSON.stringify(rows)),
     effectiveGameSourceHashes,
+    trainingSupport,
     rows,
   };
   const rowsText = JSON.stringify(rowsObject, null, 2) + "\n";
@@ -194,14 +306,24 @@ else {
         codeHashes,
         gameSourceHashes,
         sourceGates,
+        officialGoalCoverage,
+        officialOnGoalCoverage,
+        trainingSupport,
         referenceReconciliation: reconciliation,
         coverage: {
           officialSeconds,
           usableSeconds,
           officialShots,
+          rawObservedAttempts,
+          observedOnGoalAttempts,
+          officialSkaterOnGoalAttempts,
+          reviewedPrimaryLabelExcess,
+          absentOnGoalAttemptsLowerBound,
           verifiedShots,
         },
         shiftReviews,
+        ...(unavailableShiftSources.length ? { unavailableShiftSources } : {}),
+        ...(reviewedShiftRecoveries.length ? { reviewedShiftRecoveries } : {}),
         games: games.map((game) => {
           const { penaltyShots: _omittedOutcomes, ...summary } =
             summarizeGameAudit(game);
@@ -228,6 +350,7 @@ else {
     rowsSha256: rowsObject.rowsSha256,
     rowsFileSha256: hash(rowsText),
     scheduleSha256: rowsObject.scheduleSha256,
+    trainingSupport,
     penaltyShotModel,
     penaltyShotHistorySha256: hash(JSON.stringify(history)),
     penaltyShotReportSha256: rowsObject.penaltyShotReportSha256,
@@ -235,6 +358,8 @@ else {
     passesSourceGates: Object.values(sourceGates).every(Boolean),
     sourceAuditSha256: hash(auditText),
     sourcePreparationCodeHashes: codeHashes,
+    ...(unavailableShiftSources.length ? { unavailableShiftSources } : {}),
+    ...(reviewedShiftRecoveries.length ? { reviewedShiftRecoveries } : {}),
   };
   for (const entry of codeHashes)
     if (hash(await readFile(entry.path, "utf8")) !== entry.sha256)

@@ -56,7 +56,8 @@ void test("historical rosters include retired players on their season team and n
   f.put("players", "retired", {
     fullName: "Retired Player",
     isActive: false,
-    posGroup: "D",
+    posGroup: "F",
+    nhlApiId: "8470001",
     nhlTeam: ["WSH"],
     nhlStartYear: "2020",
     nhlExpiryYear: "2020",
@@ -96,6 +97,7 @@ void test("historical rosters include retired players on their season team and n
       page: [
         {
           id: "retired",
+          nhlPlayerId: 8470001,
           playerName: "Retired Player",
           position: "D",
           nhlTeam: ["TOR"],

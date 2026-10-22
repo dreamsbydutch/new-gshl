@@ -6,6 +6,7 @@ import {
   assertDualRatingPreservation,
   canonicalRatingJson,
   prepareDualRatingEntries,
+  selectNhlRatingSeasons,
 } from "../../domains/nhl/dual-ratings";
 import {
   dualRatingDeployment,
@@ -24,6 +25,7 @@ const { values } = parseArgs({
     deployment: { type: "string" },
     output: { type: "string" },
     input: { type: "string" },
+    "season-ids": { type: "string" },
     "identity-review": { type: "string" },
     "reviewed-plan": { type: "string" },
     backup: { type: "string" },
@@ -72,6 +74,9 @@ function validateReconciliation(
     throw Error("Invalid reconciliation response");
 }
 if (values.help) {
+  console.log(
+    "Optional --season-ids <comma-separated canonical season IDs> scopes planning, preflight, apply and verification to those seasons; unknown or duplicate IDs fail closed.",
+  );
   console.log(
     "Usage: reconcile-nhl-season-ratings.ts --target production --deployment polished-tern-709 --output NEW_DIRECTORY [--input SNAPSHOT_JSON] [--identity-review HASH_BOUND_REVIEW_JSON] [--apply --reviewed-plan DRY_RUN_PLAN_JSON --backup INDEPENDENT_BEFORE_JSON]. Defaults to dry-run. Replays GSHL PlayerNHL season scores and associates every existing NHL stat line with the reviewed replacement-based hockey model or an explicit unavailable status. Reviewed source bindings require independent exact-stat fingerprint evidence; they do not repair player identities. Patches only seasonRating and hockeyRating; preserves source stats, overallRating, salary, timestamps, and all nhlSeasonValues. Bounded season reads, 100-row batches, all-batch preflight, optimistic concurrency checks, exact post-read verification. Apply requires the exact reviewed snapshot and independent backup bytes.",
   );
@@ -122,6 +127,8 @@ if (values.help) {
       }
     ).seasons;
   } else seasons = await readDualRatingSeasons();
+  const requestedSeasons = values["season-ids"]?.split(",");
+  seasons = selectNhlRatingSeasons(seasons, requestedSeasons);
   const snapshotText =
     JSON.stringify({ deployment: dualRatingDeployment, seasons }, null, 2) +
     "\n";
@@ -332,7 +339,10 @@ if (values.help) {
   const preflight = await runBatches(false);
   await save("preflight.json", preflight);
   if (values.apply) {
-    const liveBefore = await readDualRatingSeasons();
+    const liveBefore = selectNhlRatingSeasons(
+      await readDualRatingSeasons(),
+      requestedSeasons,
+    );
     const scope = (input: DualRatingSeason[]) =>
       input
         .map((s) => ({
@@ -364,7 +374,10 @@ if (values.help) {
     )
       throw Error("Production associations changed during apply");
     await save("applied.json", applied);
-    const after = await readDualRatingSeasons();
+    const after = selectNhlRatingSeasons(
+      await readDualRatingSeasons(),
+      requestedSeasons,
+    );
     if (
       canonicalRatingJson(
         after.map((s) => s.season).sort((a, b) => a._id.localeCompare(b._id)),

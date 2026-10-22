@@ -10,6 +10,11 @@ import { rankNhlReplacementPreview } from "../../runtime/nhl-overall-rating";
 import type { GameSeasonRating } from "../../runtime/nhl-game-season-value";
 import type { NhlRatingSource } from "./season-rating-input";
 import { validateSeasonValue } from "../../../../convex/nhlSeasonValues";
+import { summarizeOfficialGoalCoverage } from "./official-goal-coverage";
+import {
+  summarizeOfficialOnGoalCoverage,
+  withOfficialOnGoalAttempts,
+} from "./official-on-goal-coverage";
 
 const hash = (text: string) => createHash("sha256").update(text).digest("hex");
 function fixture(teams = 1) {
@@ -163,6 +168,252 @@ function fixture(teams = 1) {
   });
   return { report, overall, audit, proof, input };
 }
+test("fresh goal proof is mandatory for guarded reports and rejects stale bindings or retained ledgers", () => {
+  const f = fixture(),
+    coverage = { ...summarizeOfficialGoalCoverage([], []), games: 10 };
+  f.report.provenance.gameSourcesHash = "7".repeat(64);
+  f.report.officialGoalCoverage = {
+    glm: coverage,
+    gb: structuredClone(coverage),
+  };
+  const base = {
+    ...f.input(),
+    auditText: JSON.stringify({
+      ...f.audit,
+      officialGoalCoverage: f.report.officialGoalCoverage,
+    }),
+  };
+  const proof = {
+    passed: true,
+    season: 20242025,
+    gameType: 2,
+    canonicalSourceSha256: f.report.provenance.canonicalSourceSha256,
+    gameSourcesHash: f.report.provenance.gameSourcesHash,
+    goalCoverage: coverage,
+  };
+  assert.throws(
+    () => prepareHockeyOverallPublication(base),
+    /independent official goal/,
+  );
+  assert.doesNotThrow(() =>
+    prepareHockeyOverallPublication({ ...base, officialGoalProof: proof }),
+  );
+  assert.throws(
+    () =>
+      prepareHockeyOverallPublication({
+        ...base,
+        officialGoalProof: { ...proof, passed: false },
+      }),
+    /independent official goal/,
+  );
+  assert.throws(
+    () =>
+      prepareHockeyOverallPublication({
+        ...base,
+        officialGoalProof: { ...proof, canonicalSourceSha256: "8".repeat(64) },
+      }),
+    /independent official goal/,
+  );
+  assert.throws(
+    () =>
+      prepareHockeyOverallPublication({
+        ...base,
+        officialGoalProof: {
+          ...proof,
+          goalCoverage: { ...coverage, games: 9 },
+        },
+      }),
+    /ledger differs/,
+  );
+  assert.throws(
+    () =>
+      prepareHockeyOverallPublication({
+        ...base,
+        officialGoalProof: proof,
+        auditText: JSON.stringify(f.audit),
+      }),
+    /audit and value report/,
+  );
+});
+
+test("official SOG/SA guarded publication needs fresh matching evidence and cannot hide coverage deficits", () => {
+  const f = fixture(),
+    source = JSON.parse(f.input().sourceText) as { nhl: NhlRatingSource };
+  for (const goalie of source.nhl.goalies) goalie.shotsAgainst = 0;
+  const sourceText = JSON.stringify(source);
+  f.report.provenance.canonicalSourceSha256 = hash(sourceText);
+  f.report.provenance.gameSourcesHash = "7".repeat(64);
+  const goalCoverage = { ...summarizeOfficialGoalCoverage([], []), games: 10 };
+  const onGoalCoverage = {
+    ...summarizeOfficialOnGoalCoverage(
+      [],
+      withOfficialOnGoalAttempts(f.report.gb.ratings, source.nhl),
+    ),
+    games: 10,
+  };
+  f.report.officialGoalCoverage = {
+    glm: goalCoverage,
+    gb: structuredClone(goalCoverage),
+  };
+  f.report.officialOnGoalCoverage = {
+    glm: onGoalCoverage,
+    gb: structuredClone(onGoalCoverage),
+  };
+  const proof = {
+    passed: true,
+    season: 20242025,
+    gameType: 2,
+    canonicalSourceSha256: hash(sourceText),
+    gameSourcesHash: f.report.provenance.gameSourcesHash,
+    goalCoverage,
+    onGoalCoverage,
+    sourceCoverage: {
+      coverage: { ...f.audit.coverage },
+      sourceGates: {
+        officialSeasonExposureMatches:
+          f.report.sourceGates.officialSeasonExposureMatches,
+        completeDownload: f.report.sourceGates.completeDownload,
+        atLeast98PercentProcessExposureVerified:
+          f.report.sourceGates.atLeast98PercentProcessExposureVerified,
+        atLeast98PercentIndividualShotsVerified:
+          f.report.sourceGates.atLeast98PercentIndividualShotsVerified,
+      },
+      onGoalAccounting: {
+        rawObservedAttempts: 1000,
+        officialSkaterOnGoalAttempts: 0,
+        observedSkaterOnGoalAttempts: 0,
+        reviewedPrimaryLabelExcess: 0,
+        absentOnGoalAttemptsLowerBound: 0,
+      },
+    },
+  };
+  const base = {
+    ...f.input(),
+    sourceText,
+    auditText: JSON.stringify({
+      ...f.audit,
+      officialGoalCoverage: f.report.officialGoalCoverage,
+      officialOnGoalCoverage: f.report.officialOnGoalCoverage,
+    }),
+  };
+  assert.doesNotThrow(() =>
+    prepareHockeyOverallPublication({ ...base, officialGoalProof: proof }),
+  );
+  const { sourceCoverage: _globalOmitted, ...individualOnly } = proof;
+  void _globalOmitted;
+  assert.throws(
+    () =>
+      prepareHockeyOverallPublication({
+        ...base,
+        officialGoalProof: individualOnly,
+      }),
+    /Fresh aggregate/,
+  );
+  assert.throws(
+    () =>
+      prepareHockeyOverallPublication({
+        ...base,
+        officialGoalProof: {
+          ...proof,
+          sourceCoverage: {
+            ...proof.sourceCoverage,
+            coverage: {
+              ...proof.sourceCoverage.coverage,
+              officialShots: proof.sourceCoverage.coverage.officialShots + 1,
+            },
+          },
+        },
+      }),
+    /Fresh aggregate/,
+  );
+  assert.throws(
+    () =>
+      prepareHockeyOverallPublication({
+        ...base,
+        officialGoalProof: {
+          ...proof,
+          sourceCoverage: {
+            ...proof.sourceCoverage,
+            sourceGates: {
+              ...proof.sourceCoverage.sourceGates,
+              atLeast98PercentIndividualShotsVerified: false,
+            },
+          },
+        },
+      }),
+    /Fresh aggregate/,
+  );
+  const { onGoalCoverage: _omitted, ...goalOnly } = proof;
+  assert.throws(
+    () =>
+      prepareHockeyOverallPublication({ ...base, officialGoalProof: goalOnly }),
+    /official on-goal coverage proof/,
+  );
+  assert.throws(
+    () =>
+      prepareHockeyOverallPublication({
+        ...base,
+        officialGoalProof: {
+          ...proof,
+          onGoalCoverage: { ...onGoalCoverage, games: 9 },
+        },
+      }),
+    /on-goal ledger differs/,
+  );
+  assert.throws(
+    () =>
+      prepareHockeyOverallPublication({
+        ...base,
+        auditText: JSON.stringify({
+          ...f.audit,
+          officialGoalCoverage: f.report.officialGoalCoverage,
+        }),
+        officialGoalProof: proof,
+      }),
+    /on-goal audit and value report/,
+  );
+  const forged = structuredClone(onGoalCoverage);
+  Object.assign(forged.players[0]!, {
+    officialOnGoalAttempts: 10,
+    observedExpectedOnGoal: 0,
+    verifiedOnGoalAttempts: 0,
+    missingOnGoalAttempts: 10,
+    effectiveExpectedAttempts: 10,
+    individualCoverage: 0,
+  });
+  // Canonical SA agrees with the missing-event ledger; only the retained rated
+  // status/coverage is false. Do not merely exercise a mismatched source total.
+  const deficientSource = structuredClone(source);
+  deficientSource.nhl.goalies[0]!.shotsAgainst = 10;
+  const deficientText = JSON.stringify(deficientSource);
+  const deficientReport = structuredClone(f.report);
+  deficientReport.provenance.canonicalSourceSha256 = hash(deficientText);
+  deficientReport.officialOnGoalCoverage = {
+    glm: forged,
+    gb: structuredClone(forged),
+  };
+  assert.throws(
+    () =>
+      prepareHockeyOverallPublication({
+        ...base,
+        sourceText: deficientText,
+        valueText: JSON.stringify(deficientReport),
+        auditText: JSON.stringify({
+          ...f.audit,
+          provenance: deficientReport.provenance,
+          officialGoalCoverage: deficientReport.officialGoalCoverage,
+          officialOnGoalCoverage: deficientReport.officialOnGoalCoverage,
+        }),
+        officialGoalProof: {
+          ...proof,
+          canonicalSourceSha256: hash(deficientText),
+          onGoalCoverage: forged,
+        },
+      }),
+    /on-goal deficit/,
+  );
+});
+
 test("publishes exact signed annual values/global rank with separate ability and no display score", () => {
   const f = fixture();
   f.report.gb.ratings[0].warnings = [

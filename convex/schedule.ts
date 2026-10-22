@@ -1,3 +1,7 @@
+import {
+  isFantasySeason,
+  selectSeasonScope,
+} from "../src/lib/utils/domain/season-scope";
 import { v } from "convex/values";
 import type { QueryCtx } from "./_generated/server";
 import { mutation, query } from "./_generated/server";
@@ -134,7 +138,7 @@ export const builderSeasons = query({
   args: {},
   handler: async (ctx) => {
     await requireCommissioner(ctx);
-    const seasons = await ctx.db.query("seasons").collect();
+    const seasons = selectSeasonScope(await ctx.db.query("seasons").collect());
     return [...seasons]
       .sort(
         (a, b) =>
@@ -150,8 +154,9 @@ export const builderContext = query({
   handler: async (ctx, { seasonId }) => {
     await requireCommissioner(ctx);
     const target = await ctx.db.get(seasonId);
-    if (!target) throw new Error("Season not found.");
-    const seasons = await ctx.db.query("seasons").collect();
+    if (!target || !isFantasySeason(target))
+      throw new Error("Fantasy season not found.");
+    const seasons = selectSeasonScope(await ctx.db.query("seasons").collect());
     const targetStart = toUtcTimestamp(target.startDate);
     if (targetStart === null)
       throw new Error("Set the season start date before building a schedule.");

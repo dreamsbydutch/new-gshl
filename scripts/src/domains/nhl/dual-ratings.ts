@@ -5,6 +5,27 @@ import type {
 } from "../../integrations/nhl/dual-ratings";
 import type { DatabaseRecord } from "../../integrations/data/records";
 
+/** An explicit NHL backfill must never broaden into unrelated season ratings. */
+export function selectNhlRatingSeasons<T extends DualRatingSeason>(
+  seasons: readonly T[],
+  requestedIds?: readonly string[],
+): T[] {
+  const available = new Set(seasons.map((entry) => entry.season._id));
+  if (available.size !== seasons.length)
+    throw Error("Duplicate NHL rating season inventory");
+  if (requestedIds === undefined) return [...seasons];
+  if (
+    !requestedIds.length ||
+    new Set(requestedIds).size !== requestedIds.length ||
+    requestedIds.some((id) => !id || id.trim() !== id || !available.has(id))
+  )
+    throw Error(
+      "Explicit NHL rating seasons are missing, invalid or duplicated",
+    );
+  const wanted = new Set(requestedIds);
+  return seasons.filter((entry) => wanted.has(entry.season._id));
+}
+
 export function canonicalRatingJson(value: unknown): string {
   const normalize = (item: unknown): unknown => {
     if (Array.isArray(item)) return item.map(normalize);

@@ -79,7 +79,13 @@ export function verifyDualRatingSourceFingerprint(
     const seconds = goalie ? row.timeOnIce : toi.get(Number(row.playerId));
     return (
       typeof seconds === "number" &&
-      Number(stat.TOI) === Math.round((seconds / 60) * 100) / 100
+      stat.TOI !== null &&
+      stat.TOI !== undefined &&
+      String(stat.TOI).trim() !== "" &&
+      Number.isFinite(Number(stat.TOI)) &&
+      // Native NHL snapshots retain exact seconds expressed as minutes; legacy
+      // rows may store two decimal minutes. Compare at that shared precision.
+      Math.round(Number(stat.TOI) * 100) === Math.round((seconds / 60) * 100)
     );
   };
   const candidates = (

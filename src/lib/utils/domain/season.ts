@@ -7,6 +7,7 @@ import type {
 } from "@gshl-types";
 import { coerceDate, getSeasonString } from "../core/date";
 import { formatRecord } from "../core/format";
+import { isFantasySeason, selectSeasonScope } from "./season-scope";
 
 type SeasonDateInput = Date | string | number | null | undefined;
 
@@ -110,6 +111,7 @@ function findSeasonByTiming(
   options: FindSeasonByTimingOptions,
 ): Season | undefined {
   if (!seasons?.length) return undefined;
+  seasons = selectSeasonScope(seasons);
 
   const {
     dateField = "startDate",
@@ -150,6 +152,8 @@ function resolveSeason(
   options: ResolveSeasonOptions = {},
 ): Season | undefined {
   if (!seasons?.length) return undefined;
+  seasons = selectSeasonScope(seasons);
+  if (!seasons.length) return undefined;
 
   const { referenceDate = new Date(), strategy = "default" } = options;
   const currentSeason = findSeasonByTiming(seasons, {
@@ -288,6 +292,7 @@ export function findMockDraftSeason(
   }).format(referenceDate);
   if (!endedAt || today <= endedAt.toISOString().slice(0, 10)) return undefined;
   const upcomingSeason = [...(seasons ?? [])]
+    .filter(isFantasySeason)
     .filter((season) => Number(season.year) > Number(latestSeason.year))
     .sort((a, b) => Number(a.year) - Number(b.year))[0];
   const draftStart = coerceDate({ value: upcomingSeason?.draftStartAt });
@@ -444,7 +449,8 @@ export function findSeasonById(
   const target = String(seasonId);
   return seasons.find(
     (season) =>
-      String(season.id) === target || String(season.legacyId ?? "") === target,
+      (isFantasySeason(season) && String(season.id) === target) ||
+      String(season.legacyId ?? "") === target,
   );
 }
 
@@ -535,6 +541,7 @@ export function isSeasonPickable(
   season: Season,
   referenceDate: Date = new Date(),
 ): boolean {
+  if (!isFantasySeason(season)) return false;
   const identifiers = [season.id, season.legacyId]
     .filter((identifier): identifier is string => identifier != null)
     .map((identifier) => identifier.trim())

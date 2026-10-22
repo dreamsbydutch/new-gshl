@@ -7,6 +7,11 @@ import {
 import { type nhlStatLineHockeyRating } from "./lib/nhlSeasonValueFields";
 import { validateSeasonValue } from "./nhlSeasonValues";
 
+import {
+  planOfficialNhlIdentity,
+  planHistoricalNhlIdentityBatch,
+} from "./lib/nhlIdentity";
+
 const MODEL = "nhl-hockey-overall-reviewed-v1";
 type Row = Record<string, unknown>;
 const playerFields = v.object(nightlyPlayerFields);
@@ -50,40 +55,12 @@ const officialIdentity = v.object({
   sourceFetchedAt: v.number(),
   sourceSha256: v.string(),
 });
-function normalizeIdentityName(value: string) {
-  return value
-    .normalize("NFKD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]/g, "");
-}
-function birthDay(value: unknown): string | null {
-  if (typeof value !== "string" && typeof value !== "number") return null;
-  if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
-    const timestamp = Date.parse(`${value}T00:00:00.000Z`);
-    return Number.isFinite(timestamp) &&
-      new Date(timestamp).toISOString().slice(0, 10) === value
-      ? value
-      : null;
-  }
-  const timestamp =
-    typeof value === "number"
-      ? value
-      : /^\d+$/.test(value)
-        ? Number(value)
-        : Date.parse(value);
-  return Number.isFinite(timestamp) &&
-    timestamp >= -2208988800000 &&
-    timestamp <= Date.now()
-    ? new Date(timestamp).toISOString().slice(0, 10)
-    : null;
-}
-
 /** Official-ID provisioning for NHL debutants. A name alone can never merge people. */
 export const provisionIdentity = mutation({
   args: {
     serverSecret: v.string(),
     official: officialIdentity,
+    historicalSeasonId: v.optional(v.id("seasons")),
     expectedPlayerPopulation: v.array(
       v.object({
         _id: v.id("players"),
@@ -94,53 +71,17 @@ export const provisionIdentity = mutation({
   },
   handler: async (ctx, args) => {
     authorize(args.serverSecret);
-    const bio = args.official;
-    if (
-      Object.keys(bio).some(
-        (key) =>
-          ![
-            "nhlPlayerId",
-            "firstName",
-            "lastName",
-            "birthDate",
-            "position",
-            "sourceUrl",
-            "sourceFetchedAt",
-            "sourceSha256",
-          ].includes(key),
-      ) ||
-      !Number.isSafeInteger(bio.nhlPlayerId) ||
-      bio.nhlPlayerId <= 0 ||
-      bio.sourceUrl !==
-        `https://api-web.nhle.com/v1/player/${bio.nhlPlayerId}/landing` ||
-      !Number.isSafeInteger(bio.sourceFetchedAt) ||
-      bio.sourceFetchedAt <= 0 ||
-      bio.sourceFetchedAt > Date.now() + 300000 ||
-      !/^[a-f0-9]{64}$/.test(bio.sourceSha256)
-    )
-      throw Error("Invalid official NHL identity provenance");
-    for (const name of [bio.firstName, bio.lastName])
+    if (args.historicalSeasonId !== undefined) {
+      const season = await ctx.db.get(args.historicalSeasonId);
+      const year = Number(season?.year);
       if (
-        !name.trim() ||
-        name !== name.trim() ||
-        name.length > 100 ||
-        /[\u0000-\u001f\u007f]/.test(name) ||
-        !normalizeIdentityName(name)
+        season?.nhlOnly !== true ||
+        !Number.isInteger(year) ||
+        year < 2009 ||
+        year > 2013
       )
-        throw Error("Invalid official NHL player name");
-    const date = birthDay(bio.birthDate);
-    const birth = Date.parse(`${bio.birthDate}T00:00:00.000Z`);
-    const ageYears = (Date.now() - birth) / (365.2425 * 86400000);
-    if (
-      !/^\d{4}-\d{2}-\d{2}$/.test(bio.birthDate) ||
-      date !== bio.birthDate ||
-      !Number.isFinite(ageYears) ||
-      ageYears < 15 ||
-      ageYears > 100
-    )
-      throw Error("Invalid official NHL birth date");
-    if (!["C", "L", "R", "LW", "RW", "D", "G"].includes(bio.position))
-      throw Error("Invalid official NHL role");
+        throw Error("Historical identity requires a 2008–13 NHL-only season");
+    }
     const players = await ctx.db.query("players").take(5001);
     const minimal = players.map((player) => ({
       _id: player._id,
@@ -152,77 +93,103 @@ export const provisionIdentity = mutation({
       population(minimal) !== population(args.expectedPlayerPopulation)
     )
       throw Error("Canonical NHL identity population snapshot changed");
-    const token = String(bio.nhlPlayerId),
-      assigned = players.filter((player) => player.nhlApiId === token);
-    if (assigned.length > 1)
-      throw Error("Ambiguous assigned NHL player identity");
-    if (assigned.length === 1)
+    const plan = planOfficialNhlIdentity(
+      args.official,
+      players,
+      args.historicalSeasonId !== undefined,
+    );
+    if (plan.action === "existing")
       return {
-        action: "existing" as const,
-        playerId: assigned[0]!._id,
-        player: { _id: assigned[0]!._id, nhlApiId: token },
+        action: plan.action,
+        playerId: plan.playerId,
+        player: { _id: plan.playerId, nhlApiId: plan.token },
         apply: args.apply ?? false,
       };
-    const fullName = `${bio.firstName} ${bio.lastName}`,
-      normalized = normalizeIdentityName(fullName);
-    const names = players.filter(
-      (player) => normalizeIdentityName(player.fullName) === normalized,
-    );
-    if (names.length > 1)
-      throw Error(
-        "Ambiguous normalized NHL player name requires identity review",
-      );
-    const posGroup =
-      bio.position === "G" ? "G" : bio.position === "D" ? "D" : "F";
-    const candidate = names[0];
-    if (candidate) {
-      if (
-        (candidate.nhlApiId !== undefined &&
-          candidate.nhlApiId !== null &&
-          candidate.nhlApiId !== "") ||
-        birthDay(candidate.birthday) !== date ||
-        candidate.posGroup !== posGroup
-      )
-        throw Error(
-          "Existing name requires independent exact birth date and role identity review",
-        );
-      if (args.apply) await ctx.db.patch(candidate._id, { nhlApiId: token });
+    if (plan.action === "link") {
+      if (args.apply)
+        await ctx.db.patch(plan.playerId as (typeof players)[number]["_id"], {
+          nhlApiId: plan.token,
+        });
       return {
-        action: "link" as const,
-        playerId: candidate._id,
+        action: plan.action,
+        playerId: plan.playerId,
         player: {
-          _id: candidate._id,
-          nhlApiId: args.apply ? token : (candidate.nhlApiId ?? null),
+          _id: plan.playerId,
+          nhlApiId: args.apply ? plan.token : plan.previousNhlApiId,
         },
         apply: args.apply ?? false,
       };
     }
-    const document = {
-      nhlApiId: token,
-      firstName: bio.firstName,
-      lastName: bio.lastName,
-      fullName,
-      birthday: birth,
-      posGroup,
-      nhlPos: [
-        bio.position === "L"
-          ? "LW"
-          : bio.position === "R"
-            ? "RW"
-            : bio.position,
-      ],
-      isActive: true,
-      isSignable: false,
-      isResignable: false,
-    };
     const playerId = args.apply
-      ? await ctx.db.insert("players", document)
+      ? await ctx.db.insert("players", plan.document)
       : null;
     return {
-      action: "create" as const,
+      action: plan.action,
       playerId,
-      player: playerId ? { _id: playerId, nhlApiId: token } : null,
+      player: playerId ? { _id: playerId, nhlApiId: plan.token } : null,
       apply: args.apply ?? false,
+    };
+  },
+});
+/** Historical-only bounded transaction: one population read/CAS, all decisions before writes. */
+export const provisionHistoricalIdentities = mutation({
+  args: {
+    serverSecret: v.string(),
+    historicalSeasonId: v.id("seasons"),
+    officials: v.array(officialIdentity),
+    expectedPlayerPopulation: v.array(
+      v.object({
+        _id: v.id("players"),
+        nhlApiId: v.optional(v.union(v.string(), v.null())),
+      }),
+    ),
+    apply: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args) => {
+    authorize(args.serverSecret);
+    const season = await ctx.db.get(args.historicalSeasonId),
+      year = Number(season?.year);
+    if (
+      season?.nhlOnly !== true ||
+      !Number.isInteger(year) ||
+      year < 2009 ||
+      year > 2013
+    )
+      throw Error("Historical identity requires a 2008–13 NHL-only season");
+    const players = await ctx.db.query("players").take(5001);
+    const minimal = players.map((p) => ({
+      _id: p._id,
+      ...(p.nhlApiId === undefined ? {} : { nhlApiId: p.nhlApiId }),
+    }));
+    if (
+      players.length > 5000 ||
+      args.expectedPlayerPopulation.length > 5000 ||
+      population(minimal) !== population(args.expectedPlayerPopulation)
+    )
+      throw Error("Canonical NHL identity population snapshot changed");
+    const plans = planHistoricalNhlIdentityBatch(args.officials, players);
+    const rows = [];
+    for (const plan of plans) {
+      let playerId = plan.playerId;
+      if (args.apply && plan.action === "create")
+        playerId = await ctx.db.insert("players", plan.document);
+      else if (args.apply && plan.action === "link")
+        await ctx.db.patch(plan.playerId as (typeof players)[number]["_id"], {
+          nhlApiId: plan.token,
+        });
+      rows.push({
+        nhlPlayerId: plan.nhlPlayerId,
+        action: plan.action,
+        playerId,
+      });
+    }
+    return {
+      apply: args.apply ?? false,
+      matched: plans.length,
+      created: plans.filter((p) => p.action === "create").length,
+      linked: plans.filter((p) => p.action === "link").length,
+      existing: plans.filter((p) => p.action === "existing").length,
+      rows,
     };
   },
 });

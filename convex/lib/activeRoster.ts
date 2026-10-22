@@ -1,3 +1,4 @@
+import { selectSeasonScope } from "../../src/lib/utils/domain/season-scope";
 import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
 import { utcTimestampToDateKey } from "./timestamps";
@@ -128,7 +129,9 @@ export async function refreshActiveRoster(
   request: { apply: boolean; seasonId?: string; now: number },
 ) {
   const today = utcTimestampToDateKey(request.now)!;
-  const seasons = bounded(await ctx.db.query("seasons").take(MAX_ROWS + 1));
+  const seasons = selectSeasonScope(
+    bounded(await ctx.db.query("seasons").take(MAX_ROWS + 1)),
+  );
   const season = selectRosterSeason(seasons, today);
   if (
     request.seasonId &&
@@ -231,7 +234,11 @@ export async function refreshActiveRoster(
         .collect();
       for (const listing of listings)
         if (listing.ownerId !== ownerId) await ctx.db.delete(listing._id);
-      await ctx.db.patch(playerId, { ownerId, ...patch, updatedAt: request.now });
+      await ctx.db.patch(playerId, {
+        ownerId,
+        ...patch,
+        updatedAt: request.now,
+      });
     }
   }
   return {

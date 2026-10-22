@@ -20,6 +20,13 @@ sidecar. See [ranking behavior](../docs/RANKING.md#uniform-gshl-category-contrib
 
 ## Convex operational jobs
 
+`src/commands/stats/backfill-historical-nhl-stats.ts` imports the five frozen
+2008–13 NHL native cohorts. Its explicit metadata, offline identity-freeze,
+identity and native phases retain source evidence and require reviewed plans
+and independent backup readback before apply. Run `--help` for phase flags.
+It never fetches replacement sources during import or recalculates holistic NHL
+values; those use the separate reviewed hockey-value pipeline.
+
 Commissioners now start and monitor managed runs from **League Office → Jobs**.
 Runs default to dry-run mode; selecting **Apply changes** is required for a
 write-capable run. Production schedules should remain disabled until dry-run
@@ -159,6 +166,26 @@ season-to-date snapshots, failed calculations and future seasons remain distinct
 Existing reviewed artifacts can be reused only after their sources, inference
 and annual-reference calculation reproduce. The builder never writes Convex.
 
+`src/commands/ratings/review-unavailable-nhl-shifts.ts` reviews retained,
+unusable official shift reports for explicitly supported historical games.
+It replays source hashes, parser failures and independent API absence offline;
+an exact reviewed plan can add immutable local-cache proofs. Unverified exposure
+remains unknown, verified individual shots remain usable, and the normal coverage
+requirements still apply. It does not fetch sources, fit models or access Convex.
+
+`src/commands/ratings/review-boundary-nhl-shifts.ts` reviews explicit historical
+clock corrections against every official period and game ice-time total. Its
+immutable local proofs retain the original reports and unaffected side's shifts;
+each use replays their source hashes and complete reconciliation. It defaults to
+an offline dry run and does not access Convex.
+
+Collect penalty-shot interpretation before binding shift or on-goal proofs to
+the effective play-by-play. A later verified label changes that hash even when
+the physical attempts and recovered shifts stay identical. Preserve the earlier
+proof and review a new binding; never overwrite a certificate to hide the change.
+Source preparation runs the existing individual goal and on-goal conservation
+checks before fitting, alongside the unchanged aggregate coverage gates.
+
 `src/commands/ratings/publish-nhl-hockey-overall.ts` independently verifies a
 build summary before preparing the additive production model
 `nhl-hockey-overall-reviewed-v1`. It requires an explicit production target and
@@ -169,6 +196,18 @@ retains separate ability, component, coverage and depth-sensitivity details.
 Old v1/v3 records, finalized seasons and GSHL category ratings are preserved.
 Consult both commands' `--help` and the
 [fixed production policy](../docs/product/nhl-hockey-overall-production-policy.md).
+Publication also reconstructs verified goal credit from the report's retained
+offline cache and compares it with canonical official goals. Older value reports
+without this source audit must be regenerated before publication; archived
+published snapshots remain preserved.
+
+`src/commands/ratings/upgrade-reviewed-nhl-2019.ts` is the separately reviewed
+replacement workflow for the five explicitly supported historical source cohorts.
+Despite its original filename, its help lists all supported seasons. It verifies
+native model reproduction and a complete independently backed-up preimage, then
+uses an exact-season atomic comparison before replacing reviewed values and
+existing native rating associations together. It preserves native statistics,
+GSHL category scores, salaries and legacy models; it never inserts or deletes rows.
 
 `src/commands/ratings/rollout-nhl-hockey-overall.ts` watches an explicitly pinned
 season inventory and existing ready checkpoints for a finite, resumable rollout.

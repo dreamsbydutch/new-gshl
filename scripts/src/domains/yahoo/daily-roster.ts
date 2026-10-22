@@ -63,7 +63,8 @@ export function parseDailyYahooRoster(
       anchor.attr("data-ys-playerid") ??
       /\/players\/(\d+)/.exec(anchor.attr("href") ?? "")?.[1] ??
       "";
-    const playerName = anchor.text().trim();
+    // Yahoo shortens long visible names but retains the full name in the title.
+    const playerName = anchor.attr("title")?.trim() || anchor.text().trim();
     const dailyPos = extractYahooLineupSlotFromCell(
       row.children("td").first().html() ?? "",
     );

@@ -49,6 +49,19 @@ export async function createNightlyNhlClient() {
         action: "existing" | "create" | "link";
         playerId: string | null;
       },
+    provisionHistoricalIdentities: async (args: Record<string, unknown>) =>
+      (await call("nightlyNhlStats:provisionHistoricalIdentities", args)) as {
+        apply: boolean;
+        matched: number;
+        created: number;
+        linked: number;
+        existing: number;
+        rows: {
+          nhlPlayerId: number;
+          action: "existing" | "create" | "link";
+          playerId: string | null;
+        }[];
+      },
     snapshot: async (seasonId: string) =>
       (await call("nightlyNhlStats:snapshot", {
         seasonId,

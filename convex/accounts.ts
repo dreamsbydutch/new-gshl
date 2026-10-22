@@ -1,3 +1,4 @@
+import { selectSeasonScope } from "../src/lib/utils/domain/season-scope";
 import { paginationOptsValidator } from "convex/server";
 import { v } from "convex/values";
 import {
@@ -84,11 +85,12 @@ export const overview = query({
   args: {},
   handler: async (ctx) => {
     await requireCommissioner(ctx);
-    const [owners, seasons] = await Promise.all([
+    const [owners, seasonRows] = await Promise.all([
       ctx.db.query("owners").take(1001),
       ctx.db.query("seasons").take(201),
     ]);
-    if (owners.length > 1000 || seasons.length > 200)
+    const seasons = selectSeasonScope(seasonRows);
+    if (owners.length > 1000 || seasonRows.length > 200)
       throw new Error(
         "Accounts overview exceeds its supported owner or season limit",
       );

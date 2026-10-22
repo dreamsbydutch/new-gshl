@@ -53,17 +53,6 @@ export * from "./enums";
  */
 export * from "./ui-components";
 
-// ============================================================================
-// DATA TRANSFORMATION TYPES
-// ============================================================================
-
-/**
- * Transformed versions of database models for application use
- * - Aliases and modified versions of core database types
- * - Application data representations
- * - Ensures type safety during data transformation processes
- */
-export * from "./transforms";
 export * from "./ufa";
 
 // ============================================================================

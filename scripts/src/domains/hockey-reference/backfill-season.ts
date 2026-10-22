@@ -990,7 +990,9 @@ async function parseOptions(args: string[]): Promise<BackfillOptions> {
     ...parseCsvList(getArgValue(args, "--season-id")),
     ...parseCsvList(getArgValue(args, "--season-ids")),
   ];
-  const seasons = (await fetchModel("Season")) as unknown as Season[];
+  const seasons = (await fetchModel("Season", {
+    includeNhlOnly: true,
+  })) as unknown as Season[];
   const resolvedSeasonIds = seasonIds.length
     ? Array.from(new Set(seasonIds))
     : seasons
@@ -1169,7 +1171,9 @@ export async function refreshPlayerNhlSeason(
   seasonId: string,
   options: { apply: boolean; logToConsole: boolean; yearOverride?: string },
 ): Promise<SeasonExecutionSummary> {
-  const seasons = (await fetchModel("Season")) as unknown as Season[];
+  const seasons = (await fetchModel("Season", {
+    includeNhlOnly: true,
+  })) as unknown as Season[];
   const players = (await fetchModel("Player")) as unknown as Player[];
   const existingStatLines = (await fetchPlayerNhlSeason(
     seasonId,
@@ -1193,7 +1197,9 @@ export async function refreshPlayerNhlSeason(
 
 export async function runHockeyReferenceBackfillCli(): Promise<void> {
   const options = await parseOptions(process.argv.slice(2));
-  const seasons = (await fetchModel("Season")) as unknown as Season[];
+  const seasons = (await fetchModel("Season", {
+    includeNhlOnly: true,
+  })) as unknown as Season[];
   const players = (await fetchModel("Player")) as unknown as Player[];
 
   log(
