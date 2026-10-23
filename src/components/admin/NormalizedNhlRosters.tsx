@@ -102,6 +102,32 @@ function RosterContent() {
           Historical contribution
         </Button>
       </div>
+      {view.mode === "current" && (
+        <div
+          role="group"
+          aria-label="Projected team rating basis"
+          className="flex flex-wrap gap-2"
+        >
+          <Button
+            variant={
+              view.projectionBasis === "conditional" ? "default" : "outline"
+            }
+            aria-pressed={view.projectionBasis === "conditional"}
+            onClick={() => view.setProjectionBasis("conditional")}
+          >
+            Talent when playing
+          </Button>
+          <Button
+            variant={
+              view.projectionBasis === "expected" ? "default" : "outline"
+            }
+            aria-pressed={view.projectionBasis === "expected"}
+            onClick={() => view.setProjectionBasis("expected")}
+          >
+            Expected season output
+          </Button>
+        </div>
+      )}
       <label className="block text-sm">
         <span className="mb-1 block font-medium">NHL season</span>
         <select

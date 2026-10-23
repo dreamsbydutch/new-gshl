@@ -170,6 +170,7 @@ export const rosterPage = query({
   args: {
     paginationOpts: paginationOptsValidator,
     seasonStartYear: v.number(),
+    includeContracts: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     await requireActiveUser(ctx);
@@ -189,14 +190,25 @@ export const rosterPage = query({
     const page = await Promise.all(
       result.page
         .filter((player) => player.nhlTeam?.some((team) => team.trim()))
-        .map((player) =>
-          rosterPlayer(
-            ctx,
-            player,
-            args.seasonStartYear,
-            player.nhlTeam ?? [],
-            true,
-          ),
+        .map(async (player) =>
+          args.includeContracts === false
+            ? {
+                id: player._id,
+                nhlPlayerId: nhlContractPlayerId(player.nhlApiId),
+                playerName: player.fullName,
+                position: player.posGroup,
+                nhlTeam: player.nhlTeam ?? [],
+                contracts: [],
+                currentProfileContract: null,
+                historyTruncated: false,
+              }
+            : rosterPlayer(
+                ctx,
+                player,
+                args.seasonStartYear,
+                player.nhlTeam ?? [],
+                true,
+              ),
         ),
     );
     return { ...result, page };

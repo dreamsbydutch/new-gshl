@@ -1,12 +1,21 @@
 "use client";
 
-import { Component, type ReactNode } from "react";
+import { Component, useState, type ReactNode } from "react";
+import dynamic from "next/dynamic";
 import { Button } from "@gshl-ui";
 import { useNhlPlayerGarRankings } from "../../hooks/features/useNhlPlayerGarRankings";
 
 const season = (year: number) => `${year}–${String(year + 1).slice(-2)}`;
 const score = (value: number | null) =>
   value === null ? "—" : `${value > 0 ? "+" : ""}${value.toFixed(2)}`;
+
+const ProjectedTalent = dynamic(
+  () =>
+    import("./NhlProjectedTalentRankings").then(
+      (m) => m.NhlProjectedTalentRankings,
+    ),
+  { loading: () => <p role="status">Loading talent model…</p> },
+);
 
 class PlayerGarBoundary extends Component<
   { children: ReactNode },
@@ -36,9 +45,32 @@ class PlayerGarBoundary extends Component<
 }
 
 export function NhlPlayerGarRankings() {
+  const [basis, setBasis] = useState<"recorded" | "talent">("recorded");
   return (
     <PlayerGarBoundary>
-      <PlayerGarTable />
+      <div className="space-y-5">
+        <div
+          role="group"
+          aria-label="Player rating basis"
+          className="flex flex-wrap gap-2"
+        >
+          <Button
+            variant={basis === "recorded" ? "default" : "outline"}
+            aria-pressed={basis === "recorded"}
+            onClick={() => setBasis("recorded")}
+          >
+            Recorded contribution
+          </Button>
+          <Button
+            variant={basis === "talent" ? "default" : "outline"}
+            aria-pressed={basis === "talent"}
+            onClick={() => setBasis("talent")}
+          >
+            Projected talent
+          </Button>
+        </div>
+        {basis === "recorded" ? <PlayerGarTable /> : <ProjectedTalent />}
+      </div>
     </PlayerGarBoundary>
   );
 }
@@ -48,11 +80,11 @@ function PlayerGarTable() {
   return (
     <section className="mx-auto max-w-7xl space-y-5">
       <div>
-        <h2 className="text-2xl font-bold">NHL player GAR</h2>
+        <h2 className="text-2xl font-bold">Recorded NHL player GAR</h2>
         <p className="mt-2 text-sm text-muted-foreground">
-          Total season contribution in goals above replacement. Forwards,
-          defensemen, and goalies share the same scale. Zero is replacement
-          level; players without a qualified rating remain unrated.
+          Recorded season contribution estimated in goals above replacement.
+          Forwards, defensemen, and goalies share the same scale. Zero is
+          replacement level; players without a qualified rating remain unrated.
         </p>
       </div>
       <div className="flex flex-wrap items-end gap-3">
@@ -118,17 +150,20 @@ function PlayerGarTable() {
               </caption>
               <thead className="bg-muted">
                 <tr>
-                  {["Rank", "Player", "Pos", "Team", "GP", "GAR", "GAR/82"].map(
-                    (label) => (
-                      <th
-                        key={label}
-                        scope="col"
-                        className="px-4 py-3 text-left"
-                      >
-                        {label}
-                      </th>
-                    ),
-                  )}
+                  {[
+                    "Rank",
+                    "Player",
+                    "Pos",
+                    "Team",
+                    "GP",
+                    "GAR",
+                    "Observed GAR/60",
+                    "GAR/82",
+                  ].map((label) => (
+                    <th key={label} scope="col" className="px-4 py-3 text-left">
+                      {label}
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
@@ -149,6 +184,9 @@ function PlayerGarTable() {
                       {score(row.goalsAboveReplacement)}
                     </td>
                     <td className="px-4 py-3 tabular-nums">
+                      {score(row.gar60)}
+                    </td>
+                    <td className="px-4 py-3 tabular-nums">
                       {score(row.gar82)}
                     </td>
                   </tr>
@@ -156,7 +194,7 @@ function PlayerGarTable() {
                 {!view.rows.length && (
                   <tr>
                     <td
-                      colSpan={7}
+                      colSpan={8}
                       className="p-6 text-center text-muted-foreground"
                     >
                       No players match these filters.

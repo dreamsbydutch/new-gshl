@@ -665,6 +665,13 @@ it has no network access or production writes and never replaces the shipped
 reference automatically. Use command help for its required input/output options.
 See [contract talent method and coverage](../docs/product/nhl-contract-talent.md).
 
+`src/commands/ratings/fit-nhl-conditional-talent.ts` fits the separate GAR/60
+playing-talent reference from the same verified complete-cohort input shape.
+It writes a new artifact and chronological validation rows, preserves unknown
+outcomes, and never publishes or replaces a shipped reference. Its help output
+owns the current input, ending-year cutoff, and output flags. This rate model
+does not refit or overwrite annual expected-contribution forecasts.
+
 #### Compare salary-rating upgrades with the current talent formula
 
 `src/commands/ratings/test-salary-rating-upgrades.ts` reuses the category experiment's

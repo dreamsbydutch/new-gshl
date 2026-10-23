@@ -9,8 +9,15 @@ import {
   predictNhlContractTalent,
 } from "../../lib/utils/domain/nhl-contract-talent-forecast";
 import forecastJson from "../../lib/data/nhl-contract-talent-forecast.json";
+import conditionalJson from "../../lib/data/nhl-conditional-talent.json";
+import {
+  parseConditionalNhlTalentArtifact,
+  predictConditionalNhlTalent,
+} from "../../lib/utils/domain/nhl-conditional-talent";
+import { rankConditionalNhlRosterTalent } from "../../lib/utils/domain/nhl-conditional-roster-talent";
 
 const forecast = parseNhlTalentForecastArtifact(forecastJson);
+const conditional = parseConditionalNhlTalentArtifact(conditionalJson);
 
 export function useNormalizedNhlRosters() {
   const [seasonStartYear, setSeasonStartYear] = useState(() => {
@@ -18,6 +25,9 @@ export function useNormalizedNhlRosters() {
     return now.getUTCFullYear() - (now.getUTCMonth() < 6 ? 1 : 0);
   });
   const [search, setSearch] = useState("");
+  const [projectionBasis, setProjectionBasis] = useState<
+    "conditional" | "expected"
+  >("conditional");
   const data = useNhlRosterAnalytics(seasonStartYear);
   const teams = useMemo(() => {
     const caps: Record<number, number> = { ...data.caps?.defaults };
@@ -92,6 +102,44 @@ export function useNormalizedNhlRosters() {
     data.talentPopulation,
     seasonStartYear,
   ]);
+  const conditionalTeams = useMemo(() => {
+    if (
+      seasonStartYear !== data.currentYear ||
+      seasonStartYear !== conditional.cutoffYear
+    )
+      return [];
+    const identities = new Map(
+      data.players.map((player) => [player.id, player.nhlPlayerId]),
+    );
+    return rankConditionalNhlRosterTalent(
+      teams
+        .filter((team) => team.id !== "unassigned")
+        .map((team) => ({
+          id: team.id,
+          name: team.name,
+          abbr: team.abbr,
+          roster: team.roster.map((player) => {
+            const nhlPlayerId = identities.get(player.id) ?? null;
+            const prediction = nhlPlayerId
+              ? predictConditionalNhlTalent(
+                  conditional,
+                  nhlPlayerId,
+                  seasonStartYear + 1,
+                )
+              : null;
+            const matches = prediction?.position === player.position;
+            return {
+              id: player.id,
+              nhlPlayerId,
+              playerName: player.playerName,
+              position: player.position,
+              ratePer60: matches ? prediction.ratePer60 : null,
+              status: matches ? prediction.status : ("unavailable" as const),
+            };
+          }),
+        })),
+    );
+  }, [teams, data.players, data.currentYear, seasonStartYear]);
   const term = search.trim().toLowerCase();
   const matchingTeams = new Set(
     teams
@@ -129,11 +177,19 @@ export function useNormalizedNhlRosters() {
     setSearch,
     isLoading: data.isLoading,
     loaded: data.players.length,
-    talentTeams: talentTeams.filter((team) => matchingTeams.has(team.id)),
+    projectionBasis,
+    setProjectionBasis,
+    talentTeams: (seasonStartYear === data.currentYear &&
+    projectionBasis === "conditional"
+      ? conditionalTeams
+      : talentTeams
+    ).filter((team) => matchingTeams.has(team.id)),
     talentBasis:
       seasonStartYear < data.currentYear
         ? ("historical" as const)
-        : ("projected" as const),
+        : projectionBasis === "conditional"
+          ? ("conditional" as const)
+          : ("projected" as const),
     talentNeedsRefresh:
       seasonStartYear === data.currentYear &&
       seasonStartYear !== forecast.cutoffYear,

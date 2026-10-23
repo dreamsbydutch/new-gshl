@@ -253,3 +253,48 @@ void test("active owners can browse NHL analytics but cannot edit salary caps", 
     /forbidden/i,
   );
 });
+
+void test("talent-only roster pages return bounded identity metadata without contract payloads", async () => {
+  const f = mutationFixture();
+  f.put("authUsers", "owner", { role: "owner", status: "active" });
+  for (let i = 0; i < 60; i++)
+    f.put("players", `player${i}`, {
+      fullName: `Player ${i}`,
+      nhlApiId: String(8470000 + i),
+      posGroup: "F",
+      nhlTeam: ["FLA"],
+      isActive: true,
+    });
+  f.signIn(null);
+  await assert.rejects(
+    invokeMutation(rosterPage, f.ctx, {
+      seasonStartYear: 2026,
+      includeContracts: false,
+      paginationOpts: { numItems: 500, cursor: null },
+    }),
+    /unauthenticated/i,
+  );
+  f.signIn("owner");
+  const result = (await invokeMutation(rosterPage, f.ctx, {
+    seasonStartYear: 2026,
+    includeContracts: false,
+    paginationOpts: { numItems: 500, cursor: null },
+  })) as {
+    page: {
+      playerName: string;
+      nhlTeam: string[];
+      contracts: unknown[];
+      currentProfileContract: unknown;
+    }[];
+  };
+  assert.equal(result.page.length, 50);
+  assert.ok(
+    result.page.every(
+      (row) =>
+        row.playerName.startsWith("Player ") &&
+        row.nhlTeam[0] === "FLA" &&
+        row.contracts.length === 0 &&
+        row.currentProfileContract === null,
+    ),
+  );
+});

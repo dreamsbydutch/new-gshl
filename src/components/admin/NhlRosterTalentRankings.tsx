@@ -9,19 +9,23 @@ export function NhlRosterTalentRankings({
   basis,
 }: {
   teams: ReturnType<typeof useNormalizedNhlRosters>["talentTeams"];
-  basis: "projected" | "historical";
+  basis: "projected" | "historical" | "conditional";
 }) {
   return (
     <section className="space-y-3" aria-labelledby="nhl-team-talent-heading">
       <h3 id="nhl-team-talent-heading" className="text-lg font-semibold">
         {basis === "historical"
           ? "Historical NHL season contribution"
-          : "Projected NHL roster talent"}
+          : basis === "conditional"
+            ? "Projected playing talent at standard lineup usage"
+            : "Expected NHL season contribution"}
       </h3>
       <p className="text-sm text-muted-foreground">
         {basis === "historical"
           ? "Top recorded season GAR from up to 14 forwards, 8 defensemen and 2 goalies. Uses actual season contribution, without forecasts or an 82-game extrapolation. Traded players await verified club allocations."
-          : "Up to 14 forwards, 8 defensemen and 2 goalies by projected GAR per 82 team games. These annual projections already include expected workload and participation risk. This compares roster talent; it does not predict standings."}
+          : basis === "conditional"
+            ? "Selects up to 14 forwards, 8 defensemen and 2 goalies by projected GAR/60. A shared lineup budget converts rates into GAR over 82 regulation games: 180 forward, 120 defense and 60 goalie minutes per team game, with small reserve rotation shares and a 65/35 goalie split. This assumes availability, rather than forecasting injuries or a coach's decisions."
+            : "Up to 14 forwards, 8 defensemen and 2 goalies by expected GAR per 82 team games. These annual forecasts include workload and participation risk. This compares expected contribution; it does not predict standings."}
       </p>
       <div className="overflow-x-auto rounded-lg border">
         <table className="w-full min-w-[650px] text-sm tabular-nums">
@@ -47,7 +51,11 @@ export function NhlRosterTalentRankings({
                 Goalies
               </th>
               <th scope="col" className="p-3 text-right" aria-sort="descending">
-                {basis === "historical" ? "Season GAR" : "Projected GAR/82"}
+                {basis === "historical"
+                  ? "Recorded GAR"
+                  : basis === "conditional"
+                    ? "Lineup talent GAR/82"
+                    : "Expected GAR/82"}
               </th>
               <th scope="col" className="p-3 text-right">
                 Rated F / D / G
@@ -117,7 +125,16 @@ export function NhlRosterTalentRankings({
                                   <span>
                                     {i + 1}. {player.playerName}
                                   </span>
-                                  <span>{gar(player.gar)}</span>
+                                  <span
+                                    title={
+                                      basis === "conditional" &&
+                                      player.ratePer60 !== undefined
+                                        ? `${gar(player.ratePer60)} GAR/60 × ${player.minutesPerTeamGame?.toFixed(1)} minutes per team game × 82 games / 60`
+                                        : undefined
+                                    }
+                                  >
+                                    {gar(player.gar)}
+                                  </span>
                                 </li>
                               ))}
                             </ol>
@@ -132,7 +149,11 @@ export function NhlRosterTalentRankings({
                       ) : null}
                       {team.researchPlayers.length ? (
                         <p className="mt-3 text-muted-foreground">
-                          Limited forecast support:{" "}
+                          Limited forecast support
+                          {basis === "conditional"
+                            ? " (including stale rated history and goalie rate uncertainty)"
+                            : ""}
+                          :{" "}
                           {team.researchPlayers
                             .map((player) => player.playerName)
                             .join(", ")}

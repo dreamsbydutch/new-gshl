@@ -19,6 +19,10 @@ export function useNhlPlayerGarRankings() {
         ...row,
         name: people.get(row.playerId)?.name ?? "Unknown player",
         teams: people.get(row.playerId)?.teams ?? [],
+        gar60:
+          row.goalsAboveReplacement !== null && row.minutes > 0
+            ? (row.goalsAboveReplacement * 60) / row.minutes
+            : null,
         gar82:
           row.goalsAboveReplacement !== null &&
           row.teamGames !== null &&

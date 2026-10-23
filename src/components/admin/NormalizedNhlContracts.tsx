@@ -73,16 +73,16 @@ function ContractRankings({ readOnly }: { readOnly: boolean }) {
         <p className="mt-2 text-sm text-muted-foreground">
           Holistic talent uses goals above replacement per 82 NHL team-game
           opportunities. Zero is replacement level; negative scores remain
-          negative. Delivered talent averages completed contract years equally.
-          Current-season contribution is shown separately, and unsupported years
-          are never filled with zero.
+          negative. Recorded contribution averages completed contract years
+          equally. Current-season contribution is shown separately, and
+          unsupported years are never filled with zero.
         </p>
         <p className="mt-1 text-sm text-muted-foreground">
-          Remaining talent averages age-adjusted annual estimates across every
-          remaining contract season. These use completed{" "}
+          Expected contribution averages age-adjusted annual estimates across
+          every remaining contract season. These use completed{" "}
           {season(view.forecastOriginYear - 1)} data; the current-year forecast
           is a full-season estimate, not additional value still to be earned.
-          Salary and cap figures do not affect either talent score.
+          Salary and cap figures do not affect either contribution score.
         </p>
         {view.talentError ? (
           <p role="alert" className="mt-2 text-sm text-red-600">
@@ -193,8 +193,10 @@ function ContractRankings({ readOnly }: { readOnly: boolean }) {
                 }}
               >
                 <option value="salary">Normalized NHL salary</option>
-                <option value="actual">Delivered holistic talent</option>
-                <option value="forecast">Remaining holistic talent</option>
+                <option value="actual">Recorded contribution</option>
+                <option value="forecast">
+                  Expected remaining contribution
+                </option>
               </select>
             </label>
             <label className="text-sm">
@@ -222,8 +224,8 @@ function ContractRankings({ readOnly }: { readOnly: boolean }) {
                 {view.sortBy === "salary"
                   ? "normalized salary"
                   : view.sortBy === "actual"
-                    ? "delivered holistic talent"
-                    : "remaining holistic talent"}
+                    ? "recorded contribution"
+                    : "expected remaining contribution"}
                 , highest first
               </caption>
               <thead className="bg-gray-100 text-left">
@@ -261,7 +263,7 @@ function ContractRankings({ readOnly }: { readOnly: boolean }) {
                     }
                     className="p-3 text-right"
                   >
-                    Delivered talent {view.sortBy === "actual" ? "↓" : ""}
+                    Recorded GAR {view.sortBy === "actual" ? "↓" : ""}
                     <br />
                     <span className="font-normal">GAR/82 per year</span>
                   </th>
@@ -272,7 +274,7 @@ function ContractRankings({ readOnly }: { readOnly: boolean }) {
                     }
                     className="p-3 text-right"
                   >
-                    Projected talent {view.sortBy === "forecast" ? "↓" : ""}
+                    Expected GAR {view.sortBy === "forecast" ? "↓" : ""}
                     <br />
                     <span className="font-normal">
                       Remaining years · GAR/82

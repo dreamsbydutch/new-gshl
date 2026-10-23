@@ -180,6 +180,51 @@ into a contract uncertainty range because errors across years can be correlated.
 
 ## Integration and refresh boundary
 
+### Recorded contribution, playing talent, and expected output
+
+NHL Explorer separates three quantities. Recorded GAR and observed GAR/60
+describe the stored retrospective hockey model; these are estimates of past
+contribution, not direct observed goals or forecasts. The existing annual
+contract forecast is labeled expected contribution because it includes
+participation and workload. Its numerical values are preserved.
+
+The separate conditional playing-talent reference is
+`src/lib/data/nhl-conditional-talent.json`. It estimates GAR/60 from rated,
+positive-minute seasons with a random-walk rate filter. Observation precision
+depends on minutes. A missing or unrated season supplies no zero-rate
+measurement. Calendar time advances a fitted within-player age drift and latent
+uncertainty; it does not multiply ability by an NHL-return probability.
+Confirmed NHL absence and stale rated evidence are tracked separately.
+
+The current reference uses 18 verified complete cohorts, 2008–09 through
+2025–26, and is a preseason 2026–27 estimate. It does not ingest current partial
+season play, medical recovery information, or salaries. Hyperparameters and
+individual-signal pooling are selected chronologically using only earlier
+forecast errors. Evaluation targets are returning players with rated GAR/60;
+absent and unrated outcomes are undefined rate targets, not zeros. These
+retrospective seasons were inspected during model development and are not an
+untouched prospective confirmation set.
+
+Across 14 evaluated origins, the conditional reference has 5,375 forward,
+2,951 defenseman, and 884 goalie targets. Forward and defense models beat both
+the last-rate and exposure-weighted position-mean baselines, winning against
+the position mean in all 14 origins. Goalies win only 7/14, so individual goalie
+rates remain research estimates despite a small aggregate improvement. A
+supported label also requires wins in at least two-thirds of evaluated origins,
+recent rated evidence, known age and sufficient minutes.
+Return-after-absence samples are only 71/37/21 by position; no medical recovery
+calibration is claimed. Latent-filter standard deviation is not a calibrated
+confidence interval around the pooled rate forecast.
+
+Team talent selects 14F/8D/2G by conditional rate, then allocates a shared
+standard lineup budget: 180 forward, 120 defense and 60 goalie minutes per team
+game. Depth-slot weights include small reserve rotation shares; goalies split
+65/35. Rates times allocated minutes produce GAR over 82 regulation-game
+equivalents. This is a comparison scenario, not predicted coaching usage or
+availability. Missing slots retain missing workload, signed negative values
+remain, and partial rosters show a subtotal. Historical contribution and the
+existing expected-output ranking remain separately selectable.
+
 The commissioner contract view can sort globally by normalized salary,
 delivered talent or remaining talent, including explicitly labeled extrapolated
 term estimates. It shows signed values,
