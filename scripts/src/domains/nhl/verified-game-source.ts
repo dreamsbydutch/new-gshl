@@ -3,6 +3,10 @@ import {
   fetchGameSources,
 } from "../../integrations/nhl/game-value-source";
 import { buildGameValueData, type Shot } from "./game-value-input";
+import {
+  withOfficialPenaltyContexts,
+  withReviewedOvertimeClock,
+} from "../../integrations/nhl/official-penalty-context-source";
 
 /** Source selection uses reconciliation only, never a player's resulting rating. */
 export async function loadVerifiedGame(
@@ -12,7 +16,11 @@ export async function loadVerifiedGame(
   probabilities?: Map<number, number>,
   penaltyShotProbability?: number,
 ) {
-  let sources = await fetchGameSources(cache, gameId);
+  let sources = await withReviewedOvertimeClock(
+    cache,
+    gameId,
+    await fetchGameSources(cache, gameId),
+  );
   let game = buildGameValueData(
     sources,
     shots,
@@ -29,7 +37,11 @@ export async function loadVerifiedGame(
   if (!game.eligible && sources.shiftSource === "nhl-api") {
     review.attempted = true;
     try {
-      const alternate = await fetchGameSources(cache, gameId, "nhl-toi-report");
+      const alternate = await withReviewedOvertimeClock(
+        cache,
+        gameId,
+        await fetchGameSources(cache, gameId, "nhl-toi-report"),
+      );
       const candidate = buildGameValueData(
         alternate,
         shots,
@@ -52,5 +64,7 @@ export async function loadVerifiedGame(
       ];
     }
   }
-  return { sources, game, review };
+  // Penalty context cannot influence which physical source is selected.
+  const supplemented = await withOfficialPenaltyContexts(cache, sources, game);
+  return { ...supplemented, review };
 }

@@ -8,6 +8,7 @@ import {
   fetchGamePlayByPlay,
 } from "../../integrations/nhl/game-value-source";
 import { loadVerifiedGame } from "../../domains/nhl/verified-game-source";
+import { withRetrospectivePenaltyContexts } from "../../integrations/nhl/retrospective-value-context";
 import {
   extractShotTrainingRows,
   buildGameValueData,
@@ -236,11 +237,14 @@ else {
     );
     if (hash(JSON.stringify(loaded.sources)) !== expected.get(scheduled.id))
       throw new Error(`Saved source differs for ${scheduled.id}`);
-    const candidate = buildGameValueData(
-      loaded.sources,
-      [],
-      probabilities,
-      report.penaltyShotModel.probability,
+    const candidate = withRetrospectivePenaltyContexts(
+      buildGameValueData(
+        loaded.sources,
+        [],
+        probabilities,
+        report.penaltyShotModel.probability,
+      ),
+      loaded.sources.penaltyContextRecovery,
     );
     for (const shot of candidate.shots)
       if (shot.attribution !== "penalty-shot")

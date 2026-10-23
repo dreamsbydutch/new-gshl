@@ -11,7 +11,10 @@ import {
 } from "../../integrations/nhl/game-value-source";
 import { loadVerifiedGame } from "../../domains/nhl/verified-game-source";
 import { loadAuditedRetrospectiveShots } from "../../integrations/nhl/retrospective-shot-source";
-import { loadRetrospectiveValueContext } from "../../integrations/nhl/retrospective-value-context";
+import {
+  loadRetrospectiveValueContext,
+  withRetrospectivePenaltyContexts,
+} from "../../integrations/nhl/retrospective-value-context";
 import { withReviewedOnGoalClassifications } from "../../integrations/nhl/official-on-goal-classification-source";
 import {
   buildGameValueData,
@@ -193,6 +196,8 @@ else {
       "scripts/src/integrations/nhl/game-value-source.ts",
       "scripts/src/domains/nhl/game-value-input.ts",
       "scripts/src/domains/nhl/verified-game-source.ts",
+      "scripts/src/domains/nhl/official-penalty-context.ts",
+      "scripts/src/integrations/nhl/official-penalty-context-source.ts",
       "scripts/src/domains/nhl/official-shift-report.ts",
       "scripts/src/domains/nhl/unavailable-shift-proof.ts",
       "scripts/src/integrations/nhl/unavailable-shift-source.ts",
@@ -391,11 +396,14 @@ else {
       [glm, glmGames, "nhl-event-xg-crossfit-glm-v1"],
       [gb, gbGames, "nhl-event-xg-crossfit-gb-v1"],
     ] as const) {
-      const game = buildGameValueData(
-        loaded.sources,
-        [],
-        probabilities,
-        context.penaltyShotModel.probability,
+      const game = withRetrospectivePenaltyContexts(
+        buildGameValueData(
+          loaded.sources,
+          [],
+          probabilities,
+          context.penaltyShotModel.probability,
+        ),
+        loaded.sources.penaltyContextRecovery,
       );
       for (const shot of game.shots)
         if (shot.attribution !== "penalty-shot") shot.probabilitySource = label;

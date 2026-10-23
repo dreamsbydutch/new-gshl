@@ -84,6 +84,13 @@ export type OfficialOnGoalClassificationProof = {
     originalRecord: Record<string, unknown>;
     interpretation: string;
   }>;
+  unpricedNativeContextDiscrepancies?: Array<{
+    eventId: number;
+    primaryOrdinal: number;
+    originalNativeEvent: unknown;
+    primaryRow: string[];
+    interpretation: string;
+  }>;
   interpretation: string;
 };
 export type ReviewedOnGoalClassificationGroup = Group & {
@@ -692,6 +699,9 @@ export function parseOfficialOnGoalClassification(
         "Unordered primary identity pair only: no native-ID to report-ordinal mapping is asserted. Native geometry/order/IDs stay unchanged; differing report distance and skater lineups are audit-only and never enrich native events.",
     });
   const consumed = new Set<number>();
+  const unpricedNativeContextDiscrepancies: NonNullable<
+    OfficialOnGoalClassificationProof["unpricedNativeContextDiscrepancies"]
+  > = [];
   for (const event of native.filter(
     (e) => e.kind === "GOAL" || playerIds.some((id) => owns(e, id)),
   )) {
@@ -719,10 +729,57 @@ export function parseOfficialOnGoalClassification(
     if (
       playerIds.some((id) => owns(event, id)) &&
       event.nativeGeometry.situationCode !== matches[0]!.situation
-    )
-      throw Error(
-        `Classification native/report manpower differs event=${event.eventId} native=${event.nativeGeometry.situationCode} report=${matches[0]!.situation}`,
-      );
+    ) {
+      const primary = matches[0]!;
+      // This physical GOAL is retained by the raw-origin quality guard but has
+      // no priced context. Its unique empty-net identity can establish annual
+      // SOG-accounting membership without copying the report's manpower into
+      // the native event. Every other missing or contradictory context rejects.
+      const reviewedUnpricedEmptyNetGoal =
+        event.period === 3 &&
+        event.kind === "GOAL" &&
+        event.goalie === 0 &&
+        event.nativeGoalieInNetId === null &&
+        event.resolvedPrimaryGoalie === null &&
+        Object.keys(event.nativeGeometry).length === 0 &&
+        ((game.id === 2008020084 &&
+          game.homeTeam.id === 29 &&
+          game.awayTeam.id === 23 &&
+          event.eventId === 10111589 &&
+          event.second === 1181 &&
+          event.shooter === 8470041 &&
+          primary.ordinal === 263 &&
+          primary.situation === "0651" &&
+          primary.primaryRow[5] === "CBJ #61 NASH(5), Off. Zone, 10 ft." &&
+          primary.primaryRow[6] === "17 C 33 C 18 R 22 L 3 D 23 D" &&
+          primary.primaryRow[7] === "12 C 27 C 61 L 22 D 97 D 31 G") ||
+          (game.id === 2008020454 &&
+            game.homeTeam.id === 24 &&
+            game.awayTeam.id === 3 &&
+            event.eventId === 10113685 &&
+            event.second === 1199 &&
+            event.shooter === 8470597 &&
+            primary.ordinal === 251 &&
+            primary.situation === "1540" &&
+            primary.primaryRow[5] ===
+              "NYR #13 ZHERDEV(11), Off. Zone, 26 ft." &&
+            primary.primaryRow[6] === "19 C 23 C 13 R 5 D 6 D 30 G" &&
+            primary.primaryRow[7] === "22 C 8 R 5 D 25 D"));
+      if (!reviewedUnpricedEmptyNetGoal)
+        throw Error(
+          `Classification native/report manpower differs event=${event.eventId} native=${event.nativeGeometry.situationCode} report=${primary.situation}`,
+        );
+      unpricedNativeContextDiscrepancies.push({
+        eventId: event.eventId,
+        primaryOrdinal: primary.ordinal,
+        originalNativeEvent: structuredClone(
+          game.plays.find((p) => p.eventId === event.eventId)!,
+        ),
+        primaryRow: [...primary.primaryRow],
+        interpretation:
+          "Exact reviewed empty-net GOAL: native actor/kind/clock and unique complete primary physical identity agree, including no defending goalie. Native geometry, manpower and goalie fields remain absent; this accounting-only certificate neither enriches nor prices the event. Its GOAL and official appearance denominators remain retained.",
+      });
+    }
     consumed.add(matches[0]!.ordinal);
   }
   const groups = playerIds.map((id) => {
@@ -746,6 +803,9 @@ export function parseOfficialOnGoalClassification(
     groups,
     unrelatedMissingExposure,
     ...(unplayedFreshBoxGoalies.length ? { unplayedFreshBoxGoalies } : {}),
+    ...(unpricedNativeContextDiscrepancies.length
+      ? { unpricedNativeContextDiscrepancies }
+      : {}),
     unrelatedContextDiscrepancies,
     unorderedPrimaryIdentityGroups,
     interpretation:

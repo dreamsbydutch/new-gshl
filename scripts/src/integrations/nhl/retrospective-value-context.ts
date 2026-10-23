@@ -6,6 +6,11 @@ import type { GameSeasonRating } from "../../runtime/nhl-game-season-value";
 import type { ShiftAvailability } from "../../domains/nhl/unavailable-shift-proof";
 import type { GameSourceBundle } from "./game-value-source";
 import type {
+  GameValueData,
+  PenaltyEvent,
+} from "../../domains/nhl/game-value-input";
+import type { OfficialPenaltyContextSourceProof } from "./official-penalty-context-source";
+import type {
   ShotQualityModel,
   fitPenaltyShotBaseline,
 } from "../../runtime/nhl-shot-quality";
@@ -18,6 +23,60 @@ type Original = {
   shotQuality: { model: ShotQualityModel };
 };
 type Frozen = { model: ImpactModel; ratings: GameSeasonRating[] };
+
+/** Rebuilding shot probabilities must retain the independently verified ledger.
+ * The fresh physical builder supplies the exact preimage; neither probabilities
+ * nor the context certificate can change any other assessment fact. */
+export function withRetrospectivePenaltyContexts(
+  game: GameValueData,
+  proof: OfficialPenaltyContextSourceProof | undefined,
+): GameValueData {
+  const isReviewedSeason = Math.floor(game.gameId / 10000) === 200802;
+  if (!proof) {
+    if (isReviewedSeason)
+      throw Error("Retrospective game is missing its verified penalty ledger");
+    return game;
+  }
+  if (
+    !isReviewedSeason ||
+    proof.version !== "nhl-official-penalty-context-source-v1" ||
+    proof.gameId !== game.gameId ||
+    proof.homeTeam !== game.homeTeam ||
+    proof.awayTeam !== game.awayTeam ||
+    JSON.stringify(proof.beforePenalties) !== JSON.stringify(game.penalties) ||
+    proof.afterPenalties.length !== game.penalties.length ||
+    hash(JSON.stringify(proof.beforePenalties)) !==
+      proof.beforePenaltiesSha256 ||
+    hash(JSON.stringify(proof.afterPenalties)) !== proof.afterPenaltiesSha256
+  )
+    throw Error(
+      "Retrospective penalty ledger identity, preimage or digest differs",
+    );
+  for (const [index, before] of game.penalties.entries()) {
+    const after = proof.afterPenalties[index]!;
+    const facts = ({
+      homeBefore: _home,
+      awayBefore: _away,
+      ...rest
+    }: PenaltyEvent) => rest;
+    const changed =
+      before.homeBefore !== after.homeBefore ||
+      before.awayBefore !== after.awayBefore;
+    if (
+      JSON.stringify(facts(before)) !== JSON.stringify(facts(after)) ||
+      (changed &&
+        (before.homeBefore !== null ||
+          before.awayBefore !== null ||
+          ![after.homeBefore, after.awayBefore].every(
+            (n) => n !== null && Number.isInteger(n) && n >= 3 && n <= 5,
+          )))
+    )
+      throw Error(
+        "Retrospective penalty ledger changes facts outside missing legal strength",
+      );
+  }
+  return { ...game, penalties: structuredClone(proof.afterPenalties) };
+}
 export type ShotTrainingSupport = {
   version: "nhl-shot-training-support-v1";
   games: Array<{

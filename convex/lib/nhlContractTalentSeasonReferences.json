@@ -1,8 +1,14 @@
 {
   "modelVersion": "nhl-hockey-overall-reviewed-v1",
-  "asOf": "2026-10-22",
-  "inputSha256": "d0e1911407d6f8bf91ae32fb7e09890accb4559214ada8a108bc4662f6ab0e41",
+  "asOf": "2026-10-23",
+  "inputSha256": "337a02d7847ae97e584219ce25f97b18fd32eb115f11431e75146714376ff103",
   "seasons": {
+    "2008": {
+      "teamGames": 82,
+      "expectedPlayers": 974,
+      "populationSha256": "950ff9a505d03c81fbaf34f9d8d275907a7ae2e0c5364847fa4f70f791f7231a",
+      "sourceSha256": "aac0426a64da322913e4b2318cd63e45603533fb0cbd16fcf0b188c0f92d8adf"
+    },
     "2009": {
       "teamGames": 82,
       "expectedPlayers": 962,

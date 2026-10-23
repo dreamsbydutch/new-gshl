@@ -282,6 +282,8 @@ async function main(inventoryPath: string, outputPath: string) {
     "scripts/src/integrations/nhl/game-value-source.ts",
     "scripts/src/domains/nhl/game-value-input.ts",
     "scripts/src/domains/nhl/verified-game-source.ts",
+    "scripts/src/domains/nhl/official-penalty-context.ts",
+    "scripts/src/integrations/nhl/official-penalty-context-source.ts",
     "scripts/src/domains/nhl/official-shift-report.ts",
     "scripts/src/domains/nhl/unavailable-shift-proof.ts",
     "scripts/src/integrations/nhl/unavailable-shift-source.ts",

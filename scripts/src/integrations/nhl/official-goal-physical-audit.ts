@@ -102,6 +102,8 @@ export async function verifyOfficialGoalCoverageFromCache(
     "scripts/src/integrations/nhl/official-goal-physical-audit.ts",
     "scripts/src/domains/nhl/game-value-input.ts",
     "scripts/src/domains/nhl/verified-game-source.ts",
+    "scripts/src/domains/nhl/official-penalty-context.ts",
+    "scripts/src/integrations/nhl/official-penalty-context-source.ts",
     "scripts/src/integrations/nhl/game-value-source.ts",
     "scripts/src/domains/nhl/official-shift-report.ts",
     "scripts/src/domains/nhl/official-game-clock.ts",

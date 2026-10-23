@@ -16,6 +16,296 @@ import type { NhlRatingSource } from "./season-rating-input";
 
 const SHOOTER = 8462042,
   GOALIE = 8462152;
+
+function unpricedNashFixture() {
+  const slots = [
+    [29, 12, "C"],
+    [29, 27, "C"],
+    [29, 61, "L"],
+    [29, 22, "D"],
+    [29, 97, "D"],
+    [29, 31, "G"],
+    [23, 17, "C"],
+    [23, 33, "C"],
+    [23, 18, "R"],
+    [23, 22, "L"],
+    [23, 3, "D"],
+    [23, 23, "D"],
+    [23, 1, "G"],
+  ] as const;
+  const rosterSpots: Array<{
+    playerId: number;
+    teamId: number;
+    sweaterNumber: number;
+    positionCode: string;
+    lastName: { default: string };
+  }> = slots.map(([teamId, sweaterNumber, positionCode], i) => ({
+    playerId: sweaterNumber === 61 ? 8470041 : i + 100,
+    teamId,
+    sweaterNumber,
+    positionCode,
+    lastName: { default: sweaterNumber === 61 ? "NASH" : "OTHER" },
+  }));
+  const awayGoalie = rosterSpots.find(
+    (p) => p.teamId === 23 && p.positionCode === "G",
+  )!.playerId;
+  const goal: {
+    eventId: number;
+    sortOrder: number;
+    typeDescKey: string;
+    periodDescriptor: { number: number; periodType: string };
+    timeInPeriod: string;
+    situationCode?: string;
+    details: Record<string, unknown>;
+  } = {
+    eventId: 10111589,
+    sortOrder: 263,
+    typeDescKey: "goal",
+    periodDescriptor: { number: 3, periodType: "REG" },
+    timeInPeriod: "19:41",
+    details: { eventOwnerTeamId: 29, scoringPlayerId: 8470041 },
+  };
+  const shot = {
+    eventId: 1,
+    sortOrder: 1,
+    typeDescKey: "shot-on-goal",
+    periodDescriptor: { number: 1, periodType: "REG" },
+    timeInPeriod: "00:10",
+    situationCode: "1551",
+    details: {
+      eventOwnerTeamId: 29,
+      shootingPlayerId: 8470041,
+      goalieInNetId: awayGoalie,
+      xCoord: 80,
+      yCoord: 2,
+      shotType: "wrist",
+    },
+  };
+  const raw = {
+    id: 2008020084,
+    gameDate: "2008-10-21",
+    homeTeam: { id: 29, abbrev: "CBJ", score: 1 },
+    awayTeam: { id: 23, abbrev: "VAN", score: 0 },
+    rosterSpots,
+    plays: [shot, goal],
+  };
+  const rows: OnGoalOfficialGameRow[] = rosterSpots.map((p) => ({
+    gameId: raw.id,
+    date: raw.gameDate,
+    playerId: p.playerId,
+    teamId: p.teamId,
+    position: p.positionCode === "G" ? "G" : p.positionCode === "D" ? "D" : "F",
+    gamesPlayed: 1,
+    goals: p.playerId === 8470041 ? 1 : 0,
+    onGoal: [8470041, awayGoalie].includes(p.playerId) ? 1 : 0,
+  }));
+  const team = (teamId: number) => ({
+    forwards: rows
+      .filter((p) => p.teamId === teamId && p.position !== "G")
+      .map((p) => ({
+        playerId: p.playerId,
+        sog: p.onGoal,
+        goals: p.goals,
+        toi: "01:00",
+      })),
+    goalies: rows
+      .filter((p) => p.teamId === teamId && p.position === "G")
+      .map((p) => ({
+        playerId: p.playerId,
+        shotsAgainst: p.onGoal,
+        goalsAgainst: p.goals,
+        toi: "01:00",
+      })),
+  });
+  const box = {
+    id: raw.id,
+    gameDate: raw.gameDate,
+    homeTeam: raw.homeTeam,
+    awayTeam: raw.awayTeam,
+    playerByGameStats: { homeTeam: team(29), awayTeam: team(23) },
+  };
+  const tr = (v: string[]) =>
+    `<tr>${v.map((s) => `<td>${s}</td>`).join("")}</tr>`;
+  let html = `<title>Play By Play</title><table>${tr(["Tuesday, October 21, 2008"])}${tr(["Game 0084"])}${tr(["1", "1", "EV", "00:10", "SHOT", "CBJ ONGOAL - #61 NASH, Wrist", "17 C 33 C 18 R 3 D 23 D 1 G", "12 C 27 C 61 L 22 D 97 D 31 G"])}${tr(["263", "3", "EV", "19:410:19", "GOAL", "CBJ #61 NASH(5), Off. Zone, 10 ft.", "17 C 33 C 18 R 22 L 3 D 23 D", "12 C 27 C 61 L 22 D 97 D 31 G"])}</table>`;
+  return {
+    raw,
+    goal,
+    shot,
+    box,
+    rows,
+    get html() {
+      return html;
+    },
+    set html(value: string) {
+      html = value;
+    },
+    parse() {
+      return parseOfficialOnGoalClassification(
+        html,
+        raw,
+        box,
+        rows,
+        [8470041],
+        {
+          pbpSha256: createHash("sha256")
+            .update(JSON.stringify(raw))
+            .digest("hex"),
+          htmlSha256: createHash("sha256").update(html).digest("hex"),
+          boxSha256: "c".repeat(64),
+          officialSummarySha256: "d".repeat(64),
+        },
+      );
+    },
+  };
+}
+
+function unpricedZherdevFixture() {
+  const f = unpricedNashFixture();
+  const jerseys = new Map([
+    [12, 19],
+    [27, 23],
+    [61, 13],
+    [22, 5],
+    [97, 6],
+    [31, 30],
+  ]);
+  const homeJerseys = new Map([
+    [17, 22],
+    [33, 8],
+    [18, 10],
+    [22, 5],
+    [3, 25],
+    [23, 32],
+    [1, 35],
+  ]);
+  f.raw.id = 2008020454;
+  f.raw.gameDate = "2008-12-16";
+  f.raw.homeTeam = { id: 24, abbrev: "ANA", score: 0 };
+  f.raw.awayTeam = { id: 3, abbrev: "NYR", score: 1 };
+  for (const p of f.raw.rosterSpots) {
+    const wasHome = p.teamId === 29;
+    p.sweaterNumber = (wasHome ? jerseys : homeJerseys).get(p.sweaterNumber)!;
+    p.teamId = wasHome ? 3 : 24;
+    if (p.playerId === 8470041) {
+      p.playerId = 8470597;
+      p.lastName.default = "ZHERDEV";
+      p.positionCode = "R";
+    }
+    if (!wasHome && p.sweaterNumber === 8) p.positionCode = "R";
+    if (!wasHome && p.sweaterNumber === 10) p.positionCode = "C";
+    if (!wasHome && [5, 25, 32].includes(p.sweaterNumber)) p.positionCode = "D";
+  }
+  f.goal.eventId = 10113685;
+  f.goal.sortOrder = 251;
+  f.goal.timeInPeriod = "19:59";
+  f.goal.details = { eventOwnerTeamId: 3, scoringPlayerId: 8470597 };
+  f.shot.details.eventOwnerTeamId = 3;
+  f.shot.details.shootingPlayerId = 8470597;
+  for (const row of f.rows) {
+    row.gameId = f.raw.id;
+    row.date = f.raw.gameDate;
+    row.teamId = row.teamId === 29 ? 3 : 24;
+    if (row.playerId === 8470041) row.playerId = 8470597;
+    const position = f.raw.rosterSpots.find(
+      (p) => p.playerId === row.playerId,
+    )!.positionCode;
+    row.position = position === "G" ? "G" : position === "D" ? "D" : "F";
+  }
+  f.box.id = f.raw.id;
+  f.box.gameDate = f.raw.gameDate;
+  f.box.homeTeam = f.raw.homeTeam;
+  f.box.awayTeam = f.raw.awayTeam;
+  const oldHome = f.box.playerByGameStats.homeTeam;
+  oldHome.forwards.find((p) => p.playerId === 8470041)!.playerId = 8470597;
+  f.box.playerByGameStats.homeTeam = f.box.playerByGameStats.awayTeam;
+  f.box.playerByGameStats.awayTeam = oldHome;
+  const tr = (v: string[]) =>
+    `<tr>${v.map((s) => `<td>${s}</td>`).join("")}</tr>`;
+  f.html = `<title>Play By Play</title><table>${tr(["Tuesday, December 16, 2008"])}${tr(["Game 0454"])}${tr(["1", "1", "EV", "00:10", "SHOT", "NYR ONGOAL - #13 ZHERDEV, Wrist", "19 C 23 C 13 R 5 D 6 D 30 G", "22 C 8 R 10 C 5 D 25 D 35 G"])}${tr(["251", "3", "PP", "19:590:01", "GOAL", "NYR #13 ZHERDEV(11), Off. Zone, 26 ft.", "19 C 23 C 13 R 5 D 6 D 30 G", "22 C 8 R 5 D 25 D"])}</table>`;
+  return {
+    ...f,
+    parse() {
+      return parseOfficialOnGoalClassification(
+        f.html,
+        f.raw,
+        f.box,
+        f.rows,
+        [8470597],
+        {
+          pbpSha256: createHash("sha256")
+            .update(JSON.stringify(f.raw))
+            .digest("hex"),
+          htmlSha256: createHash("sha256").update(f.html).digest("hex"),
+          boxSha256: "c".repeat(64),
+          officialSummarySha256: "d".repeat(64),
+        },
+      );
+    },
+  };
+}
+
+test("exact reviewed empty-net goal remains unpriced and unknown while accounting identity is certified", () => {
+  for (const makeFixture of [unpricedNashFixture, unpricedZherdevFixture]) {
+    const f = makeFixture(),
+      before = JSON.stringify(f.raw),
+      training = extractShotTrainingRows(f.raw),
+      proof = f.parse();
+    assert.equal(JSON.stringify(f.raw), before);
+    assert.equal(proof.groups[0]!.events.length, 2);
+    const goal = proof.groups[0]!.events.find(
+      (p) => p.eventId === f.goal.eventId,
+    )!;
+    assert.equal(goal.kind, "GOAL");
+    assert.deepEqual(goal.nativeGeometry, {});
+    assert.equal(goal.nativeGoalieInNetId, null);
+    assert.equal(goal.resolvedPrimaryGoalie, null);
+    assert.equal(proof.unpricedNativeContextDiscrepancies?.length, 1);
+    assert.deepEqual(
+      proof.unpricedNativeContextDiscrepancies![0]!.originalNativeEvent,
+      f.goal,
+    );
+    assert(!training.some((p) => p.eventId === f.goal.eventId));
+    assert.deepEqual(extractShotTrainingRows(f.raw), training);
+    assert.doesNotThrow(() =>
+      validateReviewedOnGoalClassificationGroup(
+        reviewedOnGoalClassificationGroups(proof)[0]!,
+      ),
+    );
+  }
+});
+
+test("empty-net accounting exception never trusts other unknown or contradictory native contexts", () => {
+  for (const mutate of [
+    (f: ReturnType<typeof unpricedNashFixture>) => {
+      f.goal.eventId++;
+    },
+    (f: ReturnType<typeof unpricedNashFixture>) => {
+      f.goal.details.xCoord = 80;
+    },
+    (f: ReturnType<typeof unpricedNashFixture>) => {
+      f.goal.details.zoneCode = "O";
+    },
+    (f: ReturnType<typeof unpricedNashFixture>) => {
+      f.goal.details.goalieInNetId = 0;
+    },
+    (f: ReturnType<typeof unpricedNashFixture>) => {
+      f.goal.situationCode = "1551";
+    },
+    (f: ReturnType<typeof unpricedNashFixture>) => {
+      f.html = f.html.replace("<td>263</td>", "<td>262</td>");
+    },
+    (f: ReturnType<typeof unpricedNashFixture>) => {
+      f.html = f.html.replace("Off. Zone, 10 ft.", "Off. Zone, 11 ft.");
+    },
+    (f: ReturnType<typeof unpricedNashFixture>) => {
+      delete (f.shot as { situationCode?: string }).situationCode;
+    },
+  ]) {
+    const f = unpricedNashFixture();
+    mutate(f);
+    assert.throws(() => f.parse());
+  }
+});
 // Controlled source fixtures use scoped identities, not claims about the actual historical game.
 function fixture() {
   const rosterSpots = [

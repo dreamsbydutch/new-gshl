@@ -39,6 +39,7 @@ import type {
 } from "../../integrations/nhl/retrospective-value-context";
 import type { ShiftAvailability } from "../../domains/nhl/unavailable-shift-proof";
 import type { GameSourceBundle } from "../../integrations/nhl/game-value-source";
+import type { OfficialPenaltyContextSourceProof } from "../../integrations/nhl/official-penalty-context-source";
 
 const { values } = parseArgs({
   options: {
@@ -84,6 +85,8 @@ else {
       "scripts/src/domains/nhl/reviewed-2008-shot-credit.ts",
       "scripts/src/integrations/nhl/reviewed-2008-shot-credit-source.ts",
       "scripts/src/domains/nhl/verified-game-source.ts",
+      "scripts/src/domains/nhl/official-penalty-context.ts",
+      "scripts/src/integrations/nhl/official-penalty-context-source.ts",
       "scripts/src/domains/nhl/official-shift-report.ts",
       "scripts/src/domains/nhl/unavailable-shift-proof.ts",
       "scripts/src/integrations/nhl/unavailable-shift-source.ts",
@@ -157,6 +160,9 @@ else {
     shots: number;
   }> = [];
   const shiftReviews = [];
+  const penaltyContextRecoveries: Array<
+    OfficialPenaltyContextSourceProof & { sourcesSha256: string }
+  > = [];
   const unavailableShiftSources: ShiftAvailability[] = [];
   const reviewedShiftRecoveries: Array<
     NonNullable<GameSourceBundle["shiftRecovery"]>
@@ -213,9 +219,15 @@ else {
       unavailableShiftSources.push(loaded.sources.shiftAvailability);
     if (loaded.sources.shiftRecovery)
       reviewedShiftRecoveries.push(loaded.sources.shiftRecovery);
+    const sourcesSha256 = hash(JSON.stringify(loaded.sources));
+    if (loaded.sources.penaltyContextRecovery)
+      penaltyContextRecoveries.push({
+        ...loaded.sources.penaltyContextRecovery,
+        sourcesSha256,
+      });
     gameSourceHashes.push({
       gameId: entry.id,
-      sha256: hash(JSON.stringify(loaded.sources)),
+      sha256: sourcesSha256,
     });
     if (loaded.review.attempted) shiftReviews.push(loaded.review);
     if (games.length % 200 === 0)
@@ -322,6 +334,9 @@ else {
           verifiedShots,
         },
         shiftReviews,
+        ...(penaltyContextRecoveries.length
+          ? { penaltyContextRecoveries }
+          : {}),
         ...(unavailableShiftSources.length ? { unavailableShiftSources } : {}),
         ...(reviewedShiftRecoveries.length ? { reviewedShiftRecoveries } : {}),
         games: games.map((game) => {
