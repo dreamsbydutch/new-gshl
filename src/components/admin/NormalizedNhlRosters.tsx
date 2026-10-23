@@ -24,8 +24,7 @@ class RosterBoundary extends Component<
     return this.state.failed ? (
       <div role="alert" className="rounded-lg border p-6">
         <p>
-          NHL rosters could not load. Check your connection and commissioner
-          access.
+          NHL rosters could not load. Check your connection and account access.
         </p>
         <Button
           className="mt-3"

@@ -8,6 +8,7 @@ import {
   Ellipsis,
   Newspaper,
   ShieldCheck,
+  ChartNoAxesCombined,
 } from "lucide-react";
 import { useAuthSession } from "@gshl-hooks";
 import type { MainNavbarMoreMenuProps } from "@gshl-types";
@@ -22,6 +23,12 @@ import {
 import { cn } from "@gshl-utils";
 
 const moreItems = [
+  {
+    label: "NHL Explorer",
+    description: "Team talent, player GAR, and contract value",
+    href: "/nhl",
+    icon: ChartNoAxesCombined,
+  },
   {
     label: "Press Box",
     description: "League news and weekly editions",

@@ -116,6 +116,9 @@ export function getAppShellRouteContext(
   if (isRoute(pathname, "/admin")) {
     return { title: "Admin", activeNavId: "more" };
   }
+  if (pathname === "/nhl") {
+    return { title: "NHL Explorer", activeNavId: "more" };
+  }
   if (isRoute(pathname, "/draft") || isRoute(pathname, "/draftboard")) {
     return { title: "Draft Hub", activeNavId: "more" };
   }

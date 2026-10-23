@@ -146,7 +146,7 @@ void test("native minutes corrections at unchanged GP withhold stale contributio
   assert.equal(changedMinutes.observations[0]?.goalsAboveReplacement, null);
 });
 
-void test("talent queries require commissioner identity and refuse overflowing cohorts", async () => {
+void test("talent queries require an active identity and refuse overflowing cohorts", async () => {
   const f = mutationFixture();
   f.signIn(null);
   await assert.rejects(() =>
@@ -164,4 +164,46 @@ void test("talent queries require commissioner identity and refuse overflowing c
     () => invokeMutation(talentSeason, f.ctx, { seasonId: "season" }),
     /bounded/,
   );
+});
+
+void test("NHL Explorer hydrates season player names and teams for active members only", async () => {
+  const f = mutationFixture();
+  f.put("authUsers", "owner", { role: "owner", status: "active" });
+  f.put("seasons", "season", { year: 2009 });
+  f.put("players", "player", {
+    fullName: "Historical Player",
+    nhlTeam: ["TOR"],
+  });
+  f.put("playerNhlStatLines", "stat", {
+    seasonId: "season",
+    playerId: "player",
+    GP: "1",
+    TOI: "10",
+    posGroup: "F",
+    nhlTeam: ["WSH"],
+  });
+  f.signIn(null);
+  await assert.rejects(
+    invokeMutation(talentSeason, f.ctx, {
+      seasonId: "season",
+      includePlayers: true,
+    }),
+    /unauthenticated/i,
+  );
+  f.signIn("owner");
+  const result = (await invokeMutation(talentSeason, f.ctx, {
+    seasonId: "season",
+    includePlayers: true,
+  })) as {
+    players: unknown;
+    observations: { goalsAboveReplacement: number | null }[];
+  };
+  assert.deepEqual(result.players, [
+    { playerId: "player", name: "Historical Player", teams: ["WSH"] },
+  ]);
+  assert.equal(result.observations[0]?.goalsAboveReplacement, null);
+  const lean = (await invokeMutation(talentSeason, f.ctx, {
+    seasonId: "season",
+  })) as { players?: unknown };
+  assert.equal(lean.players, undefined);
 });

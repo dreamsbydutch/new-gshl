@@ -32,8 +32,8 @@ class ContractRankingBoundary extends Component<
     return this.state.failed ? (
       <div role="alert" className="rounded-lg border p-6">
         <p>
-          Contract rankings could not load. Check your connection and
-          commissioner access.
+          Contract rankings could not load. Check your connection and account
+          access.
         </p>
         <Button
           className="mt-3"
@@ -48,15 +48,19 @@ class ContractRankingBoundary extends Component<
   }
 }
 
-export function NormalizedNhlContracts() {
+export function NormalizedNhlContracts({
+  readOnly = false,
+}: {
+  readOnly?: boolean;
+}) {
   return (
     <ContractRankingBoundary>
-      <ContractRankings />
+      <ContractRankings readOnly={readOnly} />
     </ContractRankingBoundary>
   );
 }
 
-function ContractRankings() {
+function ContractRankings({ readOnly }: { readOnly: boolean }) {
   const view = useNormalizedNhlContracts();
   return (
     <section className="mx-auto max-w-7xl space-y-5">
@@ -99,69 +103,71 @@ function ContractRankings() {
         </p>
       </div>
 
-      <details className="rounded-lg border p-4">
-        <summary className="cursor-pointer font-semibold">
-          Season salary caps
-        </summary>
-        <p className="my-3 text-sm text-muted-foreground">
-          Enter the total NHL team salary cap in dollars, not a team’s remaining
-          cap space. Your supplied ceiling values include future seasons through
-          2041–42. Future figures are your assumptions and can be edited. Saving
-          recalculates every contract immediately.
-        </p>
-        <div className="max-h-80 overflow-y-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr>
-                <th className="p-2 text-left">Season</th>
-                <th className="p-2 text-left">Team salary cap (USD)</th>
-              </tr>
-            </thead>
-            <tbody>
-              {view.years.map((year) => (
-                <tr key={year} className="border-t">
-                  <td className="p-2">{season(year)}</td>
-                  <td className="p-2">
-                    <input
-                      aria-label={`${season(year)} team salary cap in dollars`}
-                      inputMode="decimal"
-                      className="w-full max-w-xs rounded border bg-white px-3 py-2 text-gray-900"
-                      placeholder="Enter season cap"
-                      value={
-                        view.capDrafts[year] ??
-                        (view.caps[year] === undefined
-                          ? ""
-                          : String(view.caps[year]))
-                      }
-                      disabled={view.savingCaps}
-                      onChange={(event) =>
-                        view.changeCap(year, event.target.value)
-                      }
-                    />
-                  </td>
+      {!readOnly && (
+        <details className="rounded-lg border p-4">
+          <summary className="cursor-pointer font-semibold">
+            Season salary caps
+          </summary>
+          <p className="my-3 text-sm text-muted-foreground">
+            Enter the total NHL team salary cap in dollars, not a team’s
+            remaining cap space. Your supplied ceiling values include future
+            seasons through 2041–42. Future figures are your assumptions and can
+            be edited. Saving recalculates every contract immediately.
+          </p>
+          <div className="max-h-80 overflow-y-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr>
+                  <th className="p-2 text-left">Season</th>
+                  <th className="p-2 text-left">Team salary cap (USD)</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        <Button
-          className="mt-3"
-          disabled={view.savingCaps || !Object.keys(view.capDrafts).length}
-          onClick={view.saveCaps}
-        >
-          {view.savingCaps ? "Saving…" : "Save salary caps"}
-        </Button>
-        {view.capError ? (
-          <p role="alert" className="mt-2 text-sm text-red-600">
-            {view.capError}
-          </p>
-        ) : null}
-        {view.capSaved ? (
-          <p role="status" className="mt-2 text-sm text-green-700">
-            Salary caps saved. Rankings updated.
-          </p>
-        ) : null}
-      </details>
+              </thead>
+              <tbody>
+                {view.years.map((year) => (
+                  <tr key={year} className="border-t">
+                    <td className="p-2">{season(year)}</td>
+                    <td className="p-2">
+                      <input
+                        aria-label={`${season(year)} team salary cap in dollars`}
+                        inputMode="decimal"
+                        className="w-full max-w-xs rounded border bg-white px-3 py-2 text-gray-900"
+                        placeholder="Enter season cap"
+                        value={
+                          view.capDrafts[year] ??
+                          (view.caps[year] === undefined
+                            ? ""
+                            : String(view.caps[year]))
+                        }
+                        disabled={view.savingCaps}
+                        onChange={(event) =>
+                          view.changeCap(year, event.target.value)
+                        }
+                      />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <Button
+            className="mt-3"
+            disabled={view.savingCaps || !Object.keys(view.capDrafts).length}
+            onClick={view.saveCaps}
+          >
+            {view.savingCaps ? "Saving…" : "Save salary caps"}
+          </Button>
+          {view.capError ? (
+            <p role="alert" className="mt-2 text-sm text-red-600">
+              {view.capError}
+            </p>
+          ) : null}
+          {view.capSaved ? (
+            <p role="status" className="mt-2 text-sm text-green-700">
+              Salary caps saved. Rankings updated.
+            </p>
+          ) : null}
+        </details>
+      )}
 
       {view.isLoading ? (
         <p role="status" className="rounded-lg border p-6">

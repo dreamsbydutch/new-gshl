@@ -1,7 +1,7 @@
 import { paginationOptsValidator } from "convex/server";
 import { v } from "convex/values";
 import { query, mutation, internalMutation } from "./_generated/server";
-import { requireCommissioner } from "./lib/auth";
+import { requireActiveUser, requireCommissioner } from "./lib/auth";
 import { NHL_SALARY_CAP_BY_START_YEAR } from "../src/lib/utils/domain/nhl-salary-caps";
 import { nhlProfileContract } from "./lib/nhlProfileContract";
 import { writeNhlContracts } from "./nhlContracts";
@@ -87,7 +87,7 @@ async function rosterPlayer(
 export const rosterSeasons = query({
   args: {},
   handler: async (ctx) => {
-    await requireCommissioner(ctx);
+    await requireActiveUser(ctx);
     const seasons = await ctx.db.query("seasons").take(100);
     const available = await Promise.all(
       seasons.map(async (season) => {
@@ -113,7 +113,7 @@ export const rosterSeasons = query({
 export const historicalRosterPage = query({
   args: { paginationOpts: paginationOptsValidator, seasonId: v.id("seasons") },
   handler: async (ctx, args) => {
-    await requireCommissioner(ctx);
+    await requireActiveUser(ctx);
     const season = await ctx.db.get(args.seasonId);
     const year = Number(season?.year) - 1;
     if (!season || !Number.isInteger(year) || year < 1900 || year > 2200)
@@ -157,7 +157,7 @@ export const historicalRosterPage = query({
 export const rosterTeams = query({
   args: {},
   handler: async (ctx) => {
-    await requireCommissioner(ctx);
+    await requireActiveUser(ctx);
     return (await ctx.db.query("nhlTeams").take(100)).map((team) => ({
       id: team._id,
       name: team.name,
@@ -172,7 +172,7 @@ export const rosterPage = query({
     seasonStartYear: v.number(),
   },
   handler: async (ctx, args) => {
-    await requireCommissioner(ctx);
+    await requireActiveUser(ctx);
     if (
       !Number.isInteger(args.seasonStartYear) ||
       args.seasonStartYear < 1900 ||
@@ -251,7 +251,7 @@ export const repairProfileContracts = internalMutation({
 export const page = query({
   args: { paginationOpts: paginationOptsValidator },
   handler: async (ctx, args) => {
-    await requireCommissioner(ctx);
+    await requireActiveUser(ctx);
     const result = await ctx.db
       .query("nhlContracts")
       .order("asc")
@@ -292,9 +292,9 @@ export const page = query({
 });
 
 export const talentSeason = query({
-  args: { seasonId: v.id("seasons") },
+  args: { seasonId: v.id("seasons"), includePlayers: v.optional(v.boolean()) },
   handler: async (ctx, args) => {
-    await requireCommissioner(ctx);
+    await requireActiveUser(ctx);
     const season = await ctx.db.get(args.seasonId);
     const seasonStartYear = Number(season?.year) - 1;
     if (
@@ -338,15 +338,29 @@ export const talentSeason = query({
       talentReferences.seasons[
         String(seasonStartYear) as keyof typeof talentReferences.seasons
       ];
+    const population = await projectNhlContractTalentSeason({
+      rows,
+      sources,
+      seasonStartYear,
+      currentSeasonStartYear,
+      reference,
+    });
     return {
       currentSeasonStartYear,
-      ...(await projectNhlContractTalentSeason({
-        rows,
-        sources,
-        seasonStartYear,
-        currentSeasonStartYear,
-        reference,
-      })),
+      ...population,
+      players: args.includePlayers
+        ? await Promise.all(
+            rows.map(async (row) => {
+              const id = ctx.db.normalizeId("players", row.playerId);
+              const player = id ? await ctx.db.get(id) : null;
+              return {
+                playerId: row.playerId,
+                name: player?.fullName ?? "Unknown player",
+                teams: row.nhlTeam ?? [],
+              };
+            }),
+          )
+        : undefined,
     };
   },
 });
@@ -354,7 +368,7 @@ export const talentSeason = query({
 export const salaryCaps = query({
   args: {},
   handler: async (ctx) => {
-    await requireCommissioner(ctx);
+    await requireActiveUser(ctx);
     const rows = await ctx.db
       .query("nhlSalaryCaps")
       .withIndex("by_seasonStartYear", (q) =>

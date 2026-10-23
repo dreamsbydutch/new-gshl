@@ -92,3 +92,10 @@ void test("uses segment boundaries and leaves fallback pages unselected", () => 
     activeNavId: null,
   });
 });
+
+void test("NHL Explorer keeps More active", () => {
+  assert.deepEqual(getAppShellRouteContext("/nhl", "view=players"), {
+    title: "NHL Explorer",
+    activeNavId: "more",
+  });
+});

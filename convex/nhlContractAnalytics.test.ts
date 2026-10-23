@@ -16,10 +16,10 @@ import {
   invokeMutation,
 } from "../tools/testing/convexMutationFixture";
 
-void test("all contract analytics endpoints enforce commissioner authorization", async () => {
+void test("NHL analytics reads require an active account", async () => {
   const f = mutationFixture();
-  for (const identity of [null, "owner"]) {
-    f.put("authUsers", "owner", { role: "owner", status: "active" });
+  for (const identity of [null, "inactive"]) {
+    f.put("authUsers", "inactive", { role: "owner", status: "pending" });
     f.signIn(identity);
     for (const [fn, args] of [
       [page, { paginationOpts: { numItems: 100, cursor: null } }],
@@ -210,4 +210,46 @@ void test("invalid cap batches are rejected before any writes", async () => {
   ])
     await assert.rejects(invokeMutation(saveSalaryCaps, f.ctx, { rows }));
   assert.equal(f.rows("nhlSalaryCaps").length, 0);
+});
+
+void test("active owners can browse NHL analytics but cannot edit salary caps", async () => {
+  const f = mutationFixture();
+  f.put("authUsers", "owner", { role: "owner", status: "active" });
+  f.put("seasons", "past", { year: 2009 });
+  f.put("players", "player", {
+    fullName: "Test Player",
+    posGroup: "F",
+    nhlTeam: ["WSH"],
+    isActive: true,
+  });
+  f.put("playerNhlStatLines", "stats", {
+    seasonId: "past",
+    playerId: "player",
+    GP: "1",
+    TOI: "10",
+    posGroup: "F",
+    nhlTeam: ["WSH"],
+  });
+  f.signIn("owner");
+  for (const [fn, args] of [
+    [page, { paginationOpts: { numItems: 10, cursor: null } }],
+    [
+      rosterPage,
+      { seasonStartYear: 2026, paginationOpts: { numItems: 10, cursor: null } },
+    ],
+    [rosterTeams, {}],
+    [rosterSeasons, {}],
+    [salaryCaps, {}],
+    [
+      historicalRosterPage,
+      { seasonId: "past", paginationOpts: { numItems: 10, cursor: null } },
+    ],
+  ] as const)
+    await invokeMutation(fn, f.ctx, args);
+  await assert.rejects(
+    invokeMutation(saveSalaryCaps, f.ctx, {
+      rows: [{ seasonStartYear: 2026, salaryCap: 104_000_000 }],
+    }),
+    /forbidden/i,
+  );
 });
