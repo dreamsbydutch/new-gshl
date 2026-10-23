@@ -15,6 +15,12 @@ import {
   applyNhlTalentDeploymentCalibration,
   fitNhlTalentDeploymentCalibration,
 } from "./nhl-conditional-talent-calibration";
+import {
+  fitNhlTalentAdaptation,
+  nhlTalentChangeEvidence,
+  nhlTalentTeamSet,
+  validateNhlTalentAdaptation,
+} from "./nhl-conditional-talent-adaptation";
 
 const positions: NhlTalentPosition[] = ["F", "D", "G"];
 const parameters: NhlTalentRateParameters[] = [25, 100, 400].flatMap(
@@ -100,6 +106,10 @@ function histories(
           minutes: player.minutes,
           gar: player.goalsAboveReplacement,
           games: player.games,
+          teams:
+            player.teams === undefined
+              ? undefined
+              : nhlTalentTeamSet(player.teams),
         });
       result.set(player.nhlPlayerId, history);
     }
@@ -213,6 +223,7 @@ export function projectConditionalNhlTalent(
       (o.age !== null && (!finite(o.age) || o.age < 15 || o.age > 60))
     )
       throw Error("Invalid conditional talent history");
+    nhlTalentTeamSet(o.teams);
     if (last) {
       const gap = o.year - last.year;
       const midpointAge = last.age === null ? null : last.age + gap / 2;
@@ -425,8 +436,27 @@ export function fitConditionalNhlTalent(
     validation.find((v) => v.position === ref.position)!.metrics =
       metrics(rows);
   }
+  for (const ref of references.filter((r) => r.position !== "G")) {
+    const rows = validationRows.filter((r) => r.position === ref.position);
+    const { adaptation, predictions } = fitNhlTalentAdaptation(
+      rows,
+      observations,
+      cutoffYear,
+    );
+    ref.adaptation = adaptation;
+    for (const row of rows) {
+      row.deploymentPrediction = row.predicted;
+      row.adaptiveCandidatePrediction =
+        predictions.get(`${row.nhlPlayerId}:${row.originYear}`) ??
+        row.predicted;
+      if (adaptation.appliedWeight > 0)
+        row.predicted = row.adaptiveCandidatePrediction;
+    }
+    validation.find((v) => v.position === ref.position)!.metrics =
+      metrics(rows);
+  }
   const artifact: NhlConditionalTalentArtifact = {
-    version: "nhl-conditional-talent-v2",
+    version: "nhl-conditional-talent-v3",
     units: "goals-above-replacement-per-60-minutes",
     cutoffYear,
     sourceSha256,
@@ -451,9 +481,11 @@ export function predictConditionalNhlTalent(
   if (!parsedArtifacts.has(artifact))
     parseConditionalNhlTalentArtifact(artifact);
   if (
-    !["nhl-conditional-talent-v1", "nhl-conditional-talent-v2"].includes(
-      artifact.version,
-    ) ||
+    ![
+      "nhl-conditional-talent-v1",
+      "nhl-conditional-talent-v2",
+      "nhl-conditional-talent-v3",
+    ].includes(artifact.version) ||
     artifact.units !== "goals-above-replacement-per-60-minutes" ||
     !Number.isSafeInteger(nhlPlayerId) ||
     nhlPlayerId <= 0 ||
@@ -474,7 +506,7 @@ export function predictConditionalNhlTalent(
   const evidence = artifact.validation.find(
     (r) => r.position === profile?.position,
   )?.metrics;
-  const ratePer60 =
+  const baseRate =
     projected &&
     ref?.deploymentCalibration &&
     profile &&
@@ -486,11 +518,68 @@ export function predictConditionalNhlTalent(
           projected.ratePer60,
         )
       : (projected?.ratePer60 ?? null);
+  const change =
+    profile &&
+    baseRate !== null &&
+    targetYear === artifact.cutoffYear + 1 &&
+    ref?.adaptation
+      ? nhlTalentChangeEvidence(
+          profile.observations,
+          artifact.cutoffYear,
+          baseRate,
+        )
+      : null;
+  const adjustmentPer60 = change
+    ? change.delta * (ref?.adaptation?.appliedWeight ?? 0)
+    : 0;
+  const ratePer60 = baseRate === null ? null : baseRate + adjustmentPer60;
+  const measuredSeasons = profile?.observations.length ?? 0;
+  const confidenceReasons: NhlConditionalTalentPrediction["confidenceReasons"] =
+    [];
+  if (!projected) confidenceReasons.push("no-rated-history");
+  else {
+    if (adjustmentPer60 !== 0) confidenceReasons.push("experimental-trend");
+    if (
+      !evidence ||
+      evidence.rows < 100 ||
+      evidence.origins < 3 ||
+      evidence.positionMeanWinningOrigins * 3 < evidence.origins * 2 ||
+      evidence.mse === null ||
+      evidence.latestObservedMse === null ||
+      evidence.positionMeanMse === null ||
+      evidence.mse >=
+        Math.min(evidence.latestObservedMse, evidence.positionMeanMse)
+    )
+      confidenceReasons.push("limited-position-validation");
+    if (measuredSeasons < 2)
+      confidenceReasons.push("insufficient-measured-seasons");
+    if (observedMinutes < 1000)
+      confidenceReasons.push("insufficient-measured-minutes");
+    if (last?.age == null) confidenceReasons.push("missing-age-evidence");
+    if ((ref?.agingPairs ?? 0) < 50)
+      confidenceReasons.push("limited-aging-evidence");
+    if (profile && profile.latestAppearanceYear < artifact.cutoffYear)
+      confidenceReasons.push("absent-season");
+    if (last?.year !== artifact.cutoffYear)
+      confidenceReasons.push("stale-measurement");
+    if (targetYear > artifact.cutoffYear + 1)
+      confidenceReasons.push("future-horizon");
+  }
   return {
     nhlPlayerId,
     position: profile?.position ?? null,
     targetYear,
     ratePer60,
+    ...(change
+      ? {
+          adaptation: {
+            direction: change.direction,
+            adjustmentPer60,
+            teamSetChanged: change.teamSetChanged,
+            minutesPerAppearanceChange: change.minutesPerAppearanceChange,
+          },
+        }
+      : {}),
     latentStandardDeviation: projected?.latentStandardDeviation ?? null,
     lastObservedYear: last?.year ?? null,
     absentSeasons: profile
@@ -498,22 +587,11 @@ export function predictConditionalNhlTalent(
       : 0,
     staleSeasons: last ? artifact.cutoffYear - last.year : 0,
     observedMinutes,
+    measuredSeasons,
+    confidenceReasons,
     status: !projected
       ? "unavailable"
-      : evidence &&
-          evidence.rows >= 100 &&
-          evidence.origins >= 3 &&
-          evidence.positionMeanWinningOrigins * 3 >= evidence.origins * 2 &&
-          evidence.mse !== null &&
-          evidence.latestObservedMse !== null &&
-          evidence.positionMeanMse !== null &&
-          evidence.mse <
-            Math.min(evidence.latestObservedMse, evidence.positionMeanMse) &&
-          observedMinutes >= 1000 &&
-          last?.age !== null &&
-          (ref?.agingPairs ?? 0) >= 50 &&
-          last?.year === artifact.cutoffYear &&
-          targetYear <= artifact.cutoffYear + 1
+      : confidenceReasons.length === 0
         ? "qualified"
         : "research",
   };
@@ -527,9 +605,11 @@ export function parseConditionalNhlTalentArtifact(
     throw Error("Invalid conditional talent artifact");
   const a = input as NhlConditionalTalentArtifact;
   if (
-    !["nhl-conditional-talent-v1", "nhl-conditional-talent-v2"].includes(
-      a.version,
-    ) ||
+    ![
+      "nhl-conditional-talent-v1",
+      "nhl-conditional-talent-v2",
+      "nhl-conditional-talent-v3",
+    ].includes(a.version) ||
     a.units !== "goals-above-replacement-per-60-minutes" ||
     !Number.isSafeInteger(a.cutoffYear) ||
     a.cutoffYear < 1900 ||
@@ -560,7 +640,7 @@ export function parseConditionalNhlTalentArtifact(
     projectConditionalNhlTalent(ref, [], a.cutoffYear + 1);
     const calibration = ref.deploymentCalibration;
     if (
-      a.version === "nhl-conditional-talent-v2" &&
+      a.version !== "nhl-conditional-talent-v1" &&
       ref.position !== "G" &&
       !calibration
     )
@@ -568,7 +648,7 @@ export function parseConditionalNhlTalentArtifact(
     if (calibration) {
       const m = calibration.model;
       if (
-        a.version !== "nhl-conditional-talent-v2" ||
+        a.version === "nhl-conditional-talent-v1" ||
         ref.position === "G" ||
         calibration.version !== "nhl-talent-deployment-calibration-v1" ||
         ![0, 1, 10, 100, 1000].includes(calibration.selectedRidge) ||
@@ -608,6 +688,17 @@ export function parseConditionalNhlTalentArtifact(
       )
         throw Error("Invalid NHL deployment validation");
     }
+    if (
+      a.version === "nhl-conditional-talent-v3" &&
+      ref.position !== "G" &&
+      !ref.adaptation
+    )
+      throw Error("Missing NHL talent adaptation");
+    if (ref.adaptation) {
+      if (a.version !== "nhl-conditional-talent-v3" || ref.position === "G")
+        throw Error("Invalid NHL adaptation position");
+      validateNhlTalentAdaptation(ref.adaptation, a.cutoffYear);
+    }
   }
   for (const profile of a.profiles) {
     if (
@@ -625,7 +716,7 @@ export function parseConditionalNhlTalentArtifact(
       profile.observations.some(
         (o, i) =>
           !o ||
-          (a.version === "nhl-conditional-talent-v2" &&
+          (a.version !== "nhl-conditional-talent-v1" &&
             (!Number.isSafeInteger(o.games) || !o.games || o.games <= 0)) ||
           o.year > profile.latestAppearanceYear ||
           (i > 0 && o.year <= profile.observations[i - 1]!.year),

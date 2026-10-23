@@ -1,6 +1,20 @@
 "use client";
 import { Button } from "@gshl-ui";
 import { useNhlProjectedTalentRankings } from "../../hooks/features/useNhlProjectedTalentRankings";
+import type { NhlTalentConfidenceReason } from "../../lib/types/nhl-conditional-talent";
+
+const confidenceReasonLabels: Record<NhlTalentConfidenceReason, string> = {
+  "no-rated-history": "No rated history",
+  "experimental-trend": "Experimental trend adjustment",
+  "limited-position-validation": "Limited validation support for this position",
+  "insufficient-measured-seasons": "Fewer than two rated seasons",
+  "insufficient-measured-minutes": "Fewer than 1,000 rated minutes",
+  "missing-age-evidence": "Age evidence unavailable",
+  "limited-aging-evidence": "Limited aging evidence",
+  "absent-season": "Return after a missed season is uncertain",
+  "stale-measurement": "Latest rated evidence predates the model cutoff",
+  "future-horizon": "Longer forecast horizon has limited support",
+};
 
 const score = (n: number | null | undefined, decimals = 2) =>
   n === null || n === undefined
@@ -105,16 +119,27 @@ export function NhlProjectedTalentRankings() {
                     <td className="px-4 py-3 tabular-nums">
                       {score(row.expected?.valuePer82)}
                     </td>
-                    <td className="px-4 py-3 text-muted-foreground">
+                    <td
+                      className="px-4 py-3 text-muted-foreground"
+                      title={row.forecast?.confidenceReasons
+                        .map((reason) => confidenceReasonLabels[reason])
+                        .join("; ")}
+                    >
                       {!row.forecast || row.forecast.status === "unavailable"
                         ? "No rated history"
                         : row.forecast.absentSeasons > 0
                           ? "Return uncertain"
                           : row.forecast.staleSeasons > 0
                             ? "Older rated evidence"
-                            : row.forecast.status === "research"
-                              ? "Limited support"
-                              : "Supported"}
+                            : row.forecast.adaptation?.adjustmentPer60
+                              ? "Experimental trend"
+                              : row.forecast.measuredSeasons < 2
+                                ? "One rated season"
+                                : row.forecast.observedMinutes < 1000
+                                  ? "Under 1,000 rated minutes"
+                                  : row.forecast.status === "research"
+                                    ? "Limited support"
+                                    : "Supported"}
                     </td>
                   </tr>
                 ))}

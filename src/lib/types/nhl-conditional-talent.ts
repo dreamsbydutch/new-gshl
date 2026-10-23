@@ -7,6 +7,38 @@ export interface NhlTalentRateObservation {
   gar: number;
   /** Actual appearances; absent seasons never supply zero-game measurements. */
   games?: number;
+  teams?: readonly string[];
+}
+export interface NhlTalentAdaptationMetrics {
+  rows: number;
+  baseMse: number | null;
+  adaptiveMse: number | null;
+}
+export interface NhlTalentAdaptation {
+  version: "nhl-sustained-talent-v1";
+  trainingThroughYear: number;
+  reliabilityMinutes: number;
+  selectedWeight: number;
+  appliedWeight: number;
+  status: "experimental" | "disabled";
+  validation: NhlTalentAdaptationMetrics & {
+    origins: number;
+    changedOrigins: number;
+    winningOrigins: number;
+    changedRows: number;
+    lateGrowth: NhlTalentAdaptationMetrics;
+    sustainedDecline: NhlTalentAdaptationMetrics;
+    unconfirmedJumps: NhlTalentAdaptationMetrics;
+    staleHistory: NhlTalentAdaptationMetrics;
+    afterAbsence: NhlTalentAdaptationMetrics;
+  };
+}
+export interface NhlTalentChangeEvidence {
+  direction: "growth" | "decline" | null;
+  adjustmentPer60: number;
+  /** Unordered season affiliation changed; no claim about trade timing or causality. */
+  teamSetChanged: boolean | null;
+  minutesPerAppearanceChange: number | null;
 }
 export interface NhlTalentDeploymentLinear {
   means: number[];
@@ -46,6 +78,7 @@ export interface NhlTalentRateReference extends NhlTalentRateParameters {
   aging: [number, number];
   agingPairs: number;
   deploymentCalibration?: NhlTalentDeploymentCalibration;
+  adaptation?: NhlTalentAdaptation;
 }
 export interface NhlTalentRateValidationRow {
   nhlPlayerId: number;
@@ -60,6 +93,8 @@ export interface NhlTalentRateValidationRow {
   positionMean: number;
   selected: NhlTalentRateParameters;
   basePrediction?: number;
+  deploymentPrediction?: number;
+  adaptiveCandidatePrediction?: number;
 }
 export interface NhlTalentRateMetrics {
   rows: number;
@@ -79,7 +114,10 @@ export interface NhlTalentRateMetrics {
   };
 }
 export interface NhlConditionalTalentArtifact {
-  version: "nhl-conditional-talent-v1" | "nhl-conditional-talent-v2";
+  version:
+    | "nhl-conditional-talent-v1"
+    | "nhl-conditional-talent-v2"
+    | "nhl-conditional-talent-v3";
   units: "goals-above-replacement-per-60-minutes";
   cutoffYear: number;
   sourceSha256: string;
@@ -92,6 +130,18 @@ export interface NhlConditionalTalentArtifact {
   }[];
   validation: { position: NhlTalentPosition; metrics: NhlTalentRateMetrics }[];
 }
+export type NhlTalentConfidenceReason =
+  | "no-rated-history"
+  | "experimental-trend"
+  | "limited-position-validation"
+  | "insufficient-measured-seasons"
+  | "insufficient-measured-minutes"
+  | "missing-age-evidence"
+  | "limited-aging-evidence"
+  | "absent-season"
+  | "stale-measurement"
+  | "future-horizon";
+
 export interface NhlConditionalTalentPrediction {
   nhlPlayerId: number;
   position: NhlTalentPosition | null;
@@ -103,5 +153,8 @@ export interface NhlConditionalTalentPrediction {
   absentSeasons: number;
   staleSeasons: number;
   observedMinutes: number;
+  measuredSeasons: number;
+  confidenceReasons: NhlTalentConfidenceReason[];
   status: "qualified" | "research" | "unavailable";
+  adaptation?: NhlTalentChangeEvidence;
 }

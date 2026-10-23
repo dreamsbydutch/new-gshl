@@ -73,7 +73,7 @@ void test("unknown players remain unknown; incomplete groups expose provisional 
   });
   const result = rankNhlRosterTalent([team("missing", players)])[0]!;
   assert.equal(result.gar, null);
-  assert.equal(result.rank, 1);
+  assert.equal(result.rank, null);
   assert.equal(result.modeledGar, 166);
   assert.equal(result.provisional, true);
   assert.equal(result.knownSubtotal, 166);
@@ -101,7 +101,7 @@ void test("all-unknown rosters have no score; unknown prospects do not become re
   assert.equal(known.provisional, true);
 });
 
-void test("research estimates remain explicitly provisional and partial teams rank by modeled subtotal", () => {
+void test("partial teams retain subtotals without outranking complete teams through missing values", () => {
   const full = team("full");
   const partial = team(
     "partial",
@@ -114,14 +114,14 @@ void test("research estimates remain explicitly provisional and partial teams ra
       })),
   );
   const ranked = rankNhlRosterTalent([full, partial]);
-  assert.equal(ranked[0]?.id, "partial");
+  assert.equal(ranked[0]?.id, "full");
   assert.equal(ranked[0]?.rank, 1);
-  assert.equal(ranked[0]?.gar, null);
-  assert.equal(ranked[0]?.modeledGar, 1163);
-  assert.equal(ranked[0]?.provisional, true);
-  assert.equal(ranked[0]?.researchPlayers.length, 23);
-  assert.equal(ranked[1]?.rank, 2);
-  assert.equal(ranked[1]?.provisional, false);
+  assert.equal(ranked[0]?.provisional, false);
+  assert.equal(ranked[1]?.gar, null);
+  assert.equal(ranked[1]?.modeledGar, 1163);
+  assert.equal(ranked[1]?.provisional, true);
+  assert.equal(ranked[1]?.researchPlayers.length, 23);
+  assert.equal(ranked[1]?.rank, null);
 });
 
 void test("selection and competition ranks are deterministic across roster/team order and ties", () => {
@@ -144,6 +144,29 @@ void test("selection and competition ranks are deterministic across roster/team 
     ],
   );
   assert.deepEqual(first, second);
+});
+
+void test("unknown NHL identities retain deterministic selected and outside-depth ordering", () => {
+  const input = {
+    ...team("unknown"),
+    selectionPolicy: "nhl-first" as const,
+    roster: Array.from({ length: 16 }, (_, i) => ({
+      id: `unknown-${String(i).padStart(2, "0")}`,
+      nhlPlayerId: null,
+      playerName: `Unknown ${i}`,
+      position: "F",
+      gar: null,
+      status: "unavailable" as const,
+      membership: "organization" as const,
+    })),
+  };
+  const forward = rankNhlRosterTalent([input]);
+  assert.deepEqual(
+    rankNhlRosterTalent([{ ...input, roster: [...input.roster].reverse() }]),
+    forward,
+  );
+  assert.equal(forward[0]!.rank, null);
+  assert.equal(forward[0]!.outsideDepth.length, 2);
 });
 
 void test("rejects duplicate canonical players across teams and nonfinite or identity-free values", () => {

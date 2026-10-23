@@ -45,35 +45,55 @@ export function rankNhlRosterTalent(teams: readonly NhlRosterTalentTeam[]) {
     }
   }
   const result = teams.map((team) => {
+    const nhlFirst = team.selectionPolicy === "nhl-first";
     const available = team.roster
       .filter(
         (p) =>
           positions.some((position) => position === p.position) &&
-          p.gar !== null,
+          (p.gar !== null || nhlFirst),
       )
-      .sort((a, b) => a.nhlPlayerId! - b.nhlPlayerId!);
+      .sort(
+        (a, b) =>
+          (a.nhlPlayerId ?? Infinity) - (b.nhlPlayerId ?? Infinity) ||
+          a.id.localeCompare(b.id),
+      );
     const groups = positions.map((position) => {
       const roster = available
         .filter((p) => p.position === position)
-        .sort((a, b) => b.gar! - a.gar! || a.nhlPlayerId! - b.nhlPlayerId!)
+        .sort(
+          (a, b) =>
+            (nhlFirst
+              ? Number(b.membership === "nhl-roster") -
+                Number(a.membership === "nhl-roster")
+              : 0) ||
+            (b.gar ?? -Infinity) - (a.gar ?? -Infinity) ||
+            (a.nhlPlayerId ?? Infinity) - (b.nhlPlayerId ?? Infinity) ||
+            a.id.localeCompare(b.id),
+        )
         .slice(0, NHL_ROSTER_TALENT_DEPTH[position]);
-      const total = roster.reduce((sum, p) => sum + p.gar!, 0);
+      const total = roster.reduce((sum, p) => sum + (p.gar ?? 0), 0);
       if (!Number.isFinite(total)) throw Error("Nonfinite NHL roster total");
       return {
         position,
         roster,
         total,
         required: NHL_ROSTER_TALENT_DEPTH[position],
+        ratedPlayers: roster.filter((p) => p.gar !== null).length,
       };
     });
     const selected: NhlRosterTalentPlayer[] = groups.flatMap((g) => g.roster);
     const selectedIds = new Set(selected.map((p) => p.id));
-    const complete = groups.every((g) => g.roster.length === g.required);
+    const slotsComplete = groups.every((g) => g.roster.length === g.required);
+    const complete = slotsComplete && selected.every((p) => p.gar !== null);
     const knownSubtotal = groups.reduce((sum, g) => sum + g.total, 0);
     if (!Number.isFinite(knownSubtotal))
       throw Error("Nonfinite NHL team total");
     const unmodeled = team.roster
-      .filter((p) => !available.includes(p))
+      .filter((p) =>
+        nhlFirst
+          ? selectedIds.has(p.id) && p.gar === null
+          : !available.includes(p),
+      )
       .sort((a, b) => a.id.localeCompare(b.id));
     const researchPlayers = selected.filter((p) => p.status === "research");
     return {
@@ -89,8 +109,9 @@ export function rankNhlRosterTalent(teams: readonly NhlRosterTalentTeam[]) {
       researchPlayers,
       outsideDepth: available.filter((p) => !selectedIds.has(p.id)),
       complete,
+      slotsComplete,
       knownSubtotal,
-      modeledGar: selected.length ? knownSubtotal : null,
+      modeledGar: selected.some((p) => p.gar !== null) ? knownSubtotal : null,
       provisional:
         !complete ||
         unmodeled.length > 0 ||
@@ -102,16 +123,16 @@ export function rankNhlRosterTalent(teams: readonly NhlRosterTalentTeam[]) {
   });
   result.sort(
     (a, b) =>
-      Number(b.modeledGar !== null) - Number(a.modeledGar !== null) ||
-      (b.modeledGar ?? 0) - (a.modeledGar ?? 0) ||
+      Number(b.complete) - Number(a.complete) ||
+      (a.complete && b.complete ? b.gar! - a.gar! : 0) ||
       a.name.localeCompare(b.name) ||
       a.id.localeCompare(b.id),
   );
   let previous: number | null = null;
   let rank = 0;
   return result.map((team, i) => {
-    if (team.modeledGar !== null && team.modeledGar !== previous) rank = i + 1;
-    previous = team.modeledGar;
-    return { ...team, rank: team.modeledGar === null ? null : rank };
+    if (team.complete && team.gar !== previous) rank = i + 1;
+    previous = team.gar;
+    return { ...team, rank: team.complete ? rank : null };
   });
 }

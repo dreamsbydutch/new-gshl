@@ -10,6 +10,26 @@ import promoted from "../../data/nhl-conditional-talent.json";
 import type { NhlTalentForecastDataset } from "../../types/nhl-contract-talent-forecast";
 import type { NhlTalentRateReference } from "../../types/nhl-conditional-talent";
 
+void test("sustained defender growth updates Jones conservatively and remains experimental", () => {
+  const artifact = parseConditionalNhlTalentArtifact(promoted);
+  const jones = predictConditionalNhlTalent(artifact, 8477495, 2027);
+  assert.ok(Math.abs(jones.ratePer60! - 0.16903967853732635) < 1e-12);
+  assert.equal(jones.status, "research");
+  assert.equal(jones.adaptation?.direction, "growth");
+  assert.ok(jones.adaptation.adjustmentPer60 > 0);
+  assert.ok(jones.adaptation.minutesPerAppearanceChange! < 0);
+  assert.equal(jones.adaptation?.teamSetChanged, true);
+  assert.equal(
+    artifact.references.find((r) => r.position === "F")!.adaptation!
+      .appliedWeight,
+    0,
+  );
+  assert.equal(
+    artifact.references.find((r) => r.position === "G")!.adaptation,
+    undefined,
+  );
+});
+
 const reference: NhlTalentRateReference = {
   position: "F",
   priorMean: 0.1,
@@ -193,6 +213,45 @@ void test("a short low-usage scoring sample does not outrank established forward
     () => parseConditionalNhlTalentArtifact(missingGames),
     /profile/,
   );
+});
+
+void test("Gritsyuk's 1,001-minute single season remains research with an explicit history reason", () => {
+  const artifact = parseConditionalNhlTalentArtifact(promoted);
+  const gritsyuk = predictConditionalNhlTalent(artifact, 8481721, 2027);
+  assert.equal(gritsyuk.observedMinutes, 1001.5);
+  assert.equal(gritsyuk.measuredSeasons, 1);
+  assert.equal(gritsyuk.status, "research");
+  assert.ok(
+    gritsyuk.confidenceReasons.includes("insufficient-measured-seasons"),
+  );
+  assert.ok(
+    !gritsyuk.confidenceReasons.includes("insufficient-measured-minutes"),
+  );
+  assert.ok(gritsyuk.ratePer60 !== null && Number.isFinite(gritsyuk.ratePer60));
+});
+
+void test("two measured seasons qualify at 1,000 minutes while thinner exposure states its limit", () => {
+  const artifact = structuredClone(parseConditionalNhlTalentArtifact(promoted));
+  const player = artifact.profiles.find((p) => p.nhlPlayerId === 8478055)!;
+  player.observations = player.observations.slice(-2).map((o) => ({
+    ...o,
+    minutes: 500,
+  }));
+  const before = structuredClone(artifact);
+  const supported = predictConditionalNhlTalent(artifact, 8478055, 2027);
+  assert.equal(supported.measuredSeasons, 2);
+  assert.equal(supported.observedMinutes, 1000);
+  assert.equal(supported.status, "qualified");
+  assert.deepEqual(supported.confidenceReasons, []);
+  assert.deepEqual(artifact, before);
+  const thinnerArtifact = structuredClone(artifact);
+  thinnerArtifact.profiles.find(
+    (p) => p.nhlPlayerId === 8478055,
+  )!.observations[0]!.minutes = 499.5;
+  const thin = predictConditionalNhlTalent(thinnerArtifact, 8478055, 2027);
+  assert.equal(thin.status, "research");
+  assert.deepEqual(thin.confidenceReasons, ["insufficient-measured-minutes"]);
+  assert.ok(thin.ratePer60 !== null);
 });
 
 void test("duplicate years, wrong source models, invalid exposure and unknown future requests fail closed", () => {

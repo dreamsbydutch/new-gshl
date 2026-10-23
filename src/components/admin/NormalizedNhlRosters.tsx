@@ -115,7 +115,16 @@ function RosterContent() {
             aria-pressed={view.projectionBasis === "conditional"}
             onClick={() => view.setProjectionBasis("conditional")}
           >
-            Talent when playing
+            Talent with estimated roles
+          </Button>
+          <Button
+            variant={
+              view.projectionBasis === "standard" ? "default" : "outline"
+            }
+            aria-pressed={view.projectionBasis === "standard"}
+            onClick={() => view.setProjectionBasis("standard")}
+          >
+            Standard usage comparison
           </Button>
           <Button
             variant={
@@ -183,6 +192,18 @@ function RosterContent() {
           {!view.teams.length ? (
             <p>No teams or players match your search.</p>
           ) : null}
+          {view.mode === "current" && view.organizationError ? (
+            <div role="alert" className="rounded-lg border p-3">
+              <p>{view.organizationError}</p>
+              <Button
+                variant="outline"
+                className="mt-2"
+                onClick={view.retryOrganizations}
+              >
+                Retry NHL rosters
+              </Button>
+            </div>
+          ) : null}
           {view.mode === "current" && view.talentNeedsRefresh ? (
             <p role="status" className="text-sm text-muted-foreground">
               Projected team strength needs a forecast for the current season.
@@ -191,6 +212,7 @@ function RosterContent() {
             <NhlRosterTalentRankings
               teams={view.talentTeams}
               basis={view.talentBasis}
+              usageBasis={view.lineupUsageBasis}
             />
           ) : null}
           {view.teams.map((team) => (

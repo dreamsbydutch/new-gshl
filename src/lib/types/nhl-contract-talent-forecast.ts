@@ -10,6 +10,8 @@ export interface NhlTalentAnnualPlayer {
   minutes: number;
   goalsAboveReplacement: number | null;
   age: number | null;
+  /** Optional verified season club set; unordered and not a trade timeline. */
+  teams?: readonly string[];
 }
 export interface NhlTalentAnnualSeason {
   /** Ending year: 2024 means 2023–24. */

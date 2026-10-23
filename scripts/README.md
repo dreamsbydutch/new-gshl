@@ -672,6 +672,14 @@ outcomes, and never publishes or replaces a shipped reference. Its help output
 owns the current input, ending-year cutoff, and output flags. This rate model
 does not refit or overwrite annual expected-contribution forecasts.
 
+`src/commands/ratings/fit-nhl-lineup-usage.ts` fits next-season skater minutes per
+appearance from verified complete NHL cohorts, including positive-exposure
+seasons with unrated GAR. It predicts deployment conditional on playing, not
+games played or return probability. It writes a new artifact and chronological
+validation rows offline. Run its help for input, ending-year cutoff and output
+flags; it never publishes or replaces the shipped reference. Team comparisons
+normalize these role estimates to a shared minute budget separately from GAR/60.
+
 #### Compare salary-rating upgrades with the current talent formula
 
 `src/commands/ratings/test-salary-rating-upgrades.ts` reuses the category experiment's

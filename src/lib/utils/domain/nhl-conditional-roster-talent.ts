@@ -13,10 +13,33 @@ export const NHL_TALENT_LINEUP_USAGE = {
   G: { minutes: 60, weights: [0.65, 0.35] },
 } as const;
 
-/** Input ratePer60 is conditional ability. Output gar is allocated GAR per 82 regulation games. */
+/** Input ratePer60 is conditional ability. Output gar is allocated GAR per82 regulation games.
+ * Projected roles are normalized budget weights, not literal future player minutes.
+ * Unknown roles retain their standard slot shares and prevent a complete team rank.
+ */
 export function rankConditionalNhlRosterTalent(
   teams: readonly NhlConditionalRosterTalentTeam[],
+  mode: "standard" | "projected" = "standard",
 ) {
+  if (mode !== "standard" && mode !== "projected")
+    throw Error("Invalid NHL lineup allocation mode");
+  const usageByPlayer = new Map<string, number | null | undefined>();
+  const nhlFirstByTeam = new Map(
+    teams.map((team) => [team.id, team.selectionPolicy === "nhl-first"]),
+  );
+  for (const team of teams)
+    for (const player of team.roster) {
+      const minutes = player.projectedMinutesPerAppearance;
+      if (
+        minutes != null &&
+        (typeof minutes !== "number" ||
+          !Number.isFinite(minutes) ||
+          minutes <= 0 ||
+          minutes > 65)
+      )
+        throw Error("Invalid projected NHL minutes per appearance");
+      usageByPlayer.set(player.id, minutes);
+    }
   const rated = rankNhlRosterTalent(
     teams.map((team) => ({
       ...team,
@@ -27,43 +50,196 @@ export function rankConditionalNhlRosterTalent(
     })),
   )
     .map((team) => {
+      const missingUsage = team.selected.filter(
+        (player) =>
+          player.position !== "G" && usageByPlayer.get(player.id) == null,
+      );
+      const missingSlots = team.groups.filter(
+        (group) => group.roster.length !== group.required,
+      );
+      const usageIssues =
+        mode === "standard"
+          ? []
+          : [
+              ...missingUsage.map(
+                (player) =>
+                  `Projected usage is unavailable for ${player.playerName}.`,
+              ),
+              ...missingSlots.map(
+                (group) =>
+                  `Projected allocation requires all ${group.required} ${group.position === "F" ? "forward" : group.position === "D" ? "defense" : "goalie"} roster slots.`,
+              ),
+            ];
       const groups = team.groups.map((group) => {
+        const usageComplete =
+          mode === "standard" ||
+          (group.roster.length === group.required &&
+            (group.position === "G" ||
+              group.roster.every(
+                (player) => usageByPlayer.get(player.id) != null,
+              )));
+        const knownUsage = group.roster.filter(
+          (player) => usageByPlayer.get(player.id) != null,
+        );
+        const allocationBasis:
+          | "standard"
+          | "projected"
+          | "partial-projected"
+          | "standard-fallback" =
+          mode === "standard" || group.position === "G"
+            ? "standard"
+            : usageComplete
+              ? "projected"
+              : knownUsage.length > 0
+                ? "partial-projected"
+                : "standard-fallback";
         const policy = NHL_TALENT_LINEUP_USAGE[group.position];
         const denominator = policy.weights.reduce(
           (s: number, w: number) => s + w,
           0,
         );
+        const projectedMinutes = new Map<string, number>();
+        const standardShare = (index: number) =>
+          (policy.minutes * policy.weights[index]!) / denominator;
+        const unallocatedMinutesPerTeamGame = policy.weights
+          .slice(group.roster.length)
+          .reduce(
+            (sum: number, _weight: number, index: number) =>
+              sum + standardShare(group.roster.length + index),
+            0,
+          );
+        if (
+          (allocationBasis === "projected" ||
+            allocationBasis === "partial-projected") &&
+          group.position !== "G"
+        ) {
+          const primaryCount = group.position === "F" ? 12 : 6;
+          const heldIndices = policy.weights.flatMap((_weight, index) =>
+            !group.roster[index] ||
+            usageByPlayer.get(group.roster[index].id) == null
+              ? [index]
+              : [],
+          );
+          const heldPrimary = heldIndices.filter(
+            (index) => index < primaryCount,
+          );
+          const availableReserveIndices = policy.weights.flatMap(
+            (_weight, index) =>
+              index >= primaryCount && !heldIndices.includes(index)
+                ? [index]
+                : [],
+          );
+          const byUsage = [...knownUsage].sort(
+            (a, b) =>
+              (nhlFirstByTeam.get(team.id)
+                ? Number(b.membership === "nhl-roster") -
+                  Number(a.membership === "nhl-roster")
+                : 0) ||
+              usageByPlayer.get(b.id)! - usageByPlayer.get(a.id)! ||
+              (a.nhlPlayerId ?? Infinity) - (b.nhlPlayerId ?? Infinity) ||
+              a.id.localeCompare(b.id),
+          );
+          const availablePrimaryCount = primaryCount - heldPrimary.length;
+          const reserves = byUsage.slice(availablePrimaryCount);
+          const reserveMinutes = availableReserveIndices.map(standardShare);
+          const remaining =
+            policy.minutes -
+            policy.weights
+              .slice(primaryCount)
+              .reduce(
+                (sum: number, _weight: number, index: number) =>
+                  sum + standardShare(primaryCount + index),
+                0,
+              ) -
+            heldPrimary.reduce((sum, index) => sum + standardShare(index), 0);
+          const primary = byUsage.slice(0, availablePrimaryCount);
+          const mass = primary.reduce(
+            (sum, player) => sum + usageByPlayer.get(player.id)!,
+            0,
+          );
+          for (const player of primary)
+            projectedMinutes.set(
+              player.id,
+              remaining * (usageByPlayer.get(player.id)! / mass),
+            );
+          reserves.forEach((player, index) =>
+            projectedMinutes.set(player.id, reserveMinutes[index]!),
+          );
+        }
         const roster = group.roster.map((player, index) => {
-          const ratePer60 = player.gar!;
+          const ratePer60 = player.gar;
           // Missing slots keep their own missing share; never redistribute it to known players.
           const minutesPerTeamGame =
+            projectedMinutes.get(player.id) ??
             (policy.minutes * policy.weights[index]!) / denominator;
+          if (
+            !Number.isFinite(minutesPerTeamGame) ||
+            minutesPerTeamGame <= 0 ||
+            minutesPerTeamGame > 60
+          )
+            throw Error("Invalid NHL regulation-minute allocation");
           return {
             ...player,
             ratePer60,
+            projectedMinutesPerAppearance: usageByPlayer.get(player.id),
+            allocationBasis:
+              mode === "standard" || group.position === "G"
+                ? ("standard" as const)
+                : projectedMinutes.has(player.id)
+                  ? ("projected" as const)
+                  : ("standard-fallback" as const),
             minutesPerTeamGame,
-            gar: (ratePer60 * minutesPerTeamGame * 82) / 60,
+            gar:
+              ratePer60 === null
+                ? null
+                : (ratePer60 * minutesPerTeamGame * 82) / 60,
           };
         });
         return {
           ...group,
           roster,
-          total: roster.reduce((s, p) => s + p.gar, 0),
+          allocationBasis,
+          usageComplete,
+          unallocatedMinutesPerTeamGame,
+          total: roster.reduce((s, p) => s + (p.gar ?? 0), 0),
         };
       });
+      const usageComplete = groups.every((group) => group.usageComplete);
+      const projectedGroups = groups.filter(
+        (group) =>
+          group.allocationBasis === "projected" ||
+          group.allocationBasis === "partial-projected",
+      ).length;
+      const allocationBasis:
+        | "standard"
+        | "projected"
+        | "partial-projected"
+        | "standard-fallback" =
+        mode === "standard"
+          ? "standard"
+          : usageComplete
+            ? "projected"
+            : projectedGroups > 0
+              ? "partial-projected"
+              : "standard-fallback";
       const selected = groups.flatMap((g) => g.roster);
       const knownSubtotal = groups.reduce((s, g) => s + g.total, 0);
       return {
         ...team,
         groups,
         selected,
+        allocationBasis,
+        usageComplete,
+        usageIssues,
+        complete: team.complete && usageComplete,
+        provisional: team.provisional || !usageComplete,
         knownSubtotal,
-        modeledGar: selected.length ? knownSubtotal : null,
-        gar: team.complete ? knownSubtotal : null,
+        modeledGar: selected.some((p) => p.gar !== null) ? knownSubtotal : null,
+        gar: team.complete && usageComplete ? knownSubtotal : null,
         researchPlayers: selected.filter((p) => p.status === "research"),
         outsideDepth: team.outsideDepth.map((player) => ({
           ...player,
-          ratePer60: player.gar!,
+          ratePer60: player.gar,
           gar: 0,
           minutesPerTeamGame: 0,
         })),
@@ -71,15 +247,16 @@ export function rankConditionalNhlRosterTalent(
     })
     .sort(
       (a, b) =>
-        (b.modeledGar ?? -Infinity) - (a.modeledGar ?? -Infinity) ||
-        a.name.localeCompare(b.name),
+        Number(b.complete) - Number(a.complete) ||
+        (a.complete && b.complete ? b.gar! - a.gar! : 0) ||
+        a.name.localeCompare(b.name) ||
+        a.id.localeCompare(b.id),
     );
   let previous: number | null = null,
     rank = 0;
   return rated.map((team, index) => {
-    if (team.modeledGar !== null && team.modeledGar !== previous)
-      rank = index + 1;
-    previous = team.modeledGar;
-    return { ...team, rank: team.modeledGar === null ? null : rank };
+    if (team.complete && team.gar !== previous) rank = index + 1;
+    previous = team.gar;
+    return { ...team, rank: team.complete ? rank : null };
   });
 }

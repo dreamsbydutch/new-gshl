@@ -5,6 +5,23 @@ import {
   NHL_SCHEDULE_REFRESH_SECONDS,
 } from "@gshl-utils/features/nhl";
 import { loadNHLSchedule, loadNHLStandings, loadNHLGame } from "./nhl-data";
+import { loadNhlOrganizations } from "./nhl-organizations-data";
+import { NHL_ORGANIZATION_REFRESH_SECONDS } from "../lib/utils/features/nhl-organizations";
+
+const cachedOrganizations = unstable_cache(
+  async (seasonId: number, refreshWindow: number) => {
+    void refreshWindow;
+    return loadNhlOrganizations(seasonId);
+  },
+  ["nhl-current-organizations-v1"],
+  { revalidate: NHL_ORGANIZATION_REFRESH_SECONDS },
+);
+export function getNhlOrganizations(seasonId: number) {
+  return cachedOrganizations(
+    seasonId,
+    Math.floor(Date.now() / (NHL_ORGANIZATION_REFRESH_SECONDS * 1000)),
+  );
+}
 
 const cachedStandings = unstable_cache(
   async (seasonId: number, refreshWindow: number) => {

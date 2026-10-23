@@ -7,8 +7,9 @@ export interface NhlRosterTalentPlayer {
   position: string;
   gar: number | null;
   status: "qualified" | "research" | "unavailable";
-  ratePer60?: number;
+  ratePer60?: number | null;
   minutesPerTeamGame?: number;
+  membership?: "nhl-roster" | "organization";
 }
 
 export interface NhlRosterTalentTeam {
@@ -18,11 +19,13 @@ export interface NhlRosterTalentTeam {
   roster: readonly NhlRosterTalentPlayer[];
   unallocated?: readonly Pick<NhlRosterTalentPlayer, "id" | "playerName">[];
   populationComplete?: boolean;
+  selectionPolicy?: "nhl-first";
 }
 
 export interface NhlConditionalRosterTalentTeam
   extends Omit<NhlRosterTalentTeam, "roster"> {
   roster: readonly (Omit<NhlRosterTalentPlayer, "gar" | "ratePer60"> & {
     ratePer60: number | null;
+    projectedMinutesPerAppearance?: number | null;
   })[];
 }
