@@ -116,16 +116,35 @@ export function NhlRosterTalentRankings({
                                   ? "Defensemen"
                                   : "Goalies"}
                             </h4>
+                            {basis === "conditional" ? (
+                              <div className="mb-2 grid grid-cols-[minmax(0,1fr)_5rem_5rem] gap-2 text-xs text-muted-foreground">
+                                <span>Player</span>
+                                <span className="text-right">GAR/60</span>
+                                <span className="text-right">Lineup GAR</span>
+                              </div>
+                            ) : null}
                             <ol className="space-y-1">
                               {group.roster.map((player, i) => (
                                 <li
                                   key={player.id}
-                                  className="flex justify-between gap-3"
+                                  className={
+                                    basis === "conditional"
+                                      ? "grid grid-cols-[minmax(0,1fr)_5rem_5rem] gap-2"
+                                      : "flex justify-between gap-3"
+                                  }
                                 >
                                   <span>
                                     {i + 1}. {player.playerName}
                                   </span>
+                                  {basis === "conditional" ? (
+                                    <span className="text-right font-semibold">
+                                      {player.ratePer60 === undefined
+                                        ? "\u2014"
+                                        : `${player.ratePer60 > 0 ? "+" : ""}${player.ratePer60.toFixed(3)}`}
+                                    </span>
+                                  ) : null}
                                   <span
+                                    className="text-right"
                                     title={
                                       basis === "conditional" &&
                                       player.ratePer60 !== undefined
@@ -141,6 +160,15 @@ export function NhlRosterTalentRankings({
                           </div>
                         ))}
                       </div>
+                      {basis === "conditional" ? (
+                        <p className="mt-3 text-xs text-muted-foreground">
+                          Players are ordered by GAR/60 within each position.
+                          Lineup GAR applies the minutes assigned to that slot
+                          over 82 games; it depends on roster depth and is not an
+                          individual talent score. Small rate differences do not
+                          establish a meaningful difference in ability.
+                        </p>
+                      ) : null}
                       {!team.complete ? (
                         <p className="mt-3">
                           Known contribution: {gar(team.knownSubtotal)} GAR.
