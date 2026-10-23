@@ -5,6 +5,33 @@ export interface NhlTalentRateObservation {
   age: number | null;
   minutes: number;
   gar: number;
+  /** Actual appearances; absent seasons never supply zero-game measurements. */
+  games?: number;
+}
+export interface NhlTalentDeploymentLinear {
+  means: number[];
+  scales: number[];
+  coefficients: number[];
+  intercept: number;
+}
+export interface NhlTalentDeploymentMetrics {
+  rows: number;
+  baseMse: number | null;
+  calibratedMse: number | null;
+}
+export interface NhlTalentDeploymentCalibration {
+  version: "nhl-talent-deployment-calibration-v1";
+  selectedRidge: number;
+  model: NhlTalentDeploymentLinear | null;
+  trainingThroughYear: number;
+  trainingRows: number;
+  validation: NhlTalentDeploymentMetrics & {
+    origins: number;
+    winningOrigins: number;
+    sparseHistory: NhlTalentDeploymentMetrics;
+    lowUsage: NhlTalentDeploymentMetrics;
+    highUsage: NhlTalentDeploymentMetrics;
+  };
 }
 export interface NhlTalentRateParameters {
   observationNoise: number;
@@ -18,6 +45,7 @@ export interface NhlTalentRateReference extends NhlTalentRateParameters {
   /** Annual change = intercept + slope * (midpoint age - 27). */
   aging: [number, number];
   agingPairs: number;
+  deploymentCalibration?: NhlTalentDeploymentCalibration;
 }
 export interface NhlTalentRateValidationRow {
   nhlPlayerId: number;
@@ -31,6 +59,7 @@ export interface NhlTalentRateValidationRow {
   latestObserved: number;
   positionMean: number;
   selected: NhlTalentRateParameters;
+  basePrediction?: number;
 }
 export interface NhlTalentRateMetrics {
   rows: number;
@@ -50,7 +79,7 @@ export interface NhlTalentRateMetrics {
   };
 }
 export interface NhlConditionalTalentArtifact {
-  version: "nhl-conditional-talent-v1";
+  version: "nhl-conditional-talent-v1" | "nhl-conditional-talent-v2";
   units: "goals-above-replacement-per-60-minutes";
   cutoffYear: number;
   sourceSha256: string;
@@ -68,7 +97,7 @@ export interface NhlConditionalTalentPrediction {
   position: NhlTalentPosition | null;
   targetYear: number;
   ratePer60: number | null;
-  /** Model uncertainty in latent rate; not a guaranteed injury recovery interval. */
+  /** Original filter SD, before deployment calibration; not a forecast or recovery interval. */
   latentStandardDeviation: number | null;
   lastObservedYear: number | null;
   absentSeasons: number;

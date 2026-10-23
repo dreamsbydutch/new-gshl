@@ -216,6 +216,46 @@ Return-after-absence samples are only 71/37/21 by position; no medical recovery
 calibration is claimed. Latent-filter standard deviation is not a calibrated
 confidence interval around the pooled rate forecast.
 
+The v2 conditional reference adds an origin-safe skater deployment calibration.
+The original filter shrank short histories toward the same position mean, which
+overrated low-usage forwards as a group. A two-feature standardized ridge model
+predicts next-season rate residuals from the original rate forecast and actual
+minutes per appearance over the last three rated seasons (weights 1, 0.5, 0.25).
+These are played-season measurements; missing seasons supply no zero usage.
+Usage is predictive evidence of deployment, not a multiplier for availability
+and not an estimate of a player's causal effect or future coaching decisions.
+No salary, player-name exceptions, target-season usage or fantasy categories
+enter this calibration. Recorded GAR and annual expected-output models are
+unchanged.
+
+At each historical origin, both standardization and coefficients use only
+completed earlier forecast outcomes. Selection among no correction and ridge
+penalties 1/10/100/1000 uses earlier forecast errors, with three calibration
+origins of warmup. All original validation rows remain, including warmup rows
+that retain the original forecast. The final forward fit chooses ridge 10;
+defense chooses no correction, and goalies are excluded because minutes per
+appearance has a different interpretation for them. Calibration applies to the
+first projected season only.
+
+On the same 5,375 forward targets, MSE changes from 0.1007813 to 0.1003185
+(0.46% lower), with improvement in 9/14 origins. For the 713 origins with under
+1,000 historical rated minutes it changes from 0.1252285 to 0.1184289; for 817
+origins under 12 minutes per appearance, from 0.1194428 to 0.1120489. Error
+increases for the 1,685 origins above 17 minutes per appearance, from 0.0960782
+to 0.0971821, and for 71 return-after-absence targets, from 0.097035 to 0.098282.
+This is a targeted role/sparse-history bias correction with a modest overall
+gain, not a universal improvement or demonstrated injury-recovery model.
+The feature comparison was inspected during development; these seasons are
+not an untouched holdout. Independent numerical replay matched all 9,210
+forward/defense/goalie forecasts and chronological selections.
+
+Under 1,000 lifetime rated minutes is now marked research. This is a
+conservative reporting policy, not a learned cutoff or proof that ratings above
+it have reliable individual ordering. The exposed latent standard deviation
+continues to describe the original filter before deployment calibration; it is
+not uncertainty for the adjusted prediction. Current model and replay evidence
+are in `.local-data/nhl-rating/florida-audit-20261023-v1/conditional-role-fit-v1/`.
+
 Team talent selects 14F/8D/2G by conditional rate, then allocates a shared
 standard lineup budget: 180 forward, 120 defense and 60 goalie minutes per team
 game. Depth-slot weights include small reserve rotation shares; goalies split

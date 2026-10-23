@@ -170,6 +170,31 @@ void test("promoted reference preserves Barkov's playing evidence and keeps goal
   );
 });
 
+void test("a short low-usage scoring sample does not outrank established forwards through the common prior", () => {
+  const artifact = parseConditionalNhlTalentArtifact(promoted);
+  const schwindt = predictConditionalNhlTalent(artifact, 8481655, 2027);
+  assert.equal(schwindt.status, "research");
+  assert.ok(schwindt.ratePer60 !== null);
+  for (const id of [8482113, 8473419, 8477935]) {
+    const established = predictConditionalNhlTalent(artifact, id, 2027);
+    assert.ok(established.ratePer60! > schwindt.ratePer60);
+  }
+  const malformed = structuredClone(promoted);
+  malformed.references.find((r) => r.position === "F")!.deploymentCalibration!
+    .trainingThroughYear++;
+  assert.throws(
+    () => parseConditionalNhlTalentArtifact(malformed),
+    /calibration/,
+  );
+  const missingGames = structuredClone(promoted);
+  delete (missingGames.profiles[0]!.observations[0] as { games?: number })
+    .games;
+  assert.throws(
+    () => parseConditionalNhlTalentArtifact(missingGames),
+    /profile/,
+  );
+});
+
 void test("duplicate years, wrong source models, invalid exposure and unknown future requests fail closed", () => {
   assert.throws(() =>
     projectConditionalNhlTalent(reference, [observation, observation], 2025),
