@@ -115,7 +115,7 @@ function RosterContent() {
             aria-pressed={view.projectionBasis === "conditional"}
             onClick={() => view.setProjectionBasis("conditional")}
           >
-            Talent with estimated roles
+            Projected GAR
           </Button>
           <Button
             variant={

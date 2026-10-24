@@ -680,6 +680,15 @@ validation rows offline. Run its help for input, ending-year cutoff and output
 flags; it never publishes or replaces the shipped reference. Team comparisons
 normalize these role estimates to a shared minute budget separately from GAR/60.
 
+`src/commands/ratings/fit-nhl-average-talent.ts` fits the separate, explicitly
+above-average playing-value model from verified complete NHL season cohorts.
+It removes each season's exposure-weighted positional GAR baseline before
+chronological fitting, preserving offensive and defensive contribution. A
+league-wide usage cohort supplies standard role workloads for comparison; these
+are not individual availability or deployment predictions. Run its help for
+input, ending-year cutoff and new output-directory flags. This offline command
+does not publish, replace recorded GAR or promote its artifact automatically.
+
 #### Compare salary-rating upgrades with the current talent formula
 
 `src/commands/ratings/test-salary-rating-upgrades.ts` reuses the category experiment's

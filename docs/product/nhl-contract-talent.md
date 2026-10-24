@@ -470,6 +470,112 @@ completed annual observations; it cannot immediately detect a midseason trade
 breakout. Local research, chronological replay and subgroup checks are under
 `.local-data/nhl-rating/nhl-adaptation-20261023/`.
 
+## Projected total GAR as the main comparison
+
+The player leaderboard defaults to total **Projected GAR**, in replacement-based
+goal units, using the same healthy-team lineup scenario as the team rankings.
+Recorded GAR remains actual delivered contribution; expected season GAR remains
+the separate annual forecast including participation risk. The visible primary
+metrics do not use `/60` or `/82` denominators. Internally a conditional rate is
+still multiplied by allocated season minutes and divided by 60: playing time
+belongs in total contribution, even when it is not the displayed comparison.
+
+`buildProjectedNhlLineupGar` supplies both feature hooks. NHL roster members get
+priority in each organization's 14F/8D/2G selection. Existing forward/defense role
+projections determine relative deployment within shared 180F/120D/60G regulation
+minute budgets, including reserve rotation. The scenario covers 82 team games
+at full availability. Goalies retain the explicit 65/35 comparison split assigned
+by the existing talent order; this is not a fitted starter or backup workload
+forecast. No new injury, recovery or goalie-start model is claimed.
+
+Each player's displayed total matches the amount included in the team's modeled
+subtotal. Missing role estimates retain marked standard slot shares and research
+status, as in the team comparison. Unsupported ratings remain null. Outside-depth
+players have no allocated lineup projection rather than an invented zero or full
+starter workload. Their playing-ability estimate and the separately labeled
+above-average comparison remain available. Unselected or unknown players do not
+receive extra minutes redistributed from missing slots. Team ranks still require
+complete supported lineups. The projected roster display orders players by their
+total GAR after allocation, without changing which players or minutes were selected.
+
+Changing the unit alone does not resolve cross-position model calibration. The
+saved organization replay's raw projected top 50 contains 18F/3D/29G among 727
+rated selected players. Many goalie forecasts shrink toward a positive historical
+replacement offset, and the starter scenario turns that into similar positive
+season totals. This is a remaining limitation, not evidence of equal positional
+value or a successful balance correction. No position quota, boost or relabeling
+of above-average goals as GAR is used. The separate above-average model has its
+own validated rate target; its better positional representation is not evidence
+that an offset-restored replacement forecast would improve.
+
+## Projected value above average
+
+The secondary playing-value comparison shows **projected goals above an average
+player at the same position over a standard role season**. This is a
+separate estimand from recorded GAR and replacement-based playing talent. The
+main ordering uses total projected lineup GAR. Recorded GAR, contract averages,
+expected season GAR and team lineup GAR retain their existing baselines.
+
+The previous raw GAR/60 list contained 49 forwards, one defenseman and no goalies
+in its top 50. Defense was not omitted: the source includes teammate/opponent-
+adjusted chance prevention, finishing, penalties and goalie saving, in common
+goal units. The comparison combined different positional workload opportunities
+with annual replacement-reference offsets and stronger goalie shrinkage.
+
+The new `nhl-average-talent-v1` artifact centers every rated season observation
+by that season and position's exposure-weighted GAR/60 mean. Null ratings remain
+null. Offensive and defensive terms retain their original contribution within
+each player's centered total. The existing chronological conditional fitter,
+deployment calibration and sustained-change policy then fit the centered
+observations. This also prevents annual replacement-reference variation from
+being interpreted directly as a change in talent. It is not a percentile,
+position multiplier, fixed allocation of goal credit or position quota.
+
+The public artifact uses distinct above-average units and observation names.
+Only a private numerical adapter reuses the conditional fitter's historical
+`gar` field name. It never enters the recorded GAR source or replacement-based
+UI. The baseline is the rated, exposure-weighted positional population, not an
+unweighted average of names or an assertion of complete measurement coverage.
+
+For cross-position ordering, projected above-average rate is multiplied by a
+declared standard workload and divided by 60. Workloads use the last three
+complete seasons. Forwards and defenders use 82 times pooled minutes per
+appearance among the league-wide highest-minute 12F/6D team equivalents. Goalies
+use mean seasonal minutes among the highest-minute one-goalie team equivalents,
+normalized to 82 team games. Club counts come from verified season affiliations.
+These cohorts use playing time, never ratings. They are league-wide cohorts,
+not reconstructed lineups for each club; traded minutes are not assigned to
+guessed clubs. The resulting benchmarks are 1,292.615 forward minutes,
+1,638.215 defender minutes and 2,962.724 goalie minutes. All players of a position
+receive the same comparison opportunity, independently of their own injuries.
+This is a standard role comparison, not expected personal season output, and
+these scores must not be summed as a team's actual lineup contribution.
+
+An independent replay reconciled all 54 position-season baselines and 9,210
+validation labels from the verified 18-season source. The comparator is the
+previous replacement-rate forecast minus the position average known at its
+forecast origin. The outcome is recorded rate minus the realized target-season
+average. Target-season means define outcome labels only; they do not enter
+predictions, workload selection or earlier parameter selection.
+
+| Position | Rate MSE improvement | Improving forecast origins |
+| --- | ---: | ---: |
+| F | 1.62% | 12 / 14 |
+| D | 1.08% | 9 / 14 |
+| G | 9.73% | 14 / 14 |
+
+These are historical rate-error comparisons, not a separate validation of
+standard-season goal totals or a claim of an untouched prospective trial.
+Defensemen's late-growth subgroup has about 0.96% higher error; small goalie
+sparse-history and return-after-absence subgroups also remain less certain.
+Individual confidence reasons remain visible. With the untuned workloads, the
+saved model's top 50 contains 34 forwards, 12 defensemen and four goalies; that
+mix is a descriptive result, not a fit target or acceptance condition.
+
+The local fit and independent reports are under
+`.local-data/nhl-rating/nhl-average-value-20261024-v1/`. The source SHA-256 is
+`4de1582781f98f235ada75ca1a30cb2250df4300233bed0df8cd3fa01dba3f4d`.
+
 ## Aging revision checks
 
 The first-year forecast is unchanged. Against the preceding independent-horizon

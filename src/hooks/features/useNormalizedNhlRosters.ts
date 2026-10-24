@@ -12,15 +12,9 @@ import {
 import forecastJson from "../../lib/data/nhl-contract-talent-forecast.json";
 import conditionalJson from "../../lib/data/nhl-conditional-talent.json";
 import usageJson from "../../lib/data/nhl-lineup-usage.json";
-import {
-  parseNhlLineupUsageArtifact,
-  predictNhlLineupUsage,
-} from "../../lib/utils/domain/nhl-lineup-usage";
-import {
-  parseConditionalNhlTalentArtifact,
-  predictConditionalNhlTalent,
-} from "../../lib/utils/domain/nhl-conditional-talent";
-import { rankConditionalNhlRosterTalent } from "../../lib/utils/domain/nhl-conditional-roster-talent";
+import { parseNhlLineupUsageArtifact } from "../../lib/utils/domain/nhl-lineup-usage";
+import { parseConditionalNhlTalentArtifact } from "../../lib/utils/domain/nhl-conditional-talent";
+import { buildProjectedNhlLineupGar } from "../../lib/utils/domain/nhl-projected-lineup-gar";
 
 const forecast = parseNhlTalentForecastArtifact(forecastJson);
 const conditional = parseConditionalNhlTalentArtifact(conditionalJson);
@@ -134,57 +128,28 @@ export function useNormalizedNhlRosters() {
     if (
       seasonStartYear !== data.currentYear ||
       seasonStartYear !== conditional.cutoffYear ||
+      !organizations.data ||
       (projectionBasis === "conditional" &&
         seasonStartYear !== usage.cutoffYear)
     )
       return [];
-    return rankConditionalNhlRosterTalent(
-      organizationTeams.map((team) => ({
-        id: team.id,
-        name: team.name,
-        abbr: team.abbr,
-        selectionPolicy: team.selectionPolicy,
-        roster: team.roster.map((player) => {
-          const nhlPlayerId = player.nhlPlayerId;
-          const prediction = nhlPlayerId
-            ? predictConditionalNhlTalent(
-                conditional,
-                nhlPlayerId,
-                seasonStartYear + 1,
-              )
-            : null;
-          const matches = prediction?.position === player.position;
-          const deployment =
-            projectionBasis === "conditional" &&
-            nhlPlayerId &&
-            player.position !== "G"
-              ? predictNhlLineupUsage(usage, nhlPlayerId, seasonStartYear + 1)
-              : null;
-          return {
-            id: player.id,
-            nhlPlayerId,
-            playerName: player.playerName,
-            position: player.position,
-            membership: player.membership,
-            ratePer60: matches ? prediction.ratePer60 : null,
-            projectedMinutesPerAppearance:
-              deployment?.position === player.position
-                ? deployment.minutesPerAppearance
-                : null,
-            status: matches
-              ? prediction.status === "qualified" &&
-                projectionBasis === "conditional" &&
-                player.position !== "G" &&
-                deployment?.status !== "supported"
-                ? ("research" as const)
-                : prediction.status
-              : ("unavailable" as const),
-          };
-        }),
-      })),
+    return buildProjectedNhlLineupGar(
+      organizations.data,
+      conditional,
+      usage,
+      seasonStartYear + 1,
       projectionBasis === "conditional" ? "projected" : "standard",
-    );
-  }, [organizationTeams, data.currentYear, seasonStartYear, projectionBasis]);
+    ).map((team) => ({
+      ...team,
+      id: organizationTeams.find((t) => t.abbr === team.abbr)?.id ?? team.id,
+    }));
+  }, [
+    organizations.data,
+    organizationTeams,
+    data.currentYear,
+    seasonStartYear,
+    projectionBasis,
+  ]);
   const term = search.trim().toLowerCase();
   const matchingTeams = new Set(
     [...teams, ...organizationTeams]

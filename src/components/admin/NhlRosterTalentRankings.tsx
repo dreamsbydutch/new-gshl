@@ -20,8 +20,8 @@ export function NhlRosterTalentRankings({
           ? "Historical NHL season contribution"
           : basis === "conditional"
             ? usageBasis === "projected"
-              ? "Projected playing talent with estimated deployment"
-              : "Playing talent at standard lineup usage"
+              ? "Projected NHL team GAR"
+              : "Projected GAR at standard lineup usage"
             : "Expected NHL season contribution"}
       </h3>
       <p className="text-sm text-muted-foreground">
@@ -67,8 +67,8 @@ export function NhlRosterTalentRankings({
                 {basis === "historical"
                   ? "Recorded GAR"
                   : basis === "conditional"
-                    ? "Lineup talent GAR/82"
-                    : "Expected GAR/82"}
+                    ? "Projected GAR"
+                    : "Expected season GAR"}
               </th>
               <th scope="col" className="p-3 text-right">
                 Roster F / D / G
@@ -146,85 +146,88 @@ export function NhlRosterTalentRankings({
                               ) : null}
                             </h4>
                             {basis === "conditional" ? (
-                              <div className="mb-2 grid grid-cols-[minmax(0,1fr)_3.5rem_3.5rem_4.5rem] gap-2 text-xs text-muted-foreground">
+                              <div className="mb-2 grid grid-cols-[minmax(0,1fr)_3.5rem_5.5rem] gap-2 text-xs text-muted-foreground">
                                 <span>Player</span>
-                                <span className="text-right">GAR/60</span>
                                 <span className="text-right">Min/game</span>
-                                <span className="text-right">Lineup GAR</span>
+                                <span className="text-right">
+                                  Projected GAR
+                                </span>
                               </div>
                             ) : null}
                             <ol className="space-y-1">
-                              {group.roster.map((player, i) => (
-                                <li
-                                  key={player.id}
-                                  className={
-                                    basis === "conditional"
-                                      ? "grid grid-cols-[minmax(0,1fr)_3.5rem_3.5rem_4.5rem] gap-2"
-                                      : "flex justify-between gap-3"
-                                  }
-                                >
-                                  <span>
-                                    {i + 1}. {player.playerName}
-                                    {player.membership ? (
-                                      <span className="ml-1 text-xs text-muted-foreground">
-                                        {player.membership === "nhl-roster"
-                                          ? "NHL"
-                                          : "Depth"}
+                              {[...group.roster]
+                                .sort((a, b) =>
+                                  basis === "conditional"
+                                    ? (b.gar ?? -Infinity) -
+                                        (a.gar ?? -Infinity) ||
+                                      a.id.localeCompare(b.id)
+                                    : 0,
+                                )
+                                .map((player, i) => (
+                                  <li
+                                    key={player.id}
+                                    className={
+                                      basis === "conditional"
+                                        ? "grid grid-cols-[minmax(0,1fr)_3.5rem_5.5rem] gap-2"
+                                        : "flex justify-between gap-3"
+                                    }
+                                  >
+                                    <span>
+                                      {i + 1}. {player.playerName}
+                                      {player.membership ? (
+                                        <span className="ml-1 text-xs text-muted-foreground">
+                                          {player.membership === "nhl-roster"
+                                            ? "NHL"
+                                            : "Depth"}
+                                        </span>
+                                      ) : null}
+                                    </span>
+                                    {basis === "conditional" ? (
+                                      <span
+                                        className="text-right"
+                                        title={
+                                          group.position === "G"
+                                            ? "Allocated using the fixed 65/35 goalie split"
+                                            : usageBasis === "projected" &&
+                                                "projectedMinutesPerAppearance" in
+                                                  player &&
+                                                typeof player.projectedMinutesPerAppearance ===
+                                                  "number"
+                                              ? `Forecast: ${player.projectedMinutesPerAppearance.toFixed(1)} minutes per appearance. Displayed minutes are normalized to the team budget.`
+                                              : "Standard depth-slot allocation; no individual deployment forecast is used"
+                                        }
+                                      >
+                                        {player.minutesPerTeamGame?.toFixed(
+                                          1,
+                                        ) ?? "\u2014"}
                                       </span>
                                     ) : null}
-                                  </span>
-                                  {basis === "conditional" ? (
-                                    <span className="text-right font-semibold">
-                                      {player.ratePer60 == null
-                                        ? "\u2014"
-                                        : `${player.ratePer60 > 0 ? "+" : ""}${player.ratePer60.toFixed(3)}`}
-                                    </span>
-                                  ) : null}
-                                  {basis === "conditional" ? (
                                     <span
                                       className="text-right"
                                       title={
-                                        group.position === "G"
-                                          ? "Allocated using the fixed 65/35 goalie split"
-                                          : usageBasis === "projected" &&
-                                              "projectedMinutesPerAppearance" in
-                                                player &&
-                                              typeof player.projectedMinutesPerAppearance ===
-                                                "number"
-                                            ? `Forecast: ${player.projectedMinutesPerAppearance.toFixed(1)} minutes per appearance. Displayed minutes are normalized to the team budget.`
-                                            : "Standard depth-slot allocation; no individual deployment forecast is used"
+                                        basis === "conditional" &&
+                                        player.ratePer60 != null
+                                          ? `${gar(player.ratePer60)} GAR/60 × ${player.minutesPerTeamGame?.toFixed(1)} minutes per team game × 82 games / 60`
+                                          : undefined
                                       }
                                     >
-                                      {player.minutesPerTeamGame?.toFixed(1) ??
-                                        "\u2014"}
+                                      {gar(player.gar)}
                                     </span>
-                                  ) : null}
-                                  <span
-                                    className="text-right"
-                                    title={
-                                      basis === "conditional" &&
-                                      player.ratePer60 != null
-                                        ? `${gar(player.ratePer60)} GAR/60 × ${player.minutesPerTeamGame?.toFixed(1)} minutes per team game × 82 games / 60`
-                                        : undefined
-                                    }
-                                  >
-                                    {gar(player.gar)}
-                                  </span>
-                                </li>
-                              ))}
+                                  </li>
+                                ))}
                             </ol>
                           </div>
                         ))}
                       </div>
                       {basis === "conditional" ? (
                         <p className="mt-3 text-xs text-muted-foreground">
-                          GAR/60 is individual talent; lineup GAR applies the
-                          allocated minutes over 82 games.{" "}
+                          Projected GAR is total contribution over an 82-game
+                          healthy-team scenario.{" "}
                           {usageBasis === "projected"
-                            ? "Skater minutes reflect estimated roles, normalized to the team budget."
-                            : "Minutes follow standard depth-slot weights."}{" "}
-                          Small rate differences do not establish a meaningful
-                          difference in ability.
+                            ? "Skater minutes reflect estimated roles, normalized to the team budget, using the same player totals as the projected player leaderboard."
+                            : "Minutes follow standard depth-slot weights; this comparison differs from the player leaderboard's estimated deployment."}{" "}
+                          Goalies use the 65/35 comparison policy, not a
+                          forecast of starts or medical availability.
                         </p>
                       ) : null}
                       {basis === "conditional" &&

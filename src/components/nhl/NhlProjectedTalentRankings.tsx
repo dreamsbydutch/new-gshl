@@ -26,11 +26,13 @@ export function NhlProjectedTalentRankings() {
   return (
     <section className="space-y-5">
       <div>
-        <h2 className="text-2xl font-bold">Projected talent when playing</h2>
+        <h2 className="text-2xl font-bold">Projected NHL lineup GAR</h2>
         <p className="mt-2 text-sm text-muted-foreground">
-          GAR per 60 minutes estimates playing ability, independent of expected
-          games played. Missed seasons add uncertainty; they are not
-          zero-performance observations.
+          Projected GAR estimates total goals contributed above a replacement
+          player, including offense, defensive chance prevention and
+          goaltending. It uses the same healthy-season lineup scenario as the
+          team rankings. Recorded GAR shows what actually happened; missed games
+          do not become poor-play observations.
         </p>
         <p className="mt-1 text-xs text-muted-foreground">
           Preseason {season(view.cutoffYear + 1)} estimate using completed
@@ -39,6 +41,17 @@ export function NhlProjectedTalentRankings() {
         </p>
       </div>
       <div className="flex flex-wrap items-end gap-3">
+        <label className="text-sm">
+          <span className="mb-1 block font-medium">Rank by</span>
+          <select
+            className="rounded border bg-background px-3 py-2"
+            value={view.ordering}
+            onChange={(e) => view.changeOrdering(e.target.value)}
+          >
+            <option value="gar">Projected lineup GAR</option>
+            <option value="average">Value above average</option>
+          </select>
+        </label>
         <label className="text-sm">
           <span className="mb-1 block font-medium">Position</span>
           <select
@@ -67,6 +80,16 @@ export function NhlProjectedTalentRankings() {
         <p role="status">
           The talent model needs refreshing for this NHL season.
         </p>
+      ) : view.organizationError ? (
+        <div role="alert">
+          <p>
+            Current NHL rosters are unavailable. Projected GAR needs a lineup
+            role.
+          </p>
+          <Button variant="outline" onClick={view.retryOrganizations}>
+            Retry rosters
+          </Button>
+        </div>
       ) : view.isLoading ? (
         <p role="status">Loading NHL players…</p>
       ) : (
@@ -74,8 +97,11 @@ export function NhlProjectedTalentRankings() {
           <div className="overflow-x-auto rounded-xl border">
             <table className="w-full whitespace-nowrap text-sm">
               <caption className="sr-only">
-                Conditional playing talent and separate recorded and expected
-                contributions
+                Players ordered by{" "}
+                {view.ordering === "gar"
+                  ? "projected total GAR"
+                  : "value above average"}
+                , with recorded GAR and separate participation-adjusted output
               </caption>
               <thead className="bg-muted">
                 <tr>
@@ -83,11 +109,13 @@ export function NhlProjectedTalentRankings() {
                     "Player",
                     "Pos",
                     "Team",
+                    view.ordering === "gar"
+                      ? "Projected lineup GAR"
+                      : "Value above average",
                     "Last rated season",
-                    "Last rated GAR",
-                    "Talent GAR/60",
+                    "Recorded GAR",
                     "Rated-season TOI",
-                    "Expected GAR/82",
+                    "Expected season GAR",
                     "Evidence",
                   ].map((h) => (
                     <th scope="col" key={h} className="px-4 py-3 text-left">
@@ -103,15 +131,28 @@ export function NhlProjectedTalentRankings() {
                       {row.playerName}
                     </th>
                     <td className="px-4 py-3">{row.position}</td>
-                    <td className="px-4 py-3">{row.nhlTeam.join(" / ")}</td>
+                    <td className="px-4 py-3">{row.displayTeams.join(" / ")}</td>
+                    <td
+                      className="px-4 py-3 font-semibold tabular-nums"
+                      title={
+                        view.ordering === "gar"
+                          ? row.projected?.selected
+                            ? `Total GAR in the team lineup scenario. ${row.projected.roleBasis === "projected" ? "Estimated skater deployment" : "Standard role policy or fallback"}; ${row.projected.minutesPerTeamGame.toFixed(1)} minutes per team game. Goalies use a 65/35 comparison split, not a predicted start share.`
+                            : "No selected role in the organization's 14F/8D/2G lineup. An unavailable contribution is not zero."
+                          : "Projected goals above the same-position average over a standard role season. This is a separate comparison from GAR."
+                      }
+                    >
+                      {score(
+                        view.ordering === "gar"
+                          ? row.projected?.gar
+                          : row.value?.standardSeasonGoalsAboveAverage,
+                      )}
+                    </td>
                     <td className="px-4 py-3">
                       {row.last ? season(row.last.year) : "—"}
                     </td>
                     <td className="px-4 py-3 tabular-nums">
                       {score(row.last?.gar)}
-                    </td>
-                    <td className="px-4 py-3 font-semibold tabular-nums">
-                      {score(row.forecast?.ratePer60, 3)}
                     </td>
                     <td className="px-4 py-3 tabular-nums">
                       {row.last?.minutes.toFixed(0) ?? "—"}
@@ -121,25 +162,36 @@ export function NhlProjectedTalentRankings() {
                     </td>
                     <td
                       className="px-4 py-3 text-muted-foreground"
-                      title={row.forecast?.confidenceReasons
+                      title={row.evidence?.confidenceReasons
                         .map((reason) => confidenceReasonLabels[reason])
                         .join("; ")}
                     >
-                      {!row.forecast || row.forecast.status === "unavailable"
-                        ? "No rated history"
-                        : row.forecast.absentSeasons > 0
-                          ? "Return uncertain"
-                          : row.forecast.staleSeasons > 0
-                            ? "Older rated evidence"
-                            : row.forecast.adaptation?.adjustmentPer60
-                              ? "Experimental trend"
-                              : row.forecast.measuredSeasons < 2
-                                ? "One rated season"
-                                : row.forecast.observedMinutes < 1000
-                                  ? "Under 1,000 rated minutes"
-                                  : row.forecast.status === "research"
-                                    ? "Limited support"
-                                    : "Supported"}
+                      {view.ordering === "gar" &&
+                      row.evidence &&
+                      row.evidence.status !== "unavailable" &&
+                      !row.projected?.selected
+                        ? "No selected lineup role"
+                        : !row.evidence || row.evidence.status === "unavailable"
+                          ? "No rated history"
+                          : view.ordering === "gar" &&
+                              row.projected?.roleBasis === "standard-fallback"
+                            ? "Standard role fallback"
+                            : row.evidence.absentSeasons > 0
+                              ? "Return uncertain"
+                              : row.evidence.staleSeasons > 0
+                                ? "Older rated evidence"
+                                : row.evidence.adaptation?.adjustmentPer60
+                                  ? "Experimental trend"
+                                  : row.evidence.measuredSeasons < 2
+                                    ? "One rated season"
+                                    : row.evidence.observedMinutes < 1000
+                                      ? "Under 1,000 rated minutes"
+                                      : row.evidence.status === "research" ||
+                                          (view.ordering === "gar" &&
+                                            row.projected?.status ===
+                                              "research")
+                                        ? "Limited support"
+                                        : "Supported"}
                     </td>
                   </tr>
                 ))}
@@ -178,10 +230,33 @@ export function NhlProjectedTalentRankings() {
         </>
       )}
       <p className="text-xs text-muted-foreground">
-        Recorded GAR measures delivered contribution using the hockey model.
-        Talent is a rate forecast; expected GAR/82 includes projected
-        participation and workload. TOI is recorded minutes in the last rated
-        season. Goalies and returning players have limited validation support.
+        {view.ordering === "gar" ? (
+          <>
+            Projected GAR totals one 82-game team season at full availability,
+            sharing a fixed ice-time budget across 14 forwards, 8 defensemen and
+            2 goalies. Skater roles use estimated deployment; goalie roles use a
+            65/35 comparison policy. These are lineup scenarios, not medical or
+            goalie-start forecasts. Unassigned roles remain unavailable; missing
+            usage estimates use marked standard slot shares. Expected season GAR
+            separately includes participation and workload risk.
+          </>
+        ) : (
+          <>
+            Standard role workloads:{" "}
+            {view.standardWorkloads
+              .map(
+                (w) =>
+                  `${w.position} ${Math.round(w.standardMinutes).toLocaleString()} minutes`,
+              )
+              .join(" · ")}
+            . These use recent regular-role workloads on an 82-team-game basis,
+            with no position quotas or percentile conversion. Value above
+            average is a separate baseline from recorded GAR. Expected season
+            GAR includes projected participation and workload; standard role
+            value does not.
+          </>
+        )}{" "}
+        TOI is recorded minutes in the last rated season.
       </p>
     </section>
   );
