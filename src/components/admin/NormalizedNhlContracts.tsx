@@ -3,6 +3,7 @@
 import { Component, Fragment, type ReactNode } from "react";
 import { useNormalizedNhlContracts } from "../../hooks/features/useNormalizedNhlContracts";
 import { Button } from "@gshl-ui";
+import { NhlExplorerError } from "../nhl/NhlExplorerError";
 
 const dollars = (value: number | null) =>
   value === null
@@ -22,26 +23,25 @@ const talentScore = (value: number | null | undefined) =>
 
 class ContractRankingBoundary extends Component<
   { children: ReactNode },
-  { failed: boolean }
+  { error: Error | null }
 > {
-  state = { failed: false };
-  static getDerivedStateFromError() {
-    return { failed: true };
+  state: { error: Error | null } = { error: null };
+  static getDerivedStateFromError(error: unknown) {
+    return {
+      error:
+        error instanceof Error
+          ? error
+          : new Error(
+              typeof error === "string" ? error : "Unknown NHL contract error",
+            ),
+    };
   }
   render() {
-    return this.state.failed ? (
-      <div role="alert" className="rounded-lg border p-6">
-        <p>
-          Contract rankings could not load. Check your connection and account
-          access.
-        </p>
-        <Button
-          className="mt-3"
-          onClick={() => this.setState({ failed: false })}
-        >
-          Try again
-        </Button>
-      </div>
+    return this.state.error ? (
+      <NhlExplorerError
+        error={this.state.error}
+        reset={() => this.setState({ error: null })}
+      />
     ) : (
       this.props.children
     );
