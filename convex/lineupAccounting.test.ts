@@ -28,6 +28,8 @@ void test("accounting repair checks authorization, fields, bounds and full sourc
       { ...args, rows: [{ ...row, expected: { ...expected, Rating: 43 } }] },
     ])
       await assert.rejects(invokeMutation(applyBatch, f.ctx, invalid));
+    // A routine audit-timestamp refresh must not conflict with unchanged stats.
+    f.put("teamWeekStatLines", "line", { ...expected, updatedAt: 17 });
     assert.deepEqual(await invokeMutation(applyBatch, f.ctx, args), {
       total: 1,
       updated: 0,
@@ -40,6 +42,7 @@ void test("accounting repair checks authorization, fields, bounds and full sourc
       { total: 1, updated: 1, wouldUpdate: 0, already: 0 },
     );
     assert.equal(f.rows("teamWeekStatLines")[0]!.Rating, 42);
+    assert.equal(f.rows("teamWeekStatLines")[0]!.updatedAt, 17);
     assert.deepEqual(await invokeMutation(applyBatch, f.ctx, args), {
       total: 1,
       updated: 0,
@@ -61,11 +64,18 @@ void test("accounting repair checks authorization, fields, bounds and full sourc
       serverSecret: "accounting-test",
       table: "playerDayStatLines",
       apply: true,
-      rows: [{ id: "day", expected: day, patch: { BS: "1", bestPos: "BN" } }],
+      rows: [
+        {
+          id: "day",
+          expected: day,
+          patch: { BS: "1", bestPos: "BN", nhlTeam: ["VGK"] },
+        },
+      ],
     };
     await invokeMutation(applyBatch, f.ctx, dailyArgs);
     assert.equal(f.rows("playerDayStatLines")[0]!.dailyPos, "RW");
     assert.equal(f.rows("playerDayStatLines")[0]!.GS, "1");
+    assert.deepEqual(f.rows("playerDayStatLines")[0]!.nhlTeam, ["VGK"]);
     assert.equal(
       (f.rows("playerDayPerformanceIndex")[0]!.scores as Record<string, number>)
         .BS,

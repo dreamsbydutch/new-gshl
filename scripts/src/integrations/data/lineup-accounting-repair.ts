@@ -47,6 +47,7 @@ export async function replayLineupAccountingPlan(options: {
     files: PlanFile[];
     sourceManifestSha256: string;
     scheduleSha256: string;
+    gameLogEvidenceSha256?: string;
   };
   if (
     manifest.deployment !== "polished-tern-709" ||
@@ -99,6 +100,23 @@ export async function replayLineupAccountingPlan(options: {
     const source = JSON.parse(sourceBytes.toString()) as {
       files: Array<{ path: string; sha256: string }>;
     };
+    if (manifest.gameLogEvidenceSha256) {
+      const logDirectory = path.join(backup, "player-game-logs");
+      const logManifest = readFileSync(
+        path.join(logDirectory, "manifest.json"),
+      );
+      if (digest(logManifest) !== manifest.gameLogEvidenceSha256)
+        throw Error("Independent player game-log manifest differs");
+      const logs = JSON.parse(logManifest.toString()) as {
+        sources: Array<{ path: string; sha256: string }>;
+      };
+      for (const file of logs.sources)
+        if (
+          digest(readFileSync(containedFile(logDirectory, file.path))) !==
+          file.sha256
+        )
+          throw Error("Independent player game-log evidence differs");
+    }
     for (const file of source.files)
       if (
         digest(
@@ -170,10 +188,28 @@ export async function replayLineupAccountingPlan(options: {
   });
   const preflight = sum();
   // Validate the complete plan before the first mutation; every apply rechecks its preimage.
-  for (const batch of batches) {
-    const result = await call(batch, false);
-    for (const key of Object.keys(preflight) as Array<keyof Result>)
-      preflight[key] += result[key];
+  for (let offset = 0; offset < batches.length; offset += 3) {
+    const results = await Promise.allSettled(
+      batches.slice(offset, offset + 3).map((batch) => call(batch, false)),
+    );
+    const failures: unknown[] = [];
+    for (const result of results) {
+      if (result.status === "rejected") {
+        failures.push(result.reason);
+        continue;
+      }
+      for (const key of Object.keys(preflight) as Array<keyof Result>)
+        preflight[key] += result.value[key];
+    }
+    if (failures.length) throw failures[0];
+    if (offset % 300 === 0)
+      console.log(
+        JSON.stringify({
+          phase: "preflight-progress",
+          batches: Math.min(offset + 3, batches.length),
+          totalBatches: batches.length,
+        }),
+      );
   }
   console.log(
     JSON.stringify({
@@ -186,15 +222,27 @@ export async function replayLineupAccountingPlan(options: {
     throw Error("Accounting verification has unapplied changes");
   if (!options.apply) return preflight;
   const applied = sum();
-  for (let i = 0; i < batches.length; i++) {
-    const result = await call(batches[i]!, true);
-    for (const key of Object.keys(applied) as Array<keyof Result>)
-      applied[key] += result[key];
-    if ((i + 1) % 100 === 0)
+  // Identities are disjoint across batches. Bound concurrent transactions and
+  // inspect the whole group before stopping, so an interrupted run is resumable.
+  for (let i = 0; i < batches.length; i += 3) {
+    const results = await Promise.allSettled(
+      batches.slice(i, i + 3).map((batch) => call(batch, true)),
+    );
+    const failures: unknown[] = [];
+    for (const result of results) {
+      if (result.status === "rejected") {
+        failures.push(result.reason);
+        continue;
+      }
+      for (const key of Object.keys(applied) as Array<keyof Result>)
+        applied[key] += result.value[key];
+    }
+    if (failures.length) throw failures[0];
+    if (i % 300 === 0)
       console.log(
         JSON.stringify({
           phase: "apply",
-          batches: i + 1,
+          batches: Math.min(i + 3, batches.length),
           totalBatches: batches.length,
           updated: applied.updated,
         }),

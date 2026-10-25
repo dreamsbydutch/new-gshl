@@ -36,7 +36,9 @@ Review the proposed patches and preserve an independently verified backup of
 the source snapshot, official evidence and exact plan before applying.
 
 The replay operator defaults to a complete preflight. Its Convex mutation checks
-full source preimages and permits only MS/BS/MG and daily hindsight positions.
+source preimages (excluding only the `updatedAt` audit timestamp) and permits
+only MS/BS/MG, daily hindsight positions, and
+source-proven corrections to dated NHL team labels.
 It preserves ratings, native hockey stats and recorded fantasy decisions,
 maintains the performance index transactionally, and refuses source conflicts.
 Repeating a completed plan with `--verify` must report zero pending changes.

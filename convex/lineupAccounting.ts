@@ -25,10 +25,17 @@ function canonical(value: unknown): unknown {
       )
     : value;
 }
+const withoutUpdateTimestamp = (value: unknown) =>
+  value && typeof value === "object" && !Array.isArray(value)
+    ? Object.fromEntries(
+        Object.entries(value).filter(([key]) => key !== "updatedAt"),
+      )
+    : value;
 const equal = (a: unknown, b: unknown) =>
-  JSON.stringify(canonical(a)) === JSON.stringify(canonical(b));
+  JSON.stringify(canonical(withoutUpdateTimestamp(a))) ===
+  JSON.stringify(canonical(withoutUpdateTimestamp(b)));
 
-/** Operator-only, bounded, rating-preserving correction with full-row optimistic concurrency. */
+/** Operator-only accounting/source-team correction with full-row optimistic concurrency. */
 export const applyBatch = mutation({
   args: {
     serverSecret: v.string(),
@@ -63,7 +70,15 @@ export const applyBatch = mutation({
       if (row.expected._id !== row.id || !Object.keys(row.patch).length)
         throw Error("Canonical accounting source and nonempty patch required");
       for (const [field, value] of Object.entries(row.patch)) {
-        if (daily && ["fullPos", "bestPos"].includes(field)) {
+        if (daily && field === "nhlTeam") {
+          if (
+            !Array.isArray(value) ||
+            value.length !== 1 ||
+            typeof value[0] !== "string" ||
+            !/^[A-Z]{3}$/.test(value[0])
+          )
+            throw Error("One canonical source-proven NHL team required");
+        } else if (daily && ["fullPos", "bestPos"].includes(field)) {
           if (
             typeof value !== "string" ||
             !["C", "LW", "RW", "D", "G", "UTIL", "BN"].includes(
