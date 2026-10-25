@@ -1,3 +1,5 @@
+import currentExceptions from "./current-goalie-accounting-exceptions.json";
+
 // Exact source exceptions, not a general arithmetic exemption. Official summary,
 // fresh gamecenter boxscore and HTML reports preserve each native discrepancy.
 // These are not demonstrated shootout/penalty-shot corrections; do not invent saves.
@@ -5,6 +7,7 @@
 export const OFFICIAL_GOALIE_ACCOUNTING_REVIEW_SHA256 =
   "9dd76901430c96c0c8c79e17a40e59660c493bbcfe245efd187f139893672b9a";
 export const OFFICIAL_GOALIE_ACCOUNTING_EXCEPTIONS = [
+  ...currentExceptions,
   {
     name: "Alexandar Georgiev",
     nhlPlayerId: 8480382,

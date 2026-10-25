@@ -101,8 +101,8 @@ void test("a regular opponent does not excuse inconsistent goalie counting input
   assert.throws(() => build([{ ...leagueDays[0]!, SV: "0" }]), /SV \+ GA/);
 });
 
-void test("seven officially corroborated count discrepancies retain their exact native tuples", () => {
-  assert.equal(OFFICIAL_GOALIE_ACCOUNTING_EXCEPTIONS.length, 7);
+void test("officially corroborated count discrepancies retain their exact native tuples", () => {
+  assert.equal(OFFICIAL_GOALIE_ACCOUNTING_EXCEPTIONS.length, 8);
   for (const fact of OFFICIAL_GOALIE_ACCOUNTING_EXCEPTIONS) {
     assert.notEqual(fact.tuple.GA + fact.tuple.SV, fact.tuple.SA);
     assert.equal(fact.sources.length, 3);

@@ -1,0 +1,26 @@
+[
+  {
+    "name": "Tristan Jarry",
+    "nhlPlayerId": 8477465,
+    "date": "2026-10-24",
+    "team": "EDM",
+    "opponent": "TOR",
+    "gameId": 2026020176,
+    "tuple": { "GP": 1, "W": 0, "GA": 6, "SV": 25, "SA": 30, "TOI": 59.75 },
+    "officialTOISeconds": 3585,
+    "sources": [
+      {
+        "url": "https://api.nhle.com/stats/rest/en/goalie/summary?isAggregate=false&isGame=true&start=0&limit=100&cayenneExp=gameId=2026020176",
+        "sha256": "62e7ac84e20eaec395bbf47bd9c4dd5db1185fe54bb355f74525069bd8762ed2"
+      },
+      {
+        "url": "https://api-web.nhle.com/v1/gamecenter/2026020176/boxscore",
+        "sha256": "ec4ca917750a3a322bcfa0ddbaf1b4dc09c9f6bb9779db4f4209e54c5cc69a43"
+      },
+      {
+        "url": "https://www.nhl.com/scores/htmlreports/20262027/GS020176.HTM",
+        "sha256": "afbdbb96d04ac40daca4ea582718cfcb502082d47eee3626337f8ec38d17e756"
+      }
+    ]
+  }
+]

@@ -20,6 +20,7 @@ import { convexReader } from "@gshl-lib/data/reader";
 import { fetchPlayerDayWeeks, updateById } from "@gshl-lib/data/convex-store";
 import { rankRowsWithRankingEngine } from "@gshl-lib/ranking/ranking-engine";
 import { applyPlayerDayDerivedColumns } from "@gshl-lib/stats/player-day-flags";
+import { assertLeagueGameSourceDays } from "../aggregation/player-day-source-validation";
 import { normalizeDateOnlyValue } from "@gshl-lib/utils/core/date";
 import {
   getArgValue,
@@ -1908,6 +1909,8 @@ export async function runDailyNhlPlayerStatSync(
     );
   });
 
+  // Reject invalid source tuples before persisting days that would block rollups.
+  assertLeagueGameSourceDays(preparedRows as unknown as DatabaseRecord[]);
   const untouchedSeasonRows = seasonPlayerDayRows
     .filter((row) => !targetDateSet.has(normalizeDateKey(row.date)))
     .map((row) => row as unknown as DatabaseRecord);
