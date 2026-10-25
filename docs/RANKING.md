@@ -25,7 +25,62 @@ authorized data operation.
 
 ## Ranking behavior
 
-### Public GSHL performance ratings
+### Rating purpose and comparison contract
+
+Every player, team and franchise stat line must have a performance rating on a
+strict **0–100 scale**. Its purpose is to express both how much the complete
+stat line contributed to the team's results over its recorded time span and
+how good that performance was compared with peer stat lines for the same kind
+of time span. Team and franchise ratings assess their combined contribution
+and results. Ratings describe recorded performance, not predicted ability.
+
+The rating follows the scope of the stat line:
+
+| Stat-line level                                    | What the rating evaluates                                                                                            | Comparison reference                                               |
+| -------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| Player day                                         | The player's complete daily performance and contribution, with lineup eligibility distinguished from bench potential | Player-day performances across dates, teams and seasons            |
+| Player week                                        | The player's combined counted weekly stat line and contribution to that team's matchup                               | Player-week performances across weeks, teams and seasons           |
+| Player team/season split                           | The player's complete contribution during the recorded stint with one team                                           | Equivalent player-stint performances across teams and seasons      |
+| Player season total                                | The player's combined season performance across all team stints                                                      | Player-season performances across teams and seasons                |
+| Player career split                                | The player's accumulated contribution to one franchise over the recorded career scope                                | Equivalent player/franchise career performances                    |
+| Player career total                                | The player's complete recorded career contribution across franchises                                                 | Player-career performances across franchises and eras              |
+| Team day                                           | The team's combined counted contributions for that day                                                               | Team-day performances across dates, teams, franchises and seasons  |
+| Team week                                          | The team's combined counted contributions and matchup performance for that week                                      | Team-week performances across weeks, teams, franchises and seasons |
+| Team season                                        | The team's combined performance over the recorded season                                                             | Team-season performances across teams, franchises and seasons      |
+| Other stat-line scopes, including NHL season lines | The complete performance and contribution represented by that row                                                    | Peer performances with equivalent scope and scoring meaning        |
+
+Comparisons must remain meaningful across teams, franchises, dates, weeks and
+seasons. Each scope has its own versioned historical reference, shared across
+owners and seasons. The same contribution under the same scoring rules and
+reference version must receive the same rating regardless of who owns the
+player or when the row is viewed. Do not refit the scale to the currently
+visible teams, current day, current week or selected season. A daily 90 and a
+weekly 90 express equivalent standing in their respective references; they do
+not represent equal accumulated contribution or interchangeable workloads.
+
+Evaluate the complete native stat line for its period before assigning the
+rating. Pool goalie workload before calculating ratios. Never add or average
+daily ratings to create a weekly rating, weekly ratings to create a season
+rating, or season ratings to create a career rating. Preserve scoring rules,
+lineup counting, goalie qualification and period boundaries when evaluating
+contribution. Bench potential must be labelled separately from counted team
+contribution.
+
+Every valid played stat line is expected to have rating coverage. A missing
+rating on a supported performance is a coverage gap to resolve. Unplayed
+placeholders, invalid source statistics and unsupported comparisons must carry
+an explicit unavailable/unrated state with a reason; never invent a zero or a
+neutral rating to disguise missing evidence. This is the product contract for
+all rating producers and displays, including future stat-line scopes. It does
+not assert that every historical or separate NHL rating path already meets it.
+
+Expose the rating as `/100` with its period, reference/model version and an
+explanation of what counts toward contribution. Keep raw category impact,
+replacement-relative hockey value, workload and other explanatory statistics
+in their own named units. Those values can explain a rating but must not be
+presented as the 0–100 performance rating.
+
+### Current public GSHL performance scale
 
 GSHL player and team performance ratings use a 0–100 historical comparison
 scale, versioned as `gshl-performance-rating-100-v1`. Every period has its own
@@ -55,7 +110,9 @@ incompatible old units are unrated. Updating the historical scale requires a
 new reference version; ordinary refreshes never rebuild it. NHL hockey value,
 Elo and salary units are separate measures and are not inputs to this scale.
 
-The public runtime exposes `rankRows`, `rankPerformance`, and
+### Legacy ranking runtime
+
+The legacy runtime exposes `rankRows`, `rankPerformance`, and
 `getPerformanceGrade`. It supports player day, week, split, total, and NHL rows
 plus team day, week, and season rows. Player day/week single-row calls return a
 blank result because those ratings require a comparison pool.
@@ -75,7 +132,8 @@ Team ratings are percentile comparisons inside season-scoped pools:
 - regular-season totals also derive Hart, Norris, Vezina, Calder, Jack Adams,
   and GM of the Year team ratings. Non-regular-season rows clear those awards.
 
-The output scale is approximately 0-125 rather than a strict percentage. Grade
+Its legacy output scale is approximately 0-125 rather than a strict percentage;
+it does not satisfy the public performance-rating contract above. Grade
 labels, from highest to lowest, are Insanity, Super Elite, Elite, Above Average
 Starter, Borderline Starter, Rosterable, Waiver Wire, and No Impact.
 
@@ -112,7 +170,7 @@ exposure is global and cannot depend on a player's owner or NHL team. Historical
 schedule caches are retrospective metadata; prospective runs should freeze
 schedule context before the week starts.
 
-The displayed scale is 100 units per expected category point. Per-category
+The raw contribution scale is 100 units per expected category point. Per-category
 contributions, historical support and qualification effects accompany the raw
 value. `ifStarted` describes the performance; `counted` is zero for bench and
 injured-reserve rows. `actualImpact` separately compares the completed owner's
