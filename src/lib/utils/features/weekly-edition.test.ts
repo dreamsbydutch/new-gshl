@@ -41,7 +41,7 @@ import {
 } from "./weekly-edition";
 import { matchupPreviewWriterProfile } from "./matchup-preview-articles";
 
-void test("contribution ratings use explicit units without legacy 85/90/95 editorial grades", () => {
+void test("contribution-backed editorial performances show 0–100 ratings without legacy importance grades", () => {
   const base = source();
   const performance = {
     id: "versioned-contribution",
@@ -61,14 +61,8 @@ void test("contribution ratings use explicit units without legacy 85/90/95 edito
     (row) => row.id === "performance:versioned-contribution",
   );
   assert.equal(candidate?.importance, 70);
-  assert.match(
-    candidate?.summary ?? "",
-    /contribution rating \(100 units per expected category point\)/,
-  );
-  assert.equal(
-    candidate?.metrics[0]?.label,
-    "Contribution (100/category point)",
-  );
+  assert.match(candidate?.summary ?? "", /rating \/ 100/);
+  assert.equal(candidate?.metrics[0]?.label, "Rating / 100");
   const legacy = buildWeeklyEditionFactPacket({
     ...base,
     performances: [{ ...performance, ratingVersion: undefined, rating: 95 }],

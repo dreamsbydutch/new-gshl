@@ -12,6 +12,8 @@ import type {
   StarPlayer,
 } from "@gshl-types";
 import type { NHLSchedule } from "@gshl-lib/types/nhl";
+import { playerWeekPerformanceRating } from "../domain/player-week-rating";
+import { isCategoryImpactRating } from "./stat-rating";
 import type { MatchupCategoryConfig, TeamWeekStatLine } from "@gshl-types";
 import { normalizeDateOnlyValue } from "../core/date";
 import {
@@ -594,6 +596,11 @@ export function getStarPlayers(
 ): StarPlayer[] {
   return players
     .filter((player) => {
+      if (
+        isCategoryImpactRating(player.ratingVersion) &&
+        playerWeekPerformanceRating(player) === null
+      )
+        return false;
       return (
         toStatNumber(player.GP) > 0 ||
         toStatNumber(player.G) > 0 ||
@@ -625,7 +632,9 @@ export function getStarPlayers(
       ...player,
       starRank: (index + 1) as 1 | 2 | 3,
       team: teamLookup.get(String(player.gshlTeamId)) ?? null,
-      numericRating: toStatNumber(player.Rating),
+      numericRating:
+        playerWeekPerformanceRating(player) ??
+        Math.min(100, Math.max(0, toStatNumber(player.Rating))),
     }));
 }
 
@@ -662,6 +671,10 @@ export function renderPlayerStatCell(
     return formatStatValue(player[key], 2);
   }
 
+  if (key === "Rating" && isCategoryImpactRating(player.ratingVersion)) {
+    const rating = playerWeekPerformanceRating(player);
+    return rating === null ? "-" : rating.toFixed(1);
+  }
   if (key === "SVP" || key === "Rating") {
     if (
       key === "SVP" &&

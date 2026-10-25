@@ -6,6 +6,7 @@ import {
   projectMatchupDetailsMatchup,
   projectMatchupDetailsTeam,
   projectMatchupPlayerWeekRow,
+  projectMatchupPlayerDayRow,
   projectMatchupTeamWeekStats,
 } from "./matchupProjection";
 
@@ -79,6 +80,7 @@ void test("player-week projection joins only display identity and scoring fields
       posGroup: "F",
       nhlTeam: ["TOR"],
       GP: 3,
+      GS: 3,
       MG: 0,
       IR: 1,
       IRplus: "2",
@@ -109,9 +111,14 @@ void test("player-week projection joins only display identity and scoring fields
   assert.deepEqual(result.nhlTeam, ["TOR"]);
   assert.deepEqual(result.currentNhlTeam, ["NJD", "TOR"]);
   assert.equal(result.G, 2);
-  assert.equal(result.Rating, 8.5);
-  assert.equal(result.averageRating, 2.125);
-  assert.equal(result.ratingVersion, "gshl-category-impact-v3");
+  assert.ok(
+    typeof result.Rating === "number" &&
+      result.Rating >= 0 &&
+      result.Rating <= 100,
+  );
+  assert.equal(result.categoryImpact, 8.5);
+  assert.equal(result.averageRating, null);
+  assert.equal(result.ratingVersion, "gshl-performance-rating-100-v1");
   assert.deepEqual(
     [result.MG, result.IR, result.IRplus, result.ADD, result.MS, result.BS],
     [0, 1, "2", 1, "3", 4],
@@ -119,6 +126,50 @@ void test("player-week projection joins only display identity and scoring fields
   assert.equal("salary" in result, false);
   assert.equal("powerMetric" in result, false);
   assert.deepEqual(collectMatchupNhlAbbreviations([result, result]), ["TOR"]);
+});
+
+void test("day projection preserves source stats and dated eligibility with its own daily rating scale", () => {
+  const row = projectMatchupPlayerDayRow(
+    {
+      _id: "day",
+      gshlTeamId: "team",
+      posGroup: "G",
+      date: "2026-10-24",
+      nhlPos: ["G"],
+      dailyPos: "BN",
+      GP: 1,
+      GS: 0,
+      Rating: 123,
+      ratingVersion: "gshl-category-impact-v3",
+      SV: 24,
+      TOI: 59.83,
+      updatedAt: "2026-10-25T02:00:00Z",
+    },
+    null,
+  );
+  assert.ok(
+    typeof row.Rating === "number" && row.Rating >= 0 && row.Rating <= 100,
+  );
+  assert.equal(row.categoryImpact, 123);
+  assert.equal(row.ratingVersion, "gshl-performance-rating-100-v1");
+  assert.equal(row.ratingPeriod, "playerDayStatLines");
+  assert.equal(row.dailyPos, "BN");
+  assert.equal(row.SV, 24);
+  assert.equal(row.TOI, 59.83);
+  assert.equal(row.updatedAt, Date.parse("2026-10-25T02:00:00Z"));
+});
+
+void test("undated or malformed player days cannot silently become today's zero contributions", () => {
+  for (const date of [undefined, null, "", "2026-99-24", "2026-02-30"]) {
+    assert.throws(
+      () =>
+        projectMatchupPlayerDayRow(
+          { _id: "day", gshlTeamId: "team", posGroup: "G", date },
+          null,
+        ),
+      /canonical scoring date/,
+    );
+  }
 });
 
 void test("player-week projection falls back to the current NHL team without a snapshot", () => {

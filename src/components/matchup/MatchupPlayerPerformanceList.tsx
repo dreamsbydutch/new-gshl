@@ -1,6 +1,5 @@
 import { ChevronDown } from "lucide-react";
 import { NHLLogoList } from "@gshl-components/player/NHLLogoList";
-import { isCategoryImpactRating } from "@gshl-utils/features/stat-rating";
 import type {
   MatchupDetailsNhlTeam,
   PlayerStatColumn,
@@ -97,22 +96,8 @@ export function MatchupPlayerPerformanceList({
                     {renderPlayerStatCell(player, "Rating")}
                   </div>
                   <div className="mt-1 text-[10px] uppercase tracking-[0.12em] text-slate-300">
-                    Rating
+                    Week rating / 100
                   </div>
-                  {isCategoryImpactRating(player.ratingVersion) &&
-                  typeof player.averageRating === "number" &&
-                  Number.isFinite(player.averageRating) ? (
-                    <div
-                      className="mt-1 text-[10px] text-slate-300"
-                      title="Average rating per appearance"
-                      aria-label={`Average rating per appearance: ${player.averageRating}`}
-                    >
-                      Avg{" "}
-                      {player.averageRating.toLocaleString("en-CA", {
-                        maximumFractionDigits: 2,
-                      })}
-                    </div>
-                  ) : null}
                 </div>
               </header>
 

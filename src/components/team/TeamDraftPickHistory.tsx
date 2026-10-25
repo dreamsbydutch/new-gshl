@@ -17,6 +17,7 @@ import { Check, ChevronDown, Trophy } from "lucide-react";
 import { LockerRoomHeader } from "./LockerRoomHeader";
 import { formatMoney } from "../../lib/utils/core/format";
 import { isCategoryImpactRating } from "../../lib/utils/features/stat-rating";
+import { compactGshlPerformanceRating } from "../../lib/utils/domain/gshl-performance-rating";
 
 const number = (value: number | null | undefined) =>
   value == null ? "-" : value.toFixed(1);
@@ -95,9 +96,8 @@ export function TeamDraftPickHistory({
     <section className="mx-auto w-full max-w-5xl space-y-6">
       {contributionRatings && (
         <p className="text-xs text-muted-foreground">
-          Ratings show total category contribution (100 units per expected
-          category point). Draft-slot and salary grades are unavailable because
-          their historical curves use different units.
+          Performance ratings use a fixed 0–100 historical scale. Draft-slot and
+          salary grades are unavailable for these ratings.
         </p>
       )}
       <LockerRoomHeader currentTeam={currentTeam} headingLevel={2} />
@@ -360,7 +360,7 @@ export function TeamDraftPickHistory({
                 </th>
                 {[
                   "Slot value",
-                  contributionRatings ? "Contribution" : "Overall",
+                  contributionRatings ? "Rating / 100" : "Overall",
                   "Team usage",
                   "League usage",
                   "Over slot",
@@ -393,7 +393,15 @@ export function TeamDraftPickHistory({
                       {number(pick.expectedRating)}
                     </td>
                     <td className="px-2 py-1 tabular-nums">
-                      {number(pick.overallRating)}
+                      {number(
+                        isCategoryImpactRating(pick.ratingVersion)
+                          ? compactGshlPerformanceRating(
+                              pick.overallRating,
+                              pick.ratingVersion,
+                              "playerTotalStatLines",
+                            )
+                          : pick.overallRating,
+                      )}
                     </td>
                     <td className="px-2 py-1 tabular-nums">
                       <RosterDays
@@ -482,7 +490,7 @@ export function TeamDraftPickHistory({
                     Expected
                   </th>
                   <th scope="col" className="px-2 py-1 font-normal">
-                    {contributionRatings ? "Contribution" : "Overall"}
+                    {contributionRatings ? "Rating / 100" : "Overall"}
                   </th>
                   <th scope="col" className="px-2 py-1 font-normal">
                     Above
@@ -518,7 +526,15 @@ export function TeamDraftPickHistory({
                       {number(pick.salaryExpectedRating)}
                     </td>
                     <td className="px-2 py-1 tabular-nums">
-                      {number(pick.overallRating)}
+                      {number(
+                        isCategoryImpactRating(pick.ratingVersion)
+                          ? compactGshlPerformanceRating(
+                              pick.overallRating,
+                              pick.ratingVersion,
+                              "playerTotalStatLines",
+                            )
+                          : pick.overallRating,
+                      )}
                     </td>
                     <td
                       className={`px-2 py-1 tabular-nums ${(pick.signingValue ?? 0) > 0 ? "text-emerald-700" : (pick.signingValue ?? 0) < 0 ? "text-rose-700" : "text-slate-500"}`}

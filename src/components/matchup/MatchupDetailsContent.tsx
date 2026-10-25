@@ -39,6 +39,7 @@ import { canShareOwnerContent } from "@gshl-utils/features/whatsapp-share";
 import { buildMatchupWhatsAppShareMessage } from "@gshl-utils/features/whatsapp-messages";
 import { PlayerStatsTable } from "./PlayerStatsTable";
 import { MatchupNHLGames } from "./MatchupNHLGames";
+import { MatchupTodaySummary } from "./MatchupTodaySummary";
 import { ArrowLeftIcon, StarIcon } from "lucide-react";
 
 function CategoryResultsCard({
@@ -46,6 +47,7 @@ function CategoryResultsCard({
   title,
   scores,
   status,
+  updatedAt,
   categories,
   homeTeam,
   awayTeam,
@@ -54,6 +56,7 @@ function CategoryResultsCard({
   title: string;
   scores: { away: number; home: number };
   status: string;
+  updatedAt: number | null;
   categories: CategoryResult[];
   homeTeam: MatchupDetailsTeam | null;
   awayTeam: MatchupDetailsTeam | null;
@@ -145,6 +148,19 @@ function CategoryResultsCard({
                 className="px-2 pb-2 text-center text-xs font-normal text-slate-600"
               >
                 {status}
+                {updatedAt ? (
+                  <span className="mt-1 block text-[10px] font-normal normal-case tracking-normal text-slate-500">
+                    Weekly totals recorded{" "}
+                    {new Intl.DateTimeFormat("en-CA", {
+                      month: "short",
+                      day: "numeric",
+                      hour: "numeric",
+                      minute: "2-digit",
+                      timeZone: "America/Toronto",
+                      timeZoneName: "short",
+                    }).format(updatedAt)}
+                  </span>
+                ) : null}
               </td>
             </tr>
           </thead>
@@ -285,7 +301,7 @@ function StarPodiumCard({ star }: { star: StarPlayer }) {
         <div className="text-[10px] text-slate-500 sm:mt-1 sm:text-xs sm:font-semibold sm:text-slate-600">
           {formatStatValue(star.numericRating, 2)}
           <span className="ml-1 text-[10px] font-normal uppercase text-slate-400">
-            Rating
+            Week rating / 100
           </span>
         </div>
         <div className="contents sm:mt-0.5 sm:flex sm:flex-wrap sm:justify-center sm:gap-x-2 sm:gap-y-0.5">
@@ -539,6 +555,15 @@ export function MatchupDetailsContent({
             title="Matchup Breakdown"
             scores={matchupScore}
             status={matchupStatus}
+            updatedAt={
+              details?.teamStatsUpdatedAt?.home &&
+              details.teamStatsUpdatedAt.away
+                ? Math.min(
+                    details.teamStatsUpdatedAt.home,
+                    details.teamStatsUpdatedAt.away,
+                  )
+                : null
+            }
             categories={categoryResults}
             homeTeam={homeTeam}
             awayTeam={awayTeam}
@@ -548,6 +573,7 @@ export function MatchupDetailsContent({
       </section>
 
       <section className="mt-3 space-y-2 sm:mt-6 sm:space-y-4">
+        {details ? <MatchupTodaySummary details={details} /> : null}
         {details ? <MatchupNHLGames details={details} /> : null}
         <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
           <div
@@ -644,6 +670,7 @@ export function MatchupDetailsContent({
             team={selectedTeam}
             nhlTeams={details?.nhlTeams ?? []}
             players={selectedPlayers}
+            playerDays={details?.playerDays?.[selectedSide] ?? []}
             seasonCategories={season?.categories}
           />
         </div>

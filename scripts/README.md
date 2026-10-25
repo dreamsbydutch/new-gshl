@@ -1002,6 +1002,13 @@ npm run lineup:update-all -- --season-id 3 --week-num 22 --team-id 108 --apply
 
 ### Ratings, Power, and Ranking Engine
 
+The read-only [GSHL performance-scale reference builder](src/commands/ratings/build-gshl-performance-rating-reference.ts)
+reconstructs frozen 0–100 display benchmarks from published contribution units
+and the hash-verified historical corpus. Its `--help` owns the required inputs.
+It writes only a new local reference artifact, never Convex data or an existing
+reference. Review and adopt a new version explicitly; normal stat refreshes do
+not recalibrate public ratings. See [rating semantics](../docs/RANKING.md).
+
 #### `ratings:backfill`
 
 Recomputes player ratings for a single season and one or more supported player

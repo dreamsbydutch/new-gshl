@@ -1,4 +1,30 @@
 import { isCategoryImpactRating } from "./stat-rating";
+import {
+  gshlPerformanceRating,
+  GSHL_PERFORMANCE_RATING_VERSION,
+  type GshlRatingPeriod,
+} from "../domain/gshl-performance-rating";
+
+function editionPerformanceRating(
+  value: unknown,
+  version: string | undefined,
+  period: GshlRatingPeriod,
+): number {
+  const raw = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(raw)) return 0;
+  if (isCategoryImpactRating(version))
+    return (
+      gshlPerformanceRating(
+        {
+          Rating: raw,
+          ratingVersion: version,
+          ratingAppearances: raw === 0 ? 0 : 1,
+        },
+        period,
+      ) ?? 0
+    );
+  return Math.max(0, Math.min(100, raw));
+}
 import { z } from "zod";
 import { selectResearchEvidence } from "./weekly-edition-research";
 import type {
@@ -825,6 +851,23 @@ export function buildWeeklyEditionEditorialCandidates(
   );
   for (const performance of performances) {
     const categoryImpact = isCategoryImpactRating(performance.ratingVersion);
+    const period =
+      performance.entityType === "player"
+        ? performance.scope === "day"
+          ? "playerDayStatLines"
+          : performance.scope === "week"
+            ? "playerWeekStatLines"
+            : "playerTotalStatLines"
+        : performance.scope === "day"
+          ? "teamDayStatLines"
+          : performance.scope === "week"
+            ? "teamWeekStatLines"
+            : "teamSeasonStatLines";
+    const displayRating = editionPerformanceRating(
+      performance.rating,
+      performance.ratingVersion,
+      period,
+    );
     const ratingBonus = categoryImpact
       ? performance.scope === "season"
         ? 76
@@ -841,8 +884,8 @@ export function buildWeeklyEditionEditorialCandidates(
     const metrics = [
       {
         key: "Rating",
-        label: categoryImpact ? "Contribution (100/category point)" : "Rating",
-        value: performance.rating,
+        label: "Rating / 100",
+        value: displayRating,
       },
       ...Object.entries(performance.stats)
         .filter(([, value]) => Number.isFinite(value))
@@ -862,8 +905,8 @@ export function buildWeeklyEditionEditorialCandidates(
       scope: performance.scope,
       importance: ratingBonus,
       occurredAt: performance.occurredAt,
-      headlineHint: `${entityName ?? "GSHL standout"} posts a ${performance.rating.toFixed(1)} ${categoryImpact ? "contribution rating" : "rating"}`,
-      summary: `${entityName ?? "GSHL standout"} produced a ${performance.rating.toFixed(1)} ${performance.scope} ${categoryImpact ? "contribution rating (100 units per expected category point)" : "rating"}.${statSummary ? ` ${statSummary}.` : ""}`,
+      headlineHint: `${entityName ?? "GSHL standout"} posts a ${displayRating.toFixed(1)} rating / 100`,
+      summary: `${entityName ?? "GSHL standout"} produced a ${displayRating.toFixed(1)} ${performance.scope} rating / 100.${statSummary ? ` ${statSummary}.` : ""}`,
       playerId: performance.playerId,
       playerName: performance.playerName,
       teamId: performance.teamId,
@@ -1038,9 +1081,12 @@ export function buildWeeklyEditionFactPacket(
       playerName: player.playerName,
       teamId: player.teamId,
       teamName: player.teamName,
-      rating: numberValue(player.rating),
-      ratingVersion: player.ratingVersion,
-      averageRating: player.averageRating,
+      rating: editionPerformanceRating(
+        player.rating,
+        player.ratingVersion,
+        "playerWeekStatLines",
+      ),
+      ratingVersion: GSHL_PERFORMANCE_RATING_VERSION,
       points: numberValue(player.points),
       wins: numberValue(player.wins),
     }))
@@ -1470,9 +1516,12 @@ export function buildMilestoneEditionFactPacket(
       playerName: player.playerName,
       teamId: player.teamId,
       teamName: player.teamName,
-      rating: numberValue(player.rating),
-      ratingVersion: player.ratingVersion,
-      averageRating: player.averageRating,
+      rating: editionPerformanceRating(
+        player.rating,
+        player.ratingVersion,
+        "playerTotalStatLines",
+      ),
+      ratingVersion: GSHL_PERFORMANCE_RATING_VERSION,
       points: numberValue(player.points),
       wins: numberValue(player.wins),
     }))
@@ -1680,7 +1729,7 @@ export function buildTemplateWeeklyEdition(
         ? packet.stars
             .map(
               (star, index) =>
-                `${index + 1}. ${star.playerName} (${star.teamName}) — ${star.rating.toFixed(2)} ${isCategoryImpactRating(star.ratingVersion) ? "contribution rating" : "rating"}, ${star.points} points and ${star.wins} wins.`,
+                `${index + 1}. ${star.playerName} (${star.teamName}) — ${star.rating.toFixed(2)} rating / 100, ${star.points} points and ${star.wins} wins.`,
             )
             .join(" ")
         : "No eligible weekly player ratings were available.",
@@ -1930,7 +1979,7 @@ function buildMilestoneTemplateEditionCopy(
           packet.stars
             .map(
               (star, index) =>
-                `${index + 1}. ${star.playerName} (${star.teamName}) — ${star.rating.toFixed(2)} ${isCategoryImpactRating(star.ratingVersion) ? "contribution rating" : "rating"}.`,
+                `${index + 1}. ${star.playerName} (${star.teamName}) — ${star.rating.toFixed(2)} rating / 100.`,
             )
             .join(" ") || "Final player ratings were unavailable.",
           [],

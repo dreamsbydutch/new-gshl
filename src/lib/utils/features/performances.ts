@@ -4,7 +4,10 @@ import type {
   PerformanceKind,
   PerformanceRow,
 } from "../../types/performances";
-import { isCategoryImpactRating } from "./stat-rating";
+import {
+  gshlPerformanceRating,
+  type GshlRatingPeriod,
+} from "../domain/gshl-performance-rating";
 
 export const PERFORMANCE_KINDS: { value: PerformanceKind; label: string }[] = [
   { value: "playerDay", label: "Player days" },
@@ -186,9 +189,22 @@ export function performanceDisplayStats(
   const stats = Object.fromEntries(
     performanceStats(kind).map((stat) => [stat, performanceNumber(row[stat])]),
   );
-  if (kind !== "playerNhl" && isCategoryImpactRating(row.ratingVersion)) {
-    const average = performanceNumber(row.averageRating);
-    if (average !== null) stats.averageRating = average;
+  if (kind !== "playerNhl") {
+    const periods: Record<
+      Exclude<PerformanceKind, "playerNhl">,
+      GshlRatingPeriod
+    > = {
+      playerDay: "playerDayStatLines",
+      playerWeek: "playerWeekStatLines",
+      playerSplit: "playerSplitStatLines",
+      playerTotal: "playerTotalStatLines",
+      teamDay: "teamDayStatLines",
+      teamWeek: "teamWeekStatLines",
+      teamSeason: "teamSeasonStatLines",
+    };
+    stats.Rating = gshlPerformanceRating(row, periods[kind]);
+    // Keep the signed unit as hidden ordering metadata when percentile rounding ties.
+    stats.categoryImpact = performanceNumber(row.categoryImpact ?? row.Rating);
   }
   return stats;
 }
@@ -229,8 +245,17 @@ export function topPerformances(
     .sort((a, b) => {
       const difference =
         (a.stats[stat]! - b.stats[stat]!) * (direction === "asc" ? 1 : -1);
+      const impactDifference =
+        stat === "Rating" &&
+        a.stats.categoryImpact != null &&
+        b.stats.categoryImpact != null
+          ? (a.stats.categoryImpact - b.stats.categoryImpact) *
+            (direction === "asc" ? 1 : -1)
+          : 0;
       return (
-        difference || a.id.localeCompare(b.id) * (direction === "asc" ? 1 : -1)
+        difference ||
+        impactDifference ||
+        a.id.localeCompare(b.id) * (direction === "asc" ? 1 : -1)
       );
     })
     .slice(0, 100);

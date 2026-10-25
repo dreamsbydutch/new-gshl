@@ -25,6 +25,36 @@ authorized data operation.
 
 ## Ranking behavior
 
+### Public GSHL performance ratings
+
+GSHL player and team performance ratings use a 0–100 historical comparison
+scale, versioned as `gshl-performance-rating-100-v1`. Every period has its own
+frozen reference, shared across teams, positions and seasons. A player-week's
+50 is the historical middle and 90 is approximately the top ten percent of
+the historical weekly reference. A new weak or strong week never refits the
+scale. Weekly values are computed from combined counted starter statistics,
+including pooled goalie workload, before comparison; daily ratings are neither
+added nor averaged to produce a weekly rating.
+
+The weekly reference contains 65,238 played player-team weeks from completed
+2014–15 through 2025–26 seasons. Other period references use their published
+historical player/team contributions; careers use the October 24, 2026 snapshot.
+The daily reference is a deterministic stratified sample of 128 starter
+appearances per completed season (1,536 total), replayed against each season's
+frozen category-impact model. It is a sampled historical benchmark, not a
+percentile of today's live player pool. The checked-in reference includes
+sample counts, source hashes, sampling provenance and 1,001 quantile knots.
+Interpolation uses tied ranks, bounds results to 0–100 and gives the same
+contribution the same score in every year under this reference version.
+
+Native statistics and signed `gshl-category-impact-v3` contribution units remain
+the internal calculation/persistence contract. Public stat queries and matchup
+projections expose the bounded `Rating` and retain raw units as `categoryImpact`.
+They do not convert averages into another rating. Missing, unplayed and
+incompatible old units are unrated. Updating the historical scale requires a
+new reference version; ordinary refreshes never rebuild it. NHL hockey value,
+Elo and salary units are separate measures and are not inputs to this scale.
+
 The public runtime exposes `rankRows`, `rankPerformance`, and
 `getPerformanceGrade`. It supports player day, week, split, total, and NHL rows
 plus team day, week, and season rows. Player day/week single-row calls return a

@@ -4,11 +4,8 @@ import type { MatchupRecords } from "@gshl-lib/types/performance-records";
 import { PerformanceRecordBadge } from "./PerformanceRecordBadge";
 import { NHLLogoList } from "@gshl-components/player/NHLLogoList";
 import { NHLLogo } from "@gshl-components/player/NHLLogo";
-import { useNHLHomeSchedule } from "@gshl-hooks/features/useNHLHomeSchedule";
-import {
-  getPlayerTodayGames,
-  isMatchupInPlay,
-} from "@gshl-utils/features/matchup-details";
+import { useMatchupPlayerTable } from "@gshl-hooks/features/useMatchupPlayerTable";
+import { getPlayerTodayGames } from "@gshl-utils/features/matchup-details";
 import { nhlGameStatus } from "@gshl-utils/features/nhl";
 import { TableViewport } from "@gshl-ui";
 import type {
@@ -18,10 +15,13 @@ import type {
   MatchupDetailsTeam,
   PlayerStatRow,
   PlayerStatColumn,
+  MatchupPlayerDayRow,
+  MatchupPlayerWeekRow,
 } from "@gshl-types";
+import { PLAYER_WEEK_RATING_DESCRIPTION } from "@gshl-utils/domain/player-week-rating";
+import { playerActivity } from "@gshl-utils/features/matchup-activity";
 import {
   abbreviatePlayerName,
-  buildPlayerStatColumns,
   findNhlTeamByAbbreviation,
   formatMatchupPlayerName,
   getPlayerNhlAbbreviations,
@@ -36,6 +36,7 @@ export function PlayerStatsTable({
   team,
   nhlTeams,
   players,
+  playerDays = [],
   records = null,
   headline,
   seasonCategories,
@@ -44,17 +45,20 @@ export function PlayerStatsTable({
   week: MatchupDetailsWeek | null;
   team: MatchupDetailsTeam | null;
   nhlTeams: MatchupDetailsNhlTeam[];
-  players: PlayerStatRow[];
+  players: MatchupPlayerWeekRow[];
+  playerDays?: MatchupPlayerDayRow[];
   records?: MatchupRecords | null;
   headline?: string;
   seasonCategories?: readonly string[];
 }) {
-  const schedule = useNHLHomeSchedule(3);
-  const isActive = isMatchupInPlay(matchup, week, schedule.selectedDay?.date);
-  const columns = buildPlayerStatColumns({
+  const table = useMatchupPlayerTable({
+    matchup,
+    week,
     players,
+    playerDays,
     categories: seasonCategories,
   });
+  const { schedule, isActive, columns } = table;
   const tableColumns: (
     | PlayerStatColumn
     | { key: "today"; label: string; className?: string }
@@ -118,7 +122,11 @@ export function PlayerStatsTable({
   };
 
   const teamName = team?.name ?? "Unknown Team";
-  const sectionLabel = headline ?? "Player statistics";
+  const sectionLabel =
+    headline ??
+    (table.view === "today"
+      ? "Today's player statistics"
+      : "Full week player statistics");
 
   return (
     <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm sm:rounded-2xl">
@@ -153,6 +161,82 @@ export function PlayerStatsTable({
           {players.length} {players.length === 1 ? "Player" : "Players"}
         </div>
       </div>
+
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-3 py-2 sm:px-4">
+        <div className="flex items-center gap-2">
+          {isActive ? (
+            <div
+              className="inline-flex rounded-lg bg-slate-100 p-1"
+              role="group"
+              aria-label="Player statistics period"
+            >
+              {(["today", "week"] as const).map((view) => (
+                <button
+                  key={view}
+                  type="button"
+                  aria-pressed={table.view === view}
+                  onClick={() => table.setView(view)}
+                  className={`min-h-9 rounded-md px-3 text-xs font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${table.view === view ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"}`}
+                >
+                  {view === "today" ? "Today" : "Full week"}
+                </button>
+              ))}
+            </div>
+          ) : null}
+          <label className="flex items-center gap-2 text-xs text-slate-600">
+            Sort
+            <select
+              value={table.sort}
+              onChange={(event) => {
+                const value = event.target.value;
+                if (
+                  value === "activity" ||
+                  value === "rating" ||
+                  value === "name" ||
+                  value === "position"
+                )
+                  table.setSort(value);
+              }}
+              className="min-h-9 rounded-md border border-slate-200 bg-white px-2 text-slate-900 focus-visible:ring-2 focus-visible:ring-blue-500"
+            >
+              {isActive ? (
+                <option value="activity">Live / upcoming / final</option>
+              ) : null}
+              {table.view === "week" ? (
+                <option value="rating">Weekly rating</option>
+              ) : null}
+              <option value="position">Position</option>
+              <option value="name">Player name</option>
+            </select>
+          </label>
+        </div>
+        <label className="flex min-h-9 items-center gap-2 text-xs text-slate-600">
+          <input
+            type="checkbox"
+            checked={table.advanced}
+            onChange={(event) => table.setAdvanced(event.target.checked)}
+          />
+          More stats
+        </label>
+      </div>
+      {table.view === "week" ? (
+        <details className="border-b border-slate-200 px-3 py-2 text-xs text-slate-600 sm:px-4">
+          <summary className="min-h-6 cursor-pointer font-medium text-slate-700">
+            What does the weekly rating mean?
+          </summary>
+          <p className="mt-2 max-w-3xl leading-relaxed">
+            {PLAYER_WEEK_RATING_DESCRIPTION}
+          </p>
+        </details>
+      ) : (
+        <p className="border-b border-slate-200 px-3 py-2 text-xs text-slate-500 sm:px-4">
+          {schedule.selectedDay?.dateLabel} · Day stats include bench
+          performances; only starting slots count toward team totals.
+          {!table.hasToday
+            ? " Today's roster and stats have not been recorded yet."
+            : ""}
+        </p>
+      )}
 
       {isActive && schedule.error ? (
         <p role="alert" className="px-3 py-2 text-xs text-slate-600 sm:px-4">
@@ -193,7 +277,7 @@ export function PlayerStatsTable({
             </tr>
           </thead>
           <tbody>
-            {players.length === 0 ? (
+            {table.players.length === 0 ? (
               <tr>
                 <td
                   colSpan={tableColumns.length}
@@ -203,10 +287,10 @@ export function PlayerStatsTable({
                 </td>
               </tr>
             ) : (
-              players.map((player) => (
+              table.players.map((player) => (
                 <tr
                   key={player.id}
-                  className="group border-b border-slate-200 transition-colors last:border-0 odd:bg-white even:bg-slate-50/70 hover:bg-slate-100"
+                  className={`group border-b border-slate-200 transition-colors last:border-0 hover:bg-slate-100 ${isActive && playerActivity(player, schedule.games) === "live" ? "bg-emerald-50/60" : "odd:bg-white even:bg-slate-50/70"}`}
                 >
                   {tableColumns.map((column) => {
                     if (column.key === "today")
@@ -214,6 +298,11 @@ export function PlayerStatsTable({
                         <td key="today" className={getColumnClassName("today")}>
                           {schedule.isLoading ? (
                             <span className="text-slate-400">Loading…</span>
+                          ) : table.hasToday &&
+                            !table.todayIds.has(player.id) ? (
+                            <span className="text-[10px] text-slate-400">
+                              Off roster today
+                            </span>
                           ) : !schedule.data ? (
                             <span className="text-slate-400">Unavailable</span>
                           ) : !schedule.data.published ? (
@@ -263,6 +352,10 @@ export function PlayerStatsTable({
                                   />
                                   <span className="ml-1 text-[10px] text-slate-500">
                                     {nhlGameStatus(game)}
+                                    {typeof game.awayTeam.score === "number" &&
+                                    typeof game.homeTeam.score === "number"
+                                      ? ` · ${game.awayTeam.score}–${game.homeTeam.score}`
+                                      : ""}
                                   </span>
                                 </Link>
                               ),
@@ -274,7 +367,13 @@ export function PlayerStatsTable({
                       getColumnClassName(column.key, column.className),
                       column.key === "player" ? "group-hover:bg-slate-100" : "",
                     ].join(" ");
-                    const content = renderPlayerStatCell(player, column.key);
+                    const content =
+                      table.view === "today" &&
+                      !table.hasToday &&
+                      column.key !== "player" &&
+                      column.key !== "pos"
+                        ? "—"
+                        : renderPlayerStatCell(player, column.key);
 
                     return column.key === "player" ? (
                       <th
@@ -299,12 +398,14 @@ export function PlayerStatsTable({
                         className={cellClassName}
                       >
                         {content}
-                        <PerformanceRecordBadge
-                          records={records}
-                          entityId={(team?.id ?? "") + ":" + player.id}
-                          stat={column.key}
-                          value={content}
-                        />
+                        {table.view === "week" && column.key !== "Rating" ? (
+                          <PerformanceRecordBadge
+                            records={records}
+                            entityId={(team?.id ?? "") + ":" + player.id}
+                            stat={column.key}
+                            value={content}
+                          />
+                        ) : null}
                       </td>
                     );
                   })}

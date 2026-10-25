@@ -1,6 +1,8 @@
 export interface CategoryImpactRatingFields {
   averageRating?: number | null;
   ratingVersion?: string | null;
+  categoryImpact?: number | string | null;
+  ratingPeriod?: string;
   ratingAppearances?: number | null;
 }
 

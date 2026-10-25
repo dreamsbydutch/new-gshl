@@ -56,6 +56,33 @@ const exposure = {
     meanGamesPerNhlTeam: 3,
   })),
 };
+
+test("weekly player value rates the pooled stat line rather than adding daily ratings", async () => {
+  const days = [
+    day("a", "w1", "2025-01-01", "t", 20),
+    day("b", "w1", "2025-01-02", "t", 20),
+  ];
+  const scored = await scoreSeasonImpact({
+    season: { _id: "s", categories: ["G"] },
+    weeks,
+    days,
+    reference: await reference(),
+    exposure,
+    tables: {
+      playerDayStatLines: days,
+      playerWeekStatLines: [
+        { _id: "pw", playerId: "p", weekId: "w1", gshlTeamId: "t" },
+      ],
+    },
+  });
+  const weekly = scored.scores.get("playerWeekStatLines")!.get("pw")!;
+  const dailySum = [
+    ...scored.scores.get("playerDayStatLines")!.values(),
+  ].reduce((sum, d) => sum + d.Rating, 0);
+  assert.equal(weekly.ratingAppearances, 2);
+  assert.ok(weekly.Rating > 0);
+  assert.ok(Math.abs(weekly.Rating - dailySum) > 1);
+});
 async function reference() {
   const api = await loadPeriodImpact();
   const appearance = (G: number) => ({

@@ -7,6 +7,8 @@ import {
   projectMatchupDetailsTeam,
   projectMatchupNhlTeam,
   projectMatchupPlayerWeekRow,
+  projectMatchupPlayerDayRow,
+  projectMatchupStatUpdatedAt,
   projectMatchupTeamWeekStats,
 } from "./lib/matchupProjection";
 import { utcTimestampToDateKey } from "./lib/timestamps";
@@ -39,6 +41,8 @@ export const details = query({
       awayTeamStats,
       homePlayerStats,
       awayPlayerStats,
+      homePlayerDays,
+      awayPlayerDays,
     ] = await Promise.all([
       ctx.db.get(matchup.seasonId),
       ctx.db.get(matchup.weekId),
@@ -82,7 +86,29 @@ export const details = query({
             .eq("gshlTeamId", matchup.awayTeamId),
         )
         .collect(),
+      ctx.db
+        .query("playerDayStatLines")
+        .withIndex("by_seasonId_weekId_gshlTeamId", (q) =>
+          q
+            .eq("seasonId", matchup.seasonId)
+            .eq("weekId", matchup.weekId)
+            .eq("gshlTeamId", matchup.homeTeamId),
+        )
+        .take(1001),
+      ctx.db
+        .query("playerDayStatLines")
+        .withIndex("by_seasonId_weekId_gshlTeamId", (q) =>
+          q
+            .eq("seasonId", matchup.seasonId)
+            .eq("weekId", matchup.weekId)
+            .eq("gshlTeamId", matchup.awayTeamId),
+        )
+        .take(1001),
     ]);
+    if (homePlayerDays.length === 1001 || awayPlayerDays.length === 1001)
+      throw new Error(
+        "Matchup player-day read exceeds the supported week scope",
+      );
 
     const teamRows = [homeTeam, awayTeam].filter(present);
     const franchiseIds = Array.from(
@@ -93,7 +119,12 @@ export const details = query({
     );
     const playerIds = Array.from(
       new Set(
-        [...homePlayerStats, ...awayPlayerStats].map((stats) => stats.playerId),
+        [
+          ...homePlayerStats,
+          ...awayPlayerStats,
+          ...homePlayerDays,
+          ...awayPlayerDays,
+        ].map((stats) => stats.playerId),
       ),
     );
     const [franchiseRows, conferenceRows, playerRows] = await Promise.all([
@@ -134,6 +165,9 @@ export const details = query({
     const nhlAbbreviations = collectMatchupNhlAbbreviations([
       ...projectedHomePlayers,
       ...projectedAwayPlayers,
+      ...[...homePlayerDays, ...awayPlayerDays].map((day) => ({
+        nhlTeam: day.nhlTeam ?? [],
+      })),
     ]);
     const [ownerRows, nhlTeamRows] = await Promise.all([
       Promise.all(ownerIds.map((ownerId) => ctx.db.get(ownerId))),
@@ -183,9 +217,27 @@ export const details = query({
         home: homeTeamStats ? projectMatchupTeamWeekStats(homeTeamStats) : null,
         away: awayTeamStats ? projectMatchupTeamWeekStats(awayTeamStats) : null,
       },
+      teamStatsUpdatedAt: {
+        home: projectMatchupStatUpdatedAt(homeTeamStats?.updatedAt),
+        away: projectMatchupStatUpdatedAt(awayTeamStats?.updatedAt),
+      },
       players: {
         home: projectedHomePlayers,
         away: projectedAwayPlayers,
+      },
+      playerDays: {
+        home: homePlayerDays.map((stats) =>
+          projectMatchupPlayerDayRow(
+            stats,
+            playersById.get(stats.playerId) ?? null,
+          ),
+        ),
+        away: awayPlayerDays.map((stats) =>
+          projectMatchupPlayerDayRow(
+            stats,
+            playersById.get(stats.playerId) ?? null,
+          ),
+        ),
       },
       nhlTeams: nhlTeamRows.filter(present).map(projectMatchupNhlTeam),
     };

@@ -1,4 +1,17 @@
+import { projectPlayerWeekRating } from "../../src/lib/utils/domain/player-week-rating";
+import { projectGshlPerformanceRating } from "../../src/lib/utils/domain/gshl-performance-rating";
+
 type StatValue = string | number | null | undefined;
+
+export function projectMatchupStatUpdatedAt(value: unknown): number | null {
+  const timestamp =
+    typeof value === "number"
+      ? value
+      : typeof value === "string"
+        ? Date.parse(value)
+        : NaN;
+  return Number.isFinite(timestamp) && timestamp > 0 ? timestamp : null;
+}
 
 type MatchupSource = {
   [key: string]: unknown;
@@ -193,7 +206,7 @@ export function projectMatchupPlayerWeekRow(
   stats: PlayerWeekSource,
   player: PlayerSource | null,
 ) {
-  return {
+  return projectPlayerWeekRating({
     id: player?._id ?? stats._id,
     gshlTeamId: stats.gshlTeamId,
     firstName: player?.firstName ?? "",
@@ -234,7 +247,43 @@ export function projectMatchupPlayerWeekRow(
     Rating: stats.Rating ?? null,
     averageRating: stats.averageRating ?? null,
     ratingVersion: stats.ratingVersion ?? null,
-  };
+  });
+}
+
+/** Day identity and lineup are source-specific, including players since dropped. */
+export function projectMatchupPlayerDayRow(
+  stats: PlayerWeekSource & {
+    date?: string | null;
+    dailyPos?: string | null;
+    TOI?: StatValue;
+    updatedAt?: number | string | null;
+  },
+  player: PlayerSource | null,
+) {
+  const date = stats.date;
+  if (
+    typeof date !== "string" ||
+    !/^\d{4}-\d{2}-\d{2}$/.test(date) ||
+    !Number.isFinite(Date.parse(date)) ||
+    new Date(date).toISOString().slice(0, 10) !== date
+  )
+    throw new Error(
+      "Matchup player-day projection requires a canonical scoring date",
+    );
+  return projectGshlPerformanceRating(
+    {
+      ...projectMatchupPlayerWeekRow(stats, player),
+      Rating: stats.Rating ?? null,
+      ratingVersion: stats.ratingVersion ?? null,
+      nhlPos: stats.nhlPos ?? player?.nhlPos ?? [],
+      posGroup: stats.posGroup,
+      date,
+      dailyPos: stats.dailyPos ?? null,
+      TOI: stats.TOI ?? null,
+      updatedAt: projectMatchupStatUpdatedAt(stats.updatedAt),
+    },
+    "playerDayStatLines",
+  );
 }
 
 /** Returns the unique NHL abbreviations referenced by projected player rows. */

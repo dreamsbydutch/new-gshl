@@ -90,7 +90,15 @@ export interface MatchupPlayerWeekRow {
   Rating: MatchupStatValue;
   averageRating?: number | null;
   ratingVersion?: string | null;
+  categoryImpact?: MatchupStatValue;
 }
+
+export type MatchupPlayerDayRow = MatchupPlayerWeekRow & {
+  date: string;
+  dailyPos: string | null;
+  TOI: MatchupStatValue;
+  updatedAt: number | null;
+};
 
 export type PlayerStatRow = Pick<MatchupPlayerWeekRow, "id"> &
   Partial<Omit<MatchupPlayerWeekRow, "id">> & {
@@ -125,9 +133,14 @@ export interface MatchupDetailsPayload {
     home: MatchupTeamWeekStats | null;
     away: MatchupTeamWeekStats | null;
   };
+  teamStatsUpdatedAt?: { home: number | null; away: number | null };
   players: {
     home: MatchupPlayerWeekRow[];
     away: MatchupPlayerWeekRow[];
+  };
+  playerDays?: {
+    home: MatchupPlayerDayRow[];
+    away: MatchupPlayerDayRow[];
   };
   nhlTeams: MatchupDetailsNhlTeam[];
 }
@@ -157,6 +170,7 @@ export type PlayerStatCategoryKey =
   | "SO";
 
 export type PlayerStatContextKey =
+  | "dailyPos"
   | "nhlTeam"
   | "date"
   | "opp"

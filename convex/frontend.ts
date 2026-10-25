@@ -2,6 +2,11 @@
 // @ts-nocheck
 import { paginationOptsValidator } from "convex/server";
 import { v } from "convex/values";
+import {
+  isGshlRatingPeriod,
+  gshlPerformanceRating,
+  projectGshlPerformanceRating,
+} from "../src/lib/utils/domain/gshl-performance-rating";
 import { mutation, query } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { requireCommissioner, requireOwnerOrCommissioner } from "./lib/auth";
@@ -150,7 +155,14 @@ async function rows(
 function list(table: string) {
   return query({
     args: listArgs,
-    handler: (ctx, args) => rows(ctx, table, args),
+    handler: async (ctx, args): Promise<Record<string, any>[]> => {
+      const result = await rows(ctx, table, args);
+      const period =
+        table === "playerDayHighlights" ? "playerDayStatLines" : table;
+      return isGshlRatingPeriod(period)
+        ? result.map((row) => projectGshlPerformanceRating(row, period))
+        : result;
+    },
   });
 }
 
@@ -235,7 +247,9 @@ export const ownerDraftHistory = query({
             teamRating:
               (toUtcTimestamp(season.startDate) ?? Infinity) <= Date.now() &&
               stats.some((row) => (draftNumber(row.Rating) ?? 0) !== 0)
-                ? draftNumber(stat?.Rating)
+                ? stat
+                  ? gshlPerformanceRating(stat, "teamSeasonStatLines")
+                  : null
                 : null,
             calderRating: hasRatings ? draftNumber(stat?.calderRating) : null,
             calderRank: hasRatings ? draftNumber(stat?.calderRk) : null,
@@ -454,40 +468,56 @@ export const ownerDraftHistory = query({
           teamId: pick.gshlTeamId,
         })),
         teamIds,
-        totals: totals.map((row) => ({
-          playerId: row.playerId,
-          rating: row.Rating,
-          ratingVersion: row.ratingVersion ?? undefined,
-          averageRating: row.averageRating ?? undefined,
-          days: row.days,
-          position: row.posGroup,
-        })),
-        splits: splits.map((row) => ({
-          playerId: row.playerId,
-          teamId: row.gshlTeamId,
-          rating: row.Rating,
-          ratingVersion: row.ratingVersion ?? undefined,
-          averageRating: row.averageRating ?? undefined,
-          days: row.days,
-          position: row.posGroup,
-        })),
-        postseasonTotals: postseasonTotals.map((row) => ({
-          playerId: row.playerId,
-          days: row.days,
-          rating: row.Rating,
-          ratingVersion: row.ratingVersion ?? undefined,
-          averageRating: row.averageRating ?? undefined,
-          position: row.posGroup,
-        })),
-        postseasonSplits: postseasonSplits.map((row) => ({
-          playerId: row.playerId,
-          teamId: row.gshlTeamId,
-          days: row.days,
-          rating: row.Rating,
-          ratingVersion: row.ratingVersion ?? undefined,
-          averageRating: row.averageRating ?? undefined,
-          position: row.posGroup,
-        })),
+        totals: totals
+          .map((row) =>
+            projectGshlPerformanceRating(row, "playerTotalStatLines"),
+          )
+          .map((row) => ({
+            playerId: row.playerId,
+            rating: row.Rating,
+            ratingVersion: row.ratingVersion ?? undefined,
+            averageRating: row.averageRating ?? undefined,
+            days: row.days,
+            position: row.posGroup,
+          })),
+        splits: splits
+          .map((row) =>
+            projectGshlPerformanceRating(row, "playerSplitStatLines"),
+          )
+          .map((row) => ({
+            playerId: row.playerId,
+            teamId: row.gshlTeamId,
+            rating: row.Rating,
+            ratingVersion: row.ratingVersion ?? undefined,
+            averageRating: row.averageRating ?? undefined,
+            days: row.days,
+            position: row.posGroup,
+          })),
+        postseasonTotals: postseasonTotals
+          .map((row) =>
+            projectGshlPerformanceRating(row, "playerTotalStatLines"),
+          )
+          .map((row) => ({
+            playerId: row.playerId,
+            days: row.days,
+            rating: row.Rating,
+            ratingVersion: row.ratingVersion ?? undefined,
+            averageRating: row.averageRating ?? undefined,
+            position: row.posGroup,
+          })),
+        postseasonSplits: postseasonSplits
+          .map((row) =>
+            projectGshlPerformanceRating(row, "playerSplitStatLines"),
+          )
+          .map((row) => ({
+            playerId: row.playerId,
+            teamId: row.gshlTeamId,
+            days: row.days,
+            rating: row.Rating,
+            ratingVersion: row.ratingVersion ?? undefined,
+            averageRating: row.averageRating ?? undefined,
+            position: row.posGroup,
+          })),
         players: players.map((player) => ({
           id: player._id,
           name: player.fullName,

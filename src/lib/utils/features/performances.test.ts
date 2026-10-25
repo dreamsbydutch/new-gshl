@@ -38,17 +38,21 @@ const row = (id: string, value: number | null): PerformanceRow => ({
   team: "",
 });
 
-void test("v3 GSHL averages are display metadata across periods, leaving NHL metrics and sorting unchanged", () => {
+void test("GSHL periods display bounded ratings rather than per-appearance averages; NHL metrics stay unchanged", () => {
   const source = {
     Rating: 100,
     averageRating: 25,
     ratingVersion: "gshl-category-impact-v3",
     seasonRating: 80,
+    GP: 2,
+    GS: 2,
   };
   const before = structuredClone(source);
   for (const { value: kind } of PERFORMANCE_KINDS) {
     const stats = performanceDisplayStats(kind, source);
-    assert.equal(stats.averageRating, kind === "playerNhl" ? undefined : 25);
+    assert.equal(stats.averageRating, undefined);
+    if (kind !== "playerNhl")
+      assert.ok(stats.Rating! >= 0 && stats.Rating! <= 100);
     assert.ok(!performanceStats(kind).includes("averageRating"));
   }
   assert.equal(
@@ -66,7 +70,7 @@ void test("v3 GSHL averages are display metadata across periods, leaving NHL met
   assert.equal(
     performanceDisplayStats("teamDay", { ...source, averageRating: 0 })
       .averageRating,
-    0,
+    undefined,
   );
   assert.equal(performanceDisplayStats("playerNhl", source).seasonRating, 80);
   assert.deepEqual(
