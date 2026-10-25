@@ -797,6 +797,7 @@ export default defineSchema({
       dailyPos: optionalNullableString,
       bestPos: optionalNullableString,
       fullPos: optionalNullableString,
+      lineupAccountingFinalized: v.optional(v.boolean()),
       opp: optionalNullableString,
       score: optionalNullableString,
       ...statFields,

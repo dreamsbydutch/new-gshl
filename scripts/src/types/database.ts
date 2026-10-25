@@ -287,6 +287,7 @@ export interface DraftPick {
 
 // Player stat line types
 export interface PlayerDayStatLine {
+  lineupAccountingFinalized?: boolean;
   id: string;
   seasonId: string;
   gshlTeamId: string;

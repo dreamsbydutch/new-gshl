@@ -3,6 +3,30 @@ import test from "node:test";
 import { getLineupBuilder } from "../lineup/lineup-builder";
 import { refreshPlayerDayLineupContext } from "./player-day-lineup-context";
 
+void test("live days retain stats and recorded slots without running hindsight optimization", () => {
+  const source = [
+    {
+      seasonId: "s",
+      gshlTeamId: "t",
+      playerId: "p",
+      date: "2026-10-25",
+      GP: "1",
+      G: "2",
+      dailyPos: "RW",
+      bestPos: "BN",
+      fullPos: "RW",
+      lineupAccountingFinalized: false,
+    },
+  ];
+  const result = refreshPlayerDayLineupContext(source, () => {
+    throw Error("Live optimization should be deferred");
+  });
+  assert.equal(result[0]!.G, "2");
+  assert.equal(result[0]!.dailyPos, "RW");
+  assert.equal(result[0]!.MS, "");
+  assert.equal(result[0]!.BS, "");
+});
+
 void test("fresh ratings replace stale hindsight positions without changing the manager's lineup", async () => {
   const builder = await getLineupBuilder();
   const identity = {

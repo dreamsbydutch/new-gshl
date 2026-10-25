@@ -585,6 +585,7 @@ def build_team_game_rows(
     home_team: dict[str, Any],
     game_has_started: bool,
     game_state: str | None = None,
+    game_schedule_state: str | None = None,
 ) -> list[dict[str, Any]]:
     away_abbr = str(away_team.get("abbrev") or "").strip().upper()
     home_abbr = str(home_team.get("abbrev") or "").strip().upper()
@@ -596,6 +597,7 @@ def build_team_game_rows(
             "date": date,
             "gameId": str(game_id),
             "gameState": game_state or "",
+            "gameScheduleState": game_schedule_state or "",
             "teamAbbr": away_abbr,
             "opponentAbbr": home_abbr,
             "opp": build_opponent_display(home_abbr, True),
@@ -605,6 +607,7 @@ def build_team_game_rows(
             "date": date,
             "gameId": str(game_id),
             "gameState": game_state or "",
+            "gameScheduleState": game_schedule_state or "",
             "teamAbbr": home_abbr,
             "opponentAbbr": away_abbr,
             "opp": build_opponent_display(away_abbr, False),
@@ -618,6 +621,8 @@ def fetch_daily_stats(
     date: str,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]], int]:
     schedule = client.schedule.daily_schedule(date=date)
+    if not isinstance(schedule.get("games"), list):
+        raise RuntimeError(f"Missing NHL schedule coverage for {date}; refusing partial stats")
     # Fantasy NHL stats exclude preseason, All-Star and other exhibitions.
     games = [
         game for game in (schedule.get("games") or [])
@@ -630,6 +635,16 @@ def fetch_daily_stats(
     for game in games:
         try:
             game_id = int(game.get("id"))
+            if game.get("gameScheduleState") in ("PPD", "CNCL"):
+                team_games.extend(build_team_game_rows(
+                    date=date, game_id=game_id,
+                    away_team=game.get("awayTeam") or {},
+                    home_team=game.get("homeTeam") or {},
+                    game_has_started=False,
+                    game_state=str(game.get("gameState") or ""),
+                    game_schedule_state=str(game["gameScheduleState"]),
+                ))
+                continue
             boxscore = client.game_center.boxscore(str(game_id))
             if int(boxscore.get("gameType") or 0) != int(game["gameType"]):
                 raise ValueError("Schedule and boxscore game eligibility disagree")
@@ -664,6 +679,7 @@ def fetch_daily_stats(
                     home_team=home_team,
                     game_has_started=game_has_started,
                     game_state=str(boxscore.get("gameState") or game.get("gameState") or ""),
+                    game_schedule_state=str(game.get("gameScheduleState") or ""),
                 )
             )
             roster_players.extend(

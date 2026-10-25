@@ -8,6 +8,93 @@ import {
   prepareSeasonAggregateWriteRow,
 } from "./season-stat-aggregation";
 
+void test("live accounting stays out of every rollup until the NHL slate is final", () => {
+  const common = {
+    seasonId: "s",
+    gshlTeamId: "t",
+    weekId: "w",
+    date: "2025-01-01",
+    lineupAccountingFinalized: false,
+  };
+  const source = [
+    {
+      ...common,
+      playerId: "bad",
+      posGroup: "F",
+      GP: "1",
+      G: "2",
+      dailyPos: "RW",
+      fullPos: "RW",
+      bestPos: "BN",
+      BS: "1",
+    },
+    {
+      ...common,
+      playerId: "missed",
+      posGroup: "D",
+      GP: "1",
+      dailyPos: "BN",
+      fullPos: "D",
+      bestPos: "D",
+      MS: "1",
+    },
+    { ...common, playerId: "absent", posGroup: "F", dailyPos: "BN", MG: "1" },
+  ];
+  const aggregate = (days: typeof source) =>
+    buildSeasonStatLines(
+      "s",
+      days,
+      {
+        id: "s",
+        year: "2025",
+        categories: [
+          "G",
+          "A",
+          "P",
+          "PPP",
+          "SOG",
+          "HIT",
+          "BLK",
+          "W",
+          "GAA",
+          "SVP",
+        ],
+      },
+      [
+        {
+          id: "w",
+          seasonId: "s",
+          weekType: "RS",
+          startDate: "2025-01-01",
+          endDate: "2025-01-05",
+        },
+      ],
+      [{ id: "t", seasonId: "s" }],
+      new Date("2025-01-01T18:00:00Z"),
+    );
+  for (const finalized of [false, true]) {
+    const result = aggregate(
+      source.map((row) => ({ ...row, lineupAccountingFinalized: finalized })),
+    );
+    for (const rows of [
+      result.playerWeeks,
+      result.playerSplits,
+      result.playerTotals,
+      result.teamDays,
+      result.teamWeeks,
+      result.teamSeasons,
+    ]) {
+      for (const field of ["MS", "BS", "MG"])
+        assert.equal(
+          rows.reduce((n, row) => n + Number(row[field] ?? 0), 0),
+          finalized ? 1 : 0,
+        );
+    }
+    assert.equal(Number(result.teamWeeks[0]!.G), 2);
+  }
+  assert.equal(source[0]!.BS, "1");
+});
+
 void test("all rollups count actual bad starts, skater missed starts and bench missed games", () => {
   const common = {
     seasonId: "s",

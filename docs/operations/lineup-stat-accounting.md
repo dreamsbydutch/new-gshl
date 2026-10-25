@@ -26,6 +26,18 @@ After NHL stats and daily ratings refresh, rebuild `fullPos` and `bestPos` befor
 deriving MS and BS. Preserve the manager's recorded `dailyPos` and `GS`. Inactive
 players have neither MS nor BS, even if a hindsight slot is assigned to them.
 
+The normal daily update pipeline owns this calculation. Live NHL statistics and
+ratings continue updating, but all three counters wait until every eligible
+game on that Toronto scoring date is FINAL/OFF. This includes late games after
+midnight. Explicitly postponed or cancelled games do not block completion and
+never create MG; unknown or incomplete schedule coverage keeps accounting pending.
+
+Daily rows record `lineupAccountingFinalized: false` while pending. Both daily
+derivation and aggregate rebuilds suppress MS, BS and MG until the final NHL
+refresh marks the date ready, rebuilds hindsight positions, and calculates its
+counters. Nightly and catch-up updates repeat this step for corrections. Older
+historical rows without the marker retain their already reconciled counters.
+
 ## Historical repair
 
 Capture canonical source rows and metadata, checksum each file, and reconcile

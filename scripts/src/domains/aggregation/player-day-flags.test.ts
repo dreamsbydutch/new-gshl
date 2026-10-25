@@ -3,8 +3,76 @@ import test from "node:test";
 import {
   computePlayerDayLineupFlags,
   computePlayerDayMissedGameValue,
+  isLineupAccountingFinalized,
+  applyPlayerDayDerivedColumns,
 } from "./player-day-flags";
 import { getLineupBuilder } from "../lineup/lineup-builder";
+
+void test("accounting waits for a complete final slate, including late and unknown games", () => {
+  const finished = { gameId: "early", gameState: "OFF" };
+  const late = { gameId: "late", gameState: "LIVE" };
+  assert.equal(
+    isLineupAccountingFinalized(2, [finished, finished, late, late]),
+    false,
+  );
+  assert.equal(
+    isLineupAccountingFinalized(2, [finished, { ...late, gameState: "FINAL" }]),
+    true,
+  );
+  assert.equal(isLineupAccountingFinalized(2, [finished]), false);
+  assert.equal(isLineupAccountingFinalized(undefined, []), false);
+  assert.equal(isLineupAccountingFinalized(0, []), true);
+  assert.equal(isLineupAccountingFinalized(1, [{ gameId: "unknown" }]), false);
+  for (const gameScheduleState of ["PPD", "CNCL"]) {
+    assert.equal(
+      isLineupAccountingFinalized(2, [
+        finished,
+        { ...late, gameScheduleState },
+      ]),
+      true,
+    );
+  }
+});
+
+void test("pending accounting clears all counters despite stale hindsight or missed-game flags", () => {
+  const rows = [
+    {
+      playerId: "starter",
+      seasonId: "s",
+      gshlTeamId: "t",
+      date: "2026-10-25",
+      GP: "1",
+      dailyPos: "RW",
+      fullPos: "RW",
+      bestPos: "BN",
+      lineupAccountingFinalized: false,
+      MS: "1",
+      BS: "1",
+      MG: "1",
+    },
+    {
+      playerId: "bench",
+      seasonId: "s",
+      gshlTeamId: "t",
+      date: "2026-10-25",
+      GP: "1",
+      dailyPos: "BN",
+      fullPos: "RW",
+      bestPos: "RW",
+      lineupAccountingFinalized: false,
+      MS: "1",
+      BS: "1",
+      MG: "1",
+    },
+  ];
+  applyPlayerDayDerivedColumns(rows, rows);
+  for (const row of rows)
+    assert.deepEqual([row.MS, row.BS, row.MG], ["", "", ""]);
+  assert.equal(
+    computePlayerDayMissedGameValue({ lineupAccountingFinalized: false }, true),
+    "",
+  );
+});
 
 void test("a played starter excluded from the best lineup is a bad start", () => {
   assert.deepEqual(

@@ -6,6 +6,7 @@ type PlayerDayDerivedRecord = DatabaseRecord & {
   ADD?: unknown;
   MS?: unknown;
   BS?: unknown;
+  MG?: unknown;
 };
 
 const BENCH_DAILY_POSITIONS = new Set(["BN", "IR", "IR+"]);
@@ -76,7 +77,8 @@ export function computePlayerDayLineupFlags(row: DatabaseRecord): {
   MS: string;
   BS: string;
 } {
-  const played = toTrimmedString(row.GP) === "1";
+  const played =
+    row.lineupAccountingFinalized !== false && toTrimmedString(row.GP) === "1";
   if (!played) {
     return { MS: "", BS: "" };
   }
@@ -99,12 +101,39 @@ export function computePlayerDayLineupFlags(row: DatabaseRecord): {
   return { MS, BS };
 }
 
+/** Complete schedule coverage is required, including late games after midnight. */
+export function isLineupAccountingFinalized(
+  expectedGames: number | undefined,
+  games: readonly {
+    gameId: string;
+    gameState?: string;
+    gameScheduleState?: string;
+  }[],
+): boolean {
+  return (
+    expectedGames !== undefined &&
+    Number.isInteger(expectedGames) &&
+    expectedGames >= 0 &&
+    new Set(games.map((g) => g.gameId)).size === expectedGames &&
+    games.every(
+      (g) =>
+        !!g.gameId &&
+        (["PPD", "CNCL"].includes(toUpperToken(g.gameScheduleState)) ||
+          ["FINAL", "OFF"].includes(toUpperToken(g.gameState))),
+    )
+  );
+}
+
 /** A scheduled/live game is not evidence that an appearance was missed. */
 export function computePlayerDayMissedGameValue(
   row: DatabaseRecord,
   completedTeamGame: boolean,
 ): string {
-  return completedTeamGame && toTrimmedString(row.GP) !== "1" ? "1" : "";
+  return row.lineupAccountingFinalized !== false &&
+    completedTeamGame &&
+    toTrimmedString(row.GP) !== "1"
+    ? "1"
+    : "";
 }
 
 export function applyPlayerDayDerivedColumns<T extends PlayerDayDerivedRecord>(
@@ -146,5 +175,6 @@ export function applyPlayerDayDerivedColumns<T extends PlayerDayDerivedRecord>(
     const flags = computePlayerDayLineupFlags(row);
     row.MS = flags.MS;
     row.BS = flags.BS;
+    if (row.lineupAccountingFinalized === false) row.MG = "";
   }
 }

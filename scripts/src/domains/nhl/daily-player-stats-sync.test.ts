@@ -82,6 +82,50 @@ const boxscore: Parameters<typeof buildUpdatedPlayerDayRow>[1] = {
   TOI: "",
 };
 
+test("a completed early game waits for the full slate before publishing missed games", () => {
+  const game = {
+    date: day.date,
+    gameId: "game",
+    teamAbbr: "TOR",
+    opponentAbbr: "MTL",
+    opp: "MTL",
+    score: "2-1",
+    gameState: "OFF",
+  };
+  const absent = { ...boxscore, GP: "" };
+  const live = buildUpdatedPlayerDayRow(
+    day,
+    absent,
+    new Set(),
+    "TOR",
+    game,
+    false,
+  );
+  assert.equal(live.MG, "");
+  assert.equal(live.lineupAccountingFinalized, false);
+  const final = buildUpdatedPlayerDayRow(
+    day,
+    absent,
+    new Set(),
+    "TOR",
+    game,
+    true,
+  );
+  assert.equal(final.MG, "1");
+  assert.equal(final.lineupAccountingFinalized, true);
+  assert.equal(
+    buildUpdatedPlayerDayRow(
+      day,
+      absent,
+      new Set(),
+      "TOR",
+      { ...game, gameScheduleState: "PPD" },
+      true,
+    ).MG,
+    "",
+  );
+});
+
 test("scheduled and live games cannot become missed games before completion", () => {
   for (const gameState of ["FUT", "LIVE"]) {
     const game = {

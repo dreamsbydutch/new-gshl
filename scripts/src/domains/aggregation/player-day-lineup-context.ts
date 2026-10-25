@@ -26,7 +26,10 @@ export function refreshPlayerDayLineupContext(
     groups.set(key, group);
   }
   for (const group of groups.values()) {
-    if (group.some((row) => Number(row.GP) === 1)) {
+    if (
+      group.every((row) => row.lineupAccountingFinalized !== false) &&
+      group.some((row) => Number(row.GP) === 1)
+    ) {
       const optimized = optimize(group, slots);
       const byId = new Map(optimized.map((row) => [String(row.playerId), row]));
       if (byId.size !== group.length || optimized.length !== group.length)

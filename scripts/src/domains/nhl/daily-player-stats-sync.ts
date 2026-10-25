@@ -22,6 +22,7 @@ import { rankRowsWithRankingEngine } from "@gshl-lib/ranking/ranking-engine";
 import {
   applyPlayerDayDerivedColumns,
   computePlayerDayMissedGameValue,
+  isLineupAccountingFinalized,
 } from "@gshl-lib/stats/player-day-flags";
 import { assertLeagueGameSourceDays } from "../aggregation/player-day-source-validation";
 import { refreshPlayerDayLineupContext } from "../aggregation/player-day-lineup-context";
@@ -106,6 +107,7 @@ const PLAYER_DAY_WRITE_FIELDS = [
   "BS",
   "bestPos",
   "fullPos",
+  "lineupAccountingFinalized",
 ] as const satisfies readonly (keyof PlayerDayStatLine)[];
 
 const SEASON_GATED_STAT_FIELDS = [
@@ -242,6 +244,7 @@ type ExternalTeamGame = {
   opp: string;
   score: string;
   gameState?: string;
+  gameScheduleState?: string;
 };
 
 type ExternalRosterPlayer = {
@@ -1150,15 +1153,19 @@ export function buildUpdatedPlayerDayRow(
   activeSeasonCategories: ReadonlySet<string>,
   resolvedNhlTeam: string,
   teamGame?: ExternalTeamGame,
+  accountingFinalized = false,
 ): PlayerDayStatLine {
   const dailyPos = cleanWhitespace(existing.dailyPos) || "BN";
   const gp = cleanWhitespace(stat.GP);
   const gs = computeStartedGame(dailyPos, gp, teamGame);
   const mg = computePlayerDayMissedGameValue(
-    { GP: gp },
-    ["FINAL", "OFF"].includes(
-      cleanWhitespace(teamGame?.gameState).toUpperCase(),
-    ),
+    { GP: gp, lineupAccountingFinalized: accountingFinalized },
+    !["PPD", "CNCL"].includes(
+      cleanWhitespace(teamGame?.gameScheduleState).toUpperCase(),
+    ) &&
+      ["FINAL", "OFF"].includes(
+        cleanWhitespace(teamGame?.gameState).toUpperCase(),
+      ),
   );
   const resolvedOpp =
     cleanWhitespace(stat.opp) || cleanWhitespace(teamGame?.opp);
@@ -1167,6 +1174,7 @@ export function buildUpdatedPlayerDayRow(
   const ir = mg === "1" && isIrSlot(dailyPos) ? "1" : "";
   const row: PlayerDayStatLine = {
     ...existing,
+    lineupAccountingFinalized: accountingFinalized,
     date: normalizeDateKey(existing.date),
     // Yahoo owns fantasy eligibility; NHL supplies a single game position.
     nhlPos: splitPosTokens(existing.nhlPos).length
@@ -1782,6 +1790,14 @@ export async function runDailyNhlPlayerStatSync(
   );
   const externalRows = parseExternalPlayerStatRows(externalPayload);
   const externalTeamGames = parseExternalTeamGameRows(externalPayload);
+  const accountingFinalizedDates = new Set(
+    datesSynced.filter((date) =>
+      isLineupAccountingFinalized(
+        externalPayload.gamesByDate?.[date],
+        externalTeamGames.filter((game) => game.date === date),
+      ),
+    ),
+  );
   const externalRosterPlayers = parseExternalRosterPlayers(externalPayload);
   const externalSeasonRosterPlayers =
     parseExternalSeasonRosterPlayers(externalPayload);
@@ -1915,6 +1931,7 @@ export async function runDailyNhlPlayerStatSync(
         activeSeasonCategories,
         rowTeamAbbr,
         teamGame,
+        accountingFinalizedDates.has(normalizeDateKey(existing.date)),
       ),
       activeSeasonCategories,
     );
