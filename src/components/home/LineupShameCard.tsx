@@ -90,7 +90,7 @@ function LineupShamePanel({ seasonId }: { seasonId: string }) {
         <div className="min-w-0 flex-1">
           <h2
             id="lineup-shame-heading"
-            className="font-oswald text-xl text-slate-950 sm:text-2xl"
+            className="scroll-mt-24 font-oswald text-xl text-slate-950 sm:text-2xl"
           >
             Bench of shame
           </h2>
@@ -125,7 +125,7 @@ function LineupShamePanel({ seasonId }: { seasonId: string }) {
       ) : (
         <>
           <div className="grid min-w-0 md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
-            <div className="min-w-0">
+            <div className="row-start-2 min-w-0 md:col-start-1 md:row-start-1">
               <div className="flex items-baseline justify-between gap-2 border-b border-slate-100 px-3 py-3 sm:px-5">
                 <h3 className="font-barlow text-xs font-semibold uppercase tracking-wider text-slate-600">
                   Most missed starts
@@ -166,6 +166,9 @@ function LineupShamePanel({ seasonId }: { seasonId: string }) {
                     </th>
                     <th scope="col" className="py-2 pr-3 text-right sm:pr-5">
                       Coaching %
+                      <span className="block text-[9px] font-normal normal-case leading-3 tracking-normal">
+                        BS / decisions
+                      </span>
                     </th>
                   </tr>
                 </thead>
@@ -216,12 +219,15 @@ function LineupShamePanel({ seasonId }: { seasonId: string }) {
                             ? "—"
                             : `${entry.coachingPercentage.toFixed(1)}%`}
                         </span>
-                        <span className="mt-0.5 block text-[9px] tabular-nums text-slate-400">
+                        <span
+                          className="mt-0.5 block text-[9px] leading-3 tabular-nums text-slate-400"
+                          aria-label={`${entry.badStarts} bad starts from ${entry.startDecisions} start decisions`}
+                        >
                           {entry.coachingPercentage === null
                             ? entry.startDecisions === 0
                               ? "No decisions"
                               : "Check counts"
-                            : `${entry.badStarts} BS / ${entry.startDecisions} decisions`}
+                            : `${entry.badStarts} / ${entry.startDecisions}`}
                         </span>
                       </td>
                     </tr>
@@ -231,7 +237,7 @@ function LineupShamePanel({ seasonId }: { seasonId: string }) {
             </div>
             <aside
               aria-labelledby="lineup-last-night-heading"
-              className="min-w-0 border-t border-slate-100 bg-slate-50/60 px-3 py-3 sm:px-5 md:border-l md:border-t-0"
+              className="row-start-1 min-w-0 border-b border-slate-100 bg-slate-50/60 px-3 py-3 sm:px-5 md:col-start-2 md:border-b-0 md:border-l"
             >
               <div className="flex items-baseline justify-between gap-2">
                 <h3
