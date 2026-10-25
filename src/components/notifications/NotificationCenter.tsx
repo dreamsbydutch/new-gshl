@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { useNotificationCenter } from "@gshl-hooks/features/useNotificationCenter";
 import { Button, Skeleton } from "@gshl-ui";
-import { DraftNotificationSetup } from "./DraftNotificationSetup";
+import { PushNotificationSetup } from "./PushNotificationSetup";
 
 export function NotificationCenter() {
   const center = useNotificationCenter();
@@ -19,7 +19,7 @@ export function NotificationCenter() {
         Your league updates and notification preferences.
       </p>
       <div className="mt-4">
-        <DraftNotificationSetup />
+        <PushNotificationSetup />
       </div>
       <div className="mt-4 flex gap-4 border-b" aria-label="Notification views">
         {(["inbox", "preferences"] as const).map((value) => (

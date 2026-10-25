@@ -10,7 +10,6 @@ import { NHLScheduleHomeCard } from "./NHLScheduleHomeCard";
 import { UfaHomeCard } from "@gshl-components/contracts";
 import { WeeklyEditionHomeCard } from "@gshl-components/headlines/WeeklyEditionHomeCard";
 import { DraftHubCard } from "./DraftHubCard";
-import { DraftNotificationSetup } from "@gshl-components/notifications/DraftNotificationSetup";
 import { HomeScoreboard } from "./HomeScoreboard";
 import { LineupShameCard } from "./LineupShameCard";
 
@@ -39,7 +38,6 @@ export function HomeContent() {
         {dashboardSeason ? (
           <HomeScoreboard seasonId={String(dashboardSeason.id)} />
         ) : null}
-        <DraftNotificationSetup compact />
         <UfaHomeCard />
         <div
           className={cn(
