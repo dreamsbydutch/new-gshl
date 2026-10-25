@@ -99,12 +99,12 @@ void test("buildStandingsTeamGames returns the two latest finals and two next ga
     restoreStandingsGameVenues(olderResults, matchups, "team-a").map(
       (game) => game.venueLabel,
     ),
-    ["v", "@"],
+    ["@", "v"],
   );
 
   assert.deepEqual(
     result.previousGames.map((game) => game.venueLabel),
-    ["v", "@"],
+    ["@", "v"],
   );
   assert.deepEqual(
     result.upcomingGames.map((game) => game.venueLabel),
@@ -119,8 +119,8 @@ void test("buildStandingsTeamGames returns the two latest finals and two next ga
       game.resultTone,
     ]),
     [
-      ["W3", "Comets", "T 9-9", "tie"],
       ["W2", "Comets", "L 6-8", "loss"],
+      ["W3", "Comets", "T 9-9", "tie"],
     ],
   );
   assert.deepEqual(

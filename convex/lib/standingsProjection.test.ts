@@ -188,7 +188,7 @@ test("standings detail selects only the rendered matchup window", () => {
     selectStandingsDetailMatchups("team-1", matchups, weeks).map(
       (matchup) => matchup._id,
     ),
-    ["game-3", "game-2", "game-4", "game-5"],
+    ["game-2", "game-3", "game-4", "game-5"],
   );
 });
 

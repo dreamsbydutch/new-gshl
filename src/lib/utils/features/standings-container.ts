@@ -710,7 +710,6 @@ export function buildStandingsTeamGames(
     previousGames: games
       .filter((matchup) => matchup.isComplete)
       .slice(-2)
-      .reverse()
       .map((matchup) =>
         formatMatchupContext(teamId, matchup, weekNumById, teamById),
       ),

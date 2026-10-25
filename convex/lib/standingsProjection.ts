@@ -194,10 +194,7 @@ export function selectStandingsDetailMatchups<T extends StandingsMatchupSource>(
     );
 
   return [
-    ...ordered
-      .filter((matchup) => matchup.isComplete)
-      .slice(-2)
-      .reverse(),
+    ...ordered.filter((matchup) => matchup.isComplete).slice(-2),
     ...ordered.filter((matchup) => !matchup.isComplete).slice(0, 2),
   ];
 }
