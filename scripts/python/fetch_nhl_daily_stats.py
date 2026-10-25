@@ -3,9 +3,11 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import ssl
 import sys
 from collections import defaultdict
+from pathlib import Path
 from typing import Any
 
 try:
@@ -390,6 +392,57 @@ def build_skater_stat_row(
     }
 
 
+CURRENT_GOALIE_ACCOUNTING_EXCEPTIONS = json.loads(
+    (Path(__file__).resolve().parent.parent / "src/domains/aggregation/"
+     "current-goalie-accounting-exceptions.json").read_text(encoding="utf-8")
+)
+
+
+def reconcile_goalie_counts(
+    row: dict[str, Any], context: dict[str, Any] | None = None,
+) -> tuple[int, int, int]:
+    shots = int(row.get("shotsAgainst") or 0)
+    saves = int(row.get("saves") or 0)
+    goals = int(row.get("goalsAgainst") or 0)
+    if saves + goals == shots:
+        return shots, saves, goals
+    if context is not None:
+        native = {"GP": 1, "W": int(str(row.get("decision", "")).upper() == "W"),
+                  "GA": goals, "SV": saves, "SA": shots,
+                  "TOI": parse_time_to_minutes(row.get("toi"))}
+        for fact in CURRENT_GOALIE_ACCOUNTING_EXCEPTIONS:
+            if (all(context.get(key) == fact[key] for key in
+                    ("date", "gameId", "team", "opponent"))
+                    and row.get("playerId") == fact["nhlPlayerId"]
+                    and native == fact["tuple"]):
+                return shots, saves, goals
+
+    # Some boxscores have an erroneous aggregate saves cell. Require agreement
+    # from all three strength splits AND the separately published save percentage
+    # before replacing it. Never repair an ambiguous tuple by subtraction alone.
+    try:
+        splits = [
+            tuple(int(value) for value in str(row[key]).split("/"))
+            for key in ("evenStrengthShotsAgainst", "powerPlayShotsAgainst",
+                        "shorthandedShotsAgainst")
+        ]
+        if any(len(pair) != 2 or not 0 <= pair[0] <= pair[1] for pair in splits):
+            raise ValueError("Invalid strength split")
+        split_saves = sum(pair[0] for pair in splits)
+        split_shots = sum(pair[1] for pair in splits)
+        percentage = float(row["savePctg"])
+        if (shots > 0 and split_shots == shots and split_saves + goals == shots
+                and math.isclose(percentage, split_saves / shots,
+                                 rel_tol=0, abs_tol=0.0000005)):
+            return shots, split_saves, goals
+    except (KeyError, TypeError, ValueError):
+        pass
+    raise ValueError(
+        f"Uncorroborated NHL goalie counts for player {row.get('playerId')}: "
+        "saves + goalsAgainst differs from shotsAgainst"
+    )
+
+
 def build_goalie_stat_row(
     *,
     date: str,
@@ -419,9 +472,10 @@ def build_goalie_stat_row(
         short_name = ((row.get("name") or {}).get("default")) or ""
         full_name = str(short_name).replace(".", "").strip()
 
-    shots_against = int(row.get("shotsAgainst") or 0)
-    saves = int(row.get("saves") or 0)
-    goals_against = int(row.get("goalsAgainst") or 0)
+    shots_against, saves, goals_against = reconcile_goalie_counts(row, {
+        "date": date, "gameId": game_id, "team": team_abbr,
+        "opponent": opponent_abbr,
+    })
     save_pct = format_fixed((saves / shots_against), 5) if shots_against > 0 else ""
     gaa = format_fixed((goals_against / toi_minutes) * 60, 5) if toi_minutes > 0 else ""
     decision = str(row.get("decision") or "").strip().upper()
