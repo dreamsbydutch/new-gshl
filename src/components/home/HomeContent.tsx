@@ -13,6 +13,7 @@ import { DraftHubCard } from "./DraftHubCard";
 import { OwnerCommandCenter } from "./OwnerCommandCenter";
 import { DraftNotificationSetup } from "@gshl-components/notifications/DraftNotificationSetup";
 import { HomeScoreboard } from "./HomeScoreboard";
+import { LineupShameCard } from "./LineupShameCard";
 
 export function HomeContent() {
   const { seasons, selectedSeason, currentSeason, defaultSeason, isLoading } =
@@ -41,6 +42,9 @@ export function HomeContent() {
         <DraftNotificationSetup compact />
         <OwnerCommandCenter />
         <WeeklyEditionHomeCard />
+        {dashboardSeason ? (
+          <LineupShameCard seasonId={String(dashboardSeason.id)} />
+        ) : null}
         <UfaHomeCard />
         <div
           className={cn(

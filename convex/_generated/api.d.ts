@@ -33,6 +33,7 @@ import type * as lib_draftCorrection from "../lib/draftCorrection.js";
 import type * as lib_draftMode from "../lib/draftMode.js";
 import type * as lib_frontendQuery from "../lib/frontendQuery.js";
 import type * as lib_jobLifecycle from "../lib/jobLifecycle.js";
+import type * as lib_lineupShame from "../lib/lineupShame.js";
 import type * as lib_matchupPreviewEvidence from "../lib/matchupPreviewEvidence.js";
 import type * as lib_matchupProjection from "../lib/matchupProjection.js";
 import type * as lib_nhlContractFields from "../lib/nhlContractFields.js";
@@ -126,6 +127,7 @@ declare const fullApi: ApiFromModules<{
   "lib/draftMode": typeof lib_draftMode;
   "lib/frontendQuery": typeof lib_frontendQuery;
   "lib/jobLifecycle": typeof lib_jobLifecycle;
+  "lib/lineupShame": typeof lib_lineupShame;
   "lib/matchupPreviewEvidence": typeof lib_matchupPreviewEvidence;
   "lib/matchupProjection": typeof lib_matchupProjection;
   "lib/nhlContractFields": typeof lib_nhlContractFields;

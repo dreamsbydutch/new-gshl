@@ -22,6 +22,7 @@ import {
   retryJob as retryManagedJob,
 } from "./lib/jobLifecycle";
 import { buildLeagueActivity } from "../src/lib/utils/features/league-activity";
+import { loadLineupShame } from "./lib/lineupShame";
 import { countGshlPlayersByNhlTeam } from "../src/lib/utils/features/nhl";
 import { buildSigningValues } from "../src/lib/utils/features/signing-value";
 import { JOB_NAMES, JOB_STATUSES } from "./jobCatalog";
@@ -1239,6 +1240,11 @@ export const authUsers = query({
       publicRow(row as unknown as Row),
     );
   },
+});
+
+export const lineupShame = query({
+  args: { seasonId: v.id("seasons"), recentDate: v.string() },
+  handler: (ctx, args) => loadLineupShame(ctx, args.seasonId, args.recentDate),
 });
 
 export const activity = query({

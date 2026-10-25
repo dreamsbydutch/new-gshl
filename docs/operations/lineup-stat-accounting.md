@@ -38,6 +38,23 @@ refresh marks the date ready, rebuilds hindsight positions, and calculates its
 counters. Nightly and catch-up updates repeat this step for corrections. Older
 historical rows without the marker retain their already reconciled counters.
 
+## Home coaching comparison
+
+The home page's Bench of shame ranks season-long MS descending, with tied
+totals sharing a rank. The last Toronto calendar night's finalized player-day
+rows identify the actual missed skaters and highlight their teams.
+
+Coaching percentage is `100 × (1 − BS / (GP − GS − MS))`, as confirmed by the
+commissioner. Start decisions are `GP − GS − MS`; higher percentages are better.
+Zero decisions or inconsistent counts are unavailable, never an invented 100%.
+Sum native counts before calculating the percentage; never average daily rates.
+
+The card combines earlier team-day totals with the fresh completed night's
+player-day counts, so it does not wait for season/career rollups or count the
+latest night twice. An unfinished night contributes neither counters nor a
+provisional coaching denominator. Include all scored regular-season and
+postseason dates in the selected season; exclude today's live games.
+
 ## Historical repair
 
 Capture canonical source rows and metadata, checksum each file, and reconcile
