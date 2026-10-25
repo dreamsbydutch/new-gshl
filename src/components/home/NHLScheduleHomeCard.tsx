@@ -93,7 +93,7 @@ export function NHLScheduleHomeCard() {
                     aria-label={`${awayName} at ${homeName}${hasScore ? `, ${away.score ?? "–"} to ${home.score ?? "–"}` : ""}. ${status}. View matchup.`}
                     className="flex min-h-11 flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded py-2 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
                   >
-                    <span className="flex items-center gap-1.5 text-xs font-semibold text-slate-800">
+                    <span className="flex items-center gap-1.5 text-sm font-semibold text-slate-800">
                       <NHLLogo
                         team={{ name: away.abbrev, logoUrl: "" }}
                         size={24}
@@ -133,7 +133,7 @@ export function NHLScheduleHomeCard() {
         )}
       </div>
       {schedule.data && (
-        <p className="border-t border-slate-100 px-3 py-3 text-[11px] text-slate-500 sm:px-5">
+        <p className="border-t border-slate-100 px-3 py-3 text-xs text-slate-500 sm:px-5">
           Updated{" "}
           <time dateTime={new Date(schedule.data.updatedAt).toISOString()}>
             {formatNHLUpdatedAt(schedule.data.updatedAt)}

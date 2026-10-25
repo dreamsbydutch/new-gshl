@@ -119,14 +119,14 @@ export function WeeklyEditionHomeCard() {
             />
           </span>
           <span className="min-w-0 flex-1">
-            <span className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500 sm:text-xs">
+            <span className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
               Press Box
               <span className="text-slate-400">·</span>
               <span className="truncate text-slate-500">
                 {edition.issueLabel}
               </span>
             </span>
-            <span className="mt-0.5 block truncate text-[13px] font-semibold leading-5 text-slate-950 sm:text-sm">
+            <span className="mt-0.5 block truncate text-sm font-semibold leading-5 text-slate-950">
               {edition.headline}
             </span>
           </span>

@@ -58,7 +58,7 @@ export function DraftHubCard({ season }: DraftHubCardProps) {
             className="h-11 w-11 shrink-0 object-contain"
           />
           <div className="min-w-0">
-            <div className="mb-1 inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500">
+            <div className="mb-1 inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
               {isComplete ? (
                 <Trophy className="h-3.5 w-3.5" />
               ) : (
@@ -68,11 +68,11 @@ export function DraftHubCard({ season }: DraftHubCardProps) {
             </div>
             <h2
               id="draft-hub-home-heading"
-              className="text-xl font-black text-slate-950 sm:text-2xl"
+              className="font-oswald text-lg text-slate-950 sm:text-xl"
             >
               {draftYear} GSHL Draft Hub
             </h2>
-            <p className="mt-0.5 max-w-2xl text-sm text-slate-600">
+            <p className="mt-0.5 max-w-2xl text-xs text-slate-600">
               Live board, team rosters, and picks.
             </p>
             <p className="mt-1 text-xs font-semibold text-slate-600">
@@ -87,7 +87,7 @@ export function DraftHubCard({ season }: DraftHubCardProps) {
         <div className="flex flex-col items-start gap-3 md:items-end">
           {!isLive && !isComplete && countdown.countdown ? (
             <div>
-              <p className="mb-0.5 text-[10px] font-bold uppercase tracking-widest text-slate-500 md:text-right">
+              <p className="mb-0.5 text-xs font-semibold uppercase tracking-wide text-slate-500 md:text-right">
                 Draft starts in
               </p>
               <p className="border-y border-slate-200 px-2 py-1 font-mono text-lg font-bold tabular-nums text-slate-900">

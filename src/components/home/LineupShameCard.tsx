@@ -42,7 +42,9 @@ class LineupShameErrorBoundary extends Component<
           role="alert"
           className="mx-auto w-full max-w-5xl rounded-lg border border-slate-200 bg-white p-5"
         >
-          <h2 className="font-oswald text-xl text-slate-950">Bench of shame</h2>
+          <h2 className="font-oswald text-lg text-slate-950 sm:text-xl">
+            Bench of shame
+          </h2>
           <p className="mt-2 text-sm text-slate-500">
             Lineup rankings are unavailable right now.
           </p>
@@ -81,7 +83,7 @@ function LineupShamePanel({ seasonId }: { seasonId: string }) {
         <div className="min-w-0 flex-1">
           <h2
             id="lineup-shame-heading"
-            className="scroll-mt-24 font-oswald text-xl text-slate-950 sm:text-2xl"
+            className="scroll-mt-24 font-oswald text-lg text-slate-950 sm:text-xl"
           >
             Bench of shame
           </h2>
@@ -136,10 +138,10 @@ function LineupShamePanel({ seasonId }: { seasonId: string }) {
                 <colgroup>
                   <col className="w-10 sm:w-12" />
                   <col />
-                  <col className="w-16" />
+                  <col className="w-20" />
                   <col className="w-24 sm:w-28" />
                 </colgroup>
-                <thead className="bg-slate-50 text-[10px] uppercase tracking-wider text-slate-500">
+                <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                   <tr>
                     <th scope="col" className="py-2 text-center">
                       Rank
@@ -157,7 +159,7 @@ function LineupShamePanel({ seasonId }: { seasonId: string }) {
                     </th>
                     <th scope="col" className="py-2 pr-3 text-right sm:pr-5">
                       Coaching %
-                      <span className="block text-[9px] font-normal normal-case leading-3 tracking-normal">
+                      <span className="block text-xs font-normal normal-case leading-4 tracking-normal">
                         BS / decisions
                       </span>
                     </th>
@@ -171,7 +173,7 @@ function LineupShamePanel({ seasonId }: { seasonId: string }) {
                         entry.recentMisses.length ? "bg-rose-50/70" : ""
                       }
                     >
-                      <td className="py-2 text-center text-xs tabular-nums text-slate-400">
+                      <td className="py-2 text-center text-sm tabular-nums text-slate-400">
                         {entry.hasStats ? entry.rank : "—"}
                       </td>
                       <th
@@ -180,7 +182,7 @@ function LineupShamePanel({ seasonId }: { seasonId: string }) {
                       >
                         <div className="flex min-w-0 items-center gap-2">
                           <TeamMark team={entry.team} />
-                          <span className="line-clamp-2 text-xs leading-4 sm:text-sm">
+                          <span className="line-clamp-2 text-sm leading-5">
                             {entry.team.name}
                           </span>
                         </div>
@@ -197,7 +199,7 @@ function LineupShamePanel({ seasonId }: { seasonId: string }) {
                         </span>
                         {entry.recentMisses.length ? (
                           <span
-                            className="mx-auto mt-0.5 block w-fit rounded bg-rose-100 px-1 text-[9px] font-semibold text-rose-700"
+                            className="mx-auto mt-0.5 block w-fit rounded bg-rose-100 px-1 text-xs font-semibold leading-4 text-rose-700"
                             aria-label={`${entry.recentMisses.length} missed starts last night`}
                           >
                             +{entry.recentMisses.length} last night
@@ -211,7 +213,7 @@ function LineupShamePanel({ seasonId }: { seasonId: string }) {
                             : `${entry.coachingPercentage.toFixed(1)}%`}
                         </span>
                         <span
-                          className="mt-0.5 block text-[9px] leading-3 tabular-nums text-slate-400"
+                          className="mt-0.5 block text-xs leading-4 tabular-nums text-slate-400"
                           aria-label={`${entry.badStarts} bad starts from ${entry.startDecisions} start decisions`}
                         >
                           {entry.coachingPercentage === null

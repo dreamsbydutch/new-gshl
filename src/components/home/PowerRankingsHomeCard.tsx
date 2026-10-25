@@ -157,7 +157,7 @@ export function PowerRankingsHomeCard({
               key={entry.team.id}
               className="grid min-w-0 grid-cols-[1.75rem_minmax(0,1fr)_2.25rem_3rem] items-center gap-1.5 py-2 sm:gap-2"
             >
-              <span className="text-center font-oswald text-base font-semibold tabular-nums text-slate-950">
+              <span className="text-center text-sm font-semibold tabular-nums text-slate-950">
                 {entry.rank}
               </span>
               <div className="flex min-w-0 items-center gap-2">
@@ -169,7 +169,7 @@ export function PowerRankingsHomeCard({
                   aria-hidden="true"
                 />
                 <TeamMark entry={entry} />
-                <span className="min-w-0 truncate text-xs font-semibold text-slate-800">
+                <span className="min-w-0 truncate text-sm font-semibold text-slate-800">
                   {entry.team.name ?? entry.team.abbr ?? "Team"}
                 </span>
               </div>
@@ -182,7 +182,7 @@ export function PowerRankingsHomeCard({
                     ? "Rating unavailable"
                     : `Rating ${entry.rating.toFixed(1)}`
                 }
-                className="text-right font-mono text-xs font-semibold tabular-nums text-slate-500"
+                className="text-right text-sm font-semibold tabular-nums text-slate-500"
               >
                 {entry.rating === null ? "—" : entry.rating.toFixed(1)}
               </span>

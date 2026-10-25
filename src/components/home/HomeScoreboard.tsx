@@ -79,7 +79,7 @@ export function HomeScoreboard({ seasonId }: { seasonId: string }) {
                   ref={isCurrentWeek ? currentWeekStart : undefined}
                   className="w-max shrink-0"
                 >
-                  <h2 className="sticky left-0 mb-2 w-max max-w-full bg-white text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                  <h2 className="sticky left-0 mb-2 w-max max-w-full bg-white text-xs font-semibold uppercase tracking-wide text-slate-500">
                     Week {matchupWeek.weekNum} ·{" "}
                     {matchupPhase === "current"
                       ? "In progress"

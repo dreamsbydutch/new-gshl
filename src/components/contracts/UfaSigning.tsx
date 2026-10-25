@@ -567,14 +567,14 @@ export function UfaHomeCard() {
             </p>
             <h2
               id="home-ufa-heading"
-              className="text-lg font-black leading-tight sm:text-2xl"
+              className="font-oswald text-lg text-slate-950 sm:text-xl"
             >
               {query.data.window.isOpen
                 ? `Top ${HOME_UFA_PREVIEW_LIMIT} UFAs`
                 : "UFA offers"}
             </h2>
             {query.data.window.isOpen ? (
-              <p className="mt-0.5 text-xs leading-4 text-muted-foreground sm:mt-1 sm:text-sm">
+              <p className="mt-0.5 text-xs leading-4 text-muted-foreground sm:mt-1">
                 Salaries include the 125% premium.
               </p>
             ) : null}

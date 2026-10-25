@@ -69,13 +69,13 @@ function CommandAction({
       asChild
       size="sm"
       variant="outline"
-      className="h-9 min-w-0 justify-center gap-1 bg-white/80 px-1 text-[11px] hover:bg-white sm:px-2 sm:text-xs"
+      className="h-9 min-w-0 justify-center gap-1 bg-white/80 px-1 text-xs hover:bg-white sm:px-2"
     >
       <Link href={href} aria-label={count ? `${label} (${count})` : label}>
         <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
         <span className="whitespace-nowrap">{label}</span>
         {count ? (
-          <span className="hidden shrink-0 rounded-full bg-slate-100 px-1 py-0.5 font-mono text-[9px] leading-none text-slate-600 sm:inline">
+          <span className="hidden shrink-0 rounded-full bg-slate-100 px-1 py-0.5 font-mono text-xs leading-none text-slate-600 sm:inline">
             {count}
           </span>
         ) : null}
@@ -102,7 +102,7 @@ function SnapshotLink({
       href={href}
       className="min-w-0 rounded-md px-2 py-2 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:px-3"
     >
-      <span className="block text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+      <span className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
         {label}
       </span>
       <span
@@ -114,9 +114,7 @@ function SnapshotLink({
         {value}
       </span>
       {detail ? (
-        <span className="block truncate text-[11px] text-slate-500">
-          {detail}
-        </span>
+        <span className="block truncate text-xs text-slate-500">{detail}</span>
       ) : null}
     </Link>
   );
@@ -170,12 +168,12 @@ export function OwnerCommandCenter() {
         >
           <TeamMark team={view.team} size={36} />
           <div className="min-w-0">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-600">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-600">
               My team &middot; {view.season?.name ?? "Current season"}
             </p>
             <h2
               id="owner-command-center-heading"
-              className="truncate text-base font-bold leading-tight text-slate-950"
+              className="truncate font-oswald text-lg text-slate-950 sm:text-xl"
             >
               {view.team?.name ?? `${view.ownerName}'s team`}
             </h2>
