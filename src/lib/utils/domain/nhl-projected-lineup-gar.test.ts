@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import usageJson from "../../data/nhl-lineup-usage.json";
+import goalieUsageJson from "../../data/nhl-goalie-usage.json";
+import { parseNhlGoalieUsageArtifact } from "./nhl-goalie-usage";
 import type { NhlTalentForecastDataset } from "../../types/nhl-contract-talent-forecast";
 import type { NhlOrganizations } from "../../types/nhl-organizations";
 import { fitConditionalNhlTalent } from "./nhl-conditional-talent";
@@ -129,7 +131,55 @@ void test("player season GAR exactly reconciles with team scenario, shared budge
     goalies.map((p) => p.minutesPerTeamGame),
     [39, 21],
   );
-  assert.ok(goalies.every((p) => p.roleBasis === "standard"));
+  assert.ok(goalies.every((p) => p.roleBasis === "standard-fallback"));
+});
+
+void test("shared projection uses goalie role evidence and strictly checks its season", () => {
+  const { organization, conditional, usage } = fixture();
+  const goalieUsage = parseNhlGoalieUsageArtifact({
+    ...structuredClone(goalieUsageJson),
+    profiles: [300, 301].map((nhlPlayerId, i) => ({
+      nhlPlayerId,
+      observations: [
+        {
+          year: 2026,
+          dressedGames: 80,
+          starts: i ? 50 : 30,
+          minutes: i ? 3000 : 1800,
+        },
+      ],
+    })),
+  });
+  const team = buildProjectedNhlLineupGar(
+    organization,
+    conditional,
+    usage,
+    2027,
+    "projected",
+    goalieUsage,
+  )[0]!;
+  const goalies = team.groups.find((g) => g.position === "G")!.roster;
+  assert.ok(goalies.every((p) => p.allocationBasis === "projected"));
+  assert.ok(
+    Math.abs(goalies.reduce((s, p) => s + p.minutesPerTeamGame, 0) - 60) <
+      1e-10,
+  );
+  assert.ok(
+    goalies.find((p) => p.nhlPlayerId === 301)!.minutesPerTeamGame >
+      goalies.find((p) => p.nhlPlayerId === 300)!.minutesPerTeamGame,
+  );
+  assert.throws(
+    () =>
+      buildProjectedNhlLineupGar(
+        organization,
+        conditional,
+        usage,
+        2027,
+        "projected",
+        { ...goalieUsage, cutoffYear: 2025 },
+      ),
+    /cutoffs/,
+  );
 });
 
 void test("NHL roster priority holds over stronger organization depth and outside-depth projections remain unknown", () => {

@@ -24,6 +24,7 @@ export function rankConditionalNhlRosterTalent(
   if (mode !== "standard" && mode !== "projected")
     throw Error("Invalid NHL lineup allocation mode");
   const usageByPlayer = new Map<string, number | null | undefined>();
+  const goalieRoleByPlayer = new Map<string, number | null | undefined>();
   const nhlFirstByTeam = new Map(
     teams.map((team) => [team.id, team.selectionPolicy === "nhl-first"]),
   );
@@ -39,6 +40,13 @@ export function rankConditionalNhlRosterTalent(
       )
         throw Error("Invalid projected NHL minutes per appearance");
       usageByPlayer.set(player.id, minutes);
+      const goalieRole = player.projectedGoalieRoleWeight;
+      if (
+        goalieRole != null &&
+        (!Number.isFinite(goalieRole) || goalieRole <= 0)
+      )
+        throw Error("Invalid projected goalie role weight");
+      goalieRoleByPlayer.set(player.id, goalieRole);
     }
   const rated = rankNhlRosterTalent(
     teams.map((team) => ({
@@ -50,9 +58,10 @@ export function rankConditionalNhlRosterTalent(
     })),
   )
     .map((team) => {
-      const missingUsage = team.selected.filter(
-        (player) =>
-          player.position !== "G" && usageByPlayer.get(player.id) == null,
+      const missingUsage = team.selected.filter((player) =>
+        player.position === "G"
+          ? goalieRoleByPlayer.get(player.id) == null
+          : usageByPlayer.get(player.id) == null,
       );
       const missingSlots = team.groups.filter(
         (group) => group.roster.length !== group.required,
@@ -74,10 +83,11 @@ export function rankConditionalNhlRosterTalent(
         const usageComplete =
           mode === "standard" ||
           (group.roster.length === group.required &&
-            (group.position === "G" ||
-              group.roster.every(
-                (player) => usageByPlayer.get(player.id) != null,
-              )));
+            group.roster.every((player) =>
+              group.position === "G"
+                ? goalieRoleByPlayer.get(player.id) != null
+                : usageByPlayer.get(player.id) != null,
+            ));
         const knownUsage = group.roster.filter(
           (player) => usageByPlayer.get(player.id) != null,
         );
@@ -86,7 +96,7 @@ export function rankConditionalNhlRosterTalent(
           | "projected"
           | "partial-projected"
           | "standard-fallback" =
-          mode === "standard" || group.position === "G"
+          mode === "standard"
             ? "standard"
             : usageComplete
               ? "projected"
@@ -99,6 +109,17 @@ export function rankConditionalNhlRosterTalent(
           0,
         );
         const projectedMinutes = new Map<string, number>();
+        if (mode === "projected" && group.position === "G" && usageComplete) {
+          const mass = group.roster.reduce(
+            (sum, player) => sum + goalieRoleByPlayer.get(player.id)!,
+            0,
+          );
+          for (const player of group.roster)
+            projectedMinutes.set(
+              player.id,
+              (60 * goalieRoleByPlayer.get(player.id)!) / mass,
+            );
+        }
         const standardShare = (index: number) =>
           (policy.minutes * policy.weights[index]!) / denominator;
         const unallocatedMinutesPerTeamGame = policy.weights
@@ -183,7 +204,7 @@ export function rankConditionalNhlRosterTalent(
             ratePer60,
             projectedMinutesPerAppearance: usageByPlayer.get(player.id),
             allocationBasis:
-              mode === "standard" || group.position === "G"
+              mode === "standard"
                 ? ("standard" as const)
                 : projectedMinutes.has(player.id)
                   ? ("projected" as const)

@@ -1494,6 +1494,32 @@ compare-and-swap and transactional player-day index maintenance. Application
 requires an independently verified source and plan backup. Rollback restores
 exact prior field values and presence. Raw stats and matchup results are unchanged.
 
+## NHL goalie deployment in projected lineup GAR
+
+Player and team projected GAR share one 14F/8D/2G allocation. In the projected
+view, goalie deployment uses the latest observed starts conditional on dressing,
+with ten neutral pseudo-games and Jeffreys smoothing. The square root of start
+odds supplies relative weights for the selected tandem's shared 60-minute budget.
+Normal backup duty describes deployment; games absent never become poor-play
+observations. Dressed status is not a medical diagnosis. The standard comparison
+view retains its explicitly hypothetical 65/35 split.
+
+The goalie workload artifact uses all 18 complete cached seasons through
+2025–26, including unused dressed backups. Its historical paired-minute error is
+19.3% lower than a 65/35 baseline ordered by prior role (not by talent), over
+1,434 pair-seasons and 37,405 co-dressed games. Recent-five-season error is 12.7%
+lower. Tuning recency and shrinkage did not improve on the simpler latest-role
+comparator, which was retained. Historical tests condition on the observed pair;
+they do not forecast transactions, medical availability, or future coaching changes.
+
+The displayed goalie workload is full-game equivalents, allocated minutes / 60,
+not predicted appearances. Missing role evidence keeps marked standard shares
+and prevents a complete team rank. Player ability and historical recorded GAR
+remain separate. “Forecast uncertainty” means weak historical predictive support,
+not missing player statistics. The common goalie replacement reference still
+compresses projected ability; workload validation does not establish that the
+cross-position top-50 distribution is correctly calibrated.
+
 ## Change checklist
 
 Before changing behavior, account for every affected sheet, position, season

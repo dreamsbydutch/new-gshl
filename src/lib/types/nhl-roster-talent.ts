@@ -10,6 +10,7 @@ export interface NhlRosterTalentPlayer {
   ratePer60?: number | null;
   minutesPerTeamGame?: number;
   membership?: "nhl-roster" | "organization";
+  deploymentReasons?: readonly string[];
 }
 
 export interface NhlRosterTalentTeam {
@@ -27,5 +28,7 @@ export interface NhlConditionalRosterTalentTeam
   roster: readonly (Omit<NhlRosterTalentPlayer, "gar" | "ratePer60"> & {
     ratePer60: number | null;
     projectedMinutesPerAppearance?: number | null;
+    /** Relative goalie role when available, independent of ability or absence. */
+    projectedGoalieRoleWeight?: number | null;
   })[];
 }

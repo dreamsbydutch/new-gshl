@@ -1,6 +1,11 @@
 import type { NhlOrganizations } from "../../types/nhl-organizations";
 import type { NhlConditionalTalentArtifact } from "../../types/nhl-conditional-talent";
 import type { NhlLineupUsageArtifact } from "../../types/nhl-lineup-usage";
+import type { NhlGoalieUsageArtifact } from "../../types/nhl-goalie-usage";
+import {
+  parseNhlGoalieUsageArtifact,
+  predictNhlGoalieUsage,
+} from "./nhl-goalie-usage";
 import {
   parseConditionalNhlTalentArtifact,
   predictConditionalNhlTalent,
@@ -21,6 +26,7 @@ export function buildProjectedNhlLineupGar(
   usage: NhlLineupUsageArtifact,
   targetYear: number,
   mode: "projected" | "standard" = "projected",
+  goalieUsage?: NhlGoalieUsageArtifact,
 ) {
   if (
     !Number.isSafeInteger(targetYear) ||
@@ -28,13 +34,17 @@ export function buildProjectedNhlLineupGar(
     targetYear > 2200 ||
     organizations.seasonId !== (targetYear - 1) * 10000 + targetYear ||
     conditional.cutoffYear !== targetYear - 1 ||
-    (mode === "projected" && usage.cutoffYear !== targetYear - 1)
+    (mode === "projected" &&
+      (usage.cutoffYear !== targetYear - 1 ||
+        (goalieUsage && goalieUsage.cutoffYear !== targetYear - 1)))
   )
     throw Error(
       "NHL organization season and projection cutoffs must match the target season",
     );
   parseConditionalNhlTalentArtifact(conditional);
   if (mode === "projected") parseNhlLineupUsageArtifact(usage);
+  if (mode === "projected" && goalieUsage)
+    parseNhlGoalieUsageArtifact(goalieUsage);
   return rankConditionalNhlRosterTalent(
     organizations.teams.map((team) => ({
       id: `nhl:${team.abbr}`,
@@ -53,11 +63,20 @@ export function buildProjectedNhlLineupGar(
             ? predictNhlLineupUsage(usage, player.nhlPlayerId, targetYear)
             : null;
         const roleMatches = deployment?.position === player.position;
+        const goalieRole =
+          mode === "projected" && player.position === "G" && goalieUsage
+            ? predictNhlGoalieUsage(goalieUsage, player.nhlPlayerId, targetYear)
+            : null;
         const ratePer60 = matches ? ability.ratePer60 : null;
         return {
           ...player,
           id: `nhl:${player.nhlPlayerId}`,
           ratePer60,
+          projectedGoalieRoleWeight: goalieRole?.roleWeight ?? null,
+          deploymentReasons:
+            player.position === "G"
+              ? (goalieRole?.reasons ?? [])
+              : (deployment?.reasons ?? []),
           projectedMinutesPerAppearance: roleMatches
             ? deployment.minutesPerAppearance
             : null,
@@ -66,8 +85,9 @@ export function buildProjectedNhlLineupGar(
               ? ("unavailable" as const)
               : ability.status === "research" ||
                   (mode === "projected" &&
-                    player.position !== "G" &&
-                    (!roleMatches || deployment.status !== "supported"))
+                    (player.position === "G"
+                      ? goalieRole?.status !== "supported"
+                      : !roleMatches || deployment.status !== "supported"))
                 ? ("research" as const)
                 : ("qualified" as const),
         };
@@ -85,6 +105,7 @@ export interface ProjectedNhlLineupGarPlayer {
   status: "qualified" | "research" | "unavailable";
   roleBasis: "projected" | "standard" | "standard-fallback" | null;
   selected: boolean;
+  deploymentReasons: readonly string[];
   teamId: string;
   teamAbbr: string;
 }
@@ -109,6 +130,7 @@ export function indexProjectedNhlLineupGar(
         status: player.status,
         roleBasis: player.allocationBasis,
         selected: true,
+        deploymentReasons: player.deploymentReasons ?? [],
         teamId: team.id,
         teamAbbr: team.abbr,
       });
@@ -125,6 +147,7 @@ export function indexProjectedNhlLineupGar(
         status: player.status,
         roleBasis: null,
         selected: false,
+        deploymentReasons: player.deploymentReasons ?? [],
         teamId: team.id,
         teamAbbr: team.abbr,
       });

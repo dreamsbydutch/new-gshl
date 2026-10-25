@@ -14,6 +14,8 @@ import rateJson from "../../lib/data/nhl-conditional-talent.json";
 import annualJson from "../../lib/data/nhl-contract-talent-forecast.json";
 import averageJson from "../../lib/data/nhl-average-talent.json";
 import usageJson from "../../lib/data/nhl-lineup-usage.json";
+import goalieUsageJson from "../../lib/data/nhl-goalie-usage.json";
+import { parseNhlGoalieUsageArtifact } from "../../lib/utils/domain/nhl-goalie-usage";
 import { parseNhlLineupUsageArtifact } from "../../lib/utils/domain/nhl-lineup-usage";
 import {
   buildProjectedNhlLineupGar,
@@ -28,6 +30,7 @@ const rate = parseConditionalNhlTalentArtifact(rateJson);
 const annual = parseNhlTalentForecastArtifact(annualJson);
 const average = parseAverageNhlTalentArtifact(averageJson);
 const usage = parseNhlLineupUsageArtifact(usageJson);
+const goalieUsage = parseNhlGoalieUsageArtifact(goalieUsageJson);
 export function useNhlProjectedTalentRankings() {
   const data = useNhlTalentPlayers();
   const [search, setSearch] = useState("");
@@ -36,7 +39,8 @@ export function useNhlProjectedTalentRankings() {
   const [ordering, setOrdering] = useState("gar");
   const stale =
     data.seasonStartYear !== rate.cutoffYear ||
-    data.seasonStartYear !== usage.cutoffYear;
+    data.seasonStartYear !== usage.cutoffYear ||
+    data.seasonStartYear !== goalieUsage.cutoffYear;
   const organizations = useNhlOrganizations(
     stale ? null : data.seasonStartYear,
   );
@@ -49,6 +53,8 @@ export function useNhlProjectedTalentRankings() {
               rate,
               usage,
               data.seasonStartYear + 1,
+              "projected",
+              goalieUsage,
             )
           : [],
       ),
@@ -106,7 +112,10 @@ export function useNhlProjectedTalentRankings() {
             forecast,
             value,
             projected,
-            displayTeams: ordering === "gar" && projected ? [projected.teamAbbr] : player.nhlTeam,
+            displayTeams:
+              ordering === "gar" && projected
+                ? [projected.teamAbbr]
+                : player.nhlTeam,
             evidence: ordering === "average" ? value : forecast,
             expected,
             last,

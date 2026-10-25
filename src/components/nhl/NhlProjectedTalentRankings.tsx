@@ -6,7 +6,8 @@ import type { NhlTalentConfidenceReason } from "../../lib/types/nhl-conditional-
 const confidenceReasonLabels: Record<NhlTalentConfidenceReason, string> = {
   "no-rated-history": "No rated history",
   "experimental-trend": "Experimental trend adjustment",
-  "limited-position-validation": "Limited validation support for this position",
+  "limited-position-validation":
+    "Historical forecast tests for this position are less reliable; this does not mean player statistics are missing",
   "insufficient-measured-seasons": "Fewer than two rated seasons",
   "insufficient-measured-minutes": "Fewer than 1,000 rated minutes",
   "missing-age-evidence": "Age evidence unavailable",
@@ -14,6 +15,19 @@ const confidenceReasonLabels: Record<NhlTalentConfidenceReason, string> = {
   "absent-season": "Return after a missed season is uncertain",
   "stale-measurement": "Latest rated evidence predates the model cutoff",
   "future-horizon": "Longer forecast horizon has limited support",
+};
+
+const deploymentReasonLabels: Record<string, string> = {
+  "one-season-role-history": "Goalie role is based on one dressed season",
+  "short-dressed-role-sample":
+    "Fewer than 20 dressed games for the latest goalie role",
+  "stale-role-history": "Goalie role predates the latest completed season",
+  "one-season-history": "Deployment is based on one season",
+  "short-latest-season": "Recent deployment has a short sample",
+  "stale-history": "Deployment evidence is older",
+  "age-unavailable": "Age unavailable for deployment forecast",
+  "limited-role-validation":
+    "Deployment forecast has limited historical validation",
 };
 
 const score = (n: number | null | undefined, decimals = 2) =>
@@ -116,6 +130,9 @@ export function NhlProjectedTalentRankings() {
                     "Recorded GAR",
                     "Rated-season TOI",
                     "Expected season GAR",
+                    view.ordering === "gar"
+                      ? "Lineup workload"
+                      : "Standard workload",
                     "Evidence",
                   ].map((h) => (
                     <th scope="col" key={h} className="px-4 py-3 text-left">
@@ -131,13 +148,15 @@ export function NhlProjectedTalentRankings() {
                       {row.playerName}
                     </th>
                     <td className="px-4 py-3">{row.position}</td>
-                    <td className="px-4 py-3">{row.displayTeams.join(" / ")}</td>
+                    <td className="px-4 py-3">
+                      {row.displayTeams.join(" / ")}
+                    </td>
                     <td
                       className="px-4 py-3 font-semibold tabular-nums"
                       title={
                         view.ordering === "gar"
                           ? row.projected?.selected
-                            ? `Total GAR in the team lineup scenario. ${row.projected.roleBasis === "projected" ? "Estimated skater deployment" : "Standard role policy or fallback"}; ${row.projected.minutesPerTeamGame.toFixed(1)} minutes per team game. Goalies use a 65/35 comparison split, not a predicted start share.`
+                            ? `Total GAR in the team lineup scenario. ${row.projected.roleBasis === "projected" ? "Estimated deployment when available" : "Standard role fallback"}; ${row.projected.minutesPerTeamGame.toFixed(1)} minutes per team game. Goalie roles use starts when dressed and the selected tandem's shared ice budget.`
                             : "No selected role in the organization's 14F/8D/2G lineup. An unavailable contribution is not zero."
                           : "Projected goals above the same-position average over a standard role season. This is a separate comparison from GAR."
                       }
@@ -161,10 +180,37 @@ export function NhlProjectedTalentRankings() {
                       {score(row.expected?.valuePer82)}
                     </td>
                     <td
+                      className="px-4 py-3 tabular-nums"
+                      title={
+                        view.ordering === "gar"
+                          ? "Workload in an 82-game healthy-team scenario. Goalie game equivalents are allocated minutes divided by 60, not a prediction of appearances or health."
+                          : "Standard position workload used for the above-average comparison, separate from individual lineup deployment."
+                      }
+                    >
+                      {view.ordering === "average"
+                        ? row.value?.standardMinutes == null
+                          ? "—"
+                          : `${row.value.standardMinutes.toFixed(0)} min`
+                        : !row.projected?.selected
+                          ? "—"
+                          : row.position === "G"
+                            ? `${((row.projected.minutesPerTeamGame * 82) / 60).toFixed(1)} game equivalents`
+                            : `${row.projected.minutesPerTeamGame.toFixed(1)} min/game`}
+                    </td>
+                    <td
                       className="px-4 py-3 text-muted-foreground"
-                      title={row.evidence?.confidenceReasons
-                        .map((reason) => confidenceReasonLabels[reason])
-                        .join("; ")}
+                      title={[
+                        ...(row.evidence?.confidenceReasons.map(
+                          (reason) => confidenceReasonLabels[reason],
+                        ) ?? []),
+                        ...(view.ordering === "gar"
+                          ? (row.projected?.deploymentReasons.map(
+                              (reason) =>
+                                deploymentReasonLabels[reason] ??
+                                "Deployment estimate is uncertain",
+                            ) ?? [])
+                          : []),
+                      ].join("; ")}
                     >
                       {view.ordering === "gar" &&
                       row.evidence &&
@@ -190,14 +236,18 @@ export function NhlProjectedTalentRankings() {
                                           (view.ordering === "gar" &&
                                             row.projected?.status ===
                                               "research")
-                                        ? "Limited support"
+                                        ? row.evidence.confidenceReasons.includes(
+                                            "limited-position-validation",
+                                          )
+                                          ? "Forecast uncertainty"
+                                          : "Limited forecast evidence"
                                         : "Supported"}
                     </td>
                   </tr>
                 ))}
                 {!view.rows.length && (
                   <tr>
-                    <td colSpan={9} className="p-6 text-center">
+                    <td colSpan={10} className="p-6 text-center">
                       No players match these filters.
                     </td>
                   </tr>
@@ -234,11 +284,12 @@ export function NhlProjectedTalentRankings() {
           <>
             Projected GAR totals one 82-game team season at full availability,
             sharing a fixed ice-time budget across 14 forwards, 8 defensemen and
-            2 goalies. Skater roles use estimated deployment; goalie roles use a
-            65/35 comparison policy. These are lineup scenarios, not medical or
-            goalie-start forecasts. Unassigned roles remain unavailable; missing
-            usage estimates use marked standard slot shares. Expected season GAR
-            separately includes participation and workload risk.
+            2 goalies. Goalie roles use starts when dressed, adjusted to the
+            selected tandem; unused backup appearances describe role, not poor
+            play. These are lineup scenarios, not medical forecasts. Unassigned
+            roles remain unavailable; missing usage estimates use marked
+            standard slot shares. Expected season GAR separately includes
+            participation and workload risk.
           </>
         ) : (
           <>

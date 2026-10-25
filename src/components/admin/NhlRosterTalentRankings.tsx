@@ -29,7 +29,7 @@ export function NhlRosterTalentRankings({
           ? "Top recorded season GAR from up to 14 forwards, 8 defensemen and 2 goalies. Uses actual season contribution, without forecasts or an 82-game extrapolation. Traded players await verified club allocations."
           : basis === "conditional"
             ? usageBasis === "projected"
-              ? "Fills 14 forward, 8 defense and 2 goalie slots, with NHL roster players first. Estimated minutes per appearance determine skater deployment within a shared team budget, including reserve rotation. Goalies retain a 65/35 split. This compares talent when available; it does not predict injuries or season participation."
+              ? "Fills 14 forward, 8 defense and 2 goalie slots, with NHL roster players first. Estimated deployment shares a team ice budget, including reserve rotation. Goalie roles use starts when dressed and the selected tandem's relative workload. This compares talent when available; it does not predict injuries or season participation."
               : "Fills 14 forward, 8 defense and 2 goalie slots with NHL roster players first. Standard depth slots share 180 forward, 120 defense and 60 goalie minutes per game, including reserve rotation and a 65/35 goalie split. This is a common usage scenario, not a coaching forecast."
             : "Fills 14 forward, 8 defense and 2 goalie slots: official NHL roster players first, then the highest-rated listed organizational depth. Expected GAR includes workload and participation risk; it does not predict standings."}
       </p>
@@ -187,7 +187,12 @@ export function NhlRosterTalentRankings({
                                         className="text-right"
                                         title={
                                           group.position === "G"
-                                            ? "Allocated using the fixed 65/35 goalie split"
+                                            ? usageBasis === "projected" &&
+                                              "allocationBasis" in player &&
+                                              player.allocationBasis ===
+                                                "projected"
+                                              ? `${(((player.minutesPerTeamGame ?? 0) * 82) / 60).toFixed(1)} full-game equivalents. Role estimated from starts when dressed and normalized across this tandem; not an absence penalty.`
+                                              : "Standard 65/35 comparison split or missing-role fallback"
                                             : usageBasis === "projected" &&
                                                 "projectedMinutesPerAppearance" in
                                                   player &&
@@ -226,8 +231,9 @@ export function NhlRosterTalentRankings({
                           {usageBasis === "projected"
                             ? "Skater minutes reflect estimated roles, normalized to the team budget, using the same player totals as the projected player leaderboard."
                             : "Minutes follow standard depth-slot weights; this comparison differs from the player leaderboard's estimated deployment."}{" "}
-                          Goalies use the 65/35 comparison policy, not a
-                          forecast of starts or medical availability.
+                          {usageBasis === "projected"
+                            ? "Goalie workloads reflect starts when dressed, shared across the selected tandem. Normal backup duty is a role observation, not poor play."
+                            : "Goalies use the standard 65/35 comparison policy."}
                         </p>
                       ) : null}
                       {basis === "conditional" &&

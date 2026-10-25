@@ -12,6 +12,8 @@ import {
 import forecastJson from "../../lib/data/nhl-contract-talent-forecast.json";
 import conditionalJson from "../../lib/data/nhl-conditional-talent.json";
 import usageJson from "../../lib/data/nhl-lineup-usage.json";
+import goalieUsageJson from "../../lib/data/nhl-goalie-usage.json";
+import { parseNhlGoalieUsageArtifact } from "../../lib/utils/domain/nhl-goalie-usage";
 import { parseNhlLineupUsageArtifact } from "../../lib/utils/domain/nhl-lineup-usage";
 import { parseConditionalNhlTalentArtifact } from "../../lib/utils/domain/nhl-conditional-talent";
 import { buildProjectedNhlLineupGar } from "../../lib/utils/domain/nhl-projected-lineup-gar";
@@ -19,6 +21,7 @@ import { buildProjectedNhlLineupGar } from "../../lib/utils/domain/nhl-projected
 const forecast = parseNhlTalentForecastArtifact(forecastJson);
 const conditional = parseConditionalNhlTalentArtifact(conditionalJson);
 const usage = parseNhlLineupUsageArtifact(usageJson);
+const goalieUsage = parseNhlGoalieUsageArtifact(goalieUsageJson);
 
 export function useNormalizedNhlRosters() {
   const [seasonStartYear, setSeasonStartYear] = useState(() => {
@@ -130,7 +133,8 @@ export function useNormalizedNhlRosters() {
       seasonStartYear !== conditional.cutoffYear ||
       !organizations.data ||
       (projectionBasis === "conditional" &&
-        seasonStartYear !== usage.cutoffYear)
+        (seasonStartYear !== usage.cutoffYear ||
+          seasonStartYear !== goalieUsage.cutoffYear))
     )
       return [];
     return buildProjectedNhlLineupGar(
@@ -139,6 +143,7 @@ export function useNormalizedNhlRosters() {
       usage,
       seasonStartYear + 1,
       projectionBasis === "conditional" ? "projected" : "standard",
+      goalieUsage,
     ).map((team) => ({
       ...team,
       id: organizationTeams.find((t) => t.abbr === team.abbr)?.id ?? team.id,

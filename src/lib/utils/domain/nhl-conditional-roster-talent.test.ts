@@ -171,6 +171,7 @@ function projectedRoster() {
     membership: "nhl-roster" as const,
     projectedMinutesPerAppearance:
       player.position === "G" ? (index % 2 ? 20 : 60) : 25 - (index % 14),
+    projectedGoalieRoleWeight: player.position === "G" ? 1 : null,
   }));
 }
 
@@ -229,7 +230,7 @@ void test("projected allocation preserves selection, reserve budgets and360minut
   assert.ok(Math.abs(team.knownSubtotal - 492) < 1e-10);
   assert.deepEqual(
     team.groups[2]!.roster.map((p) => p.minutesPerTeamGame),
-    [39, 21],
+    [30, 30],
   );
   assert.deepEqual(
     rankConditionalNhlRosterTalent(
@@ -237,6 +238,39 @@ void test("projected allocation preserves selection, reserve budgets and360minut
       "projected",
     ),
     [team],
+  );
+});
+
+void test("goalie deployment follows role evidence independently of ability rank", () => {
+  const players = projectedRoster().map((p) => ({
+    ...p,
+    ratePer60: p.id === "G0" ? 2 : 1,
+    projectedGoalieRoleWeight: p.id === "G0" ? 0.4 : p.id === "G1" ? 0.6 : null,
+  }));
+  const input = [{ id: "t", name: "T", abbr: "T", roster: players }];
+  const copy = structuredClone(input);
+  const team = rankConditionalNhlRosterTalent(input, "projected")[0]!;
+  const goalies = team.groups.find((g) => g.position === "G")!.roster;
+  assert.deepEqual(
+    goalies.map((p) => p.minutesPerTeamGame),
+    [24, 36],
+  );
+  assert.ok(goalies.every((p) => p.allocationBasis === "projected"));
+  assert.equal(
+    goalies.reduce((sum, p) => sum + p.minutesPerTeamGame, 0),
+    60,
+  );
+  assert.deepEqual(input, copy);
+  const missing = structuredClone(input);
+  missing[0]!.roster.find((p) => p.id === "G0")!.projectedGoalieRoleWeight =
+    null;
+  const fallback = rankConditionalNhlRosterTalent(missing, "projected")[0]!;
+  assert.equal(fallback.usageComplete, false);
+  assert.equal(fallback.rank, null);
+  assert.ok(
+    fallback.groups
+      .find((g) => g.position === "G")!
+      .roster.every((p) => p.allocationBasis === "standard-fallback"),
   );
 });
 
@@ -352,7 +386,7 @@ void test("missing defense usage preserves forward projections and explicit grou
     [
       ["projected", true],
       ["partial-projected", false],
-      ["standard", true],
+      ["projected", true],
     ],
   );
   assert.deepEqual(partial.groups[0]!.roster, complete.groups[0]!.roster);
@@ -383,6 +417,7 @@ void test("missing defense usage preserves forward projections and explicit grou
         roster: projectedRoster().map((p) => ({
           ...p,
           projectedMinutesPerAppearance: null,
+          projectedGoalieRoleWeight: null,
         })),
       },
     ],
