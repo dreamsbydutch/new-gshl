@@ -1520,6 +1520,42 @@ not missing player statistics. The common goalie replacement reference still
 compresses projected ability; workload validation does not establish that the
 cross-position top-50 distribution is correctly calibrated.
 
+## Projected NHL ordinal replacement reference
+
+The projected player and team lineup views use the same explicit replacement
+policy: forward #350, defenseman #175 and goalie #55, ordered by predicted
+playing ability within position across all current NHL organizations. These
+are user-defined reference ranks, not fitted quotas for the leaderboard.
+
+The position-centered conditional model supplies goal-contribution differences
+including offense, defensive prevention and saving. For each position, subtract
+the forecast ability of its reference player before applying the individual's
+allocated minutes. Thus `GAR = (player rate - replacement rate) * minutes / 60`.
+The reference player has zero GAR at any workload; weaker players retain
+negative contributions. Common positional offsets cancel. No average-player
+offset is added back, and playing time never determines replacement ability.
+
+The full organization snapshot is calibrated before team/player filtering.
+Current organization members with finite NHL forecasts remain eligible even
+after absences; historical-only retired/unsigned profiles outside the current
+snapshot do not enter. Unmeasured prospects stay unknown. Coverage counts are
+retained, and insufficient rated players or missing clubs stop the projected
+view with a recoverable error rather than substituting another rank. A fitted
+reference cannot be reused with a filtered or refreshed organization snapshot.
+
+Existing centered-model historical validation supports relative ability. A
+separate origin-only paired-reference test improves average error modestly
+against the preceding raw forecast, but historical full organization snapshots
+are unavailable; historical appearance cohorts are only a proxy. Sparse and
+returning-player forecasts and uncertain reference membership remain limitations.
+The specified ranks define replacement policy, not an empirically proven best
+population or a guarantee of future results.
+
+Recorded historical GAR and the separate participation-adjusted annual forecast
+retain their original references. The UI identifies the latter as prior-model
+season GAR; it is not directly calibrated to this new lineup reference. This
+change does not rewrite stored historical NHL statistics or ratings.
+
 ## Change checklist
 
 Before changing behavior, account for every affected sheet, position, season

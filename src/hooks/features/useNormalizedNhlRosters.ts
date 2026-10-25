@@ -17,11 +17,15 @@ import { parseNhlGoalieUsageArtifact } from "../../lib/utils/domain/nhl-goalie-u
 import { parseNhlLineupUsageArtifact } from "../../lib/utils/domain/nhl-lineup-usage";
 import { parseConditionalNhlTalentArtifact } from "../../lib/utils/domain/nhl-conditional-talent";
 import { buildProjectedNhlLineupGar } from "../../lib/utils/domain/nhl-projected-lineup-gar";
+import averageJson from "../../lib/data/nhl-average-talent.json";
+import { parseAverageNhlTalentArtifact } from "../../lib/utils/domain/nhl-average-talent";
+import { fitNhlRankReplacement } from "../../lib/utils/domain/nhl-rank-replacement";
 
 const forecast = parseNhlTalentForecastArtifact(forecastJson);
 const conditional = parseConditionalNhlTalentArtifact(conditionalJson);
 const usage = parseNhlLineupUsageArtifact(usageJson);
 const goalieUsage = parseNhlGoalieUsageArtifact(goalieUsageJson);
+const average = parseAverageNhlTalentArtifact(averageJson);
 
 export function useNormalizedNhlRosters() {
   const [seasonStartYear, setSeasonStartYear] = useState(() => {
@@ -127,11 +131,32 @@ export function useNormalizedNhlRosters() {
     data.talentPopulation,
     seasonStartYear,
   ]);
+  const replacementState = useMemo(() => {
+    if (seasonStartYear !== average.cutoffYear || !organizations.data)
+      return { calibration: null, error: null };
+    try {
+      return {
+        calibration: fitNhlRankReplacement(
+          organizations.data,
+          average,
+          seasonStartYear + 1,
+        ),
+        error: null,
+      };
+    } catch {
+      return {
+        calibration: null,
+        error:
+          "The replacement baseline needs complete NHL organization coverage and enough rated players at each position.",
+      };
+    }
+  }, [organizations.data, seasonStartYear]);
   const conditionalTeams = useMemo(() => {
     if (
       seasonStartYear !== data.currentYear ||
       seasonStartYear !== conditional.cutoffYear ||
       !organizations.data ||
+      !replacementState.calibration ||
       (projectionBasis === "conditional" &&
         (seasonStartYear !== usage.cutoffYear ||
           seasonStartYear !== goalieUsage.cutoffYear))
@@ -144,6 +169,7 @@ export function useNormalizedNhlRosters() {
       seasonStartYear + 1,
       projectionBasis === "conditional" ? "projected" : "standard",
       goalieUsage,
+      replacementState.calibration,
     ).map((team) => ({
       ...team,
       id: organizationTeams.find((t) => t.abbr === team.abbr)?.id ?? team.id,
@@ -154,6 +180,7 @@ export function useNormalizedNhlRosters() {
     data.currentYear,
     seasonStartYear,
     projectionBasis,
+    replacementState.calibration,
   ]);
   const term = search.trim().toLowerCase();
   const matchingTeams = new Set(
@@ -191,7 +218,9 @@ export function useNormalizedNhlRosters() {
     search,
     setSearch,
     isLoading: data.isLoading || organizations.isLoading,
-    organizationError: organizations.error,
+    organizationError:
+      organizations.error ??
+      (projectionBasis !== "expected" ? replacementState.error : null),
     retryOrganizations: organizations.retry,
     loaded: data.players.length,
     projectionBasis,
@@ -216,6 +245,7 @@ export function useNormalizedNhlRosters() {
       (projectionBasis === "expected"
         ? seasonStartYear !== forecast.cutoffYear
         : seasonStartYear !== conditional.cutoffYear ||
+          seasonStartYear !== average.cutoffYear ||
           (projectionBasis === "conditional" &&
             seasonStartYear !== usage.cutoffYear)),
     teams: teams.filter(

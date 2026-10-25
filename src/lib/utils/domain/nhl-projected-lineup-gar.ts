@@ -2,6 +2,11 @@ import type { NhlOrganizations } from "../../types/nhl-organizations";
 import type { NhlConditionalTalentArtifact } from "../../types/nhl-conditional-talent";
 import type { NhlLineupUsageArtifact } from "../../types/nhl-lineup-usage";
 import type { NhlGoalieUsageArtifact } from "../../types/nhl-goalie-usage";
+import type { NhlRankReplacementCalibration } from "../../types/nhl-rank-replacement";
+import {
+  assertNhlRankReplacementPopulation,
+  projectNhlRankReplacement,
+} from "./nhl-rank-replacement";
 import {
   parseNhlGoalieUsageArtifact,
   predictNhlGoalieUsage,
@@ -27,6 +32,7 @@ export function buildProjectedNhlLineupGar(
   targetYear: number,
   mode: "projected" | "standard" = "projected",
   goalieUsage?: NhlGoalieUsageArtifact,
+  replacement?: NhlRankReplacementCalibration,
 ) {
   if (
     !Number.isSafeInteger(targetYear) ||
@@ -45,6 +51,13 @@ export function buildProjectedNhlLineupGar(
   if (mode === "projected") parseNhlLineupUsageArtifact(usage);
   if (mode === "projected" && goalieUsage)
     parseNhlGoalieUsageArtifact(goalieUsage);
+  if (replacement) {
+    if (replacement.sourceSha256 !== conditional.sourceSha256)
+      throw Error(
+        "NHL replacement and recorded models must use the same source",
+      );
+    assertNhlRankReplacementPopulation(replacement, organizations, targetYear);
+  }
   return rankConditionalNhlRosterTalent(
     organizations.teams.map((team) => ({
       id: `nhl:${team.abbr}`,
@@ -52,11 +65,13 @@ export function buildProjectedNhlLineupGar(
       abbr: team.abbr,
       selectionPolicy: "nhl-first" as const,
       roster: team.roster.map((player) => {
-        const ability = predictConditionalNhlTalent(
-          conditional,
-          player.nhlPlayerId,
-          targetYear,
-        );
+        const ability = replacement
+          ? projectNhlRankReplacement(replacement, player.nhlPlayerId)
+          : predictConditionalNhlTalent(
+              conditional,
+              player.nhlPlayerId,
+              targetYear,
+            );
         const matches = ability.position === player.position;
         const deployment =
           mode === "projected" && player.position !== "G"

@@ -2,10 +2,7 @@
 import { useMemo, useState } from "react";
 import { useNhlTalentPlayers } from "../main/useNhlTalentPlayers";
 import { useNhlOrganizations } from "../main/useNhlOrganizations";
-import {
-  parseConditionalNhlTalentArtifact,
-  predictConditionalNhlTalent,
-} from "../../lib/utils/domain/nhl-conditional-talent";
+import { parseConditionalNhlTalentArtifact } from "../../lib/utils/domain/nhl-conditional-talent";
 import {
   parseNhlTalentForecastArtifact,
   predictNhlContractTalent,
@@ -25,6 +22,10 @@ import {
   parseAverageNhlTalentArtifact,
   predictAverageNhlTalent,
 } from "../../lib/utils/domain/nhl-average-talent";
+import {
+  fitNhlRankReplacement,
+  projectNhlRankReplacement,
+} from "../../lib/utils/domain/nhl-rank-replacement";
 
 const rate = parseConditionalNhlTalentArtifact(rateJson);
 const annual = parseNhlTalentForecastArtifact(annualJson);
@@ -40,14 +41,34 @@ export function useNhlProjectedTalentRankings() {
   const stale =
     data.seasonStartYear !== rate.cutoffYear ||
     data.seasonStartYear !== usage.cutoffYear ||
+    data.seasonStartYear !== average.cutoffYear ||
     data.seasonStartYear !== goalieUsage.cutoffYear;
   const organizations = useNhlOrganizations(
     stale ? null : data.seasonStartYear,
   );
+  const replacementState = useMemo(() => {
+    if (stale || !organizations.data) return { calibration: null, error: null };
+    try {
+      return {
+        calibration: fitNhlRankReplacement(
+          organizations.data,
+          average,
+          data.seasonStartYear + 1,
+        ),
+        error: null,
+      };
+    } catch {
+      return {
+        calibration: null,
+        error:
+          "The replacement baseline needs complete NHL organization coverage and enough rated players at each position.",
+      };
+    }
+  }, [stale, organizations.data, data.seasonStartYear]);
   const projectedPlayers = useMemo(
     () =>
       indexProjectedNhlLineupGar(
-        !stale && organizations.data
+        !stale && organizations.data && replacementState.calibration
           ? buildProjectedNhlLineupGar(
               organizations.data,
               rate,
@@ -55,21 +76,26 @@ export function useNhlProjectedTalentRankings() {
               data.seasonStartYear + 1,
               "projected",
               goalieUsage,
+              replacementState.calibration,
             )
           : [],
       ),
-    [stale, organizations.data, data.seasonStartYear],
+    [
+      stale,
+      organizations.data,
+      data.seasonStartYear,
+      replacementState.calibration,
+    ],
   );
   const rows = useMemo(
     () =>
       data.players
         .map((player) => {
           const ratePrediction =
-            data.seasonStartYear === rate.cutoffYear && player.nhlPlayerId
-              ? predictConditionalNhlTalent(
-                  rate,
+            replacementState.calibration && player.nhlPlayerId
+              ? projectNhlRankReplacement(
+                  replacementState.calibration,
                   player.nhlPlayerId,
-                  data.seasonStartYear + 1,
                 )
               : null;
           const forecast =
@@ -144,6 +170,7 @@ export function useNhlProjectedTalentRankings() {
       position,
       ordering,
       projectedPlayers,
+      replacementState.calibration,
     ],
   );
   const pages = Math.max(1, Math.ceil(rows.length / 50)),
@@ -156,7 +183,11 @@ export function useNhlProjectedTalentRankings() {
       ordering === "average"
         ? data.seasonStartYear !== average.cutoffYear
         : stale,
-    organizationError: ordering === "gar" ? organizations.error : null,
+    organizationError:
+      ordering === "gar"
+        ? (organizations.error ?? replacementState.error)
+        : null,
+    replacementReferences: replacementState.calibration?.references ?? null,
     retryOrganizations: organizations.retry,
     cutoffYear: rate.cutoffYear,
     rows: rows.slice(currentPage * 50, (currentPage + 1) * 50),

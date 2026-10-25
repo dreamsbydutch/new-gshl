@@ -49,6 +49,12 @@ export function NhlProjectedTalentRankings() {
           do not become poor-play observations.
         </p>
         <p className="mt-1 text-xs text-muted-foreground">
+          Replacement is the projected playing ability of forward #350,
+          defenseman #175 and goalie #55 across current NHL organizations.
+          Players below those levels have negative GAR. References use players
+          with NHL ability estimates; unmeasured prospects remain unknown.
+        </p>
+        <p className="mt-1 text-xs text-muted-foreground">
           Preseason {season(view.cutoffYear + 1)} estimate using completed
           seasons through {season(view.cutoffYear)}. Current-season play and
           medical recovery forecasts are not included.
@@ -96,10 +102,7 @@ export function NhlProjectedTalentRankings() {
         </p>
       ) : view.organizationError ? (
         <div role="alert">
-          <p>
-            Current NHL rosters are unavailable. Projected GAR needs a lineup
-            role.
-          </p>
+          <p>{view.organizationError}</p>
           <Button variant="outline" onClick={view.retryOrganizations}>
             Retry rosters
           </Button>
@@ -129,7 +132,7 @@ export function NhlProjectedTalentRankings() {
                     "Last rated season",
                     "Recorded GAR",
                     "Rated-season TOI",
-                    "Expected season GAR",
+                    "Prior-model season GAR",
                     view.ordering === "gar"
                       ? "Lineup workload"
                       : "Standard workload",
@@ -170,13 +173,19 @@ export function NhlProjectedTalentRankings() {
                     <td className="px-4 py-3">
                       {row.last ? season(row.last.year) : "—"}
                     </td>
-                    <td className="px-4 py-3 tabular-nums">
+                    <td
+                      className="px-4 py-3 tabular-nums"
+                      title="Recorded historical GAR retains its original season-specific replacement reference."
+                    >
                       {score(row.last?.gar)}
                     </td>
                     <td className="px-4 py-3 tabular-nums">
                       {row.last?.minutes.toFixed(0) ?? "—"}
                     </td>
-                    <td className="px-4 py-3 tabular-nums">
+                    <td
+                      className="px-4 py-3 tabular-nums"
+                      title="Participation-adjusted forecast from the prior replacement model; it has not been recalibrated to the 350F/175D/55G reference."
+                    >
                       {score(row.expected?.valuePer82)}
                     </td>
                     <td
@@ -288,8 +297,8 @@ export function NhlProjectedTalentRankings() {
             selected tandem; unused backup appearances describe role, not poor
             play. These are lineup scenarios, not medical forecasts. Unassigned
             roles remain unavailable; missing usage estimates use marked
-            standard slot shares. Expected season GAR separately includes
-            participation and workload risk.
+            standard slot shares. Prior-model season GAR separately includes
+            participation and workload risk under its original reference.
           </>
         ) : (
           <>
@@ -302,7 +311,7 @@ export function NhlProjectedTalentRankings() {
               .join(" · ")}
             . These use recent regular-role workloads on an 82-team-game basis,
             with no position quotas or percentile conversion. Value above
-            average is a separate baseline from recorded GAR. Expected season
+            average is a separate baseline from recorded GAR. Prior-model season
             GAR includes projected participation and workload; standard role
             value does not.
           </>

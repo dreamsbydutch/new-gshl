@@ -34,6 +34,19 @@ export function NhlRosterTalentRankings({
             : "Fills 14 forward, 8 defense and 2 goalie slots: official NHL roster players first, then the highest-rated listed organizational depth. Expected GAR includes workload and participation risk; it does not predict standings."}
       </p>
       <div className="overflow-x-auto rounded-lg border">
+        {basis === "conditional" ? (
+          <p className="mb-3 text-xs text-muted-foreground">
+            Replacement levels: forward #350, defenseman #175 and goalie #55 by
+            projected playing ability across the full current organization pool.
+            References require NHL ability evidence; unmeasured prospects remain
+            unknown. Negative player contributions count in team totals.
+          </p>
+        ) : (
+          <p className="mb-3 text-xs text-muted-foreground">
+            This view retains its original season-specific replacement
+            reference.
+          </p>
+        )}
         <table className="w-full min-w-[650px] text-sm tabular-nums">
           <caption className="sr-only">
             Complete NHL team ratings ordered by{" "}
