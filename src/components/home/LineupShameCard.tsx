@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { Component, type ReactNode } from "react";
-import { ClipboardX, Clock3 } from "lucide-react";
+import { ClipboardX } from "lucide-react";
 import { useLineupShame } from "@gshl-hooks/features/useLineupShame";
 import type { LineupShameTeam } from "@gshl-lib/types/lineup-shame";
 import { Skeleton } from "../ui/SkeletonPrimitive";
@@ -69,15 +69,6 @@ export function LineupShameCard({ seasonId }: { seasonId: string }) {
 
 function LineupShamePanel({ seasonId }: { seasonId: string }) {
   const { data, isLoading, error } = useLineupShame(seasonId);
-  const dateLabel = data
-    ? new Date(`${data.recentDate}T12:00:00Z`).toLocaleDateString("en-CA", {
-        timeZone: "UTC",
-        month: "short",
-        day: "numeric",
-      })
-    : "";
-  const recentTeams =
-    data?.entries.filter((entry) => entry.recentMisses.length > 0) ?? [];
   return (
     <section
       aria-labelledby="lineup-shame-heading"
@@ -124,8 +115,8 @@ function LineupShamePanel({ seasonId }: { seasonId: string }) {
         </p>
       ) : (
         <>
-          <div className="grid min-w-0 md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
-            <div className="row-start-2 min-w-0 md:col-start-1 md:row-start-1">
+          <div className="min-w-0">
+            <div className="min-w-0">
               <div className="flex items-baseline justify-between gap-2 border-b border-slate-100 px-3 py-3 sm:px-5">
                 <h3 className="font-barlow text-xs font-semibold uppercase tracking-wider text-slate-600">
                   Most missed starts
@@ -235,91 +226,6 @@ function LineupShamePanel({ seasonId }: { seasonId: string }) {
                 </tbody>
               </table>
             </div>
-            <aside
-              aria-labelledby="lineup-last-night-heading"
-              className="row-start-1 min-w-0 border-b border-slate-100 bg-slate-50/60 px-3 py-3 sm:px-5 md:col-start-2 md:border-b-0 md:border-l"
-            >
-              <div className="flex items-baseline justify-between gap-2">
-                <h3
-                  id="lineup-last-night-heading"
-                  className="font-barlow text-xs font-semibold uppercase tracking-wider text-slate-600"
-                >
-                  Last night
-                </h3>
-                <time
-                  dateTime={data.recentDate}
-                  className="text-xs text-slate-400"
-                >
-                  {dateLabel}
-                </time>
-              </div>
-              {data.recentStatus === "pending" ? (
-                <div className="mt-4 text-sm text-slate-500">
-                  <Clock3 className="mb-2 h-5 w-5" aria-hidden="true" />
-                  <p>Waiting for the full slate to finish.</p>
-                  <p className="mt-1 text-xs leading-5">
-                    Last night’s missed starts will appear after the final stats
-                    update.
-                  </p>
-                </div>
-              ) : data.recentStatus === "no-records" ? (
-                <p className="mt-4 text-sm leading-6 text-slate-500">
-                  No lineup records for {dateLabel} in this season.
-                </p>
-              ) : (
-                <>
-                  <div className="my-4 flex items-baseline gap-2">
-                    <strong className="font-oswald text-4xl tabular-nums text-rose-700">
-                      {data.recentMissedStarts}
-                    </strong>
-                    <span className="text-sm text-slate-600">
-                      {data.recentMissedStarts === 1
-                        ? "missed start"
-                        : "missed starts"}
-                    </span>
-                  </div>
-                  {recentTeams.length ? (
-                    <ul className="space-y-3">
-                      {recentTeams.map((entry) => (
-                        <li
-                          key={entry.team.id}
-                          className="rounded-lg border border-rose-100 bg-white p-3"
-                        >
-                          <div className="flex items-center gap-2">
-                            <TeamMark team={entry.team} />
-                            <span className="min-w-0 flex-1 text-xs font-semibold text-slate-800">
-                              {entry.team.name}
-                            </span>
-                            <span className="rounded-full bg-rose-100 px-2 py-0.5 text-xs font-semibold tabular-nums text-rose-700">
-                              +{entry.recentMisses.length}
-                            </span>
-                          </div>
-                          <ul className="mt-2 space-y-1.5">
-                            {entry.recentMisses.map((player) => (
-                              <li
-                                key={player.id}
-                                className="flex items-baseline justify-between gap-2 text-xs"
-                              >
-                                <span className="font-medium text-slate-700">
-                                  {player.playerName}
-                                </span>
-                                <span className="shrink-0 text-[10px] text-slate-400">
-                                  Left on {player.dailyPos}
-                                </span>
-                              </li>
-                            ))}
-                          </ul>
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <p className="text-sm leading-6 text-slate-500">
-                      Everyone set their lineup. Nobody to shame last night.
-                    </p>
-                  )}
-                </>
-              )}
-            </aside>
           </div>
           <footer className="border-t border-slate-100 px-3 py-3 sm:px-5">
             <details className="text-xs text-slate-500">

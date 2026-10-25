@@ -42,9 +42,6 @@ export function HomeContent() {
         <DraftNotificationSetup compact />
         <OwnerCommandCenter />
         <WeeklyEditionHomeCard />
-        {dashboardSeason ? (
-          <LineupShameCard seasonId={String(dashboardSeason.id)} />
-        ) : null}
         <UfaHomeCard />
         <div
           className={cn(
@@ -56,8 +53,9 @@ export function HomeContent() {
             <PowerRankingsHomeCard seasonId={String(dashboardSeason.id)} />
           ) : null}
           <NHLScheduleHomeCard />
-        </div>
-        <div className="mx-auto w-full max-w-5xl">
+          {dashboardSeason ? (
+            <LineupShameCard seasonId={String(dashboardSeason.id)} />
+          ) : null}
           <LeagueActivityCard
             seasonId={
               dashboardSeason?.id ? String(dashboardSeason.id) : undefined

@@ -134,8 +134,7 @@ export function HomeSkeleton() {
         <div className="mx-auto grid w-full min-w-0 max-w-5xl items-start gap-3 sm:gap-4 lg:grid-cols-2">
           <PowerRankingsHomeCardSkeleton />
           <NHLScheduleHomeCardSkeleton />
-        </div>
-        <div className="mx-auto w-full max-w-5xl">
+          <PowerRankingsHomeCardSkeleton />
           <LeagueActivityCardSkeleton />
         </div>
       </div>
