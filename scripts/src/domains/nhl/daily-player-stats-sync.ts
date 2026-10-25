@@ -19,8 +19,13 @@ import {
 import { convexReader } from "@gshl-lib/data/reader";
 import { fetchPlayerDayWeeks, updateById } from "@gshl-lib/data/convex-store";
 import { rankRowsWithRankingEngine } from "@gshl-lib/ranking/ranking-engine";
-import { applyPlayerDayDerivedColumns } from "@gshl-lib/stats/player-day-flags";
+import {
+  applyPlayerDayDerivedColumns,
+  computePlayerDayMissedGameValue,
+} from "@gshl-lib/stats/player-day-flags";
 import { assertLeagueGameSourceDays } from "../aggregation/player-day-source-validation";
+import { refreshPlayerDayLineupContext } from "../aggregation/player-day-lineup-context";
+import { getLineupBuilder } from "../lineup/lineup-builder";
 import { normalizeDateOnlyValue } from "@gshl-lib/utils/core/date";
 import {
   getArgValue,
@@ -236,6 +241,7 @@ type ExternalTeamGame = {
   opponentAbbr: string;
   opp: string;
   score: string;
+  gameState?: string;
 };
 
 type ExternalRosterPlayer = {
@@ -1148,12 +1154,17 @@ export function buildUpdatedPlayerDayRow(
   const dailyPos = cleanWhitespace(existing.dailyPos) || "BN";
   const gp = cleanWhitespace(stat.GP);
   const gs = computeStartedGame(dailyPos, gp, teamGame);
-  const mg = teamGame && gp !== "1" ? "1" : "";
+  const mg = computePlayerDayMissedGameValue(
+    { GP: gp },
+    ["FINAL", "OFF"].includes(
+      cleanWhitespace(teamGame?.gameState).toUpperCase(),
+    ),
+  );
   const resolvedOpp =
     cleanWhitespace(stat.opp) || cleanWhitespace(teamGame?.opp);
   const resolvedScore =
     cleanWhitespace(stat.score) || cleanWhitespace(teamGame?.score);
-  const ir = teamGame && gp !== "1" && isIrSlot(dailyPos) ? "1" : "";
+  const ir = mg === "1" && isIrSlot(dailyPos) ? "1" : "";
   const row: PlayerDayStatLine = {
     ...existing,
     date: normalizeDateKey(existing.date),
@@ -1914,10 +1925,6 @@ export async function runDailyNhlPlayerStatSync(
   const untouchedSeasonRows = seasonPlayerDayRows
     .filter((row) => !targetDateSet.has(normalizeDateKey(row.date)))
     .map((row) => row as unknown as DatabaseRecord);
-  applyPlayerDayDerivedColumns(
-    preparedRows as unknown as DatabaseRecord[],
-    untouchedSeasonRows,
-  );
   // Owner-independent scoring needs no global player pool. Scoped repairs must
   // refresh their changed stat lines as well as whole-season imports.
   await rankRowsWithRankingEngine(preparedRows as unknown as DatabaseRecord[], {
@@ -1925,6 +1932,25 @@ export async function runDailyNhlPlayerStatSync(
     outputField: "Rating",
     mutate: true,
   });
+  const lineupBuilder = await getLineupBuilder();
+  const lineupRows = refreshPlayerDayLineupContext(
+    preparedRows as unknown as DatabaseRecord[],
+    lineupBuilder.optimizeLineup,
+    lineupBuilder.buildLineupStructureFromRosterSpots?.(season.rosterSpots),
+  );
+  for (let index = 0; index < preparedRows.length; index++) {
+    const source = lineupRows[index]!;
+    Object.assign(preparedRows[index]!, {
+      fullPos: source.fullPos,
+      bestPos: source.bestPos,
+      MS: source.MS,
+      BS: source.BS,
+    });
+  }
+  applyPlayerDayDerivedColumns(
+    preparedRows as unknown as DatabaseRecord[],
+    untouchedSeasonRows,
+  );
 
   for (const row of preparedRows) {
     if (row.ratingVersion === "gshl-category-impact-v3") continue;

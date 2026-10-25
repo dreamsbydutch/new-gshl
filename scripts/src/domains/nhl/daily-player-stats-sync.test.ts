@@ -82,6 +82,28 @@ const boxscore: Parameters<typeof buildUpdatedPlayerDayRow>[1] = {
   TOI: "",
 };
 
+test("scheduled and live games cannot become missed games before completion", () => {
+  for (const gameState of ["FUT", "LIVE"]) {
+    const game = {
+      date: day.date,
+      gameId: "2026020001",
+      teamAbbr: "TOR",
+      opponentAbbr: "MTL",
+      opp: "MTL",
+      score: gameState === "LIVE" ? "1-0" : "",
+      gameState,
+    };
+    const result = buildUpdatedPlayerDayRow(
+      day,
+      { ...boxscore, GP: "" },
+      new Set(["G", "A", "P"]),
+      "TOR",
+      game,
+    );
+    assert.equal(result.MG, "", gameState);
+  }
+});
+
 test("NHL statistics preserve Yahoo eligibility, team ownership, and bench slot", () => {
   const existing = { ...day, nhlPos: [...day.nhlPos] };
   const stat = { ...boxscore };

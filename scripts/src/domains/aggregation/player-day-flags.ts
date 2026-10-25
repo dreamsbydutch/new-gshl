@@ -76,10 +76,6 @@ export function computePlayerDayLineupFlags(row: DatabaseRecord): {
   MS: string;
   BS: string;
 } {
-  if (toUpperToken(row.posGroup) === "G") {
-    return { MS: "", BS: "" };
-  }
-
   const played = toTrimmedString(row.GP) === "1";
   if (!played) {
     return { MS: "", BS: "" };
@@ -88,15 +84,27 @@ export function computePlayerDayLineupFlags(row: DatabaseRecord): {
   const dailyPos = toUpperToken(row.dailyPos);
   const fullPos = toUpperToken(row.fullPos);
   const bestPos = toUpperToken(row.bestPos);
+  const isGoalie = toUpperToken(row.posGroup) === "G";
+  const isStarter =
+    NON_GOALIE_STARTING_FULL_POSITIONS.has(dailyPos) || dailyPos === "G";
 
   const MS =
+    !isGoalie &&
     BENCH_DAILY_POSITIONS.has(dailyPos) &&
     NON_GOALIE_STARTING_FULL_POSITIONS.has(fullPos)
       ? "1"
       : "";
-  const BS = fullPos === "BN" && !!bestPos && bestPos !== "BN" ? "1" : "";
+  const BS = isStarter && bestPos === "BN" ? "1" : "";
 
   return { MS, BS };
+}
+
+/** A scheduled/live game is not evidence that an appearance was missed. */
+export function computePlayerDayMissedGameValue(
+  row: DatabaseRecord,
+  completedTeamGame: boolean,
+): string {
+  return completedTeamGame && toTrimmedString(row.GP) !== "1" ? "1" : "";
 }
 
 export function applyPlayerDayDerivedColumns<T extends PlayerDayDerivedRecord>(

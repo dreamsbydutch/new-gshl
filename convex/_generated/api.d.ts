@@ -61,6 +61,7 @@ import type * as lib_verifiedPlayerDayRemoval from "../lib/verifiedPlayerDayRemo
 import type * as lib_weeklyEditionInjuries from "../lib/weeklyEditionInjuries.js";
 import type * as lib_weeklyEditionPublication from "../lib/weeklyEditionPublication.js";
 import type * as lib_yahooOAuth from "../lib/yahooOAuth.js";
+import type * as lineupAccounting from "../lineupAccounting.js";
 import type * as maintenanceScope from "../maintenanceScope.js";
 import type * as matchup from "../matchup.js";
 import type * as matchupPreviews from "../matchupPreviews.js";
@@ -153,6 +154,7 @@ declare const fullApi: ApiFromModules<{
   "lib/weeklyEditionInjuries": typeof lib_weeklyEditionInjuries;
   "lib/weeklyEditionPublication": typeof lib_weeklyEditionPublication;
   "lib/yahooOAuth": typeof lib_yahooOAuth;
+  lineupAccounting: typeof lineupAccounting;
   maintenanceScope: typeof maintenanceScope;
   matchup: typeof matchup;
   matchupPreviews: typeof matchupPreviews;

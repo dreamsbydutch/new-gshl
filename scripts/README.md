@@ -977,6 +977,17 @@ Notable flags:
 - `--apply`
 - `--stop-on-error`
 
+#### Reviewed lineup accounting replay
+
+Use `src/commands/stats/replay-lineup-accounting.ts` to preflight or replay a
+checksum-reviewed MS/BS/MG correction plan against production. Run it with the
+operator TypeScript runtime and `--help` for the current options. The default
+is a dry run; applying requires an independent, read-back-verified backup.
+Every row is checked against its full captured preimage. This command does not
+capture or infer missing source evidence and refuses plans with unresolved
+issues. Definitions and repair requirements live in
+[lineup stat accounting](../docs/operations/lineup-stat-accounting.md).
+
 #### `lineup:update-all`
 
 Re-optimizes `PlayerDayStatLine` lineup fields such as `bestPos`, `fullPos`,

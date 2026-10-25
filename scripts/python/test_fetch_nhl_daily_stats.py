@@ -2,10 +2,17 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import Mock
 
-from fetch_nhl_daily_stats import collect_power_play_points, is_power_play_goal, fetch_daily_stats
+from fetch_nhl_daily_stats import collect_power_play_points, is_power_play_goal, fetch_daily_stats, build_team_game_rows
 
 
 class PowerPlayTests(unittest.TestCase):
+    def test_team_game_payload_keeps_completion_state(self):
+        for state in ("FUT", "LIVE", "FINAL", "OFF"):
+            rows = build_team_game_rows(date="2026-10-24", game_id=1,
+                away_team={"abbrev": "TOR"}, home_team={"abbrev": "MTL"},
+                game_has_started=state != "FUT", game_state=state)
+            self.assertEqual([row["gameState"] for row in rows], [state, state])
+
     def test_failed_game_fetch_cannot_erase_existing_stats(self):
         for endpoint in ("boxscore", "play_by_play"):
             client = SimpleNamespace(

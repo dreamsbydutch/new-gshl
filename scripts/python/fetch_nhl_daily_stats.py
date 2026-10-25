@@ -584,6 +584,7 @@ def build_team_game_rows(
     away_team: dict[str, Any],
     home_team: dict[str, Any],
     game_has_started: bool,
+    game_state: str | None = None,
 ) -> list[dict[str, Any]]:
     away_abbr = str(away_team.get("abbrev") or "").strip().upper()
     home_abbr = str(home_team.get("abbrev") or "").strip().upper()
@@ -594,6 +595,7 @@ def build_team_game_rows(
         {
             "date": date,
             "gameId": str(game_id),
+            "gameState": game_state or "",
             "teamAbbr": away_abbr,
             "opponentAbbr": home_abbr,
             "opp": build_opponent_display(home_abbr, True),
@@ -602,6 +604,7 @@ def build_team_game_rows(
         {
             "date": date,
             "gameId": str(game_id),
+            "gameState": game_state or "",
             "teamAbbr": home_abbr,
             "opponentAbbr": away_abbr,
             "opp": build_opponent_display(away_abbr, False),
@@ -660,6 +663,7 @@ def fetch_daily_stats(
                     away_team=away_team,
                     home_team=home_team,
                     game_has_started=game_has_started,
+                    game_state=str(boxscore.get("gameState") or game.get("gameState") or ""),
                 )
             )
             roster_players.extend(
