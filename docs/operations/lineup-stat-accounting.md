@@ -43,3 +43,20 @@ It preserves ratings, native hockey stats and recorded fantasy decisions,
 maintains the performance index transactionally, and refuses source conflicts.
 Repeating a completed plan with `--verify` must report zero pending changes.
 See [the operator reference](../../scripts/README.md#reviewed-lineup-accounting-replay).
+
+### 2026-10-25 reconciliation
+
+The historical review covers 523,587 player-day rows across all 13 populated
+GSHL seasons, from 2014-15 through 2026-27, and all eight aggregate tables.
+Official NHL schedules establish completed games; official player game logs
+resolve dated team discrepancies for traded players.
+
+The commissioner confirmed that Alexander Nikishin's five rows from September
+29 through October 3, 2026 belong to Carolina despite his absence from its
+season roster. Carolina's completed games on September 29, October 2 and
+October 3 count as three MG, including their player and team aggregates.
+
+Verification includes independent sums from daily flags, repeat-run checks of
+the reviewed patches, and a fresh current-season comparison against every
+aggregate level. Backups retain the source rows, official evidence and exact
+reviewed plans independently of the working directory.

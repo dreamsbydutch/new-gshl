@@ -48,6 +48,7 @@ export async function replayLineupAccountingPlan(options: {
     sourceManifestSha256: string;
     scheduleSha256: string;
     gameLogEvidenceSha256?: string;
+    sourceRefreshManifestSha256?: string;
   };
   if (
     manifest.deployment !== "polished-tern-709" ||
@@ -117,6 +118,21 @@ export async function replayLineupAccountingPlan(options: {
         )
           throw Error("Independent player game-log evidence differs");
     }
+    if (manifest.sourceRefreshManifestSha256) {
+      const sourceDirectory = path.join(backup, "plan", "source-refresh");
+      const bytes = readFileSync(path.join(sourceDirectory, "manifest.json"));
+      if (digest(bytes) !== manifest.sourceRefreshManifestSha256)
+        throw Error("Independent refreshed source manifest differs");
+      const refreshed = JSON.parse(bytes.toString()) as {
+        files: Array<{ path: string; sha256: string }>;
+      };
+      for (const file of refreshed.files)
+        if (
+          digest(readFileSync(containedFile(sourceDirectory, file.path))) !==
+          file.sha256
+        )
+          throw Error("Independent refreshed source evidence differs");
+    }
     for (const file of source.files)
       if (
         digest(
@@ -169,16 +185,34 @@ export async function replayLineupAccountingPlan(options: {
     batch: (typeof batches)[number],
     apply: boolean,
   ): Promise<Result> => {
-    try {
-      return (await client.mutation(
-        makeFunctionReference<"mutation">("lineupAccounting:applyBatch"),
-        { ...batch, serverSecret: secret, apply },
-      )) as Result;
-    } catch {
-      throw Error(
-        `Accounting ${apply ? "apply" : "preflight"} failed for ${batch.table}/${batch.rows[0]?.id}; authenticated diagnostics suppressed`,
-      );
-    }
+    for (let attempt = 0; attempt < 3; attempt++)
+      try {
+        return (await client.mutation(
+          makeFunctionReference<"mutation">("lineupAccounting:applyBatch"),
+          { ...batch, serverSecret: secret, apply },
+          { skipQueue: true },
+        )) as Result;
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        const conflict =
+          /preimage|source row missing|Unauthorized|Invalid|Unsupported|validation/i.test(
+            message,
+          );
+        const transient =
+          /fetch failed|network|socket|ECONN|ETIMEDOUT|timed? out|too many (?:concurrent|requests)|\b(?:429|502|503|504)\b|internal server error|overload/i.test(
+            message,
+          );
+        if (!conflict && transient && attempt < 2) {
+          await new Promise((resolve) =>
+            setTimeout(resolve, 1000 * (attempt + 1)),
+          );
+          continue;
+        }
+        throw Error(
+          `Accounting ${apply ? "apply" : "preflight"} failed for ${batch.table}/${batch.rows[0]?.id} (${conflict ? "source or validation conflict" : transient ? "transient request" : "request failure"}); authenticated diagnostics suppressed`,
+        );
+      }
+    throw Error("Accounting request retry limit reached");
   };
   const sum = (): Result => ({
     total: 0,

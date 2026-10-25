@@ -8,6 +8,136 @@ import {
   prepareSeasonAggregateWriteRow,
 } from "./season-stat-aggregation";
 
+void test("all rollups count actual bad starts, skater missed starts and bench missed games", () => {
+  const common = {
+    seasonId: "s",
+    gshlTeamId: "t",
+    weekId: "w",
+    date: "2025-01-01",
+  };
+  const result = buildSeasonStatLines(
+    "s",
+    [
+      {
+        ...common,
+        playerId: "started",
+        posGroup: "F",
+        nhlPos: ["RW"],
+        dailyPos: "RW",
+        GP: "1",
+        fullPos: "RW",
+        bestPos: "BN",
+      },
+      {
+        ...common,
+        playerId: "upgrade",
+        posGroup: "F",
+        nhlPos: ["RW"],
+        dailyPos: "BN",
+        GP: "1",
+        fullPos: "BN",
+        bestPos: "RW",
+      },
+      {
+        ...common,
+        playerId: "missed",
+        posGroup: "D",
+        nhlPos: ["D"],
+        dailyPos: "IR",
+        GP: "1",
+        fullPos: "D",
+        bestPos: "D",
+      },
+      { ...common, playerId: "dnp", posGroup: "F", dailyPos: "BN", MG: "1" },
+      {
+        ...common,
+        playerId: "goalie",
+        posGroup: "G",
+        nhlPos: ["G"],
+        dailyPos: "G",
+        GP: "1",
+        fullPos: "G",
+        bestPos: "BN",
+        GA: "1",
+        SV: "29",
+        SA: "30",
+        TOI: "60",
+      },
+      {
+        ...common,
+        playerId: "goalie-upgrade",
+        posGroup: "G",
+        nhlPos: ["G"],
+        dailyPos: "BN",
+        GP: "1",
+        fullPos: "BN",
+        bestPos: "G",
+        GA: "0",
+        SV: "30",
+        SA: "30",
+        TOI: "60",
+      },
+    ],
+    {
+      id: "s",
+      year: "2025",
+      categories: [
+        "G",
+        "A",
+        "P",
+        "PPP",
+        "SOG",
+        "HIT",
+        "BLK",
+        "W",
+        "GAA",
+        "SVP",
+      ],
+    },
+    [
+      {
+        id: "w",
+        seasonId: "s",
+        weekType: "RS",
+        startDate: "2025-01-01",
+        endDate: "2025-01-05",
+      },
+    ],
+    [{ id: "t", seasonId: "s" }],
+    new Date("2025-01-01T18:00:00Z"),
+  );
+  for (const rows of [
+    result.playerWeeks,
+    result.playerSplits,
+    result.playerTotals,
+    result.teamDays,
+    result.teamWeeks,
+    result.teamSeasons,
+  ]) {
+    assert.ok(rows.length);
+    assert.equal(
+      rows.reduce((n, r) => n + Number(r.BS ?? 0), 0),
+      2,
+    );
+    assert.equal(
+      rows.reduce((n, r) => n + Number(r.MS ?? 0), 0),
+      1,
+    );
+    assert.equal(
+      rows.reduce((n, r) => n + Number(r.MG ?? 0), 0),
+      1,
+    );
+  }
+  assert.equal(
+    result.playerWeeks.find((r) => r.playerId === "upgrade")?.BS,
+    "0",
+  );
+  assert.equal(
+    result.playerWeeks.find((r) => r.playerId === "goalie-upgrade")?.MS,
+    "0",
+  );
+});
+
 void test("team goalie rates survive the persistence field filter", () => {
   for (const model of ["TeamWeekStatLine", "TeamSeasonStatLine"] as const) {
     const row = prepareSeasonAggregateWriteRow(model, {
