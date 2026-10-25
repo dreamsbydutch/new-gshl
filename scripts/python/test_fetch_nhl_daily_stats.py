@@ -9,12 +9,13 @@ class PowerPlayTests(unittest.TestCase):
     def test_failed_game_fetch_cannot_erase_existing_stats(self):
         for endpoint in ("boxscore", "play_by_play"):
             client = SimpleNamespace(
-                schedule=SimpleNamespace(daily_schedule=Mock(return_value={"games": [{"id": 1}]})),
-                game_center=SimpleNamespace(boxscore=Mock(return_value={}), play_by_play=Mock(return_value={})),
+                schedule=SimpleNamespace(daily_schedule=Mock(return_value={"games": [{"id": 1, "gameType": 2}]})),
+                game_center=SimpleNamespace(boxscore=Mock(return_value={"gameType": 2}), play_by_play=Mock(return_value={})),
             )
             getattr(client.game_center, endpoint).side_effect = RuntimeError("unavailable")
             with self.assertRaisesRegex(RuntimeError, "refusing partial stats"):
                 fetch_daily_stats(client, "2026-10-03")
+            getattr(client.game_center, endpoint).assert_called_once_with("1")
 
     def test_demidov_extra_attacker_goal_and_assist_are_not_power_play_points(self):
         plays = {"plays": [
