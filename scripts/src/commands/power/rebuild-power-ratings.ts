@@ -3,7 +3,8 @@ import {
   type DatabaseRecord,
 } from "@gshl-lib/data/records";
 import { convexWriter } from "@gshl-lib/data/writer";
-import { fetchModel } from "@gshl-lib/data/convex-store";
+import { fetchModel, fetchSeasonModel } from "@gshl-lib/data/convex-store";
+import { scopePowerRolloverUpdates } from "../../domains/power/rollover-scope";
 import {
   getArgValue,
   hasFlag,
@@ -18,6 +19,7 @@ type RebuildPowerOptions = {
   weekTypes: string[];
   seasonType: string;
   logToConsole: boolean;
+  afterWeekId: string;
 };
 
 const HELP_TEXT = `
@@ -34,6 +36,7 @@ Options:
   --apply               Write power and matchup updates back to Convex.
   --week-types <list>   Optional comma-separated week types.
   --season-type <type>  Optional legacy seasonType filter.
+  --after-week-id <id>  Publish power only after this ended week; preserve older entering snapshots.
   --log <true|false>    Enable or disable console logging. Default: true.
   --help                Show this message and exit.
 `.trim();
@@ -77,6 +80,7 @@ function parseOptions(args: string[]): RebuildPowerOptions {
     weekTypes: parseList(getArgValue(args, "--week-types")),
     seasonType: String(getArgValue(args, "--season-type") ?? "").trim(),
     logToConsole: toBoolean(getArgValue(args, "--log"), true),
+    afterWeekId: String(getArgValue(args, "--after-week-id") ?? "").trim(),
   };
 }
 
@@ -149,9 +153,21 @@ async function main(): Promise<void> {
         : undefined,
     });
 
-    const weekUpdates = result.weekUpdates ?? [];
+    const scoped = options.afterWeekId
+      ? scopePowerRolloverUpdates(
+          options.afterWeekId,
+          await fetchSeasonModel("Week", seasonId),
+          await fetchSeasonModel("Matchup", seasonId),
+          {
+            weekUpdates: result.weekUpdates ?? [],
+            matchupUpdates: result.matchupUpdates ?? [],
+          },
+        )
+      : null;
+    const weekUpdates = scoped?.weekUpdates ?? result.weekUpdates ?? [];
     const seasonUpdates = result.seasonUpdates ?? [];
-    const matchupUpdates = result.matchupUpdates ?? [];
+    const matchupUpdates =
+      scoped?.matchupUpdates ?? result.matchupUpdates ?? [];
     replayedTeamWeeks.push(...weekUpdates);
     let writtenWeekRows = 0;
     let writtenSeasonRows = 0;

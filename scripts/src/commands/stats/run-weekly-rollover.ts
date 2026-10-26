@@ -99,7 +99,9 @@ async function main() {
     return;
   }
   // Standings rebuilds the whole season, so validate every pending week first.
-  console.log("[weekly-rollover] Validating ended-week matchups and aggregates.");
+  console.log(
+    "[weekly-rollover] Validating ended-week matchups and aggregates.",
+  );
   const matchups = await fetchSeasonModel<Record<string, unknown>>(
     "Matchup",
     seasonId,
@@ -135,7 +137,7 @@ async function main() {
         );
     }
   }
-  const run = (command: string) => {
+  const run = (command: string, extraArgs: string[] = []) => {
     const child = spawnSync(
       process.execPath,
       [
@@ -144,6 +146,7 @@ async function main() {
         path.join(root, "scripts/src/commands", command),
         "--season-id",
         seasonId,
+        ...extraArgs,
         ...(values.apply ? ["--apply"] : []),
       ],
       {
@@ -199,7 +202,10 @@ async function main() {
         run("standings/backfill-season-standings.ts");
       },
       power: async () => {
-        run("power/rebuild-power-ratings.ts");
+        run("power/rebuild-power-ratings.ts", [
+          "--after-week-id",
+          due.at(-1)!.id,
+        ]);
       },
       publish: async () => {
         for (const week of due)
