@@ -509,10 +509,7 @@ export const weeklySchedule = query({
     ]);
     const today = utcTimestampToDateKey(Date.now());
     const start = utcTimestampToDateKey(week?.startDate);
-    const end = utcTimestampToDateKey(week?.endDate);
-    const isInProgress = Boolean(
-      today && start && end && start <= today && today <= end,
-    );
+    const hasStarted = Boolean(today && start && start <= today);
     const matchupRows = await ctx.db
       .query("matchups")
       .withIndex("by_seasonId_weekId", (q) =>
@@ -555,6 +552,17 @@ export const weeklySchedule = query({
         .map((conference) => [conference._id, conference] as const),
     );
 
+    // Final scores are authoritative once recorded. Until then, keep reading
+    // weekly totals even after the calendar end date or UTC midnight passes.
+    const isInProgress =
+      hasStarted &&
+      matchupRows.some(
+        (matchup) =>
+          !matchup.isComplete &&
+          !matchup.homeWin &&
+          !matchup.awayWin &&
+          !matchup.tie,
+      );
     const liveStats = isInProgress
       ? await Promise.all(
           referencedTeamIds.map((teamId) =>

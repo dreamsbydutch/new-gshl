@@ -14,6 +14,7 @@ import {
   updateBuilderCalendar,
   resizeBuilderCalendar,
   publishBuilderSchedule,
+  weeklySchedule,
 } from "./schedule";
 import {
   combineScheduleHistory,
@@ -130,6 +131,77 @@ function fixture() {
   } as unknown as MutationCtx;
   return { ctx, teams, put, get, rows, reads };
 }
+
+void test("weekly scores survive UTC midnight and delayed matchup finalization", async (t) => {
+  const f = fixture();
+  f.put("weeks", "liveweek", {
+    seasonId: "season",
+    startDate: Date.parse("2026-10-19T00:00:00Z"),
+    endDate: Date.parse("2026-10-25T00:00:00Z"),
+  });
+  Object.assign(f.get("season")!, { categories: ["G", "A", "SOG"] });
+  f.put("matchups", "live", {
+    seasonId: "season",
+    weekId: "liveweek",
+    homeTeamId: "team0",
+    awayTeamId: "team1",
+    gameType: "RS",
+    isComplete: false,
+    homeScore: 0,
+    awayScore: 0,
+  });
+  f.put("teamWeekStatLines", "homeStats", {
+    seasonId: "season",
+    weekId: "liveweek",
+    gshlTeamId: "team0",
+    G: "4",
+    A: "2",
+    SOG: "20",
+  });
+  f.put("teamWeekStatLines", "awayStats", {
+    seasonId: "season",
+    weekId: "liveweek",
+    gshlTeamId: "team1",
+    G: "1",
+    A: "5",
+    SOG: "10",
+  });
+  const args = {
+    seasonId: "season" as Id<"seasons">,
+    weekId: "liveweek" as Id<"weeks">,
+  };
+  for (const instant of [
+    "2026-10-25T23:59:00Z",
+    "2026-10-26T00:01:00Z",
+    "2026-10-26T05:00:00Z",
+  ]) {
+    t.mock.method(Date, "now", () => Date.parse(instant));
+    const result = await handler(weeklySchedule)(f.ctx, args);
+    assert.equal(result.matchups[0]?.homeScore, 2, instant);
+    assert.equal(result.matchups[0]?.awayScore, 1, instant);
+  }
+  Object.assign(f.get("live")!, {
+    isComplete: true,
+    homeWin: false,
+    awayWin: true,
+    homeScore: 1,
+    awayScore: 2,
+  });
+  const final = await handler(weeklySchedule)(f.ctx, args);
+  assert.equal(final.matchups[0]?.homeScore, 1);
+  assert.equal(final.matchups[0]?.awayScore, 2);
+  Object.assign(f.get("live")!, {
+    isComplete: false,
+    homeWin: false,
+    awayWin: false,
+    homeScore: undefined,
+    awayScore: undefined,
+  });
+  t.mock.method(Date, "now", () => Date.parse("2026-10-18T23:00:00Z"));
+  const future = await handler(weeklySchedule)(f.ctx, args);
+  assert.equal(future.matchups[0]?.homeScore, null);
+  assert.equal(future.matchups[0]?.awayScore, null);
+});
 
 void test("saved calendar count corrections preserve surviving IDs and reject calendars in use", async () => {
   const f = fixture();
