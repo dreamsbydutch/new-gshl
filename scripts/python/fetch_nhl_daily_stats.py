@@ -396,6 +396,10 @@ CURRENT_GOALIE_ACCOUNTING_EXCEPTIONS = json.loads(
     (Path(__file__).resolve().parent.parent / "src/domains/aggregation/"
      "current-goalie-accounting-exceptions.json").read_text(encoding="utf-8")
 )
+GOALIE_COUNT_CORRECTIONS = json.loads(
+    (Path(__file__).resolve().parent.parent / "src/domains/aggregation/"
+     "goalie-count-corrections.json").read_text(encoding="utf-8")
+)
 
 
 def reconcile_goalie_counts(
@@ -410,6 +414,15 @@ def reconcile_goalie_counts(
         native = {"GP": 1, "W": int(str(row.get("decision", "")).upper() == "W"),
                   "GA": goals, "SV": saves, "SA": shots,
                   "TOI": parse_time_to_minutes(row.get("toi"))}
+        for fact in GOALIE_COUNT_CORRECTIONS:
+            if (all(context.get(key) == fact[key] for key in
+                    ("date", "gameId", "team", "opponent"))
+                    and row.get("playerId") == fact["nhlPlayerId"]
+                    and native == fact["sourceTuple"]):
+                corrected = fact["correctedTuple"]
+                if corrected["SV"] + corrected["GA"] != corrected["SA"]:
+                    raise ValueError("Invalid reviewed goalie correction")
+                return corrected["SA"], corrected["SV"], corrected["GA"]
         for fact in CURRENT_GOALIE_ACCOUNTING_EXCEPTIONS:
             if (all(context.get(key) == fact[key] for key in
                     ("date", "gameId", "team", "opponent"))

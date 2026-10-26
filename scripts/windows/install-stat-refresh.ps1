@@ -33,7 +33,7 @@ $action = New-ScheduledTaskAction -Execute (Join-Path $PSHOME 'powershell.exe') 
 $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1) -RepetitionInterval (New-TimeSpan -Minutes 5)
 $principal = New-ScheduledTaskPrincipal -UserId $identity -LogonType Interactive -RunLevel Limited
 $settings = New-ScheduledTaskSettingsSet -MultipleInstances IgnoreNew -StartWhenAvailable -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -WakeToRun -ExecutionTimeLimit (New-TimeSpan -Hours 3)
-$task = New-ScheduledTask -Action $action -Trigger $trigger -Principal $principal -Settings $settings -Description 'GSHL day/week refresh hourly or every five minutes during live NHL games; season/career/NHL totals overnight after all games finish. Toronto time. No weekly publication.'
+$task = New-ScheduledTask -Action $action -Trigger $trigger -Principal $principal -Settings $settings -Description 'GSHL day/week refresh hourly or every five minutes during live NHL games; season/career/NHL totals overnight after all games finish. Weekly results, standings, power and Press Box after final-stat reconciliation. Toronto time.'
 Register-ScheduledTask -TaskName $taskName -InputObject $task | Out-Null
 $installed = Get-ScheduledTask -TaskName $taskName -ErrorAction Stop
 if ($installed.Actions.Arguments -ne $arguments -or $installed.Triggers.Repetition.Interval -ne 'PT5M') { throw 'Installed task verification failed.' }

@@ -1,0 +1,19 @@
+[
+  {
+    "name": "Karel Vejmelka",
+    "nhlPlayerId": 8478872,
+    "date": "2026-10-24",
+    "team": "UTA",
+    "opponent": "TBL",
+    "gameId": 2026020177,
+    "sourceTuple": { "GP": 1, "W": 1, "GA": 4, "SV": 29, "SA": 32, "TOI": 61.73 },
+    "correctedTuple": { "GP": 1, "W": 1, "GA": 4, "SV": 28, "SA": 32, "TOI": 61.73 },
+    "reason": "User confirmed 28 saves. Official game summary records 4 goals against on 32 shots; the API aggregate saves and strength splits incorrectly credit 29.",
+    "officialTOISeconds": 3704,
+    "sources": [
+      { "url": "https://api-web.nhle.com/v1/gamecenter/2026020177/boxscore", "sha256": "2f0946cdbe65e1106528b24dd40146575de21a9bc6e7738e5fe2f42efd3db5b3" },
+      { "url": "https://api.nhle.com/stats/rest/en/goalie/summary?isAggregate=false&isGame=true&start=0&limit=100&cayenneExp=gameId=2026020177", "sha256": "8e0e2ec8eddfc679491875aee97950605c4b5c790310fcdd81a01d09d52f0db0" },
+      { "url": "https://www.nhl.com/scores/htmlreports/20262027/GS020177.HTM", "sha256": "3354f0ee458a2976a7b46bc5745fcc69a5da7af58709c8dc75dd0a991a6d0028" }
+    ]
+  }
+]

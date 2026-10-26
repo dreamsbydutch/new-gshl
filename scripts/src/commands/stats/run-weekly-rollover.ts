@@ -70,12 +70,14 @@ async function main() {
     return;
   }
   const today = `${part("year")}-${part("month")}-${part("day")}`;
+  console.log("[weekly-rollover] Loading season and completion checkpoints.");
   const seasons = await fetchModel<Record<string, unknown>>("Season");
   const season = seasons.find((row) =>
     [row.id, row.legacyId].some((id) => String(id) === values["season-id"]),
   );
   if (!season) throw new Error("Season not found");
   const seasonId = String(season.id);
+  console.log("[weekly-rollover] Loading scoring weeks.");
   const weeks = await fetchSeasonModel<Record<string, unknown>>(
     "Week",
     seasonId,
@@ -97,6 +99,7 @@ async function main() {
     return;
   }
   // Standings rebuilds the whole season, so validate every pending week first.
+  console.log("[weekly-rollover] Validating ended-week matchups and aggregates.");
   const matchups = await fetchSeasonModel<Record<string, unknown>>(
     "Matchup",
     seasonId,
@@ -125,6 +128,7 @@ async function main() {
       date <= week.endDate;
       date = shiftYahooDate(date, 1)
     ) {
+      console.log(`[weekly-rollover] Checking final NHL games for ${date}.`);
       if (!allScoringGamesFinished(await fetchDailyGameStatus(date)))
         throw new Error(
           `NHL games for ${date} have not all finished; rollover deferred`,

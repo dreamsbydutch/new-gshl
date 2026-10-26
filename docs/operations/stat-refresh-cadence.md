@@ -27,7 +27,8 @@ Eliminated playoff teams do not require fabricated roster days.
 The Windows runner has process and task overlap protection and uses the signed-in
 operator's existing Yahoo profile and Convex CLI authentication. It stores no
 credentials in task arguments. The PC must be awake, connected and signed in.
-The installed stat task skips weekly publication, standings and power workflows.
+After final-stat reconciliation, the installed stat task finalizes ended matchups,
+refreshes standings and entering-week power, then releases their Press Box editions.
 Its season calendar is explicit; configure the next season when its weeks exist.
 
 Use the installer script's preview and the commands' help for invocation details.

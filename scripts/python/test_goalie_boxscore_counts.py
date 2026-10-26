@@ -13,6 +13,17 @@ def goalie_stats(row):
 
 
 class GoalieBoxscoreCountsTests(unittest.TestCase):
+    def test_final_vejmelka_correction_requires_the_reviewed_game_and_exact_tuple(self):
+        row = {"playerId": 8478872, "shotsAgainst": 32, "saves": 29,
+               "goalsAgainst": 4, "toi": "61:44", "decision": "W"}
+        context = {"date": "2026-10-24", "gameId": 2026020177,
+                   "team": "UTA", "opponent": "TBL"}
+        self.assertEqual(reconcile_goalie_counts(row, context), (32, 28, 4))
+        with self.assertRaises(ValueError):
+            reconcile_goalie_counts(row, {**context, "gameId": 2026020178})
+        with self.assertRaises(ValueError):
+            reconcile_goalie_counts({**row, "saves": 30}, context)
+
     def test_final_official_jarry_discrepancy_is_bound_to_identity_game_and_tuple(self):
         row = {"playerId": 8477465, "shotsAgainst": 30, "saves": 25,
                "goalsAgainst": 6, "toi": "59:45", "decision": "L"}
