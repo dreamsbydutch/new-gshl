@@ -650,7 +650,7 @@ function computeTeamPointsFromRecord(
   return (wins - homeWins) * 3 + homeWins * 2 + homeLosses;
 }
 
-function buildCategoriesForMap(
+export function buildCategoriesForMap(
   matchups: DatabaseRecord[],
   weekIdsInType: Set<string>,
 ) {
@@ -750,7 +750,7 @@ function computeHeadToHeadStatsForGroup(
   return stats;
 }
 
-function sortEntriesWithTiebreakers(
+export function sortEntriesWithTiebreakers(
   entries: RankingEntry[],
   matchups: DatabaseRecord[],
   weekIdsInType: Set<string>,
@@ -768,6 +768,10 @@ function sortEntriesWithTiebreakers(
       if (left.teamPoints !== right.teamPoints) {
         return right.teamPoints - left.teamPoints;
       }
+      const categoriesDifference =
+        (categoriesForMap.get(right.teamId) ?? 0) -
+        (categoriesForMap.get(left.teamId) ?? 0);
+      if (categoriesDifference !== 0) return categoriesDifference;
     }
     return left.teamId.localeCompare(right.teamId);
   });
@@ -783,7 +787,9 @@ function sortEntriesWithTiebreakers(
         ? sorted[end].teamPoints === sorted[index].teamPoints &&
           sorted[end].wins === sorted[index].wins
         : sorted[end].wins === sorted[index].wins &&
-          sorted[end].teamPoints === sorted[index].teamPoints)
+          sorted[end].teamPoints === sorted[index].teamPoints &&
+          (categoriesForMap.get(sorted[end].teamId) ?? 0) ===
+            (categoriesForMap.get(sorted[index].teamId) ?? 0))
     ) {
       end += 1;
     }

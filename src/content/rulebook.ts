@@ -374,23 +374,23 @@ export const rulebookSections: RulebookSection[] = [
         title: "Standings Tiebreakers",
         blocks: [
           paragraph(
-            "Teams are ranked by record first. Clear wins and home-ice wins count as wins. Clear losses and home-ice losses count as losses.",
+            "Teams are ranked by total matchup wins first. Clear wins and home-ice wins both count as wins.",
           ),
           paragraph(
-            "If teams have the same record, tiebreakers are applied in this order:",
+            "If teams have the same number of wins, tiebreakers are applied in this order:",
           ),
           ordered([
             "Total standings points",
+            "Categories for: total categories won across completed regular-season matchups",
+            "Head-to-head matchup wins",
             "Head-to-head standings points",
-            "Head-to-head category differential",
-            "Overall category differential",
-            "Conference standings points",
-            "Conference category differential",
-            "Owner Ladder Ranking",
+            "Head-to-head categories won",
+            "Power ranking",
           ]),
           bullets([
             "“Standings points” refers to the 3-2-1-0 standings system.",
-            "“Category differential” means categories won minus categories lost during the applicable period.",
+            "Categories for counts category wins, not categories won minus categories lost. Live and upcoming matchups do not count.",
+            "The same ordering applies to overall, conference, and wildcard standings. Historical seasons using the legacy tie system retain their original points-first ordering.",
           ]),
         ],
       },
