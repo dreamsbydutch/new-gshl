@@ -163,8 +163,8 @@ void test("conversation generation publishes both assigned writers, alternating 
   assert.deepEqual(f.get(row._id)?.paragraphs, [
     "Home Reporter: We have a scoring argument.",
     "Away Reporter: But we can contest it.",
-    "Home Reporter: Fair, this should stay close.",
-    "Away Reporter: I can concede that much.",
+    "HR: Fair, this should stay close.",
+    "AR: I can concede that much.",
     "Prediction: Home defeats Away, 6–4.",
   ]);
   assert.equal(f.rows("matchupPreviews").length, 1);

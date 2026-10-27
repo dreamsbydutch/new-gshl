@@ -75,8 +75,11 @@ preserved; failed or abandoned attempts can retry the following night.
 New previews are one shared conversation between both assigned franchise beat
 writers (or their legacy reporter-directory assignments). The home writer
 opens four or five short alternating turns, followed by one editorial
-prediction. The target is 200–280 words for the discussion, with a hard ceiling
-of 320 including speaker labels and the final prediction. Both writers retain
+prediction. The target is 285–325 words for the complete preview, with a hard
+ceiling of 400 including speaker labels and the final prediction. Each writer
+gets their full name on their first turn and initials thereafter. Replies carry
+the previous writer's argument forward, with restrained, slightly punchier
+banter rather than independent category summaries. Both writers retain
 their stable voices, loyalties and evidence-grounded arguments. No shared
 preview is published without both assigned writers or valid copy. Already
 published individual articles and queued legacy pairs retain their old format;
