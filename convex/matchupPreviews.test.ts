@@ -141,6 +141,10 @@ void test("conversation generation publishes both assigned writers, alternating 
             { speaker: "away", text: "But we can contest it." },
             { speaker: "home", text: "Fair, this should stay close." },
             { speaker: "away", text: "I can concede that much." },
+            { speaker: "home", text: "Only that much? You are generous." },
+            { speaker: "away", text: "Save the thanks for your goalie." },
+            { speaker: "home", text: "He can settle this argument." },
+            { speaker: "away", text: "Then we have a matchup." },
           ],
           evidenceIds: ["roster"],
           prediction: { winner: "team", teamScore: 6, opponentScore: 4 },
@@ -161,10 +165,14 @@ void test("conversation generation publishes both assigned writers, alternating 
   assert.equal(f.get(row._id)?.status, "published");
   assert.equal(f.get(row._id)?.writer, "Home Reporter & Away Reporter");
   assert.deepEqual(f.get(row._id)?.paragraphs, [
-    "Home Reporter: We have a scoring argument.",
-    "Away Reporter: But we can contest it.",
-    "HR: Fair, this should stay close.",
-    "AR: I can concede that much.",
+    "Home: We have a scoring argument.",
+    "Away: But we can contest it.",
+    "Home: Fair, this should stay close.",
+    "Away: I can concede that much.",
+    "Home: Only that much? You are generous.",
+    "Away: Save the thanks for your goalie.",
+    "Home: He can settle this argument.",
+    "Away: Then we have a matchup.",
     "Prediction: Home defeats Away, 6–4.",
   ]);
   assert.equal(f.rows("matchupPreviews").length, 1);
