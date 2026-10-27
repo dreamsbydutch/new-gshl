@@ -15,7 +15,7 @@ const evidence = {
   startsAt: 1,
   facts: [{ id: "categories", text: "Home leads goals; Away leads hits." }],
 };
-const draft = (count = 8) => ({
+const draft = (count = 6) => ({
   headline: "Scoring meets the heavy game",
   turns: Array.from({ length: count }, (_, index) => ({
     speaker: index % 2 === 0 ? "home" : "away",
@@ -28,13 +28,21 @@ const draft = (count = 8) => ({
   prediction: { winner: "team", teamScore: 6, opponentScore: 4 },
 });
 
-void test("one conversation contains eight to ten short alternating turns and one final prediction", () => {
-  for (const count of [8, 9, 10]) {
+void test("one conversation contains exactly three responses per writer and one final prediction", () => {
+  for (const count of [6]) {
     const parsed = parseMatchupPreviewConversation(
       JSON.stringify(draft(count)),
       evidence,
     );
     assert.equal(parsed.paragraphs.length, count + 1);
+    assert.equal(
+      parsed.turns.filter((turn) => turn.speaker === "home").length,
+      3,
+    );
+    assert.equal(
+      parsed.turns.filter((turn) => turn.speaker === "away").length,
+      3,
+    );
     assert.match(parsed.paragraphs[0]!, /^Home:/);
     assert.match(parsed.paragraphs[1]!, /^Away:/);
     assert.match(parsed.paragraphs[2]!, /^Home:/);
@@ -48,7 +56,7 @@ void test("one conversation contains eight to ten short alternating turns and on
 });
 
 void test("invalid turn counts, away openings, consecutive speakers and embedded paragraphs are rejected", () => {
-  for (const count of [3, 4, 5, 6, 7, 11])
+  for (const count of [3, 4, 5, 7, 8, 9, 10, 11])
     assert.throws(() =>
       parseMatchupPreviewConversation(JSON.stringify(draft(count)), evidence),
     );
@@ -112,10 +120,10 @@ void test("model-supplied names and dotted initials do not duplicate application
 });
 
 void test("conversation enforces the combined word budget, known facts and category-score rules", () => {
-  const tooLong = draft(10);
+  const tooLong = draft();
   tooLong.turns = tooLong.turns.map((turn) => ({
     ...turn,
-    text: Array(39).fill("word").join(" "),
+    text: Array(65).fill("word").join(" "),
   }));
   assert.throws(
     () => parseMatchupPreviewConversation(JSON.stringify(tooLong), evidence),
@@ -124,13 +132,13 @@ void test("conversation enforces the combined word budget, known facts and categ
   const withinLimit = draft();
   withinLimit.turns = withinLimit.turns.map((turn) => ({
     ...turn,
-    text: Array(40).fill("word").join(" "),
+    text: Array(55).fill("word").join(" "),
   }));
   assert.doesNotThrow(() =>
     parseMatchupPreviewConversation(JSON.stringify(withinLimit), evidence),
   );
   const longTurn = draft();
-  longTurn.turns[0]!.text = Array(46).fill("word").join(" ");
+  longTurn.turns[0]!.text = Array(66).fill("word").join(" ");
   assert.throws(
     () => parseMatchupPreviewConversation(JSON.stringify(longTurn), evidence),
     /turn is too long/,
@@ -184,6 +192,10 @@ void test("request supplies both stable writer profiles and requires a single co
   assert.match(request.instructions, /Use ONLY supplied facts/);
   assert.equal(request.text.format.schema.properties.evidenceIds.maxItems, 12);
   assert.equal(request.text.format.schema.properties.evidenceIds.minItems, 1);
+  assert.deepEqual(
+    request.text.format.schema.properties.evidenceIds.items.enum,
+    evidence.facts.map((fact) => fact.id),
+  );
   assert.throws(() =>
     buildMatchupPreviewConversationRequest("test", {
       ...evidence,

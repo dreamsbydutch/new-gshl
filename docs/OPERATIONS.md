@@ -74,13 +74,13 @@ written when its matchup starts in less than 96 hours. Published copy is
 preserved; failed or abandoned attempts can retry the following night.
 New previews are one shared conversation between both assigned franchise beat
 writers (or their legacy reporter-directory assignments). The home writer
-opens eight to ten short alternating turns, followed by one editorial
+opens six alternating turns (three responses per writer), followed by one editorial
 prediction. The target is 285–325 words for the complete preview, with a hard
 ceiling of 400 including speaker labels and the final prediction. Full names
 appear in the article byline; every turn uses only the writer's first name. Replies carry
-the previous writer's argument forward, with sharper hockey-focused bickering
-and earned chirps rather than independent category summaries. Turns usually
-contain 20–38 words in one or two sentences, with a hard cap of 45 words each.
+the previous writer's argument forward, with a warmer tone, sincere concessions
+and only occasional light teasing rather than sharp bickering. Turns usually
+contain 40–55 words in two or three sentences, with a hard cap of 65 words each.
 Both writers retain
 their stable voices, loyalties and evidence-grounded arguments. No shared
 preview is published without both assigned writers or valid copy. Already
