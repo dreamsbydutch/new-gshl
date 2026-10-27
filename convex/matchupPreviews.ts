@@ -30,6 +30,10 @@ import {
 } from "../src/lib/utils/features/weekly-edition-openai";
 import { utcTimestampToDateKey } from "./lib/timestamps";
 import { loadMatchupPreviewEvidence } from "./lib/matchupPreviewEvidence";
+import {
+  buildMatchupPreviewConversationRequest,
+  parseMatchupPreviewConversation,
+} from "../src/lib/utils/features/matchup-preview-conversation";
 
 async function windowFor(
   ctx: QueryCtx | MutationCtx,
@@ -74,6 +78,7 @@ export const forMatchup = query({
               headline: row.headline,
               paragraphs: row.paragraphs,
               publishedAt: row.publishedAt,
+              ...(row.format ? { format: row.format } : {}),
             },
           ]
         : [],
@@ -171,9 +176,20 @@ export const scan = internalMutation({
           matchup.tie
         )
           continue;
-        const teamIds = [matchup.homeTeamId, matchup.awayTeamId];
-        // Rotate who writes first; the other writer keeps an independent club perspective.
-        if (Number(week.weekNum) % 2 === 0) teamIds.reverse();
+        const existingRows = await ctx.db
+          .query("matchupPreviews")
+          .withIndex("by_matchupId_teamId", (q) =>
+            q.eq("matchupId", matchup._id),
+          )
+          .collect();
+        // Let already-queued legacy pairs settle without replacing published copy.
+        const legacy = existingRows.some(
+          (row) => row.format !== "conversation",
+        );
+        const teamIds = legacy
+          ? [matchup.homeTeamId, matchup.awayTeamId]
+          : [matchup.homeTeamId];
+        if (legacy && Number(week.weekNum) % 2 === 0) teamIds.reverse();
         const claimed: Id<"matchupPreviews">[] = [];
         for (const teamId of new Set(teamIds)) {
           const existing = await ctx.db
@@ -195,6 +211,7 @@ export const scan = internalMutation({
             expiresAt,
             status: "generating" as const,
             attemptAt: now,
+            ...(!legacy ? { format: "conversation" as const } : {}),
           };
           const id =
             existing?._id ?? (await ctx.db.insert("matchupPreviews", values));
@@ -207,7 +224,7 @@ export const scan = internalMutation({
             { id },
           );
         }
-        // finish chains the second writer after the first settles, so the pair can be reviewed.
+        // A conversation needs one job; legacy finish still chains its second article.
         if (claimed[0])
           await ctx.scheduler.runAfter(
             queued++ * 10000,
@@ -246,6 +263,11 @@ export const evidence = internalQuery({
       Date.now(),
     );
     if (!packet) return null;
+    if (row.format === "conversation") {
+      if (row.teamId !== window.matchup.homeTeamId || !packet.opposingWriter)
+        return null;
+      return { ...packet, format: "conversation" };
+    }
     const opponentId =
       row.teamId === window.matchup.homeTeamId
         ? window.matchup.awayTeamId
@@ -327,6 +349,7 @@ export const finish = internalMutation({
       .unique();
     if (
       args.article &&
+      row.format !== "conversation" &&
       opposing?.status === "published" &&
       opposing.paragraphs &&
       matchupPreviewAnalysisIsDuplicate(
@@ -356,6 +379,7 @@ export const finish = internalMutation({
     );
     if (
       opposing?.status === "generating" &&
+      row.format !== "conversation" &&
       opposing.attemptAt === args.attemptAt
     )
       await ctx.scheduler.runAfter(0, internal.matchupPreviews.generate, {
@@ -381,7 +405,10 @@ export const generate = internalAction({
       let rejectedArticle:
         | { headline: string; paragraphs: string[] }
         | undefined;
-      let article: ReturnType<typeof parseMatchupPreviewArticle> | undefined;
+      let article:
+        | ReturnType<typeof parseMatchupPreviewArticle>
+        | ReturnType<typeof parseMatchupPreviewConversation>
+        | undefined;
       for (let attempt = 0; attempt < 2; attempt++) {
         const response = await fetch("https://api.openai.com/v1/responses", {
           method: "POST",
@@ -390,7 +417,9 @@ export const generate = internalAction({
             "Content-Type": "application/json",
           },
           body: JSON.stringify(
-            buildMatchupPreviewRequest(
+            (packet.format === "conversation"
+              ? buildMatchupPreviewConversationRequest
+              : buildMatchupPreviewRequest)(
               resolveNewsroomModel(
                 undefined,
                 process.env.OPENAI_NEWSROOM_MODEL,
@@ -405,7 +434,10 @@ export const generate = internalAction({
         const payload: unknown = await response.json();
         const text = extractWeeklyEditionOpenAiText(payload);
         try {
-          article = parseMatchupPreviewArticle(text, packet);
+          article =
+            packet.format === "conversation"
+              ? parseMatchupPreviewConversation(text, packet)
+              : parseMatchupPreviewArticle(text, packet);
           break;
         } catch (error) {
           if (
@@ -429,7 +461,10 @@ export const generate = internalAction({
       await ctx.runMutation(internal.matchupPreviews.finish, {
         ...args,
         article: {
-          writer: packet.writer,
+          writer:
+            packet.format === "conversation"
+              ? `${packet.writer} & ${packet.opposingWriter}`
+              : packet.writer,
           headline: article.headline,
           paragraphs: article.paragraphs,
           evidence: packet.facts.filter((fact) => used.has(fact.id)),

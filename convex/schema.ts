@@ -658,6 +658,7 @@ export default defineSchema({
   ),
 
   matchupPreviews: defineTable({
+    format: v.optional(v.literal("conversation")),
     matchupId: v.id("matchups"),
     teamId: v.id("teams"),
     startsAt: v.number(),

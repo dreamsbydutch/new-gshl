@@ -1,5 +1,8 @@
 import { z } from "zod";
-import type { MatchupPreviewEvidence } from "../../types/matchup-preview-article";
+import type {
+  MatchupPreviewEvidence,
+  MatchupPreviewPrediction,
+} from "../../types/matchup-preview-article";
 
 export const PREVIEW_WINDOW_MS = 4 * 24 * 60 * 60 * 1000;
 
@@ -228,7 +231,18 @@ export function parseMatchupPreviewArticle(
     )
   )
     throw new MatchupPreviewDuplicateAnalysisError();
-  const { winner, teamScore, opponentScore } = article.prediction;
+  const prediction = formatMatchupPreviewPrediction(
+    article.prediction,
+    evidence,
+  );
+  return { ...article, paragraphs: [...article.paragraphs, prediction] };
+}
+
+export function formatMatchupPreviewPrediction(
+  result: MatchupPreviewPrediction,
+  evidence: MatchupPreviewEvidence,
+) {
+  const { winner, teamScore, opponentScore } = result;
   const ownWin = winner === "team";
   const winnerName = ownWin ? evidence.teamName : evidence.opponentName;
   const loserName = ownWin ? evidence.opponentName : evidence.teamName;
@@ -241,8 +255,7 @@ export function parseMatchupPreviewArticle(
     (tied && winnerName !== evidence.homeTeamName)
   )
     throw new Error("Invalid predicted category result");
-  const prediction = `Prediction: ${winnerName} defeats ${loserName}, ${winnerScore}–${loserScore}${tied ? " (home-ice tiebreaker)" : ""}.`;
-  return { ...article, paragraphs: [...article.paragraphs, prediction] };
+  return `Prediction: ${winnerName} defeats ${loserName}, ${winnerScore}–${loserScore}${tied ? " (home-ice tiebreaker)" : ""}.`;
 }
 
 export function buildMatchupPreviewRequest(

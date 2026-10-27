@@ -72,8 +72,15 @@ Matchup previews use the existing Convex Newsroom `OPENAI_API_KEY` and
 Eastern, accounting for daylight saving time. Each missing team preview is
 written when its matchup starts in less than 96 hours. Published copy is
 preserved; failed or abandoned attempts can retry the following night.
-The byline comes from the franchise's beat writer (or the legacy reporter
-directory). No preview is published without an assigned writer or valid copy.
+New previews are one shared conversation between both assigned franchise beat
+writers (or their legacy reporter-directory assignments). The home writer
+opens four or five short alternating turns, followed by one editorial
+prediction. The target is 200–280 words for the discussion, with a hard ceiling
+of 320 including speaker labels and the final prediction. Both writers retain
+their stable voices, loyalties and evidence-grounded arguments. No shared
+preview is published without both assigned writers or valid copy. Already
+published individual articles and queued legacy pairs retain their old format;
+new matchups queue only the home-owned shared article.
 
 Preview evidence includes current rosters, recorded player form over the last
 14 days, completed results from the last 60 days and the latest ten recorded

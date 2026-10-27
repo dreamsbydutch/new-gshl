@@ -20,7 +20,7 @@ import { getFunctionName } from "convex/server";
 const NOW = Date.parse("2026-10-01T08:00:00Z");
 const START = Date.parse("2026-10-04T07:00:00Z");
 const EXPIRY = Date.parse("2026-10-07T04:00:00Z");
-function fixture() {
+function fixture(legacyPair = false) {
   const f = mutationFixture();
   f.put("weeks", "week", {
     seasonId: "season",
@@ -34,6 +34,16 @@ function fixture() {
     awayTeamId: "away",
     isComplete: false,
   });
+  if (legacyPair)
+    for (const teamId of ["home", "away"])
+      f.put("matchupPreviews", `legacy-${teamId}`, {
+        matchupId: "matchup",
+        teamId,
+        startsAt: START,
+        expiresAt: EXPIRY,
+        status: "failed",
+        attemptAt: NOW - 16 * 60 * 1000,
+      });
   return f;
 }
 const article = {
@@ -42,6 +52,127 @@ const article = {
   paragraphs: ["First.", "Second."],
   evidence: [{ id: "roster", text: "Known roster" }],
 };
+
+void test("new previews queue one home-led conversation and retain it without a second article", async (t) => {
+  t.mock.timers.enable({ apis: ["Date"], now: NOW });
+  const f = fixture();
+  f.put("weeks", "week", {
+    seasonId: "season",
+    weekNum: 2,
+    startDate: Date.parse("2026-10-04"),
+    endDate: Date.parse("2026-10-10"),
+  });
+  await invokeMutation(scan, f.ctx, {});
+  const rows = f.rows("matchupPreviews");
+  assert.equal(rows.length, 1);
+  assert.equal(
+    rows[0]?.teamId,
+    "home",
+    "home opens even in an even-numbered week",
+  );
+  assert.equal(rows[0]?.format, "conversation");
+  assert.equal(
+    f.scheduled.filter((job) => job.args.attemptAt === NOW).length,
+    1,
+  );
+  await invokeMutation(scan, f.ctx, {});
+  assert.equal(
+    f.scheduled.filter((job) => job.args.attemptAt === NOW).length,
+    1,
+  );
+  await invokeMutation(finish, f.ctx, {
+    id: rows[0]._id,
+    attemptAt: NOW,
+    article: { ...article, writer: "Home Reporter & Away Reporter" },
+  });
+  t.mock.timers.setTime(NOW + 86400000);
+  await invokeMutation(scan, f.ctx, {});
+  const published = await invokeMutation(forMatchup, f.ctx, {
+    matchupId: "matchup",
+  });
+  assert.ok(Array.isArray(published));
+  assert.equal(published.length, 1);
+  const firstPublished: unknown = published[0];
+  assert.ok(
+    firstPublished &&
+      typeof firstPublished === "object" &&
+      "format" in firstPublished,
+  );
+  assert.equal(firstPublished.format, "conversation");
+  assert.equal(f.rows("matchupPreviews").length, 1);
+});
+
+void test("conversation generation publishes both assigned writers, alternating labels and one prediction", async (t) => {
+  t.mock.timers.enable({ apis: ["Date"], now: NOW });
+  const originalKey = process.env.OPENAI_API_KEY;
+  process.env.OPENAI_API_KEY = "test-key";
+  t.after(() => {
+    if (originalKey === undefined) delete process.env.OPENAI_API_KEY;
+    else process.env.OPENAI_API_KEY = originalKey;
+  });
+  const f = fixture();
+  await invokeMutation(scan, f.ctx, {});
+  const packet = {
+    format: "conversation",
+    writer: "Home Reporter",
+    opposingWriter: "Away Reporter",
+    teamName: "Home",
+    opponentName: "Away",
+    homeTeamName: "Home",
+    startsAt: START,
+    facts: [{ id: "roster", text: "Known roster" }],
+  };
+  const actionCtx = {
+    runQuery: async () => packet,
+    runMutation: async (_ref: unknown, args: Record<string, unknown>) =>
+      invokeMutation(finish, f.ctx, args),
+  } as unknown as ActionCtx;
+  t.mock.method(
+    globalThis,
+    "fetch",
+    async (_url: unknown, options: RequestInit) => {
+      assert.ok(typeof options.body === "string");
+      assert.match(options.body, /gshl_matchup_conversation/);
+      return Response.json({
+        output_text: JSON.stringify({
+          headline: "The rivalry debate",
+          turns: [
+            { speaker: "home", text: "We have a scoring argument." },
+            { speaker: "away", text: "But we can contest it." },
+            { speaker: "home", text: "Fair, this should stay close." },
+            { speaker: "away", text: "I can concede that much." },
+          ],
+          evidenceIds: ["roster"],
+          prediction: { winner: "team", teamScore: 6, opponentScore: 4 },
+        }),
+      });
+    },
+  );
+  const run = (
+    generate as unknown as {
+      _handler: (
+        ctx: ActionCtx,
+        args: Record<string, unknown>,
+      ) => Promise<void>;
+    }
+  )._handler;
+  const row = f.rows("matchupPreviews")[0]!;
+  await run(actionCtx, { id: row._id, attemptAt: NOW });
+  assert.equal(f.get(row._id)?.status, "published");
+  assert.equal(f.get(row._id)?.writer, "Home Reporter & Away Reporter");
+  assert.deepEqual(f.get(row._id)?.paragraphs, [
+    "Home Reporter: We have a scoring argument.",
+    "Away Reporter: But we can contest it.",
+    "Home Reporter: Fair, this should stay close.",
+    "Away Reporter: I can concede that much.",
+    "Prediction: Home defeats Away, 6–4.",
+  ]);
+  assert.equal(f.rows("matchupPreviews").length, 1);
+  assert.equal(
+    f.scheduled.filter((job) => job.args.attemptAt === NOW).length,
+    1,
+  );
+});
 
 void test("preview history reaches all 13 seasons and prefers actual matchup dates over import order", async (t) => {
   t.mock.timers.enable({ apis: ["Date"], now: NOW });
@@ -233,9 +364,9 @@ void test("owner rivalry streaks count consecutive meetings and stop at losses, 
   }
 });
 
-void test("overnight scan claims exactly one preview per team and preserves published articles", async (t) => {
+void test("overnight scan lets an already-queued legacy pair settle and preserves published articles", async (t) => {
   t.mock.timers.enable({ apis: ["Date"], now: NOW });
-  const f = fixture();
+  const f = fixture(true);
   await invokeMutation(scan, f.ctx, {});
   assert.equal(f.rows("matchupPreviews").length, 2);
   assert.deepEqual(
@@ -305,14 +436,14 @@ void test("failed work retries overnight and stale generation cannot overwrite t
   assert.equal(f.get(row._id)?.status, "failed");
   assert.equal(
     f.scheduled.filter((job) => job.args.attemptAt === NOW).length,
-    2,
-    "the first writer failing must still release the opposing writer",
+    1,
+    "a failed conversation must not start a second article",
   );
   await invokeMutation(finish, f.ctx, { id: row._id, attemptAt: NOW });
   assert.equal(
     f.scheduled.filter((job) => job.args.attemptAt === NOW).length,
-    2,
-    "a stale finish must not schedule the opposing writer twice",
+    1,
+    "a stale finish must not schedule another conversation",
   );
   assert.deepEqual(
     await invokeMutation(forMatchup, f.ctx, { matchupId: "matchup" }),
@@ -332,7 +463,7 @@ void test("failed work retries overnight and stale generation cannot overwrite t
 
 void test("pregame copy stays through Tuesday night, but late generation cannot change it", async (t) => {
   t.mock.timers.enable({ apis: ["Date"], now: NOW });
-  const f = fixture();
+  const f = fixture(true);
   await invokeMutation(scan, f.ctx, {});
   const [first, second] = f.rows("matchupPreviews");
   await invokeMutation(finish, f.ctx, {
@@ -457,7 +588,7 @@ void test("bounded cleanup upgrades legacy rows without repeatedly scanning reta
 
 void test("evidence uses the assigned writer, both current rosters, recent stats and franchise head-to-head history", async (t) => {
   t.mock.timers.enable({ apis: ["Date"], now: NOW });
-  const f = fixture();
+  const f = fixture(true);
   for (const side of ["home", "away"]) {
     f.put("teams", side, {
       seasonId: "season",
@@ -585,11 +716,39 @@ void test("evidence uses the assigned writer, both current rosters, recent stats
     headline: article.headline,
     paragraphs: article.paragraphs,
   });
+  f.put("matchupPreviews", row._id, {
+    ...f.get(row._id),
+    format: "conversation",
+  });
+  const shared = await invokeMutation(evidence, f.ctx, {
+    id: row._id,
+    attemptAt: NOW,
+  });
+  assert.ok(
+    shared &&
+      typeof shared === "object" &&
+      "format" in shared &&
+      "writer" in shared &&
+      "opposingWriter" in shared,
+  );
+  assert.equal(shared.format, "conversation");
+  assert.equal(shared.writer, "home reporter");
+  assert.equal(shared.opposingWriter, "away reporter");
+  assert.equal("opposingArticle" in shared, false);
+  f.put("franchises", "away-franchise", {
+    ...f.get("away-franchise"),
+    beatWriter: undefined,
+  });
+  assert.equal(
+    await invokeMutation(evidence, f.ctx, { id: row._id, attemptAt: NOW }),
+    null,
+    "a shared preview requires both assigned writers",
+  );
 });
 
 void test("publication rejects duplicated analysis from overlapping attempts without changing the first article", async (t) => {
   t.mock.timers.enable({ apis: ["Date"], now: NOW });
-  const f = fixture();
+  const f = fixture(true);
   await invokeMutation(scan, f.ctx, {});
   const [first, second] = f.rows("matchupPreviews");
   await invokeMutation(finish, f.ctx, {
@@ -615,7 +774,7 @@ void test("generation publishes validated copy under the assigned writer and rej
     if (originalKey === undefined) delete process.env.OPENAI_API_KEY;
     else process.env.OPENAI_API_KEY = originalKey;
   });
-  const f = fixture();
+  const f = fixture(true);
   await invokeMutation(scan, f.ctx, {});
   const packet = {
     writer: "Assigned Reporter",
@@ -671,7 +830,7 @@ void test("opposing beat writers may agree on the pick but cloned reasoning is r
     if (originalKey === undefined) delete process.env.OPENAI_API_KEY;
     else process.env.OPENAI_API_KEY = originalKey;
   });
-  const f = fixture();
+  const f = fixture(true);
   await invokeMutation(scan, f.ctx, {});
   const rows = f.rows("matchupPreviews");
   const copied = [

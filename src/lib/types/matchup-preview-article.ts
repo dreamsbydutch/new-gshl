@@ -24,6 +24,8 @@ export interface MatchupCategoryComparison {
 }
 
 export interface MatchupPreviewEvidence {
+  format?: "conversation";
+  opposingWriter?: string;
   writer: string;
   teamName: string;
   opponentName: string;
@@ -38,9 +40,16 @@ export interface MatchupPreviewEvidence {
 }
 
 export interface MatchupPreviewArticle {
+  format?: "conversation";
   teamId: string;
   writer: string;
   headline: string;
   paragraphs: string[];
   publishedAt: number;
+}
+
+export interface MatchupPreviewPrediction {
+  winner: "team" | "opponent";
+  teamScore: number;
+  opponentScore: number;
 }

@@ -454,6 +454,7 @@ export async function loadMatchupPreviewEvidence(
   }
   return {
     writer: own.writer,
+    opposingWriter: other.writer ?? undefined,
     teamName: own.name,
     opponentName: other.name,
     homeTeamName: matchup.homeTeamId === teamId ? own.name : other.name,
