@@ -81,6 +81,11 @@ appear in the article byline; every turn uses only the writer's first name. Repl
 the previous writer's argument forward, with a warmer tone, sincere concessions
 and only occasional light teasing rather than sharp bickering. Turns usually
 contain 40–55 words in two or three sentences, with a hard cap of 65 words each.
+Stat references use plain wording such as "last week", "last two weeks" or
+"two weeks ago", matching the evidence's actual period as of writing. Rolling
+seven-day player totals use "over the past week"; the preceding slice is "the
+week before". Combined fourteen-day totals can use "over the last two weeks".
+Avoid technical sample labels and do not present older data as last week's.
 Both writers retain
 their stable voices, loyalties and evidence-grounded arguments. No shared
 preview is published without both assigned writers or valid copy. Already
