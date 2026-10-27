@@ -64,7 +64,7 @@ export function parseMatchupPreviewConversation(
     const initials = writer
       .trim()
       .split(/\s+/)
-      .map((part) => part.match(/\p{L}/u)?.[0]?.toUpperCase() ?? "")
+      .map((part) => /\p{L}/u.exec(part)?.[0]?.toUpperCase() ?? "")
       .join("");
     const label = introduced.has(turn.speaker) ? initials : writer;
     const separator = turn.text.indexOf(":");
