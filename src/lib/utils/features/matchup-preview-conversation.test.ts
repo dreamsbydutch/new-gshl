@@ -121,6 +121,8 @@ void test("request supplies both stable writer profiles and requires a single co
   assert.match(request.instructions, /home writer opens/);
   assert.match(request.instructions, /320 words/);
   assert.match(request.instructions, /Use ONLY supplied facts/);
+  assert.equal(request.text.format.schema.properties.evidenceIds.maxItems, 12);
+  assert.equal(request.text.format.schema.properties.evidenceIds.minItems, 1);
   assert.throws(() =>
     buildMatchupPreviewConversationRequest("test", {
       ...evidence,

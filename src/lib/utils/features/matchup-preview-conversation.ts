@@ -125,7 +125,12 @@ export function buildMatchupPreviewConversationRequest(
                 required: ["speaker", "text"],
               },
             },
-            evidenceIds: { type: "array", items: { type: "string" } },
+            evidenceIds: {
+              type: "array",
+              items: { type: "string" },
+              minItems: 1,
+              maxItems: 12,
+            },
             prediction: {
               type: "object",
               additionalProperties: false,
