@@ -800,7 +800,7 @@ The standard in-season composite is:
 
 | Signal                                         | Weight |
 | ---------------------------------------------- | -----: |
-| Mean completed-week performance                |    85% |
+| Recency-weighted completed-week performance    |    85% |
 | Matchup Elo through the previous week          |    10% |
 | Rolling roster talent at the start of the week |     5% |
 
@@ -808,16 +808,28 @@ The standard in-season composite is:
 career ladder snapshots for diagnostics. The ladder no longer contributes
 directly to weekly power; owner history already informs the opening forecast.
 
-The legacy `powerStatEwma` field now holds the mean of completed-week performance.
-The first observed week receives full weight; the Nth receives `1 / N`. Each
-new week therefore has less influence as the season sample grows. A week's
+The legacy `powerStatEwma` field holds the normalized recency-weighted mean of
+completed-week performance. Weights use a **two-week half-life**: a performance
+from two weeks earlier has half the weight of the latest completed week, and
+one from four weeks earlier has one-quarter. All observed weeks in the current
+season remain in the calculation; there is no rolling-window cutoff. Normalize
+the weights by their sum so the opening week is not an oversized EWMA seed.
+After four completed weeks, newest-to-oldest weights are approximately
+39.1%, 27.6%, 19.5%, and 13.8%. After ten weeks, the latest week still supplies
+30.2% of the performance signal instead of shrinking to 10%. A week's
 performance blends league-relative category strength (50%), matchup points
 (25%) and category margin (25%); the latest week is counted once. Active and
-empty weeks do not enter the mean. Explicitly forfeited goalie categories
+empty weeks add no observations; gaps still age older evidence relative to the
+next observed performance. Explicitly forfeited goalie categories
 remain losses in category strength rather than disappearing from its average.
 Missing fields alone do not imply forfeiture. The earlier fixed-alpha model's
 [refinement evidence](product/power-ranking-refinement.md) remains a historical
 evaluation, not validation of this responsiveness policy.
+
+This recency policy applies to future published snapshots from the next weekly
+rollover after October 26, 2026 (entering Week 6 of 2026–27). Weeks 1–5 retain
+their published ratings and ranks. No historical recomputation accompanies
+this change; the rollover write boundary preserves earlier entering snapshots.
 
 ## Offensive and defensive NHL value
 

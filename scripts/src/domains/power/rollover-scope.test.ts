@@ -41,3 +41,30 @@ test("Week 4 rollover publishes Week 5 power without rewriting Weeks 1–4 enter
     /unknown/,
   );
 });
+
+test("the next rollover leaves the currently published Week 5 rankings intact", () => {
+  const updates = {
+    weekUpdates: [
+      { weekId: "w5", powerRk: 3, powerRating: 60 },
+      { weekId: "w6", powerRk: 2, powerRating: 65 },
+    ],
+    matchupUpdates: [
+      { id: "m5", homeRank: 3 },
+      { id: "m6", homeRank: 2 },
+    ],
+  };
+  const scoped = scopePowerRolloverUpdates(
+    "w5",
+    [
+      { id: "w5", weekNum: 5 },
+      { id: "w6", weekNum: 6 },
+    ],
+    [
+      { id: "m5", weekId: "w5" },
+      { id: "m6", weekId: "w6" },
+    ],
+    updates,
+  );
+  assert.deepEqual(scoped.weekUpdates, [updates.weekUpdates[1]]);
+  assert.deepEqual(scoped.matchupUpdates, [updates.matchupUpdates[1]]);
+});

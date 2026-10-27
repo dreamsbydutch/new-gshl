@@ -146,7 +146,7 @@ void test("the first completed week supplies the full observed form signal", asy
   assert.equal(row.powerStatEwma, row.powerStatScore);
 });
 
-void test("each new completed week has less influence as season evidence grows", async () => {
+void test("completed form normalizes two-week half-life weights across every season week", async () => {
   const input = fixture(0, 1);
   input.weeks[2]!.isActive = false;
   input.weeks[3]!.isActive = true;
@@ -161,13 +161,18 @@ void test("each new completed week has less influence as season evidence grows",
   const firstScore = Number(first.powerStatScore);
   const secondScore = Number(second.powerStatScore);
   const thirdScore = Number(third.powerStatScore);
+  const decay = Math.SQRT1_2;
   assert.ok(
-    Math.abs(Number(second.powerStatEwma) - (firstScore + secondScore) / 2) <
-      1e-10,
+    Math.abs(
+      Number(second.powerStatEwma) -
+        (firstScore * decay + secondScore) / (decay + 1),
+    ) < 1e-10,
   );
   assert.ok(
     Math.abs(
-      Number(third.powerStatEwma) - (firstScore + secondScore + thirdScore) / 3,
+      Number(third.powerStatEwma) -
+        (firstScore * decay ** 2 + secondScore * decay + thirdScore) /
+          (decay ** 2 + decay + 1),
     ) < 1e-10,
   );
   assert.ok(thirdScore < 0);
@@ -187,10 +192,28 @@ void test("empty completed weeks do not dilute observed season performance", asy
   }
 });
 
-void test("the same performance change moves ratings ten times less after ten observations", async () => {
+void test("an empty week ages older evidence when the next completed performance arrives", async () => {
+  const input = fixture(0, 1);
+  input.teamWeeks = input.teamWeeks!.filter((row) => row.weekId !== "week-2");
+  input.matchups = input.matchups!.filter((row) => row.weekId !== "week-2");
+  input.weeks[2]!.isActive = false;
+  input.weeks[3]!.isActive = true;
+  input.matchups!.find((row) => row.weekId === "week-3")!.isComplete = true;
+  const result = await runPowerRankingsFixture(seasonId, input, {
+    todayDate: "2026-08-02",
+  });
+  const first = rowByTeamWeek(result.weekUpdates!, "week-2", "team-a");
+  const latest = rowByTeamWeek(result.weekUpdates!, "week-4", "team-a");
+  const expected =
+    (Number(first.powerStatScore) * 0.5 + Number(latest.powerStatScore)) / 1.5;
+  assert.ok(Math.abs(Number(latest.powerStatEwma) - expected) < 1e-10);
+});
+
+void test("recent form stays responsive late in the season while the oldest week still counts", async () => {
   async function ratingAfter(
     completed: number,
     upset: boolean,
+    upsetIndex = completed - 1,
   ): Promise<number> {
     const input = fixture(4, 4);
     input.seasons[0]!.categories = ["G"];
@@ -212,7 +235,7 @@ void test("the same performance change moves ratings ten times less after ten ob
         teamWeek(
           String(entry.id),
           "team-a",
-          upset && index === completed - 1 ? 0 : 10,
+          upset && index === upsetIndex ? 0 : 10,
         ),
         teamWeek(String(entry.id), "team-b", 1),
       ]);
@@ -228,8 +251,19 @@ void test("the same performance change moves ratings ten times less after ten ob
     (await ratingAfter(1, false)) - (await ratingAfter(1, true));
   const lateMovement =
     (await ratingAfter(10, false)) - (await ratingAfter(10, true));
+  const oldestMovement =
+    (await ratingAfter(10, false)) - (await ratingAfter(10, true, 0));
+  const weightMass = Array.from(
+    { length: 10 },
+    (_, age) => Math.SQRT1_2 ** age,
+  ).reduce((sum, weight) => sum + weight, 0);
   assert.ok(earlyMovement > 0);
-  assert.ok(Math.abs(earlyMovement / lateMovement - 10) < 1e-10);
+  assert.ok(Math.abs(earlyMovement / lateMovement - weightMass) < 1e-10);
+  assert.ok(lateMovement / earlyMovement > 0.3);
+  assert.ok(oldestMovement > 0, "oldest season evidence is never dropped");
+  assert.ok(
+    Math.abs(oldestMovement / lateMovement - Math.SQRT1_2 ** 9) < 1e-10,
+  );
 });
 
 void test("forfeited goalie categories lower next-week form instead of disappearing", async () => {

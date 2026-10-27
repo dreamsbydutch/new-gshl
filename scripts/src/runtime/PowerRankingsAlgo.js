@@ -57,6 +57,7 @@ var PowerRankingsAlgo = (function buildPowerRankingsAlgo() {
     perfCategoryWeight: 0.5,
     perfMatchupPointsWeight: 0.25,
     perfMatchupMarginWeight: 0.25,
+    performanceHalfLifeWeeks: 2,
     historySeasons: 3,
     historyOwnerHalfLifeSeasons: 1.5,
     historyFranchiseHalfLifeSeasons: 1,
@@ -1917,6 +1918,8 @@ var PowerRankingsAlgo = (function buildPowerRankingsAlgo() {
     // Initialize Elo / season-performance state.
     var eloByTeam = new Map();
     var statEwmaByTeam = new Map();
+    var statWeightByTeam = new Map();
+    var lastStatWeekByTeam = new Map();
     var previousWeekScoreByTeam = new Map();
     teamIds.forEach(function (tid) {
       var teamKey = String(tid);
@@ -2132,11 +2135,17 @@ var PowerRankingsAlgo = (function buildPowerRankingsAlgo() {
           (completedWeeksByTeam.get(teamKey) || 0) + 1,
         );
         var prev = statEwmaByTeam.get(teamKey) || 0;
-        // The legacy powerStatEwma field now stores the completed-week mean.
-        // First evidence receives full weight; later observations receive 1 / N.
-        var alpha = 1 / completedWeeksByTeam.get(teamKey);
-        var next = prev + alpha * (curr - prev);
+        // Normalize exponentially decayed weights across all observed season weeks.
+        // Tracking weight mass avoids giving the first week an oversized EWMA seed.
+        var elapsed =
+          weekNumber - (lastStatWeekByTeam.get(teamKey) || weekNumber);
+        var retainedWeight =
+          (statWeightByTeam.get(teamKey) || 0) *
+          computeRecencyWeight(elapsed, opts.performanceHalfLifeWeeks);
+        var next = (prev * retainedWeight + curr) / (retainedWeight + 1);
         statEwmaByTeam.set(teamKey, next);
+        statWeightByTeam.set(teamKey, retainedWeight + 1);
+        lastStatWeekByTeam.set(teamKey, weekNumber);
       });
 
       // Elo updates from matchups in this week.
