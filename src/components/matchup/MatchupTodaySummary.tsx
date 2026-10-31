@@ -17,6 +17,7 @@ export function MatchupTodayRows({
 
   const categories = resolveMatchupCategories(details.season?.categories);
   const [away, home] = activity.teams;
+  if (!away || !home) return null;
 
   return (
     <>
