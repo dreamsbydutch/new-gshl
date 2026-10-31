@@ -8,17 +8,25 @@ import type {
 import { formatMatchupPlayerName } from "@gshl-utils/features/matchup-details";
 import { playerWeekPerformanceRating } from "@gshl-utils/domain/player-week-rating";
 
-export function GameTeamLogo({ team }: { team: MatchupDetailsTeam | null }) {
+export function GameTeamLogo({
+  team,
+  size = 24,
+}: {
+  team: MatchupDetailsTeam | null;
+  size?: 20 | 24;
+}) {
   return team?.logoUrl ? (
     <Image
       src={team.logoUrl}
       alt={team.name ?? team.abbr ?? "GSHL team"}
-      width={24}
-      height={24}
-      className="h-6 w-6 shrink-0 object-contain"
+      width={size}
+      height={size}
+      className={`${size === 20 ? "h-5 w-5" : "h-6 w-6"} shrink-0 object-contain`}
     />
   ) : (
-    <span className="shrink-0 font-semibold">{team?.abbr ?? "Team"}</span>
+    <span className="shrink-0 text-[11px] font-semibold">
+      {team?.abbr ?? "Team"}
+    </span>
   );
 }
 
