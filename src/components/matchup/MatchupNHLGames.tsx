@@ -11,8 +11,10 @@ import { MatchupPlayersToWatch } from "./MatchupPlayersToWatch";
 
 export function MatchupNHLGames({
   details,
+  showActivePreview = true,
 }: {
   details: MatchupDetailsPayload;
+  showActivePreview?: boolean;
 }) {
   const schedule = useMatchupNHLGames(details);
   if (schedule.isUpcoming) return <MatchupPlayersToWatch details={details} />;
@@ -21,7 +23,9 @@ export function MatchupNHLGames({
 
   return (
     <>
-      <MatchupPlayersToWatch details={details} previewOnly />
+      {showActivePreview ? (
+        <MatchupPlayersToWatch details={details} previewOnly />
+      ) : null}
       <section
         aria-labelledby="matchup-nhl-games-heading"
         className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm sm:rounded-2xl"

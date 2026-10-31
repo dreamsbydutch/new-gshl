@@ -107,9 +107,11 @@ function TeamPreview({
 export function MatchupPlayersToWatch({
   details,
   previewOnly = false,
+  className,
 }: {
   details: MatchupDetailsPayload;
   previewOnly?: boolean;
+  className?: string;
 }) {
   const articles = useMatchupPreviewArticles(details.matchup.id);
   const conversation = articles.find(
@@ -122,7 +124,7 @@ export function MatchupPlayersToWatch({
   return (
     <section
       aria-labelledby={headingId}
-      className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm sm:rounded-2xl"
+      className={`overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm sm:rounded-2xl ${className ?? ""}`}
     >
       <div className="border-b border-slate-200 px-3 py-2">
         <h2 id={headingId} className="font-oswald text-lg text-slate-900">
