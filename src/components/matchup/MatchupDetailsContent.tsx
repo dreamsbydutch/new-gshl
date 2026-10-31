@@ -3,7 +3,7 @@
 import { useMatchupRecords } from "@gshl-hooks/main/useMatchupRecords";
 import type { MatchupRecords } from "@gshl-lib/types/performance-records";
 import { PerformanceRecordBadge } from "./PerformanceRecordBadge";
-import { useMemo } from "react";
+import { useMemo, type ReactNode } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { WhatsAppShareButton } from "@gshl-components/ui/WhatsAppShareButton";
@@ -39,7 +39,7 @@ import { canShareOwnerContent } from "@gshl-utils/features/whatsapp-share";
 import { buildMatchupWhatsAppShareMessage } from "@gshl-utils/features/whatsapp-messages";
 import { PlayerStatsTable } from "./PlayerStatsTable";
 import { MatchupNHLGames } from "./MatchupNHLGames";
-import { MatchupTodaySummary } from "./MatchupTodaySummary";
+import { MatchupTodayRows } from "./MatchupTodaySummary";
 import { ArrowLeftIcon, StarIcon } from "lucide-react";
 
 function CategoryResultsCard({
@@ -51,6 +51,7 @@ function CategoryResultsCard({
   categories,
   homeTeam,
   awayTeam,
+  todayRows,
 }: {
   records: MatchupRecords | null;
   title: string;
@@ -60,6 +61,7 @@ function CategoryResultsCard({
   categories: CategoryResult[];
   homeTeam: MatchupDetailsTeam | null;
   awayTeam: MatchupDetailsTeam | null;
+  todayRows?: ReactNode;
 }) {
   const awayLabel = awayTeam?.abbr ?? awayTeam?.name ?? "Away";
   const homeLabel = homeTeam?.abbr ?? homeTeam?.name ?? "Home";
@@ -218,6 +220,7 @@ function CategoryResultsCard({
                 </td>
               </tr>
             ))}
+            {todayRows}
           </tbody>
         </table>
       </div>
@@ -567,13 +570,13 @@ export function MatchupDetailsContent({
             categories={categoryResults}
             homeTeam={homeTeam}
             awayTeam={awayTeam}
+            todayRows={details ? <MatchupTodayRows details={details} /> : null}
           />
           {isComplete ? <StarsCard stars={stars} /> : null}
         </div>
       </section>
 
       <section className="mt-3 space-y-2 sm:mt-6 sm:space-y-4">
-        {details ? <MatchupTodaySummary details={details} /> : null}
         {details ? <MatchupNHLGames details={details} /> : null}
         <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
           <div
