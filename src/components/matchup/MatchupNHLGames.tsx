@@ -64,7 +64,7 @@ export function MatchupNHLGames({
             {schedule.rows.map(({ game, awayPlayers, homePlayers }) => {
               return (
                 <li key={game.id} className="px-3 py-2">
-                  <div className="grid min-h-16 grid-cols-[5.5rem_minmax(0,1fr)] gap-3 sm:grid-cols-[6.5rem_minmax(0,1fr)]">
+                  <div className="grid grid-cols-[5.5rem_minmax(0,1fr)] gap-3 sm:grid-cols-[6.5rem_minmax(0,1fr)]">
                     <div className="flex flex-col items-center justify-center gap-1 text-center">
                       <Link
                         href={`/nhl/matchup/${game.id}?season=${encodeURIComponent(details.matchup.seasonId)}&week=${encodeURIComponent(details.matchup.weekId)}`}
@@ -88,7 +88,7 @@ export function MatchupNHLGames({
                           className="!mx-0 shrink-0"
                         />
                       </Link>
-                      <div className="text-xs leading-none text-slate-600">
+                      <div className="flex items-baseline gap-1 text-xs leading-none text-slate-600">
                         <span className="font-semibold tabular-nums text-slate-900">
                           {game.awayTeam.score != null &&
                           game.homeTeam.score != null
@@ -97,41 +97,40 @@ export function MatchupNHLGames({
                         </span>
                         {game.awayTeam.score != null &&
                         game.homeTeam.score != null ? (
-                          <span className="block pt-0.5 text-[11px] text-slate-500">
+                          <span className="text-[11px] text-slate-500">
                             {nhlGameStatus(game)}
                           </span>
                         ) : null}
                       </div>
                     </div>
-                    <div className="grid min-w-0 grid-rows-2 border-l border-slate-100 pl-3">
+                    <div className="flex min-w-0 flex-col justify-center gap-1 border-l border-slate-100 pl-3">
                       {(
                         [
                           { side: "away", players: awayPlayers },
                           { side: "home", players: homePlayers },
                         ] as const
-                      ).map(({ side, players }) => {
-                        const team = details.teams[side];
-                        const names = players
-                          .map(formatMatchupPlayerName)
-                          .join(", ");
-                        return (
-                          <div
-                            key={side}
-                            className="flex min-w-0 items-center gap-2 py-0.5 text-xs leading-4 text-slate-800"
-                          >
-                            <GameTeamLogo team={team} />
-                            <span
-                              className="min-w-0 break-words"
-                              title={
-                                names ||
-                                `${team?.name ?? side}: no players playing`
-                              }
+                      )
+                        .filter(({ players }) => players.length > 0)
+                        .map(({ side, players }) => {
+                          const team = details.teams[side];
+                          const names = players
+                            .map(formatMatchupPlayerName)
+                            .join(", ");
+                          return (
+                            <div
+                              key={side}
+                              className="flex min-w-0 items-center gap-1.5 text-[11px] leading-4 text-slate-800"
                             >
-                              {names || "No players playing"}
-                            </span>
-                          </div>
-                        );
-                      })}
+                              <GameTeamLogo team={team} size={20} />
+                              <span
+                                className="min-w-0 break-words"
+                                title={`${team?.name ?? side}: ${names}`}
+                              >
+                                {names}
+                              </span>
+                            </div>
+                          );
+                        })}
                     </div>
                   </div>
                 </li>
