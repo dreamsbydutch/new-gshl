@@ -183,32 +183,6 @@ export function PlayerStatsTable({
               ))}
             </div>
           ) : null}
-          <label className="flex items-center gap-2 text-xs text-slate-600">
-            Sort
-            <select
-              value={table.sort}
-              onChange={(event) => {
-                const value = event.target.value;
-                if (
-                  value === "activity" ||
-                  value === "rating" ||
-                  value === "name" ||
-                  value === "position"
-                )
-                  table.setSort(value);
-              }}
-              className="min-h-9 rounded-md border border-slate-200 bg-white px-2 text-slate-900 focus-visible:ring-2 focus-visible:ring-blue-500"
-            >
-              {isActive ? (
-                <option value="activity">Live / upcoming / final</option>
-              ) : null}
-              {table.view === "week" ? (
-                <option value="rating">Weekly rating</option>
-              ) : null}
-              <option value="position">Position</option>
-              <option value="name">Player name</option>
-            </select>
-          </label>
         </div>
         <label className="flex min-h-9 items-center gap-2 text-xs text-slate-600">
           <input
@@ -261,19 +235,39 @@ export function PlayerStatsTable({
           </caption>
           <thead className="bg-slate-50">
             <tr className="border-b border-slate-200">
-              {tableColumns.map((column) => (
-                <th
-                  key={column.key}
-                  scope="col"
-                  className={getColumnClassName(
-                    column.key,
-                    column.className,
-                    true,
-                  )}
-                >
-                  {column.label}
-                </th>
-              ))}
+              {tableColumns.map((column) => {
+                const sortable = column.key !== "today";
+                const isSorted = sortable && table.sort === column.key;
+                const direction = table.sortDirection === "asc" ? "ascending" : "descending";
+                return (
+                  <th
+                    key={column.key}
+                    scope="col"
+                    aria-sort={isSorted ? direction : undefined}
+                    className={getColumnClassName(
+                      column.key,
+                      column.className,
+                      true,
+                    )}
+                  >
+                    {sortable ? (
+                      <button
+                        type="button"
+                        onClick={() => table.toggleSort(column.key)}
+                        className="inline-flex min-h-6 items-center gap-1 rounded text-inherit hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                        title={`Sort by ${column.label}${isSorted ? `, currently ${direction}` : ""}`}
+                      >
+                        <span>{column.label}</span>
+                        <span aria-hidden="true" className={isSorted ? "text-slate-700" : "text-slate-300"}>
+                          {isSorted ? (table.sortDirection === "asc" ? "↑" : "↓") : "↕"}
+                        </span>
+                      </button>
+                    ) : (
+                      column.label
+                    )}
+                  </th>
+                );
+              })}
             </tr>
           </thead>
           <tbody>

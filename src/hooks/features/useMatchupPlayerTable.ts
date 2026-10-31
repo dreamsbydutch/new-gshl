@@ -16,6 +16,7 @@ import {
   sortMatchupPlayers,
   todayPlayerRows,
   type MatchupPlayerSort,
+  type MatchupPlayerSortDirection,
   type MatchupPlayerView,
 } from "@gshl-utils/features/matchup-activity";
 
@@ -32,16 +33,12 @@ export function useMatchupPlayerTable(input: {
     input.week,
     schedule.selectedDay?.date,
   );
-  const [chosenView, setView] = useState<MatchupPlayerView>("today");
-  const [chosenSort, setSort] = useState<MatchupPlayerSort>("activity");
+  const [chosenView, setView] = useState<MatchupPlayerView>("week");
+  const [sort, setSort] = useState<MatchupPlayerSort>("Rating");
+  const [sortDirection, setSortDirection] =
+    useState<MatchupPlayerSortDirection>("desc");
   const [advanced, setAdvanced] = useState(false);
   const view = isActive ? chosenView : "week";
-  const sort =
-    !isActive && chosenSort === "activity"
-      ? "rating"
-      : view === "today" && chosenSort === "rating"
-        ? "activity"
-        : chosenSort;
   const date = schedule.selectedDay?.date ?? "";
   const today = todayPlayerRows(input.players, input.playerDays, date);
   const todayIds = new Set(
@@ -51,6 +48,7 @@ export function useMatchupPlayerTable(input: {
     view === "today" ? today : input.players,
     schedule.games,
     sort,
+    sortDirection,
   );
   const columns = buildPlayerStatColumns({
     players,
@@ -80,7 +78,17 @@ export function useMatchupPlayerTable(input: {
     view,
     setView,
     sort,
-    setSort,
+    sortDirection,
+    toggleSort: (nextSort: MatchupPlayerSort) => {
+      if (nextSort === sort) {
+        setSortDirection((current) => (current === "asc" ? "desc" : "asc"));
+        return;
+      }
+      setSort(nextSort);
+      setSortDirection(
+        nextSort === "player" || nextSort === "pos" ? "asc" : "desc",
+      );
+    },
     advanced,
     setAdvanced,
     players,

@@ -4,6 +4,7 @@ import type {
   PlayerStatRow,
   MatchupTeamWeekStats,
   PlayerStatCategoryKey,
+  PlayerStatColumnKey,
 } from "@gshl-types";
 import type { NHLSchedule } from "@gshl-lib/types/nhl";
 import {
@@ -13,7 +14,8 @@ import {
 import { playerWeekPerformanceRating } from "../domain/player-week-rating";
 
 type Games = NHLSchedule["gameWeek"][number]["games"];
-export type MatchupPlayerSort = "activity" | "rating" | "name" | "position";
+export type MatchupPlayerSort = PlayerStatColumnKey | "activity";
+export type MatchupPlayerSortDirection = "asc" | "desc";
 export type MatchupPlayerView = "today" | "week";
 export type PlayerActivity =
   | "live"
@@ -61,6 +63,7 @@ export function sortMatchupPlayers(
   players: readonly PlayerStatRow[],
   games: Games,
   sort: MatchupPlayerSort,
+  direction: MatchupPlayerSortDirection = "desc",
 ) {
   const order: Record<PlayerActivity, number> = {
     live: 0,
@@ -78,18 +81,31 @@ export function sortMatchupPlayers(
         Number(isCountedLineupSlot(b)) - Number(isCountedLineupSlot(a));
       if (lineup) return lineup;
     }
-    if (sort === "position") {
-      const positions = ["F", "D", "G"];
+
+    const valueFor = (player: PlayerStatRow): string | number | null => {
+      if (sort === "activity") return playerWeekPerformanceRating(player);
+      if (sort === "player") return formatMatchupPlayerName(player);
+      if (sort === "pos") return String(player.nhlPos ?? player.posGroup ?? "");
+      if (sort === "Rating") return playerWeekPerformanceRating(player);
+      const value = player[sort];
+      if (value === null || value === undefined || value === "") return null;
+      if (typeof value === "number") return value;
+      const numeric = Number(value);
+      return Number.isFinite(numeric) ? numeric : String(value);
+    };
+    const left = valueFor(a);
+    const right = valueFor(b);
+    if (left === null && right !== null) return 1;
+    if (left !== null && right === null) return -1;
+    if (left !== null && right !== null) {
       const delta =
-        positions.indexOf(String(a.posGroup)) -
-        positions.indexOf(String(b.posGroup));
-      if (delta) return delta;
-    }
-    if (sort === "rating" || sort === "activity") {
-      const delta =
-        (playerWeekPerformanceRating(b) ?? -1) -
-        (playerWeekPerformanceRating(a) ?? -1);
-      if (delta) return delta;
+        typeof left === "number" && typeof right === "number"
+          ? left - right
+          : String(left).localeCompare(String(right), undefined, {
+              numeric: true,
+              sensitivity: "base",
+            });
+      if (delta) return direction === "asc" ? delta : -delta;
     }
     return formatMatchupPlayerName(a).localeCompare(formatMatchupPlayerName(b));
   });
