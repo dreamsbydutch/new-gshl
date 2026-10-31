@@ -85,6 +85,35 @@ void test("live first sorting uses game status, not the weekly rating; inputs st
   );
 });
 
+void test("column sorting starts numeric stats high and flips on a second click", () => {
+  const rows = [
+    day("low", { G: 1 }),
+    day("high", { G: 4 }),
+    day("none", { G: null }),
+  ];
+  assert.deepEqual(
+    sortMatchupPlayers(rows, [], "G", "desc").map((p) => p.id),
+    ["high", "low", "none"],
+  );
+  assert.deepEqual(
+    sortMatchupPlayers(rows, [], "G", "asc").map((p) => p.id),
+    ["low", "high", "none"],
+  );
+});
+
+void test("column sorting compares signed and decimal numeric strings numerically", () => {
+  const rows = [
+    day("negative-ten", { PM: "-10" }),
+    day("negative-two", { PM: "-2" }),
+    day("decimal-low", { PM: "0.85" }),
+    day("decimal-high", { PM: "0.9" }),
+  ];
+  assert.deepEqual(
+    sortMatchupPlayers(rows, [], "PM", "desc").map((p) => p.id),
+    ["decimal-high", "decimal-low", "negative-two", "negative-ten"],
+  );
+});
+
 void test("today counts Kochetkov's 24 saves and win, excludes bench, pools goalie rates", () => {
   const goalie = { posGroup: "G", dailyPos: "G", G: null, A: null, P: null };
   const rows = [

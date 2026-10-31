@@ -7,106 +7,126 @@ import {
   formatCategoryValue,
 } from "@gshl-utils/features/matchup-details";
 
-export function MatchupTodaySummary({
+export function MatchupTodayRows({
   details,
 }: {
   details: MatchupDetailsPayload;
 }) {
   const activity = useMatchupActivity(details);
   if (!activity.isActive) return null;
+
   const categories = resolveMatchupCategories(details.season?.categories);
+  const [away, home] = activity.teams;
+  if (!away || !home) return null;
+
   return (
-    <section
-      aria-labelledby="matchup-today-heading"
-      className="rounded-lg border border-slate-200 bg-white p-3 sm:rounded-2xl sm:p-4"
-    >
-      <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
-        <h2
-          id="matchup-today-heading"
-          className="font-oswald text-xl text-slate-900"
-        >
-          Today&apos;s contributions
-        </h2>
-        <span className="text-xs text-slate-500">
-          {activity.schedule.selectedDay?.dateLabel} · Starting lineup only
-        </span>
-      </div>
-      <div className="grid gap-3 sm:grid-cols-2">
-        {activity.teams.map(
-          ({
-            side,
-            team,
-            available,
-            stats,
-            counts,
-            appearances,
-            starters,
-            bench,
-            updatedAt,
-          }) => (
-            <div key={side} className="rounded-xl border border-slate-200 p-3">
-              <h3 className="font-oswald text-lg text-slate-900">
-                {team?.name ?? side}
-              </h3>
-              {!available ? (
-                <p className="mt-2 text-sm text-slate-500">
-                  Today&apos;s roster and stats have not been recorded yet.
-                </p>
-              ) : (
-                <>
-                  <div className="my-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-600">
-                    <span
-                      className={
-                        counts.live ? "font-semibold text-emerald-700" : ""
-                      }
-                    >
-                      {counts.live} live
-                    </span>
-                    <span>{counts.upcoming} to play</span>
-                    <span>{counts.final} final</span>
-                    <span>{counts.off} no game</span>
-                    {counts.postponed ? (
-                      <span>{counts.postponed} postponed / cancelled</span>
-                    ) : null}
-                  </div>
-                  <dl className="grid grid-cols-4 gap-x-2 gap-y-3 border-y border-slate-100 py-3 sm:grid-cols-5">
-                    {categories.map((category) => (
-                      <div key={String(category.field)}>
-                        <dt className="text-[10px] font-medium uppercase tracking-wide text-slate-500">
-                          {category.label}
-                        </dt>
-                        <dd className="mt-0.5 text-sm font-semibold tabular-nums text-slate-900">
-                          {formatCategoryValue(stats, category)}
-                        </dd>
-                      </div>
-                    ))}
-                  </dl>
-                  <p className="mt-2 text-[11px] text-slate-500">
-                    {appearances} recorded appearances · {starters} starting
-                    slots · {bench} bench / reserve
-                  </p>
-                  {updatedAt ? (
-                    <p className="mt-1 text-[11px] text-slate-500">
-                      Latest player update:{" "}
-                      {new Intl.DateTimeFormat("en-CA", {
-                        hour: "numeric",
-                        minute: "2-digit",
-                        timeZone: "America/Toronto",
-                        timeZoneName: "short",
-                      }).format(updatedAt)}
-                    </p>
+    <>
+      <tr className="border-y border-slate-200 bg-sky-50/70">
+        <th colSpan={3} scope="rowgroup" className="px-2 py-2 text-center">
+          <span className="font-oswald text-base font-normal text-slate-900 sm:text-lg">
+            Today&apos;s contributions
+          </span>
+          <span className="ml-2 text-[10px] font-normal text-slate-500 sm:text-xs">
+            {activity.schedule.selectedDay?.dateLabel} · Starting lineup only
+          </span>
+        </th>
+      </tr>
+      {!away.available && !home.available ? (
+        <tr className="border-b border-slate-100">
+          <td colSpan={3} className="px-4 py-3 text-center text-xs text-slate-500">
+            Today&apos;s rosters and stats have not been recorded yet.
+          </td>
+        </tr>
+      ) : (
+        <>
+          <tr className="border-b border-slate-100 bg-white">
+            <td className="px-2 py-2 text-center text-[10px] text-slate-600 sm:text-xs">
+              {away.available ? (
+                <span className="inline-flex flex-wrap justify-center gap-x-2 gap-y-0.5">
+                  <span
+                    className={
+                      away.counts.live ? "font-semibold text-emerald-700" : ""
+                    }
+                  >
+                    {away.counts.live} live
+                  </span>
+                  <span>{away.counts.upcoming} to play</span>
+                  <span>{away.counts.final} final</span>
+                  <span>{away.counts.off} no game</span>
+                  {away.counts.postponed ? (
+                    <span>{away.counts.postponed} postponed</span>
                   ) : null}
-                </>
+                </span>
+              ) : (
+                "No lineup recorded"
               )}
-            </div>
-          ),
-        )}
-      </div>
-      <p className="mt-3 text-[11px] text-slate-500">
-        These are today&apos;s recorded contributions. The matchup score above
-        uses the full week; live game status can update before recorded
-        statistics.
-      </p>
-    </section>
+            </td>
+            <th
+              scope="row"
+              className="px-1 py-2 text-center text-[10px] font-medium text-slate-500 sm:text-xs"
+            >
+              Game slate
+            </th>
+            <td className="px-2 py-2 text-center text-[10px] text-slate-600 sm:text-xs">
+              {home.available ? (
+                <span className="inline-flex flex-wrap justify-center gap-x-2 gap-y-0.5">
+                  <span
+                    className={
+                      home.counts.live ? "font-semibold text-emerald-700" : ""
+                    }
+                  >
+                    {home.counts.live} live
+                  </span>
+                  <span>{home.counts.upcoming} to play</span>
+                  <span>{home.counts.final} final</span>
+                  <span>{home.counts.off} no game</span>
+                  {home.counts.postponed ? (
+                    <span>{home.counts.postponed} postponed</span>
+                  ) : null}
+                </span>
+              ) : (
+                "No lineup recorded"
+              )}
+            </td>
+          </tr>
+          {categories.map((category) => (
+            <tr
+              key={String(category.field)}
+              className="border-b border-slate-100 odd:bg-white even:bg-slate-50/50"
+            >
+              <td className="px-2 py-1.5 text-center font-semibold tabular-nums text-slate-900">
+                {away.available ? formatCategoryValue(away.stats, category) : "—"}
+              </td>
+              <th
+                scope="row"
+                className="px-1 py-1.5 text-center text-[10px] font-semibold text-slate-600 sm:text-xs"
+              >
+                <span className="inline-block rounded bg-sky-100 px-2 py-1">
+                  {category.label}
+                </span>
+              </th>
+              <td className="px-2 py-1.5 text-center font-semibold tabular-nums text-slate-900">
+                {home.available ? formatCategoryValue(home.stats, category) : "—"}
+              </td>
+            </tr>
+          ))}
+          <tr className="bg-white text-[10px] text-slate-500 sm:text-xs">
+            <td className="px-2 py-2 text-center">
+              {away.available
+                ? `${away.appearances} recorded · ${away.starters} starters · ${away.bench} reserve`
+                : ""}
+            </td>
+            <th scope="row" className="px-1 py-2 font-medium text-slate-500">
+              Lineup
+            </th>
+            <td className="px-2 py-2 text-center">
+              {home.available
+                ? `${home.appearances} recorded · ${home.starters} starters · ${home.bench} reserve`
+                : ""}
+            </td>
+          </tr>
+        </>
+      )}
+    </>
   );
 }
