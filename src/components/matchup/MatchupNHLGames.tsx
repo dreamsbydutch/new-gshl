@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import { useMatchupPlayersToWatch } from "@gshl-hooks/features/useMatchupPlayersToWatch";
+import { GameTeamLogo, MatchupGameImpact } from "./MatchupGameImpact";
 import { NHLLogo } from "@gshl-components/player/NHLLogo";
 import { TableViewport } from "@gshl-ui";
 import { useMatchupNHLGames } from "@gshl-hooks/features/useMatchupNHLGames";
@@ -15,6 +17,8 @@ export function MatchupNHLGames({
   details: MatchupDetailsPayload;
 }) {
   const schedule = useMatchupNHLGames(details);
+  const awayStandouts = useMatchupPlayersToWatch(details.matchup.awayTeamId);
+  const homeStandouts = useMatchupPlayersToWatch(details.matchup.homeTeamId);
   if (schedule.isUpcoming) return <MatchupPlayersToWatch details={details} />;
   if (!schedule.isActive)
     return <MatchupPlayersToWatch details={details} previewOnly />;
@@ -65,14 +69,14 @@ export function MatchupNHLGames({
             viewportClassName="rounded-none border-0"
             scrollHint="Scroll to see the players involved"
           >
-            <table className="w-full min-w-[480px] table-fixed border-collapse text-xs leading-4">
+            <table className="w-full min-w-[360px] table-fixed border-collapse text-xs leading-4">
               <caption className="sr-only">
                 Today&apos;s NHL games and the players involved from each GSHL
                 team
               </caption>
               <colgroup>
-                <col className="w-24" />
-                <col className="w-28" />
+                <col className="w-20 sm:w-24" />
+                <col className="w-24 sm:w-28" />
                 <col />
               </colgroup>
               <thead className="bg-slate-50 text-left text-slate-600">
@@ -84,7 +88,10 @@ export function MatchupNHLGames({
                     Score / status
                   </th>
                   <th scope="col" className="px-2 py-1.5">
-                    Players involved
+                    <span className="lg:hidden">Players involved</span>
+                    <span className="hidden lg:inline">
+                      Game impact / roster standouts / weekly stat pace
+                    </span>
                   </th>
                 </tr>
               </thead>
@@ -127,30 +134,46 @@ export function MatchupNHLGames({
                       </div>
                     </td>
                     <td className="px-2 py-1.5">
-                      {(
-                        [
-                          { side: "away", players: awayPlayers },
-                          { side: "home", players: homePlayers },
-                        ] as const
-                      ).map(({ side, players }) => {
-                        if (!players.length) return null;
-                        const team = details.teams[side];
-                        const names = players
-                          .map(formatMatchupPlayerName)
-                          .join(", ");
-                        return (
-                          <div
-                            key={side}
-                            className="truncate"
-                            title={`${team?.name ?? side}: ${names}`}
-                          >
-                            <span className="font-semibold">
-                              {team?.abbr ?? team?.name ?? side}:
-                            </span>{" "}
-                            {names}
-                          </div>
-                        );
-                      })}
+                      <div className="hidden grid-cols-2 gap-3 lg:grid">
+                        <MatchupGameImpact
+                          team={details.teams.away}
+                          players={awayPlayers}
+                          roster={details.players.away}
+                          standouts={awayStandouts.players}
+                        />
+                        <MatchupGameImpact
+                          team={details.teams.home}
+                          players={homePlayers}
+                          roster={details.players.home}
+                          standouts={homeStandouts.players}
+                        />
+                      </div>
+                      <div className="space-y-1 lg:hidden">
+                        {(
+                          [
+                            { side: "away", players: awayPlayers },
+                            { side: "home", players: homePlayers },
+                          ] as const
+                        ).map(({ side, players }) => {
+                          if (!players.length) return null;
+                          const team = details.teams[side];
+                          const names = players
+                            .map(formatMatchupPlayerName)
+                            .join(", ");
+                          return (
+                            <div
+                              key={side}
+                              className="flex items-center gap-1.5"
+                              title={`${team?.name ?? side}: ${names}`}
+                            >
+                              <GameTeamLogo team={team} />
+                              <span className="min-w-0 break-words">
+                                {names}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
                     </td>
                   </tr>
                 ))}
