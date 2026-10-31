@@ -31,6 +31,7 @@ export function MatchupTodayValue({
     return null;
   const value = formatCategoryValue(team.stats, category);
   const ratio = stat === "GAA" || stat === "SVP";
+  if (!ratio && Number(value) === 0) return null;
   return (
     <span
       className="ml-1.5 inline-block whitespace-nowrap text-[10px] font-normal text-sky-700 sm:text-xs"
