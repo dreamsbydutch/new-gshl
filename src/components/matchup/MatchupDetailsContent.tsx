@@ -3,7 +3,7 @@
 import { useMatchupRecords } from "@gshl-hooks/main/useMatchupRecords";
 import type { MatchupRecords } from "@gshl-lib/types/performance-records";
 import { PerformanceRecordBadge } from "./PerformanceRecordBadge";
-import { useMemo } from "react";
+import { type ReactNode, useMemo } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { WhatsAppShareButton } from "@gshl-components/ui/WhatsAppShareButton";
@@ -41,7 +41,9 @@ import { buildMatchupWhatsAppShareMessage } from "@gshl-utils/features/whatsapp-
 import { PlayerStatsTable } from "./PlayerStatsTable";
 import { MatchupNHLGames } from "./MatchupNHLGames";
 import { useMatchupActivity } from "@gshl-hooks/features/useMatchupActivity";
+import { useMatchupNHLGames } from "@gshl-hooks/features/useMatchupNHLGames";
 import { MatchupTodayValue } from "./MatchupTodaySummary";
+import { MatchupPlayersToWatch } from "./MatchupPlayersToWatch";
 import { ArrowLeftIcon, StarIcon } from "lucide-react";
 
 function CategoryResultsCard({
@@ -375,6 +377,39 @@ function StarsCard({ stars }: { stars: StarPlayer[] }) {
   );
 }
 
+function MatchupSummaryLayout({
+  details,
+  categoryPanel,
+}: {
+  details: MatchupDetailsPayload;
+  categoryPanel: ReactNode;
+}) {
+  const games = useMatchupNHLGames(details);
+
+  if (!games.isActive) {
+    return (
+      <>
+        {categoryPanel}
+        <div className="mt-3 sm:mt-6">
+          <MatchupNHLGames details={details} />
+        </div>
+      </>
+    );
+  }
+
+  return (
+    <div className="grid gap-3 sm:gap-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)] lg:items-start lg:gap-4">
+      {categoryPanel}
+      <MatchupPlayersToWatch
+        details={details}
+        previewOnly
+        className="lg:order-first lg:col-span-2"
+      />
+      <MatchupNHLGames details={details} showActivePreview={false} />
+    </div>
+  );
+}
+
 export function MatchupDetailsContent({
   matchupId,
 }: MatchupDetailsContentProps) {
@@ -565,35 +600,45 @@ export function MatchupDetailsContent({
         </div>
       </div>
 
-      <section className="rounded-lg border border-slate-200 p-2 sm:p-4">
-        <div className="space-y-2 sm:space-y-4">
-          {details ? (
-            <CategoryResultsCard
-              records={records}
-              details={details}
-              title="Matchup Breakdown"
-              scores={matchupScore}
-              status={matchupStatus}
-              updatedAt={
-                details?.teamStatsUpdatedAt?.home &&
-                details.teamStatsUpdatedAt.away
-                  ? Math.min(
-                      details.teamStatsUpdatedAt.home,
-                      details.teamStatsUpdatedAt.away,
-                    )
-                  : null
-              }
-              categories={categoryResults}
-              homeTeam={homeTeam}
-              awayTeam={awayTeam}
-            />
-          ) : null}
-          {isComplete ? <StarsCard stars={stars} /> : null}
-        </div>
-      </section>
+      {details ? (
+        <MatchupSummaryLayout
+          details={details}
+          categoryPanel={
+            <section className="rounded-lg border border-slate-200 p-2 sm:p-4">
+              <div className="space-y-2 sm:space-y-4">
+                <CategoryResultsCard
+                  records={records}
+                  details={details}
+                  title="Matchup Breakdown"
+                  scores={matchupScore}
+                  status={matchupStatus}
+                  updatedAt={
+                    details.teamStatsUpdatedAt?.home &&
+                    details.teamStatsUpdatedAt.away
+                      ? Math.min(
+                          details.teamStatsUpdatedAt.home,
+                          details.teamStatsUpdatedAt.away,
+                        )
+                      : null
+                  }
+                  categories={categoryResults}
+                  homeTeam={homeTeam}
+                  awayTeam={awayTeam}
+                />
+                {isComplete ? <StarsCard stars={stars} /> : null}
+              </div>
+            </section>
+          }
+        />
+      ) : (
+        <section className="rounded-lg border border-slate-200 p-2 sm:p-4">
+          <div className="space-y-2 sm:space-y-4">
+            {isComplete ? <StarsCard stars={stars} /> : null}
+          </div>
+        </section>
+      )}
 
       <section className="mt-3 space-y-2 sm:mt-6 sm:space-y-4">
-        {details ? <MatchupNHLGames details={details} /> : null}
         <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
           <div
             role="tablist"
