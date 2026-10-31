@@ -153,11 +153,6 @@ function CategoryResultsCard({
                 className="px-2 pb-2 text-center text-xs font-normal text-slate-600"
               >
                 {status}
-                {activity.isActive ? (
-                  <span className="mt-1 block text-[10px] text-sky-700">
-                    Blue values: today&apos;s starting lineup
-                  </span>
-                ) : null}
                 {updatedAt ? (
                   <span className="mt-1 block text-[10px] font-normal normal-case tracking-normal text-slate-500">
                     Weekly totals recorded{" "}
