@@ -6,6 +6,7 @@ import { useMatchupNHLGames } from "@gshl-hooks/features/useMatchupNHLGames";
 import type { MatchupDetailsPayload } from "@gshl-types";
 import { formatMatchupPlayerName } from "@gshl-utils/features/matchup-details";
 import { nhlGameStatus } from "@gshl-utils/features/nhl";
+import { GameTeamLogo } from "./MatchupGameImpact";
 import { MatchupPlayersToWatch } from "./MatchupPlayersToWatch";
 
 export function MatchupNHLGames({
@@ -61,75 +62,76 @@ export function MatchupNHLGames({
         ) : schedule.rows.length > 0 ? (
           <ul className="divide-y divide-slate-100">
             {schedule.rows.map(({ game, awayPlayers, homePlayers }) => {
-              const playerSummaries = (
-                [
-                  { side: "away", players: awayPlayers },
-                  { side: "home", players: homePlayers },
-                ] as const
-              )
-                .filter(({ players }) => players.length > 0)
-                .map(({ side, players }) => {
-                  const team = details.teams[side];
-                  const names = players.map(formatMatchupPlayerName).join(", ");
-                  return {
-                    label: team?.abbr ?? team?.name ?? side,
-                    text: `${players.length} ${players.length === 1 ? "player" : "players"}`,
-                    title: `${team?.name ?? side}: ${names}`,
-                  };
-                });
-
               return (
                 <li key={game.id} className="px-3 py-2">
-                  <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
-                    <Link
-                      href={`/nhl/matchup/${game.id}?season=${encodeURIComponent(details.matchup.seasonId)}&week=${encodeURIComponent(details.matchup.weekId)}`}
-                      aria-label={`${game.awayTeam.abbrev} at ${game.homeTeam.abbrev} NHL matchup`}
-                      className="flex h-7 shrink-0 items-center gap-1 rounded px-1 hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
-                    >
-                      <NHLLogo
-                        team={{ name: game.awayTeam.abbrev, logoUrl: "" }}
-                        size={20}
-                        className="!mx-0 shrink-0"
-                      />
-                      <span
-                        aria-hidden="true"
-                        className="text-[10px] text-slate-400"
+                  <div className="grid min-h-16 grid-cols-[5.5rem_minmax(0,1fr)] gap-3 sm:grid-cols-[6.5rem_minmax(0,1fr)]">
+                    <div className="flex flex-col items-center justify-center gap-1 text-center">
+                      <Link
+                        href={`/nhl/matchup/${game.id}?season=${encodeURIComponent(details.matchup.seasonId)}&week=${encodeURIComponent(details.matchup.weekId)}`}
+                        aria-label={`${game.awayTeam.abbrev} at ${game.homeTeam.abbrev} NHL matchup`}
+                        className="flex h-7 items-center gap-1 rounded px-1 hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
                       >
-                        @
-                      </span>
-                      <NHLLogo
-                        team={{ name: game.homeTeam.abbrev, logoUrl: "" }}
-                        size={20}
-                        className="!mx-0 shrink-0"
-                      />
-                    </Link>
-                    <div className="min-w-0 flex-1 text-xs text-slate-600">
-                      <span className="font-semibold tabular-nums text-slate-900">
-                        {game.awayTeam.score != null &&
-                        game.homeTeam.score != null
-                          ? `${game.awayTeam.score} - ${game.homeTeam.score}`
-                          : nhlGameStatus(game)}
-                      </span>
-                      {game.awayTeam.score != null &&
-                      game.homeTeam.score != null ? (
-                        <span className="ml-1.5 text-slate-500">
-                          {nhlGameStatus(game)}
-                        </span>
-                      ) : null}
-                    </div>
-                    <div className="flex basis-full flex-wrap items-center gap-x-2 text-[11px] text-slate-600 sm:basis-auto">
-                      {playerSummaries.map(({ label, text, title }) => (
+                        <NHLLogo
+                          team={{ name: game.awayTeam.abbrev, logoUrl: "" }}
+                          size={20}
+                          className="!mx-0 shrink-0"
+                        />
                         <span
-                          key={label}
-                          title={title}
-                          className="whitespace-nowrap"
+                          aria-hidden="true"
+                          className="text-[10px] text-slate-400"
                         >
-                          <span className="font-semibold text-slate-800">
-                            {label}
-                          </span>{" "}
-                          {text}
+                          @
                         </span>
-                      ))}
+                        <NHLLogo
+                          team={{ name: game.homeTeam.abbrev, logoUrl: "" }}
+                          size={20}
+                          className="!mx-0 shrink-0"
+                        />
+                      </Link>
+                      <div className="text-xs leading-none text-slate-600">
+                        <span className="font-semibold tabular-nums text-slate-900">
+                          {game.awayTeam.score != null &&
+                          game.homeTeam.score != null
+                            ? `${game.awayTeam.score} - ${game.homeTeam.score}`
+                            : nhlGameStatus(game)}
+                        </span>
+                        {game.awayTeam.score != null &&
+                        game.homeTeam.score != null ? (
+                          <span className="block pt-0.5 text-[11px] text-slate-500">
+                            {nhlGameStatus(game)}
+                          </span>
+                        ) : null}
+                      </div>
+                    </div>
+                    <div className="grid min-w-0 grid-rows-2 border-l border-slate-100 pl-3">
+                      {(
+                        [
+                          { side: "away", players: awayPlayers },
+                          { side: "home", players: homePlayers },
+                        ] as const
+                      ).map(({ side, players }) => {
+                        const team = details.teams[side];
+                        const names = players
+                          .map(formatMatchupPlayerName)
+                          .join(", ");
+                        return (
+                          <div
+                            key={side}
+                            className="flex min-w-0 items-center gap-2 py-0.5 text-xs leading-4 text-slate-800"
+                          >
+                            <GameTeamLogo team={team} />
+                            <span
+                              className="min-w-0 break-words"
+                              title={
+                                names ||
+                                `${team?.name ?? side}: no players playing`
+                              }
+                            >
+                              {names || "No players playing"}
+                            </span>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 </li>
