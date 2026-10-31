@@ -1,5 +1,6 @@
 import type {
   CategoryResult,
+  MatchupPlayerDayRow,
   MatchupDetailsTeam,
   MatchupDetailsMatchup,
   MatchupDetailsWeek,
@@ -65,7 +66,20 @@ export function getMatchupTodayGames(
   games: NHLSchedule["gameWeek"][number]["games"],
   awayPlayers: readonly PlayerStatRow[],
   homePlayers: readonly PlayerStatRow[],
+  roster?: {
+    date: string;
+    away: readonly MatchupPlayerDayRow[];
+    home: readonly MatchupPlayerDayRow[];
+  },
 ) {
+  if (roster) {
+    awayPlayers = roster.away
+      .filter((p) => p.date === roster.date)
+      .map((p) => ({ ...p, currentNhlTeam: p.nhlTeam }));
+    homePlayers = roster.home
+      .filter((p) => p.date === roster.date)
+      .map((p) => ({ ...p, currentNhlTeam: p.nhlTeam }));
+  }
   const involvedPlayers = (
     players: readonly PlayerStatRow[],
     game: (typeof games)[number],

@@ -3,7 +3,7 @@
 import { useMatchupRecords } from "@gshl-hooks/main/useMatchupRecords";
 import type { MatchupRecords } from "@gshl-lib/types/performance-records";
 import { PerformanceRecordBadge } from "./PerformanceRecordBadge";
-import { useMemo, type ReactNode } from "react";
+import { useMemo } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { WhatsAppShareButton } from "@gshl-components/ui/WhatsAppShareButton";
@@ -20,6 +20,7 @@ import type {
   CategoryResult,
   MatchupDetailsContentProps,
   MatchupDetailsTeam,
+  MatchupDetailsPayload,
   StarPlayer,
 } from "@gshl-types";
 import {
@@ -39,7 +40,8 @@ import { canShareOwnerContent } from "@gshl-utils/features/whatsapp-share";
 import { buildMatchupWhatsAppShareMessage } from "@gshl-utils/features/whatsapp-messages";
 import { PlayerStatsTable } from "./PlayerStatsTable";
 import { MatchupNHLGames } from "./MatchupNHLGames";
-import { MatchupTodayRows } from "./MatchupTodaySummary";
+import { useMatchupActivity } from "@gshl-hooks/features/useMatchupActivity";
+import { MatchupTodayValue } from "./MatchupTodaySummary";
 import { ArrowLeftIcon, StarIcon } from "lucide-react";
 
 function CategoryResultsCard({
@@ -51,7 +53,7 @@ function CategoryResultsCard({
   categories,
   homeTeam,
   awayTeam,
-  todayRows,
+  details,
 }: {
   records: MatchupRecords | null;
   title: string;
@@ -61,8 +63,9 @@ function CategoryResultsCard({
   categories: CategoryResult[];
   homeTeam: MatchupDetailsTeam | null;
   awayTeam: MatchupDetailsTeam | null;
-  todayRows?: ReactNode;
+  details: MatchupDetailsPayload;
 }) {
+  const activity = useMatchupActivity(details);
   const awayLabel = awayTeam?.abbr ?? awayTeam?.name ?? "Away";
   const homeLabel = homeTeam?.abbr ?? homeTeam?.name ?? "Home";
   const outcomeFor = (
@@ -150,6 +153,11 @@ function CategoryResultsCard({
                 className="px-2 pb-2 text-center text-xs font-normal text-slate-600"
               >
                 {status}
+                {activity.isActive ? (
+                  <span className="mt-1 block text-[10px] text-sky-700">
+                    Blue values: today&apos;s starting lineup
+                  </span>
+                ) : null}
                 {updatedAt ? (
                   <span className="mt-1 block text-[10px] font-normal normal-case tracking-normal text-slate-500">
                     Weekly totals recorded{" "}
@@ -186,6 +194,12 @@ function CategoryResultsCard({
                   className={`px-2 py-1.5 text-center tabular-nums ${valueClassFor(category, "away")}`}
                 >
                   {category.awayValue}
+                  <MatchupTodayValue
+                    activity={activity}
+                    categories={details.season?.categories}
+                    stat={category.key}
+                    side="away"
+                  />
                   <PerformanceRecordBadge
                     records={records}
                     entityId={awayTeam?.id ?? ""}
@@ -208,6 +222,12 @@ function CategoryResultsCard({
                   className={`px-2 py-1.5 text-center tabular-nums ${valueClassFor(category, "home")}`}
                 >
                   {category.homeValue}
+                  <MatchupTodayValue
+                    activity={activity}
+                    categories={details.season?.categories}
+                    stat={category.key}
+                    side="home"
+                  />
                   <PerformanceRecordBadge
                     records={records}
                     entityId={homeTeam?.id ?? ""}
@@ -220,7 +240,6 @@ function CategoryResultsCard({
                 </td>
               </tr>
             ))}
-            {todayRows}
           </tbody>
         </table>
       </div>
@@ -553,25 +572,27 @@ export function MatchupDetailsContent({
 
       <section className="rounded-lg border border-slate-200 p-2 sm:p-4">
         <div className="space-y-2 sm:space-y-4">
-          <CategoryResultsCard
-            records={records}
-            title="Matchup Breakdown"
-            scores={matchupScore}
-            status={matchupStatus}
-            updatedAt={
-              details?.teamStatsUpdatedAt?.home &&
-              details.teamStatsUpdatedAt.away
-                ? Math.min(
-                    details.teamStatsUpdatedAt.home,
-                    details.teamStatsUpdatedAt.away,
-                  )
-                : null
-            }
-            categories={categoryResults}
-            homeTeam={homeTeam}
-            awayTeam={awayTeam}
-            todayRows={details ? <MatchupTodayRows details={details} /> : null}
-          />
+          {details ? (
+            <CategoryResultsCard
+              records={records}
+              details={details}
+              title="Matchup Breakdown"
+              scores={matchupScore}
+              status={matchupStatus}
+              updatedAt={
+                details?.teamStatsUpdatedAt?.home &&
+                details.teamStatsUpdatedAt.away
+                  ? Math.min(
+                      details.teamStatsUpdatedAt.home,
+                      details.teamStatsUpdatedAt.away,
+                    )
+                  : null
+              }
+              categories={categoryResults}
+              homeTeam={homeTeam}
+              awayTeam={awayTeam}
+            />
+          ) : null}
           {isComplete ? <StarsCard stars={stars} /> : null}
         </div>
       </section>
