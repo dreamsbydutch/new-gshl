@@ -246,7 +246,10 @@ async function main() {
         process.execPath,
         [
           "--use-system-ca",
-          path.join(root, "node_modules/convex/bin/main.js"),
+          path.join(
+            path.dirname(fileURLToPath(import.meta.resolve("convex/package.json"))),
+            "bin/main.js",
+          ),
           "env",
           "get",
           "CONVEX_SERVER_SECRET",
