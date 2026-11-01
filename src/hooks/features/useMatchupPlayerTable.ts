@@ -91,7 +91,7 @@ export function useMatchupPlayerTable(input: {
     .filter(
       (column) =>
         view !== "today" ||
-        !["Rating", "days", "GS", "GP"].includes(column.key),
+        !["date", "pos", "Rating", "days", "GS", "GP"].includes(column.key),
     )
     .filter(
       (column) =>
@@ -104,7 +104,7 @@ export function useMatchupPlayerTable(input: {
         : column,
     );
   if (view === "today")
-    columns.splice(2, 0, { key: "dailyPos", label: "Slot" });
+    columns.splice(1, 0, { key: "dailyPos", label: "Slot" });
   return {
     schedule,
     isActive,

@@ -18,6 +18,7 @@ import {
   cn,
   formatStandingsDetailStat,
 } from "@gshl-utils";
+import { standingsMatchupSummary } from "@gshl-utils/features/standings-container";
 import {
   buildWhatsAppShareMessage,
   canShareCommissionerContent,
@@ -136,6 +137,27 @@ function StandingsGroupTable({
               <th className="min-w-0 px-1.5 py-2.5 text-left font-semibold sm:px-3 sm:py-3">
                 Team
               </th>
+              {[
+                ["Conf", "Conference and conference rank"],
+                ["MP", "Matchups played"],
+                ["Win %", "Matchup wins divided by matchups played"],
+                ["Streak", "Current matchup streak"],
+                ["Power", "Season power rank"],
+              ].map(([label, description]) => (
+                <th
+                  key={label}
+                  scope="col"
+                  title={description}
+                  className="hidden w-20 px-2 py-3 text-center font-semibold lg:table-cell"
+                >
+                  <abbr
+                    title={description}
+                    className="cursor-help no-underline"
+                  >
+                    {label}
+                  </abbr>
+                </th>
+              ))}
               <th className="w-11 px-1.5 py-2.5 text-center font-semibold sm:w-20 sm:px-3 sm:py-3">
                 W
               </th>
@@ -147,6 +169,26 @@ function StandingsGroupTable({
                   T
                 </th>
               ) : null}
+              {!showTies
+                ? ["HW", "HL"].map((label) => (
+                    <th
+                      key={label}
+                      scope="col"
+                      className="hidden w-14 px-2 py-3 text-center font-semibold lg:table-cell"
+                    >
+                      <abbr
+                        title={
+                          label === "HW"
+                            ? "Home wins: 2 points each (included in W)"
+                            : "Home losses: 1 point each (included in L)"
+                        }
+                        className="cursor-help no-underline"
+                      >
+                        {label}
+                      </abbr>
+                    </th>
+                  ))
+                : null}
               <th className="w-14 px-1.5 py-2.5 text-center font-semibold sm:w-24 sm:px-3 sm:py-3">
                 PTS
               </th>
@@ -155,6 +197,7 @@ function StandingsGroupTable({
           <tbody className="divide-y divide-slate-100">
             {group.teams.map((team, index) => {
               const isOpen = openTeamId === team.id;
+              const summary = standingsMatchupSummary(team.seasonStats);
               const detailsId = `standings-team-${group.title
                 .toLowerCase()
                 .replaceAll(" ", "-")}-${team.id}`;
@@ -177,7 +220,7 @@ function StandingsGroupTable({
                           : index + 1,
                       )}
                     </td>
-                    <th className="min-w-0 px-1 py-1.5 text-left font-normal sm:px-2 sm:py-2">
+                    <th className="min-w-0 px-1 py-1.5 text-left font-normal sm:px-2 sm:py-2 lg:py-0.5">
                       <button
                         type="button"
                         aria-expanded={isOpen}
@@ -216,6 +259,24 @@ function StandingsGroupTable({
                         />
                       </button>
                     </th>
+                    {[
+                      team.confAbbr
+                        ? `${team.confAbbr}${team.seasonStats && team.seasonStats.conferenceRk > 0 ? ` #${team.seasonStats.conferenceRk}` : ""}`
+                        : "-",
+                      summary.played,
+                      summary.winPercentage,
+                      team.seasonStats?.streak ?? "-",
+                      team.seasonStats && team.seasonStats.powerRk > 0
+                        ? `#${team.seasonStats.powerRk}`
+                        : "-",
+                    ].map((value, metricIndex) => (
+                      <td
+                        key={metricIndex}
+                        className="hidden px-2 py-2 text-center font-mono text-xs tabular-nums text-slate-600 lg:table-cell"
+                      >
+                        {value}
+                      </td>
+                    ))}
                     <td className="px-1.5 py-2.5 text-center font-mono tabular-nums text-slate-700 sm:px-3 sm:py-3">
                       {getStandingValue("wins", team, season)}
                     </td>
@@ -227,6 +288,19 @@ function StandingsGroupTable({
                         {getStandingValue("ties", team, season)}
                       </td>
                     ) : null}
+                    {!showTies
+                      ? [
+                          team.seasonStats?.teamHW,
+                          team.seasonStats?.teamHL,
+                        ].map((value, metricIndex) => (
+                          <td
+                            key={metricIndex}
+                            className="hidden px-2 py-2 text-center font-mono text-xs tabular-nums text-slate-600 lg:table-cell"
+                          >
+                            {formatStandingsDetailStat(value)}
+                          </td>
+                        ))
+                      : null}
                     <td className="px-1.5 py-2.5 text-center font-mono font-bold tabular-nums text-slate-950 sm:px-3 sm:py-3">
                       {getStandingValue("points", team, season)}
                     </td>
@@ -234,7 +308,7 @@ function StandingsGroupTable({
                   {isOpen ? (
                     <tr id={detailsId}>
                       <td
-                        colSpan={showTies ? 6 : 5}
+                        colSpan={showTies ? 11 : 12}
                         className="bg-white px-2 pb-3 pt-1 sm:px-4 sm:pb-4"
                       >
                         <StandingsTeamCard
@@ -251,6 +325,12 @@ function StandingsGroupTable({
           </tbody>
         </table>
       </div>
+      <p className="hidden border-t border-slate-100 bg-slate-50/50 px-4 py-2 text-xs text-slate-500 lg:block">
+        {showTies
+          ? "Points: 2 per win, 1 per tie."
+          : "Points: 3 per away win, 2 per home win, 1 per home loss. HW and HL are included in W and L."}{" "}
+        Select a team for recent results, upcoming opponents and category ranks.
+      </p>
     </section>
   );
 }

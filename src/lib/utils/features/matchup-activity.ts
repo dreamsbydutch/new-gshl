@@ -24,6 +24,34 @@ export type PlayerActivity =
   | "postponed"
   | "off";
 
+/** Captured roster days and ratings alone do not establish a contribution. */
+export function hasMatchupPlayerContribution(player: PlayerStatRow): boolean {
+  return [
+    "GP",
+    "GS",
+    "G",
+    "A",
+    "P",
+    "PM",
+    "PIM",
+    "PPP",
+    "SOG",
+    "HIT",
+    "BLK",
+    "W",
+    "GA",
+    "GAA",
+    "SV",
+    "SA",
+    "SVP",
+    "SO",
+    "TOI",
+  ].some((key) => {
+    const value = Number(player[key as keyof PlayerStatRow]);
+    return Number.isFinite(value) && value !== 0;
+  });
+}
+
 export function playerActivity(
   player: PlayerStatRow,
   games: Games,

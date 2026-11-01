@@ -23,7 +23,10 @@ import type {
   MatchupPlayerDayRow,
   MatchupPlayerWeekRow,
 } from "@gshl-types";
-import { playerActivity } from "@gshl-utils/features/matchup-activity";
+import {
+  hasMatchupPlayerContribution,
+  playerActivity,
+} from "@gshl-utils/features/matchup-activity";
 import {
   abbreviatePlayerName,
   findNhlTeamByAbbreviation,
@@ -337,7 +340,7 @@ export function PlayerStatsTable({
                     {group.players.map((player) => (
                       <tr
                         key={player.id}
-                        className={`group border-b border-slate-200 transition-colors last:border-0 hover:bg-slate-100 ${isActive && playerActivity(player, schedule.games) === "live" ? "bg-emerald-50/60" : "odd:bg-white even:bg-slate-50/70"}`}
+                        className={`group border-b border-slate-200 transition-colors last:border-0 hover:bg-slate-100 ${isActive && table.rosterIds.has(player.id) && playerActivity(player, schedule.games) === "live" ? "bg-emerald-50/60" : "odd:bg-white even:bg-slate-50/70"}`}
                       >
                         {tableColumns.map((column) => {
                           if (column.key === "today")
@@ -425,14 +428,17 @@ export function PlayerStatsTable({
                               : "",
                           ].join(" ");
                           const isTodayNonAppearance =
-                            table.view === "today" && Number(player.GP) <= 0;
+                            table.view === "today" &&
+                            !hasMatchupPlayerContribution(player);
                           const isPlayerIdentityColumn =
                             column.key === "player" ||
                             column.key === "pos" ||
                             column.key === "dailyPos";
                           const content =
-                            table.view === "today" &&
-                            (!table.hasToday || isTodayNonAppearance) &&
+                            ((table.view === "today" &&
+                              (!table.hasToday || isTodayNonAppearance)) ||
+                              (!table.rosterIds.has(player.id) &&
+                                !hasMatchupPlayerContribution(player))) &&
                             !isPlayerIdentityColumn
                               ? "-"
                               : renderPlayerStatCell(player, column.key);
@@ -508,7 +514,8 @@ export function PlayerStatsTable({
                         column.key === "player" ? "group-hover:bg-red-50" : "",
                       ].join(" ");
                       const isTodayNonAppearance =
-                        table.view === "today" && Number(player.GP) <= 0;
+                        table.view === "today" &&
+                        !hasMatchupPlayerContribution(player);
                       const isPlayerIdentityColumn =
                         column.key === "player" ||
                         column.key === "pos" ||
