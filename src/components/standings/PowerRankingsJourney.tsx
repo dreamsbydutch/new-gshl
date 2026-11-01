@@ -60,7 +60,7 @@ export function PowerRankingsJourney({
               />
               <Tooltip
                 labelFormatter={(week) => `Week ${week}`}
-                formatter={(value, name) => [`#${value}`, name]}
+                formatter={(value, name) => [`#${String(value)}`, name]}
               />
               {orderedEntries.map((entry) => (
                 <Line

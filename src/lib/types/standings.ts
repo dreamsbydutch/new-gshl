@@ -10,7 +10,10 @@ import type {
 export type StandingsType = "overall" | "conference" | "wildcard";
 
 export type StandingsOption =
-  "Overall" | "Conference" | "Wildcard" | "LosersTourney";
+  | "Overall"
+  | "Conference"
+  | "Wildcard"
+  | "LosersTourney";
 
 export interface StandingsGroup {
   title: string;
