@@ -37,7 +37,7 @@ export function WeekMatchupScroller({
           ref={track}
           tabIndex={0}
           aria-label="Weekly matchups"
-          className="flex min-w-0 snap-x snap-mandatory gap-1.5 overflow-x-auto overscroll-x-contain p-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500"
+          className="relative flex min-w-0 snap-x snap-mandatory gap-1.5 overflow-x-auto overscroll-x-contain p-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500"
         >
           {data.matchups.map((matchup) => (
             <li
