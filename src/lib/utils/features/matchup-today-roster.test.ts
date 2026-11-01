@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { getMatchupTodayGames } from "./matchup-details";
+import {
+  matchupPlayerInjuryDesignation,
+  sortMatchupPlayersByInjury,
+} from "./matchup-details";
 import type { MatchupPlayerDayRow } from "@gshl-types";
 import type { NHLSchedule } from "@gshl-lib/types/nhl";
 
@@ -44,5 +48,38 @@ void test("daily affiliations match the daily player table even after an NHL tra
   assert.deepEqual(
     rows[0]?.awayPlayers.map((p) => p.id),
     ["new"],
+  );
+});
+
+void test("injured players keep their designation and move behind active players", () => {
+  const active = { id: "active", fullName: "Active Player", nhlTeam: ["CGY"] };
+  const injured = {
+    id: "injured",
+    fullName: "Injured Player",
+    nhlTeam: ["COL"],
+  };
+  const injuries = [
+    {
+      id: "injury",
+      name: "Injured Player",
+      team: "COL",
+      status: "long-term injured reserve",
+      designation: "LTIR",
+      description: null,
+      comment: null,
+      updatedAt: null,
+      returnDate: null,
+    },
+  ];
+  assert.equal(matchupPlayerInjuryDesignation(injured, injuries), "LTIR");
+  assert.deepEqual(
+    sortMatchupPlayersByInjury([injured, active], injuries).map(
+      (player) => player.id,
+    ),
+    ["active", "injured"],
+  );
+  assert.equal(
+    matchupPlayerInjuryDesignation({ ...active, dailyPos: "IR+" }, []),
+    "IR+",
   );
 });
