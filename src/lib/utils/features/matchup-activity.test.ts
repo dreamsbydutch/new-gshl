@@ -7,6 +7,7 @@ import {
   sortMatchupPlayers,
   todayPlayerRows,
   playerActivity,
+  hasMatchupPlayerContribution,
 } from "./matchup-activity";
 
 type Game = NHLSchedule["gameWeek"][number]["games"][number];
@@ -57,6 +58,25 @@ const day = (
   TOI: null,
   updatedAt: 100,
   ...patch,
+});
+
+void test("former roster rows require period appearances or contributions, not roster days or ratings", () => {
+  assert.equal(
+    hasMatchupPlayerContribution(day("former", { GP: 0, GS: 0 })),
+    false,
+  );
+  assert.equal(
+    hasMatchupPlayerContribution(day("former", { GP: 1, GS: 0 })),
+    true,
+  );
+  assert.equal(
+    hasMatchupPlayerContribution(day("former", { GP: 0, GS: 0, HIT: 2 })),
+    true,
+  );
+  assert.equal(
+    hasMatchupPlayerContribution(day("former", { GP: 0, GS: 0, PM: -1 })),
+    true,
+  );
 });
 
 void test("live first sorting uses game status, not the weekly rating; inputs stay immutable", () => {

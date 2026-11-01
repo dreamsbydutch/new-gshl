@@ -115,6 +115,19 @@ export const LOSERS_TOURNEY_FIELDS = [
 
 type StandingsDisplayValue = string | number | boolean | null | undefined;
 type StandingsTeamWithStats = GSHLTeam & { seasonStats?: TeamSeasonStatLine };
+
+/** Matchup appearances, rather than individual NHL player games. */
+export function standingsMatchupSummary(
+  stats?: Pick<TeamSeasonStatLine, "teamW" | "teamL" | "teamT">,
+) {
+  if (!stats) return { played: "-", winPercentage: "-" };
+  const wins = Number(stats.teamW ?? 0);
+  const played = wins + Number(stats.teamL ?? 0) + Number(stats.teamT ?? 0);
+  return {
+    played,
+    winPercentage: played > 0 ? `${((wins / played) * 100).toFixed(1)}%` : "-",
+  };
+}
 type GroupTeamsOptions = {
   includeContext?: boolean;
   allTeams?: GSHLTeam[];
