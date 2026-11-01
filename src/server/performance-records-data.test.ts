@@ -5,6 +5,19 @@ import {
   type RecordReader,
   type RecordRow,
 } from "./performance-records-data";
+const rosterSpots = [
+  "C",
+  "LW",
+  "RW",
+  "C",
+  "LW",
+  "RW",
+  "D",
+  "D",
+  "D",
+  "G",
+  "Util",
+];
 const week = {
   id: "current",
   seasonId: "s",
@@ -21,11 +34,105 @@ const game = {
   awayTeamId: "b",
   isComplete: false,
 };
+for (const kind of ["team", "player"] as const) {
+  for (const value of [4, 5, 6]) {
+    void test(`${kind}: same lineup W maximum excludes historical 7 wins (${value})`, async () => {
+      const source = reader();
+      source.calendar = async () => ({
+        seasons: [
+          { id: "s", rosterSpots },
+          {
+            id: "same",
+            rosterSpots: [...rosterSpots]
+              .reverse()
+              .map((p) => p.toLowerCase())
+              .concat(["BN", "BenchF", "IR", "IRPlus", "IL+"]),
+          },
+          { id: "goalies", rosterSpots: [...rosterSpots, "G"] },
+          { id: "skaters", rosterSpots: [...rosterSpots, "D"] },
+          { id: "missing" },
+          { id: "invalid", rosterSpots: ["G", null] },
+        ],
+        weeks: [
+          week,
+          ...["same", "goalies", "skaters", "missing", "invalid"].map(
+            (seasonId) => ({
+              ...week,
+              id: seasonId,
+              seasonId,
+              endDate: "2026-09-27",
+            }),
+          ),
+        ],
+      });
+      source.week = async (season, id) => {
+        const current = id === "current";
+        const rows = (current ? [value] : season === "same" ? [3, 5] : [7]).map(
+          (W, i) => ({
+            id: id + i,
+            gshlTeamId: current ? "a" : "c" + i,
+            playerId: String(i),
+            GP: 20,
+            GS: 4,
+            W,
+          }),
+        );
+        return {
+          teams: kind === "team" ? rows : [],
+          players: kind === "player" ? rows : [],
+          matchups: current
+            ? [game]
+            : rows.map((row) => ({
+                id: id + row.id,
+                homeTeamId: row.gshlTeamId,
+                homeWin: true,
+              })),
+        };
+      };
+      const result = await loadMatchupRecords(
+        "m",
+        source,
+        Date.parse("2026-10-03T16:00Z"),
+      );
+      const badge = result.badges.find((b) => b.stat === "W");
+      if (value < 5) assert.equal(badge, undefined);
+      else {
+        assert.equal(badge?.previous, 5);
+        assert.equal(badge?.tied, value === 5);
+        assert.equal(badge?.compared, 2);
+      }
+      assert.match(result.scope, /same starting lineup/);
+    });
+  }
+}
+for (const config of [
+  undefined,
+  [],
+  ["BenchF", "IR"],
+  ["G", 12],
+  ["G", "typo"],
+  [""],
+]) {
+  void test(`invalid current lineup fails closed: ${JSON.stringify(config)}`, async () => {
+    const source = reader();
+    const calendar = await source.calendar();
+    calendar.seasons[0]!.rosterSpots = config;
+    source.calendar = async () => calendar;
+    source.week = async () => {
+      throw new Error("must not read without valid lineup");
+    };
+    assert.deepEqual(
+      (await loadMatchupRecords("m", source, Date.parse("2026-10-03T16:00Z")))
+        .badges,
+      [],
+    );
+  });
+}
 function reader(final = false): RecordReader {
   return {
     matchup: async () => [{ ...game, isComplete: final }],
     calendar: async () => ({
-      seasons: [{ id: "s", name: "2026" }],
+      seasons: [{ id: "s", name: "2026", rosterSpots }],
       weeks: [
         week,
         { ...week, id: "old", startDate: "2026-09-21", endDate: "2026-09-27" },
@@ -97,11 +204,11 @@ void test("final records include the opponent and exclude self", async () => {
   assert.equal(result.badges[0]?.compared, 5);
 });
 
-void test("matchup long-week records pool different extended lengths and exclude normal weeks", async () => {
+void test("long matchups compare against all week lengths and only badge records", async () => {
   const source = reader(true);
   const calls: string[] = [];
   source.calendar = async () => ({
-    seasons: [{ id: "s", name: "2026" }],
+    seasons: [{ id: "s", name: "2026", rosterSpots }],
     weeks: [
       { ...week, gameDays: 10, endDate: "2026-10-11" },
       {
@@ -123,15 +230,21 @@ void test("matchup long-week records pool different extended lengths and exclude
   const read = source.week.bind(source);
   source.week = async (season, id) => {
     calls.push(id);
-    assert.notEqual(id, "normal-old");
-    return read(season, id === "long-old" ? "old" : id);
+
+    const result = await read(season, id === "current" ? id : "old");
+    if (id === "normal-old") result.teams[1]!.G = 15;
+    return result;
   };
   const result = await loadMatchupRecords(
     "m",
     source,
     Date.parse("2026-10-12T16:00Z"),
   );
-  assert.deepEqual(calls, ["current", "long-old"]);
-  assert.equal(result.badges[0]?.compared, 3);
-  assert.match(result.scope, /long-week records \(more than 7 NHL game days\)/);
+  assert.deepEqual(calls, ["current", "long-old", "normal-old"]);
+  assert.equal(result.badges[0]?.compared, 5);
+  assert.equal(
+    result.badges.some((badge) => badge.entityId === "b"),
+    false,
+  );
+  assert.match(result.scope, /overall weekly records \(all week lengths\)/);
 });

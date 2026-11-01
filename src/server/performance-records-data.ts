@@ -28,6 +28,34 @@ function isFinal(row: RecordRow) {
     row.tie === true
   );
 }
+/** Sorted starter multiset; nonstarter slots do not change the comparison era. */
+function startingLineup(rosterSpots: unknown): string | null {
+  if (!Array.isArray(rosterSpots) || !rosterSpots.length) return null;
+  const starters: string[] = [];
+  for (const spot of rosterSpots) {
+    if (typeof spot !== "string" || !spot.trim()) return null;
+    const position = spot.trim().toUpperCase();
+    if (["C", "LW", "RW", "D", "G", "UTIL"].includes(position))
+      starters.push(position);
+    else if (
+      ![
+        "BN",
+        "BENCH",
+        "BENCHF",
+        "BENCHD",
+        "BENCHG",
+        "IR",
+        "IRPLUS",
+        "IR+",
+        "IL",
+        "IL+",
+        "NA",
+      ].includes(position)
+    )
+      return null;
+  }
+  return starters.length ? starters.sort().join(",") : null;
+}
 export async function loadMatchupRecords(
   matchupId: string,
   reader: RecordReader,
@@ -41,11 +69,23 @@ export async function loadMatchupRecords(
     return { badges: [], scope: "" };
   const category = recordWeekCategory(week.gameDays);
   if (!category) return { badges: [], scope: "" };
+  const lineup = startingLineup(
+    seasons.find((row) => row.id === week.seasonId)?.rosterSpots,
+  );
+  if (!lineup) return { badges: [], scope: "" };
+  const comparableSeasons = new Set(
+    seasons
+      .filter((row) => startingLineup(row.rosterSpots) === lineup)
+      .map((row) => row.id),
+  );
   const complete = isFinal(matchup);
   const comparable = weeks.filter(
     (row) =>
+      comparableSeasons.has(String(row.seasonId)) &&
       row.isPlayoffs === week.isPlayoffs &&
-      recordWeekCategory(row.gameDays) === category &&
+      recordWeekCategory(row.gameDays) !== null &&
+      (category === "long_week" ||
+        recordWeekCategory(row.gameDays) === "weekly") &&
       String(row.endDate) <= String(week.endDate),
   );
   const observations: RecordObservation[] = [];
@@ -102,7 +142,7 @@ export async function loadMatchupRecords(
       (week.isPlayoffs ? "Playoff" : "Regular-season") +
       (category === "weekly"
         ? " weekly records (up to 7 NHL game days)."
-        : " long-week records (more than 7 NHL game days).") +
-      " Compared with completed league weeks through this matchup. Refreshes every five minutes.",
+        : " overall weekly records (all week lengths).") +
+      " Compared with completed league weeks with the same starting lineup through this matchup. Refreshes every five minutes.",
   };
 }
