@@ -189,6 +189,9 @@ export function buildPowerRankings({
         rating: validRating(
           latestStat?.powerRating ?? preseasonByTeam.get(team.id)?.rating,
         ),
+        performance: latestStat?.powerStatEwma ?? null,
+        elo: latestStat?.powerEloPre ?? null,
+        talent: latestStat?.powerTalent ?? null,
         previousRank,
         rankChange: previousRank === null ? null : previousRank - rank,
         color: colorByTeam.get(team.id) ?? "#475569",
@@ -212,6 +215,12 @@ export function buildPowerRankings({
   return {
     ...(preseasonByTeam.size ? { isPreseason: true } : {}),
     entries,
+    regularSeasonLastWeek: Math.max(
+      1,
+      ...weeks
+        .filter((week) => week.weekType === "RS")
+        .map((week) => week.weekNum),
+    ),
     chartData,
     latestWeek,
     series: entries.map((entry) => ({
@@ -222,4 +231,32 @@ export function buildPowerRankings({
       currentRank: entry.rank,
     })),
   };
+}
+
+export function buildPowerRankingJourney(
+  rankings: PowerRankingsViewModel,
+  ownerId?: string | null,
+  selectedTeamId?: string | null,
+) {
+  const focused =
+    rankings.entries.find((entry) => entry.team.id === selectedTeamId) ??
+    rankings.entries.find(
+      (entry) => ownerId && entry.team.ownerId === ownerId,
+    ) ??
+    rankings.entries[0];
+  const lastWeek = rankings.regularSeasonLastWeek ?? 22;
+  const chartData = Array.from(
+    { length: lastWeek },
+    (_, index) =>
+      rankings.chartData.find(
+        (point) =>
+          point.weekNum === index + 1 && point.label === `Week ${index + 1}`,
+      ) ?? { weekNum: index + 1 },
+  );
+  const orderedEntries = [...rankings.entries].sort(
+    (a, b) =>
+      Number(a.team.id === focused?.team.id) -
+      Number(b.team.id === focused?.team.id),
+  );
+  return { focused, lastWeek, chartData, orderedEntries };
 }
