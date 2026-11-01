@@ -35,6 +35,7 @@ import {
   toStatNumber,
 } from "@gshl-utils";
 import { canShareOwnerContent } from "@gshl-utils/features/whatsapp-share";
+import { latestMatchupStatsUpdatedAt } from "@gshl-utils/features/matchup-details";
 import { buildMatchupWhatsAppShareMessage } from "@gshl-utils/features/whatsapp-messages";
 import { WeekMatchupScroller } from "./WeekMatchupScroller";
 import { PlayerStatsTable } from "./PlayerStatsTable";
@@ -156,7 +157,7 @@ function CategoryResultsCard({
                 {status}
                 {updatedAt ? (
                   <span className="mt-1 block text-[10px] font-normal normal-case tracking-normal text-slate-500">
-                    Weekly totals recorded{" "}
+                    Data last updated{" "}
                     {new Intl.DateTimeFormat("en-CA", {
                       month: "short",
                       day: "numeric",
@@ -601,15 +602,9 @@ export function MatchupDetailsContent({
                 title="Matchup Breakdown"
                 scores={matchupScore}
                 status={matchupStatus}
-                updatedAt={
-                  details.teamStatsUpdatedAt?.home &&
-                  details.teamStatsUpdatedAt.away
-                    ? Math.min(
-                        details.teamStatsUpdatedAt.home,
-                        details.teamStatsUpdatedAt.away,
-                      )
-                    : null
-                }
+                updatedAt={latestMatchupStatsUpdatedAt(
+                  details.teamStatsUpdatedAt,
+                )}
                 categories={categoryResults}
                 homeTeam={homeTeam}
                 awayTeam={awayTeam}
