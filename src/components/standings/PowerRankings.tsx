@@ -1,5 +1,6 @@
 "use client";
 
+import { PowerRankingsJourney } from "./PowerRankingsJourney";
 import Image from "next/image";
 import { ArrowDown, ArrowUp, Minus } from "lucide-react";
 import type { PowerRankingEntry, PowerRankingsProps } from "@gshl-types";
@@ -115,7 +116,6 @@ export function PowerRankings({ season, rankings }: PowerRankingsProps) {
     view: "power",
     season: String(season.id),
   });
-  const weeks = [...rankings.chartData].reverse();
 
   return (
     <div className="mx-auto w-full max-w-6xl space-y-3 px-2.5 py-3 sm:px-6 sm:py-4">
@@ -140,95 +140,106 @@ export function PowerRankings({ season, rankings }: PowerRankingsProps) {
           </p>
         </section>
       ) : (
-        <section className="overflow-hidden rounded-lg border border-slate-200 bg-white">
-          <TableViewport
-            ariaLabel={`${snapshotLabel} team power rankings for ${season.name}`}
-            scrollHint="Scroll to see previous weeks"
-            viewportClassName="rounded-none border-0 focus-visible:ring-inset focus-visible:ring-offset-0"
-          >
-            <table className="w-max min-w-full border-separate border-spacing-0 text-sm">
-              <caption className="sr-only">
-                {snapshotLabel} team power rankings for {season.name}, with
-                weekly ranks from newest to oldest
-              </caption>
-              <thead className="bg-slate-50 text-[11px] uppercase tracking-wide text-slate-500">
-                <tr>
-                  <th
-                    scope="col"
-                    className="sticky left-0 z-20 w-[72px] min-w-[72px] border-b border-r border-slate-200 bg-slate-50 px-2 py-2 text-center"
-                  >
-                    Rank
-                  </th>
-                  <th
-                    scope="col"
-                    className="min-w-48 border-b border-slate-200 px-2 py-2 text-left sm:min-w-52"
-                  >
-                    Team
-                  </th>
-                  <th
-                    scope="col"
-                    className="min-w-20 border-b border-slate-200 px-2.5 py-2 text-center"
-                  >
-                    Movement
-                  </th>
-                  <th
-                    scope="col"
-                    className="min-w-20 border-b border-slate-200 px-2.5 py-2 text-right"
-                  >
-                    Rating
-                  </th>
-                  {weeks.map((week) => (
+        <>
+          <section className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+            <TableViewport
+              ariaLabel={`${snapshotLabel} team power rankings for ${season.name}`}
+              scrollHint="Scroll to see rating inputs"
+              viewportClassName="rounded-none border-0 focus-visible:ring-inset focus-visible:ring-offset-0"
+            >
+              <table className="w-max min-w-full border-separate border-spacing-0 text-sm">
+                <caption className="sr-only">
+                  {snapshotLabel} team power rankings for {season.name}, with
+                  the inputs behind each rating
+                </caption>
+                <thead className="bg-slate-50 text-[11px] uppercase tracking-wide text-slate-500">
+                  <tr>
                     <th
-                      key={week.weekId}
                       scope="col"
-                      className="min-w-20 whitespace-nowrap border-b border-slate-200 px-2.5 py-2 text-center"
+                      className="sticky left-0 z-20 w-[72px] min-w-[72px] border-b border-r border-slate-200 bg-slate-50 px-2 py-2 text-center"
                     >
-                      {week.label}
+                      Rank
                     </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {rankings.entries.map((entry) => (
-                  <tr key={entry.team.id} className="hover:bg-slate-50">
                     <th
-                      scope="row"
-                      aria-label={`${entry.team.name ?? entry.team.abbr ?? "Team"}, rank ${entry.rank}`}
-                      className="sticky left-0 z-10 w-[72px] min-w-[72px] border-b border-r border-slate-200 bg-white px-2 py-2 text-left font-normal"
+                      scope="col"
+                      className="min-w-48 border-b border-slate-200 px-2 py-2 text-left sm:min-w-52"
                     >
-                      <span className="flex items-center gap-2">
-                        <span className="w-5 shrink-0 text-center font-oswald text-base font-semibold tabular-nums text-slate-950">
-                          {entry.rank}
-                        </span>
-                        <TeamLogo entry={entry} />
-                      </span>
+                      Team
                     </th>
-                    <td className="min-w-48 border-b border-slate-100 px-2 py-2 font-semibold leading-tight text-slate-900 sm:min-w-52">
-                      {entry.team.name ?? entry.team.abbr ?? "Team"}
-                    </td>
-                    <td className="border-b border-slate-100 px-2.5 py-2 text-center">
-                      <RankMovement entry={entry} />
-                    </td>
-                    <td className="border-b border-slate-100 px-2.5 py-2 text-right font-mono font-semibold tabular-nums text-slate-700">
-                      {entry.rating === null ? "—" : entry.rating.toFixed(1)}
-                    </td>
-                    {weeks.map((week) => {
-                      const rank = week[entry.team.id];
-                      return (
-                        <td
-                          key={week.weekId}
-                          className="border-b border-slate-100 px-2.5 py-2 text-center font-mono tabular-nums text-slate-700"
+                    <th
+                      scope="col"
+                      className="min-w-20 border-b border-slate-200 px-2.5 py-2 text-center"
+                    >
+                      Movement
+                    </th>
+                    <th
+                      scope="col"
+                      className="min-w-20 border-b border-slate-200 px-2.5 py-2 text-right"
+                    >
+                      Rating
+                    </th>
+                    {["Recent performance", "Matchup Elo", "Roster talent"].map(
+                      (label) => (
+                        <th
+                          key={label}
+                          scope="col"
+                          className="min-w-28 border-b border-slate-200 px-2.5 py-2 text-right"
                         >
-                          {typeof rank === "number" ? rank : "—"}
-                        </td>
-                      );
-                    })}
+                          {label}
+                        </th>
+                      ),
+                    )}
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </TableViewport>
-        </section>
+                </thead>
+                <tbody>
+                  {rankings.entries.map((entry) => (
+                    <tr key={entry.team.id} className="hover:bg-slate-50">
+                      <th
+                        scope="row"
+                        aria-label={`${entry.team.name ?? entry.team.abbr ?? "Team"}, rank ${entry.rank}`}
+                        className="sticky left-0 z-10 w-[72px] min-w-[72px] border-b border-r border-slate-200 bg-white px-2 py-2 text-left font-normal"
+                      >
+                        <span className="flex items-center gap-2">
+                          <span className="w-5 shrink-0 text-center font-oswald text-base font-semibold tabular-nums text-slate-950">
+                            {entry.rank}
+                          </span>
+                          <TeamLogo entry={entry} />
+                        </span>
+                      </th>
+                      <td className="min-w-48 border-b border-slate-100 px-2 py-2 font-semibold leading-tight text-slate-900 sm:min-w-52">
+                        {entry.team.name ?? entry.team.abbr ?? "Team"}
+                      </td>
+                      <td className="border-b border-slate-100 px-2.5 py-2 text-center">
+                        <RankMovement entry={entry} />
+                      </td>
+                      <td className="border-b border-slate-100 px-2.5 py-2 text-right font-mono font-semibold tabular-nums text-slate-700">
+                        {entry.rating === null ? "—" : entry.rating.toFixed(1)}
+                      </td>
+                      {[entry.performance, entry.elo, entry.talent].map(
+                        (value, index) => (
+                          <td
+                            key={index}
+                            className="border-b border-slate-100 px-2.5 py-2 text-right font-mono tabular-nums text-slate-700"
+                          >
+                            {value == null ? "\u2014" : value.toFixed(1)}
+                          </td>
+                        ),
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </TableViewport>
+            <p className="border-t px-4 py-3 text-xs leading-relaxed text-slate-500">
+              Entering-week inputs. The current model blends recent performance
+              (85%), matchup Elo (10%), and roster talent (5%). Inputs use
+              different scales; higher is better. Earlier snapshots may use
+              earlier models. Preseason uses opening projections; missing inputs
+              are shown as a dash.
+            </p>
+          </section>
+          <PowerRankingsJourney key={season.id} rankings={rankings} />
+        </>
       )}
     </div>
   );

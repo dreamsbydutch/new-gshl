@@ -147,6 +147,9 @@ export interface PowerRankingEntry {
   team: PowerRankingTeam;
   rank: number;
   rating: number | null;
+  performance?: number | null;
+  elo?: number | null;
+  talent?: number | null;
   previousRank: number | null;
   rankChange: number | null;
   color: string;
@@ -180,6 +183,7 @@ export interface PowerRankingsViewModel {
   entries: PowerRankingEntry[];
   chartData: PowerRankingChartPoint[];
   series: PowerRankingSeries[];
+  regularSeasonLastWeek?: number;
   latestWeek: PowerRankingWeek | null;
 }
 
@@ -210,6 +214,9 @@ export interface PowerRankingsPreview {
 export interface PowerRankingWeeklyStat {
   gshlTeamId: string;
   weekId: string;
+  powerStatEwma?: number | null;
+  powerEloPre?: number | null;
+  powerTalent?: number | null;
   powerRating?: number | null;
   powerRk?: number | null;
 }

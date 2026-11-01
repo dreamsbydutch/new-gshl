@@ -10,6 +10,7 @@ import type {
 
 import {
   buildPowerRankings,
+  buildPowerRankingJourney,
   selectDistinctPowerRankingColors,
 } from "./power-rankings";
 
@@ -186,4 +187,64 @@ void test("selects distinct colors from each team's logo palette", () => {
 
   assert.equal(colors.a, "#c81e1e");
   assert.equal(colors.b, "#164eab");
+});
+
+void test("journey defaults to owner then leader, respects selection, and leaves gaps and future weeks blank", () => {
+  const result = buildPowerRankings({
+    teams: [
+      makeTeam("a", "Alpha"),
+      { ...makeTeam("b", "Bravo"), ownerId: "owner-b" },
+    ],
+    weeks: [
+      makeWeek(1),
+      makeWeek(2),
+      makeWeek(3),
+      makeWeek(4),
+      { ...makeWeek(5), weekType: "PO" },
+    ],
+    weeklyStats: [
+      weekly("a", 1, 1, 60),
+      weekly("b", 1, 2, 40),
+      {
+        ...weekly("a", 3, 1, 60),
+        powerStatEwma: 1.2,
+        powerEloPre: 1510,
+        powerTalent: 4,
+      },
+      weekly("b", 3, 2, 40),
+    ],
+    seasonStats: [],
+  });
+  assert.equal(result.regularSeasonLastWeek, 4);
+  assert.deepEqual(
+    [
+      result.entries[0]?.performance,
+      result.entries[0]?.elo,
+      result.entries[0]?.talent,
+    ],
+    [1.2, 1510, 4],
+  );
+  assert.equal(
+    buildPowerRankingJourney(result, "owner-b").focused?.team.id,
+    "b",
+  );
+  assert.equal(buildPowerRankingJourney(result).focused?.team.id, "a");
+  assert.equal(
+    buildPowerRankingJourney(result, "absent").focused?.team.id,
+    "a",
+  );
+  assert.equal(
+    buildPowerRankingJourney(result, "owner-b", "a").focused?.team.id,
+    "a",
+  );
+  const journey = buildPowerRankingJourney(result, "owner-b", "removed");
+  assert.equal(journey.focused?.team.id, "b");
+  assert.equal(journey.orderedEntries.at(-1)?.team.id, "b");
+  assert.deepEqual(
+    journey.chartData.map((point) => point.weekNum),
+    [1, 2, 3, 4],
+  );
+  assert.deepEqual(journey.chartData[1], { weekNum: 2 });
+  assert.deepEqual(journey.chartData[3], { weekNum: 4 });
+  assert.equal(result.entries[0]?.team.id, "a");
 });

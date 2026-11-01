@@ -94,6 +94,9 @@ type StandingsPowerStatSource = {
   [key: string]: unknown;
   gshlTeamId: string;
   weekId: string;
+  powerStatEwma?: NumericStat;
+  powerEloPre?: NumericStat;
+  powerTalent?: NumericStat;
   powerRating?: NumericStat;
   powerRk?: NumericStat;
 };
@@ -153,6 +156,9 @@ export function projectStandingsPowerHistory(options: {
         {
           gshlTeamId: String(stat.gshlTeamId),
           weekId: String(stat.weekId),
+          powerStatEwma: normalizedNumeric(stat.powerStatEwma),
+          powerEloPre: normalizedNumeric(stat.powerEloPre),
+          powerTalent: normalizedNumeric(stat.powerTalent),
           powerRating: normalizedNumeric(stat.powerRating),
           powerRk,
         },
