@@ -17,6 +17,7 @@ const added = {
   fullName: "New player",
   nhlTeam: ["COL"],
   date: "2026-10-31",
+  dailyPos: "C",
 } as MatchupPlayerDayRow;
 
 void test("today's games exclude dropped weekly players and include today's additions", () => {
@@ -48,6 +49,40 @@ void test("daily affiliations match the daily player table even after an NHL tra
   assert.deepEqual(
     rows[0]?.awayPlayers.map((p) => p.id),
     ["new"],
+  );
+});
+
+void test("today's games show only rostered starters on both sides", () => {
+  const players = [
+    "C",
+    "LW",
+    "RW",
+    "D",
+    "G",
+    "UTIL",
+    "BN",
+    "IR",
+    "IR+",
+    null,
+  ].map((dailyPos) => ({ ...added, id: String(dailyPos), dailyPos }));
+  const rows = getMatchupTodayGames(games, [dropped], [dropped], {
+    date: added.date,
+    away: players,
+    home: players,
+  });
+  for (const side of ["awayPlayers", "homePlayers"] as const) {
+    assert.deepEqual(
+      rows[0]?.[side].map((p) => p.id),
+      ["C", "LW", "RW", "D", "G", "UTIL"],
+    );
+  }
+  assert.deepEqual(
+    getMatchupTodayGames(games, [], [], {
+      date: added.date,
+      away: players.filter((p) => p.dailyPos === "BN"),
+      home: players.filter((p) => p.dailyPos === "IR"),
+    }),
+    [],
   );
 });
 

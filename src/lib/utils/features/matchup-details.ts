@@ -143,6 +143,13 @@ export function getMatchupTodayGames(
       ...new Map(
         players
           .filter((player) => getPlayerTodayGames(player, [game]).length > 0)
+          .filter(
+            (player) =>
+              !roster ||
+              ["C", "LW", "RW", "D", "G", "UTIL"].includes(
+                String(player.dailyPos ?? "").toUpperCase(),
+              ),
+          )
           .map((player) => [player.id, player]),
       ).values(),
     ].sort((a, b) =>

@@ -9,7 +9,7 @@ void test("missing daily capture still shows current roster games, excluding for
     { id: 1, awayTeam: { abbrev: "CGY" }, homeTeam: { abbrev: "COL" } },
   ] as NHLSchedule["gameWeek"][number]["games"];
   const former = { id: "former", nhlTeam: ["CGY"] };
-  const current = { id: "current", nhlTeam: ["COL"] };
+  const current = { id: "current", nhlTeam: ["COL"], dailyPos: "C" };
   const rows = getMatchupTodayGames(games, [former], [], {
     date: "2026-11-01",
     away: [],
@@ -45,6 +45,40 @@ void test("groups distinguish former players from injured members and retain ben
       ["No longer on roster", ["former"]],
       ["Injured / inactive", ["injured"]],
     ],
+  );
+});
+
+void test("today separates starters and bench while preserving injury and membership groups", () => {
+  const roster = [
+    { id: "center", dailyPos: "C" },
+    { id: "goalie", dailyPos: "G" },
+    { id: "bench", dailyPos: "BN" },
+    { id: "ir", dailyPos: "IR" },
+    { id: "irplus", dailyPos: "IR+" },
+    { id: "unknown", dailyPos: null },
+  ];
+  assert.deepEqual(
+    groupMatchupPlayers(
+      [...roster, { id: "former" }],
+      roster,
+      () => false,
+      true,
+    ).map((group) => [group.label, group.players.map((p) => p.id)]),
+    [
+      ["Starters", ["center", "goalie"]],
+      ["Bench", ["bench", "unknown"]],
+      ["No longer on roster", ["former"]],
+      ["Injured / inactive", ["ir", "irplus"]],
+    ],
+  );
+});
+
+void test("today's captured slots take priority over current lineup changes", () => {
+  const captured = [{ id: "player", dailyPos: "BN" }];
+  const current = [{ id: "player", dailyPos: "C" }];
+  assert.equal(
+    groupMatchupPlayers(captured, current, () => false, true)[0]?.label,
+    "Bench",
   );
 });
 
