@@ -150,6 +150,12 @@ export interface PowerRankingEntry {
   performance?: number | null;
   elo?: number | null;
   talent?: number | null;
+  ratingChanges?: {
+    rating: number | null;
+    performance: number | null;
+    elo: number | null;
+    talent: number | null;
+  };
   previousRank: number | null;
   rankChange: number | null;
   color: string;

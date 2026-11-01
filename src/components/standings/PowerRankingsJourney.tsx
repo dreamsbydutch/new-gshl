@@ -117,10 +117,6 @@ export function PowerRankingsJourney({
           ))}
         </div>
       </div>
-      <p className="mt-3 text-xs text-slate-500">
-        Ranks show each team entering the week, with #1 at the top. Future weeks
-        remain blank.
-      </p>
       {!chartData.some((point) => "weekId" in point) && (
         <p className="mt-2 text-sm text-slate-500">
           Weekly journeys appear once regular-season snapshots are available.

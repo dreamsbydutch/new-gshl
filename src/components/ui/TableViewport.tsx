@@ -81,7 +81,12 @@ export const TableViewport = forwardRef<HTMLDivElement, TableViewportProps>(
     }, [updateScrollState]);
 
     return (
-      <div className={cn("relative min-w-0 max-w-full", className)}>
+      <div
+        className={cn(
+          "relative w-fit min-w-0 max-w-full [&_table]:!w-max [&_table]:!min-w-0",
+          className,
+        )}
+      >
         <div className="relative min-w-0 max-w-full">
           <div
             ref={viewportRef}

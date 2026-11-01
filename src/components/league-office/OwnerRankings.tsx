@@ -389,18 +389,6 @@ export function OwnerRankings() {
             </tbody>
           </table>
         </div>
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-slate-200 bg-slate-50 px-3 py-2.5 text-[9px] text-slate-500 sm:gap-x-5 sm:px-4 sm:py-3 sm:text-[10px]">
-          <span>Standard range: 0–1000</span>
-          <span>Entry rating: 250</span>
-          <span>Elo form: 15%</span>
-          <span>Power form: placement rate, max ±20</span>
-          <span>Playoffs +8</span>
-          <span>Finals +18</span>
-          <span>Cup +40</span>
-          <span>GMOTY/COTY +20</span>
-          <span>Other +5</span>
-          <span className="text-red-600">Brophy −10</span>
-        </div>
       </div>
     </div>
   );

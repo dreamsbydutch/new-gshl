@@ -46,7 +46,7 @@ export function NHLStandings() {
         return (
           <section
             key={division}
-            className="overflow-hidden rounded-lg border bg-white"
+            className="mx-auto w-fit max-w-full overflow-hidden rounded-lg border bg-white"
           >
             <h3 className="bg-gray-100 px-4 py-3 font-bold">
               {division}{" "}
@@ -55,7 +55,7 @@ export function NHLStandings() {
               </span>
             </h3>
             <div className="overflow-x-auto">
-              <table className="w-full text-right text-sm tabular-nums">
+              <table className="w-max text-right text-sm tabular-nums">
                 <caption className="sr-only">
                   {division} NHL standings. OT means overtime and shootout
                   losses. RP counts all currently rostered GSHL players,
@@ -130,19 +130,6 @@ export function NHLStandings() {
           </section>
         );
       })}
-      <p className="text-center text-xs text-gray-500">
-        Source:{" "}
-        <a
-          className="underline"
-          href="https://www.nhl.com/standings"
-          target="_blank"
-          rel="noreferrer"
-        >
-          NHL
-        </a>{" "}
-        · GP: games played · OT: overtime/shootout losses · RP = GSHL Roster
-        Players
-      </p>
     </div>
   );
 }

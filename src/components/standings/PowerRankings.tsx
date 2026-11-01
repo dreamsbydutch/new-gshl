@@ -2,7 +2,7 @@
 
 import { PowerRankingsJourney } from "./PowerRankingsJourney";
 import Image from "next/image";
-import { ArrowDown, ArrowUp, Minus } from "lucide-react";
+import { ArrowDown, ArrowUp } from "lucide-react";
 import type { PowerRankingEntry, PowerRankingsProps } from "@gshl-types";
 import { useAuthSession } from "@gshl-hooks";
 import { TableViewport } from "@gshl-ui";
@@ -14,13 +14,7 @@ import {
 } from "@gshl-utils/features/whatsapp-share";
 
 function RankMovement({ entry }: { entry: PowerRankingEntry }) {
-  if (entry.rankChange === null) {
-    return (
-      <span className="text-slate-500" aria-label="No prior ranking">
-        —
-      </span>
-    );
-  }
+  if (entry.rankChange === null || entry.rankChange === 0) return null;
   if (entry.rankChange > 0) {
     return (
       <span
@@ -43,12 +37,29 @@ function RankMovement({ entry }: { entry: PowerRankingEntry }) {
       </span>
     );
   }
+  return null;
+}
+
+function RatingValue({
+  value,
+  change,
+}: {
+  value?: number | null;
+  change?: number | null;
+}) {
+  const delta = change == null ? 0 : Number(change.toFixed(1));
   return (
-    <span
-      className="inline-flex items-center gap-0.5 text-slate-500"
-      aria-label="No rank movement"
-    >
-      <Minus className="h-3.5 w-3.5" aria-hidden="true" />
+    <span className="inline-flex items-baseline justify-end gap-1.5 whitespace-nowrap">
+      {value == null ? "\u2014" : value.toFixed(1)}
+      {value != null && delta !== 0 ? (
+        <span
+          className={`text-[10px] font-medium ${delta > 0 ? "text-emerald-700" : "text-red-700"}`}
+          aria-label={`${delta > 0 ? "Up" : "Down"} ${Math.abs(delta).toFixed(1)} since last week`}
+        >
+          {delta > 0 ? "+" : ""}
+          {delta.toFixed(1)}
+        </span>
+      ) : null}
     </span>
   );
 }
@@ -141,13 +152,13 @@ export function PowerRankings({ season, rankings }: PowerRankingsProps) {
         </section>
       ) : (
         <>
-          <section className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+          <section className="mx-auto w-fit max-w-full overflow-hidden rounded-lg border border-slate-200 bg-white">
             <TableViewport
               ariaLabel={`${snapshotLabel} team power rankings for ${season.name}`}
               scrollHint="Scroll to see rating inputs"
               viewportClassName="rounded-none border-0 focus-visible:ring-inset focus-visible:ring-offset-0"
             >
-              <table className="w-max min-w-full border-separate border-spacing-0 text-sm">
+              <table className="w-max border-separate border-spacing-0 text-sm">
                 <caption className="sr-only">
                   {snapshotLabel} team power rankings for {season.name}, with
                   the inputs behind each rating
@@ -156,25 +167,19 @@ export function PowerRankings({ season, rankings }: PowerRankingsProps) {
                   <tr>
                     <th
                       scope="col"
-                      className="sticky left-0 z-20 w-[72px] min-w-[72px] border-b border-r border-slate-200 bg-slate-50 px-2 py-2 text-center"
+                      className="sticky left-0 z-20 border-b border-r border-slate-200 bg-slate-50 px-2 py-2 text-center"
                     >
                       Rank
                     </th>
                     <th
                       scope="col"
-                      className="min-w-48 border-b border-slate-200 px-2 py-2 text-left sm:min-w-52"
+                      className="border-b border-slate-200 px-2 py-2 text-left"
                     >
                       Team
                     </th>
                     <th
                       scope="col"
-                      className="min-w-20 border-b border-slate-200 px-2.5 py-2 text-center"
-                    >
-                      Movement
-                    </th>
-                    <th
-                      scope="col"
-                      className="min-w-20 border-b border-slate-200 px-2.5 py-2 text-right"
+                      className="border-b border-slate-200 px-2.5 py-2 text-right"
                     >
                       Rating
                     </th>
@@ -183,7 +188,7 @@ export function PowerRankings({ season, rankings }: PowerRankingsProps) {
                         <th
                           key={label}
                           scope="col"
-                          className="min-w-28 border-b border-slate-200 px-2.5 py-2 text-right"
+                          className="border-b border-slate-200 px-2.5 py-2 text-right"
                         >
                           {label}
                         </th>
@@ -197,31 +202,39 @@ export function PowerRankings({ season, rankings }: PowerRankingsProps) {
                       <th
                         scope="row"
                         aria-label={`${entry.team.name ?? entry.team.abbr ?? "Team"}, rank ${entry.rank}`}
-                        className="sticky left-0 z-10 w-[72px] min-w-[72px] border-b border-r border-slate-200 bg-white px-2 py-2 text-left font-normal"
+                        className="sticky left-0 z-10 border-b border-r border-slate-200 bg-white px-2 py-2 text-left font-normal"
                       >
                         <span className="flex items-center gap-2">
                           <span className="w-5 shrink-0 text-center font-oswald text-base font-semibold tabular-nums text-slate-950">
                             {entry.rank}
                           </span>
-                          <TeamLogo entry={entry} />
+                          <span className="text-[10px]">
+                            <RankMovement entry={entry} />
+                          </span>
                         </span>
                       </th>
-                      <td className="min-w-48 border-b border-slate-100 px-2 py-2 font-semibold leading-tight text-slate-900 sm:min-w-52">
-                        {entry.team.name ?? entry.team.abbr ?? "Team"}
-                      </td>
-                      <td className="border-b border-slate-100 px-2.5 py-2 text-center">
-                        <RankMovement entry={entry} />
+                      <td className="border-b border-slate-100 px-2 py-2 font-semibold leading-tight text-slate-900">
+                        <span className="flex items-center gap-2 whitespace-nowrap">
+                          <TeamLogo entry={entry} />
+                          {entry.team.name ?? entry.team.abbr ?? "Team"}
+                        </span>
                       </td>
                       <td className="border-b border-slate-100 px-2.5 py-2 text-right font-mono font-semibold tabular-nums text-slate-700">
-                        {entry.rating === null ? "—" : entry.rating.toFixed(1)}
+                        <RatingValue
+                          value={entry.rating}
+                          change={entry.ratingChanges?.rating}
+                        />
                       </td>
-                      {[entry.performance, entry.elo, entry.talent].map(
-                        (value, index) => (
+                      {(["performance", "elo", "talent"] as const).map(
+                        (key) => (
                           <td
-                            key={index}
+                            key={key}
                             className="border-b border-slate-100 px-2.5 py-2 text-right font-mono tabular-nums text-slate-700"
                           >
-                            {value == null ? "\u2014" : value.toFixed(1)}
+                            <RatingValue
+                              value={entry[key]}
+                              change={entry.ratingChanges?.[key]}
+                            />
                           </td>
                         ),
                       )}
@@ -230,13 +243,6 @@ export function PowerRankings({ season, rankings }: PowerRankingsProps) {
                 </tbody>
               </table>
             </TableViewport>
-            <p className="border-t px-4 py-3 text-xs leading-relaxed text-slate-500">
-              Entering-week inputs. The current model blends recent performance
-              (85%), matchup Elo (10%), and roster talent (5%). Inputs use
-              different scales; higher is better. Earlier snapshots may use
-              earlier models. Preseason uses opening projections; missing inputs
-              are shown as a dash.
-            </p>
           </section>
           <PowerRankingsJourney key={season.id} rankings={rankings} />
         </>
