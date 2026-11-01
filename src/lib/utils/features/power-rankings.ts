@@ -99,6 +99,7 @@ const validRank = (value: unknown): number | null => {
 };
 
 const validRating = (value: unknown): number | null => {
+  if (value == null || value === "") return null;
   const rating = Number(value);
   return Number.isFinite(rating) ? rating : null;
 };
@@ -182,6 +183,14 @@ export function buildPowerRankings({
 
   const entries: PowerRankingEntry[] = rankedTeams.map(
     ({ team, latestStat, rank }) => {
+      const previousStat = previousByTeam.get(team.id);
+      const change = (current: unknown, previous: unknown) => {
+        const currentRating = validRating(current);
+        const previousRating = validRating(previous);
+        return currentRating === null || previousRating === null
+          ? null
+          : currentRating - previousRating;
+      };
       const previousRank = validRank(previousByTeam.get(team.id)?.powerRk);
       return {
         team,
@@ -192,6 +201,15 @@ export function buildPowerRankings({
         performance: latestStat?.powerStatEwma ?? null,
         elo: latestStat?.powerEloPre ?? null,
         talent: latestStat?.powerTalent ?? null,
+        ratingChanges: {
+          rating: change(latestStat?.powerRating, previousStat?.powerRating),
+          performance: change(
+            latestStat?.powerStatEwma,
+            previousStat?.powerStatEwma,
+          ),
+          elo: change(latestStat?.powerEloPre, previousStat?.powerEloPre),
+          talent: change(latestStat?.powerTalent, previousStat?.powerTalent),
+        },
         previousRank,
         rankChange: previousRank === null ? null : previousRank - rank,
         color: colorByTeam.get(team.id) ?? "#475569",

@@ -156,6 +156,42 @@ void test("falls back to season power ranks when weekly history is absent", () =
   );
 });
 
+void test("compares rating values with the prior snapshot without inventing missing inputs", () => {
+  const result = buildPowerRankings({
+    teams: [makeTeam("a", "Alpha"), makeTeam("b", "Bravo")],
+    weeks: [makeWeek(1), makeWeek(2)],
+    weeklyStats: [
+      {
+        ...weekly("a", 1, 2, 48),
+        powerStatEwma: 0,
+        powerEloPre: 1510,
+        powerTalent: 4,
+      },
+      {
+        ...weekly("a", 2, 1, 55),
+        powerStatEwma: 1.2,
+        powerEloPre: 1500,
+        powerTalent: 4,
+      },
+      weekly("b", 2, 2, 45),
+    ],
+    seasonStats: [],
+  });
+  assert.deepEqual(result.entries[0]?.ratingChanges, {
+    rating: 7,
+    performance: 1.2,
+    elo: -10,
+    talent: 0,
+  });
+  assert.deepEqual(result.entries[1]?.ratingChanges, {
+    rating: null,
+    performance: null,
+    elo: null,
+    talent: null,
+  });
+  assert.equal(result.entries[0]?.elo, 1500);
+});
+
 void test("labels playoff snapshots for the accessible history table", () => {
   const playoffWeek: Week = {
     ...makeWeek(3),
