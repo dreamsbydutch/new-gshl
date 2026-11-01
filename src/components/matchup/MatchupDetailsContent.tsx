@@ -87,7 +87,7 @@ function CategoryResultsCard({
   return (
     <section className="rounded-lg border border-slate-200 bg-white p-2.5 shadow-sm sm:rounded-2xl sm:p-4">
       <h2 className="sr-only">{title}</h2>
-      <div className="overflow-hidden rounded-lg border border-slate-200">
+      <div className="overflow-hidden">
         <table className="w-full table-fixed border-collapse text-xs sm:text-sm">
           <caption className="sr-only">
             {awayLabel} (away) and {homeLabel} (home) matchup category
@@ -604,38 +604,34 @@ export function MatchupDetailsContent({
         <MatchupSummaryLayout
           details={details}
           categoryPanel={
-            <section className="rounded-lg border border-slate-200 p-2 sm:p-4">
-              <div className="space-y-2 sm:space-y-4">
-                <CategoryResultsCard
-                  records={records}
-                  details={details}
-                  title="Matchup Breakdown"
-                  scores={matchupScore}
-                  status={matchupStatus}
-                  updatedAt={
-                    details.teamStatsUpdatedAt?.home &&
-                    details.teamStatsUpdatedAt.away
-                      ? Math.min(
-                          details.teamStatsUpdatedAt.home,
-                          details.teamStatsUpdatedAt.away,
-                        )
-                      : null
-                  }
-                  categories={categoryResults}
-                  homeTeam={homeTeam}
-                  awayTeam={awayTeam}
-                />
-                {isComplete ? <StarsCard stars={stars} /> : null}
-              </div>
-            </section>
+            <div className="space-y-2 sm:space-y-4">
+              <CategoryResultsCard
+                records={records}
+                details={details}
+                title="Matchup Breakdown"
+                scores={matchupScore}
+                status={matchupStatus}
+                updatedAt={
+                  details.teamStatsUpdatedAt?.home &&
+                  details.teamStatsUpdatedAt.away
+                    ? Math.min(
+                        details.teamStatsUpdatedAt.home,
+                        details.teamStatsUpdatedAt.away,
+                      )
+                    : null
+                }
+                categories={categoryResults}
+                homeTeam={homeTeam}
+                awayTeam={awayTeam}
+              />
+              {isComplete ? <StarsCard stars={stars} /> : null}
+            </div>
           }
         />
       ) : (
-        <section className="rounded-lg border border-slate-200 p-2 sm:p-4">
-          <div className="space-y-2 sm:space-y-4">
-            {isComplete ? <StarsCard stars={stars} /> : null}
-          </div>
-        </section>
+        <div className="space-y-2 sm:space-y-4">
+          {isComplete ? <StarsCard stars={stars} /> : null}
+        </div>
       )}
 
       <section className="mt-3 space-y-2 sm:mt-6 sm:space-y-4">
