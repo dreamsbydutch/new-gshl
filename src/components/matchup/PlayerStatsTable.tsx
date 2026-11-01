@@ -18,7 +18,6 @@ import type {
   MatchupPlayerDayRow,
   MatchupPlayerWeekRow,
 } from "@gshl-types";
-import { PLAYER_WEEK_RATING_DESCRIPTION } from "@gshl-utils/domain/player-week-rating";
 import { playerActivity } from "@gshl-utils/features/matchup-activity";
 import {
   abbreviatePlayerName,
@@ -193,16 +192,7 @@ export function PlayerStatsTable({
           More stats
         </label>
       </div>
-      {table.view === "week" ? (
-        <details className="border-b border-slate-200 px-3 py-2 text-xs text-slate-600 sm:px-4">
-          <summary className="min-h-6 cursor-pointer font-medium text-slate-700">
-            What does the weekly rating mean?
-          </summary>
-          <p className="mt-2 max-w-3xl leading-relaxed">
-            {PLAYER_WEEK_RATING_DESCRIPTION}
-          </p>
-        </details>
-      ) : (
+      {table.view === "today" ? (
         <p className="border-b border-slate-200 px-3 py-2 text-xs text-slate-500 sm:px-4">
           {schedule.selectedDay?.dateLabel} · Day stats include bench
           performances; only starting slots count toward team totals.
@@ -210,7 +200,7 @@ export function PlayerStatsTable({
             ? " Today's roster and stats have not been recorded yet."
             : ""}
         </p>
-      )}
+      ) : null}
 
       {isActive && schedule.error ? (
         <p role="alert" className="px-3 py-2 text-xs text-slate-600 sm:px-4">
@@ -238,7 +228,8 @@ export function PlayerStatsTable({
               {tableColumns.map((column) => {
                 const sortable = column.key !== "today";
                 const isSorted = sortable && table.sort === column.key;
-                const direction = table.sortDirection === "asc" ? "ascending" : "descending";
+                const direction =
+                  table.sortDirection === "asc" ? "ascending" : "descending";
                 return (
                   <th
                     key={column.key}
@@ -258,8 +249,17 @@ export function PlayerStatsTable({
                         title={`Sort by ${column.label}${isSorted ? `, currently ${direction}` : ""}`}
                       >
                         <span>{column.label}</span>
-                        <span aria-hidden="true" className={isSorted ? "text-slate-700" : "text-slate-300"}>
-                          {isSorted ? (table.sortDirection === "asc" ? "↑" : "↓") : "↕"}
+                        <span
+                          aria-hidden="true"
+                          className={
+                            isSorted ? "text-slate-700" : "text-slate-300"
+                          }
+                        >
+                          {isSorted
+                            ? table.sortDirection === "asc"
+                              ? "↑"
+                              : "↓"
+                            : "↕"}
                         </span>
                       </button>
                     ) : (
