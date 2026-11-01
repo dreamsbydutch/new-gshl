@@ -17,7 +17,43 @@ import {
   renderPlayerStatCell,
   buildCategoryResults,
   resolveMatchupScore,
+  latestMatchupStatsUpdatedAt,
 } from "./matchup-details";
+
+void test("matchup update time follows the latest changed team, not the older team", () => {
+  const earlier = Date.parse("2026-11-01T21:17:00Z");
+  const later = Date.parse("2026-11-01T21:48:00Z");
+  assert.equal(
+    latestMatchupStatsUpdatedAt({ home: earlier, away: later }),
+    later,
+  );
+  assert.equal(
+    latestMatchupStatsUpdatedAt({ home: later, away: earlier }),
+    later,
+  );
+  assert.equal(
+    latestMatchupStatsUpdatedAt({ home: earlier, away: earlier }),
+    earlier,
+  );
+});
+
+void test("matchup update time uses an available team and never invents a timestamp", () => {
+  const updatedAt = Date.parse("2026-11-01T21:48:00Z");
+  assert.equal(
+    latestMatchupStatsUpdatedAt({ home: updatedAt, away: null }),
+    updatedAt,
+  );
+  assert.equal(
+    latestMatchupStatsUpdatedAt({ home: null, away: updatedAt }),
+    updatedAt,
+  );
+  assert.equal(latestMatchupStatsUpdatedAt(undefined), null);
+  assert.equal(
+    latestMatchupStatsUpdatedAt({ home: NaN, away: Infinity }),
+    null,
+  );
+  assert.equal(latestMatchupStatsUpdatedAt({ home: 0, away: -1 }), null);
+});
 
 void test("live scores follow category changes and corrections while final results stay fixed", () => {
   const matchup = { homeScore: 0, awayScore: 4, isComplete: false };

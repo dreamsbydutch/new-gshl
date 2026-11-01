@@ -25,6 +25,17 @@ import {
 } from "../domain/player";
 import { findPlayerInjury } from "./injuries";
 
+/** Latest stored change to either team's displayed weekly totals. */
+export function latestMatchupStatsUpdatedAt(
+  timestamps: { home?: number | null; away?: number | null } | null | undefined,
+): number | null {
+  const valid = [timestamps?.home, timestamps?.away].filter(
+    (value): value is number =>
+      typeof value === "number" && Number.isFinite(value) && value > 0,
+  );
+  return valid.length ? Math.max(...valid) : null;
+}
+
 function rosterInjuryDesignation(
   value: string | null | undefined,
 ): string | null {
