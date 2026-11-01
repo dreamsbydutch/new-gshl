@@ -28,8 +28,6 @@ import {
   formatMatchupPlayerName,
   formatMatchupPlayerPositions,
   formatStatValue,
-  formatWeekRange,
-  getScheduleGameTypeDisplay,
   getStarPlayers,
   isMatchupDetailsComplete,
   resolveMatchupCategories,
@@ -38,6 +36,7 @@ import {
 } from "@gshl-utils";
 import { canShareOwnerContent } from "@gshl-utils/features/whatsapp-share";
 import { buildMatchupWhatsAppShareMessage } from "@gshl-utils/features/whatsapp-messages";
+import { WeekMatchupScroller } from "./WeekMatchupScroller";
 import { PlayerStatsTable } from "./PlayerStatsTable";
 import { MatchupNHLGames } from "./MatchupNHLGames";
 import { useMatchupActivity } from "@gshl-hooks/features/useMatchupActivity";
@@ -517,17 +516,6 @@ export function MatchupDetailsContent({
   const selectedTeam = selectedSide === "away" ? awayTeam : homeTeam;
   const selectedPlayers = selectedSide === "away" ? awayPlayers : homePlayers;
 
-  const weekRange = formatWeekRange(week?.startDate, week?.endDate);
-  const gameDisplay = matchup
-    ? getScheduleGameTypeDisplay({
-        awayTeam: awayTeam ?? undefined,
-        gameType: String(matchup.gameType),
-        homeTeam: homeTeam ?? undefined,
-        location: "HOME",
-        week: week ?? undefined,
-      })
-    : null;
-
   if (matchupQuery.isLoading) {
     return <MatchupSkeleton />;
   }
@@ -578,26 +566,28 @@ export function MatchupDetailsContent({
       <div className="mb-3 flex items-center justify-between gap-2 sm:mb-6">
         <Link
           href={matchupNavigation.backHref}
-          className="hidden min-h-11 items-center gap-1 rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-600 underline-offset-4 shadow-sm hover:text-slate-900 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 lg:inline-flex lg:text-sm"
+          aria-label={matchupNavigation.backLabel}
+          className="inline-flex shrink-0 min-h-11 items-center gap-1 rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-600 underline-offset-4 shadow-sm hover:text-slate-900 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 lg:text-sm"
         >
           <ArrowLeftIcon aria-hidden="true" className="h-4 w-4" />
-          {matchupNavigation.backLabel}
+          <span className="hidden lg:inline">
+            {matchupNavigation.backLabel}
+          </span>
         </Link>
-        <div className="ml-auto flex min-w-0 items-center justify-end gap-2">
-          {canShareOwnerContent(session?.user.role) ? (
-            <WhatsAppShareButton
-              message={matchupShareMessage}
-              path={`/matchup/${encodeURIComponent(matchupId)}`}
-              label="Share matchup"
-              className="shrink-0"
-            />
-          ) : null}
-          <div className="line-clamp-2 text-right text-[9px] uppercase leading-tight tracking-[0.12em] text-slate-500 sm:text-xs sm:tracking-[0.18em]">
-            {season?.name ?? "Season"}{" "}
-            {gameDisplay ? `- ${gameDisplay.label}` : ""}
-            {weekRange ? ` - ${weekRange}` : ""}
-          </div>
-        </div>
+        <WeekMatchupScroller
+          seasonId={season?.id ?? ""}
+          weekId={week?.id ?? ""}
+          matchupId={matchupId}
+        />
+        {canShareOwnerContent(session?.user.role) ? (
+          <WhatsAppShareButton
+            message={matchupShareMessage}
+            path={`/matchup/${encodeURIComponent(matchupId)}`}
+            label=""
+            ariaLabel="Share matchup to WhatsApp"
+            className="h-11 w-11 shrink-0 !px-0"
+          />
+        ) : null}
       </div>
 
       {details ? (
