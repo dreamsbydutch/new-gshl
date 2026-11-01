@@ -17,20 +17,39 @@ export function groupMatchupPlayers(
   players: readonly PlayerStatRow[],
   roster: readonly PlayerStatRow[],
   isInjured: (player: PlayerStatRow) => boolean = () => false,
+  splitStarters = false,
 ) {
   const byId = new Map(roster.map((player) => [player.id, player]));
   const groups = [
-    { label: "Active roster", players: [] as PlayerStatRow[] },
+    {
+      label: splitStarters ? "Starters" : "Active roster",
+      players: [] as PlayerStatRow[],
+    },
+    { label: "Bench", players: [] as PlayerStatRow[] },
     { label: "No longer on roster", players: [] as PlayerStatRow[] },
     { label: "Injured / inactive", players: [] as PlayerStatRow[] },
   ];
   for (const player of players) {
     const member = byId.get(player.id);
-    const status = { ...player, dailyPos: member?.dailyPos ?? player.dailyPos };
+    const status = {
+      ...player,
+      dailyPos: splitStarters
+        ? (player.dailyPos ?? member?.dailyPos)
+        : (member?.dailyPos ?? player.dailyPos),
+    };
     const inactive = ["IR", "IR+", "IRPLUS", "NA", "IL", "IL+"].includes(
       String(status.dailyPos ?? "").toUpperCase(),
     );
-    const index = !member ? 1 : inactive || isInjured(status) ? 2 : 0;
+    const starter = ["C", "LW", "RW", "D", "G", "UTIL"].includes(
+      String(status.dailyPos ?? "").toUpperCase(),
+    );
+    const index = !member
+      ? 2
+      : inactive || isInjured(status)
+        ? 3
+        : splitStarters && !starter
+          ? 1
+          : 0;
     groups[index]!.players.push(player);
   }
   return groups.filter((group) => group.players.length > 0);
