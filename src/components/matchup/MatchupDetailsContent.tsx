@@ -575,8 +575,8 @@ export function MatchupDetailsContent({
           </span>
         </Link>
         <WeekMatchupScroller
-          seasonId={season?.id ?? ""}
-          weekId={week?.id ?? ""}
+          seasonId={matchup.seasonId}
+          weekId={matchup.weekId}
           matchupId={matchupId}
         />
         {canShareOwnerContent(session?.user.role) ? (
