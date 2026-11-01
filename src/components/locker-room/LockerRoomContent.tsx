@@ -19,6 +19,8 @@ import {
   useTeamAwards,
 } from "@gshl-hooks";
 import { getOwnerTeamIds, resolveSalaryCapSeason } from "@gshl-utils";
+import { isRosterSigningWindowOpen } from "@gshl-utils/features/roster-signing-window";
+import { resolveUfaSigningSeason } from "@gshl-utils/features/ufa-deadline";
 import {
   CapLabSkeleton,
   ContractHistorySkeleton,
@@ -102,13 +104,14 @@ const TradeBlock = dynamic(
   },
 );
 
-const SHOW_LOCKER_ROOM_ROSTER_SALARIES = true;
-
 export function LockerRoomContent() {
   const [capView, setCapView] = useState("contracts");
   const { selectedSeason, currentSeason, defaultSeason, seasons } =
     useSeasonState();
   const contextSeason = selectedSeason ?? currentSeason ?? defaultSeason;
+  const showRosterSalaries = isRosterSigningWindowOpen(
+    resolveUfaSigningSeason(seasons),
+  );
   const { selectedLockerRoomType, selectedOwnerId } = useNav();
   const salaryCapSeason = useMemo(
     () => resolveSalaryCapSeason(seasons, contextSeason, defaultSeason),
@@ -385,7 +388,7 @@ export function LockerRoomContent() {
             players,
             contracts: currentContracts,
             currentTeam,
-            showSalaries: SHOW_LOCKER_ROOM_ROSTER_SALARIES,
+            showSalaries: showRosterSalaries,
           }}
         />
       )}
