@@ -143,6 +143,7 @@ export interface MatchupDetailsPayload {
     away: MatchupPlayerDayRow[];
   };
   nhlTeams: MatchupDetailsNhlTeam[];
+  currentRosters?: { home: PlayerStatRow[]; away: PlayerStatRow[] };
 }
 
 export type StarPlayer = PlayerStatRow & {

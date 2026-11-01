@@ -731,6 +731,7 @@ export function MatchupDetailsContent({
             nhlTeams={details?.nhlTeams ?? []}
             players={selectedPlayers}
             playerDays={details?.playerDays?.[selectedSide] ?? []}
+            currentRoster={details?.currentRosters?.[selectedSide]}
             seasonCategories={season?.categories}
           />
         </div>
