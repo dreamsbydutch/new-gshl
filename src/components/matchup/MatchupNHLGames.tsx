@@ -3,8 +3,13 @@
 import Link from "next/link";
 import { NHLLogo } from "@gshl-components/player/NHLLogo";
 import { useMatchupNHLGames } from "@gshl-hooks/features/useMatchupNHLGames";
+import { useInjuryReport } from "@gshl-hooks/main/useInjuryReport";
 import type { MatchupDetailsPayload } from "@gshl-types";
-import { formatMatchupPlayerName } from "@gshl-utils/features/matchup-details";
+import {
+  formatMatchupPlayerName,
+  matchupPlayerInjuryDesignation,
+  sortMatchupPlayersByInjury,
+} from "@gshl-utils/features/matchup-details";
 import { nhlGameStatus } from "@gshl-utils/features/nhl";
 import { GameTeamLogo } from "./MatchupGameImpact";
 import { MatchupPlayersToWatch } from "./MatchupPlayersToWatch";
@@ -17,6 +22,8 @@ export function MatchupNHLGames({
   showActivePreview?: boolean;
 }) {
   const schedule = useMatchupNHLGames(details);
+  const injuryReport = useInjuryReport();
+  const injuries = injuryReport.data?.injuries ?? [];
   if (schedule.isUpcoming) return <MatchupPlayersToWatch details={details} />;
   if (!schedule.isActive)
     return <MatchupPlayersToWatch details={details} previewOnly />;
@@ -117,7 +124,11 @@ export function MatchupNHLGames({
                         .filter(({ players }) => players.length > 0)
                         .map(({ side, players }) => {
                           const team = details.teams[side];
-                          const names = players
+                          const sortedPlayers = sortMatchupPlayersByInjury(
+                            players,
+                            injuries,
+                          );
+                          const names = sortedPlayers
                             .map(formatMatchupPlayerName)
                             .join(", ");
                           return (
@@ -130,7 +141,32 @@ export function MatchupNHLGames({
                                 className="min-w-0 break-words"
                                 title={`${team?.name ?? side}: ${names}`}
                               >
-                                {names}
+                                {sortedPlayers.map((player, index) => {
+                                  const designation =
+                                    matchupPlayerInjuryDesignation(
+                                      player,
+                                      injuries,
+                                    );
+                                  return (
+                                    <span key={player.id}>
+                                      {index > 0 ? ", " : null}
+                                      <span
+                                        className={
+                                          designation
+                                            ? "text-red-700"
+                                            : undefined
+                                        }
+                                      >
+                                        {formatMatchupPlayerName(player)}
+                                      </span>
+                                      {designation ? (
+                                        <span className="ml-1 inline-flex rounded bg-red-100 px-1 py-px text-[9px] font-semibold leading-none text-red-700">
+                                          {designation}
+                                        </span>
+                                      ) : null}
+                                    </span>
+                                  );
+                                })}
                               </span>
                             </div>
                           );

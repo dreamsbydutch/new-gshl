@@ -13,6 +13,7 @@ import type {
   StarPlayer,
 } from "@gshl-types";
 import type { NHLSchedule } from "@gshl-lib/types/nhl";
+import type { PlayerInjury } from "@gshl-lib/types/injuries";
 import { playerWeekPerformanceRating } from "../domain/player-week-rating";
 import { isCategoryImpactRating } from "./stat-rating";
 import type { MatchupCategoryConfig, TeamWeekStatLine } from "@gshl-types";
@@ -21,6 +22,51 @@ import {
   formatPlayerPositionList,
   getPlayerNhlAbbreviations,
 } from "../domain/player";
+import { findPlayerInjury } from "./injuries";
+
+function rosterInjuryDesignation(
+  value: string | null | undefined,
+): string | null {
+  const normalized = (value ?? "").trim().toUpperCase();
+  if (normalized === "IR" || normalized === "LTIR") return normalized;
+  if (normalized === "IR+" || normalized === "IRPLUS") return "IR+";
+  return null;
+}
+
+/** Resolves the current injury designation shown beside a matchup player. */
+export function matchupPlayerInjuryDesignation(
+  player: PlayerStatRow,
+  injuries: readonly PlayerInjury[],
+): string | null {
+  const rosterDesignation = rosterInjuryDesignation(player.dailyPos);
+  if (rosterDesignation) return rosterDesignation;
+  return (
+    findPlayerInjury(
+      injuries,
+      formatMatchupPlayerName(player),
+      player.currentNhlTeam ?? player.nhlTeam,
+    )?.designation ?? null
+  );
+}
+
+/** Keeps injured players visible without mixing them into active-player lists. */
+export function sortMatchupPlayersByInjury<T extends PlayerStatRow>(
+  players: readonly T[],
+  injuries: readonly PlayerInjury[],
+): T[] {
+  return players
+    .map((player, index) => ({
+      player,
+      index,
+      injured: Boolean(matchupPlayerInjuryDesignation(player, injuries)),
+    }))
+    .sort(
+      (left, right) =>
+        Number(left.injured) - Number(right.injured) ||
+        left.index - right.index,
+    )
+    .map(({ player }) => player);
+}
 
 /** Legacy matchups may have final results without an explicit completion flag. */
 export function isMatchupDetailsComplete(

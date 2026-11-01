@@ -5,7 +5,12 @@ import { PerformanceRecordBadge } from "./PerformanceRecordBadge";
 import { NHLLogoList } from "@gshl-components/player/NHLLogoList";
 import { NHLLogo } from "@gshl-components/player/NHLLogo";
 import { useMatchupPlayerTable } from "@gshl-hooks/features/useMatchupPlayerTable";
-import { getPlayerTodayGames } from "@gshl-utils/features/matchup-details";
+import { useInjuryReport } from "@gshl-hooks/main/useInjuryReport";
+import {
+  getPlayerTodayGames,
+  matchupPlayerInjuryDesignation,
+  sortMatchupPlayersByInjury,
+} from "@gshl-utils/features/matchup-details";
 import { nhlGameStatus } from "@gshl-utils/features/nhl";
 import { TableViewport } from "@gshl-ui";
 import type {
@@ -57,6 +62,26 @@ export function PlayerStatsTable({
     playerDays,
     categories: seasonCategories,
   });
+  const injuryReport = useInjuryReport();
+  const injuries = injuryReport.data?.injuries ?? [];
+  const currentDailySlots = new Map(
+    playerDays
+      .filter((player) => player.date === table.schedule.selectedDay?.date)
+      .map((player) => [player.id, player.dailyPos]),
+  );
+  const playersByInjury = sortMatchupPlayersByInjury(
+    table.players.map((player) => ({
+      ...player,
+      dailyPos: player.dailyPos ?? currentDailySlots.get(player.id),
+    })),
+    injuries,
+  );
+  const activePlayers = playersByInjury.filter(
+    (player) => !matchupPlayerInjuryDesignation(player, injuries),
+  );
+  const injuredPlayers = playersByInjury.filter((player) =>
+    Boolean(matchupPlayerInjuryDesignation(player, injuries)),
+  );
   const { schedule, isActive, columns } = table;
   const tableColumns: (
     | PlayerStatColumn
@@ -281,130 +306,234 @@ export function PlayerStatsTable({
                 </td>
               </tr>
             ) : (
-              table.players.map((player) => (
-                <tr
-                  key={player.id}
-                  className={`group border-b border-slate-200 transition-colors last:border-0 hover:bg-slate-100 ${isActive && playerActivity(player, schedule.games) === "live" ? "bg-emerald-50/60" : "odd:bg-white even:bg-slate-50/70"}`}
-                >
-                  {tableColumns.map((column) => {
-                    if (column.key === "today")
-                      return (
-                        <td key="today" className={getColumnClassName("today")}>
-                          {schedule.isLoading ? (
-                            <span className="text-slate-400">Loading…</span>
-                          ) : table.hasToday &&
-                            !table.todayIds.has(player.id) ? (
-                            <span className="text-[10px] text-slate-400">
-                              Off roster today
-                            </span>
-                          ) : !schedule.data ? (
-                            <span className="text-slate-400">Unavailable</span>
-                          ) : !schedule.data.published ? (
-                            <span className="text-slate-400">
-                              Not scheduled
-                            </span>
-                          ) : getPlayerTodayGames(player, schedule.games)
-                              .length === 0 ? (
-                            <span
-                              aria-label="No game today"
-                              className="text-slate-400"
-                            >
-                              —
-                            </span>
-                          ) : (
-                            getPlayerTodayGames(player, schedule.games).map(
-                              (game) => (
-                                <Link
-                                  key={game.id}
-                                  href={`/nhl/matchup/${game.id}`}
-                                  prefetch={false}
-                                  aria-label={`${formatMatchupPlayerName(player)}: ${game.awayTeam.abbrev} at ${game.homeTeam.abbrev}. ${nhlGameStatus(game)}. View NHL matchup.`}
-                                  title={`${game.awayTeam.abbrev} at ${game.homeTeam.abbrev} · ${nhlGameStatus(game)}`}
-                                  className="inline-flex min-h-6 items-center justify-center gap-1 rounded px-1 text-blue-700 hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
-                                >
-                                  <NHLLogo
-                                    team={{
-                                      name: game.awayTeam.abbrev,
-                                      logoUrl: "",
-                                    }}
-                                    size={18}
-                                    className="!mx-0 shrink-0"
-                                  />
-                                  <span
-                                    aria-hidden="true"
-                                    className="text-[10px] text-slate-400"
+              <>
+                {activePlayers.map((player) => (
+                  <tr
+                    key={player.id}
+                    className={`group border-b border-slate-200 transition-colors last:border-0 hover:bg-slate-100 ${isActive && playerActivity(player, schedule.games) === "live" ? "bg-emerald-50/60" : "odd:bg-white even:bg-slate-50/70"}`}
+                  >
+                    {tableColumns.map((column) => {
+                      if (column.key === "today")
+                        return (
+                          <td
+                            key="today"
+                            className={getColumnClassName("today")}
+                          >
+                            {schedule.isLoading ? (
+                              <span className="text-slate-400">Loading…</span>
+                            ) : table.hasToday &&
+                              !table.todayIds.has(player.id) ? (
+                              <span className="text-[10px] text-slate-400">
+                                Off roster today
+                              </span>
+                            ) : !schedule.data ? (
+                              <span className="text-slate-400">
+                                Unavailable
+                              </span>
+                            ) : !schedule.data.published ? (
+                              <span className="text-slate-400">
+                                Not scheduled
+                              </span>
+                            ) : getPlayerTodayGames(player, schedule.games)
+                                .length === 0 ? (
+                              <span
+                                aria-label="No game today"
+                                className="text-slate-400"
+                              >
+                                —
+                              </span>
+                            ) : (
+                              getPlayerTodayGames(player, schedule.games).map(
+                                (game) => (
+                                  <Link
+                                    key={game.id}
+                                    href={`/nhl/matchup/${game.id}`}
+                                    prefetch={false}
+                                    aria-label={`${formatMatchupPlayerName(player)}: ${game.awayTeam.abbrev} at ${game.homeTeam.abbrev}. ${nhlGameStatus(game)}. View NHL matchup.`}
+                                    title={`${game.awayTeam.abbrev} at ${game.homeTeam.abbrev} · ${nhlGameStatus(game)}`}
+                                    className="inline-flex min-h-6 items-center justify-center gap-1 rounded px-1 text-blue-700 hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
                                   >
-                                    @
-                                  </span>
-                                  <NHLLogo
-                                    team={{
-                                      name: game.homeTeam.abbrev,
-                                      logoUrl: "",
-                                    }}
-                                    size={18}
-                                    className="!mx-0 shrink-0"
-                                  />
-                                  <span className="ml-1 text-[10px] text-slate-500">
-                                    {nhlGameStatus(game)}
-                                    {typeof game.awayTeam.score === "number" &&
-                                    typeof game.homeTeam.score === "number"
-                                      ? ` · ${game.awayTeam.score}–${game.homeTeam.score}`
-                                      : ""}
-                                  </span>
-                                </Link>
-                              ),
-                            )
-                          )}
+                                    <NHLLogo
+                                      team={{
+                                        name: game.awayTeam.abbrev,
+                                        logoUrl: "",
+                                      }}
+                                      size={18}
+                                      className="!mx-0 shrink-0"
+                                    />
+                                    <span
+                                      aria-hidden="true"
+                                      className="text-[10px] text-slate-400"
+                                    >
+                                      @
+                                    </span>
+                                    <NHLLogo
+                                      team={{
+                                        name: game.homeTeam.abbrev,
+                                        logoUrl: "",
+                                      }}
+                                      size={18}
+                                      className="!mx-0 shrink-0"
+                                    />
+                                    <span className="ml-1 text-[10px] text-slate-500">
+                                      {nhlGameStatus(game)}
+                                      {typeof game.awayTeam.score ===
+                                        "number" &&
+                                      typeof game.homeTeam.score === "number"
+                                        ? ` · ${game.awayTeam.score}–${game.homeTeam.score}`
+                                        : ""}
+                                    </span>
+                                  </Link>
+                                ),
+                              )
+                            )}
+                          </td>
+                        );
+                      const cellClassName = [
+                        getColumnClassName(column.key, column.className),
+                        column.key === "player"
+                          ? "group-hover:bg-slate-100"
+                          : "",
+                      ].join(" ");
+                      const isTodayNonAppearance =
+                        table.view === "today" && Number(player.GP) <= 0;
+                      const isPlayerIdentityColumn =
+                        column.key === "player" ||
+                        column.key === "pos" ||
+                        column.key === "dailyPos";
+                      const content =
+                        table.view === "today" &&
+                        (!table.hasToday || isTodayNonAppearance) &&
+                        !isPlayerIdentityColumn
+                          ? "—"
+                          : renderPlayerStatCell(player, column.key);
+
+                      return column.key === "player" ? (
+                        <th
+                          key={`${player.id}-${column.key}`}
+                          scope="row"
+                          className={cellClassName}
+                          aria-label={formatMatchupPlayerName(player)}
+                        >
+                          <div className="flex min-w-0 items-center gap-1.5">
+                            {renderNhlTeamCell(player)}
+                            <span
+                              className="truncate"
+                              title={formatMatchupPlayerName(player)}
+                            >
+                              {abbreviatePlayerName(content)}
+                            </span>
+                          </div>
+                        </th>
+                      ) : (
+                        <td
+                          key={`${player.id}-${column.key}`}
+                          className={cellClassName}
+                        >
+                          {content}
+                          {table.view === "week" && column.key !== "Rating" ? (
+                            <PerformanceRecordBadge
+                              records={records}
+                              entityId={(team?.id ?? "") + ":" + player.id}
+                              stat={column.key}
+                              value={content}
+                            />
+                          ) : null}
                         </td>
                       );
-                    const cellClassName = [
-                      getColumnClassName(column.key, column.className),
-                      column.key === "player" ? "group-hover:bg-slate-100" : "",
-                    ].join(" ");
-                    const content =
-                      table.view === "today" &&
-                      !table.hasToday &&
-                      column.key !== "player" &&
-                      column.key !== "pos"
-                        ? "—"
-                        : renderPlayerStatCell(player, column.key);
-
-                    return column.key === "player" ? (
-                      <th
-                        key={`${player.id}-${column.key}`}
-                        scope="row"
-                        className={cellClassName}
-                        aria-label={formatMatchupPlayerName(player)}
-                      >
-                        <div className="flex min-w-0 items-center gap-1.5">
-                          {renderNhlTeamCell(player)}
-                          <span
-                            className="truncate"
-                            title={formatMatchupPlayerName(player)}
+                    })}
+                  </tr>
+                ))}
+                {injuredPlayers.length > 0 ? (
+                  <tr className="border-y border-red-100 bg-red-50/70">
+                    <td
+                      colSpan={tableColumns.length}
+                      className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-[0.12em] text-red-700 sm:px-4 sm:text-xs"
+                    >
+                      Injured players
+                    </td>
+                  </tr>
+                ) : null}
+                {injuredPlayers.map((player) => (
+                  <tr
+                    key={player.id}
+                    className="group border-b border-red-100 bg-red-50/40 transition-colors hover:bg-red-50"
+                  >
+                    {tableColumns.map((column) => {
+                      if (column.key === "today")
+                        return (
+                          <td
+                            key="today"
+                            className={getColumnClassName("today")}
                           >
-                            {abbreviatePlayerName(content)}
-                          </span>
-                        </div>
-                      </th>
-                    ) : (
-                      <td
-                        key={`${player.id}-${column.key}`}
-                        className={cellClassName}
-                      >
-                        {content}
-                        {table.view === "week" && column.key !== "Rating" ? (
-                          <PerformanceRecordBadge
-                            records={records}
-                            entityId={(team?.id ?? "") + ":" + player.id}
-                            stat={column.key}
-                            value={content}
-                          />
-                        ) : null}
-                      </td>
-                    );
-                  })}
-                </tr>
-              ))
+                            <span className="text-[10px] text-red-600">
+                              Injured
+                            </span>
+                          </td>
+                        );
+                      const cellClassName = [
+                        getColumnClassName(column.key, column.className),
+                        column.key === "player" ? "group-hover:bg-red-50" : "",
+                      ].join(" ");
+                      const isTodayNonAppearance =
+                        table.view === "today" && Number(player.GP) <= 0;
+                      const isPlayerIdentityColumn =
+                        column.key === "player" ||
+                        column.key === "pos" ||
+                        column.key === "dailyPos";
+                      const content =
+                        table.view === "today" &&
+                        (!table.hasToday || isTodayNonAppearance) &&
+                        !isPlayerIdentityColumn
+                          ? "—"
+                          : renderPlayerStatCell(player, column.key);
+                      const designation = matchupPlayerInjuryDesignation(
+                        player,
+                        injuries,
+                      );
+
+                      return column.key === "player" ? (
+                        <th
+                          key={`${player.id}-${column.key}`}
+                          scope="row"
+                          className={cellClassName}
+                          aria-label={formatMatchupPlayerName(player)}
+                        >
+                          <div className="flex min-w-0 items-center gap-1.5">
+                            {renderNhlTeamCell(player)}
+                            <span
+                              className="truncate text-red-700"
+                              title={formatMatchupPlayerName(player)}
+                            >
+                              {abbreviatePlayerName(content)}
+                            </span>
+                            {designation ? (
+                              <span className="inline-flex shrink-0 rounded bg-red-100 px-1 py-0.5 text-[10px] font-semibold leading-tight text-red-700">
+                                {designation}
+                              </span>
+                            ) : null}
+                          </div>
+                        </th>
+                      ) : (
+                        <td
+                          key={`${player.id}-${column.key}`}
+                          className={cellClassName}
+                        >
+                          {content}
+                          {table.view === "week" && column.key !== "Rating" ? (
+                            <PerformanceRecordBadge
+                              records={records}
+                              entityId={(team?.id ?? "") + ":" + player.id}
+                              stat={column.key}
+                              value={content}
+                            />
+                          ) : null}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </>
             )}
           </tbody>
         </table>
